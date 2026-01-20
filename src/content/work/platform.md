@@ -1,7 +1,7 @@
 ---
 title: Félicité Smart Data Services - 2023
 publishDate: 2023-12-15 00:00:00
-img: /portfolio/assets/U2P-Platform.jpg
+img: /website/assets/U2P-Platform.jpg
 img_alt: Application WebGl Félicité
 description: |
   Pour représenter en 3D les divers espaces d'une grande structure, j'ai travaillé sur un outil qui permet de séparer les différentes parties d'un gros bâtiment

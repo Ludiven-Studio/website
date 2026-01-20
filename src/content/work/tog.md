@@ -1,7 +1,7 @@
 ---
 title: Trails of Gold - 2021
 publishDate: 2021-12-16 00:00:00
-img: /portfolio/assets/TrailsOfGold.jpg
+img: /website/assets/TrailsOfGold.jpg
 img_alt: Jeux VR Trails of Gold
 description: |
   J'ai participé à la réalisation de ce jeu de pirate multijoueur en VR, pour les salles d'Arcade et aussi pour la version Steam.
