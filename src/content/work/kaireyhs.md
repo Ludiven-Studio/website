@@ -1,7 +1,7 @@
 ---
 title: Kaireyhs - 2022
 publishDate: 2022-07-15 00:00:00
-img: /website/assets/Kaireyhs.jpg
+img: /assets/Kaireyhs.jpg
 img_alt: Jeux VR Kaireyhs
 description: |
   Après le jeu de pirate "Trails of Gold", un jeu de Tower Defense futuriste a été développé par La Suite Studio" : "Kaireyhs".

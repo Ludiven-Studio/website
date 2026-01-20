@@ -1,7 +1,7 @@
 ---
 title: Hocus Puzzle - 2017
 publishDate: 2017-05-24 00:00:00
-img: /website/assets/HocusPuzzle.jpg
+img: /assets/HocusPuzzle.jpg
 img_alt: Bigpoint - Hocus Puzzle
 description: |
   Suite au rachat de Little Worlds Studio par Bigpoint, nous avons continué de développer le jeu démarré dans le studio précédent et qui s'intitulait "Mana Crusher".

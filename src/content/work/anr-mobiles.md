@@ -1,7 +1,7 @@
 ---
 title: ANR Mobiles - 2024
 publishDate: 2024-03-28 00:00:00
-img: /website/assets/ANR-Mobiles.jpg
+img: /assets/ANR-Mobiles.jpg
 img_alt: Application ANR-Mobiles
 description: |
   J'ai développé une application pour l'Agence Nationale de Recherche sur Android et iOS, disponible sur les stores, destinés aux étudiants étrangers de Lyon qui découvrent la ville.

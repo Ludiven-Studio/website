@@ -1,7 +1,7 @@
 ---
 title: Axon - Challenge Your Brain - 2017
 publishDate: 2017-08-16 00:00:00
-img: /website/assets/axon.jpg
+img: /assets/axon.jpg
 img_alt: Bigpoint - Axon
 description: |
   Avec la société Bigpoint Lyon, nous avons réalisé un jeu de type logigramme avec beaucoup de mécaniques en plus qui viennent ajouter des défis supplémentaires à ce type de jeu
