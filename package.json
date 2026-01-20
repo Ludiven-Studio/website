@@ -10,8 +10,21 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^4.5.12",
     "@astrojs/check": "^0.5.10",
+    "astro": "^5.16.11",
     "typescript": "^5.4.3"
-  }
+  },
+  "description": "```sh\r npm create astro@latest -- --template portfolio\r ```",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ludiven-Studio/website.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Ludiven-Studio/website/issues"
+  },
+  "homepage": "https://github.com/Ludiven-Studio/website#readme"
 }
