@@ -5,81 +5,83 @@ import ContactCTA from '../components/ContactCTA.astro';
 import Hero from '../components/Hero.astro';
 ---
 
-<BaseLayout title="Parcours | Raphael Benedetto" description="About Raphael Benedetto">
+<BaseLayout title="À propos | Ludiven Studio" description="Découvrez Ludiven Studio, notre vision et nos valeurs">
 	<div class="stack gap-20">
 		<main class="wrapper about">
 			<Hero
-				title="Parcours"
-				tagline="Découvrez en plus sur mon parcours, mes études et mes compétences"
+				title="À propos"
+				tagline="Ludiven Studio, un studio qui joint l'utile à l'agréable pour des projets qui font avancer les choses"
 			>
 				<img
 					width="1553"
 					height="873"
 					src="/assets/code-fx.jpg"
-					alt="Raphael Benedetto code"
+					alt="Ludiven Studio"
 				/>
 			</Hero>
 
 			<section>
-				<h2 class="section-title">Parcours</h2>
+				<h2 class="section-title">Notre vision</h2>
 				<div class="content">
 					<p>
-						Après plus de 10 ans de programmation de jeux-vidéos sur PC, mobiles, Nintendo DS, ... 
-						je me suis tourné vers le monde plus concret du bâtiment et des jumeaux numériques avec le pilotage d'objets connectés 
-						et leur représentation dans des espaces en 3D permettant de visualiser les données des bâtiments.
+						Ludiven Studio est un studio de développement dédié à la création d'applications,
+						de jeux et d'expériences numériques. Notre ambition&nbsp;: concevoir des projets
+						qui allient sérieux et plaisir, et qui apportent une vraie valeur à celles et ceux qui les utilisent.
 					</p>
 					<br>
 					<p>
-						Mais j'ai toujours gardé un pied dans le monde du jeu vidéo en aidant un ancien collègue à réaliser des jeux multijoueurs
-						en VR pour des salles d'arcade. Finalement, ayant goût à découvrir de nouvelles choses, je me suis lancé en Freelance pour réaliser 
-						divers projets et en ayant aussi l'envie de développer mes propres jeux ou applications.
+						Que ce soit pour vous accompagner dans la réalisation d'un projet, inventer un nouveau gameplay,
+						ou construire un outil qui rend un sujet complexe plus accessible, nous mettons le soin du détail
+						et la rigueur technique au service de vos idées.
 					</p>
 				</div>
 			</section>
+
 			<section>
-				<h2 class="section-title">Etudes</h2>
+				<h2 class="section-title">Nos centres d'intérêt</h2>
 				<div class="content">
-					<table >
+					<table>
 						<tr>
-							<th>2001</th>
-							<th>DEUG Mathématiques et Informatique Appliquées aux Sciences à UCB Lyon 1 de Villeurbanne</th>
+							<th>Accompagnement</th>
+							<th>Vous guider dans la réalisation de vos applications et projets numériques</th>
 						</tr>
 						<tr>
-							<th>2002</th>
-							<th>DUT Informatique à l'IUT A Lyon 1 de Villeurbanne</th>
+							<th>Ludo-éducatif</th>
+							<th>Allier le divertissement et l'apprentissage de façon ludique</th>
 						</tr>
 						<tr>
-							<th>2005</th>
-							<th>MASTER 2 Informatique spécialité Images obtenu à l'UCB Lyon 1 de Villeurbanne</th>
+							<th>Gameplay</th>
+							<th>Faire découvrir de nouveaux gameplay et le plaisir de s'amuser</th>
+						</tr>
+						<tr>
+							<th>Utile & agréable</th>
+							<th>Concevoir des projets sérieux qui font avancer les choses</th>
 						</tr>
 					</table>
 				</div>
 			</section>
+
 			<section>
-				<h2 class="section-title">Compétences</h2>
+				<h2 class="section-title">Expertises</h2>
 				<div class="content">
-					<table >
+					<table>
 						<tr>
-							<th>Points forts</th>
-							<th>Mathématiques, Logique, Analyse, Écoute des besoins, Réalisation, Debug</th>
+							<th>Plateformes</th>
+							<th>PC, Mac, Android, iPhone, Web, Casques VR, Consoles</th>
 						</tr>
 						<tr>
-							<th>Langages</th>
-							<th>C#, C/C++, PHP, Symfony, API Platform, Java, Javascript, AS3, XML, SQL, HLSL</th>
+							<th>Technologies</th>
+							<th>Unity 3D, C#, C/C++, PHP, Symfony, API Platform, Java, JavaScript, SQL, HLSL</th>
 						</tr>
 						<tr>
-							<th>Logiciels</th>
-							<th>Unity 3D, Visual Studio, VS Code, Git, SVN, Perforce, FMOD, Photoshop, Maya, Word, Excel</th>
+							<th>Domaines</th>
+							<th>Jeux-vidéos, applications mobiles, réalité virtuelle, jumeaux numériques, objets connectés</th>
 						</tr>
 						<tr>
-							<th>Systèmes</th>
-							<th>Windows, Mac, Linux, Raspberry Pi</th>
+							<th>Méthodes</th>
+							<th>Approche Agile / Scrum, intégration continue, tests, versionning</th>
 						</tr>
-						<tr>
-							<th>Langues</th>
-							<th>Anglais (niveau professionnel général, lu, écrit, oral)</th>
-						</tr>
-					</table>					
+					</table>
 				</div>
 			</section>
 		</main>
@@ -99,6 +101,10 @@ import Hero from '../components/Hero.astro';
 		margin-top: 1.5rem;
 		border-radius: 1.5rem;
 		box-shadow: var(--shadow-md);
+		width: 100%;
+		aspect-ratio: 1553 / 680;
+		object-fit: cover;
+		object-position: top;
 	}
 
 	section {

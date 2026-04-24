@@ -4,8 +4,8 @@ publishDate: 2021-12-16 00:00:00
 img: /assets/TrailsOfGold.jpg
 img_alt: Jeux VR Trails of Gold
 description: |
-  J'ai participé à la réalisation de ce jeu de pirate multijoueur en VR, pour les salles d'Arcade et aussi pour la version Steam.
-  Au départ, c'était juste pour donner un coup de main à un ancien collègue et c'est devenu ensuite une aventure de plusieurs années de développement.
+  Participation à la réalisation de ce jeu de pirate multijoueur en VR, pour les salles d'Arcade et aussi pour la version Steam.
+  Ce qui était au départ une collaboration ponctuelle est devenu une aventure de plusieurs années de développement.
 tags:
   - Unity
   - Arcade

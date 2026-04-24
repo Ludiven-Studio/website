@@ -4,7 +4,7 @@ publishDate: 2023-12-15 00:00:00
 img: /assets/U2P-Platform.jpg
 img_alt: Application WebGl Félicité
 description: |
-  Pour représenter en 3D les divers espaces d'une grande structure, j'ai travaillé sur un outil qui permet de séparer les différentes parties d'un gros bâtiment
+  Pour représenter en 3D les divers espaces d'une grande structure, développement d'un outil qui permet de séparer les différentes parties d'un gros bâtiment
   en plusieurs blocs, qui chacun comporte des étages. Chaque étage est ensuite "ouvrable" pour voir apparaitre les différentes pièces et afficher des valeurs de températures, luminosité, energie, ... avec des codes couleurs préétablis.
 tags:
   - Unity
@@ -16,7 +16,7 @@ tags:
 
 L’application <a href ="https://felicite-sds.opencaps.io/login-sso" target="_blank">Félicité Smart Data Services</a> déveoppé par 
 <a href="https://www.opencaps.io/" target="_blank"> OpenCaps </a> permet de naviguer au sein d'un ensemble de bâtiments appelé "Félicité".
-Je me suis occupé de la partie 3D de cette navigation, réalisée avec Unity en WebGl et qui s'intègre dans un site réalisé avec VueJS.
+La partie 3D de cette navigation a été réalisée avec Unity en WebGL et s'intègre dans un site développé avec VueJS.
 Une communication a été mise en place avec des message JSON entre Unity et VueJS pour recevoir les données à afficher et réagir aux interractions de l'utilisateur.
 
 <div>

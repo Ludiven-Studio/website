@@ -4,7 +4,7 @@ publishDate: 2017-05-24 00:00:00
 img: /assets/HocusPuzzle.jpg
 img_alt: Bigpoint - Hocus Puzzle
 description: |
-  Suite au rachat de Little Worlds Studio par Bigpoint, nous avons continué de développer le jeu démarré dans le studio précédent et qui s'intitulait "Mana Crusher".
+  Suite au rachat de Little Worlds Studio par Bigpoint, le jeu démarré dans le studio précédent sous le nom "Mana Crusher" a poursuivi son développement.
 tags:
   - Unity
   - Android
@@ -21,7 +21,7 @@ tags:
       <li>Jeu développé par Bigpoint Lyon en 2017
       <li>Voici le <a href ="https://www.youtube.com/watch?v=mUjdVrOx15E>" target="_blank"> trailer du jeu</a>
       <li>Le jeu est toujours disponible sur l' <a href ="https://apps.apple.com/ca/app/hocus-puzzle/id952183548" target="_blank"> Apple Store</a>
-      <li>J'ai travaillé sur le gameplay et l'affichage des grilles
+      <li>Travail sur le gameplay et l'affichage des grilles
     </ul>
   </p>
 </div>

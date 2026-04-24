@@ -4,22 +4,24 @@ import Icon from './Icon.astro';
 
 <section class="box skills">
 	<div class="stack gap-2 lg:gap-4">
-		<Icon icon="terminal-window" color="var(--accent-regular)" size="2.5rem" gradient />
-		<h2>Vision en Réalité</h2>
-		<p>Ce qui me motive, c'est trouver comment retranscrire une idée, une sensation ou un comportement à l'écran</p>
-		<p>Avec Unity3D en C#, je converti votre vision en réalité sur diverses plateformes (PC, Mac, Android, Iphone, Web, Casques VR, Consoles)</p>
-	</div>
-	<div class="stack gap-2 lg:gap-4">
-		<Icon icon="trophy" color="var(--accent-regular)" size="2.5rem" gradient />
-		<h2>Du Dev à la Prod</h2>
-		<p>La chaine de prodution est importante surtout en travaillant en équipe avec du versionning, de l'intégration continue, des tests unitaires, ...</p>
-		<p>J'accompagne votre projet jusqu'à la mise en ligne (Google Play, Apple Store, Steam, ...)</p>
-	</div>
-	<div class="stack gap-2 lg:gap-4">
 		<Icon icon="strategy" color="var(--accent-regular)" size="2.5rem" gradient />
-		<h2>Satisfaction client</h2>
-		<p>Je prends en compte vos retours au fur et à mesure du développement, dans le but de vous satisfaire au mieux</p>
-		<p>J'ai suivi une formation Scrum Master et j'aime mettre en pratique la méthode Agile</p>
+		<h2>Accompagnement sur-mesure</h2>
+		<p>Nous vous accompagnons dans la réalisation de vos applications et projets numériques, de l'idée initiale à la mise en production</p>
+	</div>
+	<div class="stack gap-2 lg:gap-4">
+		<Icon icon="pencil-line" color="var(--accent-regular)" size="2.5rem" gradient />
+		<h2>Apprendre en s'amusant</h2>
+		<p>Nous aimons allier le divertissement et l'apprentissage de façon ludique pour rendre les savoirs accessibles à tous</p>
+	</div>
+	<div class="stack gap-2 lg:gap-4">
+		<Icon icon="games" color="var(--accent-regular)" size="2.5rem" gradient />
+		<h2>Nouveaux gameplay</h2>
+		<p>Nous aimons faire découvrir de nouveaux gameplay et créer des expériences de jeu originales dans lesquelles on prend plaisir à s'amuser</p>
+	</div>
+	<div class="stack gap-2 lg:gap-4">
+		<Icon icon="heart" color="var(--accent-regular)" size="2.5rem" gradient />
+		<h2>L'utile à l'agréable</h2>
+		<p>Nous concevons des projets sérieux qui font avancer les choses, tout en restant agréables à utiliser au quotidien</p>
 	</div>
 </section>
 
@@ -54,8 +56,8 @@ import Icon from './Icon.astro';
 
 		.skills {
 			display: grid;
-			grid-template-columns: repeat(3, 1fr);
-			gap: 5rem;
+			grid-template-columns: repeat(2, 1fr);
+			gap: 3rem 5rem;
 		}
 
 		.skills h2 {

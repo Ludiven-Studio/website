@@ -30,22 +30,22 @@ const projects = (await getCollection('work'))
 		<div class="wrapper stack gap-8 lg:gap-20">
 			<header class="hero">
 				<Hero
-					title="Hello, je m'appelle Raphael Benedetto"
-					tagline="Je suis Développeur Informatique Unity3D Senior"
+					title="Bienvenue chez Ludiven Studio"
+					tagline="Le studio qui allie l'utile à l'agréable pour vos projets numériques, jeux et applications"
 					align="start"
 				>
 					<div class="roles">
-						<Pill><Icon icon="games" size="1.33em" /> Jeux-Vidéos</Pill>						
+						<Pill><Icon icon="games" size="1.33em" /> Jeux-Vidéos</Pill>
 						<Pill><Icon icon="mobile" size="1.33em" /> Applications mobiles</Pill>
 						<Pill><Icon icon="virtual-reality" size="1.33em" /> Réalité Virtuelle</Pill>
 					</div>
 				</Hero>
 
 				<img
-					alt="Raphael Benedetto Portrait"
-					width="390"
-					height="520"
-					src="/assets/portrait.jpg"
+					alt="Ludiven Studio"
+					width="520"
+					height="390"
+					src="/assets/LudivenStudioLogo.png"
 				/>
 			</header>
 
@@ -55,8 +55,8 @@ const projects = (await getCollection('work'))
 		<main class="wrapper stack gap-20 lg:gap-48">
 			<section class="section with-background with-cta">
 				<header class="section-header stack gap-2 lg:gap-4">
-					<h3>Mes derniers projets</h3>
-					<p>Découvrez mes derniers projets réalisés lors de missions, dans mes précédents emplois ou pour moi-même</p>
+					<h3>Nos derniers projets</h3>
+					<p>Découvrez les derniers projets réalisés par le studio et nos collaborations</p>
 				</header>
 
 				<div class="gallery">
@@ -73,7 +73,7 @@ const projects = (await getCollection('work'))
 
 				<div class="cta">
 					<CallToAction href="/work/">
-						Tous mes projets
+						Tous nos projets
 						<Icon icon="arrow-right" size="1.2em" />
 					</CallToAction>
 				</div>
@@ -120,11 +120,15 @@ const projects = (await getCollection('work'))
 	}
 
 	.hero img {
-		aspect-ratio: 3 / 4;
-		object-fit: cover;
-		object-position: top;
-		border-radius: 2.5rem;
-		box-shadow: var(--shadow-md);
+		width: 100%;
+		max-width: 28rem;
+		height: auto;
+		object-fit: contain;
+		mix-blend-mode: multiply;
+	}
+
+	:global(.theme-dark) .hero img {
+		mix-blend-mode: screen;
 	}
 
 	@media (min-width: 50em) {
@@ -133,6 +137,7 @@ const projects = (await getCollection('work'))
 			grid-template-columns: 6fr 4fr;
 			padding-inline: 2.5rem;
 			gap: 3.75rem;
+			align-items: center;
 		}
 
 		.roles {
@@ -142,9 +147,7 @@ const projects = (await getCollection('work'))
 		}
 
 		.hero img {
-			aspect-ratio: 3 / 4;
-			border-radius: 4.5rem;
-			object-fit: cover;
+			max-width: 100%;
 		}
 	}
 
