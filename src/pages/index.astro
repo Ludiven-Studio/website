@@ -6,6 +6,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 // Component Imports
 import CallToAction from '../components/CallToAction.astro';
+import GameCard from '../components/GameCard.astro';
 import Grid from '../components/Grid.astro';
 import Hero from '../components/Hero.astro';
 import Icon from '../components/Icon.astro';
@@ -53,6 +54,50 @@ const projects = (await getCollection('work'))
 		</div>
 
 		<main class="wrapper stack gap-20 lg:gap-48">
+			<section class="section with-background with-cta">
+				<header class="section-header stack gap-2 lg:gap-4">
+					<h3>Jeux de logique</h3>
+					<p>Entraîne ta logique avec nos mini-jeux de déduction. Quelques minutes par jour, sans prise de tête.</p>
+				</header>
+
+				<div class="gallery">
+					<ul class="games-teaser">
+						<li>
+							<GameCard
+								title="Somme Toute"
+								pitch="Équilibre chaque ligne et chaque colonne pour atteindre la somme cible."
+								icon="strategy"
+								href="/jeux/somme-toute"
+								status="play"
+							/>
+						</li>
+						<li>
+							<GameCard
+								title="Sudoku"
+								pitch="Le grand classique de la logique en grille."
+								icon="games"
+								status="soon"
+							/>
+						</li>
+						<li class="teaser-extra">
+							<GameCard
+								title="Calcudoku"
+								pitch="Des cages avec une cible et une opération."
+								icon="terminal-window"
+								status="soon"
+							/>
+						</li>
+					</ul>
+				</div>
+
+				<div class="cta">
+					<CallToAction href="/jeux/">
+						Tous les jeux
+						<Icon icon="arrow-right" size="1.2em" />
+					</CallToAction>
+				</div>
+			</section>
+
 			<section class="section with-background with-cta">
 				<header class="section-header stack gap-2 lg:gap-4">
 					<h3>Nos derniers projets</h3>
@@ -229,6 +274,24 @@ const projects = (await getCollection('work'))
 
 		.cta {
 			grid-area: cta;
+		}
+	}
+
+	/* ====================================================== */
+
+	.games-teaser {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	@media (min-width: 50em) {
+		.games-teaser {
+			grid-template-columns: repeat(3, 1fr);
+			gap: 2rem;
 		}
 	}
 

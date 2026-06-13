@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import GameCard from '../../components/GameCard.astro';
+import type { iconPaths } from '../../components/IconPaths';
+
+interface GameTile {
+	title: string;
+	pitch: string;
+	icon: keyof typeof iconPaths;
+	href?: string;
+	status: 'play' | 'soon';
+}
+
+// One playable game for now, plus the platform's ambition as "soon" tiles.
+const games: GameTile[] = [
+	{
+		title: 'Somme Toute',
+		pitch: 'Équilibre chaque ligne et chaque colonne pour atteindre la somme cible. Pure déduction.',
+		icon: 'strategy',
+		href: '/jeux/somme-toute',
+		status: 'play',
+	},
+	{
+		title: 'Sudoku',
+		pitch: 'Le grand classique de la logique en grille. Bientôt jouable.',
+		icon: 'games',
+		status: 'soon',
+	},
+	{
+		title: 'Calcudoku',
+		pitch: 'Des cages avec une cible et une opération. Le Sudoku qui calcule.',
+		icon: 'terminal-window',
+		status: 'soon',
+	},
+	{
+		title: 'Le chemin',
+		pitch: 'Relie tous les points dans le bon ordre, façon Zip. Bientôt.',
+		icon: 'rocket-launch',
+		status: 'soon',
+	},
+	{
+		title: 'Suite mystère',
+		pitch: 'Devine la règle cachée et complète la séquence. Bientôt.',
+		icon: 'trophy',
+		status: 'soon',
+	},
+];
+---
+
+<BaseLayout
+	title="Jeux de logique | Ludiven Studio"
+	description="Une collection de mini-jeux de logique à entraîner chaque jour, signés Ludiven Studio."
+>
+	<div class="wrapper stack gap-8 lg:gap-20">
+		<header class="games-hero stack gap-2 lg:gap-4">
+			<h1>Jeux de logique</h1>
+			<p>
+				Des mini-jeux de déduction pensés pour aiguiser ta logique en quelques minutes.
+				Un seul pour l'instant — d'autres arrivent.
+			</p>
+		</header>
+
+		<ul class="games-grid">
+			{
+				games.map((game) => (
+					<li>
+						<GameCard
+							title={game.title}
+							pitch={game.pitch}
+							icon={game.icon}
+							href={game.href}
+							status={game.status}
+						/>
+					</li>
+				))
+			}
+		</ul>
+	</div>
+</BaseLayout>
+
+<style>
+	.games-hero {
+		text-align: center;
+		max-width: 50ch;
+		margin-inline: auto;
+		color: var(--gray-300);
+		font-size: var(--text-md);
+	}
+
+	.games-hero h1 {
+		font-size: var(--text-3xl);
+	}
+
+	.games-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	@media (min-width: 50em) {
+		.games-hero {
+			font-size: var(--text-lg);
+		}
+
+		.games-hero h1 {
+			font-size: var(--text-4xl);
+		}
+
+		.games-grid {
+			grid-template-columns: repeat(3, 1fr);
+			gap: 2rem;
+		}
+	}
+</style>
