@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, generateReines, type ReinesPuzzle } from './engine';
+import { DIFFS, generateReines, findConflicts, type ReinesPuzzle, type ConflictReason } from './engine';
+
+const REASON_LABEL: Record<ConflictReason, string> = {
+	ligne: 'sur la même ligne',
+	colonne: 'sur la même colonne',
+	zone: 'dans la même zone',
+	contact: 'qui se touchent',
+};
 
 /* =====================================================
    REINES (LinkedIn "Queens") — React island.
@@ -30,9 +37,6 @@ const PALETTE = [
 	'#f29ac9', // pink (only on 8×8)
 ];
 const regionColor = (id: number) => PALETTE[id % PALETTE.length];
-
-const adjacent = (r1: number, c1: number, r2: number, c2: number) =>
-	Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1;
 
 export default function ReinesGame() {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
@@ -72,26 +76,14 @@ export default function ReinesGame() {
 		return out;
 	}, [marks, size]);
 
-	/* Conflicting queens (same row / col / region / adjacent). */
-	const conflicts = useMemo(() => {
-		const set = new Set<string>();
-		for (let i = 0; i < queens.length; i++) {
-			for (let j = i + 1; j < queens.length; j++) {
-				const [r1, c1] = queens[i];
-				const [r2, c2] = queens[j];
-				if (
-					r1 === r2 ||
-					c1 === c2 ||
-					regions[r1][c1] === regions[r2][c2] ||
-					adjacent(r1, c1, r2, c2)
-				) {
-					set.add(`${r1},${c1}`);
-					set.add(`${r2},${c2}`);
-				}
-			}
-		}
-		return set;
-	}, [queens, regions]);
+	/* Conflicting queens (same row / col / region / adjacent) — pure & tested. */
+	const conflictInfo = useMemo(() => findConflicts(regions, queens), [regions, queens]);
+	const conflicts = conflictInfo.cells;
+	const conflictMessage = useMemo(() => {
+		if (conflictInfo.reasons.size === 0) return '';
+		const parts = [...conflictInfo.reasons].map((r) => REASON_LABEL[r]);
+		return `Conflit : des reines ${parts.join(' · ')}.`;
+	}, [conflictInfo]);
 
 	/* Win: n queens, no conflicts. */
 	useEffect(() => {
@@ -156,7 +148,12 @@ export default function ReinesGame() {
 							return (
 								<button
 									key={`${r}-${c}`}
-									className={['rn-cell', bad ? 'bad' : '', status === 'won' ? 'wondone' : ''].join(' ')}
+									className={[
+										'rn-cell',
+										bad ? 'bad' : '',
+										conflictInfo.regions.has(regions[r][c]) ? 'creg' : '',
+										status === 'won' ? 'wondone' : '',
+									].join(' ')}
 									style={{
 										backgroundColor: regionColor(regions[r][c]),
 										borderRight:
@@ -192,8 +189,10 @@ export default function ReinesGame() {
 				)}
 			</div>
 
+			<p className="rn-msg" role="status" aria-live="polite">{conflictMessage}</p>
+
 			<p className="rn-help">
-				Touche une case pour cycler : vide → point → reine ♛. Place exactement une reine par
+				Touche une case pour cycler : vide → croix → reine ♛. Place exactement une reine par
 				ligne, colonne et couleur, sans que deux reines se touchent (même en diagonale).
 			</p>
 		</div>
@@ -208,7 +207,7 @@ const CSS = `
   --rn-ok: #1f7a4d;
   --rn-bad: #d33a2c;
   --rn-ink: #23262e;            /* glyphs, readable on every pastel cell */
-  --rn-line: rgba(20, 24, 33, 0.08);  /* faint cell separation, not a wall */
+  --rn-line: rgba(35, 39, 48, 0.30);  /* visible cell grid, lighter than walls */
   --rn-line-strong: #2b2f3a;    /* region walls (theme-independent board) */
   --rn-cell: clamp(34px, calc(min(440px, 88vw) / var(--n, 6)), 56px);
 
@@ -272,12 +271,17 @@ const CSS = `
   transition: filter 0.08s ease;
 }
 .rn-cell:active { filter: brightness(0.93); }
+.rn-cell.creg { box-shadow: inset 0 0 0 2px rgba(211, 58, 44, 0.55); }
 .rn-cell.bad { color: var(--rn-bad); box-shadow: inset 0 0 0 3px var(--rn-bad); z-index: 1; }
 .rn-cell.wondone { color: var(--rn-ok); }
 
+.rn-msg {
+  min-height: 1.2em; margin-top: 1rem; text-align: center;
+  color: var(--rn-bad); font-weight: 600; font-size: 13.5px;
+}
 .rn-help {
   max-width: 420px; text-align: center; color: var(--gray-300);
-  font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem;
+  font-size: 12.5px; line-height: 1.5; margin-top: 0.5rem;
 }
 
 .rn-win {

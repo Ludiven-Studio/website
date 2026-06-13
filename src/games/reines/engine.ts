@@ -120,6 +120,48 @@ function growRegions(n: number, solution: number[], rng: Rng): number[][] {
 const adjacent = (r1: number, c1: number, r2: number, c2: number) =>
 	Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1;
 
+export type ConflictReason = 'ligne' | 'colonne' | 'zone' | 'contact';
+
+export interface Conflicts {
+	cells: Set<string>; // "r,c" of every queen in conflict
+	reasons: Set<ConflictReason>;
+	regions: Set<number>; // region ids holding 2+ queens
+}
+
+/**
+ * Pure conflict check shared by the UI and the tests.
+ * Two queens conflict if they share a row, a column, a colour region, or are
+ * adjacent (the 8 surrounding cells).
+ */
+export function findConflicts(regions: number[][], queens: [number, number][]): Conflicts {
+	const cells = new Set<string>();
+	const reasons = new Set<ConflictReason>();
+	const regionCount = new Map<number, number>();
+	for (const [r, c] of queens)
+		regionCount.set(regions[r][c], (regionCount.get(regions[r][c]) ?? 0) + 1);
+
+	for (let i = 0; i < queens.length; i++) {
+		for (let j = i + 1; j < queens.length; j++) {
+			const [r1, c1] = queens[i];
+			const [r2, c2] = queens[j];
+			let reason: ConflictReason | null = null;
+			if (r1 === r2) reason = 'ligne';
+			else if (c1 === c2) reason = 'colonne';
+			else if (regions[r1][c1] === regions[r2][c2]) reason = 'zone';
+			else if (adjacent(r1, c1, r2, c2)) reason = 'contact';
+			if (reason) {
+				cells.add(`${r1},${c1}`);
+				cells.add(`${r2},${c2}`);
+				reasons.add(reason);
+			}
+		}
+	}
+
+	const conflictRegions = new Set<number>();
+	for (const [id, n] of regionCount) if (n >= 2) conflictRegions.add(id);
+	return { cells, reasons, regions: conflictRegions };
+}
+
 /** Count solutions of a regions board, stopping at `limit`. */
 export function countSolutions(regions: number[][], n: number, limit = 2): number {
 	const cols = new Array(n).fill(false);
