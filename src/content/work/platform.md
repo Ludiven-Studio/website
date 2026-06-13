@@ -4,7 +4,7 @@ publishDate: 2023-12-15 00:00:00
 img: /assets/U2P-Platform.jpg
 img_alt: Application WebGl Félicité
 role: Développeur Unity / Web
-org: En indépendant
+org: U2P
 description: |
   Pour représenter en 3D les divers espaces d'une grande structure, développement d'un outil qui permet de séparer les différentes parties d'un gros bâtiment
   en plusieurs blocs, qui chacun comporte des étages. Chaque étage est ensuite "ouvrable" pour voir apparaitre les différentes pièces et afficher des valeurs de températures, luminosité, energie, ... avec des codes couleurs préétablis.
