@@ -28,21 +28,37 @@ const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		title: 'Reines',
+		pitch: 'Une reine par ligne, colonne et couleur, sans qu\'elles se touchent. À la LinkedIn Queens.',
+		icon: 'trophy',
+		href: '/jeux/reines',
+		status: 'play',
+	},
+	{
 		title: 'Calcudoku',
 		pitch: 'Des cages avec une cible et une opération. Le Sudoku qui calcule.',
 		icon: 'terminal-window',
-		status: 'soon',
+		href: '/jeux/calcudoku',
+		status: 'play',
 	},
 	{
 		title: 'Le chemin',
-		pitch: 'Relie tous les points dans le bon ordre, façon Zip. Bientôt.',
+		pitch: 'Relie tous les nombres dans l\'ordre en remplissant la grille, façon Zip.',
 		icon: 'rocket-launch',
-		status: 'soon',
+		href: '/jeux/chemin',
+		status: 'play',
 	},
 	{
 		title: 'Suite mystère',
-		pitch: 'Devine la règle cachée et complète la séquence. Bientôt.',
-		icon: 'trophy',
+		pitch: 'Devine la règle cachée et complète la séquence. En choix multiple.',
+		icon: 'pencil-line',
+		href: '/jeux/suite',
+		status: 'play',
+	},
+	{
+		title: 'Suguru',
+		pitch: 'Des zones à remplir où deux cases voisines diffèrent toujours. Bientôt.',
+		icon: 'code',
 		status: 'soon',
 	},
 ];
@@ -57,7 +73,7 @@ const games: GameTile[] = [
 			<h1>Jeux de logique</h1>
 			<p>
 				Des mini-jeux de déduction pensés pour aiguiser ta logique en quelques minutes.
-				Un seul pour l'instant — d'autres arrivent.
+				Six à découvrir — et d'autres arrivent.
 			</p>
 		</header>
 
