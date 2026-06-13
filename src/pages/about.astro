@@ -5,7 +5,7 @@ import ContactCTA from '../components/ContactCTA.astro';
 import Hero from '../components/Hero.astro';
 ---
 
-<BaseLayout title="À propos | Ludiven Studio" description="Découvrez Ludiven Studio, notre vision et nos valeurs">
+<BaseLayout title="À propos | Ludiven Studio" description="Derrière Ludiven Studio : Raphaël, développeur — ma vision, mon parcours et mes expertises">
 	<div class="stack gap-20">
 		<main class="wrapper about">
 			<Hero
@@ -21,24 +21,58 @@ import Hero from '../components/Hero.astro';
 			</Hero>
 
 			<section>
-				<h2 class="section-title">Notre vision</h2>
+				<h2 class="section-title">Qui suis-je&nbsp;?</h2>
+				<div class="content">
+					<img class="portrait" src="/assets/portrait.jpg" alt="Raphaël, fondateur de Ludiven Studio" />
+					<p>
+						Je suis Raphaël, développeur et fondateur de Ludiven Studio. Derrière le studio, c'est
+						moi&nbsp;: un développeur passionné par le jeu vidéo, la réalité virtuelle et les
+						applications, qui aime concevoir des expériences à la fois sérieuses et agréables.
+					</p>
+					<br>
+					<p>
+						Ludiven Studio est ma structure pour porter mes propres projets — comme les jeux de
+						logique de ce site — tout en continuant d'accompagner les vôtres.
+					</p>
+				</div>
+			</section>
+
+			<section>
+				<h2 class="section-title">Mon parcours</h2>
 				<div class="content">
 					<p>
-						Ludiven Studio est un studio de développement dédié à la création d'applications,
-						de jeux et d'expériences numériques. Notre ambition&nbsp;: concevoir des projets
-						qui allient sérieux et plaisir, et qui apportent une vraie valeur à celles et ceux qui les utilisent.
+						J'ai d'abord travaillé en indépendant et en collaboration avec plusieurs studios et
+						structures — Bigpoint, La Suite Studio, Voskalia, l'ANR&nbsp;/ LIRIS, Meltyn ou encore
+						l'Université Claude Bernard Lyon&nbsp;1 — sur des jeux, des expériences VR et des
+						applications. Ces projets, présentés dans mes réalisations, témoignent de ce savoir-faire.
+					</p>
+					<br>
+					<p>
+						Ludiven Studio en est la suite naturelle&nbsp;: aujourd'hui solo, je conçois mes propres
+						projets et mets cette expérience au service des vôtres.
+					</p>
+				</div>
+			</section>
+
+			<section>
+				<h2 class="section-title">Ma vision</h2>
+				<div class="content">
+					<p>
+						Je conçois des applications, des jeux et des expériences numériques avec une ambition&nbsp;:
+						des projets qui allient sérieux et plaisir, et qui apportent une vraie valeur à celles et
+						ceux qui les utilisent.
 					</p>
 					<br>
 					<p>
 						Que ce soit pour vous accompagner dans la réalisation d'un projet, inventer un nouveau gameplay,
-						ou construire un outil qui rend un sujet complexe plus accessible, nous mettons le soin du détail
+						ou construire un outil qui rend un sujet complexe plus accessible, je mets le soin du détail
 						et la rigueur technique au service de vos idées.
 					</p>
 				</div>
 			</section>
 
 			<section>
-				<h2 class="section-title">Nos centres d'intérêt</h2>
+				<h2 class="section-title">Mes centres d'intérêt</h2>
 				<div class="content">
 					<table>
 						<tr>
@@ -105,6 +139,15 @@ import Hero from '../components/Hero.astro';
 		aspect-ratio: 1553 / 680;
 		object-fit: cover;
 		object-position: top;
+	}
+
+	.portrait {
+		float: right;
+		width: 11rem;
+		max-width: 40%;
+		aspect-ratio: 1 / 1;
+		margin: 0 0 1rem 1.5rem;
+		object-position: center;
 	}
 
 	section {

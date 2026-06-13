@@ -3,6 +3,8 @@ title: HealQuest - 2023
 publishDate: 2023-07-15 00:00:00
 img: /assets/HealQuest.jpg
 img_alt: Jeux VR HealQuest
+role: Développeur Unity
+org: Voskalia
 description: |
   Accompagnement de la société Voskalia, de Mai à Juillet 2023, dans l'intégration de mini-jeux sur l'île paradisiaque où se déroulent les exercices de remise en forme.
 tags:

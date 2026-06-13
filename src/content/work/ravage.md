@@ -3,6 +3,8 @@ title: Ravage K1S1 - 2023
 publishDate: 2023-01-15 00:00:00
 img: /assets/RavageK1S1.jpg
 img_alt: Jeux VR Ravage K1S1
+role: Développeur Unity
+org: La Suite Studio
 description: |
   Après "Trails of Gold" et "Kaireyhs", un jeu d'exploration futuriste a été développé par La Suite Studio : "Ravage K1S1".
   Nous avons réutilisé le même moteur et l'univers de "Kaireyhs" pour offrir une nouvelle aventure avec un côté plus terrifiant.

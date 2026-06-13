@@ -3,6 +3,8 @@ title: Hocus Puzzle - 2017
 publishDate: 2017-05-24 00:00:00
 img: /assets/HocusPuzzle.jpg
 img_alt: Bigpoint - Hocus Puzzle
+role: Développeur Unity
+org: Bigpoint
 description: |
   Suite au rachat de Little Worlds Studio par Bigpoint, le jeu démarré dans le studio précédent sous le nom "Mana Crusher" a poursuivi son développement.
 tags:

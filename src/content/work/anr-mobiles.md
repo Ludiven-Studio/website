@@ -3,6 +3,8 @@ title: ANR Mobiles - 2024
 publishDate: 2024-03-28 00:00:00
 img: /assets/ANR-Mobiles.jpg
 img_alt: Application ANR-Mobiles
+role: Développeur Unity
+org: ANR · LIRIS
 description: |
   Développement d'une application pour l'Agence Nationale de Recherche sur Android et iOS, disponible sur les stores, destinée aux étudiants étrangers de Lyon qui découvrent la ville.
   Les chercheurs du laboratoire LIRIS peuvent ainsi analyser les données et mettre en place un système de recommandations.

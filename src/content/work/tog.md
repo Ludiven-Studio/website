@@ -3,6 +3,8 @@ title: Trails of Gold - 2021
 publishDate: 2021-12-16 00:00:00
 img: /assets/TrailsOfGold.jpg
 img_alt: Jeux VR Trails of Gold
+role: Développeur Unity
+org: La Suite Studio
 description: |
   Participation à la réalisation de ce jeu de pirate multijoueur en VR, pour les salles d'Arcade et aussi pour la version Steam.
   Ce qui était au départ une collaboration ponctuelle est devenu une aventure de plusieurs années de développement.
