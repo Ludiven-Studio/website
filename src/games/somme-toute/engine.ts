@@ -4,7 +4,7 @@
  * Generator guarantees a unique solution by construction.
  */
 
-import type { Rng } from './prng';
+import type { Rng } from '../prng';
 
 export type Cell = number | null;
 export type Grid = Cell[][];

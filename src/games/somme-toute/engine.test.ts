@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DIFFS, generatePuzzle, countSolutions } from './engine';
-import { mulberry32, dateSeed } from './prng';
+import { mulberry32, dateSeed } from '../prng';
 
 describe('somme-toute engine', () => {
 	it('generates a uniquely-solvable puzzle for every difficulty', () => {
