@@ -16,7 +16,18 @@ const emptyMarks = (n: number): CellState[][] =>
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-const regionColor = (id: number, n: number) => `hsla(${Math.round((id * 360) / n)}, 65%, 52%, 0.28)`;
+// Fixed, clearly distinct palette (one solid colour per region, n <= 8).
+const PALETTE = [
+	'#f4a8a3', // coral
+	'#f7c674', // orange
+	'#f1e188', // yellow
+	'#a9d98a', // green
+	'#8ad2c6', // teal
+	'#9ec3f4', // blue
+	'#c4a8ee', // purple
+	'#f2a6d3', // pink
+];
+const regionColor = (id: number) => PALETTE[id % PALETTE.length];
 
 const adjacent = (r1: number, c1: number, r2: number, c2: number) =>
 	Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1;
@@ -103,7 +114,7 @@ export default function ReinesGame() {
 	);
 
 	const thin = '1px solid var(--rn-line)';
-	const thick = '2.5px solid var(--rn-line-strong)';
+	const thick = '3px solid var(--rn-line-strong)';
 
 	return (
 		<div className="rn-root">
@@ -145,7 +156,7 @@ export default function ReinesGame() {
 									key={`${r}-${c}`}
 									className={['rn-cell', bad ? 'bad' : '', status === 'won' ? 'wondone' : ''].join(' ')}
 									style={{
-										backgroundColor: regionColor(regions[r][c], size),
+										backgroundColor: regionColor(regions[r][c]),
 										borderRight:
 											c === size - 1 ? 'none' : regions[r][c] !== regions[r][c + 1] ? thick : thin,
 										borderBottom:
@@ -157,7 +168,7 @@ export default function ReinesGame() {
 									}`}
 									disabled={status === 'won'}
 								>
-									{st === 2 ? '♛' : st === 1 ? '·' : ''}
+									{st === 2 ? '♛' : st === 1 ? '✕' : ''}
 								</button>
 							);
 						}),
@@ -192,10 +203,11 @@ export default function ReinesGame() {
 const CSS = `
 .rn-root {
   --rn-accent: var(--accent-regular);
-  --rn-ok: #2f9e6f;
-  --rn-bad: #d9534f;
-  --rn-line: var(--gray-700);
-  --rn-line-strong: var(--gray-100);
+  --rn-ok: #1f7a4d;
+  --rn-bad: #d33a2c;
+  --rn-ink: #23262e;            /* glyphs, readable on every pastel cell */
+  --rn-line: rgba(20, 24, 33, 0.08);  /* faint cell separation, not a wall */
+  --rn-line-strong: #2b2f3a;    /* region walls (theme-independent board) */
   --rn-cell: clamp(34px, calc(min(440px, 88vw) / var(--n, 6)), 56px);
 
   width: 100%;
@@ -240,24 +252,25 @@ const CSS = `
 .rn-boardwrap { position: relative; }
 .rn-board {
   display: grid;
-  border: 2.5px solid var(--rn-line-strong);
+  border: 3px solid var(--rn-line-strong);
   border-radius: 8px;
   overflow: hidden;
-  background: var(--gray-999);
+  background: #fff;
 }
 .rn-cell {
+  position: relative;
   width: var(--rn-cell); height: var(--rn-cell);
   box-sizing: border-box; border: none;
   font: inherit; font-weight: 700;
   font-size: calc(var(--rn-cell) * 0.55);
   line-height: 1;
-  color: var(--gray-0);
+  color: var(--rn-ink);
   cursor: pointer; padding: 0;
   display: flex; align-items: center; justify-content: center;
   transition: filter 0.08s ease;
 }
-.rn-cell:active { filter: brightness(0.92); }
-.rn-cell.bad { color: #fff; background-color: var(--rn-bad) !important; }
+.rn-cell:active { filter: brightness(0.93); }
+.rn-cell.bad { color: var(--rn-bad); box-shadow: inset 0 0 0 3px var(--rn-bad); z-index: 1; }
 .rn-cell.wondone { color: var(--rn-ok); }
 
 .rn-help {
