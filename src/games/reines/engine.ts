@@ -137,17 +137,22 @@ export function findConflicts(regions: number[][], queens: [number, number][]): 
 	const cells = new Set<string>();
 	const reasons = new Set<ConflictReason>();
 	const regionCount = new Map<number, number>();
-	for (const [r, c] of queens)
-		regionCount.set(regions[r][c], (regionCount.get(regions[r][c]) ?? 0) + 1);
+	for (const [r, c] of queens) {
+		const id = regions[r]?.[c];
+		if (id === undefined) continue; // ignore out-of-bounds queens (defensive)
+		regionCount.set(id, (regionCount.get(id) ?? 0) + 1);
+	}
 
 	for (let i = 0; i < queens.length; i++) {
 		for (let j = i + 1; j < queens.length; j++) {
 			const [r1, c1] = queens[i];
 			const [r2, c2] = queens[j];
+			const reg1 = regions[r1]?.[c1];
+			const reg2 = regions[r2]?.[c2];
 			let reason: ConflictReason | null = null;
 			if (r1 === r2) reason = 'ligne';
 			else if (c1 === c2) reason = 'colonne';
-			else if (regions[r1][c1] === regions[r2][c2]) reason = 'zone';
+			else if (reg1 !== undefined && reg1 === reg2) reason = 'zone';
 			else if (adjacent(r1, c1, r2, c2)) reason = 'contact';
 			if (reason) {
 				cells.add(`${r1},${c1}`);

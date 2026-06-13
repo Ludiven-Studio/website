@@ -49,6 +49,11 @@ export default function ReinesGame() {
 
 	const { size, regions } = puzzle;
 
+	// Backstop: marks always match the current puzzle (no possible desync).
+	useEffect(() => {
+		setMarks(emptyMarks(puzzle.size));
+	}, [puzzle]);
+
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
 		setDiffKey(key);
@@ -84,6 +89,20 @@ export default function ReinesGame() {
 		const parts = [...conflictInfo.reasons].map((r) => REASON_LABEL[r]);
 		return `Conflit : des reines ${parts.join(' · ')}.`;
 	}, [conflictInfo]);
+
+	/* Ground-truth diagnostic: if a "zone" conflict ever fires, dump the real
+	   region ids so a screenshot dispute can be settled from data, not pixels. */
+	useEffect(() => {
+		if (import.meta.env.DEV && conflictInfo.reasons.has('zone')) {
+			// eslint-disable-next-line no-console
+			console.warn('[Reines] conflit "zone" — regions des reines :', {
+				size,
+				queens: queens.map(([r, c]) => ({ r, c, region: regions[r]?.[c] })),
+				conflictRegions: [...conflictInfo.regions],
+				regions,
+			});
+		}
+	}, [conflictInfo, queens, regions, size]);
 
 	/* Win: n queens, no conflicts. */
 	useEffect(() => {
@@ -271,7 +290,8 @@ const CSS = `
   transition: filter 0.08s ease;
 }
 .rn-cell:active { filter: brightness(0.93); }
-.rn-cell.creg { box-shadow: inset 0 0 0 2px rgba(211, 58, 44, 0.55); }
+/* Whole offending region washed red -> reads as one connected blob. */
+.rn-cell.creg { background-image: linear-gradient(rgba(211, 58, 44, 0.34), rgba(211, 58, 44, 0.34)); }
 .rn-cell.bad { color: var(--rn-bad); box-shadow: inset 0 0 0 3px var(--rn-bad); z-index: 1; }
 .rn-cell.wondone { color: var(--rn-ok); }
 

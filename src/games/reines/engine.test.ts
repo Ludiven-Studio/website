@@ -95,6 +95,17 @@ describe('reines conflict detection', () => {
 		expect([...findConflicts(reg, [[0, 0], [1, 1]]).reasons]).toEqual(['contact']);
 	});
 
+	it('ignores out-of-bounds queens (no undefined-equality false positive)', () => {
+		const reg = [
+			[0, 1],
+			[2, 3],
+		];
+		// Both out of bounds, not adjacent / same row / col: undefined===undefined must NOT fire "zone".
+		expect(findConflicts(reg, [[5, 5], [8, 2]]).cells.size).toBe(0);
+		// One valid, one out of bounds, not adjacent -> no conflict.
+		expect(findConflicts(reg, [[0, 0], [9, 9]]).cells.size).toBe(0);
+	});
+
 	it('a uniquely-placed solution never conflicts', () => {
 		for (const key of Object.keys(DIFFS)) {
 			const p = generateReines(DIFFS[key], mulberry32(13 + DIFFS[key].size));
