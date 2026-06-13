@@ -17,15 +17,17 @@ const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 // Fixed, clearly distinct palette (one solid colour per region, n <= 8).
+// Ordered so the first 6 (used on the 6×6 board) are maximally distinct —
+// no two confusable cyan/blue tones next to each other.
 const PALETTE = [
-	'#f4a8a3', // coral
-	'#f7c674', // orange
-	'#f1e188', // yellow
-	'#a9d98a', // green
-	'#8ad2c6', // teal
-	'#9ec3f4', // blue
-	'#c4a8ee', // purple
-	'#f2a6d3', // pink
+	'#f49a91', // red / coral
+	'#f7c25c', // orange
+	'#f6e87a', // yellow
+	'#95d68a', // green
+	'#84a9f2', // blue
+	'#c2a0ee', // purple
+	'#5fcabf', // teal (only on 7×7+)
+	'#f29ac9', // pink (only on 8×8)
 ];
 const regionColor = (id: number) => PALETTE[id % PALETTE.length];
 
