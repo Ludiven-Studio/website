@@ -24,6 +24,22 @@ export const DIFFS: Record<string, DiffLevel> = {
 	difficile: { label: 'Difficile', size: 8 },
 };
 
+// Fixed, clearly distinct palette (one solid colour per region, n <= 8).
+// First 6 (used on the 6×6 board) are maximally distinct — no two confusable cyan/blue tones.
+export const PALETTE = [
+	'#f49a91', // red / coral
+	'#f7c25c', // orange
+	'#f6e87a', // yellow
+	'#95d68a', // green
+	'#84a9f2', // blue
+	'#c2a0ee', // purple
+	'#5fcabf', // teal (only on 7×7+)
+	'#f29ac9', // pink (only on 8×8)
+];
+
+/** Colour of a region id — a deterministic, unique mapping for ids 0..7. */
+export const regionColor = (id: number) => PALETTE[id % PALETTE.length];
+
 function shuffle<T>(arr: T[], rng: Rng): T[] {
 	const a = [...arr];
 	for (let i = a.length - 1; i > 0; i--) {
@@ -59,30 +75,30 @@ function randomSolution(n: number, rng: Rng): number[] | null {
 	return place(0) ? sol : null;
 }
 
-/** Grow n connected regions from the queen cells via randomised frontier fill. */
+const NEI4 = [
+	[-1, 0],
+	[1, 0],
+	[0, -1],
+	[0, 1],
+] as const;
+
+/** Grow n connected regions from the queen cells via randomised frontier fill
+ *  (fast, reliably unique-solvable; region shapes stay irregular by nature). */
 function growRegions(n: number, solution: number[], rng: Rng): number[][] {
 	const regions: number[][] = Array.from({ length: n }, () => new Array(n).fill(-1));
 	const frontier: [number, number, number][] = []; // r, c, region
 
 	const addNeighbours = (r: number, c: number, id: number) => {
-		const dirs = [
-			[r - 1, c],
-			[r + 1, c],
-			[r, c - 1],
-			[r, c + 1],
-		];
-		for (const [nr, nc] of dirs) {
-			if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] === -1) {
-				frontier.push([nr, nc, id]);
-			}
+		for (const [dr, dc] of NEI4) {
+			const nr = r + dr;
+			const nc = c + dc;
+			if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] === -1) frontier.push([nr, nc, id]);
 		}
 	};
 
 	for (let id = 0; id < n; id++) {
-		const r = id;
-		const c = solution[r];
-		regions[r][c] = id;
-		addNeighbours(r, c, id);
+		regions[id][solution[id]] = id;
+		addNeighbours(id, solution[id], id);
 	}
 
 	let remaining = n * n - n;
@@ -95,23 +111,25 @@ function growRegions(n: number, solution: number[], rng: Rng): number[][] {
 		addNeighbours(r, c, id);
 	}
 
-	// Safety: assign any leftover cell (rare) to a neighbouring region.
+	// Safety: attach any leftover cell to a neighbouring region (kept contiguous).
 	if (remaining > 0) {
-		for (let r = 0; r < n; r++)
-			for (let c = 0; c < n; c++)
-				if (regions[r][c] === -1) {
-					const dirs = [
-						[r - 1, c],
-						[r + 1, c],
-						[r, c - 1],
-						[r, c + 1],
-					];
-					for (const [nr, nc] of dirs)
-						if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] !== -1) {
-							regions[r][c] = regions[nr][nc];
-							break;
+		let changed = true;
+		while (changed && remaining > 0) {
+			changed = false;
+			for (let r = 0; r < n; r++)
+				for (let c = 0; c < n; c++)
+					if (regions[r][c] === -1)
+						for (const [dr, dc] of NEI4) {
+							const nr = r + dr;
+							const nc = c + dc;
+							if (nr >= 0 && nr < n && nc >= 0 && nc < n && regions[nr][nc] !== -1) {
+								regions[r][c] = regions[nr][nc];
+								remaining--;
+								changed = true;
+								break;
+							}
 						}
-				}
+		}
 	}
 	return regions;
 }
