@@ -45,6 +45,7 @@ export default function ReinesGame() {
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
+	const [showIds, setShowIds] = useState(false);
 	const startRef = useRef<number>(0);
 
 	const { size, regions } = puzzle;
@@ -155,6 +156,14 @@ export default function ReinesGame() {
 				</div>
 			</div>
 
+			<button
+				className={`rn-verify ${showIds ? 'active' : ''}`}
+				onClick={() => setShowIds((v) => !v)}
+				aria-pressed={showIds}
+			>
+				{showIds ? 'Masquer les zones' : 'Vérifier les zones'}
+			</button>
+
 			<div className="rn-boardwrap">
 				<div
 					className="rn-board"
@@ -186,6 +195,7 @@ export default function ReinesGame() {
 									}`}
 									disabled={status === 'won'}
 								>
+									{showIds && <span className="rn-id">{regions[r][c]}</span>}
 									{st === 2 ? '♛' : st === 1 ? '✕' : ''}
 								</button>
 							);
@@ -295,6 +305,19 @@ const CSS = `
 .rn-cell.bad { color: var(--rn-bad); box-shadow: inset 0 0 0 3px var(--rn-bad); z-index: 1; }
 .rn-cell.wondone { color: var(--rn-ok); }
 
+.rn-verify {
+  margin-top: 0.75rem;
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px;
+  padding: 7px 16px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.rn-verify.active { background: var(--rn-accent); color: var(--accent-text-over); border-color: var(--rn-accent); }
+.rn-id {
+  position: absolute; top: 2px; left: 4px; z-index: 2;
+  font-size: calc(var(--rn-cell) * 0.3); font-weight: 800; line-height: 1;
+  color: #111; opacity: 0.8; pointer-events: none;
+}
 .rn-msg {
   min-height: 1.2em; margin-top: 1rem; text-align: center;
   color: var(--rn-bad); font-weight: 600; font-size: 13.5px;
