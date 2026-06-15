@@ -26,6 +26,9 @@ export default function CheminGame() {
 	const startRef = useRef<number>(0);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const drawing = useRef(false);
+	const moved = useRef(false);
+	const downCell = useRef<[number, number] | null>(null);
+	const lastCell = useRef<[number, number] | null>(null);
 
 	const startCell = (p: CheminPuzzle): [number, number] => {
 		for (let r = 0; r < p.size; r++)
@@ -95,12 +98,18 @@ export default function CheminGame() {
 		}
 	};
 
-	const visit = useCallback(
+	/* Drag logic: step onto a cell while drawing. Re-passing over an already
+	   traced cell does nothing; only stepping back onto the previous cell
+	   retracts. Extends onto an adjacent empty cell. */
+	const step = useCallback(
 		(cell: [number, number]) => {
 			if (status !== 'playing') return;
 			setPath((prev) => {
-				const idx = prev.findIndex(([r, c]) => r === cell[0] && c === cell[1]);
-				if (idx !== -1) return prev.slice(0, idx + 1); // truncate back to a visited cell
+				if (prev.length >= 2) {
+					const back = prev[prev.length - 2];
+					if (back[0] === cell[0] && back[1] === cell[1]) return prev.slice(0, -1); // retract one
+				}
+				if (prev.some(([r, c]) => r === cell[0] && c === cell[1])) return prev; // ignore re-pass
 				const head = prev[prev.length - 1];
 				if (adjacent(head, cell)) {
 					begin();
@@ -110,6 +119,18 @@ export default function CheminGame() {
 			});
 		},
 		[status, started],
+	);
+
+	/* Deliberate click on an already-traced cell: cut the path back to it. */
+	const truncateTo = useCallback(
+		(cell: [number, number]) => {
+			if (status !== 'playing') return;
+			setPath((prev) => {
+				const idx = prev.findIndex(([r, c]) => r === cell[0] && c === cell[1]);
+				return idx !== -1 ? prev.slice(0, idx + 1) : prev;
+			});
+		},
+		[status],
 	);
 
 	const cellFromPointer = (e: React.PointerEvent): [number, number] | null => {
@@ -126,15 +147,23 @@ export default function CheminGame() {
 		const cell = cellFromPointer(e);
 		if (!cell) return;
 		drawing.current = true;
+		moved.current = false;
+		downCell.current = cell;
+		lastCell.current = cell;
 		boardRef.current?.setPointerCapture(e.pointerId);
-		visit(cell);
+		step(cell);
 	};
 	const onPointerMove = (e: React.PointerEvent) => {
 		if (!drawing.current) return;
 		const cell = cellFromPointer(e);
-		if (cell) visit(cell);
+		if (!cell) return;
+		if (lastCell.current && cell[0] === lastCell.current[0] && cell[1] === lastCell.current[1]) return;
+		lastCell.current = cell;
+		moved.current = true;
+		step(cell);
 	};
 	const endDraw = () => {
+		if (drawing.current && !moved.current && downCell.current) truncateTo(downCell.current); // deliberate tap
 		drawing.current = false;
 	};
 
