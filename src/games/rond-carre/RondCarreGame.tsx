@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DIFFS, SIZE, generateRondCarre, type Cell, type RondCarrePuzzle } from './engine';
+import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
    ROND & CARRÉ (façon LinkedIn "Tango") — React island.
@@ -17,7 +18,7 @@ const fmtTime = (s: number) =>
 
 const key = (r: number, c: number) => `${r},${c}`;
 
-export default function RondCarreGame() {
+export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<RondCarrePuzzle>(() => generateRondCarre(DIFFS.facile));
 	const [marks, setMarks] = useState<Cell[][]>(() => emptyMarks());
@@ -108,8 +109,11 @@ export default function RondCarreGame() {
 	useEffect(() => {
 		if (status === 'won') return;
 		for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (value(r, c) === 0) return;
-		if (conflicts.size === 0) setStatus('won');
-	}, [marks, status, value, conflicts, n]);
+		if (conflicts.size === 0) {
+			setStatus('won');
+			trackGame(gameId, 'game_won');
+		}
+	}, [marks, status, value, conflicts, n, gameId]);
 
 	const cycle = useCallback(
 		(r: number, c: number) => {
@@ -122,9 +126,10 @@ export default function RondCarreGame() {
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
+				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, started, given],
+		[status, started, given, gameId],
 	);
 
 	return (

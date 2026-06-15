@@ -12,7 +12,7 @@ import { PALETTE } from './engine';
 describe('ReinesGame — colour matches region index', () => {
 	it('every board cell background-color === PALETTE[data-region]', () => {
 		for (let i = 0; i < 25; i++) {
-			const html = renderToStaticMarkup(<ReinesGame />);
+			const html = renderToStaticMarkup(<ReinesGame gameId="reines" />);
 			const buttons = html.match(/<button\b[^>]*>/g) ?? [];
 			let cells = 0;
 			for (const tag of buttons) {

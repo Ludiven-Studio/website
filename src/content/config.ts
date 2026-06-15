@@ -13,6 +13,8 @@ export const collections = {
 			gallery: z
 				.array(z.object({ src: z.string(), alt: z.string().optional() }))
 				.optional(),
+			galleryTitle: z.string().optional(),
+			galleryLayout: z.enum(['phone', 'wide']).optional(),
 			role: z.string().optional(),
 			org: z.string().optional(),
 		}),

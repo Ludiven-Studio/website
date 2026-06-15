@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DIFFS, generateQuestion, type Question } from './engine';
+import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
    SUITE MYSTÈRE — React island (QCM, endless score).
@@ -10,7 +11,7 @@ import { DIFFS, generateQuestion, type Question } from './engine';
 type Status = 'playing' | 'over';
 const BEST_KEY = 'ludiven-suite-best';
 
-export default function SuiteGame() {
+export default function SuiteGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [question, setQuestion] = useState<Question>(() => generateQuestion(DIFFS.facile));
 	const [score, setScore] = useState(0);
@@ -18,6 +19,7 @@ export default function SuiteGame() {
 	const [status, setStatus] = useState<Status>('playing');
 	const [chosen, setChosen] = useState<number | null>(null);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const startedRef = useRef(false);
 
 	useEffect(() => {
 		const stored = Number(localStorage.getItem(BEST_KEY) ?? '0');
@@ -34,10 +36,15 @@ export default function SuiteGame() {
 		setScore(0);
 		setStatus('playing');
 		setChosen(null);
+		startedRef.current = false;
 	}, []);
 
 	const choose = (value: number, idx: number) => {
 		if (status === 'over' || chosen !== null) return;
+		if (!startedRef.current) {
+			startedRef.current = true;
+			trackGame(gameId, 'game_started');
+		}
 		setChosen(idx);
 		if (value === question.answer) {
 			const next = score + 1;
@@ -48,6 +55,7 @@ export default function SuiteGame() {
 			}, 650);
 		} else {
 			setStatus('over');
+			trackGame(gameId, 'game_over', { score });
 			setBest((b) => {
 				const nb = Math.max(b, score);
 				try {

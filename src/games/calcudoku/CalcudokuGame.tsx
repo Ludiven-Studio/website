@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DIFFS, generateCalcudoku, type CalcudokuPuzzle, type Op } from './engine';
+import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
    CALCUDOKU (KenKen) — React island.
@@ -17,7 +18,7 @@ const fmtTime = (s: number) =>
 
 const OP_SYM: Record<Op, string> = { '+': '+', '-': '−', '*': '×', '/': '÷', '=': '' };
 
-export default function CalcudokuGame() {
+export default function CalcudokuGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<CalcudokuPuzzle>(() => generateCalcudoku(DIFFS.facile));
 	const [entries, setEntries] = useState<(number | null)[][]>(() => emptyEntries(DIFFS.facile.size));
@@ -133,8 +134,9 @@ export default function CalcudokuGame() {
 		if (cageSatisfied()) {
 			setStatus('won');
 			setSelected(null);
+			trackGame(gameId, 'game_won');
 		}
-	}, [entries, status, size, value, conflicts, cageSatisfied]);
+	}, [entries, status, size, value, conflicts, cageSatisfied, gameId]);
 
 	const placeValue = useCallback(
 		(v: number | null) => {
@@ -149,9 +151,10 @@ export default function CalcudokuGame() {
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
+				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, selected, given, started],
+		[status, selected, given, started, gameId],
 	);
 
 	/* Keyboard. */

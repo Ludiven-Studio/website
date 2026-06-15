@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { UMAMI_WEBSITE_ID } from '../data/site';
 
 interface Props {
 	title?: string | undefined;
@@ -25,6 +26,17 @@ const {
 	href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,700;1,400&family=Rubik:wght@500;600&display=swap"
 	rel="stylesheet"
 />
+{
+	UMAMI_WEBSITE_ID && (
+		<script
+			is:inline
+			defer
+			src="https://cloud.umami.is/script.js"
+			data-website-id={UMAMI_WEBSITE_ID}
+			data-domains="www.ludiven-studio.fr"
+		/>
+	)
+}
 <script is:inline>
 	// This code is inlined in the head to make dark mode instant & blocking.
 	const getThemePreference = () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DIFFS, generateChemin, type CheminPuzzle } from './engine';
+import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
    LE CHEMIN (LinkedIn "Zip") — React island.
@@ -16,7 +17,7 @@ const key = (r: number, c: number) => `${r},${c}`;
 const adjacent = (a: [number, number], b: [number, number]) =>
 	Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) === 1;
 
-export default function CheminGame() {
+export default function CheminGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<CheminPuzzle | null>(null);
 	const [path, setPath] = useState<[number, number][]>([]);
@@ -89,12 +90,14 @@ export default function CheminGame() {
 		const last = path[path.length - 1];
 		if (puzzle.numbers[last[0]][last[1]] !== puzzle.k) return;
 		setStatus('won');
-	}, [path, puzzle, status, errors]);
+		trackGame(gameId, 'game_won');
+	}, [path, puzzle, status, errors, gameId]);
 
 	const begin = () => {
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
+			trackGame(gameId, 'game_started');
 		}
 	};
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { trackGame } from '../../lib/analytics';
 import {
 	DIFFS,
 	generateReines,
@@ -30,7 +31,7 @@ const emptyMarks = (n: number): CellState[][] =>
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-export default function ReinesGame() {
+export default function ReinesGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<ReinesPuzzle>(() => generateReines(DIFFS.facile));
 	const [marks, setMarks] = useState<CellState[][]>(() => emptyMarks(DIFFS.facile.size));
@@ -99,8 +100,11 @@ export default function ReinesGame() {
 	/* Win: n queens, no conflicts. */
 	useEffect(() => {
 		if (status === 'won') return;
-		if (queens.length === size && conflicts.size === 0) setStatus('won');
-	}, [queens, conflicts, size, status]);
+		if (queens.length === size && conflicts.size === 0) {
+			setStatus('won');
+			trackGame(gameId, 'game_won');
+		}
+	}, [queens, conflicts, size, status, gameId]);
 
 	const cycle = useCallback(
 		(r: number, c: number) => {
@@ -113,9 +117,10 @@ export default function ReinesGame() {
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
+				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, started],
+		[status, started, gameId],
 	);
 
 	const thin = '1px solid var(--rn-line)';

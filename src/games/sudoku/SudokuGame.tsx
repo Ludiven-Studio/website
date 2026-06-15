@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SIZES, DIFFS, generateSudoku, type SudokuPuzzle } from './engine';
+import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
    SUDOKU — React island (training mode)
@@ -19,7 +20,7 @@ const fmtTime = (s: number) =>
 const boxIndex = (r: number, c: number, boxH: number, boxW: number, n: number) =>
 	Math.floor(r / boxH) * (n / boxW) + Math.floor(c / boxW);
 
-export default function SudokuGame() {
+export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [sizeKey, setSizeKey] = useState<SizeKey>('6');
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<SudokuPuzzle>(() =>
@@ -98,7 +99,8 @@ export default function SudokuGame() {
 		if (conflicts.size > 0) return;
 		setStatus('won');
 		setSelected(null);
-	}, [entries, status, size, value, conflicts]);
+		trackGame(gameId, 'game_won');
+	}, [entries, status, size, value, conflicts, gameId]);
 
 	const placeValue = useCallback(
 		(v: number | null) => {
@@ -113,9 +115,10 @@ export default function SudokuGame() {
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
+				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, selected, given, started],
+		[status, selected, given, started, gameId],
 	);
 
 	/* Keyboard (desktop). '0' maps to N for the 10×10 grid. */

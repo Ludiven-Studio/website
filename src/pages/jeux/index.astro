@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
+import SuggestionForm from '../../components/SuggestionForm.astro';
 import { games } from '../../data/games';
 ---
 
@@ -34,6 +35,8 @@ import { games } from '../../data/games';
 				))
 			}
 		</ul>
+
+		<SuggestionForm />
 
 		<p class="games-note">
 			Des mini-jeux de logique développés par Ludiven Studio, librement inspirés de grands

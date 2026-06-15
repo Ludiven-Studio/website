@@ -55,8 +55,8 @@ const { Content } = await entry.render();
 				</div>
 				{entry.data.gallery && entry.data.gallery.length > 0 && (
 					<section class="screens stack gap-6">
-						<h2>Aperçu de l'application</h2>
-						<div class="screens-grid">
+						<h2>{entry.data.galleryTitle || "Aperçu de l'application"}</h2>
+						<div class:list={['screens-grid', entry.data.galleryLayout === 'wide' ? 'wide' : 'phone']}>
 							{entry.data.gallery.map((shot) => (
 								<img
 									src={shot.src}
@@ -127,9 +127,20 @@ const { Content } = await entry.render();
 
 	.screens-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 		gap: 1.25rem;
 		align-items: start;
+	}
+
+	/* Phone screenshots: responsive multi-column grid. */
+	.screens-grid.phone {
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+
+	/* Wide panoramas: stacked, full-width, centered. */
+	.screens-grid.wide {
+		grid-template-columns: 1fr;
+		max-width: 50rem;
+		margin-inline: auto;
 	}
 
 	.screens-grid img {
@@ -146,7 +157,7 @@ const { Content } = await entry.render();
 			font-size: var(--text-2xl);
 		}
 
-		.screens-grid {
+		.screens-grid.phone {
 			grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 			gap: 1.75rem;
 		}

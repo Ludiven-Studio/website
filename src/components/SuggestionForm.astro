@@ -1,0 +1,205 @@
+---
+import { WEB3FORMS_ACCESS_KEY } from '../data/site';
+---
+
+{
+	WEB3FORMS_ACCESS_KEY && (
+		<section class="suggest">
+			<header class="suggest-head stack gap-2">
+				<h2>Une idée de jeu ?</h2>
+				<p>
+					Propose un nouveau jeu ou un concept qui te ferait plaisir — on lit tout, et les
+					meilleures idées finissent dans la collection.
+				</p>
+			</header>
+
+			<form class="suggest-form" id="suggest-form">
+				<input type="hidden" name="access_key" value={WEB3FORMS_ACCESS_KEY} />
+				<input type="hidden" name="subject" value="Nouvelle suggestion de jeu — Ludiven Studio" />
+				{/* Honeypot anti-spam — must stay empty */}
+				<input type="checkbox" name="botcheck" class="hidden" style="display:none" tabindex="-1" autocomplete="off" />
+
+				<label class="field">
+					<span>Type</span>
+					<select name="type" required>
+						<option value="Nouveau jeu">Un nouveau jeu</option>
+						<option value="Nouveau concept">Un nouveau concept</option>
+						<option value="Autre">Autre</option>
+					</select>
+				</label>
+
+				<label class="field">
+					<span>Ton idée</span>
+					<textarea
+						name="message"
+						rows="4"
+						required
+						placeholder="Décris le jeu ou le concept que tu aimerais voir…"
+					/>
+				</label>
+
+				<label class="field">
+					<span>Email (optionnel, pour te répondre)</span>
+					<input type="email" name="email" placeholder="toi@exemple.fr" autocomplete="email" />
+				</label>
+
+				<button type="submit" class="submit">Envoyer ma suggestion</button>
+
+				<p class="form-status" id="suggest-status" role="status" aria-live="polite" hidden />
+				<p class="form-note">Vos informations servent uniquement à traiter votre suggestion.</p>
+			</form>
+		</section>
+	)
+}
+
+<script>
+	const form = document.getElementById('suggest-form') as HTMLFormElement | null;
+	const status = document.getElementById('suggest-status');
+
+	if (form && status) {
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+			const show = (msg: string, ok: boolean) => {
+				status.textContent = msg;
+				status.hidden = false;
+				status.classList.toggle('is-ok', ok);
+				status.classList.toggle('is-error', !ok);
+			};
+
+			if (button) button.disabled = true;
+			try {
+				const res = await fetch('https://api.web3forms.com/submit', {
+					method: 'POST',
+					headers: { Accept: 'application/json' },
+					body: new FormData(form),
+				});
+				const data = await res.json();
+				if (data.success) {
+					show('Merci ! Ta suggestion est bien partie. 🎉', true);
+					form.reset();
+				} else {
+					show("Oups, l'envoi a échoué. Réessaie dans un instant.", false);
+				}
+			} catch {
+				show('Pas de réseau — vérifie ta connexion et réessaie.', false);
+			} finally {
+				if (button) button.disabled = false;
+			}
+		});
+	}
+</script>
+
+<style>
+	.suggest {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+		max-width: 42rem;
+		margin-inline: auto;
+		width: 100%;
+		border: 1px solid var(--gray-800);
+		border-radius: 1.5rem;
+		padding: 2rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.suggest-head {
+		text-align: center;
+		color: var(--gray-300);
+	}
+
+	.suggest-head h2 {
+		font-size: var(--text-xl);
+	}
+
+	.suggest-form {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.field > span {
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+
+	.field select,
+	.field textarea,
+	.field input {
+		font: inherit;
+		color: var(--gray-0);
+		background-color: var(--gray-999);
+		border: 1px solid var(--gray-700);
+		border-radius: 0.75rem;
+		padding: 0.7rem 0.9rem;
+		transition: border-color var(--theme-transition);
+	}
+
+	.field textarea {
+		resize: vertical;
+		min-height: 6rem;
+	}
+
+	.field select:focus-visible,
+	.field textarea:focus-visible,
+	.field input:focus-visible {
+		outline: none;
+		border-color: var(--accent-regular);
+	}
+
+	.submit {
+		align-self: flex-start;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-base);
+		cursor: pointer;
+		padding: 0.7rem 1.4rem;
+		border: none;
+		border-radius: 999rem;
+		color: var(--accent-text-over);
+		background-color: var(--accent-regular);
+		transition:
+			transform var(--theme-transition),
+			box-shadow var(--theme-transition);
+	}
+
+	.submit:hover:not(:disabled),
+	.submit:focus-visible:not(:disabled) {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md);
+	}
+
+	.submit:disabled {
+		opacity: 0.6;
+		cursor: progress;
+	}
+
+	.form-status {
+		margin: 0;
+		font-size: var(--text-sm);
+	}
+
+	.form-status.is-ok {
+		color: var(--accent-regular);
+	}
+
+	.form-status.is-error {
+		color: #c0392b;
+	}
+
+	.form-note {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--gray-400);
+	}
+</style>

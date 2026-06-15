@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DIFFS, generatePuzzle, type Game } from './engine';
+import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
    SOMME TOUTE — React island (training mode)
@@ -16,7 +17,7 @@ const fmtTime = (s: number) =>
 type Status = 'idle' | 'playing' | 'won';
 type SumState = 'ok' | 'over' | 'pending';
 
-export default function SommeToute() {
+export default function SommeToute({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [game, setGame] = useState<Game>(() => generatePuzzle(DIFFS.facile));
 	const [entries, setEntries] = useState<(number | null)[][]>(() =>
@@ -61,7 +62,8 @@ export default function SommeToute() {
 		}
 		setStatus('won');
 		setSelected(null);
-	}, [entries, status, size, rowT, colT, cellValue]);
+		trackGame(gameId, 'game_won');
+	}, [entries, status, size, rowT, colT, cellValue, gameId]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
@@ -86,9 +88,10 @@ export default function SommeToute() {
 			if (status === 'idle') {
 				startRef.current = Date.now();
 				setStatus('playing');
+				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, selected, puzzle],
+		[status, selected, puzzle, gameId],
 	);
 
 	/* Keyboard (desktop) */
