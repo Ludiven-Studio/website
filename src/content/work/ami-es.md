@@ -1,8 +1,8 @@
 ---
 title: AMI-ES - Application inclusive
 publishDate: 2025-10-01 00:00:00
-img: /assets/ami-es/accueil.png
-img_alt: Écran d'accueil de l'application AMI·ES présentant ses fonctionnalités
+img: /assets/ami-es/vignette.png
+img_alt: AMI·ES — Application Mobile pour l'Inclusion des étudiant·es dans l'Enseignement Supérieur
 role: Développeur
 org: Université Claude Bernard Lyon 1
 description: |
@@ -13,6 +13,8 @@ tags:
   - Neuro-développement
   - Android
 gallery:
+  - src: /assets/ami-es/accueil.png
+    alt: Écran d'accueil de l'application AMI·ES présentant ses fonctionnalités
   - src: /assets/ami-es/minuterie-visuelle.png
     alt: Minuterie visuelle avec un cadran coloré pour matérialiser le temps
   - src: /assets/ami-es/mon-energie.png
