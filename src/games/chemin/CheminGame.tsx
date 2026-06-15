@@ -388,7 +388,7 @@ const CSS = `
 .zp-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem; }
 
 .zp-win {
-  position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: -8px; z-index: 10; display: flex; align-items: center; justify-content: center;
   background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; animation: zp-fade 0.25s ease;
 }
 .zp-wincard { background: var(--gray-999); border: 2px solid var(--zp-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg); }
