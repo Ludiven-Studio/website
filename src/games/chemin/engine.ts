@@ -24,7 +24,7 @@ export interface CheminPuzzle {
 export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 5, checkpoints: 4 },
 	moyen: { label: 'Moyen', size: 6, checkpoints: 4 },
-	difficile: { label: 'Difficile', size: 6, checkpoints: 2 },
+	difficile: { label: 'Difficile', size: 7, checkpoints: 3 },
 };
 
 const NEI = [
@@ -110,49 +110,58 @@ function feasible(visited: boolean[], n: number, walls: Set<number>): boolean {
 	return true;
 }
 
-/** Build a random Hamiltonian path with Warnsdorff ordering + backtracking. */
-function hamiltonianPath(n: number, rng: Rng): [number, number][] | null {
+/**
+ * Random Hamiltonian path via "backbiting": start from a boustrophedon snake,
+ * then repeatedly fold an endpoint onto one of its grid neighbours (reversing a
+ * segment). Each move keeps the path Hamiltonian — no backtracking, no perf
+ * cliff at any size. O(n³) total, milliseconds even for big grids.
+ */
+function hamiltonianPath(n: number, rng: Rng): [number, number][] {
 	const total = n * n;
-
-	for (let attempt = 0; attempt < 60; attempt++) {
-		const visited = new Array(total).fill(false);
-		const path: number[] = [];
-		const start = Math.floor(rng() * total);
-		visited[start] = true;
-		path.push(start);
-		let budget = 200000;
-
-		const freeNeighbours = (idx: number): number[] => {
-			const r = Math.floor(idx / n);
-			const c = idx % n;
-			const out: number[] = [];
-			for (const [dr, dc] of NEI) {
-				const nr = r + dr;
-				const nc = c + dc;
-				if (nr >= 0 && nr < n && nc >= 0 && nc < n && !visited[nr * n + nc]) out.push(nr * n + nc);
-			}
-			return out;
-		};
-
-		const dfs = (idx: number): boolean => {
-			if (path.length === total) return true;
-			if (budget-- <= 0) return false;
-			const nbs = shuffle(freeNeighbours(idx), rng).sort(
-				(a, b) => freeNeighbours(a).length - freeNeighbours(b).length,
-			);
-			for (const nb of nbs) {
-				visited[nb] = true;
-				path.push(nb);
-				if (stillConnected(visited, n, EMPTY) && dfs(nb)) return true;
-				visited[nb] = false;
-				path.pop();
-			}
-			return false;
-		};
-
-		if (dfs(start)) return path.map((i): [number, number] => [Math.floor(i / n), i % n]);
+	const path: number[] = [];
+	for (let r = 0; r < n; r++) {
+		if (r % 2 === 0) for (let c = 0; c < n; c++) path.push(r * n + c);
+		else for (let c = n - 1; c >= 0; c--) path.push(r * n + c);
 	}
-	return null;
+	const pos = new Int32Array(total);
+	for (let i = 0; i < total; i++) pos[path[i]] = i;
+
+	const nbrs = (idx: number): number[] => {
+		const r = Math.floor(idx / n);
+		const c = idx % n;
+		const out: number[] = [];
+		if (r > 0) out.push(idx - n);
+		if (r < n - 1) out.push(idx + n);
+		if (c > 0) out.push(idx - 1);
+		if (c < n - 1) out.push(idx + 1);
+		return out;
+	};
+	const reverse = (lo: number, hi: number) => {
+		while (lo < hi) {
+			const a = path[lo];
+			const b = path[hi];
+			path[lo] = b;
+			path[hi] = a;
+			pos[b] = lo;
+			pos[a] = hi;
+			lo++;
+			hi--;
+		}
+	};
+
+	const moves = total * total;
+	for (let m = 0; m < moves; m++) {
+		if (rng() < 0.5) {
+			const cand = nbrs(path[total - 1]);
+			const j = pos[cand[Math.floor(rng() * cand.length)]];
+			if (j < total - 2) reverse(j + 1, total - 1); // fold the tail
+		} else {
+			const cand = nbrs(path[0]);
+			const j = pos[cand[Math.floor(rng() * cand.length)]];
+			if (j > 1) reverse(0, j - 1); // fold the head
+		}
+	}
+	return path.map((i): [number, number] => [Math.floor(i / n), i % n]);
 }
 
 /**
@@ -191,6 +200,8 @@ export function solveSome(
 		}
 		const r = Math.floor(idx / n);
 		const c = idx % n;
+		// Collect allowed onward cells.
+		const allowed: number[] = [];
 		for (const [dr, dc] of NEI) {
 			const nr = r + dr;
 			const nc = c + dc;
@@ -199,13 +210,21 @@ export function solveSome(
 			if (visited[ni] || walls.has(edgeId(idx, ni, total))) continue;
 			const lab = numbers[nr][nc];
 			if (lab !== 0 && lab !== nextLabel) continue; // wrong checkpoint order
+			allowed.push(ni);
+		}
+		if (allowed.length === 0) return;
+		// Run the O(n²) prunes only at branch points; forced moves (single option)
+		// descend freely -> sparse (walled) boards solve fast.
+		if (allowed.length > 1 && (!feasible(visited, n, walls) || !stillConnected(visited, n, walls)))
+			return;
+		for (const ni of allowed) {
+			const lab = numbers[Math.floor(ni / n)][ni % n];
 			visited[ni] = true;
 			path.push(ni);
-			if (feasible(visited, n, walls) && stillConnected(visited, n, walls))
-				dfs(ni, depth + 1, lab !== 0 ? nextLabel + 1 : nextLabel);
+			dfs(ni, depth + 1, lab !== 0 ? nextLabel + 1 : nextLabel);
 			path.pop();
 			visited[ni] = false;
-			if (out.length >= limit) return;
+			if (out.length >= limit || aborted) return;
 		}
 	};
 
@@ -225,13 +244,13 @@ export function countSolutions(
 	return (solveSome(numbers, n, k, walls, limit) ?? []).length;
 }
 
-const NODE_BUDGET = 120000; // per solver call; slow boards are abandoned & regenerated
+const NODE_BUDGET = 12000; // per solver call; slow boards are abandoned & regenerated
 
 /** One generation attempt; returns null if a solver call blows the budget. */
 function attemptChemin(diff: DiffLevel, rng: Rng): CheminPuzzle | null {
 	const n = diff.size;
 	const total = n * n;
-	const path = hamiltonianPath(n, rng) ?? fallbackSnake(n);
+	const path = hamiltonianPath(n, rng);
 	const flat = path.map(([r, c]) => r * n + c);
 
 	// Edges used by the solution — never wallable (keeps the solution valid).
@@ -266,7 +285,7 @@ function attemptChemin(diff: DiffLevel, rng: Rng): CheminPuzzle | null {
 			}
 		}
 	const walls = new Set<number>();
-	const prewall = Math.floor(nonSol.length * (n >= 7 ? 0.7 : 0.55));
+	const prewall = Math.floor(nonSol.length * 0.4);
 	for (const e of shuffle(nonSol, rng).slice(0, prewall)) walls.add(e);
 
 	const sameFlat = (s: number[]) => s.length === flat.length && s.every((v, i) => v === flat[i]);
@@ -304,7 +323,7 @@ export function generateChemin(diff: DiffLevel, rng: Rng = Math.random): CheminP
 	// Last resort: wall every non-solution edge -> the solution is the only path.
 	const n = diff.size;
 	const total = n * n;
-	const path = hamiltonianPath(n, rng) ?? fallbackSnake(n);
+	const path = hamiltonianPath(n, rng);
 	const flat = path.map(([r, c]) => r * n + c);
 	const solEdges = new Set<number>();
 	for (let i = 1; i < flat.length; i++) solEdges.add(edgeId(flat[i - 1], flat[i], total));
@@ -319,14 +338,4 @@ export function generateChemin(diff: DiffLevel, rng: Rng = Math.random): CheminP
 			if (r + 1 < n && !solEdges.has(edgeId(a, a + n, total))) walls.push([a, a + n]);
 		}
 	return { size: n, numbers, path, k: 2, walls };
-}
-
-/** Deterministic boustrophedon path — guaranteed Hamiltonian fallback. */
-function fallbackSnake(n: number): [number, number][] {
-	const path: [number, number][] = [];
-	for (let r = 0; r < n; r++) {
-		if (r % 2 === 0) for (let c = 0; c < n; c++) path.push([r, c]);
-		else for (let c = n - 1; c >= 0; c--) path.push([r, c]);
-	}
-	return path;
 }
