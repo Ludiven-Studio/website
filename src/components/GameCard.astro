@@ -8,31 +8,101 @@ interface Props {
 	icon: keyof typeof iconPaths;
 	href?: string;
 	status?: 'play' | 'soon';
+	id?: string;
+	favorite?: boolean;
 }
 
-const { title, pitch, icon, href, status = 'play' } = Astro.props;
+const { title, pitch, icon, href, status = 'play', id, favorite = false } = Astro.props;
 const playable = status === 'play' && href;
 const Tag = playable ? 'a' : 'div';
+const showFavorite = favorite && playable && id;
 ---
 
-<Tag
-	class:list={['game-card', { soon: !playable }]}
-	{...playable ? { href } : { 'aria-disabled': 'true' }}
->
-	<div class="game-card-top">
-		<Icon icon={icon} color="var(--accent-regular)" size="2.5rem" gradient />
-		<span class:list={['badge', { soon: !playable }]}>
-			{playable ? 'Jouer' : 'Bientôt'}
-		</span>
-	</div>
-	<h3>{title}</h3>
-	<p>{pitch}</p>
-</Tag>
+<div class:list={['game-card-wrap', { 'has-fav': showFavorite }]}>
+	<Tag
+		class:list={['game-card', { soon: !playable }]}
+		{...playable ? { href } : { 'aria-disabled': 'true' }}
+	>
+		<div class="game-card-top">
+			<Icon icon={icon} color="var(--accent-regular)" size="2.5rem" gradient />
+			<span class:list={['badge', { soon: !playable }]}>
+				{playable ? 'Jouer' : 'Bientôt'}
+			</span>
+		</div>
+		<h3>{title}</h3>
+		<p>{pitch}</p>
+	</Tag>
+	{
+		showFavorite && (
+			<button
+				type="button"
+				class="fav-toggle"
+				data-game-id={id}
+				aria-pressed="false"
+				aria-label={`Mettre ${title} en favori`}
+			>
+				<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+					<path d="M12 21s-7.5-4.6-10.1-9.2C.3 8.9 1.3 5.4 4.3 4.4c2-.7 4 .1 5.1 1.8l.6.9.6-.9c1.1-1.7 3.1-2.5 5.1-1.8 3 1 4 4.5 2.4 7.4C19.5 16.4 12 21 12 21z" />
+				</svg>
+			</button>
+		)
+	}
+</div>
 
 <style>
+	.game-card-wrap {
+		position: relative;
+		height: 100%;
+	}
+
+	.game-card-wrap.has-fav .game-card {
+		/* keep room so a long pitch never slides under the heart */
+		padding-bottom: 3.25rem;
+	}
+
+	.fav-toggle {
+		position: absolute;
+		bottom: 1rem;
+		right: 1rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.35rem;
+		border: none;
+		border-radius: 999rem;
+		background: transparent;
+		color: var(--gray-400);
+		cursor: pointer;
+		line-height: 0;
+		transition:
+			color var(--theme-transition),
+			transform var(--theme-transition);
+	}
+
+	.fav-toggle svg {
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2;
+	}
+
+	.fav-toggle:hover,
+	.fav-toggle:focus-visible {
+		color: var(--accent-regular);
+		transform: scale(1.12);
+	}
+
+	.fav-toggle.is-fav {
+		color: var(--accent-regular);
+	}
+
+	.fav-toggle.is-fav svg {
+		fill: currentColor;
+	}
+
 	.game-card {
 		display: flex;
 		flex-direction: column;
+		height: 100%;
 		gap: 0.75rem;
 		border: 1px solid var(--gray-800);
 		border-radius: 1.5rem;
@@ -101,3 +171,40 @@ const Tag = playable ? 'a' : 'div';
 		}
 	}
 </style>
+
+<script>
+	// Favorites toggle — persisted in localStorage, shared key with the home page.
+	const KEY = 'ludiven-favorites';
+
+	const read = (): string[] => {
+		try {
+			return JSON.parse(localStorage.getItem(KEY) || '[]');
+		} catch {
+			return [];
+		}
+	};
+
+	const sync = () => {
+		const favs = read();
+		document.querySelectorAll<HTMLButtonElement>('.fav-toggle').forEach((btn) => {
+			const on = favs.includes(btn.dataset.gameId || '');
+			btn.classList.toggle('is-fav', on);
+			btn.setAttribute('aria-pressed', String(on));
+		});
+	};
+
+	document.addEventListener('click', (e) => {
+		const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.fav-toggle');
+		if (!btn) return;
+		e.preventDefault();
+		const id = btn.dataset.gameId;
+		if (!id) return;
+		const favs = read();
+		const i = favs.indexOf(id);
+		i >= 0 ? favs.splice(i, 1) : favs.push(id);
+		localStorage.setItem(KEY, JSON.stringify(favs));
+		sync();
+	});
+
+	sync();
+</script>

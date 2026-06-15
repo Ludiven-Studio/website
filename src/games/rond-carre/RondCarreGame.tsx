@@ -127,8 +127,6 @@ export default function RondCarreGame() {
 		[status, started, given],
 	);
 
-	const symbol = (x: Cell) => (x === 1 ? '●' : x === 2 ? '■' : '');
-
 	return (
 		<div className="rc-root">
 			<style>{CSS}</style>
@@ -178,7 +176,8 @@ export default function RondCarreGame() {
 									}`}
 									disabled={status === 'won'}
 								>
-									{symbol(x)}
+									{x === 1 && <span className="rc-shape rc-rond-shape" />}
+									{x === 2 && <span className="rc-shape rc-carre-shape" />}
 								</button>
 							);
 						}),
@@ -297,18 +296,25 @@ const CSS = `
 }
 .rc-cell:nth-child(6n) { border-right: none; } /* last column (n=6) */
 .rc-cell.given { background: var(--gray-900); cursor: default; }
-.rc-cell.rond { color: var(--rc-rond); font-size: calc(var(--rc-cell) * 0.62); }
-.rc-cell.carre { color: var(--rc-carre); }
+.rc-shape { display: block; }
+.rc-rond-shape {
+  width: calc(var(--rc-cell) * 0.62); height: calc(var(--rc-cell) * 0.62);
+  border-radius: 50%; background: var(--rc-rond);
+}
+.rc-carre-shape {
+  width: calc(var(--rc-cell) * 0.56); height: calc(var(--rc-cell) * 0.56);
+  border-radius: calc(var(--rc-cell) * 0.08); background: var(--rc-carre);
+}
 .rc-cell.bad { background: rgba(217, 83, 79, 0.16); }
 .rc-cell.wondone { box-shadow: inset 0 0 0 1px var(--rc-accent); }
 
 .rc-cons { position: absolute; inset: 0; pointer-events: none; }
 .rc-badge {
   position: absolute; transform: translate(-50%, -50%); z-index: 3;
-  min-width: 24px; height: 24px; padding: 0 3px;
+  min-width: 27px; height: 27px; padding: 0 3px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 999px; background: var(--gray-999); border: 1.5px solid var(--gray-300);
-  color: var(--gray-0); font-weight: 800; font-size: 16px; line-height: 1;
+  color: var(--gray-0); font-weight: 800; font-size: 18px; line-height: 1;
 }
 .rc-badge.bad { background: var(--rc-bad); color: #fff; border-color: var(--rc-bad); }
 

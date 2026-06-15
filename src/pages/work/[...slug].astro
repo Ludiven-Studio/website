@@ -46,13 +46,28 @@ const { Content } = await entry.render();
 					</Hero>
 				</div>
 			</header>
-			<main class="wrapper">
+			<main class="wrapper stack gap-15">
 				<div class="stack gap-10 content">
-					{entry.data.img && <img src={entry.data.img} alt={entry.data.img_alt || ''} />}
+					{entry.data.img && <img class="cover" src={entry.data.img} alt={entry.data.img_alt || ''} />}
 					<div class="content">
 						<Content />
 					</div>
 				</div>
+				{entry.data.gallery && entry.data.gallery.length > 0 && (
+					<section class="screens stack gap-6">
+						<h2>Aperçu de l'application</h2>
+						<div class="screens-grid">
+							{entry.data.gallery.map((shot) => (
+								<img
+									src={shot.src}
+									alt={shot.alt || ''}
+									loading="lazy"
+									decoding="async"
+								/>
+							))}
+						</div>
+					</section>
+				)}
 			</main>
 		</div>
 		<ContactCTA />
@@ -92,6 +107,49 @@ const { Content } = await entry.render();
 	.content {
 		max-width: 65ch;
 		margin-inline: auto;
+	}
+
+	/* Keep portrait covers (phone screenshots) from dominating the page. */
+	.cover {
+		max-height: 32rem;
+		width: auto;
+		max-width: 100%;
+		margin-inline: auto;
+	}
+
+	.screens {
+		text-align: center;
+	}
+
+	.screens h2 {
+		font-size: var(--text-xl);
+	}
+
+	.screens-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 1.25rem;
+		align-items: start;
+	}
+
+	.screens-grid img {
+		width: 100%;
+		height: auto;
+		border-radius: 1.25rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+		background: var(--gradient-subtle);
+	}
+
+	@media (min-width: 50em) {
+		.screens h2 {
+			font-size: var(--text-2xl);
+		}
+
+		.screens-grid {
+			grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+			gap: 1.75rem;
+		}
 	}
 
 	.content > :global(* + *) {

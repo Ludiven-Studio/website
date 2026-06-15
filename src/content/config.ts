@@ -10,6 +10,9 @@ export const collections = {
 			tags: z.array(z.string()),
 			img: z.string().optional(),
 			img_alt: z.string().optional(),
+			gallery: z
+				.array(z.object({ src: z.string(), alt: z.string().optional() }))
+				.optional(),
 			role: z.string().optional(),
 			org: z.string().optional(),
 		}),
