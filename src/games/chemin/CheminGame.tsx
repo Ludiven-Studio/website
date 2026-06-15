@@ -98,12 +98,24 @@ export default function CheminGame() {
 		}
 	};
 
+	/* Blocked edges (flat-index pairs a<b -> id a*total+b). */
+	const wallSet = useMemo(() => {
+		const s = new Set<number>();
+		if (puzzle) {
+			const total = puzzle.size * puzzle.size;
+			for (const [a, b] of puzzle.walls) s.add(a * total + b);
+		}
+		return s;
+	}, [puzzle]);
+
 	/* Drag logic: step onto a cell while drawing. Re-passing over an already
 	   traced cell does nothing; only stepping back onto the previous cell
 	   retracts. Extends onto an adjacent empty cell. */
 	const step = useCallback(
 		(cell: [number, number]) => {
-			if (status !== 'playing') return;
+			if (status !== 'playing' || !puzzle) return;
+			const sz = puzzle.size;
+			const total = sz * sz;
 			setPath((prev) => {
 				if (prev.length >= 2) {
 					const back = prev[prev.length - 2];
@@ -112,13 +124,17 @@ export default function CheminGame() {
 				if (prev.some(([r, c]) => r === cell[0] && c === cell[1])) return prev; // ignore re-pass
 				const head = prev[prev.length - 1];
 				if (adjacent(head, cell)) {
-					begin();
-					return [...prev, cell];
+					const ai = head[0] * sz + head[1];
+					const bi = cell[0] * sz + cell[1];
+					if (!wallSet.has(Math.min(ai, bi) * total + Math.max(ai, bi))) {
+						begin();
+						return [...prev, cell]; // extend (no wall between)
+					}
 				}
 				return prev;
 			});
 		},
-		[status, started],
+		[status, started, puzzle, wallSet],
 	);
 
 	/* Deliberate click on an already-traced cell: cut the path back to it. */
@@ -223,10 +239,18 @@ export default function CheminGame() {
 								const on = inPath.has(key(r, c));
 								const isHead = head && head[0] === r && head[1] === c;
 								const err = errors.has(key(r, c));
+								const a = r * n + c;
+								const total = n * n;
+								const wallR = c < n - 1 && wallSet.has(a * total + (a + 1));
+								const wallB = r < n - 1 && wallSet.has(a * total + (a + n));
 								return (
 									<div
 										key={`${r}-${c}`}
 										className={['zp-cell', on ? 'on' : '', isHead ? 'head' : ''].join(' ')}
+										style={{
+											borderRight: wallR ? '4px solid var(--zp-wall)' : undefined,
+											borderBottom: wallB ? '4px solid var(--zp-wall)' : undefined,
+										}}
 									>
 										{lab !== 0 && <span className={`zp-num ${err ? 'err' : ''}`}>{lab}</span>}
 									</div>
@@ -287,7 +311,10 @@ const CSS = `
   --zp-accent: var(--accent-regular);
   --zp-ok: #2f9e6f;
   --zp-bad: #d9534f;
-  --zp-cell: clamp(38px, calc(min(440px, 88vw) / var(--n, 5)), 60px);
+  --zp-wall: var(--gray-0);
+  /* Constant board width whatever the size -> bigger grids get smaller cells,
+     and the board never exceeds mobile width. */
+  --zp-cell: calc(min(420px, 92vw) / var(--n, 5));
   --zp-stroke: calc(var(--zp-cell) * 0.34);
 
   width: 100%;
@@ -325,7 +352,7 @@ const CSS = `
 .zp-boardwrap { position: relative; }
 .zp-loading {
   display: flex; align-items: center; justify-content: center;
-  width: min(440px, 88vw); height: min(440px, 88vw);
+  width: min(420px, 92vw); height: min(420px, 92vw);
   color: var(--gray-300); font-weight: 600;
 }
 .zp-board {
