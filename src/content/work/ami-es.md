@@ -9,6 +9,7 @@ description: |
   Développement d'une application destinée aux personnes autistes ou présentant des troubles neuro-développementaux, en collaboration avec l'Université Claude Bernard Lyon 1.
 tags:
   - Unity
+  - GoLang
   - Accessibilité
   - Neuro-développement
   - Android
