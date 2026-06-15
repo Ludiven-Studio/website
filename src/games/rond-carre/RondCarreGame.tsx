@@ -297,7 +297,7 @@ const CSS = `
 }
 .rc-cell:nth-child(6n) { border-right: none; } /* last column (n=6) */
 .rc-cell.given { background: var(--gray-900); cursor: default; }
-.rc-cell.rond { color: var(--rc-rond); }
+.rc-cell.rond { color: var(--rc-rond); font-size: calc(var(--rc-cell) * 0.62); }
 .rc-cell.carre { color: var(--rc-carre); }
 .rc-cell.bad { background: rgba(217, 83, 79, 0.16); }
 .rc-cell.wondone { box-shadow: inset 0 0 0 1px var(--rc-accent); }
@@ -305,10 +305,10 @@ const CSS = `
 .rc-cons { position: absolute; inset: 0; pointer-events: none; }
 .rc-badge {
   position: absolute; transform: translate(-50%, -50%); z-index: 3;
-  min-width: 20px; height: 20px; padding: 0 2px;
+  min-width: 24px; height: 24px; padding: 0 3px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 999px; background: var(--gray-999); border: 1.5px solid var(--gray-300);
-  color: var(--gray-0); font-weight: 800; font-size: 13px; line-height: 1;
+  color: var(--gray-0); font-weight: 800; font-size: 16px; line-height: 1;
 }
 .rc-badge.bad { background: var(--rc-bad); color: #fff; border-color: var(--rc-bad); }
 
