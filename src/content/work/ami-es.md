@@ -1,6 +1,6 @@
 ---
-title: AMI-ES - Application inclusive
-publishDate: 2025-10-01 00:00:00
+title: AMI-ES - Application inclusive - 2026
+publishDate: 2026-12-01 00:00:00
 img: /assets/ami-es/vignette.png
 img_alt: AMI·ES — Application Mobile pour l'Inclusion des étudiant·es dans l'Enseignement Supérieur
 role: Développeur

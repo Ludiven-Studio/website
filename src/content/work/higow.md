@@ -1,6 +1,6 @@
 ---
-title: Higow - Course à pied
-publishDate: 2024-09-15 00:00:00
+title: Higow - Course à pied - 2026
+publishDate: 2026-05-01 00:00:00
 img: /assets/higow/hero.avif
 img_alt: Application Higow — la course à pied transformée en aventure virtuelle
 role: Développeur
