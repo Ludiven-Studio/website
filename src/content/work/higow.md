@@ -13,15 +13,25 @@ tags:
   - Android
   - iOS
   - Course à pied
-galleryTitle: Des parcours dans des lieux mythiques
-galleryLayout: wide
+galleryTitle: Le jeu en images
+galleryLayout: phone
 gallery:
-  - src: /assets/higow/mont-fuji.png
-    alt: Parcours virtuel autour du Mont Fuji au coucher du soleil
-  - src: /assets/higow/grand-canyon.png
-    alt: Parcours virtuel à travers le Grand Canyon
-  - src: /assets/higow/scotland.png
-    alt: Parcours virtuel dans les Highlands d'Écosse, château au crépuscule
+  - src: /assets/higow/Capture_005.png
+    alt: Écran « Découvre le monde » avec la liste des parcours (Ember Isle, Spooky Scotland, Mont Fuji)
+  - src: /assets/higow/Capture_006.png
+    alt: Parcours Ember Isle en vue 3D, avec pont et sentier sur une île
+  - src: /assets/higow/Capture_007.png
+    alt: Parcours Tamuki Run avec une statue dorée en guise de checkpoint
+  - src: /assets/higow/Capture_008.png
+    alt: Parcours La Rive Pâle aux couleurs d'Halloween
+  - src: /assets/higow/Capture_003.png
+    alt: Progression sur un parcours et classement des joueurs autour de soi
+  - src: /assets/higow/Capture_002.png
+    alt: Ligue ASSURUN avec récompenses par rang (médailles or, argent, bronze)
+  - src: /assets/higow/Capture_001.png
+    alt: Personnage prêt à lancer une course, bouton GO
+  - src: /assets/higow/Capture_004.png
+    alt: Écran « Mes personnages » avec Mia, Leo, Elliott et Yui
 ---
 <p>
   Higow transforme tes sorties running en aventures&nbsp;: les kilomètres que tu cours dans la vraie vie, récupérés automatiquement depuis <a href="https://www.strava.com/" target="_blank">Strava</a>, te font progresser sur des parcours virtuels situés dans des lieux mythiques.
@@ -29,4 +39,7 @@ gallery:
 <p>
   L'application est disponible sur le <a href="https://play.google.com/store/apps/details?id=com.meltyn.higow&hl=fr" target="_blank">Google Play Store</a>
   et l'<a href="https://apps.apple.com/fr/app/higow/id6760266096" target="_blank">App Store</a>.
+</p>
+<p>
+  Pour en savoir plus, rendez-vous sur le <a href="https://www.higow.com/" target="_blank">site officiel de Higow</a>.
 </p>
