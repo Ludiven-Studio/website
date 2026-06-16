@@ -37,6 +37,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const [marks, setMarks] = useState<CellState[][]>(() => emptyMarks(DIFFS.facile.size));
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
+	const [revealed, setRevealed] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
@@ -54,18 +55,19 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setMarks(emptyMarks(d.size));
 		setStatus('playing');
 		setStarted(false);
+		setRevealed(false);
 		setElapsed(0);
 	}, []);
 
 	/* Timer */
 	useEffect(() => {
-		if (status !== 'playing' || !started) return;
+		if (status !== 'playing' || !started || revealed) return;
 		const id = setInterval(
 			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
 			250,
 		);
 		return () => clearInterval(id);
-	}, [status, started]);
+	}, [status, started, revealed]);
 
 	const queens = useMemo(() => {
 		const out: [number, number][] = [];
@@ -99,16 +101,16 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 
 	/* Win: n queens, no conflicts. */
 	useEffect(() => {
-		if (status === 'won') return;
+		if (status === 'won' || revealed) return;
 		if (queens.length === size && conflicts.size === 0) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
-	}, [queens, conflicts, size, status, gameId]);
+	}, [queens, conflicts, size, status, revealed, gameId]);
 
 	const cycle = useCallback(
 		(r: number, c: number) => {
-			if (status === 'won') return;
+			if (status === 'won' || revealed) return;
 			setMarks((prev) => {
 				const next = prev.map((row) => [...row]) as CellState[][];
 				next[r][c] = (((next[r][c] + 1) % 3) as CellState);
@@ -120,8 +122,44 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, started, gameId],
+		[status, started, revealed, gameId],
 	);
+
+	/* Hint: correctly place the queen in one not-yet-solved row. */
+	const hint = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		const { solution } = puzzle;
+		let target = -1;
+		for (let r = 0; r < size; r++)
+			if (marks[r][solution[r]] !== 2) {
+				target = r;
+				break;
+			}
+		if (target === -1) return;
+		setMarks((prev) => {
+			const next = prev.map((row) => [...row]) as CellState[][];
+			next[target] = new Array(size).fill(0) as CellState[];
+			next[target][solution[target]] = 2;
+			return next;
+		});
+		if (!started) {
+			startRef.current = Date.now();
+			setStarted(true);
+			trackGame(gameId, 'game_started');
+		}
+		trackGame(gameId, 'hint_used');
+	}, [status, revealed, puzzle, size, marks, started, gameId]);
+
+	/* Reveal the full solution (does not count as a win). */
+	const reveal = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		const { solution } = puzzle;
+		const next = emptyMarks(size);
+		for (let r = 0; r < size; r++) next[r][solution[r]] = 2;
+		setMarks(next);
+		setRevealed(true);
+		trackGame(gameId, 'solution_shown');
+	}, [status, revealed, puzzle, size, gameId]);
 
 	const thin = '1px solid var(--rn-line)';
 	const thick = '3px solid var(--rn-line-strong)';
@@ -152,6 +190,15 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				</div>
 			</div>
 
+			{status !== 'won' && !revealed && (
+				<div className="rn-actions">
+					<button className="rn-act" onClick={hint}>💡 Indice</button>
+					{elapsed >= 60 && (
+						<button className="rn-act" onClick={reveal}>👁 Voir la solution</button>
+					)}
+				</div>
+			)}
+
 			<div className="rn-boardwrap">
 				<div
 					className="rn-board"
@@ -169,7 +216,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 										'rn-cell',
 										bad ? 'bad' : '',
 										conflictInfo.regions.has(regions[r][c]) ? 'creg' : '',
-										status === 'won' ? 'wondone' : '',
+										status === 'won' || revealed ? 'wondone' : '',
 									].join(' ')}
 									style={{
 										backgroundColor: regionColor(regions[r][c]),
@@ -182,7 +229,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${
 										st === 2 ? ', reine' : st === 1 ? ', marquée' : ', vide'
 									}`}
-									disabled={status === 'won'}
+									disabled={status === 'won' || revealed}
 								>
 									{st === 2 ? '♛' : st === 1 ? '✕' : ''}
 								</button>
@@ -206,12 +253,21 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<p className="rn-msg" role="status" aria-live="polite">{conflictMessage}</p>
+			{revealed ? (
+				<div className="rn-revealed-note">
+					<span>Solution affichée</span>
+					<button className="rn-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+				</div>
+			) : (
+				<>
+					<p className="rn-msg" role="status" aria-live="polite">{conflictMessage}</p>
 
-			<p className="rn-help">
-				Touche une case pour cycler : vide → croix → reine ♛. Place exactement une reine par
-				ligne, colonne et couleur, sans que deux reines se touchent (même en diagonale).
-			</p>
+					<p className="rn-help">
+						Touche une case pour cycler : vide → croix → reine ♛. Place exactement une reine par
+						ligne, colonne et couleur, sans que deux reines se touchent (même en diagonale).
+					</p>
+				</>
+			)}
 		</div>
 	);
 }
@@ -265,6 +321,22 @@ const CSS = `
 .rn-new {
   border: none; background: var(--rn-accent); color: var(--accent-text-over);
   font-size: 18px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;
+}
+
+.rn-actions {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.rn-act {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 500; font-size: 13px;
+  border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.rn-act:hover { background: var(--gray-800); border-color: var(--rn-accent); color: var(--rn-accent); }
+
+.rn-revealed-note {
+  display: flex; align-items: center; gap: 14px; margin-top: 1.5rem;
+  color: var(--gray-300); font-size: 14px; font-weight: 500;
 }
 
 .rn-boardwrap { position: relative; }

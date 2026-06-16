@@ -30,6 +30,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [selected, setSelected] = useState<[number, number] | null>(null);
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
+	const [revealed, setRevealed] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
@@ -49,18 +50,19 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setSelected(null);
 		setStatus('playing');
 		setStarted(false);
+		setRevealed(false);
 		setElapsed(0);
 	}, []);
 
 	/* Timer */
 	useEffect(() => {
-		if (status !== 'playing' || !started) return;
+		if (status !== 'playing' || !started || revealed) return;
 		const id = setInterval(
 			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
 			250,
 		);
 		return () => clearInterval(id);
-	}, [status, started]);
+	}, [status, started, revealed]);
 
 	/* Conflicts: cells whose value is duplicated in row / col / box. */
 	const conflicts = useMemo(() => {
@@ -93,18 +95,52 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 
 	/* Win detection: grid full and conflict-free. */
 	useEffect(() => {
-		if (status === 'won') return;
+		if (status === 'won' || revealed) return;
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (value(r, c) == null) return;
 		if (conflicts.size > 0) return;
 		setStatus('won');
 		setSelected(null);
 		trackGame(gameId, 'game_won');
-	}, [entries, status, size, value, conflicts, gameId]);
+	}, [entries, status, revealed, size, value, conflicts, gameId]);
+
+	/* Hint: fill the selected empty cell (else the first empty) with its solution value. */
+	const hint = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		let target: [number, number] | null =
+			selected && given[selected[0]][selected[1]] === 0 && entries[selected[0]][selected[1]] == null
+				? selected
+				: null;
+		for (let r = 0; r < size && !target; r++)
+			for (let c = 0; c < size && !target; c++)
+				if (given[r][c] === 0 && entries[r][c] == null) target = [r, c];
+		if (!target) return;
+		const [r, c] = target;
+		setEntries((prev) => {
+			const next = prev.map((row) => [...row]);
+			next[r][c] = puzzle.solution[r][c];
+			return next;
+		});
+		if (!started) {
+			startRef.current = Date.now();
+			setStarted(true);
+			trackGame(gameId, 'game_started');
+		}
+		trackGame(gameId, 'hint_used');
+	}, [status, revealed, selected, given, entries, size, puzzle, started, gameId]);
+
+	/* Reveal the full solution (does not count as a win). */
+	const reveal = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		setEntries(puzzle.solution.map((row) => [...row]));
+		setSelected(null);
+		setRevealed(true);
+		trackGame(gameId, 'solution_shown');
+	}, [status, revealed, puzzle, gameId]);
 
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || !selected) return;
+			if (status === 'won' || revealed || !selected) return;
 			const [r, c] = selected;
 			if (given[r][c] !== 0) return;
 			setEntries((prev) => {
@@ -118,13 +154,13 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, selected, given, started, gameId],
+		[status, revealed, selected, given, started, gameId],
 	);
 
 	/* Keyboard (desktop). '0' maps to N for the 10×10 grid. */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (status === 'won') return;
+			if (status === 'won' || revealed) return;
 			let d = parseInt(e.key, 10);
 			if (e.key === '0') d = 10;
 			if (d >= 1 && d <= size) placeValue(d);
@@ -142,7 +178,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
-	}, [status, size, selected, placeValue]);
+	}, [status, revealed, size, selected, placeValue]);
 
 	const selVal = selected ? value(selected[0], selected[1]) : null;
 	const thin = '1px solid var(--sk-line)';
@@ -192,6 +228,15 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				</button>
 			</div>
 
+			{status !== 'won' && !revealed && (
+				<div className="sk-actions">
+					<button className="sk-act" onClick={hint}>💡 Indice</button>
+					{elapsed >= 60 && (
+						<button className="sk-act" onClick={reveal}>👁 Voir la solution</button>
+					)}
+				</div>
+			)}
+
 			<div className="sk-boardwrap">
 				<div
 					className="sk-board"
@@ -224,7 +269,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 										isPeer ? 'peer' : '',
 										sameVal ? 'same' : '',
 										bad ? 'bad' : '',
-										status === 'won' ? 'wondone' : '',
+										status === 'won' || revealed ? 'wondone' : '',
 									].join(' ')}
 									style={{
 										borderRight: c === size - 1 ? 'none' : (c + 1) % boxW === 0 ? thick : thin,
@@ -232,7 +277,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 									}}
 									onClick={() => setSelected([r, c])}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${v != null ? `, ${v}` : ', vide'}`}
-									disabled={status === 'won'}
+									disabled={status === 'won' || revealed}
 								>
 									{v != null ? v : ''}
 								</button>
@@ -256,21 +301,30 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<div className="sk-pad" aria-label="Pavé numérique">
-				{Array.from({ length: size }, (_, i) => i + 1).map((v) => (
-					<button key={v} className="sk-key" onClick={() => placeValue(v)}>
-						{v}
-					</button>
-				))}
-				<button className="sk-key erase" onClick={() => placeValue(null)} aria-label="Effacer">
-					⌫
-				</button>
-			</div>
+			{revealed ? (
+				<div className="sk-revealed-note">
+					<span>Solution affichée</span>
+					<button className="sk-replay" onClick={() => newGame(sizeKey, diffKey)}>Rejouer</button>
+				</div>
+			) : (
+				<>
+					<div className="sk-pad" aria-label="Pavé numérique">
+						{Array.from({ length: size }, (_, i) => i + 1).map((v) => (
+							<button key={v} className="sk-key" onClick={() => placeValue(v)}>
+								{v}
+							</button>
+						))}
+						<button className="sk-key erase" onClick={() => placeValue(null)} aria-label="Effacer">
+							⌫
+						</button>
+					</div>
 
-			<p className="sk-help">
-				Touche une case vide puis un chiffre de 1 à {size}. Chaque ligne, colonne et bloc
-				doit contenir tous les chiffres une seule fois.
-			</p>
+					<p className="sk-help">
+						Touche une case vide puis un chiffre de 1 à {size}. Chaque ligne, colonne et bloc
+						doit contenir tous les chiffres une seule fois.
+					</p>
+				</>
+			)}
 		</div>
 	);
 }
@@ -346,6 +400,37 @@ const CSS = `
   border-radius: 999px;
   padding: 8px 16px;
   cursor: pointer;
+}
+
+.sk-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.sk-act {
+  border: 1.5px solid var(--gray-700);
+  background: transparent;
+  color: var(--gray-300);
+  font: inherit;
+  font-weight: 500;
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.sk-act:hover { background: var(--gray-800); border-color: var(--sk-accent); color: var(--sk-accent); }
+
+.sk-revealed-note {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 1.5rem;
+  color: var(--gray-300);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .sk-boardwrap { position: relative; }

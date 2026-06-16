@@ -25,6 +25,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	);
 	const [selected, setSelected] = useState<[number, number] | null>(null);
 	const [status, setStatus] = useState<Status>('idle');
+	const [revealed, setRevealed] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
@@ -37,17 +38,17 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 
 	/* Timer */
 	useEffect(() => {
-		if (status !== 'playing') return;
+		if (status !== 'playing' || revealed) return;
 		const id = setInterval(
 			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
 			250,
 		);
 		return () => clearInterval(id);
-	}, [status]);
+	}, [status, revealed]);
 
 	/* Win detection */
 	useEffect(() => {
-		if (status === 'won') return;
+		if (status === 'won' || revealed) return;
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (cellValue(r, c) == null) return;
 		for (let r = 0; r < size; r++) {
@@ -63,7 +64,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setStatus('won');
 		setSelected(null);
 		trackGame(gameId, 'game_won');
-	}, [entries, status, size, rowT, colT, cellValue, gameId]);
+	}, [entries, status, revealed, size, rowT, colT, cellValue, gameId]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
@@ -72,12 +73,47 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setEntries(emptyEntries(d.size));
 		setSelected(null);
 		setStatus('idle');
+		setRevealed(false);
 		setElapsed(0);
 	}, []);
 
+	/* Hint: fill the selected empty cell (else the first empty) with its solution value. */
+	const hint = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		let target: [number, number] | null =
+			selected && puzzle[selected[0]][selected[1]] == null && entries[selected[0]][selected[1]] == null
+				? selected
+				: null;
+		for (let r = 0; r < size && !target; r++)
+			for (let c = 0; c < size && !target; c++)
+				if (puzzle[r][c] == null && entries[r][c] == null) target = [r, c];
+		if (!target) return;
+		const [r, c] = target;
+		setEntries((prev) => {
+			const next = prev.map((row) => [...row]);
+			next[r][c] = game.solution[r][c];
+			return next;
+		});
+		if (status === 'idle') {
+			startRef.current = Date.now();
+			setStatus('playing');
+			trackGame(gameId, 'game_started');
+		}
+		trackGame(gameId, 'hint_used');
+	}, [status, revealed, selected, puzzle, entries, size, game, gameId]);
+
+	/* Reveal the full solution (does not count as a win). */
+	const reveal = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		setEntries(game.solution.map((row) => [...row]));
+		setSelected(null);
+		setRevealed(true);
+		trackGame(gameId, 'solution_shown');
+	}, [status, revealed, game, gameId]);
+
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || !selected) return;
+			if (status === 'won' || revealed || !selected) return;
 			const [r, c] = selected;
 			if (puzzle[r][c] != null) return;
 			setEntries((prev) => {
@@ -91,13 +127,13 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, selected, puzzle, gameId],
+		[status, revealed, selected, puzzle, gameId],
 	);
 
 	/* Keyboard (desktop) */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (status === 'won') return;
+			if (status === 'won' || revealed) return;
 			const d = parseInt(e.key, 10);
 			if (d >= 1 && d <= maxVal) placeValue(d);
 			else if (e.key === 'Backspace' || e.key === 'Delete') placeValue(null);
@@ -114,7 +150,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
-	}, [status, maxVal, selected, size, placeValue]);
+	}, [status, revealed, maxVal, selected, size, placeValue]);
 
 	/* Sum state: ok | over | pending */
 	const rowState = (r: number): SumState => {
@@ -164,6 +200,15 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				</div>
 			</div>
 
+			{status !== 'won' && !revealed && (
+				<div className="st-actions">
+					<button className="st-act" onClick={hint}>💡 Indice</button>
+					{elapsed >= 60 && (
+						<button className="st-act" onClick={reveal}>👁 Voir la solution</button>
+					)}
+				</div>
+			)}
+
 			<div className="st-boardwrap">
 				<div
 					className="st-board"
@@ -180,7 +225,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 							setSelected={setSelected}
 							rowT={rowT}
 							rowState={rowState}
-							won={status === 'won'}
+							won={status === 'won' || revealed}
 						/>
 					))}
 					{/* Column targets row */}
@@ -207,21 +252,30 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<div className="st-pad" aria-label="Pavé numérique">
-				{Array.from({ length: maxVal }, (_, i) => i + 1).map((v) => (
-					<button key={v} className="st-key" onClick={() => placeValue(v)}>
-						{v}
-					</button>
-				))}
-				<button className="st-key erase" onClick={() => placeValue(null)} aria-label="Effacer">
-					⌫
-				</button>
-			</div>
+			{revealed ? (
+				<div className="st-revealed-note">
+					<span>Solution affichée</span>
+					<button className="st-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+				</div>
+			) : (
+				<>
+					<div className="st-pad" aria-label="Pavé numérique">
+						{Array.from({ length: maxVal }, (_, i) => i + 1).map((v) => (
+							<button key={v} className="st-key" onClick={() => placeValue(v)}>
+								{v}
+							</button>
+						))}
+						<button className="st-key erase" onClick={() => placeValue(null)} aria-label="Effacer">
+							⌫
+						</button>
+					</div>
 
-			<p className="st-help">
-				Touche une case vide puis choisis un nombre de 1 à {maxVal}.
-				Les pastilles indiquent la somme cible de chaque ligne et colonne.
-			</p>
+					<p className="st-help">
+						Touche une case vide puis choisis un nombre de 1 à {maxVal}.
+						Les pastilles indiquent la somme cible de chaque ligne et colonne.
+					</p>
+				</>
+			)}
 		</div>
 	);
 }
@@ -337,6 +391,37 @@ const CSS = `
   cursor: pointer;
   font-weight: 700;
   line-height: 1;
+}
+
+.st-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.st-act {
+  border: 1.5px solid var(--gray-700);
+  background: transparent;
+  color: var(--st-ink-soft);
+  font: inherit;
+  font-weight: 500;
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.st-act:hover { background: var(--gray-800); border-color: var(--st-accent); color: var(--st-accent); }
+
+.st-revealed-note {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 1.5rem;
+  color: var(--st-ink-soft);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .st-boardwrap { position: relative; }

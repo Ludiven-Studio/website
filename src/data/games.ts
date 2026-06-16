@@ -69,8 +69,17 @@ export const games: GameTile[] = [
 	{
 		id: 'suguru',
 		title: 'Suguru',
-		pitch: 'Des zones à remplir où deux cases voisines diffèrent toujours. Bientôt.',
+		pitch: 'Remplis chaque zone avec 1 à sa taille, sans que deux mêmes chiffres ne se touchent.',
 		icon: 'code',
-		status: 'soon',
+		href: '/jeux/suguru',
+		status: 'play',
+	},
+	{
+		id: 'motifs',
+		title: 'Motifs',
+		pitch: 'Découpe la grille en rectangles et carrés d\'après les indices de forme.',
+		icon: 'squares-four',
+		href: '/jeux/motifs',
+		status: 'play',
 	},
 ];

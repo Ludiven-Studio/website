@@ -13,6 +13,17 @@ describe('somme-toute engine', () => {
 		}
 	});
 
+	it('every difficulty stays uniquely solvable across many seeds (no guessing)', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const diff = DIFFS[key];
+			for (let seed = 1; seed <= 20; seed++) {
+				const game = generatePuzzle(diff, mulberry32(seed * 131 + diff.size));
+				const n = countSolutions(game.puzzle, game.size, game.maxVal, game.rowT, game.colT);
+				expect(n, `difficulty "${key}" seed ${seed} must have exactly one solution`).toBe(1);
+			}
+		}
+	});
+
 	it('removes the requested number of cells (or fewer if uniqueness blocks it)', () => {
 		const diff = DIFFS.facile;
 		const game = generatePuzzle(diff, mulberry32(999));

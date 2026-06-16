@@ -18,6 +18,8 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 	const [best, setBest] = useState(0);
 	const [status, setStatus] = useState<Status>('playing');
 	const [chosen, setChosen] = useState<number | null>(null);
+	const [eliminated, setEliminated] = useState<number[]>([]);
+	const [peeked, setPeeked] = useState(false);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const startedRef = useRef(false);
 
@@ -36,6 +38,8 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setScore(0);
 		setStatus('playing');
 		setChosen(null);
+		setEliminated([]);
+		setPeeked(false);
 		startedRef.current = false;
 	}, []);
 
@@ -52,6 +56,8 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 			timer.current = setTimeout(() => {
 				setQuestion(generateQuestion(DIFFS[diffKey]));
 				setChosen(null);
+				setEliminated([]);
+				setPeeked(false);
 			}, 650);
 		} else {
 			setStatus('over');
@@ -68,8 +74,30 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		}
 	};
 
+	/* Hint: remove one wrong option (keep at least the answer + one distractor). */
+	const eliminate = () => {
+		if (status === 'over' || chosen !== null) return;
+		const remaining = question.options
+			.map((v, i) => ({ v, i }))
+			.filter(({ v, i }) => v !== question.answer && !eliminated.includes(i));
+		if (remaining.length <= 1) return;
+		setEliminated((prev) => [...prev, remaining[0].i]);
+		trackGame(gameId, 'hint_used');
+	};
+
+	/* Reveal: highlight the correct option for this question. */
+	const peek = () => {
+		if (status === 'over' || chosen !== null || peeked) return;
+		setPeeked(true);
+		trackGame(gameId, 'solution_shown');
+	};
+
 	const optionClass = (value: number, idx: number) => {
-		if (chosen === null) return 'su-opt';
+		if (chosen === null) {
+			if (peeked && value === question.answer) return 'su-opt good';
+			if (eliminated.includes(idx)) return 'su-opt dim';
+			return 'su-opt';
+		}
 		if (value === question.answer) return 'su-opt good';
 		if (idx === chosen) return 'su-opt bad';
 		return 'su-opt dim';
@@ -114,12 +142,19 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 						key={i}
 						className={optionClass(v, i)}
 						onClick={() => choose(v, i)}
-						disabled={chosen !== null}
+						disabled={chosen !== null || eliminated.includes(i)}
 					>
 						{v}
 					</button>
 				))}
 			</div>
+
+			{status === 'playing' && chosen === null && (
+				<div className="su-actions">
+					<button className="su-act" onClick={eliminate}>💡 Indice</button>
+					<button className="su-act" onClick={peek}>👁 Voir la réponse</button>
+				</div>
+			)}
 
 			{status === 'over' ? (
 				<div className="su-over">
@@ -175,6 +210,17 @@ const CSS = `
 .su-scores { display: flex; gap: 0.5rem; font-weight: 700; font-size: 13px; }
 .su-score { background: var(--su-accent); color: var(--accent-text-over); border-radius: 999px; padding: 5px 12px; }
 .su-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; }
+
+.su-actions {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  margin-top: 1.25rem;
+}
+.su-act {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.su-act:hover { background: var(--gray-800); border-color: var(--su-accent); color: var(--su-accent); }
 
 .su-seq {
   display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;

@@ -24,10 +24,11 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const [marks, setMarks] = useState<Cell[][]>(() => emptyMarks());
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
+	const [revealed, setRevealed] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
-	const { given, constraints } = puzzle;
+	const { given, constraints, solution } = puzzle;
 	const n = SIZE;
 
 	const value = useCallback(
@@ -41,6 +42,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		setMarks(emptyMarks());
 		setStatus('playing');
 		setStarted(false);
+		setRevealed(false);
 		setElapsed(0);
 	}, []);
 
@@ -50,13 +52,13 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 
 	/* Timer */
 	useEffect(() => {
-		if (status !== 'playing' || !started) return;
+		if (status !== 'playing' || !started || revealed) return;
 		const id = setInterval(
 			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
 			250,
 		);
 		return () => clearInterval(id);
-	}, [status, started]);
+	}, [status, started, revealed]);
 
 	/* Conflicts: 3-in-a-row, row/col imbalance, violated = / ≠ constraints. */
 	const conflicts = useMemo(() => {
@@ -107,17 +109,17 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 
 	/* Win: grid full and conflict-free. */
 	useEffect(() => {
-		if (status === 'won') return;
+		if (status === 'won' || revealed) return;
 		for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (value(r, c) === 0) return;
 		if (conflicts.size === 0) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
-	}, [marks, status, value, conflicts, n, gameId]);
+	}, [marks, status, revealed, value, conflicts, n, gameId]);
 
 	const cycle = useCallback(
 		(r: number, c: number) => {
-			if (status === 'won' || given[r][c] !== 0) return;
+			if (status === 'won' || revealed || given[r][c] !== 0) return;
 			setMarks((prev) => {
 				const next = prev.map((row) => [...row]) as Cell[][];
 				next[r][c] = (((next[r][c] + 1) % 3) as Cell);
@@ -129,8 +131,38 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, started, given, gameId],
+		[status, revealed, started, given, gameId],
 	);
+
+	/* Hint: fill the first empty, non-given cell with its solution value. */
+	const hint = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		let target: [number, number] | null = null;
+		for (let r = 0; r < n && !target; r++)
+			for (let c = 0; c < n && !target; c++)
+				if (given[r][c] === 0 && marks[r][c] === 0) target = [r, c];
+		if (!target) return;
+		const [r, c] = target;
+		setMarks((prev) => {
+			const next = prev.map((row) => [...row]) as Cell[][];
+			next[r][c] = solution[r][c];
+			return next;
+		});
+		if (!started) {
+			startRef.current = Date.now();
+			setStarted(true);
+			trackGame(gameId, 'game_started');
+		}
+		trackGame(gameId, 'hint_used');
+	}, [status, revealed, started, given, marks, solution, n, gameId]);
+
+	/* Reveal the full solution (does not count as a win). */
+	const reveal = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		setMarks(solution.map((row) => [...row]));
+		setRevealed(true);
+		trackGame(gameId, 'solution_shown');
+	}, [status, revealed, solution, gameId]);
 
 	return (
 		<div className="rc-root">
@@ -158,6 +190,15 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				</div>
 			</div>
 
+			{status !== 'won' && !revealed && (
+				<div className="rc-actions">
+					<button className="rc-act" onClick={hint}>💡 Indice</button>
+					{elapsed >= 60 && (
+						<button className="rc-act" onClick={reveal}>👁 Voir la solution</button>
+					)}
+				</div>
+			)}
+
 			<div className="rc-boardwrap">
 				<div className="rc-board" style={{ ['--n' as string]: n }}>
 					{Array.from({ length: n }).map((_, r) =>
@@ -173,13 +214,13 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 										isGiven ? 'given' : '',
 										x === 1 ? 'rond' : x === 2 ? 'carre' : '',
 										bad ? 'bad' : '',
-										status === 'won' ? 'wondone' : '',
+										status === 'won' || revealed ? 'wondone' : '',
 									].join(' ')}
 									onClick={() => cycle(r, c)}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${
 										x === 1 ? ', rond' : x === 2 ? ', carré' : ', vide'
 									}`}
-									disabled={status === 'won'}
+									disabled={status === 'won' || revealed}
 								>
 									{x === 1 && <span className="rc-shape rc-rond-shape" />}
 									{x === 2 && <span className="rc-shape rc-carre-shape" />}
@@ -225,10 +266,17 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<p className="rc-help">
-				Touche une case pour cycler vide → ● → ■. Autant de ● que de ■ par ligne et colonne,
-				jamais 3 identiques à la suite, et respecte les signes = (identiques) et ≠ (différents).
-			</p>
+			{revealed ? (
+				<div className="rc-revealed-note">
+					<span>Solution affichée</span>
+					<button className="rc-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+				</div>
+			) : (
+				<p className="rc-help">
+					Touche une case pour cycler vide → ● → ■. Autant de ● que de ■ par ligne et colonne,
+					jamais 3 identiques à la suite, et respecte les signes = (identiques) et ≠ (différents).
+				</p>
+			)}
 		</div>
 	);
 }
@@ -274,6 +322,21 @@ const CSS = `
 .rc-new {
   border: none; background: var(--rc-accent); color: var(--accent-text-over);
   font-size: 18px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;
+}
+
+.rc-actions {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.rc-act {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.rc-act:hover { background: var(--gray-800); border-color: var(--rc-accent); color: var(--rc-accent); }
+
+.rc-revealed-note {
+  display: flex; align-items: center; gap: 14px; margin-top: 1.5rem;
+  color: var(--gray-300); font-size: 14px; font-weight: 500;
 }
 
 .rc-boardwrap { position: relative; }

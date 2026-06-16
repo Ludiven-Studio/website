@@ -23,6 +23,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const [path, setPath] = useState<[number, number][]>([]);
 	const [status, setStatus] = useState<Status>('loading');
 	const [started, setStarted] = useState(false);
+	const [revealed, setRevealed] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 	const boardRef = useRef<HTMLDivElement>(null);
@@ -41,6 +42,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		setDiffKey(dk);
 		setStatus('loading');
 		setStarted(false);
+		setRevealed(false);
 		setElapsed(0);
 		// Generate off the paint frame (7×7 can take a few hundred ms).
 		setTimeout(() => {
@@ -57,13 +59,13 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 
 	/* Timer */
 	useEffect(() => {
-		if (status !== 'playing' || !started) return;
+		if (status !== 'playing' || !started || revealed) return;
 		const id = setInterval(
 			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
 			250,
 		);
 		return () => clearInterval(id);
-	}, [status, started]);
+	}, [status, started, revealed]);
 
 	const inPath = useMemo(() => new Set(path.map(([r, c]) => key(r, c))), [path]);
 
@@ -84,14 +86,14 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 
 	/* Win: full coverage, checkpoints in order. */
 	useEffect(() => {
-		if (!puzzle || status !== 'playing') return;
+		if (!puzzle || status !== 'playing' || revealed) return;
 		if (path.length !== puzzle.size * puzzle.size) return;
 		if (errors.size > 0) return;
 		const last = path[path.length - 1];
 		if (puzzle.numbers[last[0]][last[1]] !== puzzle.k) return;
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [path, puzzle, status, errors, gameId]);
+	}, [path, puzzle, status, revealed, errors, gameId]);
 
 	const begin = () => {
 		if (!started) {
@@ -116,7 +118,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	   retracts. Extends onto an adjacent empty cell. */
 	const step = useCallback(
 		(cell: [number, number]) => {
-			if (status !== 'playing' || !puzzle) return;
+			if (status !== 'playing' || revealed || !puzzle) return;
 			const sz = puzzle.size;
 			const total = sz * sz;
 			setPath((prev) => {
@@ -137,13 +139,13 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				return prev;
 			});
 		},
-		[status, started, puzzle, wallSet],
+		[status, revealed, started, puzzle, wallSet],
 	);
 
 	/* Deliberate click on an already-traced cell: cut the path back to it. */
 	const truncateTo = useCallback(
 		(cell: [number, number]) => {
-			if (status !== 'playing') return;
+			if (status !== 'playing' || revealed) return;
 			setPath((prev) => {
 				const idx = prev.findIndex(([r, c]) => r === cell[0] && c === cell[1]);
 				return idx !== -1 ? prev.slice(0, idx + 1) : prev;
@@ -187,10 +189,36 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	};
 
 	const clearPath = () => {
-		if (!puzzle) return;
+		if (!puzzle || revealed) return;
 		setPath([startCell(puzzle)]);
 		if (status === 'won') setStatus('playing');
 	};
+
+	/* Hint: extend the path by one correct step along the solution. */
+	const hint = useCallback(() => {
+		if (!puzzle || status !== 'playing' || revealed) return;
+		const sol = puzzle.path;
+		let prefix = 0;
+		while (
+			prefix < path.length &&
+			prefix < sol.length &&
+			path[prefix][0] === sol[prefix][0] &&
+			path[prefix][1] === sol[prefix][1]
+		)
+			prefix++;
+		if (prefix >= sol.length) return; // already fully correct
+		setPath(sol.slice(0, prefix + 1).map((p) => [...p] as [number, number]));
+		begin();
+		trackGame(gameId, 'hint_used');
+	}, [puzzle, status, revealed, path, gameId]);
+
+	/* Reveal the full path (does not count as a win). */
+	const reveal = useCallback(() => {
+		if (!puzzle || status !== 'playing' || revealed) return;
+		setPath(puzzle.path.map((p) => [...p] as [number, number]));
+		setRevealed(true);
+		trackGame(gameId, 'solution_shown');
+	}, [puzzle, status, revealed, gameId]);
 
 	const n = puzzle?.size ?? 0;
 	const head = path[path.length - 1];
@@ -220,6 +248,15 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					</button>
 				</div>
 			</div>
+
+			{status === 'playing' && !revealed && (
+				<div className="zp-actions">
+					<button className="zp-act" onClick={hint}>💡 Indice</button>
+					{elapsed >= 60 && (
+						<button className="zp-act" onClick={reveal}>👁 Voir la solution</button>
+					)}
+				</div>
+			)}
 
 			<div className="zp-boardwrap">
 				{status === 'loading' || !puzzle ? (
@@ -299,10 +336,17 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<p className="zp-help">
-				Glisse depuis le 1 pour tracer un chemin qui passe par tous les nombres dans l'ordre et
-				remplit toutes les cases. Touche une case du tracé pour revenir en arrière.
-			</p>
+			{revealed ? (
+				<div className="zp-revealed-note">
+					<span>Solution affichée</span>
+					<button className="zp-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+				</div>
+			) : (
+				<p className="zp-help">
+					Glisse depuis le 1 pour tracer un chemin qui passe par tous les nombres dans l'ordre et
+					remplit toutes les cases. Touche une case du tracé pour revenir en arrière.
+				</p>
+			)}
 		</div>
 	);
 }
@@ -334,6 +378,26 @@ const CSS = `
   width: 100%;
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
   margin-bottom: 1rem;
+}
+
+.zp-actions {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.zp-act {
+  border: 1.5px solid var(--gray-700);
+  background: transparent;
+  color: var(--gray-300);
+  font: inherit; font-weight: 500; font-size: 13px;
+  border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.zp-act:hover { background: var(--gray-800); border-color: var(--zp-accent); color: var(--zp-accent); }
+
+.zp-revealed-note {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 1.25rem;
+  color: var(--gray-300); font-size: 14px; font-weight: 500;
 }
 .zp-bar-right { display: flex; align-items: center; gap: 0.5rem; }
 .zp-pills { display: flex; gap: 6px; flex-wrap: wrap; }

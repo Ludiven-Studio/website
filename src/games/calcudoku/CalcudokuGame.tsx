@@ -25,10 +25,12 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 	const [selected, setSelected] = useState<[number, number] | null>(null);
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
+	const [revealed, setRevealed] = useState(false);
+	const [showRules, setShowRules] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
-	const { size, cages, cageOf } = puzzle;
+	const { size, cages, cageOf, solution } = puzzle;
 
 	// Single-cell ("=") cages are revealed as fixed givens.
 	const given = useMemo(() => {
@@ -67,18 +69,19 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		setSelected(null);
 		setStatus('playing');
 		setStarted(false);
+		setRevealed(false);
 		setElapsed(0);
 	}, []);
 
 	/* Timer */
 	useEffect(() => {
-		if (status !== 'playing' || !started) return;
+		if (status !== 'playing' || !started || revealed) return;
 		const id = setInterval(
 			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
 			250,
 		);
 		return () => clearInterval(id);
-	}, [status, started]);
+	}, [status, started, revealed]);
 
 	/* Latin conflicts (row / col duplicates). */
 	const conflicts = useMemo(() => {
@@ -127,7 +130,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 
 	/* Win detection. */
 	useEffect(() => {
-		if (status === 'won') return;
+		if (status === 'won' || revealed) return;
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (value(r, c) == null) return;
 		if (conflicts.size > 0) return;
@@ -136,11 +139,11 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			setSelected(null);
 			trackGame(gameId, 'game_won');
 		}
-	}, [entries, status, size, value, conflicts, cageSatisfied, gameId]);
+	}, [entries, status, revealed, size, value, conflicts, cageSatisfied, gameId]);
 
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || !selected) return;
+			if (status === 'won' || revealed || !selected) return;
 			const [r, c] = selected;
 			if (given[r][c] != null) return;
 			setEntries((prev) => {
@@ -154,13 +157,47 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, selected, given, started, gameId],
+		[status, revealed, selected, given, started, gameId],
 	);
+
+	/* Hint: fill the selected empty cell (else the first empty) from the solution. */
+	const hint = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		let target: [number, number] | null =
+			selected && given[selected[0]][selected[1]] == null && entries[selected[0]][selected[1]] == null
+				? selected
+				: null;
+		for (let r = 0; r < size && !target; r++)
+			for (let c = 0; c < size && !target; c++)
+				if (given[r][c] == null && entries[r][c] == null) target = [r, c];
+		if (!target) return;
+		const [r, c] = target;
+		setEntries((prev) => {
+			const next = prev.map((row) => [...row]);
+			next[r][c] = solution[r][c];
+			return next;
+		});
+		if (!started) {
+			startRef.current = Date.now();
+			setStarted(true);
+			trackGame(gameId, 'game_started');
+		}
+		trackGame(gameId, 'hint_used');
+	}, [status, revealed, selected, given, entries, size, solution, started, gameId]);
+
+	/* Reveal the full solution (does not count as a win). */
+	const reveal = useCallback(() => {
+		if (status === 'won' || revealed) return;
+		setEntries(solution.map((row) => [...row]));
+		setSelected(null);
+		setRevealed(true);
+		trackGame(gameId, 'solution_shown');
+	}, [status, revealed, solution, gameId]);
 
 	/* Keyboard. */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (status === 'won') return;
+			if (status === 'won' || revealed) return;
 			const d = parseInt(e.key, 10);
 			if (d >= 1 && d <= size) placeValue(d);
 			else if (e.key === 'Backspace' || e.key === 'Delete') placeValue(null);
@@ -177,7 +214,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
-	}, [status, size, selected, placeValue]);
+	}, [status, revealed, size, selected, placeValue]);
 
 	const thin = '1px solid var(--cd-line)';
 	const thick = '2.5px solid var(--cd-line-strong)';
@@ -202,11 +239,50 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				</div>
 				<div className="cd-bar-right">
 					<div className="cd-timer">{fmtTime(elapsed)}</div>
+					<button
+						className={`cd-rulesbtn ${showRules ? 'active' : ''}`}
+						onClick={() => setShowRules((s) => !s)}
+						aria-label="Comment jouer ?"
+						aria-expanded={showRules}
+					>
+						?
+					</button>
 					<button className="cd-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 						↻
 					</button>
 				</div>
 			</div>
+
+			{showRules && (
+				<div className="cd-rules">
+					<h3>Comment jouer&nbsp;?</h3>
+					<p>
+						Remplis la grille pour que <strong>chaque ligne et chaque colonne</strong> contienne
+						les chiffres de 1 à {size}, sans répétition.
+					</p>
+					<p>
+						La grille est découpée en <strong>cages</strong> (zones aux bords épais). Dans chaque
+						cage, l'étiquette en haut à gauche donne une <strong>cible</strong> et une{' '}
+						<strong>opération</strong> : les chiffres de la cage doivent produire la cible.
+					</p>
+					<ul className="cd-legend">
+						<li><b>+</b> somme — ex. 5<b>+</b> → 2 et 3</li>
+						<li><b>−</b> différence — ex. 3<b>−</b> → 4 et 1</li>
+						<li><b>×</b> produit — ex. 6<b>×</b> → 2 et 3</li>
+						<li><b>÷</b> quotient — ex. 3<b>÷</b> → 6 et 2</li>
+						<li><b>=</b> valeur imposée — la case vaut ce chiffre</li>
+					</ul>
+				</div>
+			)}
+
+			{status !== 'won' && !revealed && (
+				<div className="cd-actions">
+					<button className="cd-act" onClick={hint}>💡 Indice</button>
+					{elapsed >= 60 && (
+						<button className="cd-act" onClick={reveal}>👁 Voir la solution</button>
+					)}
+				</div>
+			)}
 
 			<div className="cd-boardwrap">
 				<div
@@ -228,7 +304,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 										isGiven ? 'given' : 'entry',
 										isSel ? 'sel' : '',
 										bad ? 'bad' : '',
-										status === 'won' ? 'wondone' : '',
+										status === 'won' || revealed ? 'wondone' : '',
 									].join(' ')}
 									style={{
 										borderRight:
@@ -238,7 +314,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 									}}
 									onClick={() => setSelected([r, c])}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${v != null ? `, ${v}` : ', vide'}`}
-									disabled={status === 'won'}
+									disabled={status === 'won' || revealed}
 								>
 									{label && <span className="cd-cagelabel">{label}</span>}
 									<span className="cd-val">{v != null ? v : ''}</span>
@@ -263,21 +339,29 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<div className="cd-pad" aria-label="Pavé numérique">
-				{Array.from({ length: size }, (_, i) => i + 1).map((v) => (
-					<button key={v} className="cd-key" onClick={() => placeValue(v)}>
-						{v}
-					</button>
-				))}
-				<button className="cd-key erase" onClick={() => placeValue(null)} aria-label="Effacer">
-					⌫
-				</button>
-			</div>
+			{revealed ? (
+				<div className="cd-revealed-note">
+					<span>Solution affichée</span>
+					<button className="cd-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+				</div>
+			) : (
+				<>
+					<div className="cd-pad" aria-label="Pavé numérique">
+						{Array.from({ length: size }, (_, i) => i + 1).map((v) => (
+							<button key={v} className="cd-key" onClick={() => placeValue(v)}>
+								{v}
+							</button>
+						))}
+						<button className="cd-key erase" onClick={() => placeValue(null)} aria-label="Effacer">
+							⌫
+						</button>
+					</div>
 
-			<p className="cd-help">
-				Touche une case puis un chiffre de 1 à {size}. Chaque ligne et colonne contient 1 à {size}.
-				Dans chaque cage, les chiffres donnent la cible avec l'opération indiquée.
-			</p>
+					<p className="cd-help">
+						Touche une case puis un chiffre de 1 à {size}. Besoin d'aide ? Ouvre «&nbsp;?&nbsp;» en haut.
+					</p>
+				</>
+			)}
 		</div>
 	);
 }
@@ -323,6 +407,40 @@ const CSS = `
 .cd-new {
   border: none; background: var(--cd-accent); color: var(--accent-text-over);
   font-size: 18px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;
+}
+.cd-rulesbtn {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 700; font-size: 16px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; line-height: 1;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.cd-rulesbtn:hover, .cd-rulesbtn.active { background: var(--cd-accent); color: var(--accent-text-over); border-color: var(--cd-accent); }
+
+.cd-rules {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--gray-800); border-radius: 14px;
+  background: var(--gray-999); padding: 14px 16px; margin-bottom: 1.25rem;
+  font-size: 13.5px; line-height: 1.55; color: var(--gray-300);
+}
+.cd-rules h3 { font-family: var(--font-brand); font-weight: 600; font-size: 15px; color: var(--gray-0); margin: 0 0 6px; }
+.cd-rules p { margin: 0 0 8px; }
+.cd-rules strong { color: var(--gray-0); }
+.cd-legend { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.cd-legend li { display: flex; gap: 8px; align-items: baseline; }
+.cd-legend b { color: var(--cd-accent); min-width: 1.1em; display: inline-block; font-weight: 700; }
+
+.cd-actions {
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.cd-act {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.cd-act:hover { background: var(--gray-800); border-color: var(--cd-accent); color: var(--cd-accent); }
+
+.cd-revealed-note {
+  display: flex; align-items: center; gap: 14px; margin-top: 1.5rem;
+  color: var(--gray-300); font-size: 14px; font-weight: 500;
 }
 
 .cd-boardwrap { position: relative; }
