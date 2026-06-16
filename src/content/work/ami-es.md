@@ -13,6 +13,7 @@ tags:
   - Accessibilité
   - Neuro-développement
   - Android
+  - iOS
 gallery:
   - src: /assets/ami-es/accueil.png
     alt: Écran d'accueil de l'application AMI·ES présentant ses fonctionnalités
@@ -42,6 +43,16 @@ gallery:
   <li><strong>Infos campus</strong> — un accès centralisé aux ressources et documents utiles de l'université.</li>
   <li><strong>Listes de tâches &amp; applis utiles</strong> — des outils pour découper et organiser le quotidien.</li>
 </ul>
+<h3>Et bien d'autres à venir</h3>
 <p>
-  Application réalisée sous Unity et déployée sur Android.
+  L'application est en plein développement et continue de s'enrichir. Parmi les fonctionnalités à venir&nbsp;:
+</p>
+<ul>
+  <li><strong>Bilans d'activités</strong> — une vue d'ensemble pour prendre du recul sur ses journées et ses progrès.</li>
+  <li><strong>Mon jardin</strong> — un espace ludique qui valorise les efforts et entretient la motivation.</li>
+  <li><strong>Temps réflexif</strong> — un moment pour faire le point sur son ressenti et ses besoins.</li>
+  <li><strong>Côté social</strong> — rester en lien avec ses pairs et ses personnes référentes.</li>
+</ul>
+<p>
+  Application réalisée sous Unity, déployée sur Android et iOS.
 </p>
