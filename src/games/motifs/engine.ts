@@ -57,26 +57,37 @@ function shuffle<T>(arr: T[], rng: Rng): T[] {
 	return a;
 }
 
-/** Recursively split a rectangle into pieces of dims <= 4 and area <= 6. */
+/** Can (h×w) be split into two rectangles each of area >= 2? */
+function canSplit(h: number, w: number): boolean {
+	if (h >= 2 && w >= 2) return true;
+	if (h === 1 && w >= 4) return true; // 1×w strip -> 1×p + 1×(w-p), p in [2..w-2]
+	if (w === 1 && h >= 4) return true;
+	return false;
+}
+
+/** Recursively split into rectangles of dims <= 4, area in [2..6], never 1×1. */
 function partition(r0: number, c0: number, h: number, w: number, rng: Rng, out: Rect[]): void {
-	const canKeep = h <= 4 && w <= 4 && h * w <= 6;
-	if (canKeep && (h === 1 && w === 1 ? true : rng() < 0.45)) {
-		out.push({ r0, c0, h, w });
+	const tooBig = h > 4 || w > 4 || h * w > 6;
+	if (!(canSplit(h, w) && (tooBig || rng() < 0.55))) {
+		out.push({ r0, c0, h, w }); // kept piece (area >= 2 by construction)
 		return;
 	}
-	// Choose a split orientation; fall back to the other if not splittable.
-	const preferVert = w > h ? true : w < h ? false : rng() < 0.5;
-	const splitVert = preferVert ? w > 1 : !(h > 1) && w > 1;
-	if (splitVert) {
-		const cut = 1 + Math.floor(rng() * (w - 1));
+	// Feasible orientations that keep both halves at area >= 2.
+	const vOK = w >= 2 && (h >= 2 || w >= 4);
+	const hOK = h >= 2 && (w >= 2 || h >= 4);
+	const vertical = vOK && hOK ? (w > h ? true : w < h ? false : rng() < 0.5) : vOK;
+	if (vertical) {
+		const lo = h >= 2 ? 1 : 2;
+		const hi = h >= 2 ? w - 1 : w - 2;
+		const cut = lo + Math.floor(rng() * (hi - lo + 1));
 		partition(r0, c0, h, cut, rng, out);
 		partition(r0, c0 + cut, h, w - cut, rng, out);
-	} else if (h > 1) {
-		const cut = 1 + Math.floor(rng() * (h - 1));
+	} else {
+		const lo = w >= 2 ? 1 : 2;
+		const hi = w >= 2 ? h - 1 : h - 2;
+		const cut = lo + Math.floor(rng() * (hi - lo + 1));
 		partition(r0, c0, cut, w, rng, out);
 		partition(r0 + cut, c0, h - cut, w, rng, out);
-	} else {
-		out.push({ r0, c0, h, w }); // 1×w or h×1 that we chose not to split
 	}
 }
 

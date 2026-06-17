@@ -11,6 +11,18 @@ describe('motifs engine', () => {
 		}
 	});
 
+	it('never produces a single-cell piece (every rectangle has area >= 2)', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const diff = DIFFS[key];
+			for (let seed = 1; seed <= 30; seed++) {
+				const p = generateMotifs(diff, mulberry32(seed * 17 + diff.size));
+				p.rects.forEach((rect) =>
+					expect(rect.h * rect.w, `"${key}" seed ${seed} piece area`).toBeGreaterThanOrEqual(2),
+				);
+			}
+		}
+	});
+
 	it('rectangles tile the whole grid without gaps or overlaps', () => {
 		const p = generateMotifs(DIFFS.moyen, mulberry32(2024));
 		const { size, rects, solution } = p;
