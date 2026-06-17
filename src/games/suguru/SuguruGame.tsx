@@ -320,7 +320,7 @@ const CSS = `
   --sg-bad: #d9534f;
   --sg-line: var(--gray-700);
   --sg-line-strong: var(--gray-0);
-  --sg-cell: calc(min(420px, 92vw) / var(--n, 5));
+  --sg-cell: calc(min(420px, 100vw - 3.5rem) / var(--n, 5));
 
   width: 100%;
   max-width: 460px;

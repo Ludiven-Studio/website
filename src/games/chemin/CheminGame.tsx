@@ -361,7 +361,7 @@ const CSS = `
   --zp-wall: var(--gray-0);
   /* Constant board width whatever the size -> bigger grids get smaller cells,
      and the board never exceeds mobile width. */
-  --zp-cell: calc(min(420px, 92vw) / var(--n, 5));
+  --zp-cell: calc(min(420px, 100vw - 3.5rem) / var(--n, 5));
   --zp-stroke: calc(var(--zp-cell) * 0.34);
 
   width: 100%;

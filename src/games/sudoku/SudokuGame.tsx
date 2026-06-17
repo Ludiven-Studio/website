@@ -338,7 +338,7 @@ const CSS = `
   --sk-bad: #d9534f;
   --sk-line: var(--gray-700);
   --sk-line-strong: var(--gray-300);
-  --sk-cell: clamp(26px, calc(min(440px, 88vw) / var(--n, 6)), 52px);
+  --sk-cell: min(52px, calc((100vw - 3.5rem) / var(--n, 6)));
 
   width: 100%;
   max-width: 520px;

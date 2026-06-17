@@ -212,7 +212,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			<div className="st-boardwrap">
 				<div
 					className="st-board"
-					style={{ gridTemplateColumns: `repeat(${size}, var(--st-cell)) auto` }}
+					style={{ gridTemplateColumns: `repeat(${size}, var(--st-cell)) auto`, ['--n' as string]: size }}
 				>
 					{Array.from({ length: size }).map((_, r) => (
 						<FragmentRow
@@ -336,7 +336,7 @@ const CSS = `
   --st-bad: #d9534f;
   --st-cellbg: var(--gray-999);
   --st-givenbg: var(--gray-800);
-  --st-cell: clamp(42px, 11.5vw, 58px);
+  --st-cell: min(56px, calc((100vw - 3.5rem - 2.5rem) / (var(--n, 6) + 1)));
 
   width: 100%;
   max-width: 460px;

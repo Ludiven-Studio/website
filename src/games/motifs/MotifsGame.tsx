@@ -346,7 +346,7 @@ const CSS = `
 .mo-root {
   --mo-accent: var(--accent-regular);
   --mo-line: var(--gray-0);
-  --mo-cell: calc(min(420px, 92vw) / var(--n, 5));
+  --mo-cell: calc(min(420px, 100vw - 3.5rem) / var(--n, 5));
 
   width: 100%;
   max-width: 460px;

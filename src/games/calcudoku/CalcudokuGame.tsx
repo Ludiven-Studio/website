@@ -375,7 +375,7 @@ const CSS = `
   --cd-bad: #d9534f;
   --cd-line: var(--gray-700);
   --cd-line-strong: var(--gray-100);
-  --cd-cell: clamp(40px, calc(min(420px, 88vw) / var(--n, 4)), 64px);
+  --cd-cell: min(64px, calc((100vw - 3.5rem) / var(--n, 4)));
 
   width: 100%;
   max-width: 520px;

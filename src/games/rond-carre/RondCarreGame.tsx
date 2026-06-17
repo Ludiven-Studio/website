@@ -290,7 +290,7 @@ const CSS = `
   --rc-carre: #5b8def;  /* ■ blue */
   --rc-bad: #d9534f;
   --rc-line: var(--gray-700);
-  --rc-cell: calc(min(420px, 92vw) / var(--n, 6));
+  --rc-cell: calc(min(420px, 100vw - 3.5rem) / var(--n, 6));
 
   width: 100%;
   max-width: 460px;

@@ -282,7 +282,7 @@ const CSS = `
   --rn-ink: #23262e;            /* glyphs, readable on every pastel cell */
   --rn-line: rgba(35, 39, 48, 0.30);  /* visible cell grid, lighter than walls */
   --rn-line-strong: #2b2f3a;    /* region walls (theme-independent board) */
-  --rn-cell: clamp(34px, calc(min(440px, 88vw) / var(--n, 6)), 56px);
+  --rn-cell: min(56px, calc((100vw - 3.5rem) / var(--n, 6)));
 
   width: 100%;
   max-width: 520px;
