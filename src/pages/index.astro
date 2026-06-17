@@ -174,8 +174,9 @@ const projects = (await getCollection('work'))
 </BaseLayout>
 
 <script>
-	// Swap the 3-game teaser for the visitor's favorites when they have any.
-	const FAV_LIMIT = 6;
+	// Lead the home teaser with the visitor's favorites. Fewer than 3 favorites →
+	// favorites first, then fill up to 3 with other games. 3+ favorites → favorites only.
+	const MIN = 3;
 
 	let favs: string[] = [];
 	try {
@@ -184,24 +185,33 @@ const projects = (await getCollection('work'))
 		favs = [];
 	}
 
-	if (Array.isArray(favs) && favs.length) {
-		const favList = document.querySelector('[data-teaser-favorites]');
-		const defaultList = document.querySelector('[data-teaser-default]');
-		const title = document.querySelector<HTMLElement>('[data-games-title]');
+	const favList = document.querySelector('[data-teaser-favorites]');
+	if (Array.isArray(favs) && favs.length && favList) {
+		const items = Array.from(favList.querySelectorAll<HTMLElement>('[data-game-id]'));
+		const byId = new Map(items.map((li) => [li.dataset.gameId || '', li]));
+		const allIds = items.map((li) => li.dataset.gameId || ''); // registry order
+		const favIds = favs.filter((id) => byId.has(id)); // visitor order, existing games
 
-		const shown = favList
-			? Array.from(favList.querySelectorAll<HTMLElement>('[data-game-id]')).filter((li) => {
-					const on = favs.includes(li.dataset.gameId || '');
-					if (on) li.hidden = false;
-					return on;
-				})
-			: [];
+		const showIds =
+			favIds.length >= MIN
+				? favIds
+				: [...favIds, ...allIds.filter((id) => !favIds.includes(id))].slice(0, MIN);
 
-		if (shown.length) {
-			shown.slice(FAV_LIMIT).forEach((li) => (li.hidden = true));
-			defaultList?.setAttribute('hidden', '');
-			favList?.removeAttribute('hidden');
-			if (title) title.textContent = title.dataset.favTitle || title.textContent;
+		if (showIds.length) {
+			items.forEach((li) => (li.hidden = true));
+			showIds.forEach((id) => {
+				const li = byId.get(id);
+				if (li) {
+					li.hidden = false;
+					favList.appendChild(li); // reorder: favorites first
+				}
+			});
+
+			document.querySelector('[data-teaser-default]')?.setAttribute('hidden', '');
+			favList.removeAttribute('hidden');
+
+			const title = document.querySelector<HTMLElement>('[data-games-title]');
+			if (favIds.length >= MIN && title) title.textContent = title.dataset.favTitle || title.textContent;
 		}
 	}
 </script>

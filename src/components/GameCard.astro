@@ -41,8 +41,8 @@ const showFavorite = favorite && playable && id;
 				aria-pressed="false"
 				aria-label={`Mettre ${title} en favori`}
 			>
-				<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-					<path d="M12 21s-7.5-4.6-10.1-9.2C.3 8.9 1.3 5.4 4.3 4.4c2-.7 4 .1 5.1 1.8l.6.9.6-.9c1.1-1.7 3.1-2.5 5.1-1.8 3 1 4 4.5 2.4 7.4C19.5 16.4 12 21 12 21z" />
+				<svg viewBox="0 0 256 256" width="22" height="22" aria-hidden="true">
+					<path d="M128 216S28 160 28 92a52 52 0 0 1 100-20h0a52 52 0 0 1 100 20c0 68-100 124-100 124Z" />
 				</svg>
 			</button>
 		)
@@ -82,7 +82,8 @@ const showFavorite = favorite && playable && id;
 	.fav-toggle svg {
 		fill: none;
 		stroke: currentColor;
-		stroke-width: 2;
+		stroke-width: 18;
+		stroke-linejoin: round;
 	}
 
 	.fav-toggle:hover,
