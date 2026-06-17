@@ -137,7 +137,11 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	/* Hint: fill the first empty, non-given cell with its solution value. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed) return;
+		// Priority 1: fix a wrong cell. Priority 2: fill an empty cell.
 		let target: [number, number] | null = null;
+		for (let r = 0; r < n && !target; r++)
+			for (let c = 0; c < n && !target; c++)
+				if (given[r][c] === 0 && marks[r][c] !== 0 && marks[r][c] !== solution[r][c]) target = [r, c];
 		for (let r = 0; r < n && !target; r++)
 			for (let c = 0; c < n && !target; c++)
 				if (given[r][c] === 0 && marks[r][c] === 0) target = [r, c];

@@ -80,13 +80,18 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	/* Hint: fill the selected empty cell (else the first empty) with its solution value. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed) return;
+		const editable = (r: number, c: number) => puzzle[r][c] == null;
+		const wrong = (r: number, c: number) =>
+			editable(r, c) && entries[r][c] != null && entries[r][c] !== game.solution[r][c];
+		const empty = (r: number, c: number) => editable(r, c) && entries[r][c] == null;
+		// Priority 1: fix a wrong entry. Priority 2: fill an empty cell.
 		let target: [number, number] | null =
-			selected && puzzle[selected[0]][selected[1]] == null && entries[selected[0]][selected[1]] == null
-				? selected
-				: null;
+			selected && wrong(selected[0], selected[1]) ? selected : null;
 		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++)
-				if (puzzle[r][c] == null && entries[r][c] == null) target = [r, c];
+			for (let c = 0; c < size && !target; c++) if (wrong(r, c)) target = [r, c];
+		if (!target && selected && empty(selected[0], selected[1])) target = selected;
+		for (let r = 0; r < size && !target; r++)
+			for (let c = 0; c < size && !target; c++) if (empty(r, c)) target = [r, c];
 		if (!target) return;
 		const [r, c] = target;
 		setEntries((prev) => {

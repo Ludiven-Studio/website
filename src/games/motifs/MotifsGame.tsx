@@ -176,15 +176,21 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	/* Hint: place one correct piece from the solution. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed) return;
+		const sameRect = (a: Rect, b: Rect) =>
+			a.r0 === b.r0 && a.c0 === b.c0 && a.h === b.h && a.w === b.w;
 		const matches = (rect: Rect) => {
 			for (let r = rect.r0; r < rect.r0 + rect.h; r++)
 				for (let c = rect.c0; c < rect.c0 + rect.w; c++) if (owner[r][c] === -1) return false;
-			// already covered exactly by one placed rect?
 			const idx = owner[rect.r0][rect.c0];
 			const p = placed[idx];
-			return p && p.r0 === rect.r0 && p.c0 === rect.c0 && p.h === rect.h && p.w === rect.w;
+			return p && sameRect(p, rect);
 		};
-		const todo = rects.find((rect) => !matches(rect));
+		// Priority 1: replace a wrong piece (a placed rect that is no solution rect)
+		// with the solution rect covering its top-left cell.
+		const wrong = placed.find((p) => !rects.some((r) => sameRect(r, p)));
+		let todo = wrong ? rects.find((r) => inRect(r, wrong.r0, wrong.c0)) : undefined;
+		// Priority 2: reveal the next solution rect not yet correctly placed.
+		if (!todo) todo = rects.find((rect) => !matches(rect));
 		if (!todo) return;
 		addPiece({ ...todo });
 		trackGame(gameId, 'hint_used');

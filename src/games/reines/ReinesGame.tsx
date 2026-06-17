@@ -129,12 +129,17 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed) return;
 		const { solution } = puzzle;
+		// Priority 1: a row with a misplaced queen (an error).
 		let target = -1;
-		for (let r = 0; r < size; r++)
-			if (marks[r][solution[r]] !== 2) {
-				target = r;
-				break;
-			}
+		for (let r = 0; r < size && target === -1; r++)
+			for (let c = 0; c < size; c++)
+				if (marks[r][c] === 2 && c !== solution[r]) {
+					target = r;
+					break;
+				}
+		// Priority 2: a row whose correct queen isn't placed yet.
+		for (let r = 0; r < size && target === -1; r++)
+			if (marks[r][solution[r]] !== 2) target = r;
 		if (target === -1) return;
 		setMarks((prev) => {
 			const next = prev.map((row) => [...row]) as CellState[][];
