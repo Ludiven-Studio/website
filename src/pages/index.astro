@@ -347,6 +347,11 @@ const projects = (await getCollection('work'))
 		margin: 0;
 	}
 
+	/* Let the `hidden` attribute actually hide a teaser list (display:grid would win). */
+	.games-teaser[hidden] {
+		display: none;
+	}
+
 	@media (min-width: 50em) {
 		.games-teaser {
 			grid-template-columns: repeat(3, 1fr);
