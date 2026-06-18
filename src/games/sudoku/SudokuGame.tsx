@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SIZES, DIFFS, generateSudoku, type SudokuPuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
-import { dailySeed } from '../../lib/leaderboard';
+import { getDaily, dailyWeekdayLabel } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 
 /* =====================================================
@@ -23,9 +23,9 @@ const fmtTime = (s: number) =>
 const boxIndex = (r: number, c: number, boxH: number, boxW: number, n: number) =>
 	Math.floor(r / boxH) * (n / boxW) + Math.floor(c / boxW);
 
-// Fixed daily challenge (same grid for everyone that day).
+// Daily challenge: fixed size; seed + difficulty come from the server (same for everyone).
 const DAILY_SIZE: SizeKey = '9';
-const DAILY_DIFF: keyof typeof DIFFS = 'facile';
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 
 export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [sizeKey, setSizeKey] = useState<SizeKey>('6');
@@ -41,7 +41,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
 	const [daily, setDaily] = useState(false);
-	const [assisted, setAssisted] = useState(false); // hint/solution used → out of ranking
+	const [dailyLoading, setDailyLoading] = useState(false);
 	const startRef = useRef<number>(0);
 
 	const { size, boxH, boxW, given } = puzzle;
@@ -54,7 +54,6 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const newGame = useCallback((sk: SizeKey, dk: keyof typeof DIFFS) => {
 		const variant = SIZES[sk];
 		setDaily(false);
-		setAssisted(false);
 		setSizeKey(sk);
 		setDiffKey(dk);
 		setPuzzle(generateSudoku(variant, DIFFS[dk]));
@@ -67,14 +66,12 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 	}, []);
 
-	/* Daily challenge: same grid for everyone today (seeded by date + game). */
-	const startDaily = useCallback(() => {
+	/* Daily challenge: server-issued seed + difficulty (same grid for everyone today). */
+	const startDaily = useCallback(async () => {
 		const variant = SIZES[DAILY_SIZE];
 		setDaily(true);
-		setAssisted(false);
+		setDailyLoading(true);
 		setSizeKey(DAILY_SIZE);
-		setDiffKey(DAILY_DIFF);
-		setPuzzle(generateSudoku(variant, DIFFS[DAILY_DIFF], mulberry32(dailySeed(gameId))));
 		setEntries(emptyEntries(variant.size));
 		setSelected(null);
 		setStatus('playing');
@@ -82,6 +79,18 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setRevealed(false);
 		setHinted(new Set());
 		setElapsed(0);
+		const { seed, diffIndex } = await getDaily(gameId);
+		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		setDiffKey(dk);
+		setPuzzle(generateSudoku(variant, DIFFS[dk], mulberry32(seed)));
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Daily mode: chrono starts when the player presses Start. */
+	const startTimer = useCallback(() => {
+		startRef.current = Date.now();
+		setStarted(true);
+		trackGame(gameId, 'game_started');
 	}, [gameId]);
 
 	/* Timer */
@@ -157,7 +166,6 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			return next;
 		});
 		setHinted((prev) => new Set(prev).add(`${r},${c}`));
-		setAssisted(true);
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
@@ -172,13 +180,12 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setEntries(puzzle.solution.map((row) => [...row]));
 		setSelected(null);
 		setRevealed(true);
-		setAssisted(true);
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, puzzle, gameId]);
 
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || revealed || !selected) return;
+			if (status === 'won' || revealed || !selected || (daily && !started)) return;
 			const [r, c] = selected;
 			if (given[r][c] !== 0) return;
 			setEntries((prev) => {
@@ -198,7 +205,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, revealed, selected, given, started, gameId],
+		[status, revealed, selected, given, started, daily, gameId],
 	);
 
 	/* Keyboard (desktop). */
@@ -251,7 +258,11 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{daily ? (
-				<div className="sk-daily-tag">Même grille pour tous aujourd'hui · {SIZES[DAILY_SIZE].label}</div>
+				<div className="sk-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} · ${SIZES[DAILY_SIZE].label}`}
+				</div>
 			) : (
 				<div className="sk-controls">
 					<div className="sk-group" role="tablist" aria-label="Taille">
@@ -285,16 +296,18 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 
 			<div className="sk-bar">
 				<div className="sk-timer" aria-live="off">{fmtTime(elapsed)}</div>
-				<button
-					className="sk-new"
-					onClick={() => newGame(sizeKey, diffKey)}
-					aria-label="Nouvelle grille"
-				>
-					↻ Nouvelle
-				</button>
+				{!daily && (
+					<button
+						className="sk-new"
+						onClick={() => newGame(sizeKey, diffKey)}
+						aria-label="Nouvelle grille"
+					>
+						↻ Nouvelle
+					</button>
+				)}
 			</div>
 
-			{status !== 'won' && !revealed && (
+			{status !== 'won' && !revealed && !daily && (
 				<div className="sk-actions">
 					<button className="sk-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -303,9 +316,13 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{daily && status === 'won' && (
+				<div className="sk-daily-won">🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></div>
+			)}
+
 			<div className="sk-boardwrap">
 				<div
-					className="sk-board"
+					className={`sk-board ${daily && !started ? 'blurred' : ''}`}
 					style={{
 						gridTemplateColumns: `repeat(${size}, var(--sk-cell))`,
 						['--n' as string]: size,
@@ -344,7 +361,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 									}}
 									onClick={() => setSelected([r, c])}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${v != null ? `, ${v}` : ', vide'}`}
-									disabled={status === 'won' || revealed}
+									disabled={status === 'won' || revealed || (daily && !started)}
 								>
 									{v != null ? v : ''}
 								</button>
@@ -353,28 +370,43 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
-				{status === 'won' && (
+				{daily && dailyLoading && (
+					<div className="sk-overlay">
+						<div className="sk-overlay-card"><p className="sk-windiff">Préparation du défi…</p></div>
+					</div>
+				)}
+
+				{daily && !dailyLoading && !started && status !== 'won' && (
+					<div className="sk-overlay">
+						<button className="sk-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
+
+				{status === 'won' && !daily && (
 					<div className="sk-win" role="dialog" aria-label="Grille résolue">
 						<div className="sk-wincard">
 							<div className="sk-winmark">🧩</div>
 							<h2>Résolu !</h2>
 							<p className="sk-wintime">{fmtTime(elapsed)}</p>
-							<p className="sk-windiff">
-								{daily ? `Défi du jour · ${SIZES[sizeKey].label}` : `${SIZES[sizeKey].label} · ${DIFFS[diffKey].label}`}
-							</p>
-							{daily && (
-								<>
-									{assisted && <p className="sk-assisted">Partie assistée — hors classement.</p>}
-									<Leaderboard game={gameId} metric="time" submitValue={assisted ? undefined : elapsed} />
-								</>
-							)}
-							<button className="sk-replay" onClick={() => (daily ? startDaily() : newGame(sizeKey, diffKey))}>
+							<p className="sk-windiff">{SIZES[sizeKey].label} · {DIFFS[diffKey].label}</p>
+							<button className="sk-replay" onClick={() => newGame(sizeKey, diffKey)}>
 								Rejouer
 							</button>
 						</div>
 					</div>
 				)}
 			</div>
+
+			{daily && (
+				<>
+					{status === 'won' && (
+						<button className="sk-replay sk-daily-replay" onClick={startDaily}>
+							↻ Rejouer le défi
+						</button>
+					)}
+					<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				</>
+			)}
 
 			{revealed ? (
 				<div className="sk-revealed-note">
@@ -439,7 +471,6 @@ const CSS = `
   text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
   margin-bottom: 0.75rem;
 }
-.sk-assisted { color: #d9534f; font-size: 12.5px; margin: 0 0 0.5rem; }
 .sk-pill {
   border: 1.5px solid var(--gray-700);
   background: transparent;
@@ -627,9 +658,30 @@ const CSS = `
   cursor: pointer;
 }
 
+.sk-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.sk-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  animation: sk-fade 0.25s ease;
+}
+.sk-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--sk-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
+}
+.sk-startbtn {
+  border: none; background: var(--sk-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.sk-daily-won {
+  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
+}
+.sk-daily-won strong { color: var(--sk-accent); font-variant-numeric: tabular-nums; }
+.sk-daily-replay { display: block; margin: 1rem auto 0; }
+
 @keyframes sk-fade { from { opacity: 0; } to { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .sk-cell, .sk-win { transition: none; animation: none; }
+  .sk-cell, .sk-win, .sk-overlay { transition: none; animation: none; }
 }
 `;

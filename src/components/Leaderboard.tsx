@@ -60,7 +60,7 @@ export default function Leaderboard({ game, metric, submitValue }: Props) {
 				<p className="lb-msg">Le classement n'est pas encore configuré.</p>
 			) : (
 				<>
-					{!name && (
+					{submitValue != null && !name && (
 						<div className="lb-name">
 							<input
 								type="text"

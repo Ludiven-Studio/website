@@ -26,9 +26,20 @@ const hashStr = (s: string): number => {
 	return h >>> 0;
 };
 
-/** Deterministic seed: same date + game → same grid for everyone. */
+/** Deterministic seed (client fallback): same date + game → same grid. */
 export const dailySeed = (gameId: string, d: Date = new Date()): number =>
 	(Math.imul(dateSeed(d), 2654435761) ^ hashStr(gameId)) >>> 0;
+
+const WEEKDAYS_FR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+export const dailyWeekdayLabel = (d: Date = new Date()): string => WEEKDAYS_FR[d.getDay()];
+
+/** Difficulty tier 0..2, easier early week → harder weekend (client fallback). */
+export const dailyDifficultyIndex = (d: Date = new Date()): number => {
+	const dow = d.getDay(); // 0=Sun..6=Sat
+	if (dow === 1 || dow === 2) return 0; // Mon/Tue → facile
+	if (dow >= 3 && dow <= 5) return 1; // Wed/Thu/Fri → moyen
+	return 2; // Sat/Sun → difficile
+};
 
 const NAME_KEY = 'ludiven-player';
 export const playerName = (): string => {
@@ -51,6 +62,27 @@ const headers = (): Record<string, string> => ({
 	Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
 	'Content-Type': 'application/json',
 });
+
+/** Daily seed + difficulty from the server (authoritative, unpredictable).
+ *  Falls back to a date-derived seed when Supabase is off or unreachable. */
+export async function getDaily(gameId: string): Promise<{ seed: number; diffIndex: number }> {
+	const fallback = { seed: dailySeed(gameId), diffIndex: dailyDifficultyIndex() };
+	if (!leaderboardEnabled()) return fallback;
+	try {
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_daily`, {
+			method: 'POST',
+			headers: headers(),
+			body: JSON.stringify({ p_game: gameId }),
+		});
+		if (!res.ok) return fallback;
+		const rows = await res.json();
+		const row = Array.isArray(rows) ? rows[0] : rows;
+		if (!row || row.seed == null) return fallback;
+		return { seed: Number(row.seed) >>> 0, diffIndex: Number(row.diff_index) || 0 };
+	} catch {
+		return fallback;
+	}
+}
 
 async function submitScore(game: string, value: number, metric: Metric): Promise<boolean> {
 	if (!leaderboardEnabled()) return false;
