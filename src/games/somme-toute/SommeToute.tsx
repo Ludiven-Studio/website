@@ -11,6 +11,7 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    SOMME TOUTE — React island (training mode)
@@ -329,24 +330,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		<div className="st-root">
 			<style>{CSS}</style>
 
-			<div className="st-modes" role="tablist" aria-label="Mode">
-				<button
-					role="tab"
-					aria-selected={!daily}
-					className={`st-pill ${!daily ? 'active' : ''}`}
-					onClick={() => daily && newGame(diffKey)}
-				>
-					Libre
-				</button>
-				<button
-					role="tab"
-					aria-selected={daily}
-					className={`st-pill ${daily ? 'active' : ''}`}
-					onClick={startDaily}
-				>
-					🏆 Défi du jour
-				</button>
-			</div>
+			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<div className="st-daily-tag">
@@ -582,7 +566,6 @@ const CSS = `
 }
 .st-bar-right { display: flex; align-items: center; gap: 0.5rem; }
 .st-pills { display: flex; gap: 6px; flex-wrap: wrap; }
-.st-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
 .st-daily-tag {
   text-align: center; color: var(--st-ink-soft); font-size: 12.5px; font-weight: 500;
   margin-bottom: 0.75rem;

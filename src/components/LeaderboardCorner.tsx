@@ -34,8 +34,8 @@ export default function LeaderboardCorner({ game, metric }: Props) {
 
 const CSS = `
 .lbc-root {
-  position: fixed; right: 12px; bottom: 12px; z-index: 50;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
 .lbc-pill {
   border: none; background: var(--accent-regular); color: var(--accent-text-over);

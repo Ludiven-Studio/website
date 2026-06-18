@@ -10,6 +10,7 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    SUITE MYSTÈRE — React island.
@@ -263,24 +264,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		<div className="su-root">
 			<style>{CSS}</style>
 
-			<div className="su-modes" role="tablist" aria-label="Mode">
-				<button
-					role="tab"
-					aria-selected={!daily}
-					className={`su-pill ${!daily ? 'active' : ''}`}
-					onClick={() => daily && newGame(diffKey)}
-				>
-					Libre
-				</button>
-				<button
-					role="tab"
-					aria-selected={daily}
-					className={`su-pill ${daily ? 'active' : ''}`}
-					onClick={startDaily}
-				>
-					🏆 Défi du jour
-				</button>
-			</div>
+			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<>
@@ -421,7 +405,6 @@ const CSS = `
   align-items: center;
 }
 
-.su-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
 .su-daily-tag {
   text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
   margin-bottom: 0.6rem;

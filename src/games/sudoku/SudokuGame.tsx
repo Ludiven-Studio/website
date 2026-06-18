@@ -11,6 +11,7 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    SUDOKU — React island (training mode)
@@ -331,24 +332,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		<div className="sk-root">
 			<style>{CSS}</style>
 
-			<div className="sk-modes" role="tablist" aria-label="Mode">
-				<button
-					role="tab"
-					aria-selected={!daily}
-					className={`sk-pill ${!daily ? 'active' : ''}`}
-					onClick={() => daily && newGame(sizeKey, diffKey)}
-				>
-					Libre
-				</button>
-				<button
-					role="tab"
-					aria-selected={daily}
-					className={`sk-pill ${daily ? 'active' : ''}`}
-					onClick={startDaily}
-				>
-					🏆 Défi du jour
-				</button>
-			</div>
+			<ModeToggle daily={daily} onFree={() => daily && newGame(sizeKey, diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<div className="sk-daily-tag">
@@ -564,7 +548,6 @@ const CSS = `
   margin-bottom: 0.75rem;
 }
 .sk-group { display: flex; gap: 6px; flex-wrap: wrap; }
-.sk-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
 .sk-daily-tag {
   text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
   margin-bottom: 0.75rem;

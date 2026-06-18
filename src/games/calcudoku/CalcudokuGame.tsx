@@ -11,6 +11,7 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    CALCUDOKU (KenKen) — React island.
@@ -369,24 +370,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		<div className="cd-root">
 			<style>{CSS}</style>
 
-			<div className="cd-modes" role="tablist" aria-label="Mode">
-				<button
-					role="tab"
-					aria-selected={!daily}
-					className={`cd-pill ${!daily ? 'active' : ''}`}
-					onClick={() => daily && newGame(diffKey)}
-				>
-					Libre
-				</button>
-				<button
-					role="tab"
-					aria-selected={daily}
-					className={`cd-pill ${daily ? 'active' : ''}`}
-					onClick={startDaily}
-				>
-					🏆 Défi du jour
-				</button>
-			</div>
+			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
 
 			{daily && (
 				<div className="cd-daily-tag">
@@ -713,7 +697,6 @@ const CSS = `
 .cd-windiff { color: var(--gray-300); font-size: 13px; margin: 2px 0 14px; }
 .cd-replay { border: none; background: var(--cd-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
 
-.cd-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
 .cd-daily-tag {
   text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
   margin-bottom: 0.75rem;

@@ -11,6 +11,7 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    MOTIFS — React island. Split the grid into rectangles;
@@ -408,24 +409,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		<div className="mo-root">
 			<style>{CSS}</style>
 
-			<div className="mo-modes" role="tablist" aria-label="Mode">
-				<button
-					role="tab"
-					aria-selected={!daily}
-					className={`mo-pill ${!daily ? 'active' : ''}`}
-					onClick={() => daily && newGame(diffKey)}
-				>
-					Libre
-				</button>
-				<button
-					role="tab"
-					aria-selected={daily}
-					className={`mo-pill ${daily ? 'active' : ''}`}
-					onClick={startDaily}
-				>
-					🏆 Défi du jour
-				</button>
-			</div>
+			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<div className="mo-daily-tag">
@@ -597,7 +581,6 @@ const CSS = `
   align-items: center;
 }
 
-.mo-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
 .mo-daily-tag {
   text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
   margin-bottom: 0.75rem;

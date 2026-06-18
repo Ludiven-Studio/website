@@ -11,6 +11,7 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    ROND & CARRÉ (façon LinkedIn "Tango") — React island.
@@ -306,24 +307,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		<div className="rc-root">
 			<style>{CSS}</style>
 
-			<div className="rc-modes" role="tablist" aria-label="Mode">
-				<button
-					role="tab"
-					aria-selected={!daily}
-					className={`rc-pill ${!daily ? 'active' : ''}`}
-					onClick={() => daily && newGame(diffKey)}
-				>
-					Libre
-				</button>
-				<button
-					role="tab"
-					aria-selected={daily}
-					className={`rc-pill ${daily ? 'active' : ''}`}
-					onClick={startDaily}
-				>
-					🏆 Défi du jour
-				</button>
-			</div>
+			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<div className="rc-daily-tag">
@@ -509,7 +493,6 @@ const CSS = `
   align-items: center;
 }
 
-.rc-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
 .rc-daily-tag {
   text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
   margin-bottom: 0.75rem;

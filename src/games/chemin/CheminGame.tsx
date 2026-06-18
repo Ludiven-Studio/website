@@ -11,6 +11,7 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    LE CHEMIN (LinkedIn "Zip") — React island.
@@ -359,24 +360,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		<div className="zp-root">
 			<style>{CSS}</style>
 
-			<div className="zp-modes" role="tablist" aria-label="Mode">
-				<button
-					role="tab"
-					aria-selected={!daily}
-					className={`zp-pill ${!daily ? 'active' : ''}`}
-					onClick={() => daily && newGame(diffKey)}
-				>
-					Libre
-				</button>
-				<button
-					role="tab"
-					aria-selected={daily}
-					className={`zp-pill ${daily ? 'active' : ''}`}
-					onClick={startDaily}
-				>
-					🏆 Défi du jour
-				</button>
-			</div>
+			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<div className="zp-daily-tag">
@@ -573,7 +557,6 @@ const CSS = `
   align-items: center;
 }
 
-.zp-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
 .zp-daily-tag {
   text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
   margin-bottom: 0.75rem;
