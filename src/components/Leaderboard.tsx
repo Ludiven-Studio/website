@@ -22,6 +22,7 @@ interface Props {
 export default function Leaderboard({ game, metric, submitValue }: Props) {
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
+	const [editing, setEditing] = useState(false);
 	const [rows, setRows] = useState<ScoreRow[]>([]);
 	const [loading, setLoading] = useState(true);
 	const submitted = useRef(false);
@@ -46,10 +47,17 @@ export default function Leaderboard({ game, metric, submitValue }: Props) {
 		setPlayerName(n);
 		submitted.current = false; // allow submitting the pending run under the new name
 		setName(n);
+		setEditing(false);
+	};
+
+	const startEdit = () => {
+		setDraft(name);
+		setEditing(true);
 	};
 
 	const me = name.toLowerCase();
 	const fmt = (v: number) => (metric === 'time' ? fmtTime(v) : String(v));
+	const showInput = editing || (submitValue != null && !name);
 
 	return (
 		<div className="lb-root">
@@ -60,21 +68,6 @@ export default function Leaderboard({ game, metric, submitValue }: Props) {
 				<p className="lb-msg">Le classement n'est pas encore configuré.</p>
 			) : (
 				<>
-					{submitValue != null && !name && (
-						<div className="lb-name">
-							<input
-								type="text"
-								maxLength={20}
-								placeholder="Ton pseudo"
-								value={draft}
-								onChange={(e) => setDraft(e.target.value)}
-								onKeyDown={(e) => e.key === 'Enter' && save()}
-								aria-label="Pseudo"
-							/>
-							<button onClick={save}>Valider</button>
-						</div>
-					)}
-
 					{loading ? (
 						<p className="lb-msg">Chargement…</p>
 					) : rows.length === 0 ? (
@@ -89,6 +82,36 @@ export default function Leaderboard({ game, metric, submitValue }: Props) {
 								</li>
 							))}
 						</ol>
+					)}
+
+					{showInput ? (
+						<div className="lb-name">
+							<input
+								type="text"
+								maxLength={20}
+								placeholder="Ton pseudo"
+								value={draft}
+								onChange={(e) => setDraft(e.target.value)}
+								onKeyDown={(e) => e.key === 'Enter' && save()}
+								aria-label="Pseudo"
+								autoFocus
+							/>
+							<button onClick={save}>Valider</button>
+							{editing && (
+								<button className="lb-cancel" onClick={() => setEditing(false)}>Annuler</button>
+							)}
+						</div>
+					) : (
+						<p className="lb-foot">
+							{name ? (
+								<>
+									Pseudo : <strong>{name}</strong> ·{' '}
+									<button className="lb-link" onClick={startEdit}>Changer</button>
+								</>
+							) : (
+								<button className="lb-link" onClick={startEdit}>Définir un pseudo</button>
+							)}
+						</p>
 					)}
 				</>
 			)}
@@ -110,7 +133,7 @@ const CSS = `
 }
 .lb-msg { text-align: center; color: var(--gray-300); font-size: 13px; line-height: 1.5; margin: 0; }
 
-.lb-name { display: flex; gap: 8px; justify-content: center; margin-bottom: 0.9rem; }
+.lb-name { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 0.9rem; }
 .lb-name input {
   font: inherit; color: var(--gray-0); background: var(--gray-999);
   border: 1.5px solid var(--gray-700); border-radius: 999px; padding: 6px 14px; min-width: 0; flex: 1;
@@ -119,6 +142,14 @@ const CSS = `
 .lb-name button {
   border: none; background: var(--accent-regular); color: var(--accent-text-over);
   font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 16px; cursor: pointer;
+}
+.lb-name button.lb-cancel { background: var(--gray-800); color: var(--gray-0); }
+
+.lb-foot { text-align: center; color: var(--gray-300); font-size: 12.5px; margin: 0.9rem 0 0; }
+.lb-foot strong { color: var(--gray-0); }
+.lb-link {
+  border: none; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent-regular); text-decoration: underline;
 }
 
 .lb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
