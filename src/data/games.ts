@@ -21,7 +21,7 @@ export const games: GameTile[] = [
 	{
 		id: 'sudoku',
 		title: 'Sudoku',
-		pitch: 'Le grand classique de la logique en grille, en 6×6 (1–6) ou 10×10 (1–10), plusieurs niveaux.',
+		pitch: 'Le grand classique de la logique en grille, en 4×4, 6×6 ou 9×9, plusieurs niveaux.',
 		icon: 'games',
 		href: '/jeux/sudoku',
 		status: 'play',
@@ -83,11 +83,11 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
-		id: 'colocross',
-		title: 'Colocross',
-		pitch: 'Un picross en couleurs : reconstitue l\'image grâce aux indices de chaque ligne et colonne.',
+		id: 'colorgramme',
+		title: 'Colorgramme',
+		pitch: 'Un nonogramme en couleurs : reconstitue l\'image grâce aux indices de chaque ligne et colonne.',
 		icon: 'palette',
-		href: '/jeux/colocross',
+		href: '/jeux/colorgramme',
 		status: 'play',
 	},
 ];

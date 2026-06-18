@@ -6,7 +6,7 @@ import SudokuGame from '../../games/sudoku/SudokuGame.tsx';
 
 <BaseLayout
 	title="Sudoku | Jeux Ludiven Studio"
-	description="Sudoku 6×6 (1–6) et 10×10 (1–10) avec plusieurs niveaux de difficulté. Un mini-jeu de logique signé Ludiven Studio."
+	description="Sudoku en 4×4, 6×6 et 9×9 avec plusieurs niveaux de difficulté. Un mini-jeu de logique signé Ludiven Studio."
 >
 	<div class="wrapper game-page stack gap-8">
 		<header class="game-head stack gap-2">
@@ -14,7 +14,7 @@ import SudokuGame from '../../games/sudoku/SudokuGame.tsx';
 				<Icon icon="arrow-left" size="1em" /> Tous les jeux
 			</a>
 			<h1>Sudoku</h1>
-			<p>Remplis la grille en 6×6 ou 10×10, à ton rythme</p>
+			<p>Remplis la grille en 4×4, 6×6 ou 9×9, à ton rythme</p>
 		</header>
 
 		<SudokuGame client:only="react" gameId="sudoku" />

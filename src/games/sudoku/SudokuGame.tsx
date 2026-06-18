@@ -4,7 +4,7 @@ import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
    SUDOKU — React island (training mode)
-   Sizes 6×6 (1–6) and 10×10 (1–10), several levels.
+   Sizes 4×4, 6×6 and 9×9, several levels.
    Engine lives in ./engine (pure, tested).
    ===================================================== */
 
@@ -171,12 +171,11 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		[status, revealed, selected, given, started, gameId],
 	);
 
-	/* Keyboard (desktop). '0' maps to N for the 10×10 grid. */
+	/* Keyboard (desktop). */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (status === 'won' || revealed) return;
-			let d = parseInt(e.key, 10);
-			if (e.key === '0') d = 10;
+			const d = parseInt(e.key, 10);
 			if (d >= 1 && d <= size) placeValue(d);
 			else if (e.key === 'Backspace' || e.key === 'Delete') placeValue(null);
 			else if (e.key.startsWith('Arrow') && selected) {

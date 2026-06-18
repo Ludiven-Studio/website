@@ -5,7 +5,7 @@
  * Generation guarantees a unique solution by construction.
  *
  * Solver uses bitmask candidate sets + MRV (minimum-remaining-values)
- * heuristic, fast enough to generate 10×10 puzzles client-side.
+ * heuristic, fast enough to generate 9×9 puzzles client-side.
  */
 
 import type { Rng } from '../prng';
@@ -32,9 +32,10 @@ export interface SudokuPuzzle {
 	solution: Grid;
 }
 
-export const SIZES: Record<'6' | '10', Variant> = {
+export const SIZES: Record<'4' | '6' | '9', Variant> = {
+	'4': { label: '4×4', size: 4, boxH: 2, boxW: 2 },
 	'6': { label: '6×6', size: 6, boxH: 2, boxW: 3 },
-	'10': { label: '10×10', size: 10, boxH: 2, boxW: 5 },
+	'9': { label: '9×9', size: 9, boxH: 3, boxW: 3 },
 };
 
 export const DIFFS: Record<string, DiffLevel> = {

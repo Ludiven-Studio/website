@@ -1,5 +1,5 @@
 /**
- * COLOCROSS — pure engine (no UI). A fully-coloured deduction grid.
+ * COLORGRAMME — pure engine (no UI). A fully-coloured deduction grid.
  * Every cell is one of K colours (no background). For each line, the clue gives,
  * per colour, the ordered lengths of that colour's blocks — but NOT how the
  * colours interleave. The player only ever sees the active colour's numbers, so
@@ -14,7 +14,7 @@ import type { Rng } from '../prng';
 /** Per line: clue[color-1] = ordered block lengths of that colour. */
 export type LineClue = number[][];
 
-export interface ColocrossPuzzle {
+export interface ColorgrammePuzzle {
 	size: number;
 	colors: number; // K
 	rowClues: LineClue[];
@@ -181,7 +181,7 @@ const clues = (grid: number[][], size: number, K: number): { rowClues: LineClue[
 	colClues: Array.from({ length: size }, (_, c) => lineClueOf(grid.map((row) => row[c]), K)),
 });
 
-export function generateColocross(diff: DiffLevel, rng: Rng = Math.random): ColocrossPuzzle {
+export function generateColorgramme(diff: DiffLevel, rng: Rng = Math.random): ColorgrammePuzzle {
 	const { size, colors: K } = diff;
 
 	for (let attempt = 0; attempt < 4000; attempt++) {
@@ -208,5 +208,5 @@ export function generateColocross(diff: DiffLevel, rng: Rng = Math.random): Colo
 		return { size, colors: K, rowClues, colClues, solution: sol };
 	}
 
-	throw new Error('Colocross: failed to generate a puzzle');
+	throw new Error('Colorgramme: failed to generate a puzzle');
 }

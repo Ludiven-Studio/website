@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { DIFFS, generateColocross, type ColocrossPuzzle } from './engine';
+import { DIFFS, generateColorgramme, type ColorgrammePuzzle } from './engine';
 import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
-   COLOCROSS — React island. A fully-coloured deduction grid.
+   COLORGRAMME — React island. A fully-coloured deduction grid.
    Every cell is one of K colours. The clue shows, for the
    ACTIVE colour only, the ordered lengths of its blocks; the
    interleaving with the other (hidden) colours is deduced.
@@ -34,9 +34,9 @@ function lineStatus(cells: number[], solCells: number[], k: number): 'done' | 'e
 	return 'none';
 }
 
-export default function ColocrossGame({ gameId }: { gameId: string }) {
+export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
-	const [puzzle, setPuzzle] = useState<ColocrossPuzzle>(() => generateColocross(DIFFS.facile));
+	const [puzzle, setPuzzle] = useState<ColorgrammePuzzle>(() => generateColorgramme(DIFFS.facile));
 	const [grid, setGrid] = useState<number[][]>(() => emptyGrid(DIFFS.facile.size));
 	const [activeColor, setActiveColor] = useState(1);
 	const [eraseMode, setEraseMode] = useState(false);
@@ -54,7 +54,7 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
-		const p = generateColocross(d);
+		const p = generateColorgramme(d);
 		setDiffKey(key);
 		setPuzzle(p);
 		setGrid(emptyGrid(d.size));

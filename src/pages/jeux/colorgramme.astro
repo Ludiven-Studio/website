@@ -1,23 +1,23 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
-import ColocrossGame from '../../games/colocross/ColocrossGame.tsx';
+import ColorgrammeGame from '../../games/colorgramme/ColorgrammeGame.tsx';
 ---
 
 <BaseLayout
-	title="Colocross | Jeux Ludiven Studio"
-	description="Colocross : un picross en couleurs. Reconstitue l'image cachée grâce aux indices colorés de chaque ligne et colonne. Un mini-jeu de logique signé Ludiven Studio."
+	title="Colorgramme | Jeux Ludiven Studio"
+	description="Colorgramme : un nonogramme en couleurs. Reconstitue l'image cachée grâce aux indices colorés de chaque ligne et colonne. Un mini-jeu de logique signé Ludiven Studio."
 >
 	<div class="wrapper game-page stack gap-8">
 		<header class="game-head stack gap-2">
 			<a class="back" href="/jeux/">
 				<Icon icon="arrow-left" size="1em" /> Tous les jeux
 			</a>
-			<h1>Colocross</h1>
-			<p>Un picross en couleurs : déduis l'image d'après les indices</p>
+			<h1>Colorgramme</h1>
+			<p>Un jeu de logique en couleurs : déduis l'image d'après les indices</p>
 		</header>
 
-		<ColocrossGame client:only="react" gameId="colocross" />
+		<ColorgrammeGame client:only="react" gameId="colorgramme" />
 	</div>
 </BaseLayout>
 

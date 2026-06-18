@@ -380,11 +380,11 @@ const CSS = `
 .rc-cell.given { background: var(--gray-900); cursor: default; }
 .rc-shape { display: block; }
 .rc-rond-shape {
-  width: calc(var(--rc-cell) * 0.62); height: calc(var(--rc-cell) * 0.62);
+  width: calc(var(--rc-cell) * 0.5); height: calc(var(--rc-cell) * 0.5);
   border-radius: 50%; background: var(--rc-rond);
 }
 .rc-carre-shape {
-  width: calc(var(--rc-cell) * 0.56); height: calc(var(--rc-cell) * 0.56);
+  width: calc(var(--rc-cell) * 0.46); height: calc(var(--rc-cell) * 0.46);
   border-radius: calc(var(--rc-cell) * 0.08); background: var(--rc-carre);
 }
 .rc-cell.bad { background: rgba(217, 83, 79, 0.16); }
