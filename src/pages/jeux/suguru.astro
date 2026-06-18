@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
 import SuguruGame from '../../games/suguru/SuguruGame.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
 <BaseLayout
@@ -15,6 +16,7 @@ import SuguruGame from '../../games/suguru/SuguruGame.tsx';
 			</a>
 			<h1>Suguru</h1>
 			<p>Remplis les zones, sans deux chiffres identiques qui se touchent</p>
+			<GameTutorial gameId="suguru" />
 		</header>
 
 		<SuguruGame client:only="react" gameId="suguru" />

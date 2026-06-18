@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
 import SuiteGame from '../../games/suite/SuiteGame.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
 <BaseLayout
@@ -15,6 +16,7 @@ import SuiteGame from '../../games/suite/SuiteGame.tsx';
 			</a>
 			<h1>Suite mystère</h1>
 			<p>Trouve la règle cachée et complète la séquence</p>
+			<GameTutorial gameId="suite" />
 		</header>
 
 		<SuiteGame client:only="react" gameId="suite" />

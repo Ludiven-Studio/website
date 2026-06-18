@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
 import ReinesGame from '../../games/reines/ReinesGame.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
 <BaseLayout
@@ -15,6 +16,7 @@ import ReinesGame from '../../games/reines/ReinesGame.tsx';
 			</a>
 			<h1>Reines</h1>
 			<p>Une reine par ligne, colonne et couleur — sans qu'elles se touchent</p>
+			<GameTutorial gameId="reines" />
 		</header>
 
 		<ReinesGame client:only="react" gameId="reines" />

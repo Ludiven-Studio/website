@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
 import SommeTouteGame from '../../games/somme-toute/SommeToute.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
 <BaseLayout
@@ -15,6 +16,7 @@ import SommeTouteGame from '../../games/somme-toute/SommeToute.tsx';
 			</a>
 			<h1>Somme Toute</h1>
 			<p>Équilibre chaque ligne et chaque colonne</p>
+			<GameTutorial gameId="somme-toute" />
 		</header>
 
 		<SommeTouteGame client:only="react" gameId="somme-toute" />

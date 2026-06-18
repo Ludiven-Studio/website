@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
 import CheminGame from '../../games/chemin/CheminGame.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
 <BaseLayout
@@ -15,6 +16,7 @@ import CheminGame from '../../games/chemin/CheminGame.tsx';
 			</a>
 			<h1>Le chemin</h1>
 			<p>Relie tous les nombres dans l'ordre en remplissant chaque case</p>
+			<GameTutorial gameId="chemin" />
 		</header>
 
 		<CheminGame client:only="react" gameId="chemin" />

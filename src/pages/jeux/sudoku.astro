@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
 import SudokuGame from '../../games/sudoku/SudokuGame.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
 <BaseLayout
@@ -15,6 +16,7 @@ import SudokuGame from '../../games/sudoku/SudokuGame.tsx';
 			</a>
 			<h1>Sudoku</h1>
 			<p>Remplis la grille en 4×4, 6×6 ou 9×9, à ton rythme</p>
+			<GameTutorial gameId="sudoku" />
 		</header>
 
 		<SudokuGame client:only="react" gameId="sudoku" />

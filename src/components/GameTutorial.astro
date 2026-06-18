@@ -1,0 +1,278 @@
+---
+import { TUTORIALS } from '../data/tutorials';
+
+interface Props {
+	gameId: string;
+}
+
+const { gameId } = Astro.props;
+const steps = TUTORIALS[gameId] ?? [];
+---
+
+{
+	steps.length > 0 && (
+		<div class="tuto" data-game-id={gameId}>
+			<button class="tuto-open" type="button">Comment jouer&nbsp;?</button>
+
+			<div class="tuto-overlay" hidden role="dialog" aria-modal="true" aria-label="Comment jouer">
+				<div class="tuto-card">
+					<button class="tuto-close" type="button" aria-label="Fermer">✕</button>
+
+					<div class="tuto-slides">
+						{steps.map((s, i) => (
+							<div class="tuto-slide" data-i={i} hidden={i !== 0}>
+								{s.emoji && <div class="tuto-emoji">{s.emoji}</div>}
+								<h3>{s.title}</h3>
+								<p>{s.body}</p>
+							</div>
+						))}
+					</div>
+
+					<div class="tuto-dots">
+						{steps.map((_, i) => (
+							<span class={`tuto-dot ${i === 0 ? 'active' : ''}`} data-i={i} />
+						))}
+					</div>
+
+					<div class="tuto-nav">
+						<button class="tuto-skip" type="button">Passer</button>
+						<div class="tuto-navright">
+							<button class="tuto-prev" type="button" hidden>Précédent</button>
+							<button class="tuto-next" type="button" hidden={steps.length <= 1}>Suivant</button>
+							<button class="tuto-done" type="button" hidden={steps.length > 1}>C'est parti&nbsp;!</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+<script>
+	const root = document.querySelector<HTMLElement>('.tuto');
+	if (root) {
+		const gameId = root.dataset.gameId || '';
+		const overlay = root.querySelector<HTMLElement>('.tuto-overlay')!;
+		const slides = Array.from(root.querySelectorAll<HTMLElement>('.tuto-slide'));
+		const dots = Array.from(root.querySelectorAll<HTMLElement>('.tuto-dot'));
+		const prevBtn = root.querySelector<HTMLElement>('.tuto-prev')!;
+		const nextBtn = root.querySelector<HTMLElement>('.tuto-next')!;
+		const doneBtn = root.querySelector<HTMLElement>('.tuto-done')!;
+		const SEEN_KEY = 'ludiven-tuto-seen';
+		let i = 0;
+
+		const readSeen = (): string[] => {
+			try {
+				return JSON.parse(localStorage.getItem(SEEN_KEY) || '[]');
+			} catch {
+				return [];
+			}
+		};
+		const markSeen = () => {
+			const s = readSeen();
+			if (!s.includes(gameId)) {
+				s.push(gameId);
+				localStorage.setItem(SEEN_KEY, JSON.stringify(s));
+			}
+		};
+
+		const show = (n: number) => {
+			i = Math.max(0, Math.min(slides.length - 1, n));
+			slides.forEach((sl, k) => (sl.hidden = k !== i));
+			dots.forEach((d, k) => d.classList.toggle('active', k === i));
+			prevBtn.hidden = i === 0;
+			const last = i === slides.length - 1;
+			nextBtn.hidden = last;
+			doneBtn.hidden = !last;
+		};
+		const open = () => {
+			overlay.hidden = false;
+			show(0);
+		};
+		const close = () => {
+			overlay.hidden = true;
+		};
+		const dismiss = () => {
+			markSeen();
+			close();
+		};
+
+		root.querySelector('.tuto-open')!.addEventListener('click', open);
+		root.querySelector('.tuto-close')!.addEventListener('click', dismiss);
+		root.querySelector('.tuto-skip')!.addEventListener('click', dismiss);
+		doneBtn.addEventListener('click', dismiss);
+		nextBtn.addEventListener('click', () => show(i + 1));
+		prevBtn.addEventListener('click', () => show(i - 1));
+		overlay.addEventListener('click', (e) => {
+			if (e.target === overlay) dismiss();
+		});
+		document.addEventListener('keydown', (e) => {
+			if (!overlay.hidden && e.key === 'Escape') dismiss();
+		});
+
+		// First visit for this game → open automatically.
+		if (!readSeen().includes(gameId)) open();
+	}
+</script>
+
+<style>
+	.tuto {
+		display: flex;
+		justify-content: center;
+	}
+
+	.tuto-open {
+		border: 1.5px solid var(--gray-700);
+		background: transparent;
+		color: var(--gray-300);
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+		border-radius: 999px;
+		padding: 5px 14px;
+		cursor: pointer;
+		transition:
+			color var(--theme-transition),
+			border-color var(--theme-transition);
+	}
+	.tuto-open:hover,
+	.tuto-open:focus-visible {
+		color: var(--accent-regular);
+		border-color: var(--accent-regular);
+	}
+
+	.tuto-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1.5rem;
+		background: rgba(0, 0, 0, 0.45);
+		backdrop-filter: blur(4px);
+	}
+	.tuto-overlay[hidden] {
+		display: none;
+	}
+
+	.tuto-card {
+		position: relative;
+		width: 100%;
+		max-width: 26rem;
+		background: var(--gray-999);
+		border: 1px solid var(--gray-800);
+		border-radius: 1.25rem;
+		box-shadow: var(--shadow-lg);
+		padding: 1.9rem 1.5rem 1.25rem;
+		text-align: center;
+		color: var(--gray-0);
+	}
+	.tuto-close {
+		position: absolute;
+		top: 0.6rem;
+		right: 0.6rem;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		border: none;
+		background: var(--gray-900);
+		color: var(--gray-200);
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+	}
+
+	.tuto-slide {
+		display: block;
+	}
+	.tuto-slide[hidden] {
+		display: none;
+	}
+	.tuto-emoji {
+		font-size: 38px;
+		line-height: 1;
+	}
+	.tuto-card h3 {
+		font-family: var(--font-brand);
+		font-weight: 600;
+		font-size: var(--text-xl);
+		margin: 0.6rem 0 0.4rem;
+		color: var(--gray-0);
+	}
+	.tuto-card p {
+		color: var(--gray-300);
+		font-size: var(--text-base);
+		line-height: 1.55;
+		margin: 0 auto;
+		max-width: 22rem;
+		min-height: 4.6em;
+	}
+
+	.tuto-dots {
+		display: flex;
+		gap: 7px;
+		justify-content: center;
+		margin: 1rem 0;
+	}
+	.tuto-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--gray-700);
+		transition: background var(--theme-transition);
+	}
+	.tuto-dot.active {
+		background: var(--accent-regular);
+	}
+
+	.tuto-nav {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+	}
+	.tuto-navright {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.tuto-skip {
+		background: none;
+		border: none;
+		color: var(--gray-400);
+		font: inherit;
+		font-size: var(--text-sm);
+		cursor: pointer;
+	}
+	.tuto-skip:hover {
+		color: var(--gray-200);
+	}
+	.tuto-prev {
+		border: 1.5px solid var(--gray-700);
+		background: transparent;
+		color: var(--gray-200);
+		font: inherit;
+		font-weight: 500;
+		font-size: var(--text-sm);
+		border-radius: 999px;
+		padding: 7px 16px;
+		cursor: pointer;
+	}
+	.tuto-next,
+	.tuto-done {
+		border: none;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font: inherit;
+		font-weight: 600;
+		font-size: var(--text-sm);
+		border-radius: 999px;
+		padding: 7px 18px;
+		cursor: pointer;
+	}
+	.tuto-prev[hidden],
+	.tuto-next[hidden],
+	.tuto-done[hidden] {
+		display: none;
+	}
+</style>
