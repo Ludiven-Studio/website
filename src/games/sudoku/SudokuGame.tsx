@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SIZES, DIFFS, generateSudoku, type SudokuPuzzle } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { dailySeed } from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
 
 /* =====================================================
    SUDOKU — React island (training mode)
@@ -20,6 +23,10 @@ const fmtTime = (s: number) =>
 const boxIndex = (r: number, c: number, boxH: number, boxW: number, n: number) =>
 	Math.floor(r / boxH) * (n / boxW) + Math.floor(c / boxW);
 
+// Fixed daily challenge (same grid for everyone that day).
+const DAILY_SIZE: SizeKey = '9';
+const DAILY_DIFF: keyof typeof DIFFS = 'facile';
+
 export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [sizeKey, setSizeKey] = useState<SizeKey>('6');
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
@@ -33,6 +40,8 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [revealed, setRevealed] = useState(false);
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
+	const [daily, setDaily] = useState(false);
+	const [assisted, setAssisted] = useState(false); // hint/solution used → out of ranking
 	const startRef = useRef<number>(0);
 
 	const { size, boxH, boxW, given } = puzzle;
@@ -44,6 +53,8 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 
 	const newGame = useCallback((sk: SizeKey, dk: keyof typeof DIFFS) => {
 		const variant = SIZES[sk];
+		setDaily(false);
+		setAssisted(false);
 		setSizeKey(sk);
 		setDiffKey(dk);
 		setPuzzle(generateSudoku(variant, DIFFS[dk]));
@@ -55,6 +66,23 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	/* Daily challenge: same grid for everyone today (seeded by date + game). */
+	const startDaily = useCallback(() => {
+		const variant = SIZES[DAILY_SIZE];
+		setDaily(true);
+		setAssisted(false);
+		setSizeKey(DAILY_SIZE);
+		setDiffKey(DAILY_DIFF);
+		setPuzzle(generateSudoku(variant, DIFFS[DAILY_DIFF], mulberry32(dailySeed(gameId))));
+		setEntries(emptyEntries(variant.size));
+		setSelected(null);
+		setStatus('playing');
+		setStarted(false);
+		setRevealed(false);
+		setHinted(new Set());
+		setElapsed(0);
+	}, [gameId]);
 
 	/* Timer */
 	useEffect(() => {
@@ -129,6 +157,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			return next;
 		});
 		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setAssisted(true);
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
@@ -143,6 +172,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setEntries(puzzle.solution.map((row) => [...row]));
 		setSelected(null);
 		setRevealed(true);
+		setAssisted(true);
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, puzzle, gameId]);
 
@@ -201,34 +231,57 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		<div className="sk-root">
 			<style>{CSS}</style>
 
-			<div className="sk-controls">
-				<div className="sk-group" role="tablist" aria-label="Taille">
-					{(Object.keys(SIZES) as SizeKey[]).map((k) => (
-						<button
-							key={k}
-							role="tab"
-							aria-selected={sizeKey === k}
-							className={`sk-pill ${sizeKey === k ? 'active' : ''}`}
-							onClick={() => newGame(k, diffKey)}
-						>
-							{SIZES[k].label}
-						</button>
-					))}
-				</div>
-				<div className="sk-group" role="tablist" aria-label="Difficulté">
-					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
-						<button
-							key={k}
-							role="tab"
-							aria-selected={diffKey === k}
-							className={`sk-pill ${diffKey === k ? 'active' : ''}`}
-							onClick={() => newGame(sizeKey, k)}
-						>
-							{DIFFS[k].label}
-						</button>
-					))}
-				</div>
+			<div className="sk-modes" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`sk-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(sizeKey, diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`sk-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
 			</div>
+
+			{daily ? (
+				<div className="sk-daily-tag">Même grille pour tous aujourd'hui · {SIZES[DAILY_SIZE].label}</div>
+			) : (
+				<div className="sk-controls">
+					<div className="sk-group" role="tablist" aria-label="Taille">
+						{(Object.keys(SIZES) as SizeKey[]).map((k) => (
+							<button
+								key={k}
+								role="tab"
+								aria-selected={sizeKey === k}
+								className={`sk-pill ${sizeKey === k ? 'active' : ''}`}
+								onClick={() => newGame(k, diffKey)}
+							>
+								{SIZES[k].label}
+							</button>
+						))}
+					</div>
+					<div className="sk-group" role="tablist" aria-label="Difficulté">
+						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+							<button
+								key={k}
+								role="tab"
+								aria-selected={diffKey === k}
+								className={`sk-pill ${diffKey === k ? 'active' : ''}`}
+								onClick={() => newGame(sizeKey, k)}
+							>
+								{DIFFS[k].label}
+							</button>
+						))}
+					</div>
+				</div>
+			)}
 
 			<div className="sk-bar">
 				<div className="sk-timer" aria-live="off">{fmtTime(elapsed)}</div>
@@ -306,8 +359,16 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 							<div className="sk-winmark">🧩</div>
 							<h2>Résolu !</h2>
 							<p className="sk-wintime">{fmtTime(elapsed)}</p>
-							<p className="sk-windiff">{SIZES[sizeKey].label} · {DIFFS[diffKey].label}</p>
-							<button className="sk-replay" onClick={() => newGame(sizeKey, diffKey)}>
+							<p className="sk-windiff">
+								{daily ? `Défi du jour · ${SIZES[sizeKey].label}` : `${SIZES[sizeKey].label} · ${DIFFS[diffKey].label}`}
+							</p>
+							{daily && (
+								<>
+									{assisted && <p className="sk-assisted">Partie assistée — hors classement.</p>}
+									<Leaderboard game={gameId} metric="time" submitValue={assisted ? undefined : elapsed} />
+								</>
+							)}
+							<button className="sk-replay" onClick={() => (daily ? startDaily() : newGame(sizeKey, diffKey))}>
 								Rejouer
 							</button>
 						</div>
@@ -373,6 +434,12 @@ const CSS = `
   margin-bottom: 0.75rem;
 }
 .sk-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.sk-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.sk-daily-tag {
+  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+.sk-assisted { color: #d9534f; font-size: 12.5px; margin: 0 0 0.5rem; }
 .sk-pill {
   border: 1.5px solid var(--gray-700);
   background: transparent;
@@ -529,6 +596,8 @@ const CSS = `
   padding: 26px 34px;
   text-align: center;
   box-shadow: var(--shadow-lg);
+  max-height: 82vh;
+  overflow-y: auto;
 }
 .sk-wincard h2 {
   font-family: var(--font-brand);
