@@ -46,6 +46,8 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const boardRef = useRef<HTMLDivElement>(null);
 	const drawing = useRef(false);
 	const downCell = useRef<[number, number] | null>(null);
+	const anchor = useRef<[number, number] | null>(null); // fixed corner while drawing/resizing
+	const moved = useRef(false);
 
 	const { size, clues, rects } = puzzle;
 
@@ -149,27 +151,42 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		if (status === 'won' || revealed) return;
 		const cell = cellFromPointer(e);
 		if (!cell) return;
+		const [r, c] = cell;
 		drawing.current = true;
+		moved.current = false;
 		downCell.current = cell;
-		setPreview(rectFromCells(cell, cell));
+		const idx = owner[r][c];
+		if (idx !== -1) {
+			// Start on an existing piece → resize it: anchor the corner opposite the grab.
+			const p = placed[idx];
+			const anchorR = r - p.r0 <= p.r0 + p.h - 1 - r ? p.r0 + p.h - 1 : p.r0;
+			const anchorC = c - p.c0 <= p.c0 + p.w - 1 - c ? p.c0 + p.w - 1 : p.c0;
+			anchor.current = [anchorR, anchorC];
+		} else {
+			anchor.current = cell;
+		}
+		setPreview(rectFromCells(anchor.current, cell));
 		boardRef.current?.setPointerCapture(e.pointerId);
 	};
 	const onPointerMove = (e: React.PointerEvent) => {
-		if (!drawing.current || !downCell.current) return;
+		if (!drawing.current || !anchor.current || !downCell.current) return;
 		const cell = cellFromPointer(e);
 		if (!cell) return;
-		setPreview(rectFromCells(downCell.current, cell));
+		if (cell[0] !== downCell.current[0] || cell[1] !== downCell.current[1]) moved.current = true;
+		setPreview(rectFromCells(anchor.current, cell));
 	};
 	const onPointerUp = () => {
-		if (!drawing.current || !downCell.current) return;
-		const rect = preview ?? rectFromCells(downCell.current, downCell.current);
-		if (rect.h === 1 && rect.w === 1 && owner[rect.r0][rect.c0] !== -1) {
-			removeAt(rect.r0, rect.c0); // tap on a piece removes it
-		} else {
-			addPiece(rect);
+		if (!drawing.current) return;
+		const dc = downCell.current;
+		if (!moved.current && dc && owner[dc[0]][dc[1]] !== -1) {
+			removeAt(dc[0], dc[1]); // tap on a piece removes it
+		} else if (preview) {
+			addPiece(preview); // new rect, or resized existing piece
 		}
 		drawing.current = false;
+		moved.current = false;
 		downCell.current = null;
+		anchor.current = null;
 		setPreview(null);
 	};
 
