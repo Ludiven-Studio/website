@@ -3,13 +3,14 @@ import { DIFFS, generateColocross, type ColocrossPuzzle } from './engine';
 import { trackGame } from '../../lib/analytics';
 
 /* =====================================================
-   COLOCROSS — React island. A coloured picross/nonogram.
-   Deduce the picture from the coloured row/column clues.
+   COLOCROSS — React island. A fully-coloured deduction grid.
+   Every cell is one of K colours. The clue shows, for the
+   ACTIVE colour only, the ordered lengths of its blocks; the
+   interleaving with the other (hidden) colours is deduced.
    Engine is pure/tested; every puzzle is logically solvable.
    ===================================================== */
 
 type Status = 'playing' | 'won';
-type Tool = number | 'eraser' | 'cross'; // number = colour 1..K
 
 const COLORS = ['#e15554', '#4d9de0', '#e0a32e', '#3bb273']; // 1..4
 
@@ -17,14 +18,13 @@ const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 const emptyGrid = (n: number): number[][] => Array.from({ length: n }, () => new Array(n).fill(0));
-const emptyBool = (n: number): boolean[][] => Array.from({ length: n }, () => new Array(n).fill(false));
 
 export default function ColocrossGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<ColocrossPuzzle>(() => generateColocross(DIFFS.facile));
 	const [grid, setGrid] = useState<number[][]>(() => emptyGrid(DIFFS.facile.size));
-	const [crosses, setCrosses] = useState<boolean[][]>(() => emptyBool(DIFFS.facile.size));
-	const [tool, setTool] = useState<Tool>(1);
+	const [activeColor, setActiveColor] = useState(1);
+	const [eraseMode, setEraseMode] = useState(false);
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
@@ -32,11 +32,10 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 	const painting = useRef(false);
-	const stroke = useRef<{ kind: 'color' | 'cross'; value: number | boolean } | null>(null);
+	const strokeVal = useRef<number>(0);
 
 	const { size, colors, rowClues, colClues, solution } = puzzle;
 	const over = status === 'won' || revealed;
-	const focusColor = typeof tool === 'number' && tool > 0 ? tool : null;
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
@@ -44,8 +43,8 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 		setDiffKey(key);
 		setPuzzle(p);
 		setGrid(emptyGrid(d.size));
-		setCrosses(emptyBool(d.size));
-		setTool(1);
+		setActiveColor(1);
+		setEraseMode(false);
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
@@ -80,7 +79,7 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 		});
 	}, []);
 
-	/* Win: the grid matches the hidden picture. */
+	/* Win: the grid matches the hidden picture (every cell). */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 		for (let r = 0; r < size; r++)
@@ -91,31 +90,14 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 
 	const applyStroke = useCallback(
 		(r: number, c: number) => {
-			if (!stroke.current) return;
-			if (stroke.current.kind === 'color') {
-				const v = stroke.current.value as number;
-				setGrid((prev) => {
-					if (prev[r][c] === v) return prev;
-					const n = prev.map((row) => [...row]);
-					n[r][c] = v;
-					return n;
-				});
-				setCrosses((prev) => {
-					if (!prev[r][c]) return prev;
-					const n = prev.map((row) => [...row]);
-					n[r][c] = false;
-					return n;
-				});
-				removeHint(r, c);
-			} else {
-				const v = stroke.current.value as boolean;
-				setCrosses((prev) => {
-					if (prev[r][c] === v) return prev;
-					const n = prev.map((row) => [...row]);
-					n[r][c] = v;
-					return n;
-				});
-			}
+			const v = strokeVal.current;
+			setGrid((prev) => {
+				if (prev[r][c] === v) return prev;
+				const n = prev.map((row) => [...row]);
+				n[r][c] = v;
+				return n;
+			});
+			removeHint(r, c);
 			begin();
 		},
 		[begin, removeHint],
@@ -137,13 +119,7 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 		if (!cell) return;
 		const [r, c] = cell;
 		painting.current = true;
-		if (tool === 'cross') {
-			stroke.current = { kind: 'cross', value: !crosses[r][c] };
-		} else {
-			const v = tool === 'eraser' ? 0 : (tool as number);
-			const target = typeof tool === 'number' && grid[r][c] === tool ? 0 : v; // re-tap erases
-			stroke.current = { kind: 'color', value: target };
-		}
+		strokeVal.current = eraseMode ? 0 : grid[r][c] === activeColor ? 0 : activeColor; // re-tap erases
 		applyStroke(r, c);
 		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
 	};
@@ -154,10 +130,9 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 	};
 	const endStroke = () => {
 		painting.current = false;
-		stroke.current = null;
 	};
 
-	/* Hint: fix a wrong cell first, else fill a needed coloured cell. */
+	/* Hint: fix a wrong cell first, else fill an unpainted cell. */
 	const hint = useCallback(() => {
 		if (over) return;
 		let target: [number, number] | null = null;
@@ -165,19 +140,12 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 			for (let c = 0; c < size && !target; c++)
 				if (grid[r][c] !== 0 && grid[r][c] !== solution[r][c]) target = [r, c];
 		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++)
-				if (grid[r][c] === 0 && solution[r][c] !== 0) target = [r, c];
+			for (let c = 0; c < size && !target; c++) if (grid[r][c] === 0) target = [r, c];
 		if (!target) return;
 		const [r, c] = target;
 		setGrid((prev) => {
 			const n = prev.map((row) => [...row]);
 			n[r][c] = solution[r][c];
-			return n;
-		});
-		setCrosses((prev) => {
-			if (!prev[r][c]) return prev;
-			const n = prev.map((row) => [...row]);
-			n[r][c] = false;
 			return n;
 		});
 		setHinted((prev) => new Set(prev).add(`${r},${c}`));
@@ -189,12 +157,9 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 	const reveal = useCallback(() => {
 		if (over) return;
 		setGrid(solution.map((row) => [...row]));
-		setCrosses(emptyBool(size));
 		setRevealed(true);
 		trackGame(gameId, 'solution_shown');
-	}, [over, solution, size, gameId]);
-
-	const tools: Tool[] = [...Array.from({ length: colors }, (_, i) => i + 1), 'eraser', 'cross'];
+	}, [over, solution, gameId]);
 
 	return (
 		<div className="co-root">
@@ -223,24 +188,26 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{!over && (
-				<div className="co-tools" role="toolbar" aria-label="Outils">
-					{tools.map((t) => {
-						const active = tool === t;
-						const label = t === 'eraser' ? 'Gomme' : t === 'cross' ? 'Croix' : `Couleur ${t}`;
-						return (
-							<button
-								key={String(t)}
-								className={`co-tool ${active ? 'active' : ''} ${typeof t === 'number' ? 'color' : t}`}
-								style={typeof t === 'number' ? { background: COLORS[t - 1] } : undefined}
-								onClick={() => setTool(t)}
-								aria-pressed={active}
-								aria-label={label}
-								title={label}
-							>
-								{t === 'eraser' ? '⌫' : t === 'cross' ? '✕' : ''}
-							</button>
-						);
-					})}
+				<div className="co-tools" role="toolbar" aria-label="Couleurs">
+					{Array.from({ length: colors }, (_, i) => i + 1).map((v) => (
+						<button
+							key={v}
+							className={`co-tool color ${activeColor === v && !eraseMode ? 'active' : ''}`}
+							style={{ background: COLORS[v - 1] }}
+							onClick={() => { setActiveColor(v); setEraseMode(false); }}
+							aria-pressed={activeColor === v && !eraseMode}
+							aria-label={`Couleur ${v}`}
+						/>
+					))}
+					<button
+						className={`co-tool eraser ${eraseMode ? 'active' : ''}`}
+						onClick={() => setEraseMode(true)}
+						aria-pressed={eraseMode}
+						aria-label="Gomme"
+						title="Gomme"
+					>
+						⌫
+					</button>
 				</div>
 			)}
 
@@ -269,13 +236,9 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 					<div className="co-corner" />
 					{Array.from({ length: size }).map((_, c) => (
 						<div key={`cc${c}`} className="co-clue col">
-							{colClues[c].map((run, i) => (
-								<span
-									key={i}
-									className={`co-num ${focusColor && run.color !== focusColor ? 'dim' : ''}`}
-									style={{ color: COLORS[run.color - 1] }}
-								>
-									{run.len}
+							{colClues[c][activeColor - 1].map((len, i) => (
+								<span key={i} className="co-num" style={{ color: COLORS[activeColor - 1] }}>
+									{len}
 								</span>
 							))}
 						</div>
@@ -285,11 +248,10 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 							key={`row${r}`}
 							r={r}
 							size={size}
-							rowClue={rowClues[r]}
+							rowClueLens={rowClues[r][activeColor - 1]}
+							activeColor={activeColor}
 							grid={grid}
-							crosses={crosses}
 							hinted={hinted}
-							focusColor={focusColor}
 							over={over}
 						/>
 					))}
@@ -315,9 +277,9 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<p className="co-help">
-					Choisis une couleur (ou la croix) puis peins les cases d'après les indices. Les nombres
-					donnent les blocs de chaque ligne et colonne ; deux blocs de même couleur sont séparés
-					d'au moins une case vide.
+					Toutes les cases sont coloriées. Choisis une couleur : tu ne vois que SES blocs (dans
+					l'ordre). Comme les blocs des autres couleurs sont cachés, déduis où commencent les
+					tiens grâce aux lignes et colonnes.
 				</p>
 			)}
 		</div>
@@ -327,31 +289,25 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 interface RowProps {
 	r: number;
 	size: number;
-	rowClue: { len: number; color: number }[];
+	rowClueLens: number[];
+	activeColor: number;
 	grid: number[][];
-	crosses: boolean[][];
 	hinted: Set<string>;
-	focusColor: number | null;
 	over: boolean;
 }
 
-function RowClueAndCells({ r, size, rowClue, grid, crosses, hinted, focusColor, over }: RowProps) {
+function RowClueAndCells({ r, size, rowClueLens, activeColor, grid, hinted, over }: RowProps) {
 	return (
 		<>
 			<div className="co-clue row">
-				{rowClue.map((run, i) => (
-					<span
-						key={i}
-						className={`co-num ${focusColor && run.color !== focusColor ? 'dim' : ''}`}
-						style={{ color: COLORS[run.color - 1] }}
-					>
-						{run.len}
+				{rowClueLens.map((len, i) => (
+					<span key={i} className="co-num" style={{ color: COLORS[activeColor - 1] }}>
+						{len}
 					</span>
 				))}
 			</div>
 			{Array.from({ length: size }).map((_, c) => {
 				const v = grid[r][c];
-				const cross = v === 0 && crosses[r][c];
 				return (
 					<div
 						key={c}
@@ -360,9 +316,7 @@ function RowClueAndCells({ r, size, rowClue, grid, crosses, hinted, focusColor, 
 						data-c={c}
 						style={v !== 0 ? { background: COLORS[v - 1] } : undefined}
 						aria-label={`Ligne ${r + 1}, colonne ${c + 1}`}
-					>
-						{cross && <span className="co-x">✕</span>}
-					</div>
+					/>
 				);
 			})}
 		</>
@@ -421,8 +375,6 @@ const CSS = `
   transition: transform 0.08s ease, border-color 0.08s ease;
 }
 .co-tool.active { border-color: var(--co-accent); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
-.co-tool.color { color: #fff; }
-.co-tool.cross.active, .co-tool.eraser.active { border-color: var(--co-accent); }
 
 .co-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 0.85rem; }
 .co-act {
@@ -442,29 +394,26 @@ const CSS = `
 }
 .co-corner { }
 .co-clue {
-  display: flex; gap: 4px; color: var(--gray-0);
-  font-weight: 700; font-size: calc(var(--co-cell) * 0.42); font-variant-numeric: tabular-nums;
+  display: flex; gap: 4px;
+  font-weight: 700; font-size: calc(var(--co-cell) * 0.44); font-variant-numeric: tabular-nums;
   padding: 2px;
 }
-.co-clue.col { flex-direction: column; align-items: center; justify-content: flex-end; }
-.co-clue.row { flex-direction: row; align-items: center; justify-content: flex-end; }
-.co-num { line-height: 1; transition: opacity 0.12s ease; }
-.co-num.dim { opacity: 0.18; }
+.co-clue.col { flex-direction: column; align-items: center; justify-content: flex-end; min-height: calc(var(--co-cell) * 1.2); }
+.co-clue.row { flex-direction: row; align-items: center; justify-content: flex-end; min-width: calc(var(--co-cell) * 1.2); }
+.co-num { line-height: 1; }
 
 .co-cell {
   width: var(--co-cell); height: var(--co-cell);
   border: 1px solid var(--co-line);
   background: var(--gray-999);
-  display: flex; align-items: center; justify-content: center;
   cursor: pointer;
 }
 .co-cell.filled { border-color: rgba(0,0,0,0.18); }
 .co-cell.hinted { box-shadow: inset 0 0 0 3px var(--co-ok); }
 .co-cell.over { cursor: default; }
-.co-x { color: var(--gray-400); font-size: calc(var(--co-cell) * 0.5); font-weight: 700; line-height: 1; }
 
 .co-help {
-  max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1.1rem;
+  max-width: 430px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1.1rem;
 }
 .co-revealed-note {
   display: flex; align-items: center; gap: 14px; margin-top: 1.25rem; color: var(--gray-300); font-size: 14px; font-weight: 500;
@@ -486,5 +435,5 @@ const CSS = `
   font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer;
 }
 
-@media (prefers-reduced-motion: reduce) { .co-tool, .co-num, .co-win { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .co-tool, .co-win { transition: none; } }
 `;

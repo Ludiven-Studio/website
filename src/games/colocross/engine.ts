@@ -1,26 +1,25 @@
 /**
- * COLOCROSS — pure engine (no UI). A coloured picross/nonogram.
- * Each cell is empty (0) or one of K colours (1..K). Every row and column
- * carries an ordered list of blocks (length + colour). Same-colour blocks need
- * at least one empty cell between them; different-colour blocks may touch.
+ * COLOCROSS — pure engine (no UI). A fully-coloured deduction grid.
+ * Every cell is one of K colours (no background). For each line, the clue gives,
+ * per colour, the ordered lengths of that colour's blocks — but NOT how the
+ * colours interleave. The player only ever sees the active colour's numbers, so
+ * the interleaving (where each block starts) is the deduction.
  *
- * Generation keeps only puzzles a human can solve by pure line deduction
- * (`lineSolve` fully determines the grid) — which also guarantees uniqueness.
+ * Generation keeps only puzzles solvable by pure line deduction (`lineSolve`),
+ * which also guarantees a unique solution.
  */
 
 import type { Rng } from '../prng';
 
-export interface Run {
-	len: number;
-	color: number; // 1..K
-}
+/** Per line: clue[color-1] = ordered block lengths of that colour. */
+export type LineClue = number[][];
 
 export interface ColocrossPuzzle {
 	size: number;
 	colors: number; // K
-	rowClues: Run[][];
-	colClues: Run[][];
-	solution: number[][]; // 0 = empty, 1..K = colour
+	rowClues: LineClue[];
+	colClues: LineClue[];
+	solution: number[][]; // every cell 1..K
 }
 
 export interface DiffLevel {
@@ -30,41 +29,47 @@ export interface DiffLevel {
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', size: 5, colors: 3 },
+	facile: { label: 'Facile', size: 5, colors: 2 },
 	moyen: { label: 'Moyen', size: 6, colors: 3 },
 	difficile: { label: 'Difficile', size: 8, colors: 4 },
 };
 
-/** Maximal same-colour blocks of a line (different adjacent colours split). */
-export function lineRuns(line: number[]): Run[] {
-	const runs: Run[] = [];
+/** Clue of one fully-coloured line: ordered block lengths grouped by colour. */
+export function lineClueOf(line: number[], colors: number): LineClue {
+	const clue: number[][] = Array.from({ length: colors }, () => []);
 	let i = 0;
 	while (i < line.length) {
-		const color = line[i];
-		if (color === 0) { i++; continue; }
+		const c = line[i];
 		let len = 0;
-		while (i < line.length && line[i] === color) { len++; i++; }
-		runs.push({ len, color });
+		while (i < line.length && line[i] === c) { len++; i++; }
+		if (c >= 1 && c <= colors) clue[c - 1].push(len);
 	}
-	return runs;
+	return clue;
 }
 
-/** Every valid full colouring of one line consistent with its clue. */
-export function lineColorings(clue: Run[], size: number): number[][] {
+/** Every full colouring obtained by interleaving the per-colour block runs
+    (never two same-colour blocks adjacent). */
+export function lineColorings(clue: LineClue, size: number): number[][] {
 	const res: number[][] = [];
-	const cur = new Array(size).fill(0);
-	const place = (bi: number, pos: number): void => {
-		if (bi === clue.length) {
-			res.push([...cur]);
+	const ptr = clue.map(() => 0);
+	const total = clue.reduce((s, arr) => s + arr.length, 0);
+	const cur: number[] = [];
+
+	const place = (lastColor: number, placed: number): void => {
+		if (placed === total) {
+			if (cur.length === size) res.push([...cur]);
 			return;
 		}
-		const block = clue[bi];
-		for (let start = pos; start + block.len <= size; start++) {
-			for (let i = start; i < start + block.len; i++) cur[i] = block.color;
-			const next = start + block.len;
-			const sameNext = bi + 1 < clue.length && clue[bi + 1].color === block.color;
-			place(bi + 1, next + (sameNext ? 1 : 0));
-			for (let i = start; i < start + block.len; i++) cur[i] = 0;
+		for (let ci = 0; ci < clue.length; ci++) {
+			const color = ci + 1;
+			if (color === lastColor || ptr[ci] >= clue[ci].length) continue;
+			const len = clue[ci][ptr[ci]];
+			if (cur.length + len > size) continue;
+			ptr[ci]++;
+			for (let k = 0; k < len; k++) cur.push(color);
+			place(color, placed + 1);
+			for (let k = 0; k < len; k++) cur.pop();
+			ptr[ci]--;
 		}
 	};
 	place(0, 0);
@@ -77,9 +82,8 @@ const bitIndex = (m: number): number => {
 	return v;
 };
 
-/** Project the colourings compatible with `cand` onto per-cell candidate masks. */
 function refine(colorings: number[][], size: number, cand: number[]): { changed: boolean; cand: number[] } {
-	let proj = new Array(size).fill(0);
+	const proj = new Array(size).fill(0);
 	for (const col of colorings) {
 		let ok = true;
 		for (let i = 0; i < size; i++) if (!((cand[i] >> col[i]) & 1)) { ok = false; break; }
@@ -96,17 +100,15 @@ function refine(colorings: number[][], size: number, cand: number[]): { changed:
 	return { changed, cand: out };
 }
 
-/**
- * Solve by iterated line deduction. Returns the fully-determined grid, or null
- * if the clues are not enough to deduce every cell without guessing.
- */
+/** Iterated line deduction. Returns the fully-determined grid, or null if the
+    clues are not enough to deduce every cell without guessing. */
 export function lineSolve(
-	rowClues: Run[][],
-	colClues: Run[][],
+	rowClues: LineClue[],
+	colClues: LineClue[],
 	size: number,
 	colors: number,
 ): number[][] | null {
-	const full = (1 << (colors + 1)) - 1;
+	const full = ((1 << (colors + 1)) - 1) & ~1; // colours 1..K (bit 0 unused)
 	const cand: number[][] = Array.from({ length: size }, () => new Array(size).fill(full));
 	const rowOpts = rowClues.map((cl) => lineColorings(cl, size));
 	const colOpts = colClues.map((cl) => lineColorings(cl, size));
@@ -140,8 +142,8 @@ export function lineSolve(
 
 /** Count solutions consistent with the clues, stopping at `limit` (uniqueness). */
 export function countSolutions(
-	rowClues: Run[][],
-	colClues: Run[][],
+	rowClues: LineClue[],
+	colClues: LineClue[],
 	size: number,
 	limit = 2,
 ): number {
@@ -174,29 +176,28 @@ export function countSolutions(
 	return count;
 }
 
+const clues = (grid: number[][], size: number, K: number): { rowClues: LineClue[]; colClues: LineClue[] } => ({
+	rowClues: grid.map((row) => lineClueOf(row, K)),
+	colClues: Array.from({ length: size }, (_, c) => lineClueOf(grid.map((row) => row[c]), K)),
+});
+
 export function generateColocross(diff: DiffLevel, rng: Rng = Math.random): ColocrossPuzzle {
 	const { size, colors: K } = diff;
 
-	for (let attempt = 0; attempt < 800; attempt++) {
-		const sol = Array.from({ length: size }, () => new Array(size).fill(0));
-		const used = new Set<number>();
-		let filled = 0;
-		for (let r = 0; r < size; r++)
-			for (let c = 0; c < size; c++)
-				if (rng() < 0.55) {
-					const color = 1 + Math.floor(rng() * K);
-					sol[r][c] = color;
-					used.add(color);
-					filled++;
-				}
+	for (let attempt = 0; attempt < 4000; attempt++) {
+		const sol = Array.from({ length: size }, () =>
+			Array.from({ length: size }, () => 1 + Math.floor(rng() * K)),
+		);
 
-		const ratio = filled / (size * size);
-		if (ratio < 0.4 || ratio > 0.7 || used.size < K) continue;
+		// Every colour used, and no line of a single colour (too trivial).
+		const used = new Set(sol.flat());
+		if (used.size < K) continue;
+		let uniform = false;
+		for (let r = 0; r < size && !uniform; r++) if (sol[r].every((v) => v === sol[r][0])) uniform = true;
+		for (let c = 0; c < size && !uniform; c++) if (sol.every((row) => row[c] === sol[0][c])) uniform = true;
+		if (uniform) continue;
 
-		const rowClues = sol.map((row) => lineRuns(row));
-		const colClues = Array.from({ length: size }, (_, c) => lineRuns(sol.map((row) => row[c])));
-
-		// Keep only puzzles solvable by pure deduction (⇒ unique, no guessing).
+		const { rowClues, colClues } = clues(sol, size, K);
 		const solved = lineSolve(rowClues, colClues, size, K);
 		if (!solved) continue;
 		let eq = true;
