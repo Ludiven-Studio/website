@@ -19,6 +19,21 @@ const fmtTime = (s: number) =>
 
 const emptyGrid = (n: number): number[][] => Array.from({ length: n }, () => new Array(n).fill(0));
 
+/** Status of one line for the active colour: 'done' (its cells exactly placed),
+    'error' (too many cells of that colour) or 'none'. */
+function lineStatus(cells: number[], solCells: number[], k: number): 'done' | 'error' | 'none' {
+	let g = 0, s = 0, match = true;
+	for (let i = 0; i < cells.length; i++) {
+		const gk = cells[i] === k, sk = solCells[i] === k;
+		if (gk) g++;
+		if (sk) s++;
+		if (gk !== sk) match = false;
+	}
+	if (g > s) return 'error';
+	if (match) return 'done';
+	return 'none';
+}
+
 export default function ColocrossGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<ColocrossPuzzle>(() => generateColocross(DIFFS.facile));
@@ -234,15 +249,22 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 					onPointerCancel={endStroke}
 				>
 					<div className="co-corner" />
-					{Array.from({ length: size }).map((_, c) => (
-						<div key={`cc${c}`} className="co-clue col">
-							{colClues[c][activeColor - 1].map((len, i) => (
-								<span key={i} className="co-num" style={{ color: COLORS[activeColor - 1] }}>
-									{len}
-								</span>
-							))}
-						</div>
-					))}
+					{Array.from({ length: size }).map((_, c) => {
+						const st = lineStatus(grid.map((row) => row[c]), solution.map((row) => row[c]), activeColor);
+						return (
+							<div key={`cc${c}`} className={`co-clue col ${st}`}>
+								{colClues[c][activeColor - 1].map((len, i) => (
+									<span
+										key={i}
+										className="co-num"
+										style={{ color: st === 'error' ? '#d9534f' : COLORS[activeColor - 1] }}
+									>
+										{len}
+									</span>
+								))}
+							</div>
+						);
+					})}
 					{Array.from({ length: size }).map((_, r) => (
 						<RowClueAndCells
 							key={`row${r}`}
@@ -250,6 +272,7 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 							size={size}
 							rowClueLens={rowClues[r][activeColor - 1]}
 							activeColor={activeColor}
+							clueStatus={lineStatus(grid[r], solution[r], activeColor)}
 							grid={grid}
 							hinted={hinted}
 							over={over}
@@ -291,17 +314,22 @@ interface RowProps {
 	size: number;
 	rowClueLens: number[];
 	activeColor: number;
+	clueStatus: 'done' | 'error' | 'none';
 	grid: number[][];
 	hinted: Set<string>;
 	over: boolean;
 }
 
-function RowClueAndCells({ r, size, rowClueLens, activeColor, grid, hinted, over }: RowProps) {
+function RowClueAndCells({ r, size, rowClueLens, activeColor, clueStatus, grid, hinted, over }: RowProps) {
 	return (
 		<>
-			<div className="co-clue row">
+			<div className={`co-clue row ${clueStatus}`}>
 				{rowClueLens.map((len, i) => (
-					<span key={i} className="co-num" style={{ color: COLORS[activeColor - 1] }}>
+					<span
+						key={i}
+						className="co-num"
+						style={{ color: clueStatus === 'error' ? '#d9534f' : COLORS[activeColor - 1] }}
+					>
 						{len}
 					</span>
 				))}
@@ -401,6 +429,8 @@ const CSS = `
 .co-clue.col { flex-direction: column; align-items: center; justify-content: flex-end; min-height: calc(var(--co-cell) * 1.2); }
 .co-clue.row { flex-direction: row; align-items: center; justify-content: flex-end; min-width: calc(var(--co-cell) * 1.2); }
 .co-num { line-height: 1; }
+.co-clue.done { opacity: 0.5; }
+.co-clue.error .co-num { text-decoration: underline wavy; text-underline-offset: 2px; }
 
 .co-cell {
   width: var(--co-cell); height: var(--co-cell);
