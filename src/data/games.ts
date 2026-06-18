@@ -82,4 +82,12 @@ export const games: GameTile[] = [
 		href: '/jeux/motifs',
 		status: 'play',
 	},
+	{
+		id: 'colocross',
+		title: 'Colocross',
+		pitch: 'Un picross en couleurs : reconstitue l\'image grâce aux indices de chaque ligne et colonne.',
+		icon: 'palette',
+		href: '/jeux/colocross',
+		status: 'play',
+	},
 ];
