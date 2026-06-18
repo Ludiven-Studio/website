@@ -38,8 +38,9 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<ColorgrammePuzzle>(() => generateColorgramme(DIFFS.facile));
 	const [grid, setGrid] = useState<number[][]>(() => emptyGrid(DIFFS.facile.size));
+	const [crosses, setCrosses] = useState<number[][]>(() => emptyGrid(DIFFS.facile.size)); // bitmask per cell: bit k = "not colour k"
 	const [activeColor, setActiveColor] = useState(1);
-	const [eraseMode, setEraseMode] = useState(false);
+	const [tool, setTool] = useState<'paint' | 'cross' | 'eraser'>('paint');
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
@@ -48,6 +49,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	const startRef = useRef<number>(0);
 	const painting = useRef(false);
 	const strokeVal = useRef<number>(0);
+	const strokeCross = useRef<boolean>(true); // cross mode: add (true) or remove (false)
 
 	const { size, colors, rowClues, colClues, solution } = puzzle;
 	const over = status === 'won' || revealed;
@@ -58,8 +60,9 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setDiffKey(key);
 		setPuzzle(p);
 		setGrid(emptyGrid(d.size));
+		setCrosses(emptyGrid(d.size));
 		setActiveColor(1);
-		setEraseMode(false);
+		setTool('paint');
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
@@ -105,7 +108,28 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 
 	const applyStroke = useCallback(
 		(r: number, c: number) => {
-			// Locked: a cell drawn with another colour can't be changed from here.
+			if (tool === 'eraser') {
+				setGrid((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
+				setCrosses((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
+				removeHint(r, c);
+				begin();
+				return;
+			}
+			if (tool === 'cross') {
+				if (grid[r][c] !== 0) return; // can't cross a painted cell
+				const bit = 1 << activeColor;
+				setCrosses((prev) => {
+					const cur = prev[r][c];
+					const next = strokeCross.current ? cur | bit : cur & ~bit;
+					if (next === cur) return prev;
+					const n = prev.map((row) => [...row]);
+					n[r][c] = next;
+					return n;
+				});
+				begin();
+				return;
+			}
+			// paint — locked against cells drawn with another colour.
 			if (grid[r][c] !== 0 && grid[r][c] !== activeColor) return;
 			const v = strokeVal.current;
 			setGrid((prev) => {
@@ -114,10 +138,11 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				n[r][c] = v;
 				return n;
 			});
+			if (v !== 0) setCrosses((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row)))); // a decided cell loses its crosses
 			removeHint(r, c);
 			begin();
 		},
-		[grid, activeColor, begin, removeHint],
+		[tool, grid, activeColor, begin, removeHint],
 	);
 
 	const cellFromEvent = (e: React.PointerEvent): [number, number] | null => {
@@ -136,7 +161,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		if (!cell) return;
 		const [r, c] = cell;
 		painting.current = true;
-		strokeVal.current = eraseMode ? 0 : grid[r][c] === activeColor ? 0 : activeColor; // re-tap erases
+		if (tool === 'paint') strokeVal.current = grid[r][c] === activeColor ? 0 : activeColor; // re-tap erases
+		else if (tool === 'cross') strokeCross.current = !((crosses[r][c] >> activeColor) & 1);
 		applyStroke(r, c);
 		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
 	};
@@ -165,6 +191,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			n[r][c] = solution[r][c];
 			return n;
 		});
+		setCrosses((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
 		setHinted((prev) => new Set(prev).add(`${r},${c}`));
 		begin();
 		trackGame(gameId, 'hint_used');
@@ -174,9 +201,10 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	const reveal = useCallback(() => {
 		if (over) return;
 		setGrid(solution.map((row) => [...row]));
+		setCrosses(emptyGrid(size));
 		setRevealed(true);
 		trackGame(gameId, 'solution_shown');
-	}, [over, solution, gameId]);
+	}, [over, solution, size, gameId]);
 
 	return (
 		<div className="co-root">
@@ -205,21 +233,31 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{!over && (
-				<div className="co-tools" role="toolbar" aria-label="Couleurs">
+				<div className="co-tools" role="toolbar" aria-label="Outils">
 					{Array.from({ length: colors }, (_, i) => i + 1).map((v) => (
 						<button
 							key={v}
-							className={`co-tool color ${activeColor === v && !eraseMode ? 'active' : ''}`}
+							className={`co-tool color ${activeColor === v ? 'active' : ''}`}
 							style={{ background: COLORS[v - 1] }}
-							onClick={() => { setActiveColor(v); setEraseMode(false); }}
-							aria-pressed={activeColor === v && !eraseMode}
+							onClick={() => { setActiveColor(v); setTool((t) => (t === 'eraser' ? 'paint' : t)); }}
+							aria-pressed={activeColor === v}
 							aria-label={`Couleur ${v}`}
 						/>
 					))}
 					<button
-						className={`co-tool eraser ${eraseMode ? 'active' : ''}`}
-						onClick={() => setEraseMode(true)}
-						aria-pressed={eraseMode}
+						className={`co-tool cross ${tool === 'cross' ? 'active' : ''}`}
+						style={{ color: COLORS[activeColor - 1] }}
+						onClick={() => setTool((t) => (t === 'cross' ? 'paint' : 'cross'))}
+						aria-pressed={tool === 'cross'}
+						aria-label="Mode croix (marquer une couleur absente)"
+						title="Croix : marquer « pas cette couleur »"
+					>
+						✕
+					</button>
+					<button
+						className={`co-tool eraser ${tool === 'eraser' ? 'active' : ''}`}
+						onClick={() => setTool('eraser')}
+						aria-pressed={tool === 'eraser'}
 						aria-label="Gomme"
 						title="Gomme"
 					>
@@ -272,10 +310,12 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 							key={`row${r}`}
 							r={r}
 							size={size}
+							colors={colors}
 							rowClueLens={rowClues[r][activeColor - 1]}
 							activeColor={activeColor}
 							clueStatus={lineStatus(grid[r], solution[r], activeColor)}
 							grid={grid}
+							crosses={crosses}
 							hinted={hinted}
 							over={over}
 						/>
@@ -303,8 +343,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			) : (
 				<p className="co-help">
 					Toutes les cases sont coloriées. Choisis une couleur : tu ne vois que SES blocs (dans
-					l'ordre). Comme les blocs des autres couleurs sont cachés, déduis où commencent les
-					tiens grâce aux lignes et colonnes.
+					l'ordre). Déduis où ils commencent grâce aux lignes et colonnes. Le mode <strong>✕</strong>
+					marque « pas cette couleur ici » (une croix colorée par couleur exclue).
 				</p>
 			)}
 		</div>
@@ -314,15 +354,17 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 interface RowProps {
 	r: number;
 	size: number;
+	colors: number;
 	rowClueLens: number[];
 	activeColor: number;
 	clueStatus: 'done' | 'error' | 'none';
 	grid: number[][];
+	crosses: number[][];
 	hinted: Set<string>;
 	over: boolean;
 }
 
-function RowClueAndCells({ r, size, rowClueLens, activeColor, clueStatus, grid, hinted, over }: RowProps) {
+function RowClueAndCells({ r, size, colors, rowClueLens, activeColor, clueStatus, grid, crosses, hinted, over }: RowProps) {
 	return (
 		<>
 			<div className={`co-clue row ${clueStatus}`}>
@@ -338,6 +380,7 @@ function RowClueAndCells({ r, size, rowClueLens, activeColor, clueStatus, grid, 
 			</div>
 			{Array.from({ length: size }).map((_, c) => {
 				const v = grid[r][c];
+				const mask = crosses[r][c];
 				return (
 					<div
 						key={c}
@@ -346,7 +389,17 @@ function RowClueAndCells({ r, size, rowClueLens, activeColor, clueStatus, grid, 
 						data-c={c}
 						style={v !== 0 ? { background: COLORS[v - 1] } : undefined}
 						aria-label={`Ligne ${r + 1}, colonne ${c + 1}`}
-					/>
+					>
+						{v === 0 && mask !== 0 && (
+							<div className="co-crosses">
+								{Array.from({ length: colors }, (_, i) => i + 1)
+									.filter((k) => (mask >> k) & 1)
+									.map((k) => (
+										<span key={k} className="co-xmark" style={{ color: COLORS[k - 1] }}>✕</span>
+									))}
+							</div>
+						)}
+					</div>
 				);
 			})}
 		</>
@@ -439,10 +492,17 @@ const CSS = `
   border: 1px solid var(--co-line);
   background: var(--gray-999);
   cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
 .co-cell.filled { border-color: rgba(0,0,0,0.18); }
 .co-cell.hinted { box-shadow: inset 0 0 0 3px var(--co-ok); }
 .co-cell.over { cursor: default; }
+.co-crosses {
+  pointer-events: none;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 0 2px; width: 100%; height: 100%; line-height: 1;
+}
+.co-xmark { font-size: calc(var(--co-cell) * 0.34); font-weight: 800; line-height: 1; }
 
 .co-help {
   max-width: 430px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1.1rem;

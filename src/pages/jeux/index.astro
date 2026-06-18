@@ -3,6 +3,12 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
 import SuggestionForm from '../../components/SuggestionForm.astro';
 import { games } from '../../data/games';
+
+const NUM_FR = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize'];
+const playable = games.filter((g) => g.status === 'play').length;
+const playableLabel = NUM_FR[playable]
+	? NUM_FR[playable].charAt(0).toUpperCase() + NUM_FR[playable].slice(1)
+	: String(playable);
 ---
 
 <BaseLayout
@@ -14,7 +20,7 @@ import { games } from '../../data/games';
 			<h1>Jeux de logique</h1>
 			<p>
 				Des mini-jeux de déduction pensés pour aiguiser ta logique en quelques minutes.
-				Sept à découvrir — et d'autres arrivent.
+				{playableLabel} à découvrir — et d'autres arrivent.
 			</p>
 		</header>
 
