@@ -30,6 +30,7 @@ const showFavorite = favorite && playable && id;
 			</span>
 		</div>
 		<h3>{title}</h3>
+		{playable && id && <span class="daily-chip" data-game-id={id} hidden />}
 		<p>{pitch}</p>
 	</Tag>
 	{
@@ -160,6 +161,32 @@ const showFavorite = favorite && playable && id;
 		margin: 0;
 	}
 
+	.daily-chip {
+		align-self: flex-start;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+		line-height: 1;
+		padding: 0.3rem 0.7rem;
+		border-radius: 999rem;
+		border: 1px solid var(--gray-700);
+		color: var(--gray-300);
+	}
+
+	.daily-chip.progress {
+		border-color: var(--accent-regular);
+		color: var(--accent-regular);
+	}
+
+	.daily-chip.done {
+		border-color: var(--accent-regular);
+		background-color: var(--accent-regular);
+		color: var(--accent-text-over);
+	}
+
 	.game-card p {
 		color: var(--gray-400);
 		margin: 0;
@@ -208,4 +235,43 @@ const showFavorite = favorite && playable && id;
 	});
 
 	sync();
+
+	// Daily challenge status — same localStorage key as each game's daily run.
+	const todayKey = () => {
+		const d = new Date();
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	};
+
+	const syncDaily = () => {
+		const day = todayKey();
+		document.querySelectorAll<HTMLElement>('.daily-chip').forEach((chip) => {
+			const id = chip.dataset.gameId;
+			if (!id) return;
+			let started = false;
+			let done = false;
+			try {
+				const raw = localStorage.getItem(`ludiven-dailyrun-${id}-${day}`);
+				if (raw) {
+					started = true;
+					done = JSON.parse(raw)?.done === true;
+				}
+			} catch {
+				/* ignore */
+			}
+			chip.classList.toggle('done', done);
+			chip.classList.toggle('progress', started && !done);
+			chip.textContent = done
+				? '✓ Défi du jour fait'
+				: started
+					? '⏳ Défi en cours'
+					: '🏆 Défi du jour à faire';
+			chip.hidden = false;
+		});
+	};
+
+	syncDaily();
+	// Refresh when returning to the page (e.g. after finishing a daily).
+	document.addEventListener('visibilitychange', () => {
+		if (!document.hidden) syncDaily();
+	});
 </script>

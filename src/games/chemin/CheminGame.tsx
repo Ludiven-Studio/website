@@ -357,7 +357,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const head = path[path.length - 1];
 
 	return (
-		<div className="zp-root">
+		<div className="zp-root" style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
 
 			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />

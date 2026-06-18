@@ -304,7 +304,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	}, [status, revealed, solution, gameId]);
 
 	return (
-		<div className="rc-root">
+		<div className="rc-root" style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
 
 			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
