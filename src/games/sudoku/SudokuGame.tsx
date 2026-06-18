@@ -425,12 +425,12 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="sk-boardwrap">
+			<div className="sk-boardwrap" style={{ ['--n' as string]: size }}>
 				<div
 					className={`sk-board ${daily && !started ? 'blurred' : ''}`}
 					style={{
-						gridTemplateColumns: `repeat(${size}, var(--sk-cell))`,
-						['--n' as string]: size,
+						gridTemplateColumns: `repeat(${size}, 1fr)`,
+						gridTemplateRows: `repeat(${size}, 1fr)`,
 					}}
 				>
 					{Array.from({ length: size }).map((_, r) =>
@@ -545,9 +545,6 @@ const CSS = `
   --sk-bad: #d9534f;
   --sk-line: var(--gray-700);
   --sk-line-strong: var(--gray-300);
-  --sk-cell: min(52px, calc((100cqw - 6px) / var(--n, 6)));
-
-  container-type: inline-size;
   width: 100%;
   max-width: 520px;
   margin-inline: auto;
@@ -646,9 +643,17 @@ const CSS = `
   font-weight: 500;
 }
 
-.sk-boardwrap { position: relative; }
+.sk-boardwrap {
+  position: relative;
+  width: 100%;
+  max-width: min(520px, calc(52px * var(--n, 6)));
+  margin-inline: auto;
+}
 .sk-board {
+  width: 100%;
+  aspect-ratio: 1 / 1;
   display: grid;
+  container-type: inline-size;
   border: 2px solid var(--sk-line-strong);
   border-radius: 6px;
   overflow: hidden;
@@ -656,14 +661,15 @@ const CSS = `
 }
 
 .sk-cell {
-  width: var(--sk-cell);
-  height: var(--sk-cell);
+  width: 100%;
+  height: 100%;
+  min-width: 0;
   box-sizing: border-box;
   border: none;
   background: var(--gray-999);
   font: inherit;
   font-weight: 600;
-  font-size: calc(var(--sk-cell) * 0.46);
+  font-size: calc(46cqw / var(--n, 6));
   color: var(--sk-accent);
   cursor: pointer;
   padding: 0;
