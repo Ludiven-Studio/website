@@ -315,7 +315,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const thick = '3px solid var(--rn-line-strong)';
 
 	return (
-		<div className="rn-root">
+		<div className="rn-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
 			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />

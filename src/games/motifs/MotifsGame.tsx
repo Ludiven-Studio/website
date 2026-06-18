@@ -406,7 +406,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	};
 
 	return (
-		<div className="mo-root">
+		<div className="mo-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
 			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />

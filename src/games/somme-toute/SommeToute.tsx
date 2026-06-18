@@ -327,7 +327,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	const lockBoard = status === 'won' || revealed || (daily && !started);
 
 	return (
-		<div className="st-root">
+		<div className="st-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
 			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />

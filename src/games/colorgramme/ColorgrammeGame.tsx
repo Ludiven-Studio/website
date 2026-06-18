@@ -376,7 +376,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	}, [over, solution, size, gameId]);
 
 	return (
-		<div className="co-root">
+		<div className="co-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
 			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />

@@ -342,7 +342,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 	const thick = '2.5px solid var(--sg-line-strong)';
 
 	return (
-		<div className="sg-root">
+		<div className="sg-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
 			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
