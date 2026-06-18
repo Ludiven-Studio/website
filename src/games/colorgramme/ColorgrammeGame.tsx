@@ -106,6 +106,28 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_won');
 	}, [grid, status, revealed, size, solution, gameId]);
 
+	/* Auto-advance: once the active colour is fully & correctly placed, jump to the
+	   next unfinished colour. Triggered by moves (depends on `grid`), not by manual
+	   colour selection. */
+	useEffect(() => {
+		if (over) return;
+		const finished = (k: number) => {
+			for (let r = 0; r < size; r++)
+				for (let c = 0; c < size; c++)
+					if ((grid[r][c] === k) !== (solution[r][c] === k)) return false;
+			return true;
+		};
+		if (!finished(activeColor)) return;
+		for (let d = 1; d <= colors; d++) {
+			const k = ((activeColor - 1 + d) % colors) + 1;
+			if (!finished(k)) {
+				setActiveColor(k);
+				return;
+			}
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [grid]);
+
 	const applyStroke = useCallback(
 		(r: number, c: number) => {
 			if (tool === 'eraser') {
