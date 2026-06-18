@@ -38,6 +38,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
+	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
@@ -56,6 +57,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
+		setHinted(new Set());
 		setElapsed(0);
 	}, []);
 
@@ -116,6 +118,12 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				next[r][c] = (((next[r][c] + 1) % 3) as CellState);
 				return next;
 			});
+			setHinted((prev) => {
+				if (!prev.has(`${r},${c}`)) return prev;
+				const n = new Set(prev);
+				n.delete(`${r},${c}`);
+				return n;
+			});
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
@@ -152,6 +160,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			setStarted(true);
 			trackGame(gameId, 'game_started');
 		}
+		setHinted((prev) => new Set(prev).add(`${target},${solution[target]}`));
 		trackGame(gameId, 'hint_used');
 	}, [status, revealed, puzzle, size, marks, started, gameId]);
 
@@ -222,6 +231,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 										bad ? 'bad' : '',
 										conflictInfo.regions.has(regions[r][c]) ? 'creg' : '',
 										status === 'won' || revealed ? 'wondone' : '',
+										hinted.has(`${r},${c}`) ? 'hinted' : '',
 									].join(' ')}
 									style={{
 										backgroundColor: regionColor(regions[r][c]),
@@ -369,6 +379,7 @@ const CSS = `
 .rn-cell.creg { background-image: linear-gradient(rgba(211, 58, 44, 0.34), rgba(211, 58, 44, 0.34)); }
 .rn-cell.bad { color: var(--rn-bad); box-shadow: inset 0 0 0 3px var(--rn-bad); z-index: 1; }
 .rn-cell.wondone { color: var(--rn-ok); }
+.rn-cell.hinted { color: var(--rn-ok); }
 
 .rn-msg {
   min-height: 1.2em; margin-top: 1rem; text-align: center;

@@ -31,6 +31,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
+	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
@@ -51,6 +52,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
+		setHinted(new Set());
 		setElapsed(0);
 	}, []);
 
@@ -126,6 +128,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			next[r][c] = puzzle.solution[r][c];
 			return next;
 		});
+		setHinted((prev) => new Set(prev).add(`${r},${c}`));
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
@@ -152,6 +155,12 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				const next = prev.map((row) => [...row]);
 				next[r][c] = v;
 				return next;
+			});
+			setHinted((prev) => {
+				if (!prev.has(`${r},${c}`)) return prev;
+				const n = new Set(prev);
+				n.delete(`${r},${c}`);
+				return n;
 			});
 			if (!started) {
 				startRef.current = Date.now();
@@ -275,6 +284,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 										sameVal ? 'same' : '',
 										bad ? 'bad' : '',
 										status === 'won' || revealed ? 'wondone' : '',
+										!isGiven && hinted.has(`${r},${c}`) ? 'hinted' : '',
 									].join(' ')}
 									style={{
 										borderRight: c === size - 1 ? 'none' : (c + 1) % boxW === 0 ? thick : thin,
@@ -467,6 +477,7 @@ const CSS = `
 .sk-cell.sel { background: var(--accent-overlay); box-shadow: inset 0 0 0 2px var(--sk-accent); }
 .sk-cell.bad { color: var(--sk-bad); background: rgba(217, 83, 79, 0.14); }
 .sk-cell.wondone { color: var(--sk-ok); }
+.sk-cell.hinted { color: var(--sk-ok); }
 
 .sk-pad {
   display: flex;

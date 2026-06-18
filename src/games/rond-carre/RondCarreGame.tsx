@@ -25,6 +25,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
+	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
@@ -43,6 +44,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
+		setHinted(new Set());
 		setElapsed(0);
 	}, []);
 
@@ -125,6 +127,12 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				next[r][c] = (((next[r][c] + 1) % 3) as Cell);
 				return next;
 			});
+			setHinted((prev) => {
+				if (!prev.has(`${r},${c}`)) return prev;
+				const nx = new Set(prev);
+				nx.delete(`${r},${c}`);
+				return nx;
+			});
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
@@ -152,6 +160,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			next[r][c] = solution[r][c];
 			return next;
 		});
+		setHinted((prev) => new Set(prev).add(`${r},${c}`));
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
@@ -219,6 +228,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 										x === 1 ? 'rond' : x === 2 ? 'carre' : '',
 										bad ? 'bad' : '',
 										status === 'won' || revealed ? 'wondone' : '',
+										!isGiven && hinted.has(key(r, c)) ? 'hinted' : '',
 									].join(' ')}
 									onClick={() => cycle(r, c)}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${
@@ -379,6 +389,7 @@ const CSS = `
 }
 .rc-cell.bad { background: rgba(217, 83, 79, 0.16); }
 .rc-cell.wondone { box-shadow: inset 0 0 0 1px var(--rc-accent); }
+.rc-cell.hinted { box-shadow: inset 0 0 0 2px #2f9e6f; }
 
 .rc-cons { position: absolute; inset: 0; pointer-events: none; }
 .rc-badge {

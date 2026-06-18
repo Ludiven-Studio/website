@@ -26,6 +26,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
+	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [showRules, setShowRules] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
@@ -70,6 +71,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
+		setHinted(new Set());
 		setElapsed(0);
 	}, []);
 
@@ -151,6 +153,12 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				next[r][c] = v;
 				return next;
 			});
+			setHinted((prev) => {
+				if (!prev.has(`${r},${c}`)) return prev;
+				const n = new Set(prev);
+				n.delete(`${r},${c}`);
+				return n;
+			});
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
@@ -182,6 +190,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			next[r][c] = solution[r][c];
 			return next;
 		});
+		setHinted((prev) => new Set(prev).add(`${r},${c}`));
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
@@ -310,6 +319,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 										isSel ? 'sel' : '',
 										bad ? 'bad' : '',
 										status === 'won' || revealed ? 'wondone' : '',
+										!isGiven && hinted.has(`${r},${c}`) ? 'hinted' : '',
 									].join(' ')}
 									style={{
 										borderRight:
@@ -463,6 +473,7 @@ const CSS = `
 .cd-cell.sel { background: var(--accent-overlay); box-shadow: inset 0 0 0 2px var(--cd-accent); }
 .cd-cell.bad .cd-val { color: var(--cd-bad); }
 .cd-cell.wondone .cd-val { color: var(--cd-ok); }
+.cd-cell.hinted .cd-val { color: var(--cd-ok); }
 .cd-cagelabel {
   position: absolute; top: 2px; left: 4px;
   font-size: calc(var(--cd-cell) * 0.24); font-weight: 700; line-height: 1;

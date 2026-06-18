@@ -26,6 +26,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	const [selected, setSelected] = useState<[number, number] | null>(null);
 	const [status, setStatus] = useState<Status>('idle');
 	const [revealed, setRevealed] = useState(false);
+	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
@@ -74,6 +75,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setSelected(null);
 		setStatus('idle');
 		setRevealed(false);
+		setHinted(new Set());
 		setElapsed(0);
 	}, []);
 
@@ -99,6 +101,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			next[r][c] = game.solution[r][c];
 			return next;
 		});
+		setHinted((prev) => new Set(prev).add(`${r},${c}`));
 		if (status === 'idle') {
 			startRef.current = Date.now();
 			setStatus('playing');
@@ -125,6 +128,12 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				const next = prev.map((row) => [...row]);
 				next[r][c] = v;
 				return next;
+			});
+			setHinted((prev) => {
+				if (!prev.has(`${r},${c}`)) return prev;
+				const n = new Set(prev);
+				n.delete(`${r},${c}`);
+				return n;
 			});
 			if (status === 'idle') {
 				startRef.current = Date.now();
@@ -231,6 +240,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 							rowT={rowT}
 							rowState={rowState}
 							won={status === 'won' || revealed}
+							hinted={hinted}
 						/>
 					))}
 					{/* Column targets row */}
@@ -296,9 +306,10 @@ interface RowProps {
 	rowT: number[];
 	rowState: (r: number) => SumState;
 	won: boolean;
+	hinted: Set<string>;
 }
 
-function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowT, rowState, won }: RowProps) {
+function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowT, rowState, won, hinted }: RowProps) {
 	return (
 		<>
 			{Array.from({ length: size }).map((_, c) => {
@@ -316,6 +327,7 @@ function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowT, ro
 							isSel ? 'sel' : '',
 							isPeer ? 'peer' : '',
 							won ? 'wondone' : '',
+							!given && hinted.has(`${r},${c}`) ? 'hinted' : '',
 						].join(' ')}
 						onClick={() => !given && setSelected([r, c])}
 						aria-label={`Case ligne ${r + 1}, colonne ${c + 1}${v != null ? `, valeur ${v}` : ', vide'}`}
@@ -464,6 +476,7 @@ const CSS = `
   transform: scale(1.04);
 }
 .st-cell.wondone { color: var(--st-ok); }
+.st-cell.hinted { color: var(--st-ok); }
 
 .st-chip {
   min-width: calc(var(--st-cell) * 0.66);

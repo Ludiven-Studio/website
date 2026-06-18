@@ -30,6 +30,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
+	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
 	const startRef = useRef<number>(0);
 
@@ -50,6 +51,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
+		setHinted(new Set());
 		setElapsed(0);
 	}, []);
 
@@ -127,6 +129,12 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				next[r][c] = v;
 				return next;
 			});
+			setHinted((prev) => {
+				if (!prev.has(`${r},${c}`)) return prev;
+				const n = new Set(prev);
+				n.delete(`${r},${c}`);
+				return n;
+			});
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
@@ -158,6 +166,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 			next[r][c] = solution[r][c];
 			return next;
 		});
+		setHinted((prev) => new Set(prev).add(`${r},${c}`));
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
@@ -255,6 +264,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 										isSel ? 'sel' : '',
 										bad ? 'bad' : '',
 										status === 'won' || revealed ? 'wondone' : '',
+										!isGiven && hinted.has(`${r},${c}`) ? 'hinted' : '',
 									].join(' ')}
 									style={{
 										borderRight:
@@ -384,6 +394,7 @@ const CSS = `
 .sg-cell.sel { background: var(--accent-overlay); box-shadow: inset 0 0 0 2px var(--sg-accent); }
 .sg-cell.bad { color: var(--sg-bad); }
 .sg-cell.wondone { color: var(--sg-ok); }
+.sg-cell.hinted { color: var(--sg-ok); }
 
 .sg-pad {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 1.5rem; width: 100%;
