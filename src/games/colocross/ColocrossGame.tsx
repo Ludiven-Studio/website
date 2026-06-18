@@ -105,6 +105,8 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 
 	const applyStroke = useCallback(
 		(r: number, c: number) => {
+			// Locked: a cell drawn with another colour can't be changed from here.
+			if (grid[r][c] !== 0 && grid[r][c] !== activeColor) return;
 			const v = strokeVal.current;
 			setGrid((prev) => {
 				if (prev[r][c] === v) return prev;
@@ -115,7 +117,7 @@ export default function ColocrossGame({ gameId }: { gameId: string }) {
 			removeHint(r, c);
 			begin();
 		},
-		[begin, removeHint],
+		[grid, activeColor, begin, removeHint],
 	);
 
 	const cellFromEvent = (e: React.PointerEvent): [number, number] | null => {
