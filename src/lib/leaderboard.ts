@@ -57,6 +57,35 @@ export const setPlayerName = (name: string): void => {
 	}
 };
 
+/** Snapshot of today's daily attempt (one try per device, resumable). */
+export interface DailyRun {
+	startedAt: number;
+	done: boolean;
+	finalTime?: number;
+	seed?: number;
+	diffIndex?: number;
+	state?: unknown; // game-specific (e.g. Sudoku entries)
+}
+
+const runKey = (game: string): string => `ludiven-dailyrun-${game}-${todayKey()}`;
+
+export function loadDailyRun(game: string): DailyRun | null {
+	try {
+		const raw = localStorage.getItem(runKey(game));
+		return raw ? (JSON.parse(raw) as DailyRun) : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveDailyRun(game: string, run: DailyRun): void {
+	try {
+		localStorage.setItem(runKey(game), JSON.stringify(run));
+	} catch {
+		/* ignore */
+	}
+}
+
 const headers = (): Record<string, string> => ({
 	apikey: SUPABASE_ANON_KEY,
 	Authorization: `Bearer ${SUPABASE_ANON_KEY}`,

@@ -2,8 +2,15 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SIZES, DIFFS, generateSudoku, type SudokuPuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
-import { getDaily, dailyWeekdayLabel } from '../../lib/leaderboard';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+	type DailyRun,
+} from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 /* =====================================================
    SUDOKU — React island (training mode)
@@ -42,7 +49,9 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [elapsed, setElapsed] = useState(0);
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
 	const { size, boxH, boxW, given } = puzzle;
 
@@ -54,6 +63,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const newGame = useCallback((sk: SizeKey, dk: keyof typeof DIFFS) => {
 		const variant = SIZES[sk];
 		setDaily(false);
+		setAlreadyPlayed(false);
 		setSizeKey(sk);
 		setDiffKey(dk);
 		setPuzzle(generateSudoku(variant, DIFFS[dk]));
@@ -66,31 +76,84 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 	}, []);
 
-	/* Daily challenge: server-issued seed + difficulty (same grid for everyone today). */
+	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		const variant = SIZES[DAILY_SIZE];
 		setDaily(true);
-		setDailyLoading(true);
 		setSizeKey(DAILY_SIZE);
-		setEntries(emptyEntries(variant.size));
 		setSelected(null);
-		setStatus('playing');
-		setStarted(false);
 		setRevealed(false);
 		setHinted(new Set());
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
+			const dk = DIFF_ORDER[run.diffIndex ?? 0] ?? 'facile';
+			dailySeedRef.current = { seed: run.seed, diffIndex: run.diffIndex ?? 0 };
+			setDailyLoading(false);
+			setDiffKey(dk);
+			setPuzzle(generateSudoku(variant, DIFFS[dk], mulberry32(run.seed)));
+			setEntries((run.state as (number | null)[][]) ?? emptyEntries(variant.size));
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				setStatus('won');
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setAlreadyPlayed(false);
+				setStatus('playing');
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('playing');
+		setStarted(false);
 		setElapsed(0);
+		setEntries(emptyEntries(variant.size));
+		setDailyLoading(true);
 		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		setDiffKey(dk);
 		setPuzzle(generateSudoku(variant, DIFFS[dk], mulberry32(seed)));
 		setDailyLoading(false);
 	}, [gameId]);
 
-	/* Daily mode: chrono starts when the player presses Start. */
+	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
-		startRef.current = Date.now();
+		const now = Date.now();
+		startRef.current = now;
 		setStarted(true);
+		setElapsed(0);
 		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyEntries(SIZES[DAILY_SIZE].size),
+		});
+	}, [gameId]);
+
+	/* Clear my entries without resetting the attempt (chrono keeps running). */
+	const resetDailyEntries = useCallback(() => {
+		const variant = SIZES[DAILY_SIZE];
+		setEntries(emptyEntries(variant.size));
+		setHinted(new Set());
+		setSelected(null);
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyEntries(variant.size),
+		});
 	}, [gameId]);
 
 	/* Timer */
@@ -142,6 +205,36 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setSelected(null);
 		trackGame(gameId, 'game_won');
 	}, [entries, status, revealed, size, value, conflicts, gameId]);
+
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || status === 'won') return;
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: entries,
+		});
+	}, [daily, started, status, entries, gameId]);
+
+	/* Lock the daily attempt on a fresh win. */
+	useEffect(() => {
+		if (!daily || status !== 'won' || alreadyPlayed) return;
+		const sd = dailySeedRef.current;
+		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const snapshot: DailyRun = {
+			startedAt: startRef.current,
+			done: true,
+			finalTime,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: entries,
+		};
+		saveDailyRun(gameId, snapshot);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [daily, status, alreadyPlayed, gameId]);
 
 	/* Hint: fill the selected empty cell (else the first empty) with its solution value. */
 	const hint = useCallback(() => {
@@ -316,8 +409,20 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{daily && started && status === 'playing' && (
+				<div className="sk-actions">
+					<button className="sk-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+				</div>
+			)}
+
 			{daily && status === 'won' && (
-				<div className="sk-daily-won">🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></div>
+				<div className="sk-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></>
+					)}
+				</div>
 			)}
 
 			<div className="sk-boardwrap">
@@ -398,15 +503,10 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{daily && (
-				<>
-					{status === 'won' && (
-						<button className="sk-replay sk-daily-replay" onClick={startDaily}>
-							↻ Rejouer le défi
-						</button>
-					)}
-					<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
-				</>
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="sk-revealed-note">
@@ -445,8 +545,9 @@ const CSS = `
   --sk-bad: #d9534f;
   --sk-line: var(--gray-700);
   --sk-line-strong: var(--gray-300);
-  --sk-cell: min(52px, calc((100vw - 3.5rem) / var(--n, 6)));
+  --sk-cell: min(52px, calc((100cqw - 6px) / var(--n, 6)));
 
+  container-type: inline-size;
   width: 100%;
   max-width: 520px;
   margin-inline: auto;
@@ -677,7 +778,6 @@ const CSS = `
   text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
 }
 .sk-daily-won strong { color: var(--sk-accent); font-variant-numeric: tabular-nums; }
-.sk-daily-replay { display: block; margin: 1rem auto 0; }
 
 @keyframes sk-fade { from { opacity: 0; } to { opacity: 1; } }
 
