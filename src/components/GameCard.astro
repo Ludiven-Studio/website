@@ -270,8 +270,9 @@ const showFavorite = favorite && playable && id;
 	};
 
 	syncDaily();
-	// Refresh when returning to the page (e.g. after finishing a daily).
+	// Refresh when returning to the page (tab focus, and back-nav restored from bfcache).
 	document.addEventListener('visibilitychange', () => {
 		if (!document.hidden) syncDaily();
 	});
+	window.addEventListener('pageshow', syncDaily);
 </script>
