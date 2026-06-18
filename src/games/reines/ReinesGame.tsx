@@ -126,7 +126,10 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		setDiffKey(dk);
-		setPuzzle(generateReines(DIFFS[dk], mulberry32(seed)));
+		const p = generateReines(DIFFS[dk], mulberry32(seed));
+		skipBackstopRef.current = p; // we size marks here, don't let the backstop double-reset
+		setPuzzle(p);
+		setMarks(emptyMarks(DIFFS[dk].size));
 		setDailyLoading(false);
 	}, [gameId]);
 
@@ -177,7 +180,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const queens = useMemo(() => {
 		const out: [number, number][] = [];
 		for (let r = 0; r < size; r++)
-			for (let c = 0; c < size; c++) if (marks[r][c] === 2) out.push([r, c]);
+			for (let c = 0; c < size; c++) if (marks[r]?.[c] === 2) out.push([r, c]);
 		return out;
 	}, [marks, size]);
 
