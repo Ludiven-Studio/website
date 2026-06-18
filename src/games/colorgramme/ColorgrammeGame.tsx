@@ -116,7 +116,12 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				return;
 			}
 			if (tool === 'cross') {
-				if (grid[r][c] !== 0) return; // can't cross a painted cell
+				// Allowed on empty cells, or a cell painted with the active colour (replaced).
+				if (grid[r][c] !== 0 && grid[r][c] !== activeColor) return; // locked: another colour
+				if (grid[r][c] === activeColor) {
+					setGrid((prev) => prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row)));
+					removeHint(r, c);
+				}
 				const bit = 1 << activeColor;
 				setCrosses((prev) => {
 					const cur = prev[r][c];
@@ -234,35 +239,48 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 
 			{!over && (
 				<div className="co-tools" role="toolbar" aria-label="Outils">
-					{Array.from({ length: colors }, (_, i) => i + 1).map((v) => (
+					<div className="co-colors" role="group" aria-label="Couleurs">
+						{Array.from({ length: colors }, (_, i) => i + 1).map((v) => (
+							<button
+								key={v}
+								className={`co-tool color ${activeColor === v ? 'active' : ''}`}
+								style={{ background: COLORS[v - 1] }}
+								onClick={() => { setActiveColor(v); setTool((t) => (t === 'eraser' ? 'paint' : t)); }}
+								aria-pressed={activeColor === v}
+								aria-label={`Couleur ${v}`}
+							/>
+						))}
+					</div>
+					<div className="co-modes" role="group" aria-label="Action">
 						<button
-							key={v}
-							className={`co-tool color ${activeColor === v ? 'active' : ''}`}
-							style={{ background: COLORS[v - 1] }}
-							onClick={() => { setActiveColor(v); setTool((t) => (t === 'eraser' ? 'paint' : t)); }}
-							aria-pressed={activeColor === v}
-							aria-label={`Couleur ${v}`}
-						/>
-					))}
-					<button
-						className={`co-tool cross ${tool === 'cross' ? 'active' : ''}`}
-						style={{ color: COLORS[activeColor - 1] }}
-						onClick={() => setTool((t) => (t === 'cross' ? 'paint' : 'cross'))}
-						aria-pressed={tool === 'cross'}
-						aria-label="Mode croix (marquer une couleur absente)"
-						title="Croix : marquer « pas cette couleur »"
-					>
-						✕
-					</button>
-					<button
-						className={`co-tool eraser ${tool === 'eraser' ? 'active' : ''}`}
-						onClick={() => setTool('eraser')}
-						aria-pressed={tool === 'eraser'}
-						aria-label="Gomme"
-						title="Gomme"
-					>
-						⌫
-					</button>
+							className={`co-tool pencil ${tool === 'paint' ? 'active' : ''}`}
+							onClick={() => setTool('paint')}
+							aria-pressed={tool === 'paint'}
+							aria-label="Crayon (dessiner)"
+							title="Crayon : dessiner avec la couleur"
+						>
+							✏️
+						</button>
+						<button
+							className={`co-tool cross ${tool === 'cross' ? 'active' : ''}`}
+							style={{ color: COLORS[activeColor - 1] }}
+							onClick={() => setTool('cross')}
+							aria-pressed={tool === 'cross'}
+							aria-label="Croix (marquer une couleur absente)"
+							title="Croix : marquer « pas cette couleur »"
+						>
+							✕
+						</button>
+						<button
+							className={`co-tool eraser ${tool === 'eraser' ? 'active' : ''}`}
+							onClick={() => setTool('eraser')}
+							aria-pressed={tool === 'eraser'}
+							aria-label="Gomme"
+							title="Gomme"
+						>
+							⌫
+						</button>
+					</div>
 				</div>
 			)}
 
@@ -448,8 +466,12 @@ const CSS = `
 }
 
 .co-tools {
-  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 0.85rem;
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 8px 1.25rem; margin-bottom: 0.85rem;
 }
+.co-colors, .co-modes { display: flex; gap: 8px; }
+.co-modes { padding-left: 1.25rem; border-left: 1.5px solid var(--gray-800); }
+@media (max-width: 26rem) { .co-modes { padding-left: 0; border-left: none; } }
 .co-tool {
   width: 40px; height: 40px; border-radius: 12px; cursor: pointer;
   border: 2px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0);
