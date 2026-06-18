@@ -430,7 +430,10 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					<div
 						className={`zp-board ${daily && !started ? 'blurred' : ''}`}
 						ref={boardRef}
-						style={{ gridTemplateColumns: `repeat(${n}, var(--zp-cell))` }}
+						style={{
+							gridTemplateColumns: `repeat(${n}, 1fr)`,
+							gridTemplateRows: `repeat(${n}, 1fr)`,
+						}}
 						onPointerDown={onPointerDown}
 						onPointerMove={onPointerMove}
 						onPointerUp={endDraw}
@@ -620,6 +623,7 @@ const CSS = `
 .zp-board {
   position: relative;
   width: 100%;
+  aspect-ratio: 1 / 1;
   display: grid;
   border: 2.5px solid var(--gray-100);
   border-radius: 8px;
@@ -630,7 +634,7 @@ const CSS = `
 }
 .zp-cell {
   position: relative;
-  width: var(--zp-cell); height: var(--zp-cell);
+  width: 100%; height: 100%; min-width: 0;
   box-sizing: border-box;
   border-right: 1px solid var(--gray-800);
   border-bottom: 1px solid var(--gray-800);

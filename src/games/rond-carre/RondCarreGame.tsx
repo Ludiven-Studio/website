@@ -545,15 +545,17 @@ const CSS = `
 .rc-board {
   position: relative;
   width: 100%;
+  aspect-ratio: 1 / 1;
   display: grid;
-  grid-template-columns: repeat(var(--n), var(--rc-cell));
+  grid-template-columns: repeat(var(--n), 1fr);
+  grid-template-rows: repeat(var(--n), 1fr);
   border: 2.5px solid var(--gray-100);
   border-radius: 8px;
   overflow: hidden;
   background: var(--gray-999);
 }
 .rc-cell {
-  width: var(--rc-cell); height: var(--rc-cell);
+  width: 100%; height: 100%; min-width: 0;
   box-sizing: border-box;
   border-right: 1px solid var(--rc-line);
   border-bottom: 1px solid var(--rc-line);
