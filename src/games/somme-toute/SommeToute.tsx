@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DIFFS, generatePuzzle, type Game } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+	type DailyRun,
+} from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 /* =====================================================
    SOMME TOUTE — React island (training mode)
@@ -17,6 +27,9 @@ const fmtTime = (s: number) =>
 type Status = 'idle' | 'playing' | 'won';
 type SumState = 'ok' | 'over' | 'pending';
 
+// Daily challenge: seed + difficulty come from the server (same for everyone).
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+
 export default function SommeToute({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [game, setGame] = useState<Game>(() => generatePuzzle(DIFFS.facile));
@@ -25,10 +38,16 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	);
 	const [selected, setSelected] = useState<[number, number] | null>(null);
 	const [status, setStatus] = useState<Status>('idle');
+	// Daily Start gate. Free mode starts implicitly (idle->playing) and ignores this.
+	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
 	const { puzzle, rowT, colT, size, maxVal } = game;
 
@@ -69,15 +88,131 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
+		setDaily(false);
+		setAlreadyPlayed(false);
 		setDiffKey(key);
 		setGame(generatePuzzle(d));
 		setEntries(emptyEntries(d.size));
 		setSelected(null);
 		setStatus('idle');
+		setStarted(false);
 		setRevealed(false);
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
+	const startDaily = useCallback(async () => {
+		setDaily(true);
+		setSelected(null);
+		setRevealed(false);
+		setHinted(new Set());
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
+			const diffIndex = run.diffIndex ?? 0;
+			const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+			const d = DIFFS[dk];
+			dailySeedRef.current = { seed: run.seed, diffIndex };
+			setDailyLoading(false);
+			setDiffKey(dk);
+			setGame(generatePuzzle(d, mulberry32(run.seed)));
+			setEntries((run.state as (number | null)[][]) ?? emptyEntries(d.size));
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				setStatus('won');
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setAlreadyPlayed(false);
+				setStatus('playing');
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('idle');
+		setStarted(false);
+		setElapsed(0);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
+		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		const d = DIFFS[dk];
+		setDiffKey(dk);
+		setGame(generatePuzzle(d, mulberry32(seed)));
+		setEntries(emptyEntries(d.size));
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Commencer: consumes the attempt and starts the chrono. */
+	const startTimer = useCallback(() => {
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setStatus('playing');
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyEntries(DIFFS[dk].size),
+		});
+	}, [gameId]);
+
+	/* Clear my entries without resetting the attempt (chrono keeps running). */
+	const resetDailyEntries = useCallback(() => {
+		const sd = dailySeedRef.current;
+		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+		setEntries(emptyEntries(DIFFS[dk].size));
+		setHinted(new Set());
+		setSelected(null);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyEntries(DIFFS[dk].size),
+		});
+	}, [gameId]);
+
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || status === 'won') return;
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: entries,
+		});
+	}, [daily, started, status, entries, gameId]);
+
+	/* Lock the daily attempt on a fresh win. */
+	useEffect(() => {
+		if (!daily || status !== 'won' || alreadyPlayed) return;
+		const sd = dailySeedRef.current;
+		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const snapshot: DailyRun = {
+			startedAt: startRef.current,
+			done: true,
+			finalTime,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: entries,
+		};
+		saveDailyRun(gameId, snapshot);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [daily, status, alreadyPlayed, gameId]);
 
 	/* Hint: fill the selected empty cell (else the first empty) with its solution value. */
 	const hint = useCallback(() => {
@@ -121,7 +256,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || revealed || !selected) return;
+			if (status === 'won' || revealed || !selected || (daily && !started)) return;
 			const [r, c] = selected;
 			if (puzzle[r][c] != null) return;
 			setEntries((prev) => {
@@ -141,7 +276,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, revealed, selected, puzzle, gameId],
+		[status, revealed, selected, puzzle, daily, started, gameId],
 	);
 
 	/* Keyboard (desktop) */
@@ -188,33 +323,68 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		return s > colT[c] ? 'over' : 'pending';
 	};
 
+	const lockBoard = status === 'won' || revealed || (daily && !started);
+
 	return (
 		<div className="st-root">
 			<style>{CSS}</style>
 
-			<div className="st-bar">
-				<div className="st-pills" role="tablist" aria-label="Difficulté">
-					{Object.entries(DIFFS).map(([key, d]) => (
-						<button
-							key={key}
-							role="tab"
-							aria-selected={diffKey === key}
-							className={`st-pill ${diffKey === key ? 'active' : ''}`}
-							onClick={() => newGame(key as keyof typeof DIFFS)}
-						>
-							{d.label}
-						</button>
-					))}
-				</div>
-				<div className="st-bar-right">
-					<div className="st-timer" aria-live="off">{fmtTime(elapsed)}</div>
-					<button className="st-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
-						↻
-					</button>
-				</div>
+			<div className="st-modes" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`st-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`st-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
 			</div>
 
-			{status !== 'won' && !revealed && (
+			{daily ? (
+				<div className="st-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+				</div>
+			) : (
+				<div className="st-bar">
+					<div className="st-pills" role="tablist" aria-label="Difficulté">
+						{Object.entries(DIFFS).map(([key, d]) => (
+							<button
+								key={key}
+								role="tab"
+								aria-selected={diffKey === key}
+								className={`st-pill ${diffKey === key ? 'active' : ''}`}
+								onClick={() => newGame(key as keyof typeof DIFFS)}
+							>
+								{d.label}
+							</button>
+						))}
+					</div>
+					<div className="st-bar-right">
+						<div className="st-timer" aria-live="off">{fmtTime(elapsed)}</div>
+						<button className="st-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
+							↻
+						</button>
+					</div>
+				</div>
+			)}
+
+			{daily && (
+				<div className="st-bar" style={{ justifyContent: 'center' }}>
+					<div className="st-timer" aria-live="off">{fmtTime(elapsed)}</div>
+				</div>
+			)}
+
+			{status !== 'won' && !revealed && !daily && (
 				<div className="st-actions">
 					<button className="st-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -223,10 +393,26 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="st-boardwrap">
+			{daily && started && status === 'playing' && (
+				<div className="st-actions">
+					<button className="st-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+				</div>
+			)}
+
+			{daily && status === 'won' && (
+				<div className="st-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></>
+					)}
+				</div>
+			)}
+
+			<div className="st-boardwrap" style={{ ['--n' as string]: size }}>
 				<div
-					className="st-board"
-					style={{ gridTemplateColumns: `repeat(${size}, var(--st-cell)) auto`, ['--n' as string]: size }}
+					className={`st-board ${daily && !started ? 'blurred' : ''}`}
+					style={{ gridTemplateColumns: `repeat(${size}, var(--st-cell)) auto` }}
 				>
 					{Array.from({ length: size }).map((_, r) => (
 						<FragmentRow
@@ -239,6 +425,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 							setSelected={setSelected}
 							rowT={rowT}
 							rowState={rowState}
+							locked={lockBoard}
 							won={status === 'won' || revealed}
 							hinted={hinted}
 						/>
@@ -252,7 +439,19 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 					<div className="st-corner">Σ</div>
 				</div>
 
-				{status === 'won' && (
+				{daily && dailyLoading && (
+					<div className="st-overlay">
+						<div className="st-overlay-card"><p className="st-windiff">Préparation du défi…</p></div>
+					</div>
+				)}
+
+				{daily && !dailyLoading && !started && status !== 'won' && (
+					<div className="st-overlay">
+						<button className="st-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
+
+				{status === 'won' && !daily && (
 					<div className="st-win" role="dialog" aria-label="Grille résolue">
 						<div className="st-wincard">
 							<div className="st-winmark">⚖️</div>
@@ -266,6 +465,12 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="st-revealed-note">
@@ -305,11 +510,12 @@ interface RowProps {
 	setSelected: (s: [number, number]) => void;
 	rowT: number[];
 	rowState: (r: number) => SumState;
+	locked: boolean;
 	won: boolean;
 	hinted: Set<string>;
 }
 
-function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowT, rowState, won, hinted }: RowProps) {
+function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowT, rowState, locked, won, hinted }: RowProps) {
 	return (
 		<>
 			{Array.from({ length: size }).map((_, c) => {
@@ -329,9 +535,9 @@ function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowT, ro
 							won ? 'wondone' : '',
 							!given && hinted.has(`${r},${c}`) ? 'hinted' : '',
 						].join(' ')}
-						onClick={() => !given && setSelected([r, c])}
+						onClick={() => !given && !locked && setSelected([r, c])}
 						aria-label={`Case ligne ${r + 1}, colonne ${c + 1}${v != null ? `, valeur ${v}` : ', vide'}`}
-						disabled={won}
+						disabled={locked}
 					>
 						{v != null ? v : ''}
 					</button>
@@ -353,7 +559,7 @@ const CSS = `
   --st-bad: #d9534f;
   --st-cellbg: var(--gray-999);
   --st-givenbg: var(--gray-800);
-  --st-cell: min(56px, calc((100vw - 3.5rem - 2.5rem) / (var(--n, 6) + 1)));
+  --st-cell: calc(100cqw / (var(--n, 6) + 1));
 
   width: 100%;
   max-width: 460px;
@@ -376,6 +582,11 @@ const CSS = `
 }
 .st-bar-right { display: flex; align-items: center; gap: 0.5rem; }
 .st-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.st-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.st-daily-tag {
+  text-align: center; color: var(--st-ink-soft); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.75rem;
+}
 .st-pill {
   border: 1.5px solid var(--gray-700);
   background: transparent;
@@ -441,8 +652,15 @@ const CSS = `
   font-weight: 500;
 }
 
-.st-boardwrap { position: relative; }
+.st-boardwrap {
+  position: relative;
+  width: 100%;
+  max-width: calc(56px * (var(--n, 6) + 1));
+  margin-inline: auto;
+  container-type: inline-size;
+}
 .st-board {
+  width: 100%;
   display: grid;
   gap: 6px;
   align-items: center;
@@ -587,9 +805,29 @@ const CSS = `
   cursor: pointer;
 }
 
+.st-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.st-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  animation: st-fade 0.25s ease;
+}
+.st-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--st-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
+}
+.st-startbtn {
+  border: none; background: var(--st-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.st-daily-won {
+  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
+}
+.st-daily-won strong { color: var(--st-accent); font-variant-numeric: tabular-nums; }
+
 @keyframes st-fade { from { opacity: 0; } to { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .st-cell, .st-chip, .st-win { transition: none; animation: none; }
+  .st-cell, .st-chip, .st-win, .st-overlay { transition: none; animation: none; }
 }
 `;

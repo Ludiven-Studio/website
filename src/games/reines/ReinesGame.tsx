@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { trackGame } from '../../lib/analytics';
+import { mulberry32 } from '../prng';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+	type DailyRun,
+} from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 import {
 	DIFFS,
 	generateReines,
@@ -31,6 +41,9 @@ const emptyMarks = (n: number): CellState[][] =>
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
+// Daily challenge: seed + difficulty come from the server (same for everyone).
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+
 export default function ReinesGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<ReinesPuzzle>(() => generateReines(DIFFS.facile));
@@ -40,17 +53,26 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const [revealed, setRevealed] = useState(false);
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const skipBackstopRef = useRef<ReinesPuzzle | null>(null); // puzzle whose marks were pre-restored (daily resume)
 
 	const { size, regions } = puzzle;
 
 	// Backstop: marks always match the current puzzle (no possible desync).
+	// Skip when marks were intentionally restored for this puzzle (daily resume).
 	useEffect(() => {
+		if (skipBackstopRef.current === puzzle) return;
 		setMarks(emptyMarks(puzzle.size));
 	}, [puzzle]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
+		setDaily(false);
+		setAlreadyPlayed(false);
 		setDiffKey(key);
 		setPuzzle(generateReines(d));
 		setMarks(emptyMarks(d.size));
@@ -60,6 +82,86 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
+	const startDaily = useCallback(async () => {
+		setDaily(true);
+		setRevealed(false);
+		setHinted(new Set());
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
+			const di = run.diffIndex ?? 0;
+			const dk = DIFF_ORDER[di] ?? 'facile';
+			dailySeedRef.current = { seed: run.seed, diffIndex: di };
+			setDailyLoading(false);
+			setDiffKey(dk);
+			const p = generateReines(DIFFS[dk], mulberry32(run.seed));
+			skipBackstopRef.current = p; // keep the restored marks, don't clear them
+			setPuzzle(p);
+			setMarks((run.state as CellState[][]) ?? emptyMarks(p.size));
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				setStatus('won');
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setAlreadyPlayed(false);
+				setStatus('playing');
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('playing');
+		setStarted(false);
+		setElapsed(0);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
+		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		setDiffKey(dk);
+		setPuzzle(generateReines(DIFFS[dk], mulberry32(seed)));
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Commencer: consumes the attempt and starts the chrono. */
+	const startTimer = useCallback(() => {
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyMarks(DIFFS[dk].size),
+		});
+	}, [gameId]);
+
+	/* Clear my entries without resetting the attempt (chrono keeps running). */
+	const resetDailyEntries = useCallback(() => {
+		const sd = dailySeedRef.current;
+		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+		const cleared = emptyMarks(DIFFS[dk].size);
+		setMarks(cleared);
+		setHinted(new Set());
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: cleared,
+		});
+	}, [gameId]);
 
 	/* Timer */
 	useEffect(() => {
@@ -110,9 +212,39 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		}
 	}, [queens, conflicts, size, status, revealed, gameId]);
 
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || status === 'won') return;
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: marks,
+		});
+	}, [daily, started, status, marks, gameId]);
+
+	/* Lock the daily attempt on a fresh win. */
+	useEffect(() => {
+		if (!daily || status !== 'won' || alreadyPlayed) return;
+		const sd = dailySeedRef.current;
+		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const snapshot: DailyRun = {
+			startedAt: startRef.current,
+			done: true,
+			finalTime,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: marks,
+		};
+		saveDailyRun(gameId, snapshot);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [daily, status, alreadyPlayed, gameId]);
+
 	const cycle = useCallback(
 		(r: number, c: number) => {
-			if (status === 'won' || revealed) return;
+			if (status === 'won' || revealed || (daily && !started)) return;
 			setMarks((prev) => {
 				const next = prev.map((row) => [...row]) as CellState[][];
 				next[r][c] = (((next[r][c] + 1) % 3) as CellState);
@@ -130,7 +262,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, started, revealed, gameId],
+		[status, started, revealed, daily, gameId],
 	);
 
 	/* Hint: correctly place the queen in one not-yet-solved row. */
@@ -182,7 +314,32 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		<div className="rn-root">
 			<style>{CSS}</style>
 
-			<div className="rn-bar">
+			<div className="rn-modes" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`rn-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`rn-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
+			</div>
+
+			{daily ? (
+				<div className="rn-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+				</div>
+			) : (
 				<div className="rn-pills" role="tablist" aria-label="Difficulté">
 					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 						<button
@@ -196,15 +353,20 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 						</button>
 					))}
 				</div>
+			)}
+
+			<div className="rn-bar">
 				<div className="rn-bar-right">
 					<div className="rn-timer">{fmtTime(elapsed)}</div>
-					<button className="rn-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
-						↻
-					</button>
+					{!daily && (
+						<button className="rn-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
+							↻
+						</button>
+					)}
 				</div>
 			</div>
 
-			{status !== 'won' && !revealed && (
+			{status !== 'won' && !revealed && !daily && (
 				<div className="rn-actions">
 					<button className="rn-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -213,10 +375,26 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="rn-boardwrap">
+			{daily && started && status === 'playing' && (
+				<div className="rn-actions">
+					<button className="rn-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+				</div>
+			)}
+
+			{daily && status === 'won' && (
+				<div className="rn-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></>
+					)}
+				</div>
+			)}
+
+			<div className="rn-boardwrap" style={{ ['--n' as string]: size }}>
 				<div
-					className="rn-board"
-					style={{ gridTemplateColumns: `repeat(${size}, var(--rn-cell))`, ['--n' as string]: size }}
+					className={`rn-board ${daily && !started ? 'blurred' : ''}`}
+					style={{ gridTemplateColumns: `repeat(${size}, var(--rn-cell))` }}
 				>
 					{Array.from({ length: size }).map((_, r) =>
 						Array.from({ length: size }).map((_, c) => {
@@ -244,7 +422,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${
 										st === 2 ? ', reine' : st === 1 ? ', marquée' : ', vide'
 									}`}
-									disabled={status === 'won' || revealed}
+									disabled={status === 'won' || revealed || (daily && !started)}
 								>
 									{st === 2 ? '♛' : st === 1 ? '✕' : ''}
 								</button>
@@ -253,7 +431,19 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
-				{status === 'won' && (
+				{daily && dailyLoading && (
+					<div className="rn-overlay">
+						<div className="rn-overlay-card"><p className="rn-windiff">Préparation du défi…</p></div>
+					</div>
+				)}
+
+				{daily && !dailyLoading && !started && status !== 'won' && (
+					<div className="rn-overlay">
+						<button className="rn-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
+
+				{status === 'won' && !daily && (
 					<div className="rn-win" role="dialog" aria-label="Grille résolue">
 						<div className="rn-wincard">
 							<div className="rn-winmark">👑</div>
@@ -267,6 +457,12 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="rn-revealed-note">
@@ -297,7 +493,7 @@ const CSS = `
   --rn-ink: #23262e;            /* glyphs, readable on every pastel cell */
   --rn-line: rgba(35, 39, 48, 0.30);  /* visible cell grid, lighter than walls */
   --rn-line-strong: #2b2f3a;    /* region walls (theme-independent board) */
-  --rn-cell: min(56px, calc((100vw - 3.5rem) / var(--n, 6)));
+  --rn-cell: calc(100cqw / var(--n, 6));
 
   width: 100%;
   max-width: 520px;
@@ -309,6 +505,12 @@ const CSS = `
   align-items: center;
 }
 
+.rn-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.rn-daily-tag {
+  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+
 .rn-bar {
   width: 100%;
   display: flex;
@@ -318,7 +520,7 @@ const CSS = `
   margin-bottom: 1rem;
 }
 .rn-bar-right { display: flex; align-items: center; gap: 0.5rem; }
-.rn-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.rn-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.75rem; }
 .rn-pill {
   border: 1.5px solid var(--gray-700);
   background: transparent;
@@ -354,8 +556,15 @@ const CSS = `
   color: var(--gray-300); font-size: 14px; font-weight: 500;
 }
 
-.rn-boardwrap { position: relative; }
+.rn-boardwrap {
+  position: relative;
+  width: 100%;
+  max-width: calc(56px * var(--n, 6));
+  margin-inline: auto;
+  container-type: inline-size;
+}
 .rn-board {
+  width: 100%;
   display: grid;
   border: 3px solid var(--rn-line-strong);
   border-radius: 8px;
@@ -414,6 +623,26 @@ const CSS = `
   font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer;
 }
 
+.rn-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.rn-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  animation: rn-fade 0.25s ease;
+}
+.rn-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--rn-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
+}
+.rn-startbtn {
+  border: none; background: var(--rn-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.rn-daily-won {
+  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
+}
+.rn-daily-won strong { color: var(--rn-accent); font-variant-numeric: tabular-nums; }
+
 @keyframes rn-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .rn-cell, .rn-win { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rn-cell, .rn-win, .rn-overlay { transition: none; animation: none; } }
 `;

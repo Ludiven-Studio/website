@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DIFFS, generateChemin, type CheminPuzzle } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+	type DailyRun,
+} from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 /* =====================================================
    LE CHEMIN (LinkedIn "Zip") — React island.
@@ -17,6 +27,15 @@ const key = (r: number, c: number) => `${r},${c}`;
 const adjacent = (a: [number, number], b: [number, number]) =>
 	Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) === 1;
 
+const startCellOf = (p: CheminPuzzle): [number, number] => {
+	for (let r = 0; r < p.size; r++)
+		for (let c = 0; c < p.size; c++) if (p.numbers[r][c] === 1) return [r, c];
+	return [0, 0];
+};
+
+// Daily challenge: difficulty comes from the server (same for everyone).
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+
 export default function CheminGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<CheminPuzzle | null>(null);
@@ -25,20 +44,20 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const drawing = useRef(false);
 	const moved = useRef(false);
 	const downCell = useRef<[number, number] | null>(null);
 	const lastCell = useRef<[number, number] | null>(null);
 
-	const startCell = (p: CheminPuzzle): [number, number] => {
-		for (let r = 0; r < p.size; r++)
-			for (let c = 0; c < p.size; c++) if (p.numbers[r][c] === 1) return [r, c];
-		return [0, 0];
-	};
-
 	const newGame = useCallback((dk: keyof typeof DIFFS) => {
+		setDaily(false);
+		setAlreadyPlayed(false);
 		setDiffKey(dk);
 		setStatus('loading');
 		setStarted(false);
@@ -48,7 +67,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		setTimeout(() => {
 			const p = generateChemin(DIFFS[dk]);
 			setPuzzle(p);
-			setPath([startCell(p)]);
+			setPath([startCellOf(p)]);
 			setStatus('playing');
 		}, 0);
 	}, []);
@@ -56,6 +75,86 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		newGame('facile');
 	}, [newGame]);
+
+	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
+	const startDaily = useCallback(async () => {
+		setDaily(true);
+		setRevealed(false);
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
+			const diffIndex = run.diffIndex ?? 0;
+			const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+			dailySeedRef.current = { seed: run.seed, diffIndex };
+			setDailyLoading(false);
+			setDiffKey(dk);
+			const p = generateChemin(DIFFS[dk], mulberry32(run.seed));
+			setPuzzle(p);
+			setPath((run.state as [number, number][]) ?? [startCellOf(p)]);
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				setStatus('won');
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setAlreadyPlayed(false);
+				setStatus('playing');
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('loading');
+		setStarted(false);
+		setElapsed(0);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
+		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		setDiffKey(dk);
+		const p = generateChemin(DIFFS[dk], mulberry32(seed));
+		setPuzzle(p);
+		setPath([startCellOf(p)]);
+		setStatus('playing');
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Commencer: consumes the attempt and starts the chrono. */
+	const startTimer = useCallback(() => {
+		if (!puzzle) return;
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: [startCellOf(puzzle)],
+		});
+	}, [gameId, puzzle]);
+
+	/* Clear my entries without resetting the attempt (chrono keeps running). */
+	const resetDailyEntries = useCallback(() => {
+		if (!puzzle) return;
+		const start: [number, number][] = [startCellOf(puzzle)];
+		setPath(start);
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: start,
+		});
+	}, [gameId, puzzle]);
 
 	/* Timer */
 	useEffect(() => {
@@ -94,6 +193,36 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		setStatus('won');
 		trackGame(gameId, 'game_won');
 	}, [path, puzzle, status, revealed, errors, gameId]);
+
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || status === 'won') return;
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: path,
+		});
+	}, [daily, started, status, path, gameId]);
+
+	/* Lock the daily attempt on a fresh win. */
+	useEffect(() => {
+		if (!daily || status !== 'won' || alreadyPlayed) return;
+		const sd = dailySeedRef.current;
+		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const snapshot: DailyRun = {
+			startedAt: startRef.current,
+			done: true,
+			finalTime,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: path,
+		};
+		saveDailyRun(gameId, snapshot);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [daily, status, alreadyPlayed, gameId]);
 
 	const begin = () => {
 		if (!started) {
@@ -165,6 +294,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	};
 
 	const onPointerDown = (e: React.PointerEvent) => {
+		if (daily && !started) return; // armed but not started: overlay owns the board
 		const cell = cellFromPointer(e);
 		if (!cell) return;
 		drawing.current = true;
@@ -175,6 +305,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		step(cell);
 	};
 	const onPointerMove = (e: React.PointerEvent) => {
+		if (daily && !started) return;
 		if (!drawing.current) return;
 		const cell = cellFromPointer(e);
 		if (!cell) return;
@@ -184,13 +315,14 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		step(cell);
 	};
 	const endDraw = () => {
+		if (daily && !started) return;
 		if (drawing.current && !moved.current && downCell.current) truncateTo(downCell.current); // deliberate tap
 		drawing.current = false;
 	};
 
 	const clearPath = () => {
 		if (!puzzle || revealed) return;
-		setPath([startCell(puzzle)]);
+		setPath([startCellOf(puzzle)]);
 		if (status === 'won') setStatus('playing');
 	};
 
@@ -227,29 +359,62 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		<div className="zp-root">
 			<style>{CSS}</style>
 
-			<div className="zp-bar">
-				<div className="zp-pills" role="tablist" aria-label="Difficulté">
-					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
-						<button
-							key={k}
-							role="tab"
-							aria-selected={diffKey === k}
-							className={`zp-pill ${diffKey === k ? 'active' : ''}`}
-							onClick={() => newGame(k)}
-						>
-							{DIFFS[k].label}
-						</button>
-					))}
-				</div>
-				<div className="zp-bar-right">
-					<div className="zp-timer">{fmtTime(elapsed)}</div>
-					<button className="zp-new" onClick={clearPath} aria-label="Effacer le tracé">
-						⌫
-					</button>
-				</div>
+			<div className="zp-modes" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`zp-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`zp-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
 			</div>
 
-			{status === 'playing' && !revealed && (
+			{daily ? (
+				<div className="zp-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+				</div>
+			) : (
+				<div className="zp-bar">
+					<div className="zp-pills" role="tablist" aria-label="Difficulté">
+						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+							<button
+								key={k}
+								role="tab"
+								aria-selected={diffKey === k}
+								className={`zp-pill ${diffKey === k ? 'active' : ''}`}
+								onClick={() => newGame(k)}
+							>
+								{DIFFS[k].label}
+							</button>
+						))}
+					</div>
+					<div className="zp-bar-right">
+						<div className="zp-timer">{fmtTime(elapsed)}</div>
+						<button className="zp-new" onClick={clearPath} aria-label="Effacer le tracé">
+							⌫
+						</button>
+					</div>
+				</div>
+			)}
+
+			{daily && (
+				<div className="zp-bar zp-bar-daily">
+					<div className="zp-timer">{fmtTime(elapsed)}</div>
+				</div>
+			)}
+
+			{status === 'playing' && !revealed && !daily && (
 				<div className="zp-actions">
 					<button className="zp-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -258,14 +423,30 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="zp-boardwrap">
+			{daily && started && status === 'playing' && (
+				<div className="zp-actions">
+					<button className="zp-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+				</div>
+			)}
+
+			{daily && status === 'won' && (
+				<div className="zp-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Relié en <strong>{fmtTime(elapsed)}</strong></>
+					)}
+				</div>
+			)}
+
+			<div className="zp-boardwrap" style={{ ['--n' as string]: n }}>
 				{status === 'loading' || !puzzle ? (
 					<div className="zp-loading">Génération…</div>
 				) : (
 					<div
-						className="zp-board"
+						className={`zp-board ${daily && !started ? 'blurred' : ''}`}
 						ref={boardRef}
-						style={{ gridTemplateColumns: `repeat(${n}, var(--zp-cell))`, ['--n' as string]: n }}
+						style={{ gridTemplateColumns: `repeat(${n}, var(--zp-cell))` }}
 						onPointerDown={onPointerDown}
 						onPointerMove={onPointerMove}
 						onPointerUp={endDraw}
@@ -321,7 +502,19 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && (
+				{daily && dailyLoading && (
+					<div className="zp-overlay">
+						<div className="zp-overlay-card"><p className="zp-windiff">Préparation…</p></div>
+					</div>
+				)}
+
+				{daily && !dailyLoading && !started && status !== 'won' && puzzle && (
+					<div className="zp-overlay">
+						<button className="zp-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
+
+				{status === 'won' && !daily && (
 					<div className="zp-win" role="dialog" aria-label="Chemin résolu">
 						<div className="zp-wincard">
 							<div className="zp-winmark">🧭</div>
@@ -335,6 +528,12 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="zp-revealed-note">
@@ -359,9 +558,9 @@ const CSS = `
   --zp-ok: #2f9e6f;
   --zp-bad: #d9534f;
   --zp-wall: var(--gray-0);
-  /* Constant board width whatever the size -> bigger grids get smaller cells,
-     and the board never exceeds mobile width. */
-  --zp-cell: calc(min(420px, 100vw - 3.5rem) / var(--n, 5));
+  /* Fluid cell: the board fills its (capped) container, so bigger grids get
+     smaller cells and the board never exceeds mobile width. */
+  --zp-cell: calc(100cqw / var(--n, 5));
   --zp-stroke: calc(var(--zp-cell) * 0.34);
 
   width: 100%;
@@ -374,11 +573,18 @@ const CSS = `
   align-items: center;
 }
 
+.zp-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.zp-daily-tag {
+  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+
 .zp-bar {
   width: 100%;
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
   margin-bottom: 1rem;
 }
+.zp-bar-daily { justify-content: center; }
 
 .zp-actions {
   display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
@@ -416,14 +622,21 @@ const CSS = `
   font-size: 16px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;
 }
 
-.zp-boardwrap { position: relative; }
+.zp-boardwrap {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+  container-type: inline-size;
+}
 .zp-loading {
   display: flex; align-items: center; justify-content: center;
-  width: min(420px, 92vw); height: min(420px, 92vw);
+  width: 100%; aspect-ratio: 1 / 1;
   color: var(--gray-300); font-weight: 600;
 }
 .zp-board {
   position: relative;
+  width: 100%;
   display: grid;
   border: 2.5px solid var(--gray-100);
   border-radius: 8px;
@@ -452,6 +665,26 @@ const CSS = `
 .zp-num.err { background: var(--zp-bad); color: #fff; }
 .zp-line { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
 
+.zp-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.zp-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  animation: zp-fade 0.25s ease;
+}
+.zp-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--zp-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
+}
+.zp-startbtn {
+  border: none; background: var(--zp-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.zp-daily-won {
+  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
+}
+.zp-daily-won strong { color: var(--zp-accent); font-variant-numeric: tabular-nums; }
+
 .zp-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem; }
 
 .zp-win {
@@ -466,5 +699,5 @@ const CSS = `
 .zp-replay { border: none; background: var(--zp-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
 
 @keyframes zp-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .zp-win { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .zp-win, .zp-overlay { animation: none; } }
 `;

@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DIFFS, SIZE, generateRondCarre, type Cell, type RondCarrePuzzle } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+	type DailyRun,
+} from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 /* =====================================================
    ROND & CARRÉ (façon LinkedIn "Tango") — React island.
@@ -9,6 +19,7 @@ import { trackGame } from '../../lib/analytics';
 
 type Status = 'playing' | 'won';
 const HALF = SIZE / 2;
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 
 const emptyMarks = (): Cell[][] =>
 	Array.from({ length: SIZE }, () => new Array(SIZE).fill(0) as Cell[]);
@@ -27,7 +38,11 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const [revealed, setRevealed] = useState(false);
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
 	const { given, constraints, solution } = puzzle;
 	const n = SIZE;
@@ -38,6 +53,8 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	);
 
 	const newGame = useCallback((k: keyof typeof DIFFS) => {
+		setDaily(false);
+		setAlreadyPlayed(false);
 		setDiffKey(k);
 		setPuzzle(generateRondCarre(DIFFS[k]));
 		setMarks(emptyMarks());
@@ -48,8 +65,85 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 	}, []);
 
+	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
+	const startDaily = useCallback(async () => {
+		setDaily(true);
+		setRevealed(false);
+		setHinted(new Set());
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
+			const dk = DIFF_ORDER[run.diffIndex ?? 0] ?? 'facile';
+			dailySeedRef.current = { seed: run.seed, diffIndex: run.diffIndex ?? 0 };
+			setDailyLoading(false);
+			setDiffKey(dk);
+			setPuzzle(generateRondCarre(DIFFS[dk], mulberry32(run.seed)));
+			setMarks((run.state as Cell[][]) ?? emptyMarks());
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				setStatus('won');
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setAlreadyPlayed(false);
+				setStatus('playing');
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('playing');
+		setStarted(false);
+		setElapsed(0);
+		setMarks(emptyMarks());
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
+		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		setDiffKey(dk);
+		setPuzzle(generateRondCarre(DIFFS[dk], mulberry32(seed)));
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Commencer: consumes the attempt and starts the chrono. */
+	const startTimer = useCallback(() => {
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyMarks(),
+		});
+	}, [gameId]);
+
+	/* Clear my marks without resetting the attempt (chrono keeps running). */
+	const resetDailyEntries = useCallback(() => {
+		setMarks(emptyMarks());
+		setHinted(new Set());
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyMarks(),
+		});
+	}, [gameId]);
+
 	useEffect(() => {
+		if (daily) return; // daily restores its own marks
 		setMarks(emptyMarks()); // backstop: marks always match the current puzzle
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [puzzle]);
 
 	/* Timer */
@@ -119,8 +213,39 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		}
 	}, [marks, status, revealed, value, conflicts, n, gameId]);
 
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || status === 'won') return;
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: marks,
+		});
+	}, [daily, started, status, marks, gameId]);
+
+	/* Lock the daily attempt on a fresh win. */
+	useEffect(() => {
+		if (!daily || status !== 'won' || alreadyPlayed) return;
+		const sd = dailySeedRef.current;
+		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const snapshot: DailyRun = {
+			startedAt: startRef.current,
+			done: true,
+			finalTime,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: marks,
+		};
+		saveDailyRun(gameId, snapshot);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [daily, status, alreadyPlayed, gameId]);
+
 	const cycle = useCallback(
 		(r: number, c: number) => {
+			if (daily && !started) return;
 			if (status === 'won' || revealed || given[r][c] !== 0) return;
 			setMarks((prev) => {
 				const next = prev.map((row) => [...row]) as Cell[][];
@@ -139,7 +264,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, revealed, started, given, gameId],
+		[status, revealed, started, given, daily, gameId],
 	);
 
 	/* Hint: fill the first empty, non-given cell with its solution value. */
@@ -181,7 +306,32 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		<div className="rc-root">
 			<style>{CSS}</style>
 
-			<div className="rc-bar">
+			<div className="rc-modes" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`rc-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`rc-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
+			</div>
+
+			{daily ? (
+				<div className="rc-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+				</div>
+			) : (
 				<div className="rc-pills" role="tablist" aria-label="Difficulté">
 					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 						<button
@@ -195,15 +345,24 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 						</button>
 					))}
 				</div>
+			)}
+
+			<div className="rc-bar">
 				<div className="rc-bar-right">
 					<div className="rc-timer">{fmtTime(elapsed)}</div>
-					<button className="rc-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
-						↻
-					</button>
+					{!daily && (
+						<button
+							className="rc-new"
+							onClick={() => newGame(diffKey)}
+							aria-label="Nouvelle grille"
+						>
+							↻
+						</button>
+					)}
 				</div>
 			</div>
 
-			{status !== 'won' && !revealed && (
+			{status !== 'won' && !revealed && !daily && (
 				<div className="rc-actions">
 					<button className="rc-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -212,8 +371,24 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="rc-boardwrap">
-				<div className="rc-board" style={{ ['--n' as string]: n }}>
+			{daily && started && status === 'playing' && (
+				<div className="rc-actions">
+					<button className="rc-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+				</div>
+			)}
+
+			{daily && status === 'won' && (
+				<div className="rc-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></>
+					)}
+				</div>
+			)}
+
+			<div className="rc-boardwrap" style={{ ['--n' as string]: n }}>
+				<div className={`rc-board ${daily && !started ? 'blurred' : ''}`}>
 					{Array.from({ length: n }).map((_, r) =>
 						Array.from({ length: n }).map((_, c) => {
 							const x = value(r, c);
@@ -234,7 +409,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${
 										x === 1 ? ', rond' : x === 2 ? ', carré' : ', vide'
 									}`}
-									disabled={status === 'won' || revealed}
+									disabled={status === 'won' || revealed || (daily && !started)}
 								>
 									{x === 1 && <span className="rc-shape rc-rond-shape" />}
 									{x === 2 && <span className="rc-shape rc-carre-shape" />}
@@ -265,7 +440,19 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 					</div>
 				</div>
 
-				{status === 'won' && (
+				{daily && dailyLoading && (
+					<div className="rc-overlay">
+						<div className="rc-overlay-card"><p className="rc-windiff">Préparation du défi…</p></div>
+					</div>
+				)}
+
+				{daily && !dailyLoading && !started && status !== 'won' && (
+					<div className="rc-overlay">
+						<button className="rc-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
+
+				{status === 'won' && !daily && (
 					<div className="rc-win" role="dialog" aria-label="Grille résolue">
 						<div className="rc-wincard">
 							<div className="rc-winmark">●■</div>
@@ -279,6 +466,12 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="rc-revealed-note">
@@ -304,7 +497,7 @@ const CSS = `
   --rc-carre: #5b8def;  /* ■ blue */
   --rc-bad: #d9534f;
   --rc-line: var(--gray-700);
-  --rc-cell: calc(min(420px, 100vw - 3.5rem) / var(--n, 6));
+  --rc-cell: calc(100cqw / var(--n, 6));
 
   width: 100%;
   max-width: 460px;
@@ -316,13 +509,19 @@ const CSS = `
   align-items: center;
 }
 
+.rc-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.rc-daily-tag {
+  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+
 .rc-bar {
   width: 100%;
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
   margin-bottom: 1rem;
 }
 .rc-bar-right { display: flex; align-items: center; gap: 0.5rem; }
-.rc-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.rc-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.75rem; }
 .rc-pill {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
   font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer;
@@ -353,9 +552,16 @@ const CSS = `
   color: var(--gray-300); font-size: 14px; font-weight: 500;
 }
 
-.rc-boardwrap { position: relative; }
+.rc-boardwrap {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+  container-type: inline-size;
+}
 .rc-board {
   position: relative;
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(var(--n), var(--rc-cell));
   border: 2.5px solid var(--gray-100);
@@ -415,6 +621,26 @@ const CSS = `
 .rc-windiff { color: var(--gray-300); font-size: 13px; margin: 2px 0 14px; }
 .rc-replay { border: none; background: var(--rc-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
 
+.rc-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.rc-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  animation: rc-fade 0.25s ease;
+}
+.rc-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--rc-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
+}
+.rc-startbtn {
+  border: none; background: var(--rc-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.rc-daily-won {
+  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
+}
+.rc-daily-won strong { color: var(--rc-accent); font-variant-numeric: tabular-nums; }
+
 @keyframes rc-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .rc-cell, .rc-win { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rc-cell, .rc-win, .rc-overlay { transition: none; animation: none; } }
 `;

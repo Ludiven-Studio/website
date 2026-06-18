@@ -1,27 +1,60 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DIFFS, generateQuestion, type Question } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+} from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 /* =====================================================
-   SUITE MYSTÈRE — React island (QCM, endless score).
-   Pick the next term of a hidden-rule sequence.
+   SUITE MYSTÈRE — React island.
+   Libre : QCM endless au score.
+   Défi du jour : réussir 3 suites le plus vite possible (au temps).
    Engine lives in ./engine (pure, tested).
    ===================================================== */
 
-type Status = 'playing' | 'over';
+type Status = 'playing' | 'over' | 'won';
 const BEST_KEY = 'ludiven-suite-best';
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+const DAILY_TARGET = 3;
+
+const fmtTime = (s: number) =>
+	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+interface DailyState {
+	solved: number;
+	qIndex: number;
+}
+
+/** Deterministic daily question stream: question i is fully reproducible from (seed, i). */
+const dailyQ = (seed: number, diffIndex: number, i: number): Question =>
+	generateQuestion(DIFFS[DIFF_ORDER[diffIndex] ?? 'facile'], mulberry32((seed + i * 0x9e3779b1) >>> 0));
 
 export default function SuiteGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [question, setQuestion] = useState<Question>(() => generateQuestion(DIFFS.facile));
-	const [score, setScore] = useState(0);
+	const [score, setScore] = useState(0); // free: streak ; daily: suites réussies
 	const [best, setBest] = useState(0);
 	const [status, setStatus] = useState<Status>('playing');
 	const [chosen, setChosen] = useState<number | null>(null);
 	const [eliminated, setEliminated] = useState<number[]>([]);
 	const [peeked, setPeeked] = useState(false);
+	// Daily challenge
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [started, setStarted] = useState(false);
+	const [qIndex, setQIndex] = useState(0);
+	const [elapsed, setElapsed] = useState(0);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const startedRef = useRef(false);
+	const startedRef = useRef(false); // free-mode "first answer" flag
+	const startRef = useRef(0); // daily chrono start (epoch ms)
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
 	useEffect(() => {
 		const stored = Number(localStorage.getItem(BEST_KEY) ?? '0');
@@ -31,11 +64,26 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		};
 	}, []);
 
+	/* Daily chrono. */
+	useEffect(() => {
+		if (!daily || !started || status !== 'playing') return;
+		const id = setInterval(
+			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
+			250,
+		);
+		return () => clearInterval(id);
+	}, [daily, started, status]);
+
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setStarted(false);
 		setDiffKey(key);
 		setQuestion(generateQuestion(DIFFS[key]));
 		setScore(0);
+		setQIndex(0);
+		setElapsed(0);
 		setStatus('playing');
 		setChosen(null);
 		setEliminated([]);
@@ -43,16 +91,122 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		startedRef.current = false;
 	}, []);
 
+	/* Daily: one attempt per device, resumable; server-issued seed. */
+	const startDaily = useCallback(async () => {
+		if (timer.current) clearTimeout(timer.current);
+		setDaily(true);
+		setChosen(null);
+		setEliminated([]);
+		setPeeked(false);
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			const di = run.diffIndex ?? 0;
+			dailySeedRef.current = { seed: run.seed, diffIndex: di };
+			setDailyLoading(false);
+			setDiffKey(DIFF_ORDER[di] ?? 'facile');
+			const st = (run.state as DailyState) ?? { solved: 0, qIndex: 0 };
+			setScore(st.solved);
+			setQIndex(st.qIndex);
+			setQuestion(dailyQ(run.seed, di, st.qIndex));
+			setStarted(true);
+			if (run.done) {
+				setStatus('won');
+				setAlreadyPlayed(true);
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setStatus('playing');
+				setAlreadyPlayed(false);
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('playing');
+		setStarted(false);
+		setScore(0);
+		setQIndex(0);
+		setElapsed(0);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
+		setDiffKey(DIFF_ORDER[diffIndex] ?? 'facile');
+		setQuestion(dailyQ(seed, diffIndex, 0));
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Commencer: consumes the attempt and starts the chrono. */
+	const startTimer = useCallback(() => {
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { solved: 0, qIndex: 0 } satisfies DailyState,
+		});
+	}, [gameId]);
+
 	const choose = (value: number, idx: number) => {
-		if (status === 'over' || chosen !== null) return;
+		if (status !== 'playing' || chosen !== null) return;
+		if (daily && !started) return;
+		const correct = value === question.answer;
+		setChosen(idx);
+
+		if (daily) {
+			const sd = dailySeedRef.current;
+			if (correct && score + 1 >= DAILY_TARGET) {
+				const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+				setScore(score + 1);
+				setElapsed(finalTime);
+				setStatus('won');
+				trackGame(gameId, 'game_won');
+				saveDailyRun(gameId, {
+					startedAt: startRef.current,
+					done: true,
+					finalTime,
+					seed: sd?.seed,
+					diffIndex: sd?.diffIndex,
+					state: { solved: score + 1, qIndex } satisfies DailyState,
+				});
+				return;
+			}
+			if (correct) setScore(score + 1);
+			// Wrong answers don't end the run — the chrono keeps running.
+			const nextSolved = correct ? score + 1 : score;
+			timer.current = setTimeout(() => {
+				const ni = qIndex + 1;
+				setQIndex(ni);
+				setQuestion(dailyQ(sd!.seed, sd!.diffIndex, ni));
+				setChosen(null);
+				setEliminated([]);
+				setPeeked(false);
+				saveDailyRun(gameId, {
+					startedAt: startRef.current,
+					done: false,
+					seed: sd?.seed,
+					diffIndex: sd?.diffIndex,
+					state: { solved: nextSolved, qIndex: ni } satisfies DailyState,
+				});
+			}, 700);
+			return;
+		}
+
+		// Free mode (endless score).
 		if (!startedRef.current) {
 			startedRef.current = true;
 			trackGame(gameId, 'game_started');
 		}
-		setChosen(idx);
-		if (value === question.answer) {
-			const next = score + 1;
-			setScore(next);
+		if (correct) {
+			setScore(score + 1);
 			timer.current = setTimeout(() => {
 				setQuestion(generateQuestion(DIFFS[diffKey]));
 				setChosen(null);
@@ -74,9 +228,9 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		}
 	};
 
-	/* Hint: remove one wrong option (keep at least the answer + one distractor). */
+	/* Hint: remove one wrong option (free mode only). */
 	const eliminate = () => {
-		if (status === 'over' || chosen !== null) return;
+		if (status !== 'playing' || chosen !== null) return;
 		const remaining = question.options
 			.map((v, i) => ({ v, i }))
 			.filter(({ v, i }) => v !== question.answer && !eliminated.includes(i));
@@ -85,9 +239,9 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'hint_used');
 	};
 
-	/* Reveal: highlight the correct option for this question. */
+	/* Reveal: highlight the correct option (free mode only). */
 	const peek = () => {
-		if (status === 'over' || chosen !== null || peeked) return;
+		if (status !== 'playing' || chosen !== null || peeked) return;
 		setPeeked(true);
 		trackGame(gameId, 'solution_shown');
 	};
@@ -103,76 +257,148 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		return 'su-opt dim';
 	};
 
+	const armed = daily && !started;
+
 	return (
 		<div className="su-root">
 			<style>{CSS}</style>
 
-			<div className="su-bar">
-				<div className="su-pills" role="tablist" aria-label="Difficulté">
-					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+			<div className="su-modes" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`su-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`su-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
+			</div>
+
+			{daily ? (
+				<>
+					<div className="su-daily-tag">
+						{dailyLoading
+							? 'Préparation du défi…'
+							: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} · 3 suites`}
+					</div>
+					<div className="su-daily-status">
+						<span className="su-score">Réussies {Math.min(score, DAILY_TARGET)}/{DAILY_TARGET}</span>
+						<span className="su-best">⏱ {fmtTime(elapsed)}</span>
+					</div>
+				</>
+			) : (
+				<div className="su-bar">
+					<div className="su-pills" role="tablist" aria-label="Difficulté">
+						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+							<button
+								key={k}
+								role="tab"
+								aria-selected={diffKey === k}
+								className={`su-pill ${diffKey === k ? 'active' : ''}`}
+								onClick={() => newGame(k)}
+							>
+								{DIFFS[k].label}
+							</button>
+						))}
+					</div>
+					<div className="su-scores">
+						<span className="su-score">Score {score}</span>
+						<span className="su-best">Record {best}</span>
+					</div>
+				</div>
+			)}
+
+			<div className="su-playwrap">
+				<div className={`su-seq ${armed ? 'blurred' : ''}`} aria-label="Séquence">
+					{question.terms.map((t, i) => (
+						<span key={i} className="su-term">
+							{t}
+						</span>
+					))}
+					<span className="su-term q">?</span>
+				</div>
+
+				<div className={`su-options ${armed ? 'blurred' : ''}`}>
+					{question.options.map((v, i) => (
 						<button
-							key={k}
-							role="tab"
-							aria-selected={diffKey === k}
-							className={`su-pill ${diffKey === k ? 'active' : ''}`}
-							onClick={() => newGame(k)}
+							key={i}
+							className={optionClass(v, i)}
+							onClick={() => choose(v, i)}
+							disabled={chosen !== null || eliminated.includes(i) || armed}
 						>
-							{DIFFS[k].label}
+							{v}
 						</button>
 					))}
 				</div>
-				<div className="su-scores">
-					<span className="su-score">Score {score}</span>
-					<span className="su-best">Record {best}</span>
-				</div>
+
+				{daily && dailyLoading && (
+					<div className="su-overlay">
+						<div className="su-overlay-card">Préparation du défi…</div>
+					</div>
+				)}
+				{armed && !dailyLoading && status !== 'won' && (
+					<div className="su-overlay">
+						<button className="su-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
 			</div>
 
-			<div className="su-seq" aria-label="Séquence">
-				{question.terms.map((t, i) => (
-					<span key={i} className="su-term">
-						{t}
-					</span>
-				))}
-				<span className="su-term q">?</span>
-			</div>
-
-			<div className="su-options">
-				{question.options.map((v, i) => (
-					<button
-						key={i}
-						className={optionClass(v, i)}
-						onClick={() => choose(v, i)}
-						disabled={chosen !== null || eliminated.includes(i)}
-					>
-						{v}
-					</button>
-				))}
-			</div>
-
-			{status === 'playing' && chosen === null && (
+			{!daily && status === 'playing' && chosen === null && (
 				<div className="su-actions">
 					<button className="su-act" onClick={eliminate}>💡 Indice</button>
 					<button className="su-act" onClick={peek}>👁 Voir la réponse</button>
 				</div>
 			)}
 
-			{status === 'over' ? (
-				<div className="su-over">
-					<p className="su-rule">
-						La règle : <strong>{question.rule}</strong> — la réponse était{' '}
-						<strong>{question.answer}</strong>.
+			{!daily &&
+				(status === 'over' ? (
+					<div className="su-over">
+						<p className="su-rule">
+							La règle : <strong>{question.rule}</strong> — la réponse était{' '}
+							<strong>{question.answer}</strong>.
+						</p>
+						<p className="su-final">Score : {score}</p>
+						<button className="su-replay" onClick={() => newGame(diffKey)}>
+							Rejouer
+						</button>
+					</div>
+				) : (
+					<p className="su-help">
+						Trouve le terme suivant de la suite. Bonne réponse → on enchaîne ; une erreur termine
+						la manche.
 					</p>
-					<p className="su-final">Score : {score}</p>
-					<button className="su-replay" onClick={() => newGame(diffKey)}>
-						Rejouer
-					</button>
+				))}
+
+			{daily && status === 'won' && (
+				<div className="su-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 3 suites réussies en <strong>{fmtTime(elapsed)}</strong></>
+					)}
 				</div>
-			) : (
+			)}
+
+			{daily && status === 'playing' && (
 				<p className="su-help">
-					Trouve le terme suivant de la suite. Bonne réponse → on enchaîne ; une erreur termine
-					la manche.
+					Réussis 3 suites le plus vite possible. Une erreur ne t'arrête pas, mais le chrono
+					continue de tourner.
 				</p>
 			)}
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);
 }
@@ -194,6 +420,13 @@ const CSS = `
   flex-direction: column;
   align-items: center;
 }
+
+.su-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.su-daily-tag {
+  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.6rem;
+}
+.su-daily-status { display: flex; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 1.5rem; }
 
 .su-bar {
   width: 100%;
@@ -221,6 +454,8 @@ const CSS = `
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
 .su-act:hover { background: var(--gray-800); border-color: var(--su-accent); color: var(--su-accent); }
+
+.su-playwrap { width: 100%; position: relative; }
 
 .su-seq {
   display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;
@@ -251,6 +486,21 @@ const CSS = `
 .su-opt.bad { background: var(--su-bad); color: #fff; border-color: var(--su-bad); }
 .su-opt.dim { opacity: 0.5; }
 
+.su-seq.blurred, .su-options.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.su-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+}
+.su-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--su-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300);
+}
+.su-startbtn {
+  border: none; background: var(--su-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+
 .su-help { max-width: 380px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.5rem; }
 
 .su-over { text-align: center; margin-top: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
@@ -261,6 +511,9 @@ const CSS = `
   border: none; background: var(--su-accent); color: var(--accent-text-over);
   font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer;
 }
+
+.su-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin-top: 1.5rem; }
+.su-daily-won strong { color: var(--su-accent); font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) { .su-opt { transition: none; } }
 `;

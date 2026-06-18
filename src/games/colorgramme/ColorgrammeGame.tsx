@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DIFFS, generateColorgramme, type ColorgrammePuzzle } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+	type DailyRun,
+} from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 /* =====================================================
    COLORGRAMME — React island. A fully-coloured deduction grid.
@@ -14,10 +24,20 @@ type Status = 'playing' | 'won';
 
 const COLORS = ['#e15554', '#4d9de0', '#e0a32e', '#3bb273']; // 1..4
 
+// Daily challenge: difficulty comes from the server (same for everyone).
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 const emptyGrid = (n: number): number[][] => Array.from({ length: n }, () => new Array(n).fill(0));
+
+/** Resume snapshot for the daily attempt. */
+interface CoState {
+	grid: number[][];
+	crosses: number[][];
+}
+const emptyState = (n: number): CoState => ({ grid: emptyGrid(n), crosses: emptyGrid(n) });
 
 /** Status of one line for the active colour: 'done' (its cells exactly placed),
     'error' (too many cells of that colour) or 'none'. */
@@ -46,7 +66,11 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	const [revealed, setRevealed] = useState(false);
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const painting = useRef(false);
 	const strokeVal = useRef<number>(0);
 	const strokeCross = useRef<boolean>(true); // cross mode: add (true) or remove (false)
@@ -57,6 +81,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
 		const p = generateColorgramme(d);
+		setDaily(false);
+		setAlreadyPlayed(false);
 		setDiffKey(key);
 		setPuzzle(p);
 		setGrid(emptyGrid(d.size));
@@ -70,6 +96,90 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 	}, []);
 
+	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
+	const startDaily = useCallback(async () => {
+		setDaily(true);
+		setRevealed(false);
+		setHinted(new Set());
+		setActiveColor(1);
+		setTool('paint');
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
+			const di = run.diffIndex ?? 0;
+			const dk = DIFF_ORDER[di] ?? 'facile';
+			dailySeedRef.current = { seed: run.seed, diffIndex: di };
+			setDailyLoading(false);
+			setDiffKey(dk);
+			const d = DIFFS[dk];
+			setPuzzle(generateColorgramme(d, mulberry32(run.seed)));
+			const st = (run.state as CoState | undefined) ?? emptyState(d.size);
+			setGrid(st.grid ?? emptyGrid(d.size));
+			setCrosses(st.crosses ?? emptyGrid(d.size));
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				setStatus('won');
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setAlreadyPlayed(false);
+				setStatus('playing');
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('playing');
+		setStarted(false);
+		setElapsed(0);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
+		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		setDiffKey(dk);
+		const d = DIFFS[dk];
+		setPuzzle(generateColorgramme(d, mulberry32(seed)));
+		setGrid(emptyGrid(d.size));
+		setCrosses(emptyGrid(d.size));
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Commencer: consumes the attempt and starts the chrono. */
+	const startTimer = useCallback(() => {
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyState(size),
+		});
+	}, [gameId, size]);
+
+	/* Clear my entries without resetting the attempt (chrono keeps running). */
+	const resetDailyEntries = useCallback(() => {
+		setGrid(emptyGrid(size));
+		setCrosses(emptyGrid(size));
+		setHinted(new Set());
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyState(size),
+		});
+	}, [gameId, size]);
+
 	/* Timer */
 	useEffect(() => {
 		if (status !== 'playing' || !started || revealed) return;
@@ -81,12 +191,13 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	}, [status, started, revealed]);
 
 	const begin = useCallback(() => {
+		if (daily) return; // daily chrono is started by ▶ Commencer, never by a move
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
 			trackGame(gameId, 'game_started');
 		}
-	}, [started, gameId]);
+	}, [daily, started, gameId]);
 
 	const removeHint = useCallback((r: number, c: number) => {
 		setHinted((prev) => {
@@ -127,6 +238,36 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [grid]);
+
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || status === 'won') return;
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { grid, crosses },
+		});
+	}, [daily, started, status, grid, crosses, gameId]);
+
+	/* Lock the daily attempt on a fresh win. */
+	useEffect(() => {
+		if (!daily || status !== 'won' || alreadyPlayed) return;
+		const sd = dailySeedRef.current;
+		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const snapshot: DailyRun = {
+			startedAt: startRef.current,
+			done: true,
+			finalTime,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { grid, crosses },
+		};
+		saveDailyRun(gameId, snapshot);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [daily, status, alreadyPlayed, gameId]);
 
 	const applyStroke = useCallback(
 		(r: number, c: number) => {
@@ -183,7 +324,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	};
 
 	const onPointerDown = (e: React.PointerEvent) => {
-		if (over) return;
+		if (over || (daily && !started)) return;
 		const cell = cellFromEvent(e);
 		if (!cell) return;
 		const [r, c] = cell;
@@ -237,29 +378,60 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		<div className="co-root">
 			<style>{CSS}</style>
 
-			<div className="co-bar">
-				<div className="co-pills" role="tablist" aria-label="Difficulté">
-					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
-						<button
-							key={k}
-							role="tab"
-							aria-selected={diffKey === k}
-							className={`co-pill ${diffKey === k ? 'active' : ''}`}
-							onClick={() => newGame(k)}
-						>
-							{DIFFS[k].label}
-						</button>
-					))}
+			<div className="co-modes-bar" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`co-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`co-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
+			</div>
+
+			{daily ? (
+				<div className="co-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
 				</div>
+			) : null}
+
+			<div className="co-bar">
+				{!daily && (
+					<div className="co-pills" role="tablist" aria-label="Difficulté">
+						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+							<button
+								key={k}
+								role="tab"
+								aria-selected={diffKey === k}
+								className={`co-pill ${diffKey === k ? 'active' : ''}`}
+								onClick={() => newGame(k)}
+							>
+								{DIFFS[k].label}
+							</button>
+						))}
+					</div>
+				)}
 				<div className="co-bar-right">
 					<div className="co-timer">{fmtTime(elapsed)}</div>
-					<button className="co-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
-						↻
-					</button>
+					{!daily && (
+						<button className="co-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
+							↻
+						</button>
+					)}
 				</div>
 			</div>
 
-			{!over && (
+			{!over && (!daily || started) && (
 				<div className="co-tools" role="toolbar" aria-label="Outils">
 					<div className="co-colors" role="group" aria-label="Couleurs">
 						{Array.from({ length: colors }, (_, i) => i + 1).map((v) => (
@@ -306,7 +478,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!over && (
+			{!over && !daily && (
 				<div className="co-actions">
 					<button className="co-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -315,13 +487,28 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="co-boardwrap">
+			{daily && started && status === 'playing' && (
+				<div className="co-actions">
+					<button className="co-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+				</div>
+			)}
+
+			{daily && status === 'won' && (
+				<div className="co-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></>
+					)}
+				</div>
+			)}
+
+			<div className="co-boardwrap" style={{ ['--n' as string]: size }}>
 				<div
-					className="co-board"
+					className={`co-board ${daily && !started ? 'blurred' : ''}`}
 					style={{
 						gridTemplateColumns: `auto repeat(${size}, var(--co-cell))`,
 						gridTemplateRows: `auto repeat(${size}, var(--co-cell))`,
-						['--n' as string]: size,
 					}}
 					onPointerDown={onPointerDown}
 					onPointerMove={onPointerMove}
@@ -362,7 +549,19 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 					))}
 				</div>
 
-				{status === 'won' && (
+				{daily && dailyLoading && (
+					<div className="co-overlay">
+						<div className="co-overlay-card"><p className="co-windiff">Préparation…</p></div>
+					</div>
+				)}
+
+				{daily && !dailyLoading && !started && status !== 'won' && (
+					<div className="co-overlay">
+						<button className="co-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
+
+				{status === 'won' && !daily && (
 					<div className="co-win" role="dialog" aria-label="Image résolue">
 						<div className="co-wincard">
 							<div className="co-winmark">🎨</div>
@@ -374,6 +573,12 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="co-revealed-note">
@@ -452,8 +657,9 @@ const CSS = `
 .co-root {
   --co-accent: var(--accent-regular);
   --co-ok: #2f9e6f;
+  --co-bad: #d9534f;
   --co-line: var(--gray-700);
-  --co-cell: min(46px, calc((100vw - 3.5rem - 2.5rem) / var(--n, 5)));
+  --co-cell: calc(100cqw / (var(--n, 5) + 1));
 
   width: 100%;
   max-width: 480px;
@@ -463,6 +669,12 @@ const CSS = `
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.co-modes-bar { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.co-daily-tag {
+  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.75rem;
 }
 
 .co-bar {
@@ -511,8 +723,15 @@ const CSS = `
 }
 .co-act:hover { background: var(--gray-800); border-color: var(--co-accent); color: var(--co-accent); }
 
-.co-boardwrap { position: relative; }
+.co-boardwrap {
+  position: relative;
+  width: 100%;
+  max-width: calc(46px * (var(--n, 5) + 1));
+  margin-inline: auto;
+  container-type: inline-size;
+}
 .co-board {
+  width: 100%;
   display: grid;
   touch-action: none;
   user-select: none;
@@ -571,5 +790,24 @@ const CSS = `
   font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer;
 }
 
-@media (prefers-reduced-motion: reduce) { .co-tool, .co-win { transition: none; } }
+.co-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.co-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+}
+.co-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--co-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
+}
+.co-startbtn {
+  border: none; background: var(--co-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.co-daily-won {
+  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
+}
+.co-daily-won strong { color: var(--co-accent); font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) { .co-tool, .co-win, .co-overlay { transition: none; } }
 `;

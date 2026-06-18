@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DIFFS, generateMotifs, shapeOf, type MotifsPuzzle, type Rect } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+	type DailyRun,
+} from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 /* =====================================================
    MOTIFS — React island. Split the grid into rectangles;
@@ -19,6 +29,9 @@ const PALETTE = [
 	'#e5737366', '#64b5f666', '#81c78466', '#ffb74d66', '#ba68c866',
 	'#4db6ac66', '#f0629266', '#a1887f66', '#9575cd66', '#4dd0e166',
 ];
+
+// Daily challenge: seed + difficulty come from the server (same for everyone).
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 
 const rectFromCells = (a: [number, number], b: [number, number]): Rect => ({
 	r0: Math.min(a[0], b[0]),
@@ -42,7 +55,11 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const drawing = useRef(false);
 	const downCell = useRef<[number, number] | null>(null);
@@ -53,6 +70,8 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const { size, clues, rects } = puzzle;
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
+		setDaily(false);
+		setAlreadyPlayed(false);
 		setDiffKey(key);
 		setPuzzle(generateMotifs(DIFFS[key]));
 		setPlaced([]);
@@ -62,6 +81,82 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setRevealed(false);
 		setElapsed(0);
 	}, []);
+
+	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
+	const startDaily = useCallback(async () => {
+		setDaily(true);
+		setPreview(null);
+		setRevealed(false);
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
+			const diffIndex = run.diffIndex ?? 0;
+			const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+			dailySeedRef.current = { seed: run.seed, diffIndex };
+			setDailyLoading(false);
+			setDiffKey(dk);
+			setPuzzle(generateMotifs(DIFFS[dk], mulberry32(run.seed)));
+			setPlaced((run.state as Rect[]) ?? []);
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				setStatus('won');
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setAlreadyPlayed(false);
+				setStatus('playing');
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('playing');
+		setStarted(false);
+		setElapsed(0);
+		setPlaced([]);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
+		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		setDiffKey(dk);
+		setPuzzle(generateMotifs(DIFFS[dk], mulberry32(seed)));
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Commencer: consumes the attempt and starts the chrono. */
+	const startTimer = useCallback(() => {
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: [],
+		});
+	}, [gameId]);
+
+	/* Clear my entries without resetting the attempt (chrono keeps running). */
+	const resetDailyEntries = useCallback(() => {
+		setPlaced([]);
+		setPreview(null);
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: [],
+		});
+	}, [gameId]);
 
 	/* Timer */
 	useEffect(() => {
@@ -138,6 +233,36 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_won');
 	}, [owner, placed, status, revealed, size, rectValid, gameId]);
 
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || status === 'won') return;
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: placed,
+		});
+	}, [daily, started, status, placed, gameId]);
+
+	/* Lock the daily attempt on a fresh win. */
+	useEffect(() => {
+		if (!daily || status !== 'won' || alreadyPlayed) return;
+		const sd = dailySeedRef.current;
+		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const snapshot: DailyRun = {
+			startedAt: startRef.current,
+			done: true,
+			finalTime,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: placed,
+		};
+		saveDailyRun(gameId, snapshot);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [daily, status, alreadyPlayed, gameId]);
+
 	const addPiece = useCallback(
 		(rect: Rect) => {
 			setPlaced((prev) => [...prev.filter((p) => !overlaps(p, rect)), rect]);
@@ -160,7 +285,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	};
 
 	const onPointerDown = (e: React.PointerEvent) => {
-		if (status === 'won' || revealed) return;
+		if (status === 'won' || revealed || (daily && !started)) return;
 		const cell = cellFromPointer(e);
 		if (!cell) return;
 		const [r, c] = cell;
@@ -182,6 +307,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		boardRef.current?.setPointerCapture(e.pointerId);
 	};
 	const onPointerMove = (e: React.PointerEvent) => {
+		if (status === 'won' || revealed || (daily && !started)) return;
 		if (!drawing.current || !anchor.current || !downCell.current) return;
 		const cell = cellFromPointer(e);
 		if (!cell) return;
@@ -189,6 +315,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setPreview(rectFromCells(anchor.current, cell));
 	};
 	const onPointerUp = () => {
+		if (status === 'won' || revealed || (daily && !started)) return;
 		if (!drawing.current) return;
 		const dc = downCell.current;
 		const except = resizeIdx.current;
@@ -281,29 +408,62 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		<div className="mo-root">
 			<style>{CSS}</style>
 
-			<div className="mo-bar">
-				<div className="mo-pills" role="tablist" aria-label="Difficulté">
-					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
-						<button
-							key={k}
-							role="tab"
-							aria-selected={diffKey === k}
-							className={`mo-pill ${diffKey === k ? 'active' : ''}`}
-							onClick={() => newGame(k)}
-						>
-							{DIFFS[k].label}
-						</button>
-					))}
-				</div>
-				<div className="mo-bar-right">
-					<div className="mo-timer">{fmtTime(elapsed)}</div>
-					<button className="mo-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
-						↻
-					</button>
-				</div>
+			<div className="mo-modes" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`mo-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`mo-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
 			</div>
 
-			{status !== 'won' && !revealed && (
+			{daily ? (
+				<div className="mo-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+				</div>
+			) : (
+				<div className="mo-bar">
+					<div className="mo-pills" role="tablist" aria-label="Difficulté">
+						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+							<button
+								key={k}
+								role="tab"
+								aria-selected={diffKey === k}
+								className={`mo-pill ${diffKey === k ? 'active' : ''}`}
+								onClick={() => newGame(k)}
+							>
+								{DIFFS[k].label}
+							</button>
+						))}
+					</div>
+					<div className="mo-bar-right">
+						<div className="mo-timer">{fmtTime(elapsed)}</div>
+						<button className="mo-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
+							↻
+						</button>
+					</div>
+				</div>
+			)}
+
+			{daily && (
+				<div className="mo-bar">
+					<div className="mo-timer">{fmtTime(elapsed)}</div>
+				</div>
+			)}
+
+			{status !== 'won' && !revealed && !daily && (
 				<div className="mo-actions">
 					<button className="mo-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -312,11 +472,27 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="mo-boardwrap">
+			{daily && started && status === 'playing' && (
+				<div className="mo-actions">
+					<button className="mo-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+				</div>
+			)}
+
+			{daily && status === 'won' && (
+				<div className="mo-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></>
+					)}
+				</div>
+			)}
+
+			<div className="mo-boardwrap" style={{ ['--n' as string]: size }}>
 				<div
-					className="mo-board"
+					className={`mo-board ${daily && !started ? 'blurred' : ''}`}
 					ref={boardRef}
-					style={{ gridTemplateColumns: `repeat(${size}, var(--mo-cell))`, ['--n' as string]: size }}
+					style={{ gridTemplateColumns: `repeat(${size}, var(--mo-cell))` }}
 					onPointerDown={onPointerDown}
 					onPointerMove={onPointerMove}
 					onPointerUp={onPointerUp}
@@ -355,7 +531,19 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
-				{status === 'won' && (
+				{daily && dailyLoading && (
+					<div className="mo-overlay">
+						<div className="mo-overlay-card"><p className="mo-windiff">Préparation du défi…</p></div>
+					</div>
+				)}
+
+				{daily && !dailyLoading && !started && status !== 'won' && (
+					<div className="mo-overlay">
+						<button className="mo-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
+
+				{status === 'won' && !daily && (
 					<div className="mo-win" role="dialog" aria-label="Grille résolue">
 						<div className="mo-wincard">
 							<div className="mo-winmark">🧩</div>
@@ -369,6 +557,12 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="mo-revealed-note">
@@ -392,7 +586,6 @@ const CSS = `
 .mo-root {
   --mo-accent: var(--accent-regular);
   --mo-line: var(--gray-0);
-  --mo-cell: calc(min(420px, 100vw - 3.5rem) / var(--n, 5));
 
   width: 100%;
   max-width: 460px;
@@ -402,6 +595,12 @@ const CSS = `
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.mo-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.mo-daily-tag {
+  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.75rem;
 }
 
 .mo-bar {
@@ -434,8 +633,16 @@ const CSS = `
 }
 .mo-act:hover { background: var(--gray-800); border-color: var(--mo-accent); color: var(--mo-accent); }
 
-.mo-boardwrap { position: relative; }
+.mo-boardwrap {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+  container-type: inline-size;
+}
 .mo-board {
+  width: 100%;
+  --mo-cell: calc(100cqw / var(--n, 5));
   display: grid; border: 2px solid var(--mo-line); border-radius: 6px; overflow: hidden;
   background: var(--gray-999); touch-action: none; user-select: none;
 }
@@ -478,5 +685,27 @@ const CSS = `
   font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer;
 }
 
-@media (prefers-reduced-motion: reduce) { .mo-cell, .mo-win { transition: none; } }
+.mo-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.mo-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  animation: mo-fade 0.25s ease;
+}
+.mo-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--mo-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
+}
+.mo-startbtn {
+  border: none; background: var(--mo-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.mo-daily-won {
+  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
+}
+.mo-daily-won strong { color: var(--mo-accent); font-variant-numeric: tabular-nums; }
+
+@keyframes mo-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) { .mo-cell, .mo-win, .mo-overlay { transition: none; animation: none; } }
 `;

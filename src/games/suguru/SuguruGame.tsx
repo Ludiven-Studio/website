@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DIFFS, generateSuguru, type SuguruPuzzle } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import {
+	getDaily,
+	dailyWeekdayLabel,
+	loadDailyRun,
+	saveDailyRun,
+	type DailyRun,
+} from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 /* =====================================================
    SUGURU (Tectonic) — React island.
@@ -22,6 +32,8 @@ const emptyEntries = (n: number): (number | null)[][] =>
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
+const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+
 export default function SuguruGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<SuguruPuzzle>(() => generateSuguru(DIFFS.facile));
@@ -32,7 +44,11 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 	const [revealed, setRevealed] = useState(false);
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
 	const [elapsed, setElapsed] = useState(0);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
+	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
 	const { size, zones, zoneSize, maxDigit, given, solution } = puzzle;
 
@@ -44,6 +60,8 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
 		const p = generateSuguru(d);
+		setDaily(false);
+		setAlreadyPlayed(false);
 		setDiffKey(key);
 		setPuzzle(p);
 		setEntries(emptyEntries(d.size));
@@ -54,6 +72,89 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
+	const startDaily = useCallback(async () => {
+		setDaily(true);
+		setSelected(null);
+		setRevealed(false);
+		setHinted(new Set());
+
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
+			const di = run.diffIndex ?? 0;
+			const dk = DIFF_ORDER[di] ?? 'facile';
+			const d = DIFFS[dk];
+			dailySeedRef.current = { seed: run.seed, diffIndex: di };
+			setDailyLoading(false);
+			setDiffKey(dk);
+			setPuzzle(generateSuguru(d, mulberry32(run.seed)));
+			setEntries((run.state as (number | null)[][]) ?? emptyEntries(d.size));
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				setStatus('won');
+				setElapsed(run.finalTime ?? 0);
+			} else {
+				setAlreadyPlayed(false);
+				setStatus('playing');
+				startRef.current = run.startedAt;
+				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+			}
+			return;
+		}
+
+		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		setAlreadyPlayed(false);
+		setStatus('playing');
+		setStarted(false);
+		setElapsed(0);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		dailySeedRef.current = { seed, diffIndex };
+		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		const d = DIFFS[dk];
+		setDiffKey(dk);
+		setPuzzle(generateSuguru(d, mulberry32(seed)));
+		setEntries(emptyEntries(d.size));
+		setDailyLoading(false);
+	}, [gameId]);
+
+	/* Commencer: consumes the attempt and starts the chrono. */
+	const startTimer = useCallback(() => {
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+		const sd = dailySeedRef.current;
+		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+		saveDailyRun(gameId, {
+			startedAt: now,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: emptyEntries(DIFFS[dk].size),
+		});
+	}, [gameId]);
+
+	/* Clear my entries without resetting the attempt (chrono keeps running). */
+	const resetDailyEntries = useCallback(() => {
+		const sd = dailySeedRef.current;
+		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+		const empty = emptyEntries(DIFFS[dk].size);
+		setEntries(empty);
+		setHinted(new Set());
+		setSelected(null);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: empty,
+		});
+	}, [gameId]);
 
 	/* Timer */
 	useEffect(() => {
@@ -118,9 +219,39 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_won');
 	}, [entries, status, revealed, size, value, conflicts, gameId]);
 
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || status === 'won') return;
+		const sd = dailySeedRef.current;
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: entries,
+		});
+	}, [daily, started, status, entries, gameId]);
+
+	/* Lock the daily attempt on a fresh win. */
+	useEffect(() => {
+		if (!daily || status !== 'won' || alreadyPlayed) return;
+		const sd = dailySeedRef.current;
+		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const snapshot: DailyRun = {
+			startedAt: startRef.current,
+			done: true,
+			finalTime,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: entries,
+		};
+		saveDailyRun(gameId, snapshot);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [daily, status, alreadyPlayed, gameId]);
+
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || revealed || !selected) return;
+			if (status === 'won' || revealed || !selected || (daily && !started)) return;
 			const [r, c] = selected;
 			if (given[r][c] != null) return;
 			if (v != null && v > zoneSize[zones[r][c]]) return; // out of zone range
@@ -141,7 +272,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, revealed, selected, given, zones, zoneSize, started, gameId],
+		[status, revealed, selected, given, zones, zoneSize, started, daily, gameId],
 	);
 
 	/* Hint: fill the selected empty cell (else the first empty) from the solution. */
@@ -187,7 +318,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 	/* Keyboard. */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (status === 'won' || revealed) return;
+			if (status === 'won' || revealed || (daily && !started)) return;
 			const d = parseInt(e.key, 10);
 			if (d >= 1 && d <= maxDigit) placeValue(d);
 			else if (e.key === 'Backspace' || e.key === 'Delete') placeValue(null);
@@ -204,7 +335,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
-	}, [status, revealed, maxDigit, selected, size, placeValue]);
+	}, [status, revealed, maxDigit, selected, size, daily, started, placeValue]);
 
 	const thin = '1px solid var(--sg-line)';
 	const thick = '2.5px solid var(--sg-line-strong)';
@@ -213,29 +344,62 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		<div className="sg-root">
 			<style>{CSS}</style>
 
-			<div className="sg-bar">
-				<div className="sg-pills" role="tablist" aria-label="Difficulté">
-					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
-						<button
-							key={k}
-							role="tab"
-							aria-selected={diffKey === k}
-							className={`sg-pill ${diffKey === k ? 'active' : ''}`}
-							onClick={() => newGame(k)}
-						>
-							{DIFFS[k].label}
-						</button>
-					))}
+			<div className="sg-modes" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!daily}
+					className={`sg-pill ${!daily ? 'active' : ''}`}
+					onClick={() => daily && newGame(diffKey)}
+				>
+					Libre
+				</button>
+				<button
+					role="tab"
+					aria-selected={daily}
+					className={`sg-pill ${daily ? 'active' : ''}`}
+					onClick={startDaily}
+				>
+					🏆 Défi du jour
+				</button>
+			</div>
+
+			{daily && (
+				<div className="sg-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
 				</div>
+			)}
+
+			<div className="sg-bar">
+				{!daily ? (
+					<div className="sg-pills" role="tablist" aria-label="Difficulté">
+						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+							<button
+								key={k}
+								role="tab"
+								aria-selected={diffKey === k}
+								className={`sg-pill ${diffKey === k ? 'active' : ''}`}
+								onClick={() => newGame(k)}
+							>
+								{DIFFS[k].label}
+							</button>
+						))}
+					</div>
+				) : (
+					<div />
+				)}
 				<div className="sg-bar-right">
 					<div className="sg-timer">{fmtTime(elapsed)}</div>
-					<button className="sg-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
-						↻
-					</button>
+					{!daily && (
+						<button className="sg-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
+							↻
+						</button>
+					)}
 				</div>
 			</div>
 
-			{status !== 'won' && !revealed && (
+			{status !== 'won' && !revealed && !daily && (
 				<div className="sg-actions">
 					<button className="sg-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -244,10 +408,26 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="sg-boardwrap">
+			{daily && started && status === 'playing' && (
+				<div className="sg-actions">
+					<button className="sg-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+				</div>
+			)}
+
+			{daily && status === 'won' && (
+				<div className="sg-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></>
+					)}
+				</div>
+			)}
+
+			<div className="sg-boardwrap" style={{ ['--n' as string]: size }}>
 				<div
-					className="sg-board"
-					style={{ gridTemplateColumns: `repeat(${size}, var(--sg-cell))`, ['--n' as string]: size }}
+					className={`sg-board ${daily && !started ? 'blurred' : ''}`}
+					style={{ gridTemplateColumns: `repeat(${size}, var(--sg-cell))` }}
 				>
 					{Array.from({ length: size }).map((_, r) =>
 						Array.from({ length: size }).map((_, c) => {
@@ -274,7 +454,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 									}}
 									onClick={() => setSelected([r, c])}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${v != null ? `, ${v}` : ', vide'}`}
-									disabled={status === 'won' || revealed}
+									disabled={status === 'won' || revealed || (daily && !started)}
 								>
 									{v != null ? v : ''}
 								</button>
@@ -283,7 +463,19 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
-				{status === 'won' && (
+				{daily && dailyLoading && (
+					<div className="sg-overlay">
+						<div className="sg-overlay-card"><p className="sg-windiff">Préparation du défi…</p></div>
+					</div>
+				)}
+
+				{daily && !dailyLoading && !started && status !== 'won' && (
+					<div className="sg-overlay">
+						<button className="sg-startbtn" onClick={startTimer}>▶ Commencer</button>
+					</div>
+				)}
+
+				{status === 'won' && !daily && (
 					<div className="sg-win" role="dialog" aria-label="Grille résolue">
 						<div className="sg-wincard">
 							<div className="sg-winmark">🧩</div>
@@ -297,6 +489,12 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+			)}
+
+			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="sg-revealed-note">
@@ -335,7 +533,7 @@ const CSS = `
   --sg-bad: #d9534f;
   --sg-line: var(--gray-700);
   --sg-line-strong: var(--gray-0);
-  --sg-cell: calc(min(420px, 100vw - 3.5rem) / var(--n, 5));
+  --sg-cell: calc(100cqw / var(--n, 5));
 
   width: 100%;
   max-width: 460px;
@@ -345,6 +543,12 @@ const CSS = `
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.sg-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.75rem; }
+.sg-daily-tag {
+  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
+  margin-bottom: 0.75rem;
 }
 
 .sg-bar {
@@ -379,8 +583,15 @@ const CSS = `
 }
 .sg-act:hover { background: var(--gray-800); border-color: var(--sg-accent); color: var(--sg-accent); }
 
-.sg-boardwrap { position: relative; }
+.sg-boardwrap {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+  container-type: inline-size;
+}
 .sg-board {
+  width: 100%;
   display: grid; border: 2.5px solid var(--sg-line-strong); border-radius: 6px; overflow: hidden; background: var(--gray-999);
 }
 .sg-cell {
@@ -431,7 +642,29 @@ const CSS = `
   font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer;
 }
 
+.sg-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.sg-overlay {
+  position: absolute; inset: -8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  animation: sg-fade 0.25s ease;
+}
+.sg-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--sg-accent);
+  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
+}
+.sg-startbtn {
+  border: none; background: var(--sg-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px;
+  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.sg-daily-won {
+  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
+}
+.sg-daily-won strong { color: var(--sg-accent); font-variant-numeric: tabular-nums; }
+
+@keyframes sg-fade { from { opacity: 0; } to { opacity: 1; } }
+
 @media (prefers-reduced-motion: reduce) {
-  .sg-cell, .sg-win { transition: none; animation: none; }
+  .sg-cell, .sg-win, .sg-overlay { transition: none; animation: none; }
 }
 `;
