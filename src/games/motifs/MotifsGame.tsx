@@ -48,6 +48,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const downCell = useRef<[number, number] | null>(null);
 	const anchor = useRef<[number, number] | null>(null); // fixed corner while drawing/resizing
 	const moved = useRef(false);
+	const resizeIdx = useRef(-1); // index of the piece being resized, or -1 for a new draw
 
 	const { size, clues, rects } = puzzle;
 
@@ -89,6 +90,17 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		});
 		return g;
 	}, [placed, size]);
+
+	/* A rect can be drawn only over empty cells (or cells of the piece being resized). */
+	const rectClear = useCallback(
+		(rect: Rect, except: number): boolean => {
+			for (let r = rect.r0; r < rect.r0 + rect.h; r++)
+				for (let c = rect.c0; c < rect.c0 + rect.w; c++)
+					if (owner[r][c] !== -1 && owner[r][c] !== except) return false;
+			return true;
+		},
+		[owner],
+	);
 
 	const clueGrid = useMemo(() => {
 		const g: number[][] = Array.from({ length: size }, () => new Array(size).fill(-1));
@@ -156,6 +168,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		moved.current = false;
 		downCell.current = cell;
 		const idx = owner[r][c];
+		resizeIdx.current = idx;
 		if (idx !== -1) {
 			// Start on an existing piece → resize it: anchor the corner opposite the grab.
 			const p = placed[idx];
@@ -178,15 +191,22 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const onPointerUp = () => {
 		if (!drawing.current) return;
 		const dc = downCell.current;
+		const except = resizeIdx.current;
 		if (!moved.current && dc && owner[dc[0]][dc[1]] !== -1) {
 			removeAt(dc[0], dc[1]); // tap on a piece removes it
-		} else if (preview) {
-			addPiece(preview); // new rect, or resized existing piece
+		} else if (preview && rectClear(preview, except)) {
+			// Place only over empty cells (the resized piece is replaced). Never draw over another piece.
+			setPlaced((prev) => {
+				const kept = except >= 0 ? prev.filter((_, i) => i !== except) : prev;
+				return [...kept, preview];
+			});
+			begin();
 		}
 		drawing.current = false;
 		moved.current = false;
 		downCell.current = null;
 		anchor.current = null;
+		resizeIdx.current = -1;
 		setPreview(null);
 	};
 
@@ -229,6 +249,9 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				for (let c = preview.c0; c < preview.c0 + preview.w; c++) s.add(`${r},${c}`);
 		return s;
 	}, [preview]);
+
+	// The current drag would cover another piece's cells → invalid (shown in red).
+	const previewBad = preview ? !rectClear(preview, resizeIdx.current) : false;
 
 	const badPieces = useMemo(() => {
 		const s = new Set<number>();
@@ -311,7 +334,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 									key={`${r}-${c}`}
 									className={[
 										'mo-cell',
-										previewSet.has(`${r},${c}`) ? 'prev' : '',
+										previewSet.has(`${r},${c}`) ? (previewBad ? 'prev prev-bad' : 'prev') : '',
 										isBad ? 'bad' : '',
 									].join(' ')}
 									style={{
@@ -422,6 +445,7 @@ const CSS = `
   transition: background-color 0.08s ease;
 }
 .mo-cell.prev { box-shadow: inset 0 0 0 2px var(--mo-accent); background-color: var(--accent-overlay) !important; }
+.mo-cell.prev-bad { box-shadow: inset 0 0 0 2px var(--mo-bad, #d9534f); background-color: rgba(217,83,79,0.18) !important; }
 .mo-cell.bad { box-shadow: inset 0 0 0 2px var(--mo-bad, #d9534f); }
 .mo-clue {
   display: inline-flex; align-items: baseline; gap: 1px;
