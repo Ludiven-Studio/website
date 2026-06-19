@@ -46,12 +46,8 @@ const { variant } = Astro.props;
 			transform: translateY(var(--row-offset));
 		}
 
-		/* Last row with a single item: keep it in the second column AND keep the
-		   stagger offset, otherwise it overlaps the shifted item above it. */
-		.grid.offset > :global(:last-child:nth-child(odd)) {
-			grid-column: 2 / 3;
-			transform: translateY(var(--row-offset));
-		}
+		/* A lone last item stays naturally in the left column (no offset) — keeps it
+		   grounded under the first tile and avoids overlapping the shifted item above. */
 
 		.grid.small {
 			display: flex;
