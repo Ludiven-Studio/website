@@ -58,4 +58,19 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🔍', title: 'La déduction', body: 'Choisis une couleur : tu ne vois que SES blocs, dans l\'ordre. Les blocs des autres couleurs sont cachés → déduis où commencent les tiens grâce aux colonnes.' },
 		{ emoji: '🖌️', title: 'Les outils', body: 'Crayon pour peindre, Gomme pour effacer, ✕ pour marquer « pas cette couleur ici » (une croix colorée par couleur).' },
 	],
+	tente: [
+		{ emoji: '⛺', title: 'Le but', body: 'Place une tente à côté de chaque arbre — autant de tentes que d\'arbres.' },
+		{ emoji: '🚫', title: 'Les règles', body: 'Chaque tente touche son arbre (haut/bas/gauche/droite). Deux tentes ne se touchent jamais, même en diagonale. Les compteurs donnent le nombre de tentes par ligne et colonne.' },
+		{ emoji: '💡', title: 'Comment jouer', body: 'Touche une case pour cycler : tente, puis herbe (case sûrement vide), puis vide. Indice corrige ou pose une tente ; solution dispo après 1 min.' },
+	],
+	bataille: [
+		{ emoji: '🚢', title: 'Le but', body: 'Retrouve la flotte cachée. Les compteurs indiquent le nombre de cases-bateau par ligne et colonne.' },
+		{ emoji: '🌊', title: 'La règle', body: 'Les bateaux ne se touchent jamais, même en diagonale. Quelques cases sont déjà révélées (eau ou morceau de bateau) pour t\'aider à démarrer.' },
+		{ emoji: '💡', title: 'Comment jouer', body: 'Touche une case pour cycler : bateau, puis eau, puis vide. Repère la flotte à trouver en légende. Indice corrige une case ; solution dispo après 1 min.' },
+	],
+	aquarium: [
+		{ emoji: '💧', title: 'Le but', body: 'Remplis d\'eau les bassins colorés pour respecter les compteurs de chaque ligne et colonne.' },
+		{ emoji: '⬇️', title: 'La règle', body: 'Dans un bassin, l\'eau est de niveau et monte par le bas : si une case est remplie, toutes celles du même bassin en dessous le sont aussi.' },
+		{ emoji: '💡', title: 'Comment jouer', body: 'Touche/glisse pour cycler : eau, puis « pas d\'eau » (✕), puis vide. Indice corrige une case ; solution dispo après 1 min.' },
+	],
 };

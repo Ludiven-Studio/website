@@ -90,4 +90,28 @@ export const games: GameTile[] = [
 		href: '/jeux/colorgramme',
 		status: 'play',
 	},
+	{
+		id: 'tente',
+		title: 'Tente',
+		pitch: 'Plante une tente près de chaque arbre, sans qu\'elles se touchent. Façon Tents & Trees.',
+		icon: 'tent',
+		href: '/jeux/tente',
+		status: 'play',
+	},
+	{
+		id: 'bataille',
+		title: 'Bataille navale',
+		pitch: 'Retrouve la flotte cachée grâce aux compteurs de lignes et colonnes. Logique pure, façon Bimaru.',
+		icon: 'ship',
+		href: '/jeux/bataille',
+		status: 'play',
+	},
+	{
+		id: 'aquarium',
+		title: 'Aquarium',
+		pitch: 'Remplis les bassins : l\'eau monte par le bas et respecte les compteurs. Déduction tout en douceur.',
+		icon: 'water',
+		href: '/jeux/aquarium',
+		status: 'play',
+	},
 ];
