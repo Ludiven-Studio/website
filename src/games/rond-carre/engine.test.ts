@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DIFFS, SIZE, generateRondCarre, countSolutions } from './engine';
+import { DIFFS, SIZE, generateRondCarre, countSolutions, findHint, type Cell } from './engine';
 import { mulberry32, dateSeed } from '../prng';
 
 function isValidSolution(sol: number[][], n: number): boolean {
@@ -63,5 +63,39 @@ describe('rond-carre engine', () => {
 		expect(a.given).toEqual(b.given);
 		expect(a.solution).toEqual(b.solution);
 		expect(a.constraints).toEqual(b.constraints);
+	});
+
+	it('findHint solves step by step, always proposing the solution value', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const p = generateRondCarre(DIFFS[key], mulberry32(300 + DIFFS[key].extraGivens));
+			const n = p.size;
+			const marks: Cell[][] = Array.from({ length: n }, () => new Array(n).fill(0) as Cell[]);
+			for (let step = 0; step < n * n + 1; step++) {
+				const h = findHint(marks, p);
+				if (!h) break;
+				expect(h.value).toBe(p.solution[h.r][h.c]); // never proposes a wrong value
+				expect(h.reason.length).toBeGreaterThan(0);
+				marks[h.r][h.c] = h.value;
+			}
+			for (let r = 0; r < n; r++)
+				for (let c = 0; c < n; c++)
+					expect(p.given[r][c] !== 0 ? p.given[r][c] : marks[r][c]).toBe(p.solution[r][c]);
+		}
+	});
+
+	it('findHint corrects a wrong mark first', () => {
+		const p = generateRondCarre(DIFFS.facile, mulberry32(9));
+		const n = p.size;
+		const marks: Cell[][] = Array.from({ length: n }, () => new Array(n).fill(0) as Cell[]);
+		let placed = false;
+		for (let r = 0; r < n && !placed; r++)
+			for (let c = 0; c < n && !placed; c++)
+				if (p.given[r][c] === 0) {
+					marks[r][c] = (p.solution[r][c] === 1 ? 2 : 1) as Cell; // wrong on purpose
+					placed = true;
+				}
+		const h = findHint(marks, p)!;
+		expect(h.value).toBe(p.solution[h.r][h.c]);
+		expect(p.solution[h.r][h.c]).not.toBe(marks[h.r][h.c]);
 	});
 });

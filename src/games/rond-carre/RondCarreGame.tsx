@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, SIZE, generateRondCarre, type Cell, type RondCarrePuzzle } from './engine';
+import { DIFFS, SIZE, generateRondCarre, findHint, type Cell, type RondCarrePuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -42,6 +42,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
@@ -56,6 +57,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const newGame = useCallback((k: keyof typeof DIFFS) => {
 		setDaily(false);
 		setAlreadyPlayed(false);
+		setHintNote('');
 		setDiffKey(k);
 		setPuzzle(generateRondCarre(DIFFS[k]));
 		setMarks(emptyMarks());
@@ -131,6 +133,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const resetDailyEntries = useCallback(() => {
 		setMarks(emptyMarks());
 		setHinted(new Set());
+		setHintNote('');
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -268,32 +271,25 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		[status, revealed, started, given, daily, gameId],
 	);
 
-	/* Hint: fill the first empty, non-given cell with its solution value. */
+	/* Hint: deduce the next logical cell and explain the technique. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed) return;
-		// Priority 1: fix a wrong cell. Priority 2: fill an empty cell.
-		let target: [number, number] | null = null;
-		for (let r = 0; r < n && !target; r++)
-			for (let c = 0; c < n && !target; c++)
-				if (given[r][c] === 0 && marks[r][c] !== 0 && marks[r][c] !== solution[r][c]) target = [r, c];
-		for (let r = 0; r < n && !target; r++)
-			for (let c = 0; c < n && !target; c++)
-				if (given[r][c] === 0 && marks[r][c] === 0) target = [r, c];
-		if (!target) return;
-		const [r, c] = target;
+		const h = findHint(marks, puzzle);
+		if (!h) return;
 		setMarks((prev) => {
 			const next = prev.map((row) => [...row]) as Cell[][];
-			next[r][c] = solution[r][c];
+			next[h.r][h.c] = h.value;
 			return next;
 		});
-		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
+		setHintNote(h.reason);
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, started, given, marks, solution, n, gameId]);
+	}, [status, revealed, started, marks, puzzle, gameId]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -451,6 +447,10 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
+			{!daily && hintNote && (
+				<p className="rc-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
+
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
@@ -593,6 +593,10 @@ const CSS = `
 .rc-badge.bad { background: var(--rc-bad); color: #fff; border-color: var(--rc-bad); }
 
 .rc-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem; }
+.rc-hint-note {
+  max-width: 420px; margin: 1rem auto 0; text-align: center; font-size: 13px; line-height: 1.5;
+  color: #2f9e6f; background: var(--accent-overlay); border: 1px solid #2f9e6f; border-radius: 12px; padding: 8px 14px;
+}
 
 .rc-win {
   position: absolute; inset: -8px; z-index: 10; display: flex; align-items: center; justify-content: center;
