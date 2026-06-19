@@ -46,10 +46,11 @@ const { variant } = Astro.props;
 			transform: translateY(var(--row-offset));
 		}
 
-		/* If last row contains only one item, display it in the second column. */
+		/* Last row with a single item: keep it in the second column AND keep the
+		   stagger offset, otherwise it overlaps the shifted item above it. */
 		.grid.offset > :global(:last-child:nth-child(odd)) {
 			grid-column: 2 / 3;
-			transform: none;
+			transform: translateY(var(--row-offset));
 		}
 
 		.grid.small {
