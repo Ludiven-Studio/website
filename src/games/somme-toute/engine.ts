@@ -133,3 +133,131 @@ export function generatePuzzle(diff: Diff, rng: Rng = Math.random): Game {
 	}
 	return { puzzle, solution, rowT, colT, size, maxVal };
 }
+
+export interface HintResult {
+	r: number;
+	c: number;
+	value: number;
+	reason: string;
+}
+
+/**
+ * Find the next logically-deducible cell for the player and explain the technique.
+ * Corrects a wrong entry first; then "last cell of a line/column", a value forced
+ * by min/max bounds; finally an honest fallback. The returned value is always the
+ * solution. Logic is sum-based (repeats allowed — this is not a Latin square).
+ */
+export function findHint(entries: Cell[][], game: Game): HintResult | null {
+	const { puzzle, solution, rowT, colT, size, maxVal } = game;
+	const editable = (r: number, c: number) => puzzle[r][c] == null;
+	const val = (r: number, c: number): Cell =>
+		puzzle[r][c] != null ? puzzle[r][c] : entries[r][c];
+	const sol = (r: number, c: number): number => solution[r][c] as number; // always filled
+
+	const rowCells = (r: number): [number, number][] =>
+		Array.from({ length: size }, (_, c): [number, number] => [r, c]);
+	const colCells = (c: number): [number, number][] =>
+		Array.from({ length: size }, (_, r): [number, number] => [r, c]);
+
+	// Sum of currently-placed values in a unit.
+	const unitSum = (cells: [number, number][]): number =>
+		cells.reduce((s, [r, c]) => s + (val(r, c) ?? 0), 0);
+
+	// 1) Correction — a filled editable cell that does not match the solution.
+	for (let r = 0; r < size; r++)
+		for (let c = 0; c < size; c++) {
+			if (!editable(r, c) || entries[r][c] == null) continue;
+			const x = entries[r][c]!;
+			const y = sol(r, c);
+			if (x === y) continue;
+			// Mention which line's sum it already breaks (row full & off, then col).
+			const rowFull = rowCells(r).every(([rr, cc]) => val(rr, cc) != null);
+			const colFull = colCells(c).every(([rr, cc]) => val(rr, cc) != null);
+			let where = '';
+			if (rowFull && unitSum(rowCells(r)) !== rowT[r])
+				where = ` (la somme de sa ligne ne tombe pas sur ${rowT[r]})`;
+			else if (colFull && unitSum(colCells(c)) !== colT[c])
+				where = ` (la somme de sa colonne ne tombe pas sur ${colT[c]})`;
+			return {
+				r,
+				c,
+				value: y,
+				reason: `Cette valeur déséquilibre la grille${where} — la bonne valeur est ${y}.`,
+			};
+		}
+
+	// 2) Last empty cell of a line or column: missing value = target − sum(others).
+	const lastCell = (
+		cells: [number, number][],
+		target: number,
+		label: string,
+	): HintResult | null => {
+		const empties = cells.filter(([r, c]) => editable(r, c) && val(r, c) == null);
+		if (empties.length !== 1) return null;
+		const [r, c] = empties[0];
+		const y = target - unitSum(cells);
+		if (y !== sol(r, c)) return null; // safety: only ever propose the solution
+		return {
+			r,
+			c,
+			value: y,
+			reason: `Il manque exactement ${y} pour atteindre la somme ${target} de ${label}.`,
+		};
+	};
+	for (let r = 0; r < size; r++) {
+		const h = lastCell(rowCells(r), rowT[r], 'cette ligne');
+		if (h) return h;
+	}
+	for (let c = 0; c < size; c++) {
+		const h = lastCell(colCells(c), colT[c], 'cette colonne');
+		if (h) return h;
+	}
+
+	// 3) Value forced by bounds: in a unit, the remaining sum and the min/max the
+	// OTHER empty cells can absorb leave a single possible value for this cell.
+	// For k empty cells summing to `rem`, a cell value v must satisfy
+	// (k-1)*1 <= rem - v <= (k-1)*maxVal  →  rem-(k-1)*maxVal <= v <= rem-(k-1).
+	// When that window is a single integer, every empty cell of the unit is pinned.
+	const forcedByUnit = (
+		cells: [number, number][],
+		target: number,
+		label: string,
+	): HintResult | null => {
+		const empties = cells.filter(([r, c]) => editable(r, c) && val(r, c) == null);
+		if (empties.length < 2) return null; // 0/1 empties handled by earlier techniques
+		const rem = target - unitSum(cells);
+		const k = empties.length;
+		const lo = Math.max(1, rem - (k - 1) * maxVal);
+		const hi = Math.min(maxVal, rem - (k - 1));
+		if (lo !== hi) return null; // not pinned by the bound alone
+		const [r, c] = empties[0]; // window is identical for every empty cell of the unit
+		if (lo !== sol(r, c)) return null;
+		return {
+			r,
+			c,
+			value: lo,
+			reason: `Vu ce qu'il reste à placer dans ${label}, cette case ne peut être que ${lo}.`,
+		};
+	};
+	for (let r = 0; r < size; r++) {
+		const h = forcedByUnit(rowCells(r), rowT[r], 'sa ligne');
+		if (h) return h;
+	}
+	for (let c = 0; c < size; c++) {
+		const h = forcedByUnit(colCells(c), colT[c], 'sa colonne');
+		if (h) return h;
+	}
+
+	// 4) Fallback — first empty editable cell.
+	for (let r = 0; r < size; r++)
+		for (let c = 0; c < size; c++)
+			if (editable(r, c) && val(r, c) == null)
+				return {
+					r,
+					c,
+					value: sol(r, c),
+					reason: `Par déduction, cette case vaut ${sol(r, c)}.`,
+				};
+
+	return null;
+}

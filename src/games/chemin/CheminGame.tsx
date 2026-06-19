@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, generateChemin, type CheminPuzzle } from './engine';
+import { DIFFS, generateChemin, hintReason, type CheminPuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -44,6 +44,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('loading');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const [elapsed, setElapsed] = useState(0);
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -63,6 +64,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		setStatus('loading');
 		setStarted(false);
 		setRevealed(false);
+		setHintNote('');
 		setElapsed(0);
 		// Generate off the paint frame (7×7 can take a few hundred ms).
 		setTimeout(() => {
@@ -147,6 +149,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		if (!puzzle) return;
 		const start: [number, number][] = [startCellOf(puzzle)];
 		setPath(start);
+		setHintNote('');
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -324,6 +327,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const clearPath = () => {
 		if (!puzzle || revealed) return;
 		setPath([startCellOf(puzzle)]);
+		setHintNote('');
 		if (status === 'won') setStatus('playing');
 	};
 
@@ -340,6 +344,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		)
 			prefix++;
 		if (prefix >= sol.length) return; // already fully correct
+		setHintNote(hintReason(path, puzzle)); // reason for the step being added (path pre-extension)
 		setPath(sol.slice(0, prefix + 1).map((p) => [...p] as [number, number]));
 		begin();
 		trackGame(gameId, 'hint_used');
@@ -516,6 +521,10 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
+			{!daily && hintNote && (
+				<p className="zp-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
+
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
@@ -673,6 +682,19 @@ const CSS = `
 .zp-daily-won strong { color: var(--zp-accent); font-variant-numeric: tabular-nums; }
 
 .zp-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem; }
+
+.zp-hint-note {
+  max-width: 420px;
+  margin: 1rem auto 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--zp-ok);
+  background: var(--accent-overlay);
+  border: 1px solid var(--zp-ok);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
 
 .zp-win {
   position: absolute; inset: -8px; z-index: 10; display: flex; align-items: center; justify-content: center;

@@ -45,6 +45,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 	const [chosen, setChosen] = useState<number | null>(null);
 	const [eliminated, setEliminated] = useState<number[]>([]);
 	const [peeked, setPeeked] = useState(false);
+	const [hintNote, setHintNote] = useState('');
 	// Daily challenge
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -89,6 +90,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setChosen(null);
 		setEliminated([]);
 		setPeeked(false);
+		setHintNote('');
 		startedRef.current = false;
 	}, []);
 
@@ -213,6 +215,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 				setChosen(null);
 				setEliminated([]);
 				setPeeked(false);
+				setHintNote('');
 			}, 650);
 		} else {
 			setStatus('over');
@@ -237,6 +240,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 			.filter(({ v, i }) => v !== question.answer && !eliminated.includes(i));
 		if (remaining.length <= 1) return;
 		setEliminated((prev) => [...prev, remaining[0].i]);
+		setHintNote('Cette option ne suit pas la règle : ' + question.rule + '.');
 		trackGame(gameId, 'hint_used');
 	};
 
@@ -244,6 +248,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 	const peek = () => {
 		if (status !== 'playing' || chosen !== null || peeked) return;
 		setPeeked(true);
+		setHintNote('La règle est « ' + question.rule + ' » → la réponse est ' + question.answer + '.');
 		trackGame(gameId, 'solution_shown');
 	};
 
@@ -340,6 +345,10 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 					<button className="su-act" onClick={eliminate}>💡 Indice</button>
 					<button className="su-act" onClick={peek}>👁 Voir la réponse</button>
 				</div>
+			)}
+
+			{!daily && hintNote && (
+				<p className="su-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{!daily &&
@@ -485,6 +494,19 @@ const CSS = `
 }
 
 .su-help { max-width: 380px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.5rem; }
+
+.su-hint-note {
+  max-width: 420px;
+  margin: 1rem auto 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--su-ok);
+  background: var(--accent-overlay);
+  border: 1px solid var(--su-ok);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
 
 .su-over { text-align: center; margin-top: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
 .su-rule { color: var(--gray-300); font-size: 14px; max-width: 40ch; line-height: 1.5; }

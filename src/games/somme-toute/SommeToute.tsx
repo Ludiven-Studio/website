@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { DIFFS, generatePuzzle, type Game } from './engine';
+import { DIFFS, generatePuzzle, findHint, type Game } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -47,6 +47,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
@@ -91,6 +92,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		const d = DIFFS[key];
 		setDaily(false);
 		setAlreadyPlayed(false);
+		setHintNote('');
 		setDiffKey(key);
 		setGame(generatePuzzle(d));
 		setEntries(emptyEntries(d.size));
@@ -176,6 +178,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setEntries(emptyEntries(DIFFS[dk].size));
 		setHinted(new Set());
 		setSelected(null);
+		setHintNote('');
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: false,
@@ -215,36 +218,25 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [daily, status, alreadyPlayed, gameId]);
 
-	/* Hint: fill the selected empty cell (else the first empty) with its solution value. */
+	/* Hint: deduce the next logical cell and explain the technique. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed) return;
-		const editable = (r: number, c: number) => puzzle[r][c] == null;
-		const wrong = (r: number, c: number) =>
-			editable(r, c) && entries[r][c] != null && entries[r][c] !== game.solution[r][c];
-		const empty = (r: number, c: number) => editable(r, c) && entries[r][c] == null;
-		// Priority 1: fix a wrong entry. Priority 2: fill an empty cell.
-		let target: [number, number] | null =
-			selected && wrong(selected[0], selected[1]) ? selected : null;
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++) if (wrong(r, c)) target = [r, c];
-		if (!target && selected && empty(selected[0], selected[1])) target = selected;
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++) if (empty(r, c)) target = [r, c];
-		if (!target) return;
-		const [r, c] = target;
+		const h = findHint(entries, game);
+		if (!h) return;
 		setEntries((prev) => {
 			const next = prev.map((row) => [...row]);
-			next[r][c] = game.solution[r][c];
+			next[h.r][h.c] = h.value;
 			return next;
 		});
-		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
+		setHintNote(h.reason);
 		if (status === 'idle') {
 			startRef.current = Date.now();
 			setStatus('playing');
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, selected, puzzle, entries, size, game, gameId]);
+	}, [status, revealed, entries, game, gameId]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -449,6 +441,10 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{!daily && hintNote && (
+				<p className="st-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
@@ -739,6 +735,18 @@ const CSS = `
   font-size: 12.5px;
   line-height: 1.5;
   margin-top: 1.25rem;
+}
+.st-hint-note {
+  max-width: 420px;
+  margin: 1rem auto 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--st-ok);
+  background: var(--accent-overlay);
+  border: 1px solid var(--st-ok);
+  border-radius: 12px;
+  padding: 8px 14px;
 }
 
 .st-win {

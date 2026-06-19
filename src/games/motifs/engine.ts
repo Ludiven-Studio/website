@@ -153,6 +153,34 @@ export function countSolutions(clues: Clue[], size: number, limit = 2): number {
 	return count;
 }
 
+/**
+ * Short French explanation for the solution rectangle the hint places.
+ * Honest: only claims a forcing proof when the clue's shape uniquely
+ * determines the dimensions (area given + matching shape); otherwise hedges.
+ */
+export function hintReason(rect: Rect, puzzle: MotifsPuzzle): string {
+	const { h, w } = rect;
+	// Find the clue sitting inside this rectangle (one per piece by construction).
+	const clue = puzzle.clues.find(
+		(cl) => cl.r >= rect.r0 && cl.r < rect.r0 + h && cl.c >= rect.c0 && cl.c < rect.c0 + w,
+	);
+
+	const kind =
+		h === w
+			? `un carré ${w}×${h}`
+			: h > w
+				? `un rectangle vertical ${w}×${h}`
+				: `un rectangle horizontal ${w}×${h}`;
+	const areaPart = clue && clue.area != null ? ` (${clue.area} cases)` : '';
+
+	// Shape known + area known and consistent → the dimensions are forced.
+	const shapeGiven = clue != null && clue.shape !== 'any';
+	const areaGiven = clue != null && clue.area != null;
+	const lead =
+		shapeGiven && areaGiven ? 'Cet indice ne peut former que' : "D'après l'indice de forme,";
+	return `${lead} ${kind}${areaPart} ici.`;
+}
+
 export function generateMotifs(diff: DiffLevel, rng: Rng = Math.random): MotifsPuzzle {
 	const { size } = diff;
 

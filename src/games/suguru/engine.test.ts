@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DIFFS, generateSuguru, countSolutions } from './engine';
+import { DIFFS, generateSuguru, countSolutions, findHint } from './engine';
 import { mulberry32 } from '../prng';
 
 const N8 = [
@@ -49,5 +49,40 @@ describe('suguru engine', () => {
 		for (let r = 0; r < p.size; r++)
 			for (let c = 0; c < p.size; c++)
 				if (p.given[r][c] != null) expect(p.given[r][c]).toBe(p.solution[r][c]);
+	});
+
+	it('findHint solves the grid step by step, always proposing the solution value', () => {
+		const p = generateSuguru(DIFFS.moyen, mulberry32(2026));
+		const { size } = p;
+		const entries: (number | null)[][] = Array.from({ length: size }, () => new Array(size).fill(null));
+		for (let step = 0; step < size * size; step++) {
+			const h = findHint(entries, p);
+			if (!h) break;
+			expect(h.value).toBe(p.solution[h.r][h.c]); // never proposes a wrong value
+			expect(h.reason.length).toBeGreaterThan(0);
+			entries[h.r][h.c] = h.value;
+		}
+		// the whole grid (givens + entries) now equals the solution
+		for (let r = 0; r < size; r++)
+			for (let c = 0; c < size; c++)
+				expect(p.given[r][c] != null ? p.given[r][c] : entries[r][c]).toBe(p.solution[r][c]);
+	});
+
+	it('findHint corrects a wrong entry first', () => {
+		const p = generateSuguru(DIFFS.facile, mulberry32(5));
+		const { size, zoneSize, zones } = p;
+		const entries: (number | null)[][] = Array.from({ length: size }, () => new Array(size).fill(null));
+		// place a wrong value in an empty editable cell (within its zone range)
+		let placed = false;
+		for (let r = 0; r < size && !placed; r++)
+			for (let c = 0; c < size && !placed; c++)
+				if (p.given[r][c] == null) {
+					const k = zoneSize[zones[r][c]];
+					entries[r][c] = (p.solution[r][c] % k) + 1; // != solution, still in 1..k
+					placed = true;
+				}
+		const h = findHint(entries, p)!;
+		expect(h.value).toBe(p.solution[h.r][h.c]);
+		expect(p.solution[h.r][h.c]).not.toBe(entries[h.r][h.c]); // it targeted the wrong cell
 	});
 });

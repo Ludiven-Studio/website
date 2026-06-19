@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SIZES, DIFFS, generateSudoku, countSolutions, type Grid } from './engine';
+import { SIZES, DIFFS, generateSudoku, countSolutions, findHint, type Grid } from './engine';
 import { mulberry32, dateSeed } from '../prng';
 
 function isValidFullGrid(grid: Grid, n: number, boxH: number, boxW: number): boolean {
@@ -53,5 +53,37 @@ describe('sudoku engine', () => {
 		const a = generateSudoku(SIZES['6'], DIFFS.moyen, mulberry32(1));
 		const b = generateSudoku(SIZES['6'], DIFFS.moyen, mulberry32(2));
 		expect(JSON.stringify(a.solution)).not.toEqual(JSON.stringify(b.solution));
+	});
+
+	it('findHint solves the grid step by step, always proposing the solution value', () => {
+		const p = generateSudoku(SIZES['9'], DIFFS.moyen, mulberry32(2026));
+		const entries: (number | null)[][] = Array.from({ length: 9 }, () => new Array(9).fill(null));
+		for (let step = 0; step < 9 * 9; step++) {
+			const h = findHint(entries, p);
+			if (!h) break;
+			expect(h.value).toBe(p.solution[h.r][h.c]); // never proposes a wrong value
+			expect(h.reason.length).toBeGreaterThan(0);
+			entries[h.r][h.c] = h.value;
+		}
+		// the whole grid (givens + entries) now equals the solution
+		for (let r = 0; r < 9; r++)
+			for (let c = 0; c < 9; c++)
+				expect(p.given[r][c] !== 0 ? p.given[r][c] : entries[r][c]).toBe(p.solution[r][c]);
+	});
+
+	it('findHint corrects a wrong entry first', () => {
+		const p = generateSudoku(SIZES['6'], DIFFS.facile, mulberry32(5));
+		const entries: (number | null)[][] = Array.from({ length: 6 }, () => new Array(6).fill(null));
+		// place a wrong value in an empty editable cell
+		let placed = false;
+		for (let r = 0; r < 6 && !placed; r++)
+			for (let c = 0; c < 6 && !placed; c++)
+				if (p.given[r][c] === 0) {
+					entries[r][c] = (p.solution[r][c] % 6) + 1; // guaranteed != solution
+					placed = true;
+				}
+		const h = findHint(entries, p)!;
+		expect(h.value).toBe(p.solution[h.r][h.c]);
+		expect(p.solution[h.r][h.c]).not.toBe(entries[h.r][h.c]); // it targeted the wrong cell
 	});
 });

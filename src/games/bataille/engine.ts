@@ -243,6 +243,207 @@ function placeFleet(n: number, fleet: number[], rng: Rng): boolean[][] | null {
 	return grid.map((row) => row.map((v) => v === 1));
 }
 
+export type Mark = 0 | 1 | 2; // 0 empty, 1 ship, 2 water (player marks)
+
+export interface HintResult {
+	r: number;
+	c: number;
+	value: 'ship' | 'water';
+	reason: string;
+}
+
+/**
+ * Find the next logically-deducible cell for the player and explain the technique
+ * in French. `marks` is the player grid (0 empty / 1 ship / 2 water); given cells are
+ * locked and never targeted. The effective grid = givens + player marks. The returned
+ * value always matches the solution.
+ *
+ * Order: correction → empty row/col → completed count → forced ships →
+ * diagonal-of-ship → ship-segment borders → honest fallback.
+ */
+export function findHint(marks: Mark[][], puzzle: BataillePuzzle): HintResult | null {
+	const { size: n, solution, rowCounts, colCounts, given } = puzzle;
+
+	const locked = (r: number, c: number) => given[r][c] !== null;
+	const correct = (r: number, c: number): 'ship' | 'water' => (solution[r][c] ? 'ship' : 'water');
+	// Effective ship: a given ship or a player-marked ship.
+	const isShip = (r: number, c: number) =>
+		r >= 0 && r < n && c >= 0 && c < n && (given[r][c] === 'ship' || marks[r][c] === 1);
+	// Decided = given, or player marked ship/water.
+	const decided = (r: number, c: number) => locked(r, c) || marks[r][c] !== 0;
+	// Free & still empty (a valid hint target). Bounds-safe (used on 8-neighbours).
+	const empty = (r: number, c: number) =>
+		r >= 0 && r < n && c >= 0 && c < n && !locked(r, c) && marks[r][c] === 0;
+	// Effective ship count of a row/col (givens + player ships).
+	const rowShips = (r: number) => {
+		let k = 0;
+		for (let c = 0; c < n; c++) if (isShip(r, c)) k++;
+		return k;
+	};
+	const colShips = (c: number) => {
+		let k = 0;
+		for (let r = 0; r < n; r++) if (isShip(r, c)) k++;
+		return k;
+	};
+	const rowEmpties = (r: number) => {
+		const out: number[] = [];
+		for (let c = 0; c < n; c++) if (empty(r, c)) out.push(c);
+		return out;
+	};
+	const colEmpties = (c: number) => {
+		const out: number[] = [];
+		for (let r = 0; r < n; r++) if (empty(r, c)) out.push(r);
+		return out;
+	};
+
+	// 1) Correction — a player-marked cell that disagrees with the solution.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (locked(r, c) || marks[r][c] === 0) continue;
+			const want = correct(r, c);
+			const has: 'ship' | 'water' = marks[r][c] === 1 ? 'ship' : 'water';
+			if (has === want) continue;
+			let reason: string;
+			if (has === 'ship') {
+				// Why this ship is wrong: diagonal contact, or row/col over its count.
+				const diag =
+					isShip(r - 1, c - 1) || isShip(r - 1, c + 1) || isShip(r + 1, c - 1) || isShip(r + 1, c + 1);
+				if (diag)
+					reason = `Cette case ne peut pas être un bateau (elle touche un bateau en diagonale) — c'est de l'eau.`;
+				else if (rowShips(r) > rowCounts[r])
+					reason = `Cette case ne peut pas être un bateau (elle dépasse le compte de la ligne) — c'est de l'eau.`;
+				else if (colShips(c) > colCounts[c])
+					reason = `Cette case ne peut pas être un bateau (elle dépasse le compte de la colonne) — c'est de l'eau.`;
+				else reason = `Cette case ne peut pas être un bateau — c'est de l'eau.`;
+			} else {
+				reason = `Cette case ne peut pas être de l'eau — c'est un bateau.`;
+			}
+			return { r, c, value: want, reason };
+		}
+
+	// 2) Count = 0 → all water.
+	for (let r = 0; r < n; r++)
+		if (rowCounts[r] === 0)
+			for (let c = 0; c < n; c++)
+				if (empty(r, c))
+					return { r, c, value: 'water', reason: `Cette ligne n'a aucun bateau → eau.` };
+	for (let c = 0; c < n; c++)
+		if (colCounts[c] === 0)
+			for (let r = 0; r < n; r++)
+				if (empty(r, c))
+					return { r, c, value: 'water', reason: `Cette colonne n'a aucun bateau → eau.` };
+
+	// 3) Count reached → remaining empties are water.
+	for (let r = 0; r < n; r++)
+		if (rowShips(r) === rowCounts[r]) {
+			const es = rowEmpties(r);
+			if (es.length > 0)
+				return {
+					r,
+					c: es[0],
+					value: 'water',
+					reason: `Cette ligne a déjà ses ${rowCounts[r]} cases de bateau → eau.`,
+				};
+		}
+	for (let c = 0; c < n; c++)
+		if (colShips(c) === colCounts[c]) {
+			const es = colEmpties(c);
+			if (es.length > 0)
+				return {
+					r: es[0],
+					c,
+					value: 'water',
+					reason: `Cette colonne a déjà ses ${colCounts[c]} cases de bateau → eau.`,
+				};
+		}
+
+	// 4) Remaining needed === undecided empties → all ships.
+	for (let r = 0; r < n; r++) {
+		const es = rowEmpties(r);
+		const need = rowCounts[r] - rowShips(r);
+		if (es.length > 0 && need === es.length)
+			return {
+				r,
+				c: es[0],
+				value: 'ship',
+				reason: `Il reste ${need} case${need > 1 ? 's' : ''} pour ${need} case${need > 1 ? 's' : ''} de bateau dans cette ligne.`,
+			};
+	}
+	for (let c = 0; c < n; c++) {
+		const es = colEmpties(c);
+		const need = colCounts[c] - colShips(c);
+		if (es.length > 0 && need === es.length)
+			return {
+				r: es[0],
+				c,
+				value: 'ship',
+				reason: `Il reste ${need} case${need > 1 ? 's' : ''} pour ${need} case${need > 1 ? 's' : ''} de bateau dans cette colonne.`,
+			};
+	}
+
+	// 5) Empty cell diagonally adjacent to an effective ship → water.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (!empty(r, c)) continue;
+			if (isShip(r - 1, c - 1) || isShip(r - 1, c + 1) || isShip(r + 1, c - 1) || isShip(r + 1, c + 1)) {
+				if (correct(r, c) !== 'water') continue; // safety: never contradict the solution
+				return {
+					r,
+					c,
+					value: 'water',
+					reason: `Un bateau est en diagonale : les bateaux ne se touchent pas → eau.`,
+				};
+			}
+		}
+
+	// 6) Borders of a completed ship (conservative): a ship whose full extent is decided
+	//    (both orthogonal ends sealed by edge/water/given) — empties orthogonally past the
+	//    ends, or all around a confirmed single, are water. Only emit when truly forced.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (!isShip(r, c)) continue;
+			// Single: no orthogonal ship neighbour, and every orthogonal neighbour is decided
+			// (so its length of 1 is confirmed). Then its 8-neighbourhood empties are water.
+			const horiz = isShip(r, c - 1) || isShip(r, c + 1);
+			const vert = isShip(r - 1, c) || isShip(r + 1, c);
+			const orthSealed =
+				(c === 0 || decided(r, c - 1)) &&
+				(c === n - 1 || decided(r, c + 1)) &&
+				(r === 0 || decided(r - 1, c)) &&
+				(r === n - 1 || decided(r + 1, c));
+			if (!horiz && !vert && orthSealed) {
+				for (let dr = -1; dr <= 1; dr++)
+					for (let dc = -1; dc <= 1; dc++) {
+						if (dr === 0 && dc === 0) continue;
+						const nr = r + dr;
+						const nc = c + dc;
+						if (empty(nr, nc) && correct(nr, nc) === 'water')
+							return {
+								r: nr,
+								c: nc,
+								value: 'water',
+								reason: `Ce bateau est complet → eau autour.`,
+							};
+					}
+			}
+		}
+
+	// 7) Fallback — first undecided cell whose value differs from current.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++)
+			if (empty(r, c)) {
+				const want = correct(r, c);
+				return {
+					r,
+					c,
+					value: want,
+					reason: `Par déduction, cette case est ${want === 'ship' ? 'un bateau' : "de l'eau"}.`,
+				};
+			}
+
+	return null;
+}
+
 export function generateBataille(diff: DiffLevel, rng: Rng = Math.random): BataillePuzzle {
 	const n = diff.size;
 	const fleet = [...diff.fleet].sort((a, b) => b - a);

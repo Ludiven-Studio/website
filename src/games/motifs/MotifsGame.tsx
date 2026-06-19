@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, generateMotifs, shapeOf, type MotifsPuzzle, type Rect } from './engine';
+import { DIFFS, generateMotifs, hintReason, shapeOf, type MotifsPuzzle, type Rect } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -59,6 +59,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
@@ -77,6 +78,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setPuzzle(generateMotifs(DIFFS[key]));
 		setPlaced([]);
 		setPreview(null);
+		setHintNote('');
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
@@ -149,6 +151,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const resetDailyEntries = useCallback(() => {
 		setPlaced([]);
 		setPreview(null);
+		setHintNote('');
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -358,8 +361,9 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		if (!todo) todo = rects.find((rect) => !matches(rect));
 		if (!todo) return;
 		addPiece({ ...todo });
+		setHintNote(hintReason(todo, puzzle));
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, rects, owner, placed, addPiece, gameId]);
+	}, [status, revealed, rects, owner, placed, addPiece, puzzle, gameId]);
 
 	/* Reveal the full partition (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -542,6 +546,10 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
+			{!daily && hintNote && (
+				<p className="mo-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
+
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
@@ -650,6 +658,12 @@ const CSS = `
 }
 .mo-revealed-note {
   display: flex; align-items: center; gap: 14px; margin-top: 1.5rem; color: var(--gray-300); font-size: 14px; font-weight: 500;
+}
+.mo-hint-note {
+  --mo-ok: #2f9e6f;
+  max-width: 420px; margin: 1rem auto 0; text-align: center; font-size: 13px; line-height: 1.5;
+  color: var(--mo-ok); background: var(--accent-overlay); border: 1px solid var(--mo-ok);
+  border-radius: 12px; padding: 8px 14px;
 }
 
 .mo-win {

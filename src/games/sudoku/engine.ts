@@ -217,3 +217,126 @@ export function generateSudoku(
 
 	return { size, boxH, boxW, given, solution };
 }
+
+export interface HintResult {
+	r: number;
+	c: number;
+	value: number;
+	reason: string;
+}
+
+/**
+ * Find the next logically-deducible cell for the player and explain the technique.
+ * Corrects a wrong entry first; then "last cell in a unit", naked single, hidden
+ * single; finally an honest fallback. The returned value is always the solution.
+ */
+export function findHint(
+	entries: (number | null)[][],
+	puzzle: SudokuPuzzle,
+): HintResult | null {
+	const { size: n, boxH, boxW, given, solution } = puzzle;
+	const editable = (r: number, c: number) => given[r][c] === 0;
+	const val = (r: number, c: number): number | null =>
+		given[r][c] !== 0 ? given[r][c] : entries[r][c];
+	const bi = (r: number, c: number) => boxIndex(r, c, boxH, boxW, n);
+
+	const unitCells = (kind: 'row' | 'col' | 'box', i: number): [number, number][] => {
+		const out: [number, number][] = [];
+		if (kind === 'row') for (let c = 0; c < n; c++) out.push([i, c]);
+		else if (kind === 'col') for (let r = 0; r < n; r++) out.push([r, i]);
+		else
+			for (let r = 0; r < n; r++)
+				for (let c = 0; c < n; c++) if (bi(r, c) === i) out.push([r, c]);
+		return out;
+	};
+	const unitName = (k: 'row' | 'col' | 'box') =>
+		k === 'row' ? 'sa ligne' : k === 'col' ? 'sa colonne' : 'son bloc';
+	const unitNameTop = (k: 'row' | 'col' | 'box') =>
+		k === 'row' ? 'cette ligne' : k === 'col' ? 'cette colonne' : 'ce bloc';
+
+	// 1) Correction — a wrong filled cell.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (!editable(r, c) || entries[r][c] == null) continue;
+			const x = entries[r][c]!;
+			if (x === solution[r][c]) continue;
+			let dup: 'row' | 'col' | 'box' | null = null;
+			for (const k of ['row', 'col', 'box'] as const)
+				for (const [rr, cc] of unitCells(k, k === 'row' ? r : k === 'col' ? c : bi(r, c)))
+					if ((rr !== r || cc !== c) && val(rr, cc) === x) dup = k;
+			const reason = dup
+				? `Le ${x} ici fait doublon dans ${unitName(dup)} — la bonne valeur est ${solution[r][c]}.`
+				: `Le ${x} ne convient pas ici — la valeur correcte est ${solution[r][c]}.`;
+			return { r, c, value: solution[r][c], reason };
+		}
+
+	const candidates = (r: number, c: number): number[] => {
+		const used = new Set<number>();
+		for (const k of ['row', 'col', 'box'] as const)
+			for (const [rr, cc] of unitCells(k, k === 'row' ? r : k === 'col' ? c : bi(r, c))) {
+				const v = val(rr, cc);
+				if (v != null) used.add(v);
+			}
+		const out: number[] = [];
+		for (let v = 1; v <= n; v++) if (!used.has(v)) out.push(v);
+		return out;
+	};
+
+	// 2) Last empty cell of a unit.
+	for (const k of ['row', 'col', 'box'] as const)
+		for (let i = 0; i < n; i++) {
+			const empties = unitCells(k, i).filter(([r, c]) => editable(r, c) && val(r, c) == null);
+			if (empties.length !== 1) continue;
+			const [r, c] = empties[0];
+			const y = solution[r][c];
+			return {
+				r,
+				c,
+				value: y,
+				reason: `${unitNameTop(k)} n'a plus qu'une case libre : il y manque le ${y}.`,
+			};
+		}
+
+	// 3) Naked single.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (!editable(r, c) || val(r, c) != null) continue;
+			const cand = candidates(r, c);
+			if (cand.length === 1 && cand[0] === solution[r][c])
+				return {
+					r,
+					c,
+					value: cand[0],
+					reason: `Sur sa ligne, sa colonne et son bloc réunis, cette case n'accepte que le ${cand[0]}.`,
+				};
+		}
+
+	// 4) Hidden single.
+	for (const k of ['row', 'col', 'box'] as const)
+		for (let i = 0; i < n; i++) {
+			const cells = unitCells(k, i).filter(([r, c]) => editable(r, c) && val(r, c) == null);
+			for (let v = 1; v <= n; v++) {
+				const fit = cells.filter(([r, c]) => candidates(r, c).includes(v));
+				if (fit.length === 1 && solution[fit[0][0]][fit[0][1]] === v)
+					return {
+						r: fit[0][0],
+						c: fit[0][1],
+						value: v,
+						reason: `Le ${v} ne peut se placer que dans cette case de ${unitName(k)}.`,
+					};
+			}
+		}
+
+	// 5) Fallback.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++)
+			if (editable(r, c) && val(r, c) == null)
+				return {
+					r,
+					c,
+					value: solution[r][c],
+					reason: `Par élimination, cette case vaut ${solution[r][c]}.`,
+				};
+
+	return null;
+}

@@ -15,9 +15,11 @@ import {
 	DIFFS,
 	generateReines,
 	findConflicts,
+	findHint,
 	regionColor,
 	type ReinesPuzzle,
 	type ConflictReason,
+	type CellState,
 } from './engine';
 
 const REASON_LABEL: Record<ConflictReason, string> = {
@@ -34,7 +36,6 @@ const REASON_LABEL: Record<ConflictReason, string> = {
    ===================================================== */
 
 type Status = 'playing' | 'won';
-type CellState = 0 | 1 | 2; // empty | mark | queen
 
 const emptyMarks = (n: number): CellState[][] =>
 	Array.from({ length: n }, () => new Array(n).fill(0) as CellState[]);
@@ -57,6 +58,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const skipBackstopRef = useRef<ReinesPuzzle | null>(null); // puzzle whose marks were pre-restored (daily resume)
@@ -74,6 +76,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		const d = DIFFS[key];
 		setDaily(false);
 		setAlreadyPlayed(false);
+		setHintNote('');
 		setDiffKey(key);
 		setPuzzle(generateReines(d));
 		setMarks(emptyMarks(d.size));
@@ -158,6 +161,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		const cleared = emptyMarks(DIFFS[dk].size);
 		setMarks(cleared);
 		setHinted(new Set());
+		setHintNote('');
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: false,
@@ -269,34 +273,29 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		[status, started, revealed, daily, gameId],
 	);
 
-	/* Hint: correctly place the queen in one not-yet-solved row. */
+	/* Hint: deduce the next logical move and explain the technique. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed) return;
-		const { solution } = puzzle;
-		// Priority 1: a row with a misplaced queen (an error).
-		let target = -1;
-		for (let r = 0; r < size && target === -1; r++)
-			for (let c = 0; c < size; c++)
-				if (marks[r][c] === 2 && c !== solution[r]) {
-					target = r;
-					break;
-				}
-		// Priority 2: a row whose correct queen isn't placed yet.
-		for (let r = 0; r < size && target === -1; r++)
-			if (marks[r][solution[r]] !== 2) target = r;
-		if (target === -1) return;
+		const h = findHint(marks, puzzle);
+		if (!h) return;
 		setMarks((prev) => {
 			const next = prev.map((row) => [...row]) as CellState[][];
-			next[target] = new Array(size).fill(0) as CellState[];
-			next[target][solution[target]] = 2;
+			if (h.value === 'queen') {
+				// One queen per row: clear the row, drop it on the solution cell.
+				next[h.r] = new Array(size).fill(0) as CellState[];
+				next[h.r][h.c] = 2;
+			} else {
+				next[h.r][h.c] = 1;
+			}
 			return next;
 		});
+		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
+		setHintNote(h.reason);
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
 			trackGame(gameId, 'game_started');
 		}
-		setHinted((prev) => new Set(prev).add(`${target},${solution[target]}`));
 		trackGame(gameId, 'hint_used');
 	}, [status, revealed, puzzle, size, marks, started, gameId]);
 
@@ -445,6 +444,10 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
+			{!daily && hintNote && (
+				<p className="rn-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
+
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
@@ -583,6 +586,12 @@ const CSS = `
 .rn-help {
   max-width: 420px; text-align: center; color: var(--gray-300);
   font-size: 12.5px; line-height: 1.5; margin-top: 0.5rem;
+}
+.rn-hint-note {
+  max-width: 420px; margin: 1rem auto 0; text-align: center;
+  font-size: 13px; line-height: 1.5; color: var(--rn-ok);
+  background: var(--accent-overlay); border: 1px solid var(--rn-ok);
+  border-radius: 12px; padding: 8px 14px;
 }
 
 .rn-win {

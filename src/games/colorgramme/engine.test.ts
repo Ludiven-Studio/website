@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DIFFS, generateColorgramme, lineSolve, countSolutions, lineClueOf } from './engine';
+import { DIFFS, generateColorgramme, lineSolve, countSolutions, lineClueOf, findHint } from './engine';
 import { mulberry32 } from '../prng';
 
 describe('colorgramme engine', () => {
@@ -38,5 +38,43 @@ describe('colorgramme engine', () => {
 		const a = generateColorgramme(DIFFS.moyen, mulberry32(77));
 		const b = generateColorgramme(DIFFS.moyen, mulberry32(77));
 		expect(a.solution).toEqual(b.solution);
+	});
+
+	it('findHint solves the grid step by step, always proposing the solution colour', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const diff = DIFFS[key];
+			for (let seed = 1; seed <= 4; seed++) {
+				const p = generateColorgramme(diff, mulberry32(4200 + seed * 17 + diff.size));
+				const grid = Array.from({ length: p.size }, () => new Array(p.size).fill(0));
+				let steps = 0;
+				const cap = p.size * p.size + 5;
+				for (;;) {
+					const h = findHint(grid, p);
+					if (!h) break;
+					expect(h.value, `"${key}" seed ${seed} value matches solution`).toBe(
+						p.solution[h.r][h.c],
+					);
+					expect(h.value).toBeGreaterThanOrEqual(1);
+					expect(h.value).toBeLessThanOrEqual(p.colors);
+					grid[h.r][h.c] = h.value;
+					if (++steps > cap) throw new Error('findHint did not converge');
+				}
+				expect(grid, `"${key}" seed ${seed} fully solved by hints`).toEqual(p.solution);
+			}
+		}
+	});
+
+	it('findHint corrects a wrong colour before filling empty cells', () => {
+		const p = generateColorgramme(DIFFS.moyen, mulberry32(321));
+		// Find a cell and a wrong colour for it.
+		const wrong = p.solution[0][0] === 1 ? 2 : 1;
+		const grid = Array.from({ length: p.size }, () => new Array(p.size).fill(0));
+		grid[0][0] = wrong; // contradicts the picture
+		const h = findHint(grid, p);
+		expect(h).not.toBeNull();
+		expect(h!.r).toBe(0);
+		expect(h!.c).toBe(0);
+		expect(h!.value).toBe(p.solution[0][0]);
+		expect(h!.reason).toContain('ne correspond pas');
 	});
 });

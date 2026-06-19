@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, generateAquarium, type AquariumPuzzle } from './engine';
+import { DIFFS, generateAquarium, findHint, type AquariumPuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -43,6 +43,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const [elapsed, setElapsed] = useState(0);
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -67,6 +68,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		setStarted(false);
 		setRevealed(false);
 		setHinted(new Set());
+		setHintNote('');
 		setElapsed(0);
 	}, []);
 
@@ -75,6 +77,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		setDaily(true);
 		setRevealed(false);
 		setHinted(new Set());
+		setHintNote('');
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -138,6 +141,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 	const resetDailyEntries = useCallback(() => {
 		setGrid(emptyGrid(size));
 		setHinted(new Set());
+		setHintNote('');
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -272,31 +276,22 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		painting.current = false;
 	};
 
-	/* Hint (free): fix a wrong cell first, else fill a needed water cell. Marks GREEN. */
+	/* Hint (free): deduce the next logical cell and explain the technique. Marks GREEN. */
 	const hint = useCallback(() => {
 		if (over) return;
-		let target: [number, number] | null = null;
-		// Priority 1: a cell whose mark disagrees with the solution.
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++) {
-				const isWater = grid[r][c] === 1;
-				if (isWater !== solution[r][c] && grid[r][c] !== 0) target = [r, c];
-			}
-		// Priority 2: a missing water cell still empty.
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++)
-				if (grid[r][c] === 0 && solution[r][c]) target = [r, c];
-		if (!target) return;
-		const [r, c] = target;
+		const h = findHint(grid, puzzle);
+		if (!h) return;
+		const v: Mark = h.value === 'water' ? 1 : 2;
 		setGrid((prev) => {
 			const n = prev.map((row) => [...row]) as Mark[][];
-			n[r][c] = solution[r][c] ? 1 : 2;
+			n[h.r][h.c] = v;
 			return n;
 		});
-		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
+		setHintNote(h.reason);
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, size, grid, solution, begin, gameId]);
+	}, [over, grid, puzzle, begin, gameId]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -363,6 +358,10 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				<div className="aq-actions">
 					<button className="aq-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
+			)}
+
+			{!daily && hintNote && (
+				<p className="aq-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{daily && status === 'won' && (
@@ -567,6 +566,19 @@ const CSS = `
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
 .aq-act:hover { background: var(--gray-800); border-color: var(--aq-accent); color: var(--aq-accent); }
+
+.aq-hint-note {
+  max-width: 420px;
+  margin: 0 auto 0.85rem;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--aq-ok);
+  background: var(--accent-overlay);
+  border: 1px solid var(--aq-ok);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
 
 .aq-boardwrap {
   position: relative;

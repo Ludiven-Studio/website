@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, generateBataille, segType, type BataillePuzzle, type Given, type SegType } from './engine';
+import { DIFFS, generateBataille, findHint, segType, type BataillePuzzle, type Given, type SegType } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -58,6 +58,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const painting = useRef(false);
@@ -70,6 +71,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		const d = DIFFS[key];
 		setDaily(false);
 		setAlreadyPlayed(false);
+		setHintNote('');
 		setDiffKey(key);
 		setPuzzle(generateBataille(d));
 		setMarks(emptyMarks(d.size));
@@ -148,6 +150,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	const resetDailyEntries = useCallback(() => {
 		setMarks(emptyMarks(size));
 		setHinted(new Set());
+		setHintNote('');
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -287,28 +290,22 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		painting.current = false;
 	};
 
-	/* Hint: fix a wrong cell first, else reveal a needed ship/water cell. */
+	/* Hint: deduce the next logical cell and explain the technique. */
 	const hint = useCallback(() => {
 		if (over) return;
-		const wrong = (r: number, c: number) =>
-			given[r][c] === null && marks[r][c] !== 0 && (marks[r][c] === 1) !== solution[r][c];
-		const missing = (r: number, c: number) => given[r][c] === null && marks[r][c] === 0;
-		let target: [number, number] | null = null;
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++) if (wrong(r, c)) target = [r, c];
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++) if (missing(r, c)) target = [r, c];
-		if (!target) return;
-		const [r, c] = target;
+		const h = findHint(marks, puzzle);
+		if (!h) return;
+		const { r, c } = h;
 		setMarks((prev) => {
 			const n = prev.map((row) => [...row]);
-			n[r][c] = (solution[r][c] ? 1 : 2) as Mark;
+			n[r][c] = (h.value === 'ship' ? 1 : 2) as Mark;
 			return n;
 		});
 		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setHintNote(h.reason);
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, given, marks, solution, size, begin, gameId]);
+	}, [over, marks, puzzle, begin, gameId]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -474,6 +471,10 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{!daily && hintNote && (
+				<p className="ba-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
@@ -696,6 +697,10 @@ const CSS = `
 }
 .ba-revealed-note {
   display: flex; align-items: center; gap: 14px; margin-top: 1.25rem; color: var(--gray-300); font-size: 14px; font-weight: 500;
+}
+.ba-hint-note {
+  max-width: 430px; margin: 1rem auto 0; text-align: center; font-size: 13px; line-height: 1.5;
+  color: var(--ba-ok); background: var(--accent-overlay); border: 1px solid var(--ba-ok); border-radius: 12px; padding: 8px 14px;
 }
 
 .ba-win {

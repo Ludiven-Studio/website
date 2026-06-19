@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, generateCalcudoku, type CalcudokuPuzzle, type Op } from './engine';
+import { DIFFS, generateCalcudoku, findHint, type CalcudokuPuzzle, type Op } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -46,6 +46,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
@@ -84,6 +85,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		const d = DIFFS[key];
 		setDaily(false);
 		setAlreadyPlayed(false);
+		setHintNote('');
 		setDiffKey(key);
 		setPuzzle(generateCalcudoku(d));
 		setEntries(emptyEntries(d.size));
@@ -169,6 +171,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		setEntries(cleared);
 		setHinted(new Set());
 		setSelected(null);
+		setHintNote('');
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: false,
@@ -301,36 +304,25 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		[status, revealed, selected, given, started, daily, gameId],
 	);
 
-	/* Hint: fill the selected empty cell (else the first empty) from the solution. */
+	/* Hint: deduce the next logical cell and explain the technique. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed) return;
-		const editable = (r: number, c: number) => given[r][c] == null;
-		const wrong = (r: number, c: number) =>
-			editable(r, c) && entries[r][c] != null && entries[r][c] !== solution[r][c];
-		const empty = (r: number, c: number) => editable(r, c) && entries[r][c] == null;
-		// Priority 1: fix a wrong entry. Priority 2: fill an empty cell.
-		let target: [number, number] | null =
-			selected && wrong(selected[0], selected[1]) ? selected : null;
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++) if (wrong(r, c)) target = [r, c];
-		if (!target && selected && empty(selected[0], selected[1])) target = selected;
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++) if (empty(r, c)) target = [r, c];
-		if (!target) return;
-		const [r, c] = target;
+		const h = findHint(entries, puzzle);
+		if (!h) return;
 		setEntries((prev) => {
 			const next = prev.map((row) => [...row]);
-			next[r][c] = solution[r][c];
+			next[h.r][h.c] = h.value;
 			return next;
 		});
-		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
+		setHintNote(h.reason);
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, selected, given, entries, size, solution, started, gameId]);
+	}, [status, revealed, entries, puzzle, started, gameId]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -531,6 +523,10 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
+			{!daily && hintNote && (
+				<p className="cd-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
+
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
@@ -685,6 +681,18 @@ const CSS = `
 .cd-key.erase { background: var(--gray-800); }
 
 .cd-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem; }
+.cd-hint-note {
+  max-width: 420px;
+  margin: 1rem auto 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cd-ok);
+  background: var(--accent-overlay);
+  border: 1px solid var(--cd-ok);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
 
 .cd-win {
   position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center;

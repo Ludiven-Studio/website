@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DIFFS, generateMotifs, countSolutions, shapeOf } from './engine';
+import { DIFFS, generateMotifs, countSolutions, shapeOf, hintReason } from './engine';
 import { mulberry32 } from '../prng';
 
 describe('motifs engine', () => {
@@ -51,6 +51,15 @@ describe('motifs engine', () => {
 			expect(inside, `clue ${id} sits inside its rect`).toBe(true);
 			if (clue.area != null) expect(clue.area).toBe(rect.h * rect.w);
 			if (clue.shape !== 'any') expect(clue.shape).toBe(shapeOf(rect.h, rect.w));
+		});
+	});
+
+	it('hintReason returns a non-empty explanation for every solution rectangle', () => {
+		const p = generateMotifs(DIFFS.moyen, mulberry32(77));
+		p.rects.forEach((rect) => {
+			const note = hintReason(rect, p);
+			expect(note.length, 'non-empty hint reason').toBeGreaterThan(0);
+			expect(note).toContain('ici.');
 		});
 	});
 });

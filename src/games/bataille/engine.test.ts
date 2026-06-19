@@ -1,6 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32, dateSeed } from '../prng';
-import { DIFFS, generateBataille, countSolutions, segType } from './engine';
+import {
+	DIFFS,
+	generateBataille,
+	countSolutions,
+	segType,
+	findHint,
+	type Mark,
+	type BataillePuzzle,
+} from './engine';
+
+const emptyMarks = (n: number): Mark[][] =>
+	Array.from({ length: n }, () => new Array<Mark>(n).fill(0));
+
+// Effective ship grid: given ship OR player ship.
+const effShips = (marks: Mark[][], p: BataillePuzzle): boolean[][] =>
+	p.solution.map((row, r) =>
+		row.map((_, c) => p.given[r][c] === 'ship' || marks[r][c] === 1),
+	);
+
+const allShipsMarked = (marks: Mark[][], p: BataillePuzzle): boolean => {
+	const eff = effShips(marks, p);
+	for (let r = 0; r < p.size; r++)
+		for (let c = 0; c < p.size; c++) if (p.solution[r][c] && !eff[r][c]) return false;
+	return true;
+};
 
 const noTouch = (grid: boolean[][]): boolean => {
 	const n = grid.length;
@@ -53,6 +77,84 @@ describe('bataille engine', () => {
 				if (p.solution[r][c]) expect(s).not.toBeNull();
 				else expect(s).toBeNull();
 			}
+	});
+
+	for (const key of Object.keys(DIFFS)) {
+		const diff = DIFFS[key];
+		it(`${key}: findHint solves from empty marks, always proposing solution-correct cells`, () => {
+			for (let s = 0; s < 3; s++) {
+				const p = generateBataille(diff, mulberry32(7100 + s * 53 + diff.size));
+				const marks = emptyMarks(p.size);
+				let steps = 0;
+				const maxSteps = p.size * p.size + 5;
+				while (!allShipsMarked(marks, p) && steps < maxSteps) {
+					const h = findHint(marks, p);
+					expect(h).not.toBeNull();
+					if (!h) break;
+					// Target is free (never a given), and currently undecided.
+					expect(p.given[h.r][h.c]).toBeNull();
+					expect(marks[h.r][h.c]).toBe(0);
+					// Proposed value must agree with the solution.
+					const want: 'ship' | 'water' = p.solution[h.r][h.c] ? 'ship' : 'water';
+					expect(h.value).toBe(want);
+					expect(typeof h.reason).toBe('string');
+					expect(h.reason.length).toBeGreaterThan(0);
+					marks[h.r][h.c] = (h.value === 'ship' ? 1 : 2) as Mark;
+					steps++;
+				}
+				expect(allShipsMarked(marks, p)).toBe(true);
+				// Every cell now agrees with the solution (ships and water both correct).
+				for (let r = 0; r < p.size; r++)
+					for (let c = 0; c < p.size; c++) {
+						const eff = p.given[r][c] === 'ship' || marks[r][c] === 1;
+						expect(eff).toBe(p.solution[r][c]);
+					}
+			}
+		}, 20000);
+	}
+
+	it('findHint corrects a wrong player mark', () => {
+		const p = generateBataille(DIFFS.facile, mulberry32(8123));
+		// Find a free water cell (solution false) and mark it as a ship → must be corrected.
+		let target: [number, number] | null = null;
+		for (let r = 0; r < p.size && !target; r++)
+			for (let c = 0; c < p.size && !target; c++)
+				if (p.given[r][c] === null && !p.solution[r][c]) target = [r, c];
+		expect(target).not.toBeNull();
+		const [wr, wc] = target!;
+		const marks = emptyMarks(p.size);
+		marks[wr][wc] = 1; // wrong: ship where solution is water
+		const h = findHint(marks, p);
+		expect(h).not.toBeNull();
+		expect(h!.r).toBe(wr);
+		expect(h!.c).toBe(wc);
+		expect(h!.value).toBe('water');
+	});
+
+	it('findHint corrects a wrong water mark (should be ship)', () => {
+		const p = generateBataille(DIFFS.facile, mulberry32(8456));
+		let target: [number, number] | null = null;
+		for (let r = 0; r < p.size && !target; r++)
+			for (let c = 0; c < p.size && !target; c++)
+				if (p.given[r][c] === null && p.solution[r][c]) target = [r, c];
+		expect(target).not.toBeNull();
+		const [wr, wc] = target!;
+		const marks = emptyMarks(p.size);
+		marks[wr][wc] = 2; // wrong: water where solution is ship
+		const h = findHint(marks, p);
+		expect(h).not.toBeNull();
+		expect(h!.r).toBe(wr);
+		expect(h!.c).toBe(wc);
+		expect(h!.value).toBe('ship');
+	});
+
+	it('findHint returns null once solved', () => {
+		const p = generateBataille(DIFFS.facile, mulberry32(8789));
+		const marks = emptyMarks(p.size);
+		for (let r = 0; r < p.size; r++)
+			for (let c = 0; c < p.size; c++)
+				if (p.given[r][c] === null) marks[r][c] = (p.solution[r][c] ? 1 : 2) as Mark;
+		expect(findHint(marks, p)).toBeNull();
 	});
 
 	it('is reproducible from a seed (daily challenge)', () => {

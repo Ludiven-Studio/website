@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { DIFFS, generateColorgramme, type ColorgrammePuzzle } from './engine';
+import { DIFFS, generateColorgramme, findHint, type ColorgrammePuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -66,6 +66,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
 	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const [elapsed, setElapsed] = useState(0);
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -94,6 +95,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setStarted(false);
 		setRevealed(false);
 		setHinted(new Set());
+		setHintNote('');
 		setElapsed(0);
 	}, []);
 
@@ -171,6 +173,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setGrid(emptyGrid(size));
 		setCrosses(emptyGrid(size));
 		setHinted(new Set());
+		setHintNote('');
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -344,27 +347,24 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		painting.current = false;
 	};
 
-	/* Hint: fix a wrong cell first, else fill an unpainted cell. */
+	/* Hint: deduce the next logical cell and explain the technique. Paints only the
+	   target cell (active colour selection is left untouched). */
 	const hint = useCallback(() => {
 		if (over) return;
-		let target: [number, number] | null = null;
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++)
-				if (grid[r][c] !== 0 && grid[r][c] !== solution[r][c]) target = [r, c];
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++) if (grid[r][c] === 0) target = [r, c];
-		if (!target) return;
-		const [r, c] = target;
+		const h = findHint(grid, puzzle);
+		if (!h) return;
+		const { r, c, value, reason } = h;
 		setGrid((prev) => {
 			const n = prev.map((row) => [...row]);
-			n[r][c] = solution[r][c];
+			n[r][c] = value;
 			return n;
 		});
 		setCrosses((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
 		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setHintNote(reason);
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, size, grid, solution, begin, gameId]);
+	}, [over, grid, puzzle, begin, gameId]);
 
 	/* Reveal the full picture (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -557,6 +557,10 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{!daily && hintNote && (
+				<p className="co-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
@@ -755,6 +759,12 @@ const CSS = `
 }
 .co-revealed-note {
   display: flex; align-items: center; gap: 14px; margin-top: 1.25rem; color: var(--gray-300); font-size: 14px; font-weight: 500;
+}
+.co-hint-note {
+  max-width: 430px; margin: 1rem auto 0; text-align: center;
+  font-size: 13px; line-height: 1.5; color: var(--co-ok);
+  background: var(--accent-overlay); border: 1px solid var(--co-ok);
+  border-radius: 12px; padding: 8px 14px;
 }
 
 .co-win {

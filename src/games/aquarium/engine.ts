@@ -170,6 +170,181 @@ export function countSolutions(
 	return count;
 }
 
+export interface HintResult {
+	r: number;
+	c: number;
+	value: 'water' | 'air';
+	reason: string;
+}
+
+/**
+ * Find the next logically-deducible cell for the player and explain the technique.
+ * `marks`: player grid (0 empty, 1 water, 2 air). Corrects a wrong mark first, then
+ * gravity / same-row / counter deductions, finally an honest fallback. The returned
+ * value always matches the solution.
+ */
+export function findHint(marks: number[][], puzzle: AquariumPuzzle): HintResult | null {
+	const { size: n, regionOf, solution, rowCounts, colCounts } = puzzle;
+	const correct = (r: number, c: number): 'water' | 'air' => (solution[r][c] ? 'water' : 'air');
+	const isEmpty = (r: number, c: number) => marks[r][c] === 0;
+	const isWater = (r: number, c: number) => marks[r][c] === 1;
+	const isAir = (r: number, c: number) => marks[r][c] === 2;
+	const same = (r: number, c: number, rr: number, cc: number) => regionOf[r][c] === regionOf[rr][cc];
+
+	// 1) Correction — a player mark that contradicts the solution.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (isEmpty(r, c)) continue;
+			const v = correct(r, c);
+			const marked: 'water' | 'air' = isWater(r, c) ? 'water' : 'air';
+			if (marked === v) continue;
+			const wrongLabel = marked === 'water' ? "de l'eau" : "vide d'eau";
+			const goodLabel = v === 'water' ? "de l'eau" : "de l'air";
+			return {
+				r,
+				c,
+				value: v,
+				reason: `Cette case ne peut pas être ${wrongLabel} ici (gravité/compteur) — c'est ${goodLabel}.`,
+			};
+		}
+
+	// 2) Gravité — sous de l'eau : empty cell with same-region water directly above.
+	for (let r = 1; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (!isEmpty(r, c)) continue;
+			if (same(r, c, r - 1, c) && isWater(r - 1, c) && correct(r, c) === 'water')
+				return {
+					r,
+					c,
+					value: 'water',
+					reason: "L'eau remplit par le bas : sous de l'eau du même bassin → eau.",
+				};
+		}
+
+	// 3) Gravité — au-dessus d'air : empty cell with same-region air directly below.
+	for (let r = 0; r < n - 1; r++)
+		for (let c = 0; c < n; c++) {
+			if (!isEmpty(r, c)) continue;
+			if (same(r, c, r + 1, c) && isAir(r + 1, c) && correct(r, c) === 'air')
+				return {
+					r,
+					c,
+					value: 'air',
+					reason: "Au-dessus d'une case vide d'eau du même bassin → pas d'eau.",
+				};
+		}
+
+	// 4) Même rangée d'un bassin : empty cell whose same-region same-row neighbour is decided.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (!isEmpty(r, c)) continue;
+			for (let cc = 0; cc < n; cc++) {
+				if (cc === c || !same(r, c, r, cc) || isEmpty(r, cc)) continue;
+				const neighbour: 'water' | 'air' = isWater(r, cc) ? 'water' : 'air';
+				if (neighbour === correct(r, c))
+					return {
+						r,
+						c,
+						value: neighbour,
+						reason: "Dans un bassin, l'eau est de niveau : même état sur la rangée.",
+					};
+				break;
+			}
+		}
+
+	// Per-line / per-column water tallies on the effective grid.
+	const rowWater = (r: number) => {
+		let k = 0;
+		for (let c = 0; c < n; c++) if (isWater(r, c)) k++;
+		return k;
+	};
+	const colWater = (c: number) => {
+		let k = 0;
+		for (let r = 0; r < n; r++) if (isWater(r, c)) k++;
+		return k;
+	};
+	const rowEmpties = (r: number) => {
+		const out: number[] = [];
+		for (let c = 0; c < n; c++) if (isEmpty(r, c)) out.push(c);
+		return out;
+	};
+	const colEmpties = (c: number) => {
+		const out: number[] = [];
+		for (let r = 0; r < n; r++) if (isEmpty(r, c)) out.push(r);
+		return out;
+	};
+
+	// 5) Compteur atteint → air : line/col already has its water; remaining empties are air.
+	for (let r = 0; r < n; r++) {
+		if (rowWater(r) !== rowCounts[r]) continue;
+		const empties = rowEmpties(r);
+		for (const c of empties)
+			if (correct(r, c) === 'air')
+				return {
+					r,
+					c,
+					value: 'air',
+					reason: `Cette ligne a déjà ses ${rowCounts[r]} cases d'eau → pas d'eau.`,
+				};
+	}
+	for (let c = 0; c < n; c++) {
+		if (colWater(c) !== colCounts[c]) continue;
+		const empties = colEmpties(c);
+		for (const r of empties)
+			if (correct(r, c) === 'air')
+				return {
+					r,
+					c,
+					value: 'air',
+					reason: `Cette colonne a déjà ses ${colCounts[c]} cases d'eau → pas d'eau.`,
+				};
+	}
+
+	// 6) Cases libres = compteur restant → eau : remaining empties exactly fill the count.
+	for (let r = 0; r < n; r++) {
+		const need = rowCounts[r] - rowWater(r);
+		const empties = rowEmpties(r);
+		if (need > 0 && empties.length === need)
+			for (const c of empties)
+				if (correct(r, c) === 'water')
+					return {
+						r,
+						c,
+						value: 'water',
+						reason: `Il reste ${need} case${need > 1 ? 's' : ''} pour ${need} case${need > 1 ? 's' : ''} d'eau dans cette ligne.`,
+					};
+	}
+	for (let c = 0; c < n; c++) {
+		const need = colCounts[c] - colWater(c);
+		const empties = colEmpties(c);
+		if (need > 0 && empties.length === need)
+			for (const r of empties)
+				if (correct(r, c) === 'water')
+					return {
+						r,
+						c,
+						value: 'water',
+						reason: `Il reste ${need} case${need > 1 ? 's' : ''} pour ${need} case${need > 1 ? 's' : ''} d'eau dans cette colonne.`,
+					};
+	}
+
+	// 7) Fallback — first cell differing from the solution.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			const v = correct(r, c);
+			const marked: 'water' | 'air' | 'empty' = isEmpty(r, c) ? 'empty' : isWater(r, c) ? 'water' : 'air';
+			if (marked === v) continue;
+			return {
+				r,
+				c,
+				value: v,
+				reason: `Par déduction, cette case est ${v === 'water' ? "de l'eau" : "de l'air"}.`,
+			};
+		}
+
+	return null;
+}
+
 export function generateAquarium(diff: DiffLevel, rng: Rng = Math.random): AquariumPuzzle {
 	const n = diff.size;
 	for (let attempt = 0; attempt < 300; attempt++) {

@@ -18,6 +18,8 @@ export interface ReinesPuzzle {
 	solution: number[]; // solution[row] = col of the queen
 }
 
+export type CellState = 0 | 1 | 2; // empty | cross | queen
+
 export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 6 },
 	moyen: { label: 'Moyen', size: 7 },
@@ -215,6 +217,119 @@ export function countSolutions(regions: number[][], n: number, limit = 2): numbe
 
 	dfs(0);
 	return count;
+}
+
+export interface HintResult {
+	r: number;
+	c: number;
+	value: 'queen' | 'cross';
+	reason: string;
+}
+
+/**
+ * Find the next logically-deducible move and explain the technique (French).
+ * `marks`: player grid, 0 empty / 1 cross / 2 queen. Corrects a misplaced queen
+ * first; then the only possible cell of a unit (queen), an attacked cell (cross),
+ * finally an honest fallback. A proposed 'queen' is always solution[r] === c.
+ */
+export function findHint(marks: CellState[][], puzzle: ReinesPuzzle): HintResult | null {
+	const { size: n, regions, solution } = puzzle;
+	const isQueen = (r: number, c: number) => marks[r]?.[c] === 2;
+	const isSolQueen = (r: number, c: number) => solution[r] === c;
+
+	// Placed queens (player), for attack tests.
+	const queens: [number, number][] = [];
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) if (isQueen(r, c)) queens.push([r, c]);
+
+	// A cell is attacked if a placed queen shares its row/col/region or is 8-adjacent.
+	const attackedBy = (r: number, c: number): boolean =>
+		queens.some(
+			([qr, qc]) =>
+				!(qr === r && qc === c) &&
+				(qr === r ||
+					qc === c ||
+					regions[qr]?.[qc] === regions[r]?.[c] ||
+					adjacent(qr, qc, r, c)),
+		);
+
+	// 1) Correction — a player queen off the solution.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (!isQueen(r, c) || isSolQueen(r, c)) continue;
+			let why = '';
+			for (const [qr, qc] of queens) {
+				if (qr === r && qc === c) continue;
+				if (qr === r) why = 'en conflit de ligne';
+				else if (qc === c) why = 'en conflit de colonne';
+				else if (regions[qr]?.[qc] === regions[r]?.[c]) why = 'en conflit de zone';
+				else if (adjacent(qr, qc, r, c)) why = 'deux reines se touchent';
+				if (why) break;
+			}
+			const cause = why ? ` (${why})` : '';
+			return {
+				r,
+				c: solution[r],
+				value: 'queen',
+				reason: `Cette reine est mal placée${cause} — la reine de cette ligne va en colonne ${solution[r] + 1}.`,
+			};
+		}
+
+	const emptyNonAttacked = (cells: [number, number][]): [number, number][] =>
+		cells.filter(([r, c]) => marks[r]?.[c] === 0 && !attackedBy(r, c));
+
+	// 2) Only possible cell of a row / column / region -> queen.
+	const rowCells = (i: number): [number, number][] =>
+		Array.from({ length: n }, (_, c): [number, number] => [i, c]);
+	const colCells = (i: number): [number, number][] =>
+		Array.from({ length: n }, (_, r): [number, number] => [r, i]);
+	const regionCells = (id: number): [number, number][] => {
+		const out: [number, number][] = [];
+		for (let r = 0; r < n; r++)
+			for (let c = 0; c < n; c++) if (regions[r][c] === id) out.push([r, c]);
+		return out;
+	};
+	const hasQueen = (cells: [number, number][]) => cells.some(([r, c]) => isQueen(r, c));
+
+	const units: { kind: 'ligne' | 'colonne' | 'zone'; cells: [number, number][] }[] = [];
+	for (let i = 0; i < n; i++) units.push({ kind: 'ligne', cells: rowCells(i) });
+	for (let i = 0; i < n; i++) units.push({ kind: 'colonne', cells: colCells(i) });
+	for (let id = 0; id < n; id++) units.push({ kind: 'zone', cells: regionCells(id) });
+
+	for (const { kind, cells } of units) {
+		if (hasQueen(cells)) continue;
+		const free = emptyNonAttacked(cells);
+		if (free.length !== 1) continue;
+		const [r, c] = free[0];
+		if (!isSolQueen(r, c)) continue; // safety: must match the solution
+		return {
+			r,
+			c,
+			value: 'queen',
+			reason: `Cette ${kind} n'a qu'une case possible pour sa reine.`,
+		};
+	}
+
+	// 3) An attacked empty cell -> cross.
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) {
+			if (marks[r]?.[c] !== 0) continue;
+			if (isSolQueen(r, c)) continue; // never cross a real queen cell
+			if (attackedBy(r, c))
+				return {
+					r,
+					c,
+					value: 'cross',
+					reason: 'Cette case est attaquée par une reine → croix.',
+				};
+		}
+
+	// 4) Fallback — next missing solution queen.
+	for (let r = 0; r < n; r++)
+		if (!isQueen(r, solution[r]))
+			return { r, c: solution[r], value: 'queen', reason: 'La reine de cette ligne va ici.' };
+
+	return null;
 }
 
 /** Generate a uniquely-solvable Reines puzzle. */

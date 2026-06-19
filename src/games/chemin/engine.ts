@@ -314,6 +314,69 @@ function attemptChemin(diff: DiffLevel, rng: Rng): CheminPuzzle | null {
 	return { size: n, numbers, path, k, walls: wallPairs };
 }
 
+/**
+ * Length of the longest prefix of `currentPath` that matches the solution from
+ * the start — mirrors the hint's prefix walk. The hint extends to the cell at
+ * this index in the solution.
+ */
+export function matchingPrefixLength(
+	currentPath: [number, number][],
+	puzzle: CheminPuzzle,
+): number {
+	const sol = puzzle.path;
+	let prefix = 0;
+	while (
+		prefix < currentPath.length &&
+		prefix < sol.length &&
+		currentPath[prefix][0] === sol[prefix][0] &&
+		currentPath[prefix][1] === sol[prefix][1]
+	)
+		prefix++;
+	return prefix;
+}
+
+/**
+ * Short French explanation for the next hinted step (the solution cell at the
+ * matching-prefix index, appended right after the current head).
+ */
+export function hintReason(currentPath: [number, number][], puzzle: CheminPuzzle): string {
+	const sol = puzzle.path;
+	const prefix = matchingPrefixLength(currentPath, puzzle);
+	if (prefix >= sol.length) return 'Le chemin est déjà complet.';
+
+	const n = puzzle.size;
+	const total = n * n;
+	const walls = new Set<number>();
+	for (const [a, b] of puzzle.walls) walls.add(edgeId(a, b, total));
+
+	// Head = last correct cell before the step being added. Without a head
+	// (prefix 0) the "only way out" check is moot; fall back to generic.
+	const next = sol[prefix];
+
+	if (prefix > 0) {
+		const head = sol[prefix - 1];
+		const hi = head[0] * n + head[1];
+		const visited = new Set<number>();
+		for (let i = 0; i < prefix; i++) visited.add(sol[i][0] * n + sol[i][1]);
+		let reachable = 0;
+		for (const [dr, dc] of NEI) {
+			const nr = head[0] + dr;
+			const nc = head[1] + dc;
+			if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
+			const ni = nr * n + nc;
+			if (visited.has(ni)) continue;
+			if (walls.has(edgeId(hi, ni, total))) continue;
+			reachable++;
+		}
+		if (reachable === 1) return 'Le chemin ne peut continuer que par ici.';
+	}
+
+	const lab = puzzle.numbers[next[0]][next[1]];
+	if (lab !== 0) return `Le prochain nombre (${lab}) doit être relié ici.`;
+
+	return 'Prochaine étape logique du chemin.';
+}
+
 /** Generate a uniquely-solvable Chemin puzzle with walls. */
 export function generateChemin(diff: DiffLevel, rng: Rng = Math.random): CheminPuzzle {
 	for (let a = 0; a < 12; a++) {

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { DIFFS, generateReines, countSolutions, findConflicts } from './engine';
+import {
+	DIFFS,
+	generateReines,
+	countSolutions,
+	findConflicts,
+	findHint,
+	type CellState,
+} from './engine';
 import { mulberry32, dateSeed } from '../prng';
 
 const adjacent = (r1: number, c1: number, r2: number, c2: number) =>
@@ -112,5 +119,91 @@ describe('reines conflict detection', () => {
 			const sol: [number, number][] = p.solution.map((c, r) => [r, c]);
 			expect(findConflicts(p.regions, sol).cells.size).toBe(0);
 		}
+	});
+});
+
+describe('reines findHint', () => {
+	const emptyMarks = (n: number): CellState[][] =>
+		Array.from({ length: n }, () => new Array(n).fill(0) as CellState[]);
+
+	// Mirror the component: 'queen' clears its row then places the queen; 'cross' sets a 1.
+	const apply = (marks: CellState[][], h: { r: number; c: number; value: 'queen' | 'cross' }) => {
+		if (h.value === 'queen') {
+			marks[h.r] = new Array(marks.length).fill(0) as CellState[];
+			marks[h.r][h.c] = 2;
+		} else {
+			marks[h.r][h.c] = 1;
+		}
+	};
+
+	for (const key of Object.keys(DIFFS)) {
+		const diff = DIFFS[key];
+
+		it(`${diff.label}: hints solve the grid, every queen on the solution`, () => {
+			const p = generateReines(diff, mulberry32(200 + diff.size));
+			const n = p.size;
+			const marks = emptyMarks(n);
+
+			// Repeatedly apply hints until all solution queens are placed.
+			const cap = n * n * 4; // generous safety bound vs. infinite loop
+			let placed = 0;
+			for (let step = 0; step < cap; step++) {
+				placed = 0;
+				for (let r = 0; r < n; r++) if (marks[r][p.solution[r]] === 2) placed++;
+				if (placed === n) break;
+
+				const h = findHint(marks, p);
+				expect(h).not.toBeNull();
+				if (!h) break;
+
+				// Any proposed queen must sit on the solution.
+				if (h.value === 'queen') expect(p.solution[h.r]).toBe(h.c);
+				// Any proposed cross must NOT be a solution queen cell.
+				if (h.value === 'cross') expect(p.solution[h.r] === h.c).toBe(false);
+
+				apply(marks, h);
+			}
+
+			expect(placed).toBe(n);
+			// Final placement matches the solution exactly, row by row.
+			for (let r = 0; r < n; r++) expect(marks[r][p.solution[r]]).toBe(2);
+		});
+	}
+
+	it('corrects a misplaced queen back to the solution cell', () => {
+		const p = generateReines(DIFFS.facile, mulberry32(321));
+		const n = p.size;
+		const marks = emptyMarks(n);
+
+		// Put a queen on row 0 at a wrong column (anything but the solution).
+		const wrong = (p.solution[0] + 1) % n;
+		marks[0][wrong] = 2;
+
+		const h = findHint(marks, p);
+		expect(h).not.toBeNull();
+		expect(h!.value).toBe('queen');
+		expect(h!.r).toBe(0);
+		expect(h!.c).toBe(p.solution[0]); // proposes the correct cell of that row
+		expect(h!.reason).toContain('mal placée');
+	});
+
+	it('returns null once every queen is placed and every other cell crossed', () => {
+		const p = generateReines(DIFFS.facile, mulberry32(99));
+		const n = p.size;
+		const marks = emptyMarks(n);
+		for (let r = 0; r < n; r++)
+			for (let c = 0; c < n; c++) marks[r][c] = (p.solution[r] === c ? 2 : 1) as CellState;
+		expect(findHint(marks, p)).toBeNull();
+	});
+
+	it('emits crosses for attacked empties after all queens are placed', () => {
+		const p = generateReines(DIFFS.facile, mulberry32(99));
+		const n = p.size;
+		const marks = emptyMarks(n);
+		for (let r = 0; r < n; r++) marks[r][p.solution[r]] = 2;
+		const h = findHint(marks, p);
+		expect(h).not.toBeNull();
+		expect(h!.value).toBe('cross');
+		expect(p.solution[h!.r] === h!.c).toBe(false);
 	});
 });

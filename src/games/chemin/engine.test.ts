@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DIFFS, generateChemin, countSolutions } from './engine';
+import { DIFFS, generateChemin, countSolutions, hintReason } from './engine';
 import { mulberry32, dateSeed } from '../prng';
 
 const wallSetOf = (walls: [number, number][], n: number) => {
@@ -46,6 +46,12 @@ describe('chemin engine', () => {
 			expect(countSolutions(p.numbers, n, p.k, walls, 2)).toBe(1);
 		});
 	}
+
+	it('hintReason: non-empty explanation for the first step of a fresh puzzle', () => {
+		const p = generateChemin(DIFFS.facile, mulberry32(42));
+		const reason = hintReason([p.path[0]], p);
+		expect(reason.length).toBeGreaterThan(0);
+	});
 
 	it('is deterministic: same seed -> identical puzzle (numbers, path, walls)', () => {
 		const seed = dateSeed(new Date('2026-06-13T00:00:00Z'));

@@ -181,6 +181,118 @@ const clues = (grid: number[][], size: number, K: number): { rowClues: LineClue[
 	colClues: Array.from({ length: size }, (_, c) => lineClueOf(grid.map((row) => row[c]), K)),
 });
 
+/** FR colour names for the palette (1..K). Beyond the list, fall back to a generic. */
+const COLOR_NAMES = ['rouge', 'bleu', 'jaune', 'vert'];
+const colorName = (v: number): string => COLOR_NAMES[v - 1] ?? 'cette couleur';
+
+export interface HintResult {
+	r: number;
+	c: number;
+	value: number; // colour id 1..K
+	reason: string;
+}
+
+/**
+ * Find the next logically-deducible cell for the player and explain the technique.
+ * 1) Correction: a painted cell whose colour ≠ solution.
+ * 2) Block overlap: a still-empty cell forced to one colour across EVERY line
+ *    colouring consistent with what the player has already placed.
+ * 3) Fallback: first empty cell → its solution colour.
+ * The returned value always equals the solution.
+ */
+export function findHint(grid: number[][], puzzle: ColorgrammePuzzle): HintResult | null {
+	const { size, rowClues, colClues, solution } = puzzle;
+
+	// 1) Correction — a painted cell that contradicts the picture.
+	for (let r = 0; r < size; r++)
+		for (let c = 0; c < size; c++) {
+			const x = grid[r][c];
+			if (x === 0 || x === solution[r][c]) continue;
+			// Which axis disagrees? (the painted x breaks that line's block clue)
+			const rowBad = !lineColorings(rowClues[r], size).some((col) =>
+				lineMatchesGrid(col, grid[r]),
+			);
+			const where = rowBad ? 'la ligne' : 'la colonne';
+			return {
+				r,
+				c,
+				value: solution[r][c],
+				reason: `Cette couleur ne correspond pas aux indices de ${where} — c'est ${colorName(
+					solution[r][c],
+				)}.`,
+			};
+		}
+
+	// 2) Block overlap — forced colour on a row or column, where the player is empty.
+	for (let r = 0; r < size; r++) {
+		const forced = forcedCells(rowClues[r], grid[r], size);
+		for (let c = 0; c < size; c++)
+			if (grid[r][c] === 0 && forced[c] !== 0) {
+				if (forced[c] !== solution[r][c]) continue; // safety: only ever the solution
+				return {
+					r,
+					c,
+					value: forced[c],
+					reason: `Sur cette ligne, les blocs forcent cette couleur ici.`,
+				};
+			}
+	}
+	for (let c = 0; c < size; c++) {
+		const colLine = grid.map((row) => row[c]);
+		const forced = forcedCells(colClues[c], colLine, size);
+		for (let r = 0; r < size; r++)
+			if (grid[r][c] === 0 && forced[r] !== 0) {
+				if (forced[r] !== solution[r][c]) continue;
+				return {
+					r,
+					c,
+					value: forced[r],
+					reason: `Sur cette colonne, les blocs forcent cette couleur ici.`,
+				};
+			}
+	}
+
+	// 3) Fallback — first empty cell.
+	for (let r = 0; r < size; r++)
+		for (let c = 0; c < size; c++)
+			if (grid[r][c] === 0)
+				return {
+					r,
+					c,
+					value: solution[r][c],
+					reason: `Par déduction, cette case est ${colorName(solution[r][c])}.`,
+				};
+
+	return null;
+}
+
+/** A line colouring is consistent with the player's partial line (0 = unknown). */
+function lineMatchesGrid(coloring: number[], line: number[]): boolean {
+	for (let i = 0; i < line.length; i++) if (line[i] !== 0 && line[i] !== coloring[i]) return false;
+	return true;
+}
+
+/**
+ * Cells forced to a single colour across all line colourings consistent with the
+ * player's current line. Returns an array: forced[i] = colour, or 0 if not forced.
+ */
+function forcedCells(clue: LineClue, line: number[], size: number): number[] {
+	const out = new Array(size).fill(0);
+	const proj = new Array(size).fill(0); // bitmask of colours seen at each cell
+	let any = false;
+	for (const col of lineColorings(clue, size)) {
+		if (!lineMatchesGrid(col, line)) continue;
+		any = true;
+		for (let i = 0; i < size; i++) proj[i] |= 1 << col[i];
+	}
+	if (!any) return out;
+	for (let i = 0; i < size; i++) {
+		const m = proj[i];
+		if (m !== 0 && (m & (m - 1)) === 0) out[i] = bitIndex(m); // singleton → forced
+	}
+	return out;
+}
+
 export function generateColorgramme(diff: DiffLevel, rng: Rng = Math.random): ColorgrammePuzzle {
 	const { size, colors: K } = diff;
 

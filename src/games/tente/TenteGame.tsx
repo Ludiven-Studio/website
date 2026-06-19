@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, generateTente, type TentePuzzle, type Coord } from './engine';
+import { DIFFS, generateTente, findHint, type TentePuzzle, type Coord } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -50,6 +50,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
@@ -64,6 +65,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		const d = DIFFS[key];
 		setDaily(false);
 		setAlreadyPlayed(false);
+		setHintNote('');
 		setDiffKey(key);
 		setPuzzle(generateTente(d, Math.random));
 		setMarks(emptyMarks(d.size));
@@ -142,6 +144,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 	const resetDailyEntries = useCallback(() => {
 		setMarks(emptyMarks(size));
 		setHinted(new Set());
+		setHintNote('');
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -257,30 +260,21 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		[over, daily, started, treeSet, removeHint, begin],
 	);
 
-	/* Hint (free mode): fix a wrong cell first, else place a missing tent. Mark it GREEN. */
+	/* Hint (free mode): deduce the next logical cell and explain the technique. Mark it GREEN. */
 	const hint = useCallback(() => {
 		if (over) return;
-		let target: [number, number] | null = null;
-		// Priority 1: a player tent where the solution has none — turn it into grass.
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++)
-				if (marks[r][c] === 'tent' && !solSet.has(cellKey(r, c))) target = [r, c];
-		const fixWrong = target != null;
-		// Priority 2: a solution tent the player hasn't placed yet.
-		for (let r = 0; r < size && !target; r++)
-			for (let c = 0; c < size && !target; c++)
-				if (solSet.has(cellKey(r, c)) && marks[r][c] !== 'tent') target = [r, c];
-		if (!target) return;
-		const [r, c] = target;
+		const h = findHint(marks, puzzle);
+		if (!h) return;
 		setMarks((prev) => {
 			const n = prev.map((row) => [...row]);
-			n[r][c] = fixWrong ? 'grass' : 'tent';
+			n[h.r][h.c] = h.value;
 			return n;
 		});
-		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
+		setHintNote(h.reason);
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, size, marks, solSet, begin, gameId]);
+	}, [over, marks, puzzle, begin, gameId]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -427,6 +421,10 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{!daily && hintNote && (
+				<p className="te-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
@@ -600,6 +598,18 @@ const CSS = `
 }
 .te-revealed-note {
   display: flex; align-items: center; gap: 14px; margin-top: 1.25rem; color: var(--gray-300); font-size: 14px; font-weight: 500;
+}
+.te-hint-note {
+  max-width: 420px;
+  margin: 1rem auto 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--te-ok);
+  background: var(--accent-overlay);
+  border: 1px solid var(--te-ok);
+  border-radius: 12px;
+  padding: 8px 14px;
 }
 
 .te-win {
