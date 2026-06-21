@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    SUGURU (Tectonic) — React island.
@@ -123,6 +124,8 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		setEntries(emptyEntries(d.size));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -401,6 +404,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="sg-boardwrap" style={{ ['--n' as string]: size }}>
+				{celebrating && <Celebration />}
 				<div
 					className={`sg-board ${daily && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--sg-cell))` }}
@@ -451,7 +455,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="sg-win" role="dialog" aria-label="Grille résolue">
 						<div className="sg-wincard">
 							<div className="sg-winmark">🧩</div>

@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    MOTIFS — React island. Split the grid into rectangles;
@@ -129,6 +130,8 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setPuzzle(generateMotifs(DIFFS[dk], mulberry32(seed)));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -477,6 +480,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="mo-boardwrap" style={{ ['--n' as string]: size }}>
+				{celebrating && <Celebration />}
 				<div
 					className={`mo-board ${daily && !started ? 'blurred' : ''}`}
 					ref={boardRef}
@@ -531,7 +535,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="mo-win" role="dialog" aria-label="Grille résolue">
 						<div className="mo-wincard">
 							<div className="mo-winmark">🧩</div>

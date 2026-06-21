@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    AQUARIUM — React island. The grid is partitioned into
@@ -119,6 +120,8 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		setGrid(emptyGrid(d.size));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -375,6 +378,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="aq-boardwrap">
+				{celebrating && <Celebration />}
 				<div
 					className={`aq-board ${daily && !started ? 'blurred' : ''}`}
 					style={{
@@ -427,7 +431,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="aq-win" role="dialog" aria-label="Grille résolue">
 						<div className="aq-wincard">
 							<div className="aq-winmark">💧</div>

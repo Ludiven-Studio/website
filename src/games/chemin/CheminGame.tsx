@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    LE CHEMIN (LinkedIn "Zip") — React island.
@@ -125,6 +126,8 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -429,6 +432,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="zp-boardwrap" style={{ ['--n' as string]: n }}>
+				{celebrating && <Celebration />}
 				{status === 'loading' || !puzzle ? (
 					<div className="zp-loading">Génération…</div>
 				) : (
@@ -506,7 +510,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="zp-win" role="dialog" aria-label="Chemin résolu">
 						<div className="zp-wincard">
 							<div className="zp-winmark">🧭</div>

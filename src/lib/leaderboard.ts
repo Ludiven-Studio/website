@@ -97,11 +97,15 @@ const headers = (): Record<string, string> => ({
 export async function getDaily(gameId: string): Promise<{ seed: number; diffIndex: number }> {
 	const fallback = { seed: dailySeed(gameId), diffIndex: dailyDifficultyIndex() };
 	if (!leaderboardEnabled()) return fallback;
+	// Bound the fetch: a hung connection must not leave the daily stuck on loading.
+	const ctrl = new AbortController();
+	const timer = setTimeout(() => ctrl.abort(), 4000);
 	try {
 		const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_daily`, {
 			method: 'POST',
 			headers: headers(),
 			body: JSON.stringify({ p_game: gameId }),
+			signal: ctrl.signal,
 		});
 		if (!res.ok) return fallback;
 		const rows = await res.json();
@@ -110,6 +114,8 @@ export async function getDaily(gameId: string): Promise<{ seed: number; diffInde
 		return { seed: Number(row.seed) >>> 0, diffIndex: Number(row.diff_index) || 0 };
 	} catch {
 		return fallback;
+	} finally {
+		clearTimeout(timer);
 	}
 }
 

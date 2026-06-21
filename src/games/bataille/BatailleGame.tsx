@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    BATAILLE NAVALE LOGIQUE (Bimaru) — React island.
@@ -128,6 +129,8 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		setMarks(emptyMarks(d.size));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -402,6 +405,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="ba-boardwrap">
+				{celebrating && <Celebration />}
 				<div
 					className={`ba-board ${daily && !started ? 'blurred' : ''}`}
 					style={{
@@ -459,7 +463,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="ba-win" role="dialog" aria-label="Flotte trouvée">
 						<div className="ba-wincard">
 							<div className="ba-winmark">⚓</div>

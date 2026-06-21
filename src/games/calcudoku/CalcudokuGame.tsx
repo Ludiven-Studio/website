@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    CALCUDOKU (KenKen) — React island.
@@ -144,6 +145,8 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		setEntries(emptyEntries(d.size));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -456,6 +459,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="cd-boardwrap" style={{ ['--n' as string]: size }}>
+				{celebrating && <Celebration />}
 				<div
 					className={`cd-board ${daily && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--cd-cell))` }}
@@ -508,7 +512,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="cd-win" role="dialog" aria-label="Grille résolue">
 						<div className="cd-wincard">
 							<div className="cd-winmark">🧮</div>

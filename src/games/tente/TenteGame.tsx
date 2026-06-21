@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    TENTE (Tents & Trees) — React island (training mode).
@@ -122,6 +123,8 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		setMarks(emptyMarks(p.size));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -357,6 +360,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="te-boardwrap" style={{ ['--n' as string]: size }}>
+				{celebrating && <Celebration />}
 				<div
 					className={`te-board ${daily && !started ? 'blurred' : ''}`}
 					style={{
@@ -409,7 +413,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="te-win" role="dialog" aria-label="Grille résolue">
 						<div className="te-wincard">
 							<div className="te-winmark">⛺</div>

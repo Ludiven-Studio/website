@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    ROND & CARRÉ (façon LinkedIn "Tango") — React island.
@@ -111,6 +112,8 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		setPuzzle(generateRondCarre(DIFFS[dk], mulberry32(seed)));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -368,6 +371,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="rc-boardwrap" style={{ ['--n' as string]: n }}>
+				{celebrating && <Celebration />}
 				<div className={`rc-board ${daily && !started ? 'blurred' : ''}`}>
 					{Array.from({ length: n }).map((_, r) =>
 						Array.from({ length: n }).map((_, c) => {
@@ -432,7 +436,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="rc-win" role="dialog" aria-label="Grille résolue">
 						<div className="rc-wincard">
 							<div className="rc-winmark">●■</div>

@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    SUDOKU — React island (training mode)
@@ -125,6 +126,8 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setPuzzle(generateSudoku(variant, DIFFS[dk], mulberry32(seed)));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -402,6 +405,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="sk-boardwrap" style={{ ['--n' as string]: size }}>
+				{celebrating && <Celebration />}
 				<div
 					className={`sk-board ${daily && !started ? 'blurred' : ''}`}
 					style={{
@@ -463,7 +467,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="sk-win" role="dialog" aria-label="Grille résolue">
 						<div className="sk-wincard">
 							<div className="sk-winmark">🧩</div>

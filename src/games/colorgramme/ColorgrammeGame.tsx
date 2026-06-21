@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    COLORGRAMME — React island. A fully-coloured deduction grid.
@@ -150,6 +151,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setCrosses(emptyGrid(d.size));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -488,6 +491,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="co-boardwrap" style={{ ['--n' as string]: size }}>
+				{celebrating && <Celebration />}
 				<div
 					className={`co-board ${daily && !started ? 'blurred' : ''}`}
 					style={{
@@ -545,7 +549,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="co-win" role="dialog" aria-label="Image résolue">
 						<div className="co-wincard">
 							<div className="co-winmark">🎨</div>

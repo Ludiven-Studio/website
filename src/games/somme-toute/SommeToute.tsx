@@ -12,6 +12,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    SOMME TOUTE — React island (training mode)
@@ -151,6 +152,8 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setEntries(emptyEntries(d.size));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -386,6 +389,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="st-boardwrap" style={{ ['--n' as string]: size }}>
+				{celebrating && <Celebration />}
 				<div
 					className={`st-board ${daily && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--st-cell)) auto` }}
@@ -427,7 +431,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="st-win" role="dialog" aria-label="Grille résolue">
 						<div className="st-wincard">
 							<div className="st-winmark">⚖️</div>

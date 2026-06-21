@@ -11,6 +11,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 import {
 	DIFFS,
 	generateReines,
@@ -135,6 +136,8 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setMarks(emptyMarks(DIFFS[dk].size));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -378,6 +381,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="rn-boardwrap" style={{ ['--n' as string]: size }}>
+				{celebrating && <Celebration />}
 				<div
 					className={`rn-board ${daily && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--rn-cell))` }}
@@ -429,7 +433,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'won' && !daily && (
+				{showWin && !daily && (
 					<div className="rn-win" role="dialog" aria-label="Grille résolue">
 						<div className="rn-wincard">
 							<div className="rn-winmark">👑</div>

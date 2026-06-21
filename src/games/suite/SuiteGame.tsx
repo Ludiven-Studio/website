@@ -11,6 +11,7 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
    SUITE MYSTÈRE — React island.
@@ -140,6 +141,8 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setQuestion(dailyQ(seed, diffIndex, 0));
 		setDailyLoading(false);
 	}, [gameId]);
+
+	const { celebrating } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -306,6 +309,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="su-playwrap">
+				{celebrating && <Celebration />}
 				<div className={`su-seq ${armed ? 'blurred' : ''}`} aria-label="Séquence">
 					{question.terms.map((t, i) => (
 						<span key={i} className="su-term">
