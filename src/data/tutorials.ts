@@ -10,7 +10,7 @@ export interface TutorialStep {
 export const TUTORIALS: Record<string, TutorialStep[]> = {
 	'somme-toute': [
 		{ emoji: '🎯', title: 'Le but', body: 'Remplis les cases vides pour que chaque ligne et chaque colonne atteigne exactement sa somme cible (les pastilles).' },
-		{ emoji: '✍️', title: 'Comment jouer', body: 'Touche une case vide puis choisis un nombre. Les pastilles deviennent vertes quand la somme est juste.' },
+		{ emoji: '✍️', title: 'Comment jouer', body: 'Touche une case vide puis choisis un nombre. Chaque pastille montre la somme actuelle face à l\'objectif : bleu quand la somme est atteinte, orange sinon.' },
 		{ emoji: '💡', title: 'Astuce', body: 'Pure déduction : il existe toujours une seule solution. Bloqué ? Le bouton Indice corrige ou révèle une case.' },
 	],
 	sudoku: [

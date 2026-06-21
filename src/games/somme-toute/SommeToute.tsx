@@ -27,7 +27,12 @@ const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
 type Status = 'idle' | 'playing' | 'won';
-type SumState = 'ok' | 'over' | 'pending';
+type LineState = 'good' | 'diff' | 'empty';
+interface LineInfo {
+	sum: number;
+	objective: number;
+	state: LineState;
+}
 
 // Daily challenge: seed + difficulty come from the server (same for everyone).
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
@@ -298,26 +303,33 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		return () => window.removeEventListener('keydown', onKey);
 	}, [status, revealed, maxVal, selected, size, placeValue]);
 
-	/* Sum state: ok | over | pending */
-	const rowState = (r: number): SumState => {
-		let s = 0, full = true;
+	/* Running sum vs objective: good (matches) | diff (off) | empty (untouched). */
+	const lineInfo = (sum: number, anyFilled: boolean, objective: number): LineInfo => ({
+		sum,
+		objective,
+		state: !anyFilled ? 'empty' : sum === objective ? 'good' : 'diff',
+	});
+	const rowState = (r: number): LineInfo => {
+		let s = 0, anyFilled = false;
 		for (let c = 0; c < size; c++) {
 			const v = cellValue(r, c);
-			if (v == null) full = false;
-			else s += v;
+			if (v != null) {
+				s += v;
+				anyFilled = true;
+			}
 		}
-		if (full) return s === rowT[r] ? 'ok' : 'over';
-		return s > rowT[r] ? 'over' : 'pending';
+		return lineInfo(s, anyFilled, rowT[r]);
 	};
-	const colState = (c: number): SumState => {
-		let s = 0, full = true;
+	const colState = (c: number): LineInfo => {
+		let s = 0, anyFilled = false;
 		for (let r = 0; r < size; r++) {
 			const v = cellValue(r, c);
-			if (v == null) full = false;
-			else s += v;
+			if (v != null) {
+				s += v;
+				anyFilled = true;
+			}
 		}
-		if (full) return s === colT[c] ? 'ok' : 'over';
-		return s > colT[c] ? 'over' : 'pending';
+		return lineInfo(s, anyFilled, colT[c]);
 	};
 
 	const lockBoard = status === 'won' || revealed || (daily && !started);
@@ -404,7 +416,6 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 							entries={entries}
 							selected={selected}
 							setSelected={setSelected}
-							rowT={rowT}
 							rowState={rowState}
 							locked={lockBoard}
 							won={status === 'won' || revealed}
@@ -412,11 +423,20 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 						/>
 					))}
 					{/* Column targets row */}
-					{Array.from({ length: size }).map((_, c) => (
-						<div key={`ct${c}`} className={`st-chip col ${colState(c)}`}>
-							{colT[c]}
-						</div>
-					))}
+					{Array.from({ length: size }).map((_, c) => {
+						const st = colState(c);
+						return (
+							<div
+								key={`ct${c}`}
+								className={`st-chip col ${st.state}`}
+								aria-label={`Colonne ${c + 1} : somme ${st.sum}, objectif ${st.objective}`}
+							>
+								<span className="st-chip-sum">{st.sum}</span>
+								<span className="st-chip-bar" />
+								<span className="st-chip-obj">/{st.objective}</span>
+							</div>
+						);
+					})}
 					<div className="st-corner">Σ</div>
 				</div>
 
@@ -477,7 +497,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 
 					<p className="st-help">
 						Touche une case vide puis choisis un nombre de 1 à {maxVal}.
-						Les pastilles indiquent la somme cible de chaque ligne et colonne.
+						Chaque pastille montre la somme actuelle et l'objectif : elle passe en bleu quand la somme est atteinte.
 					</p>
 				</>
 			)}
@@ -493,14 +513,14 @@ interface RowProps {
 	entries: (number | null)[][];
 	selected: [number, number] | null;
 	setSelected: (s: [number, number]) => void;
-	rowT: number[];
-	rowState: (r: number) => SumState;
+	rowState: (r: number) => LineInfo;
 	locked: boolean;
 	won: boolean;
 	hinted: Set<string>;
 }
 
-function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowT, rowState, locked, won, hinted }: RowProps) {
+function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowState, locked, won, hinted }: RowProps) {
+	const st = rowState(r);
 	return (
 		<>
 			{Array.from({ length: size }).map((_, c) => {
@@ -528,7 +548,14 @@ function FragmentRow({ r, size, puzzle, entries, selected, setSelected, rowT, ro
 					</button>
 				);
 			})}
-			<div className={`st-chip row ${rowState(r)}`}>{rowT[r]}</div>
+			<div
+				className={`st-chip row ${st.state}`}
+				aria-label={`Ligne ${r + 1} : somme ${st.sum}, objectif ${st.objective}`}
+			>
+				<span className="st-chip-sum">{st.sum}</span>
+				<span className="st-chip-bar" />
+				<span className="st-chip-obj">/{st.objective}</span>
+			</div>
 		</>
 	);
 }
@@ -542,6 +569,8 @@ const CSS = `
   --st-accent: var(--accent-regular);
   --st-ok: #2f9e6f;
   --st-bad: #d9534f;
+  --st-good: #2f6df0;
+  --st-diff: #e8870c;
   --st-cellbg: var(--gray-999);
   --st-givenbg: var(--gray-800);
   --st-cell: calc(100cqw / (var(--n, 6) + 1));
@@ -682,21 +711,40 @@ const CSS = `
 
 .st-chip {
   min-width: calc(var(--st-cell) * 0.66);
-  padding: 0 8px;
-  height: calc(var(--st-cell) * 0.58);
+  height: var(--st-cell);
+  padding: 0 4px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background: var(--gray-100);
-  color: var(--gray-999);
-  font-weight: 700;
-  font-size: calc(var(--st-cell) * 0.3);
+  gap: 2px;
+  background: transparent;
   font-variant-numeric: tabular-nums;
-  transition: background 0.15s ease, transform 0.15s ease;
+  line-height: 1;
 }
-.st-chip.ok { background: var(--st-ok); color: #fff; animation: st-pop 0.3s ease; }
-.st-chip.over { background: var(--st-bad); color: #fff; }
+.st-chip-sum {
+  font-weight: 800;
+  font-size: calc(var(--st-cell) * 0.3);
+  color: var(--st-ink-soft);
+  transition: color 0.15s ease;
+}
+.st-chip-bar {
+  width: 62%;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.st-chip-obj {
+  font-weight: 600;
+  font-size: calc(var(--st-cell) * 0.2);
+  color: var(--st-ink-soft);
+}
+.st-chip.diff .st-chip-sum { color: var(--st-diff); }
+.st-chip.diff .st-chip-bar { background: var(--st-diff); }
+.st-chip.good .st-chip-sum { color: var(--st-good); }
+.st-chip.good .st-chip-bar { background: var(--st-good); }
+.st-chip.good { animation: st-pop 0.3s ease; }
 .st-corner {
   font-family: var(--font-brand);
   font-weight: 600;
