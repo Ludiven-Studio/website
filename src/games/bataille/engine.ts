@@ -25,9 +25,9 @@ export interface DiffLevel {
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', size: 6, fleet: [3, 2, 2, 1, 1] },
-	moyen: { label: 'Moyen', size: 7, fleet: [3, 3, 2, 2, 1, 1] },
-	difficile: { label: 'Difficile', size: 8, fleet: [4, 3, 2, 2, 1, 1] },
+	facile: { label: 'Facile', size: 6, fleet: [3, 2, 2] },
+	moyen: { label: 'Moyen', size: 7, fleet: [3, 3, 2, 2] },
+	difficile: { label: 'Difficile', size: 8, fleet: [4, 3, 2, 2] },
 };
 
 export interface BataillePuzzle {
