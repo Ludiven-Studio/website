@@ -298,13 +298,17 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		if (over) return;
 		const h = findHint(marks, puzzle);
 		if (!h) return;
-		const { r, c } = h;
+		const mark: Mark = (h.value === 'ship' ? 1 : 2) as Mark;
 		setMarks((prev) => {
 			const n = prev.map((row) => [...row]);
-			n[r][c] = (h.value === 'ship' ? 1 : 2) as Mark;
+			for (const { r, c } of h.cells) n[r][c] = mark;
 			return n;
 		});
-		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setHinted((prev) => {
+			const s = new Set(prev);
+			for (const { r, c } of h.cells) s.add(`${r},${c}`);
+			return s;
+		});
 		setHintNote(h.reason);
 		begin();
 		trackGame(gameId, 'hint_used');

@@ -91,15 +91,18 @@ describe('bataille engine', () => {
 					const h = findHint(marks, p);
 					expect(h).not.toBeNull();
 					if (!h) break;
-					// Target is free (never a given), and currently undecided.
-					expect(p.given[h.r][h.c]).toBeNull();
-					expect(marks[h.r][h.c]).toBe(0);
-					// Proposed value must agree with the solution.
-					const want: 'ship' | 'water' = p.solution[h.r][h.c] ? 'ship' : 'water';
-					expect(h.value).toBe(want);
+					expect(h.cells.length).toBeGreaterThan(0);
 					expect(typeof h.reason).toBe('string');
 					expect(h.reason.length).toBeGreaterThan(0);
-					marks[h.r][h.c] = (h.value === 'ship' ? 1 : 2) as Mark;
+					for (const { r, c } of h.cells) {
+						// Target is free (never a given), and currently undecided.
+						expect(p.given[r][c]).toBeNull();
+						expect(marks[r][c]).toBe(0);
+						// Proposed value must agree with the solution.
+						const want: 'ship' | 'water' = p.solution[r][c] ? 'ship' : 'water';
+						expect(h.value).toBe(want);
+						marks[r][c] = (h.value === 'ship' ? 1 : 2) as Mark;
+					}
 					steps++;
 				}
 				expect(allShipsMarked(marks, p)).toBe(true);
@@ -126,8 +129,7 @@ describe('bataille engine', () => {
 		marks[wr][wc] = 1; // wrong: ship where solution is water
 		const h = findHint(marks, p);
 		expect(h).not.toBeNull();
-		expect(h!.r).toBe(wr);
-		expect(h!.c).toBe(wc);
+		expect(h!.cells).toEqual([{ r: wr, c: wc }]);
 		expect(h!.value).toBe('water');
 	});
 
@@ -143,8 +145,7 @@ describe('bataille engine', () => {
 		marks[wr][wc] = 2; // wrong: water where solution is ship
 		const h = findHint(marks, p);
 		expect(h).not.toBeNull();
-		expect(h!.r).toBe(wr);
-		expect(h!.c).toBe(wc);
+		expect(h!.cells).toEqual([{ r: wr, c: wc }]);
 		expect(h!.value).toBe('ship');
 	});
 
@@ -155,6 +156,32 @@ describe('bataille engine', () => {
 			for (let c = 0; c < p.size; c++)
 				if (p.given[r][c] === null) marks[r][c] = (p.solution[r][c] ? 1 : 2) as Mark;
 		expect(findHint(marks, p)).toBeNull();
+	});
+
+	it('fills all 0-clued lines with water in a single hint', () => {
+		const p: BataillePuzzle = {
+			size: 4,
+			fleet: [2, 1],
+			solution: [
+				[true, true, false, false],
+				[false, false, false, false],
+				[false, false, false, true],
+				[false, false, false, false],
+			],
+			rowCounts: [2, 0, 1, 0],
+			colCounts: [1, 1, 0, 1],
+			given: Array.from({ length: 4 }, () => [null, null, null, null]) as BataillePuzzle['given'],
+		};
+		const h = findHint(emptyMarks(4), p)!;
+		expect(h).not.toBeNull();
+		expect(h.value).toBe('water');
+		// More than one cell at once (whole 0-lines, not cell-by-cell).
+		expect(h.cells.length).toBeGreaterThan(1);
+		// Every proposed cell is water in the solution.
+		for (const { r, c } of h.cells) expect(p.solution[r][c]).toBe(false);
+		// Includes the entire 0-clued row 1.
+		const has = (r: number, c: number) => h.cells.some((x) => x.r === r && x.c === c);
+		expect(has(1, 0) && has(1, 1) && has(1, 2) && has(1, 3)).toBe(true);
 	});
 
 	it('is reproducible from a seed (daily challenge)', () => {
