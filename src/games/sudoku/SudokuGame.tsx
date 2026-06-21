@@ -205,13 +205,14 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	/* Win detection: grid full and conflict-free. */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (value(r, c) == null) return;
 		if (conflicts.size > 0) return;
 		setStatus('won');
 		setSelected(null);
 		trackGame(gameId, 'game_won');
-	}, [entries, status, revealed, size, value, conflicts, gameId]);
+	}, [entries, status, revealed, size, value, conflicts, gameId, daily, started]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {

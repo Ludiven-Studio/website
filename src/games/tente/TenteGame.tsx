@@ -194,6 +194,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 	/* Win: the player's tent set equals the solution exactly. */
 	useEffect(() => {
 		if (over) return;
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		let count = 0;
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) {
@@ -205,7 +206,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		if (count !== solSet.size) return; // missing tents
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [marks, over, size, solSet, gameId]);
+	}, [marks, over, size, solSet, gameId, daily, started]);
 
 	const removeHint = useCallback((r: number, c: number) => {
 		setHinted((prev) => {

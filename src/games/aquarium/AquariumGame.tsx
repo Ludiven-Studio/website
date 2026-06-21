@@ -186,11 +186,12 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 	/* Win: every cell where the solution holds water is marked water, others not. */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if ((grid[r][c] === 1) !== solution[r][c]) return;
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [grid, status, revealed, size, solution, gameId]);
+	}, [grid, status, revealed, size, solution, gameId, daily, started]);
 
 	/* Per row/col water tallies (for clue feedback). */
 	const rowWater = useMemo(

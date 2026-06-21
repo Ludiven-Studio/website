@@ -217,11 +217,12 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	/* Win: n queens, no conflicts. */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		if (queens.length === size && conflicts.size === 0) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
-	}, [queens, conflicts, size, status, revealed, gameId]);
+	}, [queens, conflicts, size, status, revealed, gameId, daily, started]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {

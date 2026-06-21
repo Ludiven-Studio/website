@@ -193,13 +193,14 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	/* Win: full coverage, checkpoints in order. */
 	useEffect(() => {
 		if (!puzzle || status !== 'playing' || revealed) return;
+			if (daily && !started) return; // skip win-check on a daily not yet started
 		if (path.length !== puzzle.size * puzzle.size) return;
 		if (errors.size > 0) return;
 		const last = path[path.length - 1];
 		if (puzzle.numbers[last[0]][last[1]] !== puzzle.k) return;
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [path, puzzle, status, revealed, errors, gameId]);
+	}, [path, puzzle, status, revealed, errors, gameId, daily, started]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {

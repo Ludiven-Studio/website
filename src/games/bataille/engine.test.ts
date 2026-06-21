@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32, dateSeed } from '../prng';
 import {
+	SIZES,
 	DIFFS,
 	generateBataille,
 	countSolutions,
@@ -44,11 +45,11 @@ const noTouch = (grid: boolean[][]): boolean => {
 };
 
 describe('bataille engine', () => {
-	for (const key of Object.keys(DIFFS)) {
-		const diff = DIFFS[key];
-		it(`${key}: generates a uniquely-solvable puzzle`, () => {
+	for (const sk of Object.keys(SIZES)) {
+		const sl = SIZES[sk];
+		it(`${sk}: generates a uniquely-solvable puzzle`, () => {
 			for (let s = 0; s < 4; s++) {
-				const p = generateBataille(diff, mulberry32(9000 + s * 37 + diff.size));
+				const p = generateBataille(sl, DIFFS.difficile, mulberry32(9000 + s * 37 + sl.size));
 				// counts match
 				const rc = new Array(p.size).fill(0);
 				const cc = new Array(p.size).fill(0);
@@ -62,7 +63,7 @@ describe('bataille engine', () => {
 						}
 				expect(rc).toEqual(p.rowCounts);
 				expect(cc).toEqual(p.colCounts);
-				expect(ships).toBe(diff.fleet.reduce((a, b) => a + b, 0));
+				expect(ships).toBe(sl.fleet.reduce((a, b) => a + b, 0));
 				expect(noTouch(p.solution)).toBe(true);
 				expect(countSolutions(p.size, p.fleet, p.rowCounts, p.colCounts, p.given, 2)).toBe(1);
 			}
@@ -70,7 +71,7 @@ describe('bataille engine', () => {
 	}
 
 	it('segType reads ship shapes', () => {
-		const p = generateBataille(DIFFS.facile, mulberry32(321));
+		const p = generateBataille(SIZES['5'], DIFFS.facile, mulberry32(321));
 		for (let r = 0; r < p.size; r++)
 			for (let c = 0; c < p.size; c++) {
 				const s = segType(p.solution, r, c);
@@ -79,11 +80,11 @@ describe('bataille engine', () => {
 			}
 	});
 
-	for (const key of Object.keys(DIFFS)) {
-		const diff = DIFFS[key];
-		it(`${key}: findHint solves from empty marks, always proposing solution-correct cells`, () => {
+	for (const sk of Object.keys(SIZES)) {
+		const sl = SIZES[sk];
+		it(`${sk}: findHint solves from empty marks, always proposing solution-correct cells`, () => {
 			for (let s = 0; s < 3; s++) {
-				const p = generateBataille(diff, mulberry32(7100 + s * 53 + diff.size));
+				const p = generateBataille(sl, DIFFS.difficile, mulberry32(7100 + s * 53 + sl.size));
 				const marks = emptyMarks(p.size);
 				let steps = 0;
 				const maxSteps = p.size * p.size + 5;
@@ -117,7 +118,7 @@ describe('bataille engine', () => {
 	}
 
 	it('findHint corrects a wrong player mark', () => {
-		const p = generateBataille(DIFFS.facile, mulberry32(8123));
+		const p = generateBataille(SIZES['6'], DIFFS.difficile, mulberry32(8123));
 		// Find a free water cell (solution false) and mark it as a ship → must be corrected.
 		let target: [number, number] | null = null;
 		for (let r = 0; r < p.size && !target; r++)
@@ -134,7 +135,7 @@ describe('bataille engine', () => {
 	});
 
 	it('findHint corrects a wrong water mark (should be ship)', () => {
-		const p = generateBataille(DIFFS.facile, mulberry32(8456));
+		const p = generateBataille(SIZES['6'], DIFFS.difficile, mulberry32(8456));
 		let target: [number, number] | null = null;
 		for (let r = 0; r < p.size && !target; r++)
 			for (let c = 0; c < p.size && !target; c++)
@@ -150,7 +151,7 @@ describe('bataille engine', () => {
 	});
 
 	it('findHint returns null once solved', () => {
-		const p = generateBataille(DIFFS.facile, mulberry32(8789));
+		const p = generateBataille(SIZES['6'], DIFFS.difficile, mulberry32(8789));
 		const marks = emptyMarks(p.size);
 		for (let r = 0; r < p.size; r++)
 			for (let c = 0; c < p.size; c++)
@@ -184,10 +185,16 @@ describe('bataille engine', () => {
 		expect(has(1, 0) && has(1, 1) && has(1, 2) && has(1, 3)).toBe(true);
 	});
 
+	it('easier levels reveal at least as many clues', () => {
+		const g = (k: keyof typeof DIFFS) =>
+			generateBataille(SIZES['6'], DIFFS[k], mulberry32(4242)).given.flat().filter((v) => v !== null).length;
+		expect(g('facile')).toBeGreaterThanOrEqual(g('difficile'));
+	});
+
 	it('is reproducible from a seed (daily challenge)', () => {
 		const seed = dateSeed(new Date('2026-06-13T00:00:00Z'));
-		const a = generateBataille(DIFFS.moyen, mulberry32(seed));
-		const b = generateBataille(DIFFS.moyen, mulberry32(seed));
+		const a = generateBataille(SIZES['7'], DIFFS.moyen, mulberry32(seed));
+		const b = generateBataille(SIZES['7'], DIFFS.moyen, mulberry32(seed));
 		expect(a.solution).toEqual(b.solution);
 		expect(a.given).toEqual(b.given);
 	});

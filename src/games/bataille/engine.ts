@@ -18,16 +18,27 @@ export type SegType =
 	| 'mid-v'
 	| null;
 
-export interface DiffLevel {
+export interface SizeLevel {
 	label: string;
 	size: number;
-	fleet: number[]; // ship lengths, sorted desc
+	fleet: number[]; // ship lengths, sorted desc (min length 2)
+}
+
+export const SIZES: Record<string, SizeLevel> = {
+	'5': { label: '5×5', size: 5, fleet: [3, 2, 2] },
+	'6': { label: '6×6', size: 6, fleet: [3, 3, 2, 2] },
+	'7': { label: '7×7', size: 7, fleet: [4, 3, 2, 2] },
+};
+
+export interface DiffLevel {
+	label: string;
+	extraGivens: number; // clues revealed beyond the minimal unique set (more = easier)
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', size: 6, fleet: [3, 2, 2] },
-	moyen: { label: 'Moyen', size: 7, fleet: [3, 3, 2, 2] },
-	difficile: { label: 'Difficile', size: 8, fleet: [4, 3, 2, 2] },
+	facile: { label: 'Facile', extraGivens: 5 },
+	moyen: { label: 'Moyen', extraGivens: 2 },
+	difficile: { label: 'Difficile', extraGivens: 0 },
 };
 
 export interface BataillePuzzle {
@@ -456,9 +467,27 @@ export function findHint(marks: Mark[][], puzzle: BataillePuzzle): HintResult | 
 	return null;
 }
 
-export function generateBataille(diff: DiffLevel, rng: Rng = Math.random): BataillePuzzle {
-	const n = diff.size;
-	const fleet = [...diff.fleet].sort((a, b) => b - a);
+export function generateBataille(
+	sizeLvl: SizeLevel,
+	diff: DiffLevel,
+	rng: Rng = Math.random,
+): BataillePuzzle {
+	const n = sizeLvl.size;
+	const fleet = [...sizeLvl.fleet].sort((a, b) => b - a);
+
+	// Reveal `extraGivens` more solution cells as clues (among still-empty cells) → easier levels.
+	const addExtra = (given: Given[][], solution: boolean[][]) => {
+		const empties = shuffle(
+			Array.from({ length: n * n }, (_, i): [number, number] => [Math.floor(i / n), i % n]).filter(
+				([r, c]) => given[r][c] === null,
+			),
+			rng,
+		);
+		for (let i = 0; i < diff.extraGivens && i < empties.length; i++) {
+			const [r, c] = empties[i];
+			given[r][c] = solution[r][c] ? 'ship' : 'water';
+		}
+	};
 
 	for (let attempt = 0; attempt < 200; attempt++) {
 		const solution = placeFleet(n, fleet, rng);
@@ -474,24 +503,25 @@ export function generateBataille(diff: DiffLevel, rng: Rng = Math.random): Batai
 				}
 
 		const given: Given[][] = Array.from({ length: n }, () => new Array(n).fill(null) as Given[]);
-		if (countSolutions(n, fleet, rowCounts, colCounts, given, 2) === 1) {
-			return { size: n, fleet, solution, rowCounts, colCounts, given };
-		}
-
-		// Reveal cells (ship cells first, they disambiguate most) until unique.
-		const cells = shuffle(
-			Array.from({ length: n * n }, (_, i): [number, number] => [Math.floor(i / n), i % n]),
-			rng,
-		).sort((a, b) => Number(solution[b[0]][b[1]]) - Number(solution[a[0]][a[1]]));
-		let unique = false;
-		for (const [r, c] of cells) {
-			given[r][c] = solution[r][c] ? 'ship' : 'water';
-			if (countSolutions(n, fleet, rowCounts, colCounts, given, 2) === 1) {
-				unique = true;
-				break;
+		let unique = countSolutions(n, fleet, rowCounts, colCounts, given, 2) === 1;
+		if (!unique) {
+			// Reveal cells (ship cells first, they disambiguate most) until unique.
+			const cells = shuffle(
+				Array.from({ length: n * n }, (_, i): [number, number] => [Math.floor(i / n), i % n]),
+				rng,
+			).sort((a, b) => Number(solution[b[0]][b[1]]) - Number(solution[a[0]][a[1]]));
+			for (const [r, c] of cells) {
+				given[r][c] = solution[r][c] ? 'ship' : 'water';
+				if (countSolutions(n, fleet, rowCounts, colCounts, given, 2) === 1) {
+					unique = true;
+					break;
+				}
 			}
 		}
-		if (unique) return { size: n, fleet, solution, rowCounts, colCounts, given };
+		if (unique) {
+			addExtra(given, solution);
+			return { size: n, fleet, solution, rowCounts, colCounts, given };
+		}
 	}
 
 	// Fallback: tiny unique puzzle (single 1-cell ship in the corner).

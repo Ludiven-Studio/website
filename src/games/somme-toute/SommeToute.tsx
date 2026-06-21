@@ -72,6 +72,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	/* Win detection */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (cellValue(r, c) == null) return;
 		for (let r = 0; r < size; r++) {
@@ -87,7 +88,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setStatus('won');
 		setSelected(null);
 		trackGame(gameId, 'game_won');
-	}, [entries, status, revealed, size, rowT, colT, cellValue, gameId]);
+	}, [entries, status, revealed, size, rowT, colT, cellValue, gameId, daily, started]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { DIFFS, generateBataille, findHint, segType, type BataillePuzzle, type Given, type SegType } from './engine';
+import { SIZES, DIFFS, generateBataille, findHint, segType, type BataillePuzzle, type Given, type SegType } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -26,6 +26,7 @@ type Status = 'playing' | 'won';
 type Mark = 0 | 1 | 2;
 
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+const DAILY_SIZE: keyof typeof SIZES = '7';
 
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -48,9 +49,10 @@ function fleetLegend(fleet: number[]): { len: number; count: number }[] {
 }
 
 export default function BatailleGame({ gameId }: { gameId: string }) {
+	const [sizeKey, setSizeKey] = useState<keyof typeof SIZES>('6');
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
-	const [puzzle, setPuzzle] = useState<BataillePuzzle>(() => generateBataille(DIFFS.facile));
-	const [marks, setMarks] = useState<Mark[][]>(() => emptyMarks(DIFFS.facile.size));
+	const [puzzle, setPuzzle] = useState<BataillePuzzle>(() => generateBataille(SIZES['6'], DIFFS.facile));
+	const [marks, setMarks] = useState<Mark[][]>(() => emptyMarks(SIZES['6'].size));
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
@@ -68,14 +70,15 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	const { size, given, solution, rowCounts, colCounts, fleet } = puzzle;
 	const over = status === 'won' || revealed;
 
-	const newGame = useCallback((key: keyof typeof DIFFS) => {
-		const d = DIFFS[key];
+	const newGame = useCallback((sk: keyof typeof SIZES, dk: keyof typeof DIFFS) => {
+		const s = SIZES[sk];
 		setDaily(false);
 		setAlreadyPlayed(false);
 		setHintNote('');
-		setDiffKey(key);
-		setPuzzle(generateBataille(d));
-		setMarks(emptyMarks(d.size));
+		setSizeKey(sk);
+		setDiffKey(dk);
+		setPuzzle(generateBataille(s, DIFFS[dk]));
+		setMarks(emptyMarks(s.size));
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
@@ -86,6 +89,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
+		setSizeKey(DAILY_SIZE);
 		setRevealed(false);
 		setHinted(new Set());
 
@@ -97,9 +101,8 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 			dailySeedRef.current = { seed: run.seed, diffIndex: di };
 			setDailyLoading(false);
 			setDiffKey(dk);
-			const d = DIFFS[dk];
-			setPuzzle(generateBataille(d, mulberry32(run.seed)));
-			setMarks((run.state as Mark[][] | undefined) ?? emptyMarks(d.size));
+			setPuzzle(generateBataille(SIZES[DAILY_SIZE], DIFFS[dk], mulberry32(run.seed)));
+			setMarks((run.state as Mark[][] | undefined) ?? emptyMarks(SIZES[DAILY_SIZE].size));
 			setStarted(true);
 			if (run.done) {
 				setAlreadyPlayed(true);
@@ -124,9 +127,8 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		setDiffKey(dk);
-		const d = DIFFS[dk];
-		setPuzzle(generateBataille(d, mulberry32(seed)));
-		setMarks(emptyMarks(d.size));
+		setPuzzle(generateBataille(SIZES[DAILY_SIZE], DIFFS[dk], mulberry32(seed)));
+		setMarks(emptyMarks(SIZES[DAILY_SIZE].size));
 		setDailyLoading(false);
 	}, [gameId]);
 
@@ -208,11 +210,12 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	/* Win: every cell's effective ship matches the solution. */
 	useEffect(() => {
 		if (over) return;
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (ships[r][c] !== solution[r][c]) return;
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [ships, over, size, solution, gameId]);
+	}, [ships, over, size, solution, gameId, daily, started]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
@@ -334,36 +337,51 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		<div className="ba-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle daily={daily} onFree={() => daily && newGame(sizeKey, diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<div className="ba-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
-						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${SIZES[DAILY_SIZE].label} · ${DIFFS[diffKey].label}`}
 				</div>
 			) : null}
 
 			<div className="ba-bar">
 				{!daily && (
-					<div className="ba-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
-							<button
-								key={k}
-								role="tab"
-								aria-selected={diffKey === k}
-								className={`ba-pill ${diffKey === k ? 'active' : ''}`}
-								onClick={() => newGame(k)}
-							>
-								{DIFFS[k].label}
-							</button>
-						))}
+					<div className="ba-selectors">
+						<div className="ba-pills" role="tablist" aria-label="Taille">
+							{(Object.keys(SIZES) as (keyof typeof SIZES)[]).map((k) => (
+								<button
+									key={k}
+									role="tab"
+									aria-selected={sizeKey === k}
+									className={`ba-pill ${sizeKey === k ? 'active' : ''}`}
+									onClick={() => newGame(k, diffKey)}
+								>
+									{SIZES[k].label}
+								</button>
+							))}
+						</div>
+						<div className="ba-pills" role="tablist" aria-label="Difficulté">
+							{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+								<button
+									key={k}
+									role="tab"
+									aria-selected={diffKey === k}
+									className={`ba-pill ${diffKey === k ? 'active' : ''}`}
+									onClick={() => newGame(sizeKey, k)}
+								>
+									{DIFFS[k].label}
+								</button>
+							))}
+						</div>
 					</div>
 				)}
 				<div className="ba-bar-right">
 					<div className="ba-timer">{fmtTime(elapsed)}</div>
 					{!daily && (
-						<button className="ba-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
+						<button className="ba-new" onClick={() => newGame(sizeKey, diffKey)} aria-label="Nouvelle grille">
 							↻
 						</button>
 					)}
@@ -474,7 +492,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 							<h2>Flotte coulée !</h2>
 							<p className="ba-wintime">{fmtTime(elapsed)}</p>
 							<p className="ba-windiff">{DIFFS[diffKey].label} · {size}×{size}</p>
-							<button className="ba-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+							<button className="ba-replay" onClick={() => newGame(sizeKey, diffKey)}>Rejouer</button>
 						</div>
 					</div>
 				)}
@@ -493,7 +511,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 			{revealed ? (
 				<div className="ba-revealed-note">
 					<span>Solution affichée</span>
-					<button className="ba-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+					<button className="ba-replay" onClick={() => newGame(sizeKey, diffKey)}>Rejouer</button>
 				</div>
 			) : (
 				<p className="ba-help">
@@ -598,6 +616,7 @@ const CSS = `
   margin-bottom: 0.85rem;
 }
 .ba-bar-right { display: flex; align-items: center; gap: 0.5rem; }
+.ba-selectors { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .ba-pills { display: flex; gap: 6px; flex-wrap: wrap; }
 .ba-pill {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);

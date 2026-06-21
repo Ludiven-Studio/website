@@ -218,11 +218,12 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	/* Win: the grid matches the hidden picture (every cell). */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (grid[r][c] !== solution[r][c]) return;
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [grid, status, revealed, size, solution, gameId]);
+	}, [grid, status, revealed, size, solution, gameId, daily, started]);
 
 	/* Auto-advance: once the active colour is fully & correctly placed, jump to the
 	   next unfinished colour. Triggered by moves (depends on `grid`), not by manual

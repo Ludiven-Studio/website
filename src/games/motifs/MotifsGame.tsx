@@ -232,13 +232,14 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	/* Win: every cell owned and every piece valid. */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (owner[r][c] === -1) return;
 		if (!placed.every(rectValid)) return;
 		setStatus('won');
 		setPreview(null);
 		trackGame(gameId, 'game_won');
-	}, [owner, placed, status, revealed, size, rectValid, gameId]);
+	}, [owner, placed, status, revealed, size, rectValid, gameId, daily, started]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {

@@ -213,12 +213,13 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	/* Win: grid full and conflict-free. */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
+			if (daily && !started) return; // skip win-check on a daily not yet started
 		for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (value(r, c) === 0) return;
 		if (conflicts.size === 0) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
-	}, [marks, status, revealed, value, conflicts, n, gameId]);
+	}, [marks, status, revealed, value, conflicts, n, gameId, daily, started]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
