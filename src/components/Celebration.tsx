@@ -40,7 +40,9 @@ export function useCelebration(won: boolean): { celebrating: boolean; showWin: b
 		return () => clearTimeout(t);
 	}, [won]);
 
-	return { celebrating, showWin };
+	// AND with the live `won`: state is updated in an effect (one render late), so without
+	// this the flags would leak for one render when switching mode / starting a new game.
+	return { celebrating: celebrating && won, showWin: showWin && won };
 }
 
 export default function Celebration() {
