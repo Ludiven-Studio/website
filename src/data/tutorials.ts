@@ -78,6 +78,16 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🧠', title: 'Sans devinette', body: 'Chaque grille est garantie résolvable par pure logique : tu n\'es jamais obligé de deviner. En cas de doute, le bouton Indice trouve une case forcément sûre (ou une mine) et l\'explique.' },
 		{ emoji: '🚩', title: 'Marquer les mines', body: 'Clic = révéler. Clic droit, ou le bouton « Mode drapeau » puis tap, = poser/retirer un drapeau 🚩 sur une mine suspectée. Cliquer une mine = partie terminée.' },
 	],
+	snake: [
+		{ emoji: '🎯', title: 'Le but', body: 'Mange les pommes pour grandir et faire le plus gros score. Mais ne touche jamais les murs ni ta propre queue, sinon c\'est terminé.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Dirige le serpent aux flèches du clavier (ou ZQSD/WASD), ou en glissant le doigt sur la grille. Attention : tu accélères au fur et à mesure que tu grandis.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, la suite de pommes est la même pour tout le monde. Rejoue autant que tu veux : ton meilleur score est classé.' },
+	],
+	flappy: [
+		{ emoji: '🎯', title: 'Le but', body: 'Franchis un maximum de tuyaux sans les toucher ni tomber. Chaque tuyau passé vaut 1 point.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Appuie sur Espace, clique ou touche l\'écran pour battre des ailes et remonter. Sans rien faire, l\'oiseau tombe.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, les tuyaux sont identiques pour tout le monde. Rejoue à volonté : ton meilleur score est classé.' },
+	],
 	aquarium: [
 		{ emoji: '💧', title: 'Le but', body: 'Remplis d\'eau les bassins colorés pour respecter les compteurs de chaque ligne et colonne.' },
 		{ emoji: '⬇️', title: 'La règle', body: 'Dans un bassin, l\'eau est de niveau et monte par le bas : si une case est remplie, toutes celles du même bassin en dessous le sont aussi.' },

@@ -55,4 +55,6 @@ export const iconPaths = {
 	ship: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M44 168h168l-28 44H72Z"/><path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M128 44v124M128 64l56 80h-56"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M24 216h208"/>',
 	water: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M128 32C88 96 64 130 64 162a64 64 0 0 0 128 0c0-32-24-66-64-130Z"/>',
 	mine: '<circle cx="128" cy="128" r="52" fill="none" stroke-linejoin="round" stroke-width="16"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M128 24v44M128 188v44M24 128h44M188 128h44M70 70l28 28M158 158l28 28M186 70l-28 28M98 158l-28 28"/>',
+	snake: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M56 64h72a32 32 0 0 1 0 64H96a32 32 0 0 0 0 64h104"/><circle stroke="none" cx="200" cy="192" r="14"/>',
+	bird: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M40 168c44 0 72-26 88-60 16 34 44 60 88 60M128 108V60m-22 18 22-18 22 18"/><circle stroke="none" cx="100" cy="128" r="10"/>',
 };

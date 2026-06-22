@@ -7,6 +7,7 @@ export interface GameTile {
 	icon: keyof typeof iconPaths;
 	href?: string;
 	status: 'play' | 'soon';
+	category?: 'logique' | 'adresse'; // defaults to logique
 }
 
 export const games: GameTile[] = [
@@ -114,5 +115,23 @@ export const games: GameTile[] = [
 		icon: 'mine',
 		href: '/jeux/demineur',
 		status: 'play',
+	},
+	{
+		id: 'snake',
+		title: 'Snake',
+		pitch: 'Mange les pommes et grandis sans te mordre. Défi du jour à graine partagée et classement.',
+		icon: 'snake',
+		href: '/jeux/snake',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
+		id: 'flappy',
+		title: 'Flappy Bird',
+		pitch: 'Bats des ailes pour franchir un maximum de tuyaux. Tuyaux partagés au défi du jour.',
+		icon: 'bird',
+		href: '/jeux/flappy',
+		status: 'play',
+		category: 'adresse',
 	},
 ];
