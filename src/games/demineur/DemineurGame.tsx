@@ -47,7 +47,8 @@ const openedStart = (p: DemineurPuzzle): PlayerGrid => reveal(emptyState(p.size)
 export default function DemineurGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<DiffKey>('facile');
 	const [puzzle, setPuzzle] = useState<DemineurPuzzle>(() => generateDemineur(SIZES.facile, DIFFS.facile));
-	const [grid, setGrid] = useState<PlayerGrid>(() => emptyState(SIZES.facile.size));
+	// Open the safe start zone immediately (free mode) so the player never starts blind.
+	const [grid, setGrid] = useState<PlayerGrid>(() => openedStart(puzzle));
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
 	const [revealed, setRevealed] = useState(false);
