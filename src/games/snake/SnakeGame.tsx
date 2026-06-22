@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	SNAKE_CFG,
-	foodSequence,
+	SNAKE_DIFFS,
+	createSnakeLevel,
 	createSnake,
 	setDir,
 	stepSnake,
 	tickInterval,
 	type Dir,
+	type SnakeDiff,
 	type SnakeState,
 	type Vec,
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
-import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -25,7 +27,9 @@ import ModeToggle from '../../components/ModeToggle';
    ===================================================== */
 
 type Status = 'ready' | 'playing' | 'over';
+type DiffKey = keyof typeof SNAKE_DIFFS;
 const BEST_KEY = 'ludiven-snake-best';
+const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 
 interface Colors {
 	bg: string;
@@ -33,6 +37,7 @@ interface Colors {
 	body: string;
 	head: string;
 	food: string;
+	rock: string;
 }
 
 const readColors = (): Colors => {
@@ -44,6 +49,7 @@ const readColors = (): Colors => {
 		body: v('--gray-0', '#f5f5f5'),
 		head: v('--accent-regular', '#7b5cff'),
 		food: v('--accent-regular', '#7b5cff'),
+		rock: v('--gray-500', '#6b7280'),
 	};
 };
 
@@ -51,6 +57,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('ready');
 	const [score, setScore] = useState(0);
 	const [best, setBest] = useState(0);
+	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
@@ -59,6 +66,8 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const stateRef = useRef<SnakeState | null>(null);
 	const seqRef = useRef<Vec[]>([]);
+	const rocksRef = useRef<Vec[]>([]);
+	const diffRef = useRef<SnakeDiff>(SNAKE_DIFFS.moyen);
 	const seedRef = useRef(0);
 	const diffIdxRef = useRef(0);
 	const rafRef = useRef(0);
@@ -99,12 +108,13 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		}
 		ctx.globalAlpha = 1;
 		const pad = Math.max(1, cell * 0.08);
-		const cellRect = (c: Vec, fill: string) => {
+		const cellRect = (c: Vec, fill: string, radius = cell * 0.28) => {
 			ctx.fillStyle = fill;
 			ctx.beginPath();
-			ctx.roundRect(c.x * cell + pad, c.y * cell + pad, cell - 2 * pad, cell - 2 * pad, cell * 0.28);
+			ctx.roundRect(c.x * cell + pad, c.y * cell + pad, cell - 2 * pad, cell - 2 * pad, radius);
 			ctx.fill();
 		};
+		st.rocks.forEach((r) => cellRect(r, colors.rock, cell * 0.18)); // rocks: chunkier corners
 		cellRect(st.food, colors.food);
 		st.snake.forEach((seg, i) => cellRect(seg, i === 0 ? colors.head : colors.body));
 	}, []);
@@ -163,8 +173,8 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			lastRef.current = now;
 			accRef.current += dt;
 			let st = stateRef.current!;
-			while (runningRef.current && accRef.current >= tickInterval(st.score)) {
-				accRef.current -= tickInterval(st.score);
+			while (runningRef.current && accRef.current >= tickInterval(st.score, diffRef.current)) {
+				accRef.current -= tickInterval(st.score, diffRef.current);
 				st = stepSnake(st, SNAKE_CFG, seqRef.current);
 				stateRef.current = st;
 				if (st.status === 'over') break;
@@ -184,7 +194,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	);
 
 	const start = useCallback(() => {
-		stateRef.current = createSnake(SNAKE_CFG, seqRef.current);
+		stateRef.current = createSnake(SNAKE_CFG, seqRef.current, rocksRef.current);
 		scoreRef.current = 0;
 		accRef.current = 0;
 		lastRef.current = performance.now();
@@ -207,55 +217,66 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	}, [gameId, best, draw, frame]);
 
 	/* ---- Modes ---- */
-	const armFree = useCallback(() => {
-		stop();
-		dailyRef.current = false;
-		setDaily(false);
-		setAlreadyPlayed(false);
-		seedRef.current = (Math.random() * 2 ** 32) >>> 0;
-		seqRef.current = foodSequence(SNAKE_CFG, mulberry32(seedRef.current));
-		stateRef.current = createSnake(SNAKE_CFG, seqRef.current);
-		scoreRef.current = 0;
-		setScore(0);
-		setStatus('ready');
-		try {
-			setBest(Number(localStorage.getItem(BEST_KEY) ?? '0') || 0);
-		} catch {
-			setBest(0);
-		}
-		draw();
-	}, [stop, draw]);
+	const armFree = useCallback(
+		(key: DiffKey = diffKey) => {
+			stop();
+			dailyRef.current = false;
+			setDaily(false);
+			setAlreadyPlayed(false);
+			setDiffKey(key);
+			diffRef.current = SNAKE_DIFFS[key];
+			seedRef.current = (Math.random() * 2 ** 32) >>> 0;
+			const lvl = createSnakeLevel(SNAKE_CFG, SNAKE_DIFFS[key], mulberry32(seedRef.current));
+			seqRef.current = lvl.seq;
+			rocksRef.current = lvl.rocks;
+			stateRef.current = createSnake(SNAKE_CFG, lvl.seq, lvl.rocks);
+			scoreRef.current = 0;
+			setScore(0);
+			setStatus('ready');
+			try {
+				setBest(Number(localStorage.getItem(BEST_KEY) ?? '0') || 0);
+			} catch {
+				setBest(0);
+			}
+			draw();
+		},
+		[stop, draw, diffKey],
+	);
 
 	const startDaily = useCallback(async () => {
 		stop();
 		dailyRef.current = true;
 		setDaily(true);
 		setStatus('ready');
+		const applyLevel = (seed: number, diffIndex: number) => {
+			seedRef.current = seed;
+			diffIdxRef.current = diffIndex;
+			const key = DIFF_ORDER[diffIndex] ?? 'moyen';
+			setDiffKey(key);
+			diffRef.current = SNAKE_DIFFS[key];
+			const lvl = createSnakeLevel(SNAKE_CFG, SNAKE_DIFFS[key], mulberry32(seed));
+			seqRef.current = lvl.seq;
+			rocksRef.current = lvl.rocks;
+			stateRef.current = createSnake(SNAKE_CFG, lvl.seq, lvl.rocks);
+			setScore(0);
+			scoreRef.current = 0;
+		};
+
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
-			seedRef.current = run.seed;
-			diffIdxRef.current = run.diffIndex ?? 0;
-			seqRef.current = foodSequence(SNAKE_CFG, mulberry32(run.seed));
-			stateRef.current = createSnake(SNAKE_CFG, seqRef.current);
+			applyLevel(run.seed, run.diffIndex ?? dailyDifficultyIndex());
 			const st = (run.state as { best?: number } | undefined) ?? {};
 			setBest(st.best ?? 0);
 			setAlreadyPlayed(run.done === true);
 			setDailyLoading(false);
-			setScore(0);
-			scoreRef.current = 0;
 			draw();
 			return;
 		}
 		setDailyLoading(true);
 		setAlreadyPlayed(false);
 		const { seed, diffIndex } = await getDaily(gameId);
-		seedRef.current = seed;
-		diffIdxRef.current = diffIndex;
-		seqRef.current = foodSequence(SNAKE_CFG, mulberry32(seed));
-		stateRef.current = createSnake(SNAKE_CFG, seqRef.current);
+		applyLevel(seed, diffIndex);
 		setBest(0);
-		setScore(0);
-		scoreRef.current = 0;
 		setDailyLoading(false);
 		draw();
 	}, [gameId, stop, draw]);
@@ -341,13 +362,29 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		<div className="sn-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={armFree} onDaily={startDaily} />
+			<ModeToggle daily={daily} onFree={() => armFree(diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<div className="sn-daily-tag">
-					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · graine partagée`}
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${SNAKE_DIFFS[diffKey].label}`}
 				</div>
-			) : null}
+			) : (
+				<div className="sn-pills" role="tablist" aria-label="Difficulté">
+					{DIFF_ORDER.map((k) => (
+						<button
+							key={k}
+							role="tab"
+							aria-selected={diffKey === k}
+							className={`sn-pill ${diffKey === k ? 'active' : ''}`}
+							onClick={() => armFree(k)}
+						>
+							{SNAKE_DIFFS[k].label}
+						</button>
+					))}
+				</div>
+			)}
 
 			<div className="sn-bar">
 				<span className="sn-score">Score {score}</span>
@@ -405,6 +442,13 @@ const CSS = `
   display: flex; flex-direction: column; align-items: center;
 }
 .sn-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
+.sn-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.85rem; }
+.sn-pill {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.sn-pill.active { background: var(--accent-regular); color: var(--accent-text-over); border-color: var(--accent-regular); }
 .sn-bar { width: 100%; display: flex; justify-content: center; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.85rem; }
 .sn-score { background: var(--sn-accent); color: var(--accent-text-over); border-radius: 999px; padding: 5px 14px; }
 .sn-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; }

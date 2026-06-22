@@ -20,6 +20,21 @@ export interface SnakeConfig {
 
 export const SNAKE_CFG: SnakeConfig = { cols: 17, rows: 17, startLen: 3 };
 
+// Difficulty: faster ticks + more rocks. baseTick/minTick in ms, accel = speed-up per apple.
+export interface SnakeDiff {
+	label: string;
+	baseTick: number;
+	minTick: number;
+	accel: number;
+	rocks: number;
+}
+
+export const SNAKE_DIFFS: Record<string, SnakeDiff> = {
+	facile: { label: 'Facile', baseTick: 170, minTick: 90, accel: 3, rocks: 0 },
+	moyen: { label: 'Moyen', baseTick: 140, minTick: 75, accel: 4, rocks: 6 },
+	difficile: { label: 'Difficile', baseTick: 110, minTick: 60, accel: 5, rocks: 12 },
+};
+
 export type SnakeStatus = 'playing' | 'over';
 
 export interface SnakeState {
@@ -28,6 +43,7 @@ export interface SnakeState {
 	pendingDir: Dir; // queued for next tick
 	foodIndex: number; // position in the food sequence
 	food: Vec;
+	rocks: Vec[]; // static obstacles (immutable for the run)
 	score: number;
 	status: SnakeStatus;
 	grew: boolean; // last tick grew the snake (for the UI)
@@ -43,8 +59,9 @@ const DELTA: Record<Dir, Vec> = {
 export const opposite = (d: Dir): Dir =>
 	d === 'up' ? 'down' : d === 'down' ? 'up' : d === 'left' ? 'right' : 'left';
 
-/** ms per tick — accelerates with score. */
-export const tickInterval = (score: number): number => Math.max(70, 150 - score * 4);
+/** ms per tick — accelerates with score, bounded by the difficulty. */
+export const tickInterval = (score: number, diff: SnakeDiff): number =>
+	Math.max(diff.minTick, diff.baseTick - score * diff.accel);
 
 const key = (v: Vec): string => `${v.x},${v.y}`;
 
@@ -57,11 +74,31 @@ function shuffle<T>(arr: T[], rng: Rng): T[] {
 	return a;
 }
 
-/** Seeded shuffle of every cell — the shared apple order. */
-export function foodSequence(cfg: SnakeConfig, rng: Rng): Vec[] {
+/** Seeded shuffle of every cell (optionally excluding some) — the shared apple order. */
+export function foodSequence(cfg: SnakeConfig, rng: Rng, exclude?: Set<string>): Vec[] {
 	const cells: Vec[] = [];
-	for (let y = 0; y < cfg.rows; y++) for (let x = 0; x < cfg.cols; x++) cells.push({ x, y });
+	for (let y = 0; y < cfg.rows; y++)
+		for (let x = 0; x < cfg.cols; x++) if (!exclude?.has(`${x},${y}`)) cells.push({ x, y });
 	return shuffle(cells, rng);
+}
+
+/** Seeded rocks, kept off the central start row so the snake never spawns trapped. */
+export function generateRocks(cfg: SnakeConfig, count: number, rng: Rng): Vec[] {
+	if (count <= 0) return [];
+	const cy = Math.floor(cfg.rows / 2);
+	const cells: Vec[] = [];
+	for (let y = 0; y < cfg.rows; y++) {
+		if (y === cy) continue; // keep the start lane clear
+		for (let x = 0; x < cfg.cols; x++) cells.push({ x, y });
+	}
+	return shuffle(cells, rng).slice(0, count);
+}
+
+/** Build a deterministic level (rocks + apple order) for a seed + difficulty. */
+export function createSnakeLevel(cfg: SnakeConfig, diff: SnakeDiff, rng: Rng): { seq: Vec[]; rocks: Vec[] } {
+	const rocks = generateRocks(cfg, diff.rocks, rng);
+	const seq = foodSequence(cfg, rng, new Set(rocks.map(key)));
+	return { seq, rocks };
 }
 
 /** Next apple: first cell of the sequence (from fromIndex, wrapping) not under the snake. */
@@ -74,13 +111,13 @@ export function nextFood(seq: Vec[], fromIndex: number, snake: Vec[]): { food: V
 	return { food: { x: -1, y: -1 }, index: fromIndex }; // board full (unreachable in practice)
 }
 
-export function createSnake(cfg: SnakeConfig, seq: Vec[]): SnakeState {
+export function createSnake(cfg: SnakeConfig, seq: Vec[], rocks: Vec[] = []): SnakeState {
 	const cy = Math.floor(cfg.rows / 2);
 	const cx = Math.floor(cfg.cols / 2);
 	const snake: Vec[] = [];
 	for (let i = 0; i < cfg.startLen; i++) snake.push({ x: cx - i, y: cy }); // head first, body to the left
 	const { food, index } = nextFood(seq, 0, snake);
-	return { snake, dir: 'right', pendingDir: 'right', foodIndex: index, food, score: 0, status: 'playing', grew: false };
+	return { snake, dir: 'right', pendingDir: 'right', foodIndex: index, food, rocks, score: 0, status: 'playing', grew: false };
 }
 
 /** Queue a direction change. Rejected if it reverses the committed direction (anti-180°). */
@@ -98,6 +135,9 @@ export function stepSnake(state: SnakeState, cfg: SnakeConfig, seq: Vec[]): Snak
 	const newHead: Vec = { x: head.x + DELTA[dir].x, y: head.y + DELTA[dir].y };
 
 	if (newHead.x < 0 || newHead.x >= cfg.cols || newHead.y < 0 || newHead.y >= cfg.rows)
+		return { ...state, dir, status: 'over', grew: false };
+
+	if (state.rocks.some((r) => r.x === newHead.x && r.y === newHead.y))
 		return { ...state, dir, status: 'over', grew: false };
 
 	const willGrow = newHead.x === state.food.x && newHead.y === state.food.y;

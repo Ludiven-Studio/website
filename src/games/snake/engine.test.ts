@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { mulberry32 } from '../prng';
 import {
 	SNAKE_CFG,
+	SNAKE_DIFFS,
 	foodSequence,
+	generateRocks,
+	createSnakeLevel,
 	nextFood,
 	createSnake,
 	setDir,
@@ -111,9 +114,39 @@ describe('snake engine', () => {
 		expect(snake.some((c) => c.x === food.x && c.y === food.y)).toBe(false);
 	});
 
-	it('tickInterval accelerates with score and floors at 70ms', () => {
-		expect(tickInterval(0)).toBe(150);
-		expect(tickInterval(10)).toBe(110);
-		expect(tickInterval(100)).toBe(70);
+	it('tickInterval accelerates with score and floors at the difficulty minimum', () => {
+		const f = SNAKE_DIFFS.facile;
+		expect(tickInterval(0, f)).toBe(f.baseTick);
+		expect(tickInterval(10, f)).toBe(f.baseTick - 10 * f.accel);
+		expect(tickInterval(1000, f)).toBe(f.minTick);
+		// Harder levels start faster than easier ones.
+		expect(SNAKE_DIFFS.difficile.baseTick).toBeLessThan(SNAKE_DIFFS.facile.baseTick);
+	});
+
+	it('generateRocks: requested count, off the start row, deterministic by seed', () => {
+		const n = SNAKE_DIFFS.difficile.rocks;
+		const a = generateRocks(SNAKE_CFG, n, mulberry32(11));
+		const b = generateRocks(SNAKE_CFG, n, mulberry32(11));
+		expect(a.length).toBe(n);
+		expect(a).toEqual(b); // deterministic
+		const cy = Math.floor(SNAKE_CFG.rows / 2);
+		for (const r of a) expect(r.y).not.toBe(cy); // start lane stays clear
+	});
+
+	it('createSnakeLevel: apples never sit on rocks, fully reproducible from a seed', () => {
+		const lvl = createSnakeLevel(SNAKE_CFG, SNAKE_DIFFS.difficile, mulberry32(7));
+		const rockKeys = new Set(lvl.rocks.map((r) => `${r.x},${r.y}`));
+		for (const c of lvl.seq) expect(rockKeys.has(`${c.x},${c.y}`)).toBe(false);
+		const lvl2 = createSnakeLevel(SNAKE_CFG, SNAKE_DIFFS.difficile, mulberry32(7));
+		expect(lvl2).toEqual(lvl);
+	});
+
+	it('hitting a rock ends the game', () => {
+		const s = seq(8);
+		let st = createSnake(SNAKE_CFG, s); // facing right at center
+		const head = st.snake[0];
+		st = { ...st, rocks: [{ x: head.x + 1, y: head.y }] }; // rock straight ahead
+		const next = stepSnake(st, SNAKE_CFG, s);
+		expect(next.status).toBe('over');
 	});
 });

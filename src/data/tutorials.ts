@@ -79,14 +79,14 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🚩', title: 'Marquer les mines', body: 'Clic = révéler. Clic droit, ou le bouton « Mode drapeau » puis tap, = poser/retirer un drapeau 🚩 sur une mine suspectée. Cliquer une mine = partie terminée.' },
 	],
 	snake: [
-		{ emoji: '🎯', title: 'Le but', body: 'Mange les pommes pour grandir et faire le plus gros score. Mais ne touche jamais les murs ni ta propre queue, sinon c\'est terminé.' },
-		{ emoji: '🎮', title: 'Contrôles', body: 'Dirige le serpent aux flèches du clavier (ou ZQSD/WASD), ou en glissant le doigt sur la grille. Attention : tu accélères au fur et à mesure que tu grandis.' },
-		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, la suite de pommes est la même pour tout le monde. Rejoue autant que tu veux : ton meilleur score est classé.' },
+		{ emoji: '🎯', title: 'Le but', body: 'Mange les pommes pour grandir et faire le plus gros score. Ne touche jamais les murs, ta propre queue ni les rochers, sinon c\'est terminé.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Dirige le serpent aux flèches (ou ZQSD/WASD), ou en glissant le doigt. Tu accélères en grandissant. Choisis ta difficulté : plus dur = plus rapide et davantage de rochers.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, pommes et rochers sont les mêmes pour tout le monde (le niveau dépend du jour). Rejoue autant que tu veux : ton meilleur score est classé.' },
 	],
 	flappy: [
 		{ emoji: '🎯', title: 'Le but', body: 'Franchis un maximum de tuyaux sans les toucher ni tomber. Chaque tuyau passé vaut 1 point.' },
-		{ emoji: '🎮', title: 'Contrôles', body: 'Appuie sur Espace, clique ou touche l\'écran pour battre des ailes et remonter. Sans rien faire, l\'oiseau tombe.' },
-		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, les tuyaux sont identiques pour tout le monde. Rejoue à volonté : ton meilleur score est classé.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Espace, clic ou tap pour battre des ailes. Plus tu maintiens, plus l\'oiseau monte haut ; un petit tap = petit saut. Choisis ta difficulté : écart et taille des ouvertures varient.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, les tuyaux sont identiques pour tout le monde (le niveau dépend du jour). Rejoue à volonté : ton meilleur score est classé.' },
 	],
 	aquarium: [
 		{ emoji: '💧', title: 'Le but', body: 'Remplis d\'eau les bassins colorés pour respecter les compteurs de chaque ligne et colonne.' },

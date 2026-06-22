@@ -10,29 +10,54 @@ export interface FlappyConfig {
 	worldW: number;
 	worldH: number;
 	gravity: number; // units / s²
-	flapV: number; // upward impulse velocity (negative = up)
+	flapV: number; // initial upward impulse on a tap (negative = up)
+	boostAccel: number; // extra upward accel while the key stays held (variable jump)
+	boostMaxMs: number; // max duration the held boost lasts per flap
 	maxFallV: number; // terminal downward velocity
 	birdX: number;
 	birdR: number;
 	pipeW: number;
-	gapH: number;
+	gapH: number; // gap opening height
 	pipeSpacing: number; // distance between consecutive pipes
 	speed: number; // horizontal scroll speed, units / s
 }
 
-export const FLAPPY_CFG: FlappyConfig = {
+// Flap feel is constant across levels (variable impulse by hold duration). Difficulty only
+// tightens the course: smaller openings, closer pipes, faster scroll.
+const BASE = {
 	worldW: 100,
 	worldH: 100,
 	gravity: 240,
-	flapV: -90,
-	maxFallV: 160,
+	flapV: -52,
+	boostAccel: 520,
+	boostMaxMs: 220,
+	maxFallV: 150,
 	birdX: 28,
-	birdR: 3.2,
-	pipeW: 14,
-	gapH: 30,
-	pipeSpacing: 46,
-	speed: 46,
+	birdR: 3,
+	pipeW: 13,
 };
+
+export interface FlappyDiff {
+	label: string;
+	gapH: number;
+	pipeSpacing: number;
+	speed: number;
+}
+
+export const FLAPPY_DIFFS: Record<string, FlappyDiff> = {
+	facile: { label: 'Facile', gapH: 34, pipeSpacing: 60, speed: 40 },
+	moyen: { label: 'Moyen', gapH: 27, pipeSpacing: 50, speed: 47 },
+	difficile: { label: 'Difficile', gapH: 22, pipeSpacing: 42, speed: 54 },
+};
+
+export const flappyConfig = (d: FlappyDiff): FlappyConfig => ({
+	...BASE,
+	gapH: d.gapH,
+	pipeSpacing: d.pipeSpacing,
+	speed: d.speed,
+});
+
+export const FLAPPY_CFG: FlappyConfig = flappyConfig(FLAPPY_DIFFS.moyen);
 
 export type FlappyStatus = 'ready' | 'playing' | 'over';
 
@@ -50,6 +75,7 @@ export interface FlappyState {
 	pipes: Pipe[];
 	spawnIndex: number; // pipes spawned so far
 	status: FlappyStatus;
+	boostMs: number; // remaining held-boost budget for the current flap
 }
 
 // First pipe enters once the bird has scrolled a full screen — breathing room at the start.
@@ -63,20 +89,36 @@ export function pipeGap(seed: number, i: number, cfg: FlappyConfig): number {
 }
 
 export function createFlappy(cfg: FlappyConfig = FLAPPY_CFG): FlappyState {
-	return { birdY: cfg.worldH / 2, vy: 0, distance: 0, score: 0, pipes: [], spawnIndex: 0, status: 'ready' };
+	return { birdY: cfg.worldH / 2, vy: 0, distance: 0, score: 0, pipes: [], spawnIndex: 0, status: 'ready', boostMs: 0 };
 }
 
-/** Flap: upward impulse. The first flap also starts the run. */
-export function flap(state: FlappyState): FlappyState {
+/** Flap: initial impulse + arm the held-boost budget. The first flap also starts the run. */
+export function flap(state: FlappyState, cfg: FlappyConfig = FLAPPY_CFG): FlappyState {
 	if (state.status === 'over') return state;
-	return { ...state, vy: FLAPPY_CFG.flapV, status: 'playing' };
+	return { ...state, vy: cfg.flapV, boostMs: cfg.boostMaxMs, status: 'playing' };
 }
 
-/** One fixed-timestep world update. Only advances while playing. */
-export function stepWorld(state: FlappyState, dt: number, cfg: FlappyConfig, seed: number): FlappyState {
+/**
+ * One fixed-timestep world update. Only advances while playing. `holding` extends the current
+ * flap's upward boost (variable jump) until its budget runs out — then gravity resumes.
+ */
+export function stepWorld(
+	state: FlappyState,
+	dt: number,
+	cfg: FlappyConfig,
+	seed: number,
+	holding = false,
+): FlappyState {
 	if (state.status !== 'playing') return state;
 
-	const vy = Math.min(state.vy + cfg.gravity * dt, cfg.maxFallV);
+	// Variable jump: while the key is held and boost remains, push up harder than gravity.
+	let accel = cfg.gravity;
+	let boostMs = state.boostMs;
+	if (holding && boostMs > 0) {
+		accel -= cfg.boostAccel;
+		boostMs = Math.max(0, boostMs - dt * 1000);
+	}
+	const vy = Math.min(state.vy + accel * dt, cfg.maxFallV);
 	const birdY = state.birdY + vy * dt;
 	const distance = state.distance + cfg.speed * dt;
 
@@ -111,5 +153,5 @@ export function stepWorld(state: FlappyState, dt: number, cfg: FlappyConfig, see
 			if (birdY - cfg.birdR < gapTop || birdY + cfg.birdR > gapBottom) dead = true;
 		}
 
-	return { birdY, vy, distance, score, pipes, spawnIndex, status: dead ? 'over' : 'playing' };
+	return { birdY, vy, distance, score, pipes, spawnIndex, status: dead ? 'over' : 'playing', boostMs };
 }
