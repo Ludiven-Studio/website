@@ -146,36 +146,6 @@ const alternate = (rng: Rng): Generated => {
 	return { terms: [0, 1, 2, 3, 4].map(at), answer: at(5), rule: 'deux symboles en alternance' };
 };
 
-// Same color, shape advances in the ordered list (+step).
-const shapeCycle = (rng: Rng): Generated => {
-	const start = ri(rng, 0, SHAPES.length - 1);
-	const step = pick(rng, [1, 2]);
-	const color = ri(rng, 0, COLORS.length - 1);
-	const at = (i: number): Cell => ({
-		shape: SHAPES[mod(start + step * i, SHAPES.length)],
-		color,
-		rotation: 0,
-		flip: false,
-		count: 1,
-	});
-	return { terms: [0, 1, 2, 3, 4].map(at), answer: at(5), rule: 'les formes défilent dans l’ordre' };
-};
-
-// Same shape, color cycles (+step).
-const colorCycle = (rng: Rng): Generated => {
-	const start = ri(rng, 0, COLORS.length - 1);
-	const step = pick(rng, [1, 2]);
-	const shape = pick(rng, SHAPES);
-	const at = (i: number): Cell => ({
-		shape,
-		color: mod(start + step * i, COLORS.length),
-		rotation: 0,
-		flip: false,
-		count: 1,
-	});
-	return { terms: [0, 1, 2, 3, 4].map(at), answer: at(5), rule: 'les couleurs défilent' };
-};
-
 // Same symbol, rotation increases by a fixed step (asymmetric glyph).
 const rotate = (rng: Rng): Generated => {
 	const shape = pick(rng, ROT_SHAPES);
@@ -234,23 +204,23 @@ const rotateMirror = (rng: Rng): Generated => {
 	};
 };
 
-// Asymmetric symbol rotating while its color cycles.
-const rotateColor = (rng: Rng): Generated => {
+// Asymmetric symbol rotating while the count of elements grows.
+const rotateCount = (rng: Rng): Generated => {
 	const shape = pick(rng, ROT_SHAPES);
-	const cStart = ri(rng, 0, COLORS.length - 1);
+	const color = ri(rng, 0, COLORS.length - 1);
 	const rStep = pick(rng, [90, -90]);
-	const cStep = pick(rng, [1, 2]);
+	const start = ri(rng, 1, 2);
 	const at = (i: number): Cell => ({
 		shape,
-		color: mod(cStart + cStep * i, COLORS.length),
+		color,
 		rotation: rStep * i,
 		flip: false,
-		count: 1,
+		count: mod(start - 1 + i, 4) + 1,
 	});
 	return {
 		terms: [0, 1, 2, 3, 4].map(at),
 		answer: at(5),
-		rule: `il pivote de ${rStep > 0 ? '+' : ''}${rStep}° et la couleur défile`,
+		rule: `il pivote de ${rStep > 0 ? '+' : ''}${rStep}° et le nombre d’éléments augmente`,
 	};
 };
 
@@ -268,9 +238,9 @@ const interleaved = (rng: Rng): Generated => {
 };
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', families: [repeat, alternate, shapeCycle] },
-	moyen: { label: 'Moyen', families: [colorCycle, rotate, mirror, countGrow] },
-	difficile: { label: 'Difficile', families: [rotateMirror, interleaved, rotateColor] },
+	facile: { label: 'Facile', families: [repeat, alternate] },
+	moyen: { label: 'Moyen', families: [rotate, mirror, countGrow] },
+	difficile: { label: 'Difficile', families: [rotateMirror, rotateCount, interleaved] },
 };
 
 /* ---------- Distractors ---------- */

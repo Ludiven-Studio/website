@@ -21,7 +21,6 @@ import Celebration, { useCelebration } from '../../components/Celebration';
    ===================================================== */
 
 type Status = 'playing' | 'over' | 'won';
-const BEST_KEY = 'ludiven-symboles-best';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const DAILY_TARGET = 3;
 
@@ -79,8 +78,7 @@ function SymbolCell({ cell, big = false }: { cell: Cell; big?: boolean }) {
 export default function SymbolesGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [question, setQuestion] = useState<Question>(() => generateQuestion(DIFFS.facile));
-	const [score, setScore] = useState(0); // free: streak ; daily: suites réussies
-	const [best, setBest] = useState(0);
+	const [score, setScore] = useState(0); // daily: suites réussies (unused in free practice)
 	const [status, setStatus] = useState<Status>('playing');
 	const [chosen, setChosen] = useState<number | null>(null);
 	const [eliminated, setEliminated] = useState<number[]>([]);
@@ -99,8 +97,6 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 
 	useEffect(() => {
-		const stored = Number(localStorage.getItem(BEST_KEY) ?? '0');
-		if (stored > 0) setBest(stored);
 		return () => {
 			if (timer.current) clearTimeout(timer.current);
 		};
@@ -245,33 +241,25 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 			return;
 		}
 
-		// Free mode (endless score).
+		// Free mode (endless practice — no score). Wrong answer reveals the rule, then we move on.
 		if (!startedRef.current) {
 			startedRef.current = true;
 			trackGame(gameId, 'game_started');
 		}
-		if (correct) {
-			setScore(score + 1);
-			timer.current = setTimeout(() => {
+		if (!correct) {
+			setHintNote('La règle : ' + question.rule + '.');
+			trackGame(gameId, 'solution_shown');
+		}
+		timer.current = setTimeout(
+			() => {
 				setQuestion(generateQuestion(DIFFS[diffKey]));
 				setChosen(null);
 				setEliminated([]);
 				setPeeked(false);
 				setHintNote('');
-			}, 650);
-		} else {
-			setStatus('over');
-			trackGame(gameId, 'game_over', { score });
-			setBest((b) => {
-				const nb = Math.max(b, score);
-				try {
-					localStorage.setItem(BEST_KEY, String(nb));
-				} catch {
-					/* ignore */
-				}
-				return nb;
-			});
-		}
+			},
+			correct ? 700 : 1700,
+		);
 	};
 
 	/* Hint: remove one wrong option (free mode only). */
@@ -343,10 +331,6 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 							</button>
 						))}
 					</div>
-					<div className="sy-scores">
-						<span className="sy-score">Score {score}</span>
-						<span className="sy-best">Record {best}</span>
-					</div>
 				</div>
 			)}
 
@@ -398,23 +382,12 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 				<p className="sy-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{!daily &&
-				(status === 'over' ? (
-					<div className="sy-over">
-						<p className="sy-rule">
-							La règle : <strong>{question.rule}</strong>.
-						</p>
-						<p className="sy-final">Score : {score}</p>
-						<button className="sy-replay" onClick={() => newGame(diffKey)}>
-							Rejouer
-						</button>
-					</div>
-				) : (
-					<p className="sy-help">
-						Trouve le symbole suivant de la suite. Bonne réponse → on enchaîne ; une erreur termine
-						la manche.
-					</p>
-				))}
+			{!daily && (
+				<p className="sy-help">
+					Trouve le symbole suivant de la suite. Entraîne-toi autant que tu veux : une bonne réponse
+					enchaîne, une erreur révèle la règle puis on passe à la suivante.
+				</p>
+			)}
 
 			{daily && status === 'won' && (
 				<div className="sy-daily-won">
