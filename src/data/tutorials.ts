@@ -73,6 +73,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🌊', title: 'La règle', body: 'Les bateaux ne se touchent jamais, même en diagonale. Les cases numérotées sont toujours de l\'eau. Les lettres et chiffres autour de la grille servent à repérer les cases (A2…).' },
 		{ emoji: '💡', title: 'Comment jouer', body: 'Touche une case pour cycler : bateau, puis eau, puis vide. Repère la flotte à trouver en légende. Indice corrige une case ; solution dispo après 1 min.' },
 	],
+	demineur: [
+		{ emoji: '💣', title: 'Le but', body: 'Découvre toutes les cases sûres sans cliquer sur une mine. Les chiffres indiquent combien de mines touchent la case (diagonales comprises). Une ouverture sûre est révélée pour démarrer.' },
+		{ emoji: '🧠', title: 'Sans devinette', body: 'Chaque grille est garantie résolvable par pure logique : tu n\'es jamais obligé de deviner. En cas de doute, le bouton Indice trouve une case forcément sûre (ou une mine) et l\'explique.' },
+		{ emoji: '🚩', title: 'Marquer les mines', body: 'Clic = révéler. Clic droit, ou le bouton « Mode drapeau » puis tap, = poser/retirer un drapeau 🚩 sur une mine suspectée. Cliquer une mine = partie terminée.' },
+	],
 	aquarium: [
 		{ emoji: '💧', title: 'Le but', body: 'Remplis d\'eau les bassins colorés pour respecter les compteurs de chaque ligne et colonne.' },
 		{ emoji: '⬇️', title: 'La règle', body: 'Dans un bassin, l\'eau est de niveau et monte par le bas : si une case est remplie, toutes celles du même bassin en dessous le sont aussi.' },

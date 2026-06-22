@@ -107,4 +107,12 @@ export const games: GameTile[] = [
 		href: '/jeux/bataille',
 		status: 'play',
 	},
+	{
+		id: 'demineur',
+		title: 'Démineur',
+		pitch: 'Déduis l\'emplacement des mines sans jamais deviner. Chaque grille est résolvable par pure logique.',
+		icon: 'mine',
+		href: '/jeux/demineur',
+		status: 'play',
+	},
 ];
