@@ -223,9 +223,9 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		ctx.fillStyle = sky;
 		ctx.fillRect(0, 0, cfg.worldW, cfg.worldH);
 
-		// Parallax clouds: far (slow) then near (faster).
-		drawCloudLayer(ctx, cfg.worldW, st.distance, 0.18, 46, [16, 30], 1.05, 0.55);
-		drawCloudLayer(ctx, cfg.worldW, st.distance, 0.42, 34, [10, 38, 22], 0.72, 0.85);
+		// Parallax clouds: far = slow + small + faint (drawn first/behind); near = fast + big + opaque.
+		drawCloudLayer(ctx, cfg.worldW, st.distance, 0.18, 40, [14, 26], 0.62, 0.5);
+		drawCloudLayer(ctx, cfg.worldW, st.distance, 0.42, 52, [12, 40, 24], 1.15, 0.82);
 
 		for (const p of st.pipes) drawPipe(ctx, cfg, p);
 		drawGround(ctx, cfg, st.distance);
