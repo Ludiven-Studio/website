@@ -36,8 +36,11 @@ interface Colors {
 	grid: string;
 	body: string;
 	head: string;
-	food: string;
 	rock: string;
+	rockDark: string;
+	apple: string;
+	leaf: string;
+	stem: string;
 }
 
 const readColors = (): Colors => {
@@ -46,10 +49,13 @@ const readColors = (): Colors => {
 	return {
 		bg: v('--gray-999', '#0e1014'),
 		grid: v('--gray-800', '#1b1f27'),
-		body: v('--gray-0', '#f5f5f5'),
+		body: v('--accent-regular', '#7b5cff'),
 		head: v('--accent-regular', '#7b5cff'),
-		food: v('--accent-regular', '#7b5cff'),
 		rock: v('--gray-500', '#6b7280'),
+		rockDark: v('--gray-700', '#3b4252'),
+		apple: '#e23b3b',
+		leaf: '#3fb950',
+		stem: '#8a5a2b',
 	};
 };
 
@@ -91,13 +97,16 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		const colors = colorsRef.current ?? (colorsRef.current = readColors());
 		const size = cssSizeRef.current;
 		const cell = size / SNAKE_CFG.cols;
+		const cx = (c: Vec) => c.x * cell + cell / 2;
+		const cy = (c: Vec) => c.y * cell + cell / 2;
 		ctx.clearRect(0, 0, size, size);
 		ctx.fillStyle = colors.bg;
 		ctx.fillRect(0, 0, size, size);
+
 		// Faint grid.
 		ctx.strokeStyle = colors.grid;
 		ctx.lineWidth = 1;
-		ctx.globalAlpha = 0.6;
+		ctx.globalAlpha = 0.5;
 		for (let i = 1; i < SNAKE_CFG.cols; i++) {
 			ctx.beginPath();
 			ctx.moveTo(i * cell, 0);
@@ -107,16 +116,99 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			ctx.stroke();
 		}
 		ctx.globalAlpha = 1;
-		const pad = Math.max(1, cell * 0.08);
-		const cellRect = (c: Vec, fill: string, radius = cell * 0.28) => {
-			ctx.fillStyle = fill;
+
+		// Rocks: a shaded rounded boulder with a lighter top and a couple of speckles.
+		for (const r of st.rocks) {
+			const x = r.x * cell;
+			const y = r.y * cell;
+			const m = cell * 0.1;
+			ctx.fillStyle = colors.rockDark;
 			ctx.beginPath();
-			ctx.roundRect(c.x * cell + pad, c.y * cell + pad, cell - 2 * pad, cell - 2 * pad, radius);
+			ctx.roundRect(x + m, y + m, cell - 2 * m, cell - 2 * m, cell * 0.22);
 			ctx.fill();
-		};
-		st.rocks.forEach((r) => cellRect(r, colors.rock, cell * 0.18)); // rocks: chunkier corners
-		cellRect(st.food, colors.food);
-		st.snake.forEach((seg, i) => cellRect(seg, i === 0 ? colors.head : colors.body));
+			ctx.fillStyle = colors.rock;
+			ctx.beginPath();
+			ctx.roundRect(x + m, y + m, cell - 2 * m, cell - 2.4 * m, cell * 0.22);
+			ctx.fill();
+			ctx.fillStyle = colors.rockDark;
+			ctx.globalAlpha = 0.6;
+			ctx.beginPath();
+			ctx.arc(x + cell * 0.4, y + cell * 0.55, cell * 0.06, 0, Math.PI * 2);
+			ctx.arc(x + cell * 0.62, y + cell * 0.42, cell * 0.045, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.globalAlpha = 1;
+		}
+
+		// Apple: red body, little highlight, brown stem, green leaf.
+		{
+			const ax = cx(st.food);
+			const ay = cy(st.food);
+			const r = cell * 0.3;
+			ctx.fillStyle = colors.apple;
+			ctx.beginPath();
+			ctx.arc(ax - r * 0.35, ay + r * 0.1, r * 0.8, 0, Math.PI * 2);
+			ctx.arc(ax + r * 0.35, ay + r * 0.1, r * 0.8, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.fillStyle = '#ffffff';
+			ctx.globalAlpha = 0.35;
+			ctx.beginPath();
+			ctx.arc(ax - r * 0.35, ay - r * 0.2, r * 0.28, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.globalAlpha = 1;
+			ctx.strokeStyle = colors.stem;
+			ctx.lineWidth = Math.max(1, cell * 0.07);
+			ctx.lineCap = 'round';
+			ctx.beginPath();
+			ctx.moveTo(ax, ay - r * 0.7);
+			ctx.lineTo(ax + cell * 0.03, ay - r * 1.25);
+			ctx.stroke();
+			ctx.fillStyle = colors.leaf;
+			ctx.beginPath();
+			ctx.ellipse(ax + r * 0.45, ay - r * 1.15, r * 0.45, r * 0.22, -0.6, 0, Math.PI * 2);
+			ctx.fill();
+		}
+
+		// Snake: a continuous rounded body, tapered toward the tail, with an eyed head.
+		const n = st.snake.length;
+		if (n > 0) {
+			ctx.strokeStyle = colors.body;
+			ctx.lineJoin = 'round';
+			ctx.lineCap = 'round';
+			// Taper: draw from tail to neck in a few width steps so the tail thins out.
+			for (let i = n - 1; i >= 1; i--) {
+				const t = i / n; // 1 at tail → ~0 near head
+				ctx.lineWidth = cell * (0.82 - 0.32 * t);
+				ctx.beginPath();
+				ctx.moveTo(cx(st.snake[i]), cy(st.snake[i]));
+				ctx.lineTo(cx(st.snake[i - 1]), cy(st.snake[i - 1]));
+				ctx.stroke();
+			}
+			// Head.
+			const head = st.snake[0];
+			const hx = cx(head);
+			const hy = cy(head);
+			const hr = cell * 0.46;
+			ctx.fillStyle = colors.head;
+			ctx.beginPath();
+			ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+			ctx.fill();
+			// Eyes, oriented by direction.
+			const fwd = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[st.dir];
+			const px = -fwd.y;
+			const py = fwd.x; // perpendicular
+			for (const sgn of [-1, 1]) {
+				const ex = hx + fwd.x * hr * 0.3 + px * sgn * hr * 0.45;
+				const ey = hy + fwd.y * hr * 0.3 + py * sgn * hr * 0.45;
+				ctx.fillStyle = '#ffffff';
+				ctx.beginPath();
+				ctx.arc(ex, ey, hr * 0.28, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.fillStyle = '#101216';
+				ctx.beginPath();
+				ctx.arc(ex + fwd.x * hr * 0.12, ey + fwd.y * hr * 0.12, hr * 0.14, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
 	}, []);
 
 	const resize = useCallback(() => {
