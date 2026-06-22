@@ -84,8 +84,8 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, pommes et rochers sont les mêmes pour tout le monde (le niveau dépend du jour). Rejoue autant que tu veux : ton meilleur score est classé.' },
 	],
 	flappy: [
-		{ emoji: '🎯', title: 'Le but', body: 'Franchis un maximum de tuyaux sans les toucher ni tomber. Chaque tuyau passé vaut 1 point.' },
-		{ emoji: '🎮', title: 'Contrôles', body: 'Espace, clic ou tap pour battre des ailes. Plus tu maintiens, plus l\'oiseau monte haut ; un petit tap = petit saut. Choisis ta difficulté : écart et taille des ouvertures varient.' },
+		{ emoji: '🐔', title: 'Le but', body: 'Fais franchir à la cocotte un maximum de tuyaux sans les toucher ni tomber. Chaque tuyau passé vaut 1 point.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Espace, clic ou tap pour battre des ailes. Plus tu maintiens, plus la cocotte monte haut ; un petit tap = petit saut. Choisis ta difficulté : écart et taille des ouvertures varient.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, les tuyaux sont identiques pour tout le monde (le niveau dépend du jour). Rejoue à volonté : ton meilleur score est classé.' },
 	],
 	aquarium: [

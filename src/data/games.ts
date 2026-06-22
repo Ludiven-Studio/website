@@ -127,8 +127,8 @@ export const games: GameTile[] = [
 	},
 	{
 		id: 'flappy',
-		title: 'Flappy Bird',
-		pitch: 'Bats des ailes pour franchir un maximum de tuyaux. Tuyaux partagés au défi du jour.',
+		title: 'Flappy Cocotte',
+		pitch: 'Fais voleter la cocotte entre les tuyaux le plus longtemps possible. Tuyaux partagés au défi du jour.',
 		icon: 'bird',
 		href: '/jeux/flappy',
 		status: 'play',

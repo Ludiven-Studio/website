@@ -16,7 +16,7 @@ import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
-   FLAPPY BIRD — real-time React island (canvas + rAF loop).
+   FLAPPY COCOTTE — real-time React island (canvas + rAF loop).
    Libre : graine aléatoire, record local.
    Défi du jour : tuyaux identiques pour tous, rejouable, meilleur score classé.
    Engine is pure/tested (fixed-timestep physics).
@@ -81,39 +81,74 @@ const drawPipe = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, p: { x: numb
 	ctx.strokeRect(p.x - lip, gapBottom, cfg.pipeW + 2 * lip, 3);
 };
 
-const drawBird = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, birdY: number, vy: number) => {
+// A little hen ("cocotte"): white body, red comb + wattle, orange beak, wing, tail.
+const drawHen = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, birdY: number, vy: number) => {
 	const r = cfg.birdR;
 	const tilt = Math.max(-0.5, Math.min(0.8, vy / 180));
+	const RED = '#e23b3b';
 	ctx.save();
 	ctx.translate(cfg.birdX, birdY);
 	ctx.rotate(tilt);
-	// Body.
-	ctx.fillStyle = '#ffd23f';
+
+	// Tail feathers (back, pointing up-left).
+	ctx.fillStyle = '#eef0f2';
 	ctx.beginPath();
-	ctx.arc(0, 0, r, 0, Math.PI * 2);
-	ctx.fill();
-	// Wing.
-	ctx.fillStyle = '#f0b429';
-	ctx.beginPath();
-	ctx.ellipse(-r * 0.25, r * 0.15, r * 0.6, r * 0.38, -0.3, 0, Math.PI * 2);
-	ctx.fill();
-	// Beak.
-	ctx.fillStyle = '#ff8c2b';
-	ctx.beginPath();
-	ctx.moveTo(r * 0.7, -r * 0.18);
-	ctx.lineTo(r * 1.5, 0);
-	ctx.lineTo(r * 0.7, r * 0.18);
+	ctx.moveTo(-r * 0.7, r * 0.1);
+	ctx.lineTo(-r * 1.7, -r * 0.9);
+	ctx.lineTo(-r * 1.0, -r * 0.2);
+	ctx.lineTo(-r * 1.6, -r * 0.1);
 	ctx.closePath();
 	ctx.fill();
-	// Eye.
+
+	// Body.
 	ctx.fillStyle = '#ffffff';
 	ctx.beginPath();
-	ctx.arc(r * 0.42, -r * 0.42, r * 0.34, 0, Math.PI * 2);
+	ctx.ellipse(0, r * 0.1, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
 	ctx.fill();
+
+	// Wing.
+	ctx.fillStyle = '#e6e8ea';
+	ctx.beginPath();
+	ctx.ellipse(-r * 0.15, r * 0.2, r * 0.55, r * 0.4, -0.25, 0, Math.PI * 2);
+	ctx.fill();
+
+	// Head.
+	const hx = r * 0.62;
+	const hy = -r * 0.55;
+	ctx.fillStyle = '#ffffff';
+	ctx.beginPath();
+	ctx.arc(hx, hy, r * 0.62, 0, Math.PI * 2);
+	ctx.fill();
+
+	// Comb (crête) — three red bumps on top of the head.
+	ctx.fillStyle = RED;
+	for (let i = 0; i < 3; i++) {
+		ctx.beginPath();
+		ctx.arc(hx - r * 0.25 + i * r * 0.28, hy - r * 0.55, r * 0.2, 0, Math.PI * 2);
+		ctx.fill();
+	}
+
+	// Beak (orange) pointing forward.
+	ctx.fillStyle = '#ff9f1c';
+	ctx.beginPath();
+	ctx.moveTo(hx + r * 0.45, hy - r * 0.05);
+	ctx.lineTo(hx + r * 1.2, hy + r * 0.18);
+	ctx.lineTo(hx + r * 0.45, hy + r * 0.32);
+	ctx.closePath();
+	ctx.fill();
+
+	// Wattle (barbillon) under the beak.
+	ctx.fillStyle = RED;
+	ctx.beginPath();
+	ctx.ellipse(hx + r * 0.5, hy + r * 0.42, r * 0.16, r * 0.26, 0, 0, Math.PI * 2);
+	ctx.fill();
+
+	// Eye.
 	ctx.fillStyle = '#1b1b1b';
 	ctx.beginPath();
-	ctx.arc(r * 0.54, -r * 0.42, r * 0.16, 0, Math.PI * 2);
+	ctx.arc(hx + r * 0.18, hy - r * 0.1, r * 0.13, 0, Math.PI * 2);
 	ctx.fill();
+
 	ctx.restore();
 };
 
@@ -182,7 +217,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 
 		for (const p of st.pipes) drawPipe(ctx, cfg, p);
 		drawGround(ctx, cfg, st.distance);
-		drawBird(ctx, cfg, st.birdY, st.vy);
+		drawHen(ctx, cfg, st.birdY, st.vy);
 	}, []);
 
 	const resize = useCallback(() => {
@@ -459,7 +494,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 					ref={canvasRef}
 					className="fl-canvas"
 					role="img"
-					aria-label={`Flappy Bird — score ${score}`}
+					aria-label={`Flappy Cocotte — score ${score}`}
 					onPointerDown={onCanvasPointer}
 				/>
 
@@ -485,7 +520,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 
 			<p className="fl-help">
 				Appuie sur <strong>Espace</strong>, clique ou touche l'écran pour battre des ailes.
-				Plus tu <strong>maintiens</strong>, plus l'oiseau monte haut ; un petit tap = petit saut.
+				Plus tu <strong>maintiens</strong>, plus la cocotte monte haut ; un petit tap = petit saut.
 				Chaque tuyau franchi vaut 1 point. Choisis ta difficulté (écart et taille des ouvertures) ;
 				au défi du jour, les tuyaux sont les mêmes pour tout le monde.
 			</p>
