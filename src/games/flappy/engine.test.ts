@@ -40,11 +40,19 @@ describe('flappy engine', () => {
 		expect(st.status).toBe('playing');
 	});
 
-	it('holding extends the upward boost: held rises more than a tap', () => {
-		const tapped = step(flap(createFlappy()), 1, false);
-		const held = step(flap(createFlappy()), 1, true);
-		expect(held.vy).toBeLessThan(tapped.vy); // more negative = stronger rise
-		expect(held.boostMs).toBeLessThan(FLAPPY_CFG.boostMaxMs); // budget consumed while held
+	it('holding longer makes a bigger jump than a quick tap', () => {
+		const peakRise = (hold: boolean): number => {
+			let st = flap(createFlappy());
+			const startY = st.flapStartY;
+			let minY = st.birdY;
+			for (let i = 0; i < 120; i++) {
+				st = step(st, 1, hold);
+				minY = Math.min(minY, st.birdY);
+				if (!hold && st.vy >= 0) break; // tap: stop at apex
+			}
+			return startY - minY;
+		};
+		expect(peakRise(true)).toBeGreaterThan(peakRise(false));
 	});
 
 	it('gravity increases velocity and clamps at maxFallV', () => {
@@ -94,9 +102,34 @@ describe('flappy engine', () => {
 		expect(st.status).toBe('over');
 	});
 
+	it('a tap hops about a sixteenth of the screen', () => {
+		let st = flap(createFlappy());
+		const startY = st.flapStartY;
+		let minY = st.birdY;
+		for (let i = 0; i < 120; i++) {
+			st = step(st, 1, false); // release immediately → tap only
+			minY = Math.min(minY, st.birdY);
+			if (st.vy >= 0) break; // reached apex
+		}
+		const rise = startY - minY;
+		expect(rise).toBeGreaterThan(FLAPPY_CFG.worldH / 24);
+		expect(rise).toBeLessThan(FLAPPY_CFG.worldH / 10);
+	});
+
+	it('a single flap never climbs more than a quarter of the screen, even held forever', () => {
+		let st = flap(createFlappy());
+		const startY = st.flapStartY;
+		let minY = st.birdY;
+		for (let i = 0; i < 300; i++) {
+			st = step(st, 1, true); // hold the whole time
+			minY = Math.min(minY, st.birdY);
+		}
+		expect(startY - minY).toBeLessThanOrEqual(FLAPPY_CFG.worldH / 4 + 1e-6);
+	});
+
 	it('hitting a pipe (outside the gap) ends the game', () => {
 		let st: FlappyState = {
-			birdY: 50, vy: 0, distance: 0, score: 0, status: 'playing', spawnIndex: 1, boostMs: 0,
+			birdY: 50, vy: 0, distance: 0, score: 0, status: 'playing', spawnIndex: 1, boostMs: 0, heldMs: 0, flapStartY: 50,
 			pipes: [{ x: FLAPPY_CFG.birdX - 2, gapCenter: 90, scored: false }],
 		};
 		st = step(st, 1);
@@ -105,7 +138,7 @@ describe('flappy engine', () => {
 
 	it('clearing a pipe scores exactly once', () => {
 		let st: FlappyState = {
-			birdY: 50, vy: 0, distance: 0, score: 0, status: 'playing', spawnIndex: 1, boostMs: 0,
+			birdY: 50, vy: 0, distance: 0, score: 0, status: 'playing', spawnIndex: 1, boostMs: 0, heldMs: 0, flapStartY: 50,
 			pipes: [{ x: FLAPPY_CFG.birdX - FLAPPY_CFG.pipeW - 1, gapCenter: 50, scored: false }],
 		};
 		st = step(st, 1);
