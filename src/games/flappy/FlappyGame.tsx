@@ -48,19 +48,25 @@ const drawCloudLayer = (
 	sc: number,
 	alpha: number,
 ) => {
-	ctx.fillStyle = `rgba(255,255,255,${alpha})`;
 	// Each cloud k lives at world x = k*span; the layer scrolls by distance*factor. Indexing by
-	// the GLOBAL k (not a local loop index) keeps each cloud's position and height stable, so they
-	// drift smoothly off the left and in from the right with no pop.
+	// the GLOBAL k (not a local loop index) keeps each cloud's position and height stable. An alpha
+	// fade near both edges makes clouds appear/vanish smoothly instead of popping.
+	ctx.fillStyle = '#ffffff';
 	const scroll = distance * factor;
-	const margin = 22; // a cloud is ~16 wide; cull just outside the view
+	const margin = 26;
+	const fade = 16; // world units over which a cloud fades in/out at each edge
 	const kStart = Math.floor((scroll - margin) / span);
 	const kEnd = Math.ceil((scroll + worldW + margin) / span);
 	for (let k = kStart; k <= kEnd; k++) {
 		const x = k * span - scroll;
+		const center = x + 5 * sc; // visual centre of the cloud
+		const edge = Math.max(0, Math.min(1, (center + fade) / fade, (worldW + fade - center) / fade));
+		if (edge <= 0) continue;
+		ctx.globalAlpha = alpha * edge;
 		const y = ys[((k % ys.length) + ys.length) % ys.length];
 		drawCloud(ctx, x, y, sc);
 	}
+	ctx.globalAlpha = 1;
 };
 
 const drawPipe = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, p: { x: number; gapCenter: number }) => {
