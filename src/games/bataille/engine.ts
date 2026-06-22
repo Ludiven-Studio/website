@@ -2,7 +2,7 @@
  * BATAILLE NAVALE LOGIQUE — pure engine (no UI).
  * Find a hidden fleet. Cells are water or ship; ships never touch (8-neighbourhood).
  * Minesweeper-style clues: some water cells show the count of ship cells in their
- * 8-neighbourhood. Generation guarantees a unique solution.
+ * orthogonal neighbourhood (see CLUE_OFFSETS). Generation guarantees a unique solution.
  */
 
 import type { Rng } from '../prng';
@@ -41,7 +41,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	difficile: { label: 'Difficile', extraClues: 0 },
 };
 
-/** A revealed proximity clue: cell (r,c) is water and shows `n` = ship cells in its 8-nbr. */
+/** A revealed proximity clue: cell (r,c) is water and shows `n` = ship cells in its neighbourhood. */
 export interface ClueCell {
 	r: number;
 	c: number;
@@ -87,16 +87,26 @@ export function segType(grid: boolean[][], r: number, c: number): SegType {
 	return 'bottom';
 }
 
-/** Count of ship cells in the 8-neighbourhood of (r,c). */
+/**
+ * Neighbourhood a proximity clue counts over. Orthogonal only (no diagonals); add the four
+ * diagonal offsets here to count diagonals too. Independent of the no-touch rule, which always
+ * uses the full 8-neighbourhood.
+ */
+export const CLUE_OFFSETS: readonly [number, number][] = [
+	[-1, 0],
+	[1, 0],
+	[0, -1],
+	[0, 1],
+];
+
+/** Count of ship cells in the clue neighbourhood of (r,c). */
 export function proximity(grid: boolean[][], r: number, c: number, n: number): number {
 	let k = 0;
-	for (let dr = -1; dr <= 1; dr++)
-		for (let dc = -1; dc <= 1; dc++) {
-			if (dr === 0 && dc === 0) continue;
-			const nr = r + dr;
-			const nc = c + dc;
-			if (nr >= 0 && nr < n && nc >= 0 && nc < n && grid[nr][nc]) k++;
-		}
+	for (const [dr, dc] of CLUE_OFFSETS) {
+		const nr = r + dr;
+		const nc = c + dc;
+		if (nr >= 0 && nr < n && nc >= 0 && nc < n && grid[nr][nc]) k++;
+	}
 	return k;
 }
 
@@ -171,13 +181,11 @@ export function countSolutions(
 	// Clue bookkeeping: which clues each cell feeds, and the running ship count per clue.
 	const cellClues: number[][] = Array.from({ length: n * n }, () => []);
 	clues.forEach((cl, j) => {
-		for (let dr = -1; dr <= 1; dr++)
-			for (let dc = -1; dc <= 1; dc++) {
-				if (dr === 0 && dc === 0) continue;
-				const nr = cl.r + dr;
-				const nc = cl.c + dc;
-				if (nr >= 0 && nr < n && nc >= 0 && nc < n) cellClues[nr * n + nc].push(j);
-			}
+		for (const [dr, dc] of CLUE_OFFSETS) {
+			const nr = cl.r + dr;
+			const nc = cl.c + dc;
+			if (nr >= 0 && nr < n && nc >= 0 && nc < n) cellClues[nr * n + nc].push(j);
+		}
 	});
 	const clueShip = new Array(clues.length).fill(0);
 
@@ -283,16 +291,14 @@ export function findHint(marks: Mark[][], puzzle: BataillePuzzle): HintResult | 
 	// Free & still empty (a valid hint target). Bounds-safe (used on 8-neighbours).
 	const empty = (r: number, c: number) =>
 		r >= 0 && r < n && c >= 0 && c < n && !locked(r, c) && marks[r][c] === 0;
-	// 8-neighbour cells of (r,c), in bounds.
+	// Clue neighbourhood cells of (r,c), in bounds.
 	const neighbours = (r: number, c: number): { r: number; c: number }[] => {
 		const out: { r: number; c: number }[] = [];
-		for (let dr = -1; dr <= 1; dr++)
-			for (let dc = -1; dc <= 1; dc++) {
-				if (dr === 0 && dc === 0) continue;
-				const nr = r + dr;
-				const nc = c + dc;
-				if (nr >= 0 && nr < n && nc >= 0 && nc < n) out.push({ r: nr, c: nc });
-			}
+		for (const [dr, dc] of CLUE_OFFSETS) {
+			const nr = r + dr;
+			const nc = c + dc;
+			if (nr >= 0 && nr < n && nc >= 0 && nc < n) out.push({ r: nr, c: nc });
+		}
 		return out;
 	};
 

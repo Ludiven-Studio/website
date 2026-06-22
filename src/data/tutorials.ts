@@ -69,7 +69,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Comment jouer', body: 'Touche une case pour cycler : tente, puis herbe (case sûrement vide), puis vide. Indice corrige ou pose une tente ; solution dispo après 1 min.' },
 	],
 	bataille: [
-		{ emoji: '🚢', title: 'Le but', body: 'Retrouve la flotte cachée. Les chiffres dans certaines cases indiquent combien de cases-bateau les touchent, diagonales comprises (comme au démineur).' },
+		{ emoji: '🚢', title: 'Le but', body: 'Retrouve la flotte cachée. Les chiffres dans certaines cases indiquent combien de cases-bateau les touchent par un côté (haut, bas, gauche, droite — pas en diagonale).' },
 		{ emoji: '🌊', title: 'La règle', body: 'Les bateaux ne se touchent jamais, même en diagonale. Les cases numérotées sont toujours de l\'eau. Les lettres et chiffres autour de la grille servent à repérer les cases (A2…).' },
 		{ emoji: '💡', title: 'Comment jouer', body: 'Touche une case pour cycler : bateau, puis eau, puis vide. Repère la flotte à trouver en légende. Indice corrige une case ; solution dispo après 1 min.' },
 	],

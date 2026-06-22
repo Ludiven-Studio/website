@@ -17,7 +17,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 /* =====================================================
    BATAILLE NAVALE LOGIQUE — React island.
    Find a hidden fleet from minesweeper-style proximity
-   numbers: some water cells show their 8-nbr ship count.
+   numbers: some water cells show their orthogonal-nbr ship count.
    Row/column headers are coordinate labels only (A2, H4…).
    Mark each free cell ship or water; ships never touch
    (even diagonally). Engine is pure/tested.
@@ -504,10 +504,11 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<p className="ba-help">
-					Les chiffres dans certaines cases indiquent combien de cases-navire les touchent
-					(diagonales comprises). Touche une case pour la faire défiler : vide →{' '}
-					<strong>navire</strong> → <strong>eau</strong> → vide. Les navires ne se touchent
-					jamais. Les lettres et chiffres autour de la grille servent à repérer les cases (ex. A2).
+					Les chiffres dans certaines cases indiquent combien de cases-navire les touchent par
+					un côté (haut, bas, gauche, droite — pas en diagonale). Touche une case pour la faire
+					défiler : vide → <strong>navire</strong> → <strong>eau</strong> → vide. Les navires ne
+					se touchent jamais. Les lettres et chiffres autour de la grille servent à repérer les
+					cases (ex. A2).
 				</p>
 			)}
 		</div>

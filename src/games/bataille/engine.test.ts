@@ -178,12 +178,13 @@ describe('bataille engine', () => {
 		const h = findHint(emptyMarks(4), p)!;
 		expect(h).not.toBeNull();
 		expect(h.value).toBe('water');
-		// More than one cell at once (all neighbours of the 0 clue).
+		// More than one cell at once (all orthogonal neighbours of the 0 clue).
 		expect(h.cells.length).toBeGreaterThan(1);
 		for (const { r, c } of h.cells) expect(p.solution[r][c]).toBe(false);
-		// The three in-bounds neighbours of (3,3) are all proposed.
+		// The two in-bounds orthogonal neighbours of (3,3) are proposed (not the diagonal (2,2)).
 		const has = (r: number, c: number) => h.cells.some((x) => x.r === r && x.c === c);
-		expect(has(2, 2) && has(2, 3) && has(3, 2)).toBe(true);
+		expect(has(2, 3) && has(3, 2)).toBe(true);
+		expect(has(2, 2)).toBe(false);
 	});
 
 	it('easier levels reveal at least as many clues', () => {
