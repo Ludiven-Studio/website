@@ -64,13 +64,14 @@ describe('flappy engine', () => {
 		expect(st.vy).toBeCloseTo(FLAPPY_CFG.maxFallV, 5);
 	});
 
-	it('pipeGap is deterministic and within the safe band', () => {
-		const margin = FLAPPY_CFG.gapH / 2 + 6;
+	it('pipeGap is deterministic and within the safe band (below ceiling, above ground)', () => {
+		const top = FLAPPY_CFG.gapH / 2 + 4;
+		const bottom = FLAPPY_CFG.worldH - FLAPPY_CFG.groundH - FLAPPY_CFG.gapH / 2 - 4;
 		for (let i = 0; i < 30; i++) {
 			const a = pipeGap(123, i, FLAPPY_CFG);
 			expect(a).toBe(pipeGap(123, i, FLAPPY_CFG));
-			expect(a).toBeGreaterThanOrEqual(margin);
-			expect(a).toBeLessThanOrEqual(FLAPPY_CFG.worldH - margin);
+			expect(a).toBeGreaterThanOrEqual(top);
+			expect(a).toBeLessThanOrEqual(bottom);
 		}
 	});
 

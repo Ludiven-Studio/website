@@ -28,22 +28,106 @@ const BEST_KEY = 'ludiven-flappy-best';
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const STEP = 1000 / 60; // ms per physics step
 
-interface Colors {
-	bg: string;
-	pipe: string;
-	bird: string;
-	ground: string;
-}
+// Self-contained daytime scene (a little Flappy world, independent of the page theme).
+const drawCloud = (ctx: CanvasRenderingContext2D, x: number, y: number, sc: number) => {
+	ctx.beginPath();
+	ctx.arc(x, y, 5 * sc, 0, Math.PI * 2);
+	ctx.arc(x + 5 * sc, y + 1.4 * sc, 6 * sc, 0, Math.PI * 2);
+	ctx.arc(x + 11 * sc, y, 4.6 * sc, 0, Math.PI * 2);
+	ctx.arc(x + 5.5 * sc, y - 2.4 * sc, 4.6 * sc, 0, Math.PI * 2);
+	ctx.fill();
+};
 
-const readColors = (): Colors => {
-	const cs = getComputedStyle(document.documentElement);
-	const v = (n: string, fb: string) => cs.getPropertyValue(n).trim() || fb;
-	return {
-		bg: v('--gray-999', '#0e1014'),
-		pipe: v('--accent-regular', '#7b5cff'),
-		bird: v('--gray-0', '#f5f5f5'),
-		ground: v('--gray-800', '#1b1f27'),
-	};
+const drawCloudLayer = (
+	ctx: CanvasRenderingContext2D,
+	worldW: number,
+	distance: number,
+	factor: number,
+	span: number,
+	ys: number[],
+	sc: number,
+	alpha: number,
+) => {
+	ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+	const off = (distance * factor) % span;
+	for (let i = -1; i * span - off < worldW + span; i++) {
+		const x = i * span - off + 6;
+		const y = ys[((i % ys.length) + ys.length) % ys.length];
+		drawCloud(ctx, x, y, sc);
+	}
+};
+
+const drawPipe = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, p: { x: number; gapCenter: number }) => {
+	const gapTop = p.gapCenter - cfg.gapH / 2;
+	const gapBottom = p.gapCenter + cfg.gapH / 2;
+	const floorY = cfg.worldH - cfg.groundH;
+	const grad = ctx.createLinearGradient(p.x, 0, p.x + cfg.pipeW, 0);
+	grad.addColorStop(0, '#4caf5a');
+	grad.addColorStop(0.4, '#7ed98a');
+	grad.addColorStop(1, '#3c9a4c');
+	const lip = 1.4;
+	ctx.fillStyle = grad;
+	ctx.strokeStyle = '#2f7a3c';
+	ctx.lineWidth = 0.5;
+	// Top pipe + lip.
+	ctx.fillRect(p.x, 0, cfg.pipeW, gapTop - 3);
+	ctx.strokeRect(p.x, 0, cfg.pipeW, gapTop - 3);
+	ctx.fillRect(p.x - lip, gapTop - 3, cfg.pipeW + 2 * lip, 3);
+	ctx.strokeRect(p.x - lip, gapTop - 3, cfg.pipeW + 2 * lip, 3);
+	// Bottom pipe + lip (stops at the ground).
+	ctx.fillRect(p.x, gapBottom + 3, cfg.pipeW, floorY - (gapBottom + 3));
+	ctx.strokeRect(p.x, gapBottom + 3, cfg.pipeW, floorY - (gapBottom + 3));
+	ctx.fillRect(p.x - lip, gapBottom, cfg.pipeW + 2 * lip, 3);
+	ctx.strokeRect(p.x - lip, gapBottom, cfg.pipeW + 2 * lip, 3);
+};
+
+const drawBird = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, birdY: number, vy: number) => {
+	const r = cfg.birdR;
+	const tilt = Math.max(-0.5, Math.min(0.8, vy / 180));
+	ctx.save();
+	ctx.translate(cfg.birdX, birdY);
+	ctx.rotate(tilt);
+	// Body.
+	ctx.fillStyle = '#ffd23f';
+	ctx.beginPath();
+	ctx.arc(0, 0, r, 0, Math.PI * 2);
+	ctx.fill();
+	// Wing.
+	ctx.fillStyle = '#f0b429';
+	ctx.beginPath();
+	ctx.ellipse(-r * 0.25, r * 0.15, r * 0.6, r * 0.38, -0.3, 0, Math.PI * 2);
+	ctx.fill();
+	// Beak.
+	ctx.fillStyle = '#ff8c2b';
+	ctx.beginPath();
+	ctx.moveTo(r * 0.7, -r * 0.18);
+	ctx.lineTo(r * 1.5, 0);
+	ctx.lineTo(r * 0.7, r * 0.18);
+	ctx.closePath();
+	ctx.fill();
+	// Eye.
+	ctx.fillStyle = '#ffffff';
+	ctx.beginPath();
+	ctx.arc(r * 0.42, -r * 0.42, r * 0.34, 0, Math.PI * 2);
+	ctx.fill();
+	ctx.fillStyle = '#1b1b1b';
+	ctx.beginPath();
+	ctx.arc(r * 0.54, -r * 0.42, r * 0.16, 0, Math.PI * 2);
+	ctx.fill();
+	ctx.restore();
+};
+
+const drawGround = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, distance: number) => {
+	const top = cfg.worldH - cfg.groundH;
+	ctx.fillStyle = '#ded08a';
+	ctx.fillRect(0, top, cfg.worldW, cfg.groundH);
+	ctx.fillStyle = '#caa15a';
+	ctx.fillRect(0, top, cfg.worldW, 1.6);
+	// Scrolling stripes for a sense of speed.
+	ctx.fillStyle = 'rgba(160,120,60,0.35)';
+	const span = 9;
+	const off = (distance % span) + span;
+	for (let x = -off; x < cfg.worldW; x += span) ctx.fillRect(x, top + 2.5, 4.5, cfg.groundH - 3.5);
 };
 
 export default function FlappyGame({ gameId }: { gameId: string }) {
@@ -68,40 +152,37 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	const runningRef = useRef(false);
 	const scoreRef = useRef(0);
 	const startRef = useRef(0);
-	const colorsRef = useRef<Colors | null>(null);
 	const cssSizeRef = useRef(0);
 	const dailyRef = useRef(false);
 	const statusRef = useRef<Status>('ready');
 
-	/* ---- Drawing ---- */
+	/* ---- Drawing (everything in world units 0..100 via a scale transform) ---- */
 	const draw = useCallback(() => {
 		const canvas = canvasRef.current;
 		const st = stateRef.current;
 		if (!canvas) return;
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
-		const colors = colorsRef.current ?? (colorsRef.current = readColors());
 		const cfg = cfgRef.current;
 		const size = cssSizeRef.current;
-		const s = size / cfg.worldW; // world → px
-		ctx.clearRect(0, 0, size, size);
-		ctx.fillStyle = colors.bg;
-		ctx.fillRect(0, 0, size, size);
-		// Pipes (top + bottom of each gap).
-		ctx.fillStyle = colors.pipe;
-		for (const p of st.pipes) {
-			const gapTop = p.gapCenter - cfg.gapH / 2;
-			const gapBottom = p.gapCenter + cfg.gapH / 2;
-			ctx.beginPath();
-			ctx.roundRect(p.x * s, 0, cfg.pipeW * s, gapTop * s, 4);
-			ctx.roundRect(p.x * s, gapBottom * s, cfg.pipeW * s, (cfg.worldH - gapBottom) * s, 4);
-			ctx.fill();
-		}
-		// Bird.
-		ctx.fillStyle = colors.bird;
-		ctx.beginPath();
-		ctx.arc(cfg.birdX * s, st.birdY * s, cfg.birdR * s, 0, Math.PI * 2);
-		ctx.fill();
+		const dpr = window.devicePixelRatio || 1;
+		const sc = (size / cfg.worldW) * dpr; // world → device px
+		ctx.setTransform(sc, 0, 0, sc, 0, 0);
+
+		// Sky.
+		const sky = ctx.createLinearGradient(0, 0, 0, cfg.worldH);
+		sky.addColorStop(0, '#5fb6e6');
+		sky.addColorStop(1, '#c7ecf8');
+		ctx.fillStyle = sky;
+		ctx.fillRect(0, 0, cfg.worldW, cfg.worldH);
+
+		// Parallax clouds: far (slow) then near (faster).
+		drawCloudLayer(ctx, cfg.worldW, st.distance, 0.18, 46, [16, 30], 1.05, 0.55);
+		drawCloudLayer(ctx, cfg.worldW, st.distance, 0.42, 34, [10, 38, 22], 0.72, 0.85);
+
+		for (const p of st.pipes) drawPipe(ctx, cfg, p);
+		drawGround(ctx, cfg, st.distance);
+		drawBird(ctx, cfg, st.birdY, st.vy);
 	}, []);
 
 	const resize = useCallback(() => {
@@ -112,9 +193,6 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		cssSizeRef.current = cssSize;
 		canvas.width = Math.round(cssSize * dpr);
 		canvas.height = Math.round(cssSize * dpr);
-		const ctx = canvas.getContext('2d');
-		if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-		colorsRef.current = readColors();
 		draw();
 	}, [draw]);
 

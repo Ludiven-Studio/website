@@ -11,13 +11,14 @@ export interface FlappyConfig {
 	worldH: number;
 	gravity: number; // units / s²
 	flapV: number; // initial upward impulse on a tap (negative = up)
-	boostAccel: number; // extra upward accel while the key stays held (variable jump)
-	boostMaxMs: number; // max duration the held boost lasts per flap
-	boostDelayMs: number; // held time before the boost engages (quick taps stay small)
+	liftV: number; // steady upward speed while held (smooth controlled rise, not acceleration)
+	boostMaxMs: number; // max duration the held lift lasts per flap
+	boostDelayMs: number; // held time before the lift engages (quick taps stay small)
 	maxFallV: number; // terminal downward velocity
 	birdX: number;
 	birdR: number;
 	pipeW: number;
+	groundH: number; // ground band at the bottom (lethal floor sits at worldH - groundH)
 	gapH: number; // gap opening height
 	pipeSpacing: number; // distance between consecutive pipes
 	speed: number; // horizontal scroll speed, units / s
@@ -25,20 +26,21 @@ export interface FlappyConfig {
 
 // Flap feel is constant across levels (variable impulse by hold duration). Difficulty only
 // tightens the course: smaller openings, closer pipes, faster scroll.
-// flapV gives a tap a ~worldH/16 hop (sqrt(2*gravity*6.25) ≈ 55); holding adds a gentle boost.
-// A single flap's climb is hard-capped at worldH/4 (see stepWorld), so it never overshoots.
+// flapV gives a tap a ~worldH/16 hop (sqrt(2*gravity*6.25) ≈ 55). Holding lifts at a steady speed
+// (liftV) — a smooth controlled rise, not an acceleration — capped at worldH/4 per flap.
 const BASE = {
 	worldW: 100,
 	worldH: 100,
 	gravity: 240,
 	flapV: -55,
-	boostAccel: 300,
-	boostMaxMs: 260,
-	boostDelayMs: 130, // a quick tap (held < this) is just the impulse; longer holds add lift
+	liftV: 48,
+	boostMaxMs: 520, // long enough for a held lift to reach the worldH/4 cap, then it stops
+	boostDelayMs: 130, // a quick tap (held < this) is just the impulse; longer holds lift
 	maxFallV: 150,
 	birdX: 28,
 	birdR: 3,
 	pipeW: 13,
+	groundH: 8,
 };
 
 export interface FlappyDiff {
@@ -49,9 +51,9 @@ export interface FlappyDiff {
 }
 
 export const FLAPPY_DIFFS: Record<string, FlappyDiff> = {
-	facile: { label: 'Facile', gapH: 34, pipeSpacing: 60, speed: 40 },
-	moyen: { label: 'Moyen', gapH: 27, pipeSpacing: 50, speed: 47 },
-	difficile: { label: 'Difficile', gapH: 22, pipeSpacing: 42, speed: 54 },
+	facile: { label: 'Facile', gapH: 34, pipeSpacing: 82, speed: 38 },
+	moyen: { label: 'Moyen', gapH: 28, pipeSpacing: 68, speed: 44 },
+	difficile: { label: 'Difficile', gapH: 23, pipeSpacing: 56, speed: 50 },
 };
 
 export const flappyConfig = (d: FlappyDiff): FlappyConfig => ({
@@ -92,9 +94,10 @@ const firstSpawn = (cfg: FlappyConfig): number => cfg.worldW;
 
 /** Gap centre of pipe `i` — pure function of (seed, i), so the layout is shared. */
 export function pipeGap(seed: number, i: number, cfg: FlappyConfig): number {
-	const margin = cfg.gapH / 2 + 6;
+	const top = cfg.gapH / 2 + 4; // keep the gap below the ceiling
+	const bottom = cfg.worldH - cfg.groundH - cfg.gapH / 2 - 4; // and above the ground
 	const r = mulberry32((seed + i * 0x9e3779b1) >>> 0)();
-	return margin + r * (cfg.worldH - 2 * margin);
+	return top + r * (bottom - top);
 }
 
 export function createFlappy(cfg: FlappyConfig = FLAPPY_CFG): FlappyState {
@@ -131,17 +134,19 @@ export function stepWorld(
 ): FlappyState {
 	if (state.status !== 'playing') return state;
 
-	// Variable jump: a quick tap is just the impulse; holding past boostDelayMs adds lift, until
-	// the boost budget runs out or the flap reaches its climb cap.
+	// A quick tap is just the impulse; holding past boostDelayMs lifts at a steady speed (smooth
+	// rise, not acceleration) until the budget runs out or the flap reaches its climb cap.
 	const maxRise = maxFlapRise(cfg);
 	const heldMs = holding ? state.heldMs + dt * 1000 : 0;
-	let accel = cfg.gravity;
 	let boostMs = state.boostMs;
-	if (holding && heldMs >= cfg.boostDelayMs && boostMs > 0 && state.flapStartY - state.birdY < maxRise) {
-		accel -= cfg.boostAccel;
+	const lifting = holding && heldMs >= cfg.boostDelayMs && boostMs > 0 && state.flapStartY - state.birdY < maxRise;
+	let vy: number;
+	if (lifting) {
+		vy = -cfg.liftV; // hold a constant upward velocity
 		boostMs = Math.max(0, boostMs - dt * 1000);
+	} else {
+		vy = Math.min(state.vy + cfg.gravity * dt, cfg.maxFallV);
 	}
-	let vy = Math.min(state.vy + accel * dt, cfg.maxFallV);
 	let birdY = state.birdY + vy * dt;
 	// Hard cap: a single flap never climbs more than maxRise above where it started.
 	const ceilingY = state.flapStartY - maxRise;
@@ -171,8 +176,8 @@ export function stepWorld(
 
 	pipes = pipes.filter((p) => p.x + cfg.pipeW > -1); // cull off-screen left
 
-	// Collisions: floor/ceiling, or a pipe (outside its gap).
-	let dead = birdY - cfg.birdR < 0 || birdY + cfg.birdR > cfg.worldH;
+	// Collisions: ceiling/ground, or a pipe (outside its gap).
+	let dead = birdY - cfg.birdR < 0 || birdY + cfg.birdR > cfg.worldH - cfg.groundH;
 	if (!dead)
 		for (const p of pipes) {
 			const overlapX = cfg.birdX + cfg.birdR > p.x && cfg.birdX - cfg.birdR < p.x + cfg.pipeW;
