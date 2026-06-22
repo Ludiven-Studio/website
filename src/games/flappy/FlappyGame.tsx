@@ -49,10 +49,16 @@ const drawCloudLayer = (
 	alpha: number,
 ) => {
 	ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-	const off = (distance * factor) % span;
-	for (let i = -1; i * span - off < worldW + span; i++) {
-		const x = i * span - off + 6;
-		const y = ys[((i % ys.length) + ys.length) % ys.length];
+	// Each cloud k lives at world x = k*span; the layer scrolls by distance*factor. Indexing by
+	// the GLOBAL k (not a local loop index) keeps each cloud's position and height stable, so they
+	// drift smoothly off the left and in from the right with no pop.
+	const scroll = distance * factor;
+	const margin = 22; // a cloud is ~16 wide; cull just outside the view
+	const kStart = Math.floor((scroll - margin) / span);
+	const kEnd = Math.ceil((scroll + worldW + margin) / span);
+	for (let k = kStart; k <= kEnd; k++) {
+		const x = k * span - scroll;
+		const y = ys[((k % ys.length) + ys.length) % ys.length];
 		drawCloud(ctx, x, y, sc);
 	}
 };
