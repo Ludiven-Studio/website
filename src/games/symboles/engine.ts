@@ -2,17 +2,32 @@
  * SYMBOLES — pure engine (no UI).
  * Generate a sequence of visual symbols (cells) from a hidden rule; the player
  * picks the next symbol among 4 choices (QCM). Seeded for the daily challenge.
- * A cell is a CSS-drawn token: shape + color + rotation + count.
+ * A cell is a glyph token: shape + color + rotation + horizontal flip + count.
  */
 
 import type { Rng } from '../prng';
 
-export type Shape = 'circle' | 'square' | 'triangle' | 'diamond' | 'star' | 'hexagon';
+export type Shape =
+	| 'circle'
+	| 'square'
+	| 'triangle'
+	| 'diamond'
+	| 'star'
+	| 'hexagon'
+	| 'plus'
+	| 'heart'
+	| 'arrow'
+	| 'semicircle'
+	| 'quarter'
+	| 'ell'
+	| 'flag'
+	| 'zee';
 
 export interface Cell {
 	shape: Shape;
 	color: number; // index into COLORS palette
-	rotation: number; // degrees, multiples of 45/90
+	rotation: number; // degrees, multiples of 90
+	flip: boolean; // horizontal mirror (symmetry)
 	count: number; // 1..4 mini-shapes in the cell
 }
 
@@ -36,7 +51,39 @@ export interface DiffLevel {
 
 /** Palette indices map to CSS colors in the UI. Keep in sync with SymbolesGame. */
 export const COLORS = ['#5b8def', '#e6566f', '#2f9e6f', '#f0a830', '#9b6cf0', '#22b5c9'];
-export const SHAPES: Shape[] = ['circle', 'square', 'triangle', 'diamond', 'star', 'hexagon'];
+
+export const SHAPES: Shape[] = [
+	'circle', 'square', 'triangle', 'diamond', 'star', 'hexagon', 'plus', 'heart',
+	'arrow', 'semicircle', 'quarter', 'ell', 'flag', 'zee',
+];
+
+/**
+ * Per-shape symmetry metadata.
+ * rotVisible: a 90° rotation is visually distinct (so rotation may be applied).
+ * chiral: the mirror image equals NO rotation of the shape (so flip is meaningful).
+ * Invariant: rotation is only ever set on rotVisible shapes, flip only on chiral
+ * shapes — this keeps every (shape,rot,flip) combo a distinct picture, so two
+ * options can never look identical.
+ */
+export const META: Record<Shape, { rotVisible: boolean; chiral: boolean }> = {
+	circle: { rotVisible: false, chiral: false },
+	square: { rotVisible: false, chiral: false },
+	triangle: { rotVisible: true, chiral: false },
+	diamond: { rotVisible: false, chiral: false },
+	star: { rotVisible: false, chiral: false },
+	hexagon: { rotVisible: false, chiral: false },
+	plus: { rotVisible: false, chiral: false },
+	heart: { rotVisible: false, chiral: false },
+	arrow: { rotVisible: true, chiral: false },
+	semicircle: { rotVisible: true, chiral: false },
+	quarter: { rotVisible: true, chiral: false },
+	ell: { rotVisible: true, chiral: true },
+	flag: { rotVisible: true, chiral: true },
+	zee: { rotVisible: true, chiral: true },
+};
+
+const ROT_SHAPES = SHAPES.filter((s) => META[s].rotVisible);
+const CHIRAL_SHAPES = SHAPES.filter((s) => META[s].chiral);
 
 const ri = (rng: Rng, lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1));
 const pick = <T>(rng: Rng, arr: T[]): T => arr[Math.floor(rng() * arr.length)];
@@ -51,18 +98,21 @@ function shuffle<T>(arr: T[], rng: Rng): T[] {
 	return a;
 }
 
-/** Stable identity of a cell — used for option uniqueness and answer matching. */
+/** Canonical identity of a cell — matches its on-screen appearance 1:1. */
 export function cellKey(c: Cell): string {
-	return `${c.shape}|${c.color}|${mod(c.rotation, 360)}|${c.count}`;
+	const rot = META[c.shape].rotVisible ? mod(c.rotation, 360) : 0;
+	const flip = META[c.shape].chiral ? c.flip : false;
+	return `${c.shape}|${c.color}|${rot}|${flip}|${c.count}`;
 }
 
 const cellEq = (a: Cell, b: Cell) => cellKey(a) === cellKey(b);
 
-/** A fixed-attribute random base cell. */
+/** A plain upright cell with random shape + color. */
 const baseCell = (rng: Rng): Cell => ({
 	shape: pick(rng, SHAPES),
 	color: ri(rng, 0, COLORS.length - 1),
 	rotation: 0,
+	flip: false,
 	count: 1,
 });
 
@@ -74,7 +124,6 @@ const repeat = (rng: Rng): Generated => {
 	const motif: Cell[] = [];
 	for (let i = 0; i < period; i++) {
 		let c = baseCell(rng);
-		// ensure cells in the motif differ from each other
 		let guard = 0;
 		while (motif.some((m) => cellEq(m, c)) && guard++ < 12) c = baseCell(rng);
 		motif.push(c);
@@ -106,6 +155,7 @@ const shapeCycle = (rng: Rng): Generated => {
 		shape: SHAPES[mod(start + step * i, SHAPES.length)],
 		color,
 		rotation: 0,
+		flip: false,
 		count: 1,
 	});
 	return { terms: [0, 1, 2, 3, 4].map(at), answer: at(5), rule: 'les formes défilent dans l’ordre' };
@@ -120,21 +170,35 @@ const colorCycle = (rng: Rng): Generated => {
 		shape,
 		color: mod(start + step * i, COLORS.length),
 		rotation: 0,
+		flip: false,
 		count: 1,
 	});
 	return { terms: [0, 1, 2, 3, 4].map(at), answer: at(5), rule: 'les couleurs défilent' };
 };
 
-// Same symbol, rotation increases by a fixed step.
+// Same symbol, rotation increases by a fixed step (asymmetric glyph).
 const rotate = (rng: Rng): Generated => {
-	const shape = pick(rng, ['triangle', 'square', 'star', 'diamond', 'hexagon'] as Shape[]);
+	const shape = pick(rng, ROT_SHAPES);
 	const color = ri(rng, 0, COLORS.length - 1);
-	const step = pick(rng, [45, 90]) * (rng() < 0.35 ? -1 : 1);
-	const at = (i: number): Cell => ({ shape, color, rotation: step * i, count: 1 });
+	const step = pick(rng, [90, -90]);
+	const at = (i: number): Cell => ({ shape, color, rotation: step * i, flip: false, count: 1 });
 	return {
 		terms: [0, 1, 2, 3, 4].map(at),
 		answer: at(5),
 		rule: `le symbole pivote de ${step > 0 ? '+' : ''}${step}°`,
+	};
+};
+
+// Chiral symbol that reflects: it alternates with its mirror image.
+const mirror = (rng: Rng): Generated => {
+	const shape = pick(rng, CHIRAL_SHAPES);
+	const color = ri(rng, 0, COLORS.length - 1);
+	const rot0 = pick(rng, [0, 90, 180, 270]);
+	const at = (i: number): Cell => ({ shape, color, rotation: rot0, flip: i % 2 === 1, count: 1 });
+	return {
+		terms: [0, 1, 2, 3, 4].map(at),
+		answer: at(5),
+		rule: 'le symbole se reflète (miroir) en alternance',
 	};
 };
 
@@ -143,7 +207,13 @@ const countGrow = (rng: Rng): Generated => {
 	const shape = pick(rng, SHAPES);
 	const color = ri(rng, 0, COLORS.length - 1);
 	const start = ri(rng, 1, 2);
-	const at = (i: number): Cell => ({ shape, color, rotation: 0, count: mod(start - 1 + i, 4) + 1 });
+	const at = (i: number): Cell => ({
+		shape,
+		color,
+		rotation: 0,
+		flip: false,
+		count: mod(start - 1 + i, 4) + 1,
+	});
 	return {
 		terms: [0, 1, 2, 3, 4].map(at),
 		answer: at(5),
@@ -151,60 +221,84 @@ const countGrow = (rng: Rng): Generated => {
 	};
 };
 
-// Two attributes change together: rotation + color cycle.
-const combo = (rng: Rng): Generated => {
-	const shape = pick(rng, ['triangle', 'square', 'star', 'diamond', 'hexagon'] as Shape[]);
+// Chiral symbol that both rotates (+90°) and reflects each step.
+const rotateMirror = (rng: Rng): Generated => {
+	const shape = pick(rng, CHIRAL_SHAPES);
+	const color = ri(rng, 0, COLORS.length - 1);
+	const step = pick(rng, [90, -90]);
+	const at = (i: number): Cell => ({ shape, color, rotation: step * i, flip: i % 2 === 1, count: 1 });
+	return {
+		terms: [0, 1, 2, 3, 4].map(at),
+		answer: at(5),
+		rule: `il pivote de ${step > 0 ? '+' : ''}${step}° et se reflète`,
+	};
+};
+
+// Asymmetric symbol rotating while its color cycles.
+const rotateColor = (rng: Rng): Generated => {
+	const shape = pick(rng, ROT_SHAPES);
 	const cStart = ri(rng, 0, COLORS.length - 1);
-	const rStep = pick(rng, [45, 90]);
+	const rStep = pick(rng, [90, -90]);
 	const cStep = pick(rng, [1, 2]);
 	const at = (i: number): Cell => ({
 		shape,
 		color: mod(cStart + cStep * i, COLORS.length),
 		rotation: rStep * i,
+		flip: false,
 		count: 1,
 	});
 	return {
 		terms: [0, 1, 2, 3, 4].map(at),
 		answer: at(5),
-		rule: `il pivote de +${rStep}° et la couleur défile`,
+		rule: `il pivote de ${rStep > 0 ? '+' : ''}${rStep}° et la couleur défile`,
 	};
 };
 
-// Two interleaved sub-sequences: A0 B0 A1 B1 A2 -> answer B2.
+// Two interleaved sub-sequences: one rotates, one reflects.
+// A0 B0 A1 B1 A2 -> answer B2.
 const interleaved = (rng: Rng): Generated => {
-	const shapeA = pick(rng, SHAPES);
+	const shapeA = pick(rng, ROT_SHAPES);
 	const colorA = ri(rng, 0, COLORS.length - 1);
-	const stepA = pick(rng, [45, 90]);
-	const shapeB = pick(rng, SHAPES);
+	const stepA = pick(rng, [90, -90]);
+	const shapeB = pick(rng, CHIRAL_SHAPES);
 	const colorB = ri(rng, 0, COLORS.length - 1);
-	const A = (i: number): Cell => ({ shape: shapeA, color: colorA, rotation: stepA * i, count: 1 });
-	const B = (i: number): Cell => ({ shape: shapeB, color: colorB, rotation: 0, count: mod(i, 4) + 1 });
+	const A = (i: number): Cell => ({ shape: shapeA, color: colorA, rotation: stepA * i, flip: false, count: 1 });
+	const B = (i: number): Cell => ({ shape: shapeB, color: colorB, rotation: 0, flip: i % 2 === 1, count: 1 });
 	return { terms: [A(0), B(0), A(1), B(1), A(2)], answer: B(2), rule: 'deux suites entrelacées' };
 };
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', families: [repeat, alternate] },
-	moyen: { label: 'Moyen', families: [shapeCycle, colorCycle, rotate, countGrow] },
-	difficile: { label: 'Difficile', families: [combo, interleaved] },
+	facile: { label: 'Facile', families: [repeat, alternate, shapeCycle] },
+	moyen: { label: 'Moyen', families: [colorCycle, rotate, mirror, countGrow] },
+	difficile: { label: 'Difficile', families: [rotateMirror, interleaved, rotateColor] },
 };
 
 /* ---------- Distractors ---------- */
 
-/** Mutate one attribute of a cell to build a plausible-but-wrong option. */
-function nudge(c: Cell, which: number, rng: Rng): Cell {
+/** Mutate one attribute of a cell, respecting its symmetry metadata. */
+function nudge(c: Cell, rng: Rng): Cell {
 	const out = { ...c };
-	switch (mod(which, 4)) {
-		case 0:
+	const kinds = ['shape', 'color', 'count'];
+	if (META[c.shape].rotVisible) kinds.push('rot');
+	if (META[c.shape].chiral) kinds.push('flip');
+	switch (pick(rng, kinds)) {
+		case 'shape': {
 			out.shape = SHAPES[mod(SHAPES.indexOf(c.shape) + (rng() < 0.5 ? 1 : -1), SHAPES.length)];
+			if (!META[out.shape].rotVisible) out.rotation = 0;
+			if (!META[out.shape].chiral) out.flip = false;
 			break;
-		case 1:
+		}
+		case 'color':
 			out.color = mod(c.color + (rng() < 0.5 ? 1 : -1), COLORS.length);
 			break;
-		case 2:
-			out.rotation = c.rotation + pick(rng, [45, -45, 90, -90]);
+		case 'count':
+			out.count = mod(c.count - 1 + (rng() < 0.5 ? 1 : 3), 4) + 1;
+			break;
+		case 'rot':
+			out.rotation = c.rotation + pick(rng, [90, -90, 180]);
 			break;
 		default:
-			out.count = mod(c.count - 1 + (rng() < 0.5 ? 1 : 3), 4) + 1;
+			out.flip = !c.flip;
 	}
 	return out;
 }
@@ -212,16 +306,20 @@ function nudge(c: Cell, which: number, rng: Rng): Cell {
 function makeOptions(g: Generated, rng: Rng): Cell[] {
 	const { answer } = g;
 	const byKey = new Map<string, Cell>([[cellKey(answer), answer]]);
-	const order = shuffle([0, 1, 2, 3, 0, 1, 2, 3], rng);
-	let i = 0;
-	while (byKey.size < 4 && i < order.length) {
-		const cand = nudge(answer, order[i++], rng);
+	let guard = 0;
+	while (byKey.size < 4 && guard++ < 40) {
+		const cand = nudge(answer, rng);
 		byKey.set(cellKey(cand), cand);
 	}
 	// Safety: fill with shape variations until 4 distinct.
 	let k = 1;
 	while (byKey.size < 4) {
-		const cand: Cell = { ...answer, shape: SHAPES[mod(SHAPES.indexOf(answer.shape) + k++, SHAPES.length)] };
+		const cand: Cell = {
+			...answer,
+			rotation: 0,
+			flip: false,
+			shape: SHAPES[mod(SHAPES.indexOf(answer.shape) + k++, SHAPES.length)],
+		};
 		byKey.set(cellKey(cand), cand);
 	}
 	return shuffle([...byKey.values()], rng);

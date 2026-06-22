@@ -41,7 +41,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	symboles: [
 		{ emoji: '🔷', title: 'Le but', body: 'Une suite de symboles obéit à une logique cachée : devine le symbole qui vient ensuite.' },
 		{ emoji: '✅', title: 'Comment jouer', body: 'Choisis la bonne réponse. Bonne réponse → on enchaîne et le score monte ; une erreur termine la manche.' },
-		{ emoji: '💡', title: 'Astuce', body: 'Repère ce qui change : la forme, la couleur, la rotation ou le nombre d\'éléments. Indice élimine une option ; « Voir la réponse » dévoile la règle.' },
+		{ emoji: '💡', title: 'Astuce', body: 'Repère ce qui change : la forme, la couleur, la rotation, le reflet (miroir) ou le nombre d\'éléments. Indice élimine une option ; « Voir la réponse » dévoile la règle.' },
 	],
 	'rond-carre': [
 		{ emoji: '🎯', title: 'Le but', body: 'Remplis la grille de ronds ● et de carrés ■, autant de chacun par ligne et par colonne.' },

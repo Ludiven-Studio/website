@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { DIFFS, generateQuestion, cellKey, COLORS, type Question, type Cell, type Shape } from './engine';
+import { DIFFS, generateQuestion, cellKey, COLORS, META, type Question, type Cell, type Shape } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -39,36 +39,38 @@ const dailyQ = (seed: number, diffIndex: number, i: number): Question =>
 
 /* ---------- Symbol renderer ---------- */
 
-const CLIP: Record<Shape, string> = {
-	circle: '',
-	square: '',
-	triangle: 'polygon(50% 4%, 96% 96%, 4% 96%)',
-	diamond: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
-	star: 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
-	hexagon: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)',
+// Glyph inner SVG markup in a 0..100 viewBox. No fill: inherits from the <g>.
+const GLYPHS: Record<Shape, string> = {
+	circle: '<circle cx="50" cy="50" r="40"/>',
+	square: '<rect x="14" y="14" width="72" height="72" rx="6"/>',
+	triangle: '<polygon points="50,10 90,86 10,86"/>',
+	diamond: '<polygon points="50,8 92,50 50,92 8,50"/>',
+	star: '<polygon points="50,4 61,37 96,37 68,58 79,92 50,71 21,92 32,58 4,37 39,37"/>',
+	hexagon: '<polygon points="26,8 74,8 98,50 74,92 26,92 2,50"/>',
+	plus: '<polygon points="38,12 62,12 62,38 88,38 88,62 62,62 62,88 38,88 38,62 12,62 12,38 38,38"/>',
+	heart: '<path d="M50 86 C16 60 12 34 30 23 C42 16 50 25 50 33 C50 25 58 16 70 23 C88 34 84 60 50 86 Z"/>',
+	arrow: '<polygon points="10,38 56,38 56,20 92,50 56,80 56,62 10,62"/>',
+	semicircle: '<path d="M12 64 a38 38 0 0 1 76 0 Z"/>',
+	quarter: '<path d="M18 82 L82 82 A64 64 0 0 0 18 18 Z"/>',
+	ell: '<polygon points="30,12 50,12 50,68 84,68 84,88 30,88"/>',
+	flag: '<path d="M26 12 h8 v76 h-8 Z M34 16 L80 31 L34 46 Z"/>',
+	zee: '<polygon points="16,12 84,12 84,32 50,68 84,68 84,88 16,88 16,68 50,32 16,32"/>',
 };
 
 function SymbolCell({ cell, big = false }: { cell: Cell; big?: boolean }) {
 	const color = COLORS[cell.color] ?? COLORS[0];
 	const n = Math.max(1, Math.min(4, cell.count));
-	const mini = n === 1 ? (big ? 30 : 26) : big ? 15 : 13;
+	const mini = n === 1 ? (big ? 38 : 32) : big ? 19 : 16;
 	const cols = n === 1 ? 1 : 2;
-	const clip = CLIP[cell.shape];
+	const rot = META[cell.shape].rotVisible ? cell.rotation : 0;
+	const flip = META[cell.shape].chiral && cell.flip;
+	const transform = `rotate(${rot} 50 50)${flip ? ' translate(100 0) scale(-1 1)' : ''}`;
 	return (
 		<span className="sy-cell" style={{ gridTemplateColumns: `repeat(${cols}, auto)` }}>
 			{Array.from({ length: n }).map((_, i) => (
-				<span
-					key={i}
-					className="sy-shape"
-					style={{
-						width: mini,
-						height: mini,
-						background: color,
-						borderRadius: cell.shape === 'circle' ? '50%' : cell.shape === 'square' ? '3px' : '0',
-						clipPath: clip || undefined,
-						transform: `rotate(${cell.rotation}deg)`,
-					}}
-				/>
+				<svg key={i} className="sy-shape" width={mini} height={mini} viewBox="0 0 100 100" aria-hidden="true">
+					<g fill={color} transform={transform} dangerouslySetInnerHTML={{ __html: GLYPHS[cell.shape] }} />
+				</svg>
 			))}
 		</span>
 	);
