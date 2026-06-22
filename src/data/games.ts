@@ -59,6 +59,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'symboles',
+		title: 'Symboles',
+		pitch: 'Devine la logique d\'une suite de symboles et trouve le suivant. En choix multiple.',
+		icon: 'squares-four',
+		href: '/jeux/symboles',
+		status: 'play',
+	},
+	{
 		id: 'rond-carre',
 		title: 'Rond & Carré',
 		pitch: 'Équilibre ronds et carrés, jamais 3 d\'affilée, avec des contraintes = / ≠. Façon Tango.',
