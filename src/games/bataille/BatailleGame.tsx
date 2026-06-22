@@ -15,10 +15,12 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
-   BATAILLE NAVALE LOGIQUE (Bimaru) — React island.
-   Find a hidden fleet from row/column ship counts and a
-   few revealed cells. Mark each free cell ship or water;
-   ships never touch (even diagonally). Engine is pure/tested.
+   BATAILLE NAVALE LOGIQUE — React island.
+   Find a hidden fleet from minesweeper-style proximity
+   numbers: some water cells show their 8-nbr ship count.
+   Row/column headers are coordinate labels only (A2, H4…).
+   Mark each free cell ship or water; ships never touch
+   (even diagonally). Engine is pure/tested.
    ===================================================== */
 
 type Status = 'playing' | 'won';
@@ -67,7 +69,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	const painting = useRef(false);
 	const strokeVal = useRef<Mark>(0);
 
-	const { size, given, solution, rowCounts, colCounts, fleet } = puzzle;
+	const { size, given, solution, clues, fleet } = puzzle;
 	const over = status === 'won' || revealed;
 
 	const newGame = useCallback((sk: keyof typeof SIZES, dk: keyof typeof DIFFS) => {
@@ -194,18 +196,15 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		});
 	}, []);
 
-	/* Effective ship grid for rendering and counts. */
+	/* Effective ship grid for rendering. */
 	const ships = useMemo(() => shipGrid(marks, given, size), [marks, given, size]);
 
-	const rowShipCount = useMemo(
-		() => ships.map((row) => row.reduce((a, v) => a + (v ? 1 : 0), 0)),
-		[ships],
-	);
-	const colShipCount = useMemo(() => {
-		const out = new Array(size).fill(0);
-		for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) if (ships[r][c]) out[c]++;
-		return out;
-	}, [ships, size]);
+	/* Proximity clue numbers, keyed "r,c". */
+	const clueMap = useMemo(() => {
+		const m = new Map<string, number>();
+		for (const cl of clues) m.set(`${cl.r},${cl.c}`, cl.n);
+		return m;
+	}, [clues]);
 
 	/* Win: every cell's effective ship matches the solution. */
 	useEffect(() => {
@@ -440,37 +439,27 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					onPointerCancel={endStroke}
 				>
 					<div className="ba-corner" />
-					{Array.from({ length: size }).map((_, c) => {
-						const cur = colShipCount[c];
-						const tgt = colCounts[c];
-						const cls = cur > tgt ? 'over' : cur === tgt ? 'done' : '';
-						return (
-							<div key={`ch${c}`} className={`ba-head col ${cls}`}>
-								{tgt}
-							</div>
-						);
-					})}
-					{Array.from({ length: size }).map((_, r) => {
-						const curR = rowShipCount[r];
-						const tgtR = rowCounts[r];
-						const rcls = curR > tgtR ? 'over' : curR === tgtR ? 'done' : '';
-						return (
-							<RowCells
-								key={`row${r}`}
-								r={r}
-								size={size}
-								rowTarget={tgtR}
-								rowClass={rcls}
-								marks={marks}
-								given={given}
-								ships={ships}
-								solution={solution}
-								hinted={hinted}
-								revealed={revealed}
-								over={over}
-							/>
-						);
-					})}
+					{Array.from({ length: size }).map((_, c) => (
+						<div key={`ch${c}`} className="ba-head col">
+							{String.fromCharCode(65 + c)}
+						</div>
+					))}
+					{Array.from({ length: size }).map((_, r) => (
+						<RowCells
+							key={`row${r}`}
+							r={r}
+							size={size}
+							rowLabel={r + 1}
+							marks={marks}
+							given={given}
+							ships={ships}
+							solution={solution}
+							clueMap={clueMap}
+							hinted={hinted}
+							revealed={revealed}
+							over={over}
+						/>
+					))}
 				</div>
 
 				{daily && dailyLoading && (
@@ -515,9 +504,10 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<p className="ba-help">
-					Les chiffres indiquent le nombre de cases-navire par ligne et colonne. Touche une case
-					pour la faire défiler : vide → <strong>navire</strong> → <strong>eau</strong> → vide.
-					Les navires ne se touchent jamais, même en diagonale.
+					Les chiffres dans certaines cases indiquent combien de cases-navire les touchent
+					(diagonales comprises). Touche une case pour la faire défiler : vide →{' '}
+					<strong>navire</strong> → <strong>eau</strong> → vide. Les navires ne se touchent
+					jamais. Les lettres et chiffres autour de la grille servent à repérer les cases (ex. A2).
 				</p>
 			)}
 		</div>
@@ -527,12 +517,12 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 interface RowProps {
 	r: number;
 	size: number;
-	rowTarget: number;
-	rowClass: string;
+	rowLabel: number;
 	marks: Mark[][];
 	given: Given[][];
 	ships: boolean[][];
 	solution: boolean[][];
+	clueMap: Map<string, number>;
 	hinted: Set<string>;
 	revealed: boolean;
 	over: boolean;
@@ -548,15 +538,17 @@ const SEG_CLASS: Record<NonNullable<SegType>, string> = {
 	'mid-v': 'seg-midv',
 };
 
-function RowCells({ r, size, rowTarget, rowClass, marks, given, ships, solution, hinted, revealed, over }: RowProps) {
+function RowCells({ r, size, rowLabel, marks, given, ships, solution, clueMap, hinted, revealed, over }: RowProps) {
 	return (
 		<>
-			<div className={`ba-head row ${rowClass}`}>{rowTarget}</div>
+			<div className="ba-head row">{rowLabel}</div>
 			{Array.from({ length: size }).map((_, c) => {
+				const clue = clueMap.get(`${r},${c}`);
+				const isClue = clue !== undefined;
 				const g = given[r][c];
 				const isGiven = g !== null;
 				const isShip = ships[r][c];
-				const isWater = !isShip && (isGiven ? g === 'water' : marks[r][c] === 2);
+				const isWater = !isClue && !isShip && (isGiven ? g === 'water' : marks[r][c] === 2);
 				const seg = isShip ? segType(ships, r, c) : null;
 				const wrong = revealed && !isGiven && marks[r][c] !== 0 && (marks[r][c] === 1) !== solution[r][c];
 				return (
@@ -564,7 +556,8 @@ function RowCells({ r, size, rowTarget, rowClass, marks, given, ships, solution,
 						key={c}
 						className={[
 							'ba-cell',
-							isGiven ? 'given' : '',
+							isClue ? 'clue' : '',
+							isGiven && !isClue ? 'given' : '',
 							isShip ? 'ship' : '',
 							isWater ? 'water' : '',
 							seg ? SEG_CLASS[seg] : '',
@@ -574,9 +567,15 @@ function RowCells({ r, size, rowTarget, rowClass, marks, given, ships, solution,
 						].join(' ')}
 						data-r={r}
 						data-c={c}
-						aria-label={`Ligne ${r + 1}, colonne ${c + 1}${isShip ? ', navire' : isWater ? ', eau' : ', vide'}`}
+						aria-label={`Ligne ${r + 1}, colonne ${c + 1}${isClue ? `, indice ${clue}` : isShip ? ', navire' : isWater ? ', eau' : ', vide'}`}
 					>
-						{isShip ? <span className="ba-seg" /> : isWater ? <span className="ba-dot" /> : null}
+						{isClue ? (
+							<span className="ba-clue">{clue}</span>
+						) : isShip ? (
+							<span className="ba-seg" />
+						) : isWater ? (
+							<span className="ba-dot" />
+						) : null}
 					</div>
 				);
 			})}
@@ -673,13 +672,11 @@ const CSS = `
 .ba-corner { }
 .ba-head {
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: calc(var(--ba-cell) * 0.42); font-variant-numeric: tabular-nums;
-  color: var(--gray-0);
+  font-weight: 600; font-size: calc(var(--ba-cell) * 0.4); font-variant-numeric: tabular-nums;
+  color: var(--gray-300);
 }
 .ba-head.col { min-height: calc(var(--ba-cell) * 0.9); }
 .ba-head.row { min-width: calc(var(--ba-cell) * 0.9); }
-.ba-head.done { color: var(--ba-ok); }
-.ba-head.over { color: var(--ba-bad); }
 
 .ba-cell {
   position: relative;
@@ -691,6 +688,13 @@ const CSS = `
 }
 .ba-cell.over { cursor: default; }
 .ba-cell.given { background: var(--gray-900); cursor: default; }
+
+/* Proximity clue: a fixed, non-interactive numbered cell. */
+.ba-cell.clue { background: var(--gray-900); cursor: default; }
+.ba-clue {
+  font-weight: 700; font-size: calc(var(--ba-cell) * 0.5); font-variant-numeric: tabular-nums;
+  color: var(--gray-0); line-height: 1;
+}
 
 /* Water: a small muted dot. */
 .ba-dot {

@@ -7,6 +7,7 @@ import {
 	countSolutions,
 	segType,
 	findHint,
+	proximity,
 	type Mark,
 	type BataillePuzzle,
 } from './engine';
@@ -50,22 +51,18 @@ describe('bataille engine', () => {
 		it(`${sk}: generates a uniquely-solvable puzzle`, () => {
 			for (let s = 0; s < 4; s++) {
 				const p = generateBataille(sl, DIFFS.difficile, mulberry32(9000 + s * 37 + sl.size));
-				// counts match
-				const rc = new Array(p.size).fill(0);
-				const cc = new Array(p.size).fill(0);
 				let ships = 0;
 				for (let r = 0; r < p.size; r++)
-					for (let c = 0; c < p.size; c++)
-						if (p.solution[r][c]) {
-							rc[r]++;
-							cc[c]++;
-							ships++;
-						}
-				expect(rc).toEqual(p.rowCounts);
-				expect(cc).toEqual(p.colCounts);
+					for (let c = 0; c < p.size; c++) if (p.solution[r][c]) ships++;
 				expect(ships).toBe(sl.fleet.reduce((a, b) => a + b, 0));
 				expect(noTouch(p.solution)).toBe(true);
-				expect(countSolutions(p.size, p.fleet, p.rowCounts, p.colCounts, p.given, 2)).toBe(1);
+				// Every clue sits on water and reports the true 8-neighbour ship count.
+				for (const cl of p.clues) {
+					expect(p.solution[cl.r][cl.c]).toBe(false);
+					expect(p.given[cl.r][cl.c]).toBe('water');
+					expect(cl.n).toBe(proximity(p.solution, cl.r, cl.c, p.size));
+				}
+				expect(countSolutions(p.size, p.fleet, p.clues, p.given, 2)).toBe(1);
 			}
 		}, 20000);
 	}
@@ -159,35 +156,39 @@ describe('bataille engine', () => {
 		expect(findHint(marks, p)).toBeNull();
 	});
 
-	it('fills all 0-clued lines with water in a single hint', () => {
+	it('a clue marked 0 makes all its neighbours water in a single hint', () => {
+		// Single 2-ship in the top-left; a "0" clue at (3,3) far from any ship.
 		const p: BataillePuzzle = {
 			size: 4,
-			fleet: [2, 1],
+			fleet: [2],
 			solution: [
 				[true, true, false, false],
 				[false, false, false, false],
-				[false, false, false, true],
+				[false, false, false, false],
 				[false, false, false, false],
 			],
-			rowCounts: [2, 0, 1, 0],
-			colCounts: [1, 1, 0, 1],
-			given: Array.from({ length: 4 }, () => [null, null, null, null]) as BataillePuzzle['given'],
+			clues: [{ r: 3, c: 3, n: 0 }],
+			given: [
+				[null, null, null, null],
+				[null, null, null, null],
+				[null, null, null, null],
+				[null, null, null, 'water'],
+			] as BataillePuzzle['given'],
 		};
 		const h = findHint(emptyMarks(4), p)!;
 		expect(h).not.toBeNull();
 		expect(h.value).toBe('water');
-		// More than one cell at once (whole 0-lines, not cell-by-cell).
+		// More than one cell at once (all neighbours of the 0 clue).
 		expect(h.cells.length).toBeGreaterThan(1);
-		// Every proposed cell is water in the solution.
 		for (const { r, c } of h.cells) expect(p.solution[r][c]).toBe(false);
-		// Includes the entire 0-clued row 1.
+		// The three in-bounds neighbours of (3,3) are all proposed.
 		const has = (r: number, c: number) => h.cells.some((x) => x.r === r && x.c === c);
-		expect(has(1, 0) && has(1, 1) && has(1, 2) && has(1, 3)).toBe(true);
+		expect(has(2, 2) && has(2, 3) && has(3, 2)).toBe(true);
 	});
 
 	it('easier levels reveal at least as many clues', () => {
 		const g = (k: keyof typeof DIFFS) =>
-			generateBataille(SIZES['6'], DIFFS[k], mulberry32(4242)).given.flat().filter((v) => v !== null).length;
+			generateBataille(SIZES['6'], DIFFS[k], mulberry32(4242)).clues.length;
 		expect(g('facile')).toBeGreaterThanOrEqual(g('difficile'));
 	});
 
@@ -196,6 +197,6 @@ describe('bataille engine', () => {
 		const a = generateBataille(SIZES['7'], DIFFS.moyen, mulberry32(seed));
 		const b = generateBataille(SIZES['7'], DIFFS.moyen, mulberry32(seed));
 		expect(a.solution).toEqual(b.solution);
-		expect(a.given).toEqual(b.given);
+		expect(a.clues).toEqual(b.clues);
 	});
 });

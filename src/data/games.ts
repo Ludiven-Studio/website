@@ -102,7 +102,7 @@ export const games: GameTile[] = [
 	{
 		id: 'bataille',
 		title: 'Bataille navale',
-		pitch: 'Retrouve la flotte cachée grâce aux compteurs de lignes et colonnes. Logique pure, façon Bimaru.',
+		pitch: 'Retrouve la flotte cachée grâce aux indices de proximité, façon démineur. Logique pure.',
 		icon: 'ship',
 		href: '/jeux/bataille',
 		status: 'play',

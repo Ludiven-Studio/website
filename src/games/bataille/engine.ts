@@ -1,8 +1,8 @@
 /**
- * BATAILLE NAVALE LOGIQUE (Bimaru / Solitaire Battleships) — pure engine (no UI).
+ * BATAILLE NAVALE LOGIQUE — pure engine (no UI).
  * Find a hidden fleet. Cells are water or ship; ships never touch (8-neighbourhood).
- * Row/column clues give the number of ship cells; a few cells are revealed.
- * Generation guarantees a unique solution.
+ * Minesweeper-style clues: some water cells show the count of ship cells in their
+ * 8-neighbourhood. Generation guarantees a unique solution.
  */
 
 import type { Rng } from '../prng';
@@ -32,22 +32,28 @@ export const SIZES: Record<string, SizeLevel> = {
 
 export interface DiffLevel {
 	label: string;
-	extraGivens: number; // clues revealed beyond the minimal unique set (more = easier)
+	extraClues: number; // clues revealed beyond the minimal unique set (more = easier)
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', extraGivens: 5 },
-	moyen: { label: 'Moyen', extraGivens: 2 },
-	difficile: { label: 'Difficile', extraGivens: 0 },
+	facile: { label: 'Facile', extraClues: 5 },
+	moyen: { label: 'Moyen', extraClues: 2 },
+	difficile: { label: 'Difficile', extraClues: 0 },
 };
+
+/** A revealed proximity clue: cell (r,c) is water and shows `n` = ship cells in its 8-nbr. */
+export interface ClueCell {
+	r: number;
+	c: number;
+	n: number;
+}
 
 export interface BataillePuzzle {
 	size: number;
 	fleet: number[];
 	solution: boolean[][]; // true = ship
-	rowCounts: number[];
-	colCounts: number[];
-	given: Given[][];
+	clues: ClueCell[]; // proximity numbers (always on water cells)
+	given: Given[][]; // clue cells mapped to 'water'; locks input + drives shipGrid
 }
 
 interface Placement {
@@ -79,6 +85,19 @@ export function segType(grid: boolean[][], r: number, c: number): SegType {
 	if (left) return 'right';
 	if (down) return 'top';
 	return 'bottom';
+}
+
+/** Count of ship cells in the 8-neighbourhood of (r,c). */
+export function proximity(grid: boolean[][], r: number, c: number, n: number): number {
+	let k = 0;
+	for (let dr = -1; dr <= 1; dr++)
+		for (let dc = -1; dc <= 1; dc++) {
+			if (dr === 0 && dc === 0) continue;
+			const nr = r + dr;
+			const nc = c + dc;
+			if (nr >= 0 && nr < n && nc >= 0 && nc < n && grid[nr][nc]) k++;
+		}
+	return k;
 }
 
 function allPlacements(n: number, L: number): Placement[] {
@@ -120,120 +139,99 @@ function fits(grid: number[][], cells: [number, number][], n: number): boolean {
 	return true;
 }
 
-/** Ship segment lengths (orthogonal components) match the fleet, and all are straight. */
-function fleetMatches(grid: number[][], fleetSorted: number[], n: number): boolean {
-	const seen: boolean[][] = Array.from({ length: n }, () => new Array(n).fill(false));
-	const lengths: number[] = [];
-	for (let r = 0; r < n; r++)
-		for (let c = 0; c < n; c++) {
-			if (grid[r][c] !== 1 || seen[r][c]) continue;
-			const comp: [number, number][] = [[r, c]];
-			seen[r][c] = true;
-			for (let h = 0; h < comp.length; h++) {
-				const [cr, cc] = comp[h];
-				for (const [nr, nc] of [
-					[cr - 1, cc],
-					[cr + 1, cc],
-					[cr, cc - 1],
-					[cr, cc + 1],
-				] as [number, number][]) {
-					if (nr >= 0 && nr < n && nc >= 0 && nc < n && grid[nr][nc] === 1 && !seen[nr][nc]) {
-						seen[nr][nc] = true;
-						comp.push([nr, nc]);
-					}
-				}
-			}
-			const rows = new Set(comp.map(([cr]) => cr));
-			const cols = new Set(comp.map(([, cc]) => cc));
-			if (rows.size > 1 && cols.size > 1) return false; // not a straight ship
-			lengths.push(comp.length);
-		}
-	if (lengths.length !== fleetSorted.length) return false;
-	lengths.sort((a, b) => b - a);
-	return lengths.every((v, i) => v === fleetSorted[i]);
-}
-
 /**
- * Cell-by-cell solver. Each cell is ship(1) or water(0); forced by revealed clues and
- * by row/column counts; pruned by the local ship rules (no ship cell has a diagonal
- * ship neighbour, no ship cell bends). Fleet composition checked at the end. Fast even
- * near uniqueness. Stops at `limit`.
+ * Placement-based solver: place each fleet ship (in length order) into every legal position,
+ * enforcing no-touch via `fits`. Equal-length ships are placed in increasing canonical order
+ * so each distinct grid is counted once. Per-clue ship counts prune overflow during placement;
+ * the full clue equality + given coverage are verified once the fleet is placed. Stops at
+ * `limit`. Fast on small boards thanks to the no-touch pruning between placements.
  */
 export function countSolutions(
 	size: number,
 	fleet: number[],
-	rowCounts: number[],
-	colCounts: number[],
+	clues: ClueCell[],
 	given: Given[][],
 	limit = 2,
 ): number {
 	const n = size;
 	const fleetSorted = [...fleet].sort((a, b) => b - a);
-	const grid: number[][] = Array.from({ length: n }, () => new Array(n).fill(-1)); // -1 undecided
-	const rowLeft = [...rowCounts];
-	const colLeft = [...colCounts];
+	const grid: number[][] = Array.from({ length: n }, () => new Array(n).fill(0)); // 0 water, 1 ship
+
+	// Placements per distinct ship length (computed once).
+	const placeCache = new Map<number, Placement[]>();
+	const placementsFor = (L: number) => {
+		let ps = placeCache.get(L);
+		if (!ps) {
+			ps = allPlacements(n, L);
+			placeCache.set(L, ps);
+		}
+		return ps;
+	};
+
+	// Clue bookkeeping: which clues each cell feeds, and the running ship count per clue.
+	const cellClues: number[][] = Array.from({ length: n * n }, () => []);
+	clues.forEach((cl, j) => {
+		for (let dr = -1; dr <= 1; dr++)
+			for (let dc = -1; dc <= 1; dc++) {
+				if (dr === 0 && dc === 0) continue;
+				const nr = cl.r + dr;
+				const nc = cl.c + dc;
+				if (nr >= 0 && nr < n && nc >= 0 && nc < n) cellClues[nr * n + nc].push(j);
+			}
+	});
+	const clueShip = new Array(clues.length).fill(0);
+
+	// Cells that must / must not be ship.
+	const shipGivens: [number, number][] = [];
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++) if (given[r][c] === 'ship') shipGivens.push([r, c]);
+	const forbidden = (r: number, c: number) => given[r][c] === 'water';
+
 	let count = 0;
 
-	const canShip = (r: number, c: number): boolean => {
-		if (rowLeft[r] <= 0 || colLeft[c] <= 0) return false;
-		if (grid[r - 1]?.[c - 1] === 1) return false; // diagonal ship neighbours
-		if (grid[r - 1]?.[c + 1] === 1) return false;
-		if (grid[r][c - 1] === 1 && grid[r - 1]?.[c] === 1) return false; // L-bend
-		return true;
-	};
-
-	const dfs = (idx: number) => {
-		if (count >= limit) return;
-		if (idx === n * n) {
-			if (fleetMatches(grid, fleetSorted, n)) count++;
-			return;
-		}
-		const r = Math.floor(idx / n);
-		const c = idx % n;
-
-		const setShip = () => {
+	// Apply a placement; return false if it pushes any clue over its number (already applied).
+	const apply = (cells: [number, number][]): boolean => {
+		let ok = true;
+		for (const [r, c] of cells) {
 			grid[r][c] = 1;
-			rowLeft[r]--;
-			colLeft[c]--;
-			dfs(idx + 1);
-			grid[r][c] = -1;
-			rowLeft[r]++;
-			colLeft[c]++;
-		};
-		const setWater = () => {
+			for (const j of cellClues[r * n + c]) {
+				clueShip[j]++;
+				if (clueShip[j] > clues[j].n) ok = false;
+			}
+		}
+		return ok;
+	};
+	const undo = (cells: [number, number][]) => {
+		for (const [r, c] of cells) {
 			grid[r][c] = 0;
-			dfs(idx + 1);
-			grid[r][c] = -1;
-		};
-
-		const g = given[r][c];
-		if (g === 'ship') {
-			if (canShip(r, c)) setShip();
-			return;
+			for (const j of cellClues[r * n + c]) clueShip[j]--;
 		}
-		if (g === 'water') {
-			setWater();
-			return;
-		}
-		// Forcing by counts.
-		const remRow = n - c; // undecided cells left in this row (c..n-1)
-		const remCol = n - r; // undecided cells left in this column (r..n-1)
-		if (rowLeft[r] > remRow || colLeft[c] > remCol) return; // impossible
-		if (rowLeft[r] === 0 || colLeft[c] === 0) {
-			setWater();
-			return;
-		}
-		if (rowLeft[r] === remRow || colLeft[c] === remCol) {
-			if (canShip(r, c)) setShip();
-			return;
-		}
-		// Branch: ship first (more constrained), then water.
-		if (canShip(r, c)) setShip();
-		if (count >= limit) return;
-		setWater();
 	};
 
-	dfs(0);
+	const place = (i: number, minIdx: number) => {
+		if (count >= limit) return;
+		if (i === fleetSorted.length) {
+			for (let j = 0; j < clues.length; j++) if (clueShip[j] !== clues[j].n) return;
+			for (const [r, c] of shipGivens) if (grid[r][c] !== 1) return;
+			count++;
+			return;
+		}
+		const L = fleetSorted[i];
+		const sameAsPrev = i > 0 && fleetSorted[i - 1] === L;
+		const nextSame = i + 1 < fleetSorted.length && fleetSorted[i + 1] === L;
+		for (const p of placementsFor(L)) {
+			if (sameAsPrev && p.idx < minIdx) continue; // canonical order for equal ships
+			if (p.cells.some(([r, c]) => forbidden(r, c))) continue;
+			if (!fits(grid, p.cells, n)) continue;
+			const ok = apply(p.cells);
+			// Next ship of equal length must come later in canonical order (de-dup).
+			if (ok) place(i + 1, nextSame ? p.idx + 1 : 0);
+			undo(p.cells);
+			if (count >= limit) return;
+		}
+	};
+
+	place(0, 0);
 	return count;
 }
 
@@ -268,12 +266,12 @@ export interface HintResult {
  * locked and never targeted. The effective grid = givens + player marks. The returned
  * value always matches the solution.
  *
- * Each call returns one rule's worth of cells (same value + reason), e.g. a whole "0"
- * line filled in one go. Order: correction → 0-lines → completed count → forced ships →
- * diagonal-of-ship → ship borders → proof by contradiction (last resort, always sound).
+ * Each call returns one rule's worth of cells (same value + reason). Order: correction →
+ * clue-0 → clue satisfied → clue forced full → diagonal-of-ship → ship borders → proof by
+ * contradiction (last resort, always sound).
  */
 export function findHint(marks: Mark[][], puzzle: BataillePuzzle): HintResult | null {
-	const { size: n, fleet, solution, rowCounts, colCounts, given } = puzzle;
+	const { size: n, fleet, solution, clues, given } = puzzle;
 
 	const locked = (r: number, c: number) => given[r][c] !== null;
 	const correct = (r: number, c: number): 'ship' | 'water' => (solution[r][c] ? 'ship' : 'water');
@@ -285,25 +283,16 @@ export function findHint(marks: Mark[][], puzzle: BataillePuzzle): HintResult | 
 	// Free & still empty (a valid hint target). Bounds-safe (used on 8-neighbours).
 	const empty = (r: number, c: number) =>
 		r >= 0 && r < n && c >= 0 && c < n && !locked(r, c) && marks[r][c] === 0;
-	// Effective ship count of a row/col (givens + player ships).
-	const rowShips = (r: number) => {
-		let k = 0;
-		for (let c = 0; c < n; c++) if (isShip(r, c)) k++;
-		return k;
-	};
-	const colShips = (c: number) => {
-		let k = 0;
-		for (let r = 0; r < n; r++) if (isShip(r, c)) k++;
-		return k;
-	};
-	const rowEmpties = (r: number) => {
-		const out: number[] = [];
-		for (let c = 0; c < n; c++) if (empty(r, c)) out.push(c);
-		return out;
-	};
-	const colEmpties = (c: number) => {
-		const out: number[] = [];
-		for (let r = 0; r < n; r++) if (empty(r, c)) out.push(r);
+	// 8-neighbour cells of (r,c), in bounds.
+	const neighbours = (r: number, c: number): { r: number; c: number }[] => {
+		const out: { r: number; c: number }[] = [];
+		for (let dr = -1; dr <= 1; dr++)
+			for (let dc = -1; dc <= 1; dc++) {
+				if (dr === 0 && dc === 0) continue;
+				const nr = r + dr;
+				const nc = c + dc;
+				if (nr >= 0 && nr < n && nc >= 0 && nc < n) out.push({ r: nr, c: nc });
+			}
 		return out;
 	};
 
@@ -316,84 +305,56 @@ export function findHint(marks: Mark[][], puzzle: BataillePuzzle): HintResult | 
 			if (has === want) continue;
 			let reason: string;
 			if (has === 'ship') {
-				// Why this ship is wrong: diagonal contact, or row/col over its count.
 				const diag =
 					isShip(r - 1, c - 1) || isShip(r - 1, c + 1) || isShip(r + 1, c - 1) || isShip(r + 1, c + 1);
-				if (diag)
-					reason = `Cette case ne peut pas être un bateau (elle touche un bateau en diagonale) — c'est de l'eau.`;
-				else if (rowShips(r) > rowCounts[r])
-					reason = `Cette case ne peut pas être un bateau (elle dépasse le compte de la ligne) — c'est de l'eau.`;
-				else if (colShips(c) > colCounts[c])
-					reason = `Cette case ne peut pas être un bateau (elle dépasse le compte de la colonne) — c'est de l'eau.`;
-				else reason = `Cette case ne peut pas être un bateau — c'est de l'eau.`;
+				reason = diag
+					? `Cette case ne peut pas être un bateau (elle touche un bateau en diagonale) — c'est de l'eau.`
+					: `Cette case ne peut pas être un bateau — c'est de l'eau.`;
 			} else {
 				reason = `Cette case ne peut pas être de l'eau — c'est un bateau.`;
 			}
 			return { cells: [{ r, c }], value: want, reason };
 		}
 
-	// 2) Lines/columns clued 0 → every empty cell is water (fill them all at once).
-	{
-		const cells: { r: number; c: number }[] = [];
-		const seen = new Set<number>();
-		const add = (r: number, c: number) => {
-			if (empty(r, c) && correct(r, c) === 'water' && !seen.has(r * n + c)) {
-				seen.add(r * n + c);
-				cells.push({ r, c });
-			}
-		};
-		for (let r = 0; r < n; r++) if (rowCounts[r] === 0) for (let c = 0; c < n; c++) add(r, c);
-		for (let c = 0; c < n; c++) if (colCounts[c] === 0) for (let r = 0; r < n; r++) add(r, c);
-		if (cells.length)
-			return {
-				cells,
-				value: 'water',
-				reason: `Une ligne ou colonne marquée 0 n'a aucun bateau : toutes ses cases sont de l'eau.`,
-			};
-	}
+	// Proximity clue rules (N2/N3/N4). A clue at (r,c) shows k = ship cells in its 8-nbr.
+	for (const cl of clues) {
+		const nbrs = neighbours(cl.r, cl.c);
+		const shipN = nbrs.filter((p) => isShip(p.r, p.c)).length;
+		const emptyN = nbrs.filter((p) => empty(p.r, p.c));
+		if (emptyN.length === 0) continue;
 
-	// 3) A line whose ship count is already reached → its remaining empties are water.
-	for (let r = 0; r < n; r++)
-		if (rowShips(r) === rowCounts[r]) {
-			const es = rowEmpties(r).filter((c) => correct(r, c) === 'water');
-			if (es.length)
+		// N4) clue = 0 → none of the neighbours is a ship; all empties are water.
+		if (cl.n === 0) {
+			const cells = emptyN.filter((p) => correct(p.r, p.c) === 'water');
+			if (cells.length)
 				return {
-					cells: es.map((c) => ({ r, c })),
+					cells,
 					value: 'water',
-					reason: `Cette ligne a déjà ses ${rowCounts[r]} case${rowCounts[r] > 1 ? 's' : ''} de bateau : le reste est de l'eau.`,
-				};
-		}
-	for (let c = 0; c < n; c++)
-		if (colShips(c) === colCounts[c]) {
-			const es = colEmpties(c).filter((r) => correct(r, c) === 'water');
-			if (es.length)
-				return {
-					cells: es.map((r) => ({ r, c })),
-					value: 'water',
-					reason: `Cette colonne a déjà ses ${colCounts[c]} case${colCounts[c] > 1 ? 's' : ''} de bateau : le reste est de l'eau.`,
+					reason: `Cette case indique 0 : aucune des cases autour n'est un bateau.`,
 				};
 		}
 
-	// 4) A line whose remaining empties exactly equal the missing ships → all ships.
-	for (let r = 0; r < n; r++) {
-		const es = rowEmpties(r);
-		const need = rowCounts[r] - rowShips(r);
-		if (es.length && need === es.length && es.every((c) => correct(r, c) === 'ship'))
-			return {
-				cells: es.map((c) => ({ r, c })),
-				value: 'ship',
-				reason: `Il reste exactement ${need} case${need > 1 ? 's' : ''} pour ${need} bateau${need > 1 ? 'x' : ''} dans cette ligne : ce sont des bateaux.`,
-			};
-	}
-	for (let c = 0; c < n; c++) {
-		const es = colEmpties(c);
-		const need = colCounts[c] - colShips(c);
-		if (es.length && need === es.length && es.every((r) => correct(r, c) === 'ship'))
-			return {
-				cells: es.map((r) => ({ r, c })),
-				value: 'ship',
-				reason: `Il reste exactement ${need} case${need > 1 ? 's' : ''} pour ${need} bateau${need > 1 ? 'x' : ''} dans cette colonne : ce sont des bateaux.`,
-			};
+		// N2) clue satisfied (k ships already found) → remaining empties are water.
+		if (shipN === cl.n) {
+			const cells = emptyN.filter((p) => correct(p.r, p.c) === 'water');
+			if (cells.length)
+				return {
+					cells,
+					value: 'water',
+					reason: `Cette case indique ${cl.n} : ses ${cl.n} bateau${cl.n > 1 ? 'x' : ''} ${cl.n > 1 ? 'sont déjà trouvés' : 'est déjà trouvé'}, le reste autour est de l'eau.`,
+				};
+		}
+
+		// N3) ships found + empties exactly equals k → every empty neighbour is a ship.
+		if (shipN + emptyN.length === cl.n) {
+			const cells = emptyN.filter((p) => correct(p.r, p.c) === 'ship');
+			if (cells.length)
+				return {
+					cells,
+					value: 'ship',
+					reason: `Cette case indique ${cl.n} et il reste exactement ${emptyN.length} case${emptyN.length > 1 ? 's' : ''} libre${emptyN.length > 1 ? 's' : ''} autour : ${emptyN.length > 1 ? 'ce sont des bateaux' : 'c\'est un bateau'}.`,
+				};
+		}
 	}
 
 	// 5) Every empty cell diagonally adjacent to a ship → water (ships never touch).
@@ -454,13 +415,13 @@ export function findHint(marks: Mark[][], puzzle: BataillePuzzle): HintResult | 
 			if (!empty(r, c)) continue;
 			const want = correct(r, c);
 			g2[r][c] = want === 'ship' ? 'water' : 'ship';
-			const cnt = countSolutions(n, fleet, rowCounts, colCounts, g2, 1);
+			const cnt = countSolutions(n, fleet, clues, g2, 1);
 			g2[r][c] = null;
 			if (cnt === 0)
 				return {
 					cells: [{ r, c }],
 					value: want,
-					reason: `En mettant l'autre valeur ici, plus aucune flotte ne respecte les compteurs : c'est donc ${want === 'ship' ? 'un bateau' : "de l'eau"}.`,
+					reason: `En mettant l'autre valeur ici, plus aucune flotte ne respecte les indices : c'est donc ${want === 'ship' ? 'un bateau' : "de l'eau"}.`,
 				};
 		}
 
@@ -475,62 +436,53 @@ export function generateBataille(
 	const n = sizeLvl.size;
 	const fleet = [...sizeLvl.fleet].sort((a, b) => b - a);
 
-	// Reveal `extraGivens` more solution cells as clues (among still-empty cells) → easier levels.
-	const addExtra = (given: Given[][], solution: boolean[][]) => {
-		const empties = shuffle(
+	// Water cells of a solution, shuffled then sorted by descending proximity (high-info first).
+	const waterCells = (solution: boolean[][]): [number, number][] =>
+		shuffle(
 			Array.from({ length: n * n }, (_, i): [number, number] => [Math.floor(i / n), i % n]).filter(
-				([r, c]) => given[r][c] === null,
+				([r, c]) => !solution[r][c],
 			),
 			rng,
-		);
-		for (let i = 0; i < diff.extraGivens && i < empties.length; i++) {
-			const [r, c] = empties[i];
-			given[r][c] = solution[r][c] ? 'ship' : 'water';
-		}
-	};
+		).sort((a, b) => proximity(solution, b[0], b[1], n) - proximity(solution, a[0], a[1], n));
 
 	for (let attempt = 0; attempt < 200; attempt++) {
 		const solution = placeFleet(n, fleet, rng);
 		if (!solution) continue;
 
-		const rowCounts = new Array(n).fill(0);
-		const colCounts = new Array(n).fill(0);
-		for (let r = 0; r < n; r++)
-			for (let c = 0; c < n; c++)
-				if (solution[r][c]) {
-					rowCounts[r]++;
-					colCounts[c]++;
-				}
-
+		const waters = waterCells(solution);
+		const clues: ClueCell[] = [];
 		const given: Given[][] = Array.from({ length: n }, () => new Array(n).fill(null) as Given[]);
-		let unique = countSolutions(n, fleet, rowCounts, colCounts, given, 2) === 1;
-		if (!unique) {
-			// Reveal cells (ship cells first, they disambiguate most) until unique.
-			const cells = shuffle(
-				Array.from({ length: n * n }, (_, i): [number, number] => [Math.floor(i / n), i % n]),
-				rng,
-			).sort((a, b) => Number(solution[b[0]][b[1]]) - Number(solution[a[0]][a[1]]));
-			for (const [r, c] of cells) {
-				given[r][c] = solution[r][c] ? 'ship' : 'water';
-				if (countSolutions(n, fleet, rowCounts, colCounts, given, 2) === 1) {
-					unique = true;
-					break;
-				}
-			}
+		const addClue = (r: number, c: number) => {
+			clues.push({ r, c, n: proximity(solution, r, c, n) });
+			given[r][c] = 'water';
+		};
+
+		// Greedy: reveal water cells as clues until the solution is unique.
+		let i = 0;
+		while (countSolutions(n, fleet, clues, given, 2) !== 1 && i < waters.length) {
+			const [r, c] = waters[i++];
+			addClue(r, c);
 		}
-		if (unique) {
-			addExtra(given, solution);
-			return { size: n, fleet, solution, rowCounts, colCounts, given };
+		if (countSolutions(n, fleet, clues, given, 2) !== 1) continue;
+
+		// Easier levels: reveal a few more numbers.
+		for (let k = 0; k < diff.extraClues && i < waters.length; k++, i++) {
+			const [r, c] = waters[i];
+			addClue(r, c);
 		}
+		return { size: n, fleet, solution, clues, given };
 	}
 
-	// Fallback: tiny unique puzzle (single 1-cell ship in the corner).
+	// Fallback: tiny unique puzzle (single 1-cell ship in the corner, all water cells clued).
 	const solution = Array.from({ length: n }, () => new Array(n).fill(false));
 	solution[0][0] = true;
-	const rowCounts = new Array(n).fill(0);
-	const colCounts = new Array(n).fill(0);
-	rowCounts[0] = 1;
-	colCounts[0] = 1;
+	const clues: ClueCell[] = [];
 	const given: Given[][] = Array.from({ length: n }, () => new Array(n).fill(null) as Given[]);
-	return { size: n, fleet: [1], solution, rowCounts, colCounts, given };
+	for (let r = 0; r < n; r++)
+		for (let c = 0; c < n; c++)
+			if (!solution[r][c]) {
+				clues.push({ r, c, n: proximity(solution, r, c, n) });
+				given[r][c] = 'water';
+			}
+	return { size: n, fleet: [1], solution, clues, given };
 }

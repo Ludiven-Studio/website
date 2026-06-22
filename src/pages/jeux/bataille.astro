@@ -7,7 +7,7 @@ import GameTutorial from '../../components/GameTutorial.astro';
 
 <BaseLayout
 	title="Bataille navale | Jeux Ludiven Studio"
-	description="Bataille navale logique (Bimaru) : retrouve la flotte cachée grâce aux compteurs de lignes et colonnes. Un mini-jeu de logique signé Ludiven Studio."
+	description="Bataille navale logique : retrouve la flotte cachée grâce aux indices de proximité, façon démineur. Un mini-jeu de logique signé Ludiven Studio."
 >
 	<div class="wrapper game-page stack gap-8">
 		<header class="game-head stack gap-2">
@@ -19,7 +19,7 @@ import GameTutorial from '../../components/GameTutorial.astro';
 			<GameTutorial gameId="bataille" />
 		</header>
 
-		<BatailleGame client:only="react" gameId="bataille" />
+		<BatailleGame client:only="react" gameId="bataille2" />
 	</div>
 </BaseLayout>
 
