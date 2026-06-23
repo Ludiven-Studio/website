@@ -73,9 +73,9 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎯', title: 'Tirer', body: 'Clique une case pour tirer : ✸ = touché, point = manqué. Un navire entièrement touché est coulé — comme les navires ne se touchent jamais, l\'eau autour se dévoile alors toute seule.' },
 		{ emoji: '🔊', title: 'Sonar', body: 'Tu as quelques sonars : active le bouton Sonar puis clique une zone — il révèle le nombre de cases-navire dans le carré 3×3. La flotte à couler (tailles des navires) est affichée en haut. Au défi du jour, même flotte pour tous, classement au moins d\'actions.' },
 	],
-	'master-color': [
-		{ emoji: '🎨', title: 'Le but', body: 'Un code de couleurs est caché. Devine-le en un minimum d\'essais — une même couleur peut apparaître plusieurs fois.' },
-		{ emoji: '🕹️', title: 'Comment jouer', body: 'Touche une couleur de la palette pour la placer dans la prochaine case (touche une case posée pour l\'enlever), puis appuie sur Valider quand la ligne est complète.' },
+	codecolor: [
+		{ emoji: '🎨', title: 'Le but', body: 'Un code de couleurs est caché. Devine-le en un minimum d\'essais. Le code n\'a que des couleurs différentes (pas de doublon).' },
+		{ emoji: '🕹️', title: 'Comment jouer', body: 'Touche une couleur de la palette pour la placer dans la prochaine case (touche une case posée pour l\'enlever), puis appuie sur Valider quand la ligne est complète. Une couleur déjà posée n\'est plus sélectionnable.' },
 		{ emoji: '🔢', title: 'Les indices', body: 'Chaque essai renvoie deux nombres : ✓ « bien placés » (bonne couleur, bonne position) et ○ « présents » (bonne couleur, mauvaise position) — sans dire lesquels. Au défi du jour, même code pour tous, classement au moins d\'essais.' },
 	],
 	demineur: [

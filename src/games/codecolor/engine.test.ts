@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { mulberry32, dateSeed } from '../prng';
 import { LEVELS, generateCode, score, isWin } from './engine';
 
-describe('master color engine', () => {
+describe('codecolor engine', () => {
 	for (const key of Object.keys(LEVELS)) {
 		const lvl = LEVELS[key];
-		it(`${key}: generateCode has valid length and range`, () => {
+		it(`${key}: generateCode is distinct, right length and range`, () => {
 			for (let s = 0; s < 5; s++) {
 				const code = generateCode(lvl, mulberry32(700 + s * 13 + lvl.slots));
 				expect(code).toHaveLength(lvl.slots);
+				expect(new Set(code).size).toBe(lvl.slots); // all distinct
 				for (const v of code) {
 					expect(v).toBeGreaterThanOrEqual(0);
 					expect(v).toBeLessThan(lvl.colors);
@@ -35,16 +36,16 @@ describe('master color engine', () => {
 	});
 
 	it('score: handles repeated colours without double counting', () => {
-		// code has two 1s; guess has three 1s → one exact (pos 0), partial capped by code count.
-		expect(score([1, 1, 2, 3], [1, 2, 1, 1])).toEqual({ exact: 1, partial: 2 });
+		// Guards the scoring fn even though codes are now distinct: guess may still repeat.
+		expect(score([1, 0, 2, 3], [1, 1, 1, 1])).toEqual({ exact: 1, partial: 0 });
 	});
 
 	it('score: a colour absent from the code scores nothing', () => {
-		expect(score([0, 0, 1, 2], [3, 3, 3, 3])).toEqual({ exact: 0, partial: 0 });
+		expect(score([0, 1, 2, 4], [5, 5, 5, 5])).toEqual({ exact: 0, partial: 0 });
 	});
 
 	it('score: mixed exact + partial', () => {
-		// pos0 exact (5). 4 in code but misplaced → 1 partial. 6,7 absent.
-		expect(score([5, 4, 0, 0], [5, 6, 7, 4])).toEqual({ exact: 1, partial: 1 });
+		// pos0 exact (5); 4 in code but misplaced → 1 partial; 6,7 absent.
+		expect(score([5, 4, 0, 1], [5, 6, 7, 4])).toEqual({ exact: 1, partial: 1 });
 	});
 });

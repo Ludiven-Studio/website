@@ -117,11 +117,11 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
-		id: 'master-color',
-		title: 'Master Color',
-		pitch: 'Devine le code de couleurs caché à coups d\'indices. Le moins d\'essais possible.',
-		icon: 'master-color',
-		href: '/jeux/master-color',
+		id: 'codecolor',
+		title: 'CodeColor',
+		pitch: 'Devine le code de couleurs (toutes différentes) à coups d\'indices. Le moins d\'essais possible.',
+		icon: 'codecolor',
+		href: '/jeux/codecolor',
 		status: 'play',
 	},
 	{

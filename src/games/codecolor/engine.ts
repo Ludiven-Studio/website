@@ -1,8 +1,8 @@
 /**
- * MASTER COLOR — Mastermind-like (pure engine, no UI).
- * Guess a hidden code of colour pegs. After each guess two counts are returned:
+ * CODECOLOR — Mastermind-like (pure engine, no UI).
+ * Guess a hidden code of DISTINCT colour pegs. After each guess two counts are returned:
  * `exact` (right colour + right position) and `partial` (right colour, wrong position).
- * Repeats are allowed in the code. The code is deterministic from a seeded Rng (daily).
+ * The code is deterministic from a seeded Rng (daily).
  */
 
 import type { Rng } from '../prng';
@@ -10,14 +10,14 @@ import type { Rng } from '../prng';
 export interface Level {
 	label: string;
 	slots: number; // code length
-	colors: number; // palette size used
+	colors: number; // palette size used (always >= slots)
 	tries: number; // max guesses
 }
 
 export const LEVELS: Record<string, Level> = {
 	facile: { label: 'Facile', slots: 4, colors: 6, tries: 10 },
 	moyen: { label: 'Moyen', slots: 5, colors: 7, tries: 11 },
-	difficile: { label: 'Difficile', slots: 5, colors: 8, tries: 12 },
+	difficile: { label: 'Difficile', slots: 6, colors: 8, tries: 12 },
 };
 
 export interface Feedback {
@@ -29,14 +29,17 @@ export interface MasterPuzzle {
 	slots: number;
 	colors: number;
 	tries: number;
-	code: number[]; // colour index 0..colors-1 per slot
+	code: number[]; // distinct colour indices 0..colors-1
 }
 
-/** Random code of `slots` colour indices in 0..colors-1 (repeats allowed). Deterministic from rng. */
+/** Random code of `slots` DISTINCT colour indices (shuffle 0..colors-1, take slots). Deterministic from rng. */
 export function generateCode(level: Level, rng: Rng = Math.random): number[] {
-	const code: number[] = [];
-	for (let i = 0; i < level.slots; i++) code.push(Math.floor(rng() * level.colors));
-	return code;
+	const pool = Array.from({ length: level.colors }, (_, i) => i);
+	for (let i = pool.length - 1; i > 0; i--) {
+		const j = Math.floor(rng() * (i + 1));
+		[pool[i], pool[j]] = [pool[j], pool[i]];
+	}
+	return pool.slice(0, level.slots);
 }
 
 export function generatePuzzle(level: Level, rng: Rng = Math.random): MasterPuzzle {
@@ -44,8 +47,8 @@ export function generatePuzzle(level: Level, rng: Rng = Math.random): MasterPuzz
 }
 
 /**
- * Mastermind scoring (handles repeats): `exact` = positions matching; `partial` = additional
- * colour matches out of position = Σ_colour min(#code, #guess) over non-exact positions.
+ * Mastermind scoring (generic, handles repeats too): `exact` = positions matching;
+ * `partial` = additional colour matches out of position = Σ_colour min(#code, #guess) over non-exact positions.
  */
 export function score(code: number[], guess: number[]): Feedback {
 	const codeLeft: Record<number, number> = {};

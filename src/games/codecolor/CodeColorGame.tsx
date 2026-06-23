@@ -15,16 +15,16 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
-   MASTER COLOR — Mastermind-like. React island.
-   Guess the hidden colour code; each guess returns
-   "X bien placés / Y présents". Fewest guesses wins.
+   CODECOLOR — Mastermind-like. React island.
+   Guess the hidden code of DISTINCT colours; each guess
+   returns "X bien placés / Y présents". Fewest guesses wins.
    Engine is pure/tested.
    ===================================================== */
 
 type Status = 'playing' | 'won' | 'lost';
 type DiffKey = keyof typeof LEVELS;
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
-const BEST_KEY = 'ludiven-master-color-best';
+const BEST_KEY = 'ludiven-codecolor-best';
 const LOSS_OFFSET = 100000; // daily: losers ranked after winners (cf. démineur)
 
 interface Swatch {
@@ -55,7 +55,7 @@ interface DailyState {
 
 const makeEmpty = (n: number): (number | null)[] => new Array<number | null>(n).fill(null);
 
-export default function MasterColorGame({ gameId }: { gameId: string }) {
+export default function CodeColorGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<DiffKey>('facile');
 	const [puzzle, setPuzzle] = useState<MasterPuzzle>(() => generatePuzzle(LEVELS.facile));
 	const [rows, setRows] = useState<Row[]>([]);
@@ -164,12 +164,13 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 
 	const armed = daily && !started;
 
-	/* Place the next colour into the first empty slot. */
+	/* Place the next colour into the first empty slot (colours stay distinct in a guess). */
 	const placeColor = useCallback(
 		(ci: number) => {
 			if (over || armed) return;
 			begin();
 			setCurrent((prev) => {
+				if (prev.includes(ci)) return prev; // no duplicate colour in a guess
 				const i = prev.indexOf(null);
 				if (i === -1) return prev;
 				const next = prev.slice();
@@ -253,25 +254,25 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 		v >= LOSS_OFFSET ? `❌ ${slots - (v - LOSS_OFFSET)}/${slots}` : `${v} essai${v > 1 ? 's' : ''}`;
 
 	return (
-		<div className="mc-root">
+		<div className="cc-root">
 			<style>{CSS}</style>
 
 			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
 
 			{daily ? (
-				<div className="mc-daily-tag">
+				<div className="cc-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
 						: `Défi du jour · ${dailyWeekdayLabel()} · ${LEVELS[diffKey].label}`}
 				</div>
 			) : (
-				<div className="mc-pills" role="tablist" aria-label="Difficulté">
+				<div className="cc-pills" role="tablist" aria-label="Difficulté">
 					{DIFF_ORDER.map((k) => (
 						<button
 							key={k}
 							role="tab"
 							aria-selected={diffKey === k}
-							className={`mc-pill ${diffKey === k ? 'active' : ''}`}
+							className={`cc-pill ${diffKey === k ? 'active' : ''}`}
 							onClick={() => newGame(k)}
 						>
 							{LEVELS[k].label}
@@ -280,38 +281,38 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="mc-bar">
-				<span className="mc-stat">🎯 {usedTries}/{tries}</span>
-				{!daily && best > 0 && <span className="mc-stat best">★ {best}</span>}
+			<div className="cc-bar">
+				<span className="cc-stat">🎯 {usedTries}/{tries}</span>
+				{!daily && best > 0 && <span className="cc-stat best">★ {best}</span>}
 			</div>
 
-			<div className="mc-boardwrap">
+			<div className="cc-boardwrap">
 				{celebrating && <Celebration />}
 
-				<div className={`mc-board ${armed ? 'blurred' : ''}`}>
+				<div className={`cc-board ${armed ? 'blurred' : ''}`}>
 					{rows.map((row, ri) => (
-						<div className="mc-row" key={ri}>
-							<span className="mc-rownum">{ri + 1}</span>
-							<div className="mc-pegs">
+						<div className="cc-row" key={ri}>
+							<span className="cc-rownum">{ri + 1}</span>
+							<div className="cc-pegs">
 								{row.guess.map((ci, i) => (
-									<span key={i} className="mc-peg" style={{ background: PALETTE[ci].hex }} aria-label={PALETTE[ci].name} />
+									<span key={i} className="cc-peg" style={{ background: PALETTE[ci].hex }} aria-label={PALETTE[ci].name} />
 								))}
 							</div>
-							<div className="mc-fb">
-								<span className="mc-fb-exact" aria-label={`${row.fb.exact} bien placés`}>✓ {row.fb.exact}</span>
-								<span className="mc-fb-partial" aria-label={`${row.fb.partial} présents`}>○ {row.fb.partial}</span>
+							<div className="cc-fb">
+								<span className="cc-fb-exact" aria-label={`${row.fb.exact} bien placés`}>✓ {row.fb.exact}</span>
+								<span className="cc-fb-partial" aria-label={`${row.fb.partial} présents`}>○ {row.fb.partial}</span>
 							</div>
 						</div>
 					))}
 
 					{!over && (
-						<div className="mc-row active">
-							<span className="mc-rownum">{usedTries + 1}</span>
-							<div className="mc-pegs">
+						<div className="cc-row active">
+							<span className="cc-rownum">{usedTries + 1}</span>
+							<div className="cc-pegs">
 								{current.map((ci, i) => (
 									<button
 										key={i}
-										className={`mc-peg slot ${ci === null ? 'empty' : ''}`}
+										className={`cc-peg slot ${ci === null ? 'empty' : ''}`}
 										style={ci === null ? undefined : { background: PALETTE[ci].hex }}
 										onClick={() => clearSlot(i)}
 										disabled={armed || ci === null}
@@ -319,8 +320,8 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 									/>
 								))}
 							</div>
-							<div className="mc-fb">
-								<button className="mc-validate" onClick={validate} disabled={armed || !filled}>
+							<div className="cc-fb">
+								<button className="cc-validate" onClick={validate} disabled={armed || !filled}>
 									Valider
 								</button>
 							</div>
@@ -329,14 +330,14 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 				</div>
 
 				{!over && (
-					<div className={`mc-palette ${armed ? 'blurred' : ''}`} aria-label="Couleurs">
+					<div className={`cc-palette ${armed ? 'blurred' : ''}`} aria-label="Couleurs">
 						{PALETTE.slice(0, colors).map((s, ci) => (
 							<button
 								key={ci}
-								className="mc-swatch"
+								className="cc-swatch"
 								style={{ background: s.hex }}
 								onClick={() => placeColor(ci)}
-								disabled={armed || filled}
+								disabled={armed || filled || current.includes(ci)}
 								aria-label={s.name}
 								title={s.name}
 							/>
@@ -345,48 +346,48 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 				)}
 
 				{daily && dailyLoading && (
-					<div className="mc-overlay"><div className="mc-overlay-card">Préparation…</div></div>
+					<div className="cc-overlay"><div className="cc-overlay-card">Préparation…</div></div>
 				)}
 				{armed && !dailyLoading && (
-					<div className="mc-overlay">
-						<button className="mc-startbtn" onClick={startTimer}>▶ Commencer</button>
+					<div className="cc-overlay">
+						<button className="cc-startbtn" onClick={startTimer}>▶ Commencer</button>
 					</div>
 				)}
 
 				{showWin && !daily && (
-					<div className="mc-end" role="dialog" aria-label="Code trouvé">
-						<div className="mc-endcard">
-							<div className="mc-endmark">🎉</div>
+					<div className="cc-end" role="dialog" aria-label="Code trouvé">
+						<div className="cc-endcard">
+							<div className="cc-endmark">🎉</div>
 							<h2>Code trouvé !</h2>
-							<p className="mc-endbig">{usedTries} essai{usedTries > 1 ? 's' : ''}</p>
-							<div className="mc-code">
+							<p className="cc-endbig">{usedTries} essai{usedTries > 1 ? 's' : ''}</p>
+							<div className="cc-code">
 								{puzzle.code.map((ci, i) => (
-									<span key={i} className="mc-peg" style={{ background: PALETTE[ci].hex }} />
+									<span key={i} className="cc-peg" style={{ background: PALETTE[ci].hex }} />
 								))}
 							</div>
-							<button className="mc-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+							<button className="cc-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 						</div>
 					</div>
 				)}
 				{status === 'lost' && !daily && (
-					<div className="mc-end" role="dialog" aria-label="Perdu">
-						<div className="mc-endcard">
-							<div className="mc-endmark">🙈</div>
+					<div className="cc-end" role="dialog" aria-label="Perdu">
+						<div className="cc-endcard">
+							<div className="cc-endmark">🙈</div>
 							<h2>Raté !</h2>
-							<p className="mc-endsub">Le code était :</p>
-							<div className="mc-code">
+							<p className="cc-endsub">Le code était :</p>
+							<div className="cc-code">
 								{puzzle.code.map((ci, i) => (
-									<span key={i} className="mc-peg" style={{ background: PALETTE[ci].hex }} />
+									<span key={i} className="cc-peg" style={{ background: PALETTE[ci].hex }} />
 								))}
 							</div>
-							<button className="mc-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
+							<button className="cc-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 						</div>
 					</div>
 				)}
 			</div>
 
 			{daily && over && (
-				<div className="mc-daily-won">
+				<div className="cc-daily-won">
 					{alreadyPlayed ? (
 						<>
 							Défi du jour déjà joué ·{' '}
@@ -395,20 +396,20 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 					) : status === 'won' ? (
 						<>🎉 Code trouvé en <strong>{usedTries} essais</strong></>
 					) : (
-						<>Raté… le code apparaît ci-dessus. Tu es classé selon tes pions bien placés.</>
+						<>Raté… le code apparaît ci-dessous. Tu es classé selon tes pions bien placés.</>
 					)}
 				</div>
 			)}
 			{daily && over && status === 'lost' && (
-				<div className="mc-board mc-reveal">
-					<div className="mc-row">
-						<span className="mc-rownum">🔑</span>
-						<div className="mc-pegs">
+				<div className="cc-board cc-reveal">
+					<div className="cc-row">
+						<span className="cc-rownum">🔑</span>
+						<div className="cc-pegs">
 							{puzzle.code.map((ci, i) => (
-								<span key={i} className="mc-peg" style={{ background: PALETTE[ci].hex }} />
+								<span key={i} className="cc-peg" style={{ background: PALETTE[ci].hex }} />
 							))}
 						</div>
-						<div className="mc-fb" />
+						<div className="cc-fb" />
 					</div>
 				</div>
 			)}
@@ -418,11 +419,11 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 			)}
 			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
-			<p className="mc-help">
-				Devine le <strong>code de couleurs</strong> caché en un minimum d'essais. Pose des couleurs (une
-				couleur peut se répéter) puis <strong>Valide</strong>. Chaque essai renvoie deux indices :
-				<strong> ✓ bien placés</strong> (bonne couleur, bonne place) et <strong>○ présents</strong>
-				(bonne couleur, mauvaise place) — sans dire lesquels.
+			<p className="cc-help">
+				Devine le <strong>code de couleurs</strong> caché en un minimum d'essais. Le code n'a que des
+				<strong> couleurs différentes</strong> : pose-en {`${slots}`} puis <strong>Valide</strong>. Chaque
+				essai renvoie deux indices : <strong>✓ bien placés</strong> (bonne couleur, bonne place) et
+				<strong> ○ présents</strong> (bonne couleur, mauvaise place) — sans dire lesquels.
 			</p>
 		</div>
 	);
@@ -431,66 +432,66 @@ export default function MasterColorGame({ gameId }: { gameId: string }) {
 /* ---------- Styles (Ludiven charte + dark mode) ---------- */
 
 const CSS = `
-.mc-root {
-  --mc-accent: var(--accent-regular);
+.cc-root {
+  --cc-accent: var(--accent-regular);
   width: 100%; max-width: 460px; margin-inline: auto;
   color: var(--gray-0); font-family: var(--font-body);
   display: flex; flex-direction: column; align-items: center;
 }
-.mc-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
-.mc-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.85rem; }
-.mc-pill {
+.cc-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
+.cc-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.85rem; }
+.cc-pill {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
   font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer;
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
-.mc-pill.active { background: var(--mc-accent); color: var(--accent-text-over); border-color: var(--mc-accent); }
+.cc-pill.active { background: var(--cc-accent); color: var(--accent-text-over); border-color: var(--cc-accent); }
 
-.mc-bar { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.8rem; font-weight: 700; font-size: 13px; }
-.mc-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
-.mc-stat.best { background: transparent; border: 1.5px solid var(--gray-700); color: var(--gray-300); }
+.cc-bar { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.8rem; font-weight: 700; font-size: 13px; }
+.cc-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
+.cc-stat.best { background: transparent; border: 1.5px solid var(--gray-700); color: var(--gray-300); }
 
-.mc-boardwrap { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
-.mc-board { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 6px; }
-.mc-reveal { margin-top: -0.3rem; }
-.mc-row { display: flex; align-items: center; gap: 10px; }
-.mc-row.active { background: var(--gray-900); border-radius: 12px; padding: 6px 8px; }
-.mc-rownum { width: 18px; text-align: center; color: var(--gray-400); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
-.mc-pegs { display: flex; gap: 6px; flex: 1; }
-.mc-peg { width: 30px; height: 30px; border-radius: 50%; border: none; flex: none; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.18); }
-.mc-peg.slot { cursor: pointer; padding: 0; }
-.mc-peg.slot.empty { background: var(--gray-800); box-shadow: none; border: 2px dashed var(--gray-600, var(--gray-700)); cursor: default; }
-.mc-peg.slot:not(.empty):hover { outline: 2px solid var(--gray-0); outline-offset: 1px; }
+.cc-boardwrap { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
+.cc-board { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 6px; }
+.cc-reveal { margin-top: -0.3rem; }
+.cc-row { display: flex; align-items: center; gap: 10px; }
+.cc-row.active { background: var(--gray-900); border-radius: 12px; padding: 6px 8px; }
+.cc-rownum { width: 18px; text-align: center; color: var(--gray-400); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+.cc-pegs { display: flex; gap: 6px; flex: 1; }
+.cc-peg { width: 30px; height: 30px; border-radius: 50%; border: none; flex: none; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.18); }
+.cc-peg.slot { cursor: pointer; padding: 0; }
+.cc-peg.slot.empty { background: var(--gray-800); box-shadow: none; border: 2px dashed var(--gray-600, var(--gray-700)); cursor: default; }
+.cc-peg.slot:not(.empty):hover { outline: 2px solid var(--gray-0); outline-offset: 1px; }
 
-.mc-fb { display: flex; align-items: center; gap: 6px; flex: none; min-width: 92px; justify-content: flex-end; }
-.mc-fb-exact, .mc-fb-partial { font-size: 12.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
-.mc-fb-exact { background: #1f9d55; color: #fff; }
-.mc-fb-partial { background: transparent; color: var(--gray-200); border: 1.5px solid var(--gray-600, var(--gray-700)); }
-.mc-validate { border: none; background: var(--mc-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 13px; border-radius: 999px; padding: 7px 16px; cursor: pointer; }
-.mc-validate:disabled { opacity: 0.4; cursor: default; }
+.cc-fb { display: flex; align-items: center; gap: 6px; flex: none; min-width: 92px; justify-content: flex-end; }
+.cc-fb-exact, .cc-fb-partial { font-size: 12.5px; font-weight: 800; border-radius: 999px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
+.cc-fb-exact { background: #1f9d55; color: #fff; }
+.cc-fb-partial { background: transparent; color: var(--gray-200); border: 1.5px solid var(--gray-600, var(--gray-700)); }
+.cc-validate { border: none; background: var(--cc-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 13px; border-radius: 999px; padding: 7px 16px; cursor: pointer; }
+.cc-validate:disabled { opacity: 0.4; cursor: default; }
 
-.mc-palette { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 4px; }
-.mc-swatch { width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer; box-shadow: inset 0 -3px 6px rgba(0,0,0,0.2); transition: transform 0.08s; }
-.mc-swatch:hover:not(:disabled) { transform: scale(1.1); }
-.mc-swatch:disabled { opacity: 0.45; cursor: default; }
+.cc-palette { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 4px; }
+.cc-swatch { width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer; box-shadow: inset 0 -3px 6px rgba(0,0,0,0.2); transition: transform 0.08s; }
+.cc-swatch:hover:not(:disabled) { transform: scale(1.1); }
+.cc-swatch:disabled { opacity: 0.3; cursor: default; }
 
-.mc-board.blurred, .mc-palette.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
-.mc-overlay { position: absolute; inset: -8px 0 auto 0; top: 0; height: 100%; z-index: 2; display: flex; align-items: center; justify-content: center; }
-.mc-overlay-card { background: var(--gray-999); border: 2px solid var(--mc-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); }
-.mc-startbtn { border: none; background: var(--mc-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg); }
+.cc-board.blurred, .cc-palette.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.cc-overlay { position: absolute; inset: 0; top: 0; height: 100%; z-index: 2; display: flex; align-items: center; justify-content: center; }
+.cc-overlay-card { background: var(--gray-999); border: 2px solid var(--cc-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); }
+.cc-startbtn { border: none; background: var(--cc-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg); }
 
-.mc-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; z-index: 3; }
-.mc-endcard { background: var(--gray-999); border: 2px solid var(--mc-accent); border-radius: 20px; padding: 24px 32px; text-align: center; box-shadow: var(--shadow-lg); }
-.mc-endcard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 22px; color: var(--gray-0); }
-.mc-endmark { font-size: 30px; }
-.mc-endbig { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 6px; color: var(--mc-accent); }
-.mc-endsub { color: var(--gray-300); font-size: 13px; margin: 4px 0 8px; }
-.mc-code { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
-.mc-code .mc-peg { width: 26px; height: 26px; }
-.mc-replay { border: none; background: var(--mc-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
+.cc-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; z-index: 3; }
+.cc-endcard { background: var(--gray-999); border: 2px solid var(--cc-accent); border-radius: 20px; padding: 24px 32px; text-align: center; box-shadow: var(--shadow-lg); }
+.cc-endcard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 22px; color: var(--gray-0); }
+.cc-endmark { font-size: 30px; }
+.cc-endbig { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 6px; color: var(--cc-accent); }
+.cc-endsub { color: var(--gray-300); font-size: 13px; margin: 4px 0 8px; }
+.cc-code { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
+.cc-code .cc-peg { width: 26px; height: 26px; }
+.cc-replay { border: none; background: var(--cc-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
 
-.mc-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin: 0.75rem 0 0; }
-.mc-daily-won strong { color: var(--mc-accent); }
+.cc-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin: 0.75rem 0 0; }
+.cc-daily-won strong { color: var(--cc-accent); }
 
-.mc-help { max-width: 440px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1.1rem; }
+.cc-help { max-width: 440px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1.1rem; }
 `;

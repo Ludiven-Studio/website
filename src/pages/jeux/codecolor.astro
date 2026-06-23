@@ -1,25 +1,25 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
-import MasterColorGame from '../../games/mastercolor/MasterColorGame.tsx';
+import CodeColorGame from '../../games/codecolor/CodeColorGame.tsx';
 import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
 <BaseLayout
-	title="Master Color | Jeux Ludiven Studio"
-	description="Master Color : devine le code de couleurs caché en un minimum d'essais grâce aux indices, façon Mastermind. Un mini-jeu de logique signé Ludiven Studio."
+	title="CodeColor | Jeux Ludiven Studio"
+	description="CodeColor : devine le code de couleurs caché en un minimum d'essais grâce aux indices, façon Mastermind. Un mini-jeu de logique signé Ludiven Studio."
 >
 	<div class="wrapper game-page stack gap-8">
 		<header class="game-head stack gap-2">
 			<a class="back" href="/jeux/">
 				<Icon icon="arrow-left" size="1em" /> Tous les jeux
 			</a>
-			<h1>Master Color</h1>
+			<h1>CodeColor</h1>
 			<p>Devine le code de couleurs caché</p>
-			<GameTutorial gameId="master-color" />
+			<GameTutorial gameId="codecolor" />
 		</header>
 
-		<MasterColorGame client:only="react" gameId="master-color" />
+		<CodeColorGame client:only="react" gameId="codecolor" />
 	</div>
 </BaseLayout>
 
