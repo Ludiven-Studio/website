@@ -82,19 +82,49 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	const cost = shotsUsed + sonarsUsed;
 	const sonarsLeft = sonars - sonarsUsed;
 
-	/* Sunk ships + a grid of revealed ship cells (sunk, or all on win) for segment rendering. */
-	const { sunkGrid, sunkCount } = useMemo(() => {
+	/* Sunk ships + a grid of revealed ship cells (sunk, or all on win) for segment rendering,
+	   plus how many ships of each length are sunk (for the fleet legend). */
+	const { sunkGrid, sunkCount, sunkByLen } = useMemo(() => {
 		const grid: boolean[][] = Array.from({ length: size }, () => new Array(size).fill(false));
+		const lenOf = new Map<number, number>(); // ship id → length
+		for (let r = 0; r < size; r++)
+			for (let c = 0; c < size; c++) {
+				const id = puzzle.shipId[r][c];
+				if (id >= 0) lenOf.set(id, (lenOf.get(id) ?? 0) + 1);
+			}
 		let sunk = 0;
-		for (let id = 0; id < fleet.length; id++) {
-			const dead = over || isSunk(puzzle, shots, id);
-			if (dead) sunk++;
-			if (dead || over)
-				for (let r = 0; r < size; r++)
-					for (let c = 0; c < size; c++) if (puzzle.shipId[r][c] === id) grid[r][c] = true;
+		const byLen = new Map<number, number>();
+		for (const [id, len] of lenOf) {
+			if (!(over || isSunk(puzzle, shots, id))) continue;
+			sunk++;
+			byLen.set(len, (byLen.get(len) ?? 0) + 1);
+			for (let r = 0; r < size; r++)
+				for (let c = 0; c < size; c++) if (puzzle.shipId[r][c] === id) grid[r][c] = true;
 		}
-		return { sunkGrid: grid, sunkCount: sunk };
-	}, [puzzle, shots, over, size, fleet]);
+		return { sunkGrid: grid, sunkCount: sunk, sunkByLen: byLen };
+	}, [puzzle, shots, over, size]);
+
+	/* Fleet grouped by ship length (desc) — the ships to sink, shown in the legend. */
+	const fleetGroups = useMemo(() => {
+		const m = new Map<number, number>();
+		for (const l of fleet) m.set(l, (m.get(l) ?? 0) + 1);
+		return [...m.entries()].sort((a, b) => b[0] - a[0]).map(([len, count]) => ({ len, count }));
+	}, [fleet]);
+
+	/* Cells covered by any sonar's 5×5 footprint — tinted so the scanned zone is visible. */
+	const sonarZone = useMemo(() => {
+		const s = new Set<string>();
+		for (const key of Object.keys(sonarReveals)) {
+			const [cr, cc] = key.split(',').map(Number);
+			for (let dr = -2; dr <= 2; dr++)
+				for (let dc = -2; dc <= 2; dc++) {
+					const nr = cr + dr;
+					const nc = cc + dc;
+					if (nr >= 0 && nr < size && nc >= 0 && nc < size) s.add(`${nr},${nc}`);
+				}
+		}
+		return s;
+	}, [sonarReveals, size]);
 
 	const newGame = useCallback((dk: DiffKey) => {
 		const s = SIZES[dk];
@@ -334,6 +364,23 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				{!daily && best > 0 && <span className="ba-stat best">★ {best}</span>}
 			</div>
 
+			<div className="ba-fleet" aria-label="Flotte à couler">
+				{fleetGroups.map(({ len, count }) => {
+					const sunkN = sunkByLen.get(len) ?? 0;
+					return (
+						<span key={len} className="ba-fleet-group">
+							{Array.from({ length: count }).map((_, i) => (
+								<span key={i} className={`ba-fleet-ship ${i < sunkN ? 'done' : ''}`}>
+									{Array.from({ length: len }).map((_, j) => (
+										<i key={j} className="ba-fleet-seg" />
+									))}
+								</span>
+							))}
+						</span>
+					);
+				})}
+			</div>
+
 			{!over && (!daily || started) && (
 				<div className="ba-actions">
 					<button
@@ -362,12 +409,14 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 							const seg = isShipSeg ? segType(sunkGrid, r, c) : null;
 							const hit = sv === 1 && !isShipSeg; // hit but not yet sunk
 							const miss = sv === 2;
+							const inZone = sv === 0 && !isShipSeg && sonarZone.has(`${r},${c}`); // scanned 5×5 footprint
 							const cls = [
 								'ba-cell',
 								isShipSeg ? 'ship' : '',
 								seg ? SEG_CLASS[seg] : '',
 								hit ? 'hit' : '',
 								miss ? 'miss' : '',
+								inZone ? 'sonarzone' : '',
 								reveal !== undefined && sv === 0 ? 'sonarval' : '',
 								over ? 'over' : '',
 							].join(' ');
@@ -441,8 +490,8 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 			<p className="ba-help">
 				Coule toute la flotte cachée en un minimum d'actions. Clique une case pour <strong>tirer</strong>{' '}
 				(✸ touché, point = manqué) ; un navire entièrement touché est coulé (l'eau autour se dévoile).
-				Le bouton <strong>Sonar</strong> révèle le nombre de cases-navire dans une zone 3×3. Score =
-				tirs + sonars.
+				Le bouton <strong>Sonar</strong> révèle le nombre de cases-navire dans une zone 5×5. La flotte
+				à couler est indiquée au-dessus. Score = tirs + sonars.
 			</p>
 		</div>
 	);
@@ -475,6 +524,16 @@ const CSS = `
 .ba-stat.sunk { background: var(--ba-accent); color: var(--accent-text-over); }
 .ba-stat.best { background: transparent; border: 1.5px solid var(--gray-700); color: var(--gray-300); }
 
+.ba-fleet { display: flex; flex-wrap: wrap; gap: 7px 14px; justify-content: center; margin-bottom: 0.85rem; }
+.ba-fleet-group { display: inline-flex; gap: 7px; }
+.ba-fleet-ship { display: inline-flex; gap: 1px; }
+.ba-fleet-seg { width: 11px; height: 11px; background: var(--ba-accent); border-radius: 3px; }
+.ba-fleet-ship .ba-fleet-seg:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
+.ba-fleet-ship .ba-fleet-seg:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
+.ba-fleet-ship .ba-fleet-seg:only-child { border-radius: 999px; }
+.ba-fleet-ship.done { opacity: 0.4; }
+.ba-fleet-ship.done .ba-fleet-seg { background: var(--gray-600, var(--gray-700)); }
+
 .ba-actions { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 0.85rem; }
 .ba-act {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
@@ -502,7 +561,8 @@ const CSS = `
 .ba-cell:hover:not(:disabled) { background: var(--gray-800); }
 .ba-cell.miss { color: var(--gray-500); cursor: default; }
 .ba-cell.hit { color: #fff; background: var(--ba-hit); cursor: default; }
-.ba-cell.sonarval { color: var(--ba-accent); background: var(--gray-900); }
+.ba-cell.sonarzone { background: var(--accent-overlay, rgba(127, 92, 255, 0.15)); }
+.ba-cell.sonarval { color: var(--ba-accent); background: var(--accent-overlay, var(--gray-900)); box-shadow: inset 0 0 0 1.5px var(--ba-accent); }
 .ba-cell.over { cursor: default; }
 .ba-dot { width: calc(var(--ba-cell) * 0.16); height: calc(var(--ba-cell) * 0.16); border-radius: 50%; background: var(--gray-500); }
 

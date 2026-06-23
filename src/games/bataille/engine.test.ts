@@ -60,15 +60,19 @@ describe('bataille hunt engine', () => {
 		expect(a.shipId).toEqual(b.shipId);
 	});
 
-	it('sonarCount counts ship cells in the 3×3 area (clamped at edges)', () => {
+	it('sonarCount counts ship cells in the 5×5 area (radius 2, clamped at edges)', () => {
+		const F = false;
 		const ships = [
-			[true, false, false],
-			[false, true, false],
-			[false, false, true],
+			[true, F, F, F, F],
+			[F, F, F, F, F],
+			[F, F, true, F, F],
+			[F, F, F, F, F],
+			[F, F, F, F, true],
 		];
-		expect(sonarCount(ships, 1, 1, 3)).toBe(3); // centre sees all three
-		expect(sonarCount(ships, 0, 0, 3)).toBe(2); // corner sees (0,0)+(1,1)
-		expect(sonarCount(ships, 0, 2, 3)).toBe(1); // only (1,1) in range
+		expect(sonarCount(ships, 2, 2, 5)).toBe(3); // centre sees all three
+		expect(sonarCount(ships, 0, 0, 5)).toBe(2); // corner sees (0,0)+(2,2)
+		expect(sonarCount(ships, 4, 4, 5)).toBe(2); // (2,2)+(4,4)
+		expect(sonarCount(ships, 0, 4, 5)).toBe(1); // only (2,2) in range
 	});
 
 	it('isSunk only once every cell of a ship is hit', () => {

@@ -71,7 +71,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	bataille: [
 		{ emoji: '🚢', title: 'Le but', body: 'Une flotte est cachée dans la grille. Coule tous les navires en un minimum d\'actions (le score = tirs + sonars).' },
 		{ emoji: '🎯', title: 'Tirer', body: 'Clique une case pour tirer : ✸ = touché, point = manqué. Un navire entièrement touché est coulé — comme les navires ne se touchent jamais, l\'eau autour se dévoile alors toute seule.' },
-		{ emoji: '🔊', title: 'Sonar', body: 'Tu as quelques sonars : active le bouton Sonar puis clique une zone — il révèle le nombre de cases-navire dans le carré 3×3. Idéal pour cibler avant de tirer. Au défi du jour, même flotte pour tous, classement au moins d\'actions.' },
+		{ emoji: '🔊', title: 'Sonar', body: 'Tu as quelques sonars : active le bouton Sonar puis clique une zone — il révèle le nombre de cases-navire dans le carré 5×5. La flotte à couler (tailles des navires) est affichée en haut. Au défi du jour, même flotte pour tous, classement au moins d\'actions.' },
 	],
 	demineur: [
 		{ emoji: '💣', title: 'Le but', body: 'Découvre toutes les cases sûres sans cliquer sur une mine. Les chiffres indiquent combien de mines touchent la case (diagonales comprises). Une ouverture sûre est révélée pour démarrer.' },
