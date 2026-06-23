@@ -78,6 +78,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 	const triesRef = useRef(0);
 	const keysRef = useRef({ left: false, right: false, up: false, down: false });
 	const pointerRef = useRef({ active: false, lastX: 0, lastY: 0, targetX: 0, targetY: 0 });
+	const camRollRef = useRef(0); // eased camera bank
 
 	/* ---- three.js scene (built once) ---- */
 	const initScene = useCallback(() => {
@@ -193,17 +194,20 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		g.ship.rotation.x += (input.y * 0.32 - g.ship.rotation.x) * kRot;
 		g.glow.scale.setScalar(0.85 + 0.3 * Math.sin(st.elapsedMs * 0.02)); // thruster pulse
 
-		// Chase camera eased toward the ship → parallax / sense of moving through space.
-		const kCam = Math.min(1, dtSec * 5);
-		g.camera.position.x += (st.shipX * 0.6 - g.camera.position.x) * kCam;
-		g.camera.position.y += (3.2 + st.shipY * 0.4 - g.camera.position.y) * kCam;
-		g.camera.lookAt(st.shipX * 0.3, st.shipY * 0.3 + 0.4, -22);
+		// Chase camera eased toward the ship → parallax / sense of moving through space (accentuated).
+		const kCam = Math.min(1, dtSec * 6);
+		g.camera.position.x += (st.shipX * 0.9 - g.camera.position.x) * kCam;
+		g.camera.position.y += (3.2 + st.shipY * 0.6 - g.camera.position.y) * kCam;
+		g.camera.lookAt(st.shipX * 0.4, st.shipY * 0.4 + 0.4, -22);
+		camRollRef.current += (-input.x * 0.15 - camRollRef.current) * Math.min(1, dtSec * 8);
+		g.camera.rotateZ(camRollRef.current); // bank the whole view when steering (eased)
 
 		for (let i = 0; i < g.pool.length; i++) {
 			const m = g.pool[i];
 			if (i < st.asteroids.length) {
 				const a = st.asteroids[i];
 				m.visible = true;
+				m.geometry = g.astGeoms[a.shape] ?? g.astGeoms[0]; // shape travels with the asteroid → no mid-flight popping
 				m.position.set(a.x, a.y, a.z);
 				m.scale.set(a.r * a.sx, a.r * a.sy, a.r * a.sz);
 				m.rotation.set(a.rx, a.ry, a.rz);
@@ -213,7 +217,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		}
 
 		// Scroll stars forward, recycle past the camera (stronger sense of speed).
-		const dz = cfg.diff.baseSpeed * dtSec * 1.0;
+		const dz = cfg.diff.baseSpeed * dtSec * 1.5;
 		const pos = g.starPos;
 		for (let i = 0; i < STAR_COUNT; i++) {
 			let z = pos[i * 3 + 2] + dz;

@@ -23,7 +23,7 @@ const stateWith = (asteroids: Asteroid[], over = false, elapsedMs = 0): EsquiveS
 	spawnCount: 0,
 });
 
-const ast = (over: Partial<Asteroid>): Asteroid => ({ x: 0, y: 0, z: 0, r: 1, rx: 0, ry: 0, rz: 0, spin: 0, sx: 1, sy: 1, sz: 1, ...over });
+const ast = (over: Partial<Asteroid>): Asteroid => ({ x: 0, y: 0, z: 0, r: 1, rx: 0, ry: 0, rz: 0, spin: 0, sx: 1, sy: 1, sz: 1, shape: 0, ...over });
 
 describe('esquive engine', () => {
 	it('spawnAsteroid is deterministic and within bounds', () => {
@@ -40,6 +40,7 @@ describe('esquive engine', () => {
 			expect(s).toBeGreaterThanOrEqual(0.8);
 			expect(s).toBeLessThanOrEqual(1.2);
 		}
+		expect([0, 1, 2]).toContain(a.shape); // base geometry index
 	});
 
 	it('spawns occasional boulders larger than astMaxR', () => {

@@ -52,6 +52,7 @@ export interface Asteroid {
 	sx: number; // non-uniform scale factors → lumpy look (render only)
 	sy: number;
 	sz: number;
+	shape: number; // base geometry index 0..2 (render only) — stays with the asteroid
 }
 
 export interface EsquiveState {
@@ -125,6 +126,7 @@ export function spawnAsteroid(seed: number, i: number, cfg: EsquiveConfig): Aste
 		sx: 0.8 + rng() * 0.4,
 		sy: 0.8 + rng() * 0.4,
 		sz: 0.8 + rng() * 0.4,
+		shape: Math.floor(rng() * 3),
 	};
 }
 
