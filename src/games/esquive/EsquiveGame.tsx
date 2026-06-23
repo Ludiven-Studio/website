@@ -47,7 +47,19 @@ interface Scene3D {
 	starPos: Float32Array;
 	astGeoms: THREE.BufferGeometry[];
 	astMat: THREE.MeshStandardMaterial;
+	boomGroup: THREE.Group;
+	boomDebris: THREE.Mesh[];
+	boomVel: THREE.Vector3[];
+	boomCore: THREE.Mesh;
+	boomLight: THREE.PointLight;
+	boomDebrisGeom: THREE.BufferGeometry;
+	boomDebrisMat: THREE.MeshStandardMaterial;
+	boomCoreGeom: THREE.BufferGeometry;
+	boomCoreMat: THREE.MeshBasicMaterial;
 }
+
+const BOOM_PARTS = 24;
+const BOOM_MS = 1000;
 
 export default function EsquiveGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('ready');
@@ -79,6 +91,8 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 	const keysRef = useRef({ left: false, right: false, up: false, down: false });
 	const pointerRef = useRef({ active: false, lastX: 0, lastY: 0, targetX: 0, targetY: 0 });
 	const camRollRef = useRef(0); // eased camera bank
+	const explodingRef = useRef(false); // ~1s explosion before the game-over popup
+	const explElapsedRef = useRef(0);
 
 	/* ---- three.js scene (built once) ---- */
 	const initScene = useCallback(() => {
@@ -161,7 +175,31 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		const stars = new THREE.Points(starGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, sizeAttenuation: true }));
 		scene.add(stars);
 
-		g3Ref.current = { renderer, scene, camera, ship, glow, pool, starGeom, starPos, astGeoms, astMat };
+		// Explosion FX (hidden until a collision): flying debris + additive flash core + a fading light.
+		const boomGroup = new THREE.Group();
+		boomGroup.visible = false;
+		scene.add(boomGroup);
+		const boomDebrisGeom = new THREE.IcosahedronGeometry(0.22, 0);
+		const boomDebrisMat = new THREE.MeshStandardMaterial({ color: 0xffa94d, emissive: 0xff6b00, emissiveIntensity: 0.9, transparent: true });
+		const boomDebris: THREE.Mesh[] = [];
+		const boomVel: THREE.Vector3[] = [];
+		for (let i = 0; i < BOOM_PARTS; i++) {
+			const m = new THREE.Mesh(boomDebrisGeom, boomDebrisMat);
+			boomGroup.add(m);
+			boomDebris.push(m);
+			boomVel.push(new THREE.Vector3());
+		}
+		const boomCoreGeom = new THREE.SphereGeometry(1, 16, 16);
+		const boomCoreMat = new THREE.MeshBasicMaterial({ color: 0xffd27f, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+		const boomCore = new THREE.Mesh(boomCoreGeom, boomCoreMat);
+		boomGroup.add(boomCore);
+		const boomLight = new THREE.PointLight(0xff9040, 0, 50);
+		boomGroup.add(boomLight);
+
+		g3Ref.current = {
+			renderer, scene, camera, ship, glow, pool, starGeom, starPos, astGeoms, astMat,
+			boomGroup, boomDebris, boomVel, boomCore, boomLight, boomDebrisGeom, boomDebrisMat, boomCoreGeom, boomCoreMat,
+		};
 	}, []);
 
 	const computeInput = useCallback(() => {
@@ -244,6 +282,63 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		g.renderer.render(g.scene, g.camera);
 	}, []);
 
+	/* ---- Explosion FX ---- */
+	const resetBoom = useCallback(() => {
+		explodingRef.current = false;
+		explElapsedRef.current = 0;
+		const g = g3Ref.current;
+		if (!g) return;
+		g.boomGroup.visible = false;
+		g.ship.visible = true;
+	}, []);
+
+	const startExplosion = useCallback(() => {
+		const g = g3Ref.current;
+		if (!g) return;
+		explodingRef.current = true;
+		explElapsedRef.current = 0;
+		g.ship.visible = false;
+		const st = stateRef.current;
+		g.boomGroup.position.set(st.shipX, st.shipY, cfgRef.current.shipZ);
+		g.boomGroup.visible = true;
+		for (let i = 0; i < g.boomDebris.length; i++) {
+			// Random direction on the unit sphere × random speed.
+			const u = Math.random() * 2 - 1;
+			const th = Math.random() * Math.PI * 2;
+			const s = Math.sqrt(1 - u * u);
+			g.boomVel[i].set(s * Math.cos(th), s * Math.sin(th), u).multiplyScalar(5 + Math.random() * 11);
+			g.boomDebris[i].position.set(0, 0, 0);
+			g.boomDebris[i].rotation.set(Math.random() * 3, Math.random() * 3, 0);
+		}
+		g.boomDebrisMat.opacity = 1;
+		g.boomCore.scale.setScalar(0.6);
+		g.boomCoreMat.opacity = 0.9;
+		g.boomLight.intensity = 7;
+	}, []);
+
+	const animateBoom = useCallback((dtSec: number) => {
+		explElapsedRef.current += dtSec * 1000;
+		const g = g3Ref.current;
+		if (!g) return;
+		const t = Math.min(1, explElapsedRef.current / BOOM_MS);
+		for (let i = 0; i < g.boomDebris.length; i++) {
+			const m = g.boomDebris[i];
+			m.position.addScaledVector(g.boomVel[i], dtSec);
+			m.rotation.x += dtSec * 4;
+			m.rotation.y += dtSec * 3;
+		}
+		g.boomDebrisMat.opacity = 1 - t;
+		g.boomCore.scale.setScalar(0.6 + t * 7);
+		g.boomCoreMat.opacity = (1 - t) * 0.9;
+		g.boomLight.intensity = (1 - t) * 7;
+	}, []);
+
+	const finishBoom = useCallback(() => {
+		explodingRef.current = false;
+		const g = g3Ref.current;
+		if (g) g.boomGroup.visible = false;
+	}, []);
+
 	/* ---- Loop ---- */
 	const stop = useCallback(() => {
 		runningRef.current = false;
@@ -284,6 +379,20 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			if (!runningRef.current) return;
 			const dt = Math.min(now - lastRef.current, 200);
 			lastRef.current = now;
+
+			// Explosion phase: freeze the sim, animate debris ~1s, then reveal the popup.
+			if (explodingRef.current) {
+				animateBoom(dt / 1000);
+				draw(dt / 1000, { x: 0, y: 0 });
+				if (explElapsedRef.current >= BOOM_MS) {
+					finishBoom();
+					onGameOver();
+					return;
+				}
+				rafRef.current = requestAnimationFrame(frame);
+				return;
+			}
+
 			accRef.current += dt;
 			const input = computeInput();
 			let st = stateRef.current;
@@ -299,17 +408,19 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 				setScore(st.score);
 			}
 			if (st.status === 'over') {
-				onGameOver();
+				startExplosion();
+				rafRef.current = requestAnimationFrame(frame);
 				return;
 			}
 			rafRef.current = requestAnimationFrame(frame);
 		},
-		[computeInput, draw, onGameOver],
+		[computeInput, draw, onGameOver, animateBoom, startExplosion, finishBoom],
 	);
 
 	const start = useCallback(() => {
 		if (webglError) return;
 		if (dailyRef.current && triesRef.current >= MAX_TRIES) return;
+		resetBoom();
 		stateRef.current = createEsquive(cfgRef.current);
 		scoreRef.current = 0;
 		accRef.current = 0;
@@ -334,12 +445,13 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			});
 		}
 		rafRef.current = requestAnimationFrame(frame);
-	}, [webglError, gameId, best, frame]);
+	}, [webglError, gameId, best, frame, resetBoom]);
 
 	/* ---- Modes ---- */
 	const armFree = useCallback(
 		(key: DiffKey = diffKey) => {
 			stop();
+			resetBoom();
 			dailyRef.current = false;
 			setDaily(false);
 			setAlreadyPlayed(false);
@@ -361,11 +473,12 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			}
 			draw(0, { x: 0, y: 0 });
 		},
-		[stop, draw, diffKey],
+		[stop, draw, diffKey, resetBoom],
 	);
 
 	const startDaily = useCallback(async () => {
 		stop();
+		resetBoom();
 		dailyRef.current = true;
 		setDaily(true);
 		statusRef.current = 'ready';
@@ -413,7 +526,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		setStatus('ready');
 		setDailyLoading(false);
 		draw(0, { x: 0, y: 0 });
-	}, [gameId, stop, draw]);
+	}, [gameId, stop, draw, resetBoom]);
 
 	/* ---- Input ---- */
 	useEffect(() => {
@@ -473,6 +586,10 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			if (g) {
 				g.astGeoms.forEach((geo) => geo.dispose());
 				g.astMat.dispose();
+				g.boomDebrisGeom.dispose();
+				g.boomDebrisMat.dispose();
+				g.boomCoreGeom.dispose();
+				g.boomCoreMat.dispose();
 				g.starGeom.dispose();
 				g.ship.traverse((o) => {
 					if (o instanceof THREE.Mesh) {
