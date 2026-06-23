@@ -4,6 +4,7 @@ import {
 	esquiveConfig,
 	createEsquive,
 	spawnAsteroid,
+	burstAt,
 	step,
 	type Asteroid,
 	type EsquiveState,
@@ -89,5 +90,23 @@ describe('esquive engine', () => {
 		const dEarly = step(early, 0.1, cfg, 1, { x: 0, y: 0 }).asteroids[0].z;
 		const dLate = step(late, 0.1, cfg, 1, { x: 0, y: 0 }).asteroids[0].z;
 		expect(dLate).toBeGreaterThan(dEarly);
+	});
+
+	it('burstAt grows over time and is capped', () => {
+		expect(burstAt(0, cfg)).toBe(1);
+		expect(burstAt(cfg.diff.burstEveryMs, cfg)).toBe(2);
+		expect(burstAt(cfg.diff.burstEveryMs * 2, cfg)).toBe(3);
+		expect(burstAt(cfg.diff.burstEveryMs * 1000, cfg)).toBe(4); // capped
+	});
+
+	it('density grows: a spawn interval spawns more asteroids later', () => {
+		// nextSpawnMs sits just before `now`; one interval is crossed → burstAt(nextSpawnMs) asteroids.
+		const mk = (elapsedMs: number): EsquiveState => ({
+			...stateWith([], false, elapsedMs),
+			nextSpawnMs: elapsedMs + 1,
+		});
+		const early = step(mk(0), 0.05, cfg, 7, { x: 0, y: 0 }).asteroids.length;
+		const late = step(mk(cfg.diff.burstEveryMs * 2 + 1), 0.05, cfg, 7, { x: 0, y: 0 }).asteroids.length;
+		expect(late).toBeGreaterThan(early);
 	});
 });

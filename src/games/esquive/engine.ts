@@ -11,17 +11,21 @@ export interface EsquiveDiff {
 	label: string;
 	spawnEveryMs: number; // initial gap between asteroid spawns
 	baseSpeed: number; // initial forward speed (world units / s)
-	rampEveryMs: number; // difficulty step interval
-	speedRamp: number; // +fraction of baseSpeed per step
+	rampEveryMs: number; // difficulty step interval (speed + spawn gap)
+	speedRamp: number; // +fraction of baseSpeed per step (unbounded)
 	spawnRamp: number; // -ms off the spawn gap per step
 	minSpawnMs: number; // floor for the spawn gap
+	burstEveryMs: number; // every N ms, +1 asteroid spawned per interval (density ramp)
 }
 
+// Difficulty ramps without bound (speed ↑, gap ↓, density ↑ via bursts) → every run eventually ends.
 export const ESQUIVE_DIFFS: Record<string, EsquiveDiff> = {
-	facile: { label: 'Facile', spawnEveryMs: 900, baseSpeed: 26, rampEveryMs: 12000, speedRamp: 0.12, spawnRamp: 35, minSpawnMs: 360 },
-	moyen: { label: 'Moyen', spawnEveryMs: 720, baseSpeed: 32, rampEveryMs: 11000, speedRamp: 0.14, spawnRamp: 45, minSpawnMs: 300 },
-	difficile: { label: 'Difficile', spawnEveryMs: 560, baseSpeed: 38, rampEveryMs: 10000, speedRamp: 0.16, spawnRamp: 55, minSpawnMs: 250 },
+	facile: { label: 'Facile', spawnEveryMs: 950, baseSpeed: 24, rampEveryMs: 8000, speedRamp: 0.16, spawnRamp: 55, minSpawnMs: 300, burstEveryMs: 26000 },
+	moyen: { label: 'Moyen', spawnEveryMs: 800, baseSpeed: 28, rampEveryMs: 7000, speedRamp: 0.18, spawnRamp: 65, minSpawnMs: 260, burstEveryMs: 22000 },
+	difficile: { label: 'Difficile', spawnEveryMs: 650, baseSpeed: 32, rampEveryMs: 6000, speedRamp: 0.2, spawnRamp: 80, minSpawnMs: 220, burstEveryMs: 18000 },
 };
+
+const MAX_BURST = 4;
 
 export interface EsquiveConfig {
 	halfW: number; // play half-extent in x
@@ -95,6 +99,11 @@ const speedAt = (elapsedMs: number, cfg: EsquiveConfig): number =>
 const spawnGapAt = (elapsedMs: number, cfg: EsquiveConfig): number =>
 	Math.max(cfg.diff.minSpawnMs, cfg.diff.spawnEveryMs - cfg.diff.spawnRamp * stepsAt(elapsedMs, cfg));
 
+/** How many asteroids are spawned per interval — grows over time (capped) so the field becomes a wall. */
+export function burstAt(elapsedMs: number, cfg: EsquiveConfig): number {
+	return Math.min(MAX_BURST, 1 + Math.floor(elapsedMs / cfg.diff.burstEveryMs));
+}
+
 /** Asteroid `i` is fully determined by (seed, i) → reproducible, stateless. */
 export function spawnAsteroid(seed: number, i: number, cfg: EsquiveConfig): Asteroid {
 	const rng = mulberry32((seed ^ Math.imul(i + 1, 2654435761)) >>> 0);
@@ -121,8 +130,11 @@ export function step(s: EsquiveState, dtSec: number, cfg: EsquiveConfig, seed: n
 	let { nextSpawnMs, spawnCount } = s;
 	const asteroids = s.asteroids.map((a) => ({ ...a, z: a.z + speed * dtSec, rx: a.rx + a.spin * dtSec }));
 	while (elapsedMs >= nextSpawnMs) {
-		asteroids.push(spawnAsteroid(seed, spawnCount, cfg));
-		spawnCount += 1;
+		const burst = burstAt(nextSpawnMs, cfg);
+		for (let b = 0; b < burst; b++) {
+			asteroids.push(spawnAsteroid(seed, spawnCount, cfg));
+			spawnCount += 1;
+		}
 		nextSpawnMs += spawnGapAt(nextSpawnMs, cfg);
 	}
 

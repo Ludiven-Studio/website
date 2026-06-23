@@ -28,7 +28,7 @@ const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const STEP = 1000 / 60; // ms per physics step
 const MAX_TRIES = 10; // daily attempts per day; best of the day is ranked
 const MAX_AST = 100; // asteroid mesh pool size
-const STAR_COUNT = 320;
+const STAR_COUNT = 520;
 const fmtSec = (tenths: number) => `${(tenths / 10).toFixed(1)} s`;
 
 interface DailyState {
@@ -41,6 +41,7 @@ interface Scene3D {
 	scene: THREE.Scene;
 	camera: THREE.PerspectiveCamera;
 	ship: THREE.Group;
+	glow: THREE.Mesh;
 	pool: THREE.Mesh[];
 	starGeom: THREE.BufferGeometry;
 	starPos: Float32Array;
@@ -98,28 +99,37 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		scene.background = bg;
 		scene.fog = new THREE.Fog(bg, 45, 120);
 
-		const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 220);
-		camera.position.set(0, 0, 12);
-		camera.lookAt(0, 0, -30);
+		// Third-person chase camera (slightly above + behind the ship). Eased toward the ship each frame.
+		const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 220);
+		camera.position.set(0, 3.2, 14);
+		camera.lookAt(0, 0, -22);
 
-		scene.add(new THREE.AmbientLight(0x8088aa, 1.1));
-		const dir = new THREE.DirectionalLight(0xffffff, 1.6);
-		dir.position.set(4, 6, 10);
+		scene.add(new THREE.AmbientLight(0x8088aa, 1.0));
+		const dir = new THREE.DirectionalLight(0xffffff, 1.7);
+		dir.position.set(4, 7, 10);
 		scene.add(dir);
 
-		// Ship: a cone pointing toward -Z (into the asteroid stream).
+		// Ship: small craft (fuselage + wing + cockpit + glowing thruster), nose toward -Z.
 		const ship = new THREE.Group();
-		const body = new THREE.Mesh(
-			new THREE.ConeGeometry(0.7, 1.9, 18),
-			new THREE.MeshStandardMaterial({ color: accent, emissive: new THREE.Color(accent), emissiveIntensity: 0.35, metalness: 0.4, roughness: 0.35 }),
+		const hullMat = new THREE.MeshStandardMaterial({ color: accent, emissive: new THREE.Color(accent), emissiveIntensity: 0.25, metalness: 0.5, roughness: 0.35 });
+		const fuselage = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.7, 22), hullMat);
+		fuselage.rotation.x = -Math.PI / 2; // apex faces -Z
+		fuselage.position.z = -0.15;
+		ship.add(fuselage);
+		const wing = new THREE.Mesh(
+			new THREE.BoxGeometry(1.9, 0.08, 0.55),
+			new THREE.MeshStandardMaterial({ color: accent, metalness: 0.4, roughness: 0.5 }),
 		);
-		body.rotation.x = -Math.PI / 2; // apex faces -Z
-		ship.add(body);
-		const glow = new THREE.Mesh(
-			new THREE.SphereGeometry(0.28, 12, 12),
-			new THREE.MeshBasicMaterial({ color: 0x66ccff }),
+		wing.position.set(0, -0.05, 0.35);
+		ship.add(wing);
+		const cockpit = new THREE.Mesh(
+			new THREE.SphereGeometry(0.27, 16, 16),
+			new THREE.MeshStandardMaterial({ color: 0xbfeaff, emissive: 0x224466, metalness: 0.2, roughness: 0.1 }),
 		);
-		glow.position.set(0, 0, 1.0); // thruster at the back
+		cockpit.position.set(0, 0.13, -0.1);
+		ship.add(cockpit);
+		const glow = new THREE.Mesh(new THREE.SphereGeometry(0.24, 14, 14), new THREE.MeshBasicMaterial({ color: 0x66ccff }));
+		glow.position.set(0, 0, 0.85); // thruster at the back (toward camera)
 		ship.add(glow);
 		scene.add(ship);
 
@@ -143,10 +153,10 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		}
 		const starGeom = new THREE.BufferGeometry();
 		starGeom.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-		const stars = new THREE.Points(starGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, sizeAttenuation: true }));
+		const stars = new THREE.Points(starGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, sizeAttenuation: true }));
 		scene.add(stars);
 
-		g3Ref.current = { renderer, scene, camera, ship, pool, starGeom, starPos, astGeom, astMat };
+		g3Ref.current = { renderer, scene, camera, ship, glow, pool, starGeom, starPos, astGeom, astMat };
 	}, []);
 
 	const computeInput = useCallback(() => {
@@ -173,8 +183,17 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		const cfg = cfgRef.current;
 
 		g.ship.position.set(st.shipX, st.shipY, cfg.shipZ);
-		g.ship.rotation.z = -input.x * 0.35; // bank
-		g.ship.rotation.x = input.y * 0.2; // pitch
+		// Banking/pitch eased toward the input → visibly reacts to steering.
+		const kRot = Math.min(1, dtSec * 10);
+		g.ship.rotation.z += (-input.x * 0.5 - g.ship.rotation.z) * kRot;
+		g.ship.rotation.x += (input.y * 0.32 - g.ship.rotation.x) * kRot;
+		g.glow.scale.setScalar(0.85 + 0.3 * Math.sin(st.elapsedMs * 0.02)); // thruster pulse
+
+		// Chase camera eased toward the ship → parallax / sense of moving through space.
+		const kCam = Math.min(1, dtSec * 5);
+		g.camera.position.x += (st.shipX * 0.6 - g.camera.position.x) * kCam;
+		g.camera.position.y += (3.2 + st.shipY * 0.4 - g.camera.position.y) * kCam;
+		g.camera.lookAt(st.shipX * 0.3, st.shipY * 0.3 + 0.4, -22);
 
 		for (let i = 0; i < g.pool.length; i++) {
 			const m = g.pool[i];
@@ -189,8 +208,8 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			}
 		}
 
-		// Scroll stars forward, recycle past the camera.
-		const dz = cfg.diff.baseSpeed * dtSec * 0.6;
+		// Scroll stars forward, recycle past the camera (stronger sense of speed).
+		const dz = cfg.diff.baseSpeed * dtSec * 1.0;
 		const pos = g.starPos;
 		for (let i = 0; i < STAR_COUNT; i++) {
 			let z = pos[i * 3 + 2] + dz;
