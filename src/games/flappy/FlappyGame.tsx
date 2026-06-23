@@ -75,9 +75,9 @@ const drawCloudLayer = (
 	ctx.globalAlpha = 1;
 };
 
-const drawPipe = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, p: { x: number; gapCenter: number }) => {
-	const gapTop = p.gapCenter - cfg.gapH / 2;
-	const gapBottom = p.gapCenter + cfg.gapH / 2;
+const drawPipe = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, p: { x: number; gapCenter: number; gapH: number }) => {
+	const gapTop = p.gapCenter - p.gapH / 2;
+	const gapBottom = p.gapCenter + p.gapH / 2;
 	const floorY = cfg.worldH - cfg.groundH;
 	const grad = ctx.createLinearGradient(p.x, 0, p.x + cfg.pipeW, 0);
 	grad.addColorStop(0, '#4caf5a');

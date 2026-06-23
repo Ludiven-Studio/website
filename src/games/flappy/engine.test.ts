@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FLAPPY_CFG, FLAPPY_DIFFS, flappyConfig, pipeGap, createFlappy, flap, stepWorld, type FlappyState } from './engine';
+import { FLAPPY_CFG, FLAPPY_DIFFS, flappyConfig, pipeGap, ramp, createFlappy, flap, stepWorld, type FlappyState } from './engine';
 
 const DT = 1 / 60;
 const step = (s: FlappyState, seed: number, holding = false) => stepWorld(s, DT, FLAPPY_CFG, seed, holding);
@@ -130,8 +130,8 @@ describe('flappy engine', () => {
 
 	it('hitting a pipe (outside the gap) ends the game', () => {
 		let st: FlappyState = {
-			birdY: 50, vy: 0, distance: 0, score: 0, status: 'playing', spawnIndex: 1, boostMs: 0, heldMs: 0, flapStartY: 50,
-			pipes: [{ x: FLAPPY_CFG.birdX - 2, gapCenter: 90, scored: false }],
+			birdY: 50, vy: 0, distance: 0, score: 0, status: 'playing', spawnIndex: 1, boostMs: 0, heldMs: 0, flapStartY: 50, elapsedMs: 0,
+			pipes: [{ x: FLAPPY_CFG.birdX - 2, gapCenter: 90, gapH: FLAPPY_CFG.gapH, scored: false }],
 		};
 		st = step(st, 1);
 		expect(st.status).toBe('over');
@@ -139,13 +139,24 @@ describe('flappy engine', () => {
 
 	it('clearing a pipe scores exactly once', () => {
 		let st: FlappyState = {
-			birdY: 50, vy: 0, distance: 0, score: 0, status: 'playing', spawnIndex: 1, boostMs: 0, heldMs: 0, flapStartY: 50,
-			pipes: [{ x: FLAPPY_CFG.birdX - FLAPPY_CFG.pipeW - 1, gapCenter: 50, scored: false }],
+			birdY: 50, vy: 0, distance: 0, score: 0, status: 'playing', spawnIndex: 1, boostMs: 0, heldMs: 0, flapStartY: 50, elapsedMs: 0,
+			pipes: [{ x: FLAPPY_CFG.birdX - FLAPPY_CFG.pipeW - 1, gapCenter: 50, gapH: FLAPPY_CFG.gapH, scored: false }],
 		};
 		st = step(st, 1);
 		expect(st.score).toBe(1);
 		const again = step({ ...st, pipes: st.pipes }, 1);
 		expect(again.score).toBe(1);
+	});
+
+	it('difficulty ramps up over time: faster scroll, smaller gaps, floored', () => {
+		const t0 = ramp(FLAPPY_CFG, 0);
+		expect(t0.speed).toBe(FLAPPY_CFG.speed);
+		expect(t0.gapH).toBe(FLAPPY_CFG.gapH);
+		const t60 = ramp(FLAPPY_CFG, 60000); // 2 ramp steps in
+		expect(t60.speed).toBeGreaterThan(t0.speed);
+		expect(t60.gapH).toBeLessThan(t0.gapH);
+		const tFar = ramp(FLAPPY_CFG, 60 * 60000); // never below the floor
+		expect(tFar.gapH).toBe(FLAPPY_CFG.minGapH);
 	});
 
 	it('is deterministic: same seed + same flap script → identical state', () => {

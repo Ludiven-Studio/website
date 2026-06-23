@@ -19,9 +19,13 @@ export interface FlappyConfig {
 	birdR: number;
 	pipeW: number;
 	groundH: number; // ground band at the bottom (lethal floor sits at worldH - groundH)
-	gapH: number; // gap opening height
+	gapH: number; // gap opening height (at the start of a run)
 	pipeSpacing: number; // distance between consecutive pipes
-	speed: number; // horizontal scroll speed, units / s
+	speed: number; // horizontal scroll speed at the start, units / s
+	rampEveryMs: number; // difficulty steps up on this cadence
+	speedRamp: number; // +fraction of base speed per ramp step
+	gapRamp: number; // gap shrink (units) per ramp step
+	minGapH: number; // gap never shrinks below this
 }
 
 // Flap feel is constant across levels (variable impulse by hold duration). Difficulty only
@@ -41,6 +45,11 @@ const BASE = {
 	birdR: 3,
 	pipeW: 13,
 	groundH: 8,
+	// Progressive difficulty: every 30s the world scrolls a bit faster and gaps shrink slightly.
+	rampEveryMs: 30000,
+	speedRamp: 0.07,
+	gapRamp: 1.4,
+	minGapH: 15,
 };
 
 export interface FlappyDiff {
@@ -70,6 +79,7 @@ export type FlappyStatus = 'ready' | 'playing' | 'over';
 export interface Pipe {
 	x: number; // left edge
 	gapCenter: number;
+	gapH: number; // opening height, fixed at spawn (shrinks over a run via the ramp)
 	scored: boolean;
 }
 
@@ -84,6 +94,16 @@ export interface FlappyState {
 	boostMs: number; // remaining held-boost budget for the current flap
 	heldMs: number; // how long the key has been held since the last press (boost delay gate)
 	flapStartY: number; // bird Y when the current flap began (to cap its climb)
+	elapsedMs: number; // time spent playing this run (drives the difficulty ramp)
+}
+
+/** Current difficulty ramp from elapsed play time: faster scroll + slightly smaller gaps. */
+export function ramp(cfg: FlappyConfig, elapsedMs: number): { speed: number; gapH: number } {
+	const level = Math.floor(elapsedMs / cfg.rampEveryMs);
+	return {
+		speed: cfg.speed * (1 + cfg.speedRamp * level),
+		gapH: Math.max(cfg.minGapH, cfg.gapH - cfg.gapRamp * level),
+	};
 }
 
 /** Max climb of a single flap (hold included): a quarter of the screen. */
@@ -92,10 +112,11 @@ export const maxFlapRise = (cfg: FlappyConfig): number => cfg.worldH / 4;
 // First pipe enters once the bird has scrolled a full screen — breathing room at the start.
 const firstSpawn = (cfg: FlappyConfig): number => cfg.worldW;
 
-/** Gap centre of pipe `i` — pure function of (seed, i), so the layout is shared. */
-export function pipeGap(seed: number, i: number, cfg: FlappyConfig): number {
-	const top = cfg.gapH / 2 + 4; // keep the gap below the ceiling
-	const bottom = cfg.worldH - cfg.groundH - cfg.gapH / 2 - 4; // and above the ground
+/** Gap centre of pipe `i` — pure function of (seed, i), so the layout is shared. `gapH` is the
+ *  current opening (which shrinks over a run), used to keep the centre within bounds. */
+export function pipeGap(seed: number, i: number, cfg: FlappyConfig, gapH: number = cfg.gapH): number {
+	const top = gapH / 2 + 4; // keep the gap below the ceiling
+	const bottom = cfg.worldH - cfg.groundH - gapH / 2 - 4; // and above the ground
 	const r = mulberry32((seed + i * 0x9e3779b1) >>> 0)();
 	return top + r * (bottom - top);
 }
@@ -112,6 +133,7 @@ export function createFlappy(cfg: FlappyConfig = FLAPPY_CFG): FlappyState {
 		boostMs: 0,
 		heldMs: 0,
 		flapStartY: cfg.worldH / 2,
+		elapsedMs: 0,
 	};
 }
 
@@ -154,16 +176,19 @@ export function stepWorld(
 		birdY = ceilingY;
 		if (vy < 0) vy = 0;
 	}
-	const distance = state.distance + cfg.speed * dt;
+	// Difficulty ramp: scroll speed grows and new gaps shrink with elapsed play time.
+	const elapsedMs = state.elapsedMs + dt * 1000;
+	const { speed: rampSpeed, gapH: curGapH } = ramp(cfg, elapsedMs);
+	const distance = state.distance + rampSpeed * dt;
 
 	let spawnIndex = state.spawnIndex;
 	let score = state.score;
-	let pipes = state.pipes.map((p) => ({ ...p, x: p.x - cfg.speed * dt }));
+	let pipes = state.pipes.map((p) => ({ ...p, x: p.x - rampSpeed * dt }));
 
 	// Spawn pipes whose threshold distance has been crossed (x derived to absorb overshoot).
 	while (distance >= firstSpawn(cfg) + spawnIndex * cfg.pipeSpacing) {
 		const threshold = firstSpawn(cfg) + spawnIndex * cfg.pipeSpacing;
-		pipes.push({ x: cfg.worldW - (distance - threshold), gapCenter: pipeGap(seed, spawnIndex, cfg), scored: false });
+		pipes.push({ x: cfg.worldW - (distance - threshold), gapCenter: pipeGap(seed, spawnIndex, cfg, curGapH), gapH: curGapH, scored: false });
 		spawnIndex++;
 	}
 
@@ -182,10 +207,10 @@ export function stepWorld(
 		for (const p of pipes) {
 			const overlapX = cfg.birdX + cfg.birdR > p.x && cfg.birdX - cfg.birdR < p.x + cfg.pipeW;
 			if (!overlapX) continue;
-			const gapTop = p.gapCenter - cfg.gapH / 2;
-			const gapBottom = p.gapCenter + cfg.gapH / 2;
+			const gapTop = p.gapCenter - p.gapH / 2;
+			const gapBottom = p.gapCenter + p.gapH / 2;
 			if (birdY - cfg.birdR < gapTop || birdY + cfg.birdR > gapBottom) dead = true;
 		}
 
-	return { birdY, vy, distance, score, pipes, spawnIndex, status: dead ? 'over' : 'playing', boostMs, heldMs, flapStartY: state.flapStartY };
+	return { birdY, vy, distance, score, pipes, spawnIndex, status: dead ? 'over' : 'playing', boostMs, heldMs, flapStartY: state.flapStartY, elapsedMs };
 }
