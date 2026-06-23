@@ -44,11 +44,14 @@ export interface Asteroid {
 	x: number;
 	y: number;
 	z: number;
-	r: number;
+	r: number; // collision radius (also the nominal render size)
 	rx: number; // initial rotation (render only)
 	ry: number;
 	rz: number;
 	spin: number; // rad/s (render only)
+	sx: number; // non-uniform scale factors → lumpy look (render only)
+	sy: number;
+	sz: number;
 }
 
 export interface EsquiveState {
@@ -68,8 +71,8 @@ export function esquiveConfig(diff: EsquiveDiff): EsquiveConfig {
 		halfH: 9,
 		shipR: 0.9,
 		shipSpeed: 24,
-		astMinR: 0.8,
-		astMaxR: 2.2,
+		astMinR: 0.7,
+		astMaxR: 2.3,
 		farZ: -120,
 		shipZ: 0,
 		despawnZ: 12,
@@ -107,7 +110,9 @@ export function burstAt(elapsedMs: number, cfg: EsquiveConfig): number {
 /** Asteroid `i` is fully determined by (seed, i) → reproducible, stateless. */
 export function spawnAsteroid(seed: number, i: number, cfg: EsquiveConfig): Asteroid {
 	const rng = mulberry32((seed ^ Math.imul(i + 1, 2654435761)) >>> 0);
-	const r = cfg.astMinR + rng() * (cfg.astMaxR - cfg.astMinR);
+	const big = rng() < 0.16; // occasional boulders
+	const base = cfg.astMinR + rng() * (cfg.astMaxR - cfg.astMinR);
+	const r = big ? cfg.astMaxR * (1.25 + rng() * 0.4) : base;
 	return {
 		x: (rng() * 2 - 1) * cfg.halfW,
 		y: (rng() * 2 - 1) * cfg.halfH,
@@ -117,6 +122,9 @@ export function spawnAsteroid(seed: number, i: number, cfg: EsquiveConfig): Aste
 		ry: rng() * Math.PI * 2,
 		rz: rng() * Math.PI * 2,
 		spin: (rng() * 2 - 1) * 1.4,
+		sx: 0.8 + rng() * 0.4,
+		sy: 0.8 + rng() * 0.4,
+		sz: 0.8 + rng() * 0.4,
 	};
 }
 

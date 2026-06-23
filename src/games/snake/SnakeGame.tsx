@@ -586,7 +586,7 @@ const CSS = `
 .sn-canvas {
   width: 100%; aspect-ratio: 1 / 1; display: block;
   background: var(--gray-999); border: 1px solid var(--gray-800); border-radius: 12px;
-  touch-action: none;
+  touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
 
 .sn-overlay {

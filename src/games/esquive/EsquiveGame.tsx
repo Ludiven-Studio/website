@@ -45,7 +45,7 @@ interface Scene3D {
 	pool: THREE.Mesh[];
 	starGeom: THREE.BufferGeometry;
 	starPos: Float32Array;
-	astGeom: THREE.IcosahedronGeometry;
+	astGeoms: THREE.BufferGeometry[];
 	astMat: THREE.MeshStandardMaterial;
 }
 
@@ -77,7 +77,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 	const statusRef = useRef<Status>('ready');
 	const triesRef = useRef(0);
 	const keysRef = useRef({ left: false, right: false, up: false, down: false });
-	const pointerRef = useRef<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
+	const pointerRef = useRef({ active: false, lastX: 0, lastY: 0, targetX: 0, targetY: 0 });
 
 	/* ---- three.js scene (built once) ---- */
 	const initScene = useCallback(() => {
@@ -133,12 +133,16 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		ship.add(glow);
 		scene.add(ship);
 
-		// Asteroid pool (reused; hidden until active).
-		const astGeom = new THREE.IcosahedronGeometry(1, 0);
+		// Asteroid pool (reused; hidden until active). Three base shapes cycle across the pool for variety.
+		const astGeoms: THREE.BufferGeometry[] = [
+			new THREE.IcosahedronGeometry(1, 0),
+			new THREE.DodecahedronGeometry(1, 0),
+			new THREE.IcosahedronGeometry(1, 1),
+		];
 		const astMat = new THREE.MeshStandardMaterial({ color: 0x9098a4, flatShading: true, roughness: 1, metalness: 0.05 });
 		const pool: THREE.Mesh[] = [];
 		for (let i = 0; i < MAX_AST; i++) {
-			const m = new THREE.Mesh(astGeom, astMat);
+			const m = new THREE.Mesh(astGeoms[i % astGeoms.length], astMat);
 			m.visible = false;
 			scene.add(m);
 			pool.push(m);
@@ -156,7 +160,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		const stars = new THREE.Points(starGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, sizeAttenuation: true }));
 		scene.add(stars);
 
-		g3Ref.current = { renderer, scene, camera, ship, glow, pool, starGeom, starPos, astGeom, astMat };
+		g3Ref.current = { renderer, scene, camera, ship, glow, pool, starGeom, starPos, astGeoms, astMat };
 	}, []);
 
 	const computeInput = useCallback(() => {
@@ -164,10 +168,10 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		const p = pointerRef.current;
 		const st = stateRef.current;
 		if (p.active) {
-			// Follow the pointer/finger target.
+			// Follow the accumulated drag target (relative to where the drag began).
 			return {
-				x: Math.max(-1, Math.min(1, (p.x - st.shipX) * 0.6)),
-				y: Math.max(-1, Math.min(1, (p.y - st.shipY) * 0.6)),
+				x: Math.max(-1, Math.min(1, (p.targetX - st.shipX) * 0.6)),
+				y: Math.max(-1, Math.min(1, (p.targetY - st.shipY) * 0.6)),
 			};
 		}
 		return {
@@ -201,7 +205,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 				const a = st.asteroids[i];
 				m.visible = true;
 				m.position.set(a.x, a.y, a.z);
-				m.scale.setScalar(a.r);
+				m.scale.set(a.r * a.sx, a.r * a.sy, a.r * a.sz);
 				m.rotation.set(a.rx, a.ry, a.rz);
 			} else if (m.visible) {
 				m.visible = false;
@@ -310,7 +314,6 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		runningRef.current = true;
 		statusRef.current = 'playing';
 		keysRef.current = { left: false, right: false, up: false, down: false };
-		pointerRef.current.active = false;
 		setScore(0);
 		setStatus('playing');
 		setAttempt((a) => a + 1);
@@ -338,6 +341,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			setAlreadyPlayed(false);
 			triesRef.current = 0;
 			setTries(0);
+			pointerRef.current.active = false;
 			setDiffKey(key);
 			cfgRef.current = esquiveConfig(ESQUIVE_DIFFS[key]);
 			seedRef.current = (Math.random() * 2 ** 32) >>> 0;
@@ -463,7 +467,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			stop();
 			const g = g3Ref.current;
 			if (g) {
-				g.astGeom.dispose();
+				g.astGeoms.forEach((geo) => geo.dispose());
 				g.astMat.dispose();
 				g.starGeom.dispose();
 				g.ship.traverse((o) => {
@@ -479,25 +483,33 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	/* Pointer: map to a world target on the ship plane, then follow it. */
-	const updatePointer = (e: React.PointerEvent) => {
+	/* Pointer: relative drag — only the movement (delta) steers the ship, not the finger position. */
+	const onCanvasPointerDown = (e: React.PointerEvent) => {
+		e.preventDefault();
+		if (dailyLoading) return;
+		const p = pointerRef.current;
+		p.active = true;
+		p.lastX = e.clientX;
+		p.lastY = e.clientY;
+		p.targetX = stateRef.current.shipX;
+		p.targetY = stateRef.current.shipY;
+		if (statusRef.current === 'ready') start();
+	};
+	const onCanvasPointerMove = (e: React.PointerEvent) => {
+		const p = pointerRef.current;
+		if (!p.active) return;
+		if (e.buttons === 0 && e.pointerType === 'mouse') return; // mouse: only while dragging
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 		const rect = canvas.getBoundingClientRect();
 		const cfg = cfgRef.current;
-		const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-		const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
-		pointerRef.current = { active: true, x: nx * cfg.halfW, y: -ny * cfg.halfH };
-	};
-	const onCanvasPointerDown = (e: React.PointerEvent) => {
-		e.preventDefault();
-		if (dailyLoading) return;
-		updatePointer(e);
-		if (statusRef.current === 'ready') start();
-	};
-	const onCanvasPointerMove = (e: React.PointerEvent) => {
-		if (e.buttons === 0 && e.pointerType === 'mouse') return; // only while dragging with mouse
-		if (statusRef.current === 'playing') updatePointer(e);
+		const SENS = 1.2;
+		const worldDX = ((e.clientX - p.lastX) / rect.width) * (2 * cfg.halfW) * SENS;
+		const worldDY = -((e.clientY - p.lastY) / rect.height) * (2 * cfg.halfH) * SENS;
+		p.lastX = e.clientX;
+		p.lastY = e.clientY;
+		p.targetX = Math.max(-cfg.halfW, Math.min(cfg.halfW, p.targetX + worldDX));
+		p.targetY = Math.max(-cfg.halfH, Math.min(cfg.halfH, p.targetY + worldDY));
 	};
 	const releasePointer = () => {
 		pointerRef.current.active = false;
@@ -626,6 +638,7 @@ const CSS = `
   width: 100%; aspect-ratio: 1 / 1; display: block;
   background: #0a0a14; border: 1px solid var(--gray-800); border-radius: 12px;
   touch-action: none; cursor: crosshair;
+  -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
 
 .es-overlay {

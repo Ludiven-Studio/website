@@ -609,6 +609,7 @@ const CSS = `
   width: 100%; aspect-ratio: 1 / 1; display: block;
   background: var(--gray-999); border: 1px solid var(--gray-800); border-radius: 12px;
   touch-action: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
 
 .fl-overlay {

@@ -23,7 +23,7 @@ const stateWith = (asteroids: Asteroid[], over = false, elapsedMs = 0): EsquiveS
 	spawnCount: 0,
 });
 
-const ast = (over: Partial<Asteroid>): Asteroid => ({ x: 0, y: 0, z: 0, r: 1, rx: 0, ry: 0, rz: 0, spin: 0, ...over });
+const ast = (over: Partial<Asteroid>): Asteroid => ({ x: 0, y: 0, z: 0, r: 1, rx: 0, ry: 0, rz: 0, spin: 0, sx: 1, sy: 1, sz: 1, ...over });
 
 describe('esquive engine', () => {
 	it('spawnAsteroid is deterministic and within bounds', () => {
@@ -33,8 +33,19 @@ describe('esquive engine', () => {
 		expect(Math.abs(a.x)).toBeLessThanOrEqual(cfg.halfW);
 		expect(Math.abs(a.y)).toBeLessThanOrEqual(cfg.halfH);
 		expect(a.r).toBeGreaterThanOrEqual(cfg.astMinR);
-		expect(a.r).toBeLessThanOrEqual(cfg.astMaxR);
+		expect(a.r).toBeLessThanOrEqual(cfg.astMaxR * 1.8); // occasional boulders exceed astMaxR
 		expect(a.z).toBe(cfg.farZ);
+		// Lumpy non-uniform scale factors (render only), reproducible per (seed, i).
+		for (const s of [a.sx, a.sy, a.sz]) {
+			expect(s).toBeGreaterThanOrEqual(0.8);
+			expect(s).toBeLessThanOrEqual(1.2);
+		}
+	});
+
+	it('spawns occasional boulders larger than astMaxR', () => {
+		let maxR = 0;
+		for (let i = 0; i < 200; i++) maxR = Math.max(maxR, spawnAsteroid(42, i, cfg).r);
+		expect(maxR).toBeGreaterThan(cfg.astMaxR);
 	});
 
 	it('different seeds give different asteroid fields', () => {
