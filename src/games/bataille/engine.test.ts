@@ -8,7 +8,6 @@ import {
 	shipCells,
 	isSunk,
 	isWon,
-	type HuntPuzzle,
 	type Shot,
 } from './engine';
 

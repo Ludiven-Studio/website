@@ -18,7 +18,6 @@ import {
 	dailyDifficultyIndex,
 	loadDailyRun,
 	saveDailyRun,
-	type DailyRun,
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -389,7 +388,6 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					{Array.from({ length: size }).map((_, r) =>
 						Array.from({ length: size }).map((_, c) => {
 							const sv = shots[r][c];
-							const reveal = sonarReveals[`${r},${c}`];
 							const isShipSeg = sunkGrid[r][c]; // sunk (or won) → draw ship segment
 							const seg = isShipSeg ? segType(sunkGrid, r, c) : null;
 							const hit = sv === 1 && !isShipSeg; // hit but not yet sunk
@@ -400,7 +398,6 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 								seg ? SEG_CLASS[seg] : '',
 								hit ? 'hit' : '',
 								miss ? 'miss' : '',
-								reveal !== undefined && sv === 0 ? 'sonarval' : '',
 								over ? 'over' : '',
 							].join(' ');
 							return (
@@ -417,8 +414,6 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 										'✸'
 									) : miss ? (
 										<span className="ba-dot" />
-									) : reveal !== undefined ? (
-										reveal
 									) : (
 										''
 									)}
@@ -428,7 +423,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
-				{Object.keys(sonarReveals).length > 0 && (
+				{!over && Object.keys(sonarReveals).length > 0 && (
 					<div
 						className="ba-sonar-overlay"
 						style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, gridTemplateRows: `repeat(${size}, 1fr)` }}
@@ -444,7 +439,9 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 									key={key}
 									className="ba-sonarbox"
 									style={{ gridColumn: `${c0} / ${c1}`, gridRow: `${r0} / ${r1}` }}
-								/>
+								>
+									<span className="ba-sonar-num">{sonarReveals[key]}</span>
+								</div>
 							);
 						})}
 					</div>
@@ -566,11 +563,17 @@ const CSS = `
 .ba-cell:hover:not(:disabled) { background: var(--gray-800); }
 .ba-cell.miss { color: var(--gray-500); cursor: default; }
 .ba-cell.hit { color: #fff; background: var(--ba-hit); cursor: default; }
-.ba-cell.sonarval { color: var(--ba-accent); background: var(--accent-overlay, var(--gray-900)); }
 
-/* Sonar scanned-zone outline (3×3), aligned to the grid via a matching overlay. */
+/* Sonar scanned-zone outline (3×3) + small count badge, top-right of the zone. */
 .ba-sonar-overlay { position: absolute; inset: 0; display: grid; gap: 2px; padding: 2px; pointer-events: none; z-index: 1; }
-.ba-sonarbox { border: 2px dashed var(--ba-accent); border-radius: 6px; box-sizing: border-box; opacity: 0.8; }
+.ba-sonarbox { position: relative; border: 2px dashed var(--ba-accent); border-radius: 6px; box-sizing: border-box; opacity: 0.85; }
+.ba-sonar-num {
+  position: absolute; top: -7px; right: -7px;
+  min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
+  color: var(--accent-text-over); background: var(--ba-accent); border-radius: 999px;
+}
 .ba-cell.over { cursor: default; }
 .ba-dot { width: calc(var(--ba-cell) * 0.16); height: calc(var(--ba-cell) * 0.16); border-radius: 50%; background: var(--gray-500); }
 
