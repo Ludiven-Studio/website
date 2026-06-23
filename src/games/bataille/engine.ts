@@ -19,9 +19,9 @@ export interface SizeLevel {
 }
 
 export const SIZES: Record<string, SizeLevel> = {
-	facile: { label: 'Facile', size: 8, fleet: [3, 3, 2, 2], sonars: 5 },
-	moyen: { label: 'Moyen', size: 10, fleet: [4, 3, 3, 2, 2], sonars: 4 },
-	difficile: { label: 'Difficile', size: 12, fleet: [5, 4, 3, 3, 2], sonars: 3 },
+	facile: { label: 'Facile', size: 8, fleet: [3, 3, 2, 2], sonars: 8 },
+	moyen: { label: 'Moyen', size: 10, fleet: [4, 3, 3, 2, 2], sonars: 7 },
+	difficile: { label: 'Difficile', size: 12, fleet: [5, 4, 3, 3, 2], sonars: 6 },
 };
 
 export interface HuntPuzzle {
@@ -155,8 +155,8 @@ export function generateHunt(sizeLvl: SizeLevel, rng: Rng = Math.random): HuntPu
 	return { size: n, fleet, ships, shipId: labelShips(ships, n) };
 }
 
-/** Ship cells a sonar reveals: the (2*radius+1)² area centred on (r,c). Default radius 2 → 5×5. */
-export function sonarCount(ships: boolean[][], r: number, c: number, size: number, radius = 2): number {
+/** Ship cells a sonar reveals: the (2*radius+1)² area centred on (r,c). Default radius 1 → 3×3. */
+export function sonarCount(ships: boolean[][], r: number, c: number, size: number, radius = 1): number {
 	let k = 0;
 	for (let dr = -radius; dr <= radius; dr++)
 		for (let dc = -radius; dc <= radius; dc++) {

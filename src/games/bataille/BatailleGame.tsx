@@ -111,21 +111,6 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		return [...m.entries()].sort((a, b) => b[0] - a[0]).map(([len, count]) => ({ len, count }));
 	}, [fleet]);
 
-	/* Cells covered by any sonar's 5×5 footprint — tinted so the scanned zone is visible. */
-	const sonarZone = useMemo(() => {
-		const s = new Set<string>();
-		for (const key of Object.keys(sonarReveals)) {
-			const [cr, cc] = key.split(',').map(Number);
-			for (let dr = -2; dr <= 2; dr++)
-				for (let dc = -2; dc <= 2; dc++) {
-					const nr = cr + dr;
-					const nc = cc + dc;
-					if (nr >= 0 && nr < size && nc >= 0 && nc < size) s.add(`${nr},${nc}`);
-				}
-		}
-		return s;
-	}, [sonarReveals, size]);
-
 	const newGame = useCallback((dk: DiffKey) => {
 		const s = SIZES[dk];
 		setDaily(false);
@@ -409,14 +394,12 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 							const seg = isShipSeg ? segType(sunkGrid, r, c) : null;
 							const hit = sv === 1 && !isShipSeg; // hit but not yet sunk
 							const miss = sv === 2;
-							const inZone = sv === 0 && !isShipSeg && sonarZone.has(`${r},${c}`); // scanned 5×5 footprint
 							const cls = [
 								'ba-cell',
 								isShipSeg ? 'ship' : '',
 								seg ? SEG_CLASS[seg] : '',
 								hit ? 'hit' : '',
 								miss ? 'miss' : '',
-								inZone ? 'sonarzone' : '',
 								reveal !== undefined && sv === 0 ? 'sonarval' : '',
 								over ? 'over' : '',
 							].join(' ');
@@ -490,7 +473,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 			<p className="ba-help">
 				Coule toute la flotte cachée en un minimum d'actions. Clique une case pour <strong>tirer</strong>{' '}
 				(✸ touché, point = manqué) ; un navire entièrement touché est coulé (l'eau autour se dévoile).
-				Le bouton <strong>Sonar</strong> révèle le nombre de cases-navire dans une zone 5×5. La flotte
+				Le bouton <strong>Sonar</strong> révèle le nombre de cases-navire dans une zone 3×3. La flotte
 				à couler est indiquée au-dessus. Score = tirs + sonars.
 			</p>
 		</div>
@@ -561,7 +544,6 @@ const CSS = `
 .ba-cell:hover:not(:disabled) { background: var(--gray-800); }
 .ba-cell.miss { color: var(--gray-500); cursor: default; }
 .ba-cell.hit { color: #fff; background: var(--ba-hit); cursor: default; }
-.ba-cell.sonarzone { background: var(--accent-overlay, rgba(127, 92, 255, 0.15)); }
 .ba-cell.sonarval { color: var(--ba-accent); background: var(--accent-overlay, var(--gray-900)); box-shadow: inset 0 0 0 1.5px var(--ba-accent); }
 .ba-cell.over { cursor: default; }
 .ba-dot { width: calc(var(--ba-cell) * 0.16); height: calc(var(--ba-cell) * 0.16); border-radius: 50%; background: var(--gray-500); }
