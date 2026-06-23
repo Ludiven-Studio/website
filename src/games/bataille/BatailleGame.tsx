@@ -428,6 +428,28 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
+				{Object.keys(sonarReveals).length > 0 && (
+					<div
+						className="ba-sonar-overlay"
+						style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, gridTemplateRows: `repeat(${size}, 1fr)` }}
+					>
+						{Object.keys(sonarReveals).map((key) => {
+							const [r, c] = key.split(',').map(Number);
+							const r0 = Math.max(0, r - 1) + 1;
+							const c0 = Math.max(0, c - 1) + 1;
+							const r1 = Math.min(size - 1, r + 1) + 2;
+							const c1 = Math.min(size - 1, c + 1) + 2;
+							return (
+								<div
+									key={key}
+									className="ba-sonarbox"
+									style={{ gridColumn: `${c0} / ${c1}`, gridRow: `${r0} / ${r1}` }}
+								/>
+							);
+						})}
+					</div>
+				)}
+
 				{daily && dailyLoading && (
 					<div className="ba-overlay"><div className="ba-overlay-card">Préparation…</div></div>
 				)}
@@ -535,7 +557,7 @@ const CSS = `
 }
 .ba-board.sonar { outline: 2px solid var(--ba-accent); outline-offset: 2px; border-radius: 8px; }
 .ba-cell {
-  width: 100%; aspect-ratio: 1; border: none; border-radius: 3px;
+  width: 100%; aspect-ratio: 1; border: none; border-radius: 3px; overflow: hidden;
   background: var(--gray-999); color: var(--gray-300);
   font-family: var(--font-body); font-weight: 800; font-size: calc(var(--ba-cell) * 0.46);
   line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
@@ -544,7 +566,11 @@ const CSS = `
 .ba-cell:hover:not(:disabled) { background: var(--gray-800); }
 .ba-cell.miss { color: var(--gray-500); cursor: default; }
 .ba-cell.hit { color: #fff; background: var(--ba-hit); cursor: default; }
-.ba-cell.sonarval { color: var(--ba-accent); background: var(--accent-overlay, var(--gray-900)); box-shadow: inset 0 0 0 1.5px var(--ba-accent); }
+.ba-cell.sonarval { color: var(--ba-accent); background: var(--accent-overlay, var(--gray-900)); }
+
+/* Sonar scanned-zone outline (3×3), aligned to the grid via a matching overlay. */
+.ba-sonar-overlay { position: absolute; inset: 0; display: grid; gap: 2px; padding: 2px; pointer-events: none; z-index: 1; }
+.ba-sonarbox { border: 2px dashed var(--ba-accent); border-radius: 6px; box-sizing: border-box; opacity: 0.8; }
 .ba-cell.over { cursor: default; }
 .ba-dot { width: calc(var(--ba-cell) * 0.16); height: calc(var(--ba-cell) * 0.16); border-radius: 50%; background: var(--gray-500); }
 
@@ -553,10 +579,10 @@ const CSS = `
 .ba-seg { background: var(--ba-ship); display: block; }
 .ba-cell.ship .ba-seg { width: 78%; height: 78%; background: var(--ba-accent); }
 .ba-cell.seg-single .ba-seg { border-radius: 50%; }
-.ba-cell.seg-left .ba-seg { width: 100%; border-radius: 999px 0 0 999px; margin-left: 22%; }
-.ba-cell.seg-right .ba-seg { width: 100%; border-radius: 0 999px 999px 0; margin-right: 22%; }
-.ba-cell.seg-top .ba-seg { height: 100%; border-radius: 999px 999px 0 0; margin-top: 22%; }
-.ba-cell.seg-bottom .ba-seg { height: 100%; border-radius: 0 0 999px 999px; margin-bottom: 22%; }
+.ba-cell.seg-left .ba-seg { width: 78%; border-radius: 999px 0 0 999px; margin-left: 22%; }
+.ba-cell.seg-right .ba-seg { width: 78%; border-radius: 0 999px 999px 0; margin-right: 22%; }
+.ba-cell.seg-top .ba-seg { height: 78%; border-radius: 999px 999px 0 0; margin-top: 22%; }
+.ba-cell.seg-bottom .ba-seg { height: 78%; border-radius: 0 0 999px 999px; margin-bottom: 22%; }
 .ba-cell.seg-midh .ba-seg { width: 100%; height: 78%; border-radius: 0; }
 .ba-cell.seg-midv .ba-seg { width: 78%; height: 100%; border-radius: 0; }
 
