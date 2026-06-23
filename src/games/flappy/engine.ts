@@ -45,11 +45,11 @@ const BASE = {
 	birdR: 3,
 	pipeW: 13,
 	groundH: 8,
-	// Progressive difficulty: every 30s the world scrolls a bit faster and gaps shrink slightly.
-	rampEveryMs: 30000,
-	speedRamp: 0.07,
-	gapRamp: 1.4,
-	minGapH: 15,
+	// Progressive difficulty: each step the world scrolls faster and gaps shrink — clearly felt.
+	rampEveryMs: 18000,
+	speedRamp: 0.1,
+	gapRamp: 2.6,
+	minGapH: 13,
 };
 
 export interface FlappyDiff {
