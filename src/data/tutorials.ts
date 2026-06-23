@@ -69,9 +69,9 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Comment jouer', body: 'Touche une case pour cycler : tente, puis herbe (case sûrement vide), puis vide. Indice corrige ou pose une tente ; solution dispo après 1 min.' },
 	],
 	bataille: [
-		{ emoji: '🚢', title: 'Le but', body: 'Retrouve la flotte cachée. Les chiffres dans certaines cases indiquent combien de cases-bateau les touchent par un côté (haut, bas, gauche, droite — pas en diagonale).' },
-		{ emoji: '🌊', title: 'La règle', body: 'Les bateaux ne se touchent jamais, même en diagonale. Les cases numérotées sont toujours de l\'eau. Les lettres et chiffres autour de la grille servent à repérer les cases (A2…).' },
-		{ emoji: '💡', title: 'Comment jouer', body: 'Touche une case pour cycler : bateau, puis eau, puis vide. Repère la flotte à trouver en légende. Indice corrige une case ; solution dispo après 1 min.' },
+		{ emoji: '🚢', title: 'Le but', body: 'Une flotte est cachée dans la grille. Coule tous les navires en un minimum d\'actions (le score = tirs + sonars).' },
+		{ emoji: '🎯', title: 'Tirer', body: 'Clique une case pour tirer : ✸ = touché, point = manqué. Un navire entièrement touché est coulé — comme les navires ne se touchent jamais, l\'eau autour se dévoile alors toute seule.' },
+		{ emoji: '🔊', title: 'Sonar', body: 'Tu as quelques sonars : active le bouton Sonar puis clique une zone — il révèle le nombre de cases-navire dans le carré 3×3. Idéal pour cibler avant de tirer. Au défi du jour, même flotte pour tous, classement au moins d\'actions.' },
 	],
 	demineur: [
 		{ emoji: '💣', title: 'Le but', body: 'Découvre toutes les cases sûres sans cliquer sur une mine. Les chiffres indiquent combien de mines touchent la case (diagonales comprises). Une ouverture sûre est révélée pour démarrer.' },

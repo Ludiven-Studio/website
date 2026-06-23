@@ -7,7 +7,7 @@ import GameTutorial from '../../components/GameTutorial.astro';
 
 <BaseLayout
 	title="Bataille navale | Jeux Ludiven Studio"
-	description="Bataille navale logique : retrouve la flotte cachée grâce aux indices de proximité, façon démineur. Un mini-jeu de logique signé Ludiven Studio."
+	description="Bataille navale : traque et coule la flotte cachée à coups de tirs et de sonars, en un minimum d'actions. Un mini-jeu signé Ludiven Studio."
 >
 	<div class="wrapper game-page stack gap-8">
 		<header class="game-head stack gap-2">
@@ -15,11 +15,11 @@ import GameTutorial from '../../components/GameTutorial.astro';
 				<Icon icon="arrow-left" size="1em" /> Tous les jeux
 			</a>
 			<h1>Bataille navale</h1>
-			<p>Retrouve la flotte cachée par pure déduction</p>
+			<p>Coule la flotte cachée en un minimum de tirs</p>
 			<GameTutorial gameId="bataille" />
 		</header>
 
-		<BatailleGame client:only="react" gameId="bataille2" />
+		<BatailleGame client:only="react" gameId="bataille" />
 	</div>
 </BaseLayout>
 

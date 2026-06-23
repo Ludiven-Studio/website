@@ -1,10 +1,21 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { SIZES, DIFFS, generateBataille, findHint, segType, type BataillePuzzle, type Given, type SegType } from './engine';
+import {
+	SIZES,
+	generateHunt,
+	segType,
+	sonarCount,
+	isSunk,
+	isWon,
+	type HuntPuzzle,
+	type SegType,
+	type Shot,
+} from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
 	getDaily,
 	dailyWeekdayLabel,
+	dailyDifficultyIndex,
 	loadDailyRun,
 	saveDailyRun,
 	type DailyRun,
@@ -15,208 +26,180 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
-   BATAILLE NAVALE LOGIQUE — React island.
-   Find a hidden fleet from minesweeper-style proximity
-   numbers: some water cells show their orthogonal-nbr ship count.
-   Row/column headers are coordinate labels only (A2, H4…).
-   Mark each free cell ship or water; ships never touch
-   (even diagonally). Engine is pure/tested.
+   BATAILLE NAVALE — chasse à la flotte. React island.
+   Tire (touché/manqué), coule les navires ; quelques
+   sonars révèlent une zone 3×3. Score = tirs + sonars,
+   le moins possible. Engine is pure/tested.
    ===================================================== */
 
 type Status = 'playing' | 'won';
-// Player mark per cell: 0 empty, 1 ship, 2 water. Given cells override.
-type Mark = 0 | 1 | 2;
+type DiffKey = keyof typeof SIZES;
+const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
+const BEST_KEY = 'ludiven-bataille-best';
 
-const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
-const DAILY_SIZE: keyof typeof SIZES = '7';
-
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-
-const emptyMarks = (n: number): Mark[][] => Array.from({ length: n }, () => new Array<Mark>(n).fill(0));
-
-/** Effective ship grid: player 'ship' OR given 'ship'. Used for win + segType rendering. */
-function shipGrid(marks: Mark[][], given: Given[][], n: number): boolean[][] {
-	const g: boolean[][] = Array.from({ length: n }, () => new Array(n).fill(false));
-	for (let r = 0; r < n; r++)
-		for (let c = 0; c < n; c++) g[r][c] = given[r][c] === 'ship' || marks[r][c] === 1;
-	return g;
+interface DailyHunt {
+	shots: Shot[][];
+	sonar: [string, number][];
+	shotsUsed: number;
+	sonarsUsed: number;
+	done: boolean;
 }
 
-/** Fleet legend, e.g. "1×4, 2×3, 2×2, 2×1" grouped by length desc. */
-function fleetLegend(fleet: number[]): { len: number; count: number }[] {
-	const m = new Map<number, number>();
-	for (const l of fleet) m.set(l, (m.get(l) ?? 0) + 1);
-	return [...m.entries()].sort((a, b) => b[0] - a[0]).map(([len, count]) => ({ len, count }));
-}
+const emptyShots = (n: number): Shot[][] => Array.from({ length: n }, () => new Array<Shot>(n).fill(0));
+
+const NBR8: [number, number][] = [
+	[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1],
+];
+
+const SEG_CLASS: Record<NonNullable<SegType>, string> = {
+	single: 'seg-single', left: 'seg-left', right: 'seg-right', top: 'seg-top',
+	bottom: 'seg-bottom', 'mid-h': 'seg-midh', 'mid-v': 'seg-midv',
+};
 
 export default function BatailleGame({ gameId }: { gameId: string }) {
-	const [sizeKey, setSizeKey] = useState<keyof typeof SIZES>('6');
-	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
-	const [puzzle, setPuzzle] = useState<BataillePuzzle>(() => generateBataille(SIZES['6'], DIFFS.facile));
-	const [marks, setMarks] = useState<Mark[][]>(() => emptyMarks(SIZES['6'].size));
+	const [diffKey, setDiffKey] = useState<DiffKey>('facile');
+	const [puzzle, setPuzzle] = useState<HuntPuzzle>(() => generateHunt(SIZES.facile));
+	const [shots, setShots] = useState<Shot[][]>(() => emptyShots(SIZES.facile.size));
+	const [sonarReveals, setSonarReveals] = useState<Record<string, number>>({});
+	const [shotsUsed, setShotsUsed] = useState(0);
+	const [sonarsUsed, setSonarsUsed] = useState(0);
+	const [sonarMode, setSonarMode] = useState(false);
 	const [status, setStatus] = useState<Status>('playing');
+	const [best, setBest] = useState(0);
 	const [started, setStarted] = useState(false);
-	const [revealed, setRevealed] = useState(false);
-	const [hinted, setHinted] = useState<Set<string>>(() => new Set());
-	const [elapsed, setElapsed] = useState(0);
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
-	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
-	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
-	const startRef = useRef<number>(0);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const startedRef = useRef(false); // free-mode "first action" flag
+	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
-	const painting = useRef(false);
-	const strokeVal = useRef<Mark>(0);
 
-	const { size, given, solution, clues, fleet } = puzzle;
-	const over = status === 'won' || revealed;
+	const { size, fleet, sonars } = useMemo(
+		() => ({ size: puzzle.size, fleet: puzzle.fleet, sonars: SIZES[diffKey].sonars }),
+		[puzzle, diffKey],
+	);
+	const over = status === 'won';
+	const cost = shotsUsed + sonarsUsed;
+	const sonarsLeft = sonars - sonarsUsed;
 
-	const newGame = useCallback((sk: keyof typeof SIZES, dk: keyof typeof DIFFS) => {
-		const s = SIZES[sk];
+	/* Sunk ships + a grid of revealed ship cells (sunk, or all on win) for segment rendering. */
+	const { sunkGrid, sunkCount } = useMemo(() => {
+		const grid: boolean[][] = Array.from({ length: size }, () => new Array(size).fill(false));
+		let sunk = 0;
+		for (let id = 0; id < fleet.length; id++) {
+			const dead = over || isSunk(puzzle, shots, id);
+			if (dead) sunk++;
+			if (dead || over)
+				for (let r = 0; r < size; r++)
+					for (let c = 0; c < size; c++) if (puzzle.shipId[r][c] === id) grid[r][c] = true;
+		}
+		return { sunkGrid: grid, sunkCount: sunk };
+	}, [puzzle, shots, over, size, fleet]);
+
+	const newGame = useCallback((dk: DiffKey) => {
+		const s = SIZES[dk];
 		setDaily(false);
 		setAlreadyPlayed(false);
-		setHintNote('');
-		setSizeKey(sk);
 		setDiffKey(dk);
-		setPuzzle(generateBataille(s, DIFFS[dk]));
-		setMarks(emptyMarks(s.size));
+		setPuzzle(generateHunt(s));
+		setShots(emptyShots(s.size));
+		setSonarReveals({});
+		setShotsUsed(0);
+		setSonarsUsed(0);
+		setSonarMode(false);
 		setStatus('playing');
 		setStarted(false);
-		setRevealed(false);
-		setHinted(new Set());
-		setElapsed(0);
+		startedRef.current = false;
+		try {
+			setBest(Number(localStorage.getItem(BEST_KEY) ?? '0') || 0);
+		} catch {
+			setBest(0);
+		}
 	}, []);
 
-	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
+	/* Daily: one resumable attempt per device; server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
-		setSizeKey(DAILY_SIZE);
-		setRevealed(false);
-		setHinted(new Set());
-
+		setSonarMode(false);
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
-			// Resume or lock the existing attempt — regenerate from the stored seed (no fetch).
-			const di = run.diffIndex ?? 0;
-			const dk = DIFF_ORDER[di] ?? 'facile';
+			const di = run.diffIndex ?? dailyDifficultyIndex();
+			const dk = DIFF_ORDER[di] ?? 'moyen';
 			dailySeedRef.current = { seed: run.seed, diffIndex: di };
+			const p = generateHunt(SIZES[dk], mulberry32(run.seed));
+			const st = run.state as DailyHunt | undefined;
 			setDailyLoading(false);
 			setDiffKey(dk);
-			setPuzzle(generateBataille(SIZES[DAILY_SIZE], DIFFS[dk], mulberry32(run.seed)));
-			setMarks((run.state as Mark[][] | undefined) ?? emptyMarks(SIZES[DAILY_SIZE].size));
+			setPuzzle(p);
+			setShots(st?.shots ?? emptyShots(p.size));
+			setSonarReveals(st ? Object.fromEntries(st.sonar) : {});
+			setShotsUsed(st?.shotsUsed ?? 0);
+			setSonarsUsed(st?.sonarsUsed ?? 0);
 			setStarted(true);
 			if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
-				setElapsed(run.finalTime ?? 0);
 			} else {
 				setAlreadyPlayed(false);
 				setStatus('playing');
 				startRef.current = run.startedAt;
-				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
 			}
 			return;
 		}
-
-		// Fresh: fetch today's seed and arm the grid (Start not pressed yet).
+		// Fresh: fetch today's seed and arm the board (Commencer not pressed yet).
 		setAlreadyPlayed(false);
 		setStatus('playing');
 		setStarted(false);
-		setElapsed(0);
+		setShotsUsed(0);
+		setSonarsUsed(0);
+		setSonarReveals({});
 		setDailyLoading(true);
 		const { seed, diffIndex } = await getDaily(gameId);
 		dailySeedRef.current = { seed, diffIndex };
-		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
+		const dk = DIFF_ORDER[diffIndex] ?? 'moyen';
+		const p = generateHunt(SIZES[dk], mulberry32(seed));
 		setDiffKey(dk);
-		setPuzzle(generateBataille(SIZES[DAILY_SIZE], DIFFS[dk], mulberry32(seed)));
-		setMarks(emptyMarks(SIZES[DAILY_SIZE].size));
+		setPuzzle(p);
+		setShots(emptyShots(p.size));
 		setDailyLoading(false);
 	}, [gameId]);
 
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
-	/* Commencer: consumes the attempt and starts the chrono. */
+	/* Commencer: consume the daily attempt. */
 	const startTimer = useCallback(() => {
-		const now = Date.now();
-		startRef.current = now;
+		startRef.current = Date.now();
 		setStarted(true);
-		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: emptyMarks(size),
-		});
-	}, [gameId, size]);
-
-	/* Clear my entries without resetting the attempt (chrono keeps running). */
-	const resetDailyEntries = useCallback(() => {
-		setMarks(emptyMarks(size));
-		setHinted(new Set());
-		setHintNote('');
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: emptyMarks(size),
+			state: { shots: emptyShots(size), sonar: [], shotsUsed: 0, sonarsUsed: 0, done: false } satisfies DailyHunt,
 		});
 	}, [gameId, size]);
 
-	/* Timer */
-	useEffect(() => {
-		if (status !== 'playing' || !started || revealed) return;
-		const id = setInterval(
-			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
-			250,
-		);
-		return () => clearInterval(id);
-	}, [status, started, revealed]);
-
 	const begin = useCallback(() => {
-		if (daily) return; // daily chrono is started by ▶ Commencer, never by a move
-		if (!started) {
-			startRef.current = Date.now();
-			setStarted(true);
+		if (daily) return; // daily starts via Commencer
+		if (!startedRef.current) {
+			startedRef.current = true;
 			trackGame(gameId, 'game_started');
 		}
-	}, [daily, started, gameId]);
+	}, [daily, gameId]);
 
-	const removeHint = useCallback((r: number, c: number) => {
-		setHinted((prev) => {
-			if (!prev.has(`${r},${c}`)) return prev;
-			const n = new Set(prev);
-			n.delete(`${r},${c}`);
-			return n;
-		});
-	}, []);
-
-	/* Effective ship grid for rendering. */
-	const ships = useMemo(() => shipGrid(marks, given, size), [marks, given, size]);
-
-	/* Proximity clue numbers, keyed "r,c". */
-	const clueMap = useMemo(() => {
-		const m = new Map<string, number>();
-		for (const cl of clues) m.set(`${cl.r},${cl.c}`, cl.n);
-		return m;
-	}, [clues]);
-
-	/* Win: every cell's effective ship matches the solution. */
+	/* Win detection. */
 	useEffect(() => {
 		if (over) return;
-		if (daily && !started) return; // skip win-check on a daily not yet started
-		for (let r = 0; r < size; r++)
-			for (let c = 0; c < size; c++) if (ships[r][c] !== solution[r][c]) return;
-		setStatus('won');
-		trackGame(gameId, 'game_won');
-	}, [ships, over, size, solution, gameId, daily, started]);
+		if (daily && !started) return;
+		if (isWon(puzzle, shots)) {
+			setStatus('won');
+			trackGame(gameId, 'game_won', { cost });
+		}
+	}, [shots, over, puzzle, daily, started, gameId, cost]);
 
-	/* Persist the in-progress daily attempt (resume after reload). */
+	/* Persist the in-progress daily attempt. */
 	useEffect(() => {
 		if (!daily || !started || status === 'won') return;
 		const sd = dailySeedRef.current;
@@ -225,362 +208,243 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: marks,
+			state: {
+				shots,
+				sonar: Object.entries(sonarReveals).map(([k, v]) => [k, v] as [string, number]),
+				shotsUsed,
+				sonarsUsed,
+				done: false,
+			} satisfies DailyHunt,
 		});
-	}, [daily, started, status, marks, gameId]);
+	}, [daily, started, status, shots, sonarReveals, shotsUsed, sonarsUsed, gameId]);
 
-	/* Lock the daily attempt on a fresh win. */
+	/* Lock the daily on a fresh win + record free-mode best. */
 	useEffect(() => {
-		if (!daily || status !== 'won' || alreadyPlayed) return;
-		const sd = dailySeedRef.current;
-		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
-		const snapshot: DailyRun = {
-			startedAt: startRef.current,
-			done: true,
-			finalTime,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: marks,
-		};
-		saveDailyRun(gameId, snapshot);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [daily, status, alreadyPlayed, gameId]);
-
-	/* Stroke: set a free cell's mark (given cells are locked). */
-	const applyStroke = useCallback(
-		(r: number, c: number) => {
-			if (given[r][c] !== null) return; // locked clue
-			const v = strokeVal.current;
-			setMarks((prev) => {
-				if (prev[r][c] === v) return prev;
-				const n = prev.map((row) => [...row]);
-				n[r][c] = v;
-				return n;
+		if (status !== 'won') return;
+		if (daily) {
+			if (alreadyPlayed) return;
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: startRef.current,
+				done: true,
+				finalTime: cost,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: {
+					shots,
+					sonar: Object.entries(sonarReveals).map(([k, v]) => [k, v] as [string, number]),
+					shotsUsed,
+					sonarsUsed,
+					done: true,
+				} satisfies DailyHunt,
 			});
-			removeHint(r, c);
+		} else {
+			setBest((prev) => {
+				const nb = prev === 0 ? cost : Math.min(prev, cost);
+				try {
+					localStorage.setItem(BEST_KEY, String(nb));
+				} catch {
+					/* ignore */
+				}
+				return nb;
+			});
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [status]);
+
+	/* Fire at a cell: hit/miss; sinking a ship floods the (always-water) cells around it. */
+	const fire = useCallback(
+		(r: number, c: number) => {
+			if (over || (daily && !started) || shots[r][c] !== 0) return;
 			begin();
+			setShots((prev) => {
+				const next = prev.map((row) => row.slice());
+				next[r][c] = puzzle.ships[r][c] ? 1 : 2;
+				if (puzzle.ships[r][c]) {
+					const id = puzzle.shipId[r][c];
+					const cells: [number, number][] = [];
+					for (let rr = 0; rr < size; rr++)
+						for (let cc = 0; cc < size; cc++) if (puzzle.shipId[rr][cc] === id) cells.push([rr, cc]);
+					if (cells.every(([rr, cc]) => next[rr][cc] === 1)) {
+						for (const [rr, cc] of cells)
+							for (const [dr, dc] of NBR8) {
+								const nr = rr + dr;
+								const nc = cc + dc;
+								if (nr >= 0 && nr < size && nc >= 0 && nc < size && next[nr][nc] === 0 && !puzzle.ships[nr][nc])
+									next[nr][nc] = 2;
+							}
+					}
+				}
+				return next;
+			});
+			setShotsUsed((s) => s + 1);
 		},
-		[given, removeHint, begin],
+		[over, daily, started, shots, begin, puzzle, size],
 	);
 
-	const cellFromEvent = (e: React.PointerEvent): [number, number] | null => {
-		const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-		const cell = el?.closest?.('.ba-cell') as HTMLElement | null;
-		if (!cell) return null;
-		const r = Number(cell.dataset.r);
-		const c = Number(cell.dataset.c);
-		if (Number.isNaN(r) || Number.isNaN(c)) return null;
-		return [r, c];
-	};
+	/* Sonar: reveal the 3×3 ship-cell count at a cell (costs one sonar). */
+	const sonar = useCallback(
+		(r: number, c: number) => {
+			if (over || (daily && !started) || sonarsLeft <= 0) return;
+			begin();
+			setSonarReveals((prev) => ({ ...prev, [`${r},${c}`]: sonarCount(puzzle.ships, r, c, size) }));
+			setSonarsUsed((s) => s + 1);
+			setSonarMode(false);
+			trackGame(gameId, 'hint_used');
+		},
+		[over, daily, started, sonarsLeft, puzzle, size, begin, gameId],
+	);
 
-	const onPointerDown = (e: React.PointerEvent) => {
-		if (over || (daily && !started)) return;
-		const cell = cellFromEvent(e);
-		if (!cell) return;
-		const [r, c] = cell;
-		if (given[r][c] !== null) return;
-		painting.current = true;
-		// Cycle empty → ship → water → empty; the chosen value paints the whole stroke.
-		const cur = marks[r][c];
-		strokeVal.current = (cur === 0 ? 1 : cur === 1 ? 2 : 0) as Mark;
-		applyStroke(r, c);
-		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-	};
-	const onPointerMove = (e: React.PointerEvent) => {
-		if (!painting.current) return;
-		const cell = cellFromEvent(e);
-		if (cell) applyStroke(cell[0], cell[1]);
-	};
-	const endStroke = () => {
-		painting.current = false;
-	};
+	const onCell = (r: number, c: number) => (sonarMode ? sonar(r, c) : fire(r, c));
 
-	/* Hint: deduce the next logical cell and explain the technique. */
-	const hint = useCallback(() => {
-		if (over) return;
-		const h = findHint(marks, puzzle);
-		if (!h) return;
-		const mark: Mark = (h.value === 'ship' ? 1 : 2) as Mark;
-		setMarks((prev) => {
-			const n = prev.map((row) => [...row]);
-			for (const { r, c } of h.cells) n[r][c] = mark;
-			return n;
-		});
-		setHinted((prev) => {
-			const s = new Set(prev);
-			for (const { r, c } of h.cells) s.add(`${r},${c}`);
-			return s;
-		});
-		setHintNote(h.reason);
-		begin();
-		trackGame(gameId, 'hint_used');
-	}, [over, marks, puzzle, begin, gameId]);
-
-	/* Reveal the full solution (does not count as a win). */
-	const reveal = useCallback(() => {
-		if (over) return;
-		setMarks((prev) => {
-			const n = prev.map((row) => [...row]);
-			for (let r = 0; r < size; r++)
-				for (let c = 0; c < size; c++)
-					if (given[r][c] === null) n[r][c] = (solution[r][c] ? 1 : 2) as Mark;
-			return n;
-		});
-		setRevealed(true);
-		trackGame(gameId, 'solution_shown');
-	}, [over, size, given, solution, gameId]);
-
-	const legend = useMemo(() => fleetLegend(fleet), [fleet]);
+	const armed = daily && !started;
 
 	return (
 		<div className="ba-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(sizeKey, diffKey)} onDaily={startDaily} />
+			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
 
 			{daily ? (
 				<div className="ba-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
-						: `Défi du jour · ${dailyWeekdayLabel()} · ${SIZES[DAILY_SIZE].label} · ${DIFFS[diffKey].label}`}
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${SIZES[diffKey].label}`}
 				</div>
-			) : null}
+			) : (
+				<div className="ba-pills" role="tablist" aria-label="Difficulté">
+					{DIFF_ORDER.map((k) => (
+						<button
+							key={k}
+							role="tab"
+							aria-selected={diffKey === k}
+							className={`ba-pill ${diffKey === k ? 'active' : ''}`}
+							onClick={() => newGame(k)}
+						>
+							{SIZES[k].label}
+						</button>
+					))}
+				</div>
+			)}
 
 			<div className="ba-bar">
-				{!daily && (
-					<div className="ba-selectors">
-						<div className="ba-pills" role="tablist" aria-label="Taille">
-							{(Object.keys(SIZES) as (keyof typeof SIZES)[]).map((k) => (
-								<button
-									key={k}
-									role="tab"
-									aria-selected={sizeKey === k}
-									className={`ba-pill ${sizeKey === k ? 'active' : ''}`}
-									onClick={() => newGame(k, diffKey)}
-								>
-									{SIZES[k].label}
-								</button>
-							))}
-						</div>
-						<div className="ba-pills" role="tablist" aria-label="Difficulté">
-							{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
-								<button
-									key={k}
-									role="tab"
-									aria-selected={diffKey === k}
-									className={`ba-pill ${diffKey === k ? 'active' : ''}`}
-									onClick={() => newGame(sizeKey, k)}
-								>
-									{DIFFS[k].label}
-								</button>
-							))}
-						</div>
-					</div>
-				)}
-				<div className="ba-bar-right">
-					<div className="ba-timer">{fmtTime(elapsed)}</div>
-					{!daily && (
-						<button className="ba-new" onClick={() => newGame(sizeKey, diffKey)} aria-label="Nouvelle grille">
-							↻
-						</button>
-					)}
-				</div>
+				<span className="ba-stat">🎯 {shotsUsed}</span>
+				<span className="ba-stat sunk">🚢 {sunkCount}/{fleet.length}</span>
+				<span className="ba-stat">🔊 {Math.max(0, sonarsLeft)}/{sonars}</span>
+				{!daily && best > 0 && <span className="ba-stat best">★ {best}</span>}
 			</div>
 
-			<div className="ba-fleet" aria-label="Flotte à trouver">
-				{legend.map(({ len, count }) => (
-					<span key={len} className="ba-fleet-item">
-						<strong>{count}×</strong>
-						<span className="ba-fleet-ship">
-							{Array.from({ length: len }).map((_, i) => (
-								<i key={i} className="ba-fleet-seg" />
-							))}
-						</span>
-					</span>
-				))}
-			</div>
-
-			{!over && !daily && (
+			{!over && (!daily || started) && (
 				<div className="ba-actions">
-					<button className="ba-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
-						<button className="ba-act" onClick={reveal}>👁 Voir la solution</button>
-					)}
-				</div>
-			)}
-
-			{daily && started && status === 'playing' && (
-				<div className="ba-actions">
-					<button className="ba-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
-				</div>
-			)}
-
-			{daily && status === 'won' && (
-				<div className="ba-daily-won">
-					{alreadyPlayed ? (
-						<>Défi du jour déjà relevé · <strong>{fmtTime(elapsed)}</strong> — reviens demain&nbsp;!</>
-					) : (
-						<>🎉 Résolu en <strong>{fmtTime(elapsed)}</strong></>
-					)}
+					<button
+						className={`ba-act ${sonarMode ? 'on' : ''}`}
+						onClick={() => setSonarMode((v) => !v)}
+						disabled={sonarsLeft <= 0}
+						aria-pressed={sonarMode}
+					>
+						🔊 Sonar{sonarsLeft > 0 ? ` (${sonarsLeft})` : ' épuisé'}
+					</button>
+					{sonarMode && <span className="ba-hint">Clique une zone à sonder (3×3)</span>}
 				</div>
 			)}
 
 			<div className="ba-boardwrap">
 				{celebrating && <Celebration />}
 				<div
-					className={`ba-board ${daily && !started ? 'blurred' : ''}`}
-					style={{
-						gridTemplateColumns: `auto repeat(${size}, 1fr)`,
-						gridTemplateRows: `auto repeat(${size}, 1fr)`,
-					}}
-					onPointerDown={onPointerDown}
-					onPointerMove={onPointerMove}
-					onPointerUp={endStroke}
-					onPointerCancel={endStroke}
+					className={`ba-board ${armed ? 'blurred' : ''} ${sonarMode ? 'sonar' : ''}`}
+					style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
 				>
-					<div className="ba-corner" />
-					{Array.from({ length: size }).map((_, c) => (
-						<div key={`ch${c}`} className="ba-head col">
-							{String.fromCharCode(65 + c)}
-						</div>
-					))}
-					{Array.from({ length: size }).map((_, r) => (
-						<RowCells
-							key={`row${r}`}
-							r={r}
-							size={size}
-							rowLabel={r + 1}
-							marks={marks}
-							given={given}
-							ships={ships}
-							solution={solution}
-							clueMap={clueMap}
-							hinted={hinted}
-							revealed={revealed}
-							over={over}
-						/>
-					))}
+					{Array.from({ length: size }).map((_, r) =>
+						Array.from({ length: size }).map((_, c) => {
+							const sv = shots[r][c];
+							const reveal = sonarReveals[`${r},${c}`];
+							const isShipSeg = sunkGrid[r][c]; // sunk (or won) → draw ship segment
+							const seg = isShipSeg ? segType(sunkGrid, r, c) : null;
+							const hit = sv === 1 && !isShipSeg; // hit but not yet sunk
+							const miss = sv === 2;
+							const cls = [
+								'ba-cell',
+								isShipSeg ? 'ship' : '',
+								seg ? SEG_CLASS[seg] : '',
+								hit ? 'hit' : '',
+								miss ? 'miss' : '',
+								reveal !== undefined && sv === 0 ? 'sonarval' : '',
+								over ? 'over' : '',
+							].join(' ');
+							return (
+								<button
+									key={`${r}-${c}`}
+									className={cls}
+									onClick={() => onCell(r, c)}
+									disabled={over || armed}
+									aria-label={`Ligne ${r + 1}, colonne ${c + 1}`}
+								>
+									{isShipSeg ? (
+										<span className="ba-seg" />
+									) : hit ? (
+										'✸'
+									) : miss ? (
+										<span className="ba-dot" />
+									) : reveal !== undefined ? (
+										reveal
+									) : (
+										''
+									)}
+								</button>
+							);
+						}),
+					)}
 				</div>
 
 				{daily && dailyLoading && (
-					<div className="ba-overlay">
-						<div className="ba-overlay-card"><p className="ba-windiff">Préparation…</p></div>
-					</div>
+					<div className="ba-overlay"><div className="ba-overlay-card">Préparation…</div></div>
 				)}
-
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{armed && !dailyLoading && (
 					<div className="ba-overlay">
 						<button className="ba-startbtn" onClick={startTimer}>▶ Commencer</button>
 					</div>
 				)}
 
 				{showWin && !daily && (
-					<div className="ba-win" role="dialog" aria-label="Flotte trouvée">
+					<div className="ba-win" role="dialog" aria-label="Flotte coulée">
 						<div className="ba-wincard">
 							<div className="ba-winmark">⚓</div>
 							<h2>Flotte coulée !</h2>
-							<p className="ba-wintime">{fmtTime(elapsed)}</p>
-							<p className="ba-windiff">{DIFFS[diffKey].label} · {size}×{size}</p>
-							<button className="ba-replay" onClick={() => newGame(sizeKey, diffKey)}>Rejouer</button>
+							<p className="ba-wintime">{cost} coups</p>
+							<p className="ba-windiff">{shotsUsed} tirs · {sonarsUsed} sonars</p>
+							<button className="ba-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 						</div>
 					</div>
 				)}
 			</div>
 
-			{!daily && hintNote && (
-				<p className="ba-hint-note" aria-live="polite">💡 {hintNote}</p>
+			{daily && status === 'won' && (
+				<div className="ba-daily-won">
+					{alreadyPlayed ? (
+						<>Défi du jour déjà relevé · <strong>{cost} coups</strong> — reviens demain&nbsp;!</>
+					) : (
+						<>🎉 Flotte coulée en <strong>{cost} coups</strong></>
+					)}
+				</div>
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard
+					game={gameId}
+					metric="time"
+					submitValue={status === 'won' ? cost : undefined}
+					format={(v) => `${v} coups`}
+				/>
 			)}
-
 			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 
-			{revealed ? (
-				<div className="ba-revealed-note">
-					<span>Solution affichée</span>
-					<button className="ba-replay" onClick={() => newGame(sizeKey, diffKey)}>Rejouer</button>
-				</div>
-			) : (
-				<p className="ba-help">
-					Les chiffres dans certaines cases indiquent combien de cases-navire les touchent par
-					un côté (haut, bas, gauche, droite — pas en diagonale). Touche une case pour la faire
-					défiler : vide → <strong>navire</strong> → <strong>eau</strong> → vide. Les navires ne
-					se touchent jamais. Les lettres et chiffres autour de la grille servent à repérer les
-					cases (ex. A2).
-				</p>
-			)}
+			<p className="ba-help">
+				Coule toute la flotte cachée en un minimum d'actions. Clique une case pour <strong>tirer</strong>{' '}
+				(✸ touché, point = manqué) ; un navire entièrement touché est coulé (l'eau autour se dévoile).
+				Le bouton <strong>Sonar</strong> révèle le nombre de cases-navire dans une zone 3×3. Score =
+				tirs + sonars.
+			</p>
 		</div>
-	);
-}
-
-interface RowProps {
-	r: number;
-	size: number;
-	rowLabel: number;
-	marks: Mark[][];
-	given: Given[][];
-	ships: boolean[][];
-	solution: boolean[][];
-	clueMap: Map<string, number>;
-	hinted: Set<string>;
-	revealed: boolean;
-	over: boolean;
-}
-
-const SEG_CLASS: Record<NonNullable<SegType>, string> = {
-	single: 'seg-single',
-	left: 'seg-left',
-	right: 'seg-right',
-	top: 'seg-top',
-	bottom: 'seg-bottom',
-	'mid-h': 'seg-midh',
-	'mid-v': 'seg-midv',
-};
-
-function RowCells({ r, size, rowLabel, marks, given, ships, solution, clueMap, hinted, revealed, over }: RowProps) {
-	return (
-		<>
-			<div className="ba-head row">{rowLabel}</div>
-			{Array.from({ length: size }).map((_, c) => {
-				const clue = clueMap.get(`${r},${c}`);
-				const isClue = clue !== undefined;
-				const g = given[r][c];
-				const isGiven = g !== null;
-				const isShip = ships[r][c];
-				const isWater = !isClue && !isShip && (isGiven ? g === 'water' : marks[r][c] === 2);
-				const seg = isShip ? segType(ships, r, c) : null;
-				const wrong = revealed && !isGiven && marks[r][c] !== 0 && (marks[r][c] === 1) !== solution[r][c];
-				return (
-					<div
-						key={c}
-						className={[
-							'ba-cell',
-							isClue ? 'clue' : '',
-							isGiven && !isClue ? 'given' : '',
-							isShip ? 'ship' : '',
-							isWater ? 'water' : '',
-							seg ? SEG_CLASS[seg] : '',
-							hinted.has(`${r},${c}`) ? 'hinted' : '',
-							wrong ? 'wrong' : '',
-							over ? 'over' : '',
-						].join(' ')}
-						data-r={r}
-						data-c={c}
-						aria-label={`Ligne ${r + 1}, colonne ${c + 1}${isClue ? `, indice ${clue}` : isShip ? ', navire' : isWater ? ', eau' : ', vide'}`}
-					>
-						{isClue ? (
-							<span className="ba-clue">{clue}</span>
-						) : isShip ? (
-							<span className="ba-seg" />
-						) : isWater ? (
-							<span className="ba-dot" />
-						) : null}
-					</div>
-				);
-			})}
-		</>
 	);
 }
 
@@ -589,128 +453,63 @@ function RowCells({ r, size, rowLabel, marks, given, ships, solution, clueMap, h
 const CSS = `
 .ba-root {
   --ba-accent: var(--accent-regular);
-  --ba-ok: #2f9e6f;
-  --ba-bad: #d9534f;
-  --ba-line: var(--gray-700);
+  --ba-hit: #d9534f;
   --ba-ship: var(--gray-0);
-  --ba-cell: calc(100cqw / (var(--n, 6) + 1));
-
-  width: 100%;
-  max-width: 480px;
-  margin-inline: auto;
-  color: var(--gray-0);
-  font-family: var(--font-body);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  --ba-line: var(--gray-700);
+  --ba-cell: calc(100cqw / var(--n, 8));
+  width: 100%; max-width: 480px; margin-inline: auto;
+  color: var(--gray-0); font-family: var(--font-body);
+  display: flex; flex-direction: column; align-items: center;
 }
-
-.ba-daily-tag {
-  text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500;
-  margin-bottom: 0.75rem;
-}
-
-.ba-bar {
-  width: 100%;
-  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-  margin-bottom: 0.85rem;
-}
-.ba-bar-right { display: flex; align-items: center; gap: 0.5rem; }
-.ba-selectors { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.ba-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.ba-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
+.ba-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.85rem; }
 .ba-pill {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
   font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer;
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
 .ba-pill.active { background: var(--ba-accent); color: var(--accent-text-over); border-color: var(--ba-accent); }
-.ba-timer {
-  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 16px;
-  background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 6px 14px;
-}
-.ba-new {
-  border: none; background: var(--ba-accent); color: var(--accent-text-over);
-  font-size: 18px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;
-}
 
-.ba-fleet {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
-  gap: 6px 12px; margin-bottom: 0.85rem; font-size: 12.5px; color: var(--gray-300);
-}
-.ba-fleet-item { display: inline-flex; align-items: center; gap: 4px; }
-.ba-fleet-item strong { color: var(--gray-0); font-weight: 700; }
-.ba-fleet-ship { display: inline-flex; gap: 1px; }
-.ba-fleet-seg {
-  width: 11px; height: 11px; background: var(--ba-ship); border-radius: 3px;
-}
-.ba-fleet-ship .ba-fleet-seg:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
-.ba-fleet-ship .ba-fleet-seg:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
-.ba-fleet-ship .ba-fleet-seg:only-child { border-radius: 999px; }
+.ba-bar { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.7rem; font-weight: 700; font-size: 13px; }
+.ba-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
+.ba-stat.sunk { background: var(--ba-accent); color: var(--accent-text-over); }
+.ba-stat.best { background: transparent; border: 1.5px solid var(--gray-700); color: var(--gray-300); }
 
-.ba-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 0.85rem; }
+.ba-actions { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin-bottom: 0.85rem; }
 .ba-act {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
-  font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer;
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
-.ba-act:hover { background: var(--gray-800); border-color: var(--ba-accent); color: var(--ba-accent); }
+.ba-act:hover:not(:disabled) { border-color: var(--ba-accent); color: var(--ba-accent); }
+.ba-act.on { background: var(--ba-accent); color: var(--accent-text-over); border-color: var(--ba-accent); }
+.ba-act:disabled { opacity: 0.5; cursor: default; }
+.ba-hint { color: var(--ba-accent); font-size: 12.5px; font-weight: 500; }
 
-.ba-boardwrap {
-  position: relative;
-  width: 100%;
-  max-width: min(460px, calc(46px * (var(--n, 6) + 1)));
-  margin-inline: auto;
-  container-type: inline-size;
-}
+.ba-boardwrap { position: relative; width: 100%; max-width: min(460px, calc(46px * var(--n, 8))); margin-inline: auto; container-type: inline-size; }
 .ba-board {
-  width: 100%;
-  display: grid;
-  touch-action: none;
-  user-select: none;
-  background: var(--gray-999);
-  border-radius: 6px;
+  width: 100%; display: grid; gap: 2px; touch-action: manipulation; user-select: none;
+  background: var(--gray-700); border-radius: 6px; padding: 2px;
 }
-.ba-corner { }
-.ba-head {
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 600; font-size: calc(var(--ba-cell) * 0.4); font-variant-numeric: tabular-nums;
-  color: var(--gray-300);
-}
-.ba-head.col { min-height: calc(var(--ba-cell) * 0.9); }
-.ba-head.row { min-width: calc(var(--ba-cell) * 0.9); }
-
+.ba-board.sonar { outline: 2px solid var(--ba-accent); outline-offset: 2px; border-radius: 8px; }
 .ba-cell {
-  position: relative;
-  width: var(--ba-cell); height: var(--ba-cell);
-  border: 1px solid var(--ba-line);
-  background: var(--gray-999);
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  width: 100%; aspect-ratio: 1; border: none; border-radius: 3px;
+  background: var(--gray-999); color: var(--gray-300);
+  font-family: var(--font-body); font-weight: 800; font-size: calc(var(--ba-cell) * 0.46);
+  line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+  font-variant-numeric: tabular-nums;
 }
+.ba-cell:hover:not(:disabled) { background: var(--gray-800); }
+.ba-cell.miss { color: var(--gray-500); cursor: default; }
+.ba-cell.hit { color: #fff; background: var(--ba-hit); cursor: default; }
+.ba-cell.sonarval { color: var(--ba-accent); background: var(--gray-900); }
 .ba-cell.over { cursor: default; }
-.ba-cell.given { background: var(--gray-900); cursor: default; }
+.ba-dot { width: calc(var(--ba-cell) * 0.16); height: calc(var(--ba-cell) * 0.16); border-radius: 50%; background: var(--gray-500); }
 
-/* Proximity clue: a fixed, non-interactive numbered cell. */
-.ba-cell.clue { background: var(--gray-900); cursor: default; }
-.ba-clue {
-  font-weight: 700; font-size: calc(var(--ba-cell) * 0.5); font-variant-numeric: tabular-nums;
-  color: var(--gray-0); line-height: 1;
-}
-
-/* Water: a small muted dot. */
-.ba-dot {
-  width: calc(var(--ba-cell) * 0.18); height: calc(var(--ba-cell) * 0.18);
-  border-radius: 50%; background: var(--gray-500);
-}
-.ba-cell.given.water .ba-dot { background: var(--ba-accent); opacity: 0.75; }
-
-/* Ship segment shapes from segType. */
-.ba-seg {
-  background: var(--ba-ship);
-  display: block;
-}
-.ba-cell.ship.given .ba-seg { background: var(--ba-accent); }
-.ba-cell.ship .ba-seg { width: 78%; height: 78%; }
+/* Ship segments (sunk / revealed). */
+.ba-cell.ship { background: var(--gray-900); cursor: default; }
+.ba-seg { background: var(--ba-ship); display: block; }
+.ba-cell.ship .ba-seg { width: 78%; height: 78%; background: var(--ba-accent); }
 .ba-cell.seg-single .ba-seg { border-radius: 50%; }
 .ba-cell.seg-left .ba-seg { width: 100%; border-radius: 999px 0 0 999px; margin-left: 22%; }
 .ba-cell.seg-right .ba-seg { width: 100%; border-radius: 0 999px 999px 0; margin-right: 22%; }
@@ -719,56 +518,23 @@ const CSS = `
 .ba-cell.seg-midh .ba-seg { width: 100%; height: 78%; border-radius: 0; }
 .ba-cell.seg-midv .ba-seg { width: 78%; height: 100%; border-radius: 0; }
 
-.ba-cell.hinted .ba-seg { background: var(--ba-ok); }
-.ba-cell.hinted.water .ba-dot { background: var(--ba-ok); }
-.ba-cell.hinted { box-shadow: inset 0 0 0 2px var(--ba-ok); }
-.ba-cell.wrong { box-shadow: inset 0 0 0 2px var(--ba-bad); }
+.ba-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
+.ba-overlay { position: absolute; inset: -8px; z-index: 2; display: flex; align-items: center; justify-content: center; }
+.ba-overlay-card { background: var(--gray-999); border: 2px solid var(--ba-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); }
+.ba-startbtn { border: none; background: var(--ba-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg); }
 
-.ba-help {
-  max-width: 430px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1.1rem;
-}
-.ba-revealed-note {
-  display: flex; align-items: center; gap: 14px; margin-top: 1.25rem; color: var(--gray-300); font-size: 14px; font-weight: 500;
-}
-.ba-hint-note {
-  max-width: 430px; margin: 1rem auto 0; text-align: center; font-size: 13px; line-height: 1.5;
-  color: var(--ba-ok); background: var(--accent-overlay); border: 1px solid var(--ba-ok); border-radius: 12px; padding: 8px 14px;
-}
-
-.ba-win {
-  position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center;
-  background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px;
-}
-.ba-wincard {
-  background: var(--gray-999); border: 2px solid var(--ba-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg);
-}
+.ba-win { position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; }
+.ba-wincard { background: var(--gray-999); border: 2px solid var(--ba-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg); }
 .ba-wincard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 22px; color: var(--gray-0); }
 .ba-winmark { font-size: 30px; }
-.ba-wintime { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 0; color: var(--ba-accent); }
+.ba-wintime { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 0; color: var(--ba-accent); }
 .ba-windiff { color: var(--gray-300); font-size: 13px; margin: 2px 0 14px; }
-.ba-replay {
-  border: none; background: var(--ba-accent); color: var(--accent-text-over);
-  font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer;
-}
+.ba-replay { border: none; background: var(--ba-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
 
-.ba-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
-.ba-overlay {
-  position: absolute; inset: -8px; z-index: 2;
-  display: flex; align-items: center; justify-content: center;
-}
-.ba-overlay-card {
-  background: var(--gray-999); border: 2px solid var(--ba-accent);
-  border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg);
-}
-.ba-startbtn {
-  border: none; background: var(--ba-accent); color: var(--accent-text-over);
-  font: inherit; font-weight: 700; font-size: 18px;
-  border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
-}
-.ba-daily-won {
-  text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem;
-}
+.ba-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin: 0.75rem 0 0; }
 .ba-daily-won strong { color: var(--ba-accent); font-variant-numeric: tabular-nums; }
+
+.ba-help { max-width: 440px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1.1rem; }
 
 @media (prefers-reduced-motion: reduce) { .ba-win, .ba-overlay { transition: none; } }
 `;
