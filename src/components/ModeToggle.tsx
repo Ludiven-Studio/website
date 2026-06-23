@@ -1,6 +1,9 @@
 /* Shared large segmented toggle: 🎲 Mode libre / 🏆 Défi du jour.
    Used by every game island to keep the mode switch visually distinct from
-   game-specific buttons (difficulty pills, etc.). */
+   game-specific buttons (difficulty pills, etc.).
+   Deep link: ?defi (or ?mode=defi / ?mode=daily) auto-opens the daily challenge. */
+
+import { useEffect, useRef } from 'react';
 
 interface Props {
 	daily: boolean;
@@ -9,6 +12,27 @@ interface Props {
 }
 
 export default function ModeToggle({ daily, onFree, onDaily }: Props) {
+	const onDailyRef = useRef(onDaily);
+	onDailyRef.current = onDaily;
+
+	// On mount, honor a daily deep link. Deferred so it runs AFTER the game's own
+	// mount init (which arms free mode) — otherwise that would override it.
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		let params: URLSearchParams;
+		try {
+			params = new URLSearchParams(window.location.search);
+		} catch {
+			return;
+		}
+		const wantsDaily =
+			params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily';
+		if (!wantsDaily) return;
+		const id = setTimeout(() => onDailyRef.current(), 0);
+		return () => clearTimeout(id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	return (
 		<div className="dt-toggle" role="tablist" aria-label="Mode">
 			<style>{CSS}</style>
