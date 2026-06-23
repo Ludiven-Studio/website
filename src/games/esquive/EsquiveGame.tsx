@@ -1,0 +1,631 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import * as THREE from 'three';
+import {
+	ESQUIVE_DIFFS,
+	esquiveConfig,
+	createEsquive,
+	step,
+	type EsquiveConfig,
+	type EsquiveState,
+} from './engine';
+import { trackGame } from '../../lib/analytics';
+import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
+
+/* =====================================================
+   ESQUIVE — 3D asteroid dodger (three.js + rAF loop).
+   Libre : graine aléatoire, record local.
+   Défi du jour : astéroïdes identiques pour tous, 10 essais, meilleur temps classé.
+   Engine is pure/tested; three.js only renders the state.
+   ===================================================== */
+
+type Status = 'ready' | 'playing' | 'over';
+type DiffKey = keyof typeof ESQUIVE_DIFFS;
+const BEST_KEY = 'ludiven-esquive-best';
+const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
+const STEP = 1000 / 60; // ms per physics step
+const MAX_TRIES = 10; // daily attempts per day; best of the day is ranked
+const MAX_AST = 100; // asteroid mesh pool size
+const STAR_COUNT = 320;
+const fmtSec = (tenths: number) => `${(tenths / 10).toFixed(1)} s`;
+
+interface DailyState {
+	best: number;
+	tries: number;
+}
+
+interface Scene3D {
+	renderer: THREE.WebGLRenderer;
+	scene: THREE.Scene;
+	camera: THREE.PerspectiveCamera;
+	ship: THREE.Group;
+	pool: THREE.Mesh[];
+	starGeom: THREE.BufferGeometry;
+	starPos: Float32Array;
+	astGeom: THREE.IcosahedronGeometry;
+	astMat: THREE.MeshStandardMaterial;
+}
+
+export default function EsquiveGame({ gameId }: { gameId: string }) {
+	const [status, setStatus] = useState<Status>('ready');
+	const [score, setScore] = useState(0); // tenths of a second
+	const [best, setBest] = useState(0);
+	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [attempt, setAttempt] = useState(0); // re-keys the leaderboard so each replay re-submits
+	const [tries, setTries] = useState(0);
+	const [webglError, setWebglError] = useState(false);
+
+	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const g3Ref = useRef<Scene3D | null>(null);
+	const cfgRef = useRef<EsquiveConfig>(esquiveConfig(ESQUIVE_DIFFS.moyen));
+	const stateRef = useRef<EsquiveState>(createEsquive(esquiveConfig(ESQUIVE_DIFFS.moyen)));
+	const seedRef = useRef(0);
+	const diffIdxRef = useRef(0);
+	const rafRef = useRef(0);
+	const lastRef = useRef(0);
+	const accRef = useRef(0);
+	const runningRef = useRef(false);
+	const scoreRef = useRef(0);
+	const startRef = useRef(0);
+	const dailyRef = useRef(false);
+	const statusRef = useRef<Status>('ready');
+	const triesRef = useRef(0);
+	const keysRef = useRef({ left: false, right: false, up: false, down: false });
+	const pointerRef = useRef<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
+
+	/* ---- three.js scene (built once) ---- */
+	const initScene = useCallback(() => {
+		if (g3Ref.current || !canvasRef.current) return;
+		let renderer: THREE.WebGLRenderer;
+		try {
+			renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: true });
+		} catch {
+			setWebglError(true);
+			return;
+		}
+		renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+
+		const accent =
+			getComputedStyle(document.documentElement).getPropertyValue('--accent-regular').trim() || '#7c5cff';
+		const bg = new THREE.Color('#0a0a14');
+
+		const scene = new THREE.Scene();
+		scene.background = bg;
+		scene.fog = new THREE.Fog(bg, 45, 120);
+
+		const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 220);
+		camera.position.set(0, 0, 12);
+		camera.lookAt(0, 0, -30);
+
+		scene.add(new THREE.AmbientLight(0x8088aa, 1.1));
+		const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+		dir.position.set(4, 6, 10);
+		scene.add(dir);
+
+		// Ship: a cone pointing toward -Z (into the asteroid stream).
+		const ship = new THREE.Group();
+		const body = new THREE.Mesh(
+			new THREE.ConeGeometry(0.7, 1.9, 18),
+			new THREE.MeshStandardMaterial({ color: accent, emissive: new THREE.Color(accent), emissiveIntensity: 0.35, metalness: 0.4, roughness: 0.35 }),
+		);
+		body.rotation.x = -Math.PI / 2; // apex faces -Z
+		ship.add(body);
+		const glow = new THREE.Mesh(
+			new THREE.SphereGeometry(0.28, 12, 12),
+			new THREE.MeshBasicMaterial({ color: 0x66ccff }),
+		);
+		glow.position.set(0, 0, 1.0); // thruster at the back
+		ship.add(glow);
+		scene.add(ship);
+
+		// Asteroid pool (reused; hidden until active).
+		const astGeom = new THREE.IcosahedronGeometry(1, 0);
+		const astMat = new THREE.MeshStandardMaterial({ color: 0x9098a4, flatShading: true, roughness: 1, metalness: 0.05 });
+		const pool: THREE.Mesh[] = [];
+		for (let i = 0; i < MAX_AST; i++) {
+			const m = new THREE.Mesh(astGeom, astMat);
+			m.visible = false;
+			scene.add(m);
+			pool.push(m);
+		}
+
+		// Starfield (recycled for a sense of speed).
+		const starPos = new Float32Array(STAR_COUNT * 3);
+		for (let i = 0; i < STAR_COUNT; i++) {
+			starPos[i * 3] = (Math.random() * 2 - 1) * 60;
+			starPos[i * 3 + 1] = (Math.random() * 2 - 1) * 40;
+			starPos[i * 3 + 2] = -140 + Math.random() * 152;
+		}
+		const starGeom = new THREE.BufferGeometry();
+		starGeom.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+		const stars = new THREE.Points(starGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, sizeAttenuation: true }));
+		scene.add(stars);
+
+		g3Ref.current = { renderer, scene, camera, ship, pool, starGeom, starPos, astGeom, astMat };
+	}, []);
+
+	const computeInput = useCallback(() => {
+		const k = keysRef.current;
+		const p = pointerRef.current;
+		const st = stateRef.current;
+		if (p.active) {
+			// Follow the pointer/finger target.
+			return {
+				x: Math.max(-1, Math.min(1, (p.x - st.shipX) * 0.6)),
+				y: Math.max(-1, Math.min(1, (p.y - st.shipY) * 0.6)),
+			};
+		}
+		return {
+			x: (k.right ? 1 : 0) - (k.left ? 1 : 0),
+			y: (k.up ? 1 : 0) - (k.down ? 1 : 0),
+		};
+	}, []);
+
+	const draw = useCallback((dtSec: number, input: { x: number; y: number }) => {
+		const g = g3Ref.current;
+		if (!g) return;
+		const st = stateRef.current;
+		const cfg = cfgRef.current;
+
+		g.ship.position.set(st.shipX, st.shipY, cfg.shipZ);
+		g.ship.rotation.z = -input.x * 0.35; // bank
+		g.ship.rotation.x = input.y * 0.2; // pitch
+
+		for (let i = 0; i < g.pool.length; i++) {
+			const m = g.pool[i];
+			if (i < st.asteroids.length) {
+				const a = st.asteroids[i];
+				m.visible = true;
+				m.position.set(a.x, a.y, a.z);
+				m.scale.setScalar(a.r);
+				m.rotation.set(a.rx, a.ry, a.rz);
+			} else if (m.visible) {
+				m.visible = false;
+			}
+		}
+
+		// Scroll stars forward, recycle past the camera.
+		const dz = cfg.diff.baseSpeed * dtSec * 0.6;
+		const pos = g.starPos;
+		for (let i = 0; i < STAR_COUNT; i++) {
+			let z = pos[i * 3 + 2] + dz;
+			if (z > 13) {
+				z = -140;
+				pos[i * 3] = (Math.random() * 2 - 1) * 60;
+				pos[i * 3 + 1] = (Math.random() * 2 - 1) * 40;
+			}
+			pos[i * 3 + 2] = z;
+		}
+		g.starGeom.attributes.position.needsUpdate = true;
+
+		g.renderer.render(g.scene, g.camera);
+	}, []);
+
+	const resize = useCallback(() => {
+		const g = g3Ref.current;
+		const canvas = canvasRef.current;
+		if (!g || !canvas) return;
+		const css = canvas.clientWidth;
+		g.renderer.setSize(css, css, false);
+		g.camera.aspect = 1;
+		g.camera.updateProjectionMatrix();
+		g.renderer.render(g.scene, g.camera);
+	}, []);
+
+	/* ---- Loop ---- */
+	const stop = useCallback(() => {
+		runningRef.current = false;
+		if (rafRef.current) cancelAnimationFrame(rafRef.current);
+		rafRef.current = 0;
+	}, []);
+
+	const onGameOver = useCallback(() => {
+		stop();
+		const sc = stateRef.current.score;
+		statusRef.current = 'over';
+		setStatus('over');
+		setBest((prev) => {
+			const nb = Math.max(prev, sc);
+			if (dailyRef.current) {
+				if (triesRef.current >= MAX_TRIES) setAlreadyPlayed(true);
+				saveDailyRun(gameId, {
+					startedAt: startRef.current,
+					done: true,
+					seed: seedRef.current,
+					diffIndex: diffIdxRef.current,
+					state: { best: nb, tries: triesRef.current } satisfies DailyState,
+				});
+			} else {
+				try {
+					localStorage.setItem(BEST_KEY, String(nb));
+				} catch {
+					/* ignore */
+				}
+			}
+			return nb;
+		});
+		trackGame(gameId, 'game_over', { score: sc });
+	}, [gameId, stop]);
+
+	const frame = useCallback(
+		(now: number) => {
+			if (!runningRef.current) return;
+			const dt = Math.min(now - lastRef.current, 200);
+			lastRef.current = now;
+			accRef.current += dt;
+			const input = computeInput();
+			let st = stateRef.current;
+			while (runningRef.current && accRef.current >= STEP) {
+				accRef.current -= STEP;
+				st = step(st, STEP / 1000, cfgRef.current, seedRef.current, input);
+				stateRef.current = st;
+				if (st.status === 'over') break;
+			}
+			draw(dt / 1000, input);
+			if (st.score !== scoreRef.current) {
+				scoreRef.current = st.score;
+				setScore(st.score);
+			}
+			if (st.status === 'over') {
+				onGameOver();
+				return;
+			}
+			rafRef.current = requestAnimationFrame(frame);
+		},
+		[computeInput, draw, onGameOver],
+	);
+
+	const start = useCallback(() => {
+		if (webglError) return;
+		if (dailyRef.current && triesRef.current >= MAX_TRIES) return;
+		stateRef.current = createEsquive(cfgRef.current);
+		scoreRef.current = 0;
+		accRef.current = 0;
+		lastRef.current = performance.now();
+		startRef.current = Date.now();
+		runningRef.current = true;
+		statusRef.current = 'playing';
+		keysRef.current = { left: false, right: false, up: false, down: false };
+		pointerRef.current.active = false;
+		setScore(0);
+		setStatus('playing');
+		setAttempt((a) => a + 1);
+		trackGame(gameId, 'game_started');
+		if (dailyRef.current) {
+			triesRef.current += 1;
+			setTries(triesRef.current);
+			saveDailyRun(gameId, {
+				startedAt: startRef.current,
+				done: false,
+				seed: seedRef.current,
+				diffIndex: diffIdxRef.current,
+				state: { best, tries: triesRef.current } satisfies DailyState,
+			});
+		}
+		rafRef.current = requestAnimationFrame(frame);
+	}, [webglError, gameId, best, frame]);
+
+	/* ---- Modes ---- */
+	const armFree = useCallback(
+		(key: DiffKey = diffKey) => {
+			stop();
+			dailyRef.current = false;
+			setDaily(false);
+			setAlreadyPlayed(false);
+			triesRef.current = 0;
+			setTries(0);
+			setDiffKey(key);
+			cfgRef.current = esquiveConfig(ESQUIVE_DIFFS[key]);
+			seedRef.current = (Math.random() * 2 ** 32) >>> 0;
+			stateRef.current = createEsquive(cfgRef.current);
+			scoreRef.current = 0;
+			setScore(0);
+			statusRef.current = 'ready';
+			setStatus('ready');
+			try {
+				setBest(Number(localStorage.getItem(BEST_KEY) ?? '0') || 0);
+			} catch {
+				setBest(0);
+			}
+			draw(0, { x: 0, y: 0 });
+		},
+		[stop, draw, diffKey],
+	);
+
+	const startDaily = useCallback(async () => {
+		stop();
+		dailyRef.current = true;
+		setDaily(true);
+		statusRef.current = 'ready';
+		setStatus('ready');
+		const applyLevel = (seed: number, diffIndex: number) => {
+			seedRef.current = seed;
+			diffIdxRef.current = diffIndex;
+			const key = DIFF_ORDER[diffIndex] ?? 'moyen';
+			setDiffKey(key);
+			cfgRef.current = esquiveConfig(ESQUIVE_DIFFS[key]);
+			stateRef.current = createEsquive(cfgRef.current);
+			setScore(0);
+			scoreRef.current = 0;
+		};
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			applyLevel(run.seed, run.diffIndex ?? dailyDifficultyIndex());
+			const st = (run.state as DailyState | undefined) ?? { best: 0, tries: 0 };
+			triesRef.current = st.tries ?? 0;
+			setTries(triesRef.current);
+			setBest(st.best ?? 0);
+			const exhausted = triesRef.current >= MAX_TRIES;
+			setAlreadyPlayed(exhausted);
+			if (exhausted) {
+				setScore(st.best ?? 0);
+				scoreRef.current = st.best ?? 0;
+				statusRef.current = 'over';
+				setStatus('over');
+			} else {
+				statusRef.current = 'ready';
+				setStatus('ready');
+			}
+			setDailyLoading(false);
+			draw(0, { x: 0, y: 0 });
+			return;
+		}
+		setDailyLoading(true);
+		setAlreadyPlayed(false);
+		triesRef.current = 0;
+		setTries(0);
+		const { seed, diffIndex } = await getDaily(gameId);
+		applyLevel(seed, diffIndex);
+		setBest(0);
+		statusRef.current = 'ready';
+		setStatus('ready');
+		setDailyLoading(false);
+		draw(0, { x: 0, y: 0 });
+	}, [gameId, stop, draw]);
+
+	/* ---- Input ---- */
+	useEffect(() => {
+		const setKey = (k: string, down: boolean): boolean => {
+			const r = keysRef.current;
+			if (k === 'ArrowLeft' || k === 'a' || k === 'q') return ((r.left = down), true);
+			if (k === 'ArrowRight' || k === 'd') return ((r.right = down), true);
+			if (k === 'ArrowUp' || k === 'w' || k === 'z') return ((r.up = down), true);
+			if (k === 'ArrowDown' || k === 's') return ((r.down = down), true);
+			return false;
+		};
+		const onKeyDown = (e: KeyboardEvent) => {
+			const used = setKey(e.key, true);
+			if (used) {
+				e.preventDefault();
+				pointerRef.current.active = false; // keyboard takes over
+				if (statusRef.current === 'ready') start();
+			}
+		};
+		const onKeyUp = (e: KeyboardEvent) => setKey(e.key, false);
+		window.addEventListener('keydown', onKeyDown, { passive: false });
+		window.addEventListener('keyup', onKeyUp);
+		return () => {
+			window.removeEventListener('keydown', onKeyDown);
+			window.removeEventListener('keyup', onKeyUp);
+		};
+	}, [start]);
+
+	useEffect(() => {
+		const onVis = () => {
+			if (document.hidden) {
+				if (runningRef.current) {
+					runningRef.current = false;
+					if (rafRef.current) cancelAnimationFrame(rafRef.current);
+					rafRef.current = 0;
+				}
+			} else if (statusRef.current === 'playing' && !runningRef.current) {
+				lastRef.current = performance.now();
+				runningRef.current = true;
+				rafRef.current = requestAnimationFrame(frame);
+			}
+		};
+		document.addEventListener('visibilitychange', onVis);
+		return () => document.removeEventListener('visibilitychange', onVis);
+	}, [frame]);
+
+	useEffect(() => {
+		initScene();
+		resize();
+		armFree();
+		const onResize = () => resize();
+		window.addEventListener('resize', onResize);
+		return () => {
+			window.removeEventListener('resize', onResize);
+			stop();
+			const g = g3Ref.current;
+			if (g) {
+				g.astGeom.dispose();
+				g.astMat.dispose();
+				g.starGeom.dispose();
+				g.ship.traverse((o) => {
+					if (o instanceof THREE.Mesh) {
+						o.geometry.dispose();
+						(o.material as THREE.Material).dispose();
+					}
+				});
+				g.renderer.dispose();
+				g3Ref.current = null;
+			}
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	/* Pointer: map to a world target on the ship plane, then follow it. */
+	const updatePointer = (e: React.PointerEvent) => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+		const rect = canvas.getBoundingClientRect();
+		const cfg = cfgRef.current;
+		const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+		const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+		pointerRef.current = { active: true, x: nx * cfg.halfW, y: -ny * cfg.halfH };
+	};
+	const onCanvasPointerDown = (e: React.PointerEvent) => {
+		e.preventDefault();
+		if (dailyLoading) return;
+		updatePointer(e);
+		if (statusRef.current === 'ready') start();
+	};
+	const onCanvasPointerMove = (e: React.PointerEvent) => {
+		if (e.buttons === 0 && e.pointerType === 'mouse') return; // only while dragging with mouse
+		if (statusRef.current === 'playing') updatePointer(e);
+	};
+	const releasePointer = () => {
+		pointerRef.current.active = false;
+	};
+
+	const remaining = MAX_TRIES - tries;
+
+	return (
+		<div className="es-root">
+			<style>{CSS}</style>
+
+			<ModeToggle daily={daily} onFree={() => armFree(diffKey)} onDaily={startDaily} />
+
+			{daily ? (
+				<div className="es-daily-tag">
+					{dailyLoading
+						? 'Préparation du défi…'
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${ESQUIVE_DIFFS[diffKey].label} · Essai ${Math.min(tries, MAX_TRIES)}/${MAX_TRIES}`}
+				</div>
+			) : (
+				<div className="es-pills" role="tablist" aria-label="Difficulté">
+					{DIFF_ORDER.map((k) => (
+						<button
+							key={k}
+							role="tab"
+							aria-selected={diffKey === k}
+							className={`es-pill ${diffKey === k ? 'active' : ''}`}
+							onClick={() => armFree(k)}
+						>
+							{ESQUIVE_DIFFS[k].label}
+						</button>
+					))}
+				</div>
+			)}
+
+			<div className="es-bar">
+				<span className="es-score">{fmtSec(score)}</span>
+				<span className="es-best">Record {fmtSec(best)}</span>
+			</div>
+
+			<div className="es-boardwrap">
+				<canvas
+					ref={canvasRef}
+					className="es-canvas"
+					role="img"
+					aria-label={`Esquive — ${fmtSec(score)}`}
+					onPointerDown={onCanvasPointerDown}
+					onPointerMove={onCanvasPointerMove}
+					onPointerUp={releasePointer}
+					onPointerLeave={releasePointer}
+					onPointerCancel={releasePointer}
+				/>
+
+				{webglError && (
+					<div className="es-overlay">
+						<div className="es-overlay-card">
+							<p className="es-go-title">3D indisponible</p>
+							<p className="es-overlay-note">Ton navigateur ne supporte pas WebGL.</p>
+						</div>
+					</div>
+				)}
+
+				{!webglError && status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
+					<div className="es-overlay">
+						<button className="es-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
+					</div>
+				)}
+				{dailyLoading && (
+					<div className="es-overlay"><div className="es-overlay-card">Préparation…</div></div>
+				)}
+				{!webglError && status === 'over' && (
+					<div className="es-overlay">
+						<div className="es-overlay-card">
+							<p className="es-go-title">{daily && alreadyPlayed ? 'Défi du jour terminé' : '💥 Boum !'}</p>
+							<p className="es-go-score">
+								{daily ? <>Temps {fmtSec(score)} · Meilleur {fmtSec(best)}</> : <>Temps {fmtSec(score)} · Record {fmtSec(best)}</>}
+							</p>
+							{daily && alreadyPlayed ? (
+								<p className="es-overlay-note">Reviens demain&nbsp;!</p>
+							) : (
+								<button className="es-startbtn sm" onClick={start}>
+									↻ Rejouer{daily ? ` (${remaining} restant${remaining > 1 ? 's' : ''})` : ''}
+								</button>
+							)}
+						</div>
+					</div>
+				)}
+			</div>
+
+			<p className="es-help">
+				Pilote ton vaisseau et <strong>évite les astéroïdes</strong> le plus longtemps possible.
+				Déplace-toi avec les <strong>flèches</strong> / <strong>ZQSD</strong>, ou en
+				<strong> glissant le doigt</strong> (haut/bas + gauche/droite). Choisis ta difficulté ; au
+				défi du jour, les astéroïdes sont les mêmes pour tout le monde (10 essais, meilleur temps classé).
+			</p>
+
+			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtSec} />}
+			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+		</div>
+	);
+}
+
+/* ---------- Styles (Ludiven charte + dark mode) ---------- */
+
+const CSS = `
+.es-root {
+  --es-accent: var(--accent-regular);
+  width: 100%; max-width: 460px; margin-inline: auto;
+  color: var(--gray-0); font-family: var(--font-body);
+  display: flex; flex-direction: column; align-items: center;
+}
+.es-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
+.es-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.85rem; }
+.es-pill {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.es-pill.active { background: var(--es-accent); color: var(--accent-text-over); border-color: var(--es-accent); }
+.es-bar { width: 100%; display: flex; justify-content: center; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.85rem; }
+.es-score { background: var(--es-accent); color: var(--accent-text-over); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; }
+.es-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; }
+
+.es-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
+.es-canvas {
+  width: 100%; aspect-ratio: 1 / 1; display: block;
+  background: #0a0a14; border: 1px solid var(--gray-800); border-radius: 12px;
+  touch-action: none; cursor: crosshair;
+}
+
+.es-overlay {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem;
+  background: rgba(6,6,16,0.45); backdrop-filter: blur(2px); border-radius: 12px;
+}
+.es-overlay-card {
+  background: var(--gray-999); border: 2px solid var(--es-accent); border-radius: 16px;
+  padding: 18px 26px; text-align: center; box-shadow: var(--shadow-lg); color: var(--gray-0);
+}
+.es-overlay-note { color: var(--gray-300); font-size: 13px; margin: 0; }
+.es-go-title { font-family: var(--font-brand); font-weight: 600; font-size: 20px; margin: 0 0 4px; }
+.es-go-score { color: var(--gray-300); font-size: 14px; margin: 0 0 12px; font-variant-numeric: tabular-nums; }
+.es-startbtn {
+  border: none; background: var(--es-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
+}
+.es-startbtn.sm { font-size: 15px; padding: 10px 26px; }
+
+.es-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.1rem; }
+`;

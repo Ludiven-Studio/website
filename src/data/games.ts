@@ -134,6 +134,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'esquive',
+		title: 'Esquive',
+		pitch: 'Pilote un vaisseau et esquive les astéroïdes le plus longtemps possible. En 3D.',
+		icon: 'rocket-launch',
+		href: '/jeux/esquive',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'flappy',
 		title: 'Flappy Cocotte',
 		pitch: 'Fais voleter la cocotte entre les tuyaux le plus longtemps possible. Tuyaux partagés au défi du jour.',
