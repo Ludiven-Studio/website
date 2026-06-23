@@ -50,7 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      # Custom domain (cf. public/CNAME) — the github.io page_url 404s, so point at the real site.
+      url: https://www.ludiven-studio.fr
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
