@@ -73,6 +73,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎯', title: 'Tirer', body: 'Clique une case pour tirer : ✸ = touché, point = manqué. Un navire entièrement touché est coulé — comme les navires ne se touchent jamais, l\'eau autour se dévoile alors toute seule.' },
 		{ emoji: '🔊', title: 'Sonar', body: 'Tu as quelques sonars : active le bouton Sonar puis clique une zone — il révèle le nombre de cases-navire dans le carré 3×3. La flotte à couler (tailles des navires) est affichée en haut. Au défi du jour, même flotte pour tous, classement au moins d\'actions.' },
 	],
+	'master-color': [
+		{ emoji: '🎨', title: 'Le but', body: 'Un code de couleurs est caché. Devine-le en un minimum d\'essais — une même couleur peut apparaître plusieurs fois.' },
+		{ emoji: '🕹️', title: 'Comment jouer', body: 'Touche une couleur de la palette pour la placer dans la prochaine case (touche une case posée pour l\'enlever), puis appuie sur Valider quand la ligne est complète.' },
+		{ emoji: '🔢', title: 'Les indices', body: 'Chaque essai renvoie deux nombres : ✓ « bien placés » (bonne couleur, bonne position) et ○ « présents » (bonne couleur, mauvaise position) — sans dire lesquels. Au défi du jour, même code pour tous, classement au moins d\'essais.' },
+	],
 	demineur: [
 		{ emoji: '💣', title: 'Le but', body: 'Découvre toutes les cases sûres sans cliquer sur une mine. Les chiffres indiquent combien de mines touchent la case (diagonales comprises). Une ouverture sûre est révélée pour démarrer.' },
 		{ emoji: '🧠', title: 'Sans devinette', body: 'Chaque grille est garantie résolvable par pure logique : tu n\'es jamais obligé de deviner. En cas de doute, le bouton Indice trouve une case forcément sûre (ou une mine) et l\'explique.' },

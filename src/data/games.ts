@@ -117,6 +117,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'master-color',
+		title: 'Master Color',
+		pitch: 'Devine le code de couleurs caché à coups d\'indices. Le moins d\'essais possible.',
+		icon: 'master-color',
+		href: '/jeux/master-color',
+		status: 'play',
+	},
+	{
 		id: 'snake',
 		title: 'Snake',
 		pitch: 'Mange les pommes et grandis sans te mordre. Défi du jour à graine partagée et classement.',

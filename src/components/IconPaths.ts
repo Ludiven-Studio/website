@@ -57,4 +57,5 @@ export const iconPaths = {
 	mine: '<circle cx="128" cy="128" r="52" fill="none" stroke-linejoin="round" stroke-width="16"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M128 24v44M128 188v44M24 128h44M188 128h44M70 70l28 28M158 158l28 28M186 70l-28 28M98 158l-28 28"/>',
 	snake: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M56 64h72a32 32 0 0 1 0 64H96a32 32 0 0 0 0 64h104"/><circle stroke="none" cx="200" cy="192" r="14"/>',
 	bird: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M40 168c44 0 72-26 88-60 16 34 44 60 88 60M128 108V60m-22 18 22-18 22 18"/><circle stroke="none" cx="100" cy="128" r="10"/>',
+	'master-color': '<circle stroke="none" cx="92" cy="92" r="30"/><circle stroke="none" cx="164" cy="92" r="30"/><circle stroke="none" cx="92" cy="164" r="30"/><circle stroke="none" cx="164" cy="164" r="30"/>',
 };
