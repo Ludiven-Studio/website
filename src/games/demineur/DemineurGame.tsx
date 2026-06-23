@@ -36,6 +36,10 @@ type DiffKey = keyof typeof SIZES; // 'facile' | 'moyen' | 'difficile' (size + t
 
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 
+// Daily leaderboard (metric 'time'): winners submit their time; losers submit LOSS_OFFSET + bombs
+// remaining, so every loss ranks after every win, ordered by fewest bombs left.
+const LOSS_OFFSET = 100000;
+
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -306,6 +310,19 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 	const minesLeft = useMemo(() => mineCount - flagCount(grid), [mineCount, grid]);
 	const lostMine = status === 'lost'; // render every mine as a bomb when lost
 
+	// Bombs still to find = mines minus correctly-placed flags (wrong flags don't count).
+	const bombsRemaining = useMemo(() => {
+		let found = 0;
+		for (let r = 0; r < size; r++)
+			for (let c = 0; c < size; c++) if (grid[r][c] === FLAGGED && puzzle.mines[r][c]) found++;
+		return mineCount - found;
+	}, [grid, puzzle, size, mineCount]);
+
+	// Daily submission: a win → time; a loss → still ranked, below all wins, by bombs remaining.
+	const dailyValue =
+		status === 'won' ? elapsed : status === 'lost' ? LOSS_OFFSET + bombsRemaining : undefined;
+	const lbFormat = (v: number) => (v >= LOSS_OFFSET ? `💣 ${v - LOSS_OFFSET}` : fmtTime(v));
+
 	return (
 		<div className="dm-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
@@ -369,7 +386,11 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			{status === 'lost' && (
 				<div className="dm-lost">
 					💥 Mine touchée !{' '}
-					{daily ? <>Défi du jour terminé — reviens demain.</> : <>Partie perdue.</>}
+					{daily ? (
+						<>Tu apparais au classement avec <strong>{bombsRemaining}</strong> bombe{bombsRemaining > 1 ? 's' : ''} restante{bombsRemaining > 1 ? 's' : ''} — reviens demain.</>
+					) : (
+						<>Partie perdue.</>
+					)}
 					<div className="dm-lost-actions">
 						{!revealed && <button className="dm-act" onClick={showSolution}>👁 Voir la solution</button>}
 						{!daily && <button className="dm-replay" onClick={() => newGame(diffKey)}>Rejouer</button>}
@@ -456,7 +477,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			{!daily && hintNote && <p className="dm-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={dailyValue} format={lbFormat} />
 			)}
 			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
 

@@ -27,6 +27,12 @@ type DiffKey = keyof typeof FLAPPY_DIFFS;
 const BEST_KEY = 'ludiven-flappy-best';
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const STEP = 1000 / 60; // ms per physics step
+const MAX_TRIES = 10; // daily attempts per day; best of the day is ranked
+
+interface DailyState {
+	best: number;
+	tries: number;
+}
 
 // Self-contained daytime scene (a little Flappy world, independent of the page theme).
 const drawCloud = (ctx: CanvasRenderingContext2D, x: number, y: number, sc: number) => {
@@ -184,8 +190,9 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
-	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
-	const [attempt, setAttempt] = useState(0);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily tries exhausted (locked)
+	const [attempt, setAttempt] = useState(0); // re-keys the leaderboard so each replay re-submits
+	const [tries, setTries] = useState(0); // daily attempts used today
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const stateRef = useRef<FlappyState>(createFlappy());
@@ -202,6 +209,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	const cssSizeRef = useRef(0);
 	const dailyRef = useRef(false);
 	const statusRef = useRef<Status>('ready');
+	const triesRef = useRef(0); // daily attempts used (guards start without stale state)
 
 	/* ---- Drawing (everything in world units 0..100 via a scale transform) ---- */
 	const draw = useCallback(() => {
@@ -258,12 +266,14 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		setBest((prev) => {
 			const nb = Math.max(prev, sc);
 			if (dailyRef.current) {
+				const exhausted = triesRef.current >= MAX_TRIES;
+				if (exhausted) setAlreadyPlayed(true);
 				saveDailyRun(gameId, {
 					startedAt: startRef.current,
 					done: true,
 					seed: seedRef.current,
 					diffIndex: diffIdxRef.current,
-					state: { best: nb },
+					state: { best: nb, tries: triesRef.current } satisfies DailyState,
 				});
 			} else {
 				try {
@@ -305,6 +315,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	);
 
 	const start = useCallback(() => {
+		if (dailyRef.current && triesRef.current >= MAX_TRIES) return; // out of daily tries
 		stateRef.current = flap(createFlappy(cfgRef.current), cfgRef.current); // first input starts + flaps up
 		scoreRef.current = 0;
 		accRef.current = 0;
@@ -316,14 +327,17 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setAttempt((a) => a + 1);
 		trackGame(gameId, 'game_started');
-		if (dailyRef.current)
+		if (dailyRef.current) {
+			triesRef.current += 1; // a started run consumes a try (no farming by reloading)
+			setTries(triesRef.current);
 			saveDailyRun(gameId, {
 				startedAt: startRef.current,
 				done: false,
 				seed: seedRef.current,
 				diffIndex: diffIdxRef.current,
-				state: { best },
+				state: { best, tries: triesRef.current } satisfies DailyState,
 			});
+		}
 		draw();
 		rafRef.current = requestAnimationFrame(frame);
 	}, [gameId, best, draw, frame]);
@@ -345,6 +359,8 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 			dailyRef.current = false;
 			setDaily(false);
 			setAlreadyPlayed(false);
+			triesRef.current = 0;
+			setTries(0);
 			setDiffKey(key);
 			cfgRef.current = flappyConfig(FLAPPY_DIFFS[key]);
 			seedRef.current = (Math.random() * 2 ** 32) >>> 0;
@@ -381,19 +397,36 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		};
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
+			// Resume today's daily: restore best + tries used; lock once tries are spent.
 			applyLevel(run.seed, run.diffIndex ?? dailyDifficultyIndex());
-			const st = (run.state as { best?: number } | undefined) ?? {};
+			const st = (run.state as DailyState | undefined) ?? { best: 0, tries: 0 };
+			triesRef.current = st.tries ?? 0;
+			setTries(triesRef.current);
 			setBest(st.best ?? 0);
-			setAlreadyPlayed(run.done === true);
+			const exhausted = triesRef.current >= MAX_TRIES;
+			setAlreadyPlayed(exhausted);
+			if (exhausted) {
+				setScore(st.best ?? 0);
+				scoreRef.current = st.best ?? 0;
+				statusRef.current = 'over';
+				setStatus('over');
+			} else {
+				statusRef.current = 'ready';
+				setStatus('ready');
+			}
 			setDailyLoading(false);
 			draw();
 			return;
 		}
 		setDailyLoading(true);
 		setAlreadyPlayed(false);
+		triesRef.current = 0;
+		setTries(0);
 		const { seed, diffIndex } = await getDaily(gameId);
 		applyLevel(seed, diffIndex);
 		setBest(0);
+		statusRef.current = 'ready';
+		setStatus('ready');
 		setDailyLoading(false);
 		draw();
 	}, [gameId, stop, draw]);
@@ -478,7 +511,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				<div className="fl-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
-						: `Défi du jour · ${dailyWeekdayLabel()} · ${FLAPPY_DIFFS[diffKey].label}`}
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${FLAPPY_DIFFS[diffKey].label} · Essai ${Math.min(tries, MAX_TRIES)}/${MAX_TRIES}`}
 				</div>
 			) : (
 				<div className="fl-pills" role="tablist" aria-label="Difficulté">
@@ -510,10 +543,9 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 					onPointerDown={onCanvasPointer}
 				/>
 
-				{status === 'ready' && !dailyLoading && (
+				{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
 					<div className="fl-overlay">
 						<button className="fl-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
-						{daily && alreadyPlayed && <p className="fl-overlay-note">Record du jour : {best}</p>}
 					</div>
 				)}
 				{dailyLoading && (
@@ -522,9 +554,17 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				{status === 'over' && (
 					<div className="fl-overlay">
 						<div className="fl-overlay-card">
-							<p className="fl-go-title">Aïe&nbsp;!</p>
-							<p className="fl-go-score">Score {score} · Record {best}</p>
-							<button className="fl-startbtn sm" onClick={start}>↻ Rejouer</button>
+							<p className="fl-go-title">{daily && alreadyPlayed ? 'Défi du jour terminé' : 'Aïe !'}</p>
+							<p className="fl-go-score">
+								{daily ? <>Score {score} · Meilleur {best}</> : <>Score {score} · Record {best}</>}
+							</p>
+							{daily && alreadyPlayed ? (
+								<p className="fl-overlay-note">Reviens demain&nbsp;!</p>
+							) : (
+								<button className="fl-startbtn sm" onClick={start}>
+									↻ Rejouer{daily ? ` (${MAX_TRIES - tries} restant${MAX_TRIES - tries > 1 ? 's' : ''})` : ''}
+								</button>
+							)}
 						</div>
 					</div>
 				)}
@@ -537,7 +577,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				au défi du jour, les tuyaux sont les mêmes pour tout le monde.
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? score : undefined} />}
+			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
 			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);

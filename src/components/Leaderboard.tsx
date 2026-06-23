@@ -17,9 +17,11 @@ interface Props {
 	metric: Metric;
 	/** Value of a just-finished daily run to submit (omit when only viewing). */
 	submitValue?: number;
+	/** Custom value formatter (e.g. to decode an encoded value). Defaults to time/score. */
+	format?: (v: number) => string;
 }
 
-export default function Leaderboard({ game, metric, submitValue }: Props) {
+export default function Leaderboard({ game, metric, submitValue, format }: Props) {
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
 	const [editing, setEditing] = useState(false);
@@ -56,7 +58,7 @@ export default function Leaderboard({ game, metric, submitValue }: Props) {
 	};
 
 	const me = name.toLowerCase();
-	const fmt = (v: number) => (metric === 'time' ? fmtTime(v) : String(v));
+	const fmt = format ?? ((v: number) => (metric === 'time' ? fmtTime(v) : String(v)));
 	const showInput = editing || (submitValue != null && !name);
 
 	return (

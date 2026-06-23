@@ -30,6 +30,12 @@ type Status = 'ready' | 'playing' | 'over';
 type DiffKey = keyof typeof SNAKE_DIFFS;
 const BEST_KEY = 'ludiven-snake-best';
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
+const MAX_TRIES = 10; // daily attempts per day; best of the day is ranked
+
+interface DailyState {
+	best: number;
+	tries: number;
+}
 
 interface Colors {
 	bg: string;
@@ -66,8 +72,9 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
-	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
-	const [attempt, setAttempt] = useState(0);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily tries exhausted (locked)
+	const [attempt, setAttempt] = useState(0); // re-keys the leaderboard so each replay re-submits
+	const [tries, setTries] = useState(0); // daily attempts used today
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const stateRef = useRef<SnakeState | null>(null);
@@ -86,6 +93,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	const cssSizeRef = useRef(0);
 	const touchRef = useRef<{ x: number; y: number } | null>(null);
 	const dailyRef = useRef(false); // latest daily flag for callbacks/listeners
+	const triesRef = useRef(0); // daily attempts used (guards start without stale state)
 
 	/* ---- Canvas sizing + drawing ---- */
 	const draw = useCallback(() => {
@@ -239,12 +247,14 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		setBest((prev) => {
 			const nb = Math.max(prev, sc);
 			if (dailyRef.current) {
+				const exhausted = triesRef.current >= MAX_TRIES;
+				if (exhausted) setAlreadyPlayed(true);
 				saveDailyRun(gameId, {
 					startedAt: startRef.current,
 					done: true,
 					seed: seedRef.current,
 					diffIndex: diffIdxRef.current,
-					state: { best: nb },
+					state: { best: nb, tries: triesRef.current } satisfies DailyState,
 				});
 			} else {
 				try {
@@ -286,6 +296,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	);
 
 	const start = useCallback(() => {
+		if (dailyRef.current && triesRef.current >= MAX_TRIES) return; // out of daily tries
 		stateRef.current = createSnake(SNAKE_CFG, seqRef.current, rocksRef.current);
 		scoreRef.current = 0;
 		accRef.current = 0;
@@ -296,14 +307,17 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setAttempt((a) => a + 1);
 		trackGame(gameId, 'game_started');
-		if (dailyRef.current)
+		if (dailyRef.current) {
+			triesRef.current += 1; // a started run consumes a try (no farming by reloading)
+			setTries(triesRef.current);
 			saveDailyRun(gameId, {
 				startedAt: startRef.current,
 				done: false,
 				seed: seedRef.current,
 				diffIndex: diffIdxRef.current,
-				state: { best },
+				state: { best, tries: triesRef.current } satisfies DailyState,
 			});
+		}
 		draw();
 		rafRef.current = requestAnimationFrame(frame);
 	}, [gameId, best, draw, frame]);
@@ -315,6 +329,8 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			dailyRef.current = false;
 			setDaily(false);
 			setAlreadyPlayed(false);
+			triesRef.current = 0;
+			setTries(0);
 			setDiffKey(key);
 			diffRef.current = SNAKE_DIFFS[key];
 			seedRef.current = (Math.random() * 2 ** 32) >>> 0;
@@ -356,19 +372,33 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
+			// Resume today's daily: restore best + tries used; lock once tries are spent.
 			applyLevel(run.seed, run.diffIndex ?? dailyDifficultyIndex());
-			const st = (run.state as { best?: number } | undefined) ?? {};
+			const st = (run.state as DailyState | undefined) ?? { best: 0, tries: 0 };
+			triesRef.current = st.tries ?? 0;
+			setTries(triesRef.current);
 			setBest(st.best ?? 0);
-			setAlreadyPlayed(run.done === true);
+			const exhausted = triesRef.current >= MAX_TRIES;
+			setAlreadyPlayed(exhausted);
+			if (exhausted) {
+				setScore(st.best ?? 0);
+				scoreRef.current = st.best ?? 0;
+				setStatus('over');
+			} else {
+				setStatus('ready');
+			}
 			setDailyLoading(false);
 			draw();
 			return;
 		}
 		setDailyLoading(true);
 		setAlreadyPlayed(false);
+		triesRef.current = 0;
+		setTries(0);
 		const { seed, diffIndex } = await getDaily(gameId);
 		applyLevel(seed, diffIndex);
 		setBest(0);
+		setStatus('ready');
 		setDailyLoading(false);
 		draw();
 	}, [gameId, stop, draw]);
@@ -460,7 +490,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 				<div className="sn-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
-						: `Défi du jour · ${dailyWeekdayLabel()} · ${SNAKE_DIFFS[diffKey].label}`}
+						: `Défi du jour · ${dailyWeekdayLabel()} · ${SNAKE_DIFFS[diffKey].label} · Essai ${Math.min(tries, MAX_TRIES)}/${MAX_TRIES}`}
 				</div>
 			) : (
 				<div className="sn-pills" role="tablist" aria-label="Difficulté">
@@ -493,10 +523,9 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 					onTouchEnd={onTouchEnd}
 				/>
 
-				{status === 'ready' && !dailyLoading && (
+				{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
 					<div className="sn-overlay">
 						<button className="sn-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
-						{daily && alreadyPlayed && <p className="sn-overlay-note">Record du jour : {best}</p>}
 					</div>
 				)}
 				{dailyLoading && (
@@ -505,9 +534,17 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 				{status === 'over' && (
 					<div className="sn-overlay">
 						<div className="sn-overlay-card">
-							<p className="sn-go-title">Perdu&nbsp;!</p>
-							<p className="sn-go-score">Score {score} · Record {best}</p>
-							<button className="sn-startbtn sm" onClick={start}>↻ Rejouer</button>
+							<p className="sn-go-title">{daily && alreadyPlayed ? 'Défi du jour terminé' : 'Perdu !'}</p>
+							<p className="sn-go-score">
+								{daily ? <>Score {score} · Meilleur {best}</> : <>Score {score} · Record {best}</>}
+							</p>
+							{daily && alreadyPlayed ? (
+								<p className="sn-overlay-note">Reviens demain&nbsp;!</p>
+							) : (
+								<button className="sn-startbtn sm" onClick={start}>
+									↻ Rejouer{daily ? ` (${MAX_TRIES - tries} restant${MAX_TRIES - tries > 1 ? 's' : ''})` : ''}
+								</button>
+							)}
 						</div>
 					</div>
 				)}
@@ -518,7 +555,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 				Tu accélères en grossissant — évite les murs et ta propre queue&nbsp;!
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? score : undefined} />}
+			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
 			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
