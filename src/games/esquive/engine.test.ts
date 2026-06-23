@@ -30,8 +30,8 @@ describe('esquive engine', () => {
 		const a = spawnAsteroid(12345, 3, cfg);
 		const b = spawnAsteroid(12345, 3, cfg);
 		expect(a).toEqual(b);
-		expect(Math.abs(a.x)).toBeLessThanOrEqual(cfg.halfW);
-		expect(Math.abs(a.y)).toBeLessThanOrEqual(cfg.halfH);
+		expect(Math.abs(a.x)).toBeLessThanOrEqual(cfg.spawnHalfW);
+		expect(Math.abs(a.y)).toBeLessThanOrEqual(cfg.spawnHalfH);
 		expect(a.r).toBeGreaterThanOrEqual(cfg.astMinR);
 		expect(a.r).toBeLessThanOrEqual(cfg.astMaxR * 1.8); // occasional boulders exceed astMaxR
 		expect(a.z).toBe(cfg.farZ);

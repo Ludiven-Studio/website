@@ -28,8 +28,10 @@ export const ESQUIVE_DIFFS: Record<string, EsquiveDiff> = {
 const MAX_BURST = 4;
 
 export interface EsquiveConfig {
-	halfW: number; // play half-extent in x
+	halfW: number; // play half-extent in x (ship movement bound)
 	halfH: number; // play half-extent in y
+	spawnHalfW: number; // asteroid spawn half-extent in x (wider than play → fills the sides)
+	spawnHalfH: number;
 	shipR: number; // ship collision radius
 	shipSpeed: number; // x/y units per second at full input
 	astMinR: number;
@@ -67,9 +69,13 @@ export interface EsquiveState {
 }
 
 export function esquiveConfig(diff: EsquiveDiff): EsquiveConfig {
+	const halfW = 9;
+	const halfH = 9;
 	return {
-		halfW: 9,
-		halfH: 9,
+		halfW,
+		halfH,
+		spawnHalfW: halfW * 1.4, // asteroids spread wider than the ship can reach (dodge vertically)
+		spawnHalfH: halfH * 1.4,
 		shipR: 0.9,
 		shipSpeed: 24,
 		astMinR: 0.7,
@@ -115,8 +121,8 @@ export function spawnAsteroid(seed: number, i: number, cfg: EsquiveConfig): Aste
 	const base = cfg.astMinR + rng() * (cfg.astMaxR - cfg.astMinR);
 	const r = big ? cfg.astMaxR * (1.25 + rng() * 0.4) : base;
 	return {
-		x: (rng() * 2 - 1) * cfg.halfW,
-		y: (rng() * 2 - 1) * cfg.halfH,
+		x: (rng() * 2 - 1) * cfg.spawnHalfW,
+		y: (rng() * 2 - 1) * cfg.spawnHalfH,
 		z: cfg.farZ,
 		r,
 		rx: rng() * Math.PI * 2,
