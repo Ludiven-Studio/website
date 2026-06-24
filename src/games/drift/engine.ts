@@ -37,7 +37,8 @@ export interface CarParams {
 	gripDrift: number; // lateral retention while drifting (≈1 → long slide)
 	gripGrip: number; // lateral retention when gripping (low → snaps back, no slide)
 	driftMinSpeed: number; // min forward speed to break into a drift
-	driftHoldMs: number; // how long a hard turn must be held before the drift kicks in
+	driftRise: number; // how fast the drift engages while holding a hard turn (per s)
+	driftFall: number; // how slowly it releases when you ease off (per s) → smooth exit
 	offTrackMul: number; // speed/grip multiplier off-track
 	wallMargin: number; // grass band width beyond the asphalt before a hard wall
 }
@@ -49,8 +50,9 @@ export const CAR: CarParams = {
 	turnRate: 3.0,
 	gripDrift: 0.97,
 	gripGrip: 0.5,
-	driftMinSpeed: 14,
-	driftHoldMs: 200,
+	driftMinSpeed: 12,
+	driftRise: 8, // ~engages within ~0.1s of holding
+	driftFall: 2.5, // ~lingers ~0.3s then eases out
 	offTrackMul: 0.45,
 	wallMargin: 4,
 };
@@ -62,8 +64,8 @@ export interface CarState {
 	vx: number; // world velocity
 	vz: number;
 	speed: number; // signed forward speed (for HUD)
-	drifting: boolean; // true while breaking traction (held hard turn at speed) → trails
-	steerHoldMs: number; // how long a hard turn has been held
+	drifting: boolean; // derived (driftAmt high) → emit trails / HUD
+	driftAmt: number; // 0..1 continuous drift level: rises fast, falls slow (smooth exit)
 }
 
 export interface CarInput {
@@ -166,7 +168,7 @@ export function onTrack(track: Track, x: number, z: number): boolean {
 
 export function createCar(track: Track): CarState {
 	const p = track.points[track.checkpoints[0]];
-	return { x: p.x, z: p.z, heading: Math.atan2(p.dirZ, p.dirX), vx: 0, vz: 0, speed: 0, drifting: false, steerHoldMs: 0 };
+	return { x: p.x, z: p.z, heading: Math.atan2(p.dirZ, p.dirX), vx: 0, vz: 0, speed: 0, drifting: false, driftAmt: 0 };
 }
 
 /** Advance the car by dt seconds. Auto-throttle; `steer` turns; lateral velocity slips then decays (drift). */
@@ -192,13 +194,16 @@ export function stepCar(car: CarState, input: CarInput, dt: number, track: Track
 	if (fwd > vmax) fwd = vmax;
 	if (fwd < 0) fwd = 0;
 
-	// Drift engages only when a hard turn is HELD at speed — a light/brief turn keeps grip.
-	const hard = Math.abs(input.steer) > 0.6;
-	const steerHoldMs = hard ? car.steerHoldMs + dt * 1000 : 0;
-	const drifting = fwd > P.driftMinSpeed && steerHoldMs > P.driftHoldMs;
+	// Continuous drift level: rises fast while a hard turn is held at speed, falls slowly when eased off
+	// → quick engage, lingers, and exits smoothly (no abrupt regrip).
+	const wantDrift = Math.abs(input.steer) > 0.6 && fwd > P.driftMinSpeed;
+	const rate = wantDrift ? P.driftRise : P.driftFall;
+	const target = wantDrift ? 1 : 0;
+	const driftAmt = Math.max(0, Math.min(1, car.driftAmt + (target - car.driftAmt) * Math.min(1, rate * dt)));
+	const drifting = driftAmt > 0.4;
 
-	// Lateral grip: drifting → slip persists (slide); gripping → snaps back. Grass is always slippery.
-	const retain = !onIt ? 0.95 : drifting ? P.gripDrift : P.gripGrip;
+	// Lateral grip blends continuously with driftAmt → smooth slide in/out. Grass is always slippery.
+	const retain = !onIt ? 0.95 : P.gripGrip + (P.gripDrift - P.gripGrip) * driftAmt;
 	const grip = Math.pow(retain, dt * 60);
 	const lvx = latX * grip;
 	const lvz = latZ * grip;
@@ -227,7 +232,7 @@ export function stepCar(car: CarState, input: CarInput, dt: number, track: Track
 		}
 	}
 
-	return { x: nx2, z: nz2, heading, vx, vz, speed: fwd, drifting, steerHoldMs };
+	return { x: nx2, z: nz2, heading, vx, vz, speed: fwd, drifting, driftAmt };
 }
 
 /* ----------------------------- Lap timing ----------------------------- */

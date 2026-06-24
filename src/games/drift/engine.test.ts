@@ -20,7 +20,7 @@ const lateralMag = (c: CarState): number => Math.abs(c.vx * -Math.sin(c.heading)
 const makeFast = (t: Track): CarState => {
 	const p = t.points[t.checkpoints[0]];
 	const h = Math.atan2(p.dirZ, p.dirX);
-	return { x: p.x, z: p.z, heading: h, vx: Math.cos(h) * 30, vz: Math.sin(h) * 30, speed: 30, drifting: false, steerHoldMs: 0 };
+	return { x: p.x, z: p.z, heading: h, vx: Math.cos(h) * 30, vz: Math.sin(h) * 30, speed: 30, drifting: false, driftAmt: 0 };
 };
 
 /** Arm at the line, pass every checkpoint in order (incremental steps), then re-cross the line. */
@@ -81,6 +81,16 @@ describe('drift engine', () => {
 		for (let i = 0; i < 24; i++) c = stepCar(c, { steer: 1, brake: 0 }, 1 / 60, track); // ~0.4s held
 		expect(c.drifting).toBe(true);
 		expect(lateralMag(c)).toBeGreaterThan(briefLat); // it slides sideways once drifting
+	});
+
+	it('drift lingers and exits smoothly when steering is released', () => {
+		let c = makeFast(track);
+		for (let i = 0; i < 24; i++) c = stepCar(c, { steer: 1, brake: 0 }, 1 / 60, track);
+		const peak = c.driftAmt;
+		c = stepCar(c, { steer: 0, brake: 0 }, 1 / 60, track); // release for one frame
+		expect(c.drifting).toBe(true); // still drifting just after release (lingers)
+		expect(c.driftAmt).toBeLessThan(peak); // but already easing out, not snapping to 0
+		expect(c.driftAmt).toBeGreaterThan(0);
 	});
 
 	it('cannot cross the barrier (stays within wallR of the centerline)', () => {
