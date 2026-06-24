@@ -6,6 +6,7 @@ import {
 	stepCar,
 	createLap,
 	stepLap,
+	nearestIndex,
 	type CarState,
 	type LapState,
 	type Track,
@@ -65,6 +66,18 @@ describe('drift engine', () => {
 		expect(lat1).toBeGreaterThan(0.3); // it slides sideways through the turn
 		for (let i = 0; i < 90; i++) c = stepCar(c, { steer: 0, brake: 0 }, 1 / 60, track);
 		expect(lateralMag(c)).toBeLessThan(lat1); // grip pulls it back in line
+	});
+
+	it('cannot cross the barrier (stays within wallR of the centerline)', () => {
+		let c = createCar(track);
+		const wallR = track.width / 2 + CAR.wallMargin;
+		let maxD = 0;
+		for (let i = 0; i < 600; i++) {
+			c = stepCar(c, { steer: 1, brake: 0 }, 1 / 60, track); // hard turn → push outward
+			const p = track.points[nearestIndex(track, c.x, c.z)];
+			maxD = Math.max(maxD, Math.hypot(p.x - c.x, p.z - c.z));
+		}
+		expect(maxD).toBeLessThanOrEqual(wallR + 0.5);
 	});
 
 	it('counts a full, valid lap and keeps the best time', () => {

@@ -34,17 +34,19 @@ export interface CarParams {
 	maxSpeed: number;
 	brakeDecel: number;
 	turnRate: number; // rad/s at full steer
-	gripLat: number; // 0..1 per-step lateral velocity retention (lower = more drift)
+	gripLat: number; // 0..1 per-step lateral velocity retention (higher = slides longer = more drift)
 	offTrackMul: number; // speed/grip multiplier off-track
+	wallMargin: number; // grass band width beyond the asphalt before a hard wall
 }
 
 export const CAR: CarParams = {
 	accel: 26,
 	maxSpeed: 46,
 	brakeDecel: 60,
-	turnRate: 2.6,
-	gripLat: 0.92,
+	turnRate: 3.0,
+	gripLat: 0.95,
 	offTrackMul: 0.45,
+	wallMargin: 4,
 };
 
 export interface CarState {
@@ -187,16 +189,31 @@ export function stepCar(car: CarState, input: CarInput, dt: number, track: Track
 	const lvx = latX * grip;
 	const lvz = latZ * grip;
 
-	const vx = fx * fwd + lvx;
-	const vz = fz * fwd + lvz;
-	return {
-		x: car.x + vx * dt,
-		z: car.z + vz * dt,
-		heading,
-		vx,
-		vz,
-		speed: fwd,
-	};
+	let vx = fx * fwd + lvx;
+	let vz = fz * fwd + lvz;
+	let nx2 = car.x + vx * dt;
+	let nz2 = car.z + vz * dt;
+
+	// Hard barrier: cannot go beyond the grass — slide along the wall instead of flying off.
+	const wallR = track.width / 2 + P.wallMargin;
+	const ni = nearestIndex(track, nx2, nz2);
+	const np = track.points[ni];
+	const ox = nx2 - np.x;
+	const oz = nz2 - np.z;
+	const od = Math.hypot(ox, oz);
+	if (od > wallR) {
+		const ux = ox / od;
+		const uz = oz / od;
+		nx2 = np.x + ux * wallR;
+		nz2 = np.z + uz * wallR;
+		const outward = vx * ux + vz * uz;
+		if (outward > 0) {
+			vx -= outward * ux; // cancel the into-wall component → scrub along it
+			vz -= outward * uz;
+		}
+	}
+
+	return { x: nx2, z: nz2, heading, vx, vz, speed: fwd };
 }
 
 /* ----------------------------- Lap timing ----------------------------- */

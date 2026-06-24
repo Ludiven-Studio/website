@@ -26,6 +26,9 @@ type Phase = 'menu' | 'racing';
 const STEP = 1000 / 60;
 const SEND_HZ = 12;
 const CAR_COLORS = [0x7c5cff, 0xff5c8a, 0x33d6a6, 0xffb020];
+const SKID_MARKS = 240; // recycled skid-mark pool (finite trail)
+const SKID_SLIP = 4.5; // lateral speed above which tyres leave marks
+const SKID_FLOATS = SKID_MARKS * 18; // 2 triangles × 3 verts × 3 coords
 const fmtMs = (ms: number | null) => (ms == null ? '—' : `${(ms / 1000).toFixed(2)} s`);
 const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
 const lerpAngle = (a: number, b: number, t: number) => {
@@ -50,6 +53,9 @@ interface Scene3D {
 	dashMat: THREE.MeshBasicMaterial;
 	curbMat: THREE.MeshBasicMaterial;
 	startMat: THREE.MeshBasicMaterial;
+	skidGeom: THREE.BufferGeometry;
+	skidMat: THREE.MeshBasicMaterial;
+	skidPos: Float32Array;
 	disposables: { dispose: () => void }[];
 }
 
@@ -191,6 +197,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const peerInfoRef = useRef<Map<string, { name: string; color: number }>>(new Map());
 	const bestRef = useRef<number | null>(null);
 	const boardRef = useRef<Map<string, { name: string; bestMs: number }>>(new Map());
+	const markIdxRef = useRef(0);
+	const markPosRef = useRef({ x: 0, z: 0 });
 
 	useEffect(() => {
 		setName(playerName());
@@ -236,11 +244,22 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const curbMat = new THREE.MeshBasicMaterial({ color: 0xe34b4b, side: THREE.DoubleSide });
 		const startMat = new THREE.MeshBasicMaterial({ color: 0xf2f4f8, side: THREE.DoubleSide });
 
+		// Skid-mark trail (one shared geometry, positions rewritten in place, oldest recycled).
+		const skidPos = new Float32Array(SKID_FLOATS);
+		const skidGeom = new THREE.BufferGeometry();
+		skidGeom.setAttribute('position', new THREE.BufferAttribute(skidPos, 3));
+		const skidMat = new THREE.MeshBasicMaterial({ color: 0x111319, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+		const skidMesh = new THREE.Mesh(skidGeom, skidMat);
+		skidMesh.renderOrder = 1;
+		skidMesh.frustumCulled = false; // positions are mutated in place → skip stale-bounds culling
+		scene.add(skidMesh);
+
 		const car = makeCar(selfColorRef.current);
 		scene.add(car);
 
 		g3Ref.current = {
 			renderer, scene, camera, car, trackMat, trackGeom, deco, dashMat, curbMat, startMat,
+			skidGeom, skidMat, skidPos,
 			disposables: [ground.geometry, ground.material as THREE.Material],
 		};
 		return true;
@@ -304,6 +323,14 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const arr = [...boardRef.current.entries()].map(([id, v]) => ({ id, ...v }));
 		arr.sort((a, b) => a.bestMs - b.bestMs);
 		setBoard(arr);
+	}, []);
+
+	const clearSkid = useCallback(() => {
+		const g = g3Ref.current;
+		if (!g) return;
+		g.skidPos.fill(0);
+		g.skidGeom.attributes.position.needsUpdate = true;
+		markIdxRef.current = 0;
 	}, []);
 
 	/* ---- Loop ---- */
@@ -390,6 +417,33 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			}
 			carRef.current = car;
 
+			// Skid marks while sliding (lateral slip), spaced by travelled distance.
+			const g = g3Ref.current;
+			if (g) {
+				const slip = Math.abs(car.vx * -Math.sin(car.heading) + car.vz * Math.cos(car.heading));
+				const moved = Math.hypot(car.x - markPosRef.current.x, car.z - markPosRef.current.z);
+				if (slip > SKID_SLIP && moved > 0.5) {
+					markPosRef.current = { x: car.x, z: car.z };
+					const fx = Math.cos(car.heading), fz = Math.sin(car.heading);
+					const px = -fz, pz = fx; // perpendicular (track lateral)
+					const rear = 1.4, wheel = 0.7, L = 1.3, W = 0.4, y = 0.03;
+					const put = (mx: number, mz: number) => {
+						const o = (markIdxRef.current % SKID_MARKS) * 18;
+						const p = g.skidPos;
+						const ax = mx - fx * (L / 2) + px * (W / 2), az = mz - fz * (L / 2) + pz * (W / 2);
+						const bx = mx - fx * (L / 2) - px * (W / 2), bz = mz - fz * (L / 2) - pz * (W / 2);
+						const cx = mx + fx * (L / 2) - px * (W / 2), cz = mz + fz * (L / 2) - pz * (W / 2);
+						const dx2 = mx + fx * (L / 2) + px * (W / 2), dz2 = mz + fz * (L / 2) + pz * (W / 2);
+						p[o] = ax; p[o + 1] = y; p[o + 2] = az; p[o + 3] = bx; p[o + 4] = y; p[o + 5] = bz; p[o + 6] = cx; p[o + 7] = y; p[o + 8] = cz;
+						p[o + 9] = ax; p[o + 10] = y; p[o + 11] = az; p[o + 12] = cx; p[o + 13] = y; p[o + 14] = cz; p[o + 15] = dx2; p[o + 16] = y; p[o + 17] = dz2;
+						markIdxRef.current++;
+					};
+					put(car.x - fx * rear + px * wheel, car.z - fz * rear + pz * wheel);
+					put(car.x - fx * rear - px * wheel, car.z - fz * rear - pz * wheel);
+					g.skidGeom.attributes.position.needsUpdate = true;
+				}
+			}
+
 			// Broadcast pose.
 			if (raceRef.current) {
 				sendAccRef.current += dt;
@@ -437,6 +491,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			lapRef.current = createLap();
 			clockRef.current = 0;
 			prevIdxRef.current = track.checkpoints[0];
+			markPosRef.current = { x: carRef.current.x, z: carRef.current.z };
+			clearSkid();
 			bestRef.current = null;
 			setBestMs(null);
 			setCurMs(0);
@@ -470,8 +526,19 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			rafRef.current = requestAnimationFrame(frame);
 			trackGame(gameId, 'game_started');
 		},
-		[frame, gameId, getOrCreateGhost, removeGhost, syncBoard],
+		[frame, gameId, getOrCreateGhost, removeGhost, syncBoard, clearSkid],
 	);
+
+	const reset = useCallback(() => {
+		const track = trackRef.current;
+		if (!track) return;
+		carRef.current = createCar(track);
+		lapRef.current = createLap();
+		prevIdxRef.current = track.checkpoints[0];
+		markPosRef.current = { x: carRef.current.x, z: carRef.current.z };
+		clearSkid();
+		setCurMs(0);
+	}, [clearSkid]);
 
 	const play = useCallback(async () => {
 		const nm = (name || playerName()).trim();
@@ -542,6 +609,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				g.dashMat.dispose();
 				g.curbMat.dispose();
 				g.startMat.dispose();
+				g.skidGeom.dispose();
+				g.skidMat.dispose();
 				g.car.traverse((o) => {
 					if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
 				});
@@ -585,7 +654,10 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 							<button className="dr-tbtn brake" onPointerDown={touch('brake', true)} onPointerUp={touch('brake', false)} onPointerLeave={touch('brake', false)} aria-label="Frein">FREIN</button>
 							<button className="dr-tbtn" onPointerDown={touch('right', true)} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} aria-label="Droite">▶</button>
 						</div>
-						<button className="dr-quit" onClick={quit}>Quitter</button>
+						<div className="dr-topbtns">
+							<button className="dr-restart" onClick={reset}>↺ Recommencer</button>
+							<button className="dr-quit" onClick={quit}>Quitter</button>
+						</div>
 					</>
 				)}
 
@@ -643,7 +715,9 @@ const CSS = `
 .dr-touch { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 12px; }
 .dr-tbtn { width: 64px; height: 64px; border-radius: 50%; border: none; background: rgba(255,255,255,0.18); color: #fff; font-weight: 800; font-size: 20px; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
 .dr-tbtn.brake { width: auto; padding: 0 18px; border-radius: 999px; font-size: 14px; background: rgba(230,72,77,0.55); }
-.dr-quit { position: absolute; bottom: 10px; right: 10px; border: 1.5px solid var(--gray-600, var(--gray-700)); background: rgba(0,0,0,0.4); color: #fff; font: inherit; font-weight: 600; font-size: 12px; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.dr-topbtns { position: absolute; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.dr-restart, .dr-quit { border: 1.5px solid var(--gray-600, var(--gray-700)); background: rgba(0,0,0,0.5); color: #fff; font: inherit; font-weight: 600; font-size: 12px; border-radius: 999px; padding: 6px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.dr-restart { background: var(--dr-accent); color: var(--accent-text-over); border-color: transparent; }
 
 .dr-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(6,8,16,0.5); backdrop-filter: blur(2px); border-radius: 12px; }
 .dr-card { background: var(--gray-999); border: 2px solid var(--dr-accent); border-radius: 18px; padding: 22px 26px; text-align: center; box-shadow: var(--shadow-lg); max-width: 340px; }
