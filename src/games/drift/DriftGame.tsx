@@ -315,7 +315,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	/* ---- three.js scene ---- */
 	const initScene = useCallback(() => {
-		if (g3Ref.current || !canvasRef.current) return false;
+		if (g3Ref.current) return true; // already built (e.g. after Quitter → rejouer)
+		if (!canvasRef.current) return false;
 		let renderer: THREE.WebGLRenderer;
 		try {
 			renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: true });
