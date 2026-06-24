@@ -55,10 +55,10 @@ interface Scene3D {
 	trackMat: THREE.MeshStandardMaterial;
 	trackGeom: THREE.BufferGeometry;
 	deco: THREE.Group; // dashes + curbs + start line, rebuilt per track
-	dashMat: THREE.MeshBasicMaterial;
-	curbMat: THREE.MeshBasicMaterial;
-	startMat: THREE.MeshBasicMaterial;
-	wallWhiteMat: THREE.MeshBasicMaterial;
+	whiteMat: THREE.MeshBasicMaterial;
+	redMat: THREE.MeshBasicMaterial;
+	railMat: THREE.MeshBasicMaterial;
+	postMat: THREE.MeshBasicMaterial;
 	foliageMat: THREE.MeshStandardMaterial;
 	trunkMat: THREE.MeshStandardMaterial;
 	rockMat: THREE.MeshStandardMaterial;
@@ -78,20 +78,20 @@ function makeCar(color: number, ghost = false): THREE.Group {
 		m.position.set(x, y, z);
 		g.add(m);
 	};
-	// Body (the player's colour) — first child, so its colour can be refreshed for ghosts.
-	const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.35, roughness: 0.45, transparent: ghost, opacity: op });
+	// Body (the player's colour) — FIRST child, so its colour can be refreshed for ghosts.
+	const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.4, roughness: 0.4, transparent: ghost, opacity: op });
 	const darkMat = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.6, transparent: ghost, opacity: op });
-	const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, metalness: 0.4, roughness: 0.15, transparent: true, opacity: ghost ? 0.4 : 0.8 });
-	const lightMat = new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffe79a, emissiveIntensity: 0.7, transparent: ghost, opacity: op });
+	const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, metalness: 0.4, roughness: 0.15, transparent: true, opacity: ghost ? 0.4 : 0.85 });
 
-	add(new THREE.BoxGeometry(3.6, 0.55, 1.7), bodyMat, 0, 0.55, 0); // chassis (front = +x)
-	add(new THREE.BoxGeometry(1.5, 0.5, 1.5), bodyMat, -0.1, 0.95, 0); // cabin roof (colour)
-	add(new THREE.BoxGeometry(0.5, 0.42, 1.35), glassMat, 0.65, 0.96, 0); // windshield
-	// 4 wheels (dark), poking out at the corners.
-	const wheel = new THREE.BoxGeometry(0.95, 0.5, 0.35);
-	for (const wx of [1.15, -1.15]) for (const wz of [0.92, -0.92]) add(wheel, darkMat, wx, 0.42, wz);
-	// Headlights.
-	for (const lz of [0.5, -0.5]) add(new THREE.BoxGeometry(0.18, 0.22, 0.32), lightMat, 1.82, 0.6, lz);
+	// F1 single-seater, seen from above (front = +x).
+	add(new THREE.BoxGeometry(3.0, 0.4, 0.62), bodyMat, -0.1, 0.5, 0); // slim central body (colour) — child[0]
+	add(new THREE.BoxGeometry(1.3, 0.28, 0.34), bodyMat, 1.85, 0.46, 0); // pointed nose
+	add(new THREE.BoxGeometry(0.32, 0.16, 2.0), darkMat, 2.25, 0.42, 0); // front wing (wide, thin)
+	add(new THREE.BoxGeometry(0.55, 0.5, 1.7), darkMat, -1.55, 0.66, 0); // rear wing (raised)
+	add(new THREE.BoxGeometry(0.7, 0.42, 0.5), glassMat, 0.35, 0.74, 0); // cockpit bubble
+	// 4 exposed wheels (dark), well outboard.
+	const wheel = new THREE.BoxGeometry(1.0, 0.55, 0.5);
+	for (const wx of [1.25, -1.25]) for (const wz of [0.95, -0.95]) add(wheel, darkMat, wx, 0.42, wz);
 	return g;
 }
 
@@ -141,12 +141,38 @@ function buildDashes(track: Track): THREE.BufferGeometry {
 	return geomFrom(pos);
 }
 
-/** Thin curbs along both track edges. */
-function buildCurbs(track: Track): THREE.BufferGeometry {
+/** Rumble strip along both track edges: equal-length red/white stripes (no gaps). */
+function buildCurbsStriped(track: Track): { red: THREE.BufferGeometry; white: THREE.BufferGeometry } {
+	const red: number[] = [];
+	const white: number[] = [];
+	const n = track.points.length;
+	const half = track.width / 2, thick = 1.0, y = 0.04, K = 4; // K samples per stripe
+	const bands: P2[] = [[half - thick, half], [-half, -(half - thick)]];
+	for (let i = 0; i < n; i++) {
+		const out = Math.floor(i / K) % 2 === 0 ? red : white;
+		const p = track.points[i];
+		const q = track.points[(i + 1) % n];
+		for (const [o1, o2] of bands) {
+			pushQuad(
+				out,
+				[p.x + p.nx * o1, p.z + p.nz * o1],
+				[p.x + p.nx * o2, p.z + p.nz * o2],
+				[q.x + q.nx * o2, q.z + q.nz * o2],
+				[q.x + q.nx * o1, q.z + q.nz * o1],
+				y,
+			);
+		}
+	}
+	return { red: geomFrom(red), white: geomFrom(white) };
+}
+
+/** Continuous grey guard-rail at the outer wall radius (both sides). */
+function buildWall(track: Track): THREE.BufferGeometry {
 	const pos: number[] = [];
 	const n = track.points.length;
-	const half = track.width / 2, thick = 1.0, y = 0.04;
-	const bands: P2[] = [[half - thick, half], [-half, -(half - thick)]];
+	const wallR = track.width / 2 + CAR.wallMargin;
+	const y = 0.55;
+	const bands: P2[] = [[wallR - 0.45, wallR + 0.45], [-(wallR + 0.45), -(wallR - 0.45)]];
 	for (let i = 0; i < n; i++) {
 		const p = track.points[i];
 		const q = track.points[(i + 1) % n];
@@ -164,36 +190,29 @@ function buildCurbs(track: Track): THREE.BufferGeometry {
 	return geomFrom(pos);
 }
 
-/**
- * Guard-rail barriers at the outer wall radius: short segments with gaps, alternating red/white.
- * Returns one geometry per colour (built together so the alternation lines up).
- */
-function buildWallSegments(track: Track): { red: THREE.BufferGeometry; white: THREE.BufferGeometry } {
-	const red: number[] = [];
-	const white: number[] = [];
+/** Regular guard-rail posts (small squares) along the rail, both sides. */
+function buildPosts(track: Track): THREE.BufferGeometry {
+	const pos: number[] = [];
 	const n = track.points.length;
 	const wallR = track.width / 2 + CAR.wallMargin;
-	const y = 0.6;
-	const SEG = 5, GAP = 3, PERIOD = SEG + GAP; // samples on / off
-	const bands: P2[] = [[wallR - 0.7, wallR + 0.7], [-(wallR + 0.7), -(wallR - 0.7)]];
-	for (let i = 0; i < n; i++) {
-		if (i % PERIOD >= SEG) continue; // gap between segments
-		const segIndex = Math.floor(i / PERIOD);
-		const out = segIndex % 2 === 0 ? red : white;
+	const y = 0.75, s = 0.9, P = 5; // post half-size, every P samples
+	for (let i = 0; i < n; i += P) {
 		const p = track.points[i];
-		const q = track.points[(i + 1) % n];
-		for (const [o1, o2] of bands) {
+		for (const r of [wallR, -wallR]) {
+			const cx = p.x + p.nx * r, cz = p.z + p.nz * r;
+			const fx = p.dirX * s, fz = p.dirZ * s; // along track
+			const ox = p.nx * s, oz = p.nz * s; // across
 			pushQuad(
-				out,
-				[p.x + p.nx * o1, p.z + p.nz * o1],
-				[p.x + p.nx * o2, p.z + p.nz * o2],
-				[q.x + q.nx * o2, q.z + q.nz * o2],
-				[q.x + q.nx * o1, q.z + q.nz * o1],
+				pos,
+				[cx - fx - ox, cz - fz - oz],
+				[cx - fx + ox, cz - fz + oz],
+				[cx + fx + ox, cz + fz + oz],
+				[cx + fx - ox, cz + fz - oz],
 				y,
 			);
 		}
 	}
-	return { red: geomFrom(red), white: geomFrom(white) };
+	return geomFrom(pos);
 }
 
 /** Scenery scattered on the grass, off-track, deterministic from the seed (cosmetic). */
@@ -327,10 +346,10 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 		const deco = new THREE.Group();
 		scene.add(deco);
-		const dashMat = new THREE.MeshBasicMaterial({ color: 0xeef2f6, side: THREE.DoubleSide });
-		const curbMat = new THREE.MeshBasicMaterial({ color: 0xe34b4b, side: THREE.DoubleSide });
-		const startMat = new THREE.MeshBasicMaterial({ color: 0xf2f4f8, side: THREE.DoubleSide });
-		const wallWhiteMat = new THREE.MeshBasicMaterial({ color: 0xf2f4f8, side: THREE.DoubleSide });
+		const whiteMat = new THREE.MeshBasicMaterial({ color: 0xf2f4f8, side: THREE.DoubleSide });
+		const redMat = new THREE.MeshBasicMaterial({ color: 0xe34b4b, side: THREE.DoubleSide });
+		const railMat = new THREE.MeshBasicMaterial({ color: 0xc2c7cf, side: THREE.DoubleSide });
+		const postMat = new THREE.MeshBasicMaterial({ color: 0x7a808a, side: THREE.DoubleSide });
 		const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2f8f4e, roughness: 1 });
 		const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 });
 		const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a8f98, roughness: 1, flatShading: true });
@@ -349,7 +368,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		scene.add(car);
 
 		g3Ref.current = {
-			renderer, scene, camera, car, trackMat, trackGeom, deco, dashMat, curbMat, startMat, wallWhiteMat,
+			renderer, scene, camera, car, trackMat, trackGeom, deco, whiteMat, redMat, railMat, postMat,
 			foliageMat, trunkMat, rockMat, skidGeom, skidMat, skidPos,
 			disposables: [ground.geometry, ground.material as THREE.Material],
 		};
@@ -575,13 +594,14 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				// Track dressing (rebuilt per circuit) — dispose recursively (decor is a nested group).
 				g.deco.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
 				g.deco.clear();
-				const seg = buildWallSegments(track);
+				const curb = buildCurbsStriped(track);
 				g.deco.add(
-					new THREE.Mesh(buildDashes(track), g.dashMat),
-					new THREE.Mesh(buildCurbs(track), g.curbMat),
-					new THREE.Mesh(seg.red, g.curbMat),
-					new THREE.Mesh(seg.white, g.wallWhiteMat),
-					new THREE.Mesh(buildStartLine(track), g.startMat),
+					new THREE.Mesh(buildDashes(track), g.whiteMat),
+					new THREE.Mesh(curb.red, g.redMat),
+					new THREE.Mesh(curb.white, g.whiteMat),
+					new THREE.Mesh(buildWall(track), g.railMat),
+					new THREE.Mesh(buildPosts(track), g.postMat),
+					new THREE.Mesh(buildStartLine(track), g.whiteMat),
 					buildDecor(track, g.foliageMat, g.trunkMat, g.rockMat),
 				);
 			}
@@ -729,10 +749,10 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				g.trackGeom.dispose();
 				g.trackMat.dispose();
 				g.deco.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
-				g.dashMat.dispose();
-				g.curbMat.dispose();
-				g.startMat.dispose();
-				g.wallWhiteMat.dispose();
+				g.whiteMat.dispose();
+				g.redMat.dispose();
+				g.railMat.dispose();
+				g.postMat.dispose();
 				g.foliageMat.dispose();
 				g.trunkMat.dispose();
 				g.rockMat.dispose();
