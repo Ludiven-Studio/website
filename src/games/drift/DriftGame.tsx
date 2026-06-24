@@ -260,7 +260,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		ground.position.y = -0.05;
 		scene.add(ground);
 
-		const trackMat = new THREE.MeshStandardMaterial({ color: 0x6b6f77, roughness: 0.95 });
+		const trackMat = new THREE.MeshStandardMaterial({ color: 0x6b6f77, roughness: 0.95, side: THREE.DoubleSide });
 		const trackGeom = new THREE.BufferGeometry();
 		const trackMesh = new THREE.Mesh(trackGeom, trackMat);
 		scene.add(trackMesh);
@@ -687,10 +687,6 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 							<button className="dr-tbtn" onPointerDown={touch('left', true)} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)} aria-label="Gauche">◀</button>
 							<button className="dr-tbtn" onPointerDown={touch('right', true)} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)} aria-label="Droite">▶</button>
 						</div>
-						<div className="dr-topbtns">
-							<button className="dr-restart" onClick={reset}>↺ Recommencer</button>
-							<button className="dr-quit" onClick={quit}>Quitter</button>
-						</div>
 					</>
 				)}
 
@@ -720,6 +716,13 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+
+			{phase === 'racing' && (
+				<div className="dr-actions">
+					<button className="dr-restart" onClick={reset}>↺ Recommencer</button>
+					<button className="dr-quit" onClick={quit}>Quitter</button>
+				</div>
+			)}
 
 			{mode === 'defi' && (
 				<Leaderboard game={gameId} metric="time" submitValue={bestMs ?? undefined} format={fmtMs} />
@@ -757,8 +760,8 @@ const CSS = `
 .dr-touch { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; }
 .dr-tbtn { pointer-events: auto; width: 96px; height: 96px; border-radius: 24px; border: none; background: rgba(255,255,255,0.22); color: #fff; font-weight: 800; font-size: 34px; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: none; }
 .dr-tbtn:active { background: rgba(255,255,255,0.4); }
-.dr-topbtns { position: absolute; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
-.dr-restart, .dr-quit { border: 1.5px solid var(--gray-600, var(--gray-700)); background: rgba(0,0,0,0.5); color: #fff; font: inherit; font-weight: 600; font-size: 12px; border-radius: 999px; padding: 6px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.dr-actions { display: flex; gap: 10px; justify-content: center; margin-top: 0.7rem; }
+.dr-restart, .dr-quit { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 18px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .dr-restart { background: var(--dr-accent); color: var(--accent-text-over); border-color: transparent; }
 
 .dr-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(6,8,16,0.5); backdrop-filter: blur(2px); border-radius: 12px; }
