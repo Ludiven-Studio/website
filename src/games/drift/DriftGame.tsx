@@ -31,7 +31,8 @@ type DiffKey = keyof typeof DRIFT_DIFFS;
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const STEP = 1000 / 60;
 const SEND_HZ = 12;
-const CAR_COLORS = [0x7c5cff, 0xff5c8a, 0x33d6a6, 0xffb020];
+const CAR_COLORS = [0xff3b30, 0x0a84ff, 0xffd60a, 0x30d158]; // vivid: red / blue / yellow / green
+const LOOKAHEAD = 12; // camera shifts ahead of the car (see corners sooner)
 const SKID_MARKS = 240; // recycled skid-mark pool (finite trail)
 const SKID_FLOATS = SKID_MARKS * 18; // 2 triangles × 3 verts × 3 coords
 const fmtMs = (ms: number | null) => (ms == null ? '—' : `${(ms / 1000).toFixed(2)} s`);
@@ -68,7 +69,7 @@ interface Scene3D {
 	disposables: { dispose: () => void }[];
 }
 
-const HALF_SPAN = 34; // half of the visible world span (top-down zoom)
+const HALF_SPAN = 38; // half of the visible world span (top-down zoom)
 
 function makeCar(color: number, ghost = false): THREE.Group {
 	const g = new THREE.Group();
@@ -87,7 +88,7 @@ function makeCar(color: number, ghost = false): THREE.Group {
 	add(new THREE.BoxGeometry(3.0, 0.4, 0.62), bodyMat, -0.1, 0.5, 0); // slim central body (colour) — child[0]
 	add(new THREE.BoxGeometry(1.3, 0.28, 0.34), bodyMat, 1.85, 0.46, 0); // pointed nose
 	add(new THREE.BoxGeometry(0.32, 0.16, 2.0), darkMat, 2.25, 0.42, 0); // front wing (wide, thin)
-	add(new THREE.BoxGeometry(0.55, 0.5, 1.7), darkMat, -1.55, 0.66, 0); // rear wing (raised)
+	add(new THREE.BoxGeometry(0.55, 0.5, 1.7), bodyMat, -1.55, 0.66, 0); // rear wing (colour — wide & visible)
 	add(new THREE.BoxGeometry(0.7, 0.42, 0.5), glassMat, 0.35, 0.74, 0); // cockpit bubble
 	// 4 exposed wheels (dark), well outboard.
 	const wheel = new THREE.BoxGeometry(1.0, 0.55, 0.5);
@@ -171,7 +172,7 @@ function buildWall(track: Track): THREE.BufferGeometry {
 	const pos: number[] = [];
 	const n = track.points.length;
 	const wallR = track.width / 2 + CAR.wallMargin;
-	const y = 0.55;
+	const y = 1.3; // above the car → car passes UNDER the rail on contact
 	const bands: P2[] = [[wallR - 0.45, wallR + 0.45], [-(wallR + 0.45), -(wallR - 0.45)]];
 	for (let i = 0; i < n; i++) {
 		const p = track.points[i];
@@ -195,7 +196,7 @@ function buildPosts(track: Track): THREE.BufferGeometry {
 	const pos: number[] = [];
 	const n = track.points.length;
 	const wallR = track.width / 2 + CAR.wallMargin;
-	const y = 0.75, s = 0.9, P = 5; // post half-size, every P samples
+	const y = 1.6, s = 0.9, P = 5; // raised above the car; post half-size, every P samples
 	for (let i = 0; i < n; i += P) {
 		const p = track.points[i];
 		for (const r of [wallR, -wallR]) {
@@ -305,6 +306,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const boardRef = useRef<Map<string, { name: string; bestMs: number }>>(new Map());
 	const markIdxRef = useRef(0);
 	const markPosRef = useRef({ x: 0, z: 0 });
+	const prevCarRef = useRef<CarState | null>(null); // state before last physics step (render interpolation)
+	const camTargetRef = useRef({ x: 0, z: 0 }); // eased camera centre (look-ahead)
 
 	useEffect(() => {
 		setName(playerName());
@@ -450,20 +453,22 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		rafRef.current = 0;
 	}, []);
 
-	const renderFrame = useCallback((dtSec: number) => {
+	const renderFrame = useCallback((dtSec: number, pose: { x: number; z: number; heading: number }) => {
 		const g = g3Ref.current;
-		const car = carRef.current;
-		if (!g || !car) return;
-		// Self car transform.
-		g.car.position.set(car.x, 0, car.z);
-		g.car.rotation.y = -car.heading;
+		if (!g) return;
+		// Self car transform (interpolated pose → no stutter).
+		g.car.position.set(pose.x, 0, pose.z);
+		g.car.rotation.y = -pose.heading;
 
-		// Top-down camera: directly above, north-up, never rotates with the car. Eased pan.
-		const kc = Math.min(1, dtSec * 6);
-		g.camera.position.x += (car.x - g.camera.position.x) * kc;
-		g.camera.position.z += (car.z - g.camera.position.z) * kc;
-		g.camera.position.y = 80;
-		g.camera.lookAt(g.camera.position.x, 0, g.camera.position.z);
+		// Top-down camera, north-up (never rotates). Centre eased toward a point AHEAD of the car so
+		// corners are revealed sooner; the car itself is interpolated, so this stays smooth.
+		const tx = pose.x + Math.cos(pose.heading) * LOOKAHEAD;
+		const tz = pose.z + Math.sin(pose.heading) * LOOKAHEAD;
+		const kc = Math.min(1, dtSec * 4);
+		camTargetRef.current.x += (tx - camTargetRef.current.x) * kc;
+		camTargetRef.current.z += (tz - camTargetRef.current.z) * kc;
+		g.camera.position.set(camTargetRef.current.x, 80, camTargetRef.current.z);
+		g.camera.lookAt(camTargetRef.current.x, 0, camTargetRef.current.z);
 
 		// Ghost interpolation.
 		const k = Math.min(1, dtSec * 10);
@@ -507,6 +512,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			while (runningRef.current && accRef.current >= STEP) {
 				accRef.current -= STEP;
 				clockRef.current += STEP;
+				prevCarRef.current = car; // state before this step (for render interpolation)
 				car = stepCar(car, input, STEP / 1000, track);
 				const idx = nearestIndex(track, car.x, car.z);
 				const prevLap = lapRef.current;
@@ -559,7 +565,14 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				}
 			}
 
-			renderFrame(dt / 1000);
+			// Interpolated render pose between the two latest physics steps → smooth, no tremble.
+			const prev = prevCarRef.current ?? car;
+			const alpha = Math.min(1, accRef.current / STEP);
+			renderFrame(dt / 1000, {
+				x: prev.x + (car.x - prev.x) * alpha,
+				z: prev.z + (car.z - prev.z) * alpha,
+				heading: lerpAngle(prev.heading, car.heading, alpha),
+			});
 			hudAccRef.current += dt;
 			if (hudAccRef.current >= 100) {
 				hudAccRef.current = 0;
@@ -606,6 +619,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				);
 			}
 			carRef.current = createCar(track);
+			prevCarRef.current = carRef.current;
+			camTargetRef.current = { x: carRef.current.x, z: carRef.current.z };
 			lapRef.current = createLap();
 			clockRef.current = 0;
 			prevIdxRef.current = track.checkpoints[0];
@@ -662,6 +677,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const track = trackRef.current;
 		if (!track) return;
 		carRef.current = createCar(track);
+		prevCarRef.current = carRef.current;
+		camTargetRef.current = { x: carRef.current.x, z: carRef.current.z };
 		lapRef.current = createLap();
 		prevIdxRef.current = track.checkpoints[0];
 		markPosRef.current = { x: carRef.current.x, z: carRef.current.z };
