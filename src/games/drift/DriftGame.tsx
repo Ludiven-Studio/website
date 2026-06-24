@@ -13,8 +13,9 @@ import {
 	type LapState,
 } from './engine';
 import { joinRace, multiplayerAvailable, MAX_PLAYERS, type Race, type Peer, type PosMsg, type LapMsg } from './net';
-import { playerName, setPlayerName } from '../../lib/leaderboard';
+import { playerName, setPlayerName, getDaily, dailyWeekdayLabel } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
+import Leaderboard from '../../components/Leaderboard';
 
 /* =====================================================
    DRIFT — top-down 3D arcade racing (three.js + Supabase Realtime).
@@ -192,6 +193,7 @@ function buildStartLine(track: Track): THREE.BufferGeometry {
 
 export default function DriftGame({ gameId }: { gameId: string }) {
 	const [phase, setPhase] = useState<Phase>('menu');
+	const [mode, setMode] = useState<'libre' | 'defi'>('defi');
 	const [name, setName] = useState('');
 	const [status, setStatus] = useState('');
 	const [board, setBoard] = useState<{ id: string; name: string; bestMs: number }[]>([]);
@@ -258,7 +260,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		ground.position.y = -0.05;
 		scene.add(ground);
 
-		const trackMat = new THREE.MeshStandardMaterial({ color: 0x33373f, roughness: 0.95 });
+		const trackMat = new THREE.MeshStandardMaterial({ color: 0x6b6f77, roughness: 0.95 });
 		const trackGeom = new THREE.BufferGeometry();
 		const trackMesh = new THREE.Mesh(trackGeom, trackMat);
 		scene.add(trackMesh);
@@ -491,7 +493,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	/* ---- Start / stop a race ---- */
 	const beginRace = useCallback(
-		(seed: number, race: Race | null) => {
+		(seed: number, race: Race | null, m: 'libre' | 'defi') => {
+			setMode(m);
 			const track = generateTrack(seed);
 			trackRef.current = track;
 			const built = buildTrackGeometry(track);
@@ -566,7 +569,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		setCurMs(0);
 	}, [clearSkid]);
 
-	const play = useCallback(async () => {
+	const play = useCallback(async (m: 'libre' | 'defi') => {
 		const nm = (name || playerName()).trim();
 		if (!nm) {
 			setStatus('Entre un pseudo.');
@@ -576,18 +579,20 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		selfColorRef.current = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
 		if (!initScene()) return;
 		resize();
+		// Défi du jour → shared daily circuit for everyone; Libre → random per room.
+		const fixedSeed = m === 'defi' ? (await getDaily(gameId)).seed : undefined;
 		if (multiplayerAvailable()) {
 			setStatus('Recherche d\'une course…');
-			const race = await joinRace(nm, selfColorRef.current);
+			const race = await joinRace(nm, selfColorRef.current, { prefix: m === 'defi' ? 'drift-d' : 'drift-l', fixedSeed });
 			if (race) {
 				setStatus('');
-				beginRace(race.seed, race);
+				beginRace(race.seed, race, m);
 				return;
 			}
 			setStatus('Multijoueur indisponible — course solo.');
 		}
-		beginRace(randomSeed(), null); // solo fallback
-	}, [name, initScene, resize, beginRace]);
+		beginRace(fixedSeed ?? randomSeed(), null, m); // solo fallback
+	}, [name, initScene, resize, beginRace, gameId]);
 
 	const quit = useCallback(() => {
 		stop();
@@ -668,6 +673,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 							<span className="dr-cur">{fmtMs(curMs)}</span>
 							<span className="dr-best">Meilleur {fmtMs(bestMs)}</span>
 							<span className="dr-peers">👥 {Math.min(peerCount, MAX_PLAYERS)}/{MAX_PLAYERS}</span>
+							{mode === 'defi' && <span className="dr-peers">🏁 Défi</span>}
 						</div>
 						{board.length > 0 && (
 							<ol className="dr-leaderboard">
@@ -694,7 +700,12 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 					<div className="dr-overlay">
 						<div className="dr-card">
 							<h2>Drift</h2>
-							<p className="dr-sub">Cours sur un circuit aléatoire. Les autres pilotes sont des fantômes — bats leur meilleur tour&nbsp;!</p>
+							<p className="dr-sub">Les autres pilotes sont des fantômes — bats leur meilleur tour&nbsp;!</p>
+							<div className="dr-modes" role="tablist" aria-label="Mode">
+								<button role="tab" aria-selected={mode === 'defi'} className={`dr-mode ${mode === 'defi' ? 'active' : ''}`} onClick={() => setMode('defi')}>Défi du jour</button>
+								<button role="tab" aria-selected={mode === 'libre'} className={`dr-mode ${mode === 'libre' ? 'active' : ''}`} onClick={() => setMode('libre')}>Libre</button>
+							</div>
+							<p className="dr-modehint">{mode === 'defi' ? `Même circuit pour tous · ${dailyWeekdayLabel()} · classement du jour` : 'Circuit aléatoire, juste pour le fun'}</p>
 							<input
 								className="dr-name"
 								value={name}
@@ -702,13 +713,17 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 								placeholder="Ton pseudo"
 								onChange={(e) => setName(e.target.value)}
 							/>
-							<button className="dr-play" onClick={play}>▶ Rejoindre une course</button>
+							<button className="dr-play" onClick={() => play(mode)}>▶ Jouer</button>
 							{status && <p className="dr-status">{status}</p>}
 							{!multiplayerAvailable() && <p className="dr-status">Multijoueur non configuré — tu joueras en solo.</p>}
 						</div>
 					</div>
 				)}
 			</div>
+
+			{mode === 'defi' && (
+				<Leaderboard game={gameId} metric="time" submitValue={bestMs ?? undefined} format={fmtMs} />
+			)}
 
 			<p className="dr-help">
 				<strong>Tourne</strong> avec les flèches / Q-D (ou les boutons tactiles) et <strong>freine</strong>
@@ -750,6 +765,10 @@ const CSS = `
 .dr-card { background: var(--gray-999); border: 2px solid var(--dr-accent); border-radius: 18px; padding: 22px 26px; text-align: center; box-shadow: var(--shadow-lg); max-width: 340px; }
 .dr-card h2 { font-family: var(--font-brand); font-weight: 600; font-size: 24px; margin: 0 0 6px; }
 .dr-sub { color: var(--gray-300); font-size: 13px; margin: 0 0 14px; line-height: 1.5; }
+.dr-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; }
+.dr-mode { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.dr-mode.active { background: var(--dr-accent); color: var(--accent-text-over); border-color: transparent; }
+.dr-modehint { color: var(--gray-300); font-size: 11.5px; margin: 0 0 12px; }
 .dr-name { width: 100%; box-sizing: border-box; border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; border-radius: 999px; padding: 9px 16px; margin-bottom: 10px; text-align: center; }
 .dr-play { border: none; background: var(--dr-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 16px; border-radius: 999px; padding: 12px 28px; cursor: pointer; }
 .dr-status { color: var(--gray-300); font-size: 12px; margin: 10px 0 0; }

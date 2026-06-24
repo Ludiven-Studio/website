@@ -90,14 +90,19 @@ function subscribeAndSync(ch: RealtimeChannel, selfId: string): Promise<{ peers:
 	});
 }
 
+export interface JoinOpts {
+	prefix: string; // room channel namespace (separates Libre vs Défi rooms)
+	fixedSeed?: number; // forces the circuit (Défi du jour → same track for everyone)
+}
+
 /** Auto-match into the first room with a free slot; returns null if multiplayer is off or all rooms are full. */
-export async function joinRace(name: string, color: number): Promise<Race | null> {
+export async function joinRace(name: string, color: number, opts: JoinOpts): Promise<Race | null> {
 	const c = getClient();
 	if (!c) return null;
 	const selfId = randomId();
 
 	for (let slot = 0; slot < MAX_ROOMS; slot++) {
-		const roomId = `drift-${slot}`;
+		const roomId = `${opts.prefix}-${slot}`;
 		const ch = c.channel(roomId, { config: { presence: { key: selfId }, broadcast: { self: false } } });
 
 		// Live callbacks (set by the component after join).
@@ -112,7 +117,7 @@ export async function joinRace(name: string, color: number): Promise<Race | null
 			continue; // room full → try the next slot
 		}
 
-		const seed = existingSeed ?? randomSeed();
+		const seed = opts.fixedSeed ?? existingSeed ?? randomSeed();
 		await ch.track({ id: selfId, name, color, seed } satisfies PresMeta);
 
 		return {
