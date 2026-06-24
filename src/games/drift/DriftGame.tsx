@@ -42,12 +42,18 @@ interface Ghost {
 interface Scene3D {
 	renderer: THREE.WebGLRenderer;
 	scene: THREE.Scene;
-	camera: THREE.PerspectiveCamera;
+	camera: THREE.OrthographicCamera;
 	car: THREE.Group;
 	trackMat: THREE.MeshStandardMaterial;
 	trackGeom: THREE.BufferGeometry;
+	deco: THREE.Group; // dashes + curbs + start line, rebuilt per track
+	dashMat: THREE.MeshBasicMaterial;
+	curbMat: THREE.MeshBasicMaterial;
+	startMat: THREE.MeshBasicMaterial;
 	disposables: { dispose: () => void }[];
 }
+
+const HALF_SPAN = 34; // half of the visible world span (top-down zoom)
 
 function makeCar(color: number, ghost = false): THREE.Group {
 	const g = new THREE.Group();
@@ -85,6 +91,72 @@ function buildTrackGeometry(track: Track): THREE.BufferGeometry {
 	geom.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
 	geom.computeVertexNormals();
 	return geom;
+}
+
+type P2 = [number, number];
+const pushQuad = (arr: number[], a: P2, b: P2, c: P2, d: P2, y: number) => {
+	arr.push(a[0], y, a[1], b[0], y, b[1], c[0], y, c[1]);
+	arr.push(a[0], y, a[1], c[0], y, c[1], d[0], y, d[1]);
+};
+const geomFrom = (pos: number[]): THREE.BufferGeometry => {
+	const g = new THREE.BufferGeometry();
+	g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+	return g;
+};
+
+/** Dashed white centre line. */
+function buildDashes(track: Track): THREE.BufferGeometry {
+	const pos: number[] = [];
+	const L = 3, w = 0.45, y = 0.05;
+	for (let i = 0; i < track.points.length; i += 6) {
+		const p = track.points[i];
+		const ax = p.x - p.dirX * (L / 2), az = p.z - p.dirZ * (L / 2);
+		const bx = p.x + p.dirX * (L / 2), bz = p.z + p.dirZ * (L / 2);
+		const ox = p.nx * (w / 2), oz = p.nz * (w / 2);
+		pushQuad(pos, [ax - ox, az - oz], [ax + ox, az + oz], [bx + ox, bz + oz], [bx - ox, bz - oz], y);
+	}
+	return geomFrom(pos);
+}
+
+/** Thin curbs along both track edges. */
+function buildCurbs(track: Track): THREE.BufferGeometry {
+	const pos: number[] = [];
+	const n = track.points.length;
+	const half = track.width / 2, thick = 1.0, y = 0.04;
+	const bands: P2[] = [[half - thick, half], [-half, -(half - thick)]];
+	for (let i = 0; i < n; i++) {
+		const p = track.points[i];
+		const q = track.points[(i + 1) % n];
+		for (const [o1, o2] of bands) {
+			pushQuad(
+				pos,
+				[p.x + p.nx * o1, p.z + p.nz * o1],
+				[p.x + p.nx * o2, p.z + p.nz * o2],
+				[q.x + q.nx * o2, q.z + q.nz * o2],
+				[q.x + q.nx * o1, q.z + q.nz * o1],
+				y,
+			);
+		}
+	}
+	return geomFrom(pos);
+}
+
+/** Start/finish band across the track at checkpoint 0. */
+function buildStartLine(track: Track): THREE.BufferGeometry {
+	const p = track.points[track.checkpoints[0]];
+	const half = track.width / 2, L = 2.5, y = 0.06;
+	const ax = p.x - p.dirX * (L / 2), az = p.z - p.dirZ * (L / 2);
+	const bx = p.x + p.dirX * (L / 2), bz = p.z + p.dirZ * (L / 2);
+	const pos: number[] = [];
+	pushQuad(
+		pos,
+		[ax + p.nx * half, az + p.nz * half],
+		[ax - p.nx * half, az - p.nz * half],
+		[bx - p.nx * half, bz - p.nz * half],
+		[bx + p.nx * half, bz + p.nz * half],
+		y,
+	);
+	return geomFrom(pos);
 }
 
 export default function DriftGame({ gameId }: { gameId: string }) {
@@ -138,7 +210,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const scene = new THREE.Scene();
 		scene.background = new THREE.Color('#0d1117');
 		scene.fog = new THREE.Fog('#0d1117', 120, 260);
-		const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 600);
+		const camera = new THREE.OrthographicCamera(-HALF_SPAN, HALF_SPAN, HALF_SPAN, -HALF_SPAN, 0.1, 400);
+		camera.up.set(0, 0, -1); // north up, fixed (never rotates with the car)
 		scene.add(new THREE.AmbientLight(0x99a0b5, 1.1));
 		const dir = new THREE.DirectionalLight(0xffffff, 1.5);
 		dir.position.set(40, 80, 20);
@@ -157,11 +230,17 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const trackMesh = new THREE.Mesh(trackGeom, trackMat);
 		scene.add(trackMesh);
 
+		const deco = new THREE.Group();
+		scene.add(deco);
+		const dashMat = new THREE.MeshBasicMaterial({ color: 0xeef2f6, side: THREE.DoubleSide });
+		const curbMat = new THREE.MeshBasicMaterial({ color: 0xe34b4b, side: THREE.DoubleSide });
+		const startMat = new THREE.MeshBasicMaterial({ color: 0xf2f4f8, side: THREE.DoubleSide });
+
 		const car = makeCar(selfColorRef.current);
 		scene.add(car);
 
 		g3Ref.current = {
-			renderer, scene, camera, car, trackMat, trackGeom,
+			renderer, scene, camera, car, trackMat, trackGeom, deco, dashMat, curbMat, startMat,
 			disposables: [ground.geometry, ground.material as THREE.Material],
 		};
 		return true;
@@ -173,7 +252,11 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		if (!g || !canvas) return;
 		const css = canvas.clientWidth;
 		g.renderer.setSize(css, css, false);
-		g.camera.aspect = 1;
+		// Square ortho frustum (canvas is 1:1).
+		g.camera.left = -HALF_SPAN;
+		g.camera.right = HALF_SPAN;
+		g.camera.top = HALF_SPAN;
+		g.camera.bottom = -HALF_SPAN;
 		g.camera.updateProjectionMatrix();
 	}, []);
 
@@ -238,12 +321,12 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		g.car.position.set(car.x, 0, car.z);
 		g.car.rotation.y = -car.heading;
 
-		// Chase camera (high, behind heading) → top-down-ish, turns with the car.
-		const BACK = 11, HEIGHT = 22;
-		const cx = car.x - Math.cos(car.heading) * BACK;
-		const cz = car.z - Math.sin(car.heading) * BACK;
-		g.camera.position.set(cx, HEIGHT, cz);
-		g.camera.lookAt(car.x, 0, car.z);
+		// Top-down camera: directly above, north-up, never rotates with the car. Eased pan.
+		const kc = Math.min(1, dtSec * 6);
+		g.camera.position.x += (car.x - g.camera.position.x) * kc;
+		g.camera.position.z += (car.z - g.camera.position.z) * kc;
+		g.camera.position.y = 80;
+		g.camera.lookAt(g.camera.position.x, 0, g.camera.position.z);
 
 		// Ghost interpolation.
 		const k = Math.min(1, dtSec * 10);
@@ -341,6 +424,14 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				if (mesh) mesh.geometry = built;
 				g.trackGeom.dispose(); // old geometry
 				g.trackGeom = built;
+				// Track dressing (rebuilt per circuit).
+				g.deco.children.forEach((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+				g.deco.clear();
+				g.deco.add(
+					new THREE.Mesh(buildDashes(track), g.dashMat),
+					new THREE.Mesh(buildCurbs(track), g.curbMat),
+					new THREE.Mesh(buildStartLine(track), g.startMat),
+				);
 			}
 			carRef.current = createCar(track);
 			lapRef.current = createLap();
@@ -447,6 +538,10 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				for (const id of [...ghostsRef.current.keys()]) removeGhost(id);
 				g.trackGeom.dispose();
 				g.trackMat.dispose();
+				g.deco.children.forEach((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+				g.dashMat.dispose();
+				g.curbMat.dispose();
+				g.startMat.dispose();
 				g.car.traverse((o) => {
 					if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
 				});
