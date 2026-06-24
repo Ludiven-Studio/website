@@ -90,9 +90,18 @@ function makeCar(color: number, ghost = false): THREE.Group {
 	add(new THREE.BoxGeometry(0.32, 0.16, 2.0), darkMat, 2.25, 0.42, 0); // front wing (wide, thin)
 	add(new THREE.BoxGeometry(0.55, 0.5, 1.7), bodyMat, -1.55, 0.66, 0); // rear wing (colour — wide & visible)
 	add(new THREE.BoxGeometry(0.7, 0.42, 0.5), glassMat, 0.35, 0.74, 0); // cockpit bubble
-	// 4 exposed wheels (dark), well outboard.
-	const wheel = new THREE.BoxGeometry(1.0, 0.55, 0.5);
-	for (const wx of [1.25, -1.25]) for (const wz of [0.95, -0.95]) add(wheel, darkMat, wx, 0.42, wz);
+	// 4 exposed wheels (dark), well outboard. Keep the front pair to steer them visually.
+	const wheelGeo = new THREE.BoxGeometry(1.0, 0.55, 0.5);
+	const frontWheels: THREE.Mesh[] = [];
+	for (const wx of [1.25, -1.25]) {
+		for (const wz of [0.95, -0.95]) {
+			const w = new THREE.Mesh(wheelGeo, darkMat);
+			w.position.set(wx, 0.42, wz);
+			g.add(w);
+			if (wx > 0) frontWheels.push(w); // front axle
+		}
+	}
+	g.userData.frontWheels = frontWheels;
 	return g;
 }
 
@@ -308,6 +317,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const markPosRef = useRef({ x: 0, z: 0 });
 	const prevCarRef = useRef<CarState | null>(null); // state before last physics step (render interpolation)
 	const camTargetRef = useRef({ x: 0, z: 0 }); // eased camera centre (look-ahead)
+	const frontWheelRef = useRef(0); // eased front-wheel steer angle (self car)
 
 	useEffect(() => {
 		setName(playerName());
@@ -460,6 +470,11 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		// Self car transform (interpolated pose → no stutter).
 		g.car.position.set(pose.x, 0, pose.z);
 		g.car.rotation.y = -pose.heading;
+		// Steer the front wheels (eased) by the current input.
+		const steer = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
+		frontWheelRef.current += (steer * 0.5 - frontWheelRef.current) * Math.min(1, dtSec * 12);
+		const fw = g.car.userData.frontWheels as THREE.Mesh[] | undefined;
+		if (fw) for (const w of fw) w.rotation.y = frontWheelRef.current;
 
 		// Top-down camera, north-up (never rotates). Centre eased toward a point AHEAD of the car so
 		// corners are revealed sooner; the car itself is interpolated, so this stays smooth.
@@ -474,11 +489,19 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		// Ghost interpolation.
 		const k = Math.min(1, dtSec * 10);
 		for (const ghost of ghostsRef.current.values()) {
+			// Steer ghost front wheels from how much its heading is still turning toward the target.
+			let dh = ((ghost.target.heading - ghost.cur.heading + Math.PI) % (Math.PI * 2)) - Math.PI;
+			if (dh < -Math.PI) dh += Math.PI * 2;
 			ghost.cur.x += (ghost.target.x - ghost.cur.x) * k;
 			ghost.cur.z += (ghost.target.z - ghost.cur.z) * k;
 			ghost.cur.heading = lerpAngle(ghost.cur.heading, ghost.target.heading, k);
 			ghost.mesh.position.set(ghost.cur.x, 0, ghost.cur.z);
 			ghost.mesh.rotation.y = -ghost.cur.heading;
+			const gfw = ghost.mesh.userData.frontWheels as THREE.Mesh[] | undefined;
+			if (gfw) {
+				const a = Math.max(-0.5, Math.min(0.5, dh * 4));
+				for (const w of gfw) w.rotation.y = a;
+			}
 		}
 
 		g.renderer.render(g.scene, g.camera);

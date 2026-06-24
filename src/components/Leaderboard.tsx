@@ -27,12 +27,13 @@ export default function Leaderboard({ game, metric, submitValue, format }: Props
 	const [editing, setEditing] = useState(false);
 	const [rows, setRows] = useState<ScoreRow[]>([]);
 	const [loading, setLoading] = useState(true);
-	const submitted = useRef(false);
+	const lastSubmittedRef = useRef<number | null>(null); // last value sent (re-submit when it improves)
 
 	const load = useCallback(async () => {
 		setLoading(true);
-		if (submitValue != null && name && !submitted.current) {
-			submitted.current = true;
+		// Submit whenever the value changes (e.g. a new best lap); submitDaily only posts if it actually beats the day's best.
+		if (submitValue != null && name && submitValue !== lastSubmittedRef.current) {
+			lastSubmittedRef.current = submitValue;
 			await submitDaily(game, submitValue, metric);
 		}
 		setRows(await fetchLeaderboard(game, metric));
@@ -47,7 +48,7 @@ export default function Leaderboard({ game, metric, submitValue, format }: Props
 		const n = draft.trim().slice(0, 20);
 		if (!n) return;
 		setPlayerName(n);
-		submitted.current = false; // allow submitting the pending run under the new name
+		lastSubmittedRef.current = null; // allow submitting the pending run under the new name
 		setName(n);
 		setEditing(false);
 	};
