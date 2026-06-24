@@ -1,0 +1,14 @@
+{
+	"name": "Ludiven Studio",
+	"short_name": "Ludiven",
+	"description": "Mini-jeux de logique et d'adresse — Ludiven Studio",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#ffffff",
+	"theme_color": "#7611a6",
+	"icons": [
+		{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+		{ "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+	]
+}
