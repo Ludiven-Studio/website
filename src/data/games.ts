@@ -134,6 +134,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'drift',
+		title: 'Drift',
+		pitch: 'Course 3D multi sur circuit aléatoire : meilleur tour, drift auto, jusqu\'à 4 joueurs.',
+		icon: 'car',
+		href: '/jeux/drift',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'esquive',
 		title: 'Esquive',
 		pitch: 'Pilote un vaisseau et esquive les astéroïdes le plus longtemps possible. En 3D.',

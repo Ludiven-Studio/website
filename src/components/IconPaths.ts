@@ -58,4 +58,5 @@ export const iconPaths = {
 	snake: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M56 64h72a32 32 0 0 1 0 64H96a32 32 0 0 0 0 64h104"/><circle stroke="none" cx="200" cy="192" r="14"/>',
 	bird: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M40 168c44 0 72-26 88-60 16 34 44 60 88 60M128 108V60m-22 18 22-18 22 18"/><circle stroke="none" cx="100" cy="128" r="10"/>',
 	codecolor: '<circle stroke="none" cx="92" cy="92" r="30"/><circle stroke="none" cx="164" cy="92" r="30"/><circle stroke="none" cx="92" cy="164" r="30"/><circle stroke="none" cx="164" cy="164" r="30"/>',
+	car: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M48 144h160l-22-46a16 16 0 0 0-14-9H84a16 16 0 0 0-14 9Z"/><path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M40 144h176v40a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-8H72v8a8 8 0 0 1-8 8H48a8 8 0 0 1-8-8Z"/><circle stroke="none" cx="80" cy="168" r="12"/><circle stroke="none" cx="176" cy="168" r="12"/>',
 };

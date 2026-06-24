@@ -88,6 +88,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎮', title: 'Contrôles', body: 'Dirige le serpent aux flèches (ou ZQSD/WASD), ou en glissant le doigt. Tu accélères en grandissant. Choisis ta difficulté : plus dur = plus rapide et davantage de rochers.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, pommes et rochers sont les mêmes pour tout le monde (le niveau dépend du jour). Jusqu\'à 10 essais : ton meilleur score de la journée est classé.' },
 	],
+	drift: [
+		{ emoji: '🏁', title: 'Le but', body: 'Cours sur un circuit fermé aléatoire et réalise le tour le plus rapide possible. Ton meilleur tour est ton score.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'La voiture accélère et drifte toute seule. Tu tournes avec les flèches / Q-D (ou les boutons tactiles) et tu freines (Espace / bas) pour bien négocier les virages. Hors-piste, ça ralentit.' },
+		{ emoji: '👥', title: 'Multijoueur', body: 'Jusqu\'à 4 pilotes par course, mis en relation automatiquement. Les autres apparaissent en fantômes (sans collision) avec leur pseudo, et leurs meilleurs tours s\'affichent en direct.' },
+	],
 	esquive: [
 		{ emoji: '🚀', title: 'Le but', body: 'Pilote ton vaisseau qui fonce dans l\'espace et évite les astéroïdes le plus longtemps possible. Ton temps de survie est ton score.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace-toi avec les flèches ou ZQSD, ou en glissant le doigt/la souris : tu bouges en haut/bas ET gauche/droite pour esquiver. Plus ça dure, plus ça accélère.' },
