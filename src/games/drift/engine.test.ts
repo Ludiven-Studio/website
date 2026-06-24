@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
 	CAR,
+	CAR_KINDS,
+	carParams,
 	DRIFT_DIFFS,
 	generateTrack,
 	createCar,
@@ -63,6 +65,17 @@ describe('drift engine', () => {
 			expect(track.checkpoints[i]).toBeGreaterThan(track.checkpoints[i - 1]);
 			expect(track.checkpoints[i]).toBeLessThan(track.points.length);
 		}
+	});
+
+	it('car kinds merge over CAR and differ meaningfully', () => {
+		const find = (id: string) => CAR_KINDS.find((k) => k.id === id)!;
+		const vit = carParams(find('vitesse'));
+		const dft = carParams(find('drift'));
+		const eq = carParams(find('equilibre'));
+		expect(eq).toEqual(CAR); // empty override → identical to base
+		expect(vit.maxSpeed).toBeGreaterThan(dft.maxSpeed); // bolide faster
+		expect(dft.gripDrift).toBeGreaterThan(vit.gripDrift); // drifteuse slides more
+		expect(vit.turnRate).toBeLessThan(CAR.turnRate); // bolide turns less sharply
 	});
 
 	it('car accelerates from rest', () => {

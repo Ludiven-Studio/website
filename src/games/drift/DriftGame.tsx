@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import * as THREE from 'three';
 import {
 	CAR,
+	CAR_KINDS,
+	carParams,
 	DRIFT_DIFFS,
 	generateTrack,
 	createCar,
@@ -12,6 +14,7 @@ import {
 	type Track,
 	type CarState,
 	type LapState,
+	type CarParams,
 } from './engine';
 import { mulberry32 } from '../prng';
 import { joinRace, multiplayerAvailable, MAX_PLAYERS, type Race, type Peer, type PosMsg, type LapMsg } from './net';
@@ -28,6 +31,7 @@ import Leaderboard from '../../components/Leaderboard';
 
 type Phase = 'menu' | 'racing';
 type DiffKey = keyof typeof DRIFT_DIFFS;
+type KindId = 'equilibre' | 'vitesse' | 'drift';
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const STEP = 1000 / 60;
 const SEND_HZ = 12;
@@ -47,6 +51,7 @@ interface Ghost {
 	mesh: THREE.Group;
 	cur: { x: number; z: number; heading: number };
 	target: { x: number; z: number; heading: number };
+	kind: string;
 }
 interface Scene3D {
 	renderer: THREE.WebGLRenderer;
@@ -71,7 +76,15 @@ interface Scene3D {
 
 const HALF_SPAN = 38; // half of the visible world span (top-down zoom)
 
-function makeCar(color: number, ghost = false): THREE.Group {
+interface CarDims { bodyLen: number; bodyW: number; nose: number; frontWingZ: number; rearWingX: number; rearWingZ: number; wheelL: number; wheelW: number; wx: number; wz: number; }
+const CAR_DIMS: Record<string, CarDims> = {
+	// front = +x
+	equilibre: { bodyLen: 3.0, bodyW: 0.62, nose: 1.3, frontWingZ: 2.0, rearWingX: -1.55, rearWingZ: 1.7, wheelL: 1.0, wheelW: 0.5, wx: 1.25, wz: 0.95 },
+	vitesse: { bodyLen: 3.8, bodyW: 0.52, nose: 1.6, frontWingZ: 1.7, rearWingX: -1.9, rearWingZ: 2.1, wheelL: 0.85, wheelW: 0.42, wx: 1.55, wz: 0.86 },
+	drift: { bodyLen: 2.5, bodyW: 0.82, nose: 0.9, frontWingZ: 1.9, rearWingX: -1.25, rearWingZ: 1.5, wheelL: 1.15, wheelW: 0.66, wx: 1.0, wz: 1.02 },
+};
+
+function makeCar(color: number, ghost = false, kindId = 'equilibre'): THREE.Group {
 	const g = new THREE.Group();
 	const op = ghost ? 0.5 : 1;
 	const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
@@ -79,22 +92,22 @@ function makeCar(color: number, ghost = false): THREE.Group {
 		m.position.set(x, y, z);
 		g.add(m);
 	};
-	// Body (the player's colour) — FIRST child, so its colour can be refreshed for ghosts.
+	// Body material (the player's colour) — used by the FIRST child, so it can be refreshed for ghosts.
 	const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.4, roughness: 0.4, transparent: ghost, opacity: op });
 	const darkMat = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.6, transparent: ghost, opacity: op });
 	const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, metalness: 0.4, roughness: 0.15, transparent: true, opacity: ghost ? 0.4 : 0.85 });
 
-	// F1 single-seater, seen from above (front = +x).
-	add(new THREE.BoxGeometry(3.0, 0.4, 0.62), bodyMat, -0.1, 0.5, 0); // slim central body (colour) — child[0]
-	add(new THREE.BoxGeometry(1.3, 0.28, 0.34), bodyMat, 1.85, 0.46, 0); // pointed nose
-	add(new THREE.BoxGeometry(0.32, 0.16, 2.0), darkMat, 2.25, 0.42, 0); // front wing (wide, thin)
-	add(new THREE.BoxGeometry(0.55, 0.5, 1.7), bodyMat, -1.55, 0.66, 0); // rear wing (colour — wide & visible)
-	add(new THREE.BoxGeometry(0.7, 0.42, 0.5), glassMat, 0.35, 0.74, 0); // cockpit bubble
-	// 4 exposed wheels (dark), well outboard. Keep the front pair to steer them visually.
-	const wheelGeo = new THREE.BoxGeometry(1.0, 0.55, 0.5);
+	const d = CAR_DIMS[kindId] ?? CAR_DIMS.equilibre;
+	add(new THREE.BoxGeometry(d.bodyLen, 0.4, d.bodyW), bodyMat, -0.1, 0.5, 0); // central body (colour) — child[0]
+	add(new THREE.BoxGeometry(d.nose, 0.28, d.bodyW * 0.55), bodyMat, d.bodyLen / 2 + d.nose / 2 - 0.15, 0.46, 0); // nose
+	add(new THREE.BoxGeometry(0.32, 0.16, d.frontWingZ), darkMat, d.bodyLen / 2 + d.nose - 0.2, 0.42, 0); // front wing
+	add(new THREE.BoxGeometry(0.55, 0.5, d.rearWingZ), bodyMat, d.rearWingX, 0.66, 0); // rear wing (colour)
+	add(new THREE.BoxGeometry(0.7, 0.42, d.bodyW * 0.8), glassMat, 0.35, 0.74, 0); // cockpit
+	// 4 exposed wheels (dark); keep the front pair to steer them visually.
+	const wheelGeo = new THREE.BoxGeometry(d.wheelL, 0.55, d.wheelW);
 	const frontWheels: THREE.Mesh[] = [];
-	for (const wx of [1.25, -1.25]) {
-		for (const wz of [0.95, -0.95]) {
+	for (const wx of [d.wx, -d.wx]) {
+		for (const wz of [d.wz, -d.wz]) {
 			const w = new THREE.Mesh(wheelGeo, darkMat);
 			w.position.set(wx, 0.42, wz);
 			g.add(w);
@@ -278,10 +291,51 @@ function buildStartLine(track: Track): THREE.BufferGeometry {
 	return geomFrom(pos);
 }
 
+/** Tiny top-down car silhouette for the selection cards (distinct shape per kind). */
+function CarSvg({ kind }: { kind: KindId }) {
+	const tint = { equilibre: '#cdd2da', vitesse: '#7fd0ff', drift: '#ffd166' }[kind];
+	const W = '#222', K = '#111';
+	const svg = (children: ReactNode) => (
+		<svg viewBox="0 0 48 60" width="42" height="52" aria-hidden="true">{children}</svg>
+	);
+	if (kind === 'vitesse') {
+		return svg(
+			<>
+				<rect x="14" y="4" width="20" height="6" rx="2" fill={W} />
+				<rect x="20" y="8" width="8" height="40" rx="4" fill={tint} />
+				<rect x="12" y="47" width="24" height="7" rx="2" fill={W} />
+				<rect x="9" y="14" width="6" height="9" rx="2" fill={K} /><rect x="33" y="14" width="6" height="9" rx="2" fill={K} />
+				<rect x="9" y="38" width="6" height="9" rx="2" fill={K} /><rect x="33" y="38" width="6" height="9" rx="2" fill={K} />
+			</>,
+		);
+	}
+	if (kind === 'drift') {
+		return svg(
+			<>
+				<rect x="16" y="6" width="16" height="5" rx="2" fill={W} />
+				<rect x="15" y="12" width="18" height="34" rx="5" fill={tint} />
+				<rect x="17" y="46" width="14" height="5" rx="2" fill={W} />
+				<rect x="5" y="14" width="10" height="13" rx="2" fill={K} /><rect x="33" y="14" width="10" height="13" rx="2" fill={K} />
+				<rect x="5" y="33" width="10" height="13" rx="2" fill={K} /><rect x="33" y="33" width="10" height="13" rx="2" fill={K} />
+			</>,
+		);
+	}
+	return svg(
+		<>
+			<rect x="15" y="5" width="18" height="6" rx="2" fill={W} />
+			<rect x="18" y="9" width="12" height="38" rx="4" fill={tint} />
+			<rect x="15" y="46" width="18" height="6" rx="2" fill={W} />
+			<rect x="8" y="14" width="7" height="11" rx="2" fill={K} /><rect x="33" y="14" width="7" height="11" rx="2" fill={K} />
+			<rect x="8" y="36" width="7" height="11" rx="2" fill={K} /><rect x="33" y="36" width="7" height="11" rx="2" fill={K} />
+		</>,
+	);
+}
+
 export default function DriftGame({ gameId }: { gameId: string }) {
 	const [phase, setPhase] = useState<Phase>('menu');
 	const [mode, setMode] = useState<'libre' | 'defi'>('defi');
 	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
+	const [kindId, setKindId] = useState<KindId>('equilibre');
 	const [wrongWay, setWrongWay] = useState(false);
 	const [name, setName] = useState('');
 	const [status, setStatus] = useState('');
@@ -310,7 +364,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const selfColorRef = useRef(CAR_COLORS[0]);
 	const ghostsRef = useRef<Map<string, Ghost>>(new Map());
 	const labelElsRef = useRef<Map<string, HTMLDivElement>>(new Map());
-	const peerInfoRef = useRef<Map<string, { name: string; color: number }>>(new Map());
+	const peerInfoRef = useRef<Map<string, { name: string; color: number; kind: string }>>(new Map());
 	const bestRef = useRef<number | null>(null);
 	const boardRef = useRef<Map<string, { name: string; bestMs: number }>>(new Map());
 	const markIdxRef = useRef(0);
@@ -318,6 +372,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const prevCarRef = useRef<CarState | null>(null); // state before last physics step (render interpolation)
 	const camTargetRef = useRef({ x: 0, z: 0 }); // eased camera centre (look-ahead)
 	const frontWheelRef = useRef(0); // eased front-wheel steer angle (self car)
+	const carParamsRef = useRef<CarParams>(CAR); // physics params of the chosen car kind
 
 	useEffect(() => {
 		setName(playerName());
@@ -347,7 +402,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 		const ground = new THREE.Mesh(
 			new THREE.PlaneGeometry(1200, 1200),
-			new THREE.MeshStandardMaterial({ color: 0x1f5d3a, roughness: 1 }),
+			new THREE.MeshStandardMaterial({ color: 0x3f9a5a, roughness: 1 }),
 		);
 		ground.rotation.x = -Math.PI / 2;
 		ground.position.y = -0.05;
@@ -427,9 +482,10 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		let ghost = ghostsRef.current.get(id);
 		if (!ghost) {
 			const info = peerInfoRef.current.get(id);
-			const mesh = makeCar(info?.color ?? 0xcccccc, true);
+			const kind = info?.kind ?? 'equilibre';
+			const mesh = makeCar(info?.color ?? 0xcccccc, true, kind);
 			g.scene.add(mesh);
-			ghost = { mesh, cur: { x: 0, z: 0, heading: 0 }, target: { x: 0, z: 0, heading: 0 } };
+			ghost = { mesh, cur: { x: 0, z: 0, heading: 0 }, target: { x: 0, z: 0, heading: 0 }, kind };
 			ghostsRef.current.set(id, ghost);
 			// Label
 			if (labelsRef.current) {
@@ -541,7 +597,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				accRef.current -= STEP;
 				clockRef.current += STEP;
 				prevCarRef.current = car; // state before this step (for render interpolation)
-				car = stepCar(car, input, STEP / 1000, track);
+				car = stepCar(car, input, STEP / 1000, track, carParamsRef.current);
 				const idx = nearestIndex(track, car.x, car.z);
 				const prevLap = lapRef.current;
 				lapRef.current = stepLap(prevLap, prevIdxRef.current, idx, track, clockRef.current);
@@ -617,15 +673,23 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	/* ---- Start / stop a race ---- */
 	const beginRace = useCallback(
-		(seed: number, race: Race | null, m: 'libre' | 'defi', dk: DiffKey) => {
+		(seed: number, race: Race | null, m: 'libre' | 'defi', dk: DiffKey, kind: KindId) => {
 			setMode(m);
 			setDiffKey(dk);
+			setKindId(kind);
 			setWrongWay(false);
+			carParamsRef.current = carParams(CAR_KINDS.find((c) => c.id === kind) ?? CAR_KINDS[0]);
 			const track = generateTrack(seed, DRIFT_DIFFS[dk]);
 			trackRef.current = track;
 			const built = buildTrackGeometry(track);
 			const g = g3Ref.current;
 			if (g) {
+				// Rebuild the player's car for the chosen kind + colour.
+				g.scene.remove(g.car);
+				g.car.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
+				g.car = makeCar(selfColorRef.current, false, kind);
+				g.scene.add(g.car);
+
 				const mesh = g.scene.children.find(
 					(o): o is THREE.Mesh => o instanceof THREE.Mesh && (o as THREE.Mesh).material === g.trackMat,
 				);
@@ -664,14 +728,14 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			if (race) {
 				race.onPeers((peers: Peer[]) => {
 					peerInfoRef.current.clear();
-					for (const p of peers) peerInfoRef.current.set(p.id, { name: p.name, color: p.color });
+					for (const p of peers) peerInfoRef.current.set(p.id, { name: p.name, color: p.color, kind: p.kind });
 					setPeerCount(peers.length + 1);
-					// Refresh existing ghosts: drop those who left, and fix name/colour for those whose
-					// position arrived before their presence (otherwise their label stays "???").
-					for (const [id, ghost] of ghostsRef.current.entries()) {
+					// Refresh existing ghosts: drop those who left; rebuild if their chassis differs (kind known
+					// only after presence); else fix name/colour (position may arrive before presence → "???").
+					for (const [id, ghost] of [...ghostsRef.current.entries()]) {
 						const info = peerInfoRef.current.get(id);
-						if (!info) {
-							removeGhost(id);
+						if (!info || info.kind !== ghost.kind) {
+							removeGhost(id); // recreated with the right chassis on the next position message
 							continue;
 						}
 						const el = labelElsRef.current.get(id);
@@ -736,16 +800,16 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const prefix = (m === 'defi' ? 'drift-d-' : 'drift-l-') + dk; // rooms separated by level
 		if (multiplayerAvailable()) {
 			setStatus('Recherche d\'une course…');
-			const race = await joinRace(nm, selfColorRef.current, { prefix, fixedSeed });
+			const race = await joinRace(nm, selfColorRef.current, { prefix, fixedSeed, kind: kindId });
 			if (race) {
 				setStatus('');
-				beginRace(race.seed, race, m, dk);
+				beginRace(race.seed, race, m, dk, kindId);
 				return;
 			}
 			setStatus('Multijoueur indisponible — course solo.');
 		}
-		beginRace(fixedSeed ?? randomSeed(), null, m, dk); // solo fallback
-	}, [name, initScene, resize, beginRace, gameId, diffKey]);
+		beginRace(fixedSeed ?? randomSeed(), null, m, dk, kindId); // solo fallback
+	}, [name, initScene, resize, beginRace, gameId, diffKey, kindId]);
 
 	const quit = useCallback(() => {
 		stop();
@@ -869,6 +933,22 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 								</div>
 							)}
 							<p className="dr-modehint">{mode === 'defi' ? `Même circuit pour tous · ${dailyWeekdayLabel()} · niveau du jour · classement` : `Circuit aléatoire · ${DRIFT_DIFFS[diffKey].label} · plus dur = plus de virages`}</p>
+							<div className="dr-cars" role="tablist" aria-label="Voiture">
+								{CAR_KINDS.map((c) => (
+									<button key={c.id} role="tab" aria-selected={kindId === c.id} className={`dr-carcard ${kindId === c.id ? 'active' : ''}`} onClick={() => setKindId(c.id)}>
+										<CarSvg kind={c.id} />
+										<span className="dr-carname">{c.label}</span>
+										<div className="dr-gauges">
+											{([['Vit', c.stats.speed], ['Acc', c.stats.accel], ['Drift', c.stats.drift]] as const).map(([lab, val]) => (
+												<div key={lab} className="dr-gauge">
+													<span className="dr-glabel">{lab}</span>
+													<span className="dr-bars">{[1, 2, 3, 4, 5].map((i) => <i key={i} className={i <= val ? 'on' : ''} />)}</span>
+												</div>
+											))}
+										</div>
+									</button>
+								))}
+							</div>
 							<input
 								className="dr-name"
 								value={name}
@@ -939,7 +1019,18 @@ const CSS = `
 .dr-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; }
 .dr-mode { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .dr-mode.active { background: var(--dr-accent); color: var(--accent-text-over); border-color: transparent; }
-.dr-modehint { color: var(--gray-300); font-size: 11.5px; margin: 0 0 12px; }
+.dr-modehint { color: var(--gray-300); font-size: 11.5px; margin: 0 0 10px; }
+.dr-cars { display: flex; gap: 8px; justify-content: center; margin-bottom: 12px; }
+.dr-carcard { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 1.5px solid var(--gray-700); background: transparent; border-radius: 12px; padding: 8px 6px; cursor: pointer; color: var(--gray-0); }
+.dr-carcard.active { border-color: var(--dr-accent); background: var(--accent-overlay, rgba(118,17,166,0.12)); }
+.dr-carname { font-weight: 700; font-size: 12px; }
+.dr-gauges { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.dr-gauge { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--gray-300); }
+.dr-glabel { width: 26px; text-align: left; }
+.dr-bars { display: flex; gap: 1.5px; flex: 1; }
+.dr-bars i { flex: 1; height: 5px; border-radius: 1px; background: var(--gray-700); }
+.dr-bars i.on { background: var(--dr-accent); }
+.dr-card { max-width: 380px; }
 .dr-name { width: 100%; box-sizing: border-box; border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; border-radius: 999px; padding: 9px 16px; margin-bottom: 10px; text-align: center; }
 .dr-play { border: none; background: var(--dr-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 16px; border-radius: 999px; padding: 12px 28px; cursor: pointer; }
 .dr-status { color: var(--gray-300); font-size: 12px; margin: 10px 0 0; }

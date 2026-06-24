@@ -16,6 +16,7 @@ export interface Peer {
 	id: string;
 	name: string;
 	color: number;
+	kind: string;
 }
 export interface PosMsg {
 	id: string;
@@ -58,6 +59,7 @@ interface PresMeta {
 	name: string;
 	color: number;
 	seed: number;
+	kind: string;
 }
 
 const flattenPeers = (ch: RealtimeChannel, selfId: string): { peers: Peer[]; seed: number | null } => {
@@ -67,7 +69,7 @@ const flattenPeers = (ch: RealtimeChannel, selfId: string): { peers: Peer[]; see
 	for (const key of Object.keys(state)) {
 		for (const meta of state[key]) {
 			if (seed == null) seed = meta.seed;
-			if (meta.id !== selfId) peers.push({ id: meta.id, name: meta.name, color: meta.color });
+			if (meta.id !== selfId) peers.push({ id: meta.id, name: meta.name, color: meta.color, kind: meta.kind });
 		}
 	}
 	return { peers, seed };
@@ -93,6 +95,7 @@ function subscribeAndSync(ch: RealtimeChannel, selfId: string): Promise<{ peers:
 export interface JoinOpts {
 	prefix: string; // room channel namespace (separates Libre vs Défi rooms)
 	fixedSeed?: number; // forces the circuit (Défi du jour → same track for everyone)
+	kind: string; // car archetype chosen by this player (shown on their ghost)
 }
 
 /** Auto-match into the first room with a free slot; returns null if multiplayer is off or all rooms are full. */
@@ -118,7 +121,7 @@ export async function joinRace(name: string, color: number, opts: JoinOpts): Pro
 		}
 
 		const seed = opts.fixedSeed ?? existingSeed ?? randomSeed();
-		await ch.track({ id: selfId, name, color, seed } satisfies PresMeta);
+		await ch.track({ id: selfId, name, color, seed, kind: opts.kind } satisfies PresMeta);
 
 		return {
 			roomId,

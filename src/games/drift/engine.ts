@@ -69,6 +69,22 @@ export const CAR: CarParams = {
 	wallMargin: 4,
 };
 
+/** Selectable car archetypes (Mario-Kart-like): each overrides a few CAR params + has display stats. */
+export interface CarKind {
+	id: 'equilibre' | 'vitesse' | 'drift';
+	label: string;
+	params: Partial<CarParams>;
+	stats: { speed: number; accel: number; drift: number }; // 1..5, for the selection gauges
+}
+
+export const CAR_KINDS: CarKind[] = [
+	{ id: 'equilibre', label: 'Équilibrée', params: {}, stats: { speed: 3, accel: 3, drift: 3 } },
+	{ id: 'vitesse', label: 'Bolide', params: { maxSpeed: 55, accel: 31, gripDrift: 0.965, turnRate: 2.7 }, stats: { speed: 5, accel: 4, drift: 2 } },
+	{ id: 'drift', label: 'Drifteuse', params: { maxSpeed: 40, accel: 24, gripDrift: 0.99, turnRate: 3.4, driftFall: 1.2 }, stats: { speed: 2, accel: 3, drift: 5 } },
+];
+
+export const carParams = (k: CarKind): CarParams => ({ ...CAR, ...k.params });
+
 export interface CarState {
 	x: number;
 	z: number;
