@@ -16,6 +16,13 @@ const track = generateTrack(123);
 
 const lateralMag = (c: CarState): number => Math.abs(c.vx * -Math.sin(c.heading) + c.vz * Math.cos(c.heading));
 
+/** A car at the start line moving forward at ~30 u/s. */
+const makeFast = (t: Track): CarState => {
+	const p = t.points[t.checkpoints[0]];
+	const h = Math.atan2(p.dirZ, p.dirX);
+	return { x: p.x, z: p.z, heading: h, vx: Math.cos(h) * 30, vz: Math.sin(h) * 30, speed: 30, drifting: false, steerHoldMs: 0 };
+};
+
 /** Arm at the line, pass every checkpoint in order (incremental steps), then re-cross the line. */
 const driveLap = (lap: LapState, t: Track, startMs: number, endMs: number): LapState => {
 	let l = stepLap(lap, t.points.length - 1, 1, t, startMs); // cross start line
@@ -59,13 +66,21 @@ describe('drift engine', () => {
 		expect(c.speed).toBeLessThanOrEqual(CAR.maxSpeed + 1e-6);
 	});
 
-	it('steering induces lateral drift that then decays (grip)', () => {
-		let c: CarState = { x: 0, z: 0, heading: 0, vx: 20, vz: 0, speed: 20 };
-		c = stepCar(c, { steer: 1, brake: 0 }, 0.1, track);
-		const lat1 = lateralMag(c);
-		expect(lat1).toBeGreaterThan(0.3); // it slides sideways through the turn
-		for (let i = 0; i < 90; i++) c = stepCar(c, { steer: 0, brake: 0 }, 1 / 60, track);
-		expect(lateralMag(c)).toBeLessThan(lat1); // grip pulls it back in line
+	it('a brief turn does not drift (grip holds)', () => {
+		let c = makeFast(track);
+		c = stepCar(c, { steer: 1, brake: 0 }, 1 / 60, track); // a quick tap
+		expect(c.drifting).toBe(false);
+	});
+
+	it('holding a hard turn at speed engages a drift with real lateral slide', () => {
+		let brief = makeFast(track);
+		brief = stepCar(brief, { steer: 1, brake: 0 }, 1 / 60, track);
+		const briefLat = lateralMag(brief);
+
+		let c = makeFast(track);
+		for (let i = 0; i < 24; i++) c = stepCar(c, { steer: 1, brake: 0 }, 1 / 60, track); // ~0.4s held
+		expect(c.drifting).toBe(true);
+		expect(lateralMag(c)).toBeGreaterThan(briefLat); // it slides sideways once drifting
 	});
 
 	it('cannot cross the barrier (stays within wallR of the centerline)', () => {

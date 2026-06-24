@@ -34,7 +34,10 @@ export interface CarParams {
 	maxSpeed: number;
 	brakeDecel: number;
 	turnRate: number; // rad/s at full steer
-	gripLat: number; // 0..1 per-step lateral velocity retention (higher = slides longer = more drift)
+	gripDrift: number; // lateral retention while drifting (≈1 → long slide)
+	gripGrip: number; // lateral retention when gripping (low → snaps back, no slide)
+	driftMinSpeed: number; // min forward speed to break into a drift
+	driftHoldMs: number; // how long a hard turn must be held before the drift kicks in
 	offTrackMul: number; // speed/grip multiplier off-track
 	wallMargin: number; // grass band width beyond the asphalt before a hard wall
 }
@@ -44,7 +47,10 @@ export const CAR: CarParams = {
 	maxSpeed: 46,
 	brakeDecel: 60,
 	turnRate: 3.0,
-	gripLat: 0.95,
+	gripDrift: 0.97,
+	gripGrip: 0.5,
+	driftMinSpeed: 14,
+	driftHoldMs: 200,
 	offTrackMul: 0.45,
 	wallMargin: 4,
 };
@@ -56,6 +62,8 @@ export interface CarState {
 	vx: number; // world velocity
 	vz: number;
 	speed: number; // signed forward speed (for HUD)
+	drifting: boolean; // true while breaking traction (held hard turn at speed) → trails
+	steerHoldMs: number; // how long a hard turn has been held
 }
 
 export interface CarInput {
@@ -158,7 +166,7 @@ export function onTrack(track: Track, x: number, z: number): boolean {
 
 export function createCar(track: Track): CarState {
 	const p = track.points[track.checkpoints[0]];
-	return { x: p.x, z: p.z, heading: Math.atan2(p.dirZ, p.dirX), vx: 0, vz: 0, speed: 0 };
+	return { x: p.x, z: p.z, heading: Math.atan2(p.dirZ, p.dirX), vx: 0, vz: 0, speed: 0, drifting: false, steerHoldMs: 0 };
 }
 
 /** Advance the car by dt seconds. Auto-throttle; `steer` turns; lateral velocity slips then decays (drift). */
@@ -184,8 +192,14 @@ export function stepCar(car: CarState, input: CarInput, dt: number, track: Track
 	if (fwd > vmax) fwd = vmax;
 	if (fwd < 0) fwd = 0;
 
-	// Lateral grip: keep a fraction of the slip each step → the car drifts, then regrips.
-	const grip = Math.pow(onIt ? P.gripLat : P.gripLat * 0.85, dt * 60);
+	// Drift engages only when a hard turn is HELD at speed — a light/brief turn keeps grip.
+	const hard = Math.abs(input.steer) > 0.6;
+	const steerHoldMs = hard ? car.steerHoldMs + dt * 1000 : 0;
+	const drifting = fwd > P.driftMinSpeed && steerHoldMs > P.driftHoldMs;
+
+	// Lateral grip: drifting → slip persists (slide); gripping → snaps back. Grass is always slippery.
+	const retain = !onIt ? 0.95 : drifting ? P.gripDrift : P.gripGrip;
+	const grip = Math.pow(retain, dt * 60);
 	const lvx = latX * grip;
 	const lvz = latZ * grip;
 
@@ -213,7 +227,7 @@ export function stepCar(car: CarState, input: CarInput, dt: number, track: Track
 		}
 	}
 
-	return { x: nx2, z: nz2, heading, vx, vz, speed: fwd };
+	return { x: nx2, z: nz2, heading, vx, vz, speed: fwd, drifting, steerHoldMs };
 }
 
 /* ----------------------------- Lap timing ----------------------------- */

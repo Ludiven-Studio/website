@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import {
+	CAR,
 	generateTrack,
 	createCar,
 	stepCar,
@@ -27,7 +28,6 @@ const STEP = 1000 / 60;
 const SEND_HZ = 12;
 const CAR_COLORS = [0x7c5cff, 0xff5c8a, 0x33d6a6, 0xffb020];
 const SKID_MARKS = 240; // recycled skid-mark pool (finite trail)
-const SKID_SLIP = 4.5; // lateral speed above which tyres leave marks
 const SKID_FLOATS = SKID_MARKS * 18; // 2 triangles × 3 verts × 3 coords
 const fmtMs = (ms: number | null) => (ms == null ? '—' : `${(ms / 1000).toFixed(2)} s`);
 const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
@@ -53,6 +53,7 @@ interface Scene3D {
 	dashMat: THREE.MeshBasicMaterial;
 	curbMat: THREE.MeshBasicMaterial;
 	startMat: THREE.MeshBasicMaterial;
+	wallMat: THREE.MeshBasicMaterial;
 	skidGeom: THREE.BufferGeometry;
 	skidMat: THREE.MeshBasicMaterial;
 	skidPos: Float32Array;
@@ -130,6 +131,30 @@ function buildCurbs(track: Track): THREE.BufferGeometry {
 	const n = track.points.length;
 	const half = track.width / 2, thick = 1.0, y = 0.04;
 	const bands: P2[] = [[half - thick, half], [-half, -(half - thick)]];
+	for (let i = 0; i < n; i++) {
+		const p = track.points[i];
+		const q = track.points[(i + 1) % n];
+		for (const [o1, o2] of bands) {
+			pushQuad(
+				pos,
+				[p.x + p.nx * o1, p.z + p.nz * o1],
+				[p.x + p.nx * o2, p.z + p.nz * o2],
+				[q.x + q.nx * o2, q.z + q.nz * o2],
+				[q.x + q.nx * o1, q.z + q.nz * o1],
+				y,
+			);
+		}
+	}
+	return geomFrom(pos);
+}
+
+/** Raised barrier bands at the outer wall radius (both sides), so the limits are visible from above. */
+function buildWalls(track: Track): THREE.BufferGeometry {
+	const pos: number[] = [];
+	const n = track.points.length;
+	const wallR = track.width / 2 + CAR.wallMargin;
+	const y = 0.6; // raised → reads as a wall ring from the top-down view
+	const bands: P2[] = [[wallR - 0.7, wallR + 0.7], [-(wallR + 0.7), -(wallR - 0.7)]];
 	for (let i = 0; i < n; i++) {
 		const p = track.points[i];
 		const q = track.points[(i + 1) % n];
@@ -243,6 +268,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const dashMat = new THREE.MeshBasicMaterial({ color: 0xeef2f6, side: THREE.DoubleSide });
 		const curbMat = new THREE.MeshBasicMaterial({ color: 0xe34b4b, side: THREE.DoubleSide });
 		const startMat = new THREE.MeshBasicMaterial({ color: 0xf2f4f8, side: THREE.DoubleSide });
+		const wallMat = new THREE.MeshBasicMaterial({ color: 0xd9dde4, side: THREE.DoubleSide });
 
 		// Skid-mark trail (one shared geometry, positions rewritten in place, oldest recycled).
 		const skidPos = new Float32Array(SKID_FLOATS);
@@ -258,7 +284,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		scene.add(car);
 
 		g3Ref.current = {
-			renderer, scene, camera, car, trackMat, trackGeom, deco, dashMat, curbMat, startMat,
+			renderer, scene, camera, car, trackMat, trackGeom, deco, dashMat, curbMat, startMat, wallMat,
 			skidGeom, skidMat, skidPos,
 			disposables: [ground.geometry, ground.material as THREE.Material],
 		};
@@ -420,9 +446,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			// Skid marks while sliding (lateral slip), spaced by travelled distance.
 			const g = g3Ref.current;
 			if (g) {
-				const slip = Math.abs(car.vx * -Math.sin(car.heading) + car.vz * Math.cos(car.heading));
 				const moved = Math.hypot(car.x - markPosRef.current.x, car.z - markPosRef.current.z);
-				if (slip > SKID_SLIP && moved > 0.5) {
+				if (car.drifting && moved > 0.4) {
 					markPosRef.current = { x: car.x, z: car.z };
 					const fx = Math.cos(car.heading), fz = Math.sin(car.heading);
 					const px = -fz, pz = fx; // perpendicular (track lateral)
@@ -484,6 +509,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				g.deco.add(
 					new THREE.Mesh(buildDashes(track), g.dashMat),
 					new THREE.Mesh(buildCurbs(track), g.curbMat),
+					new THREE.Mesh(buildWalls(track), g.wallMat),
 					new THREE.Mesh(buildStartLine(track), g.startMat),
 				);
 			}
@@ -609,6 +635,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				g.dashMat.dispose();
 				g.curbMat.dispose();
 				g.startMat.dispose();
+				g.wallMat.dispose();
 				g.skidGeom.dispose();
 				g.skidMat.dispose();
 				g.car.traverse((o) => {
