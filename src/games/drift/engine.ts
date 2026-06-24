@@ -29,6 +29,20 @@ export interface Track {
 	checkpoints: number[]; // indices into points, in lap order (index 0 = start/finish)
 }
 
+export interface DriftDiff {
+	label: string;
+	controls: number; // control points around the loop → more = more corners
+	jitter: number; // radial variation (sharper turns)
+	width: number; // track width (narrower = harder)
+}
+
+// Difficulty = more and more corners (and a narrower track at the top end).
+export const DRIFT_DIFFS: Record<string, DriftDiff> = {
+	facile: { label: 'Facile', controls: 7, jitter: 0.4, width: 15 },
+	moyen: { label: 'Moyen', controls: 10, jitter: 0.5, width: 13 },
+	difficile: { label: 'Difficile', controls: 14, jitter: 0.58, width: 11.5 },
+};
+
 export interface CarParams {
 	accel: number; // forward acceleration (auto-throttle)
 	maxSpeed: number;
@@ -97,18 +111,18 @@ function catmullClosed(pts: Vec2[], t: number): Vec2 {
 	};
 }
 
-/** Random closed circuit from a seed. Mild jitter keeps it (near) non-self-intersecting. */
-export function generateTrack(seed: number, rng: Rng = mulberry32(seed)): Track {
-	const CONTROLS = 9;
+/** Random closed circuit from a seed + difficulty. More control points = more corners. Deterministic. */
+export function generateTrack(seed: number, diff: DriftDiff = DRIFT_DIFFS.moyen, rng: Rng = mulberry32(seed)): Track {
+	const CONTROLS = diff.controls;
 	const BASE_R = 90;
 	const SAMPLES = 220;
-	const width = 13;
+	const width = diff.width;
 
 	// Control points around a circle with bounded radial + angular jitter.
 	const ctrl: Vec2[] = [];
 	for (let i = 0; i < CONTROLS; i++) {
 		const ang = (i / CONTROLS) * TWO_PI + (rng() - 0.5) * (TWO_PI / CONTROLS) * 0.5;
-		const r = BASE_R * (0.72 + rng() * 0.5);
+		const r = BASE_R * (0.72 + rng() * diff.jitter);
 		ctrl.push({ x: Math.cos(ang) * r, z: Math.sin(ang) * r });
 	}
 

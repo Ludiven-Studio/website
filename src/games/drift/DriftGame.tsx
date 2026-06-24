@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import {
 	CAR,
+	DRIFT_DIFFS,
 	generateTrack,
 	createCar,
 	stepCar,
@@ -25,6 +26,8 @@ import Leaderboard from '../../components/Leaderboard';
    ===================================================== */
 
 type Phase = 'menu' | 'racing';
+type DiffKey = keyof typeof DRIFT_DIFFS;
+const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const STEP = 1000 / 60;
 const SEND_HZ = 12;
 const CAR_COLORS = [0x7c5cff, 0xff5c8a, 0x33d6a6, 0xffb020];
@@ -194,6 +197,8 @@ function buildStartLine(track: Track): THREE.BufferGeometry {
 export default function DriftGame({ gameId }: { gameId: string }) {
 	const [phase, setPhase] = useState<Phase>('menu');
 	const [mode, setMode] = useState<'libre' | 'defi'>('defi');
+	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
+	const [wrongWay, setWrongWay] = useState(false);
 	const [name, setName] = useState('');
 	const [status, setStatus] = useState('');
 	const [board, setBoard] = useState<{ id: string; name: string; bestMs: number }[]>([]);
@@ -482,6 +487,10 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			if (hudAccRef.current >= 100) {
 				hudAccRef.current = 0;
 				setCurMs(lapRef.current.startedMs == null ? 0 : clockRef.current - lapRef.current.startedMs);
+				// Wrong-way: car heading vs track tangent at the nearest centerline point.
+				const p = track.points[nearestIndex(track, car.x, car.z)];
+				const dot = Math.cos(car.heading) * p.dirX + Math.sin(car.heading) * p.dirZ;
+				setWrongWay(car.speed > 6 && dot < -0.25);
 			}
 			rafRef.current = requestAnimationFrame(frame);
 		},
@@ -490,9 +499,11 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	/* ---- Start / stop a race ---- */
 	const beginRace = useCallback(
-		(seed: number, race: Race | null, m: 'libre' | 'defi') => {
+		(seed: number, race: Race | null, m: 'libre' | 'defi', dk: DiffKey) => {
 			setMode(m);
-			const track = generateTrack(seed);
+			setDiffKey(dk);
+			setWrongWay(false);
+			const track = generateTrack(seed, DRIFT_DIFFS[dk]);
 			trackRef.current = track;
 			const built = buildTrackGeometry(track);
 			const g = g3Ref.current;
@@ -531,8 +542,19 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 					peerInfoRef.current.clear();
 					for (const p of peers) peerInfoRef.current.set(p.id, { name: p.name, color: p.color });
 					setPeerCount(peers.length + 1);
-					// Drop ghosts/labels for peers that left.
-					for (const id of [...ghostsRef.current.keys()]) if (!peerInfoRef.current.has(id)) removeGhost(id);
+					// Refresh existing ghosts: drop those who left, and fix name/colour for those whose
+					// position arrived before their presence (otherwise their label stays "???").
+					for (const [id, ghost] of ghostsRef.current.entries()) {
+						const info = peerInfoRef.current.get(id);
+						if (!info) {
+							removeGhost(id);
+							continue;
+						}
+						const el = labelElsRef.current.get(id);
+						if (el) el.textContent = info.name;
+						const body = ghost.mesh.children[0];
+						if (body instanceof THREE.Mesh) (body.material as THREE.MeshStandardMaterial).color.setHex(info.color);
+					}
 				});
 				race.onPos((m: PosMsg) => {
 					const ghost = getOrCreateGhost(m.id);
@@ -576,20 +598,28 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		selfColorRef.current = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
 		if (!initScene()) return;
 		resize();
-		// Défi du jour → shared daily circuit for everyone; Libre → random per room.
-		const fixedSeed = m === 'defi' ? (await getDaily(gameId)).seed : undefined;
+		// Défi du jour → shared daily circuit + daily difficulty; Libre → chosen level, random per room.
+		let dk: DiffKey = diffKey;
+		let fixedSeed: number | undefined;
+		if (m === 'defi') {
+			const d = await getDaily(gameId);
+			dk = DIFF_ORDER[d.diffIndex] ?? 'moyen';
+			fixedSeed = d.seed;
+			setDiffKey(dk);
+		}
+		const prefix = (m === 'defi' ? 'drift-d-' : 'drift-l-') + dk; // rooms separated by level
 		if (multiplayerAvailable()) {
 			setStatus('Recherche d\'une course…');
-			const race = await joinRace(nm, selfColorRef.current, { prefix: m === 'defi' ? 'drift-d' : 'drift-l', fixedSeed });
+			const race = await joinRace(nm, selfColorRef.current, { prefix, fixedSeed });
 			if (race) {
 				setStatus('');
-				beginRace(race.seed, race, m);
+				beginRace(race.seed, race, m, dk);
 				return;
 			}
 			setStatus('Multijoueur indisponible — course solo.');
 		}
-		beginRace(fixedSeed ?? randomSeed(), null, m); // solo fallback
-	}, [name, initScene, resize, beginRace, gameId]);
+		beginRace(fixedSeed ?? randomSeed(), null, m, dk); // solo fallback
+	}, [name, initScene, resize, beginRace, gameId, diffKey]);
 
 	const quit = useCallback(() => {
 		stop();
@@ -674,8 +704,9 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 							<span className="dr-cur">{fmtMs(curMs)}</span>
 							<span className="dr-best">Meilleur {fmtMs(bestMs)}</span>
 							<span className="dr-peers">👥 {Math.min(peerCount, MAX_PLAYERS)}/{MAX_PLAYERS}</span>
-							{mode === 'defi' && <span className="dr-peers">🏁 Défi</span>}
+							<span className="dr-peers">{mode === 'defi' ? '🏁 ' : ''}{DRIFT_DIFFS[diffKey].label}</span>
 						</div>
+						{wrongWay && <div className="dr-wrongway">⚠ Sens inverse</div>}
 						{board.length > 0 && (
 							<ol className="dr-leaderboard">
 								{board.slice(0, MAX_PLAYERS).map((r) => (
@@ -701,7 +732,14 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 								<button role="tab" aria-selected={mode === 'defi'} className={`dr-mode ${mode === 'defi' ? 'active' : ''}`} onClick={() => setMode('defi')}>Défi du jour</button>
 								<button role="tab" aria-selected={mode === 'libre'} className={`dr-mode ${mode === 'libre' ? 'active' : ''}`} onClick={() => setMode('libre')}>Libre</button>
 							</div>
-							<p className="dr-modehint">{mode === 'defi' ? `Même circuit pour tous · ${dailyWeekdayLabel()} · classement du jour` : 'Circuit aléatoire, juste pour le fun'}</p>
+							{mode === 'libre' && (
+								<div className="dr-modes" role="tablist" aria-label="Niveau">
+									{DIFF_ORDER.map((k) => (
+										<button key={k} role="tab" aria-selected={diffKey === k} className={`dr-mode ${diffKey === k ? 'active' : ''}`} onClick={() => setDiffKey(k)}>{DRIFT_DIFFS[k].label}</button>
+									))}
+								</div>
+							)}
+							<p className="dr-modehint">{mode === 'defi' ? `Même circuit pour tous · ${dailyWeekdayLabel()} · niveau du jour · classement` : `Circuit aléatoire · ${DRIFT_DIFFS[diffKey].label} · plus dur = plus de virages`}</p>
 							<input
 								className="dr-name"
 								value={name}
@@ -756,6 +794,7 @@ const CSS = `
 .dr-hud { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; flex-wrap: wrap; font-weight: 700; font-size: 12.5px; }
 .dr-cur { background: var(--dr-accent); color: var(--accent-text-over); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
 .dr-best, .dr-peers { background: rgba(0,0,0,0.55); color: #fff; border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+.dr-wrongway { position: absolute; top: 38%; left: 50%; transform: translateX(-50%); background: rgba(220,40,40,0.82); color: #fff; font-weight: 800; font-size: 15px; padding: 7px 16px; border-radius: 999px; letter-spacing: 0.3px; pointer-events: none; }
 .dr-leaderboard { position: absolute; top: 8px; right: 8px; margin: 0; padding: 6px 10px 6px 26px; list-style: decimal; background: rgba(0,0,0,0.55); color: #fff; border-radius: 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .dr-touch { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; }
 .dr-tbtn { pointer-events: auto; width: 96px; height: 96px; border-radius: 24px; border: none; background: rgba(255,255,255,0.22); color: #fff; font-weight: 800; font-size: 34px; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: none; }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	CAR,
+	DRIFT_DIFFS,
 	generateTrack,
 	createCar,
 	stepCar,
@@ -34,6 +35,24 @@ describe('drift engine', () => {
 	it('generateTrack is deterministic from a seed', () => {
 		expect(generateTrack(123)).toEqual(generateTrack(123));
 		expect(generateTrack(1).points).not.toEqual(generateTrack(2).points);
+	});
+
+	for (const key of Object.keys(DRIFT_DIFFS)) {
+		const diff = DRIFT_DIFFS[key];
+		it(`${key}: deterministic + valid closed circuit`, () => {
+			const a = generateTrack(50, diff);
+			const b = generateTrack(50, diff);
+			expect(a).toEqual(b); // same (seed, diff) → identical track
+			expect(a.width).toBeGreaterThan(0);
+			expect(a.points.length).toBeGreaterThan(50);
+			expect(a.checkpoints[0]).toBe(0);
+			for (let i = 1; i < a.checkpoints.length; i++) expect(a.checkpoints[i]).toBeGreaterThan(a.checkpoints[i - 1]);
+		});
+	}
+
+	it('different difficulties give different tracks (same seed)', () => {
+		expect(generateTrack(7, DRIFT_DIFFS.facile).points).not.toEqual(generateTrack(7, DRIFT_DIFFS.difficile).points);
+		expect(DRIFT_DIFFS.difficile.controls).toBeGreaterThan(DRIFT_DIFFS.facile.controls);
 	});
 
 	it('track is a valid closed circuit with ordered checkpoints', () => {
