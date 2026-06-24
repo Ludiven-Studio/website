@@ -210,7 +210,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const lapRef = useRef<LapState>(createLap());
 	const clockRef = useRef(0);
 	const prevIdxRef = useRef(0);
-	const keysRef = useRef({ left: false, right: false, brake: false });
+	const keysRef = useRef({ left: false, right: false });
 	const rafRef = useRef(0);
 	const lastRef = useRef(0);
 	const accRef = useRef(0);
@@ -421,10 +421,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			const track = trackRef.current;
 			let car = carRef.current;
 			if (!track || !car) return;
-			const input = {
-				steer: (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0),
-				brake: keysRef.current.brake ? 1 : 0,
-			};
+			const input = { steer: (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0) };
 			while (runningRef.current && accRef.current >= STEP) {
 				accRef.current -= STEP;
 				clockRef.current += STEP;
@@ -607,14 +604,18 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	/* ---- Input ---- */
 	useEffect(() => {
+		const NAV = new Set([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown']);
 		const set = (k: string, down: boolean): boolean => {
 			const r = keysRef.current;
 			if (k === 'ArrowLeft' || k === 'a' || k === 'q') return ((r.left = down), true);
 			if (k === 'ArrowRight' || k === 'd') return ((r.right = down), true);
-			if (k === ' ' || k === 'ArrowDown' || k === 's') return ((r.brake = down), true);
 			return false;
 		};
-		const onDown = (e: KeyboardEvent) => { if (set(e.key, true)) e.preventDefault(); };
+		const onDown = (e: KeyboardEvent) => {
+			const used = set(e.key, true);
+			// While racing, swallow arrows/space/pageup-down so they don't scroll the page.
+			if (used || (runningRef.current && NAV.has(e.key))) e.preventDefault();
+		};
 		const onUp = (e: KeyboardEvent) => { set(e.key, false); };
 		window.addEventListener('keydown', onDown, { passive: false });
 		window.addEventListener('keyup', onUp);
@@ -654,7 +655,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	const touch = (which: 'left' | 'right' | 'brake', down: boolean) => (e: React.PointerEvent) => {
+	const touch = (which: 'left' | 'right', down: boolean) => (e: React.PointerEvent) => {
 		e.preventDefault();
 		keysRef.current[which] = down;
 	};
@@ -683,9 +684,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 							</ol>
 						)}
 						<div className="dr-touch">
-							<button className="dr-tbtn" onPointerDown={touch('left', true)} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} aria-label="Gauche">◀</button>
-							<button className="dr-tbtn brake" onPointerDown={touch('brake', true)} onPointerUp={touch('brake', false)} onPointerLeave={touch('brake', false)} aria-label="Frein">FREIN</button>
-							<button className="dr-tbtn" onPointerDown={touch('right', true)} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} aria-label="Droite">▶</button>
+							<button className="dr-tbtn" onPointerDown={touch('left', true)} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)} aria-label="Gauche">◀</button>
+							<button className="dr-tbtn" onPointerDown={touch('right', true)} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)} aria-label="Droite">▶</button>
 						</div>
 						<div className="dr-topbtns">
 							<button className="dr-restart" onClick={reset}>↺ Recommencer</button>
@@ -726,8 +726,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="dr-help">
-				<strong>Tourne</strong> avec les flèches / Q-D (ou les boutons tactiles) et <strong>freine</strong>
-				(Espace / bas) pour négocier les virages — l'accélération et le drift sont automatiques. Jusqu'à
+				<strong>Tourne</strong> avec les flèches / Q-D (ou les deux gros boutons) — l'accélération et le drift
+				sont automatiques. <strong>Maintiens</strong> le braquage en vitesse pour partir en drift. Jusqu'à
 				{` ${MAX_PLAYERS}`} pilotes par course&nbsp;: tu vois leurs fantômes et leur meilleur tour en direct.
 			</p>
 		</div>
@@ -754,9 +754,9 @@ const CSS = `
 .dr-cur { background: var(--dr-accent); color: var(--accent-text-over); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
 .dr-best, .dr-peers { background: rgba(0,0,0,0.55); color: #fff; border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
 .dr-leaderboard { position: absolute; top: 8px; right: 8px; margin: 0; padding: 6px 10px 6px 26px; list-style: decimal; background: rgba(0,0,0,0.55); color: #fff; border-radius: 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
-.dr-touch { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 12px; }
-.dr-tbtn { width: 64px; height: 64px; border-radius: 50%; border: none; background: rgba(255,255,255,0.18); color: #fff; font-weight: 800; font-size: 20px; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
-.dr-tbtn.brake { width: auto; padding: 0 18px; border-radius: 999px; font-size: 14px; background: rgba(230,72,77,0.55); }
+.dr-touch { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; }
+.dr-tbtn { pointer-events: auto; width: 96px; height: 96px; border-radius: 24px; border: none; background: rgba(255,255,255,0.22); color: #fff; font-weight: 800; font-size: 34px; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: none; }
+.dr-tbtn:active { background: rgba(255,255,255,0.4); }
 .dr-topbtns { position: absolute; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .dr-restart, .dr-quit { border: 1.5px solid var(--gray-600, var(--gray-700)); background: rgba(0,0,0,0.5); color: #fff; font: inherit; font-weight: 600; font-size: 12px; border-radius: 999px; padding: 6px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .dr-restart { background: var(--dr-accent); color: var(--accent-text-over); border-color: transparent; }

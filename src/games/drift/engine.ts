@@ -32,7 +32,6 @@ export interface Track {
 export interface CarParams {
 	accel: number; // forward acceleration (auto-throttle)
 	maxSpeed: number;
-	brakeDecel: number;
 	turnRate: number; // rad/s at full steer
 	gripDrift: number; // lateral retention while drifting (≈1 → long slide)
 	gripGrip: number; // lateral retention when gripping (low → snaps back, no slide)
@@ -46,7 +45,6 @@ export interface CarParams {
 export const CAR: CarParams = {
 	accel: 26,
 	maxSpeed: 46,
-	brakeDecel: 60,
 	turnRate: 3.0,
 	gripDrift: 0.97,
 	gripGrip: 0.5,
@@ -69,8 +67,7 @@ export interface CarState {
 }
 
 export interface CarInput {
-	steer: number; // -1..1
-	brake: number; // 0..1
+	steer: number; // -1..1 (auto-throttle, no brake)
 }
 
 /* ----------------------------- Track ----------------------------- */
@@ -187,9 +184,8 @@ export function stepCar(car: CarState, input: CarInput, dt: number, track: Track
 	const latX = car.vx - fwd * fx;
 	const latZ = car.vz - fwd * fz;
 
-	// Auto-accelerate toward maxSpeed; brake decelerates.
-	if (input.brake > 0) fwd -= P.brakeDecel * input.brake * dt;
-	else fwd += P.accel * mul * dt;
+	// Auto-accelerate toward maxSpeed.
+	fwd += P.accel * mul * dt;
 	const vmax = P.maxSpeed * mul;
 	if (fwd > vmax) fwd = vmax;
 	if (fwd < 0) fwd = 0;
