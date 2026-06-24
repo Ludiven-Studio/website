@@ -60,11 +60,11 @@ export const CAR: CarParams = {
 	accel: 26,
 	maxSpeed: 46,
 	turnRate: 3.0,
-	gripDrift: 0.97,
+	gripDrift: 0.98, // slide persists longer while drifting
 	gripGrip: 0.5,
 	driftMinSpeed: 12,
 	driftRise: 8, // ~engages within ~0.1s of holding
-	driftFall: 2.5, // ~lingers ~0.3s then eases out
+	driftFall: 1.6, // slower release → trajectory normalises gradually after letting go
 	offTrackMul: 0.45,
 	wallMargin: 4,
 };

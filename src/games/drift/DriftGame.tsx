@@ -318,7 +318,6 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const prevCarRef = useRef<CarState | null>(null); // state before last physics step (render interpolation)
 	const camTargetRef = useRef({ x: 0, z: 0 }); // eased camera centre (look-ahead)
 	const frontWheelRef = useRef(0); // eased front-wheel steer angle (self car)
-	const lastSteerDirRef = useRef(1); // last non-zero steer direction (for counter-steer)
 
 	useEffect(() => {
 		setName(playerName());
@@ -471,12 +470,12 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		// Self car transform (interpolated pose → no stutter).
 		g.car.position.set(pose.x, 0, pose.z);
 		g.car.rotation.y = -pose.heading;
-		// Front wheels: follow the input; on release mid-drift, flick to opposite lock (counter-steer).
+		// Front wheels: while drifting and holding → counter-steer (opposite lock); normal grip turn
+		// otherwise; straighten back when released.
 		const steer = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
-		if (steer !== 0) lastSteerDirRef.current = steer;
 		const LOCK = 0.5;
 		const drifting = carRef.current?.drifting ?? false;
-		const wheelTarget = steer !== 0 ? -steer * LOCK : drifting ? lastSteerDirRef.current * LOCK : 0;
+		const wheelTarget = steer === 0 ? 0 : (drifting ? 1 : -1) * steer * LOCK;
 		frontWheelRef.current += (wheelTarget - frontWheelRef.current) * Math.min(1, dtSec * 12);
 		const fw = g.car.userData.frontWheels as THREE.Mesh[] | undefined;
 		if (fw) for (const w of fw) w.rotation.y = frontWheelRef.current;
