@@ -531,7 +531,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const steer = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
 		const LOCK = 0.5;
 		const drifting = carRef.current?.drifting ?? false;
-		const wheelTarget = steer === 0 ? 0 : (drifting ? 1 : -1) * steer * LOCK;
+		const wheelTarget = steer === 0 ? 0 : (drifting ? -1 : 1) * steer * LOCK;
 		frontWheelRef.current += (wheelTarget - frontWheelRef.current) * Math.min(1, dtSec * 12);
 		const fw = g.car.userData.frontWheels as THREE.Mesh[] | undefined;
 		if (fw) for (const w of fw) w.rotation.y = frontWheelRef.current;
@@ -559,7 +559,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			ghost.mesh.rotation.y = -ghost.cur.heading;
 			const gfw = ghost.mesh.userData.frontWheels as THREE.Mesh[] | undefined;
 			if (gfw) {
-				const a = Math.max(-0.5, Math.min(0.5, -dh * 4));
+				const a = Math.max(-0.5, Math.min(0.5, dh * 4));
 				for (const w of gfw) w.rotation.y = a;
 			}
 		}
