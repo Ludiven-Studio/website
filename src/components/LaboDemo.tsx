@@ -60,7 +60,7 @@ export default function LaboDemo() {
 	const [webglError, setWebglError] = useState(false);
 	const [ready, setReady] = useState(false);
 	const [bloom, setBloom] = useState(true);
-	const [bloomStrength, setBloomStrength] = useState(0.7);
+	const [bloomStrength, setBloomStrength] = useState(0.35);
 	const [water, setWater] = useState(true);
 	const [shadows, setShadows] = useState(true);
 	const [autoRotate, setAutoRotate] = useState(true);
@@ -197,7 +197,7 @@ export default function LaboDemo() {
 		const composer = new EffectComposer(renderer);
 		composer.setSize(w, hgt);
 		composer.addPass(new RenderPass(scene, camera));
-		const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, hgt), 0.7, 0.4, 0.85);
+		const bloomPass = new UnrealBloomPass(new THREE.Vector2(w, hgt), 0.35, 0.3, 0.9);
 		composer.addPass(bloomPass);
 		composer.addPass(new OutputPass());
 
@@ -308,7 +308,7 @@ export default function LaboDemo() {
 						<label><input type="checkbox" checked={bloom} onChange={(e) => setBloom(e.target.checked)} /> Bloom</label>
 						{bloom && (
 							<label className="labo-slider">Force
-								<input type="range" min={0} max={2} step={0.05} value={bloomStrength} onChange={(e) => setBloomStrength(+e.target.value)} />
+								<input type="range" min={0} max={1.2} step={0.05} value={bloomStrength} onChange={(e) => setBloomStrength(+e.target.value)} />
 							</label>
 						)}
 						<label><input type="checkbox" checked={water} onChange={(e) => setWater(e.target.checked)} /> Eau</label>

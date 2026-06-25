@@ -2,7 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
 import LaboDemo from '../components/LaboDemo.tsx';
-import LaboWorld from '../components/LaboWorld.tsx';
+import Scene3D from '../components/Scene3D.tsx';
 ---
 
 <BaseLayout
@@ -21,11 +21,11 @@ import LaboWorld from '../components/LaboWorld.tsx';
 		<LaboDemo client:only="react" />
 
 		<section class="labo-section stack gap-2">
-			<h2>Monde ouvert procédural</h2>
-			<p>Une île générée par code, façon GTA : ville, forêt, montagnes et mer — tout en temps réel.</p>
+			<h2>Forêt réaliste — GLB + HDRI</h2>
+			<p>Scène extérieure éclairée par une HDRI (image-based lighting) avec des scans 3D CC0 — react-three-fiber + drei.</p>
 		</section>
 
-		<LaboWorld client:only="react" />
+		<Scene3D client:only="react" />
 	</div>
 </BaseLayout>
 
