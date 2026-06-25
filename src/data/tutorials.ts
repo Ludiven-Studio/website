@@ -90,8 +90,14 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	],
 	drift: [
 		{ emoji: '🏁', title: 'Le but', body: 'Cours sur un circuit fermé aléatoire et réalise le tour le plus rapide possible. Ton meilleur tour est ton score.' },
-		{ emoji: '🎮', title: 'Contrôles', body: 'La voiture accélère et drifte toute seule. Tu tournes avec les flèches / Q-D (ou les boutons tactiles) et tu freines (Espace / bas) pour bien négocier les virages. Hors-piste, ça ralentit.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'La voiture accélère et drifte toute seule. Tu tournes seulement avec les flèches / Q-D (ou les deux gros boutons). Maintiens le braquage à vitesse pour partir en drift ; hors-piste, ça ralentit.' },
+		{ emoji: '🏎️', title: 'Les voitures', body: 'Trois voitures au choix avant la course (jauges Vitesse / Accél / Drift) : Équilibrée, Bolide (rapide mais tourne moins) et Drifteuse (glisse à fond, vitesse de pointe plus basse).' },
 		{ emoji: '👥', title: 'Multijoueur', body: 'Jusqu\'à 4 pilotes par course, mis en relation automatiquement. Les autres apparaissent en fantômes (sans collision) avec leur pseudo, et leurs meilleurs tours s\'affichent en direct.' },
+	],
+	pong: [
+		{ emoji: '🎯', title: 'Le but', body: 'Le Pong classique à deux : renvoie la balle avec ta raquette. Si tu la laisses passer, l\'adversaire marque. Premier à 7 points gagne.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace ta raquette avec les flèches ↑ / ↓ (ou Z/S), ou en glissant le doigt sur le terrain. Frappe la balle près du bord de la raquette pour changer son angle.' },
+		{ emoji: '👥', title: 'Jouer ensemble', body: 'Partie rapide pour être appairé au hasard, ou « Créer une partie » : un code s\'affiche, ton ami le saisit pour te rejoindre. Pas d\'adversaire ? Entraîne-toi contre l\'ordinateur.' },
 	],
 	esquive: [
 		{ emoji: '🚀', title: 'Le but', body: 'Pilote ton vaisseau qui fonce dans l\'espace et évite les astéroïdes le plus longtemps possible. Ton temps de survie est ton score.' },

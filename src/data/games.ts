@@ -7,7 +7,7 @@ export interface GameTile {
 	icon: keyof typeof iconPaths;
 	href?: string;
 	status: 'play' | 'soon';
-	category?: 'logique' | 'adresse'; // defaults to logique
+	category?: 'logique' | 'adresse' | 'multi'; // defaults to logique
 }
 
 export const games: GameTile[] = [
@@ -159,5 +159,14 @@ export const games: GameTile[] = [
 		href: '/jeux/flappy',
 		status: 'play',
 		category: 'adresse',
+	},
+	{
+		id: 'pong',
+		title: 'Pong',
+		pitch: 'Pong en temps réel à 2 : partie rapide, avec un code entre amis, ou solo contre l\'ordi.',
+		icon: 'pong',
+		href: '/jeux/pong',
+		status: 'play',
+		category: 'multi',
 	},
 ];

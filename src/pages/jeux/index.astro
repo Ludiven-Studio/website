@@ -12,6 +12,7 @@ const playableLabel = NUM_FR[playable]
 
 const logique = games.filter((g) => (g.category ?? 'logique') === 'logique');
 const adresse = games.filter((g) => g.category === 'adresse');
+const multi = games.filter((g) => g.category === 'multi');
 ---
 
 <BaseLayout
@@ -54,6 +55,29 @@ const adresse = games.filter((g) => g.category === 'adresse');
 					<h2 class="games-section-title">Jeux d'adresse</h2>
 					<ul class="games-grid">
 						{adresse.map((game) => (
+							<li>
+								<GameCard
+									id={game.id}
+									title={game.title}
+									pitch={game.pitch}
+									icon={game.icon}
+									href={game.href}
+									status={game.status}
+									favorite
+								/>
+							</li>
+						))}
+					</ul>
+				</section>
+			)
+		}
+
+		{
+			multi.length > 0 && (
+				<section class="games-section stack gap-6">
+					<h2 class="games-section-title">Jeux multis</h2>
+					<ul class="games-grid">
+						{multi.map((game) => (
 							<li>
 								<GameCard
 									id={game.id}
