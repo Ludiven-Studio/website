@@ -28,6 +28,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const [scoreOpp, setScoreOpp] = useState(0);
 	const [oppName, setOppName] = useState('Adversaire');
 	const [youWon, setYouWon] = useState(false);
+	const [confirmQuit, setConfirmQuit] = useState(false);
+	const [copied, setCopied] = useState(false);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const runningRef = useRef(false);
@@ -182,6 +184,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			startedRef.current = true;
 			const host = m.isHost();
 			roleRef.current = host ? 'host' : 'guest';
+			setConfirmQuit(false);
 			setScoreMe(0);
 			setScoreOpp(0);
 			myYRef.current = PONG.H / 2;
@@ -239,8 +242,17 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		startedRef.current = false;
 		matchRef.current?.leave();
 		matchRef.current = null;
+		setConfirmQuit(false);
 		setPhase('menu');
 	}, []);
+
+	const copyCode = useCallback(() => {
+		if (!roomCode) return;
+		void navigator.clipboard?.writeText(roomCode).then(() => {
+			setCopied(true);
+			setTimeout(() => setCopied(false), 1500);
+		});
+	}, [roomCode]);
 
 	/* ---------- menu actions ---------- */
 	const ensureName = useCallback((): string | null => {
@@ -314,6 +326,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		matchRef.current = null;
 		roleRef.current = 'ai';
 		startedRef.current = true;
+		setConfirmQuit(false);
 		setOppName('Ordinateur');
 		setScoreMe(0);
 		setScoreOpp(0);
@@ -327,6 +340,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 
 	const rematch = useCallback(() => {
 		if (roleRef.current === 'guest') return; // host (or AI) controls the restart
+		setConfirmQuit(false);
 		setScoreMe(0);
 		setScoreOpp(0);
 		rngRef.current = mulberry32(randSeed());
@@ -407,10 +421,23 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				/>
 
 				{phase === 'playing' && (
-					<div className="pg-hud">
-						<span style={{ color: COL_ME }}>Toi {scoreMe}</span>
-						<span className="pg-sep">—</span>
-						<span style={{ color: COL_OPP }}>{scoreOpp} {oppName}</span>
+					<>
+						<div className="pg-hud">
+							<span style={{ color: COL_ME }}>Toi {scoreMe}</span>
+							<span className="pg-sep">—</span>
+							<span style={{ color: COL_OPP }}>{scoreOpp} {oppName}</span>
+						</div>
+						<button className="pg-quit" onClick={() => setConfirmQuit(true)}>✕ Quitter</button>
+					</>
+				)}
+
+				{confirmQuit && (
+					<div className="pg-overlay">
+						<div className="pg-card">
+							<h2>Quitter la partie ?</h2>
+							<button className="pg-btn pg-primary" onClick={quitToMenu}>Oui, quitter</button>
+							<button className="pg-btn" onClick={() => setConfirmQuit(false)}>Continuer</button>
+						</div>
 					</div>
 				)}
 
@@ -444,8 +471,9 @@ export default function PongGame({ gameId }: { gameId: string }) {
 							<h2>En attente d'un adversaire…</h2>
 							{roomCode && (
 								<>
-									<p className="pg-sub">Partage ce code :</p>
-									<div className="pg-bigcode">{roomCode}</div>
+									<p className="pg-sub">Partage ce code (clique pour copier) :</p>
+									<button className="pg-bigcode" onClick={copyCode}>{roomCode}</button>
+									<p className="pg-copyhint">{copied ? 'Copié !' : ''}</p>
 								</>
 							)}
 							<div className="pg-spinner" />
@@ -486,16 +514,21 @@ const CSS = `
 .pg-card h2 { margin: 0; font-size: var(--text-xl); }
 .pg-sub { margin: 0; color: var(--gray-300); font-size: var(--text-sm); }
 .pg-name { padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid var(--gray-700, #3a4150); background: var(--gray-900, #14171f); color: var(--gray-0, #fff); font-size: 1rem; text-align: center; }
-.pg-code { text-transform: uppercase; letter-spacing: 0.2em; }
+.pg-code { text-transform: uppercase; letter-spacing: 0.15em; }
 .pg-coderow { display: flex; gap: 0.5rem; }
-.pg-coderow .pg-name { flex: 1; }
+.pg-coderow .pg-name { flex: 1; min-width: 0; }
+.pg-coderow .pg-small { flex: none; white-space: nowrap; }
 .pg-codepanel { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem; border: 1px dashed var(--gray-700, #3a4150); border-radius: 12px; }
 .pg-btn { padding: 0.6rem 0.9rem; border-radius: 10px; border: 1px solid var(--gray-700, #3a4150); background: transparent; color: var(--gray-0, #fff); font-weight: 600; cursor: pointer; }
 .pg-btn:hover:not(:disabled) { border-color: var(--accent-regular, #b07cff); }
 .pg-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .pg-primary { background: var(--accent-regular, #7611a6); border-color: transparent; }
 .pg-small { padding: 0.45rem 0.7rem; font-size: var(--text-sm); }
-.pg-bigcode { font-family: var(--font-brand); font-size: 2rem; font-weight: 800; letter-spacing: 0.3em; color: var(--accent-regular, #b07cff); }
+.pg-bigcode { font-family: var(--font-brand); font-size: 2rem; font-weight: 800; letter-spacing: 0.3em; color: var(--accent-regular, #b07cff); background: none; border: none; cursor: pointer; padding: 0.1rem 0.3rem; }
+.pg-bigcode:hover { filter: brightness(1.15); }
+.pg-quit { position: absolute; top: 8px; right: 10px; z-index: 2; padding: 0.35rem 0.6rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); background: rgba(8,10,18,0.55); color: #f4f6fb; font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.pg-quit:hover { border-color: var(--accent-regular, #b07cff); }
+.pg-copyhint { margin: 0; color: var(--accent-regular, #b07cff); font-size: var(--text-sm); min-height: 1.1em; }
 .pg-status { margin: 0; color: var(--gray-300); font-size: var(--text-sm); }
 .pg-hint { color: var(--gray-400); font-size: var(--text-sm); text-align: center; margin: 0; }
 .pg-spinner { width: 28px; height: 28px; border: 3px solid var(--gray-700, #3a4150); border-top-color: var(--accent-regular, #b07cff); border-radius: 50%; margin: 0.25rem auto; animation: pg-spin 0.8s linear infinite; }
