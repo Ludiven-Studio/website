@@ -98,31 +98,43 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		// right paddle
 		ctx.fillStyle = side === 'right' ? COL_ME : COL_OPP;
 		ctx.fillRect(VIEW_W - pw, rightY * SCALE - phR / 2, pw, phR);
-		// ball — while my view is jammed, the real ball is hidden among flickering decoys
-		const myJam = side === 'left' ? s.jamLT > 0 : s.jamRT > 0;
+		// Jam: flickering decoy balls over the JAMMED player's half (visible on every screen),
+		// so when the ball heads to that side it gets lost among fakes.
 		const r = PONG.ballR * SCALE;
+		const jamLeft = s.jamLT > 0;
+		const jamRight = s.jamRT > 0;
 		ctx.fillStyle = s.curveT > 0 ? '#ffd60a' : '#f4f6fb'; // tinted while curving
-		if (myJam) {
+		if (jamLeft || jamRight) {
 			// reposition decoys ~12×/s (not every frame → readable flicker, not a strobe)
 			jamFrameRef.current += 1;
 			if (decoysRef.current.length === 0 || jamFrameRef.current % 5 === 0) {
-				decoysRef.current = Array.from({ length: 7 }, () => ({ x: Math.random() * VIEW_W, y: Math.random() * VIEW_H }));
+				const pts: { x: number; y: number }[] = [];
+				const N = 7;
+				if (jamLeft) for (let i = 0; i < N; i++) pts.push({ x: Math.random() * (VIEW_W / 2), y: Math.random() * VIEW_H });
+				if (jamRight) for (let i = 0; i < N; i++) pts.push({ x: VIEW_W / 2 + Math.random() * (VIEW_W / 2), y: Math.random() * VIEW_H });
+				decoysRef.current = pts;
 			}
 			for (const d of decoysRef.current) {
 				ctx.beginPath();
 				ctx.arc(d.x, d.y, r, 0, Math.PI * 2);
 				ctx.fill();
 			}
-			ctx.fillStyle = 'rgba(255,255,255,0.65)';
-			ctx.font = 'bold 16px sans-serif';
-			ctx.textAlign = 'center';
+			ctx.fillStyle = 'rgba(255,255,255,0.6)';
+			ctx.font = 'bold 15px sans-serif';
 			ctx.textBaseline = 'middle';
-			ctx.fillText('🌫️ brouillage', VIEW_W / 2, 20);
+			if (jamLeft) {
+				ctx.textAlign = 'center';
+				ctx.fillText('🌫️', VIEW_W / 4, 18);
+			}
+			if (jamRight) {
+				ctx.textAlign = 'center';
+				ctx.fillText('🌫️', (VIEW_W * 3) / 4, 18);
+			}
 			ctx.fillStyle = s.curveT > 0 ? '#ffd60a' : '#f4f6fb';
 		} else {
 			decoysRef.current = [];
 		}
-		// real ball (drawn among the decoys when jammed → present but hard to spot)
+		// real ball (drawn among the decoys when its half is jammed → present but hard to spot)
 		ctx.beginPath();
 		ctx.arc(ballX * SCALE, ballY * SCALE, r, 0, Math.PI * 2);
 		ctx.fill();
