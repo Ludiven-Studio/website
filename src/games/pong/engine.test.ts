@@ -22,6 +22,7 @@ const base = (over: Partial<PongState> = {}): PongState => ({
 	jamRT: 0,
 	pickups: [],
 	lastHit: '',
+	powersOn: true,
 	...over,
 });
 
@@ -90,6 +91,13 @@ describe('pong engine', () => {
 		const before = Math.atan2(s.bvy, s.bvx);
 		for (let i = 0; i < 10; i++) s = stepBall(s, 1 / 60).state;
 		expect(Math.atan2(s.bvy, s.bvx)).not.toBeCloseTo(before, 3); // direction changed
+	});
+
+	it('classic mode: no charge, and pickups are not collected', () => {
+		const s = base({ powersOn: false, bx: PONG.paddleW + PONG.ballR + 1, bvx: -60, by: PONG.H / 2, leftY: PONG.H / 2, lastHit: 'left', pickups: [{ x: PONG.paddleW + PONG.ballR, y: PONG.H / 2, power: 'speed' }] });
+		const { state } = stepBall(s, 0.1);
+		expect(state.chargeL).toBe(0); // no meter in classic
+		expect(state.pickups.length).toBe(1); // pickup ignored
 	});
 
 	it('addPickup caps at maxPickups', () => {

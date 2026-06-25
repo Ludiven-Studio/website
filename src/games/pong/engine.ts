@@ -59,6 +59,7 @@ export interface PongState {
 	jamRT: number;
 	pickups: Pickup[]; // power-ups on the field
 	lastHit: '' | 'left' | 'right'; // last paddle that touched the ball (collects pickups)
+	powersOn: boolean; // false = classic Pong (no meter, no pickups, no effects)
 }
 
 /** Who just scored on this step (the side that gains the point), or null. */
@@ -81,7 +82,7 @@ export function serve(s: PongState, rng: Rng, towardLeft: boolean): PongState {
 }
 
 /** Fresh game: scores 0, paddles centred, first serve in a random direction. */
-export function createState(rng: Rng = mulberry32(1)): PongState {
+export function createState(rng: Rng = mulberry32(1), powersOn = true): PongState {
 	const base: PongState = {
 		bx: PONG.W / 2,
 		by: PONG.H / 2,
@@ -102,6 +103,7 @@ export function createState(rng: Rng = mulberry32(1)): PongState {
 		jamRT: 0,
 		pickups: [],
 		lastHit: '',
+		powersOn,
 	};
 	return serve(base, rng, rng() < 0.5);
 }
@@ -147,6 +149,7 @@ function applyEffect(s: PongState, side: 'left' | 'right', power: PowerId): void
 
 /** Spend a full charge to trigger a power for one side. No-op if the meter isn't full. */
 export function activatePower(prev: PongState, side: 'left' | 'right', power: PowerId): PongState {
+	if (!prev.powersOn) return prev;
 	const charge = side === 'left' ? prev.chargeL : prev.chargeR;
 	if (charge < PONG.chargeNeed) return prev;
 	const s: PongState = { ...prev };
@@ -207,7 +210,7 @@ export function stepBall(prev: PongState, dt: number): { state: PongState; score
 		if (Math.abs(s.by - s.leftY) <= halfH(s.bigLT > 0) + PONG.ballR) {
 			s.bx = PONG.paddleW + PONG.ballR;
 			bounceOffPaddle(s, s.leftY, true);
-			s.chargeL = Math.min(PONG.chargeNeed, s.chargeL + 1);
+			if (s.powersOn) s.chargeL = Math.min(PONG.chargeNeed, s.chargeL + 1);
 			s.lastHit = 'left';
 		} else if (s.bx + PONG.ballR < 0) {
 			s.scoreR += 1;
@@ -219,7 +222,7 @@ export function stepBall(prev: PongState, dt: number): { state: PongState; score
 		if (Math.abs(s.by - s.rightY) <= halfH(s.bigRT > 0) + PONG.ballR) {
 			s.bx = PONG.W - PONG.paddleW - PONG.ballR;
 			bounceOffPaddle(s, s.rightY, false);
-			s.chargeR = Math.min(PONG.chargeNeed, s.chargeR + 1);
+			if (s.powersOn) s.chargeR = Math.min(PONG.chargeNeed, s.chargeR + 1);
 			s.lastHit = 'right';
 		} else if (s.bx - PONG.ballR > PONG.W) {
 			s.scoreL += 1;
@@ -228,7 +231,7 @@ export function stepBall(prev: PongState, dt: number): { state: PongState; score
 	}
 
 	// Ground power-ups: the last hitter collects any the ball rolls over.
-	if (s.lastHit && s.pickups.length) {
+	if (s.powersOn && s.lastHit && s.pickups.length) {
 		const kept: Pickup[] = [];
 		for (const p of s.pickups) {
 			if (Math.hypot(s.bx - p.x, s.by - p.y) <= PONG.ballR + PONG.pickupR) {

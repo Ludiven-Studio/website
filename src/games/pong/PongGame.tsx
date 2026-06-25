@@ -40,6 +40,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const [confirmQuit, setConfirmQuit] = useState(false);
 	const [copied, setCopied] = useState(false);
 	const [myCharge, setMyCharge] = useState(0); // 0..chargeNeed (for the power bar)
+	const [powers, setPowers] = useState(true); // menu choice: power-ups vs classic
+	const [powersUi, setPowersUi] = useState(true); // whether the running match has powers (drives UI)
 
 	const aiPowerCdRef = useRef(0); // AI power cooldown
 	const chargeRef = useRef(0); // last pushed charge value (avoid setState every frame)
@@ -63,6 +65,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const decoysRef = useRef<{ x: number; y: number }[]>([]); // jam decoy balls
 	const jamFrameRef = useRef(0);
 	const spawnAccRef = useRef(0); // ground power-up spawn timer (host/ai)
+	const chosenPowersRef = useRef(true); // mode picked at the menu, read when the match starts
 
 	const inputDirRef = useRef(0); // keyboard -1 up / +1 down
 	const pointerYRef = useRef<number | null>(null); // drag target (field units)
@@ -228,7 +231,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				// host or ai: authoritative simulation. My paddle = left, opponent = right.
 				// Spawn ground power-ups over time (host owns them; broadcast in state).
 				spawnAccRef.current += dt;
-				if (spawnAccRef.current >= PONG.pickupEvery) {
+				if (s.powersOn && spawnAccRef.current >= PONG.pickupEvery) {
 					spawnAccRef.current = 0;
 					if (s.pickups.length < PONG.maxPickups) {
 						const x = PONG.W * 0.25 + rngRef.current() * PONG.W * 0.5;
@@ -300,7 +303,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 
 			if (host) {
 				rngRef.current = mulberry32(randSeed());
-				stateRef.current = createState(rngRef.current);
+				stateRef.current = createState(rngRef.current, chosenPowersRef.current);
+				setPowersUi(chosenPowersRef.current);
 				m.sendState(stateRef.current);
 			} else {
 				stateRef.current = createState(mulberry32(1)); // placeholder until first state arrives
@@ -314,6 +318,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					stateRef.current = st;
 					setScoreMe(st.scoreR);
 					setScoreOpp(st.scoreL);
+					setPowersUi(st.powersOn); // adopt host's mode
 				}
 			});
 			m.onPower((p) => {
@@ -389,14 +394,15 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		}
 		setStatus('Recherche d\'un adversaire…');
 		setRoomCode(null);
-		const m = await joinRandom(nm);
+		chosenPowersRef.current = powers;
+		const m = await joinRandom(nm, powers);
 		if (!m) {
 			setStatus('Aucune partie disponible, réessaie.');
 			return;
 		}
 		setStatus('');
 		beginNetMatch(m);
-	}, [ensureName, beginNetMatch]);
+	}, [ensureName, beginNetMatch, powers]);
 
 	const playJoinCode = useCallback(async () => {
 		const nm = ensureName();
@@ -407,6 +413,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			return;
 		}
 		setStatus('Connexion…');
+		chosenPowersRef.current = powers;
 		const m = await joinByCode(nm, code);
 		if (!m) {
 			setStatus('Partie introuvable ou pleine.');
@@ -415,7 +422,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		setStatus('');
 		setRoomCode(code);
 		beginNetMatch(m);
-	}, [ensureName, codeInput, beginNetMatch]);
+	}, [ensureName, codeInput, beginNetMatch, powers]);
 
 	const playCreateCode = useCallback(async () => {
 		const nm = ensureName();
@@ -426,6 +433,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		}
 		const code = makeCode();
 		setStatus('');
+		chosenPowersRef.current = powers;
 		const m = await joinByCode(nm, code);
 		if (!m) {
 			setStatus('Réessaie.');
@@ -433,7 +441,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		}
 		setRoomCode(code);
 		beginNetMatch(m);
-	}, [ensureName, beginNetMatch]);
+	}, [ensureName, beginNetMatch, powers]);
 
 	const playAI = useCallback(() => {
 		const nm = ensureName();
@@ -451,11 +459,13 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		setScoreOpp(0);
 		myYRef.current = PONG.H / 2;
 		rngRef.current = mulberry32(randSeed());
-		stateRef.current = createState(rngRef.current);
+		chosenPowersRef.current = powers;
+		stateRef.current = createState(rngRef.current, powers);
+		setPowersUi(powers);
 		setRoomCode(null);
 		setPhase('playing');
 		startLoop();
-	}, [ensureName, startLoop]);
+	}, [ensureName, startLoop, powers]);
 
 	const rematch = useCallback(() => {
 		if (roleRef.current === 'guest') return; // host (or AI) controls the restart
@@ -467,7 +477,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		setScoreMe(0);
 		setScoreOpp(0);
 		rngRef.current = mulberry32(randSeed());
-		stateRef.current = createState(rngRef.current);
+		stateRef.current = createState(rngRef.current, chosenPowersRef.current);
 		if (roleRef.current === 'host') matchRef.current?.sendState(stateRef.current);
 		setPhase('playing');
 		startLoop();
@@ -570,6 +580,10 @@ export default function PongGame({ gameId }: { gameId: string }) {
 						<div className="pg-card">
 							<h2>Pong</h2>
 							<p className="pg-sub">Premier à {PONG.maxScore} points gagne.</p>
+							<div className="pg-modes" role="tablist" aria-label="Mode de jeu">
+								<button role="tab" aria-selected={!powers} className={`pg-mode ${!powers ? 'active' : ''}`} onClick={() => setPowers(false)}>Classique</button>
+								<button role="tab" aria-selected={powers} className={`pg-mode ${powers ? 'active' : ''}`} onClick={() => setPowers(true)}>Power-ups</button>
+							</div>
 							<input className="pg-name" value={name} maxLength={20} placeholder="Ton pseudo" onChange={(e) => setName(e.target.value)} />
 							<button className="pg-btn pg-primary" disabled={mpOff} onClick={playQuick}>⚡ Partie rapide</button>
 							<button className="pg-btn" disabled={mpOff} onClick={() => setCodePanel((v) => !v)}>🔑 Jouer avec un code</button>
@@ -622,7 +636,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{phase === 'playing' && (
+			{phase === 'playing' && powersUi && (
 				<div className="pg-powerbar">
 					<div className="pg-meter" aria-label={`Jauge de pouvoir ${myCharge}/${PONG.chargeNeed}`}>
 						{Array.from({ length: PONG.chargeNeed }, (_, i) => (
@@ -639,7 +653,11 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{phase === 'playing' && <p className="pg-hint">Flèches ↑ ↓ (ou Z/S) · ou glisse le doigt · pouvoirs au 5e renvoi (touches 1-4)</p>}
+			{phase === 'playing' && (
+				<p className="pg-hint">
+					Flèches ↑ ↓ (ou Z/S) · ou glisse le doigt{powersUi ? ' · pouvoirs au 5e renvoi (touches 1-4)' : ''}
+				</p>
+			)}
 		</div>
 	);
 }
@@ -654,6 +672,9 @@ const CSS = `
 .pg-card { background: var(--gray-999, #0c0e14); border: 1px solid var(--gray-800, #2a2f3a); border-radius: 16px; padding: 1.25rem; width: min(340px, 100%); display: flex; flex-direction: column; gap: 0.6rem; text-align: center; }
 .pg-card h2 { margin: 0; font-size: var(--text-xl); }
 .pg-sub { margin: 0; color: var(--gray-300); font-size: var(--text-sm); }
+.pg-modes { display: flex; gap: 0.4rem; }
+.pg-mode { flex: 1; padding: 0.45rem 0.5rem; border-radius: 10px; border: 1px solid var(--gray-700, #3a4150); background: transparent; color: var(--gray-0, #fff); font-weight: 600; font-size: var(--text-sm); cursor: pointer; }
+.pg-mode.active { border-color: transparent; background: var(--accent-regular, #7611a6); }
 .pg-name { padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid var(--gray-700, #3a4150); background: var(--gray-900, #14171f); color: var(--gray-0, #fff); font-size: 1rem; text-align: center; }
 .pg-code { text-transform: uppercase; letter-spacing: 0.15em; }
 .pg-coderow { display: flex; gap: 0.5rem; }

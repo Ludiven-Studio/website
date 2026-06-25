@@ -98,7 +98,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎯', title: 'Le but', body: 'Le Pong classique à deux : renvoie la balle avec ta raquette. Si tu la laisses passer, l\'adversaire marque. Premier à 7 points gagne.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace ta raquette avec les flèches ↑ / ↓ (ou Z/S), ou en glissant le doigt sur le terrain. Frappe la balle près du bord de la raquette pour changer son angle.' },
 		{ emoji: '👥', title: 'Jouer ensemble', body: 'Partie rapide pour être appairé au hasard, ou « Créer une partie » : un code s\'affiche, ton ami le saisit pour te rejoindre. Pas d\'adversaire ? Entraîne-toi contre l\'ordinateur.' },
-		{ emoji: '⚡', title: 'Pouvoirs', body: 'Ta jauge se remplit à chaque renvoi : pleine au 5e, clique un des 4 pouvoirs (touches 1-4) — ⚡ Speed max, 🌀 trajectoire courbée, 🌫️ brouillage (des balles leurres apparaissent partout chez l\'adversaire), 🛡️ raquette XXL. Des power-ups apparaissent aussi sur le terrain : touche-les avec la balle pour déclencher leur effet.' },
+		{ emoji: '⚡', title: 'Pouvoirs (optionnels)', body: 'Au menu, choisis « Classique » ou « Power-ups ». En Power-ups : ta jauge se remplit à chaque renvoi (pleine au 5e), clique un des 4 pouvoirs (touches 1-4) — ⚡ Speed max, 🌀 trajectoire courbée, 🌫️ brouillage (des balles leurres apparaissent partout chez l\'adversaire), 🛡️ raquette XXL. Des power-ups apparaissent aussi sur le terrain : touche-les avec la balle pour déclencher leur effet.' },
 	],
 	esquive: [
 		{ emoji: '🚀', title: 'Le but', body: 'Pilote ton vaisseau qui fonce dans l\'espace et évite les astéroïdes le plus longtemps possible. Ton temps de survie est ton score.' },

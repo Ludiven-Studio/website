@@ -138,12 +138,14 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 	};
 }
 
-/** Auto-match into the first room with a free slot; null if multiplayer is off or all rooms are full. */
-export async function joinRandom(name: string): Promise<Match | null> {
+/** Auto-match into the first room with a free slot; null if multiplayer is off or all rooms are full.
+ * Rooms are namespaced by mode so classic and power-up players match separately. */
+export async function joinRandom(name: string, powers = true): Promise<Match | null> {
 	const c = getClient();
 	if (!c) return null;
+	const ns = powers ? 'p' : 'c';
 	for (let slot = 0; slot < MAX_ROOMS; slot++) {
-		const m = await openRoom(c, `pong-q-${slot}`, name, null);
+		const m = await openRoom(c, `pong-q${ns}-${slot}`, name, null);
 		if (m) return m;
 	}
 	return null;
