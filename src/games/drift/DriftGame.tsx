@@ -76,44 +76,60 @@ interface Scene3D {
 
 const HALF_SPAN = 38; // half of the visible world span (top-down zoom)
 
-interface CarDims { bodyLen: number; bodyW: number; nose: number; frontWingZ: number; rearWingX: number; rearWingZ: number; wheelL: number; wheelW: number; wx: number; wz: number; }
-const CAR_DIMS: Record<string, CarDims> = {
-	// front = +x
-	equilibre: { bodyLen: 3.0, bodyW: 0.62, nose: 1.3, frontWingZ: 2.0, rearWingX: -1.55, rearWingZ: 1.7, wheelL: 1.0, wheelW: 0.5, wx: 1.25, wz: 0.95 },
-	vitesse: { bodyLen: 3.8, bodyW: 0.52, nose: 1.6, frontWingZ: 1.7, rearWingX: -1.9, rearWingZ: 2.1, wheelL: 0.85, wheelW: 0.42, wx: 1.55, wz: 0.86 },
-	drift: { bodyLen: 2.5, bodyW: 0.82, nose: 0.9, frontWingZ: 1.9, rearWingX: -1.25, rearWingZ: 1.5, wheelL: 1.15, wheelW: 0.66, wx: 1.0, wz: 1.02 },
-};
-
+// Three road-car silhouettes (top-down), brand-inspired but original: supercar / coupé / roadster.
 function makeCar(color: number, ghost = false, kindId = 'equilibre'): THREE.Group {
 	const g = new THREE.Group();
 	const op = ghost ? 0.5 : 1;
+	// Body material (the player's colour) — used by the FIRST child, so it can be refreshed for ghosts.
+	const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.45, roughness: 0.35, transparent: ghost, opacity: op });
+	const darkMat = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.6, transparent: ghost, opacity: op });
+	const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, metalness: 0.4, roughness: 0.12, transparent: true, opacity: ghost ? 0.4 : 0.8 });
 	const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
 		const m = new THREE.Mesh(geo, mat);
 		m.position.set(x, y, z);
 		g.add(m);
 	};
-	// Body material (the player's colour) — used by the FIRST child, so it can be refreshed for ghosts.
-	const bodyMat = new THREE.MeshStandardMaterial({ color, metalness: 0.4, roughness: 0.4, transparent: ghost, opacity: op });
-	const darkMat = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.6, transparent: ghost, opacity: op });
-	const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, metalness: 0.4, roughness: 0.15, transparent: true, opacity: ghost ? 0.4 : 0.85 });
-
-	const d = CAR_DIMS[kindId] ?? CAR_DIMS.equilibre;
-	add(new THREE.BoxGeometry(d.bodyLen, 0.4, d.bodyW), bodyMat, -0.1, 0.5, 0); // central body (colour) — child[0]
-	add(new THREE.BoxGeometry(d.nose, 0.28, d.bodyW * 0.55), bodyMat, d.bodyLen / 2 + d.nose / 2 - 0.15, 0.46, 0); // nose
-	add(new THREE.BoxGeometry(0.32, 0.16, d.frontWingZ), darkMat, d.bodyLen / 2 + d.nose - 0.2, 0.42, 0); // front wing
-	add(new THREE.BoxGeometry(0.55, 0.5, d.rearWingZ), bodyMat, d.rearWingX, 0.66, 0); // rear wing (colour)
-	add(new THREE.BoxGeometry(0.7, 0.42, d.bodyW * 0.8), glassMat, 0.35, 0.74, 0); // cockpit
-	// 4 exposed wheels (dark); keep the front pair to steer them visually.
-	const wheelGeo = new THREE.BoxGeometry(d.wheelL, 0.55, d.wheelW);
+	// 4 wheels (front = +x); keep the front pair to steer them visually.
 	const frontWheels: THREE.Mesh[] = [];
-	for (const wx of [d.wx, -d.wx]) {
-		for (const wz of [d.wz, -d.wz]) {
-			const w = new THREE.Mesh(wheelGeo, darkMat);
-			w.position.set(wx, 0.42, wz);
-			g.add(w);
-			if (wx > 0) frontWheels.push(w); // front axle
+	const addWheels = (wl: number, ww: number, wx: number, wz: number) => {
+		const geo = new THREE.BoxGeometry(wl, 0.5, ww);
+		for (const sx of [wx, -wx]) {
+			for (const sz of [wz, -wz]) {
+				const w = new THREE.Mesh(geo, darkMat);
+				w.position.set(sx, 0.4, sz);
+				g.add(w);
+				if (sx > 0) frontWheels.push(w);
+			}
 		}
+	};
+
+	if (kindId === 'vitesse') {
+		// Supercar — wide, low, wedge nose, big rear wing.
+		add(new THREE.BoxGeometry(3.4, 0.34, 1.6), bodyMat, 0, 0.45, 0); // wide low body — child[0]
+		add(new THREE.BoxGeometry(1.5, 0.24, 1.0), bodyMat, 2.0, 0.42, 0); // wedge nose
+		add(new THREE.BoxGeometry(0.35, 0.14, 1.9), darkMat, 2.65, 0.34, 0); // front splitter
+		add(new THREE.BoxGeometry(1.0, 0.22, 1.2), glassMat, 0.1, 0.62, 0); // low canopy
+		add(new THREE.BoxGeometry(0.5, 0.5, 1.9), bodyMat, -1.7, 0.72, 0); // big rear wing (colour)
+		addWheels(1.0, 0.6, 1.3, 0.92);
+	} else if (kindId === 'drift') {
+		// Roadster — short, open cockpit, small windscreen, roll hoops.
+		add(new THREE.BoxGeometry(2.7, 0.42, 1.3), bodyMat, 0, 0.48, 0); // body — child[0]
+		add(new THREE.BoxGeometry(1.0, 0.32, 1.0), bodyMat, 1.65, 0.46, 0); // rounded nose
+		add(new THREE.BoxGeometry(0.7, 0.18, 1.3), bodyMat, -1.2, 0.5, 0); // short tail
+		add(new THREE.BoxGeometry(1.0, 0.34, 1.0), darkMat, 0.1, 0.52, 0); // open cockpit (dark interior)
+		add(new THREE.BoxGeometry(0.12, 0.34, 1.0), glassMat, 0.65, 0.7, 0); // windscreen
+		add(new THREE.BoxGeometry(0.16, 0.36, 0.16), darkMat, -0.45, 0.74, 0.4); // roll hoops
+		add(new THREE.BoxGeometry(0.16, 0.36, 0.16), darkMat, -0.45, 0.74, -0.4);
+		addWheels(1.1, 0.66, 1.05, 0.98);
+	} else {
+		// Coupé — rounded, full glass roof.
+		add(new THREE.BoxGeometry(3.1, 0.44, 1.4), bodyMat, 0, 0.5, 0); // body — child[0]
+		add(new THREE.BoxGeometry(1.1, 0.34, 1.05), bodyMat, 1.85, 0.48, 0); // sloped hood
+		add(new THREE.BoxGeometry(0.9, 0.24, 1.3), bodyMat, -1.45, 0.52, 0); // rounded tail
+		add(new THREE.BoxGeometry(1.6, 0.3, 1.1), glassMat, 0.05, 0.72, 0); // greenhouse / roof
+		addWheels(1.0, 0.56, 1.2, 0.95);
 	}
+
 	g.userData.frontWheels = frontWheels;
 	return g;
 }
@@ -294,39 +310,42 @@ function buildStartLine(track: Track): THREE.BufferGeometry {
 /** Tiny top-down car silhouette for the selection cards (distinct shape per kind). */
 function CarSvg({ kind }: { kind: KindId }) {
 	const tint = { equilibre: '#cdd2da', vitesse: '#7fd0ff', drift: '#ffd166' }[kind];
-	const W = '#222', K = '#111';
+	const W = '#222', K = '#111', G = '#1e2a36'; // wing accent, wheels, glass/interior
 	const svg = (children: ReactNode) => (
 		<svg viewBox="0 0 48 60" width="42" height="52" aria-hidden="true">{children}</svg>
 	);
 	if (kind === 'vitesse') {
+		// Supercar — wide, low, wedge nose, big rear wing.
 		return svg(
 			<>
-				<rect x="14" y="4" width="20" height="6" rx="2" fill={W} />
-				<rect x="20" y="8" width="8" height="40" rx="4" fill={tint} />
-				<rect x="12" y="47" width="24" height="7" rx="2" fill={W} />
-				<rect x="9" y="14" width="6" height="9" rx="2" fill={K} /><rect x="33" y="14" width="6" height="9" rx="2" fill={K} />
-				<rect x="9" y="38" width="6" height="9" rx="2" fill={K} /><rect x="33" y="38" width="6" height="9" rx="2" fill={K} />
+				<polygon points="24,3 34,18 14,18" fill={tint} />
+				<rect x="8" y="16" width="32" height="30" rx="7" fill={tint} />
+				<rect x="17" y="24" width="14" height="11" rx="3" fill={G} />
+				<rect x="7" y="49" width="34" height="6" rx="2" fill={W} />
+				<rect x="3" y="20" width="7" height="11" rx="2" fill={K} /><rect x="38" y="20" width="7" height="11" rx="2" fill={K} />
+				<rect x="3" y="37" width="7" height="11" rx="2" fill={K} /><rect x="38" y="37" width="7" height="11" rx="2" fill={K} />
 			</>,
 		);
 	}
 	if (kind === 'drift') {
+		// Roadster — short, open cockpit, small windscreen.
 		return svg(
 			<>
-				<rect x="16" y="6" width="16" height="5" rx="2" fill={W} />
-				<rect x="15" y="12" width="18" height="34" rx="5" fill={tint} />
-				<rect x="17" y="46" width="14" height="5" rx="2" fill={W} />
-				<rect x="5" y="14" width="10" height="13" rx="2" fill={K} /><rect x="33" y="14" width="10" height="13" rx="2" fill={K} />
-				<rect x="5" y="33" width="10" height="13" rx="2" fill={K} /><rect x="33" y="33" width="10" height="13" rx="2" fill={K} />
+				<rect x="12" y="10" width="24" height="40" rx="9" fill={tint} />
+				<rect x="16" y="22" width="16" height="16" rx="4" fill={K} />
+				<rect x="17" y="20" width="14" height="3" rx="1" fill="#9fd8ff" />
+				<rect x="5" y="16" width="8" height="12" rx="2" fill={K} /><rect x="35" y="16" width="8" height="12" rx="2" fill={K} />
+				<rect x="5" y="33" width="8" height="12" rx="2" fill={K} /><rect x="35" y="33" width="8" height="12" rx="2" fill={K} />
 			</>,
 		);
 	}
+	// Coupé — rounded body with a glass roof.
 	return svg(
 		<>
-			<rect x="15" y="5" width="18" height="6" rx="2" fill={W} />
-			<rect x="18" y="9" width="12" height="38" rx="4" fill={tint} />
-			<rect x="15" y="46" width="18" height="6" rx="2" fill={W} />
-			<rect x="8" y="14" width="7" height="11" rx="2" fill={K} /><rect x="33" y="14" width="7" height="11" rx="2" fill={K} />
-			<rect x="8" y="36" width="7" height="11" rx="2" fill={K} /><rect x="33" y="36" width="7" height="11" rx="2" fill={K} />
+			<rect x="11" y="5" width="26" height="48" rx="11" fill={tint} />
+			<rect x="15" y="20" width="18" height="18" rx="6" fill={G} />
+			<rect x="7" y="13" width="6" height="10" rx="2" fill={K} /><rect x="35" y="13" width="6" height="10" rx="2" fill={K} />
+			<rect x="7" y="37" width="6" height="10" rx="2" fill={K} /><rect x="35" y="37" width="6" height="10" rx="2" fill={K} />
 		</>,
 	);
 }
