@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
 import LaboDemo from '../components/LaboDemo.tsx';
+import LaboWorld from '../components/LaboWorld.tsx';
 ---
 
 <BaseLayout
@@ -18,6 +19,13 @@ import LaboDemo from '../components/LaboDemo.tsx';
 		</header>
 
 		<LaboDemo client:only="react" />
+
+		<section class="labo-section stack gap-2">
+			<h2>Monde ouvert procédural</h2>
+			<p>Une île générée par code, façon GTA : ville, forêt, montagnes et mer — tout en temps réel.</p>
+		</section>
+
+		<LaboWorld client:only="react" />
 	</div>
 </BaseLayout>
 
@@ -49,6 +57,18 @@ import LaboDemo from '../components/LaboDemo.tsx';
 	}
 	.labo-head p {
 		color: var(--gray-300);
+	}
+	.labo-section {
+		text-align: center;
+		align-items: center;
+		margin-top: 1rem;
+	}
+	.labo-section h2 {
+		font-size: var(--text-2xl);
+	}
+	.labo-section p {
+		color: var(--gray-300);
+		max-width: 55ch;
 	}
 	@media (min-width: 50em) {
 		.labo-head h1 {
