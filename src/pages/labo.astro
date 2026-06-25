@@ -1,0 +1,58 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from '../components/Icon.astro';
+import LaboDemo from '../components/LaboDemo.tsx';
+---
+
+<BaseLayout
+	title="Labo | Ludiven Studio"
+	description="Démo technique three.js : eau réfléchissante, ombres temps réel, matériaux PBR, tone mapping ACES et bloom. Jusqu'où peut aller le rendu 3D dans le navigateur."
+>
+	<div class="wrapper labo-page stack gap-8">
+		<header class="labo-head stack gap-2">
+			<a class="back" href="/">
+				<Icon icon="arrow-left" size="1em" /> Accueil
+			</a>
+			<h1>Labo</h1>
+			<p>Démo technique : rendu 3D avancé en temps réel</p>
+		</header>
+
+		<LaboDemo client:only="react" />
+	</div>
+</BaseLayout>
+
+<style>
+	.labo-page {
+		align-items: center;
+	}
+	.labo-head {
+		text-align: center;
+		align-items: center;
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--gray-300);
+		text-decoration: none;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+	}
+	.back:hover,
+	.back:focus-visible {
+		color: var(--accent-regular);
+	}
+	.labo-head h1 {
+		font-size: var(--text-3xl);
+		margin-top: 0.5rem;
+	}
+	.labo-head p {
+		color: var(--gray-300);
+	}
+	@media (min-width: 50em) {
+		.labo-head h1 {
+			font-size: var(--text-4xl);
+		}
+	}
+</style>
