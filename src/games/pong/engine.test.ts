@@ -11,6 +11,7 @@ const base = (over: Partial<PongState> = {}): PongState => ({
 	rightY: PONG.H / 2,
 	scoreL: 0,
 	scoreR: 0,
+	serveT: 0,
 	chargeL: 0,
 	chargeR: 0,
 	curveT: 0,

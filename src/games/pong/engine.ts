@@ -17,6 +17,7 @@ export const PONG = {
 	maxBounceAngle: Math.PI / 3.2, // deflection at the paddle edge (~56°)
 	paddleSpeed: 135, // units/s when moving a paddle
 	maxScore: 7,
+	serveDelay: 1, // s the ball stays frozen at centre before each serve (kickoff + after a point)
 	// power-ups
 	chargeNeed: 5, // paddle returns to fill the meter
 	curveRate: 1.9, // rad/s the velocity rotates while "curve" is active
@@ -37,6 +38,7 @@ export interface PongState {
 	rightY: number;
 	scoreL: number;
 	scoreR: number;
+	serveT: number; // >0 → ball frozen at centre (serve countdown / goal pause)
 	// power-ups (all broadcast as-is; timers in seconds remaining)
 	chargeL: number;
 	chargeR: number;
@@ -63,6 +65,7 @@ export function serve(s: PongState, rng: Rng, towardLeft: boolean): PongState {
 		by: PONG.H / 2,
 		bvx: Math.cos(angle) * PONG.serveSpeed * (towardLeft ? -1 : 1),
 		bvy: Math.sin(angle) * PONG.serveSpeed * vSign,
+		serveT: PONG.serveDelay, // freeze briefly before the ball flies off
 	};
 }
 
@@ -77,6 +80,7 @@ export function createState(rng: Rng = mulberry32(1)): PongState {
 		rightY: PONG.H / 2,
 		scoreL: 0,
 		scoreR: 0,
+		serveT: 0,
 		chargeL: 0,
 		chargeR: 0,
 		curveT: 0,
@@ -137,6 +141,12 @@ export function activatePower(prev: PongState, side: 'left' | 'right', power: Po
 /** Advance the ball by dt; bounce off walls/paddles; score when it passes an end. Returns the new state + who scored. */
 export function stepBall(prev: PongState, dt: number): { state: PongState; scored: Scored } {
 	const s: PongState = { ...prev };
+
+	// Serve pause: ball frozen at centre (kickoff / after a point). Everything else waits too.
+	if (s.serveT > 0) {
+		s.serveT = Math.max(0, s.serveT - dt);
+		return { state: s, scored: null };
+	}
 
 	// Power timers tick down.
 	s.curveT = Math.max(0, s.curveT - dt);

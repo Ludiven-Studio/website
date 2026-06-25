@@ -58,6 +58,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const oppPaddleRef = useRef(PONG.H / 2); // host: guest paddle received
 	const renderBallRef = useRef({ x: PONG.W / 2, y: PONG.H / 2 }); // guest: eased ball
 	const renderOppYRef = useRef(PONG.H / 2); // guest: eased opponent paddle
+	const decoysRef = useRef<{ x: number; y: number }[]>([]); // jam decoy balls
+	const jamFrameRef = useRef(0);
 
 	const inputDirRef = useRef(0); // keyboard -1 up / +1 down
 	const pointerYRef = useRef<number | null>(null); // drag target (field units)
@@ -96,22 +98,49 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		// right paddle
 		ctx.fillStyle = side === 'right' ? COL_ME : COL_OPP;
 		ctx.fillRect(VIEW_W - pw, rightY * SCALE - phR / 2, pw, phR);
-		// ball — hidden on my own side while my view is jammed
+		// ball — while my view is jammed, the real ball is hidden among flickering decoys
 		const myJam = side === 'left' ? s.jamLT > 0 : s.jamRT > 0;
-		if (!myJam) {
-			ctx.fillStyle = s.curveT > 0 ? '#ffd60a' : '#f4f6fb'; // tinted while curving
-			ctx.beginPath();
-			ctx.arc(ballX * SCALE, ballY * SCALE, PONG.ballR * SCALE, 0, Math.PI * 2);
-			ctx.fill();
-		}
-		// jam fog over my view
+		const r = PONG.ballR * SCALE;
+		ctx.fillStyle = s.curveT > 0 ? '#ffd60a' : '#f4f6fb'; // tinted while curving
 		if (myJam) {
-			ctx.fillStyle = 'rgba(150,170,200,0.5)';
-			ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-			ctx.fillStyle = 'rgba(255,255,255,0.85)';
-			ctx.font = 'bold 34px sans-serif';
+			// reposition decoys ~12×/s (not every frame → readable flicker, not a strobe)
+			jamFrameRef.current += 1;
+			if (decoysRef.current.length === 0 || jamFrameRef.current % 5 === 0) {
+				decoysRef.current = Array.from({ length: 7 }, () => ({ x: Math.random() * VIEW_W, y: Math.random() * VIEW_H }));
+			}
+			for (const d of decoysRef.current) {
+				ctx.beginPath();
+				ctx.arc(d.x, d.y, r, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			ctx.fillStyle = 'rgba(255,255,255,0.65)';
+			ctx.font = 'bold 16px sans-serif';
 			ctx.textAlign = 'center';
-			ctx.fillText('🌫️ Brouillage', VIEW_W / 2, VIEW_H / 2);
+			ctx.textBaseline = 'middle';
+			ctx.fillText('🌫️ brouillage', VIEW_W / 2, 20);
+			ctx.fillStyle = s.curveT > 0 ? '#ffd60a' : '#f4f6fb';
+		} else {
+			decoysRef.current = [];
+		}
+		// real ball (drawn among the decoys when jammed → present but hard to spot)
+		ctx.beginPath();
+		ctx.arc(ballX * SCALE, ballY * SCALE, r, 0, Math.PI * 2);
+		ctx.fill();
+		// Serve pause: dim, show the score, and an expanding ring around the frozen ball.
+		if (s.serveT > 0) {
+			const p = s.serveT / PONG.serveDelay; // 1 → 0
+			ctx.fillStyle = `rgba(8,10,18,${0.5 * p})`;
+			ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+			ctx.fillStyle = '#f4f6fb';
+			ctx.font = 'bold 72px sans-serif';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText(`${s.scoreL} — ${s.scoreR}`, VIEW_W / 2, VIEW_H / 2);
+			ctx.strokeStyle = `rgba(255,214,10,${p})`;
+			ctx.lineWidth = 3;
+			ctx.beginPath();
+			ctx.arc(ballX * SCALE, ballY * SCALE, PONG.ballR * SCALE * (1 + (1 - p) * 4), 0, Math.PI * 2);
+			ctx.stroke();
 		}
 	}, []);
 
