@@ -7,7 +7,7 @@
 
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../data/site';
-import type { PongState } from './engine';
+import type { PongState, PowerId } from './engine';
 
 export const MAX_PLAYERS = 2;
 const MAX_ROOMS = 24;
@@ -30,8 +30,10 @@ export interface Match {
 	isHost: () => boolean;
 	sendPaddle: (y: number) => void;
 	sendState: (s: PongState) => void;
+	sendPower: (power: PowerId) => void;
 	onPaddle: (cb: (m: PaddleMsg) => void) => void;
 	onState: (cb: (s: PongState) => void) => void;
+	onPower: (cb: (power: PowerId) => void) => void;
 	onPeers: (cb: (peers: PongPeer[]) => void) => void;
 	leave: () => void;
 }
@@ -90,9 +92,10 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 	const selfId = randomId();
 	const ch = c.channel(roomId, { config: { presence: { key: selfId }, broadcast: { self: false } } });
 
-	const cb: { paddle?: (m: PaddleMsg) => void; state?: (s: PongState) => void; peers?: (p: PongPeer[]) => void } = {};
+	const cb: { paddle?: (m: PaddleMsg) => void; state?: (s: PongState) => void; power?: (p: PowerId) => void; peers?: (p: PongPeer[]) => void } = {};
 	ch.on('broadcast', { event: 'paddle' }, ({ payload }) => cb.paddle?.(payload as PaddleMsg));
 	ch.on('broadcast', { event: 'state' }, ({ payload }) => cb.state?.(payload as PongState));
+	ch.on('broadcast', { event: 'power' }, ({ payload }) => cb.power?.((payload as { power: PowerId }).power));
 	ch.on('presence', { event: 'sync' }, () => cb.peers?.(peersOf(ch, selfId)));
 
 	const peers = await subscribeAndSync(ch, selfId);
@@ -113,11 +116,17 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 		sendState: (s) => {
 			void ch.send({ type: 'broadcast', event: 'state', payload: s });
 		},
+		sendPower: (power) => {
+			void ch.send({ type: 'broadcast', event: 'power', payload: { power } });
+		},
 		onPaddle: (fn) => {
 			cb.paddle = fn;
 		},
 		onState: (fn) => {
 			cb.state = fn;
+		},
+		onPower: (fn) => {
+			cb.power = fn;
 		},
 		onPeers: (fn) => {
 			cb.peers = fn;

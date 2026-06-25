@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32 } from '../prng';
-import { PONG, createState, serve, movePaddle, stepBall, type PongState } from './engine';
+import { PONG, createState, serve, movePaddle, stepBall, activatePower, type PongState } from './engine';
 
 const base = (over: Partial<PongState> = {}): PongState => ({
 	bx: PONG.W / 2,
@@ -11,6 +11,14 @@ const base = (over: Partial<PongState> = {}): PongState => ({
 	rightY: PONG.H / 2,
 	scoreL: 0,
 	scoreR: 0,
+	chargeL: 0,
+	chargeR: 0,
+	curveT: 0,
+	curveDir: 1,
+	bigLT: 0,
+	bigRT: 0,
+	jamLT: 0,
+	jamRT: 0,
 	...over,
 });
 
@@ -56,5 +64,40 @@ describe('pong engine', () => {
 	it('movePaddle clamps within the field', () => {
 		expect(movePaddle(PONG.H / 2, -1, 100)).toBe(PONG.paddleH / 2);
 		expect(movePaddle(PONG.H / 2, 1, 100)).toBe(PONG.H - PONG.paddleH / 2);
+	});
+
+	it('a paddle return charges the meter', () => {
+		const s = base({ bx: PONG.paddleW + PONG.ballR + 1, bvx: -60, by: PONG.H / 2, leftY: PONG.H / 2 });
+		const { state } = stepBall(s, 0.1);
+		expect(state.chargeL).toBe(1);
+	});
+
+	it('activatePower needs a full meter, then spends it', () => {
+		const notReady = base({ chargeL: 4, bvx: 40, bvy: 0 });
+		expect(activatePower(notReady, 'left', 'speed')).toBe(notReady); // unchanged
+
+		const ready = base({ chargeL: PONG.chargeNeed, bvx: 40, bvy: 0 });
+		const after = activatePower(ready, 'left', 'speed');
+		expect(after.chargeL).toBe(0);
+		expect(Math.hypot(after.bvx, after.bvy)).toBeCloseTo(PONG.maxBallSpeed, 5);
+	});
+
+	it('curve power bends the ball trajectory', () => {
+		let s = activatePower(base({ chargeR: PONG.chargeNeed, bvx: 60, bvy: 0 }), 'right', 'curve');
+		const before = Math.atan2(s.bvy, s.bvx);
+		for (let i = 0; i < 10; i++) s = stepBall(s, 1 / 60).state;
+		expect(Math.atan2(s.bvy, s.bvx)).not.toBeCloseTo(before, 3); // direction changed
+	});
+
+	it('big paddle extends reach (a ball that would miss now bounces)', () => {
+		const miss = PONG.paddleH / 2 + PONG.ballR + 4; // just outside a normal paddle
+		const normal = base({ bx: PONG.paddleW + PONG.ballR + 1, bvx: -60, by: PONG.H / 2 + miss, leftY: PONG.H / 2 });
+		expect(stepBall(normal, 0.1).scored).toBe('right'); // misses normally
+
+		const big = activatePower(base({ chargeL: PONG.chargeNeed }), 'left', 'big');
+		const withBig = { ...big, bx: PONG.paddleW + PONG.ballR + 1, bvx: -60, by: PONG.H / 2 + miss, leftY: PONG.H / 2 };
+		const { state, scored } = stepBall(withBig, 0.1);
+		expect(scored).toBeNull();
+		expect(state.bvx).toBeGreaterThan(0); // bounced thanks to the bigger paddle
 	});
 });

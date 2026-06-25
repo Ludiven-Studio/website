@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { PONG, createState, serve, movePaddle, stepBall, type PongState } from './engine';
+import { PONG, createState, serve, movePaddle, stepBall, activatePower, type PongState, type PowerId } from './engine';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PaddleMsg } from './net';
 import { mulberry32 } from '../prng';
 import { playerName, setPlayerName } from '../../lib/leaderboard';
@@ -13,6 +13,13 @@ const VIEW_H = 480;
 const SCALE = VIEW_W / PONG.W; // field units → backing pixels
 const COL_ME = '#4da3ff';
 const COL_OPP = '#ff5a5f';
+
+const POWERS: { id: PowerId; icon: string; label: string }[] = [
+	{ id: 'speed', icon: '⚡', label: 'Speed max' },
+	{ id: 'curve', icon: '🌀', label: 'Trajectoire courbée' },
+	{ id: 'jam', icon: '🌫️', label: 'Brouillage' },
+	{ id: 'big', icon: '🛡️', label: 'Raquette XXL' },
+];
 
 const randSeed = (): number => Math.floor(Math.random() * 2 ** 31);
 
@@ -30,6 +37,10 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const [youWon, setYouWon] = useState(false);
 	const [confirmQuit, setConfirmQuit] = useState(false);
 	const [copied, setCopied] = useState(false);
+	const [myCharge, setMyCharge] = useState(0); // 0..chargeNeed (for the power bar)
+
+	const aiPowerCdRef = useRef(0); // AI power cooldown
+	const chargeRef = useRef(0); // last pushed charge value (avoid setState every frame)
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const runningRef = useRef(false);
@@ -76,19 +87,32 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		ctx.setLineDash([]);
 
 		const pw = PONG.paddleW * SCALE;
-		const ph = PONG.paddleH * SCALE;
+		const phBase = PONG.paddleH * SCALE;
+		const phL = phBase * (s.bigLT > 0 ? PONG.bigMult : 1);
+		const phR = phBase * (s.bigRT > 0 ? PONG.bigMult : 1);
 		// left paddle
 		ctx.fillStyle = side === 'left' ? COL_ME : COL_OPP;
-		ctx.fillRect(0, leftY * SCALE - ph / 2, pw, ph);
+		ctx.fillRect(0, leftY * SCALE - phL / 2, pw, phL);
 		// right paddle
 		ctx.fillStyle = side === 'right' ? COL_ME : COL_OPP;
-		ctx.fillRect(VIEW_W - pw, rightY * SCALE - ph / 2, pw, ph);
-		// ball
-		ctx.fillStyle = '#f4f6fb';
-		ctx.beginPath();
-		ctx.arc(ballX * SCALE, ballY * SCALE, PONG.ballR * SCALE, 0, Math.PI * 2);
-		ctx.fill();
-		void s;
+		ctx.fillRect(VIEW_W - pw, rightY * SCALE - phR / 2, pw, phR);
+		// ball — hidden on my own side while my view is jammed
+		const myJam = side === 'left' ? s.jamLT > 0 : s.jamRT > 0;
+		if (!myJam) {
+			ctx.fillStyle = s.curveT > 0 ? '#ffd60a' : '#f4f6fb'; // tinted while curving
+			ctx.beginPath();
+			ctx.arc(ballX * SCALE, ballY * SCALE, PONG.ballR * SCALE, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		// jam fog over my view
+		if (myJam) {
+			ctx.fillStyle = 'rgba(150,170,200,0.5)';
+			ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+			ctx.fillStyle = 'rgba(255,255,255,0.85)';
+			ctx.font = 'bold 34px sans-serif';
+			ctx.textAlign = 'center';
+			ctx.fillText('🌫️ Brouillage', VIEW_W / 2, VIEW_H / 2);
+		}
 	}, []);
 
 	/* ---------- main loop ---------- */
@@ -109,6 +133,13 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		const cap = PONG.paddleSpeed * 0.82 * dt;
 		const move = Math.max(-cap, Math.min(cap, target - y));
 		return Math.max(PONG.paddleH / 2, Math.min(PONG.H - PONG.paddleH / 2, y + move));
+	}, []);
+
+	const syncCharge = useCallback((c: number) => {
+		if (c !== chargeRef.current) {
+			chargeRef.current = c;
+			setMyCharge(c);
+		}
 	}, []);
 
 	const frame = useCallback(
@@ -142,11 +173,21 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				renderBallRef.current.y += (s.by - renderBallRef.current.y) * k;
 				renderOppYRef.current += (s.leftY - renderOppYRef.current) * k;
 				draw(s, renderBallRef.current.x, renderBallRef.current.y, renderOppYRef.current, myYRef.current);
+				syncCharge(s.chargeR);
 				if (finishIfWon(s.scoreL, s.scoreR)) return;
 			} else {
 				// host or ai: authoritative simulation. My paddle = left, opponent = right.
 				s.leftY = myUpdate(s.leftY);
 				s.rightY = role === 'ai' ? aiMove(s.rightY, s, dt) : oppPaddleRef.current;
+				if (role === 'ai') {
+					// AI spends a full charge on a random power, with a cooldown.
+					aiPowerCdRef.current -= dt;
+					if (s.chargeR >= PONG.chargeNeed && aiPowerCdRef.current <= 0) {
+						const pick = POWERS[Math.floor(Math.random() * POWERS.length)].id;
+						Object.assign(s, activatePower(s, 'right', pick));
+						aiPowerCdRef.current = 1.2 + Math.random() * 1.6;
+					}
+				}
 				const r = stepBall(s, dt);
 				stateRef.current = r.state;
 				if (r.scored) {
@@ -163,11 +204,12 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					}
 				}
 				draw(st, st.bx, st.by, st.leftY, st.rightY);
+				syncCharge(st.chargeL);
 				if (finishIfWon(st.scoreL, st.scoreR)) return;
 			}
 			rafRef.current = requestAnimationFrame(frame);
 		},
-		[draw, finishIfWon, aiMove],
+		[draw, finishIfWon, aiMove, syncCharge],
 	);
 
 	const startLoop = useCallback(() => {
@@ -185,6 +227,9 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			const host = m.isHost();
 			roleRef.current = host ? 'host' : 'guest';
 			setConfirmQuit(false);
+			chargeRef.current = 0;
+			setMyCharge(0);
+			aiPowerCdRef.current = 0;
 			setScoreMe(0);
 			setScoreOpp(0);
 			myYRef.current = PONG.H / 2;
@@ -209,6 +254,9 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					setScoreMe(st.scoreR);
 					setScoreOpp(st.scoreL);
 				}
+			});
+			m.onPower((p) => {
+				if (roleRef.current === 'host') stateRef.current = activatePower(stateRef.current, 'right', p); // guest's power
 			});
 
 			setPhase('playing');
@@ -253,6 +301,12 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			setTimeout(() => setCopied(false), 1500);
 		});
 	}, [roomCode]);
+
+	const usePower = useCallback((power: PowerId) => {
+		const role = roleRef.current;
+		if (role === 'guest') matchRef.current?.sendPower(power);
+		else stateRef.current = activatePower(stateRef.current, 'left', power); // host/ai activate their own (left)
+	}, []);
 
 	/* ---------- menu actions ---------- */
 	const ensureName = useCallback((): string | null => {
@@ -327,6 +381,9 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		roleRef.current = 'ai';
 		startedRef.current = true;
 		setConfirmQuit(false);
+		chargeRef.current = 0;
+		setMyCharge(0);
+		aiPowerCdRef.current = 0;
 		setOppName('Ordinateur');
 		setScoreMe(0);
 		setScoreOpp(0);
@@ -341,6 +398,9 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const rematch = useCallback(() => {
 		if (roleRef.current === 'guest') return; // host (or AI) controls the restart
 		setConfirmQuit(false);
+		chargeRef.current = 0;
+		setMyCharge(0);
+		aiPowerCdRef.current = 0;
 		setScoreMe(0);
 		setScoreOpp(0);
 		rngRef.current = mulberry32(randSeed());
@@ -372,6 +432,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
 			if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'z') inputDirRef.current = -1;
 			else if (e.key === 'ArrowDown' || e.key === 's') inputDirRef.current = 1;
+			else if (e.key >= '1' && e.key <= '4') usePower(POWERS[Number(e.key) - 1].id); // engine ignores it if the meter isn't full
 		};
 		const up = (e: KeyboardEvent) => {
 			if ((e.key === 'ArrowUp' || e.key === 'w' || e.key === 'z') && inputDirRef.current === -1) inputDirRef.current = 0;
@@ -383,7 +444,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			window.removeEventListener('keydown', down);
 			window.removeEventListener('keyup', up);
 		};
-	}, []);
+	}, [usePower]);
 
 	const pointer = (e: React.PointerEvent) => {
 		const cv = canvasRef.current;
@@ -498,7 +559,24 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{phase === 'playing' && <p className="pg-hint">Flèches ↑ ↓ (ou Z/S) · ou glisse le doigt sur le terrain</p>}
+			{phase === 'playing' && (
+				<div className="pg-powerbar">
+					<div className="pg-meter" aria-label={`Jauge de pouvoir ${myCharge}/${PONG.chargeNeed}`}>
+						{Array.from({ length: PONG.chargeNeed }, (_, i) => (
+							<i key={i} className={i < myCharge ? 'on' : ''} />
+						))}
+					</div>
+					<div className="pg-powers">
+						{POWERS.map((p) => (
+							<button key={p.id} className="pg-power" disabled={myCharge < PONG.chargeNeed} title={p.label} aria-label={p.label} onClick={() => usePower(p.id)}>
+								<span aria-hidden="true">{p.icon}</span>
+							</button>
+						))}
+					</div>
+				</div>
+			)}
+
+			{phase === 'playing' && <p className="pg-hint">Flèches ↑ ↓ (ou Z/S) · ou glisse le doigt · pouvoirs au 5e renvoi (touches 1-4)</p>}
 		</div>
 	);
 }
@@ -531,6 +609,15 @@ const CSS = `
 .pg-copyhint { margin: 0; color: var(--accent-regular, #b07cff); font-size: var(--text-sm); min-height: 1.1em; }
 .pg-status { margin: 0; color: var(--gray-300); font-size: var(--text-sm); }
 .pg-hint { color: var(--gray-400); font-size: var(--text-sm); text-align: center; margin: 0; }
+.pg-powerbar { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
+.pg-meter { display: flex; gap: 4px; }
+.pg-meter i { width: 26px; height: 7px; border-radius: 2px; background: var(--gray-700, #3a4150); transition: background 0.15s; }
+.pg-meter i.on { background: var(--accent-regular, #b07cff); }
+.pg-powers { display: flex; gap: 0.5rem; }
+.pg-power { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--gray-700, #3a4150); background: var(--gray-900, #14171f); font-size: 1.5rem; cursor: pointer; display: grid; place-items: center; transition: transform 0.1s, border-color 0.15s; }
+.pg-power:not(:disabled) { border-color: var(--accent-regular, #b07cff); box-shadow: 0 0 10px rgba(176,124,255,0.35); }
+.pg-power:not(:disabled):hover { transform: translateY(-2px); }
+.pg-power:disabled { opacity: 0.4; cursor: not-allowed; }
 .pg-spinner { width: 28px; height: 28px; border: 3px solid var(--gray-700, #3a4150); border-top-color: var(--accent-regular, #b07cff); border-radius: 50%; margin: 0.25rem auto; animation: pg-spin 0.8s linear infinite; }
 @keyframes pg-spin { to { transform: rotate(360deg); } }
 `;
