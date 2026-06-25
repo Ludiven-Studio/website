@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32 } from '../prng';
-import { PONG, createState, serve, movePaddle, stepBall, activatePower, type PongState } from './engine';
+import { PONG, createState, serve, movePaddle, stepBall, activatePower, addPickup, type PongState } from './engine';
 
 const base = (over: Partial<PongState> = {}): PongState => ({
 	bx: PONG.W / 2,
@@ -20,6 +20,8 @@ const base = (over: Partial<PongState> = {}): PongState => ({
 	bigRT: 0,
 	jamLT: 0,
 	jamRT: 0,
+	pickups: [],
+	lastHit: '',
 	...over,
 });
 
@@ -88,6 +90,24 @@ describe('pong engine', () => {
 		const before = Math.atan2(s.bvy, s.bvx);
 		for (let i = 0; i < 10; i++) s = stepBall(s, 1 / 60).state;
 		expect(Math.atan2(s.bvy, s.bvx)).not.toBeCloseTo(before, 3); // direction changed
+	});
+
+	it('addPickup caps at maxPickups', () => {
+		let s = base();
+		for (let i = 0; i < PONG.maxPickups + 3; i++) s = addPickup(s, 100, 60, 'speed');
+		expect(s.pickups.length).toBe(PONG.maxPickups);
+	});
+
+	it('ball rolling over a pickup triggers it for the last hitter and removes it', () => {
+		const s = base({ bx: PONG.W / 2, by: PONG.H / 2, bvx: 40, bvy: 0, lastHit: 'left', pickups: [{ x: PONG.W / 2, y: PONG.H / 2, power: 'speed' }] });
+		const { state } = stepBall(s, 1 / 60);
+		expect(state.pickups.length).toBe(0); // collected
+		expect(Math.hypot(state.bvx, state.bvy)).toBeCloseTo(PONG.maxBallSpeed, 5); // speed effect applied
+	});
+
+	it('a pickup is not collected before any paddle has touched the ball', () => {
+		const s = base({ bx: PONG.W / 2, by: PONG.H / 2, bvx: 40, bvy: 0, lastHit: '', pickups: [{ x: PONG.W / 2, y: PONG.H / 2, power: 'big' }] });
+		expect(stepBall(s, 1 / 60).state.pickups.length).toBe(1); // stays
 	});
 
 	it('big paddle extends reach (a ball that would miss now bounces)', () => {

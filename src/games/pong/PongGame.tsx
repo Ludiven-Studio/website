@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { PONG, createState, serve, movePaddle, stepBall, activatePower, type PongState, type PowerId } from './engine';
+import { PONG, createState, serve, movePaddle, stepBall, activatePower, addPickup, type PongState, type PowerId } from './engine';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PaddleMsg } from './net';
 import { mulberry32 } from '../prng';
 import { playerName, setPlayerName } from '../../lib/leaderboard';
@@ -20,6 +20,8 @@ const POWERS: { id: PowerId; icon: string; label: string }[] = [
 	{ id: 'jam', icon: '🌫️', label: 'Brouillage' },
 	{ id: 'big', icon: '🛡️', label: 'Raquette XXL' },
 ];
+const POWER_COLOR: Record<PowerId, string> = { speed: '#ffd60a', curve: '#b07cff', jam: '#7fd0ff', big: '#30d158' };
+const POWER_ICON: Record<PowerId, string> = { speed: '⚡', curve: '🌀', jam: '🌫️', big: '🛡️' };
 
 const randSeed = (): number => Math.floor(Math.random() * 2 ** 31);
 
@@ -60,6 +62,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const renderOppYRef = useRef(PONG.H / 2); // guest: eased opponent paddle
 	const decoysRef = useRef<{ x: number; y: number }[]>([]); // jam decoy balls
 	const jamFrameRef = useRef(0);
+	const spawnAccRef = useRef(0); // ground power-up spawn timer (host/ai)
 
 	const inputDirRef = useRef(0); // keyboard -1 up / +1 down
 	const pointerYRef = useRef<number | null>(null); // drag target (field units)
@@ -98,6 +101,18 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		// right paddle
 		ctx.fillStyle = side === 'right' ? COL_ME : COL_OPP;
 		ctx.fillRect(VIEW_W - pw, rightY * SCALE - phR / 2, pw, phR);
+		// ground power-ups
+		for (const p of s.pickups) {
+			const px = p.x * SCALE, py = p.y * SCALE, pr = PONG.pickupR * SCALE;
+			ctx.fillStyle = POWER_COLOR[p.power];
+			ctx.beginPath();
+			ctx.arc(px, py, pr, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.font = `${pr * 1.2}px sans-serif`;
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText(POWER_ICON[p.power], px, py + 1);
+		}
 		// Jam: while the ball is on the jammed player's half, a few decoy balls flicker right
 		// around the real one — same look, so you can't tell which is the real ball.
 		const r = PONG.ballR * SCALE;
@@ -211,6 +226,17 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				if (finishIfWon(s.scoreL, s.scoreR)) return;
 			} else {
 				// host or ai: authoritative simulation. My paddle = left, opponent = right.
+				// Spawn ground power-ups over time (host owns them; broadcast in state).
+				spawnAccRef.current += dt;
+				if (spawnAccRef.current >= PONG.pickupEvery) {
+					spawnAccRef.current = 0;
+					if (s.pickups.length < PONG.maxPickups) {
+						const x = PONG.W * 0.25 + rngRef.current() * PONG.W * 0.5;
+						const y = PONG.pickupR + rngRef.current() * (PONG.H - 2 * PONG.pickupR);
+						const power = POWERS[Math.floor(rngRef.current() * POWERS.length)].id;
+						s.pickups = addPickup(s, x, y, power).pickups;
+					}
+				}
 				s.leftY = myUpdate(s.leftY);
 				s.rightY = role === 'ai' ? aiMove(s.rightY, s, dt) : oppPaddleRef.current;
 				if (role === 'ai') {
@@ -264,6 +290,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			chargeRef.current = 0;
 			setMyCharge(0);
 			aiPowerCdRef.current = 0;
+		spawnAccRef.current = 0;
 			setScoreMe(0);
 			setScoreOpp(0);
 			myYRef.current = PONG.H / 2;
@@ -418,6 +445,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		chargeRef.current = 0;
 		setMyCharge(0);
 		aiPowerCdRef.current = 0;
+		spawnAccRef.current = 0;
 		setOppName('Ordinateur');
 		setScoreMe(0);
 		setScoreOpp(0);
@@ -435,6 +463,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		chargeRef.current = 0;
 		setMyCharge(0);
 		aiPowerCdRef.current = 0;
+		spawnAccRef.current = 0;
 		setScoreMe(0);
 		setScoreOpp(0);
 		rngRef.current = mulberry32(randSeed());

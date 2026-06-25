@@ -25,9 +25,18 @@ export const PONG = {
 	bigMult: 1.8, // paddle half-height multiplier while "big" is active
 	bigDur: 6,
 	jamDur: 3,
+	pickupR: 6, // ground power-up radius
+	pickupEvery: 6, // seconds between spawns
+	maxPickups: 2,
 };
 
 export type PowerId = 'speed' | 'curve' | 'jam' | 'big';
+
+export interface Pickup {
+	x: number;
+	y: number;
+	power: PowerId;
+}
 
 export interface PongState {
 	bx: number;
@@ -48,6 +57,8 @@ export interface PongState {
 	bigRT: number;
 	jamLT: number; // view-jam on the left player's screen
 	jamRT: number;
+	pickups: Pickup[]; // power-ups on the field
+	lastHit: '' | 'left' | 'right'; // last paddle that touched the ball (collects pickups)
 }
 
 /** Who just scored on this step (the side that gains the point), or null. */
@@ -89,6 +100,8 @@ export function createState(rng: Rng = mulberry32(1)): PongState {
 		bigRT: 0,
 		jamLT: 0,
 		jamRT: 0,
+		pickups: [],
+		lastHit: '',
 	};
 	return serve(base, rng, rng() < 0.5);
 }
@@ -107,13 +120,8 @@ function bounceOffPaddle(s: PongState, paddleY: number, fromLeft: boolean): void
 	s.bvy = Math.sin(angle) * speed;
 }
 
-/** Spend a full charge to trigger a power for one side. No-op if the meter isn't full. */
-export function activatePower(prev: PongState, side: 'left' | 'right', power: PowerId): PongState {
-	const charge = side === 'left' ? prev.chargeL : prev.chargeR;
-	if (charge < PONG.chargeNeed) return prev;
-	const s: PongState = { ...prev };
-	if (side === 'left') s.chargeL = 0;
-	else s.chargeR = 0;
+/** Apply a power's effect for one side (no charge check) — shared by the meter and ground pickups. */
+function applyEffect(s: PongState, side: 'left' | 'right', power: PowerId): void {
 	switch (power) {
 		case 'speed': {
 			const sp = Math.hypot(s.bvx, s.bvy) || 1;
@@ -135,7 +143,23 @@ export function activatePower(prev: PongState, side: 'left' | 'right', power: Po
 			else s.jamLT = PONG.jamDur;
 			break;
 	}
+}
+
+/** Spend a full charge to trigger a power for one side. No-op if the meter isn't full. */
+export function activatePower(prev: PongState, side: 'left' | 'right', power: PowerId): PongState {
+	const charge = side === 'left' ? prev.chargeL : prev.chargeR;
+	if (charge < PONG.chargeNeed) return prev;
+	const s: PongState = { ...prev };
+	if (side === 'left') s.chargeL = 0;
+	else s.chargeR = 0;
+	applyEffect(s, side, power);
 	return s;
+}
+
+/** Add a ground power-up (capped at maxPickups). */
+export function addPickup(prev: PongState, x: number, y: number, power: PowerId): PongState {
+	if (prev.pickups.length >= PONG.maxPickups) return prev;
+	return { ...prev, pickups: [...prev.pickups, { x, y, power }] };
 }
 
 /** Advance the ball by dt; bounce off walls/paddles; score when it passes an end. Returns the new state + who scored. */
@@ -184,6 +208,7 @@ export function stepBall(prev: PongState, dt: number): { state: PongState; score
 			s.bx = PONG.paddleW + PONG.ballR;
 			bounceOffPaddle(s, s.leftY, true);
 			s.chargeL = Math.min(PONG.chargeNeed, s.chargeL + 1);
+			s.lastHit = 'left';
 		} else if (s.bx + PONG.ballR < 0) {
 			s.scoreR += 1;
 			return { state: s, scored: 'right' };
@@ -195,10 +220,24 @@ export function stepBall(prev: PongState, dt: number): { state: PongState; score
 			s.bx = PONG.W - PONG.paddleW - PONG.ballR;
 			bounceOffPaddle(s, s.rightY, false);
 			s.chargeR = Math.min(PONG.chargeNeed, s.chargeR + 1);
+			s.lastHit = 'right';
 		} else if (s.bx - PONG.ballR > PONG.W) {
 			s.scoreL += 1;
 			return { state: s, scored: 'left' };
 		}
+	}
+
+	// Ground power-ups: the last hitter collects any the ball rolls over.
+	if (s.lastHit && s.pickups.length) {
+		const kept: Pickup[] = [];
+		for (const p of s.pickups) {
+			if (Math.hypot(s.bx - p.x, s.by - p.y) <= PONG.ballR + PONG.pickupR) {
+				applyEffect(s, s.lastHit, p.power);
+			} else {
+				kept.push(p);
+			}
+		}
+		if (kept.length !== s.pickups.length) s.pickups = kept;
 	}
 
 	return { state: s, scored: null };
