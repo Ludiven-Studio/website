@@ -98,43 +98,34 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		// right paddle
 		ctx.fillStyle = side === 'right' ? COL_ME : COL_OPP;
 		ctx.fillRect(VIEW_W - pw, rightY * SCALE - phR / 2, pw, phR);
-		// Jam: flickering decoy balls over the JAMMED player's half (visible on every screen),
-		// so when the ball heads to that side it gets lost among fakes.
+		// Jam: while the ball is on the jammed player's half, a few decoy balls flicker right
+		// around the real one — same look, so you can't tell which is the real ball.
 		const r = PONG.ballR * SCALE;
-		const jamLeft = s.jamLT > 0;
-		const jamRight = s.jamRT > 0;
+		const ballInLeft = ballX < PONG.W / 2;
+		const jammedHere = (s.jamLT > 0 && ballInLeft) || (s.jamRT > 0 && !ballInLeft);
 		ctx.fillStyle = s.curveT > 0 ? '#ffd60a' : '#f4f6fb'; // tinted while curving
-		if (jamLeft || jamRight) {
-			// reposition decoys ~12×/s (not every frame → readable flicker, not a strobe)
+		if (jammedHere) {
+			const RAD = 26; // neighbourhood radius around the ball (field units)
 			jamFrameRef.current += 1;
 			if (decoysRef.current.length === 0 || jamFrameRef.current % 5 === 0) {
-				const pts: { x: number; y: number }[] = [];
-				const N = 7;
-				if (jamLeft) for (let i = 0; i < N; i++) pts.push({ x: Math.random() * (VIEW_W / 2), y: Math.random() * VIEW_H });
-				if (jamRight) for (let i = 0; i < N; i++) pts.push({ x: VIEW_W / 2 + Math.random() * (VIEW_W / 2), y: Math.random() * VIEW_H });
-				decoysRef.current = pts;
+				decoysRef.current = Array.from({ length: 3 }, () => {
+					const a = Math.random() * Math.PI * 2;
+					const d = Math.random() * RAD;
+					return {
+						x: Math.max(0, Math.min(VIEW_W, (ballX + Math.cos(a) * d) * SCALE)),
+						y: Math.max(0, Math.min(VIEW_H, (ballY + Math.sin(a) * d) * SCALE)),
+					};
+				});
 			}
 			for (const d of decoysRef.current) {
 				ctx.beginPath();
 				ctx.arc(d.x, d.y, r, 0, Math.PI * 2);
 				ctx.fill();
 			}
-			ctx.fillStyle = 'rgba(255,255,255,0.6)';
-			ctx.font = 'bold 15px sans-serif';
-			ctx.textBaseline = 'middle';
-			if (jamLeft) {
-				ctx.textAlign = 'center';
-				ctx.fillText('🌫️', VIEW_W / 4, 18);
-			}
-			if (jamRight) {
-				ctx.textAlign = 'center';
-				ctx.fillText('🌫️', (VIEW_W * 3) / 4, 18);
-			}
-			ctx.fillStyle = s.curveT > 0 ? '#ffd60a' : '#f4f6fb';
 		} else {
 			decoysRef.current = [];
 		}
-		// real ball (drawn among the decoys when its half is jammed → present but hard to spot)
+		// real ball (drawn among the decoys when jammed → present but indistinguishable)
 		ctx.beginPath();
 		ctx.arc(ballX * SCALE, ballY * SCALE, r, 0, Math.PI * 2);
 		ctx.fill();
