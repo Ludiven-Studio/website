@@ -125,10 +125,12 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		} else {
 			decoysRef.current = [];
 		}
-		// real ball (drawn among the decoys when jammed → present but indistinguishable)
-		ctx.beginPath();
-		ctx.arc(ballX * SCALE, ballY * SCALE, r, 0, Math.PI * 2);
-		ctx.fill();
+		// real ball — hidden while jammed (only the flickering decoys show its rough area)
+		if (!jammedHere) {
+			ctx.beginPath();
+			ctx.arc(ballX * SCALE, ballY * SCALE, r, 0, Math.PI * 2);
+			ctx.fill();
+		}
 		// Serve pause: dim, show the score, and an expanding ring around the frozen ball.
 		if (s.serveT > 0) {
 			const p = s.serveT / PONG.serveDelay; // 1 → 0
