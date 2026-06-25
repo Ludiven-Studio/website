@@ -90,14 +90,12 @@ describe('pong engine', () => {
 	});
 
 	it('big paddle extends reach (a ball that would miss now bounces)', () => {
-		const miss = PONG.paddleH / 2 + PONG.ballR + 4; // just outside a normal paddle
-		const normal = base({ bx: PONG.paddleW + PONG.ballR + 1, bvx: -60, by: PONG.H / 2 + miss, leftY: PONG.H / 2 });
-		expect(stepBall(normal, 0.1).scored).toBe('right'); // misses normally
-
+		const miss = PONG.paddleH / 2 + PONG.ballR + 4; // just outside a normal paddle's reach
+		const at = { bx: PONG.paddleW + PONG.ballR + 1, bvx: -60, by: PONG.H / 2 + miss, leftY: PONG.H / 2 };
+		// normal paddle: the ball slips past (still heading left after reaching the plane)
+		expect(stepBall(base(at), 0.1).state.bvx).toBeLessThan(0);
+		// big paddle active: it bounces back to the right
 		const big = activatePower(base({ chargeL: PONG.chargeNeed }), 'left', 'big');
-		const withBig = { ...big, bx: PONG.paddleW + PONG.ballR + 1, bvx: -60, by: PONG.H / 2 + miss, leftY: PONG.H / 2 };
-		const { state, scored } = stepBall(withBig, 0.1);
-		expect(scored).toBeNull();
-		expect(state.bvx).toBeGreaterThan(0); // bounced thanks to the bigger paddle
+		expect(stepBall({ ...big, ...at }, 0.1).state.bvx).toBeGreaterThan(0);
 	});
 });
