@@ -157,14 +157,19 @@ function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 		grp.add(new THREE.Mesh(stripGeom(wp), mats.water));
 	}
 	if (hole.bridge) {
+		const { lo, hi } = hole.bridge;
+		const archY = (i: number) => {
+			const u = Math.max(0, Math.min(1, (i - lo) / (hi - lo)));
+			return 0.1 + 3.2 * Math.sin(u * Math.PI) * 0.32; // matches the altitude hump
+		};
 		const bp: number[] = [];
-		for (let i = Math.max(0, hole.bridge.lo); i < Math.min(cut, hole.bridge.hi); i++) {
+		for (let i = Math.max(0, lo); i < Math.min(cut, hi); i++) {
 			const p = path[i], q = path[i + 1], wi = W[i] + 0.3, wj = W[i + 1] + 0.3;
 			const lp = [p.x + p.nx * wi, p.z + p.nz * wi], rp = [p.x - p.nx * wi, p.z - p.nz * wi];
 			const lq = [q.x + q.nx * wj, q.z + q.nz * wj], rq = [q.x - q.nx * wj, q.z - q.nz * wj];
-			const y = 0.08;
-			bp.push(lp[0], y, lp[1], rp[0], y, rp[1], lq[0], y, lq[1]);
-			bp.push(rp[0], y, rp[1], rq[0], y, rq[1], lq[0], y, lq[1]);
+			const yi = archY(i), yj = archY(i + 1);
+			bp.push(lp[0], yi, lp[1], rp[0], yi, rp[1], lq[0], yj, lq[1]);
+			bp.push(rp[0], yi, rp[1], rq[0], yj, rq[1], lq[0], yj, lq[1]);
 		}
 		if (bp.length) grp.add(new THREE.Mesh(stripGeom(bp), mats.plank));
 	}

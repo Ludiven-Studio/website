@@ -280,41 +280,9 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 		used.push(idx);
 	}
 
-	// Altitude field: smooth undulation + a dip into the green (the bowl). Drives colour + relief.
-	const aph1 = rng() * Math.PI * 2, af1 = 1.2 + rng() * 1.1;
-	const aph2 = rng() * Math.PI * 2, af2 = 2.5 + rng() * 1.4;
-	const alt: number[] = [];
-	for (let i = 0; i < SAMPLES; i++) {
-		const t = i / (SAMPLES - 1);
-		let a = 2.4 * Math.sin(t * Math.PI * af1 + aph1) + 1.1 * Math.sin(t * Math.PI * af2 + aph2);
-		const dCup = Math.hypot(path[i].x - cup.x, path[i].z - cup.z);
-		if (dCup < greenR) a -= (1 - dCup / greenR) * 2.5;
-		alt.push(a);
-	}
 	const ds = diff.length / (SAMPLES - 1);
-	const K = 42; // downhill push from the altitude gradient (clearly felt)
-	const BANK = 28; // banked-turn cross slope → curved trajectories
-	const angDiff = (a: number, b: number) => {
-		let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
-		if (d < -Math.PI) d += Math.PI * 2;
-		return d;
-	};
-	const bank: number[] = [];
-	const relief: Vec[] = [];
-	for (let i = 0; i < SAMPLES; i++) {
-		const ip = Math.max(0, i - 1), inx = Math.min(SAMPLES - 1, i + 1);
-		const dAltds = (alt[inx] - alt[ip]) / (ds * Math.max(1, inx - ip));
-		const dH = angDiff(Math.atan2(path[ip].dirZ, path[ip].dirX), Math.atan2(path[inx].dirZ, path[inx].dirX));
-		bank.push(dH);
-		relief.push({
-			x: -K * dAltds * path[i].dirX + BANK * dH * path[i].nx,
-			z: -K * dAltds * path[i].dirZ + BANK * dH * path[i].nz,
-		});
-	}
 
-	const slopes: Slope[] = [{ kind: 'radial', cx: cup.x, cz: cup.z, r: greenR, strength: 17, ax: 0, az: 0 }];
-
-	// Bridge over a decorative water stream, at a narrow corridor section (purely visual).
+	// Bridge over a decorative water stream at a narrow section — also a hump to roll over.
 	let bridge: { lo: number; hi: number } | null = null;
 	let water: Vec[] | null = null;
 	{
@@ -337,6 +305,52 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 			water = [c(along, across), c(along, -across), c(-along, -across), c(-along, across)];
 		}
 	}
+
+	// A "pump track" run of consecutive rollers somewhere along the corridor.
+	const pumpStart = Math.round(SAMPLES * (0.2 + rng() * 0.25));
+	const pumpLen = Math.round(SAMPLES * (0.18 + rng() * 0.14));
+	const pumpCycles = 3 + Math.floor(rng() * 2);
+
+	// Altitude: base undulation + green dip + pump rollers + the humpback bridge.
+	const aph1 = rng() * Math.PI * 2, af1 = 1.2 + rng() * 1.1;
+	const aph2 = rng() * Math.PI * 2, af2 = 2.5 + rng() * 1.4;
+	const alt: number[] = [];
+	for (let i = 0; i < SAMPLES; i++) {
+		const t = i / (SAMPLES - 1);
+		let a = 1.9 * Math.sin(t * Math.PI * af1 + aph1) + 0.9 * Math.sin(t * Math.PI * af2 + aph2);
+		const dCup = Math.hypot(path[i].x - cup.x, path[i].z - cup.z);
+		if (dCup < greenR) a -= (1 - dCup / greenR) * 2.5;
+		if (i >= pumpStart && i < pumpStart + pumpLen) {
+			const u = (i - pumpStart) / pumpLen;
+			a += 2.2 * Math.sin(u * Math.PI) * Math.sin(u * pumpCycles * Math.PI * 2);
+		}
+		if (bridge && i >= bridge.lo && i <= bridge.hi) {
+			const u = (i - bridge.lo) / (bridge.hi - bridge.lo);
+			a += 3.2 * Math.sin(u * Math.PI); // hump
+		}
+		alt.push(a);
+	}
+	const K = 42; // downhill push from the altitude gradient (clearly felt)
+	const BANK = 28; // banked-turn cross slope → curved trajectories
+	const angDiff = (a: number, b: number) => {
+		let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+		if (d < -Math.PI) d += Math.PI * 2;
+		return d;
+	};
+	const bank: number[] = [];
+	const relief: Vec[] = [];
+	for (let i = 0; i < SAMPLES; i++) {
+		const ip = Math.max(0, i - 1), inx = Math.min(SAMPLES - 1, i + 1);
+		const dAltds = (alt[inx] - alt[ip]) / (ds * Math.max(1, inx - ip));
+		const dH = angDiff(Math.atan2(path[ip].dirZ, path[ip].dirX), Math.atan2(path[inx].dirZ, path[inx].dirX));
+		bank.push(dH);
+		relief.push({
+			x: -K * dAltds * path[i].dirX + BANK * dH * path[i].nx,
+			z: -K * dAltds * path[i].dirZ + BANK * dH * path[i].nz,
+		});
+	}
+
+	const slopes: Slope[] = [{ kind: 'radial', cx: cup.x, cz: cup.z, r: greenR, strength: 17, ax: 0, az: 0 }];
 
 	let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
 	for (const pt of [...left.slice(0, cutIdx + 1), ...right.slice(0, cutIdx + 1), ...greenWall, ...obstacles.flatMap((o) => o.pts), ...(water ?? [])]) {
