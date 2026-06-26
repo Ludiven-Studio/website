@@ -19,10 +19,14 @@ const mkHole = (segments: Segment[], cup = { x: 1e4, z: 1e4 }, cupR = 1.2, slope
 	path: [],
 	widths: [],
 	halfWidth: 6,
+	alt: [],
+	relief: [],
+	cutIdx: 0,
 	segments,
 	obstacles: [],
 	slopes,
 	greenR: 6,
+	greenWall: [],
 	bounds: { minX: -10, maxX: 10, minZ: -10, maxZ: 10 },
 	start: { x: 0, z: 0 },
 	cup,
@@ -70,6 +74,13 @@ describe('golf engine (corridor)', () => {
 			expect(Math.max(...a.widths) - Math.min(...a.widths)).toBeGreaterThan(0.5); // actually varies
 			expect(a.slopes.some((s) => s.kind === 'radial')).toBe(true);
 			expect(a.greenR).toBeGreaterThan(2);
+			// altitude field + circular green wall
+			expect(a.alt.length).toBe(a.path.length);
+			expect(a.relief.length).toBe(a.path.length);
+			expect(a.greenWall.length).toBeGreaterThan(10);
+			for (const p of a.greenWall) expect(Math.hypot(p.x - a.cup.x, p.z - a.cup.z)).toBeCloseTo(a.greenR, 4);
+			expect(a.cutIdx).toBeGreaterThan(1);
+			expect(a.cutIdx).toBeLessThan(a.path.length);
 			for (const p of a.path) {
 				expect(p.x).toBeGreaterThanOrEqual(a.bounds.minX - 1e-6);
 				expect(p.x).toBeLessThanOrEqual(a.bounds.maxX + 1e-6);
@@ -135,5 +146,12 @@ describe('golf engine (corridor)', () => {
 		// Travelling straight along +z through a +x slope → gains sideways (+x) velocity.
 		const r = sim({ x: 0, z: -3, vx: 0, vz: 6 }, mkHole([], { x: 1e4, z: 1e4 }, 1.2, [patch]), 0.6);
 		expect(r.ball.vx).toBeGreaterThan(0);
+	});
+
+	it('the altitude relief pushes a moving ball downhill', () => {
+		const pp = (x: number) => ({ x, z: 0, dirX: 1, dirZ: 0, nx: 0, nz: 1 });
+		const hole: Hole = { ...mkHole([]), path: [pp(-2), pp(0), pp(2)], relief: [{ x: 6, z: 0 }, { x: 6, z: 0 }, { x: 6, z: 0 }] };
+		const r = stepBall({ x: 0, z: 0, vx: 0, vz: 3 }, hole, 1 / 60);
+		expect(r.ball.vx).toBeGreaterThan(0); // pushed +x by the downhill relief
 	});
 });

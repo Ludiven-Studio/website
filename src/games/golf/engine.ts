@@ -58,10 +58,14 @@ export interface Hole {
 	path: PathPoint[]; // centerline (tee → cup)
 	widths: number[]; // half-width per path point (wider/narrower sections)
 	halfWidth: number; // representative width (kept for convenience)
-	segments: Segment[]; // lane walls + end caps + obstacle edges
+	alt: number[]; // altitude per path point (drives colour + relief)
+	relief: Vec[]; // per-sample downhill acceleration (from the altitude gradient)
+	cutIdx: number; // last corridor sample before the circular green
+	segments: Segment[]; // lane walls + tee cap + green ring + obstacle edges
 	obstacles: Obstacle[]; // for rendering
-	slopes: Slope[]; // green + relief patches
+	slopes: Slope[]; // radial green bowl
 	greenR: number; // radius of the sloped green around the cup
+	greenWall: Vec[]; // ordered points of the circular green wall (for rendering)
 	bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
 	start: Vec;
 	cup: Vec;
@@ -182,50 +186,72 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 		path.push({ x: cur.x, z: cur.z, dirX: dx, dirZ: dz, nx: -dz, nz: dx });
 	}
 
-	// Variable half-width: smooth low-frequency variation (wider/narrower), widened near the cup.
-	const cupIdx = SAMPLES - 2;
+	// Variable half-width: smooth low-frequency variation (wider/narrower), tapering to a
+	// narrow "mouth" near the cup so the corridor opens into a wider circular green.
 	const minHalf = PARAMS.ballR + 1.4;
+	const mouthHalf = PARAMS.ballR + 2.0;
 	const ph1 = rng() * Math.PI * 2, ph2 = rng() * Math.PI * 2;
 	const f1 = 1.7 + rng() * 1.2, f2 = 3.3 + rng() * 1.6;
 	const widths: number[] = [];
 	for (let i = 0; i < SAMPLES; i++) {
 		const t = i / (SAMPLES - 1);
-		let factor = 1 + 0.34 * Math.sin(t * Math.PI * f1 + ph1) + 0.16 * Math.sin(t * Math.PI * f2 + ph2);
-		const nearCup = Math.max(0, 1 - Math.abs(i - cupIdx) / (SAMPLES * 0.12));
-		factor = Math.max(factor, 1 + 0.5 * nearCup); // room for the green at the cup
-		widths.push(clamp(hw * factor, minHalf, hw * 1.6));
+		const factor = 1 + 0.34 * Math.sin(t * Math.PI * f1 + ph1) + 0.16 * Math.sin(t * Math.PI * f2 + ph2);
+		let w = clamp(hw * factor, minHalf, hw * 1.6);
+		const nearCup = Math.max(0, 1 - (SAMPLES - 1 - i) / (SAMPLES * 0.12));
+		w = w * (1 - nearCup) + mouthHalf * nearCup;
+		widths.push(Math.max(minHalf, w));
 	}
 
 	const left = path.map((p, i) => ({ x: p.x + p.nx * widths[i], z: p.z + p.nz * widths[i] }));
 	const right = path.map((p, i) => ({ x: p.x - p.nx * widths[i], z: p.z - p.nz * widths[i] }));
 
+	const startIdx = 1;
+	const start: Vec = { x: path[startIdx].x, z: path[startIdx].z };
+	const cup: Vec = { x: path[SAMPLES - 1].x, z: path[SAMPLES - 1].z };
+	const cupR = diff.cupR;
+	const coreR = Math.max(PARAMS.ballR * 0.7, cupR * 0.4);
+	const greenR = clamp(hw, 5, 8);
+	const par = clamp(Math.round(diff.length / 42) + 1, 2, 6);
+
+	// The corridor runs until it meets the circular green; beyond, the green takes over.
+	let cutIdx = SAMPLES - 1;
+	while (cutIdx > 3 && Math.hypot(path[cutIdx].x - cup.x, path[cutIdx].z - cup.z) < greenR) cutIdx--;
+
 	const segments: Segment[] = [];
-	for (let i = 0; i < SAMPLES - 1; i++) {
+	for (let i = 0; i < cutIdx; i++) {
 		segments.push(makeSegment(left[i].x, left[i].z, left[i + 1].x, left[i + 1].z, path[i]));
 		segments.push(makeSegment(right[i].x, right[i].z, right[i + 1].x, right[i + 1].z, path[i]));
 	}
-	// End caps (tee + cup), normals pointing into the lane.
-	segments.push(makeSegment(left[0].x, left[0].z, right[0].x, right[0].z, path[1]));
-	const e = SAMPLES - 1;
-	segments.push(makeSegment(left[e].x, left[e].z, right[e].x, right[e].z, path[e - 1]));
+	segments.push(makeSegment(left[0].x, left[0].z, right[0].x, right[0].z, path[1])); // tee cap
 
-	const startIdx = 1;
-	const start: Vec = { x: path[startIdx].x, z: path[startIdx].z };
-	const cup: Vec = { x: path[cupIdx].x, z: path[cupIdx].z };
-	const coreR = Math.max(PARAMS.ballR * 0.7, diff.cupR * 0.4);
-	const par = clamp(Math.round(diff.length / 42) + 1, 2, 6);
+	// Circular green wall (bumper following the circle) with an opening facing the corridor.
+	const theta0 = Math.atan2(path[cutIdx].z - cup.z, path[cutIdx].x - cup.x);
+	const openHalf = clamp(Math.asin(Math.min(1, (widths[cutIdx] + 0.6) / greenR)), 0.3, 0.95);
+	const ringPt = (a: number): Vec => ({ x: cup.x + Math.cos(a) * greenR, z: cup.z + Math.sin(a) * greenR });
+	const ARC = 40;
+	const aStart = theta0 + openHalf, aEnd = theta0 + Math.PI * 2 - openHalf;
+	const greenWall: Vec[] = [];
+	for (let k = 0; k <= ARC; k++) greenWall.push(ringPt(aStart + ((aEnd - aStart) * k) / ARC));
+	for (let k = 0; k < greenWall.length - 1; k++)
+		segments.push(makeSegment(greenWall[k].x, greenWall[k].z, greenWall[k + 1].x, greenWall[k + 1].z, cup));
+	// Seal the corridor mouth to the green opening edges.
+	const op1 = greenWall[0], op2 = greenWall[greenWall.length - 1];
+	const Lc = left[cutIdx], Rc = right[cutIdx];
+	const lOpen = Math.hypot(Lc.x - op1.x, Lc.z - op1.z) <= Math.hypot(Lc.x - op2.x, Lc.z - op2.z) ? op1 : op2;
+	const rOpen = lOpen === op1 ? op2 : op1;
+	segments.push(makeSegment(Lc.x, Lc.z, lOpen.x, lOpen.z, cup));
+	segments.push(makeSegment(Rc.x, Rc.z, rOpen.x, rOpen.z, cup));
 
-	// Obstacles: central islands (a fork that rejoins) or side chicanes. A passage of at
-	// least ball-diameter + margin always remains, so the lane is never fully blocked.
+	// Obstacles (corridor only): central islands (fork) or side chicanes; a passage always remains.
 	const clearR = PARAMS.ballR + 1.0;
 	const obstacles: Obstacle[] = [];
 	const used: number[] = [];
-	const loIdx = Math.round(SAMPLES * 0.18), hiIdx = Math.round(SAMPLES * 0.82);
-	for (let attempt = 0; attempt < diff.obstacles * 40 && obstacles.length < diff.obstacles; attempt++) {
+	const loIdx = Math.round(SAMPLES * 0.18), hiIdx = Math.min(Math.round(SAMPLES * 0.82), cutIdx - 2);
+	for (let attempt = 0; attempt < diff.obstacles * 40 && obstacles.length < diff.obstacles && hiIdx > loIdx; attempt++) {
 		const idx = loIdx + Math.floor(rng() * (hiIdx - loIdx));
 		if (used.some((u) => Math.abs(u - idx) < SAMPLES * 0.12)) continue;
 		const p = path[idx];
-		const lw = widths[idx]; // local half-width
+		const lw = widths[idx];
 		const along = 1.6 + rng() * 2.4;
 		const central = rng() < 0.5;
 		let across: number, off: number;
@@ -239,34 +265,42 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 			off = (rng() < 0.5 ? 1 : -1) * (lw - across - (0.7 + rng() * 0.9));
 		}
 		const cx = p.x + p.nx * off, cz = p.z + p.nz * off;
-		if (Math.hypot(cx - start.x, cz - start.z) < 9 || Math.hypot(cx - cup.x, cz - cup.z) < 9) continue;
+		if (Math.hypot(cx - start.x, cz - start.z) < 9 || Math.hypot(cx - cup.x, cz - cup.z) < greenR + 6) continue;
 		const corner = (ta: number, na: number): Vec => ({ x: cx + p.dirX * ta + p.nx * na, z: cz + p.dirZ * ta + p.nz * na });
 		const pts = [corner(along, across), corner(along, -across), corner(-along, -across), corner(-along, across)];
 		const center = { x: cx, z: cz };
 		for (let k = 0; k < 4; k++) {
 			const a = pts[k], b = pts[(k + 1) % 4];
-			segments.push(makeSegment(a.x, a.z, b.x, b.z, center, false)); // outward normal
+			segments.push(makeSegment(a.x, a.z, b.x, b.z, center, false));
 		}
 		obstacles.push({ pts });
 		used.push(idx);
 	}
 
-	// Sloped green around the cup (bowl), plus a few gentle relief patches along the course.
-	const greenR = clamp(widths[cupIdx] - 0.4, 3, 7);
-	const slopes: Slope[] = [{ kind: 'radial', cx: cup.x, cz: cup.z, r: greenR, strength: 17, ax: 0, az: 0 }];
-	const usedS: number[] = [];
-	for (let attempt = 0; attempt < diff.slopes * 30 && slopes.length < diff.slopes + 1; attempt++) {
-		const idx = loIdx + Math.floor(rng() * (hiIdx - loIdx));
-		if (usedS.some((u) => Math.abs(u - idx) < SAMPLES * 0.1)) continue;
-		const p = path[idx];
-		if (Math.hypot(p.x - cup.x, p.z - cup.z) < greenR + 4) continue;
-		const ang = rng() * Math.PI * 2;
-		slopes.push({ kind: 'dir', cx: p.x, cz: p.z, r: 4 + rng() * 3, ax: Math.cos(ang), az: Math.sin(ang), strength: 5 + rng() * 4 });
-		usedS.push(idx);
+	// Altitude field: smooth undulation + a dip into the green (the bowl). Drives colour + relief.
+	const aph1 = rng() * Math.PI * 2, af1 = 1.2 + rng() * 1.1;
+	const aph2 = rng() * Math.PI * 2, af2 = 2.5 + rng() * 1.4;
+	const alt: number[] = [];
+	for (let i = 0; i < SAMPLES; i++) {
+		const t = i / (SAMPLES - 1);
+		let a = 2.4 * Math.sin(t * Math.PI * af1 + aph1) + 1.1 * Math.sin(t * Math.PI * af2 + aph2);
+		const dCup = Math.hypot(path[i].x - cup.x, path[i].z - cup.z);
+		if (dCup < greenR) a -= (1 - dCup / greenR) * 2.5;
+		alt.push(a);
+	}
+	const ds = diff.length / (SAMPLES - 1);
+	const K = 22; // relief responsiveness (downhill push from the altitude gradient)
+	const relief: Vec[] = [];
+	for (let i = 0; i < SAMPLES; i++) {
+		const ip = Math.max(0, i - 1), inx = Math.min(SAMPLES - 1, i + 1);
+		const dAltds = (alt[inx] - alt[ip]) / (ds * Math.max(1, inx - ip));
+		relief.push({ x: -K * dAltds * path[i].dirX, z: -K * dAltds * path[i].dirZ });
 	}
 
+	const slopes: Slope[] = [{ kind: 'radial', cx: cup.x, cz: cup.z, r: greenR, strength: 17, ax: 0, az: 0 }];
+
 	let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-	for (const pt of [...left, ...right, ...obstacles.flatMap((o) => o.pts)]) {
+	for (const pt of [...left.slice(0, cutIdx + 1), ...right.slice(0, cutIdx + 1), ...greenWall, ...obstacles.flatMap((o) => o.pts)]) {
 		if (pt.x < minX) minX = pt.x;
 		if (pt.x > maxX) maxX = pt.x;
 		if (pt.z < minZ) minZ = pt.z;
@@ -274,8 +308,8 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	}
 
 	return {
-		path, widths, halfWidth: hw, segments, obstacles, slopes, greenR,
-		bounds: { minX, maxX, minZ, maxZ }, start, cup, cupR: diff.cupR, coreR, par,
+		path, widths, halfWidth: hw, alt, relief, cutIdx, segments, obstacles, slopes, greenR, greenWall,
+		bounds: { minX, maxX, minZ, maxZ }, start, cup, cupR, coreR, par,
 	};
 }
 
@@ -326,6 +360,18 @@ export function stepBall(
 		b.vx = 0;
 		b.vz = 0;
 		return { ball: b, sunk: false };
+	}
+
+	// Altitude relief: a moving ball drifts downhill (nearest centerline sample's gradient).
+	if (hole.relief.length) {
+		let bi = 0, bd = Infinity;
+		for (let i = 0; i < hole.path.length; i++) {
+			const dx = hole.path[i].x - b.x, dz = hole.path[i].z - b.z;
+			const dd = dx * dx + dz * dz;
+			if (dd < bd) { bd = dd; bi = i; }
+		}
+		b.vx += hole.relief[bi].x * dt;
+		b.vz += hole.relief[bi].z * dt;
 	}
 
 	// Fine enough that a full-speed ball can't skip the cup core.
