@@ -150,6 +150,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'golf',
+		title: 'Mini-Golf',
+		pitch: 'Vise à la fronde, fais rebondir la balle sur les murs et rentre en un minimum de coups. En 3D, avec des fantômes multijoueur au défi du jour.',
+		icon: 'golf',
+		href: '/jeux/golf',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'drift',
 		title: 'Drift',
 		pitch: 'Course 3D multi sur circuit aléatoire : meilleur tour, drift auto, jusqu\'à 4 joueurs.',

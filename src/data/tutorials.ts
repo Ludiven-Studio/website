@@ -98,6 +98,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎮', title: 'Contrôles', body: 'Dirige le serpent aux flèches (ou ZQSD/WASD), ou en glissant le doigt. Tu accélères en grandissant. Choisis ta difficulté : plus dur = plus rapide et davantage de rochers.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, pommes et rochers sont les mêmes pour tout le monde (le niveau dépend du jour). Jusqu\'à 10 essais : ton meilleur score de la journée est classé.' },
 	],
+	golf: [
+		{ emoji: '🏌️', title: 'Le but', body: 'Rentre la balle dans le trou (le drapeau) en un minimum de coups. Le parcours est généré à chaque partie.' },
+		{ emoji: '🎯', title: 'Viser à la fronde', body: 'Touche/clique près de la balle et tire dans le sens OPPOSÉ à la direction voulue : un élastique part de la balle. Plus tu tires loin, plus le coup est puissant. Relâche pour frapper.' },
+		{ emoji: '↩️', title: 'Rebonds & fantômes', body: 'La balle rebondit sur les bords et les murs : sers-t\'en pour contourner les obstacles. Au défi du jour, même trou pour tous, 10 essais, et tu vois les balles fantômes des autres joueurs en direct (classement au moins de coups).' },
+	],
 	drift: [
 		{ emoji: '🏁', title: 'Le but', body: 'Cours sur un circuit fermé aléatoire et réalise le tour le plus rapide possible. Ton meilleur tour est ton score.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'La voiture accélère et drifte toute seule. Tu tournes seulement avec les flèches / Q-D (ou les deux gros boutons). Maintiens le braquage à vitesse pour partir en drift ; hors-piste, ça ralentit.' },

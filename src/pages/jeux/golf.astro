@@ -1,0 +1,66 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import GolfGame from '../../games/golf/GolfGame.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
+---
+
+<BaseLayout
+	title="Mini-Golf | Jeux Ludiven Studio"
+	description="Mini-golf 3D vue de dessus : vise à la fronde, fais rebondir la balle et rentre en un minimum de coups. Défi du jour avec fantômes multijoueur, signé Ludiven Studio."
+>
+	<div class="wrapper game-page stack gap-8">
+		<header class="game-head stack gap-2">
+			<a class="back" href="/jeux/">
+				<Icon icon="arrow-left" size="1em" /> Tous les jeux
+			</a>
+			<h1>Mini-Golf</h1>
+			<p>Vise à la fronde, rebondis sur les murs, rentre en un minimum de coups</p>
+			<GameTutorial gameId="golf" />
+		</header>
+
+		<GolfGame client:only="react" gameId="golf" />
+	</div>
+</BaseLayout>
+
+<style>
+	.game-page {
+		align-items: center;
+	}
+
+	.game-head {
+		text-align: center;
+		align-items: center;
+	}
+
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--gray-300);
+		text-decoration: none;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+	}
+
+	.back:hover,
+	.back:focus-visible {
+		color: var(--accent-regular);
+	}
+
+	.game-head h1 {
+		font-size: var(--text-3xl);
+		margin-top: 0.5rem;
+	}
+
+	.game-head p {
+		color: var(--gray-300);
+	}
+
+	@media (min-width: 50em) {
+		.game-head h1 {
+			font-size: var(--text-4xl);
+		}
+	}
+</style>
