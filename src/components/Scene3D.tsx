@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useState } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, PointerLockControls, AdaptiveDpr } from '@react-three/drei';
+import { OrbitControls, AdaptiveDpr } from '@react-three/drei';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
 import { heightAt, slopeAt, mulberry32 } from './terrainNoise';
@@ -220,22 +220,39 @@ function Water() {
 	return <mesh geometry={geo} material={mat} position={[0, WATER_LEVEL, 0]} renderOrder={1} />;
 }
 
-/* ---------- first-person walk: eye stays EYE metres above the terrain ---------- */
+/* ---------- first-person walk: drag to look (cursor stays free), ZQSD/WASD to move, eye at EYE above the ground ---------- */
 function WalkControls({ seed }: { seed: number }) {
-	const { camera } = useThree();
+	const { camera, gl } = useThree();
 	const keys = useMemo<Record<string, boolean>>(() => ({}), []);
+	const look = useMemo(() => ({ yaw: 0, pitch: -0.08, dragging: false, lx: 0, ly: 0 }), []);
 	useEffect(() => {
-		camera.position.set(0, heightAt(0, 0, seed) + EYE, 10);
-		const down = (e: KeyboardEvent) => { keys[e.code] = true; if (e.code.startsWith('Arrow')) e.preventDefault(); };
-		const up = (e: KeyboardEvent) => { keys[e.code] = false; };
-		window.addEventListener('keydown', down);
-		window.addEventListener('keyup', up);
-		return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
-	}, [seed, camera, keys]);
+		camera.position.set(0, heightAt(0, 0, seed) + EYE, 12);
+		look.yaw = 0; look.pitch = -0.08;
+		const el = gl.domElement;
+		const kd = (e: KeyboardEvent) => { keys[e.code] = true; if (e.code.startsWith('Arrow')) e.preventDefault(); };
+		const ku = (e: KeyboardEvent) => { keys[e.code] = false; };
+		const pd = (e: PointerEvent) => { look.dragging = true; look.lx = e.clientX; look.ly = e.clientY; el.style.cursor = 'grabbing'; };
+		const pm = (e: PointerEvent) => {
+			if (!look.dragging) return;
+			look.yaw -= (e.clientX - look.lx) * 0.0026;
+			look.pitch = Math.max(-1.2, Math.min(1.0, look.pitch - (e.clientY - look.ly) * 0.0026));
+			look.lx = e.clientX; look.ly = e.clientY;
+		};
+		const pu = () => { look.dragging = false; el.style.cursor = 'grab'; };
+		el.style.cursor = 'grab';
+		window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+		el.addEventListener('pointerdown', pd); window.addEventListener('pointermove', pm); window.addEventListener('pointerup', pu);
+		return () => {
+			window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku);
+			el.removeEventListener('pointerdown', pd); window.removeEventListener('pointermove', pm); window.removeEventListener('pointerup', pu);
+			el.style.cursor = '';
+		};
+	}, [seed, camera, gl, keys, look]);
 	const fwd = useMemo(() => new THREE.Vector3(), []);
 	const right = useMemo(() => new THREE.Vector3(), []);
 	const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
 	useFrame((_, dt) => {
+		camera.rotation.set(look.pitch, look.yaw, 0, 'YXZ');
 		const spd = 7 * Math.min(dt, 0.05);
 		camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
 		right.crossVectors(fwd, up).normalize();
@@ -251,7 +268,7 @@ function WalkControls({ seed }: { seed: number }) {
 		camera.position.z = Math.max(-half, Math.min(half, camera.position.z));
 		camera.position.y = heightAt(camera.position.x, camera.position.z, seed) + EYE;
 	});
-	return <PointerLockControls />;
+	return null;
 }
 
 function ShadowBaker({ seed }: { seed: number }) {
@@ -313,7 +330,7 @@ export default function Scene3D() {
 					{!walk && <label><input type="checkbox" checked={autoRotate} onChange={(e) => setAutoRotate(e.target.checked)} /> Rotation auto</label>}
 				</div>
 			</div>
-			<p className="s3-hint">{walk ? 'Clique sur la scène pour verrouiller la souris · ZQSD / flèches pour marcher · Échap pour sortir.' : 'Forêt low-poly stylisée 100 % procédurale. Active « Marcher » pour l’explorer à hauteur d’yeux.'}</p>
+			<p className="s3-hint">{walk ? 'Glisse pour regarder autour · ZQSD / WASD / flèches pour avancer (vue à 1,50 m, la souris reste libre).' : 'Forêt low-poly stylisée 100 % procédurale. Active « Marcher » pour l’explorer à hauteur d’yeux.'}</p>
 		</div>
 	);
 }
