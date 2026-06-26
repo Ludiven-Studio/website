@@ -34,10 +34,17 @@ export interface Segment {
 	nz: number;
 }
 
+/** Free-standing obstacle inside the lane (convex polygon corners). */
+export interface Obstacle {
+	pts: Vec[];
+}
+
 export interface Hole {
 	path: PathPoint[]; // centerline (tee → cup)
 	halfWidth: number;
-	segments: Segment[]; // lane walls + end caps
+	segments: Segment[]; // lane walls + end caps + obstacle edges
+	obstacles: Obstacle[]; // for rendering
+	bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
 	start: Vec;
 	cup: Vec;
 	cupR: number; // visual hole radius (barely > ball)
@@ -66,8 +73,8 @@ export interface BallParams {
 
 export const PARAMS: BallParams = {
 	ballR: 0.7,
-	decel: 13,
-	restitution: 0.68,
+	decel: 7,
+	restitution: 0.7,
 	captureSpeed: 8,
 	magnet: 42,
 	settleSpeed: 0.25,
@@ -82,12 +89,13 @@ export interface DiffLevel {
 	bends: number; // control points
 	width: number; // lane width
 	cupR: number;
+	obstacles: number; // free-standing islands inside the lane
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', length: 120, bends: 5, width: 15, cupR: 1.35 },
-	moyen: { label: 'Moyen', length: 175, bends: 7, width: 13, cupR: 1.2 },
-	difficile: { label: 'Difficile', length: 230, bends: 9, width: 11, cupR: 1.05 },
+	facile: { label: 'Facile', length: 120, bends: 5, width: 15, cupR: 1.35, obstacles: 1 },
+	moyen: { label: 'Moyen', length: 175, bends: 7, width: 13, cupR: 1.2, obstacles: 2 },
+	difficile: { label: 'Difficile', length: 230, bends: 9, width: 11, cupR: 1.05, obstacles: 3 },
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -116,12 +124,13 @@ function catmullOpen(pts: Vec[], t: number): Vec {
 	};
 }
 
-/** Oriented wall segment whose normal points toward `ref` (the inside of the lane). */
-function makeSegment(ax: number, az: number, bx: number, bz: number, ref: Vec): Segment {
+/** Oriented segment; normal points toward `ref` (lane walls) or away from it (obstacles). */
+function makeSegment(ax: number, az: number, bx: number, bz: number, ref: Vec, inward = true): Segment {
 	const dx = bx - ax, dz = bz - az;
 	const len = Math.hypot(dx, dz) || 1;
 	let nx = -dz / len, nz = dx / len;
-	if ((ref.x - ax) * nx + (ref.z - az) * nz < 0) { nx = -nx; nz = -nz; }
+	const towardRef = (ref.x - ax) * nx + (ref.z - az) * nz >= 0;
+	if (towardRef !== inward) { nx = -nx; nz = -nz; }
 	return { ax, az, bx, bz, nx, nz };
 }
 
@@ -174,7 +183,53 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	const coreR = Math.max(PARAMS.ballR * 0.7, diff.cupR * 0.4);
 	const par = clamp(Math.round(diff.length / 42) + 1, 2, 6);
 
-	return { path, halfWidth: hw, segments, start, cup, cupR: diff.cupR, coreR, par };
+	// Obstacles: central islands (a fork that rejoins) or side chicanes. A passage of at
+	// least ball-diameter + margin always remains, so the lane is never fully blocked.
+	const clearR = PARAMS.ballR + 1.0;
+	const obstacles: Obstacle[] = [];
+	const used: number[] = [];
+	const loIdx = Math.round(SAMPLES * 0.18), hiIdx = Math.round(SAMPLES * 0.82);
+	for (let attempt = 0; attempt < diff.obstacles * 40 && obstacles.length < diff.obstacles; attempt++) {
+		const idx = loIdx + Math.floor(rng() * (hiIdx - loIdx));
+		if (used.some((u) => Math.abs(u - idx) < SAMPLES * 0.12)) continue;
+		const p = path[idx];
+		const along = 1.6 + rng() * 2.4;
+		const central = rng() < 0.5;
+		let across: number, off: number;
+		if (central) {
+			across = clamp(1.5 + rng() * 1.4, 1.0, hw - clearR - 0.4);
+			if (across < 1.0) continue;
+			off = 0;
+		} else {
+			across = 1.3 + rng() * 1.6;
+			if (across > hw - 1.4) continue;
+			off = (rng() < 0.5 ? 1 : -1) * (hw - across - (0.7 + rng() * 0.9));
+		}
+		const cx = p.x + p.nx * off, cz = p.z + p.nz * off;
+		if (Math.hypot(cx - start.x, cz - start.z) < 9 || Math.hypot(cx - cup.x, cz - cup.z) < 9) continue;
+		const corner = (ta: number, na: number): Vec => ({ x: cx + p.dirX * ta + p.nx * na, z: cz + p.dirZ * ta + p.nz * na });
+		const pts = [corner(along, across), corner(along, -across), corner(-along, -across), corner(-along, across)];
+		const center = { x: cx, z: cz };
+		for (let k = 0; k < 4; k++) {
+			const a = pts[k], b = pts[(k + 1) % 4];
+			segments.push(makeSegment(a.x, a.z, b.x, b.z, center, false)); // outward normal
+		}
+		obstacles.push({ pts });
+		used.push(idx);
+	}
+
+	let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+	for (const pt of [...left, ...right, ...obstacles.flatMap((o) => o.pts)]) {
+		if (pt.x < minX) minX = pt.x;
+		if (pt.x > maxX) maxX = pt.x;
+		if (pt.z < minZ) minZ = pt.z;
+		if (pt.z > maxZ) maxZ = pt.z;
+	}
+
+	return {
+		path, halfWidth: hw, segments, obstacles, bounds: { minX, maxX, minZ, maxZ },
+		start, cup, cupR: diff.cupR, coreR, par,
+	};
 }
 
 /* ---------- aiming ---------- */
