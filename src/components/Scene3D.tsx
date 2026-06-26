@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useState } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, AdaptiveDpr } from '@react-three/drei';
+import { OrbitControls, PointerLockControls, AdaptiveDpr } from '@react-three/drei';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
 import { heightAt, slopeAt, mulberry32 } from './terrainNoise';
@@ -9,9 +9,28 @@ import PostFX from './PostFX';
 
 const SIZE = 280, SEG = 150;
 const TREES = 200, GRASS = 4500, ROCKS = 36, BUSHES = 60, FLOWERS = 140;
+const WATER_LEVEL = -2.6, EYE = 1.5;
+
+/* ---------- stylized ground texture (procedural canvas, tileable) ---------- */
+function makeGroundTexture(size = 256): THREE.CanvasTexture {
+	const c = document.createElement('canvas'); c.width = c.height = size;
+	const ctx = c.getContext('2d')!;
+	ctx.fillStyle = '#728a52'; ctx.fillRect(0, 0, size, size);
+	for (let i = 0; i < 2600; i++) {
+		const x = Math.random() * size, y = Math.random() * size, r = Math.random() * 2.6 + 0.6;
+		const dark = Math.random() < 0.5;
+		ctx.fillStyle = dark ? `rgba(60,84,40,${0.25 + Math.random() * 0.3})` : `rgba(156,182,110,${0.2 + Math.random() * 0.3})`;
+		ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+	}
+	const tex = new THREE.CanvasTexture(c);
+	tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+	tex.colorSpace = THREE.SRGBColorSpace;
+	tex.repeat.set(SIZE / 9, SIZE / 9);
+	return tex;
+}
 
 /* ---------- faceted, vertex-coloured terrain ---------- */
-function Terrain({ seed }: { seed: number }) {
+function Terrain({ seed, tex }: { seed: number; tex: THREE.Texture }) {
 	const { geom, mat } = useMemo(() => {
 		const g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
 		g.rotateX(-Math.PI / 2);
@@ -29,8 +48,8 @@ function Terrain({ seed }: { seed: number }) {
 		}
 		g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 		g.computeVertexNormals();
-		return { geom: g, mat: new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1 }) };
-	}, [seed]);
+		return { geom: g, mat: new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, flatShading: true, roughness: 1 }) };
+	}, [seed, tex]);
 	useEffect(() => () => { geom.dispose(); mat.dispose(); }, [geom, mat]);
 	return <mesh geometry={geom} material={mat} receiveShadow />;
 }
@@ -172,6 +191,64 @@ function Grass({ seed }: { seed: number }) {
 	return <primitive object={mesh} />;
 }
 
+/* ---------- stylized water plane (gentle animated ripples, translucent) ---------- */
+function Water() {
+	const { mat, geo } = useMemo(() => {
+		const mat = new THREE.ShaderMaterial({
+			transparent: true,
+			uniforms: { uTime: { value: 0 }, uShallow: { value: new THREE.Color('#8fd0df') }, uDeep: { value: new THREE.Color('#2f6f88') } },
+			vertexShader: `varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+			fragmentShader: `uniform float uTime; uniform vec3 uShallow; uniform vec3 uDeep; varying vec3 vW;
+				void main(){
+					float r = 0.5 + 0.5 * sin(vW.x * 0.25 + uTime * 0.8) * sin(vW.z * 0.3 - uTime * 0.6);
+					float r2 = 0.5 + 0.5 * sin((vW.x + vW.z) * 0.6 + uTime * 1.3);
+					vec3 col = mix(uDeep, uShallow, r * 0.55 + r2 * 0.2 + 0.1);
+					gl_FragColor = vec4(col, 0.82);
+				}`,
+		});
+		const geo = new THREE.PlaneGeometry(SIZE * 1.6, SIZE * 1.6);
+		geo.rotateX(-Math.PI / 2);
+		return { mat, geo };
+	}, []);
+	useFrame((_, dt) => { mat.uniforms.uTime.value += Math.min(dt, 0.05); });
+	useEffect(() => () => { mat.dispose(); geo.dispose(); }, [mat, geo]);
+	return <mesh geometry={geo} material={mat} position={[0, WATER_LEVEL, 0]} renderOrder={1} />;
+}
+
+/* ---------- first-person walk: eye stays EYE metres above the terrain ---------- */
+function WalkControls({ seed }: { seed: number }) {
+	const { camera } = useThree();
+	const keys = useMemo<Record<string, boolean>>(() => ({}), []);
+	useEffect(() => {
+		camera.position.set(0, heightAt(0, 0, seed) + EYE, 10);
+		const down = (e: KeyboardEvent) => { keys[e.code] = true; if (e.code.startsWith('Arrow')) e.preventDefault(); };
+		const up = (e: KeyboardEvent) => { keys[e.code] = false; };
+		window.addEventListener('keydown', down);
+		window.addEventListener('keyup', up);
+		return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+	}, [seed, camera, keys]);
+	const fwd = useMemo(() => new THREE.Vector3(), []);
+	const right = useMemo(() => new THREE.Vector3(), []);
+	const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+	useFrame((_, dt) => {
+		const spd = 7 * Math.min(dt, 0.05);
+		camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+		right.crossVectors(fwd, up).normalize();
+		let mx = 0, mz = 0;
+		if (keys['KeyW'] || keys['KeyZ'] || keys['ArrowUp']) { mx += fwd.x; mz += fwd.z; }
+		if (keys['KeyS'] || keys['ArrowDown']) { mx -= fwd.x; mz -= fwd.z; }
+		if (keys['KeyD'] || keys['ArrowRight']) { mx += right.x; mz += right.z; }
+		if (keys['KeyA'] || keys['KeyQ'] || keys['ArrowLeft']) { mx -= right.x; mz -= right.z; }
+		const len = Math.hypot(mx, mz);
+		if (len > 0) { camera.position.x += (mx / len) * spd; camera.position.z += (mz / len) * spd; }
+		const half = SIZE / 2 - 3;
+		camera.position.x = Math.max(-half, Math.min(half, camera.position.x));
+		camera.position.z = Math.max(-half, Math.min(half, camera.position.z));
+		camera.position.y = heightAt(camera.position.x, camera.position.z, seed) + EYE;
+	});
+	return <PointerLockControls />;
+}
+
 function ShadowBaker({ seed }: { seed: number }) {
 	const { gl } = useThree();
 	useEffect(() => { gl.shadowMap.autoUpdate = false; gl.shadowMap.needsUpdate = true; }, [seed, gl]);
@@ -180,16 +257,19 @@ function ShadowBaker({ seed }: { seed: number }) {
 
 export default function Scene3D() {
 	const [autoRotate, setAutoRotate] = useState(true);
+	const [walk, setWalk] = useState(false);
+	const [water, setWater] = useState(true);
 	const [seed, setSeed] = useState(1);
 
-	// Shared low-poly geometries for the scatter layers.
+	// Shared low-poly geometries for the scatter layers + the ground texture.
 	const geos = useMemo(() => {
 		const rock = new THREE.IcosahedronGeometry(1, 0);
 		const bush = new THREE.IcosahedronGeometry(1, 1);
 		const flower = new THREE.ConeGeometry(0.18, 0.5, 5); flower.translate(0, 0.25, 0);
 		return { rock, bush, flower };
 	}, []);
-	useEffect(() => () => { geos.rock.dispose(); geos.bush.dispose(); geos.flower.dispose(); }, [geos]);
+	const groundTex = useMemo(() => makeGroundTexture(), []);
+	useEffect(() => () => { geos.rock.dispose(); geos.bush.dispose(); geos.flower.dispose(); groundTex.dispose(); }, [geos, groundTex]);
 
 	return (
 		<div className="s3-root">
@@ -203,9 +283,10 @@ export default function Scene3D() {
 						<orthographicCamera attach="shadow-camera" args={[-80, 80, 80, -80, 1, 220]} />
 					</directionalLight>
 					<ambientLight intensity={0.2} />
+					{water && <Water />}
 
 					<group key={seed}>
-						<Terrain seed={seed} />
+						<Terrain seed={seed} tex={groundTex} />
 						<Trees seed={seed} />
 						<Grass seed={seed} />
 						<Scatter seed={seed} salt={0x1} geo={geos.rock} baseColor={0x8b886e} count={ROCKS} radius={120} scaleRange={[0.8, 3.2]} hueVary={0.04} />
@@ -214,16 +295,20 @@ export default function Scene3D() {
 						<ShadowBaker seed={seed} />
 					</group>
 
-					<OrbitControls makeDefault enableDamping autoRotate={autoRotate} autoRotateSpeed={0.4} target={[0, 2, 0]} minDistance={6} maxDistance={120} maxPolarAngle={Math.PI / 2 - 0.05} />
+					{walk ? <WalkControls seed={seed} /> : (
+						<OrbitControls makeDefault enableDamping autoRotate={autoRotate} autoRotateSpeed={0.4} target={[0, 2, 0]} minDistance={6} maxDistance={120} maxPolarAngle={Math.PI / 2 - 0.05} />
+					)}
 					<AdaptiveDpr pixelated />
 					<PostFX />
 				</Canvas>
 				<div className="s3-panel">
 					<button className="s3-reset" onClick={() => setSeed((Math.random() * 1e9) | 0)}>↻ Régénérer</button>
-					<label><input type="checkbox" checked={autoRotate} onChange={(e) => setAutoRotate(e.target.checked)} /> Rotation auto</label>
+					<label><input type="checkbox" checked={walk} onChange={(e) => setWalk(e.target.checked)} /> Marcher (vue 1,50 m)</label>
+					<label><input type="checkbox" checked={water} onChange={(e) => setWater(e.target.checked)} /> Eau</label>
+					{!walk && <label><input type="checkbox" checked={autoRotate} onChange={(e) => setAutoRotate(e.target.checked)} /> Rotation auto</label>}
 				</div>
 			</div>
-			<p className="s3-hint">Forêt low-poly stylisée, 100 % procédurale : ciel dégradé, terrain facetté, conifères, herbe au vent, rochers, buissons &amp; fleurs. « Régénérer » recompose la scène.</p>
+			<p className="s3-hint">{walk ? 'Clique sur la scène pour verrouiller la souris · ZQSD / flèches pour marcher · Échap pour sortir.' : 'Forêt low-poly stylisée 100 % procédurale. Active « Marcher » pour l’explorer à hauteur d’yeux.'}</p>
 		</div>
 	);
 }
