@@ -1,5 +1,5 @@
 /**
- * TRANSVASE (Water Sort) — pure engine (no UI).
+ * TUBES (Water Sort) — pure engine (no UI).
  * Pour the top block of one tube onto another (same top colour, or empty tube,
  * with room) until every tube is empty or full of a single colour. Generation
  * guarantees a solvable puzzle; a bounded DFS solver also powers the hint.
@@ -159,7 +159,7 @@ export function generateWaterSort(diff: DiffLevel, rng: Rng = Math.random): Wate
 		}
 	}
 
-	throw new Error('Transvase: failed to generate a solvable puzzle');
+	throw new Error('Tubes: failed to generate a solvable puzzle');
 }
 
 /* ---------- hint ---------- */

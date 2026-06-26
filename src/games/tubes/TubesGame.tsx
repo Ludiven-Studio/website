@@ -24,7 +24,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
-   TRANSVASE (Water Sort) — React island.
+   TUBES (Water Sort) — React island.
    Tap a tube then another to pour the top colour block.
    Goal: each tube empty or full of one colour. Engine pure/tested.
    ===================================================== */
@@ -71,7 +71,7 @@ interface Fresh {
 
 const emptyPuzzle = (): WaterPuzzle => ({ tubes: [], height: 4, colors: 0, tubesCount: 0 });
 
-export default function TransvaseGame({ gameId }: { gameId: string }) {
+export default function TubesGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [puzzle, setPuzzle] = useState<WaterPuzzle>(emptyPuzzle);
 	const [tubes, setTubes] = useState<Tube[]>([]);
@@ -552,7 +552,7 @@ const CSS = `
 .ws-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
 .ws-tube {
-  position: relative; width: 48px; height: calc(48px * var(--h, 4) * 0.64);
+  position: relative; isolation: isolate; width: 48px; height: calc(48px * var(--h, 4) * 0.64);
   margin-top: 6px;
   padding: 0; border: none; background: transparent; cursor: pointer;
   display: flex; align-items: flex-end;
@@ -633,13 +633,13 @@ const CSS = `
 
 .ws-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.5rem; }
 
-.ws-overlay { position: absolute; inset: -8px; z-index: 2; display: flex; align-items: center; justify-content: center; animation: ws-fade 0.25s ease; }
+.ws-overlay { position: absolute; inset: -8px; z-index: 10; display: flex; align-items: center; justify-content: center; animation: ws-fade 0.25s ease; }
 .ws-overlay-card { background: var(--gray-999); border: 2px solid var(--ws-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); }
 .ws-startbtn { border: none; background: var(--ws-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg); }
 .ws-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem; }
 .ws-daily-won strong { color: var(--ws-accent); font-variant-numeric: tabular-nums; }
 
-.ws-win { position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; }
+.ws-win { position: absolute; inset: -8px; z-index: 10; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; }
 .ws-wincard { background: var(--gray-999); border: 2px solid var(--ws-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg); }
 .ws-wincard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 24px; color: var(--gray-0); }
 .ws-winmark { font-size: 30px; }

@@ -12,7 +12,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 
-describe('transvase engine', () => {
+describe('tubes engine', () => {
 	it('generates a solvable puzzle with correct colour counts for every difficulty', () => {
 		for (const key of Object.keys(DIFFS)) {
 			const diff = DIFFS[key];

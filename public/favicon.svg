@@ -11,6 +11,9 @@
     </defs>
     <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)" />
     <rect x="4" y="4" width="120" height="60" rx="28" fill="#ffffff" opacity="0.08" />
-    <path d="M46 36 L64 36 L64 74 L92 74 L92 92 L46 92 Z"
-        fill="url(#ell)" stroke="#0b2545" stroke-width="5" stroke-linejoin="round" />
+    <text x="64" y="66" text-anchor="middle" dominant-baseline="central"
+        font-family="'Arial Black', 'Arial', sans-serif" font-weight="900"
+        font-size="58" letter-spacing="-3"
+        fill="url(#ell)" stroke="#0b2545" stroke-width="6"
+        stroke-linejoin="round" paint-order="stroke">LS</text>
 </svg>

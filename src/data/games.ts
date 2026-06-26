@@ -100,11 +100,11 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
-		id: 'transvase',
-		title: 'Transvase',
+		id: 'tubes',
+		title: 'Tubes',
 		pitch: 'Verse les liquides colorés d\'un tube à l\'autre pour rassembler chaque couleur. Relaxant et logique.',
 		icon: 'flask',
-		href: '/jeux/transvase',
+		href: '/jeux/tubes',
 		status: 'play',
 	},
 	{

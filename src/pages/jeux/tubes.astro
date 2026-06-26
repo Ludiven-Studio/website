@@ -1,12 +1,12 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
-import TransvaseGame from '../../games/transvase/TransvaseGame.tsx';
+import TubesGame from '../../games/tubes/TubesGame.tsx';
 import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
 <BaseLayout
-	title="Transvase | Jeux Ludiven Studio"
+	title="Tubes | Jeux Ludiven Studio"
 	description="Verse les liquides colorés d'un tube à l'autre pour rassembler chaque couleur. Un casse-tête de logique relaxant signé Ludiven Studio."
 >
 	<div class="wrapper game-page stack gap-8">
@@ -14,12 +14,12 @@ import GameTutorial from '../../components/GameTutorial.astro';
 			<a class="back" href="/jeux/">
 				<Icon icon="arrow-left" size="1em" /> Tous les jeux
 			</a>
-			<h1>Transvase</h1>
+			<h1>Tubes</h1>
 			<p>Verse les liquides pour rassembler chaque couleur dans un seul tube</p>
-			<GameTutorial gameId="transvase" />
+			<GameTutorial gameId="tubes" />
 		</header>
 
-		<TransvaseGame client:only="react" gameId="transvase" />
+		<TubesGame client:only="react" gameId="tubes" />
 	</div>
 </BaseLayout>
 
