@@ -61,7 +61,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	pavage: [
 		{ emoji: '🧩', title: 'Le but', body: 'Emboîte toutes les pièces dans la grille pour couvrir chaque case libre, sans chevauchement ni dépassement.' },
 		{ emoji: '🚫', title: 'La règle', body: 'Deux pièces de même couleur ne doivent jamais se toucher côte à côte. Une seule disposition respecte tout : à toi de la trouver.' },
-		{ emoji: '🖱️', title: 'Comment jouer', body: 'Glisse une pièce du bac vers la grille (un aperçu rouge = pose interdite). Tourne-la avec ⟳ ou la touche R. Reprends une pièce posée en la glissant. Les cases barrées sont bloquées. Indice et solution sont là si tu bloques.' },
+		{ emoji: '🖱️', title: 'Comment jouer', body: 'Glisse une pièce du bac vers la grille (un aperçu rouge = pose interdite). Reprends une pièce posée en la glissant. En difficile, les pièces se tournent avec ⟳ ou la touche R. Les cases barrées sont bloquées. Indice et solution sont là si tu bloques.' },
 	],
 	colorgramme: [
 		{ emoji: '🎨', title: 'Le but', body: 'Toutes les cases sont coloriées. Reconstitue l\'image cachée d\'après les indices de chaque ligne et colonne.' },

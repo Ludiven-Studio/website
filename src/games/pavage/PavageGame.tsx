@@ -86,7 +86,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
 
-	const { size, blocked, pieces, solution } = puzzle;
+	const { size, blocked, pieces, solution, rotate } = puzzle;
 
 	// rotations of every piece (small, recomputed cheaply but memoized on puzzle).
 	const pieceRots = useMemo(() => pieces.map((p) => rotations(p.cells)), [pieces]);
@@ -380,6 +380,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			});
 		};
 		const onKey = (e: KeyboardEvent) => {
+			if (!rotate) return;
 			if (e.key === 'r' || e.key === 'R') {
 				e.preventDefault();
 				setDrag((d) => {
@@ -399,7 +400,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			window.removeEventListener('pointercancel', onUp);
 			window.removeEventListener('keydown', onKey);
 		};
-	}, [drag, computeDrag, ensureStarted, pieceRots]);
+	}, [drag, computeDrag, ensureStarted, pieceRots, rotate]);
 
 	const rotateTray = useCallback((pieceIndex: number) => {
 		setTrayRot((tr) => {
@@ -658,7 +659,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 										);
 									})}
 								</div>
-								{pieceRots[i].length > 1 && (
+								{rotate && pieceRots[i].length > 1 && (
 									<button
 										className="pv-rot"
 										onClick={() => rotateTray(i)}
@@ -682,8 +683,9 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			) : (
 				<p className="pv-help">
 					Glisse chaque pièce dans la grille pour tout couvrir. Deux pièces de même couleur ne
-					doivent jamais se toucher côte à côte. Tourne une pièce avec ⟳ (ou la touche R en cours
-					de déplacement). Les cases barrées sont bloquées.
+					doivent jamais se toucher côte à côte.{' '}
+					{rotate && 'Tourne une pièce avec ⟳ (ou la touche R en cours de déplacement). '}
+					Les cases barrées sont bloquées.
 				</p>
 			)}
 
@@ -772,7 +774,7 @@ function DragGhost({
 /* Empty placeholder puzzle: rendered for one frame before the mount effect
    generates the real grid (keeps mount cheap and generation off the init path). */
 function emptyPuzzle(): PavagePuzzle {
-	return { size: 0, blocked: [], pieces: [], solution: [], palette: 0 };
+	return { size: 0, blocked: [], pieces: [], solution: [], palette: 0, rotate: false };
 }
 
 /* ---------- Styles (Ludiven charte + dark mode) ---------- */
