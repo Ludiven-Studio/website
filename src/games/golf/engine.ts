@@ -59,13 +59,16 @@ export interface Hole {
 	widths: number[]; // half-width per path point (wider/narrower sections)
 	halfWidth: number; // representative width (kept for convenience)
 	alt: number[]; // altitude per path point (drives colour + relief)
-	relief: Vec[]; // per-sample downhill acceleration (from the altitude gradient)
+	bank: number[]; // per-sample turn rate (banked curves: + = left turn)
+	relief: Vec[]; // per-sample acceleration (downhill + banking)
 	cutIdx: number; // last corridor sample before the circular green
 	segments: Segment[]; // lane walls + tee cap + green ring + obstacle edges
 	obstacles: Obstacle[]; // for rendering
 	slopes: Slope[]; // radial green bowl
 	greenR: number; // radius of the sloped green around the cup
 	greenWall: Vec[]; // ordered points of the circular green wall (for rendering)
+	bridge: { lo: number; hi: number } | null; // path sample range rendered as a plank bridge
+	water: Vec[] | null; // decorative water rectangle under the bridge (4 corners)
 	bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
 	start: Vec;
 	cup: Vec;
@@ -289,18 +292,54 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 		alt.push(a);
 	}
 	const ds = diff.length / (SAMPLES - 1);
-	const K = 22; // relief responsiveness (downhill push from the altitude gradient)
+	const K = 42; // downhill push from the altitude gradient (clearly felt)
+	const BANK = 28; // banked-turn cross slope → curved trajectories
+	const angDiff = (a: number, b: number) => {
+		let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+		if (d < -Math.PI) d += Math.PI * 2;
+		return d;
+	};
+	const bank: number[] = [];
 	const relief: Vec[] = [];
 	for (let i = 0; i < SAMPLES; i++) {
 		const ip = Math.max(0, i - 1), inx = Math.min(SAMPLES - 1, i + 1);
 		const dAltds = (alt[inx] - alt[ip]) / (ds * Math.max(1, inx - ip));
-		relief.push({ x: -K * dAltds * path[i].dirX, z: -K * dAltds * path[i].dirZ });
+		const dH = angDiff(Math.atan2(path[ip].dirZ, path[ip].dirX), Math.atan2(path[inx].dirZ, path[inx].dirX));
+		bank.push(dH);
+		relief.push({
+			x: -K * dAltds * path[i].dirX + BANK * dH * path[i].nx,
+			z: -K * dAltds * path[i].dirZ + BANK * dH * path[i].nz,
+		});
 	}
 
 	const slopes: Slope[] = [{ kind: 'radial', cx: cup.x, cz: cup.z, r: greenR, strength: 17, ax: 0, az: 0 }];
 
+	// Bridge over a decorative water stream, at a narrow corridor section (purely visual).
+	let bridge: { lo: number; hi: number } | null = null;
+	let water: Vec[] | null = null;
+	{
+		const span = 3;
+		const loB = Math.round(SAMPLES * 0.25), hiB = Math.min(Math.round(SAMPLES * 0.72), cutIdx - span - 1);
+		let bestI = -1, bestW = Infinity;
+		for (let i = loB; i <= hiB; i++) {
+			if (obstacles.some((o) => o.pts.some((pt) => Math.hypot(pt.x - path[i].x, pt.z - path[i].z) < 6))) continue;
+			let avg = 0;
+			for (let k = -span; k <= span; k++) avg += widths[i + k];
+			avg /= 2 * span + 1;
+			if (avg < bestW) { bestW = avg; bestI = i; }
+		}
+		if (bestI >= 0) {
+			bridge = { lo: bestI - span, hi: bestI + span };
+			const m = path[bestI];
+			const along = span * ds + 2.5;
+			const across = widths[bestI] + 9;
+			const c = (ta: number, na: number): Vec => ({ x: m.x + m.dirX * ta + m.nx * na, z: m.z + m.dirZ * ta + m.nz * na });
+			water = [c(along, across), c(along, -across), c(-along, -across), c(-along, across)];
+		}
+	}
+
 	let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-	for (const pt of [...left.slice(0, cutIdx + 1), ...right.slice(0, cutIdx + 1), ...greenWall, ...obstacles.flatMap((o) => o.pts)]) {
+	for (const pt of [...left.slice(0, cutIdx + 1), ...right.slice(0, cutIdx + 1), ...greenWall, ...obstacles.flatMap((o) => o.pts), ...(water ?? [])]) {
 		if (pt.x < minX) minX = pt.x;
 		if (pt.x > maxX) maxX = pt.x;
 		if (pt.z < minZ) minZ = pt.z;
@@ -308,8 +347,8 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	}
 
 	return {
-		path, widths, halfWidth: hw, alt, relief, cutIdx, segments, obstacles, slopes, greenR, greenWall,
-		bounds: { minX, maxX, minZ, maxZ }, start, cup, cupR, coreR, par,
+		path, widths, halfWidth: hw, alt, bank, relief, cutIdx, segments, obstacles, slopes, greenR, greenWall,
+		bridge, water, bounds: { minX, maxX, minZ, maxZ }, start, cup, cupR, coreR, par,
 	};
 }
 

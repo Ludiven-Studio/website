@@ -20,6 +20,7 @@ const mkHole = (segments: Segment[], cup = { x: 1e4, z: 1e4 }, cupR = 1.2, slope
 	widths: [],
 	halfWidth: 6,
 	alt: [],
+	bank: [],
 	relief: [],
 	cutIdx: 0,
 	segments,
@@ -27,6 +28,8 @@ const mkHole = (segments: Segment[], cup = { x: 1e4, z: 1e4 }, cupR = 1.2, slope
 	slopes,
 	greenR: 6,
 	greenWall: [],
+	bridge: null,
+	water: null,
 	bounds: { minX: -10, maxX: 10, minZ: -10, maxZ: 10 },
 	start: { x: 0, z: 0 },
 	cup,
@@ -76,11 +79,17 @@ describe('golf engine (corridor)', () => {
 			expect(a.greenR).toBeGreaterThan(2);
 			// altitude field + circular green wall
 			expect(a.alt.length).toBe(a.path.length);
+			expect(a.bank.length).toBe(a.path.length);
 			expect(a.relief.length).toBe(a.path.length);
 			expect(a.greenWall.length).toBeGreaterThan(10);
 			for (const p of a.greenWall) expect(Math.hypot(p.x - a.cup.x, p.z - a.cup.z)).toBeCloseTo(a.greenR, 4);
 			expect(a.cutIdx).toBeGreaterThan(1);
 			expect(a.cutIdx).toBeLessThan(a.path.length);
+			// bridge (if any) has a valid water rectangle and span
+			if (a.bridge) {
+				expect(a.bridge.hi).toBeGreaterThan(a.bridge.lo);
+				expect(a.water?.length).toBe(4);
+			}
 			for (const p of a.path) {
 				expect(p.x).toBeGreaterThanOrEqual(a.bounds.minX - 1e-6);
 				expect(p.x).toBeLessThanOrEqual(a.bounds.maxX + 1e-6);

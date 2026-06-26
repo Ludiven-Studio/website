@@ -45,6 +45,7 @@ const HALF_SPAN = 24; // ortho half-view; the corridor is larger → camera foll
 const LOOK = 0.22; // camera look-ahead (× ball velocity)
 const ARROW_MAX = 13; // arrow length (units) at full power
 const ARC_SPAN = 1.1; // angular width of the pull arc (rad)
+const GRAB_R = 4.5; // touch within this of the ball to aim; farther = pan the camera
 
 interface Ghost {
 	mesh: THREE.Mesh;
@@ -62,12 +63,15 @@ interface Mats {
 	greenLine: THREE.MeshBasicMaterial;
 	relief: THREE.MeshBasicMaterial;
 	reliefArrow: THREE.MeshBasicMaterial;
+	water: THREE.MeshBasicMaterial;
+	plank: THREE.MeshStandardMaterial;
 }
 interface Scene3D {
 	renderer: THREE.WebGLRenderer;
 	scene: THREE.Scene;
 	camera: THREE.OrthographicCamera;
 	ball: THREE.Mesh;
+	ballRing: THREE.Mesh; // "touch here to aim" hint around the ball
 	holeGroup: THREE.Group;
 	aimArc: THREE.Line;
 	aimArrow: THREE.Mesh;
@@ -118,27 +122,52 @@ function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 	const altMin = Math.min(...hole.alt), altMax = Math.max(...hole.alt);
 	const altRange = altMax - altMin || 1;
 	const col = (a: number): [number, number, number] => {
-		const tt = (a - altMin) / altRange;
+		const tt = Math.max(0, Math.min(1, (a - altMin) / altRange));
 		return [0.16 + tt * 0.44, 0.42 + tt * 0.48, 0.26 + tt * 0.4];
 	};
+	// Banked turns: the two edges sit at different heights → different shades.
+	const bankVis = 4;
+	const cL = (i: number) => col(hole.alt[i] - bankVis * hole.bank[i]);
+	const cR = (i: number) => col(hole.alt[i] + bankVis * hole.bank[i]);
 
-	// Lane floor (per-sample width), vertex-coloured by altitude, up to the green.
+	// Lane floor (per-sample width), vertex-coloured by altitude + banking, up to the green.
 	const fpos: number[] = [], fcol: number[] = [];
 	for (let i = 0; i < cut; i++) {
 		const p = path[i], q = path[i + 1], wi = W[i], wj = W[i + 1];
 		const lp = [p.x + p.nx * wi, p.z + p.nz * wi], rp = [p.x - p.nx * wi, p.z - p.nz * wi];
 		const lq = [q.x + q.nx * wj, q.z + q.nz * wj], rq = [q.x - q.nx * wj, q.z - q.nz * wj];
-		const ci = col(hole.alt[i]), cj = col(hole.alt[i + 1]);
+		const cLi = cL(i), cRi = cR(i), cLj = cL(i + 1), cRj = cR(i + 1);
 		fpos.push(lp[0], 0, lp[1], rp[0], 0, rp[1], lq[0], 0, lq[1]);
-		fcol.push(...ci, ...ci, ...cj);
+		fcol.push(...cLi, ...cRi, ...cLj);
 		fpos.push(rp[0], 0, rp[1], rq[0], 0, rq[1], lq[0], 0, lq[1]);
-		fcol.push(...ci, ...cj, ...cj);
+		fcol.push(...cRi, ...cRj, ...cLj);
 	}
 	const fgeom = new THREE.BufferGeometry();
 	fgeom.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3));
 	fgeom.setAttribute('color', new THREE.Float32BufferAttribute(fcol, 3));
 	fgeom.computeVertexNormals();
 	grp.add(new THREE.Mesh(fgeom, mats.floor));
+
+	// Decorative water stream + plank bridge over a narrow section.
+	if (hole.water) {
+		const w = hole.water;
+		const wp: number[] = [];
+		wp.push(w[0].x, -0.03, w[0].z, w[1].x, -0.03, w[1].z, w[2].x, -0.03, w[2].z);
+		wp.push(w[0].x, -0.03, w[0].z, w[2].x, -0.03, w[2].z, w[3].x, -0.03, w[3].z);
+		grp.add(new THREE.Mesh(stripGeom(wp), mats.water));
+	}
+	if (hole.bridge) {
+		const bp: number[] = [];
+		for (let i = Math.max(0, hole.bridge.lo); i < Math.min(cut, hole.bridge.hi); i++) {
+			const p = path[i], q = path[i + 1], wi = W[i] + 0.3, wj = W[i + 1] + 0.3;
+			const lp = [p.x + p.nx * wi, p.z + p.nz * wi], rp = [p.x - p.nx * wi, p.z - p.nz * wi];
+			const lq = [q.x + q.nx * wj, q.z + q.nz * wj], rq = [q.x - q.nx * wj, q.z - q.nz * wj];
+			const y = 0.08;
+			bp.push(lp[0], y, lp[1], rp[0], y, rp[1], lq[0], y, lq[1]);
+			bp.push(rp[0], y, rp[1], rq[0], y, rq[1], lq[0], y, lq[1]);
+		}
+		if (bp.length) grp.add(new THREE.Mesh(stripGeom(bp), mats.plank));
+	}
 
 	// Green bowl: dark-centre disc (low) + concentric rings to suggest the slope.
 	const ggeo = new THREE.CircleGeometry(hole.greenR, 48);
@@ -183,13 +212,34 @@ function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 
 	// Circular green wall (bumper following the circle), as a raised ribbon.
 	const gw = hole.greenWall;
+	const outR = (p: { x: number; z: number }) => ({
+		x: hole.cup.x + (p.x - hole.cup.x) * (1 + t / hole.greenR),
+		z: hole.cup.z + (p.z - hole.cup.z) * (1 + t / hole.greenR),
+	});
 	for (let k = 0; k < gw.length - 1; k++) {
-		const a = gw[k], b = gw[k + 1];
-		const oa = { x: hole.cup.x + (a.x - hole.cup.x) * (1 + t / hole.greenR), z: hole.cup.z + (a.z - hole.cup.z) * (1 + t / hole.greenR) };
-		const ob = { x: hole.cup.x + (b.x - hole.cup.x) * (1 + t / hole.greenR), z: hole.cup.z + (b.z - hole.cup.z) * (1 + t / hole.greenR) };
+		const a = gw[k], b = gw[k + 1], oa = outR(a), ob = outR(b);
 		wpos.push(a.x, wy, a.z, oa.x, wy, oa.z, ob.x, wy, ob.z);
 		wpos.push(a.x, wy, a.z, ob.x, wy, ob.z, b.x, wy, b.z);
 	}
+
+	// Connectors: bridge the corridor mouth to the circle's opening so the wall is continuous
+	// (the course simply ends in the circular green). These are the two jambs of the doorway.
+	const pc = path[cut];
+	const Li = { x: pc.x + pc.nx * W[cut], z: pc.z + pc.nz * W[cut] };
+	const Lo = { x: pc.x + pc.nx * (W[cut] + t), z: pc.z + pc.nz * (W[cut] + t) };
+	const Ri = { x: pc.x - pc.nx * W[cut], z: pc.z - pc.nz * W[cut] };
+	const Ro = { x: pc.x - pc.nx * (W[cut] + t), z: pc.z - pc.nz * (W[cut] + t) };
+	const c0 = gw[0], c1 = gw[gw.length - 1];
+	const lC = Math.hypot(Li.x - c0.x, Li.z - c0.z) <= Math.hypot(Li.x - c1.x, Li.z - c1.z) ? c0 : c1;
+	const rC = lC === c0 ? c1 : c0;
+	const jamb = (inner: { x: number; z: number }, outer: { x: number; z: number }, circ: { x: number; z: number }) => {
+		const co = outR(circ);
+		wpos.push(inner.x, wy, inner.z, outer.x, wy, outer.z, co.x, wy, co.z);
+		wpos.push(inner.x, wy, inner.z, co.x, wy, co.z, circ.x, wy, circ.z);
+	};
+	jamb(Li, Lo, lC);
+	jamb(Ri, Ro, rC);
+
 	grp.add(new THREE.Mesh(stripGeom(wpos), mats.wall));
 
 	// Cup: bright ring + dark hole, plus a flat flag marker.
@@ -270,6 +320,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const fitSpanRef = useRef(HALF_SPAN);
 	const courseCenterRef = useRef({ x: 0, z: 0 });
 	const overviewRef = useRef(false);
+	const freeCamRef = useRef<{ x: number; z: number } | null>(null); // panned (free-look) camera centre
+	const panningRef = useRef(false);
+	const lastPanRef = useRef({ x: 0, y: 0 });
 	const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
 	const pinchRef = useRef<{ dist: number; span: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
@@ -324,10 +377,20 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			greenLine: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, side: THREE.DoubleSide }),
 			relief: new THREE.MeshBasicMaterial({ color: 0x6db4ff, transparent: true, opacity: 0.26, side: THREE.DoubleSide }),
 			reliefArrow: new THREE.MeshBasicMaterial({ color: 0xeaf2ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
+			water: new THREE.MeshBasicMaterial({ color: 0x2f7fd6, transparent: true, opacity: 0.92, side: THREE.DoubleSide }),
+			plank: new THREE.MeshStandardMaterial({ color: 0xb5803f, roughness: 0.75, side: THREE.DoubleSide }),
 		};
 
 		const ball = makeBall(0xffffff);
 		scene.add(ball);
+
+		const ballRing = new THREE.Mesh(
+			new THREE.RingGeometry(GRAB_R - 0.18, GRAB_R, 40),
+			new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28, side: THREE.DoubleSide }),
+		);
+		ballRing.rotation.x = -Math.PI / 2;
+		ballRing.visible = false;
+		scene.add(ballRing);
 
 		const arcGeom = new THREE.BufferGeometry();
 		arcGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 17), 3));
@@ -345,10 +408,11 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		scene.add(holeGroup);
 
 		g3Ref.current = {
-			renderer, scene, camera, ball, holeGroup, aimArc, aimArrow, mats,
+			renderer, scene, camera, ball, ballRing, holeGroup, aimArc, aimArrow, mats,
 			disposables: [
 				arcGeom, aimArc.material as THREE.Material, aimArrow.geometry, aimArrow.material as THREE.Material,
 				ball.geometry, ball.material as THREE.Material, ground.geometry, ground.material as THREE.Material,
+				ballRing.geometry, ballRing.material as THREE.Material,
 			],
 		};
 		return true;
@@ -438,12 +502,18 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			g.camera.updateProjectionMatrix();
 			appliedSpanRef.current = span;
 		}
-		// Overview frames the whole course; otherwise follow the ball (+ look-ahead).
+		// Camera: overview frames the whole course; free-look stays where the player panned;
+		// otherwise it follows the ball (+ look-ahead).
 		const b = ballRef.current;
 		let cx: number, cz: number;
 		if (overviewRef.current) {
 			cx = courseCenterRef.current.x;
 			cz = courseCenterRef.current.z;
+		} else if (freeCamRef.current) {
+			cx = freeCamRef.current.x;
+			cz = freeCamRef.current.z;
+			camTargetRef.current.x = cx; // so follow eases smoothly when free-look ends
+			camTargetRef.current.z = cz;
 		} else {
 			const tx = pose.x + b.vx * LOOK, tz = pose.z + b.vz * LOOK;
 			const kc = Math.min(1, dtSec * 5);
@@ -454,6 +524,11 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		}
 		g.camera.position.set(cx, 80, cz);
 		g.camera.lookAt(cx, 0, cz);
+
+		// "Touch here to aim" ring around the ball (only when it's the player's turn).
+		const canAim = runningRef.current && !doneRef.current && !overviewRef.current && isSettled(b);
+		g.ballRing.position.set(b.x, 0.05, b.z);
+		g.ballRing.visible = canAim && !aimRef.current.active;
 
 		// Aim visuals: an arc on the pull side (follows the cursor) + a force arrow on the launch side.
 		if (aimRef.current.active) {
@@ -616,17 +691,23 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		if (pointersRef.current.size >= 2) {
 			pinchRef.current = { dist: pinchDist(), span: spanRef.current };
 			aimRef.current.active = false;
+			panningRef.current = false;
 			setPower(0);
 			return;
 		}
-		if (phase !== 'playing' || doneRef.current || overviewRef.current) return;
-		if (!isSettled(ballRef.current)) return;
-		const p = worldFromPointer(e.clientX, e.clientY);
-		if (!p) return;
-		aimRef.current = { active: true, px: p.x, pz: p.z };
-		const b = ballRef.current;
-		setPower(Math.min(Math.hypot(p.x - b.x, p.z - b.z), PARAMS.maxPull) / PARAMS.maxPull);
+		if (phase !== 'playing' || overviewRef.current) return;
 		(e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+		const p = worldFromPointer(e.clientX, e.clientY);
+		const b = ballRef.current;
+		// Aim only when the ball is at rest AND the touch is near it; otherwise pan ("look").
+		if (p && !doneRef.current && isSettled(b) && Math.hypot(p.x - b.x, p.z - b.z) <= GRAB_R) {
+			aimRef.current = { active: true, px: p.x, pz: p.z };
+			setPower(Math.min(Math.hypot(p.x - b.x, p.z - b.z), PARAMS.maxPull) / PARAMS.maxPull);
+		} else {
+			panningRef.current = true;
+			lastPanRef.current = { x: e.clientX, y: e.clientY };
+			if (!freeCamRef.current) freeCamRef.current = { x: camTargetRef.current.x, z: camTargetRef.current.z };
+		}
 	}, [phase, worldFromPointer]);
 
 	const onPointerMove = useCallback((e: React.PointerEvent) => {
@@ -638,6 +719,15 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				setOverview(false);
 				spanRef.current = Math.max(12, Math.min(fitSpanRef.current, pinchRef.current.span * (pinchRef.current.dist / d)));
 			}
+			return;
+		}
+		if (panningRef.current && freeCamRef.current) {
+			const canvas = canvasRef.current;
+			const span = spanRef.current;
+			const wpp = canvas ? (2 * span) / canvas.clientWidth : 0.1; // world units per screen pixel
+			freeCamRef.current.x -= (e.clientX - lastPanRef.current.x) * wpp;
+			freeCamRef.current.z -= (e.clientY - lastPanRef.current.y) * wpp;
+			lastPanRef.current = { x: e.clientX, y: e.clientY };
 			return;
 		}
 		if (!aimRef.current.active) return;
@@ -652,12 +742,14 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const onPointerUp = useCallback((e: React.PointerEvent) => {
 		pointersRef.current.delete(e.pointerId);
 		if (pointersRef.current.size < 2) pinchRef.current = null;
+		if (panningRef.current) { panningRef.current = false; return; }
 		if (!aimRef.current.active) return;
 		aimRef.current.active = false;
 		setPower(0);
 		const b = ballRef.current;
 		const vel = aimToVelocity({ x: aimRef.current.px - b.x, z: aimRef.current.pz - b.z });
 		if (!vel) return;
+		freeCamRef.current = null; // a shot re-centres the camera on the ball
 		ballRef.current = { ...b, vx: vel.vx, vz: vel.vz };
 		strokesRef.current += 1;
 		setStrokes(strokesRef.current);
@@ -671,6 +763,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		ballRef.current = { x: hole.start.x, z: hole.start.z, vx: 0, vz: 0 };
 		prevBallRef.current = ballRef.current;
 		camTargetRef.current = { x: hole.start.x, z: hole.start.z };
+		freeCamRef.current = null;
+		panningRef.current = false;
 		strokesRef.current = 0;
 		setStrokes(0);
 		doneRef.current = false;
@@ -884,7 +978,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					<div className="gf-overlay">
 						<div className="gf-card">
 							<div className="gf-winmark">🏌️</div>
-							<h2>Dans le trou&nbsp;!</h2>
+							<h2>Bravo&nbsp;!</h2>
 							<p className="gf-winscore">{strokes} coups · <strong>{parTag(strokes)}</strong></p>
 							{mode === 'defi' ? (
 								alreadyPlayed || triesRef.current >= MAX_TRIES ? (
