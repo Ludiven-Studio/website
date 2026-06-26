@@ -115,12 +115,18 @@ describe('golf engine (corridor)', () => {
 		expect(r.ball.vz).toBeGreaterThan(0); // bounced back inward
 	});
 
-	it('the cup pulls a nearby ball toward its centre', () => {
+	it('drops in when more than ~50% over the hole, even at high speed', () => {
 		const hole = mkHole([], { x: 0, z: 0 }, 1.2);
-		// fast ball skimming the rim at x=0.9, moving +z (centre is at −x)
-		const r = stepBall({ x: 0.9, z: 0, vx: 0, vz: 20 }, hole, 1 / 60);
-		expect(r.ball.vx).toBeLessThan(0); // attracted toward centre (−x)
-		expect(r.sunk).toBe(false); // too fast + off-centre → not yet
+		// centre crosses within the cup radius while moving fast → falls in
+		const r = sim({ x: 0.6, z: 4, vx: 0, vz: -40 }, hole, 2);
+		expect(r.sunk).toBe(true);
+	});
+
+	it('a graze that keeps its centre outside the rim lips out', () => {
+		const hole = mkHole([], { x: 0, z: 0 }, 1.2);
+		// centre stays at x=1.7 (> cupR) the whole way → never 50% over → no drop
+		const r = sim({ x: 1.7, z: 4, vx: 0, vz: -40 }, hole, 2);
+		expect(r.sunk).toBe(false);
 	});
 
 	it('a dead-centre pass drops in even at high speed', () => {

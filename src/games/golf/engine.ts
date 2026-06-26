@@ -245,8 +245,8 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	segments.push(makeSegment(Lc.x, Lc.z, lOpen.x, lOpen.z, cup));
 	segments.push(makeSegment(Rc.x, Rc.z, rOpen.x, rOpen.z, cup));
 
-	// Obstacles (corridor only): central islands (fork) or side chicanes; a passage always remains.
-	const clearR = PARAMS.ballR + 1.0;
+	// Obstacles: decorative blocks flush against ONE wall, jutting into the lane (chicanes).
+	// A passage on the opposite side always remains (protrusion < lane − ball clearance).
 	const obstacles: Obstacle[] = [];
 	const used: number[] = [];
 	const loIdx = Math.round(SAMPLES * 0.18), hiIdx = Math.min(Math.round(SAMPLES * 0.82), cutIdx - 2);
@@ -255,22 +255,15 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 		if (used.some((u) => Math.abs(u - idx) < SAMPLES * 0.12)) continue;
 		const p = path[idx];
 		const lw = widths[idx];
-		const along = 1.6 + rng() * 2.4;
-		const central = rng() < 0.5;
-		let across: number, off: number;
-		if (central) {
-			across = clamp(1.5 + rng() * 1.4, 1.0, lw - clearR - 0.4);
-			if (across < 1.0) continue;
-			off = 0;
-		} else {
-			across = 1.3 + rng() * 1.6;
-			if (across > lw - 1.4) continue;
-			off = (rng() < 0.5 ? 1 : -1) * (lw - across - (0.7 + rng() * 0.9));
-		}
-		const cx = p.x + p.nx * off, cz = p.z + p.nz * off;
+		const along = 1.4 + rng() * 2.2;
+		const protrude = Math.min(1.6 + rng() * 2.0, 2 * lw - (PARAMS.ballR * 2 + 2.2));
+		if (protrude < 1.2) continue;
+		const s = rng() < 0.5 ? 1 : -1; // which wall it sticks out from
+		const naO = s * lw, naI = s * (lw - protrude); // outer edge at the wall, inner edge in-lane
+		const cx = p.x + p.nx * (s * (lw - protrude / 2)), cz = p.z + p.nz * (s * (lw - protrude / 2));
 		if (Math.hypot(cx - start.x, cz - start.z) < 9 || Math.hypot(cx - cup.x, cz - cup.z) < greenR + 6) continue;
-		const corner = (ta: number, na: number): Vec => ({ x: cx + p.dirX * ta + p.nx * na, z: cz + p.dirZ * ta + p.nz * na });
-		const pts = [corner(along, across), corner(along, -across), corner(-along, -across), corner(-along, across)];
+		const corner = (ta: number, na: number): Vec => ({ x: p.x + p.dirX * ta + p.nx * na, z: p.z + p.dirZ * ta + p.nz * na });
+		const pts = [corner(along, naO), corner(along, naI), corner(-along, naI), corner(-along, naO)];
 		const center = { x: cx, z: cz };
 		for (let k = 0; k < 4; k++) {
 			const a = pts[k], b = pts[(k + 1) % 4];
@@ -457,23 +450,15 @@ export function stepBall(
 			}
 		}
 
-		// Cup magnet: pull toward the centre when over the hole (curves fast balls).
-		const dcx = hole.cup.x - b.x, dcz = hole.cup.z - b.z;
-		const dc = Math.hypot(dcx, dcz);
+		// Drop in once the ball is more than ~50% over the hole (its centre within the cup
+		// radius), at ANY speed. A graze that keeps its centre outside the rim lips out.
+		const dc = Math.hypot(hole.cup.x - b.x, hole.cup.z - b.z);
 		if (dc < hole.cupR) {
-			if (dc > 1e-4) {
-				const f = P.magnet * (1 - dc / hole.cupR) * h;
-				b.vx += (dcx / dc) * f;
-				b.vz += (dcz / dc) * f;
-			}
-			// Dead-centre → always in; otherwise needs to be slow enough.
-			if (dc < hole.coreR || ballSpeed(b) < P.captureSpeed) {
-				b.x = hole.cup.x;
-				b.z = hole.cup.z;
-				b.vx = 0;
-				b.vz = 0;
-				sunk = true;
-			}
+			b.x = hole.cup.x;
+			b.z = hole.cup.z;
+			b.vx = 0;
+			b.vz = 0;
+			sunk = true;
 		}
 
 		// Friction.

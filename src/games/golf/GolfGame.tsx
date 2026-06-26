@@ -64,7 +64,7 @@ interface Mats {
 	relief: THREE.MeshBasicMaterial;
 	reliefArrow: THREE.MeshBasicMaterial;
 	water: THREE.MeshBasicMaterial;
-	plank: THREE.MeshStandardMaterial;
+	rock: THREE.MeshStandardMaterial;
 }
 interface Scene3D {
 	renderer: THREE.WebGLRenderer;
@@ -162,24 +162,33 @@ function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 			const u = Math.max(0, Math.min(1, (i - lo) / (hi - lo)));
 			return 0.1 + 3.2 * Math.sin(u * Math.PI) * 0.32; // matches the altitude hump
 		};
-		const bp: number[] = [];
+		const bp: number[] = [], bcol: number[] = [];
 		for (let i = Math.max(0, lo); i < Math.min(cut, hi); i++) {
 			const p = path[i], q = path[i + 1], wi = W[i] + 0.3, wj = W[i + 1] + 0.3;
 			const lp = [p.x + p.nx * wi, p.z + p.nz * wi], rp = [p.x - p.nx * wi, p.z - p.nz * wi];
 			const lq = [q.x + q.nx * wj, q.z + q.nz * wj], rq = [q.x - q.nx * wj, q.z - q.nz * wj];
 			const yi = archY(i), yj = archY(i + 1);
+			const ci = col(hole.alt[i]), cj = col(hole.alt[i + 1]);
 			bp.push(lp[0], yi, lp[1], rp[0], yi, rp[1], lq[0], yj, lq[1]);
+			bcol.push(...ci, ...ci, ...cj);
 			bp.push(rp[0], yi, rp[1], rq[0], yj, rq[1], lq[0], yj, lq[1]);
+			bcol.push(...ci, ...cj, ...cj);
 		}
-		if (bp.length) grp.add(new THREE.Mesh(stripGeom(bp), mats.plank));
+		if (bp.length) {
+			const bgeo = new THREE.BufferGeometry();
+			bgeo.setAttribute('position', new THREE.Float32BufferAttribute(bp, 3));
+			bgeo.setAttribute('color', new THREE.Float32BufferAttribute(bcol, 3));
+			bgeo.computeVertexNormals();
+			grp.add(new THREE.Mesh(bgeo, mats.floor));
+		}
 	}
 
-	// Green bowl: dark-centre disc (low) + concentric rings to suggest the slope.
+	// Green bowl: coloured by the SAME altitude ramp — low centre (dark) → higher rim (lighter).
 	const ggeo = new THREE.CircleGeometry(hole.greenR, 48);
 	const gc = ggeo.attributes.position.count;
 	const gcol: number[] = [];
-	const cCenter: [number, number, number] = [0.10, 0.30, 0.18];
-	const cRim: [number, number, number] = [0.40, 0.76, 0.50];
+	const cCenter = col(hole.alt[hole.alt.length - 1]); // cup centre (lowest)
+	const cRim = col(hole.alt[cut]); // green edge
 	for (let v = 0; v < gc; v++) { const c = v === 0 ? cCenter : cRim; gcol.push(c[0], c[1], c[2]); }
 	ggeo.setAttribute('color', new THREE.Float32BufferAttribute(gcol, 3));
 	const green = new THREE.Mesh(ggeo, mats.green);
@@ -263,14 +272,21 @@ function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 	flag.position.set(hole.cup.x, 0.06, hole.cup.z + hole.cupR);
 	grp.add(flag);
 
-	// Obstacle islands: raised flat top over their footprint (convex quad → 2 tris).
-	const oy = 1.45;
+	// Obstacles: decorative rocks attached to a wall — a raised top + a smaller crest for relief.
+	const oy = 1.6;
 	for (const ob of hole.obstacles) {
 		const q = ob.pts;
 		const opos: number[] = [];
 		opos.push(q[0].x, oy, q[0].z, q[1].x, oy, q[1].z, q[2].x, oy, q[2].z);
 		opos.push(q[0].x, oy, q[0].z, q[2].x, oy, q[2].z, q[3].x, oy, q[3].z);
-		grp.add(new THREE.Mesh(stripGeom(opos), mats.wall));
+		// a smaller raised crest (centre pulled in) for a chunky rock look
+		const cxo = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, czo = (q[0].z + q[1].z + q[2].z + q[3].z) / 4;
+		const k = 0.45, cy = oy + 0.7;
+		const m = (pt: { x: number; z: number }) => ({ x: cxo + (pt.x - cxo) * k, z: czo + (pt.z - czo) * k });
+		const a = m(q[0]), b = m(q[1]), c = m(q[2]), d = m(q[3]);
+		opos.push(a.x, cy, a.z, b.x, cy, b.z, c.x, cy, c.z);
+		opos.push(a.x, cy, a.z, c.x, cy, c.z, d.x, cy, d.z);
+		grp.add(new THREE.Mesh(stripGeom(opos), mats.rock));
 	}
 
 	return grp;
@@ -383,7 +399,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			relief: new THREE.MeshBasicMaterial({ color: 0x6db4ff, transparent: true, opacity: 0.26, side: THREE.DoubleSide }),
 			reliefArrow: new THREE.MeshBasicMaterial({ color: 0xeaf2ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
 			water: new THREE.MeshBasicMaterial({ color: 0x2f7fd6, transparent: true, opacity: 0.92, side: THREE.DoubleSide }),
-			plank: new THREE.MeshStandardMaterial({ color: 0xb5803f, roughness: 0.75, side: THREE.DoubleSide }),
+			rock: new THREE.MeshStandardMaterial({ color: 0x8b9098, roughness: 1, flatShading: true, side: THREE.DoubleSide }),
 		};
 
 		const ball = makeBall(0xffffff);
@@ -979,6 +995,14 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
+				{phase === 'playing' && (
+					<div className="gf-legend" aria-hidden="true">
+						<span>Haut</span>
+						<div className="gf-legendbar" />
+						<span>Bas</span>
+					</div>
+				)}
+
 				{phase === 'playing' && done && (
 					<div className="gf-overlay">
 						<div className="gf-card">
@@ -1072,6 +1096,8 @@ const CSS = `
 .gf-zoom { position: absolute; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; }
 .gf-zbtn { width: 42px; height: 42px; border-radius: 12px; border: none; background: rgba(0,0,0,0.5); color: #fff; font-size: 20px; font-weight: 800; line-height: 1; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: none; }
 .gf-zbtn:active, .gf-zbtn.active { background: var(--gf-accent); color: var(--accent-text-over); }
+.gf-legend { position: absolute; bottom: 10px; left: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.45); padding: 6px 7px; border-radius: 10px; pointer-events: none; }
+.gf-legendbar { width: 11px; height: 64px; border-radius: 6px; background: linear-gradient(to top, #296b42, #99e6a8); border: 1px solid rgba(255,255,255,0.4); }
 .gf-actions { display: flex; gap: 10px; justify-content: center; margin-top: 0.7rem; }
 .gf-restart, .gf-quit { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 18px; cursor: pointer; }
 .gf-restart { background: var(--gf-accent); color: var(--accent-text-over); border-color: transparent; }
