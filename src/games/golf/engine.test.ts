@@ -9,97 +9,94 @@ import {
 	ballSpeed,
 	type Hole,
 	type Ball,
+	type Segment,
 } from './engine';
 import { mulberry32 } from '../prng';
 
-const distPointRect = (p: { x: number; z: number }, w: { minX: number; maxX: number; minZ: number; maxZ: number }) => {
-	const dx = Math.max(w.minX - p.x, 0, p.x - w.maxX);
-	const dz = Math.max(w.minZ - p.z, 0, p.z - w.maxZ);
-	return Math.hypot(dx, dz);
-};
+// Minimal hole for isolated physics tests (path is render-only; stepBall ignores it).
+const mkHole = (segments: Segment[], cup = { x: 1e4, z: 1e4 }, cupR = 1.2): Hole => ({
+	path: [],
+	halfWidth: 6,
+	segments,
+	start: { x: 0, z: 0 },
+	cup,
+	cupR,
+	coreR: Math.max(PARAMS.ballR * 0.7, cupR * 0.4),
+	par: 3,
+});
 
-const sim = (ball: Ball, hole: Hole, seconds: number): { ball: Ball; sunk: boolean } => {
+const sim = (ball: Ball, hole: Hole, seconds: number) => {
 	let b = ball;
 	let sunk = false;
-	const dt = 1 / 60;
 	for (let t = 0; t < seconds * 60 && !sunk; t++) {
-		const r = stepBall(b, hole, dt);
+		const r = stepBall(b, hole, 1 / 60);
 		b = r.ball;
 		sunk = r.sunk;
 	}
 	return { ball: b, sunk };
 };
 
-describe('golf engine', () => {
-	it('generates a valid, deterministic hole for each difficulty', () => {
+describe('golf engine (corridor)', () => {
+	it('generates a valid, deterministic winding hole for each difficulty', () => {
 		for (const key of Object.keys(DIFFS)) {
 			const diff = DIFFS[key];
-			const a = generateHole(mulberry32(42), diff);
-			const b = generateHole(mulberry32(42), diff);
+			const a = generateHole(mulberry32(7), diff);
+			const b = generateHole(mulberry32(7), diff);
 			expect(a, `${key} deterministic`).toEqual(b);
 
-			const { w, h } = diff.half;
-			for (const p of [a.start, a.cup]) {
-				expect(Math.abs(p.x)).toBeLessThan(w);
-				expect(Math.abs(p.z)).toBeLessThan(h);
+			expect(a.path.length).toBeGreaterThan(20);
+			expect(a.segments.length).toBeGreaterThan(20);
+			expect(a.par).toBeGreaterThanOrEqual(2);
+			expect(a.par).toBeLessThanOrEqual(6);
+			for (const p of [...a.path, a.start, a.cup]) {
+				expect(Number.isFinite(p.x) && Number.isFinite(p.z)).toBe(true);
 			}
-			// start and cup are far apart (opposite ends)
-			expect(Math.hypot(a.cup.x - a.start.x, a.cup.z - a.start.z)).toBeGreaterThan(h);
-			// walls stay in bounds and keep clear of start/cup
-			for (const wl of a.walls) {
-				expect(wl.minX).toBeGreaterThanOrEqual(-w);
-				expect(wl.maxX).toBeLessThanOrEqual(w);
-				expect(distPointRect(a.start, wl)).toBeGreaterThanOrEqual(5);
-				expect(distPointRect(a.cup, wl)).toBeGreaterThanOrEqual(5);
-			}
+			// tee and cup are far apart along the corridor
+			expect(Math.hypot(a.cup.x - a.start.x, a.cup.z - a.start.z)).toBeGreaterThan(diff.length * 0.25);
+			// every segment normal is unit length
+			for (const s of a.segments) expect(Math.hypot(s.nx, s.nz)).toBeCloseTo(1, 5);
 		}
 	});
 
 	it('aimToVelocity launches opposite the pull, clamps power, ignores micro drags', () => {
 		const v = aimToVelocity({ x: 0, z: 10 })!;
-		expect(v.vx).toBeCloseTo(0);
-		expect(v.vz).toBeLessThan(0); // pulled +z → launches −z
+		expect(v.vz).toBeLessThan(0);
 		expect(Math.hypot(v.vx, v.vz)).toBeCloseTo(10 * PARAMS.powerScale);
-		// clamped at maxPull
 		const big = aimToVelocity({ x: 0, z: 100 })!;
 		expect(Math.hypot(big.vx, big.vz)).toBeCloseTo(PARAMS.maxPull * PARAMS.powerScale);
-		// micro drag → no shot
 		expect(aimToVelocity({ x: 0.1, z: 0 })).toBeNull();
 	});
 
-	it('bounces off a border (normal velocity reverses)', () => {
-		const hole: Hole = { half: { w: 20, h: 26 }, start: { x: 0, z: 10 }, cup: { x: 0, z: -10 }, cupR: 1.3, walls: [], par: 3 };
-		const r = stepBall({ x: 19.2, z: 0, vx: 20, vz: 0 }, hole, 1 / 60);
-		expect(r.ball.vx).toBeLessThan(0);
-		expect(r.ball.x).toBeLessThanOrEqual(20 - PARAMS.ballR + 1e-6);
+	it('bounces off an angled wall segment (normal velocity reverses)', () => {
+		// Horizontal wall on the z=0 line, inside is +z.
+		const seg: Segment = { ax: -6, az: 0, bx: 6, bz: 0, nx: 0, nz: 1 };
+		const r = stepBall({ x: 0, z: 0.5, vx: 0, vz: -20 }, mkHole([seg]), 1 / 60);
+		expect(r.ball.vz).toBeGreaterThan(0); // bounced back inward
 	});
 
-	it('bounces off an internal wall', () => {
-		const wall = { minX: -3, maxX: 3, minZ: -1, maxZ: 1 };
-		const hole: Hole = { half: { w: 20, h: 26 }, start: { x: 0, z: 10 }, cup: { x: 0, z: -10 }, cupR: 1.3, walls: [wall], par: 3 };
-		const r = stepBall({ x: -3.5, z: 0, vx: 20, vz: 0 }, hole, 1 / 60);
-		expect(r.ball.vx).toBeLessThan(0); // pushed back left
+	it('the cup pulls a nearby ball toward its centre', () => {
+		const hole = mkHole([], { x: 0, z: 0 }, 1.2);
+		// fast ball skimming the rim at x=0.9, moving +z (centre is at −x)
+		const r = stepBall({ x: 0.9, z: 0, vx: 0, vz: 20 }, hole, 1 / 60);
+		expect(r.ball.vx).toBeLessThan(0); // attracted toward centre (−x)
+		expect(r.sunk).toBe(false); // too fast + off-centre → not yet
 	});
 
-	it('friction brings the ball to rest', () => {
-		const hole: Hole = { half: { w: 40, h: 40 }, start: { x: -30, z: 0 }, cup: { x: 30, z: 0 }, cupR: 1, walls: [], par: 4 };
-		const { ball } = sim({ x: 0, z: 0, vx: 10, vz: 0 }, hole, 4);
-		expect(isSettled(ball)).toBe(true);
-		expect(ballSpeed(ball)).toBe(0);
+	it('a dead-centre pass drops in even at high speed', () => {
+		const hole = mkHole([], { x: 0, z: 0 }, 1.2);
+		const r = stepBall({ x: 0, z: 0.3, vx: 0, vz: -40 }, hole, 1 / 60);
+		expect(r.sunk).toBe(true);
 	});
 
-	it('a well-judged straight putt drops in the cup', () => {
-		const hole: Hole = { half: { w: 20, h: 26 }, start: { x: 0, z: 12 }, cup: { x: 0, z: -12 }, cupR: 1.3, walls: [], par: 3 };
-		// distance 24; speed chosen to reach the cup arriving below captureSpeed
-		const { sunk } = sim({ x: 0, z: 12, vx: 0, vz: -27 }, hole, 5);
+	it('a slow ball settling in the cup drops in', () => {
+		const hole = mkHole([], { x: 0, z: 0 }, 1.2);
+		const { sunk } = sim({ x: 0, z: 2.0, vx: 0, vz: -8 }, hole, 4);
 		expect(sunk).toBe(true);
 	});
 
-	it('a ball crossing the cup too fast laps out (not captured)', () => {
-		const hole: Hole = { half: { w: 20, h: 26 }, start: { x: 0, z: 12 }, cup: { x: 0, z: -12 }, cupR: 1.3, walls: [], par: 3 };
-		// already over the cup but way faster than captureSpeed → not sunk this step
-		const r = stepBall({ x: 0, z: -11.9, vx: 0, vz: -40 }, hole, 1 / 60);
-		expect(ballSpeed({ x: 0, z: 0, vx: 0, vz: -40 } as Ball)).toBeGreaterThan(PARAMS.captureSpeed);
-		expect(r.sunk).toBe(false);
+	it('friction brings the ball to rest', () => {
+		const { ball } = sim({ x: 0, z: 0, vx: 10, vz: 0 }, mkHole([]), 4);
+		expect(isSettled(ball)).toBe(true);
+		expect(ballSpeed(ball)).toBe(0);
 	});
 });

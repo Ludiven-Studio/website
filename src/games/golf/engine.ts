@@ -1,32 +1,47 @@
 /**
  * MINI-GOLF — pure engine (no rendering, no I/O).
- * Top-down putting on a flat green: slingshot aim (power ∝ pull, launch opposite
- * the drag), friction brings the ball to rest, it bounces off the borders and a
- * few rectangular walls, and drops in the cup when it arrives slowly enough.
- * Hole layout is generated deterministically from a seed (shared daily hole).
+ * A winding walled corridor from tee to cup. Slingshot aim (power ∝ pull, launch
+ * opposite the drag); friction brings the ball to rest; it bounces off the lane
+ * walls (arbitrary angles → curves). The cup is barely bigger than the ball and
+ * pulls it toward the centre — dead-centre passes drop in even when fast.
+ * Layout is generated deterministically from a seed (shared daily hole).
  */
 
-import type { Rng } from '../prng';
+import { mulberry32, type Rng } from '../prng';
 
 export interface Vec {
 	x: number;
 	z: number;
 }
 
-/** Axis-aligned rectangle obstacle (world coords). */
-export interface Wall {
-	minX: number;
-	maxX: number;
-	minZ: number;
-	maxZ: number;
+/** Centerline sample: position, tangent (dir), left normal (n). */
+export interface PathPoint {
+	x: number;
+	z: number;
+	dirX: number;
+	dirZ: number;
+	nx: number;
+	nz: number;
+}
+
+/** Wall segment with an inward unit normal (points toward the lane centre). */
+export interface Segment {
+	ax: number;
+	az: number;
+	bx: number;
+	bz: number;
+	nx: number;
+	nz: number;
 }
 
 export interface Hole {
-	half: { w: number; h: number }; // green half-extents (green spans [-w,w]×[-h,h])
+	path: PathPoint[]; // centerline (tee → cup)
+	halfWidth: number;
+	segments: Segment[]; // lane walls + end caps
 	start: Vec;
 	cup: Vec;
-	cupR: number;
-	walls: Wall[];
+	cupR: number; // visual hole radius (barely > ball)
+	coreR: number; // dead-centre radius → always drops
 	par: number;
 }
 
@@ -39,101 +54,132 @@ export interface Ball {
 
 export interface BallParams {
 	ballR: number;
-	decel: number; // linear deceleration (units/s²) — friction
-	restitution: number; // bounce energy kept (0..1)
-	captureSpeed: number; // max speed to drop in the cup (else lip-out)
-	settleSpeed: number; // below this the ball is considered stopped
-	minPull: number; // ignore micro drags
-	maxPull: number; // pull beyond this doesn't add power
-	powerScale: number; // launch speed per unit of pull
+	decel: number; // friction deceleration (units/s²)
+	restitution: number; // wall bounce energy kept
+	captureSpeed: number; // drop in the cup below this speed
+	magnet: number; // cup attraction acceleration near the rim (units/s²)
+	settleSpeed: number;
+	minPull: number;
+	maxPull: number;
+	powerScale: number;
 }
 
 export const PARAMS: BallParams = {
 	ballR: 0.7,
-	decel: 14,
-	restitution: 0.7,
-	captureSpeed: 9,
+	decel: 13,
+	restitution: 0.68,
+	captureSpeed: 8,
+	magnet: 42,
 	settleSpeed: 0.25,
 	minPull: 0.8,
 	maxPull: 16,
-	powerScale: 2.6,
+	powerScale: 2.7,
 };
 
 export interface DiffLevel {
 	label: string;
-	half: { w: number; h: number };
-	walls: number;
+	length: number; // approx corridor length
+	bends: number; // control points
+	width: number; // lane width
 	cupR: number;
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', half: { w: 18, h: 22 }, walls: 2, cupR: 1.6 },
-	moyen: { label: 'Moyen', half: { w: 20, h: 26 }, walls: 4, cupR: 1.3 },
-	difficile: { label: 'Difficile', half: { w: 22, h: 30 }, walls: 6, cupR: 1.1 },
+	facile: { label: 'Facile', length: 120, bends: 5, width: 15, cupR: 1.35 },
+	moyen: { label: 'Moyen', length: 175, bends: 7, width: 13, cupR: 1.2 },
+	difficile: { label: 'Difficile', length: 230, bends: 9, width: 11, cupR: 1.05 },
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** Shortest distance from a point to an axis-aligned rectangle (0 if inside). */
-function distPointRect(p: Vec, w: Wall): number {
-	const dx = Math.max(w.minX - p.x, 0, p.x - w.maxX);
-	const dz = Math.max(w.minZ - p.z, 0, p.z - w.maxZ);
-	return Math.hypot(dx, dz);
-}
-
-function rectsOverlap(a: Wall, b: Wall, margin: number): boolean {
-	return (
-		a.minX - margin < b.maxX &&
-		a.maxX + margin > b.minX &&
-		a.minZ - margin < b.maxZ &&
-		a.maxZ + margin > b.minZ
-	);
-}
-
 /* ---------- generation ---------- */
 
+/** Open Catmull-Rom through control points (clamped endpoints). */
+function catmullOpen(pts: Vec[], t: number): Vec {
+	const n = pts.length;
+	const s = clamp(t, 0, 1) * (n - 1);
+	let i = Math.floor(s);
+	if (i > n - 2) i = n - 2;
+	const u = s - i;
+	const p0 = pts[Math.max(0, i - 1)];
+	const p1 = pts[i];
+	const p2 = pts[i + 1];
+	const p3 = pts[Math.min(n - 1, i + 2)];
+	const u2 = u * u, u3 = u2 * u;
+	const a = -0.5 * u3 + u2 - 0.5 * u;
+	const b = 1.5 * u3 - 2.5 * u2 + 1;
+	const c = -1.5 * u3 + 2 * u2 + 0.5 * u;
+	const d = 0.5 * u3 - 0.5 * u2;
+	return {
+		x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
+		z: a * p0.z + b * p1.z + c * p2.z + d * p3.z,
+	};
+}
+
+/** Oriented wall segment whose normal points toward `ref` (the inside of the lane). */
+function makeSegment(ax: number, az: number, bx: number, bz: number, ref: Vec): Segment {
+	const dx = bx - ax, dz = bz - az;
+	const len = Math.hypot(dx, dz) || 1;
+	let nx = -dz / len, nz = dx / len;
+	if ((ref.x - ax) * nx + (ref.z - az) * nz < 0) { nx = -nx; nz = -nz; }
+	return { ax, az, bx, bz, nx, nz };
+}
+
 export function generateHole(rng: Rng, diff: DiffLevel): Hole {
-	const { w, h } = diff.half;
-	const cupR = diff.cupR;
-	const margin = 2.5 + cupR;
-
-	const start: Vec = { x: (rng() * 2 - 1) * (w * 0.5), z: h - margin - rng() * 2 };
-	const cup: Vec = { x: (rng() * 2 - 1) * (w * 0.5), z: -h + margin + rng() * 2 };
-
-	const walls: Wall[] = [];
-	let tries = 0;
-	while (walls.length < diff.walls && tries < diff.walls * 40) {
-		tries++;
-		// Half-extents: one long axis, one thin axis; random orientation.
-		const long = 2 + rng() * 6;
-		const thin = 0.9 + rng() * 1.4;
-		const vertical = rng() < 0.5;
-		const hw = vertical ? thin : long;
-		const hd = vertical ? long : thin;
-		const cx = (rng() * 2 - 1) * (w - hw - 2);
-		const cz = (rng() * 2 - 1) * (h * 0.55);
-		const wall: Wall = { minX: cx - hw, maxX: cx + hw, minZ: cz - hd, maxZ: cz + hd };
-		const clear = 5;
-		if (
-			distPointRect(start, wall) >= clear &&
-			distPointRect(cup, wall) >= clear &&
-			!walls.some((o) => rectsOverlap(wall, o, 1.5))
-		)
-			walls.push(wall);
+	const hw = diff.width / 2;
+	const step = diff.length / (diff.bends - 1);
+	const base = -Math.PI / 2 + (rng() - 0.5) * 0.6; // generally heading −z
+	let heading = base;
+	let x = 0, z = 0;
+	const ctrl: Vec[] = [{ x, z }];
+	for (let i = 1; i < diff.bends; i++) {
+		heading = clamp(heading + (rng() - 0.5) * 1.5, base - 1.2, base + 1.2); // doglegs, no backtrack
+		x += Math.cos(heading) * step;
+		z += Math.sin(heading) * step;
+		ctrl.push({ x, z });
 	}
 
-	const dist = Math.hypot(cup.x - start.x, cup.z - start.z);
-	const par = clamp(Math.round(dist / 16) + 1, 2, 5);
+	const SAMPLES = clamp(Math.round(diff.length / 1.6), 40, 180);
+	const raw: Vec[] = [];
+	for (let s = 0; s < SAMPLES; s++) raw.push(catmullOpen(ctrl, s / (SAMPLES - 1)));
 
-	return { half: { w, h }, start, cup, cupR, walls, par };
+	const path: PathPoint[] = [];
+	for (let i = 0; i < SAMPLES; i++) {
+		const cur = raw[i];
+		const next = raw[Math.min(SAMPLES - 1, i + 1)];
+		const prev = raw[Math.max(0, i - 1)];
+		let dx = next.x - prev.x, dz = next.z - prev.z;
+		const len = Math.hypot(dx, dz) || 1;
+		dx /= len; dz /= len;
+		path.push({ x: cur.x, z: cur.z, dirX: dx, dirZ: dz, nx: -dz, nz: dx });
+	}
+
+	const left = path.map((p) => ({ x: p.x + p.nx * hw, z: p.z + p.nz * hw }));
+	const right = path.map((p) => ({ x: p.x - p.nx * hw, z: p.z - p.nz * hw }));
+
+	const segments: Segment[] = [];
+	for (let i = 0; i < SAMPLES - 1; i++) {
+		segments.push(makeSegment(left[i].x, left[i].z, left[i + 1].x, left[i + 1].z, path[i]));
+		segments.push(makeSegment(right[i].x, right[i].z, right[i + 1].x, right[i + 1].z, path[i]));
+	}
+	// End caps (tee + cup), normals pointing into the lane.
+	segments.push(makeSegment(left[0].x, left[0].z, right[0].x, right[0].z, path[1]));
+	const e = SAMPLES - 1;
+	segments.push(makeSegment(left[e].x, left[e].z, right[e].x, right[e].z, path[e - 1]));
+
+	const startIdx = 1;
+	const cupIdx = SAMPLES - 2;
+	const start: Vec = { x: path[startIdx].x, z: path[startIdx].z };
+	const cup: Vec = { x: path[cupIdx].x, z: path[cupIdx].z };
+	const coreR = Math.max(PARAMS.ballR * 0.7, diff.cupR * 0.4);
+	const par = clamp(Math.round(diff.length / 42) + 1, 2, 6);
+
+	return { path, halfWidth: hw, segments, start, cup, cupR: diff.cupR, coreR, par };
 }
 
 /* ---------- aiming ---------- */
 
-/**
- * Slingshot: `pull` is the drag vector (pointer − ball). The ball launches OPPOSITE
- * the pull; power grows with pull length up to `maxPull`. Returns null for a micro drag.
- */
+/** Slingshot: `pull` = pointer − ball. Launches OPPOSITE the pull; power ∝ pull (capped). */
 export function aimToVelocity(pull: Vec, P: BallParams = PARAMS): { vx: number; vz: number } | null {
 	const mag = Math.hypot(pull.x, pull.z);
 	if (mag < P.minPull) return null;
@@ -146,37 +192,17 @@ export const isSettled = (b: Ball, P: BallParams = PARAMS): boolean => ballSpeed
 
 /* ---------- physics ---------- */
 
-/** Circle vs AABB: push the ball out and reflect its normal velocity. Mutates `b`. */
-function collideWall(b: Ball, w: Wall, r: number, restitution: number): void {
-	const cx = clamp(b.x, w.minX, w.maxX);
-	const cz = clamp(b.z, w.minZ, w.maxZ);
-	let dx = b.x - cx;
-	let dz = b.z - cz;
+/** Circle vs segment (capsule): push the ball out and reflect its normal velocity. Mutates `b`. */
+function collideSegment(b: Ball, s: Segment, r: number, restitution: number): void {
+	const abx = s.bx - s.ax, abz = s.bz - s.az;
+	const ab2 = abx * abx + abz * abz || 1;
+	const t = clamp(((b.x - s.ax) * abx + (b.z - s.az) * abz) / ab2, 0, 1);
+	const cx = s.ax + abx * t, cz = s.az + abz * t;
+	let dx = b.x - cx, dz = b.z - cz;
 	let d = Math.hypot(dx, dz);
-	if (d >= r) return; // no contact
-
-	let nx: number;
-	let nz: number;
-	if (d > 1e-6) {
-		nx = dx / d;
-		nz = dz / d;
-	} else {
-		// Center inside the box → eject along the smallest penetration axis.
-		const left = b.x - w.minX;
-		const right = w.maxX - b.x;
-		const top = b.z - w.minZ;
-		const bottom = w.maxZ - b.z;
-		const minH = Math.min(left, right);
-		const minV = Math.min(top, bottom);
-		if (minH < minV) {
-			nx = left < right ? -1 : 1;
-			nz = 0;
-		} else {
-			nx = 0;
-			nz = top < bottom ? -1 : 1;
-		}
-		d = 0;
-	}
+	if (d >= r) return;
+	let nx: number, nz: number;
+	if (d > 1e-6) { nx = dx / d; nz = dz / d; } else { nx = s.nx; nz = s.nz; d = 0; }
 	b.x += nx * (r - d);
 	b.z += nz * (r - d);
 	const vn = b.vx * nx + b.vz * nz;
@@ -186,10 +212,7 @@ function collideWall(b: Ball, w: Wall, r: number, restitution: number): void {
 	}
 }
 
-/**
- * Advance the ball by `dt` seconds. Sub-steps to avoid tunnelling. Applies wall/border
- * bounces, friction and cup capture. Pure: returns a new ball + whether it was sunk.
- */
+/** Advance the ball by `dt` seconds. Sub-steps to avoid tunnelling. Pure. */
 export function stepBall(
 	ball: Ball,
 	hole: Hole,
@@ -203,9 +226,9 @@ export function stepBall(
 		return { ball: b, sunk: false };
 	}
 
-	const sub = clamp(Math.ceil((ballSpeed(b) * dt) / P.ballR), 1, 8);
+	// Fine enough that a full-speed ball can't skip the cup core.
+	const sub = clamp(Math.ceil((ballSpeed(b) * dt) / hole.coreR), 1, 16);
 	const h = dt / sub;
-	const { w, h: hh } = hole.half;
 	const r = P.ballR;
 	let sunk = false;
 
@@ -213,14 +236,28 @@ export function stepBall(
 		b.x += b.vx * h;
 		b.z += b.vz * h;
 
-		if (b.x < -w + r) { b.x = -w + r; if (b.vx < 0) b.vx = -b.vx * P.restitution; }
-		if (b.x > w - r) { b.x = w - r; if (b.vx > 0) b.vx = -b.vx * P.restitution; }
-		if (b.z < -hh + r) { b.z = -hh + r; if (b.vz < 0) b.vz = -b.vz * P.restitution; }
-		if (b.z > hh - r) { b.z = hh - r; if (b.vz > 0) b.vz = -b.vz * P.restitution; }
+		for (const s of hole.segments) collideSegment(b, s, r, P.restitution);
 
-		for (const wl of hole.walls) collideWall(b, wl, r, P.restitution);
+		// Cup magnet: pull toward the centre when over the hole (curves fast balls).
+		const dcx = hole.cup.x - b.x, dcz = hole.cup.z - b.z;
+		const dc = Math.hypot(dcx, dcz);
+		if (dc < hole.cupR) {
+			if (dc > 1e-4) {
+				const f = P.magnet * (1 - dc / hole.cupR) * h;
+				b.vx += (dcx / dc) * f;
+				b.vz += (dcz / dc) * f;
+			}
+			// Dead-centre → always in; otherwise needs to be slow enough.
+			if (dc < hole.coreR || ballSpeed(b) < P.captureSpeed) {
+				b.x = hole.cup.x;
+				b.z = hole.cup.z;
+				b.vx = 0;
+				b.vz = 0;
+				sunk = true;
+			}
+		}
 
-		// Friction (linear deceleration toward rest).
+		// Friction.
 		const sp = ballSpeed(b);
 		if (sp > 0) {
 			const ns = Math.max(0, sp - P.decel * h);
@@ -228,17 +265,6 @@ export function stepBall(
 			b.vx *= k;
 			b.vz *= k;
 		}
-
-		// Cup: drop only if arriving slowly enough (otherwise it laps the rim).
-		const dc = Math.hypot(b.x - hole.cup.x, b.z - hole.cup.z);
-		if (dc < hole.cupR && ballSpeed(b) < P.captureSpeed) {
-			b.x = hole.cup.x;
-			b.z = hole.cup.z;
-			b.vx = 0;
-			b.vz = 0;
-			sunk = true;
-		}
-
 		if (ballSpeed(b) < P.settleSpeed) {
 			b.vx = 0;
 			b.vz = 0;
@@ -247,3 +273,6 @@ export function stepBall(
 
 	return { ball: b, sunk };
 }
+
+/** Convenience for callers that want a fresh deterministic hole from a seed. */
+export const holeFromSeed = (seed: number, diff: DiffLevel): Hole => generateHole(mulberry32(seed), diff);

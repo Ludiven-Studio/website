@@ -41,6 +41,10 @@ const MAX_TRIES = 10;
 const BALL_COLORS = [0xff3b30, 0x0a84ff, 0xffd60a, 0x30d158, 0xbf5af2];
 const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
 const AIM_Y = 0.5;
+const HALF_SPAN = 24; // ortho half-view; the corridor is larger → camera follows the ball
+const LOOK = 0.22; // camera look-ahead (× ball velocity)
+const ARROW_MAX = 13; // arrow length (units) at full power
+const ARC_SPAN = 1.1; // angular width of the pull arc (rad)
 
 interface Ghost {
 	mesh: THREE.Mesh;
@@ -48,12 +52,12 @@ interface Ghost {
 	target: { x: number; z: number };
 }
 interface Mats {
-	green: THREE.MeshStandardMaterial;
-	rail: THREE.MeshStandardMaterial;
+	ground: THREE.MeshStandardMaterial;
+	floor: THREE.MeshStandardMaterial;
 	wall: THREE.MeshStandardMaterial;
 	cup: THREE.MeshBasicMaterial;
-	pole: THREE.MeshStandardMaterial;
-	flag: THREE.MeshStandardMaterial;
+	ring: THREE.MeshBasicMaterial;
+	flag: THREE.MeshBasicMaterial;
 }
 interface Scene3D {
 	renderer: THREE.WebGLRenderer;
@@ -61,9 +65,29 @@ interface Scene3D {
 	camera: THREE.OrthographicCamera;
 	ball: THREE.Mesh;
 	holeGroup: THREE.Group;
-	aimLine: THREE.Line;
+	aimArc: THREE.Line;
+	aimArrow: THREE.Mesh;
 	mats: Mats;
 	disposables: { dispose: () => void }[];
+}
+
+const stripGeom = (pos: number[]): THREE.BufferGeometry => {
+	const g = new THREE.BufferGeometry();
+	g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+	g.computeVertexNormals();
+	return g;
+};
+
+function buildArrowGeom(): THREE.BufferGeometry {
+	const y = AIM_Y;
+	const pos: number[] = [];
+	const sh = 0.09;
+	pos.push(0, y, -sh, 0.78, y, -sh, 0.78, y, sh);
+	pos.push(0, y, -sh, 0.78, y, sh, 0, y, sh);
+	pos.push(0.72, y, -0.26, 1.0, y, 0, 0.72, y, 0.26);
+	const g = new THREE.BufferGeometry();
+	g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+	return g;
 }
 
 function makeBall(color: number, ghost = false): THREE.Mesh {
@@ -82,42 +106,59 @@ function makeBall(color: number, ghost = false): THREE.Mesh {
 
 function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 	const grp = new THREE.Group();
-	const { w, h } = hole.half;
+	const { path, halfWidth: hw } = hole;
+	const n = path.length;
 
-	const green = new THREE.Mesh(new THREE.PlaneGeometry(2 * w, 2 * h), mats.green);
-	green.rotation.x = -Math.PI / 2;
-	grp.add(green);
-
-	const t = 0.7, hy = 1.3;
-	const mk = (geo: THREE.BufferGeometry, x: number, z: number) => {
-		const m = new THREE.Mesh(geo, mats.rail);
-		m.position.set(x, hy / 2, z);
-		grp.add(m);
-	};
-	const railH = new THREE.BoxGeometry(2 * w + 2 * t, hy, t);
-	const railV = new THREE.BoxGeometry(t, hy, 2 * h);
-	mk(railH, 0, -h - t / 2);
-	mk(railH, 0, h + t / 2);
-	mk(railV, -w - t / 2, 0);
-	mk(railV, w + t / 2, 0);
-
-	for (const wl of hole.walls) {
-		const ww = wl.maxX - wl.minX, dd = wl.maxZ - wl.minZ;
-		const m = new THREE.Mesh(new THREE.BoxGeometry(ww, 1.4, dd), mats.wall);
-		m.position.set((wl.minX + wl.maxX) / 2, 0.7, (wl.minZ + wl.maxZ) / 2);
-		grp.add(m);
+	// Lane floor (quad strip along the centerline).
+	const fpos: number[] = [];
+	for (let i = 0; i < n - 1; i++) {
+		const p = path[i], q = path[i + 1];
+		const lpx = p.x + p.nx * hw, lpz = p.z + p.nz * hw, rpx = p.x - p.nx * hw, rpz = p.z - p.nz * hw;
+		const lqx = q.x + q.nx * hw, lqz = q.z + q.nz * hw, rqx = q.x - q.nx * hw, rqz = q.z - q.nz * hw;
+		fpos.push(lpx, 0, lpz, rpx, 0, rpz, lqx, 0, lqz);
+		fpos.push(rpx, 0, rpz, rqx, 0, rqz, lqx, 0, lqz);
 	}
+	grp.add(new THREE.Mesh(stripGeom(fpos), mats.floor));
 
+	// Walls: raised flat ribbons along both edges + end caps (visible from top-down).
+	const t = 0.7, wy = 1.4;
+	const wpos: number[] = [];
+	const band = (o1: number, o2: number) => {
+		for (let i = 0; i < n - 1; i++) {
+			const p = path[i], q = path[i + 1];
+			const ax = p.x + p.nx * o1, az = p.z + p.nz * o1, bx = p.x + p.nx * o2, bz = p.z + p.nz * o2;
+			const cx = q.x + q.nx * o2, cz = q.z + q.nz * o2, dx = q.x + q.nx * o1, dz = q.z + q.nz * o1;
+			wpos.push(ax, wy, az, bx, wy, bz, cx, wy, cz);
+			wpos.push(ax, wy, az, cx, wy, cz, dx, wy, dz);
+		}
+	};
+	band(hw, hw + t);
+	band(-hw, -(hw + t));
+	const cap = (p: typeof path[0], dir: number) => {
+		const fx = p.dirX * t * dir, fz = p.dirZ * t * dir;
+		const lox = p.x + p.nx * (hw + t), loz = p.z + p.nz * (hw + t);
+		const rox = p.x - p.nx * (hw + t), roz = p.z - p.nz * (hw + t);
+		wpos.push(lox, wy, loz, rox, wy, roz, rox + fx, wy, roz + fz);
+		wpos.push(lox, wy, loz, rox + fx, wy, roz + fz, lox + fx, wy, loz + fz);
+	};
+	cap(path[0], -1);
+	cap(path[n - 1], 1);
+	grp.add(new THREE.Mesh(stripGeom(wpos), mats.wall));
+
+	// Cup: bright ring + dark hole, plus a flat flag marker.
+	const ring = new THREE.Mesh(new THREE.RingGeometry(hole.cupR, hole.cupR + 0.35, 28), mats.ring);
+	ring.rotation.x = -Math.PI / 2;
+	ring.position.set(hole.cup.x, 0.04, hole.cup.z);
+	grp.add(ring);
 	const cup = new THREE.Mesh(new THREE.CircleGeometry(hole.cupR, 28), mats.cup);
 	cup.rotation.x = -Math.PI / 2;
-	cup.position.set(hole.cup.x, 0.03, hole.cup.z);
+	cup.position.set(hole.cup.x, 0.05, hole.cup.z);
 	grp.add(cup);
-
-	const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 5.2, 6), mats.pole);
-	pole.position.set(hole.cup.x, 2.6, hole.cup.z);
-	grp.add(pole);
-	const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.2), mats.flag);
-	flag.position.set(hole.cup.x + 1.1, 4.4, hole.cup.z);
+	const fs = new THREE.Shape();
+	fs.moveTo(0, 0); fs.lineTo(2.2, 0.7); fs.lineTo(0, 1.4); fs.lineTo(0, 0);
+	const flag = new THREE.Mesh(new THREE.ShapeGeometry(fs), mats.flag);
+	flag.rotation.x = -Math.PI / 2;
+	flag.position.set(hole.cup.x, 0.06, hole.cup.z + hole.cupR);
 	grp.add(flag);
 
 	return grp;
@@ -165,6 +206,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const modeRef = useRef<Mode>('defi');
 	const seedRef = useRef(0);
 	const aimRef = useRef({ active: false, px: 0, pz: 0 });
+	const camTargetRef = useRef({ x: 0, z: 0 });
 	const rayRef = useRef(new THREE.Raycaster());
 	const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
 
@@ -188,7 +230,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 		const scene = new THREE.Scene();
 		scene.background = new THREE.Color('#0d1117');
-		const camera = new THREE.OrthographicCamera(-30, 30, 30, -30, 0.1, 400);
+		const camera = new THREE.OrthographicCamera(-HALF_SPAN, HALF_SPAN, HALF_SPAN, -HALF_SPAN, 0.1, 400);
 		camera.position.set(0, 80, 0);
 		camera.up.set(0, 0, -1);
 		camera.lookAt(0, 0, 0);
@@ -197,52 +239,64 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		dir.position.set(30, 70, 40);
 		scene.add(dir);
 
+		// Big rough-grass ground so off-lane is always covered as the camera roams.
+		const ground = new THREE.Mesh(
+			new THREE.PlaneGeometry(2000, 2000),
+			new THREE.MeshStandardMaterial({ color: 0x2c6e44, roughness: 1 }),
+		);
+		ground.rotation.x = -Math.PI / 2;
+		ground.position.y = -0.05;
+		scene.add(ground);
+
 		const mats: Mats = {
-			green: new THREE.MeshStandardMaterial({ color: 0x3f9a5a, roughness: 1 }),
-			rail: new THREE.MeshStandardMaterial({ color: 0xb8732f, roughness: 0.8 }),
-			wall: new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.8 }),
-			cup: new THREE.MeshBasicMaterial({ color: 0x0a0c10 }),
-			pole: new THREE.MeshStandardMaterial({ color: 0xf2f4f8, roughness: 0.7 }),
-			flag: new THREE.MeshStandardMaterial({ color: 0xe34b4b, roughness: 0.8, side: THREE.DoubleSide }),
+			ground: ground.material as THREE.MeshStandardMaterial,
+			floor: new THREE.MeshStandardMaterial({ color: 0x49b46a, roughness: 1 }),
+			wall: new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.85 }),
+			cup: new THREE.MeshBasicMaterial({ color: 0x07090c }),
+			ring: new THREE.MeshBasicMaterial({ color: 0xf2f4f8 }),
+			flag: new THREE.MeshBasicMaterial({ color: 0xe34b4b, side: THREE.DoubleSide }),
 		};
 
 		const ball = makeBall(0xffffff);
 		scene.add(ball);
 
-		const aimGeom = new THREE.BufferGeometry();
-		aimGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
-		const aimLine = new THREE.Line(aimGeom, new THREE.LineBasicMaterial({ color: 0xffffff }));
-		aimLine.visible = false;
-		aimLine.frustumCulled = false;
-		scene.add(aimLine);
+		const arcGeom = new THREE.BufferGeometry();
+		arcGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 17), 3));
+		const aimArc = new THREE.Line(arcGeom, new THREE.LineBasicMaterial({ color: 0xeef1f6, transparent: true, opacity: 0.85 }));
+		aimArc.visible = false;
+		aimArc.frustumCulled = false;
+		scene.add(aimArc);
+
+		const aimArrow = new THREE.Mesh(buildArrowGeom(), new THREE.MeshBasicMaterial({ color: 0x30d158, side: THREE.DoubleSide, transparent: true, opacity: 0.95 }));
+		aimArrow.visible = false;
+		aimArrow.frustumCulled = false;
+		scene.add(aimArrow);
 
 		const holeGroup = new THREE.Group();
 		scene.add(holeGroup);
 
 		g3Ref.current = {
-			renderer, scene, camera, ball, holeGroup, aimLine, mats,
-			disposables: [aimGeom, aimLine.material as THREE.Material, ball.geometry, ball.material as THREE.Material],
+			renderer, scene, camera, ball, holeGroup, aimArc, aimArrow, mats,
+			disposables: [
+				arcGeom, aimArc.material as THREE.Material, aimArrow.geometry, aimArrow.material as THREE.Material,
+				ball.geometry, ball.material as THREE.Material, ground.geometry, ground.material as THREE.Material,
+			],
 		};
 		return true;
 	}, []);
 
-	const fitCamera = useCallback((hole: Hole) => {
+	const resize = useCallback(() => {
 		const g = g3Ref.current;
 		const canvas = canvasRef.current;
 		if (!g || !canvas) return;
 		const css = canvas.clientWidth;
 		g.renderer.setSize(css, css, false);
-		const span = Math.max(hole.half.w, hole.half.h) + 3;
-		g.camera.left = -span;
-		g.camera.right = span;
-		g.camera.top = span;
-		g.camera.bottom = -span;
+		g.camera.left = -HALF_SPAN;
+		g.camera.right = HALF_SPAN;
+		g.camera.top = HALF_SPAN;
+		g.camera.bottom = -HALF_SPAN;
 		g.camera.updateProjectionMatrix();
 	}, []);
-
-	const resize = useCallback(() => {
-		if (holeRef.current) fitCamera(holeRef.current);
-	}, [fitCamera]);
 
 	const removeGhost = useCallback((id: string) => {
 		const g = g3Ref.current;
@@ -307,28 +361,53 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		return { x: hit.x, z: hit.z };
 	}, []);
 
-	const renderFrame = useCallback((pose: { x: number; z: number }) => {
+	const renderFrame = useCallback((dtSec: number, pose: { x: number; z: number }) => {
 		const g = g3Ref.current;
 		if (!g) return;
 		g.ball.position.set(pose.x, PARAMS.ballR, pose.z);
 
-		// Aim elastic: pointer → ball → predicted launch direction (opposite the pull).
+		// Follow camera: ease toward the ball + slight look-ahead along its velocity.
+		const b = ballRef.current;
+		const tx = pose.x + b.vx * LOOK;
+		const tz = pose.z + b.vz * LOOK;
+		const kc = Math.min(1, dtSec * 5);
+		camTargetRef.current.x += (tx - camTargetRef.current.x) * kc;
+		camTargetRef.current.z += (tz - camTargetRef.current.z) * kc;
+		g.camera.position.set(camTargetRef.current.x, 80, camTargetRef.current.z);
+		g.camera.lookAt(camTargetRef.current.x, 0, camTargetRef.current.z);
+
+		// Aim visuals: an arc on the pull side (follows the cursor) + a force arrow on the launch side.
 		if (aimRef.current.active) {
-			const b = ballRef.current;
 			const dx = aimRef.current.px - b.x, dz = aimRef.current.pz - b.z;
 			const mag = Math.hypot(dx, dz) || 1;
 			const frac = Math.min(mag, PARAMS.maxPull) / PARAMS.maxPull;
-			const len = frac * 14;
-			const ex = b.x - (dx / mag) * len, ez = b.z - (dz / mag) * len;
-			const arr = g.aimLine.geometry.attributes.position.array as Float32Array;
-			arr[0] = aimRef.current.px; arr[1] = AIM_Y; arr[2] = aimRef.current.pz;
-			arr[3] = b.x; arr[4] = AIM_Y; arr[5] = b.z;
-			arr[6] = ex; arr[7] = AIM_Y; arr[8] = ez;
-			g.aimLine.geometry.attributes.position.needsUpdate = true;
-			(g.aimLine.material as THREE.LineBasicMaterial).color.setRGB(0.3 + frac * 0.7, 1 - frac * 0.7, 0.25);
-			g.aimLine.visible = true;
+			const radius = Math.min(mag, PARAMS.maxPull);
+			const phi = Math.atan2(dz, dx);
+			const arr = g.aimArc.geometry.attributes.position.array as Float32Array;
+			const K = 16;
+			for (let i = 0; i <= K; i++) {
+				const ang = phi + (i / K - 0.5) * ARC_SPAN;
+				arr[i * 3] = b.x + Math.cos(ang) * radius;
+				arr[i * 3 + 1] = AIM_Y;
+				arr[i * 3 + 2] = b.z + Math.sin(ang) * radius;
+			}
+			g.aimArc.geometry.attributes.position.needsUpdate = true;
+			g.aimArc.visible = true;
+
+			// Arrow points opposite the pull, length & colour scale with power.
+			const launch = phi + Math.PI;
+			g.aimArrow.position.set(b.x, 0, b.z);
+			g.aimArrow.rotation.y = -launch;
+			g.aimArrow.scale.set(frac * ARROW_MAX, 1, 1 + frac * 1.4);
+			(g.aimArrow.material as THREE.MeshBasicMaterial).color.setRGB(
+				Math.min(1, frac * 2),
+				Math.min(1, 2 - frac * 2),
+				0.16,
+			);
+			g.aimArrow.visible = true;
 		} else {
-			g.aimLine.visible = false;
+			g.aimArc.visible = false;
+			g.aimArrow.visible = false;
 		}
 
 		const k = 0.25;
@@ -413,7 +492,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 
 			const prev = prevBallRef.current;
 			const alpha = Math.min(1, accRef.current / STEP);
-			renderFrame({ x: prev.x + (ball.x - prev.x) * alpha, z: prev.z + (ball.z - prev.z) * alpha });
+			renderFrame(dt / 1000, { x: prev.x + (ball.x - prev.x) * alpha, z: prev.z + (ball.z - prev.z) * alpha });
 			rafRef.current = requestAnimationFrame(frame);
 		},
 		[renderFrame, handleSunk],
@@ -460,6 +539,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		if (!hole) return;
 		ballRef.current = { x: hole.start.x, z: hole.start.z, vx: 0, vz: 0 };
 		prevBallRef.current = ballRef.current;
+		camTargetRef.current = { x: hole.start.x, z: hole.start.z };
 		strokesRef.current = 0;
 		setStrokes(0);
 		doneRef.current = false;
@@ -483,7 +563,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				g.holeGroup = buildHoleGroup(hole, g.mats);
 				g.scene.add(g.holeGroup);
 			}
-			fitCamera(hole);
+			resize();
 			placeBallAtStart();
 
 			lobbyRef.current = lobby;
@@ -519,7 +599,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			rafRef.current = requestAnimationFrame(frame);
 			trackGame(gameId, 'game_started');
 		},
-		[fitCamera, placeBallAtStart, frame, gameId, getOrCreateGhost, removeGhost, syncBoard],
+		[resize, placeBallAtStart, frame, gameId, getOrCreateGhost, removeGhost, syncBoard],
 	);
 
 	/** New attempt on the SAME hole (daily consumes a try; free is unlimited). */
