@@ -15,11 +15,12 @@ const WATER_LEVEL = -2.6, EYE = 1.5;
 function makeGroundTexture(size = 256): THREE.CanvasTexture {
 	const c = document.createElement('canvas'); c.width = c.height = size;
 	const ctx = c.getContext('2d')!;
-	ctx.fillStyle = '#728a52'; ctx.fillRect(0, 0, size, size);
+	// Neutral grain so it reads as grass (green tint), gravel (sand tint) or rock — driven by vertex colour.
+	ctx.fillStyle = '#c7c7ba'; ctx.fillRect(0, 0, size, size);
 	for (let i = 0; i < 2600; i++) {
 		const x = Math.random() * size, y = Math.random() * size, r = Math.random() * 2.6 + 0.6;
 		const dark = Math.random() < 0.5;
-		ctx.fillStyle = dark ? `rgba(60,84,40,${0.25 + Math.random() * 0.3})` : `rgba(156,182,110,${0.2 + Math.random() * 0.3})`;
+		ctx.fillStyle = dark ? `rgba(120,120,104,${0.25 + Math.random() * 0.3})` : `rgba(214,214,198,${0.2 + Math.random() * 0.3})`;
 		ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 	}
 	const tex = new THREE.CanvasTexture(c);
@@ -37,6 +38,7 @@ function Terrain({ seed, tex }: { seed: number; tex: THREE.Texture }) {
 		const pos = g.attributes.position as THREE.BufferAttribute;
 		const colors = new Float32Array(pos.count * 3);
 		const lo = new THREE.Color('#5c7a3c'), hi = new THREE.Color('#7fa057'), rock = new THREE.Color('#8b886e');
+		const sand = new THREE.Color('#cdbf93'), wet = new THREE.Color('#9a8c63');
 		const c = new THREE.Color();
 		for (let i = 0; i < pos.count; i++) {
 			const x = pos.getX(i), z = pos.getZ(i), y = heightAt(x, z, seed);
@@ -44,6 +46,9 @@ function Terrain({ seed, tex }: { seed: number; tex: THREE.Texture }) {
 			const s = Math.min(1, slopeAt(x, z, seed) * 1.8);
 			const hN = THREE.MathUtils.clamp((y + 8) / 16, 0, 1);
 			c.copy(lo).lerp(hi, hN).lerp(rock, s * 0.8);
+			// shoreline: wet bed under water, then a gravel/sand beach band just above it
+			if (y < WATER_LEVEL) c.copy(wet);
+			else c.lerp(sand, THREE.MathUtils.clamp((WATER_LEVEL + 1.6 - y) / 1.6, 0, 1));
 			colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
 		}
 		g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -75,7 +80,7 @@ function Trees({ seed }: { seed: number }) {
 		for (let t = 0; t < TREES * 4 && k < TREES; t++) {
 			const r = Math.sqrt(rng()) * 130, a = rng() * 6.283;
 			const x = Math.cos(a) * r, z = Math.sin(a) * r;
-			if (Math.hypot(x, z) < 6 || slopeAt(x, z, seed) > 0.6) continue;
+			if (Math.hypot(x, z) < 6 || slopeAt(x, z, seed) > 0.6 || heightAt(x, z, seed) < WATER_LEVEL + 1.4) continue;
 			const s = 0.75 + rng() * 0.95;
 			d.position.set(x, heightAt(x, z, seed), z);
 			d.rotation.set(0, rng() * 6.283, 0);
@@ -95,8 +100,8 @@ function Trees({ seed }: { seed: number }) {
 }
 
 /* ---------- generic low-poly scatter (rocks / bushes / flowers) ---------- */
-function Scatter({ seed, salt, geo, baseColor, count, radius, scaleRange, jitterY = 0, hueVary = 0, palette, castShadow = true, slopeMax = 1.5 }: {
-	seed: number; salt: number; geo: THREE.BufferGeometry; baseColor: number; count: number; radius: number; scaleRange: [number, number]; jitterY?: number; hueVary?: number; palette?: number[]; castShadow?: boolean; slopeMax?: number;
+function Scatter({ seed, salt, geo, baseColor, count, radius, scaleRange, jitterY = 0, hueVary = 0, palette, castShadow = true, slopeMax = 1.5, minHeight = -1e9 }: {
+	seed: number; salt: number; geo: THREE.BufferGeometry; baseColor: number; count: number; radius: number; scaleRange: [number, number]; jitterY?: number; hueVary?: number; palette?: number[]; castShadow?: boolean; slopeMax?: number; minHeight?: number;
 }) {
 	const { mesh, mat, dispose } = useMemo(() => {
 		const rng = mulberry32(seed ^ salt);
@@ -108,7 +113,7 @@ function Scatter({ seed, salt, geo, baseColor, count, radius, scaleRange, jitter
 		for (let t = 0; t < count * 4 && k < count; t++) {
 			const r = Math.sqrt(rng()) * radius, a = rng() * 6.283;
 			const x = Math.cos(a) * r, z = Math.sin(a) * r;
-			if (slopeAt(x, z, seed) > slopeMax) continue;
+			if (slopeAt(x, z, seed) > slopeMax || heightAt(x, z, seed) < minHeight) continue;
 			const sx = scaleRange[0] + rng() * (scaleRange[1] - scaleRange[0]);
 			d.position.set(x, heightAt(x, z, seed) + jitterY, z);
 			d.rotation.set((rng() - 0.5) * 0.3, rng() * 6.283, (rng() - 0.5) * 0.3);
@@ -171,7 +176,7 @@ function Grass({ seed }: { seed: number }) {
 		for (let t = 0; t < GRASS * 2 && k < GRASS; t++) {
 			const r = Math.sqrt(rng()) * 50, a = rng() * 6.283;
 			const x = Math.cos(a) * r, z = Math.sin(a) * r;
-			if (slopeAt(x, z, seed) > 0.7) continue;
+			if (slopeAt(x, z, seed) > 0.7 || heightAt(x, z, seed) < WATER_LEVEL + 0.9) continue;
 			const s = 0.7 + rng() * 1.0;
 			d.position.set(x, heightAt(x, z, seed), z);
 			d.rotation.set(0, rng() * 6.283, 0); d.scale.set(s, s, s); d.updateMatrix();
@@ -289,9 +294,9 @@ export default function Scene3D() {
 						<Terrain seed={seed} tex={groundTex} />
 						<Trees seed={seed} />
 						<Grass seed={seed} />
-						<Scatter seed={seed} salt={0x1} geo={geos.rock} baseColor={0x8b886e} count={ROCKS} radius={120} scaleRange={[0.8, 3.2]} hueVary={0.04} />
-						<Scatter seed={seed} salt={0x2} geo={geos.bush} baseColor={0x466e2f} count={BUSHES} radius={115} scaleRange={[0.6, 1.4]} jitterY={0.2} hueVary={0.06} slopeMax={0.7} />
-						<Scatter seed={seed} salt={0x3} geo={geos.flower} baseColor={0xffffff} count={FLOWERS} radius={70} scaleRange={[0.5, 1.1]} jitterY={0.1} castShadow={false} slopeMax={0.6} palette={[0xff5a5f, 0xffd166, 0xf4f4f4, 0xff8fab, 0x9b6dff]} />
+						<Scatter seed={seed} salt={0x1} geo={geos.rock} baseColor={0x8b886e} count={ROCKS} radius={120} scaleRange={[0.8, 3.2]} hueVary={0.04} minHeight={WATER_LEVEL - 1} />
+						<Scatter seed={seed} salt={0x2} geo={geos.bush} baseColor={0x466e2f} count={BUSHES} radius={115} scaleRange={[0.6, 1.4]} jitterY={0.2} hueVary={0.06} slopeMax={0.7} minHeight={WATER_LEVEL + 0.9} />
+						<Scatter seed={seed} salt={0x3} geo={geos.flower} baseColor={0xffffff} count={FLOWERS} radius={70} scaleRange={[0.5, 1.1]} jitterY={0.1} castShadow={false} slopeMax={0.6} palette={[0xff5a5f, 0xffd166, 0xf4f4f4, 0xff8fab, 0x9b6dff]} minHeight={WATER_LEVEL + 0.9} />
 						<ShadowBaker seed={seed} />
 					</group>
 
