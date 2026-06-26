@@ -14,6 +14,13 @@ permissions:
   pages: write
   id-token: write
 
+# Allow only one concurrent deployment. Queue new runs behind an in-progress one
+# instead of racing it (two overlapping runs make the second deploy-pages 400).
+# Do NOT cancel an in-progress run — let production deployments finish.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
