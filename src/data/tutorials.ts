@@ -63,6 +63,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🚫', title: 'La règle', body: 'Deux pièces de même couleur ne doivent jamais se toucher côte à côte. Une seule disposition respecte tout : à toi de la trouver.' },
 		{ emoji: '🖱️', title: 'Comment jouer', body: 'Glisse une pièce du bac vers la grille (un aperçu rouge = pose interdite). Reprends une pièce posée en la glissant. En difficile, les pièces se tournent avec ⟳ ou la touche R. Les cases barrées sont bloquées. Indice et solution sont là si tu bloques.' },
 	],
+	transvase: [
+		{ emoji: '🧪', title: 'Le but', body: 'Verse les liquides pour que chaque tube soit vide ou entièrement rempli d\'une seule couleur.' },
+		{ emoji: '💧', title: 'Verser', body: 'Touche un tube (source) puis un autre (destination). On ne peut verser que sur une case vide ou sur la même couleur, et s\'il reste de la place. Tout le bloc de couleur du dessus part d\'un coup.' },
+		{ emoji: '🛟', title: 'Les outils', body: 'Annuler revient en arrière, Recommencer remet la grille à zéro, Indice surligne un bon coup, et le bouton ➕ ajoute un tube vide (une fois) pour te débloquer.' },
+	],
 	colorgramme: [
 		{ emoji: '🎨', title: 'Le but', body: 'Toutes les cases sont coloriées. Reconstitue l\'image cachée d\'après les indices de chaque ligne et colonne.' },
 		{ emoji: '🔍', title: 'La déduction', body: 'Choisis une couleur : tu ne vois que SES blocs, dans l\'ordre. Les blocs des autres couleurs sont cachés → déduis où commencent les tiens grâce aux colonnes.' },

@@ -61,4 +61,5 @@ export const iconPaths = {
 	codecolor: '<circle stroke="none" cx="92" cy="92" r="30"/><circle stroke="none" cx="164" cy="92" r="30"/><circle stroke="none" cx="92" cy="164" r="30"/><circle stroke="none" cx="164" cy="164" r="30"/>',
 	car: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M48 144h160l-22-46a16 16 0 0 0-14-9H84a16 16 0 0 0-14 9Z"/><path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M40 144h176v40a8 8 0 0 1-8 8h-16a8 8 0 0 1-8-8v-8H72v8a8 8 0 0 1-8 8H48a8 8 0 0 1-8-8Z"/><circle stroke="none" cx="80" cy="168" r="12"/><circle stroke="none" cx="176" cy="168" r="12"/>',
 	'tetromino': '<path fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-width="16" d="M32 64h144v48h-48v48H80v-48H32Z"/><path fill="none" stroke-width="12" d="M80 64v48M128 64v48"/>',
+	'flask': '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M88 32h80M104 32v60L44 188a16 16 0 0 0 14 24h140a16 16 0 0 0 14-24l-60-96V32"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M70 144h116"/>',
 };

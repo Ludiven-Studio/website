@@ -100,6 +100,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'transvase',
+		title: 'Transvase',
+		pitch: 'Verse les liquides colorés d\'un tube à l\'autre pour rassembler chaque couleur. Relaxant et logique.',
+		icon: 'flask',
+		href: '/jeux/transvase',
+		status: 'play',
+	},
+	{
 		id: 'colorgramme',
 		title: 'Colorgramme',
 		pitch: 'Un nonogramme en couleurs : reconstitue l\'image grâce aux indices de chaque ligne et colonne.',
