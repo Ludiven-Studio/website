@@ -58,6 +58,10 @@ interface Mats {
 	cup: THREE.MeshBasicMaterial;
 	ring: THREE.MeshBasicMaterial;
 	flag: THREE.MeshBasicMaterial;
+	green: THREE.MeshBasicMaterial;
+	greenLine: THREE.MeshBasicMaterial;
+	relief: THREE.MeshBasicMaterial;
+	reliefArrow: THREE.MeshBasicMaterial;
 }
 interface Scene3D {
 	renderer: THREE.WebGLRenderer;
@@ -106,43 +110,73 @@ function makeBall(color: number, ghost = false): THREE.Mesh {
 
 function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 	const grp = new THREE.Group();
-	const { path, halfWidth: hw } = hole;
+	const { path } = hole;
+	const W = hole.widths;
 	const n = path.length;
 
-	// Lane floor (quad strip along the centerline).
+	// Lane floor (quad strip along the centerline, per-sample width).
 	const fpos: number[] = [];
 	for (let i = 0; i < n - 1; i++) {
-		const p = path[i], q = path[i + 1];
-		const lpx = p.x + p.nx * hw, lpz = p.z + p.nz * hw, rpx = p.x - p.nx * hw, rpz = p.z - p.nz * hw;
-		const lqx = q.x + q.nx * hw, lqz = q.z + q.nz * hw, rqx = q.x - q.nx * hw, rqz = q.z - q.nz * hw;
+		const p = path[i], q = path[i + 1], wi = W[i], wj = W[i + 1];
+		const lpx = p.x + p.nx * wi, lpz = p.z + p.nz * wi, rpx = p.x - p.nx * wi, rpz = p.z - p.nz * wi;
+		const lqx = q.x + q.nx * wj, lqz = q.z + q.nz * wj, rqx = q.x - q.nx * wj, rqz = q.z - q.nz * wj;
 		fpos.push(lpx, 0, lpz, rpx, 0, rpz, lqx, 0, lqz);
 		fpos.push(rpx, 0, rpz, rqx, 0, rqz, lqx, 0, lqz);
 	}
 	grp.add(new THREE.Mesh(stripGeom(fpos), mats.floor));
 
-	// Walls: raised flat ribbons along both edges + end caps (visible from top-down).
+	// Green bowl around the cup: light disc + concentric rings (suggests the slope).
+	const greenY = 0.02;
+	const green = new THREE.Mesh(new THREE.CircleGeometry(hole.greenR, 44), mats.green);
+	green.rotation.x = -Math.PI / 2;
+	green.position.set(hole.cup.x, greenY, hole.cup.z);
+	grp.add(green);
+	for (let k = 1; k <= 3; k++) {
+		const rr = (hole.greenR * k) / 3.4;
+		const gr = new THREE.Mesh(new THREE.RingGeometry(rr - 0.07, rr + 0.07, 44), mats.greenLine);
+		gr.rotation.x = -Math.PI / 2;
+		gr.position.set(hole.cup.x, greenY + 0.01, hole.cup.z);
+		grp.add(gr);
+	}
+
+	// Relief patches (directional slopes): tinted disc + a downhill arrow.
+	for (const sl of hole.slopes) {
+		if (sl.kind !== 'dir') continue;
+		const disc = new THREE.Mesh(new THREE.CircleGeometry(sl.r, 32), mats.relief);
+		disc.rotation.x = -Math.PI / 2;
+		disc.position.set(sl.cx, 0.015, sl.cz);
+		grp.add(disc);
+		const ar = new THREE.Mesh(buildArrowGeom(), mats.reliefArrow);
+		ar.rotation.y = -Math.atan2(sl.az, sl.ax);
+		ar.scale.set(sl.r * 0.55, 1, 1.1);
+		ar.position.set(sl.cx, 0.1, sl.cz);
+		grp.add(ar);
+	}
+
+	// Walls: raised flat ribbons along both edges + end caps (per-sample width).
 	const t = 1.0, wy = 1.4;
 	const wpos: number[] = [];
-	const band = (o1: number, o2: number) => {
+	const wallStrip = (sign: number) => {
 		for (let i = 0; i < n - 1; i++) {
 			const p = path[i], q = path[i + 1];
-			const ax = p.x + p.nx * o1, az = p.z + p.nz * o1, bx = p.x + p.nx * o2, bz = p.z + p.nz * o2;
-			const cx = q.x + q.nx * o2, cz = q.z + q.nz * o2, dx = q.x + q.nx * o1, dz = q.z + q.nz * o1;
+			const o1p = sign * W[i], o2p = sign * (W[i] + t), o1q = sign * W[i + 1], o2q = sign * (W[i + 1] + t);
+			const ax = p.x + p.nx * o1p, az = p.z + p.nz * o1p, bx = p.x + p.nx * o2p, bz = p.z + p.nz * o2p;
+			const cx = q.x + q.nx * o2q, cz = q.z + q.nz * o2q, dx = q.x + q.nx * o1q, dz = q.z + q.nz * o1q;
 			wpos.push(ax, wy, az, bx, wy, bz, cx, wy, cz);
 			wpos.push(ax, wy, az, cx, wy, cz, dx, wy, dz);
 		}
 	};
-	band(hw, hw + t);
-	band(-hw, -(hw + t));
-	const cap = (p: typeof path[0], dir: number) => {
+	wallStrip(1);
+	wallStrip(-1);
+	const cap = (p: typeof path[0], wEdge: number, dir: number) => {
 		const fx = p.dirX * t * dir, fz = p.dirZ * t * dir;
-		const lox = p.x + p.nx * (hw + t), loz = p.z + p.nz * (hw + t);
-		const rox = p.x - p.nx * (hw + t), roz = p.z - p.nz * (hw + t);
+		const lox = p.x + p.nx * (wEdge + t), loz = p.z + p.nz * (wEdge + t);
+		const rox = p.x - p.nx * (wEdge + t), roz = p.z - p.nz * (wEdge + t);
 		wpos.push(lox, wy, loz, rox, wy, roz, rox + fx, wy, roz + fz);
 		wpos.push(lox, wy, loz, rox + fx, wy, roz + fz, lox + fx, wy, loz + fz);
 	};
-	cap(path[0], -1);
-	cap(path[n - 1], 1);
+	cap(path[0], W[0], -1);
+	cap(path[n - 1], W[n - 1], 1);
 	grp.add(new THREE.Mesh(stripGeom(wpos), mats.wall));
 
 	// Cup: bright ring + dark hole, plus a flat flag marker.
@@ -273,6 +307,10 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			cup: new THREE.MeshBasicMaterial({ color: 0x07090c }),
 			ring: new THREE.MeshBasicMaterial({ color: 0xf2f4f8 }),
 			flag: new THREE.MeshBasicMaterial({ color: 0xe34b4b, side: THREE.DoubleSide }),
+			green: new THREE.MeshBasicMaterial({ color: 0x6fcf85, transparent: true, opacity: 0.92, side: THREE.DoubleSide }),
+			greenLine: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28, side: THREE.DoubleSide }),
+			relief: new THREE.MeshBasicMaterial({ color: 0x6db4ff, transparent: true, opacity: 0.26, side: THREE.DoubleSide }),
+			reliefArrow: new THREE.MeshBasicMaterial({ color: 0xeaf2ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
 		};
 
 		const ball = makeBall(0xffffff);

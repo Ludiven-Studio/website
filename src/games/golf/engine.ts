@@ -39,11 +39,29 @@ export interface Obstacle {
 	pts: Vec[];
 }
 
+/**
+ * Sloped zone that nudges the ball while it is inside.
+ * - 'radial': the putting green — accelerates toward (cx,cz) ∝ distance/r (bowl).
+ * - 'dir': a relief patch — constant downhill accel (ax,az), fading at the rim.
+ */
+export interface Slope {
+	kind: 'radial' | 'dir';
+	cx: number;
+	cz: number;
+	r: number;
+	ax: number;
+	az: number;
+	strength: number;
+}
+
 export interface Hole {
 	path: PathPoint[]; // centerline (tee → cup)
-	halfWidth: number;
+	widths: number[]; // half-width per path point (wider/narrower sections)
+	halfWidth: number; // representative width (kept for convenience)
 	segments: Segment[]; // lane walls + end caps + obstacle edges
 	obstacles: Obstacle[]; // for rendering
+	slopes: Slope[]; // green + relief patches
+	greenR: number; // radius of the sloped green around the cup
 	bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
 	start: Vec;
 	cup: Vec;
@@ -87,15 +105,16 @@ export interface DiffLevel {
 	label: string;
 	length: number; // approx corridor length
 	bends: number; // control points
-	width: number; // lane width
+	width: number; // base lane width
 	cupR: number;
 	obstacles: number; // free-standing islands inside the lane
+	slopes: number; // relief patches along the course
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', length: 120, bends: 5, width: 15, cupR: 1.35, obstacles: 1 },
-	moyen: { label: 'Moyen', length: 175, bends: 7, width: 13, cupR: 1.2, obstacles: 2 },
-	difficile: { label: 'Difficile', length: 230, bends: 9, width: 11, cupR: 1.05, obstacles: 3 },
+	facile: { label: 'Facile', length: 120, bends: 5, width: 15, cupR: 1.35, obstacles: 1, slopes: 1 },
+	moyen: { label: 'Moyen', length: 175, bends: 7, width: 13, cupR: 1.2, obstacles: 2, slopes: 2 },
+	difficile: { label: 'Difficile', length: 230, bends: 9, width: 11, cupR: 1.05, obstacles: 3, slopes: 3 },
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -163,8 +182,22 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 		path.push({ x: cur.x, z: cur.z, dirX: dx, dirZ: dz, nx: -dz, nz: dx });
 	}
 
-	const left = path.map((p) => ({ x: p.x + p.nx * hw, z: p.z + p.nz * hw }));
-	const right = path.map((p) => ({ x: p.x - p.nx * hw, z: p.z - p.nz * hw }));
+	// Variable half-width: smooth low-frequency variation (wider/narrower), widened near the cup.
+	const cupIdx = SAMPLES - 2;
+	const minHalf = PARAMS.ballR + 1.4;
+	const ph1 = rng() * Math.PI * 2, ph2 = rng() * Math.PI * 2;
+	const f1 = 1.7 + rng() * 1.2, f2 = 3.3 + rng() * 1.6;
+	const widths: number[] = [];
+	for (let i = 0; i < SAMPLES; i++) {
+		const t = i / (SAMPLES - 1);
+		let factor = 1 + 0.34 * Math.sin(t * Math.PI * f1 + ph1) + 0.16 * Math.sin(t * Math.PI * f2 + ph2);
+		const nearCup = Math.max(0, 1 - Math.abs(i - cupIdx) / (SAMPLES * 0.12));
+		factor = Math.max(factor, 1 + 0.5 * nearCup); // room for the green at the cup
+		widths.push(clamp(hw * factor, minHalf, hw * 1.6));
+	}
+
+	const left = path.map((p, i) => ({ x: p.x + p.nx * widths[i], z: p.z + p.nz * widths[i] }));
+	const right = path.map((p, i) => ({ x: p.x - p.nx * widths[i], z: p.z - p.nz * widths[i] }));
 
 	const segments: Segment[] = [];
 	for (let i = 0; i < SAMPLES - 1; i++) {
@@ -177,7 +210,6 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	segments.push(makeSegment(left[e].x, left[e].z, right[e].x, right[e].z, path[e - 1]));
 
 	const startIdx = 1;
-	const cupIdx = SAMPLES - 2;
 	const start: Vec = { x: path[startIdx].x, z: path[startIdx].z };
 	const cup: Vec = { x: path[cupIdx].x, z: path[cupIdx].z };
 	const coreR = Math.max(PARAMS.ballR * 0.7, diff.cupR * 0.4);
@@ -193,17 +225,18 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 		const idx = loIdx + Math.floor(rng() * (hiIdx - loIdx));
 		if (used.some((u) => Math.abs(u - idx) < SAMPLES * 0.12)) continue;
 		const p = path[idx];
+		const lw = widths[idx]; // local half-width
 		const along = 1.6 + rng() * 2.4;
 		const central = rng() < 0.5;
 		let across: number, off: number;
 		if (central) {
-			across = clamp(1.5 + rng() * 1.4, 1.0, hw - clearR - 0.4);
+			across = clamp(1.5 + rng() * 1.4, 1.0, lw - clearR - 0.4);
 			if (across < 1.0) continue;
 			off = 0;
 		} else {
 			across = 1.3 + rng() * 1.6;
-			if (across > hw - 1.4) continue;
-			off = (rng() < 0.5 ? 1 : -1) * (hw - across - (0.7 + rng() * 0.9));
+			if (across > lw - 1.4) continue;
+			off = (rng() < 0.5 ? 1 : -1) * (lw - across - (0.7 + rng() * 0.9));
 		}
 		const cx = p.x + p.nx * off, cz = p.z + p.nz * off;
 		if (Math.hypot(cx - start.x, cz - start.z) < 9 || Math.hypot(cx - cup.x, cz - cup.z) < 9) continue;
@@ -218,6 +251,20 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 		used.push(idx);
 	}
 
+	// Sloped green around the cup (bowl), plus a few gentle relief patches along the course.
+	const greenR = clamp(widths[cupIdx] - 0.4, 3, 7);
+	const slopes: Slope[] = [{ kind: 'radial', cx: cup.x, cz: cup.z, r: greenR, strength: 17, ax: 0, az: 0 }];
+	const usedS: number[] = [];
+	for (let attempt = 0; attempt < diff.slopes * 30 && slopes.length < diff.slopes + 1; attempt++) {
+		const idx = loIdx + Math.floor(rng() * (hiIdx - loIdx));
+		if (usedS.some((u) => Math.abs(u - idx) < SAMPLES * 0.1)) continue;
+		const p = path[idx];
+		if (Math.hypot(p.x - cup.x, p.z - cup.z) < greenR + 4) continue;
+		const ang = rng() * Math.PI * 2;
+		slopes.push({ kind: 'dir', cx: p.x, cz: p.z, r: 4 + rng() * 3, ax: Math.cos(ang), az: Math.sin(ang), strength: 5 + rng() * 4 });
+		usedS.push(idx);
+	}
+
 	let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
 	for (const pt of [...left, ...right, ...obstacles.flatMap((o) => o.pts)]) {
 		if (pt.x < minX) minX = pt.x;
@@ -227,8 +274,8 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	}
 
 	return {
-		path, halfWidth: hw, segments, obstacles, bounds: { minX, maxX, minZ, maxZ },
-		start, cup, cupR: diff.cupR, coreR, par,
+		path, widths, halfWidth: hw, segments, obstacles, slopes, greenR,
+		bounds: { minX, maxX, minZ, maxZ }, start, cup, cupR: diff.cupR, coreR, par,
 	};
 }
 
@@ -292,6 +339,24 @@ export function stepBall(
 		b.z += b.vz * h;
 
 		for (const s of hole.segments) collideSegment(b, s, r, P.restitution);
+
+		// Slopes / relief: green bowl pulls toward the cup; relief patches push downhill.
+		for (const sl of hole.slopes) {
+			const sdx = sl.cx - b.x, sdz = sl.cz - b.z;
+			const sd = Math.hypot(sdx, sdz);
+			if (sd >= sl.r) continue;
+			if (sl.kind === 'radial') {
+				if (sd > 1e-4) {
+					const f = sl.strength * (sd / sl.r) * h; // ∝ distance from centre (bowl)
+					b.vx += (sdx / sd) * f;
+					b.vz += (sdz / sd) * f;
+				}
+			} else {
+				const f = sl.strength * (1 - sd / sl.r) * h;
+				b.vx += sl.ax * f;
+				b.vz += sl.az * f;
+			}
+		}
 
 		// Cup magnet: pull toward the centre when over the hole (curves fast balls).
 		const dcx = hole.cup.x - b.x, dcz = hole.cup.z - b.z;

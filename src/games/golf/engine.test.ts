@@ -10,15 +10,19 @@ import {
 	type Hole,
 	type Ball,
 	type Segment,
+	type Slope,
 } from './engine';
 import { mulberry32 } from '../prng';
 
 // Minimal hole for isolated physics tests (path is render-only; stepBall ignores it).
-const mkHole = (segments: Segment[], cup = { x: 1e4, z: 1e4 }, cupR = 1.2): Hole => ({
+const mkHole = (segments: Segment[], cup = { x: 1e4, z: 1e4 }, cupR = 1.2, slopes: Slope[] = []): Hole => ({
 	path: [],
+	widths: [],
 	halfWidth: 6,
 	segments,
 	obstacles: [],
+	slopes,
+	greenR: 6,
 	bounds: { minX: -10, maxX: 10, minZ: -10, maxZ: 10 },
 	start: { x: 0, z: 0 },
 	cup,
@@ -60,6 +64,12 @@ describe('golf engine (corridor)', () => {
 			// obstacles are generated and the bounds enclose the whole course
 			expect(a.obstacles.length).toBeGreaterThanOrEqual(1);
 			for (const o of a.obstacles) expect(o.pts.length).toBe(4);
+			// variable widths (per path point, never below clearance) + a sloped green at the cup
+			expect(a.widths.length).toBe(a.path.length);
+			for (const w of a.widths) expect(w).toBeGreaterThanOrEqual(PARAMS.ballR + 1.4 - 1e-6);
+			expect(Math.max(...a.widths) - Math.min(...a.widths)).toBeGreaterThan(0.5); // actually varies
+			expect(a.slopes.some((s) => s.kind === 'radial')).toBe(true);
+			expect(a.greenR).toBeGreaterThan(2);
 			for (const p of a.path) {
 				expect(p.x).toBeGreaterThanOrEqual(a.bounds.minX - 1e-6);
 				expect(p.x).toBeLessThanOrEqual(a.bounds.maxX + 1e-6);
@@ -109,5 +119,21 @@ describe('golf engine (corridor)', () => {
 		const { ball } = sim({ x: 0, z: 0, vx: 10, vz: 0 }, mkHole([]), 4);
 		expect(isSettled(ball)).toBe(true);
 		expect(ballSpeed(ball)).toBe(0);
+	});
+
+	it('the sloped green guides a slow ball into the cup', () => {
+		const green: Slope = { kind: 'radial', cx: 0, cz: 0, r: 6, ax: 0, az: 0, strength: 17 };
+		// Same shot: stops short on flat ground, but the green bowl pulls it in.
+		const flat = sim({ x: 0, z: 5, vx: 0, vz: -6 }, mkHole([], { x: 0, z: 0 }, 1.2, []), 5);
+		const bowl = sim({ x: 0, z: 5, vx: 0, vz: -6 }, mkHole([], { x: 0, z: 0 }, 1.2, [green]), 5);
+		expect(flat.sunk).toBe(false);
+		expect(bowl.sunk).toBe(true);
+	});
+
+	it('a relief patch deflects the ball downhill', () => {
+		const patch: Slope = { kind: 'dir', cx: 0, cz: 0, r: 6, ax: 1, az: 0, strength: 10 };
+		// Travelling straight along +z through a +x slope → gains sideways (+x) velocity.
+		const r = sim({ x: 0, z: -3, vx: 0, vz: 6 }, mkHole([], { x: 1e4, z: 1e4 }, 1.2, [patch]), 0.6);
+		expect(r.ball.vx).toBeGreaterThan(0);
 	});
 });
