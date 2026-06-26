@@ -37,6 +37,14 @@ const COLORS = [
 	'#e6731f', '#2bb6c4', '#e85aa0', '#7d8a99',
 ];
 
+// Rising-bubble descriptors per tube (x position, size, duration, horizontal wobble, delay).
+const BUBBLES = [
+	{ x: '24%', s: '6px', d: '3.2s', w: '4px', dl: 0 },
+	{ x: '58%', s: '4px', d: '2.6s', w: '-5px', dl: 0.9 },
+	{ x: '42%', s: '5px', d: '3.8s', w: '3px', dl: 1.7 },
+	{ x: '70%', s: '3px', d: '2.9s', w: '-3px', dl: 2.4 },
+] as const;
+
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 
 const fmtTime = (s: number) =>
@@ -414,9 +422,9 @@ export default function TransvaseGame({ gameId }: { gameId: string }) {
 												return (
 													<span
 														key={depth}
-														className={`ws-seg ${isFresh ? 'fresh' : ''}`}
+														className={`ws-seg ${fromTop === 0 ? 'surface' : ''} ${isFresh ? 'fresh' : ''}`}
 														style={{
-															background: COLORS[(c - 1) % COLORS.length],
+															backgroundColor: COLORS[(c - 1) % COLORS.length],
 															height: `calc(100% / ${height})`,
 															['--seg' as string]: depth,
 														}}
@@ -424,6 +432,27 @@ export default function TransvaseGame({ gameId }: { gameId: string }) {
 												);
 											})}
 										</span>
+										{tube.length > 0 && (
+											<span
+												className="ws-bubbles"
+												style={{ height: `calc(100% / ${height} * ${tube.length})` }}
+											>
+												{BUBBLES.map((b, bi) => (
+													<span
+														key={bi}
+														className="ws-bubble"
+														style={{
+															['--bx' as string]: b.x,
+															['--bs' as string]: b.s,
+															['--bd' as string]: b.d,
+															['--bw' as string]: b.w,
+															animationDelay: `${b.dl + (i % 4) * 0.5}s`,
+														}}
+													/>
+												))}
+											</span>
+										)}
+										<span className="ws-shine" />
 									</button>
 								);
 							})}
@@ -523,27 +552,84 @@ const CSS = `
 .ws-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 
 .ws-tube {
-  position: relative; width: 46px; height: calc(46px * var(--h, 4) * 0.62);
+  position: relative; width: 48px; height: calc(48px * var(--h, 4) * 0.64);
+  margin-top: 6px;
   padding: 0; border: none; background: transparent; cursor: pointer;
-  display: flex; align-items: flex-end; transition: transform 0.14s ease;
+  display: flex; align-items: flex-end;
+  transition: transform 0.16s cubic-bezier(0.34, 1.3, 0.5, 1);
 }
 .ws-tube:disabled { cursor: default; }
-.ws-tube.sel { transform: translateY(-14px); }
+.ws-tube.sel { transform: translateY(-16px); }
+
+/* Glass shell: walls + rounded bottom + faint inner tint, sits behind the liquid. */
 .ws-glass {
-  position: absolute; inset: 0; border: 2.5px solid var(--gray-600);
-  border-top: none; border-radius: 6px 6px 22px 22px;
-  background: color-mix(in srgb, var(--gray-0) 6%, transparent);
+  position: absolute; inset: 0; z-index: 0;
+  border: 2.5px solid color-mix(in srgb, var(--gray-400) 60%, transparent);
+  border-top: none;
+  border-radius: 5px 5px 22px 22px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gray-0) 9%, transparent), color-mix(in srgb, var(--gray-0) 3%, transparent));
+  box-shadow: inset 0 -8px 14px -8px rgba(0,0,0,0.35);
   pointer-events: none;
 }
-.ws-tube.hint .ws-glass { border-color: var(--ws-accent); box-shadow: 0 0 0 2px var(--accent-overlay); }
-.ws-liquid {
-  position: relative; width: 100%; height: 100%;
-  display: flex; flex-direction: column-reverse;
-  border-radius: 4px 4px 20px 20px; overflow: hidden; margin: 0 1px 1px;
+/* Open rim (slim ellipse) at the top of the tube. */
+.ws-glass::before {
+  content: ''; position: absolute; top: -4px; left: -2.5px; right: -2.5px; height: 8px;
+  border: 2.5px solid color-mix(in srgb, var(--gray-400) 60%, transparent);
+  border-radius: 50%;
+  background: transparent;
 }
-.ws-seg { width: 100%; display: block; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.12); }
+.ws-tube.hint .ws-glass,
+.ws-tube.hint .ws-glass::before { border-color: var(--ws-accent); }
+.ws-tube.hint .ws-glass { box-shadow: 0 0 0 2px var(--accent-overlay), inset 0 -8px 14px -8px rgba(0,0,0,0.35); }
+
+.ws-liquid {
+  position: relative; z-index: 1;
+  width: calc(100% - 5px); height: 100%; margin: 0 2.5px 2.5px;
+  display: flex; flex-direction: column-reverse;
+  border-radius: 3px 3px 19px 19px; overflow: hidden;
+}
+.ws-seg {
+  position: relative; width: 100%; display: block;
+  background-image: linear-gradient(95deg,
+    rgba(255,255,255,0.22) 0 10%,
+    rgba(255,255,255,0.05) 16% 52%,
+    rgba(0,0,0,0.10) 84% 100%);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.14);
+}
+/* Liquid surface: subtle convex meniscus + a brighter top line. */
+.ws-seg.surface { border-radius: 45% 45% 0 0 / 9px 9px 0 0; }
+.ws-seg.surface::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: rgba(255,255,255,0.4); border-radius: 50%;
+}
 .ws-seg.fresh { animation: ws-drop 0.3s ease; }
 @keyframes ws-drop { from { transform: translateY(-160%); opacity: 0.5; } to { transform: translateY(0); opacity: 1; } }
+
+/* Rising bubbles, clipped to the filled portion of the tube. */
+.ws-bubbles {
+  position: absolute; left: 3px; right: 3px; bottom: 3px; z-index: 2;
+  overflow: hidden; border-radius: 0 0 18px 18px; pointer-events: none;
+}
+.ws-bubble {
+  position: absolute; bottom: 0; left: var(--bx);
+  width: var(--bs); height: var(--bs); border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0.3) 55%, rgba(255,255,255,0) 72%);
+  animation: ws-bubble var(--bd) ease-in infinite;
+}
+@keyframes ws-bubble {
+  0% { bottom: 3%; opacity: 0; transform: translateX(0) scale(0.5); }
+  18% { opacity: 0.75; }
+  82% { opacity: 0.5; }
+  100% { bottom: 94%; opacity: 0; transform: translateX(var(--bw)) scale(1); }
+}
+
+/* Glass reflection on top of everything. */
+.ws-shine {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  border-radius: 5px 5px 22px 22px; overflow: hidden;
+  background:
+    linear-gradient(100deg, rgba(255,255,255,0.18) 0 6%, rgba(255,255,255,0) 12% 70%, rgba(255,255,255,0.08) 78% 84%, rgba(255,255,255,0) 90%);
+}
 
 .ws-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.5rem; }
 
@@ -562,5 +648,8 @@ const CSS = `
 .ws-replay { border: none; background: var(--ws-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
 
 @keyframes ws-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .ws-tube, .ws-seg.fresh, .ws-win, .ws-overlay { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .ws-tube, .ws-seg.fresh, .ws-win, .ws-overlay { transition: none; animation: none; }
+  .ws-bubble { animation: none; opacity: 0; }
+}
 `;
