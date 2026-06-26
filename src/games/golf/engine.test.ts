@@ -18,6 +18,8 @@ const mkHole = (segments: Segment[], cup = { x: 1e4, z: 1e4 }, cupR = 1.2): Hole
 	path: [],
 	halfWidth: 6,
 	segments,
+	obstacles: [],
+	bounds: { minX: -10, maxX: 10, minZ: -10, maxZ: 10 },
 	start: { x: 0, z: 0 },
 	cup,
 	cupR,
@@ -55,6 +57,15 @@ describe('golf engine (corridor)', () => {
 			expect(Math.hypot(a.cup.x - a.start.x, a.cup.z - a.start.z)).toBeGreaterThan(diff.length * 0.25);
 			// every segment normal is unit length
 			for (const s of a.segments) expect(Math.hypot(s.nx, s.nz)).toBeCloseTo(1, 5);
+			// obstacles are generated and the bounds enclose the whole course
+			expect(a.obstacles.length).toBeGreaterThanOrEqual(1);
+			for (const o of a.obstacles) expect(o.pts.length).toBe(4);
+			for (const p of a.path) {
+				expect(p.x).toBeGreaterThanOrEqual(a.bounds.minX - 1e-6);
+				expect(p.x).toBeLessThanOrEqual(a.bounds.maxX + 1e-6);
+				expect(p.z).toBeGreaterThanOrEqual(a.bounds.minZ - 1e-6);
+				expect(p.z).toBeLessThanOrEqual(a.bounds.maxZ + 1e-6);
+			}
 		}
 	});
 
