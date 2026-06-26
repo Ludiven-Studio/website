@@ -121,7 +121,7 @@ function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 	grp.add(new THREE.Mesh(stripGeom(fpos), mats.floor));
 
 	// Walls: raised flat ribbons along both edges + end caps (visible from top-down).
-	const t = 0.7, wy = 1.4;
+	const t = 1.0, wy = 1.4;
 	const wpos: number[] = [];
 	const band = (o1: number, o2: number) => {
 		for (let i = 0; i < n - 1; i++) {
@@ -250,8 +250,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 
 		const mats: Mats = {
 			ground: ground.material as THREE.MeshStandardMaterial,
-			floor: new THREE.MeshStandardMaterial({ color: 0x49b46a, roughness: 1 }),
-			wall: new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.85 }),
+			floor: new THREE.MeshStandardMaterial({ color: 0x49b46a, roughness: 1, side: THREE.DoubleSide }),
+			wall: new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.85, side: THREE.DoubleSide }),
 			cup: new THREE.MeshBasicMaterial({ color: 0x07090c }),
 			ring: new THREE.MeshBasicMaterial({ color: 0xf2f4f8 }),
 			flag: new THREE.MeshBasicMaterial({ color: 0xe34b4b, side: THREE.DoubleSide }),
