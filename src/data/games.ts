@@ -92,6 +92,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'pavage',
+		title: 'Pavage',
+		pitch: 'Emboîte des pièces façon Tetris dans la grille, sans que deux mêmes couleurs ne se touchent. Solution unique.',
+		icon: 'tetromino',
+		href: '/jeux/pavage',
+		status: 'play',
+	},
+	{
 		id: 'colorgramme',
 		title: 'Colorgramme',
 		pitch: 'Un nonogramme en couleurs : reconstitue l\'image grâce aux indices de chaque ligne et colonne.',

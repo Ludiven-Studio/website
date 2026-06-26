@@ -58,6 +58,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '📐', title: 'Les indices', body: 'Chaque indice donne la forme de sa pièce — ◻ carré, ▯ rectangle haut, ▭ large, ◇ libre — et parfois son nombre de cases.' },
 		{ emoji: '🖱️', title: 'Comment jouer', body: 'Glisse pour tracer un rectangle autour d\'un indice. Touche une pièce pour l\'effacer. Indice révèle une pièce.' },
 	],
+	pavage: [
+		{ emoji: '🧩', title: 'Le but', body: 'Emboîte toutes les pièces dans la grille pour couvrir chaque case libre, sans chevauchement ni dépassement.' },
+		{ emoji: '🚫', title: 'La règle', body: 'Deux pièces de même couleur ne doivent jamais se toucher côte à côte. Une seule disposition respecte tout : à toi de la trouver.' },
+		{ emoji: '🖱️', title: 'Comment jouer', body: 'Glisse une pièce du bac vers la grille (un aperçu rouge = pose interdite). Tourne-la avec ⟳ ou la touche R. Reprends une pièce posée en la glissant. Les cases barrées sont bloquées. Indice et solution sont là si tu bloques.' },
+	],
 	colorgramme: [
 		{ emoji: '🎨', title: 'Le but', body: 'Toutes les cases sont coloriées. Reconstitue l\'image cachée d\'après les indices de chaque ligne et colonne.' },
 		{ emoji: '🔍', title: 'La déduction', body: 'Choisis une couleur : tu ne vois que SES blocs, dans l\'ordre. Les blocs des autres couleurs sont cachés → déduis où commencent les tiens grâce aux colonnes.' },
