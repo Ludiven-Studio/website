@@ -39,6 +39,17 @@ const COLORS = ['#e8623d', '#3d97e0', '#37ab73', '#c79a1f', '#9b6cd6'];
 
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 
+// Expert opt-in: rotate pieces (free mode only; the daily stays rotation-free
+// so everyone solves the same shared grid).
+const ROT_KEY = 'ludiven-pavage-rotate';
+const readStoredRotate = (): boolean => {
+	try {
+		return localStorage.getItem(ROT_KEY) === '1';
+	} catch {
+		return false;
+	}
+};
+
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -82,6 +93,8 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [hintNote, setHintNote] = useState('');
+	const [expertRotate, setExpertRotate] = useState<boolean>(readStoredRotate);
+	const rotateRef = useRef<boolean>(expertRotate);
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
@@ -92,7 +105,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	const pieceRots = useMemo(() => pieces.map((p) => rotations(p.cells)), [pieces]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
-		const p = generatePavage(DIFFS[key]);
+		const p = generatePavage(DIFFS[key], undefined, rotateRef.current);
 		setDaily(false);
 		setAlreadyPlayed(false);
 		setHintNote('');
@@ -113,6 +126,19 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		newGame('facile');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+
+	// Toggle the expert rotation option (free mode) — regenerates the grid.
+	const toggleRotate = useCallback(() => {
+		const nv = !rotateRef.current;
+		rotateRef.current = nv;
+		setExpertRotate(nv);
+		try {
+			localStorage.setItem(ROT_KEY, nv ? '1' : '0');
+		} catch {
+			/* ignore */
+		}
+		newGame(diffKey);
+	}, [newGame, diffKey]);
 
 	/* Daily challenge: one attempt per device, resumable. */
 	const startDaily = useCallback(async () => {
@@ -463,6 +489,25 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 
 	const interactive = !(status === 'won' || revealed || (daily && !started));
 
+	// Fixed slot footprint per piece so the tray never reflows on drag / rotate.
+	// No-rotation → exact bbox; rotation on → square box that fits any rotation.
+	const slotBox = useMemo(
+		() =>
+			pieces.map((_, i) => {
+				if (!rotate) {
+					const b = bbox(pieceRots[i][0]);
+					return { w: b.cols, h: b.rows };
+				}
+				let m = 1;
+				for (const o of pieceRots[i]) {
+					const b = bbox(o);
+					m = Math.max(m, b.rows, b.cols);
+				}
+				return { w: m, h: m };
+			}),
+		[pieces, pieceRots, rotate],
+	);
+
 	const sideBorder = (r: number, c: number, dr: number, dc: number, idx: number): boolean => {
 		const nr = r + dr, nc = c + dc;
 		if (nr < 0 || nr >= size || nc < 0 || nc >= size) return true;
@@ -519,6 +564,15 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 					{elapsed >= 60 && (
 						<button className="pv-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
+					<button
+						className={`pv-act pv-toggle ${expertRotate ? 'on' : ''}`}
+						onClick={toggleRotate}
+						role="switch"
+						aria-checked={expertRotate}
+						title="Autoriser la rotation des pièces (mode expert)"
+					>
+						⟳ Rotation {expertRotate ? 'activée' : 'désactivée'}
+					</button>
 				</div>
 			)}
 
@@ -619,55 +673,71 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 				<p className="pv-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{/* Tray of remaining pieces */}
+			{/* Tray — fixed slots; a placed / dragged piece leaves a greyed placeholder. */}
 			{!revealed && status !== 'won' && interactive && (
 				<div className="pv-tray" aria-label="Pièces à placer">
 					{pieces.map((piece, i) => {
-						if (placements[i]) return null;
-						if (drag && drag.pieceIndex === i) return null; // hide while dragging
+						const dimmed = !!placements[i] || drag?.pieceIndex === i;
 						const o = pieceRots[i][trayRot[i] ?? 0];
 						const { rows, cols } = bbox(o);
 						const set = new Set(o.map(([r, c]) => r * cols + c));
+						const box = slotBox[i];
+						const slotStyle = {
+							width: `calc(${box.w} * var(--pv-mini-cell) + 4px)`,
+							height: `calc(${box.h} * var(--pv-mini-cell) + 4px)`,
+						};
+						const fill = dimmed ? 'var(--pv-dim)' : COLORS[piece.color % COLORS.length];
 						return (
-							<div key={piece.id} className="pv-tray-piece">
-								<div
-									className="pv-mini"
-									style={{ gridTemplateColumns: `repeat(${cols}, var(--pv-mini-cell))` }}
-									onPointerDown={(e) => {
-										e.preventDefault();
-										// grab cell from pointer position inside the mini-grid
-										const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-										const cell = rect.width / cols;
-										let gc = Math.floor((e.clientX - rect.left) / cell);
-										let gr = Math.floor((e.clientY - rect.top) / cell);
-										gc = Math.max(0, Math.min(cols - 1, gc));
-										gr = Math.max(0, Math.min(rows - 1, gr));
-										// snap grab to an actual filled cell of the piece
-										const grab = nearestFilled(o, [gr, gc]);
-										beginDrag(i, trayRot[i] ?? 0, grab, e.clientX, e.clientY);
-									}}
-								>
-									{Array.from({ length: rows * cols }).map((_, k) => {
-										const r = Math.floor(k / cols), c = k % cols;
-										const on = set.has(r * cols + c);
-										return (
-											<div
-												key={k}
-												className={`pv-mini-cell ${on ? 'on' : 'off'}`}
-												style={on ? { background: COLORS[piece.color % COLORS.length] } : undefined}
-											/>
-										);
-									})}
-								</div>
-								{rotate && pieceRots[i].length > 1 && (
-									<button
-										className="pv-rot"
-										onClick={() => rotateTray(i)}
-										onPointerDown={(e) => e.stopPropagation()}
-										aria-label="Tourner la pièce"
+							<div key={piece.id} className={`pv-tray-piece ${dimmed ? 'dimmed' : ''}`}>
+								<div className="pv-slot" style={slotStyle}>
+									<div
+										className="pv-mini"
+										style={{
+											gridTemplateColumns: `repeat(${cols}, var(--pv-mini-cell))`,
+											cursor: dimmed ? 'default' : 'grab',
+										}}
+										onPointerDown={
+											dimmed
+												? undefined
+												: (e) => {
+														e.preventDefault();
+														const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+														const cell = rect.width / cols;
+														let gc = Math.floor((e.clientX - rect.left) / cell);
+														let gr = Math.floor((e.clientY - rect.top) / cell);
+														gc = Math.max(0, Math.min(cols - 1, gc));
+														gr = Math.max(0, Math.min(rows - 1, gr));
+														const grab = nearestFilled(o, [gr, gc]);
+														beginDrag(i, trayRot[i] ?? 0, grab, e.clientX, e.clientY);
+													}
+										}
 									>
-										⟳
-									</button>
+										{Array.from({ length: rows * cols }).map((_, k) => {
+											const r = Math.floor(k / cols), c = k % cols;
+											const on = set.has(r * cols + c);
+											return (
+												<div
+													key={k}
+													className={`pv-mini-cell ${on ? 'on' : 'off'}`}
+													style={on ? { background: fill } : undefined}
+												/>
+											);
+										})}
+									</div>
+								</div>
+								{rotate && (
+									<div className="pv-rot-row">
+										{!dimmed && pieceRots[i].length > 1 && (
+											<button
+												className="pv-rot"
+												onClick={() => rotateTray(i)}
+												onPointerDown={(e) => e.stopPropagation()}
+												aria-label="Tourner la pièce"
+											>
+												⟳
+											</button>
+										)}
+									</div>
 								)}
 							</div>
 						);
@@ -784,6 +854,7 @@ const CSS = `
   --pv-accent: var(--accent-regular);
   --pv-line: var(--gray-700);
   --pv-edge: var(--gray-999);
+  --pv-dim: var(--gray-600);
   --pv-cell: calc(100cqw / var(--n, 5));
   --pv-mini-cell: 22px;
 
@@ -831,6 +902,8 @@ const CSS = `
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
 .pv-act:hover { background: var(--gray-800); border-color: var(--pv-accent); color: var(--pv-accent); }
+.pv-toggle.on { background: var(--pv-accent); color: var(--accent-text-over); border-color: var(--pv-accent); }
+.pv-toggle.on:hover { background: var(--pv-accent); color: var(--accent-text-over); }
 
 .pv-boardwrap {
   position: relative; width: 100%; max-width: 420px; margin-inline: auto; container-type: inline-size;
@@ -859,17 +932,23 @@ const CSS = `
 .pv-cell.wondone { filter: saturate(1.15); }
 
 .pv-tray {
-  display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; align-items: flex-end;
+  display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; align-items: flex-start;
   margin-top: 1.5rem; width: 100%; min-height: 60px;
 }
-.pv-tray-piece { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.pv-mini {
-  display: grid; touch-action: none; cursor: grab; padding: 2px;
+.pv-tray-piece { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.pv-slot {
+  display: grid; place-items: center; box-sizing: border-box; padding: 2px;
   background: var(--gray-900); border-radius: 8px;
 }
+.pv-tray-piece.dimmed .pv-slot {
+  background: transparent; box-shadow: inset 0 0 0 1.5px var(--gray-800);
+}
+.pv-mini { display: grid; touch-action: none; }
 .pv-mini-cell { width: var(--pv-mini-cell); height: var(--pv-mini-cell); box-sizing: border-box; }
 .pv-mini-cell.on { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.28); border-radius: 2px; }
+.pv-tray-piece.dimmed .pv-mini-cell.on { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.15); opacity: 0.6; }
 .pv-mini-cell.off { background: transparent; }
+.pv-rot-row { height: 28px; display: flex; align-items: center; justify-content: center; }
 .pv-rot {
   border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0);
   width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 15px; line-height: 1; font-weight: 700;

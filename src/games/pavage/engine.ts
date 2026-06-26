@@ -35,13 +35,12 @@ export interface DiffLevel {
 	label: string;
 	size: number;
 	blocked: number; // target blocked cells
-	rotate: boolean; // allow piece rotation
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', size: 5, blocked: 3, rotate: false },
-	moyen: { label: 'Moyen', size: 6, blocked: 4, rotate: false },
-	difficile: { label: 'Difficile', size: 7, blocked: 7, rotate: true },
+	facile: { label: 'Facile', size: 5, blocked: 3 },
+	moyen: { label: 'Moyen', size: 6, blocked: 4 },
+	difficile: { label: 'Difficile', size: 7, blocked: 7 },
 };
 
 const ORTH = [
@@ -344,7 +343,11 @@ export function countSolutions(puzzle: PavagePuzzle, limit = 2): number {
 
 /* ---------- generation ---------- */
 
-export function generatePavage(diff: DiffLevel, rng: Rng = Math.random): PavagePuzzle {
+export function generatePavage(
+	diff: DiffLevel,
+	rng: Rng = Math.random,
+	rotate = false,
+): PavagePuzzle {
 	const { size } = diff;
 
 	for (let attempt = 0; attempt < 1500; attempt++) {
@@ -387,7 +390,7 @@ export function generatePavage(diff: DiffLevel, rng: Rng = Math.random): PavageP
 			const shape = normalize(zoneCells[z]);
 			const orient = rotations(shape);
 			// No rotation → show the solution orientation; otherwise a random one.
-			const display = diff.rotate ? orient[Math.floor(rng() * orient.length)] : shape;
+			const display = rotate ? orient[Math.floor(rng() * orient.length)] : shape;
 			const piece: Piece = { id: z, color: colors[z], cells: display };
 			const pl = placementFor(piece, zoneCells[z]);
 			if (!pl) { z = -1; pieces.length = 0; solution.length = 0; break; } // shouldn't happen; restart build
@@ -401,7 +404,7 @@ export function generatePavage(diff: DiffLevel, rng: Rng = Math.random): PavageP
 		const P = idx.map((oi, ni): Piece => ({ ...pieces[oi], id: ni }));
 		const S = idx.map((oi) => solution[oi]);
 
-		const puzzle: PavagePuzzle = { size, blocked, pieces: P, solution: S, palette, rotate: diff.rotate };
+		const puzzle: PavagePuzzle = { size, blocked, pieces: P, solution: S, palette, rotate };
 
 		// 5) uniqueness
 		if (countSolutions(puzzle, 2) === 1) return puzzle;
