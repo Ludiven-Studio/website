@@ -1,122 +1,89 @@
 import { Suspense, useMemo, useEffect, useState } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment, useGLTF, AdaptiveDpr, Html } from '@react-three/drei';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import { OrbitControls, Environment, useGLTF, useTexture, AdaptiveDpr, Html } from '@react-three/drei';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
+import { heightAt, slopeAt, mulberry32, hashStr } from './terrainNoise';
+import PostFX from './PostFX';
+import Trees from './Trees';
 
 const HDRI = '/hdris/forest_slope_1k.hdr';
 const ROCK = '/models/moon_rock_01/moon_rock_01_1k.gltf';
 const BOULDER = '/models/boulder_01/boulder_01_1k.gltf';
 const TRUNK = '/models/dead_tree_trunk/dead_tree_trunk_1k.gltf';
+const FLOOR = ['/textures/forest_floor_diff_1k.jpg', '/textures/forest_floor_nor_1k.jpg', '/textures/forest_floor_rough_1k.jpg'];
 [ROCK, BOULDER, TRUNK].forEach((u) => useGLTF.preload(u));
 
-// Terrain / population tuning.
-const SIZE = 240, SEG = 150, HILL = 16, NF = 0.02;
-const TREES = 240, GRASS = 5200, ROCKS = 52, BOULDERS = 12, LOGS = 6;
+const SIZE = 240, SEG = 150;
+const GRASS = 5200, ROCKS = 52, BOULDERS = 12, LOGS = 6;
 
-/* ---------- deterministic noise ---------- */
-function mulberry32(seed: number): () => number {
-	let a = seed >>> 0;
-	return () => {
-		a |= 0; a = (a + 0x6d2b79f5) | 0;
-		let t = Math.imul(a ^ (a >>> 15), 1 | a);
-		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
-function hash2(ix: number, iz: number, seed: number): number {
-	let h = (Math.imul(ix, 374761393) + Math.imul(iz, 668265263) + Math.imul(seed, 1442695041)) | 0;
-	h = Math.imul(h ^ (h >>> 13), 1274126177) | 0;
-	return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-function vnoise(x: number, z: number, seed: number): number {
-	const x0 = Math.floor(x), z0 = Math.floor(z), fx = x - x0, fz = z - z0;
-	const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
-	const a = hash2(x0, z0, seed), b = hash2(x0 + 1, z0, seed), c = hash2(x0, z0 + 1, seed), d = hash2(x0 + 1, z0 + 1, seed);
-	return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
-}
-function fbm(x: number, z: number, seed: number): number {
-	let amp = 1, freq = 1, sum = 0, norm = 0;
-	for (let o = 0; o < 4; o++) { sum += amp * vnoise(x * freq, z * freq, seed + o * 101); norm += amp; amp *= 0.5; freq *= 2; }
-	return sum / norm;
-}
-const heightAt = (x: number, z: number, seed: number): number => (fbm(x * NF, z * NF, seed) - 0.5) * HILL;
-function slopeAt(x: number, z: number, seed: number): number {
-	const e = 1.5;
-	const hx = heightAt(x + e, z, seed) - heightAt(x - e, z, seed);
-	const hz = heightAt(x, z + e, seed) - heightAt(x, z - e, seed);
-	return Math.hypot(hx, hz) / (2 * e);
-}
-const hashStr = (s: string): number => { let h = 0; for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0; return h; };
-
-/* ---------- terrain ---------- */
+/* ---------- terrain (noise heightmap + PBR forest floor) ---------- */
 function Terrain({ seed }: { seed: number }) {
-	const { geom, mat } = useMemo(() => {
+	const [diff, nor, rough] = useTexture(FLOOR);
+	const geom = useMemo(() => {
 		const g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
 		g.rotateX(-Math.PI / 2);
 		const pos = g.attributes.position as THREE.BufferAttribute;
-		const colors = new Float32Array(pos.count * 3);
-		const grass = new THREE.Color('#3a5226'), dirt = new THREE.Color('#6b6038'), rock = new THREE.Color('#5c5c5e');
-		const c = new THREE.Color();
-		for (let i = 0; i < pos.count; i++) {
-			const x = pos.getX(i), z = pos.getZ(i);
-			const y = heightAt(x, z, seed);
-			pos.setY(i, y);
-			const s = Math.min(1, slopeAt(x, z, seed) * 1.6);
-			const hN = THREE.MathUtils.clamp((y + HILL / 2) / HILL, 0, 1);
-			c.copy(grass).lerp(dirt, hN * 0.5).lerp(rock, s);
-			colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
-		}
-		g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+		for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i), seed));
 		g.computeVertexNormals();
-		const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
-		return { geom: g, mat };
+		return g;
 	}, [seed]);
+	const mat = useMemo(() => {
+		for (const t of [diff, nor, rough]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(SIZE / 8, SIZE / 8); }
+		diff.colorSpace = THREE.SRGBColorSpace;
+		return new THREE.MeshStandardMaterial({ map: diff, normalMap: nor, roughnessMap: rough, roughness: 1 });
+	}, [diff, nor, rough]);
 	useEffect(() => () => { geom.dispose(); mat.dispose(); }, [geom, mat]);
 	return <mesh geometry={geom} material={mat} receiveShadow />;
 }
 
-/* ---------- procedural trees (instanced) ---------- */
-function Trees({ seed }: { seed: number }) {
-	const { group, dispose } = useMemo(() => {
-		const rng = mulberry32(seed ^ 0x9e37);
-		const trunkGeo = new THREE.CylinderGeometry(0.16, 0.32, 2.4, 6); trunkGeo.translate(0, 1.2, 0);
-		const foliGeo = new THREE.ConeGeometry(1.6, 5, 8); foliGeo.translate(0, 2.4 + 2.5, 0);
-		const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 1 });
-		const foliMat = new THREE.MeshStandardMaterial({ color: 0x2f5e2a, roughness: 1 });
-		const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, TREES);
-		const foli = new THREE.InstancedMesh(foliGeo, foliMat, TREES);
-		trunks.castShadow = true; foli.castShadow = true; trunks.frustumCulled = false; foli.frustumCulled = false;
-		const d = new THREE.Object3D(), col = new THREE.Color();
-		let k = 0;
-		for (let t = 0; t < TREES * 4 && k < TREES; t++) {
-			const r = Math.sqrt(rng()) * 108, a = rng() * 6.283;
-			const x = Math.cos(a) * r, z = Math.sin(a) * r;
-			if (Math.hypot(x, z) < 6 || slopeAt(x, z, seed) > 0.55) continue;
-			const s = 0.8 + rng() * 0.9;
-			d.position.set(x, heightAt(x, z, seed), z);
-			d.rotation.set(0, rng() * 6.283, 0);
-			d.scale.set(s, s + rng() * 0.4, s);
-			d.updateMatrix();
-			trunks.setMatrixAt(k, d.matrix); foli.setMatrixAt(k, d.matrix);
-			col.setHSL(0.27 + rng() * 0.08, 0.4 + rng() * 0.2, 0.2 + rng() * 0.12); foli.setColorAt(k, col);
-			k++;
-		}
-		trunks.count = k; foli.count = k;
-		trunks.instanceMatrix.needsUpdate = true; foli.instanceMatrix.needsUpdate = true;
-		if (foli.instanceColor) foli.instanceColor.needsUpdate = true;
-		const group = new THREE.Group(); group.add(trunks, foli);
-		return { group, dispose: () => { trunkGeo.dispose(); foliGeo.dispose(); trunkMat.dispose(); foliMat.dispose(); trunks.dispose(); foli.dispose(); } };
-	}, [seed]);
-	useEffect(() => dispose, [dispose]);
-	return <primitive object={group} />;
+/* ---------- grass: crossed alpha tufts, instanced, with a wind sway ---------- */
+function makeGrassTuft(size = 64): THREE.CanvasTexture {
+	const c = document.createElement('canvas'); c.width = c.height = size;
+	const ctx = c.getContext('2d')!;
+	for (let i = 0; i < 8; i++) {
+		const bx = size * (0.15 + 0.7 * Math.random());
+		const tx = bx + (Math.random() - 0.5) * size * 0.3;
+		const w = size * (0.035 + Math.random() * 0.02);
+		const ty = size * (0.08 + Math.random() * 0.18);
+		const g = ctx.createLinearGradient(0, size, 0, ty);
+		g.addColorStop(0, '#274d18'); g.addColorStop(1, '#6fae3c');
+		ctx.fillStyle = g;
+		ctx.beginPath();
+		ctx.moveTo(bx - w, size); ctx.lineTo(bx + w, size);
+		ctx.quadraticCurveTo((bx + tx) / 2 + w, (size + ty) / 2, tx + 0.6, ty);
+		ctx.quadraticCurveTo((bx + tx) / 2 - w, (size + ty) / 2, bx - w, size);
+		ctx.fill();
+	}
+	const tex = new THREE.CanvasTexture(c);
+	tex.colorSpace = THREE.SRGBColorSpace;
+	return tex;
 }
 
-/* ---------- grass (instanced quads) ---------- */
 function Grass({ seed }: { seed: number }) {
-	const { mesh, dispose } = useMemo(() => {
+	const { mesh, mat, dispose } = useMemo(() => {
 		const rng = mulberry32(seed ^ 0x51ed);
-		const geo = new THREE.PlaneGeometry(0.32, 0.75); geo.translate(0, 0.37, 0);
-		const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, side: THREE.DoubleSide });
+		const blade = new THREE.PlaneGeometry(0.5, 0.7, 1, 3); blade.translate(0, 0.35, 0);
+		const blade2 = blade.clone(); blade2.rotateY(Math.PI / 2);
+		const geo = mergeGeometries([blade, blade2])!;
+		blade.dispose(); blade2.dispose();
+		const tex = makeGrassTuft();
+		const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1 });
+		mat.onBeforeCompile = (shader) => {
+			shader.uniforms.uTime = { value: 0 };
+			mat.userData.shader = shader;
+			shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader.replace(
+				'#include <begin_vertex>',
+				`#include <begin_vertex>
+				#ifdef USE_INSTANCING
+					float ph = instanceMatrix[3].x * 0.6 + instanceMatrix[3].z * 0.6;
+				#else
+					float ph = 0.0;
+				#endif
+				float sway = sin(uTime * 1.6 + ph) + 0.4 * sin(uTime * 3.1 + ph * 1.7);
+				transformed.x += sway * 0.10 * uv.y;`,
+			);
+		};
 		const mesh = new THREE.InstancedMesh(geo, mat, GRASS); mesh.frustumCulled = false;
 		const d = new THREE.Object3D(), col = new THREE.Color();
 		let k = 0;
@@ -124,20 +91,24 @@ function Grass({ seed }: { seed: number }) {
 			const r = Math.sqrt(rng()) * 44, a = rng() * 6.283;
 			const x = Math.cos(a) * r, z = Math.sin(a) * r;
 			if (slopeAt(x, z, seed) > 0.7) continue;
-			const s = 0.7 + rng() * 0.9;
+			const s = 0.7 + rng() * 1.0;
 			d.position.set(x, heightAt(x, z, seed), z);
-			d.rotation.set((rng() - 0.5) * 0.4, rng() * 6.283, (rng() - 0.5) * 0.4);
+			d.rotation.set(0, rng() * 6.283, 0);
 			d.scale.set(s, s, s);
 			d.updateMatrix();
 			mesh.setMatrixAt(k, d.matrix);
-			col.setHSL(0.26 + rng() * 0.08, 0.45 + rng() * 0.2, 0.28 + rng() * 0.14); mesh.setColorAt(k, col);
+			col.setHSL(0.26 + rng() * 0.08, 0.45 + rng() * 0.2, 0.42 + rng() * 0.16); mesh.setColorAt(k, col);
 			k++;
 		}
 		mesh.count = k;
 		mesh.instanceMatrix.needsUpdate = true;
 		if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-		return { mesh, dispose: () => { geo.dispose(); mat.dispose(); mesh.dispose(); } };
+		return { mesh, mat, dispose: () => { geo.dispose(); mat.dispose(); tex.dispose(); mesh.dispose(); } };
 	}, [seed]);
+	useFrame(({ clock }) => {
+		const sh = (mat.userData as { shader?: { uniforms: { uTime: { value: number } } } }).shader;
+		if (sh) sh.uniforms.uTime.value = clock.elapsedTime;
+	});
 	useEffect(() => dispose, [dispose]);
 	return <primitive object={mesh} />;
 }
@@ -185,13 +156,10 @@ function ScanInstances({ url, seed, count, scale, slopeMax = 1.5, minR = 0, radi
 	return <primitive object={mesh} />;
 }
 
-/* ---------- bake shadows once per seed (perf) ---------- */
+/* ---------- bake shadows once per seed ---------- */
 function ShadowBaker({ seed }: { seed: number }) {
 	const { gl } = useThree();
-	useEffect(() => {
-		gl.shadowMap.autoUpdate = false;
-		gl.shadowMap.needsUpdate = true;
-	}, [seed, gl]);
+	useEffect(() => { gl.shadowMap.autoUpdate = false; gl.shadowMap.needsUpdate = true; }, [seed, gl]);
 	return null;
 }
 
@@ -209,7 +177,7 @@ export default function Scene3D() {
 			<style>{CSS}</style>
 			<div className="s3-stage">
 				<Canvas shadows dpr={[1, 2]} camera={{ position: [22, 12, 26], fov: 50 }} gl={{ antialias: true }}>
-					<fog attach="fog" args={['#9fb0bf', 30, 150]} />
+					<fogExp2 attach="fog" args={['#aab6b0', 0.014]} />
 					<Environment files={HDRI} background={background} />
 					<directionalLight position={[40, 60, 20]} intensity={2.2} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}>
 						<orthographicCamera attach="shadow-camera" args={[-70, 70, 70, -70, 1, 200]} />
@@ -227,6 +195,7 @@ export default function Scene3D() {
 					</Suspense>
 					<OrbitControls makeDefault enableDamping autoRotate={autoRotate} autoRotateSpeed={0.45} target={[0, 2, 0]} minDistance={6} maxDistance={90} maxPolarAngle={Math.PI / 2 - 0.04} />
 					<AdaptiveDpr pixelated />
+					<PostFX />
 				</Canvas>
 				<div className="s3-panel">
 					<button className="s3-reset" onClick={() => setSeed((Math.random() * 1e9) | 0)}>↻ Régénérer</button>
@@ -234,7 +203,7 @@ export default function Scene3D() {
 					<label><input type="checkbox" checked={autoRotate} onChange={(e) => setAutoRotate(e.target.checked)} /> Rotation auto</label>
 				</div>
 			</div>
-			<p className="s3-hint">Forêt générée procéduralement (terrain bruité, arbres, herbe et rochers CC0) éclairée par une HDRI. « Régénérer » recompose le relief et la végétation.</p>
+			<p className="s3-hint">Forêt procédurale (terrain bruité + sol PBR, herbe alpha au vent, rochers CC0) — éclairage HDRI, AO &amp; étalonnage. « Régénérer » recompose la scène.</p>
 		</div>
 	);
 }
