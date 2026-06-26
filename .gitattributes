@@ -98,3 +98,8 @@
 *.bundle filter=lfs diff=lfs merge=lfs -text
 FirebaseCppApp-13_11_0.bundle filter=lfs diff=lfs merge=lfs -text
 *.glb filter=lfs diff=lfs merge=lfs -text
+
+# --- Web (Astro / GitHub Pages) ---
+# Pages serves public/ directly and does NOT resolve Git LFS pointers, so everything under
+# public/ must stay a normal git blob (this overrides the LFS rules above for served assets).
+public/** -filter -diff -merge
