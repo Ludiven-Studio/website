@@ -299,7 +299,7 @@ export default function Scene3D() {
 			<div className="s3-stage">
 				<Canvas shadows dpr={[1, 2]} camera={{ position: [20, 11, 24], fov: 52 }} gl={{ antialias: true }}>
 					<GradientSky top="#9fc6ef" bottom="#eaf2e6" />
-					<fogExp2 attach="fog" args={['#e3ecdf', 0.016]} />
+					<fogExp2 attach="fog" args={['#e3ecdf', 0.009]} />
 					<hemisphereLight args={['#bcd6f2', '#5c6b4a', 0.9]} />
 					<directionalLight position={[18, 26, 12]} intensity={1.7} color="#fff3df" castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}>
 						<orthographicCamera attach="shadow-camera" args={[-80, 80, 80, -80, 1, 220]} />
@@ -330,7 +330,7 @@ export default function Scene3D() {
 					{!walk && <label><input type="checkbox" checked={autoRotate} onChange={(e) => setAutoRotate(e.target.checked)} /> Rotation auto</label>}
 				</div>
 			</div>
-			<p className="s3-hint">{walk ? 'Glisse pour regarder autour · ZQSD / WASD / flèches pour avancer (vue à 1,50 m, la souris reste libre).' : 'Forêt low-poly stylisée 100 % procédurale. Active « Marcher » pour l’explorer à hauteur d’yeux.'}</p>
+			<p className="s3-hint">{walk ? 'Glisse pour regarder autour · ZQSD / WASD / flèches pour avancer (vue à 1,50 m, la souris reste libre).' : 'Décor low-poly stylisé, 100 % procédural. Active « Marcher » pour l’explorer à hauteur d’yeux.'}</p>
 		</div>
 	);
 }
