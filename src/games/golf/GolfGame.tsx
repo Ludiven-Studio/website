@@ -161,6 +161,16 @@ function buildHoleGroup(hole: Hole, mats: Mats): THREE.Group {
 	flag.position.set(hole.cup.x, 0.06, hole.cup.z + hole.cupR);
 	grp.add(flag);
 
+	// Obstacle islands: raised flat top over their footprint (convex quad → 2 tris).
+	const oy = 1.45;
+	for (const ob of hole.obstacles) {
+		const q = ob.pts;
+		const opos: number[] = [];
+		opos.push(q[0].x, oy, q[0].z, q[1].x, oy, q[1].z, q[2].x, oy, q[2].z);
+		opos.push(q[0].x, oy, q[0].z, q[2].x, oy, q[2].z, q[3].x, oy, q[3].z);
+		grp.add(new THREE.Mesh(stripGeom(opos), mats.wall));
+	}
+
 	return grp;
 }
 
@@ -180,6 +190,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const [power, setPower] = useState(0);
 	const [peerCount, setPeerCount] = useState(1);
 	const [board, setBoard] = useState<{ id: string; name: string; strokes: number; done: boolean }[]>([]);
+	const [overview, setOverview] = useState(false);
 	const [webglError, setWebglError] = useState(false);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -207,6 +218,13 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const seedRef = useRef(0);
 	const aimRef = useRef({ active: false, px: 0, pz: 0 });
 	const camTargetRef = useRef({ x: 0, z: 0 });
+	const spanRef = useRef(HALF_SPAN);
+	const appliedSpanRef = useRef(-1);
+	const fitSpanRef = useRef(HALF_SPAN);
+	const courseCenterRef = useRef({ x: 0, z: 0 });
+	const overviewRef = useRef(false);
+	const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+	const pinchRef = useRef<{ dist: number; span: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
 	const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
 
@@ -291,11 +309,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		if (!g || !canvas) return;
 		const css = canvas.clientWidth;
 		g.renderer.setSize(css, css, false);
-		g.camera.left = -HALF_SPAN;
-		g.camera.right = HALF_SPAN;
-		g.camera.top = HALF_SPAN;
-		g.camera.bottom = -HALF_SPAN;
-		g.camera.updateProjectionMatrix();
+		appliedSpanRef.current = -1; // force the camera to re-project on the next frame
 	}, []);
 
 	const removeGhost = useCallback((id: string) => {
@@ -366,15 +380,29 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		if (!g) return;
 		g.ball.position.set(pose.x, PARAMS.ballR, pose.z);
 
-		// Follow camera: ease toward the ball + slight look-ahead along its velocity.
+		// Zoom: re-project only when the span changes.
+		const span = overviewRef.current ? fitSpanRef.current : spanRef.current;
+		if (span !== appliedSpanRef.current) {
+			g.camera.left = -span; g.camera.right = span; g.camera.top = span; g.camera.bottom = -span;
+			g.camera.updateProjectionMatrix();
+			appliedSpanRef.current = span;
+		}
+		// Overview frames the whole course; otherwise follow the ball (+ look-ahead).
 		const b = ballRef.current;
-		const tx = pose.x + b.vx * LOOK;
-		const tz = pose.z + b.vz * LOOK;
-		const kc = Math.min(1, dtSec * 5);
-		camTargetRef.current.x += (tx - camTargetRef.current.x) * kc;
-		camTargetRef.current.z += (tz - camTargetRef.current.z) * kc;
-		g.camera.position.set(camTargetRef.current.x, 80, camTargetRef.current.z);
-		g.camera.lookAt(camTargetRef.current.x, 0, camTargetRef.current.z);
+		let cx: number, cz: number;
+		if (overviewRef.current) {
+			cx = courseCenterRef.current.x;
+			cz = courseCenterRef.current.z;
+		} else {
+			const tx = pose.x + b.vx * LOOK, tz = pose.z + b.vz * LOOK;
+			const kc = Math.min(1, dtSec * 5);
+			camTargetRef.current.x += (tx - camTargetRef.current.x) * kc;
+			camTargetRef.current.z += (tz - camTargetRef.current.z) * kc;
+			cx = camTargetRef.current.x;
+			cz = camTargetRef.current.z;
+		}
+		g.camera.position.set(cx, 80, cz);
+		g.camera.lookAt(cx, 0, cz);
 
 		// Aim visuals: an arc on the pull side (follows the cursor) + a force arrow on the launch side.
 		if (aimRef.current.active) {
@@ -498,9 +526,49 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		[renderFrame, handleSunk],
 	);
 
-	/* ---- Pointer: slingshot aim ---- */
+	/* ---- Zoom / overview ---- */
+	const zoomBy = useCallback((factor: number) => {
+		overviewRef.current = false;
+		setOverview(false);
+		spanRef.current = Math.max(12, Math.min(fitSpanRef.current, spanRef.current * factor));
+	}, []);
+	const toggleOverview = useCallback(() => {
+		const nv = !overviewRef.current;
+		overviewRef.current = nv;
+		setOverview(nv);
+		if (nv) {
+			aimRef.current.active = false;
+			setPower(0);
+		}
+	}, []);
+
+	useEffect(() => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+		const onWheel = (e: WheelEvent) => {
+			e.preventDefault();
+			zoomBy(e.deltaY > 0 ? 1.12 : 1 / 1.12);
+		};
+		canvas.addEventListener('wheel', onWheel, { passive: false });
+		return () => canvas.removeEventListener('wheel', onWheel);
+	}, [zoomBy]);
+
+	/* ---- Pointer: slingshot aim (single) + pinch zoom (two) ---- */
+	const pinchDist = (): number => {
+		const pts = [...pointersRef.current.values()];
+		if (pts.length < 2) return 0;
+		return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+	};
+
 	const onPointerDown = useCallback((e: React.PointerEvent) => {
-		if (phase !== 'playing' || doneRef.current) return;
+		pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		if (pointersRef.current.size >= 2) {
+			pinchRef.current = { dist: pinchDist(), span: spanRef.current };
+			aimRef.current.active = false;
+			setPower(0);
+			return;
+		}
+		if (phase !== 'playing' || doneRef.current || overviewRef.current) return;
 		if (!isSettled(ballRef.current)) return;
 		const p = worldFromPointer(e.clientX, e.clientY);
 		if (!p) return;
@@ -511,6 +579,16 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	}, [phase, worldFromPointer]);
 
 	const onPointerMove = useCallback((e: React.PointerEvent) => {
+		if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		if (pinchRef.current) {
+			const d = pinchDist();
+			if (d > 0) {
+				overviewRef.current = false;
+				setOverview(false);
+				spanRef.current = Math.max(12, Math.min(fitSpanRef.current, pinchRef.current.span * (pinchRef.current.dist / d)));
+			}
+			return;
+		}
 		if (!aimRef.current.active) return;
 		const p = worldFromPointer(e.clientX, e.clientY);
 		if (!p) return;
@@ -520,7 +598,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		setPower(Math.min(Math.hypot(p.x - b.x, p.z - b.z), PARAMS.maxPull) / PARAMS.maxPull);
 	}, [worldFromPointer]);
 
-	const onPointerUp = useCallback(() => {
+	const onPointerUp = useCallback((e: React.PointerEvent) => {
+		pointersRef.current.delete(e.pointerId);
+		if (pointersRef.current.size < 2) pinchRef.current = null;
 		if (!aimRef.current.active) return;
 		aimRef.current.active = false;
 		setPower(0);
@@ -555,6 +635,14 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			const hole = generateHole(mulberry32(seed), DIFFS[dk]);
 			holeRef.current = hole;
 			setPar(hole.par);
+
+			const bd = hole.bounds;
+			courseCenterRef.current = { x: (bd.minX + bd.maxX) / 2, z: (bd.minZ + bd.maxZ) / 2 };
+			fitSpanRef.current = Math.max(bd.maxX - bd.minX, bd.maxZ - bd.minZ) / 2 + 4;
+			spanRef.current = HALF_SPAN;
+			overviewRef.current = false;
+			setOverview(false);
+			appliedSpanRef.current = -1;
 
 			const g = g3Ref.current;
 			if (g) {
@@ -733,6 +821,14 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					</ol>
 				)}
 
+				{phase === 'playing' && (
+					<div className="gf-zoom">
+						<button className="gf-zbtn" onClick={() => zoomBy(1 / 1.25)} aria-label="Zoomer">＋</button>
+						<button className="gf-zbtn" onClick={() => zoomBy(1.25)} aria-label="Dézoomer">－</button>
+						<button className={`gf-zbtn ${overview ? 'active' : ''}`} onClick={toggleOverview} aria-label="Vue d'ensemble">🔍</button>
+					</div>
+				)}
+
 				{phase === 'playing' && done && (
 					<div className="gf-overlay">
 						<div className="gf-card">
@@ -823,6 +919,9 @@ const CSS = `
 .gf-cur { background: var(--gf-accent); color: var(--accent-text-over); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
 .gf-best, .gf-peers { background: rgba(0,0,0,0.55); color: #fff; border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
 .gf-board { position: absolute; top: 8px; right: 8px; margin: 0; padding: 6px 10px 6px 26px; list-style: decimal; background: rgba(0,0,0,0.55); color: #fff; border-radius: 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.gf-zoom { position: absolute; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; }
+.gf-zbtn { width: 42px; height: 42px; border-radius: 12px; border: none; background: rgba(0,0,0,0.5); color: #fff; font-size: 20px; font-weight: 800; line-height: 1; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: none; }
+.gf-zbtn:active, .gf-zbtn.active { background: var(--gf-accent); color: var(--accent-text-over); }
 .gf-actions { display: flex; gap: 10px; justify-content: center; margin-top: 0.7rem; }
 .gf-restart, .gf-quit { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 18px; cursor: pointer; }
 .gf-restart { background: var(--gf-accent); color: var(--accent-text-over); border-color: transparent; }
