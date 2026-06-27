@@ -921,7 +921,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			const st = (run?.state as { best?: number; tries?: number } | undefined) ?? { best: 0, tries: 0 };
 			triesRef.current = st.tries ?? 0;
 			setTries(triesRef.current);
-			if (st.best) { bestRef.current = st.best; setBest(st.best); }
+			// Only accept a real ENCODED best (≥100000 = strokes≥1); ignore legacy raw-stroke values.
+			if (st.best && st.best >= 100000) { bestRef.current = st.best; setBest(st.best); }
 			if (triesRef.current >= MAX_TRIES) setAlreadyPlayed(true);
 			else { triesRef.current += 1; setTries(triesRef.current); } // this attempt consumes a try
 		} else {
@@ -1086,7 +1087,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			)}
 
 			{mode === 'defi' && (
-				<Leaderboard key={`lb-${name}-${best ?? 0}`} game={gameId} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }} />
+				<Leaderboard key={`lb-${name}-${best ?? 0}`} game={`${gameId}-t`} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }} />
 			)}
 
 			<p className="gf-help">
