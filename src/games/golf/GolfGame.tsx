@@ -1086,7 +1086,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			)}
 
 			{mode === 'defi' && (
-				<Leaderboard game={gameId} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }} />
+				<Leaderboard key={`lb-${name}-${best ?? 0}`} game={gameId} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }} />
 			)}
 
 			<p className="gf-help">
