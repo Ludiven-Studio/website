@@ -7,6 +7,8 @@ import {
 	stepBall,
 	aimToVelocity,
 	isSettled,
+	encodeScore,
+	decodeScore,
 	type Hole,
 	type Ball,
 } from './engine';
@@ -38,6 +40,8 @@ const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const STEP = 1000 / 60;
 const SEND_HZ = 12;
 const MAX_TRIES = 10;
+const fmtTime = (s: number) =>
+	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const BALL_COLORS = [0xff3b30, 0x0a84ff, 0xffd60a, 0x30d158, 0xbf5af2];
 const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
 const AIM_Y = 0.5;
@@ -307,7 +311,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [power, setPower] = useState(0);
 	const [peerCount, setPeerCount] = useState(1);
-	const [board, setBoard] = useState<{ id: string; name: string; strokes: number; done: boolean }[]>([]);
+	const [elapsed, setElapsed] = useState(0);
+	const [board, setBoard] = useState<{ id: string; name: string; strokes: number; done: boolean; time: number }[]>([]);
 	const [overview, setOverview] = useState(false);
 	const [webglError, setWebglError] = useState(false);
 
@@ -327,9 +332,11 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const ghostsRef = useRef<Map<string, Ghost>>(new Map());
 	const labelElsRef = useRef<Map<string, HTMLDivElement>>(new Map());
 	const peerInfoRef = useRef<Map<string, { name: string; color: number }>>(new Map());
-	const boardRef = useRef<Map<string, { name: string; strokes: number; done: boolean }>>(new Map());
+	const boardRef = useRef<Map<string, { name: string; strokes: number; done: boolean; time: number }>>(new Map());
 	const strokesRef = useRef(0);
-	const bestRef = useRef<number | null>(null);
+	const bestRef = useRef<number | null>(null); // best ENCODED score (strokes+time) of the day
+	const startTimeRef = useRef(0); // performance.now() at the attempt's first stroke (0 = not started)
+	const hudAccRef = useRef(0);
 	const doneRef = useRef(false);
 	const triesRef = useRef(0);
 	const modeRef = useRef<Mode>('defi');
@@ -484,9 +491,12 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		return ghost;
 	}, []);
 
+	const curTime = () => (startTimeRef.current ? (performance.now() - startTimeRef.current) / 1000 : 0);
+
 	const syncBoard = useCallback(() => {
 		const arr = [...boardRef.current.entries()].map(([id, v]) => ({ id, ...v }));
-		arr.sort((a, b) => Number(b.done) - Number(a.done) || a.strokes - b.strokes);
+		// finished first, then fewest strokes, then fastest time (tiebreaker).
+		arr.sort((a, b) => Number(b.done) - Number(a.done) || a.strokes - b.strokes || a.time - b.time);
 		setBoard(arr);
 	}, []);
 
@@ -613,14 +623,17 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		doneRef.current = true;
 		setDone(true);
 		const sc = strokesRef.current;
-		const nb = bestRef.current == null ? sc : Math.min(bestRef.current, sc);
+		const finalSec = curTime();
+		setElapsed(finalSec);
+		const v = encodeScore(sc, finalSec); // strokes, then time as a tiebreaker
+		const nb = bestRef.current == null ? v : Math.min(bestRef.current, v);
 		bestRef.current = nb;
 		setBest(nb);
 		aimRef.current.active = false;
 		trackGame(gameId, 'game_won', { strokes: sc });
 		if (lobbyRef.current) {
-			lobbyRef.current.sendScore({ strokes: sc, done: true });
-			boardRef.current.set(lobbyRef.current.selfId, { name: name || 'Moi', strokes: sc, done: true });
+			lobbyRef.current.sendScore({ strokes: sc, done: true, time: finalSec });
+			boardRef.current.set(lobbyRef.current.selfId, { name: name || 'Moi', strokes: sc, done: true, time: finalSec });
 			syncBoard();
 		}
 		if (modeRef.current === 'defi') {
@@ -663,6 +676,12 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					sendAccRef.current = 0;
 					lobbyRef.current.sendPos({ x: ball.x, z: ball.z });
 				}
+			}
+
+			// Live chrono (throttled) while the attempt is running.
+			if (startTimeRef.current && !doneRef.current) {
+				hudAccRef.current += dt;
+				if (hudAccRef.current >= 200) { hudAccRef.current = 0; setElapsed(curTime()); }
 			}
 
 			const prev = prevBallRef.current;
@@ -772,9 +791,10 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		if (!vel) return;
 		freeCamRef.current = null; // a shot re-centres the camera on the ball
 		ballRef.current = { ...b, vx: vel.vx, vz: vel.vz };
+		if (strokesRef.current === 0) startTimeRef.current = performance.now(); // chrono starts on the first stroke
 		strokesRef.current += 1;
 		setStrokes(strokesRef.current);
-		if (lobbyRef.current) lobbyRef.current.sendScore({ strokes: strokesRef.current, done: false });
+		if (lobbyRef.current) lobbyRef.current.sendScore({ strokes: strokesRef.current, done: false, time: curTime() });
 	}, []);
 
 	/* ---- Begin / restart a hole ---- */
@@ -786,6 +806,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		camTargetRef.current = { x: hole.start.x, z: hole.start.z };
 		freeCamRef.current = null;
 		panningRef.current = false;
+		startTimeRef.current = 0;
+		setElapsed(0);
 		strokesRef.current = 0;
 		setStrokes(0);
 		doneRef.current = false;
@@ -840,7 +862,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					if (ghost) ghost.target = { x: msg.x, z: msg.z };
 				});
 				lobby.onScore((msg: ScoreMsg) => {
-					boardRef.current.set(msg.id, { name: msg.name, strokes: msg.strokes, done: msg.done });
+					boardRef.current.set(msg.id, { name: msg.name, strokes: msg.strokes, done: msg.done, time: msg.time });
 					syncBoard();
 				});
 			}
@@ -871,7 +893,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			});
 		}
 		placeBallAtStart();
-		if (lobbyRef.current) lobbyRef.current.sendScore({ strokes: 0, done: false });
+		if (lobbyRef.current) lobbyRef.current.sendScore({ strokes: 0, done: false, time: 0 });
 	}, [gameId, diffKey, placeBallAtStart]);
 
 	const play = useCallback(async (m: Mode) => {
@@ -972,6 +994,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				{phase === 'playing' && (
 					<div className="gf-hud">
 						<span className="gf-cur">{strokes} coups</span>
+						<span className="gf-best">⏱ {fmtTime(elapsed)}</span>
 						<span className="gf-best">Par {par}</span>
 						{mode === 'defi' && <span className="gf-peers">👥 {Math.min(peerCount, MAX_PLAYERS)}/{MAX_PLAYERS}</span>}
 						{mode === 'defi' && <span className="gf-peers">Essai {Math.min(tries, MAX_TRIES)}/{MAX_TRIES}</span>}
@@ -982,7 +1005,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				{phase === 'playing' && board.length > 0 && (
 					<ol className="gf-board">
 						{board.slice(0, MAX_PLAYERS).map((r) => (
-							<li key={r.id}>{r.name} · {r.done ? `${r.strokes} ✓` : `${r.strokes}…`}</li>
+							<li key={r.id}>{r.name} · {r.done ? `${r.strokes} · ${fmtTime(r.time)}` : `${r.strokes}…`}</li>
 						))}
 					</ol>
 				)}
@@ -1008,10 +1031,10 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 						<div className="gf-card">
 							<div className="gf-winmark">🏌️</div>
 							<h2>Bravo&nbsp;!</h2>
-							<p className="gf-winscore">{strokes} coups · <strong>{parTag(strokes)}</strong></p>
+							<p className="gf-winscore">{strokes} coups · {fmtTime(elapsed)} · <strong>{parTag(strokes)}</strong></p>
 							{mode === 'defi' ? (
 								alreadyPlayed || triesRef.current >= MAX_TRIES ? (
-									<p className="gf-sub">Défi terminé · meilleur <strong>{best} coups</strong> — reviens demain&nbsp;!</p>
+									<p className="gf-sub">Défi terminé · meilleur <strong>{best != null ? `${decodeScore(best).strokes} coups · ${fmtTime(decodeScore(best).timeSec)}` : '—'}</strong> — reviens demain&nbsp;!</p>
 								) : (
 									<button className="gf-play sm" onClick={newAttempt}>↻ Rejouer ({MAX_TRIES - tries} restant{MAX_TRIES - tries > 1 ? 's' : ''})</button>
 								)
@@ -1063,7 +1086,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			)}
 
 			{mode === 'defi' && (
-				<Leaderboard game={gameId} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => `${v} coups`} />
+				<Leaderboard game={gameId} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }} />
 			)}
 
 			<p className="gf-help">

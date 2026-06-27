@@ -11,6 +11,8 @@ import {
 	type Ball,
 	type Segment,
 	type Slope,
+	encodeScore,
+	decodeScore,
 } from './engine';
 import { mulberry32 } from '../prng';
 
@@ -139,6 +141,26 @@ describe('golf engine (corridor)', () => {
 		const hole = mkHole([], { x: 0, z: 0 }, 1.2);
 		const { sunk } = sim({ x: 0, z: 2.0, vx: 0, vz: -8 }, hole, 4);
 		expect(sunk).toBe(true);
+	});
+
+	it('encodeScore ranks by strokes first, then by time', () => {
+		expect(decodeScore(encodeScore(3, 42.4))).toEqual({ strokes: 3, timeSec: 42.4 });
+		expect(encodeScore(2, 999)).toBeLessThan(encodeScore(3, 0)); // fewer strokes always wins
+		expect(encodeScore(3, 12)).toBeLessThan(encodeScore(3, 30)); // tie → faster time wins
+	});
+
+	it('generates a non-self-intersecting corridor for every difficulty', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const diff = DIFFS[key];
+			const h = generateHole(mulberry32(2024 + diff.bends), diff);
+			const minSep = diff.width + 3;
+			const gap = Math.max(8, Math.ceil((minSep * 1.5) / (diff.length / (h.path.length - 1))));
+			let overlap = false;
+			for (let i = 0; i < h.path.length && !overlap; i++)
+				for (let j = i + gap; j < h.path.length; j++)
+					if (Math.hypot(h.path[i].x - h.path[j].x, h.path[i].z - h.path[j].z) < minSep) { overlap = true; break; }
+			expect(overlap, `${key} should not fold onto itself`).toBe(false);
+		}
 	});
 
 	it('friction brings the ball to rest', () => {

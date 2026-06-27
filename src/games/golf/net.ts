@@ -28,6 +28,7 @@ export interface ScoreMsg {
 	name: string;
 	strokes: number;
 	done: boolean;
+	time: number; // seconds (final time when done; running time otherwise)
 }
 
 export interface Lobby {
@@ -35,7 +36,7 @@ export interface Lobby {
 	seed: number;
 	selfId: string;
 	sendPos: (p: { x: number; z: number }) => void;
-	sendScore: (s: { strokes: number; done: boolean }) => void;
+	sendScore: (s: { strokes: number; done: boolean; time: number }) => void;
 	onPos: (cb: (m: PosMsg) => void) => void;
 	onScore: (cb: (m: ScoreMsg) => void) => void;
 	onPeers: (cb: (peers: Peer[]) => void) => void;

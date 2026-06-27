@@ -119,9 +119,9 @@ export interface DiffLevel {
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', length: 120, bends: 5, width: 15, cupR: 1.35, obstacles: 1, slopes: 1 },
-	moyen: { label: 'Moyen', length: 175, bends: 7, width: 13, cupR: 1.2, obstacles: 2, slopes: 2 },
-	difficile: { label: 'Difficile', length: 230, bends: 9, width: 11, cupR: 1.05, obstacles: 3, slopes: 3 },
+	facile: { label: 'Facile', length: 135, bends: 7, width: 15, cupR: 1.35, obstacles: 1, slopes: 1 },
+	moyen: { label: 'Moyen', length: 200, bends: 10, width: 13, cupR: 1.2, obstacles: 2, slopes: 2 },
+	difficile: { label: 'Difficile', length: 265, bends: 13, width: 11, cupR: 1.05, obstacles: 3, slopes: 3 },
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -162,32 +162,44 @@ function makeSegment(ax: number, az: number, bx: number, bz: number, ref: Vec, i
 
 export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	const hw = diff.width / 2;
-	const step = diff.length / (diff.bends - 1);
-	const base = -Math.PI / 2 + (rng() - 0.5) * 0.6; // generally heading −z
-	let heading = base;
-	let x = 0, z = 0;
-	const ctrl: Vec[] = [{ x, z }];
-	for (let i = 1; i < diff.bends; i++) {
-		heading = clamp(heading + (rng() - 0.5) * 1.5, base - 1.2, base + 1.2); // doglegs, no backtrack
-		x += Math.cos(heading) * step;
-		z += Math.sin(heading) * step;
-		ctrl.push({ x, z });
-	}
+	const baseStep = diff.length / (diff.bends - 1);
+	const SAMPLES = clamp(Math.round(diff.length / 1.6), 40, 200);
+	const minSep = diff.width + 3; // the corridor must not fold onto itself
+	// Only compare samples far enough apart in arc length that being close in space means a real fold.
+	const gap = Math.max(8, Math.ceil((minSep * 1.5) / (diff.length / (SAMPLES - 1))));
 
-	const SAMPLES = clamp(Math.round(diff.length / 1.6), 40, 180);
-	const raw: Vec[] = [];
-	for (let s = 0; s < SAMPLES; s++) raw.push(catmullOpen(ctrl, s / (SAMPLES - 1)));
-
-	const path: PathPoint[] = [];
-	for (let i = 0; i < SAMPLES; i++) {
-		const cur = raw[i];
-		const next = raw[Math.min(SAMPLES - 1, i + 1)];
-		const prev = raw[Math.max(0, i - 1)];
-		let dx = next.x - prev.x, dz = next.z - prev.z;
-		const len = Math.hypot(dx, dz) || 1;
-		dx /= len; dz /= len;
-		path.push({ x: cur.x, z: cur.z, dirX: dx, dirZ: dz, nx: -dz, nz: dx });
-	}
+	// Winding centerline: more bends, varied section lengths, sharper doglegs (no backtrack).
+	const buildPath = (): PathPoint[] => {
+		const base = -Math.PI / 2 + (rng() - 0.5) * 0.7;
+		let heading = base, x = 0, z = 0;
+		const ctrl: Vec[] = [{ x, z }];
+		for (let i = 1; i < diff.bends; i++) {
+			heading = clamp(heading + (rng() - 0.5) * 2.0, base - 1.5, base + 1.5);
+			const stp = baseStep * (0.6 + rng() * 0.9);
+			x += Math.cos(heading) * stp;
+			z += Math.sin(heading) * stp;
+			ctrl.push({ x, z });
+		}
+		const raw: Vec[] = [];
+		for (let s = 0; s < SAMPLES; s++) raw.push(catmullOpen(ctrl, s / (SAMPLES - 1)));
+		const pp: PathPoint[] = [];
+		for (let i = 0; i < SAMPLES; i++) {
+			const cur = raw[i], next = raw[Math.min(SAMPLES - 1, i + 1)], prev = raw[Math.max(0, i - 1)];
+			let dx = next.x - prev.x, dz = next.z - prev.z;
+			const len = Math.hypot(dx, dz) || 1;
+			dx /= len; dz /= len;
+			pp.push({ x: cur.x, z: cur.z, dirX: dx, dirZ: dz, nx: -dz, nz: dx });
+		}
+		return pp;
+	};
+	const selfIntersects = (pp: PathPoint[]): boolean => {
+		for (let i = 0; i < pp.length; i++)
+			for (let j = i + gap; j < pp.length; j++)
+				if (Math.hypot(pp[i].x - pp[j].x, pp[i].z - pp[j].z) < minSep) return true;
+		return false;
+	};
+	let path = buildPath();
+	for (let attempt = 0; attempt < 40 && selfIntersects(path); attempt++) path = buildPath();
 
 	// Variable half-width: smooth low-frequency variation (wider/narrower), tapering to a
 	// narrow "mouth" near the cup so the corridor opens into a wider circular green.
@@ -480,3 +492,14 @@ export function stepBall(
 
 /** Convenience for callers that want a fresh deterministic hole from a seed. */
 export const holeFromSeed = (seed: number, diff: DiffLevel): Hole => generateHole(mulberry32(seed), diff);
+
+/* ---------- leaderboard score (strokes, then time as a tiebreaker) ---------- */
+
+/** One ascending number: fewer strokes ranks first; ties are broken by faster time. */
+export function encodeScore(strokes: number, timeSec: number): number {
+	return strokes * 100000 + Math.min(99999, Math.max(0, Math.round(timeSec * 10)));
+}
+
+export function decodeScore(v: number): { strokes: number; timeSec: number } {
+	return { strokes: Math.floor(v / 100000), timeSec: (v % 100000) / 10 };
+}
