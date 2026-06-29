@@ -20,17 +20,24 @@ export interface Ball {
 	potted: boolean;
 }
 
+export interface Pocket {
+	x: number; // mouth centre (nudged inward from the rail)
+	y: number;
+	r: number; // mouth radius (drawn + used for capture)
+	anchor: Vec; // the true corner / edge point on the rail
+}
+
 export interface Table {
 	w: number;
 	h: number;
-	pockets: Vec[];
-	pocketR: number;
+	pockets: Pocket[];
 	cueStart: Vec;
 }
 
 export const BALL_R = 3.2;
-export const POCKET_R = 6.4; // capture radius
-const MOUTH = 6.6; // half-width of a pocket gap in the cushion
+export const POCKET_R = 6.4; // base size; mouth radii are derived from it
+const VR = POCKET_R * 1.6; // base mouth radius before per-pocket scaling
+const MOUTH = VR * 0.8 * 0.9 + 1; // cushion gap half-width (≈ corner mouth)
 const DECEL = 38; // rolling friction (units/s²) — lower = more inertia / longer roll
 const CUSHION_REST = 0.85; // cushion energy kept
 const BALL_REST = 0.97; // ball-ball restitution
@@ -41,13 +48,21 @@ const MAX_SPEED = 195;
 
 const len = (x: number, y: number) => Math.hypot(x, y);
 
+function makePocket(ax: number, ay: number, w: number, h: number): Pocket {
+	const isCorner = (ax === 0 || ax === w) && (ay === 0 || ay === h);
+	const r = (isCorner ? VR * 0.8 : VR * 0.7) * 0.9; // corners −20%, sides −30%, all −10%
+	const ox = ax === 0 ? r * 0.34 : ax === w ? -r * 0.34 : 0;
+	const oy = ay === 0 ? r * 0.34 : ay === h ? -r * 0.34 : 0;
+	return { x: ax + ox, y: ay + oy, r, anchor: { x: ax, y: ay } };
+}
+
 export function makeTable(): Table {
 	const w = 200, h = 100;
 	return {
-		w, h, pocketR: POCKET_R, cueStart: { x: 50, y: 50 },
+		w, h, cueStart: { x: 50, y: 50 },
 		pockets: [
-			{ x: 0, y: 0 }, { x: w, y: 0 }, { x: 0, y: h }, { x: w, y: h },
-			{ x: w / 2, y: 0 }, { x: w / 2, y: h },
+			makePocket(0, 0, w, h), makePocket(w, 0, w, h), makePocket(0, h, w, h), makePocket(w, h, w, h),
+			makePocket(w / 2, 0, w, h), makePocket(w / 2, h, w, h),
 		],
 	};
 }
