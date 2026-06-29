@@ -70,15 +70,16 @@ describe('billard engine', () => {
 		expect(Math.hypot(vMax.vx, vMax.vy)).toBeCloseTo(Math.hypot(vBig.vx, vBig.vy), 5); // capped
 	});
 
-	it('generateRack is deterministic and places 4 balls (cue + 3 colours) with no overlap, in bounds', () => {
+	it('generateRack is deterministic and places cue + N colour balls (3/4/5) with no overlap, in bounds', () => {
 		const t = makeTable();
 		for (const key of Object.keys(DIFFS)) {
+			const n = DIFFS[key].balls;
 			const a = generateRack(t, mulberry32(123), DIFFS[key]);
 			const b = generateRack(t, mulberry32(123), DIFFS[key]);
 			expect(a).toEqual(b);
-			expect(a.length).toBe(4);
+			expect(a.length).toBe(n + 1);
 			expect(a.filter((x) => x.kind === 'cue').length).toBe(1);
-			expect(new Set(a.filter((x) => x.kind === 'color').map((x) => x.color))).toEqual(new Set([0, 1, 2]));
+			expect(new Set(a.filter((x) => x.kind === 'color').map((x) => x.color))).toEqual(new Set(Array.from({ length: n }, (_, i) => i)));
 			for (const ba of a) {
 				expect(ba.x).toBeGreaterThanOrEqual(0);
 				expect(ba.x).toBeLessThanOrEqual(t.w);

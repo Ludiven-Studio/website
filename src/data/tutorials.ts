@@ -109,7 +109,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '↩️', title: 'Rebonds & fantômes', body: 'La balle rebondit sur les bords et les murs : sers-t\'en pour contourner les obstacles. Au défi du jour, même trou pour tous, 10 essais, et tu vois les balles fantômes des autres joueurs en direct (classement au moins de coups).' },
 	],
 	billard: [
-		{ emoji: '🎱', title: 'Le but', body: 'Rentre les 3 boules colorées dans les trous à l\'aide de la boule blanche, en un minimum de coups.' },
+		{ emoji: '🎱', title: 'Le but', body: 'Rentre toutes les boules colorées dans les trous à l\'aide de la boule blanche, en un minimum de coups (3 en facile, 4 en moyen, 5 en difficile).' },
 		{ emoji: '🎯', title: 'Viser à la fronde', body: 'Glisse depuis la boule blanche et tire dans le sens OPPOSÉ à la direction voulue : plus tu tires loin, plus le coup est puissant. Relâche pour frapper. La boule rebondit sur les bandes.' },
 		{ emoji: '⚪', title: 'Fausse blanche', body: 'Si la boule blanche tombe dans un trou, elle revient à sa place de départ et coûte 1 coup de pénalité. Au défi du jour, même table pour tous ; le chrono départage les ex æquo.' },
 	],

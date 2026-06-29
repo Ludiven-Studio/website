@@ -31,10 +31,10 @@ export interface Table {
 export const BALL_R = 3.2;
 export const POCKET_R = 6.4; // capture radius
 const MOUTH = 6.6; // half-width of a pocket gap in the cushion
-const DECEL = 58; // rolling friction (units/s²)
-const CUSHION_REST = 0.82; // cushion energy kept
-const BALL_REST = 0.96; // ball-ball restitution
-const SETTLE = 3; // speed below which a ball is "at rest"
+const DECEL = 38; // rolling friction (units/s²) — lower = more inertia / longer roll
+const CUSHION_REST = 0.85; // cushion energy kept
+const BALL_REST = 0.97; // ball-ball restitution
+const SETTLE = 2.4; // speed below which a ball is "at rest"
 const MIN_PULL = 4;
 const MAX_PULL = 60;
 const MAX_SPEED = 195;
@@ -56,20 +56,21 @@ export function makeTable(): Table {
 
 export interface DiffLevel {
 	label: string;
+	balls: number; // number of colour balls to pot
 	spread: number; // min separation between balls
 	nearCushion: boolean; // allow balls close to the rails
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', spread: 28, nearCushion: false },
-	moyen: { label: 'Moyen', spread: 20, nearCushion: false },
-	difficile: { label: 'Difficile', spread: 14, nearCushion: true },
+	facile: { label: 'Facile', balls: 3, spread: 26, nearCushion: false },
+	moyen: { label: 'Moyen', balls: 4, spread: 20, nearCushion: false },
+	difficile: { label: 'Difficile', balls: 5, spread: 14, nearCushion: true },
 };
 
 const nearPocket = (x: number, y: number, t: Table) =>
 	t.pockets.some((p) => len(x - p.x, y - p.y) < t.pocketR * 2.2);
 
-/** Cue ball + 3 colour balls, seeded, no overlap, inside the cloth, off the pockets. */
+/** Cue ball + `diff.balls` colour balls, seeded, no overlap, inside the cloth, off the pockets. */
 export function generateRack(table: Table, rng: Rng, diff: DiffLevel): Ball[] {
 	const cue: Ball = { x: table.cueStart.x, y: table.cueStart.y, vx: 0, vy: 0, r: BALL_R, kind: 'cue', color: -1, potted: false };
 	const balls: Ball[] = [cue];
@@ -77,18 +78,30 @@ export function generateRack(table: Table, rng: Rng, diff: DiffLevel): Ball[] {
 	const mY = diff.nearCushion ? BALL_R + 3 : 14;
 	const xMin = Math.max(mX, table.w * 0.42), xMax = table.w - mX;
 	const yMin = mY, yMax = table.h - mY;
+	const hardSep = 2 * BALL_R + 1.5; // bare minimum so balls never overlap
 
-	for (const color of [0, 1, 2]) {
+	for (let color = 0; color < diff.balls; color++) {
 		let spot: Vec | null = null;
-		for (let tries = 0; tries < 240; tries++) {
+		for (let tries = 0; tries < 500; tries++) {
 			const x = xMin + rng() * (xMax - xMin);
 			const y = yMin + rng() * (yMax - yMin);
 			if (nearPocket(x, y, table)) continue;
-			if (balls.some((b) => len(b.x - x, b.y - y) < diff.spread)) continue;
+			const minSep = tries < 260 ? diff.spread : hardSep; // relax to "just no overlap"
+			if (balls.some((b) => len(b.x - x, b.y - y) < minSep)) continue;
 			spot = { x, y };
 			break;
 		}
-		if (!spot) spot = { x: xMin + rng() * (xMax - xMin), y: yMin + rng() * (yMax - yMin) };
+		if (!spot) {
+			// deterministic last resort: scan a grid for any free, non-overlapping cell
+			scan: for (let gy = yMin; gy <= yMax; gy += hardSep)
+				for (let gx = xMin; gx <= xMax; gx += hardSep) {
+					if (nearPocket(gx, gy, table)) continue;
+					if (balls.some((b) => len(b.x - gx, b.y - gy) < hardSep)) continue;
+					spot = { x: gx, y: gy };
+					break scan;
+				}
+		}
+		if (!spot) spot = { x: xMin, y: yMin };
 		balls.push({ x: spot.x, y: spot.y, vx: 0, vy: 0, r: BALL_R, kind: 'color', color, potted: false });
 	}
 	return balls;

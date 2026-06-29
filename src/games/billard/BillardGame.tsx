@@ -22,7 +22,7 @@ type Status = 'aiming' | 'rolling' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const STEP = 1000 / 60;
 const GRAB_R = 18; // table units: start aiming when grabbing near the cue ball
-const COLORS = ['#e6566f', '#f0a830', '#5b8def']; // colour balls 0,1,2
+const COLORS = ['#e6566f', '#f0a830', '#5b8def', '#2f9e6f', '#9b6cf0']; // colour balls 0..4
 const CUE_COLOR = '#f4f4f2';
 const FELT = '#0f7a52';
 const FELT_DARK = '#0c6644';
@@ -78,7 +78,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		rollingRef.current = false;
 		aimRef.current = null;
 		setStrokes(0);
-		setRemaining(3);
+		setRemaining(ballsRef.current.filter((b) => b.kind === 'color').length);
 		setElapsed(0);
 		setStat('aiming');
 	}, []);
@@ -253,9 +253,17 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			ctx.fillStyle = FELT_DARK;
 			ctx.fillRect(0, 0, t.w, 1.5); ctx.fillRect(0, t.h - 1.5, t.w, 1.5);
 			ctx.fillRect(0, 0, 1.5, t.h); ctx.fillRect(t.w - 1.5, 0, 1.5, t.h);
-			// pockets
-			ctx.fillStyle = '#1a1a1a';
-			for (const p of t.pockets) { ctx.beginPath(); ctx.arc(p.x, p.y, t.pocketR, 0, Math.PI * 2); ctx.fill(); }
+			// pockets — drawn larger than the capture radius and nudged inward so the
+			// corner/edge openings read as full mouths instead of tiny clipped arcs.
+			const VR = t.pocketR * 1.6;
+			for (const p of t.pockets) {
+				const ox = p.x === 0 ? VR * 0.34 : p.x === t.w ? -VR * 0.34 : 0;
+				const oy = p.y === 0 ? VR * 0.34 : p.y === t.h ? -VR * 0.34 : 0;
+				ctx.fillStyle = '#161616';
+				ctx.beginPath(); ctx.arc(p.x + ox, p.y + oy, VR, 0, Math.PI * 2); ctx.fill();
+				ctx.fillStyle = 'rgba(0,0,0,0.35)'; // soft inner shadow rim
+				ctx.beginPath(); ctx.arc(p.x + ox, p.y + oy, VR * 0.78, 0, Math.PI * 2); ctx.fill();
+			}
 			// balls
 			for (const b of ballsRef.current) {
 				if (b.potted) continue;
@@ -375,7 +383,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. Rentre les 3 boules colorées. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
+				c'est puissant. Rentre toutes les boules colorées. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
 			</p>
 
 			{daily && <Leaderboard
