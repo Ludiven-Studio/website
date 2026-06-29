@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { DIFFS, generateQuestion, cellKey, COLORS, ROT_VISIBLE, type Question, type Cell, type Shape } from './engine';
+import { DIFFS, generateQuestion, cellKey, COLORS, type Question, type Cell, type Elt } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
@@ -30,36 +30,81 @@ interface DailyState {
 const dailyQ = (seed: number, diffIndex: number, i: number): Question =>
 	generateQuestion(DIFFS[DIFF_ORDER[diffIndex] ?? 'facile'], mulberry32((seed + i * 0x9e3779b1) >>> 0));
 
-/* ---------- Figure renderer (SVG glyphs in a 0..100 viewBox) ---------- */
+/* ---------- Figure renderer (geometry → SVG, 0..100 viewBox) ---------- */
 
-const GLYPHS: Record<Shape, string> = {
-	circle: '<circle cx="50" cy="50" r="40"/>',
-	square: '<rect x="14" y="14" width="72" height="72" rx="6"/>',
-	triangle: '<polygon points="50,10 90,86 10,86"/>',
-	diamond: '<polygon points="50,8 92,50 50,92 8,50"/>',
-	star: '<polygon points="50,4 61,37 96,37 68,58 79,92 50,71 21,92 32,58 4,37 39,37"/>',
-	hexagon: '<polygon points="26,8 74,8 98,50 74,92 26,92 2,50"/>',
-	heart: '<path d="M50 86 C16 60 12 34 30 23 C42 16 50 25 50 33 C50 25 58 16 70 23 C88 34 84 60 50 86 Z"/>',
-	plus: '<polygon points="38,12 62,12 62,38 88,38 88,62 62,62 62,88 38,88 38,62 12,62 12,38 38,38"/>',
-	arrow: '<polygon points="10,38 56,38 56,20 92,50 56,80 56,62 10,62"/>',
-	semicircle: '<path d="M12 64 a38 38 0 0 1 76 0 Z"/>',
-	quarter: '<path d="M18 82 L82 82 A64 64 0 0 0 18 18 Z"/>',
-};
+function regPoly(cx: number, cy: number, r: number, n: number, rotDeg: number): string {
+	const pts: string[] = [];
+	for (let i = 0; i < n; i++) {
+		const a = ((rotDeg + (360 / n) * i) * Math.PI) / 180;
+		pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+	}
+	return pts.join(' ');
+}
 
-function Figure({ cell, size = 30 }: { cell: Cell; size?: number }) {
-	const color = COLORS[cell.color] ?? COLORS[0];
-	const n = Math.max(1, Math.min(4, cell.count));
-	const mini = n === 1 ? size : n <= 2 ? Math.round(size * 0.62) : Math.round(size * 0.48);
-	const cols = n === 1 ? 1 : 2; // 2,3,4 → mini-grid inside the cell
-	const rot = ROT_VISIBLE[cell.shape] ? cell.rotation : 0;
+function starPts(cx: number, cy: number, r: number): string {
+	const pts: string[] = [];
+	for (let i = 0; i < 10; i++) {
+		const rr = i % 2 === 0 ? r : r * 0.45;
+		const a = ((-90 + 36 * i) * Math.PI) / 180;
+		pts.push(`${(cx + rr * Math.cos(a)).toFixed(1)},${(cy + rr * Math.sin(a)).toFixed(1)}`);
+	}
+	return pts.join(' ');
+}
+
+function ElementShape({ e }: { e: Elt }) {
+	const col = COLORS[e.color] ?? COLORS[0];
+	const solid = e.filled || e.kind === 'dot';
+	const common = { fill: solid ? col : 'none', stroke: solid ? 'none' : col, strokeWidth: Math.max(2, e.size * 0.34), strokeLinejoin: 'round' as const };
+	switch (e.kind) {
+		case 'dot': return <circle cx={e.x} cy={e.y} r={e.size} fill={col} />;
+		case 'circle': return <circle cx={e.x} cy={e.y} r={e.size} {...common} />;
+		case 'square': return <rect x={e.x - e.size} y={e.y - e.size} width={e.size * 2} height={e.size * 2} rx={2} {...common} />;
+		case 'triangle': return <polygon points={regPoly(e.x, e.y, e.size * 1.15, 3, -90)} {...common} />;
+		case 'diamond': return <polygon points={regPoly(e.x, e.y, e.size * 1.1, 4, -90)} {...common} />;
+		case 'hexagon': return <polygon points={regPoly(e.x, e.y, e.size * 1.1, 6, -90)} {...common} />;
+		case 'star': return <polygon points={starPts(e.x, e.y, e.size * 1.2)} {...common} />;
+		default: return null;
+	}
+}
+
+function Frame({ cell }: { cell: Cell }) {
+	const col = COLORS[cell.color] ?? COLORS[0];
+	const s = { fill: 'none', stroke: col, strokeWidth: 3, strokeLinejoin: 'round' as const };
+	switch (cell.container) {
+		case 'triangle': return <polygon points="50,12 88,84 12,84" {...s} />;
+		case 'square': return <rect x="14" y="14" width="72" height="72" rx="6" {...s} />;
+		case 'circle': return <circle cx="50" cy="50" r="38" {...s} />;
+		case 'wheel8':
+			return (
+				<>
+					<circle cx="50" cy="50" r="38" {...s} />
+					{[0, 1, 2, 3].map((k) => {
+						const a = (k * 45 * Math.PI) / 180;
+						const dx = 38 * Math.cos(a), dy = 38 * Math.sin(a);
+						return <line key={k} x1={50 - dx} y1={50 - dy} x2={50 + dx} y2={50 + dy} stroke={col} strokeWidth={3} />;
+					})}
+					<circle cx="50" cy="50" r="4" fill={col} />
+				</>
+			);
+		case 'quad':
+			return (
+				<>
+					<circle cx="50" cy="50" r="38" {...s} />
+					<line x1="50" y1="12" x2="50" y2="88" stroke={col} strokeWidth={3} />
+					<line x1="12" y1="50" x2="88" y2="50" stroke={col} strokeWidth={3} />
+				</>
+			);
+		default:
+			return null;
+	}
+}
+
+function Figure({ cell }: { cell: Cell }) {
 	return (
-		<span className="mx-cell" style={{ gridTemplateColumns: `repeat(${cols}, auto)` }}>
-			{Array.from({ length: n }).map((_, i) => (
-				<svg key={i} className="mx-shape" width={mini} height={mini} viewBox="0 0 100 100" aria-hidden="true">
-					<g fill={color} transform={`rotate(${rot} 50 50)`} dangerouslySetInnerHTML={{ __html: GLYPHS[cell.shape] }} />
-				</svg>
-			))}
-		</span>
+		<svg className="mx-fig" viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
+			<Frame cell={cell} />
+			{cell.elements.map((e, i) => <ElementShape key={i} e={e} />)}
+		</svg>
 	);
 }
 
@@ -297,7 +342,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				<div className={`mx-grid ${armed ? 'blurred' : ''}`} aria-label="Matrice">
 					{question.grid.map((cell, i) => (
 						<span key={i} className={`mx-gcell ${i === question.answerIndex ? 'q' : ''}`}>
-							{i === question.answerIndex ? '?' : <Figure cell={cell} size={30} />}
+							{i === question.answerIndex ? '?' : <Figure cell={cell} />}
 						</span>
 					))}
 				</div>
@@ -307,7 +352,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				<div className={`mx-options ${armed ? 'blurred' : ''}`}>
 					{question.options.map((c, i) => (
 						<button key={i} className={optionClass(i)} onClick={() => choose(i)} disabled={chosen !== null || eliminated.includes(i) || armed} aria-label={`Option ${i + 1}`}>
-							<Figure cell={c} size={28} />
+							<Figure cell={c} />
 						</button>
 					))}
 				</div>
@@ -380,21 +425,20 @@ const CSS = `
 .mx-gcell {
   aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center;
   border-radius: 12px; background: var(--gray-999); border: 1.5px solid var(--gray-800);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm); padding: 7%; box-sizing: border-box;
 }
 .mx-gcell.q { color: var(--mx-accent); border-color: var(--mx-accent); border-style: dashed; font-weight: 800; font-size: 28px; }
 
+.mx-fig { display: block; width: 100%; height: 100%; }
 .mx-prompt { color: var(--gray-300); font-size: 12.5px; margin: 1.1rem 0 0.75rem; text-align: center; }
 .mx-options { width: 100%; max-width: 340px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.mx-opt { aspect-ratio: 1 / 1; border-radius: 14px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); display: flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; transition: transform 0.08s ease, background 0.12s ease, border-color 0.12s ease; }
+.mx-opt { aspect-ratio: 1 / 1; border-radius: 14px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); display: flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; padding: 9%; box-sizing: border-box; transition: transform 0.08s ease, background 0.12s ease, border-color 0.12s ease; }
 .mx-opt:hover:not(:disabled) { border-color: var(--mx-accent); }
 .mx-opt:active:not(:disabled) { transform: scale(0.96); }
 .mx-opt.good { background: var(--mx-ok); border-color: var(--mx-ok); }
 .mx-opt.bad { background: var(--mx-bad); border-color: var(--mx-bad); }
 .mx-opt.dim { opacity: 0.42; }
 
-.mx-cell { display: grid; gap: 3px; place-items: center; place-content: center; }
-.mx-shape { display: block; }
 
 .mx-grid.blurred, .mx-options.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
 .mx-overlay { position: absolute; inset: -8px; z-index: 2; display: flex; align-items: center; justify-content: center; }
