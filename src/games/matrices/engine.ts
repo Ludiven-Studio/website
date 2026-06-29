@@ -107,7 +107,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 };
 
 /** Number of multiple-choice options (incl. the correct one). */
-export const N_OPTIONS = 4;
+export const N_OPTIONS = 3;
 
 export interface Question {
 	grid: Cell[]; // 9 cells (r*3+c); index 8 is the answer cell
