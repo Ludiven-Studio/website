@@ -45,10 +45,12 @@ function shuffle<T>(arr: T[], rng: Rng): T[] {
 	return r;
 }
 
-/** Canonical identity of a cell — order-independent, rounded to pixels. */
+/** Canonical identity of a cell — matches the rendered pixels 1:1.
+ *  Order-independent, rounded; exact overlaps collapse (same drawing). */
 export function cellKey(c: Cell): string {
-	const els = c.elements
-		.map((e) => `${Math.round(e.x)},${Math.round(e.y)},${e.kind},${e.filled ? 1 : 0},${e.color},${Math.round(e.size)}`)
+	const els = [
+		...new Set(c.elements.map((e) => `${Math.round(e.x)},${Math.round(e.y)},${e.kind},${e.filled ? 1 : 0},${e.color},${Math.round(e.size)}`)),
+	]
 		.sort()
 		.join(';');
 	return `${c.container}|${c.color}|${els}`;
@@ -237,6 +239,12 @@ const TEMPLATES: Record<TemplateName, (d: DiffLevel, rng: Rng) => Gen> = {
 
 const cloneCell = (c: Cell): Cell => ({ container: c.container, color: c.color, elements: c.elements.map((e) => ({ ...e })) });
 
+/** Candidate positions not already occupied in `cell` (avoids visual overlaps). */
+function freePositions(cell: Cell, pos: { x: number; y: number }[]): { x: number; y: number }[] {
+	const occ = new Set(cell.elements.map((e) => `${Math.round(e.x)},${Math.round(e.y)}`));
+	return pos.filter((p) => !occ.has(`${Math.round(p.x)},${Math.round(p.y)}`));
+}
+
 /** A plausible wrong cell: perturb one aspect of the answer using values seen in the grid. */
 function mutate(answer: Cell, grid: Cell[], rng: Rng): Cell | null {
 	const out = cloneCell(answer);
@@ -260,14 +268,17 @@ function mutate(answer: Cell, grid: Cell[], rng: Rng): Cell | null {
 			break;
 		}
 		case 'move': {
-			const np = pick(rng, usedPos);
-			el.x = np.x;
-			el.y = np.y;
+			const free = freePositions(out, usedPos);
+			if (free.length) { const np = pick(rng, free); el.x = np.x; el.y = np.y; }
+			else el.color = pick(rng, usedColors.length > 1 ? usedColors : PALETTE);
 			break;
 		}
-		default:
-			if (out.elements.length > 1 && rng() < 0.5) out.elements.splice(i, 1);
-			else { const np = pick(rng, usedPos); out.elements.push({ ...el, x: np.x, y: np.y }); }
+		default: {
+			const free = freePositions(out, usedPos);
+			if (out.elements.length > 1 && (rng() < 0.5 || !free.length)) out.elements.splice(i, 1);
+			else if (free.length) { const np = pick(rng, free); out.elements.push({ ...el, x: np.x, y: np.y }); }
+			else if (el.kind !== 'dot') el.filled = !el.filled;
+		}
 	}
 	return out;
 }
