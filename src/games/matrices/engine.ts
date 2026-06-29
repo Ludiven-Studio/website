@@ -108,9 +108,12 @@ export const DIFFS: Record<string, DiffLevel> = {
 	difficile: { label: 'Difficile', simpleVary: 4, allowLatin: true, templates: ['dots', 'wheel', 'quad', 'simple'] },
 };
 
+/** Number of multiple-choice options (incl. the correct one). */
+export const N_OPTIONS = 4;
+
 export interface Question {
 	grid: Cell[]; // 9 cells (r*3+c); index 8 is the answer cell
-	options: Cell[]; // 6 choices, shuffled, exactly one == grid[8]
+	options: Cell[]; // N_OPTIONS choices, shuffled, exactly one == grid[8]
 	answerIndex: number;
 	rule: string;
 }
@@ -245,39 +248,75 @@ function freePositions(cell: Cell, pos: { x: number; y: number }[]): { x: number
 	return pos.filter((p) => !occ.has(`${Math.round(p.x)},${Math.round(p.y)}`));
 }
 
-/** A plausible wrong cell: perturb one aspect of the answer using values seen in the grid. */
+const uniq = <T>(a: T[]): T[] => [...new Set(a)];
+const pickOther = <T>(rng: Rng, arr: T[], cur: T): T => {
+	const c = arr.filter((x) => x !== cur);
+	return c.length ? pick(rng, c) : cur;
+};
+
+/**
+ * A *plausible* wrong cell: the answer with ONE attribute nudged — and only using
+ * values that already appear in the grid, on dimensions that actually vary. This
+ * keeps distractors "in vocabulary" (no brand-new colour/shape/fill) and close to
+ * the answer, so options share most of their look with the correct one.
+ */
 function mutate(answer: Cell, grid: Cell[], rng: Rng): Cell | null {
 	const out = cloneCell(answer);
 	if (out.elements.length === 0) return null;
-	const usedColors = [...new Set(grid.flatMap((g) => g.elements.map((e) => e.color)))];
-	const usedKinds = [...new Set(grid.flatMap((g) => g.elements.map((e) => e.kind)))];
-	const usedPos = grid.flatMap((g) => g.elements.map((e) => ({ x: e.x, y: e.y })));
+	const els = grid.flatMap((g) => g.elements);
+	const colorsUsed = uniq(els.map((e) => e.color));
+	const kindsUsed = uniq(els.map((e) => e.kind));
+	const fillsUsed = uniq(els.map((e) => e.filled));
+	const countsUsed = uniq(grid.map((g) => g.elements.length));
+	const posUsed = els.map((e) => ({ x: e.x, y: e.y }));
+
+	// Only offer mutations on dimensions that genuinely vary across the grid.
+	const ops: string[] = [];
+	if (colorsUsed.length > 1) ops.push('color');
+	if (kindsUsed.length > 1) ops.push('kind');
+	if (fillsUsed.length > 1) ops.push('fill');
+	if (countsUsed.length > 1) ops.push('count');
+	if (freePositions(out, posUsed).length > 0) ops.push('move');
+	if (out.elements.length > 1 && (colorsUsed.length > 1 || kindsUsed.length > 1)) ops.push('swap');
+	if (ops.length === 0) return null; // nothing on-theme → caller falls back to real grid cells
+
 	const i = Math.floor(rng() * out.elements.length);
 	const el = out.elements[i];
-	switch (pick(rng, ['color', 'fill', 'kind', 'move', 'count'])) {
+	switch (pick(rng, ops)) {
 		case 'color':
-			el.color = pick(rng, usedColors.length > 1 ? usedColors : PALETTE);
+			el.color = pickOther(rng, colorsUsed, el.color);
+			break;
+		case 'kind':
+			el.kind = pickOther(rng, kindsUsed, el.kind);
 			break;
 		case 'fill':
-			if (el.kind !== 'dot') el.filled = !el.filled;
-			else el.color = pick(rng, usedColors.length > 1 ? usedColors : PALETTE);
+			el.filled = !el.filled; // both fill states exist in the grid
 			break;
-		case 'kind': {
-			const alt = (usedKinds.length > 1 ? usedKinds : (['circle', 'square', 'triangle'] as EltKind[])).filter((k) => k !== el.kind);
-			if (alt.length) el.kind = pick(rng, alt);
+		case 'count': {
+			let target = pickOther(rng, countsUsed, out.elements.length);
+			while (out.elements.length > target && out.elements.length > 1) out.elements.pop();
+			while (out.elements.length < target) {
+				const free = freePositions(out, posUsed);
+				if (!free.length) break;
+				const np = pick(rng, free);
+				out.elements.push({ ...pick(rng, out.elements), x: np.x, y: np.y });
+			}
 			break;
 		}
 		case 'move': {
-			const free = freePositions(out, usedPos);
-			if (free.length) { const np = pick(rng, free); el.x = np.x; el.y = np.y; }
-			else el.color = pick(rng, usedColors.length > 1 ? usedColors : PALETTE);
+			const np = pick(rng, freePositions(out, posUsed));
+			el.x = np.x;
+			el.y = np.y;
 			break;
 		}
 		default: {
-			const free = freePositions(out, usedPos);
-			if (out.elements.length > 1 && (rng() < 0.5 || !free.length)) out.elements.splice(i, 1);
-			else if (free.length) { const np = pick(rng, free); out.elements.push({ ...el, x: np.x, y: np.y }); }
-			else if (el.kind !== 'dot') el.filled = !el.filled;
+			// swap appearance between two elements → same vocabulary, plausible re-arrangement
+			let j = Math.floor(rng() * out.elements.length);
+			if (j === i) j = (j + 1) % out.elements.length;
+			const a = out.elements[i], b = out.elements[j];
+			[a.color, b.color] = [b.color, a.color];
+			[a.kind, b.kind] = [b.kind, a.kind];
+			[a.filled, b.filled] = [b.filled, a.filled];
 		}
 	}
 	return out;
@@ -301,20 +340,25 @@ export function generateQuestion(diff: DiffLevel, rng: Rng = Math.random, force?
 	const grid = gen.grid;
 	const answer = grid[8];
 	const byKey = new Map<string, Cell>([[cellKey(answer), answer]]);
+	// 1) plausible near-misses (answer with one in-vocabulary attribute nudged)
 	let guard = 0;
-	while (byKey.size < 6 && guard++ < 240) {
+	while (byKey.size < N_OPTIONS && guard++ < 240) {
 		const m = mutate(answer, grid, rng);
 		if (m) byKey.set(cellKey(m), m);
 	}
+	// 2) real cells from elsewhere in the grid (also fully on-theme)
 	for (const cell of shuffle(grid.slice(0, 8), rng)) {
-		if (byKey.size >= 6) break;
+		if (byKey.size >= N_OPTIONS) break;
 		byKey.set(cellKey(cell), cell);
 	}
+	// 3) last-resort: recolour within the grid's palette
+	const colorsUsed = uniq(grid.flatMap((g) => g.elements.map((e) => e.color)));
 	let k = 1;
-	while (byKey.size < 6) {
+	while (byKey.size < N_OPTIONS) {
 		const m = cloneCell(answer);
-		if (m.elements[0]) m.elements[0].color = mod((m.elements[0].color ?? 0) + k++, COLORS.length);
-		else m.color = mod(m.color + k++, COLORS.length);
+		const palette = colorsUsed.length ? colorsUsed : [...Array(COLORS.length).keys()];
+		if (m.elements[0]) m.elements[0].color = palette[k++ % palette.length];
+		else m.color = palette[k++ % palette.length];
 		byKey.set(cellKey(m), m);
 	}
 

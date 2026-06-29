@@ -41,7 +41,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	matrices: [
 		{ emoji: '🧩', title: 'Le but', body: 'Une grille 3×3 de figures suit une logique cachée ; une case manque. Trouve la figure qui la complète, façon test de QI.' },
 		{ emoji: '🔍', title: 'La logique', body: 'Observe ce qui change le long des lignes et des colonnes : la forme, la couleur, le nombre d\'éléments, l\'orientation. Souvent chaque ligne (ou colonne) contient les 3 valeurs, ou bien ça progresse.' },
-		{ emoji: '✅', title: 'Comment jouer', body: 'Choisis la bonne figure parmi les 6 options. Indice élimine une mauvaise option ; « Voir la réponse » dévoile la logique. Au défi du jour, résous-en 3 le plus vite possible.' },
+		{ emoji: '✅', title: 'Comment jouer', body: 'Choisis la bonne figure parmi les 4 options. Indice élimine une mauvaise option ; « Voir la réponse » dévoile la logique. Au défi du jour, résous-en 3 le plus vite possible.' },
 	],
 	symboles: [
 		{ emoji: '🔷', title: 'Le but', body: 'Une suite de symboles obéit à une logique cachée : devine le symbole qui vient ensuite.' },

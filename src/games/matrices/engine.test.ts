@@ -1,20 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { DIFFS, generateQuestion, cellKey, type TemplateName } from './engine';
+import { DIFFS, generateQuestion, cellKey, N_OPTIONS, type TemplateName } from './engine';
 import { mulberry32 } from '../prng';
 
 const ALL_TEMPLATES: TemplateName[] = ['simple', 'dots', 'wheel', 'quad'];
 
 describe('matrices engine', () => {
-	it('produces a 3×3 grid with exactly one correct option among six, all distinct', () => {
+	it('produces a 3×3 grid with exactly one correct option, all visually distinct', () => {
 		for (const key of Object.keys(DIFFS)) {
 			for (let s = 0; s < 40; s++) {
 				const q = generateQuestion(DIFFS[key], mulberry32(1000 * (s + 1) + DIFFS[key].simpleVary));
 				expect(q.grid.length, `${key} grid size`).toBe(9);
-				expect(q.options.length, `${key} options`).toBe(6);
+				expect(q.options.length, `${key} options`).toBe(N_OPTIONS);
 				expect(q.answerIndex).toBe(8);
 				const answerKey = cellKey(q.grid[8]);
 				const keys = q.options.map(cellKey);
-				expect(new Set(keys).size, `${key} options distinct`).toBe(6);
+				expect(new Set(keys).size, `${key} options distinct`).toBe(N_OPTIONS);
 				expect(keys.filter((k) => k === answerKey).length, `${key} exactly one correct`).toBe(1);
 			}
 		}
@@ -44,7 +44,7 @@ describe('matrices engine', () => {
 				expect(expectedContainer[t](q.grid[8].container), `${t} container`).toBe(true);
 				const answerKey = cellKey(q.grid[8]);
 				const keys = q.options.map(cellKey);
-				expect(new Set(keys).size, `${t} options distinct`).toBe(6);
+				expect(new Set(keys).size, `${t} options distinct`).toBe(N_OPTIONS);
 				expect(keys.filter((k) => k === answerKey).length, `${t} one correct`).toBe(1);
 			}
 		}

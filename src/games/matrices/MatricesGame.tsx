@@ -431,7 +431,7 @@ const CSS = `
 
 .mx-fig { display: block; width: 100%; height: 100%; }
 .mx-prompt { color: var(--gray-300); font-size: 12.5px; margin: 1.1rem 0 0.75rem; text-align: center; }
-.mx-options { width: 100%; max-width: 340px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.mx-options { width: 100%; max-width: 260px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .mx-opt { aspect-ratio: 1 / 1; border-radius: 14px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); display: flex; align-items: center; justify-content: center; font: inherit; cursor: pointer; padding: 9%; box-sizing: border-box; transition: transform 0.08s ease, background 0.12s ease, border-color 0.12s ease; }
 .mx-opt:hover:not(:disabled) { border-color: var(--mx-accent); }
 .mx-opt:active:not(:disabled) { transform: scale(0.96); }
