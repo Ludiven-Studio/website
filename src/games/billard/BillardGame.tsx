@@ -258,13 +258,17 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const VR = t.pocketR * 1.6;
 			for (const p of t.pockets) {
 				const isCorner = (p.x === 0 || p.x === t.w) && (p.y === 0 || p.y === t.h);
-				const vr = isCorner ? VR : VR * 0.7; // side pockets 30% smaller
+				const vr = isCorner ? VR * 0.8 : VR * 0.7; // corners −20%, side pockets −30%
 				const ox = p.x === 0 ? vr * 0.34 : p.x === t.w ? -vr * 0.34 : 0;
 				const oy = p.y === 0 ? vr * 0.34 : p.y === t.h ? -vr * 0.34 : 0;
+				const cx = p.x + ox, cy = p.y + oy;
 				ctx.fillStyle = '#161616';
-				ctx.beginPath(); ctx.arc(p.x + ox, p.y + oy, vr, 0, Math.PI * 2); ctx.fill();
+				ctx.beginPath(); ctx.arc(cx, cy, vr, 0, Math.PI * 2); ctx.fill();
 				ctx.fillStyle = 'rgba(0,0,0,0.35)'; // soft inner shadow rim
-				ctx.beginPath(); ctx.arc(p.x + ox, p.y + oy, vr * 0.78, 0, Math.PI * 2); ctx.fill();
+				ctx.beginPath(); ctx.arc(cx, cy, vr * 0.78, 0, Math.PI * 2); ctx.fill();
+				ctx.lineWidth = 1.6; // dark-green rim around the hole
+				ctx.strokeStyle = '#0a3d29';
+				ctx.beginPath(); ctx.arc(cx, cy, vr, 0, Math.PI * 2); ctx.stroke();
 			}
 			// balls
 			for (const b of ballsRef.current) {
