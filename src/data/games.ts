@@ -167,6 +167,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'billard',
+		title: 'Billard',
+		pitch: 'Vise à la fronde et rentre les 3 boules colorées avec la blanche. Rebonds sur les bandes, en un minimum de coups.',
+		icon: 'billard',
+		href: '/jeux/billard',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'drift',
 		title: 'Drift',
 		pitch: 'Course 3D multi sur circuit aléatoire : meilleur tour, drift auto, jusqu\'à 4 joueurs.',
