@@ -68,7 +68,7 @@ function wheelSlot(k: number): { x: number; y: number } {
 
 /** N dots laid out around a centre: arrangement 0=vertical, 1=diagonal, 2=horizontal. */
 function dotsLayout(n: number, arrangement: number, cy: number): { x: number; y: number }[] {
-	const step = 13;
+	const step = 15;
 	const out: { x: number; y: number }[] = [];
 	for (let i = 0; i < n; i++) {
 		const t = i - (n - 1) / 2;
@@ -79,14 +79,14 @@ function dotsLayout(n: number, arrangement: number, cy: number): { x: number; y:
 	return out;
 }
 
-/** Up to 4 identical motifs clustered in a plain cell. */
+/** Up to 4 identical motifs clustered in a plain cell — spaced so they never touch. */
 function clusterLayout(n: number): { x: number; y: number }[] {
 	if (n <= 1) return [{ x: C, y: C }];
-	if (n === 2) return [{ x: 36, y: C }, { x: 64, y: C }];
-	if (n === 3) return [{ x: C, y: 35 }, { x: 36, y: 65 }, { x: 64, y: 65 }];
-	return [{ x: 36, y: 36 }, { x: 64, y: 36 }, { x: 36, y: 64 }, { x: 64, y: 64 }];
+	if (n === 2) return [{ x: 29, y: C }, { x: 71, y: C }];
+	if (n === 3) return [{ x: C, y: 29 }, { x: 29, y: 69 }, { x: 71, y: 69 }];
+	return [{ x: 31, y: 31 }, { x: 69, y: 31 }, { x: 31, y: 69 }, { x: 69, y: 69 }];
 }
-const sizeForCount = (n: number) => (n <= 1 ? 24 : n === 2 ? 17 : 14);
+const sizeForCount = (n: number) => (n <= 1 ? 25 : n === 2 ? 14 : n === 3 ? 12 : 11);
 
 /* ---------- Difficulty ---------- */
 
