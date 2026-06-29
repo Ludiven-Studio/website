@@ -90,22 +90,20 @@ const sizeForCount = (n: number) => (n <= 1 ? 24 : n === 2 ? 17 : 14);
 
 /* ---------- Difficulty ---------- */
 
-type RuleKind = 'rows' | 'cols' | 'latin';
-const idxOf = (kind: RuleKind, r: number, c: number) => (kind === 'rows' ? r : kind === 'cols' ? c : mod(r + c, 3));
-
 export type TemplateName = 'simple' | 'dots' | 'wheel' | 'quad';
 
 export interface DiffLevel {
 	label: string;
-	simpleVary: number; // attributes varied by the "simple figure" template
-	allowLatin: boolean;
+	vary: number; // number of things (features) that change across the grid
 	templates: TemplateName[];
 }
 
+const ALL: TemplateName[] = ['simple', 'dots', 'wheel', 'quad'];
+
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', simpleVary: 2, allowLatin: false, templates: ['simple', 'dots'] },
-	moyen: { label: 'Moyen', simpleVary: 3, allowLatin: true, templates: ['simple', 'dots', 'wheel'] },
-	difficile: { label: 'Difficile', simpleVary: 4, allowLatin: true, templates: ['dots', 'wheel', 'quad', 'simple'] },
+	facile: { label: 'Facile', vary: 2, templates: ALL },
+	moyen: { label: 'Moyen', vary: 3, templates: ALL },
+	difficile: { label: 'Difficile', vary: 4, templates: ALL },
 };
 
 /** Number of multiple-choice options (incl. the correct one). */
@@ -116,125 +114,148 @@ export interface Question {
 	options: Cell[]; // N_OPTIONS choices, shuffled, exactly one == grid[8]
 	answerIndex: number;
 	rule: string;
+	varied: number; // how many features actually vary (== difficulty target)
 }
 
-interface Gen { grid: Cell[]; rule: string; }
+interface Gen { grid: Cell[]; rule: string; varied: number; }
 
-/* ---------- Template: simple figure (shape/colour/count/fill attributes) ---------- */
+/* ---------- Feature plan: pick exactly `vary` features, covering both axes ---------- */
+
+type Axis = 'rows' | 'cols';
+const aIdx = (ax: Axis, r: number, c: number) => (ax === 'rows' ? r : c);
+
+/**
+ * Choose `vary` features and assign each an axis. The two "carriers" come from
+ * pool3 (3-valued features) and take rows + cols → both axes always vary, so the
+ * grid is solvable and never trivially constant. Extras (incl. 2-valued ones)
+ * take a random axis. Returns feature → axis (only active features are present).
+ */
+function planFeatures(pool3: string[], pool2: string[], vary: number, rng: Rng): Record<string, Axis> {
+	const carriers = shuffle(pool3, rng).slice(0, 2);
+	const restPool = shuffle([...pool3.filter((f) => !carriers.includes(f)), ...pool2], rng);
+	const extras = restPool.slice(0, Math.max(0, vary - 2));
+	const plan: Record<string, Axis> = { [carriers[0]]: 'rows', [carriers[1]]: 'cols' };
+	for (const f of extras) plan[f] = pick(rng, ['rows', 'cols'] as Axis[]);
+	return plan;
+}
+
+const FR: Record<string, string> = {
+	shape: 'forme', color: 'couleur', count: 'nombre', fill: 'remplissage',
+	container: 'conteneur', arrangement: 'disposition', dotColor: 'couleur', move: 'position', kind: 'forme',
+};
+const ruleText = (plan: Record<string, Axis>): string =>
+	'éléments qui changent : ' + [...new Set(Object.keys(plan).map((f) => FR[f]))].join(', ');
+
+/* ---------- Template: simple figure (shape / colour / count / fill) ---------- */
 
 const SIMPLE_SHAPES: EltKind[] = ['circle', 'square', 'triangle', 'diamond', 'star', 'hexagon'];
 
-function tSimple(diff: DiffLevel, rng: Rng): Gen {
-	const threeVal = ['shape', 'color', 'count'] as const;
-	const axis = shuffle([...threeVal], rng).slice(0, 2); // both-axis carriers (3-valued)
-	const restPool = shuffle([threeVal.find((a) => !axis.includes(a))!, 'filled'], rng);
-	const vary = [axis[0], axis[1], ...restPool].slice(0, diff.simpleVary);
-
-	const rowPool: RuleKind[] = diff.allowLatin ? ['rows', 'latin'] : ['rows'];
-	const colPool: RuleKind[] = diff.allowLatin ? ['cols', 'latin'] : ['cols'];
-	const anyPool: RuleKind[] = diff.allowLatin ? ['rows', 'cols', 'latin'] : ['rows', 'cols'];
-	const ruleOf: Record<string, RuleKind> = { [axis[0]]: pick(rng, rowPool), [axis[1]]: pick(rng, colPool) };
-	for (let i = 2; i < vary.length; i++) ruleOf[vary[i]] = pick(rng, anyPool);
-
-	const shapeVals: EltKind[] = vary.includes('shape') ? shuffle(SIMPLE_SHAPES, rng).slice(0, 3) : [pick(rng, SIMPLE_SHAPES)];
-	const colorVals = vary.includes('color') ? shuffle(PALETTE, rng).slice(0, 3) : [ri(rng, 0, 5)];
+function tSimple(vary: number, rng: Rng): Gen {
+	const plan = planFeatures(['shape', 'color', 'count'], ['fill'], vary, rng);
+	const shapeVals: EltKind[] = plan.shape ? shuffle(SIMPLE_SHAPES, rng).slice(0, 3) : [pick(rng, SIMPLE_SHAPES)];
+	const colorVals = plan.color ? shuffle(PALETTE, rng).slice(0, 3) : [ri(rng, 0, 5)];
 	const cs = ri(rng, 1, 2);
-	const countVals = vary.includes('count') ? [cs, cs + 1, cs + 2] : [pick(rng, [1, 2, 3])];
-	const fillVals = vary.includes('filled') ? shuffle([true, false], rng) : [rng() < 0.6];
-
-	const val = <T>(a: string, vals: T[], r: number, c: number): T => (ruleOf[a] ? vals[idxOf(ruleOf[a], r, c) % vals.length] : vals[0]);
+	const countVals = plan.count ? [cs, cs + 1, cs + 2] : [pick(rng, [1, 2, 3])];
+	const fillVals = plan.fill ? shuffle([true, false], rng) : [rng() < 0.6];
+	const v = <T>(f: string, vals: T[], r: number, c: number): T => (plan[f] ? vals[aIdx(plan[f], r, c) % vals.length] : vals[0]);
 
 	const grid: Cell[] = [];
 	for (let r = 0; r < 3; r++)
 		for (let c = 0; c < 3; c++) {
-			const shape = val('shape', shapeVals, r, c);
-			const color = val('color', colorVals, r, c);
-			const count = val('count', countVals, r, c);
-			const filled = val('filled', fillVals, r, c);
+			const shape = v('shape', shapeVals, r, c);
+			const color = v('color', colorVals, r, c);
+			const count = v('count', countVals, r, c);
+			const filled = v('fill', fillVals, r, c);
 			const elements = clusterLayout(count).map((p) => ({ x: p.x, y: p.y, size: sizeForCount(count), kind: shape, filled, color }));
 			grid.push({ container: 'plain', color, elements });
 		}
-	const labels: Record<string, string> = { shape: 'forme', color: 'couleur', count: 'nombre', filled: 'remplissage' };
-	const rule = 'attributs qui changent par ligne et par colonne (' + vary.map((a) => labels[a]).join(', ') + ')';
-	return { grid, rule };
+	return { grid, rule: ruleText(plan), varied: Object.keys(plan).length };
 }
 
 /* ---------- Template: container + dots (example 1) ---------- */
 
-function tDots(_diff: DiffLevel, rng: Rng): Gen {
-	const contVals = shuffle<Container>(['triangle', 'square', 'circle'], rng); // by column
-	const cs = ri(rng, 1, 2);
-	const countByCol = [cs, cs + 1, cs + 2]; // ascending → answer column (c=2) has the most dots
-	const arrByRow = shuffle([0, 1, 2], rng); // disposition by row
-	const nCol = rng() < 0.5 ? 1 : 2;
-	const dotColors = shuffle(PALETTE, rng).slice(0, nCol);
+function tDots(vary: number, rng: Rng): Gen {
+	const plan = planFeatures(['container', 'count', 'arrangement', 'dotColor'], [], vary, rng);
+	const contVals: Container[] = plan.container ? shuffle<Container>(['triangle', 'square', 'circle'], rng) : [pick(rng, ['triangle', 'square', 'circle'] as Container[])];
+	const arrActive = !!plan.arrangement;
+	const cs = arrActive ? 2 : ri(rng, 1, 2); // keep dots ≥2 so the disposition is visible
+	const countVals = plan.count ? [cs, cs + 1, cs + 2] : [arrActive ? ri(rng, 2, 3) : ri(rng, 1, 3)];
+	const arrVals = plan.arrangement ? shuffle([0, 1, 2], rng).slice(0, 3) : [pick(rng, [0, 1, 2])];
+	const colorVals = plan.dotColor ? shuffle(PALETTE, rng).slice(0, 3) : [ri(rng, 0, 5)];
 	const contColor = ri(rng, 0, 5);
+	const vi = (f: string, len: number, r: number, c: number) => (plan[f] ? aIdx(plan[f], r, c) % len : 0);
 
 	const grid: Cell[] = [];
 	for (let r = 0; r < 3; r++)
 		for (let c = 0; c < 3; c++) {
-			const container = contVals[c];
-			const n = countByCol[c];
+			const container = contVals[vi('container', contVals.length, r, c)];
+			const n = countVals[vi('count', countVals.length, r, c)];
+			const arrangement = arrVals[vi('arrangement', arrVals.length, r, c)];
+			const color = colorVals[vi('dotColor', colorVals.length, r, c)];
 			const cy = container === 'triangle' ? 60 : C;
-			const elements = dotsLayout(n, arrByRow[r], cy).map((p, i) => ({ x: p.x, y: p.y, size: 5, kind: 'dot' as EltKind, filled: true, color: dotColors[i % nCol] }));
+			const elements = dotsLayout(n, arrangement, cy).map((p) => ({ x: p.x, y: p.y, size: 5, kind: 'dot' as EltKind, filled: true, color }));
 			grid.push({ container, color: contColor, elements });
 		}
-	return { grid, rule: 'le conteneur et le nombre de points changent par colonne ; leur disposition par ligne' };
+	return { grid, rule: ruleText(plan), varied: Object.keys(plan).length };
 }
 
-/* ---------- Template: rotating wheel (example 2) ---------- */
+/* ---------- Template: wheel with dots on spokes (example 2) ---------- */
 
-function tWheel(diff: DiffLevel, rng: Rng): Gen {
-	const D = diff.allowLatin && rng() < 0.5 ? 3 : 2;
-	const baseSlots = shuffle([0, 1, 2, 3, 4, 5, 6, 7], rng).slice(0, D);
-	const nCol = D >= 2 && rng() < 0.6 ? Math.min(D, 3) : 1;
-	const palette = shuffle(PALETTE, rng);
-	const dotColors = baseSlots.map((_, i) => (nCol === 1 ? palette[0] : palette[i % nCol]));
-	const steps = [1, 2, 3, 5, 6, 7]; // avoid 0 and 4 (4 maps opposite → symmetry)
-	const stepR = pick(rng, steps);
-	const stepC = pick(rng, steps);
+function tWheel(vary: number, rng: Rng): Gen {
+	const plan = planFeatures(['move', 'color', 'count'], ['fill'], vary, rng);
+	const order = shuffle([0, 1, 2, 3, 4, 5, 6, 7], rng).slice(0, 3); // up to 3 dot slots
+	const step = pick(rng, [1, 2, 3, 5, 6, 7]); // avoid 0 and 4 (4 = opposite → symmetry)
+	const colorVals = plan.color ? shuffle(PALETTE, rng).slice(0, 3) : [ri(rng, 0, 5)];
+	const countVals = plan.count ? [1, 2, 3] : [ri(rng, 2, 3)];
+	const fillVals = plan.fill ? shuffle([true, false], rng) : [true];
+	const deco = shuffle(PALETTE, rng); // per-dot colours when colour isn't a rule (multi-colour variety)
 	const contColor = ri(rng, 0, 5);
 
 	const grid: Cell[] = [];
 	for (let r = 0; r < 3; r++)
 		for (let c = 0; c < 3; c++) {
-			const elements = baseSlots.map((s, i) => {
-				const p = wheelSlot(mod(s + r * stepR + c * stepC, 8));
-				return { x: p.x, y: p.y, size: 5, kind: 'dot' as EltKind, filled: true, color: dotColors[i] };
+			const cnt = plan.count ? countVals[aIdx(plan.count, r, c) % countVals.length] : countVals[0];
+			const off = plan.move ? step * aIdx(plan.move, r, c) : 0;
+			const filled = plan.fill ? fillVals[aIdx(plan.fill, r, c) % fillVals.length] : fillVals[0];
+			const baseColor = plan.color ? colorVals[aIdx(plan.color, r, c) % colorVals.length] : null;
+			const elements = order.slice(0, cnt).map((s, i) => {
+				const p = wheelSlot(mod(s + off, 8));
+				return { x: p.x, y: p.y, size: 5, kind: 'circle' as EltKind, filled, color: baseColor ?? deco[i % deco.length] };
 			});
 			grid.push({ container: 'wheel8', color: contColor, elements });
 		}
-	return { grid, rule: 'les points tournent autour de la roue (d’un pas par ligne et par colonne)' };
+	return { grid, rule: ruleText(plan), varied: Object.keys(plan).length };
 }
 
 /* ---------- Template: moving quadrants (example 3) ---------- */
 
-function tQuad(_diff: DiffLevel, rng: Rng): Gen {
-	const M = 2;
-	const baseQ = shuffle([0, 1, 2, 3], rng).slice(0, M);
-	const colors = shuffle(PALETTE, rng).slice(0, M);
-	const allApp = [
-		{ kind: 'circle' as EltKind, filled: true }, { kind: 'circle' as EltKind, filled: false },
-		{ kind: 'square' as EltKind, filled: true }, { kind: 'square' as EltKind, filled: false },
-	];
-	const appByCol = [shuffle(allApp, rng).slice(0, 3), shuffle(allApp, rng).slice(0, 3)]; // per element, by column
-	const stepR = pick(rng, [1, 2, 3]); // quadrant rotation by row
+function tQuad(vary: number, rng: Rng): Gen {
+	const plan = planFeatures(['move', 'color', 'kind'], ['fill'], vary, rng);
+	const baseQ = shuffle([0, 1, 2, 3], rng).slice(0, 2);
+	const step = pick(rng, [1, 2, 3]);
+	const kindVals: EltKind[] = plan.kind ? shuffle(['circle', 'square', 'triangle'] as EltKind[], rng).slice(0, 3) : [pick(rng, ['circle', 'square', 'triangle'] as EltKind[])];
+	const colorVals = plan.color ? shuffle(PALETTE, rng).slice(0, 3) : [ri(rng, 0, 5)];
+	const fillVals = plan.fill ? shuffle([true, false], rng) : [rng() < 0.6];
+	const deco = shuffle(PALETTE, rng);
 	const contColor = ri(rng, 0, 5);
 
 	const grid: Cell[] = [];
 	for (let r = 0; r < 3; r++)
 		for (let c = 0; c < 3; c++) {
+			const off = plan.move ? step * aIdx(plan.move, r, c) : 0;
+			const kind = plan.kind ? kindVals[aIdx(plan.kind, r, c) % kindVals.length] : kindVals[0];
+			const filled = plan.fill ? fillVals[aIdx(plan.fill, r, c) % fillVals.length] : fillVals[0];
+			const baseColor = plan.color ? colorVals[aIdx(plan.color, r, c) % colorVals.length] : null;
 			const elements = baseQ.map((q, i) => {
-				const p = QUAD[mod(q + r * stepR, 4)];
-				const ap = appByCol[i][c];
-				return { x: p.x, y: p.y, size: ap.kind === 'square' ? 9 : 8, kind: ap.kind, filled: ap.filled, color: colors[i] };
+				const p = QUAD[mod(q + off, 4)];
+				return { x: p.x, y: p.y, size: kind === 'square' ? 9 : 8, kind, filled, color: baseColor ?? deco[i % deco.length] };
 			});
 			grid.push({ container: 'quad', color: contColor, elements });
 		}
-	return { grid, rule: 'les formes se déplacent de quadrant (par ligne) et changent d’aspect (par colonne)' };
+	return { grid, rule: ruleText(plan), varied: Object.keys(plan).length };
 }
 
-const TEMPLATES: Record<TemplateName, (d: DiffLevel, rng: Rng) => Gen> = {
+const TEMPLATES: Record<TemplateName, (vary: number, rng: Rng) => Gen> = {
 	simple: tSimple, dots: tDots, wheel: tWheel, quad: tQuad,
 };
 
@@ -330,10 +351,10 @@ function valid(grid: Cell[]): boolean {
 
 /** Generate one matrix QCM question. `force` selects a specific template (tests). */
 export function generateQuestion(diff: DiffLevel, rng: Rng = Math.random, force?: TemplateName): Question {
-	let gen: Gen = TEMPLATES[force ?? diff.templates[0]](diff, rng);
+	let gen: Gen = TEMPLATES[force ?? diff.templates[0]](diff.vary, rng);
 	for (let attempt = 0; attempt < 40; attempt++) {
 		const name = force ?? pick(rng, diff.templates);
-		gen = TEMPLATES[name](diff, rng);
+		gen = TEMPLATES[name](diff.vary, rng);
 		if (valid(gen.grid)) break;
 	}
 
@@ -352,15 +373,14 @@ export function generateQuestion(diff: DiffLevel, rng: Rng = Math.random, force?
 		byKey.set(cellKey(cell), cell);
 	}
 	// 3) last-resort: recolour within the grid's palette
-	const colorsUsed = uniq(grid.flatMap((g) => g.elements.map((e) => e.color)));
+	const palette = [...Array(COLORS.length).keys()]; // full palette (last resort only)
 	let k = 1;
-	while (byKey.size < N_OPTIONS) {
+	while (byKey.size < N_OPTIONS && k <= COLORS.length + 2) {
 		const m = cloneCell(answer);
-		const palette = colorsUsed.length ? colorsUsed : [...Array(COLORS.length).keys()];
 		if (m.elements[0]) m.elements[0].color = palette[k++ % palette.length];
 		else m.color = palette[k++ % palette.length];
 		byKey.set(cellKey(m), m);
 	}
 
-	return { grid, options: shuffle([...byKey.values()], rng), answerIndex: 8, rule: gen.rule };
+	return { grid, options: shuffle([...byKey.values()], rng), answerIndex: 8, rule: gen.rule, varied: gen.varied };
 }

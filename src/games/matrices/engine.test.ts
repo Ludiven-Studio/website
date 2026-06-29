@@ -8,7 +8,7 @@ describe('matrices engine', () => {
 	it('produces a 3×3 grid with exactly one correct option, all visually distinct', () => {
 		for (const key of Object.keys(DIFFS)) {
 			for (let s = 0; s < 40; s++) {
-				const q = generateQuestion(DIFFS[key], mulberry32(1000 * (s + 1) + DIFFS[key].simpleVary));
+				const q = generateQuestion(DIFFS[key], mulberry32(1000 * (s + 1) + DIFFS[key].vary));
 				expect(q.grid.length, `${key} grid size`).toBe(9);
 				expect(q.options.length, `${key} options`).toBe(N_OPTIONS);
 				expect(q.answerIndex).toBe(8);
@@ -23,10 +23,23 @@ describe('matrices engine', () => {
 	it('answer is never a trivial copy of the left or top neighbour', () => {
 		for (const key of Object.keys(DIFFS)) {
 			for (let s = 0; s < 40; s++) {
-				const q = generateQuestion(DIFFS[key], mulberry32(53 * (s + 2) + DIFFS[key].simpleVary));
+				const q = generateQuestion(DIFFS[key], mulberry32(53 * (s + 2) + DIFFS[key].vary));
 				const a = cellKey(q.grid[8]);
 				expect(a, `${key} != left`).not.toBe(cellKey(q.grid[7]));
 				expect(a, `${key} != top`).not.toBe(cellKey(q.grid[5]));
+			}
+		}
+	});
+
+	it('varies exactly `vary` things: facile 2, moyen 3, difficile 4 — for every family', () => {
+		const expected: Record<string, number> = { facile: 2, moyen: 3, difficile: 4 };
+		for (const key of Object.keys(DIFFS)) {
+			for (const t of ALL_TEMPLATES) {
+				for (let s = 0; s < 12; s++) {
+					const q = generateQuestion(DIFFS[key], mulberry32(11 * (s + 1) + key.length), t);
+					expect(q.varied, `${key}/${t} varied count`).toBe(expected[key]);
+					expect(q.varied).toBe(DIFFS[key].vary);
+				}
 			}
 		}
 	});
