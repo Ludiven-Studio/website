@@ -14,12 +14,12 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment. Queue new runs behind an in-progress one
-# instead of racing it (two overlapping runs make the second deploy-pages 400).
-# Do NOT cancel an in-progress run — let production deployments finish.
+# Allow only one deployment at a time. A new push supersedes an older, not-yet-finished
+# run so deployments never overlap — overlapping runs make deploy-pages 400 with
+# "in progress deployment". For a static site, deploying only the latest commit is fine.
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   test:
