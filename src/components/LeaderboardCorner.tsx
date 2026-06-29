@@ -8,9 +8,11 @@ import Leaderboard from './Leaderboard';
 interface Props {
 	game: string;
 	metric: Metric;
+	/** Custom value formatter (e.g. to decode an encoded value). Defaults to time/score. */
+	format?: (v: number) => string;
 }
 
-export default function LeaderboardCorner({ game, metric }: Props) {
+export default function LeaderboardCorner({ game, metric, format }: Props) {
 	const [open, setOpen] = useState(false);
 	if (!leaderboardEnabled()) return null;
 
@@ -22,7 +24,7 @@ export default function LeaderboardCorner({ game, metric }: Props) {
 					<button className="lbc-close" onClick={() => setOpen(false)} aria-label="Fermer">
 						✕
 					</button>
-					<Leaderboard game={game} metric={metric} />
+					<Leaderboard game={game} metric={metric} format={format} />
 				</div>
 			)}
 			<button className="lbc-pill" onClick={() => setOpen((o) => !o)} aria-expanded={open}>

@@ -429,7 +429,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				submitValue={status === 'won' && best != null ? best : undefined}
 				format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }}
 			/>}
-			{!daily && <LeaderboardCorner game={`${gameId}-t`} metric="time" />}
+			{!daily && <LeaderboardCorner
+				game={`${gameId}-t`}
+				metric="time"
+				format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }}
+			/>}
 		</div>
 	);
 }
