@@ -60,6 +60,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'matrices',
+		title: 'Matrices',
+		pitch: 'Complète la grille 3×3 en trouvant la figure qui suit la même logique. Façon test de QI.',
+		icon: 'matrix',
+		href: '/jeux/matrices',
+		status: 'play',
+	},
+	{
 		id: 'symboles',
 		title: 'Symboles',
 		pitch: 'Devine la logique d\'une suite de symboles et trouve le suivant. En choix multiple.',
