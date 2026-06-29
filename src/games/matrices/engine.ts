@@ -101,15 +101,22 @@ const RULE_LABEL: Record<Attr, Record<RuleKind, string>> = {
 export function generateQuestion(diff: DiffLevel, rng: Rng = Math.random): Question {
 	const varying = shuffle(ATTRS, rng).slice(0, diff.vary);
 	const rotationVaries = varying.includes('rotation');
-	const rulePool: RuleKind[] = diff.allowLatin ? ['rows', 'cols', 'latin'] : ['rows', 'cols'];
+	// Guarantee variation BOTH down the columns (a rows/latin attribute) AND across the rows
+	// (a cols/latin attribute) → no row or column is ever a row of identical figures.
+	const rowPool: RuleKind[] = diff.allowLatin ? ['rows', 'latin'] : ['rows'];
+	const colPool: RuleKind[] = diff.allowLatin ? ['cols', 'latin'] : ['cols'];
+	const anyPool: RuleKind[] = diff.allowLatin ? ['rows', 'cols', 'latin'] : ['rows', 'cols'];
 	const ruleOf: Partial<Record<Attr, RuleKind>> = {};
-	for (const a of varying) ruleOf[a] = pick(rng, rulePool);
+	ruleOf[varying[0]] = pick(rng, rowPool);
+	ruleOf[varying[1]] = pick(rng, colPool);
+	for (let i = 2; i < varying.length; i++) ruleOf[varying[i]] = pick(rng, anyPool);
 
 	// Values per attribute (3 distinct when varying, else 1).
 	const shapePool = rotationVaries ? ROT_SHAPES : ALL_SHAPES;
 	const shapeVals = varying.includes('shape') ? shuffle(shapePool, rng).slice(0, 3) : [pick(rng, shapePool)];
 	const colorVals = varying.includes('color') ? shuffle([0, 1, 2, 3, 4, 5], rng).slice(0, 3) : [ri(rng, 0, COLORS.length - 1)];
-	const countVals = varying.includes('count') ? [1, 2, 3] : [1];
+	const countStart = ri(rng, 1, 2); // [1,2,3] or [2,3,4] → up to a 2×2 cluster per cell
+	const countVals = varying.includes('count') ? [countStart, countStart + 1, countStart + 2] : [1];
 	const rotVals = varying.includes('rotation') ? [0, 90, 180] : [0];
 
 	const valFor = <T>(a: Attr, vals: T[], r: number, c: number): T => {
@@ -140,7 +147,7 @@ export function generateQuestion(diff: DiffLevel, rng: Rng = Math.random): Quest
 		switch (pick(rng, ATTRS)) {
 			case 'shape': out.shape = pick(rng, usedShapes.length > 1 ? usedShapes : ALL_SHAPES); break;
 			case 'color': out.color = pick(rng, usedColors.length > 1 ? usedColors : [0, 1, 2, 3, 4, 5]); break;
-			case 'count': out.count = pick(rng, usedCounts.length > 1 ? usedCounts : [1, 2, 3]); break;
+			case 'count': out.count = pick(rng, usedCounts.length > 1 ? usedCounts : [1, 2, 3, 4]); break;
 			default:
 				if (ROT_VISIBLE[out.shape]) out.rotation = pick(rng, usedRots.length > 1 ? usedRots : [0, 90, 180]);
 				else out.color = mod(out.color + 1, COLORS.length);

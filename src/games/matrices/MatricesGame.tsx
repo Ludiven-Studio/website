@@ -48,9 +48,9 @@ const GLYPHS: Record<Shape, string> = {
 
 function Figure({ cell, size = 30 }: { cell: Cell; size?: number }) {
 	const color = COLORS[cell.color] ?? COLORS[0];
-	const n = Math.max(1, Math.min(3, cell.count));
-	const mini = n === 1 ? size : Math.round(size * 0.6);
-	const cols = n === 1 ? 1 : 2;
+	const n = Math.max(1, Math.min(4, cell.count));
+	const mini = n === 1 ? size : n <= 2 ? Math.round(size * 0.62) : Math.round(size * 0.48);
+	const cols = n === 1 ? 1 : 2; // 2,3,4 → mini-grid inside the cell
 	const rot = ROT_VISIBLE[cell.shape] ? cell.rotation : 0;
 	return (
 		<span className="mx-cell" style={{ gridTemplateColumns: `repeat(${cols}, auto)` }}>

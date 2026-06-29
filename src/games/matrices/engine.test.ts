@@ -33,6 +33,22 @@ describe('matrices engine', () => {
 		}
 	});
 
+	it('never has identical figures along a row or a column (varies on both axes)', () => {
+		for (const key of Object.keys(DIFFS)) {
+			for (let s = 0; s < 30; s++) {
+				const q = generateQuestion(DIFFS[key], mulberry32(7 * (s + 3) + DIFFS[key].vary));
+				for (let r = 0; r < 3; r++) {
+					const row = new Set([0, 1, 2].map((c) => cellKey(q.grid[r * 3 + c])));
+					expect(row.size, `${key} row ${r} distinct`).toBe(3);
+				}
+				for (let c = 0; c < 3; c++) {
+					const col = new Set([0, 1, 2].map((r) => cellKey(q.grid[r * 3 + c])));
+					expect(col.size, `${key} col ${c} distinct`).toBe(3);
+				}
+			}
+		}
+	});
+
 	it('is deterministic for a given seed', () => {
 		const a = generateQuestion(DIFFS.moyen, mulberry32(2026));
 		const b = generateQuestion(DIFFS.moyen, mulberry32(2026));
