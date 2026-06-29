@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	makeTable, generateRack, stepBalls, aimToVelocity, isSettled,
-	encodeScore, decodeScore, BALL_R, POCKET_R, DIFFS, type Ball,
+	encodeScore, decodeScore, BALL_R, DIFFS, type Ball,
 } from './engine';
 import { mulberry32 } from '../prng';
 
@@ -85,7 +85,7 @@ describe('billard engine', () => {
 				expect(ba.x).toBeLessThanOrEqual(t.w);
 				expect(ba.y).toBeGreaterThanOrEqual(0);
 				expect(ba.y).toBeLessThanOrEqual(t.h);
-				for (const p of t.pockets) expect(Math.hypot(ba.x - p.x, ba.y - p.y)).toBeGreaterThan(POCKET_R);
+				for (const p of t.pockets) expect(Math.hypot(ba.x - p.x, ba.y - p.y), 'not inside a pocket mouth').toBeGreaterThan(p.r);
 			}
 			for (let i = 0; i < a.length; i++)
 				for (let j = i + 1; j < a.length; j++)

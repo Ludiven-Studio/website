@@ -83,7 +83,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 };
 
 const nearPocket = (x: number, y: number, t: Table) =>
-	t.pockets.some((p) => len(x - p.x, y - p.y) < t.pocketR * 2.2);
+	t.pockets.some((p) => len(x - p.anchor.x, y - p.anchor.y) < p.r + BALL_R + 6);
 
 /** Cue ball + `diff.balls` colour balls, seeded, no overlap, inside the cloth, off the pockets. */
 export function generateRack(table: Table, rng: Rng, diff: DiffLevel): Ball[] {
@@ -134,7 +134,7 @@ function reflectWalls(b: Ball, t: Table) {
 	if (b.y < r && b.vy < 0 && !inMouthX(b.x, t.w)) { b.y = r; b.vy = -b.vy * CUSHION_REST; }
 	else if (b.y > t.h - r && b.vy > 0 && !inMouthX(b.x, t.w)) { b.y = t.h - r; b.vy = -b.vy * CUSHION_REST; }
 	// safety: a ball that missed the throat shouldn't escape forever
-	const M = t.pocketR + r;
+	const M = POCKET_R + r;
 	if (b.x < -M) { b.x = -M; b.vx = Math.abs(b.vx) * CUSHION_REST; }
 	else if (b.x > t.w + M) { b.x = t.w + M; b.vx = -Math.abs(b.vx) * CUSHION_REST; }
 	if (b.y < -M) { b.y = -M; b.vy = Math.abs(b.vy) * CUSHION_REST; }
@@ -191,7 +191,8 @@ export function stepBalls(balls: Ball[], table: Table, dt: number): StepResult {
 		for (const b of active) {
 			if (b.potted) continue;
 			for (const p of table.pockets) {
-				if (len(b.x - p.x, b.y - p.y) < table.pocketR) {
+				// drop once the ball is ~half into the mouth (centre within r + half a ball)
+				if (len(b.x - p.x, b.y - p.y) < p.r + b.r * 0.5) {
 					b.potted = true; b.vx = 0; b.vy = 0;
 					if (b.kind === 'cue') scratched = true;
 					else pottedColors.push(b.color);
