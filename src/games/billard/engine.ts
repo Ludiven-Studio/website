@@ -42,8 +42,8 @@ const DECEL = 38; // rolling friction (units/s²) — lower = more inertia / lon
 const CUSHION_REST = 0.85; // cushion energy kept
 const BALL_REST = 0.97; // ball-ball restitution
 const SETTLE = 2.4; // speed below which a ball is "at rest"
-const MIN_PULL = 4;
-const MAX_PULL = 60;
+const MIN_PULL = 3;
+const MAX_PULL = 36; // shorter drag reaches full power
 const MAX_SPEED = 195;
 
 const len = (x: number, y: number) => Math.hypot(x, y);

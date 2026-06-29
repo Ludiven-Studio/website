@@ -404,7 +404,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			<div className="bi-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
 				<canvas ref={canvasRef} className="bi-canvas" />
-				{scratchFlash && <div className="bi-scratch">Fausse blanche · +1 coup</div>}
+				{scratchFlash && <div className="bi-scratch">Pénalité · +1 coup</div>}
 				{status === 'won' && (
 					<div className="bi-overlay">
 						<div className="bi-overlay-card">
