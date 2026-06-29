@@ -27,6 +27,9 @@ const CUE_COLOR = '#f4f4f2';
 const FELT = '#0f7a52';
 const FELT_DARK = '#0c6644';
 
+const SINK_MS = 280; // pot animation duration
+type Sink = { x: number; y: number; px: number; py: number; r: number; color: number; kind: 'cue' | 'color'; t0: number };
+
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -58,6 +61,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const rafRef = useRef<number | null>(null);
 	const accRef = useRef(0);
 	const lastRef = useRef(0);
+	const sinksRef = useRef<Sink[]>([]); // active pot animations
+	const seenRef = useRef<Set<number>>(new Set()); // ball indices already animated
 	const dailyRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const bestRef = useRef<number | null>(null);
 	const triesRef = useRef(0);
@@ -72,6 +77,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const layTable = useCallback((key: keyof typeof DIFFS, seed: number) => {
 		const t = tableRef.current;
 		ballsRef.current = generateRack(t, mulberry32(seed), DIFFS[key]);
+		sinksRef.current = [];
+		seenRef.current.clear();
 		strokesRef.current = 0;
 		startRef.current = 0;
 		finishedRef.current = false;
@@ -113,7 +120,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const balls = ballsRef.current;
 		const cue = balls.find((b) => b.kind === 'cue')!;
 		if (cue.potted) {
-			// scratch: respawn cue at start + 1 stroke penalty
+			// scratch: respawn cue at start + 1 stroke penalty (let its sink anim finish on its own)
+			seenRef.current.delete(balls.indexOf(cue));
 			cue.potted = false;
 			cue.x = tableRef.current.cueStart.x;
 			cue.y = tableRef.current.cueStart.y;
@@ -245,7 +253,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const ctx = cv.getContext('2d')!;
 		const t = tableRef.current;
 
-		const draw = () => {
+		const draw = (now: number) => {
 			ctx.clearRect(0, 0, t.w, t.h);
 			// cloth
 			ctx.fillStyle = FELT;
@@ -278,6 +286,22 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				ctx.beginPath();
 				ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.32, 0, Math.PI * 2);
 				ctx.fillStyle = 'rgba(255,255,255,0.45)';
+				ctx.fill();
+			}
+			// pot animations: ball sinks to the hole centre, shrinking and darkening
+			for (const s of sinksRef.current) {
+				const e = Math.min(1, (now - s.t0) / SINK_MS);
+				const ease = e * e; // accelerate inward as it drops
+				const x = s.x + (s.px - s.x) * ease;
+				const y = s.y + (s.py - s.y) * ease;
+				const r = s.r * (1 - 0.82 * ease);
+				ctx.beginPath();
+				ctx.arc(x, y, r, 0, Math.PI * 2);
+				ctx.fillStyle = s.kind === 'cue' ? CUE_COLOR : COLORS[s.color] ?? '#fff';
+				ctx.fill();
+				ctx.beginPath();
+				ctx.arc(x, y, r, 0, Math.PI * 2);
+				ctx.fillStyle = `rgba(0,0,0,${0.12 + 0.82 * ease})`;
 				ctx.fill();
 			}
 			// aim guide
@@ -323,8 +347,20 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					}
 				}
 			}
+			// spawn a pot animation for any ball that just dropped
+			const balls = ballsRef.current;
+			for (let i = 0; i < balls.length; i++) {
+				const b = balls[i];
+				if (b.potted && !seenRef.current.has(i)) {
+					seenRef.current.add(i);
+					let bp = t.pockets[0], bd = Infinity;
+					for (const p of t.pockets) { const d = Math.hypot(b.x - p.x, b.y - p.y); if (d < bd) { bd = d; bp = p; } }
+					sinksRef.current.push({ x: b.x, y: b.y, px: bp.x, py: bp.y, r: b.r, color: b.color, kind: b.kind, t0: now });
+				}
+			}
+			sinksRef.current = sinksRef.current.filter((s) => now - s.t0 < SINK_MS);
 			if (startRef.current && !finishedRef.current) setElapsed((Date.now() - startRef.current) / 1000);
-			draw();
+			draw(now);
 			rafRef.current = requestAnimationFrame(frame);
 		};
 		rafRef.current = requestAnimationFrame(frame);
