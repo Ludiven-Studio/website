@@ -126,28 +126,40 @@ function buildStructure(world: World, bx: number, rng: Rng, diff: DiffLevel, all
 	const wantTnt = allowTnt && rng() < 0.6;
 	const blk = (x: number, y: number, hw: number, hh: number, tnt = false) => world.bodies.push(block(tnt ? 'tnt' : m, x, y, hw, hh));
 	const fox = (x: number, y: number) => world.bodies.push(circle('fox', x, y, FOX_R, diff.hp));
-	const arche = ri(rng, 0, 2);
-	const tall = rng() < 0.35; // some foxes get a much taller construction (bigger fall)
+	const arche = ri(rng, 0, 3);
+	const tall = rng() < 0.45; // some foxes get a much taller construction (bigger fall)
 
 	if (arche === 0) {
 		// Pole: a narrow pillar with the fox balanced on top — easy to topple.
-		const ph = Math.round((9 + diff.sturdiness * 2) * (tall ? 1.9 : 1));
+		const ph = Math.round((11 + diff.sturdiness * 2) * (tall ? 2 : 1));
 		blk(bx, g - ph, 4, ph, wantTnt);
 		fox(bx, g - 2 * ph - FOX_R);
 		if (rng() < 0.5) world.bodies.push(circle('barrel', bx - 20, g - 5.5, 5.5)); // rolling obstacle in front
 	} else if (arche === 1) {
 		// Bridge: a long plank on two pillars, fox standing on top of the plank (exposed).
-		const ph = Math.round((8 + diff.sturdiness) * (tall ? 1.8 : 1)), bh = 2.5;
+		const ph = Math.round((9 + diff.sturdiness) * (tall ? 1.9 : 1)), bh = 2.5;
 		blk(bx - 12, g - ph, 3, ph, wantTnt);
 		blk(bx + 12, g - ph, 3, ph);
 		blk(bx, g - 2 * ph - bh, 14, bh); // plank
 		fox(bx, g - 2 * ph - 2 * bh - FOX_R);
-	} else {
+	} else if (arche === 2) {
 		// Stack: blocks piled with the fox on top; the base block may be the explosive one.
-		const n = 1 + diff.sturdiness + (tall ? 2 : 0);
+		const n = 2 + diff.sturdiness + (tall ? 2 : 0);
 		for (let k = 0; k < n; k++) blk(bx, g - 5.5 - k * 11, 5.5, 5.5, wantTnt && k === 0);
 		fox(bx, g - 5.5 - (n - 1) * 11 - 5.5 - FOX_R);
 		if (rng() < 0.5) blk(bx + 13, g - 5.5, 5.5, 5.5);
+	} else {
+		// Cage/tower: the fox is ENCLOSED by two stacked walls + a roof — break in to reach it.
+		const cageMat: Material = m === 'brick' ? 'wood' : m; // keep the cage breakable
+		const ch = 5.5, levels = 2 + diff.sturdiness + (tall ? 2 : 0);
+		const cageBlk = (x: number, y: number, hw: number, hh: number, tnt = false) => world.bodies.push(block(tnt ? 'tnt' : cageMat, x, y, hw, hh));
+		for (let k = 0; k < levels; k++) {
+			cageBlk(bx - 11, g - ch - k * 2 * ch, 3, ch, wantTnt && k === 0); // left wall column
+			cageBlk(bx + 11, g - ch - k * 2 * ch, 3, ch);                     // right wall column
+		}
+		const topY = g - ch - (levels - 1) * 2 * ch; // top wall block centre
+		cageBlk(bx, topY - ch - 2.5, 14, 2.5);        // roof beam on the two columns
+		fox(bx, g - FOX_R);                            // fox enclosed on the ground inside
 	}
 	return wantTnt;
 }
@@ -306,6 +318,13 @@ export function step(world: World, dt: number): StepEvent {
 				const c = collide(a, b);
 				if (c) resolve(a, b, c);
 			}
+	// Settling aid: bleed off residual jitter on near-resting bodies so stacks come to rest
+	// quickly (the cocotte is exempt so it keeps rolling far).
+	for (const b of live) {
+		if (b.invMass === 0 || b.tag === 'cocotte' || b.defeated) continue;
+		if (len(b.vx, b.vy) < 18) { b.vx *= 0.8; b.vy *= 0.8; }
+	}
+
 	// TNT: detonate flagged blocks → radial blast (launch + fox damage), with chain reactions.
 	const blasts: Vec[] = [];
 	if (tntFlag.size) {
