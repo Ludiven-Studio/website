@@ -49,10 +49,12 @@ const MIN_PULL = 3;
 const MAX_PULL = 46;
 const MAX_SPEED = 320; // stronger launch → reaches the far side of the scene
 
-// Low cocotte friction → it keeps rolling far; crates keep high friction so stacks stay put.
-const REST: Record<Tag, number> = { cocotte: 0.34, fox: 0.2, barrel: 0.3, crate: 0.1, rock: 0.2, ground: 0.22 };
-const FRIC: Record<Tag, number> = { cocotte: 0.16, fox: 0.45, barrel: 0.32, crate: 0.6, rock: 0.5, ground: 0.6 };
-const MASS: Record<Tag, number> = { cocotte: 1, fox: 1.2, barrel: 1, rock: 1.6, crate: 1.3, ground: 0 };
+// Light, bouncy, low-friction blocks → they fly, bump and scatter. The cocotte is heavier so
+// it ploughs through them; its own friction stays low so it keeps rolling far.
+const REST: Record<Tag, number> = { cocotte: 0.4, fox: 0.25, barrel: 0.42, crate: 0.28, rock: 0.35, ground: 0.25 };
+const FRIC: Record<Tag, number> = { cocotte: 0.16, fox: 0.4, barrel: 0.3, crate: 0.42, rock: 0.4, ground: 0.55 };
+const MASS: Record<Tag, number> = { cocotte: 1.5, fox: 1, barrel: 0.7, rock: 1, crate: 0.7, ground: 0 };
+const JUICE = 90; // closing speed above which a collision sparks impact particles
 
 const len = (x: number, y: number) => Math.hypot(x, y);
 let UID = 1;
@@ -121,7 +123,7 @@ export function makeLevel(seed: number, diff: DiffLevel): World {
 	UID = 1;
 	const w = 300, h = 190, groundY = 168;
 	const world: World = {
-		w, h, groundY, gravity: GRAVITY, bodies: [], slingshot: { x: 30, y: groundY - 30 }, cocotte: null, cocottes: diff.foxes + diff.margin,
+		w, h, groundY, gravity: GRAVITY, bodies: [], slingshot: { x: 30, y: groundY - 30 }, cocotte: null, cocottes: Infinity, // unlimited shots
 	};
 	world.bodies.push(box('ground', w / 2, groundY + 30, w / 2 + 40, 30, true)); // static ground
 
@@ -228,10 +230,11 @@ function resolve(a: Body, b: Body, c: Contact) {
 	b.x += b.invMass * corr * c.nx; b.y += b.invMass * corr * c.ny;
 }
 
-export interface StepEvent { foxesDown: number; settled: boolean; }
+export interface StepEvent { foxesDown: number; settled: boolean; hits: Vec[]; }
 
 export function step(world: World, dt: number): StepEvent {
 	const live = world.bodies.filter((b) => !b.defeated);
+	const hits: Vec[] = [];
 	// gravity + integrate
 	for (const b of live) {
 		if (b.invMass === 0) continue;
@@ -241,17 +244,16 @@ export function step(world: World, dt: number): StepEvent {
 		if (sp > MAX_V) { const k = MAX_V / sp; b.vx *= k; b.vy *= k; }
 		b.x += b.vx * dt; b.y += b.vy * dt;
 	}
-	// damage pass (closing speed before the velocity solve)
+	// damage pass (closing speed before the velocity solve) + impact sparks
 	for (let i = 0; i < live.length; i++)
 		for (let j = i + 1; j < live.length; j++) {
 			const a = live[i], b = live[j];
 			const c = collide(a, b);
 			if (!c) continue;
+			const closing = -((b.vx - a.vx) * c.nx + (b.vy - a.vy) * c.ny);
 			const fox = a.tag === 'fox' ? a : b.tag === 'fox' ? b : null;
-			if (fox && fox.hp > 0) {
-				const closing = -((b.vx - a.vx) * c.nx + (b.vy - a.vy) * c.ny);
-				if (closing > HIT_MIN) fox.hp -= (closing - HIT_MIN) * DMG_K;
-			}
+			if (fox && fox.hp > 0 && closing > HIT_MIN) fox.hp -= (closing - HIT_MIN) * DMG_K;
+			if (closing > JUICE && (a.invMass > 0 || b.invMass > 0)) hits.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 		}
 	// solver
 	for (let it = 0; it < ITER; it++)
@@ -271,7 +273,7 @@ export function step(world: World, dt: number): StepEvent {
 			foxesDown++;
 		}
 	}
-	return { foxesDown, settled: isSettled(world) };
+	return { foxesDown, settled: isSettled(world), hits: hits.slice(0, 5) };
 }
 
 export const isSettled = (world: World): boolean =>

@@ -17,7 +17,7 @@ describe('cocotte engine', () => {
 			const b = makeLevel(7, d);
 			expect(a.bodies.length).toBe(b.bodies.length);
 			expect(foxesLeft(a)).toBe(d.foxes);
-			expect(a.cocottes).toBe(d.foxes + d.margin);
+			expect(a.cocottes).toBe(Infinity); // unlimited shots
 			for (const body of a.bodies) {
 				if (body.tag === 'ground') continue;
 				expect(body.x).toBeGreaterThan(0);

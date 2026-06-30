@@ -32,7 +32,7 @@ interface Boom { x: number; y: number; t0: number; }
 export default function AngryGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [status, setStatus] = useState<Status>('aiming');
-	const [cocottesLeft, setCocottesLeft] = useState(0);
+	const [shots, setShots] = useState(0); // cocottes lancées (illimité)
 	const [foxes, setFoxes] = useState(0);
 	const [elapsed, setElapsed] = useState(0);
 	const [best, setBest] = useState<number | null>(null);
@@ -54,6 +54,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const accRef = useRef(0);
 	const lastRef = useRef(0);
 	const boomsRef = useRef<Boom[]>([]);
+	const dustRef = useRef<Boom[]>([]); // small impact puffs
 	const seenDownRef = useRef<Set<number>>(new Set());
 	const dailyRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const bestRef = useRef<number | null>(null);
@@ -73,8 +74,9 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		rollingRef.current = false;
 		aimRef.current = null;
 		boomsRef.current = [];
+		dustRef.current = [];
 		seenDownRef.current = new Set();
-		setCocottesLeft(world.cocottes);
+		setShots(0);
 		setFoxes(foxesLeft(world));
 		setElapsed(0);
 		setStat('aiming');
@@ -128,17 +130,11 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const resolveShot = useCallback(() => {
 		const world = worldRef.current!;
 		if (foxesLeft(world) === 0) { win(); return; }
-		if (world.cocottes - shotsUsedRef.current > 0) {
-			// drop the spent cocotte, load a fresh one
-			if (world.cocotte) world.bodies = world.bodies.filter((b) => b !== world.cocotte);
-			spawnCocotte(world);
-			setStat('aiming');
-		} else {
-			finishedRef.current = true;
-			setStat('lost');
-			trackGame(gameId, 'game_over');
-		}
-	}, [gameId, win]);
+		// unlimited cocottes: drop the spent one and load a fresh cocotte
+		if (world.cocotte) world.bodies = world.bodies.filter((b) => b !== world.cocotte);
+		spawnCocotte(world);
+		setStat('aiming');
+	}, [win]);
 
 	/* ---------- Pointer (slingshot) ---------- */
 	const pointerToWorld = (e: PointerEvent): Vec => {
@@ -173,7 +169,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			if (!v) return;
 			world.cocotte.vx = v.vx; world.cocotte.vy = v.vy; world.cocotte.launched = true;
 			shotsUsedRef.current += 1;
-			setCocottesLeft(world.cocottes - shotsUsedRef.current);
+			setShots(shotsUsedRef.current);
 			if (startRef.current === 0) {
 				startRef.current = Date.now();
 				trackGame(gameId, 'game_started');
@@ -322,6 +318,13 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				}
 			}
 
+			// impact dust puffs
+			dustRef.current = dustRef.current.filter((d) => now - d.t0 < 240);
+			for (const d of dustRef.current) {
+				const e = (now - d.t0) / 240;
+				ctx.fillStyle = `rgba(120,110,100,${0.5 * (1 - e)})`;
+				ctx.beginPath(); ctx.arc(d.x, d.y, 2 + e * 6, 0, Math.PI * 2); ctx.fill();
+			}
 			// explosions
 			boomsRef.current = boomsRef.current.filter((bm) => now - bm.t0 < SINK_MS);
 			for (const bm of boomsRef.current) {
@@ -357,6 +360,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 						}
 						setFoxes(foxesLeft(world));
 					}
+					for (const hpt of ev.hits) if (dustRef.current.length < 24) dustRef.current.push({ x: hpt.x, y: hpt.y, t0: now });
 					settleAccRef.current += STEP;
 					const c = world.cocotte;
 					const offscreen = !!c && (c.x > world.w + 15 || c.x < -15 || c.y > world.h + 15);
@@ -400,7 +404,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="co-stats">
-				<span className="co-stat">🥚 {cocottesLeft} cocottes</span>
+				<span className="co-stat">🥚 {shots} lancées</span>
 				<span className="co-stat">🦊 {foxes} renards</span>
 				<span className="co-stat">⏱ {fmtTime(elapsed)}</span>
 			</div>
@@ -408,12 +412,10 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			<div className="co-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
 				<canvas ref={canvasRef} className="co-canvas" />
-				{(status === 'won' || status === 'lost') && (
+				{status === 'won' && (
 					<div className="co-overlay">
 						<div className="co-overlay-card">
-							{status === 'won'
-								? <>🎉 Tous les renards à terre&nbsp;! <strong>{shotsUsedRef.current} cocottes</strong> · {fmtTime(elapsed)}</>
-								: <>🦊 Renards encore debout… plus de cocottes.</>}
+							🎉 Tous les renards à terre&nbsp;! <strong>{shotsUsedRef.current} cocottes</strong> · {fmtTime(elapsed)}
 							<button className="co-replay" onClick={() => (daily ? lay(diffKey, dailyRef.current!.seed) : newFree(diffKey))}>
 								{daily ? 'Rejouer le défi' : 'Nouveau niveau'}
 							</button>
@@ -424,7 +426,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 
 			<p className="co-help">
 				Glisse depuis la cocotte puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. Fais tomber tous les renards. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
+				c'est puissant. Cocottes illimitées — fais tomber tous les renards en le moins de lancers possible. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
 			</p>
 
 			{daily && <Leaderboard
