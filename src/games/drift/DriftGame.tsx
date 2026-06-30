@@ -621,12 +621,13 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const bg = bestGhostRef.current;
 		if (bg) {
 			const poses = bestGhostPosesRef.current;
-			const started = lapRef.current.startedMs;
-			if (!showGhostRef.current || !poses || poses.length < 2 || started == null) {
+			if (!showGhostRef.current || !poses || poses.length < 2) {
 				bg.visible = false;
 			} else {
-				const elapsed = clockRef.current - started + accRef.current; // ms into the current lap
-				const tf = Math.max(0, elapsed / STEP);
+				const started = lapRef.current.startedMs;
+				// Before the lap is armed, park the ghost on the start line (pose 0) so it's visible from
+				// the very start; once your lap begins, replay it synced to your elapsed lap time.
+				const tf = started == null ? 0 : Math.max(0, (clockRef.current - started + accRef.current) / STEP);
 				const i0 = Math.min(poses.length - 1, Math.floor(tf));
 				const i1 = Math.min(poses.length - 1, i0 + 1);
 				const fr = tf - Math.floor(tf);
@@ -828,6 +829,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				if (rec) {
 					bestGhostPosesRef.current = rec.poses;
 					bestRef.current = rec.ms;
+					lapRef.current.bestMs = rec.ms; // seed the engine so a slower lap can't overwrite it
 					setBestMs(rec.ms);
 				}
 			}
