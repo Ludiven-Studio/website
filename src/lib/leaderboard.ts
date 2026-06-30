@@ -124,10 +124,11 @@ async function submitScore(game: string, value: number, metric: Metric): Promise
 	const name = playerName().trim();
 	if (!name) return false;
 	try {
-		const res = await fetch(`${SUPABASE_URL}/rest/v1/scores`, {
+		// submit_score RPC keeps a single best row per (game, day, player) and purges past days.
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
 			method: 'POST',
-			headers: { ...headers(), Prefer: 'return=minimal' },
-			body: JSON.stringify({ game, day: todayKey(), name, value, metric }),
+			headers: headers(),
+			body: JSON.stringify({ p_game: game, p_day: todayKey(), p_name: name, p_value: value, p_metric: metric }),
 		});
 		return res.ok;
 	} catch {
