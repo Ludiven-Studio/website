@@ -32,7 +32,7 @@ function EquationRow({ q, eq }: { q: Question; eq: Question['equations'][number]
 		<div className="fr-eq">
 			{eq.tokens.map((t, i) => (
 				<span key={i} className={t.kind === 'fruit' ? 'fr-fruit' : 'fr-op'}>
-					{t.kind === 'fruit' ? q.fruits[t.idx] : t.op}
+					{t.kind === 'fruit' ? <>{t.coef && t.coef > 1 ? <span className="fr-coef">{t.coef}</span> : null}{q.fruits[t.idx]}</> : t.op}
 				</span>
 			))}
 			<span className="fr-op">=</span>
@@ -298,6 +298,7 @@ const CSS = `
 .fr-eqs { display: flex; flex-direction: column; gap: 8px; align-items: center; background: var(--gray-999); border: 1.5px solid var(--gray-800); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow-sm); }
 .fr-eq { display: flex; align-items: center; gap: 6px; font-size: 26px; line-height: 1; }
 .fr-fruit { font-size: 28px; }
+.fr-coef { font-size: 18px; font-weight: 800; color: var(--gray-0); margin-right: 1px; vertical-align: 0.12em; }
 .fr-op { color: var(--gray-300); font-weight: 700; font-size: 22px; }
 .fr-res { font-weight: 800; color: var(--fr-accent); font-size: 26px; font-variant-numeric: tabular-nums; }
 .fr-ask { color: var(--gray-0); font-size: 16px; margin: 1.1rem 0 0.75rem; text-align: center; }

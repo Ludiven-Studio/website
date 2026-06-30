@@ -40,7 +40,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	],
 	flechettes: [
 		{ emoji: '🎯', title: 'Le but (501)', body: 'Tu pars de 501 et tu dois tomber pile à 0 en un minimum de fléchettes. La dernière fléchette doit finir sur un DOUBLE (ou le bullseye).' },
-		{ emoji: '👆', title: 'Viser & lancer', body: 'Le viseur oscille sur la cible. Tape l\'écran au bon moment : la fléchette se plante là où est le viseur. Triple = ×3, Double = ×2, bull = 25, bullseye = 50.' },
+		{ emoji: '👆', title: 'Viser & lancer', body: 'Glisse le cadre sur la zone que tu veux viser. Le viseur oscille à l\'intérieur du cadre : tape dedans au bon moment pour lancer. Triple = ×3, Double = ×2, bull = 25, bullseye = 50.' },
 		{ emoji: '⚠️', title: 'Bust', body: 'Si un lancer te fait passer en dessous de 2, ou pile à 0 sans double, c\'est « bust » : rien n\'est soustrait mais la fléchette est gâchée. Au défi du jour, même cible mobile pour tous ; le chrono départage.' },
 	],
 	fruits: [

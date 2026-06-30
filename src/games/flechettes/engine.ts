@@ -44,21 +44,22 @@ export function applyThrow(remaining: number, hit: Hit): ThrowResult {
 
 /* ---------- Difficulty / oscillating reticle ---------- */
 
+// amp is the fraction of the AIM FRAME the reticle roams (≤1) — the UI scales it by the frame size.
 export interface DiffLevel { label: string; omega: number; amp: number; }
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', omega: 1.1, amp: 0.55 },
-	moyen: { label: 'Moyen', omega: 1.6, amp: 0.7 },
-	difficile: { label: 'Difficile', omega: 2.2, amp: 0.82 },
+	facile: { label: 'Facile', omega: 1.1, amp: 0.5 },
+	moyen: { label: 'Moyen', omega: 1.6, amp: 0.72 },
+	difficile: { label: 'Difficile', omega: 2.3, amp: 0.95 },
 };
 
-/** Deterministic reticle position (Lissajous) for a given dart at time tMs. */
+/** Deterministic reticle OFFSET (Lissajous) within the aim frame, in [-amp, amp]². */
 export function reticleAt(seed: number, dartIndex: number, diff: DiffLevel, tMs: number): { x: number; y: number } {
 	const rng = mulberry32((seed + dartIndex * 0x9e3779b1) >>> 0);
 	const wx = diff.omega * (0.8 + rng() * 0.5);
 	const wy = diff.omega * (0.8 + rng() * 0.5);
 	const px = rng() * Math.PI * 2, py = rng() * Math.PI * 2;
-	const ax = diff.amp * (0.7 + rng() * 0.4);
-	const ay = diff.amp * (0.7 + rng() * 0.4);
+	const ax = diff.amp * (0.7 + rng() * 0.3);
+	const ay = diff.amp * (0.7 + rng() * 0.3);
 	const t = tMs / 1000;
 	return { x: ax * Math.sin(wx * t + px), y: ay * Math.sin(wy * t + py) };
 }

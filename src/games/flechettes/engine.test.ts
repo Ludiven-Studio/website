@@ -34,8 +34,8 @@ describe('flechettes engine', () => {
 				const a = reticleAt(123, 0, d, t);
 				const b = reticleAt(123, 0, d, t);
 				expect(a).toEqual(b);
-				expect(Math.abs(a.x)).toBeLessThanOrEqual(d.amp * 1.2 + 1e-9);
-				expect(Math.abs(a.y)).toBeLessThanOrEqual(d.amp * 1.2 + 1e-9);
+				expect(Math.abs(a.x)).toBeLessThanOrEqual(d.amp + 1e-9); // offset stays within the frame
+				expect(Math.abs(a.y)).toBeLessThanOrEqual(d.amp + 1e-9);
 			}
 			// different darts → different oscillation
 			expect(reticleAt(123, 0, d, 500)).not.toEqual(reticleAt(123, 1, d, 500));

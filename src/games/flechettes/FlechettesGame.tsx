@@ -18,6 +18,9 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 
 type Status = 'aiming' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+const HALF_FRAME = 0.22; // aim-frame half-size (normalised board units)
+const TAP_THRESH = 0.05; // movement below this = a tap (not a drag)
+const clampAim = (x: number, y: number) => { const r = Math.hypot(x, y); const k = r > 1 ? 1 / r : 1; return { x: x * k, y: y * k }; };
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -44,6 +47,9 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const sizeRef = useRef(360); // css px (square)
+	const aimRef = useRef({ x: 0, y: -0.45 }); // aim-frame centre (normalised board coords)
+	const downRef = useRef<{ x: number; y: number } | null>(null); // pointer-down board pos
+	const movedRef = useRef(false);
 	const statusRef = useRef<Status>('aiming');
 	const remainingRef = useRef(START_SCORE);
 	const dartsRef = useRef<Dart[]>([]);
@@ -69,6 +75,9 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		dartsRef.current = [];
 		dartIdxRef.current = 0;
 		dartStartRef.current = (typeof performance !== 'undefined' ? performance.now() : 0);
+		aimRef.current = { x: 0, y: -0.45 }; // start aiming at the 20
+		downRef.current = null;
+		movedRef.current = false;
 		startRef.current = 0;
 		finishedRef.current = false;
 		setRemaining(START_SCORE);
@@ -121,17 +130,21 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		}
 	}, [daily, diffKey, gameId]);
 
-	/* ---------- Throw on tap ---------- */
+	/* ---------- Aim frame: drag to move, tap inside to throw ---------- */
 	useEffect(() => {
 		const cv = canvasRef.current;
 		if (!cv) return;
-		const throwDart = (e: PointerEvent) => {
-			if (statusRef.current !== 'aiming') return;
-			e.preventDefault();
+		const toBoard = (e: PointerEvent) => {
+			const rect = cv.getBoundingClientRect();
+			const R = sizeRef.current * 0.42, cx = sizeRef.current / 2, cy = sizeRef.current / 2;
+			return { x: (e.clientX - rect.left - cx) / R, y: (e.clientY - rect.top - cy) / R };
+		};
+		const fire = () => {
 			const now = (typeof performance !== 'undefined' ? performance.now() : 0);
-			const p = reticleAt(seedRef.current, dartIdxRef.current, diffRef.current, now - dartStartRef.current);
-			const hit = dartScore(p.x, p.y);
-			dartsRef.current.push({ x: p.x, y: p.y, ring: hit.ring });
+			const off = reticleAt(seedRef.current, dartIdxRef.current, diffRef.current, now - dartStartRef.current);
+			const x = aimRef.current.x + off.x * HALF_FRAME, y = aimRef.current.y + off.y * HALF_FRAME;
+			const hit = dartScore(x, y);
+			dartsRef.current.push({ x, y, ring: hit.ring });
 			dartIdxRef.current += 1;
 			dartStartRef.current = now;
 			setDarts(dartsRef.current.length);
@@ -147,8 +160,38 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			setRemaining(res.remaining);
 			if (res.finished) win();
 		};
-		cv.addEventListener('pointerdown', throwDart);
-		return () => cv.removeEventListener('pointerdown', throwDart);
+		const down = (e: PointerEvent) => {
+			if (statusRef.current !== 'aiming') return;
+			e.preventDefault();
+			downRef.current = toBoard(e);
+			movedRef.current = false;
+			cv.setPointerCapture(e.pointerId);
+		};
+		const move = (e: PointerEvent) => {
+			if (!downRef.current) return;
+			const p = toBoard(e);
+			if (Math.hypot(p.x - downRef.current.x, p.y - downRef.current.y) > TAP_THRESH) movedRef.current = true;
+			if (movedRef.current) aimRef.current = clampAim(p.x, p.y); // drag repositions the frame
+		};
+		const up = () => {
+			const d = downRef.current;
+			downRef.current = null;
+			if (!d || statusRef.current !== 'aiming') return;
+			if (movedRef.current) return; // it was a drag → no throw
+			const inFrame = Math.abs(d.x - aimRef.current.x) <= HALF_FRAME && Math.abs(d.y - aimRef.current.y) <= HALF_FRAME;
+			if (inFrame) fire();
+			else aimRef.current = clampAim(d.x, d.y); // tap outside → move the frame there
+		};
+		cv.addEventListener('pointerdown', down);
+		cv.addEventListener('pointermove', move);
+		cv.addEventListener('pointerup', up);
+		cv.addEventListener('pointercancel', up);
+		return () => {
+			cv.removeEventListener('pointerdown', down);
+			cv.removeEventListener('pointermove', move);
+			cv.removeEventListener('pointerup', up);
+			cv.removeEventListener('pointercancel', up);
+		};
 	}, [daily, gameId, win]);
 
 	/* ---------- Resize (square) ---------- */
@@ -221,15 +264,22 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 				ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(px, py, 3.2, 0, Math.PI * 2); ctx.fill();
 				ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(px, py, 1.6, 0, Math.PI * 2); ctx.fill();
 			}
-			// oscillating reticle (only while aiming)
+			// aim frame + oscillating reticle inside it (only while aiming)
 			if (statusRef.current === 'aiming') {
+				const ac = aimRef.current;
+				const fx = cx + ac.x * R, fy = cy + ac.y * R, fh = HALF_FRAME * R;
+				// frame
+				ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+				ctx.strokeRect(fx - fh, fy - fh, fh * 2, fh * 2);
+				ctx.setLineDash([]);
+				// reticle within the frame
 				const now = (typeof performance !== 'undefined' ? performance.now() : 0);
-				const p = reticleAt(seedRef.current, dartIdxRef.current, diffRef.current, now - dartStartRef.current);
-				const px = cx + p.x * R, py = cy + p.y * R, rr = R * 0.06;
+				const off = reticleAt(seedRef.current, dartIdxRef.current, diffRef.current, now - dartStartRef.current);
+				const px = fx + off.x * fh, py = fy + off.y * fh, rr = R * 0.05;
 				ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
 				ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.stroke();
-				ctx.beginPath(); ctx.moveTo(px - rr * 1.6, py); ctx.lineTo(px + rr * 1.6, py); ctx.moveTo(px, py - rr * 1.6); ctx.lineTo(px, py + rr * 1.6); ctx.stroke();
-				ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(px, py, 1.6, 0, Math.PI * 2); ctx.fill();
+				ctx.beginPath(); ctx.moveTo(px - rr * 1.7, py); ctx.lineTo(px + rr * 1.7, py); ctx.moveTo(px, py - rr * 1.7); ctx.lineTo(px, py + rr * 1.7); ctx.stroke();
+				ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(px, py, 1.7, 0, Math.PI * 2); ctx.fill();
 			}
 			if (startRef.current && !finishedRef.current) setElapsed((Date.now() - startRef.current) / 1000);
 			rafRef.current = requestAnimationFrame(frame);
@@ -288,8 +338,8 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="da-help">
-				Le viseur oscille : <strong>tape</strong> pour lancer la fléchette. Pars de 501 et tombe pile à 0
-				en finissant sur un <strong>double</strong>. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
+				<strong>Glisse le cadre</strong> sur la zone visée, puis <strong>tape dedans</strong> pour lancer : le
+				viseur oscille dans le cadre. Pars de 501 et tombe pile à 0 sur un <strong>double</strong>. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
 			</p>
 
 			{daily && <Leaderboard
