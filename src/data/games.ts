@@ -167,6 +167,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'angry',
+		title: 'Angry Cocottes',
+		pitch: 'Lance la cocotte à la fronde et fais tomber tous les renards en un minimum de coups. Les structures s\'effondrent !',
+		icon: 'angry',
+		href: '/jeux/angry',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'billard',
 		title: 'Billard',
 		pitch: 'Vise à la fronde et rentre les 3 boules colorées avec la blanche. Rebonds sur les bandes, en un minimum de coups.',

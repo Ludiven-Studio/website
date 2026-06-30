@@ -108,6 +108,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎯', title: 'Viser à la fronde', body: 'Touche/clique près de la balle et tire dans le sens OPPOSÉ à la direction voulue : un élastique part de la balle. Plus tu tires loin, plus le coup est puissant. Relâche pour frapper.' },
 		{ emoji: '↩️', title: 'Rebonds & fantômes', body: 'La balle rebondit sur les bords et les murs : sers-t\'en pour contourner les obstacles. Au défi du jour, même trou pour tous, 10 essais, et tu vois les balles fantômes des autres joueurs en direct (classement au moins de coups).' },
 	],
+	angry: [
+		{ emoji: '🐔', title: 'Le but', body: 'Fais tomber tous les renards en lançant la cocotte, avec le moins de cocottes possible.' },
+		{ emoji: '🎯', title: 'Viser à la fronde', body: 'Glisse depuis la cocotte et tire dans le sens OPPOSÉ à la direction voulue : plus tu tires loin, plus le lancer est puissant. Relâche pour lancer. Une trajectoire en pointillés t\'aide à viser.' },
+		{ emoji: '🦊', title: 'Structures & renards', body: 'Casse les caisses et tonneaux pour faire s\'effondrer les structures : chaque impact entame la vie des renards, et ils explosent à 0. Au défi du jour, même niveau pour tous ; le chrono départage.' },
+	],
 	billard: [
 		{ emoji: '🎱', title: 'Le but', body: 'Rentre toutes les boules colorées dans les trous à l\'aide de la boule blanche, en un minimum de coups (3 en facile, 4 en moyen, 5 en difficile).' },
 		{ emoji: '🎯', title: 'Viser à la fronde', body: 'Glisse depuis la boule blanche et tire dans le sens OPPOSÉ à la direction voulue : plus tu tires loin, plus le coup est puissant. Relâche pour frapper. La boule rebondit sur les bandes.' },
