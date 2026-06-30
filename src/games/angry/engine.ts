@@ -41,16 +41,17 @@ export interface World {
 
 export const GRAVITY = 380;
 const SETTLE = 12; // speed below which a body counts as at rest
-const MAX_V = 720;
+const MAX_V = 900;
 const ITER = 8; // solver iterations
 const HIT_MIN = 35; // impact speed below which no damage
 const DMG_K = 0.6; // damage per (impact - HIT_MIN)
 const MIN_PULL = 3;
-const MAX_PULL = 42;
-const MAX_SPEED = 215;
+const MAX_PULL = 46;
+const MAX_SPEED = 320; // stronger launch → reaches the far side of the scene
 
-const REST: Record<Tag, number> = { cocotte: 0.34, fox: 0.2, barrel: 0.3, crate: 0.1, rock: 0.2, ground: 0.25 };
-const FRIC: Record<Tag, number> = { cocotte: 0.5, fox: 0.5, barrel: 0.5, crate: 0.6, rock: 0.5, ground: 0.7 };
+// Low cocotte friction → it keeps rolling far; crates keep high friction so stacks stay put.
+const REST: Record<Tag, number> = { cocotte: 0.34, fox: 0.2, barrel: 0.3, crate: 0.1, rock: 0.2, ground: 0.22 };
+const FRIC: Record<Tag, number> = { cocotte: 0.16, fox: 0.45, barrel: 0.32, crate: 0.6, rock: 0.5, ground: 0.6 };
 const MASS: Record<Tag, number> = { cocotte: 1, fox: 1.2, barrel: 1, rock: 1.6, crate: 1.3, ground: 0 };
 
 const len = (x: number, y: number) => Math.hypot(x, y);
@@ -82,30 +83,54 @@ export const DIFFS: Record<string, DiffLevel> = {
 
 const ri = (rng: Rng, lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1));
 
+const FOX_R = 6;
+
+/** Build one construction (with elongated beams/pillars) and its fox around x=bx. */
+function buildStructure(world: World, bx: number, rng: Rng, diff: DiffLevel) {
+	const g = world.groundY;
+	const crate = (x: number, y: number, hw: number, hh: number) => world.bodies.push(box('crate', x, y, hw, hh));
+	const fox = (x: number, y: number) => world.bodies.push(circle('fox', x, y, FOX_R, diff.hp));
+	const arche = ri(rng, 0, 2);
+
+	if (arche === 0) {
+		// Shelter: two pillars + a long roof beam, fox tucked on the ground inside.
+		const ph = 11, bh = 2.5;
+		crate(bx - 12, g - ph, 2.5, ph);
+		crate(bx + 12, g - ph, 2.5, ph);
+		crate(bx, g - 2 * ph - bh, 15, bh); // long roof beam
+		fox(bx, g - FOX_R);
+		if (diff.sturdiness >= 2) crate(bx, g - 2 * ph - 2 * bh - 5.5, 5.5, 5.5); // weight on the roof
+		if (rng() < 0.4) world.bodies.push(circle('barrel', bx - 22, g - 5.5, 5.5));
+	} else if (arche === 1) {
+		// Tower: stack of crates with the fox perched on top, optional side wall.
+		const n = 1 + diff.sturdiness;
+		for (let k = 0; k < n; k++) crate(bx, g - 5.5 - k * 11, 5.5, 5.5);
+		const topY = g - 5.5 - (n - 1) * 11;
+		fox(bx, topY - 5.5 - FOX_R);
+		if (rng() < 0.5) crate(bx - 13, g - 14, 2.5, 14); // tall side wall (long block)
+	} else {
+		// Fort: a tall wall facing the slingshot blocks low shots — arc over it. Fox sheltered behind.
+		const wh = 15;
+		crate(bx - 9, g - wh, 2.5, wh); // tall front wall
+		fox(bx + 1, g - FOX_R);
+		crate(bx + 12, g - 9, 2.5, 9); // shorter back wall
+		if (diff.sturdiness >= 3) crate(bx - 9, g - 2 * wh - 5.5, 5.5, 5.5); // crate on the wall
+	}
+}
+
 export function makeLevel(seed: number, diff: DiffLevel): World {
 	UID = 1;
 	const w = 300, h = 190, groundY = 168;
 	const world: World = {
 		w, h, groundY, gravity: GRAVITY, bodies: [], slingshot: { x: 30, y: groundY - 30 }, cocotte: null, cocottes: diff.foxes + diff.margin,
 	};
-	// ground (static)
-	world.bodies.push(box('ground', w / 2, groundY + 30, w / 2 + 40, 30, true));
+	world.bodies.push(box('ground', w / 2, groundY + 30, w / 2 + 40, 30, true)); // static ground
 
-	// one small structure per fox, spread across the right side
 	const F = diff.foxes;
-	const startX = 132, endX = w - 22;
-	const CH = 5.5; // crate half-size
+	const startX = 122, endX = w - 20;
 	for (let i = 0; i < F; i++) {
 		const bx = F === 1 ? (startX + endX) / 2 : startX + (i * (endX - startX)) / (F - 1);
-		const n = 1 + diff.sturdiness + ri(rng2(seed, i), 0, 1);
-		for (let k = 0; k < n; k++) {
-			world.bodies.push(box('crate', bx, groundY - CH - k * 2 * CH, CH, CH));
-		}
-		const topY = groundY - CH - (n - 1) * 2 * CH; // top crate centre
-		const foxR = 6;
-		world.bodies.push(circle('fox', bx, topY - CH - foxR, foxR, diff.hp));
-		// optional guard barrel in front of some structures
-		if (rng2(seed, i + 100)() < 0.5) world.bodies.push(circle('barrel', bx - 16, groundY - 5.5, 5.5));
+		buildStructure(world, bx, rng2(seed, i), diff);
 	}
 	spawnCocotte(world);
 	return world;

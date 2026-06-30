@@ -48,11 +48,11 @@ describe('cocotte engine', () => {
 
 	it('circle-circle impact transfers momentum (struck body moves, striker slows)', () => {
 		const w = makeLevel(1, DIFFS.facile);
-		// two barrels in open space, head-on
-		const a = w.bodies.find((b) => b.tag === 'barrel')!;
+		// cocotte (striker) into a fox (struck), in open space, head-on
+		const a = w.cocotte!;
 		a.x = 80; a.y = 80; a.vx = 120; a.vy = 0;
-		const b = w.cocotte!; // reuse as the second circle
-		b.x = 80 + a.r + b.r - 0.5; b.y = 80; b.vx = 0; b.vy = 0;
+		const b = w.bodies.find((x) => x.tag === 'fox')!;
+		b.x = 80 + a.r + b.r - 0.5; b.y = 80; b.vx = 0; b.vy = 0; b.hp = 9999; // don't let it explode here
 		step(w, 1 / 240);
 		expect(b.vx, 'struck moves forward').toBeGreaterThan(20);
 		expect(a.vx, 'striker slows').toBeLessThan(120);

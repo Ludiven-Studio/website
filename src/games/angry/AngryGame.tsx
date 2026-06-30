@@ -358,8 +358,10 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 						setFoxes(foxesLeft(world));
 					}
 					settleAccRef.current += STEP;
+					const c = world.cocotte;
+					const offscreen = !!c && (c.x > world.w + 15 || c.x < -15 || c.y > world.h + 15);
 					if (foxesLeft(world) === 0 && !finishedRef.current) { rollingRef.current = false; resolveShot(); }
-					else if (ev.settled || settleAccRef.current > SETTLE_TIMEOUT) { rollingRef.current = false; resolveShot(); }
+					else if (ev.settled || offscreen || settleAccRef.current > SETTLE_TIMEOUT) { rollingRef.current = false; resolveShot(); }
 				}
 			}
 			if (startRef.current && !finishedRef.current) setElapsed((Date.now() - startRef.current) / 1000);
