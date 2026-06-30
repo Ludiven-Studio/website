@@ -61,6 +61,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const dustRef = useRef<Boom[]>([]); // small impact puffs
 	const debrisRef = useRef<Debris[]>([]); // block-shatter shards
 	const settledForRef = useRef(0); // ms the world has stayed calm
+	const curSeedRef = useRef(0); // seed of the level currently in play (for « Recommencer »)
 	const seenDownRef = useRef<Set<number>>(new Set());
 	const dailyRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const bestRef = useRef<number | null>(null);
@@ -74,6 +75,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const lay = useCallback((key: keyof typeof DIFFS, seed: number) => {
 		const world = makeLevel(seed, DIFFS[key]);
 		worldRef.current = world;
+		curSeedRef.current = seed;
 		shotsUsedRef.current = 0;
 		startRef.current = 0;
 		finishedRef.current = false;
@@ -97,6 +99,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		setBest(lb ? Number(lb) : null);
 		lay(key, (Math.random() * 2 ** 31) >>> 0);
 	}, [lay]);
+
+	const restart = useCallback(() => lay(diffKey, curSeedRef.current), [lay, diffKey]); // same level
 
 	const startDaily = useCallback(async () => {
 		setDaily(true);
@@ -445,9 +449,10 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="co-stats">
-				<span className="co-stat">🥚 {shots} lancées</span>
+				<span className="co-stat">🐔 {shots} lancées</span>
 				<span className="co-stat">🦊 {foxes} renards</span>
 				<span className="co-stat">⏱ {fmtTime(elapsed)}</span>
+				<button className="co-act" onClick={restart}>↺ Recommencer</button>
 			</div>
 
 			<div className="co-playwrap" ref={wrapRef}>
