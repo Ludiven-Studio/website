@@ -123,14 +123,22 @@ async function submitScore(game: string, value: number, metric: Metric): Promise
 	if (!leaderboardEnabled()) return false;
 	const name = playerName().trim();
 	if (!name) return false;
+	const day = todayKey();
 	try {
-		// submit_score RPC keeps a single best row per (game, day, player) and purges past days.
+		// Preferred: RPC that keeps a single best row per (game, day, player) and purges past days.
 		const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
 			method: 'POST',
 			headers: headers(),
-			body: JSON.stringify({ p_game: game, p_day: todayKey(), p_name: name, p_value: value, p_metric: metric }),
+			body: JSON.stringify({ p_game: game, p_day: day, p_name: name, p_value: value, p_metric: metric }),
 		});
-		return res.ok;
+		if (res.ok) return true;
+		// Fallback when the RPC isn't deployed yet (e.g. 404): plain insert so scores still save.
+		const ins = await fetch(`${SUPABASE_URL}/rest/v1/scores`, {
+			method: 'POST',
+			headers: { ...headers(), Prefer: 'return=minimal' },
+			body: JSON.stringify({ game, day, name, value, metric }),
+		});
+		return ins.ok;
 	} catch {
 		return false;
 	}
