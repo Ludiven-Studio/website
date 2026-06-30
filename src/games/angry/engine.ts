@@ -124,7 +124,12 @@ function buildStructure(world: World, bx: number, rng: Rng, diff: DiffLevel, all
 	const g = world.groundY;
 	const m = pickMat(rng); // structure theme material
 	const wantTnt = allowTnt && rng() < 0.6;
-	const blk = (x: number, y: number, hw: number, hh: number, tnt = false) => world.bodies.push(block(tnt ? 'tnt' : m, x, y, hw, hh));
+	const CH = 5.5; // standard cube half-size — TNT is ALWAYS this size (stacked for tall columns)
+	const blk = (x: number, y: number, hw: number, hh: number, tnt = false) => {
+		if (!tnt) { world.bodies.push(block(m, x, y, hw, hh)); return; }
+		const n = Math.max(1, Math.round(hh / CH)); // fill a tall span with fixed-size TNT cubes
+		for (let k = 0; k < n; k++) world.bodies.push(block('tnt', x, (y + hh) - CH - k * 2 * CH, CH, CH));
+	};
 	const fox = (x: number, y: number) => world.bodies.push(circle('fox', x, y, FOX_R, diff.hp));
 	const arche = ri(rng, 0, 3);
 	const tall = rng() < 0.45; // some foxes get a much taller construction (bigger fall)
