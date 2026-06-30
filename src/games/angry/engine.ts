@@ -76,16 +76,19 @@ export interface DiffLevel {
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', foxes: 3, hp: 40, margin: 2, sturdiness: 1 },
-	moyen: { label: 'Moyen', foxes: 4, hp: 60, margin: 2, sturdiness: 2 },
-	difficile: { label: 'Difficile', foxes: 5, hp: 85, margin: 1, sturdiness: 3 },
+	facile: { label: 'Facile', foxes: 3, hp: 30, margin: 2, sturdiness: 1 },
+	moyen: { label: 'Moyen', foxes: 4, hp: 45, margin: 2, sturdiness: 2 },
+	difficile: { label: 'Difficile', foxes: 5, hp: 60, margin: 1, sturdiness: 3 },
 };
 
 const ri = (rng: Rng, lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1));
 
 const FOX_R = 6;
 
-/** Build one construction (with elongated beams/pillars) and its fox around x=bx. */
+/**
+ * Build one construction with its fox **perched on top / in balance** (exposed), so a
+ * direct hit or knocking the support topples it — it falls and takes fall damage.
+ */
 function buildStructure(world: World, bx: number, rng: Rng, diff: DiffLevel) {
 	const g = world.groundY;
 	const crate = (x: number, y: number, hw: number, hh: number) => world.bodies.push(box('crate', x, y, hw, hh));
@@ -93,28 +96,24 @@ function buildStructure(world: World, bx: number, rng: Rng, diff: DiffLevel) {
 	const arche = ri(rng, 0, 2);
 
 	if (arche === 0) {
-		// Shelter: two pillars + a long roof beam, fox tucked on the ground inside.
-		const ph = 11, bh = 2.5;
-		crate(bx - 12, g - ph, 2.5, ph);
-		crate(bx + 12, g - ph, 2.5, ph);
-		crate(bx, g - 2 * ph - bh, 15, bh); // long roof beam
-		fox(bx, g - FOX_R);
-		if (diff.sturdiness >= 2) crate(bx, g - 2 * ph - 2 * bh - 5.5, 5.5, 5.5); // weight on the roof
-		if (rng() < 0.4) world.bodies.push(circle('barrel', bx - 22, g - 5.5, 5.5));
+		// Pole: a tall narrow pillar with the fox balanced on top — easy to topple.
+		const ph = 9 + diff.sturdiness * 2;
+		crate(bx, g - ph, 4, ph);
+		fox(bx, g - 2 * ph - FOX_R);
+		if (rng() < 0.5) world.bodies.push(circle('barrel', bx - 20, g - 5.5, 5.5)); // rolling obstacle in front
 	} else if (arche === 1) {
-		// Tower: stack of crates with the fox perched on top, optional side wall.
+		// Bridge: a long plank on two pillars, fox standing on top of the plank (exposed).
+		const ph = 8 + diff.sturdiness, bh = 2.5;
+		crate(bx - 12, g - ph, 3, ph);
+		crate(bx + 12, g - ph, 3, ph);
+		crate(bx, g - 2 * ph - bh, 14, bh); // plank
+		fox(bx, g - 2 * ph - 2 * bh - FOX_R);
+	} else {
+		// Stack: crates piled up with the fox perched on top, a neighbour crate to knock into it.
 		const n = 1 + diff.sturdiness;
 		for (let k = 0; k < n; k++) crate(bx, g - 5.5 - k * 11, 5.5, 5.5);
-		const topY = g - 5.5 - (n - 1) * 11;
-		fox(bx, topY - 5.5 - FOX_R);
-		if (rng() < 0.5) crate(bx - 13, g - 14, 2.5, 14); // tall side wall (long block)
-	} else {
-		// Fort: a tall wall facing the slingshot blocks low shots — arc over it. Fox sheltered behind.
-		const wh = 15;
-		crate(bx - 9, g - wh, 2.5, wh); // tall front wall
-		fox(bx + 1, g - FOX_R);
-		crate(bx + 12, g - 9, 2.5, 9); // shorter back wall
-		if (diff.sturdiness >= 3) crate(bx - 9, g - 2 * wh - 5.5, 5.5, 5.5); // crate on the wall
+		fox(bx, g - 5.5 - (n - 1) * 11 - 5.5 - FOX_R);
+		if (rng() < 0.5) crate(bx + 13, g - 5.5, 5.5, 5.5);
 	}
 }
 
