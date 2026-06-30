@@ -23,6 +23,7 @@ describe('cocotte engine', () => {
 				expect(body.x).toBeGreaterThan(0);
 				expect(body.x).toBeLessThan(a.w);
 				expect(body.y).toBeLessThanOrEqual(a.groundY + 1);
+				if (body.tag === 'crate') expect(body.mat).not.toBeNull(); // blocks have a material
 			}
 		}
 	});
@@ -79,6 +80,21 @@ describe('cocotte engine', () => {
 		const hp2 = fox2.hp;
 		step(soft, 1 / 120);
 		expect(fox2.hp).toBe(hp2); // closing 20 < HIT_MIN → no damage
+	});
+
+	it('a tnt block detonates on a hard hit, blasting and damaging a nearby fox', () => {
+		const w = makeLevel(9, DIFFS.facile);
+		const tnt = w.bodies.find((b) => b.tag === 'crate')!;
+		tnt.mat = 'tnt'; tnt.hw = 5.5; tnt.hh = 5.5; tnt.x = 120; tnt.y = 120; tnt.vx = 0; tnt.vy = 0;
+		const fox = w.bodies.find((b) => b.tag === 'fox')!;
+		fox.x = 126; fox.y = 120; fox.vx = 0; fox.vy = 0; // within the blast radius
+		const hp0 = fox.hp;
+		const c = w.cocotte!;
+		c.x = 120 - (c.r + tnt.hw) + 1; c.y = 120; c.vx = 220; c.vy = 0; c.launched = true;
+		const e = step(w, 1 / 120);
+		expect(tnt.defeated, 'tnt consumed').toBe(true);
+		expect(e.blasts.length, 'an explosion happened').toBeGreaterThanOrEqual(1);
+		expect(fox.hp).toBeLessThan(hp0); // blast hurt the fox
 	});
 
 	it('a fox knocked off the field is defeated', () => {

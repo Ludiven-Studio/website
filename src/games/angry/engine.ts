@@ -11,6 +11,7 @@ import type { Rng } from '../prng';
 export interface Vec { x: number; y: number; }
 export type Kind = 'circle' | 'box';
 export type Tag = 'cocotte' | 'fox' | 'barrel' | 'crate' | 'rock' | 'ground';
+export type Material = 'cardboard' | 'wood' | 'brick' | 'tnt';
 
 export interface Body {
 	id: number;
@@ -24,6 +25,7 @@ export interface Body {
 	fric: number;
 	hp: number; maxHp: number; // foxes only
 	spin: number; // visual roll angle (radians) for circular bodies
+	mat: Material | null; // material for boxes (drives mass/bounce/colour; 'tnt' explodes)
 	defeated: boolean;
 	launched: boolean; // cocotte: has been fired
 }
@@ -57,15 +59,32 @@ const FRIC: Record<Tag, number> = { cocotte: 0.16, fox: 0.4, barrel: 0.3, crate:
 const MASS: Record<Tag, number> = { cocotte: 1.5, fox: 1, barrel: 0.7, rock: 1, crate: 0.7, ground: 0 };
 const JUICE = 90; // closing speed above which a collision sparks impact particles
 
+// Block materials: cardboard (light/floppy) · wood (default) · brick (heavy/sturdy) · tnt (explosive).
+const MATS: Record<Material, { mass: number; rest: number; fric: number }> = {
+	cardboard: { mass: 0.35, rest: 0.12, fric: 0.5 },
+	wood: { mass: 0.7, rest: 0.28, fric: 0.42 },
+	brick: { mass: 1.9, rest: 0.1, fric: 0.62 },
+	tnt: { mass: 0.8, rest: 0.25, fric: 0.45 },
+};
+const TNT_TRIGGER = 110; // impact speed that detonates a tnt block
+const BLAST_R = 40; // explosion radius
+const BLAST_IMPULSE = 260; // blast launch strength
+const BLAST_DMG = 130; // blast damage to foxes (×falloff)
+
 const len = (x: number, y: number) => Math.hypot(x, y);
 let UID = 1;
 
 function circle(tag: Tag, x: number, y: number, r: number, hp = 0): Body {
-	return { id: UID++, kind: 'circle', tag, x, y, vx: 0, vy: 0, r, hw: 0, hh: 0, invMass: MASS[tag] ? 1 / MASS[tag] : 0, rest: REST[tag], fric: FRIC[tag], hp, maxHp: hp, spin: 0, defeated: false, launched: false };
+	return { id: UID++, kind: 'circle', tag, x, y, vx: 0, vy: 0, r, hw: 0, hh: 0, invMass: MASS[tag] ? 1 / MASS[tag] : 0, rest: REST[tag], fric: FRIC[tag], hp, maxHp: hp, spin: 0, mat: null, defeated: false, launched: false };
 }
 function box(tag: Tag, x: number, y: number, hw: number, hh: number, isStatic = false): Body {
 	const m = isStatic ? 0 : MASS[tag];
-	return { id: UID++, kind: 'box', tag, x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: m ? 1 / m : 0, rest: REST[tag], fric: FRIC[tag], hp: 0, maxHp: 0, spin: 0, defeated: false, launched: false };
+	return { id: UID++, kind: 'box', tag, x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: m ? 1 / m : 0, rest: REST[tag], fric: FRIC[tag], hp: 0, maxHp: 0, spin: 0, mat: null, defeated: false, launched: false };
+}
+/** A dynamic material block (tag 'crate'); physics come from the material. */
+function block(mat: Material, x: number, y: number, hw: number, hh: number): Body {
+	const d = MATS[mat];
+	return { id: UID++, kind: 'box', tag: 'crate', x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: 1 / d.mass, rest: d.rest, fric: d.fric, hp: 0, maxHp: 0, spin: 0, mat, defeated: false, launched: false };
 }
 
 /* ---------- Difficulty / level ---------- */
@@ -88,37 +107,43 @@ const ri = (rng: Rng, lo: number, hi: number) => lo + Math.floor(rng() * (hi - l
 
 const FOX_R = 6;
 
+const pickMat = (rng: Rng): Material => { const r = rng(); return r < 0.5 ? 'wood' : r < 0.75 ? 'cardboard' : 'brick'; };
+
 /**
  * Build one construction with its fox **perched on top / in balance** (exposed), so a
- * direct hit or knocking the support topples it — it falls and takes fall damage.
+ * direct hit or knocking the support topples it. Blocks use a mix of materials; when
+ * `allowTnt` is set the structure may include an explosive block. Returns true if it did.
  */
-function buildStructure(world: World, bx: number, rng: Rng, diff: DiffLevel) {
+function buildStructure(world: World, bx: number, rng: Rng, diff: DiffLevel, allowTnt: boolean): boolean {
 	const g = world.groundY;
-	const crate = (x: number, y: number, hw: number, hh: number) => world.bodies.push(box('crate', x, y, hw, hh));
+	const m = pickMat(rng); // structure theme material
+	const wantTnt = allowTnt && rng() < 0.6;
+	const blk = (x: number, y: number, hw: number, hh: number, tnt = false) => world.bodies.push(block(tnt ? 'tnt' : m, x, y, hw, hh));
 	const fox = (x: number, y: number) => world.bodies.push(circle('fox', x, y, FOX_R, diff.hp));
 	const arche = ri(rng, 0, 2);
 	const tall = rng() < 0.35; // some foxes get a much taller construction (bigger fall)
 
 	if (arche === 0) {
-		// Pole: a tall narrow pillar with the fox balanced on top — easy to topple.
+		// Pole: a narrow pillar with the fox balanced on top — easy to topple.
 		const ph = Math.round((9 + diff.sturdiness * 2) * (tall ? 1.9 : 1));
-		crate(bx, g - ph, 4, ph);
+		blk(bx, g - ph, 4, ph, wantTnt);
 		fox(bx, g - 2 * ph - FOX_R);
 		if (rng() < 0.5) world.bodies.push(circle('barrel', bx - 20, g - 5.5, 5.5)); // rolling obstacle in front
 	} else if (arche === 1) {
 		// Bridge: a long plank on two pillars, fox standing on top of the plank (exposed).
 		const ph = Math.round((8 + diff.sturdiness) * (tall ? 1.8 : 1)), bh = 2.5;
-		crate(bx - 12, g - ph, 3, ph);
-		crate(bx + 12, g - ph, 3, ph);
-		crate(bx, g - 2 * ph - bh, 14, bh); // plank
+		blk(bx - 12, g - ph, 3, ph, wantTnt);
+		blk(bx + 12, g - ph, 3, ph);
+		blk(bx, g - 2 * ph - bh, 14, bh); // plank
 		fox(bx, g - 2 * ph - 2 * bh - FOX_R);
 	} else {
-		// Stack: crates piled up with the fox perched on top, a neighbour crate to knock into it.
+		// Stack: blocks piled with the fox on top; the base block may be the explosive one.
 		const n = 1 + diff.sturdiness + (tall ? 2 : 0);
-		for (let k = 0; k < n; k++) crate(bx, g - 5.5 - k * 11, 5.5, 5.5);
+		for (let k = 0; k < n; k++) blk(bx, g - 5.5 - k * 11, 5.5, 5.5, wantTnt && k === 0);
 		fox(bx, g - 5.5 - (n - 1) * 11 - 5.5 - FOX_R);
-		if (rng() < 0.5) crate(bx + 13, g - 5.5, 5.5, 5.5);
+		if (rng() < 0.5) blk(bx + 13, g - 5.5, 5.5, 5.5);
 	}
+	return wantTnt;
 }
 
 export function makeLevel(seed: number, diff: DiffLevel): World {
@@ -131,9 +156,10 @@ export function makeLevel(seed: number, diff: DiffLevel): World {
 
 	const F = diff.foxes;
 	const startX = 122, endX = w - 20;
+	let tntCount = 0;
 	for (let i = 0; i < F; i++) {
 		const bx = F === 1 ? (startX + endX) / 2 : startX + (i * (endX - startX)) / (F - 1);
-		buildStructure(world, bx, rng2(seed, i), diff);
+		if (buildStructure(world, bx, rng2(seed, i), diff, tntCount < 2)) tntCount++; // cap explosives per level
 	}
 	spawnCocotte(world);
 	return world;
@@ -232,11 +258,12 @@ function resolve(a: Body, b: Body, c: Contact) {
 	b.x += b.invMass * corr * c.nx; b.y += b.invMass * corr * c.ny;
 }
 
-export interface StepEvent { foxesDown: number; settled: boolean; hits: Vec[]; }
+export interface StepEvent { foxesDown: number; settled: boolean; hits: Vec[]; blasts: Vec[]; }
 
 export function step(world: World, dt: number): StepEvent {
 	const live = world.bodies.filter((b) => !b.defeated);
 	const hits: Vec[] = [];
+	const tntFlag = new Set<number>();
 	// gravity + integrate
 	for (const b of live) {
 		if (b.invMass === 0) continue;
@@ -257,6 +284,7 @@ export function step(world: World, dt: number): StepEvent {
 			const fox = a.tag === 'fox' ? a : b.tag === 'fox' ? b : null;
 			if (fox && fox.hp > 0 && closing > HIT_MIN) fox.hp -= (closing - HIT_MIN) * DMG_K;
 			if (closing > JUICE && (a.invMass > 0 || b.invMass > 0)) hits.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+			if (closing > TNT_TRIGGER) { if (a.mat === 'tnt') tntFlag.add(a.id); if (b.mat === 'tnt') tntFlag.add(b.id); }
 		}
 	// solver
 	for (let it = 0; it < ITER; it++)
@@ -267,6 +295,30 @@ export function step(world: World, dt: number): StepEvent {
 				const c = collide(a, b);
 				if (c) resolve(a, b, c);
 			}
+	// TNT: detonate flagged blocks → radial blast (launch + fox damage), with chain reactions.
+	const blasts: Vec[] = [];
+	if (tntFlag.size) {
+		const queue = world.bodies.filter((b) => tntFlag.has(b.id) && !b.defeated);
+		while (queue.length) {
+			const t = queue.shift()!;
+			if (t.defeated) continue;
+			t.defeated = true;
+			blasts.push({ x: t.x, y: t.y });
+			for (const b of world.bodies) {
+				if (b === t || b.defeated || b.invMass === 0) continue;
+				const dx = b.x - t.x, dy = b.y - t.y;
+				const d = len(dx, dy);
+				if (d > BLAST_R) continue;
+				const f = 1 - d / BLAST_R;
+				const nx = d > 0.001 ? dx / d : 0, ny = d > 0.001 ? dy / d : -1;
+				b.vx += nx * BLAST_IMPULSE * f * b.invMass;
+				b.vy += (ny * BLAST_IMPULSE - 60) * f * b.invMass; // slight upward bias
+				if (b.tag === 'fox') b.hp -= BLAST_DMG * f;
+				if (b.mat === 'tnt' && !queue.includes(b)) queue.push(b); // chain
+			}
+		}
+	}
+
 	// defeats: HP depleted, or knocked off the field
 	let foxesDown = 0;
 	for (const b of world.bodies) {
@@ -276,7 +328,7 @@ export function step(world: World, dt: number): StepEvent {
 			foxesDown++;
 		}
 	}
-	return { foxesDown, settled: isSettled(world), hits: hits.slice(0, 5) };
+	return { foxesDown, settled: isSettled(world), hits: hits.slice(0, 5), blasts };
 }
 
 export const isSettled = (world: World): boolean =>

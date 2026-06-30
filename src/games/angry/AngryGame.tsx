@@ -27,7 +27,7 @@ const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 interface DailyState { best?: number; tries: number; }
-interface Boom { x: number; y: number; t0: number; }
+interface Boom { x: number; y: number; t0: number; big?: boolean; }
 
 export default function AngryGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
@@ -288,9 +288,15 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				if (b.defeated) continue;
 				if (b.tag === 'ground') continue;
 				if (b.tag === 'crate') {
-					ctx.fillStyle = '#b07b46'; ctx.fillRect(b.x - b.hw, b.y - b.hh, b.hw * 2, b.hh * 2);
-					ctx.strokeStyle = '#7a4f29'; ctx.lineWidth = 0.5; ctx.strokeRect(b.x - b.hw, b.y - b.hh, b.hw * 2, b.hh * 2);
-					ctx.beginPath(); ctx.moveTo(b.x - b.hw, b.y); ctx.lineTo(b.x + b.hw, b.y); ctx.stroke();
+					const x0 = b.x - b.hw, y0 = b.y - b.hh, ww = b.hw * 2, hgt = b.hh * 2, mat = b.mat ?? 'wood';
+					const FILL: Record<string, string> = { cardboard: '#d8b884', wood: '#b07b46', brick: '#b0573f', tnt: '#d23b32' };
+					const EDGE: Record<string, string> = { cardboard: '#b8965f', wood: '#7a4f29', brick: '#7d3c2b', tnt: '#7a1f1a' };
+					ctx.fillStyle = FILL[mat]; ctx.fillRect(x0, y0, ww, hgt);
+					ctx.strokeStyle = EDGE[mat]; ctx.lineWidth = 0.5; ctx.strokeRect(x0, y0, ww, hgt);
+					if (mat === 'wood') { ctx.beginPath(); ctx.moveTo(x0, b.y); ctx.lineTo(x0 + ww, b.y); ctx.stroke(); }
+					else if (mat === 'cardboard') { ctx.beginPath(); ctx.moveTo(b.x, y0); ctx.lineTo(b.x, y0 + hgt); ctx.stroke(); }
+					else if (mat === 'brick') { ctx.beginPath(); ctx.moveTo(x0, b.y); ctx.lineTo(x0 + ww, b.y); ctx.moveTo(b.x, y0); ctx.lineTo(b.x, b.y); ctx.moveTo(b.x - b.hw / 2, b.y); ctx.lineTo(b.x - b.hw / 2, y0 + hgt); ctx.moveTo(b.x + b.hw / 2, b.y); ctx.lineTo(b.x + b.hw / 2, y0 + hgt); ctx.stroke(); }
+					else { ctx.fillStyle = '#f0c52e'; ctx.fillRect(x0, b.y - hgt * 0.16, ww, hgt * 0.32); ctx.fillStyle = '#7a1f1a'; ctx.font = `${Math.max(3, b.hh * 0.85)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TNT', b.x, b.y); }
 				} else if (b.tag === 'barrel') {
 					ctx.fillStyle = '#c08a4e'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
 					ctx.strokeStyle = '#7a4f29'; ctx.lineWidth = 0.6; ctx.stroke();
@@ -333,14 +339,16 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			boomsRef.current = boomsRef.current.filter((bm) => now - bm.t0 < SINK_MS);
 			for (const bm of boomsRef.current) {
 				const e = (now - bm.t0) / SINK_MS;
-				const R = 4 + e * 16;
+				const R = (bm.big ? 8 : 4) + e * (bm.big ? 40 : 16);
 				ctx.strokeStyle = `rgba(240,${Math.round(160 * (1 - e))},40,${1 - e})`;
-				ctx.lineWidth = 2 * (1 - e);
+				ctx.lineWidth = (bm.big ? 3 : 2) * (1 - e);
 				ctx.beginPath(); ctx.arc(bm.x, bm.y, R, 0, Math.PI * 2); ctx.stroke();
-				for (let k = 0; k < 6; k++) {
-					const a = (k / 6) * Math.PI * 2;
+				if (bm.big) { ctx.fillStyle = `rgba(255,210,60,${0.5 * (1 - e)})`; ctx.beginPath(); ctx.arc(bm.x, bm.y, R * 0.6, 0, Math.PI * 2); ctx.fill(); }
+				const parts = bm.big ? 12 : 6;
+				for (let k = 0; k < parts; k++) {
+					const a = (k / parts) * Math.PI * 2;
 					ctx.fillStyle = `rgba(230,90,40,${1 - e})`;
-					ctx.beginPath(); ctx.arc(bm.x + Math.cos(a) * R, bm.y + Math.sin(a) * R, 1.4 * (1 - e), 0, Math.PI * 2); ctx.fill();
+					ctx.beginPath(); ctx.arc(bm.x + Math.cos(a) * R, bm.y + Math.sin(a) * R, (bm.big ? 2.2 : 1.4) * (1 - e), 0, Math.PI * 2); ctx.fill();
 				}
 			}
 		};
@@ -365,6 +373,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 						setFoxes(foxesLeft(world));
 					}
 					for (const hpt of ev.hits) if (dustRef.current.length < 24) dustRef.current.push({ x: hpt.x, y: hpt.y, t0: now });
+					for (const bl of ev.blasts) boomsRef.current.push({ x: bl.x, y: bl.y, t0: now, big: true });
 					settleAccRef.current += STEP;
 					const c = world.cocotte;
 					const offscreen = !!c && (c.x > world.w + 15 || c.x < -15 || c.y > world.h + 15);
