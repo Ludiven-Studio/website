@@ -809,6 +809,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			camTargetRef.current = { x: carRef.current.x, z: carRef.current.z };
 			lapRef.current = createLap();
 			clockRef.current = 0;
+			lapRef.current.startedMs = 0; // arm the lap from the start line → 1st lap is timed & the ghost runs from t=0
 			prevIdxRef.current = track.checkpoints[0];
 			markPosRef.current = { x: carRef.current.x, z: carRef.current.z };
 			clearSkid();
@@ -881,6 +882,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		prevCarRef.current = carRef.current;
 		camTargetRef.current = { x: carRef.current.x, z: carRef.current.z };
 		lapRef.current = createLap();
+		lapRef.current.startedMs = clockRef.current; // arm immediately (clock keeps running across resets)
 		prevIdxRef.current = track.checkpoints[0];
 		markPosRef.current = { x: carRef.current.x, z: carRef.current.z };
 		clearSkid();
