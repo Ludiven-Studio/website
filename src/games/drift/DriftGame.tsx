@@ -47,6 +47,20 @@ const lerpAngle = (a: number, b: number, t: number) => {
 	return a + d * t;
 };
 
+const GHOST_SELF_COLOR = 0xc7cdd6; // silver — your own best-lap ghost (distinct from rivals)
+const GHOST_KEY = 'ludiven-drift-bestlap-defi'; // single daily entry (validated by seed)
+const GHOST_TOGGLE_KEY = 'ludiven-drift-ghost';
+type GhostRecord = { seed: number; ms: number; poses: number[][] };
+const loadDailyGhost = (seed: number): GhostRecord | null => {
+	try {
+		const r = JSON.parse(localStorage.getItem(GHOST_KEY) || 'null');
+		return r && r.seed === seed && Array.isArray(r.poses) ? r : null; // only today's circuit
+	} catch { return null; }
+};
+const saveDailyGhost = (rec: GhostRecord) => {
+	try { localStorage.setItem(GHOST_KEY, JSON.stringify(rec)); } catch { /* quota */ }
+};
+
 interface Ghost {
 	mesh: THREE.Group;
 	cur: { x: number; z: number; heading: number };
@@ -363,6 +377,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const [bestMs, setBestMs] = useState<number | null>(null);
 	const [peerCount, setPeerCount] = useState(1);
 	const [webglError, setWebglError] = useState(false);
+	const [showGhost, setShowGhost] = useState(true); // best-lap ghost (default on)
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const labelsRef = useRef<HTMLDivElement>(null);
@@ -392,9 +407,28 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const camTargetRef = useRef({ x: 0, z: 0 }); // eased camera centre (look-ahead)
 	const frontWheelRef = useRef(0); // eased front-wheel steer angle (self car)
 	const carParamsRef = useRef<CarParams>(CAR); // physics params of the chosen car kind
+	// Best-lap ghost (replay of your own fastest lap on this circuit)
+	const lapPosesRef = useRef<number[][]>([]); // current lap buffer: [x, z, heading] per step
+	const bestGhostPosesRef = useRef<number[][] | null>(null); // best lap to replay
+	const bestGhostRef = useRef<THREE.Group | null>(null); // translucent ghost mesh
+	const showGhostRef = useRef(true);
+	const seedRef = useRef(0);
+	const isDefiRef = useRef(false);
 
 	useEffect(() => {
 		setName(playerName());
+		const on = localStorage.getItem(GHOST_TOGGLE_KEY) !== '0';
+		setShowGhost(on);
+		showGhostRef.current = on;
+	}, []);
+
+	const toggleGhost = useCallback(() => {
+		setShowGhost((v) => {
+			const nv = !v;
+			showGhostRef.current = nv;
+			try { localStorage.setItem(GHOST_TOGGLE_KEY, nv ? '1' : '0'); } catch { /* quota */ }
+			return nv;
+		});
 	}, []);
 
 	/* ---- three.js scene ---- */
@@ -583,6 +617,28 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			}
 		}
 
+		// Self best-lap ghost: replay recorded poses, synced to the current lap's elapsed time.
+		const bg = bestGhostRef.current;
+		if (bg) {
+			const poses = bestGhostPosesRef.current;
+			const started = lapRef.current.startedMs;
+			if (!showGhostRef.current || !poses || poses.length < 2 || started == null) {
+				bg.visible = false;
+			} else {
+				const elapsed = clockRef.current - started + accRef.current; // ms into the current lap
+				const tf = Math.max(0, elapsed / STEP);
+				const i0 = Math.min(poses.length - 1, Math.floor(tf));
+				const i1 = Math.min(poses.length - 1, i0 + 1);
+				const fr = tf - Math.floor(tf);
+				const a = poses[i0], b = poses[i1];
+				bg.position.set(a[0] + (b[0] - a[0]) * fr, 0, a[1] + (b[1] - a[1]) * fr);
+				bg.rotation.y = -lerpAngle(a[2], b[2], fr);
+				bg.visible = true;
+				const gfw = bg.userData.frontWheels as THREE.Mesh[] | undefined;
+				if (gfw) { const an = Math.max(-0.5, Math.min(0.5, (lerpAngle(a[2], b[2], 1) - a[2]) * 4)); for (const w of gfw) w.rotation.y = an; }
+			}
+		}
+
 		g.renderer.render(g.scene, g.camera);
 
 		// Position pseudo labels by projecting ghost world position to screen.
@@ -621,6 +677,14 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				const prevLap = lapRef.current;
 				lapRef.current = stepLap(prevLap, prevIdxRef.current, idx, track, clockRef.current);
 				prevIdxRef.current = idx;
+				// On lap completion, keep it as the ghost if it's a new best; then start a fresh buffer.
+				if (lapRef.current.lastMs != null && lapRef.current.lastMs !== prevLap.lastMs) {
+					if (lapRef.current.bestMs === lapRef.current.lastMs) {
+						bestGhostPosesRef.current = lapPosesRef.current;
+						if (isDefiRef.current) saveDailyGhost({ seed: seedRef.current, ms: lapRef.current.bestMs, poses: lapPosesRef.current });
+					}
+					lapPosesRef.current = [];
+				}
 				if (lapRef.current.bestMs != null && lapRef.current.bestMs !== bestRef.current) {
 					bestRef.current = lapRef.current.bestMs;
 					setBestMs(bestRef.current);
@@ -630,6 +694,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 						syncBoard();
 					}
 				}
+				if (lapRef.current.startedMs != null) lapPosesRef.current.push([car.x, car.z, car.heading]);
 			}
 			carRef.current = car;
 
@@ -709,6 +774,15 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				g.car = makeCar(selfColorRef.current, false, kind);
 				g.scene.add(g.car);
 
+				// (Re)build the self best-lap ghost (translucent), hidden until a lap exists.
+				if (bestGhostRef.current) {
+					g.scene.remove(bestGhostRef.current);
+					bestGhostRef.current.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
+				}
+				bestGhostRef.current = makeCar(GHOST_SELF_COLOR, true, kind);
+				bestGhostRef.current.visible = false;
+				g.scene.add(bestGhostRef.current);
+
 				const mesh = g.scene.children.find(
 					(o): o is THREE.Mesh => o instanceof THREE.Mesh && (o as THREE.Mesh).material === g.trackMat,
 				);
@@ -743,6 +817,20 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			boardRef.current.clear();
 			setBoard([]);
 			raceRef.current = race;
+
+			// Best-lap ghost: fresh buffers; daily mode loads today's saved ghost (same seed only).
+			seedRef.current = seed;
+			isDefiRef.current = m === 'defi';
+			lapPosesRef.current = [];
+			bestGhostPosesRef.current = null;
+			if (m === 'defi') {
+				const rec = loadDailyGhost(seed);
+				if (rec) {
+					bestGhostPosesRef.current = rec.poses;
+					bestRef.current = rec.ms;
+					setBestMs(rec.ms);
+				}
+			}
 
 			if (race) {
 				race.onPeers((peers: Peer[]) => {
@@ -794,6 +882,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		prevIdxRef.current = track.checkpoints[0];
 		markPosRef.current = { x: carRef.current.x, z: carRef.current.z };
 		clearSkid();
+		lapPosesRef.current = []; // fresh recording; keep bestGhostPosesRef so the ghost still replays
 		setCurMs(0);
 	}, [clearSkid]);
 
@@ -837,6 +926,14 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		for (const id of [...ghostsRef.current.keys()]) removeGhost(id);
 		peerInfoRef.current.clear();
 		boardRef.current.clear();
+		const g = g3Ref.current;
+		if (g && bestGhostRef.current) {
+			g.scene.remove(bestGhostRef.current);
+			bestGhostRef.current.traverse((o) => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
+			bestGhostRef.current = null;
+		}
+		bestGhostPosesRef.current = null;
+		lapPosesRef.current = [];
 		setPeerCount(1);
 		setPhase('menu');
 	}, [stop, removeGhost]);
@@ -951,6 +1048,11 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 									))}
 								</div>
 							)}
+							<div className="dr-modes" role="group" aria-label="Fantôme">
+								<button className={`dr-mode ${showGhost ? 'active' : ''}`} onClick={toggleGhost} aria-pressed={showGhost}>
+									👻 Fantôme de ton meilleur tour : {showGhost ? 'Activé' : 'Désactivé'}
+								</button>
+							</div>
 							<p className="dr-modehint">{mode === 'defi' ? `Même circuit pour tous · ${dailyWeekdayLabel()} · niveau du jour · classement` : `Circuit aléatoire · ${DRIFT_DIFFS[diffKey].label} · plus dur = plus de virages`}</p>
 							<div className="dr-cars" role="tablist" aria-label="Voiture">
 								{CAR_KINDS.map((c) => (
