@@ -38,6 +38,16 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '✅', title: 'Comment jouer', body: 'Choisis la bonne réponse. Bonne réponse → on enchaîne et le score monte ; une erreur termine la manche.' },
 		{ emoji: '💡', title: 'Astuce', body: 'Indice élimine une mauvaise option ; « Voir la réponse » te montre la bonne si tu cales.' },
 	],
+	flechettes: [
+		{ emoji: '🎯', title: 'Le but (501)', body: 'Tu pars de 501 et tu dois tomber pile à 0 en un minimum de fléchettes. La dernière fléchette doit finir sur un DOUBLE (ou le bullseye).' },
+		{ emoji: '👆', title: 'Viser & lancer', body: 'Le viseur oscille sur la cible. Tape l\'écran au bon moment : la fléchette se plante là où est le viseur. Triple = ×3, Double = ×2, bull = 25, bullseye = 50.' },
+		{ emoji: '⚠️', title: 'Bust', body: 'Si un lancer te fait passer en dessous de 2, ou pile à 0 sans double, c\'est « bust » : rien n\'est soustrait mais la fléchette est gâchée. Au défi du jour, même cible mobile pour tous ; le chrono départage.' },
+	],
+	fruits: [
+		{ emoji: '🍎', title: 'Le but', body: 'Chaque fruit cache un nombre. À partir des équations affichées, trouve combien vaut le fruit demandé.' },
+		{ emoji: '🧮', title: 'Comment jouer', body: 'Résous pas à pas en partant de l\'équation la plus simple (un fruit répété donne directement sa valeur), puis remplace dans les suivantes. Choisis la bonne valeur parmi les 4 propositions.' },
+		{ emoji: '✅', title: 'Astuce', body: 'Indice enlève une mauvaise option ; « Voir la réponse » montre les étapes. Au défi du jour, résous 3 énigmes le plus vite possible.' },
+	],
 	matrices: [
 		{ emoji: '🧩', title: 'Le but', body: 'Une grille 3×3 de figures suit une logique cachée ; une case manque. Trouve la figure qui la complète, façon test de QI.' },
 		{ emoji: '🔍', title: 'La logique', body: 'Observe ce qui change le long des lignes et des colonnes : la forme, la couleur, le nombre d\'éléments, l\'orientation. Souvent chaque ligne (ou colonne) contient les 3 valeurs, ou bien ça progresse.' },
