@@ -23,6 +23,7 @@ export interface Body {
 	rest: number; // restitution
 	fric: number;
 	hp: number; maxHp: number; // foxes only
+	spin: number; // visual roll angle (radians) for circular bodies
 	defeated: boolean;
 	launched: boolean; // cocotte: has been fired
 }
@@ -60,11 +61,11 @@ const len = (x: number, y: number) => Math.hypot(x, y);
 let UID = 1;
 
 function circle(tag: Tag, x: number, y: number, r: number, hp = 0): Body {
-	return { id: UID++, kind: 'circle', tag, x, y, vx: 0, vy: 0, r, hw: 0, hh: 0, invMass: MASS[tag] ? 1 / MASS[tag] : 0, rest: REST[tag], fric: FRIC[tag], hp, maxHp: hp, defeated: false, launched: false };
+	return { id: UID++, kind: 'circle', tag, x, y, vx: 0, vy: 0, r, hw: 0, hh: 0, invMass: MASS[tag] ? 1 / MASS[tag] : 0, rest: REST[tag], fric: FRIC[tag], hp, maxHp: hp, spin: 0, defeated: false, launched: false };
 }
 function box(tag: Tag, x: number, y: number, hw: number, hh: number, isStatic = false): Body {
 	const m = isStatic ? 0 : MASS[tag];
-	return { id: UID++, kind: 'box', tag, x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: m ? 1 / m : 0, rest: REST[tag], fric: FRIC[tag], hp: 0, maxHp: 0, defeated: false, launched: false };
+	return { id: UID++, kind: 'box', tag, x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: m ? 1 / m : 0, rest: REST[tag], fric: FRIC[tag], hp: 0, maxHp: 0, spin: 0, defeated: false, launched: false };
 }
 
 /* ---------- Difficulty / level ---------- */
@@ -96,23 +97,24 @@ function buildStructure(world: World, bx: number, rng: Rng, diff: DiffLevel) {
 	const crate = (x: number, y: number, hw: number, hh: number) => world.bodies.push(box('crate', x, y, hw, hh));
 	const fox = (x: number, y: number) => world.bodies.push(circle('fox', x, y, FOX_R, diff.hp));
 	const arche = ri(rng, 0, 2);
+	const tall = rng() < 0.35; // some foxes get a much taller construction (bigger fall)
 
 	if (arche === 0) {
 		// Pole: a tall narrow pillar with the fox balanced on top — easy to topple.
-		const ph = 9 + diff.sturdiness * 2;
+		const ph = Math.round((9 + diff.sturdiness * 2) * (tall ? 1.9 : 1));
 		crate(bx, g - ph, 4, ph);
 		fox(bx, g - 2 * ph - FOX_R);
 		if (rng() < 0.5) world.bodies.push(circle('barrel', bx - 20, g - 5.5, 5.5)); // rolling obstacle in front
 	} else if (arche === 1) {
 		// Bridge: a long plank on two pillars, fox standing on top of the plank (exposed).
-		const ph = 8 + diff.sturdiness, bh = 2.5;
+		const ph = Math.round((8 + diff.sturdiness) * (tall ? 1.8 : 1)), bh = 2.5;
 		crate(bx - 12, g - ph, 3, ph);
 		crate(bx + 12, g - ph, 3, ph);
 		crate(bx, g - 2 * ph - bh, 14, bh); // plank
 		fox(bx, g - 2 * ph - 2 * bh - FOX_R);
 	} else {
 		// Stack: crates piled up with the fox perched on top, a neighbour crate to knock into it.
-		const n = 1 + diff.sturdiness;
+		const n = 1 + diff.sturdiness + (tall ? 2 : 0);
 		for (let k = 0; k < n; k++) crate(bx, g - 5.5 - k * 11, 5.5, 5.5);
 		fox(bx, g - 5.5 - (n - 1) * 11 - 5.5 - FOX_R);
 		if (rng() < 0.5) crate(bx + 13, g - 5.5, 5.5, 5.5);
@@ -243,6 +245,7 @@ export function step(world: World, dt: number): StepEvent {
 		const sp = len(b.vx, b.vy);
 		if (sp > MAX_V) { const k = MAX_V / sp; b.vx *= k; b.vy *= k; }
 		b.x += b.vx * dt; b.y += b.vy * dt;
+		if (b.r > 0) b.spin += (b.vx / b.r) * dt; // visual roll (rolling without slipping)
 	}
 	// damage pass (closing speed before the velocity solve) + impact sparks
 	for (let i = 0; i < live.length; i++)

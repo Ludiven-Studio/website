@@ -225,6 +225,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			const frac = b.maxHp ? Math.max(0, b.hp / b.maxHp) : 1;
 			ctx.save();
 			ctx.translate(b.x, b.y);
+			ctx.rotate(b.spin); // rolls when launched / knocked
 			// ears
 			ctx.fillStyle = '#d8722c';
 			ctx.beginPath(); ctx.moveTo(-b.r * 0.7, -b.r * 0.5); ctx.lineTo(-b.r * 0.2, -b.r * 1.3); ctx.lineTo(0, -b.r * 0.6); ctx.closePath(); ctx.fill();
@@ -252,6 +253,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		const drawCocotte = (b: Body) => {
 			ctx.save();
 			ctx.translate(b.x, b.y);
+			ctx.rotate(b.spin); // rolls/tumbles when launched
 			ctx.fillStyle = '#e34b4b'; // comb
 			ctx.beginPath(); ctx.arc(-b.r * 0.2, -b.r, b.r * 0.3, 0, Math.PI * 2); ctx.arc(b.r * 0.2, -b.r, b.r * 0.3, 0, Math.PI * 2); ctx.fill();
 			ctx.fillStyle = '#fcfcfc'; // body
@@ -292,8 +294,10 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				} else if (b.tag === 'barrel') {
 					ctx.fillStyle = '#c08a4e'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
 					ctx.strokeStyle = '#7a4f29'; ctx.lineWidth = 0.6; ctx.stroke();
+					ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + Math.cos(b.spin) * b.r, b.y + Math.sin(b.spin) * b.r); ctx.stroke(); // rolling stave
 				} else if (b.tag === 'rock') {
 					ctx.fillStyle = '#9aa1a8'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+					ctx.fillStyle = '#7e858c'; ctx.beginPath(); ctx.arc(b.x + Math.cos(b.spin) * b.r * 0.5, b.y + Math.sin(b.spin) * b.r * 0.5, b.r * 0.22, 0, Math.PI * 2); ctx.fill(); // rolling speck
 				} else if (b.tag === 'fox') {
 					drawFox(b);
 				} else if (b.tag === 'cocotte') {
