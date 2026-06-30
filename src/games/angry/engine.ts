@@ -71,6 +71,11 @@ const BLAST_R = 40; // explosion radius
 const BLAST_IMPULSE = 260; // blast launch strength
 const BLAST_DMG = 130; // blast damage to foxes (×falloff)
 
+// Block durability (internal HP) — a block breaks after enough hard impacts. tnt = 0 (explodes instead).
+const TOUGH: Record<Material, number> = { cardboard: 18, wood: 50, brick: 180, tnt: 0 };
+const BLOCK_HIT_MIN = 50; // impact speed below which a block takes no damage
+const BLOCK_DMG_K = 1; // block damage per (impact − BLOCK_HIT_MIN)
+
 const len = (x: number, y: number) => Math.hypot(x, y);
 let UID = 1;
 
@@ -81,10 +86,11 @@ function box(tag: Tag, x: number, y: number, hw: number, hh: number, isStatic = 
 	const m = isStatic ? 0 : MASS[tag];
 	return { id: UID++, kind: 'box', tag, x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: m ? 1 / m : 0, rest: REST[tag], fric: FRIC[tag], hp: 0, maxHp: 0, spin: 0, mat: null, defeated: false, launched: false };
 }
-/** A dynamic material block (tag 'crate'); physics come from the material. */
+/** A dynamic material block (tag 'crate'); physics + durability come from the material. */
 function block(mat: Material, x: number, y: number, hw: number, hh: number): Body {
 	const d = MATS[mat];
-	return { id: UID++, kind: 'box', tag: 'crate', x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: 1 / d.mass, rest: d.rest, fric: d.fric, hp: 0, maxHp: 0, spin: 0, mat, defeated: false, launched: false };
+	const t = TOUGH[mat];
+	return { id: UID++, kind: 'box', tag: 'crate', x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: 1 / d.mass, rest: d.rest, fric: d.fric, hp: t, maxHp: t, spin: 0, mat, defeated: false, launched: false };
 }
 
 /* ---------- Difficulty / level ---------- */
@@ -258,7 +264,7 @@ function resolve(a: Body, b: Body, c: Contact) {
 	b.x += b.invMass * corr * c.nx; b.y += b.invMass * corr * c.ny;
 }
 
-export interface StepEvent { foxesDown: number; settled: boolean; hits: Vec[]; blasts: Vec[]; }
+export interface StepEvent { foxesDown: number; settled: boolean; hits: Vec[]; blasts: Vec[]; breaks: { x: number; y: number; mat: Material }[]; }
 
 export function step(world: World, dt: number): StepEvent {
 	const live = world.bodies.filter((b) => !b.defeated);
@@ -285,6 +291,11 @@ export function step(world: World, dt: number): StepEvent {
 			if (fox && fox.hp > 0 && closing > HIT_MIN) fox.hp -= (closing - HIT_MIN) * DMG_K;
 			if (closing > JUICE && (a.invMass > 0 || b.invMass > 0)) hits.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 			if (closing > TNT_TRIGGER) { if (a.mat === 'tnt') tntFlag.add(a.id); if (b.mat === 'tnt') tntFlag.add(b.id); }
+			if (closing > BLOCK_HIT_MIN) { // breakable blocks take internal damage
+				const dmg = (closing - BLOCK_HIT_MIN) * BLOCK_DMG_K;
+				if (a.tag === 'crate' && a.mat !== 'tnt' && a.maxHp > 0) a.hp -= dmg;
+				if (b.tag === 'crate' && b.mat !== 'tnt' && b.maxHp > 0) b.hp -= dmg;
+			}
 		}
 	// solver
 	for (let it = 0; it < ITER; it++)
@@ -319,16 +330,25 @@ export function step(world: World, dt: number): StepEvent {
 		}
 	}
 
-	// defeats: HP depleted, or knocked off the field
-	let foxesDown = 0;
+	// breakable blocks whose HP ran out → shatter (and free the path)
+	const breaks: { x: number; y: number; mat: Material }[] = [];
 	for (const b of world.bodies) {
-		if (b.tag !== 'fox' || b.defeated) continue;
-		if (b.hp <= 0 || b.y > world.h + 20 || b.x < -20 || b.x > world.w + 20) {
+		if (b.tag === 'crate' && !b.defeated && b.maxHp > 0 && b.hp <= 0) {
 			b.defeated = true;
-			foxesDown++;
+			breaks.push({ x: b.x, y: b.y, mat: b.mat ?? 'wood' });
 		}
 	}
-	return { foxesDown, settled: isSettled(world), hits: hits.slice(0, 5), blasts };
+
+	// defeats: foxes whose HP ran out, and any dynamic body knocked far off the field
+	// (removing fly-aways so the world can actually settle).
+	let foxesDown = 0;
+	const off = (b: Body) => b.y > world.h + 30 || b.x < -30 || b.x > world.w + 30;
+	for (const b of world.bodies) {
+		if (b.defeated || b.invMass === 0) continue;
+		if (b.tag === 'fox' && (b.hp <= 0 || off(b))) { b.defeated = true; foxesDown++; }
+		else if (b.tag !== 'fox' && off(b)) { b.defeated = true; }
+	}
+	return { foxesDown, settled: isSettled(world), hits: hits.slice(0, 5), blasts, breaks };
 }
 
 export const isSettled = (world: World): boolean =>

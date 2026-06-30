@@ -20,14 +20,18 @@ type Status = 'aiming' | 'rolling' | 'won' | 'lost';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const STEP = 1000 / 60;
 const GRAB_R = 28; // world units: grab near the cocotte to aim
-const SETTLE_TIMEOUT = 4500; // ms: force next shot if the world won't settle
+const SETTLE_GRACE = 900; // ms of continuous calm before resolving a shot (let everything finish)
+const SETTLE_TIMEOUT = 7000; // ms: hard cap so a shot always resolves
 const SINK_MS = 420; // explosion duration
+const DEBRIS_MS = 460; // block-shatter debris lifetime
+const MAT_FILL: Record<string, string> = { cardboard: '#d8b884', wood: '#b07b46', brick: '#b0573f', tnt: '#d23b32' };
 
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 interface DailyState { best?: number; tries: number; }
 interface Boom { x: number; y: number; t0: number; big?: boolean; }
+interface Debris { x: number; y: number; vx: number; vy: number; t0: number; color: string; }
 
 export default function AngryGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
@@ -55,6 +59,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const lastRef = useRef(0);
 	const boomsRef = useRef<Boom[]>([]);
 	const dustRef = useRef<Boom[]>([]); // small impact puffs
+	const debrisRef = useRef<Debris[]>([]); // block-shatter shards
+	const settledForRef = useRef(0); // ms the world has stayed calm
 	const seenDownRef = useRef<Set<number>>(new Set());
 	const dailyRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const bestRef = useRef<number | null>(null);
@@ -75,6 +81,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		aimRef.current = null;
 		boomsRef.current = [];
 		dustRef.current = [];
+		debrisRef.current = [];
+		settledForRef.current = 0;
 		seenDownRef.current = new Set();
 		setShots(0);
 		setFoxes(foxesLeft(world));
@@ -176,6 +184,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				if (daily) saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex, state: { best: bestRef.current ?? undefined, tries: triesRef.current } satisfies DailyState });
 			}
 			settleAccRef.current = 0;
+			settledForRef.current = 0;
 			rollingRef.current = true;
 			setStat('rolling');
 		};
@@ -336,7 +345,16 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				ctx.beginPath(); ctx.arc(d.x, d.y, 2 + e * 6, 0, Math.PI * 2); ctx.fill();
 			}
 			// explosions
-			boomsRef.current = boomsRef.current.filter((bm) => now - bm.t0 < SINK_MS);
+			debrisRef.current = debrisRef.current.filter((d) => now - d.t0 < DEBRIS_MS);
+				for (const d of debrisRef.current) {
+					const t = (now - d.t0) / 1000, e = (now - d.t0) / DEBRIS_MS;
+					const px = d.x + d.vx * t, py = d.y + d.vy * t + 0.5 * world.gravity * t * t;
+					ctx.globalAlpha = 1 - e;
+					ctx.fillStyle = d.color;
+					ctx.fillRect(px - 1.1, py - 1.1, 2.4, 2.4);
+				}
+				ctx.globalAlpha = 1;
+				boomsRef.current = boomsRef.current.filter((bm) => now - bm.t0 < SINK_MS);
 			for (const bm of boomsRef.current) {
 				const e = (now - bm.t0) / SINK_MS;
 				const R = (bm.big ? 8 : 4) + e * (bm.big ? 40 : 16);
@@ -374,11 +392,21 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 					}
 					for (const hpt of ev.hits) if (dustRef.current.length < 24) dustRef.current.push({ x: hpt.x, y: hpt.y, t0: now });
 					for (const bl of ev.blasts) boomsRef.current.push({ x: bl.x, y: bl.y, t0: now, big: true });
+					for (const br of ev.breaks) {
+						const col = MAT_FILL[br.mat] ?? '#b07b46';
+						for (let k = 0; k < 5; k++) {
+							const a = Math.random() * Math.PI * 2, sp = 20 + Math.random() * 50;
+							if (debrisRef.current.length < 80) debrisRef.current.push({ x: br.x, y: br.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, t0: now, color: col });
+						}
+					}
+					// Resolve only once the whole world has stayed calm for a moment (let everything finish),
+					// with a hard cap so it never hangs. resolveShot() then decides win vs reload.
 					settleAccRef.current += STEP;
-					const c = world.cocotte;
-					const offscreen = !!c && (c.x > world.w + 15 || c.x < -15 || c.y > world.h + 15);
-					if (foxesLeft(world) === 0 && !finishedRef.current) { rollingRef.current = false; resolveShot(); }
-					else if (ev.settled || offscreen || settleAccRef.current > SETTLE_TIMEOUT) { rollingRef.current = false; resolveShot(); }
+					settledForRef.current = ev.settled ? settledForRef.current + STEP : 0;
+					if (settledForRef.current >= SETTLE_GRACE || settleAccRef.current > SETTLE_TIMEOUT) {
+						rollingRef.current = false;
+						resolveShot();
+					}
 				}
 			}
 			if (startRef.current && !finishedRef.current) setElapsed((Date.now() - startRef.current) / 1000);

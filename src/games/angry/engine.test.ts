@@ -97,6 +97,40 @@ describe('cocotte engine', () => {
 		expect(fox.hp).toBeLessThan(hp0); // blast hurt the fox
 	});
 
+	it('blocks have durability (maxHp>0, tnt=0) and break after a hard enough hit', () => {
+		const w = makeLevel(11, DIFFS.facile);
+		for (const b of w.bodies) if (b.tag === 'crate') {
+			if (b.mat === 'tnt') expect(b.maxHp).toBe(0);
+			else expect(b.maxHp).toBeGreaterThan(0);
+		}
+		const crate = w.bodies.find((b) => b.tag === 'crate' && b.mat !== 'tnt')!;
+		crate.x = 80; crate.y = 120; crate.vx = 0; crate.vy = 0; crate.hp = 10; crate.maxHp = 10; // fragile
+		const c = w.cocotte!;
+		c.x = 80 - (c.r + crate.hw) + 1; c.y = 120; c.vx = 240; c.vy = 0; c.launched = true;
+		const e = step(w, 1 / 120);
+		expect(crate.defeated, 'block shattered').toBe(true);
+		expect(e.breaks.length, 'a break event was emitted').toBeGreaterThanOrEqual(1);
+	});
+
+	it('a gentle bump does not damage a block', () => {
+		const w = makeLevel(11, DIFFS.facile);
+		const crate = w.bodies.find((b) => b.tag === 'crate' && b.mat !== 'tnt')!;
+		crate.x = 80; crate.y = 120; crate.vx = 0; crate.vy = 0;
+		const hp0 = crate.hp;
+		const c = w.cocotte!;
+		c.x = 80 - (c.r + crate.hw) + 1; c.y = 120; c.vx = 30; c.vy = 0; // closing 30 < BLOCK_HIT_MIN
+		step(w, 1 / 120);
+		expect(crate.hp).toBe(hp0);
+	});
+
+	it('any dynamic body knocked far off the field is removed (so the world can settle)', () => {
+		const w = makeLevel(12, DIFFS.facile);
+		const cue = w.cocotte!;
+		cue.x = w.w + 100; cue.y = 50;
+		step(w, 1 / 60);
+		expect(cue.defeated).toBe(true);
+	});
+
 	it('a fox knocked off the field is defeated', () => {
 		const w = makeLevel(5, DIFFS.facile);
 		const fox = w.bodies.find((b) => b.tag === 'fox')!;
