@@ -14,12 +14,13 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one deployment at a time. A new push supersedes an older, not-yet-finished
-# run so deployments never overlap — overlapping runs make deploy-pages 400 with
-# "in progress deployment". For a static site, deploying only the latest commit is fine.
+# One Pages deployment at a time — GitHub's canonical setup. Do NOT cancel in-progress:
+# cancelling a run mid-deploy leaves the Pages deployment stuck "in progress", which then
+# 400s every following run ("due to in progress deployment"). Queue instead so each deploy
+# finishes cleanly; for a static site the small wait is harmless.
 concurrency:
   group: "pages"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   test:
