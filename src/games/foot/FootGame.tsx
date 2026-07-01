@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-	createWorld, stepPlayer, stepBall, resolveKicks, applyScore, step, separatePlayers,
-	playerPos, applyPlayerPos, ballState,
+	createWorld, stepPlayer, stepBall, resolveKicks, applyScore, step, separateAll,
+	playerPos, applyPlayerPos, applyBall, ballState,
 	FIELD, FLOOR, GOAL_TOP, PLAYER_R, BALL_R, WIN_GOALS,
-	type World, type PlayerInput, type Side,
+	type World, type PlayerInput, type Side, type SlotPos,
 } from './engine';
-import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PosMsg, type BallSync } from './net';
+import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PosMsg, type StateMsg } from './net';
 import { playerName, setPlayerName } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
-   COCOTTE FOOT — 1v1 arena football (2D canvas). Shared ball, host-authoritative
-   (host = smallest id, cf. Pong). Own cocotte simulated locally; opponent + ball come
-   from the network, interpolated. Bot mode is fully local. Engine pur/testé dans ./engine.
+   COCOTTE FOOT — 2v2 arena football (2D canvas). Shared ball, host-authoritative
+   (host = smallest id, cf. Pong). Slots 0,1 = left team; 2,3 = right team. Host = slot 0
+   (+ bot teammate slot 1), guest = slot 2 (+ bot teammate slot 3); the host simulates the
+   ball and the bots. Own cocotte is simulated locally; everything else comes from the host,
+   interpolated. Bot mode is fully local. Engine pur/testé dans ./engine.
    ===================================================== */
 
 type Phase = 'menu' | 'waiting' | 'playing' | 'over';
@@ -21,11 +23,12 @@ type Role = 'host' | 'guest' | 'ai';
 
 const SEND_HZ = 20;
 const STEP = 1000 / 60;
-const SCALE = 2.6; // world units → backing pixels
+const SCALE = 2.0; // world units → backing pixels
 const VIEW_W = FIELD.W * SCALE;
 const VIEW_H = FIELD.H * SCALE;
-const COL_ME = '#4da3ff';
-const COL_OPP = '#ff5a5f';
+const COL_T0 = '#4da3ff'; // left team (blue)
+const COL_T1 = '#ff5a5f'; // right team (red)
+const teamOf = (slot: number): Side => (slot < 2 ? 0 : 1);
 
 interface Keys { left: boolean; right: boolean; jump: boolean; }
 const readInput = (k: Keys, t: Keys): PlayerInput => ({
@@ -33,15 +36,20 @@ const readInput = (k: Keys, t: Keys): PlayerInput => ({
 	jump: k.jump || t.jump,
 });
 
-/** Simple, beatable bot: chase/lead the ball, hang back near its goal, head high balls. */
-function botInput(w: World): PlayerInput {
-	const me = w.players[1], ball = w.ball;
-	let targetX = ball.x + ball.vx * 0.15;
-	if (ball.x < FIELD.W * 0.4) targetX = FIELD.W * 0.66; // ball far away → hold position
+/** Team-aware bot: get on the own-goal side of the ball to push it toward the opponent; a
+ *  backup cocotte hangs near its own half; head high balls that are close. Beatable on purpose. */
+function botFor(w: World, slot: number): PlayerInput {
+	const me = w.players[slot], ball = w.ball, team = me.team;
+	const attackDir = team === 0 ? 1 : -1;
+	let targetX = ball.x - attackDir * (PLAYER_R + BALL_R) * 0.9; // stand behind the ball to shove it forward
+	if (slot === 1 || slot === 3) { // backup
+		const homeX = team === 0 ? FIELD.W * 0.28 : FIELD.W * 0.72;
+		const ballOurSide = team === 0 ? ball.x < FIELD.W * 0.5 : ball.x > FIELD.W * 0.5;
+		if (!ballOurSide) targetX = homeX;
+	}
 	let move: -1 | 0 | 1 = 0;
-	if (targetX < me.x - 6) move = -1;
-	else if (targetX > me.x + 6) move = 1;
-	const jump = me.onGround && ball.y < me.y - 10 && Math.abs(ball.x - me.x) < 42 && ball.vy > -20;
+	if (targetX < me.x - 5) move = -1; else if (targetX > me.x + 5) move = 1;
+	const jump = me.onGround && ball.y < me.y - 12 && Math.abs(ball.x - me.x) < 46 && ball.vy > -20;
 	return { move, jump };
 }
 
@@ -71,11 +79,12 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const roleRef = useRef<Role>('ai');
 	const startedRef = useRef(false);
 	const phaseRef = useRef<Phase>('menu');
+	const mySlotRef = useRef(0); // 0 = host/bot (left), 2 = guest (right)
 
 	const worldRef = useRef<World>(createWorld());
-	const oppNetRef = useRef<{ x: number; y: number; vx: number; vy: number; face: 1 | -1 }>({ x: FIELD.W * 0.72, y: FLOOR - PLAYER_R, vx: 0, vy: 0, face: -1 });
-	const oppRenderRef = useRef({ x: FIELD.W * 0.72, y: FLOOR - PLAYER_R, face: -1 as 1 | -1 });
-	const ballRenderRef = useRef({ x: FIELD.W / 2, y: FIELD.H * 0.32 });
+	const netPosRef = useRef<SlotPos[]>([]);         // raw networked positions per slot
+	const slotRenderRef = useRef<{ x: number; y: number; face: 1 | -1 }[]>([]); // eased render positions
+	const ballRenderRef = useRef({ x: FIELD.W / 2, y: FIELD.H * 0.3 });
 	const prevScoreRef = useRef({ l: 0, r: 0 });
 
 	const keysRef = useRef<Keys>({ left: false, right: false, jump: false });
@@ -86,8 +95,18 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	useEffect(() => { setName(playerName()); }, []);
 	useEffect(() => { phaseRef.current = phase; }, [phase]);
 
+	const isNetSlot = (role: Role, slot: number) => (role === 'host' && slot === 2) || (role === 'guest' && slot !== 2);
+
+	const seedRender = useCallback(() => {
+		const w = worldRef.current;
+		netPosRef.current = w.players.map(playerPos);
+		slotRenderRef.current = w.players.map((p) => ({ x: p.x, y: p.y, face: p.face }));
+		ballRenderRef.current = { x: w.ball.x, y: w.ball.y };
+	}, []);
+
 	/* ---------- rendering ---------- */
-	const drawCocotte = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, face: 1 | -1) => {
+	const drawCocotte = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, face: 1 | -1, isMe: boolean) => {
+		if (isMe) { ctx.strokeStyle = '#ffd60a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.stroke(); }
 		ctx.save();
 		ctx.translate(x, y);
 		ctx.scale(face, 1);
@@ -111,11 +130,8 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 		ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.2; ctx.stroke();
 		ctx.fillStyle = '#222';
-		ctx.beginPath(); ctx.arc(0, 0, r * 0.34, 0, Math.PI * 2); ctx.fill(); // centre pentagon-ish
-		for (let k = 0; k < 5; k++) {
-			const a = (k / 5) * Math.PI * 2;
-			ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62, r * 0.13, 0, Math.PI * 2); ctx.fill();
-		}
+		ctx.beginPath(); ctx.arc(0, 0, r * 0.34, 0, Math.PI * 2); ctx.fill();
+		for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62, r * 0.13, 0, Math.PI * 2); ctx.fill(); }
 		ctx.restore();
 	};
 
@@ -123,57 +139,51 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		const S = SCALE, top = GOAL_TOP * S, floor = FLOOR * S;
 		const x = side === 'l' ? 0 : VIEW_W;
 		const depth = 14 * S * (side === 'l' ? 1 : -1);
-		ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3;
-		ctx.beginPath(); ctx.moveTo(x, floor); ctx.lineTo(x, top); ctx.lineTo(x + depth, top); ctx.stroke(); // post + crossbar
-		ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 1;
-		for (let gy = top; gy <= floor; gy += 9) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + depth, top + (gy - top) * 0.5); ctx.stroke(); } // net hint
+		ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
+		ctx.beginPath(); ctx.moveTo(x, floor); ctx.lineTo(x, top); ctx.lineTo(x + depth, top); ctx.stroke();
+		ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
+		for (let gy = top; gy <= floor; gy += 9) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + depth, top + (gy - top) * 0.5); ctx.stroke(); }
 	};
 
 	const draw = useCallback(() => {
 		const cv = canvasRef.current; if (!cv) return;
 		const ctx = cv.getContext('2d'); if (!ctx) return;
-		const S = SCALE, w = worldRef.current, role = roleRef.current;
-		const mySide: Side = role === 'guest' ? 1 : 0;
+		const S = SCALE, w = worldRef.current, role = roleRef.current, mySlot = mySlotRef.current;
 
-		// sky
 		const sky = ctx.createLinearGradient(0, 0, 0, FLOOR * S);
 		sky.addColorStop(0, '#bfe3ff'); sky.addColorStop(1, '#e9f6ff');
 		ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW_W, FLOOR * S);
-		// pitch
 		ctx.fillStyle = '#5aa84a'; ctx.fillRect(0, FLOOR * S, VIEW_W, VIEW_H - FLOOR * S);
 		ctx.fillStyle = '#4c9440'; ctx.fillRect(0, FLOOR * S, VIEW_W, 3);
-		// centre line
 		ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.setLineDash([8, 10]);
 		ctx.beginPath(); ctx.moveTo(VIEW_W / 2, 0); ctx.lineTo(VIEW_W / 2, FLOOR * S); ctx.stroke(); ctx.setLineDash([]);
 		drawGoal(ctx, 'l'); drawGoal(ctx, 'r');
 
-		// ball (host/ai: authoritative; guest: eased from network)
+		for (let slot = 0; slot < 4; slot++) {
+			const net = isNetSlot(role, slot);
+			const src = net ? slotRenderRef.current[slot] : w.players[slot];
+			drawCocotte(ctx, src.x * S, src.y * S, PLAYER_R * S, teamOf(slot) === 0 ? COL_T0 : COL_T1, src.face as 1 | -1, slot === mySlot);
+		}
 		const b = role === 'guest' ? ballRenderRef.current : w.ball;
 		drawBall(ctx, b.x * S, b.y * S, BALL_R * S, w.ball.spin);
-		// my cocotte (always local)
-		const me = w.players[mySide];
-		drawCocotte(ctx, me.x * S, me.y * S, PLAYER_R * S, COL_ME, me.face);
-		// opponent (ai: local bot; net: eased)
-		if (role === 'ai') { const o = w.players[1]; drawCocotte(ctx, o.x * S, o.y * S, PLAYER_R * S, COL_OPP, o.face); }
-		else { const o = oppRenderRef.current; drawCocotte(ctx, o.x * S, o.y * S, PLAYER_R * S, COL_OPP, o.face); }
 	}, []);
 
 	/* ---------- score / win ---------- */
 	const finish = useCallback((l: number, r: number) => {
 		runningRef.current = false;
 		cancelAnimationFrame(rafRef.current);
-		const mySide = roleRef.current === 'guest' ? 1 : 0;
-		setYouWon(mySide === 0 ? l > r : r > l);
+		const myTeam = teamOf(mySlotRef.current);
+		setYouWon(myTeam === 0 ? l > r : r > l);
 		setPhase('over');
 		trackGame(gameId, 'game_won');
 	}, [gameId]);
 
 	const applyScores = useCallback((l: number, r: number) => {
-		const mySide = roleRef.current === 'guest' ? 1 : 0;
-		setScoreMe(mySide === 0 ? l : r);
-		setScoreOpp(mySide === 0 ? r : l);
+		const myTeam = teamOf(mySlotRef.current);
+		setScoreMe(myTeam === 0 ? l : r);
+		setScoreOpp(myTeam === 0 ? r : l);
 		const prev = prevScoreRef.current;
-		if (l > prev.l || r > prev.r) { setGoalFlash('BUT !'); setTimeout(() => setGoalFlash(''), 1100); }
+		if (l > prev.l || r > prev.r) { setGoalFlash('BUT !'); setTimeout(() => setGoalFlash(''), 1100); }
 		prevScoreRef.current = { l, r };
 		if (l >= WIN_GOALS || r >= WIN_GOALS) finish(l, r);
 	}, [finish]);
@@ -184,46 +194,43 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		let dtMs = now - lastRef.current; lastRef.current = now;
 		if (dtMs > 200) dtMs = 200;
 		accRef.current += dtMs;
-		const role = roleRef.current;
-		const w = worldRef.current;
-		const mySide: Side = role === 'guest' ? 1 : 0;
+		const role = roleRef.current, w = worldRef.current, mySlot = mySlotRef.current;
 
 		while (accRef.current >= STEP) {
 			accRef.current -= STEP;
 			const dt = STEP / 1000;
 			const inp = readInput(keysRef.current, touchRef.current);
 			if (role === 'ai') {
-				const r = step(w, dt, [inp, botInput(w)]);
+				const r = step(w, dt, [inp, botFor(w, 1), botFor(w, 2), botFor(w, 3)]);
 				if (r.scorer !== null) applyScores(w.score.l, w.score.r);
 			} else if (role === 'host') {
-				applyPlayerPos(w.players[1], oppNetRef.current); // opponent from the network
-				if (w.kickoff > 0) {
-					w.kickoff -= dt;
-					stepPlayer(w.players[0], inp, dt);
-					separatePlayers(w.players[0], w.players[1]);
-					w.ball.x = FIELD.W / 2; w.ball.y = FIELD.H * 0.32; w.ball.vx = 0; w.ball.vy = 0;
-				} else {
-					stepPlayer(w.players[0], inp, dt);
-					separatePlayers(w.players[0], w.players[1]);
+				applyPlayerPos(w.players[2], netPosRef.current[2]); // guest from the network
+				const live = w.kickoff <= 0;
+				if (!live) w.kickoff -= dt;
+				stepPlayer(w.players[0], inp, dt);
+				stepPlayer(w.players[1], botFor(w, 1), dt);
+				stepPlayer(w.players[3], botFor(w, 3), dt);
+				separateAll(w.players);
+				if (live) {
 					const scorer = stepBall(w, dt);
 					resolveKicks(w);
 					if (scorer !== null) { applyScore(w, scorer); applyScores(w.score.l, w.score.r); }
+				} else {
+					w.ball.x = FIELD.W / 2; w.ball.y = FIELD.H * 0.3; w.ball.vx = 0; w.ball.vy = 0;
 				}
 			} else {
-				stepPlayer(w.players[1], inp, dt); // guest: only my own cocotte
+				stepPlayer(w.players[2], inp, dt); // guest: only my own cocotte
 			}
 		}
 
 		// ease networked entities
 		const k = 0.32;
-		const ot = oppNetRef.current;
-		oppRenderRef.current.x += (ot.x - oppRenderRef.current.x) * k;
-		oppRenderRef.current.y += (ot.y - oppRenderRef.current.y) * k;
-		oppRenderRef.current.face = ot.face;
-		if (role === 'guest') {
-			ballRenderRef.current.x += (w.ball.x - ballRenderRef.current.x) * k;
-			ballRenderRef.current.y += (w.ball.y - ballRenderRef.current.y) * k;
+		for (let slot = 0; slot < 4; slot++) {
+			if (!isNetSlot(role, slot)) continue;
+			const t = netPosRef.current[slot], r = slotRenderRef.current[slot];
+			r.x += (t.x - r.x) * k; r.y += (t.y - r.y) * k; r.face = t.face;
 		}
+		if (role === 'guest') { ballRenderRef.current.x += (w.ball.x - ballRenderRef.current.x) * k; ballRenderRef.current.y += (w.ball.y - ballRenderRef.current.y) * k; }
 
 		draw();
 
@@ -232,9 +239,11 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		if (sendAccRef.current >= 1000 / SEND_HZ) {
 			sendAccRef.current = 0;
 			const m = matchRef.current;
-			if (m && role !== 'ai') {
-				m.sendPos(playerPos(w.players[mySide]));
-				if (role === 'host') m.sendBall({ ...ballState(w), l: w.score.l, r: w.score.r, ko: w.kickoff } satisfies BallSync);
+			if (m && role === 'host') {
+				const slots: PosMsg[] = [0, 1, 3].map((s) => ({ slot: s, ...playerPos(w.players[s]) }));
+				m.sendState({ ...ballState(w), l: w.score.l, r: w.score.r, ko: w.kickoff, slots } satisfies StateMsg);
+			} else if (m && role === 'guest') {
+				m.sendPos({ slot: mySlot, ...playerPos(w.players[mySlot]) });
 			}
 		}
 		rafRef.current = requestAnimationFrame(frame);
@@ -253,24 +262,25 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		worldRef.current = createWorld();
 		prevScoreRef.current = { l: 0, r: 0 };
 		setScoreMe(0); setScoreOpp(0); setGoalFlash('');
-		oppNetRef.current = { x: FIELD.W * 0.72, y: FLOOR - PLAYER_R, vx: 0, vy: 0, face: -1 };
-		oppRenderRef.current = { x: FIELD.W * 0.72, y: FLOOR - PLAYER_R, face: -1 };
-		ballRenderRef.current = { x: FIELD.W / 2, y: FIELD.H * 0.32 };
-	}, []);
+		seedRender();
+	}, [seedRender]);
 
 	const startMatch = useCallback((m: Match) => {
 		if (startedRef.current) return;
 		startedRef.current = true;
-		roleRef.current = m.isHost() ? 'host' : 'guest';
+		const host = m.isHost();
+		roleRef.current = host ? 'host' : 'guest';
+		mySlotRef.current = host ? 0 : 2;
 		setConfirmQuit(false);
 		resetWorld();
-		m.onPos((p: PosMsg) => { oppNetRef.current = { x: p.x, y: p.y, vx: p.vx, vy: p.vy, face: p.face }; });
-		m.onBall((b: BallSync) => {
+		m.onPos((p: PosMsg) => { netPosRef.current[p.slot] = { x: p.x, y: p.y, vx: p.vx, vy: p.vy, face: p.face }; });
+		m.onState((s: StateMsg) => {
 			if (roleRef.current !== 'guest') return;
 			const w = worldRef.current;
-			w.ball.x = b.x; w.ball.y = b.y; w.ball.vx = b.vx; w.ball.vy = b.vy; w.kickoff = b.ko;
-			if (phaseRef.current === 'over' && b.l === 0 && b.r === 0) { setPhase('playing'); startLoop(); } // host restarted
-			applyScores(b.l, b.r);
+			applyBall(w, s); w.kickoff = s.ko;
+			for (const sp of s.slots) netPosRef.current[sp.slot] = { x: sp.x, y: sp.y, vx: sp.vx, vy: sp.vy, face: sp.face };
+			if (phaseRef.current === 'over' && s.l === 0 && s.r === 0) { setPhase('playing'); startLoop(); } // host restarted
+			applyScores(s.l, s.r);
 		});
 		trackGame(gameId, 'game_started');
 		setPhase('playing');
@@ -334,6 +344,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 	const playAI = useCallback(() => {
 		roleRef.current = 'ai';
+		mySlotRef.current = 0;
 		matchRef.current = null;
 		startedRef.current = true;
 		setOppName('Ordinateur');
@@ -350,7 +361,11 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		resetWorld();
 		setPhase('playing');
 		startLoop();
-		if (roleRef.current === 'host') matchRef.current?.sendBall({ ...ballState(worldRef.current), l: 0, r: 0, ko: worldRef.current.kickoff });
+		if (roleRef.current === 'host') {
+			const w = worldRef.current;
+			const slots: PosMsg[] = [0, 1, 3].map((s) => ({ slot: s, ...playerPos(w.players[s]) }));
+			matchRef.current?.sendState({ ...ballState(w), l: 0, r: 0, ko: w.kickoff, slots });
+		}
 	}, [resetWorld, startLoop]);
 
 	const copyCode = useCallback(() => {
@@ -396,9 +411,9 @@ export default function FootGame({ gameId }: { gameId: string }) {
 				{phase === 'playing' && (
 					<>
 						<div className="fo-hud">
-							<span style={{ color: COL_ME }}>Toi {scoreMe}</span>
+							<span style={{ color: COL_T0 }}>Bleus {teamOf(mySlotRef.current) === 0 ? scoreMe : scoreOpp}</span>
 							<span className="fo-sep">—</span>
-							<span style={{ color: COL_OPP }}>{scoreOpp} {oppName}</span>
+							<span style={{ color: COL_T1 }}>{teamOf(mySlotRef.current) === 0 ? scoreOpp : scoreMe} Rouges</span>
 						</div>
 						<button className="fo-quit" onClick={() => setConfirmQuit(true)}>✕</button>
 						{goalFlash && <div className="fo-goal">{goalFlash}</div>}
@@ -419,7 +434,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 					<div className="fo-overlay">
 						<div className="fo-card">
 							<h2>Cocotte Foot</h2>
-							<p className="fo-sub">Duel 1 contre 1. Premier à {WIN_GOALS} buts gagne. Tape dans le ballon, il part en tir&nbsp;!</p>
+							<p className="fo-sub">2 contre 2 (avec un coéquipier bot). Premier à {WIN_GOALS} buts gagne. Fonce dans le ballon, il part en tir&nbsp;!</p>
 							<input className="fo-name" value={name} maxLength={20} placeholder="Ton pseudo" onChange={(e) => setName(e.target.value)} />
 							<button className="fo-btn fo-primary" disabled={mpOff} onClick={playQuick}>⚡ Partie rapide</button>
 							<button className="fo-btn" disabled={mpOff} onClick={() => setCodePanel((v) => !v)}>🔑 Jouer avec un ami (code)</button>
@@ -459,7 +474,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 					<div className="fo-overlay">
 						<div className="fo-card">
 							<h2>{youWon ? '🎉 Gagné !' : 'Perdu…'}</h2>
-							<p className="fo-sub">{scoreMe} — {scoreOpp}</p>
+							<p className="fo-sub">{scoreMe} — {scoreOpp}{oppName ? ` · vs ${oppName}` : ''}</p>
 							{roleRef.current === 'guest'
 								? <p className="fo-status">En attente que l'hôte relance…</p>
 								: <button className="fo-btn fo-primary" onClick={rematch}>Rejouer</button>}
@@ -479,7 +494,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<p className="fo-help">Déplace-toi ◀ ▶, saute pour faire la tête, et fonce dans le ballon pour tirer. Clavier : ← → et Espace / ↑.</p>
+			<p className="fo-help">Déplace-toi ◀ ▶, saute pour faire la tête, et fonce dans le ballon pour tirer (il décolle au sol). Clavier : ← → et Espace / ↑. Tu es la cocotte cerclée d’or.</p>
 		</div>
 	);
 }

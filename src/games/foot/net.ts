@@ -15,18 +15,21 @@ const SYNC_WAIT_MS = 600;
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no ambiguous chars (0/O, 1/I/L)
 
 export interface FootPeer { id: string; name: string; }
-export interface PosMsg { id: string; x: number; y: number; vx: number; vy: number; face: 1 | -1; }
-export interface BallSync { x: number; y: number; vx: number; vy: number; l: number; r: number; ko: number; }
+/** A cocotte's position, keyed by fixed SLOT (0,1 = left team · 2,3 = right team). */
+export interface PosMsg { slot: number; x: number; y: number; vx: number; vy: number; face: 1 | -1; }
+/** Host bundle: ball + team scores + kickoff + the positions of every slot the host owns
+ *  (its own cocotte and the bots). One message per tick keeps us under the events/sec cap. */
+export interface StateMsg { x: number; y: number; vx: number; vy: number; l: number; r: number; ko: number; slots: PosMsg[]; }
 
 export interface Match {
 	roomId: string;
 	code: string | null; // shareable code when joined via a code, else null
 	selfId: string;
 	isHost: () => boolean;
-	sendPos: (p: Omit<PosMsg, 'id'>) => void;
-	sendBall: (b: BallSync) => void;
+	sendPos: (m: PosMsg) => void;
+	sendState: (s: StateMsg) => void;
 	onPos: (cb: (m: PosMsg) => void) => void;
-	onBall: (cb: (b: BallSync) => void) => void;
+	onState: (cb: (s: StateMsg) => void) => void;
 	onPeers: (cb: (peers: FootPeer[]) => void) => void;
 	leave: () => void;
 }
@@ -78,9 +81,9 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 	const selfId = randomId();
 	const ch = c.channel(roomId, { config: { presence: { key: selfId }, broadcast: { self: false } } });
 
-	const cb: { pos?: (m: PosMsg) => void; ball?: (b: BallSync) => void; peers?: (p: FootPeer[]) => void } = {};
+	const cb: { pos?: (m: PosMsg) => void; state?: (s: StateMsg) => void; peers?: (p: FootPeer[]) => void } = {};
 	ch.on('broadcast', { event: 'pos' }, ({ payload }) => cb.pos?.(payload as PosMsg));
-	ch.on('broadcast', { event: 'ball' }, ({ payload }) => cb.ball?.(payload as BallSync));
+	ch.on('broadcast', { event: 'state' }, ({ payload }) => cb.state?.(payload as StateMsg));
 	ch.on('presence', { event: 'sync' }, () => cb.peers?.(peersOf(ch, selfId)));
 
 	const peers = await subscribeAndSync(ch, selfId);
@@ -95,10 +98,10 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 		code,
 		selfId,
 		isHost: () => allIds(ch, selfId)[0] === selfId,
-		sendPos: (p) => { void ch.send({ type: 'broadcast', event: 'pos', payload: { id: selfId, ...p } }); },
-		sendBall: (b) => { void ch.send({ type: 'broadcast', event: 'ball', payload: b }); },
+		sendPos: (m) => { void ch.send({ type: 'broadcast', event: 'pos', payload: m }); },
+		sendState: (s) => { void ch.send({ type: 'broadcast', event: 'state', payload: s }); },
 		onPos: (fn) => { cb.pos = fn; },
-		onBall: (fn) => { cb.ball = fn; },
+		onState: (fn) => { cb.state = fn; },
 		onPeers: (fn) => { cb.peers = fn; fn(peersOf(ch, selfId)); },
 		leave: () => { void ch.untrack().then(() => ch.unsubscribe()); },
 	};

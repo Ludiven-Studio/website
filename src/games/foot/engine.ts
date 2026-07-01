@@ -1,25 +1,26 @@
 /**
- * COCOTTE FOOT — pure engine (no UI). Side-view 1v1 arena football: two round players
- * (cocottes) run/jump and share ONE easily-bouncing ball that shoots off on any touch.
- * Fully deterministic (no RNG) so the network host can be authoritative over the ball.
+ * COCOTTE FOOT — pure engine (no UI). Side-view 2v2 arena football: four round players
+ * (cocottes, two per team) run/jump and share ONE easily-bouncing ball that shoots off — and
+ * LOFTS when struck along the ground. Fully deterministic (no RNG) so the network host can be
+ * authoritative over the ball. Slots 0,1 = left team (0); slots 2,3 = right team (1).
  *
- * The island composes the exported pieces: for the BOT/local game use step() (moves both
- * players + ball); over the network the host moves its own player, places the opponent from
- * the received position, then runs stepBall()/resolveKicks(); the guest only runs stepPlayer()
- * on its own cocotte and renders the ball/opponent/score from the host.
+ * The island composes the exported pieces: for the BOT/local game use step() (moves all four
+ * players + ball); over the network the host moves the slots it owns (its player + the bots),
+ * places the guest from the received position, then runs stepBall()/resolveKicks(); the guest
+ * only runs stepPlayer() on its own cocotte and renders everything else from the host.
  */
 
-export type Side = 0 | 1; // 0 = left player, 1 = right player
+export type Side = 0 | 1; // team: 0 = left, 1 = right
 export interface PlayerInput { move: -1 | 0 | 1; jump: boolean; }
 
 export interface Player {
 	x: number; y: number; vx: number; vy: number;
-	onGround: boolean; face: 1 | -1; jumpHeld: boolean;
+	onGround: boolean; face: 1 | -1; jumpHeld: boolean; team: Side;
 }
 export interface Ball { x: number; y: number; vx: number; vy: number; spin: number; }
 
 export interface World {
-	players: [Player, Player];
+	players: Player[]; // length 4 (slots 0,1 = team 0 · slots 2,3 = team 1)
 	ball: Ball;
 	score: { l: number; r: number };
 	kickoff: number; // seconds of kickoff freeze remaining (0 = live)
@@ -27,31 +28,36 @@ export interface World {
 
 /* ---------- Arena / tuning (world units, y points down) ---------- */
 
-export const FIELD = { W: 320, H: 180 };
+export const FIELD = { W: 460, H: 190 };
 const GROUND_H = 16;
 export const FLOOR = FIELD.H - GROUND_H; // top surface of the ground
 export const PLAYER_R = 11;
 export const BALL_R = 7;
-const GOAL_OPEN_H = 58;
+const GOAL_OPEN_H = 44; // smaller goals than before
 export const GOAL_TOP = FLOOR - GOAL_OPEN_H; // crossbar y; goal mouth is [GOAL_TOP, FLOOR]
 export const WIN_GOALS = 5;
 
 const GRAVITY = 640;
-const RUN_MAX = 106, RUN_ACC = 950, GROUND_DAMP = 0.8, AIR_ACC = 420;
-const JUMP_V = 252;
+const RUN_MAX = 114, RUN_ACC = 1000, GROUND_DAMP = 0.8, AIR_ACC = 440;
+const JUMP_V = 258;
 const BALL_REST = 0.84, BALL_AIRDRAG = 0.999, BALL_ROLL = 0.985, WALL_REST = 0.82;
-const BALL_MAXV = 470;
-const KICK = 155, KICK_TRANSFER = 0.6, KICK_UP = 58;
+const BALL_MAXV = 500;
+const KICK = 165, KICK_TRANSFER = 0.62, KICK_UP = 60, LIFT_MIN = 140; // LIFT_MIN = min upward pop for a grounded shot
 const KICKOFF_TIME = 1.1;
 
 /* ---------- Construction ---------- */
 
-const mkPlayer = (x: number, face: 1 | -1): Player => ({ x, y: FLOOR - PLAYER_R, vx: 0, vy: 0, onGround: true, face, jumpHeld: false });
-const centerBall = (): Ball => ({ x: FIELD.W / 2, y: FIELD.H * 0.32, vx: 0, vy: 0, spin: 0 });
+const mkPlayer = (x: number, face: 1 | -1, team: Side): Player => ({ x, y: FLOOR - PLAYER_R, vx: 0, vy: 0, onGround: true, face, jumpHeld: false, team });
+const centerBall = (): Ball => ({ x: FIELD.W / 2, y: FIELD.H * 0.3, vx: 0, vy: 0, spin: 0 });
 
 export function createWorld(): World {
 	return {
-		players: [mkPlayer(FIELD.W * 0.28, 1), mkPlayer(FIELD.W * 0.72, -1)],
+		players: [
+			mkPlayer(FIELD.W * 0.34, 1, 0), // slot 0 — left team, striker
+			mkPlayer(FIELD.W * 0.16, 1, 0), // slot 1 — left team, back
+			mkPlayer(FIELD.W * 0.66, -1, 1), // slot 2 — right team, striker
+			mkPlayer(FIELD.W * 0.84, -1, 1), // slot 3 — right team, back
+		],
 		ball: centerBall(),
 		score: { l: 0, r: 0 },
 		kickoff: KICKOFF_TIME,
@@ -86,7 +92,7 @@ export function reclampPlayer(p: Player): void {
 	else p.onGround = false;
 }
 
-/** Soft positional separation so the two cocottes don't overlap (host-side only). */
+/** Soft positional separation so two cocottes don't overlap. */
 export function separatePlayers(a: Player, b: Player): void {
 	const dx = b.x - a.x, dy = b.y - a.y;
 	const d = Math.hypot(dx, dy);
@@ -98,10 +104,14 @@ export function separatePlayers(a: Player, b: Player): void {
 	reclampPlayer(a); reclampPlayer(b);
 }
 
+export function separateAll(ps: Player[]): void {
+	for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) separatePlayers(ps[i], ps[j]);
+}
+
 /* ---------- Ball ---------- */
 
 /** Advance the ball (walls/ceiling/floor with restitution, sub-stepped to avoid tunnelling).
- *  Returns the scoring side if the ball entered a goal this step, else null. */
+ *  Returns the scoring TEAM if the ball entered a goal this step, else null. */
 export function stepBall(w: World, dt: number): Side | null {
 	const b = w.ball;
 	b.vy += GRAVITY * dt;
@@ -115,11 +125,11 @@ export function stepBall(w: World, dt: number): Side | null {
 		if (b.y > FLOOR - BALL_R) { b.y = FLOOR - BALL_R; if (b.vy > 0) b.vy = b.vy < 45 ? 0 : -b.vy * BALL_REST; b.vx *= BALL_ROLL; }
 		if (b.y < BALL_R) { b.y = BALL_R; if (b.vy < 0) b.vy = -b.vy * BALL_REST; }
 		if (b.x < BALL_R) {
-			if (b.y >= GOAL_TOP && b.y <= FLOOR) return 1; // in LEFT goal → right player scores
+			if (b.y >= GOAL_TOP && b.y <= FLOOR) return 1; // in LEFT goal → right team scores
 			b.x = BALL_R; b.vx = Math.abs(b.vx) * WALL_REST;
 		}
 		if (b.x > FIELD.W - BALL_R) {
-			if (b.y >= GOAL_TOP && b.y <= FLOOR) return 0; // in RIGHT goal → left player scores
+			if (b.y >= GOAL_TOP && b.y <= FLOOR) return 0; // in RIGHT goal → left team scores
 			b.x = FIELD.W - BALL_R; b.vx = -Math.abs(b.vx) * WALL_REST;
 		}
 	}
@@ -140,12 +150,15 @@ function kick(p: Player, b: Ball): void {
 	const nx = d > 0.001 ? dx / d : 0, ny = d > 0.001 ? dy / d : -1;
 	b.x = p.x + nx * min; b.y = p.y + ny * min; // separate
 	b.vx = nx * KICK + p.vx * KICK_TRANSFER;
-	b.vy = ny * KICK + p.vy * KICK_TRANSFER - KICK_UP; // upward pop so a touch becomes a shot
+	let vy = ny * KICK + p.vy * KICK_TRANSFER - KICK_UP;
+	// A grounded ball struck roughly horizontally must LOFT into a shot, not be driven into the turf.
+	if (b.y > FLOOR - BALL_R * 2.2 && vy > -LIFT_MIN) vy = -LIFT_MIN - Math.abs(p.vx) * 0.3;
+	b.vy = vy;
 	const sp = Math.hypot(b.vx, b.vy);
 	if (sp > BALL_MAXV) { const k = BALL_MAXV / sp; b.vx *= k; b.vy *= k; }
 }
 
-/** Register a goal: bump the score, recentre the ball, start a short kickoff freeze. */
+/** Register a goal: bump the team score, recentre the ball, start a short kickoff freeze. */
 export function applyScore(w: World, scorer: Side): void {
 	if (scorer === 0) w.score.l++; else w.score.r++;
 	w.ball = centerBall();
@@ -154,18 +167,16 @@ export function applyScore(w: World, scorer: Side): void {
 
 /* ---------- Full step (bot / local / tests) ---------- */
 
-export function step(w: World, dt: number, inputs: [PlayerInput, PlayerInput]): { scorer: Side | null } {
+export function step(w: World, dt: number, inputs: PlayerInput[]): { scorer: Side | null } {
 	if (w.kickoff > 0) {
 		w.kickoff -= dt;
-		stepPlayer(w.players[0], inputs[0], dt);
-		stepPlayer(w.players[1], inputs[1], dt);
-		separatePlayers(w.players[0], w.players[1]);
+		for (let i = 0; i < w.players.length; i++) stepPlayer(w.players[i], inputs[i], dt);
+		separateAll(w.players);
 		Object.assign(w.ball, centerBall()); // ball held at centre during kickoff
 		return { scorer: null };
 	}
-	stepPlayer(w.players[0], inputs[0], dt);
-	stepPlayer(w.players[1], inputs[1], dt);
-	separatePlayers(w.players[0], w.players[1]);
+	for (let i = 0; i < w.players.length; i++) stepPlayer(w.players[i], inputs[i], dt);
+	separateAll(w.players);
 	const scorer = stepBall(w, dt);
 	resolveKicks(w);
 	if (scorer !== null) applyScore(w, scorer);
@@ -175,9 +186,9 @@ export function step(w: World, dt: number, inputs: [PlayerInput, PlayerInput]): 
 /* ---------- Serialisation (network) ---------- */
 
 export interface BallMsg { x: number; y: number; vx: number; vy: number; }
-export interface PlayerPos { x: number; y: number; vx: number; vy: number; face: 1 | -1 }
+export interface SlotPos { x: number; y: number; vx: number; vy: number; face: 1 | -1 }
 
 export const ballState = (w: World): BallMsg => ({ x: w.ball.x, y: w.ball.y, vx: w.ball.vx, vy: w.ball.vy });
 export const applyBall = (w: World, s: BallMsg): void => { w.ball.x = s.x; w.ball.y = s.y; w.ball.vx = s.vx; w.ball.vy = s.vy; };
-export const playerPos = (p: Player): PlayerPos => ({ x: p.x, y: p.y, vx: p.vx, vy: p.vy, face: p.face });
-export const applyPlayerPos = (p: Player, s: PlayerPos): void => { p.x = s.x; p.y = s.y; p.vx = s.vx; p.vy = s.vy; p.face = s.face; };
+export const playerPos = (p: Player): SlotPos => ({ x: p.x, y: p.y, vx: p.vx, vy: p.vy, face: p.face });
+export const applyPlayerPos = (p: Player, s: SlotPos): void => { p.x = s.x; p.y = s.y; p.vx = s.vx; p.vy = s.vy; p.face = s.face; };
