@@ -94,7 +94,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		setDiffKey(key);
 		const lb = localStorage.getItem(freeBestKey(key));
-		setBest(lb ? Number(lb) : null);
+		const stored = lb ? Number(lb) : null;
+		bestRef.current = stored; // seed the ref so win() keeps the real record, not just this session's
+		setBest(stored);
 		layTable(key, (Math.random() * 2 ** 31) >>> 0);
 	}, [layTable]);
 
