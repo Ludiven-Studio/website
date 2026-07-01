@@ -270,16 +270,28 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			const S = sizeRef.current, cx = S / 2, cy = S / 2, R = S * 0.42;
 			ctx.clearRect(0, 0, S, S);
 			drawBoard(cx, cy, R);
-			// landed darts of the current volley (max 3), drawn as little darts sticking out
+			// landed darts of the current volley — the dart points at you, so you see its
+			// flights (4 fins forming an X) from behind, with the barrel end in the middle.
 			for (const d of dartsRef.current) {
-				const px = cx + d.x * R, py = cy + d.y * R;
-				const tx = px + 8, ty = py - 14; // shaft end (up-right)
-				ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
-				ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(tx, ty); ctx.stroke();
-				ctx.fillStyle = '#ffcf33'; // flight
-				ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + 6, ty - 4); ctx.lineTo(tx + 3, ty + 4); ctx.closePath(); ctx.fill();
-				ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(px, py, 2.6, 0, Math.PI * 2); ctx.fill(); // point
-				ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px, py, 1.1, 0, Math.PI * 2); ctx.fill();
+				const px = cx + d.x * R, py = cy + d.y * R, rF = R * 0.055;
+				ctx.save();
+				ctx.translate(px, py);
+				for (let k = 0; k < 4; k++) {
+					const a = k * Math.PI / 2 + Math.PI / 4; // diagonal fins
+					ctx.fillStyle = k % 2 ? '#e34b4b' : '#f4f4f2';
+					ctx.beginPath();
+					ctx.moveTo(0, 0);
+					ctx.lineTo(Math.cos(a - 0.34) * rF, Math.sin(a - 0.34) * rF);
+					ctx.lineTo(Math.cos(a) * rF * 1.35, Math.sin(a) * rF * 1.35);
+					ctx.lineTo(Math.cos(a + 0.34) * rF, Math.sin(a + 0.34) * rF);
+					ctx.closePath();
+					ctx.fill();
+				}
+				ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.5;
+				for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * rF * 1.35, Math.sin(a) * rF * 1.35); ctx.stroke(); }
+				ctx.fillStyle = '#9aa1a8'; ctx.beginPath(); ctx.arc(0, 0, rF * 0.32, 0, Math.PI * 2); ctx.fill(); // barrel end
+				ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(0, 0, rF * 0.15, 0, Math.PI * 2); ctx.fill();
+				ctx.restore();
 			}
 			// aim frame + oscillating reticle inside it (only while aiming)
 			if (statusRef.current === 'aiming') {
