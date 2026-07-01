@@ -3,7 +3,7 @@
 -- (past days are purged on every submit) so the table never bloats.
 --
 -- Apply once in the Supabase SQL editor. Idempotent: safe to re-run.
--- Assumes a `public.scores` table with columns: game text, day text, name text,
+-- Assumes a `public.scores` table with columns: game text, day date, name text,
 -- value (int/bigint), metric text, created_at timestamptz default now()
 -- (plus the existing `get_daily` RPC, untouched here).
 
@@ -35,10 +35,11 @@ security definer
 set search_path = public
 as $$
 begin
-  delete from public.scores where day < p_day; -- daily reset: drop yesterday and older
+  -- `day` is a DATE column, so cast the text param before comparing / inserting.
+  delete from public.scores where day < p_day::date; -- daily reset: drop yesterday and older
 
   insert into public.scores (game, day, name, value, metric)
-  values (p_game, p_day, p_name, p_value, p_metric)
+  values (p_game, p_day::date, p_name, p_value, p_metric)
   on conflict (game, day, lower(name)) do update
     set value = excluded.value, created_at = now()
     where (p_metric = 'time'  and excluded.value < scores.value)   -- keep the min (time / strokes)
