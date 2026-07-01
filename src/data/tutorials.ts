@@ -142,7 +142,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	],
 	foot: [
 		{ emoji: '⚽', title: 'Le but', body: 'Match de foot 2 contre 2 vu de côté : tu as un coéquipier bot, envoie le ballon dans le but adverse. Premier à 5 buts gagne. Le ballon rebondit beaucoup et part en tir dès qu\'une cocotte le touche — au sol, il décolle.' },
-		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace-toi avec ◀ ▶ (ou les flèches ← →) et saute avec le bouton SAUT (ou Espace / ↑) pour faire la tête sur les ballons hauts. Fonce dans le ballon pour le frapper : ta vitesse donne la puissance et la direction du tir. Tu es la cocotte cerclée d\'or.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace-toi avec ◀ ▶ (ou les flèches ← →) et saute avec SAUT (ou Espace / ↑). Astuce : re-tape SAUT en l\'air pour battre des ailes et planer un peu — pratique pour intercepter les ballons hauts. Fonce dans le ballon pour le frapper : ta vitesse donne la puissance et la direction du tir. Tu es la cocotte cerclée d\'or.' },
 		{ emoji: '👥', title: 'Jouer ensemble', body: 'Partie rapide pour être appairé au hasard, ou « Jouer avec un ami » : un code s\'affiche, ton ami le saisit pour te rejoindre — chacun avec son coéquipier bot. Pas d\'adversaire ? Joue contre le bot.' },
 	],
 	esquive: [

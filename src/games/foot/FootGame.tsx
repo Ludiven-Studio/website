@@ -36,10 +36,26 @@ const readInput = (k: Keys, t: Keys): PlayerInput => ({
 	jump: k.jump || t.jump,
 });
 
+interface BotSt { wiggle: number; dir: -1 | 0 | 1; jump: boolean; }
+const freshBotSt = (): BotSt[] => [0, 1, 2, 3].map(() => ({ wiggle: 0, dir: 0 as -1 | 0 | 1, jump: false }));
+
 /** Team-aware bot: get on the own-goal side of the ball to push it toward the opponent; a
- *  backup cocotte hangs near its own half; head high balls that are close. Beatable on purpose. */
-function botFor(w: World, slot: number): PlayerInput {
+ *  backup cocotte hangs near its own half; head high balls that are close. When jammed against
+ *  another cocotte it occasionally wiggles off in a random direction (and sometimes hops) to
+ *  break the deadlock. Beatable on purpose. */
+function botFor(w: World, slot: number, st: BotSt): PlayerInput {
 	const me = w.players[slot], ball = w.ball, team = me.team;
+	if (st.wiggle > 0) { st.wiggle--; return { move: st.dir, jump: st.jump }; } // finish a random escape burst
+	for (let i = 0; i < w.players.length; i++) { // stuck against a neighbour?
+		if (i === slot) continue;
+		const o = w.players[i];
+		if (Math.hypot(o.x - me.x, o.y - me.y) < PLAYER_R * 2 + 3 && Math.random() < 0.05) {
+			st.wiggle = 16 + Math.floor(Math.random() * 20); // ~0.3–0.6s
+			st.dir = Math.random() < 0.5 ? -1 : 1;
+			st.jump = Math.random() < 0.4; // sometimes hop out
+			return { move: st.dir, jump: st.jump };
+		}
+	}
 	const attackDir = team === 0 ? 1 : -1;
 	let targetX = ball.x - attackDir * (PLAYER_R + BALL_R) * 0.9; // stand behind the ball to shove it forward
 	if (slot === 1 || slot === 3) { // backup
@@ -86,6 +102,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const slotRenderRef = useRef<{ x: number; y: number; face: 1 | -1 }[]>([]); // eased render positions
 	const ballRenderRef = useRef({ x: FIELD.W / 2, y: FIELD.H * 0.3 });
 	const prevScoreRef = useRef({ l: 0, r: 0 });
+	const botStRef = useRef(freshBotSt());
 
 	const keysRef = useRef<Keys>({ left: false, right: false, jump: false });
 	const touchRef = useRef<Keys>({ left: false, right: false, jump: false });
@@ -200,16 +217,17 @@ export default function FootGame({ gameId }: { gameId: string }) {
 			accRef.current -= STEP;
 			const dt = STEP / 1000;
 			const inp = readInput(keysRef.current, touchRef.current);
+			const bs = botStRef.current;
 			if (role === 'ai') {
-				const r = step(w, dt, [inp, botFor(w, 1), botFor(w, 2), botFor(w, 3)]);
+				const r = step(w, dt, [inp, botFor(w, 1, bs[1]), botFor(w, 2, bs[2]), botFor(w, 3, bs[3])]);
 				if (r.scorer !== null) applyScores(w.score.l, w.score.r);
 			} else if (role === 'host') {
 				applyPlayerPos(w.players[2], netPosRef.current[2]); // guest from the network
 				const live = w.kickoff <= 0;
 				if (!live) w.kickoff -= dt;
 				stepPlayer(w.players[0], inp, dt);
-				stepPlayer(w.players[1], botFor(w, 1), dt);
-				stepPlayer(w.players[3], botFor(w, 3), dt);
+				stepPlayer(w.players[1], botFor(w, 1, bs[1]), dt);
+				stepPlayer(w.players[3], botFor(w, 3, bs[3]), dt);
 				separateAll(w.players);
 				if (live) {
 					const scorer = stepBall(w, dt);
@@ -261,6 +279,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const resetWorld = useCallback(() => {
 		worldRef.current = createWorld();
 		prevScoreRef.current = { l: 0, r: 0 };
+		botStRef.current = freshBotSt();
 		setScoreMe(0); setScoreOpp(0); setGoalFlash('');
 		seedRender();
 	}, [seedRender]);
@@ -494,7 +513,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<p className="fo-help">Déplace-toi ◀ ▶, saute pour faire la tête, et fonce dans le ballon pour tirer (il décolle au sol). Clavier : ← → et Espace / ↑. Tu es la cocotte cerclée d’or.</p>
+			<p className="fo-help">Déplace-toi ◀ ▶ et appuie sur Saut pour bondir — <strong>re-tape Saut en l'air pour battre des ailes et planer</strong>. Fonce dans le ballon pour tirer (il décolle au sol). Clavier : ← → et Espace / ↑. Tu es la cocotte cerclée d’or.</p>
 		</div>
 	);
 }

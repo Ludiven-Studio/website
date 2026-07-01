@@ -38,6 +38,17 @@ describe('foot engine', () => {
 		expect(p.y).toBeCloseTo(FLOOR - PLAYER_R, 3);
 	});
 
+	it('can flap to fly a bit while airborne (a re-press after release)', () => {
+		const w = live(createWorld());
+		const p = w.players[0];
+		step(w, DT, [{ move: 0, jump: true }, NONE, NONE, NONE]); // ground jump
+		for (let i = 0; i < 8; i++) step(w, DT, [{ move: 0, jump: false }, NONE, NONE, NONE]); // rise, jump released
+		const vyBefore = p.vy;
+		expect(p.onGround).toBe(false);
+		step(w, DT, [{ move: 0, jump: true }, NONE, NONE, NONE]); // flap: rising edge in the air
+		expect(p.vy).toBeLessThan(vyBefore); // pushed further upward
+	});
+
 	it('a grounded ball struck horizontally lofts into a shot (rises)', () => {
 		const w = live(createWorld());
 		w.ball.x = 160; w.ball.y = FLOOR - BALL_R; w.ball.vx = 0; w.ball.vy = 0; // resting on the floor

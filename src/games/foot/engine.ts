@@ -39,7 +39,7 @@ export const WIN_GOALS = 5;
 
 const GRAVITY = 640;
 const RUN_MAX = 114, RUN_ACC = 1000, GROUND_DAMP = 0.8, AIR_ACC = 440;
-const JUMP_V = 258;
+const JUMP_V = 258, FLAP_V = 200; // FLAP_V = upward pop of an in-air wing flap (hens fly a bit)
 const BALL_REST = 0.84, BALL_AIRDRAG = 0.999, BALL_ROLL = 0.985, WALL_REST = 0.82;
 const BALL_MAXV = 500;
 const KICK = 165, KICK_TRANSFER = 0.62, KICK_UP = 60, LIFT_MIN = 140; // LIFT_MIN = min upward pop for a grounded shot
@@ -76,7 +76,10 @@ export function stepPlayer(p: Player, inp: PlayerInput, dt: number): void {
 		p.vx *= GROUND_DAMP;
 		if (Math.abs(p.vx) < 3) p.vx = 0;
 	}
-	if (inp.jump && !p.jumpHeld && p.onGround) { p.vy = -JUMP_V; p.onGround = false; } // jump on rising edge only
+	if (inp.jump && !p.jumpHeld) { // rising edge only
+		if (p.onGround) { p.vy = -JUMP_V; p.onGround = false; } // full jump from the ground
+		else if (p.vy > -FLAP_V) p.vy = -FLAP_V; // wing flap in the air → glide/fly a bit
+	}
 	p.jumpHeld = inp.jump;
 
 	p.vy += GRAVITY * dt;
@@ -88,6 +91,7 @@ export function stepPlayer(p: Player, inp: PlayerInput, dt: number): void {
 export function reclampPlayer(p: Player): void {
 	if (p.x < PLAYER_R) { p.x = PLAYER_R; if (p.vx < 0) p.vx = 0; }
 	if (p.x > FIELD.W - PLAYER_R) { p.x = FIELD.W - PLAYER_R; if (p.vx > 0) p.vx = 0; }
+	if (p.y < PLAYER_R) { p.y = PLAYER_R; if (p.vy < 0) p.vy = 0; } // ceiling: don't fly off the top
 	if (p.y >= FLOOR - PLAYER_R) { p.y = FLOOR - PLAYER_R; if (p.vy > 0) p.vy = 0; p.onGround = true; }
 	else p.onGround = false;
 }
