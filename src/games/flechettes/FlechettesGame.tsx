@@ -62,6 +62,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 	const throwsRef = useRef(0); // total darts thrown
 	const dartIdxRef = useRef(0);
 	const dartStartRef = useRef(0); // perf.now when the current dart's oscillation began
+	const clearTimerRef = useRef<number | null>(null); // auto-clears the volley 3s after the 3rd dart
 	const startRef = useRef(0); // chrono start (epoch ms)
 	const finishedRef = useRef(false);
 	const rafRef = useRef<number | null>(null);
@@ -76,6 +77,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 	const freeBestKey = (k: string) => `ludiven-flechettes-best-${k}`;
 
 	const lay = useCallback((key: keyof typeof DIFFS, seed: number) => {
+		if (clearTimerRef.current) { clearTimeout(clearTimerRef.current); clearTimerRef.current = null; }
 		seedRef.current = seed;
 		diffRef.current = DIFFS[key];
 		remainingRef.current = START_SCORE;
@@ -149,6 +151,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			return { x: (e.clientX - rect.left - cx) / R, y: (e.clientY - rect.top - cy) / R };
 		};
 		const fire = () => {
+			if (clearTimerRef.current) { clearTimeout(clearTimerRef.current); clearTimerRef.current = null; } // a throw cancels the pending auto-clear
 			const now = (typeof performance !== 'undefined' ? performance.now() : 0);
 			const off = reticleAt(seedRef.current, dartIdxRef.current, diffRef.current, now - dartStartRef.current);
 			const x = aimRef.current.x + off.x * HALF_FRAME, y = aimRef.current.y + off.y * HALF_FRAME;
@@ -171,6 +174,9 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			remainingRef.current = res.remaining;
 			setRemaining(res.remaining);
 			if (res.finished) win();
+			else if (dartsRef.current.length >= TURN && !finishedRef.current) {
+				clearTimerRef.current = window.setTimeout(() => { dartsRef.current = []; setTurn(0); clearTimerRef.current = null; }, 3000);
+			}
 		};
 		const down = (e: PointerEvent) => {
 			if (statusRef.current !== 'aiming') return;
@@ -199,6 +205,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		cv.addEventListener('pointerup', up);
 		cv.addEventListener('pointercancel', up);
 		return () => {
+			if (clearTimerRef.current) { clearTimeout(clearTimerRef.current); clearTimerRef.current = null; }
 			cv.removeEventListener('pointerdown', down);
 			cv.removeEventListener('pointermove', move);
 			cv.removeEventListener('pointerup', up);
@@ -261,7 +268,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			ctx.fillStyle = '#f4f4f2'; ctx.font = `${Math.round(R * 0.11)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 			for (let k = 0; k < 20; k++) {
 				const tc = k * Math.PI / 10;
-				const nx = cx + Math.sin(tc) * R * 1.0, ny = cy - Math.cos(tc) * R * 1.0; // canvas: top = -y
+				const nx = cx + Math.sin(tc) * R * 1.05, ny = cy - Math.cos(tc) * R * 1.05; // on the rim, past the doubles
 				ctx.fillText(String(SECTOR_ORDER[k]), nx, ny);
 			}
 		};
