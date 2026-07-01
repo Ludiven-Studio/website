@@ -18,9 +18,13 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 
 type Status = 'aiming' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
-const HALF_FRAME = 0.22; // aim-frame half-size (normalised board units)
+const HALF_FRAME = 0.3; // aim-frame half-size (normalised board units)
 const TAP_THRESH = 0.05; // movement below this = a tap (not a drag)
 const clampAim = (x: number, y: number) => { const r = Math.hypot(x, y); const k = r > 1 ? 1 / r : 1; return { x: x * k, y: y * k }; };
+
+/** What to aim for to finish 501 on a double (null = not directly finishable). */
+const checkout = (rem: number): string | null =>
+	rem === 50 ? 'Bullseye (50)' : rem <= 40 && rem % 2 === 0 ? `Double ${rem / 2}` : null;
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -207,7 +211,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		const cv = canvasRef.current, wrap = wrapRef.current;
 		if (!cv || !wrap) return;
 		const resize = () => {
-			const s = Math.min(wrap.clientWidth, 420);
+			const s = Math.min(wrap.clientWidth, 470);
 			sizeRef.current = s;
 			const dpr = window.devicePixelRatio || 1;
 			cv.style.width = `${s}px`;
@@ -335,6 +339,13 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 				<span className="da-stat">⏱ {fmtTime(elapsed)}</span>
 			</div>
 			<div className="da-last">{flash ? <span className="da-flash">{flash}</span> : lastTxt}</div>
+			{status === 'aiming' && remaining <= 50 && (
+				<div className="da-checkout">
+					{checkout(remaining)
+						? <>À finir : <strong>{checkout(remaining)}</strong></>
+						: <>Pas finissable d'un coup : vise un simple pour laisser un <strong>double pair ≤ 40</strong>.</>}
+				</div>
+			)}
 
 			<div className="da-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
@@ -382,6 +393,8 @@ const CSS = `
 .da-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-weight: 700; font-size: 13px; }
 .da-last { min-height: 18px; font-size: 13px; font-weight: 600; color: var(--gray-300); margin-bottom: 0.5rem; }
 .da-flash { color: #fff; background: #d9534f; border-radius: 999px; padding: 3px 12px; }
+.da-checkout { font-size: 12.5px; color: var(--gray-300); background: var(--accent-overlay); border: 1px solid var(--gray-800); border-radius: 999px; padding: 4px 12px; margin-bottom: 0.5rem; }
+.da-checkout strong { color: var(--da-accent); }
 .da-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .da-canvas { display: block; border-radius: 50%; box-shadow: var(--shadow-md); touch-action: none; cursor: pointer; background: #161616; }
 .da-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
