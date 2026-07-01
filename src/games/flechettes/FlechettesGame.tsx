@@ -25,7 +25,8 @@ const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 interface DailyState { best?: number; tries: number; }
-interface Dart { x: number; y: number; ring: string; }
+interface Dart { x: number; y: number; ring: string; value: number; }
+const TURN = 3; // darts per turn (volée)
 
 const ringLabel = (h: Hit): string =>
 	h.ring === 'bullseye' ? 'Bullseye 50' : h.ring === 'bull' ? 'Bull 25' :
@@ -37,6 +38,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('aiming');
 	const [remaining, setRemaining] = useState(START_SCORE);
 	const [darts, setDarts] = useState(0);
+	const [turn, setTurn] = useState(0); // darts thrown in the current volley (0..3)
 	const [lastTxt, setLastTxt] = useState('');
 	const [elapsed, setElapsed] = useState(0);
 	const [best, setBest] = useState<number | null>(null);
@@ -52,7 +54,8 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 	const movedRef = useRef(false);
 	const statusRef = useRef<Status>('aiming');
 	const remainingRef = useRef(START_SCORE);
-	const dartsRef = useRef<Dart[]>([]);
+	const dartsRef = useRef<Dart[]>([]); // darts of the CURRENT volley (max 3, cleared each new turn)
+	const throwsRef = useRef(0); // total darts thrown
 	const dartIdxRef = useRef(0);
 	const dartStartRef = useRef(0); // perf.now when the current dart's oscillation began
 	const startRef = useRef(0); // chrono start (epoch ms)
@@ -73,6 +76,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		diffRef.current = DIFFS[key];
 		remainingRef.current = START_SCORE;
 		dartsRef.current = [];
+		throwsRef.current = 0;
 		dartIdxRef.current = 0;
 		dartStartRef.current = (typeof performance !== 'undefined' ? performance.now() : 0);
 		aimRef.current = { x: 0, y: -0.45 }; // start aiming at the 20
@@ -82,6 +86,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		finishedRef.current = false;
 		setRemaining(START_SCORE);
 		setDarts(0);
+		setTurn(0);
 		setLastTxt('');
 		setElapsed(0);
 		setFlash('');
@@ -115,7 +120,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 	const win = useCallback(() => {
 		finishedRef.current = true;
 		const timeSec = (Date.now() - startRef.current) / 1000;
-		const score = encodeScore(dartsRef.current.length, timeSec);
+		const score = encodeScore(throwsRef.current, timeSec);
 		setElapsed(timeSec);
 		setStat('won');
 		trackGame(gameId, 'game_won', { darts: dartsRef.current.length });
@@ -144,10 +149,13 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			const off = reticleAt(seedRef.current, dartIdxRef.current, diffRef.current, now - dartStartRef.current);
 			const x = aimRef.current.x + off.x * HALF_FRAME, y = aimRef.current.y + off.y * HALF_FRAME;
 			const hit = dartScore(x, y);
-			dartsRef.current.push({ x, y, ring: hit.ring });
+			if (dartsRef.current.length >= TURN) dartsRef.current = []; // new volley → retrieve the previous 3
+			dartsRef.current.push({ x, y, ring: hit.ring, value: hit.value });
+			throwsRef.current += 1;
 			dartIdxRef.current += 1;
 			dartStartRef.current = now;
-			setDarts(dartsRef.current.length);
+			setDarts(throwsRef.current);
+			setTurn(dartsRef.current.length);
 			setLastTxt(ringLabel(hit));
 			if (startRef.current === 0) {
 				startRef.current = Date.now();
@@ -258,11 +266,16 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			const S = sizeRef.current, cx = S / 2, cy = S / 2, R = S * 0.42;
 			ctx.clearRect(0, 0, S, S);
 			drawBoard(cx, cy, R);
-			// landed darts
+			// landed darts of the current volley (max 3), drawn as little darts sticking out
 			for (const d of dartsRef.current) {
 				const px = cx + d.x * R, py = cy + d.y * R;
-				ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(px, py, 3.2, 0, Math.PI * 2); ctx.fill();
-				ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(px, py, 1.6, 0, Math.PI * 2); ctx.fill();
+				const tx = px + 8, ty = py - 14; // shaft end (up-right)
+				ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+				ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(tx, ty); ctx.stroke();
+				ctx.fillStyle = '#ffcf33'; // flight
+				ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx + 6, ty - 4); ctx.lineTo(tx + 3, ty + 4); ctx.closePath(); ctx.fill();
+				ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(px, py, 2.6, 0, Math.PI * 2); ctx.fill(); // point
+				ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px, py, 1.1, 0, Math.PI * 2); ctx.fill();
 			}
 			// aim frame + oscillating reticle inside it (only while aiming)
 			if (statusRef.current === 'aiming') {
@@ -317,7 +330,8 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 
 			<div className="da-stats">
 				<span className="da-rem">{remaining}</span>
-				<span className="da-stat">🎯 {darts} fléch.</span>
+				<span className="da-stat">🎯 Volée {Math.min(turn, TURN)}/{TURN}</span>
+				<span className="da-stat">{darts} fléch.</span>
 				<span className="da-stat">⏱ {fmtTime(elapsed)}</span>
 			</div>
 			<div className="da-last">{flash ? <span className="da-flash">{flash}</span> : lastTxt}</div>

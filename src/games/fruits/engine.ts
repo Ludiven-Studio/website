@@ -37,7 +37,9 @@ export const DIFFS: Record<string, DiffLevel> = {
 	difficile: { label: 'Difficile', n: 3, max: 12, mul: true, sub: false, system: true },
 };
 
-const POOL = ['🍎', '🍌', '🍒', '🍇', '🍊', '🍓', '🥝', '🍍', '🍑', '🍐'];
+// Single-item, unambiguous fruits only — avoid 🍒 (two cherries) / 🍇 (a bunch), which read
+// as "several fruits" and make players miscount an unknown that stands for ONE value.
+const POOL = ['🍎', '🍌', '🍊', '🍋', '🍐', '🍑', '🍓', '🍍', '🥝', '🍉', '🥭', '🍅'];
 
 const ri = (rng: Rng, lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1));
 function shuffle<T>(arr: T[], rng: Rng): T[] {
