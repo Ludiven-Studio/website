@@ -114,8 +114,10 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		setDiffKey(key);
 		const st = (run?.state as DailyState) ?? { tries: 0 };
 		triesRef.current = st.tries ?? 0;
-		bestRef.current = st.best ?? null;
-		setBest(st.best ?? null);
+		// Ignore an implausible stored best (< 100000 = fewer than 1 cocotte): a corrupt value must not block real improvements.
+		const validBest = typeof st.best === 'number' && st.best >= 100000 ? st.best : null;
+		bestRef.current = validBest;
+		setBest(validBest);
 		lay(key, seed);
 		if (run?.startedAt && !run.done) startRef.current = run.startedAt; // resume the timer only for an unfinished run
 		setDailyLoading(false);
