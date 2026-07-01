@@ -237,4 +237,13 @@ export const games: GameTile[] = [
 		status: 'play',
 		category: 'multi',
 	},
+	{
+		id: 'foot',
+		title: 'Cocotte Foot',
+		pitch: 'Foot 1v1 en temps réel : deux cocottes, un ballon partagé qui part en tir dès qu\'on le touche. Rapide, entre amis par code, ou contre le bot.',
+		icon: 'foot',
+		href: '/jeux/foot',
+		status: 'play',
+		category: 'multi',
+	},
 ];

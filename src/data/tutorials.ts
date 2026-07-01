@@ -140,6 +140,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '👥', title: 'Jouer ensemble', body: 'Partie rapide pour être appairé au hasard, ou « Créer une partie » : un code s\'affiche, ton ami le saisit pour te rejoindre. Pas d\'adversaire ? Entraîne-toi contre l\'ordinateur.' },
 		{ emoji: '⚡', title: 'Pouvoirs (optionnels)', body: 'Au menu, choisis « Classique » ou « Power-ups ». En Power-ups : ta jauge se remplit à chaque renvoi (pleine au 5e), clique un des 4 pouvoirs (touches 1-4) — ⚡ Speed max, 🌀 trajectoire courbée, 🌫️ brouillage (des balles leurres apparaissent partout chez l\'adversaire), 🛡️ raquette XXL. Des power-ups apparaissent aussi sur le terrain : touche-les avec la balle pour déclencher leur effet.' },
 	],
+	foot: [
+		{ emoji: '⚽', title: 'Le but', body: 'Duel de foot 1 contre 1 vu de côté : envoie le ballon dans le but adverse. Premier à 5 buts gagne. Le ballon rebondit beaucoup et part en tir dès qu\'une cocotte le touche.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace-toi avec ◀ ▶ (ou les flèches ← →) et saute avec le bouton SAUT (ou Espace / ↑) pour faire la tête sur les ballons hauts. Fonce dans le ballon pour le frapper : ta vitesse donne la puissance et la direction du tir.' },
+		{ emoji: '👥', title: 'Jouer ensemble', body: 'Partie rapide pour être appairé au hasard, ou « Jouer avec un ami » : un code s\'affiche, ton ami le saisit pour te rejoindre. Pas d\'adversaire ? Joue contre le bot.' },
+	],
 	esquive: [
 		{ emoji: '🚀', title: 'Le but', body: 'Pilote ton vaisseau qui fonce dans l\'espace et évite les astéroïdes le plus longtemps possible. Ton temps de survie est ton score.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace-toi avec les flèches ou ZQSD, ou en glissant le doigt/la souris : tu bouges en haut/bas ET gauche/droite pour esquiver. Plus ça dure, plus ça accélère.' },
