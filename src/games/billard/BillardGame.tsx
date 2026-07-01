@@ -113,7 +113,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		bestRef.current = st.best ?? null;
 		setBest(st.best ?? null);
 		layTable(key, seed);
-		if (run?.startedAt) startRef.current = run.startedAt;
+		if (run?.startedAt && !run.done) startRef.current = run.startedAt; // resume the timer only for an unfinished run
 		setDailyLoading(false);
 	}, [gameId, layTable]);
 

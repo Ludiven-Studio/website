@@ -2,30 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { DIFFS, generateQuestion, evalEquation, type Question } from './engine';
 import { mulberry32 } from '../prng';
 
-// Solve the linear sub-system (equations without ×) by Gaussian elimination → fruit values.
-function solveValues(q: Question): number[] {
+const hasMul = (q: Question) => q.equations.some((e) => e.tokens.some((t) => t.kind === 'op' && t.op === '×'));
+
+/** Brute-force every integer assignment in [1, hi]^n (capped at 2 solutions — we test uniqueness). */
+function solutions(q: Question, hi = 25): number[][] {
 	const n = q.fruits.length;
-	const rows: number[][] = [];
-	for (const eq of q.equations) {
-		if (eq.tokens.some((t) => t.kind === 'op' && t.op === '×')) continue; // skip product clues
-		const co = new Array(n).fill(0);
-		let sign = 1;
-		for (const t of eq.tokens) {
-			if (t.kind === 'op') sign = t.op === '−' ? -1 : 1;
-			else { co[t.idx] += sign * (t.coef ?? 1); sign = 1; }
-		}
-		rows.push([...co, eq.result]);
-	}
-	// take n independent rows and eliminate
-	const M = rows.slice(0, n).map((r) => [...r]);
-	for (let c = 0; c < n; c++) {
-		let p = c; while (p < M.length && Math.abs(M[p][c]) < 1e-9) p++;
-		[M[c], M[p]] = [M[p], M[c]];
-		const pivot = M[c][c];
-		for (let j = c; j <= n; j++) M[c][j] /= pivot;
-		for (let r = 0; r < n; r++) if (r !== c) { const f = M[r][c]; for (let j = c; j <= n; j++) M[r][j] -= f * M[c][j]; }
-	}
-	return M.map((r) => Math.round(r[n]));
+	const vals = new Array<number>(n).fill(1);
+	const sols: number[][] = [];
+	const rec = (i: number): void => {
+		if (sols.length > 1) return;
+		if (i === n) { if (q.equations.every((eq) => evalEquation(eq, vals) === eq.result)) sols.push([...vals]); return; }
+		for (let v = 1; v <= hi; v++) { vals[i] = v; rec(i + 1); if (sols.length > 1) return; }
+	};
+	rec(0);
+	return sols;
 }
 
 describe('fruits engine', () => {
@@ -45,27 +35,42 @@ describe('fruits engine', () => {
 		expect(a).toEqual(b);
 	});
 
-	it('equations (incl. coefficients & products) evaluate to their results; answer matches the solution', () => {
+	it('every puzzle has a UNIQUE solution and the marked answer is that value', () => {
 		for (const key of Object.keys(DIFFS)) {
-			for (let s = 0; s < 12; s++) {
+			for (let s = 0; s < 40; s++) {
 				const q = generateQuestion(DIFFS[key], mulberry32(54321 + s * 7 + DIFFS[key].n));
-				const values = solveValues(q);
-				for (const eq of q.equations) expect(evalEquation(eq, values)).toBe(eq.result);
-				expect(q.options[q.answerIndex]).toBe(values[q.askIdx]);
+				const sols = solutions(q);
+				expect(sols.length, `unique solution (${key} seed ${s})`).toBe(1);
+				for (const eq of q.equations) expect(evalEquation(eq, sols[0])).toBe(eq.result);
+				expect(q.options[q.answerIndex]).toBe(sols[0][q.askIdx]);
 			}
 		}
 	});
 
-	it('difficile is a real system: ≥4 equations, none isolates a single fruit, has coefficients and a ×', () => {
-		for (let s = 0; s < 30; s++) {
+	it('facile: additions only, asks the terminal fruit so every equation is needed', () => {
+		for (let s = 0; s < 40; s++) {
+			const q = generateQuestion(DIFFS.facile, mulberry32(7 * (s + 1)));
+			expect(hasMul(q)).toBe(false);
+			expect(q.askIdx).toBe(q.fruits.length - 1);
+		}
+	});
+
+	it('moyen: staircase with a multiplication, still asks the terminal fruit', () => {
+		for (let s = 0; s < 40; s++) {
+			const q = generateQuestion(DIFFS.moyen, mulberry32(13 * (s + 1)));
+			expect(hasMul(q)).toBe(true);
+			expect(q.askIdx).toBe(q.fruits.length - 1);
+		}
+	});
+
+	it('difficile: a real system (no equation isolates a fruit) with a multiplication', () => {
+		for (let s = 0; s < 40; s++) {
 			const q = generateQuestion(DIFFS.difficile, mulberry32(11 * (s + 1)));
-			expect(q.equations.length).toBeGreaterThanOrEqual(4);
+			expect(hasMul(q)).toBe(true);
 			for (const eq of q.equations) {
 				const fruitTokens = eq.tokens.filter((t) => t.kind === 'fruit').length;
 				expect(fruitTokens, 'no single-fruit equation').toBeGreaterThanOrEqual(2);
 			}
-			expect(q.equations.some((e) => e.tokens.some((t) => t.kind === 'op' && t.op === '×')), 'has ×').toBe(true);
-			expect(q.equations.some((e) => e.tokens.some((t) => t.kind === 'fruit' && (t.coef ?? 1) > 1)), 'has a coefficient').toBe(true);
 		}
 	});
 });

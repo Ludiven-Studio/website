@@ -1,10 +1,14 @@
 /**
- * CALCUL DE FRUITS — pure engine (no UI). Fruit-algebra QCM: a small system of
- * equations (fruit emojis that add / subtract / multiply to numbers); the player
- * finds the value of one fruit among 4 numeric choices.
- *  - facile / moyen : "staircase" system (each equation pins one fruit) — easy.
- *  - difficile      : a real simultaneous linear system (coefficients, no equation
- *                     isolates a fruit) + a product clue → needs elimination.
+ * CALCUL DE FRUITS — pure engine (no UI). Fruit-algebra QCM: a small set of
+ * equations (fruit emojis that add / multiply to numbers); the player finds the
+ * value of ONE fruit among 4 numeric choices.
+ *  - facile : 3-fruit "staircase" (additions only). The asked fruit is the LAST
+ *             link, so all three equations are needed — no line gives it away.
+ *  - moyen  : same staircase but one link is a multiplication.
+ *  - difficile : a real simultaneous system (two sums + one product) where no
+ *             equation isolates a fruit → you must combine them. Uniqueness of
+ *             the solution is brute-force checked at generation (a product can
+ *             otherwise admit two positive roots).
  * Seeded for the daily challenge.
  */
 
@@ -26,15 +30,14 @@ export interface DiffLevel {
 	label: string;
 	n: number;
 	max: number;
-	mul: boolean;
-	sub: boolean;
-	system: boolean; // true → simultaneous linear system (harder)
+	mul: boolean;    // staircase: one link is a multiplication
+	system: boolean; // simultaneous system (two sums + one product) — hardest
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', n: 2, max: 9, mul: false, sub: false, system: false },
-	moyen: { label: 'Moyen', n: 3, max: 10, mul: false, sub: true, system: false },
-	difficile: { label: 'Difficile', n: 3, max: 12, mul: true, sub: false, system: true },
+	facile: { label: 'Facile', n: 3, max: 9, mul: false, system: false },
+	moyen: { label: 'Moyen', n: 3, max: 10, mul: true, system: false },
+	difficile: { label: 'Difficile', n: 3, max: 10, mul: false, system: true },
 };
 
 // Single-item, unambiguous fruits only — avoid 🍒 (two cherries) / 🍇 (a bunch), which read
@@ -47,10 +50,8 @@ function shuffle<T>(arr: T[], rng: Rng): T[] {
 	for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
 	return r;
 }
-const det3 = (m: number[][]) =>
-	m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
-	- m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
-	+ m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+const fruit = (idx: number): Token => ({ kind: 'fruit', idx });
+const op = (o: Op): Token => ({ kind: 'op', op: o });
 
 /** Evaluate an equation (× before + / −), respecting per-fruit coefficients. */
 export function evalEquation(eq: Equation, values: number[]): number {
@@ -68,61 +69,74 @@ export function evalEquation(eq: Equation, values: number[]): number {
 	return r;
 }
 
-/** Staircase generation (facile / moyen): each equation pins one fruit. */
-function genStaircase(diff: DiffLevel, rng: Rng): { fruits: string[]; values: number[]; equations: Equation[] } {
+/** Count integer solutions of the system in [1, hi]^n (stops at 2 — we only need "unique?"). */
+function solutionCount(equations: Equation[], n: number, hi: number): number {
+	const vals = new Array<number>(n).fill(1);
+	let count = 0;
+	const rec = (i: number): void => {
+		if (count > 1) return;
+		if (i === n) { if (equations.every((eq) => evalEquation(eq, vals) === eq.result)) count++; return; }
+		for (let v = 1; v <= hi; v++) { vals[i] = v; rec(i + 1); if (count > 1) return; }
+	};
+	rec(0);
+	return count;
+}
+
+interface Gen { fruits: string[]; values: number[]; equations: Equation[]; askIdx: number; }
+
+/** Staircase (facile / moyen): eq0 pins fruit 0, each next link ties in one more fruit.
+ *  The asked fruit is the LAST one, so every equation is needed to reach it. */
+function genStaircase(diff: DiffLevel, rng: Rng): Gen {
 	const n = diff.n;
 	const fruits = shuffle(POOL, rng).slice(0, n);
 	const values: number[] = [];
 	while (values.length < n) { const x = ri(rng, 2, diff.max); if (!values.includes(x)) values.push(x); }
 	const equations: Equation[] = [];
 
+	// eq0 pins fruit 0 (A + A [+ A] = c·A)
 	const c = ri(rng, 2, 3);
 	const t0: Token[] = [];
-	for (let k = 0; k < c; k++) { if (k > 0) t0.push({ kind: 'op', op: '+' }); t0.push({ kind: 'fruit', idx: 0 }); }
+	for (let k = 0; k < c; k++) { if (k > 0) t0.push(op('+')); t0.push(fruit(0)); }
 	equations.push({ tokens: t0, result: c * values[0] });
 
+	// links 1..n-1: one of them is a product when the level allows multiplication
+	const mulLink = diff.mul ? ri(rng, 1, n - 1) : -1;
 	for (let i = 1; i < n; i++) {
 		const j = i - 1;
-		if (diff.mul && rng() < 0.6) equations.push({ tokens: [{ kind: 'fruit', idx: j }, { kind: 'op', op: '×' }, { kind: 'fruit', idx: i }], result: values[j] * values[i] });
-		else if (diff.sub && values[j] > values[i] && rng() < 0.45) equations.push({ tokens: [{ kind: 'fruit', idx: j }, { kind: 'op', op: '−' }, { kind: 'fruit', idx: i }], result: values[j] - values[i] });
-		else equations.push({ tokens: [{ kind: 'fruit', idx: j }, { kind: 'op', op: '+' }, { kind: 'fruit', idx: i }], result: values[j] + values[i] });
+		if (i === mulLink) equations.push({ tokens: [fruit(j), op('×'), fruit(i)], result: values[j] * values[i] });
+		else equations.push({ tokens: [fruit(j), op('+'), fruit(i)], result: values[j] + values[i] });
 	}
-	return { fruits, values, equations };
+	return { fruits, values, equations, askIdx: n - 1 };
 }
 
-/** Simultaneous linear system (difficile): coefficients, no equation isolates a fruit, + a product clue. */
-function genSystem(diff: DiffLevel, rng: Rng): { fruits: string[]; values: number[]; equations: Equation[] } {
+/** Light simultaneous system (difficile): two pair-sums + one product, no equation
+ *  isolates a fruit → the three must be combined. Uniqueness is brute-force checked. */
+function genSystemLite(diff: DiffLevel, rng: Rng): Gen {
 	const fruits = shuffle(POOL, rng).slice(0, 3);
-	const values: number[] = [];
-	while (values.length < 3) { const x = ri(rng, 2, diff.max); if (!values.includes(x)) values.push(x); }
-
-	let M: number[][] = [];
-	for (let tries = 0; tries < 300; tries++) {
-		M = [];
-		for (let r = 0; r < 3; r++) {
-			let row: number[];
-			do { row = [ri(rng, 0, 3), ri(rng, 0, 3), ri(rng, 0, 3)]; } while (row.filter((c) => c > 0).length < 2); // no isolation
-			M.push(row);
-		}
-		if (Math.abs(det3(M)) >= 1) break; // invertible → unique solution
+	let values: number[] = [];
+	let equations: Equation[] = [];
+	for (let tries = 0; tries < 400; tries++) {
+		values = [];
+		while (values.length < 3) { const x = ri(rng, 2, diff.max); if (!values.includes(x)) values.push(x); }
+		const [a, b, cc] = values;
+		equations = [
+			{ tokens: [fruit(0), op('+'), fruit(1)], result: a + b }, // A + B
+			{ tokens: [fruit(1), op('+'), fruit(2)], result: b + cc }, // B + C
+			{ tokens: [fruit(0), op('×'), fruit(2)], result: a * cc }, // A × C
+		];
+		// Any solution satisfies the two sums, so every fruit is ≤ max sum result: that bounds the search.
+		const hi = Math.max(a + b, b + cc);
+		if (solutionCount(equations, 3, hi) === 1) break;
+		if (tries === 399) equations[2] = { tokens: [fruit(0), op('+'), fruit(2)], result: a + cc }; // safe fallback (linear, always unique)
 	}
-	const equations: Equation[] = M.map((row) => {
-		const tokens: Token[] = [];
-		for (let i = 0; i < 3; i++) { if (row[i] === 0) continue; if (tokens.length) tokens.push({ kind: 'op', op: '+' }); tokens.push({ kind: 'fruit', idx: i, coef: row[i] }); }
-		return { tokens, result: row[0] * values[0] + row[1] * values[1] + row[2] * values[2] };
-	});
-	const [pi, pj] = shuffle([0, 1, 2], rng).slice(0, 2); // a product clue
-	equations.push({ tokens: [{ kind: 'fruit', idx: pi }, { kind: 'op', op: '×' }, { kind: 'fruit', idx: pj }], result: values[pi] * values[pj] });
-	return { fruits, values, equations };
+	return { fruits, values, equations, askIdx: ri(rng, 0, 2) };
 }
 
 /** Generate one fruit-algebra question for the given difficulty. */
 export function generateQuestion(diff: DiffLevel, rng: Rng = Math.random): Question {
-	const { fruits, values, equations } = diff.system ? genSystem(diff, rng) : genStaircase(diff, rng);
+	const { fruits, values, equations, askIdx } = diff.system ? genSystemLite(diff, rng) : genStaircase(diff, rng);
 
-	const askIdx = ri(rng, 0, values.length - 1);
 	const answer = values[askIdx];
-
 	const opts = new Set<number>([answer]);
 	for (const cand of shuffle([answer - 1, answer + 1, answer - 2, answer + 2, ...values], rng)) {
 		if (opts.size >= 4) break;
