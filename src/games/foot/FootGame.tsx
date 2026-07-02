@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-	createWorld, stepPlayer, stepBall, resolveKicks, applyScore, step, separateAll,
+	createWorld, stepPlayer, stepBall, resolveKicks, applyScore, step, separateAll, setTeamSize as applyTeamSize,
 	playerPos, applyPlayerPos, applyBall, ballState,
 	FIELD, FLOOR, GOAL_TOP, PLAYER_R, BALL_R, WIN_GOALS, DASH_DETECT,
 	type World, type PlayerInput, type Side, type SlotPos,
@@ -84,6 +84,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const [confirmQuit, setConfirmQuit] = useState(false);
 	const [copied, setCopied] = useState(false);
 	const [goalFlash, setGoalFlash] = useState('');
+	const [teamSize, setTeamSize] = useState<1 | 2>(2); // menu choice: 1v1 or 2v2
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const runningRef = useRef(false);
@@ -104,6 +105,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const ballRenderRef = useRef({ x: FIELD.W / 2, y: FIELD.H * 0.3 });
 	const prevScoreRef = useRef({ l: 0, r: 0 });
 	const botStRef = useRef(freshBotSt());
+	const curTeamRef = useRef<1 | 2>(2); // team size the running match was laid out with
 
 	const keysRef = useRef<Keys>({ left: false, right: false, jump: false });
 	const touchRef = useRef<Keys>({ left: false, right: false, jump: false });
@@ -157,12 +159,28 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 	const drawGoal = (ctx: CanvasRenderingContext2D, side: 'l' | 'r') => {
 		const S = SCALE, top = GOAL_TOP * S, floor = FLOOR * S;
-		const x = side === 'l' ? 0 : VIEW_W;
-		const depth = 14 * S * (side === 'l' ? 1 : -1);
-		ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
-		ctx.beginPath(); ctx.moveTo(x, floor); ctx.lineTo(x, top); ctx.lineTo(x + depth, top); ctx.stroke();
-		ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
-		for (let gy = top; gy <= floor; gy += 9) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + depth, top + (gy - top) * 0.5); ctx.stroke(); }
+		const edge = side === 'l' ? 0 : VIEW_W;
+		const inw = side === 'l' ? 1 : -1; // inward direction
+		const depth = 20 * S;
+		const col = side === 'l' ? COL_T0 : COL_T1; // goal wears the colour of the team that defends it
+		const px = edge + inw * 4; // inset the post so its full width shows (edge is clipped)
+
+		// tinted net area + grid
+		ctx.fillStyle = side === 'l' ? 'rgba(77,163,255,0.16)' : 'rgba(255,90,95,0.16)';
+		ctx.fillRect(edge, top, inw * depth, floor - top);
+		ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1;
+		for (let gy = top + 6; gy < floor; gy += 7) { ctx.beginPath(); ctx.moveTo(edge, gy); ctx.lineTo(edge + inw * depth, gy); ctx.stroke(); }
+		for (let gx = 6; gx <= 20; gx += 7) { ctx.beginPath(); ctx.moveTo(edge + inw * gx * S, top); ctx.lineTo(edge + inw * gx * S, floor); ctx.stroke(); }
+
+		// bright coloured frame (post + crossbar) with a glow, then a white core highlight
+		ctx.save();
+		ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+		ctx.shadowColor = col; ctx.shadowBlur = 10;
+		ctx.strokeStyle = col; ctx.lineWidth = 6;
+		ctx.beginPath(); ctx.moveTo(px, floor); ctx.lineTo(px, top); ctx.lineTo(px + inw * depth, top); ctx.stroke();
+		ctx.restore();
+		ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+		ctx.beginPath(); ctx.moveTo(px, floor); ctx.lineTo(px, top); ctx.lineTo(px + inw * depth, top); ctx.stroke();
 	};
 
 	const draw = useCallback(() => {
@@ -180,6 +198,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		drawGoal(ctx, 'l'); drawGoal(ctx, 'r');
 
 		for (let slot = 0; slot < 4; slot++) {
+			if (!w.players[slot].active) continue; // 1v1 → backups hidden
 			const net = isNetSlot(role, slot);
 			const src = net ? slotRenderRef.current[slot] : w.players[slot];
 			const color = teamOf(slot) === 0 ? COL_T0 : COL_T1;
@@ -242,8 +261,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 				const live = w.kickoff <= 0;
 				if (!live) w.kickoff -= dt;
 				stepPlayer(w.players[0], inp, dt);
-				stepPlayer(w.players[1], botFor(w, 1, bs[1]), dt);
-				stepPlayer(w.players[3], botFor(w, 3, bs[3]), dt);
+				if (w.teamSize === 2) { stepPlayer(w.players[1], botFor(w, 1, bs[1]), dt); stepPlayer(w.players[3], botFor(w, 3, bs[3]), dt); }
 				separateAll(w.players);
 				if (live) {
 					const scorer = stepBall(w, dt);
@@ -274,8 +292,9 @@ export default function FootGame({ gameId }: { gameId: string }) {
 			sendAccRef.current = 0;
 			const m = matchRef.current;
 			if (m && role === 'host') {
-				const slots: PosMsg[] = [0, 1, 3].map((s) => ({ slot: s, ...playerPos(w.players[s]) }));
-				m.sendState({ ...ballState(w), l: w.score.l, r: w.score.r, ko: w.kickoff, slots } satisfies StateMsg);
+				const ctrl = w.teamSize === 2 ? [0, 1, 3] : [0]; // host-owned slots
+				const slots: PosMsg[] = ctrl.map((s) => ({ slot: s, ...playerPos(w.players[s]) }));
+				m.sendState({ ...ballState(w), l: w.score.l, r: w.score.r, ko: w.kickoff, ts: w.teamSize, slots } satisfies StateMsg);
 			} else if (m && role === 'guest') {
 				m.sendPos({ slot: mySlot, ...playerPos(w.players[mySlot]) });
 			}
@@ -293,7 +312,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 	/* ---------- match lifecycle ---------- */
 	const resetWorld = useCallback(() => {
-		worldRef.current = createWorld();
+		worldRef.current = createWorld(curTeamRef.current);
 		prevScoreRef.current = { l: 0, r: 0 };
 		botStRef.current = freshBotSt();
 		setScoreMe(0); setScoreOpp(0); setGoalFlash('');
@@ -313,6 +332,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 			if (roleRef.current !== 'guest') return;
 			const w = worldRef.current;
 			applyBall(w, s); w.kickoff = s.ko;
+			if (w.teamSize !== s.ts) applyTeamSize(w, s.ts); // adopt the host's 1v1 / 2v2 choice
 			for (const sp of s.slots) netPosRef.current[sp.slot] = { x: sp.x, y: sp.y, vx: sp.vx, vy: sp.vy, face: sp.face };
 			if (phaseRef.current === 'over' && s.l === 0 && s.r === 0) { setPhase('playing'); startLoop(); } // host restarted
 			applyScores(s.l, s.r);
@@ -352,34 +372,38 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const playQuick = useCallback(async () => {
 		const nm = ensureName();
 		if (!nm) { setStatus('Entre un pseudo.'); return; }
+		curTeamRef.current = teamSize;
 		setStatus('Recherche d’un adversaire…');
-		const m = await joinRandom(nm);
+		const m = await joinRandom(nm, teamSize);
 		if (!m) { setStatus('Aucune partie libre. Réessaie ou joue contre le bot.'); return; }
 		setStatus(''); setRoomCode(null); beginNetMatch(m);
-	}, [ensureName, beginNetMatch]);
+	}, [ensureName, beginNetMatch, teamSize]);
 
 	const playCreateCode = useCallback(async () => {
 		const nm = ensureName();
 		if (!nm) { setStatus('Entre un pseudo.'); return; }
+		curTeamRef.current = teamSize;
 		const code = makeCode();
 		const m = await joinByCode(nm, code);
 		if (!m) { setStatus('Impossible de créer la partie.'); return; }
 		setStatus(''); setRoomCode(code); beginNetMatch(m);
-	}, [ensureName, beginNetMatch]);
+	}, [ensureName, beginNetMatch, teamSize]);
 
 	const playJoinCode = useCallback(async () => {
 		const nm = ensureName();
 		if (!nm) { setStatus('Entre un pseudo.'); return; }
+		curTeamRef.current = teamSize;
 		const code = codeInput.trim().toUpperCase();
 		if (!code) { setStatus('Entre un code.'); return; }
 		const m = await joinByCode(nm, code);
 		if (!m) { setStatus('Partie pleine ou introuvable.'); return; }
 		setStatus(''); setRoomCode(code); beginNetMatch(m);
-	}, [ensureName, codeInput, beginNetMatch]);
+	}, [ensureName, codeInput, beginNetMatch, teamSize]);
 
 	const playAI = useCallback(() => {
 		roleRef.current = 'ai';
 		mySlotRef.current = 0;
+		curTeamRef.current = teamSize;
 		matchRef.current = null;
 		startedRef.current = true;
 		setOppName('Ordinateur');
@@ -389,7 +413,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_started');
 		setPhase('playing');
 		startLoop();
-	}, [gameId, resetWorld, startLoop]);
+	}, [gameId, resetWorld, startLoop, teamSize]);
 
 	const rematch = useCallback(() => {
 		if (roleRef.current === 'guest') return; // host / bot restarts
@@ -398,8 +422,9 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		startLoop();
 		if (roleRef.current === 'host') {
 			const w = worldRef.current;
-			const slots: PosMsg[] = [0, 1, 3].map((s) => ({ slot: s, ...playerPos(w.players[s]) }));
-			matchRef.current?.sendState({ ...ballState(w), l: 0, r: 0, ko: w.kickoff, slots });
+			const ctrl = w.teamSize === 2 ? [0, 1, 3] : [0];
+			const slots: PosMsg[] = ctrl.map((s) => ({ slot: s, ...playerPos(w.players[s]) }));
+			matchRef.current?.sendState({ ...ballState(w), l: 0, r: 0, ko: w.kickoff, ts: w.teamSize, slots });
 		}
 	}, [resetWorld, startLoop]);
 
@@ -476,7 +501,11 @@ export default function FootGame({ gameId }: { gameId: string }) {
 					<div className="fo-overlay">
 						<div className="fo-card">
 							<h2>Cocotte Foot</h2>
-							<p className="fo-sub">2 contre 2 (avec un coéquipier bot). Premier à {WIN_GOALS} buts gagne. Fonce dans le ballon, il part en tir&nbsp;!</p>
+							<p className="fo-sub">Premier à {WIN_GOALS} buts gagne. Fonce dans le ballon, il part en tir&nbsp;!</p>
+							<div className="fo-modes" role="tablist" aria-label="Format">
+								<button role="tab" aria-selected={teamSize === 1} className={`fo-mode ${teamSize === 1 ? 'active' : ''}`} onClick={() => setTeamSize(1)}>1 vs 1</button>
+								<button role="tab" aria-selected={teamSize === 2} className={`fo-mode ${teamSize === 2 ? 'active' : ''}`} onClick={() => setTeamSize(2)}>2 vs 2 (+ bot)</button>
+							</div>
 							<input className="fo-name" value={name} maxLength={20} placeholder="Ton pseudo" onChange={(e) => setName(e.target.value)} />
 							<button className="fo-btn fo-primary" disabled={mpOff} onClick={playQuick}>⚡ Partie rapide</button>
 							<button className="fo-btn" disabled={mpOff} onClick={() => setCodePanel((v) => !v)}>🔑 Jouer avec un ami (code)</button>
@@ -554,6 +583,9 @@ const CSS = `
 .fo-card { background: var(--gray-999); border: 2px solid var(--fo-accent); border-radius: 16px; padding: 20px 26px; box-shadow: var(--shadow-lg); text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 360px; width: 88%; max-height: 90vh; overflow-y: auto; }
 .fo-card h2 { margin: 0; font-family: var(--font-brand); font-size: 22px; }
 .fo-sub { margin: 0; color: var(--gray-300); font-size: 13px; line-height: 1.5; }
+.fo-modes { display: flex; gap: 6px; }
+.fo-mode { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.fo-mode.active { background: var(--fo-accent); color: var(--accent-text-over); border-color: var(--fo-accent); }
 .fo-status { margin: 0; color: var(--gray-300); font-size: 12.5px; }
 .fo-name { font: inherit; color: var(--gray-0); background: var(--gray-900); border: 1.5px solid var(--gray-700); border-radius: 999px; padding: 9px 16px; width: 100%; text-align: center; }
 .fo-name:focus-visible { outline: none; border-color: var(--fo-accent); }

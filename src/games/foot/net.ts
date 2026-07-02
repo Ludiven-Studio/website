@@ -19,7 +19,7 @@ export interface FootPeer { id: string; name: string; }
 export interface PosMsg { slot: number; x: number; y: number; vx: number; vy: number; face: 1 | -1; }
 /** Host bundle: ball + team scores + kickoff + the positions of every slot the host owns
  *  (its own cocotte and the bots). One message per tick keeps us under the events/sec cap. */
-export interface StateMsg { x: number; y: number; vx: number; vy: number; l: number; r: number; ko: number; slots: PosMsg[]; }
+export interface StateMsg { x: number; y: number; vx: number; vy: number; l: number; r: number; ko: number; ts: 1 | 2; slots: PosMsg[]; }
 
 export interface Match {
 	roomId: string;
@@ -107,12 +107,13 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 	};
 }
 
-/** Auto-match into the first room with a free slot; null if multiplayer is off or all rooms are full. */
-export async function joinRandom(name: string): Promise<Match | null> {
+/** Auto-match into the first room with a free slot; null if multiplayer is off or all rooms are full.
+ *  Rooms are namespaced by team size so 1v1 and 2v2 players match separately. */
+export async function joinRandom(name: string, teamSize: 1 | 2): Promise<Match | null> {
 	const c = getClient();
 	if (!c) return null;
 	for (let slot = 0; slot < MAX_ROOMS; slot++) {
-		const m = await openRoom(c, `foot-q-${slot}`, name, null);
+		const m = await openRoom(c, `foot-q${teamSize}-${slot}`, name, null);
 		if (m) return m;
 	}
 	return null;

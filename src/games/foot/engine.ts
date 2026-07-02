@@ -15,15 +15,16 @@ export interface PlayerInput { move: -1 | 0 | 1; jump: boolean; dash?: boolean; 
 
 export interface Player {
 	x: number; y: number; vx: number; vy: number;
-	onGround: boolean; face: 1 | -1; jumpHeld: boolean; team: Side; dashT: number;
+	onGround: boolean; face: 1 | -1; jumpHeld: boolean; team: Side; dashT: number; active: boolean;
 }
 export interface Ball { x: number; y: number; vx: number; vy: number; spin: number; }
 
 export interface World {
-	players: Player[]; // length 4 (slots 0,1 = team 0 · slots 2,3 = team 1)
-	ball: Ball;
+	players: Player[]; // always length 4 (slots 0,1 = team 0 · slots 2,3 = team 1); in 1v1 the
+	ball: Ball;        // backup slots (1 & 3) are inactive — kept for stable slot numbering.
 	score: { l: number; r: number };
 	kickoff: number; // seconds of kickoff freeze remaining (0 = live)
+	teamSize: 1 | 2;
 }
 
 /* ---------- Arena / tuning (world units, y points down) ---------- */
@@ -33,7 +34,7 @@ const GROUND_H = 16;
 export const FLOOR = FIELD.H - GROUND_H; // top surface of the ground
 export const PLAYER_R = 11;
 export const BALL_R = 7;
-const GOAL_OPEN_H = 44; // smaller goals than before
+const GOAL_OPEN_H = 38; // goal-mouth height (kept small so goals stay hard-earned)
 export const GOAL_TOP = FLOOR - GOAL_OPEN_H; // crossbar y; goal mouth is [GOAL_TOP, FLOOR]
 export const WIN_GOALS = 5;
 
@@ -50,21 +51,30 @@ const KICKOFF_TIME = 1.1;
 
 /* ---------- Construction ---------- */
 
-const mkPlayer = (x: number, face: 1 | -1, team: Side): Player => ({ x, y: FLOOR - PLAYER_R, vx: 0, vy: 0, onGround: true, face, jumpHeld: false, team, dashT: 0 });
+const mkPlayer = (x: number, face: 1 | -1, team: Side, active: boolean): Player => ({ x, y: FLOOR - PLAYER_R, vx: 0, vy: 0, onGround: true, face, jumpHeld: false, team, dashT: 0, active });
 const centerBall = (): Ball => ({ x: FIELD.W / 2, y: FIELD.H * 0.3, vx: 0, vy: 0, spin: 0 });
 
-export function createWorld(): World {
+export function createWorld(teamSize: 1 | 2 = 2): World {
+	const t2 = teamSize === 2;
 	return {
 		players: [
-			mkPlayer(FIELD.W * 0.34, 1, 0), // slot 0 — left team, striker
-			mkPlayer(FIELD.W * 0.16, 1, 0), // slot 1 — left team, back
-			mkPlayer(FIELD.W * 0.66, -1, 1), // slot 2 — right team, striker
-			mkPlayer(FIELD.W * 0.84, -1, 1), // slot 3 — right team, back
+			mkPlayer(FIELD.W * 0.34, 1, 0, true), // slot 0 — left team, striker (host / you)
+			mkPlayer(FIELD.W * 0.16, 1, 0, t2),  // slot 1 — left team, backup (2v2 only)
+			mkPlayer(FIELD.W * 0.66, -1, 1, true), // slot 2 — right team, striker (guest)
+			mkPlayer(FIELD.W * 0.84, -1, 1, t2), // slot 3 — right team, backup (2v2 only)
 		],
 		ball: centerBall(),
 		score: { l: 0, r: 0 },
 		kickoff: KICKOFF_TIME,
+		teamSize,
 	};
+}
+
+/** Switch a world between 1v1 and 2v2 (activates/deactivates the backup slots). */
+export function setTeamSize(w: World, ts: 1 | 2): void {
+	w.teamSize = ts;
+	w.players[1].active = ts === 2;
+	w.players[3].active = ts === 2;
 }
 
 /* ---------- Player ---------- */
@@ -129,7 +139,7 @@ export function separatePlayers(a: Player, b: Player): void {
 }
 
 export function separateAll(ps: Player[]): void {
-	for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) separatePlayers(ps[i], ps[j]);
+	for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) { if (ps[i].active && ps[j].active) separatePlayers(ps[i], ps[j]); }
 }
 
 /* ---------- Ball ---------- */
@@ -163,7 +173,7 @@ export function stepBall(w: World, dt: number): Side | null {
 
 /** Any cocotte overlapping the ball launches it (a shot on every touch). */
 export function resolveKicks(w: World): void {
-	for (const p of w.players) kick(p, w.ball);
+	for (const p of w.players) if (p.active) kick(p, w.ball);
 }
 
 function kick(p: Player, b: Ball): void {
@@ -194,12 +204,12 @@ export function applyScore(w: World, scorer: Side): void {
 export function step(w: World, dt: number, inputs: PlayerInput[]): { scorer: Side | null } {
 	if (w.kickoff > 0) {
 		w.kickoff -= dt;
-		for (let i = 0; i < w.players.length; i++) stepPlayer(w.players[i], inputs[i], dt);
+		for (let i = 0; i < w.players.length; i++) if (w.players[i].active) stepPlayer(w.players[i], inputs[i], dt);
 		separateAll(w.players);
 		Object.assign(w.ball, centerBall()); // ball held at centre during kickoff
 		return { scorer: null };
 	}
-	for (let i = 0; i < w.players.length; i++) stepPlayer(w.players[i], inputs[i], dt);
+	for (let i = 0; i < w.players.length; i++) if (w.players[i].active) stepPlayer(w.players[i], inputs[i], dt);
 	separateAll(w.players);
 	const scorer = stepBall(w, dt);
 	resolveKicks(w);

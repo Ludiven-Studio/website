@@ -24,6 +24,16 @@ describe('foot engine', () => {
 		expect(a).toEqual(b);
 	});
 
+	it('1v1 mode activates only the two strikers (slots 0 and 2)', () => {
+		const w = createWorld(1);
+		expect(w.players.map((p) => p.active)).toEqual([true, false, true, false]);
+		w.kickoff = 0;
+		const x1 = w.players[1].x;
+		for (let i = 0; i < 30; i++) step(w, DT, [{ move: 1, jump: true }, { move: 1, jump: true }, { move: -1, jump: false }, { move: 1, jump: false }]);
+		expect(w.players[1].x).toBe(x1); // inactive backup never moves
+		expect(w.players[1].vx).toBe(0);
+	});
+
 	it('a cocotte jumps once, falls back, and cannot double-jump while held', () => {
 		const w = live(createWorld());
 		const p = w.players[0];

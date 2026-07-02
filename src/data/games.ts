@@ -241,7 +241,7 @@ export const games: GameTile[] = [
 	{
 		id: 'foot',
 		title: 'Cocotte Foot',
-		pitch: 'Foot 2v2 en temps réel (avec coéquipier bot) : un ballon partagé qui part en tir dès qu\'on le touche. Rapide, entre amis par code, ou contre le bot.',
+		pitch: 'Foot 1v1 ou 2v2 en temps réel : un ballon partagé qui part en tir dès qu\'on le touche. Rapide, entre amis par code, ou contre le bot.',
 		icon: 'foot',
 		href: '/jeux/foot',
 		status: 'play',
