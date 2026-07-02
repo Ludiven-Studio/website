@@ -6,29 +6,29 @@ import ContactCTA from '../components/ContactCTA.astro';
 import type { iconPaths } from '../components/IconPaths';
 
 const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
-	{ icon: 'code', title: 'Développement Unity', body: 'Conception et développement d\'applications et de jeux sous Unity — mobile, desktop et WebGL. De l\'idée au produit livré, avec une exigence de qualité et de maintenabilité.' },
-	{ icon: 'mobile', title: 'Application mobile', body: 'Applications iOS et Android développées avec Unity, jusqu\'à la mise en production sur les stores. Interfaces soignées, performances et intégrations natives (capteurs, notifications, hors-ligne).' },
-	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Expériences immersives VR/XR pour la formation, la simulation ou le divertissement — casques et mobile. Interaction naturelle, confort et optimisation du rendu.' },
-	{ icon: 'strategy', title: 'Multijoueur Unity', body: 'Jeux et applications en temps réel : netcode, synchronisation, serveurs headless. Une architecture réseau fiable, du prototype à la mise en production.' },
-	{ icon: 'scales', title: 'Audit & reprise de projet Unity', body: 'Reprise d\'un projet Unity existant : audit technique, correction de bugs, optimisation des performances et des temps de chargement, montée de version. Je sécurise et fais avancer votre base de code.' },
+	{ icon: 'code', title: 'Développement Unity', body: 'De l\'idée au produit livré : je conçois et développe vos applications et jeux sous Unity — mobile, desktop et WebGL — avec une vraie exigence de qualité et un code pensé pour durer.' },
+	{ icon: 'mobile', title: 'Application mobile', body: 'Vos applications iOS et Android développées sous Unity, jusqu\'à la publication sur les stores : interfaces soignées, bonnes performances et accès aux fonctions natives (capteurs, notifications, mode hors-ligne).' },
+	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Des expériences immersives VR/XR pour la formation, la simulation ou le jeu, sur casque comme sur mobile : interaction naturelle, confort d\'usage et rendu optimisé.' },
+	{ icon: 'strategy', title: 'Multijoueur Unity', body: 'Du temps réel qui tient la route : synchronisation, netcode, serveurs headless. Une architecture réseau solide pour vos jeux et applications, du prototype à la production.' },
+	{ icon: 'scales', title: 'Audit & reprise de projet Unity', body: 'Vous héritez d\'un projet Unity ? J\'en fais l\'audit, corrige les bugs, optimise les performances et les temps de chargement et gère la montée de version — pour sécuriser votre base de code et la remettre en mouvement.' },
 ];
 
 // Interventions concrètes, plus fines que les 5 prestations ci-dessus.
 const capabilities: string[] = [
-	'Suivi d\'alternants et de jeunes codeurs',
+	'Suivi d\'alternants et de jeunes développeurs',
 	'Formation à Unity et au C#',
-	'Conseils pour structurer ses projets Unity',
-	'Solutions techniques sur des cas complexes',
+	'Conseils pour bien structurer un projet Unity',
+	'Résolution de problèmes techniques complexes',
 	'Optimisation des performances, de la mémoire et de la taille du build',
-	'Intégration d\'AssetBundles / Addressables',
+	'Intégration d\'AssetBundles et d\'Addressables',
 	'Développement de gameplays sur-mesure',
-	'Utilisation du moteur physique',
+	'Mise en œuvre du moteur physique',
 	'Multijoueur avec Photon ou Netcode',
-	'Intégration de menus et d\'interfaces (UI)',
-	'SFX et musiques avec réglage du volume',
-	'Kit de localisation des textes (multilingue)',
-	'Nombreux outils maison agrégés au fil du temps',
-	'Système de CheatCodes pour faciliter les tests',
+	'Interfaces et menus in-game (UI)',
+	'Sons et musiques avec réglages de volume',
+	'Localisation multilingue des textes',
+	'Outils internes sur-mesure, affinés au fil des projets',
+	'Cheat codes de debug pour accélérer les tests',
 ];
 
 const title = 'Services — Développement Unity, mobile, VR & multijoueur | Ludiven Studio';
@@ -51,7 +51,7 @@ const jsonLd = {
 		<main class="wrapper stack gap-12">
 			<Hero
 				title="Services"
-				tagline="Développeur Unity depuis 2010 — je conçois, développe et mets en production vos applications, jeux et expériences immersives, en France comme à distance."
+				tagline="Développeur Unity depuis 2010, je vous accompagne de la conception à la mise en production : applications, jeux et expériences immersives — en France comme à distance."
 				align="start"
 			/>
 
