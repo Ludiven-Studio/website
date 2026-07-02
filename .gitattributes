@@ -103,3 +103,6 @@ FirebaseCppApp-13_11_0.bundle filter=lfs diff=lfs merge=lfs -text
 # Pages serves public/ directly and does NOT resolve Git LFS pointers, so everything under
 # public/ must stay a normal git blob (this overrides the LFS rules above for served assets).
 public/** -filter -diff -merge
+# Astro's image pipeline (astro:assets) imports images from src/ and needs the real bytes at
+# build time; the Pages build doesn't fetch LFS either, so keep src/assets images as normal blobs.
+src/assets/** -filter -diff -merge -text
