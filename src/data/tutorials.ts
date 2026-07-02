@@ -8,6 +8,11 @@ export interface TutorialStep {
 }
 
 export const TUTORIALS: Record<string, TutorialStep[]> = {
+	'mots-meles': [
+		{ emoji: '🎯', title: 'Le but', body: 'Retrouve dans la grille tous les mots de la liste (un thème). Chaque mot est caché en ligne droite parmi les lettres.' },
+		{ emoji: '👆', title: 'Comment jouer', body: 'Glisse le doigt (ou la souris) de la première à la dernière lettre d\'un mot pour le surligner : s\'il est dans la liste, il est validé et barré.' },
+		{ emoji: '↘️', title: 'Sens & difficulté', body: 'Les mots peuvent être horizontaux, verticaux ou en diagonale — et même écrits à l\'envers au niveau difficile. Au défi du jour, même grille pour tous, le chrono départage.' },
+	],
 	'somme-toute': [
 		{ emoji: '🎯', title: 'Le but', body: 'Remplis les cases vides pour que chaque ligne et chaque colonne atteigne exactement sa somme cible (les pastilles).' },
 		{ emoji: '✍️', title: 'Comment jouer', body: 'Touche une case vide puis choisis un nombre. Chaque pastille montre la somme actuelle face à l\'objectif : bleu quand la somme est atteinte, orange sinon.' },

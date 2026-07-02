@@ -13,6 +13,14 @@ export interface GameTile {
 
 export const games: GameTile[] = [
 	{
+		id: 'mots-meles',
+		title: 'Mots Mêlés',
+		pitch: 'Retrouve tous les mots d\'un thème cachés dans la grille de lettres, en glissant dessus. Horizontal, vertical, diagonale. Défi du jour au chrono.',
+		icon: 'mots-meles',
+		href: '/jeux/mots-meles',
+		status: 'play',
+	},
+	{
 		id: 'somme-toute',
 		title: 'Somme Toute',
 		pitch: 'Équilibre chaque ligne et chaque colonne pour atteindre la somme cible. Pure déduction.',
