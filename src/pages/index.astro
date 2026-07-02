@@ -12,7 +12,11 @@ import Hero from '../components/Hero.astro';
 import Icon from '../components/Icon.astro';
 import Pill from '../components/Pill.astro';
 import PortfolioPreview from '../components/PortfolioPreview.astro';
+import { getImage } from 'astro:assets';
+import logo from '../assets/LudivenStudioLogo.png';
 import { games } from '../data/games';
+
+const logoImg = await getImage({ src: logo, width: 520, format: 'webp' });
 
 // Page section components
 import ContactCTA from '../components/ContactCTA.astro';
@@ -27,7 +31,10 @@ const projects = (await getCollection('work'))
 // https://docs.astro.build/basics/astro-components/
 ---
 
-<BaseLayout>
+<BaseLayout
+	title="Ludiven Studio — Mini-jeux gratuits & création d'applications"
+	description="Ludiven Studio : des dizaines de mini-jeux gratuits à jouer dans le navigateur (sudoku, démineur, foot, golf…) avec défi du jour et classements, et un studio de création d'applications et de jeux."
+>
 	<div class="stack gap-20 lg:gap-48">
 		<div class="wrapper stack gap-8 lg:gap-20">
 			<header class="hero">
@@ -47,7 +54,8 @@ const projects = (await getCollection('work'))
 					alt="Ludiven Studio"
 					width="520"
 					height="390"
-					src="/assets/LudivenStudioLogo.png"
+					src={logoImg.src}
+					fetchpriority="high"
 				/>
 			</header>
 
@@ -57,7 +65,7 @@ const projects = (await getCollection('work'))
 		<main class="wrapper stack gap-20 lg:gap-48">
 			<section class="section with-background with-cta" id="games-section">
 				<header class="section-header stack gap-2 lg:gap-4">
-					<h3 data-games-title data-default-title="Jeux de logique et d'adresse" data-fav-title="Mes favoris">Jeux de logique et d'adresse</h3>
+					<h2 data-games-title data-default-title="Jeux de logique et d'adresse" data-fav-title="Mes favoris">Jeux de logique et d'adresse</h2>
 					<p>Entraîne ta logique et tes réflexes avec des mini-jeux. Quelques minutes par jour, sans prise de tête.</p>
 				</header>
 
@@ -122,7 +130,7 @@ const projects = (await getCollection('work'))
 
 			<section class="section with-background with-cta">
 				<header class="section-header stack gap-2 lg:gap-4">
-					<h3>Projets & réalisations</h3>
+					<h2>Projets & réalisations</h2>
 					<p>Un aperçu de mon savoir-faire : projets récents et collaborations menées au fil des années</p>
 				</header>
 
@@ -149,7 +157,7 @@ const projects = (await getCollection('work'))
 			<section class="section with-background bg-variant">
 				
 				<header class="section-header stack gap-2 lg:gap-4">
-					<h3>Mentions</h3>
+					<h2>Mentions</h2>
 					<p>
 						I have been fortunate enough to receive praise for my work in several publications. Take
 						a look below to learn more.
@@ -299,7 +307,7 @@ const projects = (await getCollection('work'))
 		color: var(--gray-300);
 	}
 
-	.section-header h3 {
+	.section-header h2 {
 		font-size: var(--text-2xl);
 	}
 
@@ -319,7 +327,7 @@ const projects = (await getCollection('work'))
 			font-size: var(--text-lg);
 		}
 
-		.section-header h3 {
+		.section-header h2 {
 			font-size: var(--text-4xl);
 		}
 

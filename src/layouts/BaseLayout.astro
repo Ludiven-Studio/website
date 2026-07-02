@@ -6,18 +6,48 @@
 import MainHead from '../components/MainHead.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import { games } from '../data/games';
 
 interface Props {
 	title?: string | undefined;
 	description?: string | undefined;
+	image?: string | undefined;
+	type?: string | undefined;
 }
 
-const { title, description } = Astro.props;
+const { title, description, image, type } = Astro.props;
+
+// Route-based structured data (JSON-LD): Organization + WebSite on the home page,
+// VideoGame + BreadcrumbList on a game page — no per-page wiring needed.
+const site = Astro.site!;
+const path = Astro.url.pathname;
+const pageUrl = new URL(path, site).href;
+let jsonLd: unknown[] | null = null;
+if (path === '/' || path === '') {
+	jsonLd = [
+		{ '@context': 'https://schema.org', '@type': 'Organization', name: 'Ludiven Studio', url: site.href, logo: new URL('/apple-touch-icon.png', site).href },
+		{ '@context': 'https://schema.org', '@type': 'WebSite', name: 'Ludiven Studio', url: site.href, inLanguage: 'fr' },
+	];
+} else {
+	const m = path.match(/^\/jeux\/([^/]+)\/?$/);
+	const g = m ? games.find((x) => x.id === m[1] || x.href === `/jeux/${m[1]}`) : undefined;
+	if (g) {
+		jsonLd = [
+			{ '@context': 'https://schema.org', '@type': 'VideoGame', name: g.title, description: g.pitch, url: pageUrl, inLanguage: 'fr', genre: g.category ?? 'logique', applicationCategory: 'Game', operatingSystem: 'Web browser', author: { '@type': 'Organization', name: 'Ludiven Studio' }, offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' } },
+			{ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+				{ '@type': 'ListItem', position: 1, name: 'Accueil', item: site.href },
+				{ '@type': 'ListItem', position: 2, name: 'Jeux', item: new URL('/jeux/', site).href },
+				{ '@type': 'ListItem', position: 3, name: g.title, item: pageUrl },
+			] },
+		];
+	}
+}
 ---
 
-<html lang="en">
+<html lang="fr">
 	<head>
-		<MainHead title={title} description={description} />
+		<MainHead title={title} description={description} image={image} type={type} />
+		{jsonLd && <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />}
 	</head>
 	<body>
 		<div class="stack backgrounds">

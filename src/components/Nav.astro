@@ -2,6 +2,10 @@
 import Icon from './Icon.astro';
 import ThemeToggle from './ThemeToggle.astro';
 import type { iconPaths } from './IconPaths';
+import { getImage } from 'astro:assets';
+import logo from '../assets/LudivenStudioLogo.png';
+
+const logoImg = await getImage({ src: logo, width: 120, format: 'webp' });
 
 /** Main menu items */
 const textLinks: { label: string; href: string }[] = [
@@ -19,7 +23,7 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 <nav>
 	<div class="menu-header">
 		<a href="/" class="site-title">
-			<img src="/assets/LudivenStudioLogo.png" alt="" class="site-logo" />
+			<img src={logoImg.src} alt="" class="site-logo" />
 			Ludiven Studio
 		</a>
 		<menu-button>
