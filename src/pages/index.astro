@@ -33,14 +33,14 @@ const projects = (await getCollection('work'))
 
 <BaseLayout
 	title="Ludiven Studio — Développement Unity : applications, jeux, VR & mini-jeux"
-	description="Ludiven Studio — développeur Unity depuis 2006 : applications mobiles, jeux, expériences VR et solutions interactives, de la conception à la mise en production. Et des dizaines de mini-jeux gratuits à jouer dans le navigateur (défi du jour, classements)."
+	description="Ludiven Studio — développeur Unity depuis 2010 : applications mobiles, jeux, expériences VR et solutions interactives, de la conception à la mise en production. Et des dizaines de mini-jeux gratuits à jouer dans le navigateur (défi du jour, classements)."
 >
 	<div class="stack gap-20 lg:gap-48">
 		<div class="wrapper stack gap-8 lg:gap-20">
 			<header class="hero">
 				<Hero
 					title="Bienvenue chez Ludiven Studio"
-					tagline="Développeur Unity depuis 2006 — je conçois et développe vos applications, jeux et expériences VR, de l'idée à la mise en production."
+					tagline="Développeur Unity depuis 2010 — je conçois et développe vos applications, jeux et expériences VR, de l'idée à la mise en production."
 					align="start"
 				>
 					<div class="roles">
@@ -66,6 +66,32 @@ const projects = (await getCollection('work'))
 		</div>
 
 		<main class="wrapper stack gap-20 lg:gap-48">
+			<section class="section with-background with-cta">
+				<header class="section-header stack gap-2 lg:gap-4">
+					<h2>Projets & réalisations</h2>
+					<p>Un aperçu de mon savoir-faire : projets récents et collaborations menées au fil des années</p>
+				</header>
+
+				<div class="gallery">
+					<Grid variant="offset">
+						{
+							projects.map((project) => (
+								<li>
+									<PortfolioPreview project={project} />
+								</li>
+							))
+						}
+					</Grid>
+				</div>
+
+				<div class="cta">
+					<CallToAction href="/work/">
+						Tous les projets
+						<Icon icon="arrow-right" size="1.2em" />
+					</CallToAction>
+				</div>
+			</section>
+
 			<section class="section with-background with-cta" id="games-section">
 				<header class="section-header stack gap-2 lg:gap-4">
 					<h2 data-games-title data-default-title="Jeux de logique et d'adresse" data-fav-title="Mes favoris">Jeux de logique et d'adresse</h2>
@@ -126,32 +152,6 @@ const projects = (await getCollection('work'))
 				<div class="cta">
 					<CallToAction href="/jeux/">
 						Tous les jeux
-						<Icon icon="arrow-right" size="1.2em" />
-					</CallToAction>
-				</div>
-			</section>
-
-			<section class="section with-background with-cta">
-				<header class="section-header stack gap-2 lg:gap-4">
-					<h2>Projets & réalisations</h2>
-					<p>Un aperçu de mon savoir-faire : projets récents et collaborations menées au fil des années</p>
-				</header>
-
-				<div class="gallery">
-					<Grid variant="offset">
-						{
-							projects.map((project) => (
-								<li>
-									<PortfolioPreview project={project} />
-								</li>
-							))
-						}
-					</Grid>
-				</div>
-
-				<div class="cta">
-					<CallToAction href="/work/">
-						Tous les projets
 						<Icon icon="arrow-right" size="1.2em" />
 					</CallToAction>
 				</div>
