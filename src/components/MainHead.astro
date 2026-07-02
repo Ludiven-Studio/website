@@ -9,6 +9,7 @@ interface Props {
 	description?: string | undefined;
 	image?: string | undefined; // root-relative or absolute og image (defaults to the studio logo)
 	type?: string | undefined; // og:type (website | article)
+	noindex?: boolean | undefined; // keep this page out of search engines
 }
 
 const {
@@ -16,6 +17,7 @@ const {
 	description = 'Ludiven Studio — création d\'applications et de jeux qui ont du sens et facilitent le quotidien',
 	image,
 	type = 'website',
+	noindex = false,
 } = Astro.props;
 
 const siteName = 'Ludiven Studio';
@@ -31,6 +33,7 @@ const ogImage = image ? new URL(image, Astro.site).href : new URL(ogGen.src, Ast
 <meta name="generator" content={Astro.generator} />
 <title>{title}</title>
 <meta name="description" content={description} />
+{noindex && <meta name="robots" content="noindex, follow" />}
 <link rel="canonical" href={canonical} />
 
 <meta property="og:type" content={type} />

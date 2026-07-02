@@ -13,9 +13,10 @@ interface Props {
 	description?: string | undefined;
 	image?: string | undefined;
 	type?: string | undefined;
+	noindex?: boolean | undefined;
 }
 
-const { title, description, image, type } = Astro.props;
+const { title, description, image, type, noindex } = Astro.props;
 
 // Route-based structured data (JSON-LD): Organization + WebSite on the home page,
 // VideoGame + BreadcrumbList on a game page — no per-page wiring needed.
@@ -25,7 +26,7 @@ const pageUrl = new URL(path, site).href;
 let jsonLd: unknown[] | null = null;
 if (path === '/' || path === '') {
 	jsonLd = [
-		{ '@context': 'https://schema.org', '@type': 'Organization', name: 'Ludiven Studio', url: site.href, logo: new URL('/apple-touch-icon.png', site).href },
+		{ '@context': 'https://schema.org', '@type': 'Organization', name: 'Ludiven Studio', url: site.href, logo: new URL('/apple-touch-icon.png', site).href, founder: { '@type': 'Person', name: 'Raphael Benedetto', jobTitle: 'Développeur Unity' } },
 		{ '@context': 'https://schema.org', '@type': 'WebSite', name: 'Ludiven Studio', url: site.href, inLanguage: 'fr' },
 	];
 } else {
@@ -46,7 +47,7 @@ if (path === '/' || path === '') {
 
 <html lang="fr">
 	<head>
-		<MainHead title={title} description={description} image={image} type={type} />
+		<MainHead title={title} description={description} image={image} type={type} noindex={noindex} />
 		{jsonLd && <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />}
 	</head>
 	<body>

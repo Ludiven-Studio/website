@@ -1,0 +1,125 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import Icon from '../components/Icon.astro';
+import Grid from '../components/Grid.astro';
+import PortfolioPreview from '../components/PortfolioPreview.astro';
+import ContactCTA from '../components/ContactCTA.astro';
+import type { iconPaths } from '../components/IconPaths';
+
+// Feature a few representative case studies (keep this order).
+const featured = ['ami-es', 'higow', 'skoolz'];
+const rank = new Map(featured.map((s, i) => [s, i]));
+const projects = (await getCollection('work'))
+	.filter((p) => rank.has(p.slug))
+	.sort((a, b) => (rank.get(a.slug) ?? 0) - (rank.get(b.slug) ?? 0));
+
+const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
+	{ icon: 'code', title: 'Développement Unity', body: 'Conception et développement d\'applications et de jeux sous Unity — mobile, desktop et WebGL. De l\'idée au produit livré, avec une exigence de qualité et de maintenabilité.' },
+	{ icon: 'mobile', title: 'Application mobile', body: 'Applications iOS et Android développées avec Unity, jusqu\'à la mise en production sur les stores. Interfaces soignées, performances et intégrations natives (capteurs, notifications, hors-ligne).' },
+	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Expériences immersives VR/XR pour la formation, la simulation ou le divertissement — casques et mobile. Interaction naturelle, confort et optimisation du rendu.' },
+	{ icon: 'strategy', title: 'Multijoueur Unity', body: 'Jeux et applications en temps réel : netcode, synchronisation, serveurs headless. Une architecture réseau fiable, du prototype à la mise en production.' },
+	{ icon: 'scales', title: 'Audit & reprise de projet Unity', body: 'Reprise d\'un projet Unity existant : audit technique, correction de bugs, optimisation des performances et des temps de chargement, montée de version. Je sécurise et fais avancer votre base de code.' },
+];
+
+const title = 'Services — Développement Unity, mobile, VR & multijoueur | Ludiven Studio';
+const description = 'Prestations de développement Unity : applications mobiles, jeux, expériences VR/XR et multijoueur temps réel, de la conception à la mise en production. Développeur Unity depuis 2006, en France et à distance.';
+
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'ProfessionalService',
+	name: 'Ludiven Studio',
+	url: 'https://www.ludiven-studio.fr/services/',
+	description,
+	areaServed: { '@type': 'Country', name: 'France' },
+	provider: { '@type': 'Organization', name: 'Ludiven Studio', url: 'https://www.ludiven-studio.fr/' },
+	serviceType: services.map((s) => s.title),
+};
+---
+
+<BaseLayout title={title} description={description}>
+	<div class="stack gap-20">
+		<main class="wrapper stack gap-12">
+			<Hero
+				title="Services"
+				tagline="Développeur Unity depuis 2006 — je conçois, développe et mets en production vos applications, jeux et expériences immersives, en France comme à distance."
+				align="start"
+			/>
+
+			<section class="box services">
+				{services.map((s) => (
+					<div class="stack gap-2 lg:gap-4">
+						<Icon icon={s.icon} color="var(--accent-regular)" size="2.5rem" gradient />
+						<h2>{s.title}</h2>
+						<p>{s.body}</p>
+					</div>
+				))}
+			</section>
+
+			<section class="stack gap-6">
+				<h2 class="section-title">Réalisations en exemple</h2>
+				<Grid variant="offset">
+					{projects.map((project) => (
+						<li>
+							<PortfolioPreview project={project} />
+						</li>
+					))}
+				</Grid>
+			</section>
+		</main>
+
+		<ContactCTA />
+	</div>
+
+	<script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+</BaseLayout>
+
+<style>
+	.box {
+		border: 1px solid var(--gray-800);
+		border-radius: 0.75rem;
+		padding: 1.5rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.services {
+		display: flex;
+		flex-direction: column;
+		gap: 2.5rem;
+	}
+
+	.services h2 {
+		font-size: var(--text-lg);
+	}
+
+	.services p {
+		color: var(--gray-400);
+	}
+
+	.section-title {
+		font-size: var(--text-2xl);
+	}
+
+	@media (min-width: 50em) {
+		.box {
+			border-radius: 1.5rem;
+			padding: 2.5rem;
+		}
+
+		.services {
+			display: grid;
+			grid-template-columns: repeat(2, 1fr);
+			gap: 3rem 5rem;
+		}
+
+		.services h2 {
+			font-size: var(--text-2xl);
+		}
+
+		.section-title {
+			font-size: var(--text-3xl);
+		}
+	}
+</style>
