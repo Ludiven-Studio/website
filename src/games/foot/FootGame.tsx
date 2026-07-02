@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	createWorld, stepPlayer, stepBall, resolveKicks, applyScore, step, separateAll,
 	playerPos, applyPlayerPos, applyBall, ballState,
-	FIELD, FLOOR, GOAL_TOP, PLAYER_R, BALL_R, WIN_GOALS,
+	FIELD, FLOOR, GOAL_TOP, PLAYER_R, BALL_R, WIN_GOALS, DASH_DETECT,
 	type World, type PlayerInput, type Side, type SlotPos,
 } from './engine';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PosMsg, type StateMsg } from './net';
@@ -182,7 +182,17 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		for (let slot = 0; slot < 4; slot++) {
 			const net = isNetSlot(role, slot);
 			const src = net ? slotRenderRef.current[slot] : w.players[slot];
-			drawCocotte(ctx, src.x * S, src.y * S, PLAYER_R * S, teamOf(slot) === 0 ? COL_T0 : COL_T1, src.face as 1 | -1, slot === mySlot);
+			const color = teamOf(slot) === 0 ? COL_T0 : COL_T1;
+			const vx = net ? netPosRef.current[slot].vx : w.players[slot].vx;
+			if (Math.abs(vx) > DASH_DETECT) { // flash: motion-blur ghosts trailing behind
+				const dir = Math.sign(vx);
+				for (let g = 3; g >= 1; g--) {
+					ctx.globalAlpha = 0.1 * (4 - g);
+					drawCocotte(ctx, (src.x - dir * g * 5) * S, src.y * S, PLAYER_R * S, color, src.face as 1 | -1, false);
+				}
+				ctx.globalAlpha = 1;
+			}
+			drawCocotte(ctx, src.x * S, src.y * S, PLAYER_R * S, color, src.face as 1 | -1, slot === mySlot);
 		}
 		const b = role === 'guest' ? ballRenderRef.current : w.ball;
 		drawBall(ctx, b.x * S, b.y * S, BALL_R * S, w.ball.spin);
@@ -525,7 +535,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<p className="fo-help">Déplace-toi ◀ ▶ et appuie sur Saut pour bondir — <strong>re-tape Saut en l'air pour battre des ailes et planer</strong>. Fonce dans le ballon pour tirer (il décolle au sol). Clavier : ← → et Espace / ↑. Tu es la cocotte cerclée d’or.</p>
+			<p className="fo-help">Déplace-toi ◀ ▶ et appuie sur Saut pour bondir — <strong>re-tape Saut en l'air pour planer</strong>. <strong>Double-tape ◀◀ / ▶▶ pour un dash-éclair</strong> qui bouscule les autres poules. Fonce dans le ballon pour tirer (il décolle au sol). Clavier : ← → et Espace / ↑. Tu es la cocotte cerclée d’or.</p>
 		</div>
 	);
 }

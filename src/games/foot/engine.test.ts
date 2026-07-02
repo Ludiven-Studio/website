@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	createWorld, step, stepPlayer, stepBall, resolveKicks,
+	createWorld, step, stepPlayer, stepBall, resolveKicks, separateAll,
 	FIELD, FLOOR, PLAYER_R, BALL_R, GOAL_TOP,
 	type PlayerInput, type World,
 } from './engine';
@@ -56,6 +56,15 @@ describe('foot engine', () => {
 		expect(p.vx).toBeGreaterThan(140); // clearly faster than RUN_MAX (114)
 		for (let i = 0; i < 40; i++) stepPlayer(p, { move: 1, jump: false }, DT); // hold run, dash expires
 		expect(p.vx).toBeLessThanOrEqual(120); // back to the normal run cap
+	});
+
+	it('a flash-dash shoves another hen (knockback)', () => {
+		const w = live(createWorld());
+		const a = w.players[0], b = w.players[1];
+		a.x = 100; a.y = FLOOR - PLAYER_R; a.vx = 380; a.dashT = 0.2; // dashing right
+		b.x = 100 + PLAYER_R * 1.5; b.y = a.y; b.vx = 0; // overlapping just ahead
+		separateAll(w.players);
+		expect(b.vx).toBeGreaterThan(150); // knocked to the right
 	});
 
 	it('a grounded ball struck horizontally lofts into a shot (rises)', () => {

@@ -40,7 +40,9 @@ export const WIN_GOALS = 5;
 const GRAVITY = 640;
 const RUN_MAX = 114, RUN_ACC = 1000, GROUND_DAMP = 0.8, AIR_ACC = 440;
 const JUMP_V = 258, FLAP_V = 200; // FLAP_V = upward pop of an in-air wing flap (hens fly a bit)
-const DASH_V = 205, DASH_MAX = 205, DASH_TIME = 0.22; // double-tap sprint to reposition/defend
+// Double-tap flash dash: a big horizontal blink (~5× a hen's width) that shoves other hens.
+const DASH_V = 380, DASH_MAX = 380, DASH_TIME = 0.3, KNOCKBACK = 300;
+export const DASH_DETECT = 240; // speed above which a hen counts as "dashing" (knockback + flash trail)
 const BALL_REST = 0.84, BALL_AIRDRAG = 0.999, BALL_ROLL = 0.985, WALL_REST = 0.82;
 const BALL_MAXV = 500;
 const KICK = 165, KICK_TRANSFER = 0.62, KICK_UP = 60, LIFT_MIN = 140; // LIFT_MIN = min upward pop for a grounded shot
@@ -103,7 +105,10 @@ export function reclampPlayer(p: Player): void {
 	else p.onGround = false;
 }
 
-/** Soft positional separation so two cocottes don't overlap. */
+const isDashing = (p: Player): boolean => p.dashT > 0 || Math.abs(p.vx) > DASH_DETECT;
+
+/** Soft positional separation so two cocottes don't overlap — and a flash-dashing hen
+ *  SHOVES the other one (strong knockback + little pop). */
 export function separatePlayers(a: Player, b: Player): void {
 	const dx = b.x - a.x, dy = b.y - a.y;
 	const d = Math.hypot(dx, dy);
@@ -112,6 +117,14 @@ export function separatePlayers(a: Player, b: Player): void {
 	const nx = dx / d, ny = dy / d, push = (min - d) / 2;
 	a.x -= nx * push; a.y -= ny * push;
 	b.x += nx * push; b.y += ny * push;
+	const ad = isDashing(a), bd = isDashing(b);
+	if (ad !== bd) { // exactly one is flashing → it bulldozes the other
+		const dasher = ad ? a : b, other = ad ? b : a;
+		const dir = Math.sign(dasher.vx) || dasher.face;
+		other.vx = dir * KNOCKBACK;
+		other.vy = Math.min(other.vy, -KNOCKBACK * 0.45); // knock it off its feet
+		other.onGround = false;
+	}
 	reclampPlayer(a); reclampPlayer(b);
 }
 
