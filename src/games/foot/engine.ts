@@ -11,11 +11,11 @@
  */
 
 export type Side = 0 | 1; // team: 0 = left, 1 = right
-export interface PlayerInput { move: -1 | 0 | 1; jump: boolean; }
+export interface PlayerInput { move: -1 | 0 | 1; jump: boolean; dash?: boolean; }
 
 export interface Player {
 	x: number; y: number; vx: number; vy: number;
-	onGround: boolean; face: 1 | -1; jumpHeld: boolean; team: Side;
+	onGround: boolean; face: 1 | -1; jumpHeld: boolean; team: Side; dashT: number;
 }
 export interface Ball { x: number; y: number; vx: number; vy: number; spin: number; }
 
@@ -40,6 +40,7 @@ export const WIN_GOALS = 5;
 const GRAVITY = 640;
 const RUN_MAX = 114, RUN_ACC = 1000, GROUND_DAMP = 0.8, AIR_ACC = 440;
 const JUMP_V = 258, FLAP_V = 200; // FLAP_V = upward pop of an in-air wing flap (hens fly a bit)
+const DASH_V = 205, DASH_MAX = 205, DASH_TIME = 0.22; // double-tap sprint to reposition/defend
 const BALL_REST = 0.84, BALL_AIRDRAG = 0.999, BALL_ROLL = 0.985, WALL_REST = 0.82;
 const BALL_MAXV = 500;
 const KICK = 165, KICK_TRANSFER = 0.62, KICK_UP = 60, LIFT_MIN = 140; // LIFT_MIN = min upward pop for a grounded shot
@@ -47,7 +48,7 @@ const KICKOFF_TIME = 1.1;
 
 /* ---------- Construction ---------- */
 
-const mkPlayer = (x: number, face: 1 | -1, team: Side): Player => ({ x, y: FLOOR - PLAYER_R, vx: 0, vy: 0, onGround: true, face, jumpHeld: false, team });
+const mkPlayer = (x: number, face: 1 | -1, team: Side): Player => ({ x, y: FLOOR - PLAYER_R, vx: 0, vy: 0, onGround: true, face, jumpHeld: false, team, dashT: 0 });
 const centerBall = (): Ball => ({ x: FIELD.W / 2, y: FIELD.H * 0.3, vx: 0, vy: 0, spin: 0 });
 
 export function createWorld(): World {
@@ -67,12 +68,18 @@ export function createWorld(): World {
 /* ---------- Player ---------- */
 
 export function stepPlayer(p: Player, inp: PlayerInput, dt: number): void {
+	if (p.dashT > 0) p.dashT -= dt;
+	if (inp.dash && p.dashT <= 0) { // double-tap sprint
+		const dir = inp.move !== 0 ? inp.move : p.face;
+		p.dashT = DASH_TIME; p.vx = dir * DASH_V; p.face = dir;
+	}
+	const maxv = p.dashT > 0 ? DASH_MAX : RUN_MAX;
 	if (inp.move !== 0) {
 		p.vx += inp.move * (p.onGround ? RUN_ACC : AIR_ACC) * dt;
-		if (p.vx > RUN_MAX) p.vx = RUN_MAX;
-		if (p.vx < -RUN_MAX) p.vx = -RUN_MAX;
+		if (p.vx > maxv) p.vx = maxv;
+		if (p.vx < -maxv) p.vx = -maxv;
 		p.face = inp.move;
-	} else if (p.onGround) {
+	} else if (p.onGround && p.dashT <= 0) {
 		p.vx *= GROUND_DAMP;
 		if (Math.abs(p.vx) < 3) p.vx = 0;
 	}

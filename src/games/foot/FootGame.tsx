@@ -28,6 +28,7 @@ const VIEW_W = FIELD.W * SCALE;
 const VIEW_H = FIELD.H * SCALE;
 const COL_T0 = '#4da3ff'; // left team (blue)
 const COL_T1 = '#ff5a5f'; // right team (red)
+const DOUBLE_TAP_MS = 280; // window for a left-left / right-right dash
 const teamOf = (slot: number): Side => (slot < 2 ? 0 : 1);
 
 interface Keys { left: boolean; right: boolean; jump: boolean; }
@@ -106,6 +107,8 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 	const keysRef = useRef<Keys>({ left: false, right: false, jump: false });
 	const touchRef = useRef<Keys>({ left: false, right: false, jump: false });
+	const lastTapRef = useRef({ left: 0, right: 0 });
+	const dashQueuedRef = useRef<-1 | 0 | 1>(0);
 
 	const { celebrating } = useCelebration(phase === 'over' && youWon);
 
@@ -213,10 +216,12 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		accRef.current += dtMs;
 		const role = roleRef.current, w = worldRef.current, mySlot = mySlotRef.current;
 
+		const dashDir = dashQueuedRef.current; dashQueuedRef.current = 0; // consume the queued double-tap once
 		while (accRef.current >= STEP) {
 			accRef.current -= STEP;
 			const dt = STEP / 1000;
 			const inp = readInput(keysRef.current, touchRef.current);
+			if (dashDir !== 0) inp.dash = true; // engine's dashT guard ignores repeats within the frame
 			const bs = botStRef.current;
 			if (role === 'ai') {
 				const r = step(w, dt, [inp, botFor(w, 1, bs[1]), botFor(w, 2, bs[2]), botFor(w, 3, bs[3])]);
@@ -393,12 +398,19 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	}, [roomCode]);
 
 	/* ---------- input ---------- */
+	// Two quick presses of the same direction (within DOUBLE_TAP_MS) queue a dash.
+	const registerTap = useCallback((dir: 'left' | 'right') => {
+		const now = performance.now(), last = lastTapRef.current;
+		if (now - last[dir] < DOUBLE_TAP_MS) dashQueuedRef.current = dir === 'left' ? -1 : 1;
+		last[dir] = now;
+	}, []);
+
 	useEffect(() => {
 		const k = keysRef.current;
 		const down = (e: KeyboardEvent) => {
 			if (['ArrowLeft', 'ArrowRight', 'ArrowUp', ' '].includes(e.key)) e.preventDefault();
-			if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'q') k.left = true;
-			else if (e.key === 'ArrowRight' || e.key === 'd') k.right = true;
+			if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'q') { if (!k.left) registerTap('left'); k.left = true; } // rising edge only (skip auto-repeat)
+			else if (e.key === 'ArrowRight' || e.key === 'd') { if (!k.right) registerTap('right'); k.right = true; }
 			else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'z' || e.key === ' ') k.jump = true;
 		};
 		const up = (e: KeyboardEvent) => {
@@ -409,7 +421,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		window.addEventListener('keydown', down);
 		window.addEventListener('keyup', up);
 		return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
-	}, []);
+	}, [registerTap]);
 
 	useEffect(() => () => {
 		runningRef.current = false;
@@ -506,8 +518,8 @@ export default function FootGame({ gameId }: { gameId: string }) {
 			{phase === 'playing' && (
 				<div className="fo-pad">
 					<div className="fo-dpad">
-						<button className="fo-tbtn" aria-label="Gauche" onPointerDown={touch('left', true)} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)}>◀</button>
-						<button className="fo-tbtn" aria-label="Droite" onPointerDown={touch('right', true)} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)}>▶</button>
+						<button className="fo-tbtn" aria-label="Gauche" onPointerDown={(e) => { touch('left', true)(e); registerTap('left'); }} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)}>◀</button>
+						<button className="fo-tbtn" aria-label="Droite" onPointerDown={(e) => { touch('right', true)(e); registerTap('right'); }} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)}>▶</button>
 					</div>
 					<button className="fo-tbtn fo-jump" aria-label="Sauter" onPointerDown={touch('jump', true)} onPointerUp={touch('jump', false)} onPointerLeave={touch('jump', false)} onPointerCancel={touch('jump', false)}>⤴ SAUT</button>
 				</div>
@@ -527,8 +539,8 @@ const CSS = `
 .fo-goal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(30px, 9vw, 68px); color: #fff; text-shadow: 0 3px 10px rgba(0,0,0,0.5); pointer-events: none; animation: fo-pop 0.3s ease; }
 @keyframes fo-pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .fo-quit { position: absolute; top: 8px; right: 10px; border: none; background: rgba(0,0,0,0.35); color: #fff; font: inherit; font-weight: 700; border-radius: 999px; width: 30px; height: 30px; cursor: pointer; }
-.fo-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10,14,20,0.55); backdrop-filter: blur(2px); }
-.fo-card { background: var(--gray-999); border: 2px solid var(--fo-accent); border-radius: 16px; padding: 20px 26px; box-shadow: var(--shadow-lg); text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 360px; width: 88%; }
+.fo-overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(10,14,20,0.55); backdrop-filter: blur(2px); }
+.fo-card { background: var(--gray-999); border: 2px solid var(--fo-accent); border-radius: 16px; padding: 20px 26px; box-shadow: var(--shadow-lg); text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 360px; width: 88%; max-height: 90vh; overflow-y: auto; }
 .fo-card h2 { margin: 0; font-family: var(--font-brand); font-size: 22px; }
 .fo-sub { margin: 0; color: var(--gray-300); font-size: 13px; line-height: 1.5; }
 .fo-status { margin: 0; color: var(--gray-300); font-size: 12.5px; }

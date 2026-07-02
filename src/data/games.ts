@@ -8,6 +8,7 @@ export interface GameTile {
 	href?: string;
 	status: 'play' | 'soon';
 	category?: 'logique' | 'adresse' | 'multi'; // defaults to logique
+	image?: string; // optional presentation thumbnail, e.g. '/assets/jeux/<id>.png' (shown only if set)
 }
 
 export const games: GameTile[] = [

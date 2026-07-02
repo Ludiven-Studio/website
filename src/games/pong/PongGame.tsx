@@ -668,8 +668,8 @@ const CSS = `
 .pg-canvas { width: 100%; height: 100%; display: block; border-radius: 14px; background: #0b0e14; touch-action: none; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
 .pg-hud { position: absolute; top: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 0.5rem; font-family: var(--font-brand); font-weight: 700; font-size: 1.1rem; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
 .pg-sep { color: var(--gray-300); }
-.pg-overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(8,10,18,0.55); border-radius: 14px; padding: 1rem; }
-.pg-card { background: var(--gray-999, #0c0e14); border: 1px solid var(--gray-800, #2a2f3a); border-radius: 16px; padding: 1.25rem; width: min(340px, 100%); display: flex; flex-direction: column; gap: 0.6rem; text-align: center; }
+.pg-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(8,10,18,0.55); padding: 1rem; }
+.pg-card { background: var(--gray-999, #0c0e14); border: 1px solid var(--gray-800, #2a2f3a); border-radius: 16px; padding: 1.25rem; width: min(340px, 100%); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; text-align: center; }
 .pg-card h2 { margin: 0; font-size: var(--text-xl); }
 .pg-sub { margin: 0; color: var(--gray-300); font-size: var(--text-sm); }
 .pg-modes { display: flex; gap: 0.4rem; }

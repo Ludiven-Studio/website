@@ -49,6 +49,15 @@ describe('foot engine', () => {
 		expect(p.vy).toBeLessThan(vyBefore); // pushed further upward
 	});
 
+	it('a double-tap dash gives a burst well above normal run speed, then fades', () => {
+		const w = live(createWorld());
+		const p = w.players[0];
+		stepPlayer(p, { move: 1, jump: false, dash: true }, DT); // dash trigger
+		expect(p.vx).toBeGreaterThan(140); // clearly faster than RUN_MAX (114)
+		for (let i = 0; i < 40; i++) stepPlayer(p, { move: 1, jump: false }, DT); // hold run, dash expires
+		expect(p.vx).toBeLessThanOrEqual(120); // back to the normal run cap
+	});
+
 	it('a grounded ball struck horizontally lofts into a shot (rises)', () => {
 		const w = live(createWorld());
 		w.ball.x = 160; w.ball.y = FLOOR - BALL_R; w.ball.vx = 0; w.ball.vy = 0; // resting on the floor
