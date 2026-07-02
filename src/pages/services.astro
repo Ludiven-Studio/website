@@ -5,30 +5,27 @@ import Icon from '../components/Icon.astro';
 import ContactCTA from '../components/ContactCTA.astro';
 import type { iconPaths } from '../components/IconPaths';
 
+// Une seule grille de cartouches : 5 prestations principales puis des interventions plus fines.
 const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
-	{ icon: 'code', title: 'Développement Unity', body: 'De l\'idée au produit livré : je conçois et développe vos applications et jeux sous Unity — mobile, desktop et WebGL — avec une vraie exigence de qualité et un code pensé pour durer.' },
-	{ icon: 'mobile', title: 'Application mobile', body: 'Vos applications iOS et Android développées sous Unity, jusqu\'à la publication sur les stores : interfaces soignées, bonnes performances et accès aux fonctions natives (capteurs, notifications, mode hors-ligne).' },
-	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Des expériences immersives VR/XR pour la formation, la simulation ou le jeu, sur casque comme sur mobile : interaction naturelle, confort d\'usage et rendu optimisé.' },
-	{ icon: 'strategy', title: 'Multijoueur Unity', body: 'Du temps réel qui tient la route : synchronisation, netcode, serveurs headless. Une architecture réseau solide pour vos jeux et applications, du prototype à la production.' },
-	{ icon: 'scales', title: 'Audit & reprise de projet Unity', body: 'Vous héritez d\'un projet Unity ? J\'en fais l\'audit, corrige les bugs, optimise les performances et les temps de chargement et gère la montée de version — pour sécuriser votre base de code et la remettre en mouvement.' },
-];
-
-// Interventions concrètes, plus fines que les 5 prestations ci-dessus.
-const capabilities: string[] = [
-	'Suivi d\'alternants et de jeunes développeurs',
-	'Formation à Unity et au C#',
-	'Conseils pour bien structurer un projet Unity',
-	'Résolution de problèmes techniques complexes',
-	'Optimisation des performances, de la mémoire et de la taille du build',
-	'Intégration d\'AssetBundles et d\'Addressables',
-	'Développement de gameplays sur-mesure',
-	'Mise en œuvre du moteur physique',
-	'Multijoueur avec Photon ou Netcode',
-	'Interfaces et menus in-game (UI)',
-	'Sons et musiques avec réglages de volume',
-	'Localisation multilingue des textes',
-	'Outils internes sur-mesure, affinés au fil des projets',
-	'Cheat codes de debug pour accélérer les tests',
+	{ icon: 'code', title: 'Développement Unity', body: 'De l\'idée au produit livré : applications et jeux sous Unity — mobile, desktop et WebGL — avec un code pensé pour durer.' },
+	{ icon: 'mobile', title: 'Application mobile', body: 'Vos applications iOS et Android développées sous Unity, jusqu\'à la publication sur les stores, avec accès aux fonctions natives.' },
+	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Des expériences immersives VR/XR pour la formation, la simulation ou le jeu, sur casque comme sur mobile.' },
+	{ icon: 'strategy', title: 'Multijoueur Unity', body: 'Du temps réel qui tient la route : synchronisation, netcode, serveurs headless, du prototype à la production.' },
+	{ icon: 'scales', title: 'Audit & reprise de projet Unity', body: 'Audit, correction de bugs, optimisation et montée de version pour sécuriser votre base de code et la remettre en mouvement.' },
+	{ icon: 'pencil-line', title: 'Suivi d\'alternants & juniors', body: 'Encadrement technique, revues de code et montée en compétence des développeurs juniors.' },
+	{ icon: 'terminal-window', title: 'Formation Unity & C#', body: 'Des sessions sur-mesure pour prendre en main Unity et le langage C#.' },
+	{ icon: 'strategy', title: 'Structuration de projet', body: 'Architecture, organisation du code et bonnes pratiques pour un projet Unity qui reste sain.' },
+	{ icon: 'flask', title: 'Problèmes techniques complexes', body: 'Un blocage tenace ? Je trouve et mets en place la solution technique adaptée.' },
+	{ icon: 'scales', title: 'Optimisation (perfs, mémoire, build)', body: 'Plus de fluidité, moins de mémoire consommée et un build plus léger.' },
+	{ icon: 'code', title: 'AssetBundles & Addressables', body: 'Chargement et gestion des ressources à la demande, proprement.' },
+	{ icon: 'games', title: 'Gameplays sur-mesure', body: 'Des mécaniques de jeu originales, conçues et développées selon votre idée.' },
+	{ icon: 'winding-path', title: 'Moteur physique', body: 'Collisions, simulations et interactions physiques réglées finement.' },
+	{ icon: 'strategy', title: 'Multijoueur Photon / Netcode', body: 'Fonctionnalités temps réel avec Photon ou Netcode for GameObjects.' },
+	{ icon: 'games', title: 'Interfaces & menus (UI)', body: 'Des interfaces et menus in-game clairs, réactifs et agréables à utiliser.' },
+	{ icon: 'heart', title: 'Sons & musiques', body: 'Intégration audio (SFX, musiques) avec réglages de volume.' },
+	{ icon: 'paper-plane-tilt', title: 'Localisation multilingue', body: 'Des textes prêts à être traduits et affichés en plusieurs langues.' },
+	{ icon: 'terminal-window', title: 'Outils internes sur-mesure', body: 'Une boîte à outils maison, affinée au fil des projets pour gagner du temps.' },
+	{ icon: 'flask', title: 'Cheat codes de debug', body: 'Des raccourcis de test pour accélérer le développement et la QA.' },
 ];
 
 const title = 'Services — Développement Unity, mobile, VR & multijoueur | Ludiven Studio';
@@ -42,7 +39,7 @@ const jsonLd = {
 	description,
 	areaServed: { '@type': 'Country', name: 'France' },
 	provider: { '@type': 'Organization', name: 'Ludiven Studio', url: 'https://www.ludiven-studio.fr/' },
-	serviceType: [...services.map((s) => s.title), ...capabilities],
+	serviceType: services.map((s) => s.title),
 };
 ---
 
@@ -64,18 +61,6 @@ const jsonLd = {
 					</div>
 				))}
 			</section>
-
-			<section class="stack gap-6">
-				<h2 class="section-title">Interventions & compétences</h2>
-				<ul class="capabilities">
-					{capabilities.map((c) => (
-						<li class="cap">
-							<Icon icon="check" color="var(--accent-regular)" size="1.15rem" />
-							<span>{c}</span>
-						</li>
-					))}
-				</ul>
-			</section>
 		</main>
 
 		<ContactCTA />
@@ -94,8 +79,8 @@ const jsonLd = {
 	}
 
 	.services {
-		display: flex;
-		flex-direction: column;
+		display: grid;
+		grid-template-columns: 1fr;
 		gap: 2.5rem;
 	}
 
@@ -107,40 +92,6 @@ const jsonLd = {
 		color: var(--gray-400);
 	}
 
-	.section-title {
-		font-size: var(--text-2xl);
-	}
-
-	.capabilities {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 0.75rem;
-	}
-
-	.cap {
-		display: flex;
-		align-items: flex-start;
-		gap: 0.6rem;
-		border: 1px solid var(--gray-800);
-		border-radius: 0.75rem;
-		padding: 0.8rem 1rem;
-		background-color: var(--gray-999_40);
-	}
-
-	.cap :global(svg) {
-		flex: none;
-		margin-top: 0.15rem;
-	}
-
-	.cap span {
-		color: var(--gray-300);
-		font-size: var(--text-sm);
-		line-height: 1.45;
-	}
-
 	@media (min-width: 50em) {
 		.box {
 			border-radius: 1.5rem;
@@ -148,22 +99,8 @@ const jsonLd = {
 		}
 
 		.services {
-			display: grid;
 			grid-template-columns: repeat(2, 1fr);
 			gap: 3rem 5rem;
-		}
-
-		.services h2 {
-			font-size: var(--text-2xl);
-		}
-
-		.section-title {
-			font-size: var(--text-3xl);
-		}
-
-		.capabilities {
-			grid-template-columns: repeat(2, 1fr);
-			gap: 0.75rem 1.5rem;
 		}
 	}
 </style>
