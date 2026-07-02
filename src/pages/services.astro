@@ -1,19 +1,9 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Hero from '../components/Hero.astro';
 import Icon from '../components/Icon.astro';
-import Grid from '../components/Grid.astro';
-import PortfolioPreview from '../components/PortfolioPreview.astro';
 import ContactCTA from '../components/ContactCTA.astro';
 import type { iconPaths } from '../components/IconPaths';
-
-// Feature a few representative case studies (keep this order).
-const featured = ['ami-es', 'higow', 'skoolz'];
-const rank = new Map(featured.map((s, i) => [s, i]));
-const projects = (await getCollection('work'))
-	.filter((p) => rank.has(p.slug))
-	.sort((a, b) => (rank.get(a.slug) ?? 0) - (rank.get(b.slug) ?? 0));
 
 const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
 	{ icon: 'code', title: 'Développement Unity', body: 'Conception et développement d\'applications et de jeux sous Unity — mobile, desktop et WebGL. De l\'idée au produit livré, avec une exigence de qualité et de maintenabilité.' },
@@ -21,6 +11,24 @@ const services: { icon: keyof typeof iconPaths; title: string; body: string }[] 
 	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Expériences immersives VR/XR pour la formation, la simulation ou le divertissement — casques et mobile. Interaction naturelle, confort et optimisation du rendu.' },
 	{ icon: 'strategy', title: 'Multijoueur Unity', body: 'Jeux et applications en temps réel : netcode, synchronisation, serveurs headless. Une architecture réseau fiable, du prototype à la mise en production.' },
 	{ icon: 'scales', title: 'Audit & reprise de projet Unity', body: 'Reprise d\'un projet Unity existant : audit technique, correction de bugs, optimisation des performances et des temps de chargement, montée de version. Je sécurise et fais avancer votre base de code.' },
+];
+
+// Interventions concrètes, plus fines que les 5 prestations ci-dessus.
+const capabilities: string[] = [
+	'Suivi d\'alternants et de jeunes codeurs',
+	'Formation à Unity et au C#',
+	'Conseils pour structurer ses projets Unity',
+	'Solutions techniques sur des cas complexes',
+	'Optimisation des performances, de la mémoire et de la taille du build',
+	'Intégration d\'AssetBundles / Addressables',
+	'Développement de gameplays sur-mesure',
+	'Utilisation du moteur physique',
+	'Multijoueur avec Photon ou Netcode',
+	'Intégration de menus et d\'interfaces (UI)',
+	'SFX et musiques avec réglage du volume',
+	'Kit de localisation des textes (multilingue)',
+	'Nombreux outils maison agrégés au fil du temps',
+	'Système de CheatCodes pour faciliter les tests',
 ];
 
 const title = 'Services — Développement Unity, mobile, VR & multijoueur | Ludiven Studio';
@@ -34,7 +42,7 @@ const jsonLd = {
 	description,
 	areaServed: { '@type': 'Country', name: 'France' },
 	provider: { '@type': 'Organization', name: 'Ludiven Studio', url: 'https://www.ludiven-studio.fr/' },
-	serviceType: services.map((s) => s.title),
+	serviceType: [...services.map((s) => s.title), ...capabilities],
 };
 ---
 
@@ -58,14 +66,15 @@ const jsonLd = {
 			</section>
 
 			<section class="stack gap-6">
-				<h2 class="section-title">Réalisations en exemple</h2>
-				<Grid variant="offset">
-					{projects.map((project) => (
-						<li>
-							<PortfolioPreview project={project} />
+				<h2 class="section-title">Interventions & compétences</h2>
+				<ul class="capabilities">
+					{capabilities.map((c) => (
+						<li class="cap">
+							<Icon icon="check" color="var(--accent-regular)" size="1.15rem" />
+							<span>{c}</span>
 						</li>
 					))}
-				</Grid>
+				</ul>
 			</section>
 		</main>
 
@@ -102,6 +111,36 @@ const jsonLd = {
 		font-size: var(--text-2xl);
 	}
 
+	.capabilities {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.75rem;
+	}
+
+	.cap {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 0.75rem;
+		padding: 0.8rem 1rem;
+		background-color: var(--gray-999_40);
+	}
+
+	.cap :global(svg) {
+		flex: none;
+		margin-top: 0.15rem;
+	}
+
+	.cap span {
+		color: var(--gray-300);
+		font-size: var(--text-sm);
+		line-height: 1.45;
+	}
+
 	@media (min-width: 50em) {
 		.box {
 			border-radius: 1.5rem;
@@ -120,6 +159,11 @@ const jsonLd = {
 
 		.section-title {
 			font-size: var(--text-3xl);
+		}
+
+		.capabilities {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 0.75rem 1.5rem;
 		}
 	}
 </style>
