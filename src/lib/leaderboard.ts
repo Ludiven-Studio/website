@@ -3,6 +3,7 @@
 
 import { dateSeed } from '../games/prng';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
+import { trackGame } from './analytics';
 
 export type Metric = 'time' | 'score';
 export interface ScoreRow {
@@ -80,7 +81,14 @@ export function loadDailyRun(game: string): DailyRun | null {
 
 export function saveDailyRun(game: string, run: DailyRun): void {
 	try {
+		// One-shot Umami events (first save of the day = daily played; first save with done = daily finished).
+		const prevRaw = localStorage.getItem(runKey(game));
 		localStorage.setItem(runKey(game), JSON.stringify(run));
+		if (prevRaw === null) trackGame(game, 'daily_played');
+		if (run.done) {
+			const prevDone = prevRaw ? (JSON.parse(prevRaw) as DailyRun).done === true : false;
+			if (!prevDone) trackGame(game, 'daily_done');
+		}
 	} catch {
 		/* ignore */
 	}
