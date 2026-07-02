@@ -16,12 +16,13 @@ export interface DiffLevel { label: string; size: number; count: number; dirs: D
 
 const FWD: Dir[] = [{ dr: 0, dc: 1 }, { dr: 1, dc: 0 }]; // →  ↓
 const DIAG: Dir[] = [{ dr: 1, dc: 1 }, { dr: 1, dc: -1 }]; // ↘  ↙
-const REV: Dir[] = [{ dr: 0, dc: -1 }, { dr: -1, dc: 0 }, { dr: -1, dc: -1 }, { dr: -1, dc: 1 }]; // ←  ↑  ↖  ↗
+const REV_HV: Dir[] = [{ dr: 0, dc: -1 }, { dr: -1, dc: 0 }]; // ←  ↑ (mots à l'envers)
+const DIAG_UP: Dir[] = [{ dr: -1, dc: -1 }, { dr: -1, dc: 1 }]; // ↖  ↗
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', size: 9, count: 7, dirs: FWD },
-	moyen: { label: 'Moyen', size: 11, count: 9, dirs: [...FWD, ...DIAG] },
-	difficile: { label: 'Difficile', size: 13, count: 11, dirs: [...FWD, ...DIAG, ...REV] },
+	facile: { label: 'Facile', size: 9, count: 7, dirs: FWD }, // sens de lecture seulement
+	moyen: { label: 'Moyen', size: 11, count: 9, dirs: [...FWD, ...DIAG, ...REV_HV] }, // + diagonales + inversés
+	difficile: { label: 'Difficile', size: 13, count: 11, dirs: [...FWD, ...DIAG, ...REV_HV, ...DIAG_UP] }, // 8 directions
 };
 
 /** Uppercase, strip diacritics, keep A–Z only (idempotent). */

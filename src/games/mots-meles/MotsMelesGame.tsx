@@ -17,6 +17,9 @@ type Status = 'playing' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const fmtTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 const ckey = (r: number, c: number) => `${r},${c}`;
+// A distinct colour per found word (readable with white text, works in light & dark).
+const WORD_COLORS = ['#e0484d', '#e07a2f', '#c99a1e', '#37a05a', '#2f9bb0', '#4a7fe0', '#8a5cf0', '#c94f97', '#6a9e34', '#b0563a', '#3aa090'];
+const wordColor = (i: number) => WORD_COLORS[i % WORD_COLORS.length];
 
 interface DailyState { found: number[]; }
 
@@ -164,8 +167,8 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => { newGame('facile'); }, [newGame]);
 
-	const foundSet = new Set<string>();
-	for (const i of found) for (const [r, c] of grid.words[i].cells) foundSet.add(ckey(r, c));
+	const cellColor = new Map<string, string>(); // found cell → its word's colour (overlaps: last found wins)
+	for (const i of found) for (const [r, c] of grid.words[i].cells) cellColor.set(ckey(r, c), wordColor(i));
 	const selSet = new Set(sel.map(([r, c]) => ckey(r, c)));
 
 	return (
@@ -218,7 +221,9 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 				>
 					{grid.letters.map((row, r) => row.map((ch, c) => {
 						const k = ckey(r, c);
-						return <div key={k} className={`mm-cell${foundSet.has(k) ? ' found' : ''}${selSet.has(k) ? ' sel' : ''}`}>{ch}</div>;
+						const inSel = selSet.has(k);
+						const col = inSel ? undefined : cellColor.get(k); // selection (accent) takes visual priority
+						return <div key={k} className={`mm-cell${col ? ' found' : ''}${inSel ? ' sel' : ''}`} style={col ? { background: col } : undefined}>{ch}</div>;
 					}))}
 				</div>
 
@@ -229,9 +234,10 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="mm-words">
-				{grid.words.map((w, i) => (
-					<span key={i} className={`mm-word ${found.includes(i) ? 'done' : ''}`}>{w.word}</span>
-				))}
+				{grid.words.map((w, i) => {
+					const isF = found.includes(i);
+					return <span key={i} className={`mm-word ${isF ? 'done' : ''}`} style={isF ? { background: wordColor(i), borderColor: wordColor(i), color: '#fff' } : undefined}>{w.word}</span>;
+				})}
 			</div>
 
 			{daily && status === 'won' && (
@@ -246,7 +252,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 			)}
 
 			{!daily && (
-				<p className="mm-help">Glisse sur les lettres pour surligner un mot de la liste (horizontal, vertical, diagonale — et à l'envers en difficile). Trouve-les tous&nbsp;!</p>
+				<p className="mm-help">Glisse sur les lettres pour surligner un mot de la liste (horizontal, vertical, diagonale — et à l'envers dès le moyen). Chaque mot trouvé a sa couleur. Trouve-les tous&nbsp;!</p>
 			)}
 			{daily && status === 'playing' && (
 				<p className="mm-help">Retrouve tous les mots le plus vite possible. Glisse sur les lettres pour surligner.</p>
@@ -273,7 +279,7 @@ const CSS = `
 .mm-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .mm-grid { width: 100%; max-width: 460px; aspect-ratio: 1; display: grid; gap: 2px; container-type: inline-size; background: var(--gray-800); border: 2px solid var(--gray-800); border-radius: 12px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mm-cell { display: flex; align-items: center; justify-content: center; background: var(--gray-999); color: var(--gray-0); font-weight: 700; font-size: calc(100cqi / var(--n) * 0.5); text-transform: uppercase; }
-.mm-cell.found { background: color-mix(in srgb, var(--mm-ok) 32%, var(--gray-999)); color: var(--gray-0); }
+.mm-cell.found { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); } /* background = per-word colour (inline) */
 .mm-cell.sel { background: var(--mm-accent); color: var(--accent-text-over); }
 .mm-grid.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
 .mm-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; }
@@ -281,7 +287,7 @@ const CSS = `
 .mm-startbtn { border: none; background: var(--mm-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg); }
 .mm-words { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: center; margin-top: 1rem; }
 .mm-word { font-weight: 700; font-size: 13.5px; letter-spacing: 0.5px; color: var(--gray-0); background: var(--gray-900); border: 1px solid var(--gray-800); border-radius: 999px; padding: 4px 11px; }
-.mm-word.done { color: var(--gray-300); text-decoration: line-through; background: transparent; border-color: transparent; opacity: 0.6; }
+.mm-word.done { color: #fff; text-decoration: none; } /* background/border = per-word colour (inline) */
 .mm-won { text-align: center; font-size: 16px; color: var(--gray-0); margin-top: 1.25rem; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .mm-won strong { color: var(--mm-accent); font-variant-numeric: tabular-nums; }
 .mm-replay { border: none; background: var(--mm-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }
