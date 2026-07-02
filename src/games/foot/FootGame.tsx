@@ -28,7 +28,7 @@ const VIEW_W = FIELD.W * SCALE;
 const VIEW_H = FIELD.H * SCALE;
 const COL_T0 = '#4da3ff'; // left team (blue)
 const COL_T1 = '#ff5a5f'; // right team (red)
-const DOUBLE_TAP_MS = 280; // window for a left-left / right-right dash
+const DOUBLE_TAP_MS = 320; // window for a left-left / right-right dash
 const teamOf = (slot: number): Side => (slot < 2 ? 0 : 1);
 
 interface Keys { left: boolean; right: boolean; jump: boolean; }
@@ -226,12 +226,13 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		accRef.current += dtMs;
 		const role = roleRef.current, w = worldRef.current, mySlot = mySlotRef.current;
 
-		const dashDir = dashQueuedRef.current; dashQueuedRef.current = 0; // consume the queued double-tap once
 		while (accRef.current >= STEP) {
 			accRef.current -= STEP;
 			const dt = STEP / 1000;
 			const inp = readInput(keysRef.current, touchRef.current);
-			if (dashDir !== 0) inp.dash = true; // engine's dashT guard ignores repeats within the frame
+			// Consume the queued double-tap ONLY when a physics step actually runs, so it's never
+			// dropped on a frame that accumulated less than one step (e.g. 120 Hz displays).
+			if (dashQueuedRef.current !== 0) { inp.dash = true; dashQueuedRef.current = 0; }
 			const bs = botStRef.current;
 			if (role === 'ai') {
 				const r = step(w, dt, [inp, botFor(w, 1, bs[1]), botFor(w, 2, bs[2]), botFor(w, 3, bs[3])]);
