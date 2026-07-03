@@ -6,6 +6,7 @@ import {
 	dailyWeekdayLabel,
 	loadDailyRun,
 	saveDailyRun,
+	fetchMyDailyScore,
 	type DailyRun,
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -126,7 +127,8 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setStarted(false);
 		setElapsed(0);
 		setDailyLoading(true);
-		const { seed, diffIndex } = await getDaily(gameId);
+		// Server lock (parallel with getDaily): if already played today on any device, lock the grid.
+		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		setDiffKey(dk);
@@ -134,6 +136,13 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		skipBackstopRef.current = p; // we size marks here, don't let the backstop double-reset
 		setPuzzle(p);
 		setMarks(emptyMarks(DIFFS[dk].size));
+		if (mine != null) {
+			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: emptyMarks(DIFFS[dk].size) });
+			setStarted(true);
+			setAlreadyPlayed(true);
+			setStatus('won');
+			setElapsed(mine);
+		}
 		setDailyLoading(false);
 	}, [gameId]);
 

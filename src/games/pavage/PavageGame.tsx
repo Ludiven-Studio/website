@@ -13,6 +13,7 @@ import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
 	getDaily,
+	fetchMyDailyScore,
 	dailyWeekdayLabel,
 	loadDailyRun,
 	saveDailyRun,
@@ -180,7 +181,8 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		setStarted(false);
 		setElapsed(0);
 		setDailyLoading(true);
-		const { seed, diffIndex } = await getDaily(gameId);
+		// Server-authoritative lock (parallel with getDaily): if this pseudo already played today, lock the grid.
+		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		const d = DIFFS[dk];
@@ -190,6 +192,13 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		setPlacements(p.pieces.map(() => null));
 		setTrayRot(p.pieces.map(() => 0));
 		setDrag(null);
+		if (mine != null) {
+			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: { placements: p.pieces.map(() => null), trayRot: p.pieces.map(() => 0) } satisfies SavedState });
+			setStarted(true);
+			setAlreadyPlayed(true);
+			setStatus('won');
+			setElapsed(mine);
+		}
 		setDailyLoading(false);
 	}, [gameId]);
 

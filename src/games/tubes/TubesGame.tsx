@@ -14,6 +14,7 @@ import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
 	getDaily,
+	fetchMyDailyScore,
 	dailyWeekdayLabel,
 	loadDailyRun,
 	saveDailyRun,
@@ -159,7 +160,8 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		setMoves(0);
 		setJokerUsed(false);
 		setDailyLoading(true);
-		const { seed, diffIndex } = await getDaily(gameId);
+		// Server-authoritative lock (parallel with getDaily): if this pseudo already played today, lock the grid.
+		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		const d = DIFFS[dk];
@@ -167,6 +169,13 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		const p = generateWaterSort(d, mulberry32(seed));
 		setPuzzle(p);
 		setTubes(cloneTubes(p.tubes));
+		if (mine != null) {
+			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: { tubes: cloneTubes(p.tubes), moves: 0, jokerUsed: false } satisfies SavedState });
+			setStarted(true);
+			setAlreadyPlayed(true);
+			setStatus('won');
+			setElapsed(mine);
+		}
 		setDailyLoading(false);
 	}, [gameId]);
 

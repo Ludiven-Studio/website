@@ -153,6 +153,25 @@ async function submitScore(game: string, value: number, metric: Metric): Promise
 	}
 }
 
+/** This player's already-submitted score for a game today, or null.
+ *  Server-authoritative one-attempt lock: survives cache clears / other devices. */
+export async function fetchMyDailyScore(game: string, day: string = todayKey()): Promise<number | null> {
+	if (!leaderboardEnabled()) return null;
+	const name = playerName().trim();
+	if (!name) return null; // no name → only the localStorage lock applies (player is off the board anyway)
+	try {
+		const res = await fetch(
+			`${SUPABASE_URL}/rest/v1/scores?game=eq.${encodeURIComponent(game)}&day=eq.${day}&name=eq.${encodeURIComponent(name)}&select=value&limit=1`,
+			{ headers: headers() },
+		);
+		if (!res.ok) return null;
+		const rows = await res.json();
+		return Array.isArray(rows) && rows.length ? Number(rows[0].value) : null;
+	} catch {
+		return null;
+	}
+}
+
 const bestKey = (game: string): string => `ludiven-dailybest-${game}-${todayKey()}`;
 
 /** Submit only when it beats the player's own best of the day (fewer rows). */

@@ -4,6 +4,7 @@ import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
 	getDaily,
+	fetchMyDailyScore,
 	dailyWeekdayLabel,
 	loadDailyRun,
 	saveDailyRun,
@@ -123,11 +124,19 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 		setPlaced([]);
 		setDailyLoading(true);
-		const { seed, diffIndex } = await getDaily(gameId);
+		// Server-authoritative lock (parallel with getDaily): if this pseudo already played today, lock the grid.
+		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		setDiffKey(dk);
 		setPuzzle(generateMotifs(DIFFS[dk], mulberry32(seed)));
+		if (mine != null) {
+			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: [] });
+			setStarted(true);
+			setAlreadyPlayed(true);
+			setStatus('won');
+			setElapsed(mine);
+		}
 		setDailyLoading(false);
 	}, [gameId]);
 
