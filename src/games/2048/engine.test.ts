@@ -4,6 +4,7 @@ import {
 	makeStream,
 	createBoard,
 	move,
+	planMove,
 	slideLine,
 	spawnTile,
 	isGameOver,
@@ -68,6 +69,21 @@ describe('2048 engine', () => {
 		expect(b.board).toEqual(a.board);
 		expect(b.score).toBe(a.score);
 		expect(b.cursor).toBe(a.cursor);
+	});
+
+	it('planMove reports slides and merges without spawning', () => {
+		const plan = planMove([[2, 2, 0], [0, 4, 4], [0, 0, 0]], 'left');
+		expect(plan.moved).toBe(true);
+		expect(plan.gained).toBe(4 + 8);
+		expect(plan.board).toEqual([[4, 0, 0], [8, 0, 0], [0, 0, 0]]);
+		// Row 0: two tiles merge into (0,0).
+		const toRow0 = plan.slides.filter((s) => s.toR === 0 && s.toC === 0);
+		expect(toRow0.length).toBe(2);
+		expect(toRow0.every((s) => s.merged)).toBe(true);
+	});
+
+	it('planMove leaves a settled board unmoved', () => {
+		expect(planMove([[2, 4], [8, 16]], 'left').moved).toBe(false);
 	});
 
 	it('isGameOver true on a full board with no possible merge', () => {

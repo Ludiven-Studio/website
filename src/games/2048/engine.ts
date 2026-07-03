@@ -28,6 +28,24 @@ export type DiffKey = keyof typeof DIFFS;
 
 export const WIN_TILE = 2048;
 
+/** One tile's motion during a move (both partners of a merge point to the same dest). */
+export interface Slide {
+	fromR: number;
+	fromC: number;
+	toR: number;
+	toC: number;
+	value: number;
+	merged: boolean;
+}
+
+/** Board coord of the j-th cell along the travel direction of line i (0 = front). */
+const coord = (dir: Dir, size: number, i: number, j: number): [number, number] => {
+	if (dir === 'left') return [i, j];
+	if (dir === 'right') return [i, size - 1 - j];
+	if (dir === 'up') return [j, i];
+	return [size - 1 - j, i]; // down
+};
+
 /** Deterministic value stream; spawns read it by cursor (wraps if exhausted). */
 export function makeStream(rng: Rng, n = 4096): number[] {
 	const out = new Array<number>(n);
@@ -84,43 +102,51 @@ export function slideLine(cells: number[]): { line: number[]; gained: number } {
 	return { line: out, gained };
 }
 
-/** Apply a move; spawns a tile only if the board actually changed. */
-export function move(state: State, dir: Dir, stream: number[]): { state: State; moved: boolean; gained: number } {
-	const size = state.size;
-	const board = clone(state.board);
+/** Compute a move without spawning: resulting board + per-tile slides (for animation). */
+export function planMove(board: Board, dir: Dir): { board: Board; moved: boolean; gained: number; slides: Slide[] } {
+	const size = board.length;
+	const out: Board = Array.from({ length: size }, () => new Array<number>(size).fill(0));
+	const slides: Slide[] = [];
 	let gained = 0;
 	let moved = false;
 
-	const read = (i: number): number[] => {
-		const line: number[] = [];
-		for (let j = 0; j < size; j++) {
-			if (dir === 'left') line.push(board[i][j]);
-			else if (dir === 'right') line.push(board[i][size - 1 - j]);
-			else if (dir === 'up') line.push(board[j][i]);
-			else line.push(board[size - 1 - j][i]); // down
-		}
-		return line;
-	};
-	const write = (i: number, line: number[]): void => {
-		for (let j = 0; j < size; j++) {
-			if (dir === 'left') board[i][j] = line[j];
-			else if (dir === 'right') board[i][size - 1 - j] = line[j];
-			else if (dir === 'up') board[j][i] = line[j];
-			else board[size - 1 - j][i] = line[j];
-		}
-	};
-
 	for (let i = 0; i < size; i++) {
-		const before = read(i);
-		const { line, gained: g } = slideLine(before);
-		gained += g;
-		for (let j = 0; j < size; j++) if (before[j] !== line[j]) moved = true;
-		write(i, line);
+		const tiles: { v: number; j: number }[] = [];
+		for (let j = 0; j < size; j++) {
+			const [r, c] = coord(dir, size, i, j);
+			if (board[r][c] !== 0) tiles.push({ v: board[r][c], j });
+		}
+		let k = 0; // next output slot along travel
+		for (let t = 0; t < tiles.length; t++) {
+			const [dr, dc] = coord(dir, size, i, k);
+			if (t + 1 < tiles.length && tiles[t].v === tiles[t + 1].v) {
+				const merged = tiles[t].v * 2;
+				out[dr][dc] = merged;
+				gained += merged;
+				const [ar, ac] = coord(dir, size, i, tiles[t].j);
+				const [br, bc] = coord(dir, size, i, tiles[t + 1].j);
+				slides.push({ fromR: ar, fromC: ac, toR: dr, toC: dc, value: tiles[t].v, merged: true });
+				slides.push({ fromR: br, fromC: bc, toR: dr, toC: dc, value: tiles[t + 1].v, merged: true });
+				moved = true;
+				t++; // consume the partner
+			} else {
+				out[dr][dc] = tiles[t].v;
+				const [sr, sc] = coord(dir, size, i, tiles[t].j);
+				if (sr !== dr || sc !== dc) moved = true;
+				slides.push({ fromR: sr, fromC: sc, toR: dr, toC: dc, value: tiles[t].v, merged: false });
+			}
+			k++;
+		}
 	}
+	return { board: out, moved, gained, slides };
+}
 
-	if (!moved) return { state, moved: false, gained: 0 };
-	const next = spawnTile({ ...state, board, score: state.score + gained }, stream);
-	return { state: next, moved: true, gained };
+/** Apply a move; spawns a tile only if the board actually changed. */
+export function move(state: State, dir: Dir, stream: number[]): { state: State; moved: boolean; gained: number } {
+	const plan = planMove(state.board, dir);
+	if (!plan.moved) return { state, moved: false, gained: 0 };
+	const next = spawnTile({ board: plan.board, score: state.score + plan.gained, size: state.size, cursor: state.cursor }, stream);
+	return { state: next, moved: true, gained: plan.gained };
 }
 
 export function canMove(state: State): boolean {
