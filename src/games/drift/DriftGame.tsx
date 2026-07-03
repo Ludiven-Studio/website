@@ -18,7 +18,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 import { joinRace, multiplayerAvailable, MAX_PLAYERS, type Race, type Peer, type PosMsg, type LapMsg } from './net';
-import { playerName, setPlayerName, getDaily, dailyWeekdayLabel } from '../../lib/leaderboard';
+import { playerName, setPlayerName, getDaily, dailyWeekdayLabel, saveDailyRun, loadDailyRun } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
 import Leaderboard from '../../components/Leaderboard';
 
@@ -685,6 +685,15 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 						if (isDefiRef.current) saveDailyGhost({ seed: seedRef.current, ms: lapRef.current.bestMs, poses: lapPosesRef.current });
 					}
 					lapPosesRef.current = [];
+					// A completed lap = today's daily is done (games-page chip).
+					if (isDefiRef.current) {
+						const prevRun = loadDailyRun(gameId);
+						saveDailyRun(gameId, {
+							startedAt: prevRun?.startedAt ?? Date.now(),
+							done: true,
+							seed: seedRef.current,
+						});
+					}
 				}
 				if (lapRef.current.bestMs != null && lapRef.current.bestMs !== bestRef.current) {
 					bestRef.current = lapRef.current.bestMs;
@@ -833,6 +842,13 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 					lapRef.current.bestMs = rec.ms; // seed the engine so a slower lap can't overwrite it
 					setBestMs(rec.ms);
 				}
+				// Mark today's daily as started (games-page chip) — keep it done if a lap was already turned.
+				const prevRun = loadDailyRun(gameId);
+				saveDailyRun(gameId, {
+					startedAt: prevRun?.startedAt ?? Date.now(),
+					done: prevRun?.done === true || rec != null,
+					seed,
+				});
 			}
 
 			if (race) {

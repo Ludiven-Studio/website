@@ -11,9 +11,10 @@ interface Props {
 	id?: string;
 	favorite?: boolean;
 	image?: string;
+	daily?: boolean; // false for games without a daily challenge (e.g. multiplayer)
 }
 
-const { title, pitch, icon, href, status = 'play', id, favorite = false, image } = Astro.props;
+const { title, pitch, icon, href, status = 'play', id, favorite = false, image, daily = true } = Astro.props;
 const playable = status === 'play' && href;
 const Tag = playable ? 'a' : 'div';
 const showFavorite = favorite && playable && id;
@@ -36,7 +37,7 @@ const showFavorite = favorite && playable && id;
 			</span>
 		</div>
 		<h3>{title}</h3>
-		{playable && id && <span class="daily-chip" data-game-id={id} hidden />}
+		{playable && id && daily && <span class="daily-chip" data-game-id={id} hidden />}
 		<p>{pitch}</p>
 	</Tag>
 	{
