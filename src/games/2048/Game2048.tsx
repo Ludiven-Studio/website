@@ -37,21 +37,21 @@ interface DailyState {
 	cursor: number;
 }
 
-// One distinct colour per value — the number's colour encodes the tile.
-const NUM_COLOR: Record<number, string> = {
-	2: '#9db8ff',
-	4: '#5fe3c4',
-	8: '#79e07f',
-	16: '#c3e04a',
-	32: '#e6c93f',
-	64: '#e6a13a',
-	128: '#e67a3a',
-	256: '#e6553a',
-	512: '#e64a86',
-	1024: '#c44fe0',
-	2048: '#9a86ff',
+// One dark, saturated, well-separated colour per value (theme-independent), white number on top.
+const TILE_BG: Record<number, string> = {
+	2: '#4a6fa5', // steel blue
+	4: '#2f8f86', // teal
+	8: '#3f9147', // green
+	16: '#8a9330', // olive
+	32: '#b5872c', // gold
+	64: '#c26a2c', // orange
+	128: '#bb4530', // brick
+	256: '#b23052', // rose
+	512: '#9a3a9c', // purple
+	1024: '#5a4fb5', // indigo
+	2048: '#c0357f', // magenta
 };
-const numColor = (v: number): string => (v >= 4096 ? '#ffffff' : NUM_COLOR[v] ?? '#9db8ff');
+const tileBg = (v: number): string => (v >= 4096 ? '#3b4252' : TILE_BG[v] ?? '#4a6fa5');
 
 export default function Game2048({ gameId }: { gameId: string }) {
 	const [board, setBoard] = useState<Board>([]);
@@ -264,18 +264,22 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		armFree(DEFAULT_DIFF);
 	}, [armFree]);
 
-	const onTouchStart = (e: React.TouchEvent): void => {
-		const t = e.touches[0];
-		touchRef.current = { x: t.clientX, y: t.clientY };
+	// Pointer swipe (mouse, touch, pen) — one drag = one move in the dominant axis.
+	const onPointerDown = (e: React.PointerEvent): void => {
+		touchRef.current = { x: e.clientX, y: e.clientY };
+		try {
+			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
 	};
-	const onTouchEnd = (e: React.TouchEvent): void => {
+	const onPointerUp = (e: React.PointerEvent): void => {
 		const s0 = touchRef.current;
 		if (!s0) return;
-		const t = e.changedTouches[0];
-		const dx = t.clientX - s0.x;
-		const dy = t.clientY - s0.y;
+		const dx = e.clientX - s0.x;
+		const dy = e.clientY - s0.y;
 		touchRef.current = null;
-		if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // tap, not swipe
+		if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return; // click/tap, not a swipe
 		applyMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
 	};
 
@@ -312,14 +316,14 @@ export default function Game2048({ gameId }: { gameId: string }) {
 				<div
 					className={`g2-grid ${armed ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, gridTemplateRows: `repeat(${size}, 1fr)`, ['--n' as string]: size }}
-					onTouchStart={onTouchStart}
-					onTouchEnd={onTouchEnd}
+					onPointerDown={onPointerDown}
+					onPointerUp={onPointerUp}
 				>
 					{Array.from({ length: size * size }).map((_, i) => {
 						const v = board[Math.floor(i / size)]?.[i % size] ?? 0;
 						const cls = v >= 1024 ? ' xsmall' : v >= 128 ? ' small' : '';
 						return (
-							<div key={i} className={`g2-cell${v ? ' filled' : ''}${cls}`} style={v ? { color: numColor(v) } : undefined}>
+							<div key={i} className={`g2-cell${v ? ' filled' : ''}${cls}`} style={v ? { background: tileBg(v) } : undefined}>
 								{v || ''}
 							</div>
 						);
@@ -367,10 +371,10 @@ const CSS = `
 .g2-score strong, .g2-best strong { color: var(--g2-accent); margin-left: 4px; }
 .g2-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .g2-grid { width: 100%; max-width: 460px; aspect-ratio: 1; display: grid; gap: 2.2%; container-type: inline-size; background: var(--gray-800); border: 2px solid var(--gray-800); border-radius: 12px; padding: 2.2%; touch-action: none; user-select: none; -webkit-user-select: none; }
-.g2-cell { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; background: var(--gray-900); font-weight: 800; font-size: calc(100cqi / var(--n) * 0.42); border-radius: 8px; font-variant-numeric: tabular-nums; }
+.g2-cell { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; background: var(--gray-900); color: #fff; font-weight: 800; font-size: calc(100cqi / var(--n) * 0.42); border-radius: 8px; font-variant-numeric: tabular-nums; }
 .g2-cell.small { font-size: calc(100cqi / var(--n) * 0.32); }
 .g2-cell.xsmall { font-size: calc(100cqi / var(--n) * 0.24); }
-.g2-cell.filled { background: var(--gray-700); box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+.g2-cell.filled { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.35); box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
 .g2-grid.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
 .g2-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; }
 .g2-overlay-card { background: var(--gray-999); border: 2px solid var(--g2-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); text-align: center; }
