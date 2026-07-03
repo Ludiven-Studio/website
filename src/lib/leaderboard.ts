@@ -129,6 +129,7 @@ export async function getDaily(gameId: string): Promise<{ seed: number; diffInde
 
 async function submitScore(game: string, value: number, metric: Metric): Promise<boolean> {
 	if (!leaderboardEnabled()) return false;
+	value = Math.round(value); // p_value is a bigint: a fractional value (e.g. Drift lap ms) would 404 the RPC
 	const name = playerName().trim();
 	if (!name) return false;
 	const day = todayKey();
@@ -156,6 +157,7 @@ const bestKey = (game: string): string => `ludiven-dailybest-${game}-${todayKey(
 
 /** Submit only when it beats the player's own best of the day (fewer rows). */
 export async function submitDaily(game: string, value: number, metric: Metric): Promise<boolean> {
+	value = Math.round(value); // the RPC's p_value is bigint — never send a fractional value (e.g. Drift lap ms)
 	let prev: number | null = null;
 	try {
 		const v = localStorage.getItem(bestKey(game));
