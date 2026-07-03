@@ -48,9 +48,6 @@ const projects = (await getCollection('work'))
 						<Pill><Icon icon="mobile" size="1.33em" /> Applications mobiles</Pill>
 						<Pill><Icon icon="virtual-reality" size="1.33em" /> Réalité Virtuelle</Pill>
 					</div>
-					<div class="hero-cta" style="margin-top: 1.25rem;">
-						<CallToAction href="/services">Voir mes services <Icon icon="arrow-right" size="1.2em" /></CallToAction>
-					</div>
 				</Hero>
 
 				<img
@@ -62,7 +59,12 @@ const projects = (await getCollection('work'))
 				/>
 			</header>
 
-			<Skills />
+			<div class="stack gap-8">
+					<Skills />
+					<div class="services-cta">
+						<CallToAction href="/services">Tous mes services <Icon icon="arrow-right" size="1.2em" /></CallToAction>
+					</div>
+				</div>
 		</div>
 
 		<main class="wrapper stack gap-20 lg:gap-48">
@@ -94,7 +96,7 @@ const projects = (await getCollection('work'))
 
 			<section class="section with-background with-cta" id="games-section">
 				<header class="section-header stack gap-2 lg:gap-4">
-					<h2 data-games-title data-default-title="Jeux de logique et d'adresse" data-fav-title="Mes favoris">Jeux de logique et d'adresse</h2>
+					<h2>Jeux de logique et d'adresse</h2>
 					<p>Entraîne ta logique et tes réflexes avec des mini-jeux. Quelques minutes par jour, sans prise de tête.</p>
 				</header>
 
@@ -151,7 +153,7 @@ const projects = (await getCollection('work'))
 
 				<div class="cta">
 					<CallToAction href="/jeux/">
-						Tous les jeux
+						Tous les mini-jeux
 						<Icon icon="arrow-right" size="1.2em" />
 					</CallToAction>
 				</div>
@@ -222,8 +224,6 @@ const projects = (await getCollection('work'))
 			document.querySelector('[data-teaser-default]')?.setAttribute('hidden', '');
 			favList.removeAttribute('hidden');
 
-			const title = document.querySelector<HTMLElement>('[data-games-title]');
-			if (favIds.length >= MIN && title) title.textContent = title.dataset.favTitle || title.textContent;
 		}
 	}
 </script>
@@ -391,5 +391,9 @@ const projects = (await getCollection('work'))
 			border-radius: 1.5rem;
 			height: 9.5rem;
 		}
+	}
+	.services-cta {
+		display: flex;
+		justify-content: center;
 	}
 </style>
