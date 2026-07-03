@@ -13,6 +13,14 @@ export interface GameTile {
 
 export const games: GameTile[] = [
 	{
+		id: '2048',
+		title: '2048',
+		pitch: 'Fais glisser les tuiles pour fusionner les nombres égaux, atteins 2048 puis pousse ton meilleur score. Défi du jour à graine partagée.',
+		icon: '2048',
+		href: '/jeux/2048',
+		status: 'play',
+	},
+	{
 		id: 'mots-meles',
 		title: 'Mots Mêlés',
 		pitch: 'Retrouve tous les mots d\'un thème cachés dans la grille de lettres, en glissant dessus. Horizontal, vertical, diagonale. Défi du jour au chrono.',

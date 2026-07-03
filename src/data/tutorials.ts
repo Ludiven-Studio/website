@@ -8,6 +8,11 @@ export interface TutorialStep {
 }
 
 export const TUTORIALS: Record<string, TutorialStep[]> = {
+	'2048': [
+		{ emoji: '🎯', title: 'Le but', body: 'Fais glisser toutes les tuiles dans une direction : deux tuiles de même valeur qui se rencontrent fusionnent et s\'additionnent. Atteins la tuile 2048… puis va chercher le plus gros score !' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Flèches ou ZQSD/WASD au clavier, ou glisse le doigt dans une direction sur mobile. À chaque coup, une nouvelle tuile (2 ou 4) apparaît.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, les tuiles apparaissent dans le même ordre pour tout le monde (graine partagée), et tu n\'as qu\'un seul essai : ton score final est classé.' },
+	],
 	'mots-meles': [
 		{ emoji: '🎯', title: 'Le but', body: 'Retrouve dans la grille tous les mots de la liste (un thème). Chaque mot est caché en ligne droite parmi les lettres.' },
 		{ emoji: '👆', title: 'Comment jouer', body: 'Glisse le doigt (ou la souris) de la première à la dernière lettre d\'un mot pour le surligner : s\'il est dans la liste, il est validé et barré.' },
