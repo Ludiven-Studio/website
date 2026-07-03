@@ -17,7 +17,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
-import { getDaily, fetchMyDailyScore, dailyWeekdayLabel, loadDailyRun, saveDailyRun, type DailyRun } from '../../lib/leaderboard';
+import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, type DailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -124,21 +124,13 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		setStarted(false);
 		setElapsed(0);
 		setDailyLoading(true);
-		// Server-authoritative lock (parallel with getDaily): if this pseudo already played today, lock the grid.
-		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
+		const { seed, diffIndex } = await getDaily(gameId);
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		const p = generateDemineur(SIZES[dk], DIFFS[dk], mulberry32(seed));
 		setDiffKey(dk);
 		setPuzzle(p);
 		setGrid(emptyState(p.size)); // blurred until Commencer
-		if (mine != null) {
-			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: openedStart(p) });
-			setStarted(true);
-			setAlreadyPlayed(true);
-			setStatus('won');
-			setElapsed(mine);
-		}
 		setDailyLoading(false);
 	}, [gameId]);
 

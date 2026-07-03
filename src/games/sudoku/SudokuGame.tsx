@@ -7,7 +7,6 @@ import {
 	dailyWeekdayLabel,
 	loadDailyRun,
 	saveDailyRun,
-	fetchMyDailyScore,
 	type DailyRun,
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -120,19 +119,11 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 		setEntries(emptyEntries(variant.size));
 		setDailyLoading(true);
-		// Server lock (parallel with getDaily): if already played today on any device, lock the grid.
-		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
+		const { seed, diffIndex } = await getDaily(gameId);
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		setDiffKey(dk);
 		setPuzzle(generateSudoku(variant, DIFFS[dk], mulberry32(seed)));
-		if (mine != null) {
-			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: emptyEntries(variant.size) });
-			setStarted(true);
-			setAlreadyPlayed(true);
-			setStatus('won');
-			setElapsed(mine);
-		}
 		setDailyLoading(false);
 	}, [gameId]);
 

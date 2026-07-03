@@ -4,7 +4,6 @@ import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
 	getDaily,
-	fetchMyDailyScore,
 	dailyWeekdayLabel,
 	dailyDifficultyIndex,
 	loadDailyRun,
@@ -128,20 +127,13 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		setStarted(false);
 		setRows([]);
 		setDailyLoading(true);
-		// Server-authoritative lock (parallel with getDaily): if this pseudo already played today, lock the board.
-		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
+		const { seed, diffIndex } = await getDaily(gameId);
 		dailySeedRef.current = { seed, diffIndex };
 		const dk = DIFF_ORDER[diffIndex] ?? 'moyen';
 		const p = generatePuzzle(LEVELS[dk], mulberry32(seed));
 		setDiffKey(dk);
 		setPuzzle(p);
 		setCurrent(makeEmpty(p.slots));
-		if (mine != null) {
-			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: { rows: [], current: makeEmpty(p.slots), status: 'won' } satisfies DailyState });
-			setStarted(true);
-			setAlreadyPlayed(true);
-			setStatus('won');
-		}
 		setDailyLoading(false);
 	}, [gameId]);
 

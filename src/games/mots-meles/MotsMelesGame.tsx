@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { makeGrid, lineCells, matchIndex, DIFFS, type Grid, type Cell } from './engine';
 import { trackGame } from '../../lib/analytics';
-import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, fetchMyDailyScore } from '../../lib/leaderboard';
+import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -93,20 +93,11 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		setFound([]);
 		setElapsed(0);
 		setDailyLoading(true);
-		// Server-authoritative lock (parallel with getDaily): if this pseudo already played today
-		// on any device, lock the grid instead of arming a fresh — even after a cache clear.
-		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
+		const { seed, diffIndex } = await getDaily(gameId);
 		const key = DIFF_ORDER[diffIndex] ?? 'facile';
 		dailySeedRef.current = { seed, diffIndex };
 		setDiffKey(key);
 		setGrid(makeGrid(seed, DIFFS[key]));
-		if (mine != null) {
-			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: { found: [] } satisfies DailyState });
-			setStarted(true);
-			setAlreadyPlayed(true);
-			setStatus('won');
-			setElapsed(mine);
-		}
 		setDailyLoading(false);
 	}, [gameId]);
 

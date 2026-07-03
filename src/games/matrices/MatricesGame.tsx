@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { DIFFS, generateQuestion, cellKey, COLORS, type Question, type Cell, type Elt } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
-import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, fetchMyDailyScore } from '../../lib/leaderboard';
+import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -192,18 +192,10 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setQIndex(0);
 		setElapsed(0);
 		setDailyLoading(true);
-		// Server lock (parallel with getDaily): if already played today on any device, lock the game.
-		const [{ seed, diffIndex }, mine] = await Promise.all([getDaily(gameId), fetchMyDailyScore(gameId)]);
+		const { seed, diffIndex } = await getDaily(gameId);
 		dailySeedRef.current = { seed, diffIndex };
 		setDiffKey(DIFF_ORDER[diffIndex] ?? 'facile');
 		setQuestion(dailyQ(seed, diffIndex, 0));
-		if (mine != null) {
-			saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: mine, seed, diffIndex, state: { solved: 0, qIndex: 0 } satisfies DailyState });
-			setStarted(true);
-			setStatus('won');
-			setAlreadyPlayed(true);
-			setElapsed(mine);
-		}
 		setDailyLoading(false);
 	}, [gameId]);
 
