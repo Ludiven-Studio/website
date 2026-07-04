@@ -174,6 +174,15 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'cocottes-renards',
+		title: 'Cocottes VS Renards',
+		pitch: 'Défends le poulailler : pose tes cocottes voie par voie pour repousser les renards, façon tower defense. Défi du jour et survie.',
+		icon: 'cocottes-renards',
+		href: '/jeux/cocottes-renards',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'snake',
 		title: 'Snake',
 		pitch: 'Mange les pommes et grandis sans te mordre. Défi du jour à graine partagée et classement.',

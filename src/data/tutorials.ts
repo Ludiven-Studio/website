@@ -8,6 +8,11 @@ export interface TutorialStep {
 }
 
 export const TUTORIALS: Record<string, TutorialStep[]> = {
+	'cocottes-renards': [
+		{ emoji: '🎯', title: 'Le but', body: 'Un tower defense façon Plants vs Zombies : les renards arrivent par la droite, voie par voie. Empêche-les d\'atteindre le poulailler à gauche — une seule intrusion et c\'est perdu.' },
+		{ emoji: '🐔', title: 'Poser des cocottes', body: 'Les poules pondeuses produisent du grain ; avec ce grain, pose des lanceuses d\'œufs (qui tirent), des costaudes (qui bloquent), la mitrailleuse, ou le coq piment qui nettoie toute une voie. Sélectionne une carte puis clique une case.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, les vagues de renards sont les mêmes pour tout le monde (graine partagée). Jusqu\'à 3 essais : ton meilleur score (renards repoussés) est classé.' },
+	],
 	'2048': [
 		{ emoji: '🎯', title: 'Le but', body: 'Fais glisser toutes les tuiles dans une direction : deux tuiles de même valeur qui se rencontrent fusionnent et s\'additionnent. Atteins la tuile 2048… puis va chercher le plus gros score !' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Flèches ou ZQSD/WASD au clavier, ou glisse le doigt dans une direction sur mobile. À chaque coup, une nouvelle tuile (2 ou 4) apparaît.' },
