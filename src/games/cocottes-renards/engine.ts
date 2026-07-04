@@ -12,7 +12,7 @@ export const LANES = 5;
 export const COLS = 8;
 
 export type TowerType = 'pondeuse' | 'lanceuse' | 'costaude' | 'mitrailleuse' | 'piment';
-export type FoxType = 'normal' | 'rapide' | 'blinde';
+export type FoxType = 'normal' | 'rapide' | 'blinde' | 'mega';
 
 export interface Tower {
 	id: number;
@@ -48,6 +48,7 @@ export interface State {
 	eggs: Egg[];
 	time: number;
 	spawnTimer: number;
+	bossTimer: number;
 	trickleTimer: number;
 	killed: number;
 	score: number;
@@ -80,6 +81,7 @@ export const FOX: Record<FoxType, { hp: number; speed: number; dmg: number; rewa
 	normal: { hp: 100, speed: 0.35, dmg: 20, reward: 1 },
 	rapide: { hp: 45, speed: 0.75, dmg: 15, reward: 1 },
 	blinde: { hp: 320, speed: 0.22, dmg: 30, reward: 3 },
+	mega: { hp: 1200, speed: 0.18, dmg: 60, reward: 8 }, // boss: huge, slow, wrecks walls
 };
 
 export const DIFFS = {
@@ -98,14 +100,19 @@ const TRICKLE_AMOUNT = 25;
 const EGG_SPEED = 7;
 const EGG_HIT = 0.35;
 const EAT_CONTACT = 0.75; // how far into a cell a fox walks before biting
+const BOSS_FIRST = 50; // first mega renard
+const BOSS_INTERVAL = 42; // then every ~42s
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-/** Seconds until the next spawn — gentle at first, shrinks over time, scaled by difficulty. */
-export const spawnInterval = (time: number, spawnMul: number): number => clamp(7 - time / 22, 1, 7) * spawnMul;
+/** Seconds until the next spawn — gentle at first, shrinks unboundedly, scaled by difficulty. */
+export const spawnInterval = (time: number, spawnMul: number): number => clamp(7 - time / 22, 0.6, 7) * spawnMul;
 
 /** How many lanes are active (foxes ramp from a narrow band to all 5). */
 export const activeLanes = (time: number): number => Math.min(LANES, 2 + Math.floor(time / 25));
+
+/** Fox HP multiplier that grows without bound — a static defence must eventually break. */
+export const foxHpScale = (time: number): number => 1 + time / 40;
 
 /** Weighted fox type for the current elapsed time. */
 export function waveType(time: number, rng: Rng): FoxType {
@@ -128,6 +135,7 @@ export function createGame(diffIndex: number, _rng: Rng): State {
 		eggs: [],
 		time: 0,
 		spawnTimer: FIRST_SPAWN,
+		bossTimer: BOSS_FIRST,
 		trickleTimer: 0,
 		killed: 0,
 		score: 0,
@@ -176,22 +184,24 @@ export function placeTower(state: State, type: TowerType, row: number, col: numb
 	return true;
 }
 
-function spawnFox(state: State, rng: Rng): void {
-	const type = waveType(state.time, rng);
-	// Foxes only use a centered band of lanes early, widening over time.
+/** A random lane within the currently active (centered) band. */
+function bandRow(state: State, rng: Rng): number {
 	const k = activeLanes(state.time);
 	const startRow = Math.floor((state.rows - k) / 2);
-	const row = startRow + (Math.floor(rng() * k) % k);
-	const base = FOX[type];
-	state.foxes.push({
-		id: state.nextId++,
-		type,
-		row,
-		x: state.cols + 0.5,
-		hp: base.hp * state.hpMul,
-		maxHp: base.hp * state.hpMul,
-		eating: false,
-	});
+	return startRow + (Math.floor(rng() * k) % k);
+}
+
+function pushFox(state: State, type: FoxType, row: number): void {
+	const hp = FOX[type].hp * state.hpMul * foxHpScale(state.time);
+	state.foxes.push({ id: state.nextId++, type, row, x: state.cols + 0.5, hp, maxHp: hp, eating: false });
+}
+
+function spawnFox(state: State, rng: Rng): void {
+	pushFox(state, waveType(state.time, rng), bandRow(state, rng));
+}
+
+function spawnMega(state: State, rng: Rng): void {
+	pushFox(state, 'mega', bandRow(state, rng));
 }
 
 /** Advance the simulation by dt seconds (mutates state). */
@@ -277,7 +287,14 @@ export function step(state: State, dt: number, rng: Rng): void {
 		state.spawnTimer -= dt;
 		if (state.spawnTimer <= 0) {
 			spawnFox(state, rng);
+			if (state.time > 75 && rng() < 0.4) spawnFox(state, rng); // late-game density
 			state.spawnTimer += spawnInterval(state.time, state.spawnMul);
+		}
+		// Méga renard: periodic boss.
+		state.bossTimer -= dt;
+		if (state.bossTimer <= 0) {
+			spawnMega(state, rng);
+			state.bossTimer += BOSS_INTERVAL;
 		}
 	}
 }

@@ -67,6 +67,15 @@ describe('cocottes-renards engine', () => {
 		expect(s.over).toBe(true);
 	});
 
+	it('spawns a méga renard after the boss delay, bigger than a normal fox', () => {
+		const s = createGame(1, mulberry32(9));
+		s.spawnTimer = 1e9; // silence normal waves so nothing ends the game before ~50s
+		run(s, 55, mulberry32(9));
+		const mega = s.foxes.find((f) => f.type === 'mega');
+		expect(mega).toBeDefined();
+		expect(mega!.maxHp).toBeGreaterThan(FOX.normal.hp * s.hpMul);
+	});
+
 	it('is deterministic: same seed + same actions → same state', () => {
 		const play = (): State => {
 			const s = createGame(1, mulberry32(7));

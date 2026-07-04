@@ -60,6 +60,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [tries, setTries] = useState(0);
 	const [attempt, setAttempt] = useState(0);
+	const [megaAlert, setMegaAlert] = useState(false);
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -76,6 +77,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const statusRef = useRef<Status>('ready');
 	const selectedRef = useRef<Selected>(null);
 	const hoverRef = useRef<{ row: number; col: number } | null>(null);
+	const megaAlertRef = useRef(false);
 	const dailyRef = useRef(false);
 	const triesRef = useRef(0);
 	const seedRef = useRef(0);
@@ -204,18 +206,21 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			hpBar(cx, cy, r, frac);
 		};
 		const drawFox = (f: Fox): void => {
+			const mega = f.type === 'mega';
 			const cx = f.x;
 			const cy = f.row + 0.5;
-			const r = 0.36;
+			const r = mega ? 0.62 : 0.36;
 			const frac = f.maxHp ? Math.max(0, f.hp / f.maxHp) : 1;
 			ctx.save();
 			ctx.translate(cx, cy);
-			ctx.fillStyle = '#d8722c';
+			ctx.fillStyle = mega ? '#a8531c' : '#d8722c';
 			tri(-r * 0.7, -r * 0.5, -r * 0.2, -r * 1.3, 0, -r * 0.6);
 			tri(r * 0.7, -r * 0.5, r * 0.2, -r * 1.3, 0, -r * 0.6);
 			ctx.beginPath();
 			ctx.arc(0, 0, r, 0, Math.PI * 2);
-			ctx.fillStyle = `rgb(${Math.round(210 + (1 - frac) * 30)},${Math.round(110 * frac + 40)},${Math.round(50 * frac)})`;
+			ctx.fillStyle = mega
+				? `rgb(${Math.round(150 + (1 - frac) * 40)},${Math.round(60 * frac + 28)},${Math.round(30 * frac)})`
+				: `rgb(${Math.round(210 + (1 - frac) * 30)},${Math.round(110 * frac + 40)},${Math.round(50 * frac)})`;
 			ctx.fill();
 			ctx.fillStyle = '#fff'; // snout faces left (moving left)
 			dot(-r * 0.5, r * 0.15, r * 0.32);
@@ -223,6 +228,20 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			dot(-r * 0.15, -r * 0.12, r * 0.12);
 			dot(r * 0.35, -r * 0.12, r * 0.12);
 			dot(-r * 0.72, r * 0.05, r * 0.1);
+			if (mega) {
+				// angry eyebrows
+				ctx.strokeStyle = '#111';
+				ctx.lineWidth = 0.05;
+				ctx.lineCap = 'round';
+				ctx.beginPath();
+				ctx.moveTo(-r * 0.34, -r * 0.36);
+				ctx.lineTo(-r * 0.02, -r * 0.2);
+				ctx.stroke();
+				ctx.beginPath();
+				ctx.moveTo(r * 0.52, -r * 0.36);
+				ctx.lineTo(r * 0.2, -r * 0.2);
+				ctx.stroke();
+			}
 			ctx.restore();
 			hpBar(cx, cy, r, frac);
 		};
@@ -266,6 +285,11 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const syncHud = (st: State): void => {
 		setHud({ grain: Math.floor(st.grain), cd: { ...st.cooldowns } });
 		if (st.score !== score) setScore(st.score);
+		const hasMega = st.foxes.some((f) => f.type === 'mega');
+		if (hasMega !== megaAlertRef.current) {
+			megaAlertRef.current = hasMega;
+			setMegaAlert(hasMega);
+		}
 	};
 
 	const onGameOver = useCallback(() => {
@@ -335,6 +359,8 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		runningRef.current = true;
 		setScore(0);
 		setHud({ grain: Math.floor(stateRef.current.grain), cd: {} });
+		megaAlertRef.current = false;
+		setMegaAlert(false);
 		selectCard(null);
 		setStat('playing');
 		setAttempt((a) => a + 1);
@@ -552,6 +578,8 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				</button>
 			</div>
 
+			{megaAlert && status === 'playing' && <div className="cr-mega-alert">🦊 Méga renard&nbsp;!</div>}
+
 			<div className="cr-playwrap" ref={wrapRef}>
 				<canvas
 					ref={canvasRef}
@@ -615,6 +643,9 @@ const CSS = `
 .cr-card-cost { font-size: 12px; font-weight: 700; color: #ffe08a; }
 .cr-card-cd { position: absolute; left: 0; bottom: 0; width: 100%; background: rgba(0,0,0,0.55); pointer-events: none; }
 .cr-card.shovel { width: 50px; justify-content: center; }
+.cr-mega-alert { margin-bottom: 0.5rem; background: #b0281f; color: #fff; font-weight: 800; font-size: 13.5px; letter-spacing: 0.3px; border-radius: 999px; padding: 6px 16px; box-shadow: var(--shadow-md); animation: cr-pulse 0.9s ease-in-out infinite; }
+@keyframes cr-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.72; transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .cr-mega-alert { animation: none; } }
 .cr-playwrap { width: 100%; position: relative; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
 .cr-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
 .cr-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); }
