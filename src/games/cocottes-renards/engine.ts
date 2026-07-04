@@ -69,9 +69,9 @@ export interface TowerStat {
 }
 export const TOWER: Record<TowerType, TowerStat> = {
 	pondeuse: { cost: 50, cooldown: 6, hp: 60, label: 'Pondeuse' },
-	lanceuse: { cost: 100, cooldown: 6, hp: 60, fire: 1.5, dmg: 20, label: "Lanceuse d'œufs" },
+	lanceuse: { cost: 75, cooldown: 6, hp: 60, fire: 1.5, dmg: 20, label: "Lanceuse d'œufs" },
 	costaude: { cost: 50, cooldown: 12, hp: 300, label: 'Costaude' },
-	mitrailleuse: { cost: 200, cooldown: 8, hp: 60, fire: 0.6, dmg: 20, label: 'Mitrailleuse' },
+	mitrailleuse: { cost: 175, cooldown: 8, hp: 60, fire: 0.6, dmg: 20, label: 'Mitrailleuse' },
 	piment: { cost: 125, cooldown: 25, hp: 0, label: 'Coq piment' },
 };
 export const TOWER_ORDER: TowerType[] = ['pondeuse', 'lanceuse', 'costaude', 'mitrailleuse', 'piment'];
@@ -90,10 +90,10 @@ export const DIFFS = {
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 export type DiffKey = keyof typeof DIFFS;
 
-const FIRST_SPAWN = 10; // grace to set up before the first fox
-const PROD_INTERVAL = 7;
+const FIRST_SPAWN = 12; // grace to set up before the first fox
+const PROD_INTERVAL = 5;
 const PROD_AMOUNT = 25;
-const TRICKLE_INTERVAL = 10;
+const TRICKLE_INTERVAL = 8;
 const TRICKLE_AMOUNT = 25;
 const EGG_SPEED = 7;
 const EGG_HIT = 0.35;
@@ -102,7 +102,10 @@ const EAT_CONTACT = 0.75; // how far into a cell a fox walks before biting
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
 /** Seconds until the next spawn — gentle at first, shrinks over time, scaled by difficulty. */
-export const spawnInterval = (time: number, spawnMul: number): number => clamp(6 - time / 22, 0.9, 6) * spawnMul;
+export const spawnInterval = (time: number, spawnMul: number): number => clamp(7 - time / 22, 1, 7) * spawnMul;
+
+/** How many lanes are active (foxes ramp from a narrow band to all 5). */
+export const activeLanes = (time: number): number => Math.min(LANES, 2 + Math.floor(time / 25));
 
 /** Weighted fox type for the current elapsed time. */
 export function waveType(time: number, rng: Rng): FoxType {
@@ -175,7 +178,10 @@ export function placeTower(state: State, type: TowerType, row: number, col: numb
 
 function spawnFox(state: State, rng: Rng): void {
 	const type = waveType(state.time, rng);
-	const row = Math.floor(rng() * state.rows) % state.rows;
+	// Foxes only use a centered band of lanes early, widening over time.
+	const k = activeLanes(state.time);
+	const startRow = Math.floor((state.rows - k) / 2);
+	const row = startRow + (Math.floor(rng() * k) % k);
 	const base = FOX[type];
 	state.foxes.push({
 		id: state.nextId++,
