@@ -83,14 +83,14 @@ export const FOX: Record<FoxType, { hp: number; speed: number; dmg: number; rewa
 };
 
 export const DIFFS = {
-	facile: { label: 'Facile', grain: 100, hp: 0.85, speed: 0.9, spawn: 1.15 },
-	moyen: { label: 'Moyen', grain: 75, hp: 1, speed: 1, spawn: 1 },
-	difficile: { label: 'Difficile', grain: 60, hp: 1.25, speed: 1.12, spawn: 0.82 },
+	facile: { label: 'Facile', grain: 175, hp: 0.85, speed: 0.9, spawn: 1.15 },
+	moyen: { label: 'Moyen', grain: 150, hp: 1, speed: 1, spawn: 1 },
+	difficile: { label: 'Difficile', grain: 125, hp: 1.25, speed: 1.12, spawn: 0.82 },
 } as const;
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 export type DiffKey = keyof typeof DIFFS;
 
-const FIRST_SPAWN = 4; // grace before the first fox
+const FIRST_SPAWN = 10; // grace to set up before the first fox
 const PROD_INTERVAL = 7;
 const PROD_AMOUNT = 25;
 const TRICKLE_INTERVAL = 10;
@@ -101,8 +101,8 @@ const EAT_CONTACT = 0.75; // how far into a cell a fox walks before biting
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-/** Seconds until the next spawn — shrinks over time, scaled by difficulty. */
-export const spawnInterval = (time: number, spawnMul: number): number => clamp(4.5 - time / 25, 0.8, 4.5) * spawnMul;
+/** Seconds until the next spawn — gentle at first, shrinks over time, scaled by difficulty. */
+export const spawnInterval = (time: number, spawnMul: number): number => clamp(6 - time / 22, 0.9, 6) * spawnMul;
 
 /** Weighted fox type for the current elapsed time. */
 export function waveType(time: number, rng: Rng): FoxType {
