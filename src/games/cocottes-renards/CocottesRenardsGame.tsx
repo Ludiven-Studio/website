@@ -114,7 +114,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('ready');
 	const [score, setScore] = useState(0);
 	const [best, setBest] = useState(0);
-	const [hud, setHud] = useState<{ grain: number; wave: number; cd: Partial<Record<TowerType, number>> }>({ grain: 0, wave: 0, cd: {} });
+	const [hud, setHud] = useState<{ grain: number; wave: number; nests: number; cd: Partial<Record<TowerType, number>> }>({ grain: 0, wave: 0, nests: LANES, cd: {} });
 	const [grainBump, setGrainBump] = useState(false);
 	const [selected, setSelected] = useState<Selected>(null);
 	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
@@ -124,6 +124,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const [tries, setTries] = useState(0);
 	const [attempt, setAttempt] = useState(0);
 	const [megaAlert, setMegaAlert] = useState(false);
+	const [laneAlert, setLaneAlert] = useState(false);
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -145,6 +146,8 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const prevTowerRef = useRef<Map<number, { type: TowerType; col: number; row: number }>>(new Map());
 	const prevEggRef = useRef<Map<number, { x: number; row: number }>>(new Map());
 	const prevGrainRef = useRef<Map<number, { x: number; y: number; value: number }>>(new Map());
+	const prevLostRef = useRef<boolean[]>([]);
+	const laneAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	// Mirrors for listeners / pointer handlers.
 	const statusRef = useRef<Status>('ready');
 	const selectedRef = useRef<Selected>(null);
@@ -202,22 +205,39 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		push({ x: info.x, y: info.y - 0.15, vx: 0, vy: -0.9, g: 0, life: 0.8, maxLife: 0.8, size: 0.32, color: '#ffe08a', kind: 'text', text: `+${info.value}` });
 	};
 
+	const emitLaneLost = (row: number): void => {
+		for (let i = 0; i < 16; i++)
+			push({ x: rnd(-0.4, 1.8), y: row + rnd(0.15, 0.85), vx: rnd(-1.6, 1.6), vy: rnd(-2.4, -0.4), g: 4, life: rnd(0.5, 0.9), maxLife: 0.9, size: rnd(0.05, 0.1), color: i % 2 ? '#fdf4dd' : '#d8722c', kind: 'feather' });
+		push({ x: 1.4, y: row + 0.35, vx: 0, vy: -0.5, g: 0, life: 1.2, maxLife: 1.2, size: 0.32, color: '#ff9a8a', kind: 'text', text: 'Nid pillé !' });
+	};
+
 	const detectEvents = (st: State): void => {
+		// Newly raided lanes first: raid FX + suppress kill/blast FX for swept entities.
+		const newlyLost = new Set<number>();
+		for (let r = 0; r < LANES; r++) if (st.lostLanes[r] && !prevLostRef.current[r]) newlyLost.add(r);
+		if (newlyLost.size > 0) {
+			for (const r of newlyLost) emitLaneLost(r);
+			setLaneAlert(true);
+			if (laneAlertTimerRef.current) clearTimeout(laneAlertTimerRef.current);
+			laneAlertTimerRef.current = setTimeout(() => setLaneAlert(false), 2600);
+		}
+		prevLostRef.current = [...st.lostLanes];
+
 		const cur = new Set<number>();
 		for (const f of st.foxes) cur.add(f.id);
-		if (!st.over) for (const [id, info] of prevFoxRef.current) if (!cur.has(id)) emitFoxPoof(info);
+		if (!st.over) for (const [id, info] of prevFoxRef.current) if (!cur.has(id) && !newlyLost.has(info.row)) emitFoxPoof(info);
 		prevFoxRef.current.clear();
 		for (const f of st.foxes) prevFoxRef.current.set(f.id, { x: f.x, row: f.row, type: f.type });
 
 		const curT = new Set<number>();
 		for (const t of st.towers) curT.add(t.id);
-		for (const [id, info] of prevTowerRef.current) if (!curT.has(id)) (info.type === 'mine' ? emitBlast : emitPuff)(info);
+		for (const [id, info] of prevTowerRef.current) if (!curT.has(id) && !newlyLost.has(info.row)) (info.type === 'mine' ? emitBlast : emitPuff)(info);
 		prevTowerRef.current.clear();
 		for (const t of st.towers) prevTowerRef.current.set(t.id, { type: t.type, col: t.col, row: t.row });
 
 		const curE = new Set<number>();
 		for (const e of st.eggs) curE.add(e.id);
-		for (const [id, info] of prevEggRef.current) if (!curE.has(id) && info.x <= COLS + 0.6) emitSplash(info);
+		for (const [id, info] of prevEggRef.current) if (!curE.has(id) && !newlyLost.has(info.row) && info.x <= COLS + 0.6) emitSplash(info);
 		prevEggRef.current.clear();
 		for (const e of st.eggs) prevEggRef.current.set(e.id, { x: e.x, row: e.row });
 
@@ -359,10 +379,18 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		dot(coopX + coopW * 0.5, LANES * 0.5, 0.34);
 		ctx.fillStyle = '#ffd97a';
 		dot(coopX + coopW * 0.5, LANES * 0.5, 0.34 * 0.62);
-		// Nests, one per lane (the objectives), just inside the fence.
+		// Nests, one per lane (the objectives), just inside the fence. Raided lanes show a wrecked nest.
 		for (let r = 0; r < LANES; r++) {
 			const nx = -0.12;
 			const ny = r + 0.62;
+			if (st.lostLanes[r]) {
+				ctx.fillStyle = '#8f6f33';
+				ellipse(nx, ny + 0.04, 0.22, 0.07); // flattened straw
+				ctx.fillStyle = '#fdf4dd';
+				tri(nx - 0.09, ny, nx - 0.03, ny - 0.09, nx + 0.01, ny); // broken shells
+				tri(nx + 0.03, ny + 0.02, nx + 0.09, ny - 0.06, nx + 0.13, ny + 0.02);
+				continue;
+			}
 			ctx.fillStyle = '#b58a3c';
 			ellipse(nx, ny, 0.2, 0.12);
 			ctx.fillStyle = '#caa24a';
@@ -376,6 +404,19 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		ctx.fillRect(0, 0, 0.08, LANES);
 		ctx.fillStyle = 'rgba(255,255,255,0.14)';
 		ctx.fillRect(0.08, 0, 0.02, LANES);
+
+		// Raided lanes: darkened strip + scattered feathers (deterministic).
+		for (let r = 0; r < LANES; r++) {
+			if (!st.lostLanes[r]) continue;
+			ctx.fillStyle = 'rgba(52,38,24,0.42)';
+			ctx.fillRect(-HENHOUSE_W, r, VIEW_W, 1);
+			for (let i = 0; i < 6; i++) {
+				const fx = hash2(r * 7 + i, 3) * COLS;
+				const fy = r + 0.25 + hash2(i + 1, r * 5 + 1) * 0.55;
+				ctx.fillStyle = i % 2 ? 'rgba(255,250,240,0.45)' : 'rgba(216,114,44,0.4)';
+				ellipse(fx, fy, 0.07, 0.035);
+			}
+		}
 
 		/* --- Grid lines --- */
 		ctx.strokeStyle = 'rgba(0,0,0,0.08)';
@@ -701,7 +742,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		const h = hoverRef.current;
 		const sel = selectedRef.current;
 		if (statusRef.current === 'playing' && h && sel && sel !== 'shovel') {
-			const occupied = st.towers.some((t) => t.row === h.row && t.col === h.col);
+			const occupied = st.lostLanes[h.row] || st.towers.some((t) => t.row === h.row && t.col === h.col);
 			ctx.fillStyle = occupied ? 'rgba(220,60,60,0.18)' : 'rgba(255,255,255,0.18)';
 			ctx.fillRect(h.col, h.row, 1, 1);
 			if (!occupied) {
@@ -735,7 +776,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const syncHud = (st: State): void => {
 		if (st.grain > lastGrainRef.current) triggerBump();
 		lastGrainRef.current = st.grain;
-		setHud({ grain: Math.floor(st.grain), wave: st.wave, cd: { ...st.cooldowns } });
+		setHud({ grain: Math.floor(st.grain), wave: st.wave, nests: st.lostLanes.filter((l) => !l).length, cd: { ...st.cooldowns } });
 		if (st.score !== score) setScore(st.score);
 		const hasMega = st.foxes.some((f) => f.type === 'mega');
 		if (hasMega !== megaAlertRef.current) {
@@ -811,6 +852,9 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		prevTowerRef.current.clear();
 		prevEggRef.current.clear();
 		prevGrainRef.current.clear();
+		prevLostRef.current = [...st.lostLanes];
+		if (laneAlertTimerRef.current) clearTimeout(laneAlertTimerRef.current);
+		setLaneAlert(false);
 		animRef.current = 0;
 		lastGrainRef.current = st.grain;
 	};
@@ -825,7 +869,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		runningRef.current = true;
 		resetFx(stateRef.current);
 		setScore(0);
-		setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, cd: {} });
+		setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, nests: LANES, cd: {} });
 		megaAlertRef.current = false;
 		setMegaAlert(false);
 		selectCard(null);
@@ -866,7 +910,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			selectCard(null);
 			setStat('ready');
 			setScore(0);
-			setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, cd: {} });
+			setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, nests: LANES, cd: {} });
 			let b = 0;
 			try {
 				b = Number(localStorage.getItem(bestKey(key))) || 0;
@@ -896,7 +940,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			stateRef.current = createGame(diffIndex, mulberry32(seedRef.current));
 			resetFx(stateRef.current);
 			setScore(0);
-			setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, cd: {} });
+			setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, nests: LANES, cd: {} });
 			const exhausted = triesRef.current >= MAX_TRIES;
 			setAlreadyPlayed(exhausted);
 			setStat(exhausted ? 'over' : 'ready');
@@ -1050,6 +1094,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			<div className="cr-hud">
 				<span className={`cr-grain ${grainBump ? 'bump' : ''}`}>🌾 <strong>{hud.grain}</strong></span>
 				<span className="cr-scorepill">Vague <strong>{hud.wave}</strong></span>
+				<span className="cr-scorepill">Nids <strong>{hud.nests}</strong></span>
 				<span className="cr-scorepill">Renards <strong>{score}</strong></span>
 				<span className="cr-scorepill">Record <strong>{best}</strong></span>
 			</div>
@@ -1083,6 +1128,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{megaAlert && status === 'playing' && <div className="cr-mega-alert">🦊 Méga renard&nbsp;! La meute se renforce</div>}
+			{laneAlert && status === 'playing' && <div className="cr-mega-alert cr-lane-alert">💔 Un nid a été pillé&nbsp;! Défends les lignes restantes</div>}
 
 			<div className="cr-playwrap" ref={wrapRef}>
 				<canvas
@@ -1106,7 +1152,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 								<>Défi du jour terminé · <strong>{best}</strong><span>reviens demain&nbsp;!</span></>
 							) : (
 								<>
-									<span className="cr-over-title">🦊 Le poulailler est tombé&nbsp;!</span>
+									<span className="cr-over-title">🦊 Tous les nids ont été pillés&nbsp;!</span>
 									<span>Renards repoussés : <strong>{score}</strong></span>
 									{daily
 										? <button className="cr-replay" onClick={start}>↻ Rejouer ({MAX_TRIES - tries} restant{MAX_TRIES - tries > 1 ? 's' : ''})</button>
@@ -1119,7 +1165,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="cr-help">
-				Sélectionne une cocotte puis clique une case pour la poser. Les pondeuses lâchent du grain à ramasser (clique-le&nbsp;!). Poule des neiges, poule gémeaux, œuf-mine… Empêche les renards d'atteindre les nids à gauche&nbsp;!
+				Sélectionne une cocotte puis clique une case pour la poser. Les pondeuses lâchent du grain à ramasser (clique-le&nbsp;!). Si un renard atteint un nid, la ligne est perdue — la partie continue tant qu'il reste au moins un nid.
 			</p>
 
 			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? best : undefined} />}
@@ -1150,6 +1196,7 @@ const CSS = `
 .cr-card-cd { position: absolute; left: 0; bottom: 0; width: 100%; background: rgba(0,0,0,0.55); pointer-events: none; }
 .cr-card.shovel { width: 46px; justify-content: center; }
 .cr-mega-alert { margin-bottom: 0.5rem; background: #b0281f; color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.2px; border-radius: 999px; padding: 6px 16px; box-shadow: var(--shadow-md); animation: cr-pulse 0.9s ease-in-out infinite; }
+.cr-lane-alert { background: #b45309; }
 @keyframes cr-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.72; transform: scale(1.05); } }
 @media (prefers-reduced-motion: reduce) { .cr-mega-alert, .cr-grain.bump { animation: none; } }
 .cr-playwrap { width: 100%; position: relative; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }

@@ -89,12 +89,39 @@ describe('cocottes-renards engine', () => {
 		expect(s.killed).toBe(2);
 	});
 
-	it('an uncontested fox reaches the henhouse and ends the game', () => {
+	it('a fox reaching a nest only loses that lane, not the game', () => {
 		const s = createGame(1, mulberry32(5));
 		silenceWaves(s);
+		s.grain = 999;
+		placeTower(s, 'costaude', 0, 5); // behind the fox: swept with the lane
 		addFox(s, 0, 1);
 		run(s, 10, mulberry32(5));
+		expect(s.lostLanes[0]).toBe(true);
+		expect(s.over).toBe(false);
+		expect(s.foxes.some((f) => f.row === 0)).toBe(false); // lane swept
+		expect(s.towers.length).toBe(0);
+		expect(placeTower(s, 'lanceuse', 0, 2)).toBe(false); // raided lane unusable
+		expect(placeTower(s, 'lanceuse', 1, 2)).toBe(true); // others still playable
+	});
+
+	it('losing every lane ends the game', () => {
+		const s = createGame(1, mulberry32(51));
+		silenceWaves(s);
+		for (let r = 0; r < s.rows; r++) addFox(s, r, 0.5);
+		run(s, 5, mulberry32(51));
+		expect(s.lostLanes.every(Boolean)).toBe(true);
 		expect(s.over).toBe(true);
+	});
+
+	it('holds the next wave while the field is still crowded', () => {
+		const s = createGame(1, mulberry32(41));
+		s.waveTimer = 0.5;
+		for (let i = 0; i < 10; i++) addFox(s, i % 5, 6 + (i % 3) * 0.5);
+		run(s, 3, mulberry32(41));
+		expect(s.wave).toBe(0); // held back
+		s.foxes = [];
+		run(s, 2, mulberry32(41));
+		expect(s.wave).toBe(1); // released once the field clears
 	});
 
 	it('the glacière slows the foxes it hits', () => {
@@ -153,12 +180,12 @@ describe('cocottes-renards engine', () => {
 		const s = createGame(1, mulberry32(9));
 		const rng = mulberry32(9);
 		let megaHp = 0;
-		// Keep the henhouse safe (sweep foxes) so waves keep rolling to wave 5+.
-		for (let t = 0; t < 60 * 60; t++) {
+		// Sweep foxes as they enter the grid so lanes hold and waves keep rolling to wave 5+.
+		for (let t = 0; t < 100 * 60; t++) {
 			step(s, 1 / 60, rng);
 			const mega = s.foxes.find((f) => f.type === 'mega');
 			if (mega) megaHp = mega.maxHp;
-			s.foxes = s.foxes.filter((f) => f.x > 0.5);
+			s.foxes = s.foxes.filter((f) => f.x > COLS);
 		}
 		expect(s.wave).toBeGreaterThanOrEqual(5);
 		expect(megaHp).toBeGreaterThan(FOX.normal.hp * s.hpMul);
@@ -180,7 +207,7 @@ describe('cocottes-renards engine', () => {
 			const rng = mulberry32(7);
 			const STEP = 1 / 60;
 			s.grain = 999;
-			for (let t = 0; t < 1500; t++) {
+			for (let t = 0; t < 2400; t++) {
 				if (t === 30) placeTower(s, 'lanceuse', 2, 1);
 				if (t === 120) placeTower(s, 'costaude', 1, 3);
 				if (t === 300) placeTower(s, 'gemellaire', 3, 2);
@@ -194,6 +221,7 @@ describe('cocottes-renards engine', () => {
 		expect(b.wave).toBe(a.wave);
 		expect(b.grain).toBeCloseTo(a.grain, 6);
 		expect(b.grains.length).toBe(a.grains.length);
+		expect(b.lostLanes).toEqual(a.lostLanes);
 		expect(b.foxes.map((f) => [f.row, Math.round(f.x * 1000)])).toEqual(a.foxes.map((f) => [f.row, Math.round(f.x * 1000)]));
 	});
 });

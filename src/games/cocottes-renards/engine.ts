@@ -3,8 +3,10 @@ import type { Rng } from '../prng';
 /* =====================================================
    COCOTTES VS RENARDS — pure lane tower-defense engine.
    Grid: LANES rows × COLS cols. Foxes enter at x=COLS+APPROACH (right,
-   from the forest edge), walk toward x=0 (henhouse). A fox at x<=0 ends
-   the game. x is a continuous lane position; towers sit at integer cells.
+   from the forest edge), walk toward x=0 (henhouse). A fox at x<=0 raids
+   that lane's nest: the lane is lost (cleared, unusable) and the game only
+   ends when every lane is lost. x is a continuous lane position; towers
+   sit at integer cells.
    Grain is earned as collectable tokens (click, or auto after a delay).
    Spawns come in waves; a méga renard every 5 waves ramps the pressure.
    step() mutates state in place (many entities); seeded via Rng.
@@ -80,6 +82,7 @@ export interface State {
 	trickleTimer: number;
 	killed: number;
 	score: number;
+	lostLanes: boolean[]; // raided lanes (per row); game over when all true
 	over: boolean;
 	nextId: number;
 	hpMul: number;
@@ -138,7 +141,7 @@ export const DIFFS = {
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 export type DiffKey = keyof typeof DIFFS;
 
-const FIRST_SPAWN = 12; // grace to set up before the first wave
+const FIRST_SPAWN = 15; // grace to set up before the first wave
 const PROD_INTERVAL = 5;
 const PROD_AMOUNT = 25;
 const TRICKLE_INTERVAL = 8;
@@ -155,7 +158,10 @@ const MINE_DMG = 900; // mine blast damage (per fox in blast)
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
 /** Seconds between waves — long at first, shrinks with the wave count, scaled by difficulty. */
-export const waveInterval = (wave: number): number => clamp(8 - wave * 0.3, 3.5, 8);
+export const waveInterval = (wave: number): number => clamp(14 - wave * 0.4, 6, 14);
+
+/** Max foxes on the field before the next wave is held back (PvZ breathing room). */
+export const waveCrowd = (wave: number): number => 3 + Math.floor(wave / 2);
 
 /** Foxes per wave — grows steadily so late waves are heavier. */
 export const waveSize = (wave: number): number => 1 + Math.floor(wave / 3);
@@ -209,6 +215,7 @@ export function createGame(diffIndex: number, _rng: Rng): State {
 		trickleTimer: 0,
 		killed: 0,
 		score: 0,
+		lostLanes: Array.from({ length: LANES }, () => false),
 		over: false,
 		nextId: 1,
 		hpMul: d.hp,
@@ -230,7 +237,12 @@ export function frontFoxInLane(state: State, row: number): Fox | undefined {
 }
 
 export const canPlace = (state: State, row: number, col: number): boolean =>
-	row >= 0 && row < state.rows && col >= 0 && col < state.cols && !state.towers.some((t) => t.row === row && t.col === col);
+	row >= 0 &&
+	row < state.rows &&
+	col >= 0 &&
+	col < state.cols &&
+	!state.lostLanes[row] &&
+	!state.towers.some((t) => t.row === row && t.col === col);
 
 /** Try to place/trigger a tower. Returns false if invalid (cost, cooldown, occupied). */
 export function placeTower(state: State, type: TowerType, row: number, col: number): boolean {
@@ -238,6 +250,7 @@ export function placeTower(state: State, type: TowerType, row: number, col: numb
 	if (state.grain < s.cost) return false;
 	if ((state.cooldowns[type] ?? 0) > 0) return false;
 	if (row < 0 || row >= state.rows || col < 0 || col >= state.cols) return false;
+	if (state.lostLanes[row]) return false; // raided lane, unusable
 
 	if (type === 'piment') {
 		// One-shot: clear every fox in the lane.
@@ -281,6 +294,23 @@ function spawnGrain(state: State, x: number, rest: number, value: number, sky: b
 	state.grains.push({ id: state.nextId++, x, y: sky ? 0 : rest - 0.7, rest, value, ttl: TOKEN_TTL, sky });
 }
 
+/** Rows whose nest is still standing. */
+const aliveLaneRows = (state: State): number[] => {
+	const rows: number[] = [];
+	for (let r = 0; r < state.rows; r++) if (!state.lostLanes[r]) rows.push(r);
+	return rows;
+};
+
+/** A fox reached the nest: the lane is raided and swept; game over only when all lanes are lost. */
+function loseLane(state: State, row: number): void {
+	if (state.lostLanes[row]) return;
+	state.lostLanes[row] = true;
+	state.foxes = state.foxes.filter((f) => f.row !== row);
+	state.towers = state.towers.filter((t) => t.row !== row);
+	state.eggs = state.eggs.filter((e) => e.row !== row);
+	state.over = state.lostLanes.every(Boolean);
+}
+
 function pushFox(state: State, type: FoxType, row: number, trail: number): void {
 	const hp = FOX[type].hp * state.hpMul * waveHpScale(state.wave);
 	state.foxes.push({
@@ -300,9 +330,13 @@ function pushFox(state: State, type: FoxType, row: number, trail: number): void 
 function startWave(state: State, rng: Rng): void {
 	state.wave++;
 	const w = state.wave;
+	const alive = aliveLaneRows(state);
+	if (alive.length === 0) return;
 	const k = activeLanes(w);
 	const start = Math.floor((state.rows - k) / 2);
-	const laneOf = (): number => start + (Math.floor(rng() * k) % k);
+	let band = alive.filter((r) => r >= start && r < start + k);
+	if (band.length === 0) band = alive; // active band fully raided: spill anywhere alive
+	const laneOf = (): number => band[Math.floor(rng() * band.length) % band.length];
 	const size = waveSize(w);
 	for (let i = 0; i < size; i++) {
 		const type = waveType(w, rng);
@@ -336,8 +370,9 @@ export function step(state: State, dt: number, rng: Rng): void {
 	state.trickleTimer += dt;
 	if (state.trickleTimer >= TRICKLE_INTERVAL) {
 		state.trickleTimer -= TRICKLE_INTERVAL;
+		const alive = aliveLaneRows(state);
 		const col = Math.floor(rng() * state.cols);
-		const row = Math.floor(rng() * state.rows);
+		const row = alive[Math.floor(rng() * alive.length) % alive.length];
 		spawnGrain(state, col + 0.5, row + 0.82, TRICKLE_AMOUNT, true);
 	}
 
@@ -430,10 +465,7 @@ export function step(state: State, dt: number, rng: Rng): void {
 			f.eating = false;
 			const sp = FOX[f.type].speed * state.speedMul * (f.slow > 0 ? 0.5 : 1);
 			f.x -= sp * dt;
-			if (f.x <= 0) {
-				state.over = true;
-				f.x = 0;
-			}
+			if (f.x <= 0) loseLane(state, f.row);
 		}
 	}
 
@@ -448,12 +480,16 @@ export function step(state: State, dt: number, rng: Rng): void {
 		return true;
 	});
 
-	// Waves.
+	// Waves — held back while the field is still crowded so they can't pile up.
 	if (!state.over) {
 		state.waveTimer -= dt;
 		if (state.waveTimer <= 0) {
-			startWave(state, rng);
-			state.waveTimer += waveInterval(state.wave) * state.spawnMul;
+			if (state.foxes.length > waveCrowd(state.wave)) {
+				state.waveTimer = 1; // field too busy: re-check shortly
+			} else {
+				startWave(state, rng);
+				state.waveTimer += waveInterval(state.wave) * state.spawnMul;
+			}
 		}
 	}
 }
