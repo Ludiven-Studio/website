@@ -14,6 +14,7 @@ import {
 	collectGrain,
 	grainValue,
 	rebuyLane,
+	laserTarget,
 	REBUY_COST,
 	TOKEN_TTL,
 	step,
@@ -83,6 +84,7 @@ const CARD: Record<TowerType, { emoji: string; short: string; desc: string }> = 
 	costaude: { emoji: '🌾', short: 'Costaude', desc: 'Botte de foin très résistante : bloque les renards pendant que tes poules tirent.' },
 	mine: { emoji: '💣', short: 'Œuf-mine', desc: 'S\'arme en 3 s puis explose au contact — énormes dégâts de zone, usage unique.' },
 	mitrailleuse: { emoji: '🐓', short: 'Mitrailleuse', desc: 'Cadence de tir très rapide, idéale contre les meutes et les gros renards.' },
+	laser: { emoji: '⚡', short: 'Laser', desc: 'Rayon continu surpuissant qui brûle le renard le plus proche de sa voie. Chère (500) mais dévastatrice contre le méga renard.' },
 	piment: { emoji: '🌶️', short: 'Coq piment', desc: 'Usage unique : élimine immédiatement tous les renards de la voie choisie.' },
 };
 const SHOVEL_DESC = 'Retire une cocotte posée (clique-la) pour libérer la case.';
@@ -99,6 +101,7 @@ const HEN_STYLE: Record<string, HenStyle> = {
 	mitrailleuse: { comb: '#e34b4b', body: '#ffd8d8', bodyDark: '#f0b6b6', wing: '#ffc4c4' },
 	glaciere: { comb: '#7fb2e6', body: '#dcefff', bodyDark: '#b6dbf7', wing: '#c8e6ff' },
 	gemellaire: { comb: '#f0a830', body: '#fff1c6', bodyDark: '#f0dc9c', wing: '#ffe9a8' },
+	laser: { comb: '#ff2d55', body: '#e6f0ff', bodyDark: '#c2d6f2', wing: '#d4e6ff' },
 	piment: { comb: '#c22b2b', body: '#ff9a5a', bodyDark: '#e07a3a', wing: '#ffb47a' }, // preview ghost only (one-shot card)
 };
 
@@ -593,6 +596,40 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			if (t.type === 'costaude') drawHay(cx, cy, r, frac);
 			else if (t.type === 'mine') drawMine(t.col + 0.5, t.row + 0.5, r, t.armed <= 0);
 			else {
+				if (t.type === 'laser') {
+					const target = laserTarget(st, t);
+					if (target) {
+						const bx0 = t.col + 0.7;
+						const by = t.row + 0.5 - 0.04;
+						const bx1 = target.x - foxRadius(target.type) * 0.3;
+						const flick = 0.7 + 0.3 * Math.abs(Math.sin(anim * 40 + t.id));
+						ctx.save();
+						ctx.lineCap = 'round';
+						// outer glow
+						ctx.globalAlpha = 0.3 * flick;
+						ctx.strokeStyle = '#ff3b3b';
+						ctx.lineWidth = 0.14;
+						ctx.beginPath();
+						ctx.moveTo(bx0, by);
+						ctx.lineTo(bx1, by);
+						ctx.stroke();
+						// bright core
+						ctx.globalAlpha = flick;
+						ctx.strokeStyle = '#fff2f2';
+						ctx.lineWidth = 0.04;
+						ctx.beginPath();
+						ctx.moveTo(bx0, by);
+						ctx.lineTo(bx1, by);
+						ctx.stroke();
+						// impact burst
+						ctx.globalAlpha = 0.85 * flick;
+						ctx.fillStyle = '#ff6a4a';
+						dot(bx1, by, 0.09 + 0.03 * Math.abs(Math.sin(anim * 30 + t.id)));
+						ctx.fillStyle = '#fff';
+						dot(bx1, by, 0.04);
+						ctx.restore();
+					}
+				}
 				if (t.type === 'pondeuse') {
 					// Egg-in-progress: grows under the hen; she wiggles just before laying.
 					const prog = clamp(t.timer / PROD_INTERVAL, 0, 1);
@@ -1251,13 +1288,13 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				</button>
 			</div>
 
-			{selected && (
-				<div className="cr-desc">
-					{selected === 'shovel'
-						? <>🧹 <strong>Balai</strong> — {SHOVEL_DESC}</>
-						: <>{CARD[selected].emoji} <strong>{TOWER[selected].label}</strong> · {TOWER[selected].cost} grain — {CARD[selected].desc}</>}
-				</div>
-			)}
+			<div className="cr-desc">
+				{selected === 'shovel'
+					? <>🧹 <strong>Balai</strong> — {SHOVEL_DESC}</>
+					: selected
+						? <>{CARD[selected].emoji} <strong>{TOWER[selected].label}</strong> · {TOWER[selected].cost} blé — {CARD[selected].desc}</>
+						: <span className="cr-desc-hint">Sélectionne une carte pour voir son rôle, ou ❓ pour tout afficher.</span>}
+			</div>
 
 			{showInfo && (
 				<div className="cr-info-panel">
@@ -1350,8 +1387,9 @@ const CSS = `
 .cr-card-cost { font-size: 11.5px; font-weight: 700; color: #ffe08a; }
 .cr-card-cd { position: absolute; left: 0; bottom: 0; width: 100%; background: rgba(0,0,0,0.55); pointer-events: none; }
 .cr-card.shovel { width: 46px; justify-content: center; }
-.cr-desc { margin-bottom: 0.55rem; max-width: 560px; text-align: center; font-size: 12.5px; line-height: 1.45; color: var(--gray-200); background: var(--gray-900); border-radius: 10px; padding: 6px 14px; }
+.cr-desc { margin-bottom: 0.55rem; width: 100%; max-width: 560px; min-height: 46px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12.5px; line-height: 1.45; color: var(--gray-200); background: var(--gray-900); border-radius: 10px; padding: 6px 14px; }
 .cr-desc strong { color: var(--gray-0); }
+.cr-desc-hint { color: var(--gray-400); }
 .cr-info-panel { margin-bottom: 0.6rem; max-width: 560px; background: var(--gray-900); border: 1px solid var(--gray-700); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.45; color: var(--gray-200); }
 .cr-info-row { display: flex; gap: 8px; align-items: baseline; text-align: left; }
 .cr-info-emoji { font-size: 15px; flex: 0 0 auto; }

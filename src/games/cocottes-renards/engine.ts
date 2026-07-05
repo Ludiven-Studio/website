@@ -24,7 +24,8 @@ export type TowerType =
 	| 'piment'
 	| 'glaciere'
 	| 'gemellaire'
-	| 'mine';
+	| 'mine'
+	| 'laser';
 export type FoxType = 'normal' | 'rapide' | 'blinde' | 'mega' | 'creuseur' | 'sauteur' | 'meute';
 
 export interface Tower {
@@ -108,6 +109,7 @@ export const TOWER: Record<TowerType, TowerStat> = {
 	glaciere: { cost: 100, cooldown: 10, hp: 60, fire: 1.6, dmg: 12, label: 'Poule des neiges' },
 	gemellaire: { cost: 150, cooldown: 12, hp: 60, fire: 1.5, dmg: 20, label: 'Poule gémeaux' },
 	mine: { cost: 25, cooldown: 10, hp: 1, label: 'Œuf-mine' },
+	laser: { cost: 500, cooldown: 30, hp: 80, dmg: 120, label: 'Poule Laser' }, // dmg = continuous DPS
 };
 export const TOWER_ORDER: TowerType[] = [
 	'pondeuse',
@@ -117,6 +119,7 @@ export const TOWER_ORDER: TowerType[] = [
 	'costaude',
 	'mine',
 	'mitrailleuse',
+	'laser',
 	'piment',
 ];
 
@@ -232,6 +235,18 @@ export function createGame(diffIndex: number, _rng: Rng): State {
 /** First blocking tower a fox bites in a cell (mines/piment are stepped over, not bitten). */
 export const firstTowerInCell = (state: State, row: number, col: number): Tower | undefined =>
 	state.towers.find((t) => t.row === row && t.col === col && t.type !== 'piment' && t.type !== 'mine' && t.hp > 0);
+
+/** Nearest fox a laser hen can burn: closest attacker ahead of it in its lane. */
+export function laserTarget(state: State, t: Tower): Fox | undefined {
+	let target: Fox | undefined;
+	for (const f of state.foxes) {
+		if (f.row !== t.row) continue;
+		if (f.x <= t.col + 0.5 || f.x > state.cols + 0.6) continue;
+		if (f.type === 'creuseur' && f.x > state.cols / 2) continue; // burrowed, immune
+		if (!target || f.x < target.x) target = f;
+	}
+	return target;
+}
 
 /** Closest fox to the henhouse in a lane (smallest x), or undefined. */
 export function frontFoxInLane(state: State, row: number): Fox | undefined {
@@ -433,6 +448,13 @@ export function step(state: State, dt: number, rng: Rng): void {
 					t.hp = 0;
 					t.exploded = true;
 				}
+			}
+		} else if (t.type === 'laser') {
+			// Continuous beam: burns the nearest fox ahead in the lane every frame.
+			const target = laserTarget(state, t);
+			if (target) {
+				target.hp -= TOWER.laser.dmg! * dt;
+				t.fireFlash = 0.1;
 			}
 		} else if (SHOOTERS.includes(t.type)) {
 			const fire = TOWER[t.type].fire!;

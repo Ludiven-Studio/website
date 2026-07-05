@@ -150,6 +150,20 @@ describe('cocottes-renards engine', () => {
 		expect(s.wave).toBe(1); // released once the field clears
 	});
 
+	it('a poule laser burns down the nearest fox in its lane', () => {
+		const s = createGame(1, mulberry32(71));
+		silenceWaves(s);
+		s.grain = 999;
+		expect(placeTower(s, 'laser', 0, 1)).toBe(true);
+		addFox(s, 0, 6, 'blinde'); // tanky, but the beam grinds it down
+		addFox(s, 1, 6, 'normal'); // other lane, untouched
+		run(s, 6, mulberry32(71));
+		expect(s.foxes.some((f) => f.row === 0)).toBe(false); // burned away
+		expect(s.foxes.some((f) => f.row === 1)).toBe(true); // spared
+		expect(s.killed).toBeGreaterThanOrEqual(1);
+		expect(s.over).toBe(false);
+	});
+
 	it('the glacière slows the foxes it hits', () => {
 		const s = createGame(1, mulberry32(11));
 		silenceWaves(s);
