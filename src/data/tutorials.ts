@@ -9,8 +9,10 @@ export interface TutorialStep {
 
 export const TUTORIALS: Record<string, TutorialStep[]> = {
 	'cocottes-renards': [
-		{ emoji: '🎯', title: 'Le but', body: 'Un tower defense façon Plants vs Zombies : les renards arrivent par la droite, voie par voie. Empêche-les d\'atteindre le poulailler à gauche — une seule intrusion et c\'est perdu.' },
-		{ emoji: '🐔', title: 'Poser des cocottes', body: 'Les poules pondeuses produisent du grain ; avec ce grain, pose des lanceuses d\'œufs (qui tirent), des costaudes (qui bloquent), la mitrailleuse, ou le coq piment qui nettoie toute une voie. Sélectionne une carte puis clique une case.' },
+		{ emoji: '🎯', title: 'Le but', body: 'Un tower defense façon Plants vs Zombies : les renards sortent de la forêt à droite et avancent voie par voie vers les nids du poulailler, tout à gauche. Une seule intrusion et c\'est perdu.' },
+		{ emoji: '🌾', title: 'Ramasser le grain', body: 'Les pondeuses (et le ciel) lâchent des jetons de grain : clique-les pour les encaisser tout de suite — sinon ils sont ramassés automatiquement un peu plus tard. Le grain sert à poser tes défenses.' },
+		{ emoji: '🐔', title: 'Poser des cocottes', body: 'Sélectionne une carte puis clique une case. Lanceuse et mitrailleuse tirent des œufs, la poule des neiges ralentit, la poule gémeaux tire double, l\'œuf-mine explose au contact, la costaude bloque et le coq piment nettoie toute une voie.' },
+		{ emoji: '🦊', title: 'Vagues & méga renard', body: 'Les vagues sont de plus en plus dures. Toutes les 5 vagues débarque un méga renard (parfois deux en fin de partie) qui renforce la meute : adapte tes défenses ou le poulailler tombera.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, les vagues de renards sont les mêmes pour tout le monde (graine partagée). Jusqu\'à 3 essais : ton meilleur score (renards repoussés) est classé.' },
 	],
 	'2048': [

@@ -2,17 +2,22 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	LANES,
 	COLS,
+	APPROACH,
 	TOWER,
 	TOWER_ORDER,
+	FOX,
 	DIFFS,
 	DIFF_ORDER,
 	createGame,
 	placeTower,
+	collectGrain,
 	step,
 	type State,
 	type TowerType,
+	type FoxType,
 	type Tower,
 	type Fox,
+	type Grain,
 	type DiffKey,
 } from './engine';
 import { mulberry32 } from '../prng';
@@ -24,35 +29,93 @@ import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    COCOTTES VS RENARDS — real-time lane tower-defense island.
-   Canvas drawn in CELL units (0..COLS × 0..LANES) via a scaled transform.
+   World is drawn in CELL units with a henhouse margin (left) and a forest
+   approach margin (right): VIEW_W = HENHOUSE_W + COLS + APPROACH. Grain is
+   collected as PvZ-style tokens; a render-only particle layer adds juice.
    Fixed-timestep rAF loop; pure engine in ./engine (seeded, tested).
-   Libre : survie sans fin, record local. Défi du jour : vagues seedées, 3 essais.
    ===================================================== */
 
 type Status = 'ready' | 'playing' | 'over';
 type Selected = TowerType | 'shovel' | null;
 const MAX_TRIES = 3;
 const STEP = 1000 / 60;
+const HENHOUSE_W = 1.15; // left margin: coop + nests to defend
+const VIEW_W = HENHOUSE_W + COLS + APPROACH;
 const bestKey = (key: DiffKey): string => `ludiven-cocottes-best-${key}`;
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+// Stable per-cell hash for decorative scatter (no per-frame flicker).
+const hash2 = (a: number, b: number): number => {
+	const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+	return x - Math.floor(x);
+};
 
 interface DailyState {
 	best: number;
 	tries: number;
 }
 
+interface Particle {
+	x: number;
+	y: number;
+	vx: number;
+	vy: number;
+	g: number;
+	life: number;
+	maxLife: number;
+	size: number;
+	color: string;
+	kind: 'dust' | 'spark' | 'feather' | 'splash' | 'text';
+	text?: string;
+}
+
 const CARD: Record<TowerType, { emoji: string; short: string }> = {
 	pondeuse: { emoji: '🥚', short: 'Pondeuse' },
 	lanceuse: { emoji: '🐔', short: 'Lanceuse' },
+	gemellaire: { emoji: '🐤', short: 'Gémeaux' },
+	glaciere: { emoji: '🧊', short: 'Neiges' },
 	costaude: { emoji: '🌾', short: 'Costaude' },
+	mine: { emoji: '💣', short: 'Œuf-mine' },
 	mitrailleuse: { emoji: '🐓', short: 'Mitrailleuse' },
 	piment: { emoji: '🌶️', short: 'Coq piment' },
 };
+
+interface HenStyle {
+	comb: string;
+	body: string;
+	bodyDark: string;
+	wing: string;
+}
+const HEN_STYLE: Record<string, HenStyle> = {
+	pondeuse: { comb: '#e8b23a', body: '#fdfdfd', bodyDark: '#e2e2e2', wing: '#ededed' },
+	lanceuse: { comb: '#e34b4b', body: '#fdfdfd', bodyDark: '#e2e2e2', wing: '#ededed' },
+	mitrailleuse: { comb: '#e34b4b', body: '#ffd8d8', bodyDark: '#f0b6b6', wing: '#ffc4c4' },
+	glaciere: { comb: '#7fb2e6', body: '#dcefff', bodyDark: '#b6dbf7', wing: '#c8e6ff' },
+	gemellaire: { comb: '#f0a830', body: '#fff1c6', bodyDark: '#f0dc9c', wing: '#ffe9a8' },
+};
+
+interface FoxStyle {
+	fur: string;
+	furDark: string;
+	belly: string;
+}
+const FOX_STYLE: Record<FoxType, FoxStyle> = {
+	normal: { fur: '#d8722c', furDark: '#b25a1c', belly: '#f2c89b' },
+	rapide: { fur: '#e39140', furDark: '#c2731f', belly: '#f7d9ad' },
+	blinde: { fur: '#9a6a3a', furDark: '#7a5228', belly: '#d8b98c' },
+	mega: { fur: '#a8531c', furDark: '#7c3a12', belly: '#e0a86a' },
+	creuseur: { fur: '#8a6a44', furDark: '#684e2f', belly: '#c9ac82' },
+	sauteur: { fur: '#d86a4c', furDark: '#b24e34', belly: '#f4c2ac' },
+	meute: { fur: '#cd6f38', furDark: '#a8531f', belly: '#efc699' },
+};
+const foxRadius = (type: FoxType): number =>
+	type === 'mega' ? 0.6 : type === 'meute' ? 0.28 : type === 'rapide' ? 0.31 : 0.36;
 
 export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('ready');
 	const [score, setScore] = useState(0);
 	const [best, setBest] = useState(0);
-	const [hud, setHud] = useState<{ grain: number; cd: Partial<Record<TowerType, number>> }>({ grain: 0, cd: {} });
+	const [hud, setHud] = useState<{ grain: number; wave: number; cd: Partial<Record<TowerType, number>> }>({ grain: 0, wave: 0, cd: {} });
+	const [grainBump, setGrainBump] = useState(false);
 	const [selected, setSelected] = useState<Selected>(null);
 	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
 	const [daily, setDaily] = useState(false);
@@ -73,6 +136,15 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const scaleRef = useRef(1);
 	const startRef = useRef(0);
 	const hudTickRef = useRef(0);
+	const animRef = useRef(0); // real-time clock for idle/run animation
+	const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const lastGrainRef = useRef(0);
+	// Render-only FX + frame-to-frame diff bookkeeping.
+	const partsRef = useRef<Particle[]>([]);
+	const prevFoxRef = useRef<Map<number, { x: number; row: number; type: FoxType }>>(new Map());
+	const prevTowerRef = useRef<Map<number, { type: TowerType; col: number; row: number }>>(new Map());
+	const prevEggRef = useRef<Map<number, { x: number; row: number }>>(new Map());
+	const prevGrainRef = useRef<Map<number, { x: number; y: number; value: number }>>(new Map());
 	// Mirrors for listeners / pointer handlers.
 	const statusRef = useRef<Status>('ready');
 	const selectedRef = useRef<Selected>(null);
@@ -92,26 +164,220 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		setSelected(v);
 	};
 
-	/* ---------- Rendering (cell units) ---------- */
+	/* ---------- Particles ---------- */
+	const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
+	const push = (p: Particle): void => {
+		if (partsRef.current.length < 320) partsRef.current.push(p);
+	};
+	const emitFoxPoof = (info: { x: number; row: number; type: FoxType }): void => {
+		const cx = info.x;
+		const cy = info.row + 0.5;
+		const style = FOX_STYLE[info.type];
+		const n = info.type === 'mega' ? 14 : 7;
+		for (let i = 0; i < n; i++)
+			push({ x: cx, y: cy, vx: rnd(-1.4, 1.4), vy: rnd(-2, -0.3), g: 4.5, life: 0.55, maxLife: 0.55, size: rnd(0.05, 0.11), color: i % 2 ? style.fur : style.belly, kind: 'feather' });
+		for (let i = 0; i < 4; i++)
+			push({ x: cx, y: cy, vx: rnd(-0.8, 0.8), vy: rnd(-0.6, 0.2), g: 1, life: 0.5, maxLife: 0.5, size: rnd(0.08, 0.16), color: 'rgba(150,140,120,0.5)', kind: 'dust' });
+		push({ x: cx, y: cy - 0.25, vx: 0, vy: -0.7, g: 0, life: 0.85, maxLife: 0.85, size: 0.34, color: '#ffe08a', kind: 'text', text: `+${FOX[info.type].reward}` });
+	};
+	const emitBlast = (info: { col: number; row: number }): void => {
+		const cx = info.col + 0.5;
+		const cy = info.row + 0.5;
+		for (let i = 0; i < 20; i++)
+			push({ x: cx, y: cy, vx: rnd(-3, 3), vy: rnd(-3, 1.5), g: 5, life: rnd(0.4, 0.7), maxLife: 0.7, size: rnd(0.06, 0.16), color: i % 2 ? '#ffb347' : '#ff6a2b', kind: 'spark' });
+	};
+	const emitPuff = (info: { col: number; row: number }): void => {
+		const cx = info.col + 0.5;
+		const cy = info.row + 0.5;
+		for (let i = 0; i < 6; i++)
+			push({ x: cx, y: cy, vx: rnd(-1, 1), vy: rnd(-1.2, -0.1), g: 2, life: 0.5, maxLife: 0.5, size: rnd(0.08, 0.15), color: 'rgba(120,110,95,0.55)', kind: 'dust' });
+	};
+	const emitSplash = (info: { x: number; row: number }): void => {
+		for (let i = 0; i < 6; i++)
+			push({ x: info.x, y: info.row + 0.5, vx: rnd(-1.4, 1.4), vy: rnd(-1.4, 0.4), g: 3, life: 0.35, maxLife: 0.35, size: rnd(0.03, 0.07), color: '#fff6e0', kind: 'splash' });
+	};
+	const emitGrainCollect = (info: { x: number; y: number; value: number }): void => {
+		for (let i = 0; i < 8; i++)
+			push({ x: info.x, y: info.y, vx: rnd(-1.2, 1.2), vy: rnd(-2.2, -0.6), g: 1.5, life: 0.6, maxLife: 0.6, size: rnd(0.04, 0.09), color: i % 2 ? '#ffe08a' : '#ffd85a', kind: 'spark' });
+		push({ x: info.x, y: info.y - 0.15, vx: 0, vy: -0.9, g: 0, life: 0.8, maxLife: 0.8, size: 0.32, color: '#ffe08a', kind: 'text', text: `+${info.value}` });
+	};
+
+	const detectEvents = (st: State): void => {
+		const cur = new Set<number>();
+		for (const f of st.foxes) cur.add(f.id);
+		if (!st.over) for (const [id, info] of prevFoxRef.current) if (!cur.has(id)) emitFoxPoof(info);
+		prevFoxRef.current.clear();
+		for (const f of st.foxes) prevFoxRef.current.set(f.id, { x: f.x, row: f.row, type: f.type });
+
+		const curT = new Set<number>();
+		for (const t of st.towers) curT.add(t.id);
+		for (const [id, info] of prevTowerRef.current) if (!curT.has(id)) (info.type === 'mine' ? emitBlast : emitPuff)(info);
+		prevTowerRef.current.clear();
+		for (const t of st.towers) prevTowerRef.current.set(t.id, { type: t.type, col: t.col, row: t.row });
+
+		const curE = new Set<number>();
+		for (const e of st.eggs) curE.add(e.id);
+		for (const [id, info] of prevEggRef.current) if (!curE.has(id) && info.x <= COLS + 0.6) emitSplash(info);
+		prevEggRef.current.clear();
+		for (const e of st.eggs) prevEggRef.current.set(e.id, { x: e.x, row: e.row });
+
+		const curG = new Set<number>();
+		for (const g of st.grains) curG.add(g.id);
+		for (const [id, info] of prevGrainRef.current) if (!curG.has(id)) emitGrainCollect(info);
+		prevGrainRef.current.clear();
+		for (const g of st.grains) prevGrainRef.current.set(g.id, { x: g.x, y: g.y, value: g.value });
+	};
+
+	const updateParticles = (dt: number): void => {
+		const ps = partsRef.current;
+		for (const p of ps) {
+			p.x += p.vx * dt;
+			p.y += p.vy * dt;
+			p.vy += p.g * dt;
+			p.life -= dt;
+		}
+		partsRef.current = ps.filter((p) => p.life > 0);
+	};
+
+	/* ---------- Rendering (cell units, henhouse-shifted) ---------- */
 	const draw = useCallback(() => {
 		const cv = canvasRef.current;
 		const st = stateRef.current;
 		if (!cv || !st) return;
 		const ctx = cv.getContext('2d');
 		if (!ctx) return;
-		ctx.clearRect(0, 0, COLS, LANES);
+		const anim = animRef.current;
+		ctx.clearRect(0, 0, VIEW_W, LANES);
+		ctx.save();
+		ctx.translate(HENHOUSE_W, 0);
 
-		// Lanes.
+		const dot = (x: number, y: number, rr: number): void => {
+			ctx.beginPath();
+			ctx.arc(x, y, rr, 0, Math.PI * 2);
+			ctx.fill();
+		};
+		const tri = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number): void => {
+			ctx.beginPath();
+			ctx.moveTo(ax, ay);
+			ctx.lineTo(bx, by);
+			ctx.lineTo(cx, cy);
+			ctx.closePath();
+			ctx.fill();
+		};
+		const ellipse = (x: number, y: number, rx: number, ry: number): void => {
+			ctx.beginPath();
+			ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+			ctx.fill();
+		};
+		const hpBar = (cx: number, cy: number, r: number, frac: number): void => {
+			if (frac >= 1) return;
+			ctx.fillStyle = 'rgba(0,0,0,0.35)';
+			ctx.fillRect(cx - r, cy - r * 1.5, r * 2, 0.06);
+			ctx.fillStyle = frac > 0.5 ? '#2f9e6f' : frac > 0.25 ? '#f0a830' : '#d9534f';
+			ctx.fillRect(cx - r, cy - r * 1.5, r * 2 * frac, 0.06);
+		};
+
+		/* --- Ground: grid lanes, henhouse floor, forest floor --- */
 		for (let r = 0; r < LANES; r++) {
 			ctx.fillStyle = r % 2 === 0 ? '#8fce5f' : '#82c455';
 			ctx.fillRect(0, r, COLS, 1);
+			// furrow shading
+			ctx.fillStyle = 'rgba(60,110,40,0.10)';
+			ctx.fillRect(0, r + 0.92, COLS, 0.08);
 		}
-		// Henhouse fence (left edge).
+		// Decorative scatter (deterministic per cell).
+		for (let c = 0; c < COLS; c++) {
+			for (let r = 0; r < LANES; r++) {
+				const k = hash2(c + 1, r + 1);
+				const dx = c + 0.15 + hash2(c * 3 + 7, r) * 0.7;
+				const dy = r + 0.6 + hash2(c, r * 3 + 5) * 0.32;
+				if (k < 0.33) {
+					// grass tuft
+					ctx.strokeStyle = 'rgba(70,130,45,0.5)';
+					ctx.lineWidth = 0.03;
+					for (let b = -1; b <= 1; b++) {
+						ctx.beginPath();
+						ctx.moveTo(dx + b * 0.05, dy);
+						ctx.lineTo(dx + b * 0.09, dy - 0.16);
+						ctx.stroke();
+					}
+				} else if (k < 0.52) {
+					// little flower
+					ctx.fillStyle = k < 0.42 ? '#f5d24a' : '#e98fb5';
+					for (let p = 0; p < 5; p++) {
+						const a = (p / 5) * Math.PI * 2;
+						dot(dx + Math.cos(a) * 0.05, dy + Math.sin(a) * 0.05, 0.032);
+					}
+					ctx.fillStyle = '#fff6d0';
+					dot(dx, dy, 0.03);
+				} else if (k < 0.62) {
+					// pebble
+					ctx.fillStyle = 'rgba(120,120,120,0.4)';
+					ellipse(dx, dy, 0.06, 0.04);
+				}
+			}
+		}
+		// Forest approach floor (right).
+		const fg = ctx.createLinearGradient(COLS, 0, COLS + APPROACH, 0);
+		fg.addColorStop(0, '#7bb84f');
+		fg.addColorStop(1, '#5b7d38');
+		ctx.fillStyle = fg;
+		ctx.fillRect(COLS, 0, APPROACH, LANES);
+		ctx.fillStyle = '#6a5230';
+		ctx.fillRect(COLS, 0, 0.12, LANES); // dirt lip where they emerge
+		// Tree line at the far right.
+		for (let r = 0; r < LANES; r++) {
+			const bx = COLS + APPROACH - 0.28 + hash2(r + 2, 9) * 0.12;
+			const by = r + 0.5;
+			ctx.fillStyle = '#3f6b2c';
+			dot(bx, by - 0.12, 0.3);
+			ctx.fillStyle = '#4c7d33';
+			dot(bx - 0.16, by + 0.12, 0.22);
+			dot(bx + 0.16, by + 0.14, 0.2);
+		}
+
+		/* --- Henhouse + nests (left) --- */
+		// Grassy mound base.
+		ctx.fillStyle = '#7cbb52';
+		ctx.fillRect(-HENHOUSE_W, 0, HENHOUSE_W, LANES);
+		// Coop building spanning the lanes.
+		const coopX = -HENHOUSE_W + 0.1;
+		const coopW = HENHOUSE_W - 0.34;
+		ctx.fillStyle = '#c46b3d';
+		ctx.fillRect(coopX, 0.5, coopW, LANES - 1);
+		ctx.fillStyle = '#a8542c';
+		for (let i = 0; i < 5; i++) {
+			ctx.fillRect(coopX, 0.5 + i * ((LANES - 1) / 5), coopW, 0.05);
+		}
+		// Roof.
+		ctx.fillStyle = '#7c4a2b';
+		tri(-HENHOUSE_W, 0.55, coopX + coopW + 0.06, 0.55, -HENHOUSE_W + HENHOUSE_W / 2, -0.35 + 0);
+		ctx.fillStyle = '#8a5732';
+		ctx.fillRect(coopX, 0.4, coopW, 0.16);
+		// Round door.
+		ctx.fillStyle = '#3a2415';
+		dot(coopX + coopW * 0.5, LANES * 0.5, 0.34);
+		ctx.fillStyle = '#ffd97a';
+		dot(coopX + coopW * 0.5, LANES * 0.5, 0.34 * 0.62);
+		// Nests, one per lane (the objectives), just inside the fence.
+		for (let r = 0; r < LANES; r++) {
+			const nx = -0.12;
+			const ny = r + 0.62;
+			ctx.fillStyle = '#b58a3c';
+			ellipse(nx, ny, 0.2, 0.12);
+			ctx.fillStyle = '#caa24a';
+			ellipse(nx, ny - 0.02, 0.15, 0.08);
+			ctx.fillStyle = '#fdf4dd';
+			dot(nx - 0.05, ny - 0.03, 0.05);
+			dot(nx + 0.05, ny - 0.03, 0.05);
+		}
+		// Fence posts on the henhouse edge.
 		ctx.fillStyle = '#8a5a2b';
-		ctx.fillRect(0, 0, 0.14, LANES);
-		ctx.fillStyle = 'rgba(255,255,255,0.15)';
-		ctx.fillRect(0.14, 0, 0.03, LANES);
-		// Grid lines.
+		ctx.fillRect(0, 0, 0.08, LANES);
+		ctx.fillStyle = 'rgba(255,255,255,0.14)';
+		ctx.fillRect(0.08, 0, 0.02, LANES);
+
+		/* --- Grid lines --- */
 		ctx.strokeStyle = 'rgba(0,0,0,0.08)';
 		ctx.lineWidth = 0.015;
 		for (let c = 1; c < COLS; c++) {
@@ -127,51 +393,68 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			ctx.stroke();
 		}
 
-		const tri = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number): void => {
-			ctx.beginPath();
-			ctx.moveTo(ax, ay);
-			ctx.lineTo(bx, by);
-			ctx.lineTo(cx, cy);
-			ctx.closePath();
-			ctx.fill();
-		};
-		const dot = (x: number, y: number, rr: number): void => {
-			ctx.beginPath();
-			ctx.arc(x, y, rr, 0, Math.PI * 2);
-			ctx.fill();
-		};
-		const hpBar = (cx: number, cy: number, r: number, frac: number): void => {
-			if (frac >= 1) return;
-			ctx.fillStyle = 'rgba(0,0,0,0.35)';
-			ctx.fillRect(cx - r, cy - r * 1.5, r * 2, 0.06);
-			ctx.fillStyle = frac > 0.5 ? '#2f9e6f' : frac > 0.25 ? '#f0a830' : '#d9534f';
-			ctx.fillRect(cx - r, cy - r * 1.5, r * 2 * frac, 0.06);
-		};
-		const drawHen = (cx: number, cy: number, r: number, comb: string, body: string, alpha = 1): void => {
+		/* --- Sprites --- */
+		const drawHen = (cx: number, cy: number, r: number, s: HenStyle, flap: number, twin: boolean, alpha = 1): void => {
 			ctx.save();
 			ctx.globalAlpha = alpha;
 			ctx.translate(cx, cy);
-			ctx.fillStyle = comb;
-			ctx.beginPath();
-			ctx.arc(-r * 0.2, -r, r * 0.28, 0, Math.PI * 2);
-			ctx.arc(r * 0.2, -r, r * 0.28, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.fillStyle = body;
-			ctx.beginPath();
-			ctx.arc(0, 0, r, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.strokeStyle = 'rgba(0,0,0,0.16)';
-			ctx.lineWidth = 0.02;
+			// feet
+			ctx.strokeStyle = '#e0a020';
+			ctx.lineWidth = r * 0.1;
+			ctx.lineCap = 'round';
+			for (const fx of [-r * 0.28, r * 0.28]) {
+				ctx.beginPath();
+				ctx.moveTo(fx, r * 0.78);
+				ctx.lineTo(fx, r * 1.02);
+				ctx.stroke();
+			}
+			// tail feathers (back-left)
+			ctx.fillStyle = s.bodyDark;
+			tri(-r * 0.7, -r * 0.1, -r * 1.25, -r * 0.5, -r * 0.7, r * 0.35);
+			// body
+			ctx.fillStyle = s.body;
+			ellipse(0, 0, r * 0.98, r * 0.9);
+			// top shading
+			ctx.fillStyle = s.bodyDark;
+			ctx.globalAlpha = alpha * 0.5;
+			ellipse(-r * 0.1, -r * 0.4, r * 0.7, r * 0.35);
+			ctx.globalAlpha = alpha;
+			// wing (flaps on fire)
+			ctx.save();
+			ctx.translate(r * 0.1, r * 0.05);
+			ctx.rotate(-flap * 0.5);
+			ctx.fillStyle = s.wing;
+			ellipse(0, 0, r * 0.5, r * 0.34);
+			ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+			ctx.lineWidth = 0.015;
 			ctx.stroke();
-			ctx.fillStyle = '#f0a830'; // beak faces right (toward foxes)
-			tri(r * 0.7, 0, r * 1.35, r * 0.16, r * 0.7, r * 0.32);
+			ctx.restore();
+			// comb (double for twin)
+			ctx.fillStyle = s.comb;
+			for (const cxo of twin ? [-r * 0.25, r * 0.25] : [0]) {
+				dot(cxo - r * 0.16, -r, r * 0.16);
+				dot(cxo + r * 0.02, -r * 1.08, r * 0.18);
+				dot(cxo + r * 0.2, -r, r * 0.15);
+			}
+			// wattle
+			ctx.fillStyle = '#e34b4b';
+			dot(r * 0.68, r * 0.28, r * 0.1);
+			// beak (faces right, toward foxes)
+			ctx.fillStyle = '#f0a830';
+			tri(r * 0.72, -r * 0.02, r * 1.4, r * 0.14, r * 0.72, r * 0.3);
+			// eye
+			ctx.fillStyle = '#fff';
+			dot(r * 0.34, -r * 0.26, r * 0.17);
 			ctx.fillStyle = '#222';
-			dot(r * 0.32, -r * 0.28, r * 0.13);
+			dot(r * 0.4, -r * 0.26, r * 0.09);
+			ctx.fillStyle = '#fff';
+			dot(r * 0.44, -r * 0.3, r * 0.03);
 			ctx.restore();
 		};
-		const drawHay = (cx: number, cy: number, r: number, frac: number): void => {
+		const drawHay = (cx: number, cy: number, r: number, frac: number, alpha = 1): void => {
 			const w = r * 1.9;
 			ctx.save();
+			ctx.globalAlpha = alpha;
 			ctx.translate(cx, cy);
 			ctx.fillStyle = frac > 0.4 ? '#c9a24a' : '#a9843a';
 			const x = -w / 2;
@@ -192,71 +475,227 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				ctx.lineTo(x + w, (i * w) / 3);
 				ctx.stroke();
 			}
+			// binding rope
+			ctx.strokeStyle = 'rgba(90,60,20,0.7)';
+			ctx.lineWidth = 0.05;
+			ctx.beginPath();
+			ctx.moveTo(-w * 0.18, -w / 2);
+			ctx.lineTo(-w * 0.18, w / 2);
+			ctx.stroke();
+			ctx.restore();
+		};
+		const drawMine = (cx: number, cy: number, r: number, armed: boolean, alpha = 1): void => {
+			ctx.save();
+			ctx.globalAlpha = alpha;
+			ctx.translate(cx, cy);
+			// earth mound
+			ctx.fillStyle = '#6a4a2a';
+			ellipse(0, r * 0.35, r * 0.95, r * 0.55);
+			ctx.fillStyle = '#5a3e22';
+			ellipse(0, r * 0.5, r * 0.7, r * 0.32);
+			// egg poking out
+			ctx.fillStyle = '#fdf4dd';
+			ellipse(0, -r * 0.05, r * 0.5, r * 0.62);
+			ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+			ctx.lineWidth = 0.02;
+			ctx.stroke();
+			// fuse light
+			ctx.fillStyle = armed ? '#e34b4b' : '#8a8f96';
+			dot(0, -r * 0.5, r * 0.14);
+			if (armed) {
+				ctx.fillStyle = 'rgba(255,120,90,0.35)';
+				dot(0, -r * 0.5, r * 0.26);
+			}
 			ctx.restore();
 		};
 		const drawTower = (t: Tower): void => {
-			const cx = t.col + 0.5;
-			const cy = t.row + 0.5;
+			const bob = Math.sin(anim * 3 + t.id) * 0.02;
+			const recoil = t.fireFlash > 0 ? (t.fireFlash / 0.18) * 0.06 : 0;
+			const cx = t.col + 0.5 - recoil;
+			const cy = t.row + 0.5 + bob;
 			const r = 0.34;
 			const frac = t.maxHp ? t.hp / t.maxHp : 1;
 			if (t.type === 'costaude') drawHay(cx, cy, r, frac);
-			else if (t.type === 'pondeuse') drawHen(cx, cy, r, '#e8b23a', '#fdfdfd');
-			else if (t.type === 'mitrailleuse') drawHen(cx, cy, r, '#e34b4b', '#ffd8d8');
-			else drawHen(cx, cy, r, '#e34b4b', '#fdfdfd');
-			hpBar(cx, cy, r, frac);
+			else if (t.type === 'mine') drawMine(t.col + 0.5, t.row + 0.5, r, t.armed <= 0);
+			else {
+				const flap = t.fireFlash > 0 ? t.fireFlash / 0.18 : Math.max(0, Math.sin(anim * 3 + t.id)) * 0.25;
+				drawHen(cx, cy, r, HEN_STYLE[t.type], flap, t.type === 'gemellaire');
+			}
+			hpBar(t.col + 0.5, t.row + 0.5, r, frac);
 		};
 		const drawFox = (f: Fox): void => {
+			const s = FOX_STYLE[f.type];
 			const mega = f.type === 'mega';
+			const r = foxRadius(f.type);
 			const cx = f.x;
 			const cy = f.row + 0.5;
-			const r = mega ? 0.62 : 0.36;
 			const frac = f.maxHp ? Math.max(0, f.hp / f.maxHp) : 1;
+			const alpha = f.x > COLS ? clamp(1 - (f.x - COLS) / APPROACH, 0.12, 1) : 1;
+
+			// Creuseur burrowed: only a dirt mound + ears until midfield.
+			if (f.type === 'creuseur' && f.x > COLS / 2) {
+				ctx.save();
+				ctx.globalAlpha = alpha;
+				ctx.translate(cx, cy + 0.2);
+				ctx.fillStyle = '#6a4a2a';
+				ellipse(0, 0, r * 1.1, r * 0.5);
+				ctx.fillStyle = '#5a3e22';
+				ellipse(-r * 0.3 + Math.sin(anim * 8 + f.id) * 0.03, -r * 0.1, r * 0.4, r * 0.25);
+				ctx.fillStyle = s.fur;
+				tri(-r * 0.35, -r * 0.35, -r * 0.15, -r * 0.8, 0, -r * 0.3);
+				tri(r * 0.1, -r * 0.35, r * 0.3, -r * 0.8, r * 0.45, -r * 0.3);
+				ctx.restore();
+				return;
+			}
+
 			ctx.save();
+			ctx.globalAlpha = alpha;
 			ctx.translate(cx, cy);
-			ctx.fillStyle = mega ? '#a8531c' : '#d8722c';
-			tri(-r * 0.7, -r * 0.5, -r * 0.2, -r * 1.3, 0, -r * 0.6);
-			tri(r * 0.7, -r * 0.5, r * 0.2, -r * 1.3, 0, -r * 0.6);
-			ctx.beginPath();
-			ctx.arc(0, 0, r, 0, Math.PI * 2);
-			ctx.fillStyle = mega
-				? `rgb(${Math.round(150 + (1 - frac) * 40)},${Math.round(60 * frac + 28)},${Math.round(30 * frac)})`
-				: `rgb(${Math.round(210 + (1 - frac) * 30)},${Math.round(110 * frac + 40)},${Math.round(50 * frac)})`;
-			ctx.fill();
-			ctx.fillStyle = '#fff'; // snout faces left (moving left)
-			dot(-r * 0.5, r * 0.15, r * 0.32);
+			const run = f.eating ? 0 : Math.sin(anim * 12 + f.id * 1.7);
+			const lunge = f.eating ? Math.max(0, Math.sin(anim * 14 + f.id)) * 0.05 : 0;
+			ctx.translate(-lunge, 0);
+			// legs
+			ctx.strokeStyle = s.furDark;
+			ctx.lineWidth = r * 0.16;
+			ctx.lineCap = 'round';
+			const leg = (lx: number, sw: number): void => {
+				ctx.beginPath();
+				ctx.moveTo(lx, r * 0.45);
+				ctx.lineTo(lx + sw * r * 0.5, r * 1.0);
+				ctx.stroke();
+			};
+			leg(-r * 0.45, run);
+			leg(r * 0.4, -run);
+			leg(-r * 0.15, -run * 0.7);
+			leg(r * 0.12, run * 0.7);
+			// tail (back-right) with pale tip
+			ctx.save();
+			ctx.rotate(Math.sin(anim * 5 + f.id) * 0.2);
+			ctx.fillStyle = s.fur;
+			tri(r * 0.7, -r * 0.2, r * 1.5, -r * 0.6, r * 0.8, r * 0.35);
+			ctx.fillStyle = s.belly;
+			dot(r * 1.4, -r * 0.55, r * 0.16);
+			ctx.restore();
+			// body
+			ctx.fillStyle = s.fur;
+			ellipse(0, 0, r * 1.05, r * 0.82);
+			ctx.fillStyle = s.belly;
+			ellipse(-r * 0.2, r * 0.25, r * 0.7, r * 0.4);
+			ctx.fillStyle = s.furDark;
+			ctx.globalAlpha = alpha * 0.4;
+			ellipse(r * 0.15, -r * 0.4, r * 0.6, r * 0.3);
+			ctx.globalAlpha = alpha;
+			// armor plate for blindé
+			if (f.type === 'blinde') {
+				ctx.fillStyle = '#9aa0a8';
+				ellipse(r * 0.05, -r * 0.15, r * 0.7, r * 0.5);
+				ctx.fillStyle = '#c3c8ce';
+				ellipse(r * 0.05, -r * 0.25, r * 0.5, r * 0.28);
+				ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+				ctx.lineWidth = 0.02;
+				ctx.beginPath();
+				ctx.moveTo(r * 0.05, -r * 0.6);
+				ctx.lineTo(r * 0.05, r * 0.3);
+				ctx.stroke();
+			}
+			// head/snout (faces left)
+			ctx.fillStyle = s.fur;
+			ellipse(-r * 0.55, -r * 0.05, r * 0.55, r * 0.5);
+			ctx.fillStyle = '#fff';
+			dot(-r * 0.75, r * 0.12, r * 0.28);
 			ctx.fillStyle = '#222';
-			dot(-r * 0.15, -r * 0.12, r * 0.12);
-			dot(r * 0.35, -r * 0.12, r * 0.12);
-			dot(-r * 0.72, r * 0.05, r * 0.1);
+			dot(-r * 1.02, r * 0.12, r * 0.08); // nose
+			// ears
+			ctx.fillStyle = s.fur;
+			tri(-r * 0.75, -r * 0.4, -r * 0.55, -r * 1.15, -r * 0.3, -r * 0.45);
+			tri(-r * 0.3, -r * 0.45, -r * 0.1, -r * 1.05, r * 0.05, -r * 0.4);
+			ctx.fillStyle = s.furDark;
+			tri(-r * 0.6, -r * 0.5, -r * 0.5, -r * 0.95, -r * 0.35, -r * 0.5);
+			// eyes
+			ctx.fillStyle = '#222';
+			dot(-r * 0.45, -r * 0.12, r * 0.1);
+			dot(-r * 0.08, -r * 0.12, r * 0.1);
 			if (mega) {
-				// angry eyebrows
 				ctx.strokeStyle = '#111';
 				ctx.lineWidth = 0.05;
-				ctx.lineCap = 'round';
 				ctx.beginPath();
-				ctx.moveTo(-r * 0.34, -r * 0.36);
-				ctx.lineTo(-r * 0.02, -r * 0.2);
+				ctx.moveTo(-r * 0.6, -r * 0.4);
+				ctx.lineTo(-r * 0.3, -r * 0.22);
+				ctx.moveTo(-r * 0.02, -r * 0.4);
+				ctx.lineTo(-r * 0.28, -r * 0.22);
 				ctx.stroke();
-				ctx.beginPath();
-				ctx.moveTo(r * 0.52, -r * 0.36);
-				ctx.lineTo(r * 0.2, -r * 0.2);
-				ctx.stroke();
+			}
+			// frost tint
+			if (f.slow > 0) {
+				ctx.globalAlpha = alpha * 0.4;
+				ctx.fillStyle = '#9fd0ff';
+				ellipse(-r * 0.1, 0, r * 1.05, r * 0.85);
+				ctx.globalAlpha = alpha;
 			}
 			ctx.restore();
 			hpBar(cx, cy, r, frac);
 		};
+		const drawGrain = (g: Grain): void => {
+			const bob = g.y >= g.rest ? Math.sin(anim * 4 + g.id) * 0.03 : 0;
+			const x = g.x;
+			const y = g.y + bob;
+			const r = 0.19;
+			const blink = g.ttl < 2 ? 0.55 + 0.45 * Math.abs(Math.sin(anim * 8)) : 1;
+			ctx.save();
+			ctx.globalAlpha = blink;
+			ctx.fillStyle = 'rgba(255,220,120,0.28)';
+			dot(x, y, r * 1.6);
+			ctx.fillStyle = '#ffd85a';
+			dot(x, y, r);
+			ctx.strokeStyle = '#c9901f';
+			ctx.lineWidth = 0.03;
+			ctx.beginPath();
+			ctx.arc(x, y, r, 0, Math.PI * 2);
+			ctx.stroke();
+			// wheat kernels
+			ctx.fillStyle = '#e8a92a';
+			for (let i = 0; i < 3; i++) ellipse(x - 0.05 + i * 0.05, y, 0.02, 0.05);
+			ctx.fillStyle = 'rgba(255,255,255,0.75)';
+			dot(x - r * 0.35, y - r * 0.35, r * 0.28);
+			ctx.restore();
+		};
 
 		for (const e of st.eggs) {
-			ctx.fillStyle = '#fff6e0';
-			ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+			ctx.fillStyle = e.frost ? '#dff0ff' : '#fff6e0';
+			ctx.strokeStyle = e.frost ? 'rgba(90,150,210,0.5)' : 'rgba(0,0,0,0.15)';
 			ctx.lineWidth = 0.02;
+			ctx.save();
+			ctx.translate(e.x, e.row + 0.5);
+			ctx.rotate(e.x * 6);
 			ctx.beginPath();
-			ctx.ellipse(e.x, e.row + 0.5, 0.11, 0.15, 0, 0, Math.PI * 2);
+			ctx.ellipse(0, 0, 0.11, 0.15, 0, 0, Math.PI * 2);
 			ctx.fill();
 			ctx.stroke();
+			ctx.restore();
 		}
 		for (const t of st.towers) drawTower(t);
 		for (const f of st.foxes) drawFox(f);
+		for (const g of st.grains) drawGrain(g);
+
+		// Particles.
+		for (const p of partsRef.current) {
+			const a = clamp(p.life / p.maxLife, 0, 1);
+			ctx.globalAlpha = a;
+			if (p.kind === 'text') {
+				ctx.fillStyle = p.color;
+				ctx.font = `bold ${p.size}px system-ui, sans-serif`;
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+				ctx.lineWidth = 0.03;
+				ctx.strokeText(p.text ?? '', p.x, p.y);
+				ctx.fillText(p.text ?? '', p.x, p.y);
+			} else {
+				ctx.fillStyle = p.color;
+				dot(p.x, p.y, p.size);
+			}
+		}
+		ctx.globalAlpha = 1;
 
 		// Placement preview.
 		const h = hoverRef.current;
@@ -266,13 +705,18 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			ctx.fillStyle = occupied ? 'rgba(220,60,60,0.18)' : 'rgba(255,255,255,0.18)';
 			ctx.fillRect(h.col, h.row, 1, 1);
 			if (!occupied) {
-				if (sel === 'costaude') drawHay(h.col + 0.5, h.row + 0.5, 0.34, 1);
-				else drawHen(h.col + 0.5, h.row + 0.5, 0.34, sel === 'pondeuse' ? '#e8b23a' : '#e34b4b', sel === 'mitrailleuse' ? '#ffd8d8' : '#fdfdfd', 0.55);
+				const cx = h.col + 0.5;
+				const cy = h.row + 0.5;
+				if (sel === 'costaude') drawHay(cx, cy, 0.34, 1, 0.55);
+				else if (sel === 'mine') drawMine(cx, cy, 0.34, false, 0.55);
+				else drawHen(cx, cy, 0.34, HEN_STYLE[sel], 0, sel === 'gemellaire', 0.55);
 			}
 		} else if (statusRef.current === 'playing' && h && sel === 'shovel') {
 			ctx.fillStyle = 'rgba(220,60,60,0.2)';
 			ctx.fillRect(h.col, h.row, 1, 1);
 		}
+
+		ctx.restore();
 	}, []);
 
 	/* ---------- Loop ---------- */
@@ -282,8 +726,16 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		rafRef.current = 0;
 	}, []);
 
+	const triggerBump = (): void => {
+		setGrainBump(true);
+		if (bumpTimerRef.current) clearTimeout(bumpTimerRef.current);
+		bumpTimerRef.current = setTimeout(() => setGrainBump(false), 280);
+	};
+
 	const syncHud = (st: State): void => {
-		setHud({ grain: Math.floor(st.grain), cd: { ...st.cooldowns } });
+		if (st.grain > lastGrainRef.current) triggerBump();
+		lastGrainRef.current = st.grain;
+		setHud({ grain: Math.floor(st.grain), wave: st.wave, cd: { ...st.cooldowns } });
 		if (st.score !== score) setScore(st.score);
 		const hasMega = st.foxes.some((f) => f.type === 'mega');
 		if (hasMega !== megaAlertRef.current) {
@@ -326,9 +778,11 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const frame = useCallback(
 		(now: number) => {
 			if (!runningRef.current) return;
-			const dt = Math.min(now - lastRef.current, 200);
+			const rawDt = Math.min(now - lastRef.current, 200);
 			lastRef.current = now;
-			accRef.current += dt;
+			const realDt = rawDt / 1000;
+			animRef.current += realDt;
+			accRef.current += rawDt;
 			const st = stateRef.current!;
 			const rng = rngRef.current;
 			while (runningRef.current && accRef.current >= STEP) {
@@ -336,6 +790,8 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				step(st, STEP / 1000, rng);
 				if (st.over) break;
 			}
+			detectEvents(st);
+			updateParticles(realDt);
 			draw();
 			if (++hudTickRef.current % 6 === 0) syncHud(st);
 			if (st.over) {
@@ -349,6 +805,16 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		[draw, onGameOver],
 	);
 
+	const resetFx = (st: State): void => {
+		partsRef.current = [];
+		prevFoxRef.current.clear();
+		prevTowerRef.current.clear();
+		prevEggRef.current.clear();
+		prevGrainRef.current.clear();
+		animRef.current = 0;
+		lastGrainRef.current = st.grain;
+	};
+
 	const start = useCallback(() => {
 		if (dailyRef.current && triesRef.current >= MAX_TRIES) return;
 		stateRef.current = createGame(diffIdxRef.current, mulberry32(seedRef.current));
@@ -357,8 +823,9 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		lastRef.current = performance.now();
 		startRef.current = Date.now();
 		runningRef.current = true;
+		resetFx(stateRef.current);
 		setScore(0);
-		setHud({ grain: Math.floor(stateRef.current.grain), cd: {} });
+		setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, cd: {} });
 		megaAlertRef.current = false;
 		setMegaAlert(false);
 		selectCard(null);
@@ -395,10 +862,11 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			diffIdxRef.current = DIFF_ORDER.indexOf(key);
 			seedRef.current = (Math.random() * 2 ** 32) >>> 0;
 			stateRef.current = createGame(diffIdxRef.current, mulberry32(seedRef.current));
+			resetFx(stateRef.current);
 			selectCard(null);
 			setStat('ready');
 			setScore(0);
-			setHud({ grain: Math.floor(stateRef.current.grain), cd: {} });
+			setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, cd: {} });
 			let b = 0;
 			try {
 				b = Number(localStorage.getItem(bestKey(key))) || 0;
@@ -426,8 +894,9 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			const b = run?.best ?? 0;
 			setBest(b);
 			stateRef.current = createGame(diffIndex, mulberry32(seedRef.current));
+			resetFx(stateRef.current);
 			setScore(0);
-			setHud({ grain: Math.floor(stateRef.current.grain), cd: {} });
+			setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, cd: {} });
 			const exhausted = triesRef.current >= MAX_TRIES;
 			setAlreadyPlayed(exhausted);
 			setStat(exhausted ? 'over' : 'ready');
@@ -453,12 +922,12 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		const wrap = wrapRef.current;
 		if (!cv || !wrap) return;
 		const cssW = wrap.clientWidth;
-		const cssH = (cssW * LANES) / COLS;
+		const cssH = (cssW * LANES) / VIEW_W;
 		const dpr = window.devicePixelRatio || 1;
 		cv.style.height = `${cssH}px`;
 		cv.width = Math.round(cssW * dpr);
 		cv.height = Math.round(cssH * dpr);
-		scaleRef.current = cssW / COLS;
+		scaleRef.current = cssW / VIEW_W;
 		const ctx = cv.getContext('2d');
 		if (ctx) ctx.setTransform(dpr * scaleRef.current, 0, 0, dpr * scaleRef.current, 0, 0);
 		draw();
@@ -491,32 +960,66 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		return () => document.removeEventListener('visibilitychange', onVis);
 	}, [frame, stop]);
 
-	/* ---------- Pointer (place / remove) ---------- */
-	const cellFrom = (e: React.PointerEvent): { row: number; col: number } | null => {
+	/* ---------- Pointer (collect / place / remove) ---------- */
+	const worldFrom = (e: React.PointerEvent): { wx: number; wy: number } | null => {
 		const cv = canvasRef.current;
 		if (!cv) return null;
 		const rect = cv.getBoundingClientRect();
-		const col = Math.floor(((e.clientX - rect.left) / rect.width) * COLS);
-		const row = Math.floor(((e.clientY - rect.top) / rect.height) * LANES);
+		const wx = ((e.clientX - rect.left) / rect.width) * VIEW_W - HENHOUSE_W;
+		const wy = ((e.clientY - rect.top) / rect.height) * LANES;
+		return { wx, wy };
+	};
+	const cellFrom = (e: React.PointerEvent): { row: number; col: number } | null => {
+		const w = worldFrom(e);
+		if (!w) return null;
+		const col = Math.floor(w.wx);
+		const row = Math.floor(w.wy);
 		if (row < 0 || row >= LANES || col < 0 || col >= COLS) return null;
 		return { row, col };
+	};
+	const grainAt = (wx: number, wy: number): Grain | undefined => {
+		const st = stateRef.current;
+		if (!st) return undefined;
+		let best: Grain | undefined;
+		let bestD = 0.34 * 0.34;
+		for (const g of st.grains) {
+			const dx = g.x - wx;
+			const dy = g.y - wy;
+			const d = dx * dx + dy * dy;
+			if (d < bestD) {
+				bestD = d;
+				best = g;
+			}
+		}
+		return best;
 	};
 	const onPointerMove = (e: React.PointerEvent): void => {
 		hoverRef.current = cellFrom(e);
 	};
 	const onPointerDown = (e: React.PointerEvent): void => {
 		if (statusRef.current !== 'playing') return;
-		const cell = cellFrom(e);
 		const st = stateRef.current;
+		if (!st) return;
+		const w = worldFrom(e);
+		if (w) {
+			const g = grainAt(w.wx, w.wy);
+			if (g) {
+				collectGrain(st, g.id);
+				setHud((h) => ({ ...h, grain: Math.floor(st.grain) }));
+				draw();
+				return;
+			}
+		}
+		const cell = cellFrom(e);
 		const sel = selectedRef.current;
-		if (!cell || !st || !sel) return;
+		if (!cell || !sel) return;
 		if (sel === 'shovel') {
 			st.towers = st.towers.filter((t) => !(t.row === cell.row && t.col === cell.col));
 			selectCard(null);
 		} else if (placeTower(st, sel, cell.row, cell.col)) {
 			selectCard(null);
 		}
-		setHud({ grain: Math.floor(st.grain), cd: { ...st.cooldowns } });
+		setHud((h) => ({ ...h, grain: Math.floor(st.grain), cd: { ...st.cooldowns } }));
 		draw();
 	};
 
@@ -545,9 +1048,10 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="cr-hud">
-				<span className="cr-grain">🌾 <strong>{hud.grain}</strong></span>
+				<span className={`cr-grain ${grainBump ? 'bump' : ''}`}>🌾 <strong>{hud.grain}</strong></span>
+				<span className="cr-scorepill">Vague <strong>{hud.wave}</strong></span>
 				<span className="cr-scorepill">Renards <strong>{score}</strong></span>
-				{daily ? <span className="cr-scorepill">Record <strong>{best}</strong></span> : <span className="cr-scorepill">Record <strong>{best}</strong></span>}
+				<span className="cr-scorepill">Record <strong>{best}</strong></span>
 			</div>
 
 			<div className="cr-cards">
@@ -578,7 +1082,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				</button>
 			</div>
 
-			{megaAlert && status === 'playing' && <div className="cr-mega-alert">🦊 Méga renard&nbsp;!</div>}
+			{megaAlert && status === 'playing' && <div className="cr-mega-alert">🦊 Méga renard&nbsp;! La meute se renforce</div>}
 
 			<div className="cr-playwrap" ref={wrapRef}>
 				<canvas
@@ -615,7 +1119,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="cr-help">
-				Sélectionne une cocotte puis clique une case pour la poser. Les pondeuses produisent du grain, les lanceuses tirent des œufs. Empêche les renards d'atteindre le poulailler&nbsp;!
+				Sélectionne une cocotte puis clique une case pour la poser. Les pondeuses lâchent du grain à ramasser (clique-le&nbsp;!). Poule des neiges, poule gémeaux, œuf-mine… Empêche les renards d'atteindre les nids à gauche&nbsp;!
 			</p>
 
 			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? best : undefined} />}
@@ -631,21 +1135,23 @@ const CSS = `
 .cr-pills { display: flex; gap: 6px; flex-wrap: wrap; }
 .cr-pill { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
 .cr-pill.active { background: var(--cr-accent); color: var(--accent-text-over); border-color: var(--cr-accent); }
-.cr-hud { display: flex; gap: 0.6rem; align-items: center; font-size: 14px; font-weight: 600; margin-bottom: 0.55rem; }
-.cr-grain { background: #3a2f14; color: #ffe08a; border-radius: 999px; padding: 6px 14px; font-variant-numeric: tabular-nums; }
+.cr-hud { display: flex; gap: 0.5rem; align-items: center; font-size: 14px; font-weight: 600; margin-bottom: 0.55rem; flex-wrap: wrap; justify-content: center; }
+.cr-grain { background: #3a2f14; color: #ffe08a; border-radius: 999px; padding: 6px 14px; font-variant-numeric: tabular-nums; transition: transform 0.1s ease; }
+.cr-grain.bump { animation: cr-bump 0.28s ease; }
+@keyframes cr-bump { 0% { transform: scale(1); } 40% { transform: scale(1.18); background: #5a4720; } 100% { transform: scale(1); } }
 .cr-scorepill { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 6px 12px; font-variant-numeric: tabular-nums; }
 .cr-grain strong, .cr-scorepill strong { margin-left: 3px; }
-.cr-cards { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.6rem; }
-.cr-card { position: relative; overflow: hidden; width: 62px; border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); border-radius: 10px; padding: 6px 4px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cr-cards { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.6rem; }
+.cr-card { position: relative; overflow: hidden; width: 56px; border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); border-radius: 10px; padding: 5px 3px 3px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .cr-card.sel { border-color: var(--cr-accent); box-shadow: 0 0 0 2px var(--cr-accent); }
 .cr-card.disabled, .cr-card:disabled { opacity: 0.45; cursor: not-allowed; }
-.cr-card-emoji { font-size: 22px; line-height: 1; }
-.cr-card-cost { font-size: 12px; font-weight: 700; color: #ffe08a; }
+.cr-card-emoji { font-size: 20px; line-height: 1; }
+.cr-card-cost { font-size: 11.5px; font-weight: 700; color: #ffe08a; }
 .cr-card-cd { position: absolute; left: 0; bottom: 0; width: 100%; background: rgba(0,0,0,0.55); pointer-events: none; }
-.cr-card.shovel { width: 50px; justify-content: center; }
-.cr-mega-alert { margin-bottom: 0.5rem; background: #b0281f; color: #fff; font-weight: 800; font-size: 13.5px; letter-spacing: 0.3px; border-radius: 999px; padding: 6px 16px; box-shadow: var(--shadow-md); animation: cr-pulse 0.9s ease-in-out infinite; }
+.cr-card.shovel { width: 46px; justify-content: center; }
+.cr-mega-alert { margin-bottom: 0.5rem; background: #b0281f; color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.2px; border-radius: 999px; padding: 6px 16px; box-shadow: var(--shadow-md); animation: cr-pulse 0.9s ease-in-out infinite; }
 @keyframes cr-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.72; transform: scale(1.05); } }
-@media (prefers-reduced-motion: reduce) { .cr-mega-alert { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .cr-mega-alert, .cr-grain.bump { animation: none; } }
 .cr-playwrap { width: 100%; position: relative; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
 .cr-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
 .cr-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.25); }
