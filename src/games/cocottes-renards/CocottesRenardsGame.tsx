@@ -15,6 +15,7 @@ import {
 	grainValue,
 	rebuyLane,
 	REBUY_COST,
+	TOKEN_TTL,
 	step,
 	type State,
 	type TowerType,
@@ -44,7 +45,9 @@ type Selected = TowerType | 'shovel' | null;
 const MAX_TRIES = 3;
 const STEP = 1000 / 60;
 const HENHOUSE_W = 1.15; // left margin: coop + nests to defend
+const VERT_PAD = 0.55; // top & bottom breathing room so hp bars / counters aren't clipped
 const VIEW_W = HENHOUSE_W + COLS + APPROACH;
+const VIEW_H = LANES + VERT_PAD * 2;
 const bestKey = (key: DiffKey): string => `ludiven-cocottes-best-${key}`;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 // Stable per-cell hash for decorative scatter (no per-frame flicker).
@@ -286,9 +289,12 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		const ctx = cv.getContext('2d');
 		if (!ctx) return;
 		const anim = animRef.current;
-		ctx.clearRect(0, 0, VIEW_W, LANES);
+		ctx.clearRect(0, 0, VIEW_W, VIEW_H);
 		ctx.save();
-		ctx.translate(HENHOUSE_W, 0);
+		ctx.translate(HENHOUSE_W, VERT_PAD);
+		// Grassy frame filling the top/bottom padding behind everything.
+		ctx.fillStyle = '#6fae44';
+		ctx.fillRect(-HENHOUSE_W, -VERT_PAD, VIEW_W, VIEW_H);
 
 		const dot = (x: number, y: number, rr: number): void => {
 			ctx.beginPath();
@@ -751,16 +757,30 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			for (let i = 0; i < 3; i++) ellipse(x - 0.05 + i * 0.05, y, 0.02, 0.05);
 			ctx.fillStyle = 'rgba(255,255,255,0.75)';
 			dot(x - r * 0.35, y - r * 0.35, r * 0.28);
-			// value counter above the token (green → red as it decays)
+			// countdown ring around the token (depletes over its lifetime)
+			const ttlFrac = clamp(g.ttl / TOKEN_TTL, 0, 1);
+			const tint = frac > 0.85 ? '#3ddc84' : frac > 0.6 ? '#ffcf4a' : '#ff6a4a';
 			ctx.globalAlpha = blink;
-			ctx.fillStyle = frac > 0.85 ? '#3ddc84' : frac > 0.6 ? '#ffe08a' : '#ff7a5a';
-			ctx.font = 'bold 0.22px system-ui, sans-serif';
+			ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+			ctx.lineWidth = 0.045;
+			ctx.beginPath();
+			ctx.arc(x, y, r * 1.45, 0, Math.PI * 2);
+			ctx.stroke();
+			ctx.strokeStyle = tint;
+			ctx.lineWidth = 0.05;
+			ctx.beginPath();
+			ctx.arc(x, y, r * 1.45, -Math.PI / 2, -Math.PI / 2 + ttlFrac * Math.PI * 2);
+			ctx.stroke();
+			// value counter above the token (green → red as it loses worth)
+			ctx.fillStyle = tint;
+			ctx.font = 'bold 0.3px system-ui, sans-serif';
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
-			ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-			ctx.lineWidth = 0.02;
-			ctx.strokeText(String(cur), x, y - r - 0.16);
-			ctx.fillText(String(cur), x, y - r - 0.16);
+			ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+			ctx.lineWidth = 0.035;
+			const cy = y - r - 0.24;
+			ctx.strokeText(String(cur), x, cy);
+			ctx.fillText(String(cur), x, cy);
 			ctx.restore();
 		};
 
@@ -1052,7 +1072,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		const wrap = wrapRef.current;
 		if (!cv || !wrap) return;
 		const cssW = wrap.clientWidth;
-		const cssH = (cssW * LANES) / VIEW_W;
+		const cssH = (cssW * VIEW_H) / VIEW_W;
 		const dpr = window.devicePixelRatio || 1;
 		cv.style.height = `${cssH}px`;
 		cv.width = Math.round(cssW * dpr);
@@ -1096,7 +1116,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		if (!cv) return null;
 		const rect = cv.getBoundingClientRect();
 		const wx = ((e.clientX - rect.left) / rect.width) * VIEW_W - HENHOUSE_W;
-		const wy = ((e.clientY - rect.top) / rect.height) * LANES;
+		const wy = ((e.clientY - rect.top) / rect.height) * VIEW_H - VERT_PAD;
 		return { wx, wy };
 	};
 	const cellFrom = (e: React.PointerEvent): { row: number; col: number } | null => {
