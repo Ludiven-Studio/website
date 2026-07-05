@@ -55,7 +55,7 @@ describe('cocottes-renards engine', () => {
 		s.grain = 999;
 		placeTower(s, 'pondeuse', 0, 0);
 		const after = s.grain; // 999 - 50
-		run(s, 5, mulberry32(3)); // one production tick (~4s), no trickle yet (~6s)
+		run(s, 6, mulberry32(3)); // one production tick (~5s), no trickle yet (~8s)
 		expect(s.grains.length).toBeGreaterThanOrEqual(1);
 		const token = s.grains.find((g) => !g.sky)!;
 		expect(token.value).toBe(25);
@@ -72,7 +72,7 @@ describe('cocottes-renards engine', () => {
 		s.grain = 999;
 		placeTower(s, 'pondeuse', 0, 0);
 		const after = s.grain;
-		run(s, 15, mulberry32(31)); // first token spawns ~4s, auto-collects ~9s later
+		run(s, 16, mulberry32(31)); // first token spawns ~5s, auto-collects ~9s later
 		expect(s.grain).toBeGreaterThanOrEqual(after + 25);
 	});
 

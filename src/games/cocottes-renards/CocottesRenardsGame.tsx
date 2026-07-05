@@ -70,7 +70,7 @@ interface Particle {
 }
 
 const CARD: Record<TowerType, { emoji: string; short: string; desc: string }> = {
-	pondeuse: { emoji: '🥚', short: 'Pondeuse', desc: 'Pond un œuf de grain toutes les 4 s (l\'œuf grossit sous elle) : clique-le pour l\'encaisser. Le moteur de ton économie, pose-en tôt !' },
+	pondeuse: { emoji: '🥚', short: 'Pondeuse', desc: 'Pond un œuf de grain toutes les 5 s (l\'œuf grossit sous elle) : clique-le pour l\'encaisser. Le moteur de ton économie, pose-en tôt !' },
 	lanceuse: { emoji: '🐔', short: 'Lanceuse', desc: 'Tire des œufs sur le premier renard de sa voie. La défense de base.' },
 	gemellaire: { emoji: '🐤', short: 'Gémeaux', desc: 'Tire deux œufs par salve : deux fois plus de dégâts qu\'une lanceuse.' },
 	glaciere: { emoji: '🧊', short: 'Neiges', desc: 'Ses œufs givrés ralentissent les renards touchés (dégâts modestes).' },
@@ -93,6 +93,7 @@ const HEN_STYLE: Record<string, HenStyle> = {
 	mitrailleuse: { comb: '#e34b4b', body: '#ffd8d8', bodyDark: '#f0b6b6', wing: '#ffc4c4' },
 	glaciere: { comb: '#7fb2e6', body: '#dcefff', bodyDark: '#b6dbf7', wing: '#c8e6ff' },
 	gemellaire: { comb: '#f0a830', body: '#fff1c6', bodyDark: '#f0dc9c', wing: '#ffe9a8' },
+	piment: { comb: '#c22b2b', body: '#ff9a5a', bodyDark: '#e07a3a', wing: '#ffb47a' }, // preview ghost only (one-shot card)
 };
 
 interface FoxStyle {
@@ -709,24 +710,29 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			const bob = g.y >= g.rest ? Math.sin(anim * 4 + g.id) * 0.03 : 0;
 			const x = g.x;
 			const y = g.y + bob;
-			const r = 0.19;
+			const r = 0.21;
 			const blink = g.ttl < 2 ? 0.55 + 0.45 * Math.abs(Math.sin(anim * 8)) : 1;
 			ctx.save();
 			ctx.globalAlpha = blink;
-			ctx.fillStyle = 'rgba(255,220,120,0.28)';
-			dot(x, y, r * 1.6);
+			// golden glow
+			ctx.fillStyle = 'rgba(255,220,120,0.3)';
+			dot(x, y, r * 1.5);
+			// golden egg (slightly tapered at the top)
 			ctx.fillStyle = '#ffd85a';
-			dot(x, y, r);
 			ctx.strokeStyle = '#c9901f';
-			ctx.lineWidth = 0.03;
+			ctx.lineWidth = 0.028;
 			ctx.beginPath();
-			ctx.arc(x, y, r, 0, Math.PI * 2);
+			ctx.moveTo(x, y - r);
+			ctx.bezierCurveTo(x + r * 0.62, y - r * 0.55, x + r * 0.78, y + r * 0.35, x, y + r * 0.92);
+			ctx.bezierCurveTo(x - r * 0.78, y + r * 0.35, x - r * 0.62, y - r * 0.55, x, y - r);
+			ctx.closePath();
+			ctx.fill();
 			ctx.stroke();
-			// wheat kernels
-			ctx.fillStyle = '#e8a92a';
-			for (let i = 0; i < 3; i++) ellipse(x - 0.05 + i * 0.05, y, 0.02, 0.05);
-			ctx.fillStyle = 'rgba(255,255,255,0.75)';
-			dot(x - r * 0.35, y - r * 0.35, r * 0.28);
+			// warm sheen + shine
+			ctx.fillStyle = 'rgba(232,169,42,0.55)';
+			ellipse(x + r * 0.18, y + r * 0.3, r * 0.3, r * 0.4);
+			ctx.fillStyle = 'rgba(255,255,255,0.8)';
+			ellipse(x - r * 0.26, y - r * 0.32, r * 0.14, r * 0.2);
 			ctx.restore();
 		};
 

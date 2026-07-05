@@ -142,10 +142,10 @@ export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 export type DiffKey = keyof typeof DIFFS;
 
 const FIRST_SPAWN = 20; // grace to set up before the first wave
-export const PROD_INTERVAL = 4; // exported: renderer shows the egg-in-progress
+export const PROD_INTERVAL = 5; // exported: renderer shows the egg-in-progress
 
 const PROD_AMOUNT = 25;
-const TRICKLE_INTERVAL = 6;
+const TRICKLE_INTERVAL = 8;
 const TRICKLE_AMOUNT = 25;
 const EGG_SPEED = 7;
 const EGG_HIT = 0.35;
