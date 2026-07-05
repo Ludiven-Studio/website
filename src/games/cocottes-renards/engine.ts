@@ -134,17 +134,18 @@ export const FOX: Record<FoxType, { hp: number; speed: number; dmg: number; rewa
 };
 
 export const DIFFS = {
-	facile: { label: 'Facile', grain: 175, hp: 0.85, speed: 0.9, spawn: 1.15 },
-	moyen: { label: 'Moyen', grain: 150, hp: 1, speed: 1, spawn: 1 },
-	difficile: { label: 'Difficile', grain: 125, hp: 1.25, speed: 1.12, spawn: 0.82 },
+	facile: { label: 'Facile', grain: 250, hp: 0.85, speed: 0.9, spawn: 1.15 },
+	moyen: { label: 'Moyen', grain: 200, hp: 1, speed: 1, spawn: 1 },
+	difficile: { label: 'Difficile', grain: 150, hp: 1.25, speed: 1.12, spawn: 0.82 },
 } as const;
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 export type DiffKey = keyof typeof DIFFS;
 
-const FIRST_SPAWN = 15; // grace to set up before the first wave
-const PROD_INTERVAL = 5;
+const FIRST_SPAWN = 20; // grace to set up before the first wave
+export const PROD_INTERVAL = 4; // exported: renderer shows the egg-in-progress
+
 const PROD_AMOUNT = 25;
-const TRICKLE_INTERVAL = 8;
+const TRICKLE_INTERVAL = 6;
 const TRICKLE_AMOUNT = 25;
 const EGG_SPEED = 7;
 const EGG_HIT = 0.35;
@@ -158,10 +159,10 @@ const MINE_DMG = 900; // mine blast damage (per fox in blast)
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
 /** Seconds between waves — long at first, shrinks with the wave count, scaled by difficulty. */
-export const waveInterval = (wave: number): number => clamp(14 - wave * 0.4, 6, 14);
+export const waveInterval = (wave: number): number => clamp(18 - wave * 0.5, 7, 18);
 
 /** Max foxes on the field before the next wave is held back (PvZ breathing room). */
-export const waveCrowd = (wave: number): number => 3 + Math.floor(wave / 2);
+export const waveCrowd = (wave: number): number => 2 + Math.floor(wave / 2);
 
 /** Foxes per wave — grows steadily so late waves are heavier. */
 export const waveSize = (wave: number): number => 1 + Math.floor(wave / 3);

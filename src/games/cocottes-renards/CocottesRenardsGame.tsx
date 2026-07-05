@@ -8,6 +8,7 @@ import {
 	FOX,
 	DIFFS,
 	DIFF_ORDER,
+	PROD_INTERVAL,
 	createGame,
 	placeTower,
 	collectGrain,
@@ -68,16 +69,17 @@ interface Particle {
 	text?: string;
 }
 
-const CARD: Record<TowerType, { emoji: string; short: string }> = {
-	pondeuse: { emoji: '🥚', short: 'Pondeuse' },
-	lanceuse: { emoji: '🐔', short: 'Lanceuse' },
-	gemellaire: { emoji: '🐤', short: 'Gémeaux' },
-	glaciere: { emoji: '🧊', short: 'Neiges' },
-	costaude: { emoji: '🌾', short: 'Costaude' },
-	mine: { emoji: '💣', short: 'Œuf-mine' },
-	mitrailleuse: { emoji: '🐓', short: 'Mitrailleuse' },
-	piment: { emoji: '🌶️', short: 'Coq piment' },
+const CARD: Record<TowerType, { emoji: string; short: string; desc: string }> = {
+	pondeuse: { emoji: '🥚', short: 'Pondeuse', desc: 'Pond un œuf de grain toutes les 4 s (l\'œuf grossit sous elle) : clique-le pour l\'encaisser. Le moteur de ton économie, pose-en tôt !' },
+	lanceuse: { emoji: '🐔', short: 'Lanceuse', desc: 'Tire des œufs sur le premier renard de sa voie. La défense de base.' },
+	gemellaire: { emoji: '🐤', short: 'Gémeaux', desc: 'Tire deux œufs par salve : deux fois plus de dégâts qu\'une lanceuse.' },
+	glaciere: { emoji: '🧊', short: 'Neiges', desc: 'Ses œufs givrés ralentissent les renards touchés (dégâts modestes).' },
+	costaude: { emoji: '🌾', short: 'Costaude', desc: 'Botte de foin très résistante : bloque les renards pendant que tes poules tirent.' },
+	mine: { emoji: '💣', short: 'Œuf-mine', desc: 'S\'arme en 3 s puis explose au contact — énormes dégâts de zone, usage unique.' },
+	mitrailleuse: { emoji: '🐓', short: 'Mitrailleuse', desc: 'Cadence de tir très rapide, idéale contre les meutes et les gros renards.' },
+	piment: { emoji: '🌶️', short: 'Coq piment', desc: 'Usage unique : élimine immédiatement tous les renards de la voie choisie.' },
 };
+const SHOVEL_DESC = 'Retire une cocotte posée (clique-la) pour libérer la case.';
 
 interface HenStyle {
 	comb: string;
@@ -125,6 +127,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0);
 	const [megaAlert, setMegaAlert] = useState(false);
 	const [laneAlert, setLaneAlert] = useState(false);
+	const [showInfo, setShowInfo] = useState(false);
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -199,6 +202,10 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		for (let i = 0; i < 6; i++)
 			push({ x: info.x, y: info.row + 0.5, vx: rnd(-1.4, 1.4), vy: rnd(-1.4, 0.4), g: 3, life: 0.35, maxLife: 0.35, size: rnd(0.03, 0.07), color: '#fff6e0', kind: 'splash' });
 	};
+	const emitLayPop = (info: { x: number; y: number }): void => {
+		for (let i = 0; i < 6; i++)
+			push({ x: info.x, y: info.y, vx: rnd(-0.9, 0.9), vy: rnd(-1.4, -0.3), g: 2, life: 0.45, maxLife: 0.45, size: rnd(0.03, 0.06), color: i % 2 ? '#fff6e0' : '#ffe08a', kind: 'spark' });
+	};
 	const emitGrainCollect = (info: { x: number; y: number; value: number }): void => {
 		for (let i = 0; i < 8; i++)
 			push({ x: info.x, y: info.y, vx: rnd(-1.2, 1.2), vy: rnd(-2.2, -0.6), g: 1.5, life: 0.6, maxLife: 0.6, size: rnd(0.04, 0.09), color: i % 2 ? '#ffe08a' : '#ffd85a', kind: 'spark' });
@@ -244,6 +251,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		const curG = new Set<number>();
 		for (const g of st.grains) curG.add(g.id);
 		for (const [id, info] of prevGrainRef.current) if (!curG.has(id)) emitGrainCollect(info);
+		for (const g of st.grains) if (!prevGrainRef.current.has(g.id) && !g.sky) emitLayPop(g); // fresh lay
 		prevGrainRef.current.clear();
 		for (const g of st.grains) prevGrainRef.current.set(g.id, { x: g.x, y: g.y, value: g.value });
 	};
@@ -553,12 +561,33 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			const bob = Math.sin(anim * 3 + t.id) * 0.02;
 			const recoil = t.fireFlash > 0 ? (t.fireFlash / 0.18) * 0.06 : 0;
 			const cx = t.col + 0.5 - recoil;
-			const cy = t.row + 0.5 + bob;
+			let cy = t.row + 0.5 + bob;
 			const r = 0.34;
 			const frac = t.maxHp ? t.hp / t.maxHp : 1;
 			if (t.type === 'costaude') drawHay(cx, cy, r, frac);
 			else if (t.type === 'mine') drawMine(t.col + 0.5, t.row + 0.5, r, t.armed <= 0);
 			else {
+				if (t.type === 'pondeuse') {
+					// Egg-in-progress: grows under the hen; she wiggles just before laying.
+					const prog = clamp(t.timer / PROD_INTERVAL, 0, 1);
+					const near = Math.max(0, (prog - 0.75) / 0.25);
+					cy += near * Math.sin(anim * 18) * 0.02; // pre-lay wiggle
+					const ex = t.col + 0.5;
+					const ey = t.row + 0.82;
+					const er = 0.05 + prog * 0.1;
+					ctx.save();
+					ctx.globalAlpha = 0.45 + prog * 0.55;
+					if (near > 0) {
+						ctx.fillStyle = `rgba(255,220,120,${0.35 * near})`;
+						dot(ex, ey, er * 1.9); // almost-ready glow
+					}
+					ctx.fillStyle = '#fdf4dd';
+					ellipse(ex, ey, er * 0.8, er);
+					ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+					ctx.lineWidth = 0.015;
+					ctx.stroke();
+					ctx.restore();
+				}
 				const flap = t.fireFlash > 0 ? t.fireFlash / 0.18 : Math.max(0, Math.sin(anim * 3 + t.id)) * 0.25;
 				drawHen(cx, cy, r, HEN_STYLE[t.type], flap, t.type === 'gemellaire');
 			}
@@ -1125,7 +1154,38 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				>
 					<span className="cr-card-emoji">🧹</span>
 				</button>
+				<button
+					className={`cr-card shovel ${showInfo ? 'sel' : ''}`}
+					onClick={() => setShowInfo((v) => !v)}
+					title="Infos sur les défenses"
+					aria-expanded={showInfo}
+				>
+					<span className="cr-card-emoji">❓</span>
+				</button>
 			</div>
+
+			{selected && (
+				<div className="cr-desc">
+					{selected === 'shovel'
+						? <>🧹 <strong>Balai</strong> — {SHOVEL_DESC}</>
+						: <>{CARD[selected].emoji} <strong>{TOWER[selected].label}</strong> · {TOWER[selected].cost} grain — {CARD[selected].desc}</>}
+				</div>
+			)}
+
+			{showInfo && (
+				<div className="cr-info-panel">
+					{TOWER_ORDER.map((t) => (
+						<div key={t} className="cr-info-row">
+							<span className="cr-info-emoji">{CARD[t].emoji}</span>
+							<span><strong>{TOWER[t].label}</strong> · {TOWER[t].cost} grain — {CARD[t].desc}</span>
+						</div>
+					))}
+					<div className="cr-info-row">
+						<span className="cr-info-emoji">🧹</span>
+						<span><strong>Balai</strong> — {SHOVEL_DESC}</span>
+					</div>
+				</div>
+			)}
 
 			{megaAlert && status === 'playing' && <div className="cr-mega-alert">🦊 Méga renard&nbsp;! La meute se renforce</div>}
 			{laneAlert && status === 'playing' && <div className="cr-mega-alert cr-lane-alert">💔 Un nid a été pillé&nbsp;! Défends les lignes restantes</div>}
@@ -1195,6 +1255,12 @@ const CSS = `
 .cr-card-cost { font-size: 11.5px; font-weight: 700; color: #ffe08a; }
 .cr-card-cd { position: absolute; left: 0; bottom: 0; width: 100%; background: rgba(0,0,0,0.55); pointer-events: none; }
 .cr-card.shovel { width: 46px; justify-content: center; }
+.cr-desc { margin-bottom: 0.55rem; max-width: 560px; text-align: center; font-size: 12.5px; line-height: 1.45; color: var(--gray-200); background: var(--gray-900); border-radius: 10px; padding: 6px 14px; }
+.cr-desc strong { color: var(--gray-0); }
+.cr-info-panel { margin-bottom: 0.6rem; max-width: 560px; background: var(--gray-900); border: 1px solid var(--gray-700); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.45; color: var(--gray-200); }
+.cr-info-row { display: flex; gap: 8px; align-items: baseline; text-align: left; }
+.cr-info-emoji { font-size: 15px; flex: 0 0 auto; }
+.cr-info-row strong { color: var(--gray-0); }
 .cr-mega-alert { margin-bottom: 0.5rem; background: #b0281f; color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.2px; border-radius: 999px; padding: 6px 16px; box-shadow: var(--shadow-md); animation: cr-pulse 0.9s ease-in-out infinite; }
 .cr-lane-alert { background: #b45309; }
 @keyframes cr-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.72; transform: scale(1.05); } }
