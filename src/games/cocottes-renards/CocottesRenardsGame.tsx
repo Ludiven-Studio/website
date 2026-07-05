@@ -12,6 +12,9 @@ import {
 	createGame,
 	placeTower,
 	collectGrain,
+	grainValue,
+	rebuyLane,
+	REBUY_COST,
 	step,
 	type State,
 	type TowerType,
@@ -215,6 +218,11 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		push({ x: info.x, y: info.y - 0.15, vx: 0, vy: -0.9, g: 0, life: 0.8, maxLife: 0.8, size: 0.32, color: '#ffe08a', kind: 'text', text: `+${info.value}` });
 	};
 
+	const emitRebuild = (row: number): void => {
+		for (let i = 0; i < 14; i++)
+			push({ x: rnd(-0.4, 1.6), y: row + rnd(0.15, 0.85), vx: rnd(-1.4, 1.4), vy: rnd(-2.4, -0.5), g: 4, life: rnd(0.5, 0.9), maxLife: 0.9, size: rnd(0.05, 0.1), color: i % 2 ? '#fdf4dd' : '#ffd85a', kind: 'feather' });
+		push({ x: COLS / 2, y: row + 0.32, vx: 0, vy: -0.6, g: 0, life: 1.2, maxLife: 1.2, size: 0.32, color: '#7cfc98', kind: 'text', text: 'Nid reconstruit !' });
+	};
 	const emitLaneLost = (row: number): void => {
 		for (let i = 0; i < 16; i++)
 			push({ x: rnd(-0.4, 1.8), y: row + rnd(0.15, 0.85), vx: rnd(-1.6, 1.6), vy: rnd(-2.4, -0.4), g: 4, life: rnd(0.5, 0.9), maxLife: 0.9, size: rnd(0.05, 0.1), color: i % 2 ? '#fdf4dd' : '#d8722c', kind: 'feather' });
@@ -306,6 +314,15 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			ctx.fillRect(cx - r, cy - r * 1.5, r * 2, 0.06);
 			ctx.fillStyle = frac > 0.5 ? '#2f9e6f' : frac > 0.25 ? '#f0a830' : '#d9534f';
 			ctx.fillRect(cx - r, cy - r * 1.5, r * 2 * frac, 0.06);
+		};
+		const roundRect = (x: number, y: number, w: number, h: number, rad: number): void => {
+			ctx.beginPath();
+			ctx.moveTo(x + rad, y);
+			ctx.arcTo(x + w, y, x + w, y + h, rad);
+			ctx.arcTo(x + w, y + h, x, y + h, rad);
+			ctx.arcTo(x, y + h, x, y, rad);
+			ctx.arcTo(x, y, x + w, y, rad);
+			ctx.closePath();
 		};
 
 		/* --- Ground: grid lanes, henhouse floor, forest floor --- */
@@ -709,13 +726,15 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			hpBar(cx, cy, r, frac);
 		};
 		const drawGrain = (g: Grain): void => {
+			const cur = grainValue(g);
+			const frac = g.value ? cur / g.value : 1;
 			const bob = g.y >= g.rest ? Math.sin(anim * 4 + g.id) * 0.03 : 0;
 			const x = g.x;
 			const y = g.y + bob;
-			const r = 0.19;
+			const r = 0.19 * (0.82 + 0.18 * frac); // shrinks a touch as it decays
 			const blink = g.ttl < 2 ? 0.55 + 0.45 * Math.abs(Math.sin(anim * 8)) : 1;
 			ctx.save();
-			ctx.globalAlpha = blink;
+			ctx.globalAlpha = blink * (0.55 + 0.45 * frac); // dims as it decays
 			// glow
 			ctx.fillStyle = 'rgba(255,220,120,0.28)';
 			dot(x, y, r * 1.6);
@@ -732,6 +751,16 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			for (let i = 0; i < 3; i++) ellipse(x - 0.05 + i * 0.05, y, 0.02, 0.05);
 			ctx.fillStyle = 'rgba(255,255,255,0.75)';
 			dot(x - r * 0.35, y - r * 0.35, r * 0.28);
+			// value counter above the token (green → red as it decays)
+			ctx.globalAlpha = blink;
+			ctx.fillStyle = frac > 0.85 ? '#3ddc84' : frac > 0.6 ? '#ffe08a' : '#ff7a5a';
+			ctx.font = 'bold 0.22px system-ui, sans-serif';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+			ctx.lineWidth = 0.02;
+			ctx.strokeText(String(cur), x, y - r - 0.16);
+			ctx.fillText(String(cur), x, y - r - 0.16);
 			ctx.restore();
 		};
 
@@ -771,6 +800,29 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			}
 		}
 		ctx.globalAlpha = 1;
+
+		// Rebuild prompt on raided lanes.
+		if (statusRef.current === 'playing') {
+			for (let r = 0; r < LANES; r++) {
+				if (!st.lostLanes[r]) continue;
+				const afford = st.grain >= REBUY_COST;
+				const pulse = 0.82 + 0.18 * Math.sin(anim * 4 + r);
+				const label = `🔨 Reconstruire · ${REBUY_COST}`;
+				const tx = COLS / 2;
+				const ty = r + 0.5;
+				ctx.font = 'bold 0.3px system-ui, sans-serif';
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				const tw = ctx.measureText(label).width;
+				ctx.globalAlpha = afford ? pulse : 0.7;
+				ctx.fillStyle = afford ? '#2f9e6f' : '#5a5148';
+				roundRect(tx - tw / 2 - 0.18, ty - 0.26, tw + 0.36, 0.52, 0.14);
+				ctx.fill();
+				ctx.globalAlpha = 1;
+				ctx.fillStyle = afford ? '#fff' : '#cfc7bd';
+				ctx.fillText(label, tx, ty);
+			}
+		}
 
 		// Placement preview.
 		const h = hoverRef.current;
@@ -1087,6 +1139,16 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				draw();
 				return;
 			}
+			// Click a raided lane to rebuild its nest.
+			const row = Math.floor(w.wy);
+			if (row >= 0 && row < LANES && st.lostLanes[row]) {
+				if (rebuyLane(st, row)) {
+					emitRebuild(row);
+					setHud((h) => ({ ...h, grain: Math.floor(st.grain), nests: st.lostLanes.filter((l) => !l).length }));
+				}
+				draw();
+				return;
+			}
 		}
 		const cell = cellFrom(e);
 		const sel = selectedRef.current;
@@ -1189,6 +1251,14 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 						<span className="cr-info-emoji">🧹</span>
 						<span><strong>Balai</strong> — {SHOVEL_DESC}</span>
 					</div>
+					<div className="cr-info-row">
+						<span className="cr-info-emoji">🌾</span>
+						<span><strong>Blé</strong> — La monnaie. Un jeton laissé trop longtemps perd de la valeur (compteur au-dessus) puis est encaissé au minimum. Ramasse-le vite&nbsp;!</span>
+					</div>
+					<div className="cr-info-row">
+						<span className="cr-info-emoji">🔨</span>
+						<span><strong>Reconstruire un nid</strong> · {REBUY_COST} blé — Clique une ligne perdue pour relever son nid et la rendre à nouveau jouable.</span>
+					</div>
 				</div>
 			)}
 
@@ -1230,7 +1300,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="cr-help">
-				Sélectionne une cocotte puis clique une case pour la poser. Les pondeuses lâchent du grain à ramasser (clique-le&nbsp;!). Si un renard atteint un nid, la ligne est perdue — la partie continue tant qu'il reste au moins un nid.
+				Sélectionne une cocotte puis clique une case pour la poser. Ramasse vite les jetons de blé&nbsp;: ils perdent de la valeur avec le temps (compteur au-dessus). Si un renard atteint un nid, la ligne est perdue — clique-la pour la reconstruire ({REBUY_COST}&nbsp;blé). Tu perds quand il ne reste plus aucun nid.
 			</p>
 
 			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? best : undefined} />}

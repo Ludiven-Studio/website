@@ -153,6 +153,9 @@ const EAT_CONTACT = 0.75; // how far into a cell a fox walks before biting
 const FROST_TIME = 2.5; // seconds a frost egg slows a fox
 const GRAIN_FALL = 3; // token fall speed (cells/s)
 const TOKEN_TTL = 9; // token auto-collects after this many seconds
+const TOKEN_GRACE = 3; // full value for this long, then it decays
+const TOKEN_FLOOR = 0.4; // a fully-decayed token is still worth this fraction
+export const REBUY_COST = 1000; // rebuild a raided nest for this much wheat
 const MINE_ARM = 3; // seconds before a mine can detonate
 const MINE_DMG = 900; // mine blast damage (per fox in blast)
 
@@ -281,14 +284,33 @@ export function placeTower(state: State, type: TowerType, row: number, col: numb
 	return true;
 }
 
-/** Collect a grain token by id — credits its value immediately. Returns the value (0 if gone). */
+/** Current worth of a token: full during the grace window, then decaying to a floor. */
+export function grainValue(g: Grain): number {
+	const elapsed = TOKEN_TTL - g.ttl;
+	if (elapsed <= TOKEN_GRACE) return g.value;
+	const t = clamp((elapsed - TOKEN_GRACE) / (TOKEN_TTL - TOKEN_GRACE), 0, 1);
+	return Math.round(g.value * (1 - (1 - TOKEN_FLOOR) * t));
+}
+
+/** Collect a grain token by id — credits its (decayed) value. Returns the value (0 if gone). */
 export function collectGrain(state: State, id: number): number {
 	const i = state.grains.findIndex((g) => g.id === id);
 	if (i < 0) return 0;
-	const v = state.grains[i].value;
+	const v = grainValue(state.grains[i]);
 	state.grain += v;
 	state.grains.splice(i, 1);
 	return v;
+}
+
+/** Rebuild a raided nest — expensive wheat sink. Returns false if unaffordable or not lost. */
+export function rebuyLane(state: State, row: number): boolean {
+	if (row < 0 || row >= state.rows) return false;
+	if (!state.lostLanes[row]) return false;
+	if (state.grain < REBUY_COST) return false;
+	state.grain -= REBUY_COST;
+	state.lostLanes[row] = false;
+	state.over = state.lostLanes.every(Boolean);
+	return true;
 }
 
 function spawnGrain(state: State, x: number, rest: number, value: number, sky: boolean): void {
@@ -384,7 +406,7 @@ export function step(state: State, dt: number, rng: Rng): void {
 	}
 	state.grains = state.grains.filter((g) => {
 		if (g.ttl <= 0) {
-			state.grain += g.value;
+			state.grain += grainValue(g); // auto-collected at the floor: never fully lost
 			return false;
 		}
 		return true;

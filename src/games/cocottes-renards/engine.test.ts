@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32 } from '../prng';
-import { createGame, placeTower, collectGrain, step, waveType, TOWER, FOX, COLS, type State, type Fox, type FoxType } from './engine';
+import { createGame, placeTower, collectGrain, grainValue, rebuyLane, REBUY_COST, step, waveType, TOWER, FOX, COLS, type State, type Fox, type FoxType, type Grain } from './engine';
 
 const addFox = (s: State, row: number, x: number, type: Fox['type'] = 'normal'): void => {
 	const base = FOX[type];
@@ -66,14 +66,40 @@ describe('cocottes-renards engine', () => {
 		expect(s.grain).toBeGreaterThan(after);
 	});
 
-	it('an uncollected token auto-collects after its delay (never lost)', () => {
+	it('a token decays after its grace window and auto-collects at the floor', () => {
+		const g: Grain = { id: 1, x: 0, y: 0, rest: 0, value: 25, ttl: 9, sky: false };
+		expect(grainValue(g)).toBe(25); // fresh: full value
+		g.ttl = 6; // exactly at the end of the grace window (elapsed 3)
+		expect(grainValue(g)).toBe(25);
+		g.ttl = 4.5; // mid decay
+		expect(grainValue(g)).toBe(21);
+		g.ttl = 0; // fully elapsed → floor (40%)
+		expect(grainValue(g)).toBe(10);
+	});
+
+	it('an uncollected token auto-collects at reduced value (decays, never fully lost)', () => {
 		const s = createGame(1, mulberry32(31));
 		silenceWaves(s);
 		s.grain = 999;
 		placeTower(s, 'pondeuse', 0, 0);
-		const after = s.grain;
-		run(s, 16, mulberry32(31)); // first token spawns ~5s, auto-collects ~9s later
-		expect(s.grain).toBeGreaterThanOrEqual(after + 25);
+		const after = s.grain; // 999 - 50
+		run(s, 15, mulberry32(31)); // first token spawns ~5s, auto-collects ~9s later at the floor
+		expect(s.grain).toBeGreaterThan(after); // credited: never lost
+		expect(s.grain).toBeLessThan(after + 25); // but worth less than a fresh token
+	});
+
+	it('rebuilds a raided nest for a large sum', () => {
+		const s = createGame(1, mulberry32(61));
+		silenceWaves(s);
+		s.lostLanes[2] = true;
+		s.grain = 500;
+		expect(rebuyLane(s, 2)).toBe(false); // too poor
+		s.grain = REBUY_COST + 200;
+		expect(rebuyLane(s, 2)).toBe(true);
+		expect(s.lostLanes[2]).toBe(false);
+		expect(s.grain).toBe(200);
+		expect(rebuyLane(s, 2)).toBe(false); // already standing
+		expect(placeTower(s, 'lanceuse', 2, 3)).toBe(true); // lane playable again
 	});
 
 	it('piment clears its whole lane immediately', () => {
