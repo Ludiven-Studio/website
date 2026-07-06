@@ -270,7 +270,8 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		for (const [id, info] of prevGrainRef.current) if (!curG.has(id)) emitGrainCollect(info);
 		for (const g of st.grains) if (!prevGrainRef.current.has(g.id) && !g.sky) emitLayPop(g); // fresh lay
 		prevGrainRef.current.clear();
-		for (const g of st.grains) prevGrainRef.current.set(g.id, { x: g.x, y: g.y, value: g.value });
+		// Store the CURRENT (decayed) worth so the collect popup matches what's credited (+10 auto, not +25).
+		for (const g of st.grains) prevGrainRef.current.set(g.id, { x: g.x, y: g.y, value: grainValue(g) });
 	};
 
 	const updateParticles = (dt: number): void => {
