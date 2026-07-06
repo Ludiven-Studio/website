@@ -1,0 +1,58 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import AccordsGame from '../../games/accords/AccordsGame.tsx';
+---
+
+<BaseLayout
+	title="Accords & Gouffres (proto) | Jeux Ludiven Studio"
+	description="Prototype : un jeu d'oreille déguisé en plateforme. Écoute un accord, accorde les barres du visualiseur pour retrouver ses notes et franchir le gouffre de niveau en niveau."
+>
+	<div class="wrapper game-page stack gap-8">
+		<header class="game-head stack gap-2">
+			<a class="back" href="/jeux/">
+				<Icon icon="arrow-left" size="1em" /> Tous les jeux
+			</a>
+			<h1>Accords &amp; Gouffres</h1>
+			<p>Prototype — accorde l'accord, franchis le gouffre</p>
+		</header>
+
+		<AccordsGame client:only="react" />
+	</div>
+</BaseLayout>
+
+<style>
+	.game-page {
+		align-items: center;
+	}
+	.game-head {
+		text-align: center;
+		align-items: center;
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--gray-300);
+		text-decoration: none;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+	}
+	.back:hover,
+	.back:focus-visible {
+		color: var(--accent-regular);
+	}
+	.game-head h1 {
+		font-size: var(--text-3xl);
+		margin-top: 0.5rem;
+	}
+	.game-head p {
+		color: var(--gray-300);
+	}
+	@media (min-width: 50em) {
+		.game-head h1 {
+			font-size: var(--text-4xl);
+		}
+	}
+</style>
