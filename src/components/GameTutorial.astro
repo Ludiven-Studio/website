@@ -34,6 +34,11 @@ const steps = TUTORIALS[gameId] ?? [];
 						))}
 					</div>
 
+					<label class="tuto-remember">
+						<input class="tuto-remember-input" type="checkbox" checked />
+						Ne plus afficher au démarrage
+					</label>
+
 					<div class="tuto-nav">
 						<button class="tuto-skip" type="button">Passer</button>
 						<div class="tuto-navright">
@@ -58,6 +63,7 @@ const steps = TUTORIALS[gameId] ?? [];
 		const prevBtn = root.querySelector<HTMLElement>('.tuto-prev')!;
 		const nextBtn = root.querySelector<HTMLElement>('.tuto-next')!;
 		const doneBtn = root.querySelector<HTMLElement>('.tuto-done')!;
+		const rememberInput = root.querySelector<HTMLInputElement>('.tuto-remember-input')!;
 		const SEEN_KEY = 'ludiven-tuto-seen';
 		let i = 0;
 
@@ -68,12 +74,17 @@ const steps = TUTORIALS[gameId] ?? [];
 				return [];
 			}
 		};
+		const writeSeen = (s: string[]) => localStorage.setItem(SEEN_KEY, JSON.stringify(s));
 		const markSeen = () => {
 			const s = readSeen();
 			if (!s.includes(gameId)) {
 				s.push(gameId);
-				localStorage.setItem(SEEN_KEY, JSON.stringify(s));
+				writeSeen(s);
 			}
+		};
+		const unmarkSeen = () => {
+			const s = readSeen().filter((g) => g !== gameId);
+			writeSeen(s);
 		};
 
 		const show = (n: number) => {
@@ -92,8 +103,10 @@ const steps = TUTORIALS[gameId] ?? [];
 		const close = () => {
 			overlay.hidden = true;
 		};
+		// Checked (default) = never auto-open again; unchecked = remind me next visit.
 		const dismiss = () => {
-			markSeen();
+			if (rememberInput.checked) markSeen();
+			else unmarkSeen();
 			close();
 		};
 
@@ -224,6 +237,24 @@ const steps = TUTORIALS[gameId] ?? [];
 	}
 	.tuto-dot.active {
 		background: var(--accent-regular);
+	}
+
+	.tuto-remember {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.45rem;
+		margin-bottom: 0.85rem;
+		color: var(--gray-400);
+		font-size: var(--text-sm);
+		cursor: pointer;
+		user-select: none;
+	}
+	.tuto-remember-input {
+		width: 15px;
+		height: 15px;
+		accent-color: var(--accent-regular);
+		cursor: pointer;
 	}
 
 	.tuto-nav {
