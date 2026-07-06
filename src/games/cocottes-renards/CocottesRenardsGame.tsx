@@ -333,6 +333,38 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			ctx.arcTo(x, y, x + w, y, rad);
 			ctx.closePath();
 		};
+		// Canvas text via a 16px nominal font + scale — sub-pixel fonts don't render in Firefox.
+		const LABEL_BASE = 16;
+		const drawLabel = (
+			text: string,
+			x: number,
+			y: number,
+			size: number,
+			fill: string,
+			opts?: { stroke?: string; align?: CanvasTextAlign; alpha?: number },
+		): void => {
+			const k = size / LABEL_BASE;
+			ctx.save();
+			if (opts?.alpha != null) ctx.globalAlpha = opts.alpha;
+			ctx.translate(x, y);
+			ctx.scale(k, k);
+			ctx.font = `bold ${LABEL_BASE}px system-ui, sans-serif`;
+			ctx.textAlign = opts?.align ?? 'center';
+			ctx.textBaseline = 'middle';
+			if (opts?.stroke) {
+				ctx.strokeStyle = opts.stroke;
+				ctx.lineWidth = 2.5;
+				ctx.lineJoin = 'round';
+				ctx.strokeText(text, 0, 0);
+			}
+			ctx.fillStyle = fill;
+			ctx.fillText(text, 0, 0);
+			ctx.restore();
+		};
+		const measureLabel = (text: string, size: number): number => {
+			ctx.font = `bold ${LABEL_BASE}px system-ui, sans-serif`;
+			return ctx.measureText(text).width * (size / LABEL_BASE);
+		};
 
 		/* --- Ground: grid lanes, henhouse floor, forest floor --- */
 		for (let r = 0; r < LANES; r++) {
@@ -808,17 +840,9 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			ctx.beginPath();
 			ctx.arc(x, y, r * 1.45, -Math.PI / 2, -Math.PI / 2 + ttlFrac * Math.PI * 2);
 			ctx.stroke();
-			// value counter above the token (green → red as it loses worth)
-			ctx.fillStyle = tint;
-			ctx.font = 'bold 0.3px system-ui, sans-serif';
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'middle';
-			ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-			ctx.lineWidth = 0.035;
-			const cy = y - r - 0.24;
-			ctx.strokeText(String(cur), x, cy);
-			ctx.fillText(String(cur), x, cy);
 			ctx.restore();
+			// value counter above the token (green → red as it loses worth)
+			drawLabel(String(cur), x, y - r - 0.24, 0.3, tint, { stroke: 'rgba(0,0,0,0.6)', alpha: blink });
 		};
 
 		for (const e of st.eggs) {
@@ -843,14 +867,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			const a = clamp(p.life / p.maxLife, 0, 1);
 			ctx.globalAlpha = a;
 			if (p.kind === 'text') {
-				ctx.fillStyle = p.color;
-				ctx.font = `bold ${p.size}px system-ui, sans-serif`;
-				ctx.textAlign = 'center';
-				ctx.textBaseline = 'middle';
-				ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-				ctx.lineWidth = 0.03;
-				ctx.strokeText(p.text ?? '', p.x, p.y);
-				ctx.fillText(p.text ?? '', p.x, p.y);
+				drawLabel(p.text ?? '', p.x, p.y, p.size, p.color, { stroke: 'rgba(0,0,0,0.5)', alpha: a });
 			} else {
 				ctx.fillStyle = p.color;
 				dot(p.x, p.y, p.size);
@@ -867,17 +884,13 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				const label = `🔨 Reconstruire · ${REBUY_COST}`;
 				const tx = COLS / 2;
 				const ty = r + 0.5;
-				ctx.font = 'bold 0.3px system-ui, sans-serif';
-				ctx.textAlign = 'center';
-				ctx.textBaseline = 'middle';
-				const tw = ctx.measureText(label).width;
+				const tw = measureLabel(label, 0.3);
 				ctx.globalAlpha = afford ? pulse : 0.7;
 				ctx.fillStyle = afford ? '#2f9e6f' : '#5a5148';
 				roundRect(tx - tw / 2 - 0.18, ty - 0.26, tw + 0.36, 0.52, 0.14);
 				ctx.fill();
 				ctx.globalAlpha = 1;
-				ctx.fillStyle = afford ? '#fff' : '#cfc7bd';
-				ctx.fillText(label, tx, ty);
+				drawLabel(label, tx, ty, 0.3, afford ? '#fff' : '#cfc7bd');
 			}
 		}
 
