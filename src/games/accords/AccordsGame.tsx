@@ -74,6 +74,14 @@ interface Cross {
 	startedAt: number;
 	settled: boolean;
 }
+interface RecapRow {
+	name: string;
+	freq: number;
+	cents: number;
+	prec: number;
+}
+// 0 cents → 100 %, a full semitone (100 cents) off → 0 %.
+const precisionPct = (cents: number): number => clamp(Math.round(100 * (1 - Math.abs(cents) / 100)), 0, 100);
 
 export default function AccordsGame() {
 	const [status, setStatus] = useState<Status>('intro');
@@ -81,6 +89,7 @@ export default function AccordsGame() {
 	const [showNames, setShowNames] = useState(false);
 	const [attempts, setAttempts] = useState(0);
 	const [flash, setFlash] = useState<{ kind: 'ok' | 'bad'; text: string } | null>(null);
+	const [recap, setRecap] = useState<RecapRow[] | null>(null);
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -252,6 +261,17 @@ export default function AccordsGame() {
 				break;
 			}
 		}
+		// On success, capture the exact solution + how far each peak landed.
+		if (firstBad < 0) {
+			setRecap(
+				order.map((idx, k) => {
+					const cents = Math.round(centsOff(peaksRef.current[idx].midi, targets[k]));
+					return { name: noteFull(targets[k]), freq: Math.round(midiToFreq(targets[k]) * 10) / 10, cents, prec: precisionPct(cents) };
+				}),
+			);
+		} else {
+			setRecap(null);
+		}
 		crossRef.current = { firstBad, order, startedAt: animRef.current, settled: false };
 		setStat('crossing');
 	};
@@ -263,6 +283,7 @@ export default function AccordsGame() {
 		const nx = level + 1;
 		setLevel(nx);
 		buildLevel(nx);
+		setRecap(null);
 		setStat('tuning');
 		setTimeout(() => hearChordRef.current(), 250);
 	};
@@ -271,6 +292,7 @@ export default function AccordsGame() {
 		setLevel(0);
 		setAttempts(0);
 		buildLevel(0);
+		setRecap(null);
 		setStat('tuning');
 		setTimeout(() => hearChordRef.current(), 200);
 	};
@@ -278,6 +300,7 @@ export default function AccordsGame() {
 		setLevel(0);
 		setAttempts(0);
 		buildLevel(0);
+		setRecap(null);
 		setStat('tuning');
 		setTimeout(() => hearChordRef.current(), 200);
 	};
@@ -516,6 +539,41 @@ export default function AccordsGame() {
 	};
 
 	const lv = curLevel();
+	const renderRecap = (): React.ReactNode => {
+		if (!recap || recap.length === 0) return null;
+		const global = Math.round(recap.reduce((s, r) => s + r.prec, 0) / recap.length);
+		return (
+			<div className="ac-recap">
+				<div className="ac-recap-title">Solution exacte &amp; précision</div>
+				<table className="ac-recap-tbl">
+					<thead>
+						<tr>
+							<th>Note</th>
+							<th>Fréq.</th>
+							<th>Écart</th>
+							<th>Préc.</th>
+						</tr>
+					</thead>
+					<tbody>
+						{recap.map((r, i) => (
+							<tr key={i}>
+								<td>{r.name}</td>
+								<td>{r.freq} Hz</td>
+								<td className={Math.abs(r.cents) <= 10 ? 'ac-ok' : ''}>
+									{r.cents > 0 ? '+' : ''}
+									{r.cents} c
+								</td>
+								<td>{r.prec}%</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+				<div className="ac-recap-global">
+					Précision globale : <strong>{global}%</strong>
+				</div>
+			</div>
+		);
+	};
 
 	return (
 		<div className="ac-root">
@@ -577,6 +635,7 @@ export default function AccordsGame() {
 							<p>
 								{pitchName(lv.root)} {lv.chord.name} reconstitué.
 							</p>
+							{renderRecap()}
 							<button className="ac-btn primary big" onClick={nextLevel}>
 								Niveau suivant →
 							</button>
@@ -588,6 +647,7 @@ export default function AccordsGame() {
 						<div className="ac-card">
 							<h3>🏆 Bravo&nbsp;!</h3>
 							<p>Tu as reconstitué tous les spectres, du simple triade à l'accord le plus tordu.</p>
+							{renderRecap()}
 							<button className="ac-btn primary big" onClick={restart}>
 								↻ Rejouer
 							</button>
@@ -627,5 +687,15 @@ const CSS = `
 .ac-card { background: var(--gray-999); border: 2px solid var(--ac); border-radius: 16px; padding: 20px 22px; max-width: 23rem; text-align: center; box-shadow: var(--shadow-lg); }
 .ac-card h3 { margin: 0 0 0.5rem; font-family: var(--font-brand); font-size: var(--text-xl); }
 .ac-card p { color: var(--gray-200); font-size: 13.5px; line-height: 1.55; margin: 0 0 0.9rem; }
+.ac-recap { margin: 0 0 0.9rem; text-align: left; }
+.ac-recap-title { font-weight: 700; font-size: 12.5px; color: var(--gray-100); text-align: center; margin-bottom: 6px; }
+.ac-recap-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ac-recap-tbl th { color: var(--gray-400); font-weight: 600; text-align: right; padding: 2px 6px; }
+.ac-recap-tbl th:first-child { text-align: left; }
+.ac-recap-tbl td { color: var(--gray-100); text-align: right; padding: 3px 6px; border-top: 1px solid var(--gray-800); }
+.ac-recap-tbl td:first-child { text-align: left; font-weight: 600; }
+.ac-recap-tbl td.ac-ok { color: #4cc98a; }
+.ac-recap-global { text-align: center; margin-top: 8px; font-size: 14px; }
+.ac-recap-global strong { color: var(--ac); }
 .ac-help { max-width: 620px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 0.9rem; }
 `;
