@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 /* =====================================================
-   ACCORDS & GOUFFRES — prototype (ear-training, hi-fi spectrum skin).
-   Hear a chord, rebuild it by tuning vertical spectrum bars (bass left →
-   treble right). NO correctness feedback while tuning — the bars are just a
-   rainbow VU display; you judge by ear. On "Traverser" the avatar hops from
-   bar-top to bar-top: a note within tolerance holds, a wrong one drops it
+   ACCORDS & GOUFFRES — prototype (ear-training, real spectrum-analyser).
+   X axis = frequency (bass left → treble right). Each chord note is a PEAK the
+   player slides horizontally onto its frequency. No correctness feedback while
+   tuning — you judge by ear. On "Traverser" the avatar hops peak to peak (in
+   frequency order): a peak on the right frequency holds, a wrong one drops it
    through. Web Audio, no assets.
    ===================================================== */
 
@@ -17,8 +17,8 @@ const centsOff = (midi: number, target: number): number => (midi - target) * 100
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-const PASS = 45; // cents tolerance for a bar-top to hold
-const SEG = 22; // spectrum segments per bar
+const PASS = 45; // cents tolerance for a peak to sit on its frequency
+const SEG = 18; // spectrum segments per peak
 
 interface Instrument {
 	label: string;
@@ -50,7 +50,6 @@ interface Level {
 	instrument: InstrumentId;
 	prefill: number[];
 }
-// Difficulty rises: simple triads → 7ths/9ths → improbable altered tensions.
 const LEVELS: Level[] = [
 	{ root: 52, chord: { name: 'Majeur', offs: [0, 4, 7] }, instrument: 'piano', prefill: [0] },
 	{ root: 57, chord: { name: 'Mineur', offs: [0, 3, 7] }, instrument: 'timbale', prefill: [0] },
@@ -63,14 +62,15 @@ const LEVELS: Level[] = [
 	{ root: 45, chord: { name: 'Majeur 7♯11', offs: [0, 4, 7, 11, 18] }, instrument: 'violon', prefill: [0, 1] },
 ];
 
-interface Bar {
+interface Peak {
 	target: number;
-	midi: number;
+	midi: number; // current frequency (as fractional midi)
 	locked: boolean;
 }
 type Status = 'intro' | 'tuning' | 'crossing' | 'levelclear' | 'won';
 interface Cross {
-	firstBad: number;
+	firstBad: number; // index in frequency order, -1 = all good
+	order: number[]; // peak indices sorted by frequency
 	startedAt: number;
 	settled: boolean;
 }
@@ -85,7 +85,7 @@ export default function AccordsGame() {
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const dimRef = useRef({ w: 680, h: 380 });
-	const barsRef = useRef<Bar[]>([]);
+	const peaksRef = useRef<Peak[]>([]);
 	const rangeRef = useRef({ lo: 48, hi: 72 });
 	const dragRef = useRef(-1);
 	const crossRef = useRef<Cross | null>(null);
@@ -190,40 +190,37 @@ export default function AccordsGame() {
 		const lo = Math.min(...targets) - 3;
 		const hi = Math.max(...targets) + 3;
 		rangeRef.current = { lo, hi };
-		const mid = (lo + hi) / 2;
-		barsRef.current = targets.map((tm, i) => ({ target: tm, midi: lv.prefill.includes(i) ? tm : mid, locked: lv.prefill.includes(i) }));
+		const peaks: Peak[] = targets.map((tm, i) => ({ target: tm, midi: tm, locked: lv.prefill.includes(i) }));
+		// Spread the free peaks evenly across the band as a neutral (unsolved) start.
+		const free = peaks.filter((p) => !p.locked);
+		free.forEach((p, k) => (p.midi = lo + ((k + 1) / (free.length + 1)) * (hi - lo)));
+		peaksRef.current = peaks;
 		dragRef.current = -1;
 		crossRef.current = null;
 	}, []);
 
-	/* ---------- Geometry ---------- */
+	/* ---------- Geometry (X = frequency) ---------- */
 	const layout = () => {
 		const { w, h } = dimRef.current;
 		const base = h * 0.86;
-		const top = h * 0.1;
-		const ledgeW = w * 0.13;
-		const x0 = ledgeW;
-		const x1 = w - ledgeW;
-		const n = Math.max(1, barsRef.current.length);
-		const slot = (x1 - x0) / n;
-		return { w, h, base, top, ledgeW, x0, x1, n, slot };
-	};
-	const barX = (i: number): number => {
-		const L = layout();
-		return L.x0 + (i + 0.5) * L.slot;
+		const peakTop = h * 0.4;
+		const ledgeW = w * 0.11;
+		const xLo = ledgeW + w * 0.04;
+		const xHi = w - ledgeW - w * 0.04;
+		return { w, h, base, peakTop, ledgeW, xLo, xHi };
 	};
 	const frac = (m: number): number => {
 		const { lo, hi } = rangeRef.current;
 		return clamp((m - lo) / (hi - lo), 0, 1);
 	};
-	const yForMidi = (m: number): number => {
+	const xForMidi = (m: number): number => {
 		const L = layout();
-		return L.base - frac(m) * (L.base - L.top);
+		return L.xLo + frac(m) * (L.xHi - L.xLo);
 	};
-	const midiForY = (y: number): number => {
+	const midiForX = (x: number): number => {
 		const L = layout();
 		const { lo, hi } = rangeRef.current;
-		const f = clamp((L.base - y) / (L.base - L.top), 0, 1);
+		const f = clamp((x - L.xLo) / (L.xHi - L.xLo), 0, 1);
 		return lo + f * (hi - lo);
 	};
 
@@ -237,12 +234,25 @@ export default function AccordsGame() {
 	hearChordRef.current = hearChord;
 	const hearMine = (): void => {
 		const lv = curLevel();
-		playChord(barsRef.current.map((b) => midiToFreq(b.midi)), INSTRUMENTS[lv.instrument]);
+		playChord(peaksRef.current.map((p) => midiToFreq(p.midi)), INSTRUMENTS[lv.instrument]);
+	};
+	const hearPlaced = (): void => {
+		const lv = curLevel();
+		const locked = peaksRef.current.filter((p) => p.locked).map((p) => midiToFreq(p.target));
+		if (locked.length) playChord(locked, INSTRUMENTS[lv.instrument]);
 	};
 	const cross = (): void => {
 		if (statusRef.current !== 'tuning') return;
-		const firstBad = barsRef.current.findIndex((b) => Math.abs(centsOff(b.midi, b.target)) > PASS);
-		crossRef.current = { firstBad, startedAt: animRef.current, settled: false };
+		const targets = targetsOf(curLevel());
+		const order = peaksRef.current.map((_, i) => i).sort((a, b) => peaksRef.current[a].midi - peaksRef.current[b].midi);
+		let firstBad = -1;
+		for (let k = 0; k < order.length; k++) {
+			if (Math.abs(centsOff(peaksRef.current[order[k]].midi, targets[k])) > PASS) {
+				firstBad = k;
+				break;
+			}
+		}
+		crossRef.current = { firstBad, order, startedAt: animRef.current, settled: false };
 		setStat('crossing');
 	};
 	const nextLevel = (): void => {
@@ -281,28 +291,32 @@ export default function AccordsGame() {
 	const onDown = (e: React.PointerEvent): void => {
 		if (statusRef.current !== 'tuning') return;
 		const p = posFrom(e);
-		const L = layout();
 		let best = -1;
-		let bestD = L.slot * 0.55;
-		barsRef.current.forEach((b, i) => {
-			const d = Math.abs(p.x - barX(i));
-			if (d < bestD && !b.locked) {
+		let bestD = 34;
+		peaksRef.current.forEach((pk, i) => {
+			const d = Math.abs(p.x - xForMidi(pk.midi));
+			if (d < bestD) {
 				bestD = d;
 				best = i;
 			}
 		});
 		if (best < 0) return;
+		const pk = peaksRef.current[best];
+		if (pk.locked) {
+			// Locked peak → not draggable, but tap it to hear the note already in place.
+			playChord([midiToFreq(pk.target)], INSTRUMENTS[curLevel().instrument], 1.1);
+			return;
+		}
 		dragRef.current = best;
 		canvasRef.current?.setPointerCapture(e.pointerId);
-		const m = midiForY(p.y);
-		barsRef.current[best].midi = m;
-		startLive(midiToFreq(m), INSTRUMENTS[curLevel().instrument]);
+		pk.midi = midiForX(p.x);
+		startLive(midiToFreq(pk.midi), INSTRUMENTS[curLevel().instrument]);
 	};
 	const onMove = (e: React.PointerEvent): void => {
 		const i = dragRef.current;
 		if (i < 0) return;
-		const m = midiForY(posFrom(e).y);
-		barsRef.current[i].midi = m;
+		const m = midiForX(posFrom(e).x);
+		peaksRef.current[i].midi = m;
 		setLive(midiToFreq(m));
 	};
 	const onUp = (): void => {
@@ -318,7 +332,7 @@ export default function AccordsGame() {
 			const cv = canvasRef.current;
 			if (!wrap || !cv) return;
 			const w = wrap.clientWidth;
-			const h = Math.round(clamp(w * 0.52, 260, 420));
+			const h = Math.round(clamp(w * 0.5, 260, 400));
 			const dpr = window.devicePixelRatio || 1;
 			dimRef.current = { w, h };
 			cv.style.height = `${h}px`;
@@ -384,23 +398,43 @@ export default function AccordsGame() {
 		const anim = animRef.current;
 		const st = statusRef.current;
 		const names = namesRef.current;
+		const peaks = peaksRef.current;
 
-		// Panel background (hi-fi bezel).
 		ctx.fillStyle = '#0b0e14';
 		ctx.fillRect(0, 0, L.w, L.h);
-		ctx.fillStyle = '#05070b';
-		ctx.fillRect(0, L.base, L.w, L.h - L.base);
 
-		const segH = (L.base - L.top) / SEG;
-		const barW = Math.min(L.slot * 0.62, 30);
+		// Decorative spectrum floor across the whole frequency axis.
+		const binW = 5;
+		for (let x = L.xLo; x < L.xHi; x += binW) {
+			const nrm = 0.5 + 0.5 * Math.sin(anim * 3 + x * 0.25);
+			const hh = 4 + nrm * 10;
+			ctx.fillStyle = 'rgba(90,120,160,0.16)';
+			ctx.fillRect(x, L.base - hh, binW - 1.5, hh);
+		}
+		// Baseline + faint frequency ticks (one per semitone: analyser bins, no labels).
+		ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+		ctx.lineWidth = 1;
+		const { lo, hi } = rangeRef.current;
+		for (let m = Math.ceil(lo); m <= Math.floor(hi); m++) {
+			const x = xForMidi(m);
+			ctx.beginPath();
+			ctx.moveTo(x, L.peakTop);
+			ctx.lineTo(x, L.base);
+			ctx.stroke();
+		}
+		ctx.strokeStyle = 'rgba(120,150,190,0.4)';
+		ctx.beginPath();
+		ctx.moveTo(0, L.base);
+		ctx.lineTo(L.w, L.base);
+		ctx.stroke();
 
-		// Avatar path/crossing.
+		// Avatar / crossing.
 		let avX = L.ledgeW * 0.5;
 		let avY = L.base - 12;
 		if (st === 'crossing' && crossRef.current) {
 			const c = crossRef.current;
 			const positions: [number, number][] = [[L.ledgeW * 0.5, L.base - 12]];
-			barsRef.current.forEach((b, i) => positions.push([barX(i), yForMidi(b.midi) - 12]));
+			c.order.forEach((idx) => positions.push([xForMidi(peaks[idx].midi), L.peakTop - 12]));
 			positions.push([L.w - L.ledgeW * 0.5, L.base - 12]);
 			const targetIdx = c.firstBad >= 0 ? c.firstBad + 1 : positions.length - 1;
 			const segDur = 0.34;
@@ -417,14 +451,14 @@ export default function AccordsGame() {
 					c.settled = true;
 					if (c.firstBad >= 0) {
 						setAttempts((a) => a + 1);
-						setFlash({ kind: 'bad', text: 'Plaf ! Une note sonne faux — la barre cède.' });
+						setFlash({ kind: 'bad', text: 'Plaf ! Un pic sonne faux — la note cède.' });
 						setTimeout(() => {
 							setFlash(null);
 							crossRef.current = null;
 							setStat('tuning');
 						}, 950);
 					} else {
-						setFlash({ kind: 'ok', text: 'Accord juste — traversée !' });
+						setFlash({ kind: 'ok', text: 'Spectre juste — traversée !' });
 						setTimeout(() => {
 							setFlash(null);
 							setStat(levelRef.current + 1 >= LEVELS.length ? 'won' : 'levelclear');
@@ -432,11 +466,11 @@ export default function AccordsGame() {
 					}
 				}
 			} else {
-				const frac2 = el / segDur - seg;
+				const f2 = el / segDur - seg;
 				const [ax, ay] = positions[Math.min(seg, targetIdx)];
 				const [bx, by] = positions[Math.min(seg + 1, targetIdx)];
-				avX = lerp(ax, bx, frac2);
-				avY = lerp(ay, by, frac2) - Math.sin(frac2 * Math.PI) * 26;
+				avX = lerp(ax, bx, f2);
+				avY = lerp(ay, by, f2) - Math.sin(f2 * Math.PI) * 30;
 			}
 		}
 
@@ -450,39 +484,31 @@ export default function AccordsGame() {
 		ctx.textBaseline = 'middle';
 		ctx.fillText('But', L.w - L.ledgeW * 0.5, L.base - 22);
 
-		// Spectrum bars.
-		barsRef.current.forEach((b, i) => {
-			const x = barX(i);
-			const f = frac(b.midi);
-			const lit = f * SEG;
+		// Peaks: bright vertical spikes at their current frequency (X).
+		const segH = (L.base - L.peakTop) / SEG;
+		const spikeW = 12;
+		peaks.forEach((pk, i) => {
+			const x = xForMidi(pk.midi);
 			for (let s = 0; s < SEG; s++) {
 				const y = L.base - (s + 1) * segH + 1.5;
-				const on = s < Math.floor(lit) || (s === Math.floor(lit) && lit % 1 > 0.25);
-				if (on) {
-					ctx.fillStyle = spectrumColor(s, 56);
-					ctx.shadowColor = spectrumColor(s, 62);
-					ctx.shadowBlur = 6;
-				} else {
-					ctx.fillStyle = 'rgba(255,255,255,0.05)';
-					ctx.shadowBlur = 0;
-				}
-				ctx.fillRect(x - barW / 2, y, barW, segH - 3);
+				ctx.fillStyle = spectrumColor(s, 56);
+				ctx.shadowColor = spectrumColor(s, 62);
+				ctx.shadowBlur = 6;
+				ctx.fillRect(x - spikeW / 2, y, spikeW, segH - 2.5);
 			}
 			ctx.shadowBlur = 0;
-			// Bright cap at the continuous top (the stepping platform).
-			const topY = yForMidi(b.midi);
-			const capW = barW + 6;
-			ctx.fillStyle = b.locked ? '#cfe3ff' : dragRef.current === i ? '#ffffff' : '#eaf2ff';
-			ctx.fillRect(x - capW / 2, topY - 3, capW, 4);
-			if (b.locked) {
+			// Cap (the stepping platform).
+			ctx.fillStyle = pk.locked ? '#cfe3ff' : dragRef.current === i ? '#ffffff' : '#eaf2ff';
+			ctx.fillRect(x - spikeW / 2 - 3, L.peakTop - 3, spikeW + 6, 4);
+			if (pk.locked) {
 				ctx.fillStyle = '#9db7d8';
 				ctx.font = '10px system-ui, sans-serif';
-				ctx.fillText('🔒', x, topY - 14);
+				ctx.fillText('🔒', x, L.peakTop - 14);
 			}
 			if (names) {
-				ctx.fillStyle = 'rgba(230,240,255,0.85)';
+				ctx.fillStyle = 'rgba(230,240,255,0.9)';
 				ctx.font = 'bold 11px system-ui, sans-serif';
-				ctx.fillText(noteFull(b.midi), x, topY - (b.locked ? 26 : 14));
+				ctx.fillText(noteFull(pk.midi), x, L.peakTop - (pk.locked ? 26 : 14));
 			}
 		});
 
@@ -513,6 +539,9 @@ export default function AccordsGame() {
 				<button className="ac-btn" onClick={hearMine} disabled={status !== 'tuning'}>
 					🎧 Ma version
 				</button>
+				<button className="ac-btn" onClick={hearPlaced} disabled={status !== 'tuning' || lv.prefill.length === 0}>
+					🔒 Notes posées
+				</button>
 				<button className="ac-btn go" onClick={cross} disabled={status !== 'tuning'}>
 					🏃 Traverser
 				</button>
@@ -532,8 +561,8 @@ export default function AccordsGame() {
 						<div className="ac-card">
 							<h3>🎼 Accords &amp; Gouffres</h3>
 							<p>
-								Écoute l'accord, puis <b>accorde chaque barre du spectre</b> (graves à gauche, aigus à droite) pour retrouver ses notes — à l'oreille, aucun repère ne te dira si c'est juste.
-								Traverse&nbsp;: l'avatar saute de sommet en sommet, une note fausse le fait chuter&nbsp;!
+								Écoute l'accord, puis <b>fais glisser chaque pic à sa fréquence</b> sur le spectre (graves à gauche, aigus à droite) — à l'oreille, rien ne te dira si c'est juste.
+								Traverse&nbsp;: l'avatar saute de pic en pic, un pic mal placé le fait chuter&nbsp;!
 							</p>
 							<button className="ac-btn primary big" onClick={startGame}>
 								▶ Commencer
@@ -558,7 +587,7 @@ export default function AccordsGame() {
 					<div className="ac-overlay">
 						<div className="ac-card">
 							<h3>🏆 Bravo&nbsp;!</h3>
-							<p>Tu as franchi tous les gouffres, du simple triade à l'accord le plus tordu.</p>
+							<p>Tu as reconstitué tous les spectres, du simple triade à l'accord le plus tordu.</p>
 							<button className="ac-btn primary big" onClick={restart}>
 								↻ Rejouer
 							</button>
@@ -568,7 +597,7 @@ export default function AccordsGame() {
 			</div>
 
 			<p className="ac-help">
-				Prototype — glisse les barres pour régler la hauteur de chaque note. Aucun retour visuel de justesse&nbsp;: fie-toi à ton oreille (bouton «&nbsp;Ma version&nbsp;» pour comparer). Les barres <b>🔒</b> sont des aides déjà réglées.
+				Prototype — sur un analyseur de spectre, chaque note est un <b>pic</b> à une fréquence. Glisse les pics <b>horizontalement</b> pour les poser aux bonnes fréquences. Aucun retour de justesse&nbsp;: fie-toi à l'oreille («&nbsp;Ma version&nbsp;» pour comparer). Les pics <b>🔒</b> sont des aides&nbsp;: «&nbsp;Notes posées&nbsp;» ou tape-les pour les entendre.
 			</p>
 		</div>
 	);
