@@ -1,0 +1,60 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import SolitaireGame from '../../games/solitaire/SolitaireGame.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
+---
+
+<BaseLayout
+	title="Solitaire à billes | Jeux Ludiven Studio"
+	description="Le solitaire à billes (peg solitaire) : saute par-dessus les billes pour les retirer et n'en laisse qu'une. Plateau en croix ou triangle. Un casse-tête classique signé Ludiven Studio."
+>
+	<div class="wrapper game-page stack gap-8">
+		<header class="game-head stack gap-2">
+			<a class="back" href="/jeux/">
+				<Icon icon="arrow-left" size="1em" /> Tous les jeux
+			</a>
+			<h1>Solitaire à billes</h1>
+			<p>Saute, retire, n'en laisse qu'une</p>
+			<GameTutorial gameId="solitaire" />
+		</header>
+
+		<SolitaireGame client:only="react" gameId="solitaire" />
+	</div>
+</BaseLayout>
+
+<style>
+	.game-page {
+		align-items: center;
+	}
+	.game-head {
+		text-align: center;
+		align-items: center;
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--gray-300);
+		text-decoration: none;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+	}
+	.back:hover,
+	.back:focus-visible {
+		color: var(--accent-regular);
+	}
+	.game-head h1 {
+		font-size: var(--text-3xl);
+		margin-top: 0.5rem;
+	}
+	.game-head p {
+		color: var(--gray-300);
+	}
+	@media (min-width: 50em) {
+		.game-head h1 {
+			font-size: var(--text-4xl);
+		}
+	}
+</style>

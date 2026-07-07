@@ -16,6 +16,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🦊', title: 'Vagues & méga renard', body: 'Les vagues sont de plus en plus dures. Toutes les 5 vagues débarque un méga renard (parfois deux en fin de partie) qui renforce la meute : adapte tes défenses ou le poulailler tombera.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, les vagues de renards sont les mêmes pour tout le monde (graine partagée). Jusqu\'à 3 essais : ton meilleur score (renards repoussés) est classé.' },
 	],
+	'solitaire': [
+		{ emoji: '🎯', title: 'Le but', body: 'Le solitaire à billes : le plateau est plein sauf un trou. Retire les billes une à une jusqu\'à n\'en laisser qu\'une seule — au centre pour un sans-faute sur la croix.' },
+		{ emoji: '🫧', title: 'Sauter', body: 'Tape une bille puis un trou vide situé deux cases plus loin, en ligne droite, avec une bille à sauter entre les deux (ou fais-la glisser). La bille survolée est retirée.' },
+		{ emoji: '🧭', title: 'Croix ou triangle', body: 'Sur la croix (33 billes) les sauts sont horizontaux et verticaux. Sur le triangle (15 billes) ils suivent aussi les diagonales. Les deux se résolvent jusqu\'à une seule bille.' },
+		{ emoji: '💡', title: 'Aides', body: 'Bloqué ? Annule ton dernier coup, demande un indice (il montre un coup qui garde une solution) ou recommence. Ton meilleur résultat (le moins de billes restantes) est gardé.' },
+	],
 	'2048': [
 		{ emoji: '🎯', title: 'Le but', body: 'Fais glisser toutes les tuiles dans une direction : deux tuiles de même valeur qui se rencontrent fusionnent et s\'additionnent. Atteins la tuile 2048… puis va chercher le plus gros score !' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Flèches ou ZQSD/WASD au clavier, ou glisse le doigt dans une direction sur mobile. À chaque coup, une nouvelle tuile (2 ou 4) apparaît.' },

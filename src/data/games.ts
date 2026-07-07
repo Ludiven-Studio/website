@@ -37,6 +37,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'solitaire',
+		title: 'Solitaire à billes',
+		pitch: 'Le peg solitaire : saute par-dessus les billes pour les retirer et n\'en laisse qu\'une. Plateau en croix ou en triangle.',
+		icon: 'grid-dots',
+		href: '/jeux/solitaire',
+		status: 'play',
+	},
+	{
 		id: 'sudoku',
 		title: 'Sudoku',
 		pitch: 'Le grand classique de la logique en grille, en 4×4, 6×6 ou 9×9, plusieurs niveaux.',
