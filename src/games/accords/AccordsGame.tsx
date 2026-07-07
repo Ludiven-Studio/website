@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 /* =====================================================
-   ACCORDS & GOUFFRES — prototype (ear-training + platformer skin).
-   Hear a chord, rebuild it by tuning vertical bars (bass left → treble
-   right). Each note tuned within tolerance solidifies a bridge tile; when
-   all tiles are solid the avatar crosses the chasm → next level. Wrong
-   note = the avatar drops through the phantom tile. Web Audio, no assets.
+   ACCORDS & GOUFFRES — prototype (ear-training, hi-fi spectrum skin).
+   Hear a chord, rebuild it by tuning vertical spectrum bars (bass left →
+   treble right). NO correctness feedback while tuning — the bars are just a
+   rainbow VU display; you judge by ear. On "Traverser" the avatar hops from
+   bar-top to bar-top: a note within tolerance holds, a wrong one drops it
+   through. Web Audio, no assets.
    ===================================================== */
 
 const NOTE_FR = ['Do', 'Do♯', 'Ré', 'Ré♯', 'Mi', 'Fa', 'Fa♯', 'Sol', 'Sol♯', 'La', 'La♯', 'Si'];
@@ -16,8 +17,8 @@ const centsOff = (midi: number, target: number): number => (midi - target) * 100
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-const PASS = 45; // cents tolerance to solidify a tile
-const PERFECT = 15; // cents for a "parfait"
+const PASS = 45; // cents tolerance for a bar-top to hold
+const SEG = 22; // spectrum segments per bar
 
 interface Instrument {
 	label: string;
@@ -32,6 +33,9 @@ const INSTRUMENTS = {
 	piano: { label: 'Piano', type: 'triangle', attack: 0.005, decay: 0.5, sustain: 0.22, release: 0.35, harmonics: [[1, 1], [2, 0.28], [3, 0.12]] },
 	orgue: { label: 'Orgue', type: 'sine', attack: 0.02, decay: 0.1, sustain: 0.9, release: 0.25, harmonics: [[1, 1], [2, 0.55], [4, 0.3]] },
 	cordes: { label: 'Cordes', type: 'sawtooth', attack: 0.09, decay: 0.2, sustain: 0.8, release: 0.3, harmonics: [[1, 0.6], [2, 0.18]] },
+	trompette: { label: 'Trompette', type: 'sawtooth', attack: 0.03, decay: 0.15, sustain: 0.75, release: 0.2, harmonics: [[1, 0.7], [2, 0.4], [3, 0.25], [4, 0.12]] },
+	violon: { label: 'Violon', type: 'sawtooth', attack: 0.12, decay: 0.2, sustain: 0.85, release: 0.35, harmonics: [[1, 0.6], [2, 0.25], [3, 0.12]] },
+	timbale: { label: 'Timbale', type: 'sine', attack: 0.002, decay: 0.4, sustain: 0.06, release: 0.25, harmonics: [[1, 1], [2, 0.2], [3, 0.08]] },
 	synthe: { label: 'Synthé', type: 'square', attack: 0.01, decay: 0.15, sustain: 0.6, release: 0.2, harmonics: [[1, 0.5], [3, 0.12]] },
 } satisfies Record<string, Instrument>;
 type InstrumentId = keyof typeof INSTRUMENTS;
@@ -44,26 +48,29 @@ interface Level {
 	root: number;
 	chord: ChordType;
 	instrument: InstrumentId;
-	prefill: number[]; // indices (into sorted notes) given for free
+	prefill: number[];
 }
+// Difficulty rises: simple triads → 7ths/9ths → improbable altered tensions.
 const LEVELS: Level[] = [
 	{ root: 52, chord: { name: 'Majeur', offs: [0, 4, 7] }, instrument: 'piano', prefill: [0] },
-	{ root: 57, chord: { name: 'Mineur', offs: [0, 3, 7] }, instrument: 'piano', prefill: [0] },
-	{ root: 50, chord: { name: 'sus4', offs: [0, 5, 7] }, instrument: 'synthe', prefill: [2] },
-	{ root: 53, chord: { name: 'Majeur 7', offs: [0, 4, 7, 11] }, instrument: 'orgue', prefill: [0, 2] },
-	{ root: 55, chord: { name: '7 (dominante)', offs: [0, 4, 7, 10] }, instrument: 'cordes', prefill: [0] },
-	{ root: 47, chord: { name: 'Majeur 9', offs: [0, 4, 7, 11, 14] }, instrument: 'cordes', prefill: [0, 4] },
+	{ root: 57, chord: { name: 'Mineur', offs: [0, 3, 7] }, instrument: 'timbale', prefill: [0] },
+	{ root: 50, chord: { name: 'sus4', offs: [0, 5, 7] }, instrument: 'orgue', prefill: [2] },
+	{ root: 53, chord: { name: 'Majeur 7', offs: [0, 4, 7, 11] }, instrument: 'trompette', prefill: [0, 2] },
+	{ root: 55, chord: { name: '7', offs: [0, 4, 7, 10] }, instrument: 'cordes', prefill: [0] },
+	{ root: 48, chord: { name: 'Majeur 9', offs: [0, 4, 7, 11, 14] }, instrument: 'violon', prefill: [0, 4] },
 	{ root: 52, chord: { name: 'Mineur 9', offs: [0, 3, 7, 10, 14] }, instrument: 'orgue', prefill: [0, 3] },
+	{ root: 48, chord: { name: '7♭9', offs: [0, 4, 10, 13] }, instrument: 'trompette', prefill: [0] },
+	{ root: 45, chord: { name: 'Majeur 7♯11', offs: [0, 4, 7, 11, 18] }, instrument: 'violon', prefill: [0, 1] },
 ];
 
 interface Bar {
-	target: number; // exact midi to reach
-	midi: number; // current player value (float)
+	target: number;
+	midi: number;
 	locked: boolean;
 }
 type Status = 'intro' | 'tuning' | 'crossing' | 'levelclear' | 'won';
 interface Cross {
-	firstBad: number; // -1 = all good
+	firstBad: number;
 	startedAt: number;
 	settled: boolean;
 }
@@ -71,25 +78,23 @@ interface Cross {
 export default function AccordsGame() {
 	const [status, setStatus] = useState<Status>('intro');
 	const [level, setLevel] = useState(0);
-	const [assisted, setAssisted] = useState(true);
-	const [tunedCount, setTunedCount] = useState(0);
+	const [showNames, setShowNames] = useState(false);
 	const [attempts, setAttempts] = useState(0);
 	const [flash, setFlash] = useState<{ kind: 'ok' | 'bad'; text: string } | null>(null);
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
-	const dimRef = useRef({ w: 640, h: 384 });
+	const dimRef = useRef({ w: 680, h: 380 });
 	const barsRef = useRef<Bar[]>([]);
 	const rangeRef = useRef({ lo: 48, hi: 72 });
-	const dragRef = useRef<number>(-1);
+	const dragRef = useRef(-1);
 	const crossRef = useRef<Cross | null>(null);
 	const animRef = useRef(0);
 	const rafRef = useRef(0);
 	const statusRef = useRef<Status>('intro');
-	const assistedRef = useRef(true);
-	const levelRef = useRef(0); // mirror for the rAF draw closure (captured once)
+	const namesRef = useRef(false);
+	const levelRef = useRef(0);
 
-	// Audio
 	const ctxRef = useRef<AudioContext | null>(null);
 	const masterRef = useRef<GainNode | null>(null);
 	const voicesRef = useRef(3);
@@ -115,7 +120,6 @@ export default function AccordsGame() {
 		if (ctxRef.current.state === 'suspended') void ctxRef.current.resume();
 		return ctxRef.current;
 	};
-
 	const playTone = (ctx: AudioContext, freq: number, instr: Instrument, when: number, dur: number): void => {
 		const g = ctx.createGain();
 		g.connect(masterRef.current!);
@@ -138,14 +142,12 @@ export default function AccordsGame() {
 			o.stop(when + dur + rel + 0.05);
 		}
 	};
-
 	const playChord = (freqs: number[], instr: Instrument, dur = 1.5): void => {
 		const ctx = ensureAudio();
 		if (!ctx) return;
 		voicesRef.current = freqs.length;
 		freqs.forEach((f, i) => playTone(ctx, f, instr, ctx.currentTime + i * 0.012, dur));
 	};
-
 	const startLive = (freq: number, instr: Instrument): void => {
 		const ctx = ensureAudio();
 		if (!ctx) return;
@@ -178,7 +180,7 @@ export default function AccordsGame() {
 		liveRef.current = null;
 	};
 
-	/* ---------- Level setup ---------- */
+	/* ---------- Level ---------- */
 	const curLevel = (): Level => LEVELS[Math.min(level, LEVELS.length - 1)];
 	const targetsOf = (lv: Level): number[] => lv.chord.offs.map((o) => lv.root + o).sort((a, b) => a - b);
 
@@ -189,65 +191,60 @@ export default function AccordsGame() {
 		const hi = Math.max(...targets) + 3;
 		rangeRef.current = { lo, hi };
 		const mid = (lo + hi) / 2;
-		barsRef.current = targets.map((tm, i) => ({
-			target: tm,
-			midi: lv.prefill.includes(i) ? tm : mid,
-			locked: lv.prefill.includes(i),
-		}));
+		barsRef.current = targets.map((tm, i) => ({ target: tm, midi: lv.prefill.includes(i) ? tm : mid, locked: lv.prefill.includes(i) }));
 		dragRef.current = -1;
 		crossRef.current = null;
-		setTunedCount(barsRef.current.filter((b) => Math.abs(centsOff(b.midi, b.target)) <= PASS).length);
 	}, []);
-
-	const tunedFlags = (): boolean[] => barsRef.current.map((b) => Math.abs(centsOff(b.midi, b.target)) <= PASS);
 
 	/* ---------- Geometry ---------- */
 	const layout = () => {
 		const { w, h } = dimRef.current;
-		const groundY = h * 0.72;
-		const ledgeW = w * 0.15;
+		const base = h * 0.86;
+		const top = h * 0.1;
+		const ledgeW = w * 0.13;
 		const x0 = ledgeW;
 		const x1 = w - ledgeW;
-		const n = barsRef.current.length;
-		const slot = (x1 - x0) / Math.max(1, n);
-		const trackTop = h * 0.09;
-		const trackBottom = groundY - 16;
-		return { w, h, groundY, ledgeW, x0, x1, n, slot, trackTop, trackBottom };
+		const n = Math.max(1, barsRef.current.length);
+		const slot = (x1 - x0) / n;
+		return { w, h, base, top, ledgeW, x0, x1, n, slot };
 	};
 	const barX = (i: number): number => {
 		const L = layout();
 		return L.x0 + (i + 0.5) * L.slot;
 	};
+	const frac = (m: number): number => {
+		const { lo, hi } = rangeRef.current;
+		return clamp((m - lo) / (hi - lo), 0, 1);
+	};
 	const yForMidi = (m: number): number => {
 		const L = layout();
-		const { lo, hi } = rangeRef.current;
-		return L.trackBottom - ((m - lo) / (hi - lo)) * (L.trackBottom - L.trackTop);
+		return L.base - frac(m) * (L.base - L.top);
 	};
 	const midiForY = (y: number): number => {
 		const L = layout();
 		const { lo, hi } = rangeRef.current;
-		const f = (L.trackBottom - y) / (L.trackBottom - L.trackTop);
-		return clamp(lo + f * (hi - lo), lo, hi);
+		const f = clamp((L.base - y) / (L.base - L.top), 0, 1);
+		return lo + f * (hi - lo);
 	};
 
 	/* ---------- Buttons ---------- */
-	const hearChord = (): void => {
+	const hearChord = useCallback((): void => {
 		const lv = curLevel();
 		playChord(targetsOf(lv).map(midiToFreq), INSTRUMENTS[lv.instrument]);
-	};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [level]);
+	const hearChordRef = useRef(hearChord);
+	hearChordRef.current = hearChord;
 	const hearMine = (): void => {
 		const lv = curLevel();
 		playChord(barsRef.current.map((b) => midiToFreq(b.midi)), INSTRUMENTS[lv.instrument]);
 	};
-
 	const cross = (): void => {
 		if (statusRef.current !== 'tuning') return;
-		const flags = tunedFlags();
-		const firstBad = flags.findIndex((ok) => !ok);
+		const firstBad = barsRef.current.findIndex((b) => Math.abs(centsOff(b.midi, b.target)) > PASS);
 		crossRef.current = { firstBad, startedAt: animRef.current, settled: false };
 		setStat('crossing');
 	};
-
 	const nextLevel = (): void => {
 		if (level + 1 >= LEVELS.length) {
 			setStat('won');
@@ -257,11 +254,8 @@ export default function AccordsGame() {
 		setLevel(nx);
 		buildLevel(nx);
 		setStat('tuning');
-		setTimeout(hearChordRef.current, 250);
+		setTimeout(() => hearChordRef.current(), 250);
 	};
-	const hearChordRef = useRef(hearChord);
-	hearChordRef.current = hearChord;
-
 	const startGame = (): void => {
 		ensureAudio();
 		setLevel(0);
@@ -282,17 +276,14 @@ export default function AccordsGame() {
 	const posFrom = (e: React.PointerEvent): { x: number; y: number } => {
 		const cv = canvasRef.current!;
 		const rect = cv.getBoundingClientRect();
-		return {
-			x: (e.clientX - rect.left) * (dimRef.current.w / rect.width),
-			y: (e.clientY - rect.top) * (dimRef.current.h / rect.height),
-		};
+		return { x: (e.clientX - rect.left) * (dimRef.current.w / rect.width), y: (e.clientY - rect.top) * (dimRef.current.h / rect.height) };
 	};
 	const onDown = (e: React.PointerEvent): void => {
 		if (statusRef.current !== 'tuning') return;
 		const p = posFrom(e);
 		const L = layout();
 		let best = -1;
-		let bestD = L.slot * 0.5;
+		let bestD = L.slot * 0.55;
 		barsRef.current.forEach((b, i) => {
 			const d = Math.abs(p.x - barX(i));
 			if (d < bestD && !b.locked) {
@@ -306,24 +297,19 @@ export default function AccordsGame() {
 		const m = midiForY(p.y);
 		barsRef.current[best].midi = m;
 		startLive(midiToFreq(m), INSTRUMENTS[curLevel().instrument]);
-		syncTuned();
 	};
 	const onMove = (e: React.PointerEvent): void => {
 		const i = dragRef.current;
 		if (i < 0) return;
-		const p = posFrom(e);
-		const m = midiForY(p.y);
+		const m = midiForY(posFrom(e).y);
 		barsRef.current[i].midi = m;
 		setLive(midiToFreq(m));
-		syncTuned();
 	};
 	const onUp = (): void => {
 		if (dragRef.current < 0) return;
 		dragRef.current = -1;
 		stopLive();
-		syncTuned();
 	};
-	const syncTuned = (): void => setTunedCount(tunedFlags().filter(Boolean).length);
 
 	/* ---------- Loop ---------- */
 	useEffect(() => {
@@ -332,7 +318,7 @@ export default function AccordsGame() {
 			const cv = canvasRef.current;
 			if (!wrap || !cv) return;
 			const w = wrap.clientWidth;
-			const h = Math.round(clamp(w * 0.6, 280, 460));
+			const h = Math.round(clamp(w * 0.52, 260, 420));
 			const dpr = window.devicePixelRatio || 1;
 			dimRef.current = { w, h };
 			cv.style.height = `${h}px`;
@@ -344,15 +330,14 @@ export default function AccordsGame() {
 		resize();
 		const ro = new ResizeObserver(resize);
 		if (wrapRef.current) ro.observe(wrapRef.current);
-
 		let last = performance.now();
-		const frame = (now: number): void => {
+		const frameLoop = (now: number): void => {
 			animRef.current += Math.min(now - last, 100) / 1000;
 			last = now;
 			draw();
-			rafRef.current = requestAnimationFrame(frame);
+			rafRef.current = requestAnimationFrame(frameLoop);
 		};
-		rafRef.current = requestAnimationFrame(frame);
+		rafRef.current = requestAnimationFrame(frameLoop);
 		return () => {
 			ro.disconnect();
 			cancelAnimationFrame(rafRef.current);
@@ -361,15 +346,35 @@ export default function AccordsGame() {
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
-
 	useEffect(() => {
-		assistedRef.current = assisted;
-	}, [assisted]);
+		namesRef.current = showNames;
+	}, [showNames]);
 	useEffect(() => {
 		levelRef.current = level;
 	}, [level]);
 
 	/* ---------- Draw ---------- */
+	const spectrumColor = (s: number, bright: number): string => {
+		const hue = clamp(248 - (s / (SEG - 1)) * 248, 0, 248); // bottom blue → top red
+		return `hsl(${hue}, 92%, ${bright}%)`;
+	};
+	const drawAvatar = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void => {
+		ctx.fillStyle = '#ffd54a';
+		ctx.beginPath();
+		ctx.arc(x, y, r, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.fillStyle = '#2a2118';
+		ctx.beginPath();
+		ctx.arc(x - r * 0.32, y - r * 0.18, r * 0.16, 0, Math.PI * 2);
+		ctx.arc(x + r * 0.32, y - r * 0.18, r * 0.16, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.strokeStyle = '#2a2118';
+		ctx.lineWidth = r * 0.14;
+		ctx.beginPath();
+		ctx.arc(x, y + r * 0.1, r * 0.42, 0.15 * Math.PI, 0.85 * Math.PI);
+		ctx.stroke();
+	};
+
 	const draw = (): void => {
 		const cv = canvasRef.current;
 		if (!cv) return;
@@ -377,50 +382,47 @@ export default function AccordsGame() {
 		if (!ctx) return;
 		const L = layout();
 		const anim = animRef.current;
-		const assist = assistedRef.current;
 		const st = statusRef.current;
+		const names = namesRef.current;
 
-		// Sky
-		const sky = ctx.createLinearGradient(0, 0, 0, L.h);
-		sky.addColorStop(0, '#12263f');
-		sky.addColorStop(1, '#24405f');
-		ctx.fillStyle = sky;
+		// Panel background (hi-fi bezel).
+		ctx.fillStyle = '#0b0e14';
 		ctx.fillRect(0, 0, L.w, L.h);
+		ctx.fillStyle = '#05070b';
+		ctx.fillRect(0, L.base, L.w, L.h - L.base);
 
-		// Chasm depth
-		ctx.fillStyle = 'rgba(0,0,0,0.35)';
-		ctx.fillRect(L.x0, L.groundY, L.x1 - L.x0, L.h - L.groundY);
+		const segH = (L.base - L.top) / SEG;
+		const barW = Math.min(L.slot * 0.62, 30);
 
-		const flags = tunedFlags();
-
-		// Crossing avatar position
+		// Avatar path/crossing.
 		let avX = L.ledgeW * 0.5;
-		let avY = L.groundY - 16;
+		let avY = L.base - 12;
 		if (st === 'crossing' && crossRef.current) {
 			const c = crossRef.current;
-			const positions = [L.ledgeW * 0.5, ...barsRef.current.map((_, i) => barX(i)), L.w - L.ledgeW * 0.5];
+			const positions: [number, number][] = [[L.ledgeW * 0.5, L.base - 12]];
+			barsRef.current.forEach((b, i) => positions.push([barX(i), yForMidi(b.midi) - 12]));
+			positions.push([L.w - L.ledgeW * 0.5, L.base - 12]);
 			const targetIdx = c.firstBad >= 0 ? c.firstBad + 1 : positions.length - 1;
-			const segDur = 0.32;
+			const segDur = 0.34;
 			const el = anim - c.startedAt;
 			const seg = Math.floor(el / segDur);
 			if (seg >= targetIdx) {
-				avX = positions[targetIdx];
+				avX = positions[targetIdx][0];
+				avY = positions[targetIdx][1];
 				if (c.firstBad >= 0) {
 					const fall = clamp((el - targetIdx * segDur) / 0.5, 0, 1);
-					avY = L.groundY - 16 + fall * (L.h - L.groundY + 40);
-				} else {
-					avY = L.groundY - 16;
+					avY += fall * (L.h - avY + 40);
 				}
 				if (!c.settled) {
 					c.settled = true;
 					if (c.firstBad >= 0) {
 						setAttempts((a) => a + 1);
-						setFlash({ kind: 'bad', text: 'Plaf ! Note fausse — la dalle cède.' });
+						setFlash({ kind: 'bad', text: 'Plaf ! Une note sonne faux — la barre cède.' });
 						setTimeout(() => {
 							setFlash(null);
 							crossRef.current = null;
 							setStat('tuning');
-						}, 900);
+						}, 950);
 					} else {
 						setFlash({ kind: 'ok', text: 'Accord juste — traversée !' });
 						setTimeout(() => {
@@ -430,110 +432,64 @@ export default function AccordsGame() {
 					}
 				}
 			} else {
-				const frac = el / segDur - seg;
-				avX = lerp(positions[Math.min(seg, targetIdx)], positions[Math.min(seg + 1, targetIdx)], frac);
+				const frac2 = el / segDur - seg;
+				const [ax, ay] = positions[Math.min(seg, targetIdx)];
+				const [bx, by] = positions[Math.min(seg + 1, targetIdx)];
+				avX = lerp(ax, bx, frac2);
+				avY = lerp(ay, by, frac2) - Math.sin(frac2 * Math.PI) * 26;
 			}
 		}
 
-		// Ledges
-		const drawLedge = (x: number, w: number): void => {
-			ctx.fillStyle = '#3a6b3f';
-			ctx.fillRect(x, L.groundY, w, 10);
-			ctx.fillStyle = '#5b4636';
-			ctx.fillRect(x, L.groundY + 10, w, L.h - L.groundY - 10);
-		};
-		drawLedge(0, L.ledgeW);
-		drawLedge(L.w - L.ledgeW, L.ledgeW);
+		// Ledges (start + goal).
+		ctx.fillStyle = '#243447';
+		ctx.fillRect(0, L.base, L.ledgeW, L.h - L.base);
+		ctx.fillRect(L.w - L.ledgeW, L.base, L.ledgeW, L.h - L.base);
+		ctx.fillStyle = '#4cc9a0';
+		ctx.font = 'bold 12px system-ui, sans-serif';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillText('But', L.w - L.ledgeW * 0.5, L.base - 22);
 
-		// Tiles + bars
+		// Spectrum bars.
 		barsRef.current.forEach((b, i) => {
 			const x = barX(i);
-			const solid = flags[i];
-			const cents = centsOff(b.midi, b.target);
-			// bridge tile
-			const tw = L.slot * 0.74;
-			const th = 14;
-			ctx.save();
-			if (solid) {
-				ctx.fillStyle = '#e6b35a';
-				ctx.fillRect(x - tw / 2, L.groundY, tw, th);
-				ctx.fillStyle = 'rgba(0,0,0,0.18)';
-				ctx.fillRect(x - tw / 2, L.groundY + th - 3, tw, 3);
-			} else {
-				ctx.setLineDash([5, 4]);
-				ctx.strokeStyle = 'rgba(230,180,90,0.5)';
-				ctx.lineWidth = 1.5;
-				ctx.strokeRect(x - tw / 2, L.groundY, tw, th);
+			const f = frac(b.midi);
+			const lit = f * SEG;
+			for (let s = 0; s < SEG; s++) {
+				const y = L.base - (s + 1) * segH + 1.5;
+				const on = s < Math.floor(lit) || (s === Math.floor(lit) && lit % 1 > 0.25);
+				if (on) {
+					ctx.fillStyle = spectrumColor(s, 56);
+					ctx.shadowColor = spectrumColor(s, 62);
+					ctx.shadowBlur = 6;
+				} else {
+					ctx.fillStyle = 'rgba(255,255,255,0.05)';
+					ctx.shadowBlur = 0;
+				}
+				ctx.fillRect(x - barW / 2, y, barW, segH - 3);
 			}
-			ctx.restore();
-			// order number (obstacle: crossing order = left→right)
-			ctx.fillStyle = solid ? '#3a2a12' : 'rgba(255,255,255,0.55)';
-			ctx.font = 'bold 11px system-ui, sans-serif';
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'middle';
-			ctx.fillText(String(i + 1), x, L.groundY + th / 2);
-
-			// track
-			ctx.fillStyle = 'rgba(255,255,255,0.07)';
-			ctx.fillRect(x - 5, L.trackTop, 10, L.trackBottom - L.trackTop);
-			const y = yForMidi(b.midi);
-			// fill from bottom up to handle (visualizer bar)
-			let col = '#8aa0b8';
-			if (assist || b.locked) col = Math.abs(cents) <= PASS ? '#49d67f' : Math.abs(cents) <= 120 ? '#e8b53a' : '#8aa0b8';
-			if (b.locked) col = '#7db2e6';
-			ctx.fillStyle = col;
-			ctx.globalAlpha = 0.55;
-			ctx.fillRect(x - 5, y, 10, L.trackBottom - y);
-			ctx.globalAlpha = 1;
-			// handle
-			ctx.beginPath();
-			ctx.arc(x, y, b.locked ? 8 : 9, 0, Math.PI * 2);
-			ctx.fillStyle = col;
-			ctx.fill();
-			if (dragRef.current === i) {
-				ctx.strokeStyle = '#fff';
-				ctx.lineWidth = 2;
-				ctx.stroke();
-			}
+			ctx.shadowBlur = 0;
+			// Bright cap at the continuous top (the stepping platform).
+			const topY = yForMidi(b.midi);
+			const capW = barW + 6;
+			ctx.fillStyle = b.locked ? '#cfe3ff' : dragRef.current === i ? '#ffffff' : '#eaf2ff';
+			ctx.fillRect(x - capW / 2, topY - 3, capW, 4);
 			if (b.locked) {
-				ctx.fillStyle = '#123';
-				ctx.font = '9px system-ui';
-				ctx.fillText('🔒', x, y);
+				ctx.fillStyle = '#9db7d8';
+				ctx.font = '10px system-ui, sans-serif';
+				ctx.fillText('🔒', x, topY - 14);
 			}
-			// note name (assisted or locked)
-			if (assist || b.locked) {
-				ctx.fillStyle = '#dfe8f2';
+			if (names) {
+				ctx.fillStyle = 'rgba(230,240,255,0.85)';
 				ctx.font = 'bold 11px system-ui, sans-serif';
-				ctx.fillText(noteFull(b.midi), x, y - 16);
-			}
-			// perfect star
-			if ((assist || b.locked) && Math.abs(cents) <= PERFECT && !b.locked) {
-				ctx.fillText('★', x + 16, y);
+				ctx.fillText(noteFull(b.midi), x, topY - (b.locked ? 26 : 14));
 			}
 		});
 
-		// Avatar
-		ctx.save();
-		ctx.translate(avX, avY + Math.sin(anim * 4) * (st === 'tuning' ? 1.2 : 0));
-		ctx.fillStyle = '#ffd97a';
-		ctx.beginPath();
-		ctx.arc(0, 0, 11, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.fillStyle = '#2a2118';
-		ctx.beginPath();
-		ctx.arc(-3.5, -2, 1.8, 0, Math.PI * 2);
-		ctx.arc(3.5, -2, 1.8, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.strokeStyle = '#2a2118';
-		ctx.lineWidth = 1.4;
-		ctx.beginPath();
-		ctx.arc(0, 2, 4, 0.15 * Math.PI, 0.85 * Math.PI);
-		ctx.stroke();
-		ctx.restore();
+		drawAvatar(ctx, avX, avY, 11 + (st === 'tuning' ? Math.sin(anim * 4) * 0.6 : 0));
 	};
 
 	const lv = curLevel();
-	const total = barsRef.current.length;
 
 	return (
 		<div className="ac-root">
@@ -547,9 +503,6 @@ export default function AccordsGame() {
 					{pitchName(lv.root)} {lv.chord.name}
 				</span>
 				<span className="ac-pill">🎹 {INSTRUMENTS[lv.instrument].label}</span>
-				<span className="ac-pill">
-					Accordées <strong>{tunedCount}</strong>/{total}
-				</span>
 				{attempts > 0 && <span className="ac-pill">Chutes {attempts}</span>}
 			</div>
 
@@ -564,20 +517,13 @@ export default function AccordsGame() {
 					🏃 Traverser
 				</button>
 				<label className="ac-toggle">
-					<input type="checkbox" checked={assisted} onChange={(e) => setAssisted(e.target.checked)} />
-					Aide oreille
+					<input type="checkbox" checked={showNames} onChange={(e) => setShowNames(e.target.checked)} />
+					Noms des notes
 				</label>
 			</div>
 
 			<div className="ac-playwrap" ref={wrapRef}>
-				<canvas
-					ref={canvasRef}
-					className="ac-canvas"
-					onPointerDown={onDown}
-					onPointerMove={onMove}
-					onPointerUp={onUp}
-					onPointerLeave={onUp}
-				/>
+				<canvas ref={canvasRef} className="ac-canvas" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} />
 
 				{flash && <div className={`ac-flash ${flash.kind}`}>{flash.text}</div>}
 
@@ -586,8 +532,8 @@ export default function AccordsGame() {
 						<div className="ac-card">
 							<h3>🎼 Accords &amp; Gouffres</h3>
 							<p>
-								Écoute l'accord, puis <b>accorde chaque barre</b> (graves à gauche, aigus à droite) pour retrouver ses notes.
-								Chaque note juste solidifie une <b>dalle</b> du pont. Toutes justes&nbsp;? Tu traverses le gouffre&nbsp;!
+								Écoute l'accord, puis <b>accorde chaque barre du spectre</b> (graves à gauche, aigus à droite) pour retrouver ses notes — à l'oreille, aucun repère ne te dira si c'est juste.
+								Traverse&nbsp;: l'avatar saute de sommet en sommet, une note fausse le fait chuter&nbsp;!
 							</p>
 							<button className="ac-btn primary big" onClick={startGame}>
 								▶ Commencer
@@ -612,7 +558,7 @@ export default function AccordsGame() {
 					<div className="ac-overlay">
 						<div className="ac-card">
 							<h3>🏆 Bravo&nbsp;!</h3>
-							<p>Tu as franchi tous les gouffres. Oreille absolue en approche&nbsp;!</p>
+							<p>Tu as franchi tous les gouffres, du simple triade à l'accord le plus tordu.</p>
 							<button className="ac-btn primary big" onClick={restart}>
 								↻ Rejouer
 							</button>
@@ -622,15 +568,14 @@ export default function AccordsGame() {
 			</div>
 
 			<p className="ac-help">
-				Prototype — glisse les poignées pour régler la hauteur de chaque note. Les barres <b>🔒 verrouillées</b> sont des aides.
-				En mode « Aide oreille », les barres virent au vert quand elles sont justes ; décoche pour jouer à l'oreille pure.
+				Prototype — glisse les barres pour régler la hauteur de chaque note. Aucun retour visuel de justesse&nbsp;: fie-toi à ton oreille (bouton «&nbsp;Ma version&nbsp;» pour comparer). Les barres <b>🔒</b> sont des aides déjà réglées.
 			</p>
 		</div>
 	);
 }
 
 const CSS = `
-.ac-root { --ac: var(--accent-regular); width: 100%; max-width: 680px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
+.ac-root { --ac: var(--accent-regular); width: 100%; max-width: 720px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
 .ac-hud { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: center; margin-bottom: 0.55rem; font-size: 13px; font-weight: 600; }
 .ac-pill { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; }
 .ac-pill.ac-chord { background: var(--ac); color: var(--accent-text-over); }
@@ -649,9 +594,9 @@ const CSS = `
 .ac-flash { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 7px 16px; border-radius: 999px; font-weight: 700; font-size: 13px; z-index: 3; box-shadow: var(--shadow-md); }
 .ac-flash.ok { background: #2f9e6f; color: #fff; }
 .ac-flash.bad { background: #c0392b; color: #fff; }
-.ac-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); padding: 1rem; }
-.ac-card { background: var(--gray-999); border: 2px solid var(--ac); border-radius: 16px; padding: 20px 22px; max-width: 22rem; text-align: center; box-shadow: var(--shadow-lg); }
+.ac-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); backdrop-filter: blur(3px); padding: 1rem; }
+.ac-card { background: var(--gray-999); border: 2px solid var(--ac); border-radius: 16px; padding: 20px 22px; max-width: 23rem; text-align: center; box-shadow: var(--shadow-lg); }
 .ac-card h3 { margin: 0 0 0.5rem; font-family: var(--font-brand); font-size: var(--text-xl); }
 .ac-card p { color: var(--gray-200); font-size: 13.5px; line-height: 1.55; margin: 0 0 0.9rem; }
-.ac-help { max-width: 560px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 0.9rem; }
+.ac-help { max-width: 620px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 0.9rem; }
 `;
