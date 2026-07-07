@@ -21,6 +21,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🫧', title: 'Sauter', body: 'Tape une bille puis un trou vide situé deux cases plus loin, en ligne droite, avec une bille à sauter entre les deux (ou fais-la glisser). La bille survolée est retirée.' },
 		{ emoji: '🧭', title: 'Croix ou triangle', body: 'Sur la croix (33 billes) les sauts sont horizontaux et verticaux. Sur le triangle (15 billes) ils suivent aussi les diagonales. Les deux se résolvent jusqu\'à une seule bille.' },
 		{ emoji: '💡', title: 'Aides', body: 'Bloqué ? Annule ton dernier coup, demande un indice (il montre un coup qui garde une solution) ou recommence. Ton meilleur résultat (le moins de billes restantes) est gardé.' },
+		{ emoji: '⏱️', title: 'Défi du jour', body: 'Un mini-plateau identique pour tout le monde (quelques billes seulement, la même graine partagée). Vide-le jusqu’à une seule bille le plus vite possible : ton meilleur temps entre au classement.' },
 	],
 	'2048': [
 		{ emoji: '🎯', title: 'Le but', body: 'Fais glisser toutes les tuiles dans une direction : deux tuiles de même valeur qui se rencontrent fusionnent et s\'additionnent. Atteins la tuile 2048… puis va chercher le plus gros score !' },

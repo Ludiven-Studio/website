@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { trackGame } from '../../lib/analytics';
+import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import {
 	VARIANTS,
@@ -11,6 +15,7 @@ import {
 	movesFrom,
 	applyMove,
 	hintMove,
+	generateDaily,
 	type Variant,
 	type Layout,
 	type Move,
@@ -18,16 +23,24 @@ import {
 
 /* =====================================================
    SOLITAIRE À BILLES — peg solitaire island.
-   Tap a marble then a hole two away (or drag it) to jump over a neighbour
-   and remove it. Clear the board down to a single marble. Canvas board with
+   Free mode: full cross / triangle boards, clear down to one marble.
+   Daily: a small deterministic mini-board (tightest solvable position for the
+   day's seed) to clear as fast as possible — ranked by time. Canvas board with
    marble sprites + a jump animation; pure engine in ./engine (tested).
    ===================================================== */
 
 type Status = 'playing' | 'won' | 'stuck';
 const ANIM_MS = 190;
+const DAILY_COUNT = [5, 6, 7]; // pegs by difficulty tier (Mon/Tue → weekend)
 const bestKey = (v: Variant): string => `ludiven-solitaire-best-${v}`;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 const marbleHue = (i: number): number => (i * 47 + 15) % 360;
+const fmtCentis = (c: number): string => {
+	const s = c / 100;
+	if (s < 60) return `${s.toFixed(2)} s`;
+	const m = Math.floor(s / 60);
+	return `${m}:${(s % 60).toFixed(2).padStart(5, '0')}`;
+};
 
 interface Anim {
 	move: Move;
@@ -40,6 +53,13 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const [moves, setMoves] = useState(0);
 	const [status, setStatus] = useState<Status>('playing');
 	const [best, setBest] = useState<number | null>(null);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [elapsed, setElapsed] = useState(0);
+	const [finalCentis, setFinalCentis] = useState<number | null>(null);
+	const [submitCentis, setSubmitCentis] = useState<number | undefined>(undefined);
+	const [bestTime, setBestTime] = useState<number | null>(null);
+	const [attempt, setAttempt] = useState(0);
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +75,14 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const clockRef = useRef(0);
 	const rafRef = useRef(0);
 	const statusRef = useRef<Status>('playing');
+	// Daily bookkeeping
+	const dailyRef = useRef(false);
+	const seedRef = useRef(0);
+	const diffRef = useRef(1);
+	const dailyInitRef = useRef<boolean[] | null>(null);
+	const timerStartRef = useRef<number | null>(null);
+	const timerRunRef = useRef(false);
+	const bestTimeRef = useRef<number | null>(null);
 
 	/* ---------- Geometry ---------- */
 	const geom = useCallback(() => {
@@ -63,9 +91,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		const spanX = L.maxX - L.minX;
 		const spanY = L.maxY - L.minY;
 		const cell = Math.min(w / (spanX + 1.5), h / (spanY + 1.5));
-		const ox = (w - spanX * cell) / 2;
-		const oy = (h - spanY * cell) / 2;
-		return { cell, ox, oy, L };
+		return { cell, ox: (w - spanX * cell) / 2, oy: (h - spanY * cell) / 2, L };
 	}, []);
 	const pixelOf = useCallback(
 		(id: number): { px: number; py: number } => {
@@ -78,7 +104,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const hitTest = useCallback(
 		(x: number, y: number): number => {
 			const { cell, ox, oy, L } = geom();
-			let best = -1;
+			let bestId = -1;
 			let bestD = (cell * 0.55) ** 2;
 			L.holes.forEach((hole, id) => {
 				const px = ox + (hole.x - L.minX) * cell;
@@ -86,42 +112,51 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 				const d = (px - x) ** 2 + (py - y) ** 2;
 				if (d < bestD) {
 					bestD = d;
-					best = id;
+					bestId = id;
 				}
 			});
-			return best;
+			return bestId;
 		},
 		[geom],
 	);
 
-	/* ---------- State sync ---------- */
-	const syncEnd = useCallback(
-		(next: boolean[]): void => {
+	/* ---------- Free-mode record (fewest pegs) ---------- */
+	const loadBest = (v: Variant): number | null => {
+		try {
+			const r = localStorage.getItem(bestKey(v));
+			return r == null ? null : Number(r);
+		} catch {
+			return null;
+		}
+	};
+
+	/* ---------- End of game ---------- */
+	const finishFree = useCallback(
+		(next: boolean[], won: boolean): void => {
 			const count = pegCount(next);
-			setPegs(count);
-			if (isWin(next)) {
-				statusRef.current = 'won';
-				setStatus('won');
-				trackGame(gameId, 'game_over', { score: 1, win: true });
-			} else if (isStuck(layoutRef.current, next)) {
-				statusRef.current = 'stuck';
-				setStatus('stuck');
-				trackGame(gameId, 'game_over', { score: count, win: false });
-			}
-			if (isWin(next) || isStuck(layoutRef.current, next)) {
-				setBest((prev) => {
-					const nb = prev == null ? count : Math.min(prev, count);
-					try {
-						localStorage.setItem(bestKey(layoutRef.current.variant), String(nb));
-					} catch {
-						/* ignore */
-					}
-					return nb;
-				});
-			}
+			setBest((prev) => {
+				const nb = prev == null ? count : Math.min(prev, count);
+				try {
+					localStorage.setItem(bestKey(layoutRef.current.variant), String(nb));
+				} catch {
+					/* ignore */
+				}
+				return nb;
+			});
+			trackGame(gameId, 'game_over', { score: count, win: won });
 		},
 		[gameId],
 	);
+	const finishDaily = useCallback((): void => {
+		timerRunRef.current = false;
+		const centis = Math.max(0, Math.round((clockRef.current - (timerStartRef.current ?? clockRef.current)) / 10));
+		setFinalCentis(centis);
+		bestTimeRef.current = bestTimeRef.current == null ? centis : Math.min(bestTimeRef.current, centis);
+		setBestTime(bestTimeRef.current);
+		setSubmitCentis(bestTimeRef.current);
+		saveDailyRun(gameId, { startedAt: Date.now(), done: true, finalTime: bestTimeRef.current, seed: seedRef.current, diffIndex: diffRef.current });
+		trackGame(gameId, 'game_over', { score: centis, win: true, mode: 'daily' });
+	}, [gameId]);
 
 	const doMove = useCallback(
 		(m: Move): void => {
@@ -131,13 +166,35 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			selRef.current = -1;
 			hintRef.current = null;
 			setMoves((n) => n + 1);
-			syncEnd(pegsRef.current);
+			const next = pegsRef.current;
+			setPegs(pegCount(next));
+			if (dailyRef.current && timerStartRef.current == null) {
+				timerStartRef.current = clockRef.current;
+				timerRunRef.current = true;
+			}
+			const won = isWin(next);
+			const stuck = !won && isStuck(layoutRef.current, next);
+			if (won) {
+				statusRef.current = 'won';
+				setStatus('won');
+				if (dailyRef.current) finishDaily();
+				else finishFree(next, true);
+			} else if (stuck) {
+				statusRef.current = 'stuck';
+				setStatus('stuck');
+				if (!dailyRef.current) finishFree(next, false);
+			}
 		},
-		[syncEnd],
+		[finishDaily, finishFree],
 	);
 
-	const reset = useCallback(
+	/* ---------- Mode setup ---------- */
+	const startFree = useCallback(
 		(v: Variant): void => {
+			dailyRef.current = false;
+			setDaily(false);
+			setDailyLoading(false);
+			setVariant(v);
 			layoutRef.current = createLayout(v);
 			pegsRef.current = initialPegs(layoutRef.current);
 			histRef.current = [];
@@ -145,26 +202,80 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			dragRef.current = -1;
 			animRef.current = null;
 			hintRef.current = null;
+			timerStartRef.current = null;
+			timerRunRef.current = false;
 			statusRef.current = 'playing';
 			setStatus('playing');
 			setMoves(0);
 			setPegs(pegCount(pegsRef.current));
-			let b: number | null = null;
-			try {
-				const raw = localStorage.getItem(bestKey(v));
-				if (raw != null) b = Number(raw);
-			} catch {
-				/* ignore */
-			}
-			setBest(b);
-			trackGame(gameId, 'game_started', { variant: v });
+			setFinalCentis(null);
+			setSubmitCentis(undefined);
+			setElapsed(0);
+			setBest(loadBest(v));
+			trackGame(gameId, 'game_started', { variant: v, mode: 'free' });
 		},
 		[gameId],
 	);
 
-	const pickVariant = (v: Variant): void => {
-		setVariant(v);
-		reset(v);
+	const startDaily = useCallback(async (): Promise<void> => {
+		dailyRef.current = true;
+		setDaily(true);
+		selRef.current = -1;
+		const apply = (seed: number, diffIndex: number, finalTime: number | null): void => {
+			seedRef.current = seed >>> 0;
+			diffRef.current = clamp(diffIndex, 0, 2);
+			const count = DAILY_COUNT[diffRef.current];
+			layoutRef.current = createLayout('anglais');
+			const p = generateDaily(seedRef.current, count);
+			dailyInitRef.current = p;
+			pegsRef.current = p.slice();
+			histRef.current = [];
+			selRef.current = -1;
+			dragRef.current = -1;
+			animRef.current = null;
+			hintRef.current = null;
+			timerStartRef.current = null;
+			timerRunRef.current = false;
+			statusRef.current = 'playing';
+			setStatus('playing');
+			setMoves(0);
+			setPegs(pegCount(p));
+			setFinalCentis(null);
+			setSubmitCentis(undefined);
+			setElapsed(0);
+			bestTimeRef.current = finalTime;
+			setBestTime(finalTime);
+			setAttempt((a) => a + 1);
+			setDailyLoading(false);
+		};
+		const run = loadDailyRun(gameId);
+		if (run && run.seed != null) {
+			apply(run.seed, run.diffIndex ?? dailyDifficultyIndex(), run.finalTime ?? null);
+			return;
+		}
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(gameId);
+		apply(seed, diffIndex, null);
+	}, [gameId]);
+
+	const restart = (): void => {
+		if (dailyRef.current) {
+			pegsRef.current = (dailyInitRef.current ?? pegsRef.current).slice();
+			histRef.current = [];
+			selRef.current = -1;
+			animRef.current = null;
+			hintRef.current = null;
+			timerStartRef.current = null;
+			timerRunRef.current = false;
+			statusRef.current = 'playing';
+			setStatus('playing');
+			setMoves(0);
+			setPegs(pegCount(pegsRef.current));
+			setFinalCentis(null);
+			setElapsed(0);
+		} else {
+			startFree(layoutRef.current.variant);
+		}
 	};
 	const undo = (): void => {
 		const prev = histRef.current.pop();
@@ -178,7 +289,6 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		setMoves((n) => Math.max(0, n - 1));
 		setPegs(pegCount(prev));
 	};
-	const restart = (): void => reset(layoutRef.current.variant);
 	const hint = (): void => {
 		if (statusRef.current !== 'playing' || animRef.current) return;
 		const m = hintMove(layoutRef.current, pegsRef.current);
@@ -201,15 +311,15 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		movesFrom(layoutRef.current, pegsRef.current, from).find((m) => m.to === hole);
 
 	const onDown = (e: React.PointerEvent): void => {
-		if (statusRef.current !== 'playing' || animRef.current) return;
+		if (statusRef.current !== 'playing' || animRef.current || dailyLoading) return;
 		const p = posFrom(e);
 		const hole = hitTest(p.x, p.y);
 		if (hole < 0) {
 			selRef.current = -1;
 			return;
 		}
-		const pegs = pegsRef.current;
-		if (pegs[hole] && movesFrom(layoutRef.current, pegs, hole).length > 0) {
+		const ps = pegsRef.current;
+		if (ps[hole] && movesFrom(layoutRef.current, ps, hole).length > 0) {
 			selRef.current = hole;
 			dragRef.current = hole;
 			canvasRef.current?.setPointerCapture(e.pointerId);
@@ -233,7 +343,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Loop + sizing ---------- */
 	useEffect(() => {
-		reset('anglais');
+		startFree('anglais');
 		const resize = (): void => {
 			const wrap = wrapRef.current;
 			const cv = canvasRef.current;
@@ -266,6 +376,15 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+	// Live chrono in daily mode.
+	useEffect(() => {
+		if (!daily) return;
+		const id = setInterval(() => {
+			if (timerRunRef.current && timerStartRef.current != null) setElapsed(clockRef.current - timerStartRef.current);
+		}, 100);
+		return () => clearInterval(id);
+	}, [daily]);
+
 	/* ---------- Draw ---------- */
 	const drawMarble = (ctx: CanvasRenderingContext2D, px: number, py: number, r: number, id: number, alpha = 1): void => {
 		const hue = marbleHue(id);
@@ -292,19 +411,16 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		const { cell, L } = geom();
 		const R = cell * 0.42;
 		const pr = cell * 0.36;
-		const pegs = pegsRef.current;
+		const ps = pegsRef.current;
 		const now = clockRef.current;
 		const anim = animRef.current;
 		const hintOn = hintRef.current && now < hintRef.current.until ? hintRef.current.move : null;
 
 		ctx.clearRect(0, 0, w, h);
-
-		// Board panel
 		ctx.fillStyle = '#3b2a1c';
 		panelPath(ctx, w, h, cell * 0.7);
 		ctx.fill();
 
-		// Holes (recessed)
 		L.holes.forEach((_, id) => {
 			const { px, py } = pixelOf(id);
 			ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -324,9 +440,8 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			}
 		});
 
-		// Valid-target rings for the selected marble
 		if (selRef.current >= 0 && !anim) {
-			for (const m of movesFrom(L, pegs, selRef.current)) {
+			for (const m of movesFrom(L, ps, selRef.current)) {
 				const { px, py } = pixelOf(m.to);
 				const pulse = 0.5 + 0.5 * Math.abs(Math.sin(now / 260));
 				ctx.strokeStyle = `rgba(120,200,120,${0.5 + 0.4 * pulse})`;
@@ -336,8 +451,6 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 				ctx.stroke();
 			}
 		}
-
-		// Hint ring on the target
 		if (hintOn) {
 			const { px, py } = pixelOf(hintOn.to);
 			const pulse = 0.5 + 0.5 * Math.abs(Math.sin(now / 200));
@@ -348,11 +461,10 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			ctx.stroke();
 		}
 
-		// Marbles
 		const t = anim ? clamp((now - anim.start) / ANIM_MS, 0, 1) : 1;
 		L.holes.forEach((_, id) => {
-			if (!pegs[id]) return;
-			if (anim && id === anim.move.to) return; // drawn as the jumper below
+			if (!ps[id]) return;
+			if (anim && id === anim.move.to) return;
 			const { px, py } = pixelOf(id);
 			const sel = id === selRef.current;
 			if (sel) {
@@ -365,7 +477,6 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			drawMarble(ctx, px, py - (sel ? 2 : 0), pr, id);
 		});
 
-		// Jump animation: jumper arcs from → to, captured marble pops
 		if (anim) {
 			const a = pixelOf(anim.move.from);
 			const b = pixelOf(anim.move.to);
@@ -380,43 +491,84 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 
 	const layout = layoutRef.current;
 	const perfect = status === 'won' && (layout.center < 0 || pegsRef.current[layout.center]);
+	const chrono = daily && status === 'won' && finalCentis != null ? fmtCentis(finalCentis) : `${(elapsed / 1000).toFixed(1)} s`;
 
 	return (
 		<div className="sol-root">
 			<style>{CSS}</style>
 
-			<div className="sol-variants" role="tablist" aria-label="Plateau">
-				{VARIANTS.map((v) => (
-					<button key={v.key} role="tab" aria-selected={variant === v.key} className={`sol-pill ${variant === v.key ? 'active' : ''}`} onClick={() => pickVariant(v.key)}>
-						{v.label}
-					</button>
-				))}
-			</div>
+			<ModeToggle daily={daily} onFree={() => startFree(variant)} onDaily={startDaily} />
+
+			{daily ? (
+				<div className="sol-dailytag">
+					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DAILY_COUNT[diffRef.current]} billes — le plus vite possible`}
+				</div>
+			) : (
+				<div className="sol-variants" role="tablist" aria-label="Plateau">
+					{VARIANTS.map((v) => (
+						<button key={v.key} role="tab" aria-selected={variant === v.key} className={`sol-pill ${variant === v.key ? 'active' : ''}`} onClick={() => startFree(v.key)}>
+							{v.label}
+						</button>
+					))}
+				</div>
+			)}
 
 			<div className="sol-hud">
 				<span className="sol-stat">
 					Billes <strong>{pegs}</strong>
 				</span>
-				<span className="sol-stat">
-					Coups <strong>{moves}</strong>
-				</span>
-				<span className="sol-stat">
-					Record <strong>{best ?? '—'}</strong>
-				</span>
+				{daily ? (
+					<>
+						<span className="sol-stat">
+							Chrono <strong>{chrono}</strong>
+						</span>
+						<span className="sol-stat">
+							Record <strong>{bestTime == null ? '—' : fmtCentis(bestTime)}</strong>
+						</span>
+					</>
+				) : (
+					<>
+						<span className="sol-stat">
+							Coups <strong>{moves}</strong>
+						</span>
+						<span className="sol-stat">
+							Record <strong>{best ?? '—'}</strong>
+						</span>
+					</>
+				)}
 			</div>
 
 			<div className="sol-playwrap" ref={wrapRef}>
 				<canvas ref={canvasRef} className="sol-canvas" onPointerDown={onDown} onPointerUp={onUp} onPointerLeave={onUp} />
 
 				{celebrating && <Celebration />}
+				{dailyLoading && (
+					<div className="sol-overlay">
+						<div className="sol-card">Préparation du défi…</div>
+					</div>
+				)}
 				{showWin && (
 					<div className="sol-overlay">
 						<div className="sol-card">
-							<h3>{perfect ? '🏆 Parfait !' : '🎉 Gagné !'}</h3>
-							<p>{perfect ? 'Une seule bille, pile au centre. Chapeau !' : 'Il ne reste qu’une seule bille. Bravo !'}</p>
-							<button className="sol-btn primary" onClick={restart}>
-								↻ Rejouer
-							</button>
+							{daily ? (
+								<>
+									<h3>🎉 Résolu !</h3>
+									<p>
+										En <strong>{finalCentis != null ? fmtCentis(finalCentis) : chrono}</strong> et {moves} coups. Ton meilleur temps est classé.
+									</p>
+									<button className="sol-btn primary" onClick={restart}>
+										↻ Rejouer (améliorer)
+									</button>
+								</>
+							) : (
+								<>
+									<h3>{perfect ? '🏆 Parfait !' : '🎉 Gagné !'}</h3>
+									<p>{perfect ? 'Une seule bille, pile au centre. Chapeau !' : 'Il ne reste qu’une seule bille. Bravo !'}</p>
+									<button className="sol-btn primary" onClick={restart}>
+										↻ Rejouer
+									</button>
+								</>
+							)}
 						</div>
 					</div>
 				)}
@@ -444,17 +596,27 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 				<button className="sol-btn" onClick={undo} disabled={moves === 0}>
 					↶ Annuler
 				</button>
-				<button className="sol-btn" onClick={hint} disabled={status !== 'playing'}>
-					💡 Indice
-				</button>
+				{!daily && (
+					<button className="sol-btn" onClick={hint} disabled={status !== 'playing'}>
+						💡 Indice
+					</button>
+				)}
 				<button className="sol-btn" onClick={restart}>
 					↻ Recommencer
 				</button>
 			</div>
 
 			<p className="sol-help">
-				Tape une bille puis un trou situé deux cases plus loin (ou fais-la glisser) pour sauter par-dessus une voisine et la retirer. Objectif&nbsp;: n’en laisser qu’une — au centre pour la croix.
+				{daily
+					? 'Défi du jour : un mini-plateau identique pour tout le monde. Vide-le jusqu’à une seule bille le plus vite possible — ton meilleur temps entre au classement.'
+					: 'Tape une bille puis un trou situé deux cases plus loin (ou fais-la glisser) pour sauter par-dessus une voisine et la retirer. Objectif : n’en laisser qu’une — au centre pour la croix.'}
 			</p>
+
+			{daily ? (
+				<Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="time" submitValue={status === 'won' ? submitCentis : undefined} format={fmtCentis} />
+			) : (
+				<LeaderboardCorner game={gameId} metric="time" />
+			)}
 		</div>
 	);
 }
@@ -477,6 +639,7 @@ function panelPath(ctx: CanvasRenderingContext2D, w: number, h: number, pad: num
 
 const CSS = `
 .sol-root { --sol: var(--accent-regular); width: 100%; max-width: 480px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
+.sol-dailytag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.55rem; }
 .sol-variants { display: flex; gap: 6px; margin-bottom: 0.55rem; }
 .sol-pill { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 16px; cursor: pointer; }
 .sol-pill.active { background: var(--sol); color: var(--accent-text-over); border-color: var(--sol); }
@@ -486,7 +649,7 @@ const CSS = `
 .sol-playwrap { position: relative; width: 100%; max-width: 440px; display: flex; justify-content: center; }
 .sol-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 16px; box-shadow: var(--shadow-md); cursor: pointer; }
 .sol-overlay { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(3px); border-radius: 16px; }
-.sol-card { background: var(--gray-999); border: 2px solid var(--sol); border-radius: 16px; padding: 18px 22px; max-width: 18rem; text-align: center; box-shadow: var(--shadow-lg); }
+.sol-card { background: var(--gray-999); border: 2px solid var(--sol); border-radius: 16px; padding: 18px 22px; max-width: 18rem; text-align: center; box-shadow: var(--shadow-lg); color: var(--gray-0); }
 .sol-card h3 { margin: 0 0 0.5rem; font-family: var(--font-brand); font-size: var(--text-xl); }
 .sol-card p { color: var(--gray-200); font-size: 13.5px; line-height: 1.5; margin: 0 0 0.9rem; }
 .sol-cardbtns { display: flex; gap: 8px; justify-content: center; }

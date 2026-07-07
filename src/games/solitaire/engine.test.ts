@@ -10,6 +10,8 @@ import {
 	applyMove,
 	solve,
 	hintMove,
+	solutionSignatures,
+	generateDaily,
 } from './engine';
 
 describe('solitaire engine', () => {
@@ -65,6 +67,25 @@ describe('solitaire engine', () => {
 		let pegs = initialPegs(layout);
 		for (const m of sol!) pegs = applyMove(pegs, m);
 		expect(isWin(pegs)).toBe(true);
+	});
+
+	it('generates a small, solvable, tight daily on the English board', () => {
+		const layout = createLayout('anglais');
+		for (const seed of [1, 7, 42, 123, 2026]) {
+			const pegs = generateDaily(seed, 6);
+			expect(pegCount(pegs)).toBe(6);
+			const sol = solve(layout, pegs);
+			expect(sol).not.toBeNull();
+			expect(sol!.length).toBe(5); // 6 pegs → 1 peg
+			let s = pegs;
+			for (const m of sol!) s = applyMove(s, m);
+			expect(isWin(s)).toBe(true); // clears down to one peg
+			expect(solutionSignatures(layout, pegs, 8)).toBeLessThanOrEqual(6); // reasonably tight
+		}
+	});
+
+	it('is deterministic: same seed → same daily position', () => {
+		expect(generateDaily(99, 7)).toEqual(generateDaily(99, 7));
 	});
 
 	it('gives a legal, progress-keeping hint', () => {
