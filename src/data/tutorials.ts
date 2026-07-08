@@ -23,6 +23,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Aides', body: 'Bloqué ? Annule ton dernier coup, demande un indice (il montre un coup qui garde une solution) ou recommence. Ton meilleur résultat (le moins de billes restantes) est gardé.' },
 		{ emoji: '⏱️', title: 'Défi du jour', body: 'Un mini-plateau identique pour tout le monde (quelques billes seulement, la même graine partagée). Vide-le jusqu’à une seule bille le plus vite possible : ton meilleur temps entre au classement.' },
 	],
+	'spectro': [
+		{ emoji: '🎵', title: 'Le but', body: 'Un runner musical : une mélodie défile vers la gauche et passe sous une ligne (le « présent »). Suis le contour des notes pour marquer un maximum de points.' },
+		{ emoji: '🖱️', title: 'Suivre la mélodie', body: 'Bouge la souris (ou le doigt) de haut en bas pour régler ta hauteur. Ta note sonne en continu : quand tu approches la cible, tu entends des battements qui ralentissent — pile dessus, ils disparaissent.' },
+		{ emoji: '✨', title: 'Combos & rangs', body: 'Chaque note est jugée sur le temps : Parfait / Bien / Ok / Raté. Les réussites enchaînées montent un combo qui multiplie le score. En fin de morceau, tu obtiens un rang de S à D.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même mélodie pour tout le monde (graine partagée). Rejoue autant que tu veux pour améliorer ton meilleur score, qui entre au classement.' },
+	],
 	'2048': [
 		{ emoji: '🎯', title: 'Le but', body: 'Fais glisser toutes les tuiles dans une direction : deux tuiles de même valeur qui se rencontrent fusionnent et s\'additionnent. Atteins la tuile 2048… puis va chercher le plus gros score !' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Flèches ou ZQSD/WASD au clavier, ou glisse le doigt dans une direction sur mobile. À chaque coup, une nouvelle tuile (2 ou 4) apparaît.' },
