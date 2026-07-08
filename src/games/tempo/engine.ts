@@ -87,24 +87,26 @@ export interface Chart {
 	beatTimes: number[]; // metronome ticks (seconds)
 }
 
-/** Build the falling-tile chart: lane by pitch (low→left, high→right), never twice in a row. */
+/**
+ * Consistent pitch → lane map (low→left): the SAME note always falls in the same
+ * column, so a change of column always means a change of note. Distinct pitches
+ * cycle across the 4 lanes by ascending order.
+ */
+function laneMap(notes: { midi: number }[]): Map<number, number> {
+	const distinct = Array.from(new Set(notes.map((n) => n.midi))).sort((a, b) => a - b);
+	const m = new Map<number, number>();
+	distinct.forEach((mi, i) => m.set(mi, i % LANES));
+	return m;
+}
+
+/** Build the falling-tile chart. Lane is fixed per pitch (see laneMap). */
 export function buildChart(song: Song, speed = 1): Chart {
 	const eff = song.tempo * speed;
-	let lo = Infinity;
-	let hi = -Infinity;
-	for (const n of song.notes) {
-		lo = Math.min(lo, n.midi);
-		hi = Math.max(hi, n.midi);
-	}
-	const span = hi - lo || 1;
+	const lm = laneMap(song.notes);
 	const tiles: Tile[] = [];
 	let beat = 0;
-	let prevLane = -1;
 	for (const n of song.notes) {
-		let lane = Math.max(0, Math.min(LANES - 1, Math.floor(((n.midi - lo) / span) * LANES)));
-		if (lane === prevLane) lane = (lane + 1) % LANES;
-		prevLane = lane;
-		tiles.push({ time: beat / eff, lane, midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
+		tiles.push({ time: beat / eff, lane: lm.get(n.midi)!, midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
 		beat += n.dur;
 	}
 	const beatTimes: number[] = [];
@@ -155,23 +157,13 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	const ramp = opts.rampSec ?? 45;
 	const maxMult = opts.maxMult ?? 2.6;
 	const song = generateEndlessSong(seed, opts.count ?? 1500);
-	let lo = Infinity;
-	let hi = -Infinity;
-	for (const n of song.notes) {
-		lo = Math.min(lo, n.midi);
-		hi = Math.max(hi, n.midi);
-	}
-	const span = hi - lo || 1;
+	const lm = laneMap(song.notes);
 	const tiles: Tile[] = [];
 	const beatTimes: number[] = [];
 	let elapsed = 0;
-	let prevLane = -1;
 	for (const n of song.notes) {
 		const eff = base * Math.min(maxMult, 1 + elapsed / ramp); // tempo accelerates
-		let lane = Math.max(0, Math.min(LANES - 1, Math.floor(((n.midi - lo) / span) * LANES)));
-		if (lane === prevLane) lane = (lane + 1) % LANES;
-		prevLane = lane;
-		tiles.push({ time: elapsed, lane, midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
+		tiles.push({ time: elapsed, lane: lm.get(n.midi)!, midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
 		beatTimes.push(elapsed);
 		elapsed += n.dur / eff;
 	}

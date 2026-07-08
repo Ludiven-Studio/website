@@ -22,6 +22,9 @@ const ENDLESS = -1;
 const LEAD = 1.9;
 const HIT_FRAC = 0.8;
 const HOLD_RATE = 45; // bonus points per second held (× combo)
+const ENERGY_MAX = 100;
+const MISS_COST = 20; // energy lost on a miss (endless)
+const HOLD_BREAK_COST = 10;
 const bestKey = (s: number): string => `ludiven-tempo-best-${s}`;
 const midiToFreq = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
@@ -46,7 +49,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [speedIdx, setSpeedIdx] = useState(1);
 	const [songIdx, setSongIdx] = useState<number>(ENDLESS);
-	const [metro, setMetro] = useState(true);
+	const [metro, setMetro] = useState(false);
 	const [hud, setHud] = useState({ score: 0, combo: 0, mult: 1 });
 	const [result, setResult] = useState<{ score: number; rank: string; acc: number; tiles: number; endless: boolean } | null>(null);
 	const [best, setBest] = useState<number | null>(null);
@@ -66,6 +69,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const laneKeyRef = useRef<boolean[]>([false, false, false, false]);
 	const pointerLaneRef = useRef<Map<number, number>>(new Map());
 	const partsRef = useRef<Particle[]>([]);
+	const energyRef = useRef(ENERGY_MAX);
 	const animRef = useRef(0);
 	const rafRef = useRef(0);
 	const runningRef = useRef(false);
@@ -74,8 +78,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 
 	const ctxRef = useRef<AudioContext | null>(null);
 	const masterRef = useRef<GainNode | null>(null);
+	const runGainRef = useRef<GainNode | null>(null); // per-run bus so restarts don't stack scheduled ticks
 	const audioStartRef = useRef(0);
-	const metroRef = useRef(true);
+	const metroRef = useRef(false);
 
 	const dailyRef = useRef(false);
 	const seedRef = useRef(0);
@@ -131,7 +136,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const g = ctx.createGain();
-		g.connect(masterRef.current!);
+		g.connect(runGainRef.current ?? masterRef.current!);
 		g.gain.setValueAtTime(0.05, when);
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.04);
 		const o = ctx.createOscillator();
@@ -162,6 +167,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		maxComboRef.current = 0;
 		accSumRef.current = 0;
 		accCountRef.current = 0;
+		energyRef.current = ENERGY_MAX;
 		partsRef.current = [];
 		laneFlashRef.current = [-9, -9, -9, -9];
 		laneKeyRef.current = [false, false, false, false];
@@ -176,6 +182,15 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (songRef.current === ENDLESS && !dailyRef.current) seedRef.current = (Math.random() * 2 ** 32) >>> 0;
 		prepare(songRef.current, speedRef.current);
 		const chart = chartRef.current!;
+		// Fresh per-run audio bus: silences any ticks still scheduled from a previous run.
+		try {
+			runGainRef.current?.disconnect();
+		} catch {
+			/* ignore */
+		}
+		const rg = ctx.createGain();
+		rg.connect(masterRef.current!);
+		runGainRef.current = rg;
 		audioStartRef.current = ctx.currentTime + LEAD;
 		if (metroRef.current) chart.beatTimes.forEach((bt) => tick(audioStartRef.current + bt));
 		runningRef.current = true;
@@ -186,6 +201,11 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 
 	const finishRun = useCallback((): void => {
 		runningRef.current = false;
+		try {
+			runGainRef.current?.disconnect(); // stop any remaining scheduled ticks
+		} catch {
+			/* ignore */
+		}
 		const arr = stateArrRef.current;
 		if (!endlessRef.current) for (let i = 0; i < arr.length; i++) if (arr[i] === 'pending') { arr[i] = 'Raté'; accCountRef.current++; }
 		const total = Math.max(1, accCountRef.current);
@@ -250,6 +270,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		scoreRef.current += jd.points * comboMult(comboRef.current);
 		accSumRef.current += jd.points;
 		accCountRef.current += 1;
+		if (endlessRef.current) energyRef.current = Math.min(ENERGY_MAX, energyRef.current + (jd.grade === 'Parfait' ? 7 : jd.grade === 'Bien' ? 4 : 2));
 		emitText(jd.grade, lane, gradeColor(jd.grade), jd.points >= 60);
 		arr[bi] = t.hold ? 'holding' : jd.grade;
 		setHud({ score: Math.round(scoreRef.current), combo: comboRef.current, mult: comboMult(comboRef.current) });
@@ -410,7 +431,10 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					accCountRef.current += 1;
 					emitText('Raté', t.lane, '#ff6a6a');
 					dirty = true;
-					if (endlessRef.current) failed = true;
+					if (endlessRef.current) {
+						energyRef.current -= MISS_COST;
+						if (energyRef.current <= 0) failed = true;
+					}
 				}
 			} else if (s === 'holding') {
 				const end = t.time + t.dur;
@@ -421,11 +445,16 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					arr[i] = 'broken';
 					comboRef.current = 0;
 					emitText('Lâché', t.lane, '#ff9a5a');
+					if (endlessRef.current) {
+						energyRef.current -= HOLD_BREAK_COST;
+						if (energyRef.current <= 0) failed = true;
+					}
 					dirty = true;
 				} else if (now >= end - 0.06) {
 					arr[i] = 'done';
 					comboRef.current += 1;
 					scoreRef.current += 40 * comboMult(comboRef.current);
+					if (endlessRef.current) energyRef.current = Math.min(ENERGY_MAX, energyRef.current + 6);
 					emitText('Tenu !', t.lane, '#3ddc84', true);
 					dirty = true;
 				}
@@ -467,6 +496,23 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		ctx.moveTo(0, hy);
 		ctx.lineTo(w, hy);
 		ctx.stroke();
+
+		// Energy bar (endless): drops on a miss, refills on hits, game over at 0.
+		if (endlessRef.current) {
+			const e = clamp(energyRef.current / ENERGY_MAX, 0, 1);
+			const bx = 10;
+			const by = 8;
+			const bw = w - 20;
+			const bh = 8;
+			ctx.fillStyle = 'rgba(255,255,255,0.12)';
+			ctx.beginPath();
+			ctx.roundRect(bx, by, bw, bh, 4);
+			ctx.fill();
+			ctx.fillStyle = e > 0.5 ? '#3ddc84' : e > 0.25 ? '#ffd166' : '#ff6a6a';
+			ctx.beginPath();
+			ctx.roundRect(bx, by, Math.max(2, bw * e), bh, 4);
+			ctx.fill();
+		}
 
 		if (chart) {
 			const arr = stateArrRef.current;
@@ -602,7 +648,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						<div className="tp-card">
 							<h3>🎹 {songName}</h3>
 							<p>
-								Tape la colonne (clic/doigt ou <b>D F J K</b>) quand la tuile touche la ligne. Les tuiles <b>allongées</b> se <b>maintiennent</b> pour un bonus. {songIdx === ENDLESS ? 'Mode infini : ça continue jusqu\'à ce que tu rates une tuile !' : ''}
+								Tape la colonne (clic/doigt ou <b>D F J K</b>) quand la tuile touche la ligne. Les tuiles <b>allongées</b> se <b>maintiennent</b> pour un bonus. {songIdx === ENDLESS ? 'Mode infini : ça accélère peu à peu, ton énergie baisse quand tu rates et remonte quand tu enchaînes.' : ''}
 							</p>
 							<button className="tp-btn primary big" onClick={startRun}>
 								▶ Go&nbsp;!
@@ -633,7 +679,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="tp-help">
-				Prototype — un « piano tiles ». Tape pile sur la ligne&nbsp;; <b>maintiens les tuiles longues</b> pour engranger du bonus tant que tu tiens. {daily ? 'Défi du jour : même air pour tous, meilleur score classé.' : songIdx === ENDLESS ? 'Mode infini : le score grimpe sans fin, la partie s\'arrête à la première tuile ratée.' : 'Choisis un air et une vitesse, et bats ton record.'}
+				Prototype — un « piano tiles ». Tape pile sur la ligne&nbsp;; <b>maintiens les tuiles longues</b> pour engranger du bonus tant que tu tiens. {daily ? 'Défi du jour : même air pour tous, meilleur score classé.' : songIdx === ENDLESS ? 'Mode infini : ça accélère, ton énergie (barre du haut) baisse sur un raté et remonte quand tu enchaînes — game over à zéro.' : 'Choisis un air et une vitesse, et bats ton record.'}
 			</p>
 
 			{daily ? (

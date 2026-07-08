@@ -10,22 +10,33 @@ describe('tempo engine', () => {
 		}
 	});
 
-	it('builds a deterministic chart with valid, non-repeating lanes', () => {
+	it('builds a deterministic chart with valid, strictly-timed tiles', () => {
 		for (const s of SONGS) {
 			const a = buildChart(s, 1);
 			expect(buildChart(s, 1)).toEqual(a); // deterministic
 			expect(a.tiles.length).toBe(s.notes.length);
-			let prev = -1;
 			let t = -1;
 			for (const tile of a.tiles) {
 				expect(tile.lane).toBeGreaterThanOrEqual(0);
 				expect(tile.lane).toBeLessThan(LANES);
-				expect(tile.lane).not.toBe(prev); // never twice in the same lane in a row
 				expect(tile.time).toBeGreaterThan(t); // strictly increasing hit times
-				prev = tile.lane;
 				t = tile.time;
 			}
 			expect(a.totalTime).toBeGreaterThan(a.tiles[a.tiles.length - 1].time);
+		}
+	});
+
+	it('lane is fixed per pitch: same note → same lane, different lane → different note', () => {
+		for (const s of SONGS) {
+			const seen = new Map<number, number>();
+			const tiles = buildChart(s, 1).tiles;
+			for (const t of tiles) {
+				if (seen.has(t.midi)) expect(seen.get(t.midi)).toBe(t.lane);
+				else seen.set(t.midi, t.lane);
+			}
+			for (let i = 1; i < tiles.length; i++) {
+				if (tiles[i].lane !== tiles[i - 1].lane) expect(tiles[i].midi).not.toBe(tiles[i - 1].midi);
+			}
 		}
 	});
 
@@ -64,11 +75,9 @@ describe('tempo engine', () => {
 		const c = buildEndlessChart(77, 1, { count: 300, rampSec: 20 });
 		expect(c.tiles.length).toBe(300);
 		expect(buildEndlessChart(77, 1, { count: 300, rampSec: 20 })).toEqual(c); // deterministic
-		let prev = -1;
 		for (const t of c.tiles) {
 			expect(t.lane).toBeGreaterThanOrEqual(0);
-			expect(t.lane).not.toBe(prev);
-			prev = t.lane;
+			expect(t.lane).toBeLessThan(LANES);
 		}
 		const gap = (i: number): number => c.tiles[i + 1].time - c.tiles[i].time;
 		// average early gap noticeably larger than average late gap
