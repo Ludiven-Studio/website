@@ -23,6 +23,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Aides', body: 'Bloqué ? Annule ton dernier coup, demande un indice (il montre un coup qui garde une solution) ou recommence. Ton meilleur résultat (le moins de billes restantes) est gardé.' },
 		{ emoji: '⏱️', title: 'Défi du jour', body: 'Un mini-plateau identique pour tout le monde (quelques billes seulement, la même graine partagée). Vide-le jusqu’à une seule bille le plus vite possible : ton meilleur temps entre au classement.' },
 	],
+	'tempo': [
+		{ emoji: '🎹', title: 'Le but', body: 'Un « piano tiles » sur des airs connus (libres de droits) : des tuiles descendent dans 4 colonnes. Tape chacune pile au moment où elle touche la ligne — chaque tuile joue sa note, et l\'air se reconstitue sous tes doigts.' },
+		{ emoji: '👆', title: 'Contrôles', body: 'Clique/tape la colonne d\'une tuile, ou utilise les touches D F J K au clavier. Vise le meilleur timing : Parfait / Bien / Ok. Rate une tuile et le combo retombe.' },
+		{ emoji: '✨', title: 'Combos & rangs', body: 'Les réussites enchaînées montent un combo qui multiplie le score (jusqu\'à ×4). En fin de morceau, tu obtiens un rang de S à D selon ta précision.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même air pour tout le monde (graine partagée). Rejoue autant que tu veux pour améliorer ton meilleur score, qui entre au classement.' },
+	],
 	'spectro': [
 		{ emoji: '🎵', title: 'Le but', body: 'Un runner musical : une mélodie défile vers la gauche et passe sous une ligne (le « présent »). Suis le contour des notes pour marquer un maximum de points.' },
 		{ emoji: '🖱️', title: 'Suivre la mélodie', body: 'Bouge la souris (ou le doigt) de haut en bas pour régler ta hauteur. Ta note sonne en continu : quand tu approches la cible, tu entends des battements qui ralentissent — pile dessus, ils disparaissent.' },
