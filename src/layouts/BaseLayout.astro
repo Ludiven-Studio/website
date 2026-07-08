@@ -24,7 +24,7 @@ const { title, description, image, type, noindex } = Astro.props;
 const site = Astro.site!;
 const path = Astro.url.pathname;
 const pageUrl = new URL(path, site).href;
-const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path); // any /jeux/<slug>, not the index
+const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path) && !/^\/jeux\/defi\/?$/.test(path); // a game page, not the index or the daily hub
 let jsonLd: unknown[] | null = null;
 if (path === '/' || path === '') {
 	jsonLd = [

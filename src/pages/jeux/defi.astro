@@ -1,0 +1,99 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import GameCard from '../../components/GameCard.astro';
+import Icon from '../../components/Icon.astro';
+import { games } from '../../data/games';
+
+// Daily-capable games = everything but real-time multiplayer (category 'multi').
+const dailyGames = games.filter((g) => g.status === 'play' && g.category !== 'multi');
+---
+
+<BaseLayout
+	title="Défi du jour | Jeux Ludiven Studio"
+	description="Le défi du jour : chaque jour, le même niveau pour tout le monde. Fais ton meilleur score, compare-toi au classement et partage. Gratuit, sans pub, sans inscription."
+>
+	<div class="wrapper stack gap-8">
+		<header class="defi-hero stack gap-3">
+			<a class="back" href="/jeux/">
+				<Icon icon="arrow-left" size="1em" /> Tous les jeux
+			</a>
+			<h1>🏆 Le défi du jour</h1>
+			<p>
+				Chaque jour, le <strong>même niveau pour tout le monde</strong>. Fais ton meilleur score,
+				compare-toi au classement et <strong>partage-le</strong> — le lien ouvre directement le défi.
+			</p>
+			<ul class="games-promise" aria-label="Nos engagements">
+				<li>🆓 Gratuit</li>
+				<li>🚫 Sans publicité</li>
+				<li>🔓 Sans inscription</li>
+			</ul>
+		</header>
+
+		<ul class="defi-grid">
+			{
+				dailyGames.map((g) => (
+					<li>
+						<GameCard id={g.id} title={g.title} pitch={g.pitch} icon={g.icon} href={`${g.href}?defi`} status={g.status} image={g.image} />
+					</li>
+				))
+			}
+		</ul>
+	</div>
+</BaseLayout>
+
+<style>
+	.defi-hero {
+		text-align: center;
+		max-width: 54ch;
+		margin-inline: auto;
+		align-items: center;
+		color: var(--gray-300);
+		font-size: var(--text-md);
+	}
+	.defi-hero h1 {
+		font-size: var(--text-3xl);
+	}
+	.defi-hero strong {
+		color: var(--gray-0);
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--gray-300);
+		text-decoration: none;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+	}
+	.back:hover,
+	.back:focus-visible {
+		color: var(--accent-regular);
+	}
+	.games-promise {
+		list-style: none;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		justify-content: center;
+		padding: 0;
+		margin: 0.25rem 0 0;
+	}
+	.games-promise li {
+		background: var(--gray-999);
+		border: 1px solid var(--gray-800);
+		border-radius: 999px;
+		padding: 5px 13px;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--gray-100);
+	}
+	.defi-grid {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		gap: 1rem;
+	}
+</style>

@@ -26,6 +26,12 @@ const multi = games.filter((g) => g.category === 'multi');
 				Des mini-jeux pensés pour aiguiser ta logique ou tes réflexes en quelques minutes.
 				{playableLabel} à découvrir — et d'autres arrivent.
 			</p>
+			<ul class="games-promise" aria-label="Nos engagements">
+				<li>🆓 Gratuit</li>
+				<li>🚫 Sans publicité</li>
+				<li>🔓 Sans inscription</li>
+			</ul>
+			<a class="games-defi-cta" href="/jeux/defi">🏆 Le défi du jour</a>
 		</header>
 
 		<section class="games-section stack gap-6">
@@ -127,6 +133,43 @@ const multi = games.filter((g) => g.category === 'multi');
 
 	.games-hero h1 {
 		font-size: var(--text-3xl);
+	}
+
+	.games-promise {
+		list-style: none;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		justify-content: center;
+		padding: 0;
+		margin: 0.25rem 0 0;
+	}
+	.games-promise li {
+		background: var(--gray-999);
+		border: 1px solid var(--gray-800);
+		border-radius: 999px;
+		padding: 5px 13px;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--gray-100);
+	}
+	.games-defi-cta {
+		align-self: center;
+		margin-top: 0.5rem;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-family: var(--font-brand);
+		font-weight: 700;
+		font-size: var(--text-md);
+		text-decoration: none;
+		border-radius: 999px;
+		padding: 10px 22px;
+		box-shadow: var(--shadow-md);
+		transition: filter var(--theme-transition);
+	}
+	.games-defi-cta:hover,
+	.games-defi-cta:focus-visible {
+		filter: brightness(1.06);
 	}
 
 	.games-section-title {

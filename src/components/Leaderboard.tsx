@@ -8,6 +8,7 @@ import {
 	type Metric,
 	type ScoreRow,
 } from '../lib/leaderboard';
+import { games } from '../data/games';
 
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
@@ -27,6 +28,7 @@ export default function Leaderboard({ game, metric, submitValue, format }: Props
 	const [editing, setEditing] = useState(false);
 	const [rows, setRows] = useState<ScoreRow[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [shareMsg, setShareMsg] = useState('');
 	const lastSubmittedRef = useRef<number | null>(null); // last value sent (re-submit when it improves)
 
 	const load = useCallback(async () => {
@@ -62,10 +64,38 @@ export default function Leaderboard({ game, metric, submitValue, format }: Props
 	const fmt = format ?? ((v: number) => (metric === 'time' ? fmtTime(v) : String(v)));
 	const showInput = editing || (submitValue != null && !name);
 
+	// Spoiler-free result share (Wordle-style): score/rank + same-daily deep link.
+	const share = async (): Promise<void> => {
+		if (submitValue == null) return;
+		const title = games.find((g) => g.id === game)?.title ?? game;
+		const url = `${location.origin}/jeux/${game}?defi`;
+		const line = metric === 'time' ? `⏱️ ${fmt(submitValue)}` : `🏆 ${fmt(submitValue)} pts`;
+		const text = `${title} — Défi du jour\n${line}`;
+		try {
+			if (navigator.share) {
+				await navigator.share({ title: `${title} — Défi du jour`, text, url });
+				setShareMsg('Partagé !');
+			} else {
+				await navigator.clipboard.writeText(`${text}\n${url}`);
+				setShareMsg('Lien copié !');
+			}
+		} catch {
+			return; // user cancelled — no toast
+		}
+		setTimeout(() => setShareMsg(''), 1600);
+	};
+
 	return (
 		<div className="lb-root">
 			<style>{CSS}</style>
 			<h3 className="lb-title">Classement du jour</h3>
+
+			{submitValue != null && (
+				<div className="lb-share-row">
+					<button className="lb-share" onClick={share}>📣 Partager mon score</button>
+					{shareMsg && <span className="lb-share-msg">{shareMsg}</span>}
+				</div>
+			)}
 
 			{!leaderboardEnabled() ? (
 				<p className="lb-msg">Le classement n'est pas encore configuré.</p>
@@ -135,6 +165,11 @@ const CSS = `
   text-align: center; margin: 0 0 0.75rem; color: var(--gray-0);
 }
 .lb-msg { text-align: center; color: var(--gray-300); font-size: 13px; line-height: 1.5; margin: 0; }
+
+.lb-share-row { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 0 0 0.9rem; flex-wrap: wrap; }
+.lb-share { border: none; background: var(--accent-regular); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 13.5px; border-radius: 999px; padding: 8px 18px; cursor: pointer; box-shadow: var(--shadow-sm); }
+.lb-share:hover { filter: brightness(1.05); }
+.lb-share-msg { font-size: 12.5px; font-weight: 600; color: var(--accent-regular); }
 
 .lb-name { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 0.9rem; }
 .lb-name input {
