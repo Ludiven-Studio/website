@@ -4,20 +4,24 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
-import { LANES, SONGS, SPEEDS, buildChart, dailySong, judgeTiming, comboMult, rankOf, type Chart, type Grade } from './engine';
+import { LANES, SONGS, SPEEDS, buildChart, buildEndlessChart, dailySong, judgeTiming, comboMult, rankOf, type Chart, type Grade } from './engine';
 
 /* =====================================================
    TEMPO — piano-tiles rhythm game (prototype).
-   Public-domain tunes fall as tiles; tap the lane (pointer or D/F/J/K) the
-   instant a tile hits the line — each hit plays its note, so you play the song.
-   Combos, ranks, daily song + best score. Audio-clock synced.
+   Public-domain tunes (or an endless generated melody) fall as tiles; tap the
+   lane (pointer or D/F/J/K) as a tile hits the line — each hit plays its note.
+   Long notes are HOLD tiles: keep pressing for a growing bonus. Endless mode
+   ends on a miss (score chase). Audio-clock synced.
    ===================================================== */
 
 type Status = 'ready' | 'running' | 'done';
+type TileState = 'pending' | 'holding' | 'done' | 'broken' | Grade;
 const KEYS = ['d', 'f', 'j', 'k'];
 const LANE_HUE = [205, 265, 330, 35];
-const LEAD = 1.9; // seconds a tile takes to fall to the line
+const ENDLESS = -1;
+const LEAD = 1.9;
 const HIT_FRAC = 0.8;
+const HOLD_RATE = 45; // bonus points per second held (× combo)
 const bestKey = (s: number): string => `ludiven-tempo-best-${s}`;
 const midiToFreq = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
@@ -41,10 +45,10 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [speedIdx, setSpeedIdx] = useState(1);
-	const [songIdx, setSongIdx] = useState(0);
+	const [songIdx, setSongIdx] = useState<number>(ENDLESS);
 	const [metro, setMetro] = useState(true);
 	const [hud, setHud] = useState({ score: 0, combo: 0, mult: 1 });
-	const [result, setResult] = useState<{ score: number; rank: string; acc: number } | null>(null);
+	const [result, setResult] = useState<{ score: number; rank: string; acc: number; tiles: number; endless: boolean } | null>(null);
 	const [best, setBest] = useState<number | null>(null);
 	const [submitScore, setSubmitScore] = useState<number | undefined>(undefined);
 
@@ -52,16 +56,20 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const dimRef = useRef({ w: 460, h: 640 });
 	const chartRef = useRef<Chart | null>(null);
-	const stateArrRef = useRef<(Grade | 'pending')[]>([]);
+	const stateArrRef = useRef<TileState[]>([]);
 	const scoreRef = useRef(0);
 	const comboRef = useRef(0);
 	const maxComboRef = useRef(0);
-	const sumRef = useRef(0);
+	const accSumRef = useRef(0);
+	const accCountRef = useRef(0);
 	const laneFlashRef = useRef<number[]>([-9, -9, -9, -9]);
+	const laneKeyRef = useRef<boolean[]>([false, false, false, false]);
+	const pointerLaneRef = useRef<Map<number, number>>(new Map());
 	const partsRef = useRef<Particle[]>([]);
 	const animRef = useRef(0);
 	const rafRef = useRef(0);
 	const runningRef = useRef(false);
+	const endlessRef = useRef(true);
 	const statusRef = useRef<Status>('ready');
 
 	const ctxRef = useRef<AudioContext | null>(null);
@@ -72,7 +80,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false);
 	const seedRef = useRef(0);
 	const speedRef = useRef(1);
-	const songRef = useRef(0);
+	const songRef = useRef<number>(ENDLESS);
 	const dailyBestRef = useRef<number | null>(null);
 
 	const setStat = (s: Status): void => {
@@ -95,7 +103,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (ctxRef.current.state === 'suspended') void ctxRef.current.resume();
 		return ctxRef.current;
 	};
-	const playPiano = (midi: number): void => {
+	const playPiano = (midi: number, sustain = 0.5): void => {
 		const ctx = ensureAudio();
 		if (!ctx) return;
 		const when = ctx.currentTime;
@@ -105,7 +113,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const peak = 0.2;
 		g.gain.setValueAtTime(0.0001, when);
 		g.gain.exponentialRampToValueAtTime(peak, when + 0.005);
-		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.5);
+		g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.4), when + Math.min(0.2, sustain));
+		g.gain.exponentialRampToValueAtTime(0.0001, when + sustain);
 		for (const [mult, amp] of [[1, 1], [2, 0.3], [3, 0.12], [4, 0.06]]) {
 			const o = ctx.createOscillator();
 			o.type = 'triangle';
@@ -115,7 +124,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.connect(hg);
 			hg.connect(g);
 			o.start(when);
-			o.stop(when + 0.55);
+			o.stop(when + sustain + 0.05);
 		}
 	};
 	const tick = (when: number): void => {
@@ -141,17 +150,22 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const ctx = ctxRef.current;
 		return ctx ? ctx.currentTime - audioStartRef.current : 0;
 	};
+	const heldLane = (lane: number): boolean => laneKeyRef.current[lane] || Array.from(pointerLaneRef.current.values()).includes(lane);
 
 	/* ---------- Run ---------- */
 	const prepare = useCallback((song: number, speed: number): void => {
-		chartRef.current = buildChart(SONGS[song], speed);
+		endlessRef.current = song === ENDLESS;
+		chartRef.current = endlessRef.current ? buildEndlessChart(seedRef.current, speed) : buildChart(SONGS[song], speed);
 		stateArrRef.current = chartRef.current.tiles.map(() => 'pending');
 		scoreRef.current = 0;
 		comboRef.current = 0;
 		maxComboRef.current = 0;
-		sumRef.current = 0;
+		accSumRef.current = 0;
+		accCountRef.current = 0;
 		partsRef.current = [];
 		laneFlashRef.current = [-9, -9, -9, -9];
+		laneKeyRef.current = [false, false, false, false];
+		pointerLaneRef.current.clear();
 		setHud({ score: 0, combo: 0, mult: 1 });
 		setResult(null);
 	}, []);
@@ -159,6 +173,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const startRun = (): void => {
 		const ctx = ensureAudio();
 		if (!ctx) return;
+		if (songRef.current === ENDLESS && !dailyRef.current) seedRef.current = (Math.random() * 2 ** 32) >>> 0;
 		prepare(songRef.current, speedRef.current);
 		const chart = chartRef.current!;
 		audioStartRef.current = ctx.currentTime + LEAD;
@@ -166,24 +181,25 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		runningRef.current = true;
 		setStat('running');
 		setSubmitScore(undefined);
-		trackGame(gameId, 'game_started', { mode: dailyRef.current ? 'daily' : 'free', song: songRef.current });
+		trackGame(gameId, 'game_started', { mode: dailyRef.current ? 'daily' : endlessRef.current ? 'endless' : 'free' });
 	};
 
 	const finishRun = useCallback((): void => {
 		runningRef.current = false;
 		const arr = stateArrRef.current;
-		for (let i = 0; i < arr.length; i++) if (arr[i] === 'pending') arr[i] = 'Raté'; // count leftovers
-		const total = Math.max(1, arr.length);
-		const mean = sumRef.current / total;
+		if (!endlessRef.current) for (let i = 0; i < arr.length; i++) if (arr[i] === 'pending') { arr[i] = 'Raté'; accCountRef.current++; }
+		const total = Math.max(1, accCountRef.current);
+		const mean = accSumRef.current / total;
 		const rank = rankOf(mean);
-		const score = scoreRef.current;
-		setResult({ score, rank, acc: Math.round(mean) });
+		const score = Math.round(scoreRef.current);
+		setResult({ score, rank, acc: Math.round(mean), tiles: accCountRef.current, endless: endlessRef.current });
 		setStat('done');
 		if (dailyRef.current) {
 			dailyBestRef.current = dailyBestRef.current == null ? score : Math.max(dailyBestRef.current, score);
 			setBest(dailyBestRef.current);
 			setSubmitScore(dailyBestRef.current);
-			saveDailyRun(gameId, { startedAt: Date.now(), done: true, seed: seedRef.current, diffIndex: speedRef.current === SPEEDS[0].speed ? 0 : speedRef.current === SPEEDS[2].speed ? 2 : 1, state: { best: dailyBestRef.current } satisfies DailyState });
+			const di = SPEEDS.findIndex((s) => s.speed === speedRef.current);
+			saveDailyRun(gameId, { startedAt: Date.now(), done: true, seed: seedRef.current, diffIndex: di < 0 ? 1 : di, state: { best: dailyBestRef.current } satisfies DailyState });
 		} else {
 			setBest((prev) => {
 				const nb = prev == null ? score : Math.max(prev, score);
@@ -200,13 +216,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	}, [gameId]);
 
 	/* ---------- Input ---------- */
-	const emit = (grade: Grade, lane: number): void => {
-		const color = grade === 'Parfait' ? '#3ddc84' : grade === 'Bien' ? '#7fd0ff' : grade === 'Ok' ? '#ffd166' : '#ff6a6a';
+	const emitText = (text: string, lane: number, color: string, spark = false): void => {
 		const x = (lane + 0.5) * laneW();
-		partsRef.current.push({ x, y: hitY() - 18, vy: -50, life: 0.7, maxLife: 0.7, color, text: grade, size: 15 });
-		if (grade === 'Parfait' || grade === 'Bien') for (let i = 0; i < 8; i++) partsRef.current.push({ x, y: hitY(), vy: -60 - Math.random() * 60, life: 0.45, maxLife: 0.45, color, size: 3 });
+		partsRef.current.push({ x, y: hitY() - 18, vy: -50, life: 0.7, maxLife: 0.7, color, text, size: 15 });
+		if (spark) for (let i = 0; i < 8; i++) partsRef.current.push({ x, y: hitY(), vy: -60 - Math.random() * 60, life: 0.45, maxLife: 0.45, color, size: 3 });
 	};
-	const hitLane = (lane: number): void => {
+	const gradeColor = (g: Grade): string => (g === 'Parfait' ? '#3ddc84' : g === 'Bien' ? '#7fd0ff' : g === 'Ok' ? '#ffd166' : '#ff6a6a');
+
+	const pressLane = (lane: number): void => {
 		if (!runningRef.current) return;
 		const chart = chartRef.current;
 		if (!chart) return;
@@ -225,18 +242,20 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		});
 		if (bi < 0) return;
 		const jd = judgeTiming(bo);
-		if (!jd) return; // too early/late — forgiving, no penalty
-		arr[bi] = jd.grade;
-		playPiano(chart.tiles[bi].midi);
+		if (!jd) return;
+		const t = chart.tiles[bi];
+		playPiano(t.midi, t.hold ? t.dur : 0.5);
 		comboRef.current += 1;
 		maxComboRef.current = Math.max(maxComboRef.current, comboRef.current);
-		scoreRef.current += Math.round(jd.points * comboMult(comboRef.current));
-		sumRef.current += jd.points;
-		emit(jd.grade, lane);
-		setHud({ score: scoreRef.current, combo: comboRef.current, mult: comboMult(comboRef.current) });
+		scoreRef.current += jd.points * comboMult(comboRef.current);
+		accSumRef.current += jd.points;
+		accCountRef.current += 1;
+		emitText(jd.grade, lane, gradeColor(jd.grade), jd.points >= 60);
+		arr[bi] = t.hold ? 'holding' : jd.grade;
+		setHud({ score: Math.round(scoreRef.current), combo: comboRef.current, mult: comboMult(comboRef.current) });
 	};
-	const hitLaneRef = useRef(hitLane);
-	hitLaneRef.current = hitLane;
+	const pressLaneRef = useRef(pressLane);
+	pressLaneRef.current = pressLane;
 
 	const onDown = (e: React.PointerEvent): void => {
 		if (!runningRef.current) return;
@@ -244,7 +263,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!cv) return;
 		const rect = cv.getBoundingClientRect();
 		const x = (e.clientX - rect.left) * (dimRef.current.w / rect.width);
-		hitLane(clamp(Math.floor(x / laneW()), 0, LANES - 1));
+		const lane = clamp(Math.floor(x / laneW()), 0, LANES - 1);
+		const wasHeld = heldLane(lane);
+		pointerLaneRef.current.set(e.pointerId, lane);
+		cv.setPointerCapture(e.pointerId);
+		if (!wasHeld) pressLane(lane);
+	};
+	const onPointerEnd = (e: React.PointerEvent): void => {
+		pointerLaneRef.current.delete(e.pointerId);
 	};
 
 	/* ---------- Modes ---------- */
@@ -256,7 +282,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			setSongIdx(song);
 			songRef.current = song;
 			speedRef.current = speed;
-			seedRef.current = 0;
+			if (song === ENDLESS) seedRef.current = (Math.random() * 2 ** 32) >>> 0;
 			prepare(song, speed);
 			setStat('ready');
 			dailyBestRef.current = null;
@@ -302,7 +328,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Loop + keyboard ---------- */
 	useEffect(() => {
-		armFree(0, SPEEDS[1].speed);
+		armFree(ENDLESS, SPEEDS[1].speed);
 		setSpeedIdx(1);
 		const resize = (): void => {
 			const wrap = wrapRef.current;
@@ -322,14 +348,21 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		resize();
 		const ro = new ResizeObserver(resize);
 		if (wrapRef.current) ro.observe(wrapRef.current);
-		const onKey = (e: KeyboardEvent): void => {
+		const onKeyDown = (e: KeyboardEvent): void => {
 			const lane = KEYS.indexOf(e.key.toLowerCase());
-			if (lane >= 0 && runningRef.current) {
-				e.preventDefault();
-				hitLaneRef.current(lane);
+			if (lane < 0 || !runningRef.current) return;
+			e.preventDefault();
+			if (!laneKeyRef.current[lane]) {
+				laneKeyRef.current[lane] = true;
+				pressLaneRef.current(lane);
 			}
 		};
-		window.addEventListener('keydown', onKey);
+		const onKeyUp = (e: KeyboardEvent): void => {
+			const lane = KEYS.indexOf(e.key.toLowerCase());
+			if (lane >= 0) laneKeyRef.current[lane] = false;
+		};
+		window.addEventListener('keydown', onKeyDown);
+		window.addEventListener('keyup', onKeyUp);
 		let last = performance.now();
 		const frame = (now: number): void => {
 			const dt = Math.min(now - last, 100) / 1000;
@@ -342,7 +375,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		rafRef.current = requestAnimationFrame(frame);
 		return () => {
 			ro.disconnect();
-			window.removeEventListener('keydown', onKey);
+			window.removeEventListener('keydown', onKeyDown);
+			window.removeEventListener('keyup', onKeyUp);
 			cancelAnimationFrame(rafRef.current);
 			void ctxRef.current?.close();
 		};
@@ -364,17 +398,41 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!chart) return;
 		const now = songTime();
 		const arr = stateArrRef.current;
-		let changed = false;
-		chart.tiles.forEach((t, i) => {
-			if (arr[i] === 'pending' && now - t.time > 0.28) {
-				arr[i] = 'Raté';
-				comboRef.current = 0;
-				emit('Raté', t.lane);
-				changed = true;
+		let dirty = false;
+		let failed = false;
+		for (let i = 0; i < chart.tiles.length; i++) {
+			const t = chart.tiles[i];
+			const s = arr[i];
+			if (s === 'pending') {
+				if (now - t.time > 0.28) {
+					arr[i] = 'Raté';
+					comboRef.current = 0;
+					accCountRef.current += 1;
+					emitText('Raté', t.lane, '#ff6a6a');
+					dirty = true;
+					if (endlessRef.current) failed = true;
+				}
+			} else if (s === 'holding') {
+				const end = t.time + t.dur;
+				if (heldLane(t.lane) && now < end) {
+					scoreRef.current += HOLD_RATE * dt * comboMult(comboRef.current);
+					dirty = true;
+				} else if (!heldLane(t.lane) && now < end - 0.12) {
+					arr[i] = 'broken';
+					comboRef.current = 0;
+					emitText('Lâché', t.lane, '#ff9a5a');
+					dirty = true;
+				} else if (now >= end - 0.06) {
+					arr[i] = 'done';
+					comboRef.current += 1;
+					scoreRef.current += 40 * comboMult(comboRef.current);
+					emitText('Tenu !', t.lane, '#3ddc84', true);
+					dirty = true;
+				}
 			}
-		});
-		if (changed) setHud({ score: scoreRef.current, combo: comboRef.current, mult: comboMult(comboRef.current) });
-		if (now > chart.totalTime + 0.6) finishRun();
+		}
+		if (dirty) setHud({ score: Math.round(scoreRef.current), combo: comboRef.current, mult: comboMult(comboRef.current) });
+		if (failed || now > chart.totalTime + 0.6) finishRun();
 	};
 
 	/* ---------- Draw ---------- */
@@ -393,7 +451,6 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 
 		ctx.fillStyle = '#0c1018';
 		ctx.fillRect(0, 0, w, h);
-		// lanes
 		for (let l = 0; l < LANES; l++) {
 			ctx.fillStyle = l % 2 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)';
 			ctx.fillRect(l * lw, 0, lw, h);
@@ -404,7 +461,6 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			ctx.lineTo(l * lw, h);
 			ctx.stroke();
 		}
-		// hit line
 		ctx.strokeStyle = 'rgba(150,190,255,0.55)';
 		ctx.lineWidth = 3;
 		ctx.beginPath();
@@ -412,34 +468,56 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		ctx.lineTo(w, hy);
 		ctx.stroke();
 
-		// tiles
 		if (chart) {
 			const arr = stateArrRef.current;
-			chart.tiles.forEach((t, i) => {
-				if (arr[i] !== 'pending') return;
+			for (let i = 0; i < chart.tiles.length; i++) {
+				const t = chart.tiles[i];
+				const s = arr[i];
 				const yBottom = hy + (now - t.time) * pps;
 				const hh = Math.max(lw * 0.55, t.dur * pps);
 				const yTop = yBottom - hh;
-				if (yBottom < -4 || yTop > h) return;
 				const x = t.lane * lw + 4;
+				const wdt = lw - 8;
 				const hue = LANE_HUE[t.lane];
-				const g = ctx.createLinearGradient(0, yTop, 0, yBottom);
-				g.addColorStop(0, `hsl(${hue}, 80%, 62%)`);
-				g.addColorStop(1, `hsl(${hue}, 75%, 48%)`);
-				ctx.fillStyle = g;
-				ctx.shadowColor = `hsl(${hue}, 85%, 60%)`;
-				ctx.shadowBlur = 10;
-				ctx.beginPath();
-				ctx.roundRect(x, yTop, lw - 8, hh, 8);
-				ctx.fill();
-				ctx.shadowBlur = 0;
-			});
+				if (s === 'pending') {
+					if (yBottom < -4 || yTop > h) continue;
+					const g = ctx.createLinearGradient(0, yTop, 0, yBottom);
+					g.addColorStop(0, `hsl(${hue}, 80%, 62%)`);
+					g.addColorStop(1, `hsl(${hue}, 75%, 48%)`);
+					ctx.fillStyle = g;
+					ctx.shadowColor = `hsl(${hue}, 85%, 60%)`;
+					ctx.shadowBlur = 10;
+					ctx.beginPath();
+					ctx.roundRect(x, yTop, wdt, hh, 8);
+					ctx.fill();
+					ctx.shadowBlur = 0;
+					if (t.hold) {
+						ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+						ctx.lineWidth = 2;
+						ctx.beginPath();
+						ctx.roundRect(x + 3, yTop + 3, wdt - 6, hh - 6, 6);
+						ctx.stroke();
+					}
+				} else if (s === 'holding') {
+					// remaining portion above the line, shrinking as it's held
+					const top = Math.min(hy, yTop);
+					if (hy - top > 1) {
+						ctx.fillStyle = `hsla(140, 80%, 60%, 0.9)`;
+						ctx.shadowColor = 'hsl(140,85%,60%)';
+						ctx.shadowBlur = 14;
+						ctx.beginPath();
+						ctx.roundRect(x, top, wdt, hy - top, 8);
+						ctx.fill();
+						ctx.shadowBlur = 0;
+					}
+				}
+			}
 		}
 
-		// keys
 		for (let l = 0; l < LANES; l++) {
 			const flash = clamp(1 - (anim - laneFlashRef.current[l]) / 0.18, 0, 1);
-			ctx.fillStyle = `rgba(${120 + 120 * flash}, ${150 + 90 * flash}, 255, ${0.12 + 0.5 * flash})`;
+			const held = heldLane(l) ? 0.35 : 0;
+			ctx.fillStyle = `rgba(${120 + 120 * flash}, ${150 + 90 * flash}, 255, ${0.12 + 0.5 * flash + held})`;
 			ctx.fillRect(l * lw + 3, hy + 3, lw - 6, h - hy - 6);
 			ctx.fillStyle = 'rgba(255,255,255,0.5)';
 			ctx.font = 'bold 14px system-ui, sans-serif';
@@ -448,7 +526,6 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			ctx.fillText(KEYS[l].toUpperCase(), (l + 0.5) * lw, (hy + h) / 2);
 		}
 
-		// particles
 		for (const p of partsRef.current) {
 			const a = clamp(p.life / p.maxLife, 0, 1);
 			ctx.globalAlpha = a;
@@ -467,7 +544,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		ctx.globalAlpha = 1;
 	};
 
-	const songName = SONGS[songIdx]?.name ?? '';
+	const songName = songIdx === ENDLESS ? 'Infini' : SONGS[songIdx]?.name ?? '';
 
 	return (
 		<div className="tp-root">
@@ -482,6 +559,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			) : (
 				<>
 					<div className="tp-songs">
+						<button className={`tp-song ${songIdx === ENDLESS ? 'active' : ''}`} onClick={() => armFree(ENDLESS, speedRef.current)} disabled={status === 'running'}>
+							🎲 Infini
+						</button>
 						{SONGS.map((s, i) => (
 							<button key={s.name} className={`tp-song ${songIdx === i ? 'active' : ''}`} onClick={() => armFree(i, speedRef.current)} disabled={status === 'running'}>
 								{s.name}
@@ -515,14 +595,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="tp-playwrap" ref={wrapRef}>
-				<canvas ref={canvasRef} className="tp-canvas" onPointerDown={onDown} />
+				<canvas ref={canvasRef} className="tp-canvas" onPointerDown={onDown} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} />
 
 				{status === 'ready' && !dailyLoading && (
 					<div className="tp-overlay">
 						<div className="tp-card">
 							<h3>🎹 {songName}</h3>
 							<p>
-								Tape la colonne (clic/doigt ou <b>D F J K</b>) au moment où la tuile touche la ligne. Chaque tuile joue sa note&nbsp;: suis le rythme pour jouer l'air&nbsp;!
+								Tape la colonne (clic/doigt ou <b>D F J K</b>) quand la tuile touche la ligne. Les tuiles <b>allongées</b> se <b>maintiennent</b> pour un bonus. {songIdx === ENDLESS ? 'Mode infini : ça continue jusqu\'à ce que tu rates une tuile !' : ''}
 							</p>
 							<button className="tp-btn primary big" onClick={startRun}>
 								▶ Go&nbsp;!
@@ -541,7 +621,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 							<div className={`tp-rank tp-rank-${result.rank}`}>{result.rank}</div>
 							<h3>{result.score} pts</h3>
 							<p>
-								Précision <strong>{result.acc}%</strong> · plus long combo <strong>{maxComboRef.current}</strong>
+								{result.endless ? <>Tuiles jouées <strong>{result.tiles}</strong> · </> : <>Précision <strong>{result.acc}%</strong> · </>}
+								plus long combo <strong>{maxComboRef.current}</strong>
 							</p>
 							<button className="tp-btn primary big" onClick={startRun}>
 								↻ Rejouer{daily ? ' (améliorer)' : ''}
@@ -552,7 +633,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="tp-help">
-				Prototype — un « piano tiles » sur des airs connus (libres de droits). Tape pile sur la ligne&nbsp;; les combos multiplient le score. {daily ? 'Défi du jour : même air pour tous, meilleur score classé.' : 'Choisis un air et une vitesse, et bats ton record.'}
+				Prototype — un « piano tiles ». Tape pile sur la ligne&nbsp;; <b>maintiens les tuiles longues</b> pour engranger du bonus tant que tu tiens. {daily ? 'Défi du jour : même air pour tous, meilleur score classé.' : songIdx === ENDLESS ? 'Mode infini : le score grimpe sans fin, la partie s\'arrête à la première tuile ratée.' : 'Choisis un air et une vitesse, et bats ton record.'}
 			</p>
 
 			{daily ? (

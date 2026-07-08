@@ -6,6 +6,7 @@
 import MainHead from '../components/MainHead.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import GameFullscreen from '../components/GameFullscreen.astro';
 import { games } from '../data/games';
 
 interface Props {
@@ -23,6 +24,7 @@ const { title, description, image, type, noindex } = Astro.props;
 const site = Astro.site!;
 const path = Astro.url.pathname;
 const pageUrl = new URL(path, site).href;
+const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path); // any /jeux/<slug>, not the index
 let jsonLd: unknown[] | null = null;
 if (path === '/' || path === '') {
 	jsonLd = [
@@ -56,6 +58,8 @@ if (path === '/' || path === '') {
 			<slot />
 			<Footer />
 		</div>
+
+		{isGamePage && <GameFullscreen />}
 
 		<script>
 			// Add “loaded” class once the document has completely loaded.

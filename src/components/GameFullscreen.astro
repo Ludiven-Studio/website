@@ -1,0 +1,104 @@
+---
+// Injects a "Plein écran / Quitter" button into every game page's header.
+// Toggles the Fullscreen API on the game area and, on touch devices, tries to
+// lock landscape. Rendered once by BaseLayout for /jeux/<slug> pages.
+---
+
+<style is:global>
+	.gf-btn {
+		border: 1.5px solid var(--gray-700);
+		background: transparent;
+		color: var(--gray-300);
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+		border-radius: 999px;
+		padding: 5px 14px;
+		cursor: pointer;
+		margin-top: 0.25rem;
+		transition:
+			color var(--theme-transition),
+			border-color var(--theme-transition);
+	}
+	.gf-btn:hover,
+	.gf-btn:focus-visible {
+		color: var(--accent-regular);
+		border-color: var(--accent-regular);
+	}
+	.game-page:fullscreen {
+		background: var(--gray-999);
+		width: 100%;
+		height: 100%;
+		overflow: auto;
+		padding: 1rem;
+		justify-content: center;
+	}
+	.game-page:-webkit-full-screen {
+		background: var(--gray-999);
+		width: 100%;
+		height: 100%;
+		overflow: auto;
+		padding: 1rem;
+		justify-content: center;
+	}
+</style>
+
+<script>
+	(() => {
+		const d = document as any;
+		const el = document.documentElement as any;
+		if (!(el.requestFullscreen || el.webkitRequestFullscreen)) return; // unsupported (e.g. iOS Safari)
+
+		const host = document.querySelector('.game-head');
+		const target = (document.querySelector('.game-page') || document.documentElement) as any;
+		if (!host) return;
+
+		const fsEl = (): Element | null => d.fullscreenElement || d.webkitFullscreenElement || null;
+		const btn = document.createElement('button');
+		btn.type = 'button';
+		btn.className = 'gf-btn';
+		const setLabel = (): void => {
+			btn.textContent = fsEl() ? '⛶ Quitter le plein écran' : '⛶ Plein écran';
+		};
+
+		const enter = async (): Promise<void> => {
+			try {
+				if (target.requestFullscreen) await target.requestFullscreen();
+				else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+			} catch {
+				/* ignore */
+			}
+			if (window.matchMedia('(pointer: coarse)').matches) {
+				const o = (screen as any).orientation;
+				try {
+					if (o && o.lock) await o.lock('landscape');
+				} catch {
+					/* orientation lock not allowed — ignore */
+				}
+			}
+		};
+		const exit = async (): Promise<void> => {
+			try {
+				if (d.exitFullscreen) await d.exitFullscreen();
+				else if (d.webkitExitFullscreen) d.webkitExitFullscreen();
+			} catch {
+				/* ignore */
+			}
+			const o = (screen as any).orientation;
+			try {
+				if (o && o.unlock) o.unlock();
+			} catch {
+				/* ignore */
+			}
+		};
+
+		btn.addEventListener('click', () => {
+			if (fsEl()) void exit();
+			else void enter();
+		});
+		document.addEventListener('fullscreenchange', setLabel);
+		document.addEventListener('webkitfullscreenchange', setLabel as EventListener);
+		setLabel();
+		host.appendChild(btn);
+	})();
+</script>

@@ -1,11 +1,14 @@
 /* =====================================================
    TEMPO — pure engine for a "piano tiles" rhythm game.
    Public-domain melodies → a falling-tile chart (lane per note, hit time in
-   seconds). Deterministic (no RNG): the daily just picks a song by seed and a
-   difficulty speed. Timing judgment + scoring curve live here (testable).
+   seconds). An endless mode streams a seeded generated melody. Long notes are
+   HOLD tiles (press-and-hold for bonus). Timing judgment + scoring live here.
    ===================================================== */
 
+import { mulberry32 } from '../prng';
+
 export const LANES = 4;
+export const HOLD_BEATS = 2; // a note this long (or longer) becomes a hold tile
 
 export interface SongNote {
 	midi: number;
@@ -76,6 +79,7 @@ export interface Tile {
 	lane: number;
 	midi: number;
 	dur: number; // seconds
+	hold: boolean; // long note: press and hold to the end for bonus
 }
 export interface Chart {
 	tiles: Tile[];
@@ -100,7 +104,7 @@ export function buildChart(song: Song, speed = 1): Chart {
 		let lane = Math.max(0, Math.min(LANES - 1, Math.floor(((n.midi - lo) / span) * LANES)));
 		if (lane === prevLane) lane = (lane + 1) % LANES;
 		prevLane = lane;
-		tiles.push({ time: beat / eff, lane, midi: n.midi, dur: n.dur / eff });
+		tiles.push({ time: beat / eff, lane, midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
 		beat += n.dur;
 	}
 	const beatTimes: number[] = [];
@@ -110,6 +114,69 @@ export function buildChart(song: Song, speed = 1): Chart {
 
 /** Song of the day for a seed. */
 export const dailySong = (seed: number): number => (seed >>> 0) % SONGS.length;
+
+/**
+ * Endless generated tune: a gentle major-pentatonic walk with occasional long
+ * (hold) notes. Deterministic from the seed. Long enough to outlast any run —
+ * the endless mode ends when the player misses, not when the melody stops.
+ */
+const PENTA = [0, 2, 4, 7, 9];
+const scaleMidi = (root: number, deg: number): number => root + Math.floor(deg / 5) * 12 + PENTA[((deg % 5) + 5) % 5];
+export function generateEndlessSong(seed: number, count = 600): Song {
+	const rng = mulberry32(seed >>> 0);
+	const notes: SongNote[] = [];
+	let deg = 4;
+	for (let i = 0; i < count; i++) {
+		const r = rng();
+		let step: number;
+		if (r < 0.55) step = rng() < 0.5 ? 1 : -1;
+		else if (r < 0.78) step = 0;
+		else step = (rng() < 0.5 ? 1 : -1) * (1 + Math.floor(rng() * 2));
+		deg = Math.max(0, Math.min(10, deg + step));
+		const dur = rng() < 0.16 ? 2 : 1; // ~1 in 6 is a hold
+		notes.push({ midi: scaleMidi(55, deg), dur });
+	}
+	return { name: 'Infini', tempo: 2, notes };
+}
+
+export interface EndlessOpts {
+	baseTempo?: number; // beats/sec at the start
+	rampSec?: number; // seconds of play to add +100% tempo
+	maxMult?: number; // tempo ceiling (× baseTempo)
+	count?: number;
+}
+/**
+ * Endless chart whose tempo RAMPS UP over the run: successive notes get closer
+ * together, so it grows faster and denser the longer you survive. The daily/free
+ * `speed` still scales the starting tempo.
+ */
+export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {}): Chart {
+	const base = (opts.baseTempo ?? 2) * speed;
+	const ramp = opts.rampSec ?? 45;
+	const maxMult = opts.maxMult ?? 2.6;
+	const song = generateEndlessSong(seed, opts.count ?? 1500);
+	let lo = Infinity;
+	let hi = -Infinity;
+	for (const n of song.notes) {
+		lo = Math.min(lo, n.midi);
+		hi = Math.max(hi, n.midi);
+	}
+	const span = hi - lo || 1;
+	const tiles: Tile[] = [];
+	const beatTimes: number[] = [];
+	let elapsed = 0;
+	let prevLane = -1;
+	for (const n of song.notes) {
+		const eff = base * Math.min(maxMult, 1 + elapsed / ramp); // tempo accelerates
+		let lane = Math.max(0, Math.min(LANES - 1, Math.floor(((n.midi - lo) / span) * LANES)));
+		if (lane === prevLane) lane = (lane + 1) % LANES;
+		prevLane = lane;
+		tiles.push({ time: elapsed, lane, midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
+		beatTimes.push(elapsed);
+		elapsed += n.dur / eff;
+	}
+	return { tiles, totalTime: elapsed, beatTimes };
+}
 
 export type Grade = 'Parfait' | 'Bien' | 'Ok' | 'Raté';
 /** Timing judgment from the absolute offset (seconds) between tap and the tile's hit time. */
