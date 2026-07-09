@@ -16,8 +16,8 @@ import { LANES, SONGS, SPEEDS, buildChart, buildEndlessChart, dailySong, judgeTi
 
 type Status = 'ready' | 'running' | 'done';
 type TileState = 'pending' | 'holding' | 'done' | 'broken' | Grade;
-const KEYS = ['d', 'f', 'j', 'k'];
-const LANE_HUE = [205, 265, 330, 35];
+const KEYS = ['s', 'd', 'f', 'j', 'k', 'l']; // 6 columns, low pitch (left) → high (right)
+const LANE_HUE = [205, 245, 285, 325, 20, 50];
 const ENDLESS = -1;
 const LEAD = 1.9;
 const HIT_FRAC = 0.8;
@@ -49,7 +49,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [speedIdx, setSpeedIdx] = useState(1);
 	const [songIdx, setSongIdx] = useState<number>(ENDLESS);
-	const [metro, setMetro] = useState(false);
+	const [metro, setMetro] = useState(true); // backing music (drums + bass) on by default
 	const [hud, setHud] = useState({ score: 0, combo: 0, mult: 1 });
 	const [result, setResult] = useState<{ score: number; rank: string; acc: number; tiles: number; endless: boolean } | null>(null);
 	const [best, setBest] = useState<number | null>(null);
@@ -80,7 +80,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const masterRef = useRef<GainNode | null>(null);
 	const runGainRef = useRef<GainNode | null>(null); // per-run bus so restarts don't stack scheduled ticks
 	const audioStartRef = useRef(0);
-	const metroRef = useRef(false);
+	const metroRef = useRef(true);
+	const backingIdxRef = useRef(0); // next beat to schedule (lookahead groove)
 
 	const dailyRef = useRef(false);
 	const seedRef = useRef(0);
@@ -132,19 +133,36 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.stop(when + sustain + 0.05);
 		}
 	};
-	const tick = (when: number): void => {
+	// Backing accompaniment: a kick drum + a bass note per beat gives the tempo.
+	const kick = (when: number, accent: boolean): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const g = ctx.createGain();
 		g.connect(runGainRef.current ?? masterRef.current!);
-		g.gain.setValueAtTime(0.05, when);
-		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.04);
+		g.gain.setValueAtTime(accent ? 0.24 : 0.15, when);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.14);
 		const o = ctx.createOscillator();
 		o.type = 'sine';
-		o.frequency.value = 900;
+		o.frequency.setValueAtTime(130, when);
+		o.frequency.exponentialRampToValueAtTime(46, when + 0.12);
 		o.connect(g);
 		o.start(when);
-		o.stop(when + 0.05);
+		o.stop(when + 0.16);
+	};
+	const bass = (when: number, midi: number, accent: boolean): void => {
+		const ctx = ctxRef.current;
+		if (!ctx) return;
+		const g = ctx.createGain();
+		g.connect(runGainRef.current ?? masterRef.current!);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(accent ? 0.13 : 0.08, when + 0.02);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
+		const o = ctx.createOscillator();
+		o.type = 'triangle';
+		o.frequency.value = midiToFreq(midi);
+		o.connect(g);
+		o.start(when);
+		o.stop(when + 0.34);
 	};
 
 	/* ---------- Geometry ---------- */
@@ -181,8 +199,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!ctx) return;
 		if (songRef.current === ENDLESS && !dailyRef.current) seedRef.current = (Math.random() * 2 ** 32) >>> 0;
 		prepare(songRef.current, speedRef.current);
-		const chart = chartRef.current!;
-		// Fresh per-run audio bus: silences any ticks still scheduled from a previous run.
+		// Fresh per-run audio bus: silences any groove still scheduled from a previous run.
 		try {
 			runGainRef.current?.disconnect();
 		} catch {
@@ -192,7 +209,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		rg.connect(masterRef.current!);
 		runGainRef.current = rg;
 		audioStartRef.current = ctx.currentTime + LEAD;
-		if (metroRef.current) chart.beatTimes.forEach((bt) => tick(audioStartRef.current + bt));
+		backingIdxRef.current = 0; // groove is scheduled with lookahead in step()
 		runningRef.current = true;
 		setStat('running');
 		setSubmitScore(undefined);
@@ -418,6 +435,18 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const chart = chartRef.current;
 		if (!chart) return;
 		const now = songTime();
+		// Backing groove: schedule ~1s ahead (kick every beat, bass root/fifth, accent per bar).
+		if (metroRef.current) {
+			const bt = chart.beatTimes;
+			while (backingIdxRef.current < bt.length && bt[backingIdxRef.current] < now + 1) {
+				const i = backingIdxRef.current;
+				const when = audioStartRef.current + bt[i];
+				const accent = i % 4 === 0;
+				kick(when, accent);
+				bass(when, chart.key + (i % 2 === 0 ? 0 : 7), accent);
+				backingIdxRef.current++;
+			}
+		}
 		const arr = stateArrRef.current;
 		let dirty = false;
 		let failed = false;
@@ -621,7 +650,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 							</button>
 						))}
 						<label className="tp-toggle">
-							<input type="checkbox" checked={metro} onChange={(e) => setMetro(e.target.checked)} /> Métro
+							<input type="checkbox" checked={metro} onChange={(e) => setMetro(e.target.checked)} /> Musique
 						</label>
 					</div>
 				</>
@@ -648,7 +677,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						<div className="tp-card">
 							<h3>🎹 {songName}</h3>
 							<p>
-								Tape la colonne (clic/doigt ou <b>D F J K</b>) quand la tuile touche la ligne. Les tuiles <b>allongées</b> se <b>maintiennent</b> pour un bonus. {songIdx === ENDLESS ? 'Mode infini : ça accélère peu à peu, ton énergie baisse quand tu rates et remonte quand tu enchaînes.' : ''}
+								Tape la colonne (clic/doigt ou <b>S D F&nbsp;J K L</b>) quand la tuile touche la ligne — une <b>musique donne le tempo</b>, cale-toi dessus. Les tuiles <b>allongées</b> se <b>maintiennent</b> pour un bonus. {songIdx === ENDLESS ? 'Mode infini : ça accélère peu à peu, ton énergie baisse quand tu rates et remonte quand tu enchaînes.' : ''}
 							</p>
 							<button className="tp-btn primary big" onClick={startRun}>
 								▶ Go&nbsp;!

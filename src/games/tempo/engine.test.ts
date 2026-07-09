@@ -26,18 +26,26 @@ describe('tempo engine', () => {
 		}
 	});
 
-	it('lane is fixed per pitch: same note → same lane, different lane → different note', () => {
+	it('lane follows pitch: same note → same lane, low pitch left (monotonic), different lane → different note', () => {
 		for (const s of SONGS) {
-			const seen = new Map<number, number>();
 			const tiles = buildChart(s, 1).tiles;
+			const map = new Map<number, number>();
 			for (const t of tiles) {
-				if (seen.has(t.midi)) expect(seen.get(t.midi)).toBe(t.lane);
-				else seen.set(t.midi, t.lane);
+				if (map.has(t.midi)) expect(map.get(t.midi)).toBe(t.lane);
+				else map.set(t.midi, t.lane);
 			}
+			// Sorted by pitch → lanes non-decreasing (grave à gauche, aigu à droite).
+			const sorted = [...map.entries()].sort((a, b) => a[0] - b[0]);
+			for (let i = 1; i < sorted.length; i++) expect(sorted[i][1]).toBeGreaterThanOrEqual(sorted[i - 1][1]);
 			for (let i = 1; i < tiles.length; i++) {
 				if (tiles[i].lane !== tiles[i - 1].lane) expect(tiles[i].midi).not.toBe(tiles[i - 1].midi);
 			}
 		}
+	});
+
+	it('exposes the song key on the chart (bass accompaniment)', () => {
+		expect(buildChart(SONGS[0], 1).key).toBe(SONGS[0].key);
+		expect(buildEndlessChart(1, 1, { count: 40 }).key).toBeGreaterThan(0);
 	});
 
 	it('speed scales the chart faster', () => {

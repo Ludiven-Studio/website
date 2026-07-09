@@ -25,7 +25,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	],
 	'tempo': [
 		{ emoji: '🎹', title: 'Le but', body: 'Un « piano tiles » sur des airs connus (libres de droits) : des tuiles descendent dans 4 colonnes. Tape chacune pile au moment où elle touche la ligne — chaque tuile joue sa note, et l\'air se reconstitue sous tes doigts.' },
-		{ emoji: '👆', title: 'Contrôles', body: 'Clique/tape la colonne d\'une tuile, ou utilise les touches D F J K au clavier. Vise le meilleur timing : Parfait / Bien / Ok. Les tuiles allongées se MAINTIENNENT : garde la colonne enfoncée jusqu\'au bout pour un bonus qui grimpe.' },
+		{ emoji: '👆', title: 'Contrôles', body: 'Clique/tape la colonne d\'une tuile, ou utilise les touches S D F J K L au clavier (6 colonnes, grave à gauche, aigu à droite). Une musique donne le tempo : cale-toi dessus ! Les tuiles allongées se MAINTIENNENT — garde la colonne enfoncée jusqu\'au bout pour un bonus qui grimpe.' },
 		{ emoji: '♾️', title: 'Mode Infini', body: 'Choisis « Infini » pour une mélodie générée sans fin qui ACCÉLÈRE peu à peu. Une barre d\'énergie (en haut) baisse quand tu rates et remonte quand tu enchaînes : la partie s\'arrête seulement quand l\'énergie tombe à zéro. Le score grimpe sans fin — bats ton record !' },
 		{ emoji: '✨', title: 'Combos & rangs', body: 'Les réussites enchaînées montent un combo qui multiplie le score (jusqu\'à ×4). En fin de morceau, tu obtiens un rang de S à D selon ta précision.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'Même air pour tout le monde (graine partagée). Rejoue autant que tu veux pour améliorer ton meilleur score, qui entre au classement.' },

@@ -7,7 +7,7 @@
 
 import { mulberry32 } from '../prng';
 
-export const LANES = 4;
+export const LANES = 6; // columns, ordered low pitch (left) → high pitch (right)
 export const HOLD_BEATS = 2; // a note this long (or longer) becomes a hold tile
 
 export interface SongNote {
@@ -17,6 +17,7 @@ export interface SongNote {
 export interface Song {
 	name: string;
 	tempo: number; // beats per second at speed 1
+	key: number; // tonic midi (used for the bass accompaniment)
 	notes: SongNote[];
 }
 
@@ -25,6 +26,7 @@ export const SONGS: Song[] = [
 	{
 		name: 'Au clair de la lune',
 		tempo: 2,
+		key: 48,
 		notes: [
 			{ midi: 60, dur: 1 }, { midi: 60, dur: 1 }, { midi: 60, dur: 1 }, { midi: 62, dur: 1 }, { midi: 64, dur: 2 }, { midi: 62, dur: 2 },
 			{ midi: 60, dur: 1 }, { midi: 64, dur: 1 }, { midi: 62, dur: 1 }, { midi: 62, dur: 1 }, { midi: 60, dur: 2 },
@@ -33,6 +35,7 @@ export const SONGS: Song[] = [
 	{
 		name: 'Frère Jacques',
 		tempo: 2,
+		key: 48,
 		notes: [
 			{ midi: 60, dur: 1 }, { midi: 62, dur: 1 }, { midi: 64, dur: 1 }, { midi: 60, dur: 1 },
 			{ midi: 60, dur: 1 }, { midi: 62, dur: 1 }, { midi: 64, dur: 1 }, { midi: 60, dur: 1 },
@@ -45,6 +48,7 @@ export const SONGS: Song[] = [
 	{
 		name: 'Ode à la joie',
 		tempo: 2,
+		key: 48,
 		notes: [
 			{ midi: 64, dur: 1 }, { midi: 64, dur: 1 }, { midi: 65, dur: 1 }, { midi: 67, dur: 1 },
 			{ midi: 67, dur: 1 }, { midi: 65, dur: 1 }, { midi: 64, dur: 1 }, { midi: 62, dur: 1 },
@@ -55,6 +59,7 @@ export const SONGS: Song[] = [
 	{
 		name: 'Ah vous dirai-je maman',
 		tempo: 2,
+		key: 48,
 		notes: [
 			{ midi: 60, dur: 1 }, { midi: 60, dur: 1 }, { midi: 67, dur: 1 }, { midi: 67, dur: 1 },
 			{ midi: 69, dur: 1 }, { midi: 69, dur: 1 }, { midi: 67, dur: 2 },
@@ -84,34 +89,41 @@ export interface Tile {
 export interface Chart {
 	tiles: Tile[];
 	totalTime: number; // seconds until the last note ends
-	beatTimes: number[]; // metronome ticks (seconds)
+	beatTimes: number[]; // beat grid (seconds) — drives the backing groove
+	key: number; // tonic midi (bass accompaniment)
 }
 
 /**
- * Consistent pitch → lane map (low→left): the SAME note always falls in the same
- * column, so a change of column always means a change of note. Distinct pitches
- * cycle across the 4 lanes by ascending order.
+ * Pitch → lane: buckets the song's pitch range across the columns, so LOW notes
+ * fall on the LEFT and HIGH notes on the RIGHT (monotonic). The same pitch always
+ * uses the same column, and a change of column always means a change of note.
  */
-function laneMap(notes: { midi: number }[]): Map<number, number> {
-	const distinct = Array.from(new Set(notes.map((n) => n.midi))).sort((a, b) => a - b);
-	const m = new Map<number, number>();
-	distinct.forEach((mi, i) => m.set(mi, i % LANES));
-	return m;
-}
+const laneFor = (midi: number, lo: number, hi: number): number =>
+	Math.max(0, Math.min(LANES - 1, Math.floor(((midi - lo) / (hi - lo || 1)) * LANES)));
 
-/** Build the falling-tile chart. Lane is fixed per pitch (see laneMap). */
+const range = (notes: { midi: number }[]): [number, number] => {
+	let lo = Infinity;
+	let hi = -Infinity;
+	for (const n of notes) {
+		lo = Math.min(lo, n.midi);
+		hi = Math.max(hi, n.midi);
+	}
+	return [lo, hi];
+};
+
+/** Build the falling-tile chart. Column follows pitch (low→left, high→right). */
 export function buildChart(song: Song, speed = 1): Chart {
 	const eff = song.tempo * speed;
-	const lm = laneMap(song.notes);
+	const [lo, hi] = range(song.notes);
 	const tiles: Tile[] = [];
 	let beat = 0;
 	for (const n of song.notes) {
-		tiles.push({ time: beat / eff, lane: lm.get(n.midi)!, midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
+		tiles.push({ time: beat / eff, lane: laneFor(n.midi, lo, hi), midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
 		beat += n.dur;
 	}
 	const beatTimes: number[] = [];
 	for (let b = 0; b < beat; b++) beatTimes.push(b / eff);
-	return { tiles, totalTime: beat / eff, beatTimes };
+	return { tiles, totalTime: beat / eff, beatTimes, key: song.key };
 }
 
 /** Song of the day for a seed. */
@@ -135,10 +147,12 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		else if (r < 0.78) step = 0;
 		else step = (rng() < 0.5 ? 1 : -1) * (1 + Math.floor(rng() * 2));
 		deg = Math.max(0, Math.min(10, deg + step));
-		const dur = rng() < 0.16 ? 2 : 1; // ~1 in 6 is a hold
+		// Varied lengths, with occasional much longer holds (3–4 beats).
+		const d = rng();
+		const dur = d < 0.06 ? 4 : d < 0.16 ? 3 : d < 0.3 ? 2 : 1;
 		notes.push({ midi: scaleMidi(55, deg), dur });
 	}
-	return { name: 'Infini', tempo: 2, notes };
+	return { name: 'Infini', tempo: 2, key: 43, notes };
 }
 
 export interface EndlessOpts {
@@ -157,17 +171,17 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	const ramp = opts.rampSec ?? 45;
 	const maxMult = opts.maxMult ?? 2.6;
 	const song = generateEndlessSong(seed, opts.count ?? 1500);
-	const lm = laneMap(song.notes);
+	const [lo, hi] = range(song.notes);
 	const tiles: Tile[] = [];
 	const beatTimes: number[] = [];
 	let elapsed = 0;
 	for (const n of song.notes) {
 		const eff = base * Math.min(maxMult, 1 + elapsed / ramp); // tempo accelerates
-		tiles.push({ time: elapsed, lane: lm.get(n.midi)!, midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
+		tiles.push({ time: elapsed, lane: laneFor(n.midi, lo, hi), midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
 		beatTimes.push(elapsed);
 		elapsed += n.dur / eff;
 	}
-	return { tiles, totalTime: elapsed, beatTimes };
+	return { tiles, totalTime: elapsed, beatTimes, key: song.key };
 }
 
 export type Grade = 'Parfait' | 'Bien' | 'Ok' | 'Raté';
