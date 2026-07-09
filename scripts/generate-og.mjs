@@ -20,7 +20,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'public', 'assets', 'jeux');
 const PORT = 4321;
 const DOMAIN = 'ludiven-studio.fr';
-const START_RE = /commencer|jouer|go|partie|entra|d[ée]marrer|rejouer|play|▶|⚡/i;
+const START_RE = /commencer|jouer|go|d[ée]marrer|rejouer|play|▶/i; // NOT "partie rapide" (multiplayer)
+const BOT_RE = /🤖|contre le bot|ordinateur|entra[iî]nement|vs\s*bot|solo/i;
+const FREE_RE = /mode libre|^\s*libre\s*$/i;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -49,57 +51,80 @@ async function main() {
 		await waitForServer(base);
 	}
 
-	const browser = await chromium.launch();
+	const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] }); // software WebGL for 3D games
 	const ctx = await browser.newContext({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
 	const page = await ctx.newPage();
 
-	// Discover daily-capable games from the /jeux grid (cards with a .daily-chip).
+	// Discover all playable games from the /jeux grid.
 	await page.goto(`${base}/jeux/`, { waitUntil: 'networkidle' });
 	const jeux = await page.evaluate(() => {
 		const out = [];
-		document.querySelectorAll('.daily-chip[data-game-id]').forEach((chip) => {
-			const a = chip.closest('a.game-card');
-			const href = a?.getAttribute('href');
-			const id = chip.getAttribute('data-game-id');
+		document.querySelectorAll('.game-card-wrap[data-game-id]').forEach((w) => {
+			const id = w.getAttribute('data-game-id');
+			const href = w.querySelector('a.game-card[href]')?.getAttribute('href');
 			if (id && href) out.push({ id, href });
 		});
 		return out;
 	});
 	console.log(`${jeux.length} jeux à capturer`);
 
-	// Pre-mark every game's how-to-play tutorial as "seen" so it never auto-opens over the game.
+	// Pre-mark tutorials as "seen" (never auto-open) and set a pseudo (some modes, e.g.
+	// pong "vs ordinateur", refuse to start without a name).
 	await ctx.addInitScript((ids) => {
 		try {
 			localStorage.setItem('ludiven-tuto-seen', JSON.stringify(ids));
+			if (!localStorage.getItem('ludiven-player')) localStorage.setItem('ludiven-player', 'Ludiven');
 		} catch {
 			/* ignore */
 		}
 	}, jeux.map((j) => j.id));
 
-	// Click the start CTA inside a visible overlay (fallback: any start-ish button).
-	const startGame = async () => {
-		for (let attempt = 0; attempt < 3; attempt++) {
-			const started = await page.evaluate((reSrc) => {
-				const rx = new RegExp(reSrc, 'i');
-				const vis = (el) => el && el.offsetParent !== null && el.getClientRects().length > 0;
-				const overlays = Array.from(document.querySelectorAll('[class*="overlay"]')).filter(vis);
-				for (const ov of overlays) {
-					const btns = Array.from(ov.querySelectorAll('button')).filter(vis);
-					const b = btns.find((x) => rx.test(x.textContent || '')) || btns[0];
-					if (b) {
-						b.click();
-						return true;
-					}
-				}
-				const b = Array.from(document.querySelectorAll('button')).find((x) => vis(x) && rx.test(x.textContent || ''));
+	// Click the first visible, enabled button whose text matches `rxSrc`. Returns true if clicked.
+	const clickBtn = (rxSrc) =>
+		page.evaluate((src) => {
+			const rx = new RegExp(src, 'i');
+			const vis = (el) => el && el.offsetParent !== null && el.getClientRects().length > 0;
+			const b = Array.from(document.querySelectorAll('button')).find((x) => vis(x) && !x.disabled && rx.test(x.textContent || ''));
+			if (b) {
+				b.click();
+				return true;
+			}
+			return false;
+		}, rxSrc);
+
+	// Click a start CTA — prefer the primary button inside a visible overlay.
+	const startCTA = () =>
+		page.evaluate((src) => {
+			const rx = new RegExp(src, 'i');
+			const vis = (el) => el && el.offsetParent !== null && el.getClientRects().length > 0;
+			for (const ov of Array.from(document.querySelectorAll('[class*="overlay"]')).filter(vis)) {
+				const btns = Array.from(ov.querySelectorAll('button')).filter((x) => vis(x) && !x.disabled);
+				const b = btns.find((x) => rx.test(x.textContent || '')) || btns[0];
 				if (b) {
 					b.click();
 					return true;
 				}
-				return false;
-			}, START_RE.source);
+			}
+			const b = Array.from(document.querySelectorAll('button')).find((x) => vis(x) && !x.disabled && rx.test(x.textContent || ''));
+			if (b) {
+				b.click();
+				return true;
+			}
+			return false;
+		}, START_RE.source);
+
+	const startGame = async () => {
+		// Multiplayer → launch a game vs the bot.
+		if (await clickBtn(BOT_RE.source)) {
 			await sleep(500);
-			if (!started) break; // nothing left to start
+			return;
+		}
+		// Force free mode (some games default to the daily, which needs a pseudo).
+		if (await clickBtn(FREE_RE.source)) await sleep(200);
+		for (let i = 0; i < 3; i++) {
+			const started = await startCTA();
+			await sleep(500);
+			if (!started) break;
 		}
 	};
 

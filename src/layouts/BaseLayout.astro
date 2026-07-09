@@ -28,8 +28,8 @@ const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path) && !/^\/jeux\/defi\/?$/.test(
 // Matched game (if any) — reused for JSON-LD and the auto OG preview image.
 const m = path.match(/^\/jeux\/([^/]+)\/?$/);
 const g = m ? games.find((x) => x.id === m[1] || x.href === `/jeux/${m[1]}`) : undefined;
-// Non-multiplayer games get a generated 1200×630 "in-situation" preview at /assets/jeux/og/<id>.jpg.
-const ogImage = image ?? (g && g.category !== 'multi' ? `/assets/jeux/og/${g.id}.jpg` : undefined);
+// Every game gets a generated 1200×630 "in-situation" preview at /assets/jeux/og/<id>.jpg.
+const ogImage = image ?? (g ? `/assets/jeux/og/${g.id}.jpg` : undefined);
 let jsonLd: unknown[] | null = null;
 if (path === '/' || path === '') {
 	jsonLd = [

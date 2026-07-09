@@ -5,6 +5,7 @@ import {
 	playerName,
 	setPlayerName,
 	leaderboardEnabled,
+	todayKey,
 	type Metric,
 	type ScoreRow,
 } from '../lib/leaderboard';
@@ -45,6 +46,23 @@ export default function Leaderboard({ game, metric, submitValue, format }: Props
 	useEffect(() => {
 		load();
 	}, [load]);
+
+	// Persist the player's own best-of-day (offline-safe, pre-formatted) so game cards
+	// (and the /jeux/defi hub) can show "record en cours". Keyed by day + leaderboard id.
+	useEffect(() => {
+		if (submitValue == null) return;
+		try {
+			const key = `ludiven-dayrec-${game}-${todayKey()}`;
+			const prev = JSON.parse(localStorage.getItem(key) || 'null') as { v: number } | null;
+			const better = !prev || (metric === 'time' ? submitValue < prev.v : submitValue > prev.v);
+			if (better) {
+				const t = format ? format(submitValue) : metric === 'time' ? fmtTime(submitValue) : String(submitValue);
+				localStorage.setItem(key, JSON.stringify({ v: submitValue, m: metric, t }));
+			}
+		} catch {
+			/* ignore */
+		}
+	}, [submitValue, game, metric, format]);
 
 	const save = () => {
 		const n = draft.trim().slice(0, 20);
