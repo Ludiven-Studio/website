@@ -25,6 +25,11 @@ const site = Astro.site!;
 const path = Astro.url.pathname;
 const pageUrl = new URL(path, site).href;
 const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path) && !/^\/jeux\/defi\/?$/.test(path); // a game page, not the index or the daily hub
+// Matched game (if any) — reused for JSON-LD and the auto OG preview image.
+const m = path.match(/^\/jeux\/([^/]+)\/?$/);
+const g = m ? games.find((x) => x.id === m[1] || x.href === `/jeux/${m[1]}`) : undefined;
+// Non-multiplayer games get a generated 1200×630 "in-situation" preview at /assets/jeux/og/<id>.jpg.
+const ogImage = image ?? (g && g.category !== 'multi' ? `/assets/jeux/og/${g.id}.jpg` : undefined);
 let jsonLd: unknown[] | null = null;
 if (path === '/' || path === '') {
 	jsonLd = [
@@ -32,8 +37,6 @@ if (path === '/' || path === '') {
 		{ '@context': 'https://schema.org', '@type': 'WebSite', name: 'Ludiven Studio', url: site.href, inLanguage: 'fr' },
 	];
 } else {
-	const m = path.match(/^\/jeux\/([^/]+)\/?$/);
-	const g = m ? games.find((x) => x.id === m[1] || x.href === `/jeux/${m[1]}`) : undefined;
 	if (g) {
 		jsonLd = [
 			{ '@context': 'https://schema.org', '@type': 'VideoGame', name: g.title, description: g.pitch, url: pageUrl, inLanguage: 'fr', genre: g.category ?? 'logique', applicationCategory: 'Game', operatingSystem: 'Web browser', author: { '@type': 'Organization', name: 'Ludiven Studio' }, offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' } },
@@ -49,7 +52,7 @@ if (path === '/' || path === '') {
 
 <html lang="fr">
 	<head>
-		<MainHead title={title} description={description} image={image} type={type} noindex={noindex} />
+		<MainHead title={title} description={description} image={ogImage} type={type} noindex={noindex} />
 		{jsonLd && <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />}
 	</head>
 	<body>

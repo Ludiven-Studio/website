@@ -22,10 +22,18 @@ const {
 
 const siteName = 'Ludiven Studio';
 const canonical = new URL(Astro.url.pathname, Astro.site);
-const ogW = Math.min(1200, logo.width);
-const ogH = Math.round((logo.height / logo.width) * ogW);
-const ogGen = await getImage({ src: logo, width: ogW, format: 'png' });
-const ogImage = image ? new URL(image, Astro.site).href : new URL(ogGen.src, Astro.site).href;
+// Custom images are our 1200×630 game previews; only the logo fallback keeps its own ratio.
+let ogW = Math.min(1200, logo.width);
+let ogH = Math.round((logo.height / logo.width) * ogW);
+let ogImage: string;
+if (image) {
+	ogW = 1200;
+	ogH = 630;
+	ogImage = new URL(image, Astro.site).href;
+} else {
+	const ogGen = await getImage({ src: logo, width: ogW, format: 'png' });
+	ogImage = new URL(ogGen.src, Astro.site).href;
+}
 ---
 
 <meta charset="UTF-8" />

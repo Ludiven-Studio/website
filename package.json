@@ -8,7 +8,8 @@
     "build": "astro check && astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test": "vitest run"
+    "test": "vitest run",
+    "og": "node scripts/generate-og.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.5.10",
@@ -42,6 +43,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.184.1",
+    "playwright": "^1.61.1",
     "vitest": "^4.1.8"
   }
 }
