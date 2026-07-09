@@ -79,6 +79,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const audioStartRef = useRef(0);
 	const metroRef = useRef(true);
 	const backingIdxRef = useRef(0); // next beat to schedule (lookahead groove)
+	const melodyIdxRef = useRef(0); // next tile to voice with the auto lead (flute)
+	const noiseRef = useRef<AudioBuffer | null>(null); // shared white-noise buffer (hi-hat)
 
 	const dailyRef = useRef(false);
 	const seedRef = useRef(0);
@@ -98,8 +100,21 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			if (!Ctor) return null;
 			const ctx = new Ctor();
 			const master = ctx.createGain();
-			master.gain.value = 0.85;
-			master.connect(ctx.destination);
+			master.gain.value = 0.8;
+			// Soft bus compressor: keeps the fuller ensemble (lead + reed + groove) from clipping.
+			const comp = ctx.createDynamicsCompressor();
+			comp.threshold.value = -14;
+			comp.knee.value = 24;
+			comp.ratio.value = 3;
+			comp.attack.value = 0.005;
+			comp.release.value = 0.18;
+			master.connect(comp);
+			comp.connect(ctx.destination);
+			// White-noise buffer reused by the hi-hat.
+			const nb = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.3), ctx.sampleRate);
+			const nd = nb.getChannelData(0);
+			for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+			noiseRef.current = nb;
 			ctxRef.current = ctx;
 			masterRef.current = master;
 		}
@@ -128,6 +143,37 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			hg.connect(g);
 			o.start(when);
 			o.stop(when + sustain + 0.05);
+		}
+	};
+	// A fumbled note: tapped too early / too late. A dull, sour clash (target pitch +
+	// a clashing semitone, sagging downward, low-passed) — clearly "wrong" but not harsh.
+	const playWrong = (midi: number): void => {
+		const ctx = ensureAudio();
+		if (!ctx) return;
+		const when = ctx.currentTime;
+		const lp = ctx.createBiquadFilter();
+		lp.type = 'lowpass';
+		lp.frequency.value = 1600;
+		lp.Q.value = 0.7;
+		const g = ctx.createGain();
+		g.connect(lp);
+		lp.connect(masterRef.current!);
+		const peak = 0.15;
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(peak, when + 0.004);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
+		for (const [semi, amp] of [[0, 1], [1, 0.8]]) {
+			const o = ctx.createOscillator();
+			o.type = 'sawtooth';
+			const f = midiToFreq(midi + semi);
+			o.frequency.setValueAtTime(f, when);
+			o.frequency.exponentialRampToValueAtTime(f * 0.985, when + 0.28); // sour sag
+			const og = ctx.createGain();
+			og.gain.value = amp;
+			o.connect(og);
+			og.connect(g);
+			o.start(when);
+			o.stop(when + 0.32);
 		}
 	};
 	// Backing accompaniment: a kick drum + a bass note per beat gives the tempo.
@@ -191,6 +237,110 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.stop(when + dur + 0.06);
 		}
 	};
+	// Soft LEAD (flute-like): sine + faint octave, gentle vibrato. Auto-plays the
+	// main melody so the tune sings on its own; the player's piano taps harmonise it.
+	const flute = (when: number, midi: number, dur: number): void => {
+		const ctx = ctxRef.current;
+		if (!ctx) return;
+		const freq = midiToFreq(midi);
+		const g = ctx.createGain();
+		g.connect(runGainRef.current ?? masterRef.current!);
+		const atk = 0.045;
+		const rel = Math.min(0.22, dur * 0.5);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(0.1, when + atk);
+		g.gain.setValueAtTime(0.1, when + Math.max(atk, dur - rel));
+		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+		const vib = ctx.createOscillator(); // vibrato → all partials' frequency
+		vib.frequency.value = 5;
+		const vibG = ctx.createGain();
+		vibG.gain.value = freq * 0.006;
+		vib.connect(vibG);
+		for (const [mult, amp] of [[1, 1], [2, 0.14]]) {
+			const o = ctx.createOscillator();
+			o.type = 'sine';
+			o.frequency.setValueAtTime(freq * mult, when);
+			vibG.connect(o.frequency);
+			const og = ctx.createGain();
+			og.gain.value = amp;
+			o.connect(og);
+			og.connect(g);
+			o.start(when);
+			o.stop(when + dur + 0.05);
+		}
+		vib.start(when);
+		vib.stop(when + dur + 0.05);
+	};
+	// Secondary voice (reedy, oboe/clarinet-like): filtered saw. Used for the
+	// call-and-response fills and echoes woven around the main melody.
+	const reed = (when: number, midi: number, dur: number, vol = 0.06): void => {
+		const ctx = ctxRef.current;
+		if (!ctx) return;
+		const lp = ctx.createBiquadFilter();
+		lp.type = 'lowpass';
+		lp.frequency.value = 2000;
+		lp.Q.value = 0.8;
+		const g = ctx.createGain();
+		g.connect(lp);
+		lp.connect(runGainRef.current ?? masterRef.current!);
+		const atk = 0.04;
+		const rel = Math.min(0.25, dur * 0.5);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(vol, when + atk);
+		g.gain.setValueAtTime(vol, when + Math.max(atk, dur - rel));
+		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+		for (const [mult, amp] of [[1, 1], [2, 0.35], [3, 0.12]]) {
+			const o = ctx.createOscillator();
+			o.type = 'sawtooth';
+			o.frequency.value = midiToFreq(midi) * mult;
+			const og = ctx.createGain();
+			og.gain.value = amp * 0.5;
+			o.connect(og);
+			og.connect(g);
+			o.start(when);
+			o.stop(when + dur + 0.05);
+		}
+	};
+	// Hi-hat: a short high-passed noise tick for groove.
+	const hat = (when: number, accent: boolean): void => {
+		const ctx = ctxRef.current;
+		if (!ctx || !noiseRef.current) return;
+		const src = ctx.createBufferSource();
+		src.buffer = noiseRef.current;
+		const hp = ctx.createBiquadFilter();
+		hp.type = 'highpass';
+		hp.frequency.value = 7000;
+		const g = ctx.createGain();
+		g.gain.setValueAtTime(accent ? 0.05 : 0.028, when);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+		src.connect(hp);
+		hp.connect(g);
+		g.connect(runGainRef.current ?? masterRef.current!);
+		src.start(when);
+		src.stop(when + 0.06);
+	};
+	// Plucked comp (harp/guitar-like): a chord tone per beat, quick decay — adds
+	// harmonic movement between the sustained pad and the melody.
+	const pluck = (when: number, midi: number): void => {
+		const ctx = ctxRef.current;
+		if (!ctx) return;
+		const g = ctx.createGain();
+		g.connect(runGainRef.current ?? masterRef.current!);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(0.042, when + 0.008);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.4);
+		for (const [mult, amp] of [[1, 1], [2, 0.22]]) {
+			const o = ctx.createOscillator();
+			o.type = 'triangle';
+			o.frequency.value = midiToFreq(midi) * mult;
+			const og = ctx.createGain();
+			og.gain.value = amp;
+			o.connect(og);
+			og.connect(g);
+			o.start(when);
+			o.stop(when + 0.45);
+		}
+	};
 
 	/* ---------- Geometry ---------- */
 	const laneW = (): number => dimRef.current.w / LANES;
@@ -236,6 +386,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		runGainRef.current = rg;
 		audioStartRef.current = ctx.currentTime + LEAD;
 		backingIdxRef.current = 0; // groove is scheduled with lookahead in step()
+		melodyIdxRef.current = 0; // auto-lead is scheduled with lookahead in step()
 		runningRef.current = true;
 		setStat('running');
 		setSubmitScore(undefined);
@@ -299,9 +450,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				bi = i;
 			}
 		});
-		if (bi < 0) return;
-		const jd = judgeTiming(bo);
-		if (!jd) return;
+		const jd = bi >= 0 ? judgeTiming(bo) : null; // bi<0 → empty lane; jd null → off-window
+		if (!jd) {
+			// Too early / too late (or nothing to hit): a fausse note. Sour the note that
+			// belongs here (nearest pending tile), else a lane-derived pitch.
+			const midi = bi >= 0 ? chart.tiles[bi].midi : chart.key + 12 + [0, 2, 4, 7, 9, 11][lane % LANES];
+			playWrong(midi);
+			return;
+		}
 		const t = chart.tiles[bi];
 		playPiano(t.midi, t.hold ? t.dur : 0.5);
 		comboRef.current += 1;
@@ -453,9 +609,12 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const chart = chartRef.current;
 		if (!chart) return;
 		const now = songTime();
-		// Backing groove: schedule ~1s ahead (kick every beat, bass root/fifth, accent per bar).
+		// Backing groove: schedule ~1s ahead. Full ensemble per beat — kick + bass +
+		// hi-hat + a plucked chord tone, a sustained pad per bar. Root/fifth/octave
+		// only (no third) so it stays consonant over both major and minor chords.
 		if (metroRef.current) {
 			const bt = chart.beatTimes;
+			const COMP = [0, 12, 7, 12]; // arpeggio pattern (semitones above the mid root)
 			while (backingIdxRef.current < bt.length && bt[backingIdxRef.current] < now + 1) {
 				const i = backingIdxRef.current;
 				const when = audioStartRef.current + bt[i];
@@ -463,12 +622,41 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const chordRoot = chart.key + PROG[Math.floor(i / 4) % PROG.length]; // one chord per bar
 				kick(when, accent);
 				bass(when, chordRoot + (i % 2 === 0 ? 0 : 7), accent);
+				hat(when, accent); // ride the beat
+				pluck(when, chordRoot + 12 + COMP[i % COMP.length]); // harmonic comp above the bass
 				if (accent) {
 					// Sustained cello bed under each bar (deep, an octave below the groove bass).
 					const barDur = bt[Math.min(i + 4, bt.length - 1)] - bt[i] || 2;
 					pad(when, Math.max(0.6, barDur), chordRoot - 12);
 				}
 				backingIdxRef.current++;
+			}
+			// Auto-lead + secondary voice: the flute sings every melody note; the reed
+			// answers in the gaps (fills a held note with a root/fifth/octave arpeggio)
+			// and now and then echoes a phrase an octave lower ("reprise").
+			const tiles = chart.tiles;
+			const chordRootAt = (time: number): number => {
+				let b = 0;
+				while (b + 1 < bt.length && bt[b + 1] <= time) b++;
+				return chart.key + PROG[Math.floor(b / 4) % PROG.length];
+			};
+			while (melodyIdxRef.current < tiles.length && tiles[melodyIdxRef.current].time < now + 1) {
+				const mi = melodyIdxRef.current;
+				const t = tiles[mi];
+				const when = audioStartRef.current + t.time;
+				flute(when, t.midi, clamp(t.dur, 0.18, 1.4));
+				if (t.hold) {
+					// Répartie: arpeggiate the current chord (root/5th/8ve) through the held note.
+					let base = chordRootAt(t.time);
+					while (base < t.midi - 8) base += 12; // lift near the melody's register
+					const tones = [base, base + 7, base + 12];
+					const steps = Math.min(3, Math.max(1, Math.floor(t.dur / 0.3)));
+					for (let k = 1; k <= steps; k++) reed(when + (t.dur * k) / (steps + 1), tones[(k - 1) % 3], 0.32, 0.05);
+				} else if (mi % 8 === 5 && tiles[mi + 1]) {
+					// Reprise: restate this note an octave lower, on the next beat, softly.
+					reed(audioStartRef.current + tiles[mi + 1].time, t.midi - 12, 0.34, 0.045);
+				}
+				melodyIdxRef.current++;
 			}
 		}
 		const arr = stateArrRef.current;
