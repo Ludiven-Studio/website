@@ -5,7 +5,9 @@ describe('tempo engine', () => {
 	it('builds a deterministic endless chart with valid, strictly-timed tiles', () => {
 		const c = buildEndlessChart(42, 1, { count: 200 });
 		expect(buildEndlessChart(42, 1, { count: 200 })).toEqual(c); // deterministic
-		expect(c.tiles.length).toBe(200);
+		// ≥ count notes are generated (whole phrases); rests drop out, so a few fewer tiles.
+		expect(c.tiles.length).toBeGreaterThan(150);
+		expect(c.tiles.length).toBeLessThan(260);
 		let t = -1;
 		for (const tile of c.tiles) {
 			expect(tile.lane).toBeGreaterThanOrEqual(0);
@@ -43,9 +45,14 @@ describe('tempo engine', () => {
 
 	it('accelerates: later notes come closer together', () => {
 		const c = buildEndlessChart(77, 1, { count: 300, rampSec: 20 });
-		const gap = (i: number): number => c.tiles[i + 1].time - c.tiles[i].time;
-		const early = (gap(2) + gap(3) + gap(4)) / 3;
-		const late = (gap(250) + gap(251) + gap(252)) / 3;
+		// Average gap over a window (robust to rests / fractional durations).
+		const avgGap = (from: number, to: number): number => {
+			let sum = 0;
+			for (let i = from; i < to; i++) sum += c.tiles[i + 1].time - c.tiles[i].time;
+			return sum / (to - from);
+		};
+		const early = avgGap(2, 22);
+		const late = avgGap(250, 270);
 		expect(late).toBeLessThan(early * 0.7);
 	});
 

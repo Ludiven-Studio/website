@@ -4,7 +4,7 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
-import { LANES, SPEEDS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type Grade } from './engine';
+import { LANES, PROG, SPEEDS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type Grade } from './engine';
 
 /* =====================================================
    TEMPO — piano-tiles rhythm game (prototype).
@@ -18,7 +18,6 @@ type Status = 'ready' | 'running' | 'done';
 type TileState = 'pending' | 'holding' | 'done' | 'broken' | Grade;
 const KEYS = ['s', 'd', 'f', 'j', 'k', 'l']; // 6 columns, low pitch (left) → high (right)
 const LANE_HUE = [205, 245, 285, 325, 20, 50];
-const PROG = [0, 7, 9, 5]; // I–V–vi–IV progression (semitones from the key) — one chord per bar
 const LEAD = 1.9;
 const HIT_FRAC = 0.8;
 const HOLD_RATE = 45; // bonus points per second held (× combo)
