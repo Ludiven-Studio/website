@@ -32,6 +32,20 @@ describe('tempo engine', () => {
 		}
 	});
 
+	it('never places two different pitches back-to-back in the same column', () => {
+		const tiles = buildEndlessChart(11, 1, { count: 400 }).tiles;
+		for (let i = 1; i < tiles.length; i++) {
+			if (tiles[i].lane === tiles[i - 1].lane) expect(tiles[i].midi).toBe(tiles[i - 1].midi);
+		}
+	});
+
+	it('starts on long notes, shortens only later (rondes → … → croches)', () => {
+		const tiles = buildEndlessChart(11, 1, { count: 400 }).tiles;
+		const earlyMin = Math.min(...tiles.slice(0, 4).map((t) => t.dur));
+		const lateMin = Math.min(...tiles.slice(60, 120).map((t) => t.dur));
+		expect(earlyMin).toBeGreaterThan(lateMin); // early notes are longer than later ones
+	});
+
 	it('has short and long (hold) tiles', () => {
 		const tiles = buildEndlessChart(5, 1, { count: 300 }).tiles;
 		expect(tiles.some((t) => t.hold)).toBe(true);

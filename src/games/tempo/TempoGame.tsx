@@ -644,7 +644,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const mi = melodyIdxRef.current;
 				const t = tiles[mi];
 				const when = audioStartRef.current + t.time;
-				flute(when, t.midi, clamp(t.dur, 0.18, 1.4));
+				flute(when, t.midi, clamp(t.dur, 0.18, 2.2));
 				if (t.hold) {
 					// Répartie: arpeggiate the current chord (root/5th/8ve) through the held note.
 					let base = chordRootAt(t.time);
