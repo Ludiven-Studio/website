@@ -24,11 +24,10 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '⏱️', title: 'Défi du jour', body: 'Un mini-plateau identique pour tout le monde (quelques billes seulement, la même graine partagée). Vide-le jusqu’à une seule bille le plus vite possible : ton meilleur temps entre au classement.' },
 	],
 	'tempo': [
-		{ emoji: '🎹', title: 'Le but', body: 'Un « piano tiles » sur des airs connus (libres de droits) : des tuiles descendent dans 4 colonnes. Tape chacune pile au moment où elle touche la ligne — chaque tuile joue sa note, et l\'air se reconstitue sous tes doigts.' },
-		{ emoji: '👆', title: 'Contrôles', body: 'Clique/tape la colonne d\'une tuile, ou utilise les touches S D F J K L au clavier (6 colonnes, grave à gauche, aigu à droite). Une musique donne le tempo : cale-toi dessus ! Les tuiles allongées se MAINTIENNENT — garde la colonne enfoncée jusqu\'au bout pour un bonus qui grimpe.' },
-		{ emoji: '♾️', title: 'Mode Infini', body: 'Choisis « Infini » pour une mélodie générée sans fin qui ACCÉLÈRE peu à peu. Une barre d\'énergie (en haut) baisse quand tu rates et remonte quand tu enchaînes : la partie s\'arrête seulement quand l\'énergie tombe à zéro. Le score grimpe sans fin — bats ton record !' },
-		{ emoji: '✨', title: 'Combos & rangs', body: 'Les réussites enchaînées montent un combo qui multiplie le score (jusqu\'à ×4). En fin de morceau, tu obtiens un rang de S à D selon ta précision.' },
-		{ emoji: '🏆', title: 'Défi du jour', body: 'Même air pour tout le monde (graine partagée). Rejoue autant que tu veux pour améliorer ton meilleur score, qui entre au classement.' },
+		{ emoji: '🎹', title: 'Le but', body: 'Un « piano tiles » sans fin : une mélodie générée défile dans 6 colonnes (grave à gauche, aigu à droite) et ACCÉLÈRE peu à peu. Tape chaque tuile pile quand elle touche la ligne — une musique (batterie, basse, cordes) donne le tempo, cale-toi dessus.' },
+		{ emoji: '👆', title: 'Contrôles', body: 'Clique/tape la colonne d\'une tuile, ou utilise les touches S D F J K L au clavier. Vise le meilleur timing : Parfait / Bien / Ok. Les tuiles allongées se MAINTIENNENT — garde la colonne enfoncée jusqu\'au bout pour un bonus qui grimpe.' },
+		{ emoji: '❤️', title: 'Énergie & combos', body: 'Ton énergie (barre du haut) baisse quand tu rates et remonte quand tu enchaînes : la partie s\'arrête à zéro. Les réussites enchaînées montent un combo qui multiplie le score (jusqu\'à ×4).' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même mélodie pour tout le monde (graine partagée). Rejoue autant que tu veux pour améliorer ton meilleur score, qui entre au classement.' },
 	],
 	'spectro': [
 		{ emoji: '🎵', title: 'Le but', body: 'Un runner musical : une mélodie défile vers la gauche et passe sous une ligne (le « présent »). Suis le contour des notes pour marquer un maximum de points.' },

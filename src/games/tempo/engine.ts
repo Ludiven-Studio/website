@@ -21,54 +21,6 @@ export interface Song {
 	notes: SongNote[];
 }
 
-// All public-domain / trad. melodies (C4 = 60). Synthesised, no recordings.
-export const SONGS: Song[] = [
-	{
-		name: 'Au clair de la lune',
-		tempo: 2,
-		key: 48,
-		notes: [
-			{ midi: 60, dur: 1 }, { midi: 60, dur: 1 }, { midi: 60, dur: 1 }, { midi: 62, dur: 1 }, { midi: 64, dur: 2 }, { midi: 62, dur: 2 },
-			{ midi: 60, dur: 1 }, { midi: 64, dur: 1 }, { midi: 62, dur: 1 }, { midi: 62, dur: 1 }, { midi: 60, dur: 2 },
-		],
-	},
-	{
-		name: 'Frère Jacques',
-		tempo: 2,
-		key: 48,
-		notes: [
-			{ midi: 60, dur: 1 }, { midi: 62, dur: 1 }, { midi: 64, dur: 1 }, { midi: 60, dur: 1 },
-			{ midi: 60, dur: 1 }, { midi: 62, dur: 1 }, { midi: 64, dur: 1 }, { midi: 60, dur: 1 },
-			{ midi: 64, dur: 1 }, { midi: 65, dur: 1 }, { midi: 67, dur: 2 },
-			{ midi: 64, dur: 1 }, { midi: 65, dur: 1 }, { midi: 67, dur: 2 },
-			{ midi: 67, dur: 1 }, { midi: 69, dur: 1 }, { midi: 67, dur: 1 }, { midi: 65, dur: 1 }, { midi: 64, dur: 1 }, { midi: 60, dur: 1 },
-			{ midi: 60, dur: 1 }, { midi: 55, dur: 1 }, { midi: 60, dur: 2 },
-		],
-	},
-	{
-		name: 'Ode à la joie',
-		tempo: 2,
-		key: 48,
-		notes: [
-			{ midi: 64, dur: 1 }, { midi: 64, dur: 1 }, { midi: 65, dur: 1 }, { midi: 67, dur: 1 },
-			{ midi: 67, dur: 1 }, { midi: 65, dur: 1 }, { midi: 64, dur: 1 }, { midi: 62, dur: 1 },
-			{ midi: 60, dur: 1 }, { midi: 60, dur: 1 }, { midi: 62, dur: 1 }, { midi: 64, dur: 1 },
-			{ midi: 64, dur: 1.5 }, { midi: 62, dur: 0.5 }, { midi: 62, dur: 2 },
-		],
-	},
-	{
-		name: 'Ah vous dirai-je maman',
-		tempo: 2,
-		key: 48,
-		notes: [
-			{ midi: 60, dur: 1 }, { midi: 60, dur: 1 }, { midi: 67, dur: 1 }, { midi: 67, dur: 1 },
-			{ midi: 69, dur: 1 }, { midi: 69, dur: 1 }, { midi: 67, dur: 2 },
-			{ midi: 65, dur: 1 }, { midi: 65, dur: 1 }, { midi: 64, dur: 1 }, { midi: 64, dur: 1 },
-			{ midi: 62, dur: 1 }, { midi: 62, dur: 1 }, { midi: 60, dur: 2 },
-		],
-	},
-];
-
 export interface SpeedTier {
 	label: string;
 	speed: number;
@@ -110,24 +62,6 @@ const range = (notes: { midi: number }[]): [number, number] => {
 	}
 	return [lo, hi];
 };
-
-/** Build the falling-tile chart. Column follows pitch (low→left, high→right). */
-export function buildChart(song: Song, speed = 1): Chart {
-	const eff = song.tempo * speed;
-	const [lo, hi] = range(song.notes);
-	const tiles: Tile[] = [];
-	let beat = 0;
-	for (const n of song.notes) {
-		tiles.push({ time: beat / eff, lane: laneFor(n.midi, lo, hi), midi: n.midi, dur: n.dur / eff, hold: n.dur >= HOLD_BEATS });
-		beat += n.dur;
-	}
-	const beatTimes: number[] = [];
-	for (let b = 0; b < beat; b++) beatTimes.push(b / eff);
-	return { tiles, totalTime: beat / eff, beatTimes, key: song.key };
-}
-
-/** Song of the day for a seed. */
-export const dailySong = (seed: number): number => (seed >>> 0) % SONGS.length;
 
 /**
  * Endless generated tune: a gentle major-pentatonic walk with occasional long

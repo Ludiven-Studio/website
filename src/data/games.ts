@@ -45,6 +45,15 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'tempo',
+		title: 'Tempo',
+		pitch: 'Un « piano tiles » sans fin qui accélère : tape les tuiles pile sur le tempo de la musique, maintiens les longues. Défi du jour à graine partagée.',
+		icon: 'partition',
+		href: '/jeux/tempo',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'sudoku',
 		title: 'Sudoku',
 		pitch: 'Le grand classique de la logique en grille, en 4×4, 6×6 ou 9×9, plusieurs niveaux.',
