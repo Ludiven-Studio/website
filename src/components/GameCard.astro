@@ -224,6 +224,9 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 </style>
 
 <script>
+	import { fetchDailyTops, leaderboardEnabled } from '../lib/leaderboard';
+	import { DAILY_LB, fmtDaily } from '../data/dailyLb';
+
 	// Favorites toggle — persisted in localStorage, shared key with the home page.
 	const KEY = 'ludiven-favorites';
 
@@ -292,20 +295,42 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 			const recTxt = rec?.t ? `${rec.t}${rec.m === 'score' ? ' pts' : ''}` : '';
 			chip.classList.toggle('done', done);
 			chip.classList.toggle('progress', started && !done);
-			chip.textContent = done
-				? recTxt
-					? `✓ Record du jour : ${recTxt}`
-					: '✓ Défi du jour fait'
-				: started
+			// Community record of the day (Supabase), shown even for games not yet played.
+			const cfg = DAILY_LB[id];
+			const top = cfg ? tops[cfg.lbId || id] : undefined;
+			if (top) {
+				chip.title = 'Record du jour';
+				const val = fmtDaily(cfg!.fmt, top.value);
+				chip.textContent = `${done ? '✓ ' : ''}🏆 ${val ? `${val} · ` : ''}${top.name}`;
+			} else {
+				chip.textContent = done
 					? recTxt
-						? `⏳ En cours · ${recTxt}`
-						: '⏳ Défi en cours'
-					: '🏆 Défi du jour à faire';
+						? `✓ Record du jour : ${recTxt}`
+						: '✓ Défi du jour fait'
+					: started
+						? recTxt
+							? `⏳ En cours · ${recTxt}`
+							: '⏳ Défi en cours'
+						: '🏆 Défi du jour à faire';
+			}
 			chip.hidden = false;
 		});
 	};
 
+	// Community daily records (one Supabase request), then refresh the chips.
+	let tops: Record<string, { name: string; value: number }> = {};
+	const loadTops = async () => {
+		if (!leaderboardEnabled()) return;
+		try {
+			tops = await fetchDailyTops();
+		} catch {
+			/* ignore */
+		}
+		syncDaily();
+	};
+
 	syncDaily();
+	loadTops();
 	// Refresh when returning to the page (tab focus, and back-nav restored from bfcache).
 	document.addEventListener('visibilitychange', () => {
 		if (!document.hidden) syncDaily();

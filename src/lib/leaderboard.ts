@@ -178,6 +178,28 @@ export async function submitDaily(game: string, value: number, metric: Metric): 
 	return ok;
 }
 
+/** Best entry per game for a day, in one request — powers the "record du jour" on cards. */
+export async function fetchDailyTops(day: string = todayKey()): Promise<Record<string, { name: string; value: number }>> {
+	if (!leaderboardEnabled()) return {};
+	try {
+		const res = await fetch(
+			`${SUPABASE_URL}/rest/v1/scores?day=eq.${day}&select=game,name,value,metric&order=created_at.asc&limit=5000`,
+			{ headers: headers() },
+		);
+		if (!res.ok) return {};
+		const rows: { game: string; name: string; value: number; metric: Metric }[] = await res.json();
+		const best: Record<string, { name: string; value: number }> = {};
+		for (const r of rows) {
+			const cur = best[r.game];
+			const better = !cur || (r.metric === 'time' ? r.value < cur.value : r.value > cur.value);
+			if (better) best[r.game] = { name: r.name, value: r.value };
+		}
+		return best;
+	} catch {
+		return {};
+	}
+}
+
 /** Top-N for a game on a day. Dedupes to each player's best entry. */
 export async function fetchLeaderboard(
 	game: string,
