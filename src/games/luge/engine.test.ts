@@ -117,17 +117,66 @@ describe('luge generation', () => {
 		}
 	});
 
-	it('fork danger lane obstacles leave a passable gap', () => {
+	it('fork danger lane: ice pillars split the cave but always leave an open branch', () => {
 		const { fork } = findFork();
 		const f = fork.fork!;
 		const sign = f.danger === 'left' ? 1 : -1;
-		for (const obs of fork.obstacles) {
+		const pillars = fork.obstacles.filter((obs) => obs.type === 'ice');
+		expect(pillars.length).toBeGreaterThan(0);
+		for (const obs of pillars) {
+			expect(obs.len ?? 0).toBeGreaterThan(0);
 			const l = sign * obs.lat;
-			if (l < f.sepHalfMax || l > f.outerDanger) continue; // safe-side obstacle
 			const gapInner = l - obs.r - f.sepHalfMax;
 			const gapOuter = f.outerDanger - (l + obs.r);
 			expect(Math.max(gapInner, gapOuter)).toBeGreaterThanOrEqual(2 * LUGE.sledHalf);
 		}
+	});
+
+	it('bob runs span 2-3 consecutive segments with ramps only at the run ends', () => {
+		let checkedRuns = 0;
+		for (let seed = 1; seed <= 20; seed++) {
+			const segs = buildChain(seed, 80);
+			for (let i = 0; i < segs.length; ) {
+				if (segs[i].kind !== 'bob') {
+					i++;
+					continue;
+				}
+				let j = i;
+				while (j < segs.length && segs[j].kind === 'bob') j++;
+				if (j === segs.length) break; // truncated run at chain end — skip
+				const run = segs.slice(i, j);
+				expect(run.length).toBeGreaterThanOrEqual(2);
+				expect(run.length).toBeLessThanOrEqual(3);
+				run.forEach((sg, k) => {
+					expect(sg.bobRampIn).toBe(k === 0);
+					expect(sg.bobRampOut).toBe(k === run.length - 1);
+				});
+				checkedRuns++;
+				i = j;
+			}
+		}
+		expect(checkedRuns).toBeGreaterThan(0);
+	});
+
+	it('wedging into an ice pillar slows hard but never costs a life', () => {
+		const { seed, segs, fork } = findFork();
+		const f = fork.fork!;
+		const pillar = fork.obstacles.find((obs) => obs.type === 'ice')!;
+		const st: LugeState = {
+			...createLuge(),
+			s: fork.startS + pillar.s - (pillar.len ?? 0) / 2 - 1,
+			lat: pillar.lat,
+			speed: 30,
+			lane: f.danger,
+		};
+		void seed;
+		const r = stepLuge(st, { steer: 0 }, DT, segs);
+		expect(r.events).toContain('stuck');
+		expect(r.events).not.toContain('crash');
+		expect(r.state.lives).toBe(LUGE.lives);
+		expect(r.state.speed).toBeLessThan(10);
+		expect(r.state.speed).toBeGreaterThanOrEqual(LUGE.stuckMinSpeed);
+		expect(r.state.invulnMs).toBeGreaterThan(0);
 	});
 
 	it('difficulty ramps monotonically and stays bounded', () => {

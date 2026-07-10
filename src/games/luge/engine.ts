@@ -25,10 +25,11 @@ export interface TrackSample {
 }
 
 export interface Obstacle {
-	s: number; // local s in [0, length)
+	s: number; // local s of the obstacle center in [0, length)
 	lat: number;
-	r: number;
-	type: 'tree' | 'rock';
+	r: number; // lateral half-width
+	len?: number; // longitudinal extent (elongated ice pillars splitting a tunnel)
+	type: 'tree' | 'rock' | 'ice';
 }
 
 /** Fork = segment-local split: a separator wedge between a safe and a danger lane. */
@@ -49,6 +50,7 @@ export interface EntryPose {
 	heading: number; // rad, 0 = +x
 	startS: number;
 	prevKind: SegmentKind; // kind of the previous segment (fork spacing rule)
+	bobLeft?: number; // remaining segments in the current bob run (runs are 2-3 long)
 }
 
 export interface TrackSegment {
@@ -60,6 +62,8 @@ export interface TrackSegment {
 	obstacles: Obstacle[];
 	tunnel: boolean;
 	bob: boolean; // bobsleigh section: icy half-pipe, tight curves, climbable walls
+	bobRampIn?: boolean; // first segment of a bob run: walls grow in over bobRampLen
+	bobRampOut?: boolean; // last segment of a bob run: walls fade out
 	fork?: ForkInfo;
 	exit: EntryPose; // entry pose of segment index+1
 }
@@ -78,7 +82,7 @@ export interface StepInput {
 	steer: number; // -1..1
 }
 
-export type LugeEvent = 'crash' | 'gameOver' | 'forkNoseHit' | 'forkDanger' | 'forkSafe' | 'forkBonus' | 'nearMiss';
+export type LugeEvent = 'crash' | 'gameOver' | 'forkNoseHit' | 'forkDanger' | 'forkSafe' | 'forkBonus' | 'nearMiss' | 'stuck';
 
 export interface LugeState {
 	s: number;
@@ -108,6 +112,9 @@ export interface LugeParams {
 	noseHalf: number; // half-width of the fork separator nose
 	crashSpeedMul: number;
 	crashMinSpeed: number;
+	stuckSpeedMul: number; // wedging into an ice pillar: no life lost, momentum crushed
+	stuckMinSpeed: number;
+	stuckCooldownMs: number;
 	invulnMs: number;
 	boostMul: number;
 	forkBoostMs: number;
@@ -120,6 +127,7 @@ export interface LugeParams {
 	bobWallHeight: number; // wall crest height
 	bobFlatFrac: number; // fraction of the half-width that stays flat
 	bobWallGravity: number; // restoring pull back to the pipe floor (m/s² per unit slope)
+	bobRampLen: number; // meters over which walls grow/fade at a bob run's ends
 }
 
 export const LUGE: LugeParams = {
@@ -136,6 +144,9 @@ export const LUGE: LugeParams = {
 	noseHalf: 1.3,
 	crashSpeedMul: 0.35,
 	crashMinSpeed: 10,
+	stuckSpeedMul: 0.25,
+	stuckMinSpeed: 6,
+	stuckCooldownMs: 1300,
 	invulnMs: 2200,
 	boostMul: 1.25,
 	forkBoostMs: 4000,
@@ -148,6 +159,7 @@ export const LUGE: LugeParams = {
 	bobWallHeight: 3.4,
 	bobFlatFrac: 0.45,
 	bobWallGravity: 30,
+	bobRampLen: 18,
 };
 
 export const SAMPLE_STEP = 2; // meters between centerline samples
@@ -208,6 +220,15 @@ export function bobWall(width: number, lat: number, P: LugeParams = LUGE): { ris
 	return { rise: c * a * a, slope: Math.sign(lat) * 2 * c * a };
 }
 
+/** Wall scale (0..1) at local s inside a bob segment — grows/fades only at the run's ends. */
+export function bobRampAt(seg: TrackSegment, sLocal: number, P: LugeParams = LUGE): number {
+	if (!seg.bob) return 0;
+	let r = 1;
+	if (seg.bobRampIn) r = Math.min(r, smoothstep(0, P.bobRampLen, sLocal));
+	if (seg.bobRampOut) r = Math.min(r, 1 - smoothstep(seg.length - P.bobRampLen, seg.length, sLocal));
+	return r;
+}
+
 /** Separator half-width at local s inside a fork segment (0 outside [noseS, mergeS]). */
 export function sepHalfAt(fork: ForkInfo, sLocal: number): number {
 	if (sLocal < fork.noseS || sLocal >= fork.mergeS) return 0;
@@ -219,12 +240,13 @@ export function sepHalfAt(fork: ForkInfo, sLocal: number): number {
 /** Deterministic per-segment rng — independent of how the chain was pruned. */
 const segmentRng = (seed: number, index: number) => mulberry32((seed ^ Math.imul(index + 1, 0x9e3779b1)) >>> 0);
 
-function pickKind(rng: () => number, index: number, prevKind: SegmentKind, diff: Difficulty): SegmentKind {
+function pickKind(rng: () => number, index: number, prevKind: SegmentKind, bobLeft: number, diff: Difficulty): SegmentKind {
+	if (bobLeft > 0) return 'bob'; // continue the current bob run
 	if (index < WARMUP_FEATURES) return index % 2 === 0 ? 'straight' : rng() < 0.5 ? 'curveL' : 'curveR';
 	const p = rng();
 	if (p < diff.forkChance && prevKind !== 'fork') return 'fork';
 	if (p < diff.forkChance + diff.tunnelChance && prevKind !== 'fork') return 'tunnel';
-	if (p < diff.forkChance + diff.tunnelChance + diff.bobChance && prevKind !== 'fork') return 'bob';
+	if (p < diff.forkChance + diff.tunnelChance + diff.bobChance && prevKind !== 'fork' && prevKind !== 'bob') return 'bob';
 	const q = rng();
 	if (q < 0.3) return 'straight';
 	if (q < 0.55) return 'curveL';
@@ -235,7 +257,9 @@ function pickKind(rng: () => number, index: number, prevKind: SegmentKind, diff:
 export function generateSegment(seed: number, index: number, entry: EntryPose): TrackSegment {
 	const rng = segmentRng(seed, index);
 	const diff = difficultyAt(entry.startS);
-	const kind = pickKind(rng, index, entry.prevKind, diff);
+	const kind = pickKind(rng, index, entry.prevKind, entry.bobLeft ?? 0, diff);
+	// Bob runs span 2-3 segments: a fresh run decides its remaining length here.
+	const bobLeft = kind === 'bob' ? ((entry.bobLeft ?? 0) > 0 ? (entry.bobLeft ?? 0) - 1 : rng() < 0.5 ? 1 : 2) : 0;
 
 	// Length per kind, rounded to the sample step.
 	const pick = (a: number, b: number) => Math.round((a + rng() * (b - a)) / SAMPLE_STEP) * SAMPLE_STEP;
@@ -292,7 +316,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 			mergeS: length - 30,
 			sepHalfMax,
 			outerSafe: w0 / 2 + 3.5,
-			outerDanger: sepHalfMax + 3.2,
+			outerDanger: sepHalfMax + 5.2,
 			bonus: 50,
 		};
 	}
@@ -344,8 +368,10 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		while (sLocal < length - 8) {
 			const absS = entry.startS + sLocal;
 			const hw = widthAt(sLocal) / 2;
-			const type: Obstacle['type'] = rng() < 0.65 ? 'tree' : 'rock';
-			const r = type === 'tree' ? 0.8 + 0.3 * rng() : 0.9 + 0.5 * rng();
+			// Tunnels: elongated ice pillars split the passage into rejoining branches.
+			const type: Obstacle['type'] = kind === 'tunnel' ? 'ice' : rng() < 0.65 ? 'tree' : 'rock';
+			const r = type === 'ice' ? 1.0 + 0.3 * rng() : type === 'tree' ? 0.8 + 0.3 * rng() : 0.9 + 0.5 * rng();
+			const len = type === 'ice' ? 5 + rng() * 5 : undefined;
 			let lat = -hw + 1 + rng() * (2 * hw - 2);
 			const safe = latSafeAt(seed, absS, hw * 2);
 			const gap = LUGE.corridorHalf + r;
@@ -353,20 +379,22 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 				const side = lat >= safe ? 1 : -1;
 				lat = safe + side * (gap + 0.3);
 			}
-			if (Math.abs(lat) < hw - 0.6) obstacles.push({ s: sLocal, lat, r, type });
+			if (Math.abs(lat) < hw - 0.6) obstacles.push({ s: sLocal, lat, r, len, type });
 			sLocal += difficultyAt(absS).obstacleEvery * spacingMul * (0.7 + 0.6 * rng());
 		}
 	}
 	if (fork) {
-		// Danger lane: a few obstacles alternating sides — always leaves a gap.
+		// Danger lane: alternating ice pillars split the cave into rejoining branches —
+		// one side is always open (~2.5 m), the other pinches shut. Don't get stuck.
 		const sign = fork.danger === 'left' ? 1 : -1;
 		const center = (fork.sepHalfMax + fork.outerDanger) / 2;
+		const laneW = fork.outerDanger - fork.sepHalfMax;
 		const span = fork.mergeS - fork.noseS - 25;
 		const count = 3;
 		for (let i = 0; i < count; i++) {
-			const sLocal = fork.noseS + 15 + (span * (i + 0.5)) / count + (rng() - 0.5) * 6;
-			const off = (i % 2 === 0 ? 1 : -1) * (fork.outerDanger - fork.sepHalfMax) * 0.22;
-			obstacles.push({ s: sLocal, lat: sign * (center + off), r: 0.7, type: rng() < 0.5 ? 'tree' : 'rock' });
+			const sLocal = fork.noseS + 15 + (span * (i + 0.5)) / count + (rng() - 0.5) * 5;
+			const off = (i % 2 === 0 ? -1 : 1) * laneW * 0.23;
+			obstacles.push({ s: sLocal, lat: sign * (center + off), r: 1.1, len: 6 + rng() * 4, type: 'ice' });
 		}
 		// One optional obstacle on the safe side.
 		if (rng() < 0.6) {
@@ -391,6 +419,8 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		obstacles,
 		tunnel: kind === 'tunnel',
 		bob: kind === 'bob',
+		bobRampIn: kind === 'bob' && entry.prevKind !== 'bob',
+		bobRampOut: kind === 'bob' && bobLeft === 0,
 		fork,
 		exit: {
 			x: last.x,
@@ -399,6 +429,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 			heading,
 			startS: entry.startS + length,
 			prevKind: kind,
+			bobLeft,
 		},
 	};
 }
@@ -482,9 +513,10 @@ export function poseAt(
 	let y = p.y - Math.sin(p.bank) * lat;
 	let dydlat = -Math.sin(p.bank);
 	if (p.seg.bob) {
+		const ramp = bobRampAt(p.seg, s - p.seg.startS);
 		const w = bobWall(p.width, lat);
-		y += w.rise;
-		dydlat += w.slope;
+		y += w.rise * ramp;
+		dydlat += w.slope * ramp;
 	}
 	return {
 		x: p.x + p.nx * lat,
@@ -616,8 +648,9 @@ export function stepLuge(
 	if (!inForkBand) {
 		const info2 = lerpAt(segs, s);
 		if (info2.seg.bob) {
+			const ramp = bobRampAt(info2.seg, s - info2.seg.startS);
 			const w = bobWall(info2.width, lat);
-			latVel -= w.slope * P.bobWallGravity * dtSec;
+			latVel -= w.slope * ramp * P.bobWallGravity * dtSec;
 			const crest = info2.width / 2 + P.bobWallExtra - P.sledHalf;
 			if (lat > crest) {
 				lat = crest;
@@ -647,10 +680,20 @@ export function stepLuge(
 		const sg = segs[si];
 		for (const obs of sg.obstacles) {
 			const absS = sg.startS + obs.s;
-			if (absS < prevS - 3 || absS > s + 3) continue;
+			const halfLen = (obs.len ?? 0) / 2;
+			if (absS < prevS - halfLen - 3 || absS > s + halfLen + 3) continue;
 			const latGap = Math.abs(obs.lat - lat) - (obs.r + P.sledHalf);
-			if (Math.abs(absS - s) < obs.r + P.sledReach && latGap < 0) {
-				if (collide()) break;
+			if (Math.abs(absS - s) < halfLen + obs.r + P.sledReach && latGap < 0) {
+				if (obs.type === 'ice') {
+					// Wedged against an ice pillar: no life lost, momentum crushed.
+					if (invulnMs <= 0) {
+						speed = Math.max(P.stuckMinSpeed, speed * P.stuckSpeedMul);
+						invulnMs = P.stuckCooldownMs;
+						events.push('stuck');
+					}
+				} else if (collide()) {
+					break;
+				}
 			} else if (prevS < absS && s >= absS && latGap >= 0 && latGap < P.nearMissGap) {
 				events.push('nearMiss');
 				bonusScore += P.nearMissBonus;
