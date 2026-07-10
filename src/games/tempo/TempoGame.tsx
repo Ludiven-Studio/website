@@ -546,7 +546,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			const wrap = wrapRef.current;
 			const cv = canvasRef.current;
 			if (!wrap || !cv) return;
-			const w = clamp(wrap.clientWidth, 260, 460);
+			const fs = document.fullscreenElement != null;
+			const w = fs ? Math.min(wrap.clientWidth, Math.round((wrap.clientHeight || 600) / 1.4)) : clamp(wrap.clientWidth, 260, 460);
 			const h = Math.round(w * 1.4);
 			const dpr = window.devicePixelRatio || 1;
 			dimRef.current = { w, h };
@@ -560,6 +561,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		resize();
 		const ro = new ResizeObserver(resize);
 		if (wrapRef.current) ro.observe(wrapRef.current);
+		const onFs = () => requestAnimationFrame(resize);
+		document.addEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
 		const onKeyDown = (e: KeyboardEvent): void => {
 			const lane = KEYS.indexOf(e.key.toLowerCase());
 			if (lane < 0 || !runningRef.current) return;
@@ -587,6 +591,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		rafRef.current = requestAnimationFrame(frame);
 		return () => {
 			ro.disconnect();
+			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
 			window.removeEventListener('keydown', onKeyDown);
 			window.removeEventListener('keyup', onKeyUp);
 			cancelAnimationFrame(rafRef.current);
@@ -915,6 +921,13 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 
 const CSS = `
 .tp-root { --tp: var(--accent-regular); width: 100%; max-width: 480px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
+/* Site global fullscreen → the lanes fill the screen height (portrait, centred). */
+.game-page:fullscreen .tp-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .tp-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .tp-playwrap { flex: 1; min-height: 0; align-items: center; }
+.game-page:-webkit-full-screen .tp-playwrap { flex: 1; min-height: 0; align-items: center; }
+.game-page:fullscreen .tp-help { display: none; }
+.game-page:-webkit-full-screen .tp-help { display: none; }
 .tp-dailytag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.55rem; }
 .tp-songs { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.4rem; }
 .tp-song { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 12px; border-radius: 999px; padding: 5px 11px; cursor: pointer; }

@@ -182,6 +182,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace-toi avec ◀ ▶ (ou ← →) et saute avec SAUT (ou Espace / ↑). Re-tape SAUT en l\'air pour battre des ailes et planer. Double-tape une direction (◀◀ / ▶▶) pour un dash-éclair : un grand bond rapide qui bouscule les autres poules — pratique pour revenir en défense ou dégager. Fonce dans le ballon pour le frapper : ta vitesse donne la puissance et la direction du tir. Tu es la cocotte cerclée d\'or.' },
 		{ emoji: '👥', title: 'Jouer ensemble', body: 'Partie rapide pour être appairé au hasard, ou « Jouer avec un ami » : un code s\'affiche, ton ami le saisit pour te rejoindre — chacun avec son coéquipier bot. Pas d\'adversaire ? Joue contre le bot.' },
 	],
+	luge: [
+		{ emoji: '🛷', title: 'Le but', body: 'Dévale une montagne enneigée en luge, le plus loin possible. La descente accélère et se rétrécit au fil des mètres : ta distance est ton score.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'La luge fonce toute seule — tu diriges seulement à gauche/droite avec les flèches / Q-D, ou les deux gros boutons tactiles. Évite les sapins et les rochers : chaque choc coûte une vie (3 vies) et casse ta vitesse.' },
+		{ emoji: '❄️', title: 'Bifurcations', body: 'Quand la piste se sépare en deux, choisis ton côté (foncer dans le séparateur = crash !). Le tunnel de glace étroit est risqué mais rapporte +50 points et un boost de vitesse ; l\'autre voie est tranquille.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, la descente est identique pour tout le monde. Jusqu\'à 10 essais : ta meilleure distance de la journée est classée.' },
+	],
 	esquive: [
 		{ emoji: '🚀', title: 'Le but', body: 'Pilote ton vaisseau qui fonce dans l\'espace et évite les astéroïdes le plus longtemps possible. Ton temps de survie est ton score.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Déplace-toi avec les flèches ou ZQSD, ou en glissant le doigt/la souris : tu bouges en haut/bas ET gauche/droite pour esquiver. Plus ça dure, plus ça accélère.' },

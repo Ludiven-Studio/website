@@ -665,7 +665,16 @@ export default function PongGame({ gameId }: { gameId: string }) {
 const CSS = `
 .pg-root { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; width: 100%; }
 .pg-stage { position: relative; width: 100%; max-width: 680px; aspect-ratio: 5 / 3; }
-.pg-canvas { width: 100%; height: 100%; display: block; border-radius: 14px; background: #0b0e14; touch-action: none; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+.pg-canvas { width: 100%; height: 100%; display: block; object-fit: contain; border-radius: 14px; background: #0b0e14; touch-action: none; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+/* Site global fullscreen → the court fills the screen (letterboxed, not stretched). */
+.game-page:fullscreen .pg-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .pg-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .pg-stage { flex: 1; aspect-ratio: auto; max-width: none; border-radius: 0; }
+.game-page:-webkit-full-screen .pg-stage { flex: 1; aspect-ratio: auto; max-width: none; border-radius: 0; }
+.game-page:fullscreen .pg-quit { right: 132px; }
+.game-page:-webkit-full-screen .pg-quit { right: 132px; }
+.game-page:fullscreen .pg-help { display: none; }
+.game-page:-webkit-full-screen .pg-help { display: none; }
 .pg-hud { position: absolute; top: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 0.5rem; font-family: var(--font-brand); font-weight: 700; font-size: 1.1rem; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
 .pg-sep { color: var(--gray-300); }
 .pg-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(8,10,18,0.55); padding: 1rem; }

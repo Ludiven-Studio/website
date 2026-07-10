@@ -298,7 +298,8 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 			const cv = canvasRef.current;
 			if (!wrap || !cv) return;
 			const w = wrap.clientWidth;
-			const h = Math.round(clamp(w * 0.58, 300, 460));
+			const fs = document.fullscreenElement != null;
+			const h = Math.round(clamp(w * 0.58, 300, fs ? (wrap.clientHeight || 460) : 460));
 			const dpr = window.devicePixelRatio || 1;
 			dimRef.current = { w, h };
 			cv.style.height = `${h}px`;
@@ -310,6 +311,9 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		resize();
 		const ro = new ResizeObserver(resize);
 		if (wrapRef.current) ro.observe(wrapRef.current);
+		const onFs = () => requestAnimationFrame(resize);
+		document.addEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
 		let last = performance.now();
 		const frame = (now: number): void => {
 			const dt = Math.min(now - last, 100) / 1000;
@@ -322,6 +326,8 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		rafRef.current = requestAnimationFrame(frame);
 		return () => {
 			ro.disconnect();
+			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
 			cancelAnimationFrame(rafRef.current);
 			stopCursorTone();
 			void ctxRef.current?.close();
@@ -570,6 +576,11 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 
 const CSS = `
 .sp-root { --sp: var(--accent-regular); width: 100%; max-width: 720px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
+/* Site global fullscreen → the spectrogram fills the screen. */
+.game-page:fullscreen .sp-root { max-width: none; width: 100%; height: 100%; justify-content: center; }
+.game-page:-webkit-full-screen .sp-root { max-width: none; width: 100%; height: 100%; justify-content: center; }
+.game-page:fullscreen .sp-help { display: none; }
+.game-page:-webkit-full-screen .sp-help { display: none; }
 .sp-dailytag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.55rem; }
 .sp-pills { display: flex; gap: 6px; margin-bottom: 0.55rem; }
 .sp-pill { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }

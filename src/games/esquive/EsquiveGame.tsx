@@ -635,8 +635,13 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		resize();
 		armFree();
 		const onResize = () => resize();
+		const onFs = () => requestAnimationFrame(resize);
 		window.addEventListener('resize', onResize);
+		document.addEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
 		return () => {
+			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
 			window.removeEventListener('resize', onResize);
 			stop();
 			const g = g3Ref.current;
@@ -812,6 +817,15 @@ const CSS = `
 .es-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; }
 
 .es-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
+/* Site global fullscreen → the arena fits the REMAINING space (a square, no overflow in landscape). */
+.game-page:fullscreen .es-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .es-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .es-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page:-webkit-full-screen .es-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page:fullscreen .es-canvas { width: min(100cqw, 100cqh); height: auto; }
+.game-page:-webkit-full-screen .es-canvas { width: min(100cqw, 100cqh); height: auto; }
+.game-page:fullscreen .es-help { display: none; }
+.game-page:-webkit-full-screen .es-help { display: none; }
 .es-canvas {
   width: 100%; aspect-ratio: 1 / 1; display: block;
   background: #0a0a14; border: 1px solid var(--gray-800); border-radius: 12px;

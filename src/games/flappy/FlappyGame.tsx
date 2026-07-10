@@ -544,8 +544,13 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		resize();
 		armFree();
 		const onResize = () => resize();
+		const onFs = () => requestAnimationFrame(resize);
 		window.addEventListener('resize', onResize);
+		document.addEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
 		return () => {
+			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
 			window.removeEventListener('resize', onResize);
 			stop();
 		};
@@ -662,6 +667,15 @@ const CSS = `
 .fl-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; }
 
 .fl-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
+/* Site global fullscreen → the board fits the REMAINING space (a square, no overflow in landscape). */
+.game-page:fullscreen .fl-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .fl-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .fl-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page:-webkit-full-screen .fl-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page:fullscreen .fl-canvas { width: min(100cqw, 100cqh); height: auto; }
+.game-page:-webkit-full-screen .fl-canvas { width: min(100cqw, 100cqh); height: auto; }
+.game-page:fullscreen .fl-help { display: none; }
+.game-page:-webkit-full-screen .fl-help { display: none; }
 .fl-canvas {
   width: 100%; aspect-ratio: 1 / 1; display: block;
   background: var(--gray-999); border: 1px solid var(--gray-800); border-radius: 12px;

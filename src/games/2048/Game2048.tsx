@@ -435,6 +435,13 @@ export default function Game2048({ gameId }: { gameId: string }) {
 
 const CSS = `
 .g2-root { --g2-accent: var(--accent-regular); width: 100%; max-width: 460px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
+/* Site global fullscreen → the grid grows to fit the REMAINING space (controls + numpad reserved). */
+.game-page:fullscreen .g2-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .g2-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .g2-playwrap { flex: 1; min-height: 0; container-type: size; align-items: center; }
+.game-page:-webkit-full-screen .g2-playwrap { flex: 1; min-height: 0; container-type: size; align-items: center; }
+.game-page:fullscreen .g2-board { width: min(100cqw, 100cqh); max-width: none; }
+.game-page:-webkit-full-screen .g2-board { width: min(100cqw, 100cqh); max-width: none; }
 .g2-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.6rem; }
 .g2-bar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
 .g2-pills { display: flex; gap: 6px; flex-wrap: wrap; }

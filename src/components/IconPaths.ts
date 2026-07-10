@@ -73,4 +73,5 @@ export const iconPaths = {
 	'angry': '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M128 234V150M128 150 72 66M128 150l56-84"/><circle stroke="none" cx="128" cy="150" r="22"/>',
 	'flechettes': '<circle fill="none" stroke-width="14" cx="128" cy="128" r="94"/><circle fill="none" stroke-width="14" cx="128" cy="128" r="54"/><circle stroke="none" cx="128" cy="128" r="18"/>',
 	'fruits': '<path stroke="none" d="M128 80 C150 60 188 62 196 94 C206 134 176 198 128 214 C80 198 50 134 60 94 C68 62 106 60 128 80 Z"/><path fill="none" stroke-linecap="round" stroke-width="14" d="M130 80 C132 58 142 46 162 42"/>',
+	'luge': '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M36 176h140a44 44 0 0 0 44-44"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M56 128h116"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M80 128v48M148 128v48"/><circle stroke="none" cx="188" cy="106" r="16"/>',
 };

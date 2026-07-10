@@ -559,8 +559,13 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		resize();
 		armFree();
 		const onResize = () => resize();
+		const onFs = () => requestAnimationFrame(resize);
 		window.addEventListener('resize', onResize);
+		document.addEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
 		return () => {
+			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
 			window.removeEventListener('resize', onResize);
 			stop();
 		};
@@ -685,6 +690,15 @@ const CSS = `
 .sn-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; }
 
 .sn-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
+/* Site global fullscreen → the board fits the REMAINING space (a square, no overflow in landscape). */
+.game-page:fullscreen .sn-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .sn-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .sn-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page:-webkit-full-screen .sn-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page:fullscreen .sn-canvas { width: min(100cqw, 100cqh); height: auto; }
+.game-page:-webkit-full-screen .sn-canvas { width: min(100cqw, 100cqh); height: auto; }
+.game-page:fullscreen .sn-help { display: none; }
+.game-page:-webkit-full-screen .sn-help { display: none; }
 .sn-canvas {
   width: 100%; aspect-ratio: 1 / 1; display: block;
   background: var(--gray-999); border: 1px solid var(--gray-800); border-radius: 12px;

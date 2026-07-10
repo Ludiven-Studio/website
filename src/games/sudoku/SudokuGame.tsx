@@ -627,6 +627,13 @@ const CSS = `
   font-weight: 500;
 }
 
+/* Site global fullscreen → the grid grows to fit the REMAINING space (controls + numpad reserved). */
+.game-page:fullscreen .sk-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .sk-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .sk-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page:-webkit-full-screen .sk-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page:fullscreen .sk-board { width: min(100cqw, 100cqh); }
+.game-page:-webkit-full-screen .sk-board { width: min(100cqw, 100cqh); }
 .sk-boardwrap {
   position: relative;
   width: 100%;

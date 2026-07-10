@@ -263,6 +263,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'luge',
+		title: 'Luge',
+		pitch: 'Descente 3D à toute vitesse : évite sapins et rochers, ose les tunnels de glace aux bifurcations.',
+		icon: 'luge',
+		href: '/jeux/luge',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'flappy',
 		title: 'Flappy Cocotte',
 		pitch: 'Fais voleter la cocotte entre les tuyaux le plus longtemps possible. Tuyaux partagés au défi du jour.',

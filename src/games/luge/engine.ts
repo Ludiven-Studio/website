@@ -1,0 +1,612 @@
+/**
+ * LUGE — endless 3D downhill sled run (pure engine, no rendering).
+ * Track-space model: the sled lives in (s, lat) — distance along an infinite
+ * procedurally generated centerline + signed lateral offset (positive = left).
+ * Segments (80–160 m) are generated deterministically from (seed, index) and
+ * chained by an entry pose, so streaming/pruning never changes the world.
+ */
+
+import { mulberry32 } from '../prng';
+
+export type SegmentKind = 'straight' | 'curveL' | 'curveR' | 'scurve' | 'tunnel' | 'fork';
+
+/** One centerline sample every SAMPLE_STEP meters (both segment boundaries included). */
+export interface TrackSample {
+	x: number;
+	y: number; // altitude — strictly decreasing forever
+	z: number;
+	dirX: number; // horizontal unit tangent
+	dirZ: number;
+	nx: number; // unit left normal
+	nz: number;
+	width: number; // full rideable width at this sample
+	bank: number; // cross-section roll (rad), outside edge raised in curves
+}
+
+export interface Obstacle {
+	s: number; // local s in [0, length)
+	lat: number;
+	r: number;
+	type: 'tree' | 'rock';
+}
+
+/** Fork = segment-local split: a separator wedge between a safe and a danger lane. */
+export interface ForkInfo {
+	danger: 'left' | 'right';
+	noseS: number; // local s of the separator nose
+	mergeS: number; // local s where lanes merge back
+	sepHalfMax: number; // separator half-width once fully grown
+	outerSafe: number; // |lat| of the outer wall on the safe side
+	outerDanger: number; // |lat| of the outer wall on the danger side (narrow)
+	bonus: number; // flat score bonus for surviving the danger lane
+}
+
+export interface EntryPose {
+	x: number;
+	y: number;
+	z: number;
+	heading: number; // rad, 0 = +x
+	startS: number;
+	prevKind: SegmentKind; // kind of the previous segment (fork spacing rule)
+}
+
+export interface TrackSegment {
+	index: number;
+	kind: SegmentKind;
+	startS: number;
+	length: number;
+	samples: TrackSample[]; // length/SAMPLE_STEP + 1 rows
+	obstacles: Obstacle[];
+	tunnel: boolean;
+	fork?: ForkInfo;
+	exit: EntryPose; // entry pose of segment index+1
+}
+
+export interface Difficulty {
+	vMax: number; // m/s target speed
+	curveMax: number; // rad/m max curvature
+	obstacleEvery: number; // mean meters between obstacles
+	forkChance: number;
+	tunnelChance: number;
+	width: number; // full track width
+}
+
+export interface StepInput {
+	steer: number; // -1..1
+}
+
+export type LugeEvent = 'crash' | 'gameOver' | 'forkNoseHit' | 'forkDanger' | 'forkSafe' | 'forkBonus' | 'nearMiss';
+
+export interface LugeState {
+	s: number;
+	lat: number;
+	latVel: number;
+	speed: number; // m/s along track
+	lives: number;
+	invulnMs: number;
+	boostMs: number;
+	bonusScore: number;
+	score: number; // floor(s) + bonusScore — integer meters
+	lane: 'left' | 'right' | null; // side taken inside a fork
+	status: 'running' | 'over';
+}
+
+export interface LugeParams {
+	lives: number;
+	startSpeed: number;
+	speedRelax: number; // 1/s relaxation toward vMax
+	steerAccel: number; // m/s² at full steer
+	latFriction: number; // per-frame (60 Hz) lateral velocity retention
+	centrifugal: number; // fraction of curvature·v² not absorbed by banking
+	bermBounce: number; // lateral velocity restitution on walls
+	bermScrub: number; // per-frame speed retention while scraping a wall
+	sledHalf: number; // half-width of the sled
+	sledReach: number; // longitudinal collision reach
+	noseHalf: number; // half-width of the fork separator nose
+	crashSpeedMul: number;
+	crashMinSpeed: number;
+	invulnMs: number;
+	boostMul: number;
+	forkBoostMs: number;
+	nearMissGap: number; // extra lateral gap under which a pass counts as near-miss
+	nearMissBonus: number;
+	corridorHalf: number; // guaranteed obstacle-free half-width around latSafe
+}
+
+export const LUGE: LugeParams = {
+	lives: 3,
+	startSpeed: 14,
+	speedRelax: 0.4,
+	steerAccel: 34,
+	latFriction: 0.93,
+	centrifugal: 0.5,
+	bermBounce: 0.4,
+	bermScrub: 0.985,
+	sledHalf: 0.5,
+	sledReach: 1.2,
+	noseHalf: 1.3,
+	crashSpeedMul: 0.35,
+	crashMinSpeed: 10,
+	invulnMs: 2200,
+	boostMul: 1.25,
+	forkBoostMs: 4000,
+	nearMissGap: 0.6,
+	nearMissBonus: 2,
+	corridorHalf: 1.6,
+};
+
+export const SAMPLE_STEP = 2; // meters between centerline samples
+export const AHEAD = 450; // keep track generated this far ahead
+export const BEHIND = 60; // keep this much behind before pruning
+
+const TWO_PI = Math.PI * 2;
+const BANK_SCALE = 18; // bank (rad) per unit curvature
+const BANK_MAX = 0.45;
+const WARMUP_OBSTACLES = 2; // no obstacles before this segment index
+const WARMUP_FEATURES = 4; // no fork/tunnel before this segment index
+
+/* ----------------------------- Difficulty ----------------------------- */
+
+/** Smooth monotonic ramp with asymptotic caps — same for everyone at a given s. */
+export function difficultyAt(s: number): Difficulty {
+	const t = Math.max(0, s);
+	const e = (k: number) => 1 - Math.exp(-t / k);
+	return {
+		vMax: 18 + 42 * e(1600),
+		curveMax: 0.008 + 0.014 * e(2000),
+		obstacleEvery: 18 + 37 * Math.exp(-t / 1800),
+		forkChance: 0.12 + 0.1 * e(2500),
+		tunnelChance: 0.1 + 0.08 * e(2500),
+		width: 9 + 5 * Math.exp(-t / 2500),
+	};
+}
+
+/* ----------------------------- Generation ----------------------------- */
+
+export const INITIAL_ENTRY: EntryPose = { x: 0, y: 0, z: 0, heading: 0, startS: 0, prevKind: 'straight' };
+
+const smoothstep = (a: number, b: number, x: number): number => {
+	const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+	return t * t * (3 - 2 * t);
+};
+
+/**
+ * Obstacle-free corridor center at absolute s. Obstacles are always placed
+ * at least corridorHalf + r away from it → a passable path always exists.
+ */
+export function latSafeAt(seed: number, s: number, width: number): number {
+	const r = mulberry32(seed >>> 0);
+	const p1 = r() * TWO_PI;
+	const p2 = r() * TWO_PI;
+	const amp = Math.max(0, width / 2 - LUGE.corridorHalf - 0.6);
+	return amp * (0.62 * Math.sin(s * 0.011 + p1) + 0.38 * Math.sin(s * 0.023 + p2));
+}
+
+/** Separator half-width at local s inside a fork segment (0 outside [noseS, mergeS]). */
+export function sepHalfAt(fork: ForkInfo, sLocal: number): number {
+	if (sLocal < fork.noseS || sLocal >= fork.mergeS) return 0;
+	const grow = smoothstep(fork.noseS, fork.noseS + 10, sLocal);
+	const shrink = 1 - smoothstep(fork.mergeS - 8, fork.mergeS, sLocal);
+	return fork.sepHalfMax * Math.min(grow, shrink);
+}
+
+/** Deterministic per-segment rng — independent of how the chain was pruned. */
+const segmentRng = (seed: number, index: number) => mulberry32((seed ^ Math.imul(index + 1, 0x9e3779b1)) >>> 0);
+
+function pickKind(rng: () => number, index: number, prevKind: SegmentKind, diff: Difficulty): SegmentKind {
+	if (index < WARMUP_FEATURES) return index % 2 === 0 ? 'straight' : rng() < 0.5 ? 'curveL' : 'curveR';
+	const p = rng();
+	if (p < diff.forkChance && prevKind !== 'fork') return 'fork';
+	if (p < diff.forkChance + diff.tunnelChance && prevKind !== 'fork') return 'tunnel';
+	const q = rng();
+	if (q < 0.3) return 'straight';
+	if (q < 0.55) return 'curveL';
+	if (q < 0.8) return 'curveR';
+	return 'scurve';
+}
+
+export function generateSegment(seed: number, index: number, entry: EntryPose): TrackSegment {
+	const rng = segmentRng(seed, index);
+	const diff = difficultyAt(entry.startS);
+	const kind = pickKind(rng, index, entry.prevKind, diff);
+
+	// Length per kind, rounded to the sample step.
+	const pick = (a: number, b: number) => Math.round((a + rng() * (b - a)) / SAMPLE_STEP) * SAMPLE_STEP;
+	const length =
+		kind === 'fork' ? pick(130, 160) : kind === 'scurve' ? pick(120, 160) : kind === 'straight' ? pick(80, 140) : pick(90, 150);
+
+	// Curvature profile κ(t), t in [0,1].
+	const kMax = diff.curveMax * (0.6 + 0.4 * rng());
+	const wobblePh = rng() * TWO_PI;
+	const tunnelDir = rng() < 0.5 ? 1 : -1;
+	const kappa = (t: number): number => {
+		switch (kind) {
+			case 'curveL':
+				return kMax * Math.sin(Math.PI * t);
+			case 'curveR':
+				return -kMax * Math.sin(Math.PI * t);
+			case 'scurve':
+				return kMax * 0.9 * Math.sin(TWO_PI * t);
+			case 'tunnel':
+				return kMax * 0.3 * tunnelDir * Math.sin(Math.PI * t);
+			case 'fork':
+				return 0;
+			default:
+				return diff.curveMax * 0.2 * Math.sin(TWO_PI * t + wobblePh);
+		}
+	};
+
+	// Grade (descent per meter) — always positive → y strictly decreasing.
+	const g0 = 0.1 + 0.05 * rng();
+	const gradePh = rng() * TWO_PI;
+	const grade = (t: number) => g0 + 0.02 * Math.sin(TWO_PI * t + gradePh);
+
+	// Fork geometry (before sampling — samples need the widened width).
+	let fork: ForkInfo | undefined;
+	const w0 = diff.width;
+	const wEnd = difficultyAt(entry.startS + length).width;
+	if (kind === 'fork') {
+		const sepHalfMax = 1.6;
+		fork = {
+			danger: rng() < 0.5 ? 'left' : 'right',
+			noseS: 30,
+			mergeS: length - 30,
+			sepHalfMax,
+			outerSafe: w0 / 2 + 3.5,
+			outerDanger: sepHalfMax + 3.2,
+			bonus: 50,
+		};
+	}
+	const widthAt = (sLocal: number): number => {
+		const base = w0 + (wEnd - w0) * (sLocal / length);
+		if (!fork) return base;
+		const widen = 2 * fork.outerSafe - base;
+		const ramp = Math.min(smoothstep(0, fork.noseS, sLocal), 1 - smoothstep(fork.mergeS, length, sLocal));
+		return base + widen * ramp;
+	};
+
+	// Integrate the centerline (midpoint heading for clean arcs).
+	const n = Math.round(length / SAMPLE_STEP);
+	const samples: TrackSample[] = [];
+	let x = entry.x;
+	let y = entry.y;
+	let z = entry.z;
+	let heading = entry.heading;
+	for (let k = 0; k <= n; k++) {
+		const t = k / n;
+		const kap = kappa(t);
+		const dirX = Math.cos(heading);
+		const dirZ = Math.sin(heading);
+		samples.push({
+			x,
+			y,
+			z,
+			dirX,
+			dirZ,
+			nx: -dirZ,
+			nz: dirX,
+			width: widthAt(k * SAMPLE_STEP),
+			bank: Math.max(-BANK_MAX, Math.min(BANK_MAX, kap * BANK_SCALE)),
+		});
+		if (k < n) {
+			const headingMid = heading + kap * SAMPLE_STEP * 0.5;
+			x += Math.cos(headingMid) * SAMPLE_STEP;
+			z += Math.sin(headingMid) * SAMPLE_STEP;
+			y -= grade(t) * SAMPLE_STEP;
+			heading += kap * SAMPLE_STEP;
+		}
+	}
+
+	// Obstacles — never inside the safe corridor.
+	const obstacles: Obstacle[] = [];
+	if (index >= WARMUP_OBSTACLES && kind !== 'fork') {
+		const spacingMul = kind === 'tunnel' ? 1.6 : 1;
+		let sLocal = 8 + rng() * 10;
+		while (sLocal < length - 8) {
+			const absS = entry.startS + sLocal;
+			const hw = widthAt(sLocal) / 2;
+			const type: Obstacle['type'] = rng() < 0.65 ? 'tree' : 'rock';
+			const r = type === 'tree' ? 0.8 + 0.3 * rng() : 0.9 + 0.5 * rng();
+			let lat = -hw + 1 + rng() * (2 * hw - 2);
+			const safe = latSafeAt(seed, absS, hw * 2);
+			const gap = LUGE.corridorHalf + r;
+			if (Math.abs(lat - safe) < gap) {
+				const side = lat >= safe ? 1 : -1;
+				lat = safe + side * (gap + 0.3);
+			}
+			if (Math.abs(lat) < hw - 0.6) obstacles.push({ s: sLocal, lat, r, type });
+			sLocal += difficultyAt(absS).obstacleEvery * spacingMul * (0.7 + 0.6 * rng());
+		}
+	}
+	if (fork) {
+		// Danger lane: a few obstacles alternating sides — always leaves a gap.
+		const sign = fork.danger === 'left' ? 1 : -1;
+		const center = (fork.sepHalfMax + fork.outerDanger) / 2;
+		const span = fork.mergeS - fork.noseS - 25;
+		const count = 3;
+		for (let i = 0; i < count; i++) {
+			const sLocal = fork.noseS + 15 + (span * (i + 0.5)) / count + (rng() - 0.5) * 6;
+			const off = (i % 2 === 0 ? 1 : -1) * (fork.outerDanger - fork.sepHalfMax) * 0.22;
+			obstacles.push({ s: sLocal, lat: sign * (center + off), r: 0.7, type: rng() < 0.5 ? 'tree' : 'rock' });
+		}
+		// One optional obstacle on the safe side.
+		if (rng() < 0.6) {
+			const sLocal = fork.noseS + 20 + rng() * (span - 10);
+			const safeSign = -sign;
+			obstacles.push({
+				s: sLocal,
+				lat: safeSign * (fork.sepHalfMax + 1.2 + rng() * (fork.outerSafe - fork.sepHalfMax - 3)),
+				r: 0.8,
+				type: 'tree',
+			});
+		}
+	}
+
+	const last = samples[n];
+	return {
+		index,
+		kind,
+		startS: entry.startS,
+		length,
+		samples,
+		obstacles,
+		tunnel: kind === 'tunnel',
+		fork,
+		exit: {
+			x: last.x,
+			y: last.y,
+			z: last.z,
+			heading,
+			startS: entry.startS + length,
+			prevKind: kind,
+		},
+	};
+}
+
+/** Keep [s − BEHIND, s + AHEAD] covered: append ahead, prune behind. Returns a new array when it changes. */
+export function ensureSegments(segs: TrackSegment[], seed: number, s: number): TrackSegment[] {
+	let out = segs;
+	if (out.length === 0) out = [generateSegment(seed, 0, INITIAL_ENTRY)];
+	while (out[out.length - 1].exit.startS < s + AHEAD) {
+		const lastSeg = out[out.length - 1];
+		out = out === segs ? [...out] : out;
+		out.push(generateSegment(seed, lastSeg.index + 1, lastSeg.exit));
+	}
+	let drop = 0;
+	while (drop < out.length - 1 && out[drop].startS + out[drop].length < s - BEHIND) drop++;
+	if (drop > 0) out = out.slice(drop);
+	return out;
+}
+
+/* ----------------------------- Track queries ----------------------------- */
+
+export function segmentAt(segs: TrackSegment[], s: number): TrackSegment {
+	for (let i = 0; i < segs.length; i++) {
+		const seg = segs[i];
+		if (s < seg.startS + seg.length) return seg;
+	}
+	return segs[segs.length - 1];
+}
+
+interface SampleLerp {
+	seg: TrackSegment;
+	x: number;
+	y: number;
+	z: number;
+	nx: number;
+	nz: number;
+	dirX: number;
+	dirZ: number;
+	width: number;
+	bank: number;
+	curvature: number;
+}
+
+function lerpAt(segs: TrackSegment[], s: number): SampleLerp {
+	const seg = segmentAt(segs, s);
+	const f = Math.max(0, Math.min(seg.samples.length - 1.0001, (s - seg.startS) / SAMPLE_STEP));
+	const i = Math.floor(f);
+	const u = f - i;
+	const a = seg.samples[i];
+	const b = seg.samples[Math.min(i + 1, seg.samples.length - 1)];
+	const cross = a.dirX * b.dirZ - a.dirZ * b.dirX;
+	const dot = a.dirX * b.dirX + a.dirZ * b.dirZ;
+	const dirX = a.dirX + (b.dirX - a.dirX) * u;
+	const dirZ = a.dirZ + (b.dirZ - a.dirZ) * u;
+	const dl = Math.hypot(dirX, dirZ) || 1;
+	return {
+		seg,
+		x: a.x + (b.x - a.x) * u,
+		y: a.y + (b.y - a.y) * u,
+		z: a.z + (b.z - a.z) * u,
+		nx: a.nx + (b.nx - a.nx) * u,
+		nz: a.nz + (b.nz - a.nz) * u,
+		dirX: dirX / dl,
+		dirZ: dirZ / dl,
+		width: a.width + (b.width - a.width) * u,
+		bank: a.bank + (b.bank - a.bank) * u,
+		curvature: Math.atan2(cross, dot) / SAMPLE_STEP,
+	};
+}
+
+/** World pose for the renderer: centerline lerp + lateral offset along the left normal. */
+export function poseAt(
+	segs: TrackSegment[],
+	s: number,
+	lat: number,
+): { x: number; y: number; z: number; heading: number; bank: number; width: number } {
+	const p = lerpAt(segs, s);
+	return {
+		x: p.x + p.nx * lat,
+		y: p.y - Math.sin(p.bank) * lat,
+		z: p.z + p.nz * lat,
+		heading: Math.atan2(p.dirZ, p.dirX),
+		bank: p.bank,
+		width: p.width,
+	};
+}
+
+/* ----------------------------- Simulation ----------------------------- */
+
+export function createLuge(): LugeState {
+	return {
+		s: 0,
+		lat: 0,
+		latVel: 0,
+		speed: LUGE.startSpeed,
+		lives: LUGE.lives,
+		invulnMs: 0,
+		boostMs: 0,
+		bonusScore: 0,
+		score: 0,
+		lane: null,
+		status: 'running',
+	};
+}
+
+/** Advance the sled by dtSec (call at a fixed 60 Hz step). Returns the new state + gameplay events. */
+export function stepLuge(
+	st: LugeState,
+	input: StepInput,
+	dtSec: number,
+	segs: TrackSegment[],
+	P: LugeParams = LUGE,
+): { state: LugeState; events: LugeEvent[] } {
+	if (st.status === 'over') return { state: st, events: [] };
+	const events: LugeEvent[] = [];
+	let { lat, latVel, speed, lives, invulnMs, boostMs, bonusScore, lane } = st;
+	let status: LugeState['status'] = 'running';
+
+	invulnMs = Math.max(0, invulnMs - dtSec * 1000);
+	boostMs = Math.max(0, boostMs - dtSec * 1000);
+
+	const collide = (): boolean => {
+		if (invulnMs > 0) return false;
+		lives -= 1;
+		speed = Math.max(P.crashMinSpeed, speed * P.crashSpeedMul);
+		invulnMs = P.invulnMs;
+		events.push('crash');
+		if (lives <= 0) {
+			status = 'over';
+			events.push('gameOver');
+		}
+		return true;
+	};
+
+	// Forward speed relaxes toward the difficulty ramp (boost multiplies the target).
+	const diff = difficultyAt(st.s);
+	const vMax = diff.vMax * (boostMs > 0 ? P.boostMul : 1);
+	speed += (vMax - speed) * Math.min(1, P.speedRelax * dtSec);
+
+	// Lateral: steering vs centrifugal pull (κ·v², partly absorbed by banking), then friction.
+	const here = lerpAt(segs, st.s);
+	const steer = Math.max(-1, Math.min(1, input.steer));
+	latVel += steer * P.steerAccel * dtSec;
+	latVel -= here.curvature * speed * speed * P.centrifugal * dtSec;
+	latVel *= Math.pow(P.latFriction, dtSec * 60);
+	lat += latVel * dtSec;
+
+	const prevS = st.s;
+	const s = st.s + speed * dtSec;
+
+	// Fork logic on the segment we are in now.
+	const seg = segmentAt(segs, s);
+	const fork = seg.fork;
+	let inForkBand = false;
+	let bermHit = false;
+	if (fork) {
+		const sLocal = s - seg.startS;
+		const noseAbs = seg.startS + fork.noseS;
+		const mergeAbs = seg.startS + fork.mergeS;
+		if (prevS < noseAbs && s >= noseAbs) {
+			if (Math.abs(lat) < P.noseHalf && invulnMs <= 0) {
+				collide();
+				events.push('forkNoseHit');
+				const safeSign = fork.danger === 'left' ? -1 : 1;
+				lat = safeSign * (fork.sepHalfMax + P.sledHalf + 0.3);
+				latVel = 0;
+				lane = safeSign > 0 ? 'left' : 'right';
+			} else {
+				lane = lat >= 0 ? 'left' : 'right';
+				events.push(lane === fork.danger ? 'forkDanger' : 'forkSafe');
+			}
+		}
+		if (s >= noseAbs && s < mergeAbs) {
+			inForkBand = true;
+			if (!lane) lane = lat >= 0 ? 'left' : 'right';
+			const sign = lane === 'left' ? 1 : -1;
+			const lo = sepHalfAt(fork, sLocal) + P.sledHalf;
+			const hi = (lane === fork.danger ? fork.outerDanger : fork.outerSafe) - P.sledHalf;
+			let l = sign * lat;
+			if (l < lo) {
+				l = lo;
+				if (sign * latVel < 0) latVel = -latVel * P.bermBounce;
+				bermHit = true;
+			} else if (l > hi) {
+				l = hi;
+				if (sign * latVel > 0) latVel = -latVel * P.bermBounce;
+				bermHit = true;
+			}
+			lat = sign * l;
+		}
+		if (prevS < mergeAbs && s >= mergeAbs) {
+			if (lane === fork.danger) {
+				bonusScore += fork.bonus;
+				boostMs = P.forkBoostMs;
+				events.push('forkBonus');
+			}
+			lane = null;
+		}
+	} else {
+		lane = null;
+	}
+
+	// Regular berms (never lethal — bounce + speed scrub).
+	if (!inForkBand) {
+		const hw = lerpAt(segs, s).width / 2 - P.sledHalf;
+		if (lat > hw) {
+			lat = hw;
+			if (latVel > 0) latVel = -latVel * P.bermBounce;
+			bermHit = true;
+		} else if (lat < -hw) {
+			lat = -hw;
+			if (latVel < 0) latVel = -latVel * P.bermBounce;
+			bermHit = true;
+		}
+	}
+	if (bermHit) speed *= Math.pow(P.bermScrub, dtSec * 60);
+
+	// Obstacles in the current + next segment (a step never spans more).
+	const segIdx = segs.indexOf(seg);
+	for (let si = segIdx; si < Math.min(segIdx + 2, segs.length) && status === 'running'; si++) {
+		const sg = segs[si];
+		for (const obs of sg.obstacles) {
+			const absS = sg.startS + obs.s;
+			if (absS < prevS - 3 || absS > s + 3) continue;
+			const latGap = Math.abs(obs.lat - lat) - (obs.r + P.sledHalf);
+			if (Math.abs(absS - s) < obs.r + P.sledReach && latGap < 0) {
+				if (collide()) break;
+			} else if (prevS < absS && s >= absS && latGap >= 0 && latGap < P.nearMissGap) {
+				events.push('nearMiss');
+				bonusScore += P.nearMissBonus;
+			}
+		}
+	}
+
+	return {
+		state: {
+			s,
+			lat,
+			latVel,
+			speed,
+			lives,
+			invulnMs,
+			boostMs,
+			bonusScore,
+			score: Math.floor(s) + bonusScore,
+			lane,
+			status,
+		},
+		events,
+	};
+}
