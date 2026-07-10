@@ -513,11 +513,12 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		const g = g3Ref.current;
 		const canvas = canvasRef.current;
 		if (!g || !canvas) return;
-		const css = canvas.clientWidth;
-		g.renderer.setSize(css, css, false);
-		// Square ortho frustum (canvas is 1:1).
-		g.camera.left = -HALF_SPAN;
-		g.camera.right = HALF_SPAN;
+		const w = canvas.clientWidth, h = canvas.clientHeight || canvas.clientWidth;
+		g.renderer.setSize(w, h, false);
+		// Aspect-correct ortho frustum so wide screens show more track (not squished).
+		const a = w / h;
+		g.camera.left = -HALF_SPAN * a;
+		g.camera.right = HALF_SPAN * a;
 		g.camera.top = HALF_SPAN;
 		g.camera.bottom = -HALF_SPAN;
 		g.camera.updateProjectionMatrix();
@@ -995,8 +996,13 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => {
 		const onResize = () => resize();
+		const onFs = () => requestAnimationFrame(resize); // re-measure after the fullscreen box applies
 		window.addEventListener('resize', onResize);
+		document.addEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
 		return () => {
+			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
 			window.removeEventListener('resize', onResize);
 			stop();
 			raceRef.current?.leave();
@@ -1140,13 +1146,24 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 /* ---------- Styles ---------- */
 
 const CSS = `
-.dr-root { --dr-accent: var(--accent-regular); width: 100%; max-width: 560px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); }
-.dr-boardwrap { position: relative; width: 100%; max-width: 520px; margin-inline: auto; }
+.dr-root { --dr-accent: var(--accent-regular); width: 100%; max-width: 640px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); }
+.dr-boardwrap { position: relative; width: 100%; aspect-ratio: 16 / 10; margin-inline: auto; }
 .dr-canvas {
-  width: 100%; aspect-ratio: 1 / 1; display: block; background: #0d1117;
+  width: 100%; height: 100%; display: block; background: #0d1117;
   border: 1px solid var(--gray-800); border-radius: 12px;
   touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
+/* Site global fullscreen → the track fills the screen; controls stay overlaid. */
+.game-page:fullscreen .dr-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.game-page:-webkit-full-screen .dr-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.game-page:fullscreen .dr-boardwrap { flex: 1; aspect-ratio: auto; }
+.game-page:-webkit-full-screen .dr-boardwrap { flex: 1; aspect-ratio: auto; }
+.game-page:fullscreen .dr-canvas { border-radius: 0; border: none; }
+.game-page:-webkit-full-screen .dr-canvas { border-radius: 0; border: none; }
+.game-page:fullscreen .dr-help { display: none; }
+.game-page:-webkit-full-screen .dr-help { display: none; }
+.game-page:fullscreen .dr-leaderboard { top: 54px; }
+.game-page:-webkit-full-screen .dr-leaderboard { top: 54px; }
 .dr-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .dr-label {
   position: absolute; transform: translate(-50%, -100%); white-space: nowrap;

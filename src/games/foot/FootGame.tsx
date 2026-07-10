@@ -499,6 +499,13 @@ export default function FootGame({ gameId }: { gameId: string }) {
 						</div>
 						<button className="fo-quit" onClick={() => setConfirmQuit(true)}>✕</button>
 						{goalFlash && <div className="fo-goal">{goalFlash}</div>}
+						<div className="fo-pad">
+							<div className="fo-dpad">
+								<button className="fo-tbtn" aria-label="Gauche" onPointerDown={(e) => { touch('left', true)(e); registerTap('left'); }} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)}>◀</button>
+								<button className="fo-tbtn" aria-label="Droite" onPointerDown={(e) => { touch('right', true)(e); registerTap('right'); }} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)}>▶</button>
+							</div>
+							<button className="fo-tbtn fo-jump" aria-label="Sauter" onPointerDown={touch('jump', true)} onPointerUp={touch('jump', false)} onPointerLeave={touch('jump', false)} onPointerCancel={touch('jump', false)}>⤴ SAUT</button>
+						</div>
 					</>
 				)}
 
@@ -570,16 +577,6 @@ export default function FootGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{phase === 'playing' && (
-				<div className="fo-pad">
-					<div className="fo-dpad">
-						<button className="fo-tbtn" aria-label="Gauche" onPointerDown={(e) => { touch('left', true)(e); registerTap('left'); }} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)}>◀</button>
-						<button className="fo-tbtn" aria-label="Droite" onPointerDown={(e) => { touch('right', true)(e); registerTap('right'); }} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)}>▶</button>
-					</div>
-					<button className="fo-tbtn fo-jump" aria-label="Sauter" onPointerDown={touch('jump', true)} onPointerUp={touch('jump', false)} onPointerLeave={touch('jump', false)} onPointerCancel={touch('jump', false)}>⤴ SAUT</button>
-				</div>
-			)}
-
 			<p className="fo-help">Déplace-toi ◀ ▶ et appuie sur Saut pour bondir — <strong>re-tape Saut en l'air pour planer</strong>. <strong>Double-tape ◀◀ / ▶▶ pour un dash-éclair</strong> qui bouscule les autres poules. Fonce dans le ballon pour tirer (il décolle au sol). Clavier : ← → et Espace / ↑. Tu es la cocotte cerclée d’or.</p>
 		</div>
 	);
@@ -588,7 +585,16 @@ export default function FootGame({ gameId }: { gameId: string }) {
 const CSS = `
 .fo-root { --fo-accent: var(--accent-regular); width: 100%; max-width: 900px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
 .fo-stage { position: relative; width: 100%; aspect-ratio: ${FIELD.W} / ${FIELD.H}; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-md); background: #bfe3ff; }
-.fo-canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.fo-canvas { display: block; width: 100%; height: 100%; object-fit: contain; touch-action: none; }
+/* Site global fullscreen → the pitch fills the screen (letterboxed, not stretched); controls overlaid. */
+.game-page:fullscreen .fo-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .fo-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .fo-stage { flex: 1; aspect-ratio: auto; border-radius: 0; }
+.game-page:-webkit-full-screen .fo-stage { flex: 1; aspect-ratio: auto; border-radius: 0; }
+.game-page:fullscreen .fo-quit { right: 130px; }
+.game-page:-webkit-full-screen .fo-quit { right: 130px; }
+.game-page:fullscreen .fo-help { display: none; }
+.game-page:-webkit-full-screen .fo-help { display: none; }
 .fo-hud { position: absolute; top: 8px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; font-weight: 900; font-size: clamp(15px, 3.5vw, 22px); text-shadow: 0 1px 3px rgba(0,0,0,0.35); pointer-events: none; }
 .fo-sep { color: rgba(255,255,255,0.8); }
 .fo-goal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(30px, 9vw, 68px); color: #fff; text-shadow: 0 3px 10px rgba(0,0,0,0.5); pointer-events: none; animation: fo-pop 0.3s ease; }
@@ -614,9 +620,9 @@ const CSS = `
 .fo-code { text-transform: uppercase; letter-spacing: 3px; font-weight: 800; }
 .fo-bigcode { font-family: var(--font-brand); font-size: 34px; font-weight: 800; letter-spacing: 6px; background: var(--gray-900); border: 2px dashed var(--fo-accent); color: var(--fo-accent); border-radius: 12px; padding: 10px 20px; cursor: pointer; }
 .fo-copyhint { min-height: 16px; margin: 0; color: var(--fo-accent); font-size: 12.5px; }
-.fo-pad { width: 100%; display: flex; justify-content: space-between; gap: 12px; user-select: none; }
+.fo-pad { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 2; display: flex; justify-content: space-between; gap: 12px; user-select: none; pointer-events: none; }
 .fo-dpad { display: flex; gap: 12px; }
-.fo-tbtn { border: none; background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 800; font-size: 22px; border-radius: 14px; padding: 14px 22px; cursor: pointer; touch-action: none; box-shadow: var(--shadow-sm); }
+.fo-tbtn { pointer-events: auto; border: none; background: rgba(0,0,0,0.34); color: #fff; font: inherit; font-weight: 800; font-size: 22px; border-radius: 14px; padding: 14px 22px; cursor: pointer; touch-action: none; box-shadow: var(--shadow-sm); backdrop-filter: blur(2px); }
 .fo-tbtn:active { background: var(--fo-accent); color: var(--accent-text-over); }
 .fo-jump { font-size: 18px; padding: 14px 26px; }
 .fo-help { max-width: 560px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin: 0; }
