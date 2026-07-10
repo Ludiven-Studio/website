@@ -121,8 +121,9 @@ export interface LugeParams {
 	nearMissGap: number; // extra lateral gap under which a pass counts as near-miss
 	nearMissBonus: number;
 	corridorHalf: number; // guaranteed obstacle-free half-width around latSafe
-	bobVMaxMul: number; // icy bob sections are faster
-	bobLatFriction: number; // and slide more
+	bobVMaxFloor: number; // speed multiplier at the flat pipe floor (barely faster)
+	bobVMaxMul: number; // speed multiplier at the wall crest — carving high pays
+	bobLatFriction: number; // icy pipe slides a lot more
 	bobWallExtra: number; // how far the curved wall extends beyond the flat width
 	bobWallHeight: number; // wall crest height
 	bobFlatFrac: number; // fraction of the half-width that stays flat
@@ -153,7 +154,8 @@ export const LUGE: LugeParams = {
 	nearMissGap: 0.6,
 	nearMissBonus: 2,
 	corridorHalf: 1.6,
-	bobVMaxMul: 1.12,
+	bobVMaxFloor: 1.03,
+	bobVMaxMul: 1.3,
 	bobLatFriction: 0.98,
 	bobWallExtra: 3.5,
 	bobWallHeight: 3.4,
@@ -268,11 +270,13 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 			? pick(130, 160)
 			: kind === 'bob'
 				? pick(140, 200)
-				: kind === 'scurve'
-					? pick(120, 160)
-					: kind === 'straight'
-						? pick(80, 140)
-						: pick(90, 150);
+				: kind === 'tunnel'
+					? pick(160, 240)
+					: kind === 'scurve'
+						? pick(120, 160)
+						: kind === 'straight'
+							? pick(80, 140)
+							: pick(90, 150);
 
 	// Curvature profile κ(t), t in [0,1].
 	const kMax = diff.curveMax * (0.6 + 0.4 * rng());
@@ -363,15 +367,16 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 	// Obstacles — never inside the safe corridor. None in bob pipes (speed is the challenge).
 	const obstacles: Obstacle[] = [];
 	if (index >= WARMUP_OBSTACLES && kind !== 'fork' && kind !== 'bob') {
-		const spacingMul = kind === 'tunnel' ? 1.6 : 1;
-		let sLocal = 8 + rng() * 10;
+		const spacingMul = kind === 'tunnel' ? 1.9 : 1;
+		// Caves: no pillar right at the mouth — leave time to adapt after entering.
+		let sLocal = kind === 'tunnel' ? 30 + rng() * 12 : 8 + rng() * 10;
 		while (sLocal < length - 8) {
 			const absS = entry.startS + sLocal;
 			const hw = widthAt(sLocal) / 2;
 			// Tunnels: elongated ice pillars split the passage into rejoining branches.
 			const type: Obstacle['type'] = kind === 'tunnel' ? 'ice' : rng() < 0.65 ? 'tree' : 'rock';
-			const r = type === 'ice' ? 1.0 + 0.3 * rng() : type === 'tree' ? 0.8 + 0.3 * rng() : 0.9 + 0.5 * rng();
-			const len = type === 'ice' ? 5 + rng() * 5 : undefined;
+			const r = type === 'ice' ? 0.9 + 0.2 * rng() : type === 'tree' ? 0.8 + 0.3 * rng() : 0.9 + 0.5 * rng();
+			const len = type === 'ice' ? 4 + rng() * 3 : undefined;
 			let lat = -hw + 1 + rng() * (2 * hw - 2);
 			const safe = latSafeAt(seed, absS, hw * 2);
 			const gap = LUGE.corridorHalf + r;
@@ -575,10 +580,16 @@ export function stepLuge(
 		return true;
 	};
 
-	// Forward speed relaxes toward the difficulty ramp (boost and icy bob multiply the target).
+	// Forward speed relaxes toward the difficulty ramp (boost multiplies the target).
+	// In a bob pipe the multiplier scales with how high you carve on the wall.
 	const here = lerpAt(segs, st.s);
 	const diff = difficultyAt(st.s);
-	const vMax = diff.vMax * (boostMs > 0 ? P.boostMul : 1) * (here.seg.bob ? P.bobVMaxMul : 1);
+	let vMax = diff.vMax * (boostMs > 0 ? P.boostMul : 1);
+	if (here.seg.bob) {
+		const ramp = bobRampAt(here.seg, st.s - here.seg.startS);
+		const climb = Math.min(1, (bobWall(here.width, st.lat).rise * ramp) / P.bobWallHeight);
+		vMax *= P.bobVMaxFloor + (P.bobVMaxMul - P.bobVMaxFloor) * climb;
+	}
 	speed += (vMax - speed) * Math.min(1, P.speedRelax * dtSec);
 
 	// Lateral: steering vs centrifugal pull (κ·v², partly absorbed by banking), then friction.

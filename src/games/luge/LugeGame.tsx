@@ -64,6 +64,7 @@ interface Scene3D {
 		berm: THREE.MeshStandardMaterial;
 		ice: THREE.MeshStandardMaterial;
 		caveIce: THREE.MeshStandardMaterial;
+		pillarIce: THREE.MeshStandardMaterial;
 		rock: THREE.MeshStandardMaterial;
 		foliage: THREE.MeshStandardMaterial;
 		trunk: THREE.MeshStandardMaterial;
@@ -279,6 +280,33 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		add(stripFrom(rows), g.mats.snow);
 	}
 
+	// Cave-mouth portal: a thick ice face around the arch opening, in the cross-section
+	// plane at s — makes tunnel entrances read as massive glacier caves from afar.
+	const addPortal = (k: number, latC: number, R: number, ext: number, lift: number) => {
+		const s = sAt(k);
+		const fr = frameAt(segs, s);
+		const bank = seg.samples[k].bank;
+		const inner: Row[] = [];
+		const outer: Row[] = [];
+		for (let j = 0; j <= TUNNEL_RADIAL; j++) {
+			const th = -0.3 + (j / TUNNEL_RADIAL) * (Math.PI + 0.6);
+			for (const [arr, rad] of [
+				[inner, R],
+				[outer, R + ext],
+			] as [Row[], number][]) {
+				const lat = latC + Math.cos(th) * rad;
+				arr.push({
+					x: fr.x + fr.nx * lat - o.x,
+					y: fr.y + Math.sin(th) * rad * 0.85 + lift - Math.sin(bank) * lat - o.y,
+					z: fr.z + fr.nz * lat - o.z,
+					u: (th / Math.PI) * 3,
+					v: rad / 4,
+				});
+			}
+		}
+		add(stripFrom([inner, outer]), g.mats.caveIce);
+	};
+
 	// Ice cave over the full track: the arch wraps past the horizontal so the walls
 	// envelop the piste like a glacier tunnel, with dark glowing cave ice.
 	if (seg.tunnel) {
@@ -287,7 +315,7 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 			const s = sAt(k);
 			const f = frameAt(segs, s);
 			const bank = seg.samples[k].bank;
-			const R = f.hw + 1.6;
+			const R = f.hw + 2.6;
 			const across: Row[] = [];
 			for (let j = 0; j <= TUNNEL_RADIAL; j++) {
 				const th = -0.3 + (j / TUNNEL_RADIAL) * (Math.PI + 0.6);
@@ -303,6 +331,8 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 			rows.push(across);
 		}
 		add(stripFrom(rows), g.mats.caveIce);
+		addPortal(0, 0, frameAt(segs, sAt(0)).hw + 2.6, 6, 0.3);
+		addPortal(n, 0, frameAt(segs, sAt(n)).hw + 2.6, 6, 0.3);
 	}
 
 	// Fork: separator wedge + danger-lane ice tunnel + danger outer wall.
@@ -349,6 +379,8 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 			tRows.push(across);
 		}
 		add(stripFrom(tRows), g.mats.caveIce);
+		addPortal(k0 + 4, cLat, R, 3, 0.2);
+		addPortal(Math.min(k1 - 3, n), cLat, R, 3, 0.2);
 
 		// Outer ice wall closing the danger lane (the safe side keeps the full width).
 		const wallRows: Row[][] = [];
@@ -366,7 +398,7 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		const base = new THREE.Vector3(p.x - o.x, p.y - o.y, p.z - o.z);
 		if (obs.type === 'ice') {
 			// Elongated glacier pillar splitting the passage — floor to ceiling.
-			const m = new THREE.Mesh(g.shared.rock, g.mats.caveIce);
+			const m = new THREE.Mesh(g.shared.rock, g.mats.pillarIce);
 			m.scale.set((obs.len ?? 6) * 0.55, 3.2, obs.r * 1.5);
 			m.rotation.y = -p.heading;
 			m.position.copy(base).setY(base.y + 1.0);
@@ -491,6 +523,9 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const keysRef = useRef({ left: false, right: false });
 	const camLatRef = useRef(0);
 	const camHRef = useRef(4); // eased camera height — ducks under tunnel arches
+	const steerYawRef = useRef(0); // eased steering pivot of the sled nose
+	// Fatal-crash tumble: ~1.2 s of rolling sled + snow burst before the game-over popup.
+	const crashAnimRef = useRef({ active: false, t: 0, s: 0, lat: 0, vel: 0 });
 	const flashOpRef = useRef(0);
 	const bonusTimerRef = useRef(0);
 
@@ -570,6 +605,18 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				emissiveIntensity: 0.85,
 				side: THREE.DoubleSide,
 			}),
+			// Pillars: same cave ice but translucent — the sled stays visible when the
+			// chase camera briefly passes behind one.
+			pillarIce: new THREE.MeshStandardMaterial({
+				map: iceTex,
+				color: 0x74a8c8,
+				roughness: 0.18,
+				metalness: 0.05,
+				emissive: 0x0d3b52,
+				emissiveIntensity: 0.7,
+				transparent: true,
+				opacity: 0.85,
+			}),
 			rock: new THREE.MeshStandardMaterial({ map: rockTex, color: 0xb9bec6, roughness: 0.9, flatShading: true }),
 			foliage: new THREE.MeshStandardMaterial({ color: 0x2f6b46, roughness: 0.9, flatShading: true }),
 			trunk: new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.9 }),
@@ -590,7 +637,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			});
 		};
 		swapTex('snow.jpg', [mats.snow, mats.berm], 1);
-		swapTex('ice.jpg', [mats.ice, mats.caveIce], 1);
+		swapTex('ice.jpg', [mats.ice, mats.caveIce, mats.pillarIce], 1);
 		swapTex('rock.jpg', [mats.rock, mats.wedge], 1);
 
 		// Shared obstacle geometries.
@@ -694,20 +741,31 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		const driftRaw = Math.atan2(st.latVel, Math.max(8, st.speed));
 		const dz = seg.bob ? 0 : 0.07;
 		const driftYaw = Math.sign(driftRaw) * Math.max(0, Math.abs(driftRaw) - dz) * (seg.bob ? 1.25 : 0.45);
+		// Steering pivots the nose into the turn (eased) — more on ice; no body lean.
+		const yawTarget = steer * (seg.bob ? 0.22 : 0.1);
+		steerYawRef.current += (yawTarget - steerYawRef.current) * Math.min(1, dtSec * 8);
 		g.sled.position.set(pose.x, pose.y + 0.05, pose.z);
 		g.sled.rotation.set(0, 0, 0);
-		g.sled.rotateY(-pose.heading - driftYaw);
+		g.sled.rotateY(-pose.heading - driftYaw - steerYawRef.current);
 		g.sled.rotateZ(pitch);
-		g.sled.rotateX(pose.bank + steer * 0.22 + st.latVel * 0.02);
+		g.sled.rotateX(pose.bank + st.latVel * 0.015);
 		// Invulnerability blink at ~8 Hz.
 		g.sled.visible = st.invulnMs <= 0 || Math.floor(clockRef.current / 125) % 2 === 0;
+		// Fatal crash: tumbling rolls + fading bounces on top of the base pose.
+		const crash = crashAnimRef.current;
+		if (crash.active) {
+			g.sled.visible = true;
+			g.sled.rotateZ(crash.t * 9);
+			g.sled.rotateY(crash.t * 3.5);
+			g.sled.position.y += Math.abs(Math.sin(crash.t * 7)) * 0.8 * Math.max(0, 1 - crash.t);
+		}
 
 		// Chase camera: behind + above, looking through the sled far ahead.
 		// Under an arch (full tunnel / narrow danger-lane tunnel) it ducks low and
 		// hugs the sled laterally so the view stays inside the tube.
 		const sLoc = sI - seg.startS;
 		const inDanger = Boolean(seg.fork && st.lane === seg.fork.danger && sLoc >= seg.fork.noseS && sLoc < seg.fork.mergeS);
-		const wantH = inDanger ? 2 : seg.tunnel ? 2.4 : 4;
+		const wantH = inDanger ? 2 : seg.tunnel ? 3 : 4;
 		camHRef.current += (wantH - camHRef.current) * Math.min(1, dtSec * 4);
 		const latK = inDanger ? 0.9 : 0.5;
 		camLatRef.current += (latI * latK - camLatRef.current) * Math.min(1, dtSec * 5);
@@ -844,6 +902,23 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			if (!runningRef.current) return;
 			const dt = Math.min(now - lastRef.current, 200);
 			lastRef.current = now;
+
+			// Fatal-crash phase: freeze the sim, let the sled tumble to a stop, then the popup.
+			if (crashAnimRef.current.active) {
+				const c = crashAnimRef.current;
+				c.t += dt / 1000;
+				c.vel *= Math.pow(0.15, dt / 1000);
+				c.s += c.vel * (dt / 1000);
+				draw(dt / 1000, c.s, c.lat);
+				if (c.t >= 1.2) {
+					c.active = false;
+					onGameOver();
+					return;
+				}
+				rafRef.current = requestAnimationFrame(frame);
+				return;
+			}
+
 			accRef.current += dt;
 			hudAccRef.current += dt;
 			clockRef.current += dt;
@@ -884,8 +959,22 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			if (over) {
 				setScore(st.score);
 				setLives(st.lives);
-				onGameOver();
-				return;
+				// Launch the tumble + a big snow burst around the sled.
+				crashAnimRef.current = { active: true, t: 0, s: st.s, lat: st.lat, vel: Math.max(8, st.speed) };
+				const g = g3Ref.current;
+				if (g) {
+					const pose = poseAt(segsRef.current, st.s, st.lat);
+					for (let i = 0; i < SPRAY_COUNT; i++) {
+						if (i % 3 === 0) continue; // keep some pool for the trailing emit
+						g.sprayLife[i] = 0.5 + Math.random() * 0.6;
+						g.sprayPos[i * 3] = pose.x + (Math.random() - 0.5) * 1.6;
+						g.sprayPos[i * 3 + 1] = pose.y + 0.3 + Math.random() * 0.6;
+						g.sprayPos[i * 3 + 2] = pose.z + (Math.random() - 0.5) * 1.6;
+						g.sprayVel[i * 3] = (Math.random() - 0.5) * 9;
+						g.sprayVel[i * 3 + 1] = 2 + Math.random() * 6;
+						g.sprayVel[i * 3 + 2] = (Math.random() - 0.5) * 9;
+					}
+				}
 			}
 			rafRef.current = requestAnimationFrame(frame);
 		},
@@ -901,6 +990,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			stateRef.current = createLuge();
 			prevRef.current = { s: 0, lat: 0 };
 			camLatRef.current = 0;
+			crashAnimRef.current.active = false;
 			syncSegMeshes();
 			setScore(0);
 			setKmh(0);

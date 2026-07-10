@@ -221,7 +221,7 @@ describe('luge simulation', () => {
 			if (st.status === 'over') break;
 		}
 		expect(st.score).toBe(Math.floor(st.s) + st.bonusScore);
-		expect(st.speed).toBeLessThanOrEqual(60 * LUGE.boostMul + 1e-6);
+		expect(st.speed).toBeLessThanOrEqual(60 * LUGE.boostMul * LUGE.bobVMaxMul + 1e-6);
 	});
 
 	it('berms are never lethal and keep the sled on the track', () => {
@@ -335,6 +335,16 @@ describe('luge simulation', () => {
 		const v = difficultyAt(s0).vMax;
 		const st: LugeState = { ...createLuge(), s: s0, lat: 0, speed: v };
 		expect(stepLuge(st, { steer: 0 }, DT, segs).state.speed).toBeGreaterThan(v);
+	});
+
+	it('bob: carving high on the wall raises the speed target further', () => {
+		const { segs, bob } = findBob();
+		const s0 = bob.startS + bob.length / 2;
+		const w = poseAt(segs, s0, 0).width;
+		const v = difficultyAt(s0).vMax;
+		const low = stepLuge({ ...createLuge(), s: s0, lat: 0, speed: v }, { steer: 0 }, DT, segs).state.speed;
+		const high = stepLuge({ ...createLuge(), s: s0, lat: w / 2 + 2.5, speed: v }, { steer: 0 }, DT, segs).state.speed;
+		expect(high).toBeGreaterThan(low);
 	});
 
 	it('poseAt offsets along the left normal and follows the descent', () => {
