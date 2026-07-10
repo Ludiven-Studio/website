@@ -86,6 +86,26 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		load('/assets/jeux/billard/floor.jpg', floorImgRef);
 	}, []);
 
+	// Size the canvas to fill its container (the play area); table centred, floor fills the rest.
+	const doResize = useCallback(() => {
+		const cv = canvasRef.current, wrap = wrapRef.current;
+		if (!cv || !wrap) return;
+		const t = tableRef.current;
+		const cssW = wrap.clientWidth;
+		const cssH = wrap.clientHeight || cssW * 0.625;
+		const scale = Math.min(cssW / (t.w + 2 * MIN_FLOOR), cssH / (t.h + 2 * MIN_FLOOR));
+		scaleRef.current = scale;
+		offsetRef.current = { x: (cssW / scale - t.w) / 2, y: (cssH / scale - t.h) / 2 };
+		const dpr = window.devicePixelRatio || 1;
+		cv.style.width = `${cssW}px`;
+		cv.style.height = `${cssH}px`;
+		cv.width = Math.round(cssW * dpr);
+		cv.height = Math.round(cssH * dpr);
+		const ctx = cv.getContext('2d');
+		const s = dpr * scale;
+		if (ctx) ctx.setTransform(s, 0, 0, s, s * offsetRef.current.x, s * offsetRef.current.y);
+	}, []);
+
 	// Fullscreen (immersive) toggle on the play area.
 	const toggleFs = () => {
 		const el = wrapRef.current;
@@ -93,10 +113,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		else document.exitFullscreen?.();
 	};
 	useEffect(() => {
-		const onFs = () => setIsFs(!!document.fullscreenElement);
+		// Re-measure after the browser applies the fullscreen (or restored) box.
+		const onFs = () => { setIsFs(!!document.fullscreenElement); requestAnimationFrame(doResize); };
 		document.addEventListener('fullscreenchange', onFs);
 		return () => document.removeEventListener('fullscreenchange', onFs);
-	}, []);
+	}, [doResize]);
 
 	const { celebrating } = useCelebration(status === 'won');
 
@@ -263,30 +284,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Resize ---------- */
 	useEffect(() => {
-		const cv = canvasRef.current, wrap = wrapRef.current;
-		if (!cv || !wrap) return;
-		const resize = () => {
-			const t = tableRef.current;
-			// The canvas fills its container; the table is centred and the floor fills all the rest.
-			const cssW = wrap.clientWidth;
-			const cssH = wrap.clientHeight || cssW * 0.625;
-			const scale = Math.min(cssW / (t.w + 2 * MIN_FLOOR), cssH / (t.h + 2 * MIN_FLOOR));
-			scaleRef.current = scale;
-			offsetRef.current = { x: (cssW / scale - t.w) / 2, y: (cssH / scale - t.h) / 2 };
-			const dpr = window.devicePixelRatio || 1;
-			cv.style.width = `${cssW}px`;
-			cv.style.height = `${cssH}px`;
-			cv.width = Math.round(cssW * dpr);
-			cv.height = Math.round(cssH * dpr);
-			const ctx = cv.getContext('2d');
-			const s = dpr * scale;
-			if (ctx) ctx.setTransform(s, 0, 0, s, s * offsetRef.current.x, s * offsetRef.current.y);
-		};
-		resize();
-		const ro = new ResizeObserver(resize);
+		const wrap = wrapRef.current;
+		if (!wrap) return;
+		doResize();
+		const ro = new ResizeObserver(doResize);
 		ro.observe(wrap);
 		return () => ro.disconnect();
-	}, []);
+	}, [doResize]);
 
 	/* ---------- Render + physics loop ---------- */
 	useEffect(() => {
@@ -509,7 +513,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 const CSS = `
 .bi-root {
   --bi-accent: var(--accent-regular);
-  width: 100%; max-width: 1040px; margin-inline: auto; color: var(--gray-0);
+  width: 100%; max-width: 620px; margin-inline: auto; color: var(--gray-0);
   font-family: var(--font-body); display: flex; flex-direction: column; align-items: center;
 }
 
