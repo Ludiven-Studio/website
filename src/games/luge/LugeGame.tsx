@@ -4,6 +4,7 @@ import {
 	LUGE,
 	SAMPLE_STEP,
 	ensureSegments,
+	segmentAt,
 	poseAt,
 	sepHalfAt,
 	createLuge,
@@ -220,20 +221,22 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 	};
 
 	// Piste ribbon (banked) — UVs advance with s so the surface visibly streams.
+	// Bob sections: dense cross-section spanning the icy walls (poseAt carries the pipe shape).
 	{
+		const ts = seg.bob ? [-1, -0.92, -0.82, -0.68, -0.45, 0, 0.45, 0.68, 0.82, 0.92, 1] : [-1, -0.5, 0, 0.5, 1];
 		const ribbon: Row[][] = [];
 		for (let k = 0; k <= n; k++) {
 			const s = sAt(k);
-			const hw = seg.samples[k].width / 2;
+			const half = seg.samples[k].width / 2 + (seg.bob ? LUGE.bobWallExtra : 0);
 			const across: Row[] = [];
-			for (const t of [-1, -0.5, 0, 0.5, 1]) across.push(edgePt(segs, s, t * hw, o));
+			for (const t of ts) across.push(edgePt(segs, s, t * half, o));
 			ribbon.push(across);
 		}
-		add(stripFrom(ribbon), g.mats.snow);
+		add(stripFrom(ribbon), seg.bob ? g.mats.ice : g.mats.snow);
 	}
 
-	// Raised snow berms at both edges.
-	for (const side of [1, -1]) {
+	// Raised snow berms at both edges (bob walls replace them on bob sections).
+	for (const side of seg.bob ? [] : [1, -1]) {
 		const berm: Row[][] = [];
 		for (let k = 0; k <= n; k++) {
 			const s = sAt(k);
@@ -243,19 +246,23 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		add(stripFrom(berm), g.mats.berm);
 	}
 
-	// Terrain skirts: inner row rides the berm edge, outer rows climb the mountainside.
+	// Terrain skirts: inner row rides the (banked) berm edge exactly, outer rows climb
+	// the mountainside — the bank offset fades out so terrain and track never gap.
 	for (const side of [1, -1]) {
 		const rows: Row[][] = [];
 		for (let k = 0; k <= n; k += 2) {
 			const s = sAt(k);
 			const f = frameAt(segs, s);
+			const bank = seg.samples[k].bank;
 			const across: Row[] = [];
 			for (const off of TERRAIN_OFF) {
 				const lat = side * (f.hw + 3 + off);
-				const rise = off === 0 ? 0.5 : terrainRise(s, off, side);
+				// Bob sections: the inner row meets the ice-wall crest instead of the berm.
+				const rise = off === 0 ? (seg.bob ? 2.5 : 0.5) : terrainRise(s, off, side);
+				const bankDy = -Math.sin(bank) * lat * Math.max(0, 1 - off / 24);
 				across.push({
 					x: f.x + f.nx * lat - o.x,
-					y: f.y + rise - o.y,
+					y: f.y + rise + bankDy - o.y,
 					z: f.z + f.nz * lat - o.z,
 					u: lat / 10,
 					v: s / 10,
@@ -272,6 +279,7 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		for (let k = 0; k <= n; k++) {
 			const s = sAt(k);
 			const f = frameAt(segs, s);
+			const bank = seg.samples[k].bank;
 			const R = f.hw + 1.6;
 			const across: Row[] = [];
 			for (let j = 0; j <= TUNNEL_RADIAL; j++) {
@@ -279,7 +287,7 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 				const lat = Math.cos(th) * R;
 				across.push({
 					x: f.x + f.nx * lat - o.x,
-					y: f.y + Math.sin(th) * R * 0.8 + 0.3 - o.y,
+					y: f.y + Math.sin(th) * R * 0.8 + 0.3 - Math.sin(bank) * lat - o.y,
 					z: f.z + f.nz * lat - o.z,
 					u: (th / Math.PI) * 3,
 					v: s / 4,
@@ -382,7 +390,8 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		const off = 6 + rng() * 26;
 		const fr = frameAt(segs, s);
 		const lat = side * (fr.hw + 3 + off);
-		const y = fr.y + terrainRise(s, off, side);
+		const bank = seg.samples[Math.min(Math.round((s - seg.startS) / SAMPLE_STEP), n)].bank;
+		const y = fr.y + terrainRise(s, off, side) - Math.sin(bank) * lat * Math.max(0, 1 - off / 24);
 		const t = new THREE.Group();
 		const trunk = new THREE.Mesh(g.shared.trunk, g.mats.trunk);
 		trunk.position.y = 0.45;
@@ -467,6 +476,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const triesRef = useRef(0);
 	const keysRef = useRef({ left: false, right: false });
 	const camLatRef = useRef(0);
+	const camHRef = useRef(4); // eased camera height — ducks under tunnel arches
 	const flashOpRef = useRef(0);
 	const bonusTimerRef = useRef(0);
 
@@ -658,22 +668,30 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		g.sled.rotation.set(0, 0, 0);
 		g.sled.rotateY(-pose.heading);
 		g.sled.rotateZ(pitch);
-		g.sled.rotateX(-(pose.bank + steer * 0.22 + st.latVel * 0.02));
+		g.sled.rotateX(pose.bank + steer * 0.22 + st.latVel * 0.02);
 		// Invulnerability blink at ~8 Hz.
 		g.sled.visible = st.invulnMs <= 0 || Math.floor(clockRef.current / 125) % 2 === 0;
 
 		// Chase camera: behind + above, looking through the sled far ahead.
-		camLatRef.current += (latI * 0.5 - camLatRef.current) * Math.min(1, dtSec * 5);
+		// Under an arch (full tunnel / narrow danger-lane tunnel) it ducks low and
+		// hugs the sled laterally so the view stays inside the tube.
+		const seg = segmentAt(segs, sI);
+		const sLoc = sI - seg.startS;
+		const inDanger = Boolean(seg.fork && st.lane === seg.fork.danger && sLoc >= seg.fork.noseS && sLoc < seg.fork.mergeS);
+		const wantH = inDanger ? 1.4 : seg.tunnel ? 2.4 : 4;
+		camHRef.current += (wantH - camHRef.current) * Math.min(1, dtSec * 4);
+		const latK = inDanger ? 0.9 : 0.5;
+		camLatRef.current += (latI * latK - camLatRef.current) * Math.min(1, dtSec * 5);
 		const camPose = poseAt(segs, Math.max(0, sI - 8), camLatRef.current);
 		const lookPose = poseAt(segs, sI + 16, latI * 0.7);
 		const spd = Math.min(1, st.speed / 60);
 		const shake = st.speed > 20 ? (st.speed - 20) * 0.004 : 0;
 		g.camera.position.set(
 			camPose.x + (Math.random() - 0.5) * shake,
-			camPose.y + 4 + (Math.random() - 0.5) * shake,
+			camPose.y + camHRef.current + (Math.random() - 0.5) * shake,
 			camPose.z + (Math.random() - 0.5) * shake,
 		);
-		g.camera.lookAt(lookPose.x, lookPose.y + 1.2, lookPose.z);
+		g.camera.lookAt(lookPose.x, lookPose.y + 0.4 + camHRef.current * 0.2, lookPose.z);
 		const fov = 74 + 16 * spd + (st.boostMs > 0 ? 5 : 0);
 		if (Math.abs(g.camera.fov - fov) > 0.1) {
 			g.camera.fov = fov;
@@ -795,7 +813,8 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			while (runningRef.current && accRef.current >= STEP) {
 				accRef.current -= STEP;
 				prevRef.current = { s: st.s, lat: st.lat };
-				const r = stepLuge(st, { steer: -steer }, STEP / 1000, segsRef.current);
+				// +lat = screen-right for the chase camera, so keys map directly.
+				const r = stepLuge(st, { steer }, STEP / 1000, segsRef.current);
 				st = r.state;
 				stateRef.current = st;
 				if (r.events.length) handleEvents(r.events);
@@ -1081,8 +1100,9 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			<p className="lg-help">
 				Dévale la montagne en luge le plus loin possible ! Dirige avec <strong>◀ ▶</strong> (flèches / Q·D) ou les
 				boutons tactiles. Évite <strong>sapins et rochers</strong> — 3 vies. Aux <strong>bifurcations</strong>, le
-				tunnel de glace étroit rapporte un <strong>bonus et un boost</strong>… si tu en sors entier. Au défi du
-				jour, la descente est la même pour tout le monde ({MAX_TRIES} essais, meilleure distance classée).
+				tunnel de glace étroit rapporte un <strong>bonus et un boost</strong>… si tu en sors entier. Dans les
+				<strong> pistes de bobsleigh</strong> gelées, plus rapides, grimpe sur les parois dans les virages. Au défi
+				du jour, la descente est la même pour tout le monde ({MAX_TRIES} essais, meilleure distance classée).
 			</p>
 
 			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtDist} />}

@@ -2,13 +2,14 @@
  * LUGE — endless 3D downhill sled run (pure engine, no rendering).
  * Track-space model: the sled lives in (s, lat) — distance along an infinite
  * procedurally generated centerline + signed lateral offset (positive = left).
- * Segments (80–160 m) are generated deterministically from (seed, index) and
+ * Segments (80–200 m: straights, curves, ice tunnels, risk/reward forks, icy
+ * bobsleigh pipes) are generated deterministically from (seed, index) and
  * chained by an entry pose, so streaming/pruning never changes the world.
  */
 
 import { mulberry32 } from '../prng';
 
-export type SegmentKind = 'straight' | 'curveL' | 'curveR' | 'scurve' | 'tunnel' | 'fork';
+export type SegmentKind = 'straight' | 'curveL' | 'curveR' | 'scurve' | 'tunnel' | 'fork' | 'bob';
 
 /** One centerline sample every SAMPLE_STEP meters (both segment boundaries included). */
 export interface TrackSample {
@@ -58,6 +59,7 @@ export interface TrackSegment {
 	samples: TrackSample[]; // length/SAMPLE_STEP + 1 rows
 	obstacles: Obstacle[];
 	tunnel: boolean;
+	bob: boolean; // bobsleigh section: icy half-pipe, tight curves, climbable walls
 	fork?: ForkInfo;
 	exit: EntryPose; // entry pose of segment index+1
 }
@@ -68,6 +70,7 @@ export interface Difficulty {
 	obstacleEvery: number; // mean meters between obstacles
 	forkChance: number;
 	tunnelChance: number;
+	bobChance: number;
 	width: number; // full track width
 }
 
@@ -111,6 +114,12 @@ export interface LugeParams {
 	nearMissGap: number; // extra lateral gap under which a pass counts as near-miss
 	nearMissBonus: number;
 	corridorHalf: number; // guaranteed obstacle-free half-width around latSafe
+	bobVMaxMul: number; // icy bob sections are faster
+	bobLatFriction: number; // and slide more
+	bobWallExtra: number; // how far the curved wall extends beyond the flat width
+	bobWallHeight: number; // wall crest height
+	bobFlatFrac: number; // fraction of the half-width that stays flat
+	bobWallGravity: number; // restoring pull back to the pipe floor (m/s² per unit slope)
 }
 
 export const LUGE: LugeParams = {
@@ -133,6 +142,12 @@ export const LUGE: LugeParams = {
 	nearMissGap: 0.6,
 	nearMissBonus: 2,
 	corridorHalf: 1.6,
+	bobVMaxMul: 1.12,
+	bobLatFriction: 0.965,
+	bobWallExtra: 2.5,
+	bobWallHeight: 2.4,
+	bobFlatFrac: 0.55,
+	bobWallGravity: 26,
 };
 
 export const SAMPLE_STEP = 2; // meters between centerline samples
@@ -157,6 +172,7 @@ export function difficultyAt(s: number): Difficulty {
 		obstacleEvery: 18 + 37 * Math.exp(-t / 1800),
 		forkChance: 0.12 + 0.1 * e(2500),
 		tunnelChance: 0.1 + 0.08 * e(2500),
+		bobChance: 0.09 + 0.07 * e(2500),
 		width: 9 + 5 * Math.exp(-t / 2500),
 	};
 }
@@ -182,6 +198,16 @@ export function latSafeAt(seed: number, s: number, width: number): number {
 	return amp * (0.62 * Math.sin(s * 0.011 + p1) + 0.38 * Math.sin(s * 0.023 + p2));
 }
 
+/** Bobsleigh wall profile: flat pipe floor, then a quadratic icy wall. */
+export function bobWall(width: number, lat: number, P: LugeParams = LUGE): { rise: number; slope: number } {
+	const flatHalf = (width / 2) * P.bobFlatFrac;
+	const a = Math.abs(lat) - flatHalf;
+	if (a <= 0) return { rise: 0, slope: 0 };
+	const span = width / 2 + P.bobWallExtra - flatHalf;
+	const c = P.bobWallHeight / (span * span);
+	return { rise: c * a * a, slope: Math.sign(lat) * 2 * c * a };
+}
+
 /** Separator half-width at local s inside a fork segment (0 outside [noseS, mergeS]). */
 export function sepHalfAt(fork: ForkInfo, sLocal: number): number {
 	if (sLocal < fork.noseS || sLocal >= fork.mergeS) return 0;
@@ -198,6 +224,7 @@ function pickKind(rng: () => number, index: number, prevKind: SegmentKind, diff:
 	const p = rng();
 	if (p < diff.forkChance && prevKind !== 'fork') return 'fork';
 	if (p < diff.forkChance + diff.tunnelChance && prevKind !== 'fork') return 'tunnel';
+	if (p < diff.forkChance + diff.tunnelChance + diff.bobChance && prevKind !== 'fork') return 'bob';
 	const q = rng();
 	if (q < 0.3) return 'straight';
 	if (q < 0.55) return 'curveL';
@@ -213,7 +240,15 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 	// Length per kind, rounded to the sample step.
 	const pick = (a: number, b: number) => Math.round((a + rng() * (b - a)) / SAMPLE_STEP) * SAMPLE_STEP;
 	const length =
-		kind === 'fork' ? pick(130, 160) : kind === 'scurve' ? pick(120, 160) : kind === 'straight' ? pick(80, 140) : pick(90, 150);
+		kind === 'fork'
+			? pick(130, 160)
+			: kind === 'bob'
+				? pick(140, 200)
+				: kind === 'scurve'
+					? pick(120, 160)
+					: kind === 'straight'
+						? pick(80, 140)
+						: pick(90, 150);
 
 	// Curvature profile κ(t), t in [0,1].
 	const kMax = diff.curveMax * (0.6 + 0.4 * rng());
@@ -229,6 +264,9 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 				return kMax * 0.9 * Math.sin(TWO_PI * t);
 			case 'tunnel':
 				return kMax * 0.3 * tunnelDir * Math.sin(Math.PI * t);
+			case 'bob':
+				// Alternating tight arcs — the icy walls (not steering) absorb the g-forces.
+				return kMax * 1.7 * tunnelDir * Math.sin(3 * Math.PI * t) * Math.sin(Math.PI * t);
 			case 'fork':
 				return 0;
 			default:
@@ -297,9 +335,9 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		}
 	}
 
-	// Obstacles — never inside the safe corridor.
+	// Obstacles — never inside the safe corridor. None in bob pipes (speed is the challenge).
 	const obstacles: Obstacle[] = [];
-	if (index >= WARMUP_OBSTACLES && kind !== 'fork') {
+	if (index >= WARMUP_OBSTACLES && kind !== 'fork' && kind !== 'bob') {
 		const spacingMul = kind === 'tunnel' ? 1.6 : 1;
 		let sLocal = 8 + rng() * 10;
 		while (sLocal < length - 8) {
@@ -351,6 +389,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		samples,
 		obstacles,
 		tunnel: kind === 'tunnel',
+		bob: kind === 'bob',
 		fork,
 		exit: {
 			x: last.x,
@@ -429,19 +468,29 @@ function lerpAt(segs: TrackSegment[], s: number): SampleLerp {
 	};
 }
 
-/** World pose for the renderer: centerline lerp + lateral offset along the left normal. */
+/**
+ * World pose for the renderer: centerline lerp + lateral offset along the left normal.
+ * `bank` is the surface roll at that lateral position (banked ribbon + bob walls).
+ */
 export function poseAt(
 	segs: TrackSegment[],
 	s: number,
 	lat: number,
 ): { x: number; y: number; z: number; heading: number; bank: number; width: number } {
 	const p = lerpAt(segs, s);
+	let y = p.y - Math.sin(p.bank) * lat;
+	let dydlat = -Math.sin(p.bank);
+	if (p.seg.bob) {
+		const w = bobWall(p.width, lat);
+		y += w.rise;
+		dydlat += w.slope;
+	}
 	return {
 		x: p.x + p.nx * lat,
-		y: p.y - Math.sin(p.bank) * lat,
+		y,
 		z: p.z + p.nz * lat,
 		heading: Math.atan2(p.dirZ, p.dirX),
-		bank: p.bank,
+		bank: -Math.atan(dydlat),
 		width: p.width,
 	};
 }
@@ -493,17 +542,17 @@ export function stepLuge(
 		return true;
 	};
 
-	// Forward speed relaxes toward the difficulty ramp (boost multiplies the target).
+	// Forward speed relaxes toward the difficulty ramp (boost and icy bob multiply the target).
+	const here = lerpAt(segs, st.s);
 	const diff = difficultyAt(st.s);
-	const vMax = diff.vMax * (boostMs > 0 ? P.boostMul : 1);
+	const vMax = diff.vMax * (boostMs > 0 ? P.boostMul : 1) * (here.seg.bob ? P.bobVMaxMul : 1);
 	speed += (vMax - speed) * Math.min(1, P.speedRelax * dtSec);
 
 	// Lateral: steering vs centrifugal pull (κ·v², partly absorbed by banking), then friction.
-	const here = lerpAt(segs, st.s);
 	const steer = Math.max(-1, Math.min(1, input.steer));
 	latVel += steer * P.steerAccel * dtSec;
 	latVel -= here.curvature * speed * speed * P.centrifugal * dtSec;
-	latVel *= Math.pow(P.latFriction, dtSec * 60);
+	latVel *= Math.pow(here.seg.bob ? P.bobLatFriction : P.latFriction, dtSec * 60);
 	lat += latVel * dtSec;
 
 	const prevS = st.s;
@@ -561,17 +610,32 @@ export function stepLuge(
 		lane = null;
 	}
 
-	// Regular berms (never lethal — bounce + speed scrub).
+	// Edges. Bob pipe: the icy wall climbs freely and gravity pulls back — no bounce,
+	// no scrub, just a hard crest. Elsewhere: snow berms (never lethal — bounce + scrub).
 	if (!inForkBand) {
-		const hw = lerpAt(segs, s).width / 2 - P.sledHalf;
-		if (lat > hw) {
-			lat = hw;
-			if (latVel > 0) latVel = -latVel * P.bermBounce;
-			bermHit = true;
-		} else if (lat < -hw) {
-			lat = -hw;
-			if (latVel < 0) latVel = -latVel * P.bermBounce;
-			bermHit = true;
+		const info2 = lerpAt(segs, s);
+		if (info2.seg.bob) {
+			const w = bobWall(info2.width, lat);
+			latVel -= w.slope * P.bobWallGravity * dtSec;
+			const crest = info2.width / 2 + P.bobWallExtra - P.sledHalf;
+			if (lat > crest) {
+				lat = crest;
+				if (latVel > 0) latVel = 0;
+			} else if (lat < -crest) {
+				lat = -crest;
+				if (latVel < 0) latVel = 0;
+			}
+		} else {
+			const hw = info2.width / 2 - P.sledHalf;
+			if (lat > hw) {
+				lat = hw;
+				if (latVel > 0) latVel = -latVel * P.bermBounce;
+				bermHit = true;
+			} else if (lat < -hw) {
+				lat = -hw;
+				if (latVel < 0) latVel = -latVel * P.bermBounce;
+				bermHit = true;
+			}
 		}
 	}
 	if (bermHit) speed *= Math.pow(P.bermScrub, dtSec * 60);

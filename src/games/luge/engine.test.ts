@@ -36,6 +36,16 @@ const findFork = (): { seed: number; segs: TrackSegment[]; fork: TrackSegment } 
 	throw new Error('no fork found in 20 seeds x 80 segments');
 };
 
+/** First bob segment across a few seeds (deterministic search). */
+const findBob = (): { seed: number; segs: TrackSegment[]; bob: TrackSegment } => {
+	for (let seed = 1; seed < 30; seed++) {
+		const segs = buildChain(seed, 80);
+		const bob = segs.find((sg) => sg.kind === 'bob');
+		if (bob) return { seed, segs, bob };
+	}
+	throw new Error('no bob found in 30 seeds x 80 segments');
+};
+
 const runUntil = (
 	st: LugeState,
 	segs: TrackSegment[],
@@ -250,6 +260,30 @@ describe('luge simulation', () => {
 		expect(sepHalfAt(f, f.noseS)).toBe(0);
 		expect(sepHalfAt(f, (f.noseS + f.mergeS) / 2)).toBeCloseTo(f.sepHalfMax, 6);
 		expect(sepHalfAt(f, f.mergeS)).toBe(0);
+	});
+
+	it('bob: icy pipe has no obstacles, walls climb and pull back without costing lives', () => {
+		const { segs, bob } = findBob();
+		expect(bob.bob).toBe(true);
+		expect(bob.obstacles).toEqual([]);
+		const s0 = bob.startS + bob.length / 2;
+		const w = poseAt(segs, s0, 0).width;
+		// Dropped high on the wall: no crash, gravity pulls back toward the pipe floor.
+		const st: LugeState = { ...createLuge(), s: s0, lat: w / 2 + 1.5, speed: 25 };
+		const r = stepLuge(st, { steer: 0 }, DT, segs);
+		expect(r.events).toEqual([]);
+		expect(r.state.lives).toBe(LUGE.lives);
+		expect(r.state.latVel).toBeLessThan(0);
+		// The wall rise shows up in the pose (higher than the pipe floor).
+		expect(poseAt(segs, s0, w / 2 + 1.5).y).toBeGreaterThan(poseAt(segs, s0, 0).y);
+	});
+
+	it('bob: icy sections push the speed target above the regular ramp', () => {
+		const { segs, bob } = findBob();
+		const s0 = bob.startS + bob.length / 2;
+		const v = difficultyAt(s0).vMax;
+		const st: LugeState = { ...createLuge(), s: s0, lat: 0, speed: v };
+		expect(stepLuge(st, { steer: 0 }, DT, segs).state.speed).toBeGreaterThan(v);
 	});
 
 	it('poseAt offsets along the left normal and follows the descent', () => {
