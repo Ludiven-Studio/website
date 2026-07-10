@@ -29,6 +29,7 @@ const CUE_COLOR = '#f4f4f2';
 const FELT = '#0f7a52';
 const FELT_DARK = '#0c6644';
 const FELT_TILES = 10; // felt-texture repeats across the table width (higher = finer nap)
+const MIN_FLOOR = 16; // minimum floor units around the table (the floor then fills all remaining space)
 
 const SINK_MS = 280; // pot animation duration
 type Sink = { x: number; y: number; px: number; py: number; r: number; color: number; kind: 'cue' | 'color'; t0: number };
@@ -55,6 +56,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const tableRef = useRef<Table>(makeTable());
 	const ballsRef = useRef<Ball[]>([]);
 	const scaleRef = useRef(1);
+	const offsetRef = useRef({ x: MIN_FLOOR, y: MIN_FLOOR }); // world units of floor left/top of the centred table
 	const aimRef = useRef<{ pull: Vec } | null>(null);
 	const statusRef = useRef<Status>('aiming');
 	const rollingRef = useRef(false);
@@ -70,12 +72,30 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const bestRef = useRef<number | null>(null);
 	const triesRef = useRef(0);
 	const feltImgRef = useRef<HTMLImageElement | null>(null); // AI felt (else flat green)
+	const floorImgRef = useRef<HTMLImageElement | null>(null); // AI floor around the table
+	const [isFs, setIsFs] = useState(false); // immersive fullscreen
 
-	// Load the felt texture once (RAF loop picks it up next frame).
+	// Load the felt + floor textures once (RAF loop picks them up next frame).
 	useEffect(() => {
-		const img = new Image();
-		img.onload = () => { feltImgRef.current = img; };
-		img.src = '/assets/jeux/billard/felt.jpg';
+		const load = (src: string, ref: React.RefObject<HTMLImageElement | null>) => {
+			const img = new Image();
+			img.onload = () => { ref.current = img; };
+			img.src = src;
+		};
+		load('/assets/jeux/billard/felt.jpg', feltImgRef);
+		load('/assets/jeux/billard/floor.jpg', floorImgRef);
+	}, []);
+
+	// Fullscreen (immersive) toggle on the play area.
+	const toggleFs = () => {
+		const el = wrapRef.current;
+		if (!document.fullscreenElement) el?.requestFullscreen?.().catch(() => {});
+		else document.exitFullscreen?.();
+	};
+	useEffect(() => {
+		const onFs = () => setIsFs(!!document.fullscreenElement);
+		document.addEventListener('fullscreenchange', onFs);
+		return () => document.removeEventListener('fullscreenchange', onFs);
 	}, []);
 
 	const { celebrating } = useCelebration(status === 'won');
@@ -177,7 +197,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	/* ---------- Pointer (slingshot) ---------- */
 	const pointerToTable = (e: PointerEvent): Vec => {
 		const rect = canvasRef.current!.getBoundingClientRect();
-		return { x: (e.clientX - rect.left) / scaleRef.current, y: (e.clientY - rect.top) / scaleRef.current };
+		return {
+			x: (e.clientX - rect.left) / scaleRef.current - offsetRef.current.x,
+			y: (e.clientY - rect.top) / scaleRef.current - offsetRef.current.y,
+		};
 	};
 
 	useEffect(() => {
@@ -244,16 +267,20 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (!cv || !wrap) return;
 		const resize = () => {
 			const t = tableRef.current;
-			const cssW = Math.min(wrap.clientWidth, 560);
-			const cssH = (cssW * t.h) / t.w;
-			scaleRef.current = cssW / t.w;
+			// The canvas fills its container; the table is centred and the floor fills all the rest.
+			const cssW = wrap.clientWidth;
+			const cssH = wrap.clientHeight || cssW * 0.625;
+			const scale = Math.min(cssW / (t.w + 2 * MIN_FLOOR), cssH / (t.h + 2 * MIN_FLOOR));
+			scaleRef.current = scale;
+			offsetRef.current = { x: (cssW / scale - t.w) / 2, y: (cssH / scale - t.h) / 2 };
 			const dpr = window.devicePixelRatio || 1;
 			cv.style.width = `${cssW}px`;
 			cv.style.height = `${cssH}px`;
 			cv.width = Math.round(cssW * dpr);
 			cv.height = Math.round(cssH * dpr);
 			const ctx = cv.getContext('2d');
-			if (ctx) ctx.setTransform(dpr * scaleRef.current, 0, 0, dpr * scaleRef.current, 0, 0);
+			const s = dpr * scale;
+			if (ctx) ctx.setTransform(s, 0, 0, s, s * offsetRef.current.x, s * offsetRef.current.y);
 		};
 		resize();
 		const ro = new ResizeObserver(resize);
@@ -269,7 +296,26 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const t = tableRef.current;
 
 		const draw = (now: number) => {
-			ctx.clearRect(0, 0, t.w, t.h);
+			const ox = offsetRef.current.x, oy = offsetRef.current.y;
+			const VW = t.w + 2 * ox, VH = t.h + 2 * oy;
+			ctx.clearRect(-ox, -oy, VW, VH);
+			// Floor filling the whole view (tiled) — the table sits centred on it.
+			const floor = floorImgRef.current;
+			const floorPat = floor && ctx.createPattern(floor, 'repeat');
+			if (floorPat) {
+				const fscale = t.w / 4 / floor!.width; // floor tile ≈ quarter of the table width
+				floorPat.setTransform(new DOMMatrix([fscale, 0, 0, fscale, 0, 0]));
+				ctx.fillStyle = floorPat;
+			} else {
+				ctx.fillStyle = '#3a2a1c';
+			}
+			ctx.fillRect(-ox, -oy, VW, VH);
+			// Wood frame + drop shadow so the table sits above the floor.
+			ctx.save();
+			ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 9; ctx.shadowOffsetY = 4;
+			ctx.fillStyle = '#3a2416';
+			ctx.fillRect(-4, -4, t.w + 8, t.h + 8);
+			ctx.restore();
 			// cloth — tiled pattern (not a stretched drawImage, which magnified the nap ~x100)
 			const felt = feltImgRef.current;
 			const feltPat = felt && ctx.createPattern(felt, 'repeat');
@@ -399,34 +445,31 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		<div className="bi-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newFreeTable(diffKey)} onDaily={startDaily} />
-
-			{daily ? (
-				<div className="bi-daily-tag">
-					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
-				</div>
-			) : (
-				<div className="bi-bar">
-					<div className="bi-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
-							<button key={k} role="tab" aria-selected={diffKey === k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)}>
-								{DIFFS[k].label}
-							</button>
-						))}
-					</div>
-					<button className="bi-act" onClick={() => newFreeTable(diffKey)}>↻ Nouvelle table</button>
-				</div>
-			)}
-
-			<div className="bi-stats">
-				<span className="bi-stat">🎱 {strokes} coups</span>
-				<span className="bi-stat">🎯 {remaining} à rentrer</span>
-				<span className="bi-stat">⏱ {fmtTime(elapsed)}</span>
-			</div>
-
 			<div className="bi-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
 				<canvas ref={canvasRef} className="bi-canvas" />
+
+				<div className="bi-hud-top">
+					<ModeToggle daily={daily} onFree={() => daily && newFreeTable(diffKey)} onDaily={startDaily} />
+					<div className="bi-stats">
+						<span className="bi-stat">🎱 {strokes}</span>
+						<span className="bi-stat">🎯 {remaining}</span>
+						<span className="bi-stat">⏱ {fmtTime(elapsed)}</span>
+					</div>
+					<div className="bi-hud-actions">
+						{!daily && (Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+							<button key={k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)}>{DIFFS[k].label}</button>
+						))}
+						<button className="bi-act" onClick={() => newFreeTable(diffKey)} aria-label="Nouvelle table" title="Nouvelle table">↻</button>
+						<button className="bi-act" onClick={toggleFs} aria-label={isFs ? 'Quitter le plein écran' : 'Plein écran'} title="Plein écran">{isFs ? '⤡' : '⛶'}</button>
+					</div>
+				</div>
+				{daily && (
+					<div className="bi-daily-tag bi-daily-hud">
+						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+					</div>
+				)}
+
 				{scratchFlash && <div className="bi-scratch">Pénalité · +1 coup</div>}
 				{status === 'won' && (
 					<div className="bi-overlay">
@@ -466,24 +509,30 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 const CSS = `
 .bi-root {
   --bi-accent: var(--accent-regular);
-  width: 100%; max-width: 580px; margin-inline: auto; color: var(--gray-0);
+  width: 100%; max-width: 1040px; margin-inline: auto; color: var(--gray-0);
   font-family: var(--font-body); display: flex; flex-direction: column; align-items: center;
 }
-.bi-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
-.bi-bar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-.bi-pills { display: flex; gap: 6px; flex-wrap: wrap; }
-.bi-pill { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer; transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition); }
+
+/* Play area holds the canvas + all controls overlaid (immersive). */
+.bi-playwrap { width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
+.bi-canvas { display: block; touch-action: none; cursor: crosshair; background: #3a2a1c; }
+.bi-playwrap:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+
+/* Overlaid HUD — sits on the floor above the table; dark translucent so it reads on any surface. */
+.bi-hud-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; z-index: 3; pointer-events: none; }
+.bi-hud-top > * { pointer-events: auto; }
+.bi-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.bi-daily-hud { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 3; background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); }
+
+.bi-stats { display: flex; gap: 6px; font-weight: 700; font-size: 13px; flex-wrap: wrap; }
+.bi-stat { background: rgba(20,14,10,0.6); color: #f4ece2; border-radius: 999px; padding: 5px 11px; backdrop-filter: blur(4px); box-shadow: 0 1px 3px rgba(0,0,0,0.35); }
+
+.bi-pill { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(20,14,10,0.55); color: #f0e6da; font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer; backdrop-filter: blur(4px); transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition); }
 .bi-pill.active { background: var(--bi-accent); color: var(--accent-text-over); border-color: var(--bi-accent); }
-.bi-act { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
-.bi-act:hover { background: var(--gray-800); border-color: var(--bi-accent); color: var(--bi-accent); }
+.bi-act { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(20,14,10,0.55); color: #f0e6da; font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 6px 12px; min-width: 36px; cursor: pointer; backdrop-filter: blur(4px); }
+.bi-act:hover { border-color: var(--bi-accent); color: #fff; }
 
-.bi-stats { display: flex; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.75rem; flex-wrap: wrap; justify-content: center; }
-.bi-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; }
-
-.bi-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
-.bi-canvas { display: block; border-radius: 10px; box-shadow: var(--shadow-md); touch-action: none; cursor: crosshair; background: ${FELT}; }
-
-.bi-scratch { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); }
+.bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); }
 
 .bi-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .bi-overlay-card { background: var(--gray-999); border: 2px solid var(--bi-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }

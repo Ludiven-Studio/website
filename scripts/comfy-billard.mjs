@@ -14,7 +14,7 @@ import { submit, waitForImages, download } from './comfy-gen.mjs';
 const preview = process.argv.includes('--preview');
 const OUT = preview ? resolve('D:/tmp/comfy/billard') : resolve('public/assets/jeux/billard');
 await mkdir(OUT, { recursive: true });
-const ONLY = process.argv.filter((a) => ['felt'].includes(a));
+const ONLY = process.argv.filter((a) => ['felt', 'floor'].includes(a));
 const want = (n) => ONLY.length === 0 || ONLY.includes(n);
 const TILE_NEG = 'seams, border, frame, vignette, strong shadows, lighting gradient, ball, hole, pocket, cue, wood, chalk, lines, text, watermark, perspective, blurry';
 
@@ -39,5 +39,19 @@ if (want('felt')) {
 	// Nudge toward the game's felt green (#0f7a52), keep it calm.
 	await sharp(felt).modulate({ saturation: 0.92, brightness: 0.96, hue: -6 }).jpeg({ quality: 86 }).toFile(resolve(OUT, 'felt.jpg'));
 	console.log('✓ felt.jpg');
+}
+
+// Floor — dark parquet around the table (room to aim), tiled behind the felt.
+if (want('floor')) {
+	const floor = await gen({
+		id: 'floor',
+		prompt: 'seamless tileable dark hardwood parquet floor texture, top-down view, warm deep brown wood planks, herringbone, even soft lighting, subtle grain, no seams',
+		negative: 'table, felt, green, ball, cue, object, rug edge, wall, text, watermark, perspective, strong shadows, vignette, blurry',
+		w: 512,
+		h: 512,
+		steps: 7,
+	});
+	await sharp(floor).modulate({ saturation: 0.95, brightness: 0.82 }).jpeg({ quality: 86 }).toFile(resolve(OUT, 'floor.jpg'));
+	console.log('✓ floor.jpg');
 }
 console.log('done →', OUT);
