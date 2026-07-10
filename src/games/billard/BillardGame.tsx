@@ -29,7 +29,7 @@ const CUE_COLOR = '#f4f4f2';
 const FELT = '#0f7a52';
 const FELT_DARK = '#0c6644';
 const FELT_TILES = 10; // felt-texture repeats across the table width (higher = finer nap)
-const MIN_FLOOR = 16; // minimum floor units around the table (the floor then fills all remaining space)
+const MIN_FLOOR = 40; // minimum floor units around the table (the floor then fills all remaining space)
 
 const SINK_MS = 280; // pot animation duration
 type Sink = { x: number; y: number; px: number; py: number; r: number; color: number; kind: 'cue' | 'color'; t0: number };
