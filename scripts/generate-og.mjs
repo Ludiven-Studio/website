@@ -142,7 +142,7 @@ async function main() {
 			await page.addStyleTag({
 				content: `nav, footer, .game-head { display: none !important; }
 					.game-page { max-width: none !important; width: 100vw; min-height: 100vh; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; }
-					body, .backgrounds { background: ${process.env.OG_BG || 'linear-gradient(160deg, #3a2a1c, #22160d)'} !important; }`,
+					body, .backgrounds { background: ${process.env.OG_BG || 'linear-gradient(160deg, #61492f, #3a2a1a)'} !important; }`,
 			});
 
 			if (!process.env.OG_NOSTART) await startGame(); // OG_NOSTART=1 → capture the ready scene
