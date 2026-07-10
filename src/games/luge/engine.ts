@@ -259,6 +259,30 @@ export function pipeRampAt(seg: TrackSegment, sLocal: number, P: LugeParams = LU
 	return 0;
 }
 
+/**
+ * Fork danger lane = an open icy gutter: walls rise on BOTH sides of the lane
+ * (separator side and outer side) so stalagmites are dodged by climbing.
+ * Returns {rise, slope} of the surface at (sLocal, lat); zero outside the lane.
+ */
+export function forkGutter(seg: TrackSegment, sLocal: number, lat: number): { rise: number; slope: number } {
+	const f = seg.fork;
+	if (!f || sLocal < f.noseS || sLocal >= f.mergeS) return { rise: 0, slope: 0 };
+	const sign = f.danger === 'left' ? 1 : -1;
+	const l = sign * lat; // lane-space: positive into the danger side
+	if (l <= f.sepHalfMax * 0.6) return { rise: 0, slope: 0 };
+	const c = (f.sepHalfMax + f.outerDanger) / 2;
+	const halfLane = (f.outerDanger - f.sepHalfMax) / 2;
+	const flat = halfLane * 0.35;
+	const a = Math.abs(l - c) - flat;
+	if (a <= 0) return { rise: 0, slope: 0 };
+	const span = halfLane + 0.8 - flat;
+	const cc = 1.6 / (span * span);
+	const ramp = Math.min(smoothstep(f.noseS, f.noseS + 12, sLocal), 1 - smoothstep(f.mergeS - 12, f.mergeS, sLocal));
+	// Plateau past the crest: the gutter is carved into a raised ice bank.
+	const aEff = Math.min(a, span);
+	return { rise: cc * aEff * aEff * ramp, slope: a >= span ? 0 : sign * Math.sign(l - c) * 2 * cc * a * ramp };
+}
+
 /** Separator half-width at local s inside a fork segment (0 outside [noseS, mergeS]). */
 export function sepHalfAt(fork: ForkInfo, sLocal: number): number {
 	if (sLocal < fork.noseS || sLocal >= fork.mergeS) return 0;
@@ -424,17 +448,16 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		}
 	}
 	if (fork) {
-		// Danger lane: alternating ice pillars split the cave into rejoining branches —
-		// one side is always open (~2.5 m), the other pinches shut. Don't get stuck.
+		// Danger lane: an open icy gutter — a couple of centered stalagmites that are
+		// dodged by climbing the gutter walls.
 		const sign = fork.danger === 'left' ? 1 : -1;
 		const center = (fork.sepHalfMax + fork.outerDanger) / 2;
-		const laneW = fork.outerDanger - fork.sepHalfMax;
-		const span = fork.mergeS - fork.noseS - 25;
-		const count = 3;
+		const span = fork.mergeS - fork.noseS - 30;
+		const count = 2;
 		for (let i = 0; i < count; i++) {
-			const sLocal = fork.noseS + 15 + (span * (i + 0.5)) / count + (rng() - 0.5) * 5;
-			const off = (i % 2 === 0 ? -1 : 1) * laneW * 0.23;
-			obstacles.push({ s: sLocal, lat: sign * (center + off), r: 1.1, len: 6 + rng() * 4, type: 'ice' });
+			const sLocal = fork.noseS + 18 + (span * (i + 0.5)) / count + (rng() - 0.5) * 5;
+			const off = (i % 2 === 0 ? -1 : 1) * 0.4;
+			obstacles.push({ s: sLocal, lat: sign * (center + off), r: 0.9, len: 4 + rng() * 2, type: 'ice' });
 		}
 		// One optional obstacle on the safe side.
 		if (rng() < 0.6) {
@@ -557,6 +580,10 @@ export function poseAt(
 		const w = pipeWall(p.seg, p.width, lat);
 		y += w.rise * ramp;
 		dydlat += w.slope * ramp;
+	} else if (p.seg.fork) {
+		const fg = forkGutter(p.seg, s - p.seg.startS, lat);
+		y += fg.rise;
+		dydlat += fg.slope;
 	}
 	return {
 		x: p.x + p.nx * lat,
@@ -635,7 +662,8 @@ export function stepLuge(
 	const steer = Math.max(-1, Math.min(1, input.steer));
 	latVel += steer * P.steerAccel * dtSec;
 	latVel -= here.curvature * speed * speed * P.centrifugal * dtSec;
-	latVel *= Math.pow(here.seg.bob || here.seg.tunnel ? P.bobLatFriction : P.latFriction, dtSec * 60);
+	const onIce = here.seg.bob || here.seg.tunnel || (here.seg.fork != null && st.lane === here.seg.fork.danger);
+	latVel *= Math.pow(onIce ? P.bobLatFriction : P.latFriction, dtSec * 60);
 	lat += latVel * dtSec;
 
 	const prevS = st.s;
@@ -667,17 +695,20 @@ export function stepLuge(
 			inForkBand = true;
 			if (!lane) lane = lat >= 0 ? 'left' : 'right';
 			const sign = lane === 'left' ? 1 : -1;
+			const danger = lane === fork.danger;
+			// Danger lane: icy gutter walls pull back toward the lane floor (no bounce).
+			if (danger) latVel -= forkGutter(seg, sLocal, lat).slope * P.bobWallGravity * dtSec;
 			const lo = sepHalfAt(fork, sLocal) + P.sledHalf;
-			const hi = (lane === fork.danger ? fork.outerDanger : fork.outerSafe) - P.sledHalf;
+			const hi = (danger ? fork.outerDanger + 0.8 : fork.outerSafe) - P.sledHalf;
 			let l = sign * lat;
 			if (l < lo) {
 				l = lo;
-				if (sign * latVel < 0) latVel = -latVel * P.bermBounce;
-				bermHit = true;
+				if (sign * latVel < 0) latVel = danger ? 0 : -latVel * P.bermBounce;
+				bermHit = !danger;
 			} else if (l > hi) {
 				l = hi;
-				if (sign * latVel > 0) latVel = -latVel * P.bermBounce;
-				bermHit = true;
+				if (sign * latVel > 0) latVel = danger ? 0 : -latVel * P.bermBounce;
+				bermHit = !danger;
 			}
 			lat = sign * l;
 		}

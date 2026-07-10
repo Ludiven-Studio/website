@@ -117,8 +117,8 @@ describe('luge generation', () => {
 		}
 	});
 
-	it('fork danger lane: ice pillars split the cave but always leave an open branch', () => {
-		const { fork } = findFork();
+	it('fork danger lane: an open icy gutter with climbable walls around centered stalagmites', () => {
+		const { segs, fork } = findFork();
 		const f = fork.fork!;
 		const sign = f.danger === 'left' ? 1 : -1;
 		const pillars = fork.obstacles.filter((obs) => obs.type === 'ice');
@@ -128,8 +128,14 @@ describe('luge generation', () => {
 			const l = sign * obs.lat;
 			const gapInner = l - obs.r - f.sepHalfMax;
 			const gapOuter = f.outerDanger - (l + obs.r);
-			expect(Math.max(gapInner, gapOuter)).toBeGreaterThanOrEqual(2 * LUGE.sledHalf);
+			// Room to climb past the stalagmite on both sides of the gutter.
+			expect(Math.min(gapInner, gapOuter)).toBeGreaterThanOrEqual(2 * LUGE.sledHalf);
 		}
+		// Gutter walls rise above the lane floor (fork banking is zero, so this is pure wall).
+		const sMid = fork.startS + (f.noseS + f.mergeS) / 2;
+		const c = sign * ((f.sepHalfMax + f.outerDanger) / 2);
+		const edge = sign * (f.outerDanger - 0.2);
+		expect(poseAt(segs, sMid, edge).y).toBeGreaterThan(poseAt(segs, sMid, c).y + 0.3);
 	});
 
 	it('bob runs span 2-3 consecutive segments with ramps only at the run ends', () => {

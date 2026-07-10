@@ -229,7 +229,8 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 	// (poseAt carries the pipe shape) with a bright ice floor.
 	{
 		const isPipe = seg.bob || seg.tunnel;
-		const ts = isPipe ? [-1, -0.92, -0.82, -0.68, -0.45, 0, 0.45, 0.68, 0.82, 0.92, 1] : [-1, -0.5, 0, 0.5, 1];
+		const ts =
+			isPipe || seg.fork ? [-1, -0.92, -0.82, -0.68, -0.45, 0, 0.45, 0.68, 0.82, 0.92, 1] : [-1, -0.5, 0, 0.5, 1];
 		const extra = seg.bob ? LUGE.bobWallExtra : seg.tunnel ? LUGE.tunnelWallExtra : 0;
 		const ribbon: Row[][] = [];
 		for (let k = 0; k <= n; k++) {
@@ -361,38 +362,20 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		}
 		add(stripFrom(wedgeRows), g.mats.wedge);
 
-		// Danger lane: an enveloping ice cave between the separator and its outer wall.
-		const cLat = sign * ((f.sepHalfMax + f.outerDanger) / 2);
-		const R = (f.outerDanger - f.sepHalfMax) / 2 + 0.8;
-		const tRows: Row[][] = [];
-		for (let k = k0 + 4; k <= Math.min(k1 - 3, n); k++) {
-			const s = sAt(k);
-			const fr = frameAt(segs, s);
-			const across: Row[] = [];
-			for (let j = 0; j <= TUNNEL_RADIAL; j++) {
-				const th = -0.3 + (j / TUNNEL_RADIAL) * (Math.PI + 0.6);
-				const lat = cLat + Math.cos(th) * R;
-				across.push({
-					x: fr.x + fr.nx * lat - o.x,
-					y: fr.y + Math.sin(th) * R * 0.9 + 0.2 - o.y,
-					z: fr.z + fr.nz * lat - o.z,
-					u: (th / Math.PI) * 2,
-					v: s / 4,
-				});
-			}
-			tRows.push(across);
-		}
-		add(stripFrom(tRows), g.mats.caveIce);
-		addPortal(k0 + 4, cLat, R, 3, 0.2);
-		addPortal(Math.min(k1 - 3, n), cLat, R, 3, 0.2);
-
-		// Outer ice wall closing the danger lane (the safe side keeps the full width).
-		const wallRows: Row[][] = [];
+		// Danger lane: an open icy gutter (walls both sides, shape carried by poseAt).
+		// A bright ice strip overlays the snow ribbon across the whole gutter.
+		const gutterRows: Row[][] = [];
 		for (let k = k0; k <= Math.min(k1, n); k++) {
 			const s = sAt(k);
-			wallRows.push([edgePt(segs, s, sign * f.outerDanger, o), edgePt(segs, s, sign * (f.outerDanger + 0.4), o, 1.8)]);
+			const across: Row[] = [];
+			const inner = f.sepHalfMax * 0.7;
+			const outer = f.outerDanger + 0.8;
+			for (const t of [0, 0.15, 0.3, 0.5, 0.7, 0.85, 1]) {
+				across.push(edgePt(segs, s, sign * (inner + t * (outer - inner)), o, 0.04));
+			}
+			gutterRows.push(across);
 		}
-		add(stripFrom(wallRows), g.mats.caveIce);
+		add(stripFrom(gutterRows), g.mats.ice);
 	}
 
 	// Obstacles (shared geometries/materials — only transforms per instance).
@@ -799,14 +782,10 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		}
 
 		// Chase camera: behind + above, looking through the sled far ahead.
-		// Under an arch (full tunnel / narrow danger-lane tunnel) it ducks low and
-		// hugs the sled laterally so the view stays inside the tube.
-		const sLoc = sI - seg.startS;
-		const inDanger = Boolean(seg.fork && st.lane === seg.fork.danger && sLoc >= seg.fork.noseS && sLoc < seg.fork.mergeS);
-		const wantH = inDanger ? 2 : seg.tunnel ? 3 : 4;
+		// Under a cave arch it ducks low so the view stays inside the tube.
+		const wantH = seg.tunnel ? 3 : 4;
 		camHRef.current += (wantH - camHRef.current) * Math.min(1, dtSec * 4);
-		const latK = inDanger ? 0.9 : 0.5;
-		camLatRef.current += (latI * latK - camLatRef.current) * Math.min(1, dtSec * 5);
+		camLatRef.current += (latI * 0.5 - camLatRef.current) * Math.min(1, dtSec * 5);
 		const camPose = poseAt(segs, Math.max(0, sI - 8), camLatRef.current);
 		const lookPose = poseAt(segs, sI + 16, latI * 0.7);
 		const spd = Math.min(1, st.speed / 60);

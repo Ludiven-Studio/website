@@ -185,7 +185,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	luge: [
 		{ emoji: '🛷', title: 'Le but', body: 'Dévale une montagne enneigée en luge, le plus loin possible. La descente accélère et se rétrécit au fil des mètres : ta distance est ton score.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'La luge fonce toute seule — tu diriges seulement à gauche/droite avec les flèches / Q-D, ou les deux gros boutons tactiles. Évite les sapins et les rochers : chaque choc coûte une vie (3 vies) et casse ta vitesse.' },
-		{ emoji: '❄️', title: 'Sections spéciales', body: 'Aux bifurcations, choisis ton côté (foncer dans le séparateur = crash !) : la grotte de glace rapporte +50 points et un boost. Dans les grottes, le sol de glace glisse et des stalagmites barrent le passage — grimpe sur les parois pour les éviter ; te coincer ne coûte pas de vie mais écrase ta vitesse. Et dans les pistes de bobsleigh gelées, grimpe sur les parois dans les virages serrés : plus tu carves haut, plus tu vas vite.' },
+		{ emoji: '❄️', title: 'Sections spéciales', body: 'Aux bifurcations, choisis ton côté (foncer dans le séparateur = crash !) : le couloir de glace étroit rapporte +50 points et un boost. Sur la glace (grottes, couloirs), le sol glisse et des stalagmites barrent le passage — grimpe sur les parois pour les éviter ; te coincer ne coûte pas de vie mais écrase ta vitesse. Et dans les pistes de bobsleigh gelées, plus tu carves haut dans les virages, plus tu vas vite.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, la descente est identique pour tout le monde. Jusqu\'à 10 essais : ta meilleure distance de la journée est classée.' },
 	],
 	esquive: [
