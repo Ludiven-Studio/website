@@ -524,6 +524,9 @@ const CSS = `
 .game-page:-webkit-full-screen .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
 .game-page:fullscreen .bi-help { display: none; }
 .game-page:-webkit-full-screen .bi-help { display: none; }
+/* Leave room top-right for the site's global "⛶ Quitter" button (fixed at top:12/right:12). */
+.game-page:fullscreen .bi-hud-top { padding-right: 122px; }
+.game-page:-webkit-full-screen .bi-hud-top { padding-right: 122px; }
 
 /* Overlaid HUD — sits on the floor above the table; dark translucent so it reads on any surface. */
 .bi-hud-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; z-index: 3; pointer-events: none; }

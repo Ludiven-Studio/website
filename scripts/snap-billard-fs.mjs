@@ -23,8 +23,13 @@ await page.addStyleTag({ content: `
   .faux-fs .bi-root { max-width: none !important; width: 100% !important; height: 100% !important; }
   .faux-fs .bi-playwrap { flex: 1 !important; aspect-ratio: auto !important; border-radius: 0 !important; }
   .faux-fs .bi-help { display: none !important; }
+  .faux-fs .bi-hud-top { padding-right: 122px !important; }
+  .mock-quit { position: fixed; top: 12px; right: 12px; z-index: 99999; background: #141925; color: #fff; border: 1.5px solid #505d84; border-radius: 999px; padding: 7px 14px; font: 600 14px sans-serif; }
 `});
-await page.evaluate(() => document.querySelector('.game-page')?.classList.add('faux-fs'));
+await page.evaluate(() => {
+  document.querySelector('.game-page')?.classList.add('faux-fs');
+  const q = document.createElement('div'); q.className = 'mock-quit'; q.textContent = '⛶ Quitter'; document.body.appendChild(q);
+});
 await sleep(700); // let ResizeObserver → doResize fire and the canvas grow
 await page.screenshot({ path: resolve('D:/tmp/comfy/billard-fs.png') });
 console.log('→ D:/tmp/comfy/billard-fs.png');
