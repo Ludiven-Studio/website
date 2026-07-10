@@ -6,6 +6,7 @@
  */
 
 import type { Rng } from '../prng';
+import { encodePacked, decodePacked } from '../../lib/scoreFormat';
 
 export interface Vec { x: number; y: number; }
 
@@ -221,8 +222,9 @@ export const isSettled = (balls: Ball[]): boolean =>
 /* ---------- Score (strokes + time tiebreak, one ascending number) ---------- */
 
 export function encodeScore(strokes: number, timeSec: number): number {
-	return strokes * 100000 + Math.min(99999, Math.round(timeSec * 10));
+	return encodePacked(100000, [strokes, Math.min(99999, Math.round(timeSec * 10))]);
 }
 export function decodeScore(v: number): { strokes: number; timeSec: number } {
-	return { strokes: Math.floor(v / 100000), timeSec: (v % 100000) / 10 };
+	const [strokes, t] = decodePacked(100000, 2, v);
+	return { strokes, timeSec: t / 10 };
 }

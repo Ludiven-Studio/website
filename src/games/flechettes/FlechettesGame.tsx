@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-	dartScore, applyThrow, reticleAt, encodeScore, decodeScore, DIFFS, SECTOR_ORDER, RINGS, START_SCORE,
+	dartScore, applyThrow, reticleAt, encodeScore, DIFFS, SECTOR_ORDER, RINGS, START_SCORE,
 	type Hit,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
+import { formatScore } from '../../lib/scoreFormat';
+import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -328,7 +330,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => { newFree('facile'); }, [newFree]);
 
-	const bestLabel = best == null ? '—' : (() => { const d = decodeScore(best); return `${d.darts} fléchettes · ${fmtTime(d.timeSec)}`; })();
+	const bestLabel = best == null ? '—' : formatScore(DAILY_LB.flechettes.fmt, best);
 
 	return (
 		<div className="da-root">
@@ -393,9 +395,9 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 				game={`${gameId}-t`}
 				metric="time"
 				submitValue={status === 'won' && best != null ? best : undefined}
-				format={(v) => { const d = decodeScore(v); return `${d.darts} fléch. · ${fmtTime(d.timeSec)}`; }}
+				format={(v) => formatScore(DAILY_LB.flechettes.fmt, v)}
 			/>}
-			{!daily && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => { const d = decodeScore(v); return `${d.darts} fléch. · ${fmtTime(d.timeSec)}`; }} />}
+			{!daily && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(DAILY_LB.flechettes.fmt, v)} />}
 		</div>
 	);
 }
@@ -416,7 +418,7 @@ const CSS = `
 .da-flash { color: #fff; background: #d9534f; border-radius: 999px; padding: 3px 12px; }
 .da-checkout { font-size: 12.5px; color: var(--gray-300); background: var(--accent-overlay); border: 1px solid var(--gray-800); border-radius: 999px; padding: 4px 12px; margin-bottom: 0.5rem; }
 .da-checkout strong { color: var(--da-accent); }
-.da-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
+.da-playwrap { width: 100%; position: relative; display: flex; justify-content: center; padding: 22px 0; border-radius: 16px; background: #2a1a0e url('/assets/jeux/flechettes/wall.jpg') center/cover; box-shadow: inset 0 0 44px rgba(0,0,0,0.45); }
 .da-canvas { display: block; border-radius: 50%; box-shadow: var(--shadow-md); touch-action: none; cursor: pointer; background: #161616; }
 .da-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .da-overlay-card { background: var(--gray-999); border: 2px solid var(--da-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }

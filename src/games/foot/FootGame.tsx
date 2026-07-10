@@ -87,6 +87,8 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const [teamSize, setTeamSize] = useState<1 | 2>(2); // menu choice: 1v1 or 2v2
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const skyImgRef = useRef<HTMLImageElement | null>(null); // AI stadium sky (else gradient)
+	const grassImgRef = useRef<HTMLImageElement | null>(null); // AI pitch grass (else flat green)
 	const runningRef = useRef(false);
 	const rafRef = useRef(0);
 	const lastRef = useRef(0);
@@ -183,6 +185,17 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		ctx.beginPath(); ctx.moveTo(px, floor); ctx.lineTo(px, top); ctx.lineTo(px + inw * depth, top); ctx.stroke();
 	};
 
+	// Load the AI sky + pitch grass once (RAF loop picks them up next frame).
+	useEffect(() => {
+		const load = (src: string, ref: React.RefObject<HTMLImageElement | null>) => {
+			const img = new Image();
+			img.onload = () => { ref.current = img; };
+			img.src = src;
+		};
+		load('/assets/jeux/foot/sky.jpg', skyImgRef);
+		load('/assets/jeux/foot/grass.jpg', grassImgRef);
+	}, []);
+
 	const draw = useCallback(() => {
 		const cv = canvasRef.current; if (!cv) return;
 		const ctx = cv.getContext('2d'); if (!ctx) return;
@@ -190,8 +203,10 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 		const sky = ctx.createLinearGradient(0, 0, 0, FLOOR * S);
 		sky.addColorStop(0, '#bfe3ff'); sky.addColorStop(1, '#e9f6ff');
-		ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW_W, FLOOR * S);
-		ctx.fillStyle = '#5aa84a'; ctx.fillRect(0, FLOOR * S, VIEW_W, VIEW_H - FLOOR * S);
+		if (skyImgRef.current) ctx.drawImage(skyImgRef.current, 0, 0, VIEW_W, FLOOR * S);
+		else { ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW_W, FLOOR * S); }
+		if (grassImgRef.current) ctx.drawImage(grassImgRef.current, 0, FLOOR * S, VIEW_W, VIEW_H - FLOOR * S);
+		else { ctx.fillStyle = '#5aa84a'; ctx.fillRect(0, FLOOR * S, VIEW_W, VIEW_H - FLOOR * S); }
 		ctx.fillStyle = '#4c9440'; ctx.fillRect(0, FLOOR * S, VIEW_W, 3);
 		ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.setLineDash([8, 10]);
 		ctx.beginPath(); ctx.moveTo(VIEW_W / 2, 0); ctx.lineTo(VIEW_W / 2, FLOOR * S); ctx.stroke(); ctx.setLineDash([]);

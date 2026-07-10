@@ -41,6 +41,8 @@ interface Colors {
 	bg: string;
 	grid: string;
 	body: string;
+	bodyLight: string;
+	outline: string;
 	head: string;
 	rock: string;
 	rockDark: string;
@@ -56,6 +58,8 @@ const readColors = (): Colors => {
 		bg: v('--gray-999', '#0e1014'),
 		grid: v('--gray-800', '#1b1f27'),
 		body: v('--accent-regular', '#7b5cff'),
+		bodyLight: v('--accent-light', '#b9a3ff'),
+		outline: '#241640',
 		head: v('--accent-regular', '#7b5cff'),
 		rock: v('--gray-500', '#6b7280'),
 		rockDark: v('--gray-700', '#3b4252'),
@@ -94,6 +98,9 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	const touchRef = useRef<{ x: number; y: number } | null>(null);
 	const dailyRef = useRef(false); // latest daily flag for callbacks/listeners
 	const triesRef = useRef(0); // daily attempts used (guards start without stale state)
+	const bgImgRef = useRef<HTMLImageElement | null>(null); // AI board background
+	const appleImgRef = useRef<HTMLImageElement | null>(null); // AI apple sprite
+	const rockImgRef = useRef<HTMLImageElement | null>(null); // AI rock sprite
 
 	/* ---- Canvas sizing + drawing ---- */
 	const draw = useCallback(() => {
@@ -108,13 +115,30 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		const cx = (c: Vec) => c.x * cell + cell / 2;
 		const cy = (c: Vec) => c.y * cell + cell / 2;
 		ctx.clearRect(0, 0, size, size);
-		ctx.fillStyle = colors.bg;
-		ctx.fillRect(0, 0, size, size);
+		const bgImg = bgImgRef.current;
+		if (bgImg) {
+			ctx.drawImage(bgImg, 0, 0, size, size);
+			ctx.fillStyle = 'rgba(6, 12, 8, 0.14)'; // whisper of darken so the snake/apple pop
+			ctx.fillRect(0, 0, size, size);
+		} else {
+			ctx.fillStyle = colors.bg;
+			ctx.fillRect(0, 0, size, size);
+		}
 
-		// Faint grid.
-		ctx.strokeStyle = colors.grid;
+		// Checkerboard cells so the grid reads clearly (aligned to the play cells),
+		// then a light line grid on top.
+		if (bgImg) {
+			// Two levels of dark tint → a checker that reads on the light pastel lawn.
+			for (let gy = 0; gy < SNAKE_CFG.cols; gy++) {
+				for (let gx = 0; gx < SNAKE_CFG.cols; gx++) {
+					ctx.fillStyle = (gx + gy) % 2 ? 'rgba(255,255,255,0.07)' : 'rgba(20,40,15,0.15)';
+					ctx.fillRect(gx * cell, gy * cell, cell, cell);
+				}
+			}
+		}
+		ctx.strokeStyle = bgImg ? 'rgba(25,45,20,0.28)' : colors.grid;
 		ctx.lineWidth = 1;
-		ctx.globalAlpha = 0.5;
+		ctx.globalAlpha = bgImg ? 1 : 0.5;
 		for (let i = 1; i < SNAKE_CFG.cols; i++) {
 			ctx.beginPath();
 			ctx.moveTo(i * cell, 0);
@@ -125,10 +149,17 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		}
 		ctx.globalAlpha = 1;
 
-		// Rocks: a shaded rounded boulder with a lighter top and a couple of speckles.
+		// Rocks: a cartoon sprite when loaded, else a shaded procedural boulder.
+		const rockImg = rockImgRef.current;
 		for (const r of st.rocks) {
 			const x = r.x * cell;
 			const y = r.y * cell;
+			if (rockImg) {
+				const rs = cell * 0.82; // smaller than the cell → grass shows around it
+				const rw = rs * (rockImg.naturalWidth / rockImg.naturalHeight || 1);
+				ctx.drawImage(rockImg, x + (cell - rw) / 2, y + (cell - rs) / 2, rw, rs);
+				continue;
+			}
 			const m = cell * 0.1;
 			ctx.fillStyle = colors.rockDark;
 			ctx.beginPath();
@@ -147,10 +178,16 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			ctx.globalAlpha = 1;
 		}
 
-		// Apple: red body, little highlight, brown stem, green leaf.
+		// Apple: an AI sprite when loaded, else the procedural fallback.
 		{
 			const ax = cx(st.food);
 			const ay = cy(st.food);
+			const appleImg = appleImgRef.current;
+			if (appleImg) {
+				const h = cell * 1.08; // fits within the cell → grass shows around it
+				const w = h * (appleImg.naturalWidth / appleImg.naturalHeight || 1);
+				ctx.drawImage(appleImg, ax - w / 2, ay - h / 2, w, h);
+			} else {
 			const r = cell * 0.3;
 			ctx.fillStyle = colors.apple;
 			ctx.beginPath();
@@ -174,46 +211,96 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			ctx.beginPath();
 			ctx.ellipse(ax + r * 0.45, ay - r * 1.15, r * 0.45, r * 0.22, -0.6, 0, Math.PI * 2);
 			ctx.fill();
+			}
 		}
 
-		// Snake: a continuous rounded body, tapered toward the tail, with an eyed head.
+		// Snake: cartoon look — a dark outline pass under a bright body with a top
+		// highlight, then a rounded head with eyes and a little forked tongue.
 		const n = st.snake.length;
 		if (n > 0) {
-			ctx.strokeStyle = colors.body;
+			const outline = colors.outline;
 			ctx.lineJoin = 'round';
 			ctx.lineCap = 'round';
-			// Taper: draw from tail to neck in a few width steps so the tail thins out.
+			const bodyW = (i: number) => cell * (0.78 - 0.3 * (i / n));
+			const stroke = (extra: number, style: string) => {
+				ctx.strokeStyle = style;
+				for (let i = n - 1; i >= 1; i--) {
+					ctx.lineWidth = bodyW(i) + extra;
+					ctx.beginPath();
+					ctx.moveTo(cx(st.snake[i]), cy(st.snake[i]));
+					ctx.lineTo(cx(st.snake[i - 1]), cy(st.snake[i - 1]));
+					ctx.stroke();
+				}
+			};
+			stroke(cell * 0.16, outline); // dark outline
+			stroke(0, colors.body); // body fill
+			// Top highlight: a thin brighter line offset up-left along the body.
+			ctx.strokeStyle = colors.bodyLight;
+			ctx.globalAlpha = 0.55;
 			for (let i = n - 1; i >= 1; i--) {
-				const t = i / n; // 1 at tail → ~0 near head
-				ctx.lineWidth = cell * (0.82 - 0.32 * t);
+				ctx.lineWidth = Math.max(1, bodyW(i) * 0.3);
 				ctx.beginPath();
-				ctx.moveTo(cx(st.snake[i]), cy(st.snake[i]));
-				ctx.lineTo(cx(st.snake[i - 1]), cy(st.snake[i - 1]));
+				ctx.moveTo(cx(st.snake[i]) - cell * 0.08, cy(st.snake[i]) - cell * 0.1);
+				ctx.lineTo(cx(st.snake[i - 1]) - cell * 0.08, cy(st.snake[i - 1]) - cell * 0.1);
 				ctx.stroke();
 			}
+			ctx.globalAlpha = 1;
+
 			// Head.
 			const head = st.snake[0];
 			const hx = cx(head);
 			const hy = cy(head);
-			const hr = cell * 0.46;
+			const hr = cell * 0.48;
+			const fwd = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[st.dir];
+			// Tongue (behind the head), forked, pointing forward.
+			const tb = hr * 1.05;
+			const tt = hr * 1.7;
+			ctx.strokeStyle = '#e5484d';
+			ctx.lineWidth = Math.max(1.5, cell * 0.06);
+			ctx.beginPath();
+			ctx.moveTo(hx + fwd.x * tb, hy + fwd.y * tb);
+			ctx.lineTo(hx + fwd.x * tt, hy + fwd.y * tt);
+			ctx.stroke();
+			const fk = hr * 0.22;
+			ctx.beginPath();
+			ctx.moveTo(hx + fwd.x * tt, hy + fwd.y * tt);
+			ctx.lineTo(hx + fwd.x * (tt + fk) + -fwd.y * fk, hy + fwd.y * (tt + fk) + fwd.x * fk);
+			ctx.moveTo(hx + fwd.x * tt, hy + fwd.y * tt);
+			ctx.lineTo(hx + fwd.x * (tt + fk) - -fwd.y * fk, hy + fwd.y * (tt + fk) - fwd.x * fk);
+			ctx.stroke();
+			// Outlined head.
+			ctx.fillStyle = outline;
+			ctx.beginPath();
+			ctx.arc(hx, hy, hr + cell * 0.08, 0, Math.PI * 2);
+			ctx.fill();
 			ctx.fillStyle = colors.head;
 			ctx.beginPath();
 			ctx.arc(hx, hy, hr, 0, Math.PI * 2);
 			ctx.fill();
+			ctx.fillStyle = colors.bodyLight;
+			ctx.globalAlpha = 0.5;
+			ctx.beginPath();
+			ctx.arc(hx - hr * 0.32, hy - hr * 0.34, hr * 0.4, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.globalAlpha = 1;
 			// Eyes, oriented by direction.
-			const fwd = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } }[st.dir];
 			const px = -fwd.y;
 			const py = fwd.x; // perpendicular
 			for (const sgn of [-1, 1]) {
-				const ex = hx + fwd.x * hr * 0.3 + px * sgn * hr * 0.45;
-				const ey = hy + fwd.y * hr * 0.3 + py * sgn * hr * 0.45;
+				const ex = hx + fwd.x * hr * 0.26 + px * sgn * hr * 0.44;
+				const ey = hy + fwd.y * hr * 0.26 + py * sgn * hr * 0.44;
 				ctx.fillStyle = '#ffffff';
 				ctx.beginPath();
-				ctx.arc(ex, ey, hr * 0.28, 0, Math.PI * 2);
+				ctx.arc(ex, ey, hr * 0.3, 0, Math.PI * 2);
 				ctx.fill();
+				ctx.fillStyle = outline;
+				ctx.beginPath();
+				ctx.arc(ex, ey, hr * 0.3, 0, Math.PI * 2);
+				ctx.stroke();
+				ctx.lineWidth = Math.max(1, cell * 0.03);
 				ctx.fillStyle = '#101216';
 				ctx.beginPath();
-				ctx.arc(ex + fwd.x * hr * 0.12, ey + fwd.y * hr * 0.12, hr * 0.14, 0, Math.PI * 2);
+				ctx.arc(ex + fwd.x * hr * 0.12, ey + fwd.y * hr * 0.12, hr * 0.15, 0, Math.PI * 2);
 				ctx.fill();
 			}
 		}
@@ -451,6 +538,21 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		document.addEventListener('visibilitychange', onVis);
 		return () => document.removeEventListener('visibilitychange', onVis);
 	}, [status, frame]);
+
+	/* Load the AI board background + apple sprite once; redraw when each arrives. */
+	useEffect(() => {
+		const load = (src: string, ref: React.RefObject<HTMLImageElement | null>) => {
+			const img = new Image();
+			img.onload = () => {
+				ref.current = img;
+				draw();
+			};
+			img.src = src;
+		};
+		load('/assets/jeux/snake/bg.jpg', bgImgRef);
+		load('/assets/jeux/snake/apple.png', appleImgRef);
+		load('/assets/jeux/snake/rock.png', rockImgRef);
+	}, [draw]);
 
 	/* Mount: size the canvas, arm a free game, cleanup the loop on unmount. */
 	useEffect(() => {

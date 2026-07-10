@@ -64,6 +64,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
+	const woodImgRef = useRef<HTMLImageElement | null>(null); // AI wood board (else flat brown)
 	const dimRef = useRef({ w: 420, h: 420 });
 	const layoutRef = useRef<Layout>(createLayout('anglais'));
 	const pegsRef = useRef<boolean[]>(initialPegs(layoutRef.current));
@@ -83,6 +84,13 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const timerStartRef = useRef<number | null>(null);
 	const timerRunRef = useRef(false);
 	const bestTimeRef = useRef<number | null>(null);
+
+	// Load the wood board texture once (RAF loop picks it up next frame).
+	useEffect(() => {
+		const img = new Image();
+		img.onload = () => { woodImgRef.current = img; };
+		img.src = '/assets/jeux/solitaire/wood.jpg';
+	}, []);
 
 	/* ---------- Geometry ---------- */
 	const geom = useCallback(() => {
@@ -417,7 +425,8 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		const hintOn = hintRef.current && now < hintRef.current.until ? hintRef.current.move : null;
 
 		ctx.clearRect(0, 0, w, h);
-		ctx.fillStyle = '#3b2a1c';
+		const woodPat = woodImgRef.current && ctx.createPattern(woodImgRef.current, 'repeat');
+		ctx.fillStyle = woodPat || '#3b2a1c';
 		panelPath(ctx, w, h, cell * 0.7);
 		ctx.fill();
 

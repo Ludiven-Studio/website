@@ -20,6 +20,8 @@ import { mulberry32 } from '../prng';
 import { joinRace, multiplayerAvailable, MAX_PLAYERS, type Race, type Peer, type PosMsg, type LapMsg } from './net';
 import { playerName, setPlayerName, getDaily, dailyWeekdayLabel, saveDailyRun, loadDailyRun } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
+import { formatScore } from '../../lib/scoreFormat';
+import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 
 /* =====================================================
@@ -39,7 +41,7 @@ const CAR_COLORS = [0xff3b30, 0x0a84ff, 0xffd60a, 0x30d158]; // vivid: red / blu
 const LOOKAHEAD = 12; // camera shifts ahead of the car (see corners sooner)
 const SKID_MARKS = 240; // recycled skid-mark pool (finite trail)
 const SKID_FLOATS = SKID_MARKS * 18; // 2 triangles × 3 verts × 3 coords
-const fmtMs = (ms: number | null) => (ms == null ? '—' : `${(ms / 1000).toFixed(2)} s`);
+const fmtMs = (ms: number | null) => (ms == null ? '—' : formatScore(DAILY_LB.drift.fmt, ms));
 const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
 const lerpAngle = (a: number, b: number, t: number) => {
 	let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -460,6 +462,16 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		ground.rotation.x = -Math.PI / 2;
 		ground.position.y = -0.05;
 		scene.add(ground);
+		// AI grass on the ground (wrap-repeated); stays flat green until it loads / if it 404s.
+		new THREE.TextureLoader().load('/assets/jeux/drift/grass.jpg', (t) => {
+			t.wrapS = t.wrapT = THREE.RepeatWrapping;
+			t.repeat.set(150, 150);
+			t.colorSpace = THREE.SRGBColorSpace;
+			const gm = ground.material as THREE.MeshStandardMaterial;
+			gm.map = t;
+			gm.color.set(0xffffff);
+			gm.needsUpdate = true;
+		});
 
 		const trackMat = new THREE.MeshStandardMaterial({ color: 0x6b6f77, roughness: 0.95, side: THREE.DoubleSide });
 		const trackGeom = new THREE.BufferGeometry();

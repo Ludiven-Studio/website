@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	makeTable, generateRack, stepBalls, aimToVelocity, pullPower, isSettled,
-	encodeScore, decodeScore, DIFFS, type Ball, type Table, type Vec,
+	encodeScore, DIFFS, type Ball, type Table, type Vec,
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { formatScore } from '../../lib/scoreFormat';
+import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -26,6 +28,7 @@ const COLORS = ['#e6566f', '#f0a830', '#5b8def', '#2f9e6f', '#9b6cf0']; // colou
 const CUE_COLOR = '#f4f4f2';
 const FELT = '#0f7a52';
 const FELT_DARK = '#0c6644';
+const FELT_TILES = 10; // felt-texture repeats across the table width (higher = finer nap)
 
 const SINK_MS = 280; // pot animation duration
 type Sink = { x: number; y: number; px: number; py: number; r: number; color: number; kind: 'cue' | 'color'; t0: number };
@@ -66,6 +69,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const bestRef = useRef<number | null>(null);
 	const triesRef = useRef(0);
+	const feltImgRef = useRef<HTMLImageElement | null>(null); // AI felt (else flat green)
+
+	// Load the felt texture once (RAF loop picks it up next frame).
+	useEffect(() => {
+		const img = new Image();
+		img.onload = () => { feltImgRef.current = img; };
+		img.src = '/assets/jeux/billard/felt.jpg';
+	}, []);
 
 	const { celebrating } = useCelebration(status === 'won');
 
@@ -259,8 +270,16 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 		const draw = (now: number) => {
 			ctx.clearRect(0, 0, t.w, t.h);
-			// cloth
-			ctx.fillStyle = FELT;
+			// cloth — tiled pattern (not a stretched drawImage, which magnified the nap ~x100)
+			const felt = feltImgRef.current;
+			const feltPat = felt && ctx.createPattern(felt, 'repeat');
+			if (feltPat) {
+				const s = t.w / FELT_TILES / felt!.width; // ~FELT_TILES felt tiles across the 200u table
+				feltPat.setTransform(new DOMMatrix([s, 0, 0, s, 0, 0]));
+				ctx.fillStyle = feltPat;
+			} else {
+				ctx.fillStyle = FELT;
+			}
 			ctx.fillRect(0, 0, t.w, t.h);
 			ctx.fillStyle = FELT_DARK;
 			ctx.fillRect(0, 0, t.w, 1.5); ctx.fillRect(0, t.h - 1.5, t.w, 1.5);
@@ -374,7 +393,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	/* ---------- Init ---------- */
 	useEffect(() => { newFreeTable('facile'); }, [newFreeTable]);
 
-	const bestLabel = best == null ? '—' : (() => { const d = decodeScore(best); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; })();
+	const bestLabel = best == null ? '—' : formatScore(DAILY_LB.billard.fmt, best);
 
 	return (
 		<div className="bi-root">
@@ -431,12 +450,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				game={`${gameId}-t`}
 				metric="time"
 				submitValue={status === 'won' && best != null ? best : undefined}
-				format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }}
+				format={(v) => formatScore(DAILY_LB.billard.fmt, v)}
 			/>}
 			{!daily && <LeaderboardCorner
 				game={`${gameId}-t`}
 				metric="time"
-				format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }}
+				format={(v) => formatScore(DAILY_LB.billard.fmt, v)}
 			/>}
 		</div>
 	);

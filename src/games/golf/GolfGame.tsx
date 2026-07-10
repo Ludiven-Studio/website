@@ -8,11 +8,12 @@ import {
 	aimToVelocity,
 	isSettled,
 	encodeScore,
-	decodeScore,
 	type Hole,
 	type Ball,
 } from './engine';
 import { mulberry32 } from '../prng';
+import { formatScore } from '../../lib/scoreFormat';
+import { DAILY_LB } from '../../data/dailyLb';
 import { joinGolf, multiplayerAvailable, MAX_PLAYERS, type Lobby, type Peer, type PosMsg, type ScoreMsg } from './net';
 import {
 	playerName,
@@ -393,6 +394,16 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		ground.rotation.x = -Math.PI / 2;
 		ground.position.y = -0.05;
 		scene.add(ground);
+		// AI grass on the rough (wrap-repeated); stays flat green until it loads / if it 404s.
+		new THREE.TextureLoader().load('/assets/jeux/golf/grass.jpg', (t) => {
+			t.wrapS = t.wrapT = THREE.RepeatWrapping;
+			t.repeat.set(200, 200);
+			t.colorSpace = THREE.SRGBColorSpace;
+			const gm = ground.material as THREE.MeshStandardMaterial;
+			gm.map = t;
+			gm.color.set(0xffffff);
+			gm.needsUpdate = true;
+		});
 
 		const mats: Mats = {
 			ground: ground.material as THREE.MeshStandardMaterial,
@@ -1035,7 +1046,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 							<p className="gf-winscore">{strokes} coups · {fmtTime(elapsed)} · <strong>{parTag(strokes)}</strong></p>
 							{mode === 'defi' ? (
 								alreadyPlayed || triesRef.current >= MAX_TRIES ? (
-									<p className="gf-sub">Défi terminé · meilleur <strong>{best != null ? `${decodeScore(best).strokes} coups · ${fmtTime(decodeScore(best).timeSec)}` : '—'}</strong> — reviens demain&nbsp;!</p>
+									<p className="gf-sub">Défi terminé · meilleur <strong>{best != null ? formatScore(DAILY_LB.golf.fmt, best) : '—'}</strong> — reviens demain&nbsp;!</p>
 								) : (
 									<button className="gf-play sm" onClick={newAttempt}>↻ Rejouer ({MAX_TRIES - tries} restant{MAX_TRIES - tries > 1 ? 's' : ''})</button>
 								)
@@ -1087,7 +1098,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			)}
 
 			{mode === 'defi' && (
-				<Leaderboard key={`lb-${name}-${best ?? 0}`} game={`${gameId}-t`} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => { const d = decodeScore(v); return `${d.strokes} coups · ${fmtTime(d.timeSec)}`; }} />
+				<Leaderboard key={`lb-${name}-${best ?? 0}`} game={`${gameId}-t`} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => formatScore(DAILY_LB.golf.fmt, v)} />
 			)}
 
 			<p className="gf-help">

@@ -6,6 +6,7 @@
  */
 
 import { mulberry32 } from '../prng';
+import { encodePacked, decodePacked } from '../../lib/scoreFormat';
 
 export const START_SCORE = 501;
 
@@ -67,10 +68,11 @@ export function reticleAt(seed: number, dartIndex: number, diff: DiffLevel, tMs:
 /* ---------- Score (darts + time tiebreak) ---------- */
 
 export function encodeScore(darts: number, timeSec: number): number {
-	return darts * 100000 + Math.min(99999, Math.round(timeSec * 10));
+	return encodePacked(100000, [darts, Math.min(99999, Math.round(timeSec * 10))]);
 }
 export function decodeScore(v: number): { darts: number; timeSec: number } {
-	return { darts: Math.floor(v / 100000), timeSec: (v % 100000) / 10 };
+	const [darts, t] = decodePacked(100000, 2, v);
+	return { darts, timeSec: t / 10 };
 }
 
 export { ORDER as SECTOR_ORDER };

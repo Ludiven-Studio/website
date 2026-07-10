@@ -225,7 +225,8 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 
 <script>
 	import { fetchDailyTops, leaderboardEnabled } from '../lib/leaderboard';
-	import { DAILY_LB, fmtDaily } from '../data/dailyLb';
+	import { DAILY_LB } from '../data/dailyLb';
+	import { formatScore } from '../lib/scoreFormat';
 
 	// Favorites toggle — persisted in localStorage, shared key with the home page.
 	const KEY = 'ludiven-favorites';
@@ -300,7 +301,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 			const top = cfg ? tops[cfg.lbId || id] : undefined;
 			if (top) {
 				chip.title = 'Record du jour';
-				const val = fmtDaily(cfg!.fmt, top.value);
+				const val = formatScore(cfg!.fmt, top.value);
 				chip.textContent = `${done ? '✓ ' : ''}🏆 ${val ? `${val} · ` : ''}${top.name}`;
 			} else {
 				chip.textContent = done

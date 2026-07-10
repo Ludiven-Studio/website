@@ -7,6 +7,7 @@
  */
 
 import type { Rng } from '../prng';
+import { encodePacked, decodePacked } from '../../lib/scoreFormat';
 
 export interface Vec { x: number; y: number; }
 export type Kind = 'circle' | 'box';
@@ -410,8 +411,9 @@ export function predictTrajectory(world: World, start: Vec, vel: { vx: number; v
 /* ---------- Score (cocottes + time tiebreak) ---------- */
 
 export function encodeScore(cocottes: number, timeSec: number): number {
-	return cocottes * 100000 + Math.min(99999, Math.round(timeSec * 10));
+	return encodePacked(100000, [cocottes, Math.min(99999, Math.round(timeSec * 10))]);
 }
 export function decodeScore(v: number): { cocottes: number; timeSec: number } {
-	return { cocottes: Math.floor(v / 100000), timeSec: (v % 100000) / 10 };
+	const [cocottes, t] = decodePacked(100000, 2, v);
+	return { cocottes, timeSec: t / 10 };
 }

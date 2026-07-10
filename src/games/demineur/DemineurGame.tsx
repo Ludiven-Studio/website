@@ -18,6 +18,8 @@ import {
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, type DailyRun } from '../../lib/leaderboard';
+import { formatScore } from '../../lib/scoreFormat';
+import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -321,7 +323,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 	// Daily submission: a win → time; a loss → still ranked, below all wins, by bombs remaining.
 	const dailyValue =
 		status === 'won' ? elapsed : status === 'lost' ? LOSS_OFFSET + bombsRemaining : undefined;
-	const lbFormat = (v: number) => (v >= LOSS_OFFSET ? `💣 ${v - LOSS_OFFSET}` : fmtTime(v));
+	const lbFormat = (v: number) => formatScore(DAILY_LB.demineur.fmt, v);
 
 	return (
 		<div className="dm-root" style={{ ['--n' as string]: size }}>

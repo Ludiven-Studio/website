@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	makeLevel, step, foxesLeft, spawnCocotte, aimToVelocity, pullPower, predictTrajectory,
-	encodeScore, decodeScore, DIFFS, type World, type Body, type Vec,
+	encodeScore, DIFFS, type World, type Body, type Vec,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
+import { formatScore } from '../../lib/scoreFormat';
+import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -59,6 +61,9 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const lastRef = useRef(0);
 	const boomsRef = useRef<Boom[]>([]);
 	const dustRef = useRef<Boom[]>([]); // small impact puffs
+	const skyImgRef = useRef<HTMLImageElement | null>(null); // AI sky (else gradient)
+	const woodImgRef = useRef<HTMLImageElement | null>(null); // wood crate texture
+	const brickImgRef = useRef<HTMLImageElement | null>(null); // brick crate texture
 	const debrisRef = useRef<Debris[]>([]); // block-shatter shards
 	const settledForRef = useRef(0); // ms the world has stayed calm
 	const curSeedRef = useRef(0); // seed of the level currently in play (for « Recommencer »)
@@ -157,6 +162,18 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		const rect = canvasRef.current!.getBoundingClientRect();
 		return { x: (e.clientX - rect.left) / scaleRef.current, y: (e.clientY - rect.top) / scaleRef.current };
 	};
+
+	// Load the AI sky + crate textures once (the RAF loop picks them up next frame).
+	useEffect(() => {
+		const load = (src: string, ref: React.RefObject<HTMLImageElement | null>) => {
+			const img = new Image();
+			img.onload = () => { ref.current = img; };
+			img.src = src;
+		};
+		load('/assets/jeux/angry/sky.jpg', skyImgRef);
+		load('/assets/jeux/angry/wood.jpg', woodImgRef);
+		load('/assets/jeux/angry/brick.jpg', brickImgRef);
+	}, []);
 
 	useEffect(() => {
 		const cv = canvasRef.current;
@@ -290,7 +307,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			// sky
 			const sky = ctx.createLinearGradient(0, 0, 0, world.groundY);
 			sky.addColorStop(0, '#bfe3ff'); sky.addColorStop(1, '#e9f6ff');
-			ctx.fillStyle = sky; ctx.fillRect(0, 0, world.w, world.groundY);
+			if (skyImgRef.current) ctx.drawImage(skyImgRef.current, 0, 0, world.w, world.groundY);
+			else { ctx.fillStyle = sky; ctx.fillRect(0, 0, world.w, world.groundY); }
 			// ground
 			ctx.fillStyle = '#7cba54'; ctx.fillRect(0, world.groundY, world.w, world.h - world.groundY);
 			ctx.fillStyle = '#5f9e3e'; ctx.fillRect(0, world.groundY, world.w, 2);
@@ -308,11 +326,13 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 					const x0 = b.x - b.hw, y0 = b.y - b.hh, ww = b.hw * 2, hgt = b.hh * 2, mat = b.mat ?? 'wood';
 					const FILL: Record<string, string> = { cardboard: '#d8b884', wood: '#b07b46', brick: '#b0573f', tnt: '#d23b32' };
 					const EDGE: Record<string, string> = { cardboard: '#b8965f', wood: '#7a4f29', brick: '#7d3c2b', tnt: '#7a1f1a' };
-					ctx.fillStyle = FILL[mat]; ctx.fillRect(x0, y0, ww, hgt);
+					const tex = mat === 'wood' ? woodImgRef.current : mat === 'brick' ? brickImgRef.current : null;
+					if (tex) ctx.drawImage(tex, x0, y0, ww, hgt);
+					else { ctx.fillStyle = FILL[mat]; ctx.fillRect(x0, y0, ww, hgt); }
 					ctx.strokeStyle = EDGE[mat]; ctx.lineWidth = 0.5; ctx.strokeRect(x0, y0, ww, hgt);
-					if (mat === 'wood') { ctx.beginPath(); ctx.moveTo(x0, b.y); ctx.lineTo(x0 + ww, b.y); ctx.stroke(); }
+					if (mat === 'wood') { if (!tex) { ctx.beginPath(); ctx.moveTo(x0, b.y); ctx.lineTo(x0 + ww, b.y); ctx.stroke(); } }
 					else if (mat === 'cardboard') { ctx.beginPath(); ctx.moveTo(b.x, y0); ctx.lineTo(b.x, y0 + hgt); ctx.stroke(); }
-					else if (mat === 'brick') { ctx.beginPath(); ctx.moveTo(x0, b.y); ctx.lineTo(x0 + ww, b.y); ctx.moveTo(b.x, y0); ctx.lineTo(b.x, b.y); ctx.moveTo(b.x - b.hw / 2, b.y); ctx.lineTo(b.x - b.hw / 2, y0 + hgt); ctx.moveTo(b.x + b.hw / 2, b.y); ctx.lineTo(b.x + b.hw / 2, y0 + hgt); ctx.stroke(); }
+					else if (mat === 'brick') { if (!tex) { ctx.beginPath(); ctx.moveTo(x0, b.y); ctx.lineTo(x0 + ww, b.y); ctx.moveTo(b.x, y0); ctx.lineTo(b.x, b.y); ctx.moveTo(b.x - b.hw / 2, b.y); ctx.lineTo(b.x - b.hw / 2, y0 + hgt); ctx.moveTo(b.x + b.hw / 2, b.y); ctx.lineTo(b.x + b.hw / 2, y0 + hgt); ctx.stroke(); } }
 					else { ctx.fillStyle = '#f0c52e'; ctx.fillRect(x0, b.y - hgt * 0.16, ww, hgt * 0.32); ctx.fillStyle = '#7a1f1a'; ctx.font = `${Math.max(3, b.hh * 0.85)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TNT', b.x, b.y); }
 				} else if (b.tag === 'barrel') {
 					ctx.fillStyle = '#c08a4e'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
@@ -427,7 +447,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => { newFree('facile'); }, [newFree]);
 
-	const bestLabel = best == null ? '—' : (() => { const d = decodeScore(best); return `${d.cocottes} cocottes · ${fmtTime(d.timeSec)}`; })();
+	const bestLabel = best == null ? '—' : formatScore(DAILY_LB.angry.fmt, best);
 
 	return (
 		<div className="co-root">
@@ -484,9 +504,9 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				game={`${gameId}-t`}
 				metric="time"
 				submitValue={status === 'won' && best != null ? best : undefined}
-				format={(v) => { const d = decodeScore(v); return `${d.cocottes} cocottes · ${fmtTime(d.timeSec)}`; }}
+				format={(v) => formatScore(DAILY_LB.angry.fmt, v)}
 			/>}
-			{!daily && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => { const d = decodeScore(v); return `${d.cocottes} cocottes · ${fmtTime(d.timeSec)}`; }} />}
+			{!daily && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(DAILY_LB.angry.fmt, v)} />}
 		</div>
 	);
 }

@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import {
 	ESQUIVE_DIFFS,
 	esquiveConfig,
@@ -10,6 +13,8 @@ import {
 } from './engine';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { formatScore } from '../../lib/scoreFormat';
+import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -29,7 +34,7 @@ const STEP = 1000 / 60; // ms per physics step
 const MAX_TRIES = 10; // daily attempts per day; best of the day is ranked
 const MAX_AST = 100; // asteroid mesh pool size
 const STAR_COUNT = 520;
-const fmtSec = (tenths: number) => `${(tenths / 10).toFixed(1)} s`;
+const fmtSec = (tenths: number) => formatScore(DAILY_LB.esquive.fmt, tenths);
 
 interface DailyState {
 	best: number;
@@ -38,6 +43,8 @@ interface DailyState {
 
 interface Scene3D {
 	renderer: THREE.WebGLRenderer;
+	composer: EffectComposer;
+	bloom: UnrealBloomPass;
 	scene: THREE.Scene;
 	camera: THREE.PerspectiveCamera;
 	ship: THREE.Group;
@@ -105,24 +112,57 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			return;
 		}
 		renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+		renderer.toneMapping = THREE.ACESFilmicToneMapping;
+		renderer.toneMappingExposure = 1.15;
 
 		const accent =
 			getComputedStyle(document.documentElement).getPropertyValue('--accent-regular').trim() || '#7c5cff';
+		// Load a texture via a plain <img> (reliable in every context) then wrap it.
+		const loadTex = (src: string, cb: (t: THREE.Texture) => void) => {
+			const img = new Image();
+			img.onload = () => {
+				const t = new THREE.Texture(img);
+				t.needsUpdate = true;
+				cb(t);
+			};
+			img.src = src;
+		};
 		const bg = new THREE.Color('#0a0a14');
+		const fogCol = new THREE.Color('#140a1e'); // dark purple to match the nebula
 
 		const scene = new THREE.Scene();
 		scene.background = bg;
-		scene.fog = new THREE.Fog(bg, 45, 120);
+		scene.fog = new THREE.Fog(fogCol, 55, 135);
+		// Nebula skybox: an inward-facing sphere (geometry renders reliably through the
+		// composer). Tiled a little so the forward view always shows coloured nebula.
+		const skyMat = new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, toneMapped: false, color: 0x2a2440 });
+		const sky = new THREE.Mesh(new THREE.SphereGeometry(150, 40, 24), skyMat);
+		scene.add(sky);
+		loadTex('/assets/jeux/esquive/nebula.jpg', (tex) => {
+			tex.colorSpace = THREE.SRGBColorSpace;
+			tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+			tex.repeat.set(2, 1);
+			skyMat.map = tex;
+			skyMat.color.set(0xffffff);
+			skyMat.needsUpdate = true;
+		});
 
 		// Third-person chase camera (slightly above + behind the ship). Eased toward the ship each frame.
 		const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 220);
 		camera.position.set(0, 3.2, 14);
 		camera.lookAt(0, 0, -22);
 
-		scene.add(new THREE.AmbientLight(0x8088aa, 1.0));
-		const dir = new THREE.DirectionalLight(0xffffff, 1.7);
+		scene.add(new THREE.AmbientLight(0x8088aa, 0.7));
+		const dir = new THREE.DirectionalLight(0xffffff, 1.4);
 		dir.position.set(4, 7, 10);
 		scene.add(dir);
+		// Two faint coloured rim fills (nebula magenta + cyan) for depth on the metal.
+		const rimA = new THREE.PointLight(0xff4fa3, 0.6, 90);
+		rimA.position.set(-18, 6, -20);
+		scene.add(rimA);
+		const rimB = new THREE.PointLight(0x4fd0ff, 0.5, 90);
+		rimB.position.set(18, -6, -14);
+		scene.add(rimB);
 
 		// Ship: small craft (fuselage + wing + cockpit + glowing thruster), nose toward -Z.
 		const ship = new THREE.Group();
@@ -149,12 +189,21 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		scene.add(ship);
 
 		// Asteroid pool (reused; hidden until active). Three base shapes cycle across the pool for variety.
+		// Angular low-poly asteroids (flat-shaded facets read as rock). The AI rock
+		// diffuse tints each facet a different shade (polyhedron UVs are per-face, so a
+		// normal map wouldn't map cleanly — we lean on flat shading for the relief).
 		const astGeoms: THREE.BufferGeometry[] = [
 			new THREE.IcosahedronGeometry(1, 0),
 			new THREE.DodecahedronGeometry(1, 0),
 			new THREE.IcosahedronGeometry(1, 1),
 		];
-		const astMat = new THREE.MeshStandardMaterial({ color: 0x9098a4, flatShading: true, roughness: 1, metalness: 0.05 });
+		const astMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, flatShading: true, roughness: 1, metalness: 0.03 });
+		loadTex('/assets/jeux/esquive/rock.jpg', (tex) => {
+			tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+			tex.colorSpace = THREE.SRGBColorSpace;
+			astMat.map = tex;
+			astMat.needsUpdate = true;
+		});
 		const pool: THREE.Mesh[] = [];
 		for (let i = 0; i < MAX_AST; i++) {
 			const m = new THREE.Mesh(astGeoms[i % astGeoms.length], astMat);
@@ -172,7 +221,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		}
 		const starGeom = new THREE.BufferGeometry();
 		starGeom.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-		const stars = new THREE.Points(starGeom, new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, sizeAttenuation: true }));
+		const stars = new THREE.Points(starGeom, new THREE.PointsMaterial({ color: 0xcdd6f5, size: 0.3, sizeAttenuation: true, fog: false }));
 		scene.add(stars);
 
 		// Explosion FX (hidden until a collision): flying debris + additive flash core + a fading light.
@@ -196,8 +245,15 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		const boomLight = new THREE.PointLight(0xff9040, 0, 50);
 		boomGroup.add(boomLight);
 
+		// Post-processing: bloom for the thruster, cockpit, explosions and bright stars.
+		const composer = new EffectComposer(renderer);
+		composer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+		composer.addPass(new RenderPass(scene, camera));
+		const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.5, 0.95); // strength, radius, threshold (only the brightest FX bloom)
+		composer.addPass(bloom);
+
 		g3Ref.current = {
-			renderer, scene, camera, ship, glow, pool, starGeom, starPos, astGeoms, astMat,
+			renderer, composer, bloom, scene, camera, ship, glow, pool, starGeom, starPos, astGeoms, astMat,
 			boomGroup, boomDebris, boomVel, boomCore, boomLight, boomDebrisGeom, boomDebrisMat, boomCoreGeom, boomCoreMat,
 		};
 	}, []);
@@ -259,7 +315,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		const pos = g.starPos;
 		for (let i = 0; i < STAR_COUNT; i++) {
 			let z = pos[i * 3 + 2] + dz;
-			if (z > 13) {
+			if (z > 2) {
 				z = -140;
 				pos[i * 3] = (Math.random() * 2 - 1) * 60;
 				pos[i * 3 + 1] = (Math.random() * 2 - 1) * 40;
@@ -268,7 +324,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		}
 		g.starGeom.attributes.position.needsUpdate = true;
 
-		g.renderer.render(g.scene, g.camera);
+		g.composer.render();
 	}, []);
 
 	const resize = useCallback(() => {
@@ -277,9 +333,10 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		if (!g || !canvas) return;
 		const css = canvas.clientWidth;
 		g.renderer.setSize(css, css, false);
+		g.composer.setSize(css, css);
 		g.camera.aspect = 1;
 		g.camera.updateProjectionMatrix();
-		g.renderer.render(g.scene, g.camera);
+		g.composer.render();
 	}, []);
 
 	/* ---- Explosion FX ---- */

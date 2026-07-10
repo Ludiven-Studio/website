@@ -57,7 +57,7 @@ async function main() {
 
 	// Discover all playable games from the /jeux grid.
 	await page.goto(`${base}/jeux/`, { waitUntil: 'networkidle' });
-	const jeux = await page.evaluate(() => {
+	const allJeux = await page.evaluate(() => {
 		const out = [];
 		document.querySelectorAll('.game-card-wrap[data-game-id]').forEach((w) => {
 			const id = w.getAttribute('data-game-id');
@@ -66,7 +66,10 @@ async function main() {
 		});
 		return out;
 	});
-	console.log(`${jeux.length} jeux à capturer`);
+	// OG_ONLY=snake,flappy → recapture only those games.
+	const only = (process.env.OG_ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
+	const jeux = only.length ? allJeux.filter((j) => only.includes(j.id)) : allJeux;
+	console.log(`${jeux.length} jeux à capturer${only.length ? ` (filtre: ${only.join(', ')})` : ''}`);
 
 	// Pre-mark tutorials as "seen" (never auto-open) and set a pseudo (some modes, e.g.
 	// pong "vs ordinateur", refuse to start without a name).
@@ -139,11 +142,20 @@ async function main() {
 			await page.addStyleTag({
 				content: `nav, footer, .game-head { display: none !important; }
 					.game-page { max-width: none !important; width: 100vw; min-height: 100vh; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; }
-					body, .backgrounds { background: #0b0e14 !important; }`,
+					body, .backgrounds { background: ${process.env.OG_BG || 'linear-gradient(160deg, #241528, #17101c)'} !important; }`,
 			});
 
-			await startGame();
+			if (!process.env.OG_NOSTART) await startGame(); // OG_NOSTART=1 → capture the ready scene
 			await sleep(1100);
+
+			// OG_HIDE_OVERLAY=1 → hide tutorial + start/game-over overlays for a clean board
+			// (e.g. Snake dies instantly under auto-play and would otherwise show "Perdu").
+			if (process.env.OG_HIDE_OVERLAY) {
+				await page.evaluate(() => {
+					document.querySelectorAll('.tuto, .tuto-overlay, [class$="-overlay"], [class*="overlay"]').forEach((o) => (o.style.display = 'none'));
+				});
+				await sleep(120);
+			}
 
 			await page.screenshot({ path: path.join(OUT, `${id}.jpg`), type: 'jpeg', quality: 82 });
 

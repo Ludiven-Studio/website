@@ -99,72 +99,109 @@ const drawPipe = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, p: { x: numb
 	ctx.strokeRect(p.x - lip, gapBottom, cfg.pipeW + 2 * lip, 3);
 };
 
-// A little hen ("cocotte"): white body, red comb + wattle, orange beak, wing, tail.
+// A funny cartoon hen ("cocotte"): round body, googly eye, big comb + beak, a
+// wing that flaps with the vertical speed, and a dark outline. Faces right.
 const drawHen = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, birdY: number, vy: number) => {
 	const r = cfg.birdR;
 	const tilt = Math.max(-0.5, Math.min(0.8, vy / 180));
+	const flap = Math.max(-1, Math.min(1, -vy / 120)); // +1 wing up when rising fast
 	const RED = '#e23b3b';
+	const OUT = '#3a2a1e';
 	ctx.save();
 	ctx.translate(cfg.birdX, birdY);
 	ctx.rotate(tilt);
+	ctx.lineJoin = 'round';
+	ctx.lineCap = 'round';
+	ctx.strokeStyle = OUT;
+	const ol = (w = r * 0.14) => (ctx.lineWidth = w);
 
-	// Tail feathers (back, pointing up-left).
-	ctx.fillStyle = '#eef0f2';
-	ctx.beginPath();
-	ctx.moveTo(-r * 0.7, r * 0.1);
-	ctx.lineTo(-r * 1.7, -r * 0.9);
-	ctx.lineTo(-r * 1.0, -r * 0.2);
-	ctx.lineTo(-r * 1.6, -r * 0.1);
-	ctx.closePath();
-	ctx.fill();
-
-	// Body.
+	// Tail feathers (back, left).
 	ctx.fillStyle = '#ffffff';
 	ctx.beginPath();
-	ctx.ellipse(0, r * 0.1, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
+	ctx.moveTo(-r * 0.8, r * 0.1);
+	ctx.lineTo(-r * 1.75, -r * 0.55);
+	ctx.lineTo(-r * 1.1, 0);
+	ctx.lineTo(-r * 1.65, r * 0.35);
+	ctx.closePath();
+	ol();
 	ctx.fill();
+	ctx.stroke();
 
-	// Wing.
-	ctx.fillStyle = '#e6e8ea';
+	// Body (round).
+	ctx.fillStyle = '#ffffff';
 	ctx.beginPath();
-	ctx.ellipse(-r * 0.15, r * 0.2, r * 0.55, r * 0.4, -0.25, 0, Math.PI * 2);
+	ctx.ellipse(0, r * 0.15, r * 1.12, r * 1.02, 0, 0, Math.PI * 2);
+	ol();
 	ctx.fill();
+	ctx.stroke();
+
+	// Wing that flaps with the vertical speed.
+	ctx.save();
+	ctx.translate(-r * 0.05, r * 0.05);
+	ctx.rotate(-0.25 - flap * 0.7);
+	ctx.fillStyle = '#eef0f2';
+	ctx.beginPath();
+	ctx.ellipse(0, 0, r * 0.72, r * 0.4, 0, 0, Math.PI * 2);
+	ol(r * 0.12);
+	ctx.fill();
+	ctx.stroke();
+	ctx.restore();
 
 	// Head.
-	const hx = r * 0.62;
-	const hy = -r * 0.55;
+	const hx = r * 0.68;
+	const hy = -r * 0.62;
 	ctx.fillStyle = '#ffffff';
 	ctx.beginPath();
 	ctx.arc(hx, hy, r * 0.62, 0, Math.PI * 2);
+	ol();
 	ctx.fill();
+	ctx.stroke();
 
-	// Comb (crête) — three red bumps on top of the head.
+	// Comb (crête) — three big red bumps.
 	ctx.fillStyle = RED;
 	for (let i = 0; i < 3; i++) {
 		ctx.beginPath();
-		ctx.arc(hx - r * 0.25 + i * r * 0.28, hy - r * 0.55, r * 0.2, 0, Math.PI * 2);
+		ctx.arc(hx - r * 0.28 + i * r * 0.31, hy - r * 0.66, r * 0.24, 0, Math.PI * 2);
+		ol(r * 0.1);
 		ctx.fill();
+		ctx.stroke();
 	}
 
-	// Beak (orange) pointing forward.
+	// Beak (big orange) pointing forward.
 	ctx.fillStyle = '#ff9f1c';
 	ctx.beginPath();
-	ctx.moveTo(hx + r * 0.45, hy - r * 0.05);
-	ctx.lineTo(hx + r * 1.2, hy + r * 0.18);
-	ctx.lineTo(hx + r * 0.45, hy + r * 0.32);
+	ctx.moveTo(hx + r * 0.5, hy - r * 0.12);
+	ctx.lineTo(hx + r * 1.42, hy + r * 0.14);
+	ctx.lineTo(hx + r * 0.5, hy + r * 0.34);
 	ctx.closePath();
+	ol(r * 0.1);
 	ctx.fill();
+	ctx.stroke();
 
 	// Wattle (barbillon) under the beak.
 	ctx.fillStyle = RED;
 	ctx.beginPath();
-	ctx.ellipse(hx + r * 0.5, hy + r * 0.42, r * 0.16, r * 0.26, 0, 0, Math.PI * 2);
+	ctx.ellipse(hx + r * 0.55, hy + r * 0.5, r * 0.15, r * 0.27, 0, 0, Math.PI * 2);
+	ol(r * 0.08);
 	ctx.fill();
+	ctx.stroke();
 
-	// Eye.
-	ctx.fillStyle = '#1b1b1b';
+	// Big googly eye.
+	const ex = hx + r * 0.34;
+	const ey = hy - r * 0.14;
+	ctx.fillStyle = '#ffffff';
 	ctx.beginPath();
-	ctx.arc(hx + r * 0.18, hy - r * 0.1, r * 0.13, 0, Math.PI * 2);
+	ctx.arc(ex, ey, r * 0.3, 0, Math.PI * 2);
+	ol(r * 0.07);
+	ctx.fill();
+	ctx.stroke();
+	ctx.fillStyle = '#101216';
+	ctx.beginPath();
+	ctx.arc(ex + r * 0.08, ey + r * 0.03, r * 0.14, 0, Math.PI * 2);
+	ctx.fill();
+	ctx.fillStyle = '#ffffff';
+	ctx.beginPath();
+	ctx.arc(ex + r * 0.02, ey - r * 0.06, r * 0.05, 0, Math.PI * 2);
 	ctx.fill();
 
 	ctx.restore();
@@ -172,12 +209,13 @@ const drawHen = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, birdY: number
 
 const drawGround = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, distance: number) => {
 	const top = cfg.worldH - cfg.groundH;
-	ctx.fillStyle = '#ded08a';
+	// Soft pastel-green ground to match the sky/hills (was a saturated sandy band).
+	ctx.fillStyle = '#a8d78f';
 	ctx.fillRect(0, top, cfg.worldW, cfg.groundH);
-	ctx.fillStyle = '#caa15a';
+	ctx.fillStyle = '#8bc476';
 	ctx.fillRect(0, top, cfg.worldW, 1.6);
 	// Scrolling stripes for a sense of speed.
-	ctx.fillStyle = 'rgba(160,120,60,0.35)';
+	ctx.fillStyle = 'rgba(90,150,70,0.28)';
 	const span = 9;
 	const off = (distance % span) + span;
 	for (let x = -off; x < cfg.worldW; x += span) ctx.fillRect(x, top + 2.5, 4.5, cfg.groundH - 3.5);
@@ -210,6 +248,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false);
 	const statusRef = useRef<Status>('ready');
 	const triesRef = useRef(0); // daily attempts used (guards start without stale state)
+	const skyImgRef = useRef<HTMLImageElement | null>(null); // AI pastel sky
 
 	/* ---- Drawing (everything in world units 0..100 via a scale transform) ---- */
 	const draw = useCallback(() => {
@@ -224,12 +263,17 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		const sc = (size / cfg.worldW) * dpr; // world → device px
 		ctx.setTransform(sc, 0, 0, sc, 0, 0);
 
-		// Sky.
-		const sky = ctx.createLinearGradient(0, 0, 0, cfg.worldH);
-		sky.addColorStop(0, '#5fb6e6');
-		sky.addColorStop(1, '#c7ecf8');
-		ctx.fillStyle = sky;
-		ctx.fillRect(0, 0, cfg.worldW, cfg.worldH);
+		// Sky: AI pastel scene when loaded, else the gradient fallback.
+		const skyImg = skyImgRef.current;
+		if (skyImg) {
+			ctx.drawImage(skyImg, 0, 0, cfg.worldW, cfg.worldH);
+		} else {
+			const sky = ctx.createLinearGradient(0, 0, 0, cfg.worldH);
+			sky.addColorStop(0, '#5fb6e6');
+			sky.addColorStop(1, '#c7ecf8');
+			ctx.fillStyle = sky;
+			ctx.fillRect(0, 0, cfg.worldW, cfg.worldH);
+		}
 
 		// Parallax clouds: far = slow + small + faint (drawn first/behind); near = fast + big + opaque.
 		drawCloudLayer(ctx, cfg.worldW, st.distance, 0.18, 40, [14, 26], 0.62, 0.5);
@@ -482,6 +526,19 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		document.addEventListener('visibilitychange', onVis);
 		return () => document.removeEventListener('visibilitychange', onVis);
 	}, [frame]);
+
+	/* Load the AI sky + cocotte sprite once; redraw when each arrives. */
+	useEffect(() => {
+		const load = (src: string, ref: React.RefObject<HTMLImageElement | null>) => {
+			const img = new Image();
+			img.onload = () => {
+				ref.current = img;
+				draw();
+			};
+			img.src = src;
+		};
+		load('/assets/jeux/flappy/sky.jpg', skyImgRef);
+	}, [draw]);
 
 	useEffect(() => {
 		resize();

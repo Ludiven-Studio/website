@@ -141,6 +141,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
+	const grassImgRef = useRef<HTMLImageElement | null>(null); // AI farm grass under the lanes (else flat green)
 	const stateRef = useRef<State | null>(null);
 	const rngRef = useRef<() => number>(() => 0);
 	const rafRef = useRef(0);
@@ -165,6 +166,13 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const statusRef = useRef<Status>('ready');
 	const selectedRef = useRef<Selected>(null);
 	const hoverRef = useRef<{ row: number; col: number } | null>(null);
+
+	// Load the AI farm grass once (RAF loop picks it up next frame).
+	useEffect(() => {
+		const img = new Image();
+		img.onload = () => { grassImgRef.current = img; };
+		img.src = '/assets/jeux/cocottes-renards/grass.jpg';
+	}, []);
 	const megaAlertRef = useRef(false);
 	const dailyRef = useRef(false);
 	const triesRef = useRef(0);
@@ -368,8 +376,19 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		};
 
 		/* --- Ground: grid lanes, henhouse floor, forest floor --- */
+		// AI farm grass under the field (tiled); lanes become translucent tints on top so
+		// the grass shows through while the row alternation still reads.
+		const grassPat = grassImgRef.current && ctx.createPattern(grassImgRef.current, 'repeat');
+		if (grassPat) {
+			const gs = 1.6 / grassImgRef.current!.width; // ~1.6 units per grass tile
+			grassPat.setTransform(new DOMMatrix([gs, 0, 0, gs, 0, 0]));
+			ctx.fillStyle = grassPat;
+			ctx.fillRect(0, 0, COLS, LANES);
+		}
 		for (let r = 0; r < LANES; r++) {
-			ctx.fillStyle = r % 2 === 0 ? '#8fce5f' : '#82c455';
+			ctx.fillStyle = grassPat
+				? (r % 2 === 0 ? 'rgba(150,205,95,0.42)' : 'rgba(120,180,75,0.5)')
+				: (r % 2 === 0 ? '#8fce5f' : '#82c455');
 			ctx.fillRect(0, r, COLS, 1);
 			// furrow shading
 			ctx.fillStyle = 'rgba(60,110,40,0.10)';

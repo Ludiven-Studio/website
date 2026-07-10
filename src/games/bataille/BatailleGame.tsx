@@ -550,18 +550,19 @@ const CSS = `
 .ba-boardwrap { position: relative; width: 100%; max-width: min(460px, calc(46px * var(--n, 8))); margin-inline: auto; container-type: inline-size; }
 .ba-board {
   width: 100%; display: grid; gap: 2px; touch-action: manipulation; user-select: none;
-  background: var(--gray-700); border-radius: 6px; padding: 2px;
+  background: #0e3a52 url('/assets/jeux/bataille/water.jpg') center/cover; border-radius: 6px; padding: 2px;
 }
 .ba-board.sonar { outline: 2px solid var(--ba-accent); outline-offset: 2px; border-radius: 8px; }
 .ba-cell {
   width: 100%; aspect-ratio: 1; border: none; border-radius: 3px; overflow: hidden;
-  background: var(--gray-999); color: var(--gray-300);
+  background: rgba(6, 30, 52, 0.34); color: #dfe8ee;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   font-family: var(--font-body); font-weight: 800; font-size: calc(var(--ba-cell) * 0.46);
   line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
   font-variant-numeric: tabular-nums;
 }
-.ba-cell:hover:not(:disabled) { background: var(--gray-800); }
-.ba-cell.miss { color: var(--gray-500); cursor: default; }
+.ba-cell:hover:not(:disabled) { background: rgba(6, 30, 52, 0.12); }
+.ba-cell.miss { background: rgba(6, 30, 52, 0.5); color: #aebfca; cursor: default; }
 .ba-cell.hit { color: #fff; background: var(--ba-hit); cursor: default; }
 
 /* Sonar scanned-zone outline (3×3) + small count badge, top-right of the zone. */
