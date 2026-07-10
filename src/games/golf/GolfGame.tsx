@@ -347,6 +347,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const spanRef = useRef(HALF_SPAN);
 	const appliedSpanRef = useRef(-1);
 	const fitSpanRef = useRef(HALF_SPAN);
+	const aspectRef = useRef(1); // canvas w/h so the ortho camera fills wide screens
 	const courseCenterRef = useRef({ x: 0, z: 0 });
 	const overviewRef = useRef(false);
 	const freeCamRef = useRef<{ x: number; z: number } | null>(null); // panned (free-look) camera centre
@@ -461,8 +462,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		const g = g3Ref.current;
 		const canvas = canvasRef.current;
 		if (!g || !canvas) return;
-		const css = canvas.clientWidth;
-		g.renderer.setSize(css, css, false);
+		const w = canvas.clientWidth, h = canvas.clientHeight || canvas.clientWidth;
+		aspectRef.current = w / h;
+		g.renderer.setSize(w, h, false);
 		appliedSpanRef.current = -1; // force the camera to re-project on the next frame
 	}, []);
 
@@ -540,7 +542,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		// Zoom: re-project only when the span changes.
 		const span = overviewRef.current ? fitSpanRef.current : spanRef.current;
 		if (span !== appliedSpanRef.current) {
-			g.camera.left = -span; g.camera.right = span; g.camera.top = span; g.camera.bottom = -span;
+			const a = aspectRef.current; g.camera.left = -span * a; g.camera.right = span * a; g.camera.top = span; g.camera.bottom = -span;
 			g.camera.updateProjectionMatrix();
 			appliedSpanRef.current = span;
 		}
@@ -775,7 +777,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		if (panningRef.current && freeCamRef.current) {
 			const canvas = canvasRef.current;
 			const span = spanRef.current;
-			const wpp = canvas ? (2 * span) / canvas.clientWidth : 0.1; // world units per screen pixel
+			const wpp = canvas ? (2 * span) / canvas.clientHeight : 0.1; // world units per screen pixel (square pixels)
 			freeCamRef.current.x -= (e.clientX - lastPanRef.current.x) * wpp;
 			freeCamRef.current.z -= (e.clientY - lastPanRef.current.y) * wpp;
 			lastPanRef.current = { x: e.clientX, y: e.clientY };
@@ -965,8 +967,13 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => {
 		const onResize = () => resize();
+		const onFs = () => requestAnimationFrame(resize); // re-measure after the fullscreen box applies
 		window.addEventListener('resize', onResize);
+		document.addEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
 		return () => {
+			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
 			window.removeEventListener('resize', onResize);
 			stop();
 			lobbyRef.current?.leave();
@@ -1114,13 +1121,24 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 /* ---------- Styles ---------- */
 
 const CSS = `
-.gf-root { --gf-accent: var(--accent-regular); width: 100%; max-width: 560px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); }
-.gf-boardwrap { position: relative; width: 100%; max-width: 520px; margin-inline: auto; }
+.gf-root { --gf-accent: var(--accent-regular); width: 100%; max-width: 640px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); }
+.gf-boardwrap { position: relative; width: 100%; aspect-ratio: 16 / 10; margin-inline: auto; }
 .gf-canvas {
-  width: 100%; aspect-ratio: 1 / 1; display: block; background: #0d1117;
+  width: 100%; height: 100%; display: block; background: #0d1117;
   border: 1px solid var(--gray-800); border-radius: 12px;
   touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
+/* Site global fullscreen → the course fills the screen; controls stay overlaid. */
+.game-page:fullscreen .gf-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.game-page:-webkit-full-screen .gf-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.game-page:fullscreen .gf-boardwrap { flex: 1; aspect-ratio: auto; }
+.game-page:-webkit-full-screen .gf-boardwrap { flex: 1; aspect-ratio: auto; }
+.game-page:fullscreen .gf-canvas { border-radius: 0; border: none; }
+.game-page:-webkit-full-screen .gf-canvas { border-radius: 0; border: none; }
+.game-page:fullscreen .gf-help { display: none; }
+.game-page:-webkit-full-screen .gf-help { display: none; }
+.game-page:fullscreen .gf-board { top: 54px; }
+.game-page:-webkit-full-screen .gf-board { top: 54px; }
 .gf-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .gf-label { position: absolute; transform: translate(-50%, -120%); white-space: nowrap; font-size: 11px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.55); padding: 1px 6px; border-radius: 999px; }
 .gf-celebrate { position: absolute; inset: 0; pointer-events: none; }
