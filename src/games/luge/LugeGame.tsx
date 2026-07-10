@@ -7,7 +7,7 @@ import {
 	segmentAt,
 	poseAt,
 	sepHalfAt,
-	bobRampAt,
+	pipeRampAt,
 	createLuge,
 	stepLuge,
 	type TrackSegment,
@@ -78,6 +78,7 @@ interface Scene3D {
 		cap: THREE.ConeGeometry;
 		rock: THREE.IcosahedronGeometry;
 		peak: THREE.ConeGeometry;
+		spike: THREE.ConeGeometry;
 	};
 	baseDisposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[];
 }
@@ -224,22 +225,25 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 	};
 
 	// Piste ribbon (banked) — UVs advance with s so the surface visibly streams.
-	// Bob sections: dense cross-section spanning the icy walls (poseAt carries the pipe shape).
+	// Icy pipes (bob + caves): dense cross-section spanning the climbable walls
+	// (poseAt carries the pipe shape) with a bright ice floor.
 	{
-		const ts = seg.bob ? [-1, -0.92, -0.82, -0.68, -0.45, 0, 0.45, 0.68, 0.82, 0.92, 1] : [-1, -0.5, 0, 0.5, 1];
+		const isPipe = seg.bob || seg.tunnel;
+		const ts = isPipe ? [-1, -0.92, -0.82, -0.68, -0.45, 0, 0.45, 0.68, 0.82, 0.92, 1] : [-1, -0.5, 0, 0.5, 1];
+		const extra = seg.bob ? LUGE.bobWallExtra : seg.tunnel ? LUGE.tunnelWallExtra : 0;
 		const ribbon: Row[][] = [];
 		for (let k = 0; k <= n; k++) {
 			const s = sAt(k);
-			const half = seg.samples[k].width / 2 + (seg.bob ? LUGE.bobWallExtra : 0);
+			const half = seg.samples[k].width / 2 + extra;
 			const across: Row[] = [];
 			for (const t of ts) across.push(edgePt(segs, s, t * half, o));
 			ribbon.push(across);
 		}
-		add(stripFrom(ribbon), seg.bob ? g.mats.ice : g.mats.snow);
+		add(stripFrom(ribbon), isPipe ? g.mats.ice : g.mats.snow);
 	}
 
-	// Raised snow berms at both edges (bob walls replace them on bob sections).
-	for (const side of seg.bob ? [] : [1, -1]) {
+	// Raised snow berms at both edges (pipe walls replace them on icy sections).
+	for (const side of seg.bob || seg.tunnel ? [] : [1, -1]) {
 		const berm: Row[][] = [];
 		for (let k = 0; k <= n; k++) {
 			const s = sAt(k);
@@ -265,7 +269,7 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 			for (const off of TERRAIN_OFF) {
 				const lat = side * (f.hw + 3 + off);
 				// Bob sections: the inner row meets the ice-wall crest (which ramps at run ends).
-				const rise = off === 0 ? (seg.bob ? 0.5 + 2.9 * bobRampAt(seg, k * SAMPLE_STEP) : 0.5) : terrainRise(s, off, side);
+				const rise = off === 0 ? (seg.bob ? 0.5 + 2.9 * pipeRampAt(seg, k * SAMPLE_STEP) : 0.5) : terrainRise(s, off, side);
 				const bankDy = -Math.sin(bank) * lat * Math.max(0, 1 - off / 24);
 				across.push({
 					x: f.x + f.nx * lat - o.x,
@@ -397,12 +401,20 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		const p = poseAt(segs, seg.startS + obs.s, obs.lat);
 		const base = new THREE.Vector3(p.x - o.x, p.y - o.y, p.z - o.z);
 		if (obs.type === 'ice') {
-			// Elongated glacier pillar splitting the passage — floor to ceiling.
-			const m = new THREE.Mesh(g.shared.rock, g.mats.pillarIce);
-			m.scale.set((obs.len ?? 6) * 0.55, 3.2, obs.r * 1.5);
-			m.rotation.y = -p.heading;
-			m.position.copy(base).setY(base.y + 1.0);
-			group.add(m);
+			// Row of ice stalagmites splitting the passage (matches the elongated hitbox).
+			const len = obs.len ?? 6;
+			const count = Math.max(2, Math.round(len / 2.2));
+			const dirX = Math.cos(p.heading);
+			const dirZ = Math.sin(p.heading);
+			for (let i = 0; i < count; i++) {
+				const off = (count === 1 ? 0 : i / (count - 1) - 0.5) * (len - 1.2);
+				const h = 2.2 + rng() * 1.4;
+				const m = new THREE.Mesh(g.shared.spike, g.mats.pillarIce);
+				m.scale.set(obs.r * (1.1 + rng() * 0.4), h, obs.r * (1.1 + rng() * 0.4));
+				m.position.set(base.x + dirX * off, base.y + h / 2 - 0.1, base.z + dirZ * off);
+				m.rotation.y = rng() * Math.PI;
+				group.add(m);
+			}
 		} else if (obs.type === 'tree') {
 			const t = new THREE.Group();
 			const trunk = new THREE.Mesh(g.shared.trunk, g.mats.trunk);
@@ -425,6 +437,30 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 			r.position.copy(base).setY(base.y + obs.r * 0.3);
 			r.rotation.set(rng() * 3, rng() * 3, rng() * 3);
 			group.add(r);
+		}
+	}
+
+	// Stalactites hanging from the cave ceiling (decorative — far above the sled,
+	// bright ice so they read against the dark vault).
+	if (seg.tunnel) {
+		const count = 8 + Math.floor(rng() * 7);
+		for (let i = 0; i < count; i++) {
+			const sLocal = 10 + rng() * (seg.length - 20);
+			const s = seg.startS + sLocal;
+			const k = Math.min(n, Math.round(sLocal / SAMPLE_STEP));
+			const f = frameAt(segs, s);
+			const bank = seg.samples[k].bank;
+			const R = f.hw + 2.6;
+			const latFrac = (rng() * 2 - 1) * 0.6;
+			const lat = latFrac * R;
+			const th = Math.acos(latFrac);
+			const ceilY = f.y + Math.sin(th) * R * 0.85 + 0.3 - Math.sin(bank) * lat;
+			const h = 1.2 + rng() * 2;
+			const m = new THREE.Mesh(g.shared.spike, g.mats.ice);
+			m.scale.set(0.35 + rng() * 0.35, h, 0.35 + rng() * 0.35);
+			m.rotation.x = Math.PI;
+			m.position.set(f.x + f.nx * lat - o.x, ceilY - h / 2 + 0.05 - o.y, f.z + f.nz * lat - o.z);
+			group.add(m);
 		}
 	}
 
@@ -615,7 +651,8 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				emissive: 0x0d3b52,
 				emissiveIntensity: 0.7,
 				transparent: true,
-				opacity: 0.85,
+				opacity: 0.7,
+				depthWrite: false,
 			}),
 			rock: new THREE.MeshStandardMaterial({ map: rockTex, color: 0xb9bec6, roughness: 0.9, flatShading: true }),
 			foliage: new THREE.MeshStandardMaterial({ color: 0x2f6b46, roughness: 0.9, flatShading: true }),
@@ -648,6 +685,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			cap: new THREE.ConeGeometry(0.45, 0.7, 8),
 			rock: new THREE.IcosahedronGeometry(1, 1),
 			peak: new THREE.ConeGeometry(1, 1, 7),
+			spike: new THREE.ConeGeometry(1, 1, 7),
 		};
 		Object.values(shared).forEach((g0) => baseDisposables.push(g0));
 

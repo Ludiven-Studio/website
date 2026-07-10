@@ -179,6 +179,19 @@ describe('luge generation', () => {
 		expect(r.state.invulnMs).toBeGreaterThan(0);
 	});
 
+	it('tunnels keep a comfortable interior width even late in the run', () => {
+		let found = 0;
+		for (let seed = 1; seed <= 12; seed++) {
+			for (const sg of buildChain(seed, 80)) {
+				if (sg.kind !== 'tunnel' || sg.startS < 3000) continue;
+				found++;
+				const mid = sg.samples[Math.floor(sg.samples.length / 2)];
+				expect(mid.width).toBeGreaterThanOrEqual(12.4);
+			}
+		}
+		expect(found).toBeGreaterThan(0);
+	});
+
 	it('difficulty ramps monotonically and stays bounded', () => {
 		let prev = difficultyAt(0);
 		for (let s = 250; s <= 12000; s += 250) {
@@ -345,6 +358,30 @@ describe('luge simulation', () => {
 		const low = stepLuge({ ...createLuge(), s: s0, lat: 0, speed: v }, { steer: 0 }, DT, segs).state.speed;
 		const high = stepLuge({ ...createLuge(), s: s0, lat: w / 2 + 2.5, speed: v }, { steer: 0 }, DT, segs).state.speed;
 		expect(high).toBeGreaterThan(low);
+	});
+
+	it('cave tunnels: icy floor with climbable walls that pull back, no life lost on the wall', () => {
+		let tunnel: TrackSegment | undefined;
+		let segs: TrackSegment[] = [];
+		for (let seed = 1; seed <= 20 && !tunnel; seed++) {
+			segs = buildChain(seed, 80);
+			tunnel = segs.find((sg) => sg.kind === 'tunnel');
+		}
+		expect(tunnel).toBeDefined();
+		const s0 = tunnel!.startS + tunnel!.length / 2;
+		const w = poseAt(segs, s0, 0).width;
+		// High on the cave wall: no crash, gravity pulls back toward the icy floor.
+		const st: LugeState = { ...createLuge(), s: s0, lat: w / 2 + 1, speed: 25 };
+		const r = stepLuge(st, { steer: 0 }, DT, segs);
+		expect(r.state.lives).toBe(LUGE.lives);
+		expect(r.state.latVel).toBeLessThan(0);
+		// The wall rise is symmetric — mean of both sides sits above the floor center.
+		const mean = (poseAt(segs, s0, w / 2 + 1).y + poseAt(segs, s0, -(w / 2 + 1)).y) / 2;
+		expect(mean).toBeGreaterThan(poseAt(segs, s0, 0).y);
+		// And the icy floor pushes the speed target above the plain ramp.
+		const v = difficultyAt(s0).vMax;
+		const flat = stepLuge({ ...createLuge(), s: s0, lat: 0, speed: v }, { steer: 0 }, DT, segs);
+		expect(flat.state.speed).toBeGreaterThan(v);
 	});
 
 	it('poseAt offsets along the left normal and follows the descent', () => {

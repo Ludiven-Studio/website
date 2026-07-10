@@ -129,6 +129,10 @@ export interface LugeParams {
 	bobFlatFrac: number; // fraction of the half-width that stays flat
 	bobWallGravity: number; // restoring pull back to the pipe floor (m/s² per unit slope)
 	bobRampLen: number; // meters over which walls grow/fade at a bob run's ends
+	tunnelFlatFrac: number; // ice caves: flat icy floor fraction before the climbable wall
+	tunnelWallExtra: number; // cave wall lateral extent beyond the floor
+	tunnelWallHeight: number; // cave wall crest (stays under the arch shell)
+	tunnelVMaxMul: number; // icy cave floor is slightly faster
 }
 
 export const LUGE: LugeParams = {
@@ -162,6 +166,10 @@ export const LUGE: LugeParams = {
 	bobFlatFrac: 0.45,
 	bobWallGravity: 30,
 	bobRampLen: 18,
+	tunnelFlatFrac: 0.6,
+	tunnelWallExtra: 2,
+	tunnelWallHeight: 2,
+	tunnelVMaxMul: 1.05,
 };
 
 export const SAMPLE_STEP = 2; // meters between centerline samples
@@ -173,6 +181,7 @@ const BANK_SCALE = 18; // bank (rad) per unit curvature
 const BANK_MAX = 0.45;
 const WARMUP_OBSTACLES = 2; // no obstacles before this segment index
 const WARMUP_FEATURES = 4; // no fork/tunnel before this segment index
+const TUNNEL_MIN_WIDTH = 12.5; // caves widen to this even late in the run (dodging room)
 
 /* ----------------------------- Difficulty ----------------------------- */
 
@@ -212,23 +221,42 @@ export function latSafeAt(seed: number, s: number, width: number): number {
 	return amp * (0.62 * Math.sin(s * 0.011 + p1) + 0.38 * Math.sin(s * 0.023 + p2));
 }
 
-/** Bobsleigh wall profile: flat pipe floor, then a quadratic icy wall. */
-export function bobWall(width: number, lat: number, P: LugeParams = LUGE): { rise: number; slope: number } {
-	const flatHalf = (width / 2) * P.bobFlatFrac;
+/** Quadratic pipe wall: flat floor up to flatFrac of the half-width, then a rising wall. */
+function wallShape(width: number, lat: number, flatFrac: number, extra: number, height: number): { rise: number; slope: number } {
+	const flatHalf = (width / 2) * flatFrac;
 	const a = Math.abs(lat) - flatHalf;
 	if (a <= 0) return { rise: 0, slope: 0 };
-	const span = width / 2 + P.bobWallExtra - flatHalf;
-	const c = P.bobWallHeight / (span * span);
+	const span = width / 2 + extra - flatHalf;
+	const c = height / (span * span);
 	return { rise: c * a * a, slope: Math.sign(lat) * 2 * c * a };
 }
 
-/** Wall scale (0..1) at local s inside a bob segment — grows/fades only at the run's ends. */
-export function bobRampAt(seg: TrackSegment, sLocal: number, P: LugeParams = LUGE): number {
-	if (!seg.bob) return 0;
-	let r = 1;
-	if (seg.bobRampIn) r = Math.min(r, smoothstep(0, P.bobRampLen, sLocal));
-	if (seg.bobRampOut) r = Math.min(r, 1 - smoothstep(seg.length - P.bobRampLen, seg.length, sLocal));
-	return r;
+/** Bobsleigh wall profile: flat pipe floor, then a quadratic icy wall. */
+export function bobWall(width: number, lat: number, P: LugeParams = LUGE): { rise: number; slope: number } {
+	return wallShape(width, lat, P.bobFlatFrac, P.bobWallExtra, P.bobWallHeight);
+}
+
+/** Climbable-wall profile of any icy pipe (bob run or cave tunnel); zero elsewhere. */
+export function pipeWall(seg: TrackSegment, width: number, lat: number, P: LugeParams = LUGE): { rise: number; slope: number } {
+	if (seg.bob) return bobWall(width, lat, P);
+	if (seg.tunnel) return wallShape(width, lat, P.tunnelFlatFrac, P.tunnelWallExtra, P.tunnelWallHeight);
+	return { rise: 0, slope: 0 };
+}
+
+/** Lateral extent of a pipe's climbable wall beyond the floor half-width. */
+export const pipeExtra = (seg: TrackSegment, P: LugeParams = LUGE): number =>
+	seg.bob ? P.bobWallExtra : seg.tunnel ? P.tunnelWallExtra : 0;
+
+/** Wall scale (0..1) at local s inside a pipe segment — grows/fades at the pipe's ends. */
+export function pipeRampAt(seg: TrackSegment, sLocal: number, P: LugeParams = LUGE): number {
+	if (seg.bob) {
+		let r = 1;
+		if (seg.bobRampIn) r = Math.min(r, smoothstep(0, P.bobRampLen, sLocal));
+		if (seg.bobRampOut) r = Math.min(r, 1 - smoothstep(seg.length - P.bobRampLen, seg.length, sLocal));
+		return r;
+	}
+	if (seg.tunnel) return Math.min(smoothstep(0, 20, sLocal), 1 - smoothstep(seg.length - 20, seg.length, sLocal));
+	return 0;
 }
 
 /** Separator half-width at local s inside a fork segment (0 outside [noseS, mergeS]). */
@@ -326,10 +354,17 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 	}
 	const widthAt = (sLocal: number): number => {
 		const base = w0 + (wEnd - w0) * (sLocal / length);
-		if (!fork) return base;
-		const widen = 2 * fork.outerSafe - base;
-		const ramp = Math.min(smoothstep(0, fork.noseS, sLocal), 1 - smoothstep(fork.mergeS, length, sLocal));
-		return base + widen * ramp;
+		if (fork) {
+			const widen = 2 * fork.outerSafe - base;
+			const ramp = Math.min(smoothstep(0, fork.noseS, sLocal), 1 - smoothstep(fork.mergeS, length, sLocal));
+			return base + widen * ramp;
+		}
+		if (kind === 'tunnel') {
+			const widen = Math.max(0, TUNNEL_MIN_WIDTH - base);
+			const ramp = Math.min(smoothstep(0, 20, sLocal), 1 - smoothstep(length - 20, length, sLocal));
+			return base + widen * ramp;
+		}
+		return base;
 	};
 
 	// Integrate the centerline (midpoint heading for clean arcs).
@@ -517,9 +552,9 @@ export function poseAt(
 	const p = lerpAt(segs, s);
 	let y = p.y - Math.sin(p.bank) * lat;
 	let dydlat = -Math.sin(p.bank);
-	if (p.seg.bob) {
-		const ramp = bobRampAt(p.seg, s - p.seg.startS);
-		const w = bobWall(p.width, lat);
+	if (p.seg.bob || p.seg.tunnel) {
+		const ramp = pipeRampAt(p.seg, s - p.seg.startS);
+		const w = pipeWall(p.seg, p.width, lat);
 		y += w.rise * ramp;
 		dydlat += w.slope * ramp;
 	}
@@ -581,22 +616,26 @@ export function stepLuge(
 	};
 
 	// Forward speed relaxes toward the difficulty ramp (boost multiplies the target).
-	// In a bob pipe the multiplier scales with how high you carve on the wall.
+	// In a bob pipe the multiplier scales with how high you carve on the wall; the icy
+	// cave floor is slightly faster too.
 	const here = lerpAt(segs, st.s);
 	const diff = difficultyAt(st.s);
 	let vMax = diff.vMax * (boostMs > 0 ? P.boostMul : 1);
 	if (here.seg.bob) {
-		const ramp = bobRampAt(here.seg, st.s - here.seg.startS);
+		const ramp = pipeRampAt(here.seg, st.s - here.seg.startS);
 		const climb = Math.min(1, (bobWall(here.width, st.lat).rise * ramp) / P.bobWallHeight);
 		vMax *= P.bobVMaxFloor + (P.bobVMaxMul - P.bobVMaxFloor) * climb;
+	} else if (here.seg.tunnel) {
+		vMax *= P.tunnelVMaxMul;
 	}
 	speed += (vMax - speed) * Math.min(1, P.speedRelax * dtSec);
 
-	// Lateral: steering vs centrifugal pull (κ·v², partly absorbed by banking), then friction.
+	// Lateral: steering vs centrifugal pull (κ·v², partly absorbed by banking), then
+	// friction — icy pipes (bob + caves) slide a lot more than snow.
 	const steer = Math.max(-1, Math.min(1, input.steer));
 	latVel += steer * P.steerAccel * dtSec;
 	latVel -= here.curvature * speed * speed * P.centrifugal * dtSec;
-	latVel *= Math.pow(here.seg.bob ? P.bobLatFriction : P.latFriction, dtSec * 60);
+	latVel *= Math.pow(here.seg.bob || here.seg.tunnel ? P.bobLatFriction : P.latFriction, dtSec * 60);
 	lat += latVel * dtSec;
 
 	const prevS = st.s;
@@ -658,11 +697,11 @@ export function stepLuge(
 	// no scrub, just a hard crest. Elsewhere: snow berms (never lethal — bounce + scrub).
 	if (!inForkBand) {
 		const info2 = lerpAt(segs, s);
-		if (info2.seg.bob) {
-			const ramp = bobRampAt(info2.seg, s - info2.seg.startS);
-			const w = bobWall(info2.width, lat);
+		if (info2.seg.bob || info2.seg.tunnel) {
+			const ramp = pipeRampAt(info2.seg, s - info2.seg.startS);
+			const w = pipeWall(info2.seg, info2.width, lat);
 			latVel -= w.slope * ramp * P.bobWallGravity * dtSec;
-			const crest = info2.width / 2 + P.bobWallExtra - P.sledHalf;
+			const crest = info2.width / 2 + pipeExtra(info2.seg) - P.sledHalf;
 			if (lat > crest) {
 				lat = crest;
 				if (latVel > 0) latVel = 0;
