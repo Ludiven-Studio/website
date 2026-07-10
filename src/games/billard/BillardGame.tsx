@@ -73,7 +73,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const triesRef = useRef(0);
 	const feltImgRef = useRef<HTMLImageElement | null>(null); // AI felt (else flat green)
 	const floorImgRef = useRef<HTMLImageElement | null>(null); // AI floor around the table
-	const [isFs, setIsFs] = useState(false); // immersive fullscreen
 
 	// Load the felt + floor textures once (RAF loop picks them up next frame).
 	useEffect(() => {
@@ -106,17 +105,16 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (ctx) ctx.setTransform(s, 0, 0, s, s * offsetRef.current.x, s * offsetRef.current.y);
 	}, []);
 
-	// Fullscreen (immersive) toggle on the play area.
-	const toggleFs = () => {
-		const el = wrapRef.current;
-		if (!document.fullscreenElement) el?.requestFullscreen?.().catch(() => {});
-		else document.exitFullscreen?.();
-	};
+	// The site's global GameFullscreen toggles `.game-page` fullscreen; re-measure the
+	// canvas after the box changes so the table fills the screen.
 	useEffect(() => {
-		// Re-measure after the browser applies the fullscreen (or restored) box.
-		const onFs = () => { setIsFs(!!document.fullscreenElement); requestAnimationFrame(doResize); };
+		const onFs = () => requestAnimationFrame(doResize);
 		document.addEventListener('fullscreenchange', onFs);
-		return () => document.removeEventListener('fullscreenchange', onFs);
+		document.addEventListener('webkitfullscreenchange', onFs);
+		return () => {
+			document.removeEventListener('fullscreenchange', onFs);
+			document.removeEventListener('webkitfullscreenchange', onFs);
+		};
 	}, [doResize]);
 
 	const { celebrating } = useCelebration(status === 'won');
@@ -465,7 +463,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 							<button key={k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)}>{DIFFS[k].label}</button>
 						))}
 						<button className="bi-act" onClick={() => newFreeTable(diffKey)} aria-label="Nouvelle table" title="Nouvelle table">↻</button>
-						<button className="bi-act" onClick={toggleFs} aria-label={isFs ? 'Quitter le plein écran' : 'Plein écran'} title="Plein écran">{isFs ? '⤡' : '⛶'}</button>
 					</div>
 				</div>
 				{daily && (
@@ -520,7 +517,13 @@ const CSS = `
 /* Play area holds the canvas + all controls overlaid (immersive). */
 .bi-playwrap { width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
 .bi-canvas { display: block; touch-action: none; cursor: crosshair; background: #3a2a1c; }
-.bi-playwrap:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+/* Site global fullscreen puts .game-page fullscreen — let the table fill the whole screen. */
+.game-page:fullscreen .bi-root { max-width: none; width: 100%; height: 100%; }
+.game-page:-webkit-full-screen .bi-root { max-width: none; width: 100%; height: 100%; }
+.game-page:fullscreen .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+.game-page:-webkit-full-screen .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+.game-page:fullscreen .bi-help { display: none; }
+.game-page:-webkit-full-screen .bi-help { display: none; }
 
 /* Overlaid HUD — sits on the floor above the table; dark translucent so it reads on any surface. */
 .bi-hud-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; z-index: 3; pointer-events: none; }
