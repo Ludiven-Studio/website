@@ -248,9 +248,13 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 
 	// Terrain skirts: inner row rides the (banked) berm edge exactly, outer rows climb
 	// the mountainside — the bank offset fades out so terrain and track never gap.
+	// Every 2nd sample, but ALWAYS include the boundary row n (odd n would leave a 2 m gap).
+	const skirtKs: number[] = [];
+	for (let k = 0; k < n; k += 2) skirtKs.push(k);
+	skirtKs.push(n);
 	for (const side of [1, -1]) {
 		const rows: Row[][] = [];
-		for (let k = 0; k <= n; k += 2) {
+		for (const k of skirtKs) {
 			const s = sAt(k);
 			const f = frameAt(segs, s);
 			const bank = seg.samples[k].bank;
@@ -258,7 +262,7 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 			for (const off of TERRAIN_OFF) {
 				const lat = side * (f.hw + 3 + off);
 				// Bob sections: the inner row meets the ice-wall crest instead of the berm.
-				const rise = off === 0 ? (seg.bob ? 2.5 : 0.5) : terrainRise(s, off, side);
+				const rise = off === 0 ? (seg.bob ? 3.4 : 0.5) : terrainRise(s, off, side);
 				const bankDy = -Math.sin(bank) * lat * Math.max(0, 1 - off / 24);
 				across.push({
 					x: f.x + f.nx * lat - o.x,
@@ -664,9 +668,11 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		const pitch = Math.atan2(ahead.y - pose.y, 2);
 		const steer = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
 
+		// Drift yaw: sliding sideways visibly swings the nose against the slide (oversteer look).
+		const driftYaw = Math.atan2(st.latVel, Math.max(8, st.speed)) * 1.2;
 		g.sled.position.set(pose.x, pose.y + 0.05, pose.z);
 		g.sled.rotation.set(0, 0, 0);
-		g.sled.rotateY(-pose.heading);
+		g.sled.rotateY(-pose.heading + driftYaw);
 		g.sled.rotateZ(pitch);
 		g.sled.rotateX(pose.bank + steer * 0.22 + st.latVel * 0.02);
 		// Invulnerability blink at ~8 Hz.
@@ -703,8 +709,11 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		g.sun.target.position.set(pose.x, pose.y, pose.z);
 		g.peaks.position.set(g.camera.position.x, g.camera.position.y - 60, g.camera.position.z);
 
-		// Snow spray: emit behind the runners while moving, more when steering/boosting.
-		const emit = runningRef.current && st.speed > 8 ? Math.min(6, 1 + Math.floor(st.speed / 12) + Math.abs(steer) * 2) : 0;
+		// Snow spray: emit behind the runners while moving, more when steering/sliding.
+		const emit =
+			runningRef.current && st.speed > 8
+				? Math.min(10, 1 + Math.floor(st.speed / 12) + Math.abs(steer) * 2 + Math.abs(st.latVel) * 0.6)
+				: 0;
 		const back = { x: -Math.cos(pose.heading), z: -Math.sin(pose.heading) };
 		let emitted = 0;
 		for (let i = 0; i < SPRAY_COUNT; i++) {
@@ -721,7 +730,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				g.sprayPos[i * 3] = pose.x + back.x * 0.9;
 				g.sprayPos[i * 3 + 1] = pose.y + 0.15;
 				g.sprayPos[i * 3 + 2] = pose.z + back.z * 0.9;
-				const side = (Math.random() - 0.5) * 3 - steer * 2;
+				const side = (Math.random() - 0.5) * 3 - steer * 2 - st.latVel * 0.5;
 				g.sprayVel[i * 3] = back.x * st.speed * 0.25 - Math.sin(pose.heading) * side;
 				g.sprayVel[i * 3 + 1] = 1.5 + Math.random() * 2.5;
 				g.sprayVel[i * 3 + 2] = back.z * st.speed * 0.25 + Math.cos(pose.heading) * side;

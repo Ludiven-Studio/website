@@ -274,8 +274,10 @@ describe('luge simulation', () => {
 		expect(r.events).toEqual([]);
 		expect(r.state.lives).toBe(LUGE.lives);
 		expect(r.state.latVel).toBeLessThan(0);
-		// The wall rise shows up in the pose (higher than the pipe floor).
-		expect(poseAt(segs, s0, w / 2 + 1.5).y).toBeGreaterThan(poseAt(segs, s0, 0).y);
+		// The wall rise shows up in the pose: the symmetric mean cancels banking,
+		// leaving only the (symmetric) wall lift above the pipe floor.
+		const mean = (poseAt(segs, s0, w / 2 + 1.5).y + poseAt(segs, s0, -(w / 2 + 1.5)).y) / 2;
+		expect(mean).toBeGreaterThan(poseAt(segs, s0, 0).y);
 	});
 
 	it('bob: icy sections push the speed target above the regular ramp', () => {

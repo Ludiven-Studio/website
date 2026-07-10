@@ -143,11 +143,11 @@ export const LUGE: LugeParams = {
 	nearMissBonus: 2,
 	corridorHalf: 1.6,
 	bobVMaxMul: 1.12,
-	bobLatFriction: 0.965,
-	bobWallExtra: 2.5,
-	bobWallHeight: 2.4,
-	bobFlatFrac: 0.55,
-	bobWallGravity: 26,
+	bobLatFriction: 0.98,
+	bobWallExtra: 3.5,
+	bobWallHeight: 3.4,
+	bobFlatFrac: 0.45,
+	bobWallGravity: 30,
 };
 
 export const SAMPLE_STEP = 2; // meters between centerline samples
@@ -266,11 +266,12 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 				return kMax * 0.3 * tunnelDir * Math.sin(Math.PI * t);
 			case 'bob':
 				// Alternating tight arcs — the icy walls (not steering) absorb the g-forces.
-				return kMax * 1.7 * tunnelDir * Math.sin(3 * Math.PI * t) * Math.sin(Math.PI * t);
+				return kMax * 2.6 * tunnelDir * Math.sin(3 * Math.PI * t) * Math.sin(Math.PI * t);
 			case 'fork':
 				return 0;
 			default:
-				return diff.curveMax * 0.2 * Math.sin(TWO_PI * t + wobblePh);
+				// sin(πt) envelope → κ (hence bank) is 0 at both ends: seamless segment joints.
+				return diff.curveMax * 0.2 * Math.sin(TWO_PI * t + wobblePh) * Math.sin(Math.PI * t);
 		}
 	};
 
