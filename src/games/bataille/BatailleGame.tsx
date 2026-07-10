@@ -1,13 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react';
 import {
 	SIZES,
 	generateHunt,
-	segType,
 	sonarCount,
 	isSunk,
 	isWon,
 	type HuntPuzzle,
-	type SegType,
 	type Shot,
 } from './engine';
 import { mulberry32 } from '../prng';
@@ -49,11 +47,6 @@ const emptyShots = (n: number): Shot[][] => Array.from({ length: n }, () => new 
 const NBR8: [number, number][] = [
 	[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1],
 ];
-
-const SEG_CLASS: Record<NonNullable<SegType>, string> = {
-	single: 'seg-single', left: 'seg-left', right: 'seg-right', top: 'seg-top',
-	bottom: 'seg-bottom', 'mid-h': 'seg-midh', 'mid-v': 'seg-midv',
-};
 
 export default function BatailleGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<DiffKey>('facile');
@@ -102,6 +95,37 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		}
 		return { sunkGrid: grid, sunkCount: sunk, sunkByLen: byLen };
 	}, [puzzle, shots, over, size]);
+
+	// Per-cell ship geometry (index along the hull + length + orientation) so a revealed
+	// ship can be sliced across its cells from one warship sprite.
+	const shipGeom = useMemo(() => {
+		const map = new Map<string, { i: number; L: number; h: boolean }>();
+		const byId = new Map<number, [number, number][]>();
+		for (let r = 0; r < size; r++) {
+			for (let c = 0; c < size; c++) {
+				const id = puzzle.shipId[r][c];
+				if (id < 0) continue;
+				if (!byId.has(id)) byId.set(id, []);
+				byId.get(id)!.push([r, c]);
+			}
+		}
+		byId.forEach((cells) => {
+			const h = cells.every(([r]) => r === cells[0][0]);
+			cells.sort((a, b) => (h ? a[1] - b[1] : a[0] - b[0]));
+			cells.forEach(([r, c], i) => map.set(`${r},${c}`, { i, L: cells.length, h }));
+		});
+		return map;
+	}, [puzzle, size]);
+
+	// Background slice of the warship sprite for a revealed ship cell (2px cell gaps cut it per case).
+	const shipSliceStyle = (r: number, c: number): CSSProperties => {
+		const g = shipGeom.get(`${r},${c}`);
+		if (!g) return {};
+		const pos = g.L > 1 ? (g.i / (g.L - 1)) * 100 : 50;
+		return g.h
+			? { backgroundImage: "url('/assets/jeux/bataille/ship.png')", backgroundSize: `${g.L * 100}% 100%`, backgroundPosition: `${pos}% center` }
+			: { backgroundImage: "url('/assets/jeux/bataille/ship_v.png')", backgroundSize: `100% ${g.L * 100}%`, backgroundPosition: `center ${pos}%` };
+	};
 
 	/* Fleet grouped by ship length (desc) — the ships to sink, shown in the legend. */
 	const fleetGroups = useMemo(() => {
@@ -388,14 +412,12 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					{Array.from({ length: size }).map((_, r) =>
 						Array.from({ length: size }).map((_, c) => {
 							const sv = shots[r][c];
-							const isShipSeg = sunkGrid[r][c]; // sunk (or won) → draw ship segment
-							const seg = isShipSeg ? segType(sunkGrid, r, c) : null;
+							const isShipSeg = sunkGrid[r][c]; // sunk (or won) → draw the sliced ship
 							const hit = sv === 1 && !isShipSeg; // hit but not yet sunk
 							const miss = sv === 2;
 							const cls = [
 								'ba-cell',
 								isShipSeg ? 'ship' : '',
-								seg ? SEG_CLASS[seg] : '',
 								hit ? 'hit' : '',
 								miss ? 'miss' : '',
 								over ? 'over' : '',
@@ -409,7 +431,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}`}
 								>
 									{isShipSeg ? (
-										<span className="ba-seg" />
+										<span className="ba-seg" style={shipSliceStyle(r, c)} />
 									) : hit ? (
 										'✸'
 									) : miss ? (
@@ -553,17 +575,19 @@ const CSS = `
   background: #0e3a52 url('/assets/jeux/bataille/water.jpg') center/cover; border-radius: 6px; padding: 2px;
 }
 .ba-board.sonar { outline: 2px solid var(--ba-accent); outline-offset: 2px; border-radius: 8px; }
+/* Unrevealed cells are opaque (they hide the board water underneath); only revealed
+   cells (miss = water, ship = hull with water around) let the sea show through. */
 .ba-cell {
   width: 100%; aspect-ratio: 1; border: none; border-radius: 3px; overflow: hidden;
-  background: rgba(6, 30, 52, 0.34); color: #dfe8ee;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: var(--gray-999); color: var(--gray-300);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
   font-family: var(--font-body); font-weight: 800; font-size: calc(var(--ba-cell) * 0.46);
   line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
   font-variant-numeric: tabular-nums;
 }
-.ba-cell:hover:not(:disabled) { background: rgba(6, 30, 52, 0.12); }
-.ba-cell.miss { background: rgba(6, 30, 52, 0.5); color: #aebfca; cursor: default; }
-.ba-cell.hit { color: #fff; background: var(--ba-hit); cursor: default; }
+.ba-cell:hover:not(:disabled) { background: var(--gray-800); }
+.ba-cell.miss { background: transparent; box-shadow: none; cursor: default; } /* reveal the sea */
+.ba-cell.hit { color: #fff; background: var(--ba-hit); box-shadow: none; cursor: default; }
 
 /* Sonar scanned-zone outline (3×3) + small count badge, top-right of the zone. */
 .ba-sonar-overlay { position: absolute; inset: 0; display: grid; gap: 2px; padding: 2px; pointer-events: none; z-index: 1; }
@@ -576,19 +600,13 @@ const CSS = `
   color: var(--accent-text-over); background: var(--ba-accent); border-radius: 999px;
 }
 .ba-cell.over { cursor: default; }
-.ba-dot { width: calc(var(--ba-cell) * 0.16); height: calc(var(--ba-cell) * 0.16); border-radius: 50%; background: var(--gray-500); }
+/* Miss = a white ripple over the revealed sea. */
+.ba-dot { width: calc(var(--ba-cell) * 0.22); height: calc(var(--ba-cell) * 0.22); border-radius: 50%; background: rgba(255, 255, 255, 0.6); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.22); }
 
-/* Ship segments (sunk / revealed). */
-.ba-cell.ship { background: var(--gray-900); cursor: default; }
-.ba-seg { background: var(--ba-ship); display: block; }
-.ba-cell.ship .ba-seg { width: 78%; height: 78%; background: var(--ba-accent); }
-.ba-cell.seg-single .ba-seg { border-radius: 50%; }
-.ba-cell.seg-left .ba-seg { width: 78%; border-radius: 999px 0 0 999px; margin-left: 22%; }
-.ba-cell.seg-right .ba-seg { width: 78%; border-radius: 0 999px 999px 0; margin-right: 22%; }
-.ba-cell.seg-top .ba-seg { height: 78%; border-radius: 999px 999px 0 0; margin-top: 22%; }
-.ba-cell.seg-bottom .ba-seg { height: 78%; border-radius: 0 0 999px 999px; margin-bottom: 22%; }
-.ba-cell.seg-midh .ba-seg { width: 100%; height: 78%; border-radius: 0; }
-.ba-cell.seg-midv .ba-seg { width: 78%; height: 100%; border-radius: 0; }
+/* Revealed ship: a warship sprite sliced across the ship's cells (the 2px cell gaps cut it
+   per case); the cell is transparent + square so the sea shows around the hull. */
+.ba-cell.ship { background: transparent; box-shadow: none; border-radius: 0; cursor: default; }
+.ba-seg { display: block; width: 100%; height: 100%; background-repeat: no-repeat; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4)); }
 
 .ba-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
 .ba-overlay { position: absolute; inset: -8px; z-index: 2; display: flex; align-items: center; justify-content: center; }
