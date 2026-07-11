@@ -136,14 +136,18 @@ const BRIDGE_ARCHS: [number, number, number][] = [ARCHETYPES[5], ARCHETYPES[0]];
 
 const degToMidi = (tonic: number, step: number): number => tonic + Math.floor(step / 7) * 12 + MAJOR[((step % 7) + 7) % 7];
 const clampStep = (s: number): number => Math.max(MIN_STEP, Math.min(MAX_STEP, s));
-/** Nearest chord tone (root / 3rd / 5th of the given chord) to `step`, kept in register. */
-const nearestChordTone = (step: number, chordRootStep: number): number => {
+/**
+ * Nearest chord tone (root / 3rd / 5th of the given chord) to `step`, kept in
+ * register. `exclude` skips one step — used to break note repetitions by
+ * picking the SECOND nearest chord tone instead.
+ */
+const nearestChordTone = (step: number, chordRootStep: number, exclude?: number): number => {
 	let best = step;
 	let bestDist = Infinity;
 	for (let oct = -7; oct <= 14; oct += 7) {
 		for (const t of [chordRootStep, chordRootStep + 2, chordRootStep + 4]) {
 			const cand = t + oct;
-			if (cand < MIN_STEP || cand > MAX_STEP) continue;
+			if (cand < MIN_STEP || cand > MAX_STEP || cand === exclude) continue;
 			const dist = Math.abs(cand - step);
 			if (dist < bestDist) {
 				bestDist = dist;
@@ -179,8 +183,9 @@ const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(s
  * refrain (B, higher, flowing) and pont (C, sparse contrast) — then replayed
  * VERBATIM following a pop form (A A B B A B C B, cycled), so returning
  * sections are recognizable. Inside a theme, an ARCHETYPE picks rhythm
- * densities, the pitch line follows an arch contour, leaps recover by step,
- * and bar 3 replays bar 1's deltas (varied repeat). ONE seed-picked
+ * densities and the pitch line follows a FIBONACCI walk (mod 8 → scale degrees
+ * around the section's register), snapped to the harmony with a no-repeat
+ * rule; bar 3 replays bar 1's degrees (varied repeat). ONE seed-picked
  * progression loops for the whole song and is returned alongside the notes so
  * the backing follows the same harmony.
  */
@@ -198,13 +203,21 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 
 	// Emit a note at `s`, but if it would land in the same column as the previous
 	// note while being a different pitch, nudge it diatonically until the column
-	// differs (or, at the register edge, repeat the previous pitch instead).
+	// differs — trying the melodic direction first, then the opposite one, so a
+	// register edge doesn't collapse into a repeated note.
 	const emit = (s: number, dur: number): void => {
 		if (lastStep != null && s !== lastStep && laneOfStep(s) === laneOfStep(lastStep)) {
-			const dir = s > lastStep ? 1 : -1;
-			let n = s;
-			while (n + dir >= MIN_STEP && n + dir <= MAX_STEP && laneOfStep(n) === laneOfStep(lastStep)) n += dir;
-			s = laneOfStep(n) !== laneOfStep(lastStep) ? n : lastStep;
+			const pref = s > lastStep ? 1 : -1;
+			let resolved = lastStep;
+			for (const dir of [pref, -pref]) {
+				let n = s;
+				while (n + dir >= MIN_STEP && n + dir <= MAX_STEP && laneOfStep(n) === laneOfStep(lastStep)) n += dir;
+				if (laneOfStep(n) !== laneOfStep(lastStep)) {
+					resolved = n;
+					break;
+				}
+			}
+			s = resolved;
 		}
 		lastStep = s;
 		notes.push({ midi: degToMidi(TONIC, s), dur, lane: laneOfStep(s) });
@@ -231,26 +244,29 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		const cellA2 = arch[0] === arch[2] ? cellA : pick(CELLS[arch[2]]);
 		const bars: Cell[] = [cellA, cellB, cellA2, pick(CADENCES)];
 
-		// Arch contour: first half favors ascent, second half descent.
-		const contour: number[] = [];
-		for (let k = 0; k < 8; k++) {
-			const r = rng();
-			const mag = r < 0.7 ? (rng() < 0.72 ? 1 : 2) : r < 0.9 ? (rng() < 0.72 ? -1 : -2) : 0;
-			contour.push(k < 4 ? mag : -mag);
-		}
+		// Fibonacci walk (mod 8): a structured, non-repeating degree sequence — the
+		// melodic skeleton. Seeds vary per theme, so couplet and refrain differ.
+		let fa = 1 + Math.floor(rng() * 6);
+		let fb = 1 + Math.floor(rng() * 6);
+		const nextFib = (): number => {
+			const v = (fa + fb) % 8;
+			fa = fb;
+			fb = v;
+			if (fa === 0 && fb === 0) fb = 1; // never collapse to all-zeros
+			return v;
+		};
 
 		const theme: ThemeEv[][] = [];
-		const barADeltas: number[] = []; // bar 0's melodic deltas, replayed in bar 2
+		const barAVals: number[] = []; // bar 0's Fibonacci degrees, replayed in bar 2
 		let step = clampStep(startStep); // the section's register anchor
-		let lastDelta = 0;
-		let ci = 0;
+		let prev: number | null = null; // last melody step, for the no-repeat rule
 
 		for (let bar = 0; bar < 4; bar++) {
 			const chordRootStep = prog[bar];
 			const rhythm = bars[bar];
-			// Occasionally a bar walks the chord itself instead of the contour.
+			// Occasionally a bar walks the chord itself instead of the Fibonacci line.
 			const arp = bar < 3 && rng() < 0.18;
-			const arpDir = arp && rng() < 0.5 ? -1 : 1;
+			let arpDir = arp && rng() < 0.5 ? -1 : 1;
 			const ladder = arp ? chordLadder(chordRootStep) : [];
 			let arpIdx = arp ? Math.max(0, ladder.indexOf(nearestChordTone(step, chordRootStep))) : 0;
 			let beatInBar = 0;
@@ -263,21 +279,21 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 					continue;
 				}
 				if (arp) {
-					if (noteInBar > 0) arpIdx = Math.max(0, Math.min(ladder.length - 1, arpIdx + arpDir));
+					if (noteInBar > 0) {
+						let ni = arpIdx + arpDir;
+						if (ni < 0 || ni >= ladder.length) {
+							arpDir = -arpDir; // ping-pong at the register edge (no sticking)
+							ni = arpIdx + arpDir;
+						}
+						arpIdx = ni;
+					}
 					step = ladder[arpIdx];
 				} else {
 					const strong = beatInBar % 2 === 0; // beats 1 & 3 = harmonic anchors
-					let delta: number;
-					if (bar === 2 && noteInBar < barADeltas.length) {
-						delta = barADeltas[noteInBar]; // varied repeat over bar 2's chord
-					} else {
-						delta = contour[ci % 8];
-						if (Math.abs(lastDelta) >= 2) delta = -Math.sign(lastDelta); // leap → step back
-						ci++;
-					}
-					if (bar === 0) barADeltas.push(delta);
-					lastDelta = delta;
-					step = clampStep(step + delta);
+					const v = bar === 2 && noteInBar < barAVals.length ? barAVals[noteInBar] : nextFib(); // bar 2 = varied repeat of bar 0
+					if (bar === 0) barAVals.push(v);
+					// Degree v (0..7) spans an octave of the scale around the anchor.
+					step = clampStep(startStep + v - 2);
 					// Chord tone on strong beats AND on long notes (they ring against the
 					// chord); pentatonic passing note on short weak beats — resolved down
 					// when it lands on the chord's avoid note (semitone above a chord tone).
@@ -286,7 +302,19 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 						step = toPenta(step);
 						if (isAvoidNote(step, chordRootStep)) step = clampStep(step - 1);
 					}
+					// No immediate repeats: snapping can converge on the previous note —
+					// push to the next chord tone (or diatonic neighbor) instead.
+					if (step === prev) {
+						const dir = v >= 4 ? 1 : -1;
+						if (strong || ev.d >= 2) step = nearestChordTone(clampStep(prev + dir), chordRootStep, prev);
+						else {
+							step = toPenta(clampStep(prev + dir));
+							if (isAvoidNote(step, chordRootStep)) step = clampStep(step - 1);
+							if (step === prev) step = clampStep(prev + 2 * dir);
+						}
+					}
 				}
+				prev = step;
 				out.push({ d: ev.d, step });
 				beatInBar += ev.d;
 				noteInBar++;
