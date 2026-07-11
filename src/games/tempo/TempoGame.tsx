@@ -210,14 +210,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		o.start(when);
 		o.stop(when + 0.34);
 	};
-	// Warm sustained cello/bass bed (root + fifth + octave + third above, low-pass
-	// filtered). The third sits an octave up so it colors the chord without mud.
+	// Bass synth pad laying the chords down low (root + fifth + octave + third
+	// above, low-pass filtered). The third sits an octave up to avoid mud.
 	const pad = (when: number, dur: number, root: number, third: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const lp = ctx.createBiquadFilter();
 		lp.type = 'lowpass';
-		lp.frequency.value = 650;
+		lp.frequency.value = 800;
 		lp.Q.value = 0.6;
 		const g = ctx.createGain();
 		g.connect(lp);
@@ -225,8 +225,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const attack = Math.min(0.4, dur * 0.3);
 		const rel = Math.min(0.5, dur * 0.35);
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(0.06, when + attack);
-		g.gain.setValueAtTime(0.06, when + Math.max(attack, dur - rel));
+		g.gain.exponentialRampToValueAtTime(0.09, when + attack);
+		g.gain.setValueAtTime(0.09, when + Math.max(attack, dur - rel));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
 		for (const [semi, amp] of [[0, 1], [7, 0.5], [12, 0.3], [12 + third, 0.28]]) {
 			const o = ctx.createOscillator();
@@ -322,6 +322,66 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		g.connect(runGainRef.current ?? masterRef.current!);
 		src.start(when);
 		src.stop(when + 0.06);
+	};
+	// Snare: band-passed noise + a low tone body. The rock backbeat (beats 2 & 4).
+	const snare = (when: number, accent: boolean): void => {
+		const ctx = ctxRef.current;
+		if (!ctx || !noiseRef.current) return;
+		const src = ctx.createBufferSource();
+		src.buffer = noiseRef.current;
+		const bp = ctx.createBiquadFilter();
+		bp.type = 'bandpass';
+		bp.frequency.value = 1900;
+		bp.Q.value = 0.6;
+		const g = ctx.createGain();
+		g.gain.setValueAtTime(accent ? 0.15 : 0.11, when);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
+		src.connect(bp);
+		bp.connect(g);
+		g.connect(runGainRef.current ?? masterRef.current!);
+		src.start(when);
+		src.stop(when + 0.18);
+		const o = ctx.createOscillator();
+		o.type = 'triangle';
+		o.frequency.setValueAtTime(195, when);
+		const og = ctx.createGain();
+		og.gain.setValueAtTime(0.08, when);
+		og.gain.exponentialRampToValueAtTime(0.0001, when + 0.11);
+		o.connect(og);
+		og.connect(runGainRef.current ?? masterRef.current!);
+		o.start(when);
+		o.stop(when + 0.13);
+	};
+	// String ensemble (violins): detuned saws, slow swell, mid-high register —
+	// carries the chord's color (3rd + 5th + octave) above the synth pad.
+	const strings = (when: number, dur: number, root: number, third: number): void => {
+		const ctx = ctxRef.current;
+		if (!ctx) return;
+		const lp = ctx.createBiquadFilter();
+		lp.type = 'lowpass';
+		lp.frequency.value = 1500;
+		lp.Q.value = 0.5;
+		const g = ctx.createGain();
+		g.connect(lp);
+		lp.connect(runGainRef.current ?? masterRef.current!);
+		const atk = Math.min(0.5, dur * 0.35);
+		const rel = Math.min(0.6, dur * 0.4);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(0.04, when + atk);
+		g.gain.setValueAtTime(0.04, when + Math.max(atk, dur - rel));
+		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+		for (const [semi, det] of [[third + 12, -6], [19, 5], [24, -3]]) {
+			const o = ctx.createOscillator();
+			o.type = 'sawtooth';
+			o.frequency.value = midiToFreq(root + semi);
+			o.detune.value = det;
+			const og = ctx.createGain();
+			og.gain.value = 0.5;
+			o.connect(og);
+			og.connect(g);
+			o.start(when);
+			o.stop(when + dur + 0.08);
+		}
 	};
 	// Plucked comp (harp/guitar-like): a chord tone per beat, quick decay — adds
 	// harmonic movement between the sustained pad and the melody.
@@ -496,7 +556,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	pressLaneRef.current = pressLane;
 
 	const onDown = (e: React.PointerEvent): void => {
-		if (!runningRef.current) return;
+		if (!runningRef.current || autoRef.current) return; // listen mode: taps don't light lanes
 		const cv = canvasRef.current;
 		if (!cv) return;
 		const rect = cv.getBoundingClientRect();
@@ -588,7 +648,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		document.addEventListener('webkitfullscreenchange', onFs);
 		const onKeyDown = (e: KeyboardEvent): void => {
 			const lane = KEYS.indexOf(e.key.toLowerCase());
-			if (lane < 0 || !runningRef.current) return;
+			if (lane < 0 || !runningRef.current || autoRef.current) return;
 			e.preventDefault();
 			if (!laneKeyRef.current[lane]) {
 				laneKeyRef.current[lane] = true;
@@ -649,10 +709,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const accent = i % 4 === 0;
 				const { root, third } = chordAt(i);
 				const chordRoot = chart.key + root;
-				// Chord-only intro: pad + pluck + bass set the harmony first, the drums
-				// only enter with the melody.
+				// Chord-only intro: pad + strings + pluck + bass set the harmony first,
+				// the drums only enter with the melody.
 				const inIntro = bt[i] < (chart.introTime ?? 0) - 0.01;
-				if (!inIntro) kick(when, accent);
+				// Rock pattern: kick on beats 1 & 3, snare backbeat on 2 & 4, 8th-note hats.
+				if (!inIntro) {
+					if (i % 2 === 0) kick(when, accent);
+					else snare(when, i % 4 === 3);
+				}
 				// Root/fifth bass; every 8th beat walks a whole tone into the next root.
 				let bassNote = chordRoot + (i % 2 === 0 ? 0 : 7);
 				if (i % 8 === 7) {
@@ -668,9 +732,11 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const comp = Math.floor(i / 32) % 2 === 0 ? [0, 7, third + 12, 12] : [0, third, 7, third + 12];
 				pluck(when, chordRoot + 12 + comp[i % 4]);
 				if (accent) {
-					// Sustained cello bed under each bar (deep, an octave below the groove bass).
+					// Bass synth pad under each bar (deep, an octave below the groove bass),
+					// with a violin swell carrying the chord color above it.
 					const barDur = bt[Math.min(i + 4, bt.length - 1)] - bt[i] || 2;
 					pad(when, Math.max(0.6, barDur), chordRoot - 12, third);
+					strings(when, Math.max(0.6, barDur), chordRoot, third);
 				}
 				backingIdxRef.current++;
 			}

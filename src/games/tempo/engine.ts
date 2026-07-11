@@ -311,12 +311,12 @@ export const ENDLESS_OPTS: EndlessOpts[] = [
 	{ baseTempo: 1.8, rampSec: 110, maxMult: 1.45 }, // Moyen
 	{ baseTempo: 1.8, rampSec: 95, maxMult: 1.5 }, // Difficile
 ];
-export const INTRO_BEATS = 8; // 2 bars of chord-only backing before the first tile
+export const INTRO_BEATS = 16; // 4 bars: the full chord loop plays once before the first tile
 /**
  * Endless chart whose tempo RAMPS UP gently over the run: successive beats get
  * shorter, so it grows faster the longer you survive. The daily/free `speed`
- * still scales the starting tempo. Opens with a 2-bar intro (backing only) so
- * the harmony settles in before the melody enters.
+ * still scales the starting tempo. Opens with a 4-bar intro (backing only) that
+ * states the whole progression once before the melody enters.
  */
 export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {}): Chart {
 	const base = (opts.baseTempo ?? 1.8) * speed;
@@ -352,11 +352,10 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	// Whole-beat grid for the groove (kick/bass/pad step on these).
 	const beatTimes: number[] = [];
 	for (let b = 0; b <= Math.ceil(totalBeats); b++) beatTimes.push(beatTime[b]);
-	// One chord per bar, padded to cover the whole grid. The intro plays the LAST
-	// two bars of the song's looping progression, so it resolves into the I (or
-	// the loop's first chord) right as the melody enters.
+	// One chord per bar, padded to cover the whole grid. The intro states the
+	// song's full 4-chord loop once, so the melody enters on the loop's restart.
 	const songChords = song.chords ?? [];
-	const introChords = songChords.length >= 4 ? [songChords[2], songChords[3]] : [{ root: 0, third: 4 }, { root: 0, third: 4 }];
+	const introChords = songChords.length >= 4 ? songChords.slice(0, 4) : Array.from({ length: 4 }, () => ({ root: 0, third: 4 }));
 	const barCount = Math.ceil(totalBeats / 4);
 	const chords = [...introChords, ...songChords].slice(0, barCount);
 	while (chords.length < barCount) chords.push(chords[chords.length - 1] ?? { root: 0, third: 4 });
