@@ -265,7 +265,7 @@ export const games: GameTile[] = [
 	{
 		id: 'luge',
 		title: 'Luge',
-		pitch: 'Descente 3D à toute vitesse : évite sapins et rochers, ose les tunnels de glace aux bifurcations.',
+		pitch: 'Descente 3D à toute vitesse : évite sapins et rochers, ose la rampe de surf — plus tu vas vite, plus ça rapporte.',
 		icon: 'luge',
 		href: '/jeux/luge',
 		status: 'play',
