@@ -137,7 +137,10 @@ export interface LugeParams {
 	nearMissGap: number; // extra lateral gap under which a pass counts as near-miss
 	nearMissBonus: number;
 	forkLaneVMaxMul: number; // the icy danger corridor is itself a speed boost
-	jumpFlightK: number; // flight distance = speed × this (seconds of air time)
+	jumpKickLen: number; // kicker ramp length (m)
+	jumpKickH: number; // lip height — takeoff slope = 2·H/len (quadratic ramp)
+	jumpGravity: number; // flight gravity (m/s²) — a bit strong for game scale
+	jumpMaxVy: number; // vertical takeoff speed cap (keeps top-speed flights sane)
 	jumpBonus: number; // score for clearing the pit
 	corridorHalf: number; // guaranteed obstacle-free half-width around latSafe
 	bobVMaxFloor: number; // speed multiplier at the flat pipe floor (barely faster)
@@ -177,7 +180,10 @@ export const LUGE: LugeParams = {
 	nearMissGap: 0.6,
 	nearMissBonus: 2,
 	forkLaneVMaxMul: 1.12,
-	jumpFlightK: 0.92,
+	jumpKickLen: 12,
+	jumpKickH: 1.6,
+	jumpGravity: 20,
+	jumpMaxVy: 8,
 	jumpBonus: 10,
 	corridorHalf: 1.6,
 	bobVMaxFloor: 1.03,
@@ -285,14 +291,32 @@ export function pipeRampAt(seg: TrackSegment, sLocal: number, P: LugeParams = LU
 /**
  * Jump segment surface profile: a kicker ramp rising to the lip, a sharp drop
  * into a pit, and a landing ramp climbing back out after the gap.
+ * The ramp is a quadratic ease-in: it keeps STEEPENING up to the lip so the sled
+ * leaves the ground with real upward velocity (a rounded crest would kill the launch).
  */
 export function jumpRiseAt(seg: TrackSegment, sLocal: number): number {
 	const j = seg.jump;
 	if (!j) return 0;
-	if (sLocal <= j.lipS - 10) return 0;
-	if (sLocal <= j.lipS) return 1.6 * smoothstep(j.lipS - 10, j.lipS, sLocal);
+	if (sLocal <= j.lipS - LUGE.jumpKickLen) return 0;
+	if (sLocal <= j.lipS) {
+		const u = (sLocal - (j.lipS - LUGE.jumpKickLen)) / LUGE.jumpKickLen;
+		return LUGE.jumpKickH * u * u;
+	}
 	if (sLocal < j.lipS + j.gap) return -0.7;
 	return -0.7 * (1 - smoothstep(j.lipS + j.gap, j.lipS + j.gap + 8, sLocal));
+}
+
+/** Vertical takeoff speed off the kicker: forward speed × ramp exit slope, capped. */
+export function jumpTakeoffVy(speed: number): number {
+	return Math.min(LUGE.jumpMaxVy, speed * ((2 * LUGE.jumpKickH) / LUGE.jumpKickLen));
+}
+
+/** Ballistic flight length: launch at the lip, land on the pit-floor plane. */
+export function jumpFlightDist(speed: number): number {
+	const vy = jumpTakeoffVy(speed);
+	const drop = LUGE.jumpKickH + 0.7; // lip height down to the pit floor
+	const t = (vy + Math.sqrt(vy * vy + 2 * LUGE.jumpGravity * drop)) / LUGE.jumpGravity;
+	return speed * t;
 }
 
 /** Separator half-width at local s inside a fork segment (0 outside [noseS, mergeS]). */
@@ -403,11 +427,11 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		};
 	}
 	// Jump: kicker lip at ~45% of the segment; the pit is clearable while cruising
-	// (flight = speed × jumpFlightK) but not after a crash killed the momentum.
+	// (ballistic flight off the ramp) but not after a crash killed the momentum.
 	let jump: TrackSegment['jump'];
 	if (kind === 'jump') {
 		const lipS = Math.round((length * 0.45) / SAMPLE_STEP) * SAMPLE_STEP;
-		const gap = Math.min(30, Math.max(8, 0.55 * diff.vMax * LUGE.jumpFlightK));
+		const gap = Math.min(30, Math.max(8, 0.55 * jumpFlightDist(diff.vMax)));
 		jump = { lipS, gap };
 	}
 
@@ -755,13 +779,13 @@ export function stepLuge(
 		lane = null;
 	}
 
-	// Jump: crossing the kicker lip launches the sled — flight distance scales with
-	// speed. Landing before the pit's end crushes the momentum (like getting stuck).
+	// Jump: crossing the kicker lip launches the sled on a ballistic flight (vy from
+	// the ramp slope). Landing before the pit's end crushes the momentum (like stuck).
 	if (seg.jump && jumpFromS == null) {
 		const lipAbs = seg.startS + seg.jump.lipS;
 		if (prevS < lipAbs && s >= lipAbs) {
 			jumpFromS = lipAbs;
-			jumpToS = lipAbs + Math.max(4, speed * P.jumpFlightK);
+			jumpToS = lipAbs + Math.max(4, jumpFlightDist(speed));
 			jumpGapEndS = lipAbs + seg.jump.gap;
 		}
 	}

@@ -12,6 +12,7 @@ import {
 	latSafeAt,
 	sepHalfAt,
 	jumpRiseAt,
+	jumpFlightDist,
 	createLuge,
 	stepLuge,
 	type TrackSegment,
@@ -145,14 +146,18 @@ describe('luge generation', () => {
 		const j = jump!.jump!;
 		expect(jump!.obstacles).toEqual([]);
 		// Profile: lip above the approach, pit below it — and poseAt carries it.
-		expect(jumpRiseAt(jump!, j.lipS)).toBeCloseTo(1.6, 5);
+		expect(jumpRiseAt(jump!, j.lipS)).toBeCloseTo(LUGE.jumpKickH, 5);
 		expect(jumpRiseAt(jump!, j.lipS + j.gap / 2)).toBeLessThan(0);
+		// The ramp steepens toward the lip (ballistic takeoff needs a steep exit slope).
+		const riseNearLip = jumpRiseAt(jump!, j.lipS) - jumpRiseAt(jump!, j.lipS - 2);
+		const riseAtStart = jumpRiseAt(jump!, j.lipS - LUGE.jumpKickLen + 2) - jumpRiseAt(jump!, j.lipS - LUGE.jumpKickLen);
+		expect(riseNearLip).toBeGreaterThan(riseAtStart * 2);
 		const lipAbs = jump!.startS + j.lipS;
 		expect(poseAt(segs, lipAbs, 0).y).toBeGreaterThan(poseAt(segs, lipAbs - 12, 0).y);
 		expect(poseAt(segs, lipAbs + j.gap / 2, 0).y).toBeLessThan(poseAt(segs, lipAbs, 0).y - 1.5);
 		// Cruising speed clears the pit → clean landing bonus.
 		const v = difficultyAt(jump!.startS).vMax;
-		const fast = runUntil({ ...createLuge(), s: lipAbs - 3, lat: 0, speed: v }, segs, 0, 0, lipAbs + v * LUGE.jumpFlightK + 10);
+		const fast = runUntil({ ...createLuge(), s: lipAbs - 3, lat: 0, speed: v }, segs, 0, 0, lipAbs + jumpFlightDist(v) + 10);
 		expect(fast.events).toContain('jumpClean');
 		expect(fast.events).not.toContain('jumpShort');
 		expect(fast.state.bonusScore).toBeGreaterThanOrEqual(LUGE.jumpBonus);

@@ -8,6 +8,7 @@ import {
 	poseAt,
 	sepHalfAt,
 	pipeRampAt,
+	jumpTakeoffVy,
 	createLuge,
 	stepLuge,
 	type TrackSegment,
@@ -449,7 +450,7 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 
 	// Jump kicker: an ice ramp strip so the tremplin reads from afar (pit stays snow).
 	if (seg.jump) {
-		const kA = Math.max(0, Math.floor((seg.jump.lipS - 10) / SAMPLE_STEP));
+		const kA = Math.max(0, Math.floor((seg.jump.lipS - LUGE.jumpKickLen) / SAMPLE_STEP));
 		const kB = Math.min(n, Math.ceil(seg.jump.lipS / SAMPLE_STEP));
 		const rows: Row[][] = [];
 		for (let k = kA; k <= kB; k++) {
@@ -791,10 +792,30 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		if (!segs.length) return;
 
 		const pose = poseAt(segs, sI, latI);
-		const ahead = poseAt(segs, sI + 2, latI);
-		const pitch = Math.atan2(ahead.y - pose.y, 2);
 		const steer = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
 		const seg = segmentAt(segs, sI);
+
+		// Ground pitch from a +2 m sample — clamped to the kicker lip on the ramp so
+		// the nose keeps rising with the ramp instead of diving early into the pit.
+		const lipAbs = seg.jump ? seg.startS + seg.jump.lipS : 0;
+		const aheadS = seg.jump && sI < lipAbs ? Math.min(sI + 2, lipAbs) : sI + 2;
+		const ahead = poseAt(segs, aheadS, latI);
+		let pitch = Math.atan2(ahead.y - pose.y, Math.max(0.4, aheadS - sI));
+
+		// Airborne off a kicker: a parabola that leaves TANGENT to the ramp and lands
+		// exactly on the landing pose — pure ballistics, no pop at takeoff.
+		const airborne = st.jumpFromS != null && sI > st.jumpFromS && sI < st.jumpToS;
+		let flightY: number | null = null;
+		if (airborne && st.jumpFromS != null) {
+			const D = st.jumpToS - st.jumpFromS;
+			const t = (sI - st.jumpFromS) / D;
+			const yA = poseAt(segs, st.jumpFromS, latI).y;
+			const yB = poseAt(segs, st.jumpToS, latI).y;
+			const a = (jumpTakeoffVy(st.speed) / Math.max(8, st.speed)) * D;
+			const b = yB - yA - a;
+			flightY = yA + a * t + b * t * t;
+			pitch = Math.atan2(a + 2 * b * t, D);
+		}
 
 		// Drift yaw: the nose swings toward the slide. Barely on grippy snow (deadzone +
 		// small factor), fully on bob ice where huge slides are the point.
@@ -804,22 +825,13 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		// Steering pivots the nose into the turn (eased) — more on ice; no body lean.
 		const yawTarget = steer * (seg.bob ? 0.22 : 0.1);
 		steerYawRef.current += (yawTarget - steerYawRef.current) * Math.min(1, dtSec * 8);
-		g.sled.position.set(pose.x, pose.y + 0.05, pose.z);
+		g.sled.position.set(pose.x, (flightY ?? pose.y) + 0.05, pose.z);
 		g.sled.rotation.set(0, 0, 0);
 		g.sled.rotateY(-pose.heading - driftYaw - steerYawRef.current);
 		g.sled.rotateZ(pitch);
 		g.sled.rotateX(pose.bank + st.latVel * 0.015);
 		// Invulnerability blink at ~8 Hz.
 		g.sled.visible = st.invulnMs <= 0 || Math.floor(clockRef.current / 125) % 2 === 0;
-		// Airborne off a kicker: ballistic arc between the lip and the landing point.
-		const airborne = st.jumpFromS != null && sI > st.jumpFromS && sI < st.jumpToS;
-		if (airborne && st.jumpFromS != null) {
-			const t = (sI - st.jumpFromS) / (st.jumpToS - st.jumpFromS);
-			const yA = poseAt(segs, st.jumpFromS, latI).y;
-			const yB = poseAt(segs, st.jumpToS, latI).y;
-			g.sled.position.y = yA + (yB - yA) * t + 5.6 * t * (1 - t) + 0.05;
-			g.sled.rotateZ((0.5 - t) * 0.45); // nose up off the lip, dips for the landing
-		}
 
 		// Fatal crash: tumbling rolls + fading bounces on top of the base pose.
 		const crash = crashAnimRef.current;
