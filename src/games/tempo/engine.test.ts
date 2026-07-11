@@ -39,17 +39,34 @@ describe('tempo engine', () => {
 		}
 	});
 
-	it('starts on long notes, shortens only later (rondes → … → croches)', () => {
-		const tiles = buildEndlessChart(11, 1, { count: 400 }).tiles;
-		const earlyMin = Math.min(...tiles.slice(0, 4).map((t) => t.dur));
-		const lateMin = Math.min(...tiles.slice(60, 120).map((t) => t.dur));
-		expect(earlyMin).toBeGreaterThan(lateMin); // early notes are longer than later ones
+	it('never emits a note shorter than a quarter, locked to the beat grid', () => {
+		const song = generateEndlessSong(11, 400);
+		let total = 0;
+		for (const n of song.notes) {
+			expect(n.dur).toBeGreaterThanOrEqual(1); // noire minimum
+			expect(Number.isInteger(n.dur)).toBe(true); // on the grid
+			total += n.dur;
+		}
+		expect(total % 16).toBe(0); // whole 16-beat phrases → bars never drift vs the backing
 	});
 
-	it('has short and long (hold) tiles', () => {
+	it('varies note durations from the very first phrase', () => {
+		for (const seed of [3, 11, 42]) {
+			const durs = new Set(
+				generateEndlessSong(seed, 400)
+					.notes.filter((n) => !n.rest)
+					.slice(0, 12)
+					.map((n) => n.dur),
+			);
+			expect(durs.size).toBeGreaterThanOrEqual(2);
+		}
+	});
+
+	it('has short and long (hold) tiles, holds staying a minority', () => {
 		const tiles = buildEndlessChart(5, 1, { count: 300 }).tiles;
 		expect(tiles.some((t) => t.hold)).toBe(true);
 		expect(tiles.some((t) => !t.hold)).toBe(true);
+		expect(tiles.filter((t) => t.hold).length).toBeLessThan(tiles.length * 0.3);
 	});
 
 	it('speed scales the chart faster', () => {
@@ -57,17 +74,22 @@ describe('tempo engine', () => {
 		expect(SPEEDS.length).toBe(3);
 	});
 
-	it('accelerates: later notes come closer together', () => {
-		const c = buildEndlessChart(77, 1, { count: 300, rampSec: 20 });
-		// Average gap over a window (robust to rests / fractional durations).
-		const avgGap = (from: number, to: number): number => {
-			let sum = 0;
-			for (let i = from; i < to; i++) sum += c.tiles[i + 1].time - c.tiles[i].time;
-			return sum / (to - from);
-		};
-		const early = avgGap(2, 22);
-		const late = avgGap(250, 270);
-		expect(late).toBeLessThan(early * 0.7);
+	it('accelerates: later beats come closer together', () => {
+		const c = buildEndlessChart(77, 1, { count: 300, rampSec: 20, maxMult: 1.7 });
+		// Compare beat lengths on the grid (duration-independent).
+		const bt = c.beatTimes;
+		const early = bt[1] - bt[0];
+		const late = bt[281] - bt[280];
+		expect(late).toBeLessThan(early * 0.65);
+	});
+
+	it('carries one chord per bar with valid diatonic roots and thirds', () => {
+		const c = buildEndlessChart(42, 1, { count: 200 });
+		expect(c.chords.length).toBeGreaterThanOrEqual(Math.floor(c.beatTimes.length / 4));
+		for (const ch of c.chords) {
+			expect([0, 2, 4, 5, 7, 9, 11]).toContain(ch.root);
+			expect([3, 4]).toContain(ch.third);
+		}
 	});
 
 	it('endless tune generation is deterministic', () => {

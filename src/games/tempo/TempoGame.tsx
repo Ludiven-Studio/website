@@ -4,7 +4,7 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
-import { LANES, PROG, SPEEDS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type Grade } from './engine';
+import { LANES, SPEEDS, ENDLESS_OPTS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type Grade } from './engine';
 
 /* =====================================================
    TEMPO — piano-tiles rhythm game (prototype).
@@ -207,8 +207,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		o.start(when);
 		o.stop(when + 0.34);
 	};
-	// Warm sustained cello/bass bed (root + fifth + octave, low-pass filtered) for depth.
-	const pad = (when: number, dur: number, root: number): void => {
+	// Warm sustained cello/bass bed (root + fifth + octave + third above, low-pass
+	// filtered). The third sits an octave up so it colors the chord without mud.
+	const pad = (when: number, dur: number, root: number, third: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const lp = ctx.createBiquadFilter();
@@ -224,7 +225,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		g.gain.exponentialRampToValueAtTime(0.06, when + attack);
 		g.gain.setValueAtTime(0.06, when + Math.max(attack, dur - rel));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-		for (const [semi, amp] of [[0, 1], [7, 0.5], [12, 0.35]]) {
+		for (const [semi, amp] of [[0, 1], [7, 0.5], [12, 0.3], [12 + third, 0.28]]) {
 			const o = ctx.createOscillator();
 			o.type = 'sawtooth';
 			o.frequency.value = midiToFreq(root + semi);
@@ -302,7 +303,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		}
 	};
 	// Hi-hat: a short high-passed noise tick for groove.
-	const hat = (when: number, accent: boolean): void => {
+	const hat = (when: number, accent: boolean, gain?: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx || !noiseRef.current) return;
 		const src = ctx.createBufferSource();
@@ -311,7 +312,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		hp.type = 'highpass';
 		hp.frequency.value = 7000;
 		const g = ctx.createGain();
-		g.gain.setValueAtTime(accent ? 0.05 : 0.028, when);
+		g.gain.setValueAtTime(gain ?? (accent ? 0.05 : 0.028), when);
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
 		src.connect(hp);
 		hp.connect(g);
@@ -354,7 +355,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Run ---------- */
 	const prepare = useCallback((speed: number): void => {
-		chartRef.current = buildEndlessChart(seedRef.current, speed);
+		chartRef.current = buildEndlessChart(seedRef.current, speed, ENDLESS_OPTS[diffRef.current]);
 		stateArrRef.current = chartRef.current.tiles.map(() => 'pending');
 		scoreRef.current = 0;
 		comboRef.current = 0;
@@ -616,35 +617,45 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!chart) return;
 		const now = songTime();
 		// Backing groove: schedule ~1s ahead. Full ensemble per beat — kick + bass +
-		// hi-hat + a plucked chord tone, a sustained pad per bar. Root/fifth/octave
-		// only (no third) so it stays consonant over both major and minor chords.
+		// hi-hat + a plucked chord tone, a sustained pad per bar. Chords come from
+		// the chart (rotating progressions, with each chord's real third).
 		if (metroRef.current) {
 			const bt = chart.beatTimes;
-			const COMP = [0, 12, 7, 12]; // arpeggio pattern (semitones above the mid root)
+			const chordAt = (beatIdx: number) => chart.chords[Math.min(Math.floor(beatIdx / 4), chart.chords.length - 1)];
 			while (backingIdxRef.current < bt.length && bt[backingIdxRef.current] < now + 1) {
 				const i = backingIdxRef.current;
 				const when = audioStartRef.current + bt[i];
 				const accent = i % 4 === 0;
-				const chordRoot = chart.key + PROG[Math.floor(i / 4) % PROG.length]; // one chord per bar
+				const { root, third } = chordAt(i);
+				const chordRoot = chart.key + root;
 				kick(when, accent);
-				bass(when, chordRoot + (i % 2 === 0 ? 0 : 7), accent);
+				// Root/fifth bass; every 8th beat walks a whole tone into the next root.
+				let bassNote = chordRoot + (i % 2 === 0 ? 0 : 7);
+				if (i % 8 === 7) {
+					const next = chart.key + chordAt(i + 1).root;
+					if (next !== chordRoot) bassNote = next + (next > chordRoot ? -2 : 2);
+				}
+				bass(when, bassNote, accent);
 				hat(when, accent); // ride the beat
-				pluck(when, chordRoot + 12 + COMP[i % COMP.length]); // harmonic comp above the bass
+				if (i + 1 < bt.length) hat(when + (bt[i + 1] - bt[i]) / 2, false, 0.015); // soft off-beat tick
+				// Plucked comp including the third; pattern alternates every 8 bars.
+				const comp = Math.floor(i / 32) % 2 === 0 ? [0, 7, third + 12, 12] : [0, third, 7, third + 12];
+				pluck(when, chordRoot + 12 + comp[i % 4]);
 				if (accent) {
 					// Sustained cello bed under each bar (deep, an octave below the groove bass).
 					const barDur = bt[Math.min(i + 4, bt.length - 1)] - bt[i] || 2;
-					pad(when, Math.max(0.6, barDur), chordRoot - 12);
+					pad(when, Math.max(0.6, barDur), chordRoot - 12, third);
 				}
 				backingIdxRef.current++;
 			}
 			// Auto-lead + secondary voice: the flute sings every melody note; the reed
-			// answers in the gaps (fills a held note with a root/fifth/octave arpeggio)
-			// and now and then echoes a phrase an octave lower ("reprise").
+			// answers in the gaps (fills a held note with a chord arpeggio) and now
+			// and then echoes a phrase an octave lower ("reprise").
 			const tiles = chart.tiles;
-			const chordRootAt = (time: number): number => {
+			const chordBarAt = (time: number): { root: number; third: number } => {
 				let b = 0;
 				while (b + 1 < bt.length && bt[b + 1] <= time) b++;
-				return chart.key + PROG[Math.floor(b / 4) % PROG.length];
+				return chordAt(b);
 			};
 			while (melodyIdxRef.current < tiles.length && tiles[melodyIdxRef.current].time < now + 1) {
 				const mi = melodyIdxRef.current;
@@ -652,12 +663,13 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const when = audioStartRef.current + t.time;
 				flute(when, t.midi, clamp(t.dur, 0.18, 2.2));
 				if (t.hold) {
-					// Répartie: arpeggiate the current chord (root/5th/8ve) through the held note.
-					let base = chordRootAt(t.time);
+					// Répartie: arpeggiate the chord (root/3rd/5th/8ve) through the held note.
+					const c = chordBarAt(t.time);
+					let base = chart.key + c.root;
 					while (base < t.midi - 8) base += 12; // lift near the melody's register
-					const tones = [base, base + 7, base + 12];
-					const steps = Math.min(3, Math.max(1, Math.floor(t.dur / 0.3)));
-					for (let k = 1; k <= steps; k++) reed(when + (t.dur * k) / (steps + 1), tones[(k - 1) % 3], 0.32, 0.05);
+					const tones = [base, base + c.third, base + 7, base + 12];
+					const steps = Math.min(4, Math.max(1, Math.floor(t.dur / 0.3)));
+					for (let k = 1; k <= steps; k++) reed(when + (t.dur * k) / (steps + 1), tones[(k - 1) % 4], 0.32, 0.05);
 				} else if (mi % 8 === 5 && tiles[mi + 1]) {
 					// Reprise: restate this note an octave lower, on the next beat, softly.
 					reed(audioStartRef.current + tiles[mi + 1].time, t.midi - 12, 0.34, 0.045);

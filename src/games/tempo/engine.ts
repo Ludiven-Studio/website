@@ -8,9 +8,12 @@
 import { mulberry32 } from '../prng';
 
 export const LANES = 6; // columns, ordered low pitch (left) → high pitch (right)
-export const HOLD_BEATS = 2; // a note this long (or longer) becomes a hold tile
-export const PROG = [0, 7, 9, 5]; // I–V–vi–IV progression (semitones from key) — melody AND backing share it
+export const HOLD_BEATS = 3; // a note this long (or longer) becomes a hold tile
 
+export interface ChordBar {
+	root: number; // semitones from key
+	third: number; // 3 (minor) or 4 (major)
+}
 export interface SongNote {
 	midi: number;
 	dur: number; // beats
@@ -22,6 +25,7 @@ export interface Song {
 	tempo: number; // beats per second at speed 1
 	key: number; // tonic midi (used for the bass accompaniment)
 	notes: SongNote[];
+	chords?: ChordBar[]; // one per bar, aligned with the beat grid
 }
 
 export interface SpeedTier {
@@ -46,14 +50,26 @@ export interface Chart {
 	totalTime: number; // seconds until the last note ends
 	beatTimes: number[]; // beat grid (seconds) — drives the backing groove
 	key: number; // tonic midi (bass accompaniment)
+	chords: ChordBar[]; // one per bar (bar i = beats 4i..4i+3) — backing follows these
 }
 
 /* --- Music theory scaffolding for the generator -------------------------- */
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]; // major scale, semitones per scale-STEP
-// The 4 chords of PROG expressed as scale-STEP roots: I, V, vi, IV.
-// Step 0→I, 4→V, 5→vi, 3→IV — these match PROG's semitones [0,7,9,5] exactly,
-// so the melody's harmony and the backing groove agree bar for bar.
-const CHORD_ROOTS = [0, 4, 5, 3];
+// Rotating 4-bar progressions (scale-STEP roots). Sections last 2 phrases;
+// V-endings resolve into the next section's I. Melody snapping and the backing
+// both derive from these, so they agree bar for bar.
+const PROGRESSIONS: number[][] = [
+	[0, 4, 5, 3], // I  V  vi IV
+	[5, 3, 0, 4], // vi IV I  V
+	[0, 5, 3, 4], // I  vi IV V
+];
+const progForPhrase = (p: number): number[] => PROGRESSIONS[Math.floor(p / 2) % PROGRESSIONS.length];
+/** Chord of a scale-step root as semitones from key (third: 4 major, 3 minor). */
+const chordBarOf = (rootStep: number): ChordBar => {
+	const root = MAJOR[((rootStep % 7) + 7) % 7];
+	const third = (MAJOR[(((rootStep + 2) % 7) + 7) % 7] - root + 12) % 12;
+	return { root, third };
+};
 const MIN_STEP = -1; // register floor  (~ a 7th below the tonic)
 const MAX_STEP = 11; // register ceiling (~ a 4th above the octave) → ~1.5 octaves
 const BAD_PENTA = new Set([3, 6]); // 4th & 7th scale degrees: not in the pentatonic
@@ -67,39 +83,49 @@ const BAD_PENTA = new Set([3, 6]); // 4th & 7th scale degrees: not in the pentat
 const laneOfStep = (step: number): number =>
 	Math.max(0, Math.min(LANES - 1, Math.floor(((step - MIN_STEP) / (MAX_STEP - MIN_STEP + 1)) * LANES)));
 
-// Note-value progression: the tune STARTS on long notes and shortens only
-// gradually — rondes (whole) → blanches (half) → noires (quarter) → at most
-// croches (eighth) — so early play is calm and it never gets denser than eighths.
-// Every bar (each inner array) sums to EXACTLY 4 beats to stay aligned with the backing.
-const RHYTHM_TIERS: { d: number; rest?: boolean }[][][] = [
-	[[{ d: 4 }]], // tier 0 — rondes
-	[[{ d: 2 }, { d: 2 }], [{ d: 4 }]], // tier 1 — blanches
+// Rhythm cells by density (0 sparse, 1 medium, 2 flowing). Minimum duration is
+// ONE BEAT everywhere (never shorter than a quarter note, always on the grid).
+// Every cell sums to EXACTLY 4 beats so bars stay aligned with the backing.
+type Cell = { d: number; rest?: boolean }[];
+const CELLS: Cell[][] = [
 	[
-		// tier 2 — noires (with some blanches)
+		// 0 — sparse
+		[{ d: 4 }],
 		[{ d: 2 }, { d: 2 }],
-		[{ d: 2 }, { d: 1 }, { d: 1 }],
-		[{ d: 1 }, { d: 1 }, { d: 2 }],
-		[{ d: 1 }, { d: 1 }, { d: 1 }, { d: 1 }],
+		[{ d: 3 }, { d: 1 }],
+		[{ d: 2 }, { d: 1, rest: true }, { d: 1 }],
 	],
 	[
-		// tier 3 — noires + occasional croches & a breath (rest)
-		[{ d: 1 }, { d: 1 }, { d: 1 }, { d: 1 }],
+		// 1 — medium
 		[{ d: 2 }, { d: 1 }, { d: 1 }],
 		[{ d: 1 }, { d: 1 }, { d: 2 }],
-		[{ d: 1 }, { d: 0.5 }, { d: 0.5 }, { d: 1 }, { d: 1 }],
+		[{ d: 1 }, { d: 2 }, { d: 1 }],
 		[{ d: 1 }, { d: 1, rest: true }, { d: 1 }, { d: 1 }],
-		[{ d: 0.5 }, { d: 0.5 }, { d: 1 }, { d: 1 }, { d: 1 }],
+	],
+	[
+		// 2 — flowing
+		[{ d: 1 }, { d: 1 }, { d: 1 }, { d: 1 }],
+		[{ d: 1 }, { d: 1 }, { d: 2 }],
+		[{ d: 2 }, { d: 1 }, { d: 1 }],
 	],
 ];
-// Cadence cell per tier (the phrase's last bar) — always ends on a long note.
-const CADENCE_TIERS: { d: number; rest?: boolean }[][] = [
-	[{ d: 4 }],
+// Cadence cells (a phrase's last bar) — always close on a long note.
+const CADENCES: Cell[] = [
+	[{ d: 1 }, { d: 3 }],
 	[{ d: 2 }, { d: 2 }],
 	[{ d: 1 }, { d: 1 }, { d: 2 }],
-	[{ d: 1 }, { d: 1 }, { d: 2 }],
+	[{ d: 4 }],
 ];
-// Phrase index → tier: a slow climb, capped at 3 (eighths).
-const tierForPhrase = (p: number): number => (p < 2 ? 0 : p < 4 ? 1 : p < 7 ? 2 : 3);
+// Phrase archetypes: densities for bars [A, B, A′] — bar 3 is always a cadence.
+// Mixed from phrase 0 so the game opens with variation, not a monotone crawl.
+const ARCHETYPES: [number, number, number][] = [
+	[1, 0, 1], // statement – breath – restatement
+	[2, 1, 2], // flowing question / answer
+	[0, 1, 2], // building
+	[2, 2, 1], // running, then settling
+	[1, 2, 1], // arch
+	[0, 2, 0], // calm – burst – calm
+];
 
 const degToMidi = (tonic: number, step: number): number => tonic + Math.floor(step / 7) * 12 + MAJOR[((step % 7) + 7) % 7];
 const clampStep = (s: number): number => Math.max(MIN_STEP, Math.min(MAX_STEP, s));
@@ -130,18 +156,19 @@ const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(s
  * Deterministic from the seed. The melody is still PLAYED by the player's taps;
  * this only shapes which notes fall when. Long enough to outlast any run.
  *
- * Structure per 4-bar phrase (Principle 3 — question/answer):
- *   bars 0–1 = antecedent (rises, ends on a V suspension),
- *   bars 2–3 = consequent (inverts the contour, cadences on the tonic).
- * Each phrase draws ONE rhythmic motif (Principle 2) reused across its bars,
- * with the consequent's last bar swapped for a cadential cell.
+ * Structure per 4-bar phrase: an ARCHETYPE picks rhythm densities for bars
+ * [A, B, A′] + a cadence bar. The pitch line follows an arch contour (rise then
+ * fall), leaps recover by step, and A′ replays A's melodic deltas over bar 2's
+ * chord (varied repeat). Chords rotate through PROGRESSIONS every 2 phrases and
+ * are returned alongside the notes so the backing follows the same harmony.
  */
 export function generateEndlessSong(seed: number, count = 600): Song {
 	const rng = mulberry32(seed >>> 0);
 	const KEY = 43; // tonic midi for the bass accompaniment (G2)
 	const TONIC = 55; // tonic midi the melody sings around (G3)
-	const pick = <T>(arr: T[]): T => arr[Math.floor(rng() * arr.length)];
+	const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
 	const notes: SongNote[] = [];
+	const chords: ChordBar[] = [];
 
 	let step = 0; // current scale-step, carried across bars for a continuous line
 	let lastStep: number | null = null; // last EMITTED (non-rest) step, for column checks
@@ -162,7 +189,7 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	// Overwrite the last real note (used to force phrase-ending cadences). Keeps the
 	// intended scale degree but octave-shifts it if needed so it doesn't share a
 	// column with the preceding note.
-	const forceLast = (s: number, dur?: number): void => {
+	const forceLast = (s: number): void => {
 		let i = notes.length - 1;
 		while (i >= 0 && notes[i].rest) i--;
 		if (i < 0) return;
@@ -179,62 +206,97 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		}
 		notes[i].midi = degToMidi(TONIC, s);
 		notes[i].lane = laneOfStep(s);
-		if (dur != null) notes[i].dur = dur;
 		lastStep = s;
+	};
+	// Chord tones of `rootStep` across the register, sorted — for arpeggio bars.
+	const chordLadder = (rootStep: number): number[] => {
+		const tones: number[] = [];
+		for (let oct = -7; oct <= 14; oct += 7)
+			for (const t of [rootStep, rootStep + 2, rootStep + 4]) {
+				const c = t + oct;
+				if (c >= MIN_STEP && c <= MAX_STEP) tones.push(c);
+			}
+		return tones.sort((a, b) => a - b);
 	};
 
 	let phrase = 0;
 	while (notes.length < count) {
-		const tier = tierForPhrase(phrase); // note-value tier grows slowly with the phrase
-		// Principle 2 — one motif (rhythm) per phrase; Principle 4 — a contour of
-		// small steps with a rare leap, reused so the ear recognises the shape.
-		const motif = pick(RHYTHM_TIERS[tier]);
+		const prog = progForPhrase(phrase);
+		const arch = pick(ARCHETYPES);
+		const cellA = pick(CELLS[arch[0]]);
+		const cellB = pick(CELLS[arch[1]]);
+		// A′ restates A's rhythm when densities match — the answer echoes the question.
+		const cellA2 = arch[0] === arch[2] ? cellA : pick(CELLS[arch[2]]);
+		const bars: Cell[] = [cellA, cellB, cellA2, pick(CADENCES)];
+
+		// Arch contour: first half favors ascent, second half descent.
 		const contour: number[] = [];
 		for (let k = 0; k < 8; k++) {
 			const r = rng();
-			contour.push(r < 0.62 ? (rng() < 0.5 ? 1 : -1) : r < 0.86 ? (rng() < 0.5 ? 2 : -2) : 0);
+			const mag = r < 0.7 ? (rng() < 0.72 ? 1 : 2) : r < 0.9 ? (rng() < 0.72 ? -1 : -2) : 0;
+			contour.push(k < 4 ? mag : -mag);
 		}
-		const peakBar = rng() < 0.5 ? 1 : 2; // one leap-to-peak per phrase
+
+		const barADeltas: number[] = []; // bar 0's melodic deltas, replayed in bar 2
+		let lastDelta = 0;
+		let ci = 0;
 
 		for (let bar = 0; bar < 4; bar++) {
-			const chordRootStep = CHORD_ROOTS[bar];
-			const rhythm = bar === 3 ? CADENCE_TIERS[tier] : motif;
-			const invert = bar >= 2 ? -1 : 1; // Principle 3 — consequent mirrors the contour
-			const bias = bar <= 1 ? 1 : -1; // antecedent drifts up, consequent down
+			const chordRootStep = prog[bar];
+			chords.push(chordBarOf(chordRootStep));
+			const rhythm = bars[bar];
+			// Occasionally a bar walks the chord itself instead of the contour.
+			const arp = bar < 3 && rng() < 0.18;
+			const arpDir = arp && rng() < 0.5 ? -1 : 1;
+			const ladder = arp ? chordLadder(chordRootStep) : [];
+			let arpIdx = arp ? Math.max(0, ladder.indexOf(nearestChordTone(step, chordRootStep))) : 0;
 			let beatInBar = 0;
-			let ci = 0;
+			let noteInBar = 0;
 			for (const ev of rhythm) {
 				if (ev.rest) {
 					notes.push({ midi: 0, dur: ev.d, rest: true });
 					beatInBar += ev.d;
 					continue;
 				}
-				const strong = beatInBar % 2 === 0; // beats 1 & 3 = harmonic anchors
-				let delta = contour[ci % 8] * invert;
-				if (bar === peakBar && ci === 1) delta += 2; // the phrase's leap
-				if (rng() < 0.25) delta += bias; // gentle directional pull
-				step = clampStep(step + delta);
-				// Principle 1 — harmonic awareness: chord tone on strong beats,
-				// pentatonic passing note on weak beats.
-				step = strong ? nearestChordTone(step, chordRootStep) : toPenta(step);
-				emit(step, ev.d);
+				if (arp) {
+					if (noteInBar > 0) arpIdx = Math.max(0, Math.min(ladder.length - 1, arpIdx + arpDir));
+					step = ladder[arpIdx];
+					emit(step, ev.d);
+				} else {
+					const strong = beatInBar % 2 === 0; // beats 1 & 3 = harmonic anchors
+					let delta: number;
+					if (bar === 2 && noteInBar < barADeltas.length) {
+						delta = barADeltas[noteInBar]; // varied repeat over bar 2's chord
+					} else {
+						delta = contour[ci % 8];
+						if (Math.abs(lastDelta) >= 2) delta = -Math.sign(lastDelta); // leap → step back
+						ci++;
+					}
+					if (bar === 0) barADeltas.push(delta);
+					lastDelta = delta;
+					step = clampStep(step + delta);
+					// Chord tone on strong beats, pentatonic passing note on weak beats.
+					step = strong ? nearestChordTone(step, chordRootStep) : toPenta(step);
+					emit(step, ev.d);
+				}
 				beatInBar += ev.d;
-				ci++;
+				noteInBar++;
 			}
-			// Principle 3 — cadences: half-cadence (V) closes the question,
-			// authentic cadence (held tonic) closes the answer.
+			// Cadences never mutate durations (the cadence cell provides the length):
+			// bar 1 closes on its own chord, bar 3 on the tonic — or a V tone when the
+			// section ends open on V (pulls into the next section's I).
 			if (bar === 1) {
-				step = nearestChordTone(step, 4);
+				step = nearestChordTone(step, prog[1]);
 				forceLast(step);
 			}
 			if (bar === 3) {
-				step = nearestTonic(step);
-				forceLast(step, 2);
+				step = prog[3] === 4 ? nearestChordTone(step, 4) : nearestTonic(step);
+				forceLast(step);
 			}
 		}
 		phrase++;
 	}
-	return { name: 'Infini', tempo: 2, key: KEY, notes };
+	return { name: 'Infini', tempo: 2, key: KEY, notes, chords };
 }
 
 export interface EndlessOpts {
@@ -243,21 +305,27 @@ export interface EndlessOpts {
 	maxMult?: number; // tempo ceiling (× baseTempo)
 	count?: number;
 }
+// Tempo curve per difficulty tier (same order as SPEEDS; speed multiplies on top).
+// Note values are floored at 1 beat, so the ramp is the ONLY acceleration.
+export const ENDLESS_OPTS: EndlessOpts[] = [
+	{ baseTempo: 1.8, rampSec: 130, maxMult: 1.35 }, // Facile
+	{ baseTempo: 1.8, rampSec: 110, maxMult: 1.45 }, // Moyen
+	{ baseTempo: 1.8, rampSec: 95, maxMult: 1.5 }, // Difficile
+];
 /**
- * Endless chart whose tempo RAMPS UP over the run: successive notes get closer
- * together, so it grows faster and denser the longer you survive. The daily/free
- * `speed` still scales the starting tempo.
+ * Endless chart whose tempo RAMPS UP gently over the run: successive beats get
+ * shorter, so it grows faster the longer you survive. The daily/free `speed`
+ * still scales the starting tempo.
  */
 export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {}): Chart {
-	const base = (opts.baseTempo ?? 2) * speed;
-	const ramp = opts.rampSec ?? 85; // gentle: reach the ceiling only after a long run
-	const maxMult = opts.maxMult ?? 1.7; // modest tempo ceiling (× baseTempo)
+	const base = (opts.baseTempo ?? 1.8) * speed;
+	const ramp = opts.rampSec ?? 110; // gentle: reach the ceiling only after a long run
+	const maxMult = opts.maxMult ?? 1.45; // modest tempo ceiling (× baseTempo)
 	const song = generateEndlessSong(seed, opts.count ?? 1500);
 
-	// Notes now carry fractional durations (eighths, dotted…), so we can no longer
-	// assume one note == one beat. Build an INTEGER-beat time grid first: each beat
-	// is shorter than the last as the tempo ramps. Note times are then interpolated
-	// on this grid, which keeps the backing (locked to whole beats) in sync.
+	// Build an INTEGER-beat time grid: each beat is shorter than the last as the
+	// tempo ramps. Note times are interpolated on this grid, which keeps the
+	// backing (locked to whole beats) in sync.
 	const totalBeats = song.notes.reduce((s, n) => s + n.dur, 0);
 	const beatTime = [0];
 	let t = 0;
@@ -283,7 +351,11 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	// Whole-beat grid for the groove (kick/bass/pad step on these).
 	const beatTimes: number[] = [];
 	for (let b = 0; b <= Math.ceil(totalBeats); b++) beatTimes.push(beatTime[b]);
-	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key };
+	// One chord per bar, padded to cover the whole grid.
+	const barCount = Math.ceil(totalBeats / 4);
+	const chords = (song.chords ?? []).slice(0, barCount);
+	while (chords.length < barCount) chords.push(chords[chords.length - 1] ?? { root: 0, third: 4 });
+	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords };
 }
 
 export type Grade = 'Parfait' | 'Bien' | 'Ok' | 'Raté';
