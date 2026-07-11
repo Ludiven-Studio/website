@@ -9,7 +9,7 @@
 
 import { mulberry32 } from '../prng';
 
-export type SegmentKind = 'straight' | 'curveL' | 'curveR' | 'scurve' | 'tunnel' | 'fork' | 'bob';
+export type SegmentKind = 'straight' | 'curveL' | 'curveR' | 'scurve' | 'tunnel' | 'fork' | 'bob' | 'jump';
 
 /** One centerline sample every SAMPLE_STEP meters (both segment boundaries included). */
 export interface TrackSample {
@@ -51,6 +51,7 @@ export interface EntryPose {
 	startS: number;
 	prevKind: SegmentKind; // kind of the previous segment (fork spacing rule)
 	bobLeft?: number; // remaining segments in the current bob run (runs are 2-3 long)
+	sinceBob?: number; // segments since the last bob run — guarantees one regularly
 }
 
 export interface TrackSegment {
@@ -65,6 +66,7 @@ export interface TrackSegment {
 	bobRampIn?: boolean; // first segment of a bob run: walls grow in over bobRampLen
 	bobRampOut?: boolean; // last segment of a bob run: walls fade out
 	fork?: ForkInfo;
+	jump?: { lipS: number; gap: number }; // kicker lip (local s) + pit length to clear
 	exit: EntryPose; // entry pose of segment index+1
 }
 
@@ -75,6 +77,7 @@ export interface Difficulty {
 	forkChance: number;
 	tunnelChance: number;
 	bobChance: number;
+	jumpChance: number;
 	width: number; // full track width
 }
 
@@ -82,7 +85,17 @@ export interface StepInput {
 	steer: number; // -1..1
 }
 
-export type LugeEvent = 'crash' | 'gameOver' | 'forkNoseHit' | 'forkDanger' | 'forkSafe' | 'forkBonus' | 'nearMiss' | 'stuck';
+export type LugeEvent =
+	| 'crash'
+	| 'gameOver'
+	| 'forkNoseHit'
+	| 'forkDanger'
+	| 'forkSafe'
+	| 'forkBonus'
+	| 'nearMiss'
+	| 'stuck'
+	| 'jumpClean'
+	| 'jumpShort';
 
 export interface LugeState {
 	s: number;
@@ -95,6 +108,9 @@ export interface LugeState {
 	bonusScore: number;
 	score: number; // floor(s) + bonusScore — integer meters
 	lane: 'left' | 'right' | null; // side taken inside a fork
+	jumpFromS: number | null; // kicker lip (absolute s) while airborne
+	jumpToS: number; // where the flight lands (absolute s)
+	jumpGapEndS: number; // end of the pit — landing before this is a short jump
 	status: 'running' | 'over';
 }
 
@@ -120,7 +136,9 @@ export interface LugeParams {
 	forkBoostMs: number;
 	nearMissGap: number; // extra lateral gap under which a pass counts as near-miss
 	nearMissBonus: number;
-	bumpDrag: number; // speed lost per meter climbed on a fork-lane bump face
+	forkLaneVMaxMul: number; // the icy danger corridor is itself a speed boost
+	jumpFlightK: number; // flight distance = speed × this (seconds of air time)
+	jumpBonus: number; // score for clearing the pit
 	corridorHalf: number; // guaranteed obstacle-free half-width around latSafe
 	bobVMaxFloor: number; // speed multiplier at the flat pipe floor (barely faster)
 	bobVMaxMul: number; // speed multiplier at the wall crest — carving high pays
@@ -158,7 +176,9 @@ export const LUGE: LugeParams = {
 	forkBoostMs: 4000,
 	nearMissGap: 0.6,
 	nearMissBonus: 2,
-	bumpDrag: 3,
+	forkLaneVMaxMul: 1.12,
+	jumpFlightK: 0.92,
+	jumpBonus: 10,
 	corridorHalf: 1.6,
 	bobVMaxFloor: 1.03,
 	bobVMaxMul: 1.3,
@@ -197,7 +217,8 @@ export function difficultyAt(s: number): Difficulty {
 		obstacleEvery: 18 + 37 * Math.exp(-t / 1800),
 		forkChance: 0.12 + 0.1 * e(2500),
 		tunnelChance: 0.1 + 0.08 * e(2500),
-		bobChance: 0.09 + 0.07 * e(2500),
+		bobChance: 0.13 + 0.05 * e(2500),
+		jumpChance: 0.07 + 0.04 * e(2500),
 		width: 9 + 5 * Math.exp(-t / 2500),
 	};
 }
@@ -261,23 +282,17 @@ export function pipeRampAt(seg: TrackSegment, sLocal: number, P: LugeParams = LU
 	return 0;
 }
 
-const BUMP_H = 0.7; // fork danger lane bump height
-const BUMP_LEN = 9; // meters between bump crests
-
 /**
- * Fork danger lane = a flat icy corridor with successive bumps (washboard).
- * Returns the surface rise at (sLocal, lat); zero outside the lane.
+ * Jump segment surface profile: a kicker ramp rising to the lip, a sharp drop
+ * into a pit, and a landing ramp climbing back out after the gap.
  */
-export function forkBumps(seg: TrackSegment, sLocal: number, lat: number): number {
-	const f = seg.fork;
-	if (!f || sLocal < f.noseS || sLocal >= f.mergeS) return 0;
-	const sign = f.danger === 'left' ? 1 : -1;
-	const l = sign * lat; // lane-space: positive into the danger side
-	const band = smoothstep(f.sepHalfMax + 0.2, f.sepHalfMax + 1.2, l) * (1 - smoothstep(f.outerDanger - 1.2, f.outerDanger - 0.2, l));
-	if (band <= 0) return 0;
-	const ramp = Math.min(smoothstep(f.noseS + 4, f.noseS + 14, sLocal), 1 - smoothstep(f.mergeS - 14, f.mergeS - 4, sLocal));
-	const wave = 0.5 * (1 - Math.cos(TWO_PI * ((sLocal - f.noseS) / BUMP_LEN)));
-	return BUMP_H * wave * band * ramp;
+export function jumpRiseAt(seg: TrackSegment, sLocal: number): number {
+	const j = seg.jump;
+	if (!j) return 0;
+	if (sLocal <= j.lipS - 10) return 0;
+	if (sLocal <= j.lipS) return 1.6 * smoothstep(j.lipS - 10, j.lipS, sLocal);
+	if (sLocal < j.lipS + j.gap) return -0.7;
+	return -0.7 * (1 - smoothstep(j.lipS + j.gap, j.lipS + j.gap + 8, sLocal));
 }
 
 /** Separator half-width at local s inside a fork segment (0 outside [noseS, mergeS]). */
@@ -291,13 +306,24 @@ export function sepHalfAt(fork: ForkInfo, sLocal: number): number {
 /** Deterministic per-segment rng — independent of how the chain was pruned. */
 const segmentRng = (seed: number, index: number) => mulberry32((seed ^ Math.imul(index + 1, 0x9e3779b1)) >>> 0);
 
-function pickKind(rng: () => number, index: number, prevKind: SegmentKind, bobLeft: number, diff: Difficulty): SegmentKind {
+function pickKind(
+	rng: () => number,
+	index: number,
+	prevKind: SegmentKind,
+	bobLeft: number,
+	sinceBob: number,
+	diff: Difficulty,
+): SegmentKind {
 	if (bobLeft > 0) return 'bob'; // continue the current bob run
 	if (index < WARMUP_FEATURES) return index % 2 === 0 ? 'straight' : rng() < 0.5 ? 'curveL' : 'curveR';
+	// Pity timer: never go more than ~8 segments (~900 m) without a bob run.
+	if (sinceBob >= 8 && prevKind !== 'fork') return 'bob';
 	const p = rng();
 	if (p < diff.forkChance && prevKind !== 'fork') return 'fork';
 	if (p < diff.forkChance + diff.tunnelChance && prevKind !== 'fork') return 'tunnel';
 	if (p < diff.forkChance + diff.tunnelChance + diff.bobChance && prevKind !== 'fork' && prevKind !== 'bob') return 'bob';
+	if (p < diff.forkChance + diff.tunnelChance + diff.bobChance + diff.jumpChance && prevKind !== 'fork' && prevKind !== 'jump')
+		return 'jump';
 	const q = rng();
 	if (q < 0.3) return 'straight';
 	if (q < 0.55) return 'curveL';
@@ -308,7 +334,7 @@ function pickKind(rng: () => number, index: number, prevKind: SegmentKind, bobLe
 export function generateSegment(seed: number, index: number, entry: EntryPose): TrackSegment {
 	const rng = segmentRng(seed, index);
 	const diff = difficultyAt(entry.startS);
-	const kind = pickKind(rng, index, entry.prevKind, entry.bobLeft ?? 0, diff);
+	const kind = pickKind(rng, index, entry.prevKind, entry.bobLeft ?? 0, entry.sinceBob ?? 0, diff);
 	// Bob runs span 2-3 segments: a fresh run decides its remaining length here.
 	const bobLeft = kind === 'bob' ? ((entry.bobLeft ?? 0) > 0 ? (entry.bobLeft ?? 0) - 1 : rng() < 0.5 ? 1 : 2) : 0;
 
@@ -321,11 +347,13 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 				? pick(140, 200)
 				: kind === 'tunnel'
 					? pick(160, 240)
-					: kind === 'scurve'
-						? pick(120, 160)
-						: kind === 'straight'
-							? pick(80, 140)
-							: pick(90, 150);
+					: kind === 'jump'
+						? pick(100, 140)
+						: kind === 'scurve'
+							? pick(120, 160)
+							: kind === 'straight'
+								? pick(80, 140)
+								: pick(90, 150);
 
 	// Curvature profile κ(t), t in [0,1].
 	const kMax = diff.curveMax * (0.6 + 0.4 * rng());
@@ -345,6 +373,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 				// Alternating tight arcs — the icy walls (not steering) absorb the g-forces.
 				return kMax * 2.6 * tunnelDir * Math.sin(3 * Math.PI * t) * Math.sin(Math.PI * t);
 			case 'fork':
+			case 'jump':
 				return 0;
 			default:
 				// sin(πt) envelope → κ (hence bank) is 0 at both ends: seamless segment joints.
@@ -373,6 +402,15 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 			bonus: 50,
 		};
 	}
+	// Jump: kicker lip at ~45% of the segment; the pit is clearable while cruising
+	// (flight = speed × jumpFlightK) but not after a crash killed the momentum.
+	let jump: TrackSegment['jump'];
+	if (kind === 'jump') {
+		const lipS = Math.round((length * 0.45) / SAMPLE_STEP) * SAMPLE_STEP;
+		const gap = Math.min(30, Math.max(8, 0.55 * diff.vMax * LUGE.jumpFlightK));
+		jump = { lipS, gap };
+	}
+
 	const widthAt = (sLocal: number): number => {
 		const base = w0 + (wEnd - w0) * (sLocal / length);
 		if (fork) {
@@ -422,7 +460,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 
 	// Obstacles — never inside the safe corridor. None in bob pipes (speed is the challenge).
 	const obstacles: Obstacle[] = [];
-	if (index >= WARMUP_OBSTACLES && kind !== 'fork' && kind !== 'bob') {
+	if (index >= WARMUP_OBSTACLES && kind !== 'fork' && kind !== 'bob' && kind !== 'jump') {
 		const spacingMul = kind === 'tunnel' ? 1.9 : 1;
 		// Caves: no pillar right at the mouth — leave time to adapt after entering.
 		let sLocal = kind === 'tunnel' ? 30 + rng() * 12 : 8 + rng() * 10;
@@ -474,6 +512,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		bobRampIn: kind === 'bob' && entry.prevKind !== 'bob',
 		bobRampOut: kind === 'bob' && bobLeft === 0,
 		fork,
+		jump,
 		exit: {
 			x: last.x,
 			y: last.y,
@@ -482,6 +521,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 			startS: entry.startS + length,
 			prevKind: kind,
 			bobLeft,
+			sinceBob: kind === 'bob' ? 0 : (entry.sinceBob ?? 0) + 1,
 		},
 	};
 }
@@ -569,8 +609,8 @@ export function poseAt(
 		const w = pipeWall(p.seg, p.width, lat);
 		y += w.rise * ramp;
 		dydlat += w.slope * ramp;
-	} else if (p.seg.fork) {
-		y += forkBumps(p.seg, s - p.seg.startS, lat);
+	} else if (p.seg.jump) {
+		y += jumpRiseAt(p.seg, s - p.seg.startS);
 	}
 	return {
 		x: p.x + p.nx * lat,
@@ -596,6 +636,9 @@ export function createLuge(): LugeState {
 		bonusScore: 0,
 		score: 0,
 		lane: null,
+		jumpFromS: null,
+		jumpToS: 0,
+		jumpGapEndS: 0,
 		status: 'running',
 	};
 }
@@ -610,8 +653,9 @@ export function stepLuge(
 ): { state: LugeState; events: LugeEvent[] } {
 	if (st.status === 'over') return { state: st, events: [] };
 	const events: LugeEvent[] = [];
-	let { lat, latVel, speed, lives, invulnMs, boostMs, bonusScore, lane } = st;
+	let { lat, latVel, speed, lives, invulnMs, boostMs, bonusScore, lane, jumpFromS, jumpToS, jumpGapEndS } = st;
 	let status: LugeState['status'] = 'running';
+	const wasAirborne = jumpFromS != null && st.s < jumpToS;
 
 	invulnMs = Math.max(0, invulnMs - dtSec * 1000);
 	boostMs = Math.max(0, boostMs - dtSec * 1000);
@@ -641,13 +685,15 @@ export function stepLuge(
 		vMax *= P.bobVMaxFloor + (P.bobVMaxMul - P.bobVMaxFloor) * climb;
 	} else if (here.seg.tunnel) {
 		vMax *= P.tunnelVMaxMul;
+	} else if (here.seg.fork && st.lane === here.seg.fork.danger) {
+		vMax *= P.forkLaneVMaxMul; // the icy corridor is itself a boost
 	}
 	speed += (vMax - speed) * Math.min(1, P.speedRelax * dtSec);
 
 	// Lateral: steering vs centrifugal pull (κ·v², partly absorbed by banking), then
 	// friction — icy pipes (bob + caves) slide a lot more than snow.
 	const steer = Math.max(-1, Math.min(1, input.steer));
-	latVel += steer * P.steerAccel * dtSec;
+	latVel += steer * P.steerAccel * (wasAirborne ? 0.25 : 1) * dtSec;
 	latVel -= here.curvature * speed * speed * P.centrifugal * dtSec;
 	const onIce = here.seg.bob || here.seg.tunnel || (here.seg.fork != null && st.lane === here.seg.fork.danger);
 	latVel *= Math.pow(onIce ? P.bobLatFriction : P.latFriction, dtSec * 60);
@@ -683,11 +729,6 @@ export function stepLuge(
 			if (!lane) lane = lat >= 0 ? 'left' : 'right';
 			const sign = lane === 'left' ? 1 : -1;
 			const danger = lane === fork.danger;
-			// Danger lane: washboard — climbing each bump face costs speed.
-			if (danger && prevS >= seg.startS) {
-				const dh = forkBumps(seg, sLocal, lat) - forkBumps(seg, prevS - seg.startS, lat);
-				if (dh > 0) speed = Math.max(P.crashMinSpeed, speed - dh * P.bumpDrag);
-			}
 			const lo = sepHalfAt(fork, sLocal) + P.sledHalf;
 			const hi = (danger ? fork.outerDanger : fork.outerSafe) - P.sledHalf;
 			let l = sign * lat;
@@ -714,9 +755,32 @@ export function stepLuge(
 		lane = null;
 	}
 
+	// Jump: crossing the kicker lip launches the sled — flight distance scales with
+	// speed. Landing before the pit's end crushes the momentum (like getting stuck).
+	if (seg.jump && jumpFromS == null) {
+		const lipAbs = seg.startS + seg.jump.lipS;
+		if (prevS < lipAbs && s >= lipAbs) {
+			jumpFromS = lipAbs;
+			jumpToS = lipAbs + Math.max(4, speed * P.jumpFlightK);
+			jumpGapEndS = lipAbs + seg.jump.gap;
+		}
+	}
+	if (jumpFromS != null && s >= jumpToS) {
+		if (jumpToS < jumpGapEndS) {
+			speed = Math.max(P.stuckMinSpeed, speed * P.stuckSpeedMul);
+			invulnMs = Math.max(invulnMs, P.stuckCooldownMs);
+			events.push('jumpShort');
+		} else {
+			bonusScore += P.jumpBonus;
+			events.push('jumpClean');
+		}
+		jumpFromS = null;
+	}
+	const airborne = jumpFromS != null && s < jumpToS;
+
 	// Edges. Bob pipe: the icy wall climbs freely and gravity pulls back — no bounce,
 	// no scrub, just a hard crest. Elsewhere: snow berms (never lethal — bounce + scrub).
-	if (!inForkBand) {
+	if (!inForkBand && !airborne) {
 		const info2 = lerpAt(segs, s);
 		if (info2.seg.bob || info2.seg.tunnel) {
 			const ramp = pipeRampAt(info2.seg, s - info2.seg.startS);
@@ -745,9 +809,9 @@ export function stepLuge(
 	}
 	if (bermHit) speed *= Math.pow(P.bermScrub, dtSec * 60);
 
-	// Obstacles in the current + next segment (a step never spans more).
+	// Obstacles in the current + next segment (a step never spans more; none mid-air).
 	const segIdx = segs.indexOf(seg);
-	for (let si = segIdx; si < Math.min(segIdx + 2, segs.length) && status === 'running'; si++) {
+	for (let si = segIdx; si < Math.min(segIdx + 2, segs.length) && status === 'running' && !airborne; si++) {
 		const sg = segs[si];
 		for (const obs of sg.obstacles) {
 			const absS = sg.startS + obs.s;
@@ -784,6 +848,9 @@ export function stepLuge(
 			bonusScore,
 			score: Math.floor(s) + bonusScore,
 			lane,
+			jumpFromS,
+			jumpToS,
+			jumpGapEndS,
 			status,
 		},
 		events,

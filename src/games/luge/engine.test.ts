@@ -11,7 +11,7 @@ import {
 	poseAt,
 	latSafeAt,
 	sepHalfAt,
-	forkBumps,
+	jumpRiseAt,
 	createLuge,
 	stepLuge,
 	type TrackSegment,
@@ -118,25 +118,48 @@ describe('luge generation', () => {
 		}
 	});
 
-	it('fork danger lane: a washboard of bumps, no obstacles, and climbing a bump face costs speed', () => {
+	it('fork danger lane: a clean icy corridor whose floor is itself a speed boost', () => {
 		const { segs, fork } = findFork();
 		const f = fork.fork!;
 		const sign = f.danger === 'left' ? 1 : -1;
-		// No stalagmites in the lane — the bumps are the price.
+		// No obstacles in the corridor — the ice IS the reward, the nose the risk.
 		expect(fork.obstacles.filter((obs) => sign * obs.lat > f.sepHalfMax)).toEqual([]);
-		// Successive bumps: crest well above trough at the lane center.
+		// The icy corridor pushes the speed target above the safe lane's.
+		const sMid = fork.startS + (f.noseS + f.mergeS) / 2;
 		const c = sign * ((f.sepHalfMax + f.outerDanger) / 2);
-		const crestS = f.noseS + 22.5; // phase 2.5 → wave peak, inside the s-ramp window
-		const troughS = f.noseS + 27; // phase 3 → wave zero
-		expect(forkBumps(fork, crestS, c)).toBeGreaterThan(0.4);
-		expect(forkBumps(fork, troughS, c)).toBeLessThan(0.1);
-		// Riding up a bump face drags speed vs the safe lane at the same s.
-		const v = difficultyAt(fork.startS).vMax;
-		const uphillS = fork.startS + troughS + 1; // just past the trough → climbing
-		const mk = (lat: number, ln: 'left' | 'right'): LugeState => ({ ...createLuge(), s: uphillS, lat, speed: v, lane: ln });
-		const dangerRun = stepLuge(mk(c, f.danger), { steer: 0 }, DT, segs).state.speed;
-		const safeRun = stepLuge(mk(-c, f.danger === 'left' ? 'right' : 'left'), { steer: 0 }, DT, segs).state.speed;
-		expect(dangerRun).toBeLessThan(safeRun);
+		const v = difficultyAt(sMid).vMax;
+		const mk = (lat: number, ln: 'left' | 'right'): LugeState => ({ ...createLuge(), s: sMid, lat, speed: v, lane: ln });
+		const danger = stepLuge(mk(c, f.danger), { steer: 0 }, DT, segs).state.speed;
+		const safe = stepLuge(mk(-c, f.danger === 'left' ? 'right' : 'left'), { steer: 0 }, DT, segs).state.speed;
+		expect(danger).toBeGreaterThan(safe);
+	});
+
+	it('jump: kicker rises to the lip, pit drops after, and speed decides the landing', () => {
+		let segs: TrackSegment[] = [];
+		let jump: TrackSegment | undefined;
+		for (let seed = 1; seed <= 30 && !jump; seed++) {
+			segs = buildChain(seed, 80);
+			jump = segs.find((sg) => sg.kind === 'jump');
+		}
+		expect(jump).toBeDefined();
+		const j = jump!.jump!;
+		expect(jump!.obstacles).toEqual([]);
+		// Profile: lip above the approach, pit below it — and poseAt carries it.
+		expect(jumpRiseAt(jump!, j.lipS)).toBeCloseTo(1.6, 5);
+		expect(jumpRiseAt(jump!, j.lipS + j.gap / 2)).toBeLessThan(0);
+		const lipAbs = jump!.startS + j.lipS;
+		expect(poseAt(segs, lipAbs, 0).y).toBeGreaterThan(poseAt(segs, lipAbs - 12, 0).y);
+		expect(poseAt(segs, lipAbs + j.gap / 2, 0).y).toBeLessThan(poseAt(segs, lipAbs, 0).y - 1.5);
+		// Cruising speed clears the pit → clean landing bonus.
+		const v = difficultyAt(jump!.startS).vMax;
+		const fast = runUntil({ ...createLuge(), s: lipAbs - 3, lat: 0, speed: v }, segs, 0, 0, lipAbs + v * LUGE.jumpFlightK + 10);
+		expect(fast.events).toContain('jumpClean');
+		expect(fast.events).not.toContain('jumpShort');
+		expect(fast.state.bonusScore).toBeGreaterThanOrEqual(LUGE.jumpBonus);
+		// Crawling into the kicker → lands in the pit, momentum crushed.
+		const slow = runUntil({ ...createLuge(), s: lipAbs - 0.5, lat: 0, speed: j.gap * 0.4 }, segs, 0, 0, lipAbs + j.gap + 12);
+		expect(slow.events).toContain('jumpShort');
+		expect(slow.events).not.toContain('jumpClean');
 	});
 
 	it('bob runs span 2-3 consecutive segments with ramps only at the run ends', () => {
@@ -199,6 +222,25 @@ describe('luge generation', () => {
 			}
 		}
 		expect(found).toBeGreaterThan(0);
+	});
+
+	it('a bob run is guaranteed early and regularly (pity timer)', () => {
+		for (let seed = 1; seed <= 15; seed++) {
+			const segs = buildChain(seed, 60);
+			let since = 0;
+			let first: number | null = null;
+			for (const sg of segs) {
+				if (sg.kind === 'bob') {
+					if (first === null) first = sg.index;
+					since = 0;
+				} else {
+					since++;
+					expect(since).toBeLessThanOrEqual(10); // 8-segment pity + fork-adjacency slack
+				}
+			}
+			expect(first).not.toBeNull();
+			expect(first!).toBeLessThanOrEqual(9);
+		}
 	});
 
 	it('difficulty ramps monotonically and stays bounded', () => {

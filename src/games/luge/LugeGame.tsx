@@ -447,6 +447,19 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		}
 	}
 
+	// Jump kicker: an ice ramp strip so the tremplin reads from afar (pit stays snow).
+	if (seg.jump) {
+		const kA = Math.max(0, Math.floor((seg.jump.lipS - 10) / SAMPLE_STEP));
+		const kB = Math.min(n, Math.ceil(seg.jump.lipS / SAMPLE_STEP));
+		const rows: Row[][] = [];
+		for (let k = kA; k <= kB; k++) {
+			const s = sAt(k);
+			const hw = seg.samples[k].width / 2;
+			rows.push([-1, -0.5, 0, 0.5, 1].map((t) => edgePt(segs, s, t * hw, o, 0.04)));
+		}
+		add(stripFrom(rows), g.mats.ice);
+	}
+
 	// Stalactites hanging from the cave ceiling (decorative — far above the sled,
 	// bright ice so they read against the dark vault).
 	if (seg.tunnel) {
@@ -566,6 +579,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const keysRef = useRef({ left: false, right: false });
 	const camLatRef = useRef(0);
 	const camHRef = useRef(4); // eased camera height — ducks under tunnel arches
+	const camLookYRef = useRef(0); // eased look-at height — kickers/pits stay visible
 	const steerYawRef = useRef(0); // eased steering pivot of the sled nose
 	// Fatal-crash tumble: ~1.2 s of rolling sled + snow burst before the game-over popup.
 	const crashAnimRef = useRef({ active: false, t: 0, s: 0, lat: 0, vel: 0 });
@@ -797,6 +811,16 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		g.sled.rotateX(pose.bank + st.latVel * 0.015);
 		// Invulnerability blink at ~8 Hz.
 		g.sled.visible = st.invulnMs <= 0 || Math.floor(clockRef.current / 125) % 2 === 0;
+		// Airborne off a kicker: ballistic arc between the lip and the landing point.
+		const airborne = st.jumpFromS != null && sI > st.jumpFromS && sI < st.jumpToS;
+		if (airborne && st.jumpFromS != null) {
+			const t = (sI - st.jumpFromS) / (st.jumpToS - st.jumpFromS);
+			const yA = poseAt(segs, st.jumpFromS, latI).y;
+			const yB = poseAt(segs, st.jumpToS, latI).y;
+			g.sled.position.y = yA + (yB - yA) * t + 5.6 * t * (1 - t) + 0.05;
+			g.sled.rotateZ((0.5 - t) * 0.45); // nose up off the lip, dips for the landing
+		}
+
 		// Fatal crash: tumbling rolls + fading bounces on top of the base pose.
 		const crash = crashAnimRef.current;
 		if (crash.active) {
@@ -820,7 +844,12 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			camPose.y + camHRef.current + (Math.random() - 0.5) * shake,
 			camPose.z + (Math.random() - 0.5) * shake,
 		);
-		g.camera.lookAt(lookPose.x, lookPose.y + 0.4 + camHRef.current * 0.2, lookPose.z);
+		// Look-at height is eased slowly so sharp relief (kicker lip, jump pit) reads as
+		// the sled flying instead of the whole view pitching with the ground.
+		const lookY = lookPose.y + 0.4 + camHRef.current * 0.2;
+		if (Math.abs(lookY - camLookYRef.current) > 8) camLookYRef.current = lookY;
+		camLookYRef.current += (lookY - camLookYRef.current) * Math.min(1, dtSec * 2.2);
+		g.camera.lookAt(lookPose.x, camLookYRef.current, lookPose.z);
 		const fov = 74 + 16 * spd + (st.boostMs > 0 ? 5 : 0);
 		if (Math.abs(g.camera.fov - fov) > 0.1) {
 			g.camera.fov = fov;
@@ -832,9 +861,9 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		g.sun.target.position.set(pose.x, pose.y, pose.z);
 		g.peaks.position.set(g.camera.position.x, g.camera.position.y - 60, g.camera.position.z);
 
-		// Snow spray: emit behind the runners while moving, more when steering/sliding.
+		// Snow spray: emit behind the runners while moving (never mid-air), more when steering/sliding.
 		const emit =
-			runningRef.current && st.speed > 8
+			runningRef.current && st.speed > 8 && !airborne
 				? Math.min(10, 1 + Math.floor(st.speed / 12) + Math.abs(steer) * 2 + Math.abs(st.latVel) * 0.6)
 				: 0;
 		const back = { x: -Math.cos(pose.heading), z: -Math.sin(pose.heading) };
@@ -928,9 +957,13 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			if (ev === 'crash') {
 				flashOpRef.current = 0.55;
 				if (flashRef.current) flashRef.current.style.background = 'rgba(220,40,40,0.5)';
-			} else if (ev === 'stuck') {
+			} else if (ev === 'stuck' || ev === 'jumpShort') {
 				flashOpRef.current = 0.5;
 				if (flashRef.current) flashRef.current.style.background = 'rgba(90,190,255,0.45)';
+			} else if (ev === 'jumpClean') {
+				setBonusFlash('Tremplin ! +10');
+				window.clearTimeout(bonusTimerRef.current);
+				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 1600);
 			} else if (ev === 'forkBonus') {
 				setBonusFlash('Couloir de glace ! +50 · BOOST');
 				window.clearTimeout(bonusTimerRef.current);
