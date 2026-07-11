@@ -32,6 +32,14 @@ export interface Obstacle {
 	type: 'tree' | 'rock' | 'ice';
 }
 
+/** Pickup floating on the safe line: gold star (+points) or cyan ring (boost). */
+export interface Collectible {
+	s: number; // local s
+	lat: number;
+	kind: 'points' | 'boost';
+	taken?: boolean; // mutated by stepLuge on pickup (renderer hides the mesh)
+}
+
 /** Fork = segment-local split: a separator wedge between a safe and a danger lane. */
 export interface ForkInfo {
 	danger: 'left' | 'right';
@@ -62,6 +70,7 @@ export interface TrackSegment {
 	length: number;
 	samples: TrackSample[]; // length/SAMPLE_STEP + 1 rows
 	obstacles: Obstacle[];
+	collectibles: Collectible[];
 	tunnel: boolean;
 	bob: boolean; // bobsleigh section: icy half-pipe, tight curves, climbable walls
 	bobRampIn?: boolean; // first segment of a bob run: walls grow in over bobRampLen
@@ -97,7 +106,9 @@ export type LugeEvent =
 	| 'stuck'
 	| 'jumpClean'
 	| 'jumpShort'
-	| 'balanceFall';
+	| 'balanceFall'
+	| 'pickup'
+	| 'pickupBoost';
 
 export interface LugeState {
 	s: number;
@@ -154,6 +165,8 @@ export interface LugeParams {
 	scoreMultMin: number; // points per meter when (nearly) stopped
 	scoreMultGain: number; // added per m/s of speed — the HUD ×N.N tracks the km/h
 	scoreMultMax: number; // cap — reachable only at late-run speed with boosts
+	pickupPoints: number; // score per collected star
+	pickupBoostMs: number; // boost duration granted by a collected ring
 	balKick: number; // max initial lean shoved on the sled as it mounts the rail
 	balInstab: number; // inverted-pendulum divergence (s⁻²) on the ice rail
 	balNoise: number; // wobble forcing amplitude (s⁻²)
@@ -210,6 +223,8 @@ export const LUGE: LugeParams = {
 	scoreMultMin: 0.5,
 	scoreMultGain: 0.03,
 	scoreMultMax: 2.5,
+	pickupPoints: 5,
+	pickupBoostMs: 2500,
 	balKick: 0.22,
 	balInstab: 3.2,
 	balNoise: 2.4,
@@ -592,8 +607,27 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 			sLocal += difficultyAt(absS).obstacleEvery * spacingMul * (0.7 + 0.6 * rng());
 		}
 	}
+	// Collectibles: an occasional chain of stars (or a lone boost ring) riding the
+	// SAFE line — following the optimal path collects them. Simple kinds only, and
+	// generated after everything else so the rng stream of the track is untouched.
+	const collectibles: Collectible[] = [];
+	if (
+		index >= WARMUP_OBSTACLES &&
+		(kind === 'straight' || kind === 'curveL' || kind === 'curveR' || kind === 'scurve') &&
+		rng() < 0.35
+	) {
+		const kindC: Collectible['kind'] = rng() < 0.22 ? 'boost' : 'points';
+		const count = kindC === 'boost' ? 1 : 3 + Math.floor(rng() * 3);
+		let sLocal = 15 + rng() * Math.max(1, length - 30 - count * 8);
+		for (let i = 0; i < count; i++) {
+			const absS = entry.startS + sLocal;
+			collectibles.push({ s: sLocal, lat: latSafeAt(seed, absS, widthAt(sLocal)), kind: kindC });
+			sLocal += 8;
+		}
+	}
+
 	if (fork) {
-		// Danger lane: no obstacles — the washboard bumps (forkBumps) are the price.
+		// Danger lane: no obstacles — the balance rail is the price.
 		const sign = fork.danger === 'left' ? 1 : -1;
 		const span = fork.mergeS - fork.noseS - 30;
 		// One optional obstacle on the safe side.
@@ -617,6 +651,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		length,
 		samples,
 		obstacles,
+		collectibles,
 		tunnel: kind === 'tunnel',
 		bob: kind === 'bob',
 		bobRampIn: kind === 'bob' && entry.prevKind !== 'bob',
@@ -989,6 +1024,25 @@ export function stepLuge(
 			} else if (prevS < absS && s >= absS && latGap >= 0 && latGap < P.nearMissGap) {
 				events.push('nearMiss');
 				bonusScore += P.nearMissBonus;
+			}
+		}
+	}
+
+	// Collectibles on the safe line: stars pay points, rings grant a boost. The
+	// `taken` flag is mutated on the segment so the renderer can hide the mesh.
+	for (let si = segIdx; si < Math.min(segIdx + 2, segs.length) && status === 'running' && !airborne; si++) {
+		for (const c of segs[si].collectibles) {
+			if (c.taken) continue;
+			const absS = segs[si].startS + c.s;
+			if (prevS - 1 < absS && absS < s + P.sledReach && Math.abs(c.lat - lat) < P.sledHalf + 0.9) {
+				c.taken = true;
+				if (c.kind === 'points') {
+					bonusScore += P.pickupPoints;
+					events.push('pickup');
+				} else {
+					boostMs = Math.max(boostMs, P.pickupBoostMs);
+					events.push('pickupBoost');
+				}
 			}
 		}
 	}

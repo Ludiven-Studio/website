@@ -377,6 +377,48 @@ describe('luge simulation', () => {
 		expect(dangerRun.state.boostMs).toBeGreaterThan(0);
 	});
 
+	it('collectibles ride the safe line, pay once, and are deterministic', () => {
+		let seed = 0;
+		let segs: TrackSegment[] = [];
+		let seg: TrackSegment | undefined;
+		for (let sd = 1; sd <= 40 && !seg; sd++) {
+			segs = buildChain(sd, 60);
+			seg = segs.find((sg) => sg.collectibles.length > 0);
+			seed = sd;
+		}
+		expect(seg).toBeDefined();
+		// Same seed → identical collectibles (daily determinism).
+		const again = buildChain(seed, 60).find((sg) => sg.index === seg!.index)!;
+		expect(again.collectibles).toEqual(seg!.collectibles.map((c) => ({ ...c, taken: undefined })));
+		// Each one sits ON the safe line.
+		for (const c of seg!.collectibles) {
+			const absS = seg!.startS + c.s;
+			expect(c.lat).toBeCloseTo(latSafeAt(seed, absS, poseAt(segs, absS, 0).width), 3);
+		}
+		// Riding the line collects it exactly once.
+		const c0 = seg!.collectibles[0];
+		const absS0 = seg!.startS + c0.s;
+		let st: LugeState = { ...createLuge(), s: absS0 - 3, lat: c0.lat, speed: 20, invulnMs: 1e7 };
+		let got = 0;
+		while (st.s < absS0 + 4) {
+			const r = stepLuge(st, { steer: 0 }, DT, segs);
+			st = r.state;
+			got += r.events.filter((e) => e === 'pickup' || e === 'pickupBoost').length;
+		}
+		expect(got).toBe(1);
+		expect(c0.taken).toBe(true);
+		if (c0.kind === 'points') expect(st.bonusScore).toBeGreaterThanOrEqual(LUGE.pickupPoints);
+		else expect(st.boostMs).toBeGreaterThan(0);
+		// A second pass over the same spot gives nothing.
+		let st2: LugeState = { ...createLuge(), s: absS0 - 3, lat: c0.lat, speed: 20, invulnMs: 1e7 };
+		while (st2.s < absS0 + 4) {
+			const r = stepLuge(st2, { steer: 0 }, DT, segs);
+			st2 = r.state;
+			expect(r.events).not.toContain('pickup');
+			expect(r.events).not.toContain('pickupBoost');
+		}
+	});
+
 	it('balance rail: hands-off tips the sled (life lost), active correction survives to the bonus', () => {
 		const { segs, fork } = findFork();
 		const f = fork.fork!;

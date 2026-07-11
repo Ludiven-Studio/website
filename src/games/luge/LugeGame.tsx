@@ -14,6 +14,7 @@ import {
 	createLuge,
 	stepLuge,
 	type TrackSegment,
+	type Collectible,
 	type LugeState,
 	type LugeEvent,
 } from './engine';
@@ -48,6 +49,7 @@ interface DailyState {
 interface SegMesh {
 	group: THREE.Group;
 	geoms: THREE.BufferGeometry[];
+	pickups: { mesh: THREE.Mesh; c: Collectible; baseY: number }[];
 }
 
 interface Scene3D {
@@ -74,6 +76,8 @@ interface Scene3D {
 		snowCap: THREE.MeshStandardMaterial;
 		wedge: THREE.MeshStandardMaterial;
 		rail: THREE.MeshStandardMaterial;
+		gold: THREE.MeshStandardMaterial;
+		boostRing: THREE.MeshStandardMaterial;
 	};
 	shared: {
 		trunk: THREE.CylinderGeometry;
@@ -83,6 +87,8 @@ interface Scene3D {
 		rock: THREE.IcosahedronGeometry;
 		peak: THREE.ConeGeometry;
 		spike: THREE.ConeGeometry;
+		star: THREE.OctahedronGeometry;
+		ring: THREE.TorusGeometry;
 	};
 	baseDisposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[];
 }
@@ -547,7 +553,21 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		group.add(t);
 	}
 
-	return { group, geoms };
+	// Collectibles floating on the safe line (spun/hidden per-frame in draw()).
+	const pickups: SegMesh['pickups'] = [];
+	for (const c of seg.collectibles) {
+		const p = poseAt(segs, seg.startS + c.s, c.lat);
+		const m = new THREE.Mesh(
+			c.kind === 'points' ? g.shared.star : g.shared.ring,
+			c.kind === 'points' ? g.mats.gold : g.mats.boostRing,
+		);
+		const baseY = p.y + 0.75 - o.y;
+		m.position.set(p.x - o.x, baseY, p.z - o.z);
+		group.add(m);
+		pickups.push({ mesh: m, c, baseY });
+	}
+
+	return { group, geoms, pickups };
 }
 
 /** Sled + rider, nose toward +x (yawed via rotation.y = -heading). */
@@ -737,6 +757,20 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				emissiveIntensity: 0.35,
 				side: THREE.DoubleSide,
 			}),
+			gold: new THREE.MeshStandardMaterial({
+				color: 0xffd23e,
+				metalness: 0.6,
+				roughness: 0.25,
+				emissive: 0xaa7700,
+				emissiveIntensity: 0.7,
+			}),
+			boostRing: new THREE.MeshStandardMaterial({
+				color: 0x54e8ff,
+				metalness: 0.2,
+				roughness: 0.2,
+				emissive: 0x1899bb,
+				emissiveIntensity: 1.1,
+			}),
 		};
 		Object.values(mats).forEach((m) => baseDisposables.push(m));
 		const swapTex = (file: string, targets: THREE.MeshStandardMaterial[], repeat: number) => {
@@ -764,6 +798,8 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			rock: new THREE.IcosahedronGeometry(1, 1),
 			peak: new THREE.ConeGeometry(1, 1, 7),
 			spike: new THREE.ConeGeometry(1, 1, 7),
+			star: new THREE.OctahedronGeometry(0.42),
+			ring: new THREE.TorusGeometry(0.45, 0.14, 8, 16),
 		};
 		Object.values(shared).forEach((g0) => baseDisposables.push(g0));
 
@@ -987,6 +1023,18 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		}
 		g.sprayGeom.attributes.position.needsUpdate = true;
 
+		// Collectibles: spin + bob, vanish once taken.
+		const tSec = clockRef.current / 1000;
+		for (const sm of segMeshesRef.current.values()) {
+			for (const p of sm.pickups) {
+				p.mesh.visible = !p.c.taken;
+				if (p.c.taken) continue;
+				p.mesh.rotation.y = tSec * 2.5 + p.c.s;
+				p.mesh.rotation.x = p.c.kind === 'points' ? 0.5 : 0;
+				p.mesh.position.y = p.baseY + Math.sin(tSec * 3 + p.c.s) * 0.12;
+			}
+		}
+
 		// DOM FX: speed vignette + crash flash (refs only, no re-render).
 		if (vignetteRef.current) vignetteRef.current.style.opacity = String(0.25 + spd * 0.5);
 		if (flashRef.current) {
@@ -1075,6 +1123,10 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				setBonusFlash('Équilibre ! ← →');
 				window.clearTimeout(bonusTimerRef.current);
 				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 1600);
+			} else if (ev === 'pickupBoost') {
+				setBonusFlash('Anneau BOOST !');
+				window.clearTimeout(bonusTimerRef.current);
+				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 1400);
 			}
 		}
 	}, []);
