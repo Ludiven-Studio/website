@@ -876,7 +876,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		// powerslide) on the deck; the balance lean stays a roll around the travel axis.
 		const balancing = balanceActive(seg, st.lane, sI);
 		const laneSign = balancing && seg.fork ? (seg.fork.danger === 'left' ? 1 : -1) : 0;
-		balSlideRef.current += (laneSign * 1.1 - balSlideRef.current) * Math.min(1, dtSec * 6);
+		balSlideRef.current += (laneSign * 0.6 - balSlideRef.current) * Math.min(1, dtSec * 6);
 
 		// Drift yaw: the nose swings toward the slide. Barely on grippy snow (deadzone +
 		// small factor), fully on bob ice where huge slides are the point.
@@ -886,7 +886,10 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		// Steering pivots the nose into the turn (eased) — more on ice; no body lean.
 		const yawTarget = balancing ? 0 : steer * (seg.bob ? 0.22 : 0.1);
 		steerYawRef.current += (yawTarget - steerYawRef.current) * Math.min(1, dtSec * 8);
-		g.sled.position.set(pose.x, (flightY ?? pose.y) + 0.05, pose.z);
+		// While sliding sideways, the balance lean would sink the sled's ends into the
+		// deck (pivot is at its center) — lift it by the dipped-end depth.
+		const leanLift = Math.sin(Math.abs(st.balance) * 0.7) * 1.1 * Math.abs(Math.sin(balSlideRef.current));
+		g.sled.position.set(pose.x, (flightY ?? pose.y) + 0.05 + leanLift, pose.z);
 		g.sled.rotation.set(0, 0, 0);
 		g.sled.rotateY(-pose.heading - driftYaw - steerYawRef.current);
 		g.sled.rotateZ(pitch);
@@ -939,12 +942,25 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		g.sun.target.position.set(pose.x, pose.y, pose.z);
 		g.peaks.position.set(g.camera.position.x, g.camera.position.y - 60, g.camera.position.z);
 
-		// Snow spray: emit behind the runners while moving (never mid-air), more when steering/sliding.
+		// Snow spray: two trails starting at the REAR TIP of each runner, following the
+		// sled's visual yaw (drift/steer/slide) — not the track heading. On icy surfaces
+		// (caves, bob, surf rail) snow trails give way to sparse ice chips that evaporate.
+		const onIce = seg.bob || seg.tunnel || balancing;
 		const emit =
 			runningRef.current && st.speed > 8 && !airborne
-				? Math.min(10, 1 + Math.floor(st.speed / 12) + Math.abs(steer) * 2 + Math.abs(st.latVel) * 0.6)
+				? onIce
+					? Math.min(2, 1 + Math.floor(st.speed / 30))
+					: Math.min(10, 1 + Math.floor(st.speed / 12) + Math.abs(steer) * 2 + Math.abs(st.latVel) * 0.6)
 				: 0;
-		const back = { x: -Math.cos(pose.heading), z: -Math.sin(pose.heading) };
+		// Emission point follows the sled body; particle velocity streams along the track
+		// (the relative wind), whatever the body yaw.
+		const sledYaw = pose.heading + driftYaw + steerYawRef.current + balSlideRef.current;
+		const backS = { x: -Math.cos(sledYaw), z: -Math.sin(sledYaw) };
+		const nxS = -Math.sin(sledYaw);
+		const nzS = Math.cos(sledYaw);
+		const backT = { x: -Math.cos(pose.heading), z: -Math.sin(pose.heading) };
+		const nxT = -Math.sin(pose.heading);
+		const nzT = Math.cos(pose.heading);
 		let emitted = 0;
 		for (let i = 0; i < SPRAY_COUNT; i++) {
 			if (g.sprayLife[i] > 0) {
@@ -956,18 +972,17 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				if (g.sprayLife[i] <= 0) g.sprayPos[i * 3 + 1] = -9999;
 			} else if (emitted < emit) {
 				emitted++;
-				// Two trails: alternate the emit point between the two runners.
-				const runner = (emitted % 2 === 0 ? 1 : -1) * 0.32;
-				const nx = -Math.sin(pose.heading);
-				const nz = Math.cos(pose.heading);
-				g.sprayLife[i] = 0.35 + Math.random() * 0.3;
-				g.sprayPos[i * 3] = pose.x + back.x * 0.9 + nx * runner;
-				g.sprayPos[i * 3 + 1] = pose.y + 0.12;
-				g.sprayPos[i * 3 + 2] = pose.z + back.z * 0.9 + nz * runner;
-				const side = (Math.random() - 0.5) * 1.2 - steer * 2 - st.latVel * 0.5;
-				g.sprayVel[i * 3] = back.x * st.speed * 0.25 + nx * side;
-				g.sprayVel[i * 3 + 1] = 1.2 + Math.random() * 2;
-				g.sprayVel[i * 3 + 2] = back.z * st.speed * 0.25 + nz * side;
+				// Runners sit at z ±0.3, rear end at x −0.85 in sled space.
+				const runner = (emitted % 2 === 0 ? 1 : -1) * 0.3;
+				g.sprayLife[i] = onIce ? 0.1 + Math.random() * 0.15 : 0.35 + Math.random() * 0.3;
+				g.sprayPos[i * 3] = pose.x + backS.x * 0.85 + nxS * runner;
+				g.sprayPos[i * 3 + 1] = pose.y + 0.1;
+				g.sprayPos[i * 3 + 2] = pose.z + backS.z * 0.85 + nzS * runner;
+				const side = onIce ? (Math.random() - 0.5) * 0.6 : (Math.random() - 0.5) * 1.2 - steer * 2 - st.latVel * 0.5;
+				const stream = onIce ? 0.06 : 0.25;
+				g.sprayVel[i * 3] = backT.x * st.speed * stream + nxT * side;
+				g.sprayVel[i * 3 + 1] = onIce ? 1.8 + Math.random() * 1.5 : 1.2 + Math.random() * 2;
+				g.sprayVel[i * 3 + 2] = backT.z * st.speed * stream + nzT * side;
 			}
 		}
 		g.sprayGeom.attributes.position.needsUpdate = true;

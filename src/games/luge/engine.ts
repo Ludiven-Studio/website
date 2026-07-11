@@ -187,7 +187,7 @@ export const LUGE: LugeParams = {
 	bermH: 0.8,
 	bermSlopeLen: 1.6,
 	bermGravity: 22,
-	forkRailH: 1.7,
+	forkRailH: 2.4,
 	sledHalf: 0.5,
 	sledReach: 1.2,
 	noseHalf: 1.3,
@@ -277,14 +277,18 @@ export function bermRiseAt(width: number, lat: number): { rise: number; slope: n
 	return { rise: Math.max(0.5, LUGE.bermH + (a - LUGE.bermSlopeLen) * k2), slope: sgn * k2 };
 }
 
-/** Raised "surf rail" profile of the fork danger lane: flat top, sloped shoulders. */
+/**
+ * Raised "surf rail" profile of the fork danger lane: a tall narrow BEAM (poutre)
+ * with a ~1.4 m flat top — the sideways-sliding sled overhangs its edges when
+ * leaning instead of digging into a wide deck.
+ */
 export function forkRailRiseAt(seg: TrackSegment, sLocal: number, lat: number): number {
 	const f = seg.fork;
 	if (!f) return 0;
 	const sign = f.danger === 'left' ? 1 : -1;
 	const l = sign * lat;
 	const c = (f.sepHalfMax + f.outerDanger) / 2;
-	const latProf = smoothstep(f.sepHalfMax + 0.2, c - 1.1, l) * (1 - smoothstep(c + 1.1, f.outerDanger - 0.2, l));
+	const latProf = smoothstep(c - 2.4, c - 0.7, l) * (1 - smoothstep(c + 0.7, c + 2.4, l));
 	if (latProf <= 0) return 0;
 	const sProf = smoothstep(f.noseS + 2, f.noseS + 14, sLocal) * (1 - smoothstep(f.mergeS - 14, f.mergeS - 2, sLocal));
 	return LUGE.forkRailH * latProf * sProf;
