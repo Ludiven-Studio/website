@@ -73,6 +73,7 @@ interface Scene3D {
 		trunk: THREE.MeshStandardMaterial;
 		snowCap: THREE.MeshStandardMaterial;
 		wedge: THREE.MeshStandardMaterial;
+		rail: THREE.MeshStandardMaterial;
 	};
 	shared: {
 		trunk: THREE.CylinderGeometry;
@@ -142,6 +143,27 @@ const makeIceTex = () =>
 				ctx.lineTo(x, y);
 			}
 			ctx.stroke();
+		}
+	});
+
+const makeRailTex = () =>
+	makeCanvas(256, (ctx, s) => {
+		// Painted "surf ramp" panel: bright teal deck, white edge rails, orange center line.
+		const g = ctx.createLinearGradient(0, 0, s, 0);
+		g.addColorStop(0, '#0d7ca6');
+		g.addColorStop(0.5, '#1cb9d8');
+		g.addColorStop(1, '#0d7ca6');
+		ctx.fillStyle = g;
+		ctx.fillRect(0, 0, s, s);
+		ctx.fillStyle = '#f7f9ff';
+		ctx.fillRect(s * 0.05, 0, s * 0.05, s);
+		ctx.fillRect(s * 0.9, 0, s * 0.05, s);
+		ctx.fillStyle = '#ff9f43';
+		ctx.fillRect(s * 0.485, 0, s * 0.03, s);
+		const rng = mulberry32(77);
+		for (let i = 0; i < 170; i++) {
+			ctx.fillStyle = `rgba(255,255,255,${0.05 + rng() * 0.12})`;
+			ctx.fillRect(rng() * s, rng() * s, 2 + rng() * 6, 1 + rng() * 3);
 		}
 	});
 
@@ -232,8 +254,13 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 	// (poseAt carries the pipe shape) with a bright ice floor.
 	{
 		const isPipe = seg.bob || seg.tunnel;
-		const ts =
-			isPipe || seg.fork ? [-1, -0.92, -0.82, -0.68, -0.45, 0, 0.45, 0.68, 0.82, 0.92, 1] : [-1, -0.5, 0, 0.5, 1];
+		// Forks need a dense cross-section: the raised rail's shoulders (poseAt) would
+		// tear against a coarse ribbon.
+		const ts = seg.fork
+			? [-1, -0.92, -0.82, -0.72, -0.62, -0.52, -0.45, -0.38, -0.3, -0.22, -0.14, 0, 0.14, 0.22, 0.3, 0.38, 0.45, 0.52, 0.62, 0.72, 0.82, 0.92, 1]
+			: isPipe
+				? [-1, -0.92, -0.82, -0.68, -0.45, 0, 0.45, 0.68, 0.82, 0.92, 1]
+				: [-1, -0.5, 0, 0.5, 1];
 		const extra = seg.bob ? LUGE.bobWallExtra : seg.tunnel ? LUGE.tunnelWallExtra : 0;
 		const ribbon: Row[][] = [];
 		for (let k = 0; k <= n; k++) {
@@ -247,12 +274,18 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 	}
 
 	// Raised snow berms at both edges (pipe walls replace them on icy sections).
+	// poseAt carries the berm profile (climbable) — no extra lifts here.
 	for (const side of seg.bob || seg.tunnel ? [] : [1, -1]) {
 		const berm: Row[][] = [];
 		for (let k = 0; k <= n; k++) {
 			const s = sAt(k);
 			const hw = seg.samples[k].width / 2;
-			berm.push([edgePt(segs, s, side * hw, o), edgePt(segs, s, side * (hw + 1.6), o, 0.8), edgePt(segs, s, side * (hw + 3), o, 0.5)]);
+			berm.push([
+				edgePt(segs, s, side * hw, o),
+				edgePt(segs, s, side * (hw + LUGE.bermSlopeLen * 0.5), o),
+				edgePt(segs, s, side * (hw + LUGE.bermSlopeLen), o),
+				edgePt(segs, s, side * (hw + 3), o),
+			]);
 		}
 		add(stripFrom(berm), g.mats.berm);
 	}
@@ -365,26 +398,30 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		}
 		add(stripFrom(wedgeRows), g.mats.wedge);
 
-		// Danger lane: a flat icy corridor with washboard bumps (shape carried by poseAt).
-		// A bright ice strip overlays the snow ribbon; a snow berm closes the outer edge.
-		const gutterRows: Row[][] = [];
+		// Danger lane: a raised "surf rail" (relief carried by poseAt) skinned with the
+		// painted ramp deck; a snow berm still closes the outer edge.
+		const railRows: Row[][] = [];
 		const bermRows: Row[][] = [];
 		for (let k = k0; k <= Math.min(k1, n); k++) {
 			const s = sAt(k);
 			const across: Row[] = [];
 			const inner = f.sepHalfMax * 0.7;
 			const outer = f.outerDanger + 0.2;
-			for (const t of [0, 0.15, 0.3, 0.5, 0.7, 0.85, 1]) {
-				across.push(edgePt(segs, s, sign * (inner + t * (outer - inner)), o, 0.04));
+			for (const t of [0, 0.08, 0.16, 0.24, 0.32, 0.4, 0.48, 0.56, 0.64, 0.72, 0.8, 0.9, 1]) {
+				const pt = edgePt(segs, s, sign * (inner + t * (outer - inner)), o, 0.05);
+				// Deck UVs: u spans the ramp once (stripes hug the edges), v streams with s.
+				pt.u = t;
+				pt.v = s / 6;
+				across.push(pt);
 			}
-			gutterRows.push(across);
+			railRows.push(across);
 			bermRows.push([
 				edgePt(segs, s, sign * f.outerDanger, o),
 				edgePt(segs, s, sign * (f.outerDanger + 1.2), o, 0.8),
 				edgePt(segs, s, sign * (f.outerDanger + 2.4), o, 0.4),
 			]);
 		}
-		add(stripFrom(gutterRows), g.mats.ice);
+		add(stripFrom(railRows), g.mats.rail);
 		add(stripFrom(bermRows), g.mats.berm);
 
 		// Two chunky half-torus ice arches (tire-like) at the gutter's entrance and exit.
@@ -585,6 +622,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const camLatRef = useRef(0);
 	const camHRef = useRef(4); // eased camera height — ducks under tunnel arches
 	const camDistRef = useRef(8); // eased chase distance — closes in for the balance rail
+	const balRollRef = useRef(0); // eased side-slide roll on the surf rail
 	const camLookYRef = useRef(0); // eased look-at height — kickers/pits stay visible
 	const balGaugeRef = useRef<HTMLDivElement>(null);
 	const steerYawRef = useRef(0); // eased steering pivot of the sled nose
@@ -645,7 +683,8 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		const snowTex = makeSnowTex();
 		const iceTex = makeIceTex();
 		const rockTex = makeRockTex();
-		baseDisposables.push(snowTex, iceTex, rockTex);
+		const railTex = makeRailTex();
+		baseDisposables.push(snowTex, iceTex, rockTex, railTex);
 		// Strips are DoubleSide: banking/terrain rows can face either way locally.
 		const mats: Scene3D['mats'] = {
 			snow: new THREE.MeshStandardMaterial({ map: snowTex, color: 0xffffff, roughness: 0.92, side: THREE.DoubleSide }),
@@ -688,6 +727,16 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			trunk: new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.9 }),
 			snowCap: new THREE.MeshStandardMaterial({ color: 0xf4f8ff, roughness: 0.95, flatShading: true }),
 			wedge: new THREE.MeshStandardMaterial({ map: rockTex, color: 0xd6dde6, roughness: 0.85, flatShading: true, side: THREE.DoubleSide }),
+			// Surf-ramp rail deck (procedural only — no AI JPG swap).
+			rail: new THREE.MeshStandardMaterial({
+				map: railTex,
+				color: 0xffffff,
+				roughness: 0.3,
+				metalness: 0.1,
+				emissive: 0x0a4a5c,
+				emissiveIntensity: 0.35,
+				side: THREE.DoubleSide,
+			}),
 		};
 		Object.values(mats).forEach((m) => baseDisposables.push(m));
 		const swapTex = (file: string, targets: THREE.MeshStandardMaterial[], repeat: number) => {
@@ -823,9 +872,11 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			pitch = Math.atan2(a + 2 * b * t, D);
 		}
 
-		// Balance rail (fork danger lane): the lean IS the gameplay — big visible roll,
-		// no drift/steer yaw (the rail carries the sled straight).
+		// Balance rail (fork danger lane): the sled tips onto its side to slide the
+		// surf rail — the lean IS the gameplay. No drift/steer yaw (the rail carries it).
 		const balancing = balanceActive(seg, st.lane, sI);
+		const laneSign = balancing && seg.fork ? (seg.fork.danger === 'left' ? 1 : -1) : 0;
+		balRollRef.current += (laneSign * 0.85 - balRollRef.current) * Math.min(1, dtSec * 6);
 
 		// Drift yaw: the nose swings toward the slide. Barely on grippy snow (deadzone +
 		// small factor), fully on bob ice where huge slides are the point.
@@ -835,11 +886,11 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		// Steering pivots the nose into the turn (eased) — more on ice; no body lean.
 		const yawTarget = balancing ? 0 : steer * (seg.bob ? 0.22 : 0.1);
 		steerYawRef.current += (yawTarget - steerYawRef.current) * Math.min(1, dtSec * 8);
-		g.sled.position.set(pose.x, (flightY ?? pose.y) + 0.05, pose.z);
+		g.sled.position.set(pose.x, (flightY ?? pose.y) + 0.05 + Math.abs(balRollRef.current) * 0.25, pose.z);
 		g.sled.rotation.set(0, 0, 0);
 		g.sled.rotateY(-pose.heading - driftYaw - steerYawRef.current);
 		g.sled.rotateZ(pitch);
-		g.sled.rotateX(pose.bank + st.latVel * 0.015 + st.balance * 0.7);
+		g.sled.rotateX(pose.bank + st.latVel * 0.015 + st.balance * 0.7 + balRollRef.current);
 		// Invulnerability blink at ~8 Hz.
 		g.sled.visible = st.invulnMs <= 0 || Math.floor(clockRef.current / 125) % 2 === 0;
 
@@ -999,7 +1050,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				window.clearTimeout(bonusTimerRef.current);
 				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 1600);
 			} else if (ev === 'forkBonus') {
-				setBonusFlash('Couloir de glace ! +50 · BOOST');
+				setBonusFlash('Rampe de surf ! +50 · BOOST');
 				window.clearTimeout(bonusTimerRef.current);
 				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 2200);
 			} else if (ev === 'forkDanger') {

@@ -128,6 +128,10 @@ export interface LugeParams {
 	centrifugal: number; // fraction of curvature·v² not absorbed by banking
 	bermBounce: number; // lateral velocity restitution on walls
 	bermScrub: number; // per-frame speed retention while scraping a wall
+	bermH: number; // snow berm crest height — climbable like a shallow wall
+	bermSlopeLen: number; // lateral run from track edge to the crest
+	bermGravity: number; // restoring pull on the berm slope (m/s² per unit slope)
+	forkRailH: number; // raised "surf rail" height of the fork danger lane
 	sledHalf: number; // half-width of the sled
 	sledReach: number; // longitudinal collision reach
 	noseHalf: number; // half-width of the fork separator nose
@@ -179,6 +183,10 @@ export const LUGE: LugeParams = {
 	centrifugal: 0.5,
 	bermBounce: 0.4,
 	bermScrub: 0.985,
+	bermH: 0.8,
+	bermSlopeLen: 1.6,
+	bermGravity: 22,
+	forkRailH: 1.7,
 	sledHalf: 0.5,
 	sledReach: 1.2,
 	noseHalf: 1.3,
@@ -248,6 +256,36 @@ export function difficultyAt(s: number): Difficulty {
 		jumpChance: 0.07 + 0.04 * e(2500),
 		width: 9 + 5 * Math.exp(-t / 2500),
 	};
+}
+
+/**
+ * Snow berm profile beyond the track edge. Climbable (like a shallow cave wall):
+ * the slope up to the crest, then a gentle back side meeting the terrain skirt
+ * (+0.5 at hw+3 — the renderer's skirt inner row).
+ */
+export function bermRiseAt(width: number, lat: number): { rise: number; slope: number } {
+	const a = Math.abs(lat) - width / 2;
+	if (a <= 0) return { rise: 0, slope: 0 };
+	const sgn = Math.sign(lat);
+	if (a <= LUGE.bermSlopeLen) {
+		const k = LUGE.bermH / LUGE.bermSlopeLen;
+		return { rise: a * k, slope: sgn * k };
+	}
+	const k2 = -0.3 / 1.4;
+	return { rise: Math.max(0.5, LUGE.bermH + (a - LUGE.bermSlopeLen) * k2), slope: sgn * k2 };
+}
+
+/** Raised "surf rail" profile of the fork danger lane: flat top, sloped shoulders. */
+export function forkRailRiseAt(seg: TrackSegment, sLocal: number, lat: number): number {
+	const f = seg.fork;
+	if (!f) return 0;
+	const sign = f.danger === 'left' ? 1 : -1;
+	const l = sign * lat;
+	const c = (f.sepHalfMax + f.outerDanger) / 2;
+	const latProf = smoothstep(f.sepHalfMax + 0.2, c - 1.1, l) * (1 - smoothstep(c + 1.1, f.outerDanger - 0.2, l));
+	if (latProf <= 0) return 0;
+	const sProf = smoothstep(f.noseS + 2, f.noseS + 14, sLocal) * (1 - smoothstep(f.mergeS - 14, f.mergeS - 2, sLocal));
+	return LUGE.forkRailH * latProf * sProf;
 }
 
 /**
@@ -676,8 +714,12 @@ export function poseAt(
 		const w = pipeWall(p.seg, p.width, lat);
 		y += w.rise * ramp;
 		dydlat += w.slope * ramp;
-	} else if (p.seg.jump) {
-		y += jumpRiseAt(p.seg, s - p.seg.startS);
+	} else {
+		const b = bermRiseAt(p.width, lat);
+		y += b.rise;
+		dydlat += b.slope;
+		if (p.seg.jump) y += jumpRiseAt(p.seg, s - p.seg.startS);
+		else if (p.seg.fork) y += forkRailRiseAt(p.seg, s - p.seg.startS, lat);
 	}
 	return {
 		x: p.x + p.nx * lat,
@@ -891,15 +933,20 @@ export function stepLuge(
 				if (latVel < 0) latVel = 0;
 			}
 		} else {
-			const hw = info2.width / 2 - P.sledHalf;
-			if (lat > hw) {
-				lat = hw;
+			// Snow berms climb like shallow cave walls: gravity pulls back down the
+			// slope and riding them scrubs speed; only the crest is a hard (soft-bounce) stop.
+			const b = bermRiseAt(info2.width, lat + Math.sign(lat) * P.sledHalf);
+			if (b.rise > 0) {
+				latVel -= b.slope * P.bermGravity * dtSec;
+				bermHit = true;
+			}
+			const crest = info2.width / 2 + P.bermSlopeLen - P.sledHalf;
+			if (lat > crest) {
+				lat = crest;
 				if (latVel > 0) latVel = -latVel * P.bermBounce;
-				bermHit = true;
-			} else if (lat < -hw) {
-				lat = -hw;
+			} else if (lat < -crest) {
+				lat = -crest;
 				if (latVel < 0) latVel = -latVel * P.bermBounce;
-				bermHit = true;
 			}
 		}
 	}

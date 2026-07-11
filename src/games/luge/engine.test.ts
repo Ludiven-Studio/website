@@ -14,6 +14,7 @@ import {
 	jumpRiseAt,
 	jumpFlightDist,
 	scoreMultAt,
+	bermRiseAt,
 	createLuge,
 	stepLuge,
 	type TrackSegment,
@@ -300,14 +301,23 @@ describe('luge simulation', () => {
 		expect(scoreMultAt(v, 1000)).toBeGreaterThan(scoreMultAt(v * 0.3, 1000) * 1.5);
 	});
 
-	it('berms are never lethal and keep the sled on the track', () => {
+	it('berms are climbable (never lethal): crest bound, restoring pull, matching profile', () => {
 		const seed = 5;
 		const segs = ensureSegments([], seed, 0);
 		let st: LugeState = { ...createLuge(), s: 20, lat: 50, latVel: 30 };
 		st = stepLuge(st, { steer: 1 }, DT, segs).state;
 		const hw = poseAt(segs, st.s, 0).width / 2;
-		expect(Math.abs(st.lat)).toBeLessThanOrEqual(hw - LUGE.sledHalf + 1e-9);
+		expect(Math.abs(st.lat)).toBeLessThanOrEqual(hw + LUGE.bermSlopeLen - LUGE.sledHalf + 1e-9);
 		expect(st.lives).toBe(LUGE.lives);
+		// Profile: crest at hw + slopeLen, meets the terrain skirt (+0.5) at hw + 3.
+		expect(bermRiseAt(10, 5 + LUGE.bermSlopeLen).rise).toBeCloseTo(LUGE.bermH, 5);
+		expect(bermRiseAt(10, 8).rise).toBeCloseTo(0.5, 5);
+		expect(bermRiseAt(10, -5.8).slope).toBeLessThan(0); // pull back toward the track
+		expect(bermRiseAt(10, 3).rise).toBe(0);
+		// Riding the slope decays the outward push (gravity), keeping the sled on track.
+		let on: LugeState = { ...createLuge(), s: 20, lat: hw + 0.5, latVel: 0, speed: 20 };
+		for (let i = 0; i < 90; i++) on = stepLuge(on, { steer: 0 }, DT, segs).state;
+		expect(Math.abs(on.lat)).toBeLessThan(hw + 0.5); // slid back down
 	});
 
 	it('hitting an obstacle costs a life, cuts speed, grants invulnerability - third crash ends the run', () => {
@@ -373,6 +383,11 @@ describe('luge simulation', () => {
 		const mergeAbs = fork.startS + f.mergeS;
 		const dangerSign = f.danger === 'left' ? 1 : -1;
 		const mk = (): LugeState => ({ ...createLuge(), s: noseAbs - 5, lat: dangerSign * 4, speed: 25 });
+
+		// The danger lane is a raised surf rail — higher than the safe lane, carried by poseAt.
+		const midS = (noseAbs + mergeAbs) / 2;
+		const cLat = (dangerSign * (f.sepHalfMax + f.outerDanger)) / 2;
+		expect(poseAt(segs, midS, cLat).y).toBeGreaterThan(poseAt(segs, midS, -cLat).y + LUGE.forkRailH * 0.6);
 
 		// Hands off: the wobble + instability tip the sled before the merge.
 		let st = mk();
