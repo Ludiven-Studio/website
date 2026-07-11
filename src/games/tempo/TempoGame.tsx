@@ -226,15 +226,15 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!ctx) return;
 		const lp = ctx.createBiquadFilter();
 		lp.type = 'lowpass';
-		lp.frequency.value = 900;
+		lp.frequency.value = 1300;
 		lp.Q.value = 0.8;
 		const g = ctx.createGain();
 		g.connect(lp);
 		lp.connect(runGainRef.current ?? masterRef.current!);
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(accent ? 0.13 : 0.09, when + 0.008);
+		g.gain.exponentialRampToValueAtTime(accent ? 0.2 : 0.15, when + 0.008);
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.28);
-		for (const [mult, amp, type] of [[1, 1, 'triangle'], [1, 0.35, 'sawtooth'], [2, 0.15, 'triangle']] as [number, number, OscillatorType][]) {
+		for (const [mult, amp, type] of [[1, 1, 'triangle'], [1, 0.35, 'sawtooth'], [2, 0.28, 'triangle']] as [number, number, OscillatorType][]) {
 			const o = ctx.createOscillator();
 			o.type = type;
 			o.frequency.value = midiToFreq(midi) * mult;
@@ -246,23 +246,27 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.stop(when + 0.3);
 		}
 	};
-	// Bass synth pad laying the chords down low (root + fifth + octave + third
-	// above, low-pass filtered). The third sits an octave up to avoid mud.
+	// Synth bed laying the chords down low (root + fifth + octave + third above,
+	// low-pass filtered). FAST attack + legato overlap: it fills the bar from
+	// beat 1, with a slow filter sweep so the held chord breathes instead of
+	// feeling like one repetitive swell.
 	const pad = (when: number, dur: number, root: number, third: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const lp = ctx.createBiquadFilter();
 		lp.type = 'lowpass';
-		lp.frequency.value = 800;
+		lp.frequency.setValueAtTime(650, when);
+		lp.frequency.linearRampToValueAtTime(1050, when + dur * 0.5);
+		lp.frequency.linearRampToValueAtTime(700, when + dur);
 		lp.Q.value = 0.6;
 		const g = ctx.createGain();
 		g.connect(lp);
 		lp.connect(runGainRef.current ?? masterRef.current!);
-		const attack = Math.min(0.4, dur * 0.3);
-		const rel = Math.min(0.5, dur * 0.35);
+		const attack = 0.06;
+		const rel = 0.3;
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(0.09, when + attack);
-		g.gain.setValueAtTime(0.09, when + Math.max(attack, dur - rel));
+		g.gain.exponentialRampToValueAtTime(0.1, when + attack);
+		g.gain.setValueAtTime(0.1, when + Math.max(attack, dur - rel));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
 		for (const [semi, amp] of [[0, 1], [7, 0.5], [12, 0.3], [12 + third, 0.28]]) {
 			const o = ctx.createOscillator();
@@ -795,10 +799,11 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					gtr(when + (half * beatDur) / 2, chordRoot + 12 + ladder[GTR_PING[e]]);
 				}
 				if (accent) {
-					// Bass synth pad under each bar (deep, an octave below the groove bass),
-					// with a violin swell carrying the chord color above it.
+					// Synth bed under each bar (deep, an octave below the groove bass) —
+					// slight overlap into the next bar keeps it seamless (no hole while the
+					// violins swell in above it).
 					const barDur = bt[Math.min(i + 4, bt.length - 1)] - bt[i] || 2;
-					pad(when, Math.max(0.6, barDur), chordRoot - 12, third);
+					pad(when, Math.max(0.6, barDur) + 0.25, chordRoot - 12, third);
 					strings(when, Math.max(0.6, barDur), chordRoot, third);
 				}
 				backingIdxRef.current++;
