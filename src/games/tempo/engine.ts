@@ -152,6 +152,18 @@ const nearestChordTone = (step: number, chordRootStep: number): number => {
 };
 /** Snap a passing note onto the pentatonic (avoid the unstable 4th & 7th). */
 const toPenta = (step: number): number => (BAD_PENTA.has(((step % 7) + 7) % 7) ? clampStep(step + 1) : step);
+/**
+ * Classic "avoid note": a pitch one semitone ABOVE a chord tone clashes with it
+ * (e.g. the 4th over a major chord, or the tonic over V). Passing notes that
+ * land there get resolved down onto the chord tone below.
+ */
+const isAvoidNote = (step: number, chordRootStep: number): boolean => {
+	const pc = MAJOR[((step % 7) + 7) % 7];
+	for (const t of [chordRootStep, chordRootStep + 2, chordRootStep + 4]) {
+		if ((pc - MAJOR[((t % 7) + 7) % 7] + 12) % 12 === 1) return true;
+	}
+	return false;
+};
 /** Closest tonic degree (unison or octave, in register) for the final cadence. */
 const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(step - 7) ? 0 : 7);
 
@@ -263,8 +275,13 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 					lastDelta = delta;
 					step = clampStep(step + delta);
 					// Chord tone on strong beats AND on long notes (they ring against the
-					// chord); pentatonic passing note on short weak beats.
-					step = strong || ev.d >= 2 ? nearestChordTone(step, chordRootStep) : toPenta(step);
+					// chord); pentatonic passing note on short weak beats — resolved down
+					// when it lands on the chord's avoid note (semitone above a chord tone).
+					if (strong || ev.d >= 2) step = nearestChordTone(step, chordRootStep);
+					else {
+						step = toPenta(step);
+						if (isAvoidNote(step, chordRootStep)) step = clampStep(step - 1);
+					}
 				}
 				out.push({ d: ev.d, step });
 				beatInBar += ev.d;
@@ -287,24 +304,56 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		}
 		return theme;
 	};
-	const playTheme = (theme: ThemeEv[][]): void => {
+	// Replay a theme with a per-occurrence VARIATION, so repeats stay familiar
+	// but not identical: 'echo' re-strikes long notes on their last beat (drive),
+	// 'calm' merges 1-beat pairs into a held note (breathes). Bar sums stay 4.
+	type Variant = 'plain' | 'echo' | 'calm';
+	const playTheme = (theme: ThemeEv[][], variant: Variant): void => {
 		for (let bar = 0; bar < 4; bar++) {
 			chords.push(chordBarOf(prog[bar]));
-			for (const ev of theme[bar]) {
-				if (ev.rest) notes.push({ midi: 0, dur: ev.d, rest: true });
-				else emit(ev.step!, ev.d);
+			const evs = theme[bar];
+			for (let i = 0; i < evs.length; i++) {
+				const ev = evs[i];
+				if (ev.rest) {
+					notes.push({ midi: 0, dur: ev.d, rest: true });
+					continue;
+				}
+				if (variant === 'echo' && ev.d >= 3) {
+					emit(ev.step!, ev.d - 1);
+					emit(ev.step!, 1);
+					continue;
+				}
+				if (variant === 'calm' && bar < 3 && ev.d === 1 && i + 1 < evs.length && !evs[i + 1].rest && evs[i + 1].d === 1) {
+					emit(ev.step!, 2);
+					i++;
+					continue;
+				}
+				emit(ev.step!, ev.d);
 			}
 		}
 	};
 
 	// Compose the song's three themes, then cycle a pop form. The refrain sits
 	// higher than the couplet so its return is unmistakable; the pont breathes.
+	// Each theme states itself plainly first, then varies on later returns.
 	const themeA = makeTheme(0, VERSE_ARCHS); // couplet
 	const themeB = makeTheme(4, CHORUS_ARCHS); // refrain
 	const themeC = makeTheme(2, BRIDGE_ARCHS); // pont
 	const FORM = [themeA, themeA, themeB, themeB, themeA, themeB, themeC, themeB];
+	const VAR_CYCLE = new Map<ThemeEv[][], Variant[]>([
+		[themeA, ['plain', 'plain', 'calm', 'echo']],
+		[themeB, ['plain', 'plain', 'echo', 'plain', 'echo', 'calm']],
+		[themeC, ['plain', 'calm']],
+	]);
+	const occ = new Map<ThemeEv[][], number>();
 	let fi = 0;
-	while (notes.length < count) playTheme(FORM[fi++ % FORM.length]);
+	while (notes.length < count) {
+		const theme = FORM[fi++ % FORM.length];
+		const n = occ.get(theme) ?? 0;
+		occ.set(theme, n + 1);
+		const vars = VAR_CYCLE.get(theme)!;
+		playTheme(theme, vars[n % vars.length]);
+	}
 	return { name: 'Infini', tempo: 2, key: KEY, notes, chords };
 }
 

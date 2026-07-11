@@ -27,6 +27,13 @@ const HOLD_BREAK_COST = 10;
 const bestKey = (s: number): string => `ludiven-tempo-best-${s}`;
 const midiToFreq = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
+// Bass-guitar riffs on an 8th-note grid (e = eighth 0..7 in the bar), seed-picked
+// per run: r root, 5 fifth, o octave, w whole-tone walk into the next bar's root.
+const BASS_RIFFS: { e: number; t: 'r' | '5' | 'o' | 'w'; a?: boolean }[][] = [
+	[{ e: 0, t: 'r', a: true }, { e: 3, t: 'r' }, { e: 4, t: '5' }, { e: 6, t: 'r' }, { e: 7, t: 'w' }], // pop rock
+	[{ e: 0, t: 'r', a: true }, { e: 2, t: 'r' }, { e: 4, t: '5', a: true }, { e: 6, t: 'r' }, { e: 7, t: 'o' }], // driving
+	[{ e: 0, t: 'r', a: true }, { e: 3, t: '5' }, { e: 5, t: 'r' }, { e: 7, t: 'w' }], // syncopated
+];
 
 interface DailyState {
 	best: number;
@@ -209,6 +216,33 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		o.connect(g);
 		o.start(when);
 		o.stop(when + 0.34);
+	};
+	// Bass guitar: punchy plucked low note (triangle + saw bite, low-passed,
+	// quick decay). Rides its own riff on the 8th-note grid for character.
+	const bassGtr = (when: number, midi: number, accent: boolean): void => {
+		const ctx = ctxRef.current;
+		if (!ctx) return;
+		const lp = ctx.createBiquadFilter();
+		lp.type = 'lowpass';
+		lp.frequency.value = 900;
+		lp.Q.value = 0.8;
+		const g = ctx.createGain();
+		g.connect(lp);
+		lp.connect(runGainRef.current ?? masterRef.current!);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(accent ? 0.13 : 0.09, when + 0.008);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.28);
+		for (const [mult, amp, type] of [[1, 1, 'triangle'], [1, 0.35, 'sawtooth'], [2, 0.15, 'triangle']] as [number, number, OscillatorType][]) {
+			const o = ctx.createOscillator();
+			o.type = type;
+			o.frequency.value = midiToFreq(midi) * mult;
+			const og = ctx.createGain();
+			og.gain.value = amp;
+			o.connect(og);
+			og.connect(g);
+			o.start(when);
+			o.stop(when + 0.3);
+		}
 	};
 	// Bass synth pad laying the chords down low (root + fifth + octave + third
 	// above, low-pass filtered). The third sits an octave up to avoid mud.
@@ -717,13 +751,26 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					if (i % 2 === 0) kick(when, accent);
 					else snare(when, i % 4 === 3);
 				}
-				// Root/fifth bass; every 8th beat walks a whole tone into the next root.
-				let bassNote = chordRoot + (i % 2 === 0 ? 0 : 7);
-				if (i % 8 === 7) {
-					const next = chart.key + chordAt(i + 1).root;
-					if (next !== chordRoot) bassNote = next + (next > chordRoot ? -2 : 2);
+				const beatDur = i + 1 < bt.length ? bt[i + 1] - bt[i] : 0.5;
+				if (inIntro) {
+					// Intro keeps the round root/fifth pulse — the riff enters with the drums.
+					bass(when, chordRoot + (i % 2 === 0 ? 0 : 7), accent);
+				} else {
+					// Round sub anchors each bar; the bass GUITAR rides its own riff.
+					if (accent) bass(when, chordRoot, true);
+					const riff = BASS_RIFFS[seedRef.current % BASS_RIFFS.length];
+					for (const ev of riff) {
+						if (ev.e >> 1 !== i % 4) continue; // only this beat's eighths
+						let m = chordRoot;
+						if (ev.t === '5') m = chordRoot + 7;
+						else if (ev.t === 'o') m = chordRoot + 12;
+						else if (ev.t === 'w') {
+							const next = chart.key + chordAt(i + 1).root; // next bar's root
+							m = next === chordRoot ? chordRoot : next + (next > chordRoot ? -2 : 2);
+						}
+						bassGtr(when + (ev.e % 2) * (beatDur / 2), m, !!ev.a);
+					}
 				}
-				bass(when, bassNote, accent);
 				if (!inIntro) {
 					hat(when, accent); // ride the beat
 					if (i + 1 < bt.length) hat(when + (bt[i + 1] - bt[i]) / 2, false, 0.015); // soft off-beat tick
