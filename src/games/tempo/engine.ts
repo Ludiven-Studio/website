@@ -117,7 +117,6 @@ const CADENCES: Cell[] = [
 	[{ d: 4 }],
 ];
 // Phrase archetypes: densities for bars [A, B, A′] — bar 3 is always a cadence.
-// Mixed from phrase 0 so the game opens with variation, not a monotone crawl.
 const ARCHETYPES: [number, number, number][] = [
 	[1, 0, 1], // statement – breath – restatement
 	[2, 1, 2], // flowing question / answer
@@ -126,6 +125,11 @@ const ARCHETYPES: [number, number, number][] = [
 	[1, 2, 1], // arch
 	[0, 2, 0], // calm – burst – calm
 ];
+// Archetype pools per song section: the couplet stays calm, the refrain flows,
+// the bridge contrasts by breathing.
+const VERSE_ARCHS: [number, number, number][] = [ARCHETYPES[0], ARCHETYPES[2], ARCHETYPES[4]];
+const CHORUS_ARCHS: [number, number, number][] = [ARCHETYPES[1], ARCHETYPES[3], ARCHETYPES[4]];
+const BRIDGE_ARCHS: [number, number, number][] = [ARCHETYPES[5], ARCHETYPES[0]];
 
 const degToMidi = (tonic: number, step: number): number => tonic + Math.floor(step / 7) * 12 + MAJOR[((step % 7) + 7) % 7];
 const clampStep = (s: number): number => Math.max(MIN_STEP, Math.min(MAX_STEP, s));
@@ -152,15 +156,18 @@ const toPenta = (step: number): number => (BAD_PENTA.has(((step % 7) + 7) % 7) ?
 const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(step - 7) ? 0 : 7);
 
 /**
- * Endless generated tune, phrase-based and harmony-aware (not a random walk).
+ * Endless generated tune, structured like a SONG rather than a random stream.
  * Deterministic from the seed. The melody is still PLAYED by the player's taps;
  * this only shapes which notes fall when. Long enough to outlast any run.
  *
- * Structure per 4-bar phrase: an ARCHETYPE picks rhythm densities for bars
- * [A, B, A′] + a cadence bar. The pitch line follows an arch contour (rise then
- * fall), leaps recover by step, and A′ replays A's melodic deltas over bar 2's
- * chord (varied repeat). ONE seed-picked progression loops for the whole song
- * and is returned alongside the notes so the backing follows the same harmony.
+ * Three 4-bar THEMES are composed once — couplet (A, mid register, calm),
+ * refrain (B, higher, flowing) and pont (C, sparse contrast) — then replayed
+ * VERBATIM following a pop form (A A B B A B C B, cycled), so returning
+ * sections are recognizable. Inside a theme, an ARCHETYPE picks rhythm
+ * densities, the pitch line follows an arch contour, leaps recover by step,
+ * and bar 3 replays bar 1's deltas (varied repeat). ONE seed-picked
+ * progression loops for the whole song and is returned alongside the notes so
+ * the backing follows the same harmony.
  */
 export function generateEndlessSong(seed: number, count = 600): Song {
 	const rng = mulberry32(seed >>> 0);
@@ -171,7 +178,6 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	const notes: SongNote[] = [];
 	const chords: ChordBar[] = [];
 
-	let step = 0; // current scale-step, carried across bars for a continuous line
 	let lastStep: number | null = null; // last EMITTED (non-rest) step, for column checks
 
 	// Emit a note at `s`, but if it would land in the same column as the previous
@@ -187,28 +193,6 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		lastStep = s;
 		notes.push({ midi: degToMidi(TONIC, s), dur, lane: laneOfStep(s) });
 	};
-	// Overwrite the last real note (used to force phrase-ending cadences). Keeps the
-	// intended scale degree but octave-shifts it if needed so it doesn't share a
-	// column with the preceding note.
-	const forceLast = (s: number): void => {
-		let i = notes.length - 1;
-		while (i >= 0 && notes[i].rest) i--;
-		if (i < 0) return;
-		let j = i - 1;
-		while (j >= 0 && notes[j].rest) j--;
-		const prevLane = j >= 0 ? notes[j].lane : null;
-		if (prevLane != null && laneOfStep(s) === prevLane) {
-			for (const alt of [s + 7, s - 7]) {
-				if (alt >= MIN_STEP && alt <= MAX_STEP && laneOfStep(alt) !== prevLane) {
-					s = alt;
-					break;
-				}
-			}
-		}
-		notes[i].midi = degToMidi(TONIC, s);
-		notes[i].lane = laneOfStep(s);
-		lastStep = s;
-	};
 	// Chord tones of `rootStep` across the register, sorted — for arpeggio bars.
 	const chordLadder = (rootStep: number): number[] => {
 		const tones: number[] = [];
@@ -220,8 +204,11 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		return tones.sort((a, b) => a - b);
 	};
 
-	while (notes.length < count) {
-		const arch = pick(ARCHETYPES);
+	// A theme is a fully-resolved 4-bar phrase (rhythm + final scale-steps),
+	// composed ONCE and replayed verbatim wherever the FORM calls for it.
+	type ThemeEv = { d: number; rest?: boolean; step?: number };
+	const makeTheme = (startStep: number, archs: readonly [number, number, number][]): ThemeEv[][] => {
+		const arch = pick(archs);
 		const cellA = pick(CELLS[arch[0]]);
 		const cellB = pick(CELLS[arch[1]]);
 		// A′ restates A's rhythm when densities match — the answer echoes the question.
@@ -236,13 +223,14 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 			contour.push(k < 4 ? mag : -mag);
 		}
 
+		const theme: ThemeEv[][] = [];
 		const barADeltas: number[] = []; // bar 0's melodic deltas, replayed in bar 2
+		let step = clampStep(startStep); // the section's register anchor
 		let lastDelta = 0;
 		let ci = 0;
 
 		for (let bar = 0; bar < 4; bar++) {
 			const chordRootStep = prog[bar];
-			chords.push(chordBarOf(chordRootStep));
 			const rhythm = bars[bar];
 			// Occasionally a bar walks the chord itself instead of the contour.
 			const arp = bar < 3 && rng() < 0.18;
@@ -251,16 +239,16 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 			let arpIdx = arp ? Math.max(0, ladder.indexOf(nearestChordTone(step, chordRootStep))) : 0;
 			let beatInBar = 0;
 			let noteInBar = 0;
+			const out: ThemeEv[] = [];
 			for (const ev of rhythm) {
 				if (ev.rest) {
-					notes.push({ midi: 0, dur: ev.d, rest: true });
+					out.push({ d: ev.d, rest: true });
 					beatInBar += ev.d;
 					continue;
 				}
 				if (arp) {
 					if (noteInBar > 0) arpIdx = Math.max(0, Math.min(ladder.length - 1, arpIdx + arpDir));
 					step = ladder[arpIdx];
-					emit(step, ev.d);
 				} else {
 					const strong = beatInBar % 2 === 0; // beats 1 & 3 = harmonic anchors
 					let delta: number;
@@ -277,24 +265,46 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 					// Chord tone on strong beats AND on long notes (they ring against the
 					// chord); pentatonic passing note on short weak beats.
 					step = strong || ev.d >= 2 ? nearestChordTone(step, chordRootStep) : toPenta(step);
-					emit(step, ev.d);
 				}
+				out.push({ d: ev.d, step });
 				beatInBar += ev.d;
 				noteInBar++;
 			}
-			// Cadences never mutate durations (the cadence cell provides the length):
+			// Cadences (recorded into the theme so every replay closes the same way):
 			// bar 1 closes on its own chord, bar 3 on the tonic — or a V tone when the
-			// section ends open on V (pulls into the next section's I).
-			if (bar === 1) {
-				step = nearestChordTone(step, prog[1]);
-				forceLast(step);
+			// loop ends open on V (pulls into the next section's restart on I).
+			if (bar === 1 || bar === 3) {
+				const target = bar === 1 ? nearestChordTone(step, prog[1]) : prog[3] === 4 ? nearestChordTone(step, 4) : nearestTonic(step);
+				for (let i = out.length - 1; i >= 0; i--) {
+					if (!out[i].rest) {
+						out[i].step = target;
+						step = target;
+						break;
+					}
+				}
 			}
-			if (bar === 3) {
-				step = prog[3] === 4 ? nearestChordTone(step, 4) : nearestTonic(step);
-				forceLast(step);
+			theme.push(out);
+		}
+		return theme;
+	};
+	const playTheme = (theme: ThemeEv[][]): void => {
+		for (let bar = 0; bar < 4; bar++) {
+			chords.push(chordBarOf(prog[bar]));
+			for (const ev of theme[bar]) {
+				if (ev.rest) notes.push({ midi: 0, dur: ev.d, rest: true });
+				else emit(ev.step!, ev.d);
 			}
 		}
-	}
+	};
+
+	// Compose the song's three themes, then cycle a pop form. The refrain sits
+	// higher than the couplet so its return is unmistakable; the pont breathes.
+	const themeA = makeTheme(0, VERSE_ARCHS); // couplet
+	const themeB = makeTheme(4, CHORUS_ARCHS); // refrain
+	const themeC = makeTheme(2, BRIDGE_ARCHS); // pont
+	const FORM = [themeA, themeA, themeB, themeB, themeA, themeB, themeC, themeB];
+	let fi = 0;
+	while (notes.length < count) playTheme(FORM[fi++ % FORM.length]);
 	return { name: 'Infini', tempo: 2, key: KEY, notes, chords };
 }
 
