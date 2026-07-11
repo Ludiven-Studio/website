@@ -376,6 +376,23 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 			gutterRows.push(across);
 		}
 		add(stripFrom(gutterRows), g.mats.ice);
+
+		// Two chunky half-torus ice arches (tire-like) at the gutter's entrance and exit.
+		// Feet sit inside the separator margin / beyond the outer crest — out of play.
+		const spanR = (f.outerDanger + 0.9 - f.sepHalfMax * 0.9) / 2;
+		const archGeo = new THREE.TorusGeometry(spanR, 0.6, 10, 22, Math.PI);
+		geoms.push(archGeo);
+		const archLat = sign * ((f.sepHalfMax * 0.9 + f.outerDanger + 0.9) / 2);
+		for (const sL of [f.noseS + 6, f.mergeS - 6]) {
+			const s2 = seg.startS + sL;
+			const fr = frameAt(segs, s2);
+			const heading = poseAt(segs, s2, 0).heading;
+			const m = new THREE.Mesh(archGeo, g.mats.pillarIce);
+			m.position.set(fr.x + fr.nx * archLat - o.x, fr.y - 0.2 - o.y, fr.z + fr.nz * archLat - o.z);
+			m.rotation.y = -heading - Math.PI / 2; // ring plane ⟂ to the track
+			m.scale.set(1, 1.25, 1);
+			group.add(m);
+		}
 	}
 
 	// Obstacles (shared geometries/materials — only transforms per instance).
@@ -636,6 +653,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				transparent: true,
 				opacity: 0.7,
 				depthWrite: false,
+				side: THREE.DoubleSide,
 			}),
 			rock: new THREE.MeshStandardMaterial({ map: rockTex, color: 0xb9bec6, roughness: 0.9, flatShading: true }),
 			foliage: new THREE.MeshStandardMaterial({ color: 0x2f6b46, roughness: 0.9, flatShading: true }),
