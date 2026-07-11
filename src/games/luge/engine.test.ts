@@ -389,9 +389,13 @@ describe('luge simulation', () => {
 		const cLat = (dangerSign * (f.sepHalfMax + f.outerDanger)) / 2;
 		expect(poseAt(segs, midS, cLat).y).toBeGreaterThan(poseAt(segs, midS, -cLat).y + LUGE.forkRailH * 0.6);
 
-		// Hands off: the wobble + instability tip the sled before the merge.
+		// Mounting the rail shoves a seeded initial lean to rectify right away.
 		let st = mk();
 		let events: string[] = [];
+		while (st.s < noseAbs + 4.5) st = stepLuge(st, { steer: 0 }, DT, segs).state;
+		expect(Math.abs(st.balance)).toBeGreaterThan(LUGE.balKick * 0.5);
+
+		// Hands off: the shove + wobble + instability tip the sled before the merge.
 		while (st.s < mergeAbs + 5 && st.status === 'running') {
 			const r = stepLuge(st, { steer: 0 }, DT, segs);
 			st = r.state;

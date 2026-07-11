@@ -154,6 +154,7 @@ export interface LugeParams {
 	scoreMultMin: number; // points per meter when (nearly) stopped
 	scoreMultGain: number; // added per unit of speed/vMax ratio
 	scoreMultMax: number; // cap — reachable only by riding boosts/ice
+	balKick: number; // max initial lean shoved on the sled as it mounts the rail
 	balInstab: number; // inverted-pendulum divergence (s⁻²) on the ice rail
 	balNoise: number; // wobble forcing amplitude (s⁻²)
 	balSteer: number; // lean authority at full input (s⁻²)
@@ -209,6 +210,7 @@ export const LUGE: LugeParams = {
 	scoreMultMin: 0.5,
 	scoreMultGain: 1.5,
 	scoreMultMax: 2.2,
+	balKick: 0.45,
 	balInstab: 3.2,
 	balNoise: 2.4,
 	balSteer: 10,
@@ -856,6 +858,14 @@ export function stepLuge(
 				bermHit = !danger;
 			}
 			if (balanceActive(seg, lane, s)) {
+				// Seeded shove the moment the sled mounts the rail: an immediate lean
+				// (random side/strength per fork) that must be rectified right away.
+				const balStartAbs = seg.startS + fork.noseS + 4;
+				if (prevS < balStartAbs) {
+					const dir = Math.sin(fork.balPhase * 5.1) >= 0 ? 1 : -1;
+					balance = dir * P.balKick * (0.6 + 0.4 * Math.abs(Math.sin(fork.balPhase * 3.3)));
+					balanceVel = dir * 0.5;
+				}
 				// The rail carries the sled: lat centers itself and steering becomes a
 				// balance correction (you lean the way you press). An inverted pendulum
 				// plus a deterministic wobble — past ±1 the sled falls.
