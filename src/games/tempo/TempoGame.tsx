@@ -34,6 +34,8 @@ const BASS_RIFFS: { e: number; t: 'r' | '5' | 'o' | 'w'; a?: boolean }[][] = [
 	[{ e: 0, t: 'r', a: true }, { e: 2, t: 'r' }, { e: 4, t: '5', a: true }, { e: 6, t: 'r' }, { e: 7, t: 'o' }], // driving
 	[{ e: 0, t: 'r', a: true }, { e: 3, t: '5' }, { e: 5, t: 'r' }, { e: 7, t: 'w' }], // syncopated
 ];
+// Guitar arpeggio pingpong over [root, 3rd, 5th, octave] — up the bar, then down.
+const GTR_PING = [0, 1, 2, 3, 2, 1, 0, 1];
 
 interface DailyState {
 	best: number;
@@ -417,19 +419,24 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.stop(when + dur + 0.08);
 		}
 	};
-	// Plucked comp (harp/guitar-like): a chord tone per beat, quick decay — adds
-	// harmonic movement between the sustained pad and the melody.
-	const pluck = (when: number, midi: number): void => {
+	// Guitar comp (nylon-ish pluck): triangle + saw bite, band-limited, quick
+	// decay — arpeggiates the chord up then down across each bar.
+	const gtr = (when: number, midi: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
+		const lp = ctx.createBiquadFilter();
+		lp.type = 'lowpass';
+		lp.frequency.value = 1800;
+		lp.Q.value = 0.7;
 		const g = ctx.createGain();
-		g.connect(runGainRef.current ?? masterRef.current!);
+		g.connect(lp);
+		lp.connect(runGainRef.current ?? masterRef.current!);
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(0.042, when + 0.008);
-		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.4);
-		for (const [mult, amp] of [[1, 1], [2, 0.22]]) {
+		g.gain.exponentialRampToValueAtTime(0.05, when + 0.006);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.42);
+		for (const [mult, amp, type] of [[1, 1, 'triangle'], [1, 0.4, 'sawtooth'], [2, 0.18, 'triangle']] as [number, number, OscillatorType][]) {
 			const o = ctx.createOscillator();
-			o.type = 'triangle';
+			o.type = type;
 			o.frequency.value = midiToFreq(midi) * mult;
 			const og = ctx.createGain();
 			og.gain.value = amp;
@@ -743,15 +750,24 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const accent = i % 4 === 0;
 				const { root, third } = chordAt(i);
 				const chordRoot = chart.key + root;
-				// Chord-only intro: pad + strings + pluck + bass set the harmony first,
+				// Chord-only intro: pad + strings + guitar + bass set the harmony first,
 				// the drums only enter with the melody.
 				const inIntro = bt[i] < (chart.introTime ?? 0) - 0.01;
-				// Rock pattern: kick on beats 1 & 3, snare backbeat on 2 & 4, 8th-note hats.
-				if (!inIntro) {
+				const secOf = (b: number): string => chart.sections[Math.min(Math.floor(b / 4), chart.sections.length - 1)];
+				const inBridge = secOf(i) === 'C'; // pont: the drums DROP out
+				const beatDur = i + 1 < bt.length ? bt[i + 1] - bt[i] : 0.5;
+				// Snare fill (16ths) on the last beat before a section change — doubles as
+				// the count-in out of the intro and the re-entry pickup out of the pont.
+				const sectionEnd = i % 4 === 3 && secOf(i) !== secOf(i + 1);
+				if (sectionEnd) {
+					for (let k = 0; k < 4; k++) snare(when + (k * beatDur) / 4, k === 3);
+				} else if (!inIntro && !inBridge) {
+					// Rock pattern: kick on beats 1 & 3, snare backbeat on 2 & 4, 8th hats.
 					if (i % 2 === 0) kick(when, accent);
 					else snare(when, i % 4 === 3);
+					hat(when, accent);
+					if (i + 1 < bt.length) hat(when + beatDur / 2, false, 0.015);
 				}
-				const beatDur = i + 1 < bt.length ? bt[i + 1] - bt[i] : 0.5;
 				if (inIntro) {
 					// Intro keeps the round root/fifth pulse — the riff enters with the drums.
 					bass(when, chordRoot + (i % 2 === 0 ? 0 : 7), accent);
@@ -771,13 +787,13 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						bassGtr(when + (ev.e % 2) * (beatDur / 2), m, !!ev.a);
 					}
 				}
-				if (!inIntro) {
-					hat(when, accent); // ride the beat
-					if (i + 1 < bt.length) hat(when + (bt[i + 1] - bt[i]) / 2, false, 0.015); // soft off-beat tick
+				// Guitar comp: the chord's tones arpeggiated UP then DOWN across the bar
+				// (two 8ths per beat — root→3rd→5th→octave→5th→3rd pingpong).
+				const ladder = [0, third, 7, 12];
+				for (const half of [0, 1]) {
+					const e = (i % 4) * 2 + half;
+					gtr(when + (half * beatDur) / 2, chordRoot + 12 + ladder[GTR_PING[e]]);
 				}
-				// Plucked comp including the third; pattern alternates every 8 bars.
-				const comp = Math.floor(i / 32) % 2 === 0 ? [0, 7, third + 12, 12] : [0, third, 7, third + 12];
-				pluck(when, chordRoot + 12 + comp[i % 4]);
 				if (accent) {
 					// Bass synth pad under each bar (deep, an octave below the groove bass),
 					// with a violin swell carrying the chord color above it.

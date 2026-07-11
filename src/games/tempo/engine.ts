@@ -20,12 +20,14 @@ export interface SongNote {
 	rest?: boolean; // a silence: advances time, produces no tile
 	lane?: number; // column, assigned by the generator (see laneOfStep)
 }
+export type Section = 'I' | 'A' | 'B' | 'C'; // intro, couplet, refrain, pont
 export interface Song {
 	name: string;
 	tempo: number; // beats per second at speed 1
 	key: number; // tonic midi (used for the bass accompaniment)
 	notes: SongNote[];
 	chords?: ChordBar[]; // one per bar, aligned with the beat grid
+	sections?: Section[]; // one per bar — drives arrangement (fills, drops)
 }
 
 export interface SpeedTier {
@@ -51,6 +53,7 @@ export interface Chart {
 	beatTimes: number[]; // beat grid (seconds) — drives the backing groove
 	key: number; // tonic midi (bass accompaniment)
 	chords: ChordBar[]; // one per bar (bar i = beats 4i..4i+3) — backing follows these
+	sections: Section[]; // one per bar — the backing reads fills & drum drops off it
 	introTime: number; // seconds of chord-only intro before the first tile
 }
 
@@ -189,6 +192,7 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	const prog = pick(PROGRESSIONS); // the song's repeating harmonic base
 	const notes: SongNote[] = [];
 	const chords: ChordBar[] = [];
+	const sections: Section[] = [];
 
 	let lastStep: number | null = null; // last EMITTED (non-rest) step, for column checks
 
@@ -308,9 +312,10 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	// but not identical: 'echo' re-strikes long notes on their last beat (drive),
 	// 'calm' merges 1-beat pairs into a held note (breathes). Bar sums stay 4.
 	type Variant = 'plain' | 'echo' | 'calm';
-	const playTheme = (theme: ThemeEv[][], variant: Variant): void => {
+	const playTheme = (theme: ThemeEv[][], variant: Variant, label: Section): void => {
 		for (let bar = 0; bar < 4; bar++) {
 			chords.push(chordBarOf(prog[bar]));
+			sections.push(label);
 			const evs = theme[bar];
 			for (let i = 0; i < evs.length; i++) {
 				const ev = evs[i];
@@ -339,7 +344,16 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	const themeA = makeTheme(0, VERSE_ARCHS); // couplet
 	const themeB = makeTheme(4, CHORUS_ARCHS); // refrain
 	const themeC = makeTheme(2, BRIDGE_ARCHS); // pont
-	const FORM = [themeA, themeA, themeB, themeB, themeA, themeB, themeC, themeB];
+	const FORM: [ThemeEv[][], Section][] = [
+		[themeA, 'A'],
+		[themeA, 'A'],
+		[themeB, 'B'],
+		[themeB, 'B'],
+		[themeA, 'A'],
+		[themeB, 'B'],
+		[themeC, 'C'],
+		[themeB, 'B'],
+	];
 	const VAR_CYCLE = new Map<ThemeEv[][], Variant[]>([
 		[themeA, ['plain', 'plain', 'calm', 'echo']],
 		[themeB, ['plain', 'plain', 'echo', 'plain', 'echo', 'calm']],
@@ -348,13 +362,13 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	const occ = new Map<ThemeEv[][], number>();
 	let fi = 0;
 	while (notes.length < count) {
-		const theme = FORM[fi++ % FORM.length];
+		const [theme, label] = FORM[fi++ % FORM.length];
 		const n = occ.get(theme) ?? 0;
 		occ.set(theme, n + 1);
 		const vars = VAR_CYCLE.get(theme)!;
-		playTheme(theme, vars[n % vars.length]);
+		playTheme(theme, vars[n % vars.length], label);
 	}
-	return { name: 'Infini', tempo: 2, key: KEY, notes, chords };
+	return { name: 'Infini', tempo: 2, key: KEY, notes, chords, sections };
 }
 
 export interface EndlessOpts {
@@ -418,7 +432,11 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	const barCount = Math.ceil(totalBeats / 4);
 	const chords = [...introChords, ...songChords].slice(0, barCount);
 	while (chords.length < barCount) chords.push(chords[chords.length - 1] ?? { root: 0, third: 4 });
-	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, introTime: at(INTRO_BEATS) };
+	// Per-bar section labels, intro included — the backing derives fills & drops.
+	const introSections: Section[] = ['I', 'I', 'I', 'I'];
+	const sections: Section[] = [...introSections, ...(song.sections ?? [])].slice(0, barCount);
+	while (sections.length < barCount) sections.push(sections[sections.length - 1] ?? 'A');
+	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, sections, introTime: at(INTRO_BEATS) };
 }
 
 export type Grade = 'Parfait' | 'Bien' | 'Ok' | 'Raté';
