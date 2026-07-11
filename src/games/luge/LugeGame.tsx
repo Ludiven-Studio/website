@@ -362,20 +362,27 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 		}
 		add(stripFrom(wedgeRows), g.mats.wedge);
 
-		// Danger lane: an open icy gutter (walls both sides, shape carried by poseAt).
-		// A bright ice strip overlays the snow ribbon across the whole gutter.
+		// Danger lane: a flat icy corridor with washboard bumps (shape carried by poseAt).
+		// A bright ice strip overlays the snow ribbon; a snow berm closes the outer edge.
 		const gutterRows: Row[][] = [];
+		const bermRows: Row[][] = [];
 		for (let k = k0; k <= Math.min(k1, n); k++) {
 			const s = sAt(k);
 			const across: Row[] = [];
 			const inner = f.sepHalfMax * 0.7;
-			const outer = f.outerDanger + 0.8;
+			const outer = f.outerDanger + 0.2;
 			for (const t of [0, 0.15, 0.3, 0.5, 0.7, 0.85, 1]) {
 				across.push(edgePt(segs, s, sign * (inner + t * (outer - inner)), o, 0.04));
 			}
 			gutterRows.push(across);
+			bermRows.push([
+				edgePt(segs, s, sign * f.outerDanger, o),
+				edgePt(segs, s, sign * (f.outerDanger + 1.2), o, 0.8),
+				edgePt(segs, s, sign * (f.outerDanger + 2.4), o, 0.4),
+			]);
 		}
 		add(stripFrom(gutterRows), g.mats.ice);
+		add(stripFrom(bermRows), g.mats.berm);
 
 		// Two chunky half-torus ice arches (tire-like) at the gutter's entrance and exit.
 		// Feet sit inside the separator margin / beyond the outer crest — out of play.
@@ -925,7 +932,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				flashOpRef.current = 0.5;
 				if (flashRef.current) flashRef.current.style.background = 'rgba(90,190,255,0.45)';
 			} else if (ev === 'forkBonus') {
-				setBonusFlash('Tunnel de glace ! +50 · BOOST');
+				setBonusFlash('Couloir de glace ! +50 · BOOST');
 				window.clearTimeout(bonusTimerRef.current);
 				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 2200);
 			}

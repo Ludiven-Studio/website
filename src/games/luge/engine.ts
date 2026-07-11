@@ -120,6 +120,7 @@ export interface LugeParams {
 	forkBoostMs: number;
 	nearMissGap: number; // extra lateral gap under which a pass counts as near-miss
 	nearMissBonus: number;
+	bumpDrag: number; // speed lost per meter climbed on a fork-lane bump face
 	corridorHalf: number; // guaranteed obstacle-free half-width around latSafe
 	bobVMaxFloor: number; // speed multiplier at the flat pipe floor (barely faster)
 	bobVMaxMul: number; // speed multiplier at the wall crest — carving high pays
@@ -157,6 +158,7 @@ export const LUGE: LugeParams = {
 	forkBoostMs: 4000,
 	nearMissGap: 0.6,
 	nearMissBonus: 2,
+	bumpDrag: 3,
 	corridorHalf: 1.6,
 	bobVMaxFloor: 1.03,
 	bobVMaxMul: 1.3,
@@ -259,28 +261,23 @@ export function pipeRampAt(seg: TrackSegment, sLocal: number, P: LugeParams = LU
 	return 0;
 }
 
+const BUMP_H = 0.7; // fork danger lane bump height
+const BUMP_LEN = 9; // meters between bump crests
+
 /**
- * Fork danger lane = an open icy gutter: walls rise on BOTH sides of the lane
- * (separator side and outer side) so stalagmites are dodged by climbing.
- * Returns {rise, slope} of the surface at (sLocal, lat); zero outside the lane.
+ * Fork danger lane = a flat icy corridor with successive bumps (washboard).
+ * Returns the surface rise at (sLocal, lat); zero outside the lane.
  */
-export function forkGutter(seg: TrackSegment, sLocal: number, lat: number): { rise: number; slope: number } {
+export function forkBumps(seg: TrackSegment, sLocal: number, lat: number): number {
 	const f = seg.fork;
-	if (!f || sLocal < f.noseS || sLocal >= f.mergeS) return { rise: 0, slope: 0 };
+	if (!f || sLocal < f.noseS || sLocal >= f.mergeS) return 0;
 	const sign = f.danger === 'left' ? 1 : -1;
 	const l = sign * lat; // lane-space: positive into the danger side
-	if (l <= f.sepHalfMax * 0.6) return { rise: 0, slope: 0 };
-	const c = (f.sepHalfMax + f.outerDanger) / 2;
-	const halfLane = (f.outerDanger - f.sepHalfMax) / 2;
-	const flat = halfLane * 0.35;
-	const a = Math.abs(l - c) - flat;
-	if (a <= 0) return { rise: 0, slope: 0 };
-	const span = halfLane + 0.8 - flat;
-	const cc = 1.6 / (span * span);
-	const ramp = Math.min(smoothstep(f.noseS, f.noseS + 12, sLocal), 1 - smoothstep(f.mergeS - 12, f.mergeS, sLocal));
-	// Plateau past the crest: the gutter is carved into a raised ice bank.
-	const aEff = Math.min(a, span);
-	return { rise: cc * aEff * aEff * ramp, slope: a >= span ? 0 : sign * Math.sign(l - c) * 2 * cc * a * ramp };
+	const band = smoothstep(f.sepHalfMax + 0.2, f.sepHalfMax + 1.2, l) * (1 - smoothstep(f.outerDanger - 1.2, f.outerDanger - 0.2, l));
+	if (band <= 0) return 0;
+	const ramp = Math.min(smoothstep(f.noseS + 4, f.noseS + 14, sLocal), 1 - smoothstep(f.mergeS - 14, f.mergeS - 4, sLocal));
+	const wave = 0.5 * (1 - Math.cos(TWO_PI * ((sLocal - f.noseS) / BUMP_LEN)));
+	return BUMP_H * wave * band * ramp;
 }
 
 /** Separator half-width at local s inside a fork segment (0 outside [noseS, mergeS]). */
@@ -448,17 +445,9 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		}
 	}
 	if (fork) {
-		// Danger lane: an open icy gutter — a couple of centered stalagmites that are
-		// dodged by climbing the gutter walls.
+		// Danger lane: no obstacles — the washboard bumps (forkBumps) are the price.
 		const sign = fork.danger === 'left' ? 1 : -1;
-		const center = (fork.sepHalfMax + fork.outerDanger) / 2;
 		const span = fork.mergeS - fork.noseS - 30;
-		const count = 2;
-		for (let i = 0; i < count; i++) {
-			const sLocal = fork.noseS + 18 + (span * (i + 0.5)) / count + (rng() - 0.5) * 5;
-			const off = (i % 2 === 0 ? -1 : 1) * 0.4;
-			obstacles.push({ s: sLocal, lat: sign * (center + off), r: 0.9, len: 4 + rng() * 2, type: 'ice' });
-		}
 		// One optional obstacle on the safe side.
 		if (rng() < 0.6) {
 			const sLocal = fork.noseS + 20 + rng() * (span - 10);
@@ -581,9 +570,7 @@ export function poseAt(
 		y += w.rise * ramp;
 		dydlat += w.slope * ramp;
 	} else if (p.seg.fork) {
-		const fg = forkGutter(p.seg, s - p.seg.startS, lat);
-		y += fg.rise;
-		dydlat += fg.slope;
+		y += forkBumps(p.seg, s - p.seg.startS, lat);
 	}
 	return {
 		x: p.x + p.nx * lat,
@@ -696,10 +683,13 @@ export function stepLuge(
 			if (!lane) lane = lat >= 0 ? 'left' : 'right';
 			const sign = lane === 'left' ? 1 : -1;
 			const danger = lane === fork.danger;
-			// Danger lane: icy gutter walls pull back toward the lane floor (no bounce).
-			if (danger) latVel -= forkGutter(seg, sLocal, lat).slope * P.bobWallGravity * dtSec;
+			// Danger lane: washboard — climbing each bump face costs speed.
+			if (danger && prevS >= seg.startS) {
+				const dh = forkBumps(seg, sLocal, lat) - forkBumps(seg, prevS - seg.startS, lat);
+				if (dh > 0) speed = Math.max(P.crashMinSpeed, speed - dh * P.bumpDrag);
+			}
 			const lo = sepHalfAt(fork, sLocal) + P.sledHalf;
-			const hi = (danger ? fork.outerDanger + 0.8 : fork.outerSafe) - P.sledHalf;
+			const hi = (danger ? fork.outerDanger : fork.outerSafe) - P.sledHalf;
 			let l = sign * lat;
 			if (l < lo) {
 				l = lo;

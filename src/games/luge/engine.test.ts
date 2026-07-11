@@ -11,6 +11,7 @@ import {
 	poseAt,
 	latSafeAt,
 	sepHalfAt,
+	forkBumps,
 	createLuge,
 	stepLuge,
 	type TrackSegment,
@@ -117,25 +118,25 @@ describe('luge generation', () => {
 		}
 	});
 
-	it('fork danger lane: an open icy gutter with climbable walls around centered stalagmites', () => {
+	it('fork danger lane: a washboard of bumps, no obstacles, and climbing a bump face costs speed', () => {
 		const { segs, fork } = findFork();
 		const f = fork.fork!;
 		const sign = f.danger === 'left' ? 1 : -1;
-		const pillars = fork.obstacles.filter((obs) => obs.type === 'ice');
-		expect(pillars.length).toBeGreaterThan(0);
-		for (const obs of pillars) {
-			expect(obs.len ?? 0).toBeGreaterThan(0);
-			const l = sign * obs.lat;
-			const gapInner = l - obs.r - f.sepHalfMax;
-			const gapOuter = f.outerDanger - (l + obs.r);
-			// Room to climb past the stalagmite on both sides of the gutter.
-			expect(Math.min(gapInner, gapOuter)).toBeGreaterThanOrEqual(2 * LUGE.sledHalf);
-		}
-		// Gutter walls rise above the lane floor (fork banking is zero, so this is pure wall).
-		const sMid = fork.startS + (f.noseS + f.mergeS) / 2;
+		// No stalagmites in the lane — the bumps are the price.
+		expect(fork.obstacles.filter((obs) => sign * obs.lat > f.sepHalfMax)).toEqual([]);
+		// Successive bumps: crest well above trough at the lane center.
 		const c = sign * ((f.sepHalfMax + f.outerDanger) / 2);
-		const edge = sign * (f.outerDanger - 0.2);
-		expect(poseAt(segs, sMid, edge).y).toBeGreaterThan(poseAt(segs, sMid, c).y + 0.3);
+		const crestS = f.noseS + 22.5; // phase 2.5 → wave peak, inside the s-ramp window
+		const troughS = f.noseS + 27; // phase 3 → wave zero
+		expect(forkBumps(fork, crestS, c)).toBeGreaterThan(0.4);
+		expect(forkBumps(fork, troughS, c)).toBeLessThan(0.1);
+		// Riding up a bump face drags speed vs the safe lane at the same s.
+		const v = difficultyAt(fork.startS).vMax;
+		const uphillS = fork.startS + troughS + 1; // just past the trough → climbing
+		const mk = (lat: number, ln: 'left' | 'right'): LugeState => ({ ...createLuge(), s: uphillS, lat, speed: v, lane: ln });
+		const dangerRun = stepLuge(mk(c, f.danger), { steer: 0 }, DT, segs).state.speed;
+		const safeRun = stepLuge(mk(-c, f.danger === 'left' ? 'right' : 'left'), { steer: 0 }, DT, segs).state.speed;
+		expect(dangerRun).toBeLessThan(safeRun);
 	});
 
 	it('bob runs span 2-3 consecutive segments with ramps only at the run ends', () => {
@@ -165,17 +166,19 @@ describe('luge generation', () => {
 	});
 
 	it('wedging into an ice pillar slows hard but never costs a life', () => {
-		const { seed, segs, fork } = findFork();
-		const f = fork.fork!;
-		const pillar = fork.obstacles.find((obs) => obs.type === 'ice')!;
+		let segs: TrackSegment[] = [];
+		let tunnel: TrackSegment | undefined;
+		for (let seed = 1; seed <= 20 && !tunnel?.obstacles.length; seed++) {
+			segs = buildChain(seed, 80);
+			tunnel = segs.find((sg) => sg.kind === 'tunnel' && sg.obstacles.length > 0);
+		}
+		const pillar = tunnel!.obstacles.find((obs) => obs.type === 'ice')!;
 		const st: LugeState = {
 			...createLuge(),
-			s: fork.startS + pillar.s - (pillar.len ?? 0) / 2 - 1,
+			s: tunnel!.startS + pillar.s - (pillar.len ?? 0) / 2 - 1,
 			lat: pillar.lat,
 			speed: 30,
-			lane: f.danger,
 		};
-		void seed;
 		const r = stepLuge(st, { steer: 0 }, DT, segs);
 		expect(r.events).toContain('stuck');
 		expect(r.events).not.toContain('crash');
