@@ -210,7 +210,7 @@ export const LUGE: LugeParams = {
 	scoreMultMin: 0.5,
 	scoreMultGain: 0.03,
 	scoreMultMax: 2.5,
-	balKick: 0.45,
+	balKick: 0.22,
 	balInstab: 3.2,
 	balNoise: 2.4,
 	balSteer: 10,
@@ -862,12 +862,13 @@ export function stepLuge(
 			}
 			if (balanceActive(seg, lane, s)) {
 				// Seeded shove the moment the sled mounts the rail: an immediate lean
-				// (random side/strength per fork) that must be rectified right away.
+				// (random side/strength per fork) to rectify — kept gentle (≤ balKick,
+				// well under the tipping point) so there is always time to react.
 				const balStartAbs = seg.startS + fork.noseS + 4;
 				if (prevS < balStartAbs) {
 					const dir = Math.sin(fork.balPhase * 5.1) >= 0 ? 1 : -1;
 					balance = dir * P.balKick * (0.6 + 0.4 * Math.abs(Math.sin(fork.balPhase * 3.3)));
-					balanceVel = dir * 0.5;
+					balanceVel = dir * 0.3;
 				}
 				// The rail carries the sled: lat centers itself and steering becomes a
 				// balance correction (you lean the way you press). An inverted pendulum
