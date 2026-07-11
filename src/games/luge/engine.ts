@@ -37,6 +37,8 @@ export interface Collectible {
 	s: number; // local s
 	lat: number;
 	kind: 'points' | 'boost';
+	air?: boolean; // hovers over a jump pit — only catchable while AIRBORNE
+	rise?: number; // render height above the local ground (default 0.75)
 	taken?: boolean; // mutated by stepLuge on pickup (renderer hides the mesh)
 }
 
@@ -607,25 +609,6 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 			sLocal += difficultyAt(absS).obstacleEvery * spacingMul * (0.7 + 0.6 * rng());
 		}
 	}
-	// Collectibles: an occasional chain of stars (or a lone boost ring) riding the
-	// SAFE line — following the optimal path collects them. Simple kinds only, and
-	// generated after everything else so the rng stream of the track is untouched.
-	const collectibles: Collectible[] = [];
-	if (
-		index >= WARMUP_OBSTACLES &&
-		(kind === 'straight' || kind === 'curveL' || kind === 'curveR' || kind === 'scurve') &&
-		rng() < 0.35
-	) {
-		const kindC: Collectible['kind'] = rng() < 0.22 ? 'boost' : 'points';
-		const count = kindC === 'boost' ? 1 : 3 + Math.floor(rng() * 3);
-		let sLocal = 15 + rng() * Math.max(1, length - 30 - count * 8);
-		for (let i = 0; i < count; i++) {
-			const absS = entry.startS + sLocal;
-			collectibles.push({ s: sLocal, lat: latSafeAt(seed, absS, widthAt(sLocal)), kind: kindC });
-			sLocal += 8;
-		}
-	}
-
 	if (fork) {
 		// Danger lane: no obstacles — the balance rail is the price.
 		const sign = fork.danger === 'left' ? 1 : -1;
@@ -640,6 +623,40 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 				r: 0.8,
 				type: 'tree',
 			});
+		}
+	}
+
+	// Collectibles — generated LAST so the track's rng stream stays untouched.
+	// Every section flavor gets some: boost rings right at the start (spin up fast),
+	// a mid-air ring over jump pits, stars on the balance beam and through the icy
+	// sections, and the occasional chain riding the safe line elsewhere.
+	const collectibles: Collectible[] = [];
+	if (index <= 1) {
+		const sLocal = index === 0 ? 26 : 16 + Math.round(rng() * 20);
+		collectibles.push({ s: sLocal, lat: latSafeAt(seed, entry.startS + sLocal, widthAt(sLocal)), kind: 'boost' });
+	} else if (kind === 'jump' && jump) {
+		// A ring hovering over the pit, at flight height — catch it mid-air.
+		collectibles.push({
+			s: jump.lipS + jump.gap * 0.5,
+			lat: 0,
+			kind: 'boost',
+			air: true,
+			rise: LUGE.jumpKickH + 0.7 + 1.15,
+		});
+	} else if (kind === 'fork' && fork) {
+		// Stars along the beam top — an extra reason to dare the balance rail.
+		const sign = fork.danger === 'left' ? 1 : -1;
+		const c = sign * ((fork.sepHalfMax + fork.outerDanger) / 2);
+		const mid = (fork.noseS + fork.mergeS) / 2;
+		for (const ds of [-12, 0, 12]) collectibles.push({ s: mid + ds, lat: c, kind: 'points' });
+	} else if (rng() < (kind === 'tunnel' || kind === 'bob' ? 0.5 : 0.35)) {
+		const kindC: Collectible['kind'] = rng() < 0.22 ? 'boost' : 'points';
+		const count = kindC === 'boost' ? 1 : 3 + Math.floor(rng() * 3);
+		let sLocal = 15 + rng() * Math.max(1, length - 30 - count * 8);
+		for (let i = 0; i < count; i++) {
+			const absS = entry.startS + sLocal;
+			collectibles.push({ s: sLocal, lat: latSafeAt(seed, absS, widthAt(sLocal)), kind: kindC });
+			sLocal += 8;
 		}
 	}
 
@@ -1030,11 +1047,13 @@ export function stepLuge(
 
 	// Collectibles on the safe line: stars pay points, rings grant a boost. The
 	// `taken` flag is mutated on the segment so the renderer can hide the mesh.
-	for (let si = segIdx; si < Math.min(segIdx + 2, segs.length) && status === 'running' && !airborne; si++) {
+	// Air rings (over jump pits) are only catchable while airborne — and vice versa.
+	for (let si = segIdx; si < Math.min(segIdx + 2, segs.length) && status === 'running'; si++) {
 		for (const c of segs[si].collectibles) {
-			if (c.taken) continue;
+			if (c.taken || !!c.air !== airborne) continue;
 			const absS = segs[si].startS + c.s;
-			if (prevS - 1 < absS && absS < s + P.sledReach && Math.abs(c.lat - lat) < P.sledHalf + 0.9) {
+			const latReach = c.air ? 2.4 : P.sledHalf + 0.9;
+			if (prevS - 1 < absS && absS < s + P.sledReach && Math.abs(c.lat - lat) < latReach) {
 				c.taken = true;
 				if (c.kind === 'points') {
 					bonusScore += P.pickupPoints;

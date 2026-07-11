@@ -561,7 +561,7 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 			c.kind === 'points' ? g.shared.star : g.shared.ring,
 			c.kind === 'points' ? g.mats.gold : g.mats.boostRing,
 		);
-		const baseY = p.y + 0.75 - o.y;
+		const baseY = p.y + (c.rise ?? 0.75) - o.y;
 		m.position.set(p.x - o.x, baseY, p.z - o.z);
 		group.add(m);
 		pickups.push({ mesh: m, c, baseY });

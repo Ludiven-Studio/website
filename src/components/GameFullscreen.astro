@@ -46,7 +46,9 @@
 		box-shadow: var(--shadow-md);
 	}
 
-	/* Fullscreen: fill the screen, hide page chrome, keep only the game + its controls. */
+	/* Fullscreen: fill the screen, hide page chrome, keep only the game + its controls.
+	   Centering must be SAFE: with plain `center`, content taller than the screen
+	   (mobile landscape) overflows upward and the top becomes unreachable. */
 	.game-page:fullscreen {
 		max-width: none;
 		width: 100%;
@@ -54,7 +56,12 @@
 		background: var(--gray-999);
 		overflow: auto;
 		padding: 1rem;
-		justify-content: center;
+		justify-content: flex-start;
+	}
+	@supports (justify-content: safe center) {
+		.game-page:fullscreen {
+			justify-content: safe center;
+		}
 	}
 	.game-page:fullscreen > .game-head {
 		display: none;
@@ -69,7 +76,12 @@
 		background: var(--gray-999);
 		overflow: auto;
 		padding: 1rem;
-		justify-content: center;
+		justify-content: flex-start;
+	}
+	@supports (justify-content: safe center) {
+		.game-page:-webkit-full-screen {
+			justify-content: safe center;
+		}
 	}
 	.game-page:-webkit-full-screen > .game-head {
 		display: none;

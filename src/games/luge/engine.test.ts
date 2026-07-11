@@ -162,6 +162,9 @@ describe('luge generation', () => {
 		const fast = runUntil({ ...createLuge(), s: lipAbs - 3, lat: 0, speed: v }, segs, 0, 0, lipAbs + jumpFlightDist(v) + 10);
 		expect(fast.events).toContain('jumpClean');
 		expect(fast.events).not.toContain('jumpShort');
+		// A boost ring hovers over the pit and is caught mid-air.
+		expect(jump!.collectibles.some((c) => c.air)).toBe(true);
+		expect(fast.events).toContain('pickupBoost');
 		expect(fast.state.bonusScore).toBeGreaterThanOrEqual(LUGE.jumpBonus);
 		// Crawling into the kicker → lands in the pit, momentum crushed.
 		const slow = runUntil({ ...createLuge(), s: lipAbs - 0.5, lat: 0, speed: j.gap * 0.4 }, segs, 0, 0, lipAbs + j.gap + 12);
@@ -448,17 +451,22 @@ describe('luge simulation', () => {
 		expect(st.lives).toBeLessThan(LUGE.lives);
 
 		// Bang-bang correction (lean against the fall): no fall, bonus collected.
+		// Fresh chain — the hands-off pass above already ate the beam stars (taken flags).
+		const fresh = findFork();
 		st = mk();
 		events = [];
 		while (st.s < mergeAbs + 5 && st.status === 'running') {
 			const steer = -Math.sign(st.balance + st.balanceVel * 0.25);
-			const r = stepLuge(st, { steer }, DT, segs);
+			const r = stepLuge(st, { steer }, DT, fresh.segs);
 			st = r.state;
 			events.push(...r.events);
 		}
 		expect(events).not.toContain('balanceFall');
 		expect(events).toContain('forkBonus');
 		expect(st.lives).toBe(LUGE.lives);
+		// The beam carries stars — riding it centered collects them.
+		expect(fresh.fork.collectibles.length).toBeGreaterThanOrEqual(3);
+		expect(events).toContain('pickup');
 	});
 
 	it('fork: hitting the separator nose head-on crashes and snaps to the safe lane', () => {
