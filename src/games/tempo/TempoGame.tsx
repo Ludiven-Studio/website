@@ -396,7 +396,10 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const rg = ctx.createGain();
 		rg.connect(masterRef.current!);
 		runGainRef.current = rg;
-		audioStartRef.current = ctx.currentTime + LEAD;
+		// The chord-only intro covers the tiles' fall time, so the backing can start
+		// almost immediately; keep at least LEAD when there'd be no intro to hide it.
+		const introTime = chartRef.current?.introTime ?? 0;
+		audioStartRef.current = ctx.currentTime + Math.max(0.15, LEAD - introTime);
 		backingIdxRef.current = 0; // groove is scheduled with lookahead in step()
 		melodyIdxRef.current = 0; // auto-lead is scheduled with lookahead in step()
 		runningRef.current = true;
@@ -646,7 +649,10 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const accent = i % 4 === 0;
 				const { root, third } = chordAt(i);
 				const chordRoot = chart.key + root;
-				kick(when, accent);
+				// Chord-only intro: pad + pluck + bass set the harmony first, the drums
+				// only enter with the melody.
+				const inIntro = bt[i] < (chart.introTime ?? 0) - 0.01;
+				if (!inIntro) kick(when, accent);
 				// Root/fifth bass; every 8th beat walks a whole tone into the next root.
 				let bassNote = chordRoot + (i % 2 === 0 ? 0 : 7);
 				if (i % 8 === 7) {
@@ -654,8 +660,10 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					if (next !== chordRoot) bassNote = next + (next > chordRoot ? -2 : 2);
 				}
 				bass(when, bassNote, accent);
-				hat(when, accent); // ride the beat
-				if (i + 1 < bt.length) hat(when + (bt[i + 1] - bt[i]) / 2, false, 0.015); // soft off-beat tick
+				if (!inIntro) {
+					hat(when, accent); // ride the beat
+					if (i + 1 < bt.length) hat(when + (bt[i + 1] - bt[i]) / 2, false, 0.015); // soft off-beat tick
+				}
 				// Plucked comp including the third; pattern alternates every 8 bars.
 				const comp = Math.floor(i / 32) % 2 === 0 ? [0, 7, third + 12, 12] : [0, third, 7, third + 12];
 				pluck(when, chordRoot + 12 + comp[i % 4]);
@@ -754,7 +762,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				backingIdxRef.current = 0;
 				melodyIdxRef.current = 0;
 				const ctx = ctxRef.current;
-				if (ctx) audioStartRef.current = ctx.currentTime + LEAD;
+				if (ctx) audioStartRef.current = ctx.currentTime + Math.max(0.15, LEAD - (chart.introTime ?? 0));
 			}
 		} else if (failed || now > chart.totalTime + 0.6) {
 			finishRun();

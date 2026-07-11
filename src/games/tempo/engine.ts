@@ -51,19 +51,19 @@ export interface Chart {
 	beatTimes: number[]; // beat grid (seconds) — drives the backing groove
 	key: number; // tonic midi (bass accompaniment)
 	chords: ChordBar[]; // one per bar (bar i = beats 4i..4i+3) — backing follows these
+	introTime: number; // seconds of chord-only intro before the first tile
 }
 
 /* --- Music theory scaffolding for the generator -------------------------- */
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]; // major scale, semitones per scale-STEP
-// Rotating 4-bar progressions (scale-STEP roots). Sections last 2 phrases;
-// V-endings resolve into the next section's I. Melody snapping and the backing
-// both derive from these, so they agree bar for bar.
+// 4-bar progressions (scale-STEP roots). ONE is seed-picked per song and LOOPS
+// for the whole tune: the melody develops over a stable, repeating harmonic
+// base. Melody snapping and the backing both derive from it, bar for bar.
 const PROGRESSIONS: number[][] = [
 	[0, 4, 5, 3], // I  V  vi IV
 	[5, 3, 0, 4], // vi IV I  V
 	[0, 5, 3, 4], // I  vi IV V
 ];
-const progForPhrase = (p: number): number[] => PROGRESSIONS[Math.floor(p / 2) % PROGRESSIONS.length];
 /** Chord of a scale-step root as semitones from key (third: 4 major, 3 minor). */
 const chordBarOf = (rootStep: number): ChordBar => {
 	const root = MAJOR[((rootStep % 7) + 7) % 7];
@@ -159,14 +159,15 @@ const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(s
  * Structure per 4-bar phrase: an ARCHETYPE picks rhythm densities for bars
  * [A, B, A′] + a cadence bar. The pitch line follows an arch contour (rise then
  * fall), leaps recover by step, and A′ replays A's melodic deltas over bar 2's
- * chord (varied repeat). Chords rotate through PROGRESSIONS every 2 phrases and
- * are returned alongside the notes so the backing follows the same harmony.
+ * chord (varied repeat). ONE seed-picked progression loops for the whole song
+ * and is returned alongside the notes so the backing follows the same harmony.
  */
 export function generateEndlessSong(seed: number, count = 600): Song {
 	const rng = mulberry32(seed >>> 0);
 	const KEY = 43; // tonic midi for the bass accompaniment (G2)
 	const TONIC = 55; // tonic midi the melody sings around (G3)
 	const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
+	const prog = pick(PROGRESSIONS); // the song's repeating harmonic base
 	const notes: SongNote[] = [];
 	const chords: ChordBar[] = [];
 
@@ -219,9 +220,7 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		return tones.sort((a, b) => a - b);
 	};
 
-	let phrase = 0;
 	while (notes.length < count) {
-		const prog = progForPhrase(phrase);
 		const arch = pick(ARCHETYPES);
 		const cellA = pick(CELLS[arch[0]]);
 		const cellB = pick(CELLS[arch[1]]);
@@ -275,8 +274,9 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 					if (bar === 0) barADeltas.push(delta);
 					lastDelta = delta;
 					step = clampStep(step + delta);
-					// Chord tone on strong beats, pentatonic passing note on weak beats.
-					step = strong ? nearestChordTone(step, chordRootStep) : toPenta(step);
+					// Chord tone on strong beats AND on long notes (they ring against the
+					// chord); pentatonic passing note on short weak beats.
+					step = strong || ev.d >= 2 ? nearestChordTone(step, chordRootStep) : toPenta(step);
 					emit(step, ev.d);
 				}
 				beatInBar += ev.d;
@@ -294,7 +294,6 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 				forceLast(step);
 			}
 		}
-		phrase++;
 	}
 	return { name: 'Infini', tempo: 2, key: KEY, notes, chords };
 }
@@ -312,10 +311,12 @@ export const ENDLESS_OPTS: EndlessOpts[] = [
 	{ baseTempo: 1.8, rampSec: 110, maxMult: 1.45 }, // Moyen
 	{ baseTempo: 1.8, rampSec: 95, maxMult: 1.5 }, // Difficile
 ];
+export const INTRO_BEATS = 8; // 2 bars of chord-only backing before the first tile
 /**
  * Endless chart whose tempo RAMPS UP gently over the run: successive beats get
  * shorter, so it grows faster the longer you survive. The daily/free `speed`
- * still scales the starting tempo.
+ * still scales the starting tempo. Opens with a 2-bar intro (backing only) so
+ * the harmony settles in before the melody enters.
  */
 export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {}): Chart {
 	const base = (opts.baseTempo ?? 1.8) * speed;
@@ -325,8 +326,8 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 
 	// Build an INTEGER-beat time grid: each beat is shorter than the last as the
 	// tempo ramps. Note times are interpolated on this grid, which keeps the
-	// backing (locked to whole beats) in sync.
-	const totalBeats = song.notes.reduce((s, n) => s + n.dur, 0);
+	// backing (locked to whole beats) in sync. Beats 0..INTRO_BEATS-1 are the intro.
+	const totalBeats = song.notes.reduce((s, n) => s + n.dur, 0) + INTRO_BEATS;
 	const beatTime = [0];
 	let t = 0;
 	for (let b = 0; b < Math.ceil(totalBeats) + 4; b++) {
@@ -340,7 +341,7 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	};
 
 	const tiles: Tile[] = [];
-	let beat = 0;
+	let beat = INTRO_BEATS; // melody enters after the intro
 	for (const n of song.notes) {
 		if (!n.rest) {
 			const time = at(beat);
@@ -351,11 +352,15 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	// Whole-beat grid for the groove (kick/bass/pad step on these).
 	const beatTimes: number[] = [];
 	for (let b = 0; b <= Math.ceil(totalBeats); b++) beatTimes.push(beatTime[b]);
-	// One chord per bar, padded to cover the whole grid.
+	// One chord per bar, padded to cover the whole grid. The intro plays the LAST
+	// two bars of the song's looping progression, so it resolves into the I (or
+	// the loop's first chord) right as the melody enters.
+	const songChords = song.chords ?? [];
+	const introChords = songChords.length >= 4 ? [songChords[2], songChords[3]] : [{ root: 0, third: 4 }, { root: 0, third: 4 }];
 	const barCount = Math.ceil(totalBeats / 4);
-	const chords = (song.chords ?? []).slice(0, barCount);
+	const chords = [...introChords, ...songChords].slice(0, barCount);
 	while (chords.length < barCount) chords.push(chords[chords.length - 1] ?? { root: 0, third: 4 });
-	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords };
+	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, introTime: at(INTRO_BEATS) };
 }
 
 export type Grade = 'Parfait' | 'Bien' | 'Ok' | 'Raté';
