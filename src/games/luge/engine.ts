@@ -152,8 +152,8 @@ export interface LugeParams {
 	jumpMaxVy: number; // vertical takeoff speed cap (keeps top-speed flights sane)
 	jumpBonus: number; // score for clearing the pit
 	scoreMultMin: number; // points per meter when (nearly) stopped
-	scoreMultGain: number; // added per unit of speed/vMax ratio
-	scoreMultMax: number; // cap — reachable only by riding boosts/ice
+	scoreMultGain: number; // added per m/s of speed — the HUD ×N.N tracks the km/h
+	scoreMultMax: number; // cap — reachable only at late-run speed with boosts
 	balKick: number; // max initial lean shoved on the sled as it mounts the rail
 	balInstab: number; // inverted-pendulum divergence (s⁻²) on the ice rail
 	balNoise: number; // wobble forcing amplitude (s⁻²)
@@ -208,8 +208,8 @@ export const LUGE: LugeParams = {
 	jumpMaxVy: 8,
 	jumpBonus: 10,
 	scoreMultMin: 0.5,
-	scoreMultGain: 1.5,
-	scoreMultMax: 2.2,
+	scoreMultGain: 0.03,
+	scoreMultMax: 2.5,
 	balKick: 0.45,
 	balInstab: 3.2,
 	balNoise: 2.4,
@@ -302,13 +302,12 @@ export function balanceActive(seg: TrackSegment, lane: LugeState['lane'], s: num
 }
 
 /**
- * Score multiplier: points per meter scale with speed vs the local BASE vMax,
- * so riding boosts (ice corridor, tunnels, bob crests) pays above ×2 while
- * crawling after a crash barely scores. This is what makes speed worth the risk.
+ * Score multiplier: points per meter are proportional to the ABSOLUTE speed
+ * (the HUD ×N.N visibly tracks the km/h). Crawling after a crash barely scores,
+ * late-run speed and boosts pay the most — speed is worth the risk.
  */
-export function scoreMultAt(speed: number, s: number, P: LugeParams = LUGE): number {
-	const r = speed / difficultyAt(s).vMax;
-	return Math.min(P.scoreMultMax, P.scoreMultMin + P.scoreMultGain * r);
+export function scoreMultAt(speed: number, P: LugeParams = LUGE): number {
+	return Math.min(P.scoreMultMax, P.scoreMultMin + P.scoreMultGain * speed);
 }
 
 /* ----------------------------- Generation ----------------------------- */
@@ -816,7 +815,7 @@ export function stepLuge(
 
 	const prevS = st.s;
 	const s = st.s + speed * dtSec;
-	points += (s - prevS) * scoreMultAt(speed, prevS, P);
+	points += (s - prevS) * scoreMultAt(speed, P);
 
 	// Fork logic on the segment we are in now.
 	const seg = segmentAt(segs, s);

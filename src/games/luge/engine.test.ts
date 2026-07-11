@@ -296,9 +296,10 @@ describe('luge simulation', () => {
 		expect(st.points).toBeGreaterThan(LUGE.scoreMultMin * st.s);
 		expect(st.points).toBeLessThanOrEqual(LUGE.scoreMultMax * st.s);
 		expect(st.speed).toBeLessThanOrEqual(60 * LUGE.boostMul * LUGE.bobVMaxMul + 1e-6);
-		// Cruising pays roughly double what crawling does.
+		// The multiplier tracks absolute speed: faster meters pay clearly more.
 		const v = difficultyAt(1000).vMax;
-		expect(scoreMultAt(v, 1000)).toBeGreaterThan(scoreMultAt(v * 0.3, 1000) * 1.5);
+		expect(scoreMultAt(v)).toBeGreaterThan(scoreMultAt(v * 0.3) * 1.5);
+		expect(scoreMultAt(60)).toBeGreaterThan(scoreMultAt(25));
 	});
 
 	it('berms are climbable (never lethal): crest bound, restoring pull, matching profile', () => {

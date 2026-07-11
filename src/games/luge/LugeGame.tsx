@@ -622,7 +622,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const camLatRef = useRef(0);
 	const camHRef = useRef(4); // eased camera height — ducks under tunnel arches
 	const camDistRef = useRef(8); // eased chase distance — closes in for the balance rail
-	const balRollRef = useRef(0); // eased side-slide roll on the surf rail
+	const balSlideRef = useRef(0); // eased sideways slide yaw on the surf rail
 	const camLookYRef = useRef(0); // eased look-at height — kickers/pits stay visible
 	const balGaugeRef = useRef<HTMLDivElement>(null);
 	const steerYawRef = useRef(0); // eased steering pivot of the sled nose
@@ -872,11 +872,11 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			pitch = Math.atan2(a + 2 * b * t, D);
 		}
 
-		// Balance rail (fork danger lane): the sled tips onto its side to slide the
-		// surf rail — the lean IS the gameplay. No drift/steer yaw (the rail carries it).
+		// Balance rail (fork danger lane): the sled swings SIDEWAYS (flat yaw, like a
+		// powerslide) on the deck; the balance lean stays a roll around the travel axis.
 		const balancing = balanceActive(seg, st.lane, sI);
 		const laneSign = balancing && seg.fork ? (seg.fork.danger === 'left' ? 1 : -1) : 0;
-		balRollRef.current += (laneSign * 0.85 - balRollRef.current) * Math.min(1, dtSec * 6);
+		balSlideRef.current += (laneSign * 1.1 - balSlideRef.current) * Math.min(1, dtSec * 6);
 
 		// Drift yaw: the nose swings toward the slide. Barely on grippy snow (deadzone +
 		// small factor), fully on bob ice where huge slides are the point.
@@ -886,11 +886,14 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		// Steering pivots the nose into the turn (eased) — more on ice; no body lean.
 		const yawTarget = balancing ? 0 : steer * (seg.bob ? 0.22 : 0.1);
 		steerYawRef.current += (yawTarget - steerYawRef.current) * Math.min(1, dtSec * 8);
-		g.sled.position.set(pose.x, (flightY ?? pose.y) + 0.05 + Math.abs(balRollRef.current) * 0.25, pose.z);
+		g.sled.position.set(pose.x, (flightY ?? pose.y) + 0.05, pose.z);
 		g.sled.rotation.set(0, 0, 0);
 		g.sled.rotateY(-pose.heading - driftYaw - steerYawRef.current);
 		g.sled.rotateZ(pitch);
-		g.sled.rotateX(pose.bank + st.latVel * 0.015 + st.balance * 0.7 + balRollRef.current);
+		g.sled.rotateX(pose.bank + st.latVel * 0.015 + st.balance * 0.7);
+		// Slide yaw LAST (local): spins the sled flat on the deck plane, so the balance
+		// roll above keeps tilting around the direction of travel.
+		g.sled.rotateY(balSlideRef.current);
 		// Invulnerability blink at ~8 Hz.
 		g.sled.visible = st.invulnMs <= 0 || Math.floor(clockRef.current / 125) % 2 === 0;
 
@@ -1116,7 +1119,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				hudAccRef.current = 0;
 				setScore(st.score);
 				setKmh(Math.round(st.speed * 3.6));
-				setMult(Math.round(scoreMultAt(st.speed, st.s) * 10) / 10);
+				setMult(Math.round(scoreMultAt(st.speed) * 10) / 10);
 				setDist(Math.floor(st.s));
 				setLives(st.lives);
 				setBoosting(st.boostMs > 0);
