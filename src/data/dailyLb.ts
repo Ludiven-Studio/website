@@ -56,8 +56,8 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	drift: { fmt: { kind: 'duration', div: 1000, decimals: 2, mmssAbove: 60000 } }, // lap ms
 	solitaire: { fmt: { kind: 'duration', div: 100, decimals: 2, mmssAbove: 6000 } }, // centiseconds
 	esquive: { fmt: { kind: 'duration', div: 10, decimals: 1 } }, // tenths survived
-	// Distance in meters (higher is better) → "1234 m"
-	luge: { fmt: { kind: 'count', one: 'm', many: 'm' } },
+	// Meters × speed multiplier (higher is better) → "1234 pts"
+	luge: { fmt: { kind: 'count', one: 'pt', many: 'pts' } },
 	// Win value below a loss band (cf. LOSS_OFFSET = 100000 in each game)
 	demineur: { fmt: { kind: 'threshold', at: 100000, below: time, aboveLabel: '💣 ', aboveShowsDelta: true } },
 	codecolor: { fmt: { kind: 'threshold', at: 100000, below: { kind: 'count', one: 'essai', many: 'essais' }, aboveLabel: '❌' } },

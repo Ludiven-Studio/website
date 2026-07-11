@@ -41,6 +41,7 @@ export interface ForkInfo {
 	outerSafe: number; // |lat| of the outer wall on the safe side
 	outerDanger: number; // |lat| of the outer wall on the danger side (narrow)
 	bonus: number; // flat score bonus for surviving the danger lane
+	balPhase: number; // wobble phase for the balance minigame (deterministic)
 }
 
 export interface EntryPose {
@@ -95,7 +96,8 @@ export type LugeEvent =
 	| 'nearMiss'
 	| 'stuck'
 	| 'jumpClean'
-	| 'jumpShort';
+	| 'jumpShort'
+	| 'balanceFall';
 
 export interface LugeState {
 	s: number;
@@ -106,7 +108,10 @@ export interface LugeState {
 	invulnMs: number;
 	boostMs: number;
 	bonusScore: number;
-	score: number; // floor(s) + bonusScore — integer meters
+	points: number; // accrued meters × speed multiplier (fractional)
+	score: number; // floor(points) + bonusScore
+	balance: number; // lean on the ice rail, −1..1 — beyond ±1 the sled falls
+	balanceVel: number;
 	lane: 'left' | 'right' | null; // side taken inside a fork
 	jumpFromS: number | null; // kicker lip (absolute s) while airborne
 	jumpToS: number; // where the flight lands (absolute s)
@@ -142,6 +147,14 @@ export interface LugeParams {
 	jumpGravity: number; // flight gravity (m/s²) — a bit strong for game scale
 	jumpMaxVy: number; // vertical takeoff speed cap (keeps top-speed flights sane)
 	jumpBonus: number; // score for clearing the pit
+	scoreMultMin: number; // points per meter when (nearly) stopped
+	scoreMultGain: number; // added per unit of speed/vMax ratio
+	scoreMultMax: number; // cap — reachable only by riding boosts/ice
+	balInstab: number; // inverted-pendulum divergence (s⁻²) on the ice rail
+	balNoise: number; // wobble forcing amplitude (s⁻²)
+	balSteer: number; // lean authority at full input (s⁻²)
+	balDamp: number; // per-frame (60 Hz) lean velocity retention
+	balRail: number; // lat centering rate (1/s) onto the rail while balancing
 	corridorHalf: number; // guaranteed obstacle-free half-width around latSafe
 	bobVMaxFloor: number; // speed multiplier at the flat pipe floor (barely faster)
 	bobVMaxMul: number; // speed multiplier at the wall crest — carving high pays
@@ -185,6 +198,14 @@ export const LUGE: LugeParams = {
 	jumpGravity: 20,
 	jumpMaxVy: 8,
 	jumpBonus: 10,
+	scoreMultMin: 0.5,
+	scoreMultGain: 1.5,
+	scoreMultMax: 2.2,
+	balInstab: 3.2,
+	balNoise: 2.4,
+	balSteer: 10,
+	balDamp: 0.97,
+	balRail: 6,
 	corridorHalf: 1.6,
 	bobVMaxFloor: 1.03,
 	bobVMaxMul: 1.3,
@@ -227,6 +248,27 @@ export function difficultyAt(s: number): Difficulty {
 		jumpChance: 0.07 + 0.04 * e(2500),
 		width: 9 + 5 * Math.exp(-t / 2500),
 	};
+}
+
+/**
+ * Balance minigame window: riding the fork's icy danger rail. Steering stops
+ * moving the sled sideways and keeps it upright instead — leaning past ±1 falls.
+ */
+export function balanceActive(seg: TrackSegment, lane: LugeState['lane'], s: number): boolean {
+	const f = seg.fork;
+	if (!f || lane !== f.danger) return false;
+	const sLocal = s - seg.startS;
+	return sLocal >= f.noseS + 4 && sLocal < f.mergeS - 2;
+}
+
+/**
+ * Score multiplier: points per meter scale with speed vs the local BASE vMax,
+ * so riding boosts (ice corridor, tunnels, bob crests) pays above ×2 while
+ * crawling after a crash barely scores. This is what makes speed worth the risk.
+ */
+export function scoreMultAt(speed: number, s: number, P: LugeParams = LUGE): number {
+	const r = speed / difficultyAt(s).vMax;
+	return Math.min(P.scoreMultMax, P.scoreMultMin + P.scoreMultGain * r);
 }
 
 /* ----------------------------- Generation ----------------------------- */
@@ -424,6 +466,7 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 			outerSafe: w0 / 2 + 3.5,
 			outerDanger: sepHalfMax + 5.2,
 			bonus: 50,
+			balPhase: rng() * TWO_PI,
 		};
 	}
 	// Jump: kicker lip at ~45% of the segment; the pit is clearable while cruising
@@ -658,7 +701,10 @@ export function createLuge(): LugeState {
 		invulnMs: 0,
 		boostMs: 0,
 		bonusScore: 0,
+		points: 0,
 		score: 0,
+		balance: 0,
+		balanceVel: 0,
 		lane: null,
 		jumpFromS: null,
 		jumpToS: 0,
@@ -677,7 +723,8 @@ export function stepLuge(
 ): { state: LugeState; events: LugeEvent[] } {
 	if (st.status === 'over') return { state: st, events: [] };
 	const events: LugeEvent[] = [];
-	let { lat, latVel, speed, lives, invulnMs, boostMs, bonusScore, lane, jumpFromS, jumpToS, jumpGapEndS } = st;
+	let { lat, latVel, speed, lives, invulnMs, boostMs, bonusScore, points, balance, balanceVel, lane, jumpFromS, jumpToS, jumpGapEndS } =
+		st;
 	let status: LugeState['status'] = 'running';
 	const wasAirborne = jumpFromS != null && st.s < jumpToS;
 
@@ -725,6 +772,7 @@ export function stepLuge(
 
 	const prevS = st.s;
 	const s = st.s + speed * dtSec;
+	points += (s - prevS) * scoreMultAt(speed, prevS, P);
 
 	// Fork logic on the segment we are in now.
 	const seg = segmentAt(segs, s);
@@ -765,6 +813,26 @@ export function stepLuge(
 				if (sign * latVel > 0) latVel = danger ? 0 : -latVel * P.bermBounce;
 				bermHit = !danger;
 			}
+			if (balanceActive(seg, lane, s)) {
+				// The rail carries the sled: lat centers itself and steering becomes a
+				// balance correction (you lean the way you press). An inverted pendulum
+				// plus a deterministic wobble — past ±1 the sled falls.
+				const c = (sepHalfAt(fork, sLocal) + fork.outerDanger) / 2;
+				l += (c - l) * Math.min(1, P.balRail * dtSec);
+				latVel *= Math.pow(0.8, dtSec * 60);
+				const wob = Math.sin(s * 0.13 + fork.balPhase) + 0.6 * Math.sin(s * 0.29 + fork.balPhase * 2.1);
+				balanceVel += (balance * P.balInstab + wob * P.balNoise + steer * P.balSteer) * dtSec;
+				balanceVel *= Math.pow(P.balDamp, dtSec * 60);
+				balance += balanceVel * dtSec;
+				if (Math.abs(balance) > 1) {
+					if (invulnMs <= 0) {
+						collide();
+						events.push('balanceFall');
+					}
+					balance = 0;
+					balanceVel = 0;
+				}
+			}
 			lat = sign * l;
 		}
 		if (prevS < mergeAbs && s >= mergeAbs) {
@@ -774,9 +842,13 @@ export function stepLuge(
 				events.push('forkBonus');
 			}
 			lane = null;
+			balance = 0;
+			balanceVel = 0;
 		}
 	} else {
 		lane = null;
+		balance = 0;
+		balanceVel = 0;
 	}
 
 	// Jump: crossing the kicker lip launches the sled on a ballistic flight (vy from
@@ -870,7 +942,10 @@ export function stepLuge(
 			invulnMs,
 			boostMs,
 			bonusScore,
-			score: Math.floor(s) + bonusScore,
+			points,
+			score: Math.floor(points) + bonusScore,
+			balance,
+			balanceVel,
 			lane,
 			jumpFromS,
 			jumpToS,

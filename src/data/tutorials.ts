@@ -183,10 +183,10 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '👥', title: 'Jouer ensemble', body: 'Partie rapide pour être appairé au hasard, ou « Jouer avec un ami » : un code s\'affiche, ton ami le saisit pour te rejoindre — chacun avec son coéquipier bot. Pas d\'adversaire ? Joue contre le bot.' },
 	],
 	luge: [
-		{ emoji: '🛷', title: 'Le but', body: 'Dévale une montagne enneigée en luge, le plus loin possible. La descente accélère et se rétrécit au fil des mètres : ta distance est ton score.' },
+		{ emoji: '🛷', title: 'Le but', body: 'Dévale une montagne enneigée en luge. Chaque mètre rapporte des points multipliés par ta vitesse (jusqu\'à ×2,2 à fond) : rester lancé paie, se traîner après un crash ne rapporte presque rien.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'La luge fonce toute seule — tu diriges seulement à gauche/droite avec les flèches / Q-D, ou les deux gros boutons tactiles. Évite les sapins et les rochers : chaque choc coûte une vie (3 vies) et casse ta vitesse.' },
-		{ emoji: '❄️', title: 'Sections spéciales', body: 'Aux bifurcations, choisis ton côté (foncer dans le séparateur = crash !) : le couloir de glace file plus vite et rapporte +50 points et un boost. Sur les tremplins, garde de l\'élan pour franchir la fosse — trop lent, tu t\'écrases dedans. Sur la glace (grottes, couloirs), le sol glisse et des stalagmites barrent le passage — grimpe sur les parois pour les éviter ; te coincer ne coûte pas de vie mais écrase ta vitesse. Et dans les pistes de bobsleigh gelées, plus tu carves haut dans les virages, plus tu vas vite.' },
-		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, la descente est identique pour tout le monde. Jusqu\'à 10 essais : ta meilleure distance de la journée est classée.' },
+		{ emoji: '❄️', title: 'Sections spéciales', body: 'Aux bifurcations, choisis ton côté (foncer dans le séparateur = crash !) : le rail de glace file plus vite et rapporte +50 points et un boost, mais c\'est un numéro d\'équilibriste — touche gauche/droite pour rester droit, si ça penche trop la luge tombe. Sur les tremplins, garde de l\'élan pour franchir la fosse — trop lent, tu t\'écrases dedans. Dans les grottes, le sol glisse et des stalagmites barrent le passage — grimpe sur les parois pour les éviter. Et dans les pistes de bobsleigh gelées, plus tu carves haut dans les virages, plus tu vas vite.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, la descente est identique pour tout le monde. Jusqu\'à 10 essais : ton meilleur score de la journée est classé.' },
 	],
 	esquive: [
 		{ emoji: '🚀', title: 'Le but', body: 'Pilote ton vaisseau qui fonce dans l\'espace et évite les astéroïdes le plus longtemps possible. Ton temps de survie est ton score.' },

@@ -9,6 +9,8 @@ import {
 	sepHalfAt,
 	pipeRampAt,
 	jumpTakeoffVy,
+	scoreMultAt,
+	balanceActive,
 	createLuge,
 	stepLuge,
 	type TrackSegment,
@@ -36,7 +38,7 @@ const BEST_KEY = 'ludiven-luge-best';
 const STEP = 1000 / 60;
 const MAX_TRIES = 10;
 const SPRAY_COUNT = 150;
-const fmtDist = (m: number) => formatScore(DAILY_LB.luge.fmt, m);
+const fmtPts = (v: number) => formatScore(DAILY_LB.luge.fmt, v);
 
 interface DailyState {
 	best: number;
@@ -549,6 +551,8 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const [best, setBest] = useState(0);
 	const [lives, setLives] = useState(LUGE.lives);
 	const [kmh, setKmh] = useState(0);
+	const [mult, setMult] = useState(1);
+	const [dist, setDist] = useState(0);
 	const [boosting, setBoosting] = useState(false);
 	const [bonusFlash, setBonusFlash] = useState<string | null>(null);
 	const [daily, setDaily] = useState(false);
@@ -580,7 +584,9 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const keysRef = useRef({ left: false, right: false });
 	const camLatRef = useRef(0);
 	const camHRef = useRef(4); // eased camera height — ducks under tunnel arches
+	const camDistRef = useRef(8); // eased chase distance — closes in for the balance rail
 	const camLookYRef = useRef(0); // eased look-at height — kickers/pits stay visible
+	const balGaugeRef = useRef<HTMLDivElement>(null);
 	const steerYawRef = useRef(0); // eased steering pivot of the sled nose
 	// Fatal-crash tumble: ~1.2 s of rolling sled + snow burst before the game-over popup.
 	const crashAnimRef = useRef({ active: false, t: 0, s: 0, lat: 0, vel: 0 });
@@ -817,19 +823,23 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			pitch = Math.atan2(a + 2 * b * t, D);
 		}
 
+		// Balance rail (fork danger lane): the lean IS the gameplay — big visible roll,
+		// no drift/steer yaw (the rail carries the sled straight).
+		const balancing = balanceActive(seg, st.lane, sI);
+
 		// Drift yaw: the nose swings toward the slide. Barely on grippy snow (deadzone +
 		// small factor), fully on bob ice where huge slides are the point.
 		const driftRaw = Math.atan2(st.latVel, Math.max(8, st.speed));
 		const dz = seg.bob ? 0 : 0.07;
-		const driftYaw = Math.sign(driftRaw) * Math.max(0, Math.abs(driftRaw) - dz) * (seg.bob ? 1.25 : 0.45);
+		const driftYaw = balancing ? 0 : Math.sign(driftRaw) * Math.max(0, Math.abs(driftRaw) - dz) * (seg.bob ? 1.25 : 0.45);
 		// Steering pivots the nose into the turn (eased) — more on ice; no body lean.
-		const yawTarget = steer * (seg.bob ? 0.22 : 0.1);
+		const yawTarget = balancing ? 0 : steer * (seg.bob ? 0.22 : 0.1);
 		steerYawRef.current += (yawTarget - steerYawRef.current) * Math.min(1, dtSec * 8);
 		g.sled.position.set(pose.x, (flightY ?? pose.y) + 0.05, pose.z);
 		g.sled.rotation.set(0, 0, 0);
 		g.sled.rotateY(-pose.heading - driftYaw - steerYawRef.current);
 		g.sled.rotateZ(pitch);
-		g.sled.rotateX(pose.bank + st.latVel * 0.015);
+		g.sled.rotateX(pose.bank + st.latVel * 0.015 + st.balance * 0.7);
 		// Invulnerability blink at ~8 Hz.
 		g.sled.visible = st.invulnMs <= 0 || Math.floor(clockRef.current / 125) % 2 === 0;
 
@@ -843,11 +853,13 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		}
 
 		// Chase camera: behind + above, looking through the sled far ahead.
-		// Under a cave arch it ducks low so the view stays inside the tube.
-		const wantH = seg.tunnel ? 3 : 4;
+		// Under a cave arch it ducks low; on the balance rail it closes in and drops
+		// so the lean fills the frame (the view change signals the minigame).
+		const wantH = balancing ? 2.4 : seg.tunnel ? 3 : 4;
 		camHRef.current += (wantH - camHRef.current) * Math.min(1, dtSec * 4);
-		camLatRef.current += (latI * 0.5 - camLatRef.current) * Math.min(1, dtSec * 5);
-		const camPose = poseAt(segs, Math.max(0, sI - 8), camLatRef.current);
+		camLatRef.current += ((balancing ? latI : latI * 0.5) - camLatRef.current) * Math.min(1, dtSec * 5);
+		camDistRef.current += ((balancing ? 5.5 : 8) - camDistRef.current) * Math.min(1, dtSec * 4);
+		const camPose = poseAt(segs, Math.max(0, sI - camDistRef.current), camLatRef.current);
 		const lookPose = poseAt(segs, sI + 16, latI * 0.7);
 		const spd = Math.min(1, st.speed / 60);
 		const shake = st.speed > 20 ? (st.speed - 20) * 0.004 : 0;
@@ -911,6 +923,16 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		if (flashRef.current) {
 			flashOpRef.current = Math.max(0, flashOpRef.current - dtSec * 2.2);
 			flashRef.current.style.opacity = String(flashOpRef.current);
+		}
+		// Balance gauge: needle slides with the lean, turns red near the tipping point.
+		const gauge = balGaugeRef.current;
+		if (gauge) {
+			gauge.style.opacity = balancing ? '1' : '0';
+			const needle = gauge.firstElementChild as HTMLElement | null;
+			if (needle) {
+				needle.style.transform = `translateX(${(st.balance * 62).toFixed(1)}px)`;
+				needle.style.background = Math.abs(st.balance) > 0.6 ? '#ef4444' : '#22d3ee';
+			}
 		}
 
 		g.renderer.render(g.scene, g.camera);
@@ -980,6 +1002,10 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				setBonusFlash('Couloir de glace ! +50 · BOOST');
 				window.clearTimeout(bonusTimerRef.current);
 				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 2200);
+			} else if (ev === 'forkDanger') {
+				setBonusFlash('Équilibre ! ← →');
+				window.clearTimeout(bonusTimerRef.current);
+				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 1600);
 			}
 		}
 	}, []);
@@ -1039,12 +1065,15 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				hudAccRef.current = 0;
 				setScore(st.score);
 				setKmh(Math.round(st.speed * 3.6));
+				setMult(Math.round(scoreMultAt(st.speed, st.s) * 10) / 10);
+				setDist(Math.floor(st.s));
 				setLives(st.lives);
 				setBoosting(st.boostMs > 0);
 			}
 
 			if (over) {
 				setScore(st.score);
+				setDist(Math.floor(st.s));
 				setLives(st.lives);
 				// Launch the tumble + a big snow burst around the sled.
 				crashAnimRef.current = { active: true, t: 0, s: st.s, lat: st.lat, vel: Math.max(8, st.speed) };
@@ -1258,20 +1287,24 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="lg-bar">
-				<span className="lg-score">{fmtDist(score)}</span>
+				<span className="lg-score">{fmtPts(score)}</span>
 				<span className="lg-kmh">{kmh} km/h</span>
+				<span className={`lg-mult${mult >= 2 ? ' hot' : ''}`}>×{mult.toFixed(1)}</span>
 				<span className="lg-lives" aria-label={`${lives} vies`}>
 					{Array.from({ length: LUGE.lives }, (_, i) => (
 						<span key={i} className={i < lives ? '' : 'lost'}>♥</span>
 					))}
 				</span>
-				<span className="lg-best">Record {fmtDist(best)}</span>
+				<span className="lg-best">Record {fmtPts(best)}</span>
 			</div>
 
 			<div className="lg-boardwrap">
-				<canvas ref={canvasRef} className="lg-canvas" role="img" aria-label={`Luge — ${fmtDist(score)}`} />
+				<canvas ref={canvasRef} className="lg-canvas" role="img" aria-label={`Luge — ${fmtPts(score)}`} />
 				<div ref={vignetteRef} className="lg-vignette" aria-hidden="true" />
 				<div ref={flashRef} className="lg-flash" aria-hidden="true" />
+				<div ref={balGaugeRef} className="lg-balgauge" aria-hidden="true">
+					<div className="lg-balneedle" />
+				</div>
 				{boosting && <div className="lg-boost">BOOST</div>}
 				{bonusFlash && <div className="lg-bonus">{bonusFlash}</div>}
 
@@ -1301,7 +1334,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 						<div className="lg-overlay-card">
 							<p className="lg-go-title">{daily && alreadyPlayed && tries >= MAX_TRIES ? 'Défi du jour terminé' : '💥 Dans le décor !'}</p>
 							<p className="lg-go-score">
-								Distance {fmtDist(score)} · {daily ? 'Meilleure' : 'Record'} {fmtDist(best)}
+								Score {fmtPts(score)} · Distance {dist} m · {daily ? 'Meilleur' : 'Record'} {fmtPts(best)}
 							</p>
 							{daily && alreadyPlayed ? (
 								<p className="lg-overlay-note">Reviens demain&nbsp;!</p>
@@ -1323,7 +1356,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				du jour, la descente est la même pour tout le monde ({MAX_TRIES} essais, meilleure distance classée).
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtDist} />}
+			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtPts} />}
 			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
@@ -1342,6 +1375,8 @@ const CSS = `
 .lg-bar { width: 100%; display: flex; justify-content: center; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.85rem; flex-wrap: wrap; }
 .lg-score { background: var(--lg-accent); color: var(--accent-text-over); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; }
 .lg-kmh { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; min-width: 84px; text-align: center; }
+.lg-mult { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; min-width: 52px; text-align: center; transition: background 0.3s, color 0.3s; }
+.lg-mult.hot { background: #f59e0b; color: #201500; }
 .lg-lives { display: inline-flex; gap: 3px; font-size: 16px; color: #e34d5b; }
 .lg-lives .lost { opacity: 0.22; }
 .lg-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; }
@@ -1358,6 +1393,17 @@ const CSS = `
   background: radial-gradient(ellipse at center, transparent 52%, rgba(20,30,50,0.55) 100%);
 }
 .lg-flash { position: absolute; inset: 0; border-radius: 12px; pointer-events: none; background: rgba(220,40,40,0.5); opacity: 0; }
+.lg-balgauge {
+	position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%);
+	width: 150px; height: 12px; border-radius: 999px; pointer-events: none;
+	background: rgba(10, 25, 45, 0.55); border: 1px solid rgba(255,255,255,0.5);
+	opacity: 0; transition: opacity 0.25s;
+}
+.lg-balgauge::before { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: rgba(255,255,255,0.7); }
+.lg-balneedle {
+	position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
+	border-radius: 50%; background: #22d3ee; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
 .lg-boost {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
   background: rgba(40,140,255,0.85); color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.12em;

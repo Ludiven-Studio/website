@@ -13,6 +13,7 @@ import {
 	sepHalfAt,
 	jumpRiseAt,
 	jumpFlightDist,
+	scoreMultAt,
 	createLuge,
 	stepLuge,
 	type TrackSegment,
@@ -280,7 +281,7 @@ describe('luge simulation', () => {
 		expect(st.score).toBe(0);
 	});
 
-	it('score = floor(s) + bonusScore and speed stays bounded', () => {
+	it('score = floor(points) + bonusScore — each meter pays more at high speed', () => {
 		const seed = 5;
 		let segs = ensureSegments([], seed, 0);
 		let st = createLuge();
@@ -289,8 +290,14 @@ describe('luge simulation', () => {
 			st = stepLuge(st, { steer: 0 }, DT, segs).state;
 			if (st.status === 'over') break;
 		}
-		expect(st.score).toBe(Math.floor(st.s) + st.bonusScore);
+		expect(st.score).toBe(Math.floor(st.points) + st.bonusScore);
+		// Points stay inside the multiplier envelope.
+		expect(st.points).toBeGreaterThan(LUGE.scoreMultMin * st.s);
+		expect(st.points).toBeLessThanOrEqual(LUGE.scoreMultMax * st.s);
 		expect(st.speed).toBeLessThanOrEqual(60 * LUGE.boostMul * LUGE.bobVMaxMul + 1e-6);
+		// Cruising pays roughly double what crawling does.
+		const v = difficultyAt(1000).vMax;
+		expect(scoreMultAt(v, 1000)).toBeGreaterThan(scoreMultAt(v * 0.3, 1000) * 1.5);
 	});
 
 	it('berms are never lethal and keep the sled on the track', () => {
@@ -357,6 +364,39 @@ describe('luge simulation', () => {
 		// bonus + possible near-miss rewards while threading the danger lane
 		expect(dangerRun.state.bonusScore).toBeGreaterThanOrEqual(f.bonus);
 		expect(dangerRun.state.boostMs).toBeGreaterThan(0);
+	});
+
+	it('balance rail: hands-off tips the sled (life lost), active correction survives to the bonus', () => {
+		const { segs, fork } = findFork();
+		const f = fork.fork!;
+		const noseAbs = fork.startS + f.noseS;
+		const mergeAbs = fork.startS + f.mergeS;
+		const dangerSign = f.danger === 'left' ? 1 : -1;
+		const mk = (): LugeState => ({ ...createLuge(), s: noseAbs - 5, lat: dangerSign * 4, speed: 25 });
+
+		// Hands off: the wobble + instability tip the sled before the merge.
+		let st = mk();
+		let events: string[] = [];
+		while (st.s < mergeAbs + 5 && st.status === 'running') {
+			const r = stepLuge(st, { steer: 0 }, DT, segs);
+			st = r.state;
+			events.push(...r.events);
+		}
+		expect(events).toContain('balanceFall');
+		expect(st.lives).toBeLessThan(LUGE.lives);
+
+		// Bang-bang correction (lean against the fall): no fall, bonus collected.
+		st = mk();
+		events = [];
+		while (st.s < mergeAbs + 5 && st.status === 'running') {
+			const steer = -Math.sign(st.balance + st.balanceVel * 0.25);
+			const r = stepLuge(st, { steer }, DT, segs);
+			st = r.state;
+			events.push(...r.events);
+		}
+		expect(events).not.toContain('balanceFall');
+		expect(events).toContain('forkBonus');
+		expect(st.lives).toBe(LUGE.lives);
 	});
 
 	it('fork: hitting the separator nose head-on crashes and snaps to the safe lane', () => {
