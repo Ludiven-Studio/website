@@ -44,6 +44,7 @@ interface Particle {
 
 export default function TempoGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('ready');
+	const [auto, setAuto] = useState(false); // listen mode: the chart plays itself (music QA)
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [speedIdx, setSpeedIdx] = useState(1);
@@ -72,6 +73,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const rafRef = useRef(0);
 	const runningRef = useRef(false);
 	const statusRef = useRef<Status>('ready');
+	const autoRef = useRef(false);
 
 	const ctxRef = useRef<AudioContext | null>(null);
 	const masterRef = useRef<GainNode | null>(null);
@@ -121,13 +123,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (ctxRef.current.state === 'suspended') void ctxRef.current.resume();
 		return ctxRef.current;
 	};
-	const playPiano = (midi: number, sustain = 0.5): void => {
+	// `at` schedules ahead (listen mode) and routes through the run bus so Stop silences it.
+	const playPiano = (midi: number, sustain = 0.5, at?: number): void => {
 		const ctx = ensureAudio();
 		if (!ctx) return;
-		const when = ctx.currentTime;
+		const when = at ?? ctx.currentTime;
 		const freq = midiToFreq(midi);
 		const g = ctx.createGain();
-		g.connect(masterRef.current!);
+		g.connect(at != null ? (runGainRef.current ?? masterRef.current!) : masterRef.current!);
 		const peak = 0.2;
 		g.gain.setValueAtTime(0.0001, when);
 		g.gain.exponentialRampToValueAtTime(peak, when + 0.005);
@@ -371,9 +374,17 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		setResult(null);
 	}, []);
 
-	const startRun = (): void => {
+	const startRun = (listen = false): void => {
 		const ctx = ensureAudio();
 		if (!ctx) return;
+		autoRef.current = listen;
+		setAuto(listen);
+		if (listen) {
+			// Listen mode is pure playback — the backing + auto-lead must sound regardless
+			// of the Musique toggle, otherwise there'd be nothing to hear.
+			metroRef.current = true;
+			setMetro(true);
+		}
 		if (!dailyRef.current) seedRef.current = (Math.random() * 2 ** 32) >>> 0; // fresh tune each free run
 		prepare(speedRef.current);
 		// Fresh per-run audio bus: silences any groove still scheduled from a previous run.
@@ -391,7 +402,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		runningRef.current = true;
 		setStat('running');
 		setSubmitScore(undefined);
-		trackGame(gameId, 'game_started', { mode: dailyRef.current ? 'daily' : 'free' });
+		trackGame(gameId, 'game_started', { mode: listen ? 'listen' : dailyRef.current ? 'daily' : 'free' });
 	};
 
 	const finishRun = useCallback((): void => {
@@ -400,6 +411,13 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			runGainRef.current?.disconnect(); // stop any remaining scheduled groove
 		} catch {
 			/* ignore */
+		}
+		if (autoRef.current) {
+			// Listen mode: no score, no record — just return to the ready screen.
+			autoRef.current = false;
+			setAuto(false);
+			setStat('ready');
+			return;
 		}
 		const total = Math.max(1, accCountRef.current);
 		const rank = rankOf(accSumRef.current / total);
@@ -435,7 +453,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const gradeColor = (g: Grade): string => (g === 'Parfait' ? '#3ddc84' : g === 'Bien' ? '#7fd0ff' : g === 'Ok' ? '#ffd166' : '#ff6a6a');
 
 	const pressLane = (lane: number): void => {
-		if (!runningRef.current) return;
+		if (!runningRef.current || autoRef.current) return;
 		const chart = chartRef.current;
 		if (!chart) return;
 		laneFlashRef.current[lane] = animRef.current;
@@ -662,6 +680,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const t = tiles[mi];
 				const when = audioStartRef.current + t.time;
 				flute(when, t.midi, clamp(t.dur, 0.18, 2.2));
+				// Listen mode: the "player" piano plays itself, sample-accurate on the audio clock.
+				if (autoRef.current) playPiano(t.midi, t.hold ? t.dur : 0.5, when);
 				if (t.hold) {
 					// Répartie: arpeggiate the chord (root/3rd/5th/8ve) through the held note.
 					const c = chordBarAt(t.time);
@@ -683,6 +703,17 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		for (let i = 0; i < chart.tiles.length; i++) {
 			const t = chart.tiles[i];
 			const s = arr[i];
+			if (autoRef.current) {
+				// Listen mode: resolve tiles on time + flash the lane so the board animates.
+				// Piano is scheduled in the lookahead above. No energy, no miss, no fail.
+				if (s === 'pending' && now >= t.time) {
+					laneFlashRef.current[t.lane] = animRef.current;
+					arr[i] = t.hold ? 'holding' : 'Parfait';
+				} else if (s === 'holding' && now >= t.time + t.dur - 0.06) {
+					arr[i] = 'done';
+				}
+				continue;
+			}
 			if (s === 'pending') {
 				if (now - t.time > 0.28) {
 					arr[i] = 'Raté';
@@ -716,7 +747,18 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			}
 		}
 		if (dirty) setHud({ score: Math.round(scoreRef.current), combo: comboRef.current, mult: comboMult(comboRef.current) });
-		if (failed || now > chart.totalTime + 0.6) finishRun();
+		if (autoRef.current) {
+			// Loop the same tune end-to-end so the user can keep verifying it until they stop.
+			if (now > chart.totalTime + 0.6) {
+				stateArrRef.current = chart.tiles.map(() => 'pending');
+				backingIdxRef.current = 0;
+				melodyIdxRef.current = 0;
+				const ctx = ctxRef.current;
+				if (ctx) audioStartRef.current = ctx.currentTime + LEAD;
+			}
+		} else if (failed || now > chart.totalTime + 0.6) {
+			finishRun();
+		}
 	};
 
 	/* ---------- Draw ---------- */
@@ -868,21 +910,33 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="tp-hud">
-				<span className="tp-stat">
-					Score <strong>{hud.score}</strong>
-				</span>
-				<span className={`tp-stat ${hud.combo >= 5 ? 'hot' : ''}`}>
-					Combo <strong>{hud.combo}</strong>
-					{hud.mult > 1 && <em> ×{hud.mult}</em>}
-				</span>
-				<span className="tp-stat">
-					Record <strong>{best ?? '—'}</strong>
-				</span>
-			</div>
+			{auto && status === 'running' ? (
+				<div className="tp-hud">
+					<span className="tp-stat">🎧 Mode écoute — la mélodie se joue toute seule</span>
+				</div>
+			) : (
+				<div className="tp-hud">
+					<span className="tp-stat">
+						Score <strong>{hud.score}</strong>
+					</span>
+					<span className={`tp-stat ${hud.combo >= 5 ? 'hot' : ''}`}>
+						Combo <strong>{hud.combo}</strong>
+						{hud.mult > 1 && <em> ×{hud.mult}</em>}
+					</span>
+					<span className="tp-stat">
+						Record <strong>{best ?? '—'}</strong>
+					</span>
+				</div>
+			)}
 
 			<div className="tp-playwrap" ref={wrapRef}>
 				<canvas ref={canvasRef} className="tp-canvas" onPointerDown={onDown} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} />
+
+				{status === 'running' && auto && (
+					<button className="tp-stop" onClick={() => finishRun()}>
+						⏹ Arrêter l'écoute
+					</button>
+				)}
 
 				{status === 'ready' && !dailyLoading && (
 					<div className="tp-overlay">
@@ -891,9 +945,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 							<p>
 								Tape la colonne (clic/doigt ou <b>S D F&nbsp;J K L</b>) quand la tuile touche la ligne — une <b>musique donne le tempo</b>, cale-toi dessus. Les tuiles <b>allongées</b> se <b>maintiennent</b> pour un bonus. Ça <b>accélère</b> peu à peu&nbsp;: ton énergie baisse quand tu rates et remonte quand tu enchaînes.
 							</p>
-							<button className="tp-btn primary big" onClick={startRun}>
-								▶ Go&nbsp;!
-							</button>
+							<div className="tp-cta">
+								<button className="tp-btn primary big" onClick={() => startRun(false)}>
+									▶ Go&nbsp;!
+								</button>
+								<button className="tp-btn big" onClick={() => startRun(true)}>
+									🎧 Écouter
+								</button>
+							</div>
 						</div>
 					</div>
 				)}
@@ -910,7 +969,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 							<p>
 								Tuiles jouées <strong>{result.tiles}</strong> · plus long combo <strong>{maxComboRef.current}</strong>
 							</p>
-							<button className="tp-btn primary big" onClick={startRun}>
+							<button className="tp-btn primary big" onClick={() => startRun()}>
 								↻ Rejouer{daily ? ' (améliorer)' : ''}
 							</button>
 						</div>
@@ -951,6 +1010,8 @@ const CSS = `
 .tp-pill:disabled { opacity: 0.4; cursor: not-allowed; }
 .tp-toggle { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--gray-200); cursor: pointer; }
 .tp-toggle input { width: 14px; height: 14px; accent-color: var(--tp); }
+.tp-cta { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.tp-stop { position: absolute; top: 10px; right: 10px; z-index: 3; border: 1.5px solid var(--gray-700); background: rgba(12,16,24,0.82); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 12.5px; border-radius: 999px; padding: 7px 14px; cursor: pointer; backdrop-filter: blur(2px); }
 .tp-hud { display: flex; gap: 0.5rem; font-size: 14px; font-weight: 600; margin-bottom: 0.6rem; }
 .tp-stat { background: var(--gray-900); border-radius: 999px; padding: 6px 14px; font-variant-numeric: tabular-nums; }
 .tp-stat strong { margin-left: 4px; color: var(--tp); }
