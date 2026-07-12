@@ -165,9 +165,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			busesRef.current = {
 				piano: mkBus('lowpass', 2600, 0.5),
 				gtr: mkBus('lowpass', 1800, 0.7),
-				bassGtr: mkBus('lowpass', 1300, 0.8),
-				brass: mkBus('lowpass', 1700, 0.8),
-				cello: mkBus('lowpass', 950, 0.6),
+				bassGtr: mkBus('lowpass', 1100, 0.7),
+				brass: mkBus('lowpass', 1500, 0.8),
+				cello: mkBus('lowpass', 800, 0.6),
 				snare: mkBus('bandpass', 1900, 0.6),
 				strings: mkBus('lowpass', 1500, 0.5),
 				reed: mkBus('lowpass', 2000, 0.8),
@@ -298,7 +298,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		g.gain.exponentialRampToValueAtTime(accent ? 0.13 : 0.08, when + 0.02);
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
 		const o = ctx.createOscillator();
-		o.type = 'triangle';
+		o.type = 'sine'; // pure sub: rounder and deeper than triangle
 		o.frequency.value = midiToFreq(midi);
 		o.connect(g);
 		o.start(when);
@@ -314,7 +314,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		g.gain.setValueAtTime(0.0001, when);
 		g.gain.exponentialRampToValueAtTime(accent ? 0.2 : 0.15, when + 0.008);
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.28);
-		for (const [mult, amp, type] of [[1, 1, 'triangle'], [1, 0.35, 'sawtooth'], [2, 0.28, 'triangle']] as [number, number, OscillatorType][]) {
+		for (const [mult, amp, type] of [[1, 1, 'triangle'], [1, 0.2, 'sawtooth'], [2, 0.24, 'triangle']] as [number, number, OscillatorType][]) {
 			const o = ctx.createOscillator();
 			o.type = type;
 			o.frequency.value = midiToFreq(midi) * mult;
@@ -326,18 +326,19 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.stop(when + 0.3);
 		}
 	};
-	// Synth bass: legato filtered saw+triangle — holds the low end in long notes.
+	// Synth bass: deep legato — SINE fundamental + soft detuned triangle, no raw
+	// saw (round and warm rather than electronic).
 	const synthBass = (when: number, midi: number, dur: number, accent: boolean): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const g = ctx.createGain();
 		g.connect(busOut('bassGtr'));
-		const peak = accent ? 0.14 : 0.11;
+		const peak = accent ? 0.16 : 0.13;
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(peak, when + 0.03);
-		g.gain.setValueAtTime(peak, when + Math.max(0.03, dur - 0.12));
+		g.gain.exponentialRampToValueAtTime(peak, when + 0.04);
+		g.gain.setValueAtTime(peak, when + Math.max(0.04, dur - 0.12));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-		for (const [det, amp, type] of [[-5, 1, 'sawtooth'], [5, 0.7, 'triangle']] as [number, number, OscillatorType][]) {
+		for (const [det, amp, type] of [[0, 1, 'sine'], [5, 0.55, 'triangle']] as [number, number, OscillatorType][]) {
 			const o = ctx.createOscillator();
 			o.type = type;
 			o.frequency.value = midiToFreq(midi);
@@ -376,24 +377,25 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.stop(when + dur + 0.1);
 		}
 	};
-	// Bowed cello: slow-attack dark saws — sings the bass line legato.
+	// Bowed cello: SINE foundation + soft detuned saws for the bow's grain —
+	// deep and warm, the saws only color the sustain.
 	const cello = (when: number, midi: number, dur: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const g = ctx.createGain();
 		g.connect(busOut('cello'));
-		const atk = Math.min(0.15, dur * 0.3);
+		const atk = Math.min(0.18, dur * 0.3);
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(0.13, when + atk);
-		g.gain.setValueAtTime(0.13, when + Math.max(atk, dur - 0.15));
+		g.gain.exponentialRampToValueAtTime(0.14, when + atk);
+		g.gain.setValueAtTime(0.14, when + Math.max(atk, dur - 0.15));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-		for (const det of [-4, 4]) {
+		for (const [det, amp, type] of [[0, 0.9, 'sine'], [-4, 0.35, 'sawtooth'], [4, 0.35, 'sawtooth']] as [number, number, OscillatorType][]) {
 			const o = ctx.createOscillator();
-			o.type = 'sawtooth';
+			o.type = type;
 			o.frequency.value = midiToFreq(midi);
 			o.detune.value = det;
 			const og = ctx.createGain();
-			og.gain.value = 0.6;
+			og.gain.value = amp;
 			o.connect(og);
 			og.connect(g);
 			o.start(when);
@@ -409,22 +411,24 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!ctx) return;
 		const lp = ctx.createBiquadFilter();
 		lp.type = 'lowpass';
-		lp.frequency.setValueAtTime(650, when);
-		lp.frequency.linearRampToValueAtTime(1050, when + dur * 0.5);
-		lp.frequency.linearRampToValueAtTime(700, when + dur);
-		lp.Q.value = 0.6;
+		lp.frequency.setValueAtTime(550, when);
+		lp.frequency.linearRampToValueAtTime(850, when + dur * 0.5);
+		lp.frequency.linearRampToValueAtTime(600, when + dur);
+		lp.Q.value = 0.5;
 		const g = ctx.createGain();
 		g.connect(lp);
 		lp.connect(runGainRef.current ?? masterRef.current!);
 		const attack = 0.06;
 		const rel = 0.3;
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(0.1, when + attack);
-		g.gain.setValueAtTime(0.1, when + Math.max(attack, dur - rel));
+		g.gain.exponentialRampToValueAtTime(0.11, when + attack);
+		g.gain.setValueAtTime(0.11, when + Math.max(attack, dur - rel));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-		for (const [semi, amp] of [[0, 1], [7, 0.5], [12, 0.3], [12 + third, 0.28]]) {
+		// Warm stack: SINE fundamental (deep), triangles for body, one quiet saw
+		// for color — soft instead of buzzy-electronic.
+		for (const [semi, amp, type] of [[0, 1, 'sine'], [7, 0.5, 'triangle'], [12, 0.35, 'triangle'], [12 + third, 0.22, 'sawtooth']] as [number, number, OscillatorType][]) {
 			const o = ctx.createOscillator();
-			o.type = 'sawtooth';
+			o.type = type;
 			o.frequency.value = midiToFreq(root + semi);
 			o.detune.value = semi === 0 ? -4 : 3; // slight chorus
 			const og = ctx.createGain();
