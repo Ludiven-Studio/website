@@ -4,7 +4,7 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
-import { LANES, SPEEDS, ENDLESS_OPTS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type Grade } from './engine';
+import { LANES, SPEEDS, ENDLESS_OPTS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type ChordBar, type Grade } from './engine';
 
 /* =====================================================
    TEMPO — piano-tiles rhythm game (prototype).
@@ -34,8 +34,8 @@ const BASS_RIFFS: { e: number; t: 'r' | '5' | 'o' | 'w'; a?: boolean }[][] = [
 	[{ e: 0, t: 'r', a: true }, { e: 2, t: 'r' }, { e: 4, t: '5', a: true }, { e: 6, t: 'r' }, { e: 7, t: 'o' }], // driving
 	[{ e: 0, t: 'r', a: true }, { e: 3, t: '5' }, { e: 5, t: 'r' }, { e: 7, t: 'w' }], // syncopated
 ];
-// Guitar arpeggio pingpong over [root, 3rd, 5th, octave] — up the bar, then down.
-const GTR_PING = [0, 1, 2, 3, 2, 1, 0, 1];
+// Guitar arpeggio pingpong over [root, 3rd, 5th, 7th, 9th] — up the bar, then down.
+const GTR_PING = [0, 1, 2, 3, 4, 3, 2, 1];
 
 interface DailyState {
 	best: number;
@@ -393,8 +393,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		o.stop(when + 0.13);
 	};
 	// String ensemble (violins): detuned saws, slow swell, mid-high register —
-	// carries the chord's color (3rd + 5th + octave) above the synth pad.
-	const strings = (when: number, dur: number, root: number, third: number): void => {
+	// carries the ninth chord's color (3rd + 7th + 9th) above the synth pad.
+	const strings = (when: number, dur: number, root: number, third: number, seventh: number, ninth: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const lp = ctx.createBiquadFilter();
@@ -410,7 +410,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		g.gain.exponentialRampToValueAtTime(0.04, when + atk);
 		g.gain.setValueAtTime(0.04, when + Math.max(atk, dur - rel));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-		for (const [semi, det] of [[third + 12, -6], [19, 5], [24, -3]]) {
+		for (const [semi, det] of [[third + 12, -6], [seventh + 12, 5], [ninth + 12, -3]]) {
 			const o = ctx.createOscillator();
 			o.type = 'sawtooth';
 			o.frequency.value = midiToFreq(root + semi);
@@ -752,7 +752,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const i = backingIdxRef.current;
 				const when = audioStartRef.current + bt[i];
 				const accent = i % 4 === 0;
-				const { root, third } = chordAt(i);
+				const { root, third, seventh, ninth } = chordAt(i);
 				const chordRoot = chart.key + root;
 				// Chord-only intro: pad + strings + guitar + bass set the harmony first,
 				// the drums only enter with the melody.
@@ -791,9 +791,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						bassGtr(when + (ev.e % 2) * (beatDur / 2), m, !!ev.a);
 					}
 				}
-				// Guitar comp: the chord's tones arpeggiated UP then DOWN across the bar
-				// (two 8ths per beat — root→3rd→5th→octave→5th→3rd pingpong).
-				const ladder = [0, third, 7, 12];
+				// Guitar comp: the full ninth chord arpeggiated UP then DOWN across the
+				// bar (two 8ths per beat — root→3rd→5th→7th→9th→7th→5th→3rd).
+				const ladder = [0, third, 7, seventh, ninth];
 				for (const half of [0, 1]) {
 					const e = (i % 4) * 2 + half;
 					gtr(when + (half * beatDur) / 2, chordRoot + 12 + ladder[GTR_PING[e]]);
@@ -804,7 +804,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					// violins swell in above it).
 					const barDur = bt[Math.min(i + 4, bt.length - 1)] - bt[i] || 2;
 					pad(when, Math.max(0.6, barDur) + 0.25, chordRoot - 12, third);
-					strings(when, Math.max(0.6, barDur), chordRoot, third);
+					strings(when, Math.max(0.6, barDur), chordRoot, third, seventh, ninth);
 				}
 				backingIdxRef.current++;
 			}
@@ -812,7 +812,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			// answers in the gaps (fills a held note with a chord arpeggio) and now
 			// and then echoes a phrase an octave lower ("reprise").
 			const tiles = chart.tiles;
-			const chordBarAt = (time: number): { root: number; third: number } => {
+			const chordBarAt = (time: number): ChordBar => {
 				let b = 0;
 				while (b + 1 < bt.length && bt[b + 1] <= time) b++;
 				return chordAt(b);
@@ -825,11 +825,11 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				// Listen mode: the "player" piano plays itself, sample-accurate on the audio clock.
 				if (autoRef.current) playPiano(t.midi, t.hold ? t.dur : 0.5, when);
 				if (t.hold) {
-					// Répartie: arpeggiate the chord (root/3rd/5th/8ve) through the held note.
+					// Répartie: arpeggiate the chord (root/3rd/5th/7th) through the held note.
 					const c = chordBarAt(t.time);
 					let base = chart.key + c.root;
 					while (base < t.midi - 8) base += 12; // lift near the melody's register
-					const tones = [base, base + c.third, base + 7, base + 12];
+					const tones = [base, base + c.third, base + 7, base + c.seventh];
 					const steps = Math.min(4, Math.max(1, Math.floor(t.dur / 0.3)));
 					for (let k = 1; k <= steps; k++) reed(when + (t.dur * k) / (steps + 1), tones[(k - 1) % 4], 0.32, 0.05);
 				} else if (mi % 8 === 5 && tiles[mi + 1]) {

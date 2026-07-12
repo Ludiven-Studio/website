@@ -10,9 +10,14 @@ import { mulberry32 } from '../prng';
 export const LANES = 6; // columns, ordered low pitch (left) → high pitch (right)
 export const HOLD_BEATS = 3; // a note this long (or longer) becomes a hold tile
 
+// A diatonic NINTH chord (5 notes: root, 3rd, 5th, 7th, 9th stacked in the
+// scale). Degrees are filtered so the fifth is always perfect and the ninth
+// always major — every combination is consonant.
 export interface ChordBar {
 	root: number; // semitones from key
 	third: number; // 3 (minor) or 4 (major)
+	seventh: number; // 10 (minor) or 11 (major)
+	ninth: number; // 14
 }
 export interface SongNote {
 	midi: number;
@@ -59,19 +64,49 @@ export interface Chart {
 
 /* --- Music theory scaffolding for the generator -------------------------- */
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]; // major scale, semitones per scale-STEP
-// 4-bar progressions (scale-STEP roots). ONE is seed-picked per song and LOOPS
-// for the whole tune: the melody develops over a stable, repeating harmonic
-// base. Melody snapping and the backing both derive from it, bar for bar.
-const PROGRESSIONS: number[][] = [
-	[0, 4, 5, 3], // I  V  vi IV
-	[5, 3, 0, 4], // vi IV I  V
-	[0, 5, 3, 4], // I  vi IV V
-];
-/** Chord of a scale-step root as semitones from key (third: 4 major, 3 minor). */
+// Progression degree pools. iii is excluded (its diatonic 9th is a flat 9 —
+// dissonant) and vii° too (diminished fifth). Majors and minors ALTERNATE in
+// the generated loop, and roots move by strong intervals (falling fifth,
+// falling third, rising second), which is what makes a chord loop "turn" well.
+const MAJOR_DEGREES = [0, 3, 4]; // I  IV V
+const MINOR_DEGREES = [1, 5]; // ii vi
+// Scale-step deltas mod 7, strongest first: down 5th, down 3rd, down 4th,
+// up 2nd, down 2nd. Only the ascending 3rd (+2) is excluded as weak.
+const STRONG_MOTIONS = [3, 5, 4, 1, 6];
+/** Diatonic ninth chord of a scale-step root, as semitones from the key. */
 const chordBarOf = (rootStep: number): ChordBar => {
-	const root = MAJOR[((rootStep % 7) + 7) % 7];
-	const third = (MAJOR[(((rootStep + 2) % 7) + 7) % 7] - root + 12) % 12;
-	return { root, third };
+	const r = ((rootStep % 7) + 7) % 7;
+	const iv = (n: number): number => (MAJOR[(r + n) % 7] - MAJOR[r] + 12) % 12;
+	return { root: MAJOR[r], third: iv(2), seventh: iv(6), ninth: iv(1) + 12 };
+};
+/**
+ * Seeded 4-chord loop: alternating major/minor degrees linked by strong root
+ * motion, ending on a degree that pulls back to the loop's start. Rejection
+ * sampling with a safe fallback (I–vi–IV–ii).
+ */
+const makeProgression = (rng: () => number): number[] => {
+	const pickFrom = <T>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
+	for (let attempt = 0; attempt < 20; attempt++) {
+		const startMajor = rng() < 0.6;
+		const prog = [startMajor ? pickFrom(MAJOR_DEGREES) : pickFrom(MINOR_DEGREES)];
+		let ok = true;
+		for (let k = 1; k < 4; k++) {
+			const pool = (k % 2 === 0) === startMajor ? MAJOR_DEGREES : MINOR_DEGREES;
+			// Prefer the strongest root motion available from the previous chord.
+			const cands = STRONG_MOTIONS.map((m) => (prog[k - 1] + m) % 7).filter((d) => pool.includes(d) && d !== prog[k - 1]);
+			if (!cands.length) {
+				ok = false;
+				break;
+			}
+			prog.push(cands[Math.floor(rng() * cands.length)]);
+		}
+		if (!ok) continue;
+		if (new Set(prog).size !== 4) continue; // 4 DIFFERENT chords, no shortcuts
+		// The loop must turn: last → first is also a strong motion.
+		if (!STRONG_MOTIONS.includes((prog[0] - prog[3] + 7) % 7)) continue;
+		return prog;
+	}
+	return [0, 5, 3, 1]; // I vi IV ii — always safe
 };
 const MIN_STEP = -1; // register floor  (~ a 7th below the tonic)
 const MAX_STEP = 11; // register ceiling (~ a 4th above the octave) → ~1.5 octaves
@@ -136,17 +171,19 @@ const BRIDGE_ARCHS: [number, number, number][] = [ARCHETYPES[5], ARCHETYPES[0]];
 
 const degToMidi = (tonic: number, step: number): number => tonic + Math.floor(step / 7) * 12 + MAJOR[((step % 7) + 7) % 7];
 const clampStep = (s: number): number => Math.max(MIN_STEP, Math.min(MAX_STEP, s));
+// Chord-tone scale-step offsets of a ninth chord: root, 3rd, 5th, 7th, 9th.
+const CHORD_TONE_OFFSETS = [0, 2, 4, 6, 8];
 /**
- * Nearest chord tone (root / 3rd / 5th of the given chord) to `step`, kept in
- * register. `exclude` skips one step — used to break note repetitions by
- * picking the SECOND nearest chord tone instead.
+ * Nearest chord tone (of the full ninth chord) to `step`, kept in register.
+ * `exclude` skips one step — used to break note repetitions by picking the
+ * SECOND nearest chord tone instead.
  */
 const nearestChordTone = (step: number, chordRootStep: number, exclude?: number): number => {
 	let best = step;
 	let bestDist = Infinity;
 	for (let oct = -7; oct <= 14; oct += 7) {
-		for (const t of [chordRootStep, chordRootStep + 2, chordRootStep + 4]) {
-			const cand = t + oct;
+		for (const o of CHORD_TONE_OFFSETS) {
+			const cand = chordRootStep + o + oct;
 			if (cand < MIN_STEP || cand > MAX_STEP || cand === exclude) continue;
 			const dist = Math.abs(cand - step);
 			if (dist < bestDist) {
@@ -161,15 +198,16 @@ const nearestChordTone = (step: number, chordRootStep: number, exclude?: number)
 const toPenta = (step: number): number => (BAD_PENTA.has(((step % 7) + 7) % 7) ? clampStep(step + 1) : step);
 /**
  * Classic "avoid note": a pitch one semitone ABOVE a chord tone clashes with it
- * (e.g. the 4th over a major chord, or the tonic over V). Passing notes that
- * land there get resolved down onto the chord tone below.
+ * (e.g. the 4th over a major chord, or the tonic over V). Chord tones themselves
+ * are never avoid notes (the root sits a semitone above a major 7th and must
+ * stay legal). Passing notes that land there resolve down onto the tone below.
  */
 const isAvoidNote = (step: number, chordRootStep: number): boolean => {
-	const pc = MAJOR[((step % 7) + 7) % 7];
-	for (const t of [chordRootStep, chordRootStep + 2, chordRootStep + 4]) {
-		if ((pc - MAJOR[((t % 7) + 7) % 7] + 12) % 12 === 1) return true;
-	}
-	return false;
+	const pcOf = (s: number): number => MAJOR[((s % 7) + 7) % 7];
+	const pc = pcOf(step);
+	const tones = CHORD_TONE_OFFSETS.map((o) => pcOf(chordRootStep + o));
+	if (tones.includes(pc)) return false; // chord membership wins
+	return tones.some((t) => (pc - t + 12) % 12 === 1);
 };
 /** Closest tonic degree (unison or octave, in register) for the final cadence. */
 const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(step - 7) ? 0 : 7);
@@ -191,10 +229,10 @@ const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(s
  */
 export function generateEndlessSong(seed: number, count = 600): Song {
 	const rng = mulberry32(seed >>> 0);
-	const KEY = 43; // tonic midi for the bass accompaniment (G2)
-	const TONIC = 55; // tonic midi the melody sings around (G3)
+	const KEY = 38 + Math.floor(rng() * 12); // seed-picked tonic (D2..C#3) — every song has its own color
+	const TONIC = KEY + 12; // tonic midi the melody sings around
 	const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rng() * arr.length)];
-	const prog = pick(PROGRESSIONS); // the song's repeating harmonic base
+	const prog = makeProgression(rng); // the song's repeating harmonic base
 	const notes: SongNote[] = [];
 	const chords: ChordBar[] = [];
 	const sections: Section[] = [];
@@ -222,11 +260,12 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		lastStep = s;
 		notes.push({ midi: degToMidi(TONIC, s), dur, lane: laneOfStep(s) });
 	};
-	// Chord tones of `rootStep` across the register, sorted — for arpeggio bars.
+	// Chord tones of `rootStep` across the register (incl. the 7th), sorted —
+	// for arpeggio bars.
 	const chordLadder = (rootStep: number): number[] => {
 		const tones: number[] = [];
 		for (let oct = -7; oct <= 14; oct += 7)
-			for (const t of [rootStep, rootStep + 2, rootStep + 4]) {
+			for (const t of [rootStep, rootStep + 2, rootStep + 4, rootStep + 6]) {
 				const c = t + oct;
 				if (c >= MIN_STEP && c <= MAX_STEP) tones.push(c);
 			}
@@ -456,10 +495,11 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	// One chord per bar, padded to cover the whole grid. The intro states the
 	// song's full 4-chord loop once, so the melody enters on the loop's restart.
 	const songChords = song.chords ?? [];
-	const introChords = songChords.length >= 4 ? songChords.slice(0, 4) : Array.from({ length: 4 }, () => ({ root: 0, third: 4 }));
+	const FALLBACK_CHORD: ChordBar = { root: 0, third: 4, seventh: 11, ninth: 14 };
+	const introChords = songChords.length >= 4 ? songChords.slice(0, 4) : Array.from({ length: 4 }, () => ({ ...FALLBACK_CHORD }));
 	const barCount = Math.ceil(totalBeats / 4);
 	const chords = [...introChords, ...songChords].slice(0, barCount);
-	while (chords.length < barCount) chords.push(chords[chords.length - 1] ?? { root: 0, third: 4 });
+	while (chords.length < barCount) chords.push(chords[chords.length - 1] ?? FALLBACK_CHORD);
 	// Per-bar section labels, intro included — the backing derives fills & drops.
 	const introSections: Section[] = ['I', 'I', 'I', 'I'];
 	const sections: Section[] = [...introSections, ...(song.sections ?? [])].slice(0, barCount);
