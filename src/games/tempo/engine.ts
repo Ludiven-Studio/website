@@ -168,9 +168,16 @@ const ARCHETYPES: [number, number, number][] = [
 const VERSE_ARCHS: [number, number, number][] = [ARCHETYPES[0], ARCHETYPES[2], ARCHETYPES[4]];
 const CHORUS_ARCHS: [number, number, number][] = [ARCHETYPES[1], ARCHETYPES[3], ARCHETYPES[4]];
 const BRIDGE_ARCHS: [number, number, number][] = [ARCHETYPES[5], ARCHETYPES[0]];
-// Narrative register lift per bar: statement, sequence up (the "march"),
-// CLIMAX, back down for the cadence — phrases go somewhere instead of drifting.
-const BAR_LIFT = [0, 1, 3, 0];
+// Arrival-note CONTOURS: per-bar register offsets for each bar's target note.
+// Seed-picked per theme, so phrases land on different notes with different
+// shapes — arch, descent, early peak, dip-then-climb, gentle rise.
+const CONTOURS: number[][] = [
+	[0, 2, 4, 0], // arch to a late peak
+	[4, 2, 1, 0], // long descent home
+	[0, 4, 2, 0], // early peak, settle
+	[2, 0, 4, 0], // dip, then climb
+	[0, 1, 3, 0], // gentle rise
+];
 
 const degToMidi = (tonic: number, step: number): number => tonic + Math.floor(step / 7) * 12 + MAJOR[((step % 7) + 7) % 7];
 const clampStep = (s: number): number => Math.max(MIN_STEP, Math.min(MAX_STEP, s));
@@ -227,11 +234,11 @@ const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(s
  * returning sections are recognizable. Inside a theme, an ARCHETYPE picks rhythm
  * densities and the pitch line follows a FIBONACCI walk (mod 8 → scale degrees
  * around the section's register), snapped to the harmony with a no-repeat
- * rule. Each theme tells a story: bar 0 states an idea, bars 1-2 SEQUENCE it
- * upward toward a climax (BAR_LIFT), and every cadence resolves through an
- * upper-neighbor appoggiatura. ONE seed-picked progression loops for the whole
- * song and is returned alongside the notes so the backing follows the same
- * harmony.
+ * rule. Each theme is built on ARRIVAL NOTES: a seed-picked contour lays one
+ * target chord tone per bar, and the line WALKS toward each arrival — phrases
+ * land somewhere deliberate, and different themes land differently. ONE
+ * seed-picked progression loops for the whole song and is returned alongside
+ * the notes so the backing follows the same harmony.
  */
 export function generateEndlessSong(seed: number, count = 600): Song {
 	const rng = mulberry32(seed >>> 0);
@@ -301,20 +308,34 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 			return v;
 		};
 
+		// ARRIVAL-NOTE architecture: pick one target note per bar (a chord tone
+		// laid on a seed-picked CONTOUR), then walk each bar's interior TOWARD its
+		// arrival. Phrases differ by contour instead of all sharing one fixed arc,
+		// and every bar lands somewhere deliberate.
+		const contour = pick(CONTOURS);
+		const targets: number[] = [];
+		for (let bar = 0; bar < 4; bar++) {
+			const jitter = Math.floor(rng() * 3) - 1; // -1..+1: same contour, different notes
+			targets.push(nearestChordTone(clampStep(startStep + contour[bar] + jitter), prog[bar]));
+		}
+		// The final arrival keeps its cadential function: tonic — or a V tone when
+		// the loop ends open on V (pulls into the next section's restart on I).
+		targets[3] = prog[3] === 4 ? nearestChordTone(clampStep(startStep + 2), 4) : nearestTonic(clampStep(startStep));
+
 		const theme: ThemeEv[][] = [];
-		const barAVals: number[] = []; // bar 0's Fibonacci degrees, replayed in bar 2
 		let step = clampStep(startStep); // the section's register anchor
 		let prev: number | null = null; // last melody step, for the no-repeat rule
 
 		for (let bar = 0; bar < 4; bar++) {
 			const chordRootStep = prog[bar];
 			const rhythm = bars[bar];
-			// Only the QUESTION bar may walk the chord instead of the line — an arp
-			// in the statement or climax bar would break the narrative sequence.
+			// The QUESTION bar may walk the chord instead of the line (it still
+			// lands on its arrival note).
 			const arp = bar === 1 && rng() < 0.15;
 			let arpDir = arp && rng() < 0.5 ? -1 : 1;
 			const ladder = arp ? chordLadder(chordRootStep) : [];
 			let arpIdx = arp ? Math.max(0, ladder.indexOf(nearestChordTone(step, chordRootStep))) : 0;
+			const noteCount = rhythm.filter((e) => !e.rest).length;
 			let beatInBar = 0;
 			let noteInBar = 0;
 			const out: ThemeEv[] = [];
@@ -324,7 +345,10 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 					beatInBar += ev.d;
 					continue;
 				}
-				if (arp) {
+				if (noteInBar === noteCount - 1) {
+					// The bar's ARRIVAL: land exactly on the target (already a chord tone).
+					step = targets[bar];
+				} else if (arp) {
 					if (noteInBar > 0) {
 						let ni = arpIdx + arpDir;
 						if (ni < 0 || ni >= ladder.length) {
@@ -336,12 +360,15 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 					step = ladder[arpIdx];
 				} else {
 					const strong = beatInBar % 2 === 0; // beats 1 & 3 = harmonic anchors
-					// Narrative arc: bar 0 states an idea, bars 1-2 SEQUENCE it upward
-					// (melodic march toward the bar-2 climax), bar 3 falls to the cadence.
-					const v = bar > 0 && bar < 3 && noteInBar < barAVals.length ? barAVals[noteInBar] : nextFib();
-					if (bar === 0) barAVals.push(v);
-					// Degree v (0..7) spans an octave of the scale around the anchor.
-					step = clampStep(startStep + v - 2 + BAR_LIFT[bar]);
+					// Directed walk: cover the remaining gap to the arrival in roughly
+					// equal steps, with a Fibonacci wobble for character.
+					const remaining = noteCount - noteInBar;
+					const gap = targets[bar] - step;
+					let delta = Math.round(gap / remaining);
+					const v = nextFib();
+					if (delta === 0) delta = v >= 4 ? 1 : -1; // keep moving, direction by fib
+					else if (v % 3 === 0) delta += v >= 4 ? 1 : -1; // detour, recovered next step
+					step = clampStep(step + delta);
 					// Chord tone on strong beats AND on long notes (they ring against the
 					// chord); pentatonic passing note on short weak beats — resolved down
 					// when it lands on the chord's avoid note (semitone above a chord tone).
@@ -353,7 +380,7 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 					// No immediate repeats: snapping can converge on the previous note —
 					// push to the next chord tone (or diatonic neighbor) instead.
 					if (step === prev) {
-						const dir = v >= 4 ? 1 : -1;
+						const dir = gap > 0 ? 1 : -1;
 						if (strong || ev.d >= 2) step = nearestChordTone(clampStep(prev + dir), chordRootStep, prev);
 						else {
 							step = toPenta(clampStep(prev + dir));
@@ -366,31 +393,6 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 				out.push({ d: ev.d, step });
 				beatInBar += ev.d;
 				noteInBar++;
-			}
-			// Cadences (recorded into the theme so every replay closes the same way):
-			// bar 1 closes on its own chord, bar 3 on the tonic — or a V tone when the
-			// loop ends open on V (pulls into the next section's restart on I). The
-			// note BEFORE the resolution becomes its upper neighbor (appoggiatura):
-			// the tension-release "sigh" that makes a cadence feel sung.
-			if (bar === 1 || bar === 3) {
-				const target = bar === 1 ? nearestChordTone(step, prog[1]) : prog[3] === 4 ? nearestChordTone(step, 4) : nearestTonic(step);
-				let li = -1;
-				for (let i = out.length - 1; i >= 0; i--) {
-					if (!out[i].rest) {
-						li = i;
-						break;
-					}
-				}
-				if (li >= 0) {
-					out[li].step = target;
-					for (let i = li - 1; i >= 0; i--) {
-						if (!out[i].rest) {
-							out[i].step = clampStep(target + 1);
-							break;
-						}
-					}
-					step = target;
-				}
 			}
 			theme.push(out);
 		}
@@ -450,15 +452,14 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	const themeB = makeTheme(4, CHORUS_ARCHS); // refrain
 	const themeC = makeTheme(2, BRIDGE_ARCHS); // pont
 	// Shape the stories around the hook.
-	// Couplet: motif stated (rise + fall), then DEVELOPED a third higher — the
-	// classic sequence-to-climax — then the generated cadence resolves it.
-	// Refrain: opens on an upward 5th LEAP (the epic call), sequences its idea
-	// (BAR_LIFT), quotes the motif's rise in bar 2, cadences from up high.
-	// The motif's tonal notes sit inside every diatonic ninth chord, so the
-	// verbatim quotes stay consonant over the rotating bars.
+	// Couplet: motif stated (rise + fall, bars 0-1), then a FREE contour-driven
+	// answer (bars 2-3) — the hook recurs without freezing the whole phrase.
+	// Refrain: opens on an upward 5th LEAP (the epic call), walks its arrivals,
+	// quotes the motif's rise in bar 2, cadences from up high. The motif's tonal
+	// notes sit inside every diatonic ninth chord, so the verbatim quotes stay
+	// consonant over the rotating bars.
 	themeA[0] = motif[0];
 	themeA[1] = motif[1];
-	themeA[2] = motif[0].map((e) => (e.rest ? e : { ...e, step: clampStep(e.step! + 2) }));
 	{
 		const opening = themeB[0].filter((e) => !e.rest);
 		if (opening.length >= 2) {
