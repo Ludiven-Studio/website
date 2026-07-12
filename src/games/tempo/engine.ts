@@ -217,10 +217,11 @@ const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(s
  * Deterministic from the seed. The melody is still PLAYED by the player's taps;
  * this only shapes which notes fall when. Long enough to outlast any run.
  *
- * Three 4-bar THEMES are composed once — couplet (A, mid register, calm),
- * refrain (B, higher, flowing) and pont (C, sparse contrast) — then replayed
- * VERBATIM following a pop form (A A B B A B C B, cycled), so returning
- * sections are recognizable. Inside a theme, an ARCHETYPE picks rhythm
+ * A recurring MOTIF (tonic → arch up → back to tonic) plus three 4-bar THEMES
+ * are composed once — couplet (A, mid register, opens with the motif), refrain
+ * (B, higher, quotes the motif's rise) and pont (C, sparse contrast) — then
+ * replayed VERBATIM following a pop form (A A B B A B C B, cycled), so
+ * returning sections are recognizable. Inside a theme, an ARCHETYPE picks rhythm
  * densities and the pitch line follows a FIBONACCI walk (mod 8 → scale degrees
  * around the section's register), snapped to the harmony with a no-repeat
  * rule; bar 3 replays bar 1's degrees (varied repeat). ONE seed-picked
@@ -405,12 +406,36 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		}
 	};
 
-	// Compose the song's three themes, then cycle a pop form. The refrain sits
-	// higher than the couplet so its return is unmistakable; the pont breathes.
-	// Each theme states itself plainly first, then varies on later returns.
+	// The song's HOOK: a 2-bar arch phrase — starts ON THE TONIC, climbs toward
+	// a high fundamental (octave), and settles back down on the tonic. Quoted at
+	// several points of the form so the ear keeps finding it again.
+	const makeMotif = (): ThemeEv[][] => {
+		const mid = 1 + Math.floor(rng() * 2); // 2nd or 3rd degree
+		const high = 3 + Math.floor(rng() * 2); // 4th or 5th
+		const peak = rng() < 0.7 ? 7 : 8; // the arch's top: octave (or the 9th)
+		const fall = rng() < 0.5 ? 4 : 2; // stepping stone on the way back down
+		const rise: ThemeEv[] =
+			rng() < 0.4
+				? [{ d: 1, step: 0 }, { d: 1, step: mid }, { d: 1, step: high }, { d: 1, step: high + 2 }]
+				: [{ d: 1, step: 0 }, { d: 1, step: mid }, { d: 2, step: high }];
+		const back: ThemeEv[] = [{ d: 1, step: peak }, { d: 1, step: fall }, { d: 2, step: 0 }];
+		return [rise, back];
+	};
+
+	// Compose the motif and the three themes, then cycle a pop form. The refrain
+	// sits higher than the couplet so its return is unmistakable; the pont
+	// breathes. Each theme states itself plainly first, then varies on returns.
+	const motif = makeMotif();
 	const themeA = makeTheme(0, VERSE_ARCHS); // couplet
 	const themeB = makeTheme(4, CHORUS_ARCHS); // refrain
 	const themeC = makeTheme(2, BRIDGE_ARCHS); // pont
+	// Quote the hook: the couplet OPENS with the full arch (bars 0-1), the
+	// refrain restates its rise mid-phrase (bar 2). The motif's tonal notes
+	// (tonic-triad degrees) sit inside every diatonic ninth chord, so verbatim
+	// quotes stay consonant over the rotating bars.
+	themeA[0] = motif[0];
+	themeA[1] = motif[1];
+	themeB[2] = motif[0];
 	const FORM: [ThemeEv[][], Section][] = [
 		[themeA, 'A'],
 		[themeA, 'A'],
