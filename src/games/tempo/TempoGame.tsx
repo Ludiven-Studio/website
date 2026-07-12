@@ -111,14 +111,14 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			if (!Ctor) return null;
 			const ctx = new Ctor();
 			const master = ctx.createGain();
-			master.gain.value = 0.8;
-			// Soft bus compressor: keeps the fuller ensemble (lead + reed + groove) from clipping.
+			master.gain.value = 0.55; // headroom: the 9th-chord ensemble is dense — avoid clipping (crackle)
+			// Bus compressor: keeps the full ensemble (piano voicings + strings + groove) clean.
 			const comp = ctx.createDynamicsCompressor();
-			comp.threshold.value = -14;
-			comp.knee.value = 24;
-			comp.ratio.value = 3;
-			comp.attack.value = 0.005;
-			comp.release.value = 0.18;
+			comp.threshold.value = -16;
+			comp.knee.value = 30;
+			comp.ratio.value = 4.5;
+			comp.attack.value = 0.004;
+			comp.release.value = 0.2;
 			master.connect(comp);
 			comp.connect(ctx.destination);
 			// White-noise buffer reused by the hi-hat.
@@ -132,20 +132,27 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (ctxRef.current.state === 'suspended') void ctxRef.current.resume();
 		return ctxRef.current;
 	};
-	// `at` schedules ahead (listen mode) and routes through the run bus so Stop silences it.
-	const playPiano = (midi: number, sustain = 0.5, at?: number): void => {
+	// Soft felt-piano tone: fewer/quieter harmonics + a lowpass, gentle attack.
+	// `at` schedules ahead (listen mode) and routes through the run bus so Stop
+	// silences it. `vol` scales the peak (support voicing notes play quieter).
+	const playPiano = (midi: number, sustain = 0.5, at?: number, vol = 1): void => {
 		const ctx = ensureAudio();
 		if (!ctx) return;
 		const when = at ?? ctx.currentTime;
 		const freq = midiToFreq(midi);
+		const lp = ctx.createBiquadFilter();
+		lp.type = 'lowpass';
+		lp.frequency.value = 2600;
+		lp.Q.value = 0.5;
 		const g = ctx.createGain();
-		g.connect(at != null ? (runGainRef.current ?? masterRef.current!) : masterRef.current!);
-		const peak = 0.2;
+		g.connect(lp);
+		lp.connect(at != null ? (runGainRef.current ?? masterRef.current!) : masterRef.current!);
+		const peak = 0.17 * vol;
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(peak, when + 0.005);
-		g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.4), when + Math.min(0.2, sustain));
+		g.gain.exponentialRampToValueAtTime(peak, when + 0.009);
+		g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.35), when + Math.min(0.25, sustain));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + sustain);
-		for (const [mult, amp] of [[1, 1], [2, 0.3], [3, 0.12], [4, 0.06]]) {
+		for (const [mult, amp] of [[1, 1], [2, 0.22], [3, 0.07]]) {
 			const o = ctx.createOscillator();
 			o.type = 'triangle';
 			o.frequency.setValueAtTime(freq * mult, when);
@@ -156,6 +163,39 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.start(when);
 			o.stop(when + sustain + 0.05);
 		}
+	};
+	// Piano VOICING: the melody note lands with 1-2 soft chord tones below it —
+	// plaqué (dyad) on short tiles, rolled upward on holds — for a fuller sound
+	// and a smoother melodic line.
+	const chordBelow = (midi: number, time: number, n: number): number[] => {
+		const chart = chartRef.current;
+		if (!chart) return [];
+		const bt = chart.beatTimes;
+		let lo = 0;
+		let hi = bt.length - 1;
+		while (lo < hi) {
+			const mid = (lo + hi + 1) >> 1;
+			if (bt[mid] <= time) lo = mid;
+			else hi = mid - 1;
+		}
+		const c = chart.chords[Math.min(Math.floor(lo / 4), chart.chords.length - 1)];
+		const out = new Set<number>();
+		for (const semi of [c.root, c.root + c.third, c.root + 7, c.root + c.seventh]) {
+			let m = chart.key + 12 + semi;
+			while (m < midi - 12) m += 12;
+			while (m >= midi - 2) m -= 12; // strictly below the melody, ≥ a tone apart
+			if (m > midi - 15 && m >= 40) out.add(m);
+		}
+		return [...out].sort((a, b) => b - a).slice(0, n);
+	};
+	const playPianoVoiced = (midi: number, sustain: number, tileTime: number, at?: number, hold = false): void => {
+		const ctx = ensureAudio();
+		if (!ctx) return;
+		const base = at ?? ctx.currentTime;
+		playPiano(midi, sustain, at);
+		const supports = chordBelow(midi, tileTime, hold ? 2 : 1);
+		// Holds roll low→high into the melody note feel; short tiles play a dyad.
+		supports.forEach((m, k) => playPiano(m, Math.min(sustain, 0.6), base + (hold ? 0.055 * (k + 1) : 0), 0.4));
 	};
 	// A fumbled note: tapped too early / too late. A dull, sour clash (target pitch +
 	// a clashing semitone, sagging downward, low-passed) — clearly "wrong" but not harsh.
@@ -194,7 +234,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!ctx) return;
 		const g = ctx.createGain();
 		g.connect(runGainRef.current ?? masterRef.current!);
-		g.gain.setValueAtTime(accent ? 0.24 : 0.15, when);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(accent ? 0.24 : 0.15, when + 0.004); // micro-attack: no click
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.14);
 		const o = ctx.createOscillator();
 		o.type = 'sine';
@@ -355,7 +396,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		hp.type = 'highpass';
 		hp.frequency.value = 7000;
 		const g = ctx.createGain();
-		g.gain.setValueAtTime(gain ?? (accent ? 0.05 : 0.028), when);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(gain ?? (accent ? 0.05 : 0.028), when + 0.002); // micro-attack: no click
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
 		src.connect(hp);
 		hp.connect(g);
@@ -374,7 +416,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		bp.frequency.value = 1900;
 		bp.Q.value = 0.6;
 		const g = ctx.createGain();
-		g.gain.setValueAtTime(accent ? 0.15 : 0.11, when);
+		g.gain.setValueAtTime(0.0001, when);
+		g.gain.exponentialRampToValueAtTime(accent ? 0.15 : 0.11, when + 0.003); // micro-attack: no click
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
 		src.connect(bp);
 		bp.connect(g);
@@ -385,7 +428,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		o.type = 'triangle';
 		o.frequency.setValueAtTime(195, when);
 		const og = ctx.createGain();
-		og.gain.setValueAtTime(0.08, when);
+		og.gain.setValueAtTime(0.0001, when);
+		og.gain.exponentialRampToValueAtTime(0.08, when + 0.003);
 		og.gain.exponentialRampToValueAtTime(0.0001, when + 0.11);
 		o.connect(og);
 		og.connect(runGainRef.current ?? masterRef.current!);
@@ -586,7 +630,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			return;
 		}
 		const t = chart.tiles[bi];
-		playPiano(t.midi, t.hold ? t.dur : 0.5);
+		playPianoVoiced(t.midi, t.hold ? t.dur : 0.5, t.time, undefined, t.hold);
 		comboRef.current += 1;
 		maxComboRef.current = Math.max(maxComboRef.current, comboRef.current);
 		scoreRef.current += jd.points * comboMult(comboRef.current);
@@ -823,7 +867,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				const when = audioStartRef.current + t.time;
 				flute(when, t.midi, clamp(t.dur, 0.18, 2.2));
 				// Listen mode: the "player" piano plays itself, sample-accurate on the audio clock.
-				if (autoRef.current) playPiano(t.midi, t.hold ? t.dur : 0.5, when);
+				if (autoRef.current) playPianoVoiced(t.midi, t.hold ? t.dur : 0.5, t.time, when, t.hold);
 				if (t.hold) {
 					// Répartie: arpeggiate the chord (root/3rd/5th/7th) through the held note.
 					const c = chordBarAt(t.time);
