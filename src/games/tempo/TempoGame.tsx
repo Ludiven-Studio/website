@@ -110,7 +110,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!ctxRef.current) {
 			const Ctor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 			if (!Ctor) return null;
-			const ctx = new Ctor();
+			// 'balanced': bigger audio buffers than the default 'interactive' —
+			// crackle-free on mobile for a small, acceptable input-latency cost.
+			const ctx = new Ctor({ latencyHint: 'balanced' });
 			const master = ctx.createGain();
 			master.gain.value = 0.55; // headroom: the 9th-chord ensemble is dense — avoid clipping (crackle)
 			// Bus compressor: keeps the full ensemble (piano voicings + strings + groove) clean.
@@ -170,7 +172,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		g.gain.exponentialRampToValueAtTime(peak, when + 0.009);
 		g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.35), when + Math.min(0.25, sustain));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + sustain);
-		for (const [mult, amp] of [[1, 1], [2, 0.22], [3, 0.07]]) {
+		for (const [mult, amp] of [[1, 1], [2, 0.2]]) {
 			const o = ctx.createOscillator();
 			o.type = 'triangle';
 			o.frequency.setValueAtTime(freq * mult, when);
@@ -349,23 +351,18 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		g.gain.exponentialRampToValueAtTime(0.1, when + atk);
 		g.gain.setValueAtTime(0.1, when + Math.max(atk, dur - rel));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-		const vib = ctx.createOscillator(); // vibrato → all partials' frequency
+		const vib = ctx.createOscillator(); // vibrato on the single sine voice
 		vib.frequency.value = 5;
 		const vibG = ctx.createGain();
 		vibG.gain.value = freq * 0.006;
 		vib.connect(vibG);
-		for (const [mult, amp] of [[1, 1], [2, 0.14]]) {
-			const o = ctx.createOscillator();
-			o.type = 'sine';
-			o.frequency.setValueAtTime(freq * mult, when);
-			vibG.connect(o.frequency);
-			const og = ctx.createGain();
-			og.gain.value = amp;
-			o.connect(og);
-			og.connect(g);
-			o.start(when);
-			o.stop(when + dur + 0.05);
-		}
+		const o = ctx.createOscillator();
+		o.type = 'sine';
+		o.frequency.setValueAtTime(freq, when);
+		vibG.connect(o.frequency);
+		o.connect(g);
+		o.start(when);
+		o.stop(when + dur + 0.05);
 		vib.start(when);
 		vib.stop(when + dur + 0.05);
 	};
@@ -813,8 +810,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					// Rock pattern: kick on beats 1 & 3, snare backbeat on 2 & 4, 8th hats.
 					if (i % 2 === 0) kick(when, accent);
 					else snare(when, i % 4 === 3);
-					hat(when, accent);
-					if (i + 1 < bt.length) hat(when + beatDur / 2, false, 0.015);
+					hat(when, accent); // off-beat tick dropped: inaudible, cost a node per beat
 				}
 				if (inIntro) {
 					// Intro keeps the round root/fifth pulse — the riff enters with the drums.
