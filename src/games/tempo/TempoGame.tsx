@@ -48,8 +48,16 @@ const BASS_STYLES: { v: BassVoice; pat: BassEv[] }[] = [
 	{ v: 'cello', pat: [{ e: 0, t: 'r', a: true, len: 6 }, { e: 6, t: 'w', len: 2 }] },
 	{ v: 'cello', pat: [{ e: 0, t: 'r', a: true, len: 4 }, { e: 4, t: 'o', len: 2 }, { e: 6, t: '5', len: 2 }] },
 ];
-// Guitar arpeggio pingpong over [root, 3rd, 5th, 7th, 9th] — up the bar, then down.
-const GTR_PING = [0, 1, 2, 3, 4, 3, 2, 1];
+// Guitar arpeggio SHAPES over [root, 3rd, 5th, 7th, 9th] (8 eighths per bar).
+// Seed-picked per song; the refrain shifts to the next shape so sections
+// breathe differently instead of looping one identical wave.
+const GTR_PATTERNS: number[][] = [
+	[0, 1, 2, 3, 4, 3, 2, 1], // up then down
+	[4, 3, 2, 1, 0, 1, 2, 3], // down then up
+	[0, 2, 1, 3, 2, 4, 3, 1], // zigzag climb
+	[0, 2, 0, 3, 0, 4, 0, 2], // pedal on the root (Alberti-like)
+	[4, 2, 3, 1, 2, 0, 1, 3], // cascading fall
+];
 
 interface DailyState {
 	best: number;
@@ -928,12 +936,15 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						else cello(at, m, dur);
 					}
 				}
-				// Guitar comp: the full ninth chord arpeggiated UP then DOWN across the
-				// bar (two 8ths per beat — root→3rd→5th→7th→9th→7th→5th→3rd).
+				// Guitar comp: the ninth chord arpeggiated in the song's seed-picked
+				// SHAPE (up-down, down-up, zigzag, root pedal, cascade…); the refrain
+				// plays the next shape for intra-song contrast.
 				const ladder = [0, third, 7, seventh, ninth];
+				const shapeBase = (seedRef.current >>> 4) % GTR_PATTERNS.length;
+				const shape = GTR_PATTERNS[(shapeBase + (secOf(i) === 'B' ? 1 : 0)) % GTR_PATTERNS.length];
 				for (const half of [0, 1]) {
 					const e = (i % 4) * 2 + half;
-					gtr(when + (half * beatDur) / 2, chordRoot + 12 + ladder[GTR_PING[e]]);
+					gtr(when + (half * beatDur) / 2, chordRoot + 12 + ladder[shape[e]]);
 				}
 				if (accent) {
 					// Synth bed under each bar (deep, an octave below the groove bass) —
