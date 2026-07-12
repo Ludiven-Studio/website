@@ -113,7 +113,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const audioStartRef = useRef(0);
 	const metroRef = useRef(true);
 	const backingIdxRef = useRef(0); // next beat to schedule (lookahead groove)
-	const melodyIdxRef = useRef(0); // next tile to voice with the auto lead (flute)
+	const melodyIdxRef = useRef(0); // next tile to voice (auto piano + reed responses)
+	const leadIdxRef = useRef(0); // next ORNATE lead note for the flute (richer than the tiles)
 	const noiseRef = useRef<AudioBuffer | null>(null); // shared white-noise buffer (hi-hat)
 
 	const dailyRef = useRef(false);
@@ -650,6 +651,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		audioStartRef.current = ctx.currentTime + Math.max(0.15, LEAD - introTime);
 		backingIdxRef.current = 0; // groove is scheduled with lookahead in step()
 		melodyIdxRef.current = 0; // auto-lead is scheduled with lookahead in step()
+		leadIdxRef.current = 0;
 		runningRef.current = true;
 		setStat('running');
 		setSubmitScore(undefined);
@@ -969,11 +971,18 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				while (b + 1 < bt.length && bt[b + 1] <= time) b++;
 				return chordAt(b);
 			};
+			// The flute sings the ORNATE lead (runs, turns, sub-beat expression) —
+			// richer than the simple tiles the player taps.
+			const leadLine = chart.lead;
+			while (leadIdxRef.current < leadLine.length && leadLine[leadIdxRef.current].time < now + 1) {
+				const L = leadLine[leadIdxRef.current];
+				flute(audioStartRef.current + L.time, L.midi, clamp(L.dur, 0.15, 2.2));
+				leadIdxRef.current++;
+			}
 			while (melodyIdxRef.current < tiles.length && tiles[melodyIdxRef.current].time < now + 1) {
 				const mi = melodyIdxRef.current;
 				const t = tiles[mi];
 				const when = audioStartRef.current + t.time;
-				flute(when, t.midi, clamp(t.dur, 0.18, 2.2));
 				// Listen mode: the "player" piano plays itself, sample-accurate on the audio clock.
 				if (autoRef.current) playPianoVoiced(t.midi, t.hold ? t.dur : 0.5, t.time, when, t.hold);
 				if (t.hold) {
@@ -1047,6 +1056,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				stateArrRef.current = chart.tiles.map(() => 'pending');
 				backingIdxRef.current = 0;
 				melodyIdxRef.current = 0;
+				leadIdxRef.current = 0;
 				const ctx = ctxRef.current;
 				if (ctx) audioStartRef.current = ctx.currentTime + Math.max(0.15, LEAD - (chart.introTime ?? 0));
 			}

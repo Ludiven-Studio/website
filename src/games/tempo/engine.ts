@@ -31,6 +31,7 @@ export interface Song {
 	tempo: number; // beats per second at speed 1
 	key: number; // tonic midi (used for the bass accompaniment)
 	notes: SongNote[];
+	lead?: SongNote[]; // ornate melody line (sub-beat runs, turns) — same total beats as notes
 	chords?: ChordBar[]; // one per bar, aligned with the beat grid
 	sections?: Section[]; // one per bar — drives arrangement (fills, drops)
 }
@@ -59,6 +60,7 @@ export interface Chart {
 	key: number; // tonic midi (bass accompaniment)
 	chords: ChordBar[]; // one per bar (bar i = beats 4i..4i+3) — backing follows these
 	sections: Section[]; // one per bar — the backing reads fills & drum drops off it
+	lead: { time: number; midi: number; dur: number }[]; // ornate melody for the auto-lead voice — richer than the playable tiles
 	introTime: number; // seconds of chord-only intro before the first tile
 }
 
@@ -221,6 +223,46 @@ const isAvoidNote = (step: number, chordRootStep: number): boolean => {
 };
 /** Closest tonic degree (unison or octave, in register) for the final cadence. */
 const nearestTonic = (step: number): number => (Math.abs(step - 0) <= Math.abs(step - 7) ? 0 : 7);
+
+/**
+ * Ornate LEAD line derived from the playable notes: the tiles stay the SIMPLE
+ * melody the player taps, while this version adds sub-beat expression — runs
+ * of passing 8ths toward wide leaps, and turns (upper-neighbor re-lights) on
+ * long notes. Every ornament preserves the note's total duration, so the lead
+ * stays beat-for-beat aligned with the tiles.
+ */
+const buildLead = (notes: SongNote[], rng: () => number, tonic: number): SongNote[] => {
+	const stepOf = new Map<number, number>();
+	for (let s = MIN_STEP; s <= MAX_STEP; s++) stepOf.set(degToMidi(tonic, s), s);
+	const lead: SongNote[] = [];
+	for (let i = 0; i < notes.length; i++) {
+		const n = notes[i];
+		if (n.rest) {
+			lead.push({ ...n });
+			continue;
+		}
+		const next = notes.slice(i + 1).find((x) => !x.rest);
+		const s = stepOf.get(n.midi);
+		const ns = next ? stepOf.get(next.midi) : undefined;
+		// Run: fill a wide leap with two passing 8ths walking toward the next note.
+		if (n.dur >= 2 && s != null && ns != null && Math.abs(ns - s) >= 3 && rng() < 0.6) {
+			lead.push({ midi: n.midi, dur: n.dur - 1 });
+			const dir = ns > s ? 1 : -1;
+			lead.push({ midi: degToMidi(tonic, clampStep(s + dir)), dur: 0.5 });
+			lead.push({ midi: degToMidi(tonic, clampStep(s + 2 * dir)), dur: 0.5 });
+			continue;
+		}
+		// Turn: a long note re-lit by its upper neighbor right after it lands.
+		if (n.dur >= 2 && s != null && rng() < 0.35) {
+			lead.push({ midi: n.midi, dur: 0.5 });
+			lead.push({ midi: degToMidi(tonic, clampStep(s + 1)), dur: 0.5 });
+			lead.push({ midi: n.midi, dur: n.dur - 1 });
+			continue;
+		}
+		lead.push({ midi: n.midi, dur: n.dur });
+	}
+	return lead;
+};
 
 /**
  * Endless generated tune, structured like a SONG rather than a random stream.
@@ -500,7 +542,7 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		const vars = VAR_CYCLE.get(theme)!;
 		playTheme(theme, vars[n % vars.length], label);
 	}
-	return { name: 'Infini', tempo: 2, key: KEY, notes, chords, sections };
+	return { name: 'Infini', tempo: 2, key: KEY, notes, lead: buildLead(notes, rng, TONIC), chords, sections };
 }
 
 export interface EndlessOpts {
@@ -554,6 +596,16 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 		}
 		beat += n.dur;
 	}
+	// Ornate lead line on the same grid — what the auto-lead voice sings.
+	const lead: Chart['lead'] = [];
+	let lb = INTRO_BEATS;
+	for (const n of song.lead ?? song.notes) {
+		if (!n.rest) {
+			const time = at(lb);
+			lead.push({ time, midi: n.midi, dur: at(lb + n.dur) - time });
+		}
+		lb += n.dur;
+	}
 	// Whole-beat grid for the groove (kick/bass/pad step on these).
 	const beatTimes: number[] = [];
 	for (let b = 0; b <= Math.ceil(totalBeats); b++) beatTimes.push(beatTime[b]);
@@ -569,7 +621,7 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	const introSections: Section[] = ['I', 'I', 'I', 'I'];
 	const sections: Section[] = [...introSections, ...(song.sections ?? [])].slice(0, barCount);
 	while (sections.length < barCount) sections.push(sections[sections.length - 1] ?? 'A');
-	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, sections, introTime: at(INTRO_BEATS) };
+	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, sections, lead, introTime: at(INTRO_BEATS) };
 }
 
 export type Grade = 'Parfait' | 'Bien' | 'Ok' | 'Raté';
