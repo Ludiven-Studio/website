@@ -960,6 +960,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					pad(when, Math.max(0.6, barDur) + 0.25, chordRoot - 12, third);
 					strings(when, Math.max(0.6, barDur), chordRoot, third, seventh, ninth);
 				}
+				// Contre-chant: on the refrain, the reed sings slow chord tones under
+				// the lead (3rd on the downbeat, 5th mid-bar) — a second voice.
+				if (secOf(i) === 'B' && i % 2 === 0) reed(when, chordRoot + 12 + (i % 4 === 0 ? third : 7), beatDur * 1.8, 0.032);
 				backingIdxRef.current++;
 			}
 			// Auto-lead + secondary voice: the flute sings every melody note; the reed
@@ -971,20 +974,24 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				while (b + 1 < bt.length && bt[b + 1] <= time) b++;
 				return chordAt(b);
 			};
-			// The flute sings the ORNATE lead (runs, turns, sub-beat expression) —
-			// richer than the simple tiles the player taps.
+			// The flute sings the ORNATE lead (runs, turns, graces) — richer than
+			// the simple tiles the player taps. In listen mode the piano follows
+			// this expressive line too, so it differs from the raw tiles.
 			const leadLine = chart.lead;
 			while (leadIdxRef.current < leadLine.length && leadLine[leadIdxRef.current].time < now + 1) {
 				const L = leadLine[leadIdxRef.current];
-				flute(audioStartRef.current + L.time, L.midi, clamp(L.dur, 0.15, 2.2));
+				const lw = audioStartRef.current + L.time;
+				flute(lw, L.midi, clamp(L.dur, 0.15, 2.2));
+				if (autoRef.current) {
+					if (L.dur < 0.3) playPiano(L.midi, 0.35, lw); // ornaments: plain, no voicing
+					else playPianoVoiced(L.midi, Math.max(0.4, L.dur), L.time, lw, L.dur > 1.2);
+				}
 				leadIdxRef.current++;
 			}
 			while (melodyIdxRef.current < tiles.length && tiles[melodyIdxRef.current].time < now + 1) {
 				const mi = melodyIdxRef.current;
 				const t = tiles[mi];
 				const when = audioStartRef.current + t.time;
-				// Listen mode: the "player" piano plays itself, sample-accurate on the audio clock.
-				if (autoRef.current) playPianoVoiced(t.midi, t.hold ? t.dur : 0.5, t.time, when, t.hold);
 				if (t.hold) {
 					// Répartie: arpeggiate the chord (root/3rd/5th/7th) through the held note.
 					const c = chordBarAt(t.time);

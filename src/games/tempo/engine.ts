@@ -259,6 +259,12 @@ const buildLead = (notes: SongNote[], rng: () => number, tonic: number): SongNot
 			lead.push({ midi: n.midi, dur: n.dur - 1 });
 			continue;
 		}
+		// Grace note: a quick neighbor appoggiatura stealing the first quarter-beat.
+		if (n.dur === 1 && s != null && rng() < 0.15) {
+			lead.push({ midi: degToMidi(tonic, clampStep(s + (rng() < 0.5 ? 1 : -1))), dur: 0.25 });
+			lead.push({ midi: n.midi, dur: 0.75 });
+			continue;
+		}
 		lead.push({ midi: n.midi, dur: n.dur });
 	}
 	return lead;
@@ -478,18 +484,27 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		const high = 3 + Math.floor(rng() * 2); // 4th or 5th
 		const peak = rng() < 0.7 ? 7 : 8; // the arch's top: octave (or the 9th)
 		const fall = rng() < 0.5 ? 4 : 2; // stepping stone on the way back down
-		// Opening GESTURE, seed-picked — the hook doesn't always start the same
-		// way: stepwise climb, LONG held tonic, high start on the octave (still
-		// the tonic, an octave up), leap-and-sigh, or a running four.
+		// Opening GESTURE, seed-picked — first PITCH and direction vary for real:
+		// tonic climbs, long tonic, octave start, FIFTH start, DESCENDING entry,
+		// running four, fifth→octave fanfare.
 		const rises: ThemeEv[][] = [
 			[{ d: 1, step: 0 }, { d: 1, step: mid }, { d: 2, step: high }], // stepwise climb
 			[{ d: 2, step: 0 }, { d: 2, step: high }], // long tonic, then the leap
 			[{ d: 2, step: 7 }, { d: 1, step: high }, { d: 1, step: peak }], // high start, dip, push to the peak
-			[{ d: 1, step: 0 }, { d: 1, step: high }, { d: 2, step: mid }], // leap up, sigh back
+			[{ d: 2, step: 4 }, { d: 1, step: mid }, { d: 1, step: high }], // long FIFTH start
+			[{ d: 1, step: high }, { d: 1, step: mid }, { d: 2, step: 0 }], // DESCENDING entry, settles low
 			[{ d: 1, step: 0 }, { d: 1, step: mid }, { d: 1, step: high }, { d: 1, step: high + 2 }], // running four
+			[{ d: 1, step: 4 }, { d: 1, step: 7 }, { d: 2, step: high }], // fifth→octave fanfare
+		];
+		// The answer bar varies too (it was frozen before): fall home, hang on
+		// the peak, or run down the scale.
+		const backs: ThemeEv[][] = [
+			[{ d: 1, step: peak }, { d: 1, step: fall }, { d: 2, step: 0 }],
+			[{ d: 2, step: peak }, { d: 1, step: fall }, { d: 1, step: 0 }],
+			[{ d: 1, step: peak }, { d: 1, step: high }, { d: 1, step: mid }, { d: 1, step: 0 }],
 		];
 		const rise = rises[Math.floor(rng() * rises.length)];
-		const back: ThemeEv[] = [{ d: 1, step: peak }, { d: 1, step: fall }, { d: 2, step: 0 }];
+		const back = backs[Math.floor(rng() * backs.length)];
 		return [rise, back];
 	};
 
@@ -534,7 +549,9 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		[themeC, ['plain', 'calm']],
 	]);
 	const occ = new Map<ThemeEv[][], number>();
-	let fi = 0;
+	// Seed-picked FORM entry point: some songs open on the couplet, some on the
+	// refrain's leap, some mid-cycle — the first heard phrase truly differs.
+	let fi = [0, 2, 4][Math.floor(rng() * 3)];
 	while (notes.length < count) {
 		const [theme, label] = FORM[fi++ % FORM.length];
 		const n = occ.get(theme) ?? 0;
