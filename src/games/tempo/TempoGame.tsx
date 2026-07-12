@@ -1313,6 +1313,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 
 const CSS = `
 .tp-root { --tp: var(--accent-regular); width: 100%; max-width: 480px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
+/* Android: kill the browser's default bluish tap-highlight overlay on touch. */
+.tp-root, .tp-root * { -webkit-tap-highlight-color: transparent; }
 /* Site global fullscreen → the lanes fill the screen height (portrait, centred). */
 .game-page:fullscreen .tp-root { max-width: none; width: 100%; height: 100%; }
 .game-page:-webkit-full-screen .tp-root { max-width: none; width: 100%; height: 100%; }
