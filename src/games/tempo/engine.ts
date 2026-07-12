@@ -34,6 +34,8 @@ export interface Song {
 	lead?: SongNote[]; // ornate melody line (sub-beat runs, turns) — same total beats as notes
 	chords?: ChordBar[]; // one per bar, aligned with the beat grid
 	sections?: Section[]; // one per bar — drives arrangement (fills, drops)
+	introStyle?: number; // seed-picked intro archetype (see INTRO_STYLES in the arrangement)
+	introLead?: SongNote[]; // intro melodic figure (INTRO_BEATS total) — distinct from the themes
 }
 
 export interface SpeedTier {
@@ -61,7 +63,8 @@ export interface Chart {
 	chords: ChordBar[]; // one per bar (bar i = beats 4i..4i+3) — backing follows these
 	sections: Section[]; // one per bar — the backing reads fills & drum drops off it
 	lead: { time: number; midi: number; dur: number }[]; // ornate melody for the auto-lead voice — richer than the playable tiles
-	introTime: number; // seconds of chord-only intro before the first tile
+	introStyle: number; // 0 progression · 1 solo call · 2 groove · 3 cascade · 4 tonic pedal
+	introTime: number; // seconds of intro before the first tile
 }
 
 /* --- Music theory scaffolding for the generator -------------------------- */
@@ -559,7 +562,40 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		const vars = VAR_CYCLE.get(theme)!;
 		playTheme(theme, vars[n % vars.length], label);
 	}
-	return { name: 'Infini', tempo: 2, key: KEY, notes, lead: buildLead(notes, rng, TONIC), chords, sections };
+
+	// Seed-picked INTRO, deliberately unlike the couplet/refrain:
+	// 0 chord progression (backing only) · 1 solo flute call over a soft pad ·
+	// 2 rhythm-section groove (bass riff + hats, harmony held back) ·
+	// 3 arpeggio cascades · 4 TONIC PEDAL under the changing chords (tension
+	// pulling home) with a rising line. Styles 1/3/4 get their own melodic
+	// figure — never a quote of the themes.
+	const introStyle = Math.floor(rng() * 5);
+	const introLead: SongNote[] = [];
+	if (introStyle === 1) {
+		const c1 = 4 + Math.floor(rng() * 3); // 4..6
+		const c2 = 7 + Math.floor(rng() * 2); // 7..8
+		introLead.push(
+			{ midi: 0, dur: 2, rest: true },
+			{ midi: degToMidi(TONIC, c1), dur: 1 },
+			{ midi: degToMidi(TONIC, c2), dur: 1 }, // the call, reaching up
+			{ midi: degToMidi(TONIC, clampStep(c2 - 1)), dur: 2 },
+			{ midi: degToMidi(TONIC, c1), dur: 2 }, // the sigh back
+			{ midi: 0, dur: 1, rest: true },
+			{ midi: degToMidi(TONIC, clampStep(c1 + 1)), dur: 0.5 },
+			{ midi: degToMidi(TONIC, c2), dur: 0.5 },
+			{ midi: degToMidi(TONIC, clampStep(c2 + 1)), dur: 2 }, // pushed higher
+			{ midi: degToMidi(TONIC, c1), dur: 2 },
+			{ midi: degToMidi(TONIC, 1), dur: 2 }, // settles on the supertonic — leans into the song
+		);
+	} else if (introStyle === 3) {
+		for (let b = 0; b < 4; b++) {
+			for (const o of [8, 6, 4, 2]) introLead.push({ midi: degToMidi(TONIC, clampStep(prog[b] + o)), dur: 0.5 });
+			introLead.push({ midi: degToMidi(TONIC, clampStep(prog[b] + 4)), dur: 2 });
+		}
+	} else if (introStyle === 4) {
+		[0, 2, 4, 7].forEach((s, b) => introLead.push({ midi: degToMidi(TONIC, nearestChordTone(clampStep(s), prog[b])), dur: 4 }));
+	}
+	return { name: 'Infini', tempo: 2, key: KEY, notes, lead: buildLead(notes, rng, TONIC), chords, sections, introStyle, introLead };
 }
 
 export interface EndlessOpts {
@@ -614,7 +650,16 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 		beat += n.dur;
 	}
 	// Ornate lead line on the same grid — what the auto-lead voice sings.
+	// The intro figure (solo call, cascade, rising pedal line) comes first.
 	const lead: Chart['lead'] = [];
+	let ib = 0;
+	for (const n of song.introLead ?? []) {
+		if (!n.rest) {
+			const time = at(ib);
+			lead.push({ time, midi: n.midi, dur: at(ib + n.dur) - time });
+		}
+		ib += n.dur;
+	}
 	let lb = INTRO_BEATS;
 	for (const n of song.lead ?? song.notes) {
 		if (!n.rest) {
@@ -638,7 +683,7 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	const introSections: Section[] = ['I', 'I', 'I', 'I'];
 	const sections: Section[] = [...introSections, ...(song.sections ?? [])].slice(0, barCount);
 	while (sections.length < barCount) sections.push(sections[sections.length - 1] ?? 'A');
-	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, sections, lead, introTime: at(INTRO_BEATS) };
+	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, sections, lead, introStyle: song.introStyle ?? 0, introTime: at(INTRO_BEATS) };
 }
 
 export type Grade = 'Parfait' | 'Bien' | 'Ok' | 'Raté';

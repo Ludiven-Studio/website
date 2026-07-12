@@ -916,15 +916,21 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					else snare(when, i % 4 === 3);
 					hat(when, accent); // off-beat tick dropped: inaudible, cost a node per beat
 				}
-				if (inIntro) {
-					// Intro keeps the round root/fifth pulse — the styled bass enters with the drums.
+				// Intro archetypes shape the low end: 0 root/fifth pulse · 1 solo call
+				// (no bass, air) · 2 the song's groove plays EARLY with hats ·
+				// 3 cascade (no bass) · 4 TONIC PEDAL under the changing chords.
+				const IS = chart.introStyle;
+				if (inIntro && IS === 4) {
+					bass(when, chart.key, accent); // pedal point: tension pulling home
+				} else if (inIntro && IS === 0) {
 					bass(when, chordRoot + (i % 2 === 0 ? 0 : 7), accent);
-				} else {
+				} else if (!inIntro || IS === 2) {
 					// Seed-picked bass STYLE: voice + rhythm. Plucked/stabbed voices get a
 					// round sub anchor on the bar; held voices (synth, cello) own the low
-					// end by themselves.
+					// end by themselves. The groove intro (2) pre-plays it with hats.
 					const style = BASS_STYLES[seedRef.current % BASS_STYLES.length];
-					if (accent && (style.v === 'gtr' || style.v === 'brass')) bass(when, chordRoot, true);
+					if (accent && !inIntro && (style.v === 'gtr' || style.v === 'brass')) bass(when, chordRoot, true);
+					if (inIntro) hat(when, accent);
 					for (const ev of style.pat) {
 						if (ev.e >> 1 !== i % 4) continue; // only this beat's eighths
 						let m = chordRoot;
@@ -944,21 +950,25 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				}
 				// Guitar comp: the ninth chord arpeggiated in the song's seed-picked
 				// SHAPE (up-down, down-up, zigzag, root pedal, cascade…); the refrain
-				// plays the next shape for intra-song contrast.
-				const ladder = [0, third, 7, seventh, ninth];
-				const shapeBase = (seedRef.current >>> 4) % GTR_PATTERNS.length;
-				const shape = GTR_PATTERNS[(shapeBase + (secOf(i) === 'B' ? 1 : 0)) % GTR_PATTERNS.length];
-				for (const half of [0, 1]) {
-					const e = (i % 4) * 2 + half;
-					gtr(when + (half * beatDur) / 2, chordRoot + 12 + ladder[shape[e]]);
+				// plays the next shape for intra-song contrast. Silent during the solo
+				// call and groove intros; the cascade intro forces the falling shape.
+				if (!inIntro || IS === 0 || IS === 3) {
+					const ladder = [0, third, 7, seventh, ninth];
+					const shapeBase = (seedRef.current >>> 4) % GTR_PATTERNS.length;
+					const shape = inIntro && IS === 3 ? GTR_PATTERNS[1] : GTR_PATTERNS[(shapeBase + (secOf(i) === 'B' ? 1 : 0)) % GTR_PATTERNS.length];
+					for (const half of [0, 1]) {
+						const e = (i % 4) * 2 + half;
+						gtr(when + (half * beatDur) / 2, chordRoot + 12 + ladder[shape[e]]);
+					}
 				}
 				if (accent) {
 					// Synth bed under each bar (deep, an octave below the groove bass) —
-					// slight overlap into the next bar keeps it seamless (no hole while the
-					// violins swell in above it).
+					// slight overlap into the next bar keeps it seamless. The groove intro
+					// holds the harmony back; the solo call keeps only the soft pad; the
+					// violins wait for the progression/pedal intros.
 					const barDur = bt[Math.min(i + 4, bt.length - 1)] - bt[i] || 2;
-					pad(when, Math.max(0.6, barDur) + 0.25, chordRoot - 12, third);
-					strings(when, Math.max(0.6, barDur), chordRoot, third, seventh, ninth);
+					if (!inIntro || IS !== 2) pad(when, Math.max(0.6, barDur) + 0.25, chordRoot - 12, third);
+					if (!inIntro || IS === 0 || IS === 4) strings(when, Math.max(0.6, barDur), chordRoot, third, seventh, ninth);
 				}
 				// Contre-chant: on the refrain, the reed sings slow chord tones under
 				// the lead (3rd on the downbeat, 5th mid-bar) — a second voice.
