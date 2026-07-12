@@ -87,6 +87,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const ctxRef = useRef<AudioContext | null>(null);
 	const masterRef = useRef<GainNode | null>(null);
 	const runGainRef = useRef<GainNode | null>(null); // per-run bus so restarts don't stack scheduled ticks
+	const busesRef = useRef<Record<string, BiquadFilterNode> | null>(null); // persistent per-instrument filters — one biquad per instrument, NOT per note (per-note filters caused audio-thread churn = crackle)
 	const audioStartRef = useRef(0);
 	const metroRef = useRef(true);
 	const backingIdxRef = useRef(0); // next beat to schedule (lookahead groove)
@@ -126,12 +127,34 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			const nd = nb.getChannelData(0);
 			for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
 			noiseRef.current = nb;
+			// Per-instrument filter buses, created ONCE. Notes plug their envelope
+			// gain into these instead of allocating a BiquadFilter each — cuts
+			// ~15 node allocations/sec (the source of the crackle). Rewired onto
+			// the fresh run bus at each start.
+			const mkBus = (type: BiquadFilterType, freq: number, q: number): BiquadFilterNode => {
+				const f = ctx.createBiquadFilter();
+				f.type = type;
+				f.frequency.value = freq;
+				f.Q.value = q;
+				return f;
+			};
+			busesRef.current = {
+				piano: mkBus('lowpass', 2600, 0.5),
+				gtr: mkBus('lowpass', 1800, 0.7),
+				bassGtr: mkBus('lowpass', 1300, 0.8),
+				snare: mkBus('bandpass', 1900, 0.6),
+				strings: mkBus('lowpass', 1500, 0.5),
+				reed: mkBus('lowpass', 2000, 0.8),
+				hat: mkBus('highpass', 7000, 1),
+			};
 			ctxRef.current = ctx;
 			masterRef.current = master;
 		}
 		if (ctxRef.current.state === 'suspended') void ctxRef.current.resume();
 		return ctxRef.current;
 	};
+	// Notes route through their instrument's shared filter bus (see busesRef).
+	const busOut = (name: string): AudioNode => busesRef.current?.[name] ?? runGainRef.current ?? masterRef.current!;
 	// Soft felt-piano tone: fewer/quieter harmonics + a lowpass, gentle attack.
 	// `at` schedules ahead (listen mode) and routes through the run bus so Stop
 	// silences it. `vol` scales the peak (support voicing notes play quieter).
@@ -140,13 +163,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!ctx) return;
 		const when = at ?? ctx.currentTime;
 		const freq = midiToFreq(midi);
-		const lp = ctx.createBiquadFilter();
-		lp.type = 'lowpass';
-		lp.frequency.value = 2600;
-		lp.Q.value = 0.5;
 		const g = ctx.createGain();
-		g.connect(lp);
-		lp.connect(at != null ? (runGainRef.current ?? masterRef.current!) : masterRef.current!);
+		g.connect(busOut('piano'));
 		const peak = 0.17 * vol;
 		g.gain.setValueAtTime(0.0001, when);
 		g.gain.exponentialRampToValueAtTime(peak, when + 0.009);
@@ -265,13 +283,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const bassGtr = (when: number, midi: number, accent: boolean): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
-		const lp = ctx.createBiquadFilter();
-		lp.type = 'lowpass';
-		lp.frequency.value = 1300;
-		lp.Q.value = 0.8;
 		const g = ctx.createGain();
-		g.connect(lp);
-		lp.connect(runGainRef.current ?? masterRef.current!);
+		g.connect(busOut('bassGtr'));
 		g.gain.setValueAtTime(0.0001, when);
 		g.gain.exponentialRampToValueAtTime(accent ? 0.2 : 0.15, when + 0.008);
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.28);
@@ -361,13 +374,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const reed = (when: number, midi: number, dur: number, vol = 0.06): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
-		const lp = ctx.createBiquadFilter();
-		lp.type = 'lowpass';
-		lp.frequency.value = 2000;
-		lp.Q.value = 0.8;
 		const g = ctx.createGain();
-		g.connect(lp);
-		lp.connect(runGainRef.current ?? masterRef.current!);
+		g.connect(busOut('reed'));
 		const atk = 0.04;
 		const rel = Math.min(0.25, dur * 0.5);
 		g.gain.setValueAtTime(0.0001, when);
@@ -392,16 +400,12 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!ctx || !noiseRef.current) return;
 		const src = ctx.createBufferSource();
 		src.buffer = noiseRef.current;
-		const hp = ctx.createBiquadFilter();
-		hp.type = 'highpass';
-		hp.frequency.value = 7000;
 		const g = ctx.createGain();
 		g.gain.setValueAtTime(0.0001, when);
 		g.gain.exponentialRampToValueAtTime(gain ?? (accent ? 0.05 : 0.028), when + 0.002); // micro-attack: no click
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
-		src.connect(hp);
-		hp.connect(g);
-		g.connect(runGainRef.current ?? masterRef.current!);
+		src.connect(g);
+		g.connect(busOut('hat'));
 		src.start(when);
 		src.stop(when + 0.06);
 	};
@@ -411,17 +415,12 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!ctx || !noiseRef.current) return;
 		const src = ctx.createBufferSource();
 		src.buffer = noiseRef.current;
-		const bp = ctx.createBiquadFilter();
-		bp.type = 'bandpass';
-		bp.frequency.value = 1900;
-		bp.Q.value = 0.6;
 		const g = ctx.createGain();
 		g.gain.setValueAtTime(0.0001, when);
 		g.gain.exponentialRampToValueAtTime(accent ? 0.15 : 0.11, when + 0.003); // micro-attack: no click
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
-		src.connect(bp);
-		bp.connect(g);
-		g.connect(runGainRef.current ?? masterRef.current!);
+		src.connect(g);
+		g.connect(busOut('snare'));
 		src.start(when);
 		src.stop(when + 0.18);
 		const o = ctx.createOscillator();
@@ -441,13 +440,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const strings = (when: number, dur: number, root: number, third: number, seventh: number, ninth: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
-		const lp = ctx.createBiquadFilter();
-		lp.type = 'lowpass';
-		lp.frequency.value = 1500;
-		lp.Q.value = 0.5;
 		const g = ctx.createGain();
-		g.connect(lp);
-		lp.connect(runGainRef.current ?? masterRef.current!);
+		g.connect(busOut('strings'));
 		const atk = Math.min(0.5, dur * 0.35);
 		const rel = Math.min(0.6, dur * 0.4);
 		g.gain.setValueAtTime(0.0001, when);
@@ -472,17 +466,12 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const gtr = (when: number, midi: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
-		const lp = ctx.createBiquadFilter();
-		lp.type = 'lowpass';
-		lp.frequency.value = 1800;
-		lp.Q.value = 0.7;
 		const g = ctx.createGain();
-		g.connect(lp);
-		lp.connect(runGainRef.current ?? masterRef.current!);
+		g.connect(busOut('gtr'));
 		g.gain.setValueAtTime(0.0001, when);
 		g.gain.exponentialRampToValueAtTime(0.05, when + 0.006);
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.42);
-		for (const [mult, amp, type] of [[1, 1, 'triangle'], [1, 0.4, 'sawtooth'], [2, 0.18, 'triangle']] as [number, number, OscillatorType][]) {
+		for (const [mult, amp, type] of [[1, 1, 'triangle'], [1, 0.4, 'sawtooth']] as [number, number, OscillatorType][]) {
 			const o = ctx.createOscillator();
 			o.type = type;
 			o.frequency.value = midiToFreq(midi) * mult;
@@ -545,6 +534,17 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const rg = ctx.createGain();
 		rg.connect(masterRef.current!);
 		runGainRef.current = rg;
+		// Rewire the persistent instrument buses onto the fresh run bus.
+		if (busesRef.current) {
+			for (const b of Object.values(busesRef.current)) {
+				try {
+					b.disconnect();
+				} catch {
+					/* ignore */
+				}
+				b.connect(rg);
+			}
+		}
 		// The chord-only intro covers the tiles' fall time, so the backing can start
 		// almost immediately; keep at least LEAD when there'd be no intro to hide it.
 		const introTime = chartRef.current?.introTime ?? 0;
