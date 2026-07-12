@@ -436,10 +436,17 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 		const high = 3 + Math.floor(rng() * 2); // 4th or 5th
 		const peak = rng() < 0.7 ? 7 : 8; // the arch's top: octave (or the 9th)
 		const fall = rng() < 0.5 ? 4 : 2; // stepping stone on the way back down
-		const rise: ThemeEv[] =
-			rng() < 0.4
-				? [{ d: 1, step: 0 }, { d: 1, step: mid }, { d: 1, step: high }, { d: 1, step: high + 2 }]
-				: [{ d: 1, step: 0 }, { d: 1, step: mid }, { d: 2, step: high }];
+		// Opening GESTURE, seed-picked — the hook doesn't always start the same
+		// way: stepwise climb, LONG held tonic, high start on the octave (still
+		// the tonic, an octave up), leap-and-sigh, or a running four.
+		const rises: ThemeEv[][] = [
+			[{ d: 1, step: 0 }, { d: 1, step: mid }, { d: 2, step: high }], // stepwise climb
+			[{ d: 2, step: 0 }, { d: 2, step: high }], // long tonic, then the leap
+			[{ d: 2, step: 7 }, { d: 1, step: high }, { d: 1, step: peak }], // high start, dip, push to the peak
+			[{ d: 1, step: 0 }, { d: 1, step: high }, { d: 2, step: mid }], // leap up, sigh back
+			[{ d: 1, step: 0 }, { d: 1, step: mid }, { d: 1, step: high }, { d: 1, step: high + 2 }], // running four
+		];
+		const rise = rises[Math.floor(rng() * rises.length)];
 		const back: ThemeEv[] = [{ d: 1, step: peak }, { d: 1, step: fall }, { d: 2, step: 0 }];
 		return [rise, back];
 	};
@@ -463,8 +470,9 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	{
 		const opening = themeB[0].filter((e) => !e.rest);
 		if (opening.length >= 2) {
-			opening[0].step = 4;
-			opening[1].step = nearestChordTone(clampStep(8), prog[0]);
+			// Upward leap of a 4th-6th, seed-varied so refrains don't all call the same.
+			opening[0].step = 3 + Math.floor(rng() * 2);
+			opening[1].step = nearestChordTone(clampStep(opening[0].step! + 3 + Math.floor(rng() * 3)), prog[0]);
 		}
 	}
 	themeB[2] = motif[0];
