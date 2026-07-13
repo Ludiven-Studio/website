@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	makeLevel, step, isSettled, foxesLeft, aimToVelocity, predictTrajectory,
-	encodeScore, decodeScore, DIFFS,
+	encodeScore, decodeScore, DIFFS, applyHen, activatePower, spawnCocotte, HEN_TYPES,
 } from './engine';
 import { mulberry32 } from '../prng';
 
@@ -171,5 +171,123 @@ describe('cocotte engine', () => {
 			.toEqual(b.bodies.map((x) => [x.tag, Math.round(x.x), Math.round(x.y)]));
 		// touch mulberry32 so the shared prng import is exercised
 		expect(typeof mulberry32(1)()).toBe('number');
+	});
+});
+
+describe('cocotte powers', () => {
+	// Reposition all foxes far away so a test only sees the ones it places.
+	const clearFoxes = (w: ReturnType<typeof makeLevel>) => {
+		for (const b of w.bodies) if (b.tag === 'fox') { b.x = -999; b.defeated = true; }
+	};
+	const addFox = (w: ReturnType<typeof makeLevel>, x: number, y: number, hp = 9999) => {
+		const f = w.bodies.find((b) => b.tag === 'fox' && b.defeated)!;
+		f.x = x; f.y = y; f.vx = 0; f.vy = 0; f.hp = hp; f.maxHp = hp; f.defeated = false;
+		return f;
+	};
+
+	it('applyHen sets passive stats (rebond bouncier, lourde bigger & heavier) and resets on normale', () => {
+		const w = makeLevel(1, DIFFS.facile);
+		const c = w.cocotte!;
+		applyHen(c, 'rebond');
+		expect(c.rest).toBeCloseTo(0.85);
+		applyHen(c, 'lourde');
+		expect(c.r).toBe(8);
+		expect(c.invMass).toBeCloseTo(1 / 3);
+		applyHen(c, 'normale'); // back to base
+		expect(c.r).toBe(5.5);
+		expect(c.rest).toBeLessThan(0.85);
+	});
+
+	it('perce hen flies through a line of foxes: both damaged, cocotte keeps its speed', () => {
+		const w = makeLevel(1, DIFFS.facile);
+		clearFoxes(w);
+		const c = w.cocotte!;
+		applyHen(c, 'perce');
+		// slight upward vy cancels gravity's drop so the flat shot skewers both foxes
+		c.x = 60; c.y = 80; c.vx = 340; c.vy = -25; c.launched = true;
+		const f1 = addFox(w, 95, 80), f2 = addFox(w, 120, 80);
+		for (let i = 0; i < 12; i++) step(w, 1 / 60);
+		expect(f1.hp, 'first fox hit').toBeLessThan(9999);
+		expect(f2.hp, 'second fox hit too').toBeLessThan(9999);
+		expect(c.x, 'flew past both').toBeGreaterThan(120);
+		expect(c.vx, 'not stopped').toBeGreaterThan(280);
+	});
+
+	it('explosive hen: activatePower blasts nearby foxes and consumes the hen', () => {
+		const w = makeLevel(1, DIFFS.facile);
+		clearFoxes(w);
+		const c = w.cocotte!;
+		applyHen(c, 'explosive');
+		c.x = 120; c.y = 80; c.launched = true;
+		const near = addFox(w, 130, 82), far = addFox(w, 400, 82);
+		const fx = activatePower(w, c);
+		expect(fx?.blast).toBeDefined();
+		expect(near.hp, 'in-radius fox hurt').toBeLessThan(9999);
+		expect(far.hp, 'out-of-radius fox untouched').toBe(9999);
+		expect(c.defeated).toBe(true);
+		expect(c.powerUsed).toBe(true);
+		expect(activatePower(w, c), 'no double-fire').toBeNull();
+	});
+
+	it('poussins hen: activatePower splits into 3 chicks and consumes the parent', () => {
+		const w = makeLevel(1, DIFFS.facile);
+		const c = w.cocotte!;
+		applyHen(c, 'poussins');
+		c.x = 120; c.y = 60; c.vx = 200; c.vy = -40; c.launched = true;
+		const before = w.bodies.filter((b) => b.tag === 'cocotte' && b.chick).length;
+		const fx = activatePower(w, c);
+		expect(fx?.chicks).toBeDefined();
+		const chicks = w.bodies.filter((b) => b.tag === 'cocotte' && b.chick && !b.defeated);
+		expect(chicks.length - before).toBe(3);
+		expect(chicks.every((k) => k.launched && k.powerUsed)).toBe(true);
+		expect(c.defeated).toBe(true);
+	});
+
+	it('active hen auto-fires on impact when not tapped', () => {
+		const w = makeLevel(1, DIFFS.facile);
+		clearFoxes(w);
+		const c = w.cocotte!;
+		applyHen(c, 'explosive');
+		c.x = 60; c.y = 80; c.vx = 260; c.vy = 0; c.launched = true;
+		addFox(w, 100, 80); addFox(w, 116, 80); // a small cluster in the path
+		for (let i = 0; i < 20 && !c.powerUsed; i++) step(w, 1 / 60);
+		expect(c.powerUsed, 'power triggered on impact').toBe(true);
+	});
+
+	it('lourde hen keeps more speed through a wood crate than a normale', () => {
+		const speedThroughWood = (hen: 'normale' | 'lourde') => {
+			const w = makeLevel(3, DIFFS.facile);
+			const crate = w.bodies.find((b) => b.tag === 'crate' && b.mat === 'wood');
+			if (!crate) return null;
+			const c = w.cocotte!;
+			applyHen(c, hen);
+			c.x = crate.x - 40; c.y = crate.y; c.vx = 320; c.vy = 0; c.launched = true;
+			for (let i = 0; i < 8; i++) step(w, 1 / 60);
+			return c.vx;
+		};
+		const light = speedThroughWood('normale');
+		const heavy = speedThroughWood('lourde');
+		if (light != null && heavy != null) expect(heavy).toBeGreaterThan(light);
+	});
+
+	it('spawning + stepping with a poussins split stays deterministic', () => {
+		const run = () => {
+			const w = makeLevel(77, DIFFS.moyen);
+			const c = w.cocotte!;
+			applyHen(c, 'poussins');
+			c.x = 100; c.y = 60; c.vx = 220; c.vy = -30; c.launched = true;
+			activatePower(w, c);
+			for (let i = 0; i < 30; i++) step(w, 1 / 60);
+			return w.bodies.filter((b) => !b.defeated).map((b) => [b.tag, Math.round(b.x), Math.round(b.y)]);
+		};
+		expect(run()).toEqual(run());
+	});
+
+	it('spawnCocotte applies the requested hen; all types are known', () => {
+		const w = makeLevel(1, DIFFS.facile);
+		for (const h of HEN_TYPES) {
+			const c = spawnCocotte(w, h);
+			expect(c.hen).toBe(h);
+		}
 	});
 });

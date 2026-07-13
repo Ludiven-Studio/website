@@ -13,6 +13,11 @@ export interface Vec { x: number; y: number; }
 export type Kind = 'circle' | 'box';
 export type Tag = 'cocotte' | 'fox' | 'barrel' | 'crate' | 'rock' | 'ground';
 export type Material = 'cardboard' | 'wood' | 'brick' | 'tnt';
+// Hen powers. explosive/poussins are ACTIVE (tap in flight, else auto on impact);
+// perce/rebond/lourde are PASSIVE (baked into the body at spawn / into resolve).
+export type HenType = 'normale' | 'explosive' | 'perce' | 'rebond' | 'lourde' | 'poussins';
+export const HEN_TYPES: HenType[] = ['normale', 'explosive', 'perce', 'rebond', 'lourde', 'poussins'];
+const ACTIVE_HENS = new Set<HenType>(['explosive', 'poussins']);
 
 export interface Body {
 	id: number;
@@ -29,6 +34,9 @@ export interface Body {
 	mat: Material | null; // material for boxes (drives mass/bounce/colour; 'tnt' explodes)
 	defeated: boolean;
 	launched: boolean; // cocotte: has been fired
+	hen?: HenType; // cocotte power
+	powerUsed?: boolean; // active power already spent
+	chick?: boolean; // spawned by the poussins power (small, doesn't re-split)
 }
 
 export interface World {
@@ -71,6 +79,13 @@ const TNT_TRIGGER = 110; // impact speed that detonates a tnt block
 const BLAST_R = 40; // explosion radius
 const BLAST_IMPULSE = 260; // blast launch strength
 const BLAST_DMG = 130; // blast damage to foxes (×falloff)
+// Explosive-hen blast: a bit wider/stronger than a tnt crate.
+const HEN_BLAST_R = 46;
+const HEN_BLAST_IMPULSE = 300;
+const HEN_BLAST_DMG = 150;
+const CHICK_R = 2.8; // poussins spawned by the split power
+const CHICK_ANGLES = [-0.32, 0, 0.32]; // fan spread (rad) — FIXED so the sim stays deterministic
+const CHICK_SPEED_K = 0.85; // fraction of the parent's speed carried by each chick
 
 // Block durability (internal HP) — a block breaks after enough hard impacts. tnt = 0 (explodes instead).
 const TOUGH: Record<Material, number> = { cardboard: 18, wood: 50, brick: 180, tnt: 0 };
@@ -200,8 +215,21 @@ function rng2(seed: number, salt: number): Rng {
 	};
 }
 
-export function spawnCocotte(world: World): Body {
+/** Apply a hen's PASSIVE stats to a not-yet-launched cocotte (idempotent). */
+export function applyHen(c: Body, hen: HenType): void {
+	c.hen = hen;
+	c.powerUsed = false;
+	// reset to the base cocotte body, then override per power
+	c.r = 5.5;
+	c.invMass = 1 / MASS.cocotte;
+	c.rest = REST.cocotte;
+	if (hen === 'rebond') c.rest = 0.85; // ricochets
+	else if (hen === 'lourde') { c.r = 8; c.invMass = 1 / 3; } // bigger & heavier → ploughs through
+}
+
+export function spawnCocotte(world: World, hen: HenType = 'normale'): Body {
 	const c = circle('cocotte', world.slingshot.x, world.slingshot.y, 5.5);
+	applyHen(c, hen);
 	world.cocotte = c;
 	world.bodies.push(c);
 	return c;
@@ -254,7 +282,15 @@ function collide(a: Body, b: Body): Contact | null {
 	return boxBox(a, b);
 }
 
+// A live piercing cocotte passes THROUGH everything but the ground: no momentum
+// exchange (damage is still applied in the damage pass), so it keeps flying straight.
+function piercesThrough(a: Body, b: Body): boolean {
+	const pierce = (h: Body, o: Body) => h.tag === 'cocotte' && h.hen === 'perce' && !h.defeated && o.tag !== 'ground';
+	return pierce(a, b) || pierce(b, a);
+}
+
 function resolve(a: Body, b: Body, c: Contact) {
+	if (piercesThrough(a, b)) return;
 	const im = a.invMass + b.invMass;
 	if (im === 0) return;
 	const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
@@ -282,12 +318,62 @@ function resolve(a: Body, b: Body, c: Contact) {
 	b.x += b.invMass * corr * c.nx; b.y += b.invMass * corr * c.ny;
 }
 
-export interface StepEvent { foxesDown: number; settled: boolean; hits: Vec[]; blasts: Vec[]; breaks: { x: number; y: number; mat: Material }[]; }
+export interface StepEvent { foxesDown: number; settled: boolean; hits: Vec[]; blasts: Vec[]; breaks: { x: number; y: number; mat: Material }[]; pops: Vec[]; }
+
+/* ---------- Hen active powers (shared by tap-in-flight and auto-on-impact) ---------- */
+
+// Radial blast centred on a hen (wider than a tnt crate). Chains into tnt blocks.
+function henBlast(world: World, c: Body): void {
+	c.defeated = true;
+	c.powerUsed = true;
+	for (const b of world.bodies) {
+		if (b === c || b.defeated || b.invMass === 0) continue;
+		const dx = b.x - c.x, dy = b.y - c.y;
+		const d = len(dx, dy);
+		if (d > HEN_BLAST_R) continue;
+		const f = 1 - d / HEN_BLAST_R;
+		const nx = d > 0.001 ? dx / d : 0, ny = d > 0.001 ? dy / d : -1;
+		b.vx += nx * HEN_BLAST_IMPULSE * f * b.invMass;
+		b.vy += (ny * HEN_BLAST_IMPULSE - 60) * f * b.invMass; // slight upward bias
+		if (b.tag === 'fox') b.hp -= HEN_BLAST_DMG * f;
+	}
+}
+
+// Split a hen into 3 chicks in a fixed fan around its current heading.
+function splitChicks(world: World, c: Body): void {
+	c.defeated = true;
+	c.powerUsed = true;
+	const sp = len(c.vx, c.vy);
+	const base = sp > 1 ? Math.atan2(c.vy, c.vx) : 0; // fall straight-ish if barely moving
+	for (const da of CHICK_ANGLES) {
+		const a = base + da;
+		const chick = circle('cocotte', c.x, c.y, CHICK_R);
+		chick.chick = true;
+		chick.launched = true;
+		chick.powerUsed = true; // a chick can't split again
+		chick.hen = 'normale';
+		chick.vx = Math.cos(a) * sp * CHICK_SPEED_K;
+		chick.vy = Math.sin(a) * sp * CHICK_SPEED_K;
+		world.bodies.push(chick);
+	}
+}
+
+/**
+ * Fire a hen's ACTIVE power now (player tapped in flight). No-op for passive/normal
+ * hens or an already-spent power. Returns FX hints for the renderer, or null.
+ */
+export function activatePower(world: World, c: Body | null): { blast?: Vec; chicks?: Vec } | null {
+	if (!c || c.defeated || c.powerUsed || !c.hen || !ACTIVE_HENS.has(c.hen)) return null;
+	const at = { x: c.x, y: c.y };
+	if (c.hen === 'explosive') { henBlast(world, c); return { blast: at }; }
+	splitChicks(world, c); return { chicks: at };
+}
 
 export function step(world: World, dt: number): StepEvent {
 	const live = world.bodies.filter((b) => !b.defeated);
 	const hits: Vec[] = [];
 	const tntFlag = new Set<number>();
+	const powerFlag = new Set<number>(); // active hens that hit something → auto-fire
 	// gravity + integrate
 	for (const b of live) {
 		if (b.invMass === 0) continue;
@@ -309,6 +395,9 @@ export function step(world: World, dt: number): StepEvent {
 			if (fox && fox.hp > 0 && closing > HIT_MIN) fox.hp -= (closing - HIT_MIN) * DMG_K;
 			if (closing > JUICE && (a.invMass > 0 || b.invMass > 0)) hits.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 			if (closing > TNT_TRIGGER) { if (a.mat === 'tnt') tntFlag.add(a.id); if (b.mat === 'tnt') tntFlag.add(b.id); }
+			// Active hen that lands a real hit (fox or block) auto-fires if not tapped first.
+			const hitHard = (closing > HIT_MIN && (a.tag === 'fox' || b.tag === 'fox')) || closing > BLOCK_HIT_MIN;
+			if (hitHard) for (const h of [a, b]) if (h.tag === 'cocotte' && h.hen && ACTIVE_HENS.has(h.hen) && !h.powerUsed) powerFlag.add(h.id);
 			if (closing > BLOCK_HIT_MIN) { // breakable blocks take internal damage
 				const dmg = (closing - BLOCK_HIT_MIN) * BLOCK_DMG_K;
 				if (a.tag === 'crate' && a.mat !== 'tnt' && a.maxHp > 0) a.hp -= dmg;
@@ -355,6 +444,17 @@ export function step(world: World, dt: number): StepEvent {
 		}
 	}
 
+	// Active hens that hit something (and weren't tapped) auto-fire their power.
+	const pops: Vec[] = [];
+	if (powerFlag.size) {
+		for (const c of world.bodies) {
+			if (!powerFlag.has(c.id) || c.defeated || c.powerUsed) continue;
+			const at = { x: c.x, y: c.y };
+			if (c.hen === 'explosive') { henBlast(world, c); blasts.push(at); }
+			else if (c.hen === 'poussins') { splitChicks(world, c); pops.push(at); }
+		}
+	}
+
 	// breakable blocks whose HP ran out → shatter (and free the path)
 	const breaks: { x: number; y: number; mat: Material }[] = [];
 	for (const b of world.bodies) {
@@ -373,7 +473,7 @@ export function step(world: World, dt: number): StepEvent {
 		if (b.tag === 'fox' && (b.hp <= 0 || off(b))) { b.defeated = true; foxesDown++; }
 		else if (b.tag !== 'fox' && off(b)) { b.defeated = true; }
 	}
-	return { foxesDown, settled: isSettled(world), hits: hits.slice(0, 5), blasts, breaks };
+	return { foxesDown, settled: isSettled(world), hits: hits.slice(0, 5), blasts, breaks, pops };
 }
 
 export const isSettled = (world: World): boolean =>

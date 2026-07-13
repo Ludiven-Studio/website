@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-	makeLevel, step, foxesLeft, spawnCocotte, aimToVelocity, pullPower, predictTrajectory,
-	encodeScore, DIFFS, type World, type Body, type Vec,
+	makeLevel, step, foxesLeft, spawnCocotte, applyHen, activatePower, aimToVelocity, pullPower, predictTrajectory,
+	encodeScore, DIFFS, HEN_TYPES, type World, type Body, type Vec, type HenType,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
 import { formatScore } from '../../lib/scoreFormat';
@@ -27,6 +27,15 @@ const SETTLE_TIMEOUT = 7000; // ms: hard cap so a shot always resolves
 const SINK_MS = 420; // explosion duration
 const DEBRIS_MS = 460; // block-shatter debris lifetime
 const MAT_FILL: Record<string, string> = { cardboard: '#d8b884', wood: '#b07b46', brick: '#b0573f', tnt: '#d23b32' };
+// Hen roster: emoji + short label + whether the power is tap/impact triggered.
+const HEN_META: Record<HenType, { emoji: string; label: string; active: boolean; body: string; accent: string }> = {
+	normale: { emoji: '🐔', label: 'Normale', active: false, body: '#fcfcfc', accent: '#e34b4b' },
+	explosive: { emoji: '💥', label: 'Explosive', active: true, body: '#4a4a52', accent: '#ff7a2e' },
+	perce: { emoji: '➡️', label: 'Perce', active: false, body: '#eef3ff', accent: '#3f7bd6' },
+	rebond: { emoji: '↕️', label: 'Rebond', active: false, body: '#a7ec88', accent: '#2ec16b' },
+	lourde: { emoji: '🧱', label: 'Lourde', active: false, body: '#b8bcc4', accent: '#6a6f78' },
+	poussins: { emoji: '🐥', label: 'Poussins', active: true, body: '#ffe08a', accent: '#f0a830' },
+};
 
 const fmtTime = (s: number) =>
 	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -37,6 +46,7 @@ interface Debris { x: number; y: number; vx: number; vy: number; t0: number; col
 
 export default function AngryGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
+	const [henType, setHenType] = useState<HenType>('normale');
 	const [status, setStatus] = useState<Status>('aiming');
 	const [shots, setShots] = useState(0); // cocottes lancées (illimité)
 	const [foxes, setFoxes] = useState(0);
@@ -51,6 +61,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const scaleRef = useRef(1);
 	const aimRef = useRef<{ pull: Vec } | null>(null);
 	const statusRef = useRef<Status>('aiming');
+	const henTypeRef = useRef<HenType>('normale');
 	const rollingRef = useRef(false);
 	const shotsUsedRef = useRef(0);
 	const startRef = useRef(0);
@@ -79,6 +90,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	/* ---------- Level setup ---------- */
 	const lay = useCallback((key: keyof typeof DIFFS, seed: number) => {
 		const world = makeLevel(seed, DIFFS[key]);
+		if (world.cocotte) applyHen(world.cocotte, henTypeRef.current); // keep the picked power across levels
 		worldRef.current = world;
 		curSeedRef.current = seed;
 		shotsUsedRef.current = 0;
@@ -148,12 +160,20 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		}
 	}, [daily, diffKey, gameId]);
 
+	// Pick a hen type: swap the waiting (not-yet-launched) cocotte's power live.
+	const chooseHen = useCallback((h: HenType) => {
+		henTypeRef.current = h;
+		setHenType(h);
+		const world = worldRef.current;
+		if (world?.cocotte && !world.cocotte.launched) applyHen(world.cocotte, h);
+	}, []);
+
 	const resolveShot = useCallback(() => {
 		const world = worldRef.current!;
 		if (foxesLeft(world) === 0) { win(); return; }
-		// unlimited cocottes: drop the spent one and load a fresh cocotte
-		if (world.cocotte) world.bodies = world.bodies.filter((b) => b !== world.cocotte);
-		spawnCocotte(world);
+		// unlimited cocottes: drop the spent cocotte AND any leftover chicks, load a fresh one
+		world.bodies = world.bodies.filter((b) => b.tag !== 'cocotte');
+		spawnCocotte(world, henTypeRef.current);
 		setStat('aiming');
 	}, [win]);
 
@@ -180,6 +200,16 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		if (!cv) return;
 		const down = (e: PointerEvent) => {
 			const world = worldRef.current;
+			// Tap in flight → fire an active hen's power (explosive/poussins).
+			if (statusRef.current === 'rolling' && world?.cocotte?.launched) {
+				const fx = activatePower(world, world.cocotte);
+				if (fx) {
+					if (fx.blast) boomsRef.current.push({ x: fx.blast.x, y: fx.blast.y, t0: performance.now(), big: true });
+					if (fx.chicks) for (let k = 0; k < 6; k++) dustRef.current.push({ x: fx.chicks.x, y: fx.chicks.y, t0: performance.now() });
+					e.preventDefault();
+				}
+				return;
+			}
 			if (statusRef.current !== 'aiming' || !world?.cocotte || world.cocotte.launched) return;
 			const p = pointerToWorld(e);
 			if (Math.hypot(p.x - world.cocotte.x, p.y - world.cocotte.y) > GRAB_R) return;
@@ -295,18 +325,30 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		};
 
 		const drawCocotte = (b: Body) => {
+			const meta = b.chick ? HEN_META.poussins : HEN_META[b.hen ?? 'normale']; // chicks are little yellow hens
 			ctx.save();
 			ctx.translate(b.x, b.y);
 			ctx.rotate(b.spin); // rolls/tumbles when launched
-			ctx.fillStyle = '#e34b4b'; // comb
+			ctx.fillStyle = meta.accent; // comb
 			ctx.beginPath(); ctx.arc(-b.r * 0.2, -b.r, b.r * 0.3, 0, Math.PI * 2); ctx.arc(b.r * 0.2, -b.r, b.r * 0.3, 0, Math.PI * 2); ctx.fill();
-			ctx.fillStyle = '#fcfcfc'; // body
+			ctx.fillStyle = meta.body; // body (tinted per power)
 			ctx.beginPath(); ctx.arc(0, 0, b.r, 0, Math.PI * 2); ctx.fill();
 			ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 0.4; ctx.stroke();
 			ctx.fillStyle = '#f0a830'; // beak
 			ctx.beginPath(); ctx.moveTo(b.r * 0.7, 0); ctx.lineTo(b.r * 1.4, b.r * 0.18); ctx.lineTo(b.r * 0.7, b.r * 0.35); ctx.closePath(); ctx.fill();
 			ctx.fillStyle = '#222'; // eye
 			ctx.beginPath(); ctx.arc(b.r * 0.3, -b.r * 0.3, b.r * 0.15, 0, Math.PI * 2); ctx.fill();
+			// Power tells, upright (drawn un-rotated so they read clearly)
+			ctx.rotate(-b.spin);
+			if (b.hen === 'explosive' && !b.powerUsed) { // lit fuse
+				ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, -b.r); ctx.lineTo(b.r * 0.3, -b.r * 1.6); ctx.stroke();
+				ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(b.r * 0.3, -b.r * 1.6, b.r * 0.22, 0, Math.PI * 2); ctx.fill();
+			} else if (b.hen === 'perce') { // forward speed lines
+				ctx.strokeStyle = 'rgba(63,123,214,0.7)'; ctx.lineWidth = 0.5;
+				for (const dy of [-0.35, 0, 0.35]) { ctx.beginPath(); ctx.moveTo(-b.r * 1.5, b.r * dy); ctx.lineTo(-b.r * 0.6, b.r * dy); ctx.stroke(); }
+			} else if (b.hen === 'lourde') { // heavy brows
+				ctx.strokeStyle = '#4a4f57'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-b.r * 0.5, -b.r * 0.55); ctx.lineTo(b.r * 0.55, -b.r * 0.4); ctx.stroke();
+			}
 			ctx.restore();
 		};
 
@@ -430,6 +472,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 					}
 					for (const hpt of ev.hits) if (dustRef.current.length < 24) dustRef.current.push({ x: hpt.x, y: hpt.y, t0: now });
 					for (const bl of ev.blasts) boomsRef.current.push({ x: bl.x, y: bl.y, t0: now, big: true });
+					for (const pp of ev.pops) for (let k = 0; k < 6; k++) if (dustRef.current.length < 40) dustRef.current.push({ x: pp.x, y: pp.y, t0: now });
 					for (const br of ev.breaks) {
 						const col = MAT_FILL[br.mat] ?? '#b07b46';
 						for (let k = 0; k < 5; k++) {
@@ -480,6 +523,18 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 					</div>
 					<button className="co-act" onClick={() => newFree(diffKey)}>↻ Nouveau niveau</button>
 				</div>
+			)}
+
+			<div className="co-hens" role="tablist" aria-label="Type de cocotte">
+				{HEN_TYPES.map((h) => (
+					<button key={h} role="tab" aria-selected={henType === h} className={`co-hen ${henType === h ? 'active' : ''}`} onClick={() => chooseHen(h)} title={HEN_META[h].label}>
+						<span className="co-hen-emoji">{HEN_META[h].emoji}</span>
+						<span className="co-hen-label">{HEN_META[h].label}</span>
+					</button>
+				))}
+			</div>
+			{HEN_META[henType].active && (
+				<div className="co-hint">👆 Touche l'écran <b>en vol</b> pour déclencher le pouvoir (sinon il part à l'impact)</div>
 			)}
 
 			<div className="co-stats">
@@ -539,6 +594,12 @@ const CSS = `
 .co-pill.active { background: var(--co-accent); color: var(--accent-text-over); border-color: var(--co-accent); }
 .co-act { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .co-act:hover { background: var(--gray-800); border-color: var(--co-accent); color: var(--co-accent); }
+.co-hens { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.5rem; }
+.co-hen { display: flex; align-items: center; gap: 5px; border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 600; font-size: 12.5px; border-radius: 999px; padding: 5px 11px; cursor: pointer; transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition); }
+.co-hen.active { background: var(--co-accent); color: var(--accent-text-over); border-color: var(--co-accent); }
+.co-hen-emoji { font-size: 15px; line-height: 1; }
+.co-hint { text-align: center; color: var(--gray-300); font-size: 12px; margin-bottom: 0.6rem; }
+@media (max-width: 460px) { .co-hen-label { display: none; } .co-hen { padding: 6px 9px; } }
 .co-stats { display: flex; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.75rem; flex-wrap: wrap; justify-content: center; }
 .co-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; }
 .co-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
