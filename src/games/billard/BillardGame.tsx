@@ -452,7 +452,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				<canvas ref={canvasRef} className="bi-canvas" />
 
 				<div className="bi-hud-top">
-					<ModeToggle daily={daily} onFree={() => daily && newFreeTable(diffKey)} onDaily={startDaily} />
+					{/* Libre/Défi switch clutters the windowed view — show it only in fullscreen. */}
+					<div className="bi-modetoggle">
+						<ModeToggle daily={daily} onFree={() => daily && newFreeTable(diffKey)} onDaily={startDaily} />
+					</div>
 					<div className="bi-stats">
 						<span className="bi-stat">🎱 {strokes}</span>
 						<span className="bi-stat">🎯 {remaining}</span>
@@ -531,6 +534,10 @@ const CSS = `
 /* Overlaid HUD — sits on the floor above the table; dark translucent so it reads on any surface. */
 .bi-hud-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; z-index: 3; pointer-events: none; }
 .bi-hud-top > * { pointer-events: auto; }
+/* Libre/Défi toggle: hidden in the windowed view, shown only in fullscreen. */
+.bi-modetoggle { display: none; }
+.game-page:fullscreen .bi-modetoggle { display: block; }
+.game-page:-webkit-full-screen .bi-modetoggle { display: block; }
 .bi-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .bi-daily-hud { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 3; background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); }
 
