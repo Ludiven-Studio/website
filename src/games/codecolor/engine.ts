@@ -11,13 +11,13 @@ export interface Level {
 	label: string;
 	slots: number; // code length
 	colors: number; // palette size used (always >= slots)
-	tries: number; // max guesses
+	tries: number; // max guesses — high (30) so it's effectively "solve it, no pressure"
 }
 
 export const LEVELS: Record<string, Level> = {
-	facile: { label: 'Facile', slots: 4, colors: 6, tries: 10 },
-	moyen: { label: 'Moyen', slots: 5, colors: 7, tries: 11 },
-	difficile: { label: 'Difficile', slots: 6, colors: 8, tries: 12 },
+	facile: { label: 'Facile', slots: 4, colors: 6, tries: 30 },
+	moyen: { label: 'Moyen', slots: 5, colors: 7, tries: 30 },
+	difficile: { label: 'Difficile', slots: 6, colors: 8, tries: 30 },
 };
 
 export interface Feedback {
