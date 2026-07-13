@@ -1,0 +1,4 @@
+Samples from midi-js-soundfonts (https://github.com/gleitz/midi-js-soundfonts)
+Soundfonts: FluidR3_GM (Frank Wen) and MusyngKite, rendered per-note as mp3 by
+Benjamin Gleitzman. Per-voice soundfont is defined in scripts/fetch-tempo-samples.mjs.
+License: MIT (per the midi-js-soundfonts repository).

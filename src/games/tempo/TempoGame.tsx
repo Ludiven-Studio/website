@@ -5,6 +5,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import { LANES, SPEEDS, ENDLESS_OPTS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type ChordBar, type Grade } from './engine';
+import { startSamplerLoad, playSample, samplerReady, samplerLoading, onSamplerChange } from './sampler';
 
 /* =====================================================
    TEMPO — piano-tiles rhythm game (prototype).
@@ -16,7 +17,12 @@ import { LANES, SPEEDS, ENDLESS_OPTS, buildEndlessChart, judgeTiming, comboMult,
 
 type Status = 'ready' | 'running' | 'done';
 type TileState = 'pending' | 'holding' | 'done' | 'broken' | Grade;
-const KEYS = ['s', 'd', 'f', 'j', 'k', 'l']; // 6 columns, low pitch (left) → high (right)
+// Home-row keys per column count (4 easy → 6 hard), split across both hands.
+const KEY_SETS: Record<number, string[]> = {
+	4: ['d', 'f', 'j', 'k'],
+	5: ['s', 'd', 'f', 'j', 'k'],
+	6: ['s', 'd', 'f', 'j', 'k', 'l'],
+};
 const LANE_HUE = [205, 245, 285, 325, 20, 50];
 const LEAD = 1.9;
 const HIT_FRAC = 0.8;
@@ -81,6 +87,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [speedIdx, setSpeedIdx] = useState(1);
 	const [metro, setMetro] = useState(true); // backing music (drums + bass) on by default
+	const [soundsLoading, setSoundsLoading] = useState(false); // orchestra samples still downloading
 	const [hud, setHud] = useState({ score: 0, combo: 0, mult: 1 });
 	const [result, setResult] = useState<{ score: number; rank: string; tiles: number } | null>(null);
 	const [best, setBest] = useState<number | null>(null);
@@ -169,15 +176,17 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				gtr: mkBus('lowpass', 1800, 0.7),
 				bassGtr: mkBus('lowpass', 1100, 0.7),
 				brass: mkBus('lowpass', 1500, 0.8),
-				snare: mkBus('bandpass', 1900, 0.6),
+				snare: mkBus('highpass', 1400, 0.5), // broadband rattle, not a boxy bandpass beep
 				strings: mkBus('lowpass', 1500, 0.5),
 				reed: mkBus('lowpass', 2000, 0.8),
-				hat: mkBus('highpass', 7000, 1),
+				hat: mkBus('highpass', 8000, 1),
+				kclick: mkBus('bandpass', 2600, 0.9), // kick beater snap
 			};
 			ctxRef.current = ctx;
 			masterRef.current = master;
 		}
 		if (ctxRef.current.state === 'suspended') void ctxRef.current.resume();
+		startSamplerLoad(); // idempotent — first user gesture kicks the sample download
 		return ctxRef.current;
 	};
 	// Notes route through their instrument's shared filter bus (see busesRef).
@@ -189,6 +198,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const ctx = ensureAudio();
 		if (!ctx) return;
 		const when = at ?? ctx.currentTime;
+		if (playSample(ctx, 'piano', midi, when, sustain, 0.17 * vol, runGainRef.current ?? masterRef.current!)) return;
 		const freq = midiToFreq(midi);
 		const g = ctx.createGain();
 		g.connect(busOut('piano'));
@@ -274,21 +284,34 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		}
 	};
 	// Backing accompaniment: a kick drum + a bass note per beat gives the tempo.
+	// Acoustic-ish kick: a fast pitch-swept sine BODY (punch) + a short noise
+	// BEATER click through a bandpass bus — the click is what reads as "real".
 	const kick = (when: number, accent: boolean): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
 		const g = ctx.createGain();
 		g.connect(runGainRef.current ?? masterRef.current!);
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(accent ? 0.24 : 0.15, when + 0.004); // micro-attack: no click
-		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.14);
+		g.gain.exponentialRampToValueAtTime(accent ? 0.3 : 0.2, when + 0.004);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
 		const o = ctx.createOscillator();
 		o.type = 'sine';
-		o.frequency.setValueAtTime(130, when);
-		o.frequency.exponentialRampToValueAtTime(46, when + 0.12);
+		o.frequency.setValueAtTime(180, when); // start higher → more attack "thump"
+		o.frequency.exponentialRampToValueAtTime(44, when + 0.11);
 		o.connect(g);
 		o.start(when);
-		o.stop(when + 0.16);
+		o.stop(when + 0.18);
+		if (noiseRef.current) {
+			const c = ctx.createBufferSource();
+			c.buffer = noiseRef.current;
+			const cg = ctx.createGain();
+			cg.gain.setValueAtTime(accent ? 0.09 : 0.06, when);
+			cg.gain.exponentialRampToValueAtTime(0.0001, when + 0.03);
+			c.connect(cg);
+			cg.connect(busOut('kclick'));
+			c.start(when);
+			c.stop(when + 0.04);
+		}
 	};
 	const bass = (when: number, midi: number, accent: boolean): void => {
 		const ctx = ctxRef.current;
@@ -310,6 +333,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const bassGtr = (when: number, midi: number, accent: boolean): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
+		if (playSample(ctx, 'bassGtr', midi, when, 0.28, accent ? 0.2 : 0.15, runGainRef.current ?? masterRef.current!)) return;
 		const g = ctx.createGain();
 		g.connect(busOut('bassGtr'));
 		g.gain.setValueAtTime(0.0001, when);
@@ -356,6 +380,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const brass = (when: number, midi: number, dur: number, accent: boolean): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
+		if (playSample(ctx, 'brass', midi, when, dur, accent ? 0.13 : 0.1, runGainRef.current ?? masterRef.current!)) return;
 		const g = ctx.createGain();
 		g.connect(busOut('brass'));
 		const peak = accent ? 0.13 : 0.1;
@@ -420,6 +445,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const flute = (when: number, midi: number, dur: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
+		if (playSample(ctx, 'flute', midi, when, dur, 0.1, runGainRef.current ?? masterRef.current!)) return;
 		const freq = midiToFreq(midi);
 		const g = ctx.createGain();
 		g.connect(runGainRef.current ?? masterRef.current!);
@@ -449,6 +475,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const reed = (when: number, midi: number, dur: number, vol = 0.06): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
+		if (playSample(ctx, 'reed', midi, when, dur, vol, runGainRef.current ?? masterRef.current!)) return;
 		const g = ctx.createGain();
 		g.connect(busOut('reed'));
 		const atk = 0.04;
@@ -469,52 +496,74 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			o.stop(when + dur + 0.05);
 		}
 	};
-	// Hi-hat: a short high-passed noise tick for groove.
+	// Hi-hat: high-passed noise for the "tss" + two faint inharmonic square
+	// partials for the metallic shimmer of real cymbal alloy. Short & tight.
 	const hat = (when: number, accent: boolean, gain?: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx || !noiseRef.current) return;
+		const peak = gain ?? (accent ? 0.05 : 0.028);
 		const src = ctx.createBufferSource();
 		src.buffer = noiseRef.current;
 		const g = ctx.createGain();
-		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(gain ?? (accent ? 0.05 : 0.028), when + 0.002); // micro-attack: no click
+		g.gain.setValueAtTime(peak, when); // instant tick
 		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
 		src.connect(g);
 		g.connect(busOut('hat'));
 		src.start(when);
 		src.stop(when + 0.06);
+		for (const f of [8300, 11700]) {
+			const o = ctx.createOscillator();
+			o.type = 'square';
+			o.frequency.value = f;
+			const og = ctx.createGain();
+			og.gain.setValueAtTime(peak * 0.18, when);
+			og.gain.exponentialRampToValueAtTime(0.0001, when + 0.04);
+			o.connect(og);
+			og.connect(busOut('hat'));
+			o.start(when);
+			o.stop(when + 0.05);
+		}
 	};
-	// Snare: band-passed noise + a low tone body. The rock backbeat (beats 2 & 4).
+	// Snare: high-passed broadband noise (the wire rattle, with a ringing tail) +
+	// a two-tone drum SHELL body — crack instead of a boxy beep. Beats 2 & 4.
 	const snare = (when: number, accent: boolean): void => {
 		const ctx = ctxRef.current;
 		if (!ctx || !noiseRef.current) return;
 		const src = ctx.createBufferSource();
 		src.buffer = noiseRef.current;
 		const g = ctx.createGain();
-		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(accent ? 0.15 : 0.11, when + 0.003); // micro-attack: no click
-		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.16);
+		g.gain.setValueAtTime(accent ? 0.19 : 0.14, when); // instant hit → crack
+		g.gain.exponentialRampToValueAtTime(accent ? 0.06 : 0.04, when + 0.03);
+		g.gain.exponentialRampToValueAtTime(0.0001, when + 0.19); // wires ring out
 		src.connect(g);
 		g.connect(busOut('snare'));
 		src.start(when);
-		src.stop(when + 0.18);
-		const o = ctx.createOscillator();
-		o.type = 'triangle';
-		o.frequency.setValueAtTime(195, when);
-		const og = ctx.createGain();
-		og.gain.setValueAtTime(0.0001, when);
-		og.gain.exponentialRampToValueAtTime(0.08, when + 0.003);
-		og.gain.exponentialRampToValueAtTime(0.0001, when + 0.11);
-		o.connect(og);
-		og.connect(runGainRef.current ?? masterRef.current!);
-		o.start(when);
-		o.stop(when + 0.13);
+		src.stop(when + 0.21);
+		// Shell body: two detuned tones give a fuller drum than one triangle.
+		for (const [f, amp] of [[185, 0.08], [278, 0.05]] as [number, number][]) {
+			const o = ctx.createOscillator();
+			o.type = 'triangle';
+			o.frequency.setValueAtTime(f, when);
+			o.frequency.exponentialRampToValueAtTime(f * 0.85, when + 0.09); // slight downward "thwack"
+			const og = ctx.createGain();
+			og.gain.setValueAtTime(amp, when);
+			og.gain.exponentialRampToValueAtTime(0.0001, when + 0.1);
+			o.connect(og);
+			og.connect(runGainRef.current ?? masterRef.current!);
+			o.start(when);
+			o.stop(when + 0.12);
+		}
 	};
 	// String ensemble (violins): detuned saws, slow swell, mid-high register —
 	// carries the ninth chord's color (3rd + 7th + 9th) above the synth pad.
 	const strings = (when: number, dur: number, root: number, third: number, seventh: number, ninth: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
+		if (samplerReady('strings')) {
+			// Sampled ensemble, one voice per chord color tone — keeps its lowpass bus so it stays a bed.
+			for (const semi of [third + 12, seventh + 12, ninth + 12]) playSample(ctx, 'strings', root + semi, when, dur, 0.04, busOut('strings'));
+			return;
+		}
 		const g = ctx.createGain();
 		g.connect(busOut('strings'));
 		const atk = Math.min(0.5, dur * 0.35);
@@ -541,6 +590,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const gtr = (when: number, midi: number): void => {
 		const ctx = ctxRef.current;
 		if (!ctx) return;
+		if (playSample(ctx, 'gtr', midi, when, 0.42, 0.05, runGainRef.current ?? masterRef.current!)) return;
 		const g = ctx.createGain();
 		g.connect(busOut('gtr'));
 		g.gain.setValueAtTime(0.0001, when);
@@ -560,7 +610,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	};
 
 	/* ---------- Geometry ---------- */
-	const laneW = (): number => dimRef.current.w / LANES;
+	const laneCount = (): number => chartRef.current?.lanes ?? LANES;
+	const keysOf = (): string[] => KEY_SETS[laneCount()] ?? KEY_SETS[6];
+	const laneW = (): number => dimRef.current.w / laneCount();
 	const hitY = (): number => dimRef.current.h * HIT_FRAC;
 	const pxPerSec = (): number => hitY() / LEAD;
 	const songTime = (): number => {
@@ -726,7 +778,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!cv) return;
 		const rect = cv.getBoundingClientRect();
 		const x = (e.clientX - rect.left) * (dimRef.current.w / rect.width);
-		const lane = clamp(Math.floor(x / laneW()), 0, LANES - 1);
+		const lane = clamp(Math.floor(x / laneW()), 0, laneCount() - 1);
 		const wasHeld = heldLane(lane);
 		pointerLaneRef.current.set(e.pointerId, lane);
 		cv.setPointerCapture(e.pointerId);
@@ -812,7 +864,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		document.addEventListener('fullscreenchange', onFs);
 		document.addEventListener('webkitfullscreenchange', onFs);
 		const onKeyDown = (e: KeyboardEvent): void => {
-			const lane = KEYS.indexOf(e.key.toLowerCase());
+			const lane = keysOf().indexOf(e.key.toLowerCase());
 			if (lane < 0 || !runningRef.current || autoRef.current) return;
 			e.preventDefault();
 			if (!laneKeyRef.current[lane]) {
@@ -821,7 +873,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			}
 		};
 		const onKeyUp = (e: KeyboardEvent): void => {
-			const lane = KEYS.indexOf(e.key.toLowerCase());
+			const lane = keysOf().indexOf(e.key.toLowerCase());
 			if (lane >= 0) laneKeyRef.current[lane] = false;
 		};
 		window.addEventListener('keydown', onKeyDown);
@@ -850,6 +902,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		metroRef.current = metro;
 	}, [metro]);
+	useEffect(() => onSamplerChange(() => setSoundsLoading(samplerLoading())), []);
 
 	const step = (dt: number): void => {
 		for (const p of partsRef.current) {
@@ -1072,7 +1125,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 
 		ctx.fillStyle = '#0c1018';
 		ctx.fillRect(0, 0, w, h);
-		for (let l = 0; l < LANES; l++) {
+		for (let l = 0; l < laneCount(); l++) {
 			ctx.fillStyle = l % 2 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)';
 			ctx.fillRect(l * lw, 0, lw, h);
 			ctx.strokeStyle = 'rgba(255,255,255,0.06)';
@@ -1152,7 +1205,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			}
 		}
 
-		for (let l = 0; l < LANES; l++) {
+		const keys = keysOf();
+		for (let l = 0; l < laneCount(); l++) {
 			const flash = clamp(1 - (anim - laneFlashRef.current[l]) / 0.18, 0, 1);
 			const held = heldLane(l) ? 0.35 : 0;
 			ctx.fillStyle = `rgba(${120 + 120 * flash}, ${150 + 90 * flash}, 255, ${0.12 + 0.5 * flash + held})`;
@@ -1161,7 +1215,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			ctx.font = 'bold 14px system-ui, sans-serif';
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
-			ctx.fillText(KEYS[l].toUpperCase(), (l + 0.5) * lw, (hy + h) / 2);
+			ctx.fillText(keys[l].toUpperCase(), (l + 0.5) * lw, (hy + h) / 2);
 		}
 
 		for (const p of partsRef.current) {
@@ -1232,13 +1286,18 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						⏹ Arrêter l'écoute
 					</button>
 				)}
+				{status === 'running' && !auto && !daily && (
+					<button className="tp-stop tp-quit" onClick={() => finishRun()}>
+						✕ Quitter
+					</button>
+				)}
 
 				{status === 'ready' && !dailyLoading && (
 					<div className="tp-overlay">
 						<div className="tp-card">
 							<h3>🎹 Tempo</h3>
 							<p>
-								Tape la colonne (clic/doigt ou <b>S D F&nbsp;J K L</b>) quand la tuile touche la ligne — une <b>musique donne le tempo</b>, cale-toi dessus. Les tuiles <b>allongées</b> se <b>maintiennent</b> pour un bonus. Ça <b>accélère</b> peu à peu&nbsp;: ton énergie baisse quand tu rates et remonte quand tu enchaînes.
+								Tape la colonne (clic/doigt ou <b>{keysOf().join(' ').toUpperCase()}</b>) quand la tuile touche la ligne — une <b>musique donne le tempo</b>, cale-toi dessus. Les tuiles <b>allongées</b> se <b>maintiennent</b> pour un bonus. Ça <b>accélère</b> peu à peu&nbsp;: ton énergie baisse quand tu rates et remonte quand tu enchaînes.
 							</p>
 							<div className="tp-cta">
 								<button className="tp-btn primary big" onClick={() => startRun(false)}>
@@ -1248,6 +1307,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 									🎧 Écouter
 								</button>
 							</div>
+							{soundsLoading && <div className="tp-loadhint">🎼 Chargement des sons d'orchestre…</div>}
 						</div>
 					</div>
 				)}
@@ -1309,6 +1369,8 @@ const CSS = `
 .tp-toggle input { width: 14px; height: 14px; accent-color: var(--tp); }
 .tp-cta { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .tp-stop { position: absolute; top: 10px; right: 10px; z-index: 3; border: 1.5px solid rgba(255,255,255,0.35); background: rgba(12,16,24,0.82); color: #fff; font: inherit; font-weight: 600; font-size: 12.5px; border-radius: 999px; padding: 7px 14px; cursor: pointer; backdrop-filter: blur(2px); }
+.tp-quit { opacity: 0.7; font-size: 12px; padding: 5px 11px; }
+.tp-loadhint { font-size: 11.5px; color: var(--gray-300); margin-top: 8px; }
 .tp-hud { display: flex; gap: 0.5rem; font-size: 14px; font-weight: 600; margin-bottom: 0.6rem; }
 .tp-stat { background: var(--gray-900); border-radius: 999px; padding: 6px 14px; font-variant-numeric: tabular-nums; }
 .tp-stat strong { margin-left: 4px; color: var(--tp); }

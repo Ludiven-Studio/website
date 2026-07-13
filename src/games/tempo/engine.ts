@@ -7,7 +7,7 @@
 
 import { mulberry32 } from '../prng';
 
-export const LANES = 6; // columns, ordered low pitch (left) → high pitch (right)
+export const LANES = 6; // MAX columns (hardest tier) — each tier picks its own count, low pitch (left) → high (right)
 export const HOLD_BEATS = 3; // a note this long (or longer) becomes a hold tile
 
 // A diatonic NINTH chord (5 notes: root, 3rd, 5th, 7th, 9th stacked in the
@@ -65,6 +65,7 @@ export interface Chart {
 	lead: { time: number; midi: number; dur: number }[]; // ornate melody for the auto-lead voice — richer than the playable tiles
 	introStyle: number; // 0 progression · 1 solo call · 2 groove · 3 cascade · 4 tonic pedal
 	introTime: number; // seconds of intro before the first tile
+	lanes: number; // column count (per difficulty tier: 4 easy → 6 hard)
 }
 
 /* --- Music theory scaffolding for the generator -------------------------- */
@@ -123,8 +124,8 @@ const BAD_PENTA = new Set([3, 6]); // 4th & 7th scale degrees: not in the pentat
  * pitch always uses the same column. The generator uses it to guarantee that two
  * consecutive DIFFERENT pitches never share a column (which felt odd).
  */
-const laneOfStep = (step: number): number =>
-	Math.max(0, Math.min(LANES - 1, Math.floor(((step - MIN_STEP) / (MAX_STEP - MIN_STEP + 1)) * LANES)));
+const laneOfStep = (step: number, lanes: number): number =>
+	Math.max(0, Math.min(lanes - 1, Math.floor(((step - MIN_STEP) / (MAX_STEP - MIN_STEP + 1)) * lanes)));
 
 // Rhythm cells by density (0 sparse, 1 medium, 2 flowing). Minimum duration is
 // ONE BEAT everywhere (never shorter than a quarter note, always on the grid).
@@ -238,37 +239,43 @@ const buildLead = (notes: SongNote[], rng: () => number, tonic: number): SongNot
 	const stepOf = new Map<number, number>();
 	for (let s = MIN_STEP; s <= MAX_STEP; s++) stepOf.set(degToMidi(tonic, s), s);
 	const lead: SongNote[] = [];
+	let prevOrnamented = false; // never ornament two successive notes — back-to-back figures sound fussy
 	for (let i = 0; i < notes.length; i++) {
 		const n = notes[i];
 		if (n.rest) {
 			lead.push({ ...n });
+			prevOrnamented = false; // a breath resets the budget
 			continue;
 		}
 		const next = notes.slice(i + 1).find((x) => !x.rest);
 		const s = stepOf.get(n.midi);
 		const ns = next ? stepOf.get(next.midi) : undefined;
 		// Run: fill a wide leap with two passing 8ths walking toward the next note.
-		if (n.dur >= 2 && s != null && ns != null && Math.abs(ns - s) >= 3 && rng() < 0.6) {
+		if (!prevOrnamented && n.dur >= 2 && s != null && ns != null && Math.abs(ns - s) >= 3 && rng() < 0.6) {
 			lead.push({ midi: n.midi, dur: n.dur - 1 });
 			const dir = ns > s ? 1 : -1;
 			lead.push({ midi: degToMidi(tonic, clampStep(s + dir)), dur: 0.5 });
 			lead.push({ midi: degToMidi(tonic, clampStep(s + 2 * dir)), dur: 0.5 });
+			prevOrnamented = true;
 			continue;
 		}
 		// Turn: a long note re-lit by its upper neighbor right after it lands.
-		if (n.dur >= 2 && s != null && rng() < 0.35) {
+		if (!prevOrnamented && n.dur >= 2 && s != null && rng() < 0.35) {
 			lead.push({ midi: n.midi, dur: 0.5 });
 			lead.push({ midi: degToMidi(tonic, clampStep(s + 1)), dur: 0.5 });
 			lead.push({ midi: n.midi, dur: n.dur - 1 });
+			prevOrnamented = true;
 			continue;
 		}
 		// Grace note: a quick neighbor appoggiatura stealing the first quarter-beat.
-		if (n.dur === 1 && s != null && rng() < 0.15) {
+		if (!prevOrnamented && n.dur === 1 && s != null && rng() < 0.15) {
 			lead.push({ midi: degToMidi(tonic, clampStep(s + (rng() < 0.5 ? 1 : -1))), dur: 0.25 });
 			lead.push({ midi: n.midi, dur: 0.75 });
+			prevOrnamented = true;
 			continue;
 		}
 		lead.push({ midi: n.midi, dur: n.dur });
+		prevOrnamented = false;
 	}
 	return lead;
 };
@@ -291,7 +298,7 @@ const buildLead = (notes: SongNote[], rng: () => number, tonic: number): SongNot
  * seed-picked progression loops for the whole song and is returned alongside
  * the notes so the backing follows the same harmony.
  */
-export function generateEndlessSong(seed: number, count = 600): Song {
+export function generateEndlessSong(seed: number, count = 600, lanes = LANES): Song {
 	const rng = mulberry32(seed >>> 0);
 	const KEY = 38 + Math.floor(rng() * 12); // seed-picked tonic (D2..C#3) — every song has its own color
 	const TONIC = KEY + 12; // tonic midi the melody sings around
@@ -308,13 +315,13 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 	// differs — trying the melodic direction first, then the opposite one, so a
 	// register edge doesn't collapse into a repeated note.
 	const emit = (s: number, dur: number): void => {
-		if (lastStep != null && s !== lastStep && laneOfStep(s) === laneOfStep(lastStep)) {
+		if (lastStep != null && s !== lastStep && laneOfStep(s, lanes) === laneOfStep(lastStep, lanes)) {
 			const pref = s > lastStep ? 1 : -1;
 			let resolved = lastStep;
 			for (const dir of [pref, -pref]) {
 				let n = s;
-				while (n + dir >= MIN_STEP && n + dir <= MAX_STEP && laneOfStep(n) === laneOfStep(lastStep)) n += dir;
-				if (laneOfStep(n) !== laneOfStep(lastStep)) {
+				while (n + dir >= MIN_STEP && n + dir <= MAX_STEP && laneOfStep(n, lanes) === laneOfStep(lastStep, lanes)) n += dir;
+				if (laneOfStep(n, lanes) !== laneOfStep(lastStep, lanes)) {
 					resolved = n;
 					break;
 				}
@@ -322,7 +329,7 @@ export function generateEndlessSong(seed: number, count = 600): Song {
 			s = resolved;
 		}
 		lastStep = s;
-		notes.push({ midi: degToMidi(TONIC, s), dur, lane: laneOfStep(s) });
+		notes.push({ midi: degToMidi(TONIC, s), dur, lane: laneOfStep(s, lanes) });
 	};
 	// Chord tones of `rootStep` across the register (incl. the 7th), sorted —
 	// for arpeggio bars.
@@ -602,14 +609,17 @@ export interface EndlessOpts {
 	baseTempo?: number; // beats/sec at the start
 	rampSec?: number; // seconds of play to add +100% tempo
 	maxMult?: number; // tempo ceiling (× baseTempo)
+	lanes?: number; // column count for this tier
 	count?: number;
 }
 // Tempo curve per difficulty tier (same order as SPEEDS; speed multiplies on top).
 // Note values are floored at 1 beat, so the ramp is the ONLY acceleration.
+// Ceiling lands at (maxMult-1)×rampSec seconds — high enough that a long run
+// keeps accelerating well past the minute mark instead of plateauing early.
 export const ENDLESS_OPTS: EndlessOpts[] = [
-	{ baseTempo: 1.8, rampSec: 130, maxMult: 1.35 }, // Facile
-	{ baseTempo: 1.8, rampSec: 110, maxMult: 1.45 }, // Moyen
-	{ baseTempo: 1.8, rampSec: 95, maxMult: 1.5 }, // Difficile
+	{ baseTempo: 1.8, rampSec: 130, maxMult: 1.6, lanes: 4 }, // Facile — cap ~78s
+	{ baseTempo: 1.8, rampSec: 110, maxMult: 1.8, lanes: 5 }, // Moyen — cap ~88s
+	{ baseTempo: 1.8, rampSec: 95, maxMult: 2.0, lanes: 6 }, // Difficile — cap ~95s
 ];
 export const INTRO_BEATS = 16; // 4 bars: the full chord loop plays once before the first tile
 /**
@@ -621,8 +631,9 @@ export const INTRO_BEATS = 16; // 4 bars: the full chord loop plays once before 
 export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {}): Chart {
 	const base = (opts.baseTempo ?? 1.8) * speed;
 	const ramp = opts.rampSec ?? 110; // gentle: reach the ceiling only after a long run
-	const maxMult = opts.maxMult ?? 1.45; // modest tempo ceiling (× baseTempo)
-	const song = generateEndlessSong(seed, opts.count ?? 1500);
+	const maxMult = opts.maxMult ?? 1.8; // tempo ceiling (× baseTempo)
+	const lanes = opts.lanes ?? LANES;
+	const song = generateEndlessSong(seed, opts.count ?? 1500, lanes);
 
 	// Build an INTEGER-beat time grid: each beat is shorter than the last as the
 	// tempo ramps. Note times are interpolated on this grid, which keeps the
@@ -683,7 +694,7 @@ export function buildEndlessChart(seed: number, speed = 1, opts: EndlessOpts = {
 	const introSections: Section[] = ['I', 'I', 'I', 'I'];
 	const sections: Section[] = [...introSections, ...(song.sections ?? [])].slice(0, barCount);
 	while (sections.length < barCount) sections.push(sections[sections.length - 1] ?? 'A');
-	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, sections, lead, introStyle: song.introStyle ?? 0, introTime: at(INTRO_BEATS) };
+	return { tiles, totalTime: at(totalBeats), beatTimes, key: song.key, chords, sections, lead, introStyle: song.introStyle ?? 0, introTime: at(INTRO_BEATS), lanes };
 }
 
 export type Grade = 'Parfait' | 'Bien' | 'Ok' | 'Raté';
