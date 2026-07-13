@@ -95,8 +95,9 @@ const interleaved = (rng: Rng): Generated => {
 };
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', families: [arithmetic] },
-	moyen: { label: 'Moyen', families: [geometric, alternating, squares] },
+	// Facile: not just "+d, +d, +d" — mix in ×2/×3 and two-step alternating additions.
+	facile: { label: 'Facile', families: [arithmetic, geometric, alternating] },
+	moyen: { label: 'Moyen', families: [geometric, alternating, squares, interleaved] },
 	difficile: { label: 'Difficile', families: [fibonacci, quadratic, interleaved] },
 };
 

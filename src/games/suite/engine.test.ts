@@ -28,9 +28,16 @@ describe('suite engine', () => {
 		expect(a).toEqual(b);
 	});
 
-	it('arithmetic answer follows the rule', () => {
-		const q = generateQuestion(DIFFS.facile, mulberry32(12345));
-		const d = q.terms[1] - q.terms[0];
-		expect(q.answer).toBe(q.terms[q.terms.length - 1] + d);
+	it('facile still includes arithmetic runs, and they continue by a constant step', () => {
+		let tested = 0;
+		for (let s = 0; s < 80 && tested < 3; s++) {
+			const q = generateQuestion(DIFFS.facile, mulberry32(s * 7 + 3));
+			const d = q.terms[1] - q.terms[0];
+			const isArith = q.terms.every((v, i) => i === 0 || v - q.terms[i - 1] === d);
+			if (!isArith) continue; // geometric / alternating families
+			expect(q.answer).toBe(q.terms[q.terms.length - 1] + d);
+			tested++;
+		}
+		expect(tested, 'arithmetic still appears in facile').toBeGreaterThan(0);
 	});
 });
