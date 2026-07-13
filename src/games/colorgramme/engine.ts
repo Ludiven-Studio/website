@@ -20,6 +20,7 @@ export interface ColorgrammePuzzle {
 	rowClues: LineClue[];
 	colClues: LineClue[];
 	solution: number[][]; // every cell 1..K
+	given: [number, number][]; // pre-filled (locked) cells so the puzzle stays step-by-step solvable
 }
 
 export interface DiffLevel {
@@ -31,7 +32,7 @@ export interface DiffLevel {
 export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 5, colors: 2 },
 	moyen: { label: 'Moyen', size: 6, colors: 3 },
-	difficile: { label: 'Difficile', size: 8, colors: 4 },
+	difficile: { label: 'Difficile', size: 8, colors: 3 }, // 3 colours: keep the big grid but drop the 4th colour (opaque, ungrokkable by eye)
 };
 
 /** Clue of one fully-coloured line: ordered block lengths grouped by colour. */
@@ -212,14 +213,12 @@ export function findHint(grid: number[][], puzzle: ColorgrammePuzzle): HintResul
 			const rowBad = !lineColorings(rowClues[r], size).some((col) =>
 				lineMatchesGrid(col, grid[r]),
 			);
-			const where = rowBad ? 'la ligne' : 'la colonne';
+			const where = rowBad ? `la ligne ${r + 1}` : `la colonne ${c + 1}`;
 			return {
 				r,
 				c,
 				value: solution[r][c],
-				reason: `Cette couleur ne correspond pas aux indices de ${where} — c'est ${colorName(
-					solution[r][c],
-				)}.`,
+				reason: `Ligne ${r + 1}, colonne ${c + 1} : ${colorName(x)} est impossible ici — aucune façon de placer les blocs de ${where} ne le permet. C'est ${colorName(solution[r][c])}.`,
 			};
 		}
 
@@ -233,7 +232,7 @@ export function findHint(grid: number[][], puzzle: ColorgrammePuzzle): HintResul
 					r,
 					c,
 					value: forced[c],
-					reason: `Sur cette ligne, les blocs forcent cette couleur ici.`,
+					reason: `Ligne ${r + 1} : quelle que soit la façon d'y placer les blocs, cette case est toujours ${colorName(forced[c])}. C'est forcé.`,
 				};
 			}
 	}
@@ -247,7 +246,7 @@ export function findHint(grid: number[][], puzzle: ColorgrammePuzzle): HintResul
 					r,
 					c,
 					value: forced[r],
-					reason: `Sur cette colonne, les blocs forcent cette couleur ici.`,
+					reason: `Colonne ${c + 1} : quelle que soit la façon d'y placer les blocs, cette case est toujours ${colorName(forced[r])}. C'est forcé.`,
 				};
 			}
 	}
@@ -260,7 +259,7 @@ export function findHint(grid: number[][], puzzle: ColorgrammePuzzle): HintResul
 					r,
 					c,
 					value: solution[r][c],
-					reason: `Par déduction, cette case est ${colorName(solution[r][c])}.`,
+					reason: `Ligne ${r + 1}, colonne ${c + 1} : en croisant les indices de ligne et de colonne, cette case est ${colorName(solution[r][c])}.`,
 				};
 
 	return null;
@@ -293,8 +292,52 @@ function forcedCells(clue: LineClue, line: number[], size: number): number[] {
 	return out;
 }
 
+/**
+ * "Human" solver: ONLY positive single-line forced fills (forcedCells), iterated
+ * over rows then columns to a fixpoint. Deliberately weaker than lineSolve (no
+ * negative cross-elimination), so a grid it completes is findable step by step by
+ * eye. `seed` supplies known cells (givens) and is not mutated.
+ */
+export function easySolve(rowClues: LineClue[], colClues: LineClue[], size: number, seed: number[][]): number[][] {
+	const g = seed.map((row) => row.slice());
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (let r = 0; r < size; r++) {
+			const forced = forcedCells(rowClues[r], g[r], size);
+			for (let c = 0; c < size; c++) if (g[r][c] === 0 && forced[c] !== 0) { g[r][c] = forced[c]; changed = true; }
+		}
+		for (let c = 0; c < size; c++) {
+			const colLine = g.map((row) => row[c]);
+			const forced = forcedCells(colClues[c], colLine, size);
+			for (let r = 0; r < size; r++) if (g[r][c] === 0 && forced[r] !== 0) { g[r][c] = forced[r]; changed = true; }
+		}
+	}
+	return g;
+}
+
+/**
+ * Minimal given cells so `easySolve` completes the whole grid: reveal stalled
+ * cells one at a time until the human solver finishes. Deterministic (row-major
+ * scan → stable dailies). Returns null if it needs more than `cap` givens.
+ */
+function computeGivens(sol: number[][], rowClues: LineClue[], colClues: LineClue[], size: number, cap: number): [number, number][] | null {
+	const given: [number, number][] = [];
+	for (;;) {
+		const seed = Array.from({ length: size }, () => new Array(size).fill(0));
+		for (const [r, c] of given) seed[r][c] = sol[r][c];
+		const solved = easySolve(rowClues, colClues, size, seed);
+		let stuck: [number, number] | null = null;
+		for (let r = 0; r < size && !stuck; r++) for (let c = 0; c < size; c++) if (solved[r][c] === 0) { stuck = [r, c]; break; }
+		if (!stuck) return given; // easy-solvable from the givens
+		if (given.length >= cap) return null; // too many needed → prefer another puzzle
+		given.push(stuck);
+	}
+}
+
 export function generateColorgramme(diff: DiffLevel, rng: Rng = Math.random): ColorgrammePuzzle {
 	const { size, colors: K } = diff;
+	const givenCap = Math.ceil(size * size * 0.2); // reject puzzles that would need too many reveals
 
 	for (let attempt = 0; attempt < 4000; attempt++) {
 		const sol = Array.from({ length: size }, () =>
@@ -317,7 +360,11 @@ export function generateColorgramme(diff: DiffLevel, rng: Rng = Math.random): Co
 			for (let c = 0; c < size; c++) if (solved[r][c] !== sol[r][c]) { eq = false; break; }
 		if (!eq) continue;
 
-		return { size, colors: K, rowClues, colClues, solution: sol };
+		// Guarantee a step-by-step (single-line) path: reveal minimal given cells.
+		const given = computeGivens(sol, rowClues, colClues, size, givenCap);
+		if (!given) continue; // needs too many reveals → try another
+
+		return { size, colors: K, rowClues, colClues, solution: sol, given };
 	}
 
 	throw new Error('Colorgramme: failed to generate a puzzle');

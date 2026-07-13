@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DIFFS, generateColorgramme, findHint, type ColorgrammePuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
@@ -40,6 +40,14 @@ interface CoState {
 	crosses: number[][];
 }
 const emptyState = (n: number): CoState => ({ grid: emptyGrid(n), crosses: emptyGrid(n) });
+// Fresh grid with the puzzle's given (locked) cells pre-filled.
+const startGrid = (p: ColorgrammePuzzle): number[][] => {
+	const g = emptyGrid(p.size);
+	for (const [r, c] of p.given) g[r][c] = p.solution[r][c];
+	return g;
+};
+const startState = (p: ColorgrammePuzzle): CoState => ({ grid: startGrid(p), crosses: emptyGrid(p.size) });
+const givenKey = (r: number, c: number) => `${r},${c}`;
 
 /** Status of one line for the active colour: 'done' (its cells exactly placed),
     'error' (too many cells of that colour) or 'none'. */
@@ -80,6 +88,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 
 	const { size, colors, rowClues, colClues, solution } = puzzle;
 	const over = status === 'won' || revealed;
+	const givenSet = useMemo(() => new Set(puzzle.given.map(([r, c]) => givenKey(r, c))), [puzzle]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
@@ -88,7 +97,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setAlreadyPlayed(false);
 		setDiffKey(key);
 		setPuzzle(p);
-		setGrid(emptyGrid(d.size));
+		setGrid(startGrid(p));
 		setCrosses(emptyGrid(d.size));
 		setActiveColor(1);
 		setTool('paint');
@@ -117,9 +126,10 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			setDailyLoading(false);
 			setDiffKey(dk);
 			const d = DIFFS[dk];
-			setPuzzle(generateColorgramme(d, mulberry32(run.seed)));
-			const st = (run.state as CoState | undefined) ?? emptyState(d.size);
-			setGrid(st.grid ?? emptyGrid(d.size));
+			const pz = generateColorgramme(d, mulberry32(run.seed));
+			setPuzzle(pz);
+			const st = (run.state as CoState | undefined) ?? startState(pz);
+			setGrid(st.grid ?? startGrid(pz));
 			setCrosses(st.crosses ?? emptyGrid(d.size));
 			setStarted(true);
 			if (run.done) {
@@ -146,8 +156,9 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		const dk = DIFF_ORDER[diffIndex] ?? 'facile';
 		setDiffKey(dk);
 		const d = DIFFS[dk];
-		setPuzzle(generateColorgramme(d, mulberry32(seed)));
-		setGrid(emptyGrid(d.size));
+		const pz = generateColorgramme(d, mulberry32(seed));
+		setPuzzle(pz);
+		setGrid(startGrid(pz));
 		setCrosses(emptyGrid(d.size));
 		setDailyLoading(false);
 	}, [gameId]);
@@ -167,13 +178,13 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: emptyState(size),
+			state: startState(puzzle),
 		});
-	}, [gameId, size]);
+	}, [gameId, size, puzzle]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
-		setGrid(emptyGrid(size));
+		setGrid(startGrid(puzzle));
 		setCrosses(emptyGrid(size));
 		setHinted(new Set());
 		setHintNote('');
@@ -183,9 +194,9 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: emptyState(size),
+			state: startState(puzzle),
 		});
-	}, [gameId, size]);
+	}, [gameId, size, puzzle]);
 
 	/* Timer */
 	useEffect(() => {
@@ -279,6 +290,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 
 	const applyStroke = useCallback(
 		(r: number, c: number) => {
+			if (givenSet.has(givenKey(r, c))) return; // pre-filled cells are locked
 			if (tool === 'eraser') {
 				setGrid((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
 				setCrosses((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
@@ -318,7 +330,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			removeHint(r, c);
 			begin();
 		},
-		[tool, grid, activeColor, begin, removeHint],
+		[tool, grid, activeColor, begin, removeHint, givenSet],
 	);
 
 	const cellFromEvent = (e: React.PointerEvent): [number, number] | null => {
@@ -351,8 +363,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		painting.current = false;
 	};
 
-	/* Hint: deduce the next logical cell and explain the technique. Paints only the
-	   target cell (active colour selection is left untouched). */
+	/* Hint: deduce the next logical cell and explain the technique. Paints the target
+	   cell AND selects its colour, so the player can carry on in that colour. */
 	const hint = useCallback(() => {
 		if (over) return;
 		const h = findHint(grid, puzzle);
@@ -365,6 +377,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		});
 		setCrosses((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
 		setHinted((prev) => new Set(prev).add(`${r},${c}`));
+		setActiveColor(value); // switch to the revealed cell's colour
+		setTool('paint');
 		setHintNote(reason);
 		begin();
 		trackGame(gameId, 'hint_used');
@@ -526,7 +540,6 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 							key={`row${r}`}
 							r={r}
 							size={size}
-							colors={colors}
 							rowClueLens={rowClues[r][activeColor - 1]}
 							activeColor={activeColor}
 							clueStatus={lineStatus(grid[r], solution[r], activeColor)}
@@ -534,6 +547,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 							crosses={crosses}
 							hinted={hinted}
 							over={over}
+							givenSet={givenSet}
 						/>
 					))}
 				</div>
@@ -592,7 +606,6 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 interface RowProps {
 	r: number;
 	size: number;
-	colors: number;
 	rowClueLens: number[];
 	activeColor: number;
 	clueStatus: 'done' | 'error' | 'none';
@@ -600,9 +613,10 @@ interface RowProps {
 	crosses: number[][];
 	hinted: Set<string>;
 	over: boolean;
+	givenSet: Set<string>;
 }
 
-function RowClueAndCells({ r, size, colors, rowClueLens, activeColor, clueStatus, grid, crosses, hinted, over }: RowProps) {
+function RowClueAndCells({ r, size, rowClueLens, activeColor, clueStatus, grid, crosses, hinted, over, givenSet }: RowProps) {
 	return (
 		<>
 			<div className={`co-clue row ${clueStatus}`}>
@@ -619,22 +633,20 @@ function RowClueAndCells({ r, size, colors, rowClueLens, activeColor, clueStatus
 			{Array.from({ length: size }).map((_, c) => {
 				const v = grid[r][c];
 				const mask = crosses[r][c];
+				const isGiven = givenSet.has(`${r},${c}`);
 				return (
 					<div
 						key={c}
-						className={`co-cell ${v !== 0 ? 'filled' : ''} ${hinted.has(`${r},${c}`) ? 'hinted' : ''} ${over ? 'over' : ''}`}
+						className={`co-cell ${v !== 0 ? 'filled' : ''} ${isGiven ? 'given' : ''} ${hinted.has(`${r},${c}`) ? 'hinted' : ''} ${over ? 'over' : ''}`}
 						data-r={r}
 						data-c={c}
 						style={v !== 0 ? { background: COLORS[v - 1] } : undefined}
-						aria-label={`Ligne ${r + 1}, colonne ${c + 1}`}
+						aria-label={`Ligne ${r + 1}, colonne ${c + 1}${isGiven ? ' (donnée)' : ''}`}
 					>
-						{v === 0 && mask !== 0 && (
+						{/* Crosses are per-colour notes: show only the active colour's. */}
+						{v === 0 && ((mask >> activeColor) & 1) === 1 && (
 							<div className="co-crosses">
-								{Array.from({ length: colors }, (_, i) => i + 1)
-									.filter((k) => (mask >> k) & 1)
-									.map((k) => (
-										<span key={k} className="co-xmark" style={{ color: COLORS[k - 1] }}>✕</span>
-									))}
+								<span className="co-xmark" style={{ color: COLORS[activeColor - 1] }}>✕</span>
 							</div>
 						)}
 					</div>
@@ -751,6 +763,8 @@ const CSS = `
 }
 .co-cell.filled { border-color: rgba(0,0,0,0.18); }
 .co-cell.hinted { box-shadow: inset 0 0 0 3px var(--co-ok); }
+/* Given (locked) cells: a small inset ring + no pointer, so they read as fixed. */
+.co-cell.given { cursor: default; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.85), inset 0 0 0 3px rgba(0,0,0,0.35); }
 .co-cell.over { cursor: default; }
 .co-crosses {
   pointer-events: none;
