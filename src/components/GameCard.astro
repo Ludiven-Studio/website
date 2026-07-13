@@ -300,9 +300,11 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 			const cfg = DAILY_LB[id];
 			const top = cfg ? tops[cfg.lbId || id] : undefined;
 			if (top) {
-				chip.title = 'Record du jour';
+				const nb = top.players || 0;
+				chip.title = `Record du jour${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 				const val = formatScore(cfg!.fmt, top.value);
-				chip.textContent = `${done ? '✓ ' : ''}🏆 ${val ? `${val} · ` : ''}${top.name}`;
+				const who = `${val ? `${val} · ` : ''}${top.name}`;
+				chip.textContent = `${done ? '✓ ' : ''}🏆 ${who}${nb ? ` · 👥 ${nb}` : ''}`;
 			} else {
 				chip.textContent = done
 					? recTxt
@@ -319,7 +321,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 	};
 
 	// Community daily records (one Supabase request), then refresh the chips.
-	let tops: Record<string, { name: string; value: number }> = {};
+	let tops: Record<string, { name: string; value: number; players: number }> = {};
 	const loadTops = async () => {
 		if (!leaderboardEnabled()) return;
 		try {

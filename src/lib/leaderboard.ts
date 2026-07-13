@@ -178,8 +178,9 @@ export async function submitDaily(game: string, value: number, metric: Metric): 
 	return ok;
 }
 
-/** Best entry per game for a day, in one request — powers the "record du jour" on cards. */
-export async function fetchDailyTops(day: string = todayKey()): Promise<Record<string, { name: string; value: number }>> {
+/** Best entry + unique-player count per game for a day, in one request — powers the
+    "record du jour" and "N participants" on cards. */
+export async function fetchDailyTops(day: string = todayKey()): Promise<Record<string, { name: string; value: number; players: number }>> {
 	if (!leaderboardEnabled()) return {};
 	try {
 		const res = await fetch(
@@ -188,12 +189,15 @@ export async function fetchDailyTops(day: string = todayKey()): Promise<Record<s
 		);
 		if (!res.ok) return {};
 		const rows: { game: string; name: string; value: number; metric: Metric }[] = await res.json();
-		const best: Record<string, { name: string; value: number }> = {};
+		const best: Record<string, { name: string; value: number; players: number }> = {};
+		const players: Record<string, Set<string>> = {};
 		for (const r of rows) {
+			(players[r.game] ??= new Set()).add(r.name.toLowerCase());
 			const cur = best[r.game];
 			const better = !cur || (r.metric === 'time' ? r.value < cur.value : r.value > cur.value);
-			if (better) best[r.game] = { name: r.name, value: r.value };
+			if (better) best[r.game] = { name: r.name, value: r.value, players: 0 };
 		}
+		for (const g in best) best[g].players = players[g].size;
 		return best;
 	} catch {
 		return {};
