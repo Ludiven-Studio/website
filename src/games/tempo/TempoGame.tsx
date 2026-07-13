@@ -28,10 +28,11 @@ const bestKey = (s: number): string => `ludiven-tempo-best-${s}`;
 const midiToFreq = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 // Bass STYLES, seed-picked per song: a low-end voice (bass guitar, synth,
-// brass, cello) + its own rhythm on an 8th-note grid (e = eighth 0..7 in the
-// bar). Tones: r root, 5 fifth, o octave, w whole-tone walk into the next
-// bar's root. `len` = sustain in eighths (voices with held notes).
-type BassVoice = 'gtr' | 'synth' | 'brass' | 'cello';
+// brass) + its own rhythm on an 8th-note grid (e = eighth 0..7 in the bar).
+// Tones: r root, 5 fifth, o octave, w whole-tone walk into the next bar's
+// root. `len` = sustain in eighths (voices with held notes). Only FAST-attack
+// voices here: slow onsets (bowed cello) read as timing lag against the grid.
+type BassVoice = 'gtr' | 'synth' | 'brass';
 type BassEv = { e: number; t: 'r' | '5' | 'o' | 'w'; a?: boolean; len?: number };
 const BASS_STYLES: { v: BassVoice; pat: BassEv[] }[] = [
 	// Bass guitar — plucked riffs
@@ -44,9 +45,9 @@ const BASS_STYLES: { v: BassVoice; pat: BassEv[] }[] = [
 	// Brass — short syncopated stabs
 	{ v: 'brass', pat: [{ e: 0, t: 'r', a: true, len: 1 }, { e: 3, t: '5', len: 1 }, { e: 6, t: 'r', len: 1 }, { e: 7, t: 'w', len: 1 }] },
 	{ v: 'brass', pat: [{ e: 0, t: 'r', a: true, len: 2 }, { e: 2, t: 'r', len: 1 }, { e: 5, t: '5', len: 1 }, { e: 7, t: 'o', len: 1 }] },
-	// Cello — bowed legato line
-	{ v: 'cello', pat: [{ e: 0, t: 'r', a: true, len: 6 }, { e: 6, t: 'w', len: 2 }] },
-	{ v: 'cello', pat: [{ e: 0, t: 'r', a: true, len: 4 }, { e: 4, t: 'o', len: 2 }, { e: 6, t: '5', len: 2 }] },
+	// Extra plucked/held variants (former cello slots: bowed attack felt laggy)
+	{ v: 'gtr', pat: [{ e: 0, t: 'r', a: true }, { e: 2, t: '5' }, { e: 4, t: 'o', a: true }, { e: 6, t: '5' }, { e: 7, t: 'w' }] }, // octave bounce
+	{ v: 'synth', pat: [{ e: 0, t: 'r', a: true, len: 3 }, { e: 3, t: '5', len: 1 }, { e: 4, t: 'r', len: 3 }, { e: 7, t: 'w', len: 1 }] }, // pushed syncopation
 ];
 // Guitar arpeggio SHAPES over [root, 3rd, 5th, 7th, 9th] (8 eighths per bar).
 // Seed-picked per song; the refrain shifts to the next shape so sections
@@ -168,7 +169,6 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				gtr: mkBus('lowpass', 1800, 0.7),
 				bassGtr: mkBus('lowpass', 1100, 0.7),
 				brass: mkBus('lowpass', 1500, 0.8),
-				cello: mkBus('lowpass', 800, 0.6),
 				snare: mkBus('bandpass', 1900, 0.6),
 				strings: mkBus('lowpass', 1500, 0.5),
 				reed: mkBus('lowpass', 2000, 0.8),
@@ -336,8 +336,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		g.connect(busOut('bassGtr'));
 		const peak = accent ? 0.16 : 0.13;
 		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(peak, when + 0.04);
-		g.gain.setValueAtTime(peak, when + Math.max(0.04, dur - 0.12));
+		g.gain.exponentialRampToValueAtTime(peak, when + 0.015); // fast onset: slower reads as lag
+		g.gain.setValueAtTime(peak, when + Math.max(0.015, dur - 0.12));
 		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
 		for (const [det, amp, type] of [[0, 1, 'sine'], [5, 0.55, 'triangle']] as [number, number, OscillatorType][]) {
 			const o = ctx.createOscillator();
@@ -367,8 +367,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		for (const det of [-6, 6]) {
 			const o = ctx.createOscillator();
 			o.type = 'sawtooth';
-			o.frequency.setValueAtTime(f * 0.96, when); // scoop up into pitch
-			o.frequency.exponentialRampToValueAtTime(f, when + 0.06);
+			o.frequency.setValueAtTime(f * 0.97, when); // scoop up into pitch (short: keeps the onset tight)
+			o.frequency.exponentialRampToValueAtTime(f, when + 0.03);
 			o.detune.value = det;
 			const og = ctx.createGain();
 			og.gain.value = 0.55;
@@ -376,31 +376,6 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			og.connect(g);
 			o.start(when);
 			o.stop(when + dur + 0.1);
-		}
-	};
-	// Bowed cello: SINE foundation + soft detuned saws for the bow's grain —
-	// deep and warm, the saws only color the sustain.
-	const cello = (when: number, midi: number, dur: number): void => {
-		const ctx = ctxRef.current;
-		if (!ctx) return;
-		const g = ctx.createGain();
-		g.connect(busOut('cello'));
-		const atk = Math.min(0.18, dur * 0.3);
-		g.gain.setValueAtTime(0.0001, when);
-		g.gain.exponentialRampToValueAtTime(0.14, when + atk);
-		g.gain.setValueAtTime(0.14, when + Math.max(atk, dur - 0.15));
-		g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
-		for (const [det, amp, type] of [[0, 0.9, 'sine'], [-4, 0.35, 'sawtooth'], [4, 0.35, 'sawtooth']] as [number, number, OscillatorType][]) {
-			const o = ctx.createOscillator();
-			o.type = type;
-			o.frequency.value = midiToFreq(midi);
-			o.detune.value = det;
-			const og = ctx.createGain();
-			og.gain.value = amp;
-			o.connect(og);
-			og.connect(g);
-			o.start(when);
-			o.stop(when + dur + 0.05);
 		}
 	};
 	// Synth bed laying the chords down low (root + fifth + octave + third above,
@@ -926,8 +901,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					bass(when, chordRoot + (i % 2 === 0 ? 0 : 7), accent);
 				} else if (!inIntro || IS === 2) {
 					// Seed-picked bass STYLE: voice + rhythm. Plucked/stabbed voices get a
-					// round sub anchor on the bar; held voices (synth, cello) own the low
-					// end by themselves. The groove intro (2) pre-plays it with hats.
+					// round sub anchor on the bar; the held synth owns the low end by
+					// itself. The groove intro (2) pre-plays it with hats.
 					const style = BASS_STYLES[seedRef.current % BASS_STYLES.length];
 					if (accent && !inIntro && (style.v === 'gtr' || style.v === 'brass')) bass(when, chordRoot, true);
 					if (inIntro) hat(when, accent);
@@ -944,8 +919,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						const dur = ((ev.len ?? 1) / 2) * beatDur;
 						if (style.v === 'gtr') bassGtr(at, m, !!ev.a);
 						else if (style.v === 'synth') synthBass(at, m, dur, !!ev.a);
-						else if (style.v === 'brass') brass(at, m, dur, !!ev.a);
-						else cello(at, m, dur);
+						else brass(at, m, dur, !!ev.a);
 					}
 				}
 				// Guitar comp: the ninth chord arpeggiated in the song's seed-picked
@@ -1334,7 +1308,7 @@ const CSS = `
 .tp-toggle { display: flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--gray-200); cursor: pointer; }
 .tp-toggle input { width: 14px; height: 14px; accent-color: var(--tp); }
 .tp-cta { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-.tp-stop { position: absolute; top: 10px; right: 10px; z-index: 3; border: 1.5px solid var(--gray-700); background: rgba(12,16,24,0.82); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 12.5px; border-radius: 999px; padding: 7px 14px; cursor: pointer; backdrop-filter: blur(2px); }
+.tp-stop { position: absolute; top: 10px; right: 10px; z-index: 3; border: 1.5px solid rgba(255,255,255,0.35); background: rgba(12,16,24,0.82); color: #fff; font: inherit; font-weight: 600; font-size: 12.5px; border-radius: 999px; padding: 7px 14px; cursor: pointer; backdrop-filter: blur(2px); }
 .tp-hud { display: flex; gap: 0.5rem; font-size: 14px; font-weight: 600; margin-bottom: 0.6rem; }
 .tp-stat { background: var(--gray-900); border-radius: 999px; padding: 6px 14px; font-variant-numeric: tabular-nums; }
 .tp-stat strong { margin-left: 4px; color: var(--tp); }
