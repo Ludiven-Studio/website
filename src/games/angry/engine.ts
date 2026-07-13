@@ -223,7 +223,7 @@ export function applyHen(c: Body, hen: HenType): void {
 	c.r = 5.5;
 	c.invMass = 1 / MASS.cocotte;
 	c.rest = REST.cocotte;
-	if (hen === 'rebond') c.rest = 0.85; // ricochets
+	if (hen === 'rebond') { c.rest = 0.9; c.fric = 0.05; } // ricochets like a ball off everything
 	else if (hen === 'lourde') { c.r = 8; c.invMass = 1 / 3; } // bigger & heavier → ploughs through
 }
 
@@ -296,7 +296,10 @@ function resolve(a: Body, b: Body, c: Contact) {
 	const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
 	const vn = rvx * c.nx + rvy * c.ny;
 	if (vn < 0) {
-		const e = Math.min(a.rest, b.rest);
+		// Normally restitution is the softer of the pair; a bouncy hen imposes ITS
+		// high restitution on every surface so it ricochets off ground/blocks/foxes.
+		const bouncy = a.hen === 'rebond' || b.hen === 'rebond';
+		const e = bouncy ? Math.max(a.rest, b.rest) : Math.min(a.rest, b.rest);
 		const j = (-(1 + e) * vn) / im;
 		const jx = j * c.nx, jy = j * c.ny;
 		a.vx -= a.invMass * jx; a.vy -= a.invMass * jy;

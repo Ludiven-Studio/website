@@ -189,7 +189,7 @@ describe('cocotte powers', () => {
 		const w = makeLevel(1, DIFFS.facile);
 		const c = w.cocotte!;
 		applyHen(c, 'rebond');
-		expect(c.rest).toBeCloseTo(0.85);
+		expect(c.rest).toBeCloseTo(0.9);
 		applyHen(c, 'lourde');
 		expect(c.r).toBe(8);
 		expect(c.invMass).toBeCloseTo(1 / 3);
@@ -252,6 +252,21 @@ describe('cocotte powers', () => {
 		addFox(w, 100, 80); addFox(w, 116, 80); // a small cluster in the path
 		for (let i = 0; i < 20 && !c.powerUsed; i++) step(w, 1 / 60);
 		expect(c.powerUsed, 'power triggered on impact').toBe(true);
+	});
+
+	it('rebond hen bounces off the ground far more than a normale (imposes its restitution)', () => {
+		const bounceBack = (hen: 'normale' | 'rebond') => {
+			const w = makeLevel(1, DIFFS.facile);
+			const c = w.cocotte!;
+			applyHen(c, hen);
+			c.x = 40; c.y = w.groundY - c.r - 1; c.vx = 0; c.vy = 200; c.launched = true; // drop onto open ground
+			let peakUp = 0;
+			for (let i = 0; i < 30; i++) { step(w, 1 / 60); if (c.vy < peakUp) peakUp = c.vy; }
+			return -peakUp; // fastest upward speed after the bounce
+		};
+		const normal = bounceBack('normale');
+		const bouncy = bounceBack('rebond');
+		expect(bouncy).toBeGreaterThan(normal * 2);
 	});
 
 	it('lourde hen keeps more speed through a wood crate than a normale', () => {
