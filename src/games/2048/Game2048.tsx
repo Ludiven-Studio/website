@@ -34,6 +34,13 @@ type Status = 'playing' | 'over';
 const DEFAULT_DIFF: DiffKey = 'moyen';
 const freeBestKey = (key: DiffKey): string => `ludiven-2048-best-${key}`;
 const ANIM_MS = 150;
+// 2048 is endless (esp. the big 5×5 board never fills) → a time cap gives every mode
+// a definite end: score attack, highest score when the clock runs out (or the board jams).
+const TIME_LIMIT_MS = 10 * 60 * 1000;
+const fmtClock = (ms: number): string => {
+	const s = Math.max(0, Math.ceil(ms / 1000));
+	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 
 interface DailyState {
 	board: Board;
@@ -80,6 +87,8 @@ export default function Game2048({ gameId }: { gameId: string }) {
 	const [started, setStarted] = useState(true); // free starts immediately; daily arms behind "Commencer"
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already finished today (locked)
 	const [won, setWon] = useState(false);
+	const [remaining, setRemaining] = useState(TIME_LIMIT_MS); // ms left on the clock
+	const [timedOut, setTimedOut] = useState(false); // over because time ran out (vs board jammed)
 
 	const stateRef = useRef<State | null>(null);
 	const streamRef = useRef<number[] | null>(null);
@@ -158,6 +167,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 			if (!st || !stream) return;
 			const plan = planMove(st.board, dir);
 			if (!plan.moved) return;
+			if (startedAtRef.current === 0) startedAtRef.current = Date.now(); // free: clock starts on the first move
 			// Spawn on the post-slide board; diff to locate the new cell.
 			const spawned = spawnTile({ board: plan.board, score: st.score + plan.gained, size: st.size, cursor: st.cursor }, stream);
 			let sr = -1;
@@ -233,6 +243,9 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		wonRef.current = false;
 		setWon(false);
 		setStat('playing');
+		startedAtRef.current = 0; // clock unstarted until the first move
+		setRemaining(TIME_LIMIT_MS);
+		setTimedOut(false);
 		diffKeyRef.current = key;
 		setDiffKey(key);
 		const stream = makeStream(mulberry32((Math.random() * 2 ** 31) >>> 0));
@@ -255,6 +268,8 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		setDaily(true);
 		wonRef.current = false;
 		setWon(false);
+		setTimedOut(false);
+		setRemaining(TIME_LIMIT_MS);
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null && run.state) {
 			const diffIndex = run.diffIndex ?? 0;
@@ -331,6 +346,26 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		return () => window.removeEventListener('keydown', onKey);
 	}, [applyMove]);
 
+	/* Countdown: end the game when the 10-minute clock runs out. */
+	useEffect(() => {
+		if (status !== 'playing' || (daily && !started)) return;
+		const tick = (): void => {
+			if (startedAtRef.current === 0) { setRemaining(TIME_LIMIT_MS); return; } // clock not started yet
+			const rem = startedAtRef.current + TIME_LIMIT_MS - Date.now();
+			if (rem > 0) { setRemaining(rem); return; }
+			setRemaining(0);
+			if (statusRef.current !== 'playing') return;
+			setTimedOut(true);
+			setStat('over');
+			trackGame(gameId, 'game_over', { reason: 'time' });
+			if (dailyRef.current) persistDaily(true);
+		};
+		tick();
+		const id = window.setInterval(tick, 250);
+		return () => clearInterval(id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [status, daily, started]);
+
 	/* Mount: arm a free game; clear any pending animation timer on unmount. */
 	useEffect(() => {
 		armFree(DEFAULT_DIFF);
@@ -383,6 +418,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 
 			<div className="g2-status">
 				<span className="g2-score">Score <strong>{score}</strong></span>
+				<span className={`g2-clock${remaining <= 30000 ? ' urgent' : ''}`}>⏱ <strong>{fmtClock(remaining)}</strong></span>
 				{!daily && <span className="g2-best">Record <strong>{best}</strong></span>}
 			</div>
 
@@ -416,7 +452,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 									? <>Défi du jour terminé · <strong>{score}</strong><span>reviens demain&nbsp;!</span></>
 									: <>🎉 Terminé · <strong>{score}</strong><span>reviens demain pour un nouveau défi</span></>
 							) : (
-								<>Perdu ! · <strong>{score}</strong><button className="g2-replay" onClick={() => armFree(diffKey)}>Rejouer</button></>
+								<>{timedOut ? '⏱ Temps écoulé' : 'Plus de coups'} · <strong>{score}</strong><button className="g2-replay" onClick={() => armFree(diffKey)}>Rejouer</button></>
 							)}
 						</div>
 					</div>
@@ -424,7 +460,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="g2-help">
-				Flèches ou ZQSD au clavier, ou glisse (souris ou doigt) : les tuiles identiques fusionnent. Atteins 2048, puis pousse ton score&nbsp;!
+				Flèches ou ZQSD au clavier, ou glisse (souris ou doigt) : les tuiles identiques fusionnent. Fais le meilleur score en <b>10 minutes</b> — le chrono démarre au premier coup&nbsp;!
 			</p>
 
 			{daily && <Leaderboard game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? score : undefined} />}
@@ -436,12 +472,9 @@ export default function Game2048({ gameId }: { gameId: string }) {
 const CSS = `
 .g2-root { --g2-accent: var(--accent-regular); width: 100%; max-width: 460px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
 /* Site global fullscreen → the grid grows to fit the REMAINING space (controls + numpad reserved). */
-.game-page:fullscreen .g2-root { max-width: none; width: 100%; height: 100%; }
-.game-page:-webkit-full-screen .g2-root { max-width: none; width: 100%; height: 100%; }
-.game-page:fullscreen .g2-playwrap { flex: 1; min-height: 0; container-type: size; align-items: center; }
-.game-page:-webkit-full-screen .g2-playwrap { flex: 1; min-height: 0; container-type: size; align-items: center; }
-.game-page:fullscreen .g2-board { width: min(100cqw, 100cqh); max-width: none; }
-.game-page:-webkit-full-screen .g2-board { width: min(100cqw, 100cqh); max-width: none; }
+.game-page.gf-full .g2-root { max-width: none; width: 100%; height: 100%; }
+.game-page.gf-full .g2-playwrap { flex: 1; min-height: 0; container-type: size; align-items: center; }
+.game-page.gf-full .g2-board { width: min(100cqw, 100cqh); max-width: none; }
 .g2-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.6rem; }
 .g2-bar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
 .g2-pills { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -450,8 +483,11 @@ const CSS = `
 .g2-act { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .g2-act:hover { background: var(--gray-800); border-color: var(--g2-accent); color: var(--g2-accent); }
 .g2-status { display: flex; gap: 0.75rem; align-items: center; font-weight: 600; font-size: 14px; margin-bottom: 0.75rem; }
-.g2-score, .g2-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 6px 14px; font-variant-numeric: tabular-nums; }
+.g2-score, .g2-best, .g2-clock { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 6px 14px; font-variant-numeric: tabular-nums; }
 .g2-score strong, .g2-best strong { color: var(--g2-accent); margin-left: 4px; }
+.g2-clock strong { margin-left: 4px; }
+.g2-clock.urgent { background: #5a1e1e; color: #ffd0d0; }
+.g2-clock.urgent strong { color: #ff9a9a; }
 .g2-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .g2-board { position: relative; width: 100%; max-width: 460px; aspect-ratio: 1; background: var(--gray-800); border-radius: 12px; container-type: inline-size; touch-action: none; user-select: none; -webkit-user-select: none; }
 .g2-board.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
