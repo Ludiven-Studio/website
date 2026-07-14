@@ -36,7 +36,7 @@ export interface Table {
 }
 
 export const BALL_R = 3.2;
-export const POCKET_R = 6.4; // base size; mouth radii are derived from it
+export const POCKET_R = 5.12; // base size; mouth radii are derived from it (−20% for smaller holes)
 const VR = POCKET_R * 1.6; // base mouth radius before per-pocket scaling
 const MOUTH = VR * 0.8 * 0.9 + 1; // cushion gap half-width (≈ corner mouth)
 const DECEL = 38; // rolling friction (units/s²) — lower = more inertia / longer roll
@@ -50,10 +50,10 @@ const MAX_SPEED = 195;
 const len = (x: number, y: number) => Math.hypot(x, y);
 
 function makePocket(ax: number, ay: number, w: number, h: number): Pocket {
-	const isCorner = (ax === 0 || ax === w) && (ay === 0 || ay === h);
-	const r = (isCorner ? VR * 0.8 : VR * 0.7) * 0.9; // corners −20%, sides −30%, all −10%
-	const ox = ax === 0 ? r * 0.34 : ax === w ? -r * 0.34 : 0;
-	const oy = ay === 0 ? r * 0.34 : ay === h ? -r * 0.34 : 0;
+	const r = VR * 0.7 * 0.9; // uniform hole size: corners = sides
+	const k = 0.5; // inset from the rails → corners pulled toward the centre, same inset as the side pockets (aligned)
+	const ox = ax === 0 ? r * k : ax === w ? -r * k : 0;
+	const oy = ay === 0 ? r * k : ay === h ? -r * k : 0;
 	return { x: ax + ox, y: ay + oy, r, anchor: { x: ax, y: ay } };
 }
 
