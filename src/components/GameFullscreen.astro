@@ -1,8 +1,11 @@
 ---
 // Adds a "Plein écran" button to every game page. Fullscreen shows ONLY the game
-// window (the page chrome/header is hidden), and an "⛶ Quitter" button is anchored
-// inside the game area (the header — with the enter button — is hidden then).
-// On touch devices it also tries to lock landscape. Rendered once by BaseLayout.
+// window (page chrome hidden) with a "⛶ Quitter" button anchored inside it.
+// Layout is driven by a CLASS (`gf-full` on `.game-page`), not the `:fullscreen`
+// pseudo-class, so it works even where the Fullscreen API is missing (iOS Safari):
+// there we fall back to a fixed full-viewport overlay. The native API is still
+// requested best-effort (desktop/Android) to hide the browser chrome.
+// Rendered once by BaseLayout, on game pages only.
 ---
 
 <style is:global>
@@ -27,11 +30,12 @@
 		border-color: var(--accent-regular);
 	}
 
-	/* Exit button anchored inside the game area — only visible in fullscreen. */
+	/* Exit button anchored inside the game area — only visible in fullscreen.
+	   Insets respect the notch/home-bar (needs viewport-fit=cover). */
 	.gf-exit {
 		position: fixed;
-		top: 12px;
-		right: 12px;
+		top: max(12px, env(safe-area-inset-top));
+		right: max(12px, env(safe-area-inset-right));
 		z-index: 2147483647;
 		display: none;
 		border: 1.5px solid var(--gray-600);
@@ -46,47 +50,46 @@
 		box-shadow: var(--shadow-md);
 	}
 
-	/* Fullscreen: fill the screen, hide page chrome, keep only the game + its controls.
+	/* Fullscreen fill, driven by the class (works with OR without the native API).
+	   Fills the viewport, hides page chrome, keeps only the game + its controls.
 	   Centering must be SAFE: with plain `center`, content taller than the screen
 	   (mobile landscape) overflows upward and the top becomes unreachable. */
-	.game-page:fullscreen {
+	.game-page.gf-full {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
 		max-width: none;
 		width: 100%;
 		height: 100%;
 		background: var(--gray-999);
 		overflow: auto;
-		padding: 1rem;
+		padding:
+			max(1rem, env(safe-area-inset-top))
+			max(1rem, env(safe-area-inset-right))
+			max(1rem, env(safe-area-inset-bottom))
+			max(1rem, env(safe-area-inset-left));
 		justify-content: flex-start;
 	}
 	@supports (justify-content: safe center) {
-		.game-page:fullscreen {
+		.game-page.gf-full {
 			justify-content: safe center;
 		}
 	}
-	.game-page:fullscreen > .game-head {
+	/* Lock the page behind the overlay from scrolling. */
+	html.gf-full,
+	html.gf-full body {
+		overflow: hidden;
+	}
+	/* Pseudo-fullscreen (iOS / no native API): the overlay covers the viewport but the
+	   site nav & footer are still in the DOM — hide them so they can't catch taps. */
+	html.gf-full .backgrounds > nav,
+	html.gf-full .backgrounds > footer {
 		display: none;
 	}
-	.game-page:fullscreen .gf-exit {
-		display: block;
-	}
-	.game-page:-webkit-full-screen {
-		max-width: none;
-		width: 100%;
-		height: 100%;
-		background: var(--gray-999);
-		overflow: auto;
-		padding: 1rem;
-		justify-content: flex-start;
-	}
-	@supports (justify-content: safe center) {
-		.game-page:-webkit-full-screen {
-			justify-content: safe center;
-		}
-	}
-	.game-page:-webkit-full-screen > .game-head {
+	.game-page.gf-full > .game-head {
 		display: none;
 	}
-	.game-page:-webkit-full-screen .gf-exit {
+	.game-page.gf-full .gf-exit {
 		display: block;
 	}
 </style>
@@ -94,51 +97,57 @@
 <script>
 	(() => {
 		const d = document as any;
-		const rootEl = document.documentElement as any;
-		if (!(rootEl.requestFullscreen || rootEl.webkitRequestFullscreen)) return; // unsupported (e.g. iOS Safari)
-
+		const html = document.documentElement;
 		const host = document.querySelector('.game-head');
 		const target = document.querySelector('.game-page') as any;
 		if (!host || !target) return;
 
-		const fsEl = (): Element | null => d.fullscreenElement || d.webkitFullscreenElement || null;
+		const nativeFsEl = (): Element | null => d.fullscreenElement || d.webkitFullscreenElement || null;
+		let on = false; // our own state (native API may be absent — iOS)
+		let synthetic = false; // guards our self-dispatched re-measure ping
 
-		const lockLandscape = async (): Promise<void> => {
-			if (!window.matchMedia('(pointer: coarse)').matches) return;
-			const o = (screen as any).orientation;
-			try {
-				if (o && o.lock) await o.lock('landscape');
-			} catch {
-				/* not allowed — ignore */
-			}
+		const setLabel = (): void => {
+			btn.textContent = on ? '⛶ Quitter le plein écran' : '⛶ Plein écran';
 		};
-		const enter = async (): Promise<void> => {
+		// Let games re-measure their canvas: they already listen to `fullscreenchange`,
+		// which the native API doesn't fire on iOS — so dispatch it ourselves.
+		const notify = (): void => {
+			requestAnimationFrame(() => {
+				synthetic = true;
+				document.dispatchEvent(new Event('fullscreenchange'));
+				synthetic = false;
+			});
+		};
+
+		const enter = (): void => {
+			on = true;
+			target.classList.add('gf-full');
+			html.classList.add('gf-full');
 			try {
-				if (target.requestFullscreen) await target.requestFullscreen();
+				if (target.requestFullscreen) void target.requestFullscreen().catch(() => {});
 				else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
 			} catch {
-				/* ignore */
+				/* iOS / denied — the class-based overlay already fills the screen */
 			}
-			await lockLandscape();
+			setLabel();
+			notify();
 		};
-		const exit = async (): Promise<void> => {
+		const exit = (): void => {
+			on = false;
+			target.classList.remove('gf-full');
+			html.classList.remove('gf-full');
 			try {
-				if (d.exitFullscreen) await d.exitFullscreen();
-				else if (d.webkitExitFullscreen) d.webkitExitFullscreen();
+				if (nativeFsEl()) {
+					if (d.exitFullscreen) void d.exitFullscreen().catch(() => {});
+					else if (d.webkitExitFullscreen) d.webkitExitFullscreen();
+				}
 			} catch {
 				/* ignore */
 			}
-			const o = (screen as any).orientation;
-			try {
-				if (o && o.unlock) o.unlock();
-			} catch {
-				/* ignore */
-			}
+			setLabel();
+			notify();
 		};
-		const toggle = (): void => {
-			if (fsEl()) void exit();
-			else void enter();
-		};
+		const toggle = (): void => (on ? exit() : enter());
 
 		// Enter button in the header.
 		const btn = document.createElement('button');
@@ -156,11 +165,18 @@
 		exitBtn.addEventListener('click', toggle);
 		target.appendChild(exitBtn);
 
-		document.addEventListener('fullscreenchange', () => {
-			btn.textContent = fsEl() ? '⛶ Quitter le plein écran' : '⛶ Plein écran';
+		// Keep state in sync if the user exits native fullscreen via Esc / system UI.
+		// Ignore our own synthetic re-measure ping (guarded by `synthetic`).
+		const onNativeChange = (): void => {
+			if (synthetic) return;
+			if (on && !nativeFsEl()) exit(); // native fullscreen ended → tear our overlay down too
+			setLabel();
+		};
+		document.addEventListener('fullscreenchange', onNativeChange);
+		document.addEventListener('webkitfullscreenchange', onNativeChange as EventListener);
+		// Esc key in the pseudo-fullscreen (iOS/no-API) case.
+		document.addEventListener('keydown', (e) => {
+			if (on && e.key === 'Escape' && !nativeFsEl()) exit();
 		});
-		document.addEventListener('webkitfullscreenchange', (() => {
-			btn.textContent = fsEl() ? '⛶ Quitter le plein écran' : '⛶ Plein écran';
-		}) as EventListener);
 	})();
 </script>

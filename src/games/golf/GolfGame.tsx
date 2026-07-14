@@ -1129,16 +1129,11 @@ const CSS = `
   touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
 /* Site global fullscreen → the course fills the screen; controls stay overlaid. */
-.game-page:fullscreen .gf-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.game-page:-webkit-full-screen .gf-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.game-page:fullscreen .gf-boardwrap { flex: 1; aspect-ratio: auto; }
-.game-page:-webkit-full-screen .gf-boardwrap { flex: 1; aspect-ratio: auto; }
-.game-page:fullscreen .gf-canvas { border-radius: 0; border: none; }
-.game-page:-webkit-full-screen .gf-canvas { border-radius: 0; border: none; }
-.game-page:fullscreen .gf-help { display: none; }
-.game-page:-webkit-full-screen .gf-help { display: none; }
-.game-page:fullscreen .gf-board { top: 54px; }
-.game-page:-webkit-full-screen .gf-board { top: 54px; }
+.game-page.gf-full .gf-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.game-page.gf-full .gf-boardwrap { flex: 1; aspect-ratio: auto; }
+.game-page.gf-full .gf-canvas { border-radius: 0; border: none; }
+.game-page.gf-full .gf-help { display: none; }
+.game-page.gf-full .gf-board { top: 54px; }
 .gf-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .gf-label { position: absolute; transform: translate(-50%, -120%); white-space: nowrap; font-size: 11px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.55); padding: 1px 6px; border-radius: 999px; }
 .gf-celebrate { position: absolute; inset: 0; pointer-events: none; }

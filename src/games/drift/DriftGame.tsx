@@ -1154,16 +1154,11 @@ const CSS = `
   touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
 /* Site global fullscreen → the track fills the screen; controls stay overlaid. */
-.game-page:fullscreen .dr-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.game-page:-webkit-full-screen .dr-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.game-page:fullscreen .dr-boardwrap { flex: 1; aspect-ratio: auto; }
-.game-page:-webkit-full-screen .dr-boardwrap { flex: 1; aspect-ratio: auto; }
-.game-page:fullscreen .dr-canvas { border-radius: 0; border: none; }
-.game-page:-webkit-full-screen .dr-canvas { border-radius: 0; border: none; }
-.game-page:fullscreen .dr-help { display: none; }
-.game-page:-webkit-full-screen .dr-help { display: none; }
-.game-page:fullscreen .dr-leaderboard { top: 54px; }
-.game-page:-webkit-full-screen .dr-leaderboard { top: 54px; }
+.game-page.gf-full .dr-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.game-page.gf-full .dr-boardwrap { flex: 1; aspect-ratio: auto; }
+.game-page.gf-full .dr-canvas { border-radius: 0; border: none; }
+.game-page.gf-full .dr-help { display: none; }
+.game-page.gf-full .dr-leaderboard { top: 54px; }
 .dr-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .dr-label {
   position: absolute; transform: translate(-50%, -100%); white-space: nowrap;

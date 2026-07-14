@@ -577,10 +577,8 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 const CSS = `
 .sp-root { --sp: var(--accent-regular); width: 100%; max-width: 720px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
 /* Site global fullscreen → the spectrogram fills the screen. */
-.game-page:fullscreen .sp-root { max-width: none; width: 100%; height: 100%; justify-content: center; }
-.game-page:-webkit-full-screen .sp-root { max-width: none; width: 100%; height: 100%; justify-content: center; }
-.game-page:fullscreen .sp-help { display: none; }
-.game-page:-webkit-full-screen .sp-help { display: none; }
+.game-page.gf-full .sp-root { max-width: none; width: 100%; height: 100%; justify-content: center; }
+.game-page.gf-full .sp-help { display: none; }
 .sp-dailytag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.55rem; }
 .sp-pills { display: flex; gap: 6px; margin-bottom: 0.55rem; }
 .sp-pill { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }

@@ -581,12 +581,9 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 const CSS = `
 .co-root { --co-accent: var(--accent-regular); width: 100%; max-width: 640px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
 /* Site global fullscreen → the level fills the screen (kept aspect, letterboxed). */
-.game-page:fullscreen .co-root { max-width: none; width: 100%; height: 100%; }
-.game-page:-webkit-full-screen .co-root { max-width: none; width: 100%; height: 100%; }
-.game-page:fullscreen .co-playwrap { flex: 1; min-height: 0; }
-.game-page:-webkit-full-screen .co-playwrap { flex: 1; min-height: 0; }
-.game-page:fullscreen .co-help { display: none; }
-.game-page:-webkit-full-screen .co-help { display: none; }
+.game-page.gf-full .co-root { max-width: none; width: 100%; height: 100%; }
+.game-page.gf-full .co-playwrap { flex: 1; min-height: 0; }
+.game-page.gf-full .co-help { display: none; }
 .co-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
 .co-bar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
 .co-pills { display: flex; gap: 6px; flex-wrap: wrap; }

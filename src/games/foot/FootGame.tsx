@@ -586,15 +586,15 @@ const CSS = `
 .fo-root { --fo-accent: var(--accent-regular); width: 100%; max-width: 900px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
 .fo-stage { position: relative; width: 100%; aspect-ratio: ${FIELD.W} / ${FIELD.H}; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-md); background: #bfe3ff; }
 .fo-canvas { display: block; width: 100%; height: 100%; object-fit: contain; touch-action: none; }
-/* Site global fullscreen → the pitch fills the screen (letterboxed, not stretched); controls overlaid. */
-.game-page:fullscreen .fo-root { max-width: none; width: 100%; height: 100%; }
-.game-page:-webkit-full-screen .fo-root { max-width: none; width: 100%; height: 100%; }
-.game-page:fullscreen .fo-stage { flex: 1; aspect-ratio: auto; border-radius: 0; }
-.game-page:-webkit-full-screen .fo-stage { flex: 1; aspect-ratio: auto; border-radius: 0; }
-.game-page:fullscreen .fo-quit { right: 130px; }
-.game-page:-webkit-full-screen .fo-quit { right: 130px; }
-.game-page:fullscreen .fo-help { display: none; }
-.game-page:-webkit-full-screen .fo-help { display: none; }
+/* Site global fullscreen. Landscape: the pitch fills the screen. Portrait: keep the
+   pitch aspect at FULL WIDTH (a band), controls overlaid — not a tiny centred strip. */
+.game-page.gf-full .fo-root { max-width: none; width: 100%; }
+.game-page.gf-full .fo-help { display: none; }
+@media (orientation: landscape) {
+  .game-page.gf-full .fo-root { height: 100%; }
+  .game-page.gf-full .fo-stage { flex: 1; aspect-ratio: auto; border-radius: 0; }
+  .game-page.gf-full .fo-quit { right: 130px; }
+}
 .fo-hud { position: absolute; top: 8px; left: 0; right: 0; display: flex; justify-content: center; gap: 10px; font-weight: 900; font-size: clamp(15px, 3.5vw, 22px); text-shadow: 0 1px 3px rgba(0,0,0,0.35); pointer-events: none; }
 .fo-sep { color: rgba(255,255,255,0.8); }
 .fo-goal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(30px, 9vw, 68px); color: #fff; text-shadow: 0 3px 10px rgba(0,0,0,0.5); pointer-events: none; animation: fo-pop 0.3s ease; }

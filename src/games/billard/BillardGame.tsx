@@ -520,24 +520,24 @@ const CSS = `
 /* Play area holds the canvas + all controls overlaid (immersive). */
 .bi-playwrap { width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
 .bi-canvas { display: block; touch-action: none; cursor: crosshair; background: #3a2a1c; }
-/* Site global fullscreen puts .game-page fullscreen — let the table fill the whole screen. */
-.game-page:fullscreen .bi-root { max-width: none; width: 100%; height: 100%; }
-.game-page:-webkit-full-screen .bi-root { max-width: none; width: 100%; height: 100%; }
-.game-page:fullscreen .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
-.game-page:-webkit-full-screen .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
-.game-page:fullscreen .bi-help { display: none; }
-.game-page:-webkit-full-screen .bi-help { display: none; }
-/* Leave room top-right for the site's global "⛶ Quitter" button (fixed at top:12/right:12). */
-.game-page:fullscreen .bi-hud-top { padding-right: 122px; }
-.game-page:-webkit-full-screen .bi-hud-top { padding-right: 122px; }
+/* Site global fullscreen. Landscape: the table fills the whole screen. Portrait:
+   keep the 16/10 table at FULL WIDTH (a band) with the UI overlaid — never squish
+   it into a tiny centred strip. */
+.game-page.gf-full .bi-root { max-width: none; width: 100%; }
+.game-page.gf-full .bi-help { display: none; }
+@media (orientation: landscape) {
+  .game-page.gf-full .bi-root { height: 100%; }
+  .game-page.gf-full .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+  /* Leave room top-right for the site's global "⛶ Quitter" button. */
+  .game-page.gf-full .bi-hud-top { padding-right: 122px; }
+}
 
 /* Overlaid HUD — sits on the floor above the table; dark translucent so it reads on any surface. */
 .bi-hud-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; z-index: 3; pointer-events: none; }
 .bi-hud-top > * { pointer-events: auto; }
 /* Libre/Défi toggle: hidden in the windowed view, shown only in fullscreen. */
 .bi-modetoggle { display: none; }
-.game-page:fullscreen .bi-modetoggle { display: block; }
-.game-page:-webkit-full-screen .bi-modetoggle { display: block; }
+.game-page.gf-full .bi-modetoggle { display: block; }
 .bi-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .bi-daily-hud { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 3; background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); }
 

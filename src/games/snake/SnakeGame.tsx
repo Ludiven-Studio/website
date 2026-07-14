@@ -691,14 +691,10 @@ const CSS = `
 
 .sn-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
 /* Site global fullscreen → the board fits the REMAINING space (a square, no overflow in landscape). */
-.game-page:fullscreen .sn-root { max-width: none; width: 100%; height: 100%; }
-.game-page:-webkit-full-screen .sn-root { max-width: none; width: 100%; height: 100%; }
-.game-page:fullscreen .sn-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
-.game-page:-webkit-full-screen .sn-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
-.game-page:fullscreen .sn-canvas { width: min(100cqw, 100cqh); height: auto; }
-.game-page:-webkit-full-screen .sn-canvas { width: min(100cqw, 100cqh); height: auto; }
-.game-page:fullscreen .sn-help { display: none; }
-.game-page:-webkit-full-screen .sn-help { display: none; }
+.game-page.gf-full .sn-root { max-width: none; width: 100%; height: 100%; }
+.game-page.gf-full .sn-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
+.game-page.gf-full .sn-canvas { width: min(100cqw, 100cqh); height: auto; }
+.game-page.gf-full .sn-help { display: none; }
 .sn-canvas {
   width: 100%; aspect-ratio: 1 / 1; display: block;
   background: var(--gray-999); border: 1px solid var(--gray-800); border-radius: 12px;

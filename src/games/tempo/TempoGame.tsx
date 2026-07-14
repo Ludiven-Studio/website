@@ -1350,12 +1350,9 @@ const CSS = `
 /* Android: kill the browser's default bluish tap-highlight overlay on touch. */
 .tp-root, .tp-root * { -webkit-tap-highlight-color: transparent; }
 /* Site global fullscreen → the lanes fill the screen height (portrait, centred). */
-.game-page:fullscreen .tp-root { max-width: none; width: 100%; height: 100%; }
-.game-page:-webkit-full-screen .tp-root { max-width: none; width: 100%; height: 100%; }
-.game-page:fullscreen .tp-playwrap { flex: 1; min-height: 0; align-items: center; }
-.game-page:-webkit-full-screen .tp-playwrap { flex: 1; min-height: 0; align-items: center; }
-.game-page:fullscreen .tp-help { display: none; }
-.game-page:-webkit-full-screen .tp-help { display: none; }
+.game-page.gf-full .tp-root { max-width: none; width: 100%; height: 100%; }
+.game-page.gf-full .tp-playwrap { flex: 1; min-height: 0; align-items: center; }
+.game-page.gf-full .tp-help { display: none; }
 .tp-dailytag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.55rem; }
 .tp-songs { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.4rem; }
 .tp-song { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 12px; border-radius: 999px; padding: 5px 11px; cursor: pointer; }

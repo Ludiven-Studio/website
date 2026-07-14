@@ -1564,12 +1564,8 @@ const CSS = `
 .lg-help { max-width: 640px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.1rem; }
 
 /* Site global fullscreen → the run fills the remaining space. */
-.game-page:fullscreen .lg-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.game-page:-webkit-full-screen .lg-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.game-page:fullscreen .lg-boardwrap { flex: 1; min-height: 0; display: flex; }
-.game-page:-webkit-full-screen .lg-boardwrap { flex: 1; min-height: 0; display: flex; }
-.game-page:fullscreen .lg-canvas { width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; border: none; }
-.game-page:-webkit-full-screen .lg-canvas { width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; border: none; }
-.game-page:fullscreen .lg-help { display: none; }
-.game-page:-webkit-full-screen .lg-help { display: none; }
+.game-page.gf-full .lg-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.game-page.gf-full .lg-boardwrap { flex: 1; min-height: 0; display: flex; }
+.game-page.gf-full .lg-canvas { width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; border: none; }
+.game-page.gf-full .lg-help { display: none; }
 `;
