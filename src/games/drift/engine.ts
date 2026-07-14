@@ -41,9 +41,9 @@ export interface DriftDiff {
 // `alt` alternates control points near/far from centre so the centreline weaves
 // left–right (S-curves) instead of bulging into a single convex loop.
 export const DRIFT_DIFFS: Record<string, DriftDiff> = {
-	facile: { label: 'Facile', controls: 8, jitter: 0.28, width: 15, alt: 0.18 },
-	moyen: { label: 'Moyen', controls: 10, jitter: 0.42, width: 13, alt: 0.24 },
-	difficile: { label: 'Difficile', controls: 14, jitter: 0.52, width: 11.5, alt: 0.2 },
+	facile: { label: 'Facile', controls: 6, jitter: 0.26, width: 15, alt: 0.18 },
+	moyen: { label: 'Moyen', controls: 8, jitter: 0.36, width: 13.5, alt: 0.22 },
+	difficile: { label: 'Difficile', controls: 10, jitter: 0.44, width: 12.5, alt: 0.2 },
 };
 
 export interface CarParams {
@@ -150,6 +150,26 @@ export function generateTrack(seed: number, diff: DriftDiff = DRIFT_DIFFS.moyen,
 	// Sample a smooth closed centerline.
 	const raw: Vec2[] = [];
 	for (let s = 0; s < SAMPLES; s++) raw.push(catmullClosed(ctrl, s / SAMPLES));
+
+	// Round any corner sharper than the track can hold — else the INNER barrier folds
+	// over itself (offset-curve cusp). Iteratively pull only over-tight points toward
+	// their neighbours' midpoint; gentle sections (the chicanes) are left untouched.
+	const MIN_R = width; // = 2 × half-width → min radius ≥ 1.3 × half-width in practice, inner edge stays clear
+	const ST = 3;
+	const circR = (a: Vec2, b: Vec2, c: Vec2): number => {
+		const ab = Math.hypot(b.x - a.x, b.z - a.z), bc = Math.hypot(c.x - b.x, c.z - b.z), ca = Math.hypot(a.x - c.x, a.z - c.z);
+		const area = Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x)) / 2;
+		return area < 1e-6 ? Infinity : (ab * bc * ca) / (4 * area);
+	};
+	for (let pass = 0; pass < 120; pass++) {
+		const src = raw.slice();
+		let changed = false;
+		for (let i = 0; i < SAMPLES; i++) {
+			const a = src[(i - ST + SAMPLES) % SAMPLES], b = src[i], c = src[(i + ST) % SAMPLES];
+			if (circR(a, b, c) < MIN_R) { raw[i] = { x: b.x * 0.65 + (a.x + c.x) * 0.175, z: b.z * 0.65 + (a.z + c.z) * 0.175 }; changed = true; }
+		}
+		if (!changed) break;
+	}
 
 	const points: TrackPoint[] = [];
 	let length = 0;
