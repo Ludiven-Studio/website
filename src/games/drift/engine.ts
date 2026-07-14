@@ -31,16 +31,19 @@ export interface Track {
 
 export interface DriftDiff {
 	label: string;
-	controls: number; // control points around the loop → more = more corners
+	controls: number; // control points around the loop (EVEN) → more = more corners
 	jitter: number; // radial variation (sharper turns)
 	width: number; // track width (narrower = harder)
+	alt: number; // alternating in/out radial bias → guarantees OPPOSITE turns (chicanes), not just a loop
 }
 
 // Difficulty = more and more corners (and a narrower track at the top end).
+// `alt` alternates control points near/far from centre so the centreline weaves
+// left–right (S-curves) instead of bulging into a single convex loop.
 export const DRIFT_DIFFS: Record<string, DriftDiff> = {
-	facile: { label: 'Facile', controls: 7, jitter: 0.4, width: 15 },
-	moyen: { label: 'Moyen', controls: 10, jitter: 0.5, width: 13 },
-	difficile: { label: 'Difficile', controls: 14, jitter: 0.58, width: 11.5 },
+	facile: { label: 'Facile', controls: 8, jitter: 0.28, width: 15, alt: 0.18 },
+	moyen: { label: 'Moyen', controls: 10, jitter: 0.42, width: 13, alt: 0.24 },
+	difficile: { label: 'Difficile', controls: 14, jitter: 0.52, width: 11.5, alt: 0.2 },
 };
 
 export interface CarParams {
@@ -134,11 +137,13 @@ export function generateTrack(seed: number, diff: DriftDiff = DRIFT_DIFFS.moyen,
 	const SAMPLES = 220;
 	const width = diff.width;
 
-	// Control points around a circle with bounded radial + angular jitter.
+	// Control points around a circle. Radius ALTERNATES near/far (diff.alt) so the
+	// centreline weaves in and out → opposite turns (chicanes), not a convex loop.
 	const ctrl: Vec2[] = [];
 	for (let i = 0; i < CONTROLS; i++) {
 		const ang = (i / CONTROLS) * TWO_PI + (rng() - 0.5) * (TWO_PI / CONTROLS) * 0.5;
-		const r = BASE_R * (0.72 + rng() * diff.jitter);
+		const bias = i % 2 === 0 ? diff.alt : -diff.alt;
+		const r = BASE_R * (0.72 + bias + rng() * diff.jitter);
 		ctrl.push({ x: Math.cos(ang) * r, z: Math.sin(ang) * r });
 	}
 
