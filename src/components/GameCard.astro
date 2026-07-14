@@ -304,7 +304,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 				chip.title = `Record du jour${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 				const val = formatScore(cfg!.fmt, top.value);
 				const who = `${val ? `${val} · ` : ''}${top.name}`;
-				chip.textContent = `${done ? '✓ ' : ''}🏆 ${who}${nb ? ` · 👥 ${nb}` : ''}`;
+				chip.textContent = `${done ? '✓ ' : ''}🏆 ${who}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 			} else {
 				chip.textContent = done
 					? recTxt
