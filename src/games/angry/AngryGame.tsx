@@ -4,7 +4,7 @@ import {
 	encodeScore, DIFFS, HEN_TYPES, type World, type Body, type Vec, type HenType,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
-import { formatScore } from '../../lib/scoreFormat';
+import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -37,8 +37,7 @@ const HEN_META: Record<HenType, { emoji: string; label: string; active: boolean;
 	poussins: { emoji: '🐥', label: 'Poussins', active: true, body: '#ffe08a', accent: '#f0a830' },
 };
 
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const fmtTime = (s: number) => fmtCentis(Math.round(s * 100));
 
 interface DailyState { best?: number; tries: number; }
 interface Boom { x: number; y: number; t0: number; big?: boolean; }
@@ -131,8 +130,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		setDiffKey(key);
 		const st = (run?.state as DailyState) ?? { tries: 0 };
 		triesRef.current = st.tries ?? 0;
-		// Ignore an implausible stored best (< 100000 = fewer than 1 cocotte): a corrupt value must not block real improvements.
-		const validBest = typeof st.best === 'number' && st.best >= 100000 ? st.best : null;
+		// Ignore an implausible stored best (< 10_000_000 = fewer than 1 cocotte): a corrupt value must not block real improvements.
+		const validBest = typeof st.best === 'number' && st.best >= 10_000_000 ? st.best : null;
 		bestRef.current = validBest;
 		setBest(validBest);
 		lay(key, seed);

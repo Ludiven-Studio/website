@@ -11,18 +11,19 @@ export interface DailyLbCfg {
 }
 
 // Packed "count + time" score, shared by golf/angry/flechettes/billard:
-//   v = count*100000 + min(99999, round(timeSec*10)).
+//   v = count*10_000_000 + min(9_999_999, round(timeSec*100))  (centiseconds).
 const packed = (unit: string): ScoreFormat => ({
 	kind: 'packed',
-	radix: 100000,
+	radix: 10_000_000,
 	fields: [
 		{ as: 'int', unit },
-		{ as: 'mmss', div: 10 },
+		{ as: 'mmss.cc', div: 100 },
 	],
 });
 
 const score: ScoreFormat = { kind: 'plain', fmt: 'score' };
-const time: ScoreFormat = { kind: 'plain', fmt: 'time' };
+// Time races → centiseconds: "43.12 s" under a minute, else "1:23.45" (fine tie-breaking).
+const centis: ScoreFormat = { kind: 'duration', div: 100, decimals: 2, mmssAbove: 6000 };
 
 export const DAILY_LB: Record<string, DailyLbCfg> = {
 	// Score (higher is better) → "N pts"
@@ -33,25 +34,25 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	'cocottes-renards': { fmt: score },
 	flappy: { fmt: score },
 	// Time (seconds) → mm:ss
-	tubes: { fmt: time },
-	tente: { fmt: time },
-	chemin: { fmt: time },
-	matrices: { fmt: time },
-	reines: { fmt: time },
-	symboles: { fmt: time },
-	calcudoku: { fmt: time },
-	'somme-toute': { fmt: time },
-	aquarium: { fmt: time },
-	pavage: { fmt: time },
-	fruits: { fmt: time },
-	suite: { fmt: time },
-	'mots-meles': { fmt: time },
-	'rond-carre': { fmt: time },
-	colorgramme: { fmt: time },
-	sudoku: { fmt: time },
-	suguru: { fmt: time },
-	motifs: { fmt: time },
-	bataille: { fmt: time },
+	tubes: { fmt: centis },
+	tente: { fmt: centis },
+	chemin: { fmt: centis },
+	matrices: { fmt: centis },
+	reines: { fmt: centis },
+	symboles: { fmt: centis },
+	calcudoku: { fmt: centis },
+	'somme-toute': { fmt: centis },
+	aquarium: { fmt: centis },
+	pavage: { fmt: centis },
+	fruits: { fmt: centis },
+	suite: { fmt: centis },
+	'mots-meles': { fmt: centis },
+	'rond-carre': { fmt: centis },
+	colorgramme: { fmt: centis },
+	sudoku: { fmt: centis },
+	suguru: { fmt: centis },
+	motifs: { fmt: centis },
+	bataille: { fmt: { kind: 'count', one: 'coup', many: 'coups' } }, // value = shots+sonars (not time)
 	// Scaled durations
 	drift: { fmt: { kind: 'duration', div: 1000, decimals: 2, mmssAbove: 60000 } }, // lap ms
 	solitaire: { fmt: { kind: 'duration', div: 100, decimals: 2, mmssAbove: 6000 } }, // centiseconds
@@ -59,7 +60,7 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	// Meters × speed multiplier (higher is better) → "1234 pts"
 	luge: { fmt: { kind: 'count', one: 'pt', many: 'pts' } },
 	// Win value below a loss band (cf. LOSS_OFFSET = 100000 in each game)
-	demineur: { fmt: { kind: 'threshold', at: 100000, below: time, aboveLabel: '💣 ', aboveShowsDelta: true } },
+	demineur: { fmt: { kind: 'threshold', at: 100000, below: centis, aboveLabel: '💣 ', aboveShowsDelta: true } },
 	codecolor: { fmt: { kind: 'threshold', at: 100000, below: { kind: 'count', one: 'essai', many: 'essais' }, aboveLabel: '❌' } },
 	// Packed strokes/darts/cocottes + time, logged under `<id>-t`
 	angry: { lbId: 'angry-t', fmt: packed('cocottes') },

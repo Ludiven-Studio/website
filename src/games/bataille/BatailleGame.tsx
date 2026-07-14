@@ -509,7 +509,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					format={(v) => `${v} coups`}
 				/>
 			)}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && <LeaderboardCorner game={gameId} metric="time" format={(v) => `${v} coups`} />}
 
 			<p className="ba-help">
 				Coule toute la flotte cachée en un minimum d'actions. Clique une case pour <strong>tirer</strong>{' '}

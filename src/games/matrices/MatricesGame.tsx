@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { fmtCentis } from '../../lib/scoreFormat';
 import { DIFFS, generateQuestion, cellKey, COLORS, type Question, type Cell, type Elt } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
@@ -19,8 +20,7 @@ type Status = 'playing' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const DAILY_TARGET = 3;
 
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const fmtTime = fmtCentis;
 
 interface DailyState {
 	solved: number;
@@ -132,7 +132,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => {
 		if (!daily || !started || status !== 'playing') return;
-		const id = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 250);
+		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
 	}, [daily, started, status]);
 
@@ -180,7 +180,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				setStatus('playing');
 				setAlreadyPlayed(false);
 				startRef.current = run.startedAt;
-				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+				setElapsed(Math.round((Date.now() - run.startedAt) / 10));
 			}
 			return;
 		}
@@ -228,7 +228,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		if (daily) {
 			const sd = dailySeedRef.current;
 			if (correct && score + 1 >= DAILY_TARGET) {
-				const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+				const finalTime = Math.round((Date.now() - startRef.current) / 10);
 				setScore(score + 1);
 				setElapsed(finalTime);
 				setStatus('won');

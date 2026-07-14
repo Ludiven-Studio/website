@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { fmtCentis } from '../../lib/scoreFormat';
 import {
 	DIFFS,
 	generateWaterSort,
@@ -47,8 +48,7 @@ const BUBBLES = [
 
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const fmtTime = fmtCentis;
 
 const cloneTubes = (tubes: Tube[]): Tube[] => tubes.map((t) => t.slice());
 
@@ -147,7 +147,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 				setAlreadyPlayed(false);
 				setStatus('playing');
 				startRef.current = run.startedAt;
-				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+				setElapsed(Math.round((Date.now() - run.startedAt) / 10));
 			}
 			return;
 		}
@@ -198,7 +198,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	/* Timer */
 	useEffect(() => {
 		if (status !== 'playing' || !started) return;
-		const id = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 250);
+		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
 	}, [status, started]);
 
@@ -229,7 +229,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (!daily || status !== 'won' || alreadyPlayed) return;
 		const sd = dailySeedRef.current;
-		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const finalTime = Math.round((Date.now() - startRef.current) / 10);
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: true,

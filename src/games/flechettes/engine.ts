@@ -68,11 +68,11 @@ export function reticleAt(seed: number, dartIndex: number, diff: DiffLevel, tMs:
 /* ---------- Score (darts + time tiebreak) ---------- */
 
 export function encodeScore(darts: number, timeSec: number): number {
-	return encodePacked(100000, [darts, Math.min(99999, Math.round(timeSec * 10))]);
+	return encodePacked(10_000_000, [darts, Math.min(9_999_999, Math.round(timeSec * 100))]);
 }
 export function decodeScore(v: number): { darts: number; timeSec: number } {
-	const [darts, t] = decodePacked(100000, 2, v);
-	return { darts, timeSec: t / 10 };
+	const [darts, t] = decodePacked(10_000_000, 2, v);
+	return { darts, timeSec: t / 100 };
 }
 
 export { ORDER as SECTOR_ORDER };

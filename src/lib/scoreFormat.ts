@@ -15,8 +15,8 @@ export type ScoreFormat =
 	| { kind: 'threshold'; at: number; below: ScoreFormat; aboveLabel: string; aboveShowsDelta?: boolean };
 
 export interface PackedField {
-	as: 'int' | 'mmss';
-	div?: number; // divide the raw field before rendering (e.g. tenths of a second → 10)
+	as: 'int' | 'mmss' | 'mmss.cc'; // 'mmss.cc' keeps hundredths (mm:ss.cc)
+	div?: number; // divide the raw field before rendering (e.g. centiseconds → 100)
 	unit?: string; // suffix for 'int' fields, e.g. "coups"
 }
 
@@ -25,6 +25,18 @@ const pad2 = (n: number): string => String(n).padStart(2, '0');
 const mmss = (totalSec: number): string => {
 	const s = Math.max(0, Math.round(totalSec));
 	return `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+};
+/** mm:ss.cc — keeps hundredths of a second (for close-record tie-breaking). */
+const mmssCc = (totalSec: number): string => {
+	const cs = Math.max(0, Math.round(totalSec * 100));
+	return `${pad2(Math.floor(cs / 6000))}:${pad2(Math.floor((cs % 6000) / 100))}.${pad2(cs % 100)}`;
+};
+
+/** Live-timer / result label from centiseconds: "43.12 s" under a minute, else "1:23.45". */
+export const fmtCentis = (cs: number): string => {
+	const c = Math.max(0, Math.round(cs));
+	if (c < 6000) return `${(c / 100).toFixed(2)} s`;
+	return `${Math.floor(c / 6000)}:${pad2(Math.floor((c % 6000) / 100))}.${pad2(c % 100)}`;
 };
 
 /** Pack fields (highest significance first) into one integer. Each field must be < radix. */
@@ -58,13 +70,16 @@ export function formatScore(f: ScoreFormat, v: number): string {
 		case 'count':
 			return `${v} ${v > 1 ? f.many : f.one}`;
 		case 'duration':
-			return f.mmssAbove != null && v >= f.mmssAbove ? mmss(v / f.div) : `${(v / f.div).toFixed(f.decimals)} s`;
+			// Under the threshold: "43.12 s". Above: mm:ss.cc when we keep hundredths, else mm:ss.
+			return f.mmssAbove != null && v >= f.mmssAbove
+				? (f.decimals >= 2 ? mmssCc(v / f.div) : mmss(v / f.div))
+				: `${(v / f.div).toFixed(f.decimals)} s`;
 		case 'packed': {
 			const parts = decodePacked(f.radix, f.fields.length, v);
 			return f.fields
 				.map((fl, i) => {
 					const x = fl.div ? parts[i] / fl.div : parts[i];
-					const s = fl.as === 'mmss' ? mmss(x) : String(x);
+					const s = fl.as === 'mmss.cc' ? mmssCc(x) : fl.as === 'mmss' ? mmss(x) : String(x);
 					return fl.unit ? `${s} ${fl.unit}` : s;
 				})
 				.join(f.sep ?? ' · ');

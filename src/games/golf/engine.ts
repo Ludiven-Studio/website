@@ -498,10 +498,10 @@ export const holeFromSeed = (seed: number, diff: DiffLevel): Hole => generateHol
 
 /** One ascending number: fewer strokes ranks first; ties are broken by faster time. */
 export function encodeScore(strokes: number, timeSec: number): number {
-	return encodePacked(100000, [strokes, Math.min(99999, Math.max(0, Math.round(timeSec * 10)))]);
+	return encodePacked(10_000_000, [strokes, Math.min(9_999_999, Math.max(0, Math.round(timeSec * 100)))]);
 }
 
 export function decodeScore(v: number): { strokes: number; timeSec: number } {
-	const [strokes, t] = decodePacked(100000, 2, v);
-	return { strokes, timeSec: t / 10 };
+	const [strokes, t] = decodePacked(10_000_000, 2, v);
+	return { strokes, timeSec: t / 100 };
 }

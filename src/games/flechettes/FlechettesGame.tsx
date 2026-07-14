@@ -4,7 +4,7 @@ import {
 	type Hit,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
-import { formatScore } from '../../lib/scoreFormat';
+import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -27,8 +27,7 @@ const clampAim = (x: number, y: number) => { const r = Math.hypot(x, y); const k
 /** What to aim for to finish 501 on a double (null = not directly finishable). */
 const checkout = (rem: number): string | null =>
 	rem === 50 ? 'Bullseye (50)' : rem <= 40 && rem % 2 === 0 ? `Double ${rem / 2}` : null;
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const fmtTime = (s: number) => fmtCentis(Math.round(s * 100));
 
 interface DailyState { best?: number; tries: number; }
 interface Dart { x: number; y: number; ring: string; value: number; }

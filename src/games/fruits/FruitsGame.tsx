@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { fmtCentis } from '../../lib/scoreFormat';
 import { DIFFS, generateQuestion, type Question } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
@@ -19,8 +20,7 @@ type Status = 'playing' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const DAILY_TARGET = 3;
 
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const fmtTime = fmtCentis;
 
 interface DailyState { solved: number; qIndex: number; }
 
@@ -65,7 +65,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => {
 		if (!daily || !started || status !== 'playing') return;
-		const id = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 250);
+		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
 	}, [daily, started, status]);
 
@@ -106,7 +106,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 			setQuestion(dailyQ(run.seed, di, st.qIndex));
 			setStarted(true);
 			if (run.done) { setStatus('won'); setAlreadyPlayed(true); setElapsed(run.finalTime ?? 0); }
-			else { setStatus('playing'); setAlreadyPlayed(false); startRef.current = run.startedAt; setElapsed(Math.floor((Date.now() - run.startedAt) / 1000)); }
+			else { setStatus('playing'); setAlreadyPlayed(false); startRef.current = run.startedAt; setElapsed(Math.round((Date.now() - run.startedAt) / 10)); }
 			return;
 		}
 
@@ -145,7 +145,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		if (daily) {
 			const sd = dailySeedRef.current;
 			if (correct && score + 1 >= DAILY_TARGET) {
-				const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+				const finalTime = Math.round((Date.now() - startRef.current) / 10);
 				setScore(score + 1); setElapsed(finalTime); setStatus('won');
 				trackGame(gameId, 'game_won');
 				saveDailyRun(gameId, { startedAt: startRef.current, done: true, finalTime, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { solved: score + 1, qIndex } satisfies DailyState });

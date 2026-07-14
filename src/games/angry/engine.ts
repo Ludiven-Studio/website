@@ -514,9 +514,9 @@ export function predictTrajectory(world: World, start: Vec, vel: { vx: number; v
 /* ---------- Score (cocottes + time tiebreak) ---------- */
 
 export function encodeScore(cocottes: number, timeSec: number): number {
-	return encodePacked(100000, [cocottes, Math.min(99999, Math.round(timeSec * 10))]);
+	return encodePacked(10_000_000, [cocottes, Math.min(9_999_999, Math.round(timeSec * 100))]);
 }
 export function decodeScore(v: number): { cocottes: number; timeSec: number } {
-	const [cocottes, t] = decodePacked(100000, 2, v);
-	return { cocottes, timeSec: t / 10 };
+	const [cocottes, t] = decodePacked(10_000_000, 2, v);
+	return { cocottes, timeSec: t / 100 };
 }

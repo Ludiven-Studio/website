@@ -18,7 +18,7 @@ import {
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, type DailyRun } from '../../lib/leaderboard';
-import { formatScore } from '../../lib/scoreFormat';
+import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -42,8 +42,7 @@ const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 // remaining, so every loss ranks after every win, ordered by fewest bombs left.
 const LOSS_OFFSET = 100000;
 
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const fmtTime = fmtCentis;
 
 const flagCount = (g: PlayerGrid): number =>
 	g.reduce((a, row) => a + row.filter((v) => v === FLAGGED).length, 0);
@@ -110,12 +109,12 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus(isLose(state, p) ? 'lost' : 'won');
-				setElapsed(run.finalTime ?? Math.floor((Date.now() - run.startedAt) / 1000));
+				setElapsed(run.finalTime ?? Math.round((Date.now() - run.startedAt) / 10));
 			} else {
 				setAlreadyPlayed(false);
 				setStatus('playing');
 				startRef.current = run.startedAt;
-				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+				setElapsed(Math.round((Date.now() - run.startedAt) / 10));
 			}
 			return;
 		}
@@ -176,7 +175,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 	/* Timer */
 	useEffect(() => {
 		if (status !== 'playing' || !started || revealed) return;
-		const id = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 250);
+		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
 	}, [status, started, revealed]);
 
@@ -222,7 +221,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		if (!daily || alreadyPlayed) return;
 		if (status !== 'won' && status !== 'lost') return;
 		const sd = dailySeedRef.current;
-		const finalTime = status === 'won' ? Math.floor((Date.now() - startRef.current) / 1000) : undefined;
+		const finalTime = status === 'won' ? Math.round((Date.now() - startRef.current) / 10) : undefined;
 		const snapshot: DailyRun = {
 			startedAt: startRef.current,
 			done: true,
@@ -481,7 +480,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={dailyValue} format={lbFormat} />
 			)}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && <LeaderboardCorner game={gameId} metric="time" format={lbFormat} />}
 
 			{revealed ? (
 				<div className="dm-revealed-note">

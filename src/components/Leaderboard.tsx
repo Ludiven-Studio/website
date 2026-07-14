@@ -10,9 +10,9 @@ import {
 	type ScoreRow,
 } from '../lib/leaderboard';
 import { games } from '../data/games';
+import { fmtCentis } from '../lib/scoreFormat';
 
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+// Time leaderboards store CENTISECONDS; a game may still pass its own `format`.
 
 interface Props {
 	game: string;
@@ -56,7 +56,7 @@ export default function Leaderboard({ game, metric, submitValue, format }: Props
 			const prev = JSON.parse(localStorage.getItem(key) || 'null') as { v: number } | null;
 			const better = !prev || (metric === 'time' ? submitValue < prev.v : submitValue > prev.v);
 			if (better) {
-				const t = format ? format(submitValue) : metric === 'time' ? fmtTime(submitValue) : String(submitValue);
+				const t = format ? format(submitValue) : metric === 'time' ? fmtCentis(submitValue) : String(submitValue);
 				localStorage.setItem(key, JSON.stringify({ v: submitValue, m: metric, t }));
 			}
 		} catch {
@@ -79,7 +79,7 @@ export default function Leaderboard({ game, metric, submitValue, format }: Props
 	};
 
 	const me = name.toLowerCase();
-	const fmt = format ?? ((v: number) => (metric === 'time' ? fmtTime(v) : String(v)));
+	const fmt = format ?? ((v: number) => (metric === 'time' ? fmtCentis(v) : String(v)));
 	const showInput = editing || (submitValue != null && !name);
 
 	// Spoiler-free result share (Wordle-style): score/rank + same-daily deep link.

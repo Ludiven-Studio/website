@@ -25,15 +25,24 @@ describe('formatScore', () => {
 		expect(formatScore(f, 3)).toBe('3 essais');
 	});
 
-	it('scales durations, switching to mm:ss past the threshold', () => {
+	it('scales durations; keeps hundredths past the threshold when decimals ≥ 2', () => {
 		expect(formatScore({ kind: 'duration', div: 10, decimals: 1 }, 123)).toBe('12.3 s'); // esquive tenths
 		expect(formatScore({ kind: 'duration', div: 1000, decimals: 2, mmssAbove: 60000 }, 8340)).toBe('8.34 s'); // drift ms
-		expect(formatScore({ kind: 'duration', div: 1000, decimals: 2, mmssAbove: 60000 }, 65000)).toBe('01:05');
+		expect(formatScore({ kind: 'duration', div: 1000, decimals: 2, mmssAbove: 60000 }, 65000)).toBe('01:05.00');
+	});
+
+	it('renders time races in centiseconds (ss.cc / mm:ss.cc)', () => {
+		const centis: ScoreFormat = { kind: 'duration', div: 100, decimals: 2, mmssAbove: 6000 };
+		expect(formatScore(centis, 4312)).toBe('43.12 s');
+		expect(formatScore(centis, 8345)).toBe('01:23.45');
 	});
 
 	it('renders packed count + time', () => {
 		const f: ScoreFormat = { kind: 'packed', radix: 100000, fields: [{ as: 'int', unit: 'coups' }, { as: 'mmss', div: 10 }] };
 		expect(formatScore(f, encodePacked(100000, [3, 420]))).toBe('3 coups · 00:42');
+		// centisecond packed (billard/golf/angry): "coups · mm:ss.cc"
+		const cc: ScoreFormat = { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'coups' }, { as: 'mmss.cc', div: 100 }] };
+		expect(formatScore(cc, encodePacked(10_000_000, [3, 8345]))).toBe('3 coups · 01:23.45');
 	});
 
 	it('branches on a loss threshold', () => {

@@ -5,7 +5,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
-import { formatScore } from '../../lib/scoreFormat';
+import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -34,8 +34,7 @@ const MIN_FLOOR = 40; // minimum floor units around the table (the floor then fi
 const SINK_MS = 280; // pot animation duration
 type Sink = { x: number; y: number; px: number; py: number; r: number; color: number; kind: 'cue' | 'color'; t0: number };
 
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const fmtTime = (s: number) => fmtCentis(Math.round(s * 100));
 
 interface DailyState { best?: number; tries: number; }
 
@@ -160,8 +159,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setDiffKey(key);
 		const st = (run?.state as DailyState) ?? { tries: 0 };
 		triesRef.current = st.tries ?? 0;
-		// Ignore an implausible stored best (< 100000 = fewer than 1 stroke): a corrupt value must not block real improvements.
-		const validBest = typeof st.best === 'number' && st.best >= 100000 ? st.best : null;
+		// Ignore an implausible stored best (< 10_000_000 = fewer than 1 stroke): a corrupt value must not block real improvements.
+		const validBest = typeof st.best === 'number' && st.best >= 10_000_000 ? st.best : null;
 		bestRef.current = validBest;
 		setBest(validBest);
 		layTable(key, seed);

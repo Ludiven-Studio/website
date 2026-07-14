@@ -12,7 +12,7 @@ import {
 	type Ball,
 } from './engine';
 import { mulberry32 } from '../prng';
-import { formatScore } from '../../lib/scoreFormat';
+import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { joinGolf, multiplayerAvailable, MAX_PLAYERS, type Lobby, type Peer, type PosMsg, type ScoreMsg } from './net';
 import {
@@ -41,8 +41,7 @@ const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const STEP = 1000 / 60;
 const SEND_HZ = 12;
 const MAX_TRIES = 10;
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const fmtTime = (s: number) => fmtCentis(Math.round(s * 100));
 const BALL_COLORS = [0xff3b30, 0x0a84ff, 0xffd60a, 0x30d158, 0xbf5af2];
 const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
 const AIM_Y = 0.5;
@@ -934,8 +933,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			const st = (run?.state as { best?: number; tries?: number } | undefined) ?? { best: 0, tries: 0 };
 			triesRef.current = st.tries ?? 0;
 			setTries(triesRef.current);
-			// Only accept a real ENCODED best (≥100000 = strokes≥1); ignore legacy raw-stroke values.
-			if (st.best && st.best >= 100000) { bestRef.current = st.best; setBest(st.best); }
+			// Only accept a real ENCODED best (≥10_000_000 = strokes≥1); ignore legacy raw-stroke values.
+			if (st.best && st.best >= 10_000_000) { bestRef.current = st.best; setBest(st.best); }
 			if (triesRef.current >= MAX_TRIES) setAlreadyPlayed(true);
 			else { triesRef.current += 1; setTries(triesRef.current); } // this attempt consumes a try
 		} else {

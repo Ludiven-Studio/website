@@ -95,6 +95,8 @@ describe('billard engine', () => {
 
 	it('encodeScore/decodeScore round-trips and orders by strokes then time', () => {
 		expect(decodeScore(encodeScore(5, 42.3))).toEqual({ strokes: 5, timeSec: 42.3 });
+		expect(decodeScore(encodeScore(5, 42.37))).toEqual({ strokes: 5, timeSec: 42.37 }); // centisecond precision
+		expect(encodeScore(5, 42.37)).toBeLessThan(encodeScore(5, 42.38)); // 0.01s breaks close ties
 		expect(encodeScore(4, 99)).toBeLessThan(encodeScore(5, 1)); // fewer strokes wins
 		expect(encodeScore(5, 10)).toBeLessThan(encodeScore(5, 20)); // time breaks ties
 	});

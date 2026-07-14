@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { fmtCentis } from '../../lib/scoreFormat';
 import { makeGrid, lineCells, matchIndex, DIFFS, type Grid, type Cell } from './engine';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
@@ -15,7 +16,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 
 type Status = 'playing' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
-const fmtTime = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const fmtTime = fmtCentis;
 const ckey = (r: number, c: number) => `${r},${c}`;
 // A distinct colour per found word (readable with white text, works in light & dark).
 const WORD_COLORS = ['#e0484d', '#e07a2f', '#c99a1e', '#37a05a', '#2f9bb0', '#4a7fe0', '#8a5cf0', '#c94f97', '#6a9e34', '#b0563a', '#3aa090'];
@@ -51,7 +52,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 	/* Daily chrono. */
 	useEffect(() => {
 		if (!daily || !started || status !== 'playing') return;
-		const id = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 250);
+		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
 	}, [daily, started, status]);
 
@@ -84,7 +85,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 			setFound(st.found ?? []);
 			setStarted(true);
 			if (run.done) { setStatus('won'); setAlreadyPlayed(true); setElapsed(run.finalTime ?? 0); }
-			else { setStatus('playing'); setAlreadyPlayed(false); startRef.current = run.startedAt; setElapsed(Math.floor((Date.now() - run.startedAt) / 1000)); }
+			else { setStatus('playing'); setAlreadyPlayed(false); startRef.current = run.startedAt; setElapsed(Math.round((Date.now() - run.startedAt) / 10)); }
 			return;
 		}
 		setAlreadyPlayed(false);
@@ -118,7 +119,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		const complete = nf.length === grid.words.length;
 		if (daily) {
 			const sd = dailySeedRef.current;
-			const finalTime = complete ? Math.floor((Date.now() - startRef.current) / 1000) : undefined;
+			const finalTime = complete ? Math.round((Date.now() - startRef.current) / 10) : undefined;
 			saveDailyRun(gameId, { startedAt: startRef.current, done: complete, finalTime, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: nf } satisfies DailyState });
 			if (complete) { setElapsed(finalTime!); setStatus('won'); trackGame(gameId, 'game_won'); }
 		} else {

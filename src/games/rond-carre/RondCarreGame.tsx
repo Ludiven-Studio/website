@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { fmtCentis } from '../../lib/scoreFormat';
 import { DIFFS, SIZE, generateRondCarre, findHint, type Cell, type RondCarrePuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
@@ -26,8 +27,7 @@ const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const emptyMarks = (): Cell[][] =>
 	Array.from({ length: SIZE }, () => new Array(SIZE).fill(0) as Cell[]);
 
-const fmtTime = (s: number) =>
-	`${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const fmtTime = fmtCentis;
 
 const key = (r: number, c: number) => `${r},${c}`;
 
@@ -93,7 +93,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				setAlreadyPlayed(false);
 				setStatus('playing');
 				startRef.current = run.startedAt;
-				setElapsed(Math.floor((Date.now() - run.startedAt) / 1000));
+				setElapsed(Math.round((Date.now() - run.startedAt) / 10));
 			}
 			return;
 		}
@@ -157,8 +157,8 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status !== 'playing' || !started || revealed) return;
 		const id = setInterval(
-			() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
-			250,
+			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
+			50,
 		);
 		return () => clearInterval(id);
 	}, [status, started, revealed]);
@@ -238,7 +238,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (!daily || status !== 'won' || alreadyPlayed) return;
 		const sd = dailySeedRef.current;
-		const finalTime = Math.floor((Date.now() - startRef.current) / 1000);
+		const finalTime = Math.round((Date.now() - startRef.current) / 10);
 		const snapshot: DailyRun = {
 			startedAt: startRef.current,
 			done: true,
