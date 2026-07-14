@@ -55,7 +55,9 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const [best, setBest] = useState<number | null>(null);
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily: one attempt already spent today
 	const [elapsed, setElapsed] = useState(0);
+	const [started, setStarted] = useState(false); // false = board armed (blurred, Start gate)
 	const [finalCentis, setFinalCentis] = useState<number | null>(null);
 	const [submitCentis, setSubmitCentis] = useState<number | undefined>(undefined);
 	const [bestTime, setBestTime] = useState<number | null>(null);
@@ -83,7 +85,19 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const dailyInitRef = useRef<boolean[] | null>(null);
 	const timerStartRef = useRef<number | null>(null);
 	const timerRunRef = useRef(false);
+	const startedRef = useRef(false);
 	const bestTimeRef = useRef<number | null>(null);
+
+	// Arm a freshly laid board: blurred, timer paused, waiting for ▶ Commencer.
+	const armBoard = (): void => { startedRef.current = false; setStarted(false); };
+	// ▶ Commencer: reveal + start the clock now (so thinking time counts).
+	const beginPlay = (): void => {
+		if (startedRef.current) return;
+		startedRef.current = true;
+		setStarted(true);
+		timerStartRef.current = clockRef.current;
+		timerRunRef.current = true;
+	};
 
 	// Load the wood board texture once (RAF loop picks it up next frame).
 	useEffect(() => {
@@ -176,10 +190,6 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			setMoves((n) => n + 1);
 			const next = pegsRef.current;
 			setPegs(pegCount(next));
-			if (dailyRef.current && timerStartRef.current == null) {
-				timerStartRef.current = clockRef.current;
-				timerRunRef.current = true;
-			}
 			const won = isWin(next);
 			const stuck = !won && isStuck(layoutRef.current, next);
 			if (won) {
@@ -202,6 +212,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			dailyRef.current = false;
 			setDaily(false);
 			setDailyLoading(false);
+			setAlreadyPlayed(false);
 			setVariant(v);
 			layoutRef.current = createLayout(v);
 			pegsRef.current = initialPegs(layoutRef.current);
@@ -212,6 +223,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			hintRef.current = null;
 			timerStartRef.current = null;
 			timerRunRef.current = false;
+			armBoard();
 			statusRef.current = 'playing';
 			setStatus('playing');
 			setMoves(0);
@@ -244,6 +256,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			hintRef.current = null;
 			timerStartRef.current = null;
 			timerRunRef.current = false;
+			armBoard();
 			statusRef.current = 'playing';
 			setStatus('playing');
 			setMoves(0);
@@ -259,8 +272,21 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
 			apply(run.seed, run.diffIndex ?? dailyDifficultyIndex(), run.finalTime ?? null);
+			if (run.done) {
+				// One attempt per day: lock the result, no replay, no Commencer gate.
+				setAlreadyPlayed(true);
+				startedRef.current = true;
+				setStarted(true);
+				statusRef.current = 'won';
+				setStatus('won');
+				setFinalCentis(run.finalTime ?? null);
+				setSubmitCentis(undefined); // already submitted — don't resubmit on resume
+			} else {
+				setAlreadyPlayed(false);
+			}
 			return;
 		}
+		setAlreadyPlayed(false);
 		setDailyLoading(true);
 		const { seed, diffIndex } = await getDaily(gameId);
 		apply(seed, diffIndex, null);
@@ -275,6 +301,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			hintRef.current = null;
 			timerStartRef.current = null;
 			timerRunRef.current = false;
+			armBoard();
 			statusRef.current = 'playing';
 			setStatus('playing');
 			setMoves(0);
@@ -319,7 +346,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		movesFrom(layoutRef.current, pegsRef.current, from).find((m) => m.to === hole);
 
 	const onDown = (e: React.PointerEvent): void => {
-		if (statusRef.current !== 'playing' || animRef.current || dailyLoading) return;
+		if (statusRef.current !== 'playing' || !startedRef.current || animRef.current || dailyLoading) return;
 		const p = posFrom(e);
 		const hole = hitTest(p.x, p.y);
 		if (hole < 0) {
@@ -548,7 +575,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="sol-playwrap" ref={wrapRef}>
-				<canvas ref={canvasRef} className="sol-canvas" onPointerDown={onDown} onPointerUp={onUp} onPointerLeave={onUp} />
+				<canvas ref={canvasRef} className={`sol-canvas${started ? '' : ' sol-blur'}`} onPointerDown={onDown} onPointerUp={onUp} onPointerLeave={onUp} />
 
 				{celebrating && <Celebration />}
 				{dailyLoading && (
@@ -556,18 +583,26 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 						<div className="sol-card">Préparation du défi…</div>
 					</div>
 				)}
-				{showWin && (
+				{!started && status === 'playing' && !dailyLoading && (
+					<div className="sol-overlay">
+						<div className="sol-card">
+							<h3>Prêt&nbsp;?</h3>
+							<p>Le chrono démarre dès que tu commences — pas de repérage gratuit&nbsp;!</p>
+							<button className="sol-btn primary" onClick={beginPlay}>▶ Commencer</button>
+						</div>
+					</div>
+				)}
+				{(showWin || (alreadyPlayed && status === 'won')) && (
 					<div className="sol-overlay">
 						<div className="sol-card">
 							{daily ? (
 								<>
-									<h3>🎉 Résolu !</h3>
+									<h3>{alreadyPlayed ? '✓ Défi déjà relevé' : '🎉 Résolu !'}</h3>
 									<p>
-										En <strong>{finalCentis != null ? fmtCentis(finalCentis) : chrono}</strong> et {moves} coups. Ton meilleur temps est classé.
+										{alreadyPlayed
+											? <>Ton temps du jour&nbsp;: <strong>{finalCentis != null ? fmtCentis(finalCentis) : chrono}</strong>. Reviens demain pour un nouveau défi&nbsp;!</>
+											: <>En <strong>{finalCentis != null ? fmtCentis(finalCentis) : chrono}</strong> et {moves} coups. Un seul essai&nbsp;: ton temps est classé — reviens demain&nbsp;!</>}
 									</p>
-									<button className="sol-btn primary" onClick={restart}>
-										↻ Rejouer (améliorer)
-									</button>
 								</>
 							) : (
 								<>
@@ -586,15 +621,17 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 						<div className="sol-card">
 							<h3>Plus de coups possibles</h3>
 							<p>
-								Il reste <strong>{pegs}</strong> billes. Annule pour retenter, ou recommence.
+								Il reste <strong>{pegs}</strong> billes. {daily ? 'Annule un ou plusieurs coups pour tenter une autre voie.' : 'Annule pour retenter, ou recommence.'}
 							</p>
 							<div className="sol-cardbtns">
-								<button className="sol-btn" onClick={undo}>
+								<button className="sol-btn primary" onClick={undo}>
 									↶ Annuler
 								</button>
-								<button className="sol-btn primary" onClick={restart}>
-									↻ Recommencer
-								</button>
+								{!daily && (
+									<button className="sol-btn" onClick={restart}>
+										↻ Recommencer
+									</button>
+								)}
 							</div>
 						</div>
 					</div>
@@ -602,17 +639,20 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="sol-controls">
-				<button className="sol-btn" onClick={undo} disabled={moves === 0}>
+				<button className="sol-btn" onClick={undo} disabled={moves === 0 || status === 'won'}>
 					↶ Annuler
 				</button>
 				{!daily && (
-					<button className="sol-btn" onClick={hint} disabled={status !== 'playing'}>
+					<button className="sol-btn" onClick={hint} disabled={status !== 'playing' || !started}>
 						💡 Indice
 					</button>
 				)}
-				<button className="sol-btn" onClick={restart}>
-					↻ Recommencer
-				</button>
+				{/* Daily = one attempt: no restart. Free stays replayable. */}
+				{!daily && (
+					<button className="sol-btn" onClick={restart}>
+						↻ Recommencer
+					</button>
+				)}
 			</div>
 
 			<p className="sol-help">
@@ -622,7 +662,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{daily ? (
-				<Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="time" submitValue={status === 'won' ? submitCentis : undefined} format={fmtCentis} />
+				<Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? submitCentis : undefined} format={fmtCentis} />
 			) : (
 				<LeaderboardCorner game={gameId} metric="time" />
 			)}
@@ -657,6 +697,8 @@ const CSS = `
 .sol-stat strong { margin-left: 4px; color: var(--sol); }
 .sol-playwrap { position: relative; width: 100%; max-width: 440px; display: flex; justify-content: center; }
 .sol-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 16px; box-shadow: var(--shadow-md); cursor: pointer; }
+/* Armed board: hidden behind the ▶ Commencer gate until the player starts. */
+.sol-canvas.sol-blur { filter: blur(7px); cursor: default; }
 .sol-overlay { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(3px); border-radius: 16px; }
 .sol-card { background: var(--gray-999); border: 2px solid var(--sol); border-radius: 16px; padding: 18px 22px; max-width: 18rem; text-align: center; box-shadow: var(--shadow-lg); color: var(--gray-0); }
 .sol-card h3 { margin: 0 0 0.5rem; font-family: var(--font-brand); font-size: var(--text-xl); }
