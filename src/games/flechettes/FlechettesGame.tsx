@@ -412,7 +412,7 @@ const CSS = `
 .da-act:hover { background: var(--gray-800); border-color: var(--da-accent); color: var(--da-accent); }
 .da-stats { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.2rem; }
 .da-rem { font-weight: 900; font-size: 30px; color: var(--da-accent); font-variant-numeric: tabular-nums; }
-.da-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-weight: 700; font-size: 13px; }
+.da-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
 .da-last { min-height: 18px; font-size: 13px; font-weight: 600; color: var(--gray-300); margin-bottom: 0.5rem; }
 .da-flash { color: #fff; background: #d9534f; border-radius: 999px; padding: 3px 12px; }
 .da-checkout { font-size: 12.5px; color: var(--gray-300); background: var(--accent-overlay); border: 1px solid var(--gray-800); border-radius: 999px; padding: 4px 12px; margin-bottom: 0.5rem; }

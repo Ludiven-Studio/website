@@ -32,10 +32,11 @@ const mmssCc = (totalSec: number): string => {
 	return `${pad2(Math.floor(cs / 6000))}:${pad2(Math.floor((cs % 6000) / 100))}.${pad2(cs % 100)}`;
 };
 
-/** Live-timer / result label from centiseconds: "43.12 s" under a minute, else "1:23.45". */
+/** Live-timer / result label from centiseconds. FIXED WIDTH so a running timer never
+    shifts the UI: "05.83 s" / "43.12 s" under a minute, else "1:23.45". */
 export const fmtCentis = (cs: number): string => {
 	const c = Math.max(0, Math.round(cs));
-	if (c < 6000) return `${(c / 100).toFixed(2)} s`;
+	if (c < 6000) return `${(c / 100).toFixed(2).padStart(5, '0')} s`; // 2 integer digits, always
 	return `${Math.floor(c / 6000)}:${pad2(Math.floor((c % 6000) / 100))}.${pad2(c % 100)}`;
 };
 
@@ -69,11 +70,12 @@ export function formatScore(f: ScoreFormat, v: number): string {
 			}
 		case 'count':
 			return `${v} ${v > 1 ? f.many : f.one}`;
-		case 'duration':
-			// Under the threshold: "43.12 s". Above: mm:ss.cc when we keep hundredths, else mm:ss.
-			return f.mmssAbove != null && v >= f.mmssAbove
-				? (f.decimals >= 2 ? mmssCc(v / f.div) : mmss(v / f.div))
-				: `${(v / f.div).toFixed(f.decimals)} s`;
+		case 'duration': {
+			if (f.mmssAbove != null && v >= f.mmssAbove) return f.decimals >= 2 ? mmssCc(v / f.div) : mmss(v / f.div);
+			// Under the threshold: "05.83 s". Pad integer part (decimals ≥ 2) → fixed width.
+			const s = (v / f.div).toFixed(f.decimals);
+			return `${f.decimals >= 2 ? s.padStart(f.decimals + 3, '0') : s} s`;
+		}
 		case 'packed': {
 			const parts = decodePacked(f.radix, f.fields.length, v);
 			return f.fields

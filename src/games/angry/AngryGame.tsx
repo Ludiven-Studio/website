@@ -598,7 +598,7 @@ const CSS = `
 .co-ammo-cap { position: absolute; left: 50px; bottom: 12px; background: rgba(18,22,30,0.55); color: #fff; font-size: 12px; padding: 3px 10px; border-radius: 999px; z-index: 3; white-space: nowrap; pointer-events: none; }
 @media (max-width: 460px) { .co-ammo-hen { width: 28px; height: 28px; font-size: 15px; } .co-ammo-cap { font-size: 11px; left: 44px; } }
 .co-stats { display: flex; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.75rem; flex-wrap: wrap; justify-content: center; }
-.co-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; }
+.co-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
 .co-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .co-canvas { display: block; border-radius: 10px; box-shadow: var(--shadow-md); touch-action: none; cursor: crosshair; background: #bfe3ff; }
 .co-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
