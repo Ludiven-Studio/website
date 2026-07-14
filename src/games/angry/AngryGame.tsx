@@ -534,18 +534,6 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			<div className="co-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
 				<canvas ref={canvasRef} className="co-canvas" />
-				{/* In-game ammo tray: pick the hen to load, part of the play area. */}
-				<div className="co-ammo" role="tablist" aria-label="Type de cocotte">
-					{HEN_TYPES.map((h) => (
-						<button key={h} role="tab" aria-selected={henType === h} className={`co-ammo-hen ${henType === h ? 'active' : ''}`} onClick={() => chooseHen(h)} title={HEN_META[h].label} aria-label={HEN_META[h].label}>
-							{HEN_META[h].emoji}
-						</button>
-					))}
-				</div>
-				<div className="co-ammo-cap">
-					<b>{HEN_META[henType].emoji} {HEN_META[henType].label}</b>
-					{HEN_META[henType].active && <span> · 👆 touche en vol pour déclencher</span>}
-				</div>
 				{status === 'won' && (
 					<div className="co-overlay">
 						<div className="co-overlay-card">
@@ -556,6 +544,19 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+			</div>
+
+			{/* Hen picker: a horizontal row BELOW the play area, out of the slingshot/aiming zone. */}
+			<div className="co-ammo" role="tablist" aria-label="Type de cocotte">
+				{HEN_TYPES.map((h) => (
+					<button key={h} role="tab" aria-selected={henType === h} className={`co-ammo-hen ${henType === h ? 'active' : ''}`} onClick={() => chooseHen(h)} title={HEN_META[h].label} aria-label={HEN_META[h].label}>
+						{HEN_META[h].emoji}
+					</button>
+				))}
+				<span className="co-ammo-cap">
+					<b>{HEN_META[henType].emoji} {HEN_META[henType].label}</b>
+					{HEN_META[henType].active && <span> · 👆 touche en vol pour déclencher</span>}
+				</span>
 			</div>
 
 			<p className="co-help">
@@ -590,13 +591,15 @@ const CSS = `
 .co-pill.active { background: var(--co-accent); color: var(--accent-text-over); border-color: var(--co-accent); }
 .co-act { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .co-act:hover { background: var(--gray-800); border-color: var(--co-accent); color: var(--co-accent); }
-/* In-game ammo rack: a vertical column by the slingshot (bottom-left), part of the play area. */
-.co-ammo { position: absolute; left: 6px; bottom: 8px; display: flex; flex-direction: column; gap: 5px; padding: 6px 5px; background: rgba(18,22,30,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; backdrop-filter: blur(3px); z-index: 3; }
-.co-ammo-hen { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 17px; line-height: 1; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.1); cursor: pointer; transition: transform 0.1s, border-color 0.1s, background-color 0.1s; }
-.co-ammo-hen:hover { background: rgba(255,255,255,0.22); }
-.co-ammo-hen.active { border-color: #ffd24a; background: rgba(255,210,74,0.28); transform: scale(1.12); }
-.co-ammo-cap { position: absolute; left: 50px; bottom: 12px; background: rgba(18,22,30,0.55); color: #fff; font-size: 12px; padding: 3px 10px; border-radius: 999px; z-index: 3; white-space: nowrap; pointer-events: none; }
-@media (max-width: 460px) { .co-ammo-hen { width: 28px; height: 28px; font-size: 15px; } .co-ammo-cap { font-size: 11px; left: 44px; } }
+/* Ammo picker: a horizontal row below the play area (out of the slingshot/aiming zone). */
+.co-ammo { width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px; margin-top: 8px; }
+.co-ammo-hen { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1; padding: 0; border-radius: 50%; border: 1.5px solid var(--gray-700); background: transparent; cursor: pointer; transition: transform 0.1s, border-color 0.1s, background-color 0.1s; }
+.co-ammo-hen:hover { border-color: var(--co-accent); background: var(--gray-800); }
+.co-ammo-hen.active { border-color: var(--co-accent); background: var(--gray-800); box-shadow: 0 0 0 2px var(--co-accent); transform: scale(1.08); }
+.co-ammo-cap { flex-basis: 100%; text-align: center; color: var(--gray-300); font-size: 12.5px; margin-top: 2px; }
+/* In fullscreen the picker stays visible below the (flexed) canvas. */
+.game-page.gf-full .co-ammo { margin-top: 6px; }
+@media (max-width: 460px) { .co-ammo-hen { width: 34px; height: 34px; font-size: 18px; } .co-ammo-cap { font-size: 11.5px; } }
 .co-stats { display: flex; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.75rem; flex-wrap: wrap; justify-content: center; }
 .co-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
 .co-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }

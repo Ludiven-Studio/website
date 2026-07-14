@@ -35,6 +35,7 @@ export interface Body {
 	defeated: boolean;
 	launched: boolean; // cocotte: has been fired
 	still: number; // consecutive near-rest frames → sleep only when confirmed resting (never mid-air)
+	grounded: boolean; // has a support beneath it this frame → only then may it sleep (else gravity accelerates it)
 	hen?: HenType; // cocotte power
 	powerUsed?: boolean; // active power already spent
 	chick?: boolean; // spawned by the poussins power (small, doesn't re-split)
@@ -97,17 +98,17 @@ const len = (x: number, y: number) => Math.hypot(x, y);
 let UID = 1;
 
 function circle(tag: Tag, x: number, y: number, r: number, hp = 0): Body {
-	return { id: UID++, kind: 'circle', tag, x, y, vx: 0, vy: 0, r, hw: 0, hh: 0, invMass: MASS[tag] ? 1 / MASS[tag] : 0, rest: REST[tag], fric: FRIC[tag], hp, maxHp: hp, spin: 0, mat: null, defeated: false, launched: false, still: 0 };
+	return { id: UID++, kind: 'circle', tag, x, y, vx: 0, vy: 0, r, hw: 0, hh: 0, invMass: MASS[tag] ? 1 / MASS[tag] : 0, rest: REST[tag], fric: FRIC[tag], hp, maxHp: hp, spin: 0, mat: null, defeated: false, launched: false, still: 0, grounded: false };
 }
 function box(tag: Tag, x: number, y: number, hw: number, hh: number, isStatic = false): Body {
 	const m = isStatic ? 0 : MASS[tag];
-	return { id: UID++, kind: 'box', tag, x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: m ? 1 / m : 0, rest: REST[tag], fric: FRIC[tag], hp: 0, maxHp: 0, spin: 0, mat: null, defeated: false, launched: false, still: 0 };
+	return { id: UID++, kind: 'box', tag, x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: m ? 1 / m : 0, rest: REST[tag], fric: FRIC[tag], hp: 0, maxHp: 0, spin: 0, mat: null, defeated: false, launched: false, still: 0, grounded: false };
 }
 /** A dynamic material block (tag 'crate'); physics + durability come from the material. */
 function block(mat: Material, x: number, y: number, hw: number, hh: number): Body {
 	const d = MATS[mat];
 	const t = TOUGH[mat];
-	return { id: UID++, kind: 'box', tag: 'crate', x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: 1 / d.mass, rest: d.rest, fric: d.fric, hp: t, maxHp: t, spin: 0, mat, defeated: false, launched: false, still: 0 };
+	return { id: UID++, kind: 'box', tag: 'crate', x, y, vx: 0, vy: 0, r: 0, hw, hh, invMass: 1 / d.mass, rest: d.rest, fric: d.fric, hp: t, maxHp: t, spin: 0, mat, defeated: false, launched: false, still: 0, grounded: false };
 }
 
 /* ---------- Difficulty / level ---------- */
@@ -129,33 +130,94 @@ export const DIFFS: Record<string, DiffLevel> = {
 const FOX_R = 6;
 
 /**
- * Build one **Kapla-style tower**: thin wooden planks stacked into a column of cells, each
- * cell a pair of upright posts + a plank ceiling, with a fox nested in the middle. A tower
- * can stack several foxes on top of each other. Knock it over and the foxes tumble and take
- * the fall. One post may be explosive when `allowTnt`. Returns true if it embedded a tnt.
+ * Build one Angry-Birds-style **frame building**: vertical columns tied by full-width floor
+ * beams (a stable frame), each bay of each storey randomly a room-with-a-fox, a filled wall,
+ * or an open window. Mixed materials (wood beams, brick pillars, flimsy "glass"), the odd TNT.
+ * Foxes sit at various levels and a building can hold several. Returns true if it embedded a tnt.
  */
-function buildTower(world: World, bx: number, rng: Rng, diff: DiffLevel, nFox: number, allowTnt: boolean): boolean {
+function buildBuilding(world: World, bx: number, rng: Rng, diff: DiffLevel, nFox: number, allowTnt: boolean): boolean {
 	const g = world.groundY;
-	const wantTnt = allowTnt && rng() < 0.4;
-	const POST_HW = 1.7, POST_HH = 6;   // upright plank (a Kapla on its end)
-	const BEAM_HW = 9.5, BEAM_HH = 1.7; // plank laid flat (ceiling / floor)
-	const PX = 8.5;                     // posts at bx ± PX → interior gap clears the fox
+	const wantTnt = allowTnt && rng() < 0.45;
+	const POST_HW = 2.5, POST_HH = 7.5;      // chunky column between two floors (interior height 15 clears the fox)
+	const BEAM_HH = 2.2, BAY = 18;           // floor-plank thickness; column spacing (a bay clears the fox)
+	const WALL_HW = BAY / 2 - POST_HW - 0.4; // a wall that fills a bay between its two posts
 	const put = (mat: Material, x: number, y: number, hw: number, hh: number) => world.bodies.push(block(mat, x, y, hw, hh));
 	const fox = (x: number, y: number) => world.bodies.push(circle('fox', x, y, FOX_R, diff.hp));
+	const woodGlass = (): Material => (rng() < 0.22 ? 'cardboard' : 'wood'); // cardboard stands in for flimsy glass
 
-	let floorY = g; // top face the current cell stands on / its fox sits on
-	for (let c = 0; c < nFox; c++) {
-		const mat: Material = rng() < 0.16 ? 'cardboard' : 'wood'; // Kaplas are wood; the odd flimsy course
-		const postY = floorY - POST_HH;
-		put(wantTnt && c === 0 ? 'tnt' : mat, bx - PX, postY, POST_HW, POST_HH); // left post
-		put(mat, bx + PX, postY, POST_HW, POST_HH);                             // right post
-		fox(bx, floorY - FOX_R);                                                // fox nested in the middle
+	// Tall, dense fortresses: 3 columns wide (2 bays), several storeys high, most bays walled in.
+	const nCol = nFox >= 2 ? 3 : 2;
+	const nBay = nCol - 1;
+	const nStory = Math.max(Math.ceil(nFox / nBay), 5) + (rng() < 0.4 ? 1 : 0);
+	const cx = (i: number) => bx + (i - (nCol - 1) / 2) * BAY;
+	const halfW = ((nCol - 1) / 2) * BAY + POST_HW;
+
+	// Pick exactly nFox (storey,bay) cells for the foxes, spread out via a shuffled key.
+	const cells: { s: number; b: number; k: number }[] = [];
+	for (let s = 0; s < nStory; s++) for (let b = 0; b < nBay; b++) cells.push({ s, b, k: rng() });
+	cells.sort((a, z) => a.k - z.k);
+	const foxCells = new Set(cells.slice(0, nFox).map((c) => c.s * 10 + c.b));
+
+	let floorY = g; // top face the current storey stands on
+	let tnt = false;
+	for (let s = 0; s < nStory; s++) {
+		const mat = woodGlass();
+		for (let i = 0; i < nCol; i++) { // columns
+			const asTnt = wantTnt && !tnt && s === 0 && i === 0;
+			put(asTnt ? 'tnt' : rng() < 0.28 ? 'brick' : mat, cx(i), floorY - POST_HH, POST_HW, POST_HH);
+			if (asTnt) tnt = true;
+		}
+		for (let b = 0; b < nBay; b++) { // bay contents: fox room / wall / open window
+			const mid = (cx(b) + cx(b + 1)) / 2;
+			if (foxCells.has(s * 10 + b)) { fox(mid, floorY - FOX_R); continue; }
+			const r = rng();
+			if (r < 0.72) put(r < 0.2 ? 'brick' : woodGlass(), mid, floorY - POST_HH, WALL_HW, POST_HH); // mostly walled → solid fortress
+
+		}
 		const postsTop = floorY - 2 * POST_HH;
-		put(mat, bx, postsTop - BEAM_HH, BEAM_HW, BEAM_HH);                     // ceiling plank (next floor)
+		put('wood', bx, postsTop - BEAM_HH, halfW, BEAM_HH); // full-width floor / ceiling ties the columns
 		floorY = postsTop - 2 * BEAM_HH;
 	}
-	if (rng() < 0.6) put('wood', bx, floorY - BEAM_HH, BEAM_HW, BEAM_HH); // a loose plank on the roof
-	return wantTnt;
+	if (rng() < 0.5) { // roof crenellation
+		put('wood', bx - halfW + 3, floorY - 2, 2.2, 2);
+		put('wood', bx + halfW - 3, floorY - 2, 2.2, 2);
+	}
+	return tnt;
+}
+
+/**
+ * Build a small **fox-less obstacle** (variety + something extra to knock through): a short
+ * crate tower, a stable pyramid, a little gate/wall, or a couple of barrels. Returns true if
+ * it embedded a tnt.
+ */
+function buildProp(world: World, bx: number, rng: Rng, allowTnt: boolean): boolean {
+	const g = world.groundY;
+	const wantTnt = allowTnt && rng() < 0.25;
+	const put = (mat: Material, x: number, y: number, hw: number, hh: number) => world.bodies.push(block(mat, x, y, hw, hh));
+	const mat: Material = rng() < 0.5 ? 'wood' : rng() < 0.65 ? 'cardboard' : 'brick';
+	const kind = Math.floor(rng() * 4);
+	let tnt = false;
+
+	if (kind === 0) { // short crate tower
+		const n = 2 + Math.floor(rng() * 2); // 2-3 crates
+		for (let k = 0; k < n; k++) { const asTnt = wantTnt && k === 0; if (asTnt) tnt = true; put(asTnt ? 'tnt' : mat, bx, g - 5 - k * 10, 5, 5); }
+	} else if (kind === 1) { // pyramid (very stable)
+		const s = 4.5;
+		for (let k = 0; k < 3; k++) put(mat, bx - 2 * s + k * 2 * s, g - s, s, s); // base of 3
+		for (let k = 0; k < 2; k++) put(mat, bx - s + k * 2 * s, g - 3 * s, s, s);   // middle of 2
+		put(wantTnt ? 'tnt' : mat, bx, g - 5 * s, s, s);                             // capstone
+		tnt = wantTnt;
+	} else if (kind === 2) { // little gate / wall
+		const ph = 9;
+		put(mat, bx - 6, g - ph, 2.5, ph); put(mat, bx + 6, g - ph, 2.5, ph); // posts
+		put(wantTnt ? 'tnt' : mat, bx, g - 2 * ph - 2, 8, 2);                  // lintel
+		tnt = wantTnt;
+	} else { // barrels on the ground (rolling obstacles) behind a low crate
+		put(mat, bx - 7, g - 4, 4, 4);
+		world.bodies.push(circle('barrel', bx, g - 5.5, 5.5));
+		if (rng() < 0.6) world.bodies.push(circle('barrel', bx + 9, g - 5.5, 5.5));
+	}
+	return tnt;
 }
 
 export function makeLevel(seed: number, diff: DiffLevel): World {
@@ -167,16 +229,23 @@ export function makeLevel(seed: number, diff: DiffLevel): World {
 	world.bodies.push(box('ground', w / 2, groundY + 30, w / 2 + 40, 30, true)); // static ground
 
 	const F = diff.foxes;
-	const startX = 122, endX = w - 24;
-	// Group the foxes into a few Kapla towers — some towers stack several foxes.
-	const maxPer = 1 + Math.min(2, diff.sturdiness); // facile 2, moyen/difficile 3 per tower
+	const startX = 110, endX = w - 36;
+	// Pack the foxes into 1-2 massive fortresses (rather than several small structures).
+	const T = F <= 3 ? 1 : 2;
 	const groups: number[] = [];
-	{ const gr = rng2(seed, 777); let left = F; while (left > 0) { const take = Math.min(left, 1 + Math.floor(gr() * maxPer)); groups.push(take); left -= take; } }
-	const T = groups.length;
+	for (let i = 0; i < T; i++) groups.push(Math.floor(F / T) + (i < F % T ? 1 : 0));
 	let tntCount = 0;
+	const occupied: number[] = [];
 	for (let i = 0; i < T; i++) {
 		const bx = T === 1 ? (startX + endX) / 2 : startX + (i * (endX - startX)) / (T - 1);
-		if (buildTower(world, bx, rng2(seed, i), diff, groups[i], tntCount < 2)) tntCount++; // cap explosives per level
+		occupied.push(bx);
+		if (buildBuilding(world, bx, rng2(seed, i), diff, groups[i], tntCount < 2)) tntCount++; // cap explosives per level
+	}
+	// Fill the empty gaps with small fox-less obstacles for variety.
+	const pr = rng2(seed, 555);
+	for (const cx of [95, 130, 165, 200, 235, 268]) {
+		if (occupied.some((o) => Math.abs(o - cx) < 34)) continue; // clear of the fortresses & other props
+		if (pr() < 0.6) { if (buildProp(world, cx, rng2(seed, 400 + cx), tntCount < 2)) tntCount++; occupied.push(cx); }
 	}
 	spawnCocotte(world);
 	return world;
@@ -357,6 +426,7 @@ export function step(world: World, dt: number): StepEvent {
 	const powerFlag = new Set<number>(); // active hens that hit something → auto-fire
 	// gravity + integrate
 	for (const b of live) {
+		b.grounded = false; // recomputed each frame from actual contacts below
 		if (b.invMass === 0) continue;
 		b.vy += world.gravity * dt;
 		b.vx *= 0.999; b.vy *= 0.999;
@@ -392,19 +462,23 @@ export function step(world: World, dt: number): StepEvent {
 				const a = live[i], b = live[j];
 				if (a.invMass === 0 && b.invMass === 0) continue;
 				const c = collide(a, b);
-				if (c) resolve(a, b, c);
+				if (c) {
+					resolve(a, b, c);
+					// Mark support: on a mostly-vertical contact (normal a→b) the upper body rests on the lower.
+					if (c.ny > 0.5) a.grounded = true;      // b is below a → a is supported
+					else if (c.ny < -0.5) b.grounded = true; // a is below b → b is supported
+				}
 			}
-	// Settling aid: bleed off residual jitter on near-resting bodies so stacks come to rest
-	// quickly (the cocotte is exempt so it keeps rolling far).
+	// Settling: let a stack come to rest without ever slowing a falling block. A body may sleep ONLY
+	// while it has a support beneath it (grounded); the moment its support is knocked away it is no
+	// longer grounded, so it wakes and gravity accelerates it at full rate (no floaty creep).
 	for (const b of live) {
 		if (b.invMass === 0 || b.tag === 'cocotte' || b.defeated) continue;
+		if (!b.grounded) { b.still = 0; continue; } // unsupported → keep full gravity, never sleep
 		const s = len(b.vx, b.vy);
-		if (s < SETTLE) {
-			// Only sleep a body that has stayed slow for several frames (i.e. actually resting
-			// on something) — never a mid-air body at the top of its arc, which would freeze it
-			// and make gravity look weak.
-			if (++b.still > 6) { b.vx = 0; b.vy = 0; } else { b.vx *= 0.8; b.vy *= 0.8; }
-		} else { b.still = 0; if (s < 18) { b.vx *= 0.8; b.vy *= 0.8; } }
+		if (s < SETTLE) { if (++b.still > 8) { b.vx = 0; b.vy = 0; } }        // at rest on a support
+		else if (s < 30) { if (++b.still > 20) { b.vx = 0; b.vy = 0; } }      // persistent jitter on a support
+		else b.still = 0;
 	}
 
 	// TNT: detonate flagged blocks → radial blast (launch + fox damage), with chain reactions.
