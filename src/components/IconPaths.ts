@@ -74,4 +74,5 @@ export const iconPaths = {
 	'flechettes': '<circle fill="none" stroke-width="14" cx="128" cy="128" r="94"/><circle fill="none" stroke-width="14" cx="128" cy="128" r="54"/><circle stroke="none" cx="128" cy="128" r="18"/>',
 	'fruits': '<path stroke="none" d="M128 80 C150 60 188 62 196 94 C206 134 176 198 128 214 C80 198 50 134 60 94 C68 62 106 60 128 80 Z"/><path fill="none" stroke-linecap="round" stroke-width="14" d="M130 80 C132 58 142 46 162 42"/>',
 	'luge': '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M36 176h140a44 44 0 0 0 44-44"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M56 128h116"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M80 128v48M148 128v48"/><circle stroke="none" cx="188" cy="106" r="16"/>',
+	'cards': '<rect x="40" y="70" width="112" height="148" rx="16" fill="none" stroke-linejoin="round" stroke-width="16"/><rect x="104" y="42" width="112" height="148" rx="16" fill="none" stroke-linejoin="round" stroke-width="16"/><path stroke="none" d="M160 150c-2 0-30-19-30-41 0-11 8-19 18-19 6 0 10 4 12 8 2-4 6-8 12-8 10 0 18 8 18 19 0 22-28 41-30 41z"/>',
 };

@@ -23,6 +23,13 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Aides', body: 'Bloqué ? Annule ton dernier coup, demande un indice (il montre un coup qui garde une solution) ou recommence. Ton meilleur résultat (le moins de billes restantes) est gardé.' },
 		{ emoji: '⏱️', title: 'Défi du jour', body: 'Un mini-plateau identique pour tout le monde (quelques billes seulement, la même graine partagée). Vide-le jusqu’à une seule bille le plus vite possible : ton meilleur temps entre au classement.' },
 	],
+	'reussite': [
+		{ emoji: '🎯', title: 'Le but', body: 'La Réussite (Klondike) : monte les quatre familles sur les fondations, de l\'As au Roi, chacune dans sa couleur (♠ ♥ ♦ ♣). Quand les 52 cartes y sont, c\'est gagné.' },
+		{ emoji: '🃏', title: 'Ranger les colonnes', body: 'Dans les 7 colonnes, empile en DESCENDANT et en ALTERNANT les couleurs (un 7 rouge sur un 8 noir). Une colonne vide n\'accueille qu\'un Roi. Tu peux déplacer d\'un coup toute une suite déjà rangée.' },
+		{ emoji: '👆', title: 'Tap ou glisser', body: 'Touche une carte pour l\'envoyer automatiquement à sa meilleure place (une fondation en priorité), ou fais-la glisser pour la poser où tu veux.' },
+		{ emoji: '🂠', title: 'La pioche', body: 'Clique la pioche pour retourner des cartes (1 en facile, 3 en difficile). Quand elle est vide, elle se recycle — mais en difficile le nombre de passages est limité.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même donne pour tout le monde (graine partagée), un seul essai. Ton score = le nombre de cartes montées aux fondations, le temps départageant les ex æquo.' },
+	],
 	'tempo': [
 		{ emoji: '🎹', title: 'Le but', body: 'Un « piano tiles » sans fin : une mélodie générée défile dans 6 colonnes (grave à gauche, aigu à droite) et ACCÉLÈRE peu à peu. Tape chaque tuile pile quand elle touche la ligne — une musique (batterie, basse, cordes) donne le tempo, cale-toi dessus.' },
 		{ emoji: '👆', title: 'Contrôles', body: 'Clique/tape la colonne d\'une tuile, ou utilise les touches S D F J K L au clavier. Vise le meilleur timing : Parfait / Bien / Ok. Les tuiles allongées se MAINTIENNENT — garde la colonne enfoncée jusqu\'au bout pour un bonus qui grimpe.' },

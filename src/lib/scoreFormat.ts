@@ -18,6 +18,7 @@ export interface PackedField {
 	as: 'int' | 'mmss' | 'mmss.cc'; // 'mmss.cc' keeps hundredths (mm:ss.cc)
 	div?: number; // divide the raw field before rendering (e.g. centiseconds → 100)
 	unit?: string; // suffix for 'int' fields, e.g. "coups"
+	base?: number; // render `base - raw` (a field stored inverted so "more = better" sorts ascending)
 }
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
@@ -80,7 +81,8 @@ export function formatScore(f: ScoreFormat, v: number): string {
 			const parts = decodePacked(f.radix, f.fields.length, v);
 			return f.fields
 				.map((fl, i) => {
-					const x = fl.div ? parts[i] / fl.div : parts[i];
+					const raw = fl.base != null ? fl.base - parts[i] : parts[i];
+					const x = fl.div ? raw / fl.div : raw;
 					const s = fl.as === 'mmss.cc' ? mmssCc(x) : fl.as === 'mmss' ? mmss(x) : String(x);
 					return fl.unit ? `${s} ${fl.unit}` : s;
 				})

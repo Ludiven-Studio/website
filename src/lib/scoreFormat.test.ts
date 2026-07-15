@@ -44,6 +44,10 @@ describe('formatScore', () => {
 		// centisecond packed (billard/golf/angry): "coups · mm:ss.cc"
 		const cc: ScoreFormat = { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'coups' }, { as: 'mmss.cc', div: 100 }] };
 		expect(formatScore(cc, encodePacked(10_000_000, [3, 8345]))).toBe('3 coups · 01:23.45');
+		// inverted `base` field (réussite): stored (52 - cards) so "more cards" sorts ascending, rendered back to the count
+		const reu: ScoreFormat = { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'cartes', base: 52 }, { as: 'mmss.cc', div: 100 }] };
+		expect(formatScore(reu, encodePacked(10_000_000, [52 - 40, 8345]))).toBe('40 cartes · 01:23.45');
+		expect(formatScore(reu, encodePacked(10_000_000, [0, 4312]))).toBe('52 cartes · 00:43.12');
 	});
 
 	it('branches on a loss threshold', () => {

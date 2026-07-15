@@ -67,4 +67,10 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	golf: { lbId: 'golf-t', fmt: packed('coups') },
 	flechettes: { lbId: 'flechettes-t', fmt: packed('fléch.') },
 	billard: { lbId: 'billard-t', fmt: packed('coups') },
+	// Réussite (card solitaire): cards to foundations (max 52) + time tiebreak, logged under `<id>-t`.
+	// Stored as (52 - cards) so "more cards" sorts ascending (metric time); `base` renders the count back.
+	reussite: {
+		lbId: 'reussite-t',
+		fmt: { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'cartes', base: 52 }, { as: 'mmss.cc', div: 100 }] },
+	},
 };

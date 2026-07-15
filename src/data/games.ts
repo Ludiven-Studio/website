@@ -45,6 +45,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'reussite',
+		title: 'Réussite',
+		pitch: 'Le solitaire aux cartes (Klondike) : monte les quatre familles de l\'As au Roi. Tape une carte pour l\'envoi auto, ou glisse-la. Défi du jour à graine partagée.',
+		icon: 'cards',
+		href: '/jeux/reussite',
+		status: 'play',
+	},
+	{
 		id: 'tempo',
 		title: 'Tempo',
 		pitch: 'Un « piano tiles » sans fin qui accélère : tape les tuiles pile sur le tempo de la musique, maintiens les longues. Défi du jour à graine partagée.',
