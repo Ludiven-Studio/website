@@ -99,110 +99,55 @@ const drawPipe = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, p: { x: numb
 	ctx.strokeRect(p.x - lip, gapBottom, cfg.pipeW + 2 * lip, 3);
 };
 
-// A funny cartoon hen ("cocotte"): round body, googly eye, big comb + beak, a
-// wing that flaps with the vertical speed, and a dark outline. Faces right.
+// A round "poule pondeuse" cocotte — the same look as Cocottes VS Renards / Angry Cocottes:
+// a plump white body (no separate head), golden comb, orange beak, dangling feet, and a wing
+// that flaps with the vertical speed. Faces right.
 const drawHen = (ctx: CanvasRenderingContext2D, cfg: FlappyConfig, birdY: number, vy: number) => {
-	const r = cfg.birdR;
+	const r = cfg.birdR * 1.12; // drawn a touch plumper than the collision radius
 	const tilt = Math.max(-0.5, Math.min(0.8, vy / 180));
-	const flap = Math.max(-1, Math.min(1, -vy / 120)); // +1 wing up when rising fast
-	const RED = '#e23b3b';
-	const OUT = '#3a2a1e';
+	const flap = Math.max(-1, Math.min(1, -vy / 120)); // wing up when rising fast
+	const BODY = '#fdfdfd', DARK = '#e2e2e2', WING = '#ededed', COMB = '#e8b23a';
 	ctx.save();
 	ctx.translate(cfg.birdX, birdY);
 	ctx.rotate(tilt);
-	ctx.lineJoin = 'round';
 	ctx.lineCap = 'round';
-	ctx.strokeStyle = OUT;
-	const ol = (w = r * 0.14) => (ctx.lineWidth = w);
+	const ell = (x: number, y: number, rx: number, ry: number) => { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); };
+	const dot = (x: number, y: number, rr: number) => { ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill(); };
+	const tri = (a: number, b: number, c: number, d: number, e: number, f: number) => { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.lineTo(e, f); ctx.closePath(); ctx.fill(); };
 
-	// Tail feathers (back, left).
-	ctx.fillStyle = '#ffffff';
-	ctx.beginPath();
-	ctx.moveTo(-r * 0.8, r * 0.1);
-	ctx.lineTo(-r * 1.75, -r * 0.55);
-	ctx.lineTo(-r * 1.1, 0);
-	ctx.lineTo(-r * 1.65, r * 0.35);
-	ctx.closePath();
-	ol();
-	ctx.fill();
-	ctx.stroke();
+	// Feet dangling below.
+	ctx.strokeStyle = '#e0a020'; ctx.lineWidth = r * 0.1;
+	for (const fx of [-r * 0.28, r * 0.28]) { ctx.beginPath(); ctx.moveTo(fx, r * 0.78); ctx.lineTo(fx, r * 1.02); ctx.stroke(); }
 
-	// Body (round).
-	ctx.fillStyle = '#ffffff';
-	ctx.beginPath();
-	ctx.ellipse(0, r * 0.15, r * 1.12, r * 1.02, 0, 0, Math.PI * 2);
-	ol();
-	ctx.fill();
-	ctx.stroke();
+	// Tail feathers (back-left).
+	ctx.fillStyle = DARK; tri(-r * 0.7, -r * 0.1, -r * 1.28, -r * 0.5, -r * 0.7, r * 0.35);
+
+	// Round body + a soft outline so the white hen reads against the pastel sky.
+	ctx.fillStyle = BODY; ell(0, 0, r * 0.98, r * 0.9);
+	ctx.strokeStyle = 'rgba(58,42,30,0.22)'; ctx.lineWidth = r * 0.05;
+	ctx.beginPath(); ctx.ellipse(0, 0, r * 0.98, r * 0.9, 0, 0, Math.PI * 2); ctx.stroke();
+	// top shading
+	ctx.fillStyle = DARK; ctx.globalAlpha = 0.5; ell(-r * 0.1, -r * 0.4, r * 0.7, r * 0.35); ctx.globalAlpha = 1;
 
 	// Wing that flaps with the vertical speed.
 	ctx.save();
-	ctx.translate(-r * 0.05, r * 0.05);
-	ctx.rotate(-0.25 - flap * 0.7);
-	ctx.fillStyle = '#eef0f2';
-	ctx.beginPath();
-	ctx.ellipse(0, 0, r * 0.72, r * 0.4, 0, 0, Math.PI * 2);
-	ol(r * 0.12);
-	ctx.fill();
-	ctx.stroke();
+	ctx.translate(r * 0.1, r * 0.05);
+	ctx.rotate(-0.15 - flap * 0.6);
+	ctx.fillStyle = WING; ell(0, 0, r * 0.5, r * 0.34);
+	ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = r * 0.03;
+	ctx.beginPath(); ctx.ellipse(0, 0, r * 0.5, r * 0.34, 0, 0, Math.PI * 2); ctx.stroke();
 	ctx.restore();
 
-	// Head.
-	const hx = r * 0.68;
-	const hy = -r * 0.62;
-	ctx.fillStyle = '#ffffff';
-	ctx.beginPath();
-	ctx.arc(hx, hy, r * 0.62, 0, Math.PI * 2);
-	ol();
-	ctx.fill();
-	ctx.stroke();
-
-	// Comb (crête) — three big red bumps.
-	ctx.fillStyle = RED;
-	for (let i = 0; i < 3; i++) {
-		ctx.beginPath();
-		ctx.arc(hx - r * 0.28 + i * r * 0.31, hy - r * 0.66, r * 0.24, 0, Math.PI * 2);
-		ol(r * 0.1);
-		ctx.fill();
-		ctx.stroke();
-	}
-
-	// Beak (big orange) pointing forward.
-	ctx.fillStyle = '#ff9f1c';
-	ctx.beginPath();
-	ctx.moveTo(hx + r * 0.5, hy - r * 0.12);
-	ctx.lineTo(hx + r * 1.42, hy + r * 0.14);
-	ctx.lineTo(hx + r * 0.5, hy + r * 0.34);
-	ctx.closePath();
-	ol(r * 0.1);
-	ctx.fill();
-	ctx.stroke();
-
-	// Wattle (barbillon) under the beak.
-	ctx.fillStyle = RED;
-	ctx.beginPath();
-	ctx.ellipse(hx + r * 0.55, hy + r * 0.5, r * 0.15, r * 0.27, 0, 0, Math.PI * 2);
-	ol(r * 0.08);
-	ctx.fill();
-	ctx.stroke();
-
-	// Big googly eye.
-	const ex = hx + r * 0.34;
-	const ey = hy - r * 0.14;
-	ctx.fillStyle = '#ffffff';
-	ctx.beginPath();
-	ctx.arc(ex, ey, r * 0.3, 0, Math.PI * 2);
-	ol(r * 0.07);
-	ctx.fill();
-	ctx.stroke();
-	ctx.fillStyle = '#101216';
-	ctx.beginPath();
-	ctx.arc(ex + r * 0.08, ey + r * 0.03, r * 0.14, 0, Math.PI * 2);
-	ctx.fill();
-	ctx.fillStyle = '#ffffff';
-	ctx.beginPath();
-	ctx.arc(ex + r * 0.02, ey - r * 0.06, r * 0.05, 0, Math.PI * 2);
-	ctx.fill();
+	// Comb (crête) — three golden bumps on top.
+	ctx.fillStyle = COMB; dot(-r * 0.16, -r, r * 0.16); dot(r * 0.02, -r * 1.08, r * 0.18); dot(r * 0.2, -r, r * 0.15);
+	// Wattle (barbillon).
+	ctx.fillStyle = '#e34b4b'; dot(r * 0.68, r * 0.28, r * 0.1);
+	// Beak (faces right).
+	ctx.fillStyle = '#f0a830'; tri(r * 0.72, -r * 0.02, r * 1.4, r * 0.14, r * 0.72, r * 0.3);
+	// Eye.
+	ctx.fillStyle = '#fff'; dot(r * 0.34, -r * 0.26, r * 0.17);
+	ctx.fillStyle = '#222'; dot(r * 0.4, -r * 0.26, r * 0.09);
+	ctx.fillStyle = '#fff'; dot(r * 0.44, -r * 0.3, r * 0.03);
 
 	ctx.restore();
 };
