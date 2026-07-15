@@ -618,6 +618,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0);
 	const [tries, setTries] = useState(0);
 	const [webglError, setWebglError] = useState(false);
+	const [steerSide, setSteerSide] = useState<'left' | 'right' | null>(null); // hold-a-side steering (visual state)
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const vignetteRef = useRef<HTMLDivElement>(null);
@@ -639,6 +640,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false);
 	const triesRef = useRef(0);
 	const keysRef = useRef({ left: false, right: false });
+	const pressingRef = useRef(false); // a pointer is held on the steering area
 	const camLatRef = useRef(0);
 	const camHRef = useRef(4); // eased camera height — ducks under tunnel arches
 	const camDistRef = useRef(8); // eased chase distance — closes in for the balance rail
@@ -1383,10 +1385,27 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	const touch = (which: 'left' | 'right', down: boolean) => (e: React.PointerEvent) => {
+	// Hold-a-side steering: press the left/right half of the play area to turn (mouse or touch).
+	const applySide = (e: React.PointerEvent): void => {
+		const rect = e.currentTarget.getBoundingClientRect();
+		const left = e.clientX - rect.left < rect.width / 2;
+		keysRef.current.left = left;
+		keysRef.current.right = !left;
+		setSteerSide(left ? 'left' : 'right');
+	};
+	const onSteerDown = (e: React.PointerEvent): void => {
 		e.preventDefault();
-		keysRef.current[which] = down;
-		if (down && statusRef.current === 'ready') start();
+		pressingRef.current = true;
+		if (statusRef.current === 'ready') start();
+		applySide(e);
+		e.currentTarget.setPointerCapture(e.pointerId);
+	};
+	const onSteerMove = (e: React.PointerEvent): void => { if (pressingRef.current) applySide(e); };
+	const onSteerUp = (): void => {
+		pressingRef.current = false;
+		keysRef.current.left = false;
+		keysRef.current.right = false;
+		setSteerSide(null);
 	};
 
 	const remaining = MAX_TRIES - tries;
@@ -1430,9 +1449,9 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				{bonusFlash && <div className="lg-bonus">{bonusFlash}</div>}
 
 				{status === 'playing' && (
-					<div className="lg-touch">
-						<button className="lg-tbtn" onPointerDown={touch('left', true)} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)} aria-label="Gauche">◀</button>
-						<button className="lg-tbtn" onPointerDown={touch('right', true)} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)} aria-label="Droite">▶</button>
+					<div className="lg-steer" onPointerDown={onSteerDown} onPointerMove={onSteerMove} onPointerUp={onSteerUp} onPointerCancel={onSteerUp} aria-hidden="true">
+						<div className={`lg-steer-half left ${steerSide === 'left' ? 'on' : ''}`}><span>◀</span></div>
+						<div className={`lg-steer-half right ${steerSide === 'right' ? 'on' : ''}`}><span>▶</span></div>
 					</div>
 				)}
 
@@ -1538,10 +1557,15 @@ const CSS = `
 }
 @keyframes lg-pulse { from { opacity: 0.75; } to { opacity: 1; } }
 
-.lg-touch { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; }
-.lg-tbtn { pointer-events: auto; width: 96px; height: 96px; border-radius: 24px; border: none; background: rgba(255,255,255,0.25); color: #12233d; font-weight: 800; font-size: 34px; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: none; }
-.lg-tbtn:active { background: rgba(255,255,255,0.5); }
-@media (hover: hover) and (pointer: fine) { .lg-touch { display: none; } }
+/* Hold-a-side steering: press the left or right half of the play area to turn (keyboard still works). */
+.lg-steer { position: absolute; inset: 0; z-index: 2; display: flex; touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; cursor: pointer; }
+.lg-steer-half { flex: 1; display: flex; align-items: center; color: rgba(255,255,255,0.6); font-size: 40px; font-weight: 800; transition: background-color 0.12s; }
+.lg-steer-half.left { justify-content: flex-start; padding-left: 20px; }
+.lg-steer-half.right { justify-content: flex-end; padding-right: 20px; }
+.lg-steer-half span { opacity: 0.5; text-shadow: 0 1px 5px rgba(0,0,0,0.5); transition: opacity 0.12s; }
+.lg-steer-half.left.on { background: linear-gradient(to right, rgba(60,120,220,0.4), transparent 65%); }
+.lg-steer-half.right.on { background: linear-gradient(to left, rgba(60,120,220,0.4), transparent 65%); }
+.lg-steer-half.on span { opacity: 1; }
 
 .lg-overlay {
   position: absolute; inset: 0; z-index: 2;
