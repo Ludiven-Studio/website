@@ -11,6 +11,7 @@ const playableLabel = NUM_FR[playable]
 	: String(playable);
 
 const logique = games.filter((g) => (g.category ?? 'logique') === 'logique');
+const mots = games.filter((g) => g.category === 'mots');
 const adresse = games.filter((g) => g.category === 'adresse');
 const multi = games.filter((g) => g.category === 'multi');
 ---
@@ -55,6 +56,30 @@ const multi = games.filter((g) => g.category === 'multi');
 				}
 			</ul>
 		</section>
+
+		{
+			mots.length > 0 && (
+				<section class="games-section stack gap-6">
+					<h2 class="games-section-title">Jeux de mots</h2>
+					<ul class="games-grid">
+						{mots.map((game) => (
+							<li>
+								<GameCard
+									id={game.id}
+									title={game.title}
+									pitch={game.pitch}
+									icon={game.icon}
+									href={game.href}
+									status={game.status}
+									image={game.image}
+									favorite
+								/>
+							</li>
+						))}
+					</ul>
+				</section>
+			)
+		}
 
 		{
 			adresse.length > 0 && (

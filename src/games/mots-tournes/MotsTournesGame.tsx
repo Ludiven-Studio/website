@@ -182,6 +182,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 	for (const i of found) for (const [r, c] of puzzle.regions[i].cells) cellColor.set(ckey(r, c), wordColor(i));
 	const traceSet = new Set(trace.map(([r, c]) => ckey(r, c)));
 	const remainingLengths = puzzle.regions.map((_, i) => i).filter((i) => !found.includes(i)).map((i) => puzzle.regions[i].word.length).sort((a, b) => a - b);
+	const pts = (cells: Cell[]): string => cells.map(([r, c]) => `${c + 0.5},${r + 0.5}`).join(' '); // tube polyline (cell centres)
 	// Direction arrows sitting in the gaps between consecutive cells → show the reading order
 	// without covering the letters (like the ‹ › ^ v marks in the original).
 	const arrows = (cells: Cell[], kp: string): React.ReactNode[] => cells.slice(0, -1).map((_, i) => {
@@ -227,28 +228,32 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 			<div className="wt-playwrap">
 				{celebrating && <Celebration />}
 				<div className={`wt-board ${armed ? 'blurred' : ''}`} style={{ aspectRatio: `${puzzle.cols} / ${puzzle.rows}`, ['--cols' as string]: puzzle.cols }}>
+					{/* layer 1: neutral tiles (interactive) */}
 					<div
 						ref={boardRef}
-						className="wt-grid"
+						className="wt-cells"
 						style={{ gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`, gridTemplateRows: `repeat(${puzzle.rows}, 1fr)` }}
 						onPointerDown={onDown}
 						onPointerMove={onMove}
 						onPointerUp={onUp}
 						onPointerCancel={onUp}
 					>
+						{puzzle.letters.map((row, r) => row.map((ch, c) => <div key={ckey(r, c)} className={`wt-cell${ch === '' ? ' wall' : ''}`} />))}
+					</div>
+					{/* layer 2: a rounded colour TUBE per found word (+ the live trace), with direction arrows */}
+					<svg className="wt-tubes" viewBox={`0 0 ${puzzle.cols} ${puzzle.rows}`} preserveAspectRatio="none" aria-hidden="true">
+						{found.map((i) => <polyline key={`t${i}`} className="wt-tube" points={pts(puzzle.regions[i].cells)} stroke={wordColor(i)} />)}
+						{trace.length > 1 && <polyline className="wt-tube wt-tube-live" points={pts(trace)} />}
+						{found.map((i) => <g key={`a${i}`}>{arrows(puzzle.regions[i].cells, `f${i}_`)}</g>)}
+						{trace.length > 1 && <g>{arrows(trace, 'live_')}</g>}
+					</svg>
+					{/* layer 3: letters on top */}
+					<div className="wt-letters" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`, gridTemplateRows: `repeat(${puzzle.rows}, 1fr)` }} aria-hidden="true">
 						{puzzle.letters.map((row, r) => row.map((ch, c) => {
 							const k = ckey(r, c);
-							if (ch === '') return <div key={k} className="wt-cell wall" />;
-							const inTrace = traceSet.has(k);
-							const col = inTrace ? undefined : cellColor.get(k);
-							return <div key={k} className={`wt-cell${col ? ' found' : ''}${inTrace ? ' sel' : ''}`} style={col ? { background: col } : undefined}>{ch}</div>;
+							return <div key={k} className={`wt-letter${cellColor.has(k) || traceSet.has(k) ? ' on' : ''}`}>{ch}</div>;
 						}))}
 					</div>
-					{/* serpentin overlay: direction arrows between the cells of each found word (+ the live trace) */}
-					<svg className="wt-snakes" viewBox={`0 0 ${puzzle.cols} ${puzzle.rows}`} preserveAspectRatio="none" aria-hidden="true">
-						{found.map((i) => <g key={i}>{arrows(puzzle.regions[i].cells, `f${i}_`)}</g>)}
-						{trace.length > 1 && <g className="wt-live">{arrows(trace, 'live_')}</g>}
-					</svg>
 				</div>
 
 				{daily && dailyLoading && <div className="wt-overlay"><div className="wt-overlay-card">Préparation du défi…</div></div>}
@@ -313,13 +318,19 @@ const CSS = `
 .wt-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .wt-board { position: relative; width: 100%; max-width: 440px; container-type: inline-size; }
 .wt-board.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
-.wt-grid { position: absolute; inset: 0; display: grid; gap: 3px; background: var(--gray-800); border: 2px solid var(--gray-800); border-radius: 12px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
-.wt-cell { display: flex; align-items: center; justify-content: center; background: var(--gray-999); color: var(--gray-0); font-weight: 700; font-size: calc(100cqi / var(--cols) * 0.44); text-transform: uppercase; transition: background-color 0.12s; }
-.wt-cell.found { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
-.wt-cell.sel { background: var(--wt); color: var(--accent-text-over); }
-.wt-cell.wall { background: var(--gray-800); }
-.wt-snakes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+/* layer 1 — neutral tiles (interactive) */
+.wt-cells { position: absolute; inset: 0; z-index: 0; display: grid; gap: 3px; background: var(--gray-800); border: 2px solid var(--gray-800); border-radius: 12px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.wt-cell { background: var(--gray-999); border-radius: 3px; }
+.wt-cell.wall { background: var(--gray-800); } /* blends with the grid lines → looks empty */
+/* layer 2 — rounded colour tubes */
+.wt-tubes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.wt-tube { fill: none; stroke-width: 0.74; stroke-linecap: round; stroke-linejoin: round; }
+.wt-tube-live { stroke: var(--wt); opacity: 0.9; }
 .wt-arrow { fill: rgba(255,255,255,0.95); stroke: rgba(0,0,0,0.22); stroke-width: 0.03; }
+/* layer 3 — letters on top */
+.wt-letters { position: absolute; inset: 0; z-index: 2; display: grid; gap: 3px; border: 2px solid transparent; pointer-events: none; }
+.wt-letter { display: flex; align-items: center; justify-content: center; color: var(--gray-0); font-weight: 700; font-size: calc(100cqi / var(--cols) * 0.44); text-transform: uppercase; }
+.wt-letter.on { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
 .wt-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; }
 .wt-overlay-card { background: var(--gray-999); border: 2px solid var(--wt); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); text-align: center; }
 .wt-overlay-card.start h3 { margin: 0 0 0.4rem; font-family: var(--font-brand); color: var(--gray-0); font-size: var(--text-xl); }

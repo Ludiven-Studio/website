@@ -7,7 +7,7 @@ export interface GameTile {
 	icon: keyof typeof iconPaths;
 	href?: string;
 	status: 'play' | 'soon';
-	category?: 'logique' | 'adresse' | 'multi'; // defaults to logique
+	category?: 'logique' | 'mots' | 'adresse' | 'multi'; // defaults to logique
 	image?: string; // optional presentation thumbnail, e.g. '/assets/jeux/<id>.png' (shown only if set)
 }
 
@@ -27,6 +27,7 @@ export const games: GameTile[] = [
 		icon: 'mots-meles',
 		href: '/jeux/mots-meles',
 		status: 'play',
+		category: 'mots',
 	},
 	{
 		id: 'mots-tournes',
@@ -35,6 +36,7 @@ export const games: GameTile[] = [
 		icon: 'winding-path',
 		href: '/jeux/mots-tournes',
 		status: 'play',
+		category: 'mots',
 	},
 	{
 		id: 'somme-toute',
