@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	deal, draw, canFoundation, canTableau, isRun, autoMove, tableauToTableau,
+	deal, draw, canFoundation, canTableau, isRun, autoMove, tableauToTableau, jokerToTableau,
 	foundationCount, isWon, hasMoves, rankOf, suitOf, type State, type TabCard,
 } from './engine';
 import { mulberry32 } from '../prng';
@@ -103,6 +103,16 @@ describe('moves', () => {
 		let t: State = { ...blank([[up(card(7, 0))], [], [], [], [], [], []]), waste: [card(6, 1)] }; // 6♥ → onto 7♠
 		t = autoMove(t, { kind: 'waste' })!;
 		expect(t.tableau[0].map((x) => x.c)).toEqual([card(7, 0), card(6, 1)]);
+	});
+
+	it('jokerToTableau moves a face-up group onto any column ignoring the build rule (not onto foundations)', () => {
+		// Column 0: [4♣ down, 9♥, 3♠] — 9♥/3♠ are NOT a valid run, but a joker can still relocate them.
+		const s = blank([[{ c: card(4, 3), up: false }, up(card(9, 1)), up(card(3, 0))], [up(card(2, 0))], [], [], [], [], []]);
+		const r = jokerToTableau(s, { kind: 'tab', col: 0, idx: 1 }, 1)!; // onto 2♠ — illegal normally
+		expect(r.tableau[1].map((t) => t.c)).toEqual([card(2, 0), card(9, 1), card(3, 0)]);
+		expect(r.tableau[0].length).toBe(1);
+		expect(r.tableau[0][0].up).toBe(true); // exposed 4♣ flipped
+		expect(jokerToTableau(s, { kind: 'tab', col: 0, idx: 1 }, 0)).toBeNull(); // same column → no-op
 	});
 
 	it('reports win when all 52 cards reach the foundations', () => {

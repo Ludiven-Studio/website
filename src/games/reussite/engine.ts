@@ -173,6 +173,24 @@ export function foundationToTableau(s: State, suit: number, to: number): State |
 	return n;
 }
 
+/** JOKER (free move): relocate a face-up card (and whatever sits on it) to ANY tableau column,
+ *  ignoring the build rule. Never targets a foundation, so the win/score stays honest. */
+export function jokerToTableau(s: State, src: Src, to: number): State | null {
+	if (src.kind === 'waste') {
+		if (!s.waste.length) return null;
+		const n = clone(s);
+		n.tableau[to].push({ c: n.waste.pop()!, up: true });
+		return n;
+	}
+	const pile = s.tableau[src.col];
+	if (src.col === to || src.idx < 0 || src.idx >= pile.length || !pile[src.idx].up) return null;
+	const n = clone(s);
+	n.tableau[to].push(...pile.slice(src.idx).map((t) => ({ ...t })));
+	n.tableau[src.col].length = src.idx;
+	flipExposed(n.tableau[src.col]);
+	return n;
+}
+
 /* ---------- Tap: send a card to its best legal destination ---------- */
 
 /** Auto-move for a tap: foundation first (single cards only), then the first valid tableau

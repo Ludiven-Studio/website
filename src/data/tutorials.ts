@@ -28,6 +28,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🃏', title: 'Ranger les colonnes', body: 'Dans les 7 colonnes, empile en DESCENDANT et en ALTERNANT les couleurs (un 7 rouge sur un 8 noir). Une colonne vide n\'accueille qu\'un Roi. Tu peux déplacer d\'un coup toute une suite déjà rangée.' },
 		{ emoji: '👆', title: 'Tap ou glisser', body: 'Touche une carte pour l\'envoyer automatiquement à sa meilleure place (une fondation en priorité), ou fais-la glisser pour la poser où tu veux.' },
 		{ emoji: '🂠', title: 'La pioche', body: 'Clique la pioche pour retourner des cartes (1 en facile, 3 en difficile). Quand elle est vide, elle se recycle — mais en difficile le nombre de passages est limité.' },
+		{ emoji: '🃏', title: '3 jokers', body: 'Bloqué&nbsp;? Tu as 3 « déplacements libres » par partie. Active le Joker, choisis une carte (elle emporte celles posées dessus), puis une colonne où la poser — couleur et rang ignorés. Impossible sur les fondations : ton score reste honnête. Annuler rembourse le joker.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'Même donne pour tout le monde (graine partagée), un seul essai. Ton score = le nombre de cartes montées aux fondations, le temps départageant les ex æquo.' },
 	],
 	'tempo': [

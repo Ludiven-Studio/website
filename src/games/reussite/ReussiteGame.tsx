@@ -9,7 +9,7 @@ import { fmtCentis, formatScore, encodePacked } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import {
 	deal, draw as drawStock, autoMove, isRun,
-	wasteToFoundation, wasteToTableau, tableauToFoundation, tableauToTableau,
+	wasteToFoundation, wasteToTableau, tableauToFoundation, tableauToTableau, jokerToTableau,
 	foundationCount, isWon, hasMoves, rankOf, suitOf, isRed, RANKS, SUITS,
 	type State, type Src,
 } from './engine';
@@ -25,11 +25,12 @@ type Status = 'playing' | 'won' | 'ended'; // 'ended' = finished a partial daily
 type DiffKey = 'facile' | 'moyen' | 'difficile';
 const DIFFS: Record<DiffKey, { label: string; draw: number; passes: number }> = {
 	facile: { label: 'Facile', draw: 1, passes: Infinity },
-	moyen: { label: 'Moyen', draw: 3, passes: Infinity },
+	moyen: { label: 'Moyen', draw: 2, passes: Infinity },
 	difficile: { label: 'Difficile', draw: 3, passes: 2 },
 };
 const DIFF_KEYS: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const LB_FMT = DAILY_LB.reussite.fmt;
+const JOKERS = 3; // free "unblock" moves per game
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 const bestKey = (d: DiffKey): string => `ludiven-reussite-best-${d}`;
 
@@ -61,6 +62,8 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	const [submitVal, setSubmitVal] = useState<number | undefined>(undefined);
 	const [best, setBest] = useState<number | null>(null);
 	const [attempt, setAttempt] = useState(0);
+	const [jokers, setJokers] = useState(JOKERS);
+	const [jokerArmed, setJokerArmed] = useState(false);
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -68,7 +71,10 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	const dimRef = useRef({ w: 600, h: 430 });
 	const geoRef = useRef<Geo | null>(null);
 	const gameRef = useRef<State>(deal(1));
-	const histRef = useRef<State[]>([]);
+	const histRef = useRef<{ s: State; j: number }[]>([]); // undo snapshots (state + jokers left)
+	const jokersRef = useRef(JOKERS);
+	const jokerSelRef = useRef<Src | null>(null); // joker mode: the picked source (two-tap / drag)
+	const jokerArmedRef = useRef(false);
 	const statusRef = useRef<Status>('playing');
 	const startedRef = useRef(false);
 	const clockRef = useRef(0);
@@ -129,12 +135,25 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		}
 	};
 
+	const snapshot = (): void => {
+		histRef.current.push({ s: gameRef.current, j: jokersRef.current });
+		if (histRef.current.length > 400) histRef.current.shift();
+	};
 	// commit a new state (push undo), then refresh derived state
 	const commit = (next: State | null): boolean => {
 		if (!next) return false;
-		histRef.current.push(gameRef.current);
-		if (histRef.current.length > 400) histRef.current.shift();
+		snapshot();
 		gameRef.current = next;
+		sync();
+		return true;
+	};
+	// a joker move: same as commit but spends one joker and leaves joker mode
+	const doJoker = (next: State | null): boolean => {
+		if (!next) return false;
+		snapshot();
+		gameRef.current = next;
+		jokersRef.current -= 1; setJokers(jokersRef.current);
+		jokerSelRef.current = null; jokerArmedRef.current = false; setJokerArmed(false);
 		sync();
 		return true;
 	};
@@ -177,6 +196,8 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	const resetCommon = (): void => {
 		histRef.current = [];
 		dragRef.current = null;
+		jokersRef.current = JOKERS; setJokers(JOKERS);
+		jokerSelRef.current = null; jokerArmedRef.current = false; setJokerArmed(false);
 		statusRef.current = 'playing';
 		setStatus('playing');
 		setStuck(false);
@@ -241,10 +262,18 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	const undo = (): void => {
 		const prev = histRef.current.pop();
 		if (!prev) return;
-		gameRef.current = prev;
+		gameRef.current = prev.s;
+		jokersRef.current = prev.j; setJokers(prev.j); // a joker is refunded when its move is undone
+		jokerSelRef.current = null; jokerArmedRef.current = false; setJokerArmed(false);
 		dragRef.current = null;
 		statusRef.current = 'playing'; setStatus('playing');
 		sync();
+	};
+	const toggleJoker = (): void => {
+		if (jokersRef.current <= 0 || !startedRef.current || statusRef.current !== 'playing') return;
+		const next = !jokerArmedRef.current;
+		jokerArmedRef.current = next; setJokerArmed(next);
+		jokerSelRef.current = null; dragRef.current = null;
 	};
 
 	/* ---------- Pointer ---------- */
@@ -258,12 +287,13 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	type Hit = { kind: 'stock' } | { kind: 'waste' } | { kind: 'found'; suit: number } | { kind: 'tab'; col: number; idx: number };
 	const hitTest = (x: number, y: number): Hit | null => {
 		const geo = geoRef.current; if (!geo) return null;
+		const g = gameRef.current;
 		const { cardW, cardH } = geo;
 		const inBox = (bx: number, by: number, bw = cardW, bh = cardH): boolean => x >= bx && x <= bx + bw && y >= by && y <= by + bh;
 		if (inBox(geo.stock.x, geo.stock.y)) return { kind: 'stock' };
-		if (inBox(geo.waste.x, geo.waste.y)) return { kind: 'waste' };
+		const wasteW = cardW + Math.max(0, Math.min(g.drawCount, g.waste.length) - 1) * (cardW * 0.34); // cover the fan
+		if (inBox(geo.waste.x, geo.waste.y, wasteW)) return { kind: 'waste' };
 		for (let s = 0; s < 4; s++) if (inBox(geo.found[s].x, geo.found[s].y)) return { kind: 'found', suit: s };
-		const g = gameRef.current;
 		for (let col = 0; col < 7; col++) {
 			const cx = geo.colX[col];
 			if (x < cx || x > cx + cardW) continue;
@@ -279,8 +309,9 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		return null;
 	};
 
-	// map a hit to a source we can pick up (returns src + the cards being moved), or null
-	const pickSource = (h: Hit): { src: Src; cards: number[]; anchor: { x: number; y: number } } | null => {
+	// map a hit to a source we can pick up (returns src + the cards being moved), or null.
+	// `loose` (joker mode) skips the valid-run requirement → any face-up card can be grabbed.
+	const pickSource = (h: Hit, loose = false): { src: Src; cards: number[]; anchor: { x: number; y: number } } | null => {
 		const g = gameRef.current; const geo = geoRef.current!;
 		if (h.kind === 'waste') {
 			if (!g.waste.length) return null;
@@ -288,10 +319,16 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		}
 		if (h.kind === 'tab' && h.idx >= 0) {
 			const pile = g.tableau[h.col];
-			if (!pile[h.idx].up || !isRun(g, h.col, h.idx)) return null;
+			if (!pile[h.idx].up || (!loose && !isRun(g, h.col, h.idx))) return null;
 			return { src: { kind: 'tab', col: h.col, idx: h.idx }, cards: pile.slice(h.idx).map((t) => t.c), anchor: { x: geo.colX[h.col], y: geo.cardY(h.col, h.idx) } };
 		}
 		return null;
+	};
+
+	// Joker: relocate the selected source onto a tableau column (rules ignored). Consumes a joker.
+	const applyJoker = (src: Src, target: Hit): boolean => {
+		if (target.kind !== 'tab') return false;
+		return doJoker(jokerToTableau(gameRef.current, src, target.col));
 	};
 
 	const applyDrop = (src: Src, target: Hit): boolean => {
@@ -308,10 +345,23 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	};
 
 	const onDown = (e: React.PointerEvent): void => {
-		if (!startedRef.current || dailyLoading || statusRef.current === 'won') return;
+		if (!startedRef.current || dailyLoading || statusRef.current !== 'playing') return;
 		const p = posFrom(e);
 		const h = hitTest(p.x, p.y);
-		if (!h) return;
+		if (!h) { jokerSelRef.current = null; return; }
+		if (jokerArmedRef.current) {
+			// Joker: first tap picks a card, second tap picks the destination column (drag also works).
+			if (jokerSelRef.current) {
+				if (h.kind === 'tab') { if (applyJoker(jokerSelRef.current, h)) return; }
+				jokerSelRef.current = null;
+			}
+			const picked = pickSource(h, true);
+			if (!picked) return;
+			jokerSelRef.current = picked.src;
+			dragRef.current = { src: picked.src, cards: picked.cards, dx: p.x, dy: p.y, ox: p.x - picked.anchor.x, oy: p.y - picked.anchor.y, moved: false };
+			canvasRef.current?.setPointerCapture(e.pointerId);
+			return;
+		}
 		if (h.kind === 'stock') { commit(drawStock(gameRef.current)); return; }
 		const picked = pickSource(h);
 		if (!picked) return;
@@ -326,6 +376,10 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	};
 	const onUp = (e: React.PointerEvent): void => {
 		const d = dragRef.current; dragRef.current = null;
+		if (jokerArmedRef.current) {
+			if (d && d.moved) { const h = hitTest(posFrom(e).x, posFrom(e).y); if (h && applyJoker(d.src, h)) return; }
+			return; // tap or invalid drop → keep the source selected for a second tap
+		}
 		if (!d) return;
 		const p = posFrom(e);
 		if (d.moved) {
@@ -439,8 +493,8 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		else drawSlot(ctx, geo.stock.x, geo.stock.y, g.passesLeft > 0 && g.waste.length ? '↻' : '∅');
 		// waste (show up to 3 fanned when draw-3)
 		if (g.waste.length) {
-			const showN = Math.min(g.drawCount === 1 ? 1 : 3, g.waste.length);
-			const off = geo.cardW * 0.24;
+			const showN = Math.min(g.drawCount, g.waste.length); // fan the cards just drawn
+			const off = geo.cardW * 0.34;
 			for (let i = showN - 1; i >= 0; i--) drawCard(ctx, geo.waste.x + (showN - 1 - i) * off, geo.waste.y, g.waste[g.waste.length - 1 - i], true);
 		} else drawSlot(ctx, geo.waste.x, geo.waste.y);
 		// foundations
@@ -457,6 +511,19 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 				if (drag && drag.moved && drag.src.kind === 'tab' && drag.src.col === col && i >= drag.src.idx) break;
 				drawCard(ctx, geo.colX[col], geo.cardY(col, i), pile[i].c, pile[i].up);
 			}
+		}
+		// joker mode: glow the picked source (two-tap), and outline every column as a drop target
+		const jsel = jokerArmedRef.current ? jokerSelRef.current : null;
+		if (jokerArmedRef.current) {
+			ctx.strokeStyle = 'rgba(255,209,102,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+			for (let col = 0; col < 7; col++) { drawCardShape(ctx, geo.colX[col], geo.tabTop, geo.cardW, geo.cardH, geo.radius); ctx.stroke(); }
+			ctx.setLineDash([]);
+		}
+		if (jsel && !(drag && drag.moved)) {
+			const a = jsel.kind === 'waste' ? { x: geo.waste.x, y: geo.waste.y, n: 1 } : { x: geo.colX[jsel.col], y: geo.cardY(jsel.col, jsel.idx), n: g.tableau[jsel.col].length - jsel.idx };
+			const pulse = 0.55 + 0.35 * Math.abs(Math.sin(clockRef.current / 240));
+			ctx.strokeStyle = `rgba(255,209,102,${pulse})`; ctx.lineWidth = 3;
+			drawCardShape(ctx, a.x - 2, a.y - 2, geo.cardW + 4, geo.cardH + (a.n - 1) * geo.cardH * 0.30 + 4, geo.radius); ctx.stroke();
 		}
 		// dragged stack follows the pointer
 		if (drag && drag.moved) {
@@ -523,7 +590,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 								<>
 									<h3>{alreadyPlayed && !won ? '✓ Défi terminé' : won ? '🎉 Réussite !' : '✓ Défi relevé'}</h3>
 									<p>
-										<strong>{cards}/52</strong> cartes · <strong>{chrono}</strong>.<br />
+										<strong>{cards}/52</strong> cartes · <strong>{chrono}</strong>{jokers < JOKERS ? ` · 🃏${JOKERS - jokers}` : ''}.<br />
 										Un seul essai&nbsp;: ton score est classé — reviens demain&nbsp;!
 									</p>
 								</>
@@ -538,7 +605,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{stuck && status === 'playing' && (
+				{stuck && jokers === 0 && status === 'playing' && (
 					<div className="reu-overlay">
 						<div className="reu-card">
 							<h3>Plus de coups possibles</h3>
@@ -555,11 +622,16 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="reu-controls">
-				<button className="reu-btn" onClick={undo} disabled={won || !started}>↶ Annuler</button>
+				<button className="reu-btn" onClick={undo} disabled={won || !started || alreadyPlayed}>↶ Annuler</button>
+				<button className={`reu-btn ${jokerArmed ? 'armed' : ''}`} onClick={toggleJoker} disabled={jokers === 0 || won || !started || alreadyPlayed} title="Déplacement libre : pose une carte où tu veux (règles ignorées)">
+					🃏 Joker ({jokers})
+				</button>
 				{daily
 					? <button className="reu-btn" onClick={() => finish(false)} disabled={!started || won || alreadyPlayed}>🏁 Terminer</button>
-					: <button className="reu-btn" onClick={newDeal}>🃏 Nouvelle donne</button>}
+					: <button className="reu-btn" onClick={newDeal}>🎴 Nouvelle donne</button>}
 			</div>
+			{jokerArmed && <p className="reu-jokerhint">🃏 Joker&nbsp;: choisis une carte, puis une colonne où la poser (couleur/rang ignorés).</p>}
+			{stuck && !jokerArmed && jokers > 0 && status === 'playing' && <p className="reu-jokerhint">Bloqué&nbsp;? Utilise un joker 🃏 pour te débloquer.</p>}
 
 			<p className="reu-help">
 				{daily
@@ -600,5 +672,7 @@ const CSS = `
 .reu-btn { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 999px; padding: 9px 18px; cursor: pointer; }
 .reu-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .reu-btn.primary { background: var(--reu); color: var(--accent-text-over); border-color: var(--reu); }
+.reu-btn.armed { background: #ffd166; color: #3a2c00; border-color: #ffd166; box-shadow: 0 0 0 3px rgba(255,209,102,0.35); }
+.reu-jokerhint { text-align: center; color: #ffd166; font-size: 12.5px; font-weight: 600; margin-top: 0.5rem; }
 .reu-help { max-width: 640px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 0.9rem; }
 `;
