@@ -12,9 +12,10 @@ interface Props {
 	favorite?: boolean;
 	image?: string;
 	daily?: boolean; // false for games without a daily challenge (e.g. multiplayer)
+	compact?: boolean; // drop the image + pitch → a small tile (used on the daily page)
 }
 
-const { title, pitch, icon, href, status = 'play', id, favorite = false, image, daily = true } = Astro.props;
+const { title, pitch, icon, href, status = 'play', id, favorite = false, image, daily = true, compact = false } = Astro.props;
 const playable = status === 'play' && href;
 const Tag = playable ? 'a' : 'div';
 const showFavorite = favorite && playable && id;
@@ -27,7 +28,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		class:list={['game-card', { soon: !playable }]}
 		{...playable ? { href } : { 'aria-disabled': 'true' }}
 	>
-		{media && (
+		{media && !compact && (
 			<div class="game-card-media">
 				<img src={media} alt="" loading="lazy" onerror="this.parentElement.remove()" />
 			</div>
@@ -40,7 +41,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		</div>
 		<h3>{title}</h3>
 		{playable && id && daily && <span class="daily-chip" data-game-id={id} hidden />}
-		<p>{pitch}</p>
+		{!compact && <p>{pitch}</p>}
 	</Tag>
 	{
 		showFavorite && (
@@ -296,6 +297,11 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 			const recTxt = rec?.t ? `${rec.t}${rec.m === 'score' ? ' pts' : ''}` : '';
 			chip.classList.toggle('done', done);
 			chip.classList.toggle('progress', started && !done);
+			// Tag the card so pages (e.g. the daily page) can reorder / dim by status.
+			const wrap = chip.closest('.game-card-wrap');
+			wrap?.classList.toggle('daily-done', done);
+			wrap?.classList.toggle('daily-todo', !done);
+			wrap?.dispatchEvent(new CustomEvent('daily-status', { bubbles: true, detail: { id, done, started } }));
 			// Community record of the day (Supabase), shown even for games not yet played.
 			const cfg = DAILY_LB[id];
 			const top = cfg ? tops[cfg.lbId || id] : undefined;

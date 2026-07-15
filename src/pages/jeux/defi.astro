@@ -28,13 +28,14 @@ const dailyGames = games.filter((g) => g.status === 'play' && g.category !== 'mu
 				<li>🚫 Sans publicité</li>
 				<li>🔓 Sans inscription</li>
 			</ul>
+			<p class="defi-count" id="defi-count" aria-live="polite"></p>
 		</header>
 
 		<ul class="defi-grid">
 			{
 				dailyGames.map((g) => (
 					<li>
-						<GameCard id={g.id} title={g.title} pitch={g.pitch} icon={g.icon} href={`${g.href}?defi`} status={g.status} image={g.image} />
+						<GameCard id={g.id} title={g.title} pitch={g.pitch} icon={g.icon} href={`${g.href}?defi`} status={g.status} compact />
 					</li>
 				))
 			}
@@ -89,12 +90,69 @@ const dailyGames = games.filter((g) => g.status === 'play' && g.category !== 'mu
 		font-weight: 600;
 		color: var(--gray-100);
 	}
+	.defi-count {
+		font-weight: 700;
+		color: var(--accent-regular);
+		font-size: var(--text-md);
+		margin-top: 0.35rem;
+	}
 	.defi-grid {
 		list-style: none;
 		padding: 0;
 		margin: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-		gap: 1rem;
+		grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+		gap: 0.85rem;
 	}
+	/* compact tiles: tighter than the full cards on /jeux */
+	.defi-grid :global(.game-card) {
+		padding: 1rem 1.1rem;
+		gap: 0.55rem;
+		border-radius: 1.1rem;
+	}
+	.defi-grid :global(.game-card h3) {
+		font-size: var(--text-base);
+	}
+	/* done challenges fade back so the ones left to do stand out */
+	.defi-grid li.is-done { opacity: 0.5; transition: opacity var(--theme-transition); }
+	.defi-grid li.is-done:hover { opacity: 0.85; }
 </style>
+
+<script>
+	const todayKey = () => {
+		const d = new Date();
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	};
+	const grid = document.querySelector<HTMLUListElement>('.defi-grid');
+	const counter = document.getElementById('defi-count');
+
+	const refresh = () => {
+		if (!grid) return;
+		const day = todayKey();
+		const lis = Array.from(grid.children) as HTMLElement[];
+		let done = 0;
+		const ranked = lis.map((li, i) => {
+			const id = li.querySelector('[data-game-id]')?.getAttribute('data-game-id');
+			let s = 0; // 0 = à faire, 1 = en cours, 2 = fait
+			try {
+				const raw = id ? localStorage.getItem(`ludiven-dailyrun-${id}-${day}`) : null;
+				if (raw) s = JSON.parse(raw)?.done === true ? 2 : 1;
+			} catch { /* ignore */ }
+			li.classList.toggle('is-done', s === 2);
+			li.classList.toggle('is-progress', s === 1);
+			if (s === 2) done++;
+			return { li, s, i };
+		});
+		// à faire → en cours → fait (stable within a group)
+		ranked.sort((a, b) => a.s - b.s || a.i - b.i);
+		for (const { li } of ranked) grid.appendChild(li);
+		const total = lis.length, todo = total - done;
+		if (counter) counter.textContent = todo === 0
+			? '🎉 Tous les défis du jour sont faits !'
+			: `${todo} défi${todo > 1 ? 's' : ''} à faire aujourd'hui · ${done}/${total} fait${done > 1 ? 's' : ''}`;
+	};
+
+	refresh();
+	document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+	window.addEventListener('pageshow', refresh);
+</script>
