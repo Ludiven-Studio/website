@@ -47,6 +47,7 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	fruits: { fmt: centis },
 	suite: { fmt: centis },
 	'mots-meles': { fmt: centis },
+	'mots-tournes': { fmt: centis },
 	'rond-carre': { fmt: centis },
 	colorgramme: { fmt: centis },
 	sudoku: { fmt: centis },

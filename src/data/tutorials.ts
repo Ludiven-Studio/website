@@ -23,6 +23,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Aides', body: 'Bloqué ? Annule ton dernier coup, demande un indice (il montre un coup qui garde une solution) ou recommence. Ton meilleur résultat (le moins de billes restantes) est gardé.' },
 		{ emoji: '⏱️', title: 'Défi du jour', body: 'Un mini-plateau identique pour tout le monde (quelques billes seulement, la même graine partagée). Vide-le jusqu’à une seule bille le plus vite possible : ton meilleur temps entre au classement.' },
 	],
+	'mots-tournes': [
+		{ emoji: '🎯', title: 'Le but', body: 'La grille de lettres est découpée en « serpents », un par mot d\'un même thème (ex. Fruits). Trace chaque mot pour colorer sa région : quand tous les mots sont tracés, la grille entière est pavée — c\'est gagné.' },
+		{ emoji: '✏️', title: 'Tracer un mot', body: 'Pars d\'une lettre et glisse de case en case VOISINE (haut, bas, gauche, droite — jamais en diagonale) pour dessiner le chemin sinueux du mot. Dès que le tracé forme un mot du thème, il se verrouille et prend une couleur.' },
+		{ emoji: '🔢', title: 'Les indices', body: 'Le thème est affiché en haut. En bas, une pastille par mot restant donne sa LONGUEUR (des points) — mais pas le mot : à toi de le deviner à partir des lettres. Les chemins ne se croisent jamais et couvrent toutes les cases.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même grille pour tout le monde (graine partagée). Pave-la le plus vite possible : ton meilleur temps entre au classement. Bloqué ? Annule ton dernier mot pour retenter.' },
+	],
 	'reussite': [
 		{ emoji: '🎯', title: 'Le but', body: 'La Réussite (Klondike) : monte les quatre familles sur les fondations, de l\'As au Roi, chacune dans sa couleur (♠ ♥ ♦ ♣). Quand les 52 cartes y sont, c\'est gagné.' },
 		{ emoji: '🃏', title: 'Ranger les colonnes', body: 'Dans les 7 colonnes, empile en DESCENDANT et en ALTERNANT les couleurs (un 7 rouge sur un 8 noir). Une colonne vide n\'accueille qu\'un Roi. Tu peux déplacer d\'un coup toute une suite déjà rangée.' },

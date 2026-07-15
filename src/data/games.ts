@@ -29,6 +29,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'mots-tournes',
+		title: 'Mots Tournés',
+		pitch: 'Trace chaque mot d\'un thème en serpentant entre les lettres voisines — les chemins pavent toute la grille. Seules les longueurs sont données. Défi du jour au chrono.',
+		icon: 'winding-path',
+		href: '/jeux/mots-tournes',
+		status: 'play',
+	},
+	{
 		id: 'somme-toute',
 		title: 'Somme Toute',
 		pitch: 'Équilibre chaque ligne et chaque colonne pour atteindre la somme cible. Pure déduction.',
