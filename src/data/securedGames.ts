@@ -3,9 +3,12 @@
 // The <Leaderboard> component reads this to route both submission and reads.
 // Metric direction must match the `games` table row (time = lower is better).
 //
-// Excluded on purpose (need bespoke handling, still on the legacy path):
-//   - packed score+time: angry, golf, billard, flechettes, reussite (logged under `<id>-t`)
-//   - threshold win/loss bands: demineur, codecolor, mot-secret
+// Packed (golf/angry/billard/flechettes/reussite) and threshold (demineur/codecolor/
+// mot-secret) games ride the 'time' metric too: their encoded value is already
+// lexicographically ascending-is-better (packed = count in high digits + time; threshold
+// = wins below the loss band), so ordering + best-retained work on the raw int with no
+// decode. Their run-length can't be derived from the value → no min-time rule (a per-game
+// seed-replay check in validateGameSpecific is the future hardening step).
 
 import type { Metric } from '../lib/leaderboard';
 
@@ -44,6 +47,16 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	symboles: 'time',
 	reines: 'time',
 	drift: 'time',
+	// Packed count+time (logged under `<id>-t`) — value is ascending-is-better already.
+	'golf-t': 'time',
+	'angry-t': 'time',
+	'billard-t': 'time',
+	'flechettes-t': 'time',
+	'reussite-t': 'time',
+	// Threshold win/loss bands — wins sort below the loss offset, so ascending works.
+	demineur: 'time',
+	codecolor: 'time',
+	'mot-secret': 'time',
 };
 
 export const isSecured = (gameId: string): boolean =>
