@@ -24,6 +24,9 @@ const SURFACE_ROWS = 3; // open-air rows at the top of band 0
 const TORCH_REFILL = 0.25;
 const ETAI_RANGE = 3;
 const DETECTOR_MS = 10_000;
+export const BOMB_FUSE = 3000; // ms before a placed bomb detonates
+export const BOMB_RADIUS = 2; // blast half-width (Chebyshev) — flee ≥3 cells to survive
+export const BLAST_TTL = 420; // ms the explosion flash lingers (render only)
 
 export const Cell = {
 	Empty: 0, Sand: 1, Stone: 2, Bedrock: 3,
@@ -97,7 +100,10 @@ const ALL_ITEMS: ItemId[] = [
 ];
 
 export type MineStatus = 'playing' | 'over';
-export type DeathCause = 'crush' | 'lamp' | 'win'; // 'win' = the couronne was forged
+export type DeathCause = 'crush' | 'lamp' | 'bomb' | 'win'; // 'win' = the couronne was forged
+
+export interface Bomb { x: number; y: number; fuseMs: number; }
+export interface Blast { x: number; y: number; r: number; ttl: number; } // render-only flash
 
 export interface MineState {
 	seed: number;
@@ -113,6 +119,8 @@ export interface MineState {
 	propped: Set<number>; // étai-propped cells (never fall)
 	lamp: number; // 0..1
 	detectorMs: number; // gem-reveal time remaining
+	bombs: Bomb[]; // placed, ticking down to detonation
+	blasts: Blast[]; // active explosion flashes (render)
 	inventory: Record<ItemId, number>;
 	maxDepth: number;
 	collected: number; // Σ ore values picked up
@@ -189,6 +197,14 @@ export function generateBand(seed: number, band: number, diff: MineDiff): Uint8A
 			if (rng() < diff.stoneDensity) rows[r][x] = Cell.Stone;
 		}
 
+	// occasional stone barrier — a near-full row of stone (vein gap stays open) that you
+	// bomb through or skirt via the vein. Never seals the world (dig-ability BFS still holds).
+	if (band > 1 && rng() < 0.14) {
+		const by = 2 + Math.floor(rng() * (BAND_H - 4));
+		for (let x = MIN_X; x <= MAX_X; x++)
+			if (!prot.has(by * COLS + x) && rows[by][x] === Cell.Sand) rows[by][x] = Cell.Stone;
+	}
+
 	// ores — depth-banded spawn table on remaining sand (vein included)
 	for (let r = 0; r < BAND_H; r++) {
 		const depth = band * BAND_H + r;
@@ -253,7 +269,7 @@ export function createMine(seed: number, diff: MineDiff): MineState {
 		player: { x: Math.floor(COLS / 2), y: 0 },
 		dir: 'down',
 		wobbles: new Map(), falling: new Set(), justFell: new Set(), loose: new Set(), propped: new Set(),
-		lamp: 1, detectorMs: 0, inventory: emptyInventory(),
+		lamp: 1, detectorMs: 0, bombs: [], blasts: [], inventory: emptyInventory(),
 		maxDepth: 0, collected: 0, craftBonus: 0, status: 'playing', tick: 0,
 	};
 	ensureRows(state, LOOKAHEAD);
@@ -275,20 +291,21 @@ const isGem = (c: number): boolean => CELL_ORE[c] != null;
 
 /**
  * Where a stone/gem at (x,y) would move this tick, or null if it rests.
- * Stones (square) only drop straight down. Gems (round) also roll off any HARD block below
- * (stone / gem / bedrock — not the soft, flat sand bed) when a side + its diagonal-down are
- * both clear → they pile into pyramids. Bedrock walls block sideways rolls. `ignoreHen`
- * distinguishes the two cases: a RESTING cell directly above the hen is held up (she blocks
- * the drop from starting); a cell already in free-fall ignores her and crushes on contact.
+ * Boulder-Dash rounding: BOTH stones and gems are rounded — they drop straight down into
+ * empty, and also ROLL off any HARD block below (stone / gem / bedrock — not the soft, flat
+ * sand bed) when a side + its diagonal-down are both clear → they pile into pyramids and only
+ * hold when both sides are blocked. Bedrock walls block sideways rolls. `ignoreHen`
+ * distinguishes the two support cases: a RESTING object directly above the hen is held up
+ * (she blocks the drop from starting); one already in free-fall ignores her.
  */
-function fallTarget(state: MineState, x: number, y: number, c: number, ignoreHen = false): { tx: number; ty: number } | null {
+function fallTarget(state: MineState, x: number, y: number, ignoreHen = false): { tx: number; ty: number } | null {
 	if (y + 1 >= state.rows.length) return null;
 	const below = state.rows[y + 1][x];
 	if (below === Cell.Empty) {
 		const heldByHen = !ignoreHen && state.player.x === x && state.player.y === y + 1;
 		return heldByHen ? null : { tx: x, ty: y + 1 };
 	}
-	if (isGem(c) && below !== Cell.Sand) { // rolls off hard blocks, not off the flat sand bed
+	if (below !== Cell.Sand) { // a rounded block rolls off a hard block, not off the flat sand bed
 		if (state.rows[y][x - 1] === Cell.Empty && state.rows[y + 1][x - 1] === Cell.Empty) return { tx: x - 1, ty: y + 1 };
 		if (state.rows[y][x + 1] === Cell.Empty && state.rows[y + 1][x + 1] === Cell.Empty) return { tx: x + 1, ty: y + 1 };
 	}
@@ -348,17 +365,20 @@ function gravityPass(state: MineState): void {
 			if (state.propped.has(k)) continue;
 			if (state.falling.has(k)) {
 				state.falling.delete(k);
-				const target = fallTarget(state, x, y, c, true); // mid-fall: ignore the hen (she gets crushed)
+				const target = fallTarget(state, x, y, true); // mid-fall: ignore the hen (she gets crushed)
 				if (!target) continue; // landed or wedged
 				const { tx, ty } = target;
 				if (state.player.x === tx && state.player.y === ty) {
-					// a falling stone OR gem crushes the hen (gems are mined, never caught)
 					state.rows[y][x] = Cell.Empty;
 					state.loose.delete(k);
-					state.rows[ty][tx] = c; // buries her
-					state.status = 'over';
-					state.deathCause = 'crush';
-					return;
+					if (c === Cell.Stone) {
+						state.rows[ty][tx] = c; // crushed under the stone
+						state.status = 'over';
+						state.deathCause = 'crush';
+						return;
+					}
+					collectOre(state, c); // a falling gem is caught, not lethal (more fun)
+					continue;
 				}
 				state.rows[y][x] = Cell.Empty;
 				state.loose.delete(k);
@@ -366,9 +386,9 @@ function gravityPass(state: MineState): void {
 				const nk = cellKey(tx, ty);
 				if (isGem(c)) state.loose.add(nk); // now sitting in open space
 				state.justFell.add(nk);
-				if (fallTarget(state, tx, ty, c, true)) state.falling.add(nk); // keep going next tick
+				if (fallTarget(state, tx, ty, true)) state.falling.add(nk); // keep going next tick
 			} else {
-				const target = fallTarget(state, x, y, c); // resting: the hen holds a cell above her
+				const target = fallTarget(state, x, y); // resting: the hen holds a cell above her
 				if (state.wobbles.has(k)) {
 					if (!target) { state.wobbles.delete(k); continue; } // support restored
 					const w = state.wobbles.get(k)! - 1;
@@ -382,12 +402,45 @@ function gravityPass(state: MineState): void {
 	}
 }
 
-/** Real-time lamp drain (per frame, not per tick). Also ticks down the detector. */
+/** Detonate a bomb at (bx,by): clear sand/stone in range (spare bedrock/ores), kill if the hen is inside. */
+function explode(state: MineState, bx: number, by: number): void {
+	const R = BOMB_RADIUS;
+	if (Math.abs(state.player.x - bx) <= R && Math.abs(state.player.y - by) <= R) {
+		state.status = 'over';
+		state.deathCause = 'bomb';
+	}
+	for (let dy = -R; dy <= R; dy++)
+		for (let dx = -R; dx <= R; dx++) {
+			const x = bx + dx, y = by + dy;
+			if (x < MIN_X || x > MAX_X || y < 0 || y >= state.rows.length) continue;
+			const c = state.rows[y][x];
+			if (c === Cell.Sand || c === Cell.Stone) clearCell(state, x, y); // ores + bedrock survive
+		}
+	state.blasts.push({ x: bx, y: by, r: R, ttl: BLAST_TTL });
+}
+
+/**
+ * Real-time lamp drain (per frame, not per tick). Also ticks the detector, bomb fuses and
+ * blast flashes. Bomb fuses freeze while the workbench is open (the grid is paused there too).
+ */
 export function stepLamp(state: MineState, dtMs: number, workbenchOpen = false): MineState {
 	if (state.status !== 'playing') return state;
 	const factor = workbenchOpen ? state.diff.workbenchDrainFactor : 1;
 	state.lamp = Math.max(0, state.lamp - state.diff.lampDrainPerSec * (dtMs / 1000) * factor);
 	if (state.detectorMs > 0) state.detectorMs = Math.max(0, state.detectorMs - dtMs);
+
+	// fade old blasts first so a freshly-spawned one survives the frame it appears
+	for (let i = state.blasts.length - 1; i >= 0; i--)
+		if ((state.blasts[i].ttl -= dtMs) <= 0) state.blasts.splice(i, 1);
+	if (!workbenchOpen) {
+		for (let i = state.bombs.length - 1; i >= 0; i--) {
+			if ((state.bombs[i].fuseMs -= dtMs) > 0) continue;
+			const b = state.bombs.splice(i, 1)[0];
+			explode(state, b.x, b.y);
+			if (state.status !== 'playing') return state; // caught in the blast
+		}
+	}
+
 	if (state.lamp <= 0) {
 		state.status = 'over';
 		state.deathCause = 'lamp';
@@ -419,14 +472,8 @@ export function useTool(state: MineState, id: ToolId): boolean {
 		if (state.lamp >= 1) return false;
 		state.lamp = Math.min(1, state.lamp + TORCH_REFILL);
 	} else if (id === 'bombe') {
-		for (let dy = -1; dy <= 1; dy++)
-			for (let dx = -1; dx <= 1; dx++) {
-				if (!dx && !dy) continue;
-				const x = state.player.x + dx, y = state.player.y + dy;
-				if (x < MIN_X || x > MAX_X || y < 0 || y >= state.rows.length) continue;
-				const c = state.rows[y][x];
-				if (c === Cell.Sand || c === Cell.Stone) clearCell(state, x, y); // ores + bedrock survive
-			}
+		// drop a timed bomb at the hen's feet; it detonates after BOMB_FUSE — flee the blast!
+		state.bombs.push({ x: state.player.x, y: state.player.y, fuseMs: BOMB_FUSE });
 	} else if (id === 'etai') {
 		let target = -1;
 		for (let dy = 1; dy <= ETAI_RANGE; dy++) {

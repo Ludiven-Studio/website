@@ -182,6 +182,7 @@ describe('cocotte-mineuse gravity', () => {
 		s.rows[10][5] = Cell.Stone;
 		s.rows[11][5] = Cell.Sand;
 		s.rows[11][5] = Cell.Empty; // destabilize
+		for (const r of [9, 10]) { s.rows[r][4] = Cell.Sand; s.rows[r][6] = Cell.Sand; } // wall the sides → only vertical motion
 		stepMine(s); // lower wobbles
 		expect(s.wobbles.get(cellKey(5, 10))).toBe(WOBBLE_TICKS);
 		expect(s.wobbles.has(cellKey(5, 9))).toBe(false); // upper still supported
@@ -217,18 +218,19 @@ describe('cocotte-mineuse gravity', () => {
 		expect(s.deathCause).toBe('crush');
 	});
 
-	it('a falling gem crushes the hen too (gems are mined, never caught)', () => {
+	it('a falling gem is caught (collected), not lethal', () => {
 		const s = arena();
 		s.player = { x: 5, y: 11 };
 		s.rows[12][5] = Cell.Bedrock;
 		s.rows[9][5] = Cell.Diamant;
 		for (let i = 0; i < 5; i++) stepMine(s, 'down');
-		expect(s.status).toBe('over');
-		expect(s.deathCause).toBe('crush');
-		expect(s.inventory.diamant).toBe(0);
+		expect(s.status).toBe('playing');
+		expect(s.inventory.diamant).toBe(1);
+		expect(s.collected).toBe(150);
+		expect(s.rows[11][5]).toBe(Cell.Empty); // caught, not landed
 	});
 
-	it('gems roll off gems into pyramids; stones stack flat', () => {
+	it('rounded blocks roll off hard blocks into pyramids (stones and gems alike)', () => {
 		const s = arena();
 		for (let x = 3; x <= 7; x++) s.rows[31][x] = Cell.Bedrock; // floor
 		s.rows[30][5] = Cell.Diamant; // support
@@ -238,14 +240,14 @@ describe('cocotte-mineuse gravity', () => {
 		expect(s.rows[30][4]).toBe(Cell.Or); // rolled down-left onto the floor
 		expect(s.loose.has(cellKey(4, 30))).toBe(true); // sits in the open → rendered bare
 
-		// a stone on a stone does NOT roll (square, stacks flat)
+		// a stone now ALSO rolls off a stone (Boulder-Dash rounding)
 		const t = arena();
 		for (let x = 3; x <= 7; x++) t.rows[31][x] = Cell.Bedrock;
 		t.rows[30][5] = Cell.Stone;
 		t.rows[29][5] = Cell.Stone;
 		for (let i = 0; i < 6; i++) stepMine(t);
-		expect(t.rows[29][5]).toBe(Cell.Stone); // stayed put
-		expect(t.wobbles.size).toBe(0);
+		expect(t.rows[29][5]).toBe(Cell.Empty); // rolled off
+		expect(t.rows[30][4]).toBe(Cell.Stone); // into the hole beside it
 	});
 
 	it('a gem rolls off a stone (hard block) into an adjacent hole', () => {
@@ -345,7 +347,7 @@ describe('cocotte-mineuse crafting & tools', () => {
 		expect(s.inventory.torche).toBe(1);
 	});
 
-	it('bombe clears adjacent sand/stone but spares bedrock and ores', () => {
+	it('bombe is placed, then detonates after its fuse (clears sand/stone, spares bedrock/ores)', () => {
 		const s = arena();
 		s.player = { x: 5, y: 20 };
 		s.rows[19][5] = Cell.Stone;
@@ -354,11 +356,39 @@ describe('cocotte-mineuse crafting & tools', () => {
 		s.rows[20][6] = Cell.Or;
 		s.inventory.bombe = 1;
 		expect(useTool(s, 'bombe')).toBe(true);
-		expect(s.rows[19][5]).toBe(Cell.Empty);
-		expect(s.rows[21][5]).toBe(Cell.Empty);
-		expect(s.rows[20][4]).toBe(Cell.Bedrock);
-		expect(s.rows[20][6]).toBe(Cell.Or);
 		expect(s.inventory.bombe).toBe(0);
+		expect(s.bombs.length).toBe(1);
+		expect(s.rows[19][5]).toBe(Cell.Stone); // nothing cleared yet — the fuse is burning
+
+		s.player = { x: 5, y: 26 }; // flee out of the blast
+		for (let t = 0; t < 3; t++) stepLamp(s, 1000); // 3 × 1 s → fuse reaches 0, detonates
+		expect(s.bombs.length).toBe(0); // detonated
+		expect(s.rows[19][5]).toBe(Cell.Empty); // stone cleared
+		expect(s.rows[21][5]).toBe(Cell.Empty); // sand cleared
+		expect(s.rows[20][4]).toBe(Cell.Bedrock); // spared
+		expect(s.rows[20][6]).toBe(Cell.Or); // spared
+		expect(s.status).toBe('playing'); // fled in time
+		expect(s.blasts.length).toBeGreaterThan(0); // explosion flash spawned
+	});
+
+	it('the bomb kills the hen if she stays in the blast', () => {
+		const s = arena();
+		s.player = { x: 5, y: 20 };
+		s.inventory.bombe = 1;
+		useTool(s, 'bombe');
+		for (let t = 0; t < 4; t++) stepLamp(s, 1000); // never moved
+		expect(s.status).toBe('over');
+		expect(s.deathCause).toBe('bomb');
+	});
+
+	it('bomb fuses freeze while the workbench is open', () => {
+		const s = arena();
+		s.player = { x: 5, y: 20 };
+		s.inventory.bombe = 1;
+		useTool(s, 'bombe');
+		for (let t = 0; t < 5; t++) stepLamp(s, 1000, true); // bench open → fuse paused
+		expect(s.bombs.length).toBe(1);
+		expect(s.status).toBe('playing');
 	});
 
 	it('etai with no stone above → false, nothing consumed', () => {

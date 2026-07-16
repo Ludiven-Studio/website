@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	createMine, stepMine, stepLamp, craft, useTool, scoreOf, cellKey,
-	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS, ORE_VALUES,
+	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS, ORE_VALUES, BOMB_FUSE, BLAST_TTL,
 	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type JewelId, type OreId,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
@@ -41,7 +41,7 @@ const LABEL: Record<ItemId, string> = {
 // What each craftable does — shown as a legend in the workbench and as tool tooltips.
 const RECIPE_HINT: Record<ToolId | JewelId, string> = {
 	torche: 'Recharge la lampe (+25 %)',
-	bombe: 'Pulvérise le sable et les pierres autour de toi',
+	bombe: 'Posée à tes pieds, explose après 3 s — éloigne-toi !',
 	etai: 'Cale la pierre au-dessus de toi — elle ne tombera plus',
 	detecteur: 'Révèle les gemmes proches pendant 10 s',
 	bague: 'Bijou : bonus de score',
@@ -82,7 +82,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const [best, setBest] = useState(0);
 	const [inv, setInv] = useState<Record<ItemId, number> | null>(null);
 	const [bench, setBench] = useState(false);
-	const [deathCause, setDeathCause] = useState<'crush' | 'lamp' | 'win' | null>(null);
+	const [deathCause, setDeathCause] = useState<'crush' | 'lamp' | 'bomb' | 'win' | null>(null);
 	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -187,6 +187,9 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			}
 		}
 
+		// ticking bombs (under the hen)
+		for (const b of st.bombs) drawBomb(ctx, b.x * cell, (b.y - camY) * cell, cell, b.fuseMs, now);
+
 		// the hen (interpolated between grid ticks)
 		const prev = prevPlayerRef.current;
 		const ix = (prev.x + (st.player.x - prev.x) * alpha) * cell + cell / 2;
@@ -201,6 +204,9 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		grad.addColorStop(1, `rgba(0,0,0,${0.55 + 0.4 * (1 - Math.min(1, lamp * 2))})`);
 		ctx.fillStyle = grad;
 		ctx.fillRect(0, 0, w, h);
+
+		// explosion flashes — brightest, above the vignette
+		for (const bl of st.blasts) drawBlast(ctx, (bl.x + 0.5) * cell, (bl.y - camY + 0.5) * cell, cell, bl.r, bl.ttl);
 	}, []);
 
 	const resize = useCallback(() => {
@@ -656,6 +662,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 									? 'Défi du jour terminé'
 									: deathCause === 'win' ? '👑 Couronne forgée !'
 									: deathCause === 'crush' ? '💥 Écrasée !'
+									: deathCause === 'bomb' ? '💣 Soufflée par la bombe !'
 									: '🕯 Plus de lumière…'}
 							</p>
 							{deathCause === 'win' && <p className="cm-overlay-note">Victoire&nbsp;! Tu as forgé la couronne.</p>}
@@ -719,10 +726,44 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 /* ---------- Canvas helpers ---------- */
 
 /** Loose boulder that falls — a LIGHT, smooth grey cube (contrast with dark bedrock). */
+/** A placed bomb with a burning fuse — blinks faster the closer it is to detonation. */
+function drawBomb(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number, fuseMs: number, now: number): void {
+	const cx = x + cell / 2, cy = y + cell * 0.6, r = cell * 0.3;
+	const urgency = 1 - Math.min(1, fuseMs / BOMB_FUSE);
+	const blink = 0.5 + 0.5 * Math.sin(now * (0.008 + urgency * 0.05));
+	ctx.globalAlpha = 0.2 + 0.4 * blink * (0.4 + 0.6 * urgency); // danger glow
+	ctx.fillStyle = '#ff5a3c';
+	ctx.beginPath(); ctx.arc(cx, cy, cell * 0.5, 0, Math.PI * 2); ctx.fill();
+	ctx.globalAlpha = 1;
+	ctx.fillStyle = '#1b1e25'; // body
+	ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+	ctx.fillStyle = 'rgba(255,255,255,0.25)';
+	ctx.beginPath(); ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.25, 0, Math.PI * 2); ctx.fill();
+	ctx.strokeStyle = '#c98a4a'; // fuse
+	ctx.lineWidth = Math.max(1, cell * 0.05);
+	ctx.beginPath(); ctx.moveTo(cx + r * 0.5, cy - r * 0.7); ctx.quadraticCurveTo(cx + r, cy - r * 1.4, cx + r * 0.35, cy - r * 1.6); ctx.stroke();
+	ctx.fillStyle = blink > 0.5 ? '#ffe08a' : '#ff8a3c'; // spark
+	ctx.beginPath(); ctx.arc(cx + r * 0.35, cy - r * 1.6, cell * 0.08, 0, Math.PI * 2); ctx.fill();
+}
+
+/** Expanding explosion flash centred on the bomb cell. */
+function drawBlast(ctx: CanvasRenderingContext2D, cx: number, cy: number, cell: number, r: number, ttl: number): void {
+	const p = 1 - Math.max(0, ttl) / BLAST_TTL; // 0 → 1
+	const rad = (r + 0.6) * cell * (0.4 + 0.6 * p);
+	const a = (1 - p) * 0.85;
+	const g = ctx.createRadialGradient(cx, cy, rad * 0.2, cx, cy, rad);
+	g.addColorStop(0, `rgba(255,244,190,${a})`);
+	g.addColorStop(0.5, `rgba(255,140,50,${a * 0.8})`);
+	g.addColorStop(1, 'rgba(255,80,40,0)');
+	ctx.fillStyle = g;
+	ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2); ctx.fill();
+}
+
+/** Rounded boulder that falls and rolls (Boulder Dash) — LIGHT grey, distinct from dark bedrock. */
 function drawStone(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number): void {
 	const m = cell * 0.06;
 	const s = cell - 2 * m;
-	const rad = cell * 0.16; // square-ish, just a touch rounded
+	const rad = cell * 0.34; // well rounded → reads as "rolls"
 	ctx.fillStyle = '#6b7480';
 	ctx.beginPath();
 	ctx.roundRect(x + m, y + m, s, s, rad);
