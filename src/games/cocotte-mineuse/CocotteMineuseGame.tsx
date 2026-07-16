@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	createMine, stepMine, stepLamp, craft, useTool, scoreOf, cellKey,
-	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS,
-	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type OreId,
+	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS, ORE_VALUES,
+	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type JewelId, type OreId,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
@@ -38,11 +38,15 @@ const LABEL: Record<ItemId, string> = {
 	charbon: 'Charbon', silex: 'Silex', cuivre: 'Cuivre', fer: 'Fer', or: 'Or', cristal: 'Cristal', diamant: 'Diamant',
 	torche: 'Torche', bombe: 'Bombe', etai: 'Étai', detecteur: 'Détecteur', bague: 'Bague', collier: 'Collier', couronne: 'Couronne',
 };
-const TOOL_HINT: Record<ToolId, string> = {
-	torche: '+25 % de lampe',
-	bombe: 'pulvérise les pierres autour de toi',
-	etai: 'cale la pierre au-dessus de toi',
-	detecteur: 'révèle les gemmes proches 10 s',
+// What each craftable does — shown as a legend in the workbench and as tool tooltips.
+const RECIPE_HINT: Record<ToolId | JewelId, string> = {
+	torche: 'Recharge la lampe (+25 %)',
+	bombe: 'Pulvérise le sable et les pierres autour de toi',
+	etai: 'Cale la pierre au-dessus de toi — elle ne tombera plus',
+	detecteur: 'Révèle les gemmes proches pendant 10 s',
+	bague: 'Bijou : bonus de score',
+	collier: 'Bijou : gros bonus de score',
+	couronne: 'Assemble bague + diamant → tu gagnes la partie !',
 };
 const ORE_ORDER: OreId[] = ['charbon', 'silex', 'cuivre', 'fer', 'or', 'cristal', 'diamant'];
 const TOOL_ORDER: ToolId[] = ['torche', 'bombe', 'etai', 'detecteur'];
@@ -170,7 +174,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 						ctx.fillRect(sx + cell * 0.12, sy + cell * 0.86, cell * 0.76, cell * 0.14);
 					}
 				} else if (c === Cell.Bedrock) {
-					drawBedrock(ctx, sx, sy, cell, x, y);
+					drawBedrock(ctx, sx, sy, cell);
 				}
 			}
 			// depth markers on the left wall
@@ -608,9 +612,13 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 						<div className="cm-overlay-card cm-bench-card">
 							<p className="cm-go-title">🛠 Atelier</p>
 							<p className="cm-bench-hint">
-								Outils pour survivre, bijoux pour le score (bonus en plus des minerais).
-								La <b>couronne</b> 👑 remporte la partie&nbsp;! La lampe brûle encore un peu ici.
+								Combine 2 minerais. Outils pour survivre, bijoux pour le score — la <b>couronne</b> 👑 gagne la partie&nbsp;! La lampe brûle encore un peu ici.
 							</p>
+							<div className="cm-legend">
+								{ORE_ORDER.map((id) => (
+									<span key={id} className="cm-legend-item">{EMOJI[id]} {LABEL[id]}<i>{ORE_VALUES[id]}</i></span>
+								))}
+							</div>
 							<div className="cm-recipes">
 								{RECIPES.map((r) => (
 									<button
@@ -619,16 +627,19 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 										disabled={!canCraft(r)}
 										onClick={() => craftAction(r.id)}
 									>
-										<span className="cm-recipe-in">
-											{EMOJI[r.ingredients[0]]}<i>{invCount(r.ingredients[0])}</i>
-											{' + '}
-											{EMOJI[r.ingredients[1]]}<i>{invCount(r.ingredients[1])}</i>
+										<span className="cm-recipe-top">
+											<span className="cm-recipe-in">
+												{EMOJI[r.ingredients[0]]}<i>{invCount(r.ingredients[0])}</i>
+												{' + '}
+												{EMOJI[r.ingredients[1]]}<i>{invCount(r.ingredients[1])}</i>
+											</span>
+											<span className="cm-recipe-arrow">→</span>
+											<span className="cm-recipe-out">
+												{EMOJI[r.id]} {LABEL[r.id]}
+												{r.id === 'couronne' ? <b> 🏆 victoire</b> : r.kind === 'jewel' ? <b> +{r.bonus}</b> : <i> ×{invCount(r.id)}</i>}
+											</span>
 										</span>
-										<span className="cm-recipe-arrow">→</span>
-										<span className="cm-recipe-out">
-											{EMOJI[r.id]} {LABEL[r.id]}
-											{r.id === 'couronne' ? <b> 🏆 victoire</b> : r.kind === 'jewel' ? <b> +{r.bonus}</b> : <i> ×{invCount(r.id)}</i>}
-										</span>
+										<span className="cm-recipe-desc">{RECIPE_HINT[r.id as ToolId | JewelId]}</span>
 									</button>
 								))}
 							</div>
@@ -678,13 +689,19 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 						key={id}
 						className="cm-item cm-tool"
 						disabled={status !== 'playing' || !invCount(id)}
-						title={`${LABEL[id]} (${i + 1}) — ${TOOL_HINT[id]}`}
+						title={`${LABEL[id]} (${i + 1}) — ${RECIPE_HINT[id]}`}
 						onClick={() => useToolAction(id)}
 					>
 						{EMOJI[id]}<i>{invCount(id)}</i>
 					</button>
 				))}
-				<button className="cm-benchbtn" disabled={status !== 'playing'} onClick={toggleBench}>🛠 Atelier</button>
+				<button
+					className={`cm-benchbtn ${status === 'playing' && RECIPES.some((r) => canCraft(r)) ? 'ready' : ''}`}
+					disabled={status !== 'playing'}
+					onClick={toggleBench}
+				>
+					🛠 Atelier
+				</button>
 			</div>
 
 			<p className="cm-help">
@@ -701,44 +718,39 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 
 /* ---------- Canvas helpers ---------- */
 
-/** Square boulder (angular → reads as "stacks flat, never rolls"). */
+/** Loose boulder that falls — a LIGHT, smooth grey cube (contrast with dark bedrock). */
 function drawStone(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number): void {
 	const m = cell * 0.06;
 	const s = cell - 2 * m;
 	const rad = cell * 0.16; // square-ish, just a touch rounded
-	ctx.fillStyle = '#3d424a';
+	ctx.fillStyle = '#6b7480';
 	ctx.beginPath();
 	ctx.roundRect(x + m, y + m, s, s, rad);
 	ctx.fill();
-	// top bevel highlight, bottom-right shadow → a chunky cube
-	ctx.fillStyle = '#5d646e';
+	// top bevel highlight, bottom shadow → a chunky loose rock
+	ctx.fillStyle = '#8b94a1';
 	ctx.fillRect(x + m + s * 0.14, y + m + s * 0.12, s * 0.72, s * 0.2);
-	ctx.fillStyle = '#2c3037';
+	ctx.fillStyle = '#4c545e';
 	ctx.fillRect(x + m + s * 0.14, y + m + s * 0.74, s * 0.72, s * 0.14);
-	ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+	ctx.strokeStyle = 'rgba(0,0,0,0.4)';
 	ctx.lineWidth = Math.max(1, cell * 0.03);
 	ctx.beginPath();
 	ctx.roundRect(x + m, y + m, s, s, rad);
 	ctx.stroke();
 }
 
-/** Indestructible bedrock — a beveled solid block with clear borders so it never reads as empty. */
-function drawBedrock(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number, gx: number, gy: number): void {
-	ctx.fillStyle = '#3a4048';
+/** Indestructible bedrock — a DARK cross-hatched wall block, clearly not a loose stone. */
+function drawBedrock(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number): void {
+	ctx.fillStyle = '#23272e';
 	ctx.fillRect(x, y, cell + 0.5, cell + 0.5);
-	// inner bevel: light top-left, dark bottom-right
-	ctx.fillStyle = 'rgba(255,255,255,0.12)';
-	ctx.fillRect(x, y, cell, cell * 0.14);
-	ctx.fillRect(x, y, cell * 0.14, cell);
-	ctx.fillStyle = 'rgba(0,0,0,0.3)';
-	ctx.fillRect(x, y + cell * 0.86, cell, cell * 0.16);
-	ctx.fillRect(x + cell * 0.86, y, cell * 0.16, cell);
-	// speckle so it reads as hard rock, keyed off the cell coords
-	ctx.fillStyle = 'rgba(0,0,0,0.28)';
-	const h = (gx * 7 + gy * 13) % 3;
-	ctx.fillRect(x + cell * (0.3 + h * 0.18), y + cell * 0.42, cell * 0.12, cell * 0.12);
-	ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+	// cross-hatch → reads as hard, built, immovable
+	ctx.strokeStyle = 'rgba(150,162,178,0.16)';
 	ctx.lineWidth = 1;
+	ctx.beginPath();
+	ctx.moveTo(x, y); ctx.lineTo(x + cell, y + cell);
+	ctx.moveTo(x + cell, y); ctx.lineTo(x, y + cell);
+	ctx.stroke();
+	ctx.strokeStyle = 'rgba(0,0,0,0.5)';
 	ctx.strokeRect(x + 0.5, y + 0.5, cell, cell);
 }
 
@@ -898,21 +910,29 @@ const CSS = `
 }
 .cm-startbtn.sm { font-size: 15px; padding: 10px 26px; }
 
-.cm-bench-card { width: 320px; }
+.cm-bench-card { width: 340px; }
 .cm-bench-hint { color: var(--gray-300); font-size: 12px; margin: 0 0 10px; }
+.cm-legend {
+  display: flex; flex-wrap: wrap; gap: 3px 10px; justify-content: center;
+  padding: 7px 8px; margin-bottom: 10px; border-radius: 10px; background: var(--gray-900);
+}
+.cm-legend-item { font-size: 11.5px; color: var(--gray-100); white-space: nowrap; }
+.cm-legend-item i { font-style: normal; color: var(--gray-400); font-size: 10.5px; margin-left: 3px; font-variant-numeric: tabular-nums; }
 .cm-recipes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .cm-recipe {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px; text-align: left;
   border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0);
-  font: inherit; font-size: 13.5px; border-radius: 10px; padding: 8px 10px; cursor: pointer;
+  font: inherit; font-size: 13.5px; border-radius: 10px; padding: 7px 10px; cursor: pointer;
 }
 .cm-recipe:disabled { opacity: 0.45; cursor: default; }
 .cm-recipe.jewel { border-color: #b18f2f; }
 .cm-recipe b { color: #e8bb3d; }
 .cm-recipe i { font-style: normal; color: var(--gray-300); font-size: 11.5px; }
+.cm-recipe-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cm-recipe-in { white-space: nowrap; }
 .cm-recipe-arrow { color: var(--gray-400); }
 .cm-recipe-out { white-space: nowrap; font-weight: 600; }
+.cm-recipe-desc { font-size: 11px; color: var(--gray-400); line-height: 1.3; }
 
 .cm-invbar {
   display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px;
@@ -930,10 +950,17 @@ const CSS = `
 .cm-tool:disabled { opacity: 0.35; cursor: default; }
 .cm-tool:not(:disabled):hover { border-color: var(--cm-accent); }
 .cm-benchbtn {
-  border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0);
-  font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 4px 12px; cursor: pointer;
+  border: none; background: var(--cm-accent); color: var(--accent-text-over);
+  font: inherit; font-weight: 700; font-size: 13.5px; border-radius: 999px; padding: 5px 16px;
+  margin-left: 4px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
-.cm-benchbtn:disabled { opacity: 0.4; cursor: default; }
+.cm-benchbtn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.cm-benchbtn.ready { animation: cm-benchpulse 1.3s ease-in-out infinite; }
+@keyframes cm-benchpulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.07); filter: brightness(1.15); }
+}
+@media (prefers-reduced-motion: reduce) { .cm-benchbtn.ready { animation: none; } }
 
 .cm-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.1rem; }
 `;
