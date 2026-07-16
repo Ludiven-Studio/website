@@ -321,6 +321,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 			<div className="lc-playwrap">
 				{celebrating && <Celebration />}
 				<div className={`lc-play ${armed ? 'blurred' : ''}`}>
+					<div className="lc-gridcol">
 					<div className="lc-grid" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellPx}px)`, gridTemplateRows: `repeat(${puzzle.rows}, ${cellPx}px)` }}>
 						{Array.from({ length: puzzle.rows }, (_, r) => Array.from({ length: puzzle.cols }, (_, c) => {
 							const k = ck(r, c);
@@ -334,7 +335,9 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 							);
 						}))}
 					</div>
+					</div>
 
+					<div className="lc-controlscol">
 					<div className={`lc-preview-row`}>
 						<div className={`lc-preview${shake ? ' shake' : ''}${toast?.kind === 'bonus' ? ' gold' : ''}`}>
 							{toast ? toast.msg : preview || ' '}
@@ -373,6 +376,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 					<button className="lc-hint" onClick={revealHint} disabled={armed || status !== 'playing' || hintLeft > 0}>
 						💡 Indice{status === 'playing' && !armed && hintLeft > 0 ? ` · ${hintLeft}s` : ''}
 					</button>
+					</div>
 				</div>
 
 				{daily && dailyLoading && <div className="lc-overlay"><div className="lc-overlay-card">Préparation du défi…</div></div>}
@@ -407,6 +411,8 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 
 const CSS = `
 .lc-root { --lc: var(--accent-regular); width: 100%; max-width: 460px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
+/* Room for the side-by-side wheel + grid layout. */
+@media (min-width: 760px) { .lc-root { max-width: 820px; } }
 .game-page.gf-full .lc-root { max-width: none; width: 100%; height: 100%; justify-content: center; }
 .game-page.gf-full .lc-help { display: none; }
 .lc-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.6rem; }
@@ -422,6 +428,14 @@ const CSS = `
 .lc-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .lc-play { width: 100%; display: flex; flex-direction: column; align-items: center; }
 .lc-play.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
+.lc-gridcol { display: flex; align-items: center; justify-content: center; }
+.lc-controlscol { width: 100%; display: flex; flex-direction: column; align-items: center; }
+/* Wide screens: letter wheel to the LEFT of the crossword so it all fits without scrolling. */
+@media (min-width: 760px) {
+	.lc-play { flex-direction: row; align-items: center; justify-content: center; gap: 2.5rem; }
+	.lc-controlscol { order: -1; width: auto; }
+	.lc-gridcol { flex: 0 0 auto; }
+}
 .lc-grid { display: grid; gap: 3px; justify-content: center; }
 .lc-cell { background: var(--gray-800); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: clamp(13px, 4.2vw, 22px); }
 .lc-cell.on { background: var(--lc); color: var(--accent-text-over); animation: lc-pop 0.35s ease both; }
