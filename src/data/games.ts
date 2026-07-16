@@ -326,6 +326,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'cocotte-mineuse',
+		title: 'Cocotte Mineuse',
+		pitch: 'Creuse dans le sable, esquive les pierres qui tombent et collecte les minerais. À l\'atelier, crafte torches, bombes et bijoux avant que la lampe ne s\'éteigne. Défi du jour partagé.',
+		icon: 'cocotte-mineuse',
+		href: '/jeux/cocotte-mineuse',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'pong',
 		title: 'Pong',
 		pitch: 'Pong en temps réel à 2 : partie rapide, avec un code entre amis, ou solo contre l\'ordi.',

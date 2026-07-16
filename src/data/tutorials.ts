@@ -183,6 +183,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎮', title: 'Contrôles', body: 'Dirige le serpent aux flèches (ou ZQSD/WASD), ou en glissant le doigt. Tu accélères en grandissant. Choisis ta difficulté : plus dur = plus rapide et davantage de rochers.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'En défi du jour, pommes et rochers sont les mêmes pour tout le monde (le niveau dépend du jour). Jusqu\'à 10 essais : ton meilleur score de la journée est classé.' },
 	],
+	'cocotte-mineuse': [
+		{ emoji: '⛏️', title: 'Le but', body: 'Creuse dans le sable le plus profond possible et ramasse les minerais au passage : plus c\'est profond, plus c\'est précieux. Ton score = profondeur + minerais + bijoux craftés. La run s\'arrête quand ta lampe s\'éteint… ou avant.' },
+		{ emoji: '🪨', title: 'Gare aux pierres', body: 'Dirige la cocotte aux flèches (ou ZQSD), en glissant le doigt ou au pavé tactile. Les pierres ne tiennent pas en l\'air : creuse juste dessous et elles TREMBLENT un instant avant de tomber — écrasée, c\'est terminé. Les gemmes tombent aussi, mais elles, tu peux les rattraper.' },
+		{ emoji: '🛠️', title: 'L\'atelier', body: 'Le bouton Atelier met la partie en pause (la lampe brûle au ralenti). Combine 2 ressources : torche (charbon+silex, recharge la lampe), bombe (charbon+fer), étai (fer+cuivre, cale une pierre), détecteur (cuivre+cristal). Les bijoux — bague, collier, couronne — rapportent de gros bonus.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même mine pour tout le monde (graine partagée). Jusqu\'à 10 essais : ton meilleur score de la journée est classé.' },
+	],
 	golf: [
 		{ emoji: '🏌️', title: 'Le but', body: 'Rentre la balle dans le trou (le drapeau) en un minimum de coups. Le parcours est généré à chaque partie.' },
 		{ emoji: '🎯', title: 'Viser à la fronde', body: 'Touche/clique près de la balle et tire dans le sens OPPOSÉ à la direction voulue : un élastique part de la balle. Plus tu tires loin, plus le coup est puissant. Relâche pour frapper.' },

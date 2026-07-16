@@ -33,6 +33,7 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	spectro: { fmt: score },
 	'cocottes-renards': { fmt: score },
 	flappy: { fmt: score },
+	'cocotte-mineuse': { fmt: score },
 	// Time (seconds) → mm:ss
 	tubes: { fmt: centis },
 	tente: { fmt: centis },

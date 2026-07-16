@@ -23,6 +23,7 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	'cocottes-renards': 'score',
 	'meli-melo': 'score',
 	esquive: 'score',
+	'cocotte-mineuse': 'score',
 	// Time — lower is better
 	sudoku: 'time',
 	'mots-tournes': 'time',
