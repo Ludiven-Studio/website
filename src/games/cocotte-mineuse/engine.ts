@@ -1,9 +1,12 @@
 /**
- * COCOTTE MINEUSE — pure engine (no UI). Side-view digger: snake-like 4-dir movement on a
- * hidden grid; gravity pulls stones/ores (never sand, never the player). Unsupported cells
- * wobble 2 ticks (warning), then fall 1 cell/tick; a falling stone on the hen kills, a
- * falling ore is collected. Oil lamp drains in real time and bounds the run. 2-ingredient
- * crafting turns ores into tools (survival) or jewels (score bonus).
+ * COCOTTE MINEUSE — pure engine (no UI). Side-view digger: step-based 4-dir movement on a
+ * hidden grid — one cell per input, the hen stays put when idle (the component repeats the
+ * input while a key is held). Gravity pulls stones/ores (never sand, never the player) and
+ * runs every tick regardless of whether the hen moved. A RESTING stone/ore directly above
+ * the hen is held up by her (won't start falling until she leaves the cell below); a stone
+ * already in free-fall ignores her and crushes on contact, while a falling ore is collected.
+ * Unsupported cells wobble 2 ticks (warning) then fall 1 cell/tick. Oil lamp drains in real
+ * time and bounds the run. 2-ingredient crafting turns ores into tools or jewels.
  * NOTE: step functions mutate state internals (rows / Map / Set) — the component keeps the
  * state in a ref (snake pattern); never rely on structural sharing.
  */
@@ -102,8 +105,7 @@ export interface MineState {
 	rows: Uint8Array[]; // index = depth row; lazily extended, never pruned (13 B/row)
 	bandsGenerated: number;
 	player: { x: number; y: number };
-	dir: Dir;
-	pendingDir: Dir;
+	dir: Dir; // last facing (for rendering the beak); movement is per-input, not continuous
 	wobbles: Map<number, number>; // cell key -> wobble ticks remaining
 	falling: Set<number>; // cell keys in free-fall
 	justFell: Set<number>; // keys that moved down this tick (render interpolation only)
@@ -224,7 +226,7 @@ export function createMine(seed: number, diff: MineDiff): MineState {
 	const state: MineState = {
 		seed, diff, rows: [], bandsGenerated: 0,
 		player: { x: Math.floor(COLS / 2), y: 0 },
-		dir: 'down', pendingDir: 'down',
+		dir: 'down',
 		wobbles: new Map(), falling: new Set(), justFell: new Set(), propped: new Set(),
 		lamp: 1, detectorMs: 0, inventory: emptyInventory(),
 		maxDepth: 0, collected: 0, craftBonus: 0, status: 'playing', tick: 0,
@@ -234,12 +236,6 @@ export function createMine(seed: number, diff: MineDiff): MineState {
 }
 
 /* ---------- Simulation ---------- */
-
-/** Queue a direction change. 180° turns are allowed (no body, unlike snake). */
-export function setDir(state: MineState, dir: Dir): MineState {
-	state.pendingDir = dir;
-	return state;
-}
 
 const clearCell = (state: MineState, x: number, y: number): void => {
 	state.rows[y][x] = Cell.Empty;
@@ -256,31 +252,35 @@ const collectOre = (state: MineState, cell: number): void => {
 };
 
 /**
- * One grid tick: commit direction → move/dig/collect → gravity pass.
- * Gravity scans deepest→shallowest so same-tick chains work (a vacated support is
- * seen by the cell above later in the same pass) and a cell moves at most once/tick.
+ * One grid tick. `dir` = the input this tick (null/undefined = no move — the hen stays put,
+ * gravity still runs). When given: face that way, then move/dig/collect one cell. Movement is
+ * per-input, not continuous; the component decides when to feed a direction (hold = each tick).
+ * Gravity scans deepest→shallowest so same-tick chains work (a vacated support is seen by the
+ * cell above later in the same pass) and a cell moves at most once/tick.
  */
-export function stepMine(state: MineState): MineState {
+export function stepMine(state: MineState, dir?: Dir | null): MineState {
 	if (state.status !== 'playing') return state;
-	state.dir = state.pendingDir;
-	const d = DELTA[state.dir];
-	const nx = state.player.x + d.x, ny = state.player.y + d.y;
 	ensureRows(state, state.player.y + LOOKAHEAD);
-	if (ny >= 0 && nx >= 0 && nx < COLS) {
-		const c = state.rows[ny][nx];
-		if (c === Cell.Sand) {
-			clearCell(state, nx, ny); // dig — sand never falls
-			state.player = { x: nx, y: ny };
-		} else if (c === Cell.Empty) {
-			state.player = { x: nx, y: ny };
-		} else if (CELL_ORE[c]) {
-			collectOre(state, c);
-			clearCell(state, nx, ny);
-			state.player = { x: nx, y: ny };
+	if (dir) {
+		state.dir = dir;
+		const d = DELTA[dir];
+		const nx = state.player.x + d.x, ny = state.player.y + d.y;
+		if (ny >= 0 && nx >= 0 && nx < COLS) {
+			const c = state.rows[ny][nx];
+			if (c === Cell.Sand) {
+				clearCell(state, nx, ny); // dig — sand never falls
+				state.player = { x: nx, y: ny };
+			} else if (c === Cell.Empty) {
+				state.player = { x: nx, y: ny };
+			} else if (CELL_ORE[c]) {
+				collectOre(state, c);
+				clearCell(state, nx, ny);
+				state.player = { x: nx, y: ny };
+			}
+			// Stone / Bedrock: blocked, the hen stays put (no death)
 		}
-		// Stone / Bedrock: blocked, the hen stays put (no death)
+		if (state.player.y > state.maxDepth) state.maxDepth = state.player.y;
 	}
-	if (state.player.y > state.maxDepth) state.maxDepth = state.player.y;
 	gravityPass(state);
 	state.tick++;
 	return state;
@@ -296,10 +296,13 @@ function gravityPass(state: MineState): void {
 			if (c !== Cell.Stone && !CELL_ORE[c]) continue;
 			const k = cellKey(x, y);
 			if (state.propped.has(k)) continue;
-			const supported = state.rows[y + 1][x] !== Cell.Empty;
+			const groundSupport = state.rows[y + 1][x] !== Cell.Empty; // real cell beneath
+			// The hen holds up a RESTING cell directly above her (blocks the fall from starting),
+			// but a cell already in free-fall ignores her and crushes on contact.
+			const heldByHen = state.player.x === x && state.player.y === y + 1;
 			if (state.falling.has(k)) {
 				state.falling.delete(k);
-				if (supported) continue; // something landed beneath first
+				if (groundSupport) continue; // something landed beneath first
 				state.rows[y][x] = Cell.Empty;
 				const ny = y + 1;
 				if (state.player.x === x && state.player.y === ny) {
@@ -317,11 +320,11 @@ function gravityPass(state: MineState): void {
 				const below = ny + 1 < state.rows.length ? state.rows[ny + 1][x] : Cell.Bedrock;
 				if (below === Cell.Empty) state.falling.add(cellKey(x, ny));
 			} else if (state.wobbles.has(k)) {
-				if (supported) { state.wobbles.delete(k); continue; } // support restored
+				if (groundSupport || heldByHen) { state.wobbles.delete(k); continue; } // support restored
 				const w = state.wobbles.get(k)! - 1;
 				if (w <= 0) { state.wobbles.delete(k); state.falling.add(k); }
 				else state.wobbles.set(k, w);
-			} else if (!supported) {
+			} else if (!groundSupport && !heldByHen) {
 				state.wobbles.set(k, WOBBLE_TICKS);
 			}
 		}

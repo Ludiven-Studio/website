@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-	generateBand, veinStartX, createMine, ensureRows, setDir, stepMine, stepLamp,
+	generateBand, veinStartX, createMine, stepMine, stepLamp,
 	craft, useTool, scoreOf, cellKey, Cell, MINE_DIFFS, ORES, RECIPES,
-	COLS, BAND_H, WOBBLE_TICKS, type MineState,
+	COLS, WOBBLE_TICKS, type MineState,
 } from './engine';
 
 const DIFF = MINE_DIFFS.moyen;
@@ -16,7 +16,7 @@ const snap = (s: MineState) => ({
 	falling: [...s.falling].sort((a, b) => a - b),
 });
 
-/** Controlled 60-row arena: empty interior, bedrock walls + floor, player parked against a wall. */
+/** Controlled 60-row arena: empty interior, bedrock walls + floor, player idle far from action. */
 function arena(): MineState {
 	const s = createMine(1, DIFF);
 	s.rows = [];
@@ -27,8 +27,7 @@ function arena(): MineState {
 		s.rows.push(row);
 	}
 	for (let x = 0; x < COLS; x++) s.rows[59][x] = Cell.Bedrock;
-	s.player = { x: 1, y: 20 };
-	setDir(s, 'left'); // faces the wall → stays put each tick
+	s.player = { x: 1, y: 20 }; // idle: gravity tests call stepMine(s) with no dir
 	return s;
 }
 
@@ -110,8 +109,7 @@ describe('cocotte-mineuse determinism', () => {
 		const run = () => {
 			const s = createMine(42, DIFF);
 			for (let i = 0; i < 300; i++) {
-				setDir(s, script(i));
-				stepMine(s);
+				stepMine(s, script(i));
 				stepLamp(s, 16.67);
 			}
 			return s;
@@ -126,29 +124,29 @@ describe('cocotte-mineuse movement', () => {
 		s.player = { x: 5, y: 10 };
 		s.maxDepth = 10;
 		s.rows[11][5] = Cell.Sand;
-		setDir(s, 'down');
-		stepMine(s);
+		stepMine(s, 'down');
 		expect(s.player).toEqual({ x: 5, y: 11 });
 		expect(s.rows[11][5]).toBe(Cell.Empty);
 		expect(s.maxDepth).toBe(11);
 
 		s.rows[11][6] = Cell.Or;
-		setDir(s, 'right');
-		stepMine(s);
+		stepMine(s, 'right');
 		expect(s.player).toEqual({ x: 6, y: 11 });
 		expect(s.inventory.or).toBe(1);
 		expect(s.collected).toBe(50);
 
 		s.rows[11][7] = Cell.Stone;
-		stepMine(s); // still going right → blocked
+		stepMine(s, 'right'); // blocked by the stone
 		expect(s.player).toEqual({ x: 6, y: 11 });
 		expect(s.status).toBe('playing');
 
 		s.player = { x: 6, y: 0 };
-		setDir(s, 'up'); // y<0 → blocked
-		stepMine(s);
+		stepMine(s, 'up'); // y<0 → blocked
 		expect(s.player).toEqual({ x: 6, y: 0 });
 		expect(s.maxDepth).toBe(11); // unchanged by going up
+
+		stepMine(s); // idle input → the hen stays put
+		expect(s.player).toEqual({ x: 6, y: 0 });
 	});
 });
 
@@ -194,13 +192,27 @@ describe('cocotte-mineuse gravity', () => {
 		expect(s.wobbles.get(cellKey(5, 9))).toBe(WOBBLE_TICKS);
 	});
 
+	it('the hen holds up a resting stone directly above her, which falls once she leaves', () => {
+		const s = arena();
+		s.player = { x: 5, y: 11 };
+		s.rows[10][5] = Cell.Stone; // (5,11) is the hen → nothing beneath the stone but her
+		for (let i = 0; i < 6; i++) stepMine(s); // idle under the stone
+		expect(s.wobbles.size).toBe(0); // held up → never wobbles
+		expect(s.rows[10][5]).toBe(Cell.Stone);
+		expect(s.status).toBe('playing');
+
+		s.rows[13][5] = Cell.Bedrock; // give the stone somewhere to land
+		stepMine(s, 'down'); // step to (5,12): the hen leaves the cell below the stone
+		expect(s.player).toEqual({ x: 5, y: 12 });
+		expect(s.wobbles.get(cellKey(5, 10))).toBe(WOBBLE_TICKS); // now unsupported → wobbles
+	});
+
 	it('a falling stone crushes the hen', () => {
 		const s = arena();
 		s.player = { x: 5, y: 11 };
 		s.rows[12][5] = Cell.Bedrock;
-		setDir(s, 'down'); // blocked → stays under the stone
-		s.rows[9][5] = Cell.Stone; // (5,10) empty → unsupported
-		for (let i = 0; i < 5; i++) stepMine(s); // wobble ×3 ticks + fall to (5,10) + fall into player
+		s.rows[9][5] = Cell.Stone; // (5,10) empty → unsupported, hen too far below to hold it
+		for (let i = 0; i < 5; i++) stepMine(s, 'down'); // blocked below → stays; wobble + fall + crush
 		expect(s.status).toBe('over');
 		expect(s.deathCause).toBe('crush');
 	});
@@ -209,9 +221,8 @@ describe('cocotte-mineuse gravity', () => {
 		const s = arena();
 		s.player = { x: 5, y: 11 };
 		s.rows[12][5] = Cell.Bedrock;
-		setDir(s, 'down');
 		s.rows[9][5] = Cell.Diamant;
-		for (let i = 0; i < 5; i++) stepMine(s);
+		for (let i = 0; i < 5; i++) stepMine(s, 'down');
 		expect(s.status).toBe('playing');
 		expect(s.inventory.diamant).toBe(1);
 		expect(s.collected).toBe(150);
@@ -222,12 +233,11 @@ describe('cocotte-mineuse gravity', () => {
 		const s = arena();
 		s.player = { x: 5, y: 11 };
 		s.rows[12][5] = Cell.Bedrock;
-		setDir(s, 'down');
 		s.rows[9][5] = Cell.Stone;
 		s.inventory.etai = 1;
 		expect(useTool(s, 'etai')).toBe(true);
 		expect(s.propped.has(cellKey(5, 9))).toBe(true);
-		for (let i = 0; i < 10; i++) stepMine(s);
+		for (let i = 0; i < 10; i++) stepMine(s, 'down');
 		expect(s.rows[9][5]).toBe(Cell.Stone);
 		expect(s.status).toBe('playing');
 	});

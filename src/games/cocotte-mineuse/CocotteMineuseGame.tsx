@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-	createMine, setDir, stepMine, stepLamp, craft, useTool, scoreOf, cellKey,
+	createMine, stepMine, stepLamp, craft, useTool, scoreOf, cellKey,
 	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS,
 	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type OreId,
 } from './engine';
@@ -101,6 +101,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const startRef = useRef(0);
 	const cssWRef = useRef(0);
 	const touchRef = useRef<{ x: number; y: number } | null>(null);
+	const heldDirsRef = useRef<Dir[]>([]); // currently-pressed directions (last wins → hold repeats)
+	const bufferDirRef = useRef<Dir | null>(null); // one-shot move so a quick tap/swipe always lands
 	const dailyRef = useRef(false);
 	const triesRef = useRef(0);
 	const benchRef = useRef(false);
@@ -213,6 +215,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	/* ---- Game loop ---- */
 	const stop = useCallback(() => {
 		runningRef.current = false;
+		heldDirsRef.current = [];
+		bufferDirRef.current = null;
 		if (rafRef.current) cancelAnimationFrame(rafRef.current);
 		rafRef.current = 0;
 	}, []);
@@ -269,7 +273,11 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			while (runningRef.current && accRef.current >= tickMs) {
 				accRef.current -= tickMs;
 				prevPlayerRef.current = { ...st.player };
-				stepMine(st);
+				// one input per tick: the held direction (hold = repeat), else a buffered tap
+				const held = heldDirsRef.current;
+				const dir = held.length ? held[held.length - 1] : bufferDirRef.current;
+				bufferDirRef.current = null;
+				stepMine(st, dir);
 				if (st.status === 'over') break;
 			}
 		}
@@ -291,6 +299,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		camYRef.current = 0;
 		accRef.current = 0;
 		hudRef.current = { score: -1, depth: -1, lamp: -1, invSig: '' };
+		heldDirsRef.current = [];
+		bufferDirRef.current = null;
 		lastRef.current = performance.now();
 		startRef.current = Date.now();
 		runningRef.current = true;
@@ -389,15 +399,25 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		draw();
 	}, [gameId, stop, draw, syncHud]);
 
-	/* ---- Input ---- */
-	const turn = useCallback((dir: Dir) => {
+	/* ---- Input (discrete: one cell per press, hold to repeat) ---- */
+	const pressDir = useCallback((dir: Dir) => {
 		if (status === 'over' || dailyLoading || benchRef.current) return;
-		if (status === 'ready') {
-			start();
-			if (stateRef.current) setDir(stateRef.current, dir);
-			return;
-		}
-		if (stateRef.current) setDir(stateRef.current, dir);
+		if (status === 'ready') start();
+		const held = heldDirsRef.current;
+		if (!held.includes(dir)) held.push(dir); // last-pressed wins; repeats each tick while held
+		bufferDirRef.current = dir; // guarantees a fast tap lands even if released before a tick
+	}, [status, dailyLoading, start]);
+
+	const releaseDir = useCallback((dir: Dir) => {
+		const held = heldDirsRef.current;
+		const i = held.indexOf(dir);
+		if (i >= 0) held.splice(i, 1);
+	}, []);
+
+	const stepOnce = useCallback((dir: Dir) => { // one-shot move (swipe)
+		if (status === 'over' || dailyLoading || benchRef.current) return;
+		if (status === 'ready') start();
+		bufferDirRef.current = dir;
 	}, [status, dailyLoading, start]);
 
 	const useToolAction = useCallback((id: ToolId) => {
@@ -415,6 +435,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const toggleBench = useCallback(() => {
 		if (status !== 'playing') return;
 		benchRef.current = !benchRef.current;
+		if (benchRef.current) { heldDirsRef.current = []; bufferDirRef.current = null; } // don't resume a stuck key
 		setBench(benchRef.current);
 	}, [status]);
 
@@ -427,13 +448,21 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === 'Escape' && benchRef.current) { benchRef.current = false; setBench(false); return; }
 			const dir = KEYS[e.key];
-			if (dir) { e.preventDefault(); turn(dir); return; }
+			if (dir) { e.preventDefault(); if (!e.repeat) pressDir(dir); return; } // our tick drives the repeat
 			const tool = TOOLS[e.key];
-			if (tool) useToolAction(tool);
+			if (tool && !e.repeat) useToolAction(tool);
+		};
+		const onKeyUp = (e: KeyboardEvent) => {
+			const dir = KEYS[e.key];
+			if (dir) releaseDir(dir);
 		};
 		window.addEventListener('keydown', onKey, { passive: false });
-		return () => window.removeEventListener('keydown', onKey);
-	}, [turn, useToolAction]);
+		window.addEventListener('keyup', onKeyUp);
+		return () => {
+			window.removeEventListener('keydown', onKey);
+			window.removeEventListener('keyup', onKeyUp);
+		};
+	}, [pressDir, releaseDir, useToolAction]);
 
 	/* Auto-pause when the tab is hidden; resume on return if mid-game. */
 	useEffect(() => {
@@ -441,6 +470,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			if (document.hidden) {
 				if (runningRef.current) {
 					runningRef.current = false;
+					heldDirsRef.current = [];
+					bufferDirRef.current = null;
 					if (rafRef.current) cancelAnimationFrame(rafRef.current);
 					rafRef.current = 0;
 				}
@@ -484,7 +515,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		const dx = t.clientX - s0.x;
 		const dy = t.clientY - s0.y;
 		if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // tap, not swipe
-		turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
+		stepOnce(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
 		touchRef.current = null;
 	};
 
@@ -542,10 +573,18 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 
 				{coarse && status === 'playing' && !bench && (
 					<div className="cm-dpad" aria-hidden="true">
-						<button className="cm-dbtn up" onPointerDown={(e) => { e.preventDefault(); turn('up'); }}>▲</button>
-						<button className="cm-dbtn left" onPointerDown={(e) => { e.preventDefault(); turn('left'); }}>◀</button>
-						<button className="cm-dbtn right" onPointerDown={(e) => { e.preventDefault(); turn('right'); }}>▶</button>
-						<button className="cm-dbtn down" onPointerDown={(e) => { e.preventDefault(); turn('down'); }}>▼</button>
+						{(['up', 'left', 'right', 'down'] as const).map((dir) => (
+							<button
+								key={dir}
+								className={`cm-dbtn ${dir}`}
+								onPointerDown={(e) => { e.preventDefault(); (e.target as HTMLElement).releasePointerCapture?.(e.pointerId); pressDir(dir); }}
+								onPointerUp={() => releaseDir(dir)}
+								onPointerLeave={() => releaseDir(dir)}
+								onPointerCancel={() => releaseDir(dir)}
+							>
+								{dir === 'up' ? '▲' : dir === 'left' ? '◀' : dir === 'right' ? '▶' : '▼'}
+							</button>
+						))}
 					</div>
 				)}
 
