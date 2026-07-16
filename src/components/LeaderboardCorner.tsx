@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { leaderboardEnabled, type Metric } from '../lib/leaderboard';
+import { leaderboardEnabled, type Metric, type ScoreRow } from '../lib/leaderboard';
 import Leaderboard from './Leaderboard';
 
 /* Collapsible corner pill showing the day's leaderboard — shown in free mode
@@ -10,9 +10,11 @@ interface Props {
 	metric: Metric;
 	/** Custom value formatter (e.g. to decode an encoded value). Defaults to time/score. */
 	format?: (v: number) => string;
+	/** Custom rows source, forwarded to Leaderboard (cf. lib/scores getLeaderboard). */
+	source?: () => Promise<ScoreRow[]>;
 }
 
-export default function LeaderboardCorner({ game, metric, format }: Props) {
+export default function LeaderboardCorner({ game, metric, format, source }: Props) {
 	const [open, setOpen] = useState(false);
 	if (!leaderboardEnabled()) return null;
 
@@ -24,7 +26,7 @@ export default function LeaderboardCorner({ game, metric, format }: Props) {
 					<button className="lbc-close" onClick={() => setOpen(false)} aria-label="Fermer">
 						✕
 					</button>
-					<Leaderboard game={game} metric={metric} format={format} />
+					<Leaderboard game={game} metric={metric} format={format} source={source} />
 				</div>
 			)}
 			<button className="lbc-pill" onClick={() => setOpen((o) => !o)} aria-expanded={open}>

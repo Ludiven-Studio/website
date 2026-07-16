@@ -21,6 +21,7 @@ import {
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { submitScore, getLeaderboard } from '../../lib/scores';
 import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
@@ -1093,6 +1094,19 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 					seed: seedRef.current,
 					state: { best: nb, tries: triesRef.current } satisfies DailyState,
 				});
+				// Server-validated submission (Edge Function): quota + best-retained live server-side.
+				void submitScore({
+					gameId,
+					score: Math.round(sc),
+					durationSeconds: Math.max(0.1, (Date.now() - startRef.current) / 1000),
+					rawData: {
+						distance: Math.round(stateRef.current.s),
+						lives: stateRef.current.lives,
+						tries: triesRef.current,
+						seed: seedRef.current,
+					},
+					isDailyChallenge: true,
+				});
 			} else {
 				try {
 					localStorage.setItem(BEST_KEY, String(nb));
@@ -1496,8 +1510,8 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				du jour, la descente est la même pour tout le monde ({MAX_TRIES} essais, meilleure distance classée).
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtPts} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtPts} source={() => getLeaderboard(gameId)} />}
+			{!daily && <LeaderboardCorner game={gameId} metric="score" source={() => getLeaderboard(gameId)} />}
 		</div>
 	);
 }

@@ -21,9 +21,12 @@ interface Props {
 	submitValue?: number;
 	/** Custom value formatter (e.g. to decode an encoded value). Defaults to time/score. */
 	format?: (v: number) => string;
+	/** Custom rows source (e.g. lib/scores getLeaderboard). When set, the internal
+	    submitDaily is skipped — the game submits through the Edge Function itself. */
+	source?: () => Promise<ScoreRow[]>;
 }
 
-export default function Leaderboard({ game, metric, submitValue, format }: Props) {
+export default function Leaderboard({ game, metric, submitValue, format, source }: Props) {
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
 	const [editing, setEditing] = useState(false);
@@ -35,13 +38,13 @@ export default function Leaderboard({ game, metric, submitValue, format }: Props
 	const load = useCallback(async () => {
 		setLoading(true);
 		// Submit whenever the value changes (e.g. a new best lap); submitDaily only posts if it actually beats the day's best.
-		if (submitValue != null && name && submitValue !== lastSubmittedRef.current) {
+		if (!source && submitValue != null && name && submitValue !== lastSubmittedRef.current) {
 			lastSubmittedRef.current = submitValue;
 			await submitDaily(game, submitValue, metric);
 		}
-		setRows(await fetchLeaderboard(game, metric));
+		setRows(source ? await source() : await fetchLeaderboard(game, metric));
 		setLoading(false);
-	}, [game, metric, submitValue, name]);
+	}, [game, metric, submitValue, name, source]);
 
 	useEffect(() => {
 		load();
