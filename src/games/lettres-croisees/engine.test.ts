@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { generatePuzzle, subwordsOf, DIFFS, MAX_DIM, type Puzzle } from './engine';
-import { COMMON_RAW } from '../words/common';
+import { PUZZLE_RAW } from '../words/puzzle';
 import { parseWords, letterCounts, isSubset } from '../words';
 
-const COMMON = new Set(parseWords(COMMON_RAW));
+const PUZZLE = new Set(parseWords(PUZZLE_RAW));
 
 const cellMap = (p: Puzzle): Map<string, string> => {
 	const m = new Map<string, string>();
@@ -29,7 +29,7 @@ const validate = (p: Puzzle, minWords: number): void => {
 	expect(wordSet.size).toBe(p.words.length); // distinct
 	expect(wordSet.has(p.base)).toBe(true);
 	for (const w of p.words) {
-		expect(COMMON.has(w.word), `${w.word} in COMMON`).toBe(true);
+		expect(PUZZLE.has(w.word), `${w.word} in PUZZLE`).toBe(true);
 		expect(isSubset(w.word, counts), `${w.word} subset of ${p.base}`).toBe(true);
 	}
 	for (const b of p.bonus) {

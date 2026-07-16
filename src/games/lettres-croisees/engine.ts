@@ -5,7 +5,7 @@
  */
 
 import { mulberry32, type Rng } from '../prng';
-import { COMMON_RAW } from '../words/common';
+import { PUZZLE_RAW } from '../words/puzzle';
 import { parseWords, byLength, letterCounts, isSubset } from '../words';
 
 export interface PlacedWord { word: string; row: number; col: number; dir: 'h' | 'v'; }
@@ -35,7 +35,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 /** Grid must fit a phone screen above the letter wheel. */
 export const MAX_DIM = 9;
 
-const COMMON = parseWords(COMMON_RAW);
+const PUZZLE = parseWords(PUZZLE_RAW);
 
 const ck = (r: number, c: number): string => `${r},${c}`;
 
@@ -45,10 +45,10 @@ function shuffle<T>(a: T[], rng: Rng): T[] {
 	return x;
 }
 
-/** All COMMON words of length [minLen, base.length] formable from the base letters (incl. the base). */
+/** All PUZZLE words of length [minLen, base.length] formable from the base letters (incl. the base). */
 export function subwordsOf(base: string, minLen: number): string[] {
 	const counts = letterCounts(base);
-	return byLength(COMMON, minLen, base.length).filter((w) => isSubset(w, counts));
+	return byLength(PUZZLE, minLen, base.length).filter((w) => isSubset(w, counts));
 }
 
 /* ---------- Crossword layout ---------- */
@@ -130,7 +130,7 @@ function selectWords(candidates: string[], base: string, target: number, rng: Rn
 
 /** Deterministic puzzle for a seed + difficulty. Never throws (best-effort fallback). */
 export function generatePuzzle(seed: number, diff: DiffLevel): Puzzle {
-	const basePool = byLength(COMMON, diff.baseLen, diff.baseLen);
+	const basePool = byLength(PUZZLE, diff.baseLen, diff.baseLen);
 	let fallback: Puzzle | null = null;
 	for (let attempt = 0; attempt < 150; attempt++) {
 		const rng = mulberry32((seed ^ (attempt * 0x9e3779b1)) >>> 0);

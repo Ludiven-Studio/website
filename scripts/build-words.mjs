@@ -15,6 +15,8 @@ const MIN_LEN = 3, MAX_LEN = 8;
 // Per-length COMMON quotas (top by frequency). Sized so Motus (6-8) and the
 // crossword/boggle short bands (3-5) all have healthy pools.
 const COMMON_QUOTA = { 3: 300, 4: 450, 5: 550, 6: 600, 7: 600, 8: 500 };
+// Puzzle pool per length — noun/adjective/adverb/infinitive only (Lettres Croisées).
+const PUZZLE_QUOTA = { 3: 250, 4: 500, 5: 650, 6: 700, 7: 650, 8: 350 };
 const EXTENDED_CAP = 12000;
 const EXTENDED_MIN_FREQ = 0.2; // films+books occurrences per million — drops noise-tier entries
 const CONTENT_POS = new Set(['NOM', 'VER', 'ADJ', 'ADV']);
@@ -57,9 +59,9 @@ function collect(tsv) {
 		if (i < 0) throw new Error(`Missing column ${name}`);
 		return i;
 	};
-	const iOrtho = col('ortho'), iCgram = col('cgram'), iFilms = col('freqfilms2'), iLivres = col('freqlivres');
+	const iOrtho = col('ortho'), iCgram = col('cgram'), iInfover = col('infover'), iFilms = col('freqfilms2'), iLivres = col('freqlivres');
 
-	// norm word -> { freq: summed occurrences/million, content: has a NOM/VER/ADJ/ADV reading }
+	// norm word -> { freq, content: NOM/VER/ADJ/ADV reading, puzzle: guessable-word reading }
 	const map = new Map();
 	for (let l = 1; l < lines.length; l++) {
 		const f = lines[l].split('\t');
@@ -67,9 +69,15 @@ function collect(tsv) {
 		const norm = normalize(f[iOrtho]);
 		if (!/^[A-Z]+$/.test(norm) || norm.length < MIN_LEN || norm.length > MAX_LEN) continue;
 		const freq = (parseFloat(f[iFilms]) || 0) + (parseFloat(f[iLivres]) || 0);
-		const e = map.get(norm) ?? { freq: 0, content: false };
+		const cgram = f[iCgram];
+		const e = map.get(norm) ?? { freq: 0, content: false, puzzle: false };
 		e.freq += freq;
-		if (CONTENT_POS.has(f[iCgram])) e.content = true;
+		if (CONTENT_POS.has(cgram)) e.content = true;
+		// "Puzzle-clean" = a recognizable dictionary word: noun/adjective/adverb, or a verb
+		// only in its INFINITIVE form. Excludes conjugated forms (AIMAIS, ALLAIT, ARRIVA…),
+		// which read as awkward answers in Lettres Croisées.
+		if (cgram === 'NOM' || cgram === 'ADJ' || cgram === 'ADV') e.puzzle = true;
+		else if (cgram === 'VER' && (f[iInfover] || '').startsWith('inf')) e.puzzle = true;
 		map.set(norm, e);
 	}
 	return map;
@@ -91,7 +99,18 @@ function pick(map) {
 		.slice(0, EXTENDED_CAP)
 		.map((x) => x.w));
 	for (const w of MUST_INCLUDE) if (!common.has(w)) extended.add(w);
-	return { common: [...common].sort(), extended: [...extended].sort() };
+
+	// Puzzle pool (Lettres Croisées): freq-top guessable words per length — nouns,
+	// adjectives, adverbs, infinitives; no conjugations. Bases + grid words draw from here.
+	const puzzle = new Set();
+	for (const [len, quota] of Object.entries(PUZZLE_QUOTA)) {
+		const band = all
+			.filter((x) => x.w.length === Number(len) && x.puzzle && !NOT_A_SOLUTION.has(x.w))
+			.sort((a, b) => b.freq - a.freq)
+			.slice(0, quota);
+		for (const x of band) puzzle.add(x.w);
+	}
+	return { common: [...common].sort(), extended: [...extended].sort(), puzzle: [...puzzle].sort() };
 }
 
 // Emit as a template literal wrapped to ~100-char lines (sorted → gzip-friendly).
@@ -110,13 +129,15 @@ export const ${name} = \`${lines.join('\n')}\`;
 }
 
 const map = collect(await loadTsv());
-const { common, extended } = pick(map);
+const { common, extended, puzzle } = pick(map);
 const byLen = (list) => Object.fromEntries(
 	Array.from({ length: MAX_LEN - MIN_LEN + 1 }, (_, i) => [MIN_LEN + i, list.filter((w) => w.length === MIN_LEN + i).length]),
 );
 console.log('COMMON:', common.length, byLen(common));
 console.log('EXTENDED:', extended.length, byLen(extended));
+console.log('PUZZLE:', puzzle.length, byLen(puzzle));
 await mkdir(OUT_DIR, { recursive: true });
 await writeFile(path.join(OUT_DIR, 'common.ts'), emit('COMMON_RAW', common));
 await writeFile(path.join(OUT_DIR, 'extended.ts'), emit('EXTENDED_RAW', extended));
-console.log(`Wrote ${OUT_DIR}/common.ts + extended.ts`);
+await writeFile(path.join(OUT_DIR, 'puzzle.ts'), emit('PUZZLE_RAW', puzzle));
+console.log(`Wrote ${OUT_DIR}/common.ts + extended.ts + puzzle.ts`);
