@@ -97,7 +97,7 @@ const ALL_ITEMS: ItemId[] = [
 ];
 
 export type MineStatus = 'playing' | 'over';
-export type DeathCause = 'crush' | 'lamp';
+export type DeathCause = 'crush' | 'lamp' | 'win'; // 'win' = the couronne was forged
 
 export interface MineState {
 	seed: number;
@@ -109,6 +109,7 @@ export interface MineState {
 	wobbles: Map<number, number>; // cell key -> wobble ticks remaining
 	falling: Set<number>; // cell keys in free-fall
 	justFell: Set<number>; // keys that moved down this tick (render interpolation only)
+	loose: Set<number>; // ore keys that fell into open space (render bare, no sand behind)
 	propped: Set<number>; // étai-propped cells (never fall)
 	lamp: number; // 0..1
 	detectorMs: number; // gem-reveal time remaining
@@ -203,6 +204,30 @@ export function generateBand(seed: number, band: number, diff: MineDiff): Uint8A
 		}
 	}
 
+	// occasional gem pocket — a cluster of the richest ore in range, so digging into it
+	// dislodges a shower that piles into pyramids (deterministic per band, off the vein)
+	if (band > 0 && rng() < 0.2) {
+		const cx = MIN_X + 1 + Math.floor(rng() * (MAX_X - MIN_X - 1));
+		const cy = 3 + Math.floor(rng() * (BAND_H - 6));
+		const cDepth = band * BAND_H + cy;
+		let pick: OreSpec | null = null;
+		for (const o of ORES) if (cDepth >= o.minDepth && cDepth <= o.maxDepth && o.value >= 20) pick = o;
+		if (pick) {
+			const rad = 1 + Math.floor(rng() * 2); // 1..2 → 3×3 or 5×5 blob
+			for (let dy = -rad; dy <= rad; dy++)
+				for (let dx = -rad; dx <= rad; dx++) {
+					const x = cx + dx, y = cy + dy;
+					if (x < MIN_X || x > MAX_X || y < 0 || y >= BAND_H) continue;
+					if (prot.has(y * COLS + x)) continue; // never seal the vein
+					const cur = rows[y][x];
+					if (cur !== Cell.Sand && !CELL_ORE[cur]) continue; // not into stone/bedrock
+					const d = band * BAND_H + y;
+					if (d < pick.minDepth || d > pick.maxDepth) continue; // keep depth bounds
+					if (rng() < 0.7) rows[y][x] = pick.cell;
+				}
+		}
+	}
+
 	// band 0: open surface where the hen starts
 	if (band === 0)
 		for (let r = 0; r < SURFACE_ROWS; r++)
@@ -227,7 +252,7 @@ export function createMine(seed: number, diff: MineDiff): MineState {
 		seed, diff, rows: [], bandsGenerated: 0,
 		player: { x: Math.floor(COLS / 2), y: 0 },
 		dir: 'down',
-		wobbles: new Map(), falling: new Set(), justFell: new Set(), propped: new Set(),
+		wobbles: new Map(), falling: new Set(), justFell: new Set(), loose: new Set(), propped: new Set(),
 		lamp: 1, detectorMs: 0, inventory: emptyInventory(),
 		maxDepth: 0, collected: 0, craftBonus: 0, status: 'playing', tick: 0,
 	};
@@ -242,8 +267,33 @@ const clearCell = (state: MineState, x: number, y: number): void => {
 	const k = cellKey(x, y);
 	state.wobbles.delete(k);
 	state.falling.delete(k);
+	state.loose.delete(k);
 	state.propped.delete(k);
 };
+
+const isGem = (c: number): boolean => CELL_ORE[c] != null;
+
+/**
+ * Where a stone/gem at (x,y) would move this tick, or null if it rests.
+ * Stones (square) only drop straight down. Gems (round) also roll off another gem when a
+ * side + its diagonal-down are both clear → they pile into pyramids. Bedrock walls block
+ * sideways rolls. `ignoreHen` distinguishes the two cases: a RESTING cell directly above the
+ * hen is held up (she blocks the drop from starting); a cell already in free-fall ignores her
+ * and crushes on contact.
+ */
+function fallTarget(state: MineState, x: number, y: number, c: number, ignoreHen = false): { tx: number; ty: number } | null {
+	if (y + 1 >= state.rows.length) return null;
+	const below = state.rows[y + 1][x];
+	if (below === Cell.Empty) {
+		const heldByHen = !ignoreHen && state.player.x === x && state.player.y === y + 1;
+		return heldByHen ? null : { tx: x, ty: y + 1 };
+	}
+	if (isGem(c) && isGem(below)) {
+		if (state.rows[y][x - 1] === Cell.Empty && state.rows[y + 1][x - 1] === Cell.Empty) return { tx: x - 1, ty: y + 1 };
+		if (state.rows[y][x + 1] === Cell.Empty && state.rows[y + 1][x + 1] === Cell.Empty) return { tx: x + 1, ty: y + 1 };
+	}
+	return null;
+}
 
 const collectOre = (state: MineState, cell: number): void => {
 	const o = CELL_ORE[cell]!;
@@ -293,39 +343,40 @@ function gravityPass(state: MineState): void {
 	for (let y = bottom; y >= top; y--) {
 		for (let x = MIN_X; x <= MAX_X; x++) {
 			const c = state.rows[y][x];
-			if (c !== Cell.Stone && !CELL_ORE[c]) continue;
+			if (c !== Cell.Stone && !isGem(c)) continue;
 			const k = cellKey(x, y);
 			if (state.propped.has(k)) continue;
-			const groundSupport = state.rows[y + 1][x] !== Cell.Empty; // real cell beneath
-			// The hen holds up a RESTING cell directly above her (blocks the fall from starting),
-			// but a cell already in free-fall ignores her and crushes on contact.
-			const heldByHen = state.player.x === x && state.player.y === y + 1;
 			if (state.falling.has(k)) {
 				state.falling.delete(k);
-				if (groundSupport) continue; // something landed beneath first
-				state.rows[y][x] = Cell.Empty;
-				const ny = y + 1;
-				if (state.player.x === x && state.player.y === ny) {
-					if (c === Cell.Stone) {
-						state.rows[ny][x] = c; // crushed under the stone
-						state.status = 'over';
-						state.deathCause = 'crush';
-						return;
-					}
-					collectOre(state, c); // ore caught mid-air
-					continue;
+				const target = fallTarget(state, x, y, c, true); // mid-fall: ignore the hen (she gets crushed)
+				if (!target) continue; // landed or wedged
+				const { tx, ty } = target;
+				if (state.player.x === tx && state.player.y === ty) {
+					// a falling stone OR gem crushes the hen (gems are mined, never caught)
+					state.rows[y][x] = Cell.Empty;
+					state.loose.delete(k);
+					state.rows[ty][tx] = c; // buries her
+					state.status = 'over';
+					state.deathCause = 'crush';
+					return;
 				}
-				state.rows[ny][x] = c;
-				state.justFell.add(cellKey(x, ny));
-				const below = ny + 1 < state.rows.length ? state.rows[ny + 1][x] : Cell.Bedrock;
-				if (below === Cell.Empty) state.falling.add(cellKey(x, ny));
-			} else if (state.wobbles.has(k)) {
-				if (groundSupport || heldByHen) { state.wobbles.delete(k); continue; } // support restored
-				const w = state.wobbles.get(k)! - 1;
-				if (w <= 0) { state.wobbles.delete(k); state.falling.add(k); }
-				else state.wobbles.set(k, w);
-			} else if (!groundSupport && !heldByHen) {
-				state.wobbles.set(k, WOBBLE_TICKS);
+				state.rows[y][x] = Cell.Empty;
+				state.loose.delete(k);
+				state.rows[ty][tx] = c;
+				const nk = cellKey(tx, ty);
+				if (isGem(c)) state.loose.add(nk); // now sitting in open space
+				state.justFell.add(nk);
+				if (fallTarget(state, tx, ty, c, true)) state.falling.add(nk); // keep going next tick
+			} else {
+				const target = fallTarget(state, x, y, c); // resting: the hen holds a cell above her
+				if (state.wobbles.has(k)) {
+					if (!target) { state.wobbles.delete(k); continue; } // support restored
+					const w = state.wobbles.get(k)! - 1;
+					if (w <= 0) { state.wobbles.delete(k); state.falling.add(k); }
+					else state.wobbles.set(k, w);
+				} else if (target) {
+					state.wobbles.set(k, WOBBLE_TICKS);
+				}
 			}
 		}
 	}
@@ -357,6 +408,7 @@ export function craft(state: MineState, id: ItemId): boolean {
 	state.inventory[b]--;
 	state.inventory[id]++;
 	state.craftBonus += r.bonus;
+	if (id === 'couronne') { state.status = 'over'; state.deathCause = 'win'; } // the run's goal
 	return true;
 }
 

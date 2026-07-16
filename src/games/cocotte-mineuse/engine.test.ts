@@ -217,16 +217,48 @@ describe('cocotte-mineuse gravity', () => {
 		expect(s.deathCause).toBe('crush');
 	});
 
-	it('a falling gem is collected, not lethal', () => {
+	it('a falling gem crushes the hen too (gems are mined, never caught)', () => {
 		const s = arena();
 		s.player = { x: 5, y: 11 };
 		s.rows[12][5] = Cell.Bedrock;
 		s.rows[9][5] = Cell.Diamant;
 		for (let i = 0; i < 5; i++) stepMine(s, 'down');
-		expect(s.status).toBe('playing');
-		expect(s.inventory.diamant).toBe(1);
-		expect(s.collected).toBe(150);
-		expect(s.rows[11][5]).toBe(Cell.Empty); // caught, not landed
+		expect(s.status).toBe('over');
+		expect(s.deathCause).toBe('crush');
+		expect(s.inventory.diamant).toBe(0);
+	});
+
+	it('gems roll off gems into pyramids; stones stack flat', () => {
+		const s = arena();
+		for (let x = 3; x <= 7; x++) s.rows[31][x] = Cell.Bedrock; // floor
+		s.rows[30][5] = Cell.Diamant; // support
+		s.rows[29][5] = Cell.Or; // rolls off it, left side clear
+		for (let i = 0; i < 6; i++) stepMine(s); // wobble + roll steps
+		expect(s.rows[29][5]).toBe(Cell.Empty); // left the top of the pile
+		expect(s.rows[30][4]).toBe(Cell.Or); // rolled down-left onto the floor
+		expect(s.loose.has(cellKey(4, 30))).toBe(true); // sits in the open → rendered bare
+
+		// a stone on a stone does NOT roll (square, stacks flat)
+		const t = arena();
+		for (let x = 3; x <= 7; x++) t.rows[31][x] = Cell.Bedrock;
+		t.rows[30][5] = Cell.Stone;
+		t.rows[29][5] = Cell.Stone;
+		for (let i = 0; i < 6; i++) stepMine(t);
+		expect(t.rows[29][5]).toBe(Cell.Stone); // stayed put
+		expect(t.wobbles.size).toBe(0);
+	});
+
+	it('a gem wedged between two blocked sides stays put', () => {
+		const s = arena();
+		for (let x = 3; x <= 7; x++) s.rows[31][x] = Cell.Bedrock; // floor
+		s.rows[30][5] = Cell.Diamant; // support below
+		s.rows[30][4] = Cell.Diamant; // both diagonals blocked
+		s.rows[30][6] = Cell.Diamant;
+		s.rows[29][4] = Cell.Sand; // both sides blocked
+		s.rows[29][6] = Cell.Sand;
+		s.rows[29][5] = Cell.Or; // nowhere to roll
+		for (let i = 0; i < 6; i++) stepMine(s);
+		expect(s.rows[29][5]).toBe(Cell.Or); // held by its neighbours
 	});
 
 	it('a propped stone never falls', () => {
@@ -268,6 +300,8 @@ describe('cocotte-mineuse crafting & tools', () => {
 		expect(s.inventory.bague).toBe(0);
 		expect(s.inventory.couronne).toBe(1);
 		expect(s.craftBonus).toBe(800);
+		expect(s.status).toBe('over'); // the couronne wins the run
+		expect(s.deathCause).toBe('win');
 	});
 
 	it('every recipe id is craftable and consistent', () => {

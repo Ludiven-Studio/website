@@ -78,7 +78,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const [best, setBest] = useState(0);
 	const [inv, setInv] = useState<Record<ItemId, number> | null>(null);
 	const [bench, setBench] = useState(false);
-	const [deathCause, setDeathCause] = useState<'crush' | 'lamp' | null>(null);
+	const [deathCause, setDeathCause] = useState<'crush' | 'lamp' | 'win' | null>(null);
 	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -142,9 +142,10 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				if (st.wobbles.has(k)) sx += Math.sin(now * 0.045 + x * 7 + y * 13) * cell * 0.07;
 
 				if (c === Cell.Sand || CELL_ORE[c]) {
-					// sand body (ores are embedded in sand until they fall)
-					const inSand = c === Cell.Sand || !st.falling.has(k) && !st.justFell.has(k);
-					if (inSand) {
+					const spec = CELL_ORE[c];
+					// an ore is embedded in sand until it falls into open space (loose) or is mid-fall
+					const embedded = spec ? !(st.loose.has(k) || st.falling.has(k) || st.justFell.has(k)) : true;
+					if (c === Cell.Sand || embedded) {
 						ctx.fillStyle = sandColor(y);
 						ctx.fillRect(sx, sy, cell + 0.5, cell + 0.5);
 						ctx.fillStyle = sandDark(y);
@@ -154,13 +155,12 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 						ctx.arc(sx + cell * (0.15 + g2 * 0.7), sy + cell * (0.6 + g1 * 0.3), cell * 0.05, 0, Math.PI * 2);
 						ctx.fill();
 					}
-					const spec = CELL_ORE[c];
 					if (spec) {
 						const exposed =
 							st.rows[y]?.[x + 1] === Cell.Empty || st.rows[y]?.[x - 1] === Cell.Empty ||
 							st.rows[y + 1]?.[x] === Cell.Empty || st.rows[y - 1]?.[x] === Cell.Empty;
 						const near = (x - px) * (x - px) + (y - py) * (y - py) <= DETECT_R2;
-						const revealed = exposed || !inSand || (st.detectorMs > 0 && near);
+						const revealed = !embedded || exposed || (st.detectorMs > 0 && near);
 						drawGem(ctx, sx, sy, cell, GEM_COLOR[spec.id], revealed, st.detectorMs > 0 && near);
 					}
 				} else if (c === Cell.Stone) {
@@ -607,7 +607,10 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					<div className="cm-overlay cm-bench">
 						<div className="cm-overlay-card cm-bench-card">
 							<p className="cm-go-title">🛠 Atelier</p>
-							<p className="cm-bench-hint">Le jeu est en pause… mais la lampe brûle toujours un peu&nbsp;!</p>
+							<p className="cm-bench-hint">
+								Outils pour survivre, bijoux pour le score (bonus en plus des minerais).
+								La <b>couronne</b> 👑 remporte la partie&nbsp;! La lampe brûle encore un peu ici.
+							</p>
 							<div className="cm-recipes">
 								{RECIPES.map((r) => (
 									<button
@@ -624,7 +627,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 										<span className="cm-recipe-arrow">→</span>
 										<span className="cm-recipe-out">
 											{EMOJI[r.id]} {LABEL[r.id]}
-											{r.kind === 'jewel' ? <b> +{r.bonus}</b> : <i> ×{invCount(r.id)}</i>}
+											{r.id === 'couronne' ? <b> 🏆 victoire</b> : r.kind === 'jewel' ? <b> +{r.bonus}</b> : <i> ×{invCount(r.id)}</i>}
 										</span>
 									</button>
 								))}
@@ -640,8 +643,11 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 							<p className="cm-go-title">
 								{daily && alreadyPlayed && deathCause == null
 									? 'Défi du jour terminé'
-									: deathCause === 'crush' ? '💥 Écrasée !' : '🕯 Plus de lumière…'}
+									: deathCause === 'win' ? '👑 Couronne forgée !'
+									: deathCause === 'crush' ? '💥 Écrasée !'
+									: '🕯 Plus de lumière…'}
 							</p>
+							{deathCause === 'win' && <p className="cm-overlay-note">Victoire&nbsp;! Tu as forgé la couronne.</p>}
 							{st && deathCause != null && (
 								<p className="cm-go-detail">
 									Profondeur {st.maxDepth} m · Minerais {st.collected} · Bijoux {st.craftBonus}
@@ -695,39 +701,44 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 
 /* ---------- Canvas helpers ---------- */
 
+/** Square boulder (angular → reads as "stacks flat, never rolls"). */
 function drawStone(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number): void {
 	const m = cell * 0.06;
-	ctx.fillStyle = '#43484f';
+	const s = cell - 2 * m;
+	ctx.fillStyle = '#3d424a';
 	ctx.beginPath();
-	ctx.roundRect(x + m, y + m, cell - 2 * m, cell - 2 * m, cell * 0.3);
+	ctx.roundRect(x + m, y + m, s, s, cell * 0.1);
 	ctx.fill();
+	// top bevel highlight, bottom-right shadow → a chunky cube
 	ctx.fillStyle = '#5d646e';
+	ctx.fillRect(x + m + s * 0.14, y + m + s * 0.12, s * 0.72, s * 0.2);
+	ctx.fillStyle = '#2c3037';
+	ctx.fillRect(x + m + s * 0.14, y + m + s * 0.74, s * 0.72, s * 0.14);
+	ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+	ctx.lineWidth = Math.max(1, cell * 0.03);
 	ctx.beginPath();
-	ctx.roundRect(x + m, y + m, cell - 2 * m, cell - 2.8 * m, cell * 0.3);
-	ctx.fill();
-	ctx.fillStyle = '#43484f';
-	ctx.globalAlpha = 0.7;
-	ctx.beginPath();
-	ctx.arc(x + cell * 0.4, y + cell * 0.55, cell * 0.07, 0, Math.PI * 2);
-	ctx.arc(x + cell * 0.63, y + cell * 0.4, cell * 0.05, 0, Math.PI * 2);
-	ctx.fill();
-	ctx.globalAlpha = 1;
+	ctx.roundRect(x + m, y + m, s, s, cell * 0.1);
+	ctx.stroke();
 }
 
+/** Indestructible bedrock — a beveled solid block with clear borders so it never reads as empty. */
 function drawBedrock(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number, gx: number, gy: number): void {
-	ctx.fillStyle = '#23262c';
+	ctx.fillStyle = '#3a4048';
 	ctx.fillRect(x, y, cell + 0.5, cell + 0.5);
-	ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+	// inner bevel: light top-left, dark bottom-right
+	ctx.fillStyle = 'rgba(255,255,255,0.12)';
+	ctx.fillRect(x, y, cell, cell * 0.14);
+	ctx.fillRect(x, y, cell * 0.14, cell);
+	ctx.fillStyle = 'rgba(0,0,0,0.3)';
+	ctx.fillRect(x, y + cell * 0.86, cell, cell * 0.16);
+	ctx.fillRect(x + cell * 0.86, y, cell * 0.16, cell);
+	// speckle so it reads as hard rock, keyed off the cell coords
+	ctx.fillStyle = 'rgba(0,0,0,0.28)';
+	const h = (gx * 7 + gy * 13) % 3;
+	ctx.fillRect(x + cell * (0.3 + h * 0.18), y + cell * 0.42, cell * 0.12, cell * 0.12);
+	ctx.strokeStyle = 'rgba(0,0,0,0.45)';
 	ctx.lineWidth = 1;
-	ctx.beginPath();
-	if ((gx + gy) % 2) {
-		ctx.moveTo(x, y + cell);
-		ctx.lineTo(x + cell, y);
-	} else {
-		ctx.moveTo(x, y);
-		ctx.lineTo(x + cell, y + cell);
-	}
-	ctx.stroke();
+	ctx.strokeRect(x + 0.5, y + 0.5, cell, cell);
 }
 
 /** Ore lozenge: buried = discreet glint; revealed (exposed/falling/detector) = full gem. */
