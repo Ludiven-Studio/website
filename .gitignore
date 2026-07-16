@@ -2,6 +2,9 @@
 dist/
 # downloaded lexicon cache (build-words.mjs)
 scripts/.cache/
+# supabase CLI local state + deno check lockfile (byproducts, not repo config)
+supabase/.temp/
+deno.lock
 # generated types
 .astro/
 

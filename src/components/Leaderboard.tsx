@@ -11,6 +11,8 @@ import {
 } from '../lib/leaderboard';
 import { games } from '../data/games';
 import { fmtCentis } from '../lib/scoreFormat';
+import { isSecured } from '../data/securedGames';
+import { submitScore, getLeaderboard } from '../lib/scores';
 
 // Time leaderboards store CENTISECONDS; a game may still pass its own `format`.
 
@@ -35,16 +37,20 @@ export default function Leaderboard({ game, metric, submitValue, format, source 
 	const [shareMsg, setShareMsg] = useState('');
 	const lastSubmittedRef = useRef<number | null>(null); // last value sent (re-submit when it improves)
 
+	const secured = isSecured(game);
 	const load = useCallback(async () => {
 		setLoading(true);
-		// Submit whenever the value changes (e.g. a new best lap); submitDaily only posts if it actually beats the day's best.
+		// Submit whenever the value changes (e.g. a new best lap). Secured games go through
+		// the Edge Function (server-side best-retained/quota); legacy games use submitDaily
+		// (which only posts if it beats the day's best). `source` overrides reads entirely.
 		if (!source && submitValue != null && name && submitValue !== lastSubmittedRef.current) {
 			lastSubmittedRef.current = submitValue;
-			await submitDaily(game, submitValue, metric);
+			if (secured) await submitScore({ gameId: game, score: submitValue, isDailyChallenge: true });
+			else await submitDaily(game, submitValue, metric);
 		}
-		setRows(source ? await source() : await fetchLeaderboard(game, metric));
+		setRows(source ? await source() : secured ? await getLeaderboard(game, metric) : await fetchLeaderboard(game, metric));
 		setLoading(false);
-	}, [game, metric, submitValue, name, source]);
+	}, [game, metric, submitValue, name, source, secured]);
 
 	useEffect(() => {
 		load();

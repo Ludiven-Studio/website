@@ -4,7 +4,7 @@
 // games; migrate a game by calling submitScore() and feeding <Leaderboard source>.
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
-import { playerName, leaderboardEnabled, type ScoreRow } from './leaderboard';
+import { playerName, leaderboardEnabled, type Metric, type ScoreRow } from './leaderboard';
 
 const PLAYER_ID_KEY = 'ludiven-player-id';
 
@@ -28,7 +28,9 @@ export const challengeDateUTC = (): string => new Date().toISOString().slice(0, 
 export interface SubmitScoreArgs {
 	gameId: string;
 	score: number;
-	durationSeconds: number;
+	/** Client-measured run length (score games). Time games omit it — the server derives
+	    the duration from the value itself (value_units_per_second), which can't be faked. */
+	durationSeconds?: number;
 	rawData?: Record<string, unknown>;
 	isDailyChallenge?: boolean;
 }
@@ -77,13 +79,14 @@ export async function submitScore(args: SubmitScoreArgs): Promise<SubmitScoreRes
 }
 
 /** Daily top-N from game_scores, shaped like the legacy ScoreRow so
-    <Leaderboard source={...}> renders unchanged. */
-export async function getLeaderboard(gameId: string, day: string = challengeDateUTC(), limit = 50): Promise<ScoreRow[]> {
+    <Leaderboard source={...}> renders unchanged. 'time' → fastest first, 'score' → highest first. */
+export async function getLeaderboard(gameId: string, metric: Metric = 'score', day: string = challengeDateUTC(), limit = 50): Promise<ScoreRow[]> {
 	if (!leaderboardEnabled()) return [];
+	const order = metric === 'time' ? 'score.asc' : 'score.desc';
 	try {
 		const res = await fetch(
 			`${SUPABASE_URL}/rest/v1/game_scores?game_id=eq.${encodeURIComponent(gameId)}&challenge_date=eq.${day}` +
-				`&select=player_name,score,created_at&order=score.desc,created_at.asc&limit=${limit}`,
+				`&select=player_name,score,created_at&order=${order},created_at.asc&limit=${limit}`,
 			{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
 		);
 		if (!res.ok) return [];
