@@ -8,6 +8,24 @@ export interface TutorialStep {
 }
 
 export const TUTORIALS: Record<string, TutorialStep[]> = {
+	'lettres-croisees': [
+		{ emoji: '🎯', title: 'Le but', body: 'Remplis la grille croisée : chaque mot à trouver se compose UNIQUEMENT avec les lettres de la roue, en bas. Le plus long utilise toutes les lettres. Quand tous les mots de la grille sont trouvés, c\'est gagné.' },
+		{ emoji: '👆', title: 'Composer un mot', body: 'Glisse d\'une lettre à l\'autre sur la roue sans lever le doigt (reviens en arrière pour corriger), puis relâche pour valider. Tu peux aussi taper les lettres une à une et confirmer avec ✓. Le bouton 🔀 mélange la roue pour voir les lettres autrement.' },
+		{ emoji: '✨', title: 'Mots bonus', body: 'Un mot français valide qui n\'est pas dans la grille compte en bonus : il fait briller le compteur ✨ mais ne remplit pas la grille. De quoi flamber au passage.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même grille pour tout le monde (graine partagée). Remplis-la le plus vite possible : ton meilleur temps entre au classement.' },
+	],
+	'mot-secret': [
+		{ emoji: '🎯', title: 'Le but', body: 'Devine le mot secret en 6 essais maximum. Sa première lettre est affichée, et chaque essai doit être un mot français de la bonne longueur commençant par cette lettre.' },
+		{ emoji: '🟥', title: 'Les indices', body: 'Après chaque essai : carré ROUGE = lettre bien placée, rond JAUNE = lettre présente ailleurs dans le mot, case sombre = lettre absente. Les lettres confirmées s\'affichent en filigrane sur la ligne suivante.' },
+		{ emoji: '⌨️', title: 'Le clavier', body: 'Tape avec le clavier à l\'écran (ou ton vrai clavier). Les touches se colorent selon ce que tu as appris : rouge, jaune ou éteinte. Les accents ne comptent pas — tout s\'écrit sans accent.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même mot pour tout le monde, un seul essai par jour. Moins tu utilises d\'essais, mieux tu es classé. Un échec est classé après les gagnants — reviens demain !' },
+	],
+	'meli-melo': [
+		{ emoji: '🎯', title: 'Le but', body: 'Forme un maximum de mots français (3 lettres ou plus) en 90 secondes dans la grille 4×4, en reliant des lettres voisines — dans les 8 directions, chaque case au plus une fois par mot.' },
+		{ emoji: '👆', title: 'Tracer', body: 'Glisse de case en case pour tracer le mot puis relâche pour valider (reviens en arrière pour corriger). Tu peux aussi taper les cases une à une et confirmer avec ✓.' },
+		{ emoji: '💎', title: 'Les points', body: 'Plus c\'est long, plus ça rapporte : 3-4 lettres = 1 pt, 5 = 2 pts, 6 = 3 pts, 7 = 5 pts, 8 = 11 pts. À la fin, tu découvres les mots que tu as manqués.' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même grille pour tout le monde, une seule tentative chrono. Le chrono continue même si tu recharges la page — pas de pause ! Ton total de points entre au classement.' },
+	],
 	'cocottes-renards': [
 		{ emoji: '🎯', title: 'Le but', body: 'Un tower defense façon Plants vs Zombies : les renards sortent de la forêt à droite et avancent voie par voie vers les nids du poulailler, tout à gauche. Un renard qui atteint un nid pille la ligne : elle est perdue, mais tu peux la reconstruire (1000 blé) et tu continues sur les autres. Plus aucun nid = partie terminée.' },
 		{ emoji: '🌾', title: 'Ramasser le blé', body: 'Les pondeuses troquent leurs œufs en blé, et il en tombe aussi du ciel : clique les jetons pour les encaisser. Attention, un jeton laissé trop longtemps perd de la valeur (compteur au-dessus) avant d\'être ramassé automatiquement au minimum. Le blé sert à poser tes défenses et à reconstruire un nid.' },

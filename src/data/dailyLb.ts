@@ -48,6 +48,7 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	suite: { fmt: centis },
 	'mots-meles': { fmt: centis },
 	'mots-tournes': { fmt: centis },
+	'lettres-croisees': { fmt: centis },
 	'rond-carre': { fmt: centis },
 	colorgramme: { fmt: centis },
 	sudoku: { fmt: centis },
@@ -63,6 +64,9 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	// Win value below a loss band (cf. LOSS_OFFSET = 100000 in each game)
 	demineur: { fmt: { kind: 'threshold', at: 100000, below: centis, aboveLabel: '💣 ', aboveShowsDelta: true } },
 	codecolor: { fmt: { kind: 'threshold', at: 100000, below: { kind: 'count', one: 'essai', many: 'essais' }, aboveLabel: '❌' } },
+	'mot-secret': { fmt: { kind: 'threshold', at: 100000, below: { kind: 'count', one: 'essai', many: 'essais' }, aboveLabel: '❌' } },
+	// Boggle points (higher is better)
+	'meli-melo': { fmt: score },
 	// Packed strokes/darts/cocottes + time, logged under `<id>-t`
 	angry: { lbId: 'angry-t', fmt: packed('cocottes') },
 	golf: { lbId: 'golf-t', fmt: packed('coups') },

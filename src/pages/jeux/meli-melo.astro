@@ -1,0 +1,60 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import MeliMeloGame from '../../games/meli-melo/MeliMeloGame.tsx';
+import GameTutorial from '../../components/GameTutorial.astro';
+---
+
+<BaseLayout
+	title="Méli-Mélo | Jeux Ludiven Studio"
+	description="Méli-Mélo : relie des lettres voisines dans la grille 4×4 pour former un maximum de mots français en 90 secondes. Les mots longs rapportent gros. Défi du jour à graine partagée, signé Ludiven Studio."
+>
+	<div class="wrapper game-page stack gap-8">
+		<header class="game-head stack gap-2">
+			<a class="back" href="/jeux/">
+				<Icon icon="arrow-left" size="1em" /> Tous les jeux
+			</a>
+			<h1>Méli-Mélo</h1>
+			<p>Relie les lettres voisines — un max de mots en 90 secondes</p>
+			<GameTutorial gameId="meli-melo" />
+		</header>
+
+		<MeliMeloGame client:only="react" gameId="meli-melo" />
+	</div>
+</BaseLayout>
+
+<style>
+	.game-page {
+		align-items: center;
+	}
+	.game-head {
+		text-align: center;
+		align-items: center;
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--gray-300);
+		text-decoration: none;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+	}
+	.back:hover,
+	.back:focus-visible {
+		color: var(--accent-regular);
+	}
+	.game-head h1 {
+		font-size: var(--text-3xl);
+		margin-top: 0.5rem;
+	}
+	.game-head p {
+		color: var(--gray-300);
+	}
+	@media (min-width: 50em) {
+		.game-head h1 {
+			font-size: var(--text-4xl);
+		}
+	}
+</style>
