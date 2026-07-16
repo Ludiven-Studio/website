@@ -275,11 +275,11 @@ const isGem = (c: number): boolean => CELL_ORE[c] != null;
 
 /**
  * Where a stone/gem at (x,y) would move this tick, or null if it rests.
- * Stones (square) only drop straight down. Gems (round) also roll off another gem when a
- * side + its diagonal-down are both clear → they pile into pyramids. Bedrock walls block
- * sideways rolls. `ignoreHen` distinguishes the two cases: a RESTING cell directly above the
- * hen is held up (she blocks the drop from starting); a cell already in free-fall ignores her
- * and crushes on contact.
+ * Stones (square) only drop straight down. Gems (round) also roll off any HARD block below
+ * (stone / gem / bedrock — not the soft, flat sand bed) when a side + its diagonal-down are
+ * both clear → they pile into pyramids. Bedrock walls block sideways rolls. `ignoreHen`
+ * distinguishes the two cases: a RESTING cell directly above the hen is held up (she blocks
+ * the drop from starting); a cell already in free-fall ignores her and crushes on contact.
  */
 function fallTarget(state: MineState, x: number, y: number, c: number, ignoreHen = false): { tx: number; ty: number } | null {
 	if (y + 1 >= state.rows.length) return null;
@@ -288,7 +288,7 @@ function fallTarget(state: MineState, x: number, y: number, c: number, ignoreHen
 		const heldByHen = !ignoreHen && state.player.x === x && state.player.y === y + 1;
 		return heldByHen ? null : { tx: x, ty: y + 1 };
 	}
-	if (isGem(c) && isGem(below)) {
+	if (isGem(c) && below !== Cell.Sand) { // rolls off hard blocks, not off the flat sand bed
 		if (state.rows[y][x - 1] === Cell.Empty && state.rows[y + 1][x - 1] === Cell.Empty) return { tx: x - 1, ty: y + 1 };
 		if (state.rows[y][x + 1] === Cell.Empty && state.rows[y + 1][x + 1] === Cell.Empty) return { tx: x + 1, ty: y + 1 };
 	}

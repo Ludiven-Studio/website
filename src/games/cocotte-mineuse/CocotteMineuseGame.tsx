@@ -705,9 +705,10 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 function drawStone(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number): void {
 	const m = cell * 0.06;
 	const s = cell - 2 * m;
+	const rad = cell * 0.16; // square-ish, just a touch rounded
 	ctx.fillStyle = '#3d424a';
 	ctx.beginPath();
-	ctx.roundRect(x + m, y + m, s, s, cell * 0.1);
+	ctx.roundRect(x + m, y + m, s, s, rad);
 	ctx.fill();
 	// top bevel highlight, bottom-right shadow → a chunky cube
 	ctx.fillStyle = '#5d646e';
@@ -717,7 +718,7 @@ function drawStone(ctx: CanvasRenderingContext2D, x: number, y: number, cell: nu
 	ctx.strokeStyle = 'rgba(0,0,0,0.35)';
 	ctx.lineWidth = Math.max(1, cell * 0.03);
 	ctx.beginPath();
-	ctx.roundRect(x + m, y + m, s, s, cell * 0.1);
+	ctx.roundRect(x + m, y + m, s, s, rad);
 	ctx.stroke();
 }
 

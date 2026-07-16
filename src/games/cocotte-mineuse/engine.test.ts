@@ -248,6 +248,25 @@ describe('cocotte-mineuse gravity', () => {
 		expect(t.wobbles.size).toBe(0);
 	});
 
+	it('a gem rolls off a stone (hard block) into an adjacent hole', () => {
+		const s = arena();
+		for (let x = 3; x <= 7; x++) s.rows[31][x] = Cell.Bedrock; // floor
+		s.rows[30][5] = Cell.Stone; // hard support, left side clear
+		s.rows[29][5] = Cell.Diamant;
+		for (let i = 0; i < 6; i++) stepMine(s);
+		expect(s.rows[29][5]).toBe(Cell.Empty); // rolled off the stone
+		expect(s.rows[30][4]).toBe(Cell.Diamant); // into the hole beside it
+	});
+
+	it('a gem rests on sand (flat bed → no roll) even with a hole beside it', () => {
+		const s = arena();
+		for (let x = 3; x <= 7; x++) s.rows[31][x] = Cell.Bedrock;
+		s.rows[30][5] = Cell.Sand; // soft flat support
+		s.rows[29][5] = Cell.Diamant; // left side open, but sand holds it
+		for (let i = 0; i < 6; i++) stepMine(s);
+		expect(s.rows[29][5]).toBe(Cell.Diamant); // stayed on the sand
+	});
+
 	it('a gem wedged between two blocked sides stays put', () => {
 		const s = arena();
 		for (let x = 3; x <= 7; x++) s.rows[31][x] = Cell.Bedrock; // floor
