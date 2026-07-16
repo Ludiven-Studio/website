@@ -236,11 +236,11 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 				<span className="mm-count">{found.length} mot{found.length > 1 ? 's' : ''}</span>
 				<span className={`mm-time${status === 'playing' && secs <= 10 ? ' urgent' : ''}`}>⏱ {secs}s</span>
 			</div>
-			<div className="mm-timerbar"><div className="mm-timerfill" style={{ width: `${(remaining / (DURATION_S * 1000)) * 100}%` }} /></div>
+			<div className="mm-timerbar"><div className={`mm-timerfill${status === 'playing' && secs <= 10 ? ' urgent' : ''}`} style={{ width: `${(remaining / (DURATION_S * 1000)) * 100}%` }} /></div>
 
 			<div className="mm-playwrap">
 				{celebrating && <Celebration />}
-				<div className={`mm-boardwrap${armed ? ' blurred' : ''}`}>
+				<div className={`mm-boardwrap${armed || status === 'ended' ? ' blurred' : ''}`}>
 					<div
 						ref={boardRef}
 						className="mm-board"
@@ -258,6 +258,15 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 					</div>
 				</div>
 
+				{status === 'ended' && (
+					<div className="mm-overlay">
+						<div className="mm-overlay-card end">
+							<h3>⏱ Temps écoulé&nbsp;!</h3>
+							<div className="mm-bigscore">{total} pts</div>
+							<p>{found.length}/{grid.solutions.length} mots trouvés</p>
+						</div>
+					</div>
+				)}
 				{daily && dailyLoading && <div className="mm-overlay"><div className="mm-overlay-card">Préparation du défi…</div></div>}
 				{armed && !dailyLoading && (
 					<div className="mm-overlay"><div className="mm-overlay-card start">
@@ -325,10 +334,12 @@ const CSS = `
 .mm-status { display: flex; gap: 0.5rem; align-items: center; font-weight: 700; font-size: 13px; margin-bottom: 0.4rem; }
 .mm-score { background: var(--mm); color: var(--accent-text-over); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
 .mm-count, .mm-time { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
-.mm-time.urgent { color: #ff5a5f; animation: mm-pulse 1s infinite; }
+.mm-time { font-size: 16px; font-weight: 800; padding: 6px 16px; border: 1.5px solid var(--gray-700); }
+.mm-time.urgent { color: #ff5a5f; border-color: #ff5a5f; animation: mm-pulse 1s infinite; }
 @keyframes mm-pulse { 50% { opacity: 0.55; } }
-.mm-timerbar { width: 100%; max-width: 360px; height: 5px; background: var(--gray-800); border-radius: 999px; overflow: hidden; margin-bottom: 0.8rem; }
-.mm-timerfill { height: 100%; background: var(--mm); border-radius: 999px; transition: width 0.1s linear; }
+.mm-timerbar { width: 100%; max-width: 360px; height: 8px; background: var(--gray-800); border-radius: 999px; overflow: hidden; margin-bottom: 0.8rem; }
+.mm-timerfill { height: 100%; background: var(--mm); border-radius: 999px; transition: width 0.1s linear, background 0.3s; }
+.mm-timerfill.urgent { background: #e0484d; }
 .mm-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .mm-boardwrap { width: min(88vw, 340px); }
 .mm-boardwrap.blurred { filter: blur(6px); opacity: 0.5; pointer-events: none; }
@@ -359,6 +370,9 @@ const CSS = `
 .mm-overlay-card { background: var(--gray-999); border: 2px solid var(--mm); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); text-align: center; max-width: 280px; }
 .mm-overlay-card.start h3 { margin: 0 0 0.4rem; font-family: var(--font-brand); color: var(--gray-0); font-size: var(--text-xl); }
 .mm-overlay-card.start p { margin: 0 0 0.8rem; font-size: 13px; }
+.mm-overlay-card.end h3 { margin: 0 0 0.3rem; font-family: var(--font-brand); color: var(--gray-0); font-size: var(--text-xl); }
+.mm-overlay-card.end p { margin: 0.3rem 0 0; font-size: 13.5px; }
+.mm-bigscore { font-size: 40px; font-weight: 800; color: var(--mm); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .mm-startbtn { border: none; background: var(--mm); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 17px; border-radius: 999px; padding: 12px 34px; cursor: pointer; box-shadow: var(--shadow-lg); }
 .mm-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1rem; }
 `;

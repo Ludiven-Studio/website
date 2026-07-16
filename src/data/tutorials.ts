@@ -12,6 +12,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎯', title: 'Le but', body: 'Remplis la grille croisée : chaque mot à trouver se compose UNIQUEMENT avec les lettres de la roue, en bas. Le plus long utilise toutes les lettres. Quand tous les mots de la grille sont trouvés, c\'est gagné.' },
 		{ emoji: '👆', title: 'Composer un mot', body: 'Glisse d\'une lettre à l\'autre sur la roue sans lever le doigt (reviens en arrière pour corriger), puis relâche pour valider. Tu peux aussi taper les lettres une à une et confirmer avec ✓. Le bouton 🔀 mélange la roue pour voir les lettres autrement.' },
 		{ emoji: '✨', title: 'Mots bonus', body: 'Un mot français valide qui n\'est pas dans la grille compte en bonus : il fait briller le compteur ✨ mais ne remplit pas la grille. De quoi flamber au passage.' },
+		{ emoji: '💡', title: 'Indice', body: 'Bloqué ? Le bouton Indice révèle un mot de la grille, disponible toutes les 30 secondes. Au défi du jour, l\'attente compte dans ton chrono — à utiliser avec parcimonie !' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'Même grille pour tout le monde (graine partagée). Remplis-la le plus vite possible : ton meilleur temps entre au classement.' },
 	],
 	'mot-secret': [

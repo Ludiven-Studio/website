@@ -211,7 +211,12 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 				{celebrating && <Celebration />}
 				<div className={`ms-board${shake ? ' shake' : ''}`} style={{ ['--len' as string]: len }}>
 					{Array.from({ length: MAX_TRIES }, (_, r) => (
-						<div key={r} className="ms-row">{Array.from({ length: len }, (_, c) => renderCell(r, c))}</div>
+						<div key={r} className="ms-rowwrap">
+							<div className="ms-row">{Array.from({ length: len }, (_, c) => renderCell(r, c))}</div>
+							{r === rows.length && !over && (
+								<button className="ms-rowok" onClick={() => onKey('#')} disabled={current.length < len || dailyLoading} aria-label="Valider ce mot">✓</button>
+							)}
+						</div>
 					))}
 				</div>
 				{daily && dailyLoading && <div className="ms-overlay"><div className="ms-overlay-card">Préparation du défi…</div></div>}
@@ -275,8 +280,11 @@ const CSS = `
 .ms-board { display: flex; flex-direction: column; gap: 5px; }
 .ms-board.shake { animation: ms-shake 0.35s; }
 @keyframes ms-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-7px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+.ms-rowwrap { position: relative; }
+.ms-rowok { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--accent-regular); color: var(--accent-text-over); font-size: 17px; font-weight: 800; cursor: pointer; box-shadow: var(--shadow-sm); }
+.ms-rowok:disabled { opacity: 0.35; cursor: not-allowed; }
 .ms-row { display: grid; grid-template-columns: repeat(var(--len), 1fr); gap: 5px; }
-.ms-cell { width: clamp(34px, calc((100vw - 60px) / var(--len)), 52px); aspect-ratio: 1; background: var(--gray-800); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.ms-cell { width: clamp(32px, calc((100vw - 110px) / var(--len)), 52px); aspect-ratio: 1; background: var(--gray-800); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
 .ms-cell.empty { opacity: 0.55; }
 .ms-cell.cur { background: var(--gray-999); border: 2px solid var(--gray-700); }
 .ms-cell.cur.caret { border-color: var(--accent-regular); }

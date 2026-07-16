@@ -17,6 +17,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 
 type Status = 'playing' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+const HINT_COOLDOWN_S = 30; // one grid word revealed at most every 30 s
 const ck = (r: number, c: number): string => `${r},${c}`;
 
 interface DailyState { found: string[]; bonusFound: string[]; }
@@ -41,6 +42,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [started, setStarted] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
+	const [hintLeft, setHintLeft] = useState(HINT_COOLDOWN_S);
 
 	const wheelRef = useRef<HTMLDivElement | null>(null);
 	const dragging = useRef(false);
@@ -54,6 +56,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const revealDelay = useRef<Map<string, number>>(new Map());
+	const hintReadyAt = useRef(0);
 	const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const { celebrating } = useCelebration(status === 'won');
@@ -66,6 +69,20 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
 	}, [daily, started, status]);
+
+	/* Hint cooldown ticker. */
+	useEffect(() => {
+		if (status !== 'playing' || armed) return;
+		const tick = (): void => setHintLeft(Math.max(0, Math.ceil((hintReadyAt.current - Date.now()) / 1000)));
+		tick();
+		const id = setInterval(tick, 500);
+		return () => clearInterval(id);
+	}, [status, armed, puzzle]);
+
+	const armHint = (): void => {
+		hintReadyAt.current = Date.now() + HINT_COOLDOWN_S * 1000;
+		setHintLeft(HINT_COOLDOWN_S);
+	};
 
 	const setSelBoth = (s: number[]): void => { selRef.current = s; setSel(s); };
 	const setFoundBoth = (f: string[]): void => { foundRef.current = f; setFound(f); };
@@ -92,6 +109,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		setDiffKey(key); setElapsed(0);
 		applyPuzzle(generatePuzzle((Math.random() * 2 ** 31) >>> 0, DIFFS[key]));
 		setStatus('playing');
+		armHint();
 		trackGame(gameId, 'game_started', { difficulty: key, mode: 'free' });
 	}, [gameId]);
 
@@ -115,7 +133,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 			setFoundBoth(st.found ?? []); setBonusBoth(st.bonusFound ?? []);
 			setDailyLoading(false); setStarted(true);
 			if (run.done) { setStatus('won'); setAlreadyPlayed(true); setElapsed(run.finalTime ?? 0); }
-			else { setStatus('playing'); setAlreadyPlayed(false); startRef.current = run.startedAt; setElapsed(Math.round((Date.now() - run.startedAt) / 10)); }
+			else { setStatus('playing'); setAlreadyPlayed(false); startRef.current = run.startedAt; setElapsed(Math.round((Date.now() - run.startedAt) / 10)); armHint(); }
 			return;
 		}
 		setAlreadyPlayed(false); setStatus('playing'); setStarted(false);
@@ -128,6 +146,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const startTimer = useCallback((): void => {
 		const now = Date.now();
 		startRef.current = now; setStarted(true); setElapsed(0);
+		armHint();
 		trackGame(gameId, 'game_started', { mode: 'daily' });
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [], bonusFound: [] } satisfies DailyState });
@@ -138,21 +157,28 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		saveDailyRun(gameId, { startedAt: startRef.current, done: complete, finalTime, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: nf, bonusFound: nb } satisfies DailyState });
 	};
 
+	/* ---------- Reveal a grid word (correct submit or hint) ---------- */
+	const revealGridWord = (word: string): void => {
+		const p = puzzleRef.current;
+		const grid = p.words.find((w) => w.word === word);
+		if (!grid || foundRef.current.includes(word)) return;
+		wordCells(grid).forEach((k, i) => { if (!revealDelay.current.has(k)) revealDelay.current.set(k, i * 40); });
+		const nf = [...foundRef.current, word];
+		setFoundBoth(nf);
+		const complete = nf.length === p.words.length;
+		if (dailyRef.current) {
+			const finalTime = complete ? Math.round((Date.now() - startRef.current) / 10) : undefined;
+			saveDaily(nf, bonusRef.current, complete, finalTime);
+			if (complete) { setElapsed(finalTime!); setStatus('won'); trackGame(gameId, 'game_won'); }
+		} else if (complete) { setStatus('won'); trackGame(gameId, 'game_won'); }
+	};
+
 	/* ---------- Submit a composed word ---------- */
 	const submitWord = (word: string): void => {
 		const p = puzzleRef.current;
 		if (word.length < 3) return;
-		const grid = p.words.find((w) => w.word === word);
-		if (grid && !foundRef.current.includes(word)) {
-			wordCells(grid).forEach((k, i) => { if (!revealDelay.current.has(k)) revealDelay.current.set(k, i * 40); });
-			const nf = [...foundRef.current, word];
-			setFoundBoth(nf);
-			const complete = nf.length === p.words.length;
-			if (dailyRef.current) {
-				const finalTime = complete ? Math.round((Date.now() - startRef.current) / 10) : undefined;
-				saveDaily(nf, bonusRef.current, complete, finalTime);
-				if (complete) { setElapsed(finalTime!); setStatus('won'); trackGame(gameId, 'game_won'); }
-			} else if (complete) { setStatus('won'); trackGame(gameId, 'game_won'); }
+		if (p.words.some((w) => w.word === word) && !foundRef.current.includes(word)) {
+			revealGridWord(word);
 			return;
 		}
 		if (foundRef.current.includes(word) || bonusRef.current.includes(word)) { flash('Déjà trouvé', 'dup'); return; }
@@ -216,6 +242,18 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 			submitWord(word);
 		}
 		// simple tap: keep the selection (tap-to-compose mode, ✓ to submit)
+	};
+
+	/* Hint: reveal the shortest unfound grid word (30 s cooldown — self-penalizing on the chrono). */
+	const revealHint = (): void => {
+		if (status !== 'playing' || armed || Date.now() < hintReadyAt.current) return;
+		const unfound = puzzleRef.current.words
+			.filter((w) => !foundRef.current.includes(w.word))
+			.sort((a, b) => a.word.length - b.word.length);
+		if (!unfound.length) return;
+		armHint();
+		flash(`💡 ${unfound[0].word}`, 'bonus');
+		revealGridWord(unfound[0].word);
 	};
 
 	const tapSubmit = (): void => {
@@ -331,6 +369,10 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 						</div>
 						<button className="lc-shuffle" onClick={shuffleWheel} disabled={armed || status !== 'playing'} aria-label="Mélanger les lettres">🔀</button>
 					</div>
+
+					<button className="lc-hint" onClick={revealHint} disabled={armed || status !== 'playing' || hintLeft > 0}>
+						💡 Indice{status === 'playing' && !armed && hintLeft > 0 ? ` · ${hintLeft}s` : ''}
+					</button>
 				</div>
 
 				{daily && dailyLoading && <div className="lc-overlay"><div className="lc-overlay-card">Préparation du défi…</div></div>}
@@ -399,6 +441,9 @@ const CSS = `
 .lc-letter.sel { background: var(--lc); border-color: var(--lc); color: var(--accent-text-over); }
 .lc-shuffle { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); font-size: 17px; border-radius: 50%; width: 44px; height: 44px; cursor: pointer; }
 .lc-shuffle:disabled { opacity: 0.4; cursor: not-allowed; }
+.lc-hint { margin-top: 0.7rem; border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 999px; padding: 8px 18px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.lc-hint:not(:disabled):hover { border-color: #eec95c; color: #eec95c; }
+.lc-hint:disabled { opacity: 0.45; cursor: not-allowed; }
 .lc-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; }
 .lc-overlay-card { background: var(--gray-999); border: 2px solid var(--lc); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); text-align: center; }
 .lc-overlay-card.start h3 { margin: 0 0 0.4rem; font-family: var(--font-brand); color: var(--gray-0); font-size: var(--text-xl); }
