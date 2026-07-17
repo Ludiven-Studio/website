@@ -795,10 +795,15 @@ function drawBedrock(ctx: CanvasRenderingContext2D, x: number, y: number, cell: 
 	ctx.strokeRect(x + 0.5, y + 0.5, cell, cell);
 }
 
-/** Ore lozenge: buried = discreet glint; revealed (exposed/falling/detector) = full gem. */
+/**
+ * Faceted gemstone (brilliant cut: flat table on top, crown facets, pointed culet below).
+ * Buried ores already read as gems — visible and enticing, just smaller + translucent so the
+ * sand still shows through. Revealed (exposed / falling / detector) = full size, opaque, with
+ * a bright table facet + sparkle. `glow` = detector halo.
+ */
 function drawGem(ctx: CanvasRenderingContext2D, x: number, y: number, cell: number, color: string, revealed: boolean, glow: boolean): void {
 	const cx = x + cell / 2, cy = y + cell / 2;
-	const r = revealed ? cell * 0.32 : cell * 0.18;
+	const r = revealed ? cell * 0.34 : cell * 0.27; // buried gems are now clearly poking through
 	if (glow) {
 		ctx.fillStyle = color;
 		ctx.globalAlpha = 0.35;
@@ -807,22 +812,52 @@ function drawGem(ctx: CanvasRenderingContext2D, x: number, y: number, cell: numb
 		ctx.fill();
 		ctx.globalAlpha = 1;
 	}
-	ctx.globalAlpha = revealed ? 1 : 0.65;
-	ctx.fillStyle = color;
+	ctx.globalAlpha = revealed ? 1 : 0.78;
+
+	// gem outline: table (tblY), girdle (widest), culet (bottom point)
+	const tblY = cy - r * 0.55, girdleY = cy - r * 0.1, culetY = cy + r;
+	const tblX = r * 0.5, girdleX = r * 0.95;
 	ctx.beginPath();
-	ctx.moveTo(cx, cy - r);
-	ctx.lineTo(cx + r, cy);
-	ctx.lineTo(cx, cy + r);
-	ctx.lineTo(cx - r, cy);
+	ctx.moveTo(cx - tblX, tblY);
+	ctx.lineTo(cx + tblX, tblY);
+	ctx.lineTo(cx + girdleX, girdleY);
+	ctx.lineTo(cx, culetY);
+	ctx.lineTo(cx - girdleX, girdleY);
+	ctx.closePath();
+	ctx.fillStyle = color;
+	ctx.fill();
+
+	// darker pavilion (lower facets) for depth
+	ctx.fillStyle = 'rgba(0,0,0,0.24)';
+	ctx.beginPath();
+	ctx.moveTo(cx - girdleX, girdleY);
+	ctx.lineTo(cx + girdleX, girdleY);
+	ctx.lineTo(cx, culetY);
 	ctx.closePath();
 	ctx.fill();
+
+	// bright table facet (top) — the "shine" that makes it read as a gem, kept even when buried
+	ctx.fillStyle = revealed ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.32)';
+	ctx.beginPath();
+	ctx.moveTo(cx - tblX, tblY);
+	ctx.lineTo(cx + tblX, tblY);
+	ctx.lineTo(cx + tblX * 0.55, girdleY);
+	ctx.lineTo(cx - tblX * 0.55, girdleY);
+	ctx.closePath();
+	ctx.fill();
+
 	if (revealed) {
-		ctx.fillStyle = 'rgba(255,255,255,0.55)';
+		// left crown highlight + a little sparkle
+		ctx.fillStyle = 'rgba(255,255,255,0.28)';
 		ctx.beginPath();
-		ctx.moveTo(cx, cy - r * 0.7);
-		ctx.lineTo(cx + r * 0.35, cy - r * 0.1);
-		ctx.lineTo(cx - r * 0.2, cy + r * 0.05);
+		ctx.moveTo(cx - tblX, tblY);
+		ctx.lineTo(cx - tblX * 0.55, girdleY);
+		ctx.lineTo(cx - girdleX, girdleY);
 		ctx.closePath();
+		ctx.fill();
+		ctx.fillStyle = 'rgba(255,255,255,0.92)';
+		ctx.beginPath();
+		ctx.arc(cx - r * 0.24, tblY + r * 0.16, r * 0.11, 0, Math.PI * 2);
 		ctx.fill();
 	}
 	ctx.globalAlpha = 1;

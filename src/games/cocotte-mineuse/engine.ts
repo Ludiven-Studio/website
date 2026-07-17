@@ -2,9 +2,9 @@
  * COCOTTE MINEUSE — pure engine (no UI). Side-view digger: step-based 4-dir movement on a
  * hidden grid — one cell per input, the hen stays put when idle (the component repeats the
  * input while a key is held). Gravity pulls stones/ores (never sand, never the player) and
- * runs every tick regardless of whether the hen moved. A RESTING stone/ore directly above
- * the hen is held up by her (won't start falling until she leaves the cell below); a stone
- * already in free-fall ignores her and crushes on contact, while a falling ore is collected.
+ * runs every tick regardless of whether the hen moved. The hen is NOT support: a stone/ore
+ * left unsupported directly above her wobbles 2 ticks (warning) then falls — a falling stone
+ * crushes, a falling ore is caught.
  * Unsupported cells wobble 2 ticks (warning) then fall 1 cell/tick. Oil lamp drains in real
  * time and bounds the run. 2-ingredient crafting turns ores into tools or jewels.
  * NOTE: step functions mutate state internals (rows / Map / Set) — the component keeps the
@@ -294,17 +294,13 @@ const isGem = (c: number): boolean => CELL_ORE[c] != null;
  * Boulder-Dash rounding: BOTH stones and gems are rounded — they drop straight down into
  * empty, and also ROLL off any HARD block below (stone / gem / bedrock — not the soft, flat
  * sand bed) when a side + its diagonal-down are both clear → they pile into pyramids and only
- * hold when both sides are blocked. Bedrock walls block sideways rolls. `ignoreHen`
- * distinguishes the two support cases: a RESTING object directly above the hen is held up
- * (she blocks the drop from starting); one already in free-fall ignores her.
+ * hold when both sides are blocked. Bedrock walls block sideways rolls. The hen is never
+ * support: an object above her falls onto her (wobble warning first) rather than resting.
  */
-function fallTarget(state: MineState, x: number, y: number, ignoreHen = false): { tx: number; ty: number } | null {
+function fallTarget(state: MineState, x: number, y: number): { tx: number; ty: number } | null {
 	if (y + 1 >= state.rows.length) return null;
 	const below = state.rows[y + 1][x];
-	if (below === Cell.Empty) {
-		const heldByHen = !ignoreHen && state.player.x === x && state.player.y === y + 1;
-		return heldByHen ? null : { tx: x, ty: y + 1 };
-	}
+	if (below === Cell.Empty) return { tx: x, ty: y + 1 };
 	if (below !== Cell.Sand) { // a rounded block rolls off a hard block, not off the flat sand bed
 		if (state.rows[y][x - 1] === Cell.Empty && state.rows[y + 1][x - 1] === Cell.Empty) return { tx: x - 1, ty: y + 1 };
 		if (state.rows[y][x + 1] === Cell.Empty && state.rows[y + 1][x + 1] === Cell.Empty) return { tx: x + 1, ty: y + 1 };
@@ -365,7 +361,7 @@ function gravityPass(state: MineState): void {
 			if (state.propped.has(k)) continue;
 			if (state.falling.has(k)) {
 				state.falling.delete(k);
-				const target = fallTarget(state, x, y, true); // mid-fall: ignore the hen (she gets crushed)
+				const target = fallTarget(state, x, y); // mid-fall: lands on the hen → crush/catch below
 				if (!target) continue; // landed or wedged
 				const { tx, ty } = target;
 				if (state.player.x === tx && state.player.y === ty) {
@@ -386,9 +382,9 @@ function gravityPass(state: MineState): void {
 				const nk = cellKey(tx, ty);
 				if (isGem(c)) state.loose.add(nk); // now sitting in open space
 				state.justFell.add(nk);
-				if (fallTarget(state, tx, ty, true)) state.falling.add(nk); // keep going next tick
+				if (fallTarget(state, tx, ty)) state.falling.add(nk); // keep going next tick
 			} else {
-				const target = fallTarget(state, x, y); // resting: the hen holds a cell above her
+				const target = fallTarget(state, x, y); // resting cell — starts to wobble if unsupported
 				if (state.wobbles.has(k)) {
 					if (!target) { state.wobbles.delete(k); continue; } // support restored
 					const w = state.wobbles.get(k)! - 1;
