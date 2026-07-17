@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	createMine, stepMine, stepLamp, craft, useTool, scoreOf, cellKey,
-	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS, ORE_VALUES, BOMB_FUSE, BLAST_TTL,
+	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS, BOMB_FUSE, BLAST_TTL,
 	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type JewelId, type OreId,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
@@ -32,16 +32,17 @@ interface DailyState {
 
 const EMOJI: Record<ItemId, string> = {
 	charbon: '⚫', silex: '🪨', cuivre: '🟠', fer: '⚪', or: '🟡', cristal: '🔮', diamant: '💎',
-	torche: '🔥', bombe: '💣', etai: '🪵', detecteur: '📡', bague: '💍', collier: '📿', couronne: '👑',
+	torche: '🔥', bombe: '💣', etai: '🪵', detecteur: '📡', pioche: '⛏️', bague: '💍', collier: '📿', couronne: '👑',
 };
 const LABEL: Record<ItemId, string> = {
 	charbon: 'Charbon', silex: 'Silex', cuivre: 'Cuivre', fer: 'Fer', or: 'Or', cristal: 'Cristal', diamant: 'Diamant',
-	torche: 'Torche', bombe: 'Bombe', etai: 'Étai', detecteur: 'Détecteur', bague: 'Bague', collier: 'Collier', couronne: 'Couronne',
+	torche: 'Torche', bombe: 'Bombe', etai: 'Étai', detecteur: 'Détecteur', pioche: 'Pioche', bague: 'Bague', collier: 'Collier', couronne: 'Couronne',
 };
 // What each craftable does — shown as a legend in the workbench and as tool tooltips.
 const RECIPE_HINT: Record<ToolId | JewelId, string> = {
 	torche: 'Recharge la lampe (+25 %)',
 	bombe: 'Posée à tes pieds, explose après 3 s — éloigne-toi !',
+	pioche: 'Casse la pierre juste devant toi',
 	etai: 'Cale la pierre au-dessus de toi — elle ne tombera plus',
 	detecteur: 'Révèle les gemmes proches pendant 10 s',
 	bague: 'Bijou : bonus de score',
@@ -49,7 +50,7 @@ const RECIPE_HINT: Record<ToolId | JewelId, string> = {
 	couronne: 'Assemble bague + diamant → tu gagnes la partie !',
 };
 const ORE_ORDER: OreId[] = ['charbon', 'silex', 'cuivre', 'fer', 'or', 'cristal', 'diamant'];
-const TOOL_ORDER: ToolId[] = ['torche', 'bombe', 'etai', 'detecteur'];
+const TOOL_ORDER: ToolId[] = ['torche', 'bombe', 'pioche', 'etai', 'detecteur'];
 const GEM_COLOR: Record<OreId, string> = {
 	charbon: '#3a3a3a', silex: '#9a9a8c', cuivre: '#d97b4a', fer: '#b9c2cc',
 	or: '#f2c53d', cristal: '#b17bf5', diamant: '#7ee8f0',
@@ -466,7 +467,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
 			w: 'up', s: 'down', a: 'left', d: 'right', z: 'up', q: 'left',
 		};
-		const TOOLS: Record<string, ToolId> = { '1': 'torche', '2': 'bombe', '3': 'etai', '4': 'detecteur' };
+		const TOOLS: Record<string, ToolId> = { '1': 'torche', '2': 'bombe', '3': 'pioche', '4': 'etai', '5': 'detecteur' };
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === 'Escape' && benchRef.current) { benchRef.current = false; setBench(false); return; }
 			const dir = KEYS[e.key];
@@ -588,6 +589,9 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				>
 					🛠 Atelier
 				</button>
+				{status === 'playing' && (
+					<button className="cm-restartbtn" title="Recommencer la partie" onClick={start}>↻</button>
+				)}
 			</div>
 
 			<div className="cm-stage">
@@ -641,47 +645,6 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					<div className="cm-overlay"><div className="cm-overlay-card">Préparation…</div></div>
 				)}
 
-				{bench && st && (
-					<div className="cm-overlay cm-bench">
-						<div className="cm-overlay-card cm-bench-card">
-							<p className="cm-go-title">🛠 Atelier</p>
-							<p className="cm-bench-hint">
-								Combine 2 minerais. Outils pour survivre, bijoux pour le score — la <b>couronne</b> 👑 gagne la partie&nbsp;! La lampe brûle encore un peu ici.
-							</p>
-							<div className="cm-legend">
-								{ORE_ORDER.map((id) => (
-									<span key={id} className="cm-legend-item">{EMOJI[id]} {LABEL[id]}<i>{ORE_VALUES[id]}</i></span>
-								))}
-							</div>
-							<div className="cm-recipes">
-								{RECIPES.map((r) => (
-									<button
-										key={r.id}
-										className={`cm-recipe ${r.kind}`}
-										disabled={!canCraft(r)}
-										onClick={() => craftAction(r.id)}
-									>
-										<span className="cm-recipe-top">
-											<span className="cm-recipe-in">
-												{EMOJI[r.ingredients[0]]}<i>{invCount(r.ingredients[0])}</i>
-												{' + '}
-												{EMOJI[r.ingredients[1]]}<i>{invCount(r.ingredients[1])}</i>
-											</span>
-											<span className="cm-recipe-arrow">→</span>
-											<span className="cm-recipe-out">
-												{EMOJI[r.id]} {LABEL[r.id]}
-												{r.id === 'couronne' ? <b> 🏆 victoire</b> : r.kind === 'jewel' ? <b> +{r.bonus}</b> : <i> ×{invCount(r.id)}</i>}
-											</span>
-										</span>
-										<span className="cm-recipe-desc">{RECIPE_HINT[r.id as ToolId | JewelId]}</span>
-									</button>
-								))}
-							</div>
-							<button className="cm-startbtn sm" onClick={toggleBench}>Reprendre</button>
-						</div>
-					</div>
-				)}
-
 				{status === 'over' && (
 					<div className="cm-overlay">
 						<div className="cm-overlay-card">
@@ -725,12 +688,46 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					</button>
 				))}
 			</div>
+
+			{bench && st && (
+				<div className="cm-overlay cm-bench">
+					<div className="cm-overlay-card cm-bench-card">
+						<p className="cm-go-title">🛠 Atelier</p>
+						<p className="cm-bench-hint">
+							Combine 2 minerais — la <b>couronne</b> 👑 gagne la partie&nbsp;!
+						</p>
+						<div className="cm-recipes">
+							{RECIPES.map((r) => (
+								<button
+									key={r.id}
+									className={`cm-recipe ${r.kind}`}
+									disabled={!canCraft(r)}
+									onClick={() => craftAction(r.id)}
+									title={RECIPE_HINT[r.id as ToolId | JewelId]}
+								>
+									<span className="cm-recipe-out">
+										{EMOJI[r.id]} {LABEL[r.id]}
+										{r.id === 'couronne' ? <b> 🏆</b> : r.kind === 'jewel' ? <b> +{r.bonus}</b> : <i> ×{invCount(r.id)}</i>}
+									</span>
+									<span className="cm-recipe-in">
+										{EMOJI[r.ingredients[0]]}<i>{invCount(r.ingredients[0])}</i>
+										{' '}
+										{EMOJI[r.ingredients[1]]}<i>{invCount(r.ingredients[1])}</i>
+									</span>
+								</button>
+							))}
+						</div>
+						<button className="cm-startbtn sm" onClick={toggleBench}>Reprendre</button>
+					</div>
+				</div>
+			)}
 			</div>
 
 			<p className="cm-help">
 				Flèches ou ZQSD pour creuser dans les 4 directions (glisse ou pavé tactile sur mobile).
 				Les pierres tremblent quand tu creuses dessous… puis tombent — ne reste pas en dessous&nbsp;!
-				Passe à l'atelier pour fabriquer outils et bijoux (touches 1-4 pour les outils).
+				Coincée par des pierres&nbsp;? Crafte une pioche pour en casser une devant toi.
+				Passe à l'atelier pour fabriquer outils et bijoux (touches 1-5 pour les outils).
 			</p>
 
 			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
@@ -1004,31 +1001,23 @@ const CSS = `
 }
 .cm-startbtn.sm { font-size: 15px; padding: 10px 26px; }
 
-.cm-bench-card { width: 340px; }
+.cm-bench-card { width: 340px; max-width: 96%; max-height: 96%; overflow-y: auto; }
 .cm-bench-hint { color: var(--gray-300); font-size: 12px; margin: 0 0 10px; }
-.cm-legend {
-  display: flex; flex-wrap: wrap; gap: 3px 10px; justify-content: center;
-  padding: 7px 8px; margin-bottom: 10px; border-radius: 10px; background: var(--gray-900);
-}
-.cm-legend-item { font-size: 11.5px; color: var(--gray-100); white-space: nowrap; }
-.cm-legend-item i { font-style: normal; color: var(--gray-400); font-size: 10.5px; margin-left: 3px; font-variant-numeric: tabular-nums; }
-.cm-recipes { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.cm-recipes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
 .cm-recipe {
-  display: flex; flex-direction: column; align-items: stretch; gap: 3px; text-align: left;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
   border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0);
-  font: inherit; font-size: 13.5px; border-radius: 10px; padding: 7px 10px; cursor: pointer;
+  font: inherit; font-size: 13px; border-radius: 10px; padding: 6px 9px; cursor: pointer;
 }
 .cm-recipe:disabled { opacity: 0.45; cursor: default; }
 .cm-recipe.jewel { border-color: #b18f2f; }
 .cm-recipe b { color: #e8bb3d; }
 .cm-recipe i { font-style: normal; color: var(--gray-300); font-size: 11.5px; }
-.cm-recipe-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.cm-recipe-in { white-space: nowrap; }
-.cm-recipe-arrow { color: var(--gray-400); }
 .cm-recipe-out { white-space: nowrap; font-weight: 600; }
-.cm-recipe-desc { font-size: 11px; color: var(--gray-400); line-height: 1.3; }
+.cm-recipe-in { white-space: nowrap; font-size: 12px; color: var(--gray-300); }
 
 .cm-stage {
+  position: relative; /* the workbench overlay spans the whole stage, not just the narrow board */
   display: flex; align-items: center; justify-content: center; gap: 6px;
   width: 100%; max-width: 460px;
 }
@@ -1055,6 +1044,12 @@ const CSS = `
   margin-left: 4px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 .cm-benchbtn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.cm-restartbtn {
+  border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0);
+  font: inherit; font-size: 15px; line-height: 1; width: 30px; height: 30px; border-radius: 999px;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.cm-restartbtn:hover { border-color: var(--cm-accent); color: var(--cm-accent); }
 .cm-benchbtn.ready { animation: cm-benchpulse 1.3s ease-in-out infinite; }
 @keyframes cm-benchpulse {
   0%, 100% { transform: scale(1); filter: brightness(1); }

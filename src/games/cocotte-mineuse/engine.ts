@@ -37,7 +37,7 @@ export type CellV = (typeof Cell)[keyof typeof Cell];
 
 export type Dir = 'up' | 'down' | 'left' | 'right';
 export type OreId = 'charbon' | 'silex' | 'cuivre' | 'fer' | 'or' | 'cristal' | 'diamant';
-export type ToolId = 'torche' | 'bombe' | 'etai' | 'detecteur';
+export type ToolId = 'torche' | 'bombe' | 'etai' | 'detecteur' | 'pioche';
 export type JewelId = 'bague' | 'collier' | 'couronne';
 export type ItemId = OreId | ToolId | JewelId;
 
@@ -88,6 +88,7 @@ export interface Recipe {
 export const RECIPES: Recipe[] = [
 	{ id: 'torche', ingredients: ['charbon', 'silex'], kind: 'tool', bonus: 0 },
 	{ id: 'bombe', ingredients: ['charbon', 'fer'], kind: 'tool', bonus: 0 },
+	{ id: 'pioche', ingredients: ['cuivre', 'silex'], kind: 'tool', bonus: 0 },
 	{ id: 'etai', ingredients: ['fer', 'cuivre'], kind: 'tool', bonus: 0 },
 	{ id: 'detecteur', ingredients: ['cuivre', 'cristal'], kind: 'tool', bonus: 0 },
 	{ id: 'bague', ingredients: ['or', 'cristal'], kind: 'jewel', bonus: 200 },
@@ -97,7 +98,7 @@ export const RECIPES: Recipe[] = [
 
 const ALL_ITEMS: ItemId[] = [
 	'charbon', 'silex', 'cuivre', 'fer', 'or', 'cristal', 'diamant',
-	'torche', 'bombe', 'etai', 'detecteur', 'bague', 'collier', 'couronne',
+	'torche', 'bombe', 'etai', 'detecteur', 'pioche', 'bague', 'collier', 'couronne',
 ];
 
 export type MineStatus = 'playing' | 'over';
@@ -497,6 +498,12 @@ export function useTool(state: MineState, id: ToolId): boolean {
 		state.falling.delete(k);
 	} else if (id === 'detecteur') {
 		state.detectorMs = DETECTOR_MS;
+	} else if (id === 'pioche') {
+		// break the stone the hen faces — the way out when boxed in by stones
+		const x = state.player.x + DELTA[state.dir].x;
+		const y = state.player.y + DELTA[state.dir].y;
+		if (y < 0 || x < 0 || x >= COLS || y >= state.rows.length || state.rows[y][x] !== Cell.Stone) return false;
+		clearCell(state, x, y);
 	}
 	state.inventory[id]--;
 	return true;

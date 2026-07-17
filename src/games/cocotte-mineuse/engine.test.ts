@@ -410,6 +410,19 @@ describe('cocotte-mineuse crafting & tools', () => {
 		expect(useTool(s, 'etai')).toBe(false);
 		expect(s.inventory.etai).toBe(1);
 	});
+
+	it('pioche breaks the stone the hen faces; no-op (not consumed) otherwise', () => {
+		const s = arena();
+		s.player = { x: 5, y: 20 };
+		s.dir = 'right';
+		s.inventory.pioche = 1;
+		expect(useTool(s, 'pioche')).toBe(false); // faces empty → nothing to break
+		expect(s.inventory.pioche).toBe(1);
+		s.rows[20][6] = Cell.Stone; // now a stone in front
+		expect(useTool(s, 'pioche')).toBe(true);
+		expect(s.rows[20][6]).toBe(Cell.Empty); // broken
+		expect(s.inventory.pioche).toBe(0); // consumed
+	});
 });
 
 describe('cocotte-mineuse lamp & scoring', () => {
