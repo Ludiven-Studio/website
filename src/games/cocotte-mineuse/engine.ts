@@ -3,10 +3,10 @@
  * hidden grid — one cell per input, the hen stays put when idle (the component repeats the
  * input while a key is held). Gravity pulls stones/ores (never sand, never the player) and
  * runs every tick regardless of whether the hen moved. At contact the hen is a SOLID obstacle:
- * a RESTING stone/ore on top of her or beside her rests on her (won't start falling/rolling onto
- * her) until she steps away; but a stone already in FREE-FALL from above ignores her and crushes
- * on contact, while a falling ore is caught. Unsupported cells wobble 2 ticks (warning) then fall
- * 1 cell/tick. Oil lamp drains in real
+ * a RESTING stone/ore on top of her or beside her rests on her, and a block landing on a hard
+ * block beside her stops on top of it (never rolls onto her). Only a block dropping STRAIGHT
+ * down onto her crushes (stone) or is caught (ore). Unsupported cells wobble 2 ticks (warning)
+ * then fall 1 cell/tick. Oil lamp drains in real
  * time and bounds the run. 2-ingredient crafting turns ores into tools or jewels.
  * NOTE: step functions mutate state internals (rows / Map / Set) — the component keeps the
  * state in a ref (snake pattern); never rely on structural sharing.
@@ -191,12 +191,16 @@ export function generateBand(seed: number, band: number, diff: MineDiff): Uint8A
 		for (let r = by; r < by + h; r++) for (let x = bx; x < bx + w; x++) rows[r][x] = Cell.Bedrock;
 	}
 
-	// stones (the danger) — anywhere off the vein, incl. directly above it
-	for (let r = 0; r < BAND_H; r++)
+	// stones (the danger) — anywhere off the vein, incl. directly above it. Density ramps with
+	// depth (harder the deeper you dig), capped so the world stays dig-able.
+	for (let r = 0; r < BAND_H; r++) {
+		const depth = band * BAND_H + r;
+		const density = Math.min(diff.stoneDensity + depth * 0.0018, diff.stoneDensity + 0.15);
 		for (let x = MIN_X; x <= MAX_X; x++) {
 			if (rows[r][x] !== Cell.Sand || prot.has(r * COLS + x)) continue;
-			if (rng() < diff.stoneDensity) rows[r][x] = Cell.Stone;
+			if (rng() < density) rows[r][x] = Cell.Stone;
 		}
+	}
 
 	// occasional stone barrier — a near-full row of stone (vein gap stays open) that you
 	// bomb through or skirt via the vein. Never seals the world (dig-ability BFS still holds).
@@ -292,22 +296,23 @@ const isGem = (c: number): boolean => CELL_ORE[c] != null;
 
 /**
  * Where a stone/gem at (x,y) would move this tick, or null if it rests.
- * `ignoreHen` splits the two support cases (classic Boulder-Dash). At REST (ignoreHen=false)
- * the hen is a SOLID, FLAT obstacle at contact: a block rests straight on top of her, never
- * rolls off her and never rolls into the cell she occupies → it never STARTS falling onto her.
- * Mid-fall (ignoreHen=true) she is transparent: a block already in free-fall drops through her
- * cell and crushes (stone) or is caught (gem). Boulder-Dash rounding otherwise: blocks drop
- * straight into empty and ROLL off any HARD block below (stone / gem / bedrock — not the soft,
+ * The hen is always SOLID for horizontal ROLLS: a block never rolls off her and never rolls
+ * INTO the cell she occupies — so a block landing on a hard block beside her stops on top of it
+ * instead of rolling onto her. `ignoreHen` only affects the straight VERTICAL drop: at REST
+ * (false) a block resting on her is held; mid-fall (true) a block dropping straight down goes
+ * through her cell and crushes (stone) / is caught (gem). Boulder-Dash rounding otherwise:
+ * blocks drop into empty and roll off any HARD block below (stone / gem / bedrock — not the
  * flat sand bed) when a side + its diagonal-down are both clear → they pile into pyramids.
  */
 function fallTarget(state: MineState, x: number, y: number, ignoreHen = false): { tx: number; ty: number } | null {
 	if (y + 1 >= state.rows.length) return null;
-	const henAt = (cx: number, cy: number): boolean => !ignoreHen && state.player.x === cx && state.player.y === cy;
+	const henAt = (cx: number, cy: number): boolean => state.player.x === cx && state.player.y === cy;
 	const free = (cx: number, cy: number): boolean => state.rows[cy][cx] === Cell.Empty && !henAt(cx, cy);
-	if (free(x, y + 1)) return { tx: x, ty: y + 1 };
+	// vertical drop — ignoreHen lets an already-falling block drop onto (crush) the hen
+	if (state.rows[y + 1][x] === Cell.Empty && (ignoreHen || !henAt(x, y + 1))) return { tx: x, ty: y + 1 };
 	const below = state.rows[y + 1][x];
-	const flatBed = below === Cell.Sand || henAt(x, y + 1); // sand or the resting hen → flat support, no roll
-	if (!flatBed) { // a rounded block rolls off a hard block, but never off the hen or the sand bed
+	const flatBed = below === Cell.Sand || henAt(x, y + 1); // sand or the hen → flat support, no roll
+	if (!flatBed) { // rolls off a hard block, but the hen stays solid → never rolls onto her
 		if (free(x - 1, y) && free(x - 1, y + 1)) return { tx: x - 1, ty: y + 1 };
 		if (free(x + 1, y) && free(x + 1, y + 1)) return { tx: x + 1, ty: y + 1 };
 	}

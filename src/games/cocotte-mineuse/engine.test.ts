@@ -230,6 +230,19 @@ describe('cocotte-mineuse gravity', () => {
 		expect(s.rows[11][5]).toBe(Cell.Empty); // caught, not landed
 	});
 
+	it('a stone landing on a gem beside the hen stops on the gem, not rolling onto her', () => {
+		const s = arena();
+		s.player = { x: 4, y: 12 };
+		s.rows[13][5] = Cell.Bedrock; // support under the diamond
+		s.rows[12][5] = Cell.Diamant; // hard block the falling stone will land on
+		s.rows[12][6] = Cell.Bedrock; // block the right-side roll
+		s.rows[10][5] = Cell.Stone;   // falls down column 5 onto the diamond
+		for (let i = 0; i < 6; i++) stepMine(s); // idle beside it: the hen blocks the sideways roll
+		expect(s.status).toBe('playing'); // (4,12) is NOT crushed
+		expect(s.rows[11][5]).toBe(Cell.Stone); // stone rests on top of the diamond
+		expect(s.rows[12][5]).toBe(Cell.Diamant); // diamond intact
+	});
+
 	it('rounded blocks roll off hard blocks into pyramids (stones and gems alike)', () => {
 		const s = arena();
 		for (let x = 3; x <= 7; x++) s.rows[31][x] = Cell.Bedrock; // floor
