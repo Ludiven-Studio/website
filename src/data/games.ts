@@ -328,7 +328,7 @@ export const games: GameTile[] = [
 	{
 		id: 'cocotte-mineuse',
 		title: 'Cocotte Mineuse',
-		pitch: 'Creuse dans le sable, esquive les pierres qui tombent et collecte les minerais. À l\'atelier, crafte torches, bombes et bijoux avant que la lampe ne s\'éteigne. Défi du jour partagé.',
+		pitch: 'Creuse toujours plus bas pour fuir l\'averse qui dissout le sable et fait tomber les pierres. Collecte les minerais, crafte pioche, bombe et bijoux à l\'atelier, et forge la couronne pour le score. Défi du jour partagé.',
 		icon: 'cocotte-mineuse',
 		href: '/jeux/cocotte-mineuse',
 		status: 'play',

@@ -6,8 +6,10 @@
  * a RESTING stone/ore on top of her or beside her rests on her, and a block landing on a hard
  * block beside her stops on top of it (never rolls onto her). Only a block dropping STRAIGHT
  * down onto her crushes (stone) or is caught (ore). Unsupported cells wobble 2 ticks (warning)
- * then fall 1 cell/tick. Oil lamp drains in real
- * time and bounds the run. 2-ingredient crafting turns ores into tools or jewels.
+ * then fall 1 cell/tick. A downpour line descends from above (accelerating with depth), dissolving
+ * sand so stones drop, and drowns the hen on contact — this bounds the run and forces her deeper.
+ * The oil lamp only dims visibility now (not lethal). 2-ingredient crafting turns ores into tools
+ * or jewels; the couronne is a big score bonus, no longer the run's end.
  * NOTE: step functions mutate state internals (rows / Map / Set) — the component keeps the
  * state in a ref (snake pattern); never rely on structural sharing.
  */
@@ -28,6 +30,13 @@ const DETECTOR_MS = 10_000;
 export const BOMB_FUSE = 3000; // ms before a placed bomb detonates
 export const BOMB_RADIUS = 2; // blast half-width (Chebyshev) — flee ≥3 cells to survive
 export const BLAST_TTL = 420; // ms the explosion flash lingers (render only)
+
+// The downpour: a flood line descends from above, dissolving sand (so stones drop) and drowning
+// the hen if it reaches her row — the pressure that forces her ever deeper.
+export const FLOOD_START = -8; // rows above the surface where the flood begins (grace period)
+const FLOOD_BASE = 0.45; // rows/sec at the surface
+const FLOOD_ACCEL = 0.018; // extra rows/sec per meter of depth reached
+const FLOOD_MAX = 3.2; // rows/sec cap
 
 export const Cell = {
 	Empty: 0, Sand: 1, Stone: 2, Bedrock: 3,
@@ -93,7 +102,7 @@ export const RECIPES: Recipe[] = [
 	{ id: 'detecteur', ingredients: ['cuivre', 'cristal'], kind: 'tool', bonus: 0 },
 	{ id: 'bague', ingredients: ['or', 'cristal'], kind: 'jewel', bonus: 200 },
 	{ id: 'collier', ingredients: ['or', 'diamant'], kind: 'jewel', bonus: 350 },
-	{ id: 'couronne', ingredients: ['bague', 'diamant'], kind: 'jewel', bonus: 600 },
+	{ id: 'couronne', ingredients: ['bague', 'diamant'], kind: 'jewel', bonus: 1500 },
 ];
 
 const ALL_ITEMS: ItemId[] = [
@@ -102,7 +111,7 @@ const ALL_ITEMS: ItemId[] = [
 ];
 
 export type MineStatus = 'playing' | 'over';
-export type DeathCause = 'crush' | 'lamp' | 'bomb' | 'win'; // 'win' = the couronne was forged
+export type DeathCause = 'crush' | 'bomb' | 'flood'; // flood = caught by the downpour
 
 export interface Bomb { x: number; y: number; fuseMs: number; }
 export interface Blast { x: number; y: number; r: number; ttl: number; } // render-only flash
@@ -119,7 +128,9 @@ export interface MineState {
 	justFell: Set<number>; // keys that moved down this tick (render interpolation only)
 	loose: Set<number>; // ore keys that fell into open space (render bare, no sand behind)
 	propped: Set<number>; // étai-propped cells (never fall)
-	lamp: number; // 0..1
+	lamp: number; // 0..1 — light/visibility only (no longer lethal)
+	floodY: number; // world row of the descending downpour line
+	floodRow: number; // last integer row the flood has dissolved
 	detectorMs: number; // gem-reveal time remaining
 	bombs: Bomb[]; // placed, ticking down to detonation
 	blasts: Blast[]; // active explosion flashes (render)
@@ -275,7 +286,7 @@ export function createMine(seed: number, diff: MineDiff): MineState {
 		player: { x: Math.floor(COLS / 2), y: 0 },
 		dir: 'down',
 		wobbles: new Map(), falling: new Set(), justFell: new Set(), loose: new Set(), propped: new Set(),
-		lamp: 1, detectorMs: 0, bombs: [], blasts: [], inventory: emptyInventory(),
+		lamp: 1, floodY: FLOOD_START, floodRow: -1, detectorMs: 0, bombs: [], blasts: [], inventory: emptyInventory(),
 		maxDepth: 0, collected: 0, craftBonus: 0, status: 'playing', tick: 0,
 	};
 	ensureRows(state, LOOKAHEAD);
@@ -430,6 +441,7 @@ function explode(state: MineState, bx: number, by: number): void {
 /**
  * Real-time lamp drain (per frame, not per tick). Also ticks the detector, bomb fuses and
  * blast flashes. Bomb fuses freeze while the workbench is open (the grid is paused there too).
+ * The lamp only dims visibility now — it is no longer lethal (the downpour is the timer).
  */
 export function stepLamp(state: MineState, dtMs: number, workbenchOpen = false): MineState {
 	if (state.status !== 'playing') return state;
@@ -448,10 +460,32 @@ export function stepLamp(state: MineState, dtMs: number, workbenchOpen = false):
 			if (state.status !== 'playing') return state; // caught in the blast
 		}
 	}
+	return state;
+}
 
-	if (state.lamp <= 0) {
+/**
+ * Advance the downpour (real time). Its speed ramps with the depth reached. As the line crosses
+ * a row it dissolves that row's sand → the stones there lose support and drop on the next tick.
+ * It creeps (not freezes) while the workbench is open, so you can't camp there. Drowns on contact.
+ */
+export function stepFlood(state: MineState, dtMs: number, workbenchOpen = false): MineState {
+	if (state.status !== 'playing') return state;
+	const factor = workbenchOpen ? state.diff.workbenchDrainFactor : 1;
+	const speed = Math.min(FLOOD_MAX, FLOOD_BASE + state.maxDepth * FLOOD_ACCEL);
+	state.floodY += speed * (dtMs / 1000) * factor;
+
+	const front = Math.floor(state.floodY);
+	while (state.floodRow < front) {
+		state.floodRow++;
+		if (state.floodRow >= 0 && state.floodRow < state.rows.length) {
+			const row = state.rows[state.floodRow];
+			for (let x = MIN_X; x <= MAX_X; x++) if (row[x] === Cell.Sand) row[x] = Cell.Empty; // rain melts sand
+		}
+	}
+
+	if (state.floodY >= state.player.y) {
 		state.status = 'over';
-		state.deathCause = 'lamp';
+		state.deathCause = 'flood';
 	}
 	return state;
 }
@@ -469,7 +503,6 @@ export function craft(state: MineState, id: ItemId): boolean {
 	state.inventory[b]--;
 	state.inventory[id]++;
 	state.craftBonus += r.bonus;
-	if (id === 'couronne') { state.status = 'over'; state.deathCause = 'win'; } // the run's goal
 	return true;
 }
 

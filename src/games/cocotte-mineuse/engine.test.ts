@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	generateBand, veinStartX, createMine, stepMine, stepLamp,
+	generateBand, veinStartX, createMine, stepMine, stepLamp, stepFlood,
 	craft, useTool, scoreOf, cellKey, Cell, MINE_DIFFS, ORES, RECIPES,
 	COLS, WOBBLE_TICKS, type MineState,
 } from './engine';
@@ -323,7 +323,7 @@ describe('cocotte-mineuse crafting & tools', () => {
 		expect(s.craftBonus).toBe(200);
 	});
 
-	it('couronne is a 2-step chain worth 800 bonus', () => {
+	it('couronne is a 2-step chain — big bonus, does NOT end the run', () => {
 		const s = arena();
 		s.inventory.or = 1;
 		s.inventory.cristal = 1;
@@ -333,9 +333,8 @@ describe('cocotte-mineuse crafting & tools', () => {
 		expect(craft(s, 'couronne')).toBe(true);
 		expect(s.inventory.bague).toBe(0);
 		expect(s.inventory.couronne).toBe(1);
-		expect(s.craftBonus).toBe(800);
-		expect(s.status).toBe('over'); // the couronne wins the run
-		expect(s.deathCause).toBe('win');
+		expect(s.craftBonus).toBe(1700); // bague 200 + couronne 1500
+		expect(s.status).toBe('playing'); // just points now — you keep digging
 	});
 
 	it('every recipe id is craftable and consistent', () => {
@@ -426,16 +425,31 @@ describe('cocotte-mineuse crafting & tools', () => {
 });
 
 describe('cocotte-mineuse lamp & scoring', () => {
-	it('drains in real time, slower at the workbench, 0 → run over', () => {
+	it('lamp drains in real time (slower at the workbench) but is no longer lethal', () => {
 		const s = arena();
 		stepLamp(s, 1000);
 		expect(s.lamp).toBeCloseTo(1 - DIFF.lampDrainPerSec, 6);
 		stepLamp(s, 1000, true);
 		expect(s.lamp).toBeCloseTo(1 - DIFF.lampDrainPerSec * (1 + DIFF.workbenchDrainFactor), 6);
 		s.lamp = 0.001;
-		stepLamp(s, 1000);
+		stepLamp(s, 5000);
+		expect(s.lamp).toBe(0);
+		expect(s.status).toBe('playing'); // out of light ≠ dead
+	});
+
+	it('the downpour dissolves sand as it descends and drowns the hen on contact', () => {
+		const s = arena();
+		s.player = { x: 5, y: 8 };
+		s.floodY = 0.9; s.floodRow = 0; // just above row 1 (row 0 already crossed)
+		for (let x = 1; x <= COLS - 2; x++) s.rows[1][x] = Cell.Sand; // a sand row the flood will cross
+		stepFlood(s, 2000); // advances well past row 1
+		expect(s.rows[1][5]).toBe(Cell.Empty); // sand melted by the rain
+		expect(s.floodY).toBeGreaterThan(1);
+		expect(s.status).toBe('playing'); // line still well above the hen (y=8)
+		s.floodY = 8; // now level with the hen
+		stepFlood(s, 16);
 		expect(s.status).toBe('over');
-		expect(s.deathCause).toBe('lamp');
+		expect(s.deathCause).toBe('flood');
 	});
 
 	it('detector ticks down with the frame clock', () => {

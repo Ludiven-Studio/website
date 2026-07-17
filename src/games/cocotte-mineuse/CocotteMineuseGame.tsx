@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-	createMine, stepMine, stepLamp, craft, useTool, scoreOf, cellKey,
+	createMine, stepMine, stepLamp, stepFlood, craft, useTool, scoreOf, cellKey,
 	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS, BOMB_FUSE, BLAST_TTL,
 	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type JewelId, type OreId,
 } from './engine';
@@ -47,7 +47,7 @@ const RECIPE_HINT: Record<ToolId | JewelId, string> = {
 	detecteur: 'Révèle les gemmes proches pendant 10 s',
 	bague: 'Bijou : bonus de score',
 	collier: 'Bijou : gros bonus de score',
-	couronne: 'Assemble bague + diamant → tu gagnes la partie !',
+	couronne: 'Bijou suprême : énorme bonus de score',
 };
 const ORE_ORDER: OreId[] = ['charbon', 'silex', 'cuivre', 'fer', 'or', 'cristal', 'diamant'];
 const TOOL_ORDER: ToolId[] = ['torche', 'bombe', 'pioche', 'etai', 'detecteur'];
@@ -88,10 +88,11 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const [score, setScore] = useState(0);
 	const [depth, setDepth] = useState(0);
 	const [lampPct, setLampPct] = useState(100);
+	const [floodGap, setFloodGap] = useState(99); // rows between the hen and the downpour
 	const [best, setBest] = useState(0);
 	const [inv, setInv] = useState<Record<ItemId, number> | null>(null);
 	const [bench, setBench] = useState(false);
-	const [deathCause, setDeathCause] = useState<'crush' | 'lamp' | 'bomb' | 'win' | null>(null);
+	const [deathCause, setDeathCause] = useState<'crush' | 'bomb' | 'flood' | null>(null);
 	const [diffKey, setDiffKey] = useState<DiffKey>('moyen');
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -119,7 +120,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false);
 	const triesRef = useRef(0);
 	const benchRef = useRef(false);
-	const hudRef = useRef({ score: -1, depth: -1, lamp: -1, invSig: '' });
+	const hudRef = useRef({ score: -1, depth: -1, lamp: -1, floodGap: -1, invSig: '' });
 
 	/* ---- Drawing ---- */
 	const draw = useCallback((now = 0) => {
@@ -218,6 +219,36 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		ctx.fillStyle = grad;
 		ctx.fillRect(0, 0, w, h);
 
+		// the downpour — a sheet of water above the flood line, with rain streaks + a wavy surface
+		const fy = (st.floodY - camY) * cell;
+		if (fy > -cell) {
+			const top = Math.max(0, Math.min(h, fy));
+			if (top > 0) {
+				const wg = ctx.createLinearGradient(0, 0, 0, top);
+				wg.addColorStop(0, 'rgba(38,86,150,0.5)');
+				wg.addColorStop(1, 'rgba(74,146,210,0.34)');
+				ctx.fillStyle = wg;
+				ctx.fillRect(0, 0, w, top);
+				ctx.strokeStyle = 'rgba(205,232,255,0.4)';
+				ctx.lineWidth = Math.max(1, cell * 0.03);
+				for (let i = 0; i < 24; i++) {
+					const rx = (i * 61 + now * 0.35) % w;
+					const ry = (i * 83 + now * 0.9) % top;
+					ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - cell * 0.12, ry + cell * 0.55); ctx.stroke();
+				}
+			}
+			if (fy > 0 && fy < h) {
+				ctx.strokeStyle = 'rgba(175,222,255,0.95)';
+				ctx.lineWidth = Math.max(1.5, cell * 0.09);
+				ctx.beginPath();
+				for (let x = 0; x <= w; x += 4) {
+					const yy = fy + Math.sin(x * 0.06 + now * 0.005) * cell * 0.14;
+					if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+				}
+				ctx.stroke();
+			}
+		}
+
 		// explosion flashes — brightest, above the vignette
 		for (const bl of st.blasts) drawBlast(ctx, (bl.x + 0.5) * cell, (bl.y - camY + 0.5) * cell, cell, bl.r, bl.ttl);
 	}, []);
@@ -279,6 +310,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		if (st.player.y !== hud.depth) { hud.depth = st.player.y; setDepth(st.player.y); }
 		const lp = Math.ceil(st.lamp * 100);
 		if (lp !== hud.lamp) { hud.lamp = lp; setLampPct(lp); }
+		const gap = Math.max(0, Math.round(st.player.y - st.floodY));
+		if (gap !== hud.floodGap) { hud.floodGap = gap; setFloodGap(gap); }
 		const sig = Object.values(st.inventory).join(',');
 		if (sig !== hud.invSig) { hud.invSig = sig; setInv({ ...st.inventory }); }
 	}, []);
@@ -305,6 +338,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			}
 		}
 		stepLamp(st, dt, benchRef.current);
+		if (st.status === 'playing') stepFlood(st, dt, benchRef.current);
 		// camera eases toward keeping the hen in the upper third
 		const target = Math.max(0, prevPlayerRef.current.y + (st.player.y - prevPlayerRef.current.y) - VISIBLE_ROWS * 0.35);
 		camYRef.current += (target - camYRef.current) * Math.min(1, dt * 0.006);
@@ -321,7 +355,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		prevPlayerRef.current = { ...st.player };
 		camYRef.current = 0;
 		accRef.current = 0;
-		hudRef.current = { score: -1, depth: -1, lamp: -1, invSig: '' };
+		hudRef.current = { score: -1, depth: -1, lamp: -1, floodGap: -1, invSig: '' };
 		heldDirsRef.current = [];
 		bufferDirRef.current = null;
 		lastRef.current = performance.now();
@@ -578,6 +612,9 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			<div className="cm-bar">
 				<span className="cm-chip cm-depth">⛏ {depth} m</span>
 				<span className="cm-chip cm-scorechip">Score {score}</span>
+				{status === 'playing' && (
+					<span className={`cm-chip cm-flood ${floodGap <= 4 ? 'danger' : ''}`} title="Distance avant que l'averse te rattrape">🌧 {floodGap}</span>
+				)}
 				<span className={`cm-lamp ${lampPct <= 25 ? 'low' : ''}`} role="meter" aria-label={`Lampe ${lampPct}%`}>
 					<span className="cm-lampfill" style={{ width: `${lampPct}%` }} />
 					<span className="cm-lampicon">🕯</span>
@@ -635,7 +672,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 						<div className="cm-overlay-card">
 							<p className="cm-go-title">Prêt&nbsp;?</p>
 							<p className="cm-overlay-note">
-								Creuse, ramasse les minerais, fabrique des outils —<br />et remonte à la lumière avant la panne&nbsp;!
+								Creuse toujours plus bas pour fuir l'averse&nbsp;🌧<br />ramasse les minerais et forge la couronne pour le score&nbsp;!
 							</p>
 							<button className="cm-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
 						</div>
@@ -651,12 +688,10 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 							<p className="cm-go-title">
 								{daily && alreadyPlayed && deathCause == null
 									? 'Défi du jour terminé'
-									: deathCause === 'win' ? '👑 Couronne forgée !'
 									: deathCause === 'crush' ? '💥 Écrasée !'
 									: deathCause === 'bomb' ? '💣 Soufflée par la bombe !'
-									: '🕯 Plus de lumière…'}
+									: '🌊 Rattrapée par l\'averse…'}
 							</p>
-							{deathCause === 'win' && <p className="cm-overlay-note">Victoire&nbsp;! Tu as forgé la couronne.</p>}
 							{st && deathCause != null && (
 								<p className="cm-go-detail">
 									Profondeur {st.maxDepth} m · Minerais {st.collected} · Bijoux {st.craftBonus}
@@ -694,7 +729,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					<div className="cm-overlay-card cm-bench-card">
 						<p className="cm-go-title">🛠 Atelier</p>
 						<p className="cm-bench-hint">
-							Combine 2 minerais — la <b>couronne</b> 👑 gagne la partie&nbsp;!
+							Combine 2 minerais — la <b>couronne</b> 👑 rapporte gros&nbsp;! (l'averse continue de descendre)
 						</p>
 						<div className="cm-recipes">
 							{RECIPES.map((r) => (
@@ -725,9 +760,9 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 
 			<p className="cm-help">
 				Flèches ou ZQSD pour creuser dans les 4 directions (glisse ou pavé tactile sur mobile).
-				Les pierres tremblent quand tu creuses dessous… puis tombent — ne reste pas en dessous&nbsp;!
+				L'averse 🌧 descend du ciel, dissout le sable et fait tomber les pierres — creuse toujours plus bas pour la fuir&nbsp;!
 				Coincée par des pierres&nbsp;? Crafte une pioche pour en casser une devant toi.
-				Passe à l'atelier pour fabriquer outils et bijoux (touches 1-5 pour les outils).
+				À l'atelier, fabrique outils et bijoux (touches 1-5) — la couronne 👑 rapporte un gros bonus.
 			</p>
 
 			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
@@ -943,6 +978,8 @@ const CSS = `
 .cm-bar { width: 100%; max-width: 460px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.85rem; }
 .cm-chip { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cm-depth { background: var(--cm-accent); color: var(--accent-text-over); }
+.cm-flood { background: #2f6fb0; color: #eaf4ff; }
+.cm-flood.danger { background: #e05252; animation: cm-blink 0.7s ease-in-out infinite alternate; }
 .cm-lamp {
   position: relative; flex: 1; min-width: 70px; max-width: 150px; height: 22px;
   background: var(--gray-900); border-radius: 999px; overflow: hidden;
