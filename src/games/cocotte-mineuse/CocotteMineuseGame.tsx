@@ -73,6 +73,14 @@ const sandDark = (depth: number): string => {
 	const l = 46 - Math.min(26, depth * 0.11);
 	return `hsl(${h} 34% ${l}%)`;
 };
+/* Lerp two #rrggbb colors — for the atmospheric cave gradient behind the dirt. */
+const mixHex = (a: string, b: string, t: number): string => {
+	const ch = (s: string, i: number): number => parseInt(s.slice(i, i + 2), 16);
+	const r = Math.round(ch(a, 1) + (ch(b, 1) - ch(a, 1)) * t);
+	const g = Math.round(ch(a, 3) + (ch(b, 3) - ch(a, 3)) * t);
+	const bl = Math.round(ch(a, 5) + (ch(b, 5) - ch(a, 5)) * t);
+	return `rgb(${r} ${g} ${bl})`;
+};
 
 export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState<Status>('ready');
@@ -126,8 +134,12 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		const alpha = runningRef.current && !benchRef.current
 			? Math.min(1, accRef.current / diffRef.current.tickMs) : 1;
 
-		// cave background
-		ctx.fillStyle = '#16110c';
+		// cave background — dusk sky at the surface, deepening to a warm indigo dark below
+		const dt = Math.min(1, camY / 90);
+		const bg = ctx.createLinearGradient(0, 0, 0, h);
+		bg.addColorStop(0, mixHex('#3d2d54', '#0c0a14', dt));
+		bg.addColorStop(1, mixHex('#241a2a', '#08060f', dt));
+		ctx.fillStyle = bg;
 		ctx.fillRect(0, 0, w, h);
 
 		const y0 = Math.max(0, Math.floor(camY) - 1);
@@ -947,7 +959,7 @@ const CSS = `
 .game-page.gf-full .cm-help { display: none; }
 .cm-canvas {
   width: 100%; aspect-ratio: ${COLS} / ${VISIBLE_ROWS}; display: block;
-  background: #16110c; border: 1px solid var(--gray-800); border-radius: 12px;
+  background: #2a1f38; border: 1px solid var(--gray-800); border-radius: 12px;
   touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
 .cm-canvas.blurred { filter: blur(9px); }
@@ -955,10 +967,12 @@ const CSS = `
 .cm-dpad {
   position: absolute; right: 10px; bottom: 10px; z-index: 3;
   display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px);
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .cm-dbtn {
   border: none; border-radius: 12px; background: rgba(255,255,255,0.16); color: #fff;
   font-size: 17px; cursor: pointer; backdrop-filter: blur(3px); -webkit-tap-highlight-color: transparent; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .cm-dbtn:active { background: rgba(255,255,255,0.35); }
 .cm-dbtn.up { grid-area: 1 / 2; }
