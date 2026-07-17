@@ -193,28 +193,32 @@ describe('cocotte-mineuse gravity', () => {
 		expect(s.wobbles.get(cellKey(5, 9))).toBe(WOBBLE_TICKS);
 	});
 
-	it('a stone directly above the idle hen wobbles then falls onto her (hen is not support)', () => {
+	it('the hen holds up a resting stone directly above her, which falls once she leaves', () => {
 		const s = arena();
 		s.player = { x: 5, y: 11 };
-		s.rows[10][5] = Cell.Stone; // (5,11) is the hen → nothing beneath the stone but her
-		stepMine(s); // idle: unsupported over the hen → starts its wobble warning
-		expect(s.wobbles.get(cellKey(5, 10))).toBe(WOBBLE_TICKS);
-		for (let i = 0; i < 5; i++) stepMine(s); // wobble out, then drop onto the hen
-		expect(s.status).toBe('over');
-		expect(s.deathCause).toBe('crush');
+		s.rows[10][5] = Cell.Stone; // (5,11) is the hen → the stone rests on her (she is solid)
+		for (let i = 0; i < 6; i++) stepMine(s); // idle under the stone
+		expect(s.wobbles.size).toBe(0); // solid support → never wobbles
+		expect(s.rows[10][5]).toBe(Cell.Stone);
+		expect(s.status).toBe('playing');
+
+		s.rows[13][5] = Cell.Bedrock; // give the stone somewhere to land
+		stepMine(s, 'down'); // step to (5,12): the hen leaves the cell below the stone
+		expect(s.player).toEqual({ x: 5, y: 12 });
+		expect(s.wobbles.get(cellKey(5, 10))).toBe(WOBBLE_TICKS); // now unsupported → wobbles
 	});
 
-	it('a falling stone crushes the hen', () => {
+	it('a stone falling from above crushes the hen', () => {
 		const s = arena();
 		s.player = { x: 5, y: 11 };
 		s.rows[12][5] = Cell.Bedrock;
-		s.rows[9][5] = Cell.Stone; // (5,10) empty → unsupported, hen too far below to hold it
+		s.rows[9][5] = Cell.Stone; // (5,10) empty → unsupported above the hen, falls onto her
 		for (let i = 0; i < 5; i++) stepMine(s, 'down'); // blocked below → stays; wobble + fall + crush
 		expect(s.status).toBe('over');
 		expect(s.deathCause).toBe('crush');
 	});
 
-	it('a falling gem is caught (collected), not lethal', () => {
+	it('a gem falling from above is caught (collected), not lethal', () => {
 		const s = arena();
 		s.player = { x: 5, y: 11 };
 		s.rows[12][5] = Cell.Bedrock;
