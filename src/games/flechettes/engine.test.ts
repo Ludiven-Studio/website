@@ -33,7 +33,7 @@ describe('flechettes engine', () => {
 			for (let t = 0; t < 2000; t += 137) {
 				const a = sweep(123, 0, 0, d, t);
 				expect(sweep(123, 0, 0, d, t)).toBe(a); // deterministic
-				expect(Math.abs(a)).toBeLessThanOrEqual(SWEEP_AMP + 1e-9); // stays on the board
+				expect(Math.abs(a)).toBeLessThanOrEqual(SWEEP_AMP + 1e-9); // bounded by the amplitude
 			}
 			expect(sweep(123, 0, 0, d, 500)).not.toEqual(sweep(123, 1, 0, d, 500)); // per dart
 			expect(sweep(123, 0, 0, d, 500)).not.toEqual(sweep(123, 0, 1, d, 500)); // per axis (X vs Y)

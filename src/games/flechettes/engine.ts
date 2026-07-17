@@ -53,19 +53,19 @@ export const DIFFS: Record<string, DiffLevel> = {
 	difficile: { label: 'Difficile', omega: 4.3 },
 };
 
-export const SWEEP_AMP = 0.92; // how far across the board a sweep travels (board radius = 1)
+export const SWEEP_AMP = 1.02; // travels just PAST the board edge so the outer doubles are reachable
 
 /**
- * Deterministic 1-D aim sweep for one dart along one axis (0 = horizontal, 1 = vertical): a
- * triangle wave in [-SWEEP_AMP, SWEEP_AMP] so it crosses the board at constant speed. Seeded by
- * (seed, dartIndex, axis) so the daily is fair — only the player's tap timing picks the value.
+ * Deterministic 1-D aim sweep for one dart along one axis (0 = horizontal, 1 = vertical): a sine
+ * in [-SWEEP_AMP, SWEEP_AMP]. Sine (not triangle) slows near the extremes, so the outer double
+ * ring gets a generous timing window while the centre bull stays hard. It overshoots the rim
+ * slightly (miss if you stop there). Seeded by (seed, dartIndex, axis) so the daily is fair.
  */
 export function sweep(seed: number, dartIndex: number, axis: number, diff: DiffLevel, tMs: number): number {
 	const rng = mulberry32((seed + dartIndex * 0x9e3779b1 + axis * 0x85ebca6b) >>> 0);
 	const w = diff.omega * (0.9 + rng() * 0.25);
 	const phase = rng() * Math.PI * 2;
-	const tri = (2 / Math.PI) * Math.asin(Math.sin(w * (tMs / 1000) + phase)); // triangle in [-1,1]
-	return SWEEP_AMP * tri;
+	return SWEEP_AMP * Math.sin(w * (tMs / 1000) + phase);
 }
 
 /* ---------- Score (darts + time tiebreak) ---------- */

@@ -296,35 +296,38 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			if (statusRef.current === 'aiming') {
 				const now = (typeof performance !== 'undefined' ? performance.now() : 0);
 				const dt = now - phaseStartRef.current;
+				// chord of the board disc at normalised offset n (clamped so an off-rim sweep still draws)
 				const vLine = (nx: number, color: string, lw: number) => {
-					if (Math.abs(nx) >= 1) return;
-					const half = Math.sqrt(1 - nx * nx) * R, x = cx + nx * R;
+					const c = Math.max(-1, Math.min(1, nx));
+					const half = Math.sqrt(Math.max(0, 1 - c * c)) * R, x = cx + c * R;
 					ctx.strokeStyle = color; ctx.lineWidth = lw;
 					ctx.beginPath(); ctx.moveTo(x, cy - half); ctx.lineTo(x, cy + half); ctx.stroke();
 				};
 				const hLine = (ny: number, color: string, lw: number) => {
-					if (Math.abs(ny) >= 1) return;
-					const half = Math.sqrt(1 - ny * ny) * R, y = cy + ny * R;
+					const c = Math.max(-1, Math.min(1, ny));
+					const half = Math.sqrt(Math.max(0, 1 - c * c)) * R, y = cy + c * R;
 					ctx.strokeStyle = color; ctx.lineWidth = lw;
 					ctx.beginPath(); ctx.moveTo(cx - half, y); ctx.lineTo(cx + half, y); ctx.stroke();
 				};
 				if (aimPhaseRef.current === 'x') {
 					const sx = sweep(seedRef.current, dartIdxRef.current, 0, diffRef.current, dt);
+					const off = Math.abs(sx) >= 1; // past the rim → this would miss
 					vLine(sx, 'rgba(0,0,0,0.55)', 5.5); // dark underlay for contrast on the busy board
-					vLine(sx, '#ffffff', 2.6);
-					ctx.fillStyle = '#ff3b30'; // arrow caps top & bottom
-					const ax = cx + sx * R;
-					ctx.beginPath(); ctx.moveTo(ax - 7, cy - R * 1.04); ctx.lineTo(ax + 7, cy - R * 1.04); ctx.lineTo(ax, cy - R * 0.9); ctx.closePath(); ctx.fill();
-					ctx.beginPath(); ctx.moveTo(ax - 7, cy + R * 1.04); ctx.lineTo(ax + 7, cy + R * 1.04); ctx.lineTo(ax, cy + R * 0.9); ctx.closePath(); ctx.fill();
+					vLine(sx, off ? '#ff6b52' : '#ffffff', 2.6);
+					ctx.fillStyle = off ? '#ff6b52' : '#ff3b30'; // arrow caps track the sweep past the rim
+					const ax = cx + Math.max(-1.06, Math.min(1.06, sx)) * R;
+					ctx.beginPath(); ctx.moveTo(ax - 7, cy - R * 1.06); ctx.lineTo(ax + 7, cy - R * 1.06); ctx.lineTo(ax, cy - R * 0.92); ctx.closePath(); ctx.fill();
+					ctx.beginPath(); ctx.moveTo(ax - 7, cy + R * 1.06); ctx.lineTo(ax + 7, cy + R * 1.06); ctx.lineTo(ax, cy + R * 0.92); ctx.closePath(); ctx.fill();
 				} else {
 					vLine(lockedXRef.current, 'rgba(0,0,0,0.45)', 4.5); // X locked in
 					vLine(lockedXRef.current, '#7ac8ff', 2.6);
 					const sy = sweep(seedRef.current, dartIdxRef.current, 1, diffRef.current, dt);
+					const miss = Math.hypot(lockedXRef.current, sy) >= 1; // off the scoring disc
 					hLine(sy, 'rgba(0,0,0,0.55)', 5.5);
-					hLine(sy, '#ffffff', 2.6);
-					const px = cx + lockedXRef.current * R, py = cy + sy * R, rr = R * 0.055;
+					hLine(sy, miss ? '#ff6b52' : '#ffffff', 2.6);
+					const px = cx + lockedXRef.current * R, py = cy + Math.max(-1.06, Math.min(1.06, sy)) * R, rr = R * 0.055;
 					ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.stroke();
-					ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.stroke();
+					ctx.strokeStyle = miss ? '#ff6b52' : '#ffffff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, rr, 0, Math.PI * 2); ctx.stroke();
 					ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.arc(px, py, 2.4, 0, Math.PI * 2); ctx.fill();
 				}
 			}
