@@ -581,6 +581,22 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					<span className="cm-lampfill" style={{ width: `${lampPct}%` }} />
 					<span className="cm-lampicon">🕯</span>
 				</span>
+				<button
+					className={`cm-benchbtn ${status === 'playing' && RECIPES.some((r) => canCraft(r)) ? 'ready' : ''}`}
+					disabled={status !== 'playing'}
+					onClick={toggleBench}
+				>
+					🛠 Atelier
+				</button>
+			</div>
+
+			<div className="cm-stage">
+			<div className="cm-side cm-ores" aria-label="Minerais collectés">
+				{ORE_ORDER.map((id) => (
+					<span key={id} className={`cm-item ${invCount(id) ? '' : 'empty'}`} title={LABEL[id]}>
+						{EMOJI[id]}<i>{invCount(id)}</i>
+					</span>
+				))}
 			</div>
 
 			<div className="cm-boardwrap">
@@ -696,13 +712,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<div className="cm-invbar">
-				{ORE_ORDER.map((id) => (
-					<span key={id} className={`cm-item ${invCount(id) ? '' : 'empty'}`} title={LABEL[id]}>
-						{EMOJI[id]}<i>{invCount(id)}</i>
-					</span>
-				))}
-				<span className="cm-invsep" />
+			<div className="cm-side cm-tools" aria-label="Pouvoirs">
 				{TOOL_ORDER.map((id, i) => (
 					<button
 						key={id}
@@ -714,13 +724,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 						{EMOJI[id]}<i>{invCount(id)}</i>
 					</button>
 				))}
-				<button
-					className={`cm-benchbtn ${status === 'playing' && RECIPES.some((r) => canCraft(r)) ? 'ready' : ''}`}
-					disabled={status !== 'playing'}
-					onClick={toggleBench}
-				>
-					🛠 Atelier
-				</button>
+			</div>
 			</div>
 
 			<p className="cm-help">
@@ -939,7 +943,7 @@ const CSS = `
 }
 .cm-pill.active { background: var(--accent-regular); color: var(--accent-text-over); border-color: var(--accent-regular); }
 
-.cm-bar { width: 100%; max-width: 420px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.85rem; }
+.cm-bar { width: 100%; max-width: 460px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.85rem; }
 .cm-chip { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cm-depth { background: var(--cm-accent); color: var(--accent-text-over); }
 .cm-lamp {
@@ -1024,10 +1028,17 @@ const CSS = `
 .cm-recipe-out { white-space: nowrap; font-weight: 600; }
 .cm-recipe-desc { font-size: 11px; color: var(--gray-400); line-height: 1.3; }
 
-.cm-invbar {
-  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px;
-  width: 100%; max-width: 420px; margin-top: 0.7rem;
+.cm-stage {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; max-width: 460px;
 }
+.cm-stage .cm-boardwrap { flex: 1 1 auto; min-width: 0; }
+.cm-side {
+  display: flex; flex-direction: column; justify-content: center; gap: 5px;
+  flex: 0 0 auto; align-self: stretch;
+}
+.cm-side .cm-item { justify-content: center; min-width: 42px; padding: 5px 7px; font-size: 15px; }
+.cm-side .cm-item i { font-size: 12.5px; }
 .cm-item {
   display: inline-flex; align-items: center; gap: 2px;
   background: var(--gray-900); border: 1.5px solid transparent; border-radius: 999px;
@@ -1035,7 +1046,6 @@ const CSS = `
 }
 .cm-item i { font-style: normal; font-size: 11.5px; color: var(--gray-300); font-variant-numeric: tabular-nums; }
 .cm-item.empty { opacity: 0.4; }
-.cm-invsep { width: 1px; height: 18px; background: var(--gray-700); margin-inline: 3px; }
 .cm-tool { cursor: pointer; border-color: var(--gray-700); font: inherit; font-size: 13px; }
 .cm-tool:disabled { opacity: 0.35; cursor: default; }
 .cm-tool:not(:disabled):hover { border-color: var(--cm-accent); }
