@@ -17,8 +17,8 @@ const MIN_LEN = 3, MAX_LEN = 8;
 const COMMON_QUOTA = { 3: 300, 4: 450, 5: 550, 6: 600, 7: 600, 8: 500 };
 // Puzzle pool per length — noun/adjective/adverb/infinitive only (Lettres Croisées).
 const PUZZLE_QUOTA = { 3: 250, 4: 500, 5: 650, 6: 700, 7: 650, 8: 350 };
-const EXTENDED_CAP = 12000;
-const EXTENDED_MIN_FREQ = 0.2; // films+books occurrences per million — drops noise-tier entries
+const EXTENDED_CAP = 35000;
+const EXTENDED_MIN_FREQ = 0.03; // films+books occurrences per million — low floor: accept most real words, drop OCR noise
 const CONTENT_POS = new Set(['NOM', 'VER', 'ADJ', 'ADV']);
 // Real French words below the frequency cutoff that games still need accepted —
 // mots-meles THEMES words in the 3-8 range (kept in sync by mots-meles/themes.test.ts).

@@ -18,6 +18,7 @@ type Status = 'playing' | 'won' | 'lost';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const LOSS_OFFSET = 100000; // daily: losers ranked after winners (cf. démineur/codecolor)
 const KB = ['AZERTYUIOP', 'QSDFGHJKLM', '#WXCVBN<']; // # = Enter, < = Backspace
+const HINT_EVERY = 30; // free mode: reveal one more letter every 30 s (disabled in the ranked daily)
 
 interface DailyState { rows: GuessRow[]; current: string; status: Status; }
 interface Msg { text: string; }
@@ -33,7 +34,11 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [hintPos, setHintPos] = useState<Set<number>>(() => new Set());
+	const [hintIn, setHintIn] = useState(HINT_EVERY);
 
+	const hintPosRef = useRef<Set<number>>(new Set());
+	const secToHintRef = useRef(HINT_EVERY);
 	const solutionRef = useRef(solution);
 	const rowsRef = useRef<GuessRow[]>([]);
 	const currentRef = useRef(current);
@@ -53,6 +58,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const setCurrentBoth = (c: string): void => { currentRef.current = c; setCurrent(c); };
 	const setStatusBoth = (s: Status): void => { statusRef.current = s; setStatus(s); };
 	const setSolutionBoth = (s: string): void => { solutionRef.current = s; setSolution(s); };
+	const resetHints = (): void => { hintPosRef.current = new Set(); setHintPos(new Set()); secToHintRef.current = HINT_EVERY; setHintIn(HINT_EVERY); };
 
 	const flash = (text: string): void => {
 		if (msgTimer.current) clearTimeout(msgTimer.current);
@@ -68,7 +74,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		const s = pickSolution((Math.random() * 2 ** 31) >>> 0, DIFFS[key].len);
 		setSolutionBoth(s);
 		setRowsBoth([]); setCurrentBoth(s[0]);
-		setStatusBoth('playing'); setMsg(null);
+		setStatusBoth('playing'); setMsg(null); resetHints();
 		trackGame(gameId, 'game_started', { difficulty: key, mode: 'free' });
 	}, [gameId]);
 
@@ -163,10 +169,37 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		return () => window.removeEventListener('keydown', onDown);
 	}, [onKey]);
 
+	/* Reveal one more not-yet-known letter (free mode helper). */
+	const revealHint = useCallback((): void => {
+		const sol = solutionRef.current;
+		const known = new Set<number>([0]);
+		for (const r of rowsRef.current) for (let i = 0; i < sol.length; i++) if (r.states[i] === 'good') known.add(i);
+		for (const p of hintPosRef.current) known.add(p);
+		const free: number[] = [];
+		for (let i = 1; i < sol.length; i++) if (!known.has(i)) free.push(i);
+		if (!free.length) return; // whole word already known
+		const p = free[Math.floor(Math.random() * free.length)];
+		const next = new Set(hintPosRef.current); next.add(p);
+		hintPosRef.current = next; setHintPos(next);
+	}, []);
+
+	/* Free-mode countdown → reveal a letter every HINT_EVERY seconds. */
+	useEffect(() => {
+		if (daily || status !== 'playing' || dailyLoading) return;
+		secToHintRef.current = HINT_EVERY; setHintIn(HINT_EVERY);
+		const id = setInterval(() => {
+			secToHintRef.current -= 1;
+			if (secToHintRef.current <= 0) { revealHint(); secToHintRef.current = HINT_EVERY; }
+			setHintIn(secToHintRef.current);
+		}, 1000);
+		return () => clearInterval(id);
+	}, [daily, status, dailyLoading, solution, revealHint]);
+
 	useEffect(() => { newGame('facile'); }, [newGame]);
 
 	/* ---------- Render ---------- */
 	const hints = knownGood(rows, len, solution[0]);
+	for (const p of hintPos) if (hints[p] == null) hints[p] = solution[p]; // overlay the timed reveals
 	const known = bestKnown(rows);
 	const fmt = (v: number): string =>
 		v >= LOSS_OFFSET ? `❌ ${len - (v - LOSS_OFFSET)}/${len}` : `${v} essai${v > 1 ? 's' : ''}`;
@@ -205,6 +238,10 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 					</div>
 					<button className="ms-act" onClick={() => newGame(diffKey)}>↻ Nouveau mot</button>
 				</div>
+			)}
+
+			{!daily && status === 'playing' && (
+				<div className="ms-hintbar">💡 Prochain indice dans <strong>{hintIn}s</strong>{hintPos.size ? ` · ${hintPos.size} lettre${hintPos.size > 1 ? 's' : ''} révélée${hintPos.size > 1 ? 's' : ''}` : ''}</div>
 			)}
 
 			<div className="ms-playwrap">
@@ -256,6 +293,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 			<p className="ms-help">
 				Devine le mot en 6 essais : chaque essai doit être un mot français commençant par la lettre donnée.
+				En mode libre, un <strong>indice</strong> révèle une lettre toutes les 30&nbsp;s.
 				<span className="ms-legend"><i className="lg good" /> bien placée · <i className="lg present" /> présente · <i className="lg absent" /> absente</span>
 			</p>
 
@@ -276,6 +314,8 @@ const CSS = `
 .ms-pill.active { background: var(--accent-regular); color: var(--accent-text-over); border-color: var(--accent-regular); }
 .ms-act { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .ms-act:hover { background: var(--gray-800); border-color: var(--accent-regular); color: var(--accent-regular); }
+.ms-hintbar { font-size: 12.5px; color: var(--gray-300); background: var(--gray-900); border: 1px solid var(--gray-800); border-radius: 999px; padding: 4px 13px; margin-bottom: 0.6rem; }
+.ms-hintbar strong { color: var(--accent-regular); font-variant-numeric: tabular-nums; }
 .ms-playwrap { position: relative; width: 100%; display: flex; justify-content: center; }
 .ms-board { display: flex; flex-direction: column; gap: 5px; }
 .ms-board.shake { animation: ms-shake 0.35s; }

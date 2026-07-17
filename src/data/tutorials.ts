@@ -19,6 +19,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎯', title: 'Le but', body: 'Devine le mot secret en 6 essais maximum. Sa première lettre est affichée, et chaque essai doit être un mot français de la bonne longueur commençant par cette lettre.' },
 		{ emoji: '🟥', title: 'Les indices', body: 'Après chaque essai : carré ROUGE = lettre bien placée, rond JAUNE = lettre présente ailleurs dans le mot, case sombre = lettre absente. Les lettres confirmées s\'affichent en filigrane sur la ligne suivante.' },
 		{ emoji: '⌨️', title: 'Le clavier', body: 'Tape avec le clavier à l\'écran (ou ton vrai clavier). Les touches se colorent selon ce que tu as appris : rouge, jaune ou éteinte. Les accents ne comptent pas — tout s\'écrit sans accent.' },
+		{ emoji: '💡', title: 'Les indices', body: 'En mode libre, une lettre du mot se révèle automatiquement toutes les 30 s (affichée en filigrane à sa position) — de quoi te débloquer sans rien faire. Pas d\'indice au défi du jour, pour un classement équitable.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'Même mot pour tout le monde, un seul essai par jour. Moins tu utilises d\'essais, mieux tu es classé. Un échec est classé après les gagnants — reviens demain !' },
 	],
 	'meli-melo': [

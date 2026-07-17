@@ -2,13 +2,15 @@
  * MOT SECRET — pure engine (no UI). Motus-like: guess a hidden French word in 6 tries;
  * the first letter is revealed and every guess must start with it. Feedback per letter:
  * good (right spot) / present (elsewhere) / absent, with standard two-pass duplicate
- * counting. Solutions come from the COMMON tier; guesses accept COMMON ∪ EXTENDED.
+ * counting. Solutions come from the PUZZLE tier (common, non-conjugated words — no awkward
+ * verb forms); guesses accept the union COMMON ∪ EXTENDED ∪ PUZZLE (a broad dictionary).
  */
 
 import { mulberry32 } from '../prng';
 import { COMMON_RAW } from '../words/common';
 import { EXTENDED_RAW } from '../words/extended';
-import { parseWords, byLength, mergeSorted, hasWord } from '../words';
+import { PUZZLE_RAW } from '../words/puzzle';
+import { parseWords, byLength, hasWord } from '../words';
 
 export type LetterState = 'good' | 'present' | 'absent';
 export interface GuessRow { guess: string; states: LetterState[]; }
@@ -22,14 +24,14 @@ export const DIFFS: Record<string, DiffLevel> = {
 
 export const MAX_TRIES = 6;
 
-const COMMON = parseWords(COMMON_RAW);
-const ALL = mergeSorted(COMMON, parseWords(EXTENDED_RAW));
+const PUZZLE = parseWords(PUZZLE_RAW); // clean, common words → the solution pool
+const ALL = [...new Set([...parseWords(COMMON_RAW), ...parseWords(EXTENDED_RAW), ...PUZZLE])].sort(); // acceptance
 const pools = new Map<number, string[]>();
 
-/** COMMON words of exactly `len` letters (memoized) — the solution pool. */
+/** PUZZLE words of exactly `len` letters (memoized) — the solution pool (no conjugations). */
 export function solutionPool(len: number): string[] {
 	let p = pools.get(len);
-	if (!p) { p = byLength(COMMON, len, len); pools.set(len, p); }
+	if (!p) { p = byLength(PUZZLE, len, len); pools.set(len, p); }
 	return p;
 }
 
