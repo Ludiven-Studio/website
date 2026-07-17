@@ -116,6 +116,40 @@ async function main() {
 			return false;
 		}, START_RE.source);
 
+	// Freeze a game that auto-pauses on tab-hide: fake a visibilitychange so the
+	// loop stops but the canvas keeps its last (alive) frame — no game-over overlay.
+	const freeze = () =>
+		page.evaluate(() => {
+			Object.defineProperty(document, 'hidden', { get: () => true, configurable: true });
+			document.dispatchEvent(new Event('visibilitychange'));
+		});
+
+	// Per-game steering after start, for games that die or stay bare under auto-play.
+	const DRIVES = {
+		// Snake dies on the right wall in ~1s. Switch to Facile (0 rocks, so the path
+		// is deterministic-safe), circle a small square, then freeze while alive.
+		snake: async () => {
+			await page.evaluate(() => {
+				Array.from(document.querySelectorAll('.sn-pill')).find((b) => /facile/i.test(b.textContent || ''))?.click();
+			});
+			await sleep(250); // back to "ready" — first arrow key auto-starts
+			for (let lap = 0; lap < 2; lap++) {
+				for (const k of ['ArrowDown', 'ArrowLeft', 'ArrowUp', 'ArrowRight']) {
+					await page.keyboard.press(k);
+					await sleep(350);
+				}
+			}
+			await freeze();
+		},
+		// Dig a short tunnel so the board shows the hen at work.
+		'cocotte-mineuse': async () => {
+			for (const k of ['ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowRight', 'ArrowDown']) {
+				await page.keyboard.press(k);
+				await sleep(180);
+			}
+		},
+	};
+
 	const startGame = async () => {
 		// Multiplayer → launch a game vs the bot.
 		if (await clickBtn(BOT_RE.source)) {
@@ -147,7 +181,8 @@ async function main() {
 			});
 
 			if (!process.env.OG_NOSTART) await startGame(); // OG_NOSTART=1 → capture the ready scene
-			await sleep(1100);
+			if (!process.env.OG_NOSTART && DRIVES[id]) await DRIVES[id]();
+			else await sleep(1100);
 
 			// OG_HIDE_OVERLAY=1 → hide tutorial + start/game-over overlays for a clean board
 			// (e.g. Snake dies instantly under auto-play and would otherwise show "Perdu").
