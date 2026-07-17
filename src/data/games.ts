@@ -274,7 +274,7 @@ export const games: GameTile[] = [
 	{
 		id: 'flechettes',
 		title: 'Fléchettes',
-		pitch: 'Le viseur oscille : tape au bon moment pour viser doubles et triples, et descends de 501 à 0 sur un double.',
+		pitch: 'Visée en deux temps : bloque le balayage horizontal, puis le vertical, pour viser doubles et triples et descendre de 501 à 0 sur un double.',
 		icon: 'flechettes',
 		href: '/jeux/flechettes',
 		status: 'play',

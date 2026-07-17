@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dartScore, applyThrow, reticleAt, encodeScore, decodeScore, DIFFS, START_SCORE } from './engine';
+import { dartScore, applyThrow, sweep, SWEEP_AMP, encodeScore, decodeScore, DIFFS, START_SCORE } from './engine';
 
 describe('flechettes engine', () => {
 	it('scores the real dartboard geometry', () => {
@@ -27,18 +27,16 @@ describe('flechettes engine', () => {
 		expect(applyThrow(25, dartScore(0, -0.07))).toMatchObject({ bust: true });
 	});
 
-	it('reticleAt is deterministic and stays within the amplitude box', () => {
+	it('sweep is deterministic, bounded, and differs per dart and axis', () => {
 		for (const key of Object.keys(DIFFS)) {
 			const d = DIFFS[key];
 			for (let t = 0; t < 2000; t += 137) {
-				const a = reticleAt(123, 0, d, t);
-				const b = reticleAt(123, 0, d, t);
-				expect(a).toEqual(b);
-				expect(Math.abs(a.x)).toBeLessThanOrEqual(d.amp + 1e-9); // offset stays within the frame
-				expect(Math.abs(a.y)).toBeLessThanOrEqual(d.amp + 1e-9);
+				const a = sweep(123, 0, 0, d, t);
+				expect(sweep(123, 0, 0, d, t)).toBe(a); // deterministic
+				expect(Math.abs(a)).toBeLessThanOrEqual(SWEEP_AMP + 1e-9); // stays on the board
 			}
-			// different darts → different oscillation
-			expect(reticleAt(123, 0, d, 500)).not.toEqual(reticleAt(123, 1, d, 500));
+			expect(sweep(123, 0, 0, d, 500)).not.toEqual(sweep(123, 1, 0, d, 500)); // per dart
+			expect(sweep(123, 0, 0, d, 500)).not.toEqual(sweep(123, 0, 1, d, 500)); // per axis (X vs Y)
 		}
 	});
 

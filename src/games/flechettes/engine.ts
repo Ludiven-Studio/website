@@ -1,8 +1,8 @@
 /**
  * FLÉCHETTES — pure engine (no UI). Real dartboard scoring (singles, doubles ×2,
- * triples ×3, bull 25, bullseye 50) and 501 rules (checkout on a double). The aim
- * reticle oscillates deterministically (seeded) so the daily is fair; the player's
- * tap timing alone decides where the dart lands. Score = darts used (time tiebreak).
+ * triples ×3, bull 25, bullseye 50) and 501 rules (checkout on a double). Aiming is two
+ * timed sweeps — first horizontal, then vertical — each oscillating deterministically
+ * (seeded) so the daily is fair; tap timing alone picks X then Y. Score = darts (time tiebreak).
  */
 
 import { mulberry32 } from '../prng';
@@ -43,26 +43,29 @@ export function applyThrow(remaining: number, hit: Hit): ThrowResult {
 	return { remaining: after, finished: false, bust: false };
 }
 
-/* ---------- Difficulty / oscillating reticle ---------- */
+/* ---------- Difficulty / two-step oscillating aim ---------- */
 
-// amp is the fraction of the AIM FRAME the reticle roams (≤1) — the UI scales it by the frame size.
-export interface DiffLevel { label: string; omega: number; amp: number; }
+// omega drives the sweep speed (higher = faster back-and-forth = harder to time).
+export interface DiffLevel { label: string; omega: number; }
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', omega: 1.1, amp: 0.5 },
-	moyen: { label: 'Moyen', omega: 1.6, amp: 0.72 },
-	difficile: { label: 'Difficile', omega: 2.3, amp: 0.95 },
+	facile: { label: 'Facile', omega: 2.2 },
+	moyen: { label: 'Moyen', omega: 3.1 },
+	difficile: { label: 'Difficile', omega: 4.3 },
 };
 
-/** Deterministic reticle OFFSET (Lissajous) within the aim frame, in [-amp, amp]². */
-export function reticleAt(seed: number, dartIndex: number, diff: DiffLevel, tMs: number): { x: number; y: number } {
-	const rng = mulberry32((seed + dartIndex * 0x9e3779b1) >>> 0);
-	const wx = diff.omega * (0.8 + rng() * 0.5);
-	const wy = diff.omega * (0.8 + rng() * 0.5);
-	const px = rng() * Math.PI * 2, py = rng() * Math.PI * 2;
-	const ax = diff.amp * (0.7 + rng() * 0.3);
-	const ay = diff.amp * (0.7 + rng() * 0.3);
-	const t = tMs / 1000;
-	return { x: ax * Math.sin(wx * t + px), y: ay * Math.sin(wy * t + py) };
+export const SWEEP_AMP = 0.92; // how far across the board a sweep travels (board radius = 1)
+
+/**
+ * Deterministic 1-D aim sweep for one dart along one axis (0 = horizontal, 1 = vertical): a
+ * triangle wave in [-SWEEP_AMP, SWEEP_AMP] so it crosses the board at constant speed. Seeded by
+ * (seed, dartIndex, axis) so the daily is fair — only the player's tap timing picks the value.
+ */
+export function sweep(seed: number, dartIndex: number, axis: number, diff: DiffLevel, tMs: number): number {
+	const rng = mulberry32((seed + dartIndex * 0x9e3779b1 + axis * 0x85ebca6b) >>> 0);
+	const w = diff.omega * (0.9 + rng() * 0.25);
+	const phase = rng() * Math.PI * 2;
+	const tri = (2 / Math.PI) * Math.asin(Math.sin(w * (tMs / 1000) + phase)); // triangle in [-1,1]
+	return SWEEP_AMP * tri;
 }
 
 /* ---------- Score (darts + time tiebreak) ---------- */
