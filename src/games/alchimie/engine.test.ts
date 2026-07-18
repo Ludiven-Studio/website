@@ -5,8 +5,8 @@ const ids = new Set(ELEMENTS.map((e) => e.id));
 const nonBase = ELEMENTS.filter((e) => e.recipe);
 
 describe('alchimie element tree', () => {
-	it('has ~150 elements with unique ids, names and emojis', () => {
-		expect(TOTAL).toBeGreaterThanOrEqual(140);
+	it('has ~200 elements with unique ids, names and emojis', () => {
+		expect(TOTAL).toBeGreaterThanOrEqual(195);
 		expect(ids.size).toBe(ELEMENTS.length); // ids unique
 		for (const e of ELEMENTS) {
 			expect(e.name.length, e.id).toBeGreaterThan(0);

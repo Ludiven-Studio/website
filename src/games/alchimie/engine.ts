@@ -1,6 +1,6 @@
 /**
  * ALCHIMIE — pure engine (no UI). A "Little Alchemy"-style discovery game: start from 5 base
- * elements and combine two at a time to unlock ~150. Every non-base element has exactly one
+ * elements and combine two at a time to unlock ~200. Every non-base element has exactly one
  * recipe (an unordered pair of already-reachable elements); the tree is a DAG rooted at the
  * bases — enforced by engine.test.ts (all refs exist, every element reachable, no ambiguous
  * pair, no cycle). Combining is commutative and allows an element with itself (a+a).
@@ -194,6 +194,58 @@ export const ELEMENTS: Element[] = [
 	e('zombie', 'Zombie', '🧟', 'mort', 'terre'),
 	e('ange', 'Ange', '👼', 'ciel', 'humain'),
 	e('diable', 'Diable', '😈', 'feu', 'mort'),
+
+	// ---- Gems & minerals ----
+	e('geyser', 'Geyser', '⛲', 'eau', 'volcan'),
+	e('avalanche', 'Avalanche', '🏔️', 'neige', 'montagne'),
+	e('marbre', 'Marbre', '🏛️', 'montagne', 'pierre'),
+	e('cristal', 'Cristal', '💠', 'glace', 'pierre'),
+	e('saphir', 'Saphir', '🔵', 'diamant', 'eau'),
+	e('emeraude', 'Émeraude', '🟢', 'diamant', 'herbe'),
+	e('rubis', 'Rubis', '🔴', 'diamant', 'feu'),
+	e('bronze', 'Bronze', '🥉', 'metal', 'charbon'),
+	e('acier', 'Acier', '🔗', 'fer', 'charbon'),
+	e('rouille', 'Rouille', '🟠', 'fer', 'eau'),
+
+	// ---- More food & drink ----
+	e('raisin', 'Raisin', '🍇', 'plante', 'fruit'),
+	e('tomate', 'Tomate', '🍅', 'plante', 'legume'),
+	e('sauce', 'Sauce', '🥫', 'tomate', 'feu'),
+	e('pates', 'Pâtes', '🍝', 'farine', 'eau'),
+	e('riz', 'Riz', '🍚', 'graine', 'mer'),
+	e('sushi', 'Sushi', '🍣', 'poisson', 'riz'),
+	e('burger', 'Burger', '🍔', 'pain', 'vache'),
+	e('sandwich', 'Sandwich', '🥪', 'pain', 'salade'),
+	e('taco', 'Taco', '🌮', 'pain', 'legume'),
+	e('the', 'Thé', '🍵', 'feuille', 'eau'),
+	e('cookie', 'Cookie', '🍪', 'farine', 'chocolat'),
+	e('donut', 'Donut', '🍩', 'farine', 'sucre'),
+	e('bonbon', 'Bonbon', '🍭', 'sucre', 'arcenciel'),
+
+	// ---- More animals ----
+	e('dauphin', 'Dauphin', '🐬', 'poisson', 'intelligence'),
+	e('crabe', 'Crabe', '🦀', 'mer', 'insecte'),
+	e('crevette', 'Crevette', '🦐', 'mer', 'bacterie'),
+	e('meduse', 'Méduse', '🪼', 'mer', 'fantome'),
+	e('escargot', 'Escargot', '🐌', 'pluie', 'herbe'),
+	e('chat', 'Chat', '🐱', 'souris', 'humain'),
+	e('chien', 'Chien', '🐕', 'loup', 'maison'),
+	e('elephant', 'Éléphant', '🐘', 'geant', 'souris'),
+	e('rhinoceros', 'Rhinocéros', '🦏', 'dinosaure', 'prairie'),
+	e('hippopotame', 'Hippopotame', '🦛', 'vache', 'riviere'),
+	e('scorpion', 'Scorpion', '🦂', 'araignee', 'sable'),
+	e('kangourou', 'Kangourou', '🦘', 'souris', 'montagne'),
+
+	// ---- Machines & vehicles ----
+	e('panneausolaire', 'Panneau solaire', '🔆', 'soleil', 'verre'),
+	e('avion', 'Avion', '✈️', 'metal', 'ciel'),
+	e('train', 'Train', '🚂', 'metal', 'route'),
+	e('voiture', 'Voiture', '🚗', 'metal', 'roue'),
+	e('moto', 'Moto', '🏍️', 'voiture', 'energie'),
+	e('horloge', 'Horloge', '⏰', 'roue', 'outil'),
+	e('camera', 'Caméra', '📷', 'verre', 'ordinateur'),
+	e('television', 'Télévision', '📺', 'verre', 'internet'),
+	e('jeuvideo', 'Jeu vidéo', '🎮', 'television', 'intelligence'),
 ];
 
 /**
