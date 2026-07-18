@@ -309,16 +309,13 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 					<div className="al-catbar"><b>{discovered.length}</b> / {TOTAL} découverts · <span className="al-catfrontier">{frontierCount} à portée</span></div>
 					<div className="al-catgrid">
 						{catList.map(({ el, has, frontier }) => has ? (
-							<div key={el.id} className={`al-cat has${BASE_IDS.includes(el.id) ? ' base' : ''}`} title={el.name}>
-								<span className="al-emo">{el.emoji}</span><span className="al-name">{el.name}</span>
-							</div>
-						) : frontier ? (
-							<div key={el.id} className="al-cat frontier" title={`À découvrir : ${el.recipe!.map((r) => getElement(r)!.name).join(' + ')}`}>
-								<span className="al-emo faded">{el.emoji}</span>
-								<span className="al-cat-recipe">{el.recipe!.map((r) => getElement(r)!.emoji).join(' + ')}</span>
+							<div key={el.id} className={`al-cat has${BASE_IDS.includes(el.id) ? ' base' : ''}`} title={el.recipe ? `${el.name} = ${el.recipe.map((r) => getElement(r)!.name).join(' + ')}` : el.name}>
+								<span className="al-emo">{el.emoji}</span>
+								<span className="al-name">{el.name}</span>
+								{el.recipe && <span className="al-cat-recipe">{el.recipe.map((r) => getElement(r)!.emoji).join(' + ')}</span>}
 							</div>
 						) : (
-							<div key={el.id} className="al-cat locked" title="Mystère — continue à combiner">
+							<div key={el.id} className={`al-cat locked${frontier ? ' frontier' : ''}`} title={frontier ? 'À portée — à toi de trouver !' : 'Mystère'}>
 								<span className="al-cat-q">?</span>
 							</div>
 						))}
@@ -397,7 +394,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			<p className="al-help">
 				{daily
 					? <>On te donne une dizaine d'éléments : <strong>lâche une carte sur une autre</strong> pour trouver la combinaison qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). Bloqué ? Un <strong>indice</strong> apparaît toutes les 30 s. {SECRET_TOTAL} défis, un par jour.</>
-					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Catalogue</strong> montre ta progression (les prochains à portée en transparence, les autres en «&nbsp;?&nbsp;»). Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
+					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Catalogue</strong> montre ta progression : les éléments trouvés avec leur recette, le reste en «&nbsp;?&nbsp;». Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
 			</p>
 		</div>
 	);
@@ -464,10 +461,10 @@ const CSS = `
 .al-cat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; aspect-ratio: 1; border-radius: 14px; border: 1.5px solid var(--gray-800); background: rgba(255,255,255,0.03); padding: 4px; }
 .al-cat.has { border-color: var(--gray-700); background: var(--gray-999); }
 .al-cat.has.base { border-color: var(--al-accent); }
-.al-cat.frontier { border-style: dashed; border-color: #6b5bb0; }
-.al-cat.frontier .al-emo.faded { opacity: 0.4; filter: grayscale(0.3); }
-.al-cat-recipe { font-size: 11px; opacity: 0.7; line-height: 1; }
+.al-cat-recipe { font-size: 10px; opacity: 0.6; line-height: 1; margin-top: 1px; }
 .al-cat.locked { border-style: dashed; }
+.al-cat.frontier { border-color: var(--al-accent); }
+.al-cat.frontier .al-cat-q { color: #c8b6ff; }
 .al-cat-q { font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.22); }
 
 .al-float { position: fixed; z-index: 50; width: ${TOKEN}px; height: ${TOKEN}px; margin-left: -${TOKEN / 2}px; margin-top: -${TOKEN / 2}px; align-items: center; justify-content: center; font-size: 30px; pointer-events: none; border-radius: 14px; background: var(--gray-999); border: 1.5px solid var(--al-accent); box-shadow: 0 8px 22px rgba(0,0,0,0.5); }
