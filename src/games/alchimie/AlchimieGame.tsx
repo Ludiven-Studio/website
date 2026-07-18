@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ELEMENTS, BASE_IDS, TOTAL, SECRET_TOTAL, combine, getElement, dailyTarget, type Element } from './engine';
+import { ELEMENTS, BASE_IDS, TOTAL, SECRET_TOTAL, combine, getElement, dailyTarget, dailyPalette, type Element } from './engine';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { encodePacked, formatScore, fmtCentis } from '../../lib/scoreFormat';
@@ -38,6 +38,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const [discovered, setDiscovered] = useState<string[]>(() => (typeof window === 'undefined' ? [...BASE_IDS] : loadDiscovered()));
 	const [dDiscovered, setDDiscovered] = useState<string[]>([...BASE_IDS]);
 	const [dTarget, setDTarget] = useState('');
+	const [dDiff, setDDiff] = useState(0);
 	const [dDone, setDDone] = useState(false);
 	const [dElapsed, setDElapsed] = useState(0);
 	const [dLoading, setDLoading] = useState(false);
@@ -64,6 +65,8 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const dDoneRef = useRef(false);
 	const dStartRef = useRef(0);
 	const dSeedRef = useRef(0);
+	const dDiffRef = useRef(0);
+	const dPaletteLen = useRef(BASE_IDS.length);
 	const dFinalRef = useRef(0);
 	const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,7 +95,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 	const activeSet = () => (modeRef.current === 'daily' ? dSet.current : freeSet.current);
 	const persistDaily = (arr: string[], done: boolean, finalTime?: number) => {
-		saveDailyRun(DAILY_ID, { startedAt: dStartRef.current, done, seed: dSeedRef.current, finalTime, state: { discovered: arr, done } satisfies DailyState });
+		saveDailyRun(DAILY_ID, { startedAt: dStartRef.current, done, seed: dSeedRef.current, diffIndex: dDiffRef.current, finalTime, state: { discovered: arr, done } satisfies DailyState });
 	};
 
 	/* Record a product: reveal if new, add to the active album, check the daily win. */
@@ -197,10 +200,12 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		modeRef.current = 'daily'; setMode('daily'); setTokens([]); setSlots([null, null, null]); setReveal(null); setSearch('');
 		const run = loadDailyRun(DAILY_ID);
 		if (run && run.seed != null) {
-			dSeedRef.current = run.seed; dStartRef.current = run.startedAt;
+			const diff = run.diffIndex ?? 0;
+			dSeedRef.current = run.seed; dDiffRef.current = diff; setDDiff(diff); dStartRef.current = run.startedAt;
 			const target = dailyTarget(run.seed); dTargetRef.current = target; setDTarget(target);
-			const st = (run.state as DailyState) ?? { discovered: [...BASE_IDS], done: false };
-			const disc = st.discovered?.length ? st.discovered : [...BASE_IDS];
+			const palette = dailyPalette(run.seed, target, diff); dPaletteLen.current = palette.length;
+			const st = (run.state as DailyState) ?? { discovered: palette, done: false };
+			const disc = st.discovered?.length ? st.discovered : palette;
 			dArr.current = disc; dSet.current = new Set(disc); setDDiscovered(disc);
 			dDoneRef.current = !!run.done; setDDone(!!run.done);
 			if (run.done) { dFinalRef.current = run.finalTime ?? 0; setDElapsed(run.finalTime ?? 0); } else setDElapsed((Date.now() - run.startedAt) / 1000);
@@ -208,12 +213,13 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			return;
 		}
 		setDLoading(true); setDDone(false); dDoneRef.current = false;
-		dArr.current = [...BASE_IDS]; dSet.current = new Set(BASE_IDS); setDDiscovered([...BASE_IDS]);
-		const { seed } = await getDaily(DAILY_ID);
-		dSeedRef.current = seed;
+		const { seed, diffIndex } = await getDaily(DAILY_ID);
+		dSeedRef.current = seed; dDiffRef.current = diffIndex; setDDiff(diffIndex);
 		const target = dailyTarget(seed); dTargetRef.current = target; setDTarget(target);
+		const palette = dailyPalette(seed, target, diffIndex); dPaletteLen.current = palette.length;
+		dArr.current = palette; dSet.current = new Set(palette); setDDiscovered(palette);
 		dStartRef.current = Date.now(); setDElapsed(0); setDLoading(false);
-		persistDaily([...BASE_IDS], false);
+		persistDaily(palette, false);
 		trackGame(gameId, 'daily_played');
 	}, [gameId]);
 
@@ -244,7 +250,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const invIds = daily ? dDiscovered : discovered;
 	const q = search.trim().toLowerCase();
 	const invList = invIds.map((id) => getElement(id)!).filter((el) => !q || el.name.toLowerCase().includes(q));
-	const dMoves = Math.max(0, dDiscovered.length - BASE_IDS.length);
+	const dMoves = Math.max(0, dDiscovered.length - dPaletteLen.current);
 	const dScore = encodePacked(10_000_000, [dMoves, Math.min(9_999_999, Math.round((dDone ? dFinalRef.current : dElapsed) * 100))]);
 	const targetEl = dTarget ? getElement(dTarget) : null;
 
@@ -258,6 +264,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 				<div className="al-dailybar">
 					{dLoading ? <span>Préparation du défi…</span> : (
 						<>
+							<span className="al-difftag">{dailyWeekdayLabel()} · {['Facile', 'Moyen', 'Difficile'][dDiff]}</span>
 							<span className="al-obj">Objectif&nbsp;: <b>{targetEl?.emoji} {targetEl?.name}</b></span>
 							<span className="al-chip">🧪 {dMoves} fusions</span>
 							<span className="al-chip">⏱ {fmtTime(dElapsed)}</span>
@@ -359,7 +366,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 			<p className="al-help">
 				{daily
-					? <>Fabrique l'élément du jour depuis les 5 bases, en <strong>un minimum de fusions</strong> (le chrono départage). {SECRET_TOTAL} défis à découvrir, un par jour.</>
+					? <>On te donne une dizaine d'éléments : trouve la bonne <strong>combinaison</strong> (glisse 2 cartes, ou le creuset pour 3) qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). La difficulté du jour dépend du nombre d'intermédiaires à reconstruire. {SECRET_TOTAL} défis, un par jour.</>
 					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong>, ou remplis le <strong>creuset</strong> (2-3 éléments) puis Fusionner. Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
 			</p>
 		</div>
@@ -375,6 +382,7 @@ const CSS = `
 .al-dailybar { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 0.7rem; font-size: 14px; }
 .al-obj { font-weight: 600; color: var(--gray-100); } .al-obj b { color: var(--al-accent); }
 .al-chip { background: var(--gray-900); border-radius: 999px; padding: 4px 12px; font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
+.al-difftag { background: var(--gray-900); color: var(--gray-300); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600; }
 .al-btn { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .al-btn:hover { border-color: var(--al-accent); color: var(--al-accent); }
 .al-btn.ghost { padding: 6px 12px; }

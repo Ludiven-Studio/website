@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ELEMENTS, SECRET_ELEMENTS, BASE_IDS, TOTAL, SECRET_TOTAL, combine, getElement, dailyTarget } from './engine';
+import { ELEMENTS, SECRET_ELEMENTS, BASE_IDS, TOTAL, SECRET_TOTAL, combine, getElement, dailyTarget, dailyPalette } from './engine';
 
 const ids = new Set(ELEMENTS.map((e) => e.id));
 const nonBase = ELEMENTS.filter((e) => e.recipe);
@@ -103,5 +103,26 @@ describe('alchimie daily (secret) pool', () => {
 		expect(getElement('sandwich')?.name).toBe('Sandwich');
 		expect(dailyTarget(42)).toBe(dailyTarget(42));
 		expect(SECRET_ELEMENTS.some((e) => e.id === dailyTarget(7))).toBe(true);
+	});
+
+	it('dailyPalette is deterministic and always suffices to craft the target at every difficulty', () => {
+		const canCraft = (palette: string[], target: string): boolean => {
+			const have = new Set(palette);
+			for (let changed = true; changed; ) {
+				changed = false;
+				for (const el of ELEMENTS) if (el.recipe && !have.has(el.id) && el.recipe.every((r) => have.has(r))) { have.add(el.id); changed = true; }
+			}
+			return getElement(target)!.recipe!.every((r) => have.has(r));
+		};
+		for (let s = 1; s <= 40; s++) {
+			const target = dailyTarget(s);
+			for (const diff of [0, 1, 2]) {
+				const p = dailyPalette(s, target, diff);
+				expect(dailyPalette(s, target, diff)).toEqual(p); // deterministic
+				expect(p.length).toBeGreaterThanOrEqual(8);
+				expect(p.includes(target)).toBe(false); // target isn't handed for free
+				expect(canCraft(p, target), `seed ${s} diff ${diff} → ${target}`).toBe(true);
+			}
+		}
 	});
 });

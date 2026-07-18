@@ -297,3 +297,24 @@ export function combine(ids: string[], includeSecret = false): string | null {
 export function dailyTarget(seed: number): string {
 	return SECRET_ELEMENTS[Math.floor(mulberry32(seed)() * SECRET_ELEMENTS.length)].id;
 }
+
+/**
+ * Starting palette handed to the player in the daily challenge (instead of the bare 5 bases).
+ * The target's recipe tree is expanded `diffIndex` extra levels toward the bases — so facile (0)
+ * hands the target's direct ingredients (mixed with decoys → "find the right 2-3"), moyen (1) and
+ * difficile (2) hand elements further back that need 1-2 intermediates rebuilt. Seeded → shared.
+ * The returned set always suffices to craft the target.
+ */
+export function dailyPalette(seed: number, targetId: string, diffIndex: number): string[] {
+	const target = getElement(targetId);
+	if (!target?.recipe) return [...BASE_IDS];
+	let frontier = [...target.recipe];
+	for (let lvl = 0; lvl < diffIndex; lvl++)
+		frontier = frontier.flatMap((id) => { const el = getElement(id); return el?.recipe ? el.recipe : [id]; });
+	const need = [...new Set(frontier)]; // the given elements the whole path can be rebuilt from
+	const rng = mulberry32((seed ^ 0x5f356495) >>> 0);
+	const shuffle = (a: string[]): string[] => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+	const exclude = new Set([...need, targetId]);
+	const decoys = shuffle(ELEMENTS.filter((e) => !exclude.has(e.id)).map((e) => e.id)).slice(0, Math.max(0, 11 - need.length));
+	return shuffle([...need, ...decoys]);
+}
