@@ -8,6 +8,12 @@ export interface TutorialStep {
 }
 
 export const TUTORIALS: Record<string, TutorialStep[]> = {
+	alchimie: [
+		{ emoji: '🎯', title: 'Le but', body: 'Tu démarres avec 5 éléments de base — feu, eau, terre, air, bois. En les combinant deux par deux, tu en débloques près de 150 : pierre, métal, vie, dragon, robot, licorne… Objectif : tous les découvrir.' },
+		{ emoji: '🧪', title: 'Fusionner', body: 'Glisse une carte depuis l\'inventaire (à droite) sur l\'établi, puis lâche-la SUR une autre carte pour tenter une fusion. Si la combinaison existe, les deux se transforment en un nouvel élément ; sinon « rien ne se passe ». Tu peux aussi taper une carte pour la poser sur l\'établi.' },
+		{ emoji: '✨', title: 'Découvertes', body: 'Chaque nouvel élément trouvé se révèle avec une animation et rejoint ton inventaire (barre de progression en haut). Tes trouvailles sont sauvegardées sur cet appareil — tu peux reprendre plus tard.' },
+		{ emoji: '💡', title: 'Astuces', body: 'Un même élément peut se combiner avec lui-même (eau + eau = mer). Bloqué ? Le bouton Indice te souffle une combinaison encore possible. « Vider l\'établi » nettoie le plan de travail sans perdre tes découvertes.' },
+	],
 	'lettres-croisees': [
 		{ emoji: '🎯', title: 'Le but', body: 'Remplis la grille croisée : chaque mot à trouver se compose UNIQUEMENT avec les lettres de la roue, en bas. Le plus long utilise toutes les lettres. Quand tous les mots de la grille sont trouvés, c\'est gagné.' },
 		{ emoji: '👆', title: 'Composer un mot', body: 'Glisse d\'une lettre à l\'autre sur la roue sans lever le doigt (reviens en arrière pour corriger), puis relâche pour valider. Tu peux aussi taper les lettres une à une et confirmer avec ✓. Le bouton 🔀 mélange la roue pour voir les lettres autrement.' },

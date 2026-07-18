@@ -1,6 +1,6 @@
 // Safe wrapper around Umami's custom-event API. No-op when Umami isn't loaded
 // (e.g. local dev, or domain excluded via data-domains).
-type GameEvent = 'game_started' | 'game_won' | 'game_over' | 'hint_used' | 'solution_shown' | 'daily_played' | 'daily_done';
+type GameEvent = 'game_started' | 'game_won' | 'game_over' | 'hint_used' | 'solution_shown' | 'daily_played' | 'daily_done' | 'discovery';
 
 export function trackGame(
 	gameId: string,

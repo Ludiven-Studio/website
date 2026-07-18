@@ -148,6 +148,14 @@ async function main() {
 				await sleep(180);
 			}
 		},
+		// Place a few base elements on the workbench so the shot shows the mechanic, not an empty board.
+		alchimie: async () => {
+			for (const name of ['Feu', 'Eau', 'Terre', 'Bois']) {
+				await page.locator(`.al-card[title="${name}"]`).click().catch(() => {});
+				await sleep(140);
+			}
+			await sleep(300);
+		},
 	};
 
 	const startGame = async () => {

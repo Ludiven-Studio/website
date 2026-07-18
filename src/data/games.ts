@@ -335,6 +335,14 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'alchimie',
+		title: 'Alchimie',
+		pitch: 'Pars de 5 éléments (feu, eau, terre, air, bois) et combine-les 2 par 2 sur l\'établi pour en débloquer près de 150 : pierre, vie, dragon, robot, licorne… Chaque nouvelle trouvaille se révèle avec panache.',
+		icon: 'alchimie',
+		href: '/jeux/alchimie',
+		status: 'play',
+	},
+	{
 		id: 'pong',
 		title: 'Pong',
 		pitch: 'Pong en temps réel à 2 : partie rapide, avec un code entre amis, ou solo contre l\'ordi.',
