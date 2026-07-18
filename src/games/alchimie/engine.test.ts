@@ -62,8 +62,8 @@ describe('alchimie element tree', () => {
 describe('alchimie daily (secret) pool', () => {
 	const mainIds = new Set(ELEMENTS.map((e) => e.id));
 
-	it('has ≥50 secret elements, unique ids disjoint from the main tree', () => {
-		expect(SECRET_TOTAL).toBeGreaterThanOrEqual(50);
+	it('has ≥30 secret elements, unique ids disjoint from the main tree', () => {
+		expect(SECRET_TOTAL).toBeGreaterThanOrEqual(30);
 		const sids = new Set<string>();
 		for (const e of SECRET_ELEMENTS) {
 			expect(e.name.length && e.emoji.length, e.id).toBeTruthy();
@@ -73,10 +73,10 @@ describe('alchimie daily (secret) pool', () => {
 		}
 	});
 
-	it('every secret recipe is 2-3 EXISTING main elements (always reachable from the bases)', () => {
+	it('every secret recipe is a pair of EXISTING main elements (always reachable from the bases)', () => {
 		for (const e of SECRET_ELEMENTS) {
 			expect(e.recipe, e.id).toBeDefined();
-			expect(e.recipe!.length >= 2 && e.recipe!.length <= 3, `${e.id} arity`).toBe(true);
+			expect(e.recipe!.length, `${e.id} arity`).toBe(2);
 			for (const ing of e.recipe!) expect(mainIds.has(ing), `${e.id} ← ${ing}`).toBe(true);
 		}
 	});
@@ -99,8 +99,8 @@ describe('alchimie daily (secret) pool', () => {
 		const cafeLait = SECRET_ELEMENTS.find((e) => e.id === 'cafe-au-lait')!;
 		expect(combine(cafeLait.recipe!)).toBeNull(); // hidden in free play
 		expect(combine(cafeLait.recipe!, true)).toBe('cafe-au-lait'); // craftable in the daily
-		expect(combine(['pain', 'fromage', 'salade'], true)).toBe('sandwich'); // 3-ingredient
-		expect(getElement('sandwich')?.name).toBe('Sandwich');
+		expect(combine(['humain', 'robot'], true)).toBe('cyborg');
+		expect(getElement('cyborg')?.name).toBe('Cyborg');
 		expect(dailyTarget(42)).toBe(dailyTarget(42));
 		expect(SECRET_ELEMENTS.some((e) => e.id === dailyTarget(7))).toBe(true);
 	});

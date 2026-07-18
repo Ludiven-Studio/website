@@ -9,7 +9,7 @@ import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    ALCHIMIE — React island. Libre : combine ~150 éléments depuis 5 bases (glisser une carte sur
-   une autre, ou le creuset à 3 emplacements). Défi du jour : fabrique l'élément secret du jour en
+   une autre, ou le creuset à 2 emplacements). Défi du jour : fabrique l'élément secret du jour en
    un minimum de fusions (chrono départage), à partir des bases. Engine pur/testé dans ./engine.
    ===================================================== */
 
@@ -44,7 +44,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const [dLoading, setDLoading] = useState(false);
 
 	const [tokens, setTokens] = useState<Token[]>([]);
-	const [slots, setSlots] = useState<(string | null)[]>([null, null, null]);
+	const [slots, setSlots] = useState<(string | null)[]>([null, null]);
 	const [search, setSearch] = useState('');
 	const [reveal, setReveal] = useState<Element | null>(null);
 	const [toast, setToast] = useState('');
@@ -147,13 +147,13 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 	const fuseCauldron = useCallback(() => {
 		const ids = slots.filter((s): s is string => !!s);
-		if (ids.length < 2) { flash('Mets 2 ou 3 éléments dans le creuset'); return; }
+		if (ids.length < 2) { flash('Mets 2 éléments dans le creuset'); return; }
 		const product = combine(ids, modeRef.current === 'daily');
 		if (!product) { flash('Rien ne se passe…'); setShakeCauldron(true); setTimeout(() => setShakeCauldron(false), 400); return; }
 		const rect = boardRef.current?.getBoundingClientRect();
 		const x = (rect?.width ?? 300) / 2, y = (rect?.height ?? 300) / 2;
 		setTokens((cur) => [...cur, { tid: tokenSeq.current++, id: product, x, y }]);
-		setSlots([null, null, null]);
+		setSlots([null, null]);
 		registerDiscovery(product);
 	}, [slots, flash, registerDiscovery]);
 
@@ -194,10 +194,10 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	/* ---- Modes ---- */
-	const newFree = useCallback(() => { modeRef.current = 'free'; setMode('free'); setTokens([]); setSlots([null, null, null]); setReveal(null); setSearch(''); }, []);
+	const newFree = useCallback(() => { modeRef.current = 'free'; setMode('free'); setTokens([]); setSlots([null, null]); setReveal(null); setSearch(''); }, []);
 
 	const startDaily = useCallback(async () => {
-		modeRef.current = 'daily'; setMode('daily'); setTokens([]); setSlots([null, null, null]); setReveal(null); setSearch('');
+		modeRef.current = 'daily'; setMode('daily'); setTokens([]); setSlots([null, null]); setReveal(null); setSearch('');
 		const run = loadDailyRun(DAILY_ID);
 		if (run && run.seed != null) {
 			const diff = run.diffIndex ?? 0;
@@ -238,7 +238,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		flash(`💡 Essaie ${pick.recipe!.map((r) => getElement(r)!.emoji).join(' + ')}`);
 	}, [discovered.length, flash]);
 
-	const clearBoard = useCallback(() => { setTokens([]); setSlots([null, null, null]); }, []);
+	const clearBoard = useCallback(() => { setTokens([]); setSlots([null, null]); }, []);
 	const resetFree = useCallback(() => {
 		if (!window.confirm('Effacer toutes tes découvertes libres et repartir des 5 bases ?')) return;
 		setTokens([]); setDiscovered([...BASE_IDS]); freeSet.current = new Set(BASE_IDS); setSearch('');
@@ -366,8 +366,8 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 			<p className="al-help">
 				{daily
-					? <>On te donne une dizaine d'éléments : trouve la bonne <strong>combinaison</strong> (glisse 2 cartes, ou le creuset pour 3) qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). La difficulté du jour dépend du nombre d'intermédiaires à reconstruire. {SECRET_TOTAL} défis, un par jour.</>
-					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong>, ou remplis le <strong>creuset</strong> (2-3 éléments) puis Fusionner. Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
+					? <>On te donne une dizaine d'éléments : trouve la bonne <strong>combinaison</strong> (glisse 2 cartes, ou le creuset) qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). La difficulté du jour dépend du nombre d'intermédiaires à reconstruire. {SECRET_TOTAL} défis, un par jour.</>
+					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong>, ou remplis le <strong>creuset</strong> (2 éléments) puis Fusionner. Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
 			</p>
 		</div>
 	);

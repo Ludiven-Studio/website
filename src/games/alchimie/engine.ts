@@ -12,7 +12,7 @@ export interface Element {
 	id: string;
 	name: string;
 	emoji: string;
-	recipe?: string[]; // undefined = base element; 2 ids (main) or 2-3 ids (secret/daily)
+	recipe?: string[]; // undefined = base element; 2 ids (main and secret/daily)
 }
 
 const b = (id: string, name: string, emoji: string): Element => ({ id, name, emoji });
@@ -244,27 +244,6 @@ export const SECRET_ELEMENTS: Element[] = [
 	s('minotaure', 'Minotaure', '🐂', 'vache', 'humain'),
 	s('griffon', 'Griffon', '🦅', 'aigle', 'loup'),
 	s('fossile', 'Fossile', '🦴', 'dinosaure', 'pierre'),
-	// --- 3 ingredients ---
-	s('sandwich', 'Sandwich', '🥪', 'pain', 'fromage', 'salade'),
-	s('hamburger', 'Hamburger', '🍔', 'pain', 'vache', 'salade'),
-	s('crepe', 'Crêpe', '🥞', 'farine', 'oeuf', 'lait'),
-	s('omelette', 'Omelette', '🍳', 'oeuf', 'feu', 'fromage'),
-	s('sushi', 'Sushi', '🍣', 'poisson', 'ble', 'mer'),
-	s('cocktail', 'Cocktail', '🍸', 'eau', 'fruit', 'glace'),
-	s('the', 'Thé', '🍵', 'eau', 'feu', 'herbe'),
-	s('popcorn', 'Pop-corn', '🍿', 'ble', 'feu', 'air'),
-	s('voiture', 'Voiture', '🚗', 'metal', 'roue', 'energie'),
-	s('train', 'Train', '🚂', 'metal', 'roue', 'charbon'),
-	s('avion', 'Avion', '✈️', 'metal', 'oiseau', 'energie'),
-	s('velo', 'Vélo', '🚲', 'metal', 'roue', 'humain'),
-	s('moto', 'Moto', '🏍️', 'metal', 'roue', 'feu'),
-	s('camera', 'Caméra', '📷', 'verre', 'metal', 'electricite'),
-	s('horloge', 'Horloge', '🕰️', 'metal', 'verre', 'energie'),
-	s('jungle', 'Jungle', '🌴', 'foret', 'pluie', 'soleil'),
-	s('savane', 'Savane', '🦓', 'prairie', 'soleil', 'sable'),
-	s('elephant', 'Éléphant', '🐘', 'terre', 'montagne', 'vie'),
-	s('avalanche', 'Avalanche', '🏔️', 'neige', 'montagne', 'energie'),
-	s('tsunami', 'Tsunami', '🌊', 'mer', 'tempete', 'montagne'),
 ];
 
 export const BASE_IDS: string[] = ELEMENTS.filter((x) => !x.recipe).map((x) => x.id);
@@ -298,23 +277,37 @@ export function dailyTarget(seed: number): string {
 	return SECRET_ELEMENTS[Math.floor(mulberry32(seed)() * SECRET_ELEMENTS.length)].id;
 }
 
+// Number of fusions the player must perform, per daily difficulty (facile/moyen/difficile).
+const DAILY_FUSIONS = [1, 2, 3];
+
 /**
  * Starting palette handed to the player in the daily challenge (instead of the bare 5 bases).
- * The target's recipe tree is expanded `diffIndex` extra levels toward the bases — so facile (0)
- * hands the target's direct ingredients (mixed with decoys → "find the right 2-3"), moyen (1) and
- * difficile (2) hand elements further back that need 1-2 intermediates rebuilt. Seeded → shared.
- * The returned set always suffices to craft the target.
+ * Difficulty = the exact number of fusions to do: the target's build tree is walked in topological
+ * order and the LAST `k` elements (the target + its nearest intermediates) are the ones the player
+ * must craft — everything else those need is handed in the palette (plus decoys). So facile = 1
+ * fusion (find the right 2 among ~10), moyen = 2, difficile = 3. Seeded → shared; always solvable.
  */
 export function dailyPalette(seed: number, targetId: string, diffIndex: number): string[] {
 	const target = getElement(targetId);
 	if (!target?.recipe) return [...BASE_IDS];
-	let frontier = [...target.recipe];
-	for (let lvl = 0; lvl < diffIndex; lvl++)
-		frontier = frontier.flatMap((id) => { const el = getElement(id); return el?.recipe ? el.recipe : [id]; });
-	const need = [...new Set(frontier)]; // the given elements the whole path can be rebuilt from
+	// Topological order of the non-base elements needed to build the target (target last).
+	const order: string[] = []; const seen = new Set<string>();
+	const visit = (id: string): void => {
+		const el = getElement(id);
+		if (!el?.recipe || seen.has(id)) return; // base or already visited
+		seen.add(id);
+		for (const ing of el.recipe) visit(ing);
+		order.push(id);
+	};
+	visit(targetId);
+	const k = Math.min(DAILY_FUSIONS[diffIndex] ?? 1, order.length);
+	const craft = new Set(order.slice(order.length - k)); // the k elements to make (incl. the target)
+	const given = new Set<string>();
+	for (const id of craft) for (const ing of getElement(id)!.recipe!) if (!craft.has(ing)) given.add(ing);
+	const need = [...given]; // handed to the player — the whole `craft` chain builds from these
 	const rng = mulberry32((seed ^ 0x5f356495) >>> 0);
 	const shuffle = (a: string[]): string[] => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-	const exclude = new Set([...need, targetId]);
-	const decoys = shuffle(ELEMENTS.filter((e) => !exclude.has(e.id)).map((e) => e.id)).slice(0, Math.max(0, 11 - need.length));
+	const exclude = new Set([...need, ...craft, targetId]);
+	const decoys = shuffle(ELEMENTS.filter((e) => !exclude.has(e.id)).map((e) => e.id)).slice(0, Math.max(0, 9 - need.length));
 	return shuffle([...need, ...decoys]);
 }
