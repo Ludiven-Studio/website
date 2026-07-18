@@ -6,11 +6,13 @@
  * pair, no cycle). Combining is commutative and allows an element with itself (a+a).
  */
 
+import { mulberry32 } from '../prng';
+
 export interface Element {
 	id: string;
 	name: string;
 	emoji: string;
-	recipe?: [string, string]; // undefined = base element
+	recipe?: string[]; // undefined = base element; 2 ids (main) or 2-3 ids (secret/daily)
 }
 
 const b = (id: string, name: string, emoji: string): Element => ({ id, name, emoji });
@@ -194,19 +196,104 @@ export const ELEMENTS: Element[] = [
 	e('diable', 'Diable', '😈', 'feu', 'mort'),
 ];
 
+/**
+ * Daily-only "secret" elements — kept OUT of free play so the main game is never spoiled. Each
+ * recipe combines 2 or 3 EXISTING main elements (so it's always reachable from the bases). The
+ * daily challenge starts from the 5 bases, rebuilds the needed mains, then fuses to the target.
+ */
+const s = (id: string, name: string, emoji: string, ...recipe: string[]): Element => ({ id, name, emoji, recipe });
+
+export const SECRET_ELEMENTS: Element[] = [
+	// --- 2 ingredients ---
+	s('cafe-au-lait', 'Café au lait', '☕', 'cafe', 'lait'),
+	s('cyborg', 'Cyborg', '🦾', 'humain', 'robot'),
+	s('limonade', 'Limonade', '🍋', 'eau', 'sucre'),
+	s('caramel', 'Caramel', '🍮', 'sucre', 'lait'),
+	s('confiture', 'Confiture', '🍓', 'fruit', 'sucre'),
+	s('jus', 'Jus de fruit', '🧃', 'fruit', 'eau'),
+	s('smoothie', 'Smoothie', '🥤', 'fruit', 'lait'),
+	s('barbecue', 'Barbecue', '🍖', 'feu', 'vache'),
+	s('hotdog', 'Hot-dog', '🌭', 'cochon', 'feu'),
+	s('bacon', 'Bacon', '🥓', 'cochon', 'soleil'),
+	s('requin', 'Requin', '🦈', 'poisson', 'epee'),
+	s('baleine', 'Baleine', '🐋', 'poisson', 'montagne'),
+	s('pingouin', 'Pingouin', '🐧', 'oiseau', 'glace'),
+	s('paon', 'Paon', '🦚', 'oiseau', 'fleur'),
+	s('ecureuil', 'Écureuil', '🐿️', 'souris', 'arbre'),
+	s('lapin', 'Lapin', '🐰', 'souris', 'prairie'),
+	s('renard', 'Renard', '🦊', 'loup', 'prairie'),
+	s('ours', 'Ours', '🐻', 'loup', 'montagne'),
+	s('lion', 'Lion', '🦁', 'loup', 'soleil'),
+	s('tigre', 'Tigre', '🐅', 'loup', 'feu'),
+	s('girafe', 'Girafe', '🦒', 'cheval', 'arbre'),
+	s('singe', 'Singe', '🐒', 'humain', 'arbre'),
+	s('gorille', 'Gorille', '🦍', 'montagne', 'foret'),
+	s('kraken', 'Kraken', '🐙', 'mer', 'dragon'),
+	s('yeti', 'Yéti', '⛄', 'neige', 'geant'),
+	s('golem', 'Golem', '🗿', 'pierre', 'magie'),
+	s('pirate', 'Pirate', '🏴‍☠️', 'humain', 'bateau'),
+	s('ninja', 'Ninja', '🥷', 'robot', 'epee'),
+	s('pharaon', 'Pharaon', '🤴', 'roi', 'desert'),
+	s('champagne', 'Champagne', '🍾', 'vin', 'energie'),
+	s('whisky', 'Whisky', '🥃', 'biere', 'feu'),
+	s('chips', 'Chips', '🥔', 'legume', 'soleil'),
+	s('frite', 'Frites', '🍟', 'legume', 'feu'),
+	s('drone', 'Drone', '🛸', 'robot', 'air'),
+	s('marais', 'Marais', '🐊', 'boue', 'arbre'),
+	s('centaure', 'Centaure', '🏇', 'cheval', 'humain'),
+	s('minotaure', 'Minotaure', '🐂', 'vache', 'humain'),
+	s('griffon', 'Griffon', '🦅', 'aigle', 'loup'),
+	s('fossile', 'Fossile', '🦴', 'dinosaure', 'pierre'),
+	// --- 3 ingredients ---
+	s('sandwich', 'Sandwich', '🥪', 'pain', 'fromage', 'salade'),
+	s('hamburger', 'Hamburger', '🍔', 'pain', 'vache', 'salade'),
+	s('crepe', 'Crêpe', '🥞', 'farine', 'oeuf', 'lait'),
+	s('omelette', 'Omelette', '🍳', 'oeuf', 'feu', 'fromage'),
+	s('sushi', 'Sushi', '🍣', 'poisson', 'ble', 'mer'),
+	s('cocktail', 'Cocktail', '🍸', 'eau', 'fruit', 'glace'),
+	s('the', 'Thé', '🍵', 'eau', 'feu', 'herbe'),
+	s('popcorn', 'Pop-corn', '🍿', 'ble', 'feu', 'air'),
+	s('voiture', 'Voiture', '🚗', 'metal', 'roue', 'energie'),
+	s('train', 'Train', '🚂', 'metal', 'roue', 'charbon'),
+	s('avion', 'Avion', '✈️', 'metal', 'oiseau', 'energie'),
+	s('velo', 'Vélo', '🚲', 'metal', 'roue', 'humain'),
+	s('moto', 'Moto', '🏍️', 'metal', 'roue', 'feu'),
+	s('camera', 'Caméra', '📷', 'verre', 'metal', 'electricite'),
+	s('horloge', 'Horloge', '🕰️', 'metal', 'verre', 'energie'),
+	s('jungle', 'Jungle', '🌴', 'foret', 'pluie', 'soleil'),
+	s('savane', 'Savane', '🦓', 'prairie', 'soleil', 'sable'),
+	s('elephant', 'Éléphant', '🐘', 'terre', 'montagne', 'vie'),
+	s('avalanche', 'Avalanche', '🏔️', 'neige', 'montagne', 'energie'),
+	s('tsunami', 'Tsunami', '🌊', 'mer', 'tempete', 'montagne'),
+];
+
 export const BASE_IDS: string[] = ELEMENTS.filter((x) => !x.recipe).map((x) => x.id);
 export const TOTAL = ELEMENTS.length;
+export const SECRET_TOTAL = SECRET_ELEMENTS.length;
 
-const BY_ID = new Map<string, Element>(ELEMENTS.map((x) => [x.id, x]));
+const BY_ID = new Map<string, Element>([...ELEMENTS, ...SECRET_ELEMENTS].map((x) => [x.id, x]));
 export const getElement = (id: string): Element | undefined => BY_ID.get(id);
 
-/** Unordered pair key so a+b === b+a (and a+a is allowed). */
-const pairKey = (a: string, c: string): string => (a < c ? `${a}|${c}` : `${c}|${a}`);
+/** Order-independent key for a 2- or 3-element combination (a+b === b+a, a+a allowed). */
+const comboKey = (ids: string[]): string => [...ids].sort().join('|');
 
-const RECIPES = new Map<string, string>();
-for (const el of ELEMENTS) if (el.recipe) RECIPES.set(pairKey(el.recipe[0], el.recipe[1]), el.id);
+const MAIN_RECIPES = new Map<string, string>();
+for (const el of ELEMENTS) if (el.recipe) MAIN_RECIPES.set(comboKey(el.recipe), el.id);
+const SECRET_RECIPES = new Map<string, string>();
+for (const el of SECRET_ELEMENTS) if (el.recipe) SECRET_RECIPES.set(comboKey(el.recipe), el.id);
 
-/** Combine two element ids → the product id, or null if the pair makes nothing. */
-export function combine(a: string, c: string): string | null {
-	return RECIPES.get(pairKey(a, c)) ?? null;
+/**
+ * Combine 2 or 3 element ids → the product id, or null. Free play passes only main recipes;
+ * the daily challenge passes includeSecret=true so the secret/daily elements become craftable.
+ */
+export function combine(ids: string[], includeSecret = false): string | null {
+	const k = comboKey(ids);
+	const main = MAIN_RECIPES.get(k);
+	if (main) return main;
+	return includeSecret ? (SECRET_RECIPES.get(k) ?? null) : null;
+}
+
+/** Deterministic secret element for a daily seed. */
+export function dailyTarget(seed: number): string {
+	return SECRET_ELEMENTS[Math.floor(mulberry32(seed)() * SECRET_ELEMENTS.length)].id;
 }

@@ -73,6 +73,8 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	golf: { lbId: 'golf-t', fmt: packed('coups') },
 	flechettes: { lbId: 'flechettes-t', fmt: packed('fléch.') },
 	billard: { lbId: 'billard-t', fmt: packed('coups') },
+	// Alchimie daily: fewest fusions to craft the day's secret element, time tiebreak.
+	alchimie: { lbId: 'alchimie-t', fmt: packed('fusions') },
 	// Réussite (card solitaire): cards to foundations (max 52) + time tiebreak, logged under `<id>-t`.
 	// Stored as (52 - cards) so "more cards" sorts ascending (metric time); `base` renders the count back.
 	reussite: {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ELEMENTS, BASE_IDS, TOTAL, combine, getElement } from './engine';
+import { ELEMENTS, SECRET_ELEMENTS, BASE_IDS, TOTAL, SECRET_TOTAL, combine, getElement, dailyTarget } from './engine';
 
 const ids = new Set(ELEMENTS.map((e) => e.id));
 const nonBase = ELEMENTS.filter((e) => e.recipe);
@@ -50,11 +50,58 @@ describe('alchimie element tree', () => {
 		expect(orphans, `unreachable: ${orphans.join(', ')}`).toEqual([]);
 	});
 
-	it('combine is commutative, supports self-combine, and returns null for unknown pairs', () => {
-		expect(combine('feu', 'eau')).toBe('vapeur');
-		expect(combine('eau', 'feu')).toBe('vapeur'); // commutative
-		expect(combine('eau', 'eau')).toBe('mer'); // self
-		expect(combine('feu', 'or')).toBeNull(); // no such recipe
+	it('combine is order-independent, supports self-combine, and returns null for unknown combos', () => {
+		expect(combine(['feu', 'eau'])).toBe('vapeur');
+		expect(combine(['eau', 'feu'])).toBe('vapeur'); // order-independent
+		expect(combine(['eau', 'eau'])).toBe('mer'); // self
+		expect(combine(['feu', 'or'])).toBeNull(); // no such recipe
 		expect(getElement('vapeur')?.name).toBe('Vapeur');
+	});
+});
+
+describe('alchimie daily (secret) pool', () => {
+	const mainIds = new Set(ELEMENTS.map((e) => e.id));
+
+	it('has ≥50 secret elements, unique ids disjoint from the main tree', () => {
+		expect(SECRET_TOTAL).toBeGreaterThanOrEqual(50);
+		const sids = new Set<string>();
+		for (const e of SECRET_ELEMENTS) {
+			expect(e.name.length && e.emoji.length, e.id).toBeTruthy();
+			expect(sids.has(e.id), `dup secret id ${e.id}`).toBe(false);
+			expect(mainIds.has(e.id), `secret id clashes with main ${e.id}`).toBe(false);
+			sids.add(e.id);
+		}
+	});
+
+	it('every secret recipe is 2-3 EXISTING main elements (always reachable from the bases)', () => {
+		for (const e of SECRET_ELEMENTS) {
+			expect(e.recipe, e.id).toBeDefined();
+			expect(e.recipe!.length >= 2 && e.recipe!.length <= 3, `${e.id} arity`).toBe(true);
+			for (const ing of e.recipe!) expect(mainIds.has(ing), `${e.id} ← ${ing}`).toBe(true);
+		}
+	});
+
+	it('no secret combo collides with a main combo or another secret combo', () => {
+		const key = (r: string[]) => [...r].sort().join('|');
+		const mainKeys = new Set(nonBase.map((e) => key(e.recipe!)));
+		const seen = new Map<string, string>();
+		const clashes: string[] = [];
+		for (const e of SECRET_ELEMENTS) {
+			const k = key(e.recipe!);
+			if (mainKeys.has(k)) clashes.push(`${e.id} clashes with main combo`);
+			else if (seen.has(k)) clashes.push(`${k} → ${seen.get(k)} & ${e.id}`);
+			else seen.set(k, e.id);
+		}
+		expect(clashes, clashes.join(', ')).toEqual([]);
+	});
+
+	it('secret combos only fire when includeSecret=true; dailyTarget is deterministic', () => {
+		const cafeLait = SECRET_ELEMENTS.find((e) => e.id === 'cafe-au-lait')!;
+		expect(combine(cafeLait.recipe!)).toBeNull(); // hidden in free play
+		expect(combine(cafeLait.recipe!, true)).toBe('cafe-au-lait'); // craftable in the daily
+		expect(combine(['pain', 'fromage', 'salade'], true)).toBe('sandwich'); // 3-ingredient
+		expect(getElement('sandwich')?.name).toBe('Sandwich');
+		expect(dailyTarget(42)).toBe(dailyTarget(42));
+		expect(SECRET_ELEMENTS.some((e) => e.id === dailyTarget(7))).toBe(true);
 	});
 });
