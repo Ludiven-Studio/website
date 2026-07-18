@@ -261,7 +261,7 @@ const CSS = `
     linear-gradient(160deg, #241b3a, #1a1730 60%, #201a37);
   border: 1px solid var(--gray-800); touch-action: none;
 }
-.al-board-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 30px; color: var(--gray-400); font-size: 14px; pointer-events: none; }
+.al-board-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 30px; color: rgba(255,255,255,0.6); font-size: 14px; pointer-events: none; }
 
 .al-token, .al-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
@@ -286,7 +286,7 @@ const CSS = `
 
 .al-float { position: fixed; z-index: 50; width: ${TOKEN}px; height: ${TOKEN}px; margin-left: -${TOKEN / 2}px; margin-top: -${TOKEN / 2}px; align-items: center; justify-content: center; font-size: 30px; pointer-events: none; border-radius: 14px; background: var(--gray-999); border: 1.5px solid var(--al-accent); box-shadow: 0 8px 22px rgba(0,0,0,0.5); }
 
-.al-toast { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(20,16,34,0.92); border: 1px solid var(--gray-700); color: var(--gray-0); font-size: 13.5px; font-weight: 600; padding: 7px 16px; border-radius: 999px; white-space: nowrap; animation: al-pop 0.2s ease; }
+.al-toast { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(20,16,34,0.92); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 13.5px; font-weight: 600; padding: 7px 16px; border-radius: 999px; white-space: nowrap; animation: al-pop 0.2s ease; }
 
 .al-reveal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; background: rgba(10,8,20,0.45); backdrop-filter: blur(2px); cursor: pointer; }
 .al-reveal-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 34px; border-radius: 20px; background: linear-gradient(160deg, #2a2150, #1c1836); border: 2px solid var(--al-accent); box-shadow: 0 0 44px rgba(160,140,255,0.5); animation: al-reveal 0.5s cubic-bezier(0.2,1.4,0.4,1); }
