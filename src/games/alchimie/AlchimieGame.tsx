@@ -64,6 +64,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const [dLoading, setDLoading] = useState(false);
 
 	const [tokens, setTokens] = useState<Token[]>([]);
+	const [catalog, setCatalog] = useState(false);
 	const [search, setSearch] = useState('');
 	const [reveal, setReveal] = useState<Element | null>(null);
 	const [toast, setToast] = useState('');
@@ -204,7 +205,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const newFree = useCallback(() => { modeRef.current = 'free'; setMode('free'); setTokens([]); setReveal(null); setSearch(''); }, []);
 
 	const startDaily = useCallback(async () => {
-		modeRef.current = 'daily'; setMode('daily'); setTokens([]); setReveal(null); setSearch(''); lastProgressRef.current = Date.now();
+		modeRef.current = 'daily'; setMode('daily'); setCatalog(false); setTokens([]); setReveal(null); setSearch(''); lastProgressRef.current = Date.now();
 		const run = loadDailyRun(DAILY_ID);
 		if (run && run.seed != null) {
 			const diff = run.diffIndex ?? 0;
@@ -255,6 +256,15 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const dScore = encodePacked(10_000_000, [dMoves, Math.min(9_999_999, Math.round((dDone ? dFinalRef.current : dElapsed) * 100))]);
 	const targetEl = dTarget ? getElement(dTarget) : null;
 
+	// Catalog (free mode): discovered → shown; frontier (both ingredients known) → faded emoji + recipe; else "?".
+	const discSet = new Set(discovered);
+	const catList = ELEMENTS.map((el) => {
+		const has = discSet.has(el.id);
+		const frontier = !has && !!el.recipe && el.recipe.every((r) => discSet.has(r));
+		return { el, has, frontier };
+	});
+	const frontierCount = catList.filter((c) => c.frontier).length;
+
 	return (
 		<div className="al-root">
 			<style>{CSS}</style>
@@ -278,16 +288,43 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 				<>
 					<div className="al-bar">
 						<span className="al-count"><b>{discovered.length}</b> / {TOTAL} découverts</span>
-						<div className="al-actions">
-							<button className="al-btn" onClick={hint}>💡 Indice</button>
-							<button className="al-btn" onClick={clearBoard}>🧹 Vider l'établi</button>
-							<button className="al-btn ghost" onClick={resetFree}>↻</button>
+						<div className="al-viewseg">
+							<button className={catalog ? '' : 'on'} onClick={() => setCatalog(false)}>🧪 Établi</button>
+							<button className={catalog ? 'on' : ''} onClick={() => setCatalog(true)}>📖 Catalogue</button>
 						</div>
+						{!catalog && (
+							<div className="al-actions">
+								<button className="al-btn" onClick={hint}>💡 Indice</button>
+								<button className="al-btn" onClick={clearBoard}>🧹 Vider l'établi</button>
+								<button className="al-btn ghost" onClick={resetFree}>↻</button>
+							</div>
+						)}
 					</div>
 					<div className="al-progress"><span style={{ width: `${(discovered.length / TOTAL) * 100}%` }} /></div>
 				</>
 			)}
 
+			{!daily && catalog ? (
+				<div className="al-catalog">
+					<div className="al-catbar"><b>{discovered.length}</b> / {TOTAL} découverts · <span className="al-catfrontier">{frontierCount} à portée</span></div>
+					<div className="al-catgrid">
+						{catList.map(({ el, has, frontier }) => has ? (
+							<div key={el.id} className={`al-cat has${BASE_IDS.includes(el.id) ? ' base' : ''}`} title={el.name}>
+								<span className="al-emo">{el.emoji}</span><span className="al-name">{el.name}</span>
+							</div>
+						) : frontier ? (
+							<div key={el.id} className="al-cat frontier" title={`À découvrir : ${el.recipe!.map((r) => getElement(r)!.name).join(' + ')}`}>
+								<span className="al-emo faded">{el.emoji}</span>
+								<span className="al-cat-recipe">{el.recipe!.map((r) => getElement(r)!.emoji).join(' + ')}</span>
+							</div>
+						) : (
+							<div key={el.id} className="al-cat locked" title="Mystère — continue à combiner">
+								<span className="al-cat-q">?</span>
+							</div>
+						))}
+					</div>
+				</div>
+			) : (
 			<div className="al-stage">
 				<div className="al-left">
 					<div className="al-board" ref={boardRef}>
@@ -349,6 +386,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 					</div>
 				</div>
 			</div>
+			)}
 
 			<div ref={floatRef} className="al-float" style={{ display: 'none' }} />
 
@@ -359,7 +397,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			<p className="al-help">
 				{daily
 					? <>On te donne une dizaine d'éléments : <strong>lâche une carte sur une autre</strong> pour trouver la combinaison qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). Bloqué ? Un <strong>indice</strong> apparaît toutes les 30 s. {SECRET_TOTAL} défis, un par jour.</>
-					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
+					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Catalogue</strong> montre ta progression (les prochains à portée en transparence, les autres en «&nbsp;?&nbsp;»). Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
 			</p>
 		</div>
 	);
@@ -411,6 +449,26 @@ const CSS = `
 .al-card.base { border-color: var(--al-accent); }
 .al-card:hover { border-color: var(--al-accent); transform: translateY(-1px); }
 .al-empty { grid-column: 1 / -1; color: var(--gray-400); font-size: 13px; text-align: center; padding: 20px 0; }
+
+/* View switch (Établi / Catalogue) */
+.al-viewseg { display: inline-flex; background: var(--gray-900); border: 1px solid var(--gray-800); border-radius: 999px; padding: 2px; }
+.al-viewseg button { border: none; background: transparent; color: var(--gray-300); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 5px 14px; cursor: pointer; }
+.al-viewseg button.on { background: var(--al-accent); color: var(--accent-text-over); }
+
+/* Catalogue */
+.al-catalog { border: 1px solid var(--gray-800); border-radius: 18px; background: linear-gradient(160deg, #241b3a, #1a1730 60%, #201a37); padding: 12px; }
+.al-catbar { text-align: center; color: var(--gray-300); font-size: 13px; margin-bottom: 10px; }
+.al-catbar b { color: var(--al-accent); font-size: 16px; font-variant-numeric: tabular-nums; }
+.al-catfrontier { color: #c8b6ff; font-weight: 600; }
+.al-catgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 7px; max-height: 560px; overflow-y: auto; padding: 2px; }
+.al-cat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; aspect-ratio: 1; border-radius: 14px; border: 1.5px solid var(--gray-800); background: rgba(255,255,255,0.03); padding: 4px; }
+.al-cat.has { border-color: var(--gray-700); background: var(--gray-999); }
+.al-cat.has.base { border-color: var(--al-accent); }
+.al-cat.frontier { border-style: dashed; border-color: #6b5bb0; }
+.al-cat.frontier .al-emo.faded { opacity: 0.4; filter: grayscale(0.3); }
+.al-cat-recipe { font-size: 11px; opacity: 0.7; line-height: 1; }
+.al-cat.locked { border-style: dashed; }
+.al-cat-q { font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.22); }
 
 .al-float { position: fixed; z-index: 50; width: ${TOKEN}px; height: ${TOKEN}px; margin-left: -${TOKEN / 2}px; margin-top: -${TOKEN / 2}px; align-items: center; justify-content: center; font-size: 30px; pointer-events: none; border-radius: 14px; background: var(--gray-999); border: 1.5px solid var(--al-accent); box-shadow: 0 8px 22px rgba(0,0,0,0.5); }
 
