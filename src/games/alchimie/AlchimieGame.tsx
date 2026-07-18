@@ -314,8 +314,12 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 								<span className="al-name">{el.name}</span>
 								{el.recipe && <span className="al-cat-recipe">{el.recipe.map((r) => getElement(r)!.emoji).join(' + ')}</span>}
 							</div>
+						) : frontier ? (
+							<div key={el.id} className="al-cat frontier" title="À portée — à toi de trouver la recette !">
+								<span className="al-emo faded">{el.emoji}</span>
+							</div>
 						) : (
-							<div key={el.id} className={`al-cat locked${frontier ? ' frontier' : ''}`} title={frontier ? 'À portée — à toi de trouver !' : 'Mystère'}>
+							<div key={el.id} className="al-cat locked" title="Mystère">
 								<span className="al-cat-q">?</span>
 							</div>
 						))}
@@ -394,7 +398,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			<p className="al-help">
 				{daily
 					? <>On te donne une dizaine d'éléments : <strong>lâche une carte sur une autre</strong> pour trouver la combinaison qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). Bloqué ? Un <strong>indice</strong> apparaît toutes les 30 s. {SECRET_TOTAL} défis, un par jour.</>
-					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Catalogue</strong> montre ta progression : les éléments trouvés avec leur recette, le reste en «&nbsp;?&nbsp;». Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
+					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Catalogue</strong> montre ta progression : les éléments trouvés avec leur recette, les prochains à portée en transparence, le reste en «&nbsp;?&nbsp;». Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
 			</p>
 		</div>
 	);
@@ -463,8 +467,8 @@ const CSS = `
 .al-cat.has.base { border-color: var(--al-accent); }
 .al-cat-recipe { font-size: 10px; opacity: 0.6; line-height: 1; margin-top: 1px; }
 .al-cat.locked { border-style: dashed; }
-.al-cat.frontier { border-color: var(--al-accent); }
-.al-cat.frontier .al-cat-q { color: #c8b6ff; }
+.al-cat.frontier { border-style: dashed; border-color: var(--al-accent); }
+.al-cat.frontier .al-emo.faded { opacity: 0.4; filter: grayscale(0.35); }
 .al-cat-q { font-size: 24px; font-weight: 700; color: rgba(255,255,255,0.22); }
 
 .al-float { position: fixed; z-index: 50; width: ${TOKEN}px; height: ${TOKEN}px; margin-left: -${TOKEN / 2}px; margin-top: -${TOKEN / 2}px; align-items: center; justify-content: center; font-size: 30px; pointer-events: none; border-radius: 14px; background: var(--gray-999); border: 1.5px solid var(--al-accent); box-shadow: 0 8px 22px rgba(0,0,0,0.5); }
