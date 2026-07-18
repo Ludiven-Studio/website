@@ -9,8 +9,8 @@ import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
    ALCHIMIE — React island. Libre : combine ~150 éléments depuis 5 bases (glisser une carte sur
-   une autre, ou le creuset à 2 emplacements). Défi du jour : fabrique l'élément secret du jour en
-   un minimum de fusions (chrono départage), à partir des bases. Engine pur/testé dans ./engine.
+   une autre). Défi du jour : fabrique l'élément secret du jour en un minimum de fusions (chrono
+   départage). Indices auto toutes les 30 s sans progrès. Engine pur/testé dans ./engine.
    ===================================================== */
 
 const STORE_KEY = 'ludiven-alchimie-discovered';
@@ -33,6 +33,26 @@ const loadDiscovered = (): string[] => {
 	} catch { return [...BASE_IDS]; }
 };
 
+/* Next element to craft on the path to `target`: an unowned ancestor whose ingredients
+   are all already owned (craftable right now). null = every ingredient of the target is owned. */
+const dailyNextStep = (have: Set<string>, target: string): Element | null => {
+	const needed = new Set<string>();
+	const stack = [target];
+	while (stack.length) {
+		const el = getElement(stack.pop()!);
+		if (!el?.recipe) continue;
+		for (const r of el.recipe) if (!have.has(r) && !needed.has(r)) { needed.add(r); stack.push(r); }
+	}
+	for (const id of needed) { const el = getElement(id)!; if (el.recipe!.every((r) => have.has(r))) return el; }
+	return null;
+};
+const stepText = (have: Set<string>, target: string): string => {
+	const step = dailyNextStep(have, target);
+	if (step) return `💡 Essaie ${step.recipe!.map((r) => getElement(r)!.emoji).join(' + ')} → ${step.emoji}`;
+	const t = getElement(target);
+	return t ? `💡 Tu as tout — assemble ${t.recipe!.map((r) => getElement(r)!.emoji).join(' + ')}` : '💡 Assemble tes éléments';
+};
+
 export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const [mode, setMode] = useState<'free' | 'daily'>('free');
 	const [discovered, setDiscovered] = useState<string[]>(() => (typeof window === 'undefined' ? [...BASE_IDS] : loadDiscovered()));
@@ -44,13 +64,11 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const [dLoading, setDLoading] = useState(false);
 
 	const [tokens, setTokens] = useState<Token[]>([]);
-	const [slots, setSlots] = useState<(string | null)[]>([null, null]);
 	const [search, setSearch] = useState('');
 	const [reveal, setReveal] = useState<Element | null>(null);
 	const [toast, setToast] = useState('');
 	const [draggingTid, setDraggingTid] = useState<number | null>(null);
 	const [pulseId, setPulseId] = useState('');
-	const [shakeCauldron, setShakeCauldron] = useState(false);
 
 	const boardRef = useRef<HTMLDivElement | null>(null);
 	const floatRef = useRef<HTMLDivElement | null>(null);
@@ -68,6 +86,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const dDiffRef = useRef(0);
 	const dPaletteLen = useRef(BASE_IDS.length);
 	const dFinalRef = useRef(0);
+	const lastProgressRef = useRef(0); // ms of the last discovery — drives the 30s auto-hint
 	const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -87,6 +106,17 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		setToast(text);
 		toastTimer.current = setTimeout(() => setToast(''), 1600);
 	}, []);
+
+	// Daily auto-hint: nudge toward the next useful fusion after 30s without a discovery.
+	useEffect(() => {
+		if (mode !== 'daily' || dDone || dLoading || dStartRef.current === 0) return;
+		const id = setInterval(() => {
+			if (Date.now() - lastProgressRef.current < 30000) return;
+			lastProgressRef.current = Date.now();
+			flash(stepText(dSet.current, dTargetRef.current));
+		}, 2000);
+		return () => clearInterval(id);
+	}, [mode, dDone, dLoading, flash]);
 	const showReveal = useCallback((el: Element) => {
 		if (revealTimer.current) clearTimeout(revealTimer.current);
 		setReveal(el);
@@ -103,6 +133,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		const el = getElement(productId)!;
 		if (activeSet().has(productId)) { flash(`${el.emoji} ${el.name} · déjà connu`); return; }
 		activeSet().add(productId);
+		lastProgressRef.current = Date.now(); // reset the auto-hint countdown
 		if (modeRef.current === 'daily') {
 			const nd = [...dArr.current, productId];
 			dArr.current = nd; setDDiscovered(nd);
@@ -140,24 +171,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		registerDiscovery(product);
 	}, [flash, registerDiscovery]);
 
-	const fillSlot = useCallback((index: number, id: string, sourceTid: number | null) => {
-		setSlots((prev) => { const n = [...prev]; n[index] = id; return n; });
-		if (sourceTid != null) setTokens((cur) => cur.filter((t) => t.tid !== sourceTid));
-	}, []);
-
-	const fuseCauldron = useCallback(() => {
-		const ids = slots.filter((s): s is string => !!s);
-		if (ids.length < 2) { flash('Mets 2 éléments dans le creuset'); return; }
-		const product = combine(ids, modeRef.current === 'daily');
-		if (!product) { flash('Rien ne se passe…'); setShakeCauldron(true); setTimeout(() => setShakeCauldron(false), 400); return; }
-		const rect = boardRef.current?.getBoundingClientRect();
-		const x = (rect?.width ?? 300) / 2, y = (rect?.height ?? 300) / 2;
-		setTokens((cur) => [...cur, { tid: tokenSeq.current++, id: product, x, y }]);
-		setSlots([null, null]);
-		registerDiscovery(product);
-	}, [slots, flash, registerDiscovery]);
-
-	/* ---- Pointer drag (mouse + touch), routed on drop to a cauldron slot or the board ---- */
+	/* ---- Pointer drag (mouse + touch), routed on drop to the board ---- */
 	const startDrag = useCallback((id: string, sourceTid: number | null, ev: React.PointerEvent) => {
 		ev.preventDefault();
 		dragRef.current = { id, sourceTid };
@@ -171,13 +185,6 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			if (floatRef.current) floatRef.current.style.display = 'none';
 			const drag = dragRef.current; dragRef.current = null; setDraggingTid(null);
 			if (!drag) return;
-			// Dropped on a cauldron slot? (rect hit-test — reliable across z-order/reflow)
-			let hitSlot = -1;
-			document.querySelectorAll('.al-slot').forEach((el) => {
-				const r = el.getBoundingClientRect();
-				if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) hitSlot = Number(el.getAttribute('data-slot'));
-			});
-			if (hitSlot >= 0) { fillSlot(hitSlot, drag.id, drag.sourceTid); return; }
 			const rect = boardRef.current?.getBoundingClientRect();
 			const inside = !!rect && e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
 			if (inside && rect) resolveBoardDrop(drag.id, drag.sourceTid, e.clientX - rect.left, e.clientY - rect.top);
@@ -185,7 +192,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		};
 		window.addEventListener('pointermove', move, { passive: false });
 		window.addEventListener('pointerup', up);
-	}, [fillSlot, resolveBoardDrop]);
+	}, [resolveBoardDrop]);
 
 	const spawnToBoard = useCallback((id: string) => {
 		const rect = boardRef.current?.getBoundingClientRect();
@@ -194,10 +201,10 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	/* ---- Modes ---- */
-	const newFree = useCallback(() => { modeRef.current = 'free'; setMode('free'); setTokens([]); setSlots([null, null]); setReveal(null); setSearch(''); }, []);
+	const newFree = useCallback(() => { modeRef.current = 'free'; setMode('free'); setTokens([]); setReveal(null); setSearch(''); }, []);
 
 	const startDaily = useCallback(async () => {
-		modeRef.current = 'daily'; setMode('daily'); setTokens([]); setSlots([null, null]); setReveal(null); setSearch('');
+		modeRef.current = 'daily'; setMode('daily'); setTokens([]); setReveal(null); setSearch(''); lastProgressRef.current = Date.now();
 		const run = loadDailyRun(DAILY_ID);
 		if (run && run.seed != null) {
 			const diff = run.diffIndex ?? 0;
@@ -225,20 +232,14 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 	const hint = useCallback(() => {
 		const set = activeSet();
-		if (modeRef.current === 'daily') {
-			const rec = getElement(dTargetRef.current)?.recipe ?? [];
-			const missing = rec.filter((r) => !set.has(r)).map((r) => getElement(r)!);
-			const need = missing[0] ?? getElement(rec[0]!);
-			flash(need ? `💡 Il te faut ${need.emoji} ${need.name}` : '💡 Tu as tous les ingrédients — assemble-les !');
-			return;
-		}
+		if (modeRef.current === 'daily') { lastProgressRef.current = Date.now(); flash(stepText(set, dTargetRef.current)); return; }
 		const options = ELEMENTS.filter((el) => el.recipe && !set.has(el.id) && el.recipe.every((r) => set.has(r)));
 		if (!options.length) { flash(discovered.length >= TOTAL ? 'Tout est découvert ! 🎉' : 'Combine encore pour ouvrir des pistes'); return; }
 		const pick = options[Math.floor(Math.random() * options.length)];
 		flash(`💡 Essaie ${pick.recipe!.map((r) => getElement(r)!.emoji).join(' + ')}`);
 	}, [discovered.length, flash]);
 
-	const clearBoard = useCallback(() => { setTokens([]); setSlots([null, null]); }, []);
+	const clearBoard = useCallback(() => { setTokens([]); }, []);
 	const resetFree = useCallback(() => {
 		if (!window.confirm('Effacer toutes tes découvertes libres et repartir des 5 bases ?')) return;
 		setTokens([]); setDiscovered([...BASE_IDS]); freeSet.current = new Set(BASE_IDS); setSearch('');
@@ -290,7 +291,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			<div className="al-stage">
 				<div className="al-left">
 					<div className="al-board" ref={boardRef}>
-						{tokens.length === 0 && <div className="al-board-hint">Lâche une carte sur une autre pour fusionner ✨ — ou utilise le creuset ci-dessous</div>}
+						{tokens.length === 0 && <div className="al-board-hint">Lâche une carte sur une autre pour fusionner ✨</div>}
 						{tokens.map((t) => {
 							const el = getElement(t.id)!;
 							return (
@@ -328,15 +329,6 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 						)}
 						{toast && <div className="al-toast">{toast}</div>}
 					</div>
-
-					<div className={`al-cauldron${shakeCauldron ? ' shake' : ''}`}>
-						{slots.map((s, i) => (
-							<button key={i} className={`al-slot${s ? ' filled' : ''}`} data-slot={i} onClick={() => setSlots((prev) => { const n = [...prev]; n[i] = null; return n; })} title={s ? 'Cliquer pour vider' : 'Glisse un élément ici'}>
-								{s ? <span className="al-emo">{getElement(s)!.emoji}</span> : <span className="al-slot-plus">+</span>}
-							</button>
-						))}
-						<button className="al-fuse" onClick={fuseCauldron} disabled={slots.filter(Boolean).length < 2}>Fusionner</button>
-					</div>
 				</div>
 
 				<div className="al-inv">
@@ -366,8 +358,8 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 			<p className="al-help">
 				{daily
-					? <>On te donne une dizaine d'éléments : trouve la bonne <strong>combinaison</strong> (glisse 2 cartes, ou le creuset) qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). La difficulté du jour dépend du nombre d'intermédiaires à reconstruire. {SECRET_TOTAL} défis, un par jour.</>
-					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong>, ou remplis le <strong>creuset</strong> (2 éléments) puis Fusionner. Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
+					? <>On te donne une dizaine d'éléments : <strong>lâche une carte sur une autre</strong> pour trouver la combinaison qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). Bloqué ? Un <strong>indice</strong> apparaît toutes les 30 s. {SECRET_TOTAL} défis, un par jour.</>
+					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
 			</p>
 		</div>
 	);
@@ -403,14 +395,6 @@ const CSS = `
   border: 1px solid var(--gray-800); touch-action: none;
 }
 .al-board-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 30px; color: rgba(255,255,255,0.6); font-size: 14px; pointer-events: none; }
-
-.al-cauldron { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 16px; background: linear-gradient(160deg, #2a2150, #201a37); border: 1px solid var(--gray-800); }
-.al-cauldron.shake { animation: al-shake 0.4s; }
-.al-slot { width: 56px; height: 56px; border-radius: 12px; border: 2px dashed var(--gray-700); background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: none; }
-.al-slot.filled { border-style: solid; border-color: var(--al-accent); background: var(--gray-999); }
-.al-slot-plus { color: rgba(255,255,255,0.35); font-size: 22px; }
-.al-fuse { margin-left: auto; border: none; background: var(--al-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 14px; border-radius: 999px; padding: 10px 22px; cursor: pointer; box-shadow: var(--shadow-sm); }
-.al-fuse:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
 .al-token, .al-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); border-radius: 14px; cursor: grab; font: inherit; user-select: none; -webkit-user-select: none; touch-action: none; }
 .al-token { position: absolute; width: ${TOKEN}px; height: ${TOKEN}px; transform: translate(-50%, -50%); box-shadow: 0 4px 14px rgba(0,0,0,0.4); animation: al-pop 0.22s ease; z-index: 1; }
@@ -448,6 +432,5 @@ const CSS = `
 @keyframes al-pulse { 0% { transform: scale(1); } 40% { transform: scale(1.18); box-shadow: 0 0 18px rgba(200,182,255,0.7); } 100% { transform: scale(1); } }
 @keyframes al-reveal { from { transform: scale(0.5) rotate(-6deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
 @keyframes al-spark { to { transform: rotate(var(--a)) translateY(-70px) scale(0.2); opacity: 0; } }
-@keyframes al-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
-@media (prefers-reduced-motion: reduce) { .al-token, .al-card.pulse, .al-reveal-card, .al-spark i, .al-toast, .al-cauldron.shake { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .al-token, .al-card.pulse, .al-reveal-card, .al-spark i, .al-toast { animation: none; } }
 `;
