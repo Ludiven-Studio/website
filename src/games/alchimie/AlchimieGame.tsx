@@ -197,6 +197,10 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 	/* ---- Pointer drag (mouse + touch), routed on drop to the board ---- */
 	const startDrag = useCallback((id: string, sourceTid: number | null, ev: React.PointerEvent) => {
+		// Touch on a palette card (sourceTid == null): don't hijack the gesture — let the
+		// list scroll (touch-action: pan-y) and let the tap fire onClick → spawnToBoard.
+		// Dragging stays available for mouse/pen, and for board tokens (which don't scroll).
+		if (ev.pointerType === 'touch' && sourceTid == null) return;
 		ev.preventDefault();
 		dragRef.current = { id, sourceTid };
 		if (sourceTid != null) setDraggingTid(sourceTid);
@@ -513,6 +517,9 @@ const CSS = `
 .al-board-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 30px; color: rgba(255,255,255,0.6); font-size: 14px; pointer-events: none; }
 
 .al-token, .al-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); border-radius: 14px; cursor: grab; font: inherit; user-select: none; -webkit-user-select: none; touch-action: none; }
+/* Palette/catalogue cards live in a scrollable list: allow vertical panning so touch
+   can scroll (drag-to-board is mouse/pen or the tap-to-add onClick on touch). */
+.al-card { touch-action: pan-y; }
 .al-token { position: absolute; width: ${TOKEN}px; height: ${TOKEN}px; transform: translate(-50%, -50%); box-shadow: 0 4px 14px rgba(0,0,0,0.4); animation: al-pop 0.22s ease; z-index: 1; }
 .al-token.dragging { opacity: 0; }
 .al-token.pulse, .al-card.pulse { animation: al-pulse 0.9s ease; border-color: #c8b6ff; }
