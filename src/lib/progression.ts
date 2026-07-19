@@ -17,11 +17,13 @@ export interface LevelResult {
 	score: number;
 	won: boolean;
 	stat?: number;
+	raw?: Record<string, unknown>;
 }
 
 /** Per-game difficulty ramp + star rules. Cfg is the game's own difficulty shape. */
 export interface LevelPlan<Cfg> {
 	count: number; // LEVEL_COUNT
+	metric: 'time' | 'score'; // decides best-retained direction (time = lower is better)
 	config(level: number): Cfg;
 	/** Stars earned for a finished run — 0 = failed (no unlock). */
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3;

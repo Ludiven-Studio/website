@@ -17,6 +17,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 
 export const lugeLevels: LevelPlan<LugeLevelCfg> = {
 	count: LEVEL_COUNT,
+	metric: 'score',
 	config(level: number): LugeLevelCfg {
 		const l = Math.max(1, Math.min(LEVEL_COUNT, level));
 		return {

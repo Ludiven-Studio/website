@@ -22,8 +22,12 @@ import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { demineurLevels } from './levels';
 
 /* =====================================================
    DÉMINEUR LOGIQUE — React island.
@@ -66,9 +70,40 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 	const [hintNote, setHintNote] = useState('');
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, demineurLevels);
 
 	const { size, mineCount } = puzzle;
 	const over = status === 'won' || status === 'lost' || revealed;
+
+	/* Levels mode: start a level from its config; grade on win/lose. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		const p = generateDemineur(cfg.sizeLvl, cfg.diff, mulberry32(cfg.seed));
+		setDaily(false);
+		setPuzzle(p);
+		setGrid(openedStart(p));
+		setStatus('playing');
+		setRevealed(false);
+		setFlagMode(false);
+		setHinted(new Set());
+		setHintNote('');
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once it ends (win → time, mine → fail).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10), raw: { size, mineCount } });
+		else if (status === 'lost') lv.finish({ won: false, score: 0 });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	const newGame = useCallback((dk: DiffKey) => {
 		const p = generateDemineur(SIZES[dk], DIFFS[dk]);
@@ -192,6 +227,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (over) return;
 		if (daily && !started) return;
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		if (isLose(grid, puzzle)) {
 			setStatus('lost');
 			trackGame(gameId, 'game_over');
@@ -328,7 +364,14 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		<div className="dm-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{daily ? (
 				<div className="dm-daily-tag">
@@ -338,8 +381,15 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 				</div>
 			) : null}
 
+			{lv.active && (
+				<div className="dm-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${size}×${size} · ${mineCount} 💣`}
+				</div>
+			)}
+
+			{!(lv.active && lv.menu) && (
 			<div className="dm-bar">
-				{!daily && (
+				{!daily && !lv.active && (
 					<div className="dm-pills" role="tablist" aria-label="Difficulté">
 						{DIFF_ORDER.map((k) => (
 							<button
@@ -357,15 +407,16 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 				<div className="dm-bar-right">
 					<div className="dm-mines" aria-label="Mines restantes">💣 {minesLeft}</div>
 					<div className="dm-timer">{fmtTime(elapsed)}</div>
-					{!daily && (
+					{!daily && !lv.active && (
 						<button className="dm-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
 						</button>
 					)}
 				</div>
 			</div>
+			)}
 
-			{!over && (!daily || started) && (
+			{!over && (!daily || started) && !(lv.active && lv.menu) && (
 				<div className="dm-actions">
 					<button
 						className={`dm-act ${flagMode ? 'on' : ''}`}
@@ -375,7 +426,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 						🚩 Mode drapeau{flagMode ? ' : activé' : ''}
 					</button>
 					<button className="dm-act" onClick={hint}>💡 Indice</button>
-					{!daily && elapsed >= 60 && (
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="dm-act" onClick={showSolution}>👁 Voir la solution</button>
 					)}
 					{daily && started && status === 'playing' && (
@@ -384,7 +435,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status === 'lost' && (
+			{status === 'lost' && !lv.active && (
 				<div className="dm-lost">
 					💥 Mine touchée !{' '}
 					{daily ? (
@@ -409,6 +460,9 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="dm-boardwrap">
 				{celebrating && <Celebration />}
 				<div
@@ -462,7 +516,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="dm-win" role="dialog" aria-label="Démineur résolu">
 						<div className="dm-wincard">
 							<div className="dm-winmark">🧨</div>
@@ -473,14 +527,28 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={demineurLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : 'Mine touchée'}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && <p className="dm-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={dailyValue} format={lbFormat} />
 			)}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" format={lbFormat} />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" format={lbFormat} />}
 
 			{revealed ? (
 				<div className="dm-revealed-note">

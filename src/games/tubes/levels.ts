@@ -33,6 +33,7 @@ function timeTargets(colors: number, height: number): { two: number; three: numb
 
 export const tubesLevels: LevelPlan<TubesLevelCfg> = {
 	count: LEVEL_COUNT,
+	metric: 'time',
 	config(level: number): TubesLevelCfg {
 		const l = Math.max(1, Math.min(LEVEL_COUNT, level));
 		const { colors, height } = difficultyFor(l);
