@@ -209,6 +209,20 @@ table, th, td {
 	flex-direction: column;
 }
 
+/* iOS Safari only honors the -webkit- prefixed user-select: without it, rapid
+   taps on touch controls select text (steer arrows, grid cells) instead of playing. */
+.game-page {
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+	-webkit-tap-highlight-color: transparent;
+}
+.game-page input,
+.game-page textarea {
+	-webkit-user-select: text;
+	user-select: text;
+}
+
 .gap-2 {
 	gap: 0.5rem;
 }
