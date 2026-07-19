@@ -1,6 +1,6 @@
-/* Shared large segmented toggle: 🎲 Mode libre / 🏆 Défi du jour.
-   Used by every game island to keep the mode switch visually distinct from
-   game-specific buttons (difficulty pills, etc.).
+/* Shared large segmented toggle: 🎲 Mode libre / 🏆 Défi du jour, plus an
+   optional 🎯 Niveaux segment (levels/progression mode). Used by every game
+   island to keep the mode switch visually distinct from game-specific buttons.
    Deep link: ?defi (or ?mode=defi / ?mode=daily) auto-opens the daily challenge. */
 
 import { useEffect, useRef } from 'react';
@@ -9,9 +9,13 @@ interface Props {
 	daily: boolean;
 	onFree: () => void;
 	onDaily: () => void;
+	/** Opt-in third segment. When set, `levelsActive` and `onLevels` are required. */
+	showLevels?: boolean;
+	levelsActive?: boolean;
+	onLevels?: () => void;
 }
 
-export default function ModeToggle({ daily, onFree, onDaily }: Props) {
+export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsActive, onLevels }: Props) {
 	const onDailyRef = useRef(onDaily);
 	onDailyRef.current = onDaily;
 
@@ -33,25 +37,37 @@ export default function ModeToggle({ daily, onFree, onDaily }: Props) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+	// With the third segment the label 'Mode libre' is too wide on phones — shorten.
+	const freeActive = !daily && !levelsActive;
 	return (
-		<div className="dt-toggle" role="tablist" aria-label="Mode">
+		<div className={`dt-toggle ${showLevels ? 'three' : ''}`} role="tablist" aria-label="Mode">
 			<style>{CSS}</style>
 			<button
 				role="tab"
-				aria-selected={!daily}
-				className={`dt-seg ${!daily ? 'active' : ''}`}
+				aria-selected={freeActive}
+				className={`dt-seg ${freeActive ? 'active' : ''}`}
 				onClick={onFree}
 			>
-				🎲 Mode libre
+				🎲 {showLevels ? 'Libre' : 'Mode libre'}
 			</button>
 			<button
 				role="tab"
-				aria-selected={daily}
-				className={`dt-seg ${daily ? 'active' : ''}`}
+				aria-selected={daily && !levelsActive}
+				className={`dt-seg ${daily && !levelsActive ? 'active' : ''}`}
 				onClick={onDaily}
 			>
-				🏆 Défi du jour
+				🏆 {showLevels ? 'Défi' : 'Défi du jour'}
 			</button>
+			{showLevels && (
+				<button
+					role="tab"
+					aria-selected={!!levelsActive}
+					className={`dt-seg ${levelsActive ? 'active' : ''}`}
+					onClick={onLevels}
+				>
+					🎯 Niveaux
+				</button>
+			)}
 		</div>
 	);
 }
@@ -69,6 +85,7 @@ const CSS = `
   border-radius: 999px;
   box-shadow: var(--shadow-sm);
 }
+.dt-toggle.three { max-width: 440px; }
 .dt-seg {
   flex: 1;
   border: none;
@@ -83,6 +100,7 @@ const CSS = `
   white-space: nowrap;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
+.dt-toggle.three .dt-seg { font-size: 13.5px; padding: 11px 4px; }
 .dt-seg.active {
   background: var(--accent-regular);
   color: var(--accent-text-over);

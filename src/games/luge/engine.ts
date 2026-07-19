@@ -261,9 +261,17 @@ const TUNNEL_MIN_WIDTH = 12.5; // caves widen to this even late in the run (dodg
 
 /* ----------------------------- Difficulty ----------------------------- */
 
+// Levels mode shifts the whole difficulty curve forward: a level starts already
+// at harder terrain. 0 for free/daily (the classic ramp). Set once at arm time —
+// generation AND stepping read difficultyAt, so both stay consistent.
+let DIFFICULTY_BASELINE = 0;
+export function setDifficultyBaseline(meters: number): void {
+	DIFFICULTY_BASELINE = Math.max(0, meters);
+}
+
 /** Smooth monotonic ramp with asymptotic caps — same for everyone at a given s. */
 export function difficultyAt(s: number): Difficulty {
-	const t = Math.max(0, s);
+	const t = Math.max(0, s + DIFFICULTY_BASELINE);
 	const e = (k: number) => 1 - Math.exp(-t / k);
 	return {
 		vMax: 18 + 42 * e(1600),

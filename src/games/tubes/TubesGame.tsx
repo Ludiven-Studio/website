@@ -21,8 +21,11 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { tubesLevels } from './levels';
+import { getProgression, submitLevel, type GameProgress } from '../../lib/progression';
 
 /* =====================================================
    TUBES (Water Sort) — React island.
@@ -87,14 +90,22 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [hintMove, setHintMove] = useState<{ from: number; to: number } | null>(null);
 	const [fresh, setFresh] = useState<Fresh | null>(null);
+	const [levelsMode, setLevelsMode] = useState(false);
+	const [levelMenu, setLevelMenu] = useState(false);
+	const [progress, setProgress] = useState<GameProgress>({ stars: {}, best: {} });
+	const [currentLevel, setCurrentLevel] = useState(1);
+	const [earnedStars, setEarnedStars] = useState(0);
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const levelSubmittedRef = useRef(false);
 
 	const height = puzzle.height;
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const p = generateWaterSort(DIFFS[key]);
 		setDaily(false);
+		setLevelsMode(false);
+		setLevelMenu(false);
 		setAlreadyPlayed(false);
 		setDiffKey(key);
 		setPuzzle(p);
@@ -119,6 +130,8 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	/* Daily challenge: one attempt per device, resumable. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
+		setLevelsMode(false);
+		setLevelMenu(false);
 		setSelected(null);
 		setHintMove(null);
 		setFresh(null);
@@ -170,6 +183,39 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		setDailyLoading(false);
 	}, [gameId]);
 
+	/* Levels / progression mode. */
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		setLevelsMode(true);
+		setLevelMenu(true);
+		setStatus('playing');
+		setSelected(null);
+		setHintMove(null);
+		setFresh(null);
+		setHistory([]);
+		void getProgression(gameId).then((prog) => setProgress({ stars: { ...prog.stars }, best: { ...prog.best } }));
+	}, [gameId]);
+
+	const playLevel = useCallback((level: number) => {
+		const cfg = tubesLevels.config(level);
+		const p = generateWaterSort(cfg.diff, mulberry32(cfg.seed));
+		levelSubmittedRef.current = false;
+		setCurrentLevel(level);
+		setLevelMenu(false);
+		setPuzzle(p);
+		setTubes(cloneTubes(p.tubes));
+		setSelected(null);
+		setMoves(0);
+		setHistory([]);
+		setJokerUsed(false);
+		setHintMove(null);
+		setFresh(null);
+		setEarnedStars(0);
+		setStatus('playing');
+		setStarted(false); // timer starts on the first pour (ensureStarted)
+		setElapsed(0);
+	}, []);
+
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	const startTimer = useCallback(() => {
@@ -206,11 +252,29 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won') return;
 		if (daily && !started) return;
+		if (levelsMode && levelMenu) return; // grid open, not actually playing
 		if (tubes.length === 0 || !isSolved(tubes, height)) return;
 		setStatus('won');
 		setSelected(null);
 		trackGame(gameId, 'game_won');
-	}, [tubes, status, daily, started, height, gameId]);
+	}, [tubes, status, daily, started, levelsMode, levelMenu, height, gameId]);
+
+	/* Levels: on a fresh win, grade + record the level once. */
+	useEffect(() => {
+		if (!levelsMode || levelMenu || status !== 'won' || levelSubmittedRef.current) return;
+		levelSubmittedRef.current = true;
+		const finalCentis = startRef.current ? Math.round((Date.now() - startRef.current) / 10) : elapsed;
+		setElapsed(finalCentis);
+		const stars = tubesLevels.stars(currentLevel, { won: true, score: finalCentis });
+		setEarnedStars(stars);
+		if (stars >= 1) {
+			void submitLevel({
+				gameId, level: currentLevel, stars: stars as 1 | 2 | 3, score: finalCentis, metricIsTime: true,
+				rawData: { moves },
+			}).then((prog) => setProgress({ stars: { ...prog.stars }, best: { ...prog.best } }));
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [levelsMode, levelMenu, status]);
 
 	/* Persist in-progress daily attempt. */
 	useEffect(() => {
@@ -340,7 +404,14 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		<div className="ws-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => (levelsMode || daily) && newGame(diffKey)}
+				onDaily={startDaily}
+				showLevels
+				levelsActive={levelsMode}
+				onLevels={armLevels}
+			/>
 
 			{daily && (
 				<div className="ws-daily-tag">
@@ -350,8 +421,17 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{levelsMode && (
+				<div className="ws-daily-tag">
+					{levelMenu
+						? 'Progression — réussis un niveau pour débloquer le suivant'
+						: `Niveau ${currentLevel} · ${tubesLevels.starHint(currentLevel).three} pour 3★`}
+				</div>
+			)}
+
+			{!(levelsMode && levelMenu) && (
 			<div className="ws-bar">
-				{!daily ? (
+				{!daily && !levelsMode ? (
 					<div className="ws-pills" role="tablist" aria-label="Difficulté">
 						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 							<button
@@ -371,13 +451,14 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 				<div className="ws-bar-right">
 					<div className="ws-stat" aria-label="Coups">{moves} coups</div>
 					<div className="ws-timer">{fmtTime(elapsed)}</div>
-					{!daily && (
+					{!daily && !levelsMode && (
 						<button className="ws-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">↻</button>
 					)}
 				</div>
 			</div>
+			)}
 
-			{interactive && (
+			{interactive && !(levelsMode && levelMenu) && (
 				<div className="ws-actions">
 					<button className="ws-act" onClick={undo} disabled={history.length === 0}>↶ Annuler</button>
 					<button className="ws-act" onClick={hint}>💡 Indice</button>
@@ -396,6 +477,9 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{levelsMode && levelMenu ? (
+				<LevelSelect progress={progress} onPick={playLevel} />
+			) : (
 			<div className="ws-boardwrap">
 				{celebrating && <Celebration />}
 				<div className={`ws-board ${daily && !started ? 'blurred' : ''}`}>
@@ -472,7 +556,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !levelsMode && (
 					<div className="ws-win" role="dialog" aria-label="Casse-tête résolu">
 						<div className="ws-wincard">
 							<div className="ws-winmark">🧪</div>
@@ -483,12 +567,36 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{showWin && levelsMode && (
+					<div className="ws-win" role="dialog" aria-label="Niveau réussi">
+						<div className="ws-wincard">
+							<p className="ws-winstars" aria-label={`${earnedStars} étoiles sur 3`}>
+								{[1, 2, 3].map((s) => (
+									<span key={s} className={s <= earnedStars ? 'on' : ''}>★</span>
+								))}
+							</p>
+							<h2>Niveau {currentLevel} réussi !</h2>
+							<p className="ws-wintime">{fmtTime(elapsed)}</p>
+							<p className="ws-windiff">{moves} coups</p>
+							<div className="ws-winbtns">
+								<button className="ws-replay ghost" onClick={armLevels}>🗺 Carte</button>
+								{currentLevel < tubesLevels.count ? (
+									<button className="ws-replay" onClick={() => playLevel(currentLevel + 1)}>Niveau {currentLevel + 1} →</button>
+								) : (
+									<button className="ws-replay" onClick={() => playLevel(currentLevel)}>↻ Rejouer</button>
+								)}
+							</div>
+						</div>
+					</div>
+				)}
 			</div>
+			)}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !levelsMode && <LeaderboardCorner game={gameId} metric="time" />}
 
 			<p className="ws-help">
 				Touche un tube puis un autre pour verser la couleur du dessus (vers un tube vide ou une
@@ -646,6 +754,10 @@ const CSS = `
 .ws-wintime { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 0; color: var(--ws-accent); }
 .ws-windiff { color: var(--gray-300); font-size: 13px; margin: 2px 0 14px; }
 .ws-replay { border: none; background: var(--ws-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
+.ws-replay.ghost { background: transparent; color: var(--gray-300); border: 1.5px solid var(--gray-700); }
+.ws-winbtns { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+.ws-winstars { font-size: 30px; letter-spacing: 4px; color: var(--gray-600); margin: 0 0 2px; }
+.ws-winstars .on { color: #f5a623; }
 
 @keyframes ws-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {

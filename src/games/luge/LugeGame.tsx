@@ -13,18 +13,22 @@ import {
 	balanceActive,
 	createLuge,
 	stepLuge,
+	setDifficultyBaseline,
 	type TrackSegment,
 	type Collectible,
 	type LugeState,
 	type LugeEvent,
 } from './engine';
+import { lugeLevels } from './levels';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { formatScore } from '../../lib/scoreFormat';
+import { getProgression, submitLevel, type GameProgress } from '../../lib/progression';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
 import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
@@ -619,6 +623,12 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const [tries, setTries] = useState(0);
 	const [webglError, setWebglError] = useState(false);
 	const [steerSide, setSteerSide] = useState<'left' | 'right' | null>(null); // hold-a-side steering (visual state)
+	const [levelsMode, setLevelsMode] = useState(false);
+	const [levelMenu, setLevelMenu] = useState(false); // showing the 100-level grid
+	const [progress, setProgress] = useState<GameProgress>({ stars: {}, best: {} });
+	const [currentLevel, setCurrentLevel] = useState(1);
+	const [levelWon, setLevelWon] = useState(false);
+	const [earnedStars, setEarnedStars] = useState(0);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const vignetteRef = useRef<HTMLDivElement>(null);
@@ -638,6 +648,10 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const statusRef = useRef<Status>('ready');
 	const startRef = useRef(0);
 	const dailyRef = useRef(false);
+	const modeRef = useRef<'free' | 'daily' | 'levels'>('free');
+	const targetDistRef = useRef(0); // levels: meters to reach to clear
+	const levelRef = useRef(1);
+	const levelMenuRef = useRef(false); // grid is open → block auto-start from input
 	const triesRef = useRef(0);
 	const keysRef = useRef({ left: false, right: false });
 	const pressingRef = useRef(false); // a pointer is held on the steering area
@@ -1078,7 +1092,33 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		rafRef.current = 0;
 	}, []);
 
+	// Levels mode: a run ends by reaching the target (won) or crashing out (failed).
+	const finishLevel = useCallback((won: boolean) => {
+		stop();
+		const st = stateRef.current;
+		const level = levelRef.current;
+		const stars = won ? lugeLevels.stars(level, { won, score: st.score, stat: st.lives }) : 0;
+		statusRef.current = 'over';
+		setStatus('over');
+		setScore(st.score);
+		setDist(Math.floor(st.s));
+		setLives(st.lives);
+		setLevelWon(won);
+		setEarnedStars(stars);
+		if (stars >= 1) {
+			void submitLevel({
+				gameId, level, stars: stars as 1 | 2 | 3, score: st.score, metricIsTime: false,
+				rawData: { dist: Math.floor(st.s), lives: st.lives },
+			}).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best } }));
+		}
+		trackGame(gameId, 'game_over', { score: st.score });
+	}, [gameId, stop]);
+
 	const onGameOver = useCallback(() => {
+		if (modeRef.current === 'levels') {
+			finishLevel(false);
+			return;
+		}
 		stop();
 		const sc = stateRef.current.score;
 		statusRef.current = 'over';
@@ -1103,7 +1143,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			return nb;
 		});
 		trackGame(gameId, 'game_over', { score: sc });
-	}, [gameId, stop]);
+	}, [gameId, stop, finishLevel]);
 
 	const handleEvents = useCallback((events: LugeEvent[]) => {
 		for (const ev of events) {
@@ -1162,6 +1202,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			const steer = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
 			let st = stateRef.current;
 			let over = false;
+			let levelCleared = false;
 			while (runningRef.current && accRef.current >= STEP) {
 				accRef.current -= STEP;
 				prevRef.current = { s: st.s, lat: st.lat };
@@ -1174,6 +1215,18 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 					over = true;
 					break;
 				}
+				// Levels mode: reaching the target distance clears the level (no crash tumble).
+				if (modeRef.current === 'levels' && targetDistRef.current > 0 && st.s >= targetDistRef.current) {
+					levelCleared = true;
+					break;
+				}
+			}
+			if (levelCleared) {
+				draw(dt / 1000, st.s, st.lat);
+				setScore(st.score);
+				setDist(Math.floor(st.s));
+				finishLevel(true);
+				return;
 			}
 			segsRef.current = ensureSegments(segsRef.current, seedRef.current, st.s);
 			syncSegMeshes();
@@ -1217,7 +1270,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			}
 			rafRef.current = requestAnimationFrame(frame);
 		},
-		[draw, handleEvents, onGameOver, syncSegMeshes],
+		[draw, handleEvents, onGameOver, syncSegMeshes, finishLevel],
 	);
 
 	/* ---- Run control ---- */
@@ -1271,7 +1324,12 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const armFree = useCallback(() => {
 		stop();
 		dailyRef.current = false;
+		modeRef.current = 'free';
+		levelMenuRef.current = false;
 		setDaily(false);
+		setLevelsMode(false);
+		setLevelMenu(false);
+		setDifficultyBaseline(0);
 		setAlreadyPlayed(false);
 		triesRef.current = 0;
 		setTries(0);
@@ -1288,7 +1346,12 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const startDaily = useCallback(async () => {
 		stop();
 		dailyRef.current = true;
+		modeRef.current = 'daily';
+		levelMenuRef.current = false;
 		setDaily(true);
+		setLevelsMode(false);
+		setLevelMenu(false);
+		setDifficultyBaseline(0);
 		statusRef.current = 'ready';
 		setStatus('ready');
 		const run = loadDailyRun(gameId);
@@ -1318,6 +1381,36 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		setDailyLoading(false);
 	}, [gameId, stop, armWorld]);
 
+	const armLevels = useCallback(() => {
+		stop();
+		dailyRef.current = false;
+		modeRef.current = 'levels';
+		levelMenuRef.current = true;
+		targetDistRef.current = 0;
+		setDaily(false);
+		setLevelsMode(true);
+		setLevelMenu(true);
+		statusRef.current = 'ready';
+		setStatus('ready');
+		setDifficultyBaseline(0);
+		armWorld(lugeLevels.config(1).seed); // idle board behind the grid
+		void getProgression(gameId).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best } }));
+	}, [gameId, stop, armWorld]);
+
+	const playLevel = useCallback((level: number) => {
+		const cfg = lugeLevels.config(level);
+		levelRef.current = level;
+		targetDistRef.current = cfg.targetDist;
+		seedRef.current = cfg.seed;
+		levelMenuRef.current = false;
+		setDifficultyBaseline(cfg.baseline);
+		setCurrentLevel(level);
+		setLevelMenu(false);
+		setLevelWon(false);
+		setEarnedStars(0);
+		start();
+	}, [start]);
+
 	/* ---- Input ---- */
 	useEffect(() => {
 		const setKey = (k: string, down: boolean): boolean => {
@@ -1329,7 +1422,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (setKey(e.key, true)) {
 				e.preventDefault();
-				if (statusRef.current === 'ready') start();
+				if (statusRef.current === 'ready' && !levelMenuRef.current) start();
 			}
 		};
 		const onKeyUp = (e: KeyboardEvent) => setKey(e.key, false);
@@ -1385,27 +1478,46 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// Hold-a-side steering: press the left/right half of the play area to turn (mouse or touch).
-	const applySide = (e: React.PointerEvent): void => {
-		const rect = e.currentTarget.getBoundingClientRect();
-		const left = e.clientX - rect.left < rect.width / 2;
+	// Hold-a-side steering: press the left/right half of the play area to turn.
+	// Touch is handled by native touch events (reliable on iOS Safari, where pointer
+	// events with setPointerCapture drop moves); mouse/pen go through pointer events.
+	const applySideX = (clientX: number, rect: DOMRect): void => {
+		const left = clientX - rect.left < rect.width / 2;
 		keysRef.current.left = left;
 		keysRef.current.right = !left;
 		setSteerSide(left ? 'left' : 'right');
 	};
-	const onSteerDown = (e: React.PointerEvent): void => {
-		e.preventDefault();
+	const steerStart = (clientX: number, rect: DOMRect): void => {
 		pressingRef.current = true;
-		if (statusRef.current === 'ready') start();
-		applySide(e);
-		e.currentTarget.setPointerCapture(e.pointerId);
+		if (statusRef.current === 'ready' && !levelMenuRef.current) start();
+		applySideX(clientX, rect);
 	};
-	const onSteerMove = (e: React.PointerEvent): void => { if (pressingRef.current) applySide(e); };
-	const onSteerUp = (): void => {
+	const steerEnd = (): void => {
 		pressingRef.current = false;
 		keysRef.current.left = false;
 		keysRef.current.right = false;
 		setSteerSide(null);
+	};
+	const onSteerDown = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return; // touch handled by onTouch* below
+		e.preventDefault();
+		steerStart(e.clientX, e.currentTarget.getBoundingClientRect());
+	};
+	const onSteerMove = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		if (pressingRef.current) applySideX(e.clientX, e.currentTarget.getBoundingClientRect());
+	};
+	const onSteerUp = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		steerEnd();
+	};
+	const onSteerTouchStart = (e: React.TouchEvent): void => {
+		const t = e.touches[0];
+		if (t) steerStart(t.clientX, e.currentTarget.getBoundingClientRect());
+	};
+	const onSteerTouchMove = (e: React.TouchEvent): void => {
+		const t = e.touches[0];
+		if (t && pressingRef.current) applySideX(t.clientX, e.currentTarget.getBoundingClientRect());
 	};
 
 	const remaining = MAX_TRIES - tries;
@@ -1414,9 +1526,22 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		<div className="lg-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={armFree} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={armFree}
+				onDaily={startDaily}
+				showLevels
+				levelsActive={levelsMode}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{levelsMode ? (
+				<div className="lg-daily-tag">
+					{levelMenu
+						? 'Progression — réussis un niveau pour débloquer le suivant'
+						: `Niveau ${currentLevel} · cible ${targetDistRef.current} m`}
+				</div>
+			) : daily ? (
 				<div className="lg-daily-tag">
 					{dailyLoading
 						? 'Préparation de la descente…'
@@ -1438,7 +1563,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				<span className="lg-best">Record {fmtPts(best)}</span>
 			</div>
 
-			<div className="lg-boardwrap">
+			<div className={`lg-boardwrap ${levelsMode && levelMenu ? 'hidden' : ''}`}>
 				<canvas ref={canvasRef} className="lg-canvas" role="img" aria-label={`Luge — ${fmtPts(score)}`} />
 				<div ref={vignetteRef} className="lg-vignette" aria-hidden="true" />
 				<div ref={flashRef} className="lg-flash" aria-hidden="true" />
@@ -1449,7 +1574,18 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				{bonusFlash && <div className="lg-bonus">{bonusFlash}</div>}
 
 				{status === 'playing' && (
-					<div className="lg-steer" onPointerDown={onSteerDown} onPointerMove={onSteerMove} onPointerUp={onSteerUp} onPointerCancel={onSteerUp} aria-hidden="true">
+					<div
+						className="lg-steer"
+						onPointerDown={onSteerDown}
+						onPointerMove={onSteerMove}
+						onPointerUp={onSteerUp}
+						onPointerCancel={onSteerUp}
+						onTouchStart={onSteerTouchStart}
+						onTouchMove={onSteerTouchMove}
+						onTouchEnd={steerEnd}
+						onTouchCancel={steerEnd}
+						aria-hidden="true"
+					>
 						<div className={`lg-steer-half left ${steerSide === 'left' ? 'on' : ''}`}><span>◀</span></div>
 						<div className={`lg-steer-half right ${steerSide === 'right' ? 'on' : ''}`}><span>▶</span></div>
 					</div>
@@ -1463,13 +1599,40 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-				{!webglError && status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
+				{!webglError && status === 'ready' && !dailyLoading && !levelsMode && !(daily && alreadyPlayed) && (
 					<div className="lg-overlay">
 						<button className="lg-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
 					</div>
 				)}
 				{dailyLoading && <div className="lg-overlay"><div className="lg-overlay-card">Préparation…</div></div>}
-				{!webglError && status === 'over' && (
+				{!webglError && status === 'over' && levelsMode && (
+					<div className="lg-overlay">
+						<div className="lg-overlay-card">
+							<p className="lg-go-title">{levelWon ? `Niveau ${currentLevel} réussi !` : '💥 Dans le décor !'}</p>
+							{levelWon && (
+								<p className="lg-go-stars" aria-label={`${earnedStars} étoiles sur 3`}>
+									{[1, 2, 3].map((s) => (
+										<span key={s} className={s <= earnedStars ? 'on' : ''}>★</span>
+									))}
+								</p>
+							)}
+							<p className="lg-go-score">Distance {dist} m · Score {fmtPts(score)}</p>
+							<div className="lg-go-btns">
+								<button className="lg-startbtn sm" onClick={() => { levelMenuRef.current = true; targetDistRef.current = 0; setLevelMenu(true); statusRef.current = 'ready'; setStatus('ready'); }}>
+									🗺 Carte
+								</button>
+								{levelWon && currentLevel < lugeLevels.count ? (
+									<button className="lg-startbtn sm" onClick={() => playLevel(currentLevel + 1)}>
+										Niveau {currentLevel + 1} →
+									</button>
+								) : (
+									<button className="lg-startbtn sm" onClick={() => playLevel(currentLevel)}>↻ Rejouer</button>
+								)}
+							</div>
+						</div>
+					</div>
+				)}
+				{!webglError && status === 'over' && !levelsMode && (
 					<div className="lg-overlay">
 						<div className="lg-overlay-card">
 							<p className="lg-go-title">{daily && alreadyPlayed && tries >= MAX_TRIES ? 'Défi du jour terminé' : '💥 Dans le décor !'}</p>
@@ -1488,6 +1651,10 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
+			{levelsMode && levelMenu && (
+				<LevelSelect progress={progress} onPick={playLevel} />
+			)}
+
 			<p className="lg-help">
 				Dévale la montagne en luge le plus loin possible ! Dirige avec <strong>◀ ▶</strong> (flèches / Q·D) ou les
 				boutons tactiles. Évite <strong>sapins et rochers</strong> — 3 vies. Aux <strong>bifurcations</strong>, le
@@ -1497,7 +1664,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtPts} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{!daily && !levelsMode && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
 }
@@ -1522,6 +1689,10 @@ const CSS = `
 .lg-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; }
 
 .lg-boardwrap { position: relative; width: 100%; }
+.lg-boardwrap.hidden { display: none; }
+.lg-go-stars { font-size: 30px; letter-spacing: 4px; color: var(--gray-600); margin: 0.2rem 0; }
+.lg-go-stars .on { color: #f5a623; }
+.lg-go-btns { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
 .lg-canvas {
   width: 100%; aspect-ratio: 16 / 10; display: block;
   background: #cfe0f0; border: 1px solid var(--gray-800); border-radius: 12px;
