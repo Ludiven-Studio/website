@@ -3,6 +3,10 @@ import { PONG, createState, serve, movePaddle, stepBall, activatePower, addPicku
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PaddleMsg } from './net';
 import { mulberry32 } from '../prng';
 import { playerName, setPlayerName } from '../../lib/leaderboard';
+import { useLevels } from '../../lib/useLevels';
+import { pongLevels, type PongLevelCfg } from './levels';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 
 type Phase = 'menu' | 'waiting' | 'playing' | 'over';
 type Role = 'host' | 'guest' | 'ai';
@@ -26,7 +30,7 @@ const POWER_ICON: Record<PowerId, string> = { speed: '⚡', curve: '🌀', jam: 
 const randSeed = (): number => Math.floor(Math.random() * 2 ** 31);
 
 export default function PongGame({ gameId }: { gameId: string }) {
-	void gameId;
+	const lv = useLevels<PongLevelCfg>(gameId, pongLevels);
 	const [phase, setPhase] = useState<Phase>('menu');
 	const [name, setName] = useState('');
 	const [codeInput, setCodeInput] = useState('');
@@ -45,6 +49,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 
 	const aiPowerCdRef = useRef(0); // AI power cooldown
 	const chargeRef = useRef(0); // last pushed charge value (avoid setState every frame)
+	const levelCfgRef = useRef<PongLevelCfg | null>(null); // non-null → levels match (ramps AI + serve speed)
+	const targetRef = useRef(PONG.maxScore); // points to win the current match
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const runningRef = useRef(false);
@@ -169,20 +175,32 @@ export default function PongGame({ gameId }: { gameId: string }) {
 
 	/* ---------- main loop ---------- */
 	const finishIfWon = useCallback((sL: number, sR: number) => {
-		if (sL < PONG.maxScore && sR < PONG.maxScore) return false;
+		const target = targetRef.current;
+		if (sL < target && sR < target) return false;
+		// Solo: I'm always the left paddle (levels + AI training). Guest is right in net play.
 		const side = roleRef.current === 'guest' ? 'right' : 'left';
 		const myScore = side === 'left' ? sL : sR;
-		setYouWon(myScore >= PONG.maxScore);
+		const oppScore = side === 'left' ? sR : sL;
+		const won = myScore >= target;
 		runningRef.current = false;
 		cancelAnimationFrame(rafRef.current);
+		if (levelCfgRef.current) {
+			// Levels match: grade by winning margin (opponent points conceded). No 'over' overlay.
+			lv.finish({ won, score: target - oppScore, raw: { my: myScore, opp: oppScore } });
+			return true;
+		}
+		setYouWon(won);
 		setPhase('over');
 		return true;
-	}, []);
+	}, [lv]);
 
 	const aiMove = useCallback((y: number, s: PongState, dt: number): number => {
 		// Track the ball when it comes toward the AI (right side); else drift to centre. Capped speed → beatable.
-		const target = s.bvx > 0 ? s.by : PONG.H / 2;
-		const cap = PONG.paddleSpeed * 0.82 * dt;
+		// Levels ramp the reaction cap + add aim jitter so the AI gets sharper with the level.
+		const cfg = levelCfgRef.current;
+		const jitter = cfg ? (Math.random() * 2 - 1) * cfg.aiError : 0;
+		const target = s.bvx > 0 ? s.by + jitter : PONG.H / 2;
+		const cap = PONG.paddleSpeed * (cfg ? cfg.aiReaction : 0.82) * dt;
 		const move = Math.max(-cap, Math.min(cap, target - y));
 		return Math.max(PONG.paddleH / 2, Math.min(PONG.H - PONG.paddleH / 2, y + move));
 	}, []);
@@ -256,7 +274,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				if (r.scored) {
 					setScoreMe(r.state.scoreL);
 					setScoreOpp(r.state.scoreR);
-					stateRef.current = serve(r.state, rngRef.current, r.scored === 'left'); // serve toward the loser
+					const ss = levelCfgRef.current?.serveSpeed ?? PONG.serveSpeed;
+					stateRef.current = serve(r.state, rngRef.current, r.scored === 'left', ss); // serve toward the loser
 				}
 				const st = stateRef.current;
 				if (role === 'host') {
@@ -290,6 +309,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			const host = m.isHost();
 			roleRef.current = host ? 'host' : 'guest';
 			setConfirmQuit(false);
+			levelCfgRef.current = null;
+			targetRef.current = PONG.maxScore;
 			chargeRef.current = 0;
 			setMyCharge(0);
 			aiPowerCdRef.current = 0;
@@ -450,6 +471,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		roleRef.current = 'ai';
 		startedRef.current = true;
 		setConfirmQuit(false);
+		levelCfgRef.current = null;
+		targetRef.current = PONG.maxScore;
 		chargeRef.current = 0;
 		setMyCharge(0);
 		aiPowerCdRef.current = 0;
@@ -466,6 +489,53 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		setPhase('playing');
 		startLoop();
 	}, [ensureName, startLoop, powers]);
+
+	/* ---------- levels mode ---------- */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		levelCfgRef.current = cfg;
+		targetRef.current = cfg.target;
+		matchRef.current = null;
+		roleRef.current = 'ai';
+		startedRef.current = true;
+		setConfirmQuit(false);
+		chargeRef.current = 0;
+		setMyCharge(0);
+		aiPowerCdRef.current = 0;
+		spawnAccRef.current = 0;
+		setOppName('Ordinateur');
+		setScoreMe(0);
+		setScoreOpp(0);
+		myYRef.current = PONG.H / 2;
+		rngRef.current = mulberry32(cfg.seed);
+		stateRef.current = createState(rngRef.current, false, cfg.serveSpeed); // classic pong for a clean skill signal
+		setPowersUi(false);
+		setRoomCode(null);
+		setPhase('playing');
+		startLoop();
+	}, [lv, startLoop]);
+
+	const armLevels = useCallback(() => {
+		runningRef.current = false;
+		cancelAnimationFrame(rafRef.current);
+		levelCfgRef.current = null;
+		targetRef.current = PONG.maxScore;
+		matchRef.current = null;
+		startedRef.current = false;
+		setConfirmQuit(false);
+		setPhase('menu');
+		lv.enter();
+	}, [lv]);
+
+	const exitLevels = useCallback(() => {
+		runningRef.current = false;
+		cancelAnimationFrame(rafRef.current);
+		levelCfgRef.current = null;
+		targetRef.current = PONG.maxScore;
+		startedRef.current = false;
+		lv.exit();
+		setPhase('menu');
+	}, [lv]);
 
 	const rematch = useCallback(() => {
 		if (roleRef.current === 'guest') return; // host (or AI) controls the restart
@@ -537,9 +607,40 @@ export default function PongGame({ gameId }: { gameId: string }) {
 
 	const mpOff = !multiplayerAvailable();
 
+	const levelHint = lv.playing && levelCfgRef.current
+		? `Niveau ${lv.level} · premier à ${targetRef.current} pts`
+		: null;
+
 	return (
 		<div className="pg-root">
 			<style>{CSS}</style>
+
+			{/* Pong has no daily challenge, so a 2-segment toggle (Play vs Levels) instead of ModeToggle. */}
+			<div className="pg-modetoggle" role="tablist" aria-label="Mode">
+				<button
+					role="tab"
+					aria-selected={!lv.active}
+					className={`pg-modeseg ${!lv.active ? 'active' : ''}`}
+					onClick={() => { if (lv.active) exitLevels(); }}
+				>
+					🎮 Jouer
+				</button>
+				<button
+					role="tab"
+					aria-selected={lv.active}
+					className={`pg-modeseg ${lv.active ? 'active' : ''}`}
+					onClick={armLevels}
+				>
+					🎯 Niveaux
+				</button>
+			</div>
+
+			{lv.active && (
+				<div className="pg-leveltag">
+					{lv.menu ? 'Progression — bats l\'ordi pour débloquer le niveau suivant' : levelHint}
+				</div>
+			)}
+
 			<div className="pg-stage">
 				<canvas
 					ref={canvasRef}
@@ -561,8 +662,27 @@ export default function PongGame({ gameId }: { gameId: string }) {
 							<span className="pg-sep">—</span>
 							<span style={{ color: COL_OPP }}>{scoreOpp} {oppName}</span>
 						</div>
-						<button className="pg-quit" onClick={() => setConfirmQuit(true)}>✕ Quitter</button>
+						<button className="pg-quit" onClick={() => (lv.active ? lv.backToMenu() : setConfirmQuit(true))}>✕ Quitter</button>
 					</>
+				)}
+
+				{lv.menu && (
+					<div className="pg-leveloverlay">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={pongLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`Toi ${scoreMe} — ${scoreOpp} Ordi`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
 				)}
 
 				{confirmQuit && (
@@ -575,7 +695,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'menu' && (
+				{phase === 'menu' && !lv.active && (
 					<div className="pg-overlay">
 						<div className="pg-card">
 							<h2>Pong</h2>
@@ -664,6 +784,22 @@ export default function PongGame({ gameId }: { gameId: string }) {
 
 const CSS = `
 .pg-root { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; width: 100%; }
+.pg-modetoggle {
+  width: 100%; max-width: 340px; margin: 0 auto; display: flex; gap: 4px; padding: 4px;
+  background: var(--gray-999); border: 1.5px solid var(--gray-700); border-radius: 999px; box-shadow: var(--shadow-sm);
+}
+.pg-modeseg {
+  flex: 1; border: none; background: transparent; color: var(--gray-300); font: inherit; font-weight: 700;
+  font-size: 14px; padding: 11px 8px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.pg-modeseg.active { background: var(--accent-regular); color: var(--accent-text-over); }
+.pg-modeseg:not(.active):hover { color: var(--gray-0); }
+.pg-leveltag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin: -0.25rem 0 0; }
+.pg-leveloverlay {
+  position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+  padding: 1rem; overflow-y: auto; background: rgba(8,10,18,0.72); border-radius: 14px;
+}
 .pg-stage { position: relative; width: 100%; max-width: 680px; aspect-ratio: 5 / 3; }
 .pg-canvas { width: 100%; height: 100%; display: block; object-fit: contain; border-radius: 14px; background: #0b0e14; touch-action: none; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
 /* Site global fullscreen. Landscape: the court fills the screen. Portrait: keep the

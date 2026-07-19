@@ -6,8 +6,12 @@ import {
 	type World, type PlayerInput, type Side, type SlotPos,
 } from './engine';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PosMsg, type StateMsg } from './net';
+import { footLevels } from './levels';
 import { playerName, setPlayerName } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
+import { useLevels } from '../../lib/useLevels';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
@@ -37,16 +41,21 @@ const readInput = (k: Keys, t: Keys): PlayerInput => ({
 	jump: k.jump || t.jump,
 });
 
-interface BotSt { wiggle: number; dir: -1 | 0 | 1; jump: boolean; }
-const freshBotSt = (): BotSt[] => [0, 1, 2, 3].map(() => ({ wiggle: 0, dir: 0 as -1 | 0 | 1, jump: false }));
+interface BotSt { wiggle: number; dir: -1 | 0 | 1; jump: boolean; idle: number; }
+const freshBotSt = (): BotSt[] => [0, 1, 2, 3].map(() => ({ wiggle: 0, dir: 0 as -1 | 0 | 1, jump: false, idle: 0 }));
 
 /** Team-aware bot: get on the own-goal side of the ball to push it toward the opponent; a
  *  backup cocotte hangs near its own half; head high balls that are close. When jammed against
  *  another cocotte it occasionally wiggles off in a random direction (and sometimes hops) to
- *  break the deadlock. Beatable on purpose. */
-function botFor(w: World, slot: number, st: BotSt): PlayerInput {
+ *  break the deadlock. `skill` (0..1) tunes how sharp it plays — low skill dawdles (short idle
+ *  pauses, a wide deadband) and rarely heads the ball; high skill chases tightly and jumps more.
+ *  Beatable on purpose; free-play stays at skill 1. */
+function botFor(w: World, slot: number, st: BotSt, skill = 1): PlayerInput {
 	const me = w.players[slot], ball = w.ball, team = me.team;
 	if (st.wiggle > 0) { st.wiggle--; return { move: st.dir, jump: st.jump }; } // finish a random escape burst
+	// Low-skill hesitation: occasionally freeze for a few frames so weak bots feel sluggish.
+	if (st.idle > 0) { st.idle--; return { move: 0, jump: false }; }
+	if (skill < 1 && Math.random() < (1 - skill) * 0.06) { st.idle = 4 + Math.floor(Math.random() * 10); return { move: 0, jump: false }; }
 	for (let i = 0; i < w.players.length; i++) { // stuck against a neighbour?
 		if (i === slot) continue;
 		const o = w.players[i];
@@ -64,9 +73,12 @@ function botFor(w: World, slot: number, st: BotSt): PlayerInput {
 		const ballOurSide = team === 0 ? ball.x < FIELD.W * 0.5 : ball.x > FIELD.W * 0.5;
 		if (!ballOurSide) targetX = homeX;
 	}
+	const dead = 5 + (1 - skill) * 22; // weak bots let the ball drift before reacting
 	let move: -1 | 0 | 1 = 0;
-	if (targetX < me.x - 5) move = -1; else if (targetX > me.x + 5) move = 1;
-	const jump = me.onGround && ball.y < me.y - 12 && Math.abs(ball.x - me.x) < 46 && ball.vy > -20;
+	if (targetX < me.x - dead) move = -1; else if (targetX > me.x + dead) move = 1;
+	// Heading range widens and jump chance rises with skill.
+	const reach = 30 + skill * 20;
+	const jump = me.onGround && ball.y < me.y - 12 && Math.abs(ball.x - me.x) < reach && ball.vy > -20 && Math.random() < 0.4 + skill * 0.6;
 	return { move, jump };
 }
 
@@ -85,6 +97,13 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const [copied, setCopied] = useState(false);
 	const [goalFlash, setGoalFlash] = useState('');
 	const [teamSize, setTeamSize] = useState<1 | 2>(2); // menu choice: 1v1 or 2v2
+
+	const lv = useLevels(gameId, footLevels);
+	// Levels-mode tuning for the running match (refs so the rAF loop reads them without re-arming).
+	const levelsRef = useRef(false); // this match is a level (variable target + per-bot skill)
+	const targetRef = useRef(WIN_GOALS); // goals needed to win the current match
+	const oppSkillRef = useRef(1); // opponent bot skill 0..1
+	const mateSkillRef = useRef(1); // teammate bot skill 0..1
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const skyImgRef = useRef<HTMLImageElement | null>(null); // AI stadium sky (else gradient)
@@ -236,11 +255,13 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const finish = useCallback((l: number, r: number) => {
 		runningRef.current = false;
 		cancelAnimationFrame(rafRef.current);
-		const myTeam = teamOf(mySlotRef.current);
-		setYouWon(myTeam === 0 ? l > r : r > l);
+		const myTeam = teamOf(mySlotRef.current); // levels: player is always team 0
+		const won = myTeam === 0 ? l > r : r > l;
+		setYouWon(won);
+		if (levelsRef.current) { lv.finish({ won, score: l - r }); return; } // margin = my goals − opponent
 		setPhase('over');
 		trackGame(gameId, 'game_won');
-	}, [gameId]);
+	}, [gameId, lv]);
 
 	const applyScores = useCallback((l: number, r: number) => {
 		const myTeam = teamOf(mySlotRef.current);
@@ -249,7 +270,8 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		const prev = prevScoreRef.current;
 		if (l > prev.l || r > prev.r) { setGoalFlash('BUT !'); setTimeout(() => setGoalFlash(''), 1100); }
 		prevScoreRef.current = { l, r };
-		if (l >= WIN_GOALS || r >= WIN_GOALS) finish(l, r);
+		const target = levelsRef.current ? targetRef.current : WIN_GOALS;
+		if (l >= target || r >= target) finish(l, r);
 	}, [finish]);
 
 	/* ---------- main loop ---------- */
@@ -269,7 +291,9 @@ export default function FootGame({ gameId }: { gameId: string }) {
 			if (dashQueuedRef.current !== 0) { inp.dash = true; dashQueuedRef.current = 0; }
 			const bs = botStRef.current;
 			if (role === 'ai') {
-				const r = step(w, dt, [inp, botFor(w, 1, bs[1]), botFor(w, 2, bs[2]), botFor(w, 3, bs[3])]);
+				const mate = levelsRef.current ? mateSkillRef.current : 1;
+				const opp = levelsRef.current ? oppSkillRef.current : 1;
+				const r = step(w, dt, [inp, botFor(w, 1, bs[1], mate), botFor(w, 2, bs[2], opp), botFor(w, 3, bs[3], opp)]);
 				if (r.scorer !== null) applyScores(w.score.l, w.score.r);
 			} else if (role === 'host') {
 				applyPlayerPos(w.players[2], netPosRef.current[2]); // guest from the network
@@ -364,10 +388,12 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		matchRef.current?.leave();
 		matchRef.current = null;
 		setConfirmQuit(false);
+		if (levelsRef.current) { levelsRef.current = false; lv.backToMenu(); setPhase('menu'); return; } // back to the level grid
 		setPhase('menu');
-	}, []);
+	}, [lv]);
 
 	const beginNetMatch = useCallback((m: Match) => {
+		levelsRef.current = false;
 		matchRef.current = m;
 		startedRef.current = false;
 		setPhase('waiting');
@@ -416,6 +442,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	}, [ensureName, codeInput, beginNetMatch, teamSize]);
 
 	const playAI = useCallback(() => {
+		levelsRef.current = false;
 		roleRef.current = 'ai';
 		mySlotRef.current = 0;
 		curTeamRef.current = teamSize;
@@ -429,6 +456,38 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		setPhase('playing');
 		startLoop();
 	}, [gameId, resetWorld, startLoop, teamSize]);
+
+	/* ---------- levels mode ---------- */
+	// Enter the level grid. Leaving free/daily's net match if any.
+	const armLevels = useCallback(() => {
+		matchRef.current?.leave();
+		matchRef.current = null;
+		startedRef.current = false;
+		levelsRef.current = false;
+		setStatus('');
+		lv.enter();
+	}, [lv]);
+
+	// Start a level as a fully-local solo match (player team 0 vs AI team 1).
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		levelsRef.current = true;
+		targetRef.current = cfg.target;
+		oppSkillRef.current = cfg.oppSkill;
+		mateSkillRef.current = cfg.mateSkill;
+		curTeamRef.current = cfg.teamSize;
+		roleRef.current = 'ai';
+		mySlotRef.current = 0;
+		matchRef.current = null;
+		startedRef.current = true;
+		setOppName('Ordinateur');
+		setConfirmQuit(false);
+		resetWorld();
+		setRoomCode(null);
+		trackGame(gameId, 'game_started');
+		setPhase('playing');
+		startLoop();
+	}, [gameId, lv, resetWorld, startLoop]);
 
 	const rematch = useCallback(() => {
 		if (roleRef.current === 'guest') return; // host / bot restarts
@@ -483,11 +542,49 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const touch = (key: keyof Keys, v: boolean) => (e: React.PointerEvent) => { e.preventDefault(); touchRef.current[key] = v; };
 	const mpOff = !multiplayerAvailable();
 
+	const cfg = lv.active ? footLevels.config(lv.level) : null;
+
 	return (
 		<div className="fo-root">
 			<style>{CSS}</style>
+
+			{/* Mode switch: multijoueur (les modes réseau/bot existants) ↔ niveaux solo.
+			    Foot has no daily challenge, so this stays a 2-way toggle. */}
+			{phase === 'menu' && (
+				<div className={`fo-modetoggle ${lv.active ? 'lv' : ''}`} role="tablist" aria-label="Mode">
+					<button role="tab" aria-selected={!lv.active} className={`fo-mseg ${!lv.active ? 'active' : ''}`} onClick={() => lv.exit()}>🎲 Multijoueur</button>
+					<button role="tab" aria-selected={lv.active} className={`fo-mseg ${lv.active ? 'active' : ''}`} onClick={armLevels}>🎯 Niveaux</button>
+				</div>
+			)}
+
+			{lv.active && lv.menu && phase === 'menu' && (
+				<div className="fo-lvtag">Progression solo — gagne un niveau pour débloquer le suivant. Tu joues en bleu.</div>
+			)}
+			{lv.active && (lv.playing || lv.done) && cfg && (
+				<div className="fo-lvtag">Niveau {lv.level} · premier à {cfg.target} buts · {cfg.teamSize === 2 ? '2 vs 2' : '1 vs 1'}</div>
+			)}
+
 			<div className="fo-stage">
 				<canvas ref={canvasRef} width={VIEW_W} height={VIEW_H} className="fo-canvas" role="img" aria-label="Cocotte Foot" />
+
+				{lv.active && lv.menu && phase === 'menu' && (
+					<div className="fo-lvselect">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={footLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Gagné ${scoreMe} — ${scoreOpp}` : `Perdu ${scoreMe} — ${scoreOpp}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={() => { levelsRef.current = false; lv.backToMenu(); setPhase('menu'); }}
+					/>
+				)}
 				{celebrating && <Celebration />}
 
 				{phase === 'playing' && (
@@ -519,7 +616,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'menu' && (
+				{phase === 'menu' && !lv.active && (
 					<div className="fo-overlay">
 						<div className="fo-card">
 							<h2>Cocotte Foot</h2>
@@ -584,6 +681,12 @@ export default function FootGame({ gameId }: { gameId: string }) {
 
 const CSS = `
 .fo-root { --fo-accent: var(--accent-regular); width: 100%; max-width: 900px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+.fo-modetoggle { width: 100%; max-width: 380px; display: flex; gap: 4px; padding: 4px; background: var(--gray-999); border: 1.5px solid var(--gray-700); border-radius: 999px; box-shadow: var(--shadow-sm); }
+.fo-mseg { flex: 1; border: none; background: transparent; color: var(--gray-300); font: inherit; font-weight: 700; font-size: 14.5px; padding: 11px 8px; border-radius: 999px; cursor: pointer; white-space: nowrap; transition: background-color 0.15s ease, color 0.15s ease; }
+.fo-mseg.active { background: var(--fo-accent); color: var(--accent-text-over); }
+.fo-mseg:not(.active):hover { color: var(--gray-0); }
+.fo-lvtag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; }
+.fo-lvselect { position: absolute; inset: 0; z-index: 4; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(10,14,20,0.72); backdrop-filter: blur(2px); }
 .fo-stage { position: relative; width: 100%; aspect-ratio: ${FIELD.W} / ${FIELD.H}; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-md); background: #bfe3ff; }
 .fo-canvas { display: block; width: 100%; height: 100%; object-fit: contain; touch-action: none; }
 /* Site global fullscreen. Landscape: the pitch fills the screen. Portrait: keep the

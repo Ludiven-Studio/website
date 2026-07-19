@@ -68,21 +68,21 @@ export type Scored = 'left' | 'right' | null;
 const clampPaddle = (y: number): number => Math.max(PONG.paddleH / 2, Math.min(PONG.H - PONG.paddleH / 2, y));
 
 /** Reset the ball to centre and serve toward one side at a bounded random angle, keeping scores/paddles. */
-export function serve(s: PongState, rng: Rng, towardLeft: boolean): PongState {
+export function serve(s: PongState, rng: Rng, towardLeft: boolean, serveSpeed = PONG.serveSpeed): PongState {
 	const angle = (rng() * 2 - 1) * PONG.maxBounceAngle;
 	const vSign = rng() < 0.5 ? -1 : 1;
 	return {
 		...s,
 		bx: PONG.W / 2,
 		by: PONG.H / 2,
-		bvx: Math.cos(angle) * PONG.serveSpeed * (towardLeft ? -1 : 1),
-		bvy: Math.sin(angle) * PONG.serveSpeed * vSign,
+		bvx: Math.cos(angle) * serveSpeed * (towardLeft ? -1 : 1),
+		bvy: Math.sin(angle) * serveSpeed * vSign,
 		serveT: PONG.serveDelay, // freeze briefly before the ball flies off
 	};
 }
 
 /** Fresh game: scores 0, paddles centred, first serve in a random direction. */
-export function createState(rng: Rng = mulberry32(1), powersOn = true): PongState {
+export function createState(rng: Rng = mulberry32(1), powersOn = true, serveSpeed = PONG.serveSpeed): PongState {
 	const base: PongState = {
 		bx: PONG.W / 2,
 		by: PONG.H / 2,
@@ -105,7 +105,7 @@ export function createState(rng: Rng = mulberry32(1), powersOn = true): PongStat
 		lastHit: '',
 		powersOn,
 	};
-	return serve(base, rng, rng() < 0.5);
+	return serve(base, rng, rng() < 0.5, serveSpeed);
 }
 
 export const movePaddle = (y: number, dir: number, dt: number): number => clampPaddle(y + dir * PONG.paddleSpeed * dt);

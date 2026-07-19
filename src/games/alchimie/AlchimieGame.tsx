@@ -5,7 +5,11 @@ import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../l
 import { encodePacked, formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
+import { useLevels } from '../../lib/useLevels';
+import { alchimieLevels } from './levels';
 
 /* =====================================================
    ALCHIMIE — React island. Libre : combine ~150 éléments depuis 5 bases (glisser une carte sur
@@ -54,7 +58,11 @@ const stepText = (have: Set<string>, target: string): string => {
 };
 
 export default function AlchimieGame({ gameId }: { gameId: string }) {
-	const [mode, setMode] = useState<'free' | 'daily'>('free');
+	const [mode, setMode] = useState<'free' | 'daily' | 'level'>('free');
+	const lv = useLevels(gameId, alchimieLevels);
+	const [lvDiscovered, setLvDiscovered] = useState<string[]>([...BASE_IDS]);
+	const [lvCombos, setLvCombos] = useState(0);
+	const [lvTarget, setLvTarget] = useState('');
 	const [discovered, setDiscovered] = useState<string[]>(() => (typeof window === 'undefined' ? [...BASE_IDS] : loadDiscovered()));
 	const [dDiscovered, setDDiscovered] = useState<string[]>([...BASE_IDS]);
 	const [dTarget, setDTarget] = useState('');
@@ -76,8 +84,13 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const dragRef = useRef<{ id: string; sourceTid: number | null } | null>(null);
 	const tokenSeq = useRef(1);
 	const tokensRef = useRef<Token[]>([]);
-	const modeRef = useRef<'free' | 'daily'>('free');
+	const modeRef = useRef<'free' | 'daily' | 'level'>('free');
 	const freeSet = useRef(new Set(discovered));
+	const lvSet = useRef(new Set(BASE_IDS));
+	const lvArr = useRef<string[]>([...BASE_IDS]);
+	const lvCombosRef = useRef(0);
+	const lvTargetRef = useRef('');
+	const lvDoneRef = useRef(false);
 	const dArr = useRef<string[]>([...BASE_IDS]);
 	const dSet = useRef(new Set(BASE_IDS));
 	const dTargetRef = useRef('');
@@ -124,7 +137,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		revealTimer.current = setTimeout(() => setReveal(null), 2200);
 	}, []);
 
-	const activeSet = () => (modeRef.current === 'daily' ? dSet.current : freeSet.current);
+	const activeSet = () => (modeRef.current === 'daily' ? dSet.current : modeRef.current === 'level' ? lvSet.current : freeSet.current);
 	const persistDaily = (arr: string[], done: boolean, finalTime?: number) => {
 		saveDailyRun(DAILY_ID, { startedAt: dStartRef.current, done, seed: dSeedRef.current, diffIndex: dDiffRef.current, finalTime, state: { discovered: arr, done } satisfies DailyState });
 	};
@@ -145,13 +158,23 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'daily_done', { element: productId });
 			}
 			persistDaily(nd, won, won ? dFinalRef.current : undefined);
+		} else if (modeRef.current === 'level') {
+			const combos = lvCombosRef.current + 1; // each new discovery = one fusion used
+			lvCombosRef.current = combos; setLvCombos(combos);
+			const nd = [...lvArr.current, productId];
+			lvArr.current = nd; setLvDiscovered(nd);
+			if (productId === lvTargetRef.current && !lvDoneRef.current) {
+				lvDoneRef.current = true;
+				lv.finish({ won: true, score: combos, raw: { target: productId, combos } });
+			}
 		} else {
 			setDiscovered((d) => [...d, productId]);
 		}
 		setPulseId(productId); setTimeout(() => setPulseId(''), 950);
-		showReveal(el);
+		// In levels mode, hitting the target opens the outcome card — skip the reveal so it doesn't cover it.
+		if (!(modeRef.current === 'level' && productId === lvTargetRef.current)) showReveal(el);
 		trackGame(gameId, 'discovery', { element: productId, mode: modeRef.current });
-	}, [flash, showReveal, gameId]);
+	}, [flash, showReveal, gameId, lv]);
 
 	/* Drop a board token onto another → 2-combo (the v1 mechanic, kept). */
 	const resolveBoardDrop = useCallback((dragId: string, sourceTid: number | null, bx: number, by: number) => {
@@ -204,6 +227,20 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	/* ---- Modes ---- */
 	const newFree = useCallback(() => { modeRef.current = 'free'; setMode('free'); setTokens([]); setReveal(null); setSearch(''); }, []);
 
+	/* Levels: each level seeds the workspace with the 5 bases and asks to craft one target. */
+	const armLevels = useCallback(() => { modeRef.current = 'level'; setMode('level'); setTokens([]); setReveal(null); setSearch(''); lv.enter(); }, [lv]);
+
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		modeRef.current = 'level'; setMode('level');
+		lvTargetRef.current = cfg.target; setLvTarget(cfg.target);
+		lvSet.current = new Set(BASE_IDS);
+		lvArr.current = [...BASE_IDS]; setLvDiscovered([...BASE_IDS]);
+		lvCombosRef.current = 0; setLvCombos(0);
+		lvDoneRef.current = false;
+		setTokens([]); setReveal(null); setSearch('');
+	}, [lv]);
+
 	const startDaily = useCallback(async () => {
 		modeRef.current = 'daily'; setMode('daily'); setCatalog(false); setTokens([]); setReveal(null); setSearch(''); lastProgressRef.current = Date.now();
 		const run = loadDailyRun(DAILY_ID);
@@ -234,6 +271,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const hint = useCallback(() => {
 		const set = activeSet();
 		if (modeRef.current === 'daily') { lastProgressRef.current = Date.now(); flash(stepText(set, dTargetRef.current)); return; }
+		if (modeRef.current === 'level') { flash(stepText(set, lvTargetRef.current)); return; }
 		const options = ELEMENTS.filter((el) => el.recipe && !set.has(el.id) && el.recipe.every((r) => set.has(r)));
 		if (!options.length) { flash(discovered.length >= TOTAL ? 'Tout est découvert ! 🎉' : 'Combine encore pour ouvrir des pistes'); return; }
 		const pick = options[Math.floor(Math.random() * options.length)];
@@ -249,12 +287,15 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	useEffect(() => { trackGame(gameId, 'game_started'); }, [gameId]);
 
 	const daily = mode === 'daily';
-	const invIds = daily ? dDiscovered : discovered;
+	const levels = mode === 'level';
+	const invIds = daily ? dDiscovered : levels ? lvDiscovered : discovered;
 	const q = search.trim().toLowerCase();
 	const invList = invIds.map((id) => getElement(id)!).filter((el) => !q || el.name.toLowerCase().includes(q));
 	const dMoves = Math.max(0, dDiscovered.length - dPaletteLen.current);
 	const dScore = encodePacked(10_000_000, [dMoves, Math.min(9_999_999, Math.round((dDone ? dFinalRef.current : dElapsed) * 100))]);
 	const targetEl = dTarget ? getElement(dTarget) : null;
+	const lvTargetEl = lvTarget ? getElement(lvTarget) : null;
+	const lvCfg = levels ? alchimieLevels.config(lv.level) : null;
 
 	// Catalog (free mode): discovered → shown; frontier (both ingredients known) → faded emoji + recipe; else "?".
 	const discSet = new Set(discovered);
@@ -269,7 +310,14 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		<div className="al-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newFree()} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newFree(); } else if (daily) newFree(); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{daily ? (
 				<div className="al-dailybar">
@@ -284,6 +332,19 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 						</>
 					)}
 				</div>
+			) : levels ? (
+				lv.menu ? (
+					<div className="al-dailybar"><span className="al-difftag">Progression — découvre la cible pour débloquer le niveau suivant</span></div>
+				) : (
+					<div className="al-dailybar">
+						<span className="al-difftag">Niveau {lv.level}</span>
+						<span className="al-obj">Objectif&nbsp;: <b>{lvTargetEl?.emoji} {lvTargetEl?.name}</b></span>
+						<span className="al-chip">🧪 {lvCombos} combinaison{lvCombos > 1 ? 's' : ''}</span>
+						{lvCfg && <span className="al-chip" title="Seuils d'étoiles">⭐ {lvCfg.threeStar} / {lvCfg.twoStar}</span>}
+						<button className="al-btn" onClick={hint}>💡</button>
+						<button className="al-btn" onClick={clearBoard}>🧹</button>
+					</div>
+				)
 			) : (
 				<>
 					<div className="al-bar">
@@ -304,7 +365,9 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 				</>
 			)}
 
-			{!daily && catalog ? (
+			{levels && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : !daily && !levels && catalog ? (
 				<div className="al-catalog">
 					<div className="al-catbar"><b>{discovered.length}</b> / {TOTAL} découverts · <span className="al-catfrontier">{frontierCount} à portée</span></div>
 					<div className="al-catgrid">
@@ -366,6 +429,18 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 							</div>
 						)}
 						{toast && <div className="al-toast">{toast}</div>}
+						{lv.done && (
+							<LevelOutcome
+								level={lv.level}
+								lastLevel={alchimieLevels.count}
+								won={lv.won}
+								stars={lv.stars}
+								detail={lv.won ? `Découvert en ${lvCombos} combinaison${lvCombos > 1 ? 's' : ''}` : undefined}
+								onNext={() => startLevel(lv.level + 1)}
+								onReplay={() => startLevel(lv.level)}
+								onMenu={lv.backToMenu}
+							/>
+						)}
 					</div>
 				</div>
 
@@ -398,7 +473,9 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			<p className="al-help">
 				{daily
 					? <>On te donne une dizaine d'éléments : <strong>lâche une carte sur une autre</strong> pour trouver la combinaison qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). Bloqué ? Un <strong>indice</strong> apparaît toutes les 30 s. {SECRET_TOTAL} défis, un par jour.</>
-					: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Catalogue</strong> montre ta progression : les éléments trouvés avec leur recette, les prochains à portée en transparence, le reste en «&nbsp;?&nbsp;». Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
+					: levels
+						? <>Chaque niveau te lance un <strong>élément cible</strong> à découvrir depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour fusionner. Moins tu fais de combinaisons, plus tu gagnes d'étoiles. Réussir un niveau débloque le suivant. {alchimieLevels.count} niveaux, du plus court au plus profond.</>
+						: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Catalogue</strong> montre ta progression : les éléments trouvés avec leur recette, les prochains à portée en transparence, le reste en «&nbsp;?&nbsp;». Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
 			</p>
 		</div>
 	);
