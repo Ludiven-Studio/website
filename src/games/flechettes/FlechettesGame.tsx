@@ -9,8 +9,12 @@ import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { flechettesLevels } from './levels';
 
 /* =====================================================
    FLÉCHETTES — React island (2D canvas), mode 501.
@@ -51,6 +55,13 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [aimPhase, setAimPhase] = useState<AimPhase>('x');
+	const [points, setPoints] = useState(0); // levels: total cashed so far
+
+	const lv = useLevels(gameId, flechettesLevels);
+	const levelsRef = useRef(false); // true while a levels run is live
+	const targetRef = useRef(0); // levels: points needed to clear
+	const levelThrowsRef = useRef(0); // levels: darts allowed in the run
+	const pointsRef = useRef(0); // levels: total cashed
 
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -79,6 +90,11 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 
 	const lay = useCallback((key: keyof typeof DIFFS, seed: number) => {
 		if (clearTimerRef.current) { clearTimeout(clearTimerRef.current); clearTimerRef.current = null; }
+		levelsRef.current = false; // free/daily wipe any levels run
+		pointsRef.current = 0;
+		targetRef.current = 0;
+		levelThrowsRef.current = 0;
+		setPoints(0);
 		seedRef.current = seed;
 		diffRef.current = DIFFS[key];
 		remainingRef.current = START_SCORE;
@@ -126,6 +142,23 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		setDailyLoading(false);
 	}, [gameId, lay]);
 
+	/* Levels: a fixed run of N throws; cash each dart's board value; clear at target. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		lay('facile', cfg.seed); // resets the board (also wipes levels state)
+		levelsRef.current = true;
+		targetRef.current = cfg.target;
+		levelThrowsRef.current = cfg.throws;
+		pointsRef.current = 0;
+		setPoints(0);
+		diffRef.current = cfg.diff; // custom aim-sweep speed for the level
+	}, [lv, lay]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
 	const win = useCallback(() => {
 		finishedRef.current = true;
 		const timeSec = (Date.now() - startRef.current) / 1000;
@@ -160,6 +193,23 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			trackGame(gameId, 'game_started');
 			if (daily) saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex, state: { best: bestRef.current ?? undefined, tries: triesRef.current } satisfies DailyState });
 		}
+		// Levels mode: cash the dart's board value; the run ends after N throws.
+		if (levelsRef.current) {
+			const total = pointsRef.current + hit.value;
+			pointsRef.current = total;
+			setPoints(total);
+			// next dart's sweep + reset the aim to horizontal
+			aimPhaseRef.current = 'x';
+			lockedXRef.current = 0;
+			phaseStartRef.current = perfNow();
+			setAimPhase('x');
+			if (throwsRef.current >= levelThrowsRef.current) {
+				finishedRef.current = true;
+				setElapsed((Date.now() - startRef.current) / 1000);
+				lv.finish({ won: total >= targetRef.current, score: total, raw: { throws: throwsRef.current } });
+			}
+			return;
+		}
 		const res = applyThrow(remainingRef.current, hit);
 		if (res.bust) { setFlash(remainingRef.current - hit.value < 0 || (remainingRef.current - hit.value) === 1 ? 'Dépassé !' : 'Raté le double !'); setTimeout(() => setFlash(''), 900); }
 		remainingRef.current = res.remaining;
@@ -173,7 +223,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		else if (dartsRef.current.length >= TURN && !finishedRef.current) {
 			clearTimerRef.current = window.setTimeout(() => { dartsRef.current = []; setTurn(0); clearTimerRef.current = null; }, 3000);
 		}
-	}, [daily, gameId, win]);
+	}, [daily, gameId, win, lv]);
 
 	/* ---------- Two-step aim: 1st tap locks X (horizontal sweep), 2nd locks Y (vertical) ---------- */
 	useEffect(() => {
@@ -181,6 +231,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		if (!cv) return;
 		const lock = () => {
 			if (statusRef.current !== 'aiming') return;
+			if (levelsRef.current && finishedRef.current) return; // levels run over — wait for the outcome card
 			const now = perfNow();
 			const dt = now - phaseStartRef.current;
 			if (dt < LOCK_GUARD_MS) return; // guard against an accidental instant second tap
@@ -293,7 +344,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 				ctx.restore();
 			}
 			// two-step aim: a horizontal sweep, then a vertical one — lines clipped to the board disc
-			if (statusRef.current === 'aiming') {
+			if (statusRef.current === 'aiming' && !finishedRef.current) {
 				const now = (typeof performance !== 'undefined' ? performance.now() : 0);
 				const dt = now - phaseStartRef.current;
 				// chord of the board disc at normalised offset n (clamped so an off-rim sweep still draws)
@@ -346,9 +397,22 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		<div className="da-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newFree(diffKey); } else if (daily) newFree(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="da-daily-tag">
+					{lv.menu
+						? 'Progression — réussis un niveau pour débloquer le suivant'
+						: `Niveau ${lv.level} · lancer ${Math.min(darts + 1, levelThrowsRef.current)}/${levelThrowsRef.current} · objectif ${targetRef.current} pts`}
+				</div>
+			) : daily ? (
 				<div className="da-daily-tag">
 					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} · 501`}
 				</div>
@@ -365,21 +429,31 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="da-stats">
-				<span className="da-rem">{remaining}</span>
-				<span className="da-stat">🎯 Volée {Math.min(turn, TURN)}/{TURN}</span>
-				<span className="da-stat">{darts} fléch.</span>
-				<span className="da-stat">⏱ {fmtTime(elapsed)}</span>
-			</div>
-			<div className="da-last">{flash ? <span className="da-flash">{flash}</span> : lastTxt}</div>
-			{status === 'aiming' && (
+			{!lv.menu && <div className="da-stats">
+				{lv.active ? (
+					<>
+						<span className="da-rem">{points}</span>
+						<span className="da-stat">🎯 {targetRef.current} pts</span>
+						<span className="da-stat">{darts}/{levelThrowsRef.current} fléch.</span>
+					</>
+				) : (
+					<>
+						<span className="da-rem">{remaining}</span>
+						<span className="da-stat">🎯 Volée {Math.min(turn, TURN)}/{TURN}</span>
+						<span className="da-stat">{darts} fléch.</span>
+						<span className="da-stat">⏱ {fmtTime(elapsed)}</span>
+					</>
+				)}
+			</div>}
+			{!lv.menu && <div className="da-last">{flash ? <span className="da-flash">{flash}</span> : lastTxt}</div>}
+			{status === 'aiming' && !(lv.active && !lv.playing) && (
 				<div className={`da-aimhint ${aimPhase === 'y' ? 'step2' : ''}`}>
 					{aimPhase === 'x'
 						? <>① Tape pour bloquer la visée <strong>horizontale&nbsp;↔</strong></>
 						: <>② Tape pour bloquer la visée <strong>verticale&nbsp;↕</strong></>}
 				</div>
 			)}
-			{status === 'aiming' && remaining <= 50 && (
+			{status === 'aiming' && !lv.active && remaining <= 50 && (
 				<div className="da-checkout">
 					{checkout(remaining)
 						? <>À finir : <strong>{checkout(remaining)}</strong></>
@@ -388,9 +462,9 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="da-playwrap" ref={wrapRef}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<canvas ref={canvasRef} className="da-canvas" />
-				{status === 'won' && (
+				{status === 'won' && !lv.active && (
 					<div className="da-overlay">
 						<div className="da-overlay-card">
 							🎉 501 fini en <strong>{darts} fléchettes</strong> · {fmtTime(elapsed)}
@@ -400,20 +474,39 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+				{lv.menu && (
+					<div className="da-lvoverlay">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={flechettesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`${points} pts · objectif ${targetRef.current}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
 
 			<p className="da-help">
-				<strong>Deux visées :</strong> tape une 1<sup>re</sup> fois pour bloquer le balayage <strong>horizontal&nbsp;↔</strong>, puis une 2<sup>e</sup> pour le balayage <strong>vertical&nbsp;↕</strong> — la fléchette part au croisement (Espace au clavier). Pars de 501 et tombe pile à 0 sur un <strong>double</strong>. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
+				{lv.active
+					? <><strong>Niveaux :</strong> {levelThrowsRef.current || flechettesLevels.config(1).throws} lancers pour atteindre l'objectif en points. Chaque fléchette rapporte la valeur touchée (double ×2, triple ×3, bull 25, centre 50). Vise haut pour décrocher 2 et 3 <strong>★</strong>.</>
+					: <><strong>Deux visées :</strong> tape une 1<sup>re</sup> fois pour bloquer le balayage <strong>horizontal&nbsp;↔</strong>, puis une 2<sup>e</sup> pour le balayage <strong>vertical&nbsp;↕</strong> — la fléchette part au croisement (Espace au clavier). Pars de 501 et tombe pile à 0 sur un <strong>double</strong>. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}</>}
 			</p>
 
-			{daily && <Leaderboard
+			{daily && !lv.active && <Leaderboard
 				key={`lb-${best ?? 0}`}
 				game={`${gameId}-t`}
 				metric="time"
 				submitValue={status === 'won' && best != null ? best : undefined}
 				format={(v) => formatScore(DAILY_LB.flechettes.fmt, v)}
 			/>}
-			{!daily && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(DAILY_LB.flechettes.fmt, v)} />}
+			{!daily && !lv.active && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(DAILY_LB.flechettes.fmt, v)} />}
 		</div>
 	);
 }
@@ -440,6 +533,7 @@ const CSS = `
 .da-playwrap { width: 100%; position: relative; display: flex; justify-content: center; padding: 22px 0; border-radius: 16px; background: #2a1a0e url('/assets/jeux/flechettes/wall.jpg') center/cover; box-shadow: inset 0 0 44px rgba(0,0,0,0.45); }
 .da-canvas { display: block; border-radius: 50%; box-shadow: var(--shadow-md); touch-action: none; cursor: pointer; background: #161616; }
 .da-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.da-lvoverlay { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; padding: 16px; overflow-y: auto; background: var(--gray-999); border-radius: 16px; }
 .da-overlay-card { background: var(--gray-999); border: 2px solid var(--da-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .da-overlay-card strong { color: var(--da-accent); }
 .da-replay { border: none; background: var(--da-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }

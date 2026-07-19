@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import ModeToggle from '../../components/ModeToggle';
+import { useLevels } from '../../lib/useLevels';
+import { accordsLevels } from './levels';
 
 /* =====================================================
    ACCORDS & GOUFFRES — prototype (ear-training, real spectrum-analyser).
@@ -7,6 +12,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
    tuning — you judge by ear. On "Traverser" the avatar hops peak to peak (in
    frequency order): a peak on the right frequency holds, a wrong one drops it
    through. Web Audio, no assets.
+
+   Modes:
+   - Libre : the hand-crafted 9-chord campaign below (endless, replayable).
+   - Niveaux : progression mode — each level is N seeded chords at a tier; stars
+     by how many were rebuilt right and whether every crossing worked first try.
    ===================================================== */
 
 const NOTE_FR = ['Do', 'Do♯', 'Ré', 'Ré♯', 'Mi', 'Fa', 'Fa♯', 'Sol', 'Sol♯', 'La', 'La♯', 'Si'];
@@ -83,13 +93,22 @@ interface RecapRow {
 // 0 cents → 100 %, a full semitone (100 cents) off → 0 %.
 const precisionPct = (cents: number): number => clamp(Math.round(100 * (1 - Math.abs(cents) / 100)), 0, 100);
 
-export default function AccordsGame() {
+export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } = {}) {
 	const [status, setStatus] = useState<Status>('intro');
 	const [level, setLevel] = useState(0);
 	const [showNames, setShowNames] = useState(false);
 	const [attempts, setAttempts] = useState(0);
 	const [flash, setFlash] = useState<{ kind: 'ok' | 'bad'; text: string } | null>(null);
 	const [recap, setRecap] = useState<RecapRow[] | null>(null);
+
+	// Levels mode. `rounds` is the active chord list — the free campaign (LEVELS)
+	// or the current level's N seeded chords; `level` indexes into it either way.
+	const lv = useLevels(gameId, accordsLevels);
+	const [rounds, setRounds] = useState<Level[]>(LEVELS);
+	const [lvCorrect, setLvCorrect] = useState(0); // chords rebuilt right this level
+	const [lvFalls, setLvFalls] = useState(0); // wrong crossings this level
+	const roundsRef = useRef<Level[]>(LEVELS);
+	roundsRef.current = rounds;
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -103,6 +122,8 @@ export default function AccordsGame() {
 	const statusRef = useRef<Status>('intro');
 	const namesRef = useRef(false);
 	const levelRef = useRef(0);
+	const levelsModeRef = useRef(false); // true while a progression level is in play
+	const finishLevelRef = useRef<(passed: boolean) => void>(() => {});
 
 	const ctxRef = useRef<AudioContext | null>(null);
 	const masterRef = useRef<GainNode | null>(null);
@@ -190,16 +211,19 @@ export default function AccordsGame() {
 	};
 
 	/* ---------- Level ---------- */
-	const curLevel = (): Level => LEVELS[Math.min(level, LEVELS.length - 1)];
-	const targetsOf = (lv: Level): number[] => lv.chord.offs.map((o) => lv.root + o).sort((a, b) => a - b);
+	const curLevel = (): Level => {
+		const list = roundsRef.current;
+		return list[Math.min(level, list.length - 1)];
+	};
+	const targetsOf = (round: Level): number[] => round.chord.offs.map((o) => round.root + o).sort((a, b) => a - b);
 
-	const buildLevel = useCallback((idx: number): void => {
-		const lv = LEVELS[idx];
-		const targets = lv.chord.offs.map((o) => lv.root + o).sort((a, b) => a - b);
+	const buildLevel = useCallback((idx: number, list: Level[] = roundsRef.current): void => {
+		const round = list[idx];
+		const targets = round.chord.offs.map((o) => round.root + o).sort((a, b) => a - b);
 		const lo = Math.min(...targets) - 3;
 		const hi = Math.max(...targets) + 3;
 		rangeRef.current = { lo, hi };
-		const peaks: Peak[] = targets.map((tm, i) => ({ target: tm, midi: tm, locked: lv.prefill.includes(i) }));
+		const peaks: Peak[] = targets.map((tm, i) => ({ target: tm, midi: tm, locked: round.prefill.includes(i) }));
 		// Spread the free peaks evenly across the band as a neutral (unsolved) start.
 		const free = peaks.filter((p) => !p.locked);
 		free.forEach((p, k) => (p.midi = lo + ((k + 1) / (free.length + 1)) * (hi - lo)));
@@ -235,20 +259,20 @@ export default function AccordsGame() {
 
 	/* ---------- Buttons ---------- */
 	const hearChord = useCallback((): void => {
-		const lv = curLevel();
-		playChord(targetsOf(lv).map(midiToFreq), INSTRUMENTS[lv.instrument]);
+		const round = curLevel();
+		playChord(targetsOf(round).map(midiToFreq), INSTRUMENTS[round.instrument]);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [level]);
 	const hearChordRef = useRef(hearChord);
 	hearChordRef.current = hearChord;
 	const hearMine = (): void => {
-		const lv = curLevel();
-		playChord(peaksRef.current.map((p) => midiToFreq(p.midi)), INSTRUMENTS[lv.instrument]);
+		const round = curLevel();
+		playChord(peaksRef.current.map((p) => midiToFreq(p.midi)), INSTRUMENTS[round.instrument]);
 	};
 	const hearPlaced = (): void => {
-		const lv = curLevel();
+		const round = curLevel();
 		const locked = peaksRef.current.filter((p) => p.locked).map((p) => midiToFreq(p.target));
-		if (locked.length) playChord(locked, INSTRUMENTS[lv.instrument]);
+		if (locked.length) playChord(locked, INSTRUMENTS[round.instrument]);
 	};
 	const cross = (): void => {
 		if (statusRef.current !== 'tuning') return;
@@ -276,7 +300,7 @@ export default function AccordsGame() {
 		setStat('crossing');
 	};
 	const nextLevel = (): void => {
-		if (level + 1 >= LEVELS.length) {
+		if (level + 1 >= roundsRef.current.length) {
 			setStat('won');
 			return;
 		}
@@ -289,21 +313,88 @@ export default function AccordsGame() {
 	};
 	const startGame = (): void => {
 		ensureAudio();
+		levelsModeRef.current = false;
+		setRounds(LEVELS);
+		roundsRef.current = LEVELS;
 		setLevel(0);
 		setAttempts(0);
-		buildLevel(0);
+		buildLevel(0, LEVELS);
 		setRecap(null);
 		setStat('tuning');
 		setTimeout(() => hearChordRef.current(), 200);
 	};
 	const restart = (): void => {
+		levelsModeRef.current = false;
+		setRounds(LEVELS);
+		roundsRef.current = LEVELS;
 		setLevel(0);
 		setAttempts(0);
-		buildLevel(0);
+		buildLevel(0, LEVELS);
 		setRecap(null);
 		setStat('tuning');
 		setTimeout(() => hearChordRef.current(), 200);
 	};
+
+	/* ---------- Levels (progression) ---------- */
+	// Build a level's N seeded chords and play the first one. The engine (peaks,
+	// crossing, audio) runs unchanged — only the round source and scoring differ.
+	const startLevel = useCallback((lvl: number): void => {
+		ensureAudio();
+		const cfg = lv.play(lvl);
+		const list: Level[] = cfg.chords.map((c) => ({
+			root: c.root,
+			chord: c.chord,
+			instrument: (c.instrument in INSTRUMENTS ? c.instrument : 'piano') as InstrumentId,
+			prefill: c.prefill,
+		}));
+		levelsModeRef.current = true;
+		setRounds(list);
+		roundsRef.current = list;
+		setLvCorrect(0);
+		setLvFalls(0);
+		setAttempts(0);
+		setLevel(0);
+		buildLevel(0, list);
+		setRecap(null);
+		setStat('tuning');
+		setTimeout(() => hearChordRef.current(), 200);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv]);
+
+	// Called when a chord crossing settles in levels mode: tally, then advance to
+	// the next chord or finish the level via the shared hook.
+	const finishLevel = useCallback((passed: boolean): void => {
+		const nextCorrect = lvCorrect + (passed ? 1 : 0);
+		const nextFalls = lvFalls + (passed ? 0 : 1);
+		if (passed) setLvCorrect(nextCorrect);
+		else setLvFalls(nextFalls);
+		const list = roundsRef.current;
+		const isLast = level + 1 >= list.length;
+		if (isLast) {
+			crossRef.current = null;
+			lv.finish({ won: true, score: nextCorrect, stat: nextFalls, raw: { correct: nextCorrect, total: list.length, falls: nextFalls } });
+			return;
+		}
+		const nx = level + 1;
+		setLevel(nx);
+		buildLevel(nx, list);
+		setRecap(null);
+		crossRef.current = null;
+		setStat('tuning');
+		setTimeout(() => hearChordRef.current(), 250);
+	}, [lvCorrect, lvFalls, level, lv, buildLevel]);
+	finishLevelRef.current = finishLevel;
+
+	const armLevels = useCallback((): void => {
+		levelsModeRef.current = false;
+		setStat('intro');
+		lv.enter();
+	}, [lv]);
+
+	const exitLevels = useCallback((): void => {
+		levelsModeRef.current = false;
+		lv.exit();
+	}, [lv]);
 
 	/* ---------- Pointer ---------- */
 	const posFrom = (e: React.PointerEvent): { x: number; y: number } => {
@@ -472,7 +563,13 @@ export default function AccordsGame() {
 				}
 				if (!c.settled) {
 					c.settled = true;
-					if (c.firstBad >= 0) {
+					if (levelsModeRef.current) {
+						// Progression: every crossing (pass or fail) ends this chord;
+						// advance to the next chord or finish the level.
+						const passed = c.firstBad < 0;
+						setFlash(passed ? { kind: 'ok', text: 'Spectre juste — traversée !' } : { kind: 'bad', text: 'Plaf ! Un pic sonne faux — la note cède.' });
+						setTimeout(() => { setFlash(null); finishLevelRef.current(passed); }, passed ? 800 : 950);
+					} else if (c.firstBad >= 0) {
 						setAttempts((a) => a + 1);
 						setFlash({ kind: 'bad', text: 'Plaf ! Un pic sonne faux — la note cède.' });
 						setTimeout(() => {
@@ -484,7 +581,7 @@ export default function AccordsGame() {
 						setFlash({ kind: 'ok', text: 'Spectre juste — traversée !' });
 						setTimeout(() => {
 							setFlash(null);
-							setStat(levelRef.current + 1 >= LEVELS.length ? 'won' : 'levelclear');
+							setStat(levelRef.current + 1 >= roundsRef.current.length ? 'won' : 'levelclear');
 						}, 800);
 					}
 				}
@@ -538,7 +635,7 @@ export default function AccordsGame() {
 		drawAvatar(ctx, avX, avY, 11 + (st === 'tuning' ? Math.sin(anim * 4) * 0.6 : 0));
 	};
 
-	const lv = curLevel();
+	const round = curLevel();
 	const renderRecap = (): React.ReactNode => {
 		if (!recap || recap.length === 0) return null;
 		const global = Math.round(recap.reduce((s, r) => s + r.prec, 0) / recap.length);
@@ -575,21 +672,53 @@ export default function AccordsGame() {
 		);
 	};
 
+	const levelsMenu = lv.active && lv.menu;
+	const totalRounds = roundsRef.current.length;
+
 	return (
 		<div className="ac-root">
 			<style>{CSS}</style>
 
-			<div className="ac-hud">
-				<span className="ac-pill">
-					Niveau <strong>{Math.min(level + 1, LEVELS.length)}</strong>/{LEVELS.length}
-				</span>
-				<span className="ac-pill ac-chord">
-					{pitchName(lv.root)} {lv.chord.name}
-				</span>
-				<span className="ac-pill">🎹 {INSTRUMENTS[lv.instrument].label}</span>
-				{attempts > 0 && <span className="ac-pill">Chutes {attempts}</span>}
-			</div>
+			<ModeToggle
+				daily={false}
+				onFree={() => { if (lv.active) { exitLevels(); startGame(); } }}
+				onDaily={() => { if (lv.active) { exitLevels(); startGame(); } }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
+			{lv.active && (
+				<div className="ac-daily-tag">
+					{lv.menu
+						? 'Progression — réussis un niveau pour débloquer le suivant'
+						: `Niveau ${lv.level} · ${accordsLevels.config(lv.level).label} · accord ${Math.min(level + 1, totalRounds)}/${totalRounds}`}
+				</div>
+			)}
+
+			{!levelsMenu && (
+				<div className="ac-hud">
+					<span className="ac-pill">
+						{lv.active ? (
+							<>Justes <strong>{lvCorrect}</strong>/{totalRounds}</>
+						) : (
+							<>Niveau <strong>{Math.min(level + 1, totalRounds)}</strong>/{totalRounds}</>
+						)}
+					</span>
+					<span className="ac-pill ac-chord">
+						{pitchName(round.root)} {round.chord.name}
+					</span>
+					<span className="ac-pill">🎹 {INSTRUMENTS[round.instrument].label}</span>
+					{lv.active
+						? lvFalls > 0 && <span className="ac-pill">Chutes {lvFalls}</span>
+						: attempts > 0 && <span className="ac-pill">Chutes {attempts}</span>}
+				</div>
+			)}
+
+			{levelsMenu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
+			<>
 			<div className="ac-controls">
 				<button className="ac-btn primary" onClick={hearChord} disabled={status === 'intro' || status === 'won'}>
 					▶ Écouter l'accord
@@ -597,7 +726,7 @@ export default function AccordsGame() {
 				<button className="ac-btn" onClick={hearMine} disabled={status !== 'tuning'}>
 					🎧 Ma version
 				</button>
-				<button className="ac-btn" onClick={hearPlaced} disabled={status !== 'tuning' || lv.prefill.length === 0}>
+				<button className="ac-btn" onClick={hearPlaced} disabled={status !== 'tuning' || round.prefill.length === 0}>
 					🔒 Notes posées
 				</button>
 				<button className="ac-btn go" onClick={cross} disabled={status !== 'tuning'}>
@@ -614,7 +743,20 @@ export default function AccordsGame() {
 
 				{flash && <div className={`ac-flash ${flash.kind}`}>{flash.text}</div>}
 
-				{status === 'intro' && (
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={accordsLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`${lvCorrect}/${totalRounds} justes · ${lvFalls} chute${lvFalls > 1 ? 's' : ''}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+
+				{!lv.active && status === 'intro' && (
 					<div className="ac-overlay">
 						<div className="ac-card">
 							<h3>🎼 Accords &amp; Gouffres</h3>
@@ -628,12 +770,12 @@ export default function AccordsGame() {
 						</div>
 					</div>
 				)}
-				{status === 'levelclear' && (
+				{!lv.active && status === 'levelclear' && (
 					<div className="ac-overlay">
 						<div className="ac-card">
 							<h3>✅ Gouffre franchi&nbsp;!</h3>
 							<p>
-								{pitchName(lv.root)} {lv.chord.name} reconstitué.
+								{pitchName(round.root)} {round.chord.name} reconstitué.
 							</p>
 							{renderRecap()}
 							<button className="ac-btn primary big" onClick={nextLevel}>
@@ -642,7 +784,7 @@ export default function AccordsGame() {
 						</div>
 					</div>
 				)}
-				{status === 'won' && (
+				{!lv.active && status === 'won' && (
 					<div className="ac-overlay">
 						<div className="ac-card">
 							<h3>🏆 Bravo&nbsp;!</h3>
@@ -656,15 +798,24 @@ export default function AccordsGame() {
 				)}
 			</div>
 
-			<p className="ac-help">
-				Prototype — sur un analyseur de spectre, chaque note est un <b>pic</b> à une fréquence. Glisse les pics <b>horizontalement</b> pour les poser aux bonnes fréquences. Aucun retour de justesse&nbsp;: fie-toi à l'oreille («&nbsp;Ma version&nbsp;» pour comparer). Les pics <b>🔒</b> sont des aides&nbsp;: «&nbsp;Notes posées&nbsp;» ou tape-les pour les entendre.
-			</p>
+			{lv.active ? (
+				<p className="ac-help">
+					Reconstitue les {totalRounds} accords du niveau. Toutes les traversées réussies du premier coup pour 3 étoiles.
+				</p>
+			) : (
+				<p className="ac-help">
+					Prototype — sur un analyseur de spectre, chaque note est un <b>pic</b> à une fréquence. Glisse les pics <b>horizontalement</b> pour les poser aux bonnes fréquences. Aucun retour de justesse&nbsp;: fie-toi à l'oreille («&nbsp;Ma version&nbsp;» pour comparer). Les pics <b>🔒</b> sont des aides&nbsp;: «&nbsp;Notes posées&nbsp;» ou tape-les pour les entendre.
+				</p>
+			)}
+			</>
+			)}
 		</div>
 	);
 }
 
 const CSS = `
 .ac-root { --ac: var(--accent-regular); width: 100%; max-width: 720px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
+.ac-daily-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.6rem; }
 .ac-hud { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: center; margin-bottom: 0.55rem; font-size: 13px; font-weight: 600; }
 .ac-pill { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; }
 .ac-pill.ac-chord { background: var(--ac); color: var(--accent-text-over); }

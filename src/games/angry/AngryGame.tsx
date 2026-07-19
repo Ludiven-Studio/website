@@ -10,7 +10,11 @@ import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../l
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { angryLevels } from './levels';
 import { touchDrag } from '../touchDrag';
 
 /* =====================================================
@@ -82,14 +86,20 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const bestRef = useRef<number | null>(null);
 	const triesRef = useRef(0);
+	// Levels mode: a shot budget (unlike free/daily's unlimited cocottes). Running out
+	// with foxes left = loss; clearing early = more stars. lv.playing gates the branch.
+	const budgetRef = useRef(0);
+	const lv = useLevels(gameId, angryLevels);
+	const lvPlayingRef = useRef(false);
+	lvPlayingRef.current = lv.playing;
 
 	const { celebrating } = useCelebration(status === 'won');
 	const setStat = (s: Status) => { statusRef.current = s; setStatus(s); };
 	const freeBestKey = (k: string) => `ludiven-angry-best-${k}`;
 
 	/* ---------- Level setup ---------- */
-	const lay = useCallback((key: keyof typeof DIFFS, seed: number) => {
-		const world = makeLevel(seed, DIFFS[key]);
+	const layDiff = useCallback((diff: typeof DIFFS[keyof typeof DIFFS], seed: number) => {
+		const world = makeLevel(seed, diff);
 		if (world.cocotte) applyHen(world.cocotte, henTypeRef.current); // keep the picked power across levels
 		worldRef.current = world;
 		curSeedRef.current = seed;
@@ -109,6 +119,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		setStat('aiming');
 	}, []);
 
+	const lay = useCallback((key: keyof typeof DIFFS, seed: number) => layDiff(DIFFS[key], seed), [layDiff]);
+
 	const newFree = useCallback((key: keyof typeof DIFFS) => {
 		setDaily(false);
 		setDiffKey(key);
@@ -120,6 +132,19 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	}, [lay]);
 
 	const restart = useCallback(() => lay(diffKey, curSeedRef.current), [lay, diffKey]); // same level
+
+	/* ---------- Levels / progression mode ---------- */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level); // sets lv.phase = 'playing'
+		setDaily(false);
+		budgetRef.current = cfg.budget;
+		layDiff(cfg.diff, cfg.seed); // resets finishedRef, shotsUsedRef, aiming, etc.
+	}, [lv, layDiff]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
 
 	const startDaily = useCallback(async () => {
 		setDaily(true);
@@ -168,14 +193,40 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		if (world?.cocotte && !world.cocotte.launched) applyHen(world.cocotte, h);
 	}, []);
 
+	// Levels mode: grade a finished shot against the budget. All foxes down → win with
+	// shots left as the score/stat; budget spent with foxes remaining → loss.
+	const resolveLevelShot = useCallback(() => {
+		const world = worldRef.current!;
+		if (finishedRef.current) return;
+		if (foxesLeft(world) === 0) {
+			finishedRef.current = true;
+			const left = Math.max(0, budgetRef.current - shotsUsedRef.current);
+			setElapsed((Date.now() - startRef.current) / 1000);
+			setStat('won');
+			trackGame(gameId, 'game_won', { cocottes: shotsUsedRef.current });
+			lv.finish({ won: true, score: left, stat: left, raw: { budget: budgetRef.current } });
+			return;
+		}
+		if (shotsUsedRef.current >= budgetRef.current) { // out of cocottes, foxes remain
+			finishedRef.current = true;
+			setStat('lost');
+			lv.finish({ won: false, score: 0 });
+			return;
+		}
+		world.bodies = world.bodies.filter((b) => b.tag !== 'cocotte');
+		spawnCocotte(world, henTypeRef.current);
+		setStat('aiming');
+	}, [gameId, lv]);
+
 	const resolveShot = useCallback(() => {
+		if (lvPlayingRef.current) { resolveLevelShot(); return; }
 		const world = worldRef.current!;
 		if (foxesLeft(world) === 0) { win(); return; }
 		// unlimited cocottes: drop the spent cocotte AND any leftover chicks, load a fresh one
 		world.bodies = world.bodies.filter((b) => b.tag !== 'cocotte');
 		spawnCocotte(world, henTypeRef.current);
 		setStat('aiming');
-	}, [win]);
+	}, [win, resolveLevelShot]);
 
 	/* ---------- Aim (slingshot) — coord-based so both pointer and native touch feed it ---------- */
 	const clientToWorld = (clientX: number, clientY: number): Vec => {
@@ -540,9 +591,20 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		<div className="co-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newFree(diffKey); } else if (daily) newFree(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="co-daily-tag">
+					{lv.menu ? 'Progression — fais tomber tous les renards avant la panne de cocottes' : `Niveau ${lv.level} · ${budgetRef.current} cocottes`}
+				</div>
+			) : daily ? (
 				<div className="co-daily-tag">
 					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
 				</div>
@@ -559,17 +621,27 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="co-stats">
-				<span className="co-stat">🐔 {shots} lancées</span>
-				<span className="co-stat">🦊 {foxes} renards</span>
-				<span className="co-stat">⏱ {fmtTime(elapsed)}</span>
-				<button className="co-act" onClick={restart}>↺ Recommencer</button>
-			</div>
+			{!(lv.active && lv.menu) && (
+				<div className="co-stats">
+					{lv.playing ? (
+						<span className="co-stat">🐔 {Math.max(0, budgetRef.current - shots)} restantes</span>
+					) : (
+						<span className="co-stat">🐔 {shots} lancées</span>
+					)}
+					<span className="co-stat">🦊 {foxes} renards</span>
+					<span className="co-stat">⏱ {fmtTime(elapsed)}</span>
+					{lv.playing ? (
+						<button className="co-act" onClick={() => startLevel(lv.level)}>↺ Recommencer</button>
+					) : (
+						<button className="co-act" onClick={restart}>↺ Recommencer</button>
+					)}
+				</div>
+			)}
 
 			<div className="co-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
 				<canvas ref={canvasRef} className="co-canvas" {...touchDrag(touchAimStart, aimMove, aimEnd)} />
-				{status === 'won' && (
+				{status === 'won' && !lv.active && (
 					<div className="co-overlay">
 						<div className="co-overlay-card">
 							🎉 Tous les renards à terre&nbsp;! <strong>{shotsUsedRef.current} cocottes</strong> · {fmtTime(elapsed)}
@@ -578,6 +650,25 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 							</button>
 						</div>
 					</div>
+				)}
+				{lv.menu && (
+					<div className="co-overlay co-overlay-scroll">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={angryLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won
+							? `${Math.max(0, budgetRef.current - shotsUsedRef.current)} cocottes restantes · ${fmtTime(elapsed)}`
+							: 'Plus de cocottes, renards debout'}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
 				)}
 			</div>
 
@@ -595,18 +686,19 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="co-help">
-				Glisse depuis la cocotte puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. Cocottes illimitées — fais tomber tous les renards en le moins de lancers possible. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
+				{lv.active
+					? 'Glisse depuis la cocotte puis relâche : tu tires dans le sens opposé, plus tu tires loin plus c\'est puissant. Fais tomber tous les renards avant d\'être à court de cocottes — moins tu en gaspilles, plus tu gagnes d\'étoiles.'
+					: <>Glisse depuis la cocotte puis relâche : tu tires dans le sens opposé, plus tu tires loin plus c'est puissant. Cocottes illimitées — fais tomber tous les renards en le moins de lancers possible. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}</>}
 			</p>
 
-			{daily && <Leaderboard
+			{daily && !lv.active && <Leaderboard
 				key={`lb-${best ?? 0}`}
 				game={`${gameId}-t`}
 				metric="time"
 				submitValue={status === 'won' && best != null ? best : undefined}
 				format={(v) => formatScore(DAILY_LB.angry.fmt, v)}
 			/>}
-			{!daily && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(DAILY_LB.angry.fmt, v)} />}
+			{!daily && !lv.active && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(DAILY_LB.angry.fmt, v)} />}
 		</div>
 	);
 }
@@ -640,6 +732,7 @@ const CSS = `
 .co-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .co-canvas { display: block; border-radius: 10px; box-shadow: var(--shadow-md); touch-action: none; cursor: crosshair; background: #bfe3ff; }
 .co-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.co-overlay-scroll { background: var(--gray-999); border-radius: 10px; align-items: flex-start; overflow-y: auto; padding: 12px; }
 .co-overlay-card { background: var(--gray-999); border: 2px solid var(--co-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .co-overlay-card strong { color: var(--co-accent); }
 .co-replay { border: none; background: var(--co-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }

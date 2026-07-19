@@ -4,7 +4,11 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { solitaireLevels, levelPegs } from './levels';
 import {
 	VARIANTS,
 	createLayout,
@@ -63,6 +67,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const [bestTime, setBestTime] = useState<number | null>(null);
 	const [attempt, setAttempt] = useState(0);
 	const { celebrating, showWin } = useCelebration(status === 'won');
+	const lv = useLevels(gameId, solitaireLevels);
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -87,6 +92,8 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const timerRunRef = useRef(false);
 	const startedRef = useRef(false);
 	const bestTimeRef = useRef<number | null>(null);
+	// Levels mode: routes move-end grading to lv.finish, reuses the daily timer + Commencer gate.
+	const levelsRef = useRef(false);
 
 	// Arm a freshly laid board: blurred, timer paused, waiting for ▶ Commencer.
 	const armBoard = (): void => { startedRef.current = false; setStarted(false); };
@@ -180,6 +187,14 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_over', { score: centis, win: true, mode: 'daily' });
 	}, [gameId]);
 
+	// Levels mode end: stop the clock, grade the run (win → time; stuck → fail).
+	const finishLevel = useCallback((won: boolean): void => {
+		timerRunRef.current = false;
+		const centis = Math.max(0, Math.round((clockRef.current - (timerStartRef.current ?? clockRef.current)) / 10));
+		setFinalCentis(won ? centis : null);
+		lv.finish({ won, score: won ? centis : 0, raw: { variant: layoutRef.current.variant, pegs: pegCount(pegsRef.current) } });
+	}, [lv]);
+
 	const doMove = useCallback(
 		(m: Move): void => {
 			histRef.current.push(pegsRef.current);
@@ -195,20 +210,23 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			if (won) {
 				statusRef.current = 'won';
 				setStatus('won');
-				if (dailyRef.current) finishDaily();
+				if (levelsRef.current) finishLevel(true);
+				else if (dailyRef.current) finishDaily();
 				else finishFree(next, true);
 			} else if (stuck) {
 				statusRef.current = 'stuck';
 				setStatus('stuck');
-				if (!dailyRef.current) finishFree(next, false);
+				if (levelsRef.current) finishLevel(false);
+				else if (!dailyRef.current) finishFree(next, false);
 			}
 		},
-		[finishDaily, finishFree],
+		[finishDaily, finishFree, finishLevel],
 	);
 
 	/* ---------- Mode setup ---------- */
 	const startFree = useCallback(
 		(v: Variant): void => {
+			levelsRef.current = false;
 			dailyRef.current = false;
 			setDaily(false);
 			setDailyLoading(false);
@@ -238,6 +256,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	);
 
 	const startDaily = useCallback(async (): Promise<void> => {
+		levelsRef.current = false;
 		dailyRef.current = true;
 		setDaily(true);
 		selRef.current = -1;
@@ -292,8 +311,54 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		apply(seed, diffIndex, null);
 	}, [gameId]);
 
+	/* ---------- Levels mode ---------- */
+	// Start a level from its seeded config; arm the board + Commencer gate (chrono starts on ▶).
+	const startLevel = useCallback((level: number): void => {
+		const cfg = lv.play(level);
+		levelsRef.current = true;
+		dailyRef.current = false;
+		setDaily(false);
+		setDailyLoading(false);
+		setAlreadyPlayed(false);
+		layoutRef.current = createLayout(cfg.variant);
+		setVariant(cfg.variant);
+		const p = levelPegs(cfg);
+		dailyInitRef.current = p;
+		pegsRef.current = p.slice();
+		histRef.current = [];
+		selRef.current = -1;
+		dragRef.current = -1;
+		animRef.current = null;
+		hintRef.current = null;
+		timerStartRef.current = null;
+		timerRunRef.current = false;
+		armBoard();
+		statusRef.current = 'playing';
+		setStatus('playing');
+		setMoves(0);
+		setPegs(pegCount(p));
+		setFinalCentis(null);
+		setSubmitCentis(undefined);
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback((): void => {
+		levelsRef.current = true;
+		dailyRef.current = false;
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Leave levels mode (helper for the mode toggle).
+	const exitLevels = useCallback((): void => {
+		levelsRef.current = false;
+		lv.exit();
+	}, [lv]);
+
 	const restart = (): void => {
-		if (dailyRef.current) {
+		if (levelsRef.current) {
+			startLevel(lv.level);
+		} else if (dailyRef.current) {
 			pegsRef.current = (dailyInitRef.current ?? pegsRef.current).slice();
 			histRef.current = [];
 			selRef.current = -1;
@@ -411,14 +476,14 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// Live chrono in daily mode.
+	// Live chrono in daily + levels mode (both race the clock from ▶ Commencer).
 	useEffect(() => {
-		if (!daily) return;
+		if (!daily && !lv.active) return;
 		const id = setInterval(() => {
 			if (timerRunRef.current && timerStartRef.current != null) setElapsed(clockRef.current - timerStartRef.current);
 		}, 100);
 		return () => clearInterval(id);
-	}, [daily]);
+	}, [daily, lv.active]);
 
 	/* ---------- Draw ---------- */
 	const drawMarble = (ctx: CanvasRenderingContext2D, px: number, py: number, r: number, id: number, alpha = 1): void => {
@@ -527,15 +592,27 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 
 	const layout = layoutRef.current;
 	const perfect = status === 'won' && (layout.center < 0 || pegsRef.current[layout.center]);
-	const chrono = daily && status === 'won' && finalCentis != null ? fmtCentis(finalCentis) : `${(elapsed / 1000).toFixed(1)} s`;
+	const timed = daily || lv.active; // both race the chrono
+	const chrono = timed && status === 'won' && finalCentis != null ? fmtCentis(finalCentis) : `${(elapsed / 1000).toFixed(1)} s`;
 
 	return (
 		<div className="sol-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => startFree(variant)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) exitLevels(); startFree(variant); }}
+				onDaily={() => { if (lv.active) exitLevels(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="sol-dailytag">
+					{lv.menu ? 'Progression — résous un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${layout.variant === 'triangle' ? 'Triangle' : 'Croix'} · ${pegs} billes — le plus vite possible`}
+				</div>
+			) : daily ? (
 				<div className="sol-dailytag">
 					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DAILY_COUNT[diffRef.current]} billes — le plus vite possible`}
 				</div>
@@ -562,6 +639,15 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 							Record <strong>{bestTime == null ? '—' : fmtCentis(bestTime)}</strong>
 						</span>
 					</>
+				) : lv.active ? (
+					<>
+						<span className="sol-stat">
+							Chrono <strong>{chrono}</strong>
+						</span>
+						<span className="sol-stat">
+							Coups <strong>{moves}</strong>
+						</span>
+					</>
 				) : (
 					<>
 						<span className="sol-stat">
@@ -583,7 +669,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 						<div className="sol-card">Préparation du défi…</div>
 					</div>
 				)}
-				{!started && status === 'playing' && !dailyLoading && (
+				{!started && status === 'playing' && !dailyLoading && !(lv.active && lv.menu) && !lv.done && (
 					<div className="sol-overlay">
 						<div className="sol-card">
 							<h3>Prêt&nbsp;?</h3>
@@ -592,7 +678,24 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-				{(showWin || (alreadyPlayed && status === 'won')) && (
+				{lv.active && lv.menu && (
+					<div className="sol-overlay sol-overlay-scroll">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={solitaireLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${chrono} · ${moves} coups` : `Bloqué — il reste ${pegs} billes`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+				{!lv.active && (showWin || (alreadyPlayed && status === 'won')) && (
 					<div className="sol-overlay">
 						<div className="sol-card">
 							{daily ? (
@@ -616,7 +719,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-				{status === 'stuck' && (
+				{status === 'stuck' && !lv.active && (
 					<div className="sol-overlay">
 						<div className="sol-card">
 							<h3>Plus de coups possibles</h3>
@@ -638,34 +741,39 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<div className="sol-controls">
-				<button className="sol-btn" onClick={undo} disabled={moves === 0 || status === 'won'}>
-					↶ Annuler
-				</button>
-				{!daily && (
-					<button className="sol-btn" onClick={hint} disabled={status !== 'playing' || !started}>
-						💡 Indice
+			{!(lv.active && (lv.menu || lv.done)) && (
+				<div className="sol-controls">
+					<button className="sol-btn" onClick={undo} disabled={moves === 0 || status === 'won'}>
+						↶ Annuler
 					</button>
-				)}
-				{/* Daily = one attempt: no restart. Free stays replayable. */}
-				{!daily && (
-					<button className="sol-btn" onClick={restart}>
-						↻ Recommencer
-					</button>
-				)}
-			</div>
+					{/* Levels are timed too — no free hints there. */}
+					{!daily && !lv.active && (
+						<button className="sol-btn" onClick={hint} disabled={status !== 'playing' || !started}>
+							💡 Indice
+						</button>
+					)}
+					{/* Daily = one attempt: no restart. Free + levels stay replayable. */}
+					{!daily && (
+						<button className="sol-btn" onClick={restart}>
+							↻ Recommencer
+						</button>
+					)}
+				</div>
+			)}
 
 			<p className="sol-help">
-				{daily
-					? 'Défi du jour : un mini-plateau identique pour tout le monde. Vide-le jusqu’à une seule bille le plus vite possible — ton meilleur temps entre au classement.'
-					: 'Tape une bille puis un trou situé deux cases plus loin (ou fais-la glisser) pour sauter par-dessus une voisine et la retirer. Objectif : n’en laisser qu’une — au centre pour la croix.'}
+				{lv.active
+					? 'Niveaux : chaque niveau part d’une position toujours résoluble. Vide le plateau jusqu’à une seule bille pour le valider — plus tu vas vite, plus tu gagnes d’étoiles.'
+					: daily
+						? 'Défi du jour : un mini-plateau identique pour tout le monde. Vide-le jusqu’à une seule bille le plus vite possible — ton meilleur temps entre au classement.'
+						: 'Tape une bille puis un trou situé deux cases plus loin (ou fais-la glisser) pour sauter par-dessus une voisine et la retirer. Objectif : n’en laisser qu’une — au centre pour la croix.'}
 			</p>
 
 			{daily ? (
 				<Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? submitCentis : undefined} format={fmtCentis} />
-			) : (
+			) : !lv.active ? (
 				<LeaderboardCorner game={gameId} metric="time" />
-			)}
+			) : null}
 		</div>
 	);
 }
@@ -700,6 +808,8 @@ const CSS = `
 /* Armed board: hidden behind the ▶ Commencer gate until the player starts. */
 .sol-canvas.sol-blur { filter: blur(7px); cursor: default; }
 .sol-overlay { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(3px); border-radius: 16px; }
+/* Level grid overlay: scrolls if the 100-tile grid overflows the board. */
+.sol-overlay-scroll { align-items: flex-start; overflow: auto; padding: 12px; z-index: 8; }
 .sol-card { background: var(--gray-999); border: 2px solid var(--sol); border-radius: 16px; padding: 18px 22px; max-width: 18rem; text-align: center; box-shadow: var(--shadow-lg); color: var(--gray-0); }
 .sol-card h3 { margin: 0 0 0.5rem; font-family: var(--font-brand); font-size: var(--text-xl); }
 .sol-card p { color: var(--gray-200); font-size: 13.5px; line-height: 1.5; margin: 0 0 0.9rem; }

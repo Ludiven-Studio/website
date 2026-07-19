@@ -27,6 +27,11 @@ import { trackGame } from '../../lib/analytics';
 import Leaderboard from '../../components/Leaderboard';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { touchDrag } from '../touchDrag';
+import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { golfLevels, type GolfLevelCfg } from './levels';
 
 /* =====================================================
    MINI-GOLF — top-down 3D arcade (three.js + Supabase Realtime).
@@ -357,6 +362,10 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const pinchRef = useRef<{ dist: number; span: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
 	const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+	const lv = useLevels(gameId, golfLevels);
+	const levelCfgRef = useRef<GolfLevelCfg | null>(null);
+	const levelActiveRef = useRef(false); // read inside the raf loop / handleSunk
+	levelActiveRef.current = lv.active;
 
 	useEffect(() => {
 		setName(playerName());
@@ -644,6 +653,11 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		setBest(nb);
 		aimRef.current.active = false;
 		trackGame(gameId, 'game_won', { strokes: sc });
+		// Levels: solo only — grade by strokes, never touch the lobby / daily run.
+		if (levelActiveRef.current) {
+			lv.finish({ won: true, score: sc, raw: { seed: seedRef.current } });
+			return;
+		}
 		if (lobbyRef.current) {
 			lobbyRef.current.sendScore({ strokes: sc, done: true, time: finalSec });
 			boardRef.current.set(lobbyRef.current.selfId, { name: name || 'Moi', strokes: sc, done: true, time: finalSec });
@@ -659,7 +673,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				state: { best: nb, tries: triesRef.current },
 			});
 		}
-	}, [gameId, name, syncBoard, diffKey]);
+	}, [gameId, name, syncBoard, diffKey, lv]);
 
 	const frame = useCallback(
 		(now: number) => {
@@ -849,12 +863,12 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	const beginHole = useCallback(
-		(seed: number, lobby: Lobby | null, m: Mode, dk: DiffKey) => {
+		(seed: number, lobby: Lobby | null, m: Mode, dk: DiffKey, diffOverride?: import('./engine').DiffLevel) => {
 			modeRef.current = m;
 			seedRef.current = seed;
 			setMode(m);
 			setDiffKey(dk);
-			const hole = generateHole(mulberry32(seed), DIFFS[dk]);
+			const hole = generateHole(mulberry32(seed), diffOverride ?? DIFFS[dk]);
 			holeRef.current = hole;
 			setPar(hole.par);
 
@@ -911,6 +925,28 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		},
 		[resize, placeBallAtStart, frame, gameId, getOrCreateGhost, removeGhost, syncBoard],
 	);
+
+	/* Levels: start a solo, deterministic hole for a level (seed + ramped diff); grade on holing. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		levelCfgRef.current = cfg;
+		if (!initScene()) return;
+		stop();
+		lobbyRef.current?.leave();
+		lobbyRef.current = null;
+		for (const id of [...ghostsRef.current.keys()]) removeGhost(id);
+		beginHole(cfg.seed, null, 'libre', diffKey, cfg.diff);
+	}, [lv, initScene, stop, removeGhost, beginHole, diffKey]);
+
+	const armLevels = useCallback(() => {
+		stop();
+		lobbyRef.current?.leave();
+		lobbyRef.current = null;
+		for (const id of [...ghostsRef.current.keys()]) removeGhost(id);
+		setMode('libre');
+		setPhase('menu');
+		lv.enter();
+	}, [lv, stop, removeGhost]);
 
 	/** New attempt on the SAME hole (daily consumes a try; free is unlimited). */
 	const newAttempt = useCallback(() => {
@@ -1017,6 +1053,23 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		<div className="gf-root">
 			<style>{CSS}</style>
 
+			<ModeToggle
+				daily={mode === 'defi' && !lv.active}
+				onFree={() => { lv.exit(); setMode('libre'); if (phase === 'playing') quit(); }}
+				onDaily={() => { lv.exit(); setMode('defi'); if (phase === 'playing') quit(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
+
+			{lv.active && (
+				<p className="gf-leveltag">
+					{lv.menu
+						? 'Progression — rentre la balle pour valider, moins de coups pour les étoiles'
+						: `Niveau ${lv.level} · par ${levelCfgRef.current?.par ?? '—'} · rentre la balle`}
+				</p>
+			)}
+
 			<div className="gf-boardwrap">
 				<canvas
 					ref={canvasRef}
@@ -1043,7 +1096,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'playing' && board.length > 0 && (
+				{phase === 'playing' && !lv.active && board.length > 0 && (
 					<ol className="gf-board">
 						{board.slice(0, MAX_PLAYERS).map((r) => (
 							<li key={r.id}>{r.name} · {r.done ? `${r.strokes} · ${fmtTime(r.time)}` : `${r.strokes}…`}</li>
@@ -1067,7 +1120,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'playing' && done && (
+				{phase === 'playing' && done && !lv.active && (
 					<div className="gf-overlay">
 						<div className="gf-card">
 							<div className="gf-winmark">🏌️</div>
@@ -1091,7 +1144,30 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 
 				{webglError && <div className="gf-overlay"><div className="gf-card">3D indisponible (WebGL manquant).</div></div>}
 
-				{phase === 'menu' && !webglError && (
+				{lv.menu && !webglError && (
+					<div className="gf-overlay gf-overlay-levels">
+						<LevelSelect
+							progress={lv.progress}
+							onPick={startLevel}
+							title={`${Object.values(lv.progress.stars).reduce((a, b) => a + b, 0)} / ${golfLevels.count * 3} ⭐`}
+						/>
+					</div>
+				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={golfLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `${strokes} coups` : 'Balle non rentrée'}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+
+				{phase === 'menu' && !webglError && !lv.active && (
 					<div className="gf-overlay">
 						<div className="gf-card">
 							<h2>Mini-Golf</h2>
@@ -1119,14 +1195,21 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{phase === 'playing' && (
+			{phase === 'playing' && lv.active && !lv.done && (
+				<div className="gf-actions">
+					<button className="gf-restart" onClick={() => startLevel(lv.level)}>↻ Recommencer</button>
+					<button className="gf-quit" onClick={() => { stop(); lv.backToMenu(); }}>🗺 Carte</button>
+				</div>
+			)}
+
+			{phase === 'playing' && !lv.active && (
 				<div className="gf-actions">
 					{mode === 'libre' && <button className="gf-restart" onClick={() => beginHole(randomSeed(), null, 'libre', diffKey)}>🎲 Nouveau trou</button>}
 					<button className="gf-quit" onClick={quit}>Quitter</button>
 				</div>
 			)}
 
-			{mode === 'defi' && (
+			{mode === 'defi' && !lv.active && (
 				<Leaderboard key={`lb-${name}-${best ?? 0}`} game={`${gameId}-t`} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => formatScore(DAILY_LB.golf.fmt, v)} />
 			)}
 
@@ -1172,7 +1255,9 @@ const CSS = `
 .gf-restart, .gf-quit { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 18px; cursor: pointer; }
 .gf-restart { background: var(--gf-accent); color: var(--accent-text-over); border-color: transparent; }
 
+.gf-leveltag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 600; margin: -0.4rem auto 0.7rem; max-width: 480px; }
 .gf-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(6,8,16,0.5); backdrop-filter: blur(2px); border-radius: 12px; }
+.gf-overlay-levels { overflow-y: auto; padding: 16px 12px; align-items: flex-start; }
 .gf-card { background: var(--gray-999); border: 2px solid var(--gf-accent); border-radius: 18px; padding: 22px 26px; text-align: center; box-shadow: var(--shadow-lg); max-width: 360px; }
 .gf-card h2 { font-family: var(--font-brand); font-weight: 600; font-size: 24px; margin: 0 0 6px; }
 .gf-winmark { font-size: 30px; }

@@ -5,6 +5,10 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { reussiteLevels } from './levels';
 import { fmtCentis, formatScore, encodePacked } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import {
@@ -65,14 +69,18 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	const [jokers, setJokers] = useState(JOKERS);
 	const [jokerArmed, setJokerArmed] = useState(false);
 	const { celebrating, showWin } = useCelebration(status === 'won');
+	const lv = useLevels(gameId, reussiteLevels);
+	const lvRef = useRef(lv);
+	lvRef.current = lv;
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const dimRef = useRef({ w: 600, h: 430 });
 	const geoRef = useRef<Geo | null>(null);
 	const gameRef = useRef<State>(deal(1));
-	const histRef = useRef<{ s: State; j: number }[]>([]); // undo snapshots (state + jokers left)
+	const histRef = useRef<{ s: State; j: number; m: number }[]>([]); // undo snapshots (state + jokers left + move count)
 	const jokersRef = useRef(JOKERS);
+	const movesRef = useRef(0); // committed moves this run (undo rewinds it) — used for level star grading
 	const jokerSelRef = useRef<Src | null>(null); // joker mode: the picked source (two-tap / drag)
 	const jokerArmedRef = useRef(false);
 	const statusRef = useRef<Status>('playing');
@@ -136,7 +144,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	};
 
 	const snapshot = (): void => {
-		histRef.current.push({ s: gameRef.current, j: jokersRef.current });
+		histRef.current.push({ s: gameRef.current, j: jokersRef.current, m: movesRef.current });
 		if (histRef.current.length > 400) histRef.current.shift();
 	};
 	// commit a new state (push undo), then refresh derived state
@@ -144,6 +152,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		if (!next) return false;
 		snapshot();
 		gameRef.current = next;
+		movesRef.current += 1;
 		sync();
 		return true;
 	};
@@ -152,6 +161,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		if (!next) return false;
 		snapshot();
 		gameRef.current = next;
+		movesRef.current += 1;
 		jokersRef.current -= 1; setJokers(jokersRef.current);
 		jokerSelRef.current = null; jokerArmedRef.current = false; setJokerArmed(false);
 		sync();
@@ -165,6 +175,11 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		timerRunRef.current = false;
 		statusRef.current = won ? 'won' : 'ended';
 		setStatus(won ? 'won' : 'ended');
+		if (lvRef.current.active) {
+			// Levels mode: a win grades on time (star metric) with moves as the tie-break stat.
+			lvRef.current.finish({ won, score: won ? centis : 0, stat: movesRef.current, raw: { cards: fc, centis, moves: movesRef.current } });
+			return;
+		}
 		if (dailyRef.current) {
 			const value = encodeScore(fc, centis);
 			setFinalScore(value);
@@ -195,6 +210,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 
 	const resetCommon = (): void => {
 		histRef.current = [];
+		movesRef.current = 0;
 		dragRef.current = null;
 		jokersRef.current = JOKERS; setJokers(JOKERS);
 		jokerSelRef.current = null; jokerArmedRef.current = false; setJokerArmed(false);
@@ -258,11 +274,34 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		apply(seed, diffIndex, false, null);
 	}, [gameId]);
 
+	/* ---------- Levels / progression ---------- */
+	const startLevel = useCallback((level: number): void => {
+		const cfg = lv.play(level);
+		dailyRef.current = false;
+		setDaily(false); setDailyLoading(false); setAlreadyPlayed(false);
+		gameRef.current = deal(cfg.seed, cfg.draw, cfg.passes);
+		initRef.current = null;
+		resetCommon();
+		startedRef.current = true; setStarted(true); // no Start gate; the chrono runs from the first move
+		timerStartRef.current = clockRef.current; timerRunRef.current = true;
+		setCards(foundationCount(gameRef.current));
+		geoRef.current = null;
+		trackGame(gameId, 'game_started', { level, mode: 'levels' });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv, gameId]);
+
+	const armLevels = useCallback((): void => {
+		dailyRef.current = false;
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
 	const newDeal = (): void => { if (!dailyRef.current) startFree(diffKey); };
 	const undo = (): void => {
 		const prev = histRef.current.pop();
 		if (!prev) return;
 		gameRef.current = prev.s;
+		movesRef.current = prev.m; // rewind the move counter too, so a solve's move count is honest
 		jokersRef.current = prev.j; setJokers(prev.j); // a joker is refunded when its move is undone
 		jokerSelRef.current = null; jokerArmedRef.current = false; setJokerArmed(false);
 		dragRef.current = null;
@@ -424,12 +463,12 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// live chrono (daily)
+	// live chrono (daily + levels — both time the run)
 	useEffect(() => {
-		if (!daily) return;
+		if (!daily && !lv.active) return;
 		const id = setInterval(() => { if (timerRunRef.current && timerStartRef.current != null) setElapsed(clockRef.current - timerStartRef.current); }, 60);
 		return () => clearInterval(id);
-	}, [daily]);
+	}, [daily, lv.active]);
 
 	/* ---------- Draw ---------- */
 	const drawCardShape = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void => {
@@ -537,14 +576,26 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 	const centis = elapsed > 0 ? Math.round(elapsed / 10) : 0;
 	const chrono = daily && finalScore != null ? fmtCentis(finalScore % 10_000_000) : fmtCentis(centis);
 	const won = status === 'won';
+	const lvCfg = lv.active ? reussiteLevels.config(lv.level) : null;
 
 	return (
 		<div className="reu-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => startFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); startFree(diffKey); } else startFree(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="reu-dailytag">
+					{lv.menu ? 'Progression — réussis une donne pour débloquer la suivante' : `Niveau ${lv.level} · ${lvCfg?.label}`}
+				</div>
+			) : daily ? (
 				<div className="reu-dailytag">
 					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} (pioche ${DIFFS[diffKey].draw}) — un seul essai`}
 				</div>
@@ -558,22 +609,40 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{!(lv.active && lv.menu) && (
 			<div className="reu-hud">
 				<span className="reu-stat">Fondations <strong>{cards}/52</strong></span>
-				{daily ? (
+				{daily || lv.active ? (
 					<span className="reu-stat">Chrono <strong>{chrono}</strong></span>
 				) : (
 					<span className="reu-stat">Record <strong>{best == null ? '—' : `${best}/52`}</strong></span>
 				)}
 			</div>
+			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="reu-playwrap" ref={wrapRef}>
 				<canvas ref={canvasRef} className={`reu-canvas${started ? '' : ' reu-blur'}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
 				{celebrating && <Celebration />}
 
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={reussiteLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtCentis(centis)} · ${movesRef.current} coups` : `${cards}/52 cartes montées`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+
 				{dailyLoading && <div className="reu-overlay"><div className="reu-card">Préparation du défi…</div></div>}
 
-				{!started && !dailyLoading && (
+				{!started && !dailyLoading && !lv.active && (
 					<div className="reu-overlay">
 						<div className="reu-card">
 							<h3>Prêt&nbsp;?</h3>
@@ -583,7 +652,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{(showWin || (alreadyPlayed && (won || status === 'ended'))) && (
+				{!lv.active && (showWin || (alreadyPlayed && (won || status === 'ended'))) && (
 					<div className="reu-overlay">
 						<div className="reu-card">
 							{daily ? (
@@ -609,41 +678,50 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 					<div className="reu-overlay">
 						<div className="reu-card">
 							<h3>Plus de coups possibles</h3>
-							<p>Il reste <strong>{cards}/52</strong> cartes montées. {daily ? 'Annule pour tenter une autre voie, ou termine le défi.' : 'Annule pour retenter, ou relance une donne.'}</p>
+							<p>Il reste <strong>{cards}/52</strong> cartes montées. {lv.active ? 'Annule pour tenter une autre voie, ou abandonne la donne.' : daily ? 'Annule pour tenter une autre voie, ou termine le défi.' : 'Annule pour retenter, ou relance une donne.'}</p>
 							<div className="reu-cardbtns">
 								<button className="reu-btn" onClick={undo}>↶ Annuler</button>
-								{daily
-									? <button className="reu-btn primary" onClick={() => finish(false)}>Terminer &amp; classer</button>
-									: <button className="reu-btn primary" onClick={newDeal}>↻ Nouvelle donne</button>}
+								{lv.active
+									? <button className="reu-btn primary" onClick={() => finish(false)}>Abandonner</button>
+									: daily
+										? <button className="reu-btn primary" onClick={() => finish(false)}>Terminer &amp; classer</button>
+										: <button className="reu-btn primary" onClick={newDeal}>↻ Nouvelle donne</button>}
 							</div>
 						</div>
 					</div>
 				)}
 			</div>
+			)}
 
+			{!(lv.active && (lv.menu || lv.done)) && (
 			<div className="reu-controls">
 				<button className="reu-btn" onClick={undo} disabled={won || !started || alreadyPlayed}>↶ Annuler</button>
 				<button className={`reu-btn ${jokerArmed ? 'armed' : ''}`} onClick={toggleJoker} disabled={jokers === 0 || won || !started || alreadyPlayed} title="Déplacement libre : pose une carte où tu veux (règles ignorées)">
 					🃏 Joker ({jokers})
 				</button>
-				{daily
-					? <button className="reu-btn" onClick={() => finish(false)} disabled={!started || won || alreadyPlayed}>🏁 Terminer</button>
-					: <button className="reu-btn" onClick={newDeal}>🎴 Nouvelle donne</button>}
+				{lv.active
+					? <button className="reu-btn" onClick={lv.backToMenu} disabled={won}>🗺 Carte</button>
+					: daily
+						? <button className="reu-btn" onClick={() => finish(false)} disabled={!started || won || alreadyPlayed}>🏁 Terminer</button>
+						: <button className="reu-btn" onClick={newDeal}>🎴 Nouvelle donne</button>}
 			</div>
+			)}
 			{jokerArmed && <p className="reu-jokerhint">🃏 Joker&nbsp;: choisis une carte, puis une colonne où la poser (couleur/rang ignorés).</p>}
 			{stuck && !jokerArmed && jokers > 0 && status === 'playing' && <p className="reu-jokerhint">Bloqué&nbsp;? Utilise un joker 🃏 pour te débloquer.</p>}
 
 			<p className="reu-help">
-				{daily
-					? 'Défi du jour : la même donne pour tout le monde, un seul essai. Monte un maximum de cartes aux fondations — le temps départage les ex æquo.'
-					: 'Touche une carte pour l’envoyer automatiquement (une fondation en priorité), ou fais-la glisser. Empile en descendant et en alternant les couleurs ; une colonne vide n’accueille qu’un Roi.'}
+				{lv.active
+					? 'Progression : chaque niveau est une donne graine. Range les 52 cartes pour valider le niveau ; les étoiles récompensent la rapidité (et un jeu net). La difficulté monte (pioche 1 → 3, passes limitées sur la fin).'
+					: daily
+						? 'Défi du jour : la même donne pour tout le monde, un seul essai. Monte un maximum de cartes aux fondations — le temps départage les ex æquo.'
+						: 'Touche une carte pour l’envoyer automatiquement (une fondation en priorité), ou fais-la glisser. Empile en descendant et en alternant les couleurs ; une colonne vide n’accueille qu’un Roi.'}
 			</p>
 
 			{daily ? (
 				<Leaderboard key={`lb-${gameId}-${attempt}`} game={`${gameId}-t`} metric="time" submitValue={submitVal} format={(v) => formatScore(LB_FMT, v)} />
-			) : (
+			) : !lv.active ? (
 				<LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(LB_FMT, v)} />
-			)}
+			) : null}
 		</div>
 	);
 }

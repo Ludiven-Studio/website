@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	makeTable, generateRack, stepBalls, aimToVelocity, pullPower, isSettled,
-	encodeScore, DIFFS, type Ball, type Table, type Vec,
+	encodeScore, DIFFS, type Ball, type DiffLevel, type Table, type Vec,
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
@@ -12,6 +12,10 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { billardLevels } from './levels';
 import { touchDrag } from '../touchDrag';
 
 /* =====================================================
@@ -119,14 +123,16 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const { celebrating } = useCelebration(status === 'won');
 
+	const lv = useLevels(gameId, billardLevels);
+
 	const setStat = (s: Status) => { statusRef.current = s; setStatus(s); };
 
 	const freeBestKey = (k: string) => `ludiven-billard-best-${k}`;
 
 	/* ---------- Table setup ---------- */
-	const layTable = useCallback((key: keyof typeof DIFFS, seed: number) => {
+	const layRack = useCallback((diff: DiffLevel, seed: number) => {
 		const t = tableRef.current;
-		ballsRef.current = generateRack(t, mulberry32(seed), DIFFS[key]);
+		ballsRef.current = generateRack(t, mulberry32(seed), diff);
 		sinksRef.current = [];
 		seenRef.current.clear();
 		strokesRef.current = 0;
@@ -139,6 +145,22 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 		setStat('aiming');
 	}, []);
+
+	const layTable = useCallback((key: keyof typeof DIFFS, seed: number) => {
+		layRack(DIFFS[key], seed);
+	}, [layRack]);
+
+	/* ---------- Levels mode: seeded rack; grade on the sink-all win (strokes). ---------- */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		layRack(cfg.diff, cfg.seed);
+	}, [lv, layRack]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
 
 	const newFreeTable = useCallback((key: keyof typeof DIFFS) => {
 		setDaily(false);
@@ -194,6 +216,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			setElapsed(timeSec);
 			setStat('won');
 			trackGame(gameId, 'game_won', { strokes: strokesRef.current });
+			if (lv.active) {
+				lv.finish({ won: true, score: strokesRef.current, raw: { timeSec: Math.round(timeSec * 100) } });
+				return;
+			}
 			const prev = bestRef.current;
 			const newBest = prev == null ? score : Math.min(prev, score);
 			bestRef.current = newBest;
@@ -211,7 +237,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		} else {
 			setStat('aiming');
 		}
-	}, [daily, diffKey, gameId]);
+	}, [daily, diffKey, gameId, lv]);
 
 	/* ---------- Aim (slingshot) — coord-based so both pointer and native touch feed it ---------- */
 	const clientToTable = (clientX: number, clientY: number): Vec => {
@@ -473,7 +499,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				<div className="bi-hud-top">
 					{/* Libre/Défi switch clutters the windowed view — show it only in fullscreen. */}
 					<div className="bi-modetoggle">
-						<ModeToggle daily={daily} onFree={() => daily && newFreeTable(diffKey)} onDaily={startDaily} />
+						<ModeToggle
+							daily={daily}
+							onFree={() => { if (lv.active) { lv.exit(); newFreeTable(diffKey); } else if (daily) newFreeTable(diffKey); }}
+							onDaily={() => { lv.exit(); startDaily(); }}
+							showLevels
+							levelsActive={lv.active}
+							onLevels={armLevels}
+						/>
 					</div>
 					<div className="bi-stats">
 						<span className="bi-stat">🎱 {strokes}</span>
@@ -481,20 +514,27 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						<span className="bi-stat">⏱ {fmtTime(elapsed)}</span>
 					</div>
 					<div className="bi-hud-actions">
-						{!daily && (Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{!daily && !lv.active && (Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 							<button key={k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)}>{DIFFS[k].label}</button>
 						))}
-						<button className="bi-act" onClick={() => newFreeTable(diffKey)} aria-label="Nouvelle table" title="Nouvelle table">↻</button>
+						{!lv.active && (
+							<button className="bi-act" onClick={() => newFreeTable(diffKey)} aria-label="Nouvelle table" title="Nouvelle table">↻</button>
+						)}
 					</div>
 				</div>
-				{daily && (
+				{daily && !lv.active && (
 					<div className="bi-daily-tag bi-daily-hud">
 						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
 					</div>
 				)}
+				{lv.active && !lv.menu && (
+					<div className="bi-daily-tag bi-daily-hud">
+						{`Niveau ${lv.level} · ${billardLevels.config(lv.level).diff.balls} boules · ${billardLevels.starHint(lv.level).three} / ${billardLevels.starHint(lv.level).two}`}
+					</div>
+				)}
 
 				{scratchFlash && <div className="bi-scratch">Pénalité · +1 coup</div>}
-				{status === 'won' && (
+				{status === 'won' && !lv.active && (
 					<div className="bi-overlay">
 						<div className="bi-overlay-card">
 							🎉 Gagné en <strong>{strokes} coups</strong> · {fmtTime(elapsed)}
@@ -504,21 +544,39 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.active && lv.menu && (
+					<div className="bi-overlay bi-levels-overlay">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={billardLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`${strokes} coups`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
 
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. Rentre toutes les boules colorées. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
+				c'est puissant. Rentre toutes les boules colorées. {lv.active ? 'Moins tu joues de coups, plus tu gagnes d\'étoiles.' : daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
 			</p>
 
-			{daily && <Leaderboard
+			{daily && !lv.active && <Leaderboard
 				key={`lb-${best ?? 0}`}
 				game={`${gameId}-t`}
 				metric="time"
 				submitValue={status === 'won' && best != null ? best : undefined}
 				format={(v) => formatScore(DAILY_LB.billard.fmt, v)}
 			/>}
-			{!daily && <LeaderboardCorner
+			{!daily && !lv.active && <LeaderboardCorner
 				game={`${gameId}-t`}
 				metric="time"
 				format={(v) => formatScore(DAILY_LB.billard.fmt, v)}
@@ -574,6 +632,10 @@ const CSS = `
 .bi-overlay-card { background: var(--gray-999); border: 2px solid var(--bi-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .bi-overlay-card strong { color: var(--bi-accent); }
 .bi-replay { border: none; background: var(--bi-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }
+
+/* Levels grid overlays the table (canvas stays mounted); scrollable + opaque so it reads. */
+.bi-levels-overlay { background: rgba(12, 8, 5, 0.82); backdrop-filter: blur(4px); overflow-y: auto; padding: 18px 12px; align-items: flex-start; }
+.bi-levels-overlay .ls-wrap { margin: auto; }
 
 .bi-help { max-width: 460px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1rem; }
 `;
