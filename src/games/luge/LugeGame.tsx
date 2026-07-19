@@ -631,6 +631,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const [earnedStars, setEarnedStars] = useState(0);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const boardwrapRef = useRef<HTMLDivElement>(null);
 	const vignetteRef = useRef<HTMLDivElement>(null);
 	const flashRef = useRef<HTMLDivElement>(null);
 	const g3Ref = useRef<Scene3D | null>(null);
@@ -1434,6 +1435,50 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		};
 	}, [start]);
 
+	// Touch steering: native NON-PASSIVE listeners on the always-mounted board, so we
+	// can preventDefault() and stop iOS Safari from treating the hold as a scroll (which
+	// fires touchcancel and kills the steer). React's synthetic touch handlers are passive.
+	useEffect(() => {
+		const el = boardwrapRef.current;
+		if (!el) return;
+		const apply = (clientX: number): void => {
+			const rect = el.getBoundingClientRect();
+			const left = clientX - rect.left < rect.width / 2;
+			keysRef.current.left = left;
+			keysRef.current.right = !left;
+			setSteerSide(left ? 'left' : 'right');
+		};
+		const onStart = (e: TouchEvent): void => {
+			if (statusRef.current !== 'playing') return;
+			e.preventDefault();
+			pressingRef.current = true;
+			if (e.touches[0]) apply(e.touches[0].clientX);
+		};
+		const onMove = (e: TouchEvent): void => {
+			if (statusRef.current !== 'playing' || !pressingRef.current) return;
+			e.preventDefault();
+			if (e.touches[0]) apply(e.touches[0].clientX);
+		};
+		const onEnd = (e: TouchEvent): void => {
+			if (!pressingRef.current) return;
+			e.preventDefault();
+			pressingRef.current = false;
+			keysRef.current.left = false;
+			keysRef.current.right = false;
+			setSteerSide(null);
+		};
+		el.addEventListener('touchstart', onStart, { passive: false });
+		el.addEventListener('touchmove', onMove, { passive: false });
+		el.addEventListener('touchend', onEnd, { passive: false });
+		el.addEventListener('touchcancel', onEnd, { passive: false });
+		return () => {
+			el.removeEventListener('touchstart', onStart);
+			el.removeEventListener('touchmove', onMove);
+			el.removeEventListener('touchend', onEnd);
+			el.removeEventListener('touchcancel', onEnd);
+		};
+	}, []);
+
 	useEffect(() => {
 		const onVis = () => {
 			if (document.hidden) {
@@ -1511,14 +1556,6 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		if (e.pointerType === 'touch') return;
 		steerEnd();
 	};
-	const onSteerTouchStart = (e: React.TouchEvent): void => {
-		const t = e.touches[0];
-		if (t) steerStart(t.clientX, e.currentTarget.getBoundingClientRect());
-	};
-	const onSteerTouchMove = (e: React.TouchEvent): void => {
-		const t = e.touches[0];
-		if (t && pressingRef.current) applySideX(t.clientX, e.currentTarget.getBoundingClientRect());
-	};
 
 	const remaining = MAX_TRIES - tries;
 
@@ -1563,7 +1600,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				<span className="lg-best">Record {fmtPts(best)}</span>
 			</div>
 
-			<div className={`lg-boardwrap ${levelsMode && levelMenu ? 'hidden' : ''}`}>
+			<div ref={boardwrapRef} className={`lg-boardwrap ${levelsMode && levelMenu ? 'hidden' : ''}`}>
 				<canvas ref={canvasRef} className="lg-canvas" role="img" aria-label={`Luge — ${fmtPts(score)}`} />
 				<div ref={vignetteRef} className="lg-vignette" aria-hidden="true" />
 				<div ref={flashRef} className="lg-flash" aria-hidden="true" />
@@ -1580,10 +1617,6 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 						onPointerMove={onSteerMove}
 						onPointerUp={onSteerUp}
 						onPointerCancel={onSteerUp}
-						onTouchStart={onSteerTouchStart}
-						onTouchMove={onSteerTouchMove}
-						onTouchEnd={steerEnd}
-						onTouchCancel={steerEnd}
 						aria-hidden="true"
 					>
 						<div className={`lg-steer-half left ${steerSide === 'left' ? 'on' : ''}`}><span>◀</span></div>
