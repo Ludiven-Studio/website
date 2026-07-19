@@ -6,8 +6,12 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { fruitsLevels } from './levels';
 
 /* =====================================================
    CALCUL DE FRUITS — React island (QCM).
@@ -60,14 +64,15 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 	const startedRef = useRef(false);
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, fruitsLevels);
 
 	useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
 	useEffect(() => {
-		if (!daily || !started || status !== 'playing') return;
+		if (!(daily || lv.playing) || !started || status !== 'playing') return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, started, status]);
+	}, [daily, lv.playing, started, status]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);
@@ -86,6 +91,33 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		setHintNote('');
 		startedRef.current = false;
 	}, []);
+
+	/* Levels mode: one seeded question from the level config; grade on answer. */
+	const startLevel = useCallback((level: number) => {
+		if (timer.current) clearTimeout(timer.current);
+		const cfg = lv.play(level);
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setDiffKey(cfg.diff.system ? 'difficile' : cfg.diff.mul ? 'moyen' : 'facile');
+		setQuestion(generateQuestion(cfg.diff, mulberry32(cfg.seed)));
+		setScore(0);
+		setQIndex(0);
+		setElapsed(0);
+		setStatus('playing');
+		setChosen(null);
+		setEliminated([]);
+		setPeeked(false);
+		setHintNote('');
+		startedRef.current = false;
+		startRef.current = Date.now();
+		setStarted(true);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		if (timer.current) clearTimeout(timer.current);
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
 
 	const startDaily = useCallback(async () => {
 		if (timer.current) clearTimeout(timer.current);
@@ -141,6 +173,14 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		if (daily && !started) return;
 		const correct = idx === question.answerIndex;
 		setChosen(idx);
+
+		if (lv.playing) {
+			const t = Math.round((Date.now() - startRef.current) / 10);
+			setElapsed(t);
+			if (correct) { setScore(1); setStatus('won'); trackGame(gameId, 'game_won'); }
+			timer.current = setTimeout(() => lv.finish({ won: correct, score: t }), 700);
+			return;
+		}
 
 		if (daily) {
 			const sd = dailySeedRef.current;
@@ -205,9 +245,22 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		<div className="fr-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active && (
+				<div className="fr-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${DIFFS[diffKey].label}`}
+				</div>
+			)}
+
+			{!lv.active && (daily ? (
 				<>
 					<div className="fr-daily-tag">
 						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} · 3 énigmes`}
@@ -227,8 +280,17 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 						))}
 					</div>
 				</div>
+			))}
+
+			{lv.playing && (
+				<div className="fr-daily-status">
+					<span className="fr-best">⏱ {fmtTime(elapsed)}</span>
+				</div>
 			)}
 
+			{lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="fr-playwrap">
 				{celebrating && <Celebration />}
 				<div className={`fr-eqs ${armed ? 'blurred' : ''}`}>
@@ -247,18 +309,36 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 				{armed && !dailyLoading && status !== 'won' && (
 					<div className="fr-overlay"><button className="fr-startbtn" onClick={startTimer}>▶ Commencer</button></div>
 				)}
-			</div>
 
-			{!daily && status === 'playing' && chosen === null && (
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={fruitsLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : 'Mauvaise réponse'}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+			</div>
+			)}
+
+			{!daily && !lv.active && status === 'playing' && chosen === null && (
 				<div className="fr-actions">
 					<button className="fr-act" onClick={eliminate}>💡 Indice</button>
 					<button className="fr-act" onClick={peek}>👁 Voir la réponse</button>
 				</div>
 			)}
 
-			{!daily && hintNote && <p className="fr-hint-note" aria-live="polite">💡 {hintNote}</p>}
+			{!daily && !lv.active && hintNote && <p className="fr-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
-			{!daily && (
+			{lv.playing && (
+				<p className="fr-help">Réponds le plus vite possible : une seule question, une seule réponse. Une erreur fait échouer le niveau.</p>
+			)}
+
+			{!daily && !lv.active && (
 				<p className="fr-help">
 					Chaque fruit cache un nombre. Déduis la valeur demandée à partir des équations. Entraîne-toi
 					autant que tu veux : une erreur révèle la solution puis on passe à la suivante.
@@ -278,7 +358,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);
 }

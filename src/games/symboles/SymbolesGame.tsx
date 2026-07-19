@@ -11,8 +11,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { symbolesLevels, QUESTIONS_PER_LEVEL } from './levels';
 
 /* =====================================================
    SYMBOLES — React island.
@@ -95,6 +99,11 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 	const startedRef = useRef(false); // free-mode "first answer" flag
 	const startRef = useRef(0); // daily chrono start (epoch ms)
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	// Levels mode: a level = a fixed set of N seeded questions.
+	const lv = useLevels(gameId, symbolesLevels);
+	const [lvQuestions, setLvQuestions] = useState<Question[]>([]);
+	const [lvCorrect, setLvCorrect] = useState(0);
+	const lvCorrectRef = useRef(0);
 
 	useEffect(() => {
 		return () => {
@@ -102,15 +111,16 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 		};
 	}, []);
 
-	/* Daily chrono. */
+	/* Daily / levels chrono. */
 	useEffect(() => {
-		if (!daily || !started || status !== 'playing') return;
+		const running = (daily && started) || lv.playing;
+		if (!running || status !== 'playing') return;
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
 			50,
 		);
 		return () => clearInterval(id);
-	}, [daily, started, status]);
+	}, [daily, started, status, lv.playing]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);
@@ -177,6 +187,34 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 		setDailyLoading(false);
 	}, [gameId]);
 
+	/* Levels mode: start a level from its config (N seeded questions); grade on finish. */
+	const startLevel = useCallback((level: number) => {
+		if (timer.current) clearTimeout(timer.current);
+		const cfg = lv.play(level);
+		setDaily(false);
+		setLvQuestions(cfg.questions);
+		setLvCorrect(0);
+		lvCorrectRef.current = 0;
+		setQuestion(cfg.questions[0]);
+		setQIndex(0);
+		setScore(0);
+		setStatus('playing');
+		setChosen(null);
+		setEliminated([]);
+		setPeeked(false);
+		setHintNote('');
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+	}, [lv, gameId]);
+
+	const armLevels = useCallback(() => {
+		if (timer.current) clearTimeout(timer.current);
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
 	const { celebrating } = useCelebration(status === 'won');
 
 	/* Commencer: consumes the attempt and starts the chrono. */
@@ -201,6 +239,34 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 		if (daily && !started) return;
 		const correct = cellKey(question.options[idx]) === cellKey(question.answer);
 		setChosen(idx);
+
+		if (lv.playing) {
+			const nowCorrect = correct ? lvCorrectRef.current + 1 : lvCorrectRef.current;
+			lvCorrectRef.current = nowCorrect;
+			setLvCorrect(nowCorrect);
+			if (!correct) setHintNote('La règle : ' + question.rule + '.');
+			const isLast = qIndex + 1 >= QUESTIONS_PER_LEVEL;
+			if (isLast) {
+				const finalTime = Math.round((Date.now() - startRef.current) / 10);
+				setElapsed(finalTime);
+				const passed = nowCorrect >= QUESTIONS_PER_LEVEL - 1;
+				trackGame(gameId, passed ? 'game_won' : 'game_over');
+				timer.current = setTimeout(() => {
+					lv.finish({ won: passed, score: finalTime, stat: nowCorrect });
+				}, correct ? 700 : 1400);
+				return;
+			}
+			timer.current = setTimeout(() => {
+				const ni = qIndex + 1;
+				setQIndex(ni);
+				setQuestion(lvQuestions[ni]);
+				setChosen(null);
+				setEliminated([]);
+				setPeeked(false);
+				setHintNote('');
+			}, correct ? 700 : 1400);
+			return;
+		}
 
 		if (daily) {
 			const sd = dailySeedRef.current;
@@ -302,9 +368,31 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 		<div className="sy-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<>
+					<div className="sy-daily-tag">
+						{lv.menu
+							? 'Progression — réussis un niveau pour débloquer le suivant'
+							: `Niveau ${lv.level} · ${symbolesLevels.config(lv.level).tierLabel}`}
+					</div>
+					{lv.playing && (
+						<div className="sy-daily-status">
+							<span className="sy-score">Question {Math.min(qIndex + 1, QUESTIONS_PER_LEVEL)}/{QUESTIONS_PER_LEVEL}</span>
+							<span className="sy-best">✓ {lvCorrect}</span>
+							<span className="sy-best">⏱ {fmtTime(elapsed)}</span>
+						</div>
+					)}
+				</>
+			) : daily ? (
 				<>
 					<div className="sy-daily-tag">
 						{dailyLoading
@@ -334,6 +422,9 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="sy-playwrap">
 				{celebrating && <Celebration />}
 				<div className={`sy-seq ${armed ? 'blurred' : ''}`} aria-label="Séquence">
@@ -369,9 +460,23 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 						<button className="sy-startbtn" onClick={startTimer}>▶ Commencer</button>
 					</div>
 				)}
-			</div>
 
-			{!daily && status === 'playing' && chosen === null && (
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={symbolesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`${lvCorrect}/${QUESTIONS_PER_LEVEL} correct · ${fmtTime(elapsed)}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+			</div>
+			)}
+
+			{!daily && !lv.active && status === 'playing' && chosen === null && (
 				<div className="sy-actions">
 					<button className="sy-act" onClick={eliminate}>💡 Indice</button>
 					<button className="sy-act" onClick={peek}>👁 Voir la réponse</button>
@@ -382,7 +487,14 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 				<p className="sy-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{!daily && (
+			{lv.active && !lv.menu && (
+				<p className="sy-help">
+					Une série de {QUESTIONS_PER_LEVEL} suites : réponds vite et sans faute. Il faut au moins{' '}
+					{QUESTIONS_PER_LEVEL - 1}/{QUESTIONS_PER_LEVEL} pour valider le niveau, {QUESTIONS_PER_LEVEL}/{QUESTIONS_PER_LEVEL} pour viser 3 étoiles.
+				</p>
+			)}
+
+			{!daily && !lv.active && (
 				<p className="sy-help">
 					Trouve le symbole suivant de la suite. Entraîne-toi autant que tu veux : une bonne réponse
 					enchaîne, une erreur révèle la règle puis on passe à la suivante.
@@ -410,7 +522,7 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);
 }

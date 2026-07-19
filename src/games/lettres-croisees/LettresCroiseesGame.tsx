@@ -5,8 +5,12 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { lettresCroiseesLevels } from './levels';
 import { touchDrag } from '../touchDrag';
 
 /* =====================================================
@@ -59,6 +63,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const revealDelay = useRef<Map<string, number>>(new Map());
 	const hintReadyAt = useRef(0);
 	const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const lv = useLevels(gameId, lettresCroiseesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
 	const armed = daily && !started;
@@ -157,6 +162,41 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, { startedAt: startRef.current, done: complete, finalTime, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: nf, bonusFound: nb } satisfies DailyState });
 	};
+
+	/* ---------- Levels mode ---------- */
+	const startLevel = useCallback((level: number): void => {
+		const cfg = lv.play(level);
+		dailyRef.current = false;
+		setDaily(false); setAlreadyPlayed(false);
+		setDiffKey('facile');
+		applyPuzzle(generatePuzzle(cfg.seed, cfg.diff));
+		setStatus('playing');
+		const now = Date.now();
+		startRef.current = now; setStarted(true); setElapsed(0);
+		armHint();
+		trackGame(gameId, 'game_started', { mode: 'levels', level });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv, gameId]);
+
+	const armLevels = useCallback((): void => {
+		dailyRef.current = false;
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	/* Levels chrono. */
+	useEffect(() => {
+		if (!lv.playing || status !== 'playing') return;
+		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
+		return () => clearInterval(id);
+	}, [lv.playing, status]);
+
+	/* Grade the level once every grid word is filled. */
+	useEffect(() => {
+		if (!lv.playing || status !== 'won') return;
+		lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10) });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* ---------- Reveal a grid word (correct submit or hint) ---------- */
 	const revealGridWord = (word: string): void => {
@@ -303,9 +343,29 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		<div className="lc-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<>
+					<div className="lc-daily-tag">
+						{lv.menu ? 'Progression — remplis la grille pour débloquer le niveau suivant' : `Niveau ${lv.level} · ${total} mots`}
+					</div>
+					{!lv.menu && (
+						<div className="lc-status">
+							<span className="lc-count">{found.length}/{total} mots</span>
+							<span className="lc-bonus">✨ {bonusFound.length}</span>
+							<span className="lc-time">⏱ {fmtCentis(elapsed)}</span>
+						</div>
+					)}
+				</>
+			) : daily ? (
 				<>
 					<div className="lc-daily-tag">{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}</div>
 					<div className="lc-status">
@@ -331,7 +391,10 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 				</>
 			)}
 
-			<div className="lc-playwrap">
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
+				<div className="lc-playwrap">
 				{celebrating && <Celebration />}
 				<div className={`lc-play ${armed ? 'blurred' : ''}`}>
 					<div className="lc-gridcol">
@@ -387,9 +450,11 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 						<button className="lc-shuffle" onClick={shuffleWheel} disabled={armed || status !== 'playing'} aria-label="Mélanger les lettres">🔀</button>
 					</div>
 
-					<button className="lc-hint" onClick={revealHint} disabled={armed || status !== 'playing' || hintLeft > 0}>
-						💡 Indice{status === 'playing' && !armed && hintLeft > 0 ? ` · ${hintLeft}s` : ''}
-					</button>
+					{!lv.active && (
+						<button className="lc-hint" onClick={revealHint} disabled={armed || status !== 'playing' || hintLeft > 0}>
+							💡 Indice{status === 'playing' && !armed && hintLeft > 0 ? ` · ${hintLeft}s` : ''}
+						</button>
+					)}
 					</div>
 				</div>
 
@@ -401,14 +466,28 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 						<button className="lc-startbtn" onClick={startTimer}>▶ Commencer</button>
 					</div></div>
 				)}
-			</div>
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={lettresCroiseesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Grille remplie en ${fmtCentis(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+				</div>
+			)}
 
 			{daily && status === 'won' && (
 				<div className="lc-won">{alreadyPlayed
 					? <>Défi du jour déjà relevé · <strong>{fmtCentis(elapsed)}</strong> — reviens demain&nbsp;!</>
 					: <>🎉 Grille remplie en <strong>{fmtCentis(elapsed)}</strong>&nbsp;!{bonusFound.length > 0 && <> ✨ {bonusFound.length} mot{bonusFound.length > 1 ? 's' : ''} bonus</>}</>}</div>
 			)}
-			{!daily && status === 'won' && (
+			{!daily && !lv.active && status === 'won' && (
 				<div className="lc-won">🎉 Grille remplie&nbsp;! <button className="lc-replay" onClick={() => newGame(diffKey)}>Nouvelle grille</button></div>
 			)}
 
@@ -418,7 +497,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);
 }

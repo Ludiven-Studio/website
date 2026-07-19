@@ -101,6 +101,8 @@ export const DIFFS: Record<string, DiffLevel> = {
 	difficile: { label: 'Difficile', families: [fibonacci, quadratic, interleaved] },
 };
 
+export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
+
 /* ---------- Distractors ---------- */
 
 function makeOptions(g: Generated, rng: Rng): number[] {

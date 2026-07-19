@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fmtCentis } from '../../lib/scoreFormat';
-import { DIFFS, generateQuestion, type Question } from './engine';
+import { DIFFS, DIFF_ORDER, generateQuestion, type Question } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -11,8 +11,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { suiteLevels, SUITE_QUESTIONS, type SuiteLevelCfg } from './levels';
 
 /* =====================================================
    SUITE MYSTÈRE — React island.
@@ -23,7 +27,6 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 
 type Status = 'playing' | 'over' | 'won';
 const BEST_KEY = 'ludiven-suite-best';
-const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const DAILY_TARGET = 3;
 
 const fmtTime = fmtCentis;
@@ -33,9 +36,10 @@ interface DailyState {
 	qIndex: number;
 }
 
-/** Deterministic daily question stream: question i is fully reproducible from (seed, i). */
-const dailyQ = (seed: number, diffIndex: number, i: number): Question =>
+/** Deterministic question stream: question i is fully reproducible from (seed, i). */
+const seededQ = (seed: number, diffIndex: number, i: number): Question =>
 	generateQuestion(DIFFS[DIFF_ORDER[diffIndex] ?? 'facile'], mulberry32((seed + i * 0x9e3779b1) >>> 0));
+const dailyQ = seededQ;
 
 export default function SuiteGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
@@ -56,8 +60,12 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 	const [elapsed, setElapsed] = useState(0);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const startedRef = useRef(false); // free-mode "first answer" flag
-	const startRef = useRef(0); // daily chrono start (epoch ms)
+	const startRef = useRef(0); // daily/level chrono start (epoch ms)
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	// Levels mode: a fixed set of N seeded questions, answered in sequence.
+	const lv = useLevels(gameId, suiteLevels);
+	const lvCfgRef = useRef<SuiteLevelCfg | null>(null);
+	const lvCorrectRef = useRef(0); // correct answers so far in the current level set
 
 	useEffect(() => {
 		const stored = Number(localStorage.getItem(BEST_KEY) ?? '0');
@@ -67,18 +75,49 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		};
 	}, []);
 
-	/* Daily chrono. */
+	/* Daily / level chrono. */
 	useEffect(() => {
-		if (!daily || !started || status !== 'playing') return;
+		const running = (daily && started) || lv.playing;
+		if (!running || status !== 'playing') return;
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
 			50,
 		);
 		return () => clearInterval(id);
-	}, [daily, started, status]);
+	}, [daily, started, lv.playing, status]);
+
+	/* Levels mode: run a fixed set of N seeded questions in sequence. */
+	const startLevel = useCallback((level: number) => {
+		if (timer.current) clearTimeout(timer.current);
+		const cfg = lv.play(level);
+		lvCfgRef.current = cfg;
+		lvCorrectRef.current = 0;
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setStarted(true);
+		setDiffKey(DIFF_ORDER[cfg.diffIndex] ?? 'facile');
+		setQuestion(seededQ(cfg.seed, cfg.diffIndex, 0));
+		setScore(0);
+		setQIndex(0);
+		setElapsed(0);
+		setStatus('playing');
+		setChosen(null);
+		setEliminated([]);
+		setPeeked(false);
+		setHintNote('');
+		startRef.current = Date.now();
+		trackGame(gameId, 'game_started');
+	}, [lv, gameId]);
+
+	const armLevels = useCallback(() => {
+		if (timer.current) clearTimeout(timer.current);
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);
+		lv.exit();
 		setDaily(false);
 		setAlreadyPlayed(false);
 		setStarted(false);
@@ -93,11 +132,12 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setPeeked(false);
 		setHintNote('');
 		startedRef.current = false;
-	}, []);
+	}, [lv]);
 
 	/* Daily: one attempt per device, resumable; server-issued seed. */
 	const startDaily = useCallback(async () => {
 		if (timer.current) clearTimeout(timer.current);
+		lv.exit();
 		setDaily(true);
 		setChosen(null);
 		setEliminated([]);
@@ -140,7 +180,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setDiffKey(DIFF_ORDER[diffIndex] ?? 'facile');
 		setQuestion(dailyQ(seed, diffIndex, 0));
 		setDailyLoading(false);
-	}, [gameId]);
+	}, [gameId, lv]);
 
 	const { celebrating } = useCelebration(status === 'won');
 
@@ -166,6 +206,36 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		if (daily && !started) return;
 		const correct = value === question.answer;
 		setChosen(idx);
+
+		if (lv.playing) {
+			const cfg = lvCfgRef.current!;
+			if (correct) {
+				lvCorrectRef.current += 1;
+				setScore((s) => s + 1);
+			}
+			const answered = qIndex + 1;
+			if (answered >= cfg.count) {
+				// Last question answered → level cleared (finishing always wins; stars grade it).
+				const finalTime = Math.round((Date.now() - startRef.current) / 10);
+				setElapsed(finalTime);
+				setStatus('won');
+				trackGame(gameId, 'game_won');
+				const c = lvCorrectRef.current;
+				timer.current = setTimeout(() => {
+					lv.finish({ won: true, score: finalTime, stat: c, raw: { correct: c, total: cfg.count } });
+				}, 700);
+				return;
+			}
+			timer.current = setTimeout(() => {
+				const ni = qIndex + 1;
+				setQIndex(ni);
+				setQuestion(seededQ(cfg.seed, cfg.diffIndex, ni));
+				setChosen(null);
+				setEliminated([]);
+				setPeeked(false);
+			}, 700);
+			return;
+		}
 
 		if (daily) {
 			const sd = dailySeedRef.current;
@@ -272,9 +342,31 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		<div className="su-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={startDaily}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active && (
+				<div className="su-daily-tag">
+					{lv.menu
+						? 'Progression — enchaîne les niveaux pour débloquer les suivants'
+						: `Niveau ${lv.level} · ${DIFFS[diffKey].label} · question ${Math.min(qIndex + 1, SUITE_QUESTIONS)}/${SUITE_QUESTIONS}`}
+				</div>
+			)}
+
+			{lv.active && lv.playing && (
+				<div className="su-daily-status">
+					<span className="su-score">Bonnes {score}/{SUITE_QUESTIONS}</span>
+					<span className="su-best">⏱ {fmtTime(elapsed)}</span>
+				</div>
+			)}
+
+			{!lv.active && (daily ? (
 				<>
 					<div className="su-daily-tag">
 						{dailyLoading
@@ -306,8 +398,11 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 						<span className="su-best">Record {best}</span>
 					</div>
 				</div>
-			)}
+			))}
 
+			{lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="su-playwrap">
 				{celebrating && <Celebration />}
 				<div className={`su-seq ${armed ? 'blurred' : ''}`} aria-label="Séquence">
@@ -342,20 +437,34 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 						<button className="su-startbtn" onClick={startTimer}>▶ Commencer</button>
 					</div>
 				)}
-			</div>
 
-			{!daily && status === 'playing' && chosen === null && (
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={suiteLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`${score}/${SUITE_QUESTIONS} correctes · ${fmtTime(elapsed)}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+			</div>
+			)}
+
+			{!daily && !lv.active && status === 'playing' && chosen === null && (
 				<div className="su-actions">
 					<button className="su-act" onClick={eliminate}>💡 Indice</button>
 					<button className="su-act" onClick={peek}>👁 Voir la réponse</button>
 				</div>
 			)}
 
-			{!daily && hintNote && (
+			{!daily && !lv.active && hintNote && (
 				<p className="su-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{!daily &&
+			{!daily && !lv.active &&
 				(status === 'over' ? (
 					<div className="su-over">
 						<p className="su-rule">
@@ -373,6 +482,13 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 						la manche.
 					</p>
 				))}
+
+			{lv.playing && (
+				<p className="su-help">
+					Réponds aux {SUITE_QUESTIONS} suites le plus vite possible. Une erreur ne t'arrête pas,
+					mais vise le sans-faute pour décrocher les 3 étoiles.
+				</p>
+			)}
 
 			{daily && status === 'won' && (
 				<div className="su-daily-won">
@@ -395,7 +511,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);
 }

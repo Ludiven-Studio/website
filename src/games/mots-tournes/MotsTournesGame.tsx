@@ -5,8 +5,12 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { motsTournesLevels } from './levels';
 import { touchDrag } from '../touchDrag';
 
 /* =====================================================
@@ -45,17 +49,46 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false);
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, motsTournesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
 	const armed = daily && !started;
 	const total = puzzle.regions.length;
 
-	/* Daily chrono. */
+	/* Daily / levels chrono. */
 	useEffect(() => {
-		if (!daily || !started || status !== 'playing') return;
+		if (status !== 'playing') return;
+		if (!((daily && started) || lv.playing)) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, started, status]);
+	}, [daily, started, status, lv.playing]);
+
+	/* Levels mode: start a level from its config; grade on completion. */
+	const startLevel = useCallback((level: number): void => {
+		const cfg = lv.play(level);
+		dailyRef.current = false;
+		setDaily(false); setStarted(false); setAlreadyPlayed(false);
+		const p = generatePuzzle(cfg.seed, cfg.diff);
+		puzzleRef.current = p; setPuzzle(p);
+		setFoundBoth([]); setTraceBoth([]);
+		setStatus('playing');
+		startRef.current = Date.now();
+		setElapsed(0);
+		trackGame(gameId, 'game_started', { mode: 'levels', level });
+	}, [lv, gameId]);
+
+	const armLevels = useCallback((): void => {
+		dailyRef.current = false;
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once every word is traced.
+	useEffect(() => {
+		if (!lv.playing || status !== 'won') return;
+		lv.finish({ won: true, score: elapsed, raw: { rows: puzzleRef.current.rows, cols: puzzleRef.current.cols } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	const setTraceBoth = (t: Cell[]): void => { traceRef.current = t; setTrace(t); };
 	const setFoundBoth = (f: number[]): void => { foundRef.current = f; setFound(f); };
@@ -126,7 +159,10 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 			const finalTime = complete ? Math.round((Date.now() - startRef.current) / 10) : undefined;
 			saveDaily(nf, complete, finalTime);
 			if (complete) { setElapsed(finalTime!); setStatus('won'); trackGame(gameId, 'game_won'); }
-		} else if (complete) { setStatus('won'); trackGame(gameId, 'game_won'); }
+		} else if (complete) {
+			if (lv.playing) setElapsed(Math.round((Date.now() - startRef.current) / 10));
+			setStatus('won'); trackGame(gameId, 'game_won');
+		}
 	};
 
 	const undo = (): void => {
@@ -210,9 +246,22 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		<div className="wt-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active && (
+				<div className="wt-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${puzzle.rows}×${puzzle.cols}`}
+				</div>
+			)}
+
+			{!lv.active && (daily ? (
 				<>
 					<div className="wt-daily-tag">{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}</div>
 					<div className="wt-status">
@@ -236,8 +285,19 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 						<span className="wt-count">{found.length}/{total}</span>
 					</div>
 				</>
+			))}
+
+			{lv.active && !lv.menu && (
+				<div className="wt-status">
+					<span className="wt-theme">🎯 {puzzle.theme}</span>
+					<span className="wt-count">{found.length}/{total}</span>
+					<span className="wt-time">⏱ {fmtCentis(elapsed)}</span>
+				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="wt-playwrap">
 				{celebrating && <Celebration />}
 				<div className={`wt-board ${armed ? 'blurred' : ''}`} style={{ aspectRatio: `${puzzle.cols} / ${puzzle.rows}`, ['--cols' as string]: puzzle.cols }}>
@@ -278,8 +338,23 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 						<button className="wt-startbtn" onClick={startTimer}>▶ Commencer</button>
 					</div></div>
 				)}
-			</div>
 
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={motsTournesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Pavée en ${fmtCentis(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+			</div>
+			)}
+
+			{!(lv.active && lv.menu) && (
 			<div className="wt-slots">
 				{found.map((i) => (
 					<span key={`f${i}`} className="wt-slot done" style={{ background: wordColor(i), borderColor: wordColor(i) }}>{puzzle.regions[i].word}</span>
@@ -288,18 +363,21 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 					<span key={`r${j}`} className="wt-slot">{'•'.repeat(len)}</span>
 				))}
 			</div>
+			)}
 
+			{!(lv.active && lv.menu) && (
 			<div className="wt-controls">
 				<button className="wt-btn" onClick={undo} disabled={!found.length || status === 'won'}>↶ Annuler</button>
-				{!daily && <button className="wt-btn" onClick={() => newGame(diffKey)}>↻ Nouvelle grille</button>}
+				{!daily && !lv.active && <button className="wt-btn" onClick={() => newGame(diffKey)}>↻ Nouvelle grille</button>}
 			</div>
+			)}
 
 			{daily && status === 'won' && (
 				<div className="wt-won">{alreadyPlayed
 					? <>Défi du jour déjà relevé · <strong>{fmtCentis(elapsed)}</strong> — reviens demain&nbsp;!</>
 					: <>🎉 Grille pavée en <strong>{fmtCentis(elapsed)}</strong>&nbsp;!</>}</div>
 			)}
-			{!daily && status === 'won' && (
+			{!daily && !lv.active && status === 'won' && (
 				<div className="wt-won">🎉 Grille pavée&nbsp;! <button className="wt-replay" onClick={() => newGame(diffKey)}>Nouvelle grille</button></div>
 			)}
 
@@ -310,7 +388,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);
 }

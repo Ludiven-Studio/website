@@ -19,8 +19,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { batailleLevels } from './levels';
 
 /* =====================================================
    BATAILLE NAVALE — chasse à la flotte. React island.
@@ -62,13 +66,15 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [levelSonars, setLevelSonars] = useState(0); // sonars for the current level (levels mode)
 	const startedRef = useRef(false); // free-mode "first action" flag
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, batailleLevels);
 
 	const { size, fleet, sonars } = useMemo(
-		() => ({ size: puzzle.size, fleet: puzzle.fleet, sonars: SIZES[diffKey].sonars }),
-		[puzzle, diffKey],
+		() => ({ size: puzzle.size, fleet: puzzle.fleet, sonars: lv.active ? levelSonars : SIZES[diffKey].sonars }),
+		[puzzle, diffKey, lv.active, levelSonars],
 	);
 	const over = status === 'won';
 	const cost = shotsUsed + sonarsUsed;
@@ -155,6 +161,36 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		}
 	}, []);
 
+	/* Levels mode: start a level from its config; grade on win (score = shots + sonars). */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		const p = generateHunt(cfg.sizeLvl, mulberry32(cfg.seed));
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setPuzzle(p);
+		setLevelSonars(cfg.sizeLvl.sonars);
+		setShots(emptyShots(p.size));
+		setSonarReveals({});
+		setShotsUsed(0);
+		setSonarsUsed(0);
+		setSonarMode(false);
+		setStatus('playing');
+		setStarted(true);
+		startRef.current = Date.now();
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once the fleet is sunk (score = shots + sonars, fewer is better).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: cost, raw: { size, fleet: fleet.length } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
+
 	/* Daily: one resumable attempt per device; server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
@@ -231,6 +267,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (over) return;
 		if (daily && !started) return;
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		if (isWon(puzzle, shots)) {
 			setStatus('won');
 			trackGame(gameId, 'game_won', { cost });
@@ -259,6 +296,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 	/* Lock the daily on a fresh win + record free-mode best. */
 	useEffect(() => {
 		if (status !== 'won') return;
+		if (lv.active) return; // levels mode grades via the hook, no daily/free best
 		if (daily) {
 			if (alreadyPlayed) return;
 			const sd = dailySeedRef.current;
@@ -341,9 +379,22 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		<div className="ba-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="ba-daily-tag">
+					{lv.menu
+						? 'Progression — coule la flotte pour débloquer le niveau suivant'
+						: `Niveau ${lv.level} · ${size}×${size} · ${fleet.length} navires`}
+				</div>
+			) : daily ? (
 				<div className="ba-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
@@ -365,13 +416,16 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{!(lv.active && lv.menu) && (
 			<div className="ba-bar">
 				<span className="ba-stat">🎯 {shotsUsed}</span>
 				<span className="ba-stat sunk">🚢 {sunkCount}/{fleet.length}</span>
 				<span className="ba-stat">🔊 {Math.max(0, sonarsLeft)}/{sonars}</span>
-				{!daily && best > 0 && <span className="ba-stat best">★ {best}</span>}
+				{!daily && !lv.active && best > 0 && <span className="ba-stat best">★ {best}</span>}
 			</div>
+			)}
 
+			{!(lv.active && lv.menu) && (
 			<div className="ba-fleet" aria-label="Flotte à couler">
 				{fleetGroups.map(({ len, count }) => {
 					const sunkN = sunkByLen.get(len) ?? 0;
@@ -388,8 +442,9 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					);
 				})}
 			</div>
+			)}
 
-			{!over && (!daily || started) && (
+			{!over && (!daily || started) && !(lv.active && lv.menu) && (
 				<div className="ba-actions">
 					<button
 						className={`ba-act ${sonarMode ? 'on' : ''}`}
@@ -403,6 +458,9 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="ba-boardwrap">
 				{celebrating && <Celebration />}
 				<div
@@ -478,7 +536,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="ba-win" role="dialog" aria-label="Flotte coulée">
 						<div className="ba-wincard">
 							<div className="ba-winmark">⚓</div>
@@ -489,7 +547,21 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={batailleLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Coulée en ${cost} coups · ${shotsUsed} tirs · ${sonarsUsed} sonars` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{daily && status === 'won' && (
 				<div className="ba-daily-won">
@@ -509,7 +581,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					format={(v) => `${v} coups`}
 				/>
 			)}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" format={(v) => `${v} coups`} />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" format={(v) => `${v} coups`} />}
 
 			<p className="ba-help">
 				Coule toute la flotte cachée en un minimum d'actions. Clique une case pour <strong>tirer</strong>{' '}

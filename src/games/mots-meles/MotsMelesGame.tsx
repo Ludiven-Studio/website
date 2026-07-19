@@ -5,8 +5,12 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { motsMelesLevels } from './levels';
 import { touchDrag } from '../touchDrag';
 
 /* =====================================================
@@ -43,19 +47,47 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 	const startCellRef = useRef<Cell | null>(null);
 	const selRef = useRef<Cell[]>([]);
 	const startedRef = useRef(false); // free-mode "first find" flag
-	const startRef = useRef(0); // daily chrono start (epoch ms)
+	const startRef = useRef(0); // daily / levels chrono start (epoch ms)
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, motsMelesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
 	const armed = daily && !started;
 	const total = grid.words.length;
 
-	/* Daily chrono. */
+	/* Daily / levels chrono. */
 	useEffect(() => {
-		if (!daily || !started || status !== 'playing') return;
+		if (!(daily || lv.playing) || !started || status !== 'playing') return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, started, status]);
+	}, [daily, lv.playing, started, status]);
+
+	/* Levels mode: start a level from its config; grade on solve (all words found). */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		setDiffKey('facile');
+		setGrid(makeGrid(cfg.seed, cfg.diff));
+		setFound([]); applySel([]);
+		setStatus('playing');
+		setStarted(true);
+		startedRef.current = false;
+		startRef.current = Date.now();
+		setElapsed(0);
+		trackGame(gameId, 'game_started');
+	}, [lv, gameId]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once every word is found (metric = total time).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: elapsed, raw: { size: grid.size, words: grid.words.length } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	const applySel = (cells: Cell[]) => { selRef.current = cells; setSel(cells); };
 
@@ -125,7 +157,11 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 			if (complete) { setElapsed(finalTime!); setStatus('won'); trackGame(gameId, 'game_won'); }
 		} else {
 			if (!startedRef.current) { startedRef.current = true; trackGame(gameId, 'game_started'); }
-			if (complete) { setStatus('won'); trackGame(gameId, 'game_won'); }
+			if (complete) {
+				if (lv.playing) setElapsed(Math.round((Date.now() - startRef.current) / 10)); // freeze solve time for grading
+				setStatus('won');
+				trackGame(gameId, 'game_won');
+			}
 		}
 	};
 
@@ -189,9 +225,30 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		<div className="mm-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active && (
+				<div className="mm-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${grid.size}×${grid.size} · ${total} mots`}
+				</div>
+			)}
+
+			{lv.active && !lv.menu && (
+				<div className="mm-status">
+					<span className="mm-theme">🔎 {grid.theme}</span>
+					<span className="mm-count">{found.length}/{total}</span>
+					<span className="mm-time">⏱ {fmtTime(elapsed)}</span>
+				</div>
+			)}
+
+			{!lv.active && (daily ? (
 				<>
 					<div className="mm-daily-tag">
 						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
@@ -213,15 +270,19 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 					</div>
 					<button className="mm-act" onClick={() => newGame(diffKey)}>↻ Nouvelle grille</button>
 				</div>
-			)}
+			))}
 
-			{!daily && (
+			{!daily && !lv.active && (
 				<div className="mm-status">
 					<span className="mm-theme">🔎 {grid.theme}</span>
 					<span className="mm-count">{found.length}/{total}</span>
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
+			<>
 			<div className="mm-playwrap">
 				{celebrating && <Celebration />}
 				<div
@@ -246,6 +307,19 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 				{armed && !dailyLoading && status !== 'won' && (
 					<div className="mm-overlay"><button className="mm-startbtn" onClick={startTimer}>▶ Commencer</button></div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={motsMelesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
 
 			<div className="mm-words">
@@ -262,19 +336,24 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 						: <>🎉 Tous les mots trouvés en <strong>{fmtTime(elapsed)}</strong></>}
 				</div>
 			)}
-			{!daily && status === 'won' && (
+			{!daily && !lv.active && status === 'won' && (
 				<div className="mm-won">🎉 Grille terminée&nbsp;! <button className="mm-replay" onClick={() => newGame(diffKey)}>Nouvelle grille</button></div>
 			)}
 
-			{!daily && (
+			{!daily && !lv.active && (
 				<p className="mm-help">Glisse sur les lettres pour surligner un mot de la liste (horizontal, vertical, diagonale — et à l'envers dès le moyen). Chaque mot trouvé a sa couleur. Trouve-les tous&nbsp;!</p>
+			)}
+			{lv.active && (
+				<p className="mm-help">Retrouve tous les mots le plus vite possible pour décrocher les 3 étoiles.</p>
 			)}
 			{daily && status === 'playing' && (
 				<p className="mm-help">Retrouve tous les mots le plus vite possible. Glisse sur les lettres pour surligner.</p>
 			)}
+			</>
+			)}
 
 			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);
 }

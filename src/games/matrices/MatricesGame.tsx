@@ -6,8 +6,12 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { matricesLevels } from './levels';
 
 /* =====================================================
    MATRICES — React island (IQ-test "Raven" matrices).
@@ -127,14 +131,20 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 	const startedRef = useRef(false);
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, matricesLevels);
+	// Levels mode: fixed N-question set, current index, and running correct count.
+	const [lvQuestions, setLvQuestions] = useState<Question[]>([]);
+	const [lvCorrect, setLvCorrect] = useState(0);
 
 	useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
+	// Chrono runs for the daily and for a level in progress.
 	useEffect(() => {
-		if (!daily || !started || status !== 'playing') return;
+		if (status !== 'playing' || !started) return;
+		if (!daily && !lv.playing) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, started, status]);
+	}, [daily, started, status, lv.playing]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);
@@ -153,6 +163,35 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setHintNote('');
 		startedRef.current = false;
 	}, []);
+
+	/* Levels mode: build a fixed N-question set from the level seed, then play through it. */
+	const startLevel = useCallback((level: number) => {
+		if (timer.current) clearTimeout(timer.current);
+		const cfg = lv.play(level);
+		const qs = Array.from({ length: cfg.count }, (_, i) =>
+			generateQuestion(cfg.diff, mulberry32((cfg.seed + i * 0x9e3779b1) >>> 0)),
+		);
+		setDaily(false);
+		setLvQuestions(qs);
+		setLvCorrect(0);
+		setQIndex(0);
+		setQuestion(qs[0]);
+		setScore(0);
+		setStatus('playing');
+		setChosen(null);
+		setEliminated([]);
+		setPeeked(false);
+		setHintNote('');
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		if (timer.current) clearTimeout(timer.current);
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
 
 	const startDaily = useCallback(async () => {
 		if (timer.current) clearTimeout(timer.current);
@@ -224,6 +263,29 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		if (daily && !started) return;
 		const correct = cellKey(question.options[idx]) === answerKey;
 		setChosen(idx);
+
+		if (lv.playing) {
+			const nextCorrect = correct ? lvCorrect + 1 : lvCorrect;
+			if (correct) setLvCorrect(nextCorrect);
+			const isLast = qIndex + 1 >= lvQuestions.length;
+			if (isLast) {
+				const finalTime = Math.round((Date.now() - startRef.current) / 10);
+				setElapsed(finalTime);
+				timer.current = setTimeout(() => {
+					lv.finish({ won: true, score: nextCorrect, stat: finalTime, raw: { correct: nextCorrect, total: lvQuestions.length } });
+				}, 700);
+				return;
+			}
+			timer.current = setTimeout(() => {
+				const ni = qIndex + 1;
+				setQIndex(ni);
+				setQuestion(lvQuestions[ni]);
+				setChosen(null);
+				setEliminated([]);
+				setPeeked(false);
+			}, 700);
+			return;
+		}
 
 		if (daily) {
 			const sd = dailySeedRef.current;
@@ -312,9 +374,30 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		<div className="mx-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<>
+					<div className="mx-daily-tag">
+						{lv.menu
+							? 'Progression — réussis un niveau pour débloquer le suivant'
+							: `Niveau ${lv.level} · ${matricesLevels.config(lv.level).diff.label} · question ${Math.min(qIndex + 1, lvQuestions.length)}/${lvQuestions.length}`}
+					</div>
+					{!lv.menu && (
+						<div className="mx-daily-status">
+							<span className="mx-score">Bonnes {lvCorrect}/{lvQuestions.length}</span>
+							<span className="mx-best">⏱ {fmtTime(elapsed)}</span>
+						</div>
+					)}
+				</>
+			) : daily ? (
 				<>
 					<div className="mx-daily-tag">
 						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} · 3 matrices`}
@@ -336,6 +419,9 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="mx-playwrap">
 				{celebrating && <Celebration />}
 
@@ -363,22 +449,40 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				{armed && !dailyLoading && status !== 'won' && (
 					<div className="mx-overlay"><button className="mx-startbtn" onClick={startTimer}>▶ Commencer</button></div>
 				)}
-			</div>
 
-			{!daily && status === 'playing' && chosen === null && (
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={matricesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`${lvCorrect}/${lvQuestions.length} bonnes · ${fmtTime(elapsed)}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+			</div>
+			)}
+
+			{!daily && !lv.active && status === 'playing' && chosen === null && (
 				<div className="mx-actions">
 					<button className="mx-act" onClick={eliminate}>💡 Indice</button>
 					<button className="mx-act" onClick={peek}>👁 Voir la réponse</button>
 				</div>
 			)}
 
-			{!daily && hintNote && <p className="mx-hint-note" aria-live="polite">💡 {hintNote}</p>}
+			{!daily && !lv.active && hintNote && <p className="mx-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
-			{!daily && (
+			{!daily && !lv.active && (
 				<p className="mx-help">
 					Repère la logique de chaque ligne et colonne (forme, couleur, nombre, orientation) et trouve la
 					figure manquante. Entraîne-toi autant que tu veux : une erreur révèle la logique.
 				</p>
+			)}
+
+			{lv.active && !lv.menu && (
+				<p className="mx-help">Réponds aux {lvQuestions.length} matrices du niveau. Toutes justes le plus vite possible pour 3 étoiles.</p>
 			)}
 
 			{daily && status === 'won' && (
@@ -396,7 +500,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);
 }
