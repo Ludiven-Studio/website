@@ -12,8 +12,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { suguruLevels } from './levels';
 
 /* =====================================================
    SUGURU (Tectonic) — React island.
@@ -52,6 +56,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, suguruLevels);
 
 	const { size, zones, zoneSize, maxDigit, given, solution } = puzzle;
 
@@ -76,6 +81,36 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	/* Levels mode: start a level from its config; chrono runs immediately. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		const p = generateSuguru(cfg.diff, mulberry32(cfg.seed));
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setHintNote('');
+		setPuzzle(p);
+		setEntries(emptyEntries(cfg.diff.size));
+		setSelected(null);
+		setStatus('playing');
+		setStarted(true);
+		setRevealed(false);
+		setHinted(new Set());
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once it is solved (suguru can't be lost).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10), raw: { size } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -219,6 +254,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 		if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (value(r, c) == null) return;
 		if (conflicts.size > 0) return;
@@ -341,7 +377,14 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		<div className="sg-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{daily && (
 				<div className="sg-daily-tag">
@@ -351,8 +394,15 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && (
+				<div className="sg-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${size}×${size}`}
+				</div>
+			)}
+
+			{!(lv.active && lv.menu) && (
 			<div className="sg-bar">
-				{!daily ? (
+				{!daily && !lv.active ? (
 					<div className="sg-pills" role="tablist" aria-label="Difficulté">
 						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 							<button
@@ -371,15 +421,16 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				)}
 				<div className="sg-bar-right">
 					<div className="sg-timer">{fmtTime(elapsed)}</div>
-					{!daily && (
+					{!daily && !lv.active && (
 						<button className="sg-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
 						</button>
 					)}
 				</div>
 			</div>
+			)}
 
-			{status !== 'won' && !revealed && !daily && (
+			{status !== 'won' && !revealed && !daily && !lv.active && (
 				<div className="sg-actions">
 					<button className="sg-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -404,6 +455,9 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="sg-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
@@ -456,7 +510,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="sg-win" role="dialog" aria-label="Grille résolue">
 						<div className="sg-wincard">
 							<div className="sg-winmark">🧩</div>
@@ -469,7 +523,21 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={suguruLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`Résolu en ${fmtTime(elapsed)}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && (
 				<p className="sg-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -479,7 +547,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="sg-revealed-note">

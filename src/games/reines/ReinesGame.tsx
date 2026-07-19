@@ -11,8 +11,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { reinesLevels } from './levels';
 import {
 	DIFFS,
 	generateReines,
@@ -63,6 +67,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const skipBackstopRef = useRef<ReinesPuzzle | null>(null); // puzzle whose marks were pre-restored (daily resume)
+	const lv = useLevels(gameId, reinesLevels);
 
 	const { size, regions } = puzzle;
 
@@ -87,6 +92,35 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	/* Levels mode: start a level from its config; grade on solve. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		const p = generateReines(cfg.size, mulberry32(cfg.seed));
+		setDaily(false);
+		skipBackstopRef.current = p; // we size marks here, don't let the backstop double-reset
+		setPuzzle(p);
+		setMarks(emptyMarks(cfg.size.size));
+		setStatus('playing');
+		setRevealed(false);
+		setHinted(new Set());
+		setHintNote('');
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once it is solved (win → time).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10), raw: { size } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -218,6 +252,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 		if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		if (queens.length === size && conflicts.size === 0) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
@@ -321,15 +356,32 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		<div className="rn-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{daily && (
 				<div className="rn-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
 						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
 				</div>
-			) : (
+			)}
+
+			{lv.active && (
+				<div className="rn-daily-tag">
+					{lv.menu
+						? 'Progression — réussis un niveau pour débloquer le suivant'
+						: `Niveau ${lv.level} · ${size}×${size} · ${reinesLevels.starHint(lv.level).three} pour ★★★`}
+				</div>
+			)}
+
+			{!daily && !lv.active && (
 				<div className="rn-pills" role="tablist" aria-label="Difficulté">
 					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 						<button
@@ -345,21 +397,23 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{!(lv.active && lv.menu) && (
 			<div className="rn-bar">
 				<div className="rn-bar-right">
 					<div className="rn-timer">{fmtTime(elapsed)}</div>
-					{!daily && (
+					{!daily && !lv.active && (
 						<button className="rn-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
 						</button>
 					)}
 				</div>
 			</div>
+			)}
 
-			{status !== 'won' && !revealed && !daily && (
+			{status !== 'won' && !revealed && !daily && !(lv.active && lv.menu) && (
 				<div className="rn-actions">
 					<button className="rn-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					{!lv.active && elapsed >= 60 && (
 						<button className="rn-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -381,6 +435,9 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="rn-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
@@ -434,7 +491,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="rn-win" role="dialog" aria-label="Grille résolue">
 						<div className="rn-wincard">
 							<div className="rn-winmark">👑</div>
@@ -447,7 +504,21 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={reinesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && (
 				<p className="rn-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -457,14 +528,14 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
-			{revealed ? (
+			{revealed && !lv.active ? (
 				<div className="rn-revealed-note">
 					<span>Solution affichée</span>
 					<button className="rn-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
-			) : (
+			) : lv.active && lv.menu ? null : (
 				<>
 					<p className="rn-msg" role="status" aria-live="polite">{conflictMessage}</p>
 

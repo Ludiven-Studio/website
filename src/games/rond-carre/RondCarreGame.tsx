@@ -12,8 +12,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { rondCarreLevels } from './levels';
 
 /* =====================================================
    ROND & CARRÉ (façon LinkedIn "Tango") — React island.
@@ -46,9 +50,30 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, rondCarreLevels);
 
 	const { given, constraints, solution } = puzzle;
 	const n = SIZE;
+
+	/* Levels mode: start a level from its config; grade on solve. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		setPuzzle(generateRondCarre(cfg.diff, mulberry32(cfg.seed)));
+		setMarks(emptyMarks());
+		setStatus('playing');
+		setRevealed(false);
+		setHinted(new Set());
+		setHintNote('');
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
 
 	const value = useCallback(
 		(r: number, c: number): Cell => (given[r][c] !== 0 ? given[r][c] : marks[r][c]),
@@ -214,12 +239,20 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 			if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (value(r, c) === 0) return;
 		if (conflicts.size === 0) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
 	}, [marks, status, revealed, value, conflicts, n, gameId, daily, started]);
+
+	/* Grade the level once it is solved. */
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10) });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
@@ -307,13 +340,24 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		<div className="rc-root" style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{daily ? (
 				<div className="rc-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
 						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+				</div>
+			) : lv.active ? (
+				<div className="rc-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${n}×${n}`}
 				</div>
 			) : (
 				<div className="rc-pills" role="tablist" aria-label="Difficulté">
@@ -331,10 +375,11 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{!(lv.active && lv.menu) && (
 			<div className="rc-bar">
 				<div className="rc-bar-right">
 					<div className="rc-timer">{fmtTime(elapsed)}</div>
-					{!daily && (
+					{!daily && !lv.active && (
 						<button
 							className="rc-new"
 							onClick={() => newGame(diffKey)}
@@ -345,11 +390,12 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			</div>
+			)}
 
-			{status !== 'won' && !revealed && !daily && (
+			{status !== 'won' && !revealed && !daily && !(lv.active && lv.menu) && (
 				<div className="rc-actions">
 					<button className="rc-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					{!lv.active && elapsed >= 60 && (
 						<button className="rc-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -371,6 +417,9 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="rc-boardwrap" style={{ ['--n' as string]: n }}>
 				{celebrating && <Celebration />}
 				<div className={`rc-board ${daily && !started ? 'blurred' : ''}`}>
@@ -437,7 +486,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="rc-win" role="dialog" aria-label="Grille résolue">
 						<div className="rc-wincard">
 							<div className="rc-winmark">●■</div>
@@ -450,7 +499,21 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={rondCarreLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && (
 				<p className="rc-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -460,9 +523,9 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
-			{revealed ? (
+			{lv.active && lv.menu ? null : revealed ? (
 				<div className="rc-revealed-note">
 					<span>Solution affichée</span>
 					<button className="rc-replay" onClick={() => newGame(diffKey)}>Rejouer</button>

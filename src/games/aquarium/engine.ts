@@ -135,9 +135,14 @@ export function countSolutions(
 	const rowSum = new Array(n).fill(0);
 	const colSum = new Array(n).fill(0);
 	let count = 0;
+	let nodes = 0;
+	// Node cap: some region layouts make the search exponential. Rather than hang,
+	// give up and report "ambiguous" (= limit) so callers reject and regenerate.
+	const NODE_CAP = 120000;
 
 	const dfs = (k: number) => {
 		if (count >= limit) return;
+		if (++nodes > NODE_CAP) { count = limit; return; }
 		if (k === order.length) {
 			for (let i = 0; i < n; i++) if (rowSum[i] !== rowCounts[i] || colSum[i] !== colCounts[i]) return;
 			count++;

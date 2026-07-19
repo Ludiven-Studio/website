@@ -12,8 +12,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { sommeTouteLevels } from './levels';
 
 /* =====================================================
    SOMME TOUTE — React island (training mode)
@@ -56,6 +60,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, sommeTouteLevels);
 
 	const { puzzle, rowT, colT, size, maxVal } = game;
 
@@ -78,6 +83,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 		if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (cellValue(r, c) == null) return;
 		for (let r = 0; r < size; r++) {
@@ -110,6 +116,35 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	/* Levels mode: start a level from its config; grade on solve. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		const g = generatePuzzle(cfg.diff, mulberry32(cfg.seed));
+		setDaily(false);
+		setHintNote('');
+		setGame(g);
+		setEntries(emptyEntries(cfg.diff.size));
+		setSelected(null);
+		setRevealed(false);
+		setHinted(new Set());
+		setStarted(true);
+		setStatus('playing');
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once it is solved (win → time).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: elapsed, raw: { size, maxVal } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -338,13 +373,24 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		<div className="st-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{daily ? (
 				<div className="st-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
 						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+				</div>
+			) : lv.active ? (
+				<div className="st-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${size}×${size}`}
 				</div>
 			) : (
 				<div className="st-bar">
@@ -370,16 +416,16 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && (
+			{(daily || (lv.active && !lv.menu)) && (
 				<div className="st-bar" style={{ justifyContent: 'center' }}>
 					<div className="st-timer" aria-live="off">{fmtTime(elapsed)}</div>
 				</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && (
+			{status !== 'won' && !revealed && !daily && !(lv.active && lv.menu) && (
 				<div className="st-actions">
 					<button className="st-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					{!lv.active && elapsed >= 60 && (
 						<button className="st-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -401,6 +447,9 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="st-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
@@ -452,7 +501,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="st-win" role="dialog" aria-label="Grille résolue">
 						<div className="st-wincard">
 							<div className="st-winmark">⚖️</div>
@@ -465,7 +514,21 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={sommeTouteLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && (
 				<p className="st-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -475,7 +538,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="st-revealed-note">

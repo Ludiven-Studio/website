@@ -12,8 +12,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { motifsLevels } from './levels';
 import { touchDrag } from '../touchDrag';
 
 /* =====================================================
@@ -70,8 +74,36 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const anchor = useRef<[number, number] | null>(null); // fixed corner while drawing/resizing
 	const moved = useRef(false);
 	const resizeIdx = useRef(-1); // index of the piece being resized, or -1 for a new draw
+	const lv = useLevels(gameId, motifsLevels);
 
 	const { size, clues, rects } = puzzle;
+
+	/* Levels mode: start a level from its config; grade on win. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		setPuzzle(generateMotifs(cfg.diff, mulberry32(cfg.seed)));
+		setPlaced([]);
+		setPreview(null);
+		setHintNote('');
+		setStatus('playing');
+		setRevealed(false);
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once it is solved (win → time).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10), raw: { size } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		setDaily(false);
@@ -234,13 +266,14 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 		if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (owner[r][c] === -1) return;
 		if (!placed.every(rectValid)) return;
 		setStatus('won');
 		setPreview(null);
 		trackGame(gameId, 'game_won');
-	}, [owner, placed, status, revealed, size, rectValid, gameId, daily, started]);
+	}, [owner, placed, status, revealed, size, rectValid, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
@@ -432,9 +465,22 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		<div className="mo-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active && (
+				<div className="mo-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${size}×${size}`}
+				</div>
+			)}
+
+			{!lv.active && (daily ? (
 				<div className="mo-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
@@ -462,20 +508,32 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 						</button>
 					</div>
 				</div>
-			)}
+			))}
 
-			{daily && (
+			{daily && !lv.active && (
 				<div className="mo-bar">
 					<div className="mo-timer">{fmtTime(elapsed)}</div>
 				</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && (
+			{lv.playing && (
+				<div className="mo-bar">
+					<div className="mo-timer">{fmtTime(elapsed)}</div>
+				</div>
+			)}
+
+			{status !== 'won' && !revealed && !daily && !lv.active && (
 				<div className="mo-actions">
 					<button className="mo-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
 						<button className="mo-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
+				</div>
+			)}
+
+			{lv.playing && status !== 'won' && !revealed && (
+				<div className="mo-actions">
+					<button className="mo-act" onClick={hint}>💡 Indice</button>
 				</div>
 			)}
 
@@ -495,6 +553,9 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="mo-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
@@ -552,7 +613,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="mo-win" role="dialog" aria-label="Grille résolue">
 						<div className="mo-wincard">
 							<div className="mo-winmark">🧩</div>
@@ -565,7 +626,21 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={motifsLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && (
 				<p className="mo-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -575,9 +650,9 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
-			{revealed ? (
+			{lv.active ? null : revealed ? (
 				<div className="mo-revealed-note">
 					<span>Solution affichée</span>
 					<button className="mo-replay" onClick={() => newGame(diffKey)}>Rejouer</button>

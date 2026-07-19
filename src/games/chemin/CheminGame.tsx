@@ -12,8 +12,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { cheminLevels } from './levels';
 import { touchDrag } from '../touchDrag';
 
 /* =====================================================
@@ -53,6 +57,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, cheminLevels);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const drawing = useRef(false);
 	const moved = useRef(false);
@@ -80,6 +85,37 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		newGame('facile');
 	}, [newGame]);
+
+	/* Levels mode: start a level from its config; grade on solve. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		setDiffKey('facile');
+		setRevealed(false);
+		setHintNote('');
+		setStatus('loading');
+		setStarted(false);
+		setElapsed(0);
+		const p = generateChemin(cfg.diff, mulberry32(cfg.seed));
+		setPuzzle(p);
+		setPath([startCellOf(p)]);
+		setStatus('playing');
+		startRef.current = Date.now();
+		setStarted(true);
+		trackGame(gameId, 'game_started');
+	}, [lv, gameId]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	/* Grade the level once solved (win → time). */
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10), raw: { size: puzzle?.size } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -195,6 +231,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (!puzzle || status !== 'playing' || revealed) return;
 			if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		if (path.length !== puzzle.size * puzzle.size) return;
 		if (errors.size > 0) return;
 		const last = path[path.length - 1];
@@ -384,9 +421,22 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		<div className="zp-root" style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active && (
+				<div className="zp-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${n}×${n}`}
+				</div>
+			)}
+
+			{!lv.active && (daily ? (
 				<div className="zp-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
@@ -414,18 +464,18 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 						</button>
 					</div>
 				</div>
-			)}
+			))}
 
-			{daily && (
+			{!lv.active && daily && (
 				<div className="zp-bar zp-bar-daily">
 					<div className="zp-timer">{fmtTime(elapsed)}</div>
 				</div>
 			)}
 
-			{status === 'playing' && !revealed && !daily && (
+			{status === 'playing' && !revealed && !daily && !(lv.active && lv.menu) && (
 				<div className="zp-actions">
 					<button className="zp-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					{!lv.active && elapsed >= 60 && (
 						<button className="zp-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -447,6 +497,9 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="zp-boardwrap" style={{ ['--n' as string]: n }}>
 				{celebrating && <Celebration />}
 				{status === 'loading' || !puzzle ? (
@@ -527,7 +580,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="zp-win" role="dialog" aria-label="Chemin résolu">
 						<div className="zp-wincard">
 							<div className="zp-winmark">🧭</div>
@@ -540,7 +593,21 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={cheminLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Relié en ${fmtTime(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && (
 				<p className="zp-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -550,7 +617,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="zp-revealed-note">

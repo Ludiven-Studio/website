@@ -150,8 +150,13 @@ export function countSolutions(
 		for (let c = 0; c < size; c++) if (grid[r][c] == null) empties.push([r, c]);
 
 	let count = 0;
+	let nodes = 0;
+	// Node cap: some zone partitions make the search exponential. Rather than hang,
+	// give up and report "ambiguous" (= limit) so callers reject/keep-clue and move on.
+	const NODE_CAP = 60000;
 	const dfs = (i: number): void => {
 		if (count >= limit) return;
+		if (++nodes > NODE_CAP) { count = limit; return; }
 		if (i === empties.length) {
 			count++;
 			return;
@@ -190,7 +195,12 @@ function solveOne(zones: number[][], size: number, rng: Rng): number[][] | null 
 	const zoneOf = zoneCells(zones, size);
 	const grid: (number | null)[][] = Array.from({ length: size }, () => new Array(size).fill(null));
 
+	let nodes = 0;
+	// Node cap: a few partitions backtrack exponentially. Abort (null) so the caller
+	// discards this partition and tries another, instead of hanging on a level seed.
+	const NODE_CAP = 200000;
 	const solve = (): boolean => {
+		if (++nodes > NODE_CAP) return false;
 		let bestR = -1, bestC = -1, bestCand: number[] | null = null;
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) {

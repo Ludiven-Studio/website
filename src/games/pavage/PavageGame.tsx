@@ -20,8 +20,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { pavageLevels } from './levels';
 
 /* =====================================================
    PAVAGE — React island.
@@ -98,6 +102,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
+	const lv = useLevels(gameId, pavageLevels);
 
 	const { size, blocked, pieces, solution, rotate } = puzzle;
 
@@ -139,6 +144,37 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		}
 		newGame(diffKey);
 	}, [newGame, diffKey]);
+
+	/* Levels mode: start a level from its config; grade on win. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		const p = generatePavage(cfg.diff, mulberry32(cfg.seed));
+		setDaily(false);
+		setHintNote('');
+		setDiffKey('facile');
+		setPuzzle(p);
+		setPlacements(p.pieces.map(() => null));
+		setTrayRot(p.pieces.map(() => 0));
+		setDrag(null);
+		setStatus('playing');
+		setRevealed(false);
+		setHinted(new Set());
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once solved (win → time).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10), raw: { size, blocked: puzzle.blocked.flat().filter(Boolean).length } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* Daily challenge: one attempt per device, resumable. */
 	const startDaily = useCallback(async () => {
@@ -283,11 +319,12 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 		if (daily && !started) return;
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		if (placements.length === 0 || placements.some((p) => !p)) return;
 		setStatus('won');
 		setDrag(null);
 		trackGame(gameId, 'game_won');
-	}, [placements, status, revealed, daily, started, gameId]);
+	}, [placements, status, revealed, daily, started, gameId, lv.active, lv.playing]);
 
 	/* Persist in-progress daily attempt. */
 	useEffect(() => {
@@ -520,7 +557,14 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		<div className="pv-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{daily && (
 				<div className="pv-daily-tag">
@@ -530,8 +574,15 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && (
+				<div className="pv-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${size}×${size}`}
+				</div>
+			)}
+
+			{!(lv.active && lv.menu) && (
 			<div className="pv-bar">
-				{!daily ? (
+				{!daily && !lv.active ? (
 					<div className="pv-pills" role="tablist" aria-label="Difficulté">
 						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 							<button
@@ -550,15 +601,16 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 				)}
 				<div className="pv-bar-right">
 					<div className="pv-timer">{fmtTime(elapsed)}</div>
-					{!daily && (
+					{!daily && !lv.active && (
 						<button className="pv-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
 						</button>
 					)}
 				</div>
 			</div>
+			)}
 
-			{status !== 'won' && !revealed && !daily && (
+			{status !== 'won' && !revealed && !daily && !lv.active && (
 				<div className="pv-actions">
 					<button className="pv-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -573,6 +625,12 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 					>
 						⟳ Rotation {expertRotate ? 'activée' : 'désactivée'}
 					</button>
+				</div>
+			)}
+
+			{lv.playing && status !== 'won' && (
+				<div className="pv-actions">
+					<button className="pv-act" onClick={hint}>💡 Indice</button>
 				</div>
 			)}
 
@@ -593,6 +651,9 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="pv-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
@@ -653,7 +714,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="pv-win" role="dialog" aria-label="Grille résolue">
 						<div className="pv-wincard">
 							<div className="pv-winmark">🧩</div>
@@ -664,17 +725,34 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-			</div>
 
-			{!daily && hintNote && (
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={pavageLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+			</div>
+			)}
+
+			{!daily && !lv.active && hintNote && (
 				<p className="pv-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 			{daily && started && hintNote && (
 				<p className="pv-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
+			{lv.playing && hintNote && (
+				<p className="pv-hint-note" aria-live="polite">💡 {hintNote}</p>
+			)}
 
 			{/* Tray — fixed slots; a placed / dragged piece leaves a greyed placeholder. */}
-			{!revealed && status !== 'won' && interactive && (
+			{!revealed && status !== 'won' && interactive && !(lv.active && lv.menu) && (
 				<div className="pv-tray" aria-label="Pièces à placer">
 					{pieces.map((piece, i) => {
 						const dimmed = !!placements[i] || drag?.pieceIndex === i;
@@ -750,19 +828,19 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 					<span>Solution affichée</span>
 					<button className="pv-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
-			) : (
+			) : !(lv.active && lv.menu) ? (
 				<p className="pv-help">
 					Glisse chaque pièce dans la grille pour tout couvrir. Deux pièces de même couleur ne
 					doivent jamais se toucher côte à côte.{' '}
 					{rotate && 'Tourne une pièce avec ⟳ (ou la touche R en cours de déplacement). '}
 					Les cases barrées sont bloquées.
 				</p>
-			)}
+			) : null}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{/* Floating drag ghost */}
 			{dragGhost && (

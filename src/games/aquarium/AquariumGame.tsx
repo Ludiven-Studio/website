@@ -12,8 +12,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { aquariumLevels } from './levels';
 
 /* =====================================================
    AQUARIUM — React island. The grid is partitioned into
@@ -53,9 +57,38 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const painting = useRef(false);
 	const strokeVal = useRef<Mark>(0);
+	const lv = useLevels(gameId, aquariumLevels);
 
 	const { size, regionOf, solution, rowCounts, colCounts } = puzzle;
 	const over = status === 'won' || revealed;
+
+	/* Levels mode: start a level from its config; grade on solve. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		const p = generateAquarium(cfg.diff, mulberry32(cfg.seed));
+		setDaily(false);
+		setPuzzle(p);
+		setGrid(emptyGrid(cfg.diff.size));
+		setStatus('playing');
+		setRevealed(false);
+		setHinted(new Set());
+		setHintNote('');
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once it is solved (win → time).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10), raw: { size } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
@@ -187,6 +220,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 		if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if ((grid[r][c] === 1) !== solution[r][c]) return;
 		setStatus('won');
@@ -313,7 +347,14 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		<div className="aq-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{daily ? (
 				<div className="aq-daily-tag">
@@ -323,8 +364,15 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				</div>
 			) : null}
 
+			{lv.active && (
+				<div className="aq-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${size}×${size}`}
+				</div>
+			)}
+
+			{!(lv.active && lv.menu) && (
 			<div className="aq-bar">
-				{!daily && (
+				{!daily && !lv.active && (
 					<div className="aq-pills" role="tablist" aria-label="Difficulté">
 						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 							<button
@@ -341,18 +389,19 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				)}
 				<div className="aq-bar-right">
 					<div className="aq-timer">{fmtTime(elapsed)}</div>
-					{!daily && (
+					{!daily && !lv.active && (
 						<button className="aq-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻ Nouvelle
 						</button>
 					)}
 				</div>
 			</div>
+			)}
 
-			{!over && !daily && (
+			{!over && !daily && !(lv.active && lv.menu) && (
 				<div className="aq-actions">
 					<button className="aq-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					{!lv.active && elapsed >= 60 && (
 						<button className="aq-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -378,6 +427,9 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="aq-boardwrap">
 				{celebrating && <Celebration />}
 				<div
@@ -432,7 +484,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="aq-win" role="dialog" aria-label="Grille résolue">
 						<div className="aq-wincard">
 							<div className="aq-winmark">💧</div>
@@ -443,13 +495,27 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={aquariumLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Résolu en ${fmtTime(elapsed)}` : undefined}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="aq-revealed-note">
