@@ -11,6 +11,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    ANGRY COCOTTE — React island (2D canvas, gravity).
@@ -176,10 +177,61 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		setStat('aiming');
 	}, [win]);
 
-	/* ---------- Pointer (slingshot) ---------- */
-	const pointerToWorld = (e: PointerEvent): Vec => {
+	/* ---------- Aim (slingshot) — coord-based so both pointer and native touch feed it ---------- */
+	const clientToWorld = (clientX: number, clientY: number): Vec => {
 		const rect = canvasRef.current!.getBoundingClientRect();
-		return { x: (e.clientX - rect.left) / scaleRef.current, y: (e.clientY - rect.top) / scaleRef.current };
+		return { x: (clientX - rect.left) / scaleRef.current, y: (clientY - rect.top) / scaleRef.current };
+	};
+
+	const aimStart = (clientX: number, clientY: number) => {
+		const world = worldRef.current;
+		if (statusRef.current !== 'aiming' || !world?.cocotte || world.cocotte.launched) return;
+		const p = clientToWorld(clientX, clientY);
+		if (Math.hypot(p.x - world.cocotte.x, p.y - world.cocotte.y) > GRAB_R) return;
+		aimRef.current = { pull: { x: 0, y: 0 } };
+	};
+
+	// Native-touch start: also handle "tap in flight → fire the hen's power" (the pointer
+	// path does this in its own down handler), then fall through to aiming.
+	const touchAimStart = (clientX: number, clientY: number) => {
+		const world = worldRef.current;
+		if (statusRef.current === 'rolling' && world?.cocotte?.launched) {
+			const fx = activatePower(world, world.cocotte);
+			if (fx) {
+				if (fx.blast) boomsRef.current.push({ x: fx.blast.x, y: fx.blast.y, t0: performance.now(), big: true });
+				if (fx.chicks) for (let k = 0; k < 6; k++) dustRef.current.push({ x: fx.chicks.x, y: fx.chicks.y, t0: performance.now() });
+			}
+			return;
+		}
+		aimStart(clientX, clientY);
+	};
+
+	const aimMove = (clientX: number, clientY: number) => {
+		const world = worldRef.current;
+		if (!aimRef.current || !world?.cocotte) return;
+		const p = clientToWorld(clientX, clientY);
+		aimRef.current.pull = { x: p.x - world.cocotte.x, y: p.y - world.cocotte.y };
+	};
+
+	const aimEnd = () => {
+		const aim = aimRef.current;
+		aimRef.current = null;
+		const world = worldRef.current;
+		if (!aim || statusRef.current !== 'aiming' || !world?.cocotte) return;
+		const v = aimToVelocity(aim.pull);
+		if (!v) return;
+		world.cocotte.vx = v.vx; world.cocotte.vy = v.vy; world.cocotte.launched = true;
+		shotsUsedRef.current += 1;
+		setShots(shotsUsedRef.current);
+		if (startRef.current === 0) {
+			startRef.current = Date.now();
+			trackGame(gameId, 'game_started');
+			if (daily) saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex, state: { best: bestRef.current ?? undefined, tries: triesRef.current } satisfies DailyState });
+		}
+		settleAccRef.current = 0;
+		settledForRef.current = 0;
+		rollingRef.current = true;
+		setStat('rolling');
 	};
 
 	// Load the AI sky + crate textures once (the RAF loop picks them up next frame).
@@ -198,6 +250,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		const cv = canvasRef.current;
 		if (!cv) return;
 		const down = (e: PointerEvent) => {
+			if (e.pointerType === 'touch') return; // native touch handled by touchDrag on the canvas
 			const world = worldRef.current;
 			// Tap in flight → fire an active hen's power (explosive/poussins).
 			if (statusRef.current === 'rolling' && world?.cocotte?.launched) {
@@ -209,38 +262,20 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				}
 				return;
 			}
-			if (statusRef.current !== 'aiming' || !world?.cocotte || world.cocotte.launched) return;
-			const p = pointerToWorld(e);
-			if (Math.hypot(p.x - world.cocotte.x, p.y - world.cocotte.y) > GRAB_R) return;
-			aimRef.current = { pull: { x: 0, y: 0 } };
-			cv.setPointerCapture(e.pointerId);
-			e.preventDefault();
+			const before = aimRef.current;
+			aimStart(e.clientX, e.clientY);
+			if (aimRef.current && aimRef.current !== before) {
+				cv.setPointerCapture(e.pointerId);
+				e.preventDefault();
+			}
 		};
 		const move = (e: PointerEvent) => {
-			const world = worldRef.current;
-			if (!aimRef.current || !world?.cocotte) return;
-			const p = pointerToWorld(e);
-			aimRef.current.pull = { x: p.x - world.cocotte.x, y: p.y - world.cocotte.y };
+			if (e.pointerType === 'touch') return;
+			aimMove(e.clientX, e.clientY);
 		};
-		const up = () => {
-			const aim = aimRef.current;
-			aimRef.current = null;
-			const world = worldRef.current;
-			if (!aim || statusRef.current !== 'aiming' || !world?.cocotte) return;
-			const v = aimToVelocity(aim.pull);
-			if (!v) return;
-			world.cocotte.vx = v.vx; world.cocotte.vy = v.vy; world.cocotte.launched = true;
-			shotsUsedRef.current += 1;
-			setShots(shotsUsedRef.current);
-			if (startRef.current === 0) {
-				startRef.current = Date.now();
-				trackGame(gameId, 'game_started');
-				if (daily) saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex, state: { best: bestRef.current ?? undefined, tries: triesRef.current } satisfies DailyState });
-			}
-			settleAccRef.current = 0;
-			settledForRef.current = 0;
-			rollingRef.current = true;
-			setStat('rolling');
+		const up = (e: PointerEvent) => {
+			if (e.pointerType === 'touch') return;
+			aimEnd();
 		};
 		cv.addEventListener('pointerdown', down);
 		cv.addEventListener('pointermove', move);
@@ -533,7 +568,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 
 			<div className="co-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
-				<canvas ref={canvasRef} className="co-canvas" />
+				<canvas ref={canvasRef} className="co-canvas" {...touchDrag(touchAimStart, aimMove, aimEnd)} />
 				{status === 'won' && (
 					<div className="co-overlay">
 						<div className="co-overlay-card">

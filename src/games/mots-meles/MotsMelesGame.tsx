@@ -7,6 +7,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    MOTS MÊLÉS — React island. Grille de lettres, mots d'un thème à retrouver en glissant.
@@ -129,34 +130,32 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 	};
 
 	/* ---------- Pointer: drag a straight line across letters ---------- */
-	const cellFromPointer = (e: React.PointerEvent): Cell | null => {
+	const cellFromXY = (clientX: number, clientY: number): Cell | null => {
 		const board = boardRef.current;
 		if (!board) return null;
 		const rect = board.getBoundingClientRect();
 		const n = grid.size;
-		const c = Math.floor(((e.clientX - rect.left) / rect.width) * n);
-		const r = Math.floor(((e.clientY - rect.top) / rect.height) * n);
+		const c = Math.floor(((clientX - rect.left) / rect.width) * n);
+		const r = Math.floor(((clientY - rect.top) / rect.height) * n);
 		if (r < 0 || r >= n || c < 0 || c >= n) return null;
 		return [r, c];
 	};
-	const onDown = (e: React.PointerEvent) => {
+	const startDrag = (clientX: number, clientY: number) => {
 		if (armed || status !== 'playing') return;
-		const cell = cellFromPointer(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (!cell) return;
 		drawing.current = true;
 		startCellRef.current = cell;
 		applySel([cell]);
-		boardRef.current?.setPointerCapture(e.pointerId);
-		e.preventDefault();
 	};
-	const onMove = (e: React.PointerEvent) => {
+	const moveDrag = (clientX: number, clientY: number) => {
 		if (!drawing.current || !startCellRef.current) return;
-		const cell = cellFromPointer(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (!cell) return;
 		const line = lineCells(startCellRef.current, cell, grid.size);
 		if (line) applySel(line);
 	};
-	const onUp = () => {
+	const endDrag = () => {
 		if (!drawing.current) return;
 		drawing.current = false;
 		const s = selRef.current;
@@ -164,6 +163,20 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		if (s.length < 2) return;
 		const idx = matchIndex(s, grid.words);
 		if (idx >= 0) markFound(idx);
+	};
+	const onDown = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		startDrag(e.clientX, e.clientY);
+		boardRef.current?.setPointerCapture(e.pointerId);
+		e.preventDefault();
+	};
+	const onMove = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		moveDrag(e.clientX, e.clientY);
+	};
+	const onUp = (e?: React.PointerEvent) => {
+		if (e && e.pointerType === 'touch') return;
+		endDrag();
 	};
 
 	useEffect(() => { newGame('facile'); }, [newGame]);
@@ -215,6 +228,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 					ref={boardRef}
 					className={`mm-grid ${armed ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${grid.size}, 1fr)`, ['--n' as string]: grid.size }}
+					{...touchDrag(startDrag, moveDrag, endDrag)}
 					onPointerDown={onDown}
 					onPointerMove={onMove}
 					onPointerUp={onUp}

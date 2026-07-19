@@ -7,6 +7,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    MOTS TOURNÉS — React island. A "Wend"-style word puzzle: trace each themed word as a snaking
@@ -136,27 +137,25 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 	};
 
 	/* ---------- Pointer: trace a path across adjacent letters ---------- */
-	const cellFromPointer = (e: React.PointerEvent): Cell | null => {
+	const cellFromXY = (clientX: number, clientY: number): Cell | null => {
 		const board = boardRef.current; if (!board) return null;
 		const p = puzzleRef.current;
 		const rect = board.getBoundingClientRect();
-		const c = Math.floor(((e.clientX - rect.left) / rect.width) * p.cols);
-		const r = Math.floor(((e.clientY - rect.top) / rect.height) * p.rows);
+		const c = Math.floor(((clientX - rect.left) / rect.width) * p.cols);
+		const r = Math.floor(((clientY - rect.top) / rect.height) * p.rows);
 		if (r < 0 || r >= p.rows || c < 0 || c >= p.cols) return null;
 		return [r, c];
 	};
-	const onDown = (e: React.PointerEvent): void => {
+	const startDrag = (clientX: number, clientY: number): void => {
 		if (armed || status !== 'playing') return;
-		const cell = cellFromPointer(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (!cell || occupied(cell)) return;
 		drawing.current = true;
 		setTraceBoth([cell]);
-		boardRef.current?.setPointerCapture(e.pointerId);
-		e.preventDefault();
 	};
-	const onMove = (e: React.PointerEvent): void => {
+	const moveDrag = (clientX: number, clientY: number): void => {
 		if (!drawing.current) return;
-		const cell = cellFromPointer(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (!cell) return;
 		const t = traceRef.current;
 		const last = t[t.length - 1];
@@ -164,7 +163,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		if (t.length >= 2 && t[t.length - 2][0] === cell[0] && t[t.length - 2][1] === cell[1]) { setTraceBoth(t.slice(0, -1)); return; } // backtrack
 		if (adjacent(last, cell) && !occupied(cell) && !t.some(([r, c]) => r === cell[0] && c === cell[1])) setTraceBoth([...t, cell]);
 	};
-	const onUp = (): void => {
+	const endDrag = (): void => {
 		if (!drawing.current) return;
 		drawing.current = false;
 		const t = traceRef.current;
@@ -173,6 +172,20 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		const s = spell(t, puzzleRef.current.letters);
 		const idx = puzzleRef.current.regions.findIndex((rg, i) => !foundRef.current.includes(i) && rg.word === s);
 		if (idx >= 0) markFound(idx);
+	};
+	const onDown = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		startDrag(e.clientX, e.clientY);
+		boardRef.current?.setPointerCapture(e.pointerId);
+		e.preventDefault();
+	};
+	const onMove = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		moveDrag(e.clientX, e.clientY);
+	};
+	const onUp = (e?: React.PointerEvent): void => {
+		if (e && e.pointerType === 'touch') return;
+		endDrag();
 	};
 
 	useEffect(() => { newGame('facile'); }, [newGame]);
@@ -233,6 +246,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 						ref={boardRef}
 						className="wt-cells"
 						style={{ gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`, gridTemplateRows: `repeat(${puzzle.rows}, 1fr)` }}
+						{...touchDrag(startDrag, moveDrag, endDrag)}
 						onPointerDown={onDown}
 						onPointerMove={onMove}
 						onPointerUp={onUp}

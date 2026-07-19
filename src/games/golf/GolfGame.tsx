@@ -26,6 +26,7 @@ import {
 import { trackGame } from '../../lib/analytics';
 import Leaderboard from '../../components/Leaderboard';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    MINI-GOLF — top-down 3D arcade (three.js + Supabase Realtime).
@@ -738,18 +739,12 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
 	};
 
-	const onPointerDown = useCallback((e: React.PointerEvent) => {
-		pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		if (pointersRef.current.size >= 2) {
-			pinchRef.current = { dist: pinchDist(), span: spanRef.current };
-			aimRef.current.active = false;
-			panningRef.current = false;
-			setPower(0);
-			return;
-		}
+	// Single-gesture aim/pan flow, coord-based so both pointer (mouse/pen) and native touch feed it.
+	// Pinch (two pointers) stays on the pointer path — touchDrag only tracks touches[0].
+	const aimStart = useCallback((clientX: number, clientY: number) => {
+		if (pinchRef.current) return; // a second finger is zooming — don't (re)arm aim/pan
 		if (phase !== 'playing' || overviewRef.current) return;
-		(e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-		const p = worldFromPointer(e.clientX, e.clientY);
+		const p = worldFromPointer(clientX, clientY);
 		const b = ballRef.current;
 		// Aim only when the ball is at rest AND the touch is near it; otherwise pan ("look").
 		if (p && !doneRef.current && isSettled(b) && Math.hypot(p.x - b.x, p.z - b.z) <= GRAB_R) {
@@ -757,33 +752,24 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			setPower(Math.min(Math.hypot(p.x - b.x, p.z - b.z), PARAMS.maxPull) / PARAMS.maxPull);
 		} else {
 			panningRef.current = true;
-			lastPanRef.current = { x: e.clientX, y: e.clientY };
+			lastPanRef.current = { x: clientX, y: clientY };
 			if (!freeCamRef.current) freeCamRef.current = { x: camTargetRef.current.x, z: camTargetRef.current.z };
 		}
 	}, [phase, worldFromPointer]);
 
-	const onPointerMove = useCallback((e: React.PointerEvent) => {
-		if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		if (pinchRef.current) {
-			const d = pinchDist();
-			if (d > 0) {
-				overviewRef.current = false;
-				setOverview(false);
-				spanRef.current = Math.max(12, Math.min(fitSpanRef.current, pinchRef.current.span * (pinchRef.current.dist / d)));
-			}
-			return;
-		}
+	const aimMove = useCallback((clientX: number, clientY: number) => {
+		if (pinchRef.current) return;
 		if (panningRef.current && freeCamRef.current) {
 			const canvas = canvasRef.current;
 			const span = spanRef.current;
 			const wpp = canvas ? (2 * span) / canvas.clientHeight : 0.1; // world units per screen pixel (square pixels)
-			freeCamRef.current.x -= (e.clientX - lastPanRef.current.x) * wpp;
-			freeCamRef.current.z -= (e.clientY - lastPanRef.current.y) * wpp;
-			lastPanRef.current = { x: e.clientX, y: e.clientY };
+			freeCamRef.current.x -= (clientX - lastPanRef.current.x) * wpp;
+			freeCamRef.current.z -= (clientY - lastPanRef.current.y) * wpp;
+			lastPanRef.current = { x: clientX, y: clientY };
 			return;
 		}
 		if (!aimRef.current.active) return;
-		const p = worldFromPointer(e.clientX, e.clientY);
+		const p = worldFromPointer(clientX, clientY);
 		if (!p) return;
 		aimRef.current.px = p.x;
 		aimRef.current.pz = p.z;
@@ -791,9 +777,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		setPower(Math.min(Math.hypot(p.x - b.x, p.z - b.z), PARAMS.maxPull) / PARAMS.maxPull);
 	}, [worldFromPointer]);
 
-	const onPointerUp = useCallback((e: React.PointerEvent) => {
-		pointersRef.current.delete(e.pointerId);
-		if (pointersRef.current.size < 2) pinchRef.current = null;
+	const aimEnd = useCallback(() => {
+		if (pinchRef.current) return; // lifting one of two zoom fingers — never fires a shot
 		if (panningRef.current) { panningRef.current = false; return; }
 		if (!aimRef.current.active) return;
 		aimRef.current.active = false;
@@ -808,6 +793,43 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		setStrokes(strokesRef.current);
 		if (lobbyRef.current) lobbyRef.current.sendScore({ strokes: strokesRef.current, done: false, time: curTime() });
 	}, []);
+
+	const onPointerDown = useCallback((e: React.PointerEvent) => {
+		pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		if (pointersRef.current.size >= 2) {
+			pinchRef.current = { dist: pinchDist(), span: spanRef.current };
+			aimRef.current.active = false;
+			panningRef.current = false;
+			setPower(0);
+			return;
+		}
+		if (e.pointerType === 'touch') return; // native touch aim/pan handled by touchDrag on the canvas
+		(e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+		aimStart(e.clientX, e.clientY);
+	}, [aimStart]);
+
+	const onPointerMove = useCallback((e: React.PointerEvent) => {
+		if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		if (pinchRef.current) {
+			const d = pinchDist();
+			if (d > 0) {
+				overviewRef.current = false;
+				setOverview(false);
+				spanRef.current = Math.max(12, Math.min(fitSpanRef.current, pinchRef.current.span * (pinchRef.current.dist / d)));
+			}
+			return;
+		}
+		if (e.pointerType === 'touch') return;
+		aimMove(e.clientX, e.clientY);
+	}, [aimMove]);
+
+	const onPointerUp = useCallback((e: React.PointerEvent) => {
+		const wasTouch = e.pointerType === 'touch';
+		pointersRef.current.delete(e.pointerId);
+		if (pointersRef.current.size < 2) pinchRef.current = null;
+		if (wasTouch) return; // native touch end handled by touchDrag on the canvas
+		aimEnd();
+	}, [aimEnd]);
 
 	/* ---- Begin / restart a hole ---- */
 	const placeBallAtStart = useCallback(() => {
@@ -1005,6 +1027,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					onPointerMove={onPointerMove}
 					onPointerUp={onPointerUp}
 					onPointerCancel={onPointerUp}
+					{...touchDrag(aimStart, aimMove, aimEnd)}
 				/>
 				<div ref={labelsRef} className="gf-labels" />
 				{celebrating && <div className="gf-celebrate"><Celebration /></div>}

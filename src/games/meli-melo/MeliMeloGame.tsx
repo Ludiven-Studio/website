@@ -6,6 +6,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    MÉLI-MÉLO — React island. Boggle 4×4: chain adjacent letters (8 directions) to form
@@ -153,11 +154,11 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 	};
 
 	/* ---------- Pointer: chain adjacent cells (8 directions) ---------- */
-	const cellFromPointer = (e: React.PointerEvent): number | null => {
+	const cellFromXY = (clientX: number, clientY: number): number | null => {
 		const board = boardRef.current; if (!board) return null;
 		const rect = board.getBoundingClientRect();
-		const px = ((e.clientX - rect.left) / rect.width) * SIZE;
-		const py = ((e.clientY - rect.top) / rect.height) * SIZE;
+		const px = ((clientX - rect.left) / rect.width) * SIZE;
+		const py = ((clientY - rect.top) / rect.height) * SIZE;
 		const c = Math.floor(px), r = Math.floor(py);
 		if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) return null;
 		// centre deadzone → reliable diagonals
@@ -165,28 +166,26 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		return r * SIZE + c;
 	};
 	const downOnLast = useRef(false);
-	const onDown = (e: React.PointerEvent): void => {
+	const startDrag = (clientX: number, clientY: number): void => {
 		if (statusRef.current !== 'playing') return;
 		dragging.current = true; dragMoved.current = false;
-		boardRef.current?.setPointerCapture(e.pointerId);
-		const cell = cellFromPointer(e);
+		const cell = cellFromXY(clientX, clientY);
 		const p = pathRef.current;
 		downOnLast.current = cell != null && p.length > 0 && cell === p[p.length - 1];
 		if (cell != null && !p.includes(cell)) {
 			if (!p.length || adjacent(p[p.length - 1], cell)) { setPathBoth([...p, cell]); dragMoved.current = p.length > 0; }
 		}
-		e.preventDefault();
 	};
-	const onMove = (e: React.PointerEvent): void => {
+	const moveDrag = (clientX: number, clientY: number): void => {
 		if (!dragging.current) return;
-		const cell = cellFromPointer(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (cell == null) return;
 		const p = pathRef.current;
 		if (p.length && cell === p[p.length - 1]) return;
 		if (p.length >= 2 && cell === p[p.length - 2]) { setPathBoth(p.slice(0, -1)); dragMoved.current = true; return; } // backtrack
 		if (!p.includes(cell) && (!p.length || adjacent(p[p.length - 1], cell))) { setPathBoth([...p, cell]); if (p.length) dragMoved.current = true; }
 	};
-	const onUp = (): void => {
+	const endDrag = (): void => {
 		if (!dragging.current) return;
 		dragging.current = false;
 		if (dragMoved.current) {
@@ -197,6 +196,20 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 			setPathBoth(pathRef.current.slice(0, -1)); // re-tap the last cell → remove it
 		}
 		// otherwise: simple tap appended a cell (tap-to-compose mode, ✓ to submit)
+	};
+	const onDown = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		startDrag(e.clientX, e.clientY);
+		boardRef.current?.setPointerCapture(e.pointerId);
+		e.preventDefault();
+	};
+	const onMove = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		moveDrag(e.clientX, e.clientY);
+	};
+	const onUp = (e?: React.PointerEvent): void => {
+		if (e && e.pointerType === 'touch') return;
+		endDrag();
 	};
 	const tapRemove = (): void => { setPathBoth(pathRef.current.slice(0, -1)); };
 	const tapSubmit = (): void => { const p = pathRef.current; setPathBoth([]); submitPath(p); };
@@ -244,6 +257,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 					<div
 						ref={boardRef}
 						className="mm-board"
+						{...touchDrag(startDrag, moveDrag, endDrag)}
 						onPointerDown={onDown}
 						onPointerMove={onMove}
 						onPointerUp={onUp}

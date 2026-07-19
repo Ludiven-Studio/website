@@ -14,6 +14,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    MOTIFS — React island. Split the grid into rectangles;
@@ -283,18 +284,18 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setPlaced((prev) => prev.filter((p) => !inRect(p, r, c)));
 	}, []);
 
-	const cellFromPointer = (e: React.PointerEvent): [number, number] | null => {
+	const cellFromCoords = (clientX: number, clientY: number): [number, number] | null => {
 		if (!boardRef.current) return null;
 		const rect = boardRef.current.getBoundingClientRect();
-		const c = Math.floor(((e.clientX - rect.left) / rect.width) * size);
-		const r = Math.floor(((e.clientY - rect.top) / rect.height) * size);
+		const c = Math.floor(((clientX - rect.left) / rect.width) * size);
+		const r = Math.floor(((clientY - rect.top) / rect.height) * size);
 		if (r < 0 || r >= size || c < 0 || c >= size) return null;
 		return [r, c];
 	};
 
-	const onPointerDown = (e: React.PointerEvent) => {
+	const startDrag = (clientX: number, clientY: number) => {
 		if (status === 'won' || revealed || (daily && !started)) return;
-		const cell = cellFromPointer(e);
+		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
 		const [r, c] = cell;
 		drawing.current = true;
@@ -312,17 +313,16 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 			anchor.current = cell;
 		}
 		setPreview(rectFromCells(anchor.current, cell));
-		boardRef.current?.setPointerCapture(e.pointerId);
 	};
-	const onPointerMove = (e: React.PointerEvent) => {
+	const moveDrag = (clientX: number, clientY: number) => {
 		if (status === 'won' || revealed || (daily && !started)) return;
 		if (!drawing.current || !anchor.current || !downCell.current) return;
-		const cell = cellFromPointer(e);
+		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
 		if (cell[0] !== downCell.current[0] || cell[1] !== downCell.current[1]) moved.current = true;
 		setPreview(rectFromCells(anchor.current, cell));
 	};
-	const onPointerUp = () => {
+	const endDrag = () => {
 		if (status === 'won' || revealed || (daily && !started)) return;
 		if (!drawing.current) return;
 		const dc = downCell.current;
@@ -343,6 +343,21 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		anchor.current = null;
 		resizeIdx.current = -1;
 		setPreview(null);
+	};
+
+	const onPointerDown = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		startDrag(e.clientX, e.clientY);
+		boardRef.current?.setPointerCapture(e.pointerId);
+		e.preventDefault();
+	};
+	const onPointerMove = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		moveDrag(e.clientX, e.clientY);
+	};
+	const onPointerUp = (e?: React.PointerEvent) => {
+		if (e && e.pointerType === 'touch') return;
+		endDrag();
 	};
 
 	/* Hint: place one correct piece from the solution. */
@@ -486,6 +501,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 					className={`mo-board ${daily && !started ? 'blurred' : ''}`}
 					ref={boardRef}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--mo-cell))` }}
+					{...touchDrag(startDrag, moveDrag, endDrag)}
 					onPointerDown={onPointerDown}
 					onPointerMove={onPointerMove}
 					onPointerUp={onPointerUp}

@@ -7,6 +7,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    LETTRES CROISÉES — React island. Wordscapes-style: compose words from a letter wheel;
@@ -193,11 +194,11 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	};
 
 	/* ---------- Wheel pointer handling ---------- */
-	const wheelIndexAt = (e: React.PointerEvent): number | null => {
+	const wheelIndexAt = (clientX: number, clientY: number): number | null => {
 		const el = wheelRef.current; if (!el) return null;
 		const rect = el.getBoundingClientRect();
-		const x = ((e.clientX - rect.left) / rect.width) * 100;
-		const y = ((e.clientY - rect.top) / rect.height) * 100;
+		const x = ((clientX - rect.left) / rect.width) * 100;
+		const y = ((clientY - rect.top) / rect.height) * 100;
 		const n = lettersRef.current.length;
 		let best = -1, bestD = Infinity;
 		for (let i = 0; i < n; i++) {
@@ -208,31 +209,29 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		}
 		return bestD <= 13 ? best : null; // dead zone between letters
 	};
-	const wheelPos = (e: React.PointerEvent): { x: number; y: number } | null => {
+	const wheelPos = (clientX: number, clientY: number): { x: number; y: number } | null => {
 		const el = wheelRef.current; if (!el) return null;
 		const rect = el.getBoundingClientRect();
-		return { x: ((e.clientX - rect.left) / rect.width) * 100, y: ((e.clientY - rect.top) / rect.height) * 100 };
+		return { x: ((clientX - rect.left) / rect.width) * 100, y: ((clientY - rect.top) / rect.height) * 100 };
 	};
-	const onWheelDown = (e: React.PointerEvent): void => {
+	const startDrag = (clientX: number, clientY: number): void => {
 		if (armed || status !== 'playing') return;
 		dragging.current = true; dragMoved.current = false;
-		wheelRef.current?.setPointerCapture(e.pointerId);
-		const idx = wheelIndexAt(e);
+		const idx = wheelIndexAt(clientX, clientY);
 		if (idx != null && !selRef.current.includes(idx)) { setSelBoth([...selRef.current, idx]); dragMoved.current = selRef.current.length > 0; }
-		setLivePos(wheelPos(e));
-		e.preventDefault();
+		setLivePos(wheelPos(clientX, clientY));
 	};
-	const onWheelMove = (e: React.PointerEvent): void => {
+	const moveDrag = (clientX: number, clientY: number): void => {
 		if (!dragging.current) return;
-		setLivePos(wheelPos(e));
-		const idx = wheelIndexAt(e);
+		setLivePos(wheelPos(clientX, clientY));
+		const idx = wheelIndexAt(clientX, clientY);
 		if (idx == null) return;
 		const s = selRef.current;
 		if (s.length && idx === s[s.length - 1]) return;
 		if (s.length >= 2 && idx === s[s.length - 2]) { setSelBoth(s.slice(0, -1)); dragMoved.current = true; return; } // backtrack
 		if (!s.includes(idx)) { setSelBoth([...s, idx]); if (s.length) dragMoved.current = true; }
 	};
-	const onWheelUp = (): void => {
+	const endDrag = (): void => {
 		if (!dragging.current) return;
 		dragging.current = false;
 		setLivePos(null);
@@ -242,6 +241,20 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 			submitWord(word);
 		}
 		// simple tap: keep the selection (tap-to-compose mode, ✓ to submit)
+	};
+	const onWheelDown = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		startDrag(e.clientX, e.clientY);
+		wheelRef.current?.setPointerCapture(e.pointerId);
+		e.preventDefault();
+	};
+	const onWheelMove = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		moveDrag(e.clientX, e.clientY);
+	};
+	const onWheelUp = (e?: React.PointerEvent): void => {
+		if (e && e.pointerType === 'touch') return;
+		endDrag();
 	};
 
 	/* Hint: reveal the shortest unfound grid word (30 s cooldown — self-penalizing on the chrono). */
@@ -350,6 +363,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 						<div
 							ref={wheelRef}
 							className="lc-wheel"
+							{...touchDrag(startDrag, moveDrag, endDrag)}
 							onPointerDown={onWheelDown}
 							onPointerMove={onWheelMove}
 							onPointerUp={onWheelUp}

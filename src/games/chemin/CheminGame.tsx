@@ -14,6 +14,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    LE CHEMIN (LinkedIn "Zip") — React island.
@@ -291,41 +292,55 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		[status],
 	);
 
-	const cellFromPointer = (e: React.PointerEvent): [number, number] | null => {
+	const cellFromCoords = (clientX: number, clientY: number): [number, number] | null => {
 		if (!boardRef.current || !puzzle) return null;
 		const rect = boardRef.current.getBoundingClientRect();
 		const n = puzzle.size;
-		const c = Math.floor(((e.clientX - rect.left) / rect.width) * n);
-		const r = Math.floor(((e.clientY - rect.top) / rect.height) * n);
+		const c = Math.floor(((clientX - rect.left) / rect.width) * n);
+		const r = Math.floor(((clientY - rect.top) / rect.height) * n);
 		if (r < 0 || r >= n || c < 0 || c >= n) return null;
 		return [r, c];
 	};
 
-	const onPointerDown = (e: React.PointerEvent) => {
+	const startDrag = (clientX: number, clientY: number) => {
 		if (daily && !started) return; // armed but not started: overlay owns the board
-		const cell = cellFromPointer(e);
+		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
 		drawing.current = true;
 		moved.current = false;
 		downCell.current = cell;
 		lastCell.current = cell;
-		boardRef.current?.setPointerCapture(e.pointerId);
 		step(cell);
 	};
-	const onPointerMove = (e: React.PointerEvent) => {
+	const moveDrag = (clientX: number, clientY: number) => {
 		if (daily && !started) return;
 		if (!drawing.current) return;
-		const cell = cellFromPointer(e);
+		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
 		if (lastCell.current && cell[0] === lastCell.current[0] && cell[1] === lastCell.current[1]) return;
 		lastCell.current = cell;
 		moved.current = true;
 		step(cell);
 	};
-	const endDraw = () => {
+	const endDrag = () => {
 		if (daily && !started) return;
 		if (drawing.current && !moved.current && downCell.current) truncateTo(downCell.current); // deliberate tap
 		drawing.current = false;
+	};
+
+	const onPointerDown = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		startDrag(e.clientX, e.clientY);
+		boardRef.current?.setPointerCapture(e.pointerId);
+		e.preventDefault();
+	};
+	const onPointerMove = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		moveDrag(e.clientX, e.clientY);
+	};
+	const endDraw = (e?: React.PointerEvent) => {
+		if (e && e.pointerType === 'touch') return;
+		endDrag();
 	};
 
 	const clearPath = () => {
@@ -444,6 +459,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 							gridTemplateColumns: `repeat(${n}, 1fr)`,
 							gridTemplateRows: `repeat(${n}, 1fr)`,
 						}}
+						{...touchDrag(startDrag, moveDrag, endDrag)}
 						onPointerDown={onPointerDown}
 						onPointerMove={onPointerMove}
 						onPointerUp={endDraw}

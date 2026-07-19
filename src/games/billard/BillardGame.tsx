@@ -12,6 +12,7 @@ import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    BILLARD — React island (2D canvas).
@@ -212,59 +213,78 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		}
 	}, [daily, diffKey, gameId]);
 
-	/* ---------- Pointer (slingshot) ---------- */
-	const pointerToTable = (e: PointerEvent): Vec => {
+	/* ---------- Aim (slingshot) — coord-based so both pointer and native touch feed it ---------- */
+	const clientToTable = (clientX: number, clientY: number): Vec => {
 		const rect = canvasRef.current!.getBoundingClientRect();
 		return {
-			x: (e.clientX - rect.left) / scaleRef.current - offsetRef.current.x,
-			y: (e.clientY - rect.top) / scaleRef.current - offsetRef.current.y,
+			x: (clientX - rect.left) / scaleRef.current - offsetRef.current.x,
+			y: (clientY - rect.top) / scaleRef.current - offsetRef.current.y,
 		};
+	};
+
+	const cueBall = () => ballsRef.current.find((b) => b.kind === 'cue');
+
+	const aimStart = (clientX: number, clientY: number) => {
+		if (statusRef.current !== 'aiming') return;
+		const cue = cueBall();
+		if (!cue) return;
+		const p = clientToTable(clientX, clientY);
+		if (Math.hypot(p.x - cue.x, p.y - cue.y) > GRAB_R) return;
+		aimRef.current = { pull: { x: 0, y: 0 } };
+	};
+
+	const aimMove = (clientX: number, clientY: number) => {
+		if (!aimRef.current) return;
+		const cue = cueBall();
+		if (!cue) return;
+		const p = clientToTable(clientX, clientY);
+		aimRef.current.pull = { x: p.x - cue.x, y: p.y - cue.y };
+	};
+
+	const aimEnd = () => {
+		const aim = aimRef.current;
+		aimRef.current = null;
+		if (!aim || statusRef.current !== 'aiming') return;
+		const v = aimToVelocity(aim.pull);
+		if (!v) return;
+		const cue = cueBall();
+		if (!cue) return;
+		cue.vx = v.vx; cue.vy = v.vy;
+		if (startRef.current === 0) {
+			startRef.current = Date.now();
+			trackGame(gameId, 'game_started');
+			if (daily) saveDailyRun(gameId, {
+				startedAt: startRef.current, done: false,
+				seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex,
+				state: { best: bestRef.current ?? undefined, tries: triesRef.current } satisfies DailyState,
+			});
+		}
+		strokesRef.current += 1;
+		setStrokes(strokesRef.current);
+		rollingRef.current = true;
+		setStat('rolling');
 	};
 
 	useEffect(() => {
 		const cv = canvasRef.current;
 		if (!cv) return;
-		const cueBall = () => ballsRef.current.find((b) => b.kind === 'cue');
 
 		const down = (e: PointerEvent) => {
-			if (statusRef.current !== 'aiming') return;
-			const cue = cueBall();
-			if (!cue) return;
-			const p = pointerToTable(e);
-			if (Math.hypot(p.x - cue.x, p.y - cue.y) > GRAB_R) return;
-			aimRef.current = { pull: { x: 0, y: 0 } };
-			cv.setPointerCapture(e.pointerId);
-			e.preventDefault();
+			if (e.pointerType === 'touch') return; // native touch handled by touchDrag on the canvas
+			const before = aimRef.current;
+			aimStart(e.clientX, e.clientY);
+			if (aimRef.current && aimRef.current !== before) {
+				cv.setPointerCapture(e.pointerId);
+				e.preventDefault();
+			}
 		};
 		const move = (e: PointerEvent) => {
-			if (!aimRef.current) return;
-			const cue = cueBall();
-			if (!cue) return;
-			const p = pointerToTable(e);
-			aimRef.current.pull = { x: p.x - cue.x, y: p.y - cue.y };
+			if (e.pointerType === 'touch') return;
+			aimMove(e.clientX, e.clientY);
 		};
-		const up = () => {
-			const aim = aimRef.current;
-			aimRef.current = null;
-			if (!aim || statusRef.current !== 'aiming') return;
-			const v = aimToVelocity(aim.pull);
-			if (!v) return;
-			const cue = cueBall();
-			if (!cue) return;
-			cue.vx = v.vx; cue.vy = v.vy;
-			if (startRef.current === 0) {
-				startRef.current = Date.now();
-				trackGame(gameId, 'game_started');
-				if (daily) saveDailyRun(gameId, {
-					startedAt: startRef.current, done: false,
-					seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex,
-					state: { best: bestRef.current ?? undefined, tries: triesRef.current } satisfies DailyState,
-				});
-			}
-			strokesRef.current += 1;
-			setStrokes(strokesRef.current);
-			rollingRef.current = true;
-			setStat('rolling');
+		const up = (e: PointerEvent) => {
+			if (e.pointerType === 'touch') return;
+			aimEnd();
 		};
 
 		cv.addEventListener('pointerdown', down);
@@ -448,7 +468,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<div className="bi-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
-				<canvas ref={canvasRef} className="bi-canvas" />
+				<canvas ref={canvasRef} className="bi-canvas" {...touchDrag(aimStart, aimMove, aimEnd)} />
 
 				<div className="bi-hud-top">
 					{/* Libre/Défi switch clutters the windowed view — show it only in fullscreen. */}

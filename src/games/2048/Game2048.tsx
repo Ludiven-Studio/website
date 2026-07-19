@@ -14,6 +14,7 @@ import {
 	type DiffKey,
 } from './engine';
 import { mulberry32 } from '../prng';
+import { touchDrag } from '../touchDrag';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -98,6 +99,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const startedAtRef = useRef(0);
 	const pointerRef = useRef<{ x: number; y: number } | null>(null);
+	const lastRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 }); // latest touch position for swipe-end direction
 	// Mirrors read by the stable keydown listener (avoid stale closures).
 	const statusRef = useRef<Status>('playing');
 	const startedRef = useRef(true);
@@ -374,9 +376,29 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		};
 	}, [armFree]);
 
-	// Pointer swipe (mouse, touch, pen) — one drag = one move in the dominant axis.
+	// Swipe (mouse, touch, pen) — one drag = one move in the dominant axis.
+	// Coord-based so both Pointer Events and the native-touch fallback can drive it.
+	const swipeStart = (clientX: number, clientY: number): void => {
+		pointerRef.current = { x: clientX, y: clientY };
+		lastRef.current = { x: clientX, y: clientY };
+	};
+	const swipeMove = (clientX: number, clientY: number): void => {
+		lastRef.current = { x: clientX, y: clientY };
+	};
+	const swipeEnd = (clientX: number, clientY: number): void => {
+		const p0 = pointerRef.current;
+		if (!p0) return;
+		const dx = clientX - p0.x;
+		const dy = clientY - p0.y;
+		pointerRef.current = null;
+		if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return; // click/tap, not a swipe
+		applyMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
+	};
+
+	// Pointer Events drive mouse/pen only; touch routes through touchDrag (reliable on iOS Safari).
 	const onPointerDown = (e: React.PointerEvent): void => {
-		pointerRef.current = { x: e.clientX, y: e.clientY };
+		if (e.pointerType === 'touch') return;
+		swipeStart(e.clientX, e.clientY);
 		try {
 			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 		} catch {
@@ -384,13 +406,8 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		}
 	};
 	const onPointerUp = (e: React.PointerEvent): void => {
-		const p0 = pointerRef.current;
-		if (!p0) return;
-		const dx = e.clientX - p0.x;
-		const dy = e.clientY - p0.y;
-		pointerRef.current = null;
-		if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return; // click/tap, not a swipe
-		applyMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
+		if (e.pointerType === 'touch') return;
+		swipeEnd(e.clientX, e.clientY);
 	};
 
 	return (
@@ -429,6 +446,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 					style={{ ['--n' as string]: size }}
 					onPointerDown={onPointerDown}
 					onPointerUp={onPointerUp}
+						{...touchDrag(swipeStart, swipeMove, () => swipeEnd(lastRef.current.x, lastRef.current.y))}
 				>
 					<div className="g2-cells">
 						{Array.from({ length: size * size }).map((_, i) => (
