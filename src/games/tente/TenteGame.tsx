@@ -12,8 +12,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { tenteLevels } from './levels';
 
 /* =====================================================
    TENTE (Tents & Trees) — React island (training mode).
@@ -54,6 +58,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, tenteLevels);
 
 	const { size, trees, tents, rowCounts, colCounts } = puzzle;
 	const over = status === 'won' || revealed;
@@ -76,6 +81,33 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	/* Levels mode: start a level from its config; the chrono runs immediately. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		setHintNote('');
+		setPuzzle(generateTente(cfg, mulberry32(cfg.seed)));
+		setMarks(emptyMarks(cfg.size));
+		setStatus('playing');
+		setRevealed(false);
+		setHinted(new Set());
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once solved (Tente can't be lost → always a win).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10) });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -195,6 +227,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (over) return;
 		if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		let count = 0;
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) {
@@ -206,7 +239,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		if (count !== solSet.size) return; // missing tents
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [marks, over, size, solSet, gameId, daily, started]);
+	}, [marks, over, size, solSet, gameId, daily, started, lv.active, lv.playing]);
 
 	const removeHint = useCallback((r: number, c: number) => {
 		setHinted((prev) => {
@@ -299,7 +332,22 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		<div className="te-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
+
+			{lv.active && (
+				<div className="te-daily-tag">
+					{lv.menu
+						? 'Progression — réussis un niveau pour débloquer le suivant'
+						: `Niveau ${lv.level} · ${size}×${size} · ${tents.length} ⛺`}
+				</div>
+			)}
 
 			{daily ? (
 				<div className="te-daily-tag">
@@ -309,8 +357,9 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 				</div>
 			) : null}
 
+			{!(lv.active && lv.menu) && (
 			<div className="te-bar">
-				{!daily && (
+				{!daily && !lv.active && (
 					<div className="te-pills" role="tablist" aria-label="Difficulté">
 						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 							<button
@@ -327,15 +376,16 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 				)}
 				<div className="te-bar-right">
 					<div className="te-timer" aria-live="off">{fmtTime(elapsed)}</div>
-					{!daily && (
+					{!daily && !lv.active && (
 						<button className="te-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻ Nouvelle
 						</button>
 					)}
 				</div>
 			</div>
+			)}
 
-			{!over && !daily && (
+			{!over && !daily && !lv.active && (
 				<div className="te-actions">
 					<button className="te-act" onClick={hint}>💡 Indice</button>
 					{elapsed >= 60 && (
@@ -360,6 +410,9 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="te-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
@@ -414,7 +467,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="te-win" role="dialog" aria-label="Grille résolue">
 						<div className="te-wincard">
 							<div className="te-winmark">⛺</div>
@@ -425,7 +478,21 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={tenteLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`Résolu en ${fmtTime(elapsed)}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && (
 				<p className="te-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -435,7 +502,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
 				<div className="te-revealed-note">

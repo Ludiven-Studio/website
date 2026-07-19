@@ -12,8 +12,12 @@ import {
 } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { calcudokuLevels } from './levels';
 
 /* =====================================================
    CALCUDOKU (KenKen) — React island.
@@ -50,6 +54,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, calcudokuLevels);
 
 	const { size, cages, cageOf, solution } = puzzle;
 
@@ -81,6 +86,34 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		(r: number, c: number) => (given[r][c] != null ? given[r][c] : entries[r][c]),
 		[given, entries],
 	);
+
+	/* Levels mode: start a level from its config; grade on solve. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		setPuzzle(generateCalcudoku(cfg.diff, mulberry32(cfg.seed)));
+		setEntries(emptyEntries(cfg.diff.size));
+		setSelected(null);
+		setStatus('playing');
+		setRevealed(false);
+		setHinted(new Set());
+		setHintNote('');
+		setStarted(true);
+		startRef.current = Date.now();
+		setElapsed(0);
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade the level once solved (Calcudoku can't be lost).
+	useEffect(() => {
+		if (!lv.playing) return;
+		if (status === 'won') lv.finish({ won: true, score: Math.round((Date.now() - startRef.current) / 10) });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];
@@ -243,6 +276,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
 			if (daily && !started) return; // skip win-check on a daily not yet started
+		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) if (value(r, c) == null) return;
 		if (conflicts.size > 0) return;
@@ -251,7 +285,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			setSelected(null);
 			trackGame(gameId, 'game_won');
 		}
-	}, [entries, status, revealed, size, value, conflicts, cageSatisfied, gameId, daily, started]);
+	}, [entries, status, revealed, size, value, conflicts, cageSatisfied, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
@@ -366,7 +400,14 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		<div className="cd-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{daily && (
 				<div className="cd-daily-tag">
@@ -376,8 +417,15 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && (
+				<div className="cd-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${size}×${size}`}
+				</div>
+			)}
+
+			{!(lv.active && lv.menu) && (
 			<div className="cd-bar">
-				{daily ? (
+				{daily || lv.active ? (
 					<div className="cd-timer">{fmtTime(elapsed)}</div>
 				) : (
 					<div className="cd-pills" role="tablist" aria-label="Difficulté">
@@ -395,7 +443,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 				<div className="cd-bar-right">
-					{!daily && <div className="cd-timer">{fmtTime(elapsed)}</div>}
+					{!daily && !lv.active && <div className="cd-timer">{fmtTime(elapsed)}</div>}
 					<button
 						className={`cd-rulesbtn ${showRules ? 'active' : ''}`}
 						onClick={() => setShowRules((s) => !s)}
@@ -404,13 +452,14 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					>
 						?
 					</button>
-					{!daily && (
+					{!daily && !lv.active && (
 						<button className="cd-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
 						</button>
 					)}
 				</div>
 			</div>
+			)}
 
 			{showRules && (
 				<div className="cd-rules">
@@ -434,10 +483,10 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && (
+			{status !== 'won' && !revealed && !daily && !(lv.active && lv.menu) && (
 				<div className="cd-actions">
 					<button className="cd-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					{!lv.active && elapsed >= 60 && (
 						<button className="cd-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -459,6 +508,9 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="cd-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
@@ -513,7 +565,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="cd-win" role="dialog" aria-label="Grille résolue">
 						<div className="cd-wincard">
 							<div className="cd-winmark">🧮</div>
@@ -526,7 +578,21 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={calcudokuLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`Résolu en ${fmtTime(elapsed)}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			{!daily && hintNote && (
 				<p className="cd-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -536,9 +602,9 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
-			{revealed ? (
+			{lv.active && lv.menu ? null : revealed ? (
 				<div className="cd-revealed-note">
 					<span>Solution affichée</span>
 					<button className="cd-replay" onClick={() => newGame(diffKey)}>Rejouer</button>

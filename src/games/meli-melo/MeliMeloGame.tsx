@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateGrid, wordPoints, adjacent, spellPath, DIFFS, DURATION_S, SIZE, type BoggleGrid } from './engine';
+import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useLevels } from '../../lib/useLevels';
+import { meliMeloLevels } from './levels';
 import { touchDrag } from '../touchDrag';
 
 /* =====================================================
@@ -34,6 +39,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const lv = useLevels(gameId, meliMeloLevels);
 
 	const boardRef = useRef<HTMLDivElement | null>(null);
 	const dragging = useRef(false);
@@ -46,6 +52,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const levelTargetRef = useRef(0);
 
 	const total = score(found);
 	const { celebrating } = useCelebration(daily && status === 'ended' && !alreadyPlayed && total > 0);
@@ -76,6 +83,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 	/* Wall-clock timer — reloads never pause it. */
 	useEffect(() => {
 		if (status !== 'playing') return;
+		if (lv.active && !lv.playing) return; // levels grid open, not a running level
 		const tick = (): void => {
 			const left = DURATION_S * 1000 - (Date.now() - startRef.current);
 			setRemaining(Math.max(0, left));
@@ -84,7 +92,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		tick();
 		const id = setInterval(tick, 100);
 		return () => clearInterval(id);
-	}, [status, endRun]);
+	}, [status, endRun, lv.active, lv.playing]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS): void => {
 		dailyRef.current = false;
@@ -140,6 +148,36 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_started', { mode: dailyRef.current ? 'daily' : 'free', difficulty: diffKey });
 		if (dailyRef.current) saveDaily([], false);
 	}, [gameId, diffKey]);
+
+	/* Levels mode: start a level from its config; chrono starts immediately, grade when it ends. */
+	const startLevel = useCallback((level: number): void => {
+		const cfg = lv.play(level);
+		dailyRef.current = false;
+		setDaily(false); setAlreadyPlayed(false);
+		levelTargetRef.current = cfg.target;
+		// Derive a deterministic 32-bit seed from cfg.seed via mulberry32; generateGrid re-seeds from it.
+		const g = generateGrid(mulberry32(cfg.seed)() * 2 ** 32 >>> 0, cfg.diff);
+		gridRef.current = g; setGrid(g);
+		setFoundBoth([]); setPathBoth([]); setToast(null);
+		startRef.current = Date.now();
+		setRemaining(DURATION_S * 1000);
+		setStatusBoth('playing');
+		trackGame(gameId, 'game_started', { mode: 'levels', level });
+	}, [lv, gameId]);
+
+	const armLevels = useCallback((): void => {
+		dailyRef.current = false;
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	/* Grade the level once the run ends: won = final score reached the target. */
+	useEffect(() => {
+		if (!lv.playing || status !== 'ended') return;
+		const pts = score(foundRef.current);
+		lv.finish({ won: pts >= levelTargetRef.current, score: pts, raw: { found: foundRef.current.length } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, status]);
 
 	/* ---------- Submit ---------- */
 	const submitPath = (p: number[]): void => {
@@ -229,11 +267,24 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		<div className="mm-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
+
+			{lv.active && (
+				<div className="mm-daily-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · objectif ${levelTargetRef.current} pts`}
+				</div>
+			)}
 
 			{daily ? (
 				<div className="mm-daily-tag">{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}</div>
-			) : (
+			) : !lv.active ? (
 				<div className="mm-bar">
 					<div className="mm-pills" role="tablist" aria-label="Difficulté">
 						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
@@ -242,8 +293,12 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 					</div>
 					<button className="mm-act" onClick={() => newGame(diffKey)}>↻ Nouvelle grille</button>
 				</div>
-			)}
+			) : null}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
+			<>
 			<div className="mm-status">
 				<span className="mm-score">{total} pts</span>
 				<span className="mm-count">{found.length} mot{found.length > 1 ? 's' : ''}</span>
@@ -272,7 +327,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 					</div>
 				</div>
 
-				{status === 'ended' && (
+				{status === 'ended' && !lv.active && (
 					<div className="mm-overlay">
 						<div className="mm-overlay-card end">
 							<h3>⏱ Temps écoulé&nbsp;!</h3>
@@ -280,6 +335,20 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 							<p>{found.length}/{grid.solutions.length} mots trouvés</p>
 						</div>
 					</div>
+				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={meliMeloLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won
+							? `${total} pts · objectif ${levelTargetRef.current} atteint`
+							: `${total} / ${levelTargetRef.current} pts — objectif manqué`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
 				)}
 				{daily && dailyLoading && <div className="mm-overlay"><div className="mm-overlay-card">Préparation du défi…</div></div>}
 				{armed && !dailyLoading && (
@@ -317,10 +386,12 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 							<div className="mm-chips">{missed.map((w) => <span key={w} className="mm-chip">{w} <i>+{wordPoints(w)}</i></span>)}</div>
 						</details>
 					)}
-					{!daily && <button className="mm-replay" onClick={() => newGame(diffKey)}>↻ Nouvelle grille</button>}
+					{!daily && !lv.active && <button className="mm-replay" onClick={() => newGame(diffKey)}>↻ Nouvelle grille</button>}
 				</div>
 			) : (
 				found.length > 0 && <div className="mm-chips live">{found.slice().reverse().map((w) => <span key={w} className="mm-chip done">{w} <i>+{wordPoints(w)}</i></span>)}</div>
+			)}
+			</>
 			)}
 
 			<p className="mm-help">
@@ -329,7 +400,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{daily && <Leaderboard game={gameId} metric="score" submitValue={status === 'ended' && !alreadyPlayed ? total : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
 }
