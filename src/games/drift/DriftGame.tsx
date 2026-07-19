@@ -15,6 +15,7 @@ import {
 	type CarState,
 	type LapState,
 	type CarParams,
+	type DriftDiff,
 } from './engine';
 import { mulberry32 } from '../prng';
 import { joinRace, multiplayerAvailable, MAX_PLAYERS, type Race, type Peer, type PosMsg, type LapMsg } from './net';
@@ -23,6 +24,11 @@ import { trackGame } from '../../lib/analytics';
 import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
+import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { driftLevels, type DriftLevelCfg } from './levels';
 
 /* =====================================================
    DRIFT — top-down 3D arcade racing (three.js + Supabase Realtime).
@@ -380,6 +386,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const [peerCount, setPeerCount] = useState(1);
 	const [webglError, setWebglError] = useState(false);
 	const [showGhost, setShowGhost] = useState(true); // best-lap ghost (default on)
+	const lv = useLevels(gameId, driftLevels);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const labelsRef = useRef<HTMLDivElement>(null);
@@ -416,6 +423,9 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const showGhostRef = useRef(true);
 	const seedRef = useRef(0);
 	const isDefiRef = useRef(false);
+	const isLevelsRef = useRef(false); // levels run in progress → grade the first completed lap
+	const levelCfgRef = useRef<DriftLevelCfg | null>(null); // active level config (seed + diff + targets)
+	const finishLevelRef = useRef<((lapMs: number) => void) | null>(null); // stable finish callback (set by effect)
 
 	useEffect(() => {
 		setName(playerName());
@@ -707,6 +717,12 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 							seed: seedRef.current,
 						});
 					}
+					// Levels: the first valid lap finishes the level, graded on its time.
+					if (isLevelsRef.current) {
+						isLevelsRef.current = false; // grade once
+						runningRef.current = false;
+						finishLevelRef.current?.(lapRef.current.lastMs);
+					}
 				}
 				if (lapRef.current.bestMs != null && lapRef.current.bestMs !== bestRef.current) {
 					bestRef.current = lapRef.current.bestMs;
@@ -780,13 +796,13 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	/* ---- Start / stop a race ---- */
 	const beginRace = useCallback(
-		(seed: number, race: Race | null, m: 'libre' | 'defi', dk: DiffKey, kind: KindId) => {
+		(seed: number, race: Race | null, m: 'libre' | 'defi', dk: DiffKey, kind: KindId, levelDiff?: DriftDiff) => {
 			setMode(m);
 			setDiffKey(dk);
 			setKindId(kind);
 			setWrongWay(false);
 			carParamsRef.current = carParams(CAR_KINDS.find((c) => c.id === kind) ?? CAR_KINDS[0]);
-			const track = generateTrack(seed, DRIFT_DIFFS[dk]);
+			const track = generateTrack(seed, levelDiff ?? DRIFT_DIFFS[dk]);
 			trackRef.current = track;
 			const built = buildTrackGeometry(track);
 			const g = g3Ref.current;
@@ -845,6 +861,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			// Best-lap ghost: fresh buffers; daily mode loads today's saved ghost (same seed only).
 			seedRef.current = seed;
 			isDefiRef.current = m === 'defi';
+			isLevelsRef.current = levelDiff != null;
 			lapPosesRef.current = [];
 			bestGhostPosesRef.current = null;
 			if (m === 'defi') {
@@ -952,6 +969,31 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		beginRace(fixedSeed ?? randomSeed(), null, m, dk, kindId); // solo fallback
 	}, [name, initScene, resize, beginRace, gameId, diffKey, kindId]);
 
+	/* Levels: start a solo, deterministic run for a level (seed + ramped track); grade on lap. */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		levelCfgRef.current = cfg;
+		if (!initScene()) return;
+		resize();
+		stop();
+		raceRef.current?.leave();
+		raceRef.current = null;
+		beginRace(cfg.seed, null, 'libre', 'moyen', kindId, cfg.diff);
+	}, [lv, initScene, resize, stop, beginRace, kindId]);
+
+	const armLevels = useCallback(() => {
+		stop();
+		setMode('libre');
+		setPhase('menu');
+		lv.enter();
+	}, [lv, stop]);
+
+	// Stable finish callback the raf loop reaches through a ref (avoids re-binding `frame`).
+	finishLevelRef.current = (lapMs: number) => {
+		trackGame(gameId, 'game_won');
+		lv.finish({ won: true, score: Math.round(lapMs / 10), raw: { seed: seedRef.current } });
+	};
+
 	const quit = useCallback(() => {
 		stop();
 		raceRef.current?.leave();
@@ -1041,6 +1083,23 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		<div className="dr-root">
 			<style>{CSS}</style>
 
+			<ModeToggle
+				daily={mode === 'defi' && !lv.active}
+				onFree={() => { lv.exit(); setMode('libre'); setPhase('menu'); }}
+				onDaily={() => { lv.exit(); setMode('defi'); setPhase('menu'); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
+
+			{lv.active && (
+				<p className="dr-leveltag">
+					{lv.menu
+						? 'Progression — boucle un tour pour valider, plus vite pour les étoiles'
+						: `Niveau ${lv.level} · ${levelCfgRef.current?.diff.controls ?? 6} virages · boucle un tour`}
+				</p>
+			)}
+
 			<div className="dr-boardwrap">
 				<canvas ref={canvasRef} className="dr-canvas" role="img" aria-label="Drift" />
 				<div ref={labelsRef} className="dr-labels" />
@@ -1050,8 +1109,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 						<div className="dr-hud">
 							<span className="dr-cur">{fmtMs(curMs)}</span>
 							<span className="dr-best">Meilleur {fmtMs(bestMs)}</span>
-							<span className="dr-peers">👥 {Math.min(peerCount, MAX_PLAYERS)}/{MAX_PLAYERS}</span>
-							<span className="dr-peers">{mode === 'defi' ? '🏁 ' : ''}{DRIFT_DIFFS[diffKey].label}</span>
+							{!lv.active && <span className="dr-peers">👥 {Math.min(peerCount, MAX_PLAYERS)}/{MAX_PLAYERS}</span>}
+							<span className="dr-peers">{lv.active ? `🎯 Niveau ${lv.level}` : `${mode === 'defi' ? '🏁 ' : ''}${DRIFT_DIFFS[diffKey].label}`}</span>
 						</div>
 						{wrongWay && <div className="dr-wrongway">⚠ Sens inverse</div>}
 						{board.length > 0 && (
@@ -1070,7 +1129,30 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 				{webglError && <div className="dr-overlay"><div className="dr-card">3D indisponible (WebGL manquant).</div></div>}
 
-				{phase === 'menu' && !webglError && (
+				{lv.menu && !webglError && (
+					<div className="dr-overlay dr-overlay-levels">
+						<LevelSelect
+							progress={lv.progress}
+							onPick={startLevel}
+							title={`${Object.values(lv.progress.stars).reduce((a, b) => a + b, 0)} / ${driftLevels.count * 3} ⭐`}
+						/>
+					</div>
+				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={driftLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Tour bouclé en ${fmtMs(bestMs)}` : 'Tour non terminé'}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+
+				{phase === 'menu' && !webglError && !lv.active && (
 					<div className="dr-overlay">
 						<div className="dr-card">
 							<h2>Drift</h2>
@@ -1123,14 +1205,18 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{phase === 'racing' && (
+			{phase === 'racing' && !lv.done && (
 				<div className="dr-actions">
 					<button className="dr-restart" onClick={reset}>↺ Recommencer</button>
-					<button className="dr-quit" onClick={quit}>Quitter</button>
+					{lv.active ? (
+						<button className="dr-quit" onClick={() => { stop(); lv.backToMenu(); }}>🗺 Carte</button>
+					) : (
+						<button className="dr-quit" onClick={quit}>Quitter</button>
+					)}
 				</div>
 			)}
 
-			{mode === 'defi' && (
+			{mode === 'defi' && !lv.active && (
 				<Leaderboard game={gameId} metric="time" submitValue={bestMs ?? undefined} format={fmtMs} />
 			)}
 
@@ -1200,4 +1286,7 @@ const CSS = `
 .dr-play { border: none; background: var(--dr-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 16px; border-radius: 999px; padding: 12px 28px; cursor: pointer; }
 .dr-status { color: var(--gray-300); font-size: 12px; margin: 10px 0 0; }
 .dr-help { max-width: 460px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin: 1rem auto 0; }
+.dr-leveltag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin: -0.25rem 0 0.75rem; }
+/* Levels grid overlay: scrollable over the (still mounted) canvas. */
+.dr-overlay-levels { align-items: flex-start; overflow-y: auto; padding: 14px 10px; }
 `;

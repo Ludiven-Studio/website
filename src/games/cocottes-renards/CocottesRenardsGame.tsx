@@ -32,6 +32,10 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { cocottesRenardsLevels, type CocottesLevelCfg } from './levels';
 
 /* =====================================================
    COCOTTES VS RENARDS — real-time lane tower-defense island.
@@ -139,6 +143,8 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const [laneAlert, setLaneAlert] = useState(false);
 	const [showInfo, setShowInfo] = useState(false);
 
+	const lv = useLevels<CocottesLevelCfg>(gameId, cocottesRenardsLevels);
+
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const grassImgRef = useRef<HTMLImageElement | null>(null); // AI farm grass under the lanes (else flat green)
@@ -178,6 +184,12 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const triesRef = useRef(0);
 	const seedRef = useRef(0);
 	const diffIdxRef = useRef(1);
+	// Levels mode: survive up to this wave to clear (0 = not in a level run).
+	const levelTargetWaveRef = useRef(0);
+	const levelCfgRef = useRef<CocottesLevelCfg | null>(null);
+	const levelDoneRef = useRef(false); // guard: grade a level run only once
+	const lvRef = useRef(lv);
+	lvRef.current = lv;
 
 	const setStat = (v: Status): void => {
 		statusRef.current = v;
@@ -961,7 +973,40 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		}
 	};
 
+	// Levels mode: the base fell → grade as a loss (0 stars, replay prompt).
+	const onLevelLoss = useCallback(() => {
+		stop();
+		const st = stateRef.current;
+		const sc = st?.score ?? 0;
+		setStat('over');
+		setScore(sc);
+		if (!levelDoneRef.current) {
+			levelDoneRef.current = true;
+			lvRef.current.finish({ won: false, score: sc });
+		}
+		trackGame(gameId, 'game_over', { score: sc });
+	}, [gameId, stop]);
+
+	// Levels mode: survived the target wave → grade by nests left.
+	const onLevelClear = useCallback(() => {
+		stop();
+		const st = stateRef.current;
+		const sc = st?.score ?? 0;
+		const nests = st ? st.lostLanes.filter((l) => !l).length : 0;
+		setStat('over');
+		setScore(sc);
+		if (!levelDoneRef.current) {
+			levelDoneRef.current = true;
+			lvRef.current.finish({ won: true, score: sc, stat: nests, raw: { wave: st?.wave ?? 0, nests } });
+		}
+		trackGame(gameId, 'game_over', { score: sc });
+	}, [gameId, stop]);
+
 	const onGameOver = useCallback(() => {
+		if (levelTargetWaveRef.current > 0) {
+			onLevelLoss();
+			return;
+		}
 		stop();
 		const st = stateRef.current;
 		const sc = st?.score ?? 0;
@@ -990,7 +1035,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		});
 		trackGame(gameId, 'game_over', { score: sc });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [gameId, stop]);
+	}, [gameId, stop, onLevelLoss]);
 
 	const frame = useCallback(
 		(now: number) => {
@@ -1011,6 +1056,18 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			updateParticles(realDt);
 			draw();
 			if (++hudTickRef.current % 6 === 0) syncHud(st);
+			// Levels mode: clear once the target wave is reached and fully swept.
+			if (
+				levelTargetWaveRef.current > 0 &&
+				!levelDoneRef.current &&
+				st.wave >= levelTargetWaveRef.current &&
+				st.foxes.length === 0 &&
+				!st.over
+			) {
+				syncHud(st);
+				onLevelClear();
+				return;
+			}
 			if (st.over) {
 				syncHud(st);
 				onGameOver();
@@ -1019,7 +1076,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			rafRef.current = requestAnimationFrame(frame);
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		},
-		[draw, onGameOver],
+		[draw, onGameOver, onLevelClear],
 	);
 
 	const resetFx = (st: State): void => {
@@ -1038,6 +1095,15 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	const start = useCallback(() => {
 		if (dailyRef.current && triesRef.current >= MAX_TRIES) return;
 		stateRef.current = createGame(diffIdxRef.current, mulberry32(seedRef.current));
+		// Levels mode: override the difficulty ramp + starting wheat from the level cfg.
+		if (levelTargetWaveRef.current > 0 && levelCfgRef.current) {
+			const c = levelCfgRef.current;
+			stateRef.current.hpMul = c.hpMul;
+			stateRef.current.speedMul = c.speedMul;
+			stateRef.current.spawnMul = c.spawnMul;
+			stateRef.current.grain = c.startGrain;
+			levelDoneRef.current = false;
+		}
 		rngRef.current = mulberry32(seedRef.current ^ 0x9e3779b9);
 		accRef.current = 0;
 		lastRef.current = performance.now();
@@ -1135,6 +1201,45 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		setDailyLoading(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId, stop, draw]);
+
+	/* ---------- Levels mode ---------- */
+	// Start a level from its config: deterministic seed + ramped difficulty, and
+	// stash the clear condition (target wave) in a ref for the loop to check.
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		levelCfgRef.current = cfg;
+		levelTargetWaveRef.current = cfg.targetWave;
+		levelDoneRef.current = false;
+		dailyRef.current = false;
+		setDaily(false);
+		triesRef.current = 0;
+		setTries(0);
+		diffIdxRef.current = 1; // moyen baseline; the cfg overrides the multipliers
+		seedRef.current = cfg.seed;
+		start();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv, start]);
+
+	const armLevels = useCallback(() => {
+		stop();
+		dailyRef.current = false;
+		setDaily(false);
+		levelTargetWaveRef.current = 0;
+		levelCfgRef.current = null;
+		levelDoneRef.current = false;
+		selectCard(null);
+		lv.enter();
+		// idle board behind the level grid
+		seedRef.current = cocottesRenardsLevels.config(1).seed;
+		diffIdxRef.current = 1;
+		stateRef.current = createGame(diffIdxRef.current, mulberry32(seedRef.current));
+		resetFx(stateRef.current);
+		setScore(0);
+		setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, nests: LANES, cd: {} });
+		setStat('ready');
+		draw();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv, stop, draw]);
 
 	/* ---------- Canvas sizing ---------- */
 	const resize = useCallback(() => {
@@ -1259,9 +1364,24 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		<div className="cr-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => armFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); levelTargetWaveRef.current = 0; } armFree(diffKey); }}
+				onDaily={() => { if (lv.active) { lv.exit(); levelTargetWaveRef.current = 0; } startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active && (
+				<div className="cr-daily-tag">
+					{lv.menu
+						? 'Progression — survis aux vagues pour débloquer le niveau suivant'
+						: `Niveau ${lv.level} · survis à ${levelTargetWaveRef.current} vagues`}
+				</div>
+			)}
+
+			{!lv.active && (daily ? (
 				<div className="cr-daily-tag">
 					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} · Essai ${Math.min(tries, MAX_TRIES)}/${MAX_TRIES}`}
 				</div>
@@ -1275,7 +1395,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 						))}
 					</div>
 				</div>
-			)}
+			))}
 
 			<div className="cr-hud">
 				<span className={`cr-grain ${grainBump ? 'bump' : ''}`}>🌾 <strong>{hud.grain}</strong></span>
@@ -1364,13 +1484,13 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 					onPointerLeave={() => (hoverRef.current = null)}
 				/>
 
-				{status === 'ready' && !dailyLoading && (
+				{status === 'ready' && !dailyLoading && !lv.active && (
 					<div className="cr-overlay">
 						<button className="cr-startbtn" onClick={start}>▶ Commencer</button>
 					</div>
 				)}
 				{daily && dailyLoading && <div className="cr-overlay"><div className="cr-overlay-card">Préparation du défi…</div></div>}
-				{status === 'over' && (
+				{status === 'over' && !lv.active && (
 					<div className="cr-overlay">
 						<div className="cr-overlay-card cr-over">
 							{daily && alreadyPlayed ? (
@@ -1387,14 +1507,32 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={cocottesRenardsLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won
+							? `Vague ${levelTargetWaveRef.current} atteinte · ${hud.nests} nid${hud.nests > 1 ? 's' : ''} · ${score} renards`
+							: 'Tous les nids ont été pillés'}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			)}
 
 			<p className="cr-help">
 				Sélectionne une cocotte puis clique une case pour la poser. Ramasse vite les jetons de blé&nbsp;: ils perdent de la valeur avec le temps (compteur au-dessus). Si un renard atteint un nid, la ligne est perdue — clique-la pour la reconstruire ({REBUY_COST}&nbsp;blé). Tu perds quand il ne reste plus aucun nid.
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? best : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? best : undefined} />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
 }

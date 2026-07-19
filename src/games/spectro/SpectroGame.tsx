@@ -4,7 +4,11 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
-import { DIFFS, generateMelody, judge, comboMult, rankOf, type Melody, type Grade } from './engine';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { spectroLevels } from './levels';
+import { DIFFS, generateMelody, generateMelodyDiff, judge, comboMult, rankOf, type Melody, type Grade } from './engine';
 
 /* =====================================================
    SPECTRO — melodic pitch-tracing runner (prototype).
@@ -76,6 +80,12 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 	const seedRef = useRef(0);
 	const diffRef = useRef(0);
 	const dailyBestRef = useRef<number | null>(null);
+
+	const lv = useLevels(gameId, spectroLevels);
+	const levelsRef = useRef(false); // a level run is live (grade at end)
+	const targetRef = useRef(0); // score to reach to clear the current level
+	const lvFinishRef = useRef(lv.finish); // always the live grader (frame loop reads it)
+	lvFinishRef.current = lv.finish;
 
 	const setStat = (s: Status): void => {
 		statusRef.current = s;
@@ -171,8 +181,7 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 	};
 
 	/* ---------- Run lifecycle ---------- */
-	const loadMelody = useCallback((seed: number, di: number): void => {
-		const mel = generateMelody(seed, di);
+	const applyMelody = useCallback((mel: Melody): void => {
 		melodyRef.current = mel;
 		cursorRef.current = (mel.lo + mel.hi) / 2;
 		beatRef.current = 0;
@@ -188,10 +197,16 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		setResult(null);
 	}, []);
 
+	const loadMelody = useCallback((seed: number, di: number): void => {
+		applyMelody(generateMelody(seed, di));
+	}, [applyMelody]);
+
 	const startRun = (): void => {
 		const ctx = ensureAudio();
 		if (!ctx) return;
-		loadMelody(seedRef.current, diffRef.current);
+		// Levels stage their own melody (custom Diff) before starting; free/daily reload
+		// from the preset index so a Rejouer re-arms the same run.
+		if (!levelsRef.current) loadMelody(seedRef.current, diffRef.current);
 		const mel = melodyRef.current;
 		if (!mel) return;
 		audioStartRef.current = ctx.currentTime + LEAD;
@@ -212,6 +227,11 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		const score = scoreRef.current;
 		setResult({ score, rank, acc: Math.round(mean) });
 		setStat('done');
+		if (levelsRef.current) {
+			lvFinishRef.current({ won: score >= targetRef.current, score, raw: { rank, acc: Math.round(mean) } });
+			trackGame(gameId, 'game_over', { score });
+			return;
+		}
 		if (dailyRef.current) {
 			dailyBestRef.current = dailyBestRef.current == null ? score : Math.max(dailyBestRef.current, score);
 			setBest(dailyBestRef.current);
@@ -236,6 +256,7 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 	const armFree = useCallback(
 		(di: number): void => {
 			dailyRef.current = false;
+			levelsRef.current = false;
 			setDaily(false);
 			setDailyLoading(false);
 			setDiffIdx(di);
@@ -258,6 +279,7 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 
 	const startDaily = useCallback(async (): Promise<void> => {
 		dailyRef.current = true;
+		levelsRef.current = false;
 		setDaily(true);
 		runningRef.current = false;
 		stopCursorTone();
@@ -280,6 +302,30 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		const { seed, diffIndex } = await getDaily(gameId);
 		apply(seed, diffIndex, null);
 	}, [gameId, loadMelody]);
+
+	// Levels: play a seeded melody, then start the run right away and grade at its end.
+	const startLevel = useCallback((level: number): void => {
+		const cfg = lv.play(level);
+		dailyRef.current = false;
+		levelsRef.current = true;
+		targetRef.current = cfg.target;
+		setDaily(false);
+		setDailyLoading(false);
+		seedRef.current = cfg.seed;
+		applyMelody(generateMelodyDiff(cfg.seed, cfg.diff));
+		startRun();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv, applyMelody]);
+
+	const armLevels = useCallback((): void => {
+		runningRef.current = false;
+		levelsRef.current = false;
+		stopCursorTone();
+		setDaily(false);
+		setStat('ready');
+		lv.enter();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv]);
 
 	/* ---------- Pointer ---------- */
 	const onPoint = (e: React.PointerEvent): void => {
@@ -495,9 +541,22 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		<div className="sp-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => armFree(diffIdx)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) lv.exit(); armFree(diffIdx); }}
+				onDaily={() => { if (lv.active) lv.exit(); void startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="sp-dailytag">
+					{lv.menu
+						? 'Progression — atteins le score cible pour débloquer le niveau suivant'
+						: `Niveau ${lv.level} · cible ${targetRef.current} pts`}
+				</div>
+			) : daily ? (
 				<div className="sp-dailytag">
 					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${diffLabel}`}
 				</div>
@@ -527,7 +586,7 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 			<div className="sp-playwrap" ref={wrapRef}>
 				<canvas ref={canvasRef} className="sp-canvas" onPointerDown={onPoint} onPointerMove={onPoint} />
 
-				{status === 'ready' && !dailyLoading && (
+				{!lv.active && status === 'ready' && !dailyLoading && (
 					<div className="sp-overlay">
 						<div className="sp-card">
 							<h3>🎵 Spectro</h3>
@@ -545,7 +604,7 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 						<div className="sp-card">Préparation du défi…</div>
 					</div>
 				)}
-				{status === 'done' && result && (
+				{!lv.active && status === 'done' && result && (
 					<div className="sp-overlay">
 						<div className="sp-card">
 							<div className={`sp-rank sp-rank-${result.rank}`}>{result.rank}</div>
@@ -559,13 +618,31 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.menu && (
+					<div className="sp-overlay sp-overlay-scroll">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={spectroLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `${result?.score ?? 0} pts · objectif ${targetRef.current}` : `${result?.score ?? 0} / ${targetRef.current} pts`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
 
 			<p className="sp-help">
-				Prototype — un runner musical. Suis le contour de la mélodie qui défile&nbsp;; fie-toi à l'oreille (ta note bat contre la cible). Parfait = pile dessus, les combos multiplient le score. {daily ? 'Défi du jour : même mélodie pour tout le monde, meilleur score classé.' : 'Choisis ta difficulté et bats ton record.'}
+				Prototype — un runner musical. Suis le contour de la mélodie qui défile&nbsp;; fie-toi à l'oreille (ta note bat contre la cible). Parfait = pile dessus, les combos multiplient le score. {lv.active ? 'Niveaux : atteins le score cible pour débloquer le suivant, vise plus haut pour 2★ / 3★.' : daily ? 'Défi du jour : même mélodie pour tout le monde, meilleur score classé.' : 'Choisis ta difficulté et bats ton record.'}
 			</p>
 
-			{daily ? (
+			{lv.active ? null : daily ? (
 				<Leaderboard key={`lb-${gameId}`} game={gameId} metric="score" submitValue={status === 'done' ? submitScore : undefined} />
 			) : (
 				<LeaderboardCorner game={gameId} metric="score" />
@@ -592,6 +669,8 @@ const CSS = `
 .sp-playwrap { width: 100%; position: relative; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-md); }
 .sp-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
 .sp-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); padding: 1rem; }
+.sp-overlay-scroll { align-items: flex-start; overflow-y: auto; }
+.sp-overlay-scroll .ls-wrap { padding: 0.5rem 0; }
 .sp-card { background: var(--gray-999); border: 2px solid var(--sp); border-radius: 16px; padding: 20px 24px; max-width: 22rem; text-align: center; box-shadow: var(--shadow-lg); }
 .sp-card h3 { margin: 0 0 0.5rem; font-family: var(--font-brand); font-size: var(--text-2xl); }
 .sp-card p { color: var(--gray-200); font-size: 13.5px; line-height: 1.55; margin: 0 0 0.9rem; }

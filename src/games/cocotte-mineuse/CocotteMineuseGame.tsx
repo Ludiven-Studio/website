@@ -4,10 +4,14 @@ import {
 	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS, BOMB_FUSE, BLAST_TTL,
 	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type JewelId, type OreId,
 } from './engine';
+import { cocotteMineuseLevels } from './levels';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { useLevels } from '../../lib/useLevels';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 
 /* =====================================================
@@ -100,6 +104,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0); // re-keys the leaderboard so each replay re-submits
 	const [tries, setTries] = useState(0);
 	const [coarse, setCoarse] = useState(false);
+	const lv = useLevels(gameId, cocotteMineuseLevels);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const stateRef = useRef<MineState | null>(null);
@@ -120,6 +125,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false);
 	const triesRef = useRef(0);
 	const benchRef = useRef(false);
+	const levelsRef = useRef(false); // levels mode active → game-over grades the run
+	const targetRef = useRef(0); // score to clear the current level
 	const hudRef = useRef({ score: -1, depth: -1, lamp: -1, floodGap: -1, invSig: '' });
 
 	/* ---- Drawing ---- */
@@ -284,6 +291,11 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		benchRef.current = false;
 		setStatus('over');
 		setScore(sc);
+		if (levelsRef.current) {
+			lv.finish({ won: sc >= targetRef.current, score: sc, raw: { depth: st?.maxDepth ?? 0 } });
+			trackGame(gameId, 'game_over', { score: sc });
+			return;
+		}
 		setBest((prevBest) => {
 			const nb = Math.max(prevBest, sc);
 			if (dailyRef.current) {
@@ -301,7 +313,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			return nb;
 		});
 		trackGame(gameId, 'game_over', { score: sc });
-	}, [gameId, stop]);
+	}, [gameId, stop, lv.finish]);
 
 	const syncHud = useCallback((st: MineState) => {
 		const hud = hudRef.current;
@@ -386,6 +398,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	/* ---- Modes ---- */
 	const armFree = useCallback((key: DiffKey = diffKey) => {
 		stop();
+		lv.exit();
+		levelsRef.current = false;
 		dailyRef.current = false;
 		setDaily(false);
 		setAlreadyPlayed(false);
@@ -405,10 +419,12 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		syncHud(st);
 		try { setBest(Number(localStorage.getItem(BEST_KEY) ?? '0') || 0); } catch { setBest(0); }
 		draw();
-	}, [stop, draw, diffKey, syncHud]);
+	}, [stop, draw, diffKey, syncHud, lv.exit]);
 
 	const startDaily = useCallback(async () => {
 		stop();
+		lv.exit();
+		levelsRef.current = false;
 		dailyRef.current = true;
 		setDaily(true);
 		setStatus('ready');
@@ -454,16 +470,44 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		setStatus('ready');
 		setDailyLoading(false);
 		draw();
-	}, [gameId, stop, draw, syncHud]);
+	}, [gameId, stop, draw, syncHud, lv.exit]);
+
+	/* ---- Levels (progression) ---- */
+	// Enter levels mode: show the grid over an idle board (daily off, no run yet).
+	const armLevels = useCallback(() => {
+		stop();
+		dailyRef.current = false;
+		levelsRef.current = true;
+		setDaily(false);
+		setAlreadyPlayed(false);
+		triesRef.current = 0;
+		setTries(0);
+		setBench(false);
+		benchRef.current = false;
+		setDeathCause(null);
+		setStatus('ready');
+		lv.enter();
+	}, [stop, lv.enter]);
+
+	// Play a level: build the run from its config, store the target, then start.
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		levelsRef.current = true;
+		targetRef.current = cfg.target;
+		seedRef.current = cfg.seed;
+		diffRef.current = cfg.diff;
+		start();
+	}, [lv.play, start]);
 
 	/* ---- Input (discrete: one cell per press, hold to repeat) ---- */
 	const pressDir = useCallback((dir: Dir) => {
 		if (status === 'over' || dailyLoading || benchRef.current) return;
+		if (lv.menu) return; // levels grid open → don't auto-start from a stray key/press
 		if (status === 'ready') start();
 		const held = heldDirsRef.current;
 		if (!held.includes(dir)) held.push(dir); // last-pressed wins; repeats each tick while held
 		bufferDirRef.current = dir; // guarantees a fast tap lands even if released before a tick
-	}, [status, dailyLoading, start]);
+	}, [status, dailyLoading, start, lv.menu]);
 
 	const releaseDir = useCallback((dir: Dir) => {
 		const held = heldDirsRef.current;
@@ -473,9 +517,10 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 
 	const stepOnce = useCallback((dir: Dir) => { // one-shot move (swipe)
 		if (status === 'over' || dailyLoading || benchRef.current) return;
+		if (lv.menu) return; // levels grid open → don't auto-start from a swipe
 		if (status === 'ready') start();
 		bufferDirRef.current = dir;
-	}, [status, dailyLoading, start]);
+	}, [status, dailyLoading, start, lv.menu]);
 
 	const useToolAction = useCallback((id: ToolId) => {
 		const st = stateRef.current;
@@ -585,9 +630,22 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		<div className="cm-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => armFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => armFree(diffKey)}
+				onDaily={startDaily}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="cm-daily-tag">
+					{lv.menu
+						? 'Progression — réussis un niveau pour débloquer le suivant'
+						: `Niveau ${lv.level} · objectif ${targetRef.current}`}
+				</div>
+			) : daily ? (
 				<div className="cm-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
@@ -631,7 +689,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<div className="cm-stage">
+			<div className={`cm-stage ${lv.menu ? 'hidden' : ''}`}>
 			<div className="cm-side cm-ores" aria-label="Minerais collectés">
 				{ORE_ORDER.map((id) => (
 					<span key={id} className={`cm-item ${invCount(id) ? '' : 'empty'}`} title={LABEL[id]}>
@@ -640,7 +698,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				))}
 			</div>
 
-			<div className="cm-boardwrap">
+			<div className={`cm-boardwrap ${lv.menu ? 'hidden' : ''}`}>
 				<canvas
 					ref={canvasRef}
 					className={`cm-canvas ${daily && status === 'ready' ? 'blurred' : ''}`}
@@ -667,7 +725,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
+				{status === 'ready' && !dailyLoading && !lv.active && !(daily && alreadyPlayed) && (
 					<div className="cm-overlay">
 						<div className="cm-overlay-card">
 							<p className="cm-go-title">Prêt&nbsp;?</p>
@@ -682,7 +740,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					<div className="cm-overlay"><div className="cm-overlay-card">Préparation…</div></div>
 				)}
 
-				{status === 'over' && (
+				{status === 'over' && !lv.active && (
 					<div className="cm-overlay">
 						<div className="cm-overlay-card">
 							<p className="cm-go-title">
@@ -707,6 +765,19 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 							)}
 						</div>
 					</div>
+				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={cocotteMineuseLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Score ${score} / objectif ${targetRef.current}` : `Score ${score} · objectif ${targetRef.current}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
 				)}
 			</div>
 
@@ -758,6 +829,12 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			)}
 			</div>
 
+			{lv.menu && (
+				<div className="cm-levelselect">
+					<LevelSelect progress={lv.progress} onPick={startLevel} />
+				</div>
+			)}
+
 			<p className="cm-help">
 				Flèches ou ZQSD pour creuser dans les 4 directions (glisse ou pavé tactile sur mobile).
 				L'averse 🌧 descend du ciel, dissout le sable et fait tomber les pierres — creuse toujours plus bas pour la fuir&nbsp;!
@@ -765,8 +842,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				À l'atelier, fabrique outils et bijoux (touches 1-5) — la couronne 👑 rapporte un gros bonus.
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
 }
@@ -990,6 +1067,8 @@ const CSS = `
 .cm-lampicon { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); font-size: 12px; }
 
 .cm-boardwrap { position: relative; width: 100%; max-width: 380px; margin-inline: auto; }
+.cm-boardwrap.hidden { display: none; }
+.cm-levelselect { width: 100%; margin-top: 0.25rem; }
 /* Site global fullscreen → the board fits the remaining space (portrait ratio preserved). */
 .game-page.gf-full .cm-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .cm-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
@@ -1058,6 +1137,7 @@ const CSS = `
   display: flex; align-items: center; justify-content: center; gap: 6px;
   width: 100%; max-width: 460px;
 }
+.cm-stage.hidden { display: none; }
 .cm-stage .cm-boardwrap { flex: 1 1 auto; min-width: 0; }
 .cm-side {
   display: flex; flex-direction: column; justify-content: center; gap: 5px;

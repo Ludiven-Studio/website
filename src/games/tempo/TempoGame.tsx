@@ -3,7 +3,11 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
+import { useLevels } from '../../lib/useLevels';
+import { tempoLevels } from './levels';
 import { LANES, SPEEDS, ENDLESS_OPTS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type ChordBar, type Grade } from './engine';
 import { startSamplerLoad, playSample, samplerReady, samplerLoading, onSamplerChange } from './sampler';
 
@@ -92,6 +96,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const [result, setResult] = useState<{ score: number; rank: string; tiles: number } | null>(null);
 	const [best, setBest] = useState<number | null>(null);
 	const [submitScore, setSubmitScore] = useState<number | undefined>(undefined);
+	const lv = useLevels(gameId, tempoLevels);
+	const lvRef = useRef(lv);
+	lvRef.current = lv; // the rAF loop grades a levels run through this (always latest)
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -130,6 +137,8 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const speedRef = useRef(1);
 	const diffRef = useRef(1); // difficulty tier index (SPEEDS)
 	const dailyBestRef = useRef<number | null>(null);
+	const levelRunRef = useRef(false); // this run is a levels-mode attempt
+	const targetRef = useRef(0); // score to clear the current level (1★)
 
 	const setStat = (s: Status): void => {
 		statusRef.current = s;
@@ -650,7 +659,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			metroRef.current = true;
 			setMetro(true);
 		}
-		if (!dailyRef.current) seedRef.current = (Math.random() * 2 ** 32) >>> 0; // fresh tune each free run
+		if (!dailyRef.current && !levelRunRef.current) seedRef.current = (Math.random() * 2 ** 32) >>> 0; // fresh tune each free run
 		prepare(speedRef.current);
 		// Fresh per-run audio bus: silences any groove still scheduled from a previous run.
 		try {
@@ -682,7 +691,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		runningRef.current = true;
 		setStat('running');
 		setSubmitScore(undefined);
-		trackGame(gameId, 'game_started', { mode: listen ? 'listen' : dailyRef.current ? 'daily' : 'free' });
+		trackGame(gameId, 'game_started', { mode: listen ? 'listen' : levelRunRef.current ? 'levels' : dailyRef.current ? 'daily' : 'free' });
 	};
 
 	const finishRun = useCallback((): void => {
@@ -702,6 +711,15 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const total = Math.max(1, accCountRef.current);
 		const rank = rankOf(accSumRef.current / total);
 		const score = Math.round(scoreRef.current);
+		if (levelRunRef.current) {
+			// Levels mode: grade against the target. The LevelOutcome card replaces the
+			// free/daily result overlay, so no setResult / setBest here.
+			levelRunRef.current = false;
+			setStat('ready');
+			lvRef.current.finish({ won: score >= targetRef.current, score, raw: { rank, tiles: accCountRef.current } });
+			trackGame(gameId, 'game_over', { score });
+			return;
+		}
 		setResult({ score, rank, tiles: accCountRef.current });
 		setStat('done');
 		if (dailyRef.current) {
@@ -837,6 +855,38 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		const { seed, diffIndex } = await getDaily(gameId);
 		apply(seed, diffIndex, null);
 	}, [gameId, prepare]);
+
+	// Levels mode: switch into the progression grid.
+	const armLevels = useCallback((): void => {
+		dailyRef.current = false;
+		setDaily(false);
+		setDailyLoading(false);
+		levelRunRef.current = false;
+		runningRef.current = false;
+		try {
+			runGainRef.current?.disconnect(); // silence any groove still scheduled
+		} catch {
+			/* ignore */
+		}
+		setStat('ready');
+		lv.enter();
+	}, [lv]);
+
+	// Start a level: its seed/tier/tempo are fixed by the plan; play the song and
+	// grade when it ends (song complete or energy-out) against the target.
+	const startLevel = useCallback((level: number): void => {
+		const cfg = lv.play(level);
+		dailyRef.current = false;
+		setDaily(false);
+		levelRunRef.current = true;
+		seedRef.current = cfg.seed >>> 0;
+		diffRef.current = cfg.diff;
+		speedRef.current = cfg.speed;
+		targetRef.current = cfg.target;
+		setSpeedIdx(cfg.diff);
+		prepare(cfg.speed);
+		startRun(false);
+	}, [lv, prepare]);
 
 	/* ---------- Loop + keyboard ---------- */
 	useEffect(() => {
@@ -1240,9 +1290,22 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		<div className="tp-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => armFree(diffRef.current)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { lv.exit(); armFree(diffRef.current); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="tp-dailytag">
+					{lv.menu
+						? 'Progression — atteins le score cible pour débloquer le niveau suivant'
+						: `Niveau ${lv.level} · ${SPEEDS[diffRef.current].label} · objectif ${targetRef.current} pts`}
+				</div>
+			) : daily ? (
 				<div className="tp-dailytag">
 					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${SPEEDS[speedIdx].label}`}
 				</div>
@@ -1278,6 +1341,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="tp-playwrap" ref={wrapRef}>
 				<canvas ref={canvasRef} className="tp-canvas" onPointerDown={onDown} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} />
 
@@ -1292,7 +1358,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					</button>
 				)}
 
-				{status === 'ready' && !dailyLoading && (
+				{status === 'ready' && !dailyLoading && !lv.active && (
 					<div className="tp-overlay">
 						<div className="tp-card">
 							<h3>🎹 Tempo</h3>
@@ -1316,7 +1382,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						<div className="tp-card">Préparation du défi…</div>
 					</div>
 				)}
-				{status === 'done' && result && (
+				{status === 'done' && result && !lv.active && (
 					<div className="tp-overlay">
 						<div className="tp-card">
 							<div className={`tp-rank tp-rank-${result.rank}`}>{result.rank}</div>
@@ -1330,13 +1396,30 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={tempoLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={
+							lv.won
+								? `${Math.round(scoreRef.current)} pts · objectif ${targetRef.current}`
+								: `${Math.round(scoreRef.current)} pts · objectif ${targetRef.current} manqué`
+						}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
+			)}
 
 			<p className="tp-help">
-				Un « piano tiles » sans fin&nbsp;: la mélodie générée <b>accélère</b> peu à peu. Tape pile sur la ligne, <b>maintiens les tuiles longues</b> pour du bonus. {daily ? 'Défi du jour : même mélodie pour tous, meilleur score classé.' : 'Ton énergie (barre du haut) baisse sur un raté et remonte quand tu enchaînes — game over à zéro. Bats ton record !'}
+				Un « piano tiles » sans fin&nbsp;: la mélodie générée <b>accélère</b> peu à peu. Tape pile sur la ligne, <b>maintiens les tuiles longues</b> pour du bonus. {lv.active ? 'Progression : chaque niveau est une mélodie fixe à jouer — atteins le score cible pour le réussir, vise plus haut pour 2 et 3 étoiles.' : daily ? 'Défi du jour : même mélodie pour tous, meilleur score classé.' : 'Ton énergie (barre du haut) baisse sur un raté et remonte quand tu enchaînes — game over à zéro. Bats ton record !'}
 			</p>
 
-			{daily ? (
+			{lv.active ? null : daily ? (
 				<Leaderboard key={`lb-${gameId}`} game={gameId} metric="score" submitValue={status === 'done' ? submitScore : undefined} />
 			) : (
 				<LeaderboardCorner game={gameId} metric="score" />

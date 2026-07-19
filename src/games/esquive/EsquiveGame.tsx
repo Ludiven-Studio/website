@@ -17,7 +17,11 @@ import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
+import { useLevels } from '../../lib/useLevels';
+import { esquiveLevels } from './levels';
 
 /* =====================================================
    ESQUIVE — 3D asteroid dodger (three.js + rAF loop).
@@ -79,6 +83,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0); // re-keys the leaderboard so each replay re-submits
 	const [tries, setTries] = useState(0);
 	const [webglError, setWebglError] = useState(false);
+	const lv = useLevels(gameId, esquiveLevels);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const g3Ref = useRef<Scene3D | null>(null);
@@ -100,6 +105,9 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 	const camRollRef = useRef(0); // eased camera bank
 	const explodingRef = useRef(false); // ~1s explosion before the game-over popup
 	const explElapsedRef = useRef(0);
+	const levelsRef = useRef(false); // levels-mode run in progress → grade at game over
+	const targetRef = useRef(0); // levels: tenths of a second to reach to clear
+	const menuOpenRef = useRef(false); // level grid is open → block auto-start from input
 
 	/* ---- three.js scene (built once) ---- */
 	const initScene = useCallback(() => {
@@ -408,6 +416,11 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		const sc = stateRef.current.score;
 		statusRef.current = 'over';
 		setStatus('over');
+		if (levelsRef.current) {
+			lv.finish({ won: sc >= targetRef.current, score: sc });
+			trackGame(gameId, 'game_over', { score: sc });
+			return;
+		}
 		setBest((prev) => {
 			const nb = Math.max(prev, sc);
 			if (dailyRef.current) {
@@ -429,7 +442,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			return nb;
 		});
 		trackGame(gameId, 'game_over', { score: sc });
-	}, [gameId, stop]);
+	}, [gameId, stop, lv]);
 
 	const frame = useCallback(
 		(now: number) => {
@@ -509,6 +522,8 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		(key: DiffKey = diffKey) => {
 			stop();
 			resetBoom();
+			levelsRef.current = false;
+			menuOpenRef.current = false;
 			dailyRef.current = false;
 			setDaily(false);
 			setAlreadyPlayed(false);
@@ -536,6 +551,8 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 	const startDaily = useCallback(async () => {
 		stop();
 		resetBoom();
+		levelsRef.current = false;
+		menuOpenRef.current = false;
 		dailyRef.current = true;
 		setDaily(true);
 		statusRef.current = 'ready';
@@ -585,6 +602,40 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		draw(0, { x: 0, y: 0 });
 	}, [gameId, stop, draw, resetBoom]);
 
+	/* ---- Levels ---- */
+	// Start a level run from its deterministic config; grading happens at game over.
+	const startLevel = useCallback((level: number) => {
+		stop();
+		resetBoom();
+		const cfg = lv.play(level);
+		dailyRef.current = false;
+		setDaily(false);
+		levelsRef.current = true;
+		menuOpenRef.current = false;
+		targetRef.current = cfg.targetTenths;
+		pointerRef.current.active = false;
+		cfgRef.current = esquiveConfig(cfg.diff);
+		seedRef.current = cfg.seed;
+		stateRef.current = createEsquive(cfgRef.current);
+		scoreRef.current = 0;
+		setScore(0);
+		statusRef.current = 'ready';
+		setStatus('ready');
+		draw(0, { x: 0, y: 0 });
+	}, [stop, draw, resetBoom, lv]);
+
+	const armLevels = useCallback(() => {
+		stop();
+		resetBoom();
+		levelsRef.current = false;
+		menuOpenRef.current = true;
+		dailyRef.current = false;
+		setDaily(false);
+		statusRef.current = 'ready';
+		setStatus('ready');
+		lv.enter();
+	}, [stop, resetBoom, lv]);
+
 	/* ---- Input ---- */
 	useEffect(() => {
 		const setKey = (k: string, down: boolean): boolean => {
@@ -600,7 +651,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			if (used) {
 				e.preventDefault();
 				pointerRef.current.active = false; // keyboard takes over
-				if (statusRef.current === 'ready') start();
+				if (statusRef.current === 'ready' && !menuOpenRef.current) start();
 			}
 		};
 		const onKeyUp = (e: KeyboardEvent) => setKey(e.key, false);
@@ -676,7 +727,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		p.lastY = e.clientY;
 		p.targetX = stateRef.current.shipX;
 		p.targetY = stateRef.current.shipY;
-		if (statusRef.current === 'ready') start();
+		if (statusRef.current === 'ready' && !menuOpenRef.current) start();
 	};
 	const onCanvasPointerMove = (e: React.PointerEvent) => {
 		const p = pointerRef.current;
@@ -704,9 +755,22 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		<div className="es-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => armFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) lv.exit(); armFree(diffKey); }}
+				onDaily={() => { if (lv.active) lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="es-daily-tag">
+					{lv.menu
+						? 'Progression — atteins le temps cible pour débloquer le niveau suivant'
+						: `Niveau ${lv.level} · objectif ${Math.round(targetRef.current / 10)} s`}
+				</div>
+			) : daily ? (
 				<div className="es-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
@@ -755,15 +819,15 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{!webglError && status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
+				{!webglError && status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && !(lv.active && lv.menu) && (
 					<div className="es-overlay">
-						<button className="es-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
+						<button className="es-startbtn" onClick={start}>▶ {lv.active ? `Niveau ${lv.level}` : daily ? 'Commencer' : 'Jouer'}</button>
 					</div>
 				)}
 				{dailyLoading && (
 					<div className="es-overlay"><div className="es-overlay-card">Préparation…</div></div>
 				)}
-				{!webglError && status === 'over' && (
+				{!webglError && status === 'over' && !lv.active && (
 					<div className="es-overlay">
 						<div className="es-overlay-card">
 							<p className="es-go-title">{daily && alreadyPlayed ? 'Défi du jour terminé' : '💥 Boum !'}</p>
@@ -780,6 +844,25 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.menu && (
+					<div className="es-overlay es-levels">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={esquiveLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`Score ${fmtSec(score)} · objectif ${fmtSec(targetRef.current)}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={armLevels}
+					/>
+				)}
 			</div>
 
 			<p className="es-help">
@@ -789,8 +872,8 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 				défi du jour, les astéroïdes sont les mêmes pour tout le monde (10 essais, meilleur temps classé).
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtSec} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtSec} />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
 }
@@ -833,6 +916,11 @@ const CSS = `
   position: absolute; inset: 0; z-index: 2;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem;
   background: rgba(6,6,16,0.45); backdrop-filter: blur(2px); border-radius: 12px;
+}
+/* Level grid overlays the (still-rendering) canvas: opaque, padded, scrollable. */
+.es-overlay.es-levels {
+  background: rgba(6,6,16,0.9); overflow-y: auto; align-items: stretch; justify-content: flex-start;
+  padding: 14px 12px;
 }
 .es-overlay-card {
   background: var(--gray-999); border: 2px solid var(--es-accent); border-radius: 16px;

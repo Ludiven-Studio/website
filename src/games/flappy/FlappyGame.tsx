@@ -14,6 +14,10 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { flappyLevels } from './levels';
 
 /* =====================================================
    FLAPPY COCOTTE — real-time React island (canvas + rAF loop).
@@ -177,6 +181,9 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0); // re-keys the leaderboard so each replay re-submits
 	const [tries, setTries] = useState(0); // daily attempts used today
 
+	const lv = useLevels(gameId, flappyLevels);
+	const targetRef = useRef(0); // current level target (score to clear), read at game-over
+
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const stateRef = useRef<FlappyState>(createFlappy());
 	const cfgRef = useRef<FlappyConfig>(FLAPPY_CFG);
@@ -191,6 +198,8 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	const startRef = useRef(0);
 	const cssSizeRef = useRef(0);
 	const dailyRef = useRef(false);
+	const levelsRef = useRef(false); // levels mode active (guards start/game-over branches)
+	const levelMenuRef = useRef(false); // levels grid open (block a flap from starting a run)
 	const statusRef = useRef<Status>('ready');
 	const triesRef = useRef(0); // daily attempts used (guards start without stale state)
 	const skyImgRef = useRef<HTMLImageElement | null>(null); // AI pastel sky
@@ -252,6 +261,12 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		const sc = stateRef.current.score;
 		statusRef.current = 'over';
 		setStatus('over');
+		if (levelsRef.current) {
+			// Levels mode: grade the run (cleared when score reaches the level target).
+			lv.finish({ won: sc >= targetRef.current, score: sc });
+			trackGame(gameId, 'game_over', { score: sc });
+			return;
+		}
 		setBest((prev) => {
 			const nb = Math.max(prev, sc);
 			if (dailyRef.current) {
@@ -274,7 +289,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 			return nb;
 		});
 		trackGame(gameId, 'game_over', { score: sc });
-	}, [gameId, stop]);
+	}, [gameId, stop, lv]);
 
 	const frame = useCallback(
 		(now: number) => {
@@ -333,6 +348,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 
 	const doFlap = useCallback(() => {
 		if (dailyLoading) return;
+		if (levelMenuRef.current) return; // levels grid open — a flap must not start a run
 		if (statusRef.current === 'over') return;
 		if (statusRef.current === 'ready') {
 			start();
@@ -345,6 +361,9 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	const armFree = useCallback(
 		(key: DiffKey = diffKey) => {
 			stop();
+			lv.exit();
+			levelsRef.current = false;
+			levelMenuRef.current = false;
 			dailyRef.current = false;
 			setDaily(false);
 			setAlreadyPlayed(false);
@@ -365,11 +384,14 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 			}
 			draw();
 		},
-		[stop, draw, diffKey],
+		[stop, draw, diffKey, lv],
 	);
 
 	const startDaily = useCallback(async () => {
 		stop();
+		lv.exit();
+		levelsRef.current = false;
+		levelMenuRef.current = false;
 		dailyRef.current = true;
 		setDaily(true);
 		statusRef.current = 'ready';
@@ -418,7 +440,47 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		setStatus('ready');
 		setDailyLoading(false);
 		draw();
-	}, [gameId, stop, draw]);
+	}, [gameId, stop, draw, lv]);
+
+	/* ---- Levels mode ---- */
+	const startLevel = useCallback(
+		(level: number) => {
+			stop();
+			const cfg = lv.play(level); // sets the hook to "playing" for this level
+			levelsRef.current = true;
+			levelMenuRef.current = false;
+			dailyRef.current = false;
+			setDaily(false);
+			setAlreadyPlayed(false);
+			targetRef.current = cfg.target;
+			seedRef.current = cfg.seed;
+			cfgRef.current = flappyConfig({ label: `Niveau ${level}`, gapH: cfg.gapH, pipeSpacing: cfg.pipeSpacing, speed: cfg.speed });
+			stateRef.current = createFlappy(cfgRef.current);
+			scoreRef.current = 0;
+			setScore(0);
+			statusRef.current = 'ready';
+			setStatus('ready');
+			draw();
+		},
+		[stop, draw, lv],
+	);
+
+	const armLevels = useCallback(() => {
+		stop();
+		levelsRef.current = true;
+		levelMenuRef.current = true;
+		dailyRef.current = false;
+		setDaily(false);
+		statusRef.current = 'ready';
+		setStatus('ready');
+		lv.enter(); // load progression + show the grid
+	}, [stop, lv]);
+
+	// Mirror the levels-grid state into a ref so the loop/input guards stay in sync
+	// (e.g. after "Carte" returns from an outcome card).
+	useEffect(() => {
+		levelMenuRef.current = lv.menu;
+	}, [lv.menu]);
 
 	/* ---- Input ---- */
 	useEffect(() => {
@@ -512,9 +574,22 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		<div className="fl-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => armFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => armFree(diffKey)}
+				onDaily={startDaily}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="fl-daily-tag">
+					{lv.menu
+						? 'Progression — réussis un niveau pour débloquer le suivant'
+						: `Niveau ${lv.level} · objectif ${targetRef.current} pts`}
+				</div>
+			) : daily ? (
 				<div className="fl-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
@@ -538,10 +613,14 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 
 			<div className="fl-bar">
 				<span className="fl-score">Score {score}</span>
-				<span className="fl-best">Record {best}</span>
+				{lv.active ? (
+					<span className="fl-best">Objectif {targetRef.current}</span>
+				) : (
+					<span className="fl-best">Record {best}</span>
+				)}
 			</div>
 
-			<div className="fl-boardwrap">
+			<div className={`fl-boardwrap ${lv.active && lv.menu ? 'hidden' : ''}`}>
 				<canvas
 					ref={canvasRef}
 					className="fl-canvas"
@@ -550,15 +629,34 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 					onPointerDown={onCanvasPointer}
 				/>
 
-				{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
+				{/* Levels mode: press to start the level run (no free-mode overlays). */}
+				{lv.playing && status === 'ready' && (
+					<div className="fl-overlay">
+						<button className="fl-startbtn" onClick={start}>▶ Niveau {lv.level}</button>
+					</div>
+				)}
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={flappyLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`Score ${score} · objectif ${targetRef.current}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+
+				{!lv.active && status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
 					<div className="fl-overlay">
 						<button className="fl-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
 					</div>
 				)}
-				{dailyLoading && (
+				{!lv.active && dailyLoading && (
 					<div className="fl-overlay"><div className="fl-overlay-card">Préparation…</div></div>
 				)}
-				{status === 'over' && (
+				{!lv.active && status === 'over' && (
 					<div className="fl-overlay">
 						<div className="fl-overlay-card">
 							<p className="fl-go-title">{daily && alreadyPlayed ? 'Défi du jour terminé' : 'Aïe !'}</p>
@@ -577,6 +675,8 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} />}
+
 			<p className="fl-help">
 				Appuie sur <strong>Espace</strong>, clique ou touche l'écran pour battre des ailes.
 				Plus tu <strong>maintiens</strong>, plus la cocotte monte haut ; un petit tap = petit saut.
@@ -584,8 +684,8 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				au défi du jour, les tuyaux sont les mêmes pour tout le monde.
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
 }
@@ -612,6 +712,8 @@ const CSS = `
 .fl-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; }
 
 .fl-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
+/* Levels menu: keep the canvas mounted (rAF/render) but hide it behind the level grid. */
+.fl-boardwrap.hidden { display: none; }
 /* Site global fullscreen → the board fits the REMAINING space (a square, no overflow in landscape). */
 .game-page.gf-full .fl-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .fl-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }

@@ -40,9 +40,13 @@ const DEG_HI = 10; // ~2 octaves of pentatonic
 const clampDeg = (d: number): number => Math.max(DEG_LO, Math.min(DEG_HI, d));
 const scaleMidi = (root: number, deg: number): number => root + Math.floor(deg / 5) * 12 + PENTA[((deg % 5) + 5) % 5];
 
-/** Deterministic melody: gentle stepwise walk with occasional leaps and repeats. */
+/** Deterministic melody from a preset difficulty index (free / daily). */
 export function generateMelody(seed: number, diffIndex: number): Melody {
-	const d = DIFFS[Math.max(0, Math.min(2, diffIndex))];
+	return generateMelodyDiff(seed, DIFFS[Math.max(0, Math.min(2, diffIndex))]);
+}
+
+/** Deterministic melody: gentle stepwise walk with occasional leaps and repeats. */
+export function generateMelodyDiff(seed: number, d: Diff): Melody {
 	const rng = mulberry32(seed >>> 0);
 	const notes: Note[] = [];
 	let deg = 4;
@@ -78,6 +82,13 @@ export function judge(absCents: number): { grade: Grade; points: number } {
 
 /** Combo multiplier: +0.5× every 5 hits in a row (capped). */
 export const comboMult = (combo: number): number => Math.min(4, 1 + Math.floor(combo / 5) * 0.5);
+
+/** Max reachable score: every note Parfait (100) with the combo growing 1,2,3,… */
+export function maxScore(noteCount: number): number {
+	let total = 0;
+	for (let i = 0; i < noteCount; i++) total += Math.round(100 * comboMult(i + 1));
+	return total;
+}
 
 /** Final rank from mean points per note (0..100). */
 export function rankOf(meanPoints: number): 'S' | 'A' | 'B' | 'C' | 'D' {
