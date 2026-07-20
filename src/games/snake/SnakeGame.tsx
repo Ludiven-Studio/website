@@ -99,7 +99,6 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false); // latest daily flag for callbacks/listeners
 	const triesRef = useRef(0); // daily attempts used (guards start without stale state)
 	const bgImgRef = useRef<HTMLImageElement | null>(null); // AI board background
-	const appleImgRef = useRef<HTMLImageElement | null>(null); // AI apple sprite
 	const rockImgRef = useRef<HTMLImageElement | null>(null); // AI rock sprite
 
 	/* ---- Canvas sizing + drawing ---- */
@@ -178,40 +177,29 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			ctx.globalAlpha = 1;
 		}
 
-		// Apple: an AI sprite when loaded, else the procedural fallback.
+		// Food: a cocotte egg (cream ovoid with a highlight) — a nod to the Ludiven hens.
 		{
 			const ax = cx(st.food);
 			const ay = cy(st.food);
-			const appleImg = appleImgRef.current;
-			if (appleImg) {
-				const h = cell * 1.08; // fits within the cell → grass shows around it
-				const w = h * (appleImg.naturalWidth / appleImg.naturalHeight || 1);
-				ctx.drawImage(appleImg, ax - w / 2, ay - h / 2, w, h);
-			} else {
-			const r = cell * 0.3;
-			ctx.fillStyle = colors.apple;
+			const ew = cell * 0.32, eh = cell * 0.42; // half-width / half-height (taller = egg)
+			// soft drop shadow
+			ctx.fillStyle = 'rgba(0,0,0,0.14)';
 			ctx.beginPath();
-			ctx.arc(ax - r * 0.35, ay + r * 0.1, r * 0.8, 0, Math.PI * 2);
-			ctx.arc(ax + r * 0.35, ay + r * 0.1, r * 0.8, 0, Math.PI * 2);
+			ctx.ellipse(ax, ay + eh * 0.9, ew * 0.85, ew * 0.38, 0, 0, Math.PI * 2);
 			ctx.fill();
-			ctx.fillStyle = '#ffffff';
-			ctx.globalAlpha = 0.35;
+			// shell — slight top-to-bottom shading
+			const grad = ctx.createLinearGradient(ax, ay - eh, ax, ay + eh);
+			grad.addColorStop(0, '#fffdf6');
+			grad.addColorStop(1, '#efd9b4');
+			ctx.fillStyle = grad;
 			ctx.beginPath();
-			ctx.arc(ax - r * 0.35, ay - r * 0.2, r * 0.28, 0, Math.PI * 2);
+			ctx.ellipse(ax, ay, ew, eh, 0, 0, Math.PI * 2);
 			ctx.fill();
-			ctx.globalAlpha = 1;
-			ctx.strokeStyle = colors.stem;
-			ctx.lineWidth = Math.max(1, cell * 0.07);
-			ctx.lineCap = 'round';
+			// highlight
+			ctx.fillStyle = 'rgba(255,255,255,0.6)';
 			ctx.beginPath();
-			ctx.moveTo(ax, ay - r * 0.7);
-			ctx.lineTo(ax + cell * 0.03, ay - r * 1.25);
-			ctx.stroke();
-			ctx.fillStyle = colors.leaf;
-			ctx.beginPath();
-			ctx.ellipse(ax + r * 0.45, ay - r * 1.15, r * 0.45, r * 0.22, -0.6, 0, Math.PI * 2);
+			ctx.ellipse(ax - ew * 0.32, ay - eh * 0.33, ew * 0.26, eh * 0.2, -0.3, 0, Math.PI * 2);
 			ctx.fill();
-			}
 		}
 
 		// Snake: cartoon look — a dark outline pass under a bright body with a top
@@ -550,7 +538,6 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			img.src = src;
 		};
 		load('/assets/jeux/snake/bg.jpg', bgImgRef);
-		load('/assets/jeux/snake/apple.png', appleImgRef);
 		load('/assets/jeux/snake/rock.png', rockImgRef);
 	}, [draw]);
 
