@@ -205,21 +205,41 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		dragRef.current = { id, sourceTid };
 		if (sourceTid != null) setDraggingTid(sourceTid);
 		const fl = floatRef.current;
-		if (fl) { fl.textContent = getElement(id)!.emoji; fl.style.display = 'flex'; fl.style.left = `${ev.clientX}px`; fl.style.top = `${ev.clientY}px`; }
-		const move = (e: PointerEvent) => { if (floatRef.current) { floatRef.current.style.left = `${e.clientX}px`; floatRef.current.style.top = `${e.clientY}px`; } };
-		const up = (e: PointerEvent) => {
-			window.removeEventListener('pointermove', move);
-			window.removeEventListener('pointerup', up);
+		if (fl) { fl.textContent = getElement(id)!.emoji; fl.style.display = 'flex'; }
+		const moveAt = (x: number, y: number) => { const f = floatRef.current; if (f) { f.style.left = `${x}px`; f.style.top = `${y}px`; } };
+		moveAt(ev.clientX, ev.clientY);
+		const dropAt = (x: number, y: number) => {
 			if (floatRef.current) floatRef.current.style.display = 'none';
 			const drag = dragRef.current; dragRef.current = null; setDraggingTid(null);
 			if (!drag) return;
 			const rect = boardRef.current?.getBoundingClientRect();
-			const inside = !!rect && e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-			if (inside && rect) resolveBoardDrop(drag.id, drag.sourceTid, e.clientX - rect.left, e.clientY - rect.top);
+			const inside = !!rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+			if (inside && rect) resolveBoardDrop(drag.id, drag.sourceTid, x - rect.left, y - rect.top);
 			else if (drag.sourceTid != null) setTokens((cur) => cur.filter((t) => t.tid !== drag.sourceTid)); // off the board → remove
 		};
-		window.addEventListener('pointermove', move, { passive: false });
-		window.addEventListener('pointerup', up);
+		if (ev.pointerType === 'touch') {
+			// iOS Safari: pointermove during a touch is unreliable — use native touch events.
+			const tm = (e: TouchEvent) => { e.preventDefault(); const t = e.touches[0]; if (t) moveAt(t.clientX, t.clientY); };
+			const te = (e: TouchEvent) => {
+				window.removeEventListener('touchmove', tm);
+				window.removeEventListener('touchend', te);
+				window.removeEventListener('touchcancel', te);
+				const t = e.changedTouches[0];
+				dropAt(t ? t.clientX : ev.clientX, t ? t.clientY : ev.clientY);
+			};
+			window.addEventListener('touchmove', tm, { passive: false });
+			window.addEventListener('touchend', te, { passive: false });
+			window.addEventListener('touchcancel', te, { passive: false });
+		} else {
+			const move = (e: PointerEvent) => moveAt(e.clientX, e.clientY);
+			const up = (e: PointerEvent) => {
+				window.removeEventListener('pointermove', move);
+				window.removeEventListener('pointerup', up);
+				dropAt(e.clientX, e.clientY);
+			};
+			window.addEventListener('pointermove', move, { passive: false });
+			window.addEventListener('pointerup', up);
+		}
 	}, [resolveBoardDrop]);
 
 	const spawnToBoard = useCallback((id: string) => {
