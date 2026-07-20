@@ -72,6 +72,8 @@ export default function Celebration() {
 					}}
 				/>
 			))}
+			{/* Shared Ludiven mascot: a crowned cocotte pops in the centre of every victory burst. */}
+			<span className="lv-cocotte">🐔</span>
 			<style>{CSS}</style>
 		</div>
 	);
@@ -100,6 +102,31 @@ const CSS = `
 	0% { opacity: 1; transform: rotate(var(--a)) translateY(0) translateX(0) scale(0.3); }
 	70% { opacity: 1; }
 	100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) translateX(var(--drift)) scale(1); }
+}
+/* Crowned cocotte mascot — the common thread across every game's victory. */
+.lv-cocotte {
+	position: absolute;
+	font-size: 46px;
+	line-height: 1;
+	filter: drop-shadow(0 4px 8px rgba(0,0,0,0.32));
+	transform-origin: center bottom;
+	animation: lv-cocotte-in 0.9s cubic-bezier(0.2, 1.5, 0.4, 1) forwards;
+	z-index: 5;
+}
+.lv-cocotte::before {
+	content: '👑';
+	position: absolute;
+	left: 50%;
+	top: -0.4em;
+	transform: translateX(-50%) rotate(-8deg);
+	font-size: 0.5em;
+}
+@keyframes lv-cocotte-in {
+	0% { transform: scale(0) rotate(-18deg); opacity: 0; }
+	55% { transform: scale(1.06) rotate(0); opacity: 1; }
+	72% { transform: scale(1) translateY(0); }
+	86% { transform: scale(1) translateY(-6px); }
+	100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .lv-celebrate { display: none; } }
 `;
