@@ -587,10 +587,14 @@ function buildSled(accent: string): { sled: THREE.Group; disposables: (THREE.Buf
 	};
 	const wood = new THREE.MeshStandardMaterial({ color: 0xa9743f, roughness: 0.7 });
 	const metal = new THREE.MeshStandardMaterial({ color: 0xd9dee6, metalness: 0.8, roughness: 0.3 });
-	const suit = new THREE.MeshStandardMaterial({ color: new THREE.Color(accent), roughness: 0.6 });
-	const skin = new THREE.MeshStandardMaterial({ color: 0xf0c8a0, roughness: 0.8 });
-	const helmet = new THREE.MeshStandardMaterial({ color: 0xd83a3a, roughness: 0.35 });
-	d.push(wood, metal, suit, skin, helmet);
+	// Cocotte rider — a white hen, beak/head toward +x (downhill); the chase camera
+	// sees her back (tail + comb). A per-game accent band keeps her scarf coloured.
+	const white = new THREE.MeshStandardMaterial({ color: 0xf7f7f4, roughness: 0.8 });
+	const red = new THREE.MeshStandardMaterial({ color: 0xe0413a, roughness: 0.5 }); // comb + wattle
+	const beakMat = new THREE.MeshStandardMaterial({ color: 0xf5a623, roughness: 0.5 }); // orange
+	const eyeMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.4 });
+	const scarf = new THREE.MeshStandardMaterial({ color: new THREE.Color(accent), roughness: 0.6 });
+	d.push(wood, metal, white, red, beakMat, eyeMat, scarf);
 
 	mk(new THREE.BoxGeometry(1.5, 0.08, 0.7), wood, 0, 0.26, 0); // deck
 	for (const z of [-0.3, 0.3]) {
@@ -598,11 +602,26 @@ function buildSled(accent: string): { sled: THREE.Group; disposables: (THREE.Buf
 		const tip = mk(new THREE.BoxGeometry(0.34, 0.07, 0.09), metal, 0.9, 0.19, z);
 		tip.rotation.z = 0.7;
 	}
-	mk(new THREE.BoxGeometry(0.85, 0.3, 0.5), suit, -0.1, 0.48, 0); // lying rider body
-	mk(new THREE.BoxGeometry(0.35, 0.22, 0.44), suit, -0.55, 0.44, 0); // legs
-	const head = mk(new THREE.SphereGeometry(0.19, 14, 12), skin, 0.42, 0.55, 0);
-	void head;
-	mk(new THREE.SphereGeometry(0.22, 14, 12), helmet, 0.44, 0.58, 0);
+	// plump white body
+	const body = mk(new THREE.SphereGeometry(0.33, 16, 12), white, 0.02, 0.54, 0);
+	body.scale.set(1.3, 0.9, 1.0);
+	// tail feathers (back, angled up toward the camera)
+	const tail = mk(new THREE.BoxGeometry(0.26, 0.12, 0.34), white, -0.44, 0.64, 0);
+	tail.rotation.z = 0.6;
+	// wings tucked on the sides
+	for (const z of [-0.3, 0.3]) {
+		const w = mk(new THREE.BoxGeometry(0.4, 0.1, 0.13), white, 0.04, 0.52, z);
+		w.rotation.x = z > 0 ? -0.15 : 0.15;
+	}
+	// accent scarf around the neck
+	const neck = mk(new THREE.CylinderGeometry(0.2, 0.2, 0.09, 16), scarf, 0.33, 0.6, 0);
+	neck.rotation.z = Math.PI / 2;
+	mk(new THREE.SphereGeometry(0.2, 16, 12), white, 0.46, 0.67, 0); // head
+	mk(new THREE.BoxGeometry(0.07, 0.13, 0.17), red, 0.46, 0.85, 0); // comb on top
+	mk(new THREE.SphereGeometry(0.05, 8, 6), red, 0.58, 0.58, 0); // wattle
+	const beak = mk(new THREE.ConeGeometry(0.07, 0.17, 10), beakMat, 0.64, 0.67, 0);
+	beak.rotation.z = -Math.PI / 2; // point toward +x
+	for (const z of [-0.1, 0.1]) mk(new THREE.SphereGeometry(0.028, 8, 6), eyeMat, 0.55, 0.72, z); // eyes
 	return { sled, disposables: d };
 }
 
