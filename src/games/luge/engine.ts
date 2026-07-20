@@ -36,7 +36,7 @@ export interface Obstacle {
 export interface Collectible {
 	s: number; // local s
 	lat: number;
-	kind: 'points' | 'boost';
+	kind: 'points' | 'boost' | 'heart';
 	air?: boolean; // hovers over a jump pit — only catchable while AIRBORNE
 	rise?: number; // render height above the local ground (default 0.75)
 	taken?: boolean; // mutated by stepLuge on pickup (renderer hides the mesh)
@@ -110,7 +110,8 @@ export type LugeEvent =
 	| 'jumpShort'
 	| 'balanceFall'
 	| 'pickup'
-	| 'pickupBoost';
+	| 'pickupBoost'
+	| 'pickupHeart';
 
 export interface LugeState {
 	s: number;
@@ -658,8 +659,10 @@ export function generateSegment(seed: number, index: number, entry: EntryPose): 
 		const mid = (fork.noseS + fork.mergeS) / 2;
 		for (const ds of [-12, 0, 12]) collectibles.push({ s: mid + ds, lat: c, kind: 'points' });
 	} else if (rng() < (kind === 'tunnel' || kind === 'bob' ? 0.5 : 0.35)) {
-		const kindC: Collectible['kind'] = rng() < 0.22 ? 'boost' : 'points';
-		const count = kindC === 'boost' ? 1 : 3 + Math.floor(rng() * 3);
+		// An occasional heart heals a life; otherwise a boost ring or a chain of stars.
+		const r = rng();
+		const kindC: Collectible['kind'] = r < 0.15 ? 'heart' : r < 0.37 ? 'boost' : 'points';
+		const count = kindC === 'points' ? 3 + Math.floor(rng() * 3) : 1;
 		let sLocal = 15 + rng() * Math.max(1, length - 30 - count * 8);
 		for (let i = 0; i < count; i++) {
 			const absS = entry.startS + sLocal;
@@ -1066,6 +1069,14 @@ export function stepLuge(
 				if (c.kind === 'points') {
 					bonusScore += P.pickupPoints;
 					events.push('pickup');
+				} else if (c.kind === 'heart') {
+					if (lives < P.lives) {
+						lives += 1;
+						events.push('pickupHeart');
+					} else {
+						bonusScore += P.pickupPoints * 3; // already at full lives → bonus points
+						events.push('pickup');
+					}
 				} else {
 					boostMs = Math.max(boostMs, P.pickupBoostMs);
 					events.push('pickupBoost');

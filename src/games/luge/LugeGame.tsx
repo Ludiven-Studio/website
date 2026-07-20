@@ -82,6 +82,7 @@ interface Scene3D {
 		rail: THREE.MeshStandardMaterial;
 		gold: THREE.MeshStandardMaterial;
 		boostRing: THREE.MeshStandardMaterial;
+		heart: THREE.MeshStandardMaterial;
 	};
 	shared: {
 		trunk: THREE.CylinderGeometry;
@@ -93,6 +94,7 @@ interface Scene3D {
 		spike: THREE.ConeGeometry;
 		star: THREE.OctahedronGeometry;
 		ring: THREE.TorusGeometry;
+		heart: THREE.BufferGeometry;
 	};
 	baseDisposables: (THREE.BufferGeometry | THREE.Material | THREE.Texture)[];
 }
@@ -561,10 +563,9 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 	const pickups: SegMesh['pickups'] = [];
 	for (const c of seg.collectibles) {
 		const p = poseAt(segs, seg.startS + c.s, c.lat);
-		const m = new THREE.Mesh(
-			c.kind === 'points' ? g.shared.star : g.shared.ring,
-			c.kind === 'points' ? g.mats.gold : g.mats.boostRing,
-		);
+		const geo = c.kind === 'points' ? g.shared.star : c.kind === 'heart' ? g.shared.heart : g.shared.ring;
+		const mat = c.kind === 'points' ? g.mats.gold : c.kind === 'heart' ? g.mats.heart : g.mats.boostRing;
+		const m = new THREE.Mesh(geo, mat);
 		const baseY = p.y + (c.rise ?? 0.75) - o.y;
 		m.position.set(p.x - o.x, baseY, p.z - o.z);
 		group.add(m);
@@ -572,6 +573,23 @@ function buildSegmentMeshes(segs: TrackSegment[], seg: TrackSegment, g: Scene3D,
 	}
 
 	return { group, geoms, pickups };
+}
+
+/** A small extruded 3D heart (point down), sized like the star pickup. */
+function makeHeartGeo(): THREE.BufferGeometry {
+	const s = new THREE.Shape();
+	s.moveTo(0.25, 0.25);
+	s.bezierCurveTo(0.25, 0.25, 0.2, 0, 0, 0);
+	s.bezierCurveTo(-0.3, 0, -0.3, 0.35, -0.3, 0.35);
+	s.bezierCurveTo(-0.3, 0.55, -0.1, 0.77, 0.25, 0.95);
+	s.bezierCurveTo(0.6, 0.77, 0.8, 0.55, 0.8, 0.35);
+	s.bezierCurveTo(0.8, 0.35, 0.8, 0, 0.5, 0);
+	s.bezierCurveTo(0.35, 0, 0.25, 0.25, 0.25, 0.25);
+	const geo = new THREE.ExtrudeGeometry(s, { depth: 0.3, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.07, bevelSegments: 2, steps: 1 });
+	geo.center();
+	geo.rotateZ(Math.PI); // shape points up → flip so the heart's point is down
+	geo.scale(0.62, 0.62, 0.62);
+	return geo;
 }
 
 /** Sled + rider, nose toward +x (yawed via rotation.y = -heading). */
@@ -807,6 +825,13 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				emissive: 0x1899bb,
 				emissiveIntensity: 1.1,
 			}),
+			heart: new THREE.MeshStandardMaterial({
+				color: 0xff4d6d,
+				metalness: 0.15,
+				roughness: 0.35,
+				emissive: 0xcc1f3d,
+				emissiveIntensity: 0.85,
+			}),
 		};
 		Object.values(mats).forEach((m) => baseDisposables.push(m));
 		const swapTex = (file: string, targets: THREE.MeshStandardMaterial[], repeat: number) => {
@@ -836,6 +861,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			spike: new THREE.ConeGeometry(1, 1, 7),
 			star: new THREE.OctahedronGeometry(0.42),
 			ring: new THREE.TorusGeometry(0.45, 0.14, 8, 16),
+			heart: makeHeartGeo(),
 		};
 		Object.values(shared).forEach((g0) => baseDisposables.push(g0));
 
@@ -1189,6 +1215,12 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				setBonusFlash('Anneau BOOST !');
 				window.clearTimeout(bonusTimerRef.current);
 				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 1400);
+			} else if (ev === 'pickupHeart') {
+				flashOpRef.current = 0.4;
+				if (flashRef.current) flashRef.current.style.background = 'rgba(255,90,120,0.4)';
+				setBonusFlash('❤️ +1 vie !');
+				window.clearTimeout(bonusTimerRef.current);
+				bonusTimerRef.current = window.setTimeout(() => setBonusFlash(null), 1500);
 			}
 		}
 	}, []);
