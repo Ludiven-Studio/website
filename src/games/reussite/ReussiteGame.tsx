@@ -620,10 +620,12 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{lv.active && lv.menu ? (
+			{lv.active && lv.menu && (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
-			<div className="reu-playwrap" ref={wrapRef}>
+			)}
+			{/* Keep the canvas mounted (hidden under the grid) so the ResizeObserver re-sizes
+			    it when a level starts — unmounting left it at the default 300×150 (stretched). */}
+			<div className="reu-playwrap" ref={wrapRef} hidden={lv.active && lv.menu}>
 				<canvas ref={canvasRef} className={`reu-canvas${started ? '' : ' reu-blur'}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
 				{celebrating && <Celebration />}
 
@@ -691,7 +693,6 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
-			)}
 
 			{!(lv.active && (lv.menu || lv.done)) && (
 			<div className="reu-controls">
