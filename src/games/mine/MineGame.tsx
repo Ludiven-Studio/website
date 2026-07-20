@@ -53,11 +53,11 @@ function GemSVG({ color, special }: { color: number; special?: SpecialKind }) {
 					</linearGradient>
 				</defs>
 			)}
-			<polygon points="50,9 85,35 68,90 32,90 15,35" fill={isRainbow ? `url(#mn-rainbow)` : c.base} stroke="rgba(0,0,0,0.18)" strokeWidth="2" />
-			<polygon points="50,9 85,35 50,46 15,35" fill={isRainbow ? '#ffffff' : c.light} opacity="0.9" />
-			<polygon points="15,35 50,46 32,90" fill={isRainbow ? c.dark : c.dark} opacity="0.55" />
-			<polygon points="85,35 50,46 68,90" fill={c.dark} opacity="0.7" />
-			<line x1="50" y1="46" x2="50" y2="90" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
+			<polygon points="50,3 93,37 69,97 31,97 7,37" fill={isRainbow ? `url(#mn-rainbow)` : c.base} stroke="rgba(0,0,0,0.18)" strokeWidth="2" />
+			<polygon points="50,3 93,37 50,51 7,37" fill={isRainbow ? '#ffffff' : c.light} opacity="0.9" />
+			<polygon points="7,37 50,51 31,97" fill={isRainbow ? c.dark : c.dark} opacity="0.55" />
+			<polygon points="93,37 50,51 69,97" fill={c.dark} opacity="0.7" />
+			<line x1="50" y1="51" x2="50" y2="97" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
 			{(special === 'rowClear' || special === 'colClear') && (
 				<g stroke="#fff" strokeWidth="6" strokeLinecap="round" opacity="0.95">
 					{special === 'rowClear' ? <><line x1="24" y1="50" x2="76" y2="50" /><polyline points="66,42 78,50 66,58" fill="none" /><polyline points="34,42 22,50 34,58" fill="none" /></>
@@ -444,7 +444,7 @@ const CSS = `
 @keyframes mn-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
 
 .mn-gem, .mn-cage, .mn-hit { position: absolute; box-sizing: border-box; }
-.mn-gem { padding: 4%; transition: left 0.16s ease, top 0.16s ease; animation: mn-in 0.18s ease; pointer-events: none; }
+.mn-gem { padding: 1.5%; transition: left 0.16s ease, top 0.16s ease; animation: mn-in 0.18s ease; pointer-events: none; }
 .mn-gemsvg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
 .mn-gem.sel .mn-gemsvg { filter: drop-shadow(0 0 6px #fff) drop-shadow(0 2px 3px rgba(0,0,0,0.4)); transform: scale(1.08); }
 .mn-gem.hint .mn-gemsvg { animation: mn-hint 0.8s ease-in-out infinite; }
@@ -452,8 +452,8 @@ const CSS = `
 @keyframes mn-in { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes mn-hint { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
 
-.mn-cage { padding: 6%; display: grid; place-items: center; pointer-events: none; }
-.mn-cage .mn-cocotte { width: 78%; height: 78%; }
+.mn-cage { padding: 3%; display: grid; place-items: center; pointer-events: none; }
+.mn-cage .mn-cocotte { width: 88%; height: 88%; }
 .mn-bars { position: absolute; inset: 8%; border-radius: 8px; border: 2px solid rgba(255,255,255,0.55); background: repeating-linear-gradient(90deg, rgba(180,190,210,0.75) 0 3px, transparent 3px 22%); box-shadow: inset 0 0 8px rgba(0,0,0,0.4); }
 .mn-cage.h1 .mn-bars { opacity: 0.5; background: repeating-linear-gradient(90deg, rgba(180,190,210,0.6) 0 2px, transparent 2px 33%); }
 
