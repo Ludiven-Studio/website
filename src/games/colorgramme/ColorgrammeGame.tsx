@@ -18,6 +18,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { colorgrammeLevels } from './levels';
+import { touchDrag } from '../touchDrag';
 
 /* =====================================================
    COLORGRAMME — React island. A fully-coloured deduction grid.
@@ -370,8 +371,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		[tool, grid, activeColor, begin, removeHint, givenSet],
 	);
 
-	const cellFromEvent = (e: React.PointerEvent): [number, number] | null => {
-		const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+	const cellFromXY = (clientX: number, clientY: number): [number, number] | null => {
+		const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
 		const cell = el?.closest?.('.co-cell') as HTMLElement | null;
 		if (!cell) return null;
 		const r = Number(cell.dataset.r);
@@ -380,24 +381,40 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		return [r, c];
 	};
 
-	const onPointerDown = (e: React.PointerEvent) => {
+	/* Coordinate-driven stroke handlers, shared by Pointer (mouse/pen) and native touch. */
+	const startStroke = (clientX: number, clientY: number) => {
 		if (over || (daily && !started)) return;
-		const cell = cellFromEvent(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (!cell) return;
 		const [r, c] = cell;
 		painting.current = true;
 		if (tool === 'paint') strokeVal.current = grid[r][c] === activeColor ? 0 : activeColor; // re-tap erases
 		else if (tool === 'cross') strokeCross.current = !((crosses[r][c] >> activeColor) & 1);
 		applyStroke(r, c);
-		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
 	};
-	const onPointerMove = (e: React.PointerEvent) => {
+	const moveStroke = (clientX: number, clientY: number) => {
 		if (!painting.current) return;
-		const cell = cellFromEvent(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (cell) applyStroke(cell[0], cell[1]);
 	};
 	const endStroke = () => {
 		painting.current = false;
+	};
+
+	// Pointer Events drive mouse/pen only; touch goes through native handlers (iOS Safari
+	// drops pointermove after setPointerCapture).
+	const onPointerDown = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		startStroke(e.clientX, e.clientY);
+		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+	};
+	const onPointerMove = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		moveStroke(e.clientX, e.clientY);
+	};
+	const onPointerUp = (e?: React.PointerEvent) => {
+		if (e && e.pointerType === 'touch') return;
+		endStroke();
 	};
 
 	/* Hint: deduce the next logical cell and explain the technique. Paints the target
@@ -568,10 +585,11 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 						gridTemplateColumns: `auto repeat(${size}, var(--co-cell))`,
 						gridTemplateRows: `auto repeat(${size}, var(--co-cell))`,
 					}}
+					{...touchDrag(startStroke, moveStroke, endStroke)}
 					onPointerDown={onPointerDown}
 					onPointerMove={onPointerMove}
-					onPointerUp={endStroke}
-					onPointerCancel={endStroke}
+					onPointerUp={onPointerUp}
+					onPointerCancel={onPointerUp}
 				>
 					<div className="co-corner" />
 					{Array.from({ length: size }).map((_, c) => {

@@ -66,6 +66,7 @@ interface Drag {
 	y: number;
 	preview: Placement | null;
 	valid: boolean;
+	touch: boolean; // touch-initiated → native touch listeners (iOS Safari)
 }
 
 interface SavedState {
@@ -378,7 +379,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	}, [size]);
 
 	const beginDrag = useCallback(
-		(pieceIndex: number, rotation: number, grab: Cell, x: number, y: number) => {
+		(pieceIndex: number, rotation: number, grab: Cell, x: number, y: number, touch: boolean) => {
 			if (status === 'won' || revealed) return;
 			if (daily && !started) return;
 			// Pick a placed piece back up.
@@ -389,7 +390,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 				return next;
 			});
 			setHintNote('');
-			setDrag({ pieceIndex, rotation, grab, cellPx: boardCellPx(), x, y, preview: null, valid: false });
+			setDrag({ pieceIndex, rotation, grab, cellPx: boardCellPx(), x, y, preview: null, valid: false, touch });
 		},
 		[status, revealed, daily, started, boardCellPx],
 	);
@@ -411,13 +412,17 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		[cellFromPoint, validPlacement],
 	);
 
+	// Only re-attach listeners when a drag starts / ends or its touch mode flips —
+	// not on every pointer move (which updates `drag` on each frame).
+	const dragActive = !!drag;
+	const dragTouch = drag?.touch ?? false;
+
 	useEffect(() => {
-		if (!drag) return;
-		const onMove = (e: PointerEvent) => {
-			e.preventDefault();
-			setDrag((d) => (d ? computeDrag(d, e.clientX, e.clientY, d.rotation) : d));
+		if (!dragActive) return;
+		const moveTo = (x: number, y: number) => {
+			setDrag((d) => (d ? computeDrag(d, x, y, d.rotation) : d));
 		};
-		const onUp = () => {
+		const endDrag = () => {
 			setDrag((d) => {
 				if (!d) return null;
 				setTrayRot((tr) => {
@@ -453,17 +458,47 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 				});
 			}
 		};
+		window.addEventListener('keydown', onKey);
+
+		if (dragTouch) {
+			// iOS Safari: pointermove/pointerup during a touch is unreliable — use
+			// native touch events with preventDefault so the page never scrolls mid-drag.
+			const onTouchMove = (e: TouchEvent) => {
+				e.preventDefault();
+				const t = e.touches[0];
+				if (t) moveTo(t.clientX, t.clientY);
+			};
+			const onTouchEnd = (e: TouchEvent) => {
+				const t = e.changedTouches[0];
+				if (t) moveTo(t.clientX, t.clientY); // land on the last real position
+				endDrag();
+			};
+			window.addEventListener('touchmove', onTouchMove, { passive: false });
+			window.addEventListener('touchend', onTouchEnd, { passive: false });
+			window.addEventListener('touchcancel', onTouchEnd, { passive: false });
+			return () => {
+				window.removeEventListener('touchmove', onTouchMove);
+				window.removeEventListener('touchend', onTouchEnd);
+				window.removeEventListener('touchcancel', onTouchEnd);
+				window.removeEventListener('keydown', onKey);
+			};
+		}
+
+		const onMove = (e: PointerEvent) => {
+			e.preventDefault();
+			moveTo(e.clientX, e.clientY);
+		};
+		const onUp = () => endDrag();
 		window.addEventListener('pointermove', onMove, { passive: false });
 		window.addEventListener('pointerup', onUp);
 		window.addEventListener('pointercancel', onUp);
-		window.addEventListener('keydown', onKey);
 		return () => {
 			window.removeEventListener('pointermove', onMove);
 			window.removeEventListener('pointerup', onUp);
 			window.removeEventListener('pointercancel', onUp);
 			window.removeEventListener('keydown', onKey);
 		};
-	}, [drag, computeDrag, ensureStarted, pieceRots, rotate]);
+	}, [dragActive, dragTouch, computeDrag, ensureStarted, pieceRots, rotate]);
 
 	const rotateTray = useCallback((pieceIndex: number) => {
 		setTrayRot((tr) => {
@@ -693,7 +728,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 										if (!interactive || !covered) return;
 										e.preventDefault();
 										const pl = placements[idx]!;
-										beginDrag(idx, pl.rotation, [r - pl.row, c - pl.col], e.clientX, e.clientY);
+										beginDrag(idx, pl.rotation, [r - pl.row, c - pl.col], e.clientX, e.clientY, e.pointerType === 'touch');
 									}}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${isBlocked ? ', bloquée' : covered ? ', occupée' : ', libre'}`}
 								/>
@@ -786,7 +821,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 														gc = Math.max(0, Math.min(cols - 1, gc));
 														gr = Math.max(0, Math.min(rows - 1, gr));
 														const grab = nearestFilled(o, [gr, gc]);
-														beginDrag(i, trayRot[i] ?? 0, grab, e.clientX, e.clientY);
+														beginDrag(i, trayRot[i] ?? 0, grab, e.clientX, e.clientY, e.pointerType === 'touch');
 													}
 										}
 									>

@@ -17,6 +17,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { touchDrag } from '../touchDrag';
 import { aquariumLevels } from './levels';
 
 /* =====================================================
@@ -284,8 +285,8 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		[begin, removeHint],
 	);
 
-	const cellFromEvent = (e: React.PointerEvent): [number, number] | null => {
-		const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+	const cellFromXY = (clientX: number, clientY: number): [number, number] | null => {
+		const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
 		const cell = el?.closest?.('.aq-cell') as HTMLElement | null;
 		if (!cell) return null;
 		const r = Number(cell.dataset.r);
@@ -294,24 +295,35 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		return [r, c];
 	};
 
-	const onPointerDown = (e: React.PointerEvent) => {
+	// Coordinate-based paint. Mouse/pen go through Pointer Events; iOS touch is driven
+	// by native touch events (touchDrag) because pointermove is unreliable after capture.
+	const startPaint = (clientX: number, clientY: number) => {
 		if (over || (daily && !started)) return;
-		const cell = cellFromEvent(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (!cell) return;
 		const [r, c] = cell;
 		painting.current = true;
 		// Cycle the tapped cell empty → water → air → empty; drag paints that value.
 		strokeVal.current = ((grid[r][c] + 1) % 3) as Mark;
 		applyStroke(r, c);
-		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
 	};
-	const onPointerMove = (e: React.PointerEvent) => {
+	const movePaint = (clientX: number, clientY: number) => {
 		if (!painting.current) return;
-		const cell = cellFromEvent(e);
+		const cell = cellFromXY(clientX, clientY);
 		if (cell) applyStroke(cell[0], cell[1]);
 	};
 	const endStroke = () => {
 		painting.current = false;
+	};
+
+	const onPointerDown = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		startPaint(e.clientX, e.clientY);
+		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+	};
+	const onPointerMove = (e: React.PointerEvent) => {
+		if (e.pointerType === 'touch') return;
+		movePaint(e.clientX, e.clientY);
 	};
 
 	/* Hint (free): deduce the next logical cell and explain the technique. Marks GREEN. */
@@ -441,6 +453,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 					onPointerMove={onPointerMove}
 					onPointerUp={endStroke}
 					onPointerCancel={endStroke}
+					{...touchDrag(startPaint, movePaint, endStroke)}
 				>
 					<div className="aq-corner" />
 					{/* Column clues (water count per column). */}

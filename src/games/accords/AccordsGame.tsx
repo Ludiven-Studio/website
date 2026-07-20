@@ -396,15 +396,16 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 		lv.exit();
 	}, [lv]);
 
-	/* ---------- Pointer ---------- */
-	const posFrom = (e: React.PointerEvent): { x: number; y: number } => {
+	/* ---------- Drag (coord-based; shared by mouse-pointer and native touch) ---------- */
+	// Convert a client (viewport) point to canvas coordinates.
+	const posFrom = (clientX: number, clientY: number): { x: number; y: number } => {
 		const cv = canvasRef.current!;
 		const rect = cv.getBoundingClientRect();
-		return { x: (e.clientX - rect.left) * (dimRef.current.w / rect.width), y: (e.clientY - rect.top) * (dimRef.current.h / rect.height) };
+		return { x: (clientX - rect.left) * (dimRef.current.w / rect.width), y: (clientY - rect.top) * (dimRef.current.h / rect.height) };
 	};
-	const onDown = (e: React.PointerEvent): void => {
+	const startDrag = (clientX: number, clientY: number): void => {
 		if (statusRef.current !== 'tuning') return;
-		const p = posFrom(e);
+		const p = posFrom(clientX, clientY);
 		let best = -1;
 		let bestD = 34;
 		peaksRef.current.forEach((pk, i) => {
@@ -422,21 +423,36 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 			return;
 		}
 		dragRef.current = best;
-		canvasRef.current?.setPointerCapture(e.pointerId);
 		pk.midi = midiForX(p.x);
 		startLive(midiToFreq(pk.midi), INSTRUMENTS[curLevel().instrument]);
 	};
-	const onMove = (e: React.PointerEvent): void => {
+	const moveDrag = (clientX: number, clientY: number): void => {
 		const i = dragRef.current;
 		if (i < 0) return;
-		const m = midiForX(posFrom(e).x);
+		const m = midiForX(posFrom(clientX, clientY).x);
 		peaksRef.current[i].midi = m;
 		setLive(midiToFreq(m));
 	};
-	const onUp = (): void => {
+	const endDrag = (): void => {
 		if (dragRef.current < 0) return;
 		dragRef.current = -1;
 		stopLive();
+	};
+
+	// Pointer Events drive mouse/pen only. iOS Safari drops pointermove after a
+	// touch (same failure that broke luge/alchimie), so touch goes through native
+	// touch listeners below instead of setPointerCapture.
+	const onDown = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		startDrag(e.clientX, e.clientY);
+	};
+	const onMove = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		moveDrag(e.clientX, e.clientY);
+	};
+	const onUp = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
+		endDrag();
 	};
 
 	/* ---------- Loop ---------- */
@@ -471,6 +487,39 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 			cancelAnimationFrame(rafRef.current);
 			stopLive();
 			void ctxRef.current?.close();
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+	// Native touch listeners (non-passive) so preventDefault works on iOS Safari and
+	// the drag stays reliable — Pointer Events only cover mouse/pen (see onDown).
+	useEffect(() => {
+		const cv = canvasRef.current;
+		if (!cv) return;
+		const onTouchStart = (e: globalThis.TouchEvent): void => {
+			const t = e.touches[0];
+			if (!t) return;
+			e.preventDefault();
+			startDrag(t.clientX, t.clientY);
+		};
+		const onTouchMove = (e: globalThis.TouchEvent): void => {
+			const t = e.touches[0];
+			if (!t) return;
+			e.preventDefault();
+			moveDrag(t.clientX, t.clientY);
+		};
+		const onTouchEnd = (e: globalThis.TouchEvent): void => {
+			e.preventDefault();
+			endDrag();
+		};
+		cv.addEventListener('touchstart', onTouchStart, { passive: false });
+		cv.addEventListener('touchmove', onTouchMove, { passive: false });
+		cv.addEventListener('touchend', onTouchEnd, { passive: false });
+		cv.addEventListener('touchcancel', onTouchEnd, { passive: false });
+		return () => {
+			cv.removeEventListener('touchstart', onTouchStart);
+			cv.removeEventListener('touchmove', onTouchMove);
+			cv.removeEventListener('touchend', onTouchEnd);
+			cv.removeEventListener('touchcancel', onTouchEnd);
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
