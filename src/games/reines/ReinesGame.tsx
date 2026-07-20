@@ -231,7 +231,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const conflictMessage = useMemo(() => {
 		if (conflictInfo.reasons.size === 0) return '';
 		const parts = [...conflictInfo.reasons].map((r) => REASON_LABEL[r]);
-		return `Conflit : des reines ${parts.join(' · ')}.`;
+		return `Conflit : des cocottes ${parts.join(' · ')}.`;
 	}, [conflictInfo]);
 
 	/* Ground-truth diagnostic: if a "zone" conflict ever fires, dump the real
@@ -468,11 +468,11 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 									}}
 									onClick={() => cycle(r, c)}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${
-										st === 2 ? ', reine' : st === 1 ? ', marquée' : ', vide'
+										st === 2 ? ', cocotte' : st === 1 ? ', marquée' : ', vide'
 									}`}
 									disabled={status === 'won' || revealed || (daily && !started)}
 								>
-									{st === 2 ? '♛' : st === 1 ? '✕' : ''}
+									{st === 2 ? <span className="rn-cocotte" aria-hidden="true">🐔</span> : st === 1 ? '✕' : ''}
 								</button>
 							);
 						}),
@@ -494,7 +494,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				{showWin && !daily && !lv.active && (
 					<div className="rn-win" role="dialog" aria-label="Grille résolue">
 						<div className="rn-wincard">
-							<div className="rn-winmark">👑</div>
+							<div className="rn-winmark"><span className="rn-cocotte">🐔</span></div>
 							<h2>Couronné !</h2>
 							<p className="rn-wintime">{fmtTime(elapsed)}</p>
 							<p className="rn-windiff">{DIFFS[diffKey].label} · {size}×{size}</p>
@@ -540,8 +540,8 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 					<p className="rn-msg" role="status" aria-live="polite">{conflictMessage}</p>
 
 					<p className="rn-help">
-						Touche une case pour cycler : vide → croix → reine ♛. Place exactement une reine par
-						ligne, colonne et couleur, sans que deux reines se touchent (même en diagonale).
+						Touche une case pour cycler : vide → croix → cocotte couronnée 🐔. Place exactement une
+						cocotte par ligne, colonne et couleur, sans que deux cocottes se touchent (même en diagonale).
 					</p>
 				</>
 			)}
@@ -649,6 +649,12 @@ const CSS = `
   transition: filter 0.08s ease;
 }
 .rn-cell:active { filter: brightness(0.93); }
+/* A crowned cocotte marks a placed "reine": the hen with a small crown on its head. */
+.rn-cocotte { position: relative; display: inline-flex; line-height: 1; }
+.rn-cocotte::before {
+  content: '👑'; position: absolute; left: 50%; top: -0.28em;
+  transform: translateX(-50%); font-size: 0.5em; pointer-events: none;
+}
 /* Whole offending region washed red -> reads as one connected blob. */
 .rn-cell.creg { background-image: linear-gradient(rgba(211, 58, 44, 0.34), rgba(211, 58, 44, 0.34)); }
 .rn-cell.bad { color: var(--rn-bad); box-shadow: inset 0 0 0 3px var(--rn-bad); z-index: 1; }

@@ -108,8 +108,8 @@ export const games: GameTile[] = [
 	},
 	{
 		id: 'reines',
-		title: 'Reines',
-		pitch: 'Une reine par ligne, colonne et couleur, sans qu\'elles se touchent. À la LinkedIn Queens.',
+		title: 'Reines Cocottes',
+		pitch: 'Une cocotte couronnée par ligne, colonne et couleur, sans qu\'elles se touchent. À la LinkedIn Queens.',
 		icon: 'crown',
 		href: '/jeux/reines',
 		status: 'play',

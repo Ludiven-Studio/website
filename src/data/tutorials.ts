@@ -96,9 +96,9 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Astuce', body: 'Solution unique garantie. Indice corrige une erreur ou dévoile une case ; après 1 min, tu peux voir la solution.' },
 	],
 	reines: [
-		{ emoji: '👑', title: 'Le but', body: 'Place une reine par ligne, par colonne et par zone de couleur.' },
-		{ emoji: '🚫', title: 'La règle', body: 'Deux reines ne doivent jamais se toucher, même en diagonale. Touche une case pour cycler : marque, puis reine.' },
-		{ emoji: '💡', title: 'Astuce', body: 'Pose une croix sur les cases sûrement interdites pour t\'y retrouver. Indice place une reine correcte si tu bloques.' },
+		{ emoji: '🐔', title: 'Le but', body: 'Place une cocotte couronnée par ligne, par colonne et par zone de couleur.' },
+		{ emoji: '🚫', title: 'La règle', body: 'Deux cocottes ne doivent jamais se toucher, même en diagonale. Touche une case pour cycler : marque, puis cocotte.' },
+		{ emoji: '💡', title: 'Astuce', body: 'Pose une croix sur les cases sûrement interdites pour t\'y retrouver. Indice place une cocotte correcte si tu bloques.' },
 	],
 	calcudoku: [
 		{ emoji: '🎯', title: 'Le but', body: 'Chaque ligne et chaque colonne contient les chiffres de 1 à N, sans répétition.' },
