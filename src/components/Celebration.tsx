@@ -72,8 +72,28 @@ export default function Celebration() {
 					}}
 				/>
 			))}
-			{/* Shared Ludiven mascot: a crowned cocotte pops in the centre of every victory burst. */}
-			<span className="lv-cocotte">🐔</span>
+			{/* Shared Ludiven mascot: a plump front-facing cocotte pops in the centre of every win. */}
+			<svg className="lv-cocotte" viewBox="0 0 100 104" aria-hidden="true">
+				<g fill="#e0413a">
+					<circle cx="42" cy="21" r="7" />
+					<circle cx="52" cy="15" r="8.5" />
+					<circle cx="62" cy="21" r="7" />
+				</g>
+				<ellipse cx="18" cy="62" rx="11" ry="19" fill="#eef0ea" />
+				<ellipse cx="82" cy="62" rx="11" ry="19" fill="#eef0ea" />
+				<ellipse cx="50" cy="61" rx="35" ry="33" fill="#fdfdfb" stroke="#e6e6df" strokeWidth="1.5" />
+				<circle cx="39" cy="50" r="5" fill="#2a2a2a" />
+				<circle cx="61" cy="50" r="5" fill="#2a2a2a" />
+				<circle cx="40.6" cy="48.2" r="1.6" fill="#fff" />
+				<circle cx="62.6" cy="48.2" r="1.6" fill="#fff" />
+				<polygon points="50,55 43,62 57,62" fill="#f5a623" />
+				<circle cx="46" cy="67" r="3.6" fill="#e0413a" />
+				<circle cx="54" cy="67" r="3.6" fill="#e0413a" />
+				<g stroke="#f5a623" strokeWidth="3.4" strokeLinecap="round">
+					<line x1="42" y1="92" x2="42" y2="99" />
+					<line x1="58" y1="92" x2="58" y2="99" />
+				</g>
+			</svg>
 			<style>{CSS}</style>
 		</div>
 	);
@@ -103,23 +123,15 @@ const CSS = `
 	70% { opacity: 1; }
 	100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) translateX(var(--drift)) scale(1); }
 }
-/* Crowned cocotte mascot — the common thread across every game's victory. */
+/* Cocotte mascot — the common thread across every game's victory. */
 .lv-cocotte {
 	position: absolute;
-	font-size: 46px;
-	line-height: 1;
-	filter: drop-shadow(0 4px 8px rgba(0,0,0,0.32));
+	width: 56px;
+	height: 58px;
+	filter: drop-shadow(0 4px 8px rgba(0,0,0,0.28));
 	transform-origin: center bottom;
 	animation: lv-cocotte-in 0.9s cubic-bezier(0.2, 1.5, 0.4, 1) forwards;
 	z-index: 5;
-}
-.lv-cocotte::before {
-	content: '👑';
-	position: absolute;
-	left: 50%;
-	top: -0.4em;
-	transform: translateX(-50%) rotate(-8deg);
-	font-size: 0.5em;
 }
 @keyframes lv-cocotte-in {
 	0% { transform: scale(0) rotate(-18deg); opacity: 0; }
