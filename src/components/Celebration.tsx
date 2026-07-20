@@ -72,26 +72,32 @@ export default function Celebration() {
 					}}
 				/>
 			))}
-			{/* Shared Ludiven mascot: a plump front-facing cocotte pops in the centre of every win. */}
-			<svg className="lv-cocotte" viewBox="0 0 100 104" aria-hidden="true">
+			{/* Shared Ludiven mascot: a plump front-facing cocotte gives a thumbs-up on every win. */}
+			<svg className="lv-cocotte" viewBox="0 0 110 108" aria-hidden="true">
 				<g fill="#e0413a">
 					<circle cx="42" cy="21" r="7" />
 					<circle cx="52" cy="15" r="8.5" />
 					<circle cx="62" cy="21" r="7" />
 				</g>
-				<ellipse cx="18" cy="62" rx="11" ry="19" fill="#eef0ea" />
-				<ellipse cx="82" cy="62" rx="11" ry="19" fill="#eef0ea" />
-				<ellipse cx="50" cy="61" rx="35" ry="33" fill="#fdfdfb" stroke="#e6e6df" strokeWidth="1.5" />
-				<circle cx="39" cy="50" r="5" fill="#2a2a2a" />
-				<circle cx="61" cy="50" r="5" fill="#2a2a2a" />
-				<circle cx="40.6" cy="48.2" r="1.6" fill="#fff" />
-				<circle cx="62.6" cy="48.2" r="1.6" fill="#fff" />
-				<polygon points="50,55 43,62 57,62" fill="#f5a623" />
-				<circle cx="46" cy="67" r="3.6" fill="#e0413a" />
-				<circle cx="54" cy="67" r="3.6" fill="#e0413a" />
+				<ellipse cx="18" cy="64" rx="11" ry="19" fill="#eef0ea" />
+				{/* raised right wing (arm) */}
+				<path d="M 70 60 Q 84 60 89 47" stroke="#eef0ea" strokeWidth="12" strokeLinecap="round" fill="none" />
+				<ellipse cx="50" cy="62" rx="35" ry="33" fill="#fdfdfb" stroke="#e6e6df" strokeWidth="1.5" />
+				{/* thumbs-up hand: wide fist + thumb up on the side */}
+				<g fill="#fdfdfb" stroke="#e6e6df" strokeWidth="1.4">
+					<rect x="80" y="32" width="20" height="15" rx="6.5" />
+					<rect x="80" y="18" width="9.5" height="17" rx="4.75" />
+				</g>
+				<circle cx="39" cy="51" r="5" fill="#2a2a2a" />
+				<circle cx="61" cy="51" r="5" fill="#2a2a2a" />
+				<circle cx="40.6" cy="49.2" r="1.6" fill="#fff" />
+				<circle cx="62.6" cy="49.2" r="1.6" fill="#fff" />
+				<polygon points="50,56 43,63 57,63" fill="#f5a623" />
+				<circle cx="46" cy="68" r="3.6" fill="#e0413a" />
+				<circle cx="54" cy="68" r="3.6" fill="#e0413a" />
 				<g stroke="#f5a623" strokeWidth="3.4" strokeLinecap="round">
-					<line x1="42" y1="92" x2="42" y2="99" />
-					<line x1="58" y1="92" x2="58" y2="99" />
+					<line x1="42" y1="93" x2="42" y2="100" />
+					<line x1="58" y1="93" x2="58" y2="100" />
 				</g>
 			</svg>
 			<style>{CSS}</style>
@@ -126,8 +132,8 @@ const CSS = `
 /* Cocotte mascot — the common thread across every game's victory. */
 .lv-cocotte {
 	position: absolute;
-	width: 56px;
-	height: 58px;
+	width: 60px;
+	height: 59px;
 	filter: drop-shadow(0 4px 8px rgba(0,0,0,0.28));
 	transform-origin: center bottom;
 	animation: lv-cocotte-in 0.9s cubic-bezier(0.2, 1.5, 0.4, 1) forwards;
