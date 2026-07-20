@@ -13,6 +13,14 @@ export interface GameTile {
 
 export const games: GameTile[] = [
 	{
+		id: 'mine',
+		title: 'La Mine aux Cocottes',
+		pitch: 'Un match-3 de cristaux pour libérer les cocottes prisonnières des cages : aligne diamants, rubis et émeraudes, déclenche fusées, bombes et arc-en-ciel, et sauve toutes les cocottes avant la fin des coups.',
+		icon: 'mine',
+		href: '/jeux/mine',
+		status: 'play',
+	},
+	{
 		id: '2048',
 		title: '2048',
 		pitch: 'Fais glisser les tuiles pour fusionner les nombres égaux, atteins 2048 puis pousse ton meilleur score. Défi du jour à graine partagée.',

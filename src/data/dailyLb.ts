@@ -27,6 +27,7 @@ const centis: ScoreFormat = { kind: 'duration', div: 100, decimals: 2, mmssAbove
 
 export const DAILY_LB: Record<string, DailyLbCfg> = {
 	// Score (higher is better) → "N pts"
+	mine: { fmt: score },
 	'2048': { fmt: score },
 	snake: { fmt: score },
 	tempo: { fmt: score },

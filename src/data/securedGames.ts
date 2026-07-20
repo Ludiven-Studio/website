@@ -14,6 +14,7 @@ import type { Metric } from '../lib/leaderboard';
 
 export const SECURED_GAMES: Record<string, Metric> = {
 	// Score — higher is better
+	mine: 'score',
 	luge: 'score',
 	'2048': 'score',
 	snake: 'score',
