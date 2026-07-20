@@ -195,19 +195,14 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		registerDiscovery(product);
 	}, [flash, registerDiscovery]);
 
-	/* ---- Pointer drag (mouse + touch), routed on drop to the board ---- */
-	const startDrag = useCallback((id: string, sourceTid: number | null, ev: React.PointerEvent) => {
-		// Touch on a palette card (sourceTid == null): don't hijack the gesture — let the
-		// list scroll (touch-action: pan-y) and let the tap fire onClick → spawnToBoard.
-		// Dragging stays available for mouse/pen, and for board tokens (which don't scroll).
-		if (ev.pointerType === 'touch' && sourceTid == null) return;
-		ev.preventDefault();
+	/* ---- Drag mechanics (shared by mouse pointer + native touch) ---- */
+	const runDrag = useCallback((id: string, sourceTid: number | null, clientX: number, clientY: number, isTouch: boolean) => {
 		dragRef.current = { id, sourceTid };
 		if (sourceTid != null) setDraggingTid(sourceTid);
 		const fl = floatRef.current;
 		if (fl) { fl.textContent = getElement(id)!.emoji; fl.style.display = 'flex'; }
 		const moveAt = (x: number, y: number) => { const f = floatRef.current; if (f) { f.style.left = `${x}px`; f.style.top = `${y}px`; } };
-		moveAt(ev.clientX, ev.clientY);
+		moveAt(clientX, clientY);
 		const dropAt = (x: number, y: number) => {
 			if (floatRef.current) floatRef.current.style.display = 'none';
 			const drag = dragRef.current; dragRef.current = null; setDraggingTid(null);
@@ -217,15 +212,14 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			if (inside && rect) resolveBoardDrop(drag.id, drag.sourceTid, x - rect.left, y - rect.top);
 			else if (drag.sourceTid != null) setTokens((cur) => cur.filter((t) => t.tid !== drag.sourceTid)); // off the board → remove
 		};
-		if (ev.pointerType === 'touch') {
-			// iOS Safari: pointermove during a touch is unreliable — use native touch events.
+		if (isTouch) {
 			const tm = (e: TouchEvent) => { e.preventDefault(); const t = e.touches[0]; if (t) moveAt(t.clientX, t.clientY); };
 			const te = (e: TouchEvent) => {
 				window.removeEventListener('touchmove', tm);
 				window.removeEventListener('touchend', te);
 				window.removeEventListener('touchcancel', te);
 				const t = e.changedTouches[0];
-				dropAt(t ? t.clientX : ev.clientX, t ? t.clientY : ev.clientY);
+				dropAt(t ? t.clientX : clientX, t ? t.clientY : clientY);
 			};
 			window.addEventListener('touchmove', tm, { passive: false });
 			window.addEventListener('touchend', te, { passive: false });
@@ -241,6 +235,39 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			window.addEventListener('pointerup', up);
 		}
 	}, [resolveBoardDrop]);
+
+	// Mouse/pen drag entry (React onPointerDown on tokens + palette cards). Touch is NOT
+	// handled here: React's pointerdown is unreliable for touch on iOS Safari — board
+	// tokens use the native touchstart listener below, palette cards use tap (onClick).
+	const startDrag = useCallback((id: string, sourceTid: number | null, ev: React.PointerEvent) => {
+		if (ev.pointerType === 'touch') return;
+		ev.preventDefault();
+		runDrag(id, sourceTid, ev.clientX, ev.clientY, false);
+	}, [runDrag]);
+
+	// Native touch drag for board tokens: a non-passive touchstart on the always-mounted
+	// board hit-tests the token under the finger and starts the drag. This beats iOS
+	// Safari's flaky React pointer events for touch.
+	useEffect(() => {
+		const el = boardRef.current;
+		if (!el) return;
+		const onTouchStart = (e: TouchEvent) => {
+			const t = e.touches[0];
+			if (!t) return;
+			const rect = el.getBoundingClientRect();
+			const bx = t.clientX - rect.left, by = t.clientY - rect.top;
+			const cur = tokensRef.current;
+			let hit: Token | null = null;
+			for (let i = cur.length - 1; i >= 0; i--) {
+				if (Math.hypot(cur[i].x - bx, cur[i].y - by) < TOKEN * 0.7) { hit = cur[i]; break; }
+			}
+			if (!hit) return;
+			e.preventDefault();
+			runDrag(hit.id, hit.tid, t.clientX, t.clientY, true);
+		};
+		el.addEventListener('touchstart', onTouchStart, { passive: false });
+		return () => el.removeEventListener('touchstart', onTouchStart);
+	}, [runDrag]);
 
 	const spawnToBoard = useCallback((id: string) => {
 		const rect = boardRef.current?.getBoundingClientRect();
