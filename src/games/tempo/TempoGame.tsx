@@ -1341,10 +1341,12 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
+			{lv.active && lv.menu && (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
-			<div className="tp-playwrap" ref={wrapRef}>
+			)}
+			{/* Keep the canvas mounted (hidden under the grid) so the ResizeObserver re-sizes
+			    it when a level starts — unmounting left it at the default size (stretched). */}
+			<div className="tp-playwrap" ref={wrapRef} hidden={lv.active && lv.menu}>
 				<canvas ref={canvasRef} className="tp-canvas" onPointerDown={onDown} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} />
 
 				{status === 'running' && auto && (
@@ -1413,7 +1415,6 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			<p className="tp-help">
 				Un « piano tiles » sans fin&nbsp;: la mélodie générée <b>accélère</b> peu à peu. Tape pile sur la ligne, <b>maintiens les tuiles longues</b> pour du bonus. {lv.active ? 'Progression : chaque niveau est une mélodie fixe à jouer — atteins le score cible pour le réussir, vise plus haut pour 2 et 3 étoiles.' : daily ? 'Défi du jour : même mélodie pour tous, meilleur score classé.' : 'Ton énergie (barre du haut) baisse sur un raté et remonte quand tu enchaînes — game over à zéro. Bats ton record !'}
