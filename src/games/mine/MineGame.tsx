@@ -166,7 +166,7 @@ function CocotteMini() {
 	// The hen is drawn small in its viewBox; scale it up around the centre so it fills the frame.
 	return (
 		<svg viewBox="0 0 100 100" className="mn-cocotte" aria-hidden="true">
-			<g transform="translate(50 53) scale(1.32) translate(-50 -53)">
+			<g transform="translate(50 53) scale(1.24) translate(-50 -53)">
 				<g fill="#e0413a"><circle cx="42" cy="26" r="6" /><circle cx="52" cy="21" r="7" /><circle cx="62" cy="26" r="6" /></g>
 				<ellipse cx="50" cy="60" rx="30" ry="28" fill="#fdfdfb" stroke="#e6e6df" strokeWidth="1.4" />
 				<circle cx="41" cy="52" r="4" fill="#2a2a2a" /><circle cx="59" cy="52" r="4" fill="#2a2a2a" />
@@ -644,8 +644,8 @@ const CSS = `
 	100% { filter: brightness(3.2) drop-shadow(0 0 6px rgba(255,255,255,0.6)); }
 }
 
-.mn-cage { padding: 1%; display: grid; place-items: center; pointer-events: none; }
-.mn-cage .mn-cocotte { width: 98%; height: 98%; }
+.mn-cage { padding: 2%; display: grid; place-items: center; pointer-events: none; }
+.mn-cage .mn-cocotte { width: 95%; height: 95%; }
 .mn-bars { position: absolute; inset: 8%; border-radius: 8px; border: 2px solid rgba(255,255,255,0.55); background: repeating-linear-gradient(90deg, rgba(180,190,210,0.75) 0 3px, transparent 3px 22%); box-shadow: inset 0 0 8px rgba(0,0,0,0.4); }
 .mn-cage.h1 .mn-bars { opacity: 0.5; background: repeating-linear-gradient(90deg, rgba(180,190,210,0.6) 0 2px, transparent 2px 33%); }
 
