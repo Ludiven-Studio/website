@@ -476,7 +476,8 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			window.removeEventListener('pointercancel', onUp);
 			if (raf) cancelAnimationFrame(raf);
 		};
-	}, []);
+		// re-bind when the board (un)mounts — it's replaced by LevelSelect on the progression map
+	}, [lv.active, lv.menu]);
 
 	/* ---------- idle hint ---------- */
 	useEffect(() => {
