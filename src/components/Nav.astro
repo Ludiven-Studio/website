@@ -17,7 +17,9 @@ const textLinks: { label: string; href: string }[] = [
 ];
 
 /** Icon links to social media — edit these with links to your profiles! */
-const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[] = [];
+const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[] = [
+	{ label: 'LinkedIn', href: 'https://www.linkedin.com/in/raphael-benedetto/', icon: 'linkedin-logo' },
+];
 ---
 
 <nav>
@@ -63,7 +65,7 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 			<div class="socials">
 				{
 					iconLinks.map(({ href, icon, label }) => (
-						<a href={href} target="_blank" class="social">
+						<a href={href} target="_blank" rel="noopener" class="social">
 							<span class="sr-only">{label}</span>
 							<Icon icon={icon} />
 						</a>
@@ -98,7 +100,7 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 			<div class="socials">
 				{
 					iconLinks.map(({ href, icon, label }) => (
-						<a href={href} class="social" target="_blank">
+						<a href={href} class="social" target="_blank" rel="noopener">
 							<span class="sr-only">{label}</span>
 							<Icon icon={icon} />
 						</a>
@@ -351,17 +353,12 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 		}
 
 		.socials {
-			display: none;
-		}
-	}
-
-	@media (min-width: 60em) {
-		.socials {
 			display: flex;
 			justify-content: flex-end;
 			gap: 0;
 		}
 	}
+
 	@media (forced-colors: active) {
 		.link.active {
 			color: SelectedItem;
