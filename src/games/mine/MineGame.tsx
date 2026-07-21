@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties, type ReactNode } from 'react';
 import {
 	generateBoard, trySwap, smash, findHint, hasAnyMove, shuffle, cagedLeft,
 	isGem, isCage, type Cell, type GenBoard, type Cfg, type SpecialKind, type Step,
@@ -55,6 +55,75 @@ function specialMarkEls(special?: SpecialKind) {
 	);
 }
 
+type Cut = { base: string; light: string; dark: string };
+const STROKE = 'rgba(0,0,0,0.24)';
+
+// One distinct cut per gem colour: round, emerald, marquise, pear, hexagon, brilliant.
+const GEM_SHAPES: ((c: Cut) => ReactNode)[] = [
+	// 1 rubis — round brilliant (octagon)
+	(c) => (<>
+		<polygon points="32,7 68,7 93,32 93,68 68,93 32,93 7,68 7,32" fill={c.base} stroke={STROKE} strokeWidth="2" />
+		<polygon points="40,25 60,25 75,40 75,60 60,75 40,75 25,60 25,40" fill={c.light} opacity="0.9" />
+		<g stroke={c.dark} strokeWidth="1.1" opacity="0.45">
+			<line x1="40" y1="25" x2="32" y2="7" /><line x1="60" y1="25" x2="68" y2="7" />
+			<line x1="75" y1="40" x2="93" y2="32" /><line x1="75" y1="60" x2="93" y2="68" />
+			<line x1="60" y1="75" x2="68" y2="93" /><line x1="40" y1="75" x2="32" y2="93" />
+			<line x1="25" y1="60" x2="7" y2="68" /><line x1="25" y1="40" x2="7" y2="32" />
+		</g>
+		<polygon points="25,60 75,60 68,93 32,93" fill={c.dark} opacity="0.25" />
+	</>),
+	// 2 émeraude — emerald step cut (cut-corner rectangle)
+	(c) => (<>
+		<polygon points="26,9 74,9 91,26 91,74 74,91 26,91 9,74 9,26" fill={c.base} stroke={STROKE} strokeWidth="2" />
+		<polygon points="30,23 70,23 77,30 77,70 70,77 30,77 23,70 23,30" fill={c.light} opacity="0.5" />
+		<rect x="35" y="35" width="30" height="30" fill={c.light} opacity="0.9" />
+		<rect x="35" y="35" width="30" height="30" fill="none" stroke={c.dark} strokeWidth="1.1" opacity="0.4" />
+		<polygon points="9,74 91,74 74,91 26,91" fill={c.dark} opacity="0.28" />
+		<polygon points="26,9 74,9 70,17 30,17" fill="#fff" opacity="0.22" />
+	</>),
+	// 3 saphir — marquise (pointed oval)
+	(c) => (<>
+		<path d="M7,50 Q50,9 93,50 Q50,91 7,50 Z" fill={c.base} stroke={STROKE} strokeWidth="2" />
+		<path d="M24,50 Q50,30 76,50 Q50,70 24,50 Z" fill={c.light} opacity="0.85" />
+		<line x1="7" y1="50" x2="93" y2="50" stroke={c.dark} strokeWidth="1.1" opacity="0.4" />
+		<path d="M7,50 Q50,91 93,50 Z" fill={c.dark} opacity="0.2" />
+	</>),
+	// 4 ambre — pear (teardrop)
+	(c) => (<>
+		<path d="M50,8 Q83,40 83,60 A33,33 0 1 1 17,60 Q17,40 50,8 Z" fill={c.base} stroke={STROKE} strokeWidth="2" />
+		<path d="M50,25 Q67,42 67,59 A17,17 0 1 1 33,59 Q33,42 50,25 Z" fill={c.light} opacity="0.85" />
+		<path d="M17,60 A33,33 0 0 0 83,60 Z" fill={c.dark} opacity="0.22" />
+	</>),
+	// 5 améthyste — hexagon
+	(c) => (<>
+		<polygon points="50,7 89,29 89,71 50,93 11,71 11,29" fill={c.base} stroke={STROKE} strokeWidth="2" />
+		<polygon points="50,24 73,37 73,63 50,76 27,63 27,37" fill={c.light} opacity="0.88" />
+		<g stroke={c.dark} strokeWidth="1.1" opacity="0.4">
+			<line x1="50" y1="24" x2="50" y2="7" /><line x1="73" y1="37" x2="89" y2="29" /><line x1="73" y1="63" x2="89" y2="71" />
+			<line x1="50" y1="76" x2="50" y2="93" /><line x1="27" y1="63" x2="11" y2="71" /><line x1="27" y1="37" x2="11" y2="29" />
+		</g>
+		<polygon points="27,63 73,63 50,93" fill={c.dark} opacity="0.25" />
+	</>),
+	// 6 diamant — brilliant (pointed kite)
+	(c) => (<>
+		<polygon points="50,4 93,37 69,96 31,96 7,37" fill={c.base} stroke={STROKE} strokeWidth="2" />
+		<polygon points="50,4 93,37 50,50 7,37" fill={c.light} opacity="0.92" />
+		<polygon points="7,37 50,50 31,96" fill={c.dark} opacity="0.5" />
+		<polygon points="93,37 50,50 69,96" fill={c.dark} opacity="0.66" />
+		<line x1="50" y1="50" x2="50" y2="96" stroke="rgba(255,255,255,0.35)" strokeWidth="1.4" />
+	</>),
+];
+
+/** A twinkling sparkle (4-point star + a small glint) laid over every gem. */
+function Glint({ color }: { color: number }) {
+	return (
+		<g className="mn-glint" fill="#fff" style={{ animationDelay: `${-(color * 0.37).toFixed(2)}s` }}>
+			<path d="M37,29 L40,40 L51,43 L40,46 L37,57 L34,46 L23,43 L34,40 Z" />
+			<circle cx="61" cy="33" r="2.6" opacity="0.85" />
+		</g>
+	);
+}
+
 function GemSVG({ color, special }: { color: number; special?: SpecialKind }) {
 	const c = GEM_COLORS[(color - 1) % GEM_COLORS.length];
 	const isRainbow = special === 'rainbow';
@@ -68,11 +137,13 @@ function GemSVG({ color, special }: { color: number; special?: SpecialKind }) {
 					</linearGradient>
 				</defs>
 			)}
-			<polygon points="50,3 93,37 69,97 31,97 7,37" fill={isRainbow ? `url(#mn-rainbow)` : c.base} stroke="rgba(0,0,0,0.18)" strokeWidth="2" />
-			<polygon points="50,3 93,37 50,51 7,37" fill={isRainbow ? '#ffffff' : c.light} opacity="0.9" />
-			<polygon points="7,37 50,51 31,97" fill={isRainbow ? c.dark : c.dark} opacity="0.55" />
-			<polygon points="93,37 50,51 69,97" fill={c.dark} opacity="0.7" />
-			<line x1="50" y1="51" x2="50" y2="97" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
+			{isRainbow ? (
+				<>
+					<polygon points="32,7 68,7 93,32 93,68 68,93 32,93 7,68 7,32" fill="url(#mn-rainbow)" stroke={STROKE} strokeWidth="2" />
+					<polygon points="40,25 60,25 75,40 75,60 60,75 40,75 25,60 25,40" fill="#fff" opacity="0.85" />
+				</>
+			) : GEM_SHAPES[(color - 1) % GEM_SHAPES.length](c)}
+			<Glint color={color} />
 			{specialMarkEls(special)}
 		</svg>
 	);
@@ -560,6 +631,9 @@ const CSS = `
 .mn-gem.clr .mn-gemsvg, .mn-gem.clr .mn-gemimg { animation: mn-flash 0.46s ease-out forwards; }
 @keyframes mn-in { 0% { transform: translateY(-28%) scale(0.55); opacity: 0; } 55% { opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
 @keyframes mn-hint { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
+/* sparkle glint over each gem — gentle opacity twinkle (staggered per colour) */
+.mn-glint { animation: mn-twinkle 2.4s ease-in-out infinite; }
+@keyframes mn-twinkle { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
 @keyframes mn-burst { 0% { transform: scale(1) rotate(0); } 32% { transform: scale(1.45) rotate(-10deg); } 100% { transform: scale(0) rotate(35deg); opacity: 0; } }
 @keyframes mn-flash {
 	0% { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
@@ -613,5 +687,5 @@ const CSS = `
 .mn-act:disabled { opacity: 0.4; cursor: default; }
 
 .mn-help { max-width: 440px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.2rem; }
-@media (prefers-reduced-motion: reduce) { .mn-gem, .mn-gem.clr .mn-gemsvg, .mn-gem.clr .mn-gemimg, .mn-combo, .mn-halo, .mn-flyer, .mn-egg span, .mn-cstat, .mn-board.shake { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .mn-gem, .mn-gem.clr .mn-gemsvg, .mn-gem.clr .mn-gemimg, .mn-glint, .mn-combo, .mn-halo, .mn-flyer, .mn-egg span, .mn-cstat, .mn-board.shake { animation: none; transition: none; } }
 `;
