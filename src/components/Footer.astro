@@ -12,7 +12,15 @@ const currentYear = new Date().getFullYear();
 		<p>&copy; {currentYear} Ludiven Studio</p>
 	</div>
 	<p class="socials">
-		<a href="mailto:contact@ludiven-studio.fr"> contact@ludiven-studio.fr</a>
+		<a
+			href="https://www.linkedin.com/in/raphael-benedetto/"
+			target="_blank"
+			rel="noopener"
+			aria-label="LinkedIn de Raphaël Benedetto"
+		>
+			<Icon icon="linkedin-logo" size="1.3em" /> LinkedIn
+		</a>
+		<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
 	</p>
 </footer>
 <style>
@@ -47,9 +55,16 @@ const currentYear = new Date().getFullYear();
 
 	.socials {
 		display: flex;
+		align-items: center;
 		justify-content: center;
 		gap: 1rem;
 		flex-wrap: wrap;
+	}
+
+	.socials a {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35em;
 	}
 
 	@media (min-width: 50em) {
