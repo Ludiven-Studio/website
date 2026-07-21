@@ -322,7 +322,9 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	/* ---------- end of game ---------- */
 	const endGame = useCallback((didWin: boolean) => {
 		setStat('over'); setWon(didWin);
-		trackGame(gameId, didWin ? 'game_won' : 'game_over', { score: scoreRef.current });
+		const mode = lv.active ? 'levels' : dailyRef.current ? 'daily' : 'free';
+		const ctx = lv.active ? { level: lv.level } : dailyRef.current ? {} : { diff: freeDiffRef.current };
+		trackGame(gameId, didWin ? 'game_won' : 'game_over', { mode, ...ctx, score: scoreRef.current });
 		if (lv.active) {
 			lv.finish({ won: didWin, score: scoreRef.current, stat: movesRef.current });
 		} else if (dailyRef.current) {
