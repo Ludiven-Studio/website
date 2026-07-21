@@ -90,6 +90,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const [cocottesLeft, setCocottesLeft] = useState(0);
 	const [cocottesTotal, setCocottesTotal] = useState(0);
 	const [selected, setSelected] = useState<[number, number] | null>(null);
+	const [dragCell, setDragCell] = useState<[number, number] | null>(null);
 	const [clearing, setClearing] = useState<Set<number>>(new Set());
 	const [combo, setCombo] = useState(0);
 	const [hint, setHint] = useState<{ a: [number, number]; b: [number, number] } | null>(null);
@@ -113,6 +114,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const idleRef = useRef<number>(0);
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const cocotteRef = useRef<HTMLSpanElement | null>(null);
+	const dragStartRef = useRef<[number, number] | null>(null);
 	const flyIdRef = useRef(0);
 	const lv = useLevels(gameId, mineLevels);
 	const { celebrating, showWin } = useCelebration(status === 'over' && won);
@@ -301,6 +303,38 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
 	}, [cfg.cols, cfg.rows, doSwap]);
 
+	/* ---------- mouse drag-and-drop (desktop) ---------- */
+	useEffect(() => {
+		const el = wrapRef.current;
+		if (!el) return;
+		// start is kept in a ref: setDragCell re-renders (recreating this effect), so a
+		// closure-local start would be lost between pointerdown and pointerup.
+		const cellAt = (x: number, y: number): [number, number] | null => {
+			const rect = el.getBoundingClientRect();
+			const c = Math.floor(((x - rect.left) / rect.width) * cfg.cols);
+			const r = Math.floor(((y - rect.top) / rect.height) * cfg.rows);
+			return r >= 0 && r < cfg.rows && c >= 0 && c < cfg.cols ? [r, c] : null;
+		};
+		const onDown = (e: PointerEvent) => {
+			if (e.pointerType !== 'mouse' || animatingRef.current || statusRef.current !== 'playing') return;
+			const s = cellAt(e.clientX, e.clientY);
+			if (s && isGem(boardRef.current!.grid[s[0]][s[1]])) { dragStartRef.current = s; setDragCell(s); }
+			else dragStartRef.current = null;
+		};
+		const onUp = (e: PointerEvent) => {
+			const s = dragStartRef.current;
+			if (e.pointerType !== 'mouse' || !s) return;
+			dragStartRef.current = null; setDragCell(null);
+			const end = cellAt(e.clientX, e.clientY);
+			if (!end) return;
+			// drag to a neighbour → swap (a release on the same cell is a click → onCell selects it)
+			if (Math.abs(s[0] - end[0]) + Math.abs(s[1] - end[1]) === 1) void doSwap(s, end);
+		};
+		el.addEventListener('pointerdown', onDown);
+		window.addEventListener('pointerup', onUp);
+		return () => { el.removeEventListener('pointerdown', onDown); window.removeEventListener('pointerup', onUp); };
+	}, [cfg.cols, cfg.rows, doSwap]);
+
 	/* ---------- idle hint ---------- */
 	useEffect(() => {
 		if (status !== 'playing' || lv.menu) return;
@@ -363,7 +397,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 						row.map((cell, c) => {
 							if (isGem(cell)) {
 								const cl = clearing.has(cell.id) ? ' clr' : '';
-								const sel = selected && selected[0] === r && selected[1] === c ? ' sel' : '';
+								const sel = (selected && selected[0] === r && selected[1] === c) || (dragCell && dragCell[0] === r && dragCell[1] === c) ? ' sel' : '';
 								const hi = hintSet?.has(`${r},${c}`) ? ' hint' : '';
 								return (
 									<div key={cell.id} className={`mn-gem${cl}${sel}${hi}`} style={cellStyle(r, c, cfg)}>
@@ -510,7 +544,8 @@ const CSS = `
 .mn-bars { position: absolute; inset: 8%; border-radius: 8px; border: 2px solid rgba(255,255,255,0.55); background: repeating-linear-gradient(90deg, rgba(180,190,210,0.75) 0 3px, transparent 3px 22%); box-shadow: inset 0 0 8px rgba(0,0,0,0.4); }
 .mn-cage.h1 .mn-bars { opacity: 0.5; background: repeating-linear-gradient(90deg, rgba(180,190,210,0.6) 0 2px, transparent 2px 33%); }
 
-.mn-hit { background: transparent; border: none; cursor: pointer; padding: 0; -webkit-tap-highlight-color: transparent; }
+.mn-hit { background: transparent; border: none; cursor: grab; padding: 0; -webkit-tap-highlight-color: transparent; }
+.mn-hit:active { cursor: grabbing; }
 
 .mn-combo { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--mn-accent); color: var(--accent-text-over); font-weight: 800; font-size: 19px; letter-spacing: 0.3px; padding: 7px 20px; border-radius: 999px; pointer-events: none; box-shadow: 0 0 18px var(--mn-accent), 0 4px 12px rgba(0,0,0,0.4); animation: mn-pop 0.6s cubic-bezier(0.2,1.5,0.35,1); z-index: 6; }
 @keyframes mn-pop { 0% { transform: translateX(-50%) scale(0.3); opacity: 0; } 55% { transform: translateX(-50%) scale(1.2); opacity: 1; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
