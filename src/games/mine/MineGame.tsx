@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties, type ReactNode } from 'react';
 import {
-	generateBoard, trySwap, smash, findHint, hasAnyMove, shuffle, cagedLeft,
+	generateBoard, trySwap, smash, findHint, hasAnyMove, shuffle, cagesLeft,
 	isGem, isCage, type Cell, type GenBoard, type Cfg, type SpecialKind, type Step,
 } from './engine';
 import { mineLevels } from './levels';
@@ -22,10 +22,18 @@ import Celebration, { useCelebration } from '../../components/Celebration';
    ===================================================== */
 
 type Status = 'playing' | 'over';
-const FREE_CFG: Cfg = { rows: 8, cols: 8, colors: 6, cocottes: 5, cageHits: 1 };
-const FREE_MOVES = 25;
-const DAILY_CFG: Cfg = { rows: 8, cols: 8, colors: 6, cocottes: 6, cageHits: 1 };
-const DAILY_MOVES = 24;
+// Free mode: 3 difficulties by number of cocottes to free (only ~3 shown at once, the
+// rest descend from the top). Moves scale with the objective.
+const FREE_DIFFS = [
+	{ key: 'facile', label: 'Facile', cocottes: 5, moves: 16 },
+	{ key: 'moyen', label: 'Moyen', cocottes: 10, moves: 26 },
+	{ key: 'costaud', label: 'Costaud', cocottes: 20, moves: 42 },
+] as const;
+type FreeDiff = typeof FREE_DIFFS[number]['key'];
+const DIFF_KEY = 'ludiven-mine-diff';
+const freeCfg = (cocottes: number): Cfg => ({ rows: 8, cols: 8, colors: 6, cocottes, cageHits: 1 });
+const DAILY_CFG: Cfg = { rows: 8, cols: 8, colors: 6, cocottes: 8, cageHits: 1 };
+const DAILY_MOVES = 34;
 const HAMMERS = 3;
 const BEST_KEY = 'ludiven-mine-best';
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -178,11 +186,12 @@ function CocotteMini() {
 
 export default function MineGame({ gameId }: { gameId: string }) {
 	const [displayGrid, setDisplayGrid] = useState<Cell[][]>([]);
-	const [cfg, setCfg] = useState<Cfg>(FREE_CFG);
+	const [cfg, setCfg] = useState<Cfg>(freeCfg(FREE_DIFFS[0].cocottes));
 	const [status, setStatus] = useState<Status>('playing');
 	const [won, setWon] = useState(false);
 	const [score, setScore] = useState(0);
-	const [movesLeft, setMovesLeft] = useState(FREE_MOVES);
+	const [freeDiff, setFreeDiff] = useState<FreeDiff>(FREE_DIFFS[0].key);
+	const [movesLeft, setMovesLeft] = useState<number>(FREE_DIFFS[0].moves);
 	const [cocottesLeft, setCocottesLeft] = useState(0);
 	const [cocottesTotal, setCocottesTotal] = useState(0);
 	const [selected, setSelected] = useState<[number, number] | null>(null);
@@ -205,7 +214,8 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const boardRef = useRef<GenBoard | null>(null);
 	const statusRef = useRef<Status>('playing');
 	const animatingRef = useRef(false);
-	const movesRef = useRef(FREE_MOVES);
+	const movesRef = useRef<number>(FREE_DIFFS[0].moves);
+	const freeDiffRef = useRef<FreeDiff>(FREE_DIFFS[0].key);
 	const scoreRef = useRef(0);
 	const dailyRef = useRef(false);
 	const idleRef = useRef<number>(0);
@@ -225,8 +235,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		setDisplayGrid(b.grid.map((row) => row.slice()));
 		movesRef.current = moves; setMovesLeft(moves);
 		scoreRef.current = 0; setScore(0);
-		const caged = cagedLeft(b.grid);
-		setCocottesLeft(caged); setCocottesTotal(caged);
+		setCocottesLeft(cagesLeft(b)); setCocottesTotal(b.cfg.cocottes);
 		setSelected(null); setHint(null); setClearing(new Set()); setCombo(0);
 		setHammers(HAMMERS); setHammerArmed(false); setWon(false);
 		setFlyers([]); setEggs([]);
@@ -259,11 +268,18 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		window.setTimeout(() => setEggs((e) => e.filter((x) => !eggIds.has(x.id))), 800);
 	}, []);
 
-	const newFree = useCallback(() => {
+	const newFree = useCallback((diff: FreeDiff = freeDiffRef.current) => {
+		const d = FREE_DIFFS.find((x) => x.key === diff) ?? FREE_DIFFS[0];
+		freeDiffRef.current = d.key; setFreeDiff(d.key);
 		setDaily(false); dailyRef.current = false; setAlreadyPlayed(false);
-		armBoard(generateBoard((Math.random() * 2 ** 31) >>> 0, FREE_CFG), FREE_MOVES);
+		armBoard(generateBoard((Math.random() * 2 ** 31) >>> 0, freeCfg(d.cocottes)), d.moves);
 		try { setBest(Number(localStorage.getItem(BEST_KEY) ?? '0') || 0); } catch { setBest(0); }
 	}, [armBoard]);
+
+	const pickDiff = useCallback((diff: FreeDiff) => {
+		try { localStorage.setItem(DIFF_KEY, diff); } catch { /* ignore */ }
+		newFree(diff);
+	}, [newFree]);
 
 	const startLevel = useCallback((level: number) => {
 		const s = lv.play(level); // switch the levels phase to "playing" (leaves the menu) + get the config
@@ -286,8 +302,13 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		setDailyLoading(false);
 	}, [gameId, armBoard, lv]);
 
-	// Init once.
-	useEffect(() => { newFree(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+	// Init once — restore the last-played free difficulty.
+	useEffect(() => {
+		let d: FreeDiff = FREE_DIFFS[0].key;
+		try { const s = localStorage.getItem(DIFF_KEY); if (s && FREE_DIFFS.some((x) => x.key === s)) d = s as FreeDiff; } catch { /* ignore */ }
+		newFree(d);
+		/* eslint-disable-next-line react-hooks/exhaustive-deps */
+	}, []);
 
 	// Use generated gem art if present (drop PNGs in public/assets/mine/ — no code change needed).
 	useEffect(() => { const img = new Image(); img.onload = () => setGemImg(true); img.src = '/assets/mine/gem-1.png'; }, []);
@@ -330,10 +351,10 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			await sleep(step.freedPos.length ? 760 : step.combo > 1 ? 560 : 320);
 		}
 		scoreRef.current += gained; setScore(scoreRef.current);
-		setCocottesLeft(cagedLeft(boardRef.current!.grid));
+		setCocottesLeft(cagesLeft(boardRef.current!));
 		setCombo(0);
-		// win / lose / shuffle
-		if (cagedLeft(boardRef.current!.grid) === 0) endGame(true);
+		// win / lose / shuffle — all cocottes freed (none left on the board OR in the buffers)
+		if (cagesLeft(boardRef.current!) === 0) endGame(true);
 		else if (movesRef.current <= 0) endGame(false);
 		else if (!hasAnyMove(boardRef.current!)) {
 			shuffle(boardRef.current!);
@@ -470,7 +491,23 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			) : daily ? (
 				<div className="mn-tag">{dailyLoading ? 'Préparation…' : `Défi du jour · ${dailyWeekdayLabel()}`}</div>
 			) : (
-				<div className="mn-tag">Mine libre — graine aléatoire</div>
+				<div className="mn-tag">Mine libre — {cocottesTotal} cocottes à libérer</div>
+			)}
+
+			{!daily && !lv.active && (
+				<div className="mn-diff" role="tablist" aria-label="Difficulté">
+					{FREE_DIFFS.map((d) => (
+						<button
+							key={d.key}
+							role="tab"
+							aria-selected={freeDiff === d.key}
+							className={`mn-diff-seg ${freeDiff === d.key ? 'on' : ''}`}
+							onClick={() => pickDiff(d.key)}
+						>
+							{d.label} · {d.cocottes}🐔
+						</button>
+					))}
+				</div>
 			)}
 
 			{!(lv.active && lv.menu) && (
@@ -564,7 +601,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 								) : daily ? (
 									<p className="mn-note">Score classé — reviens demain&nbsp;!</p>
 								) : (
-									<button className="mn-btn primary" onClick={newFree}>↻ Nouvelle mine</button>
+									<button className="mn-btn primary" onClick={() => newFree()}>↻ Nouvelle mine</button>
 								)}
 							</div>
 						</div>
@@ -586,7 +623,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 					{lv.active ? (
 						<button className="mn-act" onClick={lv.backToMenu}>🗺 Carte</button>
 					) : !daily ? (
-						<button className="mn-act" onClick={newFree}>↻ Nouvelle</button>
+						<button className="mn-act" onClick={() => newFree()}>↻ Nouvelle</button>
 					) : null}
 				</div>
 			) : null}
@@ -613,6 +650,10 @@ function cellStyle(r: number, c: number, cfg: Cfg): CSSProperties {
 const CSS = `
 .mn-root { --mn-accent: var(--accent-regular); width: 100%; max-width: 480px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; align-items: center; }
 .mn-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.7rem; }
+.mn-diff { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 0.7rem; }
+.mn-diff-seg { border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-300); font: inherit; font-weight: 600; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+.mn-diff-seg:hover:not(.on) { color: var(--gray-0); border-color: var(--gray-500); }
+.mn-diff-seg.on { background: var(--mn-accent); color: var(--accent-text-over); border-color: var(--mn-accent); }
 .mn-hud { width: 100%; display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.7rem; font-size: 13px; }
 .mn-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
 .mn-stat strong { color: var(--mn-accent); }

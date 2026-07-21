@@ -1,10 +1,11 @@
 /**
  * LA MINE AUX COCOTTES — match-3 engine (pure, tested; no UI).
  *
- * Swap two adjacent gems to line up ≥3 of a colour. Matches clear, gems fall,
- * new ones spill from the top, and cascades chain. Cocottes are trapped in cages
- * on the BOTTOM row: a match on/adjacent to a cage cracks it; two cracks free the
- * cocotte. Free them all within the move budget to win.
+ * Swap two adjacent gems to line up ≥3 of a colour. Matches clear, gems (and cages)
+ * fall, new ones spill from the top, and cascades chain. Cocottes are trapped in cages:
+ * a match on/adjacent to a cage cracks it; enough cracks free the cocotte. At most 3
+ * cages sit on the board at once; extra cocottes queue in per-column off-screen buffers
+ * and descend as the pile is cleared. Free them all within the move budget to win.
  *
  * Specials (created by big matches):
  *  - line of 4  → a rocket (clears the whole row or column it lines up with)
@@ -39,6 +40,9 @@ export interface Cfg {
 export interface Board {
 	grid: Cell[][]; // [row][col], row 0 = top
 	cfg: Cfg;
+	// Per-column off-screen queue feeding the top of the board. [c][0] enters next, so
+	// cocottes queued here descend into view as the pile is cleared. Drained → new gems.
+	buffers?: Cell[][];
 	rngRef?: () => Rng; // cascade refill source (set by generateBoard); Math.random fallback
 }
 
@@ -199,22 +203,19 @@ function expandClears(grid: Cell[][], seed: Set<string>): Set<string> {
 
 /* ----------------------------- gravity ----------------------------- */
 
-/** Column gravity: within each cage-free segment, gems fall to the bottom and the top
- *  refills with new gems. Cages (immovable) split a column into independent segments,
- *  so no empty cell is ever trapped below a cage. */
-function settle(grid: Cell[][], cfg: Cfg, rng: Rng): void {
+/** Column gravity: gems AND cages fall to the bottom (compacted, order preserved), then
+ *  each empty cell at the top is filled from that column's off-screen buffer (queued
+ *  cocottes above the board) — or a fresh gem once the buffer is drained. So queued
+ *  cocottes enter from the top and descend as the pile below is cleared. */
+function settle(grid: Cell[][], cfg: Cfg, rng: Rng, buffers: Cell[][]): void {
 	for (let c = 0; c < cfg.cols; c++) {
-		let segStart = 0;
-		for (let r = 0; r <= cfg.rows; r++) {
-			if (r === cfg.rows || isCage(grid[r][c])) {
-				const gems: Gem[] = [];
-				for (let rr = segStart; rr < r; rr++) { const g = grid[rr][c]; if (isGem(g)) gems.push(g); }
-				const empties = (r - segStart) - gems.length;
-				for (let i = 0; i < empties; i++) grid[segStart + i][c] = newGem(rng, cfg.colors);
-				for (let i = 0; i < gems.length; i++) grid[segStart + empties + i][c] = gems[i];
-				segStart = r + 1;
-			}
-		}
+		const stack: Cell[] = [];
+		for (let r = 0; r < cfg.rows; r++) { const cell = grid[r][c]; if (cell) stack.push(cell); }
+		const empties = cfg.rows - stack.length;
+		for (let i = 0; i < stack.length; i++) grid[empties + i][c] = stack[i]; // bottom-align survivors
+		const buf = buffers[c] ?? (buffers[c] = []);
+		// fill nearest-to-stack first so the buffer front lands deepest (it "fell in" first)
+		for (let r = empties - 1; r >= 0; r--) grid[r][c] = buf.length ? buf.shift()! : newGem(rng, cfg.colors);
 	}
 }
 
@@ -247,7 +248,7 @@ function crackCages(grid: Cell[][], cfg: Cfg, cleared: Set<string>): { cracked: 
 const SCORE_GEM = 10;
 
 /** Resolve one board to stable, producing cascade steps. `seedClear` = pre-cleared cells (special activation). */
-function resolve(grid: Cell[][], cfg: Cfg, rng: Rng, first: { clears: Set<string>; at: [number, number] | null }): { steps: Step[]; freed: number; gained: number } {
+function resolve(grid: Cell[][], cfg: Cfg, rng: Rng, buffers: Cell[][], first: { clears: Set<string>; at: [number, number] | null }): { steps: Step[]; freed: number; gained: number } {
 	const steps: Step[] = [];
 	let combo = 0;
 	let totalFreed = 0;
@@ -289,7 +290,7 @@ function resolve(grid: Cell[][], cfg: Cfg, rng: Rng, first: { clears: Set<string
 		const gained = clearedList.length * SCORE_GEM * combo + freed * 200;
 		totalGained += gained;
 
-		settle(grid, cfg, rng);
+		settle(grid, cfg, rng, buffers);
 		steps.push({ cleared: clearedList, cracked, freed, freedPos, gained, combo, grid: cloneGrid(grid) });
 
 		// A freed cocotte leaves an explosive egg → its whole column detonates next beat.
@@ -330,7 +331,8 @@ export function trySwap(board: Board, a: [number, number], b: [number, number]):
 
 	if (!activated && !hasMatch(grid)) return { valid: false, grid: board.grid, steps: [], freed: 0, gained: 0 };
 
-	const { steps, freed, gained } = resolve(grid, cfg, rng, { clears: seed, at: activated ? null : (matchIncludes(grid, a) ? a : b) });
+	const buffers = board.buffers ?? Array.from({ length: cfg.cols }, () => []);
+	const { steps, freed, gained } = resolve(grid, cfg, rng, buffers, { clears: seed, at: activated ? null : (matchIncludes(grid, a) ? a : b) });
 	return { valid: true, grid: steps.length ? steps[steps.length - 1].grid : grid, steps, freed, gained };
 }
 
@@ -351,34 +353,57 @@ export interface GenBoard extends Board {
 	rngRef: () => Rng; // returns a fresh rng call source for cascades (uses one shared rng)
 }
 
-/** Build a solvable board: no initial match, ≥1 valid move, cocottes caged on the bottom row. */
+const MAX_VISIBLE_CAGES = 3; // at most this many cocottes on the board at start; the rest queue above
+const BUFFER_LEAD = 2; // gems before the first queued cocotte in a column
+const BUFFER_GAP = 3; // gems between queued cocottes in the same column
+
+/** Build a solvable board: no initial match, ≥1 valid move. Up to 3 cocottes are caged
+ *  on the board; any extra are queued in the off-screen buffers to descend later. */
 export function generateBoard(seed: number, cfg: Cfg, rngIn?: Rng): GenBoard {
 	const rng = rngIn ?? mulberry(seed);
+	const visible = Math.min(MAX_VISIBLE_CAGES, cfg.cocottes);
 	let grid: Cell[][] = [];
 	for (let attempt = 0; attempt < 60; attempt++) {
 		grid = Array.from({ length: cfg.rows }, () => new Array<Cell>(cfg.cols).fill(null));
 		// Cocottes caged across the bottom band (more crackable neighbours than the bottom row alone).
-		for (const [r, c] of spreadCages(cfg, rng)) grid[r][c] = { cage: true, hits: cfg.cageHits };
+		for (const [r, c] of spreadCages(cfg, rng, visible)) grid[r][c] = { cage: true, hits: cfg.cageHits };
 		for (let r = 0; r < cfg.rows; r++) for (let c = 0; c < cfg.cols; c++) {
 			if (isCage(grid[r][c])) continue;
 			grid[r][c] = { color: safeColor(grid, r, c, rng, cfg.colors), id: nextId() };
 		}
 		if (!hasMatch(grid) && hasAnyMove({ grid, cfg })) break;
 	}
+	const buffers = buildBuffers(cfg, rng, cfg.cocottes - visible);
 	const rngRef = () => rng;
-	return { grid, cfg, rngRef };
+	return { grid, cfg, buffers, rngRef };
 }
 
 const mulberry = (seed: number): Rng => mulberry32(seed >>> 0);
 
 /** Distinct cage cells in the bottom band (up to 3 rows), spread out. */
-function spreadCages(cfg: Cfg, rng: Rng): [number, number][] {
-	const n = Math.min(cfg.cocottes, cfg.cols * 3);
+function spreadCages(cfg: Cfg, rng: Rng, count: number): [number, number][] {
+	const n = Math.min(count, cfg.cols * 3);
 	const band = Math.min(3, cfg.rows - 2);
 	const cells: [number, number][] = [];
 	for (let r = cfg.rows - band; r < cfg.rows; r++) for (let c = 0; c < cfg.cols; c++) cells.push([r, c]);
 	for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [cells[i], cells[j]] = [cells[j], cells[i]]; }
 	return cells.slice(0, n);
+}
+
+/** Queue `remaining` cocottes across the columns' off-screen buffers, spaced with gems
+ *  so they arrive gradually (never all at once → no one-move clears). */
+function buildBuffers(cfg: Cfg, rng: Rng, remaining: number): Cell[][] {
+	const buffers: Cell[][] = Array.from({ length: cfg.cols }, () => []);
+	if (remaining <= 0) return buffers;
+	const cols = range(0, cfg.cols);
+	for (let i = cols.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [cols[i], cols[j]] = [cols[j], cols[i]]; }
+	for (let k = 0; k < remaining; k++) {
+		const buf = buffers[cols[k % cfg.cols]];
+		const lead = buf.length === 0 ? BUFFER_LEAD : BUFFER_GAP;
+		for (let g = 0; g < lead; g++) buf.push(newGem(rng, cfg.colors));
+		buf.push({ cage: true, hits: cfg.cageHits });
+	}
+	return buffers;
 }
 
 /* ----------------------------- moves / hint / shuffle ----------------------------- */
@@ -425,13 +450,21 @@ export function smash(board: Board, at: [number, number]): SwapResult {
 	if (!isGem(grid[at[0]][at[1]])) return { valid: false, grid: board.grid, steps: [], freed: 0, gained: 0 };
 	const rng = board.rngRef?.() ?? Math.random;
 	const seed = new Set<string>([key(at[0], at[1])]);
-	const { steps, freed, gained } = resolve(grid, cfg, rng, { clears: seed, at: null });
+	const buffers = board.buffers ?? Array.from({ length: cfg.cols }, () => []);
+	const { steps, freed, gained } = resolve(grid, cfg, rng, buffers, { clears: seed, at: null });
 	return { valid: true, grid: steps.length ? steps[steps.length - 1].grid : grid, steps, freed, gained };
 }
 
-/** Count cocottes still caged. */
+/** Count cocottes still caged on the grid. */
 export function cagedLeft(grid: Cell[][]): number {
 	let n = 0;
 	for (const row of grid) for (const c of row) if (isCage(c)) n++;
+	return n;
+}
+
+/** Total cocottes still to free: caged on the board plus queued in the off-screen buffers. */
+export function cagesLeft(board: Board): number {
+	let n = cagedLeft(board.grid);
+	if (board.buffers) for (const buf of board.buffers) for (const cell of buf) if (isCage(cell)) n++;
 	return n;
 }

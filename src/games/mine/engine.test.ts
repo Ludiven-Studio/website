@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	generateBoard, trySwap, findRuns, hasMatch, cagedLeft, findHint,
+	generateBoard, trySwap, findRuns, hasMatch, cagedLeft, cagesLeft, findHint,
 	isGem, isCage, type Cfg, type Cell, type Gem, type Board,
 } from './engine';
 
@@ -22,6 +22,12 @@ describe('generateBoard', () => {
 		const cageRows: number[] = [];
 		b.grid.forEach((row, r) => { if (row.some(isCage)) cageRows.push(r); });
 		expect(cageRows.every((r) => r >= 5)).toBe(true);
+	});
+	it('caps on-board cocottes at 3 and queues the rest in the buffers', () => {
+		const cfg: Cfg = { rows: 8, cols: 8, colors: 6, cocottes: 7, cageHits: 1 };
+		const b = generateBoard(999, cfg);
+		expect(cagedLeft(b.grid)).toBe(3); // at most 3 visible at start
+		expect(cagesLeft(b)).toBe(7); // grid + buffers = full objective
 	});
 });
 
