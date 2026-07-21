@@ -100,6 +100,9 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [shake, setShake] = useState(false);
+	const [flyers, setFlyers] = useState<{ id: number; r: number; c: number; dx: number; dy: number }[]>([]);
+	const [eggs, setEggs] = useState<{ id: number; r: number; c: number }[]>([]);
+	const [counterHit, setCounterHit] = useState(0);
 
 	const boardRef = useRef<GenBoard | null>(null);
 	const statusRef = useRef<Status>('playing');
@@ -109,6 +112,8 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false);
 	const idleRef = useRef<number>(0);
 	const wrapRef = useRef<HTMLDivElement | null>(null);
+	const cocotteRef = useRef<HTMLSpanElement | null>(null);
+	const flyIdRef = useRef(0);
 	const lv = useLevels(gameId, mineLevels);
 	const { celebrating, showWin } = useCelebration(status === 'over' && won);
 
@@ -125,9 +130,34 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		setCocottesLeft(caged); setCocottesTotal(caged);
 		setSelected(null); setHint(null); setClearing(new Set()); setCombo(0);
 		setHammers(HAMMERS); setHammerArmed(false); setWon(false);
+		setFlyers([]); setEggs([]);
 		setStat('playing');
 		animatingRef.current = false;
 		idleRef.current = Date.now();
+	}, []);
+
+	/* ---------- freed-cocotte flight → counter + explosive egg ---------- */
+	const spawnFreed = useCallback((positions: [number, number][]) => {
+		const board = wrapRef.current;
+		if (!board) return;
+		const br = board.getBoundingClientRect();
+		const tr = cocotteRef.current?.getBoundingClientRect();
+		const cols = boardRef.current!.cfg.cols, rows = boardRef.current!.cfg.rows;
+		const tx = tr ? tr.left + tr.width / 2 : br.left + br.width * 0.12;
+		const ty = tr ? tr.top + tr.height / 2 : br.top - 24;
+		const flyAdd = positions.map(([r, c]) => {
+			const cx = br.left + ((c + 0.5) / cols) * br.width;
+			const cy = br.top + ((r + 0.5) / rows) * br.height;
+			return { id: ++flyIdRef.current, r, c, dx: Math.round(tx - cx), dy: Math.round(ty - cy) };
+		});
+		const eggAdd = positions.map(([r, c]) => ({ id: ++flyIdRef.current, r, c }));
+		setFlyers((f) => [...f, ...flyAdd]);
+		setEggs((e) => [...e, ...eggAdd]);
+		const flyIds = new Set(flyAdd.map((a) => a.id));
+		const eggIds = new Set(eggAdd.map((a) => a.id));
+		window.setTimeout(() => setCounterHit((n) => n + 1), 620); // counter bumps as the cocotte lands
+		window.setTimeout(() => setFlyers((f) => f.filter((x) => !flyIds.has(x.id))), 950);
+		window.setTimeout(() => setEggs((e) => e.filter((x) => !eggIds.has(x.id))), 800);
 	}, []);
 
 	const newFree = useCallback(() => {
@@ -188,11 +218,14 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			setClearing(ids);
 			if (step.combo > 1) setCombo(step.combo);
 			// let the burst/flash play before collapsing the column
-			await sleep(step.cleared.length ? 360 : 60);
+			await sleep(step.cleared.length ? 380 : 60);
+			// a cocotte just broke free → it flies to the counter and drops an egg (still on the old grid so it pops from the cage)
+			if (step.freedPos.length) spawnFreed(step.freedPos);
 			boardRef.current = { ...boardRef.current!, grid: step.grid };
 			setDisplayGrid(step.grid.map((row) => row.slice()));
 			setClearing(new Set());
-			await sleep(300); // gems fall + settle
+			// hold longer on combos, and longer still on a freed beat so the flight + egg read before the column blast
+			await sleep(step.freedPos.length ? 760 : step.combo > 1 ? 560 : 320);
 		}
 		scoreRef.current += gained; setScore(scoreRef.current);
 		setCocottesLeft(cagedLeft(boardRef.current!.grid));
@@ -308,7 +341,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 
 			{!(lv.active && lv.menu) && (
 				<div className="mn-hud">
-					<span className="mn-stat">🐔 <strong>{cocottesLeft}</strong>/{cocottesTotal}</span>
+					<span ref={cocotteRef} key={counterHit} className="mn-stat mn-cstat">🐔 <strong>{cocottesLeft}</strong>/{cocottesTotal}</span>
 					<span className="mn-stat">👣 <strong>{movesLeft}</strong></span>
 					<span className="mn-stat">💎 <strong>{fmtScore(score)}</strong></span>
 					{!daily && !lv.active && <span className="mn-stat">🏆 {fmtScore(best)}</span>}
@@ -355,6 +388,10 @@ export default function MineGame({ gameId }: { gameId: string }) {
 							<button key={`hit-${r}-${c}`} className="mn-hit" style={cellStyle(r, c, cfg)} onClick={() => onCell(r, c)} aria-label={`Case ${r + 1},${c + 1}`} />
 						)),
 					)}
+					{/* explosive eggs left where a cocotte broke free (blast the column next beat) */}
+					{eggs.map((eg) => (
+						<div key={eg.id} className="mn-egg" style={cellStyle(eg.r, eg.c, cfg)} aria-hidden="true"><span>🥚</span></div>
+					))}
 					{combo > 1 && <div key={combo} className="mn-halo" aria-hidden="true" />}
 					{combo > 1 && <div className="mn-combo">Combo ×{combo} !</div>}
 
@@ -399,6 +436,12 @@ export default function MineGame({ gameId }: { gameId: string }) {
 						</div>
 					)}
 				</div>
+				{/* freed cocottes flying out to the counter (outside the board so they aren't clipped) */}
+				{flyers.map((fl) => (
+					<div key={fl.id} className="mn-flyer" style={{ ...cellStyle(fl.r, fl.c, cfg), ['--dx' as string]: `${fl.dx}px`, ['--dy' as string]: `${fl.dy}px` }} aria-hidden="true">
+						<CocotteMini />
+					</div>
+				))}
 			</div>
 			)}
 
@@ -475,6 +518,23 @@ const CSS = `
 .mn-halo { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; z-index: 5; box-shadow: inset 0 0 42px 6px var(--mn-accent); animation: mn-halo 0.6s ease-out forwards; }
 @keyframes mn-halo { 0% { opacity: 0; } 35% { opacity: 0.9; } 100% { opacity: 0; } }
 
+/* freed cocotte: pops from the cage, then flies to the 🐔 counter and shrinks in */
+.mn-flyer { position: absolute; z-index: 30; pointer-events: none; padding: 4%; animation: mn-fly 0.9s cubic-bezier(0.45,-0.15,0.7,1) forwards; }
+.mn-flyer .mn-cocotte { width: 100%; height: 100%; filter: drop-shadow(0 0 9px rgba(255,214,120,0.95)); }
+@keyframes mn-fly {
+	0% { transform: translate(0,0) scale(0.7) rotate(0); opacity: 0; }
+	18% { transform: translate(0,-14%) scale(1.35) rotate(-10deg); opacity: 1; }
+	40% { transform: translate(calc(var(--dx) * 0.2), calc(var(--dy) * 0.2 - 12px)) scale(1.1) rotate(8deg); opacity: 1; }
+	100% { transform: translate(var(--dx), var(--dy)) scale(0.28) rotate(-14deg); opacity: 0.15; }
+}
+/* explosive egg dropped where the cocotte was — swells and rattles before the column blast */
+.mn-egg { position: absolute; z-index: 7; display: grid; place-items: center; pointer-events: none; }
+.mn-egg span { font-size: min(6vw, 26px); filter: drop-shadow(0 0 10px rgba(255,150,60,0.95)); animation: mn-egg 0.8s ease-out forwards; }
+@keyframes mn-egg { 0% { transform: scale(0.2) rotate(0); opacity: 0; } 35% { transform: scale(1.25) rotate(-8deg); opacity: 1; } 55% { transform: scale(1.1) rotate(8deg); } 75% { transform: scale(1.2) rotate(-6deg); } 100% { transform: scale(1.5); opacity: 0; } }
+/* the 🐔 counter bumps as a cocotte lands in it */
+.mn-cstat { animation: mn-bump 0.42s cubic-bezier(0.2,1.6,0.4,1); }
+@keyframes mn-bump { 0% { transform: scale(1); } 45% { transform: scale(1.35); box-shadow: 0 0 14px var(--mn-accent); } 100% { transform: scale(1); } }
+
 .mn-overlay { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; background: rgba(10,8,18,0.55); backdrop-filter: blur(3px); border-radius: 14px; }
 .mn-card { background: var(--gray-999); border: 2px solid var(--mn-accent); border-radius: 18px; padding: 20px 28px; text-align: center; box-shadow: var(--shadow-lg); max-width: 300px; }
 .mn-card .mn-cocotte { width: 54px; height: 54px; }
@@ -490,5 +550,5 @@ const CSS = `
 .mn-act:disabled { opacity: 0.4; cursor: default; }
 
 .mn-help { max-width: 440px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.2rem; }
-@media (prefers-reduced-motion: reduce) { .mn-gem, .mn-gem.clr .mn-gemsvg, .mn-combo, .mn-halo, .mn-board.shake { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .mn-gem, .mn-gem.clr .mn-gemsvg, .mn-combo, .mn-halo, .mn-flyer, .mn-egg span, .mn-cstat, .mn-board.shake { animation: none; transition: none; } }
 `;

@@ -47,6 +47,7 @@ export interface Step {
 	cleared: [number, number][];
 	cracked: [number, number][];
 	freed: number;
+	freedPos: [number, number][]; // cells where a cocotte was freed this beat (leaves an explosive egg)
 	gained: number;
 	combo: number; // 1, 2, 3… along the cascade
 	grid: Cell[][];
@@ -217,10 +218,10 @@ function settle(grid: Cell[][], cfg: Cfg, rng: Rng): void {
 	}
 }
 
-/** Crack every cage orthogonally adjacent to a cleared cell. Returns cracked positions + freed count. */
-function crackCages(grid: Cell[][], cfg: Cfg, cleared: Set<string>): { cracked: [number, number][]; freed: number } {
+/** Crack every cage orthogonally adjacent to a cleared cell. Returns cracked/freed positions. */
+function crackCages(grid: Cell[][], cfg: Cfg, cleared: Set<string>): { cracked: [number, number][]; freed: number; freedPos: [number, number][] } {
 	const cracked: [number, number][] = [];
-	let freed = 0;
+	const freedPos: [number, number][] = [];
 	const hit = new Set<string>();
 	for (const k of cleared) {
 		const [r, c] = k.split(',').map(Number);
@@ -236,9 +237,9 @@ function crackCages(grid: Cell[][], cfg: Cfg, cleared: Set<string>): { cracked: 
 		const cage = grid[r][c] as Cage;
 		cage.hits -= 1;
 		cracked.push([r, c]);
-		if (cage.hits <= 0) { grid[r][c] = null; freed += 1; } // freed → empty, refills on settle
+		if (cage.hits <= 0) { grid[r][c] = null; freedPos.push([r, c]); } // freed → empty, refills on settle
 	}
-	return { cracked, freed };
+	return { cracked, freed: freedPos.length, freedPos };
 }
 
 /* ----------------------------- resolve ----------------------------- */
@@ -272,7 +273,7 @@ function resolve(grid: Cell[][], cfg: Cfg, rng: Rng, first: { clears: Set<string
 		combo += 1;
 
 		// Crack cages adjacent to the cleared cells.
-		const { cracked, freed } = crackCages(grid, cfg, clears);
+		const { cracked, freed, freedPos } = crackCages(grid, cfg, clears);
 		totalFreed += freed;
 
 		// Clear cells; where a special is planned, place it instead of clearing.
@@ -289,7 +290,14 @@ function resolve(grid: Cell[][], cfg: Cfg, rng: Rng, first: { clears: Set<string
 		totalGained += gained;
 
 		settle(grid, cfg, rng);
-		steps.push({ cleared: clearedList, cracked, freed, gained, combo, grid: cloneGrid(grid) });
+		steps.push({ cleared: clearedList, cracked, freed, freedPos, gained, combo, grid: cloneGrid(grid) });
+
+		// A freed cocotte leaves an explosive egg → its whole column detonates next beat.
+		if (freedPos.length) {
+			const egg = new Set<string>();
+			for (const [, c] of freedPos) for (let rr = 0; rr < cfg.rows; rr++) if (!isCage(grid[rr][c])) egg.add(key(rr, c));
+			pending = egg;
+		}
 	}
 	return { steps, freed: totalFreed, gained: totalGained };
 }

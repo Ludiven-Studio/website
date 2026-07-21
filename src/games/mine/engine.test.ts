@@ -82,6 +82,13 @@ describe('cocotte cages', () => {
 		expect(res.freed).toBe(1);
 		expect(cagedLeft(res.grid)).toBe(0);
 	});
+	it('a freed cocotte leaves an explosive egg that detonates its whole column', () => {
+		const b = setup(1); // cage at (2,0), column 0 has 3 rows
+		const res = trySwap(b, [1, 0], [0, 0]);
+		expect(res.steps.some((s) => s.freedPos.length === 1)).toBe(true);
+		// a later beat clears the entire column 0 (the egg blast)
+		expect(res.steps.some((s) => s.cleared.filter(([, c]) => c === 0).length >= 3)).toBe(true);
+	});
 });
 
 describe('specials', () => {
