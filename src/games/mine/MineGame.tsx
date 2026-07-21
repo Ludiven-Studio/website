@@ -81,12 +81,12 @@ const GEM_SHAPES: ((c: Cut) => ReactNode)[] = [
 		<polygon points="9,74 91,74 74,91 26,91" fill={c.dark} opacity="0.28" />
 		<polygon points="26,9 74,9 70,17 30,17" fill="#fff" opacity="0.22" />
 	</>),
-	// 3 saphir — marquise (pointed oval)
+	// 3 saphir — marquise (pointed oval, fuller / less elongated)
 	(c) => (<>
-		<path d="M7,50 Q50,9 93,50 Q50,91 7,50 Z" fill={c.base} stroke={STROKE} strokeWidth="2" />
-		<path d="M24,50 Q50,30 76,50 Q50,70 24,50 Z" fill={c.light} opacity="0.85" />
-		<line x1="7" y1="50" x2="93" y2="50" stroke={c.dark} strokeWidth="1.1" opacity="0.4" />
-		<path d="M7,50 Q50,91 93,50 Z" fill={c.dark} opacity="0.2" />
+		<path d="M14,50 Q50,-6 86,50 Q50,106 14,50 Z" fill={c.base} stroke={STROKE} strokeWidth="2" />
+		<path d="M28,50 Q50,20 72,50 Q50,80 28,50 Z" fill={c.light} opacity="0.85" />
+		<line x1="14" y1="50" x2="86" y2="50" stroke={c.dark} strokeWidth="1.1" opacity="0.4" />
+		<path d="M14,50 Q50,106 86,50 Z" fill={c.dark} opacity="0.2" />
 	</>),
 	// 4 ambre — pear (teardrop)
 	(c) => (<>
