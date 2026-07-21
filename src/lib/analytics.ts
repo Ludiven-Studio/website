@@ -8,8 +8,10 @@ export function trackGame(
 	data: Record<string, unknown> = {},
 ): void {
 	if (typeof window === 'undefined') return;
-	(window as unknown as { umami?: { track: (e: string, d?: unknown) => void } }).umami?.track(
-		event,
-		{ game: gameId, ...data },
-	);
+	const umami = (window as unknown as { umami?: { track: (e: string, d?: unknown) => void } }).umami;
+	if (!umami) return;
+	// The event NAME carries the game (e.g. "mine:game_won") so Umami's event list is
+	// readable at a glance; the properties keep game + event separate for filtering
+	// and cross-game aggregation.
+	umami.track(`${gameId}:${event}`, { game: gameId, event, ...data });
 }
