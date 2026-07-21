@@ -192,7 +192,8 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const [score, setScore] = useState(0);
 	const [freeDiff, setFreeDiff] = useState<FreeDiff>(FREE_DIFFS[0].key);
 	const [movesLeft, setMovesLeft] = useState<number>(FREE_DIFFS[0].moves);
-	const [cocottesLeft, setCocottesLeft] = useState(0);
+	const [cocottesLeft, setCocottesLeft] = useState(0); // still caged (for lose/detail texts + win check)
+	const [cocottesFreed, setCocottesFreed] = useState(0); // shown counter: fills up as cocottes land in it
 	const [cocottesTotal, setCocottesTotal] = useState(0);
 	const [selected, setSelected] = useState<[number, number] | null>(null);
 	const [drag, setDrag] = useState<{ from: [number, number]; to: [number, number] | null; dx: number; dy: number } | null>(null);
@@ -239,6 +240,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		movesRef.current = moves; setMovesLeft(moves);
 		scoreRef.current = 0; setScore(0);
 		setCocottesLeft(cagesLeft(b)); setCocottesTotal(b.cfg.cocottes);
+		setCocottesFreed(b.cfg.cocottes - cagesLeft(b)); // starts at 0 (all caged)
 		setSelected(null); setHint(null); setClearing(new Set()); setCombo(0);
 		setHammers(HAMMERS); setHammerArmed(false); setWon(false);
 		setFlyers([]); setEggs([]);
@@ -266,7 +268,8 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		setEggs((e) => [...e, ...eggAdd]);
 		const flyIds = new Set(flyAdd.map((a) => a.id));
 		const eggIds = new Set(eggAdd.map((a) => a.id));
-		window.setTimeout(() => setCounterHit((n) => n + 1), 620); // counter bumps as the cocotte lands
+		// as each cocotte lands in the counter, tick it up + bump it
+		window.setTimeout(() => { setCounterHit((n) => n + 1); setCocottesFreed((f) => f + positions.length); }, 620);
 		window.setTimeout(() => setFlyers((f) => f.filter((x) => !flyIds.has(x.id))), 950);
 		window.setTimeout(() => setEggs((e) => e.filter((x) => !eggIds.has(x.id))), 800);
 	}, []);
@@ -531,7 +534,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 
 			{!(lv.active && lv.menu) && (
 				<div className="mn-hud">
-					<span ref={cocotteRef} key={counterHit} className="mn-stat mn-cstat">🐔 <strong>{cocottesLeft}</strong>/{cocottesTotal}</span>
+					<span ref={cocotteRef} key={counterHit} className="mn-stat mn-cstat">🐔 <strong>{cocottesFreed}</strong>/{cocottesTotal}</span>
 					<span className="mn-stat">👣 <strong>{movesLeft}</strong></span>
 					<span className="mn-stat">💎 <strong>{fmtScore(score)}</strong></span>
 					{!daily && !lv.active && <span className="mn-stat">🏆 {fmtScore(best)}</span>}
