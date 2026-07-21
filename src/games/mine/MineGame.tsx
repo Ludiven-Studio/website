@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties, type ReactNode } from 'react';
 import {
-	generateBoard, trySwap, smash, findHint, hasAnyMove, shuffle, cagesLeft,
+	generateBoard, trySwap, smash, findHint, hasAnyMove, shuffle, cagesLeft, canSwap,
 	isGem, isCage, type Cell, type GenBoard, type Cfg, type SpecialKind, type Step,
 } from './engine';
 import { mineLevels } from './levels';
@@ -195,7 +195,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const [cocottesLeft, setCocottesLeft] = useState(0);
 	const [cocottesTotal, setCocottesTotal] = useState(0);
 	const [selected, setSelected] = useState<[number, number] | null>(null);
-	const [dragCell, setDragCell] = useState<[number, number] | null>(null);
+	const [drag, setDrag] = useState<{ from: [number, number]; to: [number, number] | null; dx: number; dy: number } | null>(null);
 	const [clearing, setClearing] = useState<Set<number>>(new Set());
 	const [combo, setCombo] = useState(0);
 	const [hint, setHint] = useState<{ a: [number, number]; b: [number, number] } | null>(null);
@@ -221,7 +221,10 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const idleRef = useRef<number>(0);
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const cocotteRef = useRef<HTMLSpanElement | null>(null);
-	const dragStartRef = useRef<[number, number] | null>(null);
+	const dragRef = useRef<{ from: [number, number]; x: number; y: number; dx: number; dy: number; to: [number, number] | null; moved: boolean } | null>(null);
+	const draggedRef = useRef(false); // last pointer sequence was a drag → suppress the click-select
+	const doSwapRef = useRef<(a: [number, number], b: [number, number]) => void>(() => {});
+	const hammerArmedRef = useRef(false);
 	const flyIdRef = useRef(0);
 	const lv = useLevels(gameId, mineLevels);
 	const { celebrating, showWin } = useCelebration(status === 'over' && won);
@@ -379,7 +382,12 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		await runResult(res.steps, res.gained, res.freed);
 	}, [runResult]);
 
+	// keep the drag controller (a run-once effect) reading the latest handlers/state
+	doSwapRef.current = doSwap;
+	hammerArmedRef.current = hammerArmed;
+
 	const onCell = useCallback((r: number, c: number) => {
+		if (draggedRef.current) { draggedRef.current = false; return; } // this pointer sequence was a drag, not a tap
 		if (animatingRef.current || statusRef.current !== 'playing') return;
 		idleRef.current = Date.now(); setHint(null);
 		const cell = boardRef.current!.grid[r][c];
@@ -398,63 +406,74 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		else setSelected([r, c]);
 	}, [hammerArmed, selected, doSwap, runResult]);
 
-	/* ---------- native touch swipe (iOS-safe) ---------- */
+	/* ---------- drag-to-swap: the gem follows the pointer, then snaps to the target
+	   (valid swap) or back (invalid). Pointer events + `touch-action:none` on the board
+	   cover mouse and touch alike; runs once and reads live state via refs. ---------- */
 	useEffect(() => {
 		const el = wrapRef.current;
 		if (!el) return;
-		let start: [number, number] | null = null;
-		const cellAt = (x: number, y: number): [number, number] | null => {
+		let raf = 0;
+		const geo = () => {
 			const rect = el.getBoundingClientRect();
-			const c = Math.floor(((x - rect.left) / rect.width) * cfg.cols);
-			const r = Math.floor(((y - rect.top) / rect.height) * cfg.rows);
-			return r >= 0 && r < cfg.rows && c >= 0 && c < cfg.cols ? [r, c] : null;
+			const cfg2 = boardRef.current?.cfg;
+			const cols = cfg2?.cols ?? 8, rows = cfg2?.rows ?? 8;
+			return { rect, w: rect.width / cols, h: rect.height / rows, cols, rows };
 		};
-		const onStart = (e: TouchEvent) => { const t = e.touches[0]; if (t) start = cellAt(t.clientX, t.clientY); };
-		const onEnd = (e: TouchEvent) => {
-			if (!start) return;
-			const t = e.changedTouches[0];
-			const end = t ? cellAt(t.clientX, t.clientY) : null;
-			const s = start; start = null;
-			if (!end) return;
-			const d = Math.abs(s[0] - end[0]) + Math.abs(s[1] - end[1]);
-			if (d === 1) { e.preventDefault(); void doSwap(s, end); } // a swipe to a neighbour → swap (tap falls through to onCell)
+		const cellAt = (x: number, y: number, g: ReturnType<typeof geo>): [number, number] | null => {
+			const c = Math.floor((x - g.rect.left) / g.w);
+			const r = Math.floor((y - g.rect.top) / g.h);
+			return r >= 0 && r < g.rows && c >= 0 && c < g.cols ? [r, c] : null;
 		};
-		el.addEventListener('touchstart', onStart, { passive: false });
-		el.addEventListener('touchend', onEnd, { passive: false });
-		return () => { el.removeEventListener('touchstart', onStart); el.removeEventListener('touchend', onEnd); };
-	}, [cfg.cols, cfg.rows, doSwap]);
+		const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
+		const isGemAt = (r: number, c: number) => !!boardRef.current && isGem(boardRef.current.grid[r]?.[c]);
 
-	/* ---------- mouse drag-and-drop (desktop) ---------- */
-	useEffect(() => {
-		const el = wrapRef.current;
-		if (!el) return;
-		// start is kept in a ref: setDragCell re-renders (recreating this effect), so a
-		// closure-local start would be lost between pointerdown and pointerup.
-		const cellAt = (x: number, y: number): [number, number] | null => {
-			const rect = el.getBoundingClientRect();
-			const c = Math.floor(((x - rect.left) / rect.width) * cfg.cols);
-			const r = Math.floor(((y - rect.top) / rect.height) * cfg.rows);
-			return r >= 0 && r < cfg.rows && c >= 0 && c < cfg.cols ? [r, c] : null;
-		};
 		const onDown = (e: PointerEvent) => {
-			if (e.pointerType !== 'mouse' || animatingRef.current || statusRef.current !== 'playing') return;
-			const s = cellAt(e.clientX, e.clientY);
-			if (s && isGem(boardRef.current!.grid[s[0]][s[1]])) { dragStartRef.current = s; setDragCell(s); }
-			else dragStartRef.current = null;
+			if (animatingRef.current || statusRef.current !== 'playing' || hammerArmedRef.current) return;
+			const g = geo();
+			const from = cellAt(e.clientX, e.clientY, g);
+			if (!from || !isGemAt(from[0], from[1])) return;
+			dragRef.current = { from, x: e.clientX, y: e.clientY, dx: 0, dy: 0, to: null, moved: false };
+			setHint(null); idleRef.current = Date.now();
 		};
-		const onUp = (e: PointerEvent) => {
-			const s = dragStartRef.current;
-			if (e.pointerType !== 'mouse' || !s) return;
-			dragStartRef.current = null; setDragCell(null);
-			const end = cellAt(e.clientX, e.clientY);
-			if (!end) return;
-			// drag to a neighbour → swap (a release on the same cell is a click → onCell selects it)
-			if (Math.abs(s[0] - end[0]) + Math.abs(s[1] - end[1]) === 1) void doSwap(s, end);
+		const onMove = (e: PointerEvent) => {
+			const d = dragRef.current;
+			if (!d) return;
+			const g = geo();
+			let dx = e.clientX - d.x, dy = e.clientY - d.y;
+			if (Math.abs(dx) >= Math.abs(dy)) { dy = 0; dx = clamp(dx, g.w); } else { dx = 0; dy = clamp(dy, g.h); }
+			let to: [number, number] | null = null;
+			if (dx > 0) to = [d.from[0], d.from[1] + 1];
+			else if (dx < 0) to = [d.from[0], d.from[1] - 1];
+			else if (dy > 0) to = [d.from[0] + 1, d.from[1]];
+			else if (dy < 0) to = [d.from[0] - 1, d.from[1]];
+			if (to && !isGemAt(to[0], to[1])) { to = null; dx = clamp(dx, g.w * 0.32); dy = clamp(dy, g.h * 0.32); } // resist into a wall/cage
+			if (Math.abs(dx) > 3 || Math.abs(dy) > 3) d.moved = true;
+			d.dx = dx; d.dy = dy; d.to = to;
+			if (!raf) raf = requestAnimationFrame(() => { raf = 0; const c = dragRef.current; if (c) setDrag({ from: c.from, to: c.to, dx: c.dx, dy: c.dy }); });
+		};
+		const onUp = () => {
+			const d = dragRef.current;
+			if (!d) return;
+			dragRef.current = null;
+			if (raf) { cancelAnimationFrame(raf); raf = 0; }
+			const g = geo();
+			const past = Math.abs(d.dx) > g.w * 0.4 || Math.abs(d.dy) > g.h * 0.4;
+			if (d.moved) draggedRef.current = true; // suppress the click-select that follows
+			setDrag(null); // transforms animate back to 0
+			if (d.to && past && boardRef.current && canSwap(boardRef.current, d.from, d.to)) void doSwapRef.current(d.from, d.to);
 		};
 		el.addEventListener('pointerdown', onDown);
+		window.addEventListener('pointermove', onMove);
 		window.addEventListener('pointerup', onUp);
-		return () => { el.removeEventListener('pointerdown', onDown); window.removeEventListener('pointerup', onUp); };
-	}, [cfg.cols, cfg.rows, doSwap]);
+		window.addEventListener('pointercancel', onUp);
+		return () => {
+			el.removeEventListener('pointerdown', onDown);
+			window.removeEventListener('pointermove', onMove);
+			window.removeEventListener('pointerup', onUp);
+			window.removeEventListener('pointercancel', onUp);
+			if (raf) cancelAnimationFrame(raf);
+		};
+	}, []);
 
 	/* ---------- idle hint ---------- */
 	useEffect(() => {
@@ -534,10 +553,15 @@ export default function MineGame({ gameId }: { gameId: string }) {
 						row.map((cell, c) => {
 							if (isGem(cell)) {
 								const cl = clearing.has(cell.id) ? ' clr' : '';
-								const sel = (selected && selected[0] === r && selected[1] === c) || (dragCell && dragCell[0] === r && dragCell[1] === c) ? ' sel' : '';
+								const isFrom = drag && drag.from[0] === r && drag.from[1] === c;
+								const isTo = drag && drag.to && drag.to[0] === r && drag.to[1] === c;
+								const sel = (selected && selected[0] === r && selected[1] === c) || isFrom ? ' sel' : '';
 								const hi = hintSet?.has(`${r},${c}`) ? ' hint' : '';
+								const style = cellStyle(r, c, cfg);
+								if (isFrom) { style.transform = `translate(${drag!.dx}px, ${drag!.dy}px)`; style.zIndex = 20; }
+								else if (isTo) style.transform = `translate(${-drag!.dx}px, ${-drag!.dy}px)`;
 								return (
-									<div key={cell.id} className={`mn-gem${cl}${sel}${hi}`} style={cellStyle(r, c, cfg)}>
+									<div key={cell.id} className={`mn-gem${cl}${sel}${hi}${isFrom || isTo ? ' drag' : ''}`} style={style}>
 										<GemVisual color={cell.color} special={cell.special} useImg={gemImg} />
 									</div>
 								);
@@ -664,7 +688,8 @@ const CSS = `
 @keyframes mn-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
 
 .mn-gem, .mn-cage, .mn-hit { position: absolute; box-sizing: border-box; }
-.mn-gem { padding: 1.5%; transition: left 0.28s cubic-bezier(0.3,1.1,0.5,1), top 0.32s cubic-bezier(0.3,1.25,0.5,1); animation: mn-in 0.42s cubic-bezier(0.3,1.3,0.5,1); pointer-events: none; }
+.mn-gem { padding: 1.5%; transition: left 0.28s cubic-bezier(0.3,1.1,0.5,1), top 0.32s cubic-bezier(0.3,1.25,0.5,1), transform 0.22s cubic-bezier(0.3,1.1,0.5,1); animation: mn-in 0.42s cubic-bezier(0.3,1.3,0.5,1); pointer-events: none; }
+.mn-gem.drag { transition: none; } /* follow the pointer 1:1 while dragging (snap animates on release) */
 .mn-gemsvg, .mn-gemimg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
 .mn-gemimg { object-fit: contain; -webkit-user-drag: none; user-select: none; }
 .mn-mark { position: absolute; inset: 1.5%; width: auto; height: auto; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.85)); }

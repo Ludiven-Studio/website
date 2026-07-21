@@ -340,6 +340,19 @@ function matchIncludes(grid: Cell[][], p: [number, number]): boolean {
 	return findRuns(grid).some((run) => run.cells.some(([r, c]) => r === p[0] && c === p[1]));
 }
 
+/** Would swapping a↔b do anything? Pure check (no cascade, no buffer consumption) — for
+ *  the drag UI to decide snap-to-target vs. snap-back before committing the real swap. */
+export function canSwap(board: Board, a: [number, number], b: [number, number]): boolean {
+	const { grid } = board;
+	if (!adjacent(a, b)) return false;
+	const ga = grid[a[0]]?.[a[1]], gb = grid[b[0]]?.[b[1]];
+	if (!isGem(ga) || !isGem(gb)) return false;
+	if (ga.special === 'rainbow' || gb.special === 'rainbow' || (ga.special && gb.special)) return true;
+	const g = cloneGrid(grid);
+	[g[a[0]][a[1]], g[b[0]][b[1]]] = [g[b[0]][b[1]], g[a[0]][a[1]]];
+	return hasMatch(g);
+}
+
 /** Rainbow swapped onto `other`: clear every gem of other's colour (or a random colour if other is a special/none). */
 function activateRainbow(grid: Cell[][], at: [number, number], other: Gem | null, seed: Set<string>): void {
 	const color = other && !other.special ? other.color : 1 + Math.floor(Math.random() * 6);
