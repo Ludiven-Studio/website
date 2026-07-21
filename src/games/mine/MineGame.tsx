@@ -40,6 +40,21 @@ const GEM_COLORS: { base: string; light: string; dark: string }[] = [
 	{ base: '#dfe9f2', light: '#ffffff', dark: '#9fb3c8' }, // 6 diamant
 ];
 
+/** Rocket / bomb glyphs, drawn over the gem (works on both the SVG and image gems). */
+function specialMarkEls(special?: SpecialKind) {
+	return (
+		<>
+			{(special === 'rowClear' || special === 'colClear') && (
+				<g stroke="#fff" strokeWidth="6" strokeLinecap="round" opacity="0.95">
+					{special === 'rowClear' ? <><line x1="24" y1="50" x2="76" y2="50" /><polyline points="66,42 78,50 66,58" fill="none" /><polyline points="34,42 22,50 34,58" fill="none" /></>
+						: <><line x1="50" y1="26" x2="50" y2="74" /><polyline points="42,36 50,24 58,36" fill="none" /><polyline points="42,64 50,76 58,64" fill="none" /></>}
+				</g>
+			)}
+			{special === 'bomb' && <circle cx="50" cy="52" r="15" fill="#1b1b22" stroke="#fff" strokeWidth="3" />}
+		</>
+	);
+}
+
 function GemSVG({ color, special }: { color: number; special?: SpecialKind }) {
 	const c = GEM_COLORS[(color - 1) % GEM_COLORS.length];
 	const isRainbow = special === 'rainbow';
@@ -58,14 +73,21 @@ function GemSVG({ color, special }: { color: number; special?: SpecialKind }) {
 			<polygon points="7,37 50,51 31,97" fill={isRainbow ? c.dark : c.dark} opacity="0.55" />
 			<polygon points="93,37 50,51 69,97" fill={c.dark} opacity="0.7" />
 			<line x1="50" y1="51" x2="50" y2="97" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
-			{(special === 'rowClear' || special === 'colClear') && (
-				<g stroke="#fff" strokeWidth="6" strokeLinecap="round" opacity="0.95">
-					{special === 'rowClear' ? <><line x1="24" y1="50" x2="76" y2="50" /><polyline points="66,42 78,50 66,58" fill="none" /><polyline points="34,42 22,50 34,58" fill="none" /></>
-						: <><line x1="50" y1="26" x2="50" y2="74" /><polyline points="42,36 50,24 58,36" fill="none" /><polyline points="42,64 50,76 58,64" fill="none" /></>}
-				</g>
-			)}
-			{special === 'bomb' && <circle cx="50" cy="52" r="15" fill="#1b1b22" stroke="#fff" strokeWidth="3" />}
+			{specialMarkEls(special)}
 		</svg>
+	);
+}
+
+/** Prefer generated gem art (public/assets/mine/gem-N.png) when present; else the SVG gem.
+ *  Rainbow always uses the SVG (its look is colour-agnostic). */
+function GemVisual({ color, special, useImg }: { color: number; special?: SpecialKind; useImg: boolean }) {
+	if (!useImg || special === 'rainbow') return <GemSVG color={color} special={special} />;
+	const n = ((color - 1) % GEM_COLORS.length) + 1;
+	return (
+		<>
+			<img className="mn-gemimg" src={`/assets/mine/gem-${n}.png`} alt="" draggable={false} />
+			{special && <svg viewBox="0 0 100 100" className="mn-mark" aria-hidden="true">{specialMarkEls(special)}</svg>}
+		</>
 	);
 }
 
@@ -104,6 +126,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const [flyers, setFlyers] = useState<{ id: number; r: number; c: number; dx: number; dy: number }[]>([]);
 	const [eggs, setEggs] = useState<{ id: number; r: number; c: number }[]>([]);
 	const [counterHit, setCounterHit] = useState(0);
+	const [gemImg, setGemImg] = useState(false); // true once generated gem art is available
 
 	const boardRef = useRef<GenBoard | null>(null);
 	const statusRef = useRef<Status>('playing');
@@ -191,6 +214,9 @@ export default function MineGame({ gameId }: { gameId: string }) {
 
 	// Init once.
 	useEffect(() => { newFree(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+	// Use generated gem art if present (drop PNGs in public/assets/mine/ — no code change needed).
+	useEffect(() => { const img = new Image(); img.onload = () => setGemImg(true); img.src = '/assets/mine/gem-1.png'; }, []);
 
 	/* ---------- end of game ---------- */
 	const endGame = useCallback((didWin: boolean) => {
@@ -401,7 +427,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 								const hi = hintSet?.has(`${r},${c}`) ? ' hint' : '';
 								return (
 									<div key={cell.id} className={`mn-gem${cl}${sel}${hi}`} style={cellStyle(r, c, cfg)}>
-										<GemSVG color={cell.color} special={cell.special} />
+										<GemVisual color={cell.color} special={cell.special} useImg={gemImg} />
 									</div>
 								);
 							}
@@ -524,12 +550,14 @@ const CSS = `
 
 .mn-gem, .mn-cage, .mn-hit { position: absolute; box-sizing: border-box; }
 .mn-gem { padding: 1.5%; transition: left 0.28s cubic-bezier(0.3,1.1,0.5,1), top 0.32s cubic-bezier(0.3,1.25,0.5,1); animation: mn-in 0.42s cubic-bezier(0.3,1.3,0.5,1); pointer-events: none; }
-.mn-gemsvg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
-.mn-gem.sel .mn-gemsvg { filter: drop-shadow(0 0 6px #fff) drop-shadow(0 2px 3px rgba(0,0,0,0.4)); transform: scale(1.08); }
-.mn-gem.hint .mn-gemsvg { animation: mn-hint 0.8s ease-in-out infinite; }
+.mn-gemsvg, .mn-gemimg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
+.mn-gemimg { object-fit: contain; -webkit-user-drag: none; user-select: none; }
+.mn-mark { position: absolute; inset: 1.5%; width: auto; height: auto; pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.85)); }
+.mn-gem.sel .mn-gemsvg, .mn-gem.sel .mn-gemimg { filter: drop-shadow(0 0 6px #fff) drop-shadow(0 2px 3px rgba(0,0,0,0.4)); transform: scale(1.08); }
+.mn-gem.hint .mn-gemsvg, .mn-gem.hint .mn-gemimg { animation: mn-hint 0.8s ease-in-out infinite; }
 /* clearing: flash bright, swell, then burst away in a spin */
 .mn-gem.clr { z-index: 4; animation: mn-burst 0.46s cubic-bezier(0.45,0,0.4,1) forwards; }
-.mn-gem.clr .mn-gemsvg { animation: mn-flash 0.46s ease-out forwards; }
+.mn-gem.clr .mn-gemsvg, .mn-gem.clr .mn-gemimg { animation: mn-flash 0.46s ease-out forwards; }
 @keyframes mn-in { 0% { transform: translateY(-28%) scale(0.55); opacity: 0; } 55% { opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
 @keyframes mn-hint { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
 @keyframes mn-burst { 0% { transform: scale(1) rotate(0); } 32% { transform: scale(1.45) rotate(-10deg); } 100% { transform: scale(0) rotate(35deg); opacity: 0; } }
@@ -585,5 +613,5 @@ const CSS = `
 .mn-act:disabled { opacity: 0.4; cursor: default; }
 
 .mn-help { max-width: 440px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.2rem; }
-@media (prefers-reduced-motion: reduce) { .mn-gem, .mn-gem.clr .mn-gemsvg, .mn-combo, .mn-halo, .mn-flyer, .mn-egg span, .mn-cstat, .mn-board.shake { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .mn-gem, .mn-gem.clr .mn-gemsvg, .mn-gem.clr .mn-gemimg, .mn-combo, .mn-halo, .mn-flyer, .mn-egg span, .mn-cstat, .mn-board.shake { animation: none; transition: none; } }
 `;
