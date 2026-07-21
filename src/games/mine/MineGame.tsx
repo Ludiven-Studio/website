@@ -187,11 +187,12 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			for (const [r, c] of step.cleared) { const id = idAt(grid, r, c); if (id != null) ids.add(id); }
 			setClearing(ids);
 			if (step.combo > 1) setCombo(step.combo);
-			await sleep(step.cleared.length ? 170 : 40);
+			// let the burst/flash play before collapsing the column
+			await sleep(step.cleared.length ? 360 : 60);
 			boardRef.current = { ...boardRef.current!, grid: step.grid };
 			setDisplayGrid(step.grid.map((row) => row.slice()));
 			setClearing(new Set());
-			await sleep(150);
+			await sleep(300); // gems fall + settle
 		}
 		scoreRef.current += gained; setScore(scoreRef.current);
 		setCocottesLeft(cagedLeft(boardRef.current!.grid));
@@ -218,7 +219,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		[swapped[a[0]][a[1]], swapped[b[0]][b[1]]] = [swapped[b[0]][b[1]], swapped[a[0]][a[1]]];
 		boardRef.current = { ...boardRef.current, grid: swapped };
 		setDisplayGrid(swapped.map((row) => row.slice()));
-		await sleep(160);
+		await sleep(260); // let the swap glide finish before the first match pops
 		await runResult(res.steps, res.gained, res.freed);
 	}, [runResult]);
 
@@ -354,6 +355,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 							<button key={`hit-${r}-${c}`} className="mn-hit" style={cellStyle(r, c, cfg)} onClick={() => onCell(r, c)} aria-label={`Case ${r + 1},${c + 1}`} />
 						)),
 					)}
+					{combo > 1 && <div key={combo} className="mn-halo" aria-hidden="true" />}
 					{combo > 1 && <div className="mn-combo">Combo ×{combo} !</div>}
 
 					{dailyLoading && <div className="mn-overlay"><div className="mn-card">Préparation du défi…</div></div>}
@@ -444,13 +446,21 @@ const CSS = `
 @keyframes mn-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
 
 .mn-gem, .mn-cage, .mn-hit { position: absolute; box-sizing: border-box; }
-.mn-gem { padding: 1.5%; transition: left 0.16s ease, top 0.16s ease; animation: mn-in 0.18s ease; pointer-events: none; }
+.mn-gem { padding: 1.5%; transition: left 0.28s cubic-bezier(0.3,1.1,0.5,1), top 0.32s cubic-bezier(0.3,1.25,0.5,1); animation: mn-in 0.42s cubic-bezier(0.3,1.3,0.5,1); pointer-events: none; }
 .mn-gemsvg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
 .mn-gem.sel .mn-gemsvg { filter: drop-shadow(0 0 6px #fff) drop-shadow(0 2px 3px rgba(0,0,0,0.4)); transform: scale(1.08); }
 .mn-gem.hint .mn-gemsvg { animation: mn-hint 0.8s ease-in-out infinite; }
-.mn-gem.clr { transform: scale(0); opacity: 0; transition: transform 0.15s ease, opacity 0.15s ease; }
-@keyframes mn-in { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-@keyframes mn-hint { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
+/* clearing: flash bright, swell, then burst away in a spin */
+.mn-gem.clr { z-index: 4; animation: mn-burst 0.46s cubic-bezier(0.45,0,0.4,1) forwards; }
+.mn-gem.clr .mn-gemsvg { animation: mn-flash 0.46s ease-out forwards; }
+@keyframes mn-in { 0% { transform: translateY(-28%) scale(0.55); opacity: 0; } 55% { opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes mn-hint { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
+@keyframes mn-burst { 0% { transform: scale(1) rotate(0); } 32% { transform: scale(1.45) rotate(-10deg); } 100% { transform: scale(0) rotate(35deg); opacity: 0; } }
+@keyframes mn-flash {
+	0% { filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); }
+	32% { filter: brightness(2.6) saturate(1.4) drop-shadow(0 0 14px rgba(255,255,255,0.95)); }
+	100% { filter: brightness(3.2) drop-shadow(0 0 6px rgba(255,255,255,0.6)); }
+}
 
 .mn-cage { padding: 3%; display: grid; place-items: center; pointer-events: none; }
 .mn-cage .mn-cocotte { width: 88%; height: 88%; }
@@ -459,8 +469,11 @@ const CSS = `
 
 .mn-hit { background: transparent; border: none; cursor: pointer; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-.mn-combo { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--mn-accent); color: var(--accent-text-over); font-weight: 800; font-size: 15px; padding: 5px 16px; border-radius: 999px; pointer-events: none; animation: mn-pop 0.5s ease; z-index: 5; }
-@keyframes mn-pop { from { transform: translateX(-50%) scale(0.4); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+.mn-combo { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--mn-accent); color: var(--accent-text-over); font-weight: 800; font-size: 19px; letter-spacing: 0.3px; padding: 7px 20px; border-radius: 999px; pointer-events: none; box-shadow: 0 0 18px var(--mn-accent), 0 4px 12px rgba(0,0,0,0.4); animation: mn-pop 0.6s cubic-bezier(0.2,1.5,0.35,1); z-index: 6; }
+@keyframes mn-pop { 0% { transform: translateX(-50%) scale(0.3); opacity: 0; } 55% { transform: translateX(-50%) scale(1.2); opacity: 1; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+/* combo halo pulse on the board — remounts each chain step to replay */
+.mn-halo { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; z-index: 5; box-shadow: inset 0 0 42px 6px var(--mn-accent); animation: mn-halo 0.6s ease-out forwards; }
+@keyframes mn-halo { 0% { opacity: 0; } 35% { opacity: 0.9; } 100% { opacity: 0; } }
 
 .mn-overlay { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; background: rgba(10,8,18,0.55); backdrop-filter: blur(3px); border-radius: 14px; }
 .mn-card { background: var(--gray-999); border: 2px solid var(--mn-accent); border-radius: 18px; padding: 20px 28px; text-align: center; box-shadow: var(--shadow-lg); max-width: 300px; }
@@ -477,5 +490,5 @@ const CSS = `
 .mn-act:disabled { opacity: 0.4; cursor: default; }
 
 .mn-help { max-width: 440px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.2rem; }
-@media (prefers-reduced-motion: reduce) { .mn-gem, .mn-combo, .mn-board.shake { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .mn-gem, .mn-gem.clr .mn-gemsvg, .mn-combo, .mn-halo, .mn-board.shake { animation: none; transition: none; } }
 `;
