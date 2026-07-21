@@ -20,6 +20,7 @@ const NEG = 'text, words, letters, numbers, watermark, signature, ui, blurry, ug
 
 // The hen mascot ("cocotte") recurs across the studio's games.
 const CARDS = {
+	mine: 'a colorful gem match-3 puzzle, a grid of sparkling faceted ruby emerald sapphire amber crystals, a cute cartoon hen locked in a crystal cage being freed, jewel mine treasure, vivid jewel tones',
 	'2048': 'sliding number puzzle, glossy rounded tiles stacked in a grid, warm oranges and yellows',
 	'mots-meles': 'word-search letter grid puzzle, glowing highlighted diagonal line of tiles',
 	'somme-toute': 'a balanced scale with small number blocks, equilibrium, teal and gold',
