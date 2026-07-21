@@ -19,13 +19,11 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 export function levelSetup(level: number): MineLevelCfg {
 	const l = Math.max(1, Math.min(LEVEL_COUNT, level));
 	const colors = l <= 40 ? 5 : 6;
-	const cocottes = Math.min(10, 1 + Math.floor((l - 1) / 11)); // 1 → 10 (extra ones descend from the top)
-	const cageHits = l > 60 ? 2 : 1;
+	const cocottes = Math.round(3 + 17 * ((l - 1) / (LEVEL_COUNT - 1))); // 3 (lvl 1) → 20 (lvl 100); ≤3 shown, rest descend
+	const cageHits = 1;
 	const cfg: Cfg = { rows: 8, cols: 8, colors, cocottes, cageHits };
-	// Moves scale with the objective (cracks to make + queued cocottes to bring down),
-	// tightening a touch as levels rise.
-	const cracks = cocottes * cageHits;
-	const moves = Math.max(9, Math.round((9 + cracks * 3.2) * (1 - 0.1 * (l / LEVEL_COUNT))));
+	// Moves scale with the number of cocottes to free, tightening a touch as levels rise.
+	const moves = Math.max(10, Math.round((8 + cocottes * 2) * (1 - 0.06 * (l / LEVEL_COUNT))));
 	return {
 		seed: levelSeed(l),
 		cfg,
