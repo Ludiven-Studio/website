@@ -2,13 +2,14 @@
 // (e.g. local dev, or domain excluded via data-domains).
 type GameEvent = 'game_started' | 'game_won' | 'game_over' | 'hint_used' | 'solution_shown' | 'daily_played' | 'daily_done' | 'discovery';
 
-/** Play mode, so free / daily / levels runs can be told apart in Umami. */
+/** Play mode, so free / daily / levels runs can be told apart in Umami. Games may pass
+ *  their own mode string (some use 'level', 'listen', …); it's folded into the event name. */
 export type GameMode = 'free' | 'daily' | 'levels';
 
 export function trackGame(
 	gameId: string,
 	event: GameEvent,
-	data: Record<string, unknown> & { mode?: GameMode } = {},
+	data: Record<string, unknown> & { mode?: string } = {},
 ): void {
 	if (typeof window === 'undefined') return;
 	const umami = (window as unknown as { umami?: { track: (e: string, d?: unknown) => void } }).umami;
