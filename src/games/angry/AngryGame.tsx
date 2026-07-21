@@ -72,6 +72,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 	const finishedRef = useRef(false);
 	const settleAccRef = useRef(0);
 	const rafRef = useRef<number | null>(null);
+	const resolveShotRef = useRef<() => void>(() => {});
 	const accRef = useRef(0);
 	const lastRef = useRef(0);
 	const boomsRef = useRef<Boom[]>([]);
@@ -374,6 +375,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		};
 	}, []);
 
+	resolveShotRef.current = resolveShot; // keep the run-once physics loop calling the latest resolveShot
+
 	/* ---------- Render + physics loop ---------- */
 	useEffect(() => {
 		const cv = canvasRef.current;
@@ -571,7 +574,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 					settledForRef.current = ev.settled ? settledForRef.current + STEP : 0;
 					if (settledForRef.current >= SETTLE_GRACE || settleAccRef.current > SETTLE_TIMEOUT) {
 						rollingRef.current = false;
-						resolveShot();
+						resolveShotRef.current();
 					}
 				}
 			}
@@ -581,7 +584,9 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		};
 		rafRef.current = requestAnimationFrame(frame);
 		return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); lastRef.current = 0; };
-	}, [resolveShot]);
+		// Run once: reading resolveShot via a ref keeps the physics clock from resetting
+		// every frame (setElapsed re-renders each frame; an unstable dep stalled `step`).
+	}, []);
 
 	useEffect(() => { newFree('facile'); }, [newFree]);
 

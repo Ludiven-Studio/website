@@ -68,6 +68,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const startRef = useRef(0); // chrono start (epoch ms), 0 = not started
 	const finishedRef = useRef(false);
 	const rafRef = useRef<number | null>(null);
+	const resolveShotRef = useRef<() => void>(() => {});
 	const accRef = useRef(0);
 	const lastRef = useRef(0);
 	const sinksRef = useRef<Sink[]>([]); // active pot animations
@@ -335,6 +336,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		return () => ro.disconnect();
 	}, [doResize]);
 
+	resolveShotRef.current = resolveShot; // keep the run-once physics loop calling the latest resolveShot
+
 	/* ---------- Render + physics loop ---------- */
 	useEffect(() => {
 		const cv = canvasRef.current;
@@ -459,7 +462,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					stepBalls(ballsRef.current, t, STEP / 1000);
 					if (isSettled(ballsRef.current)) {
 						rollingRef.current = false;
-						resolveShot();
+						resolveShotRef.current();
 					}
 				}
 			}
@@ -481,7 +484,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		};
 		rafRef.current = requestAnimationFrame(frame);
 		return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); lastRef.current = 0; };
-	}, [resolveShot]);
+		// Run once: resolveShot via ref so setElapsed's per-frame re-render can't restart
+		// this effect and reset the physics clock (which would freeze the balls).
+	}, []);
 
 	/* ---------- Init ---------- */
 	useEffect(() => { newFreeTable('facile'); }, [newFreeTable]);
