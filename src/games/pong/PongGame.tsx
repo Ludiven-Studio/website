@@ -2,11 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { PONG, createState, serve, movePaddle, stepBall, activatePower, addPickup, type PongState, type PowerId } from './engine';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PaddleMsg } from './net';
 import { mulberry32 } from '../prng';
-import { playerName, setPlayerName } from '../../lib/leaderboard';
+import { playerName, setPlayerName, getDaily, loadDailyRun, saveDailyRun, dailyWeekdayLabel } from '../../lib/leaderboard';
+import { fmtCentis } from '../../lib/scoreFormat';
 import { useLevels } from '../../lib/useLevels';
 import { pongLevels, type PongLevelCfg } from './levels';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
+import ModeToggle from '../../components/ModeToggle';
+import Leaderboard from '../../components/Leaderboard';
 
 type Phase = 'menu' | 'waiting' | 'playing' | 'over';
 type Role = 'host' | 'guest' | 'ai';
@@ -28,6 +31,7 @@ const POWER_COLOR: Record<PowerId, string> = { speed: '#ffd60a', curve: '#b07cff
 const POWER_ICON: Record<PowerId, string> = { speed: '⚡', curve: '🌀', jam: '🌫️', big: '🛡️' };
 
 const randSeed = (): number => Math.floor(Math.random() * 2 ** 31);
+const DAILY_TARGET = 3; // daily challenge: first to 3 points vs the AI, fastest time wins
 
 export default function PongGame({ gameId }: { gameId: string }) {
 	const lv = useLevels<PongLevelCfg>(gameId, pongLevels);
@@ -46,7 +50,13 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const [myCharge, setMyCharge] = useState(0); // 0..chargeNeed (for the power bar)
 	const [powers, setPowers] = useState(true); // menu choice: power-ups vs classic
 	const [powersUi, setPowersUi] = useState(true); // whether the running match has powers (drives UI)
+	const [daily, setDaily] = useState(false); // daily-challenge mode active
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [dailyTime, setDailyTime] = useState<number | null>(null); // winning time (centiseconds)
 
+	const dailyRef = useRef(false);
+	const dailyStartRef = useRef(0); // match start (ms) — timing basis for the daily
+	const dailySeedRef = useRef(0);
 	const aiPowerCdRef = useRef(0); // AI power cooldown
 	const chargeRef = useRef(0); // last pushed charge value (avoid setState every frame)
 	const levelCfgRef = useRef<PongLevelCfg | null>(null); // non-null → levels match (ramps AI + serve speed)
@@ -184,6 +194,17 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		const won = myScore >= target;
 		runningRef.current = false;
 		cancelAnimationFrame(rafRef.current);
+		if (dailyRef.current) {
+			// Daily race: on a win, submit the elapsed time; on a loss, let the player retry.
+			if (won) {
+				const centis = Math.max(1, Math.round((Date.now() - dailyStartRef.current) / 10));
+				setDailyTime(centis);
+				saveDailyRun(gameId, { startedAt: dailyStartRef.current, done: true, seed: dailySeedRef.current, state: { time: centis } });
+			}
+			setYouWon(won);
+			setPhase('over');
+			return true;
+		}
 		if (levelCfgRef.current) {
 			// Levels match: grade by winning margin (opponent points conceded). No 'over' overlay.
 			lv.finish({ won, score: target - oppScore, raw: { my: myScore, opp: oppScore } });
@@ -192,7 +213,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		setYouWon(won);
 		setPhase('over');
 		return true;
-	}, [lv]);
+	}, [lv, gameId]);
 
 	const aiMove = useCallback((y: number, s: PongState, dt: number): number => {
 		// Track the ball when it comes toward the AI (right side); else drift to centre. Capped speed → beatable.
@@ -377,6 +398,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		startedRef.current = false;
 		matchRef.current?.leave();
 		matchRef.current = null;
+		dailyRef.current = false;
+		setDaily(false);
 		setConfirmQuit(false);
 		setPhase('menu');
 	}, []);
@@ -490,6 +513,71 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		startLoop();
 	}, [ensureName, startLoop, powers]);
 
+	/* ---------- daily challenge (solo vs AI, first to 3, fastest time) ---------- */
+	const startDailyRace = useCallback((seed: number) => {
+		dailyRef.current = true;
+		matchRef.current = null;
+		roleRef.current = 'ai';
+		startedRef.current = true;
+		setConfirmQuit(false);
+		levelCfgRef.current = null;
+		targetRef.current = DAILY_TARGET;
+		chargeRef.current = 0;
+		setMyCharge(0);
+		aiPowerCdRef.current = 0;
+		spawnAccRef.current = 0;
+		setOppName('Ordinateur');
+		setScoreMe(0);
+		setScoreOpp(0);
+		myYRef.current = PONG.H / 2;
+		dailySeedRef.current = seed;
+		rngRef.current = mulberry32(seed);
+		chosenPowersRef.current = false; // classic pong → a clean, fair race
+		stateRef.current = createState(rngRef.current, false);
+		setPowersUi(false);
+		setRoomCode(null);
+		dailyStartRef.current = Date.now();
+		setPhase('playing');
+		startLoop();
+	}, [startLoop]);
+
+	const startDaily = useCallback(async () => {
+		runningRef.current = false;
+		cancelAnimationFrame(rafRef.current);
+		if (lv.active) lv.exit();
+		dailyRef.current = true;
+		setDaily(true);
+		setConfirmQuit(false);
+		setDailyTime(null);
+		const run = loadDailyRun(gameId);
+		if (run && run.done) {
+			// Already cleared today — show the result + leaderboard, no replay.
+			const t = (run.state as { time?: number } | undefined)?.time ?? null;
+			dailySeedRef.current = run.seed ?? 0;
+			setDailyTime(t);
+			setYouWon(true);
+			setScoreMe(DAILY_TARGET);
+			setScoreOpp(0);
+			setPhase('over');
+			return;
+		}
+		setDailyLoading(true);
+		setPhase('menu');
+		const { seed } = await getDaily(gameId);
+		setDailyLoading(false);
+		startDailyRace(seed);
+	}, [gameId, lv, startDailyRace]);
+
+	const armFree = useCallback(() => {
+		runningRef.current = false;
+		cancelAnimationFrame(rafRef.current);
+		if (lv.active) lv.exit();
+		dailyRef.current = false;
+		setDaily(false);
+		setConfirmQuit(false);
+		setPhase('menu');
+	}, [lv]);
+
 	/* ---------- levels mode ---------- */
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
@@ -522,19 +610,11 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		targetRef.current = PONG.maxScore;
 		matchRef.current = null;
 		startedRef.current = false;
+		dailyRef.current = false;
+		setDaily(false);
 		setConfirmQuit(false);
 		setPhase('menu');
 		lv.enter();
-	}, [lv]);
-
-	const exitLevels = useCallback(() => {
-		runningRef.current = false;
-		cancelAnimationFrame(rafRef.current);
-		levelCfgRef.current = null;
-		targetRef.current = PONG.maxScore;
-		startedRef.current = false;
-		lv.exit();
-		setPhase('menu');
 	}, [lv]);
 
 	const rematch = useCallback(() => {
@@ -615,30 +695,23 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		<div className="pg-root">
 			<style>{CSS}</style>
 
-			{/* Pong has no daily challenge, so a 2-segment toggle (Play vs Levels) instead of ModeToggle. */}
-			<div className="pg-modetoggle" role="tablist" aria-label="Mode">
-				<button
-					role="tab"
-					aria-selected={!lv.active}
-					className={`pg-modeseg ${!lv.active ? 'active' : ''}`}
-					onClick={() => { if (lv.active) exitLevels(); }}
-				>
-					🎮 Jouer
-				</button>
-				<button
-					role="tab"
-					aria-selected={lv.active}
-					className={`pg-modeseg ${lv.active ? 'active' : ''}`}
-					onClick={armLevels}
-				>
-					🎯 Niveaux
-				</button>
-			</div>
+			<ModeToggle
+				daily={daily}
+				onFree={armFree}
+				onDaily={startDaily}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{lv.active && (
 				<div className="pg-leveltag">
 					{lv.menu ? 'Progression — bats l\'ordi pour débloquer le niveau suivant' : levelHint}
 				</div>
+			)}
+
+			{daily && phase === 'playing' && (
+				<div className="pg-leveltag">Défi du jour ({dailyWeekdayLabel()}) · premier à {DAILY_TARGET} points, le plus vite</div>
 			)}
 
 			<div className="pg-stage">
@@ -695,7 +768,17 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'menu' && !lv.active && (
+				{daily && dailyLoading && (
+					<div className="pg-overlay">
+						<div className="pg-card">
+							<h2>Défi du jour</h2>
+							<div className="pg-spinner" />
+							<p className="pg-status">Chargement…</p>
+						</div>
+					</div>
+				)}
+
+				{phase === 'menu' && !lv.active && !daily && (
 					<div className="pg-overlay">
 						<div className="pg-card">
 							<h2>Pong</h2>
@@ -740,7 +823,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'over' && (
+				{phase === 'over' && !daily && (
 					<div className="pg-overlay">
 						<div className="pg-card">
 							<h2>{youWon ? '🏆 Gagné !' : 'Perdu'}</h2>
@@ -751,6 +834,29 @@ export default function PongGame({ gameId }: { gameId: string }) {
 								<p className="pg-status">En attente que l'hôte relance…</p>
 							)}
 							<button className="pg-btn" onClick={quitToMenu}>Quitter</button>
+						</div>
+					</div>
+				)}
+
+				{phase === 'over' && daily && (
+					<div className="pg-overlay">
+						<div className="pg-card">
+							{youWon ? (
+								<>
+									<h2>🏆 Défi réussi !</h2>
+									<p className="pg-sub">
+										Tu bats l'ordi {DAILY_TARGET}–{scoreOpp}{dailyTime != null ? ` en ${fmtCentis(dailyTime)}` : ''}.
+									</p>
+								</>
+							) : (
+								<>
+									<h2>Défi manqué</h2>
+									<p className="pg-sub">L'ordi a atteint {DAILY_TARGET} avant toi ({scoreMe}–{scoreOpp}). Réessaie&nbsp;!</p>
+									<button className="pg-btn pg-primary" onClick={() => startDailyRace(dailySeedRef.current)}>↻ Réessayer</button>
+								</>
+							)}
+							<Leaderboard game={gameId} metric="time" submitValue={youWon && dailyTime != null ? dailyTime : undefined} />
+							<button className="pg-btn" onClick={armFree}>Menu libre</button>
 						</div>
 					</div>
 				)}

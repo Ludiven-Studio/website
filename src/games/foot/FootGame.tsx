@@ -7,11 +7,14 @@ import {
 } from './engine';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PosMsg, type StateMsg } from './net';
 import { footLevels } from './levels';
-import { playerName, setPlayerName } from '../../lib/leaderboard';
+import { playerName, setPlayerName, loadDailyRun, saveDailyRun, dailyWeekdayLabel } from '../../lib/leaderboard';
+import { fmtCentis } from '../../lib/scoreFormat';
 import { trackGame } from '../../lib/analytics';
 import { useLevels } from '../../lib/useLevels';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
+import ModeToggle from '../../components/ModeToggle';
+import Leaderboard from '../../components/Leaderboard';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
@@ -34,6 +37,7 @@ const COL_T0 = '#4da3ff'; // left team (blue)
 const COL_T1 = '#ff5a5f'; // right team (red)
 const DOUBLE_TAP_MS = 320; // window for a left-left / right-right dash
 const teamOf = (slot: number): Side => (slot < 2 ? 0 : 1);
+const DAILY_GOALS = 3; // daily challenge: first to 3 goals vs the bot (1v1), fastest time wins
 
 interface Keys { left: boolean; right: boolean; jump: boolean; }
 const readInput = (k: Keys, t: Keys): PlayerInput => ({
@@ -97,6 +101,11 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const [copied, setCopied] = useState(false);
 	const [goalFlash, setGoalFlash] = useState('');
 	const [teamSize, setTeamSize] = useState<1 | 2>(2); // menu choice: 1v1 or 2v2
+	const [daily, setDaily] = useState(false); // daily-challenge mode active
+	const [dailyTime, setDailyTime] = useState<number | null>(null); // winning time (centiseconds)
+
+	const dailyRef = useRef(false);
+	const dailyStartRef = useRef(0); // match start (ms) — timing basis for the daily
 
 	const lv = useLevels(gameId, footLevels);
 	// Levels-mode tuning for the running match (refs so the rAF loop reads them without re-arming).
@@ -258,6 +267,16 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		const myTeam = teamOf(mySlotRef.current); // levels: player is always team 0
 		const won = myTeam === 0 ? l > r : r > l;
 		setYouWon(won);
+		if (dailyRef.current) {
+			// Daily race: on a win, submit the elapsed time; on a loss, let the player retry.
+			if (won) {
+				const centis = Math.max(1, Math.round((Date.now() - dailyStartRef.current) / 10));
+				setDailyTime(centis);
+				saveDailyRun(gameId, { startedAt: dailyStartRef.current, done: true, state: { time: centis } });
+			}
+			setPhase('over');
+			return;
+		}
 		if (levelsRef.current) { lv.finish({ won, score: l - r }); return; } // margin = my goals − opponent
 		setPhase('over');
 		trackGame(gameId, 'game_won');
@@ -270,7 +289,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		const prev = prevScoreRef.current;
 		if (l > prev.l || r > prev.r) { setGoalFlash('BUT !'); setTimeout(() => setGoalFlash(''), 1100); }
 		prevScoreRef.current = { l, r };
-		const target = levelsRef.current ? targetRef.current : WIN_GOALS;
+		const target = dailyRef.current || levelsRef.current ? targetRef.current : WIN_GOALS;
 		if (l >= target || r >= target) finish(l, r);
 	}, [finish]);
 
@@ -387,6 +406,8 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		startedRef.current = false;
 		matchRef.current?.leave();
 		matchRef.current = null;
+		dailyRef.current = false;
+		setDaily(false);
 		setConfirmQuit(false);
 		if (levelsRef.current) { levelsRef.current = false; lv.backToMenu(); setPhase('menu'); return; } // back to the level grid
 		setPhase('menu');
@@ -457,6 +478,63 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		startLoop();
 	}, [gameId, resetWorld, startLoop, teamSize]);
 
+	/* ---------- daily challenge (solo 1v1 vs bot, first to 3 goals, fastest time) ---------- */
+	const startDailyRace = useCallback(() => {
+		dailyRef.current = true;
+		levelsRef.current = false;
+		roleRef.current = 'ai';
+		mySlotRef.current = 0;
+		curTeamRef.current = 1; // 1v1 for a clean race
+		targetRef.current = DAILY_GOALS;
+		matchRef.current = null;
+		startedRef.current = true;
+		setOppName('Ordinateur');
+		setConfirmQuit(false);
+		resetWorld();
+		setRoomCode(null);
+		dailyStartRef.current = Date.now();
+		trackGame(gameId, 'game_started');
+		setPhase('playing');
+		startLoop();
+	}, [gameId, resetWorld, startLoop]);
+
+	const startDaily = useCallback(() => {
+		runningRef.current = false;
+		cancelAnimationFrame(rafRef.current);
+		if (lv.active) lv.exit();
+		matchRef.current?.leave();
+		matchRef.current = null;
+		dailyRef.current = true;
+		setDaily(true);
+		setConfirmQuit(false);
+		setDailyTime(null);
+		const run = loadDailyRun(gameId);
+		if (run && run.done) {
+			// Already cleared today — show the result + leaderboard, no replay.
+			const t = (run.state as { time?: number } | undefined)?.time ?? null;
+			setDailyTime(t);
+			setYouWon(true);
+			setScoreMe(DAILY_GOALS);
+			setScoreOpp(0);
+			setPhase('over');
+			return;
+		}
+		startDailyRace();
+	}, [gameId, lv, startDailyRace]);
+
+	const armFree = useCallback(() => {
+		runningRef.current = false;
+		cancelAnimationFrame(rafRef.current);
+		if (lv.active) lv.exit();
+		matchRef.current?.leave();
+		matchRef.current = null;
+		startedRef.current = false;
+		dailyRef.current = false;
+		setDaily(false);
+		setConfirmQuit(false);
+		setPhase('menu');
+	}, [lv]);
+
 	/* ---------- levels mode ---------- */
 	// Enter the level grid. Leaving free/daily's net match if any.
 	const armLevels = useCallback(() => {
@@ -464,6 +542,8 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		matchRef.current = null;
 		startedRef.current = false;
 		levelsRef.current = false;
+		dailyRef.current = false;
+		setDaily(false);
 		setStatus('');
 		lv.enter();
 	}, [lv]);
@@ -548,20 +628,23 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		<div className="fo-root">
 			<style>{CSS}</style>
 
-			{/* Mode switch: multijoueur (les modes réseau/bot existants) ↔ niveaux solo.
-			    Foot has no daily challenge, so this stays a 2-way toggle. */}
-			{phase === 'menu' && (
-				<div className={`fo-modetoggle ${lv.active ? 'lv' : ''}`} role="tablist" aria-label="Mode">
-					<button role="tab" aria-selected={!lv.active} className={`fo-mseg ${!lv.active ? 'active' : ''}`} onClick={() => lv.exit()}>🎲 Multijoueur</button>
-					<button role="tab" aria-selected={lv.active} className={`fo-mseg ${lv.active ? 'active' : ''}`} onClick={armLevels}>🎯 Niveaux</button>
-				</div>
-			)}
+			<ModeToggle
+				daily={daily}
+				onFree={armFree}
+				onDaily={startDaily}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
 			{lv.active && lv.menu && phase === 'menu' && (
 				<div className="fo-lvtag">Progression solo — gagne un niveau pour débloquer le suivant. Tu joues en bleu.</div>
 			)}
 			{lv.active && (lv.playing || lv.done) && cfg && (
 				<div className="fo-lvtag">Niveau {lv.level} · premier à {cfg.target} buts · {cfg.teamSize === 2 ? '2 vs 2' : '1 vs 1'}</div>
+			)}
+			{daily && phase === 'playing' && (
+				<div className="fo-lvtag">Défi du jour ({dailyWeekdayLabel()}) · premier à {DAILY_GOALS} buts, le plus vite · 1 vs 1</div>
 			)}
 
 			<div className="fo-stage">
@@ -616,7 +699,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'menu' && !lv.active && (
+				{phase === 'menu' && !lv.active && !daily && (
 					<div className="fo-overlay">
 						<div className="fo-card">
 							<h2>Cocotte Foot</h2>
@@ -660,7 +743,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'over' && (
+				{phase === 'over' && !daily && (
 					<div className="fo-overlay">
 						<div className="fo-card">
 							<h2>{youWon ? '🎉 Gagné !' : 'Perdu…'}</h2>
@@ -669,6 +752,29 @@ export default function FootGame({ gameId }: { gameId: string }) {
 								? <p className="fo-status">En attente que l'hôte relance…</p>
 								: <button className="fo-btn fo-primary" onClick={rematch}>Rejouer</button>}
 							<button className="fo-btn" onClick={quitToMenu}>Menu</button>
+						</div>
+					</div>
+				)}
+
+				{phase === 'over' && daily && (
+					<div className="fo-overlay">
+						<div className="fo-card">
+							{youWon ? (
+								<>
+									<h2>🏆 Défi réussi !</h2>
+									<p className="fo-sub">
+										Tu bats le bot {DAILY_GOALS}–{scoreOpp}{dailyTime != null ? ` en ${fmtCentis(dailyTime)}` : ''}.
+									</p>
+								</>
+							) : (
+								<>
+									<h2>Défi manqué</h2>
+									<p className="fo-sub">Le bot a atteint {DAILY_GOALS} avant toi ({scoreMe}–{scoreOpp}). Réessaie&nbsp;!</p>
+									<button className="fo-btn fo-primary" onClick={startDailyRace}>↻ Réessayer</button>
+								</>
+							)}
+							<Leaderboard game={gameId} metric="time" submitValue={youWon && dailyTime != null ? dailyTime : undefined} />
+							<button className="fo-btn" onClick={armFree}>Menu libre</button>
 						</div>
 					</div>
 				)}
