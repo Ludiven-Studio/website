@@ -4,6 +4,7 @@
 import { dateSeed } from '../games/prng';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
 import { trackGame } from './analytics';
+import { recordDailyDone } from './streak';
 
 export type Metric = 'time' | 'score';
 export interface ScoreRow {
@@ -87,7 +88,10 @@ export function saveDailyRun(game: string, run: DailyRun): void {
 		if (prevRaw === null) trackGame(game, 'daily_played');
 		if (run.done) {
 			const prevDone = prevRaw ? (JSON.parse(prevRaw) as DailyRun).done === true : false;
-			if (!prevDone) trackGame(game, 'daily_done');
+			if (!prevDone) {
+				trackGame(game, 'daily_done');
+				recordDailyDone(game); // first completion today → advance the streaks
+			}
 		}
 	} catch {
 		/* ignore */

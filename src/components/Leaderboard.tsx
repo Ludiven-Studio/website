@@ -13,6 +13,7 @@ import { games } from '../data/games';
 import { fmtCentis } from '../lib/scoreFormat';
 import { isSecured } from '../data/securedGames';
 import { submitScore, getLeaderboard } from '../lib/scores';
+import { gameStreak } from '../lib/streak';
 import ErrorBoundary from './ErrorBoundary';
 
 // Time leaderboards store CENTISECONDS; a game may still pass its own `format`.
@@ -120,7 +121,9 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 		const title = games.find((g) => g.id === game)?.title ?? game;
 		const url = `${location.origin}/jeux/${game}?defi`;
 		const line = metric === 'time' ? `⏱️ ${fmt(submitValue)}` : `🏆 ${fmt(submitValue)} pts`;
-		const text = `${title} — Défi du jour\n${line}`;
+		const st = gameStreak(game);
+		const streakLine = st.count > 0 ? `\n🔥 ${st.count} jour${st.count > 1 ? 's' : ''} d'affilée` : '';
+		const text = `${title} — Défi du jour\n${line}${streakLine}`;
 		try {
 			if (navigator.share) {
 				await navigator.share({ title: `${title} — Défi du jour`, text, url });

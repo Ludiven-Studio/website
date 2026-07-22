@@ -28,6 +28,7 @@ const dailyGames = games.filter((g) => g.status === 'play' && g.category !== 'mu
 				<li>🚫 Sans publicité</li>
 				<li>🔓 Sans inscription</li>
 			</ul>
+			<p class="defi-streak" id="defi-streak" hidden></p>
 			<p class="defi-count" id="defi-count" aria-live="polite"></p>
 		</header>
 
@@ -116,17 +117,49 @@ const dailyGames = games.filter((g) => g.status === 'play' && g.category !== 'mu
 	/* done challenges fade back so the ones left to do stand out */
 	.defi-grid li.is-done { opacity: 0.5; transition: opacity var(--theme-transition); }
 	.defi-grid li.is-done:hover { opacity: 0.85; }
+
+	.defi-streak {
+		align-self: center;
+		font-weight: 800;
+		font-size: var(--text-md);
+		color: var(--gray-0);
+		background: var(--accent-overlay);
+		border: 1px solid var(--accent-regular);
+		border-radius: 999px;
+		padding: 6px 16px;
+		margin-top: 0.35rem;
+	}
+	.defi-streak .defi-streak-note {
+		font-weight: 600;
+		color: var(--gray-200);
+	}
 </style>
 
 <script>
+	import { globalStreak } from '../../lib/streak';
+
 	const todayKey = () => {
 		const d = new Date();
 		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 	};
 	const grid = document.querySelector<HTMLUListElement>('.defi-grid');
 	const counter = document.getElementById('defi-count');
+	const streakEl = document.getElementById('defi-streak');
+
+	const refreshStreak = () => {
+		if (!streakEl) return;
+		const s = globalStreak();
+		if (s.count > 0) {
+			streakEl.hidden = false;
+			const note = s.atRisk ? ' <span class="defi-streak-note">· joue aujourd\'hui pour la garder</span>' : '';
+			streakEl.innerHTML = `🔥 ${s.count} jour${s.count > 1 ? 's' : ''} d'affilée${note}`;
+		} else {
+			streakEl.hidden = true;
+		}
+	};
 
 	const refresh = () => {
+		refreshStreak();
 		if (!grid) return;
 		const day = todayKey();
 		const lis = Array.from(grid.children) as HTMLElement[];

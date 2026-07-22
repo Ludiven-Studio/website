@@ -41,6 +41,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		</div>
 		<h3>{title}</h3>
 		{playable && id && daily && <span class="daily-chip" data-game-id={id} hidden />}
+			{playable && id && daily && <span class="streak-badge" data-game-id={id} hidden />}
 		{!compact && <p>{pitch}</p>}
 	</Tag>
 	{
@@ -211,6 +212,22 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		color: var(--accent-text-over);
 	}
 
+	.streak-badge {
+		align-self: flex-start;
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		font-family: var(--font-brand);
+		font-weight: 800;
+		font-size: 12px;
+		line-height: 1;
+		padding: 3px 9px;
+		border-radius: 999rem;
+		color: #f5a623;
+		background: rgba(245, 166, 35, 0.12);
+		border: 1px solid rgba(245, 166, 35, 0.4);
+	}
+
 	.game-card p {
 		color: var(--gray-400);
 		margin: 0;
@@ -228,6 +245,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 	import { fetchDailyTops, leaderboardEnabled } from '../lib/leaderboard';
 	import { DAILY_LB } from '../data/dailyLb';
 	import { formatScore } from '../lib/scoreFormat';
+	import { gameStreak } from '../lib/streak';
 
 	// Favorites toggle — persisted in localStorage, shared key with the home page.
 	const KEY = 'ludiven-favorites';
@@ -327,6 +345,22 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		});
 	};
 
+	// Per-game daily streak badge (🔥 N consecutive days).
+	const syncStreak = () => {
+		document.querySelectorAll<HTMLElement>('.streak-badge').forEach((badge) => {
+			const id = badge.dataset.gameId;
+			if (!id) return;
+			const s = gameStreak(id);
+			if (s.count > 0) {
+				badge.textContent = `🔥 ${s.count}`;
+				badge.title = `${s.count} jour${s.count > 1 ? 's' : ''} d'affilée${s.atRisk ? ' · joue aujourd\'hui pour la garder' : ''}`;
+				badge.hidden = false;
+			} else {
+				badge.hidden = true;
+			}
+		});
+	};
+
 	// Community daily records (one Supabase request), then refresh the chips.
 	let tops: Record<string, { name: string; value: number; players: number }> = {};
 	const loadTops = async () => {
@@ -340,10 +374,17 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 	};
 
 	syncDaily();
+	syncStreak();
 	loadTops();
 	// Refresh when returning to the page (tab focus, and back-nav restored from bfcache).
 	document.addEventListener('visibilitychange', () => {
-		if (!document.hidden) syncDaily();
+		if (!document.hidden) {
+			syncDaily();
+			syncStreak();
+		}
 	});
-	window.addEventListener('pageshow', syncDaily);
+	window.addEventListener('pageshow', () => {
+		syncDaily();
+		syncStreak();
+	});
 </script>
