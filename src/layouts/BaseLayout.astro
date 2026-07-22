@@ -67,6 +67,13 @@ if (path === '/' || path === '') {
 		<script>
 			// Add “loaded” class once the document has completely loaded.
 			addEventListener('load', () => document.documentElement.classList.add('loaded'));
+
+			// Register the service worker (offline play + faster repeat visits).
+			// @vite-pwa/astro skips auto-injection when it doesn't manage the manifest,
+			// so we register its generated sw.js ourselves.
+			if ('serviceWorker' in navigator) {
+				addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+			}
 		</script>
 
 		<style>
