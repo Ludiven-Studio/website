@@ -1,60 +1,14 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import Icon from '../../components/Icon.astro';
+import GamePage from '../../layouts/GamePage.astro';
 import FootGame from '../../games/foot/FootGame.tsx';
-import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
-<BaseLayout
+<GamePage
 	title="Cocotte Foot | Jeux Ludiven Studio"
 	description="Foot 2 contre 2 en temps réel (avec coéquipier bot) : un ballon partagé qui part en tir dès qu'on le touche. Partie rapide, avec un ami par code, ou contre le bot. Un mini-jeu multijoueur signé Ludiven Studio."
+	heading="Cocotte Foot"
+	tagline="Foot 2v2 en temps réel : tape dans le ballon partagé et marque"
+	gameId="foot"
 >
-	<div class="wrapper game-page stack gap-8">
-		<header class="game-head stack gap-2">
-			<a class="back" href="/jeux/">
-				<Icon icon="arrow-left" size="1em" /> Tous les jeux
-			</a>
-			<h1>Cocotte Foot</h1>
-			<p>Foot 2v2 en temps réel : tape dans le ballon partagé et marque</p>
-			<GameTutorial gameId="foot" />
-		</header>
-
-		<FootGame client:only="react" gameId="foot" />
-	</div>
-</BaseLayout>
-
-<style>
-	.game-page {
-		align-items: center;
-	}
-	.game-head {
-		text-align: center;
-		align-items: center;
-	}
-	.back {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		color: var(--gray-300);
-		text-decoration: none;
-		font-family: var(--font-brand);
-		font-weight: 500;
-		font-size: var(--text-sm);
-	}
-	.back:hover,
-	.back:focus-visible {
-		color: var(--accent-regular);
-	}
-	.game-head h1 {
-		font-size: var(--text-3xl);
-		margin-top: 0.5rem;
-	}
-	.game-head p {
-		color: var(--gray-300);
-	}
-	@media (min-width: 50em) {
-		.game-head h1 {
-			font-size: var(--text-4xl);
-		}
-	}
-</style>
+	<FootGame client:only="react" gameId="foot" />
+</GamePage>

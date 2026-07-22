@@ -1,38 +1,14 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import Icon from '../../components/Icon.astro';
+import GamePage from '../../layouts/GamePage.astro';
 import MineGame from '../../games/mine/MineGame.tsx';
-import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
-<BaseLayout
+<GamePage
 	title="La Mine aux Cocottes | Jeux Ludiven Studio"
 	description="Un match-3 de cristaux pour libérer les cocottes prisonnières des cages : aligne diamants, rubis et émeraudes, déclenche fusées et bombes, et sauve toutes les cocottes. Un mini-jeu signé Ludiven Studio."
+	heading="La Mine aux Cocottes"
+	tagline="Aligne les cristaux pour fissurer les cages et libérer les cocottes"
+	gameId="mine"
 >
-	<div class="wrapper game-page stack gap-8">
-		<header class="game-head stack gap-2">
-			<a class="back" href="/jeux/">
-				<Icon icon="arrow-left" size="1em" /> Tous les jeux
-			</a>
-			<h1>La Mine aux Cocottes</h1>
-			<p>Aligne les cristaux pour fissurer les cages et libérer les cocottes</p>
-			<GameTutorial gameId="mine" />
-		</header>
-
-		<MineGame client:only="react" gameId="mine" />
-	</div>
-</BaseLayout>
-
-<style>
-	.game-page { align-items: center; }
-	.game-head { text-align: center; align-items: center; }
-	.back {
-		display: inline-flex; align-items: center; gap: 0.4rem;
-		color: var(--gray-300); text-decoration: none;
-		font-family: var(--font-brand); font-weight: 500; font-size: var(--text-sm);
-	}
-	.back:hover, .back:focus-visible { color: var(--accent-regular); }
-	.game-head h1 { font-size: var(--text-3xl); margin-top: 0.5rem; }
-	.game-head p { color: var(--gray-300); }
-	@media (min-width: 50em) { .game-head h1 { font-size: var(--text-4xl); } }
-</style>
+	<MineGame client:only="react" gameId="mine" />
+</GamePage>

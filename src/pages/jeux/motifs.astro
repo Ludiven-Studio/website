@@ -1,66 +1,14 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import Icon from '../../components/Icon.astro';
+import GamePage from '../../layouts/GamePage.astro';
 import MotifsGame from '../../games/motifs/MotifsGame.tsx';
-import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
-<BaseLayout
+<GamePage
 	title="Motifs | Jeux Ludiven Studio"
 	description="Motifs : découpe la grille en rectangles et carrés d'après les indices de forme. Un mini-jeu de logique signé Ludiven Studio."
+	heading="Motifs"
+	tagline="Découpe la grille en rectangles d'après les indices de forme"
+	gameId="motifs"
 >
-	<div class="wrapper game-page stack gap-8">
-		<header class="game-head stack gap-2">
-			<a class="back" href="/jeux/">
-				<Icon icon="arrow-left" size="1em" /> Tous les jeux
-			</a>
-			<h1>Motifs</h1>
-			<p>Découpe la grille en rectangles d'après les indices de forme</p>
-			<GameTutorial gameId="motifs" />
-		</header>
-
-		<MotifsGame client:only="react" gameId="motifs" />
-	</div>
-</BaseLayout>
-
-<style>
-	.game-page {
-		align-items: center;
-	}
-
-	.game-head {
-		text-align: center;
-		align-items: center;
-	}
-
-	.back {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		color: var(--gray-300);
-		text-decoration: none;
-		font-family: var(--font-brand);
-		font-weight: 500;
-		font-size: var(--text-sm);
-	}
-
-	.back:hover,
-	.back:focus-visible {
-		color: var(--accent-regular);
-	}
-
-	.game-head h1 {
-		font-size: var(--text-3xl);
-		margin-top: 0.5rem;
-	}
-
-	.game-head p {
-		color: var(--gray-300);
-	}
-
-	@media (min-width: 50em) {
-		.game-head h1 {
-			font-size: var(--text-4xl);
-		}
-	}
-</style>
+	<MotifsGame client:only="react" gameId="motifs" />
+</GamePage>

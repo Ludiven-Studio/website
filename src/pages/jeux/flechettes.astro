@@ -1,34 +1,14 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import Icon from '../../components/Icon.astro';
+import GamePage from '../../layouts/GamePage.astro';
 import FlechettesGame from '../../games/flechettes/FlechettesGame.tsx';
-import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
-<BaseLayout
+<GamePage
 	title="Fléchettes | Jeux Ludiven Studio"
 	description="Fléchettes 501 : vise en deux temps (balayage horizontal puis vertical), lance et tombe pile à 0 sur un double. Un mini-jeu d'adresse signé Ludiven Studio."
+	heading="Fléchettes"
+	tagline="Vise en deux temps — horizontal puis vertical — et descends de 501 à 0 sur un double"
+	gameId="flechettes"
 >
-	<div class="wrapper game-page stack gap-8">
-		<header class="game-head stack gap-2">
-			<a class="back" href="/jeux/">
-				<Icon icon="arrow-left" size="1em" /> Tous les jeux
-			</a>
-			<h1>Fléchettes</h1>
-			<p>Vise en deux temps — horizontal puis vertical — et descends de 501 à 0 sur un double</p>
-			<GameTutorial gameId="flechettes" />
-		</header>
-
-		<FlechettesGame client:only="react" gameId="flechettes" />
-	</div>
-</BaseLayout>
-
-<style>
-	.game-page { align-items: center; }
-	.game-head { text-align: center; align-items: center; }
-	.back { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--gray-300); text-decoration: none; font-family: var(--font-brand); font-weight: 500; font-size: var(--text-sm); }
-	.back:hover, .back:focus-visible { color: var(--accent-regular); }
-	.game-head h1 { font-size: var(--text-3xl); margin-top: 0.5rem; }
-	.game-head p { color: var(--gray-300); }
-	@media (min-width: 50em) { .game-head h1 { font-size: var(--text-4xl); } }
-</style>
+	<FlechettesGame client:only="react" gameId="flechettes" />
+</GamePage>

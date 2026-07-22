@@ -1,60 +1,14 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import Icon from '../../components/Icon.astro';
+import GamePage from '../../layouts/GamePage.astro';
 import CocottesRenardsGame from '../../games/cocottes-renards/CocottesRenardsGame.tsx';
-import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
-<BaseLayout
+<GamePage
 	title="Cocottes VS Renards | Jeux Ludiven Studio"
 	description="Cocottes VS Renards : un tower defense en voies façon Plants vs Zombies. Pose tes cocottes pour défendre le poulailler contre les renards. Défi du jour à graine partagée et classement. Un jeu d'adresse signé Ludiven Studio."
+	heading="Cocottes VS Renards"
+	tagline="Défends le poulailler, voie par voie"
+	gameId="cocottes-renards"
 >
-	<div class="wrapper game-page stack gap-8">
-		<header class="game-head stack gap-2">
-			<a class="back" href="/jeux/">
-				<Icon icon="arrow-left" size="1em" /> Tous les jeux
-			</a>
-			<h1>Cocottes VS Renards</h1>
-			<p>Défends le poulailler, voie par voie</p>
-			<GameTutorial gameId="cocottes-renards" />
-		</header>
-
-		<CocottesRenardsGame client:only="react" gameId="cocottes-renards" />
-	</div>
-</BaseLayout>
-
-<style>
-	.game-page {
-		align-items: center;
-	}
-	.game-head {
-		text-align: center;
-		align-items: center;
-	}
-	.back {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		color: var(--gray-300);
-		text-decoration: none;
-		font-family: var(--font-brand);
-		font-weight: 500;
-		font-size: var(--text-sm);
-	}
-	.back:hover,
-	.back:focus-visible {
-		color: var(--accent-regular);
-	}
-	.game-head h1 {
-		font-size: var(--text-3xl);
-		margin-top: 0.5rem;
-	}
-	.game-head p {
-		color: var(--gray-300);
-	}
-	@media (min-width: 50em) {
-		.game-head h1 {
-			font-size: var(--text-4xl);
-		}
-	}
-</style>
+	<CocottesRenardsGame client:only="react" gameId="cocottes-renards" />
+</GamePage>

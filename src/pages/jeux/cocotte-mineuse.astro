@@ -1,60 +1,14 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import Icon from '../../components/Icon.astro';
+import GamePage from '../../layouts/GamePage.astro';
 import CocotteMineuseGame from '../../games/cocotte-mineuse/CocotteMineuseGame.tsx';
-import GameTutorial from '../../components/GameTutorial.astro';
 ---
 
-<BaseLayout
+<GamePage
 	title="Cocotte Mineuse | Jeux Ludiven Studio"
 	description="Cocotte Mineuse : creuse toujours plus bas pour fuir l'averse qui dissout le sable et fait tomber les pierres. Collecte les minerais, crafte pioche, bombe et bijoux, et forge la couronne pour le score. Défi du jour et classement. Un jeu Ludiven Studio."
+	heading="Cocotte Mineuse"
+	tagline="Creuse toujours plus bas et fuis l'averse"
+	gameId="cocotte-mineuse"
 >
-	<div class="wrapper game-page stack gap-8">
-		<header class="game-head stack gap-2">
-			<a class="back" href="/jeux/">
-				<Icon icon="arrow-left" size="1em" /> Tous les jeux
-			</a>
-			<h1>Cocotte Mineuse</h1>
-			<p>Creuse toujours plus bas et fuis l'averse</p>
-			<GameTutorial gameId="cocotte-mineuse" />
-		</header>
-
-		<CocotteMineuseGame client:only="react" gameId="cocotte-mineuse" />
-	</div>
-</BaseLayout>
-
-<style>
-	.game-page {
-		align-items: center;
-	}
-	.game-head {
-		text-align: center;
-		align-items: center;
-	}
-	.back {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		color: var(--gray-300);
-		text-decoration: none;
-		font-family: var(--font-brand);
-		font-weight: 500;
-		font-size: var(--text-sm);
-	}
-	.back:hover,
-	.back:focus-visible {
-		color: var(--accent-regular);
-	}
-	.game-head h1 {
-		font-size: var(--text-3xl);
-		margin-top: 0.5rem;
-	}
-	.game-head p {
-		color: var(--gray-300);
-	}
-	@media (min-width: 50em) {
-		.game-head h1 {
-			font-size: var(--text-4xl);
-		}
-	}
-</style>
+	<CocotteMineuseGame client:only="react" gameId="cocotte-mineuse" />
+</GamePage>
