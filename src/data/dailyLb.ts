@@ -56,6 +56,9 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	sudoku: { fmt: centis },
 	suguru: { fmt: centis },
 	motifs: { fmt: centis },
+	// Real-time vs-AI races → time to reach the target (Pong: 3 pts, Foot: 3 goals)
+	pong: { fmt: centis },
+	foot: { fmt: centis },
 	bataille: { fmt: { kind: 'count', one: 'coup', many: 'coups' } }, // value = shots+sonars (not time)
 	// Scaled durations
 	drift: { fmt: { kind: 'duration', div: 1000, decimals: 2, mmssAbove: 60000 } }, // lap ms

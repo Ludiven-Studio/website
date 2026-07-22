@@ -4,8 +4,9 @@ import GameCard from '../../components/GameCard.astro';
 import Icon from '../../components/Icon.astro';
 import { games } from '../../data/games';
 
-// Daily-capable games = everything but real-time multiplayer (category 'multi').
-const dailyGames = games.filter((g) => g.status === 'play' && g.category !== 'multi');
+// Every playable game now has a daily challenge (Pong & Foot race the AI to 3), so the
+// hub lists them all — same count as the /jeux catalogue.
+const dailyGames = games.filter((g) => g.status === 'play');
 ---
 
 <BaseLayout
