@@ -1,0 +1,100 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+---
+
+<BaseLayout
+	title="Mentions légales | Ludiven Studio"
+	description="Mentions légales du site Ludiven Studio : éditeur, hébergeur et propriété intellectuelle."
+	noindex
+>
+	<div class="wrapper stack gap-12 legal">
+		<Hero title="Mentions légales" tagline="Informations légales relatives au site ludiven-studio.fr" />
+
+		<section class="stack gap-2">
+			<h2>Éditeur du site</h2>
+			<p>
+				Le site <strong>ludiven-studio.fr</strong> est édité par&nbsp;:
+			</p>
+			<ul>
+				<li><strong>Ludiven Studio</strong>, EURL au capital de 1&nbsp;000&nbsp;€</li>
+				<li>Siège social&nbsp;: 1166 route de la Ranche, 38440 Châtonnay</li>
+				<li>SIRET&nbsp;: 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>RCS&nbsp;: 999&nbsp;253&nbsp;586 R.C.S. Vienne</li>
+				<li>TVA intracommunautaire&nbsp;: FR20&nbsp;999253586</li>
+				<li>Contact&nbsp;: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Directeur de la publication</h2>
+			<p>Ludiven Studio.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Hébergeur</h2>
+			<p>
+				Le site est hébergé par <strong>GitHub, Inc.</strong> (GitHub Pages),
+				88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, États-Unis —
+				<a href="https://github.com" target="_blank" rel="noopener">github.com</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Propriété intellectuelle</h2>
+			<p>
+				L'ensemble des contenus du site (jeux, textes, visuels, code) est la propriété de
+				Ludiven Studio, sauf mention contraire. Les mini-jeux sont librement inspirés de grands
+				classiques du genre, sans affiliation avec leurs éditeurs respectifs. Toute reproduction
+				ou réutilisation sans autorisation est interdite.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Responsabilité</h2>
+			<p>
+				Ludiven Studio s'efforce d'assurer l'exactitude des informations publiées et le bon
+				fonctionnement du site, sans pouvoir le garantir. Le site peut contenir des liens vers
+				des sites tiers dont Ludiven Studio n'est pas responsable.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Données personnelles</h2>
+			<p>
+				Le traitement des données et la mesure d'audience sont détaillés dans notre
+				<a href="/confidentialite">politique de confidentialité</a>.
+			</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+</style>

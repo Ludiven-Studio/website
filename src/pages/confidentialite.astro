@@ -1,0 +1,119 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+---
+
+<BaseLayout
+	title="Politique de confidentialité | Ludiven Studio"
+	description="Comment Ludiven Studio traite tes données : mesure d'audience sans cookie, pseudo des classements, et tes droits."
+	noindex
+>
+	<div class="wrapper stack gap-12 legal">
+		<Hero
+			title="Politique de confidentialité"
+			tagline="Le site collecte le strict minimum : pas de cookie de suivi, pas de traceur publicitaire."
+		/>
+
+		<section class="stack gap-2">
+			<h2>Responsable du traitement</h2>
+			<p>
+				Les données sont traitées par Ludiven Studio, éditeur du site (voir les
+				<a href="/mentions-legales">mentions légales</a>). Pour toute question&nbsp;:
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Mesure d'audience</h2>
+			<p>
+				Le site utilise <strong>Umami</strong>, un outil de mesure d'audience respectueux de la vie
+				privée. Il <strong>ne dépose aucun cookie</strong>, ne suit pas les internautes entre les
+				sites et ne collecte pas de donnée personnelle identifiante&nbsp;: seules des statistiques
+				agrégées et anonymes sont enregistrées (pages vues, type d'appareil, provenance). Aucune
+				bannière de consentement n'est donc nécessaire.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Classements et défis du jour</h2>
+			<p>
+				Lorsque tu enregistres un score dans un classement, le <strong>pseudo que tu choisis
+				librement</strong> et ton score sont transmis et conservés chez notre prestataire
+				technique <strong>Supabase</strong> (hébergement dans l'Union européenne). Le pseudo n'a
+				pas besoin d'être ton vrai nom. Un identifiant technique anonyme, généré aléatoirement,
+				est stocké sur ton appareil pour rattacher tes scores&nbsp;; il ne permet pas de
+				t'identifier personnellement.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Données stockées sur ton appareil</h2>
+			<p>
+				Ta progression, tes favoris, tes préférences (thème, tutoriels déjà vus) et l'état de tes
+				parties sont enregistrés localement dans ton navigateur (<em>localStorage</em>). Ces
+				informations restent sur ton appareil et ne sont pas transmises à un tiers. Tu peux les
+				effacer à tout moment en vidant les données de site de ton navigateur.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Finalités et base légale</h2>
+			<p>
+				Ces traitements servent uniquement à faire fonctionner les classements et défis, et à
+				mesurer l'audience du site pour l'améliorer. Ils reposent sur l'intérêt légitime de
+				Ludiven Studio à proposer et améliorer ses jeux.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Destinataires et sous-traitants</h2>
+			<p>
+				Tes données ne sont ni vendues ni cédées. Elles sont uniquement traitées par nos
+				prestataires techniques&nbsp;: Supabase (base de données des scores, UE) et GitHub Pages
+				(hébergement du site).
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Tes droits</h2>
+			<p>
+				Conformément au RGPD, tu disposes d'un droit d'accès, de rectification et de suppression
+				de tes données. Pour l'exercer — par exemple faire retirer un pseudo d'un classement —
+				écris à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Tu peux
+				aussi introduire une réclamation auprès de la CNIL (<a href="https://www.cnil.fr" target="_blank" rel="noopener">cnil.fr</a>).
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Cookies</h2>
+			<p>
+				Le site n'utilise <strong>aucun cookie de suivi ou publicitaire</strong>. Seul le stockage
+				local décrit ci-dessus, nécessaire au fonctionnement des jeux, est utilisé.
+			</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.legal a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+</style>

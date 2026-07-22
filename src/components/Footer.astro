@@ -22,6 +22,10 @@ const currentYear = new Date().getFullYear();
 		</a>
 		<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
 	</p>
+	<nav class="legal-links" aria-label="Liens légaux">
+		<a href="/mentions-legales">Mentions légales</a>
+		<a href="/confidentialite">Confidentialité</a>
+	</nav>
 </footer>
 <style>
 	footer {
@@ -65,6 +69,14 @@ const currentYear = new Date().getFullYear();
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35em;
+	}
+
+	.legal-links {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 1rem;
+		flex-wrap: wrap;
 	}
 
 	@media (min-width: 50em) {
