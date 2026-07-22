@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-	createMine, stepMine, stepLamp, stepFlood, craft, useTool, scoreOf, cellKey,
+	createMine, stepMine, stepLamp, stepFlood, craft, useTool as applyTool, scoreOf, cellKey,
 	Cell, CELL_ORE, MINE_DIFFS, RECIPES, COLS, BOMB_FUSE, BLAST_TTL,
 	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type JewelId, type OreId,
 } from './engine';
@@ -522,10 +522,10 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		bufferDirRef.current = dir;
 	}, [status, dailyLoading, start, lv.menu]);
 
-	const useToolAction = useCallback((id: ToolId) => {
+	const triggerToolAction = useCallback((id: ToolId) => {
 		const st = stateRef.current;
 		if (!st || status !== 'playing') return;
-		if (useTool(st, id)) syncHud(st);
+		if (applyTool(st, id)) syncHud(st);
 	}, [status, syncHud]);
 
 	const craftAction = useCallback((id: ItemId) => {
@@ -552,7 +552,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			const dir = KEYS[e.key];
 			if (dir) { e.preventDefault(); if (!e.repeat) pressDir(dir); return; } // our tick drives the repeat
 			const tool = TOOLS[e.key];
-			if (tool && !e.repeat) useToolAction(tool);
+			if (tool && !e.repeat) triggerToolAction(tool);
 		};
 		const onKeyUp = (e: KeyboardEvent) => {
 			const dir = KEYS[e.key];
@@ -564,7 +564,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			window.removeEventListener('keydown', onKey);
 			window.removeEventListener('keyup', onKeyUp);
 		};
-	}, [pressDir, releaseDir, useToolAction]);
+	}, [pressDir, releaseDir, triggerToolAction]);
 
 	/* Auto-pause when the tab is hidden; resume on return if mid-game. */
 	useEffect(() => {
@@ -788,7 +788,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 						className="cm-item cm-tool"
 						disabled={status !== 'playing' || !invCount(id)}
 						title={`${LABEL[id]} (${i + 1}) — ${RECIPE_HINT[id]}`}
-						onClick={() => useToolAction(id)}
+						onClick={() => triggerToolAction(id)}
 					>
 						{EMOJI[id]}<i>{invCount(id)}</i>
 					</button>

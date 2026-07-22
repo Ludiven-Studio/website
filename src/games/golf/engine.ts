@@ -393,7 +393,7 @@ function collideSegment(b: Ball, s: Segment, r: number, restitution: number): vo
 	const ab2 = abx * abx + abz * abz || 1;
 	const t = clamp(((b.x - s.ax) * abx + (b.z - s.az) * abz) / ab2, 0, 1);
 	const cx = s.ax + abx * t, cz = s.az + abz * t;
-	let dx = b.x - cx, dz = b.z - cz;
+	const dx = b.x - cx, dz = b.z - cz;
 	let d = Math.hypot(dx, dz);
 	if (d >= r) return;
 	let nx: number, nz: number;

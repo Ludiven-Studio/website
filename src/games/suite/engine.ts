@@ -54,7 +54,7 @@ const geometric = (rng: Rng): Generated => {
 
 const alternating = (rng: Rng): Generated => {
 	const start = ri(rng, 1, 6);
-	let d1 = ri(rng, 1, 5);
+	const d1 = ri(rng, 1, 5);
 	let d2 = ri(rng, 1, 5);
 	if (d1 === d2) d2 += 1;
 	const seq = [start];

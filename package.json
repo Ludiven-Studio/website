@@ -9,6 +9,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",
+    "lint": "eslint .",
     "og": "node scripts/generate-og.mjs"
   },
   "dependencies": {
@@ -39,11 +40,16 @@
   "homepage": "https://github.com/Ludiven-Studio/website#readme",
   "devDependencies": {
     "@astrojs/sitemap": "^3.7.3",
+    "@eslint/js": "^9.39.5",
     "@gltf-transform/cli": "^4.4.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.184.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-astro": "^1.7.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "playwright": "^1.61.1",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.8"
   }
 }

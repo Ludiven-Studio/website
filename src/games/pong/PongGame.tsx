@@ -389,7 +389,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		});
 	}, [roomCode]);
 
-	const usePower = useCallback((power: PowerId) => {
+	const triggerPower = useCallback((power: PowerId) => {
 		const role = roleRef.current;
 		if (role === 'guest') matchRef.current?.sendPower(power);
 		else stateRef.current = activatePower(stateRef.current, 'left', power); // host/ai activate their own (left)
@@ -575,7 +575,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
 			if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'z') inputDirRef.current = -1;
 			else if (e.key === 'ArrowDown' || e.key === 's') inputDirRef.current = 1;
-			else if (e.key >= '1' && e.key <= '4') usePower(POWERS[Number(e.key) - 1].id); // engine ignores it if the meter isn't full
+			else if (e.key >= '1' && e.key <= '4') triggerPower(POWERS[Number(e.key) - 1].id); // engine ignores it if the meter isn't full
 		};
 		const up = (e: KeyboardEvent) => {
 			if ((e.key === 'ArrowUp' || e.key === 'w' || e.key === 'z') && inputDirRef.current === -1) inputDirRef.current = 0;
@@ -587,7 +587,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 			window.removeEventListener('keydown', down);
 			window.removeEventListener('keyup', up);
 		};
-	}, [usePower]);
+	}, [triggerPower]);
 
 	const pointer = (e: React.PointerEvent) => {
 		const cv = canvasRef.current;
@@ -765,7 +765,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					</div>
 					<div className="pg-powers">
 						{POWERS.map((p) => (
-							<button key={p.id} className="pg-power" disabled={myCharge < PONG.chargeNeed} title={p.label} aria-label={p.label} onClick={() => usePower(p.id)}>
+							<button key={p.id} className="pg-power" disabled={myCharge < PONG.chargeNeed} title={p.label} aria-label={p.label} onClick={() => triggerPower(p.id)}>
 								<span aria-hidden="true">{p.icon}</span>
 							</button>
 						))}

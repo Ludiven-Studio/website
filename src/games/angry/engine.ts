@@ -558,7 +558,8 @@ export const pullPower = (pull: Vec): number => Math.min(len(pull.x, pull.y), MA
 /** Sampled parabola for the aim guide (no collisions). */
 export function predictTrajectory(world: World, start: Vec, vel: { vx: number; vy: number }, n = 30, dt = 1 / 40): Vec[] {
 	const pts: Vec[] = [];
-	let x = start.x, y = start.y, vx = vel.vx, vy = vel.vy;
+	const vx = vel.vx;
+	let x = start.x, y = start.y, vy = vel.vy;
 	for (let i = 0; i < n; i++) {
 		vy += world.gravity * dt;
 		x += vx * dt; y += vy * dt;
