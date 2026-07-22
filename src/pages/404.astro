@@ -1,8 +1,104 @@
 ---
-import Hero from '../components/Hero.astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import GameCard from '../components/GameCard.astro';
+import { games } from '../data/games';
+
+// Curated picks, resilient to registry changes: keep those that still exist and
+// are playable, then top up with other playable games until we have four.
+const PICKS = ['mine', '2048', 'sudoku', 'mots-meles'];
+const byId = new Map(games.map((g) => [g.id, g]));
+const curated = PICKS.map((id) => byId.get(id)).filter(
+	(g): g is (typeof games)[number] => !!g && g.status === 'play',
+);
+const extra = games.filter((g) => g.status === 'play' && !PICKS.includes(g.id));
+const suggestions = [...curated, ...extra].slice(0, 4);
 ---
 
-<BaseLayout title="Not Found" description="404 Error — this page was not found">
-	<Hero title="Page Not Found" tagline="Not found" />
+<BaseLayout title="Page introuvable | Ludiven Studio" description="Cette page n'existe pas (ou plus). Retrouve tous les mini-jeux et le défi du jour de Ludiven Studio." noindex>
+	<div class="wrapper stack gap-8 lg:gap-20">
+		<Hero title="Oups, page introuvable" tagline="La page que tu cherches n'existe pas, ou n'existe plus. Mais il y a plein de jeux à essayer.">
+			<div class="nf-cta">
+				<a class="nf-btn nf-btn--primary" href="/jeux/">🎮 Tous les jeux</a>
+				<a class="nf-btn" href="/jeux/defi">🏆 Le défi du jour</a>
+			</div>
+		</Hero>
+
+		<section class="nf-section stack gap-6">
+			<h2 class="nf-section-title">Et si tu jouais plutôt à…</h2>
+			<ul class="nf-grid">
+				{
+					suggestions.map((game) => (
+						<li>
+							<GameCard
+								id={game.id}
+								title={game.title}
+								pitch={game.pitch}
+								icon={game.icon}
+								href={game.href}
+								status={game.status}
+								image={game.image}
+								daily={false}
+							/>
+						</li>
+					))
+				}
+			</ul>
+		</section>
+	</div>
 </BaseLayout>
+
+<style>
+	.nf-cta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		justify-content: center;
+		margin-top: 1.5rem;
+	}
+	.nf-btn {
+		background: var(--gray-999);
+		border: 1px solid var(--gray-800);
+		color: var(--gray-100);
+		font-family: var(--font-brand);
+		font-weight: 700;
+		font-size: var(--text-md);
+		text-decoration: none;
+		border-radius: 999px;
+		padding: 10px 22px;
+		transition: filter var(--theme-transition);
+	}
+	.nf-btn--primary {
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		border-color: transparent;
+		box-shadow: var(--shadow-md);
+	}
+	.nf-btn:hover,
+	.nf-btn:focus-visible {
+		filter: brightness(1.08);
+	}
+
+	.nf-section-title {
+		font-size: var(--text-xl);
+		text-align: center;
+		margin: 0;
+		color: var(--gray-0);
+	}
+
+	.nf-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	@media (min-width: 50em) {
+		.nf-grid {
+			grid-template-columns: repeat(4, 1fr);
+			gap: 2rem;
+		}
+	}
+</style>
