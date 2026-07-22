@@ -83,16 +83,13 @@ export async function submitScore(args: SubmitScoreArgs): Promise<SubmitScoreRes
 export async function getLeaderboard(gameId: string, metric: Metric = 'score', day: string = challengeDateUTC(), limit = 50): Promise<ScoreRow[]> {
 	if (!leaderboardEnabled()) return [];
 	const order = metric === 'time' ? 'score.asc' : 'score.desc';
-	try {
-		const res = await fetch(
-			`${SUPABASE_URL}/rest/v1/game_scores?game_id=eq.${encodeURIComponent(gameId)}&challenge_date=eq.${day}` +
-				`&select=player_name,score,created_at&order=${order},created_at.asc&limit=${limit}`,
-			{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
-		);
-		if (!res.ok) return [];
-		const rows: { player_name: string; score: number; created_at: string }[] = await res.json();
-		return rows.map((r) => ({ name: r.player_name || 'Anonyme', value: r.score, created_at: r.created_at }));
-	} catch {
-		return [];
-	}
+	// Throws on transport/HTTP failure so <Leaderboard> can distinguish empty from unreachable.
+	const res = await fetch(
+		`${SUPABASE_URL}/rest/v1/game_scores?game_id=eq.${encodeURIComponent(gameId)}&challenge_date=eq.${day}` +
+			`&select=player_name,score,created_at&order=${order},created_at.asc&limit=${limit}`,
+		{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
+	);
+	if (!res.ok) throw new Error(`leaderboard ${res.status}`);
+	const rows: { player_name: string; score: number; created_at: string }[] = await res.json();
+	return rows.map((r) => ({ name: r.player_name || 'Anonyme', value: r.score, created_at: r.created_at }));
 }

@@ -4,6 +4,7 @@
 
 import type { GameProgress } from '../lib/progression';
 import { LEVEL_COUNT, unlockedUpTo } from '../lib/progression';
+import ErrorBoundary from './ErrorBoundary';
 
 interface Props {
 	progress: GameProgress;
@@ -12,7 +13,7 @@ interface Props {
 	title?: string;
 }
 
-export default function LevelSelect({ progress, onPick, title }: Props) {
+function LevelSelectInner({ progress, onPick, title }: Props) {
 	const unlocked = unlockedUpTo(progress);
 	const totalStars = Object.values(progress.stars).reduce((a, b) => a + b, 0);
 
@@ -51,6 +52,20 @@ export default function LevelSelect({ progress, onPick, title }: Props) {
 				})}
 			</div>
 		</div>
+	);
+}
+
+export default function LevelSelect(props: Props) {
+	return (
+		<ErrorBoundary
+			fallback={
+				<p style={{ textAlign: 'center', color: 'var(--gray-300)', fontSize: 13 }}>
+					Sélecteur de niveaux momentanément indisponible.
+				</p>
+			}
+		>
+			<LevelSelectInner {...props} />
+		</ErrorBoundary>
 	);
 }
 

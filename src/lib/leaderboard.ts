@@ -204,7 +204,8 @@ export async function fetchDailyTops(day: string = todayKey()): Promise<Record<s
 	}
 }
 
-/** Top-N for a game on a day. Dedupes to each player's best entry. */
+/** Top-N for a game on a day. Dedupes to each player's best entry.
+    Throws on transport/HTTP failure so the UI can tell "empty" from "unreachable". */
 export async function fetchLeaderboard(
 	game: string,
 	metric: Metric,
@@ -213,24 +214,20 @@ export async function fetchLeaderboard(
 ): Promise<ScoreRow[]> {
 	if (!leaderboardEnabled()) return [];
 	const order = metric === 'time' ? 'value.asc' : 'value.desc';
-	try {
-		const res = await fetch(
-			`${SUPABASE_URL}/rest/v1/scores?game=eq.${encodeURIComponent(game)}&day=eq.${day}&select=name,value,created_at&order=${order},created_at.asc&limit=${limit}`,
-			{ headers: headers() },
-		);
-		if (!res.ok) return [];
-		const rows: ScoreRow[] = await res.json();
-		// Keep each player's best (rows already ordered best-first).
-		const seen = new Set<string>();
-		const out: ScoreRow[] = [];
-		for (const r of rows) {
-			const key = r.name.toLowerCase();
-			if (seen.has(key)) continue;
-			seen.add(key);
-			out.push(r);
-		}
-		return out;
-	} catch {
-		return [];
+	const res = await fetch(
+		`${SUPABASE_URL}/rest/v1/scores?game=eq.${encodeURIComponent(game)}&day=eq.${day}&select=name,value,created_at&order=${order},created_at.asc&limit=${limit}`,
+		{ headers: headers() },
+	);
+	if (!res.ok) throw new Error(`leaderboard ${res.status}`);
+	const rows: ScoreRow[] = await res.json();
+	// Keep each player's best (rows already ordered best-first).
+	const seen = new Set<string>();
+	const out: ScoreRow[] = [];
+	for (const r of rows) {
+		const key = r.name.toLowerCase();
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(r);
 	}
+	return out;
 }
