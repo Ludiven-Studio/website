@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { PONG, createState, serve, movePaddle, stepBall, activatePower, addPickup, type PongState, type PowerId } from './engine';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, type Match, type PaddleMsg } from './net';
 import { mulberry32 } from '../prng';
+import { usePointerDrag } from '../usePointerDrag';
 import { playerName, setPlayerName, getDaily, loadDailyRun, saveDailyRun, dailyWeekdayLabel } from '../../lib/leaderboard';
 import { fmtCentis } from '../../lib/scoreFormat';
 import { useLevels } from '../../lib/useLevels';
@@ -669,15 +670,18 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		};
 	}, [triggerPower]);
 
-	const pointer = (e: React.PointerEvent) => {
+	// Paddle drag via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
+	const setPaddleY = (clientY: number): void => {
 		const cv = canvasRef.current;
 		if (!cv) return;
 		const rect = cv.getBoundingClientRect();
-		pointerYRef.current = ((e.clientY - rect.top) / rect.height) * PONG.H;
+		pointerYRef.current = ((clientY - rect.top) / rect.height) * PONG.H;
 	};
-	const pointerEnd = () => {
-		pointerYRef.current = null;
-	};
+	const { onPointerDown } = usePointerDrag(
+		(_x, y) => setPaddleY(y),
+		(_x, y) => setPaddleY(y),
+		() => { pointerYRef.current = null; },
+	);
 
 	useEffect(() => () => {
 		runningRef.current = false;
@@ -722,10 +726,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					className="pg-canvas"
 					role="img"
 					aria-label="Pong"
-					onPointerDown={pointer}
-					onPointerMove={(e) => pointerYRef.current != null && pointer(e)}
-					onPointerUp={pointerEnd}
-					onPointerLeave={pointerEnd}
+					onPointerDown={onPointerDown}
 				/>
 
 				{phase === 'playing' && (

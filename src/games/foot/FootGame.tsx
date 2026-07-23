@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useHoldButton } from '../useHoldButton';
 import {
 	createWorld, stepPlayer, stepBall, resolveKicks, applyScore, step, separateAll, setTeamSize as applyTeamSize,
 	playerPos, applyPlayerPos, applyBall, ballState,
@@ -619,7 +620,11 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		matchRef.current?.leave();
 	}, []);
 
-	const touch = (key: keyof Keys, v: boolean) => (e: React.PointerEvent) => { e.preventDefault(); touchRef.current[key] = v; };
+	// Hold controls via NATIVE non-passive touch listeners (React pointer preventDefault is a
+	// no-op → iOS cancels the hold). Left/right also register a tap for the dash double-tap.
+	const holdLeft = useHoldButton(() => { touchRef.current.left = true; registerTap('left'); }, () => { touchRef.current.left = false; });
+	const holdRight = useHoldButton(() => { touchRef.current.right = true; registerTap('right'); }, () => { touchRef.current.right = false; });
+	const holdJump = useHoldButton(() => { touchRef.current.jump = true; }, () => { touchRef.current.jump = false; });
 	const mpOff = !multiplayerAvailable();
 
 	const cfg = lv.active ? footLevels.config(lv.level) : null;
@@ -681,10 +686,10 @@ export default function FootGame({ gameId }: { gameId: string }) {
 						{goalFlash && <div className="fo-goal">{goalFlash}</div>}
 						<div className="fo-pad">
 							<div className="fo-dpad">
-								<button className="fo-tbtn" aria-label="Gauche" onPointerDown={(e) => { touch('left', true)(e); registerTap('left'); }} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)}>◀</button>
-								<button className="fo-tbtn" aria-label="Droite" onPointerDown={(e) => { touch('right', true)(e); registerTap('right'); }} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)}>▶</button>
+								<button className="fo-tbtn" aria-label="Gauche" ref={holdLeft}>◀</button>
+								<button className="fo-tbtn" aria-label="Droite" ref={holdRight}>▶</button>
 							</div>
-							<button className="fo-tbtn fo-jump" aria-label="Sauter" onPointerDown={touch('jump', true)} onPointerUp={touch('jump', false)} onPointerLeave={touch('jump', false)} onPointerCancel={touch('jump', false)}>⤴ SAUT</button>
+							<button className="fo-tbtn fo-jump" aria-label="Sauter" ref={holdJump}>⤴ SAUT</button>
 						</div>
 					</>
 				)}
