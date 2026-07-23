@@ -10,6 +10,7 @@ import {
 	owns,
 	type Blason,
 } from '../lib/wallet';
+import { trackEvent } from '../lib/analytics';
 
 /* Local cocottes wallet UI on /jeux: balance, escalating daily-return reward, and the
    blason shop (buy + equip). All device-local — see lib/wallet.ts. */
@@ -45,6 +46,7 @@ export default function CocottesPanel() {
 	const claim = () => {
 		const g = claimDailyReward();
 		if (g > 0) {
+			trackEvent('cocottes:reward_claim', { amount: g });
 			setMsg(`+${g} 🐔 récompense du jour !`);
 			refresh();
 			setTimeout(() => setMsg(''), 2200);
@@ -52,6 +54,7 @@ export default function CocottesPanel() {
 	};
 	const buy = (b: Blason) => {
 		if (buyBlason(b.id)) {
+			trackEvent('cocottes:buy_blason', { blason: b.id, price: b.price });
 			equipBlason(b.id);
 			setMsg(`${b.emoji} ${b.label} débloqué et équipé !`);
 			refresh();
@@ -59,7 +62,9 @@ export default function CocottesPanel() {
 		}
 	};
 	const toggleEquip = (id: string) => {
-		equipBlason(equipped === id ? null : id);
+		const on = equipped !== id;
+		equipBlason(on ? id : null);
+		trackEvent('cocottes:equip_blason', { blason: on ? id : 'none' });
 		refresh();
 	};
 
@@ -75,7 +80,7 @@ export default function CocottesPanel() {
 				) : (
 					<span className="cp-note">Joue un jeu pour ta récompense (+{reward.amount} 🐔)</span>
 				)}
-				<button className="cp-shopbtn" onClick={() => setShopOpen((o) => !o)} aria-expanded={shopOpen}>
+				<button className="cp-shopbtn" onClick={() => setShopOpen((o) => { if (!o) trackEvent('cocottes:shop_open'); return !o; })} aria-expanded={shopOpen}>
 					🎖️ Blasons {shopOpen ? '▲' : '▼'}
 				</button>
 			</div>

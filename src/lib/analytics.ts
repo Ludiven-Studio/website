@@ -28,3 +28,11 @@ export function trackGame(
 	const name = seg ? `${gameId}:${seg}:${event}` : `${gameId}:${event}`;
 	umami.track(name, { game: gameId, event, ...data });
 }
+
+/** Track a non-game custom event in Umami (e.g. wallet / shop actions). No-op without Umami. */
+export function trackEvent(name: string, data?: Record<string, unknown>): void {
+	if (typeof window === 'undefined') return;
+	const umami = (window as unknown as { umami?: { track: (e: string, d?: unknown) => void } }).umami;
+	if (!umami) return;
+	umami.track(name, data);
+}
