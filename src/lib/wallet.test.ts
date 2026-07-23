@@ -13,7 +13,9 @@ class MemStorage {
 	clear(): void { this.m.clear(); }
 }
 
-const setDay = (iso: string): void => vi.setSystemTime(new Date(`${iso}T12:00:00Z`));
+const setDay = (iso: string): void => {
+	vi.setSystemTime(new Date(`${iso}T12:00:00Z`));
+};
 
 beforeEach(() => {
 	vi.stubGlobal('localStorage', new MemStorage());
