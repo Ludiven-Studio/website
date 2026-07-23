@@ -12,6 +12,10 @@ import {
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { codecolorLevels } from './levels';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
@@ -69,6 +73,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 	const startedRef = useRef(false); // free-mode "first action" flag
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const lv = useLevels(gameId, codecolorLevels);
 
 	const { slots, colors, tries } = puzzle;
 	const over = status !== 'playing';
@@ -93,6 +98,33 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		} catch {
 			setBest(0);
 		}
+	}, []);
+
+	/* Levels mode: crack a code from the level config (no chrono → no ready-gate). */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setPuzzle(generatePuzzle({ label: cfg.label, slots: cfg.slots, colors: cfg.colors, tries: cfg.tries }, mulberry32(cfg.seed)));
+		setRows([]);
+		setCurrent(makeEmpty(cfg.slots));
+		setStatus('playing');
+		setStarted(true);
+		startedRef.current = true;
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	/* Daily: one resumable attempt per device; server-issued seed + difficulty. */
@@ -225,6 +257,10 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 	/* Lock the daily on a fresh finish + record free-mode best on a win. */
 	useEffect(() => {
 		if (!over) return;
+		if (lv.playing) {
+			lv.finish({ won: status === 'won', score: usedTries });
+			return;
+		}
 		if (daily) {
 			if (alreadyPlayed) return;
 			const sd = dailySeedRef.current;
@@ -257,9 +293,20 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		<div className="cc-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => daily && newGame(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="cc-daily-tag">
+					{lv.menu ? 'Progression — choisis un niveau' : `Niveau ${lv.level} · code de ${slots} couleurs`}
+				</div>
+			) : daily ? (
 				<div className="cc-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
@@ -287,6 +334,10 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="cc-boardwrap">
+				{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+				) : (
+				<>
 				{celebrating && <Celebration />}
 
 				<div className={`cc-board ${armed ? 'blurred' : ''}`}>
@@ -354,7 +405,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && (
+				{showWin && !daily && !lv.active && (
 					<div className="cc-end" role="dialog" aria-label="Code trouvé">
 						<div className="cc-endcard">
 							<div className="cc-endmark">🎉</div>
@@ -369,7 +420,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-				{status === 'lost' && !daily && (
+				{status === 'lost' && !daily && !lv.active && (
 					<div className="cc-end" role="dialog" aria-label="Perdu">
 						<div className="cc-endcard">
 							<div className="cc-endmark">🙈</div>
@@ -384,7 +435,22 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+				</>
+				)}
 			</div>
+
+			{lv.done && (
+				<LevelOutcome
+					level={lv.level}
+					lastLevel={codecolorLevels.count}
+					won={lv.won}
+					stars={lv.stars}
+					detail={lv.won ? `${usedTries} essai${usedTries > 1 ? 's' : ''}` : 'Code manqué'}
+					onNext={() => startLevel(lv.level + 1)}
+					onReplay={() => startLevel(lv.level)}
+					onMenu={lv.backToMenu}
+				/>
+			)}
 
 			{daily && over && (
 				<div className="cc-daily-won">
@@ -417,7 +483,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={over ? cost : undefined} format={fmt} />
 			)}
-			{!daily && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			<p className="cc-help">
 				Devine le <strong>code de couleurs</strong> caché en un minimum d'essais. Le code n'a que des
