@@ -5,6 +5,7 @@ import { dateSeed } from '../games/prng';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
 import { trackGame } from './analytics';
 import { recordDailyDone } from './streak';
+import { earn } from './wallet';
 
 export type Metric = 'time' | 'score';
 export interface ScoreRow {
@@ -91,6 +92,7 @@ export function saveDailyRun(game: string, run: DailyRun): void {
 			if (!prevDone) {
 				trackGame(game, 'daily_done');
 				recordDailyDone(game); // first completion today → advance the streaks
+				earn(10); // cocottes bonus for finishing a daily challenge
 			}
 		}
 	} catch {

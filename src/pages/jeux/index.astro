@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
 import SuggestionForm from '../../components/SuggestionForm.astro';
+import CocottesPanel from '../../components/CocottesPanel';
 import { games } from '../../data/games';
 
 const NUM_FR = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize'];
@@ -35,6 +36,8 @@ const multi = games.filter((g) => g.category === 'multi');
 			<a class="games-defi-cta" href="/jeux/defi">🏆 Le défi du jour</a>
 				<p class="games-streak" id="games-streak" hidden></p>
 		</header>
+
+			<CocottesPanel client:load />
 
 		<section class="games-section stack gap-6">
 			<h2 class="games-section-title">Jeux de logique</h2>

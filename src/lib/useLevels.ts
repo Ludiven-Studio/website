@@ -9,6 +9,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { getProgression, submitLevel, type GameProgress, type LevelPlan, type LevelResult } from './progression';
+import { earn } from './wallet';
 
 export type LevelPhase = 'off' | 'menu' | 'playing' | 'done';
 
@@ -78,12 +79,14 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 		setStars(s);
 		setPhase('done');
 		if (s >= 1) {
+			const gained = Math.max(0, s - (progress.stars[level] ?? 0));
+			if (gained > 0) earn(gained * 3); // cocottes for newly-earned stars
 			void submitLevel({
 				gameId, level, stars: s as 1 | 2 | 3, score: Math.round(r.score),
 				metricIsTime: plan.metric === 'time', rawData: r.raw,
 			}).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best } }));
 		}
-	}, [gameId, level, plan]);
+	}, [gameId, level, plan, progress]);
 
 	const replay = useCallback((): Cfg => play(level), [play, level]);
 	const next = useCallback((): Cfg | null => (level < plan.count ? play(level + 1) : null), [play, level, plan.count]);

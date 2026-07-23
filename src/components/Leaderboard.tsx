@@ -14,6 +14,7 @@ import { fmtCentis } from '../lib/scoreFormat';
 import { isSecured } from '../data/securedGames';
 import { submitScore, getLeaderboard } from '../lib/scores';
 import { gameStreak } from '../lib/streak';
+import { equippedBlason } from '../lib/wallet';
 import ErrorBoundary from './ErrorBoundary';
 
 // Time leaderboards store CENTISECONDS; a game may still pass its own `format`.
@@ -112,6 +113,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 	};
 
 	const me = name.toLowerCase();
+	const myBlason = equippedBlason(); // shown next to your own name (public display needs the backend)
 	const fmt = format ?? ((v: number) => (metric === 'time' ? fmtCentis(v) : String(v)));
 	const showInput = editing || (submitValue != null && !name);
 
@@ -175,7 +177,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 							{rows.map((r, i) => (
 								<li key={`${r.name}-${i}`} className={`lb-row ${r.name.toLowerCase() === me ? 'me' : ''}`}>
 									<span className="lb-rank">{i + 1}</span>
-									<span className="lb-pname">{r.name}</span>
+									<span className="lb-pname">{r.name.toLowerCase() === me && myBlason ? `${myBlason.emoji} ` : ''}{r.name}</span>
 									<span className="lb-val">{fmt(r.value)}</span>
 								</li>
 							))}
@@ -203,7 +205,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 						<p className="lb-foot">
 							{name ? (
 								<>
-									Pseudo : <strong>{name}</strong> ·{' '}
+									Pseudo : <strong>{myBlason ? `${myBlason.emoji} ` : ''}{name}</strong> ·{' '}
 									<button className="lb-link" onClick={startEdit}>Changer</button>
 								</>
 							) : (
