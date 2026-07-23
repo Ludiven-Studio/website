@@ -184,6 +184,15 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		lv.enter();
 	}, [lv]);
 
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	// Grade the level once the fleet is sunk (score = shots + sonars, fewer is better).
 	useEffect(() => {
 		if (!lv.playing) return;
