@@ -245,6 +245,13 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		border: 1px solid var(--accent-regular);
 	}
 
+	/* [hidden] must win over the display above, else empty badges show as blank pills. */
+	.daily-chip[hidden],
+	.streak-badge[hidden],
+	.level-badge[hidden] {
+		display: none;
+	}
+
 	.game-card p {
 		color: var(--gray-400);
 		margin: 0;
@@ -392,7 +399,13 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 				/* ignore */
 			}
 			const cleared = Object.keys(stars).map(Number).filter((n) => stars[n] >= 1);
-			if (cleared.length === 0) { badge.hidden = true; return; }
+			if (cleared.length === 0) {
+				// Not played yet → invite to start at level 1.
+				badge.textContent = '🎯 Niveau 1';
+				badge.title = 'Commence les niveaux';
+				badge.hidden = false;
+				return;
+			}
 			const maxCleared = Math.max(...cleared);
 			if (maxCleared >= 100) {
 				const total = cleared.reduce((a, n) => a + (stars[n] || 0), 0);

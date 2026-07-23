@@ -33,6 +33,7 @@ const multi = games.filter((g) => g.category === 'multi');
 				<li>🔓 Sans inscription</li>
 			</ul>
 			<a class="games-defi-cta" href="/jeux/defi">🏆 Le défi du jour</a>
+				<p class="games-streak" id="games-streak" hidden></p>
 		</header>
 
 		<section class="games-section stack gap-6">
@@ -197,6 +198,22 @@ const multi = games.filter((g) => g.category === 'multi');
 		filter: brightness(1.06);
 	}
 
+	.games-streak {
+		align-self: center;
+		margin-top: 0.6rem;
+		font-weight: 800;
+		font-size: var(--text-md);
+		color: var(--gray-0);
+		background: rgba(245, 166, 35, 0.14);
+		border: 1px solid rgba(245, 166, 35, 0.5);
+		border-radius: 999px;
+		padding: 7px 18px;
+	}
+	.games-streak .games-streak-note {
+		font-weight: 600;
+		color: var(--gray-200);
+	}
+
 	.games-section-title {
 		font-size: var(--text-xl);
 		text-align: center;
@@ -228,3 +245,23 @@ const multi = games.filter((g) => g.category === 'multi');
 		}
 	}
 </style>
+
+<script>
+	import { activityStreak } from '../../lib/streak';
+
+	const el = document.getElementById('games-streak');
+	const refresh = () => {
+		if (!el) return;
+		el.hidden = false;
+		const s = activityStreak();
+		if (s.count > 0) {
+			const note = s.atRisk ? ' <span class="games-streak-note">· joue aujourd\'hui pour la garder</span>' : '';
+			el.innerHTML = `🔥 ${s.count} jour${s.count > 1 ? 's' : ''} d'affilée${note}`;
+		} else {
+			el.innerHTML = `🔥 <span class="games-streak-note">Joue un jeu aujourd'hui pour lancer ta série</span>`;
+		}
+	};
+	refresh();
+	document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+	window.addEventListener('pageshow', refresh);
+</script>

@@ -14,6 +14,7 @@ export interface StreakView {
 }
 
 const GLOBAL_KEY = 'ludiven-streak-global';
+const ACTIVITY_KEY = 'ludiven-streak-activity'; // played ANY game (free/daily/levels) today
 const gameKey = (gameId: string): string => `ludiven-streak-${gameId}`;
 
 /** UTC day, matching challengeDateUTC() in lib/scores. */
@@ -56,6 +57,11 @@ export function recordDailyDone(gameId: string): void {
 	bump(gameKey(gameId), today);
 }
 
+/** Record that ANY game was played today (free/daily/levels) — the daily-return streak. Idempotent. */
+export function recordDayActivity(): void {
+	bump(ACTIVITY_KEY, utcDay());
+}
+
 const view = (s: Streak): StreakView => {
 	const today = utcDay();
 	if (s.lastDate === today) return { count: s.count, playedToday: true, atRisk: false };
@@ -68,3 +74,6 @@ export const globalStreak = (): StreakView => view(read(GLOBAL_KEY));
 
 /** Current streak for one game. */
 export const gameStreak = (gameId: string): StreakView => view(read(gameKey(gameId)));
+
+/** Days-in-a-row playing any game (free/daily/levels) — the daily-return streak. */
+export const activityStreak = (): StreakView => view(read(ACTIVITY_KEY));

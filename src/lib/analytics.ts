@@ -1,5 +1,7 @@
 // Safe wrapper around Umami's custom-event API. No-op when Umami isn't loaded
 // (e.g. local dev, or domain excluded via data-domains).
+import { recordDayActivity } from './streak';
+
 type GameEvent = 'game_started' | 'game_won' | 'game_over' | 'hint_used' | 'solution_shown' | 'daily_played' | 'daily_done' | 'discovery';
 
 /** Play mode, so free / daily / levels runs can be told apart in Umami. Games may pass
@@ -12,6 +14,8 @@ export function trackGame(
 	data: Record<string, unknown> & { mode?: string } = {},
 ): void {
 	if (typeof window === 'undefined') return;
+	// Any game event = played today → feeds the daily-return (activity) streak. Idempotent.
+	recordDayActivity();
 	const umami = (window as unknown as { umami?: { track: (e: string, d?: unknown) => void } }).umami;
 	if (!umami) return;
 	// The event NAME carries the game and (when provided) the mode — and for a levels
