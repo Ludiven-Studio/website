@@ -100,15 +100,22 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		setPuzzle(p);
 		setPath([startCellOf(p)]);
 		setStatus('playing');
-		startRef.current = Date.now();
-		setStarted(true);
-		trackGame(gameId, 'game_started');
-	}, [lv, gameId]);
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
+	}, [lv]);
 
 	const armLevels = useCallback(() => {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* Grade the level once solved (win → time). */
 	useEffect(() => {
@@ -174,15 +181,17 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: [startCellOf(puzzle)],
-		});
-	}, [gameId, puzzle]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: [startCellOf(puzzle)],
+			});
+		}
+	}, [gameId, puzzle, daily]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -340,7 +349,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	};
 
 	const startDrag = (clientX: number, clientY: number) => {
-		if (daily && !started) return; // armed but not started: overlay owns the board
+		if ((daily || lv.playing) && !started) return; // armed but not started: overlay owns the board
 		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
 		drawing.current = true;
@@ -350,7 +359,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		step(cell);
 	};
 	const moveDrag = (clientX: number, clientY: number) => {
-		if (daily && !started) return;
+		if ((daily || lv.playing) && !started) return;
 		if (!drawing.current) return;
 		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
@@ -360,7 +369,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		step(cell);
 	};
 	const endDrag = () => {
-		if (daily && !started) return;
+		if ((daily || lv.playing) && !started) return;
 		if (drawing.current && !moved.current && downCell.current) truncateTo(downCell.current); // deliberate tap
 		drawing.current = false;
 	};
@@ -506,7 +515,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					<div className="zp-loading">Génération…</div>
 				) : (
 					<div
-						className={`zp-board ${daily && !started ? 'blurred' : ''}`}
+						className={`zp-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 						ref={boardRef}
 						style={{
 							gridTemplateColumns: `repeat(${n}, 1fr)`,
@@ -574,9 +583,11 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && puzzle && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && puzzle && (
 					<div className="zp-overlay">
-						<button className="zp-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="zp-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 

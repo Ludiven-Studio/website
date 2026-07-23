@@ -65,8 +65,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		setRevealed(false);
 		setHinted(new Set());
 		setHintNote('');
-		setStarted(true);
-		startRef.current = Date.now();
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
 
@@ -74,6 +73,15 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const value = useCallback(
 		(r: number, c: number): Cell => (given[r][c] !== 0 ? given[r][c] : marks[r][c]),
@@ -147,15 +155,17 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: emptyMarks(),
-		});
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: emptyMarks(),
+			});
+		}
+	}, [gameId, daily]);
 
 	/* Clear my marks without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -286,7 +296,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 
 	const cycle = useCallback(
 		(r: number, c: number) => {
-			if (daily && !started) return;
+			if ((daily || lv.playing) && !started) return;
 			if (status === 'won' || revealed || given[r][c] !== 0) return;
 			setMarks((prev) => {
 				const next = prev.map((row) => [...row]) as Cell[][];
@@ -305,7 +315,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, revealed, started, given, daily, gameId],
+		[status, revealed, started, given, daily, gameId, lv.playing],
 	);
 
 	/* Hint: deduce the next logical cell and explain the technique. */
@@ -422,7 +432,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			) : (
 			<div className="rc-boardwrap" style={{ ['--n' as string]: n }}>
 				{celebrating && <Celebration />}
-				<div className={`rc-board ${daily && !started ? 'blurred' : ''}`}>
+				<div className={`rc-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}>
 					{Array.from({ length: n }).map((_, r) =>
 						Array.from({ length: n }).map((_, c) => {
 							const x = value(r, c);
@@ -443,7 +453,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${
 										x === 1 ? ', rond' : x === 2 ? ', carré' : ', vide'
 									}`}
-									disabled={status === 'won' || revealed || (daily && !started)}
+									disabled={status === 'won' || revealed || ((daily || lv.playing) && !started)}
 								>
 									{x === 1 && <span className="rc-shape rc-rond-shape" />}
 									{x === 2 && <span className="rc-shape rc-carre-shape" />}
@@ -480,9 +490,11 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && (
 					<div className="rc-overlay">
-						<button className="rc-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="rc-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 

@@ -87,8 +87,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		setFlagMode(false);
 		setHinted(new Set());
 		setHintNote('');
-		setStarted(true);
-		startRef.current = Date.now();
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
 
@@ -96,6 +95,15 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once it ends (win → time, mine → fail).
 	useEffect(() => {
@@ -181,15 +189,17 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: opened,
-		});
-	}, [gameId, puzzle]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: opened,
+			});
+		}
+	}, [gameId, puzzle, daily]);
 
 	/* Clear my entries (chrono keeps running) — back to the opened start. */
 	const resetDailyEntries = useCallback(() => {
@@ -281,18 +291,18 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 
 	const doReveal = useCallback(
 		(r: number, c: number) => {
-			if (over || (daily && !started)) return;
+			if (over || ((daily || lv.playing) && !started)) return;
 			if (grid[r][c] !== HIDDEN) return; // already revealed or flagged
 			begin();
 			setGrid((prev) => reveal(prev, puzzle, { r, c }));
 			removeHint(r, c);
 		},
-		[over, daily, started, grid, begin, puzzle, removeHint],
+		[over, daily, started, grid, begin, puzzle, removeHint, lv.playing],
 	);
 
 	const toggleFlag = useCallback(
 		(r: number, c: number) => {
-			if (over || (daily && !started)) return;
+			if (over || ((daily || lv.playing) && !started)) return;
 			if (grid[r][c] === REVEALED) return; // can't flag a revealed cell
 			begin();
 			setGrid((prev) => {
@@ -302,7 +312,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			});
 			removeHint(r, c);
 		},
-		[over, daily, started, grid, begin, puzzle, removeHint],
+		[over, daily, started, grid, begin, puzzle, removeHint, lv.playing],
 	);
 
 	const onCellClick = (r: number, c: number) => (flagMode ? toggleFlag(r, c) : doReveal(r, c));
@@ -466,7 +476,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			<div className="dm-boardwrap">
 				{celebrating && <Celebration />}
 				<div
-					className={`dm-board ${daily && !started ? 'blurred' : ''}`}
+					className={`dm-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
 					onContextMenu={(e) => e.preventDefault()}
 				>
@@ -510,9 +520,11 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status === 'playing' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status === 'playing' && (
 					<div className="dm-overlay">
-						<button className="dm-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="dm-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 

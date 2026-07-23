@@ -98,8 +98,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		setRevealed(false);
 		setHinted(new Set());
 		setHintNote('');
-		setStarted(true);
-		startRef.current = Date.now();
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
 
@@ -107,6 +106,15 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once solved (Calcudoku can't be lost).
 	useEffect(() => {
@@ -188,16 +196,18 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: emptyEntries(DIFFS[dk].size),
-		});
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: emptyEntries(DIFFS[dk].size),
+			});
+		}
+	}, [gameId, daily]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -319,7 +329,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || revealed || !selected || (daily && !started)) return;
+			if (status === 'won' || revealed || !selected || ((daily || lv.playing) && !started)) return;
 			const [r, c] = selected;
 			if (given[r][c] != null) return;
 			setEntries((prev) => {
@@ -339,7 +349,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, revealed, selected, given, started, daily, gameId],
+		[status, revealed, selected, given, started, daily, gameId, lv.playing],
 	);
 
 	/* Hint: deduce the next logical cell and explain the technique. */
@@ -514,7 +524,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			<div className="cd-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
-					className={`cd-board ${daily && !started ? 'blurred' : ''}`}
+					className={`cd-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--cd-cell))` }}
 				>
 					{Array.from({ length: size }).map((_, r) =>
@@ -543,7 +553,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 									}}
 									onClick={() => setSelected([r, c])}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${v != null ? `, ${v}` : ', vide'}`}
-									disabled={status === 'won' || revealed || (daily && !started)}
+									disabled={status === 'won' || revealed || ((daily || lv.playing) && !started)}
 								>
 									{label && <span className="cd-cagelabel">{label}</span>}
 									<span className="cd-val">{v != null ? v : ''}</span>
@@ -559,9 +569,11 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && (
 					<div className="cd-overlay">
-						<button className="cd-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="cd-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 

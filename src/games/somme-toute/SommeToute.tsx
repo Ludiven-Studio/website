@@ -128,9 +128,8 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setSelected(null);
 		setRevealed(false);
 		setHinted(new Set());
-		setStarted(true);
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setStatus('playing');
-		startRef.current = Date.now();
 		setElapsed(0);
 	}, [lv]);
 
@@ -138,6 +137,15 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once it is solved (win → time).
 	useEffect(() => {
@@ -204,16 +212,18 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: emptyEntries(DIFFS[dk].size),
-		});
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: emptyEntries(DIFFS[dk].size),
+			});
+		}
+	}, [gameId, daily]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -293,7 +303,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || revealed || !selected || (daily && !started)) return;
+			if (status === 'won' || revealed || !selected || ((daily || lv.playing) && !started)) return;
 			const [r, c] = selected;
 			if (puzzle[r][c] != null) return;
 			setEntries((prev) => {
@@ -313,7 +323,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, revealed, selected, puzzle, daily, started, gameId],
+		[status, revealed, selected, puzzle, daily, started, gameId, lv.playing],
 	);
 
 	/* Keyboard (desktop) */
@@ -367,7 +377,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		return lineInfo(s, anyFilled, colT[c]);
 	};
 
-	const lockBoard = status === 'won' || revealed || (daily && !started);
+	const lockBoard = status === 'won' || revealed || ((daily || lv.playing) && !started);
 
 	return (
 		<div className="st-root" style={{ ['--n' as string]: size }}>
@@ -453,7 +463,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			<div className="st-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
-					className={`st-board ${daily && !started ? 'blurred' : ''}`}
+					className={`st-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--st-cell)) auto` }}
 				>
 					{Array.from({ length: size }).map((_, r) => (
@@ -495,9 +505,11 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && (
 					<div className="st-overlay">
-						<button className="st-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="st-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 

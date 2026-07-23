@@ -126,11 +126,10 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setActiveColor(1);
 		setTool('paint');
 		setStatus('playing');
-		setStarted(true);
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setRevealed(false);
 		setHinted(new Set());
 		setHintNote('');
-		startRef.current = Date.now();
 		setElapsed(0);
 	}, [lv]);
 
@@ -138,6 +137,15 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once the picture is fully reconstructed.
 	useEffect(() => {
@@ -209,15 +217,17 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: startState(puzzle),
-		});
-	}, [gameId, size, puzzle]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: startState(puzzle),
+			});
+		}
+	}, [gameId, size, puzzle, daily]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -383,7 +393,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 
 	/* Coordinate-driven stroke handlers, shared by Pointer (mouse/pen) and native touch. */
 	const startStroke = (clientX: number, clientY: number) => {
-		if (over || (daily && !started)) return;
+		if (over || ((daily || lv.playing) && !started)) return;
 		const cell = cellFromXY(clientX, clientY);
 		if (!cell) return;
 		const [r, c] = cell;
@@ -580,7 +590,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			<div className="co-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
-					className={`co-board ${daily && !started ? 'blurred' : ''}`}
+					className={`co-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{
 						gridTemplateColumns: `auto repeat(${size}, var(--co-cell))`,
 						gridTemplateRows: `auto repeat(${size}, var(--co-cell))`,
@@ -631,9 +641,11 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && (
 					<div className="co-overlay">
-						<button className="co-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="co-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 

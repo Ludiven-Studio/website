@@ -88,8 +88,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setHintNote('');
 		setStatus('playing');
 		setRevealed(false);
-		setStarted(true);
-		startRef.current = Date.now();
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
 
@@ -97,6 +96,15 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once it is solved (win → time).
 	useEffect(() => {
@@ -173,15 +181,17 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: [],
-		});
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: [],
+			});
+		}
+	}, [gameId, daily]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -327,7 +337,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	};
 
 	const startDrag = (clientX: number, clientY: number) => {
-		if (status === 'won' || revealed || (daily && !started)) return;
+		if (status === 'won' || revealed || ((daily || lv.playing) && !started)) return;
 		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
 		const [r, c] = cell;
@@ -348,7 +358,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setPreview(rectFromCells(anchor.current, cell));
 	};
 	const moveDrag = (clientX: number, clientY: number) => {
-		if (status === 'won' || revealed || (daily && !started)) return;
+		if (status === 'won' || revealed || ((daily || lv.playing) && !started)) return;
 		if (!drawing.current || !anchor.current || !downCell.current) return;
 		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
@@ -356,7 +366,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setPreview(rectFromCells(anchor.current, cell));
 	};
 	const endDrag = () => {
-		if (status === 'won' || revealed || (daily && !started)) return;
+		if (status === 'won' || revealed || ((daily || lv.playing) && !started)) return;
 		if (!drawing.current) return;
 		const dc = downCell.current;
 		const except = resizeIdx.current;
@@ -559,7 +569,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 			<div className="mo-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
-					className={`mo-board ${daily && !started ? 'blurred' : ''}`}
+					className={`mo-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					ref={boardRef}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--mo-cell))` }}
 					{...touchDrag(startDrag, moveDrag, endDrag)}
@@ -607,9 +617,11 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && (
 					<div className="mo-overlay">
-						<button className="mo-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="mo-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 

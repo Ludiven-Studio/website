@@ -160,8 +160,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setRevealed(false);
 		setHinted(new Set());
-		setStarted(true);
-		startRef.current = Date.now();
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
 
@@ -169,6 +168,15 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once solved (win → time).
 	useEffect(() => {
@@ -238,15 +246,17 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: { placements: pieces.map(() => null), trayRot: pieces.map(() => 0) } satisfies SavedState,
-		});
-	}, [gameId, pieces]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: { placements: pieces.map(() => null), trayRot: pieces.map(() => 0) } satisfies SavedState,
+			});
+		}
+	}, [gameId, pieces, daily]);
 
 	const resetDailyEntries = useCallback(() => {
 		const empty: SavedState = {
@@ -381,7 +391,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	const beginDrag = useCallback(
 		(pieceIndex: number, rotation: number, grab: Cell, x: number, y: number, touch: boolean) => {
 			if (status === 'won' || revealed) return;
-			if (daily && !started) return;
+			if ((daily || lv.playing) && !started) return;
 			// Pick a placed piece back up.
 			setPlacements((prev) => {
 				if (!prev[pieceIndex]) return prev;
@@ -392,7 +402,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			setHintNote('');
 			setDrag({ pieceIndex, rotation, grab, cellPx: boardCellPx(), x, y, preview: null, valid: false, touch });
 		},
-		[status, revealed, daily, started, boardCellPx],
+		[status, revealed, daily, started, boardCellPx, lv.playing],
 	);
 
 	// Recompute preview given a pointer position + rotation.
@@ -559,7 +569,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		return m;
 	}, [drag, pieces, size, blocked, cover]);
 
-	const interactive = !(status === 'won' || revealed || (daily && !started));
+	const interactive = !(status === 'won' || revealed || ((daily || lv.playing) && !started));
 
 	// Fixed slot footprint per piece so the tray never reflows on drag / rotate.
 	// No-rotation → exact bbox; rotation on → square box that fits any rotation.
@@ -693,7 +703,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 				{celebrating && <Celebration />}
 				<div
 					ref={boardRef}
-					className={`pv-board ${daily && !started ? 'blurred' : ''}`}
+					className={`pv-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--pv-cell))` }}
 				>
 					{Array.from({ length: size }).map((_, r) =>
@@ -743,9 +753,11 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && (
 					<div className="pv-overlay">
-						<button className="pv-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="pv-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 
