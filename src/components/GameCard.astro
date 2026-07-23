@@ -42,6 +42,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		<h3>{title}</h3>
 		{playable && id && daily && <span class="daily-chip" data-game-id={id} hidden />}
 			{playable && id && daily && <span class="streak-badge" data-game-id={id} hidden />}
+			{playable && id && <span class="level-badge" data-game-id={id} hidden />}
 		{!compact && <p>{pitch}</p>}
 	</Tag>
 	{
@@ -228,6 +229,22 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		border: 1px solid rgba(245, 166, 35, 0.4);
 	}
 
+	.level-badge {
+		align-self: flex-start;
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		font-family: var(--font-brand);
+		font-weight: 700;
+		font-size: 12px;
+		line-height: 1;
+		padding: 3px 9px;
+		border-radius: 999rem;
+		color: var(--accent-regular);
+		background: var(--accent-overlay);
+		border: 1px solid var(--accent-regular);
+	}
+
 	.game-card p {
 		color: var(--gray-400);
 		margin: 0;
@@ -361,6 +378,33 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		});
 	};
 
+	// Per-game levels progress badge (🎯 current level), read from the local progression
+	// mirror. Hidden for games with no levels or no progress yet. (LEVEL_COUNT = 100.)
+	const syncLevels = () => {
+		document.querySelectorAll<HTMLElement>('.level-badge').forEach((badge) => {
+			const id = badge.dataset.gameId;
+			if (!id) return;
+			let stars: Record<string, number> = {};
+			try {
+				const raw = localStorage.getItem(`ludiven-progress-${id}`);
+				if (raw) stars = JSON.parse(raw)?.stars ?? {};
+			} catch {
+				/* ignore */
+			}
+			const cleared = Object.keys(stars).map(Number).filter((n) => stars[n] >= 1);
+			if (cleared.length === 0) { badge.hidden = true; return; }
+			const maxCleared = Math.max(...cleared);
+			if (maxCleared >= 100) {
+				const total = cleared.reduce((a, n) => a + (stars[n] || 0), 0);
+				badge.textContent = `🎯 Fini · ${total}★`;
+			} else {
+				badge.textContent = `🎯 Niveau ${maxCleared + 1}`;
+			}
+			badge.title = 'Ta progression en mode Niveaux';
+			badge.hidden = false;
+		});
+	};
+
 	// Community daily records (one Supabase request), then refresh the chips.
 	let tops: Record<string, { name: string; value: number; players: number }> = {};
 	const loadTops = async () => {
@@ -375,16 +419,19 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 
 	syncDaily();
 	syncStreak();
+	syncLevels();
 	loadTops();
 	// Refresh when returning to the page (tab focus, and back-nav restored from bfcache).
 	document.addEventListener('visibilitychange', () => {
 		if (!document.hidden) {
 			syncDaily();
 			syncStreak();
+			syncLevels();
 		}
 	});
 	window.addEventListener('pageshow', () => {
 		syncDaily();
 		syncStreak();
+		syncLevels();
 	});
 </script>

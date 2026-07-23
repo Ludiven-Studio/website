@@ -42,22 +42,6 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 	return (
 		<div className={`dt-toggle ${showLevels ? 'three' : ''}`} role="tablist" aria-label="Mode">
 			<style>{CSS}</style>
-			<button
-				role="tab"
-				aria-selected={freeActive}
-				className={`dt-seg ${freeActive ? 'active' : ''}`}
-				onClick={onFree}
-			>
-				🎲 {showLevels ? 'Libre' : 'Mode libre'}
-			</button>
-			<button
-				role="tab"
-				aria-selected={daily && !levelsActive}
-				className={`dt-seg ${daily && !levelsActive ? 'active' : ''}`}
-				onClick={onDaily}
-			>
-				🏆 {showLevels ? 'Défi' : 'Défi du jour'}
-			</button>
 			{showLevels && (
 				<button
 					role="tab"
@@ -68,6 +52,22 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 					🎯 Niveaux
 				</button>
 			)}
+			<button
+				role="tab"
+				aria-selected={daily && !levelsActive}
+				className={`dt-seg ${daily && !levelsActive ? 'active' : ''}`}
+				onClick={onDaily}
+			>
+				🏆 {showLevels ? 'Défi' : 'Défi du jour'}
+			</button>
+			<button
+				role="tab"
+				aria-selected={freeActive}
+				className={`dt-seg ${freeActive ? 'active' : ''}`}
+				onClick={onFree}
+			>
+				🎲 {showLevels ? 'Libre' : 'Mode libre'}
+			</button>
 		</div>
 	);
 }
