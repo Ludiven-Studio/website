@@ -23,6 +23,9 @@ export interface UseLevels<Cfg> {
 	stars: number; // 0-3, valid once done
 	won: boolean;
 	enter: () => void; // switch into levels mode, load progression, show the grid
+	/** Load progression, then return the next level to auto-start — or null (all cleared →
+	    grid shown). For "open on the current level" landing. */
+	resume: () => Promise<number | null>;
 	exit: () => void; // leave levels mode (back to free/daily)
 	play: (level: number) => Cfg; // start a level; returns its difficulty config
 	backToMenu: () => void;
@@ -48,6 +51,15 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 
 	const exit = useCallback(() => setPhase('off'), []);
 	const backToMenu = useCallback(() => setPhase('menu'), []);
+
+	const resume = useCallback(async (): Promise<number | null> => {
+		const p = await getProgression(gameId);
+		setProgress({ stars: { ...p.stars }, best: { ...p.best } });
+		const cleared = Object.keys(p.stars).map(Number).filter((n) => p.stars[n] >= 1);
+		const maxCleared = cleared.length ? Math.max(...cleared) : 0;
+		if (maxCleared >= plan.count) { setPhase('menu'); return null; } // all cleared → grid
+		return maxCleared + 1; // next unlocked level → caller auto-starts it
+	}, [gameId, plan.count]);
 
 	const play = useCallback((lvl: number): Cfg => {
 		submittedRef.current = false;
@@ -78,6 +90,6 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 
 	return {
 		phase, active: phase !== 'off', menu: phase === 'menu', playing: phase === 'playing', done: phase === 'done',
-		progress, level, stars, won, enter, exit, play, backToMenu, finish, replay, next,
+		progress, level, stars, won, enter, exit, play, backToMenu, finish, replay, next, resume,
 	};
 }

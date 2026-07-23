@@ -97,8 +97,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setRevealed(false);
 		setHinted(new Set());
 		setHintNote('');
-		setStarted(true);
-		startRef.current = Date.now();
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
 
@@ -107,11 +106,14 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		lv.enter();
 	}, [lv]);
 
-	// Levels is the default landing: open on the level grid. A ?defi deep link (handled by
-	// ModeToggle right after mount) still overrides to the daily challenge.
+	// Levels is the default landing: resume at the next unlocked level (or the grid once all
+	// are cleared). A ?defi deep link opens the daily instead — skip auto-resume then.
 	useEffect(() => {
-		lv.enter();
-	}, [lv.enter]);
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once the grid is solved (sudoku can't be lost → win path only).
 	useEffect(() => {
@@ -169,22 +171,25 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
-	/* Commencer: consumes the attempt and starts the chrono. */
+	/* Commencer: starts the chrono (daily also consumes/persists the attempt). Shared by the
+	   daily and the levels ready-gate. */
 	const startTimer = useCallback(() => {
 		const now = Date.now();
 		startRef.current = now;
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: emptyEntries(SIZES[DAILY_SIZE].size),
-		});
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: emptyEntries(SIZES[DAILY_SIZE].size),
+			});
+		}
+	}, [gameId, daily]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -316,7 +321,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 
 	const placeValue = useCallback(
 		(v: number | null) => {
-			if (status === 'won' || revealed || !selected || (daily && !started)) return;
+			if (status === 'won' || revealed || !selected || ((daily || lv.playing) && !started)) return;
 			const [r, c] = selected;
 			if (given[r][c] !== 0) return;
 			setEntries((prev) => {
@@ -336,7 +341,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, revealed, selected, given, started, daily, gameId],
+		[status, revealed, selected, given, started, daily, gameId, lv.playing],
 	);
 
 	/* Keyboard (desktop). */
@@ -469,7 +474,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			<div className="sk-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
-					className={`sk-board ${daily && !started ? 'blurred' : ''}`}
+					className={`sk-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{
 						gridTemplateColumns: `repeat(${size}, 1fr)`,
 						gridTemplateRows: `repeat(${size}, 1fr)`,
@@ -508,7 +513,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 									}}
 									onClick={() => setSelected([r, c])}
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${v != null ? `, ${v}` : ', vide'}`}
-									disabled={status === 'won' || revealed || (daily && !started)}
+									disabled={status === 'won' || revealed || ((daily || lv.playing) && !started)}
 								>
 									{v != null ? v : ''}
 								</button>
@@ -523,9 +528,11 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && (
 					<div className="sk-overlay">
-						<button className="sk-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="sk-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 

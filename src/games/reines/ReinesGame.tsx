@@ -105,8 +105,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setRevealed(false);
 		setHinted(new Set());
 		setHintNote('');
-		setStarted(true);
-		startRef.current = Date.now();
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
 
@@ -114,6 +113,15 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once it is solved (win → time).
 	useEffect(() => {
@@ -180,16 +188,18 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: emptyMarks(DIFFS[dk].size),
-		});
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			const dk = DIFF_ORDER[sd?.diffIndex ?? 0] ?? 'facile';
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: emptyMarks(DIFFS[dk].size),
+			});
+		}
+	}, [gameId, daily]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -291,7 +301,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 
 	const cycle = useCallback(
 		(r: number, c: number) => {
-			if (status === 'won' || revealed || (daily && !started)) return;
+			if (status === 'won' || revealed || ((daily || lv.playing) && !started)) return;
 			setMarks((prev) => {
 				const next = prev.map((row) => [...row]) as CellState[][];
 				next[r][c] = (((next[r][c] + 1) % 3) as CellState);
@@ -309,7 +319,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_started');
 			}
 		},
-		[status, started, revealed, daily, gameId],
+		[status, started, revealed, daily, gameId, lv.playing],
 	);
 
 	/* Hint: deduce the next logical move and explain the technique. */
@@ -441,7 +451,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			<div className="rn-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
-					className={`rn-board ${daily && !started ? 'blurred' : ''}`}
+					className={`rn-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--rn-cell))` }}
 				>
 					{Array.from({ length: size }).map((_, r) =>
@@ -470,7 +480,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 									aria-label={`Ligne ${r + 1}, colonne ${c + 1}${
 										st === 2 ? ', cocotte' : st === 1 ? ', marquée' : ', vide'
 									}`}
-									disabled={status === 'won' || revealed || (daily && !started)}
+									disabled={status === 'won' || revealed || ((daily || lv.playing) && !started)}
 								>
 									{st === 2 ? <span className="rn-cocotte" aria-hidden="true">🐔</span> : st === 1 ? '✕' : ''}
 								</button>
@@ -485,9 +495,11 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{daily && !dailyLoading && !started && status !== 'won' && (
+				{((daily && !dailyLoading) || lv.playing) && !started && status !== 'won' && (
 					<div className="rn-overlay">
-						<button className="rn-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="rn-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 
