@@ -282,8 +282,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		gameRef.current = deal(cfg.seed, cfg.draw, cfg.passes);
 		initRef.current = null;
 		resetCommon();
-		startedRef.current = true; setStarted(true); // no Start gate; the chrono runs from the first move
-		timerStartRef.current = clockRef.current; timerRunRef.current = true;
+		armBoard(); // ready-gate: blurred board + ▶ Commencer starts the chrono (resetCommon left the timer stopped)
 		setCards(foundationCount(gameRef.current));
 		geoRef.current = null;
 		trackGame(gameId, 'game_started', { level, mode: 'levels' });
@@ -295,6 +294,15 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const newDeal = (): void => { if (!dailyRef.current) startFree(diffKey); };
 	const undo = (): void => {
@@ -644,12 +652,14 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 
 				{dailyLoading && <div className="reu-overlay"><div className="reu-card">Préparation du défi…</div></div>}
 
-				{!started && !dailyLoading && !lv.active && (
+				{!started && !dailyLoading && !(lv.active && lv.menu) && !lv.done && (
 					<div className="reu-overlay">
 						<div className="reu-card">
 							<h3>Prêt&nbsp;?</h3>
 							<p>Le chrono démarre dès que tu commences — un seul essai&nbsp;!</p>
-							<button className="reu-btn primary" onClick={beginPlay}>▶ Commencer</button>
+							<button className="reu-btn primary" onClick={beginPlay}>
+								{lv.active ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+							</button>
 						</div>
 					</div>
 				)}

@@ -885,8 +885,19 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		targetRef.current = cfg.target;
 		setSpeedIdx(cfg.diff);
 		prepare(cfg.speed);
-		startRun(false);
+		// Ready-gate: land on the level without touching audio. The ▶ overlay
+		// click (a user gesture) calls startRun, which unlocks the AudioContext.
+		setStat('ready');
 	}, [lv, prepare]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* ---------- Loop + keyboard ---------- */
 	useEffect(() => {
@@ -1360,7 +1371,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 					</button>
 				)}
 
-				{status === 'ready' && !dailyLoading && !lv.active && (
+				{status === 'ready' && !dailyLoading && !lv.playing && !lv.menu && !lv.done && (
 					<div className="tp-overlay">
 						<div className="tp-card">
 							<h3>🎹 Tempo</h3>
@@ -1373,6 +1384,20 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 								</button>
 								<button className="tp-btn big" onClick={() => startRun(true)}>
 									🎧 Écouter
+								</button>
+							</div>
+							{soundsLoading && <div className="tp-loadhint">🎼 Chargement des sons d'orchestre…</div>}
+						</div>
+					</div>
+				)}
+				{/* Levels ready-gate: resumed level waits for the user gesture (unlocks audio). */}
+				{status === 'ready' && lv.playing && (
+					<div className="tp-overlay">
+						<div className="tp-card">
+							<h3>🎹 Niveau {lv.level}</h3>
+							<div className="tp-cta">
+								<button className="tp-btn primary big" onClick={() => startRun(false)}>
+									▶ Commencer
 								</button>
 							</div>
 							{soundsLoading && <div className="tp-loadhint">🎼 Chargement des sons d'orchestre…</div>}

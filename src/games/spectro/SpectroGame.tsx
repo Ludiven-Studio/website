@@ -303,7 +303,8 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		apply(seed, diffIndex, null);
 	}, [gameId, loadMelody]);
 
-	// Levels: play a seeded melody, then start the run right away and grade at its end.
+	// Levels: stage a seeded melody and land on a ready-gate. The ▶ overlay click
+	// (a user gesture) calls startRun, which unlocks the AudioContext.
 	const startLevel = useCallback((level: number): void => {
 		const cfg = lv.play(level);
 		dailyRef.current = false;
@@ -313,7 +314,7 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		setDailyLoading(false);
 		seedRef.current = cfg.seed;
 		applyMelody(generateMelodyDiff(cfg.seed, cfg.diff));
-		startRun();
+		setStat('ready');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv, applyMelody]);
 
@@ -326,6 +327,15 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		lv.enter();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* ---------- Pointer ---------- */
 	const onPoint = (e: React.PointerEvent): void => {
@@ -595,6 +605,17 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 							</p>
 							<button className="sp-btn primary big" onClick={startRun}>
 								▶ Go&nbsp;!
+							</button>
+						</div>
+					</div>
+				)}
+				{/* Levels ready-gate: resumed level waits for the user gesture (unlocks audio). */}
+				{lv.playing && status === 'ready' && (
+					<div className="sp-overlay">
+						<div className="sp-card">
+							<h3>🎵 Niveau {lv.level}</h3>
+							<button className="sp-btn primary big" onClick={startRun}>
+								▶ Commencer
 							</button>
 						</div>
 					</div>

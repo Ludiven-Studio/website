@@ -386,6 +386,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	const [peerCount, setPeerCount] = useState(1);
 	const [webglError, setWebglError] = useState(false);
 	const [showGhost, setShowGhost] = useState(true); // best-lap ghost (default on)
+	const [levelReady, setLevelReady] = useState(false); // levels: track built, waiting for ▶ Commencer (loop paused)
 	const lv = useLevels(gameId, driftLevels);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -796,7 +797,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	/* ---- Start / stop a race ---- */
 	const beginRace = useCallback(
-		(seed: number, race: Race | null, m: 'libre' | 'defi', dk: DiffKey, kind: KindId, levelDiff?: DriftDiff) => {
+		(seed: number, race: Race | null, m: 'libre' | 'defi', dk: DiffKey, kind: KindId, levelDiff?: DriftDiff, paused = false) => {
 			setMode(m);
 			setDiffKey(dk);
 			setKindId(kind);
@@ -911,6 +912,13 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			}
 
 			setPhase('racing');
+			// Ready-gate (levels auto-open): build the scene but keep the loop paused until ▶ Commencer,
+			// so a real-time run never starts before the player is ready. Render one frame so the car shows.
+			if (paused) {
+				runningRef.current = false;
+				renderFrame(0, { x: carRef.current.x, z: carRef.current.z, heading: carRef.current.heading });
+				return;
+			}
 			runningRef.current = true;
 			lastRef.current = performance.now();
 			accRef.current = 0;
@@ -918,7 +926,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			rafRef.current = requestAnimationFrame(frame);
 			trackGame(gameId, 'game_started');
 		},
-		[frame, gameId, getOrCreateGhost, removeGhost, syncBoard, clearSkid],
+		[frame, gameId, getOrCreateGhost, removeGhost, syncBoard, clearSkid, renderFrame],
 	);
 
 	const reset = useCallback(() => {
@@ -978,15 +986,38 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		stop();
 		raceRef.current?.leave();
 		raceRef.current = null;
-		beginRace(cfg.seed, null, 'libre', 'moyen', kindId, cfg.diff);
+		// Ready-gate: build the track but hold the loop until the player taps ▶ Commencer.
+		setLevelReady(true);
+		beginRace(cfg.seed, null, 'libre', 'moyen', kindId, cfg.diff, true);
 	}, [lv, initScene, resize, stop, beginRace, kindId]);
+
+	// Release the ready-gate: start the paused level run's rAF loop on ▶ Commencer.
+	const beginPlaying = useCallback(() => {
+		setLevelReady(false);
+		runningRef.current = true;
+		lastRef.current = performance.now();
+		accRef.current = 0;
+		sendAccRef.current = 0;
+		rafRef.current = requestAnimationFrame(frame);
+		trackGame(gameId, 'game_started');
+	}, [frame, gameId]);
 
 	const armLevels = useCallback(() => {
 		stop();
+		setLevelReady(false);
 		setMode('libre');
 		setPhase('menu');
 		lv.enter();
 	}, [lv, stop]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// The level opens behind a ▶ Niveau N — Commencer gate; the loop only runs on that click.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Stable finish callback the raf loop reaches through a ref (avoids re-binding `frame`).
 	finishLevelRef.current = (lapMs: number) => {
@@ -1010,6 +1041,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		bestGhostPosesRef.current = null;
 		lapPosesRef.current = [];
 		setPeerCount(1);
+		setLevelReady(false);
 		setPhase('menu');
 	}, [stop, removeGhost]);
 
@@ -1128,6 +1160,13 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				)}
 
 				{webglError && <div className="dr-overlay"><div className="dr-card">3D indisponible (WebGL manquant).</div></div>}
+
+				{/* Levels ready-gate: the track is built but the loop is paused until the player is ready. */}
+				{levelReady && lv.playing && !webglError && (
+					<div className="dr-overlay">
+						<button className="dr-play" onClick={beginPlaying}>▶ Niveau {lv.level} — Commencer</button>
+					</div>
+				)}
 
 				{lv.menu && !webglError && (
 					<div className="dr-overlay dr-overlay-levels">

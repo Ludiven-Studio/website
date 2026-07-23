@@ -1206,6 +1206,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	// Start a level from its config: deterministic seed + ramped difficulty, and
 	// stash the clear condition (target wave) in a ref for the loop to check.
 	const startLevel = useCallback((level: number) => {
+		stop();
 		const cfg = lv.play(level);
 		levelCfgRef.current = cfg;
 		levelTargetWaveRef.current = cfg.targetWave;
@@ -1216,9 +1217,21 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		setTries(0);
 		diffIdxRef.current = 1; // moyen baseline; the cfg overrides the multipliers
 		seedRef.current = cfg.seed;
-		start();
+		// Ready-gate: build the board for preview but hold the loop until ▶ Commencer (real-time —
+		// foxes must not spawn/advance before the player is ready). start() runs the run on the tap.
+		stateRef.current = createGame(diffIdxRef.current, mulberry32(seedRef.current));
+		stateRef.current.hpMul = cfg.hpMul;
+		stateRef.current.speedMul = cfg.speedMul;
+		stateRef.current.spawnMul = cfg.spawnMul;
+		stateRef.current.grain = cfg.startGrain;
+		resetFx(stateRef.current);
+		selectCard(null);
+		setStat('ready');
+		setScore(0);
+		setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, nests: LANES, cd: {} });
+		draw();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [lv, start]);
+	}, [lv, stop, draw]);
 
 	const armLevels = useCallback(() => {
 		stop();
@@ -1240,6 +1253,16 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		draw();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv, stop, draw]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// The level opens behind a ▶ Niveau N — Commencer gate; the loop only runs on that tap. This is
+	// async, so it lands after the mount armFree() and wins (opens the level rather than free mode).
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lvRef.current.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* ---------- Canvas sizing ---------- */
 	const resize = useCallback(() => {
@@ -1487,6 +1510,12 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				{status === 'ready' && !dailyLoading && !lv.active && (
 					<div className="cr-overlay">
 						<button className="cr-startbtn" onClick={start}>▶ Commencer</button>
+					</div>
+				)}
+				{/* Levels ready-gate: board built, hold the real-time loop until the player taps. */}
+				{status === 'ready' && lv.playing && (
+					<div className="cr-overlay">
+						<button className="cr-startbtn" onClick={start}>▶ Niveau {lv.level} — Commencer</button>
 					</div>
 				)}
 				{daily && dailyLoading && <div className="cr-overlay"><div className="cr-overlay-card">Préparation du défi…</div></div>}

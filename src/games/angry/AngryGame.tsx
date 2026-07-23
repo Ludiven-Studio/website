@@ -147,6 +147,15 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		lv.enter();
 	}, [lv]);
 
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi / ?mode=daily deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	const startDaily = useCallback(async () => {
 		setDaily(true);
 		setDailyLoading(true);

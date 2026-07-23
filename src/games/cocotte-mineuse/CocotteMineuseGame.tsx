@@ -489,15 +489,38 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		lv.enter();
 	}, [stop, lv.enter]);
 
-	// Play a level: build the run from its config, store the target, then start.
+	// Play a level: build the run from its config, store the target, then arm it in the
+	// "ready" state. The descent loop is real-time, so it must NOT auto-start: the
+	// "▶ Niveau N — Commencer" overlay (start button) kicks off the loop.
 	const startLevel = useCallback((level: number) => {
+		stop();
 		const cfg = lv.play(level);
 		levelsRef.current = true;
+		dailyRef.current = false;
+		setDaily(false);
 		targetRef.current = cfg.target;
 		seedRef.current = cfg.seed;
 		diffRef.current = cfg.diff;
-		start();
-	}, [lv.play, start]);
+		const st = createMine(seedRef.current, diffRef.current);
+		stateRef.current = st;
+		prevPlayerRef.current = { ...st.player };
+		camYRef.current = 0;
+		setBench(false);
+		benchRef.current = false;
+		setDeathCause(null);
+		setStatus('ready');
+		syncHud(st);
+		draw();
+	}, [lv.play, stop, syncHud, draw]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* ---- Input (discrete: one cell per press, hold to repeat) ---- */
 	const pressDir = useCallback((dir: Dir) => {
@@ -725,14 +748,16 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'ready' && !dailyLoading && !lv.active && !(daily && alreadyPlayed) && (
+				{status === 'ready' && !dailyLoading && !(lv.active && lv.menu) && !(daily && alreadyPlayed) && (
 					<div className="cm-overlay">
 						<div className="cm-overlay-card">
 							<p className="cm-go-title">Prêt&nbsp;?</p>
 							<p className="cm-overlay-note">
 								Creuse toujours plus bas pour fuir l'averse&nbsp;🌧<br />ramasse les minerais et forge la couronne pour le score&nbsp;!
 							</p>
-							<button className="cm-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
+							<button className="cm-startbtn" onClick={start}>
+								▶ {lv.active ? `Niveau ${lv.level} — Commencer` : daily ? 'Commencer' : 'Jouer'}
+							</button>
 						</div>
 					</div>
 				)}

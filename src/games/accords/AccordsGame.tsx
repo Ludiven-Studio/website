@@ -339,7 +339,6 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 	// Build a level's N seeded chords and play the first one. The engine (peaks,
 	// crossing, audio) runs unchanged — only the round source and scoring differ.
 	const startLevel = useCallback((lvl: number): void => {
-		ensureAudio();
 		const cfg = lv.play(lvl);
 		const list: Level[] = cfg.chords.map((c) => ({
 			root: c.root,
@@ -356,10 +355,27 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 		setLevel(0);
 		buildLevel(0, list);
 		setRecap(null);
-		setStat('tuning');
-		setTimeout(() => hearChordRef.current(), 200);
+		// Ready-gate: stage the level and wait. The ▶ overlay click (a user gesture)
+		// calls beginLevel, which unlocks the AudioContext before the first chord plays.
+		setStat('intro');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv]);
+
+	// User gesture that starts a staged level: unlock audio, then play the first chord.
+	const beginLevel = useCallback((): void => {
+		ensureAudio();
+		setStat('tuning');
+		setTimeout(() => hearChordRef.current(), 200);
+	}, []);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Called when a chord crossing settles in levels mode: tally, then advance to
 	// the next chord or finish the level via the shared hook.
@@ -814,6 +830,17 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 								Traverse&nbsp;: l'avatar saute de pic en pic, un pic mal placé le fait chuter&nbsp;!
 							</p>
 							<button className="ac-btn primary big" onClick={startGame}>
+								▶ Commencer
+							</button>
+						</div>
+					</div>
+				)}
+				{/* Levels ready-gate: resumed level waits for the user gesture (unlocks audio). */}
+				{lv.playing && status === 'intro' && (
+					<div className="ac-overlay">
+						<div className="ac-card">
+							<h3>🎼 Niveau {lv.level}</h3>
+							<button className="ac-btn primary big" onClick={beginLevel}>
 								▶ Commencer
 							</button>
 						</div>

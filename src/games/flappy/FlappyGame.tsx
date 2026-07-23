@@ -482,6 +482,15 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		levelMenuRef.current = lv.menu;
 	}, [lv.menu]);
 
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// startLevel lands in the "ready" state (▶ Niveau N gate) — the loop only runs on the first flap.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	/* ---- Input ---- */
 	useEffect(() => {
 		const isFlapKey = (k: string) => k === ' ' || k === 'ArrowUp' || k === 'w';
