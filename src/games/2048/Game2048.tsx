@@ -14,7 +14,6 @@ import {
 	type DiffKey,
 } from './engine';
 import { mulberry32 } from '../prng';
-import { touchDrag } from '../touchDrag';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -106,7 +105,6 @@ export default function Game2048({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const startedAtRef = useRef(0);
 	const pointerRef = useRef<{ x: number; y: number } | null>(null);
-	const lastRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 }); // latest touch position for swipe-end direction
 	// Mirrors read by the stable keydown listener (avoid stale closures).
 	const statusRef = useRef<Status>('playing');
 	const startedRef = useRef(true);
@@ -433,6 +431,25 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		return () => window.removeEventListener('keydown', onKey);
 	}, [applyMove]);
 
+	// A swipe ends on pointer release anywhere (the finger can lift off the board).
+	useEffect(() => {
+		const onUp = (e: PointerEvent): void => {
+			const p0 = pointerRef.current;
+			if (!p0) return;
+			pointerRef.current = null;
+			const dx = e.clientX - p0.x;
+			const dy = e.clientY - p0.y;
+			if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return; // tap, not a swipe
+			applyMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
+		};
+		document.addEventListener('pointerup', onUp);
+		document.addEventListener('pointercancel', onUp);
+		return () => {
+			document.removeEventListener('pointerup', onUp);
+			document.removeEventListener('pointercancel', onUp);
+		};
+	}, [applyMove]);
+
 	/* Countdown: end the game when the 10-minute clock runs out. */
 	useEffect(() => {
 		if (status !== 'playing' || (daily && !started)) return;
@@ -462,38 +479,12 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		};
 	}, [armFree]);
 
-	// Swipe (mouse, touch, pen) — one drag = one move in the dominant axis.
-	// Coord-based so both Pointer Events and the native-touch fallback can drive it.
-	const swipeStart = (clientX: number, clientY: number): void => {
-		pointerRef.current = { x: clientX, y: clientY };
-		lastRef.current = { x: clientX, y: clientY };
-	};
-	const swipeMove = (clientX: number, clientY: number): void => {
-		lastRef.current = { x: clientX, y: clientY };
-	};
-	const swipeEnd = (clientX: number, clientY: number): void => {
-		const p0 = pointerRef.current;
-		if (!p0) return;
-		const dx = clientX - p0.x;
-		const dy = clientY - p0.y;
-		pointerRef.current = null;
-		if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return; // click/tap, not a swipe
-		applyMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
-	};
-
-	// Pointer Events drive mouse/pen only; touch routes through touchDrag (reliable on iOS Safari).
+	// Swipe via Pointer Events for ALL inputs (mouse, touch, pen). We deliberately DON'T use
+	// setPointerCapture (breaks iOS Safari) nor touch events (flaky next to pointer handlers):
+	// the press starts on the board, and a document-level pointerup (effect below) reads the
+	// release anywhere. The board has touch-action:none so iOS scrolls the page, not the swipe.
 	const onPointerDown = (e: React.PointerEvent): void => {
-		if (e.pointerType === 'touch') return;
-		swipeStart(e.clientX, e.clientY);
-		try {
-			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-		} catch {
-			/* ignore */
-		}
-	};
-	const onPointerUp = (e: React.PointerEvent): void => {
-		if (e.pointerType === 'touch') return;
-		swipeEnd(e.clientX, e.clientY);
+		pointerRef.current = { x: e.clientX, y: e.clientY };
 	};
 
 	return (
@@ -555,8 +546,6 @@ export default function Game2048({ gameId }: { gameId: string }) {
 					className={`g2-board ${armed ? 'blurred' : ''}`}
 					style={{ ['--n' as string]: size }}
 					onPointerDown={onPointerDown}
-					onPointerUp={onPointerUp}
-						{...touchDrag(swipeStart, swipeMove, (x, y) => swipeEnd(x, y))}
 				>
 					<div className="g2-cells">
 						{Array.from({ length: size * size }).map((_, i) => (
