@@ -159,17 +159,24 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		const g = generateGrid(mulberry32(cfg.seed)() * 2 ** 32 >>> 0, cfg.diff);
 		gridRef.current = g; setGrid(g);
 		setFoundBoth([]); setPathBoth([]); setToast(null);
-		startRef.current = Date.now();
 		setRemaining(DURATION_S * 1000);
-		setStatusBoth('playing');
-		trackGame(gameId, 'game_started', { mode: 'levels', level });
-	}, [lv, gameId]);
+		setStatusBoth('armed'); // ready-gate: ▶ Commencer starts the chrono
+	}, [lv]);
 
 	const armLevels = useCallback((): void => {
 		dailyRef.current = false;
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* Grade the level once the run ends: won = final score reached the target. */
 	useEffect(() => {
@@ -355,7 +362,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 					<div className="mm-overlay"><div className="mm-overlay-card start">
 						<h3>Prêt&nbsp;?</h3>
 						<p>{DURATION_S} secondes pour trouver un max de mots{daily ? ' — une seule tentative !' : ''}.</p>
-						<button className="mm-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="mm-startbtn" onClick={startTimer}>{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}</button>
 					</div></div>
 				)}
 			</div>

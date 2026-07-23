@@ -52,13 +52,13 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 	const lv = useLevels(gameId, motsTournesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
-	const armed = daily && !started;
+	const armed = (daily || lv.playing) && !started;
 	const total = puzzle.regions.length;
 
 	/* Daily / levels chrono. */
 	useEffect(() => {
 		if (status !== 'playing') return;
-		if (!((daily && started) || lv.playing)) return;
+		if (!(((daily || lv.playing) && started))) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
 	}, [daily, started, status, lv.playing]);
@@ -72,7 +72,6 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		puzzleRef.current = p; setPuzzle(p);
 		setFoundBoth([]); setTraceBoth([]);
 		setStatus('playing');
-		startRef.current = Date.now();
 		setElapsed(0);
 		trackGame(gameId, 'game_started', { mode: 'levels', level });
 	}, [lv, gameId]);
@@ -82,6 +81,15 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once every word is traced.
 	useEffect(() => {
@@ -141,9 +149,11 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		const now = Date.now();
 		startRef.current = now; setStarted(true); setElapsed(0);
 		trackGame(gameId, 'game_started', { mode: 'daily' });
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [] } satisfies DailyState });
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [] } satisfies DailyState });
+		}
+	}, [gameId, daily]);
 
 	const saveDaily = (nf: number[], complete: boolean, finalTime?: number): void => {
 		const sd = dailySeedRef.current;
@@ -335,7 +345,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 					<div className="wt-overlay"><div className="wt-overlay-card start">
 						<h3>Prêt&nbsp;?</h3>
 						<p>Le chrono démarre dès que tu commences.</p>
-						<button className="wt-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="wt-startbtn" onClick={startTimer}>{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}</button>
 					</div></div>
 				)}
 

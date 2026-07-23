@@ -182,8 +182,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setEliminated([]);
 		setPeeked(false);
 		setHintNote('');
-		setStarted(true);
-		startRef.current = Date.now();
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
 
@@ -192,6 +191,15 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const startDaily = useCallback(async () => {
 		if (timer.current) clearTimeout(timer.current);
@@ -246,21 +254,23 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: { solved: 0, qIndex: 0 } satisfies DailyState,
-		});
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: { solved: 0, qIndex: 0 } satisfies DailyState,
+			});
+		}
+	}, [gameId, daily]);
 
 	const answerKey = cellKey(question.grid[question.answerIndex]);
 
 	const choose = (idx: number) => {
 		if (status !== 'playing' || chosen !== null) return;
-		if (daily && !started) return;
+		if ((daily || lv.playing) && !started) return;
 		const correct = cellKey(question.options[idx]) === answerKey;
 		setChosen(idx);
 
@@ -368,7 +378,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		return 'mx-opt dim';
 	};
 
-	const armed = daily && !started;
+	const armed = (daily || lv.playing) && !started;
 
 	return (
 		<div className="mx-root">
@@ -447,7 +457,9 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 					<div className="mx-overlay"><div className="mx-overlay-card">Préparation du défi…</div></div>
 				)}
 				{armed && !dailyLoading && status !== 'won' && (
-					<div className="mx-overlay"><button className="mx-startbtn" onClick={startTimer}>▶ Commencer</button></div>
+					<div className="mx-overlay"><button className="mx-startbtn" onClick={startTimer}>
+						{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+					</button></div>
 				)}
 
 				{lv.done && (

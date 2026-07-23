@@ -52,7 +52,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 	const lv = useLevels(gameId, motsMelesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
-	const armed = daily && !started;
+	const armed = (daily || lv.playing) && !started;
 	const total = grid.words.length;
 
 	/* Daily / levels chrono. */
@@ -70,9 +70,8 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		setGrid(makeGrid(cfg.seed, cfg.diff));
 		setFound([]); applySel([]);
 		setStatus('playing');
-		setStarted(true);
+		setStarted(false);
 		startedRef.current = false;
-		startRef.current = Date.now();
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
 	}, [lv, gameId]);
@@ -81,6 +80,15 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Grade the level once every word is found (metric = total time).
 	useEffect(() => {
@@ -141,9 +149,11 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [] } satisfies DailyState });
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [] } satisfies DailyState });
+		}
+	}, [gameId, daily]);
 
 	const markFound = (idx: number) => {
 		if (found.includes(idx)) return;
@@ -305,7 +315,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 
 				{daily && dailyLoading && <div className="mm-overlay"><div className="mm-overlay-card">Préparation du défi…</div></div>}
 				{armed && !dailyLoading && status !== 'won' && (
-					<div className="mm-overlay"><button className="mm-startbtn" onClick={startTimer}>▶ Commencer</button></div>
+					<div className="mm-overlay"><button className="mm-startbtn" onClick={startTimer}>{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}</button></div>
 				)}
 
 				{lv.done && (

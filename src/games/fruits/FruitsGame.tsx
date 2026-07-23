@@ -109,8 +109,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		setPeeked(false);
 		setHintNote('');
 		startedRef.current = false;
-		startRef.current = Date.now();
-		setStarted(true);
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 	}, [lv]);
 
 	const armLevels = useCallback(() => {
@@ -118,6 +117,15 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const startDaily = useCallback(async () => {
 		if (timer.current) clearTimeout(timer.current);
@@ -164,13 +172,15 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { solved: 0, qIndex: 0 } satisfies DailyState });
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { solved: 0, qIndex: 0 } satisfies DailyState });
+		}
+	}, [gameId, daily]);
 
 	const choose = (idx: number) => {
 		if (status !== 'playing' || chosen !== null) return;
-		if (daily && !started) return;
+		if ((daily || lv.playing) && !started) return;
 		const correct = idx === question.answerIndex;
 		setChosen(idx);
 
@@ -239,7 +249,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		return 'fr-opt dim';
 	};
 
-	const armed = daily && !started;
+	const armed = (daily || lv.playing) && !started;
 
 	return (
 		<div className="fr-root">
@@ -307,7 +317,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 
 				{daily && dailyLoading && <div className="fr-overlay"><div className="fr-overlay-card">Préparation du défi…</div></div>}
 				{armed && !dailyLoading && status !== 'won' && (
-					<div className="fr-overlay"><button className="fr-startbtn" onClick={startTimer}>▶ Commencer</button></div>
+					<div className="fr-overlay"><button className="fr-startbtn" onClick={startTimer}>{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}</button></div>
 				)}
 
 				{lv.done && (

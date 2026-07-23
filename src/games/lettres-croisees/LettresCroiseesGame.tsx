@@ -66,7 +66,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const lv = useLevels(gameId, lettresCroiseesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
-	const armed = daily && !started;
+	const armed = (daily || lv.playing) && !started;
 	const total = puzzle.words.length;
 
 	/* Daily chrono. */
@@ -154,9 +154,11 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		startRef.current = now; setStarted(true); setElapsed(0);
 		armHint();
 		trackGame(gameId, 'game_started', { mode: 'daily' });
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [], bonusFound: [] } satisfies DailyState });
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [], bonusFound: [] } satisfies DailyState });
+		}
+	}, [gameId, daily]);
 
 	const saveDaily = (nf: string[], nb: string[], complete: boolean, finalTime?: number): void => {
 		const sd = dailySeedRef.current;
@@ -171,8 +173,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		setDiffKey('facile');
 		applyPuzzle(generatePuzzle(cfg.seed, cfg.diff));
 		setStatus('playing');
-		const now = Date.now();
-		startRef.current = now; setStarted(true); setElapsed(0);
+		setStarted(false); setElapsed(0);
 		armHint();
 		trackGame(gameId, 'game_started', { mode: 'levels', level });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,12 +185,21 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		lv.enter();
 	}, [lv]);
 
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	/* Levels chrono. */
 	useEffect(() => {
-		if (!lv.playing || status !== 'playing') return;
+		if (!lv.playing || !started || status !== 'playing') return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [lv.playing, status]);
+	}, [lv.playing, started, status]);
 
 	/* Grade the level once every grid word is filled. */
 	useEffect(() => {
@@ -463,7 +473,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 					<div className="lc-overlay"><div className="lc-overlay-card start">
 						<h3>Prêt&nbsp;?</h3>
 						<p>Le chrono démarre dès que tu commences.</p>
-						<button className="lc-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="lc-startbtn" onClick={startTimer}>{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}</button>
 					</div></div>
 				)}
 

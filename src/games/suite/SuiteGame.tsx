@@ -77,7 +77,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 
 	/* Daily / level chrono. */
 	useEffect(() => {
-		const running = (daily && started) || lv.playing;
+		const running = (daily || lv.playing) && started;
 		if (!running || status !== 'playing') return;
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
@@ -94,7 +94,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		lvCorrectRef.current = 0;
 		setDaily(false);
 		setAlreadyPlayed(false);
-		setStarted(true);
+		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setDiffKey(DIFF_ORDER[cfg.diffIndex] ?? 'facile');
 		setQuestion(seededQ(cfg.seed, cfg.diffIndex, 0));
 		setScore(0);
@@ -105,7 +105,6 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setEliminated([]);
 		setPeeked(false);
 		setHintNote('');
-		startRef.current = Date.now();
 		trackGame(gameId, 'game_started');
 	}, [lv, gameId]);
 
@@ -114,6 +113,15 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);
@@ -191,19 +199,21 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
-		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, {
-			startedAt: now,
-			done: false,
-			seed: sd?.seed,
-			diffIndex: sd?.diffIndex,
-			state: { solved: 0, qIndex: 0 } satisfies DailyState,
-		});
-	}, [gameId]);
+		if (daily) {
+			const sd = dailySeedRef.current;
+			saveDailyRun(gameId, {
+				startedAt: now,
+				done: false,
+				seed: sd?.seed,
+				diffIndex: sd?.diffIndex,
+				state: { solved: 0, qIndex: 0 } satisfies DailyState,
+			});
+		}
+	}, [gameId, daily]);
 
 	const choose = (value: number, idx: number) => {
 		if (status !== 'playing' || chosen !== null) return;
-		if (daily && !started) return;
+		if ((daily || lv.playing) && !started) return;
 		const correct = value === question.answer;
 		setChosen(idx);
 
@@ -336,7 +346,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		return 'su-opt dim';
 	};
 
-	const armed = daily && !started;
+	const armed = (daily || lv.playing) && !started;
 
 	return (
 		<div className="su-root">
@@ -434,7 +444,9 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 				)}
 				{armed && !dailyLoading && status !== 'won' && (
 					<div className="su-overlay">
-						<button className="su-startbtn" onClick={startTimer}>▶ Commencer</button>
+						<button className="su-startbtn" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
 					</div>
 				)}
 
