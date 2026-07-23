@@ -107,6 +107,12 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		lv.enter();
 	}, [lv]);
 
+	// Levels is the default landing: open on the level grid. A ?defi deep link (handled by
+	// ModeToggle right after mount) still overrides to the daily challenge.
+	useEffect(() => {
+		lv.enter();
+	}, [lv.enter]);
+
 	// Grade the level once the grid is solved (sudoku can't be lost → win path only).
 	useEffect(() => {
 		if (!lv.playing) return;
