@@ -308,7 +308,16 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		setDaily(true); dailyRef.current = true;
 		lv.exit();
 		const run = loadDailyRun(gameId);
-		if (run?.done) { setAlreadyPlayed(true); setDailyLoading(false); armBoard(generateBoard(run.seed ?? 1, DAILY_CFG), 0); setStat('over'); setScore((run.state as { score?: number })?.score ?? 0); return; }
+		if (run?.done) {
+			const st = run.state as { score?: number; won?: boolean; caged?: number } | undefined;
+			setAlreadyPlayed(true); setDailyLoading(false);
+			armBoard(generateBoard(run.seed ?? 1, DAILY_CFG), 0);
+			setStat('over');
+			setScore(st?.score ?? 0);
+			setWon(st?.won ?? false); // restore the real outcome (else it always shows "Plus de coups")
+			setCocottesLeft(st?.caged ?? 0);
+			return;
+		}
 		setAlreadyPlayed(false); setDailyLoading(true);
 		const { seed } = await getDaily(gameId);
 		armBoard(generateBoard(seed, DAILY_CFG), DAILY_MOVES);
@@ -338,7 +347,8 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			lv.finish({ won: didWin, score: scoreRef.current, stat: movesRef.current });
 		} else if (dailyRef.current) {
 			const seed = (boardRef.current as (GenBoard & { seed?: number }) | null)?.seed ?? 1;
-			saveDailyRun(gameId, { startedAt: Date.now(), done: true, seed, state: { score: scoreRef.current } });
+			const caged = boardRef.current ? cagesLeft(boardRef.current) : 0;
+			saveDailyRun(gameId, { startedAt: Date.now(), done: true, seed, state: { score: scoreRef.current, won: didWin, caged } });
 			setAlreadyPlayed(true);
 		} else if (didWin || scoreRef.current > 0) {
 			setBest((prev) => { const nb = Math.max(prev, scoreRef.current); try { localStorage.setItem(BEST_KEY, String(nb)); } catch { /* ignore */ } return nb; });
