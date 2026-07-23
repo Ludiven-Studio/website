@@ -18,7 +18,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { cheminLevels } from './levels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 
 /* =====================================================
    LE CHEMIN (LinkedIn "Zip") — React island.
@@ -374,20 +374,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		drawing.current = false;
 	};
 
-	const onPointerDown = (e: React.PointerEvent) => {
-		if (e.pointerType === 'touch') return;
-		startDrag(e.clientX, e.clientY);
-		boardRef.current?.setPointerCapture(e.pointerId);
-		e.preventDefault();
-	};
-	const onPointerMove = (e: React.PointerEvent) => {
-		if (e.pointerType === 'touch') return;
-		moveDrag(e.clientX, e.clientY);
-	};
-	const endDraw = (e?: React.PointerEvent) => {
-		if (e && e.pointerType === 'touch') return;
-		endDrag();
-	};
+	const { onPointerDown } = usePointerDrag(startDrag, moveDrag, endDrag);
 
 	const clearPath = () => {
 		if (!puzzle || revealed) return;
@@ -521,11 +508,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 							gridTemplateColumns: `repeat(${n}, 1fr)`,
 							gridTemplateRows: `repeat(${n}, 1fr)`,
 						}}
-						{...touchDrag(startDrag, moveDrag, endDrag)}
 						onPointerDown={onPointerDown}
-						onPointerMove={onPointerMove}
-						onPointerUp={endDraw}
-						onPointerCancel={endDraw}
 						role="application"
 						aria-label="Grille du chemin"
 					>

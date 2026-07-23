@@ -11,7 +11,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { meliMeloLevels } from './levels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 
 /* =====================================================
    MÉLI-MÉLO — React island. Boggle 4×4: chain adjacent letters (8 directions) to form
@@ -242,20 +242,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		}
 		// otherwise: simple tap appended a cell (tap-to-compose mode, ✓ to submit)
 	};
-	const onDown = (e: React.PointerEvent): void => {
-		if (e.pointerType === 'touch') return;
-		startDrag(e.clientX, e.clientY);
-		boardRef.current?.setPointerCapture(e.pointerId);
-		e.preventDefault();
-	};
-	const onMove = (e: React.PointerEvent): void => {
-		if (e.pointerType === 'touch') return;
-		moveDrag(e.clientX, e.clientY);
-	};
-	const onUp = (e?: React.PointerEvent): void => {
-		if (e && e.pointerType === 'touch') return;
-		endDrag();
-	};
+	const { onPointerDown } = usePointerDrag(startDrag, moveDrag, endDrag);
 	const tapRemove = (): void => { setPathBoth(pathRef.current.slice(0, -1)); };
 	const tapSubmit = (): void => { const p = pathRef.current; setPathBoth([]); submitPath(p); };
 
@@ -319,11 +306,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 					<div
 						ref={boardRef}
 						className="mm-board"
-						{...touchDrag(startDrag, moveDrag, endDrag)}
-						onPointerDown={onDown}
-						onPointerMove={onMove}
-						onPointerUp={onUp}
-						onPointerCancel={onUp}
+						onPointerDown={onPointerDown}
 					>
 						{grid.cells.map((ch, i) => (
 							<div key={i} className={`mm-cell${path.includes(i) ? ' sel' : ''}`}>{ch}</div>

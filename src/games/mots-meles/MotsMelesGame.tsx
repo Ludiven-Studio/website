@@ -11,7 +11,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { motsMelesLevels } from './levels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 
 /* =====================================================
    MOTS MÊLÉS — React island. Grille de lettres, mots d'un thème à retrouver en glissant.
@@ -210,20 +210,8 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		const idx = matchIndex(s, grid.words);
 		if (idx >= 0) markFound(idx);
 	};
-	const onDown = (e: React.PointerEvent) => {
-		if (e.pointerType === 'touch') return;
-		startDrag(e.clientX, e.clientY);
-		boardRef.current?.setPointerCapture(e.pointerId);
-		e.preventDefault();
-	};
-	const onMove = (e: React.PointerEvent) => {
-		if (e.pointerType === 'touch') return;
-		moveDrag(e.clientX, e.clientY);
-	};
-	const onUp = (e?: React.PointerEvent) => {
-		if (e && e.pointerType === 'touch') return;
-		endDrag();
-	};
+	// Drag across letters via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
+	const { onPointerDown } = usePointerDrag(startDrag, moveDrag, endDrag);
 
 	useEffect(() => { newGame('facile'); }, [newGame]);
 
@@ -299,11 +287,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 					ref={boardRef}
 					className={`mm-grid ${armed ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${grid.size}, 1fr)`, ['--n' as string]: grid.size }}
-					{...touchDrag(startDrag, moveDrag, endDrag)}
-					onPointerDown={onDown}
-					onPointerMove={onMove}
-					onPointerUp={onUp}
-					onPointerCancel={onUp}
+					onPointerDown={onPointerDown}
 				>
 					{grid.letters.map((row, r) => row.map((ch, c) => {
 						const k = ckey(r, c);

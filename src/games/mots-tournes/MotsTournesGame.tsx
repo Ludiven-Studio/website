@@ -11,7 +11,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { motsTournesLevels } from './levels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 
 /* =====================================================
    MOTS TOURNÉS — React island. A "Wend"-style word puzzle: trace each themed word as a snaking
@@ -219,20 +219,8 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		const idx = puzzleRef.current.regions.findIndex((rg, i) => !foundRef.current.includes(i) && rg.word === s);
 		if (idx >= 0) markFound(idx);
 	};
-	const onDown = (e: React.PointerEvent): void => {
-		if (e.pointerType === 'touch') return;
-		startDrag(e.clientX, e.clientY);
-		boardRef.current?.setPointerCapture(e.pointerId);
-		e.preventDefault();
-	};
-	const onMove = (e: React.PointerEvent): void => {
-		if (e.pointerType === 'touch') return;
-		moveDrag(e.clientX, e.clientY);
-	};
-	const onUp = (e?: React.PointerEvent): void => {
-		if (e && e.pointerType === 'touch') return;
-		endDrag();
-	};
+	// Trace across letters via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
+	const { onPointerDown } = usePointerDrag(startDrag, moveDrag, endDrag);
 
 	useEffect(() => { newGame('facile'); }, [newGame]);
 
@@ -316,11 +304,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 						ref={boardRef}
 						className="wt-cells"
 						style={{ gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`, gridTemplateRows: `repeat(${puzzle.rows}, 1fr)` }}
-						{...touchDrag(startDrag, moveDrag, endDrag)}
-						onPointerDown={onDown}
-						onPointerMove={onMove}
-						onPointerUp={onUp}
-						onPointerCancel={onUp}
+						onPointerDown={onPointerDown}
 					>
 						{puzzle.letters.map((row, r) => row.map((ch, c) => <div key={ckey(r, c)} className={`wt-cell${ch === '' ? ' wall' : ''}`} />))}
 					</div>

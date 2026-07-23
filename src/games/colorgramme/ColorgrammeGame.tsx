@@ -18,7 +18,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { colorgrammeLevels } from './levels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 
 /* =====================================================
    COLORGRAMME — React island. A fully-coloured deduction grid.
@@ -411,21 +411,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		painting.current = false;
 	};
 
-	// Pointer Events drive mouse/pen only; touch goes through native handlers (iOS Safari
-	// drops pointermove after setPointerCapture).
-	const onPointerDown = (e: React.PointerEvent) => {
-		if (e.pointerType === 'touch') return;
-		startStroke(e.clientX, e.clientY);
-		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-	};
-	const onPointerMove = (e: React.PointerEvent) => {
-		if (e.pointerType === 'touch') return;
-		moveStroke(e.clientX, e.clientY);
-	};
-	const onPointerUp = (e?: React.PointerEvent) => {
-		if (e && e.pointerType === 'touch') return;
-		endStroke();
-	};
+	// Unified pointer drag drives mouse, pen AND touch (iOS-safe; see usePointerDrag).
+	const { onPointerDown } = usePointerDrag(startStroke, moveStroke, endStroke);
 
 	/* Hint: deduce the next logical cell and explain the technique. Paints the target
 	   cell AND selects its colour, so the player can carry on in that colour. */
@@ -595,11 +582,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 						gridTemplateColumns: `auto repeat(${size}, var(--co-cell))`,
 						gridTemplateRows: `auto repeat(${size}, var(--co-cell))`,
 					}}
-					{...touchDrag(startStroke, moveStroke, endStroke)}
 					onPointerDown={onPointerDown}
-					onPointerMove={onPointerMove}
-					onPointerUp={onPointerUp}
-					onPointerCancel={onPointerUp}
 				>
 					<div className="co-corner" />
 					{Array.from({ length: size }).map((_, c) => {

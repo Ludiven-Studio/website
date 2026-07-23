@@ -17,7 +17,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 import { aquariumLevels } from './levels';
 
 /* =====================================================
@@ -316,15 +316,8 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		painting.current = false;
 	};
 
-	const onPointerDown = (e: React.PointerEvent) => {
-		if (e.pointerType === 'touch') return;
-		startPaint(e.clientX, e.clientY);
-		(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-	};
-	const onPointerMove = (e: React.PointerEvent) => {
-		if (e.pointerType === 'touch') return;
-		movePaint(e.clientX, e.clientY);
-	};
+	// Paint via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
+	const { onPointerDown } = usePointerDrag(startPaint, movePaint, endStroke);
 
 	/* Hint (free): deduce the next logical cell and explain the technique. Marks GREEN. */
 	const hint = useCallback(() => {
@@ -450,10 +443,6 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 						gridTemplate: `auto repeat(${size}, 1fr) / auto repeat(${size}, 1fr)`,
 					}}
 					onPointerDown={onPointerDown}
-					onPointerMove={onPointerMove}
-					onPointerUp={endStroke}
-					onPointerCancel={endStroke}
-					{...touchDrag(startPaint, movePaint, endStroke)}
 				>
 					<div className="aq-corner" />
 					{/* Column clues (water count per column). */}

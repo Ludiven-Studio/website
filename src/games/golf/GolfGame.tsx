@@ -26,7 +26,7 @@ import {
 import { trackGame } from '../../lib/analytics';
 import Leaderboard from '../../components/Leaderboard';
 import Celebration, { useCelebration } from '../../components/Celebration';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -808,6 +808,12 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		if (lobbyRef.current) lobbyRef.current.sendScore({ strokes: strokesRef.current, done: false, time: curTime() });
 	}, []);
 
+	// Single-pointer aim/pan (mouse, touch, pen) via Pointer Events — reliable on iOS (see usePointerDrag).
+	const { onPointerDown: onAimPointerDown } = usePointerDrag(aimStart, aimMove, aimEnd);
+
+	// Pinch (two pointers) needs multi-pointer tracking, which usePointerDrag doesn't do, so it stays
+	// on native canvas handlers. aimStart/Move/End already early-return while pinchRef is set, so the
+	// hook's document listeners no-op during a pinch.
 	const onPointerDown = useCallback((e: React.PointerEvent) => {
 		pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		if (pointersRef.current.size >= 2) {
@@ -817,10 +823,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			setPower(0);
 			return;
 		}
-		if (e.pointerType === 'touch') return; // native touch aim/pan handled by touchDrag on the canvas
-		(e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-		aimStart(e.clientX, e.clientY);
-	}, [aimStart]);
+		onAimPointerDown(e); // single pointer → aim/pan via the hook
+	}, [onAimPointerDown]);
 
 	const onPointerMove = useCallback((e: React.PointerEvent) => {
 		if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -831,19 +835,13 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				setOverview(false);
 				spanRef.current = Math.max(12, Math.min(fitSpanRef.current, pinchRef.current.span * (pinchRef.current.dist / d)));
 			}
-			return;
 		}
-		if (e.pointerType === 'touch') return;
-		aimMove(e.clientX, e.clientY);
-	}, [aimMove]);
+	}, []);
 
 	const onPointerUp = useCallback((e: React.PointerEvent) => {
-		const wasTouch = e.pointerType === 'touch';
 		pointersRef.current.delete(e.pointerId);
 		if (pointersRef.current.size < 2) pinchRef.current = null;
-		if (wasTouch) return; // native touch end handled by touchDrag on the canvas
-		aimEnd();
-	}, [aimEnd]);
+	}, []);
 
 	/* ---- Begin / restart a hole ---- */
 	const placeBallAtStart = useCallback(() => {
@@ -1089,7 +1087,6 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					onPointerMove={onPointerMove}
 					onPointerUp={onPointerUp}
 					onPointerCancel={onPointerUp}
-					{...touchDrag(aimStart, aimMove, aimEnd)}
 				/>
 				<div ref={labelsRef} className="gf-labels" />
 				{celebrating && <div className="gf-celebrate"><Celebration /></div>}

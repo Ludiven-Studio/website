@@ -16,7 +16,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { billardLevels } from './levels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 
 /* =====================================================
    BILLARD — React island (2D canvas).
@@ -301,39 +301,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setStat('rolling');
 	};
 
-	useEffect(() => {
-		const cv = canvasRef.current;
-		if (!cv) return;
-
-		const down = (e: PointerEvent) => {
-			if (e.pointerType === 'touch') return; // native touch handled by touchDrag on the canvas
-			const before = aimRef.current;
-			aimStart(e.clientX, e.clientY);
-			if (aimRef.current && aimRef.current !== before) {
-				cv.setPointerCapture(e.pointerId);
-				e.preventDefault();
-			}
-		};
-		const move = (e: PointerEvent) => {
-			if (e.pointerType === 'touch') return;
-			aimMove(e.clientX, e.clientY);
-		};
-		const up = (e: PointerEvent) => {
-			if (e.pointerType === 'touch') return;
-			aimEnd();
-		};
-
-		cv.addEventListener('pointerdown', down);
-		cv.addEventListener('pointermove', move);
-		cv.addEventListener('pointerup', up);
-		cv.addEventListener('pointercancel', up);
-		return () => {
-			cv.removeEventListener('pointerdown', down);
-			cv.removeEventListener('pointermove', move);
-			cv.removeEventListener('pointerup', up);
-			cv.removeEventListener('pointercancel', up);
-		};
-	}, [daily, gameId]);
+	// Aim via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
+	const { onPointerDown } = usePointerDrag(aimStart, aimMove, aimEnd);
 
 	/* ---------- Resize ---------- */
 	useEffect(() => {
@@ -508,7 +477,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<div className="bi-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
-				<canvas ref={canvasRef} className="bi-canvas" {...touchDrag(aimStart, aimMove, aimEnd)} />
+				<canvas ref={canvasRef} className="bi-canvas" onPointerDown={onPointerDown} />
 
 				<div className="bi-hud-top">
 					{/* Libre/Défi switch clutters the windowed view — show it only in fullscreen. */}

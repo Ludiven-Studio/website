@@ -11,7 +11,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { lettresCroiseesLevels } from './levels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 
 /* =====================================================
    LETTRES CROISÉES — React island. Wordscapes-style: compose words from a letter wheel;
@@ -292,20 +292,8 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		}
 		// simple tap: keep the selection (tap-to-compose mode, ✓ to submit)
 	};
-	const onWheelDown = (e: React.PointerEvent): void => {
-		if (e.pointerType === 'touch') return;
-		startDrag(e.clientX, e.clientY);
-		wheelRef.current?.setPointerCapture(e.pointerId);
-		e.preventDefault();
-	};
-	const onWheelMove = (e: React.PointerEvent): void => {
-		if (e.pointerType === 'touch') return;
-		moveDrag(e.clientX, e.clientY);
-	};
-	const onWheelUp = (e?: React.PointerEvent): void => {
-		if (e && e.pointerType === 'touch') return;
-		endDrag();
-	};
+	// Drag across the wheel via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
+	const { onPointerDown: onWheelDown } = usePointerDrag(startDrag, moveDrag, endDrag);
 
 	/* Hint: reveal the shortest unfound grid word (30 s cooldown — self-penalizing on the chrono). */
 	const revealHint = (): void => {
@@ -436,11 +424,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 						<div
 							ref={wheelRef}
 							className="lc-wheel"
-							{...touchDrag(startDrag, moveDrag, endDrag)}
 							onPointerDown={onWheelDown}
-							onPointerMove={onWheelMove}
-							onPointerUp={onWheelUp}
-							onPointerCancel={onWheelUp}
 						>
 							<svg className="lc-trail" viewBox="0 0 100 100" aria-hidden="true">
 								{sel.length > 0 && (

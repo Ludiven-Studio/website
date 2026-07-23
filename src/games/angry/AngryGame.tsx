@@ -15,7 +15,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { angryLevels } from './levels';
-import { touchDrag } from '../touchDrag';
+import { usePointerDrag } from '../usePointerDrag';
 
 /* =====================================================
    ANGRY COCOTTE — React island (2D canvas, gravity).
@@ -252,9 +252,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		aimRef.current = { pull: { x: 0, y: 0 } };
 	};
 
-	// Native-touch start: also handle "tap in flight → fire the hen's power" (the pointer
-	// path does this in its own down handler), then fall through to aiming.
-	const touchAimStart = (clientX: number, clientY: number) => {
+	// Pointer down: "tap in flight → fire the hen's power" (explosive/poussins), else start aiming.
+	const pointerStart = (clientX: number, clientY: number) => {
 		const world = worldRef.current;
 		if (statusRef.current === 'rolling' && world?.cocotte?.launched) {
 			const fx = activatePower(world, world.cocotte);
@@ -295,6 +294,9 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		setStat('rolling');
 	};
 
+	// Aim + tap-to-fire via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
+	const { onPointerDown } = usePointerDrag(pointerStart, aimMove, aimEnd);
+
 	// Load the AI sky + crate textures once (the RAF loop picks them up next frame).
 	useEffect(() => {
 		const load = (src: string, ref: React.RefObject<HTMLImageElement | null>) => {
@@ -306,49 +308,6 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		load('/assets/jeux/angry/wood.jpg', woodImgRef);
 		load('/assets/jeux/angry/brick.jpg', brickImgRef);
 	}, []);
-
-	useEffect(() => {
-		const cv = canvasRef.current;
-		if (!cv) return;
-		const down = (e: PointerEvent) => {
-			if (e.pointerType === 'touch') return; // native touch handled by touchDrag on the canvas
-			const world = worldRef.current;
-			// Tap in flight → fire an active hen's power (explosive/poussins).
-			if (statusRef.current === 'rolling' && world?.cocotte?.launched) {
-				const fx = activatePower(world, world.cocotte);
-				if (fx) {
-					if (fx.blast) boomsRef.current.push({ x: fx.blast.x, y: fx.blast.y, t0: performance.now(), big: true });
-					if (fx.chicks) for (let k = 0; k < 6; k++) dustRef.current.push({ x: fx.chicks.x, y: fx.chicks.y, t0: performance.now() });
-					e.preventDefault();
-				}
-				return;
-			}
-			const before = aimRef.current;
-			aimStart(e.clientX, e.clientY);
-			if (aimRef.current && aimRef.current !== before) {
-				cv.setPointerCapture(e.pointerId);
-				e.preventDefault();
-			}
-		};
-		const move = (e: PointerEvent) => {
-			if (e.pointerType === 'touch') return;
-			aimMove(e.clientX, e.clientY);
-		};
-		const up = (e: PointerEvent) => {
-			if (e.pointerType === 'touch') return;
-			aimEnd();
-		};
-		cv.addEventListener('pointerdown', down);
-		cv.addEventListener('pointermove', move);
-		cv.addEventListener('pointerup', up);
-		cv.addEventListener('pointercancel', up);
-		return () => {
-			cv.removeEventListener('pointerdown', down);
-			cv.removeEventListener('pointermove', move);
-			cv.removeEventListener('pointerup', up);
-			cv.removeEventListener('pointercancel', up);
-		};
-	}, [daily, gameId]);
 
 	/* ---------- Resize ---------- */
 	useEffect(() => {
@@ -654,7 +613,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 
 			<div className="co-playwrap" ref={wrapRef}>
 				{celebrating && <Celebration />}
-				<canvas ref={canvasRef} className="co-canvas" {...touchDrag(touchAimStart, aimMove, aimEnd)} />
+				<canvas ref={canvasRef} className="co-canvas" onPointerDown={onPointerDown} />
 				{status === 'won' && !lv.active && (
 					<div className="co-overlay">
 						<div className="co-overlay-card">
