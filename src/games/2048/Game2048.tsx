@@ -556,7 +556,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 					style={{ ['--n' as string]: size }}
 					onPointerDown={onPointerDown}
 					onPointerUp={onPointerUp}
-						{...touchDrag(swipeStart, swipeMove, () => swipeEnd(lastRef.current.x, lastRef.current.y))}
+						{...touchDrag(swipeStart, swipeMove, (x, y) => swipeEnd(x, y))}
 				>
 					<div className="g2-cells">
 						{Array.from({ length: size * size }).map((_, i) => (

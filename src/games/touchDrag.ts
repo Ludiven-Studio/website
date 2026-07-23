@@ -12,8 +12,15 @@ import type { TouchEvent } from 'react';
 export function touchDrag(
 	start: (clientX: number, clientY: number) => void,
 	move: (clientX: number, clientY: number) => void,
-	end: () => void,
+	// Called with the FINAL touch position (from changedTouches) — reliable even for a fast
+	// flick where touchmove never fired. Callbacks that don't need it can ignore the args.
+	end: (clientX: number, clientY: number) => void,
 ) {
+	const finish = (e: TouchEvent) => {
+		const t = e.changedTouches[0];
+		if (t) end(t.clientX, t.clientY);
+		else end(0, 0);
+	};
 	return {
 		onTouchStart: (e: TouchEvent) => {
 			const t = e.touches[0];
@@ -23,7 +30,7 @@ export function touchDrag(
 			const t = e.touches[0];
 			if (t) move(t.clientX, t.clientY);
 		},
-		onTouchEnd: () => end(),
-		onTouchCancel: () => end(),
+		onTouchEnd: finish,
+		onTouchCancel: finish,
 	};
 }
