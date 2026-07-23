@@ -18,6 +18,10 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { snakeLevels } from './levels';
 
 /* =====================================================
    SNAKE — real-time React island (canvas + rAF loop).
@@ -100,6 +104,9 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	const triesRef = useRef(0); // daily attempts used (guards start without stale state)
 	const bgImgRef = useRef<HTMLImageElement | null>(null); // AI board background
 	const rockImgRef = useRef<HTMLImageElement | null>(null); // AI rock sprite
+	const lv = useLevels(gameId, snakeLevels);
+	const levelsRef = useRef(false); // latest levels-active flag for the loop/game-over
+	const targetRef = useRef(0); // apples to eat to clear the current level
 
 	/* ---- Canvas sizing + drawing ---- */
 	const draw = useCallback(() => {
@@ -319,6 +326,13 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		stop();
 		const sc = stateRef.current?.score ?? 0;
 		setStatus('over');
+		if (levelsRef.current) {
+			// Levels: winning is reaching the target; dying short of it loses.
+			lv.finish({ won: sc >= targetRef.current, score: sc });
+			setScore(sc);
+			trackGame(gameId, 'game_over', { score: sc });
+			return;
+		}
 		setBest((prev) => {
 			const nb = Math.max(prev, sc);
 			if (dailyRef.current) {
@@ -341,7 +355,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			return nb;
 		});
 		trackGame(gameId, 'game_over', { score: sc });
-	}, [gameId, stop]);
+	}, [gameId, stop, lv]);
 
 	const frame = useCallback(
 		(now: number) => {
@@ -350,18 +364,24 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			lastRef.current = now;
 			accRef.current += dt;
 			let st = stateRef.current!;
+			let reachedTarget = false;
 			while (runningRef.current && accRef.current >= tickInterval(st.score, diffRef.current)) {
 				accRef.current -= tickInterval(st.score, diffRef.current);
 				st = stepSnake(st, SNAKE_CFG, seqRef.current);
 				stateRef.current = st;
 				if (st.status === 'over') break;
+				// Levels: reaching the apple target ends the run as a win.
+				if (levelsRef.current && st.score >= targetRef.current) {
+					reachedTarget = true;
+					break;
+				}
 			}
 			draw();
 			if (st.score !== scoreRef.current) {
 				scoreRef.current = st.score;
 				setScore(st.score);
 			}
-			if (st.status === 'over') {
+			if (st.status === 'over' || reachedTarget) {
 				onGameOver();
 				return;
 			}
@@ -402,6 +422,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		(key: DiffKey = diffKey) => {
 			stop();
 			dailyRef.current = false;
+			levelsRef.current = false;
 			setDaily(false);
 			setAlreadyPlayed(false);
 			triesRef.current = 0;
@@ -429,6 +450,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 	const startDaily = useCallback(async () => {
 		stop();
 		dailyRef.current = true;
+		levelsRef.current = false;
 		setDaily(true);
 		setStatus('ready');
 		const applyLevel = (seed: number, diffIndex: number) => {
@@ -477,6 +499,49 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		setDailyLoading(false);
 		draw();
 	}, [gameId, stop, draw]);
+
+	/* ---- Levels mode ---- */
+	// Build a deterministic run from the level config, then land in 'ready' so the
+	// snake waits behind the ▶ overlay (real-time → no auto-start).
+	const startLevel = useCallback(
+		(level: number) => {
+			stop();
+			const cfg = lv.play(level);
+			dailyRef.current = false;
+			levelsRef.current = true;
+			setDaily(false);
+			setAlreadyPlayed(false);
+			targetRef.current = cfg.target;
+			diffRef.current = cfg.diff;
+			seedRef.current = cfg.seed;
+			const built = createSnakeLevel(SNAKE_CFG, cfg.diff, mulberry32(cfg.seed));
+			seqRef.current = built.seq;
+			rocksRef.current = built.rocks;
+			stateRef.current = createSnake(SNAKE_CFG, built.seq, built.rocks);
+			scoreRef.current = 0;
+			setScore(0);
+			setBest(cfg.target); // "Record" slot shows the apple target in levels mode
+			setStatus('ready');
+			draw();
+		},
+		[lv, stop, draw],
+	);
+
+	const armLevels = useCallback(() => {
+		stop();
+		dailyRef.current = false;
+		setDaily(false);
+		lv.enter();
+	}, [lv, stop]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all
+	// cleared). A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* ---- Input ---- */
 	const turn = useCallback(
@@ -578,9 +643,20 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		<div className="sn-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => armFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); } armFree(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="sn-daily-tag">
+					{lv.menu ? 'Progression — choisis un niveau' : `Niveau ${lv.level} · ${targetRef.current} pommes · ${diffRef.current.label}`}
+				</div>
+			) : daily ? (
 				<div className="sn-daily-tag">
 					{dailyLoading
 						? 'Préparation du défi…'
@@ -604,10 +680,14 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 
 			<div className="sn-bar">
 				<span className="sn-score">Score {score}</span>
-				<span className="sn-best">Record {best}</span>
+				<span className="sn-best">{lv.active ? `Objectif ${targetRef.current}` : `Record ${best}`}</span>
 			</div>
 
 			<div className="sn-boardwrap">
+				{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+				) : (
+				<>
 				<canvas
 					ref={canvasRef}
 					className="sn-canvas"
@@ -619,13 +699,14 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 
 				{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
 					<div className="sn-overlay">
-						<button className="sn-startbtn" onClick={start}>▶ {daily ? 'Commencer' : 'Jouer'}</button>
+						{lv.active && <p className="sn-go-title">Niveau {lv.level} · {targetRef.current} pommes</p>}
+						<button className="sn-startbtn" onClick={start}>▶ {lv.active || daily ? 'Commencer' : 'Jouer'}</button>
 					</div>
 				)}
 				{dailyLoading && (
 					<div className="sn-overlay"><div className="sn-overlay-card">Préparation…</div></div>
 				)}
-				{status === 'over' && (
+				{status === 'over' && !lv.active && (
 					<div className="sn-overlay">
 						<div className="sn-overlay-card">
 							<p className="sn-go-title">{daily && alreadyPlayed ? 'Défi du jour terminé' : 'Perdu !'}</p>
@@ -642,6 +723,21 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={snakeLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `${score} pomme${score > 1 ? 's' : ''} mangée${score > 1 ? 's' : ''}` : `${score} / ${targetRef.current} pommes`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+				</>
+				)}
 			</div>
 
 			<p className="sn-help">
@@ -649,8 +745,8 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 				Tu accélères en grossissant — évite les murs et ta propre queue&nbsp;!
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
 }

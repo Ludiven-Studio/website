@@ -20,6 +20,10 @@ import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../l
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { twentyFortyEightLevels, levelSize } from './levels';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
@@ -90,6 +94,9 @@ export default function Game2048({ gameId }: { gameId: string }) {
 	const [won, setWon] = useState(false);
 	const [remaining, setRemaining] = useState(TIME_LIMIT_MS); // ms left on the clock
 	const [timedOut, setTimedOut] = useState(false); // over because time ran out (vs board jammed)
+	const [movesLeft, setMovesLeft] = useState(0); // levels: moves remaining in the budget
+
+	const lv = useLevels(gameId, twentyFortyEightLevels);
 
 	const stateRef = useRef<State | null>(null);
 	const streamRef = useRef<number[] | null>(null);
@@ -109,6 +116,12 @@ export default function Game2048({ gameId }: { gameId: string }) {
 	const bestRef = useRef(0);
 	const diffKeyRef = useRef<DiffKey>(DEFAULT_DIFF);
 	const wonRef = useRef(false);
+	// Levels mode mirrors (read by the stable applyMove without stale closures).
+	const levelsRef = useRef(false);
+	const targetRef = useRef(0); // tile value that wins the level
+	const movesUsedRef = useRef(0); // moves played in the current level
+	const moveBudgetRef = useRef(0); // total moves allowed
+	const levelFinishRef = useRef<((r: { won: boolean; score: number }) => void) | null>(null);
 
 	const { celebrating } = useCelebration(won);
 	const armed = daily && !started;
@@ -216,6 +229,26 @@ export default function Game2048({ gameId }: { gameId: string }) {
 			if (cleanupRef.current) clearTimeout(cleanupRef.current);
 			cleanupRef.current = window.setTimeout(() => setTiles(tilesRef.current.map((t) => ({ id: t.id, r: t.r, c: t.c, value: t.value }))), ANIM_MS);
 
+			// Levels: this move counts. Win the moment the target tile appears; else
+			// lose when the move budget is spent (or the board jams).
+			if (levelsRef.current) {
+				movesUsedRef.current += 1;
+				setMovesLeft(Math.max(0, moveBudgetRef.current - movesUsedRef.current));
+				const reached = spawned.board.some((row) => row.some((v) => v >= targetRef.current));
+				if (reached) {
+					if (!wonRef.current) { wonRef.current = true; setWon(true); }
+					setStat('over');
+					levelFinishRef.current?.({ won: true, score: movesUsedRef.current });
+					return;
+				}
+				if (movesUsedRef.current >= moveBudgetRef.current || isGameOver(spawned)) {
+					setStat('over');
+					levelFinishRef.current?.({ won: false, score: movesUsedRef.current });
+					return;
+				}
+				return;
+			}
+
 			if (dailyRef.current) persistDaily(false);
 			else commitFreeBest(spawned.score);
 			if (!wonRef.current && hasWon(spawned)) {
@@ -234,6 +267,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 	);
 
 	const armFree = useCallback((key: DiffKey) => {
+		levelsRef.current = false;
 		dailyRef.current = false;
 		setDaily(false);
 		alreadyRef.current = false;
@@ -266,6 +300,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 	}, []);
 
 	const startDaily = useCallback(async () => {
+		levelsRef.current = false;
 		dailyRef.current = true;
 		setDaily(true);
 		wonRef.current = false;
@@ -331,6 +366,56 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId]);
 
+	/* Levels: reach a target tile within a move budget (no chrono pressure at start →
+	   no ready-gate, the board opens straight away). */
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		dailyRef.current = false;
+		setDaily(false);
+		alreadyRef.current = false;
+		setAlreadyPlayed(false);
+		loadingRef.current = false;
+		setDailyLoading(false);
+		startedRef.current = true;
+		setStarted(true);
+		wonRef.current = false;
+		setWon(false);
+		setStat('playing');
+		setTimedOut(false);
+		setRemaining(TIME_LIMIT_MS);
+		startedAtRef.current = 0; // clock unstarted until the first move
+		levelsRef.current = true;
+		targetRef.current = cfg.target;
+		movesUsedRef.current = 0;
+		moveBudgetRef.current = cfg.moves;
+		setMovesLeft(cfg.moves);
+		diffKeyRef.current = cfg.diffKey;
+		setDiffKey(cfg.diffKey);
+		const stream = makeStream(mulberry32(cfg.seed));
+		streamRef.current = stream;
+		stateRef.current = createBoard(DIFFS[cfg.diffKey].size, stream);
+		showBoard(true);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv]);
+
+	const armLevels = useCallback(() => {
+		dailyRef.current = false;
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Grade + record a finished level run (once). Ref so the stable applyMove reads it.
+	levelFinishRef.current = (r) => lv.finish({ won: r.won, score: r.score });
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all
+	// cleared). A ?defi deep link opens the daily instead — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	/* Keyboard: arrows + ZQSD/WASD. */
 	useEffect(() => {
 		const KEYS: Record<string, Dir> = {
@@ -359,6 +444,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 			if (statusRef.current !== 'playing') return;
 			setTimedOut(true);
 			setStat('over');
+			if (levelsRef.current) { levelFinishRef.current?.({ won: false, score: movesUsedRef.current }); return; }
 			trackGame(gameId, 'game_over', { reason: 'time' });
 			if (dailyRef.current) persistDaily(true);
 		};
@@ -414,9 +500,22 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		<div className="g2-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={daily} onFree={() => armFree(diffKey)} onDaily={startDaily} />
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); armFree(diffKey); } else armFree(diffKey); }}
+				onDaily={() => { lv.exit(); startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			{daily ? (
+			{lv.active ? (
+				<div className="g2-daily-tag">
+					{lv.menu
+						? 'Progression — choisis un niveau'
+						: `Niveau ${lv.level} · atteins ${targetRef.current || twentyFortyEightLevels.config(lv.level).target} · ${levelSize(lv.level)}×${levelSize(lv.level)}`}
+				</div>
+			) : daily ? (
 				<div className="g2-daily-tag">
 					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} ${size}×${size}`}
 				</div>
@@ -433,12 +532,23 @@ export default function Game2048({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			<div className="g2-status">
-				<span className="g2-score">Score <strong>{score}</strong></span>
-				<span className={`g2-clock${remaining <= 30000 ? ' urgent' : ''}`}>⏱ <strong>{fmtClock(remaining)}</strong></span>
-				{!daily && <span className="g2-best">Record <strong>{best}</strong></span>}
-			</div>
+			{!(lv.active && lv.menu) && (
+				<div className="g2-status">
+					<span className="g2-score">Score <strong>{score}</strong></span>
+					{lv.active ? (
+						<span className={`g2-clock${movesLeft <= 5 ? ' urgent' : ''}`}>🎯 <strong>{movesLeft}</strong> coups</span>
+					) : (
+						<>
+							<span className={`g2-clock${remaining <= 30000 ? ' urgent' : ''}`}>⏱ <strong>{fmtClock(remaining)}</strong></span>
+							{!daily && <span className="g2-best">Record <strong>{best}</strong></span>}
+						</>
+					)}
+				</div>
+			)}
 
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
 			<div className="g2-playwrap">
 				{celebrating && <Celebration />}
 				<div
@@ -462,7 +572,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 
 				{daily && dailyLoading && <div className="g2-overlay"><div className="g2-overlay-card">Préparation du défi…</div></div>}
 				{armed && !dailyLoading && <div className="g2-overlay"><button className="g2-startbtn" onClick={startTimer}>▶ Commencer</button></div>}
-				{status === 'over' && (
+				{status === 'over' && !lv.active && (
 					<div className="g2-overlay">
 						<div className="g2-overlay-card g2-over">
 							{daily ? (
@@ -476,13 +586,29 @@ export default function Game2048({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
+			)}
+
+			{lv.done && (
+				<LevelOutcome
+					level={lv.level}
+					lastLevel={twentyFortyEightLevels.count}
+					won={lv.won}
+					stars={lv.stars}
+					detail={lv.won ? `${movesUsedRef.current} coup${movesUsedRef.current > 1 ? 's' : ''}` : timedOut ? 'Temps écoulé' : 'Objectif manqué'}
+					onNext={() => startLevel(lv.level + 1)}
+					onReplay={() => startLevel(lv.level)}
+					onMenu={lv.backToMenu}
+				/>
+			)}
 
 			<p className="g2-help">
-				Flèches ou ZQSD au clavier, ou glisse (souris ou doigt) : les tuiles identiques fusionnent. Fais le meilleur score en <b>10 minutes</b> — le chrono démarre au premier coup&nbsp;!
+				{lv.active
+					? <>Atteins la <b>tuile cible</b> avant d'épuiser ton budget de coups. Flèches, ZQSD ou glisse : les tuiles identiques fusionnent.</>
+					: <>Flèches ou ZQSD au clavier, ou glisse (souris ou doigt) : les tuiles identiques fusionnent. Fais le meilleur score en <b>10 minutes</b> — le chrono démarre au premier coup&nbsp;!</>}
 			</p>
 
-			{daily && <Leaderboard game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? score : undefined} />}
-			{!daily && <LeaderboardCorner game={gameId} metric="score" />}
+			{daily && !lv.active && <Leaderboard game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? score : undefined} />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
 }
