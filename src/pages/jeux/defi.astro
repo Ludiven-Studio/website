@@ -1,12 +1,25 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
+import GameFold from '../../components/GameFold.astro';
 import Icon from '../../components/Icon.astro';
 import { games } from '../../data/games';
 
 // Every playable game now has a daily challenge (Pong & Foot race the AI to 3), so the
 // hub lists them all — same count as the /jeux catalogue.
 const dailyGames = games.filter((g) => g.status === 'play');
+
+// Collapsible category sections (42 games is too long for one flat grid).
+const CATEGORIES = [
+	{ id: 'logique', title: '🧩 Logique' },
+	{ id: 'mots', title: '🔤 Mots' },
+	{ id: 'adresse', title: '🎯 Adresse' },
+	{ id: 'multi', title: '⚽ Duels' },
+] as const;
+const byCategory = CATEGORIES.map((c) => ({
+	...c,
+	games: dailyGames.filter((g) => (g.category ?? 'logique') === c.id),
+})).filter((c) => c.games.length > 0);
 ---
 
 <BaseLayout
@@ -33,15 +46,21 @@ const dailyGames = games.filter((g) => g.status === 'play');
 			<p class="defi-count" id="defi-count" aria-live="polite"></p>
 		</header>
 
-		<ul class="defi-grid">
+		<div class="defi-sections stack gap-4">
 			{
-				dailyGames.map((g) => (
-					<li>
-						<GameCard id={g.id} title={g.title} pitch={g.pitch} icon={g.icon} href={`${g.href}?defi`} status={g.status} compact />
-					</li>
+				byCategory.map((c) => (
+					<GameFold id={c.id} title={c.title} count={c.games.length}>
+						<ul class="defi-grid">
+							{c.games.map((g) => (
+								<li>
+									<GameCard id={g.id} title={g.title} pitch={g.pitch} icon={g.icon} href={`${g.href}?defi`} status={g.status} compact />
+								</li>
+							))}
+						</ul>
+					</GameFold>
 				))
 			}
-		</ul>
+		</div>
 	</div>
 </BaseLayout>
 
@@ -143,7 +162,7 @@ const dailyGames = games.filter((g) => g.status === 'play');
 		const d = new Date();
 		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 	};
-	const grid = document.querySelector<HTMLUListElement>('.defi-grid');
+	const grids = Array.from(document.querySelectorAll<HTMLUListElement>('.defi-grid'));
 	const counter = document.getElementById('defi-count');
 	const streakEl = document.getElementById('defi-streak');
 
@@ -161,26 +180,35 @@ const dailyGames = games.filter((g) => g.status === 'play');
 
 	const refresh = () => {
 		refreshStreak();
-		if (!grid) return;
 		const day = todayKey();
-		const lis = Array.from(grid.children) as HTMLElement[];
-		let done = 0;
-		const ranked = lis.map((li, i) => {
-			const id = li.querySelector('[data-game-id]')?.getAttribute('data-game-id');
-			let s = 0; // 0 = à faire, 1 = en cours, 2 = fait
-			try {
-				const raw = id ? localStorage.getItem(`ludiven-dailyrun-${id}-${day}`) : null;
-				if (raw) s = JSON.parse(raw)?.done === true ? 2 : 1;
-			} catch { /* ignore */ }
-			li.classList.toggle('is-done', s === 2);
-			li.classList.toggle('is-progress', s === 1);
-			if (s === 2) done++;
-			return { li, s, i };
-		});
-		// à faire → en cours → fait (stable within a group)
-		ranked.sort((a, b) => a.s - b.s || a.i - b.i);
-		for (const { li } of ranked) grid.appendChild(li);
-		const total = lis.length, todo = total - done;
+		let done = 0, total = 0;
+		for (const grid of grids) {
+			const lis = Array.from(grid.children) as HTMLElement[];
+			let sectionDone = 0;
+			const ranked = lis.map((li, i) => {
+				const id = li.querySelector('[data-game-id]')?.getAttribute('data-game-id');
+				let s = 0; // 0 = à faire, 1 = en cours, 2 = fait
+				try {
+					const raw = id ? localStorage.getItem(`ludiven-dailyrun-${id}-${day}`) : null;
+					if (raw) s = JSON.parse(raw)?.done === true ? 2 : 1;
+				} catch { /* ignore */ }
+				li.classList.toggle('is-done', s === 2);
+				li.classList.toggle('is-progress', s === 1);
+				if (s === 2) sectionDone++;
+				return { li, s, i };
+			});
+			// à faire → en cours → fait (stable within a group)
+			ranked.sort((a, b) => a.s - b.s || a.i - b.i);
+			for (const { li } of ranked) grid.appendChild(li);
+			done += sectionDone;
+			total += lis.length;
+			// Per-section progress in the fold header ("3/12 faits").
+			const meta = grid.closest('.game-fold')?.querySelector('[data-fold-meta]');
+			if (meta) meta.textContent = sectionDone === lis.length
+				? '✓ tout fait'
+				: `${sectionDone}/${lis.length} fait${sectionDone > 1 ? 's' : ''}`;
+		}
+		const todo = total - done;
 		if (counter) counter.textContent = todo === 0
 			? '🎉 Tous les défis du jour sont faits !'
 			: `${todo} défi${todo > 1 ? 's' : ''} à faire aujourd'hui · ${done}/${total} fait${done > 1 ? 's' : ''}`;

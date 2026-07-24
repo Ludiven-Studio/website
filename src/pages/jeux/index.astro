@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
+import GameFold from '../../components/GameFold.astro';
 import SuggestionForm from '../../components/SuggestionForm.astro';
 import CocottesPanel from '../../components/CocottesPanel';
 import { games } from '../../data/games';
@@ -11,10 +12,17 @@ const playableLabel = NUM_FR[playable]
 	? NUM_FR[playable].charAt(0).toUpperCase() + NUM_FR[playable].slice(1)
 	: String(playable);
 
-const logique = games.filter((g) => (g.category ?? 'logique') === 'logique');
-const mots = games.filter((g) => g.category === 'mots');
-const adresse = games.filter((g) => g.category === 'adresse');
-const multi = games.filter((g) => g.category === 'multi');
+// Collapsible category sections — fold ids/state shared with /jeux/defi.
+const CATEGORIES = [
+	{ id: 'logique', title: '🧩 Jeux de logique' },
+	{ id: 'mots', title: '🔤 Jeux de mots' },
+	{ id: 'adresse', title: "🎯 Jeux d'adresse" },
+	{ id: 'multi', title: '⚽ Jeux multis' },
+] as const;
+const byCategory = CATEGORIES.map((c) => ({
+	...c,
+	games: games.filter((g) => (g.category ?? 'logique') === c.id),
+})).filter((c) => c.games.length > 0);
 ---
 
 <BaseLayout
@@ -39,100 +47,31 @@ const multi = games.filter((g) => g.category === 'multi');
 
 			<CocottesPanel client:load />
 
-		<section class="games-section stack gap-6">
-			<h2 class="games-section-title">Jeux de logique</h2>
-			<ul class="games-grid">
-				{
-					logique.map((game) => (
-						<li>
-							<GameCard
-								id={game.id}
-								title={game.title}
-								pitch={game.pitch}
-								icon={game.icon}
-								href={game.href}
-								status={game.status}
-								image={game.image}
-								favorite
-							/>
-						</li>
-					))
-				}
-			</ul>
-		</section>
-
-		{
-			mots.length > 0 && (
-				<section class="games-section stack gap-6">
-					<h2 class="games-section-title">Jeux de mots</h2>
-					<ul class="games-grid">
-						{mots.map((game) => (
-							<li>
-								<GameCard
-									id={game.id}
-									title={game.title}
-									pitch={game.pitch}
-									icon={game.icon}
-									href={game.href}
-									status={game.status}
-									image={game.image}
-									favorite
-								/>
-							</li>
-						))}
-					</ul>
-				</section>
-			)
-		}
-
-		{
-			adresse.length > 0 && (
-				<section class="games-section stack gap-6">
-					<h2 class="games-section-title">Jeux d'adresse</h2>
-					<ul class="games-grid">
-						{adresse.map((game) => (
-							<li>
-								<GameCard
-									id={game.id}
-									title={game.title}
-									pitch={game.pitch}
-									icon={game.icon}
-									href={game.href}
-									status={game.status}
-									image={game.image}
-									favorite
-								/>
-							</li>
-						))}
-					</ul>
-				</section>
-			)
-		}
-
-		{
-			multi.length > 0 && (
-				<section class="games-section stack gap-6">
-					<h2 class="games-section-title">Jeux multis</h2>
-					<ul class="games-grid">
-						{multi.map((game) => (
-							<li>
-								<GameCard
-									id={game.id}
-									title={game.title}
-									pitch={game.pitch}
-									icon={game.icon}
-									href={game.href}
-									status={game.status}
-									image={game.image}
-									daily={false}
-									favorite
-								/>
-							</li>
-						))}
-					</ul>
-				</section>
-			)
-		}
+		<div class="games-sections stack gap-4">
+			{
+				byCategory.map((c) => (
+					<GameFold id={c.id} title={c.title} count={c.games.length}>
+						<ul class="games-grid">
+							{c.games.map((game) => (
+								<li>
+									<GameCard
+										id={game.id}
+										title={game.title}
+										pitch={game.pitch}
+										icon={game.icon}
+										href={game.href}
+										status={game.status}
+										image={game.image}
+										daily={c.id !== 'multi'}
+										favorite
+									/>
+								</li>
+							))}
+						</ul>
+					</GameFold>
+				))
+			}
+		</div>
 
 		<SuggestionForm />
 
@@ -215,13 +154,6 @@ const multi = games.filter((g) => g.category === 'multi');
 	.games-streak .games-streak-note {
 		font-weight: 600;
 		color: var(--gray-200);
-	}
-
-	.games-section-title {
-		font-size: var(--text-xl);
-		text-align: center;
-		margin: 0;
-		color: var(--gray-0);
 	}
 
 	.games-grid {

@@ -1,0 +1,94 @@
+---
+// Collapsible game section (native <details>), open by default; the open/closed
+// state persists per category in localStorage, shared across pages.
+
+interface Props {
+	id: string; // category id → localStorage key
+	title: string;
+	count: number;
+}
+
+const { id, title, count } = Astro.props;
+---
+
+<details class="game-fold" data-fold-id={id} open>
+	<summary>
+		<span class="fold-caret" aria-hidden="true">▸</span>
+		<span class="fold-title">{title}</span>
+		<span class="fold-meta" data-fold-meta>{count} jeux</span>
+	</summary>
+	<div class="fold-body">
+		<slot />
+	</div>
+</details>
+
+<style>
+	.game-fold {
+		width: 100%;
+	}
+	.game-fold summary {
+		list-style: none;
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		cursor: pointer;
+		user-select: none;
+		padding: 0.6rem 0.9rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background: var(--gray-999_40);
+		transition: border-color var(--theme-transition);
+	}
+	.game-fold summary::-webkit-details-marker {
+		display: none;
+	}
+	.game-fold summary:hover,
+	.game-fold summary:focus-visible {
+		border-color: var(--accent-regular);
+	}
+	.fold-caret {
+		color: var(--accent-regular);
+		font-size: var(--text-md);
+		transition: transform var(--theme-transition);
+	}
+	.game-fold[open] .fold-caret {
+		transform: rotate(90deg);
+	}
+	.fold-title {
+		font-family: var(--font-brand);
+		font-weight: 700;
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+	}
+	.fold-meta {
+		margin-left: auto;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--gray-300);
+		white-space: nowrap;
+	}
+	.fold-body {
+		padding-top: 1rem;
+	}
+</style>
+
+<script>
+	const KEY = (id: string) => `ludiven-fold-${id}`;
+
+	document.querySelectorAll<HTMLDetailsElement>('.game-fold').forEach((d) => {
+		const id = d.dataset.foldId;
+		if (!id) return;
+		try {
+			if (localStorage.getItem(KEY(id)) === 'closed') d.open = false;
+		} catch {
+			/* ignore */
+		}
+		d.addEventListener('toggle', () => {
+			try {
+				localStorage.setItem(KEY(id), d.open ? 'open' : 'closed');
+			} catch {
+				/* ignore */
+			}
+		});
+	});
+</script>
