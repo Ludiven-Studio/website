@@ -267,6 +267,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 
 <script>
 	import { fetchDailyTops, leaderboardEnabled } from '../lib/leaderboard';
+	import { fetchDailyTopsSecure } from '../lib/scores';
 	import { DAILY_LB } from '../data/dailyLb';
 	import { formatScore } from '../lib/scoreFormat';
 	import { gameStreak } from '../lib/streak';
@@ -354,16 +355,26 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 				const val = formatScore(cfg!.fmt, top.value);
 				const who = `${val ? `${val} · ` : ''}${top.name}`;
 				chip.textContent = `${done ? '✓ ' : ''}🏆 ${who}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
-			} else {
+			} else if (done || started) {
 				chip.textContent = done
 					? recTxt
 						? `✓ Record du jour : ${recTxt}`
 						: '✓ Défi du jour fait'
-					: started
-						? recTxt
-							? `⏳ En cours · ${recTxt}`
-							: '⏳ Défi en cours'
-						: '🏆 Défi du jour à faire';
+					: recTxt
+						? `⏳ En cours · ${recTxt}`
+						: '⏳ Défi en cours';
+			} else {
+				// No record yet today (the daily board resets each morning): fall back to
+				// yesterday's record, else invite to be the first.
+				const ytop = cfg ? yTops[cfg.lbId || id] : undefined;
+				if (ytop) {
+					const nb = ytop.players || 0;
+					chip.title = `Record d'hier${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
+					const val = formatScore(cfg!.fmt, ytop.value);
+					chip.textContent = `🏆 Hier : ${val ? `${val} · ` : ''}${ytop.name}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
+				} else {
+					chip.textContent = "🏆 Sois le premier aujourd'hui !";
+				}
 			}
 			chip.hidden = false;
 		});
@@ -420,6 +431,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 
 	// Community daily records (one Supabase request), then refresh the chips.
 	let tops: Record<string, { name: string; value: number; players: number }> = {};
+	let yTops: Record<string, { name: string; value: number; players: number }> = {};
 	const loadTops = async () => {
 		if (!leaderboardEnabled()) return;
 		try {
@@ -427,6 +439,16 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 		} catch {
 			/* ignore */
 		}
+		syncDaily();
+		// Some cards without a record today → fetch yesterday's tops for the fallback.
+		const missing = Array.from(document.querySelectorAll<HTMLElement>('.daily-chip')).some((chip) => {
+			const id = chip.dataset.gameId;
+			const cfg = id ? DAILY_LB[id] : undefined;
+			return cfg ? !tops[cfg.lbId || id!] : false;
+		});
+		if (!missing) return;
+		const yday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+		yTops = await fetchDailyTopsSecure(yday);
 		syncDaily();
 	};
 
