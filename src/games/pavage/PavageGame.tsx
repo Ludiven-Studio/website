@@ -102,8 +102,26 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	const rotateRef = useRef<boolean>(expertRotate);
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
-	const boardRef = useRef<HTMLDivElement>(null);
+	const boardRef = useRef<HTMLDivElement | null>(null);
 	const lv = useLevels(gameId, pavageLevels);
+
+	// iOS: block the scroll gesture at touchstart on drag sources. preventDefault on
+	// pointerdown does not stop scrolling, and the window touchmove listeners attach
+	// only after the drag re-render — too late when Safari already owns the gesture.
+	const blockTouchStart = useCallback((el: HTMLElement | null) => {
+		if (!el) return;
+		el.addEventListener(
+			'touchstart',
+			(e: TouchEvent) => {
+				if (!(e.target as HTMLElement).closest('.pv-rot')) e.preventDefault();
+			},
+			{ passive: false },
+		);
+	}, []);
+	const boardCbRef = useCallback((el: HTMLDivElement | null) => {
+		boardRef.current = el;
+		blockTouchStart(el);
+	}, [blockTouchStart]);
 
 	const { size, blocked, pieces, solution, rotate } = puzzle;
 
@@ -702,7 +720,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			<div className="pv-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && <Celebration />}
 				<div
-					ref={boardRef}
+					ref={boardCbRef}
 					className={`pv-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--pv-cell))` }}
 				>
@@ -800,7 +818,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 
 			{/* Tray — fixed slots; a placed / dragged piece leaves a greyed placeholder. */}
 			{!revealed && status !== 'won' && interactive && !(lv.active && lv.menu) && (
-				<div className="pv-tray" aria-label="Pièces à placer">
+				<div className="pv-tray" aria-label="Pièces à placer" ref={blockTouchStart}>
 					{pieces.map((piece, i) => {
 						const dimmed = !!placements[i] || drag?.pieceIndex === i;
 						const o = pieceRots[i][trayRot[i] ?? 0];
@@ -1042,6 +1060,7 @@ const CSS = `
 .pv-cell {
   width: var(--pv-cell); height: var(--pv-cell);
   box-sizing: border-box;
+  touch-action: none; /* not inherited on iOS — must sit on the touched element */
   border-right: 1px solid var(--pv-line); border-bottom: 1px solid var(--pv-line);
   background: var(--gray-999);
 }
@@ -1069,7 +1088,7 @@ const CSS = `
   background: transparent; box-shadow: inset 0 0 0 1.5px var(--gray-800);
 }
 .pv-mini { display: grid; touch-action: none; }
-.pv-mini-cell { width: var(--pv-mini-cell); height: var(--pv-mini-cell); box-sizing: border-box; }
+.pv-mini-cell { width: var(--pv-mini-cell); height: var(--pv-mini-cell); box-sizing: border-box; touch-action: none; }
 .pv-mini-cell.on { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.28); border-radius: 2px; }
 .pv-tray-piece.dimmed .pv-mini-cell.on { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.15); opacity: 0.6; }
 .pv-mini-cell.off { background: transparent; }

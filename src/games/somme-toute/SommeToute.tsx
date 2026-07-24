@@ -72,12 +72,13 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	/* Timer */
 	useEffect(() => {
 		if (status !== 'playing' || revealed) return;
+		if ((daily || lv.playing) && !started) return; // ready-gate: chrono starts on ▶ Commencer
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
 			50,
 		);
 		return () => clearInterval(id);
-	}, [status, revealed]);
+	}, [status, revealed, daily, lv.playing, started]);
 
 	/* Win detection */
 	useEffect(() => {

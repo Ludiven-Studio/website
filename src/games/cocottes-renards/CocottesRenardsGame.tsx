@@ -1309,16 +1309,16 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 	}, [frame, stop]);
 
 	/* ---------- Pointer (collect / place / remove) ---------- */
-	const worldFrom = (e: React.PointerEvent): { wx: number; wy: number } | null => {
+	const worldFrom = (clientX: number, clientY: number): { wx: number; wy: number } | null => {
 		const cv = canvasRef.current;
 		if (!cv) return null;
 		const rect = cv.getBoundingClientRect();
-		const wx = ((e.clientX - rect.left) / rect.width) * VIEW_W - HENHOUSE_W;
-		const wy = ((e.clientY - rect.top) / rect.height) * VIEW_H - VERT_PAD;
+		const wx = ((clientX - rect.left) / rect.width) * VIEW_W - HENHOUSE_W;
+		const wy = ((clientY - rect.top) / rect.height) * VIEW_H - VERT_PAD;
 		return { wx, wy };
 	};
-	const cellFrom = (e: React.PointerEvent): { row: number; col: number } | null => {
-		const w = worldFrom(e);
+	const cellFrom = (clientX: number, clientY: number): { row: number; col: number } | null => {
+		const w = worldFrom(clientX, clientY);
 		if (!w) return null;
 		const col = Math.floor(w.wx);
 		const row = Math.floor(w.wy);
@@ -1342,13 +1342,14 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		return best;
 	};
 	const onPointerMove = (e: React.PointerEvent): void => {
-		hoverRef.current = cellFrom(e);
+		if (e.pointerType === 'touch') return;
+		hoverRef.current = cellFrom(e.clientX, e.clientY);
 	};
-	const onPointerDown = (e: React.PointerEvent): void => {
+	const tapAt = (clientX: number, clientY: number): void => {
 		if (statusRef.current !== 'playing') return;
 		const st = stateRef.current;
 		if (!st) return;
-		const w = worldFrom(e);
+		const w = worldFrom(clientX, clientY);
 		if (w) {
 			const g = grainAt(w.wx, w.wy);
 			if (g) {
@@ -1368,7 +1369,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				return;
 			}
 		}
-		const cell = cellFrom(e);
+		const cell = cellFrom(clientX, clientY);
 		const sel = selectedRef.current;
 		if (!cell || !sel) return;
 		if (sel === 'shovel') {
@@ -1380,6 +1381,26 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		setHud((h) => ({ ...h, grain: Math.floor(st.grain), cd: { ...st.cooldowns } }));
 		draw();
 	};
+	const tapRef = useRef(tapAt);
+	tapRef.current = tapAt;
+	const onPointerDown = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return; // touch handled by the native listener (iOS)
+		tapAt(e.clientX, e.clientY);
+	};
+
+	// iOS: taps on the canvas go through a native non-passive touchstart — React pointer
+	// handlers on the canvas proved unreliable on iOS Safari for this game.
+	useEffect(() => {
+		const cv = canvasRef.current;
+		if (!cv) return;
+		const onStart = (e: TouchEvent): void => {
+			e.preventDefault();
+			const t = e.changedTouches[0];
+			if (t) tapRef.current(t.clientX, t.clientY);
+		};
+		cv.addEventListener('touchstart', onStart, { passive: false });
+		return () => cv.removeEventListener('touchstart', onStart);
+	}, []);
 
 	const affordable = (type: TowerType): boolean => hud.grain >= TOWER[type].cost && (hud.cd[type] ?? 0) <= 0;
 

@@ -5,6 +5,8 @@ import {
 	type Dir, type MineDiff, type MineState, type ItemId, type ToolId, type JewelId, type OreId,
 } from './engine';
 import { cocotteMineuseLevels } from './levels';
+import { usePointerDrag } from '../usePointerDrag';
+import { useHoldButton } from '../useHoldButton';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { useLevels } from '../../lib/useLevels';
@@ -629,20 +631,27 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	const onTouchStart = (e: React.TouchEvent) => {
-		const t = e.touches[0];
-		touchRef.current = { x: t.clientX, y: t.clientY };
-	};
-	const onTouchEnd = (e: React.TouchEvent) => {
-		const s0 = touchRef.current;
-		if (!s0) return;
-		const t = e.changedTouches[0];
-		const dx = t.clientX - s0.x;
-		const dy = t.clientY - s0.y;
-		if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // tap, not swipe
-		stepOnce(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
-		touchRef.current = null;
-	};
+	// Swipe on the board — pure Pointer Events (React touch handlers do nothing on real iOS).
+	const swipe = usePointerDrag(
+		(x, y) => { touchRef.current = { x, y }; },
+		() => {},
+		(x, y) => {
+			const s0 = touchRef.current;
+			if (!s0) return;
+			touchRef.current = null;
+			const dx = x - s0.x;
+			const dy = y - s0.y;
+			if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // tap, not swipe
+			stepOnce(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
+		},
+	);
+
+	// D-pad: native touch listeners — React pointer handlers drop held touches on iOS.
+	const holdUp = useHoldButton(() => pressDir('up'), () => releaseDir('up'));
+	const holdLeft = useHoldButton(() => pressDir('left'), () => releaseDir('left'));
+	const holdRight = useHoldButton(() => pressDir('right'), () => releaseDir('right'));
+	const holdDown = useHoldButton(() => pressDir('down'), () => releaseDir('down'));
+	const holdByDir = { up: holdUp, left: holdLeft, right: holdRight, down: holdDown } as const;
 
 	const invCount = (id: ItemId): number => inv?.[id] ?? 0;
 	const canCraft = (r: (typeof RECIPES)[number]): boolean =>
@@ -727,8 +736,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					className={`cm-canvas ${daily && status === 'ready' ? 'blurred' : ''}`}
 					role="img"
 					aria-label={`Cocotte Mineuse — profondeur ${depth} m`}
-					onTouchStart={onTouchStart}
-					onTouchEnd={onTouchEnd}
+					onPointerDown={swipe.onPointerDown}
 				/>
 
 				{coarse && status === 'playing' && !bench && (
@@ -737,10 +745,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 							<button
 								key={dir}
 								className={`cm-dbtn ${dir}`}
-								onPointerDown={(e) => { e.preventDefault(); (e.target as HTMLElement).releasePointerCapture?.(e.pointerId); pressDir(dir); }}
-								onPointerUp={() => releaseDir(dir)}
-								onPointerLeave={() => releaseDir(dir)}
-								onPointerCancel={() => releaseDir(dir)}
+								ref={holdByDir[dir]}
 							>
 								{dir === 'up' ? '▲' : dir === 'left' ? '◀' : dir === 'right' ? '▶' : '▼'}
 							</button>

@@ -665,8 +665,10 @@ const CSS = `
   font-family: var(--font-body); font-weight: 800; font-size: calc(var(--ba-cell) * 0.46);
   line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
   font-variant-numeric: tabular-nums;
+  touch-action: manipulation; /* not inherited — without it iOS delays the tap (double-tap zoom) */
 }
-.ba-cell:hover:not(:disabled) { background: var(--gray-800); }
+/* hover-capable devices only: sticky :hover on iOS makes taps look one cell behind */
+@media (hover: hover) { .ba-cell:hover:not(:disabled) { background: var(--gray-800); } }
 .ba-cell.miss { background: transparent; box-shadow: none; cursor: default; } /* reveal the sea */
 .ba-cell.hit { color: #fff; background: var(--ba-hit); box-shadow: none; cursor: default; }
 

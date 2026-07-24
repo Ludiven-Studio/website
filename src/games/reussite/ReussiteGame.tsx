@@ -8,6 +8,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
+import { usePointerDrag } from '../usePointerDrag';
 import { reussiteLevels } from './levels';
 import { fmtCentis, formatScore, encodePacked } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
@@ -323,11 +324,11 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		jokerSelRef.current = null; dragRef.current = null;
 	};
 
-	/* ---------- Pointer ---------- */
-	const posFrom = (e: React.PointerEvent): { x: number; y: number } => {
+	/* ---------- Pointer (usePointerDrag: no capture, doc-level move/up — iOS-safe) ---------- */
+	const posFrom = (clientX: number, clientY: number): { x: number; y: number } => {
 		const cv = canvasRef.current!;
 		const rect = cv.getBoundingClientRect();
-		return { x: (e.clientX - rect.left) * (dimRef.current.w / rect.width), y: (e.clientY - rect.top) * (dimRef.current.h / rect.height) };
+		return { x: (clientX - rect.left) * (dimRef.current.w / rect.width), y: (clientY - rect.top) * (dimRef.current.h / rect.height) };
 	};
 
 	// Which pile/card is at (x,y)?
@@ -391,9 +392,9 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		return false;
 	};
 
-	const onDown = (e: React.PointerEvent): void => {
+	const onDown = (clientX: number, clientY: number): void => {
 		if (!startedRef.current || dailyLoading || statusRef.current !== 'playing') return;
-		const p = posFrom(e);
+		const p = posFrom(clientX, clientY);
 		const h = hitTest(p.x, p.y);
 		if (!h) { jokerSelRef.current = null; return; }
 		if (jokerArmedRef.current) {
@@ -406,29 +407,27 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			if (!picked) return;
 			jokerSelRef.current = picked.src;
 			dragRef.current = { src: picked.src, cards: picked.cards, dx: p.x, dy: p.y, ox: p.x - picked.anchor.x, oy: p.y - picked.anchor.y, moved: false };
-			canvasRef.current?.setPointerCapture(e.pointerId);
 			return;
 		}
 		if (h.kind === 'stock') { commit(drawStock(gameRef.current)); return; }
 		const picked = pickSource(h);
 		if (!picked) return;
 		dragRef.current = { src: picked.src, cards: picked.cards, dx: p.x, dy: p.y, ox: p.x - picked.anchor.x, oy: p.y - picked.anchor.y, moved: false };
-		canvasRef.current?.setPointerCapture(e.pointerId);
 	};
-	const onMove = (e: React.PointerEvent): void => {
+	const onMove = (clientX: number, clientY: number): void => {
 		const d = dragRef.current; if (!d) return;
-		const p = posFrom(e);
+		const p = posFrom(clientX, clientY);
 		if (Math.hypot(p.x - d.dx, p.y - d.dy) > 6) d.moved = true;
 		d.dx = p.x; d.dy = p.y;
 	};
-	const onUp = (e: React.PointerEvent): void => {
+	const onUp = (clientX: number, clientY: number): void => {
 		const d = dragRef.current; dragRef.current = null;
+		const p = posFrom(clientX, clientY);
 		if (jokerArmedRef.current) {
-			if (d && d.moved) { const h = hitTest(posFrom(e).x, posFrom(e).y); if (h && applyJoker(d.src, h)) return; }
+			if (d && d.moved) { const h = hitTest(p.x, p.y); if (h && applyJoker(d.src, h)) return; }
 			return; // tap or invalid drop → keep the source selected for a second tap
 		}
 		if (!d) return;
-		const p = posFrom(e);
 		if (d.moved) {
 			const h = hitTest(p.x, p.y);
 			if (h && applyDrop(d.src, h)) return;
@@ -438,6 +437,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			commit(autoMove(gameRef.current, d.src)); // tap
 		}
 	};
+	const pointer = usePointerDrag(onDown, onMove, onUp);
 
 	/* ---------- Loop + sizing ---------- */
 	useEffect(() => {
@@ -634,7 +634,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			{/* Keep the canvas mounted (hidden under the grid) so the ResizeObserver re-sizes
 			    it when a level starts — unmounting left it at the default 300×150 (stretched). */}
 			<div className="reu-playwrap" ref={wrapRef} hidden={lv.active && lv.menu}>
-				<canvas ref={canvasRef} className={`reu-canvas${started ? '' : ' reu-blur'}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />
+				<canvas ref={canvasRef} className={`reu-canvas${started ? '' : ' reu-blur'}`} onPointerDown={pointer.onPointerDown} />
 				{celebrating && <Celebration />}
 
 				{lv.done && (

@@ -21,6 +21,7 @@ import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
+import { usePointerDrag } from '../usePointerDrag';
 import { snakeLevels } from './levels';
 
 /* =====================================================
@@ -624,20 +625,20 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	const onTouchStart = (e: React.TouchEvent) => {
-		const t = e.touches[0];
-		touchRef.current = { x: t.clientX, y: t.clientY };
-	};
-	const onTouchEnd = (e: React.TouchEvent) => {
-		const start0 = touchRef.current;
-		if (!start0) return;
-		const t = e.changedTouches[0];
-		const dx = t.clientX - start0.x;
-		const dy = t.clientY - start0.y;
-		if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // tap, not swipe
-		turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
-		touchRef.current = null;
-	};
+	// Swipe steering — pure Pointer Events (React touch handlers do nothing on real iOS).
+	const swipe = usePointerDrag(
+		(x, y) => { touchRef.current = { x, y }; },
+		() => {},
+		(x, y) => {
+			const start0 = touchRef.current;
+			if (!start0) return;
+			touchRef.current = null;
+			const dx = x - start0.x;
+			const dy = y - start0.y;
+			if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return; // tap, not swipe
+			turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
+		},
+	);
 
 	return (
 		<div className="sn-root">
@@ -693,8 +694,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 					className="sn-canvas"
 					role="img"
 					aria-label={`Snake — score ${score}`}
-					onTouchStart={onTouchStart}
-					onTouchEnd={onTouchEnd}
+					onPointerDown={swipe.onPointerDown}
 				/>
 
 				{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (

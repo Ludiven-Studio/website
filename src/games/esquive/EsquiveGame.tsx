@@ -21,6 +21,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import { useLevels } from '../../lib/useLevels';
+import { usePointerDrag } from '../usePointerDrag';
 import { esquiveLevels } from './levels';
 
 /* =====================================================
@@ -726,37 +727,38 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	/* Pointer: relative drag — only the movement (delta) steers the ship, not the finger position. */
-	const onCanvasPointerDown = (e: React.PointerEvent) => {
-		e.preventDefault();
-		if (dailyLoading) return;
-		const p = pointerRef.current;
-		p.active = true;
-		p.lastX = e.clientX;
-		p.lastY = e.clientY;
-		p.targetX = stateRef.current.shipX;
-		p.targetY = stateRef.current.shipY;
-		if (statusRef.current === 'ready' && !menuOpenRef.current) start();
-	};
-	const onCanvasPointerMove = (e: React.PointerEvent) => {
-		const p = pointerRef.current;
-		if (!p.active) return;
-		if (e.buttons === 0 && e.pointerType === 'mouse') return; // mouse: only while dragging
-		const canvas = canvasRef.current;
-		if (!canvas) return;
-		const rect = canvas.getBoundingClientRect();
-		const cfg = cfgRef.current;
-		const SENS = 1.2;
-		const worldDX = ((e.clientX - p.lastX) / rect.width) * (2 * cfg.halfW) * SENS;
-		const worldDY = -((e.clientY - p.lastY) / rect.height) * (2 * cfg.halfH) * SENS;
-		p.lastX = e.clientX;
-		p.lastY = e.clientY;
-		p.targetX = Math.max(-cfg.halfW, Math.min(cfg.halfW, p.targetX + worldDX));
-		p.targetY = Math.max(-cfg.halfH, Math.min(cfg.halfH, p.targetY + worldDY));
-	};
-	const releasePointer = () => {
-		pointerRef.current.active = false;
-	};
+	/* Pointer: relative drag — only the movement (delta) steers the ship, not the finger
+	   position. usePointerDrag (doc-level move/up, no capture) so it works on iOS. */
+	const shipDrag = usePointerDrag(
+		(clientX, clientY) => {
+			if (dailyLoading) return;
+			const p = pointerRef.current;
+			p.active = true;
+			p.lastX = clientX;
+			p.lastY = clientY;
+			p.targetX = stateRef.current.shipX;
+			p.targetY = stateRef.current.shipY;
+			if (statusRef.current === 'ready' && !menuOpenRef.current) start();
+		},
+		(clientX, clientY) => {
+			const p = pointerRef.current;
+			if (!p.active) return;
+			const canvas = canvasRef.current;
+			if (!canvas) return;
+			const rect = canvas.getBoundingClientRect();
+			const cfg = cfgRef.current;
+			const SENS = 1.2;
+			const worldDX = ((clientX - p.lastX) / rect.width) * (2 * cfg.halfW) * SENS;
+			const worldDY = -((clientY - p.lastY) / rect.height) * (2 * cfg.halfH) * SENS;
+			p.lastX = clientX;
+			p.lastY = clientY;
+			p.targetX = Math.max(-cfg.halfW, Math.min(cfg.halfW, p.targetX + worldDX));
+			p.targetY = Math.max(-cfg.halfH, Math.min(cfg.halfH, p.targetY + worldDY));
+		},
+		() => {
+			pointerRef.current.active = false;
+		},
+	);
 
 	const remaining = MAX_TRIES - tries;
 
@@ -812,11 +814,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 					className="es-canvas"
 					role="img"
 					aria-label={`Esquive — ${fmtSec(score)}`}
-					onPointerDown={onCanvasPointerDown}
-					onPointerMove={onCanvasPointerMove}
-					onPointerUp={releasePointer}
-					onPointerLeave={releasePointer}
-					onPointerCancel={releasePointer}
+					onPointerDown={shipDrag.onPointerDown}
 				/>
 
 				{webglError && (

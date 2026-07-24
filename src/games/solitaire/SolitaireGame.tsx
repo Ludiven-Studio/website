@@ -8,6 +8,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePointerDrag } from '../usePointerDrag';
 import { solitaireLevels, levelPegs } from './levels';
 import {
 	VARIANTS,
@@ -407,21 +408,21 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		}
 	};
 
-	/* ---------- Pointer ---------- */
-	const posFrom = (e: React.PointerEvent): { x: number; y: number } => {
+	/* ---------- Pointer (usePointerDrag: no capture, doc-level up — iOS-safe) ---------- */
+	const posFrom = (clientX: number, clientY: number): { x: number; y: number } => {
 		const cv = canvasRef.current!;
 		const rect = cv.getBoundingClientRect();
 		return {
-			x: (e.clientX - rect.left) * (dimRef.current.w / rect.width),
-			y: (e.clientY - rect.top) * (dimRef.current.h / rect.height),
+			x: (clientX - rect.left) * (dimRef.current.w / rect.width),
+			y: (clientY - rect.top) * (dimRef.current.h / rect.height),
 		};
 	};
 	const validTarget = (from: number, hole: number): Move | undefined =>
 		movesFrom(layoutRef.current, pegsRef.current, from).find((m) => m.to === hole);
 
-	const onDown = (e: React.PointerEvent): void => {
+	const onDown = (clientX: number, clientY: number): void => {
 		if (statusRef.current !== 'playing' || !startedRef.current || animRef.current || dailyLoading) return;
-		const p = posFrom(e);
+		const p = posFrom(clientX, clientY);
 		const hole = hitTest(p.x, p.y);
 		if (hole < 0) {
 			selRef.current = -1;
@@ -431,24 +432,24 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		if (ps[hole] && movesFrom(layoutRef.current, ps, hole).length > 0) {
 			selRef.current = hole;
 			dragRef.current = hole;
-			canvasRef.current?.setPointerCapture(e.pointerId);
 		} else if (selRef.current >= 0) {
 			const m = validTarget(selRef.current, hole);
 			if (m) doMove(m);
 			else selRef.current = -1;
 		}
 	};
-	const onUp = (e: React.PointerEvent): void => {
+	const onUp = (clientX: number, clientY: number): void => {
 		const from = dragRef.current;
 		dragRef.current = -1;
 		if (from < 0 || animRef.current) return;
-		const p = posFrom(e);
+		const p = posFrom(clientX, clientY);
 		const hole = hitTest(p.x, p.y);
 		if (hole >= 0 && hole !== from) {
 			const m = validTarget(from, hole);
 			if (m) doMove(m);
 		}
 	};
+	const pointer = usePointerDrag(onDown, () => {}, onUp);
 
 	/* ---------- Loop + sizing ---------- */
 	useEffect(() => {
@@ -670,7 +671,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="sol-playwrap" ref={wrapRef}>
-				<canvas ref={canvasRef} className={`sol-canvas${started ? '' : ' sol-blur'}`} onPointerDown={onDown} onPointerUp={onUp} onPointerLeave={onUp} />
+				<canvas ref={canvasRef} className={`sol-canvas${started ? '' : ' sol-blur'}`} onPointerDown={pointer.onPointerDown} />
 
 				{celebrating && <Celebration />}
 				{dailyLoading && (

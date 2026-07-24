@@ -61,6 +61,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const ballsRef = useRef<Ball[]>([]);
 	const scaleRef = useRef(1);
 	const offsetRef = useRef({ x: MIN_FLOOR, y: MIN_FLOOR }); // world units of floor left/top of the centred table
+	const rotRef = useRef(false); // portrait fullscreen: view rotated 90°
 	const aimRef = useRef<{ pull: Vec } | null>(null);
 	const statusRef = useRef<Status>('aiming');
 	const rollingRef = useRef(false);
@@ -91,23 +92,37 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	// Size the canvas to fill its container (the play area); table centred, floor fills the rest.
+	// Portrait fullscreen: rotate the view 90° so the table's long side runs down the screen —
+	// otherwise the 16/10 table is a tiny band across a phone held upright.
 	const doResize = useCallback(() => {
 		const cv = canvasRef.current, wrap = wrapRef.current;
 		if (!cv || !wrap) return;
 		const t = tableRef.current;
 		const cssW = wrap.clientWidth;
 		const cssH = wrap.clientHeight || cssW * 0.625;
-		const scale = Math.min(cssW / (t.w + 2 * MIN_FLOOR), cssH / (t.h + 2 * MIN_FLOOR));
-		scaleRef.current = scale;
-		offsetRef.current = { x: (cssW / scale - t.w) / 2, y: (cssH / scale - t.h) / 2 };
 		const dpr = window.devicePixelRatio || 1;
 		cv.style.width = `${cssW}px`;
 		cv.style.height = `${cssH}px`;
 		cv.width = Math.round(cssW * dpr);
 		cv.height = Math.round(cssH * dpr);
 		const ctx = cv.getContext('2d');
-		const s = dpr * scale;
-		if (ctx) ctx.setTransform(s, 0, 0, s, s * offsetRef.current.x, s * offsetRef.current.y);
+		const fs = document.fullscreenElement != null || document.querySelector('.game-page.gf-full') != null;
+		const rot = fs && cssH > cssW;
+		rotRef.current = rot;
+		if (rot) {
+			const scale = Math.min(cssW / (t.h + 2 * MIN_FLOOR), cssH / (t.w + 2 * MIN_FLOOR));
+			scaleRef.current = scale;
+			// offset.x = world-x margin (down the screen), offset.y = world-y margin (across)
+			offsetRef.current = { x: (cssH / scale - t.w) / 2, y: (cssW / scale - t.h) / 2 };
+			const s = dpr * scale;
+			if (ctx) ctx.setTransform(0, s, -s, 0, dpr * cssW - s * offsetRef.current.y, s * offsetRef.current.x);
+		} else {
+			const scale = Math.min(cssW / (t.w + 2 * MIN_FLOOR), cssH / (t.h + 2 * MIN_FLOOR));
+			scaleRef.current = scale;
+			offsetRef.current = { x: (cssW / scale - t.w) / 2, y: (cssH / scale - t.h) / 2 };
+			const s = dpr * scale;
+			if (ctx) ctx.setTransform(s, 0, 0, s, s * offsetRef.current.x, s * offsetRef.current.y);
+		}
 	}, []);
 
 	// The site's global GameFullscreen toggles `.game-page` fullscreen; re-measure the
@@ -252,6 +267,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	/* ---------- Aim (slingshot) — coord-based so both pointer and native touch feed it ---------- */
 	const clientToTable = (clientX: number, clientY: number): Vec => {
 		const rect = canvasRef.current!.getBoundingClientRect();
+		if (rotRef.current) {
+			// inverse of the rotated setTransform in doResize
+			return {
+				x: (clientY - rect.top) / scaleRef.current - offsetRef.current.x,
+				y: (rect.width - (clientX - rect.left)) / scaleRef.current - offsetRef.current.y,
+			};
+		}
 		return {
 			x: (clientX - rect.left) / scaleRef.current - offsetRef.current.x,
 			y: (clientY - rect.top) / scaleRef.current - offsetRef.current.y,
@@ -589,6 +611,12 @@ const CSS = `
   .game-page.gf-full .bi-root { height: 100%; }
   .game-page.gf-full .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
   /* Leave room top-right for the site's global "⛶ Quitter" button. */
+  .game-page.gf-full .bi-hud-top { padding-right: 122px; }
+}
+/* Portrait fullscreen: the playwrap fills the height and the canvas draws the table rotated 90°. */
+@media (orientation: portrait) {
+  .game-page.gf-full .bi-root { height: 100%; }
+  .game-page.gf-full .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
   .game-page.gf-full .bi-hud-top { padding-right: 122px; }
 }
 

@@ -28,6 +28,7 @@ import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
+import { useHoldButton } from '../useHoldButton';
 import { driftLevels, type DriftLevelCfg } from './levels';
 
 /* =====================================================
@@ -1106,10 +1107,9 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	const touch = (which: 'left' | 'right', down: boolean) => (e: React.PointerEvent) => {
-		e.preventDefault();
-		keysRef.current[which] = down;
-	};
+	// Hold buttons: native touch listeners — React pointer handlers drop held touches on iOS.
+	const holdLeft = useHoldButton(() => { keysRef.current.left = true; }, () => { keysRef.current.left = false; });
+	const holdRight = useHoldButton(() => { keysRef.current.right = true; }, () => { keysRef.current.right = false; });
 
 	return (
 		<div className="dr-root">
@@ -1153,8 +1153,8 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 							</ol>
 						)}
 						<div className="dr-touch">
-							<button className="dr-tbtn" onPointerDown={touch('left', true)} onPointerUp={touch('left', false)} onPointerLeave={touch('left', false)} onPointerCancel={touch('left', false)} aria-label="Gauche">◀</button>
-							<button className="dr-tbtn" onPointerDown={touch('right', true)} onPointerUp={touch('right', false)} onPointerLeave={touch('right', false)} onPointerCancel={touch('right', false)} aria-label="Droite">▶</button>
+							<button className="dr-tbtn" ref={holdLeft} aria-label="Gauche">◀</button>
+							<button className="dr-tbtn" ref={holdRight} aria-label="Droite">▶</button>
 						</div>
 					</>
 				)}

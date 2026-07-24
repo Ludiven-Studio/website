@@ -569,5 +569,19 @@ const CSS = `
 .mx-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin-top: 1.25rem; }
 .mx-daily-won strong { color: var(--mx-accent); font-variant-numeric: tabular-nums; }
 
+/* Compact phones: grid + all 6 options must fit one viewport, no scroll mid-question */
+@media (max-width: 480px) {
+  .mx-grid { max-width: min(234px, 30vh); gap: 6px; }
+  .mx-gcell { border-radius: 10px; }
+  .mx-gcell.q { font-size: 22px; }
+  .mx-prompt { margin: 0.55rem 0 0.45rem; font-size: 12px; }
+  .mx-options { max-width: min(258px, 33vh); gap: 7px; }
+  .mx-opt { border-radius: 11px; }
+  .mx-daily-status { margin-bottom: 0.7rem; }
+  .mx-bar { margin-bottom: 0.7rem; }
+  .mx-actions { margin-top: 0.8rem; }
+  .mx-help { margin-top: 0.8rem; }
+}
+
 @media (prefers-reduced-motion: reduce) { .mx-opt { transition: none; } }
 `;

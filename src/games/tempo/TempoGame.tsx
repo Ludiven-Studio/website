@@ -791,6 +791,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	pressLaneRef.current = pressLane;
 
 	const onDown = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return; // touch handled by native listeners (iOS)
 		if (!runningRef.current || autoRef.current) return; // listen mode: taps don't light lanes
 		const cv = canvasRef.current;
 		if (!cv) return;
@@ -803,8 +804,41 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		if (!wasHeld) pressLane(lane);
 	};
 	const onPointerEnd = (e: React.PointerEvent): void => {
+		if (e.pointerType === 'touch') return;
 		pointerLaneRef.current.delete(e.pointerId);
 	};
+
+	// iOS: native non-passive touch listeners — pointer events + capture drop taps and cancel
+	// holds on iOS Safari. Touch ids map into pointerLaneRef with negative keys (no clash with
+	// mouse/pen pointerIds). Everything read inside goes through refs, so mounting once is safe.
+	useEffect(() => {
+		const cv = canvasRef.current;
+		if (!cv) return;
+		const onStart = (e: TouchEvent): void => {
+			e.preventDefault(); // beat the scroll gesture; a held touch must never cancel
+			if (!runningRef.current || autoRef.current) return;
+			const rect = cv.getBoundingClientRect();
+			for (const t of Array.from(e.changedTouches)) {
+				const x = (t.clientX - rect.left) * (dimRef.current.w / rect.width);
+				const lane = clamp(Math.floor(x / laneW()), 0, laneCount() - 1);
+				const wasHeld = heldLane(lane);
+				pointerLaneRef.current.set(-1 - t.identifier, lane);
+				if (!wasHeld) pressLaneRef.current(lane);
+			}
+		};
+		const onEnd = (e: TouchEvent): void => {
+			for (const t of Array.from(e.changedTouches)) pointerLaneRef.current.delete(-1 - t.identifier);
+		};
+		cv.addEventListener('touchstart', onStart, { passive: false });
+		cv.addEventListener('touchend', onEnd);
+		cv.addEventListener('touchcancel', onEnd);
+		return () => {
+			cv.removeEventListener('touchstart', onStart);
+			cv.removeEventListener('touchend', onEnd);
+			cv.removeEventListener('touchcancel', onEnd);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* ---------- Modes ---------- */
 	const armFree = useCallback(
