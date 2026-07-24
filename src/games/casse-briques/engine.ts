@@ -259,10 +259,11 @@ export const LIFE_POINTS = 100; // per life left when the field is cleared
 export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConfig, paddleX: number): BreakoutState {
 	if (state.status !== 'playing') return { ...state, paddleX };
 
-	let { score, lives, speed } = state;
-	let wideMs = Math.max(0, state.wideMs - dt * 1000);
+	let { score, speed } = state;
+	const { lives } = state;
+	const wideMs = Math.max(0, state.wideMs - dt * 1000);
 	const powerMs = Math.max(0, state.powerMs - dt * 1000);
-	let slowMs = Math.max(0, state.slowMs - dt * 1000);
+	const slowMs = Math.max(0, state.slowMs - dt * 1000);
 	const power = powerMs > 0;
 	// Slow just ended → restore full speed.
 	if (slowMs === 0 && speed !== state.baseSpeed) speed = state.baseSpeed;
