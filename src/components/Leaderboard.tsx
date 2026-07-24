@@ -148,6 +148,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 			{submitValue != null && (
 				<div className="lb-share-row">
 					<button className="lb-share" onClick={share}>📣 Partager mon score</button>
+					<a className="lb-back" href="/jeux/defi/">🗓 Tous les défis</a>
 					{shareMsg && <span className="lb-share-msg">{shareMsg}</span>}
 				</div>
 			)}
@@ -261,6 +262,12 @@ const CSS = `
 .lb-share-row { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 0 0 0.9rem; flex-wrap: wrap; }
 .lb-share { border: none; background: var(--accent-regular); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 13.5px; border-radius: 999px; padding: 8px 18px; cursor: pointer; box-shadow: var(--shadow-sm); }
 .lb-share:hover { filter: brightness(1.05); }
+.lb-back {
+  border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0);
+  font: inherit; font-weight: 700; font-size: 13.5px; border-radius: 999px; padding: 8px 18px;
+  text-decoration: none; box-shadow: var(--shadow-sm);
+}
+.lb-back:hover, .lb-back:focus-visible { border-color: var(--accent-regular); color: var(--accent-regular); }
 .lb-share-msg { font-size: 12.5px; font-weight: 600; color: var(--accent-regular); }
 
 .lb-name { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 0.9rem; }
