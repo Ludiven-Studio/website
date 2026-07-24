@@ -530,15 +530,15 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 
 						{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
 							<div className="cb-overlay">
-								{lv.active && <p className="cb-go-title">Niveau {lv.level} · {diffRef.current.label}</p>}
+								{lv.active && <p className="cb-go-chip">Niveau {lv.level} · {diffRef.current.label}</p>}
 								<button className="cb-startbtn" onClick={start}>▶ {lv.active || daily ? 'Commencer' : 'Jouer'}</button>
 							</div>
 						)}
 						{dailyLoading && (
-							<div className="cb-overlay"><div className="cb-overlay-card">Préparation…</div></div>
+							<div className="cb-overlay cb-overlay-end"><div className="cb-overlay-card">Préparation…</div></div>
 						)}
 						{(status === 'over' || status === 'won') && !lv.active && (
-							<div className="cb-overlay">
+							<div className="cb-overlay cb-overlay-end">
 								<div className="cb-overlay-card">
 									<p className="cb-go-title">
 										{status === 'won' ? '🎉 Mur détruit !' : daily && alreadyPlayed ? 'Défi du jour terminé' : 'Perdu !'}
@@ -628,14 +628,18 @@ const CSS = `
   position: absolute; inset: 0; z-index: 2;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem;
 }
+/* End states dim the whole (frozen) board so the card reads as a clean modal. */
+.cb-overlay-end { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); border-radius: 12px; }
 .cb-overlay-card {
-  background: rgba(10, 12, 16, 0.82); backdrop-filter: blur(4px);
-  border: 1.5px solid var(--gray-700); border-radius: 16px; padding: 18px 26px;
+  /* Theme-adaptive surface + text so contrast holds in both light and dark modes. */
+  background: var(--gray-999); border: 1.5px solid var(--gray-700); border-radius: 16px; padding: 18px 26px;
   display: flex; flex-direction: column; align-items: center; gap: 0.5rem; text-align: center;
   box-shadow: var(--shadow-lg);
 }
 .cb-go-title { font-family: var(--font-brand); font-weight: 700; font-size: 18px; margin: 0; color: var(--gray-0); }
-.cb-go-score { margin: 0; color: var(--gray-200); font-size: 13.5px; font-weight: 600; }
+/* Standalone label over the armed board (ready gate) — dark chip, always readable. */
+.cb-go-chip { margin: 0; font-family: var(--font-brand); font-weight: 700; font-size: 14px; color: #fff; background: rgba(10, 12, 16, 0.7); border-radius: 999px; padding: 6px 14px; backdrop-filter: blur(3px); }
+.cb-go-score { margin: 0; color: var(--gray-300); font-size: 13.5px; font-weight: 600; }
 .cb-overlay-note { margin: 0; color: var(--gray-300); font-size: 13px; }
 .cb-startbtn {
   border: none; background: var(--accent-regular); color: var(--accent-text-over);
