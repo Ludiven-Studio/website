@@ -192,6 +192,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🧠', title: 'Sans devinette', body: 'Chaque grille est garantie résolvable par pure logique : tu n\'es jamais obligé de deviner. En cas de doute, le bouton Indice trouve une case forcément sûre (ou une mine) et l\'explique.' },
 		{ emoji: '🚩', title: 'Marquer les mines', body: 'Clic = révéler. Clic droit, ou le bouton « Mode drapeau » puis tap, = poser/retirer un drapeau 🚩 sur une mine suspectée. Cliquer une mine = partie terminée — mais au défi du jour tu apparais quand même au classement, selon les bombes restantes.' },
 	],
+	'casse-briques': [
+		{ emoji: '🎯', title: 'Le but', body: 'Renvoie la balle avec ta raquette pour détruire toutes les briques du mur. Ne laisse pas tomber la balle : chaque balle perdue coûte une vie, et à court de vies c\'est terminé.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Glisse le doigt (ou la souris) pour déplacer la raquette — la balle rebondit selon l\'endroit qu\'elle touche : vers le bord pour l\'envoyer sur le côté. Au clavier : flèches gauche/droite, Espace pour lancer. Les briques foncées demandent deux coups.' },
+		{ emoji: '🎁', title: 'Les bonus', body: 'Certaines briques lâchent un bonus qui tombe — attrape-le avec la raquette : 📏 raquette large, ⚡ multi-balles (×3), 💥 balle puissante (casse d\'un coup), ❤️ vie en plus, 🐢 ralenti. Les effets à durée se cumulent, cours après les capsules utiles !' },
+		{ emoji: '🏆', title: 'Défi du jour', body: 'Même mur et mêmes bonus pour tout le monde (graine partagée). Jusqu\'à 5 essais : ton meilleur score de la journée est classé. Vider le mur et garder des vies rapporte gros.' },
+	],
 	snake: [
 		{ emoji: '🎯', title: 'Le but', body: 'Mange les pommes pour grandir et faire le plus gros score. Ne touche jamais les murs, ta propre queue ni les rochers, sinon c\'est terminé.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Dirige le serpent aux flèches (ou ZQSD/WASD), ou en glissant le doigt. Tu accélères en grandissant. Choisis ta difficulté : plus dur = plus rapide et davantage de rochers.' },

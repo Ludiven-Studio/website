@@ -30,6 +30,7 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	mine: { fmt: score },
 	'2048': { fmt: score },
 	snake: { fmt: score },
+	'casse-briques': { fmt: score },
 	tempo: { fmt: score },
 	spectro: { fmt: score },
 	'cocottes-renards': { fmt: score },

@@ -18,6 +18,7 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	luge: 'score',
 	'2048': 'score',
 	snake: 'score',
+	'casse-briques': 'score',
 	flappy: 'score',
 	tempo: 'score',
 	spectro: 'score',

@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import CasseBriquesGame from '../../games/casse-briques/CasseBriquesGame.tsx';
+---
+
+<GamePage
+	title="Casse-Briques | Jeux Ludiven Studio"
+	description="Casse-Briques : renvoie la balle avec ta raquette pour détruire tout le mur, attrape les bonus (raquette large, multi-balles, balle puissante…). Défi du jour à graine partagée et classement. Un jeu d'adresse signé Ludiven Studio."
+	heading="Casse-Briques"
+	tagline="Détruis tout le mur, attrape les bonus"
+	gameId="casse-briques"
+>
+	<CasseBriquesGame client:only="react" gameId="casse-briques" />
+</GamePage>

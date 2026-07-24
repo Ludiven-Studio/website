@@ -253,6 +253,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'casse-briques',
+		title: 'Casse-Briques',
+		pitch: 'Renvoie la balle avec ta raquette et détruis tout le mur de briques. Attrape les bonus qui tombent : raquette large, multi-balles, balle puissante… Défi du jour à graine partagée et classement.',
+		icon: 'casse-briques',
+		href: '/jeux/casse-briques',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'snake',
 		title: 'Snake',
 		pitch: 'Mange les pommes et grandis sans te mordre. Défi du jour à graine partagée et classement.',
