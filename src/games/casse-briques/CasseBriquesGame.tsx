@@ -507,14 +507,6 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 				<span className="cb-best">{lv.active ? `Niveau ${lv.level}` : `Record ${best}`}</span>
 			</div>
 
-			{active.length > 0 && (
-				<div className="cb-buffs" aria-live="off">
-					{active.map((k) => (
-						<span key={k} className="cb-buff" title={BONUS_LABEL[k]}>{BONUS_EMOJI[k]} {BONUS_LABEL[k]}</span>
-					))}
-				</div>
-			)}
-
 			<div className="cb-boardwrap">
 				{lv.active && lv.menu ? (
 					<LevelSelect progress={lv.progress} onPick={startLevel} />
@@ -527,6 +519,14 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 							aria-label={`Casse-Briques — score ${score}`}
 							onPointerDown={drag.onPointerDown}
 						/>
+
+						{active.length > 0 && (
+							<div className="cb-buffs" aria-live="off">
+								{active.map((k) => (
+									<span key={k} className="cb-buff" title={BONUS_LABEL[k]}>{BONUS_EMOJI[k]} {BONUS_LABEL[k]}</span>
+								))}
+							</div>
+						)}
 
 						{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
 							<div className="cb-overlay">
@@ -614,8 +614,9 @@ const CSS = `
 .cb-score { color: var(--gray-0); }
 .cb-lives { letter-spacing: 1px; font-size: 12px; }
 .cb-best { color: var(--gray-300); }
-.cb-buffs { width: 100%; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-bottom: 0.5rem; }
-.cb-buff { background: var(--accent-overlay); border: 1px solid var(--accent-regular); color: var(--gray-0); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; }
+/* Overlaid on the board (top-centre) so appearing/disappearing chips never reflow the scene. */
+.cb-buffs { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); z-index: 3; width: 100%; box-sizing: border-box; padding: 0 8px; display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; pointer-events: none; }
+.cb-buff { background: rgba(10, 12, 16, 0.7); backdrop-filter: blur(3px); border: 1px solid var(--accent-regular); color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; }
 
 .cb-boardwrap { position: relative; width: 100%; }
 .cb-canvas {
