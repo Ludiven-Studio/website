@@ -38,24 +38,39 @@ describe('casse-briques engine', () => {
 		expect(JSON.stringify(a)).not.toEqual(JSON.stringify(c));
 	});
 
-	it('fills a full grid of cols × rows within the world bounds', () => {
+	it('places a non-empty motif within the grid + world bounds (never a full solid grid)', () => {
 		const bricks = generateBricks(7, cfg, diff);
-		expect(bricks.length).toBe(cfg.cols * diff.rows);
+		expect(bricks.length).toBeGreaterThan(0);
+		expect(bricks.length).toBeLessThanOrEqual(cfg.cols * diff.rows);
 		for (const br of bricks) {
 			expect(br.x).toBeGreaterThanOrEqual(cfg.sideMargin - 0.001);
 			expect(br.x + br.w).toBeLessThanOrEqual(cfg.worldW - cfg.sideMargin + 0.001);
+			expect(br.row).toBeGreaterThanOrEqual(0);
+			expect(br.row).toBeLessThan(diff.rows);
 			expect(br.hp).toBeGreaterThanOrEqual(1);
 			expect(br.hp).toBeLessThanOrEqual(2);
 		}
 		expect(brickWidth(cfg)).toBeGreaterThan(0);
 	});
 
-	it('harder difficulty means more rows and more 2-hit bricks', () => {
-		const easy = generateBricks(9, cfg, BREAKOUT_DIFFS.facile);
-		const hard = generateBricks(9, cfg, BREAKOUT_DIFFS.difficile);
-		expect(hard.length).toBeGreaterThan(easy.length);
-		const two = (bs: ReturnType<typeof generateBricks>) => bs.filter((b) => b.maxHp === 2).length / bs.length;
-		expect(two(hard)).toBeGreaterThan(two(easy));
+	it('motifs are horizontally symmetric (left half mirrors the right)', () => {
+		const present = new Set(generateBricks(11, cfg, diff).map((b) => `${b.row},${b.col}`));
+		for (const key of present) {
+			const [r, c] = key.split(',').map(Number);
+			expect(present.has(`${r},${cfg.cols - 1 - c}`)).toBe(true);
+		}
+	});
+
+	it('harder difficulty means fuller walls and more 2-hit bricks (averaged over seeds)', () => {
+		const avg = (d: typeof diff, pick: (bs: ReturnType<typeof generateBricks>) => number) => {
+			let s = 0;
+			for (let seed = 1; seed <= 24; seed++) s += pick(generateBricks(seed, cfg, d));
+			return s / 24;
+		};
+		const count = (bs: ReturnType<typeof generateBricks>) => bs.length;
+		const twoFrac = (bs: ReturnType<typeof generateBricks>) => (bs.length ? bs.filter((b) => b.maxHp === 2).length / bs.length : 0);
+		expect(avg(BREAKOUT_DIFFS.difficile, count)).toBeGreaterThan(avg(BREAKOUT_DIFFS.facile, count));
+		expect(avg(BREAKOUT_DIFFS.difficile, twoFrac)).toBeGreaterThan(avg(BREAKOUT_DIFFS.facile, twoFrac));
 	});
 
 	it('starts ready with one ball resting on the paddle, launches on demand', () => {

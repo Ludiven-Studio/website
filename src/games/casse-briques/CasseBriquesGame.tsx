@@ -180,9 +180,11 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 		const dpr = window.devicePixelRatio || 1;
+		// Display height comes from the CSS aspect-ratio (reliable across mounts/replays);
+		// we only size the backing store to match, so nothing is ever cropped.
 		const cssW = canvas.clientWidth;
-		const cssH = cssW * (CFG.worldH / CFG.worldW);
-		canvas.style.height = `${cssH}px`;
+		const cssH = canvas.clientHeight || cssW * (CFG.worldH / CFG.worldW);
+		if (cssW === 0) return; // not laid out yet — a later rAF resize will catch it
 		cssWRef.current = cssW;
 		scaleRef.current = cssW / CFG.worldW;
 		canvas.width = Math.round(cssW * dpr);
@@ -311,7 +313,10 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 		setActive([]);
 		setStatus('ready');
 		draw();
-	}, [draw]);
+		// Re-measure after this render commits — the canvas may have just (re)mounted
+		// (e.g. returning from the levels grid), so its backing store size is stale.
+		requestAnimationFrame(resize);
+	}, [draw, resize]);
 
 	/* ---- Modes ---- */
 	const armFree = useCallback(
@@ -620,7 +625,7 @@ const CSS = `
 
 .cb-boardwrap { position: relative; width: 100%; }
 .cb-canvas {
-  width: 100%; display: block;
+  width: 100%; aspect-ratio: 100 / 132; display: block;
   background: var(--gray-999); border: 1px solid var(--gray-800); border-radius: 12px;
   touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }

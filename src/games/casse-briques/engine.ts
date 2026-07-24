@@ -70,12 +70,13 @@ export interface BreakoutDiff {
 	rows: number;
 	twoHpChance: number; // fraction of 2-hit bricks
 	speed: number; // ball speed, units / s
+	density: number; // 0..1 fill of the chosen motif — lower = more holes (more ricochet fun)
 }
 
 export const BREAKOUT_DIFFS: Record<string, BreakoutDiff> = {
-	facile: { label: 'Facile', rows: 4, twoHpChance: 0.12, speed: 66 },
-	moyen: { label: 'Moyen', rows: 6, twoHpChance: 0.34, speed: 78 },
-	difficile: { label: 'Difficile', rows: 8, twoHpChance: 0.55, speed: 92 },
+	facile: { label: 'Facile', rows: 4, twoHpChance: 0.12, speed: 66, density: 0.6 },
+	moyen: { label: 'Moyen', rows: 6, twoHpChance: 0.34, speed: 78, density: 0.78 },
+	difficile: { label: 'Difficile', rows: 8, twoHpChance: 0.55, speed: 92, density: 0.9 },
 };
 
 export const breakoutConfig = (): BreakoutConfig => ({ ...BASE });
@@ -147,13 +148,64 @@ function pickBonus(r: number): BonusKind {
 	return 'wide';
 }
 
-/** Brick field for a seed — pure, so the daily layout is shared by everyone. */
+// Layout motifs — the shape a difficulty's bricks form. Holes inside a shape (from the
+// density draw) give the satisfying "ball trapped ricocheting between bricks" moments.
+export type Motif = 'full' | 'checker' | 'columns' | 'rows' | 'pyramid' | 'invpyramid' | 'diamond' | 'frame' | 'channels' | 'scatter';
+export const MOTIFS: Motif[] = ['full', 'checker', 'columns', 'rows', 'pyramid', 'invpyramid', 'diamond', 'frame', 'channels', 'scatter'];
+
+// Whether a cell belongs to the motif's base shape (before random holes are punched).
+function inMotif(motif: Motif, r: number, c: number, cols: number, rows: number): boolean {
+	const cx = (cols - 1) / 2;
+	const dc = Math.abs(c - cx);
+	switch (motif) {
+		case 'full':
+		case 'scatter': return true; // shape is everything; density alone carves the holes
+		case 'checker': return (r + c) % 2 === 0;
+		case 'columns': return c % 2 === 0;
+		case 'rows': return r % 2 === 0;
+		case 'channels': return c % 3 !== 1; // vertical channels every third column
+		case 'pyramid': return dc <= r + 0.5; // narrow top → wide bottom
+		case 'invpyramid': return dc <= rows - 1 - r + 0.5; // wide top → narrow bottom
+		case 'diamond': {
+			const cy = (rows - 1) / 2;
+			return Math.abs(r - cy) + dc <= Math.max(cx, cy) - 0.5;
+		}
+		case 'frame': return r === 0 || r === rows - 1 || c === 0 || c === cols - 1;
+	}
+}
+
+// Symmetric fill mask for a motif: decide the left half + centre, mirror to the right so
+// the wall always looks deliberate. `density` sets how much of the shape survives.
+function buildMask(rng: () => number, cols: number, rows: number, density: number, motif: Motif): boolean[][] {
+	const hole = 1 - density;
+	const mask: boolean[][] = Array.from({ length: rows }, () => new Array<boolean>(cols).fill(false));
+	const halfEnd = Math.floor((cols - 1) / 2);
+	for (let r = 0; r < rows; r++) {
+		for (let c = 0; c <= halfEnd; c++) {
+			const on = inMotif(motif, r, c, cols, rows) && rng() >= hole;
+			mask[r][c] = on;
+			mask[r][cols - 1 - c] = on; // mirror → horizontal symmetry
+		}
+	}
+	return mask;
+}
+
+/** Brick field for a seed — pure, so the daily layout is shared by everyone. A seed-chosen
+ *  motif + difficulty density shape the wall; harder = fuller + more 2-hit bricks. */
 export function generateBricks(seed: number, cfg: BreakoutConfig, diff: BreakoutDiff): Brick[] {
 	const rng = mulberry32(seed >>> 0);
+	const motif = MOTIFS[Math.floor(rng() * MOTIFS.length)] ?? 'full';
+	const mask = buildMask(rng, cfg.cols, diff.rows, diff.density, motif);
+	// Guard against a near-empty wall (sparse motif + high holes): fill the bottom row.
+	let count = 0;
+	for (let r = 0; r < diff.rows; r++) for (let c = 0; c < cfg.cols; c++) if (mask[r][c]) count++;
+	if (count < cfg.cols) for (let c = 0; c < cfg.cols; c++) mask[diff.rows - 1][c] = true;
+
 	const bw = brickWidth(cfg);
 	const bricks: Brick[] = [];
 	for (let row = 0; row < diff.rows; row++) {
 		for (let col = 0; col < cfg.cols; col++) {
+			if (!mask[row][col]) continue;
 			const hp = rng() < diff.twoHpChance ? 2 : 1;
 			const bonus = rng() < cfg.bonusChance ? pickBonus(rng()) : null;
 			bricks.push({

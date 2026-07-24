@@ -21,7 +21,7 @@ export interface CasseBriquesLevelCfg {
 const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x51ed270b) >>> 0;
 
 // A tougher tier past "difficile": a full 9-row wall, dense 2-hit bricks, fast ball.
-const EXPERT: BreakoutDiff = { label: 'Expert', rows: 9, twoHpChance: 0.7, speed: 104 };
+const EXPERT: BreakoutDiff = { label: 'Expert', rows: 9, twoHpChance: 0.7, speed: 104, density: 0.95 };
 
 // Four bands: difficulty tier fixed per band, starting lives ramp from `from` → `to`.
 const BANDS: { min: number; max: number; diff: BreakoutDiff; from: number; to: number }[] = [
