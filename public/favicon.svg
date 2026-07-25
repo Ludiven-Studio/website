@@ -1,19 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
     <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#7c3aed" />
-            <stop offset="1" stop-color="#4338ca" />
+        <radialGradient id="bg" cx="0.5" cy="0.3" r="0.85">
+            <stop offset="0" stop-color="#8b5cf6" />
+            <stop offset="0.55" stop-color="#5b21b6" />
+            <stop offset="1" stop-color="#2e1065" />
+        </radialGradient>
+        <linearGradient id="cy" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="0.4" stop-color="#cdf3ff" />
+            <stop offset="1" stop-color="#3fc4ef" />
         </linearGradient>
-        <linearGradient id="ell" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#a5f3fc" />
-            <stop offset="1" stop-color="#38bdf8" />
+        <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.32" />
+            <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
         </linearGradient>
+        <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="4.5" />
+        </filter>
     </defs>
-    <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)" />
-    <rect x="4" y="4" width="120" height="60" rx="28" fill="#ffffff" opacity="0.08" />
-    <text x="64" y="66" text-anchor="middle" dominant-baseline="central"
-        font-family="'Arial Black', 'Arial', sans-serif" font-weight="900"
-        font-size="58" letter-spacing="-3"
-        fill="url(#ell)" stroke="#0b2545" stroke-width="6"
-        stroke-linejoin="round" paint-order="stroke">LS</text>
+
+    <rect x="2" y="2" width="124" height="124" rx="30" fill="url(#bg)" />
+    <rect x="2" y="2" width="124" height="68" rx="30" fill="url(#gloss)" />
+
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <g id="letters" transform="translate(64 65) skewX(-9) translate(-64 -65)">
+            <path d="M 41 41 C 41 41 41 78 41 82 C 41 86 44 87 48 87 L 62 87" />
+            <path d="M 93 54 C 93 42 73 40 73 52 C 73 62 92 61 92 73 C 92 86 71 85 70 74" />
+        </g>
+        <use href="#letters" stroke="#38bdf8" stroke-width="27" filter="url(#glow)" opacity="0.5" />
+        <use href="#letters" stroke="#8b5cf6" stroke-width="26" />
+        <use href="#letters" stroke="#160a38" stroke-width="19" />
+        <use href="#letters" stroke="url(#cy)" stroke-width="11" />
+    </g>
 </svg>

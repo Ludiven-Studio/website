@@ -10,7 +10,8 @@
     "astro": "astro",
     "test": "vitest run",
     "lint": "eslint .",
-    "og": "node scripts/generate-og.mjs"
+    "og": "node scripts/generate-og.mjs",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.5.10",

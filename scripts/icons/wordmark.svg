@@ -1,0 +1,39 @@
+<!-- Source for the large app icons (home screen, PWA). Rasterised by scripts/generate-icons.mjs;
+     never served as-is, because the <text> would depend on the visitor's fonts. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+    <defs>
+        <radialGradient id="bg" cx="0.5" cy="0.3" r="0.85">
+            <stop offset="0" stop-color="#8b5cf6" />
+            <stop offset="0.55" stop-color="#5b21b6" />
+            <stop offset="1" stop-color="#2e1065" />
+        </radialGradient>
+        <linearGradient id="cy" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="0.45" stop-color="#cdf3ff" />
+            <stop offset="1" stop-color="#3fc4ef" />
+        </linearGradient>
+        <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.32" />
+            <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+        </linearGradient>
+    </defs>
+
+    <rect id="plate" x="2" y="2" width="124" height="124" rx="30" fill="url(#bg)" />
+    <rect id="shine" x="2" y="2" width="124" height="68" rx="30" fill="url(#gloss)" />
+
+    <g id="mark">
+        <text x="64" y="54" text-anchor="middle" dominant-baseline="central"
+            font-family="'Segoe UI', system-ui, sans-serif" font-weight="800" font-style="italic"
+            font-size="34" textLength="106" lengthAdjust="spacingAndGlyphs"
+            fill="url(#cy)" stroke="#160a38" stroke-width="7" stroke-linejoin="round"
+            paint-order="stroke">Ludiven</text>
+
+        <g transform="translate(64 88)">
+            <rect x="-44" y="-14" width="88" height="28" rx="14" fill="#3b1178" stroke="#a78bfa" stroke-width="4" />
+            <text x="0" y="1" text-anchor="middle" dominant-baseline="central"
+                font-family="'Segoe UI', system-ui, sans-serif" font-weight="800"
+                font-size="17" letter-spacing="2.5" textLength="64" lengthAdjust="spacing"
+                fill="#ffffff">STUDIO</text>
+        </g>
+    </g>
+</svg>
