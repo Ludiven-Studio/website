@@ -200,6 +200,36 @@ function buildMask(rng: () => number, cols: number, rows: number, density: numbe
 	return mask;
 }
 
+// Ricochet pockets: a sealed empty cell ringed by reinforced bricks. Break in and the ball
+// pinballs inside for a while before chewing its way back out.
+const CHAMBER_W = 2; // pocket interior width, in columns (the interior is one row tall)
+
+/** Carve mirrored pockets into the mask. Returns the cells whose brick must be reinforced. */
+function carveChambers(rng: () => number, mask: boolean[][], cols: number, rows: number): boolean[][] {
+	const reinforce: boolean[][] = Array.from({ length: rows }, () => new Array<boolean>(cols).fill(false));
+	const maxC0 = Math.floor(cols / 2) - CHAMBER_W - 1; // further right and a pocket would meet its mirror
+	if (rows < 3 || maxC0 < 1) return reinforce;
+
+	// Rows a pocket can sit on, spaced by 3 so two pockets never share a ring row.
+	const slots: number[] = [];
+	for (let r = 1; r <= rows - 2; r += 3) slots.push(r);
+	const wanted = rows >= 6 ? 2 : 1;
+	for (let i = 0; i < wanted && slots.length > 0; i++) {
+		const r0 = slots.splice(Math.floor(rng() * slots.length), 1)[0];
+		const c0 = 1 + Math.floor(rng() * maxC0);
+		for (const left of [c0, cols - CHAMBER_W - c0]) {
+			for (let r = r0 - 1; r <= r0 + 1; r++) {
+				for (let c = left - 1; c <= left + CHAMBER_W; c++) {
+					const inside = r === r0 && c >= left && c < left + CHAMBER_W;
+					mask[r][c] = !inside;
+					reinforce[r][c] = !inside;
+				}
+			}
+		}
+	}
+	return reinforce;
+}
+
 /** Brick field for a seed — pure, so the daily layout is shared by everyone. A seed-chosen
  *  motif + difficulty density shape the wall; harder = fuller + more 2-hit bricks. */
 export function generateBricks(seed: number, cfg: BreakoutConfig, diff: BreakoutDiff): Brick[] {
@@ -210,13 +240,16 @@ export function generateBricks(seed: number, cfg: BreakoutConfig, diff: Breakout
 	let count = 0;
 	for (let r = 0; r < diff.rows; r++) for (let c = 0; c < cfg.cols; c++) if (mask[r][c]) count++;
 	if (count < cfg.cols) for (let c = 0; c < cfg.cols; c++) mask[diff.rows - 1][c] = true;
+	const reinforce = carveChambers(rng, mask, cfg.cols, diff.rows);
 
 	const bw = brickWidth(cfg);
 	const bricks: Brick[] = [];
 	for (let row = 0; row < diff.rows; row++) {
 		for (let col = 0; col < cfg.cols; col++) {
 			if (!mask[row][col]) continue;
-			const hp = rng() < diff.twoHpChance ? 2 : 1;
+			// Draw first, then reinforce: the rng stream must not depend on the pocket layout.
+			const heavy = rng() < diff.twoHpChance;
+			const hp = heavy || reinforce[row][col] ? 2 : 1;
 			const bonus = rng() < cfg.bonusChance ? pickBonus(rng()) : null;
 			bricks.push({
 				col,

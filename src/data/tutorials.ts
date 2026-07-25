@@ -195,7 +195,8 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	'casse-briques': [
 		{ emoji: '🎯', title: 'Le but', body: 'Renvoie la cocotte avec ta raquette pour détruire toutes les briques du mur. Ne la laisse pas tomber : chaque cocotte perdue coûte une vie, et à court de vies c\'est terminé.' },
 		{ emoji: '🎮', title: 'Contrôles', body: 'Glisse le doigt (ou la souris) pour déplacer la raquette — la cocotte rebondit selon l\'endroit qu\'elle touche : vers le bord pour l\'envoyer sur le côté. Au clavier : flèches gauche/droite, Espace pour lancer. Les briques foncées demandent deux coups.' },
-		{ emoji: '🎁', title: 'Les bonus', body: 'Certaines briques lâchent un bonus qui tombe — attrape-le avec la raquette : 📏 raquette large, ⚡ multi-cocottes (×3), 💥 cocotte puissante (casse d\'un coup), 🔥 cocotte de feu (traverse le mur et pulvérise chaque brique touchée), 🥚 cocotte qui se dédouble à chaque rebond jusqu\'à 16, ❤️ vie en plus, 🐢 ralenti. Le plumage de la cocotte change selon son pouvoir.' },
+		{ emoji: '🎁', title: 'Les bonus', body: 'Certaines briques lâchent un bonus qui tombe — attrape-le avec la raquette : 📏 raquette large, ⚡ multi-cocottes (×3), 💥 cocotte puissante (casse d\'un coup), 🔥 cocotte de feu (traverse le mur et pulvérise chaque brique touchée), 🥚 cocotte qui se dédouble à chaque rebond jusqu\'à 16, ❤️ vie en plus, 🐢 ralenti. Chaque brique piégée porte son bonus écrit dessus : vise celui que tu veux ! Le plumage de la cocotte change selon son pouvoir.' },
+		{ emoji: '🌀', title: 'Les alvéoles', body: 'Le mur cache des alvéoles : de petites cavités scellées par des briques doubles. Perce la coquille et la cocotte y rebondit comme un flipper, en croquant les parois de l\'intérieur.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'Même mur et mêmes bonus pour tout le monde (graine partagée). Jusqu\'à 5 essais : ton meilleur score de la journée est classé. Vider le mur et garder des vies rapporte gros.' },
 	],
 	snake: [

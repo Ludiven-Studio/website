@@ -61,6 +61,27 @@ describe('casse-briques engine', () => {
 		}
 	});
 
+	it('carves ricochet pockets: an empty cell sealed by 2-hit bricks', () => {
+		for (const d of [BREAKOUT_DIFFS.facile, BREAKOUT_DIFFS.moyen, BREAKOUT_DIFFS.difficile]) {
+			for (let seed = 1; seed <= 12; seed++) {
+				const at = new Map(generateBricks(seed, cfg, d).map((b) => [`${b.row},${b.col}`, b]));
+				const pockets: string[] = [];
+				for (let r = 1; r < d.rows - 1; r++) {
+					for (let c = 1; c < cfg.cols - 1; c++) {
+						if (at.has(`${r},${c}`)) continue;
+						const ring = [
+							[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1],
+							[r - 1, c - 1], [r - 1, c + 1], [r + 1, c - 1], [r + 1, c + 1],
+						].map(([rr, cc]) => at.get(`${rr},${cc}`));
+						// A pocket cell: walled on every side except towards its twin cell.
+						if (ring.filter(Boolean).length >= 7 && ring.every((b) => !b || b.maxHp === 2)) pockets.push(`${r},${c}`);
+					}
+				}
+				expect(pockets.length).toBeGreaterThanOrEqual(2); // mirrored, so pockets come in pairs
+			}
+		}
+	});
+
 	it('harder difficulty means fuller walls and more 2-hit bricks (averaged over seeds)', () => {
 		const avg = (d: typeof diff, pick: (bs: ReturnType<typeof generateBricks>) => number) => {
 			let s = 0;

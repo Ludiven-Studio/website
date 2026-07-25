@@ -177,6 +177,13 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 				ctx.lineWidth = Math.max(1, 0.5 * S);
 				ctx.stroke();
 			}
+			// Bonus bricks wear their glyph, so the player can aim for the power they want.
+			if (b.bonus) {
+				ctx.font = `${b.h * S * 0.72}px system-ui, sans-serif`;
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.fillText(BONUS_EMOJI[b.bonus], (b.x + b.w / 2) * S, (b.y + b.h / 2) * S);
+			}
 		}
 
 		// Falling bonuses — a rounded capsule with an emoji glyph.
@@ -627,7 +634,9 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 			<p className="cb-help">
 				Glisse la raquette pour renvoyer la cocotte et casser tout le mur. Attrape les bonus qui tombent :
 				📏 raquette large, ⚡ multi-cocottes, 💥 cocotte puissante, 🔥 cocotte de feu (traverse et casse tout),
-				🥚 cocotte qui se dédouble à chaque rebond (jusqu'à 16), ❤️ vie, 🐢 ralenti. Flèches ou souris au clavier.
+				🥚 cocotte qui se dédouble à chaque rebond (jusqu'à 16), ❤️ vie, 🐢 ralenti. Chaque brique piégée
+				affiche son bonus : vise-la. Perce les alvéoles du mur, la cocotte y rebondit comme un flipper.
+				Flèches ou souris au clavier.
 			</p>
 
 			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={(status === 'over' || status === 'won') ? best : undefined} />}
