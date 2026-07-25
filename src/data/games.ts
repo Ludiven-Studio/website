@@ -255,7 +255,7 @@ export const games: GameTile[] = [
 	{
 		id: 'casse-briques',
 		title: 'Casse-Briques',
-		pitch: 'Renvoie la balle avec ta raquette et détruis tout le mur de briques. Attrape les bonus qui tombent : raquette large, multi-balles, balle puissante… Défi du jour à graine partagée et classement.',
+		pitch: 'Renvoie la cocotte avec ta raquette et détruis tout le mur de briques. Chaque brique piégée affiche son bonus : raquette large, multi-cocottes, cocotte de feu… Défi du jour à graine partagée et classement.',
 		icon: 'casse-briques',
 		href: '/jeux/casse-briques',
 		status: 'play',

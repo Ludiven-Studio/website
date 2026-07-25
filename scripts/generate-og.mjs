@@ -148,6 +148,17 @@ async function main() {
 				await sleep(180);
 			}
 		},
+		// Levels mode opens on a sparse 4-row wall and the tall board overflows the frame.
+		// Free + Difficile fills the wall; zooming out brings the paddle back in shot.
+		'casse-briques': async () => {
+			await clickBtn('libre');
+			await sleep(250);
+			await clickBtn('difficile');
+			await sleep(250);
+			await page.addStyleTag({ content: '.cb-root { zoom: 0.78; }' });
+			await startCTA();
+			await sleep(900); // let the cocotte fly off the paddle
+		},
 		// Place a few base elements on the workbench so the shot shows the mechanic, not an empty board.
 		alchimie: async () => {
 			for (const name of ['Feu', 'Eau', 'Terre', 'Bois']) {
