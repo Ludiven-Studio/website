@@ -4,10 +4,14 @@
  * challenge is identical for everyone regardless of how the player plays.
  * All units are logical (a 100-wide world); the island scales it to the canvas.
  *
- * Balls keep a CONSTANT speed (classic breakout): only their direction changes on
- * a bounce. The "slow" bonus lowers that target speed for a while, "pierce" makes a
- * ball wipe every brick it touches without bouncing, and "split" twins a ball on
- * each bounce up to the ball cap.
+ * Balls keep a constant speed (classic breakout): only their direction changes on a
+ * bounce. That target speed ramps up as the wall empties (hunting the last bricks was
+ * the slow part). The "slow" bonus lowers it for a while, "pierce" makes a ball wipe
+ * every brick it touches without bouncing, and "split" twins a ball on each bounce up
+ * to the ball cap.
+ *
+ * The paddle is a convex ARC: bounces reflect about the surface normal at the contact
+ * point, so the incoming angle matters instead of being overwritten by a steer nudge.
  */
 
 import { mulberry32 } from '../prng';
@@ -28,7 +32,9 @@ export interface BreakoutConfig {
 	paddleBaseW: number;
 	paddleWideW: number; // paddle width while "wide" is active
 	ballR: number;
-	steer: number; // how much the paddle hit position bends the bounce (0..1)
+	paddleCurve: number; // half-angle (rad) of the paddle's convex arc — its edge normal tilt
+	speedRamp: number; // extra ball speed once the wall is empty (0.6 = +60%)
+	autoBonusEvery: number; // points between two free falling bonuses
 	bonusW: number;
 	bonusH: number;
 	bonusFallV: number; // units / s
@@ -56,7 +62,9 @@ const BASE = {
 	paddleBaseW: 20,
 	paddleWideW: 32,
 	ballR: 1.7,
-	steer: 0.75,
+	paddleCurve: 0.55,
+	speedRamp: 0.6,
+	autoBonusEvery: 200,
 	bonusW: 8,
 	bonusH: 5,
 	bonusFallV: 33,
@@ -74,15 +82,16 @@ const BASE = {
 export interface BreakoutDiff {
 	label: string;
 	rows: number;
-	twoHpChance: number; // fraction of 2-hit bricks
+	twoHpChance: number; // fraction of bricks needing 2+ hits
+	threeHpChance: number; // fraction needing 3 (a subset of twoHpChance)
 	speed: number; // ball speed, units / s
 	density: number; // 0..1 fill of the chosen motif — lower = more holes (more ricochet fun)
 }
 
 export const BREAKOUT_DIFFS: Record<string, BreakoutDiff> = {
-	facile: { label: 'Facile', rows: 4, twoHpChance: 0.12, speed: 66, density: 0.6 },
-	moyen: { label: 'Moyen', rows: 6, twoHpChance: 0.34, speed: 78, density: 0.78 },
-	difficile: { label: 'Difficile', rows: 8, twoHpChance: 0.55, speed: 92, density: 0.9 },
+	facile: { label: 'Facile', rows: 4, twoHpChance: 0.16, threeHpChance: 0.03, speed: 66, density: 0.6 },
+	moyen: { label: 'Moyen', rows: 6, twoHpChance: 0.4, threeHpChance: 0.1, speed: 78, density: 0.78 },
+	difficile: { label: 'Difficile', rows: 8, twoHpChance: 0.6, threeHpChance: 0.22, speed: 92, density: 0.9 },
 };
 
 export const breakoutConfig = (): BreakoutConfig => ({ ...BASE });
@@ -247,9 +256,10 @@ export function generateBricks(seed: number, cfg: BreakoutConfig, diff: Breakout
 	for (let row = 0; row < diff.rows; row++) {
 		for (let col = 0; col < cfg.cols; col++) {
 			if (!mask[row][col]) continue;
-			// Draw first, then reinforce: the rng stream must not depend on the pocket layout.
-			const heavy = rng() < diff.twoHpChance;
-			const hp = heavy || reinforce[row][col] ? 2 : 1;
+			// One draw for the three tiers, so the rng stream never depends on the pocket layout.
+			const roll = rng();
+			const rolled = roll < diff.threeHpChance ? 3 : roll < diff.twoHpChance ? 2 : 1;
+			const hp = reinforce[row][col] ? Math.max(2, rolled) : rolled;
 			const bonus = rng() < cfg.bonusChance ? pickBonus(rng()) : null;
 			bricks.push({
 				col,
@@ -307,6 +317,13 @@ export function launch(state: BreakoutState): BreakoutState {
 export const paddleWidth = (state: BreakoutState, cfg: BreakoutConfig): number =>
 	state.wideMs > 0 ? cfg.paddleWideW : cfg.paddleBaseW;
 
+/** The paddle is a convex arc, not a bar: its circle, so the UI draws exactly what the ball hits.
+ *  `paddleY` is the top of the arc (its centre); the tips sag by the sagitta. */
+export function paddleArc(halfW: number, cfg: BreakoutConfig): { r: number; cy: number } {
+	const r = halfW / Math.sin(cfg.paddleCurve);
+	return { r, cy: cfg.paddleY + r };
+}
+
 /** Re-normalise a velocity to a target speed (keeps ball speed constant). */
 function setSpeed(vx: number, vy: number, speed: number): { vx: number; vy: number } {
 	const m = Math.hypot(vx, vy) || 1;
@@ -356,6 +373,21 @@ export const LIFE_POINTS = 100; // per life left when the field is cleared
 // Angle (rad) a "split" twin is deviated by, so the pair fans out instead of overlapping.
 const SPLIT_SPREAD = 0.5;
 
+// Shallowest angle (rad from horizontal) a paddle bounce may leave at: a grazing hit on the
+// arc could otherwise send the ball sideways for ages.
+const MIN_UP_ANGLE = 0.3;
+
+// Smallest deviation from straight up a paddle bounce keeps — breaks endless vertical loops.
+const MIN_DEV = 0.05;
+
+/** Deterministic bonus dropped for reaching a score milestone (no rng in the step: replays must match). */
+function milestoneBonus(index: number, cfg: BreakoutConfig): FallingBonus {
+	const rng = mulberry32(Math.imul(index, 2654435761) >>> 0);
+	const kind = pickBonus(rng());
+	const span = cfg.worldW - 2 * cfg.bonusW;
+	return { x: cfg.bonusW + rng() * span, y: cfg.brickTop, kind };
+}
+
 /**
  * One fixed-timestep update. Deterministic given (state, dt, paddleX): no randomness
  * (bonuses are baked into the bricks at generation). Returns a new state.
@@ -373,13 +405,17 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 	const power = powerMs > 0;
 	const pierce = pierceMs > 0;
 	const split = splitMs > 0;
-	// Slow just ended → restore full speed.
-	if (slowMs === 0 && speed !== state.baseSpeed) speed = state.baseSpeed;
 
 	const bricks = state.bricks.map((b) => ({ ...b }));
+	// Hunting the last few bricks is the slow part: the ball speeds up as the wall empties.
+	const left = bricks.reduce((n, b) => n + (b.alive ? 1 : 0), 0);
+	const ramp = 1 + cfg.speedRamp * (1 - left / Math.max(1, bricks.length));
+	speed = state.baseSpeed * ramp * (slowMs > 0 ? cfg.slowFactor : 1);
+
 	const pw = wideMs > 0 ? cfg.paddleWideW : cfg.paddleBaseW;
 	const half = pw / 2;
 	const px = Math.max(half, Math.min(cfg.worldW - half, paddleX));
+	const { r: arcR, cy: arcCy } = paddleArc(half, cfg);
 
 	const balls: Ball[] = [];
 	let count = state.balls.length; // projected ball count, so "split" can respect the cap
@@ -402,14 +438,28 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 		else if (b.x > cfg.worldW - cfg.ballR) { b.x = cfg.worldW - cfg.ballR; b.vx = -Math.abs(b.vx); bounced = true; }
 		if (b.y < cfg.ballR) { b.y = cfg.ballR; b.vy = Math.abs(b.vy); bounced = true; }
 
-		// Paddle: reflect up, steering by where it hit.
-		if (b.vy > 0 && b.y + cfg.ballR >= cfg.paddleY && b.y - cfg.ballR <= cfg.paddleY + cfg.paddleH) {
-			if (b.x >= px - half - cfg.ballR && b.x <= px + half + cfg.ballR) {
-				const rel = Math.max(-1, Math.min(1, (b.x - px) / half));
-				const ang = -Math.PI / 2 + rel * cfg.steer * (Math.PI / 2.4);
-				b.vx = Math.cos(ang) * speed;
-				b.vy = Math.sin(ang) * speed;
-				b.y = cfg.paddleY - cfg.ballR - 0.1;
+		// Paddle: a convex arc. The ball reflects about the surface normal at the point it
+		// touches, so the incoming angle still matters — a flat bar plus a "steer" nudge
+		// ignored it entirely and felt fake.
+		if (b.vy > 0 && b.x >= px - half - cfg.ballR && b.x <= px + half + cfg.ballR) {
+			const dx = Math.max(-half, Math.min(half, b.x - px));
+			const surfY = arcCy - Math.sqrt(Math.max(0, arcR * arcR - dx * dx));
+			if (b.y + cfg.ballR >= surfY && b.y - cfg.ballR <= surfY + cfg.paddleH) {
+				const nx = dx / arcR; // unit normal of the arc at the contact point
+				const ny = -Math.sqrt(Math.max(0, 1 - nx * nx));
+				const dot = b.vx * nx + b.vy * ny;
+				// Reflect, then clamp away from horizontal so a graze can't send it sideways.
+				const out = Math.atan2(b.vy - 2 * dot * ny, b.vx - 2 * dot * nx);
+				const maxDev = Math.PI / 2 - MIN_UP_ANGLE;
+				let dev = out + Math.PI / 2; // deviation from straight up
+				dev = Math.atan2(Math.sin(dev), Math.cos(dev)); // wrap to [-π, π]
+				dev = Math.max(-maxDev, Math.min(maxDev, dev));
+				// A dead-vertical bounce would loop forever if the paddle stays put: tip it
+				// inwards. Derived from the state, so replays stay identical.
+				if (Math.abs(dev) < MIN_DEV) dev = b.x < cfg.worldW / 2 ? MIN_DEV : -MIN_DEV;
+				b.vx = Math.cos(dev - Math.PI / 2) * speed;
+				b.vy = Math.sin(dev - Math.PI / 2) * speed;
+				b.y = surfY - cfg.ballR - 0.1;
 				bounced = true;
 			}
 		}
@@ -462,6 +512,11 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 		if (onPaddle) { caught.push(bo.kind); return false; }
 		return bo.y - cfg.bonusH / 2 <= cfg.worldH;
 	});
+
+	// Every autoBonusEvery points a free bonus drops from the wall, so a long field keeps
+	// handing out powers even when the bonus bricks are already gone.
+	const from = Math.floor(state.score / cfg.autoBonusEvery);
+	for (let m = from + 1; m <= Math.floor(score / cfg.autoBonusEvery); m++) bonuses.push(milestoneBonus(m, cfg));
 
 	let next: BreakoutState = { ...state, balls, bricks, paddleX: px, bonuses, score, lives, speed, wideMs, powerMs, slowMs, pierceMs, splitMs };
 	for (const k of caught) {

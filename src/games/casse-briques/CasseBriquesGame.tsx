@@ -6,6 +6,7 @@ import {
 	createBreakout,
 	launch,
 	stepBreakout,
+	paddleArc,
 	type BreakoutDiff,
 	type BreakoutState,
 	type BonusKind,
@@ -162,19 +163,22 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 		ctx.fillStyle = c.bg;
 		ctx.fillRect(0, 0, W, H);
 
-		// Bricks — colour by row; a 2-hit brick reads darker until its first hit chips it.
+		// Bricks — colour by row. Armour darkens the tile and adds an inset outline, so each
+		// hit visibly lightens it: 3 hits → 2 hits → 1 hit → gone.
 		for (const b of st.bricks) {
 			if (!b.alive) continue;
-			const base = c.rows[b.row % c.rows.length];
-			ctx.fillStyle = base;
-			if (b.hp < b.maxHp) ctx.globalAlpha = 1; // chipped 2-hit brick brightens to full
-			else if (b.maxHp === 2) ctx.globalAlpha = 0.72; // intact 2-hit brick reads darker
+			ctx.fillStyle = c.rows[b.row % c.rows.length];
 			roundRect(ctx, b.x * S, b.y * S, b.w * S, b.h * S, 1.4 * S);
 			ctx.fill();
-			ctx.globalAlpha = 1;
-			if (b.maxHp === 2 && b.hp === b.maxHp) {
-				ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-				ctx.lineWidth = Math.max(1, 0.5 * S);
+			if (b.hp > 1) {
+				ctx.fillStyle = '#000';
+				ctx.globalAlpha = 0.15 * (b.hp - 1);
+				ctx.fill();
+				ctx.globalAlpha = 1;
+				ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+				ctx.lineWidth = Math.max(1, 0.42 * S);
+				const in_ = 0.9;
+				roundRect(ctx, (b.x + in_) * S, (b.y + in_) * S, (b.w - 2 * in_) * S, (b.h - 2 * in_) * S, 1 * S);
 				ctx.stroke();
 			}
 			// Bonus bricks wear their glyph, so the player can aim for the power they want.
@@ -199,10 +203,16 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 			ctx.fillText(BONUS_EMOJI[bo.kind], bo.x * S, (bo.y + 0.2) * S);
 		}
 
-		// Paddle.
+		// Paddle — the same convex arc the engine bounces off, so the curve is readable.
 		const pw = st.wideMs > 0 ? CFG.paddleWideW : CFG.paddleBaseW;
+		const { r, cy } = paddleArc(pw / 2, CFG);
+		const a0 = -Math.PI / 2 - CFG.paddleCurve;
+		const a1 = -Math.PI / 2 + CFG.paddleCurve;
 		ctx.fillStyle = c.paddle;
-		roundRect(ctx, (st.paddleX - pw / 2) * S, CFG.paddleY * S, pw * S, CFG.paddleH * S, CFG.paddleH * S * 0.5);
+		ctx.beginPath();
+		ctx.arc(st.paddleX * S, cy * S, r * S, a0, a1);
+		ctx.arc(st.paddleX * S, cy * S, (r - CFG.paddleH) * S, a1, a0, true);
+		ctx.closePath();
 		ctx.fill();
 
 		// Balls are cocottes — they face where they fly and wear the active power's skin.
@@ -635,8 +645,9 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 				Glisse la raquette pour renvoyer la cocotte et casser tout le mur. Attrape les bonus qui tombent :
 				📏 raquette large, ⚡ multi-cocottes, 💥 cocotte puissante, 🔥 cocotte de feu (traverse et casse tout),
 				🥚 cocotte qui se dédouble à chaque rebond (jusqu'à 16), ❤️ vie, 🐢 ralenti. Chaque brique piégée
-				affiche son bonus : vise-la. Perce les alvéoles du mur, la cocotte y rebondit comme un flipper.
-				Flèches ou souris au clavier.
+				affiche son bonus : vise-la, et tous les 200 points un bonus tombe tout seul. Les briques
+				sombres demandent jusqu'à 3 coups. Perce les alvéoles du mur, la cocotte y rebondit comme
+				un flipper. Flèches ou souris au clavier.
 			</p>
 
 			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={(status === 'over' || status === 'won') ? best : undefined} />}
