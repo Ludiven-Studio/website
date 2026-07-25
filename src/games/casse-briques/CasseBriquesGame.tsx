@@ -36,6 +36,15 @@ const BEST_KEY = 'ludiven-casse-briques-best';
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 const MAX_TRIES = 5; // daily attempts per day; best of the day is ranked
 const MAX_DT = 1 / 120; // physics sub-step cap so a fast ball never tunnels through a brick
+const KEY_SPEED = 95; // paddle units / s while an arrow is held (≈1.1 s to cross the board)
+
+// Held-key direction. Letters are lowercased so Shift/CapsLock still steer (AZERTY: a/q).
+const keyDir = (k: string): 'l' | 'r' | null => {
+	const s = k.length === 1 ? k.toLowerCase() : k;
+	if (s === 'ArrowLeft' || s === 'a' || s === 'q') return 'l';
+	if (s === 'ArrowRight' || s === 'd') return 'r';
+	return null;
+};
 
 interface DailyState {
 	best: number;
@@ -131,6 +140,7 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 	const cssWRef = useRef(0);
 	const scaleRef = useRef(1);
 	const paddleTargetRef = useRef(CFG.worldW / 2);
+	const keysRef = useRef(new Set<'l' | 'r'>()); // arrows currently held
 	const dailyRef = useRef(false);
 	const triesRef = useRef(0);
 	const lv = useLevels(gameId, casseBriquesLevels);
@@ -258,9 +268,16 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 			let dt = Math.min((now - lastRef.current) / 1000, 0.05); // clamp after tab-hidden
 			lastRef.current = now;
 			let st = stateRef.current!;
+			// Held arrows glide the paddle here rather than on keydown, so it moves smoothly
+			// instead of stuttering on the OS key-repeat delay.
+			const dir = (keysRef.current.has('r') ? 1 : 0) - (keysRef.current.has('l') ? 1 : 0);
 			// Sub-step so a fast ball can't skip over a brick between frames.
 			while (dt > 0 && st.status === 'playing') {
 				const step = Math.min(dt, MAX_DT);
+				if (dir !== 0) {
+					const next = paddleTargetRef.current + dir * KEY_SPEED * step;
+					paddleTargetRef.current = Math.max(0, Math.min(CFG.worldW, next));
+				}
 				st = stepBreakout(st, step, CFG, paddleTargetRef.current);
 				dt -= step;
 			}
@@ -438,19 +455,29 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'q') {
+			const dir = keyDir(e.key);
+			if (dir) {
 				e.preventDefault();
-				paddleTargetRef.current = Math.max(0, paddleTargetRef.current - 6);
-			} else if (e.key === 'ArrowRight' || e.key === 'd') {
-				e.preventDefault();
-				paddleTargetRef.current = Math.min(CFG.worldW, paddleTargetRef.current + 6);
+				keysRef.current.add(dir);
 			} else if ((e.key === ' ' || e.key === 'ArrowUp') && status === 'ready' && !dailyLoading && !(daily && alreadyPlayed)) {
 				e.preventDefault();
 				start();
 			}
 		};
+		const onKeyUp = (e: KeyboardEvent) => {
+			const dir = keyDir(e.key);
+			if (dir) keysRef.current.delete(dir);
+		};
+		// Losing focus (alt-tab, fullscreen toggle) swallows the keyup, so drop everything.
+		const clearKeys = () => keysRef.current.clear();
 		window.addEventListener('keydown', onKey, { passive: false });
-		return () => window.removeEventListener('keydown', onKey);
+		window.addEventListener('keyup', onKeyUp);
+		window.addEventListener('blur', clearKeys);
+		return () => {
+			window.removeEventListener('keydown', onKey);
+			window.removeEventListener('keyup', onKeyUp);
+			window.removeEventListener('blur', clearKeys);
+		};
 	}, [status, dailyLoading, daily, alreadyPlayed, start]);
 
 	/* Auto-pause when the tab is hidden; resume on return if mid-game. */
