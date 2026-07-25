@@ -1,0 +1,387 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+---
+
+<BaseLayout
+	title="Confidentialité de l'application Pétanque AR | Ludiven Studio"
+	description="Politique de confidentialité de l'application mobile Pétanque AR : données traitées, publicité, mesure d'audience, droits RGPD."
+>
+	<div class="wrapper stack gap-12 legal">
+		<Hero
+			title="Confidentialité — Pétanque AR"
+			tagline="Les images de ta caméra ne quittent jamais ton téléphone."
+		/>
+
+		<p class="updated">
+			Cette politique concerne <strong>l'application mobile Pétanque AR</strong>
+			(<code>com.raphbenpro.petanquear</code>), et non le site ludiven-studio.fr, qui dispose de sa
+			<a href="/confidentialite">propre politique</a>. Dernière mise à jour&nbsp;: 25 juillet 2026.
+		</p>
+
+		<div class="summary">
+			<p><strong>L'essentiel&nbsp;:</strong></p>
+			<ul>
+				<li><strong>Les images de votre caméra ne quittent jamais votre appareil.</strong> La détection des boules est calculée localement sur le téléphone. Aucune photo, aucune vidéo, aucune image n'est envoyée à un serveur, ni enregistrée durablement.</li>
+				<li>Nous n'avons <strong>aucun serveur</strong> et <strong>aucun compte utilisateur</strong>. Nous ne connaissons ni votre nom, ni votre e-mail, ni votre position.</li>
+				<li>La publicité et la mesure d'audience ne sont activées <strong>qu'avec votre consentement</strong>, demandé au premier lancement. Vous pouvez le retirer à tout moment.</li>
+				<li>L'achat <strong>Premium supprime la publicité</strong> et, dans ce cas, le SDK publicitaire n'est même pas démarré.</li>
+			</ul>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Qui est responsable du traitement</h2>
+			<p>Éditeur de l'application et responsable du traitement&nbsp;:</p>
+			<ul>
+				<li>Dénomination sociale&nbsp;: <strong>Ludiven Studio</strong></li>
+				<li>Forme juridique&nbsp;: EURL au capital de 1&nbsp;000&nbsp;€</li>
+				<li>Immatriculation&nbsp;: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Siège social&nbsp;: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Directeur de la publication&nbsp;: Ludiven Studio</li>
+				<li>Contact&nbsp;: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>Voir aussi les <a href="/mentions-legales">mentions légales</a>.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. La caméra et la réalité augmentée</h2>
+			<p>
+				Pétanque AR a besoin de l'accès à la caméra pour fonctionner&nbsp;: c'est le cœur de l'application.
+				Il est important de comprendre précisément ce qui est fait de ces images.
+			</p>
+			<ul>
+				<li>Les images de la caméra sont analysées <strong>en temps réel, entièrement sur votre appareil</strong>, par un modèle de détection d'objets embarqué dans l'application (aucun téléchargement, aucun appel réseau pour l'analyse).</li>
+				<li>Les images sont conservées en mémoire vive le temps du calcul, puis <strong>immédiatement libérées</strong>. Elles ne sont écrites ni dans votre galerie, ni dans un fichier, ni dans un cache persistant.</li>
+				<li><strong>Aucune image n'est transmise</strong> à l'éditeur ni à un tiers, quel que soit votre choix en matière de consentement publicitaire.</li>
+				<li>Seul le résultat du calcul (des positions en 3 dimensions et des distances) est utilisé pour l'affichage, et il disparaît quand vous quittez le scan.</li>
+			</ul>
+			<p>
+				En conséquence, l'usage de la caméra ne donne lieu à <strong>aucune collecte de données personnelles</strong>
+				par l'éditeur.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Données traitées</h2>
+			<p>Voici l'inventaire complet des traitements réalisés par l'application.</p>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Donnée</th>
+							<th>Finalité</th>
+							<th>Base légale</th>
+							<th>Destinataire</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Identifiant publicitaire de l'appareil (GAID sur Android, IDFA sur iOS)</td>
+							<td>Affichage de publicités, personnalisées uniquement si vous y consentez</td>
+							<td>Consentement (art. 6.1.a RGPD)</td>
+							<td>Google (AdMob)</td>
+						</tr>
+						<tr>
+							<td>Événements d'usage de l'application (voir §5) et données techniques associées&nbsp;: modèle d'appareil, version du système, version de l'application, pays</td>
+							<td>Mesure d'audience&nbsp;: comprendre quelles fonctions sont utilisées et améliorer l'application</td>
+							<td>Consentement</td>
+							<td>Google (Firebase Analytics)</td>
+						</tr>
+						<tr>
+							<td>Jeton de notification push</td>
+							<td>Vous envoyer des notifications (nouveautés, rappels)</td>
+							<td>Consentement</td>
+							<td>Google (Firebase Cloud Messaging)</td>
+						</tr>
+						<tr>
+							<td>Votre choix de consentement</td>
+							<td>Mémoriser votre décision et ne pas vous la redemander à chaque lancement</td>
+							<td>Obligation légale / intérêt légitime</td>
+							<td>Stocké sur l'appareil&nbsp;; géré par Google (UMP)</td>
+						</tr>
+						<tr>
+							<td>Preuve d'achat («&nbsp;reçu&nbsp;») du Premium</td>
+							<td>Débloquer et restaurer votre achat</td>
+							<td>Exécution du contrat (art. 6.1.b)</td>
+							<td>Apple ou Google (magasin d'applications)</td>
+						</tr>
+						<tr>
+							<td>Nombre de scans effectués aujourd'hui et date du jour</td>
+							<td>Faire fonctionner la limite de 3 scans gratuits par jour</td>
+							<td>Exécution du contrat</td>
+							<td>Personne&nbsp;: reste sur l'appareil</td>
+						</tr>
+						<tr>
+							<td>Images de la caméra</td>
+							<td>Détection des boules</td>
+							<td>Exécution du contrat</td>
+							<td><strong>Personne&nbsp;: traitement local, aucune transmission</strong></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<p>
+				L'application ne collecte <strong>pas</strong>&nbsp;: votre nom, votre e-mail, votre numéro de téléphone,
+				vos contacts, votre position GPS, votre carnet d'adresses, vos photos, ni aucun identifiant que vous
+				auriez saisi. Il n'y a pas de création de compte.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Publicité et consentement</h2>
+			<p>
+				L'application est gratuite et financée par une bannière publicitaire, ainsi que par une publicité
+				facultative que vous pouvez choisir de regarder pour recharger vos scans gratuits. La régie utilisée est
+				<strong>Google AdMob</strong>.
+			</p>
+			<p>
+				Au premier lancement, un écran de consentement géré par la plateforme <strong>Google UMP</strong> (User
+				Messaging Platform) vous est présenté lorsque la réglementation l'exige (notamment dans l'Espace
+				économique européen, au Royaume-Uni et en Suisse). Concrètement&nbsp;:
+			</p>
+			<ul>
+				<li><strong>Si vous acceptez</strong>&nbsp;: les publicités peuvent être personnalisées à partir de l'identifiant publicitaire de votre appareil, et la mesure d'audience est activée.</li>
+				<li><strong>Si vous refusez</strong>&nbsp;: la mesure d'audience n'est pas démarrée du tout, les notifications non plus, et les publicités affichées sont <strong>non personnalisées</strong> (elles restent nécessaires au financement de l'application gratuite, mais ne s'appuient pas sur un profil publicitaire).</li>
+				<li>Sur iOS, une seconde demande, imposée par Apple (<em>App Tracking Transparency</em>), vous demande si vous autorisez le suivi. Un refus est respecté indépendamment de votre réponse précédente.</li>
+				<li>La mesure d'audience est configurée pour <strong>ne pas collecter l'identifiant publicitaire</strong>&nbsp;: celui-ci n'est utilisé que par la partie publicitaire, et seulement avec votre accord.</li>
+				<li><strong>Si vous achetez le Premium</strong>&nbsp;: la publicité disparaît et le SDK publicitaire n'est plus initialisé.</li>
+			</ul>
+			<p>
+				Pour en savoir plus sur l'usage des données par Google dans ce contexte&nbsp;:
+				<a href="https://business.safety.google/privacy/" target="_blank" rel="noopener">Google — Confidentialité et conditions</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Mesure d'audience&nbsp;: les événements exacts</h2>
+			<p>
+				Par souci de transparence, voici la liste exhaustive des événements envoyés à Firebase Analytics
+				<em>lorsque vous avez consenti</em>. Aucun ne contient de donnée que vous auriez saisie, ni d'identifiant
+				que nous aurions créé.
+			</p>
+			<ul>
+				<li><code>scan_started</code> — un scan démarre</li>
+				<li><code>scan_completed</code> — un scan aboutit, avec le nombre de scans réalisés dans la journée</li>
+				<li><code>scan_blocked_quota</code> — un scan est refusé car la limite quotidienne est atteinte</li>
+				<li><code>paywall_shown</code> / <code>paywall_dismissed</code> — l'écran d'offre Premium est affiché ou fermé, avec le motif d'affichage</li>
+				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — étapes d'un achat, avec le motif d'échec le cas échéant</li>
+				<li><code>premium_restore_success</code> — un achat antérieur a été restauré</li>
+				<li><code>iap_receipt_invalid</code> — une preuve d'achat n'a pas pu être validée</li>
+				<li><code>consent_accepted</code> / <code>consent_declined</code> — votre choix de consentement</li>
+				<li><code>notification_token_registered</code> — l'appareil est enregistré pour les notifications</li>
+			</ul>
+			<p>
+				À ces événements, Firebase ajoute automatiquement des informations techniques standard (modèle d'appareil,
+				version du système d'exploitation, version de l'application, pays déduit de l'adresse IP, première
+				ouverture, durée de session).
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Notifications push</h2>
+			<p>
+				Si vous avez consenti et accepté la demande de notifications du système, l'appareil est enregistré auprès
+				de Firebase Cloud Messaging afin de pouvoir recevoir des messages. Les notifications sont envoyées
+				manuellement depuis la console Firebase&nbsp;; il n'existe pas de serveur d'envoi automatisé. Vous pouvez
+				désactiver les notifications à tout moment dans les réglages de votre téléphone, sans conséquence sur le
+				fonctionnement de l'application.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. Achats intégrés</h2>
+			<p>
+				L'achat «&nbsp;Premium à vie&nbsp;» est un achat unique traité <strong>intégralement par l'App Store
+				d'Apple ou par Google Play</strong>. Nous ne voyons jamais vos données de paiement&nbsp;: ni numéro de
+				carte, ni adresse de facturation, ni identité. L'application reçoit seulement une preuve d'achat, vérifiée
+				localement, qui sert à débloquer la fonctionnalité.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Une lecture de l'heure de référence</h2>
+			<p>
+				Pour que la limite de 3 scans gratuits se réinitialise à une heure fiable (et ne puisse pas être
+				contournée en changeant l'horloge du téléphone), l'application lit l'heure de référence auprès d'un
+				service Google Firebase hébergé dans l'Union européenne (Belgique, région <code>europe-west1</code>).
+				Cette requête est en <strong>lecture seule</strong>&nbsp;: elle ne transmet aucune donnée vous concernant.
+				Si elle échoue, l'horloge locale est utilisée.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Ce qui est stocké sur votre appareil</h2>
+			<p>
+				Quatre informations sont enregistrées localement, dans le stockage sécurisé du système (Trousseau sur iOS,
+				<em>EncryptedSharedPreferences</em> sur Android)&nbsp;:
+			</p>
+			<ul>
+				<li>le nombre de scans effectués aujourd'hui&nbsp;;</li>
+				<li>la date correspondante, pour savoir quand remettre le compteur à zéro&nbsp;;</li>
+				<li>le fait que vous possédez ou non le Premium&nbsp;;</li>
+				<li>votre choix de consentement.</li>
+			</ul>
+			<p>
+				Ces données ne sont pas synchronisées vers un serveur et ne sont pas sauvegardées dans le cloud par
+				l'application. Désinstaller l'application les efface — à une exception près&nbsp;: sur iOS, l'indicateur de
+				Premium peut être conservé par le Trousseau, ce qui est précisément ce qui permet de retrouver votre achat
+				après une réinstallation.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Destinataires et transferts hors Union européenne</h2>
+			<p>
+				Les seuls destinataires de données sont les prestataires ci-dessous. Nous ne vendons aucune donnée et ne
+				partageons rien avec des courtiers en données.
+			</p>
+			<ul>
+				<li><strong>Google Ireland Limited / Google LLC</strong> — publicité (AdMob), mesure d'audience (Firebase Analytics), notifications (Firebase Cloud Messaging), gestion du consentement (UMP), heure de référence (Firebase Realtime Database).</li>
+				<li><strong>Apple Inc.</strong> et <strong>Google LLC</strong> — distribution de l'application et traitement des achats intégrés.</li>
+			</ul>
+			<p>
+				Certains de ces traitements impliquent un transfert vers les États-Unis. Ces transferts sont encadrés par
+				les mécanismes prévus au chapitre V du RGPD&nbsp;: clauses contractuelles types et, pour les prestataires
+				concernés, certification au titre du <em>EU-U.S. Data Privacy Framework</em>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>11. Durées de conservation</h2>
+			<ul>
+				<li><strong>Images de la caméra</strong>&nbsp;: le temps du calcul, en mémoire vive uniquement (quelques millisecondes).</li>
+				<li><strong>Données de mesure d'audience</strong>&nbsp;: conservées par Firebase Analytics <strong>14 mois au maximum</strong>, selon la durée paramétrée dans la console Firebase. Les rapports agrégés (non rattachables à un appareil) peuvent être conservés au-delà.</li>
+				<li><strong>Compteur de scans</strong>&nbsp;: réinitialisé chaque jour.</li>
+				<li><strong>Indicateur de Premium et choix de consentement</strong>&nbsp;: conservés sur l'appareil jusqu'à la désinstallation ou jusqu'au retrait de votre consentement.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>12. Vos droits</h2>
+			<p>
+				Conformément au RGPD, vous disposez d'un droit d'accès, de rectification, d'effacement, de limitation,
+				d'opposition et de portabilité, ainsi que du droit de retirer votre consentement à tout moment.
+			</p>
+			<p><strong>En pratique&nbsp;:</strong></p>
+			<ul>
+				<li><strong>Retirer ou modifier votre consentement</strong>&nbsp;: rouvrez l'écran «&nbsp;Options de confidentialité&nbsp;» depuis l'application. La mesure d'audience et les notifications sont alors désactivées, et les publicités repassent en mode non personnalisé.</li>
+				<li><strong>Effacer les données locales</strong>&nbsp;: désinstallez l'application, ou effacez ses données depuis les réglages du téléphone.</li>
+				<li><strong>Réinitialiser votre identifiant publicitaire</strong>&nbsp;: Android → Paramètres › Google › Annonces&nbsp;; iOS → Réglages › Confidentialité et sécurité › Suivi.</li>
+				<li><strong>Exercer vos droits auprès de nous</strong>&nbsp;: écrivez à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Nous répondons dans un délai d'un mois. Notez que, faute de compte utilisateur et d'identifiant nous permettant de vous reconnaître, il nous est matériellement impossible de retrouver des données «&nbsp;vous&nbsp;» concernant dans nos statistiques&nbsp;: celles-ci sont agrégées et non rattachées à une personne identifiable de notre côté.</li>
+			</ul>
+			<p>
+				Si vous estimez que vos droits ne sont pas respectés, vous pouvez introduire une réclamation auprès de la
+				CNIL (<a href="https://www.cnil.fr" target="_blank" rel="noopener">www.cnil.fr</a>), 3 place de Fontenoy,
+				TSA 80715, 75334 Paris Cedex 07.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>13. Enfants</h2>
+			<p>
+				L'application n'est pas destinée aux enfants et n'est pas conçue comme un service à destination des
+				mineurs. Elle n'est pas déclarée comme telle auprès des magasins d'applications et ne cible pas
+				volontairement les moins de 16 ans. Si vous êtes titulaire de l'autorité parentale et constatez qu'un
+				enfant a utilisé l'application, contactez-nous.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>14. Sécurité</h2>
+			<p>
+				Les données stockées localement le sont via les mécanismes de stockage sécurisé fournis par le système
+				d'exploitation. Les échanges réseau avec les services Google sont chiffrés (HTTPS/TLS). Comme il n'existe
+				aucun serveur applicatif propre à Pétanque AR, la surface d'exposition est limitée aux prestataires listés
+				au §10.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>15. Modifications de cette politique</h2>
+			<p>
+				Cette politique peut évoluer, notamment si l'application gagne de nouvelles fonctionnalités. La date de
+				dernière mise à jour figure en haut de page. En cas de changement substantiel affectant vos droits, un
+				nouveau consentement vous sera demandé dans l'application.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>16. Contact</h2>
+			<p>
+				Pour toute question relative à cette politique&nbsp;:
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
+			</p>
+			<p>Voir aussi les <a href="/petanque-ar/cgu">conditions d'utilisation de l'application</a>.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+	.summary {
+		border: 1px solid var(--gray-800);
+		border-left: 3px solid var(--accent-regular);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--gray-999_40);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--gray-999_40);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+	/* The 4-column table can't shrink below ~40em — scroll it instead of overflowing the page. */
+	.table-scroll {
+		overflow-x: auto;
+	}
+	table {
+		border-collapse: collapse;
+		width: 100%;
+		min-width: 36rem;
+		font-size: var(--text-sm);
+	}
+	th,
+	td {
+		border: 1px solid var(--gray-800);
+		padding: 0.5rem 0.65rem;
+		text-align: left;
+		vertical-align: top;
+	}
+	th {
+		color: var(--gray-0);
+	}
+</style>
