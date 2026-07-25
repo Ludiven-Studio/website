@@ -5,13 +5,15 @@
  * All units are logical (a 100-wide world); the island scales it to the canvas.
  *
  * Balls keep a CONSTANT speed (classic breakout): only their direction changes on
- * a bounce. The "slow" bonus lowers that target speed for a while.
+ * a bounce. The "slow" bonus lowers that target speed for a while, "pierce" makes a
+ * ball wipe every brick it touches without bouncing, and "split" twins a ball on
+ * each bounce up to the ball cap.
  */
 
 import { mulberry32 } from '../prng';
 
-export type BonusKind = 'wide' | 'multi' | 'power' | 'life' | 'slow';
-export const BONUS_KINDS: BonusKind[] = ['wide', 'multi', 'power', 'life', 'slow'];
+export type BonusKind = 'wide' | 'multi' | 'power' | 'life' | 'slow' | 'pierce' | 'split';
+export const BONUS_KINDS: BonusKind[] = ['wide', 'multi', 'power', 'life', 'slow', 'pierce', 'split'];
 
 export interface BreakoutConfig {
 	worldW: number;
@@ -35,6 +37,8 @@ export interface BreakoutConfig {
 	wideMs: number;
 	powerMs: number;
 	slowMs: number;
+	pierceMs: number;
+	splitMs: number;
 	slowFactor: number; // speed multiplier while "slow" is active
 	startLives: number;
 }
@@ -57,10 +61,12 @@ const BASE = {
 	bonusH: 5,
 	bonusFallV: 33,
 	bonusChance: 0.16,
-	maxBalls: 8,
+	maxBalls: 16,
 	wideMs: 12000,
 	powerMs: 10000,
 	slowMs: 9000,
+	pierceMs: 7000,
+	splitMs: 8000,
 	slowFactor: 0.68,
 	startLives: 3,
 };
@@ -127,15 +133,19 @@ export interface BreakoutState {
 	wideMs: number;
 	powerMs: number;
 	slowMs: number;
+	pierceMs: number;
+	splitMs: number;
 }
 
-// Bonus weights — helpful ones are common, "life" is rarer.
+// Bonus weights — helpful ones are common, the run-defining ones are rarer.
 const BONUS_WEIGHTS: [BonusKind, number][] = [
 	['wide', 5],
 	['multi', 4],
 	['power', 4],
 	['slow', 3],
 	['life', 2],
+	['pierce', 2],
+	['split', 2],
 ];
 
 function pickBonus(r: number): BonusKind {
@@ -245,6 +255,8 @@ export function createBreakout(cfg: BreakoutConfig, bricks: Brick[], diff: Break
 		wideMs: 0,
 		powerMs: 0,
 		slowMs: 0,
+		pierceMs: 0,
+		splitMs: 0,
 	};
 }
 
@@ -275,6 +287,10 @@ export function applyBonus(state: BreakoutState, kind: BonusKind, cfg: BreakoutC
 			return { ...state, wideMs: cfg.wideMs };
 		case 'power':
 			return { ...state, powerMs: cfg.powerMs };
+		case 'pierce':
+			return { ...state, pierceMs: cfg.pierceMs };
+		case 'split':
+			return { ...state, splitMs: cfg.splitMs };
 		case 'life':
 			return { ...state, lives: state.lives + 1 };
 		case 'slow': {
@@ -304,6 +320,9 @@ export const BONUS_POINTS = 25;
 export const CLEAR_POINTS = 500;
 export const LIFE_POINTS = 100; // per life left when the field is cleared
 
+// Angle (rad) a "split" twin is deviated by, so the pair fans out instead of overlapping.
+const SPLIT_SPREAD = 0.5;
+
 /**
  * One fixed-timestep update. Deterministic given (state, dt, paddleX): no randomness
  * (bonuses are baked into the bricks at generation). Returns a new state.
@@ -316,7 +335,11 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 	const wideMs = Math.max(0, state.wideMs - dt * 1000);
 	const powerMs = Math.max(0, state.powerMs - dt * 1000);
 	const slowMs = Math.max(0, state.slowMs - dt * 1000);
+	const pierceMs = Math.max(0, state.pierceMs - dt * 1000);
+	const splitMs = Math.max(0, state.splitMs - dt * 1000);
 	const power = powerMs > 0;
+	const pierce = pierceMs > 0;
+	const split = splitMs > 0;
 	// Slow just ended → restore full speed.
 	if (slowMs === 0 && speed !== state.baseSpeed) speed = state.baseSpeed;
 
@@ -326,6 +349,7 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 	const px = Math.max(half, Math.min(cfg.worldW - half, paddleX));
 
 	const balls: Ball[] = [];
+	let count = state.balls.length; // projected ball count, so "split" can respect the cap
 	for (const src of state.balls) {
 		const b = { ...src };
 		if (b.stuck) {
@@ -334,15 +358,16 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 			balls.push(b);
 			continue;
 		}
+		let bounced = false; // any deflection this step — what "split" duplicates on
 		// Keep constant speed, then advance.
 		({ vx: b.vx, vy: b.vy } = setSpeed(b.vx, b.vy, speed));
 		b.x += b.vx * dt;
 		b.y += b.vy * dt;
 
 		// Side + ceiling walls.
-		if (b.x < cfg.ballR) { b.x = cfg.ballR; b.vx = Math.abs(b.vx); }
-		else if (b.x > cfg.worldW - cfg.ballR) { b.x = cfg.worldW - cfg.ballR; b.vx = -Math.abs(b.vx); }
-		if (b.y < cfg.ballR) { b.y = cfg.ballR; b.vy = Math.abs(b.vy); }
+		if (b.x < cfg.ballR) { b.x = cfg.ballR; b.vx = Math.abs(b.vx); bounced = true; }
+		else if (b.x > cfg.worldW - cfg.ballR) { b.x = cfg.worldW - cfg.ballR; b.vx = -Math.abs(b.vx); bounced = true; }
+		if (b.y < cfg.ballR) { b.y = cfg.ballR; b.vy = Math.abs(b.vy); bounced = true; }
 
 		// Paddle: reflect up, steering by where it hit.
 		if (b.vy > 0 && b.y + cfg.ballR >= cfg.paddleY && b.y - cfg.ballR <= cfg.paddleY + cfg.paddleH) {
@@ -352,31 +377,44 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 				b.vx = Math.cos(ang) * speed;
 				b.vy = Math.sin(ang) * speed;
 				b.y = cfg.paddleY - cfg.ballR - 0.1;
+				bounced = true;
 			}
 		}
 
-		// One brick collision per step (nearest-axis reflection).
+		// Bricks: "pierce" wipes every brick it overlaps and flies straight on; otherwise
+		// one collision per step, reflected on the nearest axis.
 		for (const br of bricks) {
 			if (!br.alive) continue;
 			if (b.x + cfg.ballR < br.x || b.x - cfg.ballR > br.x + br.w) continue;
 			if (b.y + cfg.ballR < br.y || b.y - cfg.ballR > br.y + br.h) continue;
-			// Decide bounce axis from the smaller overlap.
-			const overlapX = Math.min(b.x + cfg.ballR - br.x, br.x + br.w - (b.x - cfg.ballR));
-			const overlapY = Math.min(b.y + cfg.ballR - br.y, br.y + br.h - (b.y - cfg.ballR));
-			if (overlapX < overlapY) b.vx = b.x < br.x + br.w / 2 ? -Math.abs(b.vx) : Math.abs(b.vx);
-			else b.vy = b.y < br.y + br.h / 2 ? -Math.abs(b.vy) : Math.abs(b.vy);
-			br.hp -= power ? 2 : 1;
+			if (!pierce) {
+				// Decide bounce axis from the smaller overlap.
+				const overlapX = Math.min(b.x + cfg.ballR - br.x, br.x + br.w - (b.x - cfg.ballR));
+				const overlapY = Math.min(b.y + cfg.ballR - br.y, br.y + br.h - (b.y - cfg.ballR));
+				if (overlapX < overlapY) b.vx = b.x < br.x + br.w / 2 ? -Math.abs(b.vx) : Math.abs(b.vx);
+				else b.vy = b.y < br.y + br.h / 2 ? -Math.abs(b.vy) : Math.abs(b.vy);
+				bounced = true;
+			}
+			br.hp = pierce ? 0 : br.hp - (power ? 2 : 1);
 			if (br.hp <= 0) {
 				br.alive = false;
 				score += BRICK_POINTS * br.maxHp;
 				if (br.bonus) state = { ...state, bonuses: [...state.bonuses, { x: br.x + br.w / 2, y: br.y + br.h / 2, kind: br.bonus }] };
 			}
-			break;
+			if (!pierce) break;
 		}
 
 		// Below the floor → the ball is lost (dropped from the list).
-		if (b.y - cfg.ballR > cfg.worldH) continue;
+		if (b.y - cfg.ballR > cfg.worldH) { count -= 1; continue; }
 		balls.push(b);
+
+		// "split": every bounce spawns a twin, deviated away from straight-down so the
+		// swarm keeps working the wall instead of raining onto the floor.
+		if (split && bounced && count < cfg.maxBalls) {
+			const ang = Math.atan2(b.vy, b.vx) + (b.vy > 0 ? -SPLIT_SPREAD : SPLIT_SPREAD);
+			balls.push({ x: b.x, y: b.y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, stuck: false });
+			count += 1;
+		}
 	}
 
 	// Falling bonuses: descend, catch on the paddle, cull off-screen.
@@ -392,7 +430,7 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 		return bo.y - cfg.bonusH / 2 <= cfg.worldH;
 	});
 
-	let next: BreakoutState = { ...state, balls, bricks, paddleX: px, bonuses, score, lives, speed, wideMs, powerMs, slowMs };
+	let next: BreakoutState = { ...state, balls, bricks, paddleX: px, bonuses, score, lives, speed, wideMs, powerMs, slowMs, pierceMs, splitMs };
 	for (const k of caught) {
 		if (k === 'life') { next = { ...next, lives: next.lives + 1 }; score = next.score; }
 		else next = applyBonus(next, k, cfg);
@@ -404,7 +442,7 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 	// Lost the last ball → consume a life and re-serve, or game over.
 	if (next.balls.length === 0) {
 		if (next.lives > 1) {
-			next = { ...next, lives: next.lives - 1, balls: [ballOnPaddle(cfg, px)], speed: next.baseSpeed, slowMs: 0, powerMs: 0, wideMs: 0 };
+			next = { ...next, lives: next.lives - 1, balls: [ballOnPaddle(cfg, px)], speed: next.baseSpeed, slowMs: 0, powerMs: 0, wideMs: 0, pierceMs: 0, splitMs: 0 };
 			return launch(next);
 		}
 		return { ...next, lives: 0, status: 'over' };

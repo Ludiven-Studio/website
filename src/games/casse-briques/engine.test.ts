@@ -125,6 +125,37 @@ describe('casse-briques engine', () => {
 		expect(after.alive).toBe(false);
 	});
 
+	it('pierce bonus wipes every brick it touches and never deflects the ball', () => {
+		let s = launch(fresh(3));
+		s = applyBonus(s, 'pierce', cfg);
+		const target = s.bricks.find((b) => b.maxHp === 2)!;
+		const ball: Ball = { x: target.x + target.w / 2, y: target.y + target.h + cfg.ballR + 0.2, vx: 0, vy: -s.speed, stuck: false };
+		s = { ...s, balls: [ball], bonuses: [] };
+		s = stepBreakout(s, 1 / 60, cfg, s.paddleX);
+		const hit = s.bricks.find((b) => b.col === target.col && b.row === target.row)!;
+		expect(hit.alive).toBe(false); // 2-hit brick gone in a single pass
+		expect(s.balls[0].vy).toBeLessThan(0); // still flying straight up, no deflection
+	});
+
+	it('split bonus twins a ball on every bounce, capped at maxBalls', () => {
+		// A ball dropped straight onto the paddle: one bounce → one twin.
+		const onPaddle = (s: BreakoutState): Ball => ({ x: s.paddleX, y: cfg.paddleY - cfg.ballR - 0.5, vx: 0, vy: s.speed, stuck: false });
+		let s = applyBonus(launch(fresh()), 'split', cfg);
+		s = { ...s, balls: [onPaddle(s)], bonuses: [] };
+		s = stepBreakout(s, 1 / 60, cfg, s.paddleX);
+		expect(s.balls).toHaveLength(2);
+
+		// Bouncing on and on, the swarm never exceeds the cap.
+		expect(play(s, 1200).balls.length).toBeLessThanOrEqual(cfg.maxBalls);
+
+		// Once the timer runs out, a bounce no longer twins.
+		let done = applyBonus(launch(fresh()), 'split', cfg);
+		done = { ...done, splitMs: 1, balls: [onPaddle(done)], bonuses: [] };
+		done = stepBreakout(done, 1 / 60, cfg, done.paddleX); // dt eats the last ms
+		expect(done.splitMs).toBe(0);
+		expect(done.balls).toHaveLength(1);
+	});
+
 	it('wide bonus widens the paddle; multi adds balls; life adds a life', () => {
 		const s = launch(fresh());
 		expect(paddleWidth(applyBonus(s, 'wide', cfg), cfg)).toBe(cfg.paddleWideW);

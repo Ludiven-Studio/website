@@ -48,20 +48,44 @@ const BONUS_EMOJI: Record<BonusKind, string> = {
 	power: '💥',
 	life: '❤️',
 	slow: '🐢',
+	pierce: '🔥',
+	split: '🥚',
 };
 const BONUS_LABEL: Record<BonusKind, string> = {
 	wide: 'Raquette large',
-	multi: 'Multi-balles',
-	power: 'Balle puissante',
+	multi: 'Multi-cocottes',
+	power: 'Cocotte puissante',
 	life: 'Vie bonus',
 	slow: 'Ralenti',
+	pierce: 'Cocotte de feu',
+	split: 'Cocotte qui se dédouble',
 };
+
+/* ---- Cocotte skins: the ball wears the run's strongest active power ---- */
+interface Skin {
+	body: string;
+	comb: string; // comb + tail
+	aura: string | null; // glow, null = plain hen
+	tell: 'none' | 'flame' | 'twin' | 'spark' | 'sleep';
+}
+const SKIN_PLAIN: Skin = { body: '#fcfcfc', comb: '#e34b4b', aura: null, tell: 'none' };
+const SKIN_PIERCE: Skin = { body: '#ff8b45', comb: '#ffd24a', aura: '#ff5a1f', tell: 'flame' };
+const SKIN_SPLIT: Skin = { body: '#8fe8c8', comb: '#2f9e6f', aura: '#2fd6a0', tell: 'twin' };
+const SKIN_POWER: Skin = { body: '#f0c94a', comb: '#e07a2f', aura: '#f0c94a', tell: 'spark' };
+const SKIN_SLOW: Skin = { body: '#b6d9f5', comb: '#5f8fb8', aura: '#4aa3e0', tell: 'sleep' };
+
+// Strongest power wins the look, so the ball always reads as its most impactful state.
+const skinFor = (st: BreakoutState): Skin =>
+	st.pierceMs > 0 ? SKIN_PIERCE
+	: st.splitMs > 0 ? SKIN_SPLIT
+	: st.powerMs > 0 ? SKIN_POWER
+	: st.slowMs > 0 ? SKIN_SLOW
+	: SKIN_PLAIN;
 
 interface Colors {
 	bg: string;
 	rows: string[];
 	paddle: string;
-	ball: string;
 	line: string;
 }
 
@@ -74,7 +98,6 @@ const readColors = (): Colors => {
 		// Pastel row ramp — warm at the top, cool toward the paddle.
 		rows: ['#e8637a', '#f0913f', '#f0c94a', '#5fbf6f', '#4aa3e0', '#8a7be8'],
 		paddle: accent,
-		ball: v('--gray-0', '#f5f5f7'),
 		line: v('--gray-800', '#1b1f27'),
 	};
 };
@@ -165,14 +188,10 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 		roundRect(ctx, (st.paddleX - pw / 2) * S, CFG.paddleY * S, pw * S, CFG.paddleH * S, CFG.paddleH * S * 0.5);
 		ctx.fill();
 
-		// Balls — a "power" ball glows.
+		// Balls are cocottes — they face where they fly and wear the active power's skin.
+		const skin = skinFor(st);
 		for (const ball of st.balls) {
-			ctx.beginPath();
-			ctx.arc(ball.x * S, ball.y * S, CFG.ballR * S, 0, Math.PI * 2);
-			ctx.fillStyle = st.powerMs > 0 ? '#f0c94a' : c.ball;
-			if (st.powerMs > 0) { ctx.shadowColor = '#f0c94a'; ctx.shadowBlur = 8; }
-			ctx.fill();
-			ctx.shadowBlur = 0;
+			drawCocotte(ctx, ball.x * S, ball.y * S, CFG.ballR * S, ball.vx < 0 ? -1 : 1, skin);
 		}
 	}, []);
 
@@ -250,13 +269,15 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 			if (st.score !== scoreRef.current) { scoreRef.current = st.score; setScore(st.score); }
 			if (st.lives !== livesRef.current) { livesRef.current = st.lives; setLives(st.lives); }
 			// Active timed bonuses (for the HUD chips) — only re-render when the set changes.
-			const sig = `${st.wideMs > 0 ? 'w' : ''}${st.powerMs > 0 ? 'p' : ''}${st.slowMs > 0 ? 's' : ''}`;
+			const sig = `${st.wideMs > 0 ? 'w' : ''}${st.powerMs > 0 ? 'p' : ''}${st.slowMs > 0 ? 's' : ''}${st.pierceMs > 0 ? 'f' : ''}${st.splitMs > 0 ? 'd' : ''}`;
 			if (sig !== activeRef.current) {
 				activeRef.current = sig;
 				const list: BonusKind[] = [];
 				if (st.wideMs > 0) list.push('wide');
 				if (st.powerMs > 0) list.push('power');
 				if (st.slowMs > 0) list.push('slow');
+				if (st.pierceMs > 0) list.push('pierce');
+				if (st.splitMs > 0) list.push('split');
 				setActive(list);
 			}
 			if (st.status === 'won' || st.status === 'over') { onEnd(st); return; }
@@ -521,7 +542,7 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 							ref={canvasRef}
 							className="cb-canvas"
 							role="img"
-							aria-label={`Casse-Briques — score ${score}`}
+										aria-label={`Casse-Briques — score ${score}`}
 							onPointerDown={drag.onPointerDown}
 						/>
 
@@ -577,14 +598,103 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="cb-help">
-				Glisse la raquette pour renvoyer la balle et casser tout le mur. Attrape les bonus qui tombent :
-				📏 raquette large, ⚡ multi-balles, 💥 balle puissante, ❤️ vie, 🐢 ralenti. Flèches ou souris au clavier.
+				Glisse la raquette pour renvoyer la cocotte et casser tout le mur. Attrape les bonus qui tombent :
+				📏 raquette large, ⚡ multi-cocottes, 💥 cocotte puissante, 🔥 cocotte de feu (traverse et casse tout),
+				🥚 cocotte qui se dédouble à chaque rebond (jusqu'à 16), ❤️ vie, 🐢 ralenti. Flèches ou souris au clavier.
 			</p>
 
 			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={(status === 'over' || status === 'won') ? best : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
+}
+
+const TAU = Math.PI * 2;
+
+/** A cocotte in place of the ball: body + comb + tail + beak, plus a per-power tell. */
+function drawCocotte(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, face: 1 | -1, skin: Skin): void {
+	ctx.save();
+	ctx.translate(x, y);
+	ctx.scale(face, 1);
+
+	// Tell drawn behind the body so it reads as a trail / echo.
+	if (skin.tell === 'flame') {
+		for (const [dx, rad, col] of [[-1.5, 0.55, 'rgba(255,90,31,0.45)'], [-1.05, 0.75, 'rgba(255,196,74,0.6)']] as const) {
+			ctx.fillStyle = col;
+			ctx.beginPath();
+			ctx.arc(r * dx, 0, r * rad, 0, TAU);
+			ctx.fill();
+		}
+	} else if (skin.tell === 'twin') {
+		ctx.globalAlpha = 0.4;
+		ctx.fillStyle = skin.body;
+		ctx.beginPath();
+		ctx.arc(-r * 0.85, r * 0.2, r * 0.8, 0, TAU);
+		ctx.fill();
+		ctx.globalAlpha = 1;
+	}
+
+	if (skin.aura) { ctx.shadowColor = skin.aura; ctx.shadowBlur = r * 1.5; }
+
+	ctx.fillStyle = skin.comb;
+	ctx.beginPath(); // tail feathers
+	ctx.moveTo(-r * 0.7, -r * 0.2);
+	ctx.lineTo(-r * 1.5, -r * 0.95);
+	ctx.lineTo(-r * 0.65, r * 0.55);
+	ctx.closePath();
+	ctx.fill();
+	ctx.beginPath(); // comb
+	ctx.arc(-r * 0.2, -r, r * 0.32, 0, TAU);
+	ctx.arc(r * 0.2, -r, r * 0.32, 0, TAU);
+	ctx.fill();
+
+	ctx.fillStyle = skin.body;
+	ctx.beginPath();
+	ctx.arc(0, 0, r, 0, TAU);
+	ctx.fill();
+	ctx.shadowBlur = 0;
+	ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+	ctx.lineWidth = Math.max(0.6, r * 0.1);
+	ctx.stroke();
+
+	ctx.fillStyle = '#f0a830'; // beak
+	ctx.beginPath();
+	ctx.moveTo(r * 0.68, 0);
+	ctx.lineTo(r * 1.45, r * 0.2);
+	ctx.lineTo(r * 0.68, r * 0.4);
+	ctx.closePath();
+	ctx.fill();
+
+	ctx.fillStyle = '#fff'; // eye
+	ctx.beginPath();
+	ctx.arc(r * 0.34, -r * 0.3, r * 0.3, 0, TAU);
+	ctx.fill();
+	if (skin.tell === 'sleep') { // dozing slit instead of a pupil
+		ctx.strokeStyle = '#222';
+		ctx.lineWidth = Math.max(0.7, r * 0.12);
+		ctx.beginPath();
+		ctx.moveTo(r * 0.14, -r * 0.3);
+		ctx.lineTo(r * 0.56, -r * 0.3);
+		ctx.stroke();
+	} else {
+		ctx.fillStyle = '#222';
+		ctx.beginPath();
+		ctx.arc(r * 0.42, -r * 0.3, r * 0.15, 0, TAU);
+		ctx.fill();
+	}
+
+	if (skin.tell === 'spark') { // impact star above the comb
+		ctx.fillStyle = '#fff6c4';
+		ctx.beginPath();
+		for (let i = 0; i < 8; i++) {
+			const a = (i / 8) * TAU;
+			const rad = i % 2 === 0 ? r * 0.55 : r * 0.22;
+			ctx.lineTo(Math.cos(a) * rad, -r * 1.35 + Math.sin(a) * rad);
+		}
+		ctx.closePath();
+		ctx.fill();
+	}
+	ctx.restore();
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

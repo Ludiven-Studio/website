@@ -193,9 +193,9 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🚩', title: 'Marquer les mines', body: 'Clic = révéler. Clic droit, ou le bouton « Mode drapeau » puis tap, = poser/retirer un drapeau 🚩 sur une mine suspectée. Cliquer une mine = partie terminée — mais au défi du jour tu apparais quand même au classement, selon les bombes restantes.' },
 	],
 	'casse-briques': [
-		{ emoji: '🎯', title: 'Le but', body: 'Renvoie la balle avec ta raquette pour détruire toutes les briques du mur. Ne laisse pas tomber la balle : chaque balle perdue coûte une vie, et à court de vies c\'est terminé.' },
-		{ emoji: '🎮', title: 'Contrôles', body: 'Glisse le doigt (ou la souris) pour déplacer la raquette — la balle rebondit selon l\'endroit qu\'elle touche : vers le bord pour l\'envoyer sur le côté. Au clavier : flèches gauche/droite, Espace pour lancer. Les briques foncées demandent deux coups.' },
-		{ emoji: '🎁', title: 'Les bonus', body: 'Certaines briques lâchent un bonus qui tombe — attrape-le avec la raquette : 📏 raquette large, ⚡ multi-balles (×3), 💥 balle puissante (casse d\'un coup), ❤️ vie en plus, 🐢 ralenti. Les effets à durée se cumulent, cours après les capsules utiles !' },
+		{ emoji: '🎯', title: 'Le but', body: 'Renvoie la cocotte avec ta raquette pour détruire toutes les briques du mur. Ne la laisse pas tomber : chaque cocotte perdue coûte une vie, et à court de vies c\'est terminé.' },
+		{ emoji: '🎮', title: 'Contrôles', body: 'Glisse le doigt (ou la souris) pour déplacer la raquette — la cocotte rebondit selon l\'endroit qu\'elle touche : vers le bord pour l\'envoyer sur le côté. Au clavier : flèches gauche/droite, Espace pour lancer. Les briques foncées demandent deux coups.' },
+		{ emoji: '🎁', title: 'Les bonus', body: 'Certaines briques lâchent un bonus qui tombe — attrape-le avec la raquette : 📏 raquette large, ⚡ multi-cocottes (×3), 💥 cocotte puissante (casse d\'un coup), 🔥 cocotte de feu (traverse le mur et pulvérise chaque brique touchée), 🥚 cocotte qui se dédouble à chaque rebond jusqu\'à 16, ❤️ vie en plus, 🐢 ralenti. Le plumage de la cocotte change selon son pouvoir.' },
 		{ emoji: '🏆', title: 'Défi du jour', body: 'Même mur et mêmes bonus pour tout le monde (graine partagée). Jusqu\'à 5 essais : ton meilleur score de la journée est classé. Vider le mur et garder des vies rapporte gros.' },
 	],
 	snake: [
