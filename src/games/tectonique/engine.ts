@@ -6,8 +6,9 @@
 // The CRYSTALS never move: they hover above the floor, and the only way to eat one is to
 // ride the hero across its cell.
 //
-// A rock is planted along one axis: a row rock never budges when you push its row (it only
-// travels through its column), and the other way round. It is what the crates jam against.
+// A rock is planted: a row rock never budges when you push its row (it only travels through
+// its column), the other way round for a column rock, and a boulder is planted on both axes
+// and never moves at all. They are what the crates jam against.
 //
 // Piling up loses the gaps, so a move cannot be undone — the player can strand himself and
 // has ↻ for that. Generation is unaffected: the walk it records IS a solution from the start,
@@ -18,8 +19,9 @@ export const PLATE = 1;
 export const HERO = 2;
 export const LOCK_ROW = 3;
 export const LOCK_COL = 4;
+export const LOCK_ALL = 5;
 
-export type Tile = 0 | 1 | 2 | 3 | 4;
+export type Tile = 0 | 1 | 2 | 3 | 4 | 5;
 export type Axis = 'row' | 'col';
 
 export interface Board {
@@ -28,9 +30,16 @@ export interface Board {
 	crystals: boolean[]; // world-fixed, length n*n
 }
 
+/** One piece's trip, in flat indices. Pieces pile up, so they no longer all travel the same. */
+export interface PieceMove {
+	from: number;
+	to: number;
+}
+
 export interface SlideResult {
 	board: Board;
-	shift: number; // what the clamp actually allowed
+	shift: number; // how far the furthest piece went
+	moves: PieceMove[]; // every piece that actually travelled
 	eaten: number[]; // flat indices of the crystals swallowed
 	swept: number[]; // flat indices the hero crossed, endpoints included
 }
@@ -52,8 +61,9 @@ export const heroIndex = (b: Board): number => b.floor.indexOf(HERO);
 export const flatAt = (n: number, axis: Axis, index: number, i: number): number =>
 	axis === 'row' ? index * n + i : i * n + index;
 
-/** A rock is planted along one axis: pushing that axis leaves it exactly where it is. */
-export const anchored = (t: Tile, axis: Axis): boolean => (axis === 'row' ? t === LOCK_ROW : t === LOCK_COL);
+/** A rock is planted: pushing an axis it holds leaves it exactly where it is. */
+export const anchored = (t: Tile, axis: Axis): boolean =>
+	t === LOCK_ALL || (axis === 'row' ? t === LOCK_ROW : t === LOCK_COL);
 
 const lineOf = (b: Board, axis: Axis, index: number): Tile[] => {
 	const line: Tile[] = [];
@@ -115,21 +125,25 @@ export function movers(b: Board, axis: Axis, index: number, dir: 1 | -1): number
 
 /** Push a line by `shift` cells. Returns the same board when nothing moves. */
 export function slide(b: Board, axis: Axis, index: number, shift: number): SlideResult {
+	const still: SlideResult = { board: b, shift: 0, moves: [], eaten: [], swept: [] };
 	const d = Math.round(shift);
-	if (d === 0 || index < 0 || index >= b.n) return { board: b, shift: 0, eaten: [], swept: [] };
+	if (d === 0 || index < 0 || index >= b.n) return still;
 
 	const n = b.n;
 	const { out, from } = pack(lineOf(b, axis, index), axis, d);
 
-	// The line travelled as far as its furthest piece did.
+	// The line travelled as far as its furthest piece did, but each piece has its own trip:
+	// whatever draws them has to follow `moves`, never `shift`, or a jammed piece drifts off.
+	const moves: PieceMove[] = [];
 	let moved = 0;
 	let hero = -1;
 	for (let p = 0; p < n; p++) {
 		if (from[p] < 0) continue;
+		if (from[p] !== p) moves.push({ from: flatAt(n, axis, index, from[p]), to: flatAt(n, axis, index, p) });
 		if (Math.abs(p - from[p]) > Math.abs(moved)) moved = p - from[p];
 		if (out[p] === HERO) hero = p;
 	}
-	if (moved === 0) return { board: b, shift: 0, eaten: [], swept: [] };
+	if (moved === 0) return still;
 
 	const next = cloneBoard(b);
 	for (let i = 0; i < n; i++) next.floor[flatAt(n, axis, index, i)] = out[i];
@@ -148,7 +162,7 @@ export function slide(b: Board, axis: Axis, index: number, shift: number): Slide
 			}
 		}
 	}
-	return { board: next, shift: moved, eaten, swept };
+	return { board: next, shift: moved, moves, eaten, swept };
 }
 
 export const encodeBoard = (b: Board): string => `${b.floor.join('')}|${b.crystals.map((c) => (c ? '1' : '0')).join('')}`;
@@ -166,6 +180,7 @@ export interface GenParams {
 	crystals: number;
 	rowLocks: number;
 	colLocks: number;
+	allLocks: number; // boulders planted on both axes
 	holes: number;
 }
 
@@ -224,6 +239,7 @@ function buildFloor(rng: () => number, p: GenParams): Board {
 	floor[free[k++]] = HERO;
 	for (let i = 0; i < p.rowLocks && k < free.length; i++) floor[free[k++]] = LOCK_ROW;
 	for (let i = 0; i < p.colLocks && k < free.length; i++) floor[free[k++]] = LOCK_COL;
+	for (let i = 0; i < p.allLocks && k < free.length; i++) floor[free[k++]] = LOCK_ALL;
 
 	return { n, floor, crystals: new Array<boolean>(n * n).fill(false) };
 }

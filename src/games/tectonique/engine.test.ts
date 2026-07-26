@@ -13,6 +13,7 @@ import {
 	slack,
 	slide,
 	HERO,
+	LOCK_ALL,
 	LOCK_COL,
 	LOCK_ROW,
 	PLATE,
@@ -21,10 +22,12 @@ import {
 	type GenParams,
 	type Tile,
 } from './engine';
-import { TECTONIQUE_BANDS } from './levels';
+import { TECTONIQUE_BANDS, tectoniqueLevels } from './levels';
+import { LEVEL_COUNT } from '../../lib/progression';
 
-/** '.' void · '#' slab · 'H' hero · 'R' row lock · 'K' column lock. Crystals come as a second block, '*'. */
-const TILE: Record<string, Tile> = { '.': VOID, '#': PLATE, H: HERO, R: LOCK_ROW, K: LOCK_COL };
+/** '.' void · '#' slab · 'H' hero · 'R' row lock · 'K' column lock · 'B' boulder (both axes).
+    Crystals come as a second block, '*'. */
+const TILE: Record<string, Tile> = { '.': VOID, '#': PLATE, H: HERO, R: LOCK_ROW, K: LOCK_COL, B: LOCK_ALL };
 
 function board(rows: string[], gems: string[] = []): Board {
 	const n = rows.length;
@@ -35,7 +38,9 @@ function board(rows: string[], gems: string[] = []): Board {
 	return { n, floor, crystals };
 }
 
-const BACK: Record<number, string> = { [VOID]: '.', [PLATE]: '#', [HERO]: 'H', [LOCK_ROW]: 'R', [LOCK_COL]: 'K' };
+const BACK: Record<number, string> = {
+	[VOID]: '.', [PLATE]: '#', [HERO]: 'H', [LOCK_ROW]: 'R', [LOCK_COL]: 'K', [LOCK_ALL]: 'B',
+};
 
 const show = (b: Board): string[] => {
 	const out: string[] = [];
@@ -64,6 +69,12 @@ describe('slack', () => {
 	it('lets the other axis carry a rock away', () => {
 		const b = board(['R#..', '....', '....', '....']);
 		expect(show(slide(b, 'col', 0, 3).board)).toEqual(['.#..', '....', '....', 'R...']);
+	});
+
+	it('holds a boulder on both axes, unlike a one-way rock', () => {
+		expect(show(slide(board(['B#..', '....', '....', '....']), 'row', 0, 3).board)[0]).toBe('B..#');
+		const b = board(['B...', '....', '....', '....']);
+		expect(slide(b, 'col', 0, 3).board).toBe(b);
 	});
 });
 
@@ -137,6 +148,42 @@ describe('slide', () => {
 	});
 });
 
+describe('piece trips', () => {
+	// Whatever draws the pieces has to follow `moves`. Shifting the whole line by `shift`
+	// instead used to overlap the jammed pieces and walk the end of the line off the grid.
+	it('leaves a jammed piece out of the trips', () => {
+		const r = slide(board(['#..#', '....', '....', '....']), 'row', 0, 4);
+		expect(show(r.board)[0]).toBe('..##');
+		expect(r.shift).toBe(2);
+		expect(r.moves).toEqual([{ from: 0, to: 2 }]); // the crate already on the wall never budged
+	});
+
+	it('stays on the board across a whole generated walk', () => {
+		let jams = 0; // slides where a piece stayed put while the line moved — the case that broke
+		for (const p of TECTONIQUE_BANDS) {
+			const { board: start, walk } = generateDetailed(mulberry32(11), p);
+			let b = start;
+			let drawn = new Map<number, Tile>(start.floor.flatMap((t, i) => (t === VOID ? [] : [[i, t]])));
+			for (const m of walk) {
+				const r = slide(b, m.axis, m.index, m.shift);
+				const onLine = b.floor.filter((t, i) =>
+					t !== VOID && (m.axis === 'row' ? Math.floor(i / b.n) === m.index : i % b.n === m.index));
+				if (r.shift && r.moves.length < onLine.length) jams++;
+
+				const next = new Map(drawn);
+				for (const mv of r.moves) next.delete(mv.from);
+				for (const mv of r.moves) next.set(mv.to, drawn.get(mv.from) as Tile);
+				drawn = next;
+				b = r.board;
+			}
+			expect([...drawn].sort((x, y) => x[0] - y[0])).toEqual(
+				b.floor.flatMap((t, i) => (t === VOID ? [] : [[i, t]])),
+			);
+		}
+		expect(jams).toBeGreaterThan(0);
+	});
+});
+
 describe('movers', () => {
 	it('names only the pieces with room ahead of them', () => {
 		expect(movers(board(['#.R.', '....', '....', '....']), 'row', 0, 1)).toEqual([0]);
@@ -168,7 +215,7 @@ describe('board helpers', () => {
 });
 
 describe('generate', () => {
-	const params: GenParams = { n: 8, crystals: 6, rowLocks: 2, colLocks: 2, holes: 5 };
+	const params: GenParams = { n: 8, crystals: 6, rowLocks: 2, colLocks: 2, allLocks: 1, holes: 5 };
 
 	it('is deterministic for a given seed', () => {
 		expect(encodeBoard(generate(mulberry32(7), params))).toBe(encodeBoard(generate(mulberry32(7), params)));
@@ -181,6 +228,7 @@ describe('generate', () => {
 		expect(b.floor.filter((t) => t === HERO)).toHaveLength(1);
 		expect(b.floor.filter((t) => t === LOCK_ROW)).toHaveLength(2);
 		expect(b.floor.filter((t) => t === LOCK_COL)).toHaveLength(2);
+		expect(b.floor.filter((t) => t === LOCK_ALL)).toHaveLength(1);
 	});
 
 	it('never drops a crystal under the hero', () => {
@@ -197,7 +245,18 @@ describe('generate', () => {
 	});
 
 	// The walk is the only proof the grid is solvable — packing makes moves final, so replaying
-	// it has to still clear every crystal on every band we ship.
+	// it has to still clear every crystal on every band and every level we ship.
+	it('ships a walk that clears all 100 levels', () => {
+		for (let l = 1; l <= LEVEL_COUNT; l++) {
+			const cfg = tectoniqueLevels.config(l);
+			const { board: start, walk } = generateDetailed(mulberry32(cfg.seed), cfg);
+			expect(countCrystals(start)).toBe(cfg.crystals);
+			let b = start;
+			for (const m of walk) b = slide(b, m.axis, m.index, m.shift).board;
+			expect(isWon(b), `level ${l}`).toBe(true);
+		}
+	});
+
 	it('ships a walk that eats every crystal it dropped', () => {
 		for (const p of TECTONIQUE_BANDS) {
 			for (let s = 0; s < 20; s++) {

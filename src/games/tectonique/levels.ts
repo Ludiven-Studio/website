@@ -31,6 +31,7 @@ export const tectoniqueLevels: LevelPlan<TectoniqueLevelCfg> = {
 			crystals,
 			rowLocks: locks,
 			colLocks: locks,
+			allLocks: Math.min(2, Math.floor((l - 1) / 34)),
 			holes: n - 3,
 			seed: levelSeed(l),
 			threeStar: three,
@@ -52,7 +53,7 @@ export const tectoniqueLevels: LevelPlan<TectoniqueLevelCfg> = {
 
 /** Free play and the daily share three bands; the daily picks with the server's difficulty index. */
 export const TECTONIQUE_BANDS: GenParams[] = [
-	{ n: 6, crystals: 4, rowLocks: 1, colLocks: 1, holes: 3 },
-	{ n: 8, crystals: 6, rowLocks: 2, colLocks: 2, holes: 5 },
-	{ n: 10, crystals: 8, rowLocks: 3, colLocks: 3, holes: 7 },
+	{ n: 6, crystals: 4, rowLocks: 1, colLocks: 1, allLocks: 0, holes: 3 },
+	{ n: 8, crystals: 6, rowLocks: 2, colLocks: 2, allLocks: 1, holes: 5 },
+	{ n: 10, crystals: 8, rowLocks: 3, colLocks: 3, allLocks: 2, holes: 7 },
 ];

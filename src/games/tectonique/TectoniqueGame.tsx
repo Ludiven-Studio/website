@@ -24,6 +24,7 @@ import {
 	slack,
 	slide,
 	HERO,
+	LOCK_ALL,
 	LOCK_COL,
 	LOCK_ROW,
 	PLATE,
@@ -75,8 +76,11 @@ interface Grab {
 }
 
 // The arrow on a rock is the axis it can still travel — a row rock is planted in its row.
-const GLYPH: Record<number, string> = { [HERO]: '🐔', [LOCK_ROW]: '↕', [LOCK_COL]: '↔' };
-const KIND_CLASS: Record<number, string> = { [PLATE]: 'plate', [HERO]: 'hero', [LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol' };
+// A boulder holds both axes, so it gets a cross instead.
+const GLYPH: Record<number, string> = { [HERO]: '🐔', [LOCK_ROW]: '↕', [LOCK_COL]: '↔', [LOCK_ALL]: '✖' };
+const KIND_CLASS: Record<number, string> = {
+	[PLATE]: 'plate', [HERO]: 'hero', [LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol', [LOCK_ALL]: 'lockall',
+};
 const FREE_LABELS = ['Facile', 'Moyen', 'Difficile'];
 
 // Arrows + ZQSD/WASD, both keyboard layouts. They nudge the line the hero stands on.
@@ -278,9 +282,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		// The ground travels with the line, so its scroll has to keep adding up: the live
 		// offset drops back to zero on every commit, this does not.
 		setShifts((prev) => ({ ...prev, [lineKey(axis, index)]: (prev[lineKey(axis, index)] ?? 0) + r.shift }));
-		const stride = axis === 'row' ? 1 : b.n;
-		const onLine = (i: number): boolean => (axis === 'row' ? Math.floor(i / b.n) === index : i % b.n === index);
-		setSprites((prev) => prev.map((s) => (onLine(s.idx) ? { ...s, idx: s.idx + r.shift * stride } : s)));
+		// Each piece has its own trip once they pile up, so moving the whole line by `shift`
+		// would overlap the jammed ones and push the end of the line off the grid.
+		const trips = new Map(r.moves.map((m) => [m.from, m.to]));
+		setSprites((prev) => prev.map((s) => (trips.has(s.idx) ? { ...s, idx: trips.get(s.idx) as number } : s)));
 
 		if (r.eaten.length) {
 			const fresh = r.eaten.map((idx) => ({ id: ++popIdRef.current, idx }));
@@ -704,7 +709,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			<p className="tk-help">
 				Fais glisser une ligne ou une colonne : le sol défile, les caisses et le nid partent avec lui
 				et s'empilent contre le mur ou contre un rocher. Un rocher est planté dans le sol — la flèche
-				dessus dit le seul axe où il peut encore bouger. À plusieurs doigts, plusieurs lignes (ou
+				dessus dit le seul axe où il peut encore bouger, et celui marqué ✖ ne bouge jamais du tout.
+				À plusieurs doigts, plusieurs lignes (ou
 				plusieurs colonnes) glissent en même temps. Les 💎 flottent au-dessus et ne bougent jamais —
 				c'est le nid de la cocotte 🐔 qui doit leur passer dessus. Les trous se referment : si tu te
 				coinces, ↻ remet la grange à zéro.
@@ -811,7 +817,7 @@ const CSS = `
 
 /* Blockers are boulders, one per cell. The glow around the silhouette says which axis they
    hold — a ring cannot, the rock is not a box. */
-.tk-slab.lockrow .tk-face, .tk-slab.lockcol .tk-face {
+.tk-slab.lockrow .tk-face, .tk-slab.lockcol .tk-face, .tk-slab.lockall .tk-face {
   background:
     var(--tk-rock, none) center / 100% 100% no-repeat,
     radial-gradient(circle at 42% 36%, #9a9a92 0 34%, #5c5c54 62%, transparent 66%);
@@ -825,7 +831,12 @@ const CSS = `
   filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.95)) drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
   color: #bae6fd;
 }
-.tk-slab.lockrow span, .tk-slab.lockcol span {
+/* No glow at all: this one holds both axes, so there is no direction to point at. */
+.tk-slab.lockall .tk-face {
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.9)) drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
+  color: #e5e7eb;
+}
+.tk-slab.lockrow span, .tk-slab.lockcol span, .tk-slab.lockall span {
   font-weight: 700; font-size: calc(var(--tk-cell) * 0.5);
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9);
 }
