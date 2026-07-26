@@ -11,7 +11,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { mulberry32 } from '../prng';
-import { usePointerDrag } from '../usePointerDrag';
+import { useMultiPointerDrag } from '../useMultiPointerDrag';
 import { tectoniqueLevels, TECTONIQUE_BANDS } from './levels';
 import {
 	countCrystals,
@@ -48,11 +48,28 @@ interface Sprite {
 	idx: number;
 }
 
-/** The line currently under the finger (or coasting), and its fractional offset in cells. */
-interface Motion {
+/** A line being dragged or coasting. `t` is where the gesture asked it to be, in cells. */
+interface Live {
 	axis: Axis;
 	index: number;
-	offset: number;
+	t: number;
+	committed: number;
+	raf: number;
+	held: boolean; // a finger is still on it
+}
+
+/** One finger. It picks its line only once the gesture commits to an axis. */
+interface Grab {
+	r: number;
+	c: number;
+	x: number;
+	y: number;
+	axis: Axis | null;
+	line: Live | null;
+	base: number;
+	t: number;
+	ms: number;
+	v: number;
 }
 
 const GLYPH: Record<number, string> = { [HERO]: '🐔', [LOCK_ROW]: '↔', [LOCK_COL]: '↕' };
@@ -66,7 +83,16 @@ const KEY_MOVES: Record<string, [Axis, -1 | 1] | undefined> = {
 };
 
 const AXIS_LOCK_PX = 7; // travel before the gesture commits to a row or a column
-const FLICK_SEC = 0.13; // how long the release speed keeps coasting
+const FLICK_SEC = 0.32; // how long the release speed keeps coasting
+
+const lineKey = (axis: Axis, index: number): string => `${axis}:${index}`;
+
+const ART: [string, string][] = [
+	['ground.jpg', '--tk-ground'],
+	['crate.jpg', '--tk-crate'],
+	['rock.png', '--tk-rock'],
+	['nest.png', '--tk-nest'],
+];
 
 const spritesOf = (b: Board): Sprite[] =>
 	b.floor.flatMap((t, i) => (t === VOID ? [] : [{ id: i, kind: t, idx: i }]));
@@ -74,7 +100,8 @@ const spritesOf = (b: Board): Sprite[] =>
 export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [board, setBoard] = useState<Board | null>(null);
 	const [sprites, setSprites] = useState<Sprite[]>([]);
-	const [motion, setMotion] = useState<Motion | null>(null);
+	const [offsets, setOffsets] = useState<Record<string, number>>({});
+	const [shifts, setShifts] = useState<Record<string, number>>({}); // cells a line has travelled since it was dealt
 	const [pops, setPops] = useState<{ id: number; idx: number }[]>([]);
 	const [status, setStatus] = useState<Status>('playing');
 	const [shaking, setShaking] = useState(false);
@@ -87,9 +114,9 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 	const boardRef = useRef<Board | null>(null);
 	const freshRef = useRef<Board | null>(null); // the board as generated, for ↻
+	const rootRef = useRef<HTMLDivElement>(null);
 	const elRef = useRef<HTMLDivElement>(null);
-	const liveRef = useRef<{ axis: Axis; index: number; t: number; committed: number } | null>(null);
-	const rafRef = useRef(0);
+	const livesRef = useRef(new Map<string, Live>());
 	const startRef = useRef(0);
 	const winRef = useRef(0);
 	const seedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
@@ -97,22 +124,34 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const shakeRef = useRef(0);
 	const lv = useLevels(gameId, tectoniqueLevels);
 
-	const stopMotion = useCallback(() => {
-		cancelAnimationFrame(rafRef.current);
-		liveRef.current = null;
-		setMotion(null);
+	const stopAll = useCallback(() => {
+		for (const l of livesRef.current.values()) cancelAnimationFrame(l.raf);
+		livesRef.current.clear();
+		setOffsets({});
+	}, []);
+
+	/* Art is optional: each CSS var stays unset until its image really loads, so a missing
+	   asset just leaves the plain gradients in place. */
+	useEffect(() => {
+		for (const [file, prop] of ART) {
+			const url = `/assets/jeux/tectonique/${file}`;
+			const img = new Image();
+			img.onload = () => rootRef.current?.style.setProperty(prop, `url(${url})`);
+			img.src = url;
+		}
 	}, []);
 
 	const load = useCallback((fresh: Board, resume?: Board) => {
-		stopMotion();
+		stopAll();
 		freshRef.current = fresh;
 		const b = resume ?? fresh;
 		boardRef.current = b;
+		setShifts({});
 		setBoard(b);
 		setSprites(spritesOf(b));
 		setPops([]);
 		setStatus(isWon(b) ? 'won' : 'playing');
-	}, [stopMotion]);
+	}, [stopAll]);
 
 	const newFree = useCallback((diff: number) => {
 		setDaily(false);
@@ -231,6 +270,9 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 		boardRef.current = r.board;
 		setBoard(r.board);
+		// The ground travels with the line, so its scroll has to keep adding up: the live
+		// offset drops back to zero on every commit, this does not.
+		setShifts((prev) => ({ ...prev, [lineKey(axis, index)]: (prev[lineKey(axis, index)] ?? 0) + r.shift }));
 		const stride = axis === 'row' ? 1 : b.n;
 		const onLine = (i: number): boolean => (axis === 'row' ? Math.floor(i / b.n) === index : i % b.n === index);
 		setSprites((prev) => prev.map((s) => (onLine(s.idx) ? { ...s, idx: s.idx + r.shift * stride } : s)));
@@ -250,62 +292,99 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		return r.shift;
 	}, [gameId]);
 
+	const pushOffsets = useCallback(() => {
+		const o: Record<string, number> = {};
+		for (const [k, l] of livesRef.current) o[k] = l.t - l.committed;
+		setOffsets(o);
+	}, []);
+
 	/**
-	 * Move the live line to `next` cells from where the gesture started. Whole cells are
+	 * Move a live line to `next` cells from where its gesture started. Whole cells are
 	 * committed to the engine as they are crossed and the remainder stays visual, so the
 	 * slide reads as continuous while the board itself stays on the grid.
 	 */
-	const setOffset = useCallback((next: number) => {
-		const m = liveRef.current;
+	const setOffset = useCallback((l: Live, next: number) => {
 		const b = boardRef.current;
-		if (!m || !b) return;
-		const s = slack(b, m.axis, m.index);
-		const t = Math.max(m.committed + s.min, Math.min(m.committed + s.max, next));
-		const step = Math.round(t) - m.committed;
-		if (step !== 0) m.committed += applyStep(m.axis, m.index, step);
-		m.t = t;
-		setMotion({ axis: m.axis, index: m.index, offset: t - m.committed });
-	}, [applyStep]);
+		if (!b) return;
+		const s = slack(b, l.axis, l.index);
+		const t = Math.max(l.committed + s.min, Math.min(l.committed + s.max, next));
+		const step = Math.round(t) - l.committed;
+		if (step !== 0) l.committed += applyStep(l.axis, l.index, step);
+		l.t = t;
+		pushOffsets();
+	}, [applyStep, pushOffsets]);
 
-	/** Ease the live line to a whole-cell target, then let go of it. */
-	const glideTo = useCallback((target: number) => {
-		const m = liveRef.current;
-		if (!m) return;
-		const from = m.t;
-		const dur = Math.min(420, 130 + Math.abs(target - from) * 90);
+	const drop = useCallback((l: Live) => {
+		cancelAnimationFrame(l.raf);
+		livesRef.current.delete(lineKey(l.axis, l.index));
+		pushOffsets();
+	}, [pushOffsets]);
+
+	/** Ease a line to a whole-cell target, then let go of it. */
+	const glideTo = useCallback((l: Live, target: number) => {
+		const from = l.t;
+		const key = lineKey(l.axis, l.index);
+		const dur = Math.min(900, 180 + Math.abs(target - from) * 130);
 		const t0 = performance.now();
 		const frame = (): void => {
-			if (!liveRef.current) return;
+			if (livesRef.current.get(key) !== l) return;
 			const k = Math.min(1, (performance.now() - t0) / dur);
-			setOffset(from + (target - from) * (1 - (1 - k) ** 3));
-			if (k < 1) rafRef.current = requestAnimationFrame(frame);
-			else stopMotion();
+			setOffset(l, from + (target - from) * (1 - (1 - k) ** 4));
+			if (k < 1) l.raf = requestAnimationFrame(frame);
+			else drop(l);
 		};
-		cancelAnimationFrame(rafRef.current);
-		rafRef.current = requestAnimationFrame(frame);
-	}, [setOffset, stopMotion]);
+		cancelAnimationFrame(l.raf);
+		l.raf = requestAnimationFrame(frame);
+	}, [setOffset, drop]);
+
+	/**
+	 * Rows and columns cross each other, so two perpendicular lines can never slide at once.
+	 * Lines still coasting on the other axis are snapped home; a held one wins and the new
+	 * gesture is dropped.
+	 */
+	const claimAxis = useCallback((axis: Axis): boolean => {
+		for (const l of livesRef.current.values()) if (l.axis !== axis && l.held) return false;
+		for (const l of [...livesRef.current.values()]) {
+			if (l.axis === axis) continue;
+			cancelAnimationFrame(l.raf);
+			setOffset(l, Math.round(l.t));
+			livesRef.current.delete(lineKey(l.axis, l.index));
+		}
+		pushOffsets();
+		return true;
+	}, [setOffset, pushOffsets]);
+
+	/** Grab a line, reusing the one already there when a finger lands on a coasting line. */
+	const takeLine = useCallback((axis: Axis, index: number): Live | null => {
+		if (!claimAxis(axis)) return null;
+		const key = lineKey(axis, index);
+		const found = livesRef.current.get(key);
+		if (found) {
+			cancelAnimationFrame(found.raf);
+			found.held = true;
+			return found;
+		}
+		const l: Live = { axis, index, t: 0, committed: 0, raf: 0, held: true };
+		livesRef.current.set(key, l);
+		return l;
+	}, [claimAxis]);
 
 	const cellPx = useCallback((): number => {
 		const rect = elRef.current?.getBoundingClientRect();
 		return Math.max(1, (rect?.width ?? 320) / Math.max(1, boardRef.current?.n ?? 1));
 	}, []);
 
-	const dragRef = useRef<{ r: number; c: number; x: number; y: number; axis: Axis | null; t: number; ms: number; v: number } | null>(null);
-
-	const { onPointerDown } = usePointerDrag(
-		(x, y) => {
+	const { onPointerDown } = useMultiPointerDrag<Grab>({
+		start: (x, y) => {
 			const b = boardRef.current;
 			const rect = elRef.current?.getBoundingClientRect();
-			if (!b || !rect || lockedRef.current) return;
+			if (!b || !rect || lockedRef.current) return null;
 			const c = Math.floor(((x - rect.left) / rect.width) * b.n);
 			const r = Math.floor(((y - rect.top) / rect.height) * b.n);
-			if (r < 0 || r >= b.n || c < 0 || c >= b.n) return;
-			stopMotion();
-			dragRef.current = { r, c, x, y, axis: null, t: 0, ms: performance.now(), v: 0 };
+			if (r < 0 || r >= b.n || c < 0 || c >= b.n) return null;
+			return { r, c, x, y, axis: null, line: null, base: 0, t: 0, ms: performance.now(), v: 0 };
 		},
-		(x, y) => {
-			const d = dragRef.current;
-			if (!d) return;
+		move: (d, x, y) => {
 			if (!d.axis) {
 				const dx = x - d.x;
 				const dy = y - d.y;
@@ -315,38 +394,42 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				d.y = y; // the gesture restarts here, so the line does not jump by the lock distance
 				const index = d.axis === 'row' ? d.r : d.c;
 				const b = boardRef.current;
-				if (b && frozen(b, d.axis, index)) { dragRef.current = null; bump(); return; }
-				liveRef.current = { axis: d.axis, index, t: 0, committed: 0 };
+				if (b && frozen(b, d.axis, index)) { bump(); return; }
+				d.line = takeLine(d.axis, index);
+				d.base = d.line?.t ?? 0;
+				d.t = d.base;
 			}
+			if (!d.line) return;
 			const now = performance.now();
-			const t = (d.axis === 'row' ? x - d.x : y - d.y) / cellPx();
+			const t = d.base + (d.axis === 'row' ? x - d.x : y - d.y) / cellPx();
 			const dt = Math.max(8, now - d.ms);
 			d.v = ((t - d.t) / dt) * 1000;
 			d.t = t;
 			d.ms = now;
-			setOffset(t);
+			setOffset(d.line, t);
 		},
-		() => {
-			const d = dragRef.current;
-			dragRef.current = null;
-			const m = liveRef.current;
-			if (!d || !m) return;
-			const s = slack(boardRef.current as Board, m.axis, m.index);
-			const coast = Math.round(m.t + d.v * FLICK_SEC);
-			glideTo(Math.max(m.committed + s.min, Math.min(m.committed + s.max, coast)));
+		end: (d) => {
+			const l = d.line;
+			if (!l) return;
+			l.held = false;
+			const s = slack(boardRef.current as Board, l.axis, l.index);
+			const coast = Math.round(l.t + d.v * FLICK_SEC);
+			glideTo(l, Math.max(l.committed + s.min, Math.min(l.committed + s.max, coast)));
 		},
-	);
+	});
 
 	/* Keyboard: the arrows nudge the line the hero stands on by one cell. */
 	const nudgeRef = useRef<(axis: Axis, dir: -1 | 1) => void>(() => {});
 	nudgeRef.current = (axis, dir) => {
 		const b = boardRef.current;
-		if (!b || locked || liveRef.current) return;
+		if (!b || locked) return;
 		const h = heroIndex(b);
 		const index = axis === 'row' ? Math.floor(h / b.n) : h % b.n;
 		if (frozen(b, axis, index)) { bump(); return; }
-		liveRef.current = { axis, index, t: 0, committed: 0 };
-		glideTo(dir);
+		const l = takeLine(axis, index);
+		if (!l) return;
+		l.held = false;
+		glideTo(l, Math.round(l.t) + dir);
 	};
 
 	useEffect(() => {
@@ -360,7 +443,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		return () => window.removeEventListener('keydown', onKey);
 	}, []);
 
-	useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+	useEffect(() => stopAll, [stopAll]);
 
 	const restart = useCallback(() => {
 		const fresh = freshRef.current;
@@ -421,18 +504,32 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 	const gems = useMemo(() => (board ? board.crystals.flatMap((c, i) => (c ? [i] : [])) : []), [board]);
 
-	const offsetOf = (idx: number): { x: number; y: number } => {
-		if (!motion) return { x: 0, y: 0 };
-		const on = motion.axis === 'row' ? Math.floor(idx / n) === motion.index : idx % n === motion.index;
-		if (!on) return { x: 0, y: 0 };
-		return motion.axis === 'row' ? { x: motion.offset, y: 0 } : { x: 0, y: motion.offset };
+	const cells = useMemo(() => [...Array(n * n).keys()], [n]);
+
+	const offsetOf = (idx: number): { x: number; y: number } => ({
+		x: offsets[lineKey('row', Math.floor(idx / n))] ?? 0,
+		y: offsets[lineKey('col', idx % n)] ?? 0,
+	});
+
+	/**
+	 * The ground is no backdrop: every cell is a window on the straw, scrolled by all its row
+	 * and its column have travelled. Cells of the same band stay continuous, and the floor
+	 * tears between two bands — that is what makes the slide readable.
+	 * The texture is laid out `n` cells wide, so a position of p% lands on cell p·(n−1)/100.
+	 */
+	const groundPos = (idx: number): string => {
+		const rk = lineKey('row', Math.floor(idx / n));
+		const ck = lineKey('col', idx % n);
+		const x = (idx % n) - (shifts[rk] ?? 0) - (offsets[rk] ?? 0);
+		const y = Math.floor(idx / n) - (shifts[ck] ?? 0) - (offsets[ck] ?? 0);
+		return `${(x / (n - 1)) * 100}% ${(y / (n - 1)) * 100}%`;
 	};
 
 	const left = board ? countCrystals(board) : 0;
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	return (
-		<div className="tk-root" style={{ ['--n' as string]: n }}>
+		<div className="tk-root" ref={rootRef} style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
 
 			<ModeToggle
@@ -493,6 +590,18 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						role="application"
 						aria-label="Grille de Tectonique"
 					>
+						{cells.map((i) => (
+							<div
+								key={`f${i}`}
+								className="tk-floor"
+								style={{
+									transform: `translate(${(i % n) * 100}%, ${Math.floor(i / n) * 100}%)`,
+									backgroundPosition: groundPos(i),
+								}}
+							/>
+						))}
+						<div className="tk-grid" />
+
 						{freeze.rows.map((r) => (
 							<div key={`fr${r}`} className="tk-freeze row" style={{ transform: `translateY(${r * 100}%)` }} />
 						))}
@@ -592,9 +701,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			<p className="tk-help">
-				Fais glisser une ligne ou une colonne du sol : la plaque part d'un bloc et continue sur sa
-				lancée, jusqu'à buter contre le bord. Les 💎 flottent au-dessus et ne bougent jamais — c'est la
-				cocotte 🐔 qui doit leur passer dessus. Un bloc ↔ gèle sa ligne, un bloc ↕ gèle sa colonne.
+				Fais glisser une ligne ou une colonne : le sol part d'un bloc, emporte les caisses et le nid,
+				et continue sur sa lancée jusqu'au mur. À plusieurs doigts, plusieurs lignes (ou plusieurs
+				colonnes) glissent en même temps. Les 💎 flottent au-dessus et ne bougent jamais — c'est le
+				nid de la cocotte 🐔 qui doit leur passer dessus. Un rocher ↔ gèle sa ligne, un ↕ sa colonne.
 			</p>
 		</div>
 	);
@@ -642,42 +752,95 @@ const CSS = `
   border: 2.5px solid var(--gray-100);
   border-radius: 14px;
   overflow: hidden;
-  /* The void the plate floats in — that empty room IS what lets a line travel. */
-  background:
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px var(--tk-cell)),
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px var(--tk-cell)),
-    radial-gradient(circle at 50% 40%, #131722, #05070c);
+  background: linear-gradient(160deg, #3a2c1c, #221a10);
   touch-action: none;
   user-select: none;
   cursor: grab;
 }
 
+/* The barn floor, one window per cell. It is the only textured layer — the crates and the
+   rocks are objects standing on it. Sized n cells wide and repeated, so a band can scroll
+   for ever without ever running out of straw. */
+.tk-floor {
+  position: absolute; top: 0; left: 0;
+  width: calc(100% / var(--n)); height: calc(100% / var(--n));
+  background-image: var(--tk-ground, none);
+  background-size: calc(var(--n) * 100%) calc(var(--n) * 100%);
+  pointer-events: none;
+}
+.tk-grid {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(0,0,0,0.22) 0 1px, transparent 1px),
+    linear-gradient(180deg, rgba(0,0,0,0.22) 0 1px, transparent 1px);
+  background-size: calc(100% / var(--n)) 100%, 100% calc(100% / var(--n));
+}
+
 /* A frozen line keeps its blocker's hue, so the dead ends read at a glance. */
 .tk-freeze { position: absolute; top: 0; left: 0; pointer-events: none; }
-.tk-freeze.row { width: 100%; height: calc(100% / var(--n)); background: rgba(245, 158, 11, 0.12); }
-.tk-freeze.col { width: calc(100% / var(--n)); height: 100%; background: rgba(56, 189, 248, 0.12); }
+/* Edge stripes rather than a full wash: a busy floor drowns a tint, and a 10×10 with six
+   frozen lines would turn into plaid. */
+.tk-freeze.row {
+  width: 100%; height: calc(100% / var(--n));
+  background: rgba(245, 158, 11, 0.13);
+  box-shadow: inset 0 2px 0 rgba(245, 158, 11, 0.85), inset 0 -2px 0 rgba(245, 158, 11, 0.85);
+}
+.tk-freeze.col {
+  width: calc(100% / var(--n)); height: 100%;
+  background: rgba(56, 189, 248, 0.13);
+  box-shadow: inset 2px 0 0 rgba(56, 189, 248, 0.85), inset -2px 0 0 rgba(56, 189, 248, 0.85);
+}
 
 .tk-slab {
   position: absolute; top: 0; left: 0;
   width: calc(100% / var(--n)); height: calc(100% / var(--n));
-  padding: 2.5%;
+  padding: 1%;
   box-sizing: border-box;
   pointer-events: none;
   will-change: transform;
 }
+/* The crate is square and fills its cell. The rock and the nest keep their alpha, so the
+   floor shows around them and they read as objects put down on it. */
 .tk-face {
+  position: relative;
   width: 100%; height: 100%;
-  border-radius: 20%;
+  border-radius: 16%;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(180deg, #55606f, #333c4b);
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  background: var(--tk-crate, none) center / 100% 100% no-repeat, linear-gradient(180deg, #a9743a, #6d4620);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
 }
-.tk-slab span { font-size: calc(var(--tk-cell) * 0.5); line-height: 1; }
-.tk-slab.hero .tk-face { background: linear-gradient(180deg, #7a6a4a, #4a3f2c); box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.2); }
-.tk-slab.hero span { font-size: calc(var(--tk-cell) * 0.58); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.3)); }
-.tk-slab.lockrow .tk-face { background: linear-gradient(180deg, #a86a12, #6d4207); color: #fde68a; }
-.tk-slab.lockcol .tk-face { background: linear-gradient(180deg, #0e7ea6, #08475f); color: #bae6fd; }
-.tk-slab.lockrow span, .tk-slab.lockcol span { font-weight: 700; font-size: calc(var(--tk-cell) * 0.44); }
+.tk-slab span { position: relative; font-size: calc(var(--tk-cell) * 0.56); line-height: 1; }
+
+/* The hen never rides a crate: she sits on her nest, which rides the floor like a rock does. */
+.tk-slab.hero .tk-face {
+  background:
+    var(--tk-nest, none) center / 100% 100% no-repeat,
+    radial-gradient(circle, rgba(90, 62, 20, 0.85) 0 40%, rgba(0, 0, 0, 0.35) 46%, transparent 50%);
+  box-shadow: none;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
+}
+.tk-slab.hero span { font-size: calc(var(--tk-cell) * 0.62); filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55)); }
+
+/* Blockers are boulders, one per cell. The glow around the silhouette says which axis they
+   hold — a ring cannot, the rock is not a box. */
+.tk-slab.lockrow .tk-face, .tk-slab.lockcol .tk-face {
+  background:
+    var(--tk-rock, none) center / 100% 100% no-repeat,
+    radial-gradient(circle at 42% 36%, #9a9a92 0 34%, #5c5c54 62%, transparent 66%);
+  box-shadow: none;
+}
+.tk-slab.lockrow .tk-face {
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.95)) drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
+  color: #fde68a;
+}
+.tk-slab.lockcol .tk-face {
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.95)) drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
+  color: #bae6fd;
+}
+.tk-slab.lockrow span, .tk-slab.lockcol span {
+  font-weight: 700; font-size: calc(var(--tk-cell) * 0.5);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9);
+}
 
 /* Crystals hover above the floor: raised, with their own shadow, and never offset by a slide. */
 .tk-gem {
@@ -687,7 +850,7 @@ const CSS = `
   pointer-events: none;
 }
 .tk-gem span {
-  font-size: calc(var(--tk-cell) * 0.46); line-height: 1;
+  font-size: calc(var(--tk-cell) * 0.55); line-height: 1;
   filter: drop-shadow(0 5px 4px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 6px rgba(90, 200, 255, 0.55));
   animation: tk-float 2.4s ease-in-out infinite;
 }

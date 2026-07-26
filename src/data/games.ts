@@ -238,7 +238,7 @@ export const games: GameTile[] = [
 	{
 		id: 'tectonique',
 		title: 'Tectonique',
-		pitch: 'Fais glisser le sol ligne par ligne : la plaque dérive avec de l\'inertie et emporte la cocotte, mais les cristaux flottent sur place. Des blocs gèlent une ligne, d\'autres une colonne. 100 niveaux et un défi du jour, au chrono.',
+		pitch: 'Fais glisser le sol de la grange, ligne par ligne : il dérive avec de l\'inertie et emporte les caisses et le nid de la cocotte, mais les cristaux flottent sur place. Des rochers gèlent une ligne, d\'autres une colonne. 100 niveaux et un défi du jour, au chrono.',
 		icon: 'tectonique',
 		href: '/jeux/tectonique',
 		status: 'play',

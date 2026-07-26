@@ -183,10 +183,10 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🔊', title: 'Sonar', body: 'Tu as quelques sonars : active le bouton Sonar puis clique une zone — il révèle le nombre de cases-navire dans le carré 3×3. La flotte à couler (tailles des navires) est affichée en haut. Au défi du jour, même flotte pour tous, classement au moins d\'actions.' },
 	],
 	tectonique: [
-		{ emoji: '💎', title: 'Le but', body: 'Les cristaux flottent au-dessus du sol et ne bougent jamais. La cocotte, elle, est posée sur la plaque : fais-la passer sur chaque cristal pour tous les avaler, le plus vite possible.' },
-		{ emoji: '🕹️', title: 'Faire glisser le sol', body: 'Attrape une ligne ou une colonne et fais-la glisser : toute la plaque part d\'un bloc, sans se tasser, et continue sur sa lancée quand tu relâches. Elle s\'arrête quand sa dalle extrême bute contre le bord — c\'est le vide autour qui donne le jeu. Au clavier, les flèches décalent la ligne de la cocotte.' },
-		{ emoji: '🧱', title: 'Les bloqueurs', body: 'Un bloc ↔ gèle la ligne où il se trouve, un bloc ↕ gèle sa colonne (la ligne gelée est teintée). Pour le déloger, pousse-le dans l\'autre sens : un bloqueur de ligne se déplace en glissant sa colonne.' },
-		{ emoji: '🏆', title: 'Niveaux & défi', body: '100 niveaux, de 6×6 à 10×10 : les étoiles se gagnent au chrono. Au défi du jour, même grille pour tout le monde, classement au temps. Aucun coup n\'est perdu — tout se rejoue en glissant dans l\'autre sens.' },
+		{ emoji: '💎', title: 'Le but', body: 'Les cristaux flottent au-dessus du sol de la grange et ne bougent jamais. La cocotte, elle, est posée sur son nid, au milieu des caisses : fais passer le nid sur chaque cristal pour tous les avaler, le plus vite possible.' },
+		{ emoji: '🕹️', title: 'Pousser le sol', body: 'Attrape une ligne ou une colonne et fais-la glisser : le sol défile et emporte tout ce qui est posé dessus — caisses, rochers et nid partent d\'un bloc, sans se tasser, et continuent sur leur lancée quand tu relâches. Ça s\'arrête quand la pièce extrême bute contre le mur. À plusieurs doigts, tu peux pousser plusieurs lignes (ou plusieurs colonnes) d\'un coup. Au clavier, les flèches décalent la ligne du nid.' },
+		{ emoji: '🪨', title: 'Les rochers', body: 'Un rocher ↔ gèle la ligne où il se trouve, un rocher ↕ gèle sa colonne (la ligne gelée est teintée). Pour le déloger, pousse-le dans l\'autre sens : un rocher de ligne se déplace en glissant sa colonne.' },
+		{ emoji: '🏆', title: 'Niveaux & défi', body: '100 niveaux, de 6×6 à 10×10 : les étoiles se gagnent au chrono. Au défi du jour, même grille pour tout le monde, classement au temps. Aucun coup n\'est perdu — tout se rejoue en poussant dans l\'autre sens.' },
 	],
 	codecolor: [
 		{ emoji: '🎨', title: 'Le but', body: 'Un code de couleurs est caché. Devine-le en un minimum d\'essais. Le code n\'a que des couleurs différentes (pas de doublon).' },
