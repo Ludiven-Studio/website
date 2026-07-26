@@ -1,16 +1,17 @@
-// Tectonique — the floor is a broken plate whose rows and columns slide freely.
+// Tectonique — the barn floor slides, row by row and column by column.
 //
-// Two layers share the grid. The FLOOR (slabs, the hero, the locks) slides: a line
-// translates as one rigid block, gaps kept, until its outermost slab hits the wall.
-// The CRYSTALS never move — they hover above the floor, so the only way to eat one is
-// to ride the hero across its cell.
+// Two layers share the grid. The FLOOR (crates, the hero on her nest, the rocks) slides:
+// pushing a line runs everything that way until it hits the wall, a rock, or the piece in
+// front of it — so the crates PILE UP and the gaps close behind them.
+// The CRYSTALS never move: they hover above the floor, and the only way to eat one is to
+// ride the hero across its cell.
 //
-// A row lock freezes the row it sits in, a column lock freezes its column: freeing a row
-// means sliding its lock out through the other axis first.
+// A rock is planted along one axis: a row rock never budges when you push its row (it only
+// travels through its column), and the other way round. It is what the crates jam against.
 //
-// Every slide is reversible, so the puzzle has no dead end. That is what lets the
-// generator skip a solver: it walks the hero at random, remembers the cells it swept,
-// and drops the crystals there — replaying the walk collects them all.
+// Piling up loses the gaps, so a move cannot be undone — the player can strand himself and
+// has ↻ for that. Generation is unaffected: the walk it records IS a solution from the start,
+// which is what lets it skip a solver.
 
 export const VOID = 0;
 export const PLATE = 1;
@@ -51,47 +52,93 @@ export const heroIndex = (b: Board): number => b.floor.indexOf(HERO);
 export const flatAt = (n: number, axis: Axis, index: number, i: number): number =>
 	axis === 'row' ? index * n + i : i * n + index;
 
-/** A line is frozen while its own kind of lock stands on it. */
-export function frozen(b: Board, axis: Axis, index: number): boolean {
-	const stop = axis === 'row' ? LOCK_ROW : LOCK_COL;
-	for (let i = 0; i < b.n; i++) if (b.floor[flatAt(b.n, axis, index, i)] === stop) return true;
-	return false;
-}
+/** A rock is planted along one axis: pushing that axis leaves it exactly where it is. */
+export const anchored = (t: Tile, axis: Axis): boolean => (axis === 'row' ? t === LOCK_ROW : t === LOCK_COL);
 
-/** How far the line may still travel, in cells. Both zero when it cannot move at all. */
-export function slack(b: Board, axis: Axis, index: number): Slack {
-	if (index < 0 || index >= b.n || frozen(b, axis, index)) return { min: 0, max: 0 };
-	let lo = -1;
-	let hi = -1;
-	for (let i = 0; i < b.n; i++) {
-		if (b.floor[flatAt(b.n, axis, index, i)] === VOID) continue;
-		if (lo < 0) lo = i;
-		hi = i;
+const lineOf = (b: Board, axis: Axis, index: number): Tile[] => {
+	const line: Tile[] = [];
+	for (let i = 0; i < b.n; i++) line.push(b.floor[flatAt(b.n, axis, index, i)]);
+	return line;
+};
+
+/**
+ * Push a line and let it settle. Every piece runs up to `d` cells that way until it meets the
+ * wall, an anchored rock, or the piece ahead of it — so the crates pile up and the holes close.
+ * Returns the settled line plus, for each landing cell, where its piece came from.
+ */
+function pack(line: Tile[], axis: Axis, d: number): { out: Tile[]; from: number[] } {
+	const n = line.length;
+	const out: Tile[] = new Array<Tile>(n).fill(VOID);
+	const from: number[] = new Array<number>(n).fill(-1);
+	const dir = Math.sign(d);
+	const room = Math.abs(d);
+	// Walk from the leading end, so each piece already knows the last free cell left to it.
+	let limit = dir > 0 ? n - 1 : 0;
+	for (let k = 0; k < n; k++) {
+		const i = dir > 0 ? n - 1 - k : k;
+		const t = line[i];
+		if (t === VOID) continue;
+		const p = anchored(t, axis)
+			? i
+			: dir > 0 ? Math.min(i + room, limit) : Math.max(i - room, limit);
+		out[p] = t;
+		from[p] = i;
+		limit = p - dir;
 	}
-	if (lo < 0) return { min: 0, max: 0 };
-	return { min: lo > 0 ? -lo : 0, max: b.n - 1 - hi };
+	return { out, from };
 }
 
-/** Translate a line by `shift` cells, clamped to its slack. Returns the same board when nothing moves. */
+/** Cells the biggest traveller gains when the line is pushed all the way. */
+function reach(line: Tile[], axis: Axis, dir: 1 | -1): number {
+	const { from } = pack(line, axis, dir * line.length);
+	let best = 0;
+	for (let p = 0; p < line.length; p++) if (from[p] >= 0) best = Math.max(best, Math.abs(p - from[p]));
+	return best;
+}
+
+/** How far the line may still travel, in cells. Both zero when nothing on it can move. */
+export function slack(b: Board, axis: Axis, index: number): Slack {
+	if (index < 0 || index >= b.n) return { min: 0, max: 0 };
+	const line = lineOf(b, axis, index);
+	const back = reach(line, axis, -1);
+	return { min: back ? -back : 0, max: reach(line, axis, 1) };
+}
+
+/** Flat indices of the pieces that still gain ground when the line is nudged one cell that way. */
+export function movers(b: Board, axis: Axis, index: number, dir: 1 | -1): number[] {
+	if (index < 0 || index >= b.n) return [];
+	const { from } = pack(lineOf(b, axis, index), axis, dir);
+	const out: number[] = [];
+	for (let p = 0; p < b.n; p++) if (from[p] >= 0 && from[p] !== p) out.push(flatAt(b.n, axis, index, from[p]));
+	return out;
+}
+
+/** Push a line by `shift` cells. Returns the same board when nothing moves. */
 export function slide(b: Board, axis: Axis, index: number, shift: number): SlideResult {
-	const s = slack(b, axis, index);
-	const d = Math.max(s.min, Math.min(s.max, Math.round(shift)));
-	if (d === 0) return { board: b, shift: 0, eaten: [], swept: [] };
+	const d = Math.round(shift);
+	if (d === 0 || index < 0 || index >= b.n) return { board: b, shift: 0, eaten: [], swept: [] };
 
 	const n = b.n;
-	const line: Tile[] = [];
-	for (let i = 0; i < n; i++) line.push(b.floor[flatAt(n, axis, index, i)]);
+	const { out, from } = pack(lineOf(b, axis, index), axis, d);
+
+	// The line travelled as far as its furthest piece did.
+	let moved = 0;
+	let hero = -1;
+	for (let p = 0; p < n; p++) {
+		if (from[p] < 0) continue;
+		if (Math.abs(p - from[p]) > Math.abs(moved)) moved = p - from[p];
+		if (out[p] === HERO) hero = p;
+	}
+	if (moved === 0) return { board: b, shift: 0, eaten: [], swept: [] };
 
 	const next = cloneBoard(b);
-	for (let i = 0; i < n; i++) next.floor[flatAt(n, axis, index, i)] = VOID;
-	for (let i = 0; i < n; i++) if (line[i] !== VOID) next.floor[flatAt(n, axis, index, i + d)] = line[i];
+	for (let i = 0; i < n; i++) next.floor[flatAt(n, axis, index, i)] = out[i];
 
 	const eaten: number[] = [];
 	const swept: number[] = [];
-	const h = line.indexOf(HERO);
-	if (h >= 0) {
-		const lo = Math.min(h, h + d);
-		const hi = Math.max(h, h + d);
+	if (hero >= 0) {
+		const lo = Math.min(hero, from[hero]);
+		const hi = Math.max(hero, from[hero]);
 		for (let i = lo; i <= hi; i++) {
 			const f = flatAt(n, axis, index, i);
 			swept.push(f);
@@ -101,7 +148,7 @@ export function slide(b: Board, axis: Axis, index: number, shift: number): Slide
 			}
 		}
 	}
-	return { board: next, shift: d, eaten, swept };
+	return { board: next, shift: moved, eaten, swept };
 }
 
 export const encodeBoard = (b: Board): string => `${b.floor.join('')}|${b.crystals.map((c) => (c ? '1' : '0')).join('')}`;

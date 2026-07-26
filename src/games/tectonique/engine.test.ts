@@ -5,11 +5,11 @@ import {
 	countCrystals,
 	decodeBoard,
 	encodeBoard,
-	frozen,
 	generate,
 	generateDetailed,
 	heroIndex,
 	isWon,
+	movers,
 	slack,
 	slide,
 	HERO,
@@ -21,6 +21,7 @@ import {
 	type GenParams,
 	type Tile,
 } from './engine';
+import { TECTONIQUE_BANDS } from './levels';
 
 /** '.' void · '#' slab · 'H' hero · 'R' row lock · 'K' column lock. Crystals come as a second block, '*'. */
 const TILE: Record<string, Tile> = { '.': VOID, '#': PLATE, H: HERO, R: LOCK_ROW, K: LOCK_COL };
@@ -47,41 +48,50 @@ describe('slack', () => {
 		expect(slack(board(['.##.', '....', '....', '....']), 'row', 0)).toEqual({ min: -1, max: 1 });
 	});
 
-	it('ignores the holes inside a line — only the outermost slabs matter', () => {
-		expect(slack(board(['#..#', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 0 });
+	it('counts the holes inside a line — the crates close them as they pile up', () => {
+		expect(slack(board(['#..#', '....', '....', '....']), 'row', 0)).toEqual({ min: -2, max: 2 });
 	});
 
 	it('is zero on an empty line', () => {
 		expect(slack(board(['....', '....', '....', '....']), 'row', 2)).toEqual({ min: 0, max: 0 });
 	});
 
-	it('is zero on a frozen line', () => {
-		const b = board(['R#..', '....', '....', '....']);
-		expect(frozen(b, 'row', 0)).toBe(true);
-		expect(slack(b, 'row', 0)).toEqual({ min: 0, max: 0 });
+	it('is zero once everything is packed against a rock', () => {
+		expect(slack(board(['R#..', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 2 });
+		expect(slack(board(['R...', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 0 });
 	});
 
-	it('lets the other axis carry a lock away and thaw the line', () => {
+	it('lets the other axis carry a rock away', () => {
 		const b = board(['R#..', '....', '....', '....']);
-		expect(frozen(b, 'col', 0)).toBe(false);
-		expect(frozen(slide(b, 'col', 0, 3).board, 'row', 0)).toBe(false);
+		expect(show(slide(b, 'col', 0, 3).board)).toEqual(['.#..', '....', '....', 'R...']);
 	});
 });
 
 describe('slide', () => {
-	it('translates the whole line and keeps the gaps', () => {
+	it('keeps the gaps while nothing jams', () => {
 		expect(show(slide(board(['#.#.', '....', '....', '....']), 'row', 0, 1).board)[0]).toBe('.#.#');
 	});
 
-	it('clamps at the wall instead of squashing', () => {
-		const r = slide(board(['##..', '....', '....', '....']), 'row', 0, 5);
-		expect(r.shift).toBe(2);
+	it('packs everything against the wall on a full push', () => {
+		const r = slide(board(['#.#.', '....', '....', '....']), 'row', 0, 4);
 		expect(show(r.board)[0]).toBe('..##');
+		expect(r.shift).toBe(2); // the line travels as far as its furthest piece
+	});
+
+	it('stops the crates against an anchored rock', () => {
+		const r = slide(board(['#.R.', '....', '....', '....']), 'row', 0, 4);
+		expect(show(r.board)[0]).toBe('.#R.');
+	});
+
+	it('carries the rock along when the other axis is pushed', () => {
+		expect(show(slide(board(['#.R.', '....', '....', '....']), 'col', 2, 3).board)).toEqual(
+			['#...', '....', '....', '..R.'],
+		);
 	});
 
 	it('returns the very same board when nothing can move', () => {
 		const b = board(['R#..', '....', '....', '....']);
-		const r = slide(b, 'row', 0, 1);
+		const r = slide(b, 'row', 0, -1);
 		expect(r.board).toBe(b);
 		expect(r.shift).toBe(0);
 	});
@@ -115,10 +125,22 @@ describe('slide', () => {
 		expect(slide(b, 'row', 0, -2).eaten.slice().sort()).toEqual([1, 2]);
 	});
 
-	it('is reversible on the floor, so the puzzle has no dead end', () => {
+	it('takes a nudge back while nothing jams', () => {
 		const b = board(['.H#.', '..#.', '....', '....']);
 		const there = slide(b, 'row', 0, 1).board;
 		expect(show(slide(there, 'row', 0, -1).board)).toEqual(show(b));
+	});
+
+	it('never gives the gaps back once they are packed', () => {
+		const there = slide(board(['#.#.', '....', '....', '....']), 'row', 0, 3).board;
+		expect(show(slide(there, 'row', 0, -3).board)[0]).toBe('##..');
+	});
+});
+
+describe('movers', () => {
+	it('names only the pieces with room ahead of them', () => {
+		expect(movers(board(['#.R.', '....', '....', '....']), 'row', 0, 1)).toEqual([0]);
+		expect(movers(board(['.#R.', '....', '....', '....']), 'row', 0, 1)).toEqual([]);
 	});
 });
 
@@ -169,19 +191,22 @@ describe('generate', () => {
 	});
 
 	it('always leaves some line able to move', () => {
-		for (let s = 0; s < 30; s++) {
-			const b = generate(mulberry32(s), params);
-			expect(movableLines(b)).toBeGreaterThan(0);
+		for (const p of TECTONIQUE_BANDS) {
+			for (let s = 0; s < 30; s++) expect(movableLines(generate(mulberry32(s), p))).toBeGreaterThan(0);
 		}
 	});
 
+	// The walk is the only proof the grid is solvable — packing makes moves final, so replaying
+	// it has to still clear every crystal on every band we ship.
 	it('ships a walk that eats every crystal it dropped', () => {
-		for (let s = 0; s < 20; s++) {
-			const { board: start, walk } = generateDetailed(mulberry32(300 + s), params);
-			expect(countCrystals(start)).toBe(params.crystals);
-			let b = start;
-			for (const m of walk) b = slide(b, m.axis, m.index, m.shift).board;
-			expect(isWon(b)).toBe(true);
+		for (const p of TECTONIQUE_BANDS) {
+			for (let s = 0; s < 20; s++) {
+				const { board: start, walk } = generateDetailed(mulberry32(300 + s), p);
+				expect(countCrystals(start)).toBe(p.crystals);
+				let b = start;
+				for (const m of walk) b = slide(b, m.axis, m.index, m.shift).board;
+				expect(isWon(b)).toBe(true);
+			}
 		}
 	});
 });

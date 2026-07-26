@@ -17,10 +17,10 @@ import {
 	countCrystals,
 	decodeBoard,
 	encodeBoard,
-	frozen,
 	generate,
 	heroIndex,
 	isWon,
+	movers,
 	slack,
 	slide,
 	HERO,
@@ -35,8 +35,9 @@ import {
 
 /* =====================================================
    TECTONIQUE — React island.
-   Drag a row or a column of the floor: the plate slides as one block, coasts on release
-   and stops against the wall. The crystals hover in place — ride the hero over them.
+   Drag a row or a column of the floor: the crates run that way and pile up against the wall
+   or against a planted rock, coasting on release. The crystals hover in place — ride the
+   hero over them.
    ===================================================== */
 
 type Status = 'playing' | 'won';
@@ -56,6 +57,7 @@ interface Live {
 	committed: number;
 	raf: number;
 	held: boolean; // a finger is still on it
+	movers: Set<number>; // pieces that still have room, so only they follow the drag
 }
 
 /** One finger. It picks its line only once the gesture commits to an axis. */
@@ -72,7 +74,8 @@ interface Grab {
 	v: number;
 }
 
-const GLYPH: Record<number, string> = { [HERO]: '🐔', [LOCK_ROW]: '↔', [LOCK_COL]: '↕' };
+// The arrow on a rock is the axis it can still travel — a row rock is planted in its row.
+const GLYPH: Record<number, string> = { [HERO]: '🐔', [LOCK_ROW]: '↕', [LOCK_COL]: '↔' };
 const KIND_CLASS: Record<number, string> = { [PLATE]: 'plate', [HERO]: 'hero', [LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol' };
 const FREE_LABELS = ['Facile', 'Moyen', 'Difficile'];
 
@@ -101,6 +104,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [board, setBoard] = useState<Board | null>(null);
 	const [sprites, setSprites] = useState<Sprite[]>([]);
 	const [offsets, setOffsets] = useState<Record<string, number>>({});
+	const [moving, setMoving] = useState<Set<number>>(new Set()); // pieces free to follow the live drag
 	const [shifts, setShifts] = useState<Record<string, number>>({}); // cells a line has travelled since it was dealt
 	const [pops, setPops] = useState<{ id: number; idx: number }[]>([]);
 	const [status, setStatus] = useState<Status>('playing');
@@ -128,6 +132,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		for (const l of livesRef.current.values()) cancelAnimationFrame(l.raf);
 		livesRef.current.clear();
 		setOffsets({});
+		setMoving(new Set());
 	}, []);
 
 	/* Art is optional: each CSS var stays unset until its image really loads, so a missing
@@ -294,8 +299,13 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 	const pushOffsets = useCallback(() => {
 		const o: Record<string, number> = {};
-		for (const [k, l] of livesRef.current) o[k] = l.t - l.committed;
+		const m = new Set<number>();
+		for (const [k, l] of livesRef.current) {
+			o[k] = l.t - l.committed;
+			for (const i of l.movers) m.add(i);
+		}
 		setOffsets(o);
+		setMoving(m);
 	}, []);
 
 	/**
@@ -311,6 +321,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		const step = Math.round(t) - l.committed;
 		if (step !== 0) l.committed += applyStep(l.axis, l.index, step);
 		l.t = t;
+		// Pieces pile up, so they no longer share one offset: only those with room ahead follow.
+		const dir = Math.sign(t - l.committed);
+		const after = boardRef.current as Board;
+		l.movers = dir ? new Set(movers(after, l.axis, l.index, dir as 1 | -1)) : new Set();
 		pushOffsets();
 	}, [applyStep, pushOffsets]);
 
@@ -364,7 +378,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			found.held = true;
 			return found;
 		}
-		const l: Live = { axis, index, t: 0, committed: 0, raf: 0, held: true };
+		const l: Live = { axis, index, t: 0, committed: 0, raf: 0, held: true, movers: new Set() };
 		livesRef.current.set(key, l);
 		return l;
 	}, [claimAxis]);
@@ -394,7 +408,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				d.y = y; // the gesture restarts here, so the line does not jump by the lock distance
 				const index = d.axis === 'row' ? d.r : d.c;
 				const b = boardRef.current;
-				if (b && frozen(b, d.axis, index)) { bump(); return; }
+				const s = b ? slack(b, d.axis, index) : { min: 0, max: 0 };
+				if (!s.min && !s.max) { bump(); return; }
 				d.line = takeLine(d.axis, index);
 				d.base = d.line?.t ?? 0;
 				d.t = d.base;
@@ -425,7 +440,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		if (!b || locked) return;
 		const h = heroIndex(b);
 		const index = axis === 'row' ? Math.floor(h / b.n) : h % b.n;
-		if (frozen(b, axis, index)) { bump(); return; }
+		const s = slack(b, axis, index);
+		if (dir > 0 ? !s.max : !s.min) { bump(); return; }
 		const l = takeLine(axis, index);
 		if (!l) return;
 		l.held = false;
@@ -490,26 +506,18 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 	const n = board?.n ?? 0;
 
-	const freeze = useMemo(() => {
-		const rows: number[] = [];
-		const cols: number[] = [];
-		if (board) {
-			for (let i = 0; i < board.n; i++) {
-				if (frozen(board, 'row', i)) rows.push(i);
-				if (frozen(board, 'col', i)) cols.push(i);
-			}
-		}
-		return { rows, cols };
-	}, [board]);
-
 	const gems = useMemo(() => (board ? board.crystals.flatMap((c, i) => (c ? [i] : [])) : []), [board]);
 
 	const cells = useMemo(() => [...Array(n * n).keys()], [n]);
 
-	const offsetOf = (idx: number): { x: number; y: number } => ({
-		x: offsets[lineKey('row', Math.floor(idx / n))] ?? 0,
-		y: offsets[lineKey('col', idx % n)] ?? 0,
-	});
+	/** A piece jammed against the wall or a rock stays put while the rest of its line runs on. */
+	const offsetOf = (idx: number): { x: number; y: number } => {
+		if (!moving.has(idx)) return { x: 0, y: 0 };
+		return {
+			x: offsets[lineKey('row', Math.floor(idx / n))] ?? 0,
+			y: offsets[lineKey('col', idx % n)] ?? 0,
+		};
+	};
 
 	/**
 	 * The ground is no backdrop: every cell is a window on the straw, scrolled by all its row
@@ -601,13 +609,6 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 							/>
 						))}
 						<div className="tk-grid" />
-
-						{freeze.rows.map((r) => (
-							<div key={`fr${r}`} className="tk-freeze row" style={{ transform: `translateY(${r * 100}%)` }} />
-						))}
-						{freeze.cols.map((c) => (
-							<div key={`fc${c}`} className="tk-freeze col" style={{ transform: `translateX(${c * 100}%)` }} />
-						))}
 
 						{sprites.map((s) => {
 							const o = offsetOf(s.idx);
@@ -701,10 +702,12 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			<p className="tk-help">
-				Fais glisser une ligne ou une colonne : le sol part d'un bloc, emporte les caisses et le nid,
-				et continue sur sa lancée jusqu'au mur. À plusieurs doigts, plusieurs lignes (ou plusieurs
-				colonnes) glissent en même temps. Les 💎 flottent au-dessus et ne bougent jamais — c'est le
-				nid de la cocotte 🐔 qui doit leur passer dessus. Un rocher ↔ gèle sa ligne, un ↕ sa colonne.
+				Fais glisser une ligne ou une colonne : le sol défile, les caisses et le nid partent avec lui
+				et s'empilent contre le mur ou contre un rocher. Un rocher est planté dans le sol — la flèche
+				dessus dit le seul axe où il peut encore bouger. À plusieurs doigts, plusieurs lignes (ou
+				plusieurs colonnes) glissent en même temps. Les 💎 flottent au-dessus et ne bougent jamais —
+				c'est le nid de la cocotte 🐔 qui doit leur passer dessus. Les trous se referment : si tu te
+				coinces, ↻ remet la grange à zéro.
 			</p>
 		</div>
 	);
@@ -774,21 +777,6 @@ const CSS = `
     linear-gradient(90deg, rgba(0,0,0,0.22) 0 1px, transparent 1px),
     linear-gradient(180deg, rgba(0,0,0,0.22) 0 1px, transparent 1px);
   background-size: calc(100% / var(--n)) 100%, 100% calc(100% / var(--n));
-}
-
-/* A frozen line keeps its blocker's hue, so the dead ends read at a glance. */
-.tk-freeze { position: absolute; top: 0; left: 0; pointer-events: none; }
-/* Edge stripes rather than a full wash: a busy floor drowns a tint, and a 10×10 with six
-   frozen lines would turn into plaid. */
-.tk-freeze.row {
-  width: 100%; height: calc(100% / var(--n));
-  background: rgba(245, 158, 11, 0.13);
-  box-shadow: inset 0 2px 0 rgba(245, 158, 11, 0.85), inset 0 -2px 0 rgba(245, 158, 11, 0.85);
-}
-.tk-freeze.col {
-  width: calc(100% / var(--n)); height: 100%;
-  background: rgba(56, 189, 248, 0.13);
-  box-shadow: inset 2px 0 0 rgba(56, 189, 248, 0.85), inset -2px 0 0 rgba(56, 189, 248, 0.85);
 }
 
 .tk-slab {

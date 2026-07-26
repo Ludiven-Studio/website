@@ -58,9 +58,17 @@ const cdp = await ctx.newCDPSession(page);
 const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
 const box = await page.locator('.tk-board').boundingBox();
 const n = await page.locator('.tk-board').evaluate((el) => Number(getComputedStyle(el).getPropertyValue('--n')));
-const frozenRows = await page.$$eval('.tk-freeze.row', (els) =>
-	els.map((e) => Math.round(Number(/translateY\(([-\d.]+)%\)/.exec(e.style.transform)?.[1] ?? 0) / 100)));
-const rows = [...Array(n).keys()].filter((r) => !frozenRows.includes(r)).slice(0, 2);
+// A row is worth grabbing when it holds a piece that is not a row rock and still has a free cell.
+const rows = (await page.$$eval('.tk-slab', (els, size) => {
+	const free = [...Array(size).keys()].map(() => ({ loose: 0, taken: 0 }));
+	for (const e of els) {
+		const m = /translate\(([-\d.]+)%, ([-\d.]+)%\)/.exec(e.style.transform);
+		const r = Math.round(Number(m[2]) / 100);
+		free[r].taken++;
+		if (!e.classList.contains('lockrow')) free[r].loose++;
+	}
+	return free.flatMap((f, r) => (f.loose && f.taken < size ? [r] : []));
+}, n)).slice(0, 2);
 const rowY = (r) => box.y + (r + 0.5) * (box.height / n);
 const pt = (i, x) => ({ x, y: rowY(rows[i]), id: i });
 const x0 = box.x + box.width * 0.5;
