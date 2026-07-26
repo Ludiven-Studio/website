@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import TectoniqueGame from '../../games/tectonique/TectoniqueGame.tsx';
+---
+
+<GamePage
+	title="Tectonique | Jeux Ludiven Studio"
+	description="Tectonique : pousse les lignes et les colonnes de la grille jusqu'au bord, la cocotte avale les cristaux qu'elle balaie. Des blocs gèlent une ligne ou une colonne. 100 niveaux et un défi du jour au moins de coups. Un casse-tête signé Ludiven Studio."
+	heading="Tectonique"
+	tagline="Fais glisser le sol, avale tous les cristaux"
+	gameId="tectonique"
+>
+	<TectoniqueGame client:only="react" gameId="tectonique" />
+</GamePage>

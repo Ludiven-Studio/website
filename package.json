@@ -11,7 +11,8 @@
     "test": "vitest run",
     "lint": "eslint .",
     "og": "node scripts/generate-og.mjs",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "grids:tectonique": "npx tsx scripts/generate-tectonique.mts"
   },
   "dependencies": {
     "@astrojs/check": "^0.5.10",

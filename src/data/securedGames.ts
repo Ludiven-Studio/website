@@ -56,6 +56,7 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	'billard-t': 'time',
 	'flechettes-t': 'time',
 	'reussite-t': 'time',
+	'tectonique-t': 'time',
 	// Threshold win/loss bands — wins sort below the loss offset, so ascending works.
 	demineur: 'time',
 	codecolor: 'time',

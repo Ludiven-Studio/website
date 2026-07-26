@@ -182,6 +182,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🎯', title: 'Tirer', body: 'Clique une case pour tirer : ✸ = touché, point = manqué. Un navire entièrement touché est coulé — comme les navires ne se touchent jamais, l\'eau autour se dévoile alors toute seule.' },
 		{ emoji: '🔊', title: 'Sonar', body: 'Tu as quelques sonars : active le bouton Sonar puis clique une zone — il révèle le nombre de cases-navire dans le carré 3×3. La flotte à couler (tailles des navires) est affichée en haut. Au défi du jour, même flotte pour tous, classement au moins d\'actions.' },
 	],
+	tectonique: [
+		{ emoji: '💎', title: 'Le but', body: 'La cocotte doit avaler tous les cristaux de la grille, en un minimum de coups. Le compteur affiche l\'optimum prouvé : chaque grille est résolvable en ce nombre exact de coups.' },
+		{ emoji: '🕹️', title: 'Pousser le sol', body: 'Glisse sur une ligne ou une colonne : tout ce qui est dessus file jusqu\'au bord et s\'empile, comme au 2048. La cocotte ne bouge que si on pousse SA ligne ou SA colonne — et sur son passage elle avale les 💎 qu\'elle rattrape, jusqu\'à buter sur un bloc. Au clavier, les flèches poussent la ligne de la cocotte.' },
+		{ emoji: '🧱', title: 'Les bloqueurs', body: 'Un bloc ↔ gèle la ligne où il se trouve, un bloc ↕ gèle sa colonne (la ligne gelée est teintée). Pour le déloger, pousse-le dans l\'autre sens : un bloqueur de ligne se déplace en poussant sa colonne.' },
+		{ emoji: '🏆', title: 'Niveaux & défi', body: '100 niveaux de plus en plus retors : 3★ pour l\'optimum, 2★ à deux coups près. Au défi du jour, même grille pour tout le monde, classement au moins de coups (le chrono départage). ↶ annule autant de fois que tu veux.' },
+	],
 	codecolor: [
 		{ emoji: '🎨', title: 'Le but', body: 'Un code de couleurs est caché. Devine-le en un minimum d\'essais. Le code n\'a que des couleurs différentes (pas de doublon).' },
 		{ emoji: '🕹️', title: 'Comment jouer', body: 'Touche une couleur de la palette pour la placer dans la prochaine case (touche une case posée pour l\'enlever), puis appuie sur Valider quand la ligne est complète. Une couleur déjà posée n\'est plus sélectionnable.' },
