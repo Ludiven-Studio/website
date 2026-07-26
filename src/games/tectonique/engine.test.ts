@@ -17,6 +17,7 @@ import {
 	LOCK_COL,
 	LOCK_ROW,
 	PLATE,
+	ROCK,
 	VOID,
 	type Board,
 	type GenParams,
@@ -25,9 +26,11 @@ import {
 import { TECTONIQUE_BANDS, tectoniqueLevels } from './levels';
 import { LEVEL_COUNT } from '../../lib/progression';
 
-/** '.' void · '#' slab · 'H' hero · 'R' row lock · 'K' column lock · 'B' boulder (both axes).
+/** '.' void · '#' crate · 'H' hero · 'O' rock · 'R'/'K'/'B' post holding the row / the column / both.
     Crystals come as a second block, '*'. */
-const TILE: Record<string, Tile> = { '.': VOID, '#': PLATE, H: HERO, R: LOCK_ROW, K: LOCK_COL, B: LOCK_ALL };
+const TILE: Record<string, Tile> = {
+	'.': VOID, '#': PLATE, H: HERO, R: LOCK_ROW, K: LOCK_COL, B: LOCK_ALL, O: ROCK,
+};
 
 function board(rows: string[], gems: string[] = []): Board {
 	const n = rows.length;
@@ -39,7 +42,7 @@ function board(rows: string[], gems: string[] = []): Board {
 }
 
 const BACK: Record<number, string> = {
-	[VOID]: '.', [PLATE]: '#', [HERO]: 'H', [LOCK_ROW]: 'R', [LOCK_COL]: 'K', [LOCK_ALL]: 'B',
+	[VOID]: '.', [PLATE]: '#', [HERO]: 'H', [LOCK_ROW]: 'R', [LOCK_COL]: 'K', [LOCK_ALL]: 'B', [ROCK]: 'O',
 };
 
 const show = (b: Board): string[] => {
@@ -61,20 +64,24 @@ describe('slack', () => {
 		expect(slack(board(['....', '....', '....', '....']), 'row', 2)).toEqual({ min: 0, max: 0 });
 	});
 
-	it('is zero once everything is packed against a rock', () => {
-		expect(slack(board(['R#..', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 2 });
-		expect(slack(board(['R...', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 0 });
+	it('is zero on the side where a rock already touches the wall', () => {
+		expect(slack(board(['O#..', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 2 });
 	});
 
-	it('lets the other axis carry a rock away', () => {
+	it('lets the other axis carry a post away', () => {
 		const b = board(['R#..', '....', '....', '....']);
 		expect(show(slide(b, 'col', 0, 3).board)).toEqual(['.#..', '....', '....', 'R...']);
 	});
 
-	it('holds a boulder on both axes, unlike a one-way rock', () => {
-		expect(show(slide(board(['B#..', '....', '....', '....']), 'row', 0, 3).board)[0]).toBe('B..#');
-		const b = board(['B...', '....', '....', '....']);
-		expect(slide(b, 'col', 0, 3).board).toBe(b);
+	it('nails a line down whole when a post holds it', () => {
+		expect(slack(board(['R#..', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 0 });
+		expect(slack(board(['B...', '....', '....', '....']), 'col', 0)).toEqual({ min: 0, max: 0 });
+	});
+
+	it('caps the slide at what a rock can do, since the floor carries it', () => {
+		// The rock has a single cell left before the wall, so the whole line slides one — no more.
+		expect(slack(board(['#.O.', '....', '....', '....']), 'row', 0)).toEqual({ min: -1, max: 1 });
+		expect(show(slide(board(['#.O.', '....', '....', '....']), 'row', 0, 3).board)[0]).toBe('.#.O');
 	});
 });
 
@@ -89,14 +96,18 @@ describe('slide', () => {
 		expect(r.shift).toBe(2); // the line travels as far as its furthest piece
 	});
 
-	it('stops the crates against an anchored rock', () => {
-		const r = slide(board(['#.R.', '....', '....', '....']), 'row', 0, 4);
-		expect(show(r.board)[0]).toBe('.#R.');
+	it('lets a crate fall behind the floor, which is what stacks them', () => {
+		// The floor slides 2, the rock rides it the full 2, but the crate jams on the wall
+		// after 1 — it has slid one cell back across the floor.
+		const r = slide(board(['O.#.', '....', '....', '....']), 'row', 0, 3);
+		expect(show(r.board)[0]).toBe('..O#');
+		expect(r.shift).toBe(2);
+		expect(r.moves).toEqual([{ from: 0, to: 2 }, { from: 2, to: 3 }]);
 	});
 
-	it('carries the rock along when the other axis is pushed', () => {
-		expect(show(slide(board(['#.R.', '....', '....', '....']), 'col', 2, 3).board)).toEqual(
-			['#...', '....', '....', '..R.'],
+	it('carries a rock the whole way, since it rides the floor', () => {
+		expect(show(slide(board(['#.O.', '....', '....', '....']), 'col', 2, 3).board)).toEqual(
+			['#...', '....', '....', '..O.'],
 		);
 	});
 
@@ -185,9 +196,12 @@ describe('piece trips', () => {
 });
 
 describe('movers', () => {
-	it('names only the pieces with room ahead of them', () => {
-		expect(movers(board(['#.R.', '....', '....', '....']), 'row', 0, 1)).toEqual([0]);
-		expect(movers(board(['.#R.', '....', '....', '....']), 'row', 0, 1)).toEqual([]);
+	it('leaves out the crate that is already against the wall', () => {
+		expect(movers(board(['#..#', '....', '....', '....']), 'row', 0, 1)).toEqual([0]);
+	});
+
+	it('names nobody when a jammed rock caps the line', () => {
+		expect(movers(board(['..O#', '....', '....', '....']), 'row', 0, 1)).toEqual([]);
 	});
 });
 
@@ -215,7 +229,7 @@ describe('board helpers', () => {
 });
 
 describe('generate', () => {
-	const params: GenParams = { n: 8, crystals: 6, rowLocks: 2, colLocks: 2, allLocks: 1, holes: 5 };
+	const params: GenParams = { n: 8, crystals: 6, rowLocks: 2, colLocks: 2, allLocks: 1, rocks: 3, holes: 5 };
 
 	it('is deterministic for a given seed', () => {
 		expect(encodeBoard(generate(mulberry32(7), params))).toBe(encodeBoard(generate(mulberry32(7), params)));
@@ -229,6 +243,7 @@ describe('generate', () => {
 		expect(b.floor.filter((t) => t === LOCK_ROW)).toHaveLength(2);
 		expect(b.floor.filter((t) => t === LOCK_COL)).toHaveLength(2);
 		expect(b.floor.filter((t) => t === LOCK_ALL)).toHaveLength(1);
+		expect(b.floor.filter((t) => t === ROCK)).toHaveLength(3);
 	});
 
 	it('never drops a crystal under the hero', () => {

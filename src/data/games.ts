@@ -238,7 +238,7 @@ export const games: GameTile[] = [
 	{
 		id: 'tectonique',
 		title: 'Tectonique',
-		pitch: 'Fais glisser le sol de la grange, ligne par ligne : les caisses courent avec l\'inertie et s\'empilent contre le mur, mais les rochers sont plantés dedans et tout se bloque contre eux. Les cristaux flottent sur place : promène le nid de la cocotte dessus. 100 niveaux et un défi du jour, au chrono.',
+		pitch: 'Fais glisser le sol de la grange, ligne par ligne : seules les caisses glissent dessus, elles se tassent contre le mur et les trous se referment. Les rochers, eux, voyagent avec le sol et arrêtent toute la ligne dès qu\'ils butent — et les pieux plantés dedans la bloquent net. Les cristaux flottent sur place : promène le nid de la cocotte dessus. 100 niveaux et un défi du jour, au chrono.',
 		icon: 'tectonique',
 		href: '/jeux/tectonique',
 		status: 'play',

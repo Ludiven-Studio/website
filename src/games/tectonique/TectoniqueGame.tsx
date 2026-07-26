@@ -28,6 +28,7 @@ import {
 	LOCK_COL,
 	LOCK_ROW,
 	PLATE,
+	ROCK,
 	VOID,
 	type Axis,
 	type Board,
@@ -75,11 +76,10 @@ interface Grab {
 	v: number;
 }
 
-// The arrow on a rock is the axis it can still travel — a row rock is planted in its row.
-// A boulder holds both axes, so it gets a cross instead.
-const GLYPH: Record<number, string> = { [HERO]: '🐔', [LOCK_ROW]: '↕', [LOCK_COL]: '↔', [LOCK_ALL]: '✖' };
+const GLYPH: Record<number, string> = { [HERO]: '🐔' };
 const KIND_CLASS: Record<number, string> = {
-	[PLATE]: 'plate', [HERO]: 'hero', [LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol', [LOCK_ALL]: 'lockall',
+	[PLATE]: 'plate', [HERO]: 'hero', [ROCK]: 'rock',
+	[LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol', [LOCK_ALL]: 'lockall',
 };
 const FREE_LABELS = ['Facile', 'Moyen', 'Difficile'];
 
@@ -707,9 +707,11 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			<p className="tk-help">
-				Fais glisser une ligne ou une colonne : le sol défile, les caisses et le nid partent avec lui
-				et s'empilent contre le mur ou contre un rocher. Un rocher est planté dans le sol — la flèche
-				dessus dit le seul axe où il peut encore bouger, et celui marqué ✖ ne bouge jamais du tout.
+				Fais glisser une ligne ou une colonne : le sol défile. Seules les caisses glissent dessus, donc
+				elles se tassent contre le mur ou contre ce qui les arrête. Les rochers et le nid, eux, sont
+				posés sur le sol et voyagent exactement avec lui : dès qu'un rocher bute, toute sa ligne
+				s'arrête. Les pieux, plantés à travers le sol, bloquent net leur ligne — leur rainure montre le
+				seul sens où le sol peut encore les emmener, et le pieu boulonné n'en a aucune.
 				À plusieurs doigts, plusieurs lignes (ou
 				plusieurs colonnes) glissent en même temps. Les 💎 flottent au-dessus et ne bougent jamais —
 				c'est le nid de la cocotte 🐔 qui doit leur passer dessus. Les trous se referment : si tu te
@@ -815,30 +817,41 @@ const CSS = `
 }
 .tk-slab.hero span { font-size: calc(var(--tk-cell) * 0.62); filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55)); }
 
-/* Blockers are boulders, one per cell. The glow around the silhouette says which axis they
-   hold — a ring cannot, the rock is not a box. */
-.tk-slab.lockrow .tk-face, .tk-slab.lockcol .tk-face, .tk-slab.lockall .tk-face {
+/* A rock is only set down on the floor: it rides along with it, but never slides across it. */
+.tk-slab.rock .tk-face {
   background:
     var(--tk-rock, none) center / 100% 100% no-repeat,
     radial-gradient(circle at 42% 36%, #9a9a92 0 34%, #5c5c54 62%, transparent 66%);
   box-shadow: none;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
 }
-.tk-slab.lockrow .tk-face {
-  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.95)) drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
-  color: #fde68a;
+
+/* A post is driven through the floor into the ground below, so the line it holds cannot budge.
+   Its slot is the one axis the floor can still carry it along — the bolted one gets none. */
+.tk-slab.lockrow .tk-face, .tk-slab.lockcol .tk-face, .tk-slab.lockall .tk-face {
+  background: none;
+  box-shadow: none;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
 }
-.tk-slab.lockcol .tk-face {
-  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.95)) drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
-  color: #bae6fd;
+.tk-slab.lockrow .tk-face { --tk-post: rgba(245, 158, 11, 0.9); }
+.tk-slab.lockcol .tk-face { --tk-post: rgba(56, 189, 248, 0.9); }
+.tk-slab.lockrow .tk-face::before, .tk-slab.lockcol .tk-face::before, .tk-slab.lockall .tk-face::before {
+  content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #16181c, #343a41);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 0 2px var(--tk-post, #6b7280);
 }
-/* No glow at all: this one holds both axes, so there is no direction to point at. */
-.tk-slab.lockall .tk-face {
-  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.9)) drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
-  color: #e5e7eb;
-}
-.tk-slab.lockrow span, .tk-slab.lockcol span, .tk-slab.lockall span {
-  font-weight: 700; font-size: calc(var(--tk-cell) * 0.5);
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.9);
+.tk-slab.lockrow .tk-face::before { width: 60%; height: 96%; }
+.tk-slab.lockcol .tk-face::before { width: 96%; height: 60%; }
+/* Bolted both ways: a flange plate instead of a slot, nothing to slide along. */
+.tk-slab.lockall .tk-face::before { width: 84%; height: 84%; border-radius: 24%; }
+/* A hex nut, not a round knob: a disc in a coloured slot reads as a toggle switch. */
+.tk-slab.lockrow .tk-face::after, .tk-slab.lockcol .tk-face::after, .tk-slab.lockall .tk-face::after {
+  content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 44%; height: 44%;
+  clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  background: radial-gradient(circle at 34% 26%, #dfe4e9 0 8%, #99a1a9 36%, #5f666e 72%, #2f343a 100%);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.85));
 }
 
 /* Crystals hover above the floor: raised, with their own shadow, and never offset by a slide. */
