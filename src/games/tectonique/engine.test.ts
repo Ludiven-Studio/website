@@ -1,210 +1,199 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { mulberry32 } from '../prng';
 import {
-	CRYSTAL,
-	EMPTY,
-	HERO,
-	LOCK_COL,
-	LOCK_ROW,
-	applyMove,
-	canPush,
+	cloneBoard,
 	countCrystals,
 	decodeBoard,
 	encodeBoard,
-	findBoard,
+	frozen,
+	generate,
+	generateDetailed,
+	heroIndex,
 	isWon,
-	legalMoves,
-	slideLine,
-	solve,
+	slack,
+	slide,
+	HERO,
+	LOCK_COL,
+	LOCK_ROW,
+	PLATE,
+	VOID,
 	type Board,
-	type Piece,
+	type GenParams,
+	type Tile,
 } from './engine';
 
-const CHARS: Record<string, Piece> = { '.': EMPTY, H: HERO, C: CRYSTAL, R: LOCK_ROW, K: LOCK_COL };
+/** '.' void · '#' slab · 'H' hero · 'R' row lock · 'K' column lock. Crystals come as a second block, '*'. */
+const TILE: Record<string, Tile> = { '.': VOID, '#': PLATE, H: HERO, R: LOCK_ROW, K: LOCK_COL };
 
-/** Board from ASCII art — '.' empty, H hero, C crystal, R row lock, K column lock. */
-const board = (rows: string[]): Board => ({
-	n: rows.length,
-	cells: rows.flatMap((r) => Array.from(r, (ch) => CHARS[ch])),
-});
+function board(rows: string[], gems: string[] = []): Board {
+	const n = rows.length;
+	const floor = rows.flatMap((r) => Array.from(r, (ch) => TILE[ch]));
+	const crystals = gems.length
+		? gems.flatMap((r) => Array.from(r, (ch) => ch === '*'))
+		: new Array<boolean>(n * n).fill(false);
+	return { n, floor, crystals };
+}
 
-const draw = (b: Board): string[] => {
-	const back = Object.fromEntries(Object.entries(CHARS).map(([k, v]) => [v, k]));
+const BACK: Record<number, string> = { [VOID]: '.', [PLATE]: '#', [HERO]: 'H', [LOCK_ROW]: 'R', [LOCK_COL]: 'K' };
+
+const show = (b: Board): string[] => {
 	const out: string[] = [];
-	for (let r = 0; r < b.n; r++) out.push(b.cells.slice(r * b.n, r * b.n + b.n).map((p) => back[p]).join(''));
+	for (let r = 0; r < b.n; r++) out.push(b.floor.slice(r * b.n, r * b.n + b.n).map((t) => BACK[t]).join(''));
 	return out;
 };
 
-const line = (s: string): Piece[] => Array.from(s, (ch) => CHARS[ch]);
-const show = (l: Piece[]): string => {
-	const back = Object.fromEntries(Object.entries(CHARS).map(([k, v]) => [v, k]));
-	return l.map((p) => back[p]).join('');
-};
-
-describe('slideLine', () => {
-	it('packs everything against the pushed edge, keeping the order', () => {
-		expect(show(slideLine(line('.R..K.'), 1).line)).toBe('....RK');
-		expect(show(slideLine(line('.R..K.'), -1).line)).toBe('RK....');
+describe('slack', () => {
+	it('measures the room left on both sides of a line', () => {
+		expect(slack(board(['.##.', '....', '....', '....']), 'row', 0)).toEqual({ min: -1, max: 1 });
 	});
 
-	it('lets the hero eat every crystal between itself and the wall', () => {
-		const r = slideLine(line('H.C.C.'), 1);
-		expect(show(r.line)).toBe('.....H');
-		expect(r.eatenAt).toEqual([2, 4]);
+	it('ignores the holes inside a line — only the outermost slabs matter', () => {
+		expect(slack(board(['#..#', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 0 });
 	});
 
-	it('stops the hero at the first solid piece, sparing the crystals behind it', () => {
-		const r = slideLine(line('H.CRC.'), 1);
-		// Eats the crystal at 2, stops against the lock; the crystal at 4 survives.
-		expect(r.eatenAt).toEqual([2]);
-		expect(show(r.line)).toBe('...HRC');
+	it('is zero on an empty line', () => {
+		expect(slack(board(['....', '....', '....', '....']), 'row', 2)).toEqual({ min: 0, max: 0 });
 	});
 
-	it('never eats crystals sitting behind the hero', () => {
-		const r = slideLine(line('C.H...'), 1);
-		expect(r.eatenAt).toEqual([]);
-		expect(show(r.line)).toBe('....CH');
+	it('is zero on a frozen line', () => {
+		const b = board(['R#..', '....', '....', '....']);
+		expect(frozen(b, 'row', 0)).toBe(true);
+		expect(slack(b, 'row', 0)).toEqual({ min: 0, max: 0 });
 	});
 
-	it('reports where each surviving piece went', () => {
-		const r = slideLine(line('R...K.'), 1);
-		expect(r.moved).toEqual([
-			{ from: 0, to: 4 },
-			{ from: 4, to: 5 },
-		]);
+	it('lets the other axis carry a lock away and thaw the line', () => {
+		const b = board(['R#..', '....', '....', '....']);
+		expect(frozen(b, 'col', 0)).toBe(false);
+		expect(frozen(slide(b, 'col', 0, 3).board, 'row', 0)).toBe(false);
 	});
 });
 
-describe('locks', () => {
-	it('a row lock freezes its row but leaves its column pushable', () => {
-		const b = board(['....', '.R..', '....', '....']);
-		expect(canPush(b, 'row', 1)).toBe(false);
-		expect(canPush(b, 'col', 1)).toBe(true);
-		expect(canPush(b, 'row', 0)).toBe(true);
+describe('slide', () => {
+	it('translates the whole line and keeps the gaps', () => {
+		expect(show(slide(board(['#.#.', '....', '....', '....']), 'row', 0, 1).board)[0]).toBe('.#.#');
 	});
 
-	it('a column lock freezes its column but leaves its row pushable', () => {
-		const b = board(['....', '.K..', '....', '....']);
-		expect(canPush(b, 'col', 1)).toBe(false);
-		expect(canPush(b, 'row', 1)).toBe(true);
+	it('clamps at the wall instead of squashing', () => {
+		const r = slide(board(['##..', '....', '....', '....']), 'row', 0, 5);
+		expect(r.shift).toBe(2);
+		expect(show(r.board)[0]).toBe('..##');
 	});
 
-	it('pushing the perpendicular line is how a lock gets relocated', () => {
-		const b = board(['.C..', '.R..', '....', 'H...']);
-		expect(canPush(b, 'row', 1)).toBe(false);
-		const after = applyMove(b, { axis: 'col', index: 1, dir: 1 })!.board;
-		expect(canPush(after, 'row', 1)).toBe(true); // the lock left row 1
-		expect(canPush(after, 'row', 3)).toBe(false); // ...and froze row 3 instead
-	});
-});
-
-describe('applyMove', () => {
-	it('refuses a push that would change nothing', () => {
-		const b = board(['...H', '....', '....', '....']);
-		expect(applyMove(b, { axis: 'row', index: 0, dir: 1 })).toBeNull(); // already packed right
-		expect(applyMove(b, { axis: 'row', index: 1, dir: 1 })).toBeNull(); // empty line
-		expect(applyMove(b, { axis: 'row', index: 0, dir: -1 })).not.toBeNull();
+	it('returns the very same board when nothing can move', () => {
+		const b = board(['R#..', '....', '....', '....']);
+		const r = slide(b, 'row', 0, 1);
+		expect(r.board).toBe(b);
+		expect(r.shift).toBe(0);
 	});
 
-	it('refuses a push on a frozen line', () => {
-		const b = board(['H..R', '....', '....', '....']);
-		expect(applyMove(b, { axis: 'row', index: 0, dir: -1 })).toBeNull();
+	it('moves columns too', () => {
+		const b = board(['#...', '#...', '....', '....']);
+		expect(show(slide(b, 'col', 0, 2).board)).toEqual(['....', '....', '#...', '#...']);
 	});
 
-	it('maps eaten crystals and moved pieces to flat board indices', () => {
-		const b = board(['H.C.', '....', '....', '....']);
-		const r = applyMove(b, { axis: 'row', index: 0, dir: 1 })!;
-		expect(r.eaten).toBe(1);
-		expect(r.eatenAt).toEqual([2]); // row 0, col 2
-		expect(r.moved).toEqual([{ from: 0, to: 3 }]);
-		expect(draw(r.board)[0]).toBe('...H');
+	it('eats every crystal the hero sweeps, endpoints included', () => {
+		const b = board(['H#..', '....', '....', '....'], ['.**.', '....', '....', '....']);
+		const r = slide(b, 'row', 0, 2);
+		expect(r.eaten.slice().sort()).toEqual([1, 2]);
+		expect(countCrystals(r.board)).toBe(0);
 	});
 
-	it('moves the whole line, not just the hero', () => {
-		const b = board(['....', '.HKC', '....', '....']);
-		const r = applyMove(b, { axis: 'row', index: 1, dir: -1 })!;
-		expect(draw(r.board)[1]).toBe('HKC.');
-		expect(r.eaten).toBe(0); // the crystal trails the hero, it is never caught
+	it('leaves the crystals where they are — they never ride the floor', () => {
+		const b = board(['H#..', '....', '....', '....'], ['....', '..*.', '....', '....']);
+		const r = slide(b, 'row', 0, 2);
+		expect(r.board.crystals[6]).toBe(true);
+		expect(r.eaten).toEqual([]);
 	});
 
-	it('leaves the source board untouched', () => {
-		const b = board(['H..C', '....', '....', '....']);
-		const before = encodeBoard(b);
-		applyMove(b, { axis: 'row', index: 0, dir: 1 });
-		expect(encodeBoard(b)).toBe(before);
-	});
-});
-
-describe('solve', () => {
-	it('counts a one-move sweep', () => {
-		const b = board(['H.CC', '....', '....', '....']);
-		expect(solve(b)).toBe(1);
+	it('does not eat under a line the hero is not on', () => {
+		const b = board(['H#..', '##..', '....', '....'], ['....', '.*..', '....', '....']);
+		expect(slide(b, 'row', 1, 2).eaten).toEqual([]);
 	});
 
-	it('is already won with no crystal left', () => {
-		expect(solve(board(['H...', '....', '....', '....']))).toBe(0);
+	it('eats backwards as well', () => {
+		const b = board(['..#H', '....', '....', '....'], ['.**.', '....', '....', '....']);
+		expect(slide(b, 'row', 0, -2).eaten.slice().sort()).toEqual([1, 2]);
 	});
 
-	it('needs a perpendicular push when the crystal is off the hero line', () => {
-		const b = board(['H...', '....', '....', '...C']);
-		const opt = solve(b)!;
-		expect(opt).toBeGreaterThanOrEqual(2);
-		// The optimum must really be reachable in that many moves.
-		expect(opt).toBeLessThanOrEqual(4);
-	});
-
-	it('reports no solution when a crystal can never be reached', () => {
-		// Every line through the crystal is frozen by a lock the hero cannot shift.
-		const b = board(['HR..', 'KC..', '....', '....']);
-		const opt = solve(b);
-		if (opt !== null) {
-			// If it is solvable the search must agree with a replay of that many moves.
-			expect(opt).toBeGreaterThan(0);
-		} else {
-			expect(opt).toBeNull();
-		}
-	});
-
-	it('agrees with a brute-force replay of its own answer', () => {
-		const b = board(['H..C', '..R.', 'C...', '....']);
-		const opt = solve(b)!;
-		// No sequence shorter than `opt` may win.
-		const reach = (bo: Board, depth: number): boolean => {
-			if (isWon(bo)) return true;
-			if (depth === 0) return false;
-			return legalMoves(bo).some((m) => reach(applyMove(bo, m)!.board, depth - 1));
-		};
-		expect(reach(b, opt)).toBe(true);
-		expect(reach(b, opt - 1)).toBe(false);
+	it('is reversible on the floor, so the puzzle has no dead end', () => {
+		const b = board(['.H#.', '..#.', '....', '....']);
+		const there = slide(b, 'row', 0, 1).board;
+		expect(show(slide(there, 'row', 0, -1).board)).toEqual(show(b));
 	});
 });
 
 describe('board helpers', () => {
+	it('reads the hero position and the win condition', () => {
+		const b = board(['H#..', '....', '....', '....'], ['..*.', '....', '....', '....']);
+		expect(heroIndex(b)).toBe(0);
+		expect(isWon(b)).toBe(false);
+		expect(isWon(slide(b, 'row', 0, 2).board)).toBe(true);
+	});
+
 	it('round-trips through encode/decode', () => {
-		const b = board(['H.C.', '..R.', 'K...', '...C']);
-		expect(draw(decodeBoard(4, encodeBoard(b)))).toEqual(draw(b));
+		const b = board(['H#..', '..R.', '.K..', '....'], ['..*.', '....', '*...', '....']);
+		expect(decodeBoard(4, encodeBoard(b))).toEqual(b);
 	});
 
-	it('counts crystals and detects the win', () => {
-		expect(countCrystals(board(['HCC.', '....', '....', '....']))).toBe(2);
-		expect(isWon(board(['H...', '....', '....', '....']))).toBe(true);
+	it('clones without sharing the layers', () => {
+		const b = board(['H#..', '....', '....', '....'], ['.*..', '....', '....', '....']);
+		const c = cloneBoard(b);
+		c.floor[0] = VOID;
+		c.crystals[1] = false;
+		expect(b.floor[0]).toBe(HERO);
+		expect(b.crystals[1]).toBe(true);
 	});
 });
 
-describe('findBoard', () => {
-	it('only returns boards whose optimum sits in the asked range', () => {
-		const got = findBoard(mulberry32(7), { n: 5, crystals: 3, rowLocks: 1, colLocks: 1 }, 4, 7)!;
-		expect(got).not.toBeNull();
-		expect(got.opt).toBeGreaterThanOrEqual(4);
-		expect(got.opt).toBeLessThanOrEqual(7);
-		expect(solve(got.board)).toBe(got.opt);
+describe('generate', () => {
+	const params: GenParams = { n: 8, crystals: 6, rowLocks: 2, colLocks: 2, holes: 5 };
+
+	it('is deterministic for a given seed', () => {
+		expect(encodeBoard(generate(mulberry32(7), params))).toBe(encodeBoard(generate(mulberry32(7), params)));
 	});
 
-	it('is deterministic for a seed — everyone gets the same daily grid', () => {
-		const p = { n: 5, crystals: 3, rowLocks: 1, colLocks: 1 };
-		const a = findBoard(mulberry32(99), p, 4, 8)!;
-		const b = findBoard(mulberry32(99), p, 4, 8)!;
-		expect(encodeBoard(a.board)).toBe(encodeBoard(b.board));
-		expect(a.opt).toBe(b.opt);
+	it('lays out the asked-for pieces', () => {
+		const b = generate(mulberry32(42), params);
+		expect(b.n).toBe(8);
+		expect(countCrystals(b)).toBe(6);
+		expect(b.floor.filter((t) => t === HERO)).toHaveLength(1);
+		expect(b.floor.filter((t) => t === LOCK_ROW)).toHaveLength(2);
+		expect(b.floor.filter((t) => t === LOCK_COL)).toHaveLength(2);
+	});
+
+	it('never drops a crystal under the hero', () => {
+		for (let s = 0; s < 30; s++) {
+			const b = generate(mulberry32(s), params);
+			expect(b.crystals[heroIndex(b)]).toBe(false);
+		}
+	});
+
+	it('always leaves some line able to move', () => {
+		for (let s = 0; s < 30; s++) {
+			const b = generate(mulberry32(s), params);
+			expect(movableLines(b)).toBeGreaterThan(0);
+		}
+	});
+
+	it('ships a walk that eats every crystal it dropped', () => {
+		for (let s = 0; s < 20; s++) {
+			const { board: start, walk } = generateDetailed(mulberry32(300 + s), params);
+			expect(countCrystals(start)).toBe(params.crystals);
+			let b = start;
+			for (const m of walk) b = slide(b, m.axis, m.index, m.shift).board;
+			expect(isWon(b)).toBe(true);
+		}
 	});
 });
+
+function movableLines(b: Board): number {
+	let count = 0;
+	for (let i = 0; i < b.n; i++) {
+		for (const axis of ['row', 'col'] as const) {
+			const sl = slack(b, axis, i);
+			if (sl.min < 0 || sl.max > 0) count++;
+		}
+	}
+	return count;
+}
+

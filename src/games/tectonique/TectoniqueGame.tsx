@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import { encodePacked, formatScore, fmtCentis } from '../../lib/scoreFormat';
+import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -10,74 +10,72 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
-import { tectoniqueLevels } from './levels';
-import { TECTONIQUE_DAILY, type PackedGrid } from './grids';
+import { tectoniqueLevels, TECTONIQUE_BANDS } from './levels';
 import {
-	applyMove,
-	canPush,
 	countCrystals,
 	decodeBoard,
 	encodeBoard,
+	frozen,
+	generate,
+	heroIndex,
 	isWon,
-	legalMoves,
-	CRYSTAL,
-	EMPTY,
+	slack,
+	slide,
 	HERO,
 	LOCK_COL,
 	LOCK_ROW,
+	PLATE,
+	VOID,
+	type Axis,
 	type Board,
-	type Move,
-	type Piece,
+	type Tile,
 } from './engine';
 
 /* =====================================================
    TECTONIQUE — React island.
-   Push a whole row or column to an edge; the hero eats the crystals it sweeps.
-   Engine + pre-solved grids live next door (pure, tested).
+   Drag a row or a column of the floor: the plate slides as one block, coasts on release
+   and stops against the wall. The crystals hover in place — ride the hero over them.
    ===================================================== */
 
 type Status = 'playing' | 'won';
 
-/** One piece on the board. `id` stays put across moves so CSS can animate the slide. */
+/** One floor piece. `id` stays put across slides so the DOM node is never remounted. */
 interface Sprite {
 	id: number;
-	kind: Piece;
+	kind: Tile;
 	idx: number;
 }
 
-interface Snapshot {
-	board: Board;
-	sprites: Sprite[];
+/** The line currently under the finger (or coasting), and its fractional offset in cells. */
+interface Motion {
+	axis: Axis;
+	index: number;
+	offset: number;
 }
 
-const GLYPH: Record<number, string> = { [HERO]: '🐔', [CRYSTAL]: '💎', [LOCK_ROW]: '↔', [LOCK_COL]: '↕' };
-const KIND_CLASS: Record<number, string> = { [HERO]: 'hero', [CRYSTAL]: 'crystal', [LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol' };
-
+const GLYPH: Record<number, string> = { [HERO]: '🐔', [LOCK_ROW]: '↔', [LOCK_COL]: '↕' };
+const KIND_CLASS: Record<number, string> = { [PLATE]: 'plate', [HERO]: 'hero', [LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol' };
 const FREE_LABELS = ['Facile', 'Moyen', 'Difficile'];
 
-// Arrows + ZQSD/WASD, both keyboard layouts.
-const KEY_MOVES: Record<string, [Move['axis'], -1 | 1] | undefined> = {
+// Arrows + ZQSD/WASD, both keyboard layouts. They nudge the line the hero stands on.
+const KEY_MOVES: Record<string, [Axis, -1 | 1] | undefined> = {
 	ArrowLeft: ['row', -1], ArrowRight: ['row', 1], ArrowUp: ['col', -1], ArrowDown: ['col', 1],
 	q: ['row', -1], a: ['row', -1], d: ['row', 1], z: ['col', -1], w: ['col', -1], s: ['col', 1],
 };
 
-const spritesOf = (b: Board): Sprite[] => {
-	const out: Sprite[] = [];
-	b.cells.forEach((p, i) => {
-		if (p !== EMPTY) out.push({ id: i, kind: p, idx: i });
-	});
-	return out;
-};
+const AXIS_LOCK_PX = 7; // travel before the gesture commits to a row or a column
+const FLICK_SEC = 0.13; // how long the release speed keeps coasting
+
+const spritesOf = (b: Board): Sprite[] =>
+	b.floor.flatMap((t, i) => (t === VOID ? [] : [{ id: i, kind: t, idx: i }]));
 
 export default function TectoniqueGame({ gameId }: { gameId: string }) {
-	const lbId = `${gameId}-t`;
-	const [grid, setGrid] = useState<PackedGrid | null>(null);
 	const [board, setBoard] = useState<Board | null>(null);
 	const [sprites, setSprites] = useState<Sprite[]>([]);
+	const [motion, setMotion] = useState<Motion | null>(null);
 	const [pops, setPops] = useState<{ id: number; idx: number }[]>([]);
-	const [history, setHistory] = useState<Snapshot[]>([]);
-	const [movesPlayed, setMovesPlayed] = useState(0);
 	const [status, setStatus] = useState<Status>('playing');
 	const [shaking, setShaking] = useState(false);
 	const [started, setStarted] = useState(false);
@@ -86,25 +84,36 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+
+	const boardRef = useRef<Board | null>(null);
+	const freshRef = useRef<Board | null>(null); // the board as generated, for ↻
+	const elRef = useRef<HTMLDivElement>(null);
+	const liveRef = useRef<{ axis: Axis; index: number; t: number; committed: number } | null>(null);
+	const rafRef = useRef(0);
 	const startRef = useRef(0);
-	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const winRef = useRef(0);
+	const seedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const popIdRef = useRef(0);
-	const shakeRef = useRef<number>(0);
-	const boardRef = useRef<HTMLDivElement>(null);
+	const shakeRef = useRef(0);
 	const lv = useLevels(gameId, tectoniqueLevels);
 
-	const load = useCallback((g: PackedGrid, resume?: { cells: string; moves: number }) => {
-		const b = decodeBoard(g.n, resume?.cells ?? g.cells);
-		setGrid(g);
+	const stopMotion = useCallback(() => {
+		cancelAnimationFrame(rafRef.current);
+		liveRef.current = null;
+		setMotion(null);
+	}, []);
+
+	const load = useCallback((fresh: Board, resume?: Board) => {
+		stopMotion();
+		freshRef.current = fresh;
+		const b = resume ?? fresh;
+		boardRef.current = b;
 		setBoard(b);
 		setSprites(spritesOf(b));
 		setPops([]);
-		setHistory([]);
-		setMovesPlayed(resume?.moves ?? 0);
 		setStatus(isWon(b) ? 'won' : 'playing');
-	}, []);
+	}, [stopMotion]);
 
-	/* Free play reuses the daily pools — they are just boards, already proven solvable. */
 	const newFree = useCallback((diff: number) => {
 		setDaily(false);
 		setAlreadyPlayed(false);
@@ -112,8 +121,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setStarted(true);
 		setElapsed(0);
 		startRef.current = Date.now();
-		const pool = TECTONIQUE_DAILY[diff] ?? TECTONIQUE_DAILY[0];
-		load(pool[Math.floor(Math.random() * pool.length)]);
+		const params = TECTONIQUE_BANDS[diff] ?? TECTONIQUE_BANDS[0];
+		load(generate(mulberry32(Math.floor(Math.random() * 0xffffffff)), params));
 	}, [load]);
 
 	useEffect(() => {
@@ -125,7 +134,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
-		load(cfg.grid);
+		load(generate(mulberry32(cfg.seed), cfg));
 	}, [lv, load]);
 
 	const armLevels = useCallback(() => {
@@ -145,20 +154,23 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
+		const build = (seed: number, diffIndex: number): Board =>
+			generate(mulberry32(seed), TECTONIQUE_BANDS[diffIndex] ?? TECTONIQUE_BANDS[0]);
+
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
 			const diffIndex = run.diffIndex ?? 0;
-			const pool = TECTONIQUE_DAILY[diffIndex] ?? TECTONIQUE_DAILY[0];
-			const g = pool[run.seed % pool.length];
-			dailySeedRef.current = { seed: run.seed, diffIndex };
+			seedRef.current = { seed: run.seed, diffIndex };
+			const fresh = build(run.seed, diffIndex);
+			const saved = (run.state as { cells?: string } | undefined)?.cells;
 			setDailyLoading(false);
 			setStarted(true);
-			const st = run.state as { cells?: string; moves?: number } | undefined;
-			load(g, st?.cells ? { cells: st.cells, moves: st.moves ?? 0 } : undefined);
+			load(fresh, saved ? decodeBoard(fresh.n, saved) : undefined);
 			if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
-				setElapsed(run.finalTime ?? 0);
+				winRef.current = run.finalTime ?? 0;
+				setElapsed(winRef.current);
 			} else {
 				setAlreadyPlayed(false);
 				startRef.current = run.startedAt;
@@ -172,13 +184,15 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 		setDailyLoading(true);
 		const { seed, diffIndex } = await getDaily(gameId);
-		dailySeedRef.current = { seed, diffIndex };
-		const pool = TECTONIQUE_DAILY[diffIndex] ?? TECTONIQUE_DAILY[0];
-		load(pool[seed % pool.length]);
+		seedRef.current = { seed, diffIndex };
+		load(build(seed, diffIndex));
 		setDailyLoading(false);
 	}, [gameId, load]);
 
 	const gated = (daily || lv.playing) && !started;
+	const locked = gated || status === 'won';
+	const lockedRef = useRef(locked);
+	lockedRef.current = locked;
 
 	/* Commencer: consumes the attempt and starts the chrono. */
 	const startTimer = useCallback(() => {
@@ -188,7 +202,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 		trackGame(gameId, 'game_started');
 		if (daily) {
-			const sd = dailySeedRef.current;
+			const sd = seedRef.current;
 			saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex });
 		}
 	}, [gameId, daily]);
@@ -203,163 +217,219 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const bump = useCallback(() => {
 		setShaking(true);
 		window.clearTimeout(shakeRef.current);
-		shakeRef.current = window.setTimeout(() => setShaking(false), 260);
+		shakeRef.current = window.setTimeout(() => setShaking(false), 240);
 	}, []);
 
-	const push = useCallback((m: Move) => {
-		if (!board || status !== 'playing' || gated) return;
-		const out = applyMove(board, m);
-		if (!out) { bump(); return; }
-		setHistory((h) => [...h, { board, sprites }]);
-		const eaten = new Set(out.eatenAt);
-		const moved = new Map(out.moved.map((mv) => [mv.from, mv.to]));
-		setSprites(
-			sprites
-				.filter((s) => !eaten.has(s.idx))
-				.map((s) => (moved.has(s.idx) ? { ...s, idx: moved.get(s.idx)! } : s)),
-		);
-		if (out.eatenAt.length) {
-			const fresh = out.eatenAt.map((idx) => ({ id: ++popIdRef.current, idx }));
+	/* ---------- Sliding ---------- */
+
+	/** Commit an integer slide and carry the sprites of that line along with it. */
+	const applyStep = useCallback((axis: Axis, index: number, step: number): number => {
+		const b = boardRef.current;
+		if (!b) return 0;
+		const r = slide(b, axis, index, step);
+		if (!r.shift) return 0;
+
+		boardRef.current = r.board;
+		setBoard(r.board);
+		const stride = axis === 'row' ? 1 : b.n;
+		const onLine = (i: number): boolean => (axis === 'row' ? Math.floor(i / b.n) === index : i % b.n === index);
+		setSprites((prev) => prev.map((s) => (onLine(s.idx) ? { ...s, idx: s.idx + r.shift * stride } : s)));
+
+		if (r.eaten.length) {
+			const fresh = r.eaten.map((idx) => ({ id: ++popIdRef.current, idx }));
 			setPops((p) => [...p, ...fresh]);
 			const ids = new Set(fresh.map((f) => f.id));
-			setTimeout(() => setPops((p) => p.filter((x) => !ids.has(x.id))), 500);
+			setTimeout(() => setPops((p) => p.filter((x) => !ids.has(x.id))), 480);
 		}
-		setBoard(out.board);
-		setMovesPlayed((n) => n + 1);
-		if (isWon(out.board)) {
+		if (isWon(r.board)) {
+			winRef.current = Math.round((Date.now() - startRef.current) / 10);
+			setElapsed(winRef.current);
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
-	}, [board, sprites, status, gated, bump, gameId]);
+		return r.shift;
+	}, [gameId]);
 
-	const pushRef = useRef(push);
-	pushRef.current = push;
+	/**
+	 * Move the live line to `next` cells from where the gesture started. Whole cells are
+	 * committed to the engine as they are crossed and the remainder stays visual, so the
+	 * slide reads as continuous while the board itself stays on the grid.
+	 */
+	const setOffset = useCallback((next: number) => {
+		const m = liveRef.current;
+		const b = boardRef.current;
+		if (!m || !b) return;
+		const s = slack(b, m.axis, m.index);
+		const t = Math.max(m.committed + s.min, Math.min(m.committed + s.max, next));
+		const step = Math.round(t) - m.committed;
+		if (step !== 0) m.committed += applyStep(m.axis, m.index, step);
+		m.t = t;
+		setMotion({ axis: m.axis, index: m.index, offset: t - m.committed });
+	}, [applyStep]);
 
-	const undo = useCallback(() => {
-		if (!history.length || status === 'won') return;
-		const prev = history[history.length - 1];
-		setHistory((h) => h.slice(0, -1));
-		setBoard(prev.board);
-		setSprites(prev.sprites);
-		setMovesPlayed((n) => Math.max(0, n - 1));
-	}, [history, status]);
+	/** Ease the live line to a whole-cell target, then let go of it. */
+	const glideTo = useCallback((target: number) => {
+		const m = liveRef.current;
+		if (!m) return;
+		const from = m.t;
+		const dur = Math.min(420, 130 + Math.abs(target - from) * 90);
+		const t0 = performance.now();
+		const frame = (): void => {
+			if (!liveRef.current) return;
+			const k = Math.min(1, (performance.now() - t0) / dur);
+			setOffset(from + (target - from) * (1 - (1 - k) ** 3));
+			if (k < 1) rafRef.current = requestAnimationFrame(frame);
+			else stopMotion();
+		};
+		cancelAnimationFrame(rafRef.current);
+		rafRef.current = requestAnimationFrame(frame);
+	}, [setOffset, stopMotion]);
+
+	const cellPx = useCallback((): number => {
+		const rect = elRef.current?.getBoundingClientRect();
+		return Math.max(1, (rect?.width ?? 320) / Math.max(1, boardRef.current?.n ?? 1));
+	}, []);
+
+	const dragRef = useRef<{ r: number; c: number; x: number; y: number; axis: Axis | null; t: number; ms: number; v: number } | null>(null);
+
+	const { onPointerDown } = usePointerDrag(
+		(x, y) => {
+			const b = boardRef.current;
+			const rect = elRef.current?.getBoundingClientRect();
+			if (!b || !rect || lockedRef.current) return;
+			const c = Math.floor(((x - rect.left) / rect.width) * b.n);
+			const r = Math.floor(((y - rect.top) / rect.height) * b.n);
+			if (r < 0 || r >= b.n || c < 0 || c >= b.n) return;
+			stopMotion();
+			dragRef.current = { r, c, x, y, axis: null, t: 0, ms: performance.now(), v: 0 };
+		},
+		(x, y) => {
+			const d = dragRef.current;
+			if (!d) return;
+			if (!d.axis) {
+				const dx = x - d.x;
+				const dy = y - d.y;
+				if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
+				d.axis = Math.abs(dx) >= Math.abs(dy) ? 'row' : 'col';
+				d.x = x;
+				d.y = y; // the gesture restarts here, so the line does not jump by the lock distance
+				const index = d.axis === 'row' ? d.r : d.c;
+				const b = boardRef.current;
+				if (b && frozen(b, d.axis, index)) { dragRef.current = null; bump(); return; }
+				liveRef.current = { axis: d.axis, index, t: 0, committed: 0 };
+			}
+			const now = performance.now();
+			const t = (d.axis === 'row' ? x - d.x : y - d.y) / cellPx();
+			const dt = Math.max(8, now - d.ms);
+			d.v = ((t - d.t) / dt) * 1000;
+			d.t = t;
+			d.ms = now;
+			setOffset(t);
+		},
+		() => {
+			const d = dragRef.current;
+			dragRef.current = null;
+			const m = liveRef.current;
+			if (!d || !m) return;
+			const s = slack(boardRef.current as Board, m.axis, m.index);
+			const coast = Math.round(m.t + d.v * FLICK_SEC);
+			glideTo(Math.max(m.committed + s.min, Math.min(m.committed + s.max, coast)));
+		},
+	);
+
+	/* Keyboard: the arrows nudge the line the hero stands on by one cell. */
+	const nudgeRef = useRef<(axis: Axis, dir: -1 | 1) => void>(() => {});
+	nudgeRef.current = (axis, dir) => {
+		const b = boardRef.current;
+		if (!b || locked || liveRef.current) return;
+		const h = heroIndex(b);
+		const index = axis === 'row' ? Math.floor(h / b.n) : h % b.n;
+		if (frozen(b, axis, index)) { bump(); return; }
+		liveRef.current = { axis, index, t: 0, committed: 0 };
+		glideTo(dir);
+	};
+
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent): void => {
+			const hit = KEY_MOVES[e.key] ?? KEY_MOVES[e.key.toLowerCase()];
+			if (!hit) return;
+			e.preventDefault();
+			nudgeRef.current(hit[0], hit[1]);
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, []);
+
+	useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
 	const restart = useCallback(() => {
-		if (!grid || status === 'won') return;
-		load(grid);
-	}, [grid, status, load]);
+		const fresh = freshRef.current;
+		if (!fresh || status === 'won') return;
+		load(fresh);
+	}, [status, load]);
 
-	/* Grade the level once solved. Score = moves played, fewer is better. */
+	/* Grade the level once solved. Score = the chrono, in centiseconds. */
 	useEffect(() => {
 		if (!lv.playing || status !== 'won') return;
-		lv.finish({ won: true, score: movesPlayed, raw: { n: grid?.n, opt: grid?.opt } });
+		lv.finish({ won: true, score: winRef.current, raw: { n: board?.n } });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv.playing, status]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
 		if (!daily || !started || status === 'won' || !board) return;
-		const sd = dailySeedRef.current;
+		const sd = seedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: { cells: encodeBoard(board), moves: movesPlayed },
+			state: { cells: encodeBoard(board) },
 		});
-	}, [daily, started, status, board, movesPlayed, gameId]);
+	}, [daily, started, status, board, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
 		if (!daily || status !== 'won' || alreadyPlayed || !board) return;
-		const sd = dailySeedRef.current;
+		const sd = seedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: true,
-			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			finalTime: winRef.current,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: { cells: encodeBoard(board), moves: movesPlayed },
+			state: { cells: encodeBoard(board) },
 		});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [daily, status, alreadyPlayed, gameId]);
 
-	const heroIdx = board ? board.cells.indexOf(HERO) : -1;
+	/* ---------- Render ---------- */
+
 	const n = board?.n ?? 0;
-	const heroLineRef = useRef({ row: 0, col: 0 });
-	heroLineRef.current = n > 0 && heroIdx >= 0
-		? { row: Math.floor(heroIdx / n), col: heroIdx % n }
-		: { row: 0, col: 0 };
 
-	/* Keyboard: the arrows push the line the hero stands on. */
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			const hit = KEY_MOVES[e.key] ?? KEY_MOVES[e.key.toLowerCase()];
-			if (!hit) return;
-			e.preventDefault();
-			pushRef.current({ axis: hit[0], index: heroLineRef.current[hit[0]], dir: hit[1] });
-		};
-		window.addEventListener('keydown', onKey);
-		return () => window.removeEventListener('keydown', onKey);
-	}, []);
-
-	/* Swipe: the gesture's start cell picks the line, its dominant axis the push. */
-	const dragRef = useRef<{ cell: [number, number]; x: number; y: number; done: boolean } | null>(null);
-
-	const cellFromCoords = (clientX: number, clientY: number): [number, number] | null => {
-		if (!boardRef.current || !n) return null;
-		const rect = boardRef.current.getBoundingClientRect();
-		const c = Math.floor(((clientX - rect.left) / rect.width) * n);
-		const r = Math.floor(((clientY - rect.top) / rect.height) * n);
-		if (r < 0 || r >= n || c < 0 || c >= n) return null;
-		return [r, c];
-	};
-
-	const threshold = (): number => {
-		const rect = boardRef.current?.getBoundingClientRect();
-		return Math.max(14, ((rect?.width ?? 320) / Math.max(1, n)) * 0.4);
-	};
-
-	const { onPointerDown } = usePointerDrag(
-		(x, y) => {
-			const cell = cellFromCoords(x, y);
-			dragRef.current = cell ? { cell, x, y, done: false } : null;
-		},
-		(x, y) => {
-			const d = dragRef.current;
-			if (!d || d.done) return;
-			const dx = x - d.x;
-			const dy = y - d.y;
-			const t = threshold();
-			if (Math.abs(dx) < t && Math.abs(dy) < t) return;
-			d.done = true;
-			const horizontal = Math.abs(dx) >= Math.abs(dy);
-			pushRef.current(
-				horizontal
-					? { axis: 'row', index: d.cell[0], dir: dx > 0 ? 1 : -1 }
-					: { axis: 'col', index: d.cell[1], dir: dy > 0 ? 1 : -1 },
-			);
-		},
-		() => { dragRef.current = null; },
-	);
-
-	const frozen = useMemo(() => {
-		const rows: boolean[] = [];
-		const cols: boolean[] = [];
+	const freeze = useMemo(() => {
+		const rows: number[] = [];
+		const cols: number[] = [];
 		if (board) {
 			for (let i = 0; i < board.n; i++) {
-				rows.push(!canPush(board, 'row', i));
-				cols.push(!canPush(board, 'col', i));
+				if (frozen(board, 'row', i)) rows.push(i);
+				if (frozen(board, 'col', i)) cols.push(i);
 			}
 		}
 		return { rows, cols };
 	}, [board]);
 
+	const gems = useMemo(() => (board ? board.crystals.flatMap((c, i) => (c ? [i] : [])) : []), [board]);
+
+	const offsetOf = (idx: number): { x: number; y: number } => {
+		if (!motion) return { x: 0, y: 0 };
+		const on = motion.axis === 'row' ? Math.floor(idx / n) === motion.index : idx % n === motion.index;
+		if (!on) return { x: 0, y: 0 };
+		return motion.axis === 'row' ? { x: motion.offset, y: 0 } : { x: 0, y: motion.offset };
+	};
+
 	const left = board ? countCrystals(board) : 0;
-	const stuck = !!board && status === 'playing' && !gated && legalMoves(board).length === 0;
 	const { celebrating, showWin } = useCelebration(status === 'won');
-	const dScore = encodePacked(10_000_000, [movesPlayed, Math.min(9_999_999, elapsed)]);
-	const par = grid?.opt ?? 0;
 
 	return (
 		<div className="tk-root" style={{ ['--n' as string]: n }}>
@@ -380,7 +450,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				</div>
 			) : daily ? (
 				<div className="tk-tag">
-					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${FREE_LABELS[dailySeedRef.current?.diffIndex ?? 0]}`}
+					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${FREE_LABELS[seedRef.current?.diffIndex ?? 0]}`}
 				</div>
 			) : (
 				<div className="tk-pills" role="tablist" aria-label="Difficulté">
@@ -400,10 +470,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 			{!(lv.active && lv.menu) && (
 				<div className="tk-bar">
-					<span className="tk-chip">🔁 {movesPlayed} <small>/ {par} coups</small></span>
 					<span className="tk-chip">💎 {left}</span>
 					<span className="tk-chip">⏱ {fmtCentis(elapsed)}</span>
-					<button className="tk-btn" onClick={undo} disabled={!history.length || status === 'won'} aria-label="Annuler le dernier coup">↶</button>
 					<button
 						className="tk-btn"
 						onClick={daily || lv.playing ? restart : () => newFree(freeDiff)}
@@ -420,34 +488,45 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 					{celebrating && <Celebration />}
 					<div
 						className={`tk-board ${gated ? 'blurred' : ''} ${shaking ? 'shake' : ''}`}
-						ref={boardRef}
+						ref={elRef}
 						onPointerDown={onPointerDown}
 						role="application"
 						aria-label="Grille de Tectonique"
 					>
-						<div className="tk-cells" style={{ gridTemplateColumns: `repeat(${n}, 1fr)`, gridTemplateRows: `repeat(${n}, 1fr)` }}>
-							{Array.from({ length: n * n }).map((_, i) => {
-								const r = Math.floor(i / n);
-								const c = i % n;
-								const cls = ['tk-cell', frozen.rows[r] ? 'frow' : '', frozen.cols[c] ? 'fcol' : ''].join(' ');
-								return <div key={i} className={cls} />;
-							})}
-						</div>
+						{freeze.rows.map((r) => (
+							<div key={`fr${r}`} className="tk-freeze row" style={{ transform: `translateY(${r * 100}%)` }} />
+						))}
+						{freeze.cols.map((c) => (
+							<div key={`fc${c}`} className="tk-freeze col" style={{ transform: `translateX(${c * 100}%)` }} />
+						))}
 
-						{sprites.map((s) => (
+						{sprites.map((s) => {
+							const o = offsetOf(s.idx);
+							return (
+								<div
+									key={s.id}
+									className={`tk-slab ${KIND_CLASS[s.kind]}`}
+									style={{ transform: `translate(${((s.idx % n) + o.x) * 100}%, ${(Math.floor(s.idx / n) + o.y) * 100}%)` }}
+								>
+									<div className="tk-face">{GLYPH[s.kind] && <span>{GLYPH[s.kind]}</span>}</div>
+								</div>
+							);
+						})}
+
+						{gems.map((i) => (
 							<div
-								key={s.id}
-								className={`tk-piece ${KIND_CLASS[s.kind]}`}
-								style={{ transform: `translate(${(s.idx % n) * 100}%, ${Math.floor(s.idx / n) * 100}%)` }}
+								key={`g${i}`}
+								className="tk-gem"
+								style={{ transform: `translate(${(i % n) * 100}%, ${Math.floor(i / n) * 100}%)` }}
 							>
-								<span>{GLYPH[s.kind]}</span>
+								<span>💎</span>
 							</div>
 						))}
 
 						{pops.map((p) => (
 							<div
 								key={p.id}
-								className="tk-piece tk-pop"
+								className="tk-gem tk-pop"
 								style={{ transform: `translate(${(p.idx % n) * 100}%, ${Math.floor(p.idx / n) * 100}%)` }}
 							>
 								<span>✨</span>
@@ -471,9 +550,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						<div className="tk-overlay tk-win" role="dialog" aria-label="Grille résolue">
 							<div className="tk-card">
 								<div className="tk-mark">💎</div>
-								<h2>Grille avalée !</h2>
-								<p className="tk-big">{movesPlayed} coups</p>
-								<p className="tk-sub">Optimum : {par} · {fmtCentis(elapsed)}</p>
+								<h2>Plaque nettoyée !</h2>
+								<p className="tk-big">{fmtCentis(winRef.current)}</p>
 								<button className="tk-start small" onClick={() => newFree(freeDiff)}>Rejouer</button>
 							</div>
 						</div>
@@ -485,7 +563,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 							lastLevel={tectoniqueLevels.count}
 							won={lv.won}
 							stars={lv.stars}
-							detail={lv.won ? `${movesPlayed} coups (optimum ${par})` : undefined}
+							detail={lv.won ? fmtCentis(winRef.current) : undefined}
 							onNext={() => startLevel(lv.level + 1)}
 							onReplay={() => startLevel(lv.level)}
 							onMenu={lv.backToMenu}
@@ -494,33 +572,29 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{stuck && (
-				<p className="tk-stuck" aria-live="polite">Plus aucun coup possible — annule ({'↶'}) ou recommence.</p>
-			)}
-
 			{daily && status === 'won' && (
 				<div className="tk-done">
 					{alreadyPlayed
-						? <>Défi du jour déjà relevé · <strong>{movesPlayed} coups</strong> — reviens demain&nbsp;!</>
-						: <>🎉 Avalé en <strong>{movesPlayed} coups</strong> · {fmtCentis(elapsed)}</>}
+						? <>Défi du jour déjà relevé · <strong>{fmtCentis(winRef.current)}</strong> — reviens demain&nbsp;!</>
+						: <>🎉 Plaque nettoyée en <strong>{fmtCentis(winRef.current)}</strong></>}
 				</div>
 			)}
 
 			{daily && !dailyLoading && (
 				<Leaderboard
-					game={lbId}
+					game={gameId}
 					metric="time"
-					submitValue={status === 'won' ? dScore : undefined}
+					submitValue={status === 'won' ? winRef.current : undefined}
 					format={(v) => formatScore(DAILY_LB.tectonique.fmt, v)}
 				/>
 			)}
 
-			{!daily && !lv.active && <LeaderboardCorner game={lbId} metric="time" />}
+			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			<p className="tk-help">
-				Glisse une ligne ou une colonne : tout ce qui est dessus file jusqu'au bord. La cocotte 🐔 avale
-				les 💎 qu'elle balaie sur son passage. Un bloc ↔ gèle sa ligne, un bloc ↕ gèle sa colonne —
-				déplace-le par l'autre sens. Le moins de coups possible.
+				Fais glisser une ligne ou une colonne du sol : la plaque part d'un bloc et continue sur sa
+				lancée, jusqu'à buter contre le bord. Les 💎 flottent au-dessus et ne bougent jamais — c'est la
+				cocotte 🐔 qui doit leur passer dessus. Un bloc ↔ gèle sa ligne, un bloc ↕ gèle sa colonne.
 			</p>
 		</div>
 	);
@@ -531,7 +605,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 const CSS = `
 .tk-root {
   --tk-accent: var(--accent-regular);
-  --tk-cell: calc(100cqw / var(--n, 5));
+  --tk-cell: calc(100cqw / var(--n, 6));
   width: 100%;
   max-width: 520px;
   margin-inline: auto;
@@ -555,7 +629,6 @@ const CSS = `
   background: var(--gray-900); border-radius: 999px; padding: 6px 12px;
   font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;
 }
-.tk-chip small { color: var(--gray-300); font-weight: 500; }
 .tk-btn {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-0);
   width: 36px; height: 36px; border-radius: 50%; font-size: 16px; cursor: pointer; line-height: 1;
@@ -567,58 +640,63 @@ const CSS = `
   position: relative;
   width: 100%; aspect-ratio: 1 / 1;
   border: 2.5px solid var(--gray-100);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  background: var(--gray-999);
+  /* The void the plate floats in — that empty room IS what lets a line travel. */
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px var(--tk-cell)),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px var(--tk-cell)),
+    radial-gradient(circle at 50% 40%, #131722, #05070c);
   touch-action: none;
   user-select: none;
+  cursor: grab;
 }
-.tk-cells { position: absolute; inset: 0; display: grid; }
-.tk-cell {
-  border-right: 1px solid var(--gray-800);
-  border-bottom: 1px solid var(--gray-800);
-  box-sizing: border-box;
-}
-/* A frozen line is tinted with its blocker's hue, so the dead-ends are readable at a glance. */
-.tk-cell.frow { background: rgba(245, 158, 11, 0.13); }
-.tk-cell.fcol { background: rgba(56, 189, 248, 0.13); }
-.tk-cell.frow.fcol { background: rgba(150, 130, 140, 0.18); }
 
-.tk-piece {
+/* A frozen line keeps its blocker's hue, so the dead ends read at a glance. */
+.tk-freeze { position: absolute; top: 0; left: 0; pointer-events: none; }
+.tk-freeze.row { width: 100%; height: calc(100% / var(--n)); background: rgba(245, 158, 11, 0.12); }
+.tk-freeze.col { width: calc(100% / var(--n)); height: 100%; background: rgba(56, 189, 248, 0.12); }
+
+.tk-slab {
+  position: absolute; top: 0; left: 0;
+  width: calc(100% / var(--n)); height: calc(100% / var(--n));
+  padding: 2.5%;
+  box-sizing: border-box;
+  pointer-events: none;
+  will-change: transform;
+}
+.tk-face {
+  width: 100%; height: 100%;
+  border-radius: 20%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #55606f, #333c4b);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.tk-slab span { font-size: calc(var(--tk-cell) * 0.5); line-height: 1; }
+.tk-slab.hero .tk-face { background: linear-gradient(180deg, #7a6a4a, #4a3f2c); box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.2); }
+.tk-slab.hero span { font-size: calc(var(--tk-cell) * 0.58); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.3)); }
+.tk-slab.lockrow .tk-face { background: linear-gradient(180deg, #a86a12, #6d4207); color: #fde68a; }
+.tk-slab.lockcol .tk-face { background: linear-gradient(180deg, #0e7ea6, #08475f); color: #bae6fd; }
+.tk-slab.lockrow span, .tk-slab.lockcol span { font-weight: 700; font-size: calc(var(--tk-cell) * 0.44); }
+
+/* Crystals hover above the floor: raised, with their own shadow, and never offset by a slide. */
+.tk-gem {
   position: absolute; top: 0; left: 0;
   width: calc(100% / var(--n)); height: calc(100% / var(--n));
   display: flex; align-items: center; justify-content: center;
-  transition: transform 0.16s ease-out;
   pointer-events: none;
 }
-.tk-piece span { font-size: calc(var(--tk-cell) * 0.52); line-height: 1; }
-.tk-piece.hero span { font-size: calc(var(--tk-cell) * 0.6); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35)); }
-.tk-piece.crystal span { filter: drop-shadow(0 0 5px rgba(90, 200, 255, 0.6)); }
-
-.tk-piece.lockrow span, .tk-piece.lockcol span {
-  position: relative;
-  width: 78%; height: 78%;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 8px;
-  font-size: calc(var(--tk-cell) * 0.4); font-weight: 700;
-  background: #2b2f3a; color: #f8fafc;
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35);
+.tk-gem span {
+  font-size: calc(var(--tk-cell) * 0.46); line-height: 1;
+  filter: drop-shadow(0 5px 4px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 6px rgba(90, 200, 255, 0.55));
+  animation: tk-float 2.4s ease-in-out infinite;
 }
-/* Diagonal bar rather than a strike-through: a horizontal line would vanish into the ↔ shaft. */
-.tk-piece.lockrow span::after, .tk-piece.lockcol span::after {
-  content: '';
-  position: absolute; left: 15%; right: 15%; top: 50%;
-  height: 3px; margin-top: -1.5px; border-radius: 2px;
-  background: currentColor;
-  transform: rotate(-40deg);
-}
-.tk-piece.lockrow span { background: #7c4a06; color: #fde68a; }
-.tk-piece.lockcol span { background: #0b4a63; color: #bae6fd; }
+@keyframes tk-float { 0%, 100% { transform: translateY(-14%); } 50% { transform: translateY(-26%); } }
 
-.tk-pop span { animation: tk-pop 0.5s ease-out forwards; }
-@keyframes tk-pop { from { opacity: 1; transform: scale(0.6); } to { opacity: 0; transform: scale(1.6); } }
+.tk-pop span { animation: tk-pop 0.48s ease-out forwards; }
+@keyframes tk-pop { from { opacity: 1; transform: scale(0.6); } to { opacity: 0; transform: scale(1.7); } }
 
-.tk-board.shake { animation: tk-shake 0.26s ease; }
+.tk-board.shake { animation: tk-shake 0.24s ease; }
 @keyframes tk-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 
 .tk-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
@@ -641,19 +719,15 @@ const CSS = `
   font: inherit; font-weight: 700; font-size: 18px;
   border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
 }
-.tk-start.small { font-size: 15px; padding: 10px 26px; box-shadow: none; }
+.tk-start.small { font-size: 15px; padding: 10px 26px; box-shadow: none; margin-top: 12px; }
 
-.tk-stuck {
-  margin: 1rem auto 0; text-align: center; font-size: 13px; color: #f59e0b;
-  border: 1px solid #f59e0b; border-radius: 12px; padding: 8px 14px;
-}
 .tk-done { text-align: center; font-size: 16px; margin: 1rem 0 0; }
 .tk-done strong { color: var(--tk-accent); }
 .tk-help { max-width: 420px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem; }
 
 @keyframes tk-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .tk-piece { transition: none; }
+  .tk-gem span { animation: none; transform: translateY(-14%); }
   .tk-overlay, .tk-board.shake, .tk-pop span { animation: none; }
 }
 `;

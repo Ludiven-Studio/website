@@ -57,6 +57,7 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	sudoku: { fmt: centis },
 	suguru: { fmt: centis },
 	motifs: { fmt: centis },
+	tectonique: { fmt: centis },
 	// Real-time vs-AI races → time to reach the target (Pong: 3 pts, Foot: 3 goals)
 	pong: { fmt: centis },
 	foot: { fmt: centis },
@@ -78,7 +79,6 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	golf: { lbId: 'golf-t', fmt: packed('coups') },
 	flechettes: { lbId: 'flechettes-t', fmt: packed('fléch.') },
 	billard: { lbId: 'billard-t', fmt: packed('coups') },
-	tectonique: { lbId: 'tectonique-t', fmt: packed('coups') },
 	// Alchimie daily: fewest fusions to craft the day's secret element, time tiebreak.
 	alchimie: { lbId: 'alchimie-t', fmt: packed('fusions') },
 	// Réussite (card solitaire): cards to foundations (max 52) + time tiebreak, logged under `<id>-t`.

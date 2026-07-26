@@ -1,206 +1,276 @@
-// Tectonique — the floor slides in whole rows and columns.
+// Tectonique — the floor is a broken plate whose rows and columns slide freely.
 //
-// A move picks one line (a row or a column) and one edge: everything standing on that
-// line packs against that edge, order preserved. The hero never moves on its own — it
-// only travels when the line under it is pushed, and on the way it eats every crystal
-// between itself and the first solid piece, stopping against it.
+// Two layers share the grid. The FLOOR (slabs, the hero, the locks) slides: a line
+// translates as one rigid block, gaps kept, until its outermost slab hits the wall.
+// The CRYSTALS never move — they hover above the floor, so the only way to eat one is
+// to ride the hero across its cell.
 //
-// Locks are what turn this into a puzzle. A row lock freezes the ROW it sits in, so the
-// only way to get rid of it is to push its COLUMN — and a column lock freezes the column
-// it sits in. Clearing a path is therefore a sub-puzzle of its own.
+// A row lock freezes the row it sits in, a column lock freezes its column: freeing a row
+// means sliding its lock out through the other axis first.
 //
-// The engine stays a pure cell array so the solver can hash a state cheaply. `applyMove`
-// hands back the per-piece from → to mapping the UI needs to animate the slide.
+// Every slide is reversible, so the puzzle has no dead end. That is what lets the
+// generator skip a solver: it walks the hero at random, remembers the cells it swept,
+// and drops the crystals there — replaying the walk collects them all.
 
-export const EMPTY = 0;
-export const HERO = 1;
-export const CRYSTAL = 2;
+export const VOID = 0;
+export const PLATE = 1;
+export const HERO = 2;
 export const LOCK_ROW = 3;
 export const LOCK_COL = 4;
 
-export type Piece = 0 | 1 | 2 | 3 | 4;
+export type Tile = 0 | 1 | 2 | 3 | 4;
+export type Axis = 'row' | 'col';
 
 export interface Board {
 	n: number;
-	cells: Piece[]; // row-major, length n*n
+	floor: Tile[]; // row-major, length n*n
+	crystals: boolean[]; // world-fixed, length n*n
 }
 
-export type Axis = 'row' | 'col';
-
-/** `dir` +1 pushes toward the high index (right for a row, down for a column). */
-export interface Move {
-	axis: Axis;
-	index: number;
-	dir: -1 | 1;
-}
-
-export interface MoveOutcome {
+export interface SlideResult {
 	board: Board;
-	eaten: number;
-	eatenAt: number[]; // flat board indices of the crystals the hero swallowed
-	moved: { from: number; to: number }[]; // flat board indices, for the slide animation
+	shift: number; // what the clamp actually allowed
+	eaten: number[]; // flat indices of the crystals swallowed
+	swept: number[]; // flat indices the hero crossed, endpoints included
 }
 
-export const cloneBoard = (b: Board): Board => ({ n: b.n, cells: b.cells.slice() });
+export interface Slack {
+	min: number;
+	max: number;
+}
 
-export const isWon = (b: Board): boolean => !b.cells.includes(CRYSTAL);
+export const cloneBoard = (b: Board): Board => ({ n: b.n, floor: b.floor.slice(), crystals: b.crystals.slice() });
 
-export const countCrystals = (b: Board): number => b.cells.reduce<number>((n, p) => n + (p === CRYSTAL ? 1 : 0), 0);
+export const countCrystals = (b: Board): number => b.crystals.reduce<number>((n, c) => n + (c ? 1 : 0), 0);
 
-/** Flat board index of position `i` along a line. */
-const flatAt = (n: number, axis: Axis, index: number, i: number): number =>
+export const isWon = (b: Board): boolean => !b.crystals.includes(true);
+
+export const heroIndex = (b: Board): number => b.floor.indexOf(HERO);
+
+/** Flat index of position `i` along a line. */
+export const flatAt = (n: number, axis: Axis, index: number, i: number): number =>
 	axis === 'row' ? index * n + i : i * n + index;
 
-const readLine = (b: Board, axis: Axis, index: number): Piece[] => {
-	const line: Piece[] = [];
-	for (let i = 0; i < b.n; i++) line.push(b.cells[flatAt(b.n, axis, index, i)]);
-	return line;
-};
-
-interface SlideResult {
-	line: Piece[];
-	eatenAt: number[]; // positions along the line
-	moved: { from: number; to: number }[]; // positions along the line
-}
-
-/** Slide one line toward `dir`: the hero eats ahead of itself, then everything packs. */
-export function slideLine(line: Piece[], dir: -1 | 1): SlideResult {
-	const n = line.length;
-	const out = line.slice();
-	const eatenAt: number[] = [];
-
-	const h = out.indexOf(HERO);
-	if (h >= 0) {
-		for (let i = h + dir; i >= 0 && i < n; i += dir) {
-			if (out[i] === CRYSTAL) {
-				out[i] = EMPTY;
-				eatenAt.push(i);
-				continue;
-			}
-			if (out[i] !== EMPTY) break; // a solid piece: the hero stops against it
-		}
-	}
-
-	// Pack the survivors against the destination edge, keeping their order.
-	const kept: { piece: Piece; from: number }[] = [];
-	for (let i = 0; i < n; i++) if (out[i] !== EMPTY) kept.push({ piece: out[i], from: i });
-	const packed: Piece[] = new Array(n).fill(EMPTY);
-	const moved: { from: number; to: number }[] = [];
-	for (let k = 0; k < kept.length; k++) {
-		const to = dir === 1 ? n - kept.length + k : k;
-		packed[to] = kept[k].piece;
-		if (kept[k].from !== to) moved.push({ from: kept[k].from, to });
-	}
-	return { line: packed, eatenAt, moved };
-}
-
 /** A line is frozen while its own kind of lock stands on it. */
-export function canPush(b: Board, axis: Axis, index: number): boolean {
-	const freezer = axis === 'row' ? LOCK_ROW : LOCK_COL;
-	return !readLine(b, axis, index).includes(freezer);
+export function frozen(b: Board, axis: Axis, index: number): boolean {
+	const stop = axis === 'row' ? LOCK_ROW : LOCK_COL;
+	for (let i = 0; i < b.n; i++) if (b.floor[flatAt(b.n, axis, index, i)] === stop) return true;
+	return false;
 }
 
-/** Apply a push, or null when it is illegal or would change nothing. */
-export function applyMove(b: Board, m: Move): MoveOutcome | null {
-	if (m.index < 0 || m.index >= b.n) return null;
-	if (!canPush(b, m.axis, m.index)) return null;
-	const before = readLine(b, m.axis, m.index);
-	const { line, eatenAt, moved } = slideLine(before, m.dir);
-	// A push that shuffles nothing is not a move: the counter would be cheatable.
-	if (!eatenAt.length && !moved.length) return null;
+/** How far the line may still travel, in cells. Both zero when it cannot move at all. */
+export function slack(b: Board, axis: Axis, index: number): Slack {
+	if (index < 0 || index >= b.n || frozen(b, axis, index)) return { min: 0, max: 0 };
+	let lo = -1;
+	let hi = -1;
+	for (let i = 0; i < b.n; i++) {
+		if (b.floor[flatAt(b.n, axis, index, i)] === VOID) continue;
+		if (lo < 0) lo = i;
+		hi = i;
+	}
+	if (lo < 0) return { min: 0, max: 0 };
+	return { min: lo > 0 ? -lo : 0, max: b.n - 1 - hi };
+}
+
+/** Translate a line by `shift` cells, clamped to its slack. Returns the same board when nothing moves. */
+export function slide(b: Board, axis: Axis, index: number, shift: number): SlideResult {
+	const s = slack(b, axis, index);
+	const d = Math.max(s.min, Math.min(s.max, Math.round(shift)));
+	if (d === 0) return { board: b, shift: 0, eaten: [], swept: [] };
+
+	const n = b.n;
+	const line: Tile[] = [];
+	for (let i = 0; i < n; i++) line.push(b.floor[flatAt(n, axis, index, i)]);
 
 	const next = cloneBoard(b);
-	for (let i = 0; i < b.n; i++) next.cells[flatAt(b.n, m.axis, m.index, i)] = line[i];
-	const toFlat = (i: number): number => flatAt(b.n, m.axis, m.index, i);
-	return {
-		board: next,
-		eaten: eatenAt.length,
-		eatenAt: eatenAt.map(toFlat),
-		moved: moved.map((mv) => ({ from: toFlat(mv.from), to: toFlat(mv.to) })),
-	};
-}
+	for (let i = 0; i < n; i++) next.floor[flatAt(n, axis, index, i)] = VOID;
+	for (let i = 0; i < n; i++) if (line[i] !== VOID) next.floor[flatAt(n, axis, index, i + d)] = line[i];
 
-/** Every push the board geometry allows, legal or not — the solver filters with applyMove. */
-export function allMoves(n: number): Move[] {
-	const out: Move[] = [];
-	for (let i = 0; i < n; i++) {
-		out.push({ axis: 'row', index: i, dir: -1 }, { axis: 'row', index: i, dir: 1 });
-		out.push({ axis: 'col', index: i, dir: -1 }, { axis: 'col', index: i, dir: 1 });
-	}
-	return out;
-}
-
-export const legalMoves = (b: Board): Move[] => allMoves(b.n).filter((m) => applyMove(b, m) !== null);
-
-export const encodeBoard = (b: Board): string => b.cells.join('');
-
-export function decodeBoard(n: number, s: string): Board {
-	const cells = Array.from(s, (ch) => Number(ch) as Piece);
-	if (cells.length !== n * n) throw new Error(`bad board: ${s.length} cells for ${n}×${n}`);
-	return { n, cells };
-}
-
-/** Fewest moves to eat every crystal. null = no solution within `maxStates` explored. */
-export function solve(b: Board, maxStates = 300_000): number | null {
-	if (isWon(b)) return 0;
-	const moves = allMoves(b.n);
-	const seen = new Set<string>([encodeBoard(b)]);
-	let frontier = [b];
-	for (let depth = 1; frontier.length > 0; depth++) {
-		const next: Board[] = [];
-		for (const cur of frontier) {
-			for (const m of moves) {
-				const r = applyMove(cur, m);
-				if (!r) continue;
-				if (isWon(r.board)) return depth;
-				const k = encodeBoard(r.board);
-				if (seen.has(k)) continue;
-				if (seen.size >= maxStates) return null;
-				seen.add(k);
-				next.push(r.board);
+	const eaten: number[] = [];
+	const swept: number[] = [];
+	const h = line.indexOf(HERO);
+	if (h >= 0) {
+		const lo = Math.min(h, h + d);
+		const hi = Math.max(h, h + d);
+		for (let i = lo; i <= hi; i++) {
+			const f = flatAt(n, axis, index, i);
+			swept.push(f);
+			if (next.crystals[f]) {
+				next.crystals[f] = false;
+				eaten.push(f);
 			}
 		}
-		frontier = next;
 	}
-	return null; // search exhausted: the crystals cannot all be reached
+	return { board: next, shift: d, eaten, swept };
 }
+
+export const encodeBoard = (b: Board): string => `${b.floor.join('')}|${b.crystals.map((c) => (c ? '1' : '0')).join('')}`;
+
+export function decodeBoard(n: number, s: string): Board {
+	const [f, c] = s.split('|');
+	if (!f || !c || f.length !== n * n || c.length !== n * n) throw new Error(`bad board for ${n}×${n}: ${s}`);
+	return { n, floor: Array.from(f, (ch) => Number(ch) as Tile), crystals: Array.from(c, (ch) => ch === '1') };
+}
+
+/* ---------- Generation ---------- */
 
 export interface GenParams {
 	n: number;
 	crystals: number;
 	rowLocks: number;
 	colLocks: number;
+	holes: number;
 }
 
-/** Scatter the pieces on distinct cells. Says nothing about solvability — `findBoard` judges that. */
-export function buildBoard(rng: () => number, p: GenParams): Board {
-	const cells: Piece[] = new Array(p.n * p.n).fill(EMPTY);
-	const free: number[] = cells.map((_, i) => i);
-	const take = (): number => free.splice(Math.floor(rng() * free.length), 1)[0];
-	cells[take()] = HERO;
-	for (let i = 0; i < p.crystals; i++) cells[take()] = CRYSTAL;
-	for (let i = 0; i < p.rowLocks; i++) cells[take()] = LOCK_ROW;
-	for (let i = 0; i < p.colLocks; i++) cells[take()] = LOCK_COL;
-	return { n: p.n, cells };
-}
+/** Void frame around the plate. It IS the room every line slides in — keep it thin, or the
+    plate shreds into lone slabs that roam the whole grid and the puzzle goes slack. */
+const MARGIN = 2;
 
-export interface GeneratedBoard {
-	board: Board;
-	opt: number;
-}
-
-/** Keep scattering until a board's optimum lands in [minOpt, maxOpt]. Deterministic in `rng`. */
-export function findBoard(
-	rng: () => number,
-	p: GenParams,
-	minOpt: number,
-	maxOpt: number,
-	tries = 300,
-): GeneratedBoard | null {
-	for (let t = 0; t < tries; t++) {
-		const board = buildBoard(rng, p);
-		const opt = solve(board);
-		if (opt !== null && opt >= minOpt && opt <= maxOpt) return { board, opt };
+const shuffled = <T>(rng: () => number, arr: T[]): T[] => {
+	const out = arr.slice();
+	for (let i = out.length - 1; i > 0; i--) {
+		const j = Math.floor(rng() * (i + 1));
+		[out[i], out[j]] = [out[j], out[i]];
 	}
-	return null;
+	return out;
+};
+
+/** A square plate floating in the void, pierced with holes, carrying the hero and the locks. */
+function buildFloor(rng: () => number, p: GenParams): Board {
+	const n = p.n;
+	const w = n - MARGIN;
+	const ox = Math.floor(rng() * (MARGIN + 1));
+	const oy = Math.floor(rng() * (MARGIN + 1));
+
+	const floor: Tile[] = new Array(n * n).fill(VOID);
+	const plate: number[] = [];
+	for (let r = 0; r < w; r++) {
+		for (let c = 0; c < w; c++) {
+			const i = (oy + r) * n + ox + c;
+			floor[i] = PLATE;
+			plate.push(i);
+		}
+	}
+
+	// Holes, but never below two slabs on a line: a lone slab roams the whole grid and the
+	// plate stops reading as one piece.
+	const rowCount = new Array<number>(n).fill(0);
+	const colCount = new Array<number>(n).fill(0);
+	for (let k = 0; k < w; k++) {
+		rowCount[oy + k] = w;
+		colCount[ox + k] = w;
+	}
+	let holes = p.holes;
+	for (const i of shuffled(rng, plate)) {
+		if (holes <= 0) break;
+		const r = Math.floor(i / n);
+		const c = i % n;
+		if (rowCount[r] <= 2 || colCount[c] <= 2) continue;
+		floor[i] = VOID;
+		rowCount[r]--;
+		colCount[c]--;
+		holes--;
+	}
+
+	const free = shuffled(rng, plate.filter((i) => floor[i] === PLATE));
+	let k = 0;
+	floor[free[k++]] = HERO;
+	for (let i = 0; i < p.rowLocks && k < free.length; i++) floor[free[k++]] = LOCK_ROW;
+	for (let i = 0; i < p.colLocks && k < free.length; i++) floor[free[k++]] = LOCK_COL;
+
+	return { n, floor, crystals: new Array<boolean>(n * n).fill(false) };
 }
+
+interface Line {
+	axis: Axis;
+	index: number;
+}
+
+export interface LineMove extends Line {
+	shift: number;
+}
+
+interface Walk {
+	visits: Set<number>;
+	moves: LineMove[];
+}
+
+/** Slide lines at random, favouring the ones under the hero, and collect every cell it crosses. */
+function walkVisits(rng: () => number, start: Board, steps: number): Walk {
+	const seen = new Set<number>();
+	const moves: LineMove[] = [];
+	let b = start;
+	for (let s = 0; s < steps; s++) {
+		const movable = (axis: Axis, index: number): boolean => {
+			const sl = slack(b, axis, index);
+			return sl.min < 0 || sl.max > 0;
+		};
+		const h = heroIndex(b);
+		const own: Line[] = [];
+		if (movable('row', Math.floor(h / b.n))) own.push({ axis: 'row', index: Math.floor(h / b.n) });
+		if (movable('col', h % b.n)) own.push({ axis: 'col', index: h % b.n });
+
+		const all: Line[] = [];
+		for (let i = 0; i < b.n; i++) {
+			if (movable('row', i)) all.push({ axis: 'row', index: i });
+			if (movable('col', i)) all.push({ axis: 'col', index: i });
+		}
+		if (!all.length) break;
+
+		const pool = own.length && rng() < 0.7 ? own : all;
+		const line = pool[Math.floor(rng() * pool.length)];
+		const sl = slack(b, line.axis, line.index);
+		let d = 0;
+		while (d === 0) d = sl.min + Math.floor(rng() * (sl.max - sl.min + 1));
+
+		const r = slide(b, line.axis, line.index, d);
+		for (const i of r.swept) seen.add(i);
+		moves.push({ ...line, shift: d });
+		b = r.board;
+	}
+	return { visits: seen, moves };
+}
+
+/** Pick `want` cells, keeping them apart while candidates allow it. */
+function spread(rng: () => number, cand: number[], want: number, n: number): number[] {
+	const chosen: number[] = [];
+	const pool = shuffled(rng, cand);
+	const far = (a: number, b: number): number =>
+		Math.max(Math.abs(Math.floor(a / n) - Math.floor(b / n)), Math.abs((a % n) - (b % n)));
+	for (const minD of [3, 2, 1]) {
+		for (const c of pool) {
+			if (chosen.length >= want) return chosen;
+			if (chosen.includes(c)) continue;
+			if (chosen.every((o) => far(o, c) >= minD)) chosen.push(c);
+		}
+	}
+	return chosen;
+}
+
+export interface Generated {
+	board: Board;
+	/** The walk the crystals were dropped on: replaying it eats every one of them. */
+	walk: LineMove[];
+}
+
+/** Deterministic in `rng`. Solvable by construction — the crystals sit on a walk the hero can replay. */
+export function generateDetailed(rng: () => number, p: GenParams): Generated {
+	let best: Generated | null = null;
+	let bestCount = -1;
+	for (let t = 0; t < 40; t++) {
+		const base = buildFloor(rng, p);
+		const { visits, moves } = walkVisits(rng, base, 30 + 14 * p.crystals);
+		visits.delete(heroIndex(base)); // a crystal under the hero would fall on the first slide
+		const spots = spread(rng, [...visits], p.crystals, p.n);
+		if (spots.length > bestCount) {
+			const board = cloneBoard(base);
+			for (const i of spots) board.crystals[i] = true;
+			best = { board, walk: moves };
+			bestCount = spots.length;
+		}
+		if (bestCount >= p.crystals) break;
+	}
+	return best as Generated;
+}
+
+export const generate = (rng: () => number, p: GenParams): Board => generateDetailed(rng, p).board;

@@ -183,10 +183,10 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🔊', title: 'Sonar', body: 'Tu as quelques sonars : active le bouton Sonar puis clique une zone — il révèle le nombre de cases-navire dans le carré 3×3. La flotte à couler (tailles des navires) est affichée en haut. Au défi du jour, même flotte pour tous, classement au moins d\'actions.' },
 	],
 	tectonique: [
-		{ emoji: '💎', title: 'Le but', body: 'La cocotte doit avaler tous les cristaux de la grille, en un minimum de coups. Le compteur affiche l\'optimum prouvé : chaque grille est résolvable en ce nombre exact de coups.' },
-		{ emoji: '🕹️', title: 'Pousser le sol', body: 'Glisse sur une ligne ou une colonne : tout ce qui est dessus file jusqu\'au bord et s\'empile, comme au 2048. La cocotte ne bouge que si on pousse SA ligne ou SA colonne — et sur son passage elle avale les 💎 qu\'elle rattrape, jusqu\'à buter sur un bloc. Au clavier, les flèches poussent la ligne de la cocotte.' },
-		{ emoji: '🧱', title: 'Les bloqueurs', body: 'Un bloc ↔ gèle la ligne où il se trouve, un bloc ↕ gèle sa colonne (la ligne gelée est teintée). Pour le déloger, pousse-le dans l\'autre sens : un bloqueur de ligne se déplace en poussant sa colonne.' },
-		{ emoji: '🏆', title: 'Niveaux & défi', body: '100 niveaux de plus en plus retors : 3★ pour l\'optimum, 2★ à deux coups près. Au défi du jour, même grille pour tout le monde, classement au moins de coups (le chrono départage). ↶ annule autant de fois que tu veux.' },
+		{ emoji: '💎', title: 'Le but', body: 'Les cristaux flottent au-dessus du sol et ne bougent jamais. La cocotte, elle, est posée sur la plaque : fais-la passer sur chaque cristal pour tous les avaler, le plus vite possible.' },
+		{ emoji: '🕹️', title: 'Faire glisser le sol', body: 'Attrape une ligne ou une colonne et fais-la glisser : toute la plaque part d\'un bloc, sans se tasser, et continue sur sa lancée quand tu relâches. Elle s\'arrête quand sa dalle extrême bute contre le bord — c\'est le vide autour qui donne le jeu. Au clavier, les flèches décalent la ligne de la cocotte.' },
+		{ emoji: '🧱', title: 'Les bloqueurs', body: 'Un bloc ↔ gèle la ligne où il se trouve, un bloc ↕ gèle sa colonne (la ligne gelée est teintée). Pour le déloger, pousse-le dans l\'autre sens : un bloqueur de ligne se déplace en glissant sa colonne.' },
+		{ emoji: '🏆', title: 'Niveaux & défi', body: '100 niveaux, de 6×6 à 10×10 : les étoiles se gagnent au chrono. Au défi du jour, même grille pour tout le monde, classement au temps. Aucun coup n\'est perdu — tout se rejoue en glissant dans l\'autre sens.' },
 	],
 	codecolor: [
 		{ emoji: '🎨', title: 'Le but', body: 'Un code de couleurs est caché. Devine-le en un minimum d\'essais. Le code n\'a que des couleurs différentes (pas de doublon).' },
