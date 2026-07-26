@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import { formatScore, fmtCentis } from '../../lib/scoreFormat';
+import { formatScore, fmtCentis, encodePacked } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -11,7 +11,8 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { mulberry32 } from '../prng';
-import { useMultiPointerDrag } from '../useMultiPointerDrag';
+import { usePointerDrag } from '../usePointerDrag';
+import { useHoldButton } from '../useHoldButton';
 import { tectoniqueLevels, TECTONIQUE_BANDS } from './levels';
 import {
 	countCrystals,
@@ -19,9 +20,8 @@ import {
 	encodeBoard,
 	generate,
 	heroIndex,
+	heroStuck,
 	isWon,
-	movers,
-	slack,
 	slide,
 	HERO,
 	LOCK_ALL,
@@ -32,48 +32,24 @@ import {
 	VOID,
 	type Axis,
 	type Board,
+	type PieceMove,
 	type Tile,
 } from './engine';
 
 /* =====================================================
    TECTONIQUE — React island.
-   Drag a row or a column of the floor: the crates run that way and pile up against the wall
-   or against a planted rock, coasting on release. The crystals hover in place — ride the
-   hero over them.
+   Push the row or the column the hen stands on, one cell at a time: the floor runs that way,
+   the crates pile up against the wall and the gaps close for good. The crystals hover in
+   place — ride the hen over them, and mind the dead ends.
    ===================================================== */
 
-type Status = 'playing' | 'won';
+type Status = 'playing' | 'won' | 'stuck';
 
 /** One floor piece. `id` stays put across slides so the DOM node is never remounted. */
 interface Sprite {
 	id: number;
 	kind: Tile;
 	idx: number;
-}
-
-/** A line being dragged or coasting. `t` is where the gesture asked it to be, in cells. */
-interface Live {
-	axis: Axis;
-	index: number;
-	t: number;
-	committed: number;
-	raf: number;
-	held: boolean; // a finger is still on it
-	movers: Set<number>; // pieces that still have room, so only they follow the drag
-}
-
-/** One finger. It picks its line only once the gesture commits to an axis. */
-interface Grab {
-	r: number;
-	c: number;
-	x: number;
-	y: number;
-	axis: Axis | null;
-	line: Live | null;
-	base: number;
-	t: number;
-	ms: number;
-	v: number;
 }
 
 const GLYPH: Record<number, string> = { [HERO]: '🐔' };
@@ -89,8 +65,10 @@ const KEY_MOVES: Record<string, [Axis, -1 | 1] | undefined> = {
 	q: ['row', -1], a: ['row', -1], d: ['row', 1], z: ['col', -1], w: ['col', -1], s: ['col', 1],
 };
 
-const AXIS_LOCK_PX = 7; // travel before the gesture commits to a row or a column
-const FLICK_SEC = 0.32; // how long the release speed keeps coasting
+const DRY_HINT = 25; // moves without a crystal before the way out is offered
+const STEP_MS = 130; // how long a line takes to ease into its new cell
+const HOLD_MS = 340; // press-and-hold on the pad before it starts repeating
+const REPEAT_MS = 200;
 
 const lineKey = (axis: Axis, index: number): string => `${axis}:${index}`;
 
@@ -111,6 +89,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [moving, setMoving] = useState<Set<number>>(new Set()); // pieces free to follow the live drag
 	const [shifts, setShifts] = useState<Record<string, number>>({}); // cells a line has travelled since it was dealt
 	const [pops, setPops] = useState<{ id: number; idx: number }[]>([]);
+	const [total, setTotal] = useState(0); // crystals the grid was dealt with
+	const [dry, setDry] = useState(0); // moves since the last crystal, to offer a way out
 	const [status, setStatus] = useState<Status>('playing');
 	const [shaking, setShaking] = useState(false);
 	const [started, setStarted] = useState(false);
@@ -124,17 +104,19 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const freshRef = useRef<Board | null>(null); // the board as generated, for ↻
 	const rootRef = useRef<HTMLDivElement>(null);
 	const elRef = useRef<HTMLDivElement>(null);
-	const livesRef = useRef(new Map<string, Live>());
+	const animRef = useRef(0);
 	const startRef = useRef(0);
-	const winRef = useRef(0);
+	const finalRef = useRef(0); // chrono at the end of the run, win or dead end
 	const seedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const popIdRef = useRef(0);
 	const shakeRef = useRef(0);
 	const lv = useLevels(gameId, tectoniqueLevels);
 
-	const stopAll = useCallback(() => {
-		for (const l of livesRef.current.values()) cancelAnimationFrame(l.raf);
-		livesRef.current.clear();
+	/** Snap a running step home, so the next one starts from the grid. */
+	const settle = useCallback(() => {
+		if (!animRef.current) return;
+		cancelAnimationFrame(animRef.current);
+		animRef.current = 0;
 		setOffsets({});
 		setMoving(new Set());
 	}, []);
@@ -151,7 +133,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	const load = useCallback((fresh: Board, resume?: Board) => {
-		stopAll();
+		settle();
 		freshRef.current = fresh;
 		const b = resume ?? fresh;
 		boardRef.current = b;
@@ -159,8 +141,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setBoard(b);
 		setSprites(spritesOf(b));
 		setPops([]);
+		setDry(0);
+		setTotal(countCrystals(fresh));
 		setStatus(isWon(b) ? 'won' : 'playing');
-	}, [stopAll]);
+	}, [settle]);
 
 	const newFree = useCallback((diff: number) => {
 		setDaily(false);
@@ -211,14 +195,15 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			seedRef.current = { seed: run.seed, diffIndex };
 			const fresh = build(run.seed, diffIndex);
 			const saved = (run.state as { cells?: string } | undefined)?.cells;
+			const resumed = saved ? decodeBoard(fresh.n, saved) : undefined;
 			setDailyLoading(false);
 			setStarted(true);
-			load(fresh, saved ? decodeBoard(fresh.n, saved) : undefined);
+			load(fresh, resumed);
 			if (run.done) {
 				setAlreadyPlayed(true);
-				setStatus('won');
-				winRef.current = run.finalTime ?? 0;
-				setElapsed(winRef.current);
+				setStatus(isWon(resumed ?? fresh) ? 'won' : 'stuck');
+				finalRef.current = run.finalTime ?? 0;
+				setElapsed(finalRef.current);
 			} else {
 				setAlreadyPlayed(false);
 				startRef.current = run.startedAt;
@@ -238,7 +223,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	}, [gameId, load]);
 
 	const gated = (daily || lv.playing) && !started;
-	const locked = gated || status === 'won';
+	const locked = gated || status !== 'playing';
 	const lockedRef = useRef(locked);
 	lockedRef.current = locked;
 
@@ -270,12 +255,19 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Sliding ---------- */
 
-	/** Commit an integer slide and carry the sprites of that line along with it. */
-	const applyStep = useCallback((axis: Axis, index: number, step: number): number => {
+	/** Stop the chrono and close the run, cleared or given up. */
+	const endRun = useCallback((s: Status) => {
+		finalRef.current = Math.round((Date.now() - startRef.current) / 10);
+		setElapsed(finalRef.current);
+		setStatus(s);
+	}, []);
+
+	/** Commit a one-cell slide and carry the sprites of that line along with it. */
+	const applyStep = useCallback((axis: Axis, index: number, dir: -1 | 1): PieceMove[] => {
 		const b = boardRef.current;
-		if (!b) return 0;
-		const r = slide(b, axis, index, step);
-		if (!r.shift) return 0;
+		if (!b) return [];
+		const r = slide(b, axis, index, dir);
+		if (!r.shift) return [];
 
 		boardRef.current = r.board;
 		setBoard(r.board);
@@ -293,164 +285,92 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			const ids = new Set(fresh.map((f) => f.id));
 			setTimeout(() => setPops((p) => p.filter((x) => !ids.has(x.id))), 480);
 		}
-		if (isWon(r.board)) {
-			winRef.current = Math.round((Date.now() - startRef.current) / 10);
-			setElapsed(winRef.current);
-			setStatus('won');
-			trackGame(gameId, 'game_won');
-		}
-		return r.shift;
-	}, [gameId]);
+		setDry((d) => (r.eaten.length ? 0 : d + 1));
 
-	const pushOffsets = useCallback(() => {
-		const o: Record<string, number> = {};
-		const m = new Set<number>();
-		for (const [k, l] of livesRef.current) {
-			o[k] = l.t - l.committed;
-			for (const i of l.movers) m.add(i);
+		if (isWon(r.board)) {
+			endRun('won');
+			trackGame(gameId, 'game_won');
+		} else if (heroStuck(r.board)) {
+			// Rare, but the gaps close for good: a move can nail the hen down for ever.
+			endRun('stuck');
+			trackGame(gameId, 'game_over');
 		}
-		setOffsets(o);
-		setMoving(m);
-	}, []);
+		return r.moves;
+	}, [gameId, endRun]);
 
 	/**
-	 * Move a live line to `next` cells from where its gesture started. Whole cells are
-	 * committed to the engine as they are crossed and the remainder stays visual, so the
-	 * slide reads as continuous while the board itself stays on the grid.
+	 * One tactical move: push the line the hen stands on by a single cell. The board is committed
+	 * first, then the line is drawn back where it came from and eased in — pieces that jammed are
+	 * absent from `moves`, so they simply stay put while the rest of the line runs.
 	 */
-	const setOffset = useCallback((l: Live, next: number) => {
+	const step = useCallback((axis: Axis, dir: -1 | 1) => {
 		const b = boardRef.current;
-		if (!b) return;
-		const s = slack(b, l.axis, l.index);
-		const t = Math.max(l.committed + s.min, Math.min(l.committed + s.max, next));
-		const step = Math.round(t) - l.committed;
-		if (step !== 0) l.committed += applyStep(l.axis, l.index, step);
-		l.t = t;
-		// Pieces pile up, so they no longer share one offset: only those with room ahead follow.
-		const dir = Math.sign(t - l.committed);
-		const after = boardRef.current as Board;
-		l.movers = dir ? new Set(movers(after, l.axis, l.index, dir as 1 | -1)) : new Set();
-		pushOffsets();
-	}, [applyStep, pushOffsets]);
+		if (!b || lockedRef.current) return;
+		settle();
+		const h = heroIndex(b);
+		const index = axis === 'row' ? Math.floor(h / b.n) : h % b.n;
+		const moves = applyStep(axis, index, dir);
+		if (!moves.length) { bump(); return; }
 
-	const drop = useCallback((l: Live) => {
-		cancelAnimationFrame(l.raf);
-		livesRef.current.delete(lineKey(l.axis, l.index));
-		pushOffsets();
-	}, [pushOffsets]);
-
-	/** Ease a line to a whole-cell target, then let go of it. */
-	const glideTo = useCallback((l: Live, target: number) => {
-		const from = l.t;
-		const key = lineKey(l.axis, l.index);
-		const dur = Math.min(900, 180 + Math.abs(target - from) * 130);
+		const key = lineKey(axis, index);
+		setMoving(new Set(moves.map((m) => m.to)));
 		const t0 = performance.now();
 		const frame = (): void => {
-			if (livesRef.current.get(key) !== l) return;
-			const k = Math.min(1, (performance.now() - t0) / dur);
-			setOffset(l, from + (target - from) * (1 - (1 - k) ** 4));
-			if (k < 1) l.raf = requestAnimationFrame(frame);
-			else drop(l);
+			const k = Math.min(1, (performance.now() - t0) / STEP_MS);
+			setOffsets({ [key]: -dir * (1 - k) ** 3 });
+			if (k < 1) animRef.current = requestAnimationFrame(frame);
+			else { animRef.current = 0; setOffsets({}); setMoving(new Set()); }
 		};
-		cancelAnimationFrame(l.raf);
-		l.raf = requestAnimationFrame(frame);
-	}, [setOffset, drop]);
+		animRef.current = requestAnimationFrame(frame);
+	}, [applyStep, bump, settle]);
 
-	/**
-	 * Rows and columns cross each other, so two perpendicular lines can never slide at once.
-	 * Lines still coasting on the other axis are snapped home; a held one wins and the new
-	 * gesture is dropped.
-	 */
-	const claimAxis = useCallback((axis: Axis): boolean => {
-		for (const l of livesRef.current.values()) if (l.axis !== axis && l.held) return false;
-		for (const l of [...livesRef.current.values()]) {
-			if (l.axis === axis) continue;
-			cancelAnimationFrame(l.raf);
-			setOffset(l, Math.round(l.t));
-			livesRef.current.delete(lineKey(l.axis, l.index));
-		}
-		pushOffsets();
-		return true;
-	}, [setOffset, pushOffsets]);
-
-	/** Grab a line, reusing the one already there when a finger lands on a coasting line. */
-	const takeLine = useCallback((axis: Axis, index: number): Live | null => {
-		if (!claimAxis(axis)) return null;
-		const key = lineKey(axis, index);
-		const found = livesRef.current.get(key);
-		if (found) {
-			cancelAnimationFrame(found.raf);
-			found.held = true;
-			return found;
-		}
-		const l: Live = { axis, index, t: 0, committed: 0, raf: 0, held: true, movers: new Set() };
-		livesRef.current.set(key, l);
-		return l;
-	}, [claimAxis]);
+	const stepRef = useRef(step);
+	stepRef.current = step;
 
 	const cellPx = useCallback((): number => {
 		const rect = elRef.current?.getBoundingClientRect();
 		return Math.max(1, (rect?.width ?? 320) / Math.max(1, boardRef.current?.n ?? 1));
 	}, []);
 
-	const { onPointerDown } = useMultiPointerDrag<Grab>({
-		start: (x, y) => {
-			const b = boardRef.current;
-			const rect = elRef.current?.getBoundingClientRect();
-			if (!b || !rect || lockedRef.current) return null;
-			const c = Math.floor(((x - rect.left) / rect.width) * b.n);
-			const r = Math.floor(((y - rect.top) / rect.height) * b.n);
-			if (r < 0 || r >= b.n || c < 0 || c >= b.n) return null;
-			return { r, c, x, y, axis: null, line: null, base: 0, t: 0, ms: performance.now(), v: 0 };
+	/* Swipe on the board: one step per threshold crossed, so a long drag chains them. */
+	const swipeRef = useRef({ x: 0, y: 0, on: false });
+	const swipe = usePointerDrag(
+		(x, y) => { swipeRef.current = { x, y, on: !lockedRef.current }; },
+		(x, y) => {
+			const g = swipeRef.current;
+			if (!g.on) return;
+			const dx = x - g.x;
+			const dy = y - g.y;
+			const need = Math.max(18, cellPx() * 0.6);
+			if (Math.abs(dx) < need && Math.abs(dy) < need) return;
+			const row = Math.abs(dx) >= Math.abs(dy);
+			stepRef.current(row ? 'row' : 'col', (row ? dx : dy) > 0 ? 1 : -1);
+			g.x = x;
+			g.y = y;
 		},
-		move: (d, x, y) => {
-			if (!d.axis) {
-				const dx = x - d.x;
-				const dy = y - d.y;
-				if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
-				d.axis = Math.abs(dx) >= Math.abs(dy) ? 'row' : 'col';
-				d.x = x;
-				d.y = y; // the gesture restarts here, so the line does not jump by the lock distance
-				const index = d.axis === 'row' ? d.r : d.c;
-				const b = boardRef.current;
-				const s = b ? slack(b, d.axis, index) : { min: 0, max: 0 };
-				if (!s.min && !s.max) { bump(); return; }
-				d.line = takeLine(d.axis, index);
-				d.base = d.line?.t ?? 0;
-				d.t = d.base;
-			}
-			if (!d.line) return;
-			const now = performance.now();
-			const t = d.base + (d.axis === 'row' ? x - d.x : y - d.y) / cellPx();
-			const dt = Math.max(8, now - d.ms);
-			d.v = ((t - d.t) / dt) * 1000;
-			d.t = t;
-			d.ms = now;
-			setOffset(d.line, t);
-		},
-		end: (d) => {
-			const l = d.line;
-			if (!l) return;
-			l.held = false;
-			const s = slack(boardRef.current as Board, l.axis, l.index);
-			const coast = Math.round(l.t + d.v * FLICK_SEC);
-			glideTo(l, Math.max(l.committed + s.min, Math.min(l.committed + s.max, coast)));
-		},
-	});
+		() => { swipeRef.current.on = false; },
+	);
 
-	/* Keyboard: the arrows nudge the line the hero stands on by one cell. */
-	const nudgeRef = useRef<(axis: Axis, dir: -1 | 1) => void>(() => {});
-	nudgeRef.current = (axis, dir) => {
-		const b = boardRef.current;
-		if (!b || locked) return;
-		const h = heroIndex(b);
-		const index = axis === 'row' ? Math.floor(h / b.n) : h % b.n;
-		const s = slack(b, axis, index);
-		if (dir > 0 ? !s.max : !s.min) { bump(); return; }
-		const l = takeLine(axis, index);
-		if (!l) return;
-		l.held = false;
-		glideTo(l, Math.round(l.t) + dir);
+	/* Arrow pad: press once, then hold to repeat. */
+	const repeatRef = useRef<{ delay: number; tick: number }>({ delay: 0, tick: 0 });
+	const releasePad = useCallback(() => {
+		window.clearTimeout(repeatRef.current.delay);
+		window.clearInterval(repeatRef.current.tick);
+		repeatRef.current = { delay: 0, tick: 0 };
+	}, []);
+	const holdPad = useCallback((axis: Axis, dir: -1 | 1) => {
+		releasePad();
+		stepRef.current(axis, dir);
+		repeatRef.current.delay = window.setTimeout(() => {
+			repeatRef.current.tick = window.setInterval(() => stepRef.current(axis, dir), REPEAT_MS);
+		}, HOLD_MS);
+	}, [releasePad]);
+
+	const pad = {
+		up: useHoldButton(() => holdPad('col', -1), releasePad),
+		down: useHoldButton(() => holdPad('col', 1), releasePad),
+		left: useHoldButton(() => holdPad('row', -1), releasePad),
+		right: useHoldButton(() => holdPad('row', 1), releasePad),
 	};
 
 	useEffect(() => {
@@ -458,30 +378,30 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			const hit = KEY_MOVES[e.key] ?? KEY_MOVES[e.key.toLowerCase()];
 			if (!hit) return;
 			e.preventDefault();
-			nudgeRef.current(hit[0], hit[1]);
+			stepRef.current(hit[0], hit[1]);
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
 	}, []);
 
-	useEffect(() => stopAll, [stopAll]);
+	useEffect(() => () => { settle(); releasePad(); }, [settle, releasePad]);
 
 	const restart = useCallback(() => {
 		const fresh = freshRef.current;
-		if (!fresh || status === 'won') return;
+		if (!fresh || (daily && status !== 'playing')) return;
 		load(fresh);
-	}, [status, load]);
+	}, [daily, status, load]);
 
-	/* Grade the level once solved. Score = the chrono, in centiseconds. */
+	/* Grade the level once the run ends — a dead end counts as a loss. */
 	useEffect(() => {
-		if (!lv.playing || status !== 'won') return;
-		lv.finish({ won: true, score: winRef.current, raw: { n: board?.n } });
+		if (!lv.playing || status === 'playing') return;
+		lv.finish({ won: status === 'won', score: finalRef.current, raw: { n: board?.n } });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv.playing, status]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won' || !board) return;
+		if (!daily || !started || status !== 'playing' || !board) return;
 		const sd = seedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -492,14 +412,14 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		});
 	}, [daily, started, status, board, gameId]);
 
-	/* Lock the daily attempt on a fresh win. */
+	/* Lock the daily attempt once the run ends, cleared or stranded. */
 	useEffect(() => {
-		if (!daily || status !== 'won' || alreadyPlayed || !board) return;
+		if (!daily || status === 'playing' || alreadyPlayed || !board) return;
 		const sd = seedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: true,
-			finalTime: winRef.current,
+			finalTime: finalRef.current,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
 			state: { cells: encodeBoard(board) },
@@ -541,6 +461,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const left = board ? countCrystals(board) : 0;
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
+	// The daily ranks on crystals first, the chrono only splits ties. Storing what was MISSED
+	// keeps the packed value ascending-is-better, like every other 'time' score.
+	const dailyScore = encodePacked(10_000_000, [left, Math.min(9_999_999, finalRef.current)]);
+
 	return (
 		<div className="tk-root" ref={rootRef} style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
@@ -580,14 +504,25 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 			{!(lv.active && lv.menu) && (
 				<div className="tk-bar">
-					<span className="tk-chip">💎 {left}</span>
+					<span className="tk-chip">💎 {total - left}/{total}</span>
 					<span className="tk-chip">⏱ {fmtCentis(elapsed)}</span>
 					<button
 						className="tk-btn"
 						onClick={daily || lv.playing ? restart : () => newFree(freeDiff)}
-						disabled={status === 'won'}
+						disabled={daily ? status !== 'playing' : status === 'won'}
 						aria-label="Recommencer"
 					>↻</button>
+				</div>
+			)}
+
+			{/* A true dead end is rare — losing the thread is not. After a long dry spell, say so
+			    and give the way out: start over, or bank the crystals when the daily is at stake. */}
+			{status === 'playing' && started && dry >= DRY_HINT && (
+				<div className="tk-hint">
+					Bloqué&nbsp;?
+					{daily
+						? <button className="tk-link" onClick={() => endRun('stuck')}>Terminer l'essai ({total - left} 💎)</button>
+						: <button className="tk-link" onClick={lv.playing ? restart : () => newFree(freeDiff)}>Recommencer</button>}
 				</div>
 			)}
 
@@ -599,7 +534,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 					<div
 						className={`tk-board ${gated ? 'blurred' : ''} ${shaking ? 'shake' : ''}`}
 						ref={elRef}
-						onPointerDown={onPointerDown}
+						onPointerDown={swipe.onPointerDown}
 						role="application"
 						aria-label="Grille de Tectonique"
 					>
@@ -666,8 +601,23 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 							<div className="tk-card">
 								<div className="tk-mark">💎</div>
 								<h2>Plaque nettoyée !</h2>
-								<p className="tk-big">{fmtCentis(winRef.current)}</p>
+								<p className="tk-big">{fmtCentis(finalRef.current)}</p>
 								<button className="tk-start small" onClick={() => newFree(freeDiff)}>Rejouer</button>
+							</div>
+						</div>
+					)}
+
+					{status === 'stuck' && !daily && !lv.active && (
+						<div className="tk-overlay tk-win" role="dialog" aria-label="Grange bloquée">
+							<div className="tk-card">
+								<div className="tk-mark">🪨</div>
+								<h2>Bloqué !</h2>
+								<p className="tk-sub">Plus rien ne peut bouger autour de la cocotte.</p>
+								<p className="tk-big">💎 {total - left}/{total}</p>
+								<div className="tk-row">
+									<button className="tk-start small" onClick={restart}>Recommencer</button>
+									<button className="tk-start small ghost" onClick={() => newFree(freeDiff)}>Autre grange</button>
+								</div>
 							</div>
 						</div>
 					)}
@@ -678,7 +628,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 							lastLevel={tectoniqueLevels.count}
 							won={lv.won}
 							stars={lv.stars}
-							detail={lv.won ? fmtCentis(winRef.current) : undefined}
+							detail={lv.won ? fmtCentis(finalRef.current) : 'Grange bloquée'}
 							onNext={() => startLevel(lv.level + 1)}
 							onReplay={() => startLevel(lv.level)}
 							onMenu={lv.backToMenu}
@@ -687,35 +637,47 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && status === 'won' && (
+			{!(lv.active && lv.menu) && (
+				<div className="tk-dpad" aria-label="Pousser la ligne de la cocotte">
+					<button className="tk-dbtn up" ref={pad.up} aria-label="Pousser vers le haut">▲</button>
+					<button className="tk-dbtn left" ref={pad.left} aria-label="Pousser vers la gauche">◀</button>
+					<button className="tk-dbtn right" ref={pad.right} aria-label="Pousser vers la droite">▶</button>
+					<button className="tk-dbtn down" ref={pad.down} aria-label="Pousser vers le bas">▼</button>
+				</div>
+			)}
+
+			{daily && status !== 'playing' && (
 				<div className="tk-done">
 					{alreadyPlayed
-						? <>Défi du jour déjà relevé · <strong>{fmtCentis(winRef.current)}</strong> — reviens demain&nbsp;!</>
-						: <>🎉 Plaque nettoyée en <strong>{fmtCentis(winRef.current)}</strong></>}
+						? <>Défi du jour déjà relevé · <strong>💎 {total - left}/{total}</strong> en {fmtCentis(finalRef.current)} — reviens demain&nbsp;!</>
+						: status === 'won'
+							? <>🎉 Plaque nettoyée en <strong>{fmtCentis(finalRef.current)}</strong></>
+							: <>🪨 Bloqué avec <strong>💎 {total - left}/{total}</strong> · {fmtCentis(finalRef.current)}</>}
 				</div>
 			)}
 
 			{daily && !dailyLoading && (
 				<Leaderboard
-					game={gameId}
+					game={`${gameId}-t`}
 					metric="time"
-					submitValue={status === 'won' ? winRef.current : undefined}
+					submitValue={status !== 'playing' ? dailyScore : undefined}
 					format={(v) => formatScore(DAILY_LB.tectonique.fmt, v)}
 				/>
 			)}
 
-			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
+			{!daily && !lv.active && (
+				<LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(DAILY_LB.tectonique.fmt, v)} />
+			)}
 
 			<p className="tk-help">
-				Fais glisser une ligne ou une colonne : le sol défile. Seules les caisses glissent dessus, donc
-				elles se tassent contre le mur ou contre ce qui les arrête. Les rochers et le nid, eux, sont
-				posés sur le sol et voyagent exactement avec lui : dès qu'un rocher bute, toute sa ligne
-				s'arrête. Les pieux, plantés à travers le sol, bloquent net leur ligne — leur rainure montre le
-				seul sens où le sol peut encore les emmener, et le pieu boulonné n'en a aucune.
-				À plusieurs doigts, plusieurs lignes (ou
-				plusieurs colonnes) glissent en même temps. Les 💎 flottent au-dessus et ne bougent jamais —
-				c'est le nid de la cocotte 🐔 qui doit leur passer dessus. Les trous se referment : si tu te
-				coinces, ↻ remet la grange à zéro.
+				Seules la ligne et la colonne où se trouve la cocotte 🐔 peuvent bouger, d'une case à la fois :
+				flèches du clavier, pavé ci-dessus, ou petit glissé sur la grille. Le sol défile, mais seules les
+				caisses glissent dessus : elles se tassent contre le mur ou contre ce qui les arrête. Les rochers
+				et le nid sont posés sur le sol et voyagent exactement avec lui — dès qu'un rocher bute, toute sa
+				ligne s'arrête. Les pieux, plantés à travers le sol, bloquent net leur ligne ; leur rainure montre
+				le seul sens où le sol peut encore les emmener, et le pieu boulonné n'en a aucune. Les 💎 flottent
+				au-dessus et ne bougent jamais — c'est le nid qui doit leur passer dessus. Les trous se referment
+				pour de bon : on peut s'enfermer, et là il faut recommencer.
 			</p>
 		</div>
 	);
@@ -755,6 +717,15 @@ const CSS = `
   width: 36px; height: 36px; border-radius: 50%; font-size: 16px; cursor: pointer; line-height: 1;
 }
 .tk-btn:disabled { opacity: 0.35; cursor: default; }
+
+.tk-hint {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;
+  color: var(--gray-300); font-size: 13px; margin: -0.4rem 0 0.9rem;
+}
+.tk-link {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-0);
+  font: inherit; font-size: 13px; border-radius: 999px; padding: 5px 12px; cursor: pointer;
+}
 
 .tk-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; container-type: inline-size; }
 .tk-board {
@@ -895,6 +866,25 @@ const CSS = `
   border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg);
 }
 .tk-start.small { font-size: 15px; padding: 10px 26px; box-shadow: none; margin-top: 12px; }
+.tk-start.ghost { background: transparent; color: var(--gray-100); border: 1.5px solid var(--gray-700); }
+.tk-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* The pad is the whole input on touch, so it stays out in the open under the board. */
+.tk-dpad {
+  margin-top: 0.9rem;
+  display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(2, 46px); gap: 6px;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.tk-dbtn {
+  border: 1.5px solid var(--gray-700); border-radius: 12px; background: var(--gray-900); color: var(--gray-0);
+  font-size: 17px; cursor: pointer; touch-action: none;
+  -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+}
+.tk-dbtn:active { background: var(--tk-accent); color: var(--accent-text-over); border-color: var(--tk-accent); }
+.tk-dbtn.up { grid-area: 1 / 2; }
+.tk-dbtn.left { grid-area: 2 / 1; }
+.tk-dbtn.down { grid-area: 2 / 2; }
+.tk-dbtn.right { grid-area: 2 / 3; }
 
 .tk-done { text-align: center; font-size: 16px; margin: 1rem 0 0; }
 .tk-done strong { color: var(--tk-accent); }

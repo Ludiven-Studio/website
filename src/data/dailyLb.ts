@@ -57,7 +57,6 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	sudoku: { fmt: centis },
 	suguru: { fmt: centis },
 	motifs: { fmt: centis },
-	tectonique: { fmt: centis },
 	// Real-time vs-AI races → time to reach the target (Pong: 3 pts, Foot: 3 goals)
 	pong: { fmt: centis },
 	foot: { fmt: centis },
@@ -87,4 +86,8 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 		lbId: 'reussite-t',
 		fmt: { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'cartes', base: 52 }, { as: 'mmss.cc', div: 100 }] },
 	},
+	// Tectonique: crystals collected first, chrono as tiebreak. The grid size varies, so the
+	// packed count is the crystals MISSED — which keeps ascending-is-better and needs no `base`.
+	// Old plain-centis rows decode as "0 raté", i.e. a full clear, which is what they were.
+	tectonique: { lbId: 'tectonique-t', fmt: packed('ratés') },
 };

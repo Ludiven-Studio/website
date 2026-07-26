@@ -1,4 +1,4 @@
-/* Throwaway: preview Tectonique — plate sliding, mid-drag offset, inertia, then the daily. */
+/* Throwaway: preview Tectonique — one-cell steps by key, pad and swipe, the dead end, the daily. */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -10,7 +10,7 @@ const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd:
 for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 520, height: 900 }, deviceScaleFactor: 3, hasTouch: true });
+const ctx = await browser.newContext({ viewport: { width: 520, height: 980 }, deviceScaleFactor: 3, hasTouch: true });
 await ctx.addInitScript(() => localStorage.setItem('ludiven-tuto-seen', '["tectonique"]'));
 const page = await ctx.newPage();
 page.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE', m.text()); });
@@ -20,83 +20,74 @@ await page.waitForSelector('.tk-board');
 const start = page.locator('.tk-start');
 if (await start.count()) { try { await start.first().click(); } catch {} }
 await sleep(300);
-const shot = (name) => page.locator('.tk-boardwrap').screenshot({ path: resolve(`D:/tmp/tecto-${name}.png`) });
+const shot = (name) => page.locator('.tk-root').screenshot({ path: resolve(`D:/tmp/tecto-${name}.png`) });
 await shot(1);
 
 const heroBox = async () => page.locator('.tk-slab.hero').boundingBox();
+const heroCell = async () => page.locator('.tk-slab.hero').evaluate((el) => el.style.transform);
 
-// Press, move partway, shoot mid-drag, then flick and let the inertia settle.
-const flick = async (dx, dy) => {
-	const box = await heroBox();
-	const x = box.x + box.width / 2;
-	const y = box.y + box.height / 2;
-	await page.mouse.move(x, y);
-	await page.mouse.down();
-	await page.mouse.move(x + dx / 2, y + dy / 2, { steps: 10 });
-	return { x, y, dx, dy };
-};
-const release = async (g) => {
-	await page.mouse.move(g.x + g.dx, g.y + g.dy, { steps: 4 });
-	await page.mouse.up();
-	await sleep(600);
-};
-
-const cell = (await heroBox()).width;
-const g = await flick(cell * 2.5, 0);
-await shot(2); // held mid-slide
-await release(g);
+// Keyboard: one cell per press.
+const before = await heroCell();
+await page.keyboard.press('ArrowRight');
+await sleep(60);
+await shot(2); // caught mid-ease
+await sleep(400);
+console.log('key step:', before, '→', await heroCell());
 await shot(3);
 
-// A column, then a keyboard nudge.
-await release(await flick(0, cell * 2.5));
-await page.keyboard.press('ArrowLeft');
-await sleep(600);
+// Pad: hold to repeat.
+await page.locator('.tk-dbtn.down').dispatchEvent('mousedown');
+await sleep(1100);
+await page.locator('.tk-dbtn.down').dispatchEvent('mouseup');
+await sleep(400);
+console.log('after a 1.1 s hold:', await heroCell());
 await shot(4);
 
-// Two fingers, two rows at once — only CDP can dispatch real multi-touch.
-const cdp = await ctx.newCDPSession(page);
-const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
+// Swipe: one step per threshold crossed, chained along the drag.
+const cell = (await heroBox()).width;
 const box = await page.locator('.tk-board').boundingBox();
-const n = await page.locator('.tk-board').evaluate((el) => Number(getComputedStyle(el).getPropertyValue('--n')));
-// A row is worth grabbing when it holds a piece that is not a row rock and still has a free cell.
-const rows = (await page.$$eval('.tk-slab', (els, size) => {
-	const free = [...Array(size).keys()].map(() => ({ loose: 0, taken: 0 }));
-	for (const e of els) {
-		const m = /translate\(([-\d.]+)%, ([-\d.]+)%\)/.exec(e.style.transform);
-		const r = Math.round(Number(m[2]) / 100);
-		free[r].taken++;
-		if (!e.classList.contains('lockrow')) free[r].loose++;
-	}
-	return free.flatMap((f, r) => (f.loose && f.taken < size ? [r] : []));
-}, n)).slice(0, 2);
-const rowY = (r) => box.y + (r + 0.5) * (box.height / n);
-const pt = (i, x) => ({ x, y: rowY(rows[i]), id: i });
-const x0 = box.x + box.width * 0.5;
-const rowX = async () => page.$$eval('.tk-slab', (els) =>
-	els.map((e) => {
-		const m = /translate\(([-\d.]+)%, ([-\d.]+)%\)/.exec(e.style.transform);
-		return { r: Number(m[2]) / 100, x: Number(m[1]) / 100 };
-	}).reduce((acc, s) => { acc[Math.round(s.r)] = Math.min(acc[Math.round(s.r)] ?? 99, s.x); return acc; }, {}));
-const before = await rowX();
-await touch('touchStart', [pt(0, x0), pt(1, x0)]);
-for (const k of [0.3, 0.6, 1]) await touch('touchMove', [pt(0, x0 + cell * 1.6 * k), pt(1, x0 - cell * 1.6 * k)]);
-await shot(6); // both rows displaced, in opposite directions
-const during = await rowX();
-console.log('rows', rows, 'before', before, 'during', during);
-await touch('touchEnd', [pt(0, x0 + cell * 1.6), pt(1, x0 - cell * 1.6)]);
-await sleep(800);
-await shot(7);
+const x = box.x + box.width / 2;
+const y = box.y + box.height / 2;
+await page.mouse.move(x, y);
+await page.mouse.down();
+await page.mouse.move(x - cell * 2, y, { steps: 12 });
+await page.mouse.up();
+await sleep(400);
+console.log('after a 2-cell swipe:', await heroCell());
+await shot(5);
 
-// Daily (10×10 on the hard band).
+// Random play until the level closes, one way or another.
+const KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+const outcome = page.locator('.tk-card h2, .lo-card h2, [class*="outcome"] h2');
+for (let i = 0; i < 400 && !(await outcome.count()); i++) {
+	await page.keyboard.press(KEYS[Math.floor(Math.random() * 4)]);
+	await sleep(30);
+}
+console.log('level ended with:', await outcome.first().textContent().catch(() => '(still playing)'));
+await sleep(400);
+await shot(6);
+
+// Daily (10×10 on the hard band): a long dry spell must offer the way out.
 await page.locator('.dt-seg', { hasText: 'Défi' }).click();
 await sleep(1500);
 const dStart = page.locator('.tk-start');
 if (await dStart.count()) { try { await dStart.first().click(); } catch {} }
 await sleep(400);
-await shot(5);
-await page.locator('.tk-slab.hero').screenshot({ path: resolve('D:/tmp/tecto-nest.png') });
+await shot(7);
 
-console.log('→ D:/tmp/tecto-1..5.png + tecto-nest.png');
+const hint = page.locator('.tk-hint');
+for (let i = 0; i < 120 && !(await hint.count()); i++) {
+	await page.keyboard.press(KEYS[Math.floor(Math.random() * 4)]);
+	await sleep(28);
+}
+await sleep(300);
+console.log('dry-spell hint:', (await hint.count()) ? await hint.textContent() : '(none)');
+await shot(8);
+if (await page.locator('.tk-link').count()) await page.locator('.tk-link').click();
+await sleep(500);
+await shot(9);
+
+console.log('→ D:/tmp/tecto-1..9.png');
 await browser.close();
 server.kill();
 process.exit(0);

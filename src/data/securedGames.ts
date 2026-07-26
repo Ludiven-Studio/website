@@ -50,9 +50,9 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	symboles: 'time',
 	reines: 'time',
 	drift: 'time',
-	tectonique: 'time',
 	// Packed count+time (logged under `<id>-t`) — value is ascending-is-better already.
 	'golf-t': 'time',
+	'tectonique-t': 'time',
 	'angry-t': 'time',
 	'billard-t': 'time',
 	'flechettes-t': 'time',

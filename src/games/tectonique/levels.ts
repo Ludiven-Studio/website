@@ -1,4 +1,4 @@
-// Tectonique levels plan (1-100). The grid grows 6×6 → 10×10, the crystals and the locks
+// Tectonique levels plan (1-100). The grid grows 6×6 → 10×10, the crystals and the blockers
 // pile up with it. Scoring is the chrono alone, so the stars are time budgets: they scale
 // with the number of crystals to fetch and the size of the plate to shuffle.
 
@@ -26,7 +26,8 @@ export const tectoniqueLevels: LevelPlan<TectoniqueLevelCfg> = {
 		const crystals = Math.min(10, 3 + Math.floor((l - 1) / 13));
 		// A post freezes its whole line, so they stay rare; the rocks carry the difficulty.
 		const locks = Math.min(2, Math.floor((l - 1) / 40));
-		const three = (6 + 5 * crystals + 2 * (n - 6)) * 100;
+		// Budgets from a near-optimal solve (11-23 moves on 6×6, 33-65 on 10×10), at a human pace.
+		const three = (8 + 7 * crystals + 4 * (n - 6)) * 100;
 		return {
 			n,
 			crystals,

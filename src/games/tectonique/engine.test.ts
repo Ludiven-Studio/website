@@ -7,7 +7,9 @@ import {
 	encodeBoard,
 	generate,
 	generateDetailed,
+	heroLines,
 	heroIndex,
+	heroStuck,
 	isWon,
 	movers,
 	slack,
@@ -253,9 +255,25 @@ describe('generate', () => {
 		}
 	});
 
-	it('always leaves some line able to move', () => {
+	it('never deals a board the hero cannot move', () => {
 		for (const p of TECTONIQUE_BANDS) {
-			for (let s = 0; s < 30; s++) expect(movableLines(generate(mulberry32(s), p))).toBeGreaterThan(0);
+			for (let s = 0; s < 30; s++) expect(heroStuck(generate(mulberry32(s), p))).toBe(false);
+		}
+	});
+
+	// The player only ever pushes the hero's own line, one cell at a time. The recorded walk has
+	// to obey that too, or it is not a solution he could ever reproduce.
+	it('records a walk the player could actually play', () => {
+		for (const p of TECTONIQUE_BANDS) {
+			const { board: start, walk } = generateDetailed(mulberry32(77), p);
+			let b = start;
+			for (const m of walk) {
+				expect(Math.abs(m.shift)).toBe(1);
+				expect(heroLines(b).some(([a, i]) => a === m.axis && i === m.index)).toBe(true);
+				const r = slide(b, m.axis, m.index, m.shift);
+				expect(r.shift).toBe(m.shift); // a step the board refused would desync the replay
+				b = r.board;
+			}
 		}
 	});
 
@@ -284,15 +302,4 @@ describe('generate', () => {
 		}
 	});
 });
-
-function movableLines(b: Board): number {
-	let count = 0;
-	for (let i = 0; i < b.n; i++) {
-		for (const axis of ['row', 'col'] as const) {
-			const sl = slack(b, axis, i);
-			if (sl.min < 0 || sl.max > 0) count++;
-		}
-	}
-	return count;
-}
 

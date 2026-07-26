@@ -12,9 +12,10 @@
 //   · a POST is not on the floor at all: it is driven through it into the ground below, so the
 //     floor of the axis it holds cannot budge one cell.
 //
-// Stacking loses the gaps, so a move cannot be undone — the player can strand himself and has
-// ↻ for that. Generation is unaffected: the walk it records IS a solution from the start,
-// which is what lets it skip a solver.
+// The player only ever pushes the two lines the hero stands on, one cell at a time. Stacking
+// loses the gaps, so a move cannot be undone: he can strand himself, and `heroStuck` is how the
+// UI catches it. Generation follows the same rule, so the walk it records IS a player solution
+// from the start — which is what lets it skip a solver.
 
 export const VOID = 0;
 export const PLATE = 1;
@@ -143,6 +144,21 @@ export function movers(b: Board, axis: Axis, index: number, dir: 1 | -1): number
 	const out: number[] = [];
 	for (let p = 0; p < b.n; p++) if (from[p] >= 0 && from[p] !== p) out.push(flatAt(b.n, axis, index, from[p]));
 	return out;
+}
+
+/** The two lines the player may push: the ones the hero stands on. */
+export function heroLines(b: Board): [Axis, number][] {
+	const h = heroIndex(b);
+	return h < 0 ? [] : [['row', Math.floor(h / b.n)], ['col', h % b.n]];
+}
+
+/** Dead end: neither of the hero's lines can budge, so no move is left at all. */
+export function heroStuck(b: Board): boolean {
+	for (const [axis, index] of heroLines(b)) {
+		const s = slack(b, axis, index);
+		if (s.min < 0 || s.max > 0) return false;
+	}
+	return true;
 }
 
 /** Push a line by `shift` cells. Returns the same board when nothing moves. */
@@ -284,37 +300,30 @@ interface Walk {
 	moves: LineMove[];
 }
 
-/** Slide lines at random, favouring the ones under the hero, and collect every cell it crosses. */
+/** Walk the hero the only way the player can — his own line, one cell — and collect what he crosses. */
 function walkVisits(rng: () => number, start: Board, steps: number): Walk {
 	const seen = new Set<number>();
 	const moves: LineMove[] = [];
 	let b = start;
+	seen.add(heroIndex(b));
+	let undo: LineMove | null = null;
 	for (let s = 0; s < steps; s++) {
-		const movable = (axis: Axis, index: number): boolean => {
+		const opts: LineMove[] = [];
+		for (const [axis, index] of heroLines(b)) {
 			const sl = slack(b, axis, index);
-			return sl.min < 0 || sl.max > 0;
-		};
-		const h = heroIndex(b);
-		const own: Line[] = [];
-		if (movable('row', Math.floor(h / b.n))) own.push({ axis: 'row', index: Math.floor(h / b.n) });
-		if (movable('col', h % b.n)) own.push({ axis: 'col', index: h % b.n });
-
-		const all: Line[] = [];
-		for (let i = 0; i < b.n; i++) {
-			if (movable('row', i)) all.push({ axis: 'row', index: i });
-			if (movable('col', i)) all.push({ axis: 'col', index: i });
+			if (sl.min < 0) opts.push({ axis, index, shift: -1 });
+			if (sl.max > 0) opts.push({ axis, index, shift: 1 });
 		}
-		if (!all.length) break;
+		if (!opts.length) break;
+		// Retracing covers no new ground, so take it back only when it is the last way out.
+		const fresh = opts.filter((o) => !undo || o.axis !== undo.axis || o.shift !== undo.shift);
+		const pool = fresh.length ? fresh : opts;
+		const m = pool[Math.floor(rng() * pool.length)];
 
-		const pool = own.length && rng() < 0.7 ? own : all;
-		const line = pool[Math.floor(rng() * pool.length)];
-		const sl = slack(b, line.axis, line.index);
-		let d = 0;
-		while (d === 0) d = sl.min + Math.floor(rng() * (sl.max - sl.min + 1));
-
-		const r = slide(b, line.axis, line.index, d);
+		const r = slide(b, m.axis, m.index, m.shift);
 		for (const i of r.swept) seen.add(i);
-		moves.push({ ...line, shift: d });
+		moves.push(m);
+		undo = { ...m, shift: -m.shift };
 		b = r.board;
 	}
 	return { visits: seen, moves };
@@ -348,7 +357,7 @@ export function generateDetailed(rng: () => number, p: GenParams): Generated {
 	let bestCount = -1;
 	for (let t = 0; t < 40; t++) {
 		const base = buildFloor(rng, p);
-		const { visits, moves } = walkVisits(rng, base, 30 + 14 * p.crystals);
+		const { visits, moves } = walkVisits(rng, base, 60 + 30 * p.crystals);
 		visits.delete(heroIndex(base)); // a crystal under the hero would fall on the first slide
 		const spots = spread(rng, [...visits], p.crystals, p.n);
 		if (spots.length > bestCount) {
