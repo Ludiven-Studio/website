@@ -95,6 +95,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [moves, setMoves] = useState(0); // the score in levels mode: stars compare it to par
 	const [dry, setDry] = useState(0); // moves since the last crystal, to offer a way out
 	const [status, setStatus] = useState<Status>('playing');
+	const [front, setFront] = useState<Axis>('col'); // last pushed axis: its hero belt rides on top
 	const [shaking, setShaking] = useState(false);
 	const [started, setStarted] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
@@ -323,6 +324,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		const index = axis === 'row' ? Math.floor(h / b.n) : h % b.n;
 		const moves = applyStep(axis, index, dir);
 		if (!moves.length) { bump(); return; }
+		setFront(axis);
 
 		const key = lineKey(axis, index);
 		setMoving(new Set(moves.map((m) => m.to)));
@@ -464,6 +466,17 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		return `calc(${(shifts[k] ?? 0) + (offsets[k] ?? 0)} * var(--tk-cell))`;
 	};
 
+	// The hen's two belts, the last pushed one on the very top: the belt you drive passes in front.
+	const heroBelts = [
+		laneR >= 0 && (
+			<div key="hr" className="tk-belt h on" style={{ top: `calc(${(laneR * 100) / n}% + 4px)`, backgroundPositionX: beltPos('row', laneR) }} />
+		),
+		laneC >= 0 && (
+			<div key="hc" className="tk-belt v on" style={{ left: `calc(${(laneC * 100) / n}% + 4px)`, backgroundPositionY: beltPos('col', laneC) }} />
+		),
+	];
+	if (front === 'row') heroBelts.reverse();
+
 	/* A push that cannot move greys its arrow out, so the dead ends read at a glance. */
 	const can = useMemo(() => {
 		if (!board || locked) return { up: false, down: false, left: false, right: false };
@@ -563,12 +576,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						{Array.from({ length: n }, (_, c) => c !== laneC && (
 							<div key={`bc${c}`} className="tk-belt v" style={{ left: `calc(${(c * 100) / n}% + 4px)`, backgroundPositionY: beltPos('col', c) }} />
 						))}
-						{laneR >= 0 && (
-							<div key="hr" className="tk-belt h on" style={{ top: `calc(${(laneR * 100) / n}% + 4px)`, backgroundPositionX: beltPos('row', laneR) }} />
-						)}
-						{laneC >= 0 && (
-							<div key="hc" className="tk-belt v on" style={{ left: `calc(${(laneC * 100) / n}% + 4px)`, backgroundPositionY: beltPos('col', laneC) }} />
-						)}
+						{heroBelts}
 
 						{sprites.map((s) => {
 							const o = offsetOf(s.idx);
