@@ -296,16 +296,17 @@ export interface LineMove extends Line {
 }
 
 interface Walk {
-	visits: Set<number>;
+	/** Cell → step of the walk that first swept it. */
+	visits: Map<number, number>;
 	moves: LineMove[];
 }
 
 /** Walk the hero the only way the player can — his own line, one cell — and collect what he crosses. */
 function walkVisits(rng: () => number, start: Board, steps: number): Walk {
-	const seen = new Set<number>();
+	const seen = new Map<number, number>();
 	const moves: LineMove[] = [];
 	let b = start;
-	seen.add(heroIndex(b));
+	seen.set(heroIndex(b), 0);
 	let undo: LineMove | null = null;
 	for (let s = 0; s < steps; s++) {
 		const opts: LineMove[] = [];
@@ -321,7 +322,7 @@ function walkVisits(rng: () => number, start: Board, steps: number): Walk {
 		const m = pool[Math.floor(rng() * pool.length)];
 
 		const r = slide(b, m.axis, m.index, m.shift);
-		for (const i of r.swept) seen.add(i);
+		for (const i of r.swept) if (!seen.has(i)) seen.set(i, s + 1);
 		moves.push(m);
 		undo = { ...m, shift: -m.shift };
 		b = r.board;
@@ -359,7 +360,11 @@ export function generateDetailed(rng: () => number, p: GenParams): Generated {
 		const base = buildFloor(rng, p);
 		const { visits, moves } = walkVisits(rng, base, 60 + 30 * p.crystals);
 		visits.delete(heroIndex(base)); // a crystal under the hero would fall on the first slide
-		const spots = spread(rng, [...visits], p.crystals, p.n);
+		// Cells swept early come almost for free. Keeping only the late ones forces the player
+		// deep into the irreversible sequence before the first crystal pays out.
+		const order = [...visits.entries()].sort((a, b) => a[1] - b[1]).map(([i]) => i);
+		const late = order.slice(Math.floor(order.length * 0.4));
+		const spots = spread(rng, late, p.crystals, p.n);
 		if (spots.length > bestCount) {
 			const board = cloneBoard(base);
 			for (const i of spots) board.crystals[i] = true;

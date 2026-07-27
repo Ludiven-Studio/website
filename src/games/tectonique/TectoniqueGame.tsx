@@ -22,6 +22,7 @@ import {
 	heroIndex,
 	heroStuck,
 	isWon,
+	slack,
 	slide,
 	HERO,
 	LOCK_ALL,
@@ -90,6 +91,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [shifts, setShifts] = useState<Record<string, number>>({}); // cells a line has travelled since it was dealt
 	const [pops, setPops] = useState<{ id: number; idx: number }[]>([]);
 	const [total, setTotal] = useState(0); // crystals the grid was dealt with
+	const [moves, setMoves] = useState(0); // the score in levels mode: stars compare it to par
 	const [dry, setDry] = useState(0); // moves since the last crystal, to offer a way out
 	const [status, setStatus] = useState<Status>('playing');
 	const [shaking, setShaking] = useState(false);
@@ -106,6 +108,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const elRef = useRef<HTMLDivElement>(null);
 	const animRef = useRef(0);
 	const startRef = useRef(0);
+	const movesRef = useRef(0);
 	const finalRef = useRef(0); // chrono at the end of the run, win or dead end
 	const seedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const popIdRef = useRef(0);
@@ -142,6 +145,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setSprites(spritesOf(b));
 		setPops([]);
 		setDry(0);
+		setMoves(0);
+		movesRef.current = 0;
 		setTotal(countCrystals(fresh));
 		setStatus(isWon(b) ? 'won' : 'playing');
 	}, [settle]);
@@ -286,6 +291,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			setTimeout(() => setPops((p) => p.filter((x) => !ids.has(x.id))), 480);
 		}
 		setDry((d) => (r.eaten.length ? 0 : d + 1));
+		movesRef.current += 1;
+		setMoves(movesRef.current);
 
 		if (isWon(r.board)) {
 			endRun('won');
@@ -395,7 +402,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	/* Grade the level once the run ends — a dead end counts as a loss. */
 	useEffect(() => {
 		if (!lv.playing || status === 'playing') return;
-		lv.finish({ won: status === 'won', score: finalRef.current, raw: { n: board?.n } });
+		lv.finish({ won: status === 'won', score: movesRef.current, raw: { n: board?.n } });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv.playing, status]);
 
@@ -458,6 +465,15 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		return `${(x / (n - 1)) * 100}% ${(y / (n - 1)) * 100}%`;
 	};
 
+	/* A push that cannot move greys its arrow out, so the dead ends read at a glance. */
+	const can = useMemo(() => {
+		if (!board || locked) return { up: false, down: false, left: false, right: false };
+		const h = heroIndex(board);
+		const row = slack(board, 'row', Math.floor(h / board.n));
+		const col = slack(board, 'col', h % board.n);
+		return { up: col.min < 0, down: col.max > 0, left: row.min < 0, right: row.max > 0 };
+	}, [board, locked]);
+
 	const left = board ? countCrystals(board) : 0;
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
@@ -505,6 +521,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			{!(lv.active && lv.menu) && (
 				<div className="tk-bar">
 					<span className="tk-chip">💎 {total - left}/{total}</span>
+					<span className="tk-chip">👣 {moves}</span>
 					<span className="tk-chip">⏱ {fmtCentis(elapsed)}</span>
 					<button
 						className="tk-btn"
@@ -628,7 +645,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 							lastLevel={tectoniqueLevels.count}
 							won={lv.won}
 							stars={lv.stars}
-							detail={lv.won ? fmtCentis(finalRef.current) : 'Grange bloquée'}
+							detail={lv.won ? `${moves} coups` : 'Grange bloquée'}
 							onNext={() => startLevel(lv.level + 1)}
 							onReplay={() => startLevel(lv.level)}
 							onMenu={lv.backToMenu}
@@ -639,10 +656,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 			{!(lv.active && lv.menu) && (
 				<div className="tk-dpad" aria-label="Pousser la ligne de la cocotte">
-					<button className="tk-dbtn up" ref={pad.up} aria-label="Pousser vers le haut">▲</button>
-					<button className="tk-dbtn left" ref={pad.left} aria-label="Pousser vers la gauche">◀</button>
-					<button className="tk-dbtn right" ref={pad.right} aria-label="Pousser vers la droite">▶</button>
-					<button className="tk-dbtn down" ref={pad.down} aria-label="Pousser vers le bas">▼</button>
+					<button className="tk-dbtn up" ref={pad.up} disabled={!can.up} aria-label="Pousser vers le haut">▲</button>
+					<button className="tk-dbtn left" ref={pad.left} disabled={!can.left} aria-label="Pousser vers la gauche">◀</button>
+					<button className="tk-dbtn right" ref={pad.right} disabled={!can.right} aria-label="Pousser vers la droite">▶</button>
+					<button className="tk-dbtn down" ref={pad.down} disabled={!can.down} aria-label="Pousser vers le bas">▼</button>
 				</div>
 			)}
 
@@ -880,7 +897,8 @@ const CSS = `
   font-size: 17px; cursor: pointer; touch-action: none;
   -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
 }
-.tk-dbtn:active { background: var(--tk-accent); color: var(--accent-text-over); border-color: var(--tk-accent); }
+.tk-dbtn:active:not(:disabled) { background: var(--tk-accent); color: var(--accent-text-over); border-color: var(--tk-accent); }
+.tk-dbtn:disabled { opacity: 0.3; cursor: default; }
 .tk-dbtn.up { grid-area: 1 / 2; }
 .tk-dbtn.left { grid-area: 2 / 1; }
 .tk-dbtn.down { grid-area: 2 / 2; }
