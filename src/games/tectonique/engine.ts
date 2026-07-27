@@ -1,16 +1,16 @@
-// Tectonique — the barn floor slides, row by row and column by column.
+// Tectonique — the factory floor is a lattice of conveyor belts, one per row and column.
 //
-// Two layers share the grid. The FLOOR slides, and everything standing on it rides along.
-// The CRYSTALS never move: they hover above the floor, and the only way to eat one is to
-// ride the hero across its cell.
+// Two layers share the grid. The BELTS slide, and the CRYSTALS never move: they hover above,
+// and the only way to eat one is to carry the hero across their cell.
 //
-// What tells the floor pieces apart is whether they can slide ON the floor:
-//   · a CRATE can. Jam it against the wall or another crate and it falls behind the floor,
-//     which is how the crates stack and the gaps close.
-//   · a ROCK and the hero's NEST cannot — they are glued to the floor and travel exactly with
-//     it. So a rock that butts into something caps the slide of its whole line.
-//   · a POST is not on the floor at all: it is driven through it into the ground below, so the
-//     floor of the axis it holds cannot budge one cell.
+// What tells the pieces apart is how they sit on the belt:
+//   · a CRATE and the HERO slide on it. Jammed against the wall or the piece ahead, they fall
+//     behind while the belt runs on — that is how the crates stack, how the gaps close, and
+//     why the belt still scrolls under a blocked hero.
+//   · a BLOCK is bolted to its belt and travels exactly with it. So a block that butts into
+//     something caps the slide of its whole line.
+//   · a POST is not on the belt at all: it is driven through it into the ground below, so the
+//     belt of the axis it holds cannot budge one cell.
 //
 // The player only ever pushes the two lines the hero stands on, one cell at a time. Stacking
 // loses the gaps, so a move cannot be undone: he can strand himself, and `heroStuck` is how the
@@ -69,8 +69,8 @@ export const flatAt = (n: number, axis: Axis, index: number, i: number): number 
 export const holds = (t: Tile, axis: Axis): boolean =>
 	t === LOCK_ALL || (axis === 'row' ? t === LOCK_ROW : t === LOCK_COL);
 
-/** Only crates slide on the floor. Everything else is glued to it and travels exactly with it. */
-const glued = (t: Tile): boolean => t !== VOID && t !== PLATE;
+/** Crates and the hero slide on the belt. The rest is bolted to it and travels exactly with it. */
+const glued = (t: Tile): boolean => t !== VOID && t !== PLATE && t !== HERO;
 
 const lineOf = (b: Board, axis: Axis, index: number): Tile[] => {
 	const line: Tile[] = [];
@@ -318,7 +318,12 @@ function walkVisits(rng: () => number, start: Board, steps: number): Walk {
 		if (!opts.length) break;
 		// Retracing covers no new ground, so take it back only when it is the last way out.
 		const fresh = opts.filter((o) => !undo || o.axis !== undo.axis || o.shift !== undo.shift);
-		const pool = fresh.length ? fresh : opts;
+		let pool = fresh.length ? fresh : opts;
+		// A push can scroll the belt under a jammed hero and sweep nothing. Fine for the player,
+		// wasted here: prefer the pushes that actually carry him somewhere.
+		const h = heroIndex(b);
+		const riding = pool.filter((o) => movers(b, o.axis, o.index, o.shift > 0 ? 1 : -1).includes(h));
+		if (riding.length) pool = riding;
 		const m = pool[Math.floor(rng() * pool.length)];
 
 		const r = slide(b, m.axis, m.index, m.shift);

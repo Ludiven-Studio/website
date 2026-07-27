@@ -238,7 +238,7 @@ export const games: GameTile[] = [
 	{
 		id: 'tectonique',
 		title: 'Tectonique',
-		pitch: 'Aux flèches, pousse d\'une case la ligne ou la colonne où se trouve la cocotte : le sol défile, les caisses se tassent contre le mur et les trous se referment pour de bon. Les rochers voyagent avec le sol et arrêtent toute la ligne dès qu\'ils butent, les pieux la bloquent net — et si tu t\'enfermes, la partie s\'arrête. Promène le nid sur les cristaux. 100 niveaux et un défi du jour.',
+		pitch: 'Aux flèches, pousse d\'une case la ligne ou la colonne où se trouve la cocotte : les tapis roulants défilent, la cocotte et les bacs en plastique se tassent contre le mur et les trous se referment pour de bon. Les caisses en fer voyagent avec le tapis et arrêtent toute la ligne dès qu\'elles butent, les plots la bloquent net — et si tu t\'enfermes, la partie s\'arrête. Promène la cocotte sur les cristaux. 100 niveaux et un défi du jour.',
 		icon: 'tectonique',
 		href: '/jeux/tectonique',
 		status: 'play',

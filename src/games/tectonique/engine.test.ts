@@ -149,6 +149,20 @@ describe('slide', () => {
 		expect(slide(b, 'row', 0, -2).eaten.slice().sort()).toEqual([1, 2]);
 	});
 
+	it('scrolls the belt under a jammed hero', () => {
+		const r = slide(board(['H..#', '....', '....', '....']), 'row', 0, -1);
+		expect(show(r.board)[0]).toBe('H.#.');
+		expect(r.shift).toBe(-1);
+		expect(r.moves).toEqual([{ from: 3, to: 2 }]); // the hero stayed on the wall
+	});
+
+	it('no longer lets the hero cap the line — he falls behind like a crate', () => {
+		const r = slide(board(['#.H.', '....', '....', '....']), 'row', 0, 3);
+		expect(show(r.board)[0]).toBe('..#H');
+		expect(r.shift).toBe(2);
+		expect(r.moves).toEqual([{ from: 0, to: 2 }, { from: 2, to: 3 }]);
+	});
+
 	it('takes a nudge back while nothing jams', () => {
 		const b = board(['.H#.', '..#.', '....', '....']);
 		const there = slide(b, 'row', 0, 1).board;

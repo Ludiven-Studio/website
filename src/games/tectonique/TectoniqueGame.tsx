@@ -39,9 +39,9 @@ import {
 
 /* =====================================================
    TECTONIQUE — React island.
-   Push the row or the column the hen stands on, one cell at a time: the floor runs that way,
-   the crates pile up against the wall and the gaps close for good. The crystals hover in
-   place — ride the hen over them, and mind the dead ends.
+   The floor is a lattice of conveyor belts. Push the hen's row or column, one cell at a
+   time: the belt runs that way, the hen and the bins slide on it and jam against the
+   wall. The crystals hover in place — ride the hen over them, and mind the dead ends.
    ===================================================== */
 
 type Status = 'playing' | 'won' | 'stuck';
@@ -74,10 +74,11 @@ const REPEAT_MS = 200;
 const lineKey = (axis: Axis, index: number): string => `${axis}:${index}`;
 
 const ART: [string, string][] = [
-	['ground.jpg', '--tk-ground'],
-	['crate.jpg', '--tk-crate'],
-	['rock.png', '--tk-rock'],
-	['nest.png', '--tk-nest'],
+	['belt.jpg', '--tk-belt'],
+	['belt-v.jpg', '--tk-beltv'],
+	['bin.jpg', '--tk-bin'],
+	['metal.jpg', '--tk-metal'],
+	['hen.png', '--tk-hen'],
 ];
 
 const spritesOf = (b: Board): Sprite[] =>
@@ -130,7 +131,11 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		for (const [file, prop] of ART) {
 			const url = `/assets/jeux/tectonique/${file}`;
 			const img = new Image();
-			img.onload = () => rootRef.current?.style.setProperty(prop, `url(${url})`);
+			img.onload = () => {
+				rootRef.current?.style.setProperty(prop, `url(${url})`);
+				// Marker class, so the CSS can drop a fallback (the hero emoji) once its art is in.
+				rootRef.current?.classList.add(`art-${file.split('.')[0]}`);
+			};
 			img.src = url;
 		}
 	}, []);
@@ -440,7 +445,9 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 	const gems = useMemo(() => (board ? board.crystals.flatMap((c, i) => (c ? [i] : [])) : []), [board]);
 
-	const cells = useMemo(() => [...Array(n * n).keys()], [n]);
+	// The hen's two belts render on top of the crossing ones, with their end drums lit.
+	const laneR = board ? Math.floor(heroIndex(board) / n) : -1;
+	const laneC = board ? heroIndex(board) % n : -1;
 
 	/** A piece jammed against the wall or a rock stays put while the rest of its line runs on. */
 	const offsetOf = (idx: number): { x: number; y: number } => {
@@ -451,18 +458,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		};
 	};
 
-	/**
-	 * The ground is no backdrop: every cell is a window on the straw, scrolled by all its row
-	 * and its column have travelled. Cells of the same band stay continuous, and the floor
-	 * tears between two bands — that is what makes the slide readable.
-	 * The texture is laid out `n` cells wide, so a position of p% lands on cell p·(n−1)/100.
-	 */
-	const groundPos = (idx: number): string => {
-		const rk = lineKey('row', Math.floor(idx / n));
-		const ck = lineKey('col', idx % n);
-		const x = (idx % n) - (shifts[rk] ?? 0) - (offsets[rk] ?? 0);
-		const y = Math.floor(idx / n) - (shifts[ck] ?? 0) - (offsets[ck] ?? 0);
-		return `${(x / (n - 1)) * 100}% ${(y / (n - 1)) * 100}%`;
+	/** The belt surface travels with its line: one cell of texture per cell of shift. */
+	const beltPos = (axis: Axis, index: number): string => {
+		const k = lineKey(axis, index);
+		return `calc(${(shifts[k] ?? 0) + (offsets[k] ?? 0)} * var(--tk-cell))`;
 	};
 
 	/* A push that cannot move greys its arrow out, so the dead ends read at a glance. */
@@ -555,17 +554,21 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						role="application"
 						aria-label="Grille de Tectonique"
 					>
-						{cells.map((i) => (
-							<div
-								key={`f${i}`}
-								className="tk-floor"
-								style={{
-									transform: `translate(${(i % n) * 100}%, ${Math.floor(i / n) * 100}%)`,
-									backgroundPosition: groundPos(i),
-								}}
-							/>
+						{/* One physical band per lane. Draw order does the crossing: plain rows, grid
+						    ticks, plain columns, then the hen's two belts ride over everything. */}
+						{Array.from({ length: n }, (_, r) => r !== laneR && (
+							<div key={`br${r}`} className="tk-belt h" style={{ top: `calc(${(r * 100) / n}% + 4px)`, backgroundPositionX: beltPos('row', r) }} />
 						))}
 						<div className="tk-grid" />
+						{Array.from({ length: n }, (_, c) => c !== laneC && (
+							<div key={`bc${c}`} className="tk-belt v" style={{ left: `calc(${(c * 100) / n}% + 4px)`, backgroundPositionY: beltPos('col', c) }} />
+						))}
+						{laneR >= 0 && (
+							<div key="hr" className="tk-belt h on" style={{ top: `calc(${(laneR * 100) / n}% + 4px)`, backgroundPositionX: beltPos('row', laneR) }} />
+						)}
+						{laneC >= 0 && (
+							<div key="hc" className="tk-belt v on" style={{ left: `calc(${(laneC * 100) / n}% + 4px)`, backgroundPositionY: beltPos('col', laneC) }} />
+						)}
 
 						{sprites.map((s) => {
 							const o = offsetOf(s.idx);
@@ -601,6 +604,21 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						))}
 					</div>
 
+					{/* End drums in the gutter: every belt wraps around one, the hen's two light up. */}
+					{n > 0 && (
+						<div className="tk-rollers" aria-hidden="true">
+							{Array.from({ length: n }, (_, i) => {
+								const at = `calc(${(i * 100) / n}% + 5px)`;
+								return [
+									<div key={`ra${i}`} className={`tk-roller v${i === laneR ? ' on' : ''}`} style={{ top: at, left: -13 }} />,
+									<div key={`rb${i}`} className={`tk-roller v${i === laneR ? ' on' : ''}`} style={{ top: at, right: -13 }} />,
+									<div key={`rc${i}`} className={`tk-roller h${i === laneC ? ' on' : ''}`} style={{ left: at, top: -13 }} />,
+									<div key={`rd${i}`} className={`tk-roller h${i === laneC ? ' on' : ''}`} style={{ left: at, bottom: -13 }} />,
+								];
+							})}
+						</div>
+					)}
+
 					{daily && dailyLoading && (
 						<div className="tk-overlay"><div className="tk-card"><p className="tk-sub">Préparation…</p></div></div>
 					)}
@@ -617,7 +635,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						<div className="tk-overlay tk-win" role="dialog" aria-label="Grille résolue">
 							<div className="tk-card">
 								<div className="tk-mark">💎</div>
-								<h2>Plaque nettoyée !</h2>
+								<h2>Tapis nettoyés !</h2>
 								<p className="tk-big">{fmtCentis(finalRef.current)}</p>
 								<button className="tk-start small" onClick={() => newFree(freeDiff)}>Rejouer</button>
 							</div>
@@ -625,15 +643,15 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 					)}
 
 					{status === 'stuck' && !daily && !lv.active && (
-						<div className="tk-overlay tk-win" role="dialog" aria-label="Grange bloquée">
+						<div className="tk-overlay tk-win" role="dialog" aria-label="Usine bloquée">
 							<div className="tk-card">
-								<div className="tk-mark">🪨</div>
+								<div className="tk-mark">⚙️</div>
 								<h2>Bloqué !</h2>
 								<p className="tk-sub">Plus rien ne peut bouger autour de la cocotte.</p>
 								<p className="tk-big">💎 {total - left}/{total}</p>
 								<div className="tk-row">
 									<button className="tk-start small" onClick={restart}>Recommencer</button>
-									<button className="tk-start small ghost" onClick={() => newFree(freeDiff)}>Autre grange</button>
+									<button className="tk-start small ghost" onClick={() => newFree(freeDiff)}>Autre usine</button>
 								</div>
 							</div>
 						</div>
@@ -645,7 +663,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 							lastLevel={tectoniqueLevels.count}
 							won={lv.won}
 							stars={lv.stars}
-							detail={lv.won ? `${moves} coups` : 'Grange bloquée'}
+							detail={lv.won ? `${moves} coups` : 'Usine bloquée'}
 							onNext={() => startLevel(lv.level + 1)}
 							onReplay={() => startLevel(lv.level)}
 							onMenu={lv.backToMenu}
@@ -668,8 +686,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 					{alreadyPlayed
 						? <>Défi du jour déjà relevé · <strong>💎 {total - left}/{total}</strong> en {fmtCentis(finalRef.current)} — reviens demain&nbsp;!</>
 						: status === 'won'
-							? <>🎉 Plaque nettoyée en <strong>{fmtCentis(finalRef.current)}</strong></>
-							: <>🪨 Bloqué avec <strong>💎 {total - left}/{total}</strong> · {fmtCentis(finalRef.current)}</>}
+							? <>🎉 Tapis nettoyés en <strong>{fmtCentis(finalRef.current)}</strong></>
+							: <>⚙️ Bloqué avec <strong>💎 {total - left}/{total}</strong> · {fmtCentis(finalRef.current)}</>}
 				</div>
 			)}
 
@@ -688,13 +706,15 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 			<p className="tk-help">
 				Seules la ligne et la colonne où se trouve la cocotte 🐔 peuvent bouger, d'une case à la fois :
-				flèches du clavier, pavé ci-dessus, ou petit glissé sur la grille. Le sol défile, mais seules les
-				caisses glissent dessus : elles se tassent contre le mur ou contre ce qui les arrête. Les rochers
-				et le nid sont posés sur le sol et voyagent exactement avec lui — dès qu'un rocher bute, toute sa
-				ligne s'arrête. Les pieux, plantés à travers le sol, bloquent net leur ligne ; leur rainure montre
-				le seul sens où le sol peut encore les emmener, et le pieu boulonné n'en a aucune. Les 💎 flottent
-				au-dessus et ne bougent jamais — c'est le nid qui doit leur passer dessus. Les trous se referment
-				pour de bon : on peut s'enfermer, et là il faut recommencer.
+				flèches du clavier, pavé ci-dessus, ou petit glissé sur la grille. Le sol est un quadrillage de
+				tapis roulants : la cocotte et les bacs en plastique glissent dessus et se tassent contre le mur
+				ou contre ce qui les arrête — le tapis, lui, continue de tourner dessous. Les caisses en fer,
+				pleines de pièces lourdes, sont boulonnées au tapis et voyagent exactement avec lui : dès
+				qu'une caisse bute, toute sa ligne s'arrête. Les
+				plots, vissés à travers le tapis, bloquent net leur ligne ; leur rainure montre le seul sens où le
+				tapis peut encore les emmener, et le plot boulonné n'en a aucune. Les 💎 flottent au-dessus et ne
+				bougent jamais — c'est la cocotte qui doit leur passer dessus. Les trous se referment pour de
+				bon : on peut s'enfermer, et là il faut recommencer.
 			</p>
 		</div>
 	);
@@ -744,36 +764,70 @@ const CSS = `
   font: inherit; font-size: 13px; border-radius: 999px; padding: 5px 12px; cursor: pointer;
 }
 
-.tk-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; container-type: inline-size; }
+/* The gutter around the board holds the belt end drums. */
+.tk-boardwrap { position: relative; width: 100%; max-width: 448px; margin-inline: auto; container-type: inline-size; padding: 14px; box-sizing: border-box; }
 .tk-board {
   position: relative;
   width: 100%; aspect-ratio: 1 / 1;
   border: 2.5px solid var(--gray-100);
   border-radius: 14px;
   overflow: hidden;
-  background: linear-gradient(160deg, #3a2c1c, #221a10);
+  background: linear-gradient(160deg, #23262b, #121417);
   touch-action: none;
   user-select: none;
   cursor: grab;
 }
 
-/* The barn floor, one window per cell. It is the only textured layer — the crates and the
-   rocks are objects standing on it. Sized n cells wide and repeated, so a band can scroll
-   for ever without ever running out of straw. */
-.tk-floor {
-  position: absolute; top: 0; left: 0;
-  width: calc(100% / var(--n)); height: calc(100% / var(--n));
-  background-image: var(--tk-ground, none);
-  background-size: calc(var(--n) * 100%) calc(var(--n) * 100%);
-  pointer-events: none;
+/* One physical band per lane, edge rails shaded in. The texture is one cell of belt,
+   repeated along the run, and background-position carries it exactly with its line —
+   so the slats really travel. The rotated copy serves the columns. */
+.tk-belt {
+  position: absolute; top: 0; left: 0; pointer-events: none;
+  will-change: background-position;
 }
+/* Each band sits 4px inside its lane: the gaps let the crossing bands show through. */
+.tk-belt.h {
+  width: 100%; height: calc(100% / var(--n) - 8px);
+  background-image: var(--tk-belt, linear-gradient(90deg, #2c3035, #24272b));
+  background-size: var(--tk-cell) 100%;
+  box-shadow:
+    inset 0 4px 5px -3px rgba(255, 255, 255, 0.16),
+    inset 0 -5px 6px -3px rgba(0, 0, 0, 0.9);
+}
+.tk-belt.v {
+  height: 100%; width: calc(100% / var(--n) - 8px);
+  background-image: var(--tk-beltv, linear-gradient(0deg, #2c3035, #24272b));
+  background-size: 100% var(--tk-cell);
+  box-shadow:
+    inset 4px 0 5px -3px rgba(255, 255, 255, 0.16),
+    inset -5px 0 6px -3px rgba(0, 0, 0, 0.9);
+}
+/* The hen's two belts pass in front: brighter, and casting on the lanes they cross. */
+.tk-belt.on { filter: brightness(1.22); }
+.tk-belt.h.on { box-shadow: 0 0 12px 3px rgba(0, 0, 0, 0.6), inset 0 4px 5px -3px rgba(255, 255, 255, 0.2), inset 0 -5px 6px -3px rgba(0, 0, 0, 0.9); }
+.tk-belt.v.on { box-shadow: 0 0 12px 3px rgba(0, 0, 0, 0.6), inset 4px 0 5px -3px rgba(255, 255, 255, 0.2), inset -5px 0 6px -3px rgba(0, 0, 0, 0.9); }
+
+/* Faint cell ticks, under the crossing columns. */
 .tk-grid {
   position: absolute; inset: 0; pointer-events: none;
   background-image:
-    linear-gradient(90deg, rgba(0,0,0,0.22) 0 1px, transparent 1px),
-    linear-gradient(180deg, rgba(0,0,0,0.22) 0 1px, transparent 1px);
+    linear-gradient(90deg, rgba(0,0,0,0.35) 0 2px, transparent 2px),
+    linear-gradient(180deg, rgba(0,0,0,0.35) 0 2px, transparent 2px);
   background-size: calc(100% / var(--n)) 100%, 100% calc(100% / var(--n));
 }
+
+/* End drums: one per lane in the gutter, dim until the hen's belt runs over them. */
+.tk-rollers { position: absolute; inset: 14px; pointer-events: none; }
+.tk-roller { position: absolute; border-radius: 6px; opacity: 0.45; }
+.tk-roller.v {
+  width: 10px; height: calc(100% / var(--n) - 10px);
+  background: linear-gradient(90deg, #565c63, #1e2226 45%, #565c63);
+}
+.tk-roller.h {
+  height: 10px; width: calc(100% / var(--n) - 10px);
+  background: linear-gradient(180deg, #565c63, #1e2226 45%, #565c63);
+}
+.tk-roller.on { opacity: 1; box-shadow: 0 0 6px rgba(0, 0, 0, 0.7), inset 0 0 0 1px #7d848c; }
 
 .tk-slab {
   position: absolute; top: 0; left: 0;
@@ -783,39 +837,34 @@ const CSS = `
   pointer-events: none;
   will-change: transform;
 }
-/* The crate is square and fills its cell. The rock and the nest keep their alpha, so the
-   floor shows around them and they read as objects put down on it. */
+/* Both crates are square and fill their cell: a plastic bin that slides, an iron one bolted. */
 .tk-face {
   position: relative;
   width: 100%; height: 100%;
-  border-radius: 16%;
+  border-radius: 12%;
   display: flex; align-items: center; justify-content: center;
-  background: var(--tk-crate, none) center / 100% 100% no-repeat, linear-gradient(180deg, #a9743a, #6d4620);
+  background: var(--tk-bin, none) center / 100% 100% no-repeat, linear-gradient(180deg, #7fd4cf, #4aa8a2);
   box-shadow: 0 3px 5px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(0, 0, 0, 0.3);
 }
 .tk-slab span { position: relative; font-size: calc(var(--tk-cell) * 0.56); line-height: 1; }
 
-/* The hen never rides a crate: she sits on her nest, which rides the floor like a rock does. */
+/* The hen stands right on the belt, nothing under her: she slides like a bin does.
+   The robo-hen sprite replaces the emoji as soon as it loads. */
 .tk-slab.hero .tk-face {
-  background:
-    var(--tk-nest, none) center / 100% 100% no-repeat,
-    radial-gradient(circle, rgba(90, 62, 20, 0.85) 0 40%, rgba(0, 0, 0, 0.35) 46%, transparent 50%);
+  background: var(--tk-hen, none) center / 94% 94% no-repeat;
   box-shadow: none;
-  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.65));
 }
-.tk-slab.hero span { font-size: calc(var(--tk-cell) * 0.62); filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55)); }
+.tk-slab.hero span { font-size: calc(var(--tk-cell) * 0.78); filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.65)); }
+.tk-root.art-hen .tk-slab.hero span { visibility: hidden; }
 
-/* A rock is only set down on the floor: it rides along with it, but never slides across it. */
+/* The iron crate is bolted to the belt: it travels exactly with it, and caps its line. */
 .tk-slab.rock .tk-face {
-  background:
-    var(--tk-rock, none) center / 100% 100% no-repeat,
-    radial-gradient(circle at 42% 36%, #9a9a92 0 34%, #5c5c54 62%, transparent 66%);
-  box-shadow: none;
-  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.55));
+  background: var(--tk-metal, none) center / 100% 100% no-repeat, linear-gradient(180deg, #565c63, #2c3136);
 }
 
-/* A post is driven through the floor into the ground below, so the line it holds cannot budge.
-   Its slot is the one axis the floor can still carry it along — the bolted one gets none. */
+/* A post is driven through the belt into the frame below, so the line it holds cannot budge.
+   Its slot is the one axis the belt can still carry it along — the bolted one gets none. */
 .tk-slab.lockrow .tk-face, .tk-slab.lockcol .tk-face, .tk-slab.lockall .tk-face {
   background: none;
   box-shadow: none;

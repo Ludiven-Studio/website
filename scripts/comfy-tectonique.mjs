@@ -1,14 +1,15 @@
 /*
  * Tectonique assets via ComfyUI (SDXL Turbo) → public/assets/jeux/tectonique/
- *   - ground.jpg : the barn floor, tiled under everything. Only the ground is textured.
- *   - crate.jpg  : a sliding crate (the plate slabs)
- *   - rock.png   : a blocker — one boulder per cell, it stops a line
- *   - nest.png   : the hen's nest, a boulder-like object that rides the floor
- * The crate is square and fills its cell, so it needs no alpha. The rock and the nest are
- * round: they keep an alpha and the floor shows around them.
+ * Factory theme: the floor is a lattice of conveyor belts.
+ *   - belt.jpg  : smooth dark rubber belt with a fine grain, airport style. Tiled per lane.
+ *   - bin.jpg   : a sliding translucent plastic bin, loose parts inside (the plate slabs)
+ *   - metal.jpg : a heavy riveted iron box full of metal parts — bolted, it caps its line
+ *   - hen.png   : the hero, a half-hen half-robot mascot right on the belt
+ * The bin and the metal box are square and fill their cell, so they need no alpha. The hen
+ * keeps an alpha and the belt shows around her. The posts stay pure CSS (slot + hex nut).
  * Fixed seeds so the shipped assets are reproducible.
  *
- * Usage: node scripts/comfy-tectonique.mjs [--preview] [ground|crate|rock|nest]
+ * Usage: node scripts/comfy-tectonique.mjs [--preview] [belt|bin|metal|hen]
  */
 import { resolve } from 'node:path';
 import { readFile, mkdir, access } from 'node:fs/promises';
@@ -18,7 +19,7 @@ import { submit, waitForImages, download } from './comfy-gen.mjs';
 const preview = process.argv.includes('--preview');
 const OUT = preview ? resolve('D:/tmp/comfy/tectonique') : resolve('public/assets/jeux/tectonique');
 await mkdir(OUT, { recursive: true });
-const ONLY = process.argv.filter((a) => ['ground', 'crate', 'rock', 'nest'].includes(a));
+const ONLY = process.argv.filter((a) => ['belt', 'bin', 'metal', 'hen'].includes(a));
 const want = (n) => ONLY.length === 0 || ONLY.includes(n);
 const NEG = 'text, watermark, perspective, side view, horizon, vignette, frame, border, strong shadows, blurry, photo';
 
@@ -35,7 +36,7 @@ async function gen(job) {
 	return readFile(tmp);
 }
 
-// Round objects sit on the floor, so they need an alpha. The model paints them isolated on a
+// Round objects sit on the belt, so they need an alpha. The model paints them isolated on a
 // flat backdrop, which keys out by luminance with a soft ramp — cleaner than a green screen.
 // `dark` cuts a near-black backdrop away, otherwise a near-white one.
 async function cutout(img, { lo, hi, dark }, file) {
@@ -48,65 +49,75 @@ async function cutout(img, { lo, hi, dark }, file) {
 		data[i + 3] = Math.round((dark ? t : 1 - t) * 255);
 	}
 	await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
-		.png({ palette: true, quality: 84 }) // 800 kB of flat cartoon shading down to ~90 kB
+		.png({ palette: true, quality: 84 })
 		.toFile(resolve(OUT, file));
 	console.log('✓', file);
 }
 
-if (want('ground')) {
+if (want('belt')) {
 	const img = await gen({
-		id: 'ground',
-		prompt: 'seamless tileable top-down barn floor texture, packed dry earth, scattered straw and hay wisps, warm brown soil, a few small pebbles, flat even lighting, stylized game texture, no seams',
-		negative: `${NEG}, object, crate, box, animal, grass, plant, path`,
+		id: 'belt3',
+		prompt: 'seamless tileable texture of plain dark grey rubber sheet, uniform matte surface with a fine speckled noise grain, flat even color everywhere, no pattern, flat even lighting, stylized game texture',
+		negative: `${NEG}, lines, stripes, ridges, grooves, slats, bands, seams, grid, mesh, weave, crosshatch, leather, quilted, padded, buttons, stitching, studs, object, box, rollers, machine, floor tiles, wood, bright, colorful`,
 		w: 512,
 		h: 512,
 		steps: 7,
-		seed: 118203,
+		seed: 815533,
 	});
-	// Kept dark: the crates, the nest and the crystals all have to pop against it.
-	await sharp(img).modulate({ saturation: 0.7, brightness: 0.55 }).jpeg({ quality: 86 }).toFile(resolve(OUT, 'ground.jpg'));
-	console.log('✓ ground.jpg');
+	// Kept dark: the bins, the hen and the crystals all have to pop against it.
+	// The rows and the columns are separate strips now, so the columns get a rotated copy.
+	await sharp(img).modulate({ saturation: 0.5, brightness: 0.62 }).jpeg({ quality: 86 }).toFile(resolve(OUT, 'belt.jpg'));
+	await sharp(img).modulate({ saturation: 0.5, brightness: 0.62 }).rotate(90).jpeg({ quality: 86 }).toFile(resolve(OUT, 'belt-v.jpg'));
+	console.log('✓ belt.jpg + belt-v.jpg');
 }
 
-if (want('crate')) {
+if (want('bin')) {
 	const img = await gen({
-		id: 'crate',
-		prompt: 'top-down view of a single wooden crate seen from directly above, square wooden box, planks with visible grain, metal corner brackets, warm honey brown wood, the crate fills the whole frame edge to edge, flat vector game art, bold clean shapes, flat even lighting',
-		negative: `${NEG}, floor, ground, background, several boxes, open lid, content, shadow on floor`,
+		id: 'bin',
+		prompt: 'top-down view of one open square translucent plastic storage crate seen from directly above, frosted semi-transparent blue plastic bin, loose small colorful parts jumbled inside seen through the plastic, the crate fills the whole frame edge to edge, flat vector game art, bold clean shapes, flat even lighting',
+		negative: `${NEG}, floor, ground, background, several crates, lid, cardboard, wood, metal, shadow on floor`,
 		w: 512,
 		h: 512,
 		steps: 8,
-		seed: 660419,
+		seed: 90312,
 	});
-	await sharp(img).modulate({ saturation: 1.05, brightness: 1.02 }).jpeg({ quality: 88 }).toFile(resolve(OUT, 'crate.jpg'));
-	console.log('✓ crate.jpg');
+	// Trim the backdrop margin around the crate; the cell's border-radius hides the corners.
+	await sharp(img)
+		.extract({ left: 16, top: 16, width: 480, height: 480 })
+		.resize(512, 512)
+		.modulate({ saturation: 1.05, brightness: 1.02 })
+		.jpeg({ quality: 88 })
+		.toFile(resolve(OUT, 'bin.jpg'));
+	console.log('✓ bin.jpg');
 }
 
-if (want('rock')) {
+if (want('metal')) {
 	const img = await gen({
-		id: 'rock',
-		prompt: 'one large round grey stone seen from straight above, cartoon game asset sticker on a completely black empty background, night, dark surroundings, smooth pebble shape, subtle cracks, flat shading, bold outline, centered, single object',
-		negative: `${NEG}, rock field, rubble, gravel, ground, floor, grass, plants, trees, moss, pattern, several rocks`,
+		id: 'metal',
+		prompt: 'top-down view of one open square heavy iron crate seen from directly above, dark riveted steel box with thick metal edges, heavy metal parts gears and bolts piled inside, the crate fills the whole frame edge to edge, flat vector game art, bold clean shapes, flat even lighting',
+		negative: `${NEG}, floor, ground, background, several crates, lid, cardboard, wood, plastic, shadow on floor, bright, colorful`,
 		w: 512,
 		h: 512,
 		steps: 8,
-		seed: 51002,
+		seed: 55871,
 	});
-	// The model ignored the black backdrop and drew the stone on white, so the key runs the
-	// other way. The bold outline gives the ramp all the room it needs.
-	await cutout(img, { lo: 206, hi: 234, dark: false }, 'rock.png');
+	await sharp(img)
+		.modulate({ saturation: 0.85, brightness: 0.95 })
+		.jpeg({ quality: 88 })
+		.toFile(resolve(OUT, 'metal.jpg'));
+	console.log('✓ metal.jpg');
 }
 
-if (want('nest')) {
+if (want('hen')) {
 	const img = await gen({
-		id: 'nest',
-		prompt: 'top-down view of an empty round bird nest seen from directly above, woven golden straw and dry twigs, soft hollow centre, the nest fills the whole frame, flat vector game art, bold clean shapes, flat even lighting',
-		negative: `${NEG}, egg, bird, hen, chicken, tree, branch, ground, background, shadow on floor`,
+		id: 'hen',
+		prompt: 'cute robot chicken mascot, half hen half robot cyborg, white feathered round body with a steel chest plate, glowing blue eye visor, small antenna, tiny metal legs, orange beak, cartoon game asset sticker on a completely white empty background, bold outline, flat shading, centered, single character',
+		negative: `${NEG}, several characters, background scene, ground, floor, realistic photo, egg, nest`,
 		w: 512,
 		h: 512,
 		steps: 8,
-		seed: 447290,
+		seed: 51234,
 	});
-	await cutout(img, { lo: 60, hi: 120, dark: true }, 'nest.png');
+	await cutout(img, { lo: 206, hi: 234, dark: false }, 'hen.png');
 }
 console.log('done →', OUT);
