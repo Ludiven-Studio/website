@@ -336,13 +336,14 @@ describe('generate', () => {
 			const b = generate(mulberry32(s), params);
 			expect(b.crystals[heroIndex(b)]).toBe(false);
 		}
-	});
+	}, 20_000);
 
+	// ~45 ms of generation a board, and this deals ninety of them: room for a slow CI runner.
 	it('never deals a board the hero cannot move', () => {
 		for (const p of TECTONIQUE_BANDS) {
 			for (let s = 0; s < 30; s++) expect(heroStuck(generate(mulberry32(s), p))).toBe(false);
 		}
-	});
+	}, 20_000);
 
 	// The player only ever pushes the hero's own line, one cell at a time. The recorded walk has
 	// to obey that too, or it is not a solution he could ever reproduce.
@@ -384,6 +385,6 @@ describe('generate', () => {
 				expect(isWon(b)).toBe(true);
 			}
 		}
-	});
+	}, 20_000);
 });
 
