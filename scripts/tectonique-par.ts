@@ -1,73 +1,180 @@
-// Prints the PAR table for src/games/tectonique/levels.ts: a near-optimal move count per
-// level, from a greedy solver that BFSes to the cheapest next crystal and repeats. Rerun
-// after any change to the generator or the level ramp, and paste the output over PAR.
+// Prints the SALT and PAR tables for src/games/tectonique/levels.ts. A coup is a belt, not a cell:
+// once a line is in hand it runs any distance, either way, for free. So the solver works in whole
+// belts — for every level it deals a few candidate grids, measures each with a greedy search that
+// BFSes to the cheapest next crystal and repeats, and keeps the one landing closest to the ramp we
+// want. SALT is which grid, PAR is what it costs. Rerun after any change to the generator, the
+// scoring or the ramp below, and paste both tables over.
 //   npx tsx scripts/tectonique-par.ts
 
 import { mulberry32 } from '../src/games/prng';
-import { encodeBoard, generateDetailed, heroLines, isWon, slack, slide, type Board } from '../src/games/tectonique/engine';
-import { tectoniqueLevels, TECTONIQUE_BANDS } from '../src/games/tectonique/levels';
+import { countCrystals, encodeBoard, generateDetailed, heroIndex, heroLines, isWon, slack, slide, type Axis, type Board } from '../src/games/tectonique/engine';
+import { levelSeed, tectoniqueLevels, TECTONIQUE_BANDS } from '../src/games/tectonique/levels';
 
-/** Shortest run of moves that eats one more crystal. */
-function toNextCrystal(start: Board, cap: number): { board: Board; moves: number } | null {
-	const seen = new Set<string>([encodeBoard(start)]);
+/** How far the hero still is from the closest crystal, to rank states when the search is beamed. */
+function heroDist(b: Board): number {
+	const h = heroIndex(b);
+	const hr = Math.floor(h / b.n);
+	const hc = h % b.n;
+	let best = Infinity;
+	for (let i = 0; i < b.crystals.length; i++) {
+		if (!b.crystals[i]) continue;
+		best = Math.min(best, Math.abs(Math.floor(i / b.n) - hr) + Math.abs((i % b.n) - hc));
+	}
+	return best;
+}
+
+const other = (a: Axis): Axis => (a === 'row' ? 'col' : 'row');
+
+/**
+ * Every board one belt of driving can reach. The hero slides ALONG the line she pushes, so she
+ * never leaves it: the line index stays the same all the way, and this closure is the whole of
+ * what a single coup buys — including driving back the other way.
+ */
+function afterBelt(start: Board, axis: Axis): Board[] {
+	const out = new Map<string, Board>();
+	const home = encodeBoard(start);
 	let front = [start];
-	for (let depth = 1; front.length; depth++) {
+	while (front.length) {
 		const next: Board[] = [];
 		for (const b of front) {
-			for (const [axis, index] of heroLines(b)) {
-				const sl = slack(b, axis, index);
-				for (const d of [-1, 1] as const) {
-					if (d < 0 ? !(sl.min < 0) : !(sl.max > 0)) continue;
-					const r = slide(b, axis, index, d);
-					if (r.eaten.length) return { board: r.board, moves: depth };
-					const key = encodeBoard(r.board);
-					if (seen.has(key)) continue;
-					seen.add(key);
-					next.push(r.board);
+			const line = heroLines(b).find(([a]) => a === axis);
+			if (!line) continue;
+			const sl = slack(b, axis, line[1]);
+			for (const d of [-1, 1] as const) {
+				if (d < 0 ? !(sl.min < 0) : !(sl.max > 0)) continue;
+				const nb = slide(b, axis, line[1], d).board;
+				const key = encodeBoard(nb);
+				if (key === home || out.has(key)) continue;
+				out.set(key, nb);
+				next.push(nb);
+			}
+		}
+		front = next;
+	}
+	return [...out.values()];
+}
+
+/** A board plus the belt that was last driven: driving that one again is free, so it is state. */
+interface Step {
+	board: Board;
+	axis: Axis | null;
+}
+
+/**
+ * Fewest coups that eat one more crystal. `held` is the belt already in hand, whose closure comes
+ * for free. Each depth keeps at most `width` states, ranked on `heroDist` — so the search is a beam,
+ * and `pruned` says whether it ever had to drop anything. It never did means the answer is exact.
+ */
+function toNextCrystal(start: Board, held: Axis | null, width: number, maxDepth: number): { step: Step; coups: number; pruned: boolean } | null {
+	const left = countCrystals(start);
+	const seen = new Set<string>([encodeBoard(start)]);
+	let front: Step[] = [{ board: start, axis: held }];
+	let pruned = false;
+	// The belt still in hand costs nothing, so its whole closure sits at depth 0 with the start.
+	if (held) {
+		for (const b of afterBelt(start, held)) {
+			if (countCrystals(b) < left) return { step: { board: b, axis: held }, coups: 0, pruned };
+			seen.add(encodeBoard(b));
+			front.push({ board: b, axis: held });
+		}
+	}
+	for (let depth = 1; front.length && depth <= maxDepth; depth++) {
+		const next = new Map<string, Step>();
+		for (const s of front) {
+			// Same axis again would land inside the closure we already have: only a switch is new.
+			for (const axis of s.axis ? [other(s.axis)] : (['row', 'col'] as Axis[])) {
+				for (const b of afterBelt(s.board, axis)) {
+					if (countCrystals(b) < left) return { step: { board: b, axis }, coups: depth, pruned };
+					const key = encodeBoard(b);
+					if (!seen.has(key)) next.set(key, { board: b, axis });
 				}
 			}
 		}
-		if (seen.size > cap) return null;
-		front = next;
+		let kept = [...next];
+		if (kept.length > width) {
+			kept.sort((a, b) => heroDist(a[1].board) - heroDist(b[1].board));
+			kept = kept.slice(0, width);
+			pruned = true;
+		}
+		// Only what the beam keeps is closed: marking a pruned state would wall the search in.
+		for (const [key] of kept) seen.add(key);
+		front = kept.map(([, s]) => s);
 	}
 	return null;
 }
 
-function solve(start: Board, cap: number): number | null {
-	let b = start;
+/** Greedy: hop to the cheapest next crystal and repeat, carrying the belt in hand across the hops. */
+function solve(start: Board, width: number, maxDepth: number): { par: number; beamed: boolean } | null {
+	let s: Step = { board: start, axis: null };
 	let total = 0;
-	while (!isWon(b)) {
-		const step = toNextCrystal(b, cap);
-		if (!step) return null;
-		total += step.moves;
-		b = step.board;
+	let beamed = false;
+	while (!isWon(s.board)) {
+		const hop = toNextCrystal(s.board, s.axis, width, maxDepth);
+		if (!hop) return null;
+		total += hop.coups;
+		beamed = beamed || hop.pruned;
+		s = hop.step;
 	}
-	return total;
+	return { par: total, beamed };
 }
+
+// One belt of driving reaches a dozen boards, so the branching is wide and the depth short: past a
+// few coups a full sweep explodes. The beam is generous enough that the early grids never touch it.
+// A hop takes two or three coups in practice, so a hop still hunting after 25 is on a grid the
+// greedy cannot crack — cut it there rather than let the beam grind through 60 useless depths.
+const BEAM = 4000;
+const bestEffort = (b: Board): { par: number | null; beamed: boolean } => solve(b, BEAM, 25) ?? { par: null, beamed: true };
+
+/** The ramp we want to feel: the ladder is judged on this, not on the raw luck of one seed. */
+const wanted = (l: number): number => Math.round(6 + (l - 1) * 0.28);
+const VARIANTS = 10;
 
 const pars: number[] = [];
+const salts: number[] = [];
 let worst = 0;
+let beams = 0;
+let clock = Date.now();
 for (let l = 1; l <= tectoniqueLevels.count; l++) {
 	const cfg = tectoniqueLevels.config(l);
-	const { board, walk } = generateDetailed(mulberry32(cfg.seed), cfg);
-	const par = solve(board, 400_000);
-	// The recorded walk always clears the level, so it bounds the rare solver give-up.
-	pars.push(par ?? walk.length);
-	if (par == null) console.error(`level ${l}: solver gave up, using the walk (${walk.length})`);
-	worst = Math.max(worst, par ?? walk.length);
-	if (l % 10 === 0) console.error(`…level ${l} (par ${pars[l - 1]})`);
+	// The same ramp deals wildly uneven grids from one seed to the next, and an easy level in the
+	// middle of hard ones is what breaks the ladder. So measure a handful and keep the fitting one.
+	let pick: { salt: number; par: number; err: number; beamed: boolean } | null = null;
+	let fallback = 0;
+	for (let salt = 0; salt < VARIANTS; salt++) {
+		const { board, walk } = generateDetailed(mulberry32(levelSeed(l, salt)), cfg);
+		fallback = fallback || walk.length;
+		// The generator drops crystals on the walk it recorded; when the walk is too short it
+		// silently ships fewer than asked, which quietly makes the level easier.
+		if (countCrystals(board) < cfg.crystals) continue;
+		const { par, beamed } = bestEffort(board);
+		if (par == null) continue;
+		const err = Math.abs(par - wanted(l));
+		if (!pick || err < pick.err) pick = { salt, par, err, beamed };
+	}
+	if (!pick) console.error(`level ${l}: no variant solved, using the walk (${fallback})`);
+	else if (pick.beamed) beams++;
+	pars.push(pick?.par ?? fallback);
+	salts.push(pick?.salt ?? 0);
+	worst = Math.max(worst, pars[l - 1]);
+	console.error(`…level ${l} (par ${pars[l - 1]}, wanted ${wanted(l)}, ${Math.round((Date.now() - clock) / 1000)}s)`);
+	clock = Date.now();
 }
 
-console.log('const PAR: number[] = [');
-for (let i = 0; i < pars.length; i += 20) console.log('\t' + pars.slice(i, i + 20).join(', ') + ',');
-console.log('];');
-console.error(`\nmax par ${worst}`);
+const table = (name: string, xs: number[]): void => {
+	console.log(`const ${name}: number[] = [`);
+	for (let i = 0; i < xs.length; i += 20) console.log('\t' + xs.slice(i, i + 20).join(', ') + ',');
+	console.log('];');
+};
+table('SALT', salts);
+table('PAR', pars);
+const off = pars.reduce((s, p, i) => s + Math.abs(p - wanted(i + 1)), 0) / pars.length;
+console.error(`\nmax par ${worst} · off the wanted ramp by ${off.toFixed(1)} on average · ${beams} level(s) beamed`);
 
 // The free/daily bands, for a sanity read on the ramp.
 for (const [i, p] of TECTONIQUE_BANDS.entries()) {
 	const xs: number[] = [];
 	for (let s = 0; s < 12; s++) {
-		const k = solve(generateDetailed(mulberry32(1000 + s), p).board, 400_000);
+		const k = bestEffort(generateDetailed(mulberry32(1000 + s), p).board).par;
 		if (k != null) xs.push(k);
 	}
 	xs.sort((a, b) => a - b);

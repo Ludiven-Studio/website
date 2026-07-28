@@ -11,6 +11,9 @@
 //     something caps the slide of its whole line.
 //   · a POST is not on the belt at all: it is driven through it into the ground below, so the
 //     belt of the axis it holds cannot budge one cell.
+//   · a PILLAR is bolted to the frame too, but it only takes the room: the belt keeps running
+//     around it and nothing crosses it, so it cuts its row and its column into segments that
+//     pack on their own. That is what stops every push from ending against the outer wall.
 //
 // The player only ever pushes the two lines the hero stands on, one cell at a time. Stacking
 // loses the gaps, so a move cannot be undone: he can strand himself, and `heroStuck` is how the
@@ -24,8 +27,9 @@ export const LOCK_ROW = 3;
 export const LOCK_COL = 4;
 export const LOCK_ALL = 5;
 export const ROCK = 6;
+export const PILLAR = 7;
 
-export type Tile = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type Tile = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type Axis = 'row' | 'col';
 
 export interface Board {
@@ -69,8 +73,11 @@ export const flatAt = (n: number, axis: Axis, index: number, i: number): number 
 export const holds = (t: Tile, axis: Axis): boolean =>
 	t === LOCK_ALL || (axis === 'row' ? t === LOCK_ROW : t === LOCK_COL);
 
+/** A pillar belongs to the frame, not to the belt: it never moves, and nothing goes through it. */
+export const anchored = (t: Tile): boolean => t === PILLAR;
+
 /** Crates and the hero slide on the belt. The rest is bolted to it and travels exactly with it. */
-const glued = (t: Tile): boolean => t !== VOID && t !== PLATE && t !== HERO;
+const glued = (t: Tile): boolean => t !== VOID && t !== PLATE && t !== HERO && !anchored(t);
 
 const lineOf = (b: Board, axis: Axis, index: number): Tile[] => {
 	const line: Tile[] = [];
@@ -94,6 +101,13 @@ function pack(line: Tile[], d: number): { out: Tile[]; from: number[] } {
 	for (let k = 0; k < n; k++) {
 		const i = dir > 0 ? n - 1 - k : k;
 		if (line[i] === VOID) continue;
+		// A pillar stays where it is and closes the road: what follows packs against it instead.
+		if (anchored(line[i])) {
+			out[i] = line[i];
+			from[i] = i;
+			limit = i - dir;
+			continue;
+		}
 		const p = dir > 0 ? Math.min(i + room, limit) : Math.max(i - room, limit);
 		out[p] = line[i];
 		from[p] = i;
@@ -152,6 +166,8 @@ export function blockers(b: Board, axis: Axis, index: number, dir: 1 | -1): numb
 	const line = lineOf(b, axis, index);
 	const posts = line.flatMap((t, i) => (holds(t, axis) ? [flatAt(b.n, axis, index, i)] : []));
 	if (posts.length) return posts;
+	// A pillar freezes only its own segment, so ask the line first whether anything moves at all.
+	if (travel(line, axis, dir, 1)) return [];
 	const { from } = pack(line, dir);
 	const stuck: number[] = [];
 	const capped: number[] = [];
@@ -240,6 +256,7 @@ export interface GenParams {
 	colLocks: number;
 	allLocks: number; // posts holding both axes
 	rocks: number; // glued to the floor, they cap the slide instead of freezing it
+	pillars: number; // bolted to the frame: the belt runs on, but nothing crosses them
 	holes: number;
 }
 
@@ -300,6 +317,15 @@ function buildFloor(rng: () => number, p: GenParams): Board {
 	for (let i = 0; i < p.colLocks && k < free.length; i++) floor[free[k++]] = LOCK_COL;
 	for (let i = 0; i < p.allLocks && k < free.length; i++) floor[free[k++]] = LOCK_ALL;
 	for (let i = 0; i < p.rocks && k < free.length; i++) floor[free[k++]] = ROCK;
+
+	// A pillar only earns its keep inside the plate: on the rim it would just double the outer wall.
+	const inner = (i: number): boolean => {
+		const r = Math.floor(i / n);
+		const c = i % n;
+		return r > oy && r < oy + w - 1 && c > ox && c < ox + w - 1;
+	};
+	const rest = free.slice(k);
+	for (const i of [...rest.filter(inner), ...rest.filter((x) => !inner(x))].slice(0, p.pillars)) floor[i] = PILLAR;
 
 	return { n, floor, crystals: new Array<boolean>(n * n).fill(false) };
 }
@@ -379,6 +405,7 @@ export interface Generated {
 export function generateDetailed(rng: () => number, p: GenParams): Generated {
 	let best: Generated | null = null;
 	let bestCount = -1;
+	let bestDepth = -1;
 	for (let t = 0; t < 40; t++) {
 		const base = buildFloor(rng, p);
 		const { visits, moves } = walkVisits(rng, base, 60 + 30 * p.crystals);
@@ -386,15 +413,18 @@ export function generateDetailed(rng: () => number, p: GenParams): Generated {
 		// Cells swept early come almost for free. Keeping only the late ones forces the player
 		// deep into the irreversible sequence before the first crystal pays out.
 		const order = [...visits.entries()].sort((a, b) => a[1] - b[1]).map(([i]) => i);
-		const late = order.slice(Math.floor(order.length * 0.4));
+		const late = order.slice(Math.floor(order.length * 0.5));
 		const spots = spread(rng, late, p.crystals, p.n);
-		if (spots.length > bestCount) {
+		// Between two layouts that hold every crystal, keep the one whose crystals sit deepest in
+		// the walk: same parts, but the player has to commit much further before they pay out.
+		const depth = spots.reduce((s, i) => s + (visits.get(i) ?? 0), 0);
+		if (spots.length > bestCount || (spots.length === bestCount && depth > bestDepth)) {
 			const board = cloneBoard(base);
 			for (const i of spots) board.crystals[i] = true;
 			best = { board, walk: moves };
 			bestCount = spots.length;
+			bestDepth = depth;
 		}
-		if (bestCount >= p.crystals) break;
 	}
 	return best as Generated;
 }

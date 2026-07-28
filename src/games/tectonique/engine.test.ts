@@ -19,6 +19,7 @@ import {
 	LOCK_ALL,
 	LOCK_COL,
 	LOCK_ROW,
+	PILLAR,
 	PLATE,
 	ROCK,
 	VOID,
@@ -29,10 +30,10 @@ import {
 import { TECTONIQUE_BANDS, tectoniqueLevels } from './levels';
 import { LEVEL_COUNT } from '../../lib/progression';
 
-/** '.' void · '#' crate · 'H' hero · 'O' rock · 'R'/'K'/'B' post holding the row / the column / both.
-    Crystals come as a second block, '*'. */
+/** '.' void · '#' crate · 'H' hero · 'O' rock · 'X' pillar · 'R'/'K'/'B' post holding the row /
+    the column / both. Crystals come as a second block, '*'. */
 const TILE: Record<string, Tile> = {
-	'.': VOID, '#': PLATE, H: HERO, R: LOCK_ROW, K: LOCK_COL, B: LOCK_ALL, O: ROCK,
+	'.': VOID, '#': PLATE, H: HERO, R: LOCK_ROW, K: LOCK_COL, B: LOCK_ALL, O: ROCK, X: PILLAR,
 };
 
 function board(rows: string[], gems: string[] = []): Board {
@@ -46,6 +47,7 @@ function board(rows: string[], gems: string[] = []): Board {
 
 const BACK: Record<number, string> = {
 	[VOID]: '.', [PLATE]: '#', [HERO]: 'H', [LOCK_ROW]: 'R', [LOCK_COL]: 'K', [LOCK_ALL]: 'B', [ROCK]: 'O',
+	[PILLAR]: 'X',
 };
 
 const show = (b: Board): string[] => {
@@ -259,6 +261,34 @@ describe('blockers', () => {
 	});
 });
 
+// A pillar is bolted to the frame: the belt runs under it, but it cuts the line in two and each
+// side packs on its own. That is what gives a push somewhere to stop other than the outer wall.
+describe('pillars', () => {
+	it('stops a crate one cell short instead of letting it reach the wall', () => {
+		expect(show(slide(board(['#.X.', '....', '....', '....']), 'row', 0, 3).board)[0]).toBe('.#X.');
+	});
+
+	it('leaves no room at all on the side where the pillar already touches the crate', () => {
+		expect(slack(board(['#.X.', '....', '....', '....']), 'row', 0)).toEqual({ min: 0, max: 1 });
+	});
+
+	it('never travels with the belt', () => {
+		expect(show(slide(board(['H.X#', '....', '....', '....']), 'row', 0, 3).board)[0]).toBe('.HX#');
+	});
+
+	it('lets a rock jammed on it cap the whole line, and names that rock alone', () => {
+		const b = board(['.HOX', '....', '....', '....']);
+		expect(slack(b, 'row', 0)).toEqual({ min: -1, max: 0 });
+		expect(blockers(b, 'row', 0, 1)).toEqual([2]);
+	});
+
+	it('points at nothing while the far segment can still move', () => {
+		const b = board(['#X#.', '....', '....', '....']);
+		expect(movers(b, 'row', 0, 1)).toEqual([2]);
+		expect(blockers(b, 'row', 0, 1)).toEqual([]);
+	});
+});
+
 describe('board helpers', () => {
 	it('reads the hero position and the win condition', () => {
 		const b = board(['H#..', '....', '....', '....'], ['..*.', '....', '....', '....']);
@@ -283,7 +313,7 @@ describe('board helpers', () => {
 });
 
 describe('generate', () => {
-	const params: GenParams = { n: 8, crystals: 6, rowLocks: 2, colLocks: 2, allLocks: 1, rocks: 3, holes: 5 };
+	const params: GenParams = { n: 8, crystals: 6, rowLocks: 2, colLocks: 2, allLocks: 1, rocks: 3, pillars: 2, holes: 5 };
 
 	it('is deterministic for a given seed', () => {
 		expect(encodeBoard(generate(mulberry32(7), params))).toBe(encodeBoard(generate(mulberry32(7), params)));
@@ -298,6 +328,7 @@ describe('generate', () => {
 		expect(b.floor.filter((t) => t === LOCK_COL)).toHaveLength(2);
 		expect(b.floor.filter((t) => t === LOCK_ALL)).toHaveLength(1);
 		expect(b.floor.filter((t) => t === ROCK)).toHaveLength(3);
+		expect(b.floor.filter((t) => t === PILLAR)).toHaveLength(2);
 	});
 
 	it('never drops a crystal under the hero', () => {
@@ -340,7 +371,8 @@ describe('generate', () => {
 			for (const m of walk) b = slide(b, m.axis, m.index, m.shift).board;
 			expect(isWon(b), `level ${l}`).toBe(true);
 		}
-	});
+		// ~45 ms of generation per level: fine once at level start, 100 in a row needs the room.
+	}, 30_000);
 
 	it('ships a walk that eats every crystal it dropped', () => {
 		for (const p of TECTONIQUE_BANDS) {

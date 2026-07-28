@@ -30,6 +30,7 @@ import {
 	LOCK_ALL,
 	LOCK_COL,
 	LOCK_ROW,
+	PILLAR,
 	PLATE,
 	ROCK,
 	VOID,
@@ -44,7 +45,8 @@ import {
    The floor is a lattice of conveyor belts. Grab the hen's row or column and drag it: the
    belt follows the finger cell by cell, and it keeps the speed it had when you let go —
    so it coasts on, and you cut it with a second press. The crystals hover in place: ride
-   the hen over them, and mind the dead ends.
+   the hen over them, and mind the dead ends. The score counts belts, not cells: one line
+   driven any distance, either way, is one coup.
    ===================================================== */
 
 type Status = 'playing' | 'won' | 'stuck';
@@ -78,7 +80,7 @@ interface BeltRun {
 
 const GLYPH: Record<number, string> = { [HERO]: '🐔' };
 const KIND_CLASS: Record<number, string> = {
-	[PLATE]: 'plate', [HERO]: 'hero', [ROCK]: 'rock',
+	[PLATE]: 'plate', [HERO]: 'hero', [ROCK]: 'rock', [PILLAR]: 'pillar',
 	[LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol', [LOCK_ALL]: 'lockall',
 };
 const FREE_LABELS = ['Facile', 'Moyen', 'Difficile'];
@@ -89,7 +91,7 @@ const KEY_MOVES: Record<string, [Axis, -1 | 1] | undefined> = {
 	q: ['row', -1], a: ['row', -1], d: ['row', 1], z: ['col', -1], w: ['col', -1], s: ['col', 1],
 };
 
-const DRY_HINT = 25; // moves without a crystal before the way out is offered
+const DRY_HINT = 12; // coups without a crystal before the way out is offered
 // A launched belt is heavy: it only gives up its speed to friction, which takes about three
 // seconds from a full fling. Precision comes from cutting it, not from short pushes.
 const RUN_DECEL = 7.5; // cells/s² of friction
@@ -129,7 +131,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [pops, setPops] = useState<{ id: number; idx: number }[]>([]);
 	const [total, setTotal] = useState(0); // crystals the grid was dealt with
 	const [moves, setMoves] = useState(0); // the score in levels mode: stars compare it to par
-	const [dry, setDry] = useState(0); // moves since the last crystal, to offer a way out
+	const [dry, setDry] = useState(0); // coups since the last crystal, to offer a way out
 	const [status, setStatus] = useState<Status>('playing');
 	const [front, setFront] = useState<Axis>('col'); // last pushed axis: its hero belt rides on top
 	const [running, setRunning] = useState(false); // a belt is under the hand or still coasting
@@ -148,6 +150,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const animRef = useRef(0);
 	const startRef = useRef(0);
 	const movesRef = useRef(0);
+	const lastAxisRef = useRef<Axis | null>(null); // the belt in hand: pushing it again is free
 	const finalRef = useRef(0); // chrono at the end of the run, win or dead end
 	const seedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const popIdRef = useRef(0);
@@ -194,6 +197,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setDry(0);
 		setMoves(0);
 		movesRef.current = 0;
+		lastAxisRef.current = null;
 		setTotal(countCrystals(fresh));
 		setStatus(isWon(b) ? 'won' : 'playing');
 	}, [settle]);
@@ -344,9 +348,16 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			const ids = new Set(fresh.map((f) => f.id));
 			setTimeout(() => setPops((p) => p.filter((x) => !ids.has(x.id))), 480);
 		}
-		setDry((d) => (r.eaten.length ? 0 : d + 1));
-		movesRef.current += 1;
-		setMoves(movesRef.current);
+		// A coup is a belt, not a cell: keep driving the same one — any distance, either way —
+		// and it stays one coup. The hen slides ALONG the line she pushes, so she never leaves
+		// it: same axis always means same line, and the axis alone tells a new belt from the old.
+		const belt = lastAxisRef.current !== axis;
+		if (belt) {
+			lastAxisRef.current = axis;
+			movesRef.current += 1;
+			setMoves(movesRef.current);
+		}
+		setDry((d) => (r.eaten.length ? 0 : belt ? d + 1 : d));
 
 		if (isWon(r.board)) {
 			endRun('won');
@@ -845,14 +856,17 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				Seules la ligne et la colonne où se trouve la cocotte 🐔 peuvent bouger. Attrape la ligne au
 				doigt&nbsp;: le tapis suit la main, et il garde son élan quand tu lâches — il continue tout seul
 				jusqu'à ce que le frottement l'arrête. Un nouvel appui le coupe net. Les flèches du clavier et le
-				pavé ci-dessus lui donnent une impulsion, et servent aussi de frein. Chaque case parcourue compte
-				un coup&nbsp;: c'est en coupant tôt qu'on vise le par. Le sol est un quadrillage de
+				pavé ci-dessus lui donnent une impulsion, et servent aussi de frein. Un coup, c'est un tapis, pas
+				une case&nbsp;: relance le même autant que tu veux, dans un sens comme dans l'autre, ça reste le
+				même coup — tu ne paies qu'en changeant de tapis. Le sol est un quadrillage de
 				tapis roulants : la cocotte et les bacs en plastique glissent dessus et se tassent contre le mur
 				ou contre ce qui les arrête — le tapis, lui, continue de tourner dessous. Les caisses en fer,
 				pleines de pièces lourdes, sont boulonnées au tapis et voyagent exactement avec lui : dès
 				qu'une caisse bute, toute sa ligne s'arrête. Les
 				plots, vissés à travers le tapis, bloquent net leur ligne ; leur rainure montre le seul sens où le
-				tapis peut encore les emmener, et le plot boulonné n'en a aucune. Les 💎 flottent au-dessus et ne
+				tapis peut encore les emmener, et le plot boulonné n'en a aucune. Les piliers rayés jaune et
+				noir sont scellés au bâti&nbsp;: le tapis tourne toujours autour, mais rien ne les traverse — ils
+				coupent leur ligne en deux et donnent enfin où s'arrêter ailleurs qu'au bord. Les 💎 flottent au-dessus et ne
 				bougent jamais — c'est la cocotte qui doit leur passer dessus. Les trous se referment pour de
 				bon : on peut s'enfermer, et là il faut recommencer.
 			</p>
@@ -1002,6 +1016,19 @@ const CSS = `
 /* The iron crate is bolted to the belt: it travels exactly with it, and caps its line. */
 .tk-slab.rock .tk-face {
   background: var(--tk-metal, none) center / 100% 100% no-repeat, linear-gradient(180deg, #565c63, #2c3136);
+}
+
+/* A pillar rises from the frame through the belt: it never rides it, and nothing gets past it —
+   the belt just runs on underneath. The hazard band has to read at 8×8 on a phone. */
+.tk-slab.pillar .tk-face {
+  border-radius: 8%;
+  background: linear-gradient(180deg, #6b7178, #2a2e33 55%, #16181c);
+  box-shadow: 0 5px 0 #101215, 0 9px 13px rgba(0, 0, 0, 0.65), inset 0 0 0 2px rgba(0, 0, 0, 0.5);
+}
+.tk-slab.pillar .tk-face::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 33%; height: 30%;
+  background: repeating-linear-gradient(135deg, #facc15 0 6px, #1c1917 6px 12px);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
 }
 
 /* A post is driven through the belt into the frame below, so the line it holds cannot budge.
