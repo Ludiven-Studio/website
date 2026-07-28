@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32 } from '../prng';
 import {
+	blockers,
 	cloneBoard,
 	countCrystals,
 	decodeBoard,
@@ -218,6 +219,43 @@ describe('movers', () => {
 
 	it('names nobody when a jammed rock caps the line', () => {
 		expect(movers(board(['..O#', '....', '....', '....']), 'row', 0, 1)).toEqual([]);
+	});
+});
+
+describe('blockers', () => {
+	it('names the post that nails the line down, and nothing else', () => {
+		expect(blockers(board(['#R.#', '....', '....', '....']), 'row', 0, 1)).toEqual([1]);
+	});
+
+	it('ignores a post the pushed axis can still carry', () => {
+		// A row post lets the columns run: the column jams on the wall instead.
+		expect(blockers(board(['..R.', '....', '....', '....']), 'col', 2, -1)).toEqual([2]);
+	});
+
+	it('singles out the rock that caps the line, not the crates behind it', () => {
+		expect(blockers(board(['.#O#', '....', '....', '....']), 'row', 0, 1)).toEqual([2]);
+	});
+
+	it('names the whole stack when it is the wall that stops everyone', () => {
+		expect(blockers(board(['..##', '....', '....', '....']), 'row', 0, 1)).toEqual([2, 3]);
+	});
+
+	it('works on columns', () => {
+		expect(blockers(board(['....', '....', '..#.', '..#.']), 'col', 2, 1)).toEqual([10, 14]);
+	});
+
+	it('has nothing to point at on an empty line', () => {
+		expect(blockers(board(['....', '....', '....', '....']), 'row', 0, 1)).toEqual([]);
+	});
+
+	it('stays empty exactly when the line can still move', () => {
+		const b = generate(mulberry32(7), TECTONIQUE_BANDS[1]);
+		for (const [axis, index] of heroLines(b)) {
+			for (const dir of [1, -1] as const) {
+				const free = movers(b, axis, index, dir).length > 0;
+				expect(blockers(b, axis, index, dir).length === 0).toBe(free);
+			}
+		}
 	});
 });
 

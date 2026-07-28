@@ -146,6 +146,24 @@ export function movers(b: Board, axis: Axis, index: number, dir: 1 | -1): number
 	return out;
 }
 
+/** What stops this line: the posts nailing it down, or whatever jams one cell short. */
+export function blockers(b: Board, axis: Axis, index: number, dir: 1 | -1): number[] {
+	if (index < 0 || index >= b.n) return [];
+	const line = lineOf(b, axis, index);
+	const posts = line.flatMap((t, i) => (holds(t, axis) ? [flatAt(b.n, axis, index, i)] : []));
+	if (posts.length) return posts;
+	const { from } = pack(line, dir);
+	const stuck: number[] = [];
+	const capped: number[] = [];
+	for (let p = 0; p < b.n; p++) {
+		if (from[p] < 0 || from[p] !== p) continue;
+		stuck.push(flatAt(b.n, axis, index, p));
+		// A glued piece that cannot keep up caps the whole line on its own — name it alone.
+		if (glued(line[p])) capped.push(flatAt(b.n, axis, index, p));
+	}
+	return capped.length ? capped : stuck;
+}
+
 /** The two lines the player may push: the ones the hero stands on. */
 export function heroLines(b: Board): [Axis, number][] {
 	const h = heroIndex(b);

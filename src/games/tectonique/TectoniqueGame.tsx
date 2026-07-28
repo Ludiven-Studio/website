@@ -15,6 +15,7 @@ import { usePointerDrag } from '../usePointerDrag';
 import { useHoldButton } from '../useHoldButton';
 import { tectoniqueLevels, TECTONIQUE_BANDS } from './levels';
 import {
+	blockers,
 	countCrystals,
 	decodeBoard,
 	encodeBoard,
@@ -22,6 +23,7 @@ import {
 	heroIndex,
 	heroStuck,
 	isWon,
+	movers,
 	slack,
 	slide,
 	HERO,
@@ -39,9 +41,10 @@ import {
 
 /* =====================================================
    TECTONIQUE — React island.
-   The floor is a lattice of conveyor belts. Push the hen's row or column, one cell at a
-   time: the belt runs that way, the hen and the bins slide on it and jam against the
-   wall. The crystals hover in place — ride the hen over them, and mind the dead ends.
+   The floor is a lattice of conveyor belts. Grab the hen's row or column and drag it: the
+   belt follows the finger cell by cell, and it keeps the speed it had when you let go —
+   so it coasts on, and you cut it with a second press. The crystals hover in place: ride
+   the hen over them, and mind the dead ends.
    ===================================================== */
 
 type Status = 'playing' | 'won' | 'stuck';
@@ -51,6 +54,26 @@ interface Sprite {
 	id: number;
 	kind: Tile;
 	idx: number;
+}
+
+/**
+ * The line the player has hold of. `base` counts the cells already committed to the board,
+ * `frac` is where the belt sits between two of them — the offset every piece is drawn at.
+ */
+interface BeltRun {
+	axis: Axis;
+	index: number;
+	dir: -1 | 1;
+	base: number;
+	frac: number;
+	want: number; // cells the finger asks for, total since the grab
+	v: number; // cells per second, once the finger has let go
+	held: boolean;
+	settle: number; // stamp the wind-down started at, 0 while the belt still runs
+	from: number; // frac the wind-down started from
+	t: number;
+	jolted: boolean;
+	hist: { t: number; p: number }[]; // tail of the drag, to read the fling speed off
 }
 
 const GLYPH: Record<number, string> = { [HERO]: '🐔' };
@@ -67,11 +90,24 @@ const KEY_MOVES: Record<string, [Axis, -1 | 1] | undefined> = {
 };
 
 const DRY_HINT = 25; // moves without a crystal before the way out is offered
-const STEP_MS = 130; // how long a line takes to ease into its new cell
-const HOLD_MS = 340; // press-and-hold on the pad before it starts repeating
-const REPEAT_MS = 200;
+// A launched belt is heavy: it only gives up its speed to friction, which takes about three
+// seconds from a full fling. Precision comes from cutting it, not from short pushes.
+const RUN_DECEL = 7.5; // cells/s² of friction
+const RUN_VMAX = 22; // cells/s — cap on a fling, so one flick cannot run for ever
+const TAP_V = 6.5; // cells/s — the impulse a key or a pad press gives (≈2.8 cells of glide)
+const SETTLE_MS = 130; // easing the last part-cell home once the belt is cut
 
 const lineKey = (axis: Axis, index: number): string => `${axis}:${index}`;
+
+/** Cells per second over the tail of the drag: the speed the belt keeps when the finger lets go. */
+const flingSpeed = (hist: { t: number; p: number }[]): number => {
+	if (hist.length < 2) return 0;
+	const last = hist[hist.length - 1];
+	let ref = hist[0];
+	for (const h of hist) if (last.t - h.t <= 110) { ref = h; break; }
+	const dt = (last.t - ref.t) / 1000;
+	return dt > 0.008 ? Math.max(0, (last.p - ref.p) / dt) : 0;
+};
 
 const ART: [string, string][] = [
 	['belt.jpg', '--tk-belt'],
@@ -96,7 +132,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [dry, setDry] = useState(0); // moves since the last crystal, to offer a way out
 	const [status, setStatus] = useState<Status>('playing');
 	const [front, setFront] = useState<Axis>('col'); // last pushed axis: its hero belt rides on top
-	const [shaking, setShaking] = useState(false);
+	const [running, setRunning] = useState(false); // a belt is under the hand or still coasting
+	const [jam, setJam] = useState<{ cells: Set<number>; axis: Axis } | null>(null);
 	const [started, setStarted] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const [freeDiff, setFreeDiff] = useState(0);
@@ -114,14 +151,18 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const finalRef = useRef(0); // chrono at the end of the run, win or dead end
 	const seedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const popIdRef = useRef(0);
-	const shakeRef = useRef(0);
+	const jamRef = useRef(0);
+	const beltRef = useRef<BeltRun | null>(null);
+	const nextRef = useRef<number[]>([]); // pieces the next cell will carry
 	const lv = useLevels(gameId, tectoniqueLevels);
 
-	/** Snap a running step home, so the next one starts from the grid. */
+	/** Let go of the line and put every piece back on its cell. */
 	const settle = useCallback(() => {
-		if (!animRef.current) return;
-		cancelAnimationFrame(animRef.current);
+		if (animRef.current) cancelAnimationFrame(animRef.current);
 		animRef.current = 0;
+		beltRef.current = null;
+		nextRef.current = [];
+		setRunning(false);
 		setOffsets({});
 		setMoving(new Set());
 	}, []);
@@ -258,10 +299,17 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		return () => clearInterval(id);
 	}, [status, started]);
 
-	const bump = useCallback(() => {
-		setShaking(true);
-		window.clearTimeout(shakeRef.current);
-		shakeRef.current = window.setTimeout(() => setShaking(false), 240);
+	/** Nothing gives: shudder whatever is holding the line, rather than the whole board.
+	    Cleared first, so two jams in a row really replay the animation. */
+	const jolt = useCallback((axis: Axis, index: number, dir: -1 | 1) => {
+		const b = boardRef.current;
+		if (!b) return;
+		const cells = blockers(b, axis, index, dir);
+		if (!cells.length) return;
+		window.clearTimeout(jamRef.current);
+		setJam(null);
+		requestAnimationFrame(() => setJam({ cells: new Set(cells), axis }));
+		jamRef.current = window.setTimeout(() => setJam(null), 340);
 	}, []);
 
 	/* ---------- Sliding ---------- */
@@ -311,80 +359,158 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		return r.moves;
 	}, [gameId, endRun]);
 
-	/**
-	 * One tactical move: push the line the hen stands on by a single cell. The board is committed
-	 * first, then the line is drawn back where it came from and eased in — pieces that jammed are
-	 * absent from `moves`, so they simply stay put while the rest of the line runs.
-	 */
-	const step = useCallback((axis: Axis, dir: -1 | 1) => {
+	/** Look ahead: which pieces the next cell will carry. Empty means the line is against a jam. */
+	const aim = useCallback((r: BeltRun): boolean => {
 		const b = boardRef.current;
-		if (!b || lockedRef.current) return;
+		const m = b ? movers(b, r.axis, r.index, r.dir) : [];
+		nextRef.current = m;
+		setMoving(new Set(m));
+		return m.length > 0;
+	}, []);
+
+	/** Cut the belt: finish the cell it is more than halfway into, then ease the rest home. */
+	const wind = useCallback((r: BeltRun, now: number) => {
+		if (r.settle) return;
+		r.held = false;
+		r.v = 0;
+		if (r.frac >= 0.5 && nextRef.current.length) {
+			const moves = applyStep(r.axis, r.index, r.dir);
+			r.base += 1;
+			r.frac -= 1;
+			// Those pieces have arrived: from here they ease IN from behind, so they are the
+			// ones to draw offset — not the look-ahead set.
+			setMoving(new Set(moves.map((m) => m.to)));
+			nextRef.current = [];
+		}
+		r.settle = now;
+		r.from = r.frac;
+	}, [applyStep]);
+
+	/**
+	 * The belt, frame by frame. Under the hand it tracks the finger 1:1; let go and it coasts
+	 * on friction alone. Cells are committed as it runs over them, and a jam pins it dead.
+	 */
+	const tick = useCallback((now: number) => {
+		const r = beltRef.current;
+		if (!r) return;
+		const dt = Math.min(0.05, (now - r.t) / 1000);
+		r.t = now;
+
+		if (r.settle) {
+			const k = Math.min(1, (now - r.settle) / SETTLE_MS);
+			r.frac = r.from * (1 - k) ** 2;
+			if (k >= 1) { settle(); return; }
+		} else if (r.held) {
+			// The belt cannot be pulled back past the last cell it committed: slides are final.
+			r.frac = Math.max(0, r.want - r.base);
+		} else {
+			r.v = Math.max(0, r.v - RUN_DECEL * dt);
+			r.frac += r.v * dt;
+		}
+
+		while (!r.settle && r.frac >= 1 && nextRef.current.length) {
+			applyStep(r.axis, r.index, r.dir);
+			r.base += 1;
+			r.frac -= 1;
+			r.jolted = false;
+			aim(r);
+		}
+
+		if (!r.settle && !nextRef.current.length) {
+			if (r.frac > 0.05 && !r.jolted) { r.jolted = true; jolt(r.axis, r.index, r.dir); }
+			r.frac = 0;
+			r.v = 0;
+			if (!r.held) { settle(); return; } // ran into the jam: it stops dead there
+		}
+		if (lockedRef.current) { settle(); return; }
+		if (!r.settle && !r.held && r.v === 0) wind(r, now);
+
+		setOffsets({ [lineKey(r.axis, r.index)]: r.dir * r.frac });
+		animRef.current = requestAnimationFrame(tick);
+	}, [applyStep, aim, jolt, settle, wind]);
+
+	/** Take hold of the hen's line. False when it is nailed down and nothing can start. */
+	const grab = useCallback((axis: Axis, dir: -1 | 1, held: boolean): boolean => {
+		const b = boardRef.current;
+		if (!b || lockedRef.current) return false;
 		settle();
 		const h = heroIndex(b);
 		const index = axis === 'row' ? Math.floor(h / b.n) : h % b.n;
-		const moves = applyStep(axis, index, dir);
-		if (!moves.length) { bump(); return; }
-		setFront(axis);
-
-		const key = lineKey(axis, index);
-		setMoving(new Set(moves.map((m) => m.to)));
-		const t0 = performance.now();
-		const frame = (): void => {
-			const k = Math.min(1, (performance.now() - t0) / STEP_MS);
-			setOffsets({ [key]: -dir * (1 - k) ** 3 });
-			if (k < 1) animRef.current = requestAnimationFrame(frame);
-			else { animRef.current = 0; setOffsets({}); setMoving(new Set()); }
+		const r: BeltRun = {
+			axis, index, dir, base: 0, frac: 0, want: 0, v: 0, held,
+			settle: 0, from: 0, t: performance.now(), jolted: false, hist: [],
 		};
-		animRef.current = requestAnimationFrame(frame);
-	}, [applyStep, bump, settle]);
+		beltRef.current = r;
+		setFront(axis);
+		if (!aim(r)) { jolt(axis, index, dir); settle(); return false; }
+		setRunning(true);
+		animRef.current = requestAnimationFrame(tick);
+		return true;
+	}, [settle, aim, jolt, tick]);
 
-	const stepRef = useRef(step);
-	stepRef.current = step;
+	/** One press — a key or the pad: launch the belt, or cut it when it is already running. */
+	const nudge = useCallback((axis: Axis, dir: -1 | 1) => {
+		const r = beltRef.current;
+		if (r) { wind(r, performance.now()); return; }
+		if (grab(axis, dir, false) && beltRef.current) beltRef.current.v = TAP_V;
+	}, [grab, wind]);
+
+	const nudgeRef = useRef(nudge);
+	nudgeRef.current = nudge;
 
 	const cellPx = useCallback((): number => {
 		const rect = elRef.current?.getBoundingClientRect();
 		return Math.max(1, (rect?.width ?? 320) / Math.max(1, boardRef.current?.n ?? 1));
 	}, []);
 
-	/* Swipe on the board: one step per threshold crossed, so a long drag chains them. */
-	const swipeRef = useRef({ x: 0, y: 0, on: false });
+	/* Drag on the board: the belt follows the finger, and keeps its speed when you let go. */
+	const dragRef = useRef({ x: 0, y: 0, on: false, locked: false });
 	const swipe = usePointerDrag(
-		(x, y) => { swipeRef.current = { x, y, on: !lockedRef.current }; },
 		(x, y) => {
-			const g = swipeRef.current;
+			// Touching a running belt is the brake.
+			const r = beltRef.current;
+			if (r) wind(r, performance.now());
+			dragRef.current = { x, y, on: !lockedRef.current, locked: false };
+		},
+		(x, y) => {
+			const g = dragRef.current;
 			if (!g.on) return;
+			const cell = cellPx();
 			const dx = x - g.x;
 			const dy = y - g.y;
-			const need = Math.max(18, cellPx() * 0.6);
-			if (Math.abs(dx) < need && Math.abs(dy) < need) return;
-			const row = Math.abs(dx) >= Math.abs(dy);
-			stepRef.current(row ? 'row' : 'col', (row ? dx : dy) > 0 ? 1 : -1);
-			g.x = x;
-			g.y = y;
+			if (!g.locked) {
+				const need = Math.max(9, cell * 0.25);
+				if (Math.abs(dx) < need && Math.abs(dy) < need) return;
+				const row = Math.abs(dx) >= Math.abs(dy);
+				// Re-anchor on the crossing point, so the belt does not jump by the threshold.
+				g.x = x;
+				g.y = y;
+				g.locked = true;
+				if (!grab(row ? 'row' : 'col', (row ? dx : dy) > 0 ? 1 : -1, true)) g.on = false;
+				return;
+			}
+			const r = beltRef.current;
+			if (!r || !r.held) return;
+			r.want = Math.max(0, ((r.axis === 'row' ? dx : dy) * r.dir) / cell);
+			r.hist.push({ t: performance.now(), p: r.want });
+			if (r.hist.length > 8) r.hist.shift();
 		},
-		() => { swipeRef.current.on = false; },
+		() => {
+			dragRef.current.on = false;
+			const r = beltRef.current;
+			if (!r || !r.held) return;
+			r.held = false;
+			r.v = Math.min(RUN_VMAX, flingSpeed(r.hist));
+			if (r.v < 0.6) wind(r, performance.now());
+		},
 	);
 
-	/* Arrow pad: press once, then hold to repeat. */
-	const repeatRef = useRef<{ delay: number; tick: number }>({ delay: 0, tick: 0 });
-	const releasePad = useCallback(() => {
-		window.clearTimeout(repeatRef.current.delay);
-		window.clearInterval(repeatRef.current.tick);
-		repeatRef.current = { delay: 0, tick: 0 };
-	}, []);
-	const holdPad = useCallback((axis: Axis, dir: -1 | 1) => {
-		releasePad();
-		stepRef.current(axis, dir);
-		repeatRef.current.delay = window.setTimeout(() => {
-			repeatRef.current.tick = window.setInterval(() => stepRef.current(axis, dir), REPEAT_MS);
-		}, HOLD_MS);
-	}, [releasePad]);
-
+	const noop = useCallback(() => {}, []);
 	const pad = {
-		up: useHoldButton(() => holdPad('col', -1), releasePad),
-		down: useHoldButton(() => holdPad('col', 1), releasePad),
-		left: useHoldButton(() => holdPad('row', -1), releasePad),
-		right: useHoldButton(() => holdPad('row', 1), releasePad),
+		up: useHoldButton(() => nudgeRef.current('col', -1), noop),
+		down: useHoldButton(() => nudgeRef.current('col', 1), noop),
+		left: useHoldButton(() => nudgeRef.current('row', -1), noop),
+		right: useHoldButton(() => nudgeRef.current('row', 1), noop),
 	};
 
 	useEffect(() => {
@@ -392,13 +518,14 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			const hit = KEY_MOVES[e.key] ?? KEY_MOVES[e.key.toLowerCase()];
 			if (!hit) return;
 			e.preventDefault();
-			stepRef.current(hit[0], hit[1]);
+			if (e.repeat) return; // a held key must not flip between launch and brake
+			nudgeRef.current(hit[0], hit[1]);
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
 	}, []);
 
-	useEffect(() => () => { settle(); releasePad(); }, [settle, releasePad]);
+	useEffect(() => () => { settle(); window.clearTimeout(jamRef.current); }, [settle]);
 
 	const restart = useCallback(() => {
 		const fresh = freshRef.current;
@@ -477,14 +604,16 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	];
 	if (front === 'row') heroBelts.reverse();
 
-	/* A push that cannot move greys its arrow out, so the dead ends read at a glance. */
+	/* A push that cannot move greys its arrow out, so the dead ends read at a glance.
+	   While a belt runs they all stay lit: any of them is the brake. */
 	const can = useMemo(() => {
 		if (!board || locked) return { up: false, down: false, left: false, right: false };
+		if (running) return { up: true, down: true, left: true, right: true };
 		const h = heroIndex(board);
 		const row = slack(board, 'row', Math.floor(h / board.n));
 		const col = slack(board, 'col', h % board.n);
 		return { up: col.min < 0, down: col.max > 0, left: row.min < 0, right: row.max > 0 };
-	}, [board, locked]);
+	}, [board, locked, running]);
 
 	const left = board ? countCrystals(board) : 0;
 	const { celebrating, showWin } = useCelebration(status === 'won');
@@ -561,7 +690,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				<div className="tk-boardwrap">
 					{celebrating && <Celebration />}
 					<div
-						className={`tk-board ${gated ? 'blurred' : ''} ${shaking ? 'shake' : ''}`}
+						className={`tk-board ${gated ? 'blurred' : ''}`}
 						ref={elRef}
 						onPointerDown={swipe.onPointerDown}
 						role="application"
@@ -583,7 +712,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 							return (
 								<div
 									key={s.id}
-									className={`tk-slab ${KIND_CLASS[s.kind]}`}
+									className={`tk-slab ${KIND_CLASS[s.kind]}${jam?.cells.has(s.idx) ? ` jam ${jam.axis === 'row' ? 'jx' : 'jy'}` : ''}`}
 									style={{ transform: `translate(${((s.idx % n) + o.x) * 100}%, ${(Math.floor(s.idx / n) + o.y) * 100}%)` }}
 								>
 									<div className="tk-face">{GLYPH[s.kind] && <span>{GLYPH[s.kind]}</span>}</div>
@@ -713,8 +842,11 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="tk-help">
-				Seules la ligne et la colonne où se trouve la cocotte 🐔 peuvent bouger, d'une case à la fois :
-				flèches du clavier, pavé ci-dessus, ou petit glissé sur la grille. Le sol est un quadrillage de
+				Seules la ligne et la colonne où se trouve la cocotte 🐔 peuvent bouger. Attrape la ligne au
+				doigt&nbsp;: le tapis suit la main, et il garde son élan quand tu lâches — il continue tout seul
+				jusqu'à ce que le frottement l'arrête. Un nouvel appui le coupe net. Les flèches du clavier et le
+				pavé ci-dessus lui donnent une impulsion, et servent aussi de frein. Chaque case parcourue compte
+				un coup&nbsp;: c'est en coupant tôt qu'on vise le par. Le sol est un quadrillage de
 				tapis roulants : la cocotte et les bacs en plastique glissent dessus et se tassent contre le mur
 				ou contre ce qui les arrête — le tapis, lui, continue de tourner dessous. Les caisses en fer,
 				pleines de pièces lourdes, sont boulonnées au tapis et voyagent exactement avec lui : dès
@@ -785,6 +917,7 @@ const CSS = `
   user-select: none;
   cursor: grab;
 }
+.tk-board:active { cursor: grabbing; }
 
 /* One physical band per lane, edge rails shaded in. The texture is one cell of belt,
    repeated along the run, and background-position carries it exactly with its line —
@@ -916,8 +1049,19 @@ const CSS = `
 .tk-pop span { animation: tk-pop 0.48s ease-out forwards; }
 @keyframes tk-pop { from { opacity: 1; transform: scale(0.6); } to { opacity: 0; transform: scale(1.7); } }
 
-.tk-board.shake { animation: tk-shake 0.24s ease; }
-@keyframes tk-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+/* Nothing gives: the pieces holding the line shudder against it, the board stays put. */
+.tk-slab.jam .tk-face { animation: tk-jam 0.34s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+.tk-slab.jam.jy .tk-face { animation-name: tk-jam-v; }
+@keyframes tk-jam {
+  0%, 100% { transform: translateX(0); }
+  18% { transform: translateX(-9%); } 42% { transform: translateX(7%); }
+  66% { transform: translateX(-4%); } 85% { transform: translateX(2%); }
+}
+@keyframes tk-jam-v {
+  0%, 100% { transform: translateY(0); }
+  18% { transform: translateY(-9%); } 42% { transform: translateY(7%); }
+  66% { transform: translateY(-4%); } 85% { transform: translateY(2%); }
+}
 
 .tk-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
 .tk-overlay {
@@ -968,6 +1112,6 @@ const CSS = `
 @keyframes tk-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .tk-gem span { animation: none; transform: translateY(-14%); }
-  .tk-overlay, .tk-board.shake, .tk-pop span { animation: none; }
+  .tk-overlay, .tk-slab.jam .tk-face, .tk-pop span { animation: none; }
 }
 `;
