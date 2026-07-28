@@ -8,7 +8,14 @@ export default defineConfig({
     site: 'https://www.ludiven-studio.fr',
     integrations: [
         react(),
-        sitemap({ filter: (page) => !page.includes('/labo') }),
+        // Keep noindex pages (labo, legal pages) out of the sitemap — submitting
+        // them while they carry a noindex meta triggers Search Console warnings.
+        sitemap({
+            filter: (page) =>
+                !page.includes('/labo') &&
+                !page.includes('/confidentialite') &&
+                !page.includes('/mentions-legales'),
+        }),
         AstroPWA({
             registerType: 'autoUpdate',
             // Keep the hand-written public/manifest.webmanifest (+ MainHead link) — don't
