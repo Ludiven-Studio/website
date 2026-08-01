@@ -2,7 +2,8 @@
  * REINES (LinkedIn "Queens") — pure engine (no UI).
  * n×n grid split into n colour regions. Place one queen per row, per column
  * and per region, with no two queens adjacent (orthogonal or diagonal).
- * Generation guarantees a unique solution.
+ * Generation guarantees a unique solution and a guess-free logical path
+ * (every board passes solveByLogic, deterministic deductions only).
  */
 
 import type { Rng } from '../prng';
@@ -84,10 +85,24 @@ const NEI4 = [
 	[0, 1],
 ] as const;
 
-/** Grow n connected regions from the queen cells via randomised frontier fill
- *  (fast, reliably unique-solvable; region shapes stay irregular by nature). */
+/** Grow n connected regions from the queen cells via randomised frontier fill.
+ *  Region sizes are drawn uneven on purpose (rich-get-richer targets): small
+ *  zones pin queens, which makes unique, logic-solvable boards far more likely. */
 function growRegions(n: number, solution: number[], rng: Rng): number[][] {
+	// Uneven size targets summing to n*n (each region starts at 1 = its queen cell).
+	const targets = new Array<number>(n).fill(1);
+	for (let rest = n * n - n; rest > 0; rest--) {
+		let x = rng() * (n * n - rest);
+		let id = 0;
+		for (; id < n - 1; id++) {
+			x -= targets[id];
+			if (x <= 0) break;
+		}
+		targets[id]++;
+	}
+
 	const regions: number[][] = Array.from({ length: n }, () => new Array(n).fill(-1));
+	const sizes = new Array<number>(n).fill(1);
 	const frontier: [number, number, number][] = []; // r, c, region
 
 	const addNeighbours = (r: number, c: number, id: number) => {
@@ -105,10 +120,17 @@ function growRegions(n: number, solution: number[], rng: Rng): number[][] {
 
 	let remaining = n * n - n;
 	while (remaining > 0 && frontier.length) {
-		const idx = Math.floor(rng() * frontier.length);
+		// Prefer frontier cells of regions still under their target size.
+		const under: number[] = [];
+		for (let i = 0; i < frontier.length; i++)
+			if (sizes[frontier[i][2]] < targets[frontier[i][2]]) under.push(i);
+		const idx = under.length
+			? under[Math.floor(rng() * under.length)]
+			: Math.floor(rng() * frontier.length);
 		const [r, c, id] = frontier.splice(idx, 1)[0];
 		if (regions[r][c] !== -1) continue;
 		regions[r][c] = id;
+		sizes[id]++;
 		remaining--;
 		addNeighbours(r, c, id);
 	}
@@ -219,6 +241,275 @@ export function countSolutions(regions: number[][], n: number, limit = 2): numbe
 	return count;
 }
 
+type UnitKind = 'ligne' | 'colonne' | 'zone';
+
+interface UnitRef {
+	kind: UnitKind;
+	index: number;
+}
+interface SinglePlaced extends UnitRef {
+	r: number;
+	c: number;
+}
+interface ConfineResult {
+	cells: [number, number][]; // eliminated cells
+	axis: 'ligne' | 'colonne';
+	ids: number[]; // zones of the confined group
+	lines: number[]; // 0-based line indices
+	dual: boolean; // true: lines -> zones direction
+}
+interface WipeResult extends UnitRef {
+	r: number; // eliminated cell; kind/index = the unit its queen would wipe
+	c: number;
+}
+
+// French names of the zones, aligned with PALETTE (hint wording).
+const FR_COLORS = ['corail', 'orange', 'jaune', 'verte', 'bleue', 'violette', 'turquoise', 'rose'];
+const zoneName = (id: number) => `zone ${FR_COLORS[id % FR_COLORS.length]}`;
+const unitName = (u: UnitRef) => (u.kind === 'zone' ? zoneName(u.index) : `${u.kind} ${u.index + 1}`);
+const joinFr = (xs: string[]) =>
+	xs.length <= 1 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} et ${xs[xs.length - 1]}`;
+
+function confineReason(e: ConfineResult): string {
+	const lines = joinFr(e.lines.map((i) => `${e.axis} ${i + 1}`));
+	const zones = joinFr(e.ids.map(zoneName));
+	const nl = e.lines.length > 1;
+	const nz = e.ids.length > 1;
+	return e.dual
+		? `${nl ? 'Les' : 'La'} ${lines} n'offre${nl ? 'nt' : ''} que ${nz ? 'les' : 'la'} ${zones} → croix pour ${nz ? 'ces zones' : 'cette zone'} ailleurs.`
+		: `${nz ? 'Les' : 'La'} ${zones} tien${nz ? 'nent' : 't'} sur ${nl ? 'les' : 'la'} ${lines} → croix pour les autres zones sur ${nl ? `ces ${e.axis}s` : `cette ${e.axis}`}.`;
+}
+
+/** Shared deduction engine: candidate grid + the human rule set. Each rule
+ *  applies its deduction and reports what it did (for solver and hints). */
+function createLogic(regions: number[][], n: number) {
+	const cand: boolean[][] = Array.from({ length: n }, () => new Array(n).fill(true));
+	const queenCol = new Array<number>(n).fill(-1);
+	let placed = 0;
+
+	const attacks = (r1: number, c1: number, r2: number, c2: number) =>
+		r1 === r2 || c1 === c2 || regions[r1][c1] === regions[r2][c2] || adjacent(r1, c1, r2, c2);
+
+	const place = (r: number, c: number) => {
+		queenCol[r] = c;
+		placed++;
+		for (let rr = 0; rr < n; rr++)
+			for (let cc = 0; cc < n; cc++) {
+				if (rr === r && cc === c) continue;
+				if (cand[rr][cc] && attacks(r, c, rr, cc)) cand[rr][cc] = false;
+			}
+	};
+
+	const colHasQueen = (c: number) => queenCol.includes(c);
+	const regionHasQueen = (id: number) =>
+		queenCol.some((qc, r) => qc !== -1 && regions[r][qc] === id);
+	const regionCells = (id: number): [number, number][] => {
+		const out: [number, number][] = [];
+		for (let r = 0; r < n; r++)
+			for (let c = 0; c < n; c++) if (regions[r][c] === id && cand[r][c]) out.push([r, c]);
+		return out;
+	};
+
+	// Last free cell of a queenless row / column / zone -> place its queen.
+	const singles = (): SinglePlaced | 'dead' | null => {
+		for (let r = 0; r < n; r++) {
+			if (queenCol[r] !== -1) continue;
+			const cs: number[] = [];
+			for (let c = 0; c < n; c++) if (cand[r][c]) cs.push(c);
+			if (cs.length === 0) return 'dead';
+			if (cs.length === 1) {
+				place(r, cs[0]);
+				return { r, c: cs[0], kind: 'ligne', index: r };
+			}
+		}
+		for (let c = 0; c < n; c++) {
+			if (colHasQueen(c)) continue;
+			const rs: number[] = [];
+			for (let r = 0; r < n; r++) if (cand[r][c]) rs.push(r);
+			if (rs.length === 0) return 'dead';
+			if (rs.length === 1) {
+				place(rs[0], c);
+				return { r: rs[0], c, kind: 'colonne', index: c };
+			}
+		}
+		for (let id = 0; id < n; id++) {
+			if (regionHasQueen(id)) continue;
+			const cells = regionCells(id);
+			if (cells.length === 0) return 'dead';
+			if (cells.length === 1) {
+				place(cells[0][0], cells[0][1]);
+				return { r: cells[0][0], c: cells[0][1], kind: 'zone', index: id };
+			}
+		}
+		return null;
+	};
+
+	const combos = (arr: number[], k: number): number[][] => {
+		const out: number[][] = [];
+		const acc: number[] = [];
+		const rec = (start: number) => {
+			if (acc.length === k) {
+				out.push([...acc]);
+				return;
+			}
+			for (let i = start; i < arr.length; i++) {
+				acc.push(arr[i]);
+				rec(i + 1);
+				acc.pop();
+			}
+		};
+		rec(0);
+		return out;
+	};
+
+	// k zones confined to k rows/cols own those lines; dual: k lines spanning
+	// exactly k zones lock those zones in. maxK = 1 (tier 2) or 3 (tier 3+).
+	const confinement = (maxK: number): ConfineResult | null => {
+		const freeRegions: number[] = [];
+		for (let id = 0; id < n; id++) if (!regionHasQueen(id)) freeRegions.push(id);
+		for (const axis of ['row', 'col'] as const) {
+			const regionSets = new Map(
+				freeRegions.map((id) => {
+					const s = new Set<number>();
+					for (const [r, c] of regionCells(id)) s.add(axis === 'row' ? r : c);
+					return [id, s];
+				}),
+			);
+			for (let k = 1; k <= maxK; k++) {
+				for (const group of combos(freeRegions, k)) {
+					const union = new Set<number>();
+					for (const id of group) for (const v of regionSets.get(id)!) union.add(v);
+					if (union.size !== k) continue;
+					const cells: [number, number][] = [];
+					const inGroup = new Set(group);
+					for (const v of union)
+						for (let o = 0; o < n; o++) {
+							const r = axis === 'row' ? v : o;
+							const c = axis === 'row' ? o : v;
+							if (cand[r][c] && !inGroup.has(regions[r][c])) {
+								cand[r][c] = false;
+								cells.push([r, c]);
+							}
+						}
+					if (cells.length)
+						return {
+							cells,
+							axis: axis === 'row' ? 'ligne' : 'colonne',
+							ids: group,
+							lines: [...union],
+							dual: false,
+						};
+				}
+			}
+			const freeLines: number[] = [];
+			for (let i = 0; i < n; i++) {
+				if (axis === 'row' ? queenCol[i] !== -1 : colHasQueen(i)) continue;
+				freeLines.push(i);
+			}
+			const lineRegions = new Map(
+				freeLines.map((i) => {
+					const s = new Set<number>();
+					for (let o = 0; o < n; o++) {
+						const r = axis === 'row' ? i : o;
+						const c = axis === 'row' ? o : i;
+						if (cand[r][c]) s.add(regions[r][c]);
+					}
+					return [i, s];
+				}),
+			);
+			for (let k = 1; k <= maxK; k++) {
+				for (const group of combos(freeLines, k)) {
+					const union = new Set<number>();
+					for (const i of group) for (const v of lineRegions.get(i)!) union.add(v);
+					if (union.size !== k) continue;
+					const cells: [number, number][] = [];
+					const inGroup = new Set(group);
+					for (const id of union)
+						for (let r = 0; r < n; r++)
+							for (let c = 0; c < n; c++) {
+								if (!cand[r][c] || regions[r][c] !== id) continue;
+								if (!inGroup.has(axis === 'row' ? r : c)) {
+									cand[r][c] = false;
+									cells.push([r, c]);
+								}
+							}
+					if (cells.length)
+						return {
+							cells,
+							axis: axis === 'row' ? 'ligne' : 'colonne',
+							ids: [...union],
+							lines: group,
+							dual: true,
+						};
+				}
+			}
+		}
+		return null;
+	};
+
+	// A candidate whose queen would wipe every cell of another queenless unit
+	// cannot be a queen ("if I play here, that zone dies").
+	const attackWipe = (): WipeResult | null => {
+		const wouldWipe = (r: number, c: number, cells: [number, number][]) =>
+			cells.length > 0 && cells.every(([r2, c2]) => attacks(r, c, r2, c2));
+		for (let r = 0; r < n; r++)
+			for (let c = 0; c < n; c++) {
+				if (!cand[r][c]) continue;
+				for (let id = 0; id < n; id++) {
+					if (id === regions[r][c] || regionHasQueen(id)) continue;
+					if (wouldWipe(r, c, regionCells(id))) {
+						cand[r][c] = false;
+						return { r, c, kind: 'zone', index: id };
+					}
+				}
+				for (let rr = 0; rr < n; rr++) {
+					if (rr === r || queenCol[rr] !== -1) continue;
+					const cells: [number, number][] = [];
+					for (let cc = 0; cc < n; cc++) if (cand[rr][cc]) cells.push([rr, cc]);
+					if (wouldWipe(r, c, cells)) {
+						cand[r][c] = false;
+						return { r, c, kind: 'ligne', index: rr };
+					}
+				}
+				for (let cc = 0; cc < n; cc++) {
+					if (cc === c || colHasQueen(cc)) continue;
+					const cells: [number, number][] = [];
+					for (let rr = 0; rr < n; rr++) if (cand[rr][cc]) cells.push([rr, cc]);
+					if (wouldWipe(r, c, cells)) {
+						cand[r][c] = false;
+						return { r, c, kind: 'colonne', index: cc };
+					}
+				}
+			}
+		return null;
+	};
+
+	return { queenCol, placedCount: () => placed, place, singles, confinement, attackWipe };
+}
+
+/**
+ * Deterministic human-style solver. Applies only forced deductions, so a
+ * solved board is guaranteed to have a single solution AND a no-guess path:
+ *  - tier 1: propagation from placed queens + last free cell of a row/col/zone
+ *  - tier 2: + a zone confined to one row/col excludes the rest of that line
+ *  - tier 3: + k zones confined to k lines (k <= 3), and the dual
+ *  - tier 4: + a cell whose queen would empty another unit is excluded
+ * Returns the solution (col per row) or null if stuck / contradiction.
+ */
+export function solveByLogic(regions: number[][], n: number, tier: 1 | 2 | 3 | 4): number[] | null {
+	const L = createLogic(regions, n);
+	for (let guard = 0; guard < n * n * 8; guard++) {
+		if (L.placedCount() === n) return L.queenCol;
+		const s = L.singles();
+		if (s === 'dead') return null;
+		if (s) continue;
+		if (tier >= 2 && L.confinement(tier >= 3 ? 3 : 1)) continue;
+		if (tier >= 4 && L.attackWipe()) continue;
+		return null;
+	}
+	return null;
+}
+
 export interface HintResult {
 	r: number;
 	c: number;
@@ -228,9 +519,10 @@ export interface HintResult {
 
 /**
  * Find the next logically-deducible move and explain the technique (French).
- * `marks`: player grid, 0 empty / 1 cross / 2 queen. Corrects a misplaced queen
- * first; then the only possible cell of a unit (queen), an attacked cell (cross),
- * finally an honest fallback. A proposed 'queen' is always solution[r] === c.
+ * `marks`: player grid, 0 empty / 1 cross / 2 queen. Corrects a wrong mark
+ * first; then crosses attacked cells; then follows the same deterministic rule
+ * chain as solveByLogic (so a hint is always a justified deduction, never an
+ * arbitrary reveal). A proposed 'queen' is always solution[r] === c.
  */
 export function findHint(marks: CellState[][], puzzle: ReinesPuzzle): HintResult | null {
 	const { size: n, regions, solution } = puzzle;
@@ -275,40 +567,15 @@ export function findHint(marks: CellState[][], puzzle: ReinesPuzzle): HintResult
 			};
 		}
 
-	const emptyNonAttacked = (cells: [number, number][]): [number, number][] =>
-		cells.filter(([r, c]) => marks[r]?.[c] === 0 && !attackedBy(r, c));
-
-	// 2) Only possible cell of a row / column / region -> queen.
-	const rowCells = (i: number): [number, number][] =>
-		Array.from({ length: n }, (_, c): [number, number] => [i, c]);
-	const colCells = (i: number): [number, number][] =>
-		Array.from({ length: n }, (_, r): [number, number] => [r, i]);
-	const regionCells = (id: number): [number, number][] => {
-		const out: [number, number][] = [];
-		for (let r = 0; r < n; r++)
-			for (let c = 0; c < n; c++) if (regions[r][c] === id) out.push([r, c]);
-		return out;
-	};
-	const hasQueen = (cells: [number, number][]) => cells.some(([r, c]) => isQueen(r, c));
-
-	const units: { kind: 'ligne' | 'colonne' | 'zone'; cells: [number, number][] }[] = [];
-	for (let i = 0; i < n; i++) units.push({ kind: 'ligne', cells: rowCells(i) });
-	for (let i = 0; i < n; i++) units.push({ kind: 'colonne', cells: colCells(i) });
-	for (let id = 0; id < n; id++) units.push({ kind: 'zone', cells: regionCells(id) });
-
-	for (const { kind, cells } of units) {
-		if (hasQueen(cells)) continue;
-		const free = emptyNonAttacked(cells);
-		if (free.length !== 1) continue;
-		const [r, c] = free[0];
-		if (!isSolQueen(r, c)) continue; // safety: must match the solution
-		return {
-			r,
-			c,
-			value: 'queen',
-			reason: `Cette ${kind} n'a qu'une case possible pour sa reine.`,
-		};
-	}
+	// 2) A cross sitting on the real queen cell poisons every deduction — fix it.
+	for (let r = 0; r < n; r++)
+		if (marks[r]?.[solution[r]] === 1)
+			return {
+				r,
+				c: solution[r],
+				value: 'queen',
+				reason: "La croix posée ici est erronée — c'est justement la case de la reine de cette ligne.",
+			};
 
 	// 3) An attacked empty cell -> cross.
 	for (let r = 0; r < n; r++)
@@ -324,7 +591,48 @@ export function findHint(marks: CellState[][], puzzle: ReinesPuzzle): HintResult
 				};
 		}
 
-	// 4) Fallback — next missing solution queen.
+	// 4) Next deduction of the logic solver, seeded with the placed queens.
+	// Deductions already crossed by the player advance the internal state only.
+	const L = createLogic(regions, n);
+	for (const [r, c] of queens) L.place(r, c);
+	const tier = tierForSize(n);
+	for (let guard = 0; guard < n * n * 8; guard++) {
+		if (L.placedCount() === n) break;
+		const s = L.singles();
+		if (s === 'dead') break; // inconsistent state -> honest fallback
+		if (s) {
+			if (!isSolQueen(s.r, s.c)) break; // safety: must match the solution
+			return {
+				r: s.r,
+				c: s.c,
+				value: 'queen',
+				reason: `Seule case encore possible de la ${unitName(s)}.`,
+			};
+		}
+		const e = L.confinement(tier >= 3 ? 3 : 1);
+		if (e) {
+			const fresh = e.cells.find(([rr, cc]) => marks[rr]?.[cc] === 0 && !isSolQueen(rr, cc));
+			if (fresh)
+				return { r: fresh[0], c: fresh[1], value: 'cross', reason: confineReason(e) };
+			continue;
+		}
+		if (tier >= 4) {
+			const w = L.attackWipe();
+			if (w) {
+				if (marks[w.r]?.[w.c] === 0 && !isSolQueen(w.r, w.c))
+					return {
+						r: w.r,
+						c: w.c,
+						value: 'cross',
+						reason: `Une reine ici couvrirait toutes les cases restantes de la ${unitName(w)} → croix.`,
+					};
+				continue;
+			}
+		}
+		break;
+	}
+
+	// 5) Fallback — next missing solution queen (degraded boards only).
 	for (let r = 0; r < n; r++)
 		if (!isQueen(r, solution[r]))
 			return { r, c: solution[r], value: 'queen', reason: 'La reine de cette ligne va ici.' };
@@ -332,18 +640,31 @@ export function findHint(marks: CellState[][], puzzle: ReinesPuzzle): HintResult
 	return null;
 }
 
-/** Generate a uniquely-solvable Reines puzzle. */
+/** Rule tier a board of size n may require: 6/7 stay solvable with confinement
+ *  techniques only; 8 may also need the one-step "wipe" exclusions (tier 4). */
+const tierForSize = (n: number): 3 | 4 => (n >= 8 ? 4 : 3);
+
+/** Generate a Reines puzzle with a unique solution AND a guess-free logical
+ *  path (every step deducible with the solveByLogic rule tier of its size). */
 export function generateReines(diff: DiffLevel, rng: Rng = Math.random): ReinesPuzzle {
 	const n = diff.size;
-	for (let attempt = 0; attempt < 200; attempt++) {
+	const tier = tierForSize(n);
+	for (let attempt = 0; attempt < 600; attempt++) {
 		const solution = randomSolution(n, rng);
 		if (!solution) continue;
 		// A few region layouts per solution before re-seeding the solution.
+		for (let g = 0; g < 8; g++) {
+			const regions = growRegions(n, solution, rng);
+			if (solveByLogic(regions, n, tier)) return { size: n, regions, solution };
+		}
+	}
+	// Degraded fallback: give up on the no-guess path but keep uniqueness.
+	for (let attempt = 0; attempt < 300; attempt++) {
+		const solution = randomSolution(n, rng);
+		if (!solution) continue;
 		for (let g = 0; g < 12; g++) {
 			const regions = growRegions(n, solution, rng);
-			if (countSolutions(regions, n, 2) === 1) {
-				return { size: n, regions, solution };
-			}
+			if (countSolutions(regions, n, 2) === 1) return { size: n, regions, solution };
 		}
 	}
 	// Extremely unlikely fallback: return last attempt's layout.

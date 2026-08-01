@@ -3,6 +3,7 @@ import {
 	DIFFS,
 	generateReines,
 	countSolutions,
+	solveByLogic,
 	findConflicts,
 	findHint,
 	type CellState,
@@ -44,6 +45,30 @@ describe('reines engine', () => {
 			expect(countSolutions(p.regions, n, 2)).toBe(1);
 		});
 	}
+
+	for (const key of Object.keys(DIFFS)) {
+		const diff = DIFFS[key];
+
+		it(`${diff.label}: every board has a guess-free logical path`, () => {
+			// Many seeds: the logic filter must hold, not just on a lucky draw.
+			for (let s = 0; s < 15; s++) {
+				const p = generateReines(diff, mulberry32(5000 + s * 37 + diff.size));
+				const tier = diff.size >= 8 ? 4 : 3;
+				const derived = solveByLogic(p.regions, p.size, tier);
+				expect(derived).not.toBeNull();
+				expect(derived).toEqual(p.solution);
+				expect(countSolutions(p.regions, p.size, 2)).toBe(1);
+			}
+		});
+	}
+
+	it('solveByLogic rejects a multi-solution board', () => {
+		// Region = column: every non-adjacent permutation is a valid solution.
+		const n = 6;
+		const regions = Array.from({ length: n }, () => Array.from({ length: n }, (_, c) => c));
+		expect(countSolutions(regions, n, 2)).toBe(2);
+		expect(solveByLogic(regions, n, 4)).toBeNull();
+	});
 
 	it('is deterministic: same seed -> identical puzzle', () => {
 		const seed = dateSeed(new Date('2026-06-13T00:00:00Z'));
@@ -160,6 +185,9 @@ describe('reines findHint', () => {
 				if (h.value === 'queen') expect(p.solution[h.r]).toBe(h.c);
 				// Any proposed cross must NOT be a solution queen cell.
 				if (h.value === 'cross') expect(p.solution[h.r] === h.c).toBe(false);
+				// Generated boards have a full logical path: the unjustified
+				// "reveal" fallback must never fire.
+				expect(h.reason).not.toBe('La reine de cette ligne va ici.');
 
 				apply(marks, h);
 			}

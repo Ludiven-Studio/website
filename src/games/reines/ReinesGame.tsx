@@ -46,6 +46,18 @@ type Status = 'playing' | 'won';
 const emptyMarks = (n: number): CellState[][] =>
 	Array.from({ length: n }, () => new Array(n).fill(0) as CellState[]);
 
+/* Daily-run state is versioned: GEN_V bumps with the generator, so marks saved
+   for a grid built by an older engine are discarded instead of restored onto a
+   different board (same seed, different regions). */
+const GEN_V = 2;
+const packMarks = (marks: CellState[][]) => ({ v: GEN_V, marks });
+const unpackMarks = (state: unknown, n: number): CellState[][] => {
+	const s = state as { v?: number; marks?: CellState[][] } | null;
+	return s && s.v === GEN_V && Array.isArray(s.marks) && s.marks.length === n
+		? s.marks
+		: emptyMarks(n);
+};
+
 const fmtTime = fmtCentis;
 
 // Daily challenge: seed + difficulty come from the server (same for everyone).
@@ -147,7 +159,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			const p = generateReines(DIFFS[dk], mulberry32(run.seed));
 			skipBackstopRef.current = p; // keep the restored marks, don't clear them
 			setPuzzle(p);
-			setMarks((run.state as CellState[][]) ?? emptyMarks(p.size));
+			setMarks(unpackMarks(run.state, p.size));
 			setStarted(true);
 			if (run.done) {
 				setAlreadyPlayed(true);
@@ -196,7 +208,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				done: false,
 				seed: sd?.seed,
 				diffIndex: sd?.diffIndex,
-				state: emptyMarks(DIFFS[dk].size),
+				state: packMarks(emptyMarks(DIFFS[dk].size)),
 			});
 		}
 	}, [gameId, daily]);
@@ -214,7 +226,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: cleared,
+			state: packMarks(cleared),
 		});
 	}, [gameId]);
 
@@ -278,7 +290,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: marks,
+			state: packMarks(marks),
 		});
 	}, [daily, started, status, marks, gameId]);
 
@@ -293,7 +305,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			finalTime,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: marks,
+			state: packMarks(marks),
 		};
 		saveDailyRun(gameId, snapshot);
 		// eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,6 +1,6 @@
 // Reines levels plan (1-100). The engine's only difficulty knob is board size,
-// and it only produces reliably unique boards up to 8x8 (frontier-fill region
-// growth almost never yields a unique solution at n>=9). So the ramp goes 6 -> 8:
+// and it only produces reliably unique, logic-solvable boards up to 8x8
+// (region growth almost never yields a unique solution at n>=9). So the ramp goes 6 -> 8:
 // levels 1-40 are 6x6, 41-75 are 7x7, 76-100 are 8x8. A level = solve the board;
 // stars come from solve time, scaled to n^2 (bigger board = more cells to reason on).
 
