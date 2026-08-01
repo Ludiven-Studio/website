@@ -6,6 +6,7 @@ import {
 	solveByLogic,
 	findConflicts,
 	findHint,
+	applyHint,
 	type CellState,
 } from './engine';
 import { mulberry32, dateSeed } from '../prng';
@@ -151,15 +152,23 @@ describe('reines findHint', () => {
 	const emptyMarks = (n: number): CellState[][] =>
 		Array.from({ length: n }, () => new Array(n).fill(0) as CellState[]);
 
-	// Mirror the component: 'queen' clears its row then places the queen; 'cross' sets a 1.
-	const apply = (marks: CellState[][], h: { r: number; c: number; value: 'queen' | 'cross' }) => {
-		if (h.value === 'queen') {
-			marks[h.r] = new Array(marks.length).fill(0) as CellState[];
-			marks[h.r][h.c] = 2;
-		} else {
-			marks[h.r][h.c] = 1;
-		}
-	};
+	it('placing a hint queen keeps the crosses of that row', () => {
+		const p = generateReines(DIFFS.facile, mulberry32(77));
+		const n = p.size;
+		const marks = emptyMarks(n);
+		const target = p.solution[0];
+		// Cross every other cell of row 0, plus a queen to be replaced.
+		for (let c = 0; c < n; c++) if (c !== target) marks[0][c] = 1;
+		const wrong = (target + 2) % n;
+		marks[0][wrong] = 2;
+
+		const next = applyHint(marks, { r: 0, c: target, value: 'queen', reason: '' });
+		expect(next[0][target]).toBe(2);
+		expect(next[0][wrong]).toBe(0); // the other queen of the row is dropped
+		for (let c = 0; c < n; c++)
+			if (c !== target && c !== wrong) expect(next[0][c]).toBe(1); // crosses survive
+		expect(marks[0][target]).toBe(0); // input grid untouched (pure)
+	});
 
 	for (const key of Object.keys(DIFFS)) {
 		const diff = DIFFS[key];
@@ -167,7 +176,7 @@ describe('reines findHint', () => {
 		it(`${diff.label}: hints solve the grid, every queen on the solution`, () => {
 			const p = generateReines(diff, mulberry32(200 + diff.size));
 			const n = p.size;
-			const marks = emptyMarks(n);
+			let marks = emptyMarks(n);
 
 			// Repeatedly apply hints until all solution queens are placed.
 			const cap = n * n * 4; // generous safety bound vs. infinite loop
@@ -189,7 +198,7 @@ describe('reines findHint', () => {
 				// "reveal" fallback must never fire.
 				expect(h.reason).not.toBe('La reine de cette ligne va ici.');
 
-				apply(marks, h);
+				marks = applyHint(marks, h);
 			}
 
 			expect(placed).toBe(n);

@@ -517,6 +517,20 @@ export interface HintResult {
 	reason: string;
 }
 
+/** Apply a hint to the player grid (pure, returns a new grid).
+ *  A queen drops the other queens of its row — one per row — but never the
+ *  player's crosses, which carry their own reasoning. */
+export function applyHint(marks: CellState[][], h: HintResult): CellState[][] {
+	const next = marks.map((row) => [...row]) as CellState[][];
+	if (h.value === 'queen') {
+		for (let c = 0; c < next[h.r].length; c++) if (next[h.r][c] === 2) next[h.r][c] = 0;
+		next[h.r][h.c] = 2;
+	} else {
+		next[h.r][h.c] = 1;
+	}
+	return next;
+}
+
 /**
  * Find the next logically-deducible move and explain the technique (French).
  * `marks`: player grid, 0 empty / 1 cross / 2 queen. Corrects a wrong mark

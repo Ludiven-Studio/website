@@ -22,6 +22,7 @@ import {
 	generateReines,
 	findConflicts,
 	findHint,
+	applyHint,
 	regionColor,
 	type ReinesPuzzle,
 	type ConflictReason,
@@ -339,17 +340,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		if (status === 'won' || revealed) return;
 		const h = findHint(marks, puzzle);
 		if (!h) return;
-		setMarks((prev) => {
-			const next = prev.map((row) => [...row]) as CellState[][];
-			if (h.value === 'queen') {
-				// One queen per row: clear the row, drop it on the solution cell.
-				next[h.r] = new Array(size).fill(0) as CellState[];
-				next[h.r][h.c] = 2;
-			} else {
-				next[h.r][h.c] = 1;
-			}
-			return next;
-		});
+		setMarks((prev) => applyHint(prev, h));
 		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
 		setHintNote(h.reason);
 		if (!started) {
@@ -358,7 +349,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, puzzle, size, marks, started, gameId]);
+	}, [status, revealed, puzzle, marks, started, gameId]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
