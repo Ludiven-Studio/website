@@ -10,8 +10,10 @@ import {
 	applyMove,
 	solve,
 	hintMove,
+	rescueHint,
 	solutionSignatures,
 	generateDaily,
+	type Move,
 } from './engine';
 
 describe('solitaire engine', () => {
@@ -94,5 +96,62 @@ describe('solitaire engine', () => {
 		const hint = hintMove(layout, pegs)!;
 		expect(hint).toBeTruthy();
 		expect(allMoves(layout, pegs).some((m) => m.from === hint.from && m.to === hint.to)).toBe(true);
+	});
+
+	// The daily is one attempt per day with no restart: an unsolvable start would be a dead end.
+	it('every daily start clears down to a single marble', () => {
+		const layout = createLayout('anglais');
+		for (const count of [5, 6, 7]) {
+			for (let s = 0; s < 12; s++) {
+				const pegs = generateDaily(s * 7919 + 13, count);
+				expect(pegCount(pegs)).toBe(count);
+				const sol = solve(layout, pegs);
+				expect(sol).not.toBeNull();
+				expect(sol!.length).toBe(count - 1);
+				let state = pegs;
+				for (const m of sol!) state = applyMove(state, m);
+				expect(isWin(state)).toBe(true);
+			}
+		}
+	});
+});
+
+describe('solitaire rescue hint', () => {
+	const layout = createLayout('anglais');
+
+	it('keeps the current position when it still wins', () => {
+		const pegs = generateDaily(42, 6);
+		const r = rescueHint(layout, [], pegs)!;
+		expect(r).toBeTruthy();
+		expect(r.undo).toBe(0);
+		expect(solve(layout, applyMove(pegs, r.move))).not.toBeNull();
+	});
+
+	it('rewinds a dead end back to the last winnable position', () => {
+		// Find a daily whose very first move can already be a trap, then walk into it.
+		let start: boolean[] | null = null;
+		let bad: Move | undefined;
+		for (let s = 0; s < 30 && !bad; s++) {
+			start = generateDaily(s * 7919 + 13, 6);
+			bad = allMoves(layout, start).find((m) => solve(layout, applyMove(start!, m)) === null);
+		}
+		expect(bad).toBeTruthy();
+
+		const history = [start!];
+		const pegs = applyMove(start!, bad!);
+		expect(solve(layout, pegs)).toBeNull();
+
+		const r = rescueHint(layout, history, pegs)!;
+		expect(r).toBeTruthy();
+		expect(r.undo).toBe(1);
+		// Replaying the undo lands on a position the suggested move keeps winnable.
+		expect(solve(layout, applyMove(start!, r.move))).not.toBeNull();
+	});
+
+	it('returns null when nothing in the line can win', () => {
+		const dead = layout.holes.map(() => false);
+		dead[0] = true;
+		dead[layout.holes.length - 1] = true; // two far-apart pegs: no jump, no win
+		expect(rescueHint(layout, [], dead)).toBeNull();
 	});
 });

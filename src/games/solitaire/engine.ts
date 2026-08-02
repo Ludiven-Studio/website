@@ -194,6 +194,28 @@ export function hintMove(layout: Layout, pegs: boolean[]): Move | null {
 	return allMoves(layout, pegs)[0] ?? null;
 }
 
+export interface Rescue {
+	undo: number; // moves to take back first (0 = the current position still wins)
+	move: Move; // then play this one
+}
+
+/**
+ * A hint that always leads to the win: walk back through `history` until a position
+ * that still solves down to one peg, and return its first winning move. Small positions
+ * are trap-heavy, so a plain hint on a dead board could only suggest another dead end.
+ * `maxUndo` bounds both the search cost and how much progress the player can lose;
+ * beyond it the caller should fall back to `hintMove`.
+ */
+export function rescueHint(layout: Layout, history: boolean[][], pegs: boolean[], maxUndo = 10, budget = 120000): Rescue | null {
+	const line = [...history, pegs];
+	const floor = Math.max(0, line.length - 1 - maxUndo);
+	for (let i = line.length - 1; i >= floor; i--) {
+		const sol = solve(layout, line[i], budget);
+		if (sol && sol.length) return { undo: line.length - 1 - i, move: sol[0] };
+	}
+	return null;
+}
+
 /* ---------- Daily puzzle: small, uniquely-solvable positions ---------- */
 
 /** Legal *backward* moves: a peg at `to` un-jumps, spawning pegs at `over` and `from`. */
