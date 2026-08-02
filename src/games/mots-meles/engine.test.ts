@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeGrid, lineCells, matchIndex, normalize, DIFFS, type Cell } from './engine';
+import { makeGrid, lineCells, matchIndex, normalize, findHint, DIFFS, type Cell } from './engine';
 
 describe('mots-meles engine', () => {
 	it('normalize strips accents and non-letters to A–Z uppercase', () => {
@@ -55,5 +55,25 @@ describe('mots-meles engine', () => {
 		expect(matchIndex(fwd, g.words)).toBe(0);
 		expect(matchIndex(rev, g.words)).toBe(0);
 		expect(matchIndex([[0, 0]], g.words)).toBe(-1); // a single cell is never a (≥4-letter) word
+	});
+
+	it('findHint gives one start cell while words are missing, and never the word itself', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const g = makeGrid(3131, DIFFS[key]);
+			const found: number[] = [];
+			const hinted: Cell[] = [];
+			while (found.length < g.words.length) {
+				const h = findHint(g, found, hinted);
+				expect(h, 'a hint exists while the grid is unsolved').not.toBeNull();
+				// Only a cell and a French note — no word, no path.
+				expect(Object.keys(h!).sort()).toEqual(['cell', 'reason']);
+				expect(h!.reason).toMatch(/^Un mot de \d+ lettres commence ici, (à l'horizontale|à la verticale|en diagonale)\.$/);
+				const idx = g.words.findIndex((p, i) => !found.includes(i) && p.cells[0][0] === h!.cell[0] && p.cells[0][1] === h!.cell[1]);
+				expect(idx, 'the cell starts a still-unfound word').toBeGreaterThanOrEqual(0);
+				hinted.push(h!.cell);
+				found.push(idx);
+			}
+			expect(findHint(g, found)).toBeNull(); // nothing left to hint
+		}
 	});
 });

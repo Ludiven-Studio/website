@@ -28,6 +28,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { demineurLevels } from './levels';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    DÉMINEUR LOGIQUE — React island.
@@ -74,6 +75,8 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 
 	const { size, mineCount } = puzzle;
 	const over = status === 'won' || status === 'lost' || revealed;
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
 
 	/* Levels mode: start a level from its config; grade on win/lose. */
 	const startLevel = useCallback((level: number) => {
@@ -323,9 +326,10 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 
 	/* Hint: apply the next forced deduction and explain it. */
 	const hint = useCallback(() => {
-		if (over) return;
+		if (over || !gate.ready) return;
 		const h = findHint(grid, puzzle);
 		if (!h) return;
+		gate.consume();
 		setGrid((prev) => {
 			let next = prev;
 			if (h.value === 'safe') {
@@ -344,7 +348,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		setHintNote(h.reason);
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, grid, puzzle, begin, gameId]);
+	}, [over, grid, puzzle, begin, gameId, gate]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const showSolution = useCallback(() => {
@@ -435,7 +439,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 					>
 						🚩 Mode drapeau{flagMode ? ' : activé' : ''}
 					</button>
-					<button className="dm-act" onClick={hint}>💡 Indice</button>
+					<button className="dm-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
 					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="dm-act" onClick={showSolution}>👁 Voir la solution</button>
 					)}
@@ -555,7 +559,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && <p className="dm-hint-note" aria-live="polite">💡 {hintNote}</p>}
+			{hintNote && <p className="dm-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={dailyValue} format={lbFormat} />

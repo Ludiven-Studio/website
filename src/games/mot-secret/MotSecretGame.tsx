@@ -10,6 +10,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { motSecretLevels } from './levels';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    MOT SECRET — React island. Motus-like: guess the hidden French word in 6 tries; the first
@@ -22,10 +23,12 @@ type Status = 'playing' | 'won' | 'lost';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const LOSS_OFFSET = 100000; // daily: losers ranked after winners (cf. démineur/codecolor)
 const KB = ['AZERTYUIOP', 'QSDFGHJKLM', '#WXCVBN<']; // # = Enter, < = Backspace
-const HINT_EVERY = 30; // free mode: reveal one more letter every 30 s (disabled in the ranked daily)
+const HINT_EVERY = 30; // free mode only: one more letter drops on its own every 30 s
 
-interface DailyState { rows: GuessRow[]; current: string; status: Status; }
+interface DailyState { rows: GuessRow[]; current: string; status: Status; hinted?: number[]; }
 interface Msg { text: string; }
+
+const ordinal = (n: number): string => (n === 1 ? '1ʳᵉ' : `${n}ᵉ`);
 
 export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
@@ -40,6 +43,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [hintPos, setHintPos] = useState<Set<number>>(() => new Set());
 	const [hintIn, setHintIn] = useState(HINT_EVERY);
+	const [hintNote, setHintNote] = useState(''); // what the last hint uncovered
 	const [maxTries, setMaxTries] = useState(MAX_TRIES); // level mode may tighten the budget
 
 	const hintPosRef = useRef<Set<number>>(new Set());
@@ -58,6 +62,8 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const { celebrating } = useCelebration(status === 'won');
 	const len = solution.length;
 	const over = status !== 'playing';
+	const timed = daily || lv.playing; // both are ranked → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && !dailyLoading);
 	const bestGood = rows.reduce((m, r) => Math.max(m, r.states.filter((s) => s === 'good').length), 0);
 	const cost = status === 'won' ? rows.length : LOSS_OFFSET + (len - bestGood);
 
@@ -65,7 +71,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const setCurrentBoth = (c: string): void => { currentRef.current = c; setCurrent(c); };
 	const setStatusBoth = (s: Status): void => { statusRef.current = s; setStatus(s); };
 	const setSolutionBoth = (s: string): void => { solutionRef.current = s; setSolution(s); };
-	const resetHints = (): void => { hintPosRef.current = new Set(); setHintPos(new Set()); secToHintRef.current = HINT_EVERY; setHintIn(HINT_EVERY); };
+	const resetHints = (): void => { hintPosRef.current = new Set(); setHintPos(new Set()); setHintNote(''); secToHintRef.current = HINT_EVERY; setHintIn(HINT_EVERY); };
 
 	const flash = (text: string): void => {
 		if (msgTimer.current) clearTimeout(msgTimer.current);
@@ -88,12 +94,12 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 	const saveDaily = (nr: GuessRow[], cur: string, st: Status): void => {
 		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, { startedAt: startRef.current, done: st !== 'playing', seed: sd?.seed, diffIndex: sd?.diffIndex, state: { rows: nr, current: cur, status: st } satisfies DailyState });
+		saveDailyRun(gameId, { startedAt: startRef.current, done: st !== 'playing', seed: sd?.seed, diffIndex: sd?.diffIndex, state: { rows: nr, current: cur, status: st, hinted: [...hintPosRef.current] } satisfies DailyState });
 	};
 
 	const startDaily = useCallback(async (): Promise<void> => {
 		dailyRef.current = true;
-		setDaily(true); setMsg(null);
+		setDaily(true); setMsg(null); resetHints();
 		maxTriesRef.current = MAX_TRIES; setMaxTries(MAX_TRIES);
 		const lay = (seed: number, di: number): string => {
 			const key = DIFF_ORDER[di] ?? 'facile';
@@ -108,6 +114,9 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 			const s = lay(run.seed, run.diffIndex ?? 0);
 			const st = (run.state as DailyState) ?? { rows: [], current: s[0], status: 'playing' };
 			setRowsBoth(st.rows ?? []); setCurrentBoth(st.current || s[0]);
+			// Letters already paid for stay uncovered across a reload.
+			const back = new Set(st.hinted ?? []);
+			hintPosRef.current = back; setHintPos(back);
 			setDailyLoading(false);
 			startRef.current = run.startedAt;
 			if (run.done) { setStatusBoth(st.status === 'lost' ? 'lost' : 'won'); setAlreadyPlayed(true); }
@@ -206,19 +215,29 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		return () => window.removeEventListener('keydown', onDown);
 	}, [onKey]);
 
-	/* Reveal one more not-yet-known letter (free mode helper). */
-	const revealHint = useCallback((): void => {
+	/* Uncover the LEFTMOST still-unknown letter. Deterministic, so a hint always advances the
+	   word from the left instead of dropping a random letter somewhere. */
+	const revealHint = useCallback((): boolean => {
 		const sol = solutionRef.current;
 		const known = new Set<number>([0]);
 		for (const r of rowsRef.current) for (let i = 0; i < sol.length; i++) if (r.states[i] === 'good') known.add(i);
 		for (const p of hintPosRef.current) known.add(p);
-		const free: number[] = [];
-		for (let i = 1; i < sol.length; i++) if (!known.has(i)) free.push(i);
-		if (!free.length) return; // whole word already known
-		const p = free[Math.floor(Math.random() * free.length)];
+		let p = -1;
+		for (let i = 1; i < sol.length; i++) if (!known.has(i)) { p = i; break; }
+		if (p < 0) return false; // whole word already known
 		const next = new Set(hintPosRef.current); next.add(p);
 		hintPosRef.current = next; setHintPos(next);
+		setHintNote(`La ${ordinal(p + 1)} lettre est un ${sol[p]}.`);
+		return true;
 	}, []);
+
+	const askHint = (): void => {
+		if (statusRef.current !== 'playing' || dailyLoading || !gate.ready) return;
+		if (!revealHint()) return;
+		if (dailyRef.current) saveDaily(rowsRef.current, currentRef.current, statusRef.current);
+		gate.consume();
+		trackGame(gameId, 'hint_used');
+	};
 
 	/* Free-mode countdown → reveal a letter every HINT_EVERY seconds. */
 	useEffect(() => {
@@ -295,8 +314,12 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!daily && !lv.active && status === 'playing' && (
-				<div className="ms-hintbar">💡 Prochain indice dans <strong>{hintIn}s</strong>{hintPos.size ? ` · ${hintPos.size} lettre${hintPos.size > 1 ? 's' : ''} révélée${hintPos.size > 1 ? 's' : ''}` : ''}</div>
+			{status === 'playing' && !(lv.active && lv.menu) && (
+				<div className="ms-hintbar">
+					<button className="ms-hintbtn" onClick={askHint} disabled={!gate.ready || dailyLoading}>{gate.label}</button>
+					{!daily && !lv.active && <span>auto dans <strong>{hintIn}s</strong></span>}
+					{hintNote && <span className="ms-hintnote">{hintNote}</span>}
+				</div>
 			)}
 
 			{lv.active && lv.menu ? (
@@ -364,7 +387,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 			<p className="ms-help">
 				Devine le mot en 6 essais : chaque essai doit être un mot français commençant par la lettre donnée.
-				En mode libre, un <strong>indice</strong> révèle une lettre toutes les 30&nbsp;s.
+				L'<strong>indice</strong> dévoile la première lettre encore inconnue (en mode libre, une tombe aussi toute seule toutes les 30&nbsp;s).
 				<span className="ms-legend"><i className="lg good" /> bien placée · <i className="lg present" /> présente · <i className="lg absent" /> absente</span>
 			</p>
 
@@ -385,8 +408,12 @@ const CSS = `
 .ms-pill.active { background: var(--accent-regular); color: var(--accent-text-over); border-color: var(--accent-regular); }
 .ms-act { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .ms-act:hover { background: var(--gray-800); border-color: var(--accent-regular); color: var(--accent-regular); }
-.ms-hintbar { font-size: 12.5px; color: var(--gray-300); background: var(--gray-900); border: 1px solid var(--gray-800); border-radius: 999px; padding: 4px 13px; margin-bottom: 0.6rem; }
+.ms-hintbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; font-size: 12.5px; color: var(--gray-300); margin-bottom: 0.6rem; }
 .ms-hintbar strong { color: var(--accent-regular); font-variant-numeric: tabular-nums; }
+.ms-hintbtn { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 12.5px; border-radius: 999px; padding: 5px 14px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.ms-hintbtn:not(:disabled):hover { border-color: var(--ms-present); color: var(--ms-present); }
+.ms-hintbtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ms-hintnote { color: var(--ms-present); font-weight: 600; }
 .ms-playwrap { position: relative; width: 100%; display: flex; justify-content: center; }
 .ms-board { display: flex; flex-direction: column; gap: 5px; }
 .ms-board.shake { animation: ms-shake 0.35s; }

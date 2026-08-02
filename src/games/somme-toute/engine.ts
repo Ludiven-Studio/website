@@ -248,16 +248,21 @@ export function findHint(entries: Cell[][], game: Game): HintResult | null {
 		if (h) return h;
 	}
 
-	// 4) Fallback — first empty editable cell.
+	// 4) Fallback — first empty editable cell. No rule fired, so say so instead of
+	// inventing one; the remaining row total is still useful context.
 	for (let r = 0; r < size; r++)
 		for (let c = 0; c < size; c++)
-			if (editable(r, c) && val(r, c) == null)
+			if (editable(r, c) && val(r, c) == null) {
+				const cells = rowCells(r);
+				const rem = rowT[r] - unitSum(cells);
+				const k = cells.filter(([rr, cc]) => editable(rr, cc) && val(rr, cc) == null).length;
 				return {
 					r,
 					c,
 					value: sol(r, c),
-					reason: `Par déduction, cette case vaut ${sol(r, c)}.`,
+					reason: `Aucune règle simple ne tranche ici : il reste ${rem} à répartir sur ${k} case${k > 1 ? 's' : ''} de cette ligne, et cette case vaut ${sol(r, c)}.`,
 				};
+			}
 
 	return null;
 }

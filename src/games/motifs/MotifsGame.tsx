@@ -19,6 +19,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { motifsLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    MOTIFS — React island. Split the grid into rectangles;
@@ -75,6 +76,8 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 	const moved = useRef(false);
 	const resizeIdx = useRef(-1); // index of the piece being resized, or -1 for a new draw
 	const lv = useLevels(gameId, motifsLevels);
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
 
 	const { size, clues, rects } = puzzle;
 
@@ -393,7 +396,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 
 	/* Hint: place one correct piece from the solution. */
 	const hint = useCallback(() => {
-		if (status === 'won' || revealed) return;
+		if (status === 'won' || revealed || !gate.ready) return;
 		const sameRect = (a: Rect, b: Rect) =>
 			a.r0 === b.r0 && a.c0 === b.c0 && a.h === b.h && a.w === b.w;
 		const matches = (rect: Rect) => {
@@ -410,10 +413,11 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		// Priority 2: reveal the next solution rect not yet correctly placed.
 		if (!todo) todo = rects.find((rect) => !matches(rect));
 		if (!todo) return;
+		gate.consume();
 		addPiece({ ...todo });
 		setHintNote(hintReason(todo, puzzle));
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, rects, owner, placed, addPiece, puzzle, gameId]);
+	}, [status, revealed, rects, owner, placed, addPiece, puzzle, gameId, gate]);
 
 	/* Reveal the full partition (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -520,18 +524,12 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && !lv.active && (
+			{status !== 'won' && !revealed && !(lv.active && lv.menu) && (
 				<div className="mo-actions">
-					<button className="mo-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					<button className="mo-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="mo-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
-				</div>
-			)}
-
-			{lv.playing && status !== 'won' && !revealed && (
-				<div className="mo-actions">
-					<button className="mo-act" onClick={hint}>💡 Indice</button>
 				</div>
 			)}
 
@@ -638,7 +636,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && (
 				<p className="mo-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
@@ -715,6 +713,7 @@ const CSS = `
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
 .mo-act:hover { background: var(--gray-800); border-color: var(--mo-accent); color: var(--mo-accent); }
+.mo-act:disabled { opacity: 0.55; cursor: default; background: transparent; border-color: var(--gray-700); color: var(--gray-300); }
 
 .mo-boardwrap {
   position: relative;

@@ -19,6 +19,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { colorgrammeLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    COLORGRAMME — React island. A fully-coloured deduction grid.
@@ -44,7 +45,6 @@ interface CoState {
 	grid: number[][];
 	crosses: number[][];
 }
-const emptyState = (n: number): CoState => ({ grid: emptyGrid(n), crosses: emptyGrid(n) });
 // Fresh grid with the puzzle's given (locked) cells pre-filled.
 const startGrid = (p: ColorgrammePuzzle): number[][] => {
 	const g = emptyGrid(p.size);
@@ -94,6 +94,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 
 	const { size, colors, rowClues, colClues, solution } = puzzle;
 	const over = status === 'won' || revealed;
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, !over && started);
 	const givenSet = useMemo(() => new Set(puzzle.given.map(([r, c]) => givenKey(r, c))), [puzzle]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
@@ -227,7 +229,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				state: startState(puzzle),
 			});
 		}
-	}, [gameId, size, puzzle, daily]);
+	}, [gameId, puzzle, daily]);
 
 	/* Clear my entries without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
@@ -282,7 +284,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			for (let c = 0; c < size; c++) if (grid[r][c] !== solution[r][c]) return;
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [grid, status, revealed, size, solution, gameId, daily, started]);
+	}, [grid, status, revealed, size, solution, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Auto-advance: once the active colour is fully & correctly placed, jump to the
 	   next unfinished colour. Triggered by moves (depends on `grid`), not by manual
@@ -417,9 +419,10 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	/* Hint: deduce the next logical cell and explain the technique. Paints the target
 	   cell AND selects its colour, so the player can carry on in that colour. */
 	const hint = useCallback(() => {
-		if (over) return;
+		if (over || !gate.ready) return;
 		const h = findHint(grid, puzzle);
 		if (!h) return;
+		gate.consume();
 		const { r, c, value, reason } = h;
 		setGrid((prev) => {
 			const n = prev.map((row) => [...row]);
@@ -433,7 +436,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setHintNote(reason);
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, grid, puzzle, begin, gameId]);
+	}, [over, grid, puzzle, begin, gameId, gate]);
 
 	/* Reveal the full picture (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -546,10 +549,10 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!over && !daily && !(lv.active && lv.menu) && (
+			{!over && !(lv.active && lv.menu) && (
 				<div className="co-actions">
-					<button className="co-act" onClick={hint}>💡 Indice</button>
-					{!lv.active && elapsed >= 60 && (
+					<button className="co-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="co-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -659,7 +662,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && (
 				<p className="co-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
@@ -808,6 +811,7 @@ const CSS = `
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
 .co-act:hover { background: var(--gray-800); border-color: var(--co-accent); color: var(--co-accent); }
+.co-act:disabled { opacity: 0.55; cursor: default; background: transparent; border-color: var(--gray-700); color: var(--gray-300); }
 
 .co-boardwrap {
   position: relative;

@@ -26,6 +26,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { pavageLevels } from './levels';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    PAVAGE — React island.
@@ -124,6 +125,8 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 	}, [blockTouchStart]);
 
 	const { size, blocked, pieces, solution, rotate } = puzzle;
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
 
 	// rotations of every piece (small, recomputed cheaply but memoized on puzzle).
 	const pieceRots = useMemo(() => pieces.map((p) => rotations(p.cells)), [pieces]);
@@ -538,9 +541,10 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 
 	/* Hint: remove a misplaced piece or place the next forced one. */
 	const hint = useCallback(() => {
-		if (status === 'won' || revealed) return;
+		if (status === 'won' || revealed || !gate.ready) return;
 		const h = findHint(placements, puzzle);
 		if (!h) return;
+		gate.consume();
 		if (h.action === 'remove') {
 			setPlacements((prev) => {
 				const next = [...prev];
@@ -564,7 +568,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		setHintNote(h.reason);
 		ensureStarted();
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, placements, puzzle, ensureStarted, gameId]);
+	}, [status, revealed, placements, puzzle, ensureStarted, gameId, gate]);
 
 	const reveal = useCallback(() => {
 		if (status === 'won' || revealed) return;
@@ -673,34 +677,26 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && !lv.active && (
+			{status !== 'won' && !revealed && !(lv.active && lv.menu) && (
 				<div className="pv-actions">
-					<button className="pv-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					<button className="pv-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="pv-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
-					<button
-						className={`pv-act pv-toggle ${expertRotate ? 'on' : ''}`}
-						onClick={toggleRotate}
-						role="switch"
-						aria-checked={expertRotate}
-						title="Autoriser la rotation des pièces (mode expert)"
-					>
-						⟳ Rotation {expertRotate ? 'activée' : 'désactivée'}
-					</button>
-				</div>
-			)}
-
-			{lv.playing && status !== 'won' && (
-				<div className="pv-actions">
-					<button className="pv-act" onClick={hint}>💡 Indice</button>
-				</div>
-			)}
-
-			{daily && started && status === 'playing' && (
-				<div className="pv-actions">
-					<button className="pv-act" onClick={hint}>💡 Indice</button>
-					<button className="pv-act" onClick={resetDailyEntries}>↺ Vider</button>
+					{!daily && !lv.active && (
+						<button
+							className={`pv-act pv-toggle ${expertRotate ? 'on' : ''}`}
+							onClick={toggleRotate}
+							role="switch"
+							aria-checked={expertRotate}
+							title="Autoriser la rotation des pièces (mode expert)"
+						>
+							⟳ Rotation {expertRotate ? 'activée' : 'désactivée'}
+						</button>
+					)}
+					{daily && started && (
+						<button className="pv-act" onClick={resetDailyEntries}>↺ Vider</button>
+					)}
 				</div>
 			)}
 
@@ -806,13 +802,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && !lv.active && hintNote && (
-				<p className="pv-hint-note" aria-live="polite">💡 {hintNote}</p>
-			)}
-			{daily && started && hintNote && (
-				<p className="pv-hint-note" aria-live="polite">💡 {hintNote}</p>
-			)}
-			{lv.playing && hintNote && (
+			{hintNote && !(lv.active && lv.menu) && (
 				<p className="pv-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 

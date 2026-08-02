@@ -119,7 +119,7 @@ describe('reines conflict detection', () => {
 	});
 
 	it('flags row, column and adjacency too', () => {
-		const reg = Array.from({ length: 4 }, (_, r) => Array.from({ length: 4 }, (_, c) => r));
+		const reg = Array.from({ length: 4 }, (_, r) => Array.from({ length: 4 }, () => r));
 		// same row
 		expect([...findConflicts(reg, [[0, 0], [0, 2]]).reasons]).toEqual(['ligne']);
 		// same column (different regions since region = row index)

@@ -186,6 +186,17 @@ export function heroLines(b: Board): [Axis, number][] {
 	return h < 0 ? [] : [['row', Math.floor(h / b.n)], ['col', h % b.n]];
 }
 
+/** Every one-cell push the player may play right now. */
+export function heroMoves(b: Board): LineMove[] {
+	const out: LineMove[] = [];
+	for (const [axis, index] of heroLines(b)) {
+		const s = slack(b, axis, index);
+		if (s.min < 0) out.push({ axis, index, shift: -1 });
+		if (s.max > 0) out.push({ axis, index, shift: 1 });
+	}
+	return out;
+}
+
 /** Dead end: neither of the hero's lines can budge, so no move is left at all. */
 export function heroStuck(b: Board): boolean {
 	for (const [axis, index] of heroLines(b)) {
@@ -353,12 +364,7 @@ function walkVisits(rng: () => number, start: Board, steps: number): Walk {
 	seen.set(heroIndex(b), 0);
 	let undo: LineMove | null = null;
 	for (let s = 0; s < steps; s++) {
-		const opts: LineMove[] = [];
-		for (const [axis, index] of heroLines(b)) {
-			const sl = slack(b, axis, index);
-			if (sl.min < 0) opts.push({ axis, index, shift: -1 });
-			if (sl.max > 0) opts.push({ axis, index, shift: 1 });
-		}
+		const opts = heroMoves(b);
 		if (!opts.length) break;
 		// Retracing covers no new ground, so take it back only when it is the last way out.
 		const fresh = opts.filter((o) => !undo || o.axis !== undo.axis || o.shift !== undo.shift);
@@ -430,3 +436,155 @@ export function generateDetailed(rng: () => number, p: GenParams): Generated {
 }
 
 export const generate = (rng: () => number, p: GenParams): Board => generateDetailed(rng, p).board;
+
+/* ---------- Hints ---------- */
+
+export interface Hint {
+	move: LineMove; // always legal on the board it was asked about
+	step: number; // step of the recorded walk it comes from, -1 once the player has left it
+	reason: string; // French, shown to the player
+}
+
+const SEARCH_NODES = 1500;
+const SEARCH_DEPTH = 12;
+const BUCKETS = 160;
+
+const sameMove = (a: LineMove, b: LineMove): boolean =>
+	a.axis === b.axis && a.index === b.index && Math.sign(a.shift) === Math.sign(b.shift);
+
+const WAY: Record<string, string> = {
+	'row1': 'vers la droite', 'row-1': 'vers la gauche', 'col1': 'vers le bas', 'col-1': 'vers le haut',
+};
+
+const pushText = (m: LineMove): string =>
+	`Pousse ${m.axis === 'row' ? 'la ligne' : 'la colonne'} ${m.index + 1} ${WAY[`${m.axis}${m.shift > 0 ? 1 : -1}`]}`;
+
+const times = (k: number): string => `${k} poussée${k > 1 ? 's' : ''}`;
+
+/** How far into the recorded walk this board sits, or -1 once the player has left it. */
+function walkStep(plan: Generated, cur: Board): number {
+	const key = encodeBoard(cur);
+	let b = plan.board;
+	let at = encodeBoard(b) === key ? 0 : -1;
+	for (let s = 0; s < plan.walk.length; s++) {
+		const m = plan.walk[s];
+		b = slide(b, m.axis, m.index, m.shift).board;
+		if (encodeBoard(b) === key) at = s + 1; // a board seen twice: take the shortest tail left
+	}
+	return at;
+}
+
+/** Pushes the recorded walk still needs from `at` before the hen sweeps her next crystal. */
+function pushesToGem(plan: Generated, cur: Board, at: number): number {
+	let b = cur;
+	for (let s = at; s < plan.walk.length && s - at < 40; s++) {
+		const m = plan.walk[s];
+		const r = slide(b, m.axis, m.index, m.shift);
+		if (r.eaten.length) return s - at + 1;
+		b = r.board;
+	}
+	return -1;
+}
+
+/** Manhattan to the nearest crystal: the belts carry the hen one axis at a time. */
+function gemDist(b: Board): number {
+	const h = heroIndex(b);
+	if (h < 0) return BUCKETS;
+	const hr = Math.floor(h / b.n);
+	const hc = h % b.n;
+	let best = BUCKETS;
+	for (let i = 0; i < b.crystals.length; i++) {
+		if (!b.crystals[i]) continue;
+		best = Math.min(best, Math.abs(Math.floor(i / b.n) - hr) + Math.abs((i % b.n) - hc));
+	}
+	return best;
+}
+
+interface Probe {
+	board: Board;
+	first: LineMove; // the push to suggest, whatever depth this node sits at
+	depth: number;
+	dist: number;
+}
+
+/**
+ * Off the recorded walk the board is a fresh puzzle, so hunt the shortest run of pushes that
+ * swallows one crystal — best-first on the hen's distance to it, on a node budget. Spent budget
+ * hands back the push that got her closest, so the answer is always a move the board accepts.
+ */
+function searchHint(cur: Board, legal: LineMove[]): Hint {
+	const seen = new Set<string>([encodeBoard(cur)]);
+	const buckets: Probe[][] = [];
+
+	// Returns the child that swallowed a crystal — the goal is caught here, not on the way out:
+	// once the crystal is gone the hen is far from the next one, and the queue would bury it.
+	const spawn = (from: Board, first: LineMove | null, depth: number): Probe | null => {
+		for (const m of heroMoves(from)) {
+			const r = slide(from, m.axis, m.index, m.shift);
+			if (!r.shift) continue;
+			const p: Probe = { board: r.board, first: first ?? m, depth: depth + 1, dist: gemDist(r.board) };
+			if (r.eaten.length) return p;
+			const key = encodeBoard(r.board);
+			if (seen.has(key)) continue;
+			seen.add(key);
+			if (heroStuck(r.board)) continue; // walling the hen in is no hint
+			const s = Math.min(BUCKETS - 1, p.dist * 4 + p.depth);
+			if (!buckets[s]) buckets[s] = [];
+			buckets[s].push(p);
+		}
+		return null;
+	};
+	const take = (): Probe | null => {
+		for (let s = 0; s < BUCKETS; s++) if (buckets[s]?.length) return buckets[s].pop() as Probe;
+		return null;
+	};
+	const route = (p: Probe): Hint => ({
+		move: p.first,
+		step: -1,
+		reason: `${pushText(p.first)} : hors du chemin d'origine, mais la cocotte rejoint un 💎 en ${times(p.depth)}.`,
+	});
+
+	const near = spawn(cur, null, 0);
+	if (near) return route(near);
+	let best: Probe | null = null;
+	for (let n = 0; n < SEARCH_NODES; n++) {
+		const p = take();
+		if (!p) break;
+		if (!best || p.dist < best.dist || (p.dist === best.dist && p.depth < best.depth)) best = p;
+		if (p.depth >= SEARCH_DEPTH) continue;
+		const hit = spawn(p.board, p.first, p.depth);
+		if (hit) return route(hit);
+	}
+	const m = best?.first ?? legal[0];
+	return {
+		move: m,
+		step: -1,
+		reason: `${pushText(m)} : aucun 💎 à portée pour l'instant, c'est la poussée qui rapproche le plus la cocotte.`,
+	};
+}
+
+/**
+ * One step of the way out — never the rest of it. Follows the walk the crystals were dropped on
+ * while the player is still on it, and searches the live board once he has left it (a belt that
+ * coasts two cells already leaves it). Pure: same board in, same hint out.
+ */
+export function hint(plan: Generated, cur: Board): Hint | null {
+	if (isWon(cur)) return null;
+	const legal = heroMoves(cur);
+	if (!legal.length) return null; // dead end: the game is over, not hintable
+	const at = walkStep(plan, cur);
+	if (at >= 0 && at < plan.walk.length) {
+		const m = plan.walk[at];
+		// The walk only holds while the board still accepts it; a desync falls through to the search.
+		if (legal.some((o) => sameMove(o, m))) {
+			const k = pushesToGem(plan, cur, at);
+			const why = k === 1
+				? ' : la cocotte passe droit sur un 💎.'
+				: k > 1
+					? ` : c'est le début du chemin, le 💎 tombe ${times(k)} plus loin.`
+					: ' : ce coup garde la route ouverte.';
+			return { move: m, step: at, reason: `${pushText(m)}${legal.length === 1 ? ' (seul coup possible)' : ''}${why}` };
+		}
+	}
+	return searchHint(cur, legal);
+}

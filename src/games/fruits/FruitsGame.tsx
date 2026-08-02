@@ -11,6 +11,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { fruitsLevels } from './levels';
 
 /* =====================================================
@@ -65,6 +66,8 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const lv = useLevels(gameId, fruitsLevels);
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && (!timed || started));
 
 	useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
@@ -133,6 +136,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		setChosen(null);
 		setEliminated([]);
 		setPeeked(false);
+		setHintNote('');
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -207,7 +211,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 				const ni = qIndex + 1;
 				setQIndex(ni);
 				setQuestion(dailyQ(sd!.seed, sd!.diffIndex, ni));
-				setChosen(null); setEliminated([]); setPeeked(false);
+				setChosen(null); setEliminated([]); setPeeked(false); setHintNote('');
 				saveDailyRun(gameId, { startedAt: startRef.current, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { solved: nextSolved, qIndex: ni } satisfies DailyState });
 			}, 700);
 			return;
@@ -222,11 +226,15 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 	};
 
 	const eliminate = () => {
-		if (status !== 'playing' || chosen !== null) return;
+		if (status !== 'playing' || chosen !== null || !gate.ready) return;
 		const remaining = question.options.map((_, i) => i).filter((i) => i !== question.answerIndex && !eliminated.includes(i));
-		if (remaining.length <= 1) return;
-		setEliminated((prev) => [...prev, remaining[0]]);
-		setHintNote('Une option en moins. Résous pas à pas en partant de l\'équation la plus simple.');
+		if (remaining.length <= 1) return; // always leave a real choice
+		// Drop the value furthest from the answer: deterministic, and the cheapest option to rule out by hand.
+		const answer = question.options[question.answerIndex];
+		const out = remaining.reduce((a, b) => (Math.abs(question.options[b] - answer) > Math.abs(question.options[a] - answer) ? b : a));
+		setEliminated((prev) => [...prev, out]);
+		setHintNote(`${question.options[out]} est écarté : c'est la valeur la plus éloignée du compte.`);
+		gate.consume();
 		trackGame(gameId, 'hint_used');
 	};
 
@@ -335,14 +343,14 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && !lv.active && status === 'playing' && chosen === null && (
+			{status === 'playing' && chosen === null && !lv.menu && !lv.done && (
 				<div className="fr-actions">
-					<button className="fr-act" onClick={eliminate}>💡 Indice</button>
-					<button className="fr-act" onClick={peek}>👁 Voir la réponse</button>
+					<button className="fr-act" onClick={eliminate} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && <button className="fr-act" onClick={peek}>👁 Voir la réponse</button>}
 				</div>
 			)}
 
-			{!daily && !lv.active && hintNote && <p className="fr-hint-note" aria-live="polite">💡 {hintNote}</p>}
+			{hintNote && <p className="fr-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{lv.playing && (
 				<p className="fr-help">Réponds le plus vite possible : une seule question, une seule réponse. Une erreur fait échouer le niveau.</p>
@@ -409,7 +417,8 @@ const CSS = `
 
 .fr-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 1.25rem; }
 .fr-act { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition); }
-.fr-act:hover { background: var(--gray-800); border-color: var(--fr-accent); color: var(--fr-accent); }
+.fr-act:hover:not(:disabled) { background: var(--gray-800); border-color: var(--fr-accent); color: var(--fr-accent); }
+.fr-act:disabled { opacity: 0.45; cursor: default; }
 .fr-help { max-width: 400px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem; }
 .fr-hint-note { max-width: 420px; margin: 1rem auto 0; text-align: center; font-size: 13px; line-height: 1.5; color: var(--fr-ok); background: var(--accent-overlay); border: 1px solid var(--fr-ok); border-radius: 12px; padding: 8px 14px; }
 .fr-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin-top: 1.25rem; }

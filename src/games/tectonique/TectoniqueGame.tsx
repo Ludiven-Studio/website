@@ -13,15 +13,17 @@ import { useLevels } from '../../lib/useLevels';
 import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHoldButton } from '../useHoldButton';
+import { useHintGate } from '../useHintGate';
 import { tectoniqueLevels, TECTONIQUE_BANDS } from './levels';
 import {
 	blockers,
 	countCrystals,
 	decodeBoard,
 	encodeBoard,
-	generate,
+	generateDetailed,
 	heroIndex,
 	heroStuck,
+	hint as findHint,
 	isWon,
 	movers,
 	slack,
@@ -36,6 +38,8 @@ import {
 	VOID,
 	type Axis,
 	type Board,
+	type Generated,
+	type Hint,
 	type PieceMove,
 	type Tile,
 } from './engine';
@@ -142,9 +146,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [tip, setTip] = useState<Hint | null>(null); // the last hint handed out
 
 	const boardRef = useRef<Board | null>(null);
-	const freshRef = useRef<Board | null>(null); // the board as generated, for ↻
+	const freshRef = useRef<Generated | null>(null); // the board as generated + its walk, for ↻ and the hints
 	const rootRef = useRef<HTMLDivElement>(null);
 	const elRef = useRef<HTMLDivElement>(null);
 	const animRef = useRef(0);
@@ -158,6 +163,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const beltRef = useRef<BeltRun | null>(null);
 	const nextRef = useRef<number[]>([]); // pieces the next cell will carry
 	const lv = useLevels(gameId, tectoniqueLevels);
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started);
 
 	/** Let go of the line and put every piece back on its cell. */
 	const settle = useCallback(() => {
@@ -185,10 +192,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		}
 	}, []);
 
-	const load = useCallback((fresh: Board, resume?: Board) => {
+	const load = useCallback((plan: Generated, resume?: Board) => {
 		settle();
-		freshRef.current = fresh;
-		const b = resume ?? fresh;
+		freshRef.current = plan;
+		const b = resume ?? plan.board;
 		boardRef.current = b;
 		setShifts({});
 		setBoard(b);
@@ -196,9 +203,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setPops([]);
 		setDry(0);
 		setMoves(0);
+		setTip(null);
 		movesRef.current = 0;
 		lastAxisRef.current = null;
-		setTotal(countCrystals(fresh));
+		setTotal(countCrystals(plan.board));
 		setStatus(isWon(b) ? 'won' : 'playing');
 	}, [settle]);
 
@@ -210,7 +218,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setElapsed(0);
 		startRef.current = Date.now();
 		const params = TECTONIQUE_BANDS[diff] ?? TECTONIQUE_BANDS[0];
-		load(generate(mulberry32(Math.floor(Math.random() * 0xffffffff)), params));
+		load(generateDetailed(mulberry32(Math.floor(Math.random() * 0xffffffff)), params));
 	}, [load]);
 
 	useEffect(() => {
@@ -222,7 +230,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
-		load(generate(mulberry32(cfg.seed), cfg));
+		load(generateDetailed(mulberry32(cfg.seed), cfg));
 	}, [lv, load]);
 
 	const armLevels = useCallback(() => {
@@ -242,8 +250,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
-		const build = (seed: number, diffIndex: number): Board =>
-			generate(mulberry32(seed), TECTONIQUE_BANDS[diffIndex] ?? TECTONIQUE_BANDS[0]);
+		const build = (seed: number, diffIndex: number): Generated =>
+			generateDetailed(mulberry32(seed), TECTONIQUE_BANDS[diffIndex] ?? TECTONIQUE_BANDS[0]);
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -251,13 +259,13 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			seedRef.current = { seed: run.seed, diffIndex };
 			const fresh = build(run.seed, diffIndex);
 			const saved = (run.state as { cells?: string } | undefined)?.cells;
-			const resumed = saved ? decodeBoard(fresh.n, saved) : undefined;
+			const resumed = saved ? decodeBoard(fresh.board.n, saved) : undefined;
 			setDailyLoading(false);
 			setStarted(true);
 			load(fresh, resumed);
 			if (run.done) {
 				setAlreadyPlayed(true);
-				setStatus(isWon(resumed ?? fresh) ? 'won' : 'stuck');
+				setStatus(isWon(resumed ?? fresh.board) ? 'won' : 'stuck');
 				finalRef.current = run.finalTime ?? 0;
 				setElapsed(finalRef.current);
 			} else {
@@ -334,6 +342,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 		boardRef.current = r.board;
 		setBoard(r.board);
+		setTip(null); // the board moved: the last hint is spent
 		// The ground travels with the line, so its scroll has to keep adding up: the live
 		// offset drops back to zero on every commit, this does not.
 		setShifts((prev) => ({ ...prev, [lineKey(axis, index)]: (prev[lineKey(axis, index)] ?? 0) + r.shift }));
@@ -544,6 +553,18 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		load(fresh);
 	}, [daily, status, load]);
 
+	/* Hint: one push of the way out, and why it pays. */
+	const askHint = useCallback(() => {
+		const plan = freshRef.current;
+		const b = boardRef.current;
+		if (!plan || !b || status !== 'playing' || running || !gate.ready) return;
+		const h = findHint(plan, b);
+		if (!h) return;
+		gate.consume();
+		setTip(h);
+		trackGame(gameId, 'hint_used');
+	}, [status, running, gate, gameId]);
+
 	/* Grade the level once the run ends — a dead end counts as a loss. */
 	useEffect(() => {
 		if (!lv.playing || status === 'playing') return;
@@ -681,6 +702,11 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						disabled={daily ? status !== 'playing' : status === 'won'}
 						aria-label="Recommencer"
 					>↻</button>
+					<button
+						className="tk-act"
+						onClick={askHint}
+						disabled={status !== 'playing' || running || !gate.ready || (timed && !started)}
+					>{gate.label}</button>
 				</div>
 			)}
 
@@ -820,6 +846,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{tip && status === 'playing' && (
+				<p className="tk-note" aria-live="polite">💡 {tip.reason}</p>
+			)}
+
 			{!(lv.active && lv.menu) && (
 				<div className="tk-dpad" aria-label="Pousser la ligne de la cocotte">
 					<button className="tk-dbtn up" ref={pad.up} disabled={!can.up} aria-label="Pousser vers le haut">▲</button>
@@ -908,6 +938,15 @@ const CSS = `
   width: 36px; height: 36px; border-radius: 50%; font-size: 16px; cursor: pointer; line-height: 1;
 }
 .tk-btn:disabled { opacity: 0.35; cursor: default; }
+.tk-act {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-0);
+  font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+}
+.tk-act:disabled { opacity: 0.35; cursor: default; }
+.tk-note {
+  max-width: 420px; margin: 0.9rem auto 0; text-align: center;
+  color: var(--gray-100); font-size: 13.5px; line-height: 1.5;
+}
 
 .tk-hint {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center;

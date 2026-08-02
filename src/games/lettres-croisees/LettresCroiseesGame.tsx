@@ -12,6 +12,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { lettresCroiseesLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    LETTRES CROISÉES — React island. Wordscapes-style: compose words from a letter wheel;
@@ -22,10 +23,9 @@ import { usePointerDrag } from '../usePointerDrag';
 
 type Status = 'playing' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
-const HINT_COOLDOWN_S = 30; // one grid word revealed at most every 30 s
 const ck = (r: number, c: number): string => `${r},${c}`;
 
-interface DailyState { found: string[]; bonusFound: string[]; }
+interface DailyState { found: string[]; bonusFound: string[]; hinted?: string[]; }
 interface Toast { msg: string; kind: 'ok' | 'bonus' | 'dup' | 'bad'; }
 
 const wordCells = (w: Puzzle['words'][number]): string[] =>
@@ -47,7 +47,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [started, setStarted] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
-	const [hintLeft, setHintLeft] = useState(HINT_COOLDOWN_S);
+	const [hinted, setHinted] = useState<Set<string>>(() => new Set()); // cells uncovered one letter at a time
 
 	const wheelRef = useRef<HTMLDivElement | null>(null);
 	const dragging = useRef(false);
@@ -61,13 +61,15 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const revealDelay = useRef<Map<string, number>>(new Map());
-	const hintReadyAt = useRef(0);
+	const hintedRef = useRef<Set<string>>(new Set());
 	const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const lv = useLevels(gameId, lettresCroiseesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
 	const armed = (daily || lv.playing) && !started;
 	const total = puzzle.words.length;
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && !armed);
 
 	/* Daily chrono. */
 	useEffect(() => {
@@ -76,24 +78,11 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		return () => clearInterval(id);
 	}, [daily, started, status]);
 
-	/* Hint cooldown ticker. */
-	useEffect(() => {
-		if (status !== 'playing' || armed) return;
-		const tick = (): void => setHintLeft(Math.max(0, Math.ceil((hintReadyAt.current - Date.now()) / 1000)));
-		tick();
-		const id = setInterval(tick, 500);
-		return () => clearInterval(id);
-	}, [status, armed, puzzle]);
-
-	const armHint = (): void => {
-		hintReadyAt.current = Date.now() + HINT_COOLDOWN_S * 1000;
-		setHintLeft(HINT_COOLDOWN_S);
-	};
-
 	const setSelBoth = (s: number[]): void => { selRef.current = s; setSel(s); };
 	const setFoundBoth = (f: string[]): void => { foundRef.current = f; setFound(f); };
 	const setBonusBoth = (b: string[]): void => { bonusRef.current = b; setBonusFound(b); };
 	const setLettersBoth = (l: string[]): void => { lettersRef.current = l; setLetters(l); };
+	const setHintedBoth = (h: Set<string>): void => { hintedRef.current = h; setHinted(h); };
 
 	const flash = (msg: string, kind: Toast['kind']): void => {
 		if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -105,7 +94,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		puzzleRef.current = p; setPuzzle(p);
 		setLettersBoth(p.letters);
 		revealDelay.current = new Map();
-		setSelBoth([]); setFoundBoth([]); setBonusBoth([]);
+		setSelBoth([]); setFoundBoth([]); setBonusBoth([]); setHintedBoth(new Set());
 		setToast(null);
 	};
 
@@ -115,7 +104,6 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		setDiffKey(key); setElapsed(0);
 		applyPuzzle(generatePuzzle((Math.random() * 2 ** 31) >>> 0, DIFFS[key]));
 		setStatus('playing');
-		armHint();
 		trackGame(gameId, 'game_started', { difficulty: key, mode: 'free' });
 	}, [gameId]);
 
@@ -136,10 +124,10 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 			const st = (run.state as DailyState) ?? { found: [], bonusFound: [] };
 			// re-mark found cells without replay animation
 			for (const w of p.words) if ((st.found ?? []).includes(w.word)) wordCells(w).forEach((k) => revealDelay.current.set(k, 0));
-			setFoundBoth(st.found ?? []); setBonusBoth(st.bonusFound ?? []);
+			setFoundBoth(st.found ?? []); setBonusBoth(st.bonusFound ?? []); setHintedBoth(new Set(st.hinted ?? []));
 			setDailyLoading(false); setStarted(true);
 			if (run.done) { setStatus('won'); setAlreadyPlayed(true); setElapsed(run.finalTime ?? 0); }
-			else { setStatus('playing'); setAlreadyPlayed(false); startRef.current = run.startedAt; setElapsed(Math.round((Date.now() - run.startedAt) / 10)); armHint(); }
+			else { setStatus('playing'); setAlreadyPlayed(false); startRef.current = run.startedAt; setElapsed(Math.round((Date.now() - run.startedAt) / 10)); }
 			return;
 		}
 		setAlreadyPlayed(false); setStatus('playing'); setStarted(false);
@@ -152,17 +140,16 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const startTimer = useCallback((): void => {
 		const now = Date.now();
 		startRef.current = now; setStarted(true); setElapsed(0);
-		armHint();
 		trackGame(gameId, 'game_started', { mode: 'daily' });
 		if (daily) {
 			const sd = dailySeedRef.current;
-			saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [], bonusFound: [] } satisfies DailyState });
+			saveDailyRun(gameId, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: [], bonusFound: [], hinted: [] } satisfies DailyState });
 		}
 	}, [gameId, daily]);
 
 	const saveDaily = (nf: string[], nb: string[], complete: boolean, finalTime?: number): void => {
 		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, { startedAt: startRef.current, done: complete, finalTime, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: nf, bonusFound: nb } satisfies DailyState });
+		saveDailyRun(gameId, { startedAt: startRef.current, done: complete, finalTime, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: nf, bonusFound: nb, hinted: [...hintedRef.current] } satisfies DailyState });
 	};
 
 	/* ---------- Levels mode ---------- */
@@ -174,7 +161,6 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		applyPuzzle(generatePuzzle(cfg.seed, cfg.diff));
 		setStatus('playing');
 		setStarted(false); setElapsed(0);
-		armHint();
 		trackGame(gameId, 'game_started', { mode: 'levels', level });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv, gameId]);
@@ -295,16 +281,26 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	// Drag across the wheel via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
 	const { onPointerDown: onWheelDown } = usePointerDrag(startDrag, moveDrag, endDrag);
 
-	/* Hint: reveal the shortest unfound grid word (30 s cooldown — self-penalizing on the chrono). */
+	/* Hint: uncover ONE letter of the shortest unfound word — its first still-hidden cell.
+	   Spend several hints on the same word to walk it letter by letter. */
 	const revealHint = (): void => {
-		if (status !== 'playing' || armed || Date.now() < hintReadyAt.current) return;
-		const unfound = puzzleRef.current.words
+		if (status !== 'playing' || armed || !gate.ready) return;
+		const p = puzzleRef.current;
+		const shown = new Set(hintedRef.current);
+		for (const w of p.words) if (foundRef.current.includes(w.word)) wordCells(w).forEach((k) => shown.add(k));
+		const unfound = p.words
 			.filter((w) => !foundRef.current.includes(w.word))
 			.sort((a, b) => a.word.length - b.word.length);
-		if (!unfound.length) return;
-		armHint();
-		flash(`💡 ${unfound[0].word}`, 'bonus');
-		revealGridWord(unfound[0].word);
+		for (const w of unfound) {
+			const cell = wordCells(w).find((k) => !shown.has(k));
+			if (cell == null) continue;
+			gate.consume();
+			setHintedBoth(new Set(hintedRef.current).add(cell));
+			flash('💡 Une lettre de plus', 'bonus');
+			if (dailyRef.current) saveDaily(foundRef.current, bonusRef.current, false);
+			trackGame(gameId, 'hint_used');
+			return;
+		}
 	};
 
 	const tapSubmit = (): void => {
@@ -402,9 +398,10 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 							const letter = cellLetter.get(k);
 							if (letter == null) return <div key={k} />;
 							const on = cellOn.has(k);
+							const tip = !on && hinted.has(k);
 							return (
-								<div key={k} className={`lc-cell${on ? ' on' : ''}`} style={on ? { animationDelay: `${revealDelay.current.get(k) ?? 0}ms` } : undefined}>
-									{on ? letter : ''}
+								<div key={k} className={`lc-cell${on ? ' on' : ''}${tip ? ' hinted' : ''}`} style={on ? { animationDelay: `${revealDelay.current.get(k) ?? 0}ms` } : undefined}>
+									{on || tip ? letter : ''}
 								</div>
 							);
 						}))}
@@ -444,11 +441,9 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 						<button className="lc-shuffle" onClick={shuffleWheel} disabled={armed || status !== 'playing'} aria-label="Mélanger les lettres">🔀</button>
 					</div>
 
-					{!lv.active && (
-						<button className="lc-hint" onClick={revealHint} disabled={armed || status !== 'playing' || hintLeft > 0}>
-							💡 Indice{status === 'playing' && !armed && hintLeft > 0 ? ` · ${hintLeft}s` : ''}
-						</button>
-					)}
+					<button className="lc-hint" onClick={revealHint} disabled={armed || status !== 'playing' || !gate.ready}>
+						{gate.label}
+					</button>
 					</div>
 				</div>
 
@@ -488,6 +483,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 			<p className="lc-help">
 				Glisse d'une lettre à l'autre (ou tape-les une à une) pour composer un mot, et remplis la grille croisée.
 				Tous les mots utilisent uniquement les lettres de la roue. Les autres mots valides comptent en bonus ✨.
+				L'indice 💡 dévoile une seule lettre du mot restant le plus court.
 			</p>
 
 			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
@@ -526,6 +522,7 @@ const CSS = `
 .lc-grid { display: grid; gap: 3px; justify-content: center; }
 .lc-cell { background: var(--gray-800); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; font-size: clamp(13px, 4.2vw, 22px); }
 .lc-cell.on { background: var(--lc); color: var(--accent-text-over); animation: lc-pop 0.35s ease both; }
+.lc-cell.hinted { background: var(--gray-800); color: #eec95c; box-shadow: inset 0 0 0 1.5px #eec95c; }
 @keyframes lc-pop { 0% { transform: scale(0.4); opacity: 0.2; } 65% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
 .lc-preview-row { display: flex; align-items: center; gap: 8px; margin: 0.7rem 0 0.2rem; min-height: 40px; }
 .lc-preview { min-width: 120px; text-align: center; background: var(--gray-900); border: 1.5px solid var(--gray-700); border-radius: 999px; padding: 7px 18px; font-weight: 800; font-size: 17px; letter-spacing: 2px; }

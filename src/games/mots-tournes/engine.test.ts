@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generatePuzzle, countPaths, spell, matchWord, neighbors, DIFFS, type Puzzle } from './engine';
+import { generatePuzzle, countPaths, spell, matchWord, neighbors, findHint, DIFFS, type Puzzle, type Cell } from './engine';
 import { THEMES, normalize } from '../mots-meles/engine';
 import { mulberry32 } from '../prng';
 
@@ -54,6 +54,35 @@ describe('mots-tournés generator', () => {
 		const empties = p.letters.flat().filter((x) => x === '').length;
 		expect(p.rows * p.cols - empties).toBe(p.regions.reduce((a, r) => a + r.word.length, 0));
 		for (const rg of p.regions) { expect(rg.word.length).toBeGreaterThanOrEqual(DIFFS.difficile.minLen); expect(rg.word.length).toBeLessThanOrEqual(DIFFS.difficile.maxLen); }
+	});
+});
+
+describe('findHint', () => {
+	it('always advances one cell while words remain, and never hands over a whole word', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const p = generatePuzzle(23, DIFFS[key]);
+			const found: number[] = [];
+			while (found.length < p.regions.length) {
+				let prefix: Cell[] = [];
+				let idx = -1;
+				for (let step = 0; step < 20; step++) {
+					const h = findHint(p, found, prefix);
+					expect(h, `${key}: a hint is offered while words remain`).not.toBeNull();
+					const target = p.regions[h!.regionIndex];
+					expect(found).not.toContain(h!.regionIndex);
+					expect(h!.reason.length).toBeGreaterThan(0);
+					expect(h!.cells.length).toBeGreaterThan(0);
+					expect(h!.cells.length, 'stops one cell short of the answer').toBeLessThan(target.word.length);
+					expect(spell(h!.cells, p.letters)).not.toBe(target.word);
+					expect(h!.cells).toEqual(target.cells.slice(0, h!.cells.length)); // a real prefix of the path
+					if (h!.cells.length <= prefix.length) break; // capped: can't give more without the answer
+					prefix = h!.cells; idx = h!.regionIndex;
+				}
+				expect(prefix.length).toBe(p.regions[idx].word.length - 1); // hints walk the word to its last cell
+				found.push(idx);
+			}
+			expect(findHint(p, found, [])).toBeNull(); // nothing left to hint
+		}
 	});
 });
 

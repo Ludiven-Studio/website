@@ -17,6 +17,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { tenteLevels } from './levels';
 
 /* =====================================================
@@ -62,6 +63,9 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 
 	const { size, trees, tents, rowCounts, colCounts } = puzzle;
 	const over = status === 'won' || revealed;
+
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, !over && started);
 
 	// Trees occupy fixed cells; lookup set + solution tent set.
 	const treeSet = useMemo(() => new Set(trees.map(([r, c]) => cellKey(r, c))), [trees]);
@@ -297,11 +301,12 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		[over, daily, started, treeSet, removeHint, begin],
 	);
 
-	/* Hint (free mode): deduce the next logical cell and explain the technique. Mark it GREEN. */
+	/* Hint: deduce the next logical cell and explain the technique. Mark it GREEN. */
 	const hint = useCallback(() => {
-		if (over) return;
+		if (over || !gate.ready) return;
 		const h = findHint(marks, puzzle);
 		if (!h) return;
+		gate.consume();
 		setMarks((prev) => {
 			const n = prev.map((row) => [...row]);
 			n[h.r][h.c] = h.value;
@@ -311,7 +316,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		setHintNote(h.reason);
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, marks, puzzle, begin, gameId]);
+	}, [over, marks, puzzle, begin, gameId, gate]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -385,10 +390,10 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!over && !daily && !lv.active && (
+			{!over && !(lv.active && !lv.playing) && (
 				<div className="te-actions">
-					<button className="te-act" onClick={hint}>💡 Indice</button>
-					{elapsed >= 60 && (
+					<button className="te-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="te-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -494,7 +499,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && (
 				<p className="te-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 

@@ -18,6 +18,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { sommeTouteLevels } from './levels';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    SOMME TOUTE — React island (training mode)
@@ -63,6 +64,8 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	const lv = useLevels(gameId, sommeTouteLevels);
 
 	const { puzzle, rowT, colT, size, maxVal } = game;
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
 
 	const cellValue = useCallback(
 		(r: number, c: number) => (puzzle[r][c] != null ? puzzle[r][c] : entries[r][c]),
@@ -161,6 +164,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setSelected(null);
 		setRevealed(false);
 		setHinted(new Set());
+		setHintNote('');
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -275,9 +279,10 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 
 	/* Hint: deduce the next logical cell and explain the technique. */
 	const hint = useCallback(() => {
-		if (status === 'won' || revealed) return;
+		if (status === 'won' || revealed || !gate.ready) return;
 		const h = findHint(entries, game);
 		if (!h) return;
+		gate.consume();
 		setEntries((prev) => {
 			const next = prev.map((row) => [...row]);
 			next[h.r][h.c] = h.value;
@@ -291,7 +296,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, entries, game, gameId]);
+	}, [status, revealed, entries, game, gameId, gate]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -433,18 +438,15 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && !(lv.active && lv.menu) && (
+			{status !== 'won' && !revealed && !(lv.active && lv.menu) && (
 				<div className="st-actions">
-					<button className="st-act" onClick={hint}>💡 Indice</button>
-					{!lv.active && elapsed >= 60 && (
+					<button className="st-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="st-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
-				</div>
-			)}
-
-			{daily && started && status === 'playing' && (
-				<div className="st-actions">
-					<button className="st-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+					{daily && started && (
+						<button className="st-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+					)}
 				</div>
 			)}
 
@@ -543,7 +545,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && !(lv.active && lv.menu) && (
 				<p className="st-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 

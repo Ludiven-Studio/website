@@ -9,12 +9,15 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { alchimieLevels } from './levels';
 
 /* =====================================================
    ALCHIMIE — React island. Libre : combine ~150 éléments depuis 5 bases (glisser une carte sur
    une autre). Défi du jour : fabrique l'élément secret du jour en un minimum de fusions (chrono
-   départage). Indices auto toutes les 30 s sans progrès. Engine pur/testé dans ./engine.
+   départage). Niveaux : une cible par niveau, étoiles au chrono. Indice à la demande (bouton) ou
+   automatique après 30 s sans progrès, sur le cooldown partagé useHintGate.
+   Engine pur/testé dans ./engine.
    ===================================================== */
 
 const STORE_KEY = 'ludiven-alchimie-discovered';
@@ -63,6 +66,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const [lvDiscovered, setLvDiscovered] = useState<string[]>([...BASE_IDS]);
 	const [lvCombos, setLvCombos] = useState(0);
 	const [lvTarget, setLvTarget] = useState('');
+	const [lvElapsed, setLvElapsed] = useState(0);
 	const [discovered, setDiscovered] = useState<string[]>(() => (typeof window === 'undefined' ? [...BASE_IDS] : loadDiscovered()));
 	const [dDiscovered, setDDiscovered] = useState<string[]>([...BASE_IDS]);
 	const [dTarget, setDTarget] = useState('');
@@ -70,6 +74,8 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const [dDone, setDDone] = useState(false);
 	const [dElapsed, setDElapsed] = useState(0);
 	const [dLoading, setDLoading] = useState(false);
+	const timed = mode === 'daily' || lv.playing;
+	const gate = useHintGate(timed, mode === 'daily' ? !dDone && !dLoading : !lv.done);
 
 	const [tokens, setTokens] = useState<Token[]>([]);
 	const [catalog, setCatalog] = useState(false);
@@ -91,6 +97,8 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const lvCombosRef = useRef(0);
 	const lvTargetRef = useRef('');
 	const lvDoneRef = useRef(false);
+	const lvStartRef = useRef(0);
+	const lvFinalRef = useRef(0);
 	const dArr = useRef<string[]>([...BASE_IDS]);
 	const dSet = useRef(new Set(BASE_IDS));
 	const dTargetRef = useRef('');
@@ -115,22 +123,34 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		return () => clearInterval(id);
 	}, [mode, dDone, dLoading]);
 
+	// Same chrono in levels: they are ranked on time, which is what the hint cooldown costs.
+	useEffect(() => {
+		if (!lv.playing || lvStartRef.current === 0) return;
+		const id = setInterval(() => setLvElapsed((Date.now() - lvStartRef.current) / 1000), 250);
+		return () => clearInterval(id);
+	}, [lv.playing]);
+
 	const flash = useCallback((text: string) => {
 		if (toastTimer.current) clearTimeout(toastTimer.current);
 		setToast(text);
 		toastTimer.current = setTimeout(() => setToast(''), 1600);
 	}, []);
 
-	// Daily auto-hint: nudge toward the next useful fusion after 30s without a discovery.
+	// Daily auto-hint: nudge toward the next useful fusion after 30s without a discovery,
+	// once the shared cooldown allows it. Depends on the gate fields, not on the gate
+	// object — that one is rebuilt on every tick and would reset the interval.
+	const hintReady = gate.ready;
+	const consumeHint = gate.consume;
 	useEffect(() => {
-		if (mode !== 'daily' || dDone || dLoading || dStartRef.current === 0) return;
+		if (mode !== 'daily' || dDone || dLoading || dStartRef.current === 0 || !hintReady) return;
 		const id = setInterval(() => {
 			if (Date.now() - lastProgressRef.current < 30000) return;
 			lastProgressRef.current = Date.now();
+			consumeHint();
 			flash(stepText(dSet.current, dTargetRef.current));
 		}, 2000);
 		return () => clearInterval(id);
-	}, [mode, dDone, dLoading, flash]);
+	}, [mode, dDone, dLoading, flash, hintReady, consumeHint]);
 	const showReveal = useCallback((el: Element) => {
 		if (revealTimer.current) clearTimeout(revealTimer.current);
 		setReveal(el);
@@ -165,7 +185,9 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			lvArr.current = nd; setLvDiscovered(nd);
 			if (productId === lvTargetRef.current && !lvDoneRef.current) {
 				lvDoneRef.current = true;
-				lv.finish({ won: true, score: combos, raw: { target: productId, combos } });
+				const centis = Math.round((Date.now() - lvStartRef.current) / 10);
+				lvFinalRef.current = centis / 100; setLvElapsed(centis / 100);
+				lv.finish({ won: true, score: centis, stat: combos, raw: { target: productId, combos, centis } });
 			}
 		} else {
 			setDiscovered((d) => [...d, productId]);
@@ -289,11 +311,12 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		lvArr.current = [...BASE_IDS]; setLvDiscovered([...BASE_IDS]);
 		lvCombosRef.current = 0; setLvCombos(0);
 		lvDoneRef.current = false;
+		lvStartRef.current = Date.now(); lvFinalRef.current = 0; setLvElapsed(0);
 		setTokens([]); setReveal(null); setSearch('');
 	}, [lv]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
-	// alchimie levels are untimed (no ready-gate). A ?defi deep link opens the daily.
+	// The chrono starts with the level (no ready-gate). A ?defi deep link opens the daily.
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
 		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
@@ -328,15 +351,18 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'daily_played');
 	}, [gameId]);
 
+	/* One step only: a single fusion whose two ingredients are already owned. */
 	const hint = useCallback(() => {
+		if (!gate.ready) return;
 		const set = activeSet();
-		if (modeRef.current === 'daily') { lastProgressRef.current = Date.now(); flash(stepText(set, dTargetRef.current)); return; }
-		if (modeRef.current === 'level') { flash(stepText(set, lvTargetRef.current)); return; }
+		if (modeRef.current === 'daily') { lastProgressRef.current = Date.now(); gate.consume(); flash(stepText(set, dTargetRef.current)); return; }
+		if (modeRef.current === 'level') { gate.consume(); flash(stepText(set, lvTargetRef.current)); return; }
 		const options = ELEMENTS.filter((el) => el.recipe && !set.has(el.id) && el.recipe.every((r) => set.has(r)));
 		if (!options.length) { flash(discovered.length >= TOTAL ? 'Tout est découvert ! 🎉' : 'Combine encore pour ouvrir des pistes'); return; }
 		const pick = options[Math.floor(Math.random() * options.length)];
+		gate.consume();
 		flash(`💡 Essaie ${pick.recipe!.map((r) => getElement(r)!.emoji).join(' + ')}`);
-	}, [discovered.length, flash]);
+	}, [discovered.length, flash, gate]);
 
 	const clearBoard = useCallback(() => { setTokens([]); }, []);
 	const resetFree = useCallback(() => {
@@ -355,7 +381,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 	const dScore = encodePacked(10_000_000, [dMoves, Math.min(9_999_999, Math.round((dDone ? dFinalRef.current : dElapsed) * 100))]);
 	const targetEl = dTarget ? getElement(dTarget) : null;
 	const lvTargetEl = lvTarget ? getElement(lvTarget) : null;
-	const lvCfg = levels ? alchimieLevels.config(lv.level) : null;
+	const lvStars = levels ? alchimieLevels.starHint(lv.level) : null;
 
 	// Catalog (free mode): discovered → shown; frontier (both ingredients known) → faded emoji + recipe; else "?".
 	const discSet = new Set(discovered);
@@ -387,7 +413,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 							<span className="al-obj">Objectif&nbsp;: <b>{targetEl?.emoji} {targetEl?.name}</b></span>
 							<span className="al-chip">🧪 {dMoves} fusions</span>
 							<span className="al-chip">⏱ {fmtTime(dElapsed)}</span>
-							<button className="al-btn" onClick={hint}>💡</button>
+							{!dDone && <button className="al-btn" onClick={hint} disabled={!gate.ready}>{gate.label}</button>}
 							<button className="al-btn" onClick={clearBoard}>🧹</button>
 						</>
 					)}
@@ -400,8 +426,9 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 						<span className="al-difftag">Niveau {lv.level}</span>
 						<span className="al-obj">Objectif&nbsp;: <b>{lvTargetEl?.emoji} {lvTargetEl?.name}</b></span>
 						<span className="al-chip">🧪 {lvCombos} combinaison{lvCombos > 1 ? 's' : ''}</span>
-						{lvCfg && <span className="al-chip" title="Seuils d'étoiles">⭐ {lvCfg.threeStar} / {lvCfg.twoStar}</span>}
-						<button className="al-btn" onClick={hint}>💡</button>
+						<span className="al-chip">⏱ {fmtTime(lvElapsed)}</span>
+						{lvStars && <span className="al-chip" title="Seuils d'étoiles">⭐ {lvStars.three} / {lvStars.two}</span>}
+						{!lv.done && <button className="al-btn" onClick={hint} disabled={!gate.ready}>{gate.label}</button>}
 						<button className="al-btn" onClick={clearBoard}>🧹</button>
 					</div>
 				)
@@ -415,7 +442,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 						</div>
 						{!catalog && (
 							<div className="al-actions">
-								<button className="al-btn" onClick={hint}>💡 Indice</button>
+								<button className="al-btn" onClick={hint} disabled={!gate.ready}>{gate.label}</button>
 								<button className="al-btn" onClick={clearBoard}>🧹 Vider l'établi</button>
 								<button className="al-btn ghost" onClick={resetFree}>↻</button>
 							</div>
@@ -495,7 +522,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 								lastLevel={alchimieLevels.count}
 								won={lv.won}
 								stars={lv.stars}
-								detail={lv.won ? `Découvert en ${lvCombos} combinaison${lvCombos > 1 ? 's' : ''}` : undefined}
+								detail={lv.won ? `Découvert en ${fmtTime(lvFinalRef.current)} · ${lvCombos} combinaison${lvCombos > 1 ? 's' : ''}` : undefined}
 								onNext={() => startLevel(lv.level + 1)}
 								onReplay={() => startLevel(lv.level)}
 								onMenu={lv.backToMenu}
@@ -532,7 +559,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 			<p className="al-help">
 				{daily
-					? <>On te donne une dizaine d'éléments : <strong>lâche une carte sur une autre</strong> pour trouver la combinaison qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). Bloqué ? Un <strong>indice</strong> apparaît toutes les 30 s. {SECRET_TOTAL} défis, un par jour.</>
+					? <>On te donne une dizaine d'éléments : <strong>lâche une carte sur une autre</strong> pour trouver la combinaison qui mène à l'objectif, en <strong>un minimum de fusions</strong> (le chrono départage). Bloqué ? Demande un <strong>indice</strong> (bouton 💡) ou laisse-le apparaître : une seule étape toutes les 30 s. {SECRET_TOTAL} défis, un par jour.</>
 					: levels
 						? <>Chaque niveau te lance un <strong>élément cible</strong> à découvrir depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour fusionner. Moins tu fais de combinaisons, plus tu gagnes d'étoiles. Réussir un niveau débloque le suivant. {alchimieLevels.count} niveaux, du plus court au plus profond.</>
 						: <>Combine ~{TOTAL} éléments depuis les 5 bases : <strong>lâche une carte sur une autre</strong> pour les fusionner. Le <strong>Catalogue</strong> montre ta progression : les éléments trouvés avec leur recette, les prochains à portée en transparence, le reste en «&nbsp;?&nbsp;». Le <strong>Défi du jour</strong> te lance un objectif secret.</>}
@@ -552,7 +579,8 @@ const CSS = `
 .al-chip { background: var(--gray-900); border-radius: 999px; padding: 4px 12px; font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
 .al-difftag { background: var(--gray-900); color: var(--gray-300); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600; }
 .al-btn { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
-.al-btn:hover { border-color: var(--al-accent); color: var(--al-accent); }
+.al-btn:hover:not(:disabled) { border-color: var(--al-accent); color: var(--al-accent); }
+.al-btn:disabled { opacity: 0.5; cursor: default; }
 .al-btn.ghost { padding: 6px 12px; }
 .al-progress { height: 6px; background: var(--gray-900); border-radius: 999px; overflow: hidden; margin-bottom: 0.8rem; }
 .al-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--al-accent), #c8b6ff); border-radius: 999px; transition: width 0.4s ease; }

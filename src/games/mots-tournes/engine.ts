@@ -81,6 +81,46 @@ export function countPaths(letters: string[][], word: string): number {
 	return count;
 }
 
+/* ---------- Hint ---------- */
+
+export interface Hint {
+	regionIndex: number;
+	cells: Cell[]; // strict prefix of the region path — never the whole word
+	reason: string;
+}
+
+const sameCell = (a: Cell, b: Cell): boolean => a[0] === b[0] && a[1] === b[1];
+
+/**
+ * One step towards a solution, never a whole word: extends `trace` by a cell when it is a
+ * prefix of an unfound word's path, otherwise points at where the shortest one starts.
+ * The returned prefix always stops one cell short of the answer.
+ */
+export function findHint(puzzle: Puzzle, found: number[], trace: Cell[] = []): Hint | null {
+	const remaining = puzzle.regions
+		.map((region, index) => ({ region, index }))
+		.filter(({ index }) => !found.includes(index));
+	if (!remaining.length) return null;
+
+	const onTrack = trace.length
+		? remaining.find(({ region }) => trace.length < region.cells.length - 1 && trace.every((c, i) => sameCell(c, region.cells[i])))
+		: undefined;
+	if (onTrack) {
+		return {
+			regionIndex: onTrack.index,
+			cells: onTrack.region.cells.slice(0, trace.length + 1),
+			reason: 'Ton début est bon : le mot continue par cette case.',
+		};
+	}
+
+	const target = remaining.reduce((best, cur) => (cur.region.word.length < best.region.word.length ? cur : best));
+	return {
+		regionIndex: target.index,
+		cells: [target.region.cells[0]],
+		reason: `Un mot de ${target.region.word.length} lettres commence ici.`,
+	};
+}
+
 /* ---------- Generation ---------- */
 
 /** Pick distinct words summing to exactly `n` cells, count in [minW,maxW] (randomised DFS). */

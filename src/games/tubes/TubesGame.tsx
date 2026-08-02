@@ -26,6 +26,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { tubesLevels } from './levels';
 import { getProgression, submitLevel, type GameProgress } from '../../lib/progression';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    TUBES (Water Sort) — React island.
@@ -313,6 +314,10 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	}, [fresh]);
 
 	const interactive = status !== 'won' && !(daily && !started);
+	const inLevel = levelsMode && !levelMenu;
+	const timed = daily || inLevel; // both race the chrono → hints on a cooldown
+	// Levels have no ▶ Commencer, so their window opens as soon as the level is on screen.
+	const gate = useHintGate(timed, status === 'playing' && (inLevel || started));
 
 	const pushHistory = useCallback(() => {
 		setHistory((h) => [...h, { tubes: cloneTubes(tubes), moves, jokerUsed }]);
@@ -387,16 +392,17 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	}, [jokerUsed, interactive, pushHistory]);
 
 	const hint = useCallback(() => {
-		if (!interactive) return;
+		if (!interactive || !gate.ready) return;
 		const h = findHint(tubes, height);
 		if (!h) {
 			setHintMove(null);
 			return;
 		}
+		gate.consume();
 		setSelected(null);
 		setHintMove({ from: h.from, to: h.to }); // suggest the pour; player performs it
 		trackGame(gameId, 'hint_used');
-	}, [interactive, tubes, height, gameId]);
+	}, [interactive, tubes, height, gameId, gate]);
 
 	const tubeRows = layoutRows(tubes.length);
 
@@ -461,7 +467,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 			{interactive && !(levelsMode && levelMenu) && (
 				<div className="ws-actions">
 					<button className="ws-act" onClick={undo} disabled={history.length === 0}>↶ Annuler</button>
-					<button className="ws-act" onClick={hint}>💡 Indice</button>
+					<button className="ws-act" onClick={hint} disabled={!gate.ready}>{gate.label}</button>
 					<button className="ws-act" onClick={restart}>↺ Recommencer</button>
 					<button className="ws-act" onClick={addTube} disabled={jokerUsed}>➕ Tube</button>
 				</div>

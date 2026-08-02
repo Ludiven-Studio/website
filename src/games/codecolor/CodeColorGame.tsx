@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { LEVELS, generatePuzzle, score, isWin, type MasterPuzzle, type Feedback } from './engine';
+import { LEVELS, generatePuzzle, score, isWin, findHint, COLOR_NAMES, type MasterPuzzle, type Feedback } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {
@@ -15,6 +15,7 @@ import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { codecolorLevels } from './levels';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
@@ -35,17 +36,10 @@ interface Swatch {
 	hex: string;
 	name: string;
 }
-// 8 distinct hues; a level uses the first `colors` of them.
-const PALETTE: Swatch[] = [
-	{ hex: '#e6484d', name: 'Rouge' },
-	{ hex: '#f59e0b', name: 'Orange' },
-	{ hex: '#facc15', name: 'Jaune' },
-	{ hex: '#22c55e', name: 'Vert' },
-	{ hex: '#06b6d4', name: 'Cyan' },
-	{ hex: '#3b82f6', name: 'Bleu' },
-	{ hex: '#8b5cf6', name: 'Violet' },
-	{ hex: '#ec4899', name: 'Rose' },
-];
+// 8 distinct hues; a level uses the first `colors` of them. Names live in the engine so hints
+// can name a colour without duplicating the list.
+const HEX = ['#e6484d', '#f59e0b', '#facc15', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
+const PALETTE: Swatch[] = HEX.map((hex, i) => ({ hex, name: COLOR_NAMES[i] }));
 
 interface Row {
 	guess: number[];
@@ -70,13 +64,17 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
+	const [hintKeys, setHintKeys] = useState<Set<string>>(() => new Set()); // facts already handed out
 	const startedRef = useRef(false); // free-mode "first action" flag
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const lv = useLevels(gameId, codecolorLevels);
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
 
 	const { slots, colors, tries } = puzzle;
 	const over = status !== 'playing';
+	const gate = useHintGate(timed, status === 'playing' && started);
 	const usedTries = rows.length;
 	const filled = current.every((v) => v !== null);
 	const bestExact = useMemo(() => rows.reduce((m, r) => Math.max(m, r.fb.exact), 0), [rows]);
@@ -93,6 +91,8 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setStarted(false);
 		startedRef.current = false;
+		setHintNote('');
+		setHintKeys(new Set());
 		try {
 			setBest(Number(localStorage.getItem(BEST_KEY) ?? '0') || 0);
 		} catch {
@@ -111,6 +111,8 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setStarted(true);
 		startedRef.current = true;
+		setHintNote('');
+		setHintKeys(new Set());
 	}, [lv]);
 
 	const armLevels = useCallback(() => {
@@ -130,6 +132,8 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 	/* Daily: one resumable attempt per device; server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
+		setHintNote('');
+		setHintKeys(new Set());
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
 			const di = run.diffIndex ?? dailyDifficultyIndex();
@@ -240,6 +244,17 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 			trackGame(gameId, 'game_over', { tries: nextRows.length });
 		}
 	}, [over, armed, current, puzzle.code, rows, slots, tries, gameId]);
+
+	/* Hint: state one constraint deduced from the feedback so far — never a peg of the code. */
+	const hint = useCallback(() => {
+		if (over || armed || !gate.ready) return;
+		const h = findHint(slots, colors, rows, hintKeys);
+		gate.consume();
+		setHintNote(h.reason);
+		setHintKeys((prev) => new Set(prev).add(h.key));
+		begin();
+		trackGame(gameId, 'hint_used');
+	}, [over, armed, gate, slots, colors, rows, hintKeys, begin, gameId]);
 
 	/* Persist the in-progress daily attempt. */
 	useEffect(() => {
@@ -396,6 +411,16 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
+				{!over && (
+					<div className="cc-actions">
+						<button className="cc-act" onClick={hint} disabled={!gate.ready || armed || (timed && !started)}>
+							{gate.label}
+						</button>
+					</div>
+				)}
+
+				{hintNote && <p className="cc-hint-note" aria-live="polite">💡 {hintNote}</p>}
+
 				{daily && dailyLoading && (
 					<div className="cc-overlay"><div className="cc-overlay-card">Préparation…</div></div>
 				)}
@@ -540,6 +565,18 @@ const CSS = `
 .cc-swatch { width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer; box-shadow: inset 0 -3px 6px rgba(0,0,0,0.2); transition: transform 0.08s; }
 .cc-swatch:hover:not(:disabled) { transform: scale(1.1); }
 .cc-swatch:disabled { opacity: 0.3; cursor: default; }
+
+.cc-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.cc-act {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-200);
+  font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 7px 16px; cursor: pointer;
+}
+.cc-act:disabled { opacity: 0.4; cursor: default; }
+.cc-hint-note {
+  max-width: 420px; margin: 0; text-align: center;
+  color: var(--gray-200); font-size: 13px; line-height: 1.5;
+  background: var(--gray-900); border-radius: 12px; padding: 8px 14px;
+}
 
 .cc-board.blurred, .cc-palette.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
 .cc-overlay { position: absolute; inset: 0; top: 0; height: 100%; z-index: 2; display: flex; align-items: center; justify-content: center; }

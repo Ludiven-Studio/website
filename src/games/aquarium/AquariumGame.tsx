@@ -18,6 +18,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { usePointerDrag } from '../usePointerDrag';
+import { useHintGate } from '../useHintGate';
 import { aquariumLevels } from './levels';
 
 /* =====================================================
@@ -62,6 +63,9 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 
 	const { size, regionOf, solution, rowCounts, colCounts } = puzzle;
 	const over = status === 'won' || revealed;
+
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, !over && started);
 
 	/* Levels mode: start a level from its config; grade on solve. */
 	const startLevel = useCallback((level: number) => {
@@ -319,11 +323,12 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 	// Paint via Pointer Events (mouse, touch, pen) — reliable on iOS (see usePointerDrag).
 	const { onPointerDown } = usePointerDrag(startPaint, movePaint, endStroke);
 
-	/* Hint (free): deduce the next logical cell and explain the technique. Marks GREEN. */
+	/* Hint: deduce the next logical cell and explain the technique. Marks GREEN. */
 	const hint = useCallback(() => {
-		if (over) return;
+		if (over || !gate.ready) return;
 		const h = findHint(grid, puzzle);
 		if (!h) return;
+		gate.consume();
 		const v: Mark = h.value === 'water' ? 1 : 2;
 		setGrid((prev) => {
 			const n = prev.map((row) => [...row]) as Mark[][];
@@ -334,7 +339,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		setHintNote(h.reason);
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, grid, puzzle, begin, gameId]);
+	}, [over, grid, puzzle, begin, gameId, gate]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -403,10 +408,10 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!over && !daily && !(lv.active && lv.menu) && (
+			{!over && !(lv.active && !lv.playing) && (
 				<div className="aq-actions">
-					<button className="aq-act" onClick={hint}>💡 Indice</button>
-					{!lv.active && elapsed >= 60 && (
+					<button className="aq-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="aq-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -418,7 +423,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && (
 				<p className="aq-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 

@@ -17,6 +17,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { sudokuLevels } from './levels';
 
 /* =====================================================
@@ -60,6 +61,8 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const lv = useLevels(gameId, sudokuLevels);
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
 
 	const { size, boxH, boxW, given } = puzzle;
 
@@ -292,9 +295,10 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 
 	/* Hint: deduce the next logical cell and explain the technique. */
 	const hint = useCallback(() => {
-		if (status === 'won' || revealed) return;
+		if (status === 'won' || revealed || !gate.ready) return;
 		const h = findHint(entries, puzzle);
 		if (!h) return;
+		gate.consume();
 		setEntries((prev) => {
 			const next = prev.map((row) => [...row]);
 			next[h.r][h.c] = h.value;
@@ -308,7 +312,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, entries, puzzle, started, gameId]);
+	}, [status, revealed, entries, puzzle, started, gameId, gate]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -443,10 +447,10 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && !(lv.active && !lv.playing) && (
+			{status !== 'won' && !revealed && !(lv.active && !lv.playing) && (
 				<div className="sk-actions">
-					<button className="sk-act" onClick={hint}>💡 Indice</button>
-					{!lv.active && elapsed >= 60 && (
+					<button className="sk-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="sk-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -565,7 +569,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && (
 				<p className="sk-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 

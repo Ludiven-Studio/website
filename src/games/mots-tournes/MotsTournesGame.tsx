@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fmtCentis } from '../../lib/scoreFormat';
-import { generatePuzzle, spell, DIFFS, type Puzzle, type Cell } from './engine';
+import { generatePuzzle, spell, findHint, DIFFS, type Puzzle, type Cell } from './engine';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -12,6 +12,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { motsTournesLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    MOTS TOURNÉS — React island. A "Wend"-style word puzzle: trace each themed word as a snaking
@@ -40,6 +41,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [started, setStarted] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
+	const [hint, setHint] = useState<{ regionIndex: number; cells: Cell[]; reason: string } | null>(null);
 
 	const boardRef = useRef<HTMLDivElement | null>(null);
 	const drawing = useRef(false);
@@ -49,11 +51,14 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef(false);
 	const startRef = useRef(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const hintRef = useRef<{ regionIndex: number; cells: Cell[]; reason: string } | null>(null);
 	const lv = useLevels(gameId, motsTournesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
 	const armed = (daily || lv.playing) && !started;
 	const total = puzzle.regions.length;
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && !armed);
 
 	/* Daily / levels chrono. */
 	useEffect(() => {
@@ -70,7 +75,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		setDaily(false); setStarted(false); setAlreadyPlayed(false);
 		const p = generatePuzzle(cfg.seed, cfg.diff);
 		puzzleRef.current = p; setPuzzle(p);
-		setFoundBoth([]); setTraceBoth([]);
+		setFoundBoth([]); setTraceBoth([]); setHintBoth(null);
 		setStatus('playing');
 		setElapsed(0);
 		trackGame(gameId, 'game_started', { mode: 'levels', level });
@@ -100,6 +105,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 
 	const setTraceBoth = (t: Cell[]): void => { traceRef.current = t; setTrace(t); };
 	const setFoundBoth = (f: number[]): void => { foundRef.current = f; setFound(f); };
+	const setHintBoth = (h: typeof hintRef.current): void => { hintRef.current = h; setHint(h); };
 	const occupied = (cell: Cell): boolean => {
 		const p = puzzleRef.current;
 		if (p.letters[cell[0]][cell[1]] === '') return true; // blank/wall cell — can't be traced
@@ -112,14 +118,14 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		setDiffKey(key); setElapsed(0);
 		const p = generatePuzzle((Math.random() * 2 ** 31) >>> 0, DIFFS[key]);
 		puzzleRef.current = p; setPuzzle(p);
-		setFoundBoth([]); setTraceBoth([]);
+		setFoundBoth([]); setTraceBoth([]); setHintBoth(null);
 		setStatus('playing');
 		trackGame(gameId, 'game_started', { difficulty: key, mode: 'free' });
 	}, [gameId]);
 
 	const startDaily = useCallback(async (): Promise<void> => {
 		dailyRef.current = true;
-		setDaily(true); setTraceBoth([]);
+		setDaily(true); setTraceBoth([]); setHintBoth(null);
 		const lay = (seed: number, di: number): void => {
 			const key = DIFF_ORDER[di] ?? 'facile';
 			dailySeedRef.current = { seed, diffIndex: di };
@@ -164,6 +170,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		if (foundRef.current.includes(idx)) return;
 		const nf = [...foundRef.current, idx];
 		setFoundBoth(nf);
+		if (hintRef.current?.regionIndex === idx) setHintBoth(null);
 		const complete = nf.length === puzzleRef.current.regions.length;
 		if (dailyRef.current) {
 			const finalTime = complete ? Math.round((Date.now() - startRef.current) / 10) : undefined;
@@ -180,6 +187,20 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		const nf = foundRef.current.slice(0, -1);
 		setFoundBoth(nf);
 		if (dailyRef.current) saveDaily(nf, false);
+	};
+
+	/* Hint: one more cell of the shortest unfound word — never the whole path. */
+	const askHint = (): void => {
+		if (status !== 'playing' || armed || !gate.ready) return;
+		const p = puzzleRef.current;
+		const cur = hintRef.current;
+		// A prefix one cell short of the answer is as far as a word goes — move on to another.
+		const maxed = cur != null && cur.cells.length >= p.regions[cur.regionIndex].word.length - 1;
+		const h = findHint(p, maxed ? [...foundRef.current, cur.regionIndex] : foundRef.current, maxed ? [] : (cur?.cells ?? []));
+		if (!h) return;
+		gate.consume();
+		setHintBoth(h);
+		trackGame(gameId, 'hint_used');
 	};
 
 	/* ---------- Pointer: trace a path across adjacent letters ---------- */
@@ -228,6 +249,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 	const cellColor = new Map<string, string>();
 	for (const i of found) for (const [r, c] of puzzle.regions[i].cells) cellColor.set(ckey(r, c), wordColor(i));
 	const traceSet = new Set(trace.map(([r, c]) => ckey(r, c)));
+	const hintSet = new Set((hint?.cells ?? []).map(([r, c]) => ckey(r, c)));
 	const remainingLengths = puzzle.regions.map((_, i) => i).filter((i) => !found.includes(i)).map((i) => puzzle.regions[i].word.length).sort((a, b) => a - b);
 	const pts = (cells: Cell[]): string => cells.map(([r, c]) => `${c + 0.5},${r + 0.5}`).join(' '); // tube polyline (cell centres)
 	// Direction arrows sitting in the gaps between consecutive cells → show the reading order
@@ -306,7 +328,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 						style={{ gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`, gridTemplateRows: `repeat(${puzzle.rows}, 1fr)` }}
 						onPointerDown={onPointerDown}
 					>
-						{puzzle.letters.map((row, r) => row.map((ch, c) => <div key={ckey(r, c)} className={`wt-cell${ch === '' ? ' wall' : ''}`} />))}
+						{puzzle.letters.map((row, r) => row.map((ch, c) => <div key={ckey(r, c)} className={`wt-cell${ch === '' ? ' wall' : ''}${hintSet.has(ckey(r, c)) ? ' hint' : ''}`} />))}
 					</div>
 					{/* layer 2: a rounded colour TUBE per found word (+ the live trace), with direction arrows */}
 					<svg className="wt-tubes" viewBox={`0 0 ${puzzle.cols} ${puzzle.rows}`} preserveAspectRatio="none" aria-hidden="true">
@@ -362,9 +384,11 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 			{!(lv.active && lv.menu) && (
 			<div className="wt-controls">
 				<button className="wt-btn" onClick={undo} disabled={!found.length || status === 'won'}>↶ Annuler</button>
+				<button className="wt-btn hint" onClick={askHint} disabled={armed || status !== 'playing' || !gate.ready}>{gate.label}</button>
 				{!daily && !lv.active && <button className="wt-btn" onClick={() => newGame(diffKey)}>↻ Nouvelle grille</button>}
 			</div>
 			)}
+			{hint && !(lv.active && lv.menu) && <p className="wt-hintnote" aria-live="polite">💡 {hint.reason}</p>}
 
 			{daily && status === 'won' && (
 				<div className="wt-won">{alreadyPlayed
@@ -408,6 +432,7 @@ const CSS = `
 .wt-cells { position: absolute; inset: 0; z-index: 0; display: grid; gap: 3px; background: var(--gray-800); border: 2px solid var(--gray-800); border-radius: 12px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 .wt-cell { background: var(--gray-999); border-radius: 3px; }
 .wt-cell.wall { background: var(--gray-800); } /* blends with the grid lines → looks empty */
+.wt-cell.hint { background: rgba(238, 201, 92, 0.28); box-shadow: inset 0 0 0 2px #eec95c; }
 /* layer 2 — rounded colour tubes */
 .wt-tubes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 .wt-tube { fill: none; stroke-width: 0.74; stroke-linecap: round; stroke-linejoin: round; }
@@ -428,6 +453,9 @@ const CSS = `
 .wt-controls { display: flex; gap: 8px; margin-top: 0.8rem; flex-wrap: wrap; justify-content: center; }
 .wt-btn { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 999px; padding: 8px 16px; cursor: pointer; }
 .wt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.wt-btn.hint { font-variant-numeric: tabular-nums; }
+.wt-btn.hint:not(:disabled):hover { border-color: #eec95c; color: #eec95c; }
+.wt-hintnote { text-align: center; color: #eec95c; font-size: 12.5px; font-weight: 600; margin-top: 0.6rem; }
 .wt-won { text-align: center; font-size: 16px; color: var(--gray-0); margin-top: 1rem; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .wt-won strong { color: var(--wt); font-variant-numeric: tabular-nums; }
 .wt-replay { border: none; background: var(--wt); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }

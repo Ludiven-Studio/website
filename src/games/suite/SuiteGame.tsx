@@ -16,6 +16,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { suiteLevels, SUITE_QUESTIONS, type SuiteLevelCfg } from './levels';
 
 /* =====================================================
@@ -66,6 +67,8 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 	const lv = useLevels(gameId, suiteLevels);
 	const lvCfgRef = useRef<SuiteLevelCfg | null>(null);
 	const lvCorrectRef = useRef(0); // correct answers so far in the current level set
+	const timed = daily || lv.playing;
+	const gate = useHintGate(timed, status === 'playing' && (!timed || started));
 
 	useEffect(() => {
 		const stored = Number(localStorage.getItem(BEST_KEY) ?? '0');
@@ -150,6 +153,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setChosen(null);
 		setEliminated([]);
 		setPeeked(false);
+		setHintNote('');
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -243,6 +247,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 				setChosen(null);
 				setEliminated([]);
 				setPeeked(false);
+				setHintNote('');
 			}, 700);
 			return;
 		}
@@ -275,6 +280,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 				setChosen(null);
 				setEliminated([]);
 				setPeeked(false);
+				setHintNote('');
 				saveDailyRun(gameId, {
 					startedAt: startRef.current,
 					done: false,
@@ -315,15 +321,21 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		}
 	};
 
-	/* Hint: remove one wrong option (free mode only). */
+	/* Hint (all modes, gated in the timed ones): drop the wrong option that is
+	   furthest from the answer. Deterministic, so the same puzzle behaves the same
+	   for everyone — and it never names the rule. */
 	const eliminate = () => {
-		if (status !== 'playing' || chosen !== null) return;
+		if (status !== 'playing' || chosen !== null || !gate.ready) return;
 		const remaining = question.options
 			.map((v, i) => ({ v, i }))
 			.filter(({ v, i }) => v !== question.answer && !eliminated.includes(i));
 		if (remaining.length <= 1) return;
-		setEliminated((prev) => [...prev, remaining[0].i]);
-		setHintNote('Cette option ne suit pas la règle : ' + question.rule + '.');
+		const worst = remaining.reduce((a, b) =>
+			Math.abs(b.v - question.answer) > Math.abs(a.v - question.answer) ? b : a,
+		);
+		setEliminated((prev) => [...prev, worst.i]);
+		setHintNote(`${worst.v} est écarté : c'est la valeur la plus éloignée de la logique de la suite.`);
+		gate.consume();
 		trackGame(gameId, 'hint_used');
 	};
 
@@ -465,16 +477,14 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && !lv.active && status === 'playing' && chosen === null && (
+			{status === 'playing' && chosen === null && !lv.menu && !lv.done && (
 				<div className="su-actions">
-					<button className="su-act" onClick={eliminate}>💡 Indice</button>
-					<button className="su-act" onClick={peek}>👁 Voir la réponse</button>
+					<button className="su-act" onClick={eliminate} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && <button className="su-act" onClick={peek}>👁 Voir la réponse</button>}
 				</div>
 			)}
 
-			{!daily && !lv.active && hintNote && (
-				<p className="su-hint-note" aria-live="polite">💡 {hintNote}</p>
-			)}
+			{hintNote && <p className="su-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{!daily && !lv.active &&
 				(status === 'over' ? (
@@ -577,7 +587,8 @@ const CSS = `
   font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer;
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
-.su-act:hover { background: var(--gray-800); border-color: var(--su-accent); color: var(--su-accent); }
+.su-act:hover:not(:disabled) { background: var(--gray-800); border-color: var(--su-accent); color: var(--su-accent); }
+.su-act:disabled { opacity: 0.5; cursor: default; }
 
 .su-playwrap { width: 100%; position: relative; }
 

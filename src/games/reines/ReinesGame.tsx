@@ -16,6 +16,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { reinesLevels } from './levels';
 import {
 	DIFFS,
@@ -81,6 +82,8 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const skipBackstopRef = useRef<ReinesPuzzle | null>(null); // puzzle whose marks were pre-restored (daily resume)
 	const lv = useLevels(gameId, reinesLevels);
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
 
 	const { size, regions } = puzzle;
 
@@ -261,7 +264,6 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 	   region ids so a screenshot dispute can be settled from data, not pixels. */
 	useEffect(() => {
 		if (import.meta.env.DEV && conflictInfo.reasons.has('zone')) {
-			// eslint-disable-next-line no-console
 			console.warn('[Reines] conflit "zone" — regions des reines :', {
 				size,
 				queens: queens.map(([r, c]) => ({ r, c, region: regions[r]?.[c] })),
@@ -280,7 +282,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
-	}, [queens, conflicts, size, status, revealed, gameId, daily, started]);
+	}, [queens, conflicts, size, status, revealed, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
@@ -337,9 +339,10 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 
 	/* Hint: deduce the next logical move and explain the technique. */
 	const hint = useCallback(() => {
-		if (status === 'won' || revealed) return;
+		if (status === 'won' || revealed || !gate.ready) return;
 		const h = findHint(marks, puzzle);
 		if (!h) return;
+		gate.consume();
 		setMarks((prev) => applyHint(prev, h));
 		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
 		setHintNote(h.reason);
@@ -349,7 +352,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, puzzle, marks, started, gameId]);
+	}, [status, revealed, puzzle, marks, started, gameId, gate]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -423,10 +426,10 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && !(lv.active && lv.menu) && (
+			{status !== 'won' && !revealed && !(lv.active && lv.menu) && (
 				<div className="rn-actions">
-					<button className="rn-act" onClick={hint}>💡 Indice</button>
-					{!lv.active && elapsed >= 60 && (
+					<button className="rn-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="rn-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -535,7 +538,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && (
 				<p className="rn-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 

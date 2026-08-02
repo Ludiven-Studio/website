@@ -9,8 +9,10 @@ import {
 	generate,
 	generateDetailed,
 	heroLines,
+	heroMoves,
 	heroIndex,
 	heroStuck,
+	hint,
 	isWon,
 	movers,
 	slack,
@@ -25,6 +27,7 @@ import {
 	VOID,
 	type Board,
 	type GenParams,
+	type LineMove,
 	type Tile,
 } from './engine';
 import { TECTONIQUE_BANDS, tectoniqueLevels } from './levels';
@@ -386,5 +389,77 @@ describe('generate', () => {
 			}
 		}
 	}, 20_000);
+});
+
+/* A hint hands out ONE push, never the tail of the walk. It has to stay legal even after the
+   player has left the recorded walk — a coasting belt does that on its own. */
+describe('hint', () => {
+	const same = (a: LineMove, b: LineMove): boolean =>
+		a.axis === b.axis && a.index === b.index && a.shift === b.shift;
+
+	it('always names a push the board accepts, and clears the grid when followed', () => {
+		for (const seed of [3, 17, 42]) {
+			const plan = generateDetailed(mulberry32(seed), TECTONIQUE_BANDS[1]);
+			let b = plan.board;
+			let steps = 0;
+			while (!isWon(b) && steps < 800) {
+				const h = hint(plan, b);
+				expect(h, `seed ${seed}`).not.toBeNull();
+				const m = (h as { move: LineMove }).move;
+				expect(heroMoves(b).some((o) => same(o, m)), `seed ${seed}`).toBe(true);
+				const r = slide(b, m.axis, m.index, m.shift);
+				expect(r.shift).toBe(m.shift);
+				b = r.board;
+				steps++;
+			}
+			expect(isWon(b), `seed ${seed}`).toBe(true);
+		}
+	}, 20_000);
+
+	it('explains itself in French, naming the belt', () => {
+		const plan = generateDetailed(mulberry32(9), TECTONIQUE_BANDS[0]);
+		const h = hint(plan, plan.board);
+		expect(h?.reason).toMatch(/^Pousse (la ligne|la colonne) \d+ vers (la droite|la gauche|le bas|le haut)/);
+		expect(h?.step).toBe(0);
+	});
+
+	it('gives the same answer twice — asking again never moves the board', () => {
+		const plan = generateDetailed(mulberry32(21), TECTONIQUE_BANDS[1]);
+		const before = encodeBoard(plan.board);
+		expect(hint(plan, plan.board)).toEqual(hint(plan, plan.board));
+		expect(encodeBoard(plan.board)).toBe(before);
+	});
+
+	// Belts coast, so the player leaves the recorded walk almost at once. Play anything BUT the
+	// hint: the answer has to be recomputed on the live board, and still be playable.
+	it('keeps answering once the player has left the recorded walk', () => {
+		let offPath = 0;
+		let routed = 0; // off-path answers where the search really found a crystal to head for
+		for (const seed of [4, 8, 15]) {
+			const plan = generateDetailed(mulberry32(seed), TECTONIQUE_BANDS[1]);
+			let b = plan.board;
+			for (let k = 0; k < 14 && !isWon(b) && heroMoves(b).length; k++) {
+				const h = hint(plan, b);
+				expect(h).not.toBeNull();
+				const legal = heroMoves(b);
+				expect(legal.some((o) => same(o, (h as { move: LineMove }).move))).toBe(true);
+				if ((h as { step: number }).step < 0) offPath++;
+				if ((h as { reason: string }).reason.includes('rejoint un 💎')) routed++;
+				const other = legal.find((o) => !same(o, (h as { move: LineMove }).move));
+				const m = other ?? legal[0];
+				b = slide(b, m.axis, m.index, m.shift).board;
+			}
+		}
+		expect(offPath).toBeGreaterThan(0);
+		expect(routed).toBeGreaterThan(0);
+	}, 20_000);
+
+	it('has nothing left to say once the grid is clear', () => {
+		const plan = generateDetailed(mulberry32(31), TECTONIQUE_BANDS[0]);
+		let b = plan.board;
+		for (const m of plan.walk) b = slide(b, m.axis, m.index, m.shift).board;
+		expect(isWon(b)).toBe(true);
+		expect(hint(plan, b)).toBeNull();
+	});
 });
 

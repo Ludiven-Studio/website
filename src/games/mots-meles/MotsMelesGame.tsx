@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fmtCentis } from '../../lib/scoreFormat';
-import { makeGrid, lineCells, matchIndex, DIFFS, type Grid, type Cell } from './engine';
+import { makeGrid, lineCells, matchIndex, findHint, DIFFS, type Grid, type Cell, type Hint } from './engine';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -12,6 +12,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { motsMelesLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    MOTS MÊLÉS — React island. Grille de lettres, mots d'un thème à retrouver en glissant.
@@ -41,6 +42,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [started, setStarted] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
+	const [hint, setHint] = useState<Hint | null>(null);
 
 	const boardRef = useRef<HTMLDivElement | null>(null);
 	const drawing = useRef(false);
@@ -49,11 +51,14 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 	const startedRef = useRef(false); // free-mode "first find" flag
 	const startRef = useRef(0); // daily / levels chrono start (epoch ms)
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const hintedRef = useRef<Cell[]>([]); // start cells already handed out
 	const lv = useLevels(gameId, motsMelesLevels);
 
 	const { celebrating } = useCelebration(status === 'won');
 	const armed = (daily || lv.playing) && !started;
 	const total = grid.words.length;
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started);
 
 	/* Daily / levels chrono. */
 	useEffect(() => {
@@ -73,6 +78,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		setStarted(false);
 		startedRef.current = false;
 		setElapsed(0);
+		setHint(null); hintedRef.current = [];
 		trackGame(gameId, 'game_started');
 	}, [lv, gameId]);
 
@@ -109,11 +115,13 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		setGrid(makeGrid((Math.random() * 2 ** 31) >>> 0, DIFFS[key]));
 		setFound([]); applySel([]);
 		setStatus('playing');
+		setHint(null); hintedRef.current = [];
 	}, []);
 
 	const startDaily = useCallback(async () => {
 		setDaily(true);
 		applySel([]);
+		setHint(null); hintedRef.current = [];
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
 			const di = run.diffIndex ?? 0;
@@ -155,10 +163,22 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		}
 	}, [gameId, daily]);
 
+	/* Hint: point at the first letter of one missing word, and say how long it is + which way it runs. */
+	const askHint = () => {
+		if (status !== 'playing' || !gate.ready || (timed && !started)) return;
+		const h = findHint(grid, found, hintedRef.current);
+		if (!h) return;
+		gate.consume();
+		hintedRef.current = [...hintedRef.current, h.cell];
+		setHint(h);
+		trackGame(gameId, 'hint_used');
+	};
+
 	const markFound = (idx: number) => {
 		if (found.includes(idx)) return;
 		const nf = [...found, idx];
 		setFound(nf);
+		setHint(null);
 		const complete = nf.length === grid.words.length;
 		if (daily) {
 			const sd = dailySeedRef.current;
@@ -218,6 +238,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 	const cellColor = new Map<string, string>(); // found cell → its word's colour (overlaps: last found wins)
 	for (const i of found) for (const [r, c] of grid.words[i].cells) cellColor.set(ckey(r, c), wordColor(i));
 	const selSet = new Set(sel.map(([r, c]) => ckey(r, c)));
+	const hintKey = hint ? ckey(hint.cell[0], hint.cell[1]) : null;
 
 	return (
 		<div className="mm-root">
@@ -293,7 +314,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 						const k = ckey(r, c);
 						const inSel = selSet.has(k);
 						const col = inSel ? undefined : cellColor.get(k); // selection (accent) takes visual priority
-						return <div key={k} className={`mm-cell${col ? ' found' : ''}${inSel ? ' sel' : ''}`} style={col ? { background: col } : undefined}>{ch}</div>;
+						return <div key={k} className={`mm-cell${col ? ' found' : ''}${inSel ? ' sel' : ''}${k === hintKey ? ' hint' : ''}`} style={col ? { background: col } : undefined}>{ch}</div>;
 					}))}
 				</div>
 
@@ -315,6 +336,13 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
+
+			{status === 'playing' && (
+				<div className="mm-actions">
+					<button className="mm-act" onClick={askHint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+				</div>
+			)}
+			{hint && status === 'playing' && <p className="mm-hint-note" aria-live="polite">💡 {hint.reason}</p>}
 
 			<div className="mm-words">
 				{grid.words.map((w, i) => {
@@ -369,6 +397,10 @@ const CSS = `
 .mm-cell { display: flex; align-items: center; justify-content: center; background: var(--gray-999); color: var(--gray-0); font-weight: 700; font-size: calc(100cqi / var(--n) * 0.5); text-transform: uppercase; }
 .mm-cell.found { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); } /* background = per-word colour (inline) */
 .mm-cell.sel { background: var(--mm-accent); color: var(--accent-text-over); }
+.mm-cell.hint { box-shadow: inset 0 0 0 3px #e8b923; animation: mm-hintpulse 1.1s ease-in-out infinite; }
+@keyframes mm-hintpulse { 50% { box-shadow: inset 0 0 0 3px rgba(232,185,35,0.35); } }
+.mm-actions { display: flex; gap: 8px; justify-content: center; margin-top: 0.8rem; }
+.mm-hint-note { text-align: center; color: var(--gray-200); font-size: 13px; margin: 0.5rem 0 0; }
 .mm-grid.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
 .mm-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; }
 .mm-overlay-card { background: var(--gray-999); border: 2px solid var(--mm-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); }

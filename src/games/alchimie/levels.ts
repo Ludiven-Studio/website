@@ -3,9 +3,9 @@
 // minimal build cost (fewest fusions to reach from the bases), then id — so the ramp goes
 // from shallow targets (steam, lava) to deep ones (jeu vidéo, intelligence, dauphin).
 //
-// A level is CLEARED (1★) once the target is crafted. Stars grade efficiency: the fewer
-// fusions used beyond the theoretical minimum, the more stars. metric 'time' (lower is
-// better) with score = fusions used.
+// A level is CLEARED (1★) once the target is crafted. Stars grade speed: score = time in
+// centiseconds, and the budget scales with the target's depth (minCombos). The fusion
+// count is still reported as `stat` for the outcome card.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
@@ -14,13 +14,21 @@ import { ELEMENTS, getElement } from './engine';
 export interface AlchimieLevelCfg {
 	target: string; // element id to discover
 	minCombos: number; // theoretical minimum fusions from the bases
-	twoStar: number; // ≤ this many fusions → 2★
-	threeStar: number; // ≤ this many fusions → 3★
+	twoStar: number; // ≤ this many centiseconds → 2★
+	threeStar: number; // ≤ this many centiseconds → 3★
 }
 
-// Slack over the minimum for each star tier. Deeper targets get a bit more room to explore.
-const K3 = 1; // 3★: near-optimal (at most 1 extra fusion)
-const slack2 = (min: number): number => Math.max(3, Math.round(min * 0.6)); // 2★: proportional slack
+// Time budget per star tier, in seconds: a flat allowance plus a per-required-fusion rate
+// (find two cards in a growing inventory, drag, read the result).
+const threeStarSec = (min: number): number => 15 + 12 * min;
+const twoStarSec = (min: number): number => 30 + 30 * min;
+
+/** m:ss (or "45 s" under a minute) for the star captions. */
+const fmt = (sec: number): string => {
+	if (sec < 60) return `${sec} s`;
+	const m = Math.floor(sec / 60);
+	return `${m}:${String(sec % 60).padStart(2, '0')}`;
+};
 
 /** Minimal fusions to build every main element = size of its distinct non-base ancestor set
     (each ancestor must be crafted exactly once; the target itself counts). Memoized. */
@@ -75,14 +83,14 @@ const cfgFor = (level: number): AlchimieLevelCfg => {
 	return {
 		target,
 		minCombos,
-		threeStar: minCombos + K3,
-		twoStar: minCombos + slack2(minCombos),
+		threeStar: threeStarSec(minCombos) * 100,
+		twoStar: twoStarSec(minCombos) * 100,
 	};
 };
 
 export const alchimieLevels: LevelPlan<AlchimieLevelCfg> = {
 	count: Math.min(LEVEL_COUNT, TARGETS.length),
-	metric: 'time', // lower is better — score = fusions used
+	metric: 'time', // lower is better — score = centiseconds
 	config: cfgFor,
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
 		if (!r.won) return 0;
@@ -92,7 +100,7 @@ export const alchimieLevels: LevelPlan<AlchimieLevelCfg> = {
 		return 1;
 	},
 	starHint(level: number) {
-		const cfg = cfgFor(level);
-		return { two: `≤ ${cfg.twoStar} combinaisons`, three: `≤ ${cfg.threeStar} combinaisons` };
+		const min = cfgFor(level).minCombos;
+		return { two: `≤ ${fmt(twoStarSec(min))}`, three: `≤ ${fmt(threeStarSec(min))}` };
 	},
 };

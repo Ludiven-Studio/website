@@ -16,6 +16,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { symbolesLevels, QUESTIONS_PER_LEVEL } from './levels';
 
 /* =====================================================
@@ -39,6 +40,21 @@ interface DailyState {
 /** Deterministic daily question stream: question i is fully reproducible from (seed, i). */
 const dailyQ = (seed: number, diffIndex: number, i: number): Question =>
 	generateQuestion(DIFFS[DIFF_ORDER[diffIndex] ?? 'facile'], mulberry32((seed + i * 0x9e3779b1) >>> 0));
+
+/** Visual gap between two cells — the hint drops the wrong option that scores highest. */
+const deg = (n: number) => ((n % 360) + 360) % 360;
+function cellDistance(a: Cell, b: Cell): number {
+	const rot = (c: Cell) => (META[c.shape].rotVisible ? deg(c.rotation) : 0);
+	const flipped = (c: Cell) => META[c.shape].chiral && c.flip;
+	const turn = Math.min(deg(rot(a) - rot(b)), deg(rot(b) - rot(a)));
+	return (
+		(a.shape !== b.shape ? 3 : 0) +
+		(a.color !== b.color ? 2 : 0) +
+		Math.abs(a.count - b.count) +
+		turn / 90 +
+		(flipped(a) !== flipped(b) ? 1 : 0)
+	);
+}
 
 /* ---------- Symbol renderer ---------- */
 
@@ -104,6 +120,8 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 	const [lvQuestions, setLvQuestions] = useState<Question[]>([]);
 	const [lvCorrect, setLvCorrect] = useState(0);
 	const lvCorrectRef = useRef(0);
+	const timed = daily || lv.playing;
+	const gate = useHintGate(timed, status === 'playing' && (!timed || started));
 
 	useEffect(() => {
 		return () => {
@@ -147,6 +165,7 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 		setChosen(null);
 		setEliminated([]);
 		setPeeked(false);
+		setHintNote('');
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -306,6 +325,7 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 				setChosen(null);
 				setEliminated([]);
 				setPeeked(false);
+				setHintNote('');
 				saveDailyRun(gameId, {
 					startedAt: startRef.current,
 					done: false,
@@ -338,16 +358,21 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 		);
 	};
 
-	/* Hint: remove one wrong option (free mode only). */
+	/* Hint (all modes, gated in the timed ones): drop the wrong option that looks
+	   furthest from the answer. Deterministic, and it never names the rule. */
 	const eliminate = () => {
-		if (status !== 'playing' || chosen !== null) return;
+		if (status !== 'playing' || chosen !== null || !gate.ready) return;
 		const answerKey = cellKey(question.answer);
 		const remaining = question.options
 			.map((c, i) => ({ c, i }))
 			.filter(({ c, i }) => cellKey(c) !== answerKey && !eliminated.includes(i));
 		if (remaining.length <= 1) return;
-		setEliminated((prev) => [...prev, remaining[0].i]);
-		setHintNote('Cette option ne suit pas la règle : ' + question.rule + '.');
+		const worst = remaining.reduce((a, b) =>
+			cellDistance(b.c, question.answer) > cellDistance(a.c, question.answer) ? b : a,
+		);
+		setEliminated((prev) => [...prev, worst.i]);
+		setHintNote('Une option écartée : c’est celle qui s’éloigne le plus de la logique de la suite.');
+		gate.consume();
 		trackGame(gameId, 'hint_used');
 	};
 
@@ -488,16 +513,14 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && !lv.active && status === 'playing' && chosen === null && (
+			{status === 'playing' && chosen === null && !lv.menu && !lv.done && (
 				<div className="sy-actions">
-					<button className="sy-act" onClick={eliminate}>💡 Indice</button>
-					<button className="sy-act" onClick={peek}>👁 Voir la réponse</button>
+					<button className="sy-act" onClick={eliminate} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && <button className="sy-act" onClick={peek}>👁 Voir la réponse</button>}
 				</div>
 			)}
 
-			{!daily && hintNote && (
-				<p className="sy-hint-note" aria-live="polite">💡 {hintNote}</p>
-			)}
+			{hintNote && <p className="sy-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{lv.active && !lv.menu && (
 				<p className="sy-help">
@@ -588,7 +611,8 @@ const CSS = `
   font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer;
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
-.sy-act:hover { background: var(--gray-800); border-color: var(--sy-accent); color: var(--sy-accent); }
+.sy-act:hover:not(:disabled) { background: var(--gray-800); border-color: var(--sy-accent); color: var(--sy-accent); }
+.sy-act:disabled { opacity: 0.5; cursor: default; }
 
 .sy-playwrap { width: 100%; position: relative; }
 

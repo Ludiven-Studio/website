@@ -101,6 +101,42 @@ export function generateGrid(seed: number, diff: DiffLevel): BoggleGrid {
 	return fallback!; // 60 attempts always yield at least one rolled grid
 }
 
+export interface Hint { cell: number; reason: string; }
+
+/** Index of the first cell of a path spelling `word`, or null. */
+function pathStart(cells: string[], word: string): number | null {
+	const used = new Array<boolean>(cells.length).fill(false);
+	const dfs = (i: number, k: number): boolean => {
+		if (cells[i] !== word[k]) return false;
+		if (k === word.length - 1) return true;
+		used[i] = true;
+		for (const j of NEIGHBORS[i]) if (!used[j] && dfs(j, k + 1)) { used[i] = false; return true; }
+		used[i] = false;
+		return false;
+	};
+	for (let i = 0; i < cells.length; i++) if (dfs(i, 0)) return i;
+	return null;
+}
+
+/**
+ * One step forward: the cell where a still-unfound word starts, plus its length.
+ * A single letter is placed — never the word itself. Shortest word first (cheapest
+ * to complete). `hinted` = cells already handed out, so a second hint moves on.
+ */
+export function findHint(grid: BoggleGrid, found: string[], hinted: number[] = []): Hint | null {
+	const open = grid.solutions.filter((w) => !found.includes(w))
+		.sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
+	let fallback: Hint | null = null;
+	for (const w of open) {
+		const cell = pathStart(grid.cells, w);
+		if (cell == null) continue;
+		const hint: Hint = { cell, reason: `Un mot de ${w.length} lettres commence sur cette lettre.` };
+		if (!hinted.includes(cell)) return hint;
+		fallback ??= hint;
+	}
+	return fallback;
+}
+
 export const spellPath = (path: number[], cells: string[]): string => path.map((i) => cells[i]).join('');
 
 export function validPath(path: number[]): boolean {

@@ -8,6 +8,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { usePointerDrag } from '../usePointerDrag';
 import { solitaireLevels, levelPegs } from './levels';
 import {
@@ -18,8 +19,9 @@ import {
 	isWin,
 	isStuck,
 	movesFrom,
+	allMoves,
 	applyMove,
-	hintMove,
+	rescueHint,
 	generateDaily,
 	type Variant,
 	type Layout,
@@ -69,6 +71,8 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0);
 	const { celebrating, showWin } = useCelebration(status === 'won');
 	const lv = useLevels(gameId, solitaireLevels);
+	const timed = daily || lv.active; // both race the chrono
+	const gate = useHintGate(timed, started && status !== 'won');
 
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -400,12 +404,28 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		setPegs(pegCount(prev));
 	};
 	const hint = (): void => {
-		if (statusRef.current !== 'playing' || animRef.current) return;
-		const m = hintMove(layoutRef.current, pegsRef.current);
-		if (m) {
-			hintRef.current = { move: m, until: clockRef.current + 2200 };
-			selRef.current = m.from;
+		if (statusRef.current === 'won' || animRef.current || !gate.ready) return;
+		// Rescue knows the current position is dead when it rewinds; on a big board it may not
+		// reach a winnable one within its cap — then just show any legal move.
+		const fallback = allMoves(layoutRef.current, pegsRef.current)[0];
+		const r = rescueHint(layoutRef.current, histRef.current, pegsRef.current) ?? (fallback ? { undo: 0, move: fallback } : null);
+		if (!r) return;
+		// Dead end: rewind to the last position that still clears down to one marble.
+		for (let i = 0; i < r.undo; i++) {
+			const prev = histRef.current.pop();
+			if (!prev) break;
+			pegsRef.current = prev;
 		}
+		if (r.undo > 0) {
+			animRef.current = null;
+			statusRef.current = 'playing';
+			setStatus('playing');
+			setMoves((n) => Math.max(0, n - r.undo));
+			setPegs(pegCount(pegsRef.current));
+		}
+		hintRef.current = { move: r.move, until: clockRef.current + 2600 };
+		selRef.current = r.move.from;
+		gate.consume();
 	};
 
 	/* ---------- Pointer (usePointerDrag: no capture, doc-level up — iOS-safe) ---------- */
@@ -602,7 +622,8 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 
 	const layout = layoutRef.current;
 	const perfect = status === 'won' && (layout.center < 0 || pegsRef.current[layout.center]);
-	const timed = daily || lv.active; // both race the chrono
+	// Free mode has Recommencer for dead ends; only the daily rewinds through a hint.
+	const hintOff = !started || status === 'won' || (status === 'stuck' && !daily) || !gate.ready;
 	const chrono = timed && status === 'won' && finalCentis != null ? fmtCentis(finalCentis) : `${(elapsed / 1000).toFixed(1)} s`;
 
 	return (
@@ -734,12 +755,18 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 						<div className="sol-card">
 							<h3>Plus de coups possibles</h3>
 							<p>
-								Il reste <strong>{pegs}</strong> billes. {daily ? 'Annule un ou plusieurs coups pour tenter une autre voie.' : 'Annule pour retenter, ou recommence.'}
+								Il reste <strong>{pegs}</strong> billes. {daily ? 'Annule pour tenter une autre voie, ou prends un indice : il te remet sur une position gagnante.' : 'Annule pour retenter, ou recommence.'}
 							</p>
 							<div className="sol-cardbtns">
 								<button className="sol-btn primary" onClick={undo}>
 									↶ Annuler
 								</button>
+								{/* Daily has no restart: the hint is the only way back onto a winning line. */}
+								{daily && (
+									<button className="sol-btn" onClick={hint} disabled={!gate.ready}>
+										{gate.label}
+									</button>
+								)}
 								{!daily && (
 									<button className="sol-btn" onClick={restart}>
 										↻ Recommencer
@@ -756,12 +783,10 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 					<button className="sol-btn" onClick={undo} disabled={moves === 0 || status === 'won'}>
 						↶ Annuler
 					</button>
-					{/* Levels are timed too — no free hints there. */}
-					{!daily && !lv.active && (
-						<button className="sol-btn" onClick={hint} disabled={status !== 'playing' || !started}>
-							💡 Indice
-						</button>
-					)}
+					{/* Timed modes get it too, on a 30 s cooldown — the safety net for trap-heavy boards. */}
+					<button className="sol-btn" onClick={hint} disabled={hintOff}>
+						{gate.label}
+					</button>
 					{/* Daily = one attempt: no restart. Free + levels stay replayable. */}
 					{!daily && (
 						<button className="sol-btn" onClick={restart}>
@@ -773,9 +798,9 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 
 			<p className="sol-help">
 				{lv.active
-					? 'Niveaux : chaque niveau part d’une position toujours résoluble. Vide le plateau jusqu’à une seule bille pour le valider — plus tu vas vite, plus tu gagnes d’étoiles.'
+					? 'Niveaux : chaque niveau part d’une position toujours résoluble. Vide le plateau jusqu’à une seule bille pour le valider — plus tu vas vite, plus tu gagnes d’étoiles. Bloqué ? Un indice se débloque toutes les 30 s.'
 					: daily
-						? 'Défi du jour : un mini-plateau identique pour tout le monde. Vide-le jusqu’à une seule bille le plus vite possible — ton meilleur temps entre au classement.'
+						? 'Défi du jour : un mini-plateau identique pour tout le monde, toujours résoluble jusqu’à une seule bille. Fais-le le plus vite possible — ton meilleur temps entre au classement. Bloqué ? Un indice se débloque toutes les 30 s et te ramène à la dernière position gagnante.'
 						: 'Tape une bille puis un trou situé deux cases plus loin (ou fais-la glisser) pour sauter par-dessus une voisine et la retirer. Objectif : n’en laisser qu’une — au centre pour la croix.'}
 			</p>
 

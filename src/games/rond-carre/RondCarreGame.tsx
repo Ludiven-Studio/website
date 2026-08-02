@@ -18,6 +18,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { rondCarreLevels } from './levels';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    ROND & CARRÉ (façon LinkedIn "Tango") — React island.
@@ -51,6 +52,8 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const lv = useLevels(gameId, rondCarreLevels);
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
 
 	const { given, constraints, solution } = puzzle;
 	const n = SIZE;
@@ -255,7 +258,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
-	}, [marks, status, revealed, value, conflicts, n, gameId, daily, started]);
+	}, [marks, status, revealed, value, conflicts, n, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Grade the level once it is solved. */
 	useEffect(() => {
@@ -320,9 +323,10 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 
 	/* Hint: deduce the next logical cell and explain the technique. */
 	const hint = useCallback(() => {
-		if (status === 'won' || revealed) return;
+		if (status === 'won' || revealed || !gate.ready) return;
 		const h = findHint(marks, puzzle);
 		if (!h) return;
+		gate.consume();
 		setMarks((prev) => {
 			const next = prev.map((row) => [...row]) as Cell[][];
 			next[h.r][h.c] = h.value;
@@ -336,7 +340,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, started, marks, puzzle, gameId]);
+	}, [status, revealed, started, marks, puzzle, gameId, gate]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -402,10 +406,10 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{status !== 'won' && !revealed && !daily && !(lv.active && lv.menu) && (
+			{status !== 'won' && !revealed && !(lv.active && lv.menu) && (
 				<div className="rc-actions">
-					<button className="rc-act" onClick={hint}>💡 Indice</button>
-					{!lv.active && elapsed >= 60 && (
+					<button className="rc-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="rc-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 				</div>
@@ -527,7 +531,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && (
 				<p className="rc-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
@@ -609,6 +613,7 @@ const CSS = `
   transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
 }
 .rc-act:hover { background: var(--gray-800); border-color: var(--rc-accent); color: var(--rc-accent); }
+.rc-act:disabled { opacity: 0.55; cursor: default; background: transparent; border-color: var(--gray-700); color: var(--gray-300); }
 
 .rc-revealed-note {
   display: flex; align-items: center; gap: 14px; margin-top: 1.5rem;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateGrid, solveGrid, rollCells, wordPoints, adjacent, validPath, spellPath, gridPoints, DICE_FR, DIFFS, SIZE } from './engine';
+import { generateGrid, solveGrid, rollCells, wordPoints, adjacent, validPath, spellPath, gridPoints, findHint, DICE_FR, DIFFS, SIZE } from './engine';
 import { mulberry32 } from '../prng';
 
 describe('meli-melo engine', () => {
@@ -97,5 +97,24 @@ describe('meli-melo engine', () => {
 			return false;
 		};
 		for (const w of g.solutions) expect(hasPath(w), `${w} traceable`).toBe(true);
+	});
+
+	it('findHint gives one starting cell while words are missing, and never the word itself', () => {
+		const g = generateGrid(11, DIFFS.moyen);
+		const found: string[] = [];
+		const hinted: number[] = [];
+		for (let step = 0; step < 5; step++) {
+			const h = findHint(g, found, hinted);
+			expect(h, 'a hint exists while words are missing').not.toBeNull();
+			// Only a cell index and a French note — no word, no path.
+			expect(Object.keys(h!).sort()).toEqual(['cell', 'reason']);
+			expect(h!.reason).toMatch(/^Un mot de \d+ lettres commence sur cette lettre\.$/);
+			const len = Number(h!.reason.match(/\d+/)![0]);
+			const open = g.solutions.filter((w) => !found.includes(w));
+			expect(open.some((w) => w.length === len && w[0] === g.cells[h!.cell])).toBe(true);
+			hinted.push(h!.cell);
+			found.push(...open.filter((w) => w.length === len && w[0] === g.cells[h!.cell]));
+		}
+		expect(findHint(g, g.solutions)).toBeNull(); // everything found → nothing to hint
 	});
 });

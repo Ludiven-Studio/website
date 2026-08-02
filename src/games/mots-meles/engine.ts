@@ -121,6 +121,26 @@ export function lineCells(a: Cell, b: Cell, size: number): Cell[] | null {
 	return cells;
 }
 
+export interface Hint { cell: Cell; reason: string; }
+
+const sameCell = (a: Cell, b: Cell): boolean => a[0] === b[0] && a[1] === b[1];
+
+/**
+ * One step forward: the starting cell of a still-unfound word, plus its length and
+ * direction family. Never the word, never the rest of its path.
+ * `hinted` = cells already handed out, so a second hint moves on to another word.
+ */
+export function findHint(grid: Grid, found: number[], hinted: Cell[] = []): Hint | null {
+	const open = grid.words.filter((_, i) => !found.includes(i));
+	if (!open.length) return null;
+	const fresh = open.filter((p) => !hinted.some((h) => sameCell(h, p.cells[0])));
+	const p = (fresh.length ? fresh : open)[0];
+	const dr = p.cells[1][0] - p.cells[0][0];
+	const dc = p.cells[1][1] - p.cells[0][1];
+	const way = dr === 0 ? "à l'horizontale" : dc === 0 ? 'à la verticale' : 'en diagonale';
+	return { cell: p.cells[0], reason: `Un mot de ${p.word.length} lettres commence ici, ${way}.` };
+}
+
 const cellKey = (cs: Cell[]): string => cs.map((c) => c[0] * 1000 + c[1]).sort((x, y) => x - y).join(',');
 
 /** Index of the placed word whose cell-set equals the selection (so reversed drags match too), else -1. */

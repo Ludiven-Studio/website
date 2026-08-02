@@ -19,6 +19,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { cheminLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    LE CHEMIN (LinkedIn "Zip") — React island.
@@ -63,6 +64,8 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const moved = useRef(false);
 	const downCell = useRef<[number, number] | null>(null);
 	const lastCell = useRef<[number, number] | null>(null);
+	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
 
 	const newGame = useCallback((dk: keyof typeof DIFFS) => {
 		setDaily(false);
@@ -128,6 +131,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const startDaily = useCallback(async () => {
 		setDaily(true);
 		setRevealed(false);
+		setHintNote('');
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -385,7 +389,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 
 	/* Hint: extend the path by one correct step along the solution. */
 	const hint = useCallback(() => {
-		if (!puzzle || status !== 'playing' || revealed) return;
+		if (!puzzle || status !== 'playing' || revealed || !gate.ready) return;
 		const sol = puzzle.path;
 		let prefix = 0;
 		while (
@@ -396,11 +400,12 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		)
 			prefix++;
 		if (prefix >= sol.length) return; // already fully correct
+		gate.consume();
 		setHintNote(hintReason(path, puzzle)); // reason for the step being added (path pre-extension)
-		setPath(sol.slice(0, prefix + 1).map((p) => [...p] as [number, number]));
+		setPath(sol.slice(0, prefix + 1).map((p) => [...p] as [number, number])); // exactly one step further
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [puzzle, status, revealed, path, gameId]);
+	}, [puzzle, status, revealed, path, gameId, gate]);
 
 	/* Reveal the full path (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -468,18 +473,15 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status === 'playing' && !revealed && !daily && !(lv.active && lv.menu) && (
+			{status === 'playing' && !revealed && !(lv.active && lv.menu) && (
 				<div className="zp-actions">
-					<button className="zp-act" onClick={hint}>💡 Indice</button>
-					{!lv.active && elapsed >= 60 && (
+					<button className="zp-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && elapsed >= 60 && (
 						<button className="zp-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
-				</div>
-			)}
-
-			{daily && started && status === 'playing' && (
-				<div className="zp-actions">
-					<button className="zp-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+					{daily && started && (
+						<button className="zp-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+					)}
 				</div>
 			)}
 
@@ -603,7 +605,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && hintNote && (
+			{hintNote && !(lv.active && lv.menu) && (
 				<p className="zp-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 

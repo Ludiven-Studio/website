@@ -11,6 +11,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { useHintGate } from '../useHintGate';
 import { matricesLevels } from './levels';
 
 /* =====================================================
@@ -33,6 +34,17 @@ interface DailyState {
 
 const dailyQ = (seed: number, diffIndex: number, i: number): Question =>
 	generateQuestion(DIFFS[DIFF_ORDER[diffIndex] ?? 'facile'], mulberry32((seed + i * 0x9e3779b1) >>> 0));
+
+/** Drawn gap between two cells — the hint drops the wrong option that scores highest. */
+const eltKeys = (c: Cell) =>
+	new Set(c.elements.map((e) => `${Math.round(e.x)},${Math.round(e.y)},${e.kind},${e.filled ? 1 : 0},${e.color},${Math.round(e.size)}`));
+function cellDistance(a: Cell, b: Cell): number {
+	const ka = eltKeys(a), kb = eltKeys(b);
+	let apart = 0;
+	for (const k of ka) if (!kb.has(k)) apart++;
+	for (const k of kb) if (!ka.has(k)) apart++;
+	return (a.container !== b.container ? 3 : 0) + (a.color !== b.color ? 1 : 0) + apart;
+}
 
 /* ---------- Figure renderer (geometry → SVG, 0..100 viewBox) ---------- */
 
@@ -135,6 +147,8 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 	// Levels mode: fixed N-question set, current index, and running correct count.
 	const [lvQuestions, setLvQuestions] = useState<Question[]>([]);
 	const [lvCorrect, setLvCorrect] = useState(0);
+	const timed = daily || lv.playing;
+	const gate = useHintGate(timed, status === 'playing' && (!timed || started));
 
 	useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
@@ -207,6 +221,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setChosen(null);
 		setEliminated([]);
 		setPeeked(false);
+		setHintNote('');
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -293,6 +308,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				setChosen(null);
 				setEliminated([]);
 				setPeeked(false);
+				setHintNote('');
 			}, 700);
 			return;
 		}
@@ -321,6 +337,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				setChosen(null);
 				setEliminated([]);
 				setPeeked(false);
+				setHintNote('');
 				saveDailyRun(gameId, {
 					startedAt: startRef.current, done: false,
 					seed: sd?.seed, diffIndex: sd?.diffIndex,
@@ -348,14 +365,21 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		}, correct ? 700 : 1900);
 	};
 
+	/* Hint (all modes, gated in the timed ones): drop the wrong option that is drawn
+	   furthest from the answer. Deterministic, and it never names the logic. */
 	const eliminate = () => {
-		if (status !== 'playing' || chosen !== null) return;
+		if (status !== 'playing' || chosen !== null || !gate.ready) return;
+		const answer = question.grid[question.answerIndex];
 		const remaining = question.options
 			.map((c, i) => ({ c, i }))
 			.filter(({ c, i }) => cellKey(c) !== answerKey && !eliminated.includes(i));
 		if (remaining.length <= 1) return;
-		setEliminated((prev) => [...prev, remaining[0].i]);
-		setHintNote('Cette option ne suit pas la logique.');
+		const worst = remaining.reduce((a, b) =>
+			cellDistance(b.c, answer) > cellDistance(a.c, answer) ? b : a,
+		);
+		setEliminated((prev) => [...prev, worst.i]);
+		setHintNote('Une option écartée : c’est celle qui s’éloigne le plus de la logique de la grille.');
+		gate.consume();
 		trackGame(gameId, 'hint_used');
 	};
 
@@ -477,14 +501,14 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{!daily && !lv.active && status === 'playing' && chosen === null && (
+			{status === 'playing' && chosen === null && !lv.menu && !lv.done && (
 				<div className="mx-actions">
-					<button className="mx-act" onClick={eliminate}>💡 Indice</button>
-					<button className="mx-act" onClick={peek}>👁 Voir la réponse</button>
+					<button className="mx-act" onClick={eliminate} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
+					{!daily && !lv.active && <button className="mx-act" onClick={peek}>👁 Voir la réponse</button>}
 				</div>
 			)}
 
-			{!daily && !lv.active && hintNote && <p className="mx-hint-note" aria-live="polite">💡 {hintNote}</p>}
+			{hintNote && <p className="mx-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{!daily && !lv.active && (
 				<p className="mx-help">
@@ -563,7 +587,8 @@ const CSS = `
 
 .mx-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 1.25rem; }
 .mx-act { border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300); font: inherit; font-weight: 500; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition); }
-.mx-act:hover { background: var(--gray-800); border-color: var(--mx-accent); color: var(--mx-accent); }
+.mx-act:hover:not(:disabled) { background: var(--gray-800); border-color: var(--mx-accent); color: var(--mx-accent); }
+.mx-act:disabled { opacity: 0.5; cursor: default; }
 .mx-help { max-width: 400px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.25rem; }
 .mx-hint-note { max-width: 420px; margin: 1rem auto 0; text-align: center; font-size: 13px; line-height: 1.5; color: var(--mx-ok); background: var(--accent-overlay); border: 1px solid var(--mx-ok); border-radius: 12px; padding: 8px 14px; }
 .mx-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin-top: 1.25rem; }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { generateGrid, wordPoints, adjacent, spellPath, DIFFS, DURATION_S, SIZE, type BoggleGrid } from './engine';
+import { generateGrid, wordPoints, adjacent, spellPath, findHint, DIFFS, DURATION_S, SIZE, type BoggleGrid } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
@@ -12,6 +12,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { meliMeloLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
+import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    MÉLI-MÉLO — React island. Boggle 4×4: chain adjacent letters (8 directions) to form
@@ -39,6 +40,8 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [hintCell, setHintCell] = useState<number | null>(null);
+	const [hintNote, setHintNote] = useState('');
 	const lv = useLevels(gameId, meliMeloLevels);
 
 	const boardRef = useRef<HTMLDivElement | null>(null);
@@ -53,9 +56,12 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const levelTargetRef = useRef(0);
+	const hintedRef = useRef<number[]>([]); // cells already handed out
 
 	const total = score(found);
 	const { celebrating } = useCelebration(daily && status === 'ended' && !alreadyPlayed && total > 0);
+	const timed = daily || lv.playing; // both race the leaderboard → hints on a cooldown
+	const gate = useHintGate(timed, status === 'playing');
 
 	const setPathBoth = (p: number[]): void => { pathRef.current = p; setPath(p); };
 	const setFoundBoth = (f: string[]): void => { foundRef.current = f; setFound(f); };
@@ -103,11 +109,13 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		setFoundBoth([]); setPathBoth([]); setToast(null);
 		setRemaining(DURATION_S * 1000);
 		setStatusBoth('armed');
+		setHintCell(null); setHintNote(''); hintedRef.current = [];
 	}, []);
 
 	const startDaily = useCallback(async (): Promise<void> => {
 		dailyRef.current = true;
 		setDaily(true); setPathBoth([]); setToast(null);
+		setHintCell(null); setHintNote(''); hintedRef.current = [];
 		const lay = (seed: number, di: number): void => {
 			const key = DIFF_ORDER[di] ?? 'facile';
 			dailySeedRef.current = { seed, diffIndex: di };
@@ -161,6 +169,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		setFoundBoth([]); setPathBoth([]); setToast(null);
 		setRemaining(DURATION_S * 1000);
 		setStatusBoth('armed'); // ready-gate: ▶ Commencer starts the chrono
+		setHintCell(null); setHintNote(''); hintedRef.current = [];
 	}, [lv]);
 
 	const armLevels = useCallback((): void => {
@@ -194,9 +203,21 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		if (!gridRef.current.solutions.includes(word)) { flash(word, 'bad'); return; }
 		const nf = [...foundRef.current, word];
 		setFoundBoth(nf);
+		setHintCell(null); setHintNote('');
 		flash(`${word} +${wordPoints(word)}`, 'ok');
 		if (dailyRef.current) saveDaily(nf, false);
 	};
+
+	/* Hint: light up the cell where a missing word starts, and say how long it is. */
+	const askHint = useCallback((): void => {
+		if (statusRef.current !== 'playing' || !gate.ready) return;
+		const h = findHint(gridRef.current, foundRef.current, hintedRef.current);
+		if (!h) return;
+		gate.consume();
+		hintedRef.current = [...hintedRef.current, h.cell];
+		setHintCell(h.cell); setHintNote(h.reason);
+		trackGame(gameId, 'hint_used');
+	}, [gate, gameId]);
 
 	/* ---------- Pointer: chain adjacent cells (8 directions) ---------- */
 	const cellFromXY = (clientX: number, clientY: number): number | null => {
@@ -309,7 +330,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 						onPointerDown={onPointerDown}
 					>
 						{grid.cells.map((ch, i) => (
-							<div key={i} className={`mm-cell${path.includes(i) ? ' sel' : ''}`}>{ch}</div>
+							<div key={i} className={`mm-cell${path.includes(i) ? ' sel' : ''}${i === hintCell ? ' hint' : ''}`}>{ch}</div>
 						))}
 						<svg className="mm-trail" viewBox={`0 0 ${SIZE} ${SIZE}`} preserveAspectRatio="none" aria-hidden="true">
 							{path.length > 1 && <polyline points={pts} />}
@@ -359,6 +380,13 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 					</>
 				)}
 			</div>
+
+			{status !== 'ended' && (
+				<div className="mm-actions">
+					<button className="mm-act" onClick={askHint} disabled={!gate.ready || status !== 'playing'}>{gate.label}</button>
+				</div>
+			)}
+			{hintNote && status === 'playing' && <p className="mm-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{status === 'ended' ? (
 				<div className="mm-end">
@@ -421,6 +449,10 @@ const CSS = `
 .mm-board { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; aspect-ratio: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mm-cell { background: var(--gray-900); border: 2px solid var(--gray-800); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: clamp(22px, 8vw, 34px); color: var(--gray-0); }
 .mm-cell.sel { background: var(--mm); border-color: var(--mm); color: var(--accent-text-over); }
+.mm-cell.hint { border-color: #e8b923; box-shadow: inset 0 0 0 2px #e8b923; animation: mm-hintpulse 1.1s ease-in-out infinite; }
+@keyframes mm-hintpulse { 50% { box-shadow: inset 0 0 0 2px rgba(232,185,35,0.3); } }
+.mm-actions { display: flex; gap: 8px; justify-content: center; margin-top: 0.5rem; }
+.mm-hint-note { text-align: center; color: var(--gray-200); font-size: 13px; margin: 0.45rem 0 0; }
 .mm-trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .mm-trail polyline { fill: none; stroke: rgba(255,255,255,0.55); stroke-width: 0.14; stroke-linecap: round; stroke-linejoin: round; }
 .mm-preview-row { display: flex; align-items: center; gap: 8px; margin-top: 0.7rem; min-height: 40px; }
