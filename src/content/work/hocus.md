@@ -21,7 +21,7 @@ tags:
   <p>
     <ul>
       <li>Jeu développé par Bigpoint Lyon en 2017
-      <li>Voici le <a href ="https://www.youtube.com/watch?v=mUjdVrOx15E>" target="_blank"> trailer du jeu</a>
+      <li>Voici le <a href ="https://www.youtube.com/watch?v=mUjdVrOx15E" target="_blank"> trailer du jeu</a>
       <li>Le jeu est toujours disponible sur l' <a href ="https://apps.apple.com/ca/app/hocus-puzzle/id952183548" target="_blank"> Apple Store</a>
       <li>Travail sur le gameplay et l'affichage des grilles
     </ul>

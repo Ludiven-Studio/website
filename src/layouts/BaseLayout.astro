@@ -15,9 +15,11 @@ interface Props {
 	image?: string | undefined;
 	type?: string | undefined;
 	noindex?: boolean | undefined;
+	lang?: 'fr' | 'en' | undefined;
+	altLang?: string | undefined; // path of the same page in the other language
 }
 
-const { title, description, image, type, noindex } = Astro.props;
+const { title, description, image, type, noindex, lang = 'fr', altLang } = Astro.props;
 
 // Route-based structured data (JSON-LD): Organization + WebSite on the home page,
 // VideoGame + BreadcrumbList on a game page — no per-page wiring needed.
@@ -50,9 +52,9 @@ if (path === '/' || path === '') {
 }
 ---
 
-<html lang="fr">
+<html lang={lang}>
 	<head>
-		<MainHead title={title} description={description} image={ogImage} type={type} noindex={noindex} />
+		<MainHead title={title} description={description} image={ogImage} type={type} noindex={noindex} lang={lang} altLang={altLang} />
 		{jsonLd && <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />}
 	</head>
 	<body>

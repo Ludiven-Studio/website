@@ -1,12 +1,21 @@
 ---
 import CallToAction from './CallToAction.astro';
 import Icon from './Icon.astro';
+
+interface Props {
+	lang?: 'fr' | 'en' | undefined;
+}
+
+const { lang = 'fr' } = Astro.props;
+const t = lang === 'en'
+	? { heading: 'Got a project in mind?', cta: 'Get in touch' }
+	: { heading: 'Un projet en tête ?', cta: 'Contactez-moi' };
 ---
 
 <aside>
-	<h2>Un projet en tête ?</h2>
+	<h2>{t.heading}</h2>
 	<CallToAction href="mailto:contact@ludiven-studio.fr">
-		Contactez-moi
+		{t.cta}
 		<Icon icon="paper-plane-tilt" size="1.2em" />
 	</CallToAction>
 </aside>

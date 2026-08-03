@@ -10,6 +10,8 @@ interface Props {
 	image?: string | undefined; // root-relative or absolute og image (defaults to the studio logo)
 	type?: string | undefined; // og:type (website | article)
 	noindex?: boolean | undefined; // keep this page out of search engines
+	lang?: 'fr' | 'en' | undefined;
+	altLang?: string | undefined; // path of the same page in the other language
 }
 
 const {
@@ -18,6 +20,8 @@ const {
 	image,
 	type = 'website',
 	noindex = false,
+	lang = 'fr',
+	altLang,
 } = Astro.props;
 
 const siteName = 'Ludiven Studio';
@@ -43,13 +47,22 @@ if (image) {
 <meta name="description" content={description} />
 {noindex && <meta name="robots" content="noindex, follow" />}
 <link rel="canonical" href={canonical} />
+{
+	altLang && (
+		<>
+			<link rel="alternate" hreflang={lang} href={canonical} />
+			<link rel="alternate" hreflang={lang === 'fr' ? 'en' : 'fr'} href={new URL(altLang, Astro.site)} />
+			<link rel="alternate" hreflang="x-default" href={lang === 'fr' ? canonical : new URL(altLang, Astro.site)} />
+		</>
+	)
+}
 
 <meta property="og:type" content={type} />
 <meta property="og:site_name" content={siteName} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:url" content={canonical} />
-<meta property="og:locale" content="fr_FR" />
+<meta property="og:locale" content={lang === 'en' ? 'en_GB' : 'fr_FR'} />
 <meta property="og:image" content={ogImage} />
 <meta property="og:image:width" content={String(ogW)} />
 <meta property="og:image:height" content={String(ogH)} />

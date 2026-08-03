@@ -1,0 +1,143 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+import Icon from '../../components/Icon.astro';
+import ContactCTA from '../../components/ContactCTA.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
+import type { iconPaths } from '../../components/IconPaths';
+
+// Mirrors /services — keep both lists in step when the offer changes.
+const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
+	{ icon: 'code', title: 'Unity development', body: 'From the idea to a shipped product: Unity apps and games — mobile, desktop and WebGL — with code built to last.' },
+	{ icon: 'mobile', title: 'iOS & Android apps', body: 'Your apps built with Unity, with real access to native features (sensors, notifications, offline mode), then shipped to the App Store and Google Play: signed builds, certificates, store listings and review rules.' },
+	{ icon: 'virtual-reality', title: 'Virtual reality / XR', body: 'Immersive VR and XR experiences for training, simulation or games — on headset as well as on mobile.' },
+	{ icon: 'strategy', title: 'Real-time multiplayer', body: 'Real time that holds up: state sync, netcode, headless servers, with Photon or Netcode for GameObjects — from prototype to production.' },
+	{ icon: 'scales', title: 'Audit, rescue & optimisation', body: 'Audit, bug fixing, version upgrades and a way through the stubborn problems. Then performance: smoother frames, less memory, a lighter build.' },
+	{ icon: 'pencil-line', title: 'Training & mentoring', body: 'Tailored sessions on Unity and C#, technical guidance, code reviews and mentoring for apprentices and junior developers.' },
+];
+
+const focused: { title: string; body: string }[] = [
+	{ title: 'Project structure', body: 'Architecture, code organisation and good practice to keep a Unity project healthy.' },
+	{ title: 'Gameplay & physics', body: 'Original mechanics designed around your idea, with collisions and simulations tuned finely.' },
+	{ title: 'In-game UI & menus', body: 'Screens that are clear, responsive and pleasant to use.' },
+	{ title: 'AssetBundles & Addressables', body: 'On-demand asset loading and management, done properly.' },
+	{ title: 'Internal tools & debug', body: 'A homegrown toolbox and test shortcuts to speed up development and QA.' },
+	{ title: 'Localisation', body: 'Text ready to be translated and displayed in several languages.' },
+	{ title: 'Sound & music', body: 'Audio integration: SFX, music and volume settings.' },
+];
+
+const title = 'Services — Unity, mobile, VR & multiplayer development | Ludiven Studio';
+const description = 'Unity development services: mobile apps, games, VR/XR experiences and real-time multiplayer, from concept to production. Unity developer since 2010, based in France and working remotely.';
+
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'ProfessionalService',
+	name: 'Ludiven Studio',
+	url: 'https://www.ludiven-studio.fr/en/services/',
+	description,
+	provider: { '@type': 'Organization', name: 'Ludiven Studio', url: 'https://www.ludiven-studio.fr/' },
+	serviceType: [...services, ...focused].map((s) => s.title),
+};
+---
+
+<BaseLayout title={title} description={description} lang="en" altLang="/services/">
+	<div class="stack gap-20">
+		<main class="wrapper stack gap-12">
+			<div class="stack gap-8">
+				<LangSwitch lang="en" href="/services/" />
+				<Hero
+					title="Services"
+					tagline="A Unity developer since 2010, I take your project from concept to production: apps, games and immersive experiences — in France and remotely."
+					align="start"
+				/>
+			</div>
+
+			<section class="stack gap-4">
+				<h2 class="section-title">Main services</h2>
+				<div class="box services">
+					{services.map((s) => (
+						<div class="stack gap-2 lg:gap-4">
+							<Icon icon={s.icon} color="var(--accent-regular)" size="2.5rem" gradient />
+							<h3>{s.title}</h3>
+							<p>{s.body}</p>
+						</div>
+					))}
+				</div>
+			</section>
+
+			<section class="stack gap-4">
+				<h2 class="section-title">Focused work</h2>
+				<div class="box focused">
+					{focused.map((s) => (
+						<div>
+							<h3>{s.title}</h3>
+							<p>{s.body}</p>
+						</div>
+					))}
+				</div>
+			</section>
+		</main>
+
+		<ContactCTA lang="en" />
+	</div>
+
+	<script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+</BaseLayout>
+
+<style>
+	.box {
+		border: 1px solid var(--gray-800);
+		border-radius: 0.75rem;
+		padding: 1.5rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.section-title {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+
+	.services {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 2.5rem;
+	}
+
+	.services h3 {
+		font-size: var(--text-lg);
+	}
+
+	.focused {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+	}
+
+	.focused h3 {
+		font-size: var(--text-md);
+		color: var(--gray-0);
+	}
+
+	.services p,
+	.focused p {
+		color: var(--gray-400);
+	}
+
+	@media (min-width: 50em) {
+		.box {
+			border-radius: 1.5rem;
+			padding: 2.5rem;
+		}
+
+		.services {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 3rem 5rem;
+		}
+
+		.focused {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 1.75rem 5rem;
+		}
+	}
+</style>

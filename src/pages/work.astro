@@ -7,6 +7,7 @@ import ContactCTA from '../components/ContactCTA.astro';
 import PortfolioPreview from '../components/PortfolioPreview.astro';
 import Hero from '../components/Hero.astro';
 import Grid from '../components/Grid.astro';
+import LangSwitch from '../components/LangSwitch.astro';
 
 const projects = (await getCollection('work')).sort(
 	(a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf()
@@ -16,9 +17,11 @@ const projects = (await getCollection('work')).sort(
 <BaseLayout
 	title="Projets & réalisations | Ludiven Studio"
 	description="Les projets et collaborations qui composent le savoir-faire derrière Ludiven Studio"
+	altLang="/en/work/"
 >
 	<div class="stack gap-20">
 		<main class="wrapper stack gap-8">
+			<LangSwitch lang="fr" href="/en/work/" />
 			<Hero
 				title="Projets & réalisations"
 				tagline="De mes années en studio et en indépendant jusqu'à Ludiven Studio — chaque projet précise le rôle que j'y ai tenu et la structure concernée"
