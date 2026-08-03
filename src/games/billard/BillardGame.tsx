@@ -43,6 +43,8 @@ const fmtTime = (s: number) => fmtCentis(Math.round(s * 100));
 
 interface DailyState { best?: number; tries: number; }
 
+const MAX_TRIES = 10; // daily attempts per day; best of the day is ranked
+
 export default function BillardGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
 	const [status, setStatus] = useState<Status>('aiming');
@@ -54,6 +56,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	// Daily
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
+	const [tries, setTries] = useState(0); // daily attempts used today
 
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -190,6 +193,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const newFreeTable = useCallback((key: keyof typeof DIFFS) => {
 		setDaily(false);
 		setDiffKey(key);
+		triesRef.current = 0;
+		setTries(0);
 		const lb = localStorage.getItem(freeBestKey(key));
 		const stored = lb ? Number(lb) : null;
 		bestRef.current = stored; // seed the ref so win() keeps the real record, not just this session's
@@ -207,6 +212,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setDiffKey(key);
 		const st = (run?.state as DailyState) ?? { tries: 0 };
 		triesRef.current = st.tries ?? 0;
+		setTries(triesRef.current);
 		// Ignore an implausible stored best (< 10_000_000 = fewer than 1 stroke): a corrupt value must not block real improvements.
 		const validBest = typeof st.best === 'number' && st.best >= 10_000_000 ? st.best : null;
 		bestRef.current = validBest;
@@ -215,6 +221,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (run?.startedAt && !run.done) startRef.current = run.startedAt; // resume the timer only for an unfinished run
 		setDailyLoading(false);
 	}, [gameId, layTable]);
+
+	// ↻ stays available in every mode. The daily re-lays the same table, so the cost
+	// is a try: it is billed on the next first stroke, not here.
+	const restart = useCallback(() => {
+		if (lv.active) startLevel(lv.level);
+		else if (daily && dailyRef.current) layTable(diffKey, dailyRef.current.seed);
+		else newFreeTable(diffKey);
+	}, [lv.active, lv.level, startLevel, daily, diffKey, layTable, newFreeTable]);
 
 	/* ---------- Resolve end of a shot ---------- */
 	const resolveShot = useCallback(() => {
@@ -250,7 +264,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			bestRef.current = newBest;
 			setBest(newBest);
 			if (daily) {
-				triesRef.current += 1;
 				saveDailyRun(gameId, {
 					startedAt: startRef.current, done: true,
 					seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex,
@@ -303,6 +316,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const aim = aimRef.current;
 		aimRef.current = null;
 		if (!aim || statusRef.current !== 'aiming') return;
+		if (daily && startRef.current === 0 && triesRef.current >= MAX_TRIES) return; // out of daily tries
 		const v = aimToVelocity(aim.pull);
 		if (!v) return;
 		const cue = cueBall();
@@ -311,11 +325,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (startRef.current === 0) {
 			startRef.current = Date.now();
 			trackGame(gameId, 'game_started');
-			if (daily) saveDailyRun(gameId, {
-				startedAt: startRef.current, done: false,
-				seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex,
-				state: { best: bestRef.current ?? undefined, tries: triesRef.current } satisfies DailyState,
-			});
+			if (daily) {
+				triesRef.current += 1; // the first stroke consumes a try (no farming by reloading)
+				setTries(triesRef.current);
+				saveDailyRun(gameId, {
+					startedAt: startRef.current, done: false,
+					seed: dailyRef.current?.seed, diffIndex: dailyRef.current?.diffIndex,
+					state: { best: bestRef.current ?? undefined, tries: triesRef.current } satisfies DailyState,
+				});
+			}
 		}
 		strokesRef.current += 1;
 		setStrokes(strokesRef.current);
@@ -492,15 +510,19 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	useEffect(() => { newFreeTable('facile'); }, [newFreeTable]);
 
 	const bestLabel = best == null ? '—' : formatScore(DAILY_LB.billard.fmt, best);
+	const dailyMode = daily && !lv.active;
+	const triesLeft = MAX_TRIES - tries;
+	const exhausted = dailyMode && triesLeft <= 0;
+	const restartLabel = lv.active ? 'Recommencer le niveau'
+		: dailyMode ? (exhausted ? 'Essais du jour épuisés' : `Recommencer (${triesLeft} essai${triesLeft > 1 ? 's' : ''} restant${triesLeft > 1 ? 's' : ''})`)
+		: 'Nouvelle table';
 
 	return (
 		<div className="bi-root">
 			<style>{CSS}</style>
 
-			<div className="bi-playwrap" ref={wrapRef}>
-				{celebrating && <Celebration />}
-				<canvas ref={canvasRef} className="bi-canvas" onPointerDown={onPointerDown} />
-
+			{/* Sits above the table on a phone; overlays it on a wide screen and in fullscreen. */}
+			<div className="bi-topbar">
 				<div className="bi-hud-top">
 					{/* Libre/Défi switch clutters the windowed view — show it only in fullscreen. */}
 					<div className="bi-modetoggle">
@@ -522,14 +544,20 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						{!daily && !lv.active && (Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
 							<button key={k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)}>{DIFFS[k].label}</button>
 						))}
-						{!lv.active && (
-							<button className="bi-act" onClick={() => newFreeTable(diffKey)} aria-label="Nouvelle table" title="Nouvelle table">↻</button>
+						{!lv.menu && (
+							<button
+								className="bi-act"
+								onClick={restart}
+								disabled={exhausted}
+								aria-label={restartLabel}
+								title={restartLabel}
+							>↻</button>
 						)}
 					</div>
 				</div>
-				{daily && !lv.active && (
+				{dailyMode && (
 					<div className="bi-daily-tag bi-daily-hud">
-						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
+						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} · Essai ${Math.min(Math.max(tries, 1), MAX_TRIES)}/${MAX_TRIES}`}
 					</div>
 				)}
 				{lv.active && !lv.menu && (
@@ -537,15 +565,22 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						{`Niveau ${lv.level} · ${billardLevels.config(lv.level).diff.balls} boules · ${billardLevels.starHint(lv.level).three} / ${billardLevels.starHint(lv.level).two}`}
 					</div>
 				)}
+			</div>
+
+			<div className="bi-playwrap" ref={wrapRef}>
+				{celebrating && <Celebration />}
+				<canvas ref={canvasRef} className="bi-canvas" onPointerDown={onPointerDown} />
 
 				{scratchFlash && <div className="bi-scratch">Pénalité · +1 coup</div>}
 				{status === 'won' && !lv.active && (
 					<div className="bi-overlay">
 						<div className="bi-overlay-card">
 							🎉 Gagné en <strong>{strokes} coups</strong> · {fmtTime(elapsed)}
-							<button className="bi-replay" onClick={() => (daily ? layTable(diffKey, dailyRef.current!.seed) : newFreeTable(diffKey))}>
-								{daily ? 'Rejouer la table' : 'Nouvelle table'}
-							</button>
+							{exhausted ? <span className="bi-spent">Défi terminé pour aujourd'hui</span> : (
+								<button className="bi-replay" onClick={restart}>
+									{daily ? `Rejouer la table (${triesLeft} restant${triesLeft > 1 ? 's' : ''})` : 'Nouvelle table'}
+								</button>
+							)}
 						</div>
 					</div>
 				)}
@@ -571,7 +606,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. Rentre toutes les boules colorées. {lv.active ? 'Moins tu joues de coups, plus tu gagnes d\'étoiles.' : daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}
+				c'est puissant. Rentre toutes les boules colorées. {lv.active ? 'Moins tu joues de coups, plus tu gagnes d\'étoiles.' : daily ? `Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.` : `Record : ${bestLabel}.`}
 			</p>
 
 			{daily && !lv.active && <Leaderboard
@@ -597,6 +632,7 @@ const CSS = `
   --bi-accent: var(--accent-regular);
   width: 100%; max-width: 620px; margin-inline: auto; color: var(--gray-0);
   font-family: var(--font-body); display: flex; flex-direction: column; align-items: center;
+  position: relative; /* anchor for the HUD once it goes absolute in fullscreen */
 }
 
 /* Play area holds the canvas + all controls overlaid (immersive). */
@@ -620,14 +656,23 @@ const CSS = `
   .game-page.gf-full .bi-hud-top { padding-right: 122px; }
 }
 
-/* Overlaid HUD — sits on the floor above the table; dark translucent so it reads on any surface. */
-.bi-hud-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; z-index: 3; pointer-events: none; }
+/* HUD stacked above the table: on a phone an overlaid banner covers the cushion
+   and swallows the drag that aims the shot. */
+.bi-topbar { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 10px; }
+.bi-hud-top { width: 100%; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; pointer-events: none; }
 .bi-hud-top > * { pointer-events: auto; }
 /* Libre/Défi toggle: hidden in the windowed view, shown only in fullscreen. */
 .bi-modetoggle { display: none; }
 .game-page.gf-full .bi-modetoggle { display: block; }
 .bi-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.bi-daily-hud { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 3; background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); }
+.bi-daily-hud { background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); pointer-events: none; }
+
+/* Fullscreen has no room outside the table, so the HUD floats back over it —
+   same on a wide screen, where it no longer sits under the thumb. */
+.game-page.gf-full .bi-topbar { position: absolute; top: 10px; left: 10px; right: 10px; width: auto; margin: 0; z-index: 3; pointer-events: none; }
+@media (min-width: 50em) {
+  .bi-topbar { position: absolute; top: 10px; left: 10px; right: 10px; width: auto; margin: 0; z-index: 3; pointer-events: none; }
+}
 
 .bi-stats { display: flex; gap: 6px; font-weight: 700; font-size: 13px; flex-wrap: wrap; }
 .bi-stat { background: rgba(20,14,10,0.6); color: #f4ece2; border-radius: 999px; padding: 5px 11px; backdrop-filter: blur(4px); box-shadow: 0 1px 3px rgba(0,0,0,0.35); font-variant-numeric: tabular-nums; }
@@ -635,7 +680,8 @@ const CSS = `
 .bi-pill { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(20,14,10,0.55); color: #f0e6da; font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer; backdrop-filter: blur(4px); transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition); }
 .bi-pill.active { background: var(--bi-accent); color: var(--accent-text-over); border-color: var(--bi-accent); }
 .bi-act { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(20,14,10,0.55); color: #f0e6da; font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 6px 12px; min-width: 36px; cursor: pointer; backdrop-filter: blur(4px); }
-.bi-act:hover { border-color: var(--bi-accent); color: #fff; }
+.bi-act:hover:not(:disabled) { border-color: var(--bi-accent); color: #fff; }
+.bi-act:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); }
 
@@ -643,6 +689,7 @@ const CSS = `
 .bi-overlay-card { background: var(--gray-999); border: 2px solid var(--bi-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .bi-overlay-card strong { color: var(--bi-accent); }
 .bi-replay { border: none; background: var(--bi-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }
+.bi-spent { color: var(--gray-300); font-size: 13px; }
 
 /* Levels grid overlays the table (canvas stays mounted); scrollable + opaque so it reads. */
 .bi-levels-overlay { background: rgba(12, 8, 5, 0.82); backdrop-filter: blur(4px); overflow-y: auto; padding: 18px 12px; align-items: flex-start; }
