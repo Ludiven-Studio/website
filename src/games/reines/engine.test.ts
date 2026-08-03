@@ -63,6 +63,18 @@ describe('reines engine', () => {
 		});
 	}
 
+	// Moyen must force a confinement step, Difficile a k-subset or a wipe. Without this
+	// most of the big boards fell to plain propagation and only felt bigger, not harder.
+	for (const [key, easiest] of [['moyen', 1], ['difficile', 2]] as const) {
+		const diff = DIFFS[key];
+		it(`${diff.label}: no board falls to the easier techniques alone`, () => {
+			for (let s = 0; s < 10; s++) {
+				const p = generateReines(diff, mulberry32(7700 + s * 53 + diff.size));
+				expect(solveByLogic(p.regions, p.size, easiest)).toBeNull();
+			}
+		}, 60000);
+	}
+
 	it('solveByLogic rejects a multi-solution board', () => {
 		// Region = column: every non-adjacent permutation is a valid solution.
 		const n = 6;

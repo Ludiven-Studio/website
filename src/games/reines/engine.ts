@@ -155,6 +155,7 @@ function growRegions(n: number, solution: number[], rng: Rng): number[][] {
 						}
 		}
 	}
+
 	return regions;
 }
 
@@ -658,15 +659,41 @@ export function findHint(marks: CellState[][], puzzle: ReinesPuzzle): HintResult
  *  techniques only; 8 may also need the one-step "wipe" exclusions (tier 4). */
 const tierForSize = (n: number): 3 | 4 => (n >= 8 ? 4 : 3);
 
+/** Hardest technique a board of size n must actually force. Without this the bigger
+ *  boards were mostly free: measured on 8×8, 33% of the boards we shipped fell to
+ *  plain propagation and another 28% to a single confinement step — the grid grew
+ *  but the reasoning did not. Zone sizes are NOT the knob here: 90%+ of solvable
+ *  layouts contain a 1-cell zone at every size, so banning them starves generation
+ *  (a 3-cell floor yields nothing in 4000 draws) instead of making boards harder. */
+const minTierForSize = (n: number): 1 | 2 | 3 => (n >= 8 ? 3 : n >= 7 ? 2 : 1);
+
+/** Solvable with the size's full rule set, and NOT with anything easier than `min`.
+ *  Tiers are cumulative, so "needs tier ≥ min" is just "tier min-1 cannot finish it".
+ *  The cheap easier tier runs first: it rejects the giveaway boards for almost nothing. */
+function meetsTier(regions: number[][], n: number, max: 3 | 4, min: 1 | 2 | 3): boolean {
+	if (min > 1 && solveByLogic(regions, n, (min - 1) as 1 | 2)) return false;
+	return !!solveByLogic(regions, n, max);
+}
+
 /** Generate a Reines puzzle with a unique solution AND a guess-free logical
  *  path (every step deducible with the solveByLogic rule tier of its size). */
 export function generateReines(diff: DiffLevel, rng: Rng = Math.random): ReinesPuzzle {
 	const n = diff.size;
 	const tier = tierForSize(n);
+	const minTier = minTierForSize(n);
 	for (let attempt = 0; attempt < 600; attempt++) {
 		const solution = randomSolution(n, rng);
 		if (!solution) continue;
 		// A few region layouts per solution before re-seeding the solution.
+		for (let g = 0; g < 8; g++) {
+			const regions = growRegions(n, solution, rng);
+			if (meetsTier(regions, n, tier, minTier)) return { size: n, regions, solution };
+		}
+	}
+	// Out of budget: keep the guess-free path, drop the "must be hard" requirement.
+	for (let attempt = 0; attempt < 200; attempt++) {
+		const solution = randomSolution(n, rng);
+		if (!solution) continue;
 		for (let g = 0; g < 8; g++) {
 			const regions = growRegions(n, solution, rng);
 			if (solveByLogic(regions, n, tier)) return { size: n, regions, solution };

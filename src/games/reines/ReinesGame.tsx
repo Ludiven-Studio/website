@@ -52,7 +52,7 @@ const emptyMarks = (n: number): CellState[][] =>
 /* Daily-run state is versioned: GEN_V bumps with the generator, so marks saved
    for a grid built by an older engine are discarded instead of restored onto a
    different board (same seed, different regions). */
-const GEN_V = 2;
+const GEN_V = 3;
 const packMarks = (marks: CellState[][]) => ({ v: GEN_V, marks });
 const unpackMarks = (state: unknown, n: number): CellState[][] => {
 	const s = state as { v?: number; marks?: CellState[][] } | null;
