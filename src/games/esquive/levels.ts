@@ -6,6 +6,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import type { EsquiveDiff } from './engine';
+import { fmtSeconds } from '../../lib/scoreFormat';
 
 export interface EsquiveLevelCfg {
 	seed: number;
@@ -48,7 +49,7 @@ export const esquiveLevels: LevelPlan<EsquiveLevelCfg> = {
 	},
 	starHint(level: number) {
 		const target = this.config(level).targetTenths;
-		const s = (tenths: number) => `${Math.round(tenths / 10)} s`;
+		const s = (tenths: number) => fmtSeconds(tenths / 10);
 		return { two: `≥ ${s(target * 1.3)}`, three: `≥ ${s(target * 1.6)}` };
 	},
 };

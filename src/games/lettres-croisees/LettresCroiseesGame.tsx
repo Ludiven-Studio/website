@@ -355,7 +355,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 						<div className="lc-status">
 							<span className="lc-count">{found.length}/{total} mots</span>
 							<span className="lc-bonus">✨ {bonusFound.length}</span>
-							<span className="lc-time">⏱ {fmtCentis(elapsed)}</span>
+							<span className="lc-time">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
 						</div>
 					)}
 				</>
@@ -365,7 +365,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 					<div className="lc-status">
 						<span className="lc-count">{found.length}/{total} mots</span>
 						<span className="lc-bonus">✨ {bonusFound.length}</span>
-						<span className="lc-time">⏱ {fmtCentis(elapsed)}</span>
+						<span className="lc-time">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
 					</div>
 				</>
 			) : (

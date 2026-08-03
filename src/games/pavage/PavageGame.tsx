@@ -24,6 +24,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { pavageLevels } from './levels';
 import { useHintGate } from '../useHintGate';
@@ -228,7 +229,13 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			setTrayRot(saved?.trayRot ?? p.pieces.map(() => 0));
 			setDrag(null);
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored placements ARE the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -360,7 +367,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 
 	/* Persist in-progress daily attempt. */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -369,7 +376,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: { placements, trayRot } satisfies SavedState,
 		});
-	}, [daily, started, status, placements, trayRot, gameId]);
+	}, [daily, started, status, revealed, placements, trayRot, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -578,6 +585,28 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, solution, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = solution.map((p) => ({ ...p }));
+		const sd = dailySeedRef.current;
+		setPlacements(solved);
+		setDrag(null);
+		setHinted(new Set());
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { placements: solved, trayRot } satisfies SavedState,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [solution, trayRot, gameId]);
+
 	/* ---------- derived render data ---------- */
 
 	const previewMap = useMemo(() => {
@@ -667,7 +696,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 					<div />
 				)}
 				<div className="pv-bar-right">
-					<div className="pv-timer">{fmtTime(elapsed)}</div>
+					<div className="pv-timer chrono">{fmtTime(elapsed)}</div>
 					{!daily && !lv.active && (
 						<button className="pv-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
@@ -699,6 +728,8 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="pv-daily-won">
@@ -879,10 +910,14 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			)}
 
 			{revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="pv-revealed-note">
 					<span>Solution affichée</span>
 					<button className="pv-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : !(lv.active && lv.menu) ? (
 				<p className="pv-help">
 					Glisse chaque pièce dans la grille pour tout couvrir. Deux pièces de même couleur ne
@@ -893,7 +928,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			) : null}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 

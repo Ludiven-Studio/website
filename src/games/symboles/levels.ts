@@ -7,6 +7,7 @@ import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import { DIFFS, generateQuestion, type DiffLevel, type Question } from './engine';
 import { mulberry32 } from '../prng';
+import { fmtCentis } from '../../lib/scoreFormat';
 
 export const QUESTIONS_PER_LEVEL = 5;
 
@@ -72,10 +73,9 @@ export const symbolesLevels: LevelPlan<SymbolesLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		const s = (c: number) => `${Math.round(c / 100)} s`;
 		return {
 			two: `${QUESTIONS_PER_LEVEL}/${QUESTIONS_PER_LEVEL}`,
-			three: `${QUESTIONS_PER_LEVEL}/${QUESTIONS_PER_LEVEL} · ≤ ${s(cfg.threeStarCentis)}`,
+			three: `${QUESTIONS_PER_LEVEL}/${QUESTIONS_PER_LEVEL} · ≤ ${fmtCentis(cfg.threeStarCentis)}`,
 		};
 	},
 };

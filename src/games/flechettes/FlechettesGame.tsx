@@ -450,7 +450,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 						<span className="da-rem">{remaining}</span>
 						<span className="da-stat">🎯 Volée {Math.min(turn, TURN)}/{TURN}</span>
 						<span className="da-stat">{darts} fléch.</span>
-						<span className="da-stat">⏱ {fmtTime(elapsed)}</span>
+						<span className="da-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</>
 				)}
 			</div>}

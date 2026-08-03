@@ -317,7 +317,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 			<div className="mm-status">
 				<span className="mm-score">{total} pts</span>
 				<span className="mm-count">{found.length} mot{found.length > 1 ? 's' : ''}</span>
-				<span className={`mm-time${status === 'playing' && secs <= 10 ? ' urgent' : ''}`}>⏱ {secs}s</span>
+				<span className={`mm-time${status === 'playing' && secs <= 10 ? ' urgent' : ''}`}>⏱ <span className="chrono">{secs}s</span></span>
 			</div>
 			<div className="mm-timerbar"><div className={`mm-timerfill${status === 'playing' && secs <= 10 ? ' urgent' : ''}`} style={{ width: `${(remaining / (DURATION_S * 1000)) * 100}%` }} /></div>
 

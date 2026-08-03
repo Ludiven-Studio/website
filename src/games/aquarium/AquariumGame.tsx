@@ -16,6 +16,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHintGate } from '../useHintGate';
@@ -130,7 +131,13 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 			setPuzzle(generateAquarium(d, mulberry32(run.seed)));
 			setGrid((run.state as Mark[][]) ?? emptyGrid(d.size));
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored grid IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -246,7 +253,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -255,7 +262,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: grid,
 		});
-	}, [daily, started, status, grid, gameId]);
+	}, [daily, started, status, revealed, grid, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -349,6 +356,27 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [over, solution, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = solution.map((row) => row.map((w) => (w ? 1 : 2)) as Mark[]);
+		const sd = dailySeedRef.current;
+		setGrid(solved);
+		setHinted(new Set());
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: solved,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [solution, gameId]);
+
 	// Region border helper: thick edge where the neighbour belongs to another region.
 	const diffRegion = (r: number, c: number, nr: number, nc: number) =>
 		nr < 0 || nr >= size || nc < 0 || nc >= size || regionOf[r][c] !== regionOf[nr][nc];
@@ -398,7 +426,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 				<div className="aq-bar-right">
-					<div className="aq-timer">{fmtTime(elapsed)}</div>
+					<div className="aq-timer chrono">{fmtTime(elapsed)}</div>
 					{!daily && !lv.active && (
 						<button className="aq-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻ Nouvelle
@@ -417,11 +445,13 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && started && status === 'playing' && (
+			{daily && started && status === 'playing' && !revealed && (
 				<div className="aq-actions">
 					<button className="aq-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{hintNote && (
 				<p className="aq-hint-note" aria-live="polite">💡 {hintNote}</p>
@@ -519,16 +549,20 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="aq-revealed-note">
 					<span>Solution affichée</span>
 					<button className="aq-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<p className="aq-help">
 					La grille est découpée en aquariums colorés. L'eau se dépose par gravité : dans un

@@ -10,6 +10,7 @@
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
+import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface ReussiteLevelCfg {
 	seed: number;
@@ -59,13 +60,9 @@ export const reussiteLevels: LevelPlan<ReussiteLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		const mmss = (centis: number): string => {
-			const s = Math.round(centis / 100);
-			return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-		};
 		return {
-			two: `≤ ${mmss(cfg.twoStarCentis)} · ${cfg.twoStarMoves} coups`,
-			three: `≤ ${mmss(cfg.threeStarCentis)} · ${cfg.threeStarMoves} coups`,
+			two: `≤ ${fmtCentis(cfg.twoStarCentis)} · ${cfg.twoStarMoves} coups`,
+			three: `≤ ${fmtCentis(cfg.threeStarCentis)} · ${cfg.threeStarMoves} coups`,
 		};
 	},
 };

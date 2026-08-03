@@ -26,6 +26,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { demineurLevels } from './levels';
 import { useHintGate } from '../useHintGate';
@@ -70,6 +71,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 	const [hintNote, setHintNote] = useState('');
 	const startRef = useRef<number>(0);
+	const preRevealRef = useRef<PlayerGrid | null>(null); // grid as it stood when the run ended
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const lv = useLevels(gameId, demineurLevels);
 
@@ -87,6 +89,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		setGrid(openedStart(p));
 		setStatus('playing');
 		setRevealed(false);
+		preRevealRef.current = null;
 		setFlagMode(false);
 		setHinted(new Set());
 		setHintNote('');
@@ -127,6 +130,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setStarted(false);
 		setRevealed(false);
+		preRevealRef.current = null;
 		setFlagMode(false);
 		setHinted(new Set());
 		setElapsed(0);
@@ -136,6 +140,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 	const startDaily = useCallback(async () => {
 		setDaily(true);
 		setRevealed(false);
+		preRevealRef.current = null;
 		setHinted(new Set());
 		setFlagMode(false);
 		setHintNote('');
@@ -353,19 +358,21 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 	/* Reveal the full solution (does not count as a win). */
 	const showSolution = useCallback(() => {
 		if (revealed) return;
+		preRevealRef.current = grid; // revealing flags every mine: keep the ranked loss where it was
 		setGrid(revealSolution(puzzle));
 		setRevealed(true);
 		trackGame(gameId, 'solution_shown');
-	}, [revealed, puzzle, gameId]);
+	}, [revealed, grid, puzzle, gameId]);
 
 	const minesLeft = useMemo(() => mineCount - flagCount(grid), [mineCount, grid]);
 	const lostMine = status === 'lost'; // render every mine as a bomb when lost
 
 	// Bombs still to find = mines minus correctly-placed flags (wrong flags don't count).
 	const bombsRemaining = useMemo(() => {
+		const g = preRevealRef.current ?? grid;
 		let found = 0;
 		for (let r = 0; r < size; r++)
-			for (let c = 0; c < size; c++) if (grid[r][c] === FLAGGED && puzzle.mines[r][c]) found++;
+			for (let c = 0; c < size; c++) if (g[r][c] === FLAGGED && puzzle.mines[r][c]) found++;
 		return mineCount - found;
 	}, [grid, puzzle, size, mineCount]);
 
@@ -420,7 +427,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 				)}
 				<div className="dm-bar-right">
 					<div className="dm-mines" aria-label="Mines restantes">💣 {minesLeft}</div>
-					<div className="dm-timer">{fmtTime(elapsed)}</div>
+					<div className="dm-timer chrono">{fmtTime(elapsed)}</div>
 					{!daily && !lv.active && (
 						<button className="dm-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
@@ -458,7 +465,9 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 						<>Partie perdue.</>
 					)}
 					<div className="dm-lost-actions">
-						{!revealed && <button className="dm-act" onClick={showSolution}>👁 Voir la solution</button>}
+						{!revealed && (daily
+							? <GiveUp over onGiveUp={showSolution} />
+							: <button className="dm-act" onClick={showSolution}>👁 Voir la solution</button>)}
 						{!daily && <button className="dm-replay" onClick={() => newGame(diffKey)}>Rejouer</button>}
 					</div>
 				</div>
@@ -566,10 +575,12 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			)}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" format={lbFormat} />}
 
-			{revealed ? (
+			{revealed && daily ? (
+				<RevealNote>Reviens demain pour un nouveau défi&nbsp;!</RevealNote>
+			) : revealed ? (
 				<div className="dm-revealed-note">
 					<span>Solution affichée</span>
-					{!daily && <button className="dm-replay" onClick={() => newGame(diffKey)}>Rejouer</button>}
+					<button className="dm-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
 			) : (
 				<p className="dm-help">

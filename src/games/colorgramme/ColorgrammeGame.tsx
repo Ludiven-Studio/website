@@ -16,6 +16,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { colorgrammeLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
@@ -179,7 +180,13 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			setGrid(st.grid ?? startGrid(pz));
 			setCrosses(st.crosses ?? emptyGrid(d.size));
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored grid IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -310,7 +317,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -319,7 +326,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: { grid, crosses },
 		});
-	}, [daily, started, status, grid, crosses, gameId]);
+	}, [daily, started, status, revealed, grid, crosses, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -447,6 +454,29 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [over, solution, size, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = solution.map((row) => [...row]);
+		const cleared = emptyGrid(size);
+		const sd = dailySeedRef.current;
+		setGrid(solved);
+		setCrosses(cleared);
+		setHinted(new Set());
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { grid: solved, crosses: cleared },
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [solution, size, gameId]);
+
 	return (
 		<div className="co-root" style={{ ['--n' as string]: size }}>
 			<style>{CSS}</style>
@@ -492,7 +522,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 				<div className="co-bar-right">
-					<div className="co-timer">{fmtTime(elapsed)}</div>
+					<div className="co-timer chrono">{fmtTime(elapsed)}</div>
 					{!daily && !lv.active && (
 						<button className="co-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
@@ -558,11 +588,13 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && started && status === 'playing' && (
+			{daily && started && status === 'playing' && !revealed && (
 				<div className="co-actions">
 					<button className="co-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="co-daily-won">
@@ -667,16 +699,20 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="co-revealed-note">
 					<span>Solution affichée</span>
 					<button className="co-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<p className="co-help">
 					Toutes les cases sont coloriées. Choisis une couleur : tu ne vois que SES blocs (dans

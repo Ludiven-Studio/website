@@ -15,6 +15,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { useHintGate } from '../useHintGate';
 import { reinesLevels } from './levels';
@@ -165,7 +166,13 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			setPuzzle(p);
 			setMarks(unpackMarks(run.state, p.size));
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored marks ARE the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -286,7 +293,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -295,7 +302,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: packMarks(marks),
 		});
-	}, [daily, started, status, marks, gameId]);
+	}, [daily, started, status, revealed, marks, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -365,6 +372,28 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, puzzle, size, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = emptyMarks(size);
+		for (let r = 0; r < size; r++) solved[r][puzzle.solution[r]] = 2;
+		const sd = dailySeedRef.current;
+		setMarks(solved);
+		setHinted(new Set());
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: packMarks(solved),
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [puzzle, size, gameId]);
+
 	const thin = '1px solid var(--rn-line)';
 	const thick = '3px solid var(--rn-line-strong)';
 
@@ -416,7 +445,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			{!(lv.active && lv.menu) && (
 			<div className="rn-bar">
 				<div className="rn-bar-right">
-					<div className="rn-timer">{fmtTime(elapsed)}</div>
+					<div className="rn-timer chrono">{fmtTime(elapsed)}</div>
 					{!daily && !lv.active && (
 						<button className="rn-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
@@ -435,11 +464,13 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && started && status === 'playing' && (
+			{daily && started && status === 'playing' && !revealed && (
 				<div className="rn-actions">
 					<button className="rn-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="rn-daily-won">
@@ -543,16 +574,20 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed && !lv.active ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="rn-revealed-note">
 					<span>Solution affichée</span>
 					<button className="rn-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : lv.active && lv.menu ? null : (
 				<>
 					<p className="rn-msg" role="status" aria-live="polite">{conflictMessage}</p>

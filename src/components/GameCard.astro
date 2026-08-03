@@ -271,6 +271,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 	import { DAILY_LB } from '../data/dailyLb';
 	import { formatScore } from '../lib/scoreFormat';
 	import { gameStreak } from '../lib/streak';
+	import { challengeDay, dayBefore } from '../lib/day';
 
 	// Favorites toggle — persisted in localStorage, shared key with the home page.
 	const KEY = 'ludiven-favorites';
@@ -309,13 +310,8 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 	sync();
 
 	// Daily challenge status — same localStorage key as each game's daily run.
-	const todayKey = () => {
-		const d = new Date();
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-	};
-
 	const syncDaily = () => {
-		const day = todayKey();
+		const day = challengeDay();
 		document.querySelectorAll<HTMLElement>('.daily-chip').forEach((chip) => {
 			const id = chip.dataset.gameId;
 			if (!id) return;
@@ -447,7 +443,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 			return cfg ? !tops[cfg.lbId || id!] : false;
 		});
 		if (!missing) return;
-		const yday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+		const yday = dayBefore(challengeDay());
 		yTops = await fetchDailyTopsSecure(yday);
 		syncDaily();
 	};

@@ -10,6 +10,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { useHintGate } from '../useHintGate';
 import { matricesLevels } from './levels';
@@ -132,6 +133,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 	const [chosen, setChosen] = useState<number | null>(null);
 	const [eliminated, setEliminated] = useState<number[]>([]);
 	const [peeked, setPeeked] = useState(false);
+	const [revealed, setRevealed] = useState(false);
 	const [hintNote, setHintNote] = useState('');
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -148,17 +150,17 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 	const [lvQuestions, setLvQuestions] = useState<Question[]>([]);
 	const [lvCorrect, setLvCorrect] = useState(0);
 	const timed = daily || lv.playing;
-	const gate = useHintGate(timed, status === 'playing' && (!timed || started));
+	const gate = useHintGate(timed, status === 'playing' && !revealed && (!timed || started));
 
 	useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
 	// Chrono runs for the daily and for a level in progress.
 	useEffect(() => {
-		if (status !== 'playing' || !started) return;
+		if (status !== 'playing' || !started || revealed) return;
 		if (!daily && !lv.playing) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, started, status, lv.playing]);
+	}, [daily, started, status, revealed, lv.playing]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);
@@ -174,6 +176,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setChosen(null);
 		setEliminated([]);
 		setPeeked(false);
+		setRevealed(false);
 		setHintNote('');
 		startedRef.current = false;
 	}, []);
@@ -195,6 +198,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setChosen(null);
 		setEliminated([]);
 		setPeeked(false);
+		setRevealed(false);
 		setHintNote('');
 		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
@@ -221,6 +225,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setChosen(null);
 		setEliminated([]);
 		setPeeked(false);
+		setRevealed(false);
 		setHintNote('');
 
 		const run = loadDailyRun(gameId);
@@ -232,9 +237,18 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 			const st = (run.state as DailyState) ?? { solved: 0, qIndex: 0 };
 			setScore(st.solved);
 			setQIndex(st.qIndex);
-			setQuestion(dailyQ(run.seed, di, st.qIndex));
+			const q = dailyQ(run.seed, di, st.qIndex);
+			setQuestion(q);
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: reopen on the revealed matrix, it never won.
+				setStatus('playing');
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setPeeked(true);
+				setHintNote('La logique : ' + q.rule + '.');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setStatus('won');
 				setAlreadyPlayed(true);
 				setElapsed(run.finalTime ?? 0);
@@ -284,7 +298,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 	const answerKey = cellKey(question.grid[question.answerIndex]);
 
 	const choose = (idx: number) => {
-		if (status !== 'playing' || chosen !== null) return;
+		if (status !== 'playing' || chosen !== null || revealed) return;
 		if ((daily || lv.playing) && !started) return;
 		const correct = cellKey(question.options[idx]) === answerKey;
 		setChosen(idx);
@@ -390,6 +404,26 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	};
 
+	/* Daily give-up: show the answer of the matrix in progress and close the attempt. */
+	const giveUp = useCallback(() => {
+		if (timer.current) clearTimeout(timer.current);
+		const sd = dailySeedRef.current;
+		setPeeked(true);
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		setHintNote('La logique : ' + question.rule + '.');
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { solved: score, qIndex } satisfies DailyState,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [question, score, qIndex, gameId]);
+
 	const optionClass = (idx: number) => {
 		const isAnswer = cellKey(question.options[idx]) === answerKey;
 		if (chosen === null) {
@@ -427,7 +461,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 					{!lv.menu && (
 						<div className="mx-daily-status">
 							<span className="mx-score">Bonnes {lvCorrect}/{lvQuestions.length}</span>
-							<span className="mx-best">⏱ {fmtTime(elapsed)}</span>
+							<span className="mx-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 						</div>
 					)}
 				</>
@@ -438,7 +472,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 					</div>
 					<div className="mx-daily-status">
 						<span className="mx-score">Réussies {Math.min(score, DAILY_TARGET)}/{DAILY_TARGET}</span>
-						<span className="mx-best">⏱ {fmtTime(elapsed)}</span>
+						<span className="mx-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</div>
 				</>
 			) : (
@@ -471,7 +505,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 
 				<div className={`mx-options ${armed ? 'blurred' : ''}`}>
 					{question.options.map((c, i) => (
-						<button key={i} className={optionClass(i)} onClick={() => choose(i)} disabled={chosen !== null || eliminated.includes(i) || armed} aria-label={`Option ${i + 1}`}>
+						<button key={i} className={optionClass(i)} onClick={() => choose(i)} disabled={chosen !== null || eliminated.includes(i) || armed || revealed} aria-label={`Option ${i + 1}`}>
 							<Figure cell={c} />
 						</button>
 					))}
@@ -501,12 +535,14 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 			</div>
 			)}
 
-			{status === 'playing' && chosen === null && !lv.menu && !lv.done && (
+			{status === 'playing' && chosen === null && !revealed && !lv.menu && !lv.done && (
 				<div className="mx-actions">
 					<button className="mx-act" onClick={eliminate} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
 					{!daily && !lv.active && <button className="mx-act" onClick={peek}>👁 Voir la réponse</button>}
 				</div>
 			)}
+
+			{daily && started && chosen === null && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{hintNote && <p className="mx-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
@@ -531,11 +567,13 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && status === 'playing' && (
+			{daily && revealed && <RevealNote />}
+
+			{daily && status === 'playing' && !revealed && (
 				<p className="mx-help">Résous 3 matrices le plus vite possible. Une erreur ne t'arrête pas, mais le chrono continue.</p>
 			)}
 
-			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />}
+			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);

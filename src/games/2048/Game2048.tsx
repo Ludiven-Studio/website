@@ -530,7 +530,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 						<span className={`g2-clock${movesLeft <= 5 ? ' urgent' : ''}`}>🎯 <strong>{movesLeft}</strong> coups</span>
 					) : (
 						<>
-							<span className={`g2-clock${remaining <= 30000 ? ' urgent' : ''}`}>⏱ <strong>{fmtClock(remaining)}</strong></span>
+							<span className={`g2-clock${remaining <= 30000 ? ' urgent' : ''}`}>⏱ <strong className="chrono">{fmtClock(remaining)}</strong></span>
 							{!daily && <span className="g2-best">Record <strong>{best}</strong></span>}
 						</>
 					)}

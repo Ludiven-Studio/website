@@ -1139,7 +1139,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				{phase === 'racing' && (
 					<>
 						<div className="dr-hud">
-							<span className="dr-cur">{fmtMs(curMs)}</span>
+							<span className="dr-cur chrono">{fmtMs(curMs)}</span>
 							<span className="dr-best">Meilleur {fmtMs(bestMs)}</span>
 							{!lv.active && <span className="dr-peers">👥 {Math.min(peerCount, MAX_PLAYERS)}/{MAX_PLAYERS}</span>}
 							<span className="dr-peers">{lv.active ? `🎯 Niveau ${lv.level}` : `${mode === 'defi' ? '🏁 ' : ''}${DRIFT_DIFFS[diffKey].label}`}</span>

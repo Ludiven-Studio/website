@@ -804,7 +804,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="es-bar">
-				<span className="es-score">{fmtSec(score)}</span>
+				<span className="es-score chrono">{fmtSec(score)}</span>
 				<span className="es-best">Record {fmtSec(best)}</span>
 			</div>
 

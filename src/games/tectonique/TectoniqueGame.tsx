@@ -9,6 +9,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
@@ -96,6 +97,8 @@ const KEY_MOVES: Record<string, [Axis, -1 | 1] | undefined> = {
 };
 
 const DRY_HINT = 12; // coups without a crystal before the way out is offered
+const REPLAY_MS = 330; // slowest step of the solution playback
+const REPLAY_TOTAL_MS = 12000; // a long walk speeds up rather than dragging on
 // A launched belt is heavy: it only gives up its speed to friction, which takes about three
 // seconds from a full fling. Precision comes from cutting it, not from short pushes.
 const RUN_DECEL = 7.5; // cells/s² of friction
@@ -146,6 +149,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [revealed, setRevealed] = useState(false); // the recorded walk is playing back
 	const [tip, setTip] = useState<Hint | null>(null); // the last hint handed out
 
 	const boardRef = useRef<Board | null>(null);
@@ -157,6 +161,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const movesRef = useRef(0);
 	const lastAxisRef = useRef<Axis | null>(null); // the belt in hand: pushing it again is free
 	const finalRef = useRef(0); // chrono at the end of the run, win or dead end
+	const leftRef = useRef(0); // crystals still on the grid when the run ended
+	const replayRef = useRef(0); // interval driving the solution playback
 	const seedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const popIdRef = useRef(0);
 	const jamRef = useRef(0);
@@ -194,6 +200,9 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 	const load = useCallback((plan: Generated, resume?: Board) => {
 		settle();
+		window.clearInterval(replayRef.current);
+		replayRef.current = 0;
+		setRevealed(false);
 		freshRef.current = plan;
 		const b = resume ?? plan.board;
 		boardRef.current = b;
@@ -267,6 +276,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				setAlreadyPlayed(true);
 				setStatus(isWon(resumed ?? fresh.board) ? 'won' : 'stuck');
 				finalRef.current = run.finalTime ?? 0;
+				leftRef.current = countCrystals(resumed ?? fresh.board);
 				setElapsed(finalRef.current);
 			} else {
 				setAlreadyPlayed(false);
@@ -287,7 +297,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	}, [gameId, load]);
 
 	const gated = (daily || lv.playing) && !started;
-	const locked = gated || status !== 'playing';
+	const locked = gated || status !== 'playing' || revealed;
 	const lockedRef = useRef(locked);
 	lockedRef.current = locked;
 
@@ -329,6 +339,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	/** Stop the chrono and close the run, cleared or given up. */
 	const endRun = useCallback((s: Status) => {
 		finalRef.current = Math.round((Date.now() - startRef.current) / 10);
+		leftRef.current = boardRef.current ? countCrystals(boardRef.current) : 0;
 		setElapsed(finalRef.current);
 		setStatus(s);
 	}, []);
@@ -545,7 +556,51 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		return () => window.removeEventListener('keydown', onKey);
 	}, []);
 
-	useEffect(() => () => { settle(); window.clearTimeout(jamRef.current); }, [settle]);
+	useEffect(() => () => {
+		settle();
+		window.clearTimeout(jamRef.current);
+		window.clearInterval(replayRef.current);
+	}, [settle]);
+
+	/* Daily give-up: the run is already closed and ranked, so this only plays the recorded walk
+	   back from the fresh grid — no score, no status, nothing saved. */
+	const giveUp = useCallback(() => {
+		const plan = freshRef.current;
+		if (!plan) return;
+		settle();
+		setRevealed(true);
+		setTip(null);
+		trackGame(gameId, 'solution_shown');
+		// The walk keeps wandering after the last crystal: stop as soon as the grid is clear.
+		let end = plan.walk.length;
+		let probe = plan.board;
+		for (let i = 0; i < plan.walk.length; i++) {
+			const m = plan.walk[i];
+			probe = slide(probe, m.axis, m.index, m.shift).board;
+			if (isWon(probe)) { end = i + 1; break; }
+		}
+		let b = plan.board;
+		boardRef.current = b;
+		setShifts({});
+		setBoard(b);
+		setSprites(spritesOf(b));
+		let s = 0;
+		window.clearInterval(replayRef.current);
+		replayRef.current = window.setInterval(() => {
+			if (s >= end) {
+				window.clearInterval(replayRef.current);
+				replayRef.current = 0;
+				return;
+			}
+			const m = plan.walk[s++];
+			const r = slide(b, m.axis, m.index, m.shift);
+			b = r.board;
+			boardRef.current = b;
+			setBoard(b);
+			const trips = new Map(r.moves.map((mv) => [mv.from, mv.to]));
+			setSprites((prev) => prev.map((sp) => (trips.has(sp.idx) ? { ...sp, idx: trips.get(sp.idx) as number } : sp)));
+		}, Math.max(90, Math.min(REPLAY_MS, Math.round(REPLAY_TOTAL_MS / Math.max(1, end)))));
+	}, [gameId, settle]);
 
 	const restart = useCallback(() => {
 		const fresh = freshRef.current;
@@ -648,11 +703,13 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	}, [board, locked, running]);
 
 	const left = board ? countCrystals(board) : 0;
+	// The playback eats the crystals the player missed: the run keeps its own tally.
+	const scored = revealed ? leftRef.current : left;
 	const { celebrating, showWin } = useCelebration(status === 'won');
 
 	// The daily ranks on crystals first, the chrono only splits ties. Storing what was MISSED
 	// keeps the packed value ascending-is-better, like every other 'time' score.
-	const dailyScore = encodePacked(10_000_000, [left, Math.min(9_999_999, finalRef.current)]);
+	const dailyScore = encodePacked(10_000_000, [scored, Math.min(9_999_999, finalRef.current)]);
 
 	return (
 		<div className="tk-root" ref={rootRef} style={{ ['--n' as string]: n }}>
@@ -695,7 +752,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				<div className="tk-bar">
 					<span className="tk-chip">💎 {total - left}/{total}</span>
 					<span className="tk-chip">👣 {moves}</span>
-					<span className="tk-chip">⏱ {fmtCentis(elapsed)}</span>
+					<span className="tk-chip">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
 					<button
 						className="tk-btn"
 						onClick={daily || lv.playing ? restart : () => newFree(freeDiff)}
@@ -862,12 +919,14 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			{daily && status !== 'playing' && (
 				<div className="tk-done">
 					{alreadyPlayed
-						? <>Défi du jour déjà relevé · <strong>💎 {total - left}/{total}</strong> en {fmtCentis(finalRef.current)} — reviens demain&nbsp;!</>
+						? <>Défi du jour déjà relevé · <strong>💎 {total - scored}/{total}</strong> en {fmtCentis(finalRef.current)} — reviens demain&nbsp;!</>
 						: status === 'won'
 							? <>🎉 Tapis nettoyés en <strong>{fmtCentis(finalRef.current)}</strong></>
-							: <>⚙️ Bloqué avec <strong>💎 {total - left}/{total}</strong> · {fmtCentis(finalRef.current)}</>}
+							: <>⚙️ Bloqué avec <strong>💎 {total - scored}/{total}</strong> · {fmtCentis(finalRef.current)}</>}
 				</div>
 			)}
+			{daily && status === 'stuck' && !revealed && <GiveUp over onGiveUp={giveUp} />}
+			{daily && revealed && <RevealNote>Le chemin d'origine se rejoue sur la grille. Reviens demain pour un nouveau défi&nbsp;!</RevealNote>}
 
 			{daily && !dailyLoading && (
 				<Leaderboard

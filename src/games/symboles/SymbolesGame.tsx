@@ -423,7 +423,7 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 						<div className="sy-daily-status">
 							<span className="sy-score">Question {Math.min(qIndex + 1, QUESTIONS_PER_LEVEL)}/{QUESTIONS_PER_LEVEL}</span>
 							<span className="sy-best">✓ {lvCorrect}</span>
-							<span className="sy-best">⏱ {fmtTime(elapsed)}</span>
+							<span className="sy-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 						</div>
 					)}
 				</>
@@ -436,7 +436,7 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 					</div>
 					<div className="sy-daily-status">
 						<span className="sy-score">Réussies {Math.min(score, DAILY_TARGET)}/{DAILY_TARGET}</span>
-						<span className="sy-best">⏱ {fmtTime(elapsed)}</span>
+						<span className="sy-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</div>
 				</>
 			) : (

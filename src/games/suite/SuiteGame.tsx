@@ -384,7 +384,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 			{lv.active && lv.playing && (
 				<div className="su-daily-status">
 					<span className="su-score">Bonnes {score}/{SUITE_QUESTIONS}</span>
-					<span className="su-best">⏱ {fmtTime(elapsed)}</span>
+					<span className="su-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 				</div>
 			)}
 
@@ -397,7 +397,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 					</div>
 					<div className="su-daily-status">
 						<span className="su-score">Réussies {Math.min(score, DAILY_TARGET)}/{DAILY_TARGET}</span>
-						<span className="su-best">⏱ {fmtTime(elapsed)}</span>
+						<span className="su-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</div>
 				</>
 			) : (

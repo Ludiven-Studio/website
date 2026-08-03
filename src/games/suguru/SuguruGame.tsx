@@ -10,6 +10,7 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
@@ -143,7 +144,13 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 			setPuzzle(generateSuguru(d, mulberry32(run.seed)));
 			setEntries((run.state as (number | null)[][]) ?? emptyEntries(d.size));
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored grid IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -279,7 +286,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -288,7 +295,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: entries,
 		});
-	}, [daily, started, status, entries, gameId]);
+	}, [daily, started, status, revealed, entries, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -363,6 +370,27 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, solution, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = solution.map((row) => [...row]);
+		const sd = dailySeedRef.current;
+		setEntries(solved);
+		setSelected(null);
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: solved,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [solution, gameId]);
+
 	/* Keyboard. */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
@@ -435,7 +463,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 					<div />
 				)}
 				<div className="sg-bar-right">
-					<div className="sg-timer">{fmtTime(elapsed)}</div>
+					<div className="sg-timer chrono">{fmtTime(elapsed)}</div>
 					{!daily && !lv.active && (
 						<button className="sg-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
@@ -454,11 +482,13 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && started && status === 'playing' && (
+			{daily && started && status === 'playing' && !revealed && (
 				<div className="sg-actions">
 					<button className="sg-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="sg-daily-won">
@@ -561,16 +591,20 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="sg-revealed-note">
 					<span>Solution affichée</span>
 					<button className="sg-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<>
 					<div className="sg-pad" aria-label="Pavé numérique">

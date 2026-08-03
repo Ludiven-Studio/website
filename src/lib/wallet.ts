@@ -3,6 +3,7 @@
 // casually cheatable, but it only buys vanity, so that's fine. See [[currency-cocottes]].
 
 import { activityStreak } from './streak';
+import { challengeDay } from './day';
 
 const KEY = 'ludiven-cocottes';
 
@@ -31,12 +32,10 @@ interface WalletData {
 	balance: number;
 	owned: string[];
 	equipped: string | null;
-	lastReward: string; // UTC day of the last claimed daily reward
+	lastReward: string; // challenge day of the last claimed daily reward
 }
 
 const empty = (): WalletData => ({ balance: 0, owned: ['cocotte'], equipped: null, lastReward: '' });
-
-const utcDay = (): string => new Date().toISOString().slice(0, 10);
 
 function read(): WalletData {
 	try {
@@ -113,7 +112,7 @@ export interface RewardState {
 export function rewardState(): RewardState {
 	const s = activityStreak();
 	const nextDay = s.playedToday ? s.count : s.atRisk ? s.count + 1 : 1; // streak-day today's play counts as
-	const claimedToday = read().lastReward === utcDay();
+	const claimedToday = read().lastReward === challengeDay();
 	return { playedToday: s.playedToday, canClaim: s.playedToday && !claimedToday, amount: dailyRewardAmount(nextDay) };
 }
 
@@ -123,7 +122,7 @@ export function claimDailyReward(): number {
 	if (!st.canClaim) return 0;
 	const w = read();
 	w.balance += st.amount;
-	w.lastReward = utcDay();
+	w.lastReward = challengeDay();
 	write(w);
 	return st.amount;
 }

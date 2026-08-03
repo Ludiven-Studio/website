@@ -16,6 +16,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { motifsLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
@@ -147,7 +148,13 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 			setPuzzle(generateMotifs(DIFFS[dk], mulberry32(run.seed)));
 			setPlaced((run.state as Rect[]) ?? []);
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored partition IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -290,7 +297,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -299,7 +306,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: placed,
 		});
-	}, [daily, started, status, placed, gameId]);
+	}, [daily, started, status, revealed, placed, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -428,6 +435,27 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, rects, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = rects.map((r) => ({ ...r }));
+		const sd = dailySeedRef.current;
+		setPlaced(solved);
+		setPreview(null);
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: solved,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [rects, gameId]);
+
 	const previewSet = useMemo(() => {
 		const s = new Set<string>();
 		if (preview)
@@ -504,7 +532,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 						))}
 					</div>
 					<div className="mo-bar-right">
-						<div className="mo-timer">{fmtTime(elapsed)}</div>
+						<div className="mo-timer chrono">{fmtTime(elapsed)}</div>
 						<button className="mo-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
 						</button>
@@ -514,13 +542,13 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 
 			{daily && !lv.active && (
 				<div className="mo-bar">
-					<div className="mo-timer">{fmtTime(elapsed)}</div>
+					<div className="mo-timer chrono">{fmtTime(elapsed)}</div>
 				</div>
 			)}
 
 			{lv.playing && (
 				<div className="mo-bar">
-					<div className="mo-timer">{fmtTime(elapsed)}</div>
+					<div className="mo-timer chrono">{fmtTime(elapsed)}</div>
 				</div>
 			)}
 
@@ -533,11 +561,13 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && started && status === 'playing' && (
+			{daily && started && status === 'playing' && !revealed && (
 				<div className="mo-actions">
 					<button className="mo-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="mo-daily-won">
@@ -641,16 +671,20 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{lv.active ? null : revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="mo-revealed-note">
 					<span>Solution affichée</span>
 					<button className="mo-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<p className="mo-help">
 					Glisse pour tracer un rectangle autour de chaque indice. ◻ carré · ▯ rectangle haut ·

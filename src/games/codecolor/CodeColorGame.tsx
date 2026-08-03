@@ -18,6 +18,7 @@ import { useLevels } from '../../lib/useLevels';
 import { useHintGate } from '../useHintGate';
 import { codecolorLevels } from './levels';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 
 /* =====================================================
    CODECOLOR — Mastermind-like. React island.
@@ -64,6 +65,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [revealed, setRevealed] = useState(false); // daily: the code was asked for after the loss
 	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
 	const [hintKeys, setHintKeys] = useState<Set<string>>(() => new Set()); // facts already handed out
 	const startedRef = useRef(false); // free-mode "first action" flag
@@ -84,6 +86,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		const lvl = LEVELS[dk];
 		setDaily(false);
 		setAlreadyPlayed(false);
+		setRevealed(false);
 		setDiffKey(dk);
 		setPuzzle(generatePuzzle(lvl));
 		setRows([]);
@@ -105,6 +108,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		const cfg = lv.play(level);
 		setDaily(false);
 		setAlreadyPlayed(false);
+		setRevealed(false);
 		setPuzzle(generatePuzzle({ label: cfg.label, slots: cfg.slots, colors: cfg.colors, tries: cfg.tries }, mulberry32(cfg.seed)));
 		setRows([]);
 		setCurrent(makeEmpty(cfg.slots));
@@ -132,6 +136,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 	/* Daily: one resumable attempt per device; server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
+		setRevealed(false);
 		setHintNote('');
 		setHintKeys(new Set());
 		const run = loadDailyRun(gameId);
@@ -255,6 +260,12 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		begin();
 		trackGame(gameId, 'hint_used');
 	}, [over, armed, gate, slots, colors, rows, hintKeys, begin, gameId]);
+
+	/* Daily: the run is already lost and recorded — showing the code only draws it on screen. */
+	const giveUp = useCallback(() => {
+		setRevealed(true);
+		trackGame(gameId, 'solution_shown');
+	}, [gameId]);
 
 	/* Persist the in-progress daily attempt. */
 	useEffect(() => {
@@ -487,11 +498,12 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 					) : status === 'won' ? (
 						<>🎉 Code trouvé en <strong>{usedTries} essais</strong></>
 					) : (
-						<>Raté… le code apparaît ci-dessous. Tu es classé selon tes pions bien placés.</>
+						<>Raté… tu es classé selon tes pions bien placés.</>
 					)}
 				</div>
 			)}
-			{daily && over && status === 'lost' && (
+			{daily && status === 'lost' && !revealed && <GiveUp over onGiveUp={giveUp} />}
+			{daily && status === 'lost' && revealed && (
 				<div className="cc-board cc-reveal">
 					<div className="cc-row">
 						<span className="cc-rownum">🔑</span>
@@ -504,6 +516,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 					</div>
 				</div>
 			)}
+			{daily && revealed && <RevealNote>Reviens demain pour un nouveau défi&nbsp;!</RevealNote>}
 
 			{daily && (
 				<Leaderboard game={gameId} metric="time" submitValue={over ? cost : undefined} format={fmt} />

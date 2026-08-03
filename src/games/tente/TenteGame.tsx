@@ -10,6 +10,7 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
@@ -131,7 +132,13 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 			setPuzzle(p);
 			setMarks((run.state as Mark[][] | undefined) ?? emptyMarks(p.size));
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored grid IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -256,7 +263,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -265,7 +272,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: marks,
 		});
-	}, [daily, started, status, marks, gameId]);
+	}, [daily, started, status, revealed, marks, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -318,20 +325,45 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'hint_used');
 	}, [over, marks, puzzle, begin, gameId, gate]);
 
-	/* Reveal the full solution (does not count as a win). */
-	const reveal = useCallback(() => {
-		if (over) return;
+	const solvedMarks = useCallback((): Mark[][] => {
 		const next = emptyMarks(size);
 		for (let r = 0; r < size; r++)
 			for (let c = 0; c < size; c++) {
 				if (treeSet.has(cellKey(r, c))) continue;
 				next[r][c] = solSet.has(cellKey(r, c)) ? 'tent' : 'grass';
 			}
-		setMarks(next);
+		return next;
+	}, [size, treeSet, solSet]);
+
+	/* Reveal the full solution (does not count as a win). */
+	const reveal = useCallback(() => {
+		if (over) return;
+		setMarks(solvedMarks());
 		setHinted(new Set());
 		setRevealed(true);
 		trackGame(gameId, 'solution_shown');
-	}, [over, size, treeSet, solSet, gameId]);
+	}, [over, solvedMarks, gameId]);
+
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = solvedMarks();
+		const sd = dailySeedRef.current;
+		setMarks(solved);
+		setHinted(new Set());
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: solved,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [solvedMarks, gameId]);
 
 	return (
 		<div className="te-root" style={{ ['--n' as string]: size }}>
@@ -380,7 +412,7 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 				<div className="te-bar-right">
-					<div className="te-timer" aria-live="off">{fmtTime(elapsed)}</div>
+					<div className="te-timer chrono" aria-live="off">{fmtTime(elapsed)}</div>
 					{!daily && !lv.active && (
 						<button className="te-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻ Nouvelle
@@ -399,11 +431,13 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && started && status === 'playing' && (
+			{daily && started && status === 'playing' && !revealed && (
 				<div className="te-actions">
 					<button className="te-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
 			)}
+
+			{daily && started && !over && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="te-daily-won">
@@ -504,16 +538,20 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="te-revealed-note">
 					<span>Solution affichée</span>
 					<button className="te-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<p className="te-help">
 					Place une tente (⛺) à côté de chaque arbre (🌳) : une seule par arbre, jamais deux

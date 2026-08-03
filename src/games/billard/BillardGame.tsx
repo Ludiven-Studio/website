@@ -516,7 +516,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					<div className="bi-stats">
 						<span className="bi-stat">🎱 {strokes}</span>
 						<span className="bi-stat">🎯 {remaining}</span>
-						<span className="bi-stat">⏱ {fmtTime(elapsed)}</span>
+						<span className="bi-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</div>
 					<div className="bi-hud-actions">
 						{!daily && !lv.active && (Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (

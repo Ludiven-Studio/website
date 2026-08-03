@@ -5,6 +5,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import type { DiffLevel } from './engine';
+import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface TubesLevelCfg {
 	seed: number;
@@ -54,7 +55,6 @@ export const tubesLevels: LevelPlan<TubesLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		const fmt = (c: number) => `${Math.round(c / 100)} s`;
-		return { two: `≤ ${fmt(cfg.twoStarCentis)}`, three: `≤ ${fmt(cfg.threeStarCentis)}` };
+		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };

@@ -602,7 +602,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 						<span className="co-stat">🐔 {shots} lancées</span>
 					)}
 					<span className="co-stat">🦊 {foxes} renards</span>
-					<span className="co-stat">⏱ {fmtTime(elapsed)}</span>
+					<span className="co-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					{lv.playing ? (
 						<button className="co-act" onClick={() => startLevel(lv.level)}>↺ Recommencer</button>
 					) : (

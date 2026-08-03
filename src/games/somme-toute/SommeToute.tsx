@@ -10,6 +10,7 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
@@ -178,7 +179,13 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			setGame(generatePuzzle(d, mulberry32(run.seed)));
 			setEntries((run.state as (number | null)[][]) ?? emptyEntries(d.size));
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored grid IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -249,7 +256,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -258,7 +265,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: entries,
 		});
-	}, [daily, started, status, entries, gameId]);
+	}, [daily, started, status, revealed, entries, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -306,6 +313,27 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setRevealed(true);
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, game, gameId]);
+
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = game.solution.map((row) => [...row]);
+		const sd = dailySeedRef.current;
+		setEntries(solved);
+		setSelected(null);
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: solved,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [game, gameId]);
 
 	const placeValue = useCallback(
 		(v: number | null) => {
@@ -424,7 +452,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 						))}
 					</div>
 					<div className="st-bar-right">
-						<div className="st-timer" aria-live="off">{fmtTime(elapsed)}</div>
+						<div className="st-timer chrono" aria-live="off">{fmtTime(elapsed)}</div>
 						<button className="st-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">
 							↻
 						</button>
@@ -434,7 +462,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 
 			{(daily || (lv.active && !lv.menu)) && (
 				<div className="st-bar" style={{ justifyContent: 'center' }}>
-					<div className="st-timer" aria-live="off">{fmtTime(elapsed)}</div>
+					<div className="st-timer chrono" aria-live="off">{fmtTime(elapsed)}</div>
 				</div>
 			)}
 
@@ -449,6 +477,8 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="st-daily-won">
@@ -550,16 +580,20 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="st-revealed-note">
 					<span>Solution affichée</span>
 					<button className="st-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<>
 					<div className="st-pad" aria-label="Pavé numérique">

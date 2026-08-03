@@ -287,7 +287,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 					<div className="wt-status">
 						<span className="wt-theme">🎯 {puzzle.theme}</span>
 						<span className="wt-count">{found.length}/{total}</span>
-						<span className="wt-time">⏱ {fmtCentis(elapsed)}</span>
+						<span className="wt-time">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
 					</div>
 				</>
 			) : (
@@ -311,7 +311,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 				<div className="wt-status">
 					<span className="wt-theme">🎯 {puzzle.theme}</span>
 					<span className="wt-count">{found.length}/{total}</span>
-					<span className="wt-time">⏱ {fmtCentis(elapsed)}</span>
+					<span className="wt-time">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
 				</div>
 			)}
 

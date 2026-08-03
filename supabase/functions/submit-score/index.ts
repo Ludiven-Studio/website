@@ -129,8 +129,15 @@ Deno.serve(async (req) => {
 	}
 
 	// ---- Daily challenge: quota + best-score-retained upsert ----
-	// The server (UTC) decides the challenge date — never trust a client-sent date.
-	const challengeDate = new Date().toISOString().slice(0, 10);
+	// The server decides the challenge date — never trust a client-sent date. Europe/Paris,
+	// mirroring src/lib/day.ts: the puzzle, the local keys and these rows must roll over at
+	// the same instant, otherwise midnight-to-2am players get yesterday's leaderboard.
+	const challengeDate = new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'Europe/Paris',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	}).format(new Date());
 
 	const { data: existing, error: exErr } = await supabase
 		.from('game_scores')

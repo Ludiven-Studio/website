@@ -223,6 +223,15 @@ table, th, td {
 	user-select: text;
 }
 
+/* Running chronos. Reserve the width of the longest label ("12:05") so the ticking
+   value never resizes its chip and nudges the buttons next to it. */
+.chrono {
+	display: inline-block;
+	min-width: 5ch;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
 .gap-2 {
 	gap: 0.5rem;
 }

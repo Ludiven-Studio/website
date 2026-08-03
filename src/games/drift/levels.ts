@@ -6,6 +6,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import type { DriftDiff } from './engine';
+import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface DriftLevelCfg {
 	seed: number;
@@ -48,7 +49,6 @@ export const driftLevels: LevelPlan<DriftLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		const s = (c: number) => `${(c / 100).toFixed(1)} s`;
-		return { two: `≤ ${s(cfg.twoStarCentis)}`, three: `≤ ${s(cfg.threeStarCentis)}` };
+		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };

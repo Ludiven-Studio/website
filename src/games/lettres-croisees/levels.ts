@@ -5,6 +5,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import type { DiffLevel } from './engine';
+import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface LettresCroiseesLevelCfg {
 	seed: number;
@@ -49,7 +50,6 @@ export const lettresCroiseesLevels: LevelPlan<LettresCroiseesLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		const s = (c: number) => `${Math.round(c / 100)} s`;
-		return { two: `≤ ${s(cfg.twoStarCentis)}`, three: `≤ ${s(cfg.threeStarCentis)}` };
+		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };

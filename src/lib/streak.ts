@@ -1,10 +1,12 @@
 // Daily-challenge streaks: a global "did any daily today" streak plus one per game.
-// Stored in localStorage and keyed by UTC day (aligned with challengeDateUTC in
-// lib/scores) so the day rolls over at the same instant for everyone.
+// Stored in localStorage and keyed by the challenge day (lib/day) so the streak
+// rolls over at the same instant as the puzzle itself.
+
+import { challengeDay, dayBefore } from './day';
 
 export interface Streak {
 	count: number;
-	lastDate: string; // YYYY-MM-DD (UTC) of the last completed day
+	lastDate: string; // YYYY-MM-DD of the last completed challenge day
 }
 
 export interface StreakView {
@@ -16,12 +18,6 @@ export interface StreakView {
 const GLOBAL_KEY = 'ludiven-streak-global';
 const ACTIVITY_KEY = 'ludiven-streak-activity'; // played ANY game (free/daily/levels) today
 const gameKey = (gameId: string): string => `ludiven-streak-${gameId}`;
-
-/** UTC day, matching challengeDateUTC() in lib/scores. */
-const utcDay = (d: Date = new Date()): string => d.toISOString().slice(0, 10);
-
-const dayBefore = (isoDay: string): string =>
-	new Date(Date.parse(`${isoDay}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
 
 const read = (key: string): Streak => {
 	try {
@@ -42,7 +38,7 @@ const write = (key: string, s: Streak): void => {
 	}
 };
 
-/** Advance one streak for "completed today". Idempotent within a UTC day. */
+/** Advance one streak for "completed today". Idempotent within a challenge day. */
 const bump = (key: string, today: string): void => {
 	const s = read(key);
 	if (s.lastDate === today) return; // already counted today
@@ -52,18 +48,18 @@ const bump = (key: string, today: string): void => {
 
 /** Record that a daily challenge was completed — bumps the global streak and this game's. */
 export function recordDailyDone(gameId: string): void {
-	const today = utcDay();
+	const today = challengeDay();
 	bump(GLOBAL_KEY, today);
 	bump(gameKey(gameId), today);
 }
 
 /** Record that ANY game was played today (free/daily/levels) — the daily-return streak. Idempotent. */
 export function recordDayActivity(): void {
-	bump(ACTIVITY_KEY, utcDay());
+	bump(ACTIVITY_KEY, challengeDay());
 }
 
 const view = (s: Streak): StreakView => {
-	const today = utcDay();
+	const today = challengeDay();
 	if (s.lastDate === today) return { count: s.count, playedToday: true, atRisk: false };
 	if (s.lastDate === dayBefore(today)) return { count: s.count, playedToday: false, atRisk: true };
 	return { count: 0, playedToday: false, atRisk: false };

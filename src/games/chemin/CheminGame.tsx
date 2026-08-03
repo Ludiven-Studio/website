@@ -16,6 +16,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { cheminLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
@@ -145,7 +146,13 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 			setPuzzle(p);
 			setPath((run.state as [number, number][]) ?? [startCellOf(p)]);
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored path IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -255,7 +262,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -264,7 +271,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: path,
 		});
-	}, [daily, started, status, path, gameId]);
+	}, [daily, started, status, revealed, path, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -415,6 +422,27 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [puzzle, status, revealed, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		if (!puzzle) return;
+		const solved = puzzle.path.map((p) => [...p] as [number, number]);
+		const sd = dailySeedRef.current;
+		setPath(solved);
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: solved,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [puzzle, gameId]);
+
 	const n = puzzle?.size ?? 0;
 	const head = path[path.length - 1];
 
@@ -459,7 +487,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 						))}
 					</div>
 					<div className="zp-bar-right">
-						<div className="zp-timer">{fmtTime(elapsed)}</div>
+						<div className="zp-timer chrono">{fmtTime(elapsed)}</div>
 						<button className="zp-new" onClick={clearPath} aria-label="Effacer le tracé">
 							⌫
 						</button>
@@ -469,7 +497,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 
 			{!lv.active && daily && (
 				<div className="zp-bar zp-bar-daily">
-					<div className="zp-timer">{fmtTime(elapsed)}</div>
+					<div className="zp-timer chrono">{fmtTime(elapsed)}</div>
 				</div>
 			)}
 
@@ -484,6 +512,8 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && puzzle && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="zp-daily-won">
@@ -610,16 +640,20 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="zp-revealed-note">
 					<span>Solution affichée</span>
 					<button className="zp-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<p className="zp-help">
 					Glisse depuis le 1 pour tracer un chemin qui passe par tous les nombres dans l'ordre et

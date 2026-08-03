@@ -621,7 +621,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			<div className="reu-hud">
 				<span className="reu-stat">Fondations <strong>{cards}/52</strong></span>
 				{daily || lv.active ? (
-					<span className="reu-stat">Chrono <strong>{chrono}</strong></span>
+					<span className="reu-stat">Chrono <strong className="chrono">{chrono}</strong></span>
 				) : (
 					<span className="reu-stat">Record <strong>{best == null ? '—' : `${best}/52`}</strong></span>
 				)}

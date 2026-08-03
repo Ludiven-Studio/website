@@ -2,6 +2,7 @@
 // Inactive until SUPABASE_URL + SUPABASE_ANON_KEY are set in src/data/site.ts.
 
 import { dateSeed } from '../games/prng';
+import { challengeDay, challengeWeekday } from './day';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
 import { trackGame } from './analytics';
 import { recordDailyDone } from './streak';
@@ -16,9 +17,8 @@ export interface ScoreRow {
 
 export const leaderboardEnabled = (): boolean => Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-/** Local date as YYYY-MM-DD (the puzzle "day", shared by everyone). */
-export const todayKey = (d: Date = new Date()): string =>
-	`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** The puzzle "day" as YYYY-MM-DD, shared by everyone — see lib/day. */
+export const todayKey = (d: Date = new Date()): string => challengeDay(d);
 
 const hashStr = (s: string): number => {
 	let h = 2166136261;
@@ -34,11 +34,11 @@ export const dailySeed = (gameId: string, d: Date = new Date()): number =>
 	(Math.imul(dateSeed(d), 2654435761) ^ hashStr(gameId)) >>> 0;
 
 const WEEKDAYS_FR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-export const dailyWeekdayLabel = (d: Date = new Date()): string => WEEKDAYS_FR[d.getDay()];
+export const dailyWeekdayLabel = (d: Date = new Date()): string => WEEKDAYS_FR[challengeWeekday(d)];
 
 /** Difficulty tier 0..2, easier early week → harder weekend (client fallback). */
 export const dailyDifficultyIndex = (d: Date = new Date()): number => {
-	const dow = d.getDay(); // 0=Sun..6=Sat
+	const dow = challengeWeekday(d); // 0=Sun..6=Sat
 	if (dow === 1 || dow === 2) return 0; // Mon/Tue → facile
 	if (dow >= 3 && dow <= 5) return 1; // Wed/Thu/Fri → moyen
 	return 2; // Sat/Sun → difficile
@@ -68,6 +68,9 @@ export interface DailyRun {
 	seed?: number;
 	diffIndex?: number;
 	state?: unknown; // game-specific (e.g. Sudoku entries)
+	// The player asked to see the solution instead of finishing. The attempt is spent
+	// (no replay today) but it earned nothing: no score, no streak, no cocottes.
+	abandoned?: boolean;
 }
 
 const runKey = (game: string): string => `ludiven-dailyrun-${game}-${todayKey()}`;
@@ -90,9 +93,13 @@ export function saveDailyRun(game: string, run: DailyRun): void {
 		if (run.done) {
 			const prevDone = prevRaw ? (JSON.parse(prevRaw) as DailyRun).done === true : false;
 			if (!prevDone) {
-				trackGame(game, 'daily_done');
-				recordDailyDone(game); // first completion today → advance the streaks
-				earn(10); // cocottes bonus for finishing a daily challenge
+				if (run.abandoned) {
+					trackGame(game, 'daily_revealed');
+				} else {
+					trackGame(game, 'daily_done');
+					recordDailyDone(game); // first completion today → advance the streaks
+					earn(10); // cocottes bonus for finishing a daily challenge
+				}
 			}
 		}
 	} catch {

@@ -10,6 +10,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import { ELEMENTS, getElement } from './engine';
+import { fmtSeconds } from '../../lib/scoreFormat';
 
 export interface AlchimieLevelCfg {
 	target: string; // element id to discover
@@ -22,13 +23,6 @@ export interface AlchimieLevelCfg {
 // (find two cards in a growing inventory, drag, read the result).
 const threeStarSec = (min: number): number => 15 + 12 * min;
 const twoStarSec = (min: number): number => 30 + 30 * min;
-
-/** m:ss (or "45 s" under a minute) for the star captions. */
-const fmt = (sec: number): string => {
-	if (sec < 60) return `${sec} s`;
-	const m = Math.floor(sec / 60);
-	return `${m}:${String(sec % 60).padStart(2, '0')}`;
-};
 
 /** Minimal fusions to build every main element = size of its distinct non-base ancestor set
     (each ancestor must be crafted exactly once; the target itself counts). Memoized. */
@@ -101,6 +95,6 @@ export const alchimieLevels: LevelPlan<AlchimieLevelCfg> = {
 	},
 	starHint(level: number) {
 		const min = cfgFor(level).minCombos;
-		return { two: `≤ ${fmt(twoStarSec(min))}`, three: `≤ ${fmt(threeStarSec(min))}` };
+		return { two: `≤ ${fmtSeconds(twoStarSec(min))}`, three: `≤ ${fmtSeconds(threeStarSec(min))}` };
 	},
 };

@@ -412,7 +412,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 							<span className="al-difftag">{dailyWeekdayLabel()} · {['Facile', 'Moyen', 'Difficile'][dDiff]}</span>
 							<span className="al-obj">Objectif&nbsp;: <b>{targetEl?.emoji} {targetEl?.name}</b></span>
 							<span className="al-chip">🧪 {dMoves} fusions</span>
-							<span className="al-chip">⏱ {fmtTime(dElapsed)}</span>
+							<span className="al-chip">⏱ <span className="chrono">{fmtTime(dElapsed)}</span></span>
 							{!dDone && <button className="al-btn" onClick={hint} disabled={!gate.ready}>{gate.label}</button>}
 							<button className="al-btn" onClick={clearBoard}>🧹</button>
 						</>
@@ -426,7 +426,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 						<span className="al-difftag">Niveau {lv.level}</span>
 						<span className="al-obj">Objectif&nbsp;: <b>{lvTargetEl?.emoji} {lvTargetEl?.name}</b></span>
 						<span className="al-chip">🧪 {lvCombos} combinaison{lvCombos > 1 ? 's' : ''}</span>
-						<span className="al-chip">⏱ {fmtTime(lvElapsed)}</span>
+						<span className="al-chip">⏱ <span className="chrono">{fmtTime(lvElapsed)}</span></span>
 						{lvStars && <span className="al-chip" title="Seuils d'étoiles">⭐ {lvStars.three} / {lvStars.two}</span>}
 						{!lv.done && <button className="al-btn" onClick={hint} disabled={!gate.ready}>{gate.label}</button>}
 						<button className="al-btn" onClick={clearBoard}>🧹</button>

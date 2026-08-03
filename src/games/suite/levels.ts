@@ -9,6 +9,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import { DIFF_ORDER } from './engine';
+import { fmtCentis } from '../../lib/scoreFormat';
 
 export const SUITE_QUESTIONS = 5; // questions per level
 
@@ -58,10 +59,9 @@ export const suiteLevels: LevelPlan<SuiteLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		const s = (c: number) => `${Math.round(c / 100)} s`;
 		return {
-			two: `≥ ${cfg.count - 1}/${cfg.count} en ≤ ${s(cfg.twoStarCentis)}`,
-			three: `${cfg.count}/${cfg.count} en ≤ ${s(cfg.threeStarCentis)}`,
+			two: `≥ ${cfg.count - 1}/${cfg.count} en ≤ ${fmtCentis(cfg.twoStarCentis)}`,
+			three: `${cfg.count}/${cfg.count} en ≤ ${fmtCentis(cfg.threeStarCentis)}`,
 		};
 	},
 };

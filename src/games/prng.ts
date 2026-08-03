@@ -4,6 +4,8 @@
  * Never use Math.random for that mode (would break the shared leaderboard).
  */
 
+import { challengeDayNumber } from '../lib/day';
+
 export type Rng = () => number;
 
 /** mulberry32 — fast, seedable, good-enough distribution for puzzle generation. */
@@ -18,10 +20,7 @@ export function mulberry32(seed: number): Rng {
 	};
 }
 
-/** Date -> integer seed (YYYYMMDD in UTC). Defaults to today. */
+/** Date -> integer seed (YYYYMMDD on the challenge day). Defaults to today. */
 export function dateSeed(date: Date = new Date()): number {
-	const y = date.getUTCFullYear();
-	const m = date.getUTCMonth() + 1;
-	const d = date.getUTCDate();
-	return y * 10000 + m * 100 + d;
+	return challengeDayNumber(date);
 }

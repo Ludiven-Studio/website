@@ -1094,7 +1094,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				{phase === 'playing' && (
 					<div className="gf-hud">
 						<span className="gf-cur">{strokes} coups</span>
-						<span className="gf-best">⏱ {fmtTime(elapsed)}</span>
+						<span className="gf-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 						<span className="gf-best">Par {par}</span>
 						{mode === 'defi' && <span className="gf-peers">👥 {Math.min(peerCount, MAX_PLAYERS)}/{MAX_PLAYERS}</span>}
 						{mode === 'defi' && <span className="gf-peers">Essai {Math.min(tries, MAX_TRIES)}/{MAX_TRIES}</span>}

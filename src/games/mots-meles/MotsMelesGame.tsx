@@ -263,7 +263,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 				<div className="mm-status">
 					<span className="mm-theme">🔎 {grid.theme}</span>
 					<span className="mm-count">{found.length}/{total}</span>
-					<span className="mm-time">⏱ {fmtTime(elapsed)}</span>
+					<span className="mm-time">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 				</div>
 			)}
 
@@ -275,7 +275,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 					<div className="mm-status">
 						<span className="mm-theme">🔎 {grid.theme}</span>
 						<span className="mm-count">{found.length}/{total}</span>
-						<span className="mm-time">⏱ {fmtTime(elapsed)}</span>
+						<span className="mm-time">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</div>
 				</>
 			) : (

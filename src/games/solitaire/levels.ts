@@ -9,6 +9,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import { createLayout, initialPegs, generateDaily, pegCount, type Variant } from './engine';
+import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface SolitaireLevelCfg {
 	seed: number;
@@ -62,7 +63,6 @@ export const solitaireLevels: LevelPlan<SolitaireLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		const s = (c: number) => `${Math.round(c / 100)} s`;
-		return { two: `≤ ${s(cfg.twoStarCentis)}`, three: `≤ ${s(cfg.threeStarCentis)}` };
+		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };

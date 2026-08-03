@@ -4,6 +4,7 @@ import {
 	DIFFS,
 	generateWaterSort,
 	findHint,
+	findSolution,
 	legalMove,
 	applyMove,
 	isSolved,
@@ -19,6 +20,7 @@ import {
 	loadDailyRun,
 	saveDailyRun,
 } from '../../lib/leaderboard';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
@@ -85,6 +87,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	const [jokerUsed, setJokerUsed] = useState(false);
 	const [status, setStatus] = useState<Status>('playing');
 	const [started, setStarted] = useState(false);
+	const [revealed, setRevealed] = useState(false);
 	const [elapsed, setElapsed] = useState(0);
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -119,6 +122,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		setFresh(null);
 		setStatus('playing');
 		setStarted(false);
+		setRevealed(false);
 		setElapsed(0);
 	}, []);
 
@@ -137,6 +141,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		setHintMove(null);
 		setFresh(null);
 		setHistory([]);
+		setRevealed(false);
 
 		const run = loadDailyRun(gameId);
 		if (run && run.seed != null) {
@@ -153,7 +158,13 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 			setMoves(saved?.moves ?? 0);
 			setJokerUsed(saved?.jokerUsed ?? false);
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored tubes ARE the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -190,6 +201,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		setLevelsMode(true);
 		setLevelMenu(true);
 		setStatus('playing');
+		setRevealed(false);
 		setSelected(null);
 		setHintMove(null);
 		setFresh(null);
@@ -214,6 +226,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		setEarnedStars(0);
 		setStatus('playing');
 		setStarted(false); // timer starts on the first pour (ensureStarted)
+		setRevealed(false);
 		setElapsed(0);
 	}, []);
 
@@ -244,21 +257,21 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 
 	/* Timer */
 	useEffect(() => {
-		if (status !== 'playing' || !started) return;
+		if (status !== 'playing' || !started || revealed) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [status, started]);
+	}, [status, started, revealed]);
 
 	/* Win detection */
 	useEffect(() => {
-		if (status === 'won') return;
+		if (status === 'won' || revealed) return;
 		if (daily && !started) return;
 		if (levelsMode && levelMenu) return; // grid open, not actually playing
 		if (tubes.length === 0 || !isSolved(tubes, height)) return;
 		setStatus('won');
 		setSelected(null);
 		trackGame(gameId, 'game_won');
-	}, [tubes, status, daily, started, levelsMode, levelMenu, height, gameId]);
+	}, [tubes, status, revealed, daily, started, levelsMode, levelMenu, height, gameId]);
 
 	/* Levels: on a fresh win, grade + record the level once. */
 	useEffect(() => {
@@ -279,7 +292,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 
 	/* Persist in-progress daily attempt. */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -288,7 +301,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: { tubes, moves, jokerUsed } satisfies SavedState,
 		});
-	}, [daily, started, status, tubes, moves, jokerUsed, gameId]);
+	}, [daily, started, status, revealed, tubes, moves, jokerUsed, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -313,7 +326,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		return () => clearTimeout(t);
 	}, [fresh]);
 
-	const interactive = status !== 'won' && !(daily && !started);
+	const interactive = status !== 'won' && !revealed && !(daily && !started);
 	const inLevel = levelsMode && !levelMenu;
 	const timed = daily || inLevel; // both race the chrono → hints on a cooldown
 	// Levels have no ▶ Commencer, so their window opens as soon as the level is on screen.
@@ -404,6 +417,43 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'hint_used');
 	}, [interactive, tubes, height, gameId, gate]);
 
+	/* Play a solution out to the sorted board. */
+	const solveFrom = useCallback(
+		(start: Tube[]): Tube[] | null => {
+			const path = findSolution(start, height);
+			if (!path) return null;
+			let cur = cloneTubes(start);
+			for (const m of path) cur = applyMove(cur, m, height);
+			return cur;
+		},
+		[height],
+	);
+
+	/* Daily give-up: sort the tubes and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		// The current board can be a dead end; the original deal is always solvable.
+		const solved = solveFrom(tubes) ?? solveFrom(puzzle.tubes);
+		if (!solved) return;
+		const sd = dailySeedRef.current;
+		setTubes(solved);
+		setSelected(null);
+		setHintMove(null);
+		setFresh(null);
+		setHistory([]);
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { tubes: solved, moves, jokerUsed } satisfies SavedState,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [solveFrom, tubes, puzzle, moves, jokerUsed, gameId]);
+
 	const tubeRows = layoutRows(tubes.length);
 
 	return (
@@ -456,7 +506,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 				)}
 				<div className="ws-bar-right">
 					<div className="ws-stat" aria-label="Coups">{moves} coups</div>
-					<div className="ws-timer">{fmtTime(elapsed)}</div>
+					<div className="ws-timer chrono">{fmtTime(elapsed)}</div>
 					{!daily && !levelsMode && (
 						<button className="ws-new" onClick={() => newGame(diffKey)} aria-label="Nouvelle grille">↻</button>
 					)}
@@ -472,6 +522,8 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 					<button className="ws-act" onClick={addTube} disabled={jokerUsed}>➕ Tube</button>
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="ws-daily-won">
@@ -600,9 +652,11 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 			{!daily && !levelsMode && <LeaderboardCorner game={gameId} metric="time" />}
+
+			{daily && revealed && <RevealNote />}
 
 			<p className="ws-help">
 				Touche un tube puis un autre pour verser la couleur du dessus (vers un tube vide ou une

@@ -10,6 +10,7 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
@@ -121,7 +122,13 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			setPuzzle(generateRondCarre(DIFFS[dk], mulberry32(run.seed)));
 			setMarks((run.state as Cell[][]) ?? emptyMarks());
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored grid IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -269,7 +276,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -278,7 +285,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: marks,
 		});
-	}, [daily, started, status, marks, gameId]);
+	}, [daily, started, status, revealed, marks, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -350,6 +357,26 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, solution, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = solution.map((row) => [...row]);
+		const sd = dailySeedRef.current;
+		setMarks(solved);
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: solved,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [solution, gameId]);
+
 	return (
 		<div className="rc-root" style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
@@ -392,7 +419,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			{!(lv.active && lv.menu) && (
 			<div className="rc-bar">
 				<div className="rc-bar-right">
-					<div className="rc-timer">{fmtTime(elapsed)}</div>
+					<div className="rc-timer chrono">{fmtTime(elapsed)}</div>
 					{!daily && !lv.active && (
 						<button
 							className="rc-new"
@@ -415,11 +442,13 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && started && status === 'playing' && (
+			{daily && started && status === 'playing' && !revealed && (
 				<div className="rc-actions">
 					<button className="rc-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="rc-daily-won">
@@ -536,16 +565,20 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{lv.active && lv.menu ? null : revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="rc-revealed-note">
 					<span>Solution affichée</span>
 					<button className="rc-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<p className="rc-help">
 					Touche une case pour cycler vide → ● → ■. Autant de ● que de ■ par ligne et colonne,

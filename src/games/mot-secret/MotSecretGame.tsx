@@ -10,6 +10,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { motSecretLevels } from './levels';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useHintGate } from '../useHintGate';
 
 /* =====================================================
@@ -41,6 +42,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [revealed, setRevealed] = useState(false); // daily: the word was asked for after the loss
 	const [hintPos, setHintPos] = useState<Set<number>>(() => new Set());
 	const [hintIn, setHintIn] = useState(HINT_EVERY);
 	const [hintNote, setHintNote] = useState(''); // what the last hint uncovered
@@ -82,7 +84,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 	const newGame = useCallback((key: keyof typeof DIFFS): void => {
 		dailyRef.current = false;
-		setDaily(false); setAlreadyPlayed(false);
+		setDaily(false); setAlreadyPlayed(false); setRevealed(false);
 		maxTriesRef.current = MAX_TRIES; setMaxTries(MAX_TRIES);
 		setDiffKey(key);
 		const s = pickSolution((Math.random() * 2 ** 31) >>> 0, DIFFS[key].len);
@@ -99,7 +101,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 	const startDaily = useCallback(async (): Promise<void> => {
 		dailyRef.current = true;
-		setDaily(true); setMsg(null); resetHints();
+		setDaily(true); setMsg(null); setRevealed(false); resetHints();
 		maxTriesRef.current = MAX_TRIES; setMaxTries(MAX_TRIES);
 		const lay = (seed: number, di: number): string => {
 			const key = DIFF_ORDER[di] ?? 'facile';
@@ -138,7 +140,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const startLevel = useCallback((level: number): void => {
 		const cfg = lv.play(level);
 		dailyRef.current = false;
-		setDaily(false); setAlreadyPlayed(false); setDailyLoading(false);
+		setDaily(false); setAlreadyPlayed(false); setDailyLoading(false); setRevealed(false);
 		maxTriesRef.current = cfg.tries; setMaxTries(cfg.tries);
 		const s = pickSolution(cfg.seed, cfg.len);
 		setSolutionBoth(s);
@@ -238,6 +240,12 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		gate.consume();
 		trackGame(gameId, 'hint_used');
 	};
+
+	/* Daily: the run is already lost and recorded — showing the word only draws it on screen. */
+	const giveUp = useCallback((): void => {
+		setRevealed(true);
+		trackGame(gameId, 'solution_shown');
+	}, [gameId]);
 
 	/* Free-mode countdown → reveal a letter every HINT_EVERY seconds. */
 	useEffect(() => {
@@ -355,7 +363,9 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 			<div className="ms-msg" role="status">{msg?.text ?? ' '}</div>
 
-			{status === 'lost' && !lv.active && <div className="ms-reveal">Le mot était <strong>{solution}</strong></div>}
+			{status === 'lost' && !lv.active && (!daily || revealed) && <div className="ms-reveal">Le mot était <strong>{solution}</strong></div>}
+			{daily && status === 'lost' && !revealed && <GiveUp over onGiveUp={giveUp} />}
+			{daily && revealed && <RevealNote>Reviens demain pour un nouveau défi&nbsp;!</RevealNote>}
 			{status === 'won' && !lv.active && (
 				<div className="ms-won">
 					{daily

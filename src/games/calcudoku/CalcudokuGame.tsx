@@ -16,6 +16,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { useHintGate } from '../useHintGate';
 import { calcudokuLevels } from './levels';
@@ -162,7 +163,13 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			setPuzzle(generateCalcudoku(d, mulberry32(run.seed)));
 			setEntries((run.state as (number | null)[][]) ?? emptyEntries(d.size));
 			setStarted(true);
-			if (run.done) {
+			if (run.done && run.abandoned) {
+				// Gave up earlier today: the stored grid IS the solution, and it never won.
+				setAlreadyPlayed(true);
+				setRevealed(true);
+				setStatus('playing');
+				setElapsed(run.finalTime ?? 0);
+			} else if (run.done) {
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
@@ -303,7 +310,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
-		if (!daily || !started || status === 'won') return;
+		if (!daily || !started || status === 'won' || revealed) return;
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
@@ -312,7 +319,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: entries,
 		});
-	}, [daily, started, status, entries, gameId]);
+	}, [daily, started, status, revealed, entries, gameId]);
 
 	/* Lock the daily attempt on a fresh win. */
 	useEffect(() => {
@@ -386,6 +393,28 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'solution_shown');
 	}, [status, revealed, solution, gameId]);
 
+	/* Daily give-up: show the solution and close the attempt — nothing is submitted. */
+	const giveUp = useCallback(() => {
+		const solved = solution.map((row) => [...row]);
+		const sd = dailySeedRef.current;
+		setEntries(solved);
+		setSelected(null);
+		setHinted(new Set());
+		setHintNote('');
+		setRevealed(true);
+		setAlreadyPlayed(true);
+		saveDailyRun(gameId, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: Math.round((Date.now() - startRef.current) / 10),
+			abandoned: true,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: solved,
+		});
+		trackGame(gameId, 'solution_shown');
+	}, [solution, gameId]);
+
 	/* Keyboard. */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
@@ -441,7 +470,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			{!(lv.active && lv.menu) && (
 			<div className="cd-bar">
 				{daily || lv.active ? (
-					<div className="cd-timer">{fmtTime(elapsed)}</div>
+					<div className="cd-timer chrono">{fmtTime(elapsed)}</div>
 				) : (
 					<div className="cd-pills" role="tablist" aria-label="Difficulté">
 						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
@@ -458,7 +487,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 				<div className="cd-bar-right">
-					{!daily && !lv.active && <div className="cd-timer">{fmtTime(elapsed)}</div>}
+					{!daily && !lv.active && <div className="cd-timer chrono">{fmtTime(elapsed)}</div>}
 					<button
 						className={`cd-rulesbtn ${showRules ? 'active' : ''}`}
 						onClick={() => setShowRules((s) => !s)}
@@ -507,11 +536,13 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{daily && started && status === 'playing' && (
+			{daily && started && status === 'playing' && !revealed && (
 				<div className="cd-actions">
 					<button className="cd-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
 				</div>
 			)}
+
+			{daily && started && !revealed && status !== 'won' && <GiveUp onGiveUp={giveUp} />}
 
 			{daily && status === 'won' && (
 				<div className="cd-daily-won">
@@ -616,16 +647,20 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{lv.active && lv.menu ? null : revealed ? (
+				daily ? (
+					<RevealNote />
+				) : (
 				<div className="cd-revealed-note">
 					<span>Solution affichée</span>
 					<button className="cd-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
+				)
 			) : (
 				<>
 					<div className="cd-pad" aria-label="Pavé numérique">

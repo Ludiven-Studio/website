@@ -285,7 +285,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 					</div>
 					<div className="fr-daily-status">
 						<span className="fr-score">Résolues {Math.min(score, DAILY_TARGET)}/{DAILY_TARGET}</span>
-						<span className="fr-best">⏱ {fmtTime(elapsed)}</span>
+						<span className="fr-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</div>
 				</>
 			) : (
@@ -302,7 +302,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 
 			{lv.playing && (
 				<div className="fr-daily-status">
-					<span className="fr-best">⏱ {fmtTime(elapsed)}</span>
+					<span className="fr-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 				</div>
 			)}
 

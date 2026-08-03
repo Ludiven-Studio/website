@@ -10,6 +10,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { useHintGate } from '../useHintGate';
 import { usePointerDrag } from '../usePointerDrag';
+import { fmtCentis, fmtSeconds } from '../../lib/scoreFormat';
 import { solitaireLevels, levelPegs } from './levels';
 import {
 	VARIANTS,
@@ -42,12 +43,6 @@ const DAILY_COUNT = [5, 6, 7]; // pegs by difficulty tier (Mon/Tue → weekend)
 const bestKey = (v: Variant): string => `ludiven-solitaire-best-${v}`;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 const marbleHue = (i: number): number => (i * 47 + 15) % 360;
-const fmtCentis = (c: number): string => {
-	const s = c / 100;
-	if (s < 60) return `${s.toFixed(2)} s`;
-	const m = Math.floor(s / 60);
-	return `${m}:${(s % 60).toFixed(2).padStart(5, '0')}`;
-};
 
 interface Anim {
 	move: Move;
@@ -624,7 +619,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 	const perfect = status === 'won' && (layout.center < 0 || pegsRef.current[layout.center]);
 	// Free mode has Recommencer for dead ends; only the daily rewinds through a hint.
 	const hintOff = !started || status === 'won' || (status === 'stuck' && !daily) || !gate.ready;
-	const chrono = timed && status === 'won' && finalCentis != null ? fmtCentis(finalCentis) : `${(elapsed / 1000).toFixed(1)} s`;
+	const chrono = timed && status === 'won' && finalCentis != null ? fmtCentis(finalCentis) : fmtSeconds(elapsed / 1000);
 
 	return (
 		<div className="sol-root">
@@ -664,7 +659,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 				{daily ? (
 					<>
 						<span className="sol-stat">
-							Chrono <strong>{chrono}</strong>
+							Chrono <strong className="chrono">{chrono}</strong>
 						</span>
 						<span className="sol-stat">
 							Record <strong>{bestTime == null ? '—' : fmtCentis(bestTime)}</strong>
@@ -673,7 +668,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 				) : lv.active ? (
 					<>
 						<span className="sol-stat">
-							Chrono <strong>{chrono}</strong>
+							Chrono <strong className="chrono">{chrono}</strong>
 						</span>
 						<span className="sol-stat">
 							Coups <strong>{moves}</strong>

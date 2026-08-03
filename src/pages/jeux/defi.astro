@@ -157,11 +157,8 @@ const byCategory = CATEGORIES.map((c) => ({
 
 <script>
 	import { globalStreak } from '../../lib/streak';
+	import { challengeDay } from '../../lib/day';
 
-	const todayKey = () => {
-		const d = new Date();
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-	};
 	const grids = Array.from(document.querySelectorAll<HTMLUListElement>('.defi-grid'));
 	const counter = document.getElementById('defi-count');
 	const streakEl = document.getElementById('defi-streak');
@@ -180,7 +177,7 @@ const byCategory = CATEGORIES.map((c) => ({
 
 	const refresh = () => {
 		refreshStreak();
-		const day = todayKey();
+		const day = challengeDay();
 		let done = 0, total = 0;
 		for (const grid of grids) {
 			const lis = Array.from(grid.children) as HTMLElement[];

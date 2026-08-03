@@ -2,7 +2,7 @@
 // (e.g. local dev, or domain excluded via data-domains).
 import { recordDayActivity } from './streak';
 
-type GameEvent = 'game_started' | 'game_won' | 'game_over' | 'hint_used' | 'solution_shown' | 'daily_played' | 'daily_done' | 'discovery';
+type GameEvent = 'game_started' | 'game_won' | 'game_over' | 'hint_used' | 'solution_shown' | 'daily_played' | 'daily_done' | 'daily_revealed' | 'discovery';
 
 /** Play mode, so free / daily / levels runs can be told apart in Umami. Games may pass
  *  their own mode string (some use 'level', 'listen', …); it's folded into the event name. */

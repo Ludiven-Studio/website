@@ -17,13 +17,13 @@ const packed = (unit: string): ScoreFormat => ({
 	radix: 10_000_000,
 	fields: [
 		{ as: 'int', unit },
-		{ as: 'mmss.cc', div: 100 },
+		{ as: 'time', div: 100 },
 	],
 });
 
 const score: ScoreFormat = { kind: 'plain', fmt: 'score' };
-// Time races → centiseconds: "43.12 s" under a minute, else "1:23.45" (fine tie-breaking).
-const centis: ScoreFormat = { kind: 'duration', div: 100, decimals: 2, mmssAbove: 6000 };
+// Time races → stored in centiseconds, shown in whole seconds ("43 s" / "1:23").
+const centis: ScoreFormat = { kind: 'duration', div: 100 };
 
 export const DAILY_LB: Record<string, DailyLbCfg> = {
 	// Score (higher is better) → "N pts"
@@ -62,9 +62,9 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	foot: { fmt: centis },
 	bataille: { fmt: { kind: 'count', one: 'coup', many: 'coups' } }, // value = shots+sonars (not time)
 	// Scaled durations
-	drift: { fmt: { kind: 'duration', div: 1000, decimals: 2, mmssAbove: 60000 } }, // lap ms
-	solitaire: { fmt: { kind: 'duration', div: 100, decimals: 2, mmssAbove: 6000 } }, // centiseconds
-	esquive: { fmt: { kind: 'duration', div: 10, decimals: 1 } }, // tenths survived
+	drift: { fmt: { kind: 'duration', div: 1000 } }, // lap ms
+	solitaire: { fmt: centis },
+	esquive: { fmt: { kind: 'duration', div: 10 } }, // tenths survived
 	// Meters × speed multiplier (higher is better) → "1234 pts"
 	luge: { fmt: { kind: 'count', one: 'pt', many: 'pts' } },
 	// Win value below a loss band (cf. LOSS_OFFSET = 100000 in each game)
@@ -84,7 +84,7 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	// Stored as (52 - cards) so "more cards" sorts ascending (metric time); `base` renders the count back.
 	reussite: {
 		lbId: 'reussite-t',
-		fmt: { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'cartes', base: 52 }, { as: 'mmss.cc', div: 100 }] },
+		fmt: { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'cartes', base: 52 }, { as: 'time', div: 100 }] },
 	},
 	// Tectonique: crystals collected first, chrono as tiebreak. The grid size varies, so the
 	// packed count is the crystals MISSED — which keeps ascending-is-better and needs no `base`.

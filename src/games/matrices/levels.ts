@@ -6,6 +6,7 @@
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT } from '../../lib/progression';
 import type { DiffLevel, TemplateName } from './engine';
+import { fmtCentis } from '../../lib/scoreFormat';
 
 export const QUESTIONS_PER_LEVEL = 5;
 
@@ -51,7 +52,6 @@ export const matricesLevels: LevelPlan<MatricesLevelCfg> = {
 	},
 	starHint(level: number) {
 		const cfg = this.config(level);
-		const s = Math.round(cfg.perfectCentis / 100);
-		return { two: `${cfg.count}/${cfg.count} bonnes`, three: `${cfg.count}/${cfg.count} en ≤ ${s} s` };
+		return { two: `${cfg.count}/${cfg.count} bonnes`, three: `${cfg.count}/${cfg.count} en ≤ ${fmtCentis(cfg.perfectCentis)}` };
 	},
 };

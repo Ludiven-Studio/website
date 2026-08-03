@@ -5,6 +5,7 @@
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
 import { SECURED_GAMES } from '../data/securedGames';
+import { challengeDay } from './day';
 import { playerName, leaderboardEnabled, type Metric, type ScoreRow } from './leaderboard';
 
 const PLAYER_ID_KEY = 'ludiven-player-id';
@@ -23,8 +24,8 @@ export function playerId(): string {
 	}
 }
 
-/** The new system's challenge day — server-decided UTC date, mirrored here for reads. */
-export const challengeDateUTC = (): string => new Date().toISOString().slice(0, 10);
+/** The challenge day the server stamps rows with (Europe/Paris), mirrored here for reads. */
+export const challengeDateKey = (): string => challengeDay();
 
 export interface SubmitScoreArgs {
 	gameId: string;
@@ -109,7 +110,7 @@ export async function fetchDailyTopsSecure(day: string): Promise<Record<string, 
 
 /** Daily top-N from game_scores, shaped like the legacy ScoreRow so
     <Leaderboard source={...}> renders unchanged. 'time' → fastest first, 'score' → highest first. */
-export async function getLeaderboard(gameId: string, metric: Metric = 'score', day: string = challengeDateUTC(), limit = 50): Promise<ScoreRow[]> {
+export async function getLeaderboard(gameId: string, metric: Metric = 'score', day: string = challengeDateKey(), limit = 50): Promise<ScoreRow[]> {
 	if (!leaderboardEnabled()) return [];
 	const order = metric === 'time' ? 'score.asc' : 'score.desc';
 	// Throws on transport/HTTP failure so <Leaderboard> can distinguish empty from unreachable.
