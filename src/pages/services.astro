@@ -3,30 +3,28 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Hero from '../components/Hero.astro';
 import Icon from '../components/Icon.astro';
 import ContactCTA from '../components/ContactCTA.astro';
+import LangSwitch from '../components/LangSwitch.astro';
 import type { iconPaths } from '../components/IconPaths';
 
-// Une seule grille de cartouches : 5 prestations principales puis des interventions plus fines.
+// Two tiers: the offers a client actually buys, then the finer work that comes with them.
 const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
 	{ icon: 'code', title: 'Développement Unity', body: 'De l\'idée au produit livré : applications et jeux sous Unity — mobile, desktop et WebGL — avec un code pensé pour durer.' },
-	{ icon: 'mobile', title: 'Application mobile', body: 'Vos applications iOS et Android développées sous Unity, avec un vrai accès aux fonctions natives (capteurs, notifications, mode hors-ligne).' },
-	{ icon: 'paper-plane-tilt', title: 'Publication App Store & Google Play', body: 'Mise en ligne de vos apps sur l\'App Store et Google Play : builds signés, certificats, fiches store et respect des règles de validation.' },
+	{ icon: 'mobile', title: 'Applications mobiles iOS & Android', body: 'Vos applications développées sous Unity avec un vrai accès aux fonctions natives (capteurs, notifications, hors-ligne), puis publiées sur l\'App Store et Google Play : builds signés, certificats, fiches store et règles de validation.' },
 	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Des expériences immersives VR/XR pour la formation, la simulation ou le jeu, sur casque comme sur mobile.' },
-	{ icon: 'strategy', title: 'Multijoueur Unity', body: 'Du temps réel qui tient la route : synchronisation, netcode, serveurs headless, du prototype à la production.' },
-	{ icon: 'scales', title: 'Audit & reprise de projet Unity', body: 'Audit, correction de bugs, optimisation et montée de version pour sécuriser votre base de code et la remettre en mouvement.' },
-	{ icon: 'pencil-line', title: 'Suivi d\'alternants & juniors', body: 'Encadrement technique, revues de code et montée en compétence des développeurs juniors.' },
-	{ icon: 'terminal-window', title: 'Formation Unity & C#', body: 'Des sessions sur-mesure pour prendre en main Unity et le langage C#.' },
-	{ icon: 'strategy', title: 'Structuration de projet', body: 'Architecture, organisation du code et bonnes pratiques pour un projet Unity qui reste sain.' },
-	{ icon: 'flask', title: 'Problèmes techniques complexes', body: 'Un blocage tenace ? Je trouve et mets en place la solution technique adaptée.' },
-	{ icon: 'scales', title: 'Optimisation (perfs, mémoire, build)', body: 'Plus de fluidité, moins de mémoire consommée et un build plus léger.' },
-	{ icon: 'code', title: 'AssetBundles & Addressables', body: 'Chargement et gestion des ressources à la demande, proprement.' },
-	{ icon: 'games', title: 'Gameplays sur-mesure', body: 'Des mécaniques de jeu originales, conçues et développées selon votre idée.' },
-	{ icon: 'winding-path', title: 'Moteur physique', body: 'Collisions, simulations et interactions physiques réglées finement.' },
-	{ icon: 'strategy', title: 'Multijoueur Photon / Netcode', body: 'Fonctionnalités temps réel avec Photon ou Netcode for GameObjects.' },
-	{ icon: 'games', title: 'Interfaces & menus (UI)', body: 'Des interfaces et menus in-game clairs, réactifs et agréables à utiliser.' },
-	{ icon: 'heart', title: 'Sons & musiques', body: 'Intégration audio (SFX, musiques) avec réglages de volume.' },
-	{ icon: 'paper-plane-tilt', title: 'Localisation multilingue', body: 'Des textes prêts à être traduits et affichés en plusieurs langues.' },
-	{ icon: 'terminal-window', title: 'Outils internes sur-mesure', body: 'Une boîte à outils maison, affinée au fil des projets pour gagner du temps.' },
-	{ icon: 'flask', title: 'Cheat codes de debug', body: 'Des raccourcis de test pour accélérer le développement et la QA.' },
+	{ icon: 'strategy', title: 'Multijoueur temps réel', body: 'Du temps réel qui tient la route : synchronisation, netcode, serveurs headless, avec Photon ou Netcode for GameObjects — du prototype à la production.' },
+	{ icon: 'scales', title: 'Audit, reprise & optimisation', body: 'Audit, correction de bugs, montée de version et déblocage des problèmes tenaces. Puis les perfs : plus de fluidité, moins de mémoire, un build plus léger.' },
+	{ icon: 'pencil-line', title: 'Formation & accompagnement', body: 'Sessions sur-mesure sur Unity et C#, encadrement technique, revues de code et suivi d\'alternants ou de développeurs juniors.' },
+];
+
+// Finer work, usually bundled with a prestation above rather than sold on its own.
+const focused: { title: string; body: string }[] = [
+	{ title: 'Structuration de projet', body: 'Architecture, organisation du code et bonnes pratiques pour un projet Unity qui reste sain.' },
+	{ title: 'Gameplays & moteur physique', body: 'Des mécaniques originales conçues selon votre idée, collisions et simulations réglées finement.' },
+	{ title: 'Interfaces & menus in-game', body: 'Des écrans clairs, réactifs et agréables à utiliser.' },
+	{ title: 'AssetBundles & Addressables', body: 'Chargement et gestion des ressources à la demande, proprement.' },
+	{ title: 'Outils internes & debug', body: 'Une boîte à outils maison et des raccourcis de test pour accélérer le développement et la QA.' },
+	{ title: 'Localisation multilingue', body: 'Des textes prêts à être traduits et affichés en plusieurs langues.' },
+	{ title: 'Sons & musiques', body: 'Intégration audio : SFX, musiques et réglages de volume.' },
 ];
 
 const title = 'Services — Développement Unity, mobile, VR & multijoueur | Ludiven Studio';
@@ -40,27 +38,45 @@ const jsonLd = {
 	description,
 	areaServed: { '@type': 'Country', name: 'France' },
 	provider: { '@type': 'Organization', name: 'Ludiven Studio', url: 'https://www.ludiven-studio.fr/' },
-	serviceType: services.map((s) => s.title),
+	serviceType: [...services, ...focused].map((s) => s.title),
 };
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout title={title} description={description} altLang="/en/services/">
 	<div class="stack gap-20">
 		<main class="wrapper stack gap-12">
-			<Hero
-				title="Services"
-				tagline="Développeur Unity depuis 2010, je vous accompagne de la conception à la mise en production : applications, jeux et expériences immersives — en France comme à distance."
-				align="start"
-			/>
+			<div class="stack gap-8">
+				<LangSwitch lang="fr" href="/en/services/" />
+				<Hero
+					title="Services"
+					tagline="Développeur Unity depuis 2010, je vous accompagne de la conception à la mise en production : applications, jeux et expériences immersives — en France comme à distance."
+					align="start"
+				/>
+			</div>
 
-			<section class="box services">
-				{services.map((s) => (
-					<div class="stack gap-2 lg:gap-4">
-						<Icon icon={s.icon} color="var(--accent-regular)" size="2.5rem" gradient />
-						<h2>{s.title}</h2>
-						<p>{s.body}</p>
-					</div>
-				))}
+			<section class="stack gap-4">
+				<h2 class="section-title">Prestations</h2>
+				<div class="box services">
+					{services.map((s) => (
+						<div class="stack gap-2 lg:gap-4">
+							<Icon icon={s.icon} color="var(--accent-regular)" size="2.5rem" gradient />
+							<h3>{s.title}</h3>
+							<p>{s.body}</p>
+						</div>
+					))}
+				</div>
+			</section>
+
+			<section class="stack gap-4">
+				<h2 class="section-title">Interventions ciblées</h2>
+				<div class="box focused">
+					{focused.map((s) => (
+						<div>
+							<h3>{s.title}</h3>
+							<p>{s.body}</p>
+						</div>
+					))}
+				</div>
 			</section>
 		</main>
 
@@ -79,17 +95,34 @@ const jsonLd = {
 		box-shadow: var(--shadow-sm);
 	}
 
+	.section-title {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+
 	.services {
 		display: grid;
 		grid-template-columns: 1fr;
 		gap: 2.5rem;
 	}
 
-	.services h2 {
+	.services h3 {
 		font-size: var(--text-lg);
 	}
 
-	.services p {
+	.focused {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+	}
+
+	.focused h3 {
+		font-size: var(--text-md);
+		color: var(--gray-0);
+	}
+
+	.services p,
+	.focused p {
 		color: var(--gray-400);
 	}
 
@@ -102,6 +135,11 @@ const jsonLd = {
 		.services {
 			grid-template-columns: repeat(2, 1fr);
 			gap: 3rem 5rem;
+		}
+
+		.focused {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 1.75rem 5rem;
 		}
 	}
 </style>
