@@ -6,6 +6,7 @@ import {
 	findHint,
 	rotations,
 	placedCells,
+	fpKey,
 	type PavagePuzzle,
 	type Placement,
 	type Cell,
@@ -58,6 +59,12 @@ const readStoredRotate = (): boolean => {
 };
 
 const fmtTime = fmtCentis;
+
+// Pieces, not cells: the shared repairNote wording does not fit here.
+const repairPiecesNote = (count: number): string =>
+	count === 1
+		? 'Une pièce mal placée retirée : la grille redevient juste.'
+		: `${count} pièces mal placées retirées : la grille redevient juste.`;
 
 interface Drag {
 	pieceIndex: number;
@@ -332,6 +339,19 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		return g;
 	}, [placements, pieces, size]);
 
+	/* Pieces whose footprint is nowhere in the solution (or belongs there to another colour).
+	   Nothing flags them, and the rest of the grid is then unsolvable with no way back. */
+	const wrongPieces = useMemo(() => {
+		const solColor = new Map<string, number>();
+		pieces.forEach((p, i) => solColor.set(fpKey(placedCells(p, solution[i])), p.color));
+		const out: number[] = [];
+		placements.forEach((pl, i) => {
+			if (!pl) return;
+			if (solColor.get(fpKey(placedCells(pieces[i], pl))) !== pieces[i].color) out.push(i);
+		});
+		return out;
+	}, [placements, pieces, solution]);
+
 	const validPlacement = useCallback(
 		(pieceIndex: number, pl: Placement): boolean => {
 			const piece = pieces[pieceIndex];
@@ -546,19 +566,33 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 		});
 	}, [pieceRots]);
 
-	/* Hint: remove a misplaced piece or place the next forced one. */
+	/* Hint: repair first, deduce second. A misplaced piece poisons the solver, which reasons
+	   from the grid as played — so take every bad piece back before the next step. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed || !gate.ready) return;
-		const h = findHint(placements, puzzle);
-		if (!h) return;
+		const repairing = wrongPieces.length > 0;
+		const h = repairing ? null : findHint(placements, puzzle);
+		if (!repairing && !h) return;
 		gate.consume();
-		if (h.action === 'remove') {
+		if (repairing) {
+			// Back to the tray: a piece with no placement is draggable again.
+			setPlacements((prev) => {
+				const next = [...prev];
+				for (const i of wrongPieces) next[i] = null;
+				return next;
+			});
+			setHinted((prev) => {
+				const n = new Set(prev);
+				for (const i of wrongPieces) n.delete(i);
+				return n;
+			});
+		} else if (h?.action === 'remove') {
 			setPlacements((prev) => {
 				const next = [...prev];
 				next[h.pieceIndex] = null;
 				return next;
 			});
-		} else if (h.placement) {
+		} else if (h?.placement) {
 			const pl = h.placement;
 			setPlacements((prev) => {
 				const next = [...prev];
@@ -572,10 +606,10 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			});
 			setHinted((prev) => new Set(prev).add(h.pieceIndex));
 		}
-		setHintNote(h.reason);
+		setHintNote(repairing ? repairPiecesNote(wrongPieces.length) : (h?.reason ?? ''));
 		ensureStarted();
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, placements, puzzle, ensureStarted, gameId, gate]);
+	}, [status, revealed, placements, puzzle, ensureStarted, gameId, gate, wrongPieces]);
 
 	const reveal = useCallback(() => {
 		if (status === 'won' || revealed) return;

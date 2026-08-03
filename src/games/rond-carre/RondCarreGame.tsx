@@ -20,6 +20,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { rondCarreLevels } from './levels';
 import { useHintGate } from '../useHintGate';
+import { repairNote } from '../repairNote';
 
 /* =====================================================
    ROND & CARRÉ (façon LinkedIn "Tango") — React island.
@@ -328,26 +329,45 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		[status, revealed, started, given, daily, gameId, lv.playing],
 	);
 
-	/* Hint: deduce the next logical cell and explain the technique. */
+	/* Marks that contradict the solution without breaking any rule, so nothing flags them.
+	   Left alone they quietly make the grid unsolvable, with no way back. */
+	const wrongCells = useMemo(() => {
+		const out: [number, number][] = [];
+		for (let r = 0; r < n; r++)
+			for (let c = 0; c < n; c++)
+				if (given[r][c] === 0 && marks[r][c] !== 0 && marks[r][c] !== solution[r][c])
+					out.push([r, c]);
+		return out;
+	}, [marks, given, solution, n]);
+
+	/* Hint: repair first, deduce second. A wrong mark poisons the solver, which reasons
+	   from the grid as played — so clear the bad cells before looking for the next step. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed || !gate.ready) return;
-		const h = findHint(marks, puzzle);
-		if (!h) return;
+		const repairing = wrongCells.length > 0;
+		const h = repairing ? null : findHint(marks, puzzle);
+		if (!repairing && !h) return;
 		gate.consume();
 		setMarks((prev) => {
 			const next = prev.map((row) => [...row]) as Cell[][];
-			next[h.r][h.c] = h.value;
+			if (repairing) for (const [r, c] of wrongCells) next[r][c] = 0;
+			else if (h) next[h.r][h.c] = h.value;
 			return next;
 		});
-		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
-		setHintNote(h.reason);
+		setHinted((prev) => {
+			const next = new Set(prev);
+			if (repairing) for (const [r, c] of wrongCells) next.delete(`${r},${c}`);
+			else if (h) next.add(`${h.r},${h.c}`);
+			return next;
+		});
+		setHintNote(repairing ? repairNote(wrongCells.length) : (h?.reason ?? ''));
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, started, marks, puzzle, gameId, gate]);
+	}, [status, revealed, started, marks, puzzle, gameId, gate, wrongCells]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -597,6 +617,7 @@ const CSS = `
   --rc-rond: #ef8e3c;   /* ● amber */
   --rc-carre: #5b8def;  /* ■ blue */
   --rc-bad: #d9534f;
+  --rc-given: color-mix(in srgb, var(--gray-0) 12%, transparent);
   --rc-line: var(--gray-700);
   --rc-cell: calc(100cqw / var(--n, 6));
 
@@ -686,7 +707,12 @@ const CSS = `
   transition: background 0.08s ease;
 }
 .rc-cell:nth-child(6n) { border-right: none; } /* last column (n=6) */
-.rc-cell.given { background: var(--gray-900); cursor: default; }
+/* Fixed clues carry a tint on top of whatever the cell's background is, so the conflict
+   highlight still reads through it. */
+.rc-cell.given {
+  cursor: default;
+  background-image: linear-gradient(var(--rc-given), var(--rc-given));
+}
 .rc-shape { display: block; }
 .rc-rond-shape {
   width: calc(var(--rc-cell) * 0.5); height: calc(var(--rc-cell) * 0.5);

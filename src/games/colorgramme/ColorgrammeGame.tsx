@@ -21,6 +21,7 @@ import { useLevels } from '../../lib/useLevels';
 import { colorgrammeLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHintGate } from '../useHintGate';
+import { repairNote } from '../repairNote';
 
 /* =====================================================
    COLORGRAMME — React island. A fully-coloured deduction grid.
@@ -282,6 +283,18 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		});
 	}, []);
 
+	/* Cells painted against the picture. The clues only count the active colour, so nothing
+	   flags them. Left alone they quietly make the grid unsolvable, with no way back. */
+	const wrongCells = useMemo(() => {
+		const out: [number, number][] = [];
+		for (let r = 0; r < size; r++)
+			for (let c = 0; c < size; c++) {
+				const v = grid[r][c];
+				if (v !== 0 && v !== solution[r][c] && !givenSet.has(givenKey(r, c))) out.push([r, c]);
+			}
+		return out;
+	}, [grid, solution, size, givenSet]);
+
 	/* Win: the grid matches the hidden picture (every cell). */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
@@ -423,27 +436,38 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 	// Unified pointer drag drives mouse, pen AND touch (iOS-safe; see usePointerDrag).
 	const { onPointerDown } = usePointerDrag(startStroke, moveStroke, endStroke);
 
-	/* Hint: deduce the next logical cell and explain the technique. Paints the target
-	   cell AND selects its colour, so the player can carry on in that colour. */
+	/* Hint: repair first, deduce second. A wrong cell poisons the solver, which reasons from
+	   the grid as played — so clear the bad cells before looking for the next step. Otherwise
+	   paints the target cell AND selects its colour, so the player can carry on in it. */
 	const hint = useCallback(() => {
 		if (over || !gate.ready) return;
-		const h = findHint(grid, puzzle);
-		if (!h) return;
+		const repairing = wrongCells.length > 0;
+		const h = repairing ? null : findHint(grid, puzzle);
+		if (!repairing && !h) return;
 		gate.consume();
-		const { r, c, value, reason } = h;
-		setGrid((prev) => {
-			const n = prev.map((row) => [...row]);
-			n[r][c] = value;
-			return n;
-		});
-		setCrosses((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
-		setHinted((prev) => new Set(prev).add(`${r},${c}`));
-		setActiveColor(value); // switch to the revealed cell's colour
-		setTool('paint');
-		setHintNote(reason);
+		if (repairing) {
+			setGrid((prev) => {
+				const n = prev.map((row) => [...row]);
+				for (const [r, c] of wrongCells) n[r][c] = 0;
+				return n;
+			});
+			setHintNote(repairNote(wrongCells.length));
+		} else if (h) {
+			const { r, c, value, reason } = h;
+			setGrid((prev) => {
+				const n = prev.map((row) => [...row]);
+				n[r][c] = value;
+				return n;
+			});
+			setCrosses((prev) => (prev[r][c] === 0 ? prev : prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? 0 : x)) : row))));
+			setHinted((prev) => new Set(prev).add(`${r},${c}`));
+			setActiveColor(value); // switch to the revealed cell's colour
+			setTool('paint');
+			setHintNote(reason);
+		}
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [over, grid, puzzle, begin, gameId, gate]);
+	}, [over, grid, puzzle, begin, gameId, gate, wrongCells]);
 
 	/* Reveal the full picture (does not count as a win). */
 	const reveal = useCallback(() => {

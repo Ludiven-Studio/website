@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fmtCentis } from '../../lib/scoreFormat';
 import { DIFFS, generatePuzzle, findHint, type Game } from './engine';
 import { mulberry32 } from '../prng';
@@ -20,6 +20,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
 import { sommeTouteLevels } from './levels';
 import { useHintGate } from '../useHintGate';
+import { repairNote } from '../repairNote';
 
 /* =====================================================
    SOMME TOUTE — React island (training mode)
@@ -284,26 +285,46 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [daily, status, alreadyPlayed, gameId]);
 
-	/* Hint: deduce the next logical cell and explain the technique. */
+	/* Entries that contradict the solution while the row and column sums still look
+	   plausible, so nothing flags them. Left alone they quietly make the grid unsolvable. */
+	const wrongCells = useMemo(() => {
+		const out: [number, number][] = [];
+		for (let r = 0; r < size; r++)
+			for (let c = 0; c < size; c++) {
+				const v = entries[r][c];
+				if (puzzle[r][c] == null && v != null && v !== game.solution[r][c]) out.push([r, c]);
+			}
+		return out;
+	}, [entries, puzzle, game, size]);
+
+	/* Hint: repair first, deduce second. A wrong entry poisons the solver, which reasons
+	   from the grid as played — so clear the bad cells before looking for the next step. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed || !gate.ready) return;
-		const h = findHint(entries, game);
-		if (!h) return;
+		const repairing = wrongCells.length > 0;
+		const h = repairing ? null : findHint(entries, game);
+		if (!repairing && !h) return;
 		gate.consume();
 		setEntries((prev) => {
 			const next = prev.map((row) => [...row]);
-			next[h.r][h.c] = h.value;
+			if (repairing) for (const [r, c] of wrongCells) next[r][c] = null;
+			else if (h) next[h.r][h.c] = h.value;
 			return next;
 		});
-		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
-		setHintNote(h.reason);
+		setHinted((prev) => {
+			const next = new Set(prev);
+			if (repairing) for (const [r, c] of wrongCells) next.delete(`${r},${c}`);
+			else if (h) next.add(`${h.r},${h.c}`);
+			return next;
+		});
+		setHintNote(repairing ? repairNote(wrongCells.length) : (h?.reason ?? ''));
 		if (status === 'idle') {
 			startRef.current = Date.now();
 			setStatus('playing');
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, entries, game, gameId, gate]);
+	}, [status, revealed, entries, game, gameId, gate, wrongCells]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -684,7 +705,7 @@ const CSS = `
   --st-good: #2f6df0;
   --st-diff: #e8870c;
   --st-cellbg: var(--gray-999);
-  --st-givenbg: var(--gray-800);
+  --st-given: color-mix(in srgb, var(--gray-0) 12%, transparent);
   --st-cell: calc(100cqw / (var(--n, 6) + 1));
 
   width: 100%;
@@ -806,11 +827,13 @@ const CSS = `
   cursor: pointer;
   transition: transform 0.08s ease, border-color 0.08s ease, background 0.08s ease;
 }
+/* Fixed clues carry a tint on top of whatever the cell's background is, so any
+   highlight still reads through it. */
 .st-cell.given {
-  background: var(--st-givenbg);
   color: var(--gray-0);
   cursor: default;
   box-shadow: none;
+  background-image: linear-gradient(var(--st-given), var(--st-given));
 }
 .st-cell.entry.peer { border-color: var(--gray-700); }
 .st-cell.entry.sel {

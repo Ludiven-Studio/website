@@ -19,6 +19,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { useHintGate } from '../useHintGate';
+import { repairNote } from '../repairNote';
 import { calcudokuLevels } from './levels';
 
 /* =====================================================
@@ -293,6 +294,18 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		return true;
 	}, [cages, value]);
 
+	/* Entries that contradict the solution without duplicating anything, so nothing flags
+	   them. Left alone they quietly make the grid unsolvable, with no way back. */
+	const wrongCells = useMemo(() => {
+		const out: [number, number][] = [];
+		for (let r = 0; r < size; r++)
+			for (let c = 0; c < size; c++) {
+				const v = entries[r][c];
+				if (given[r][c] == null && v != null && v !== solution[r][c]) out.push([r, c]);
+			}
+		return out;
+	}, [entries, given, solution, size]);
+
 	/* Win detection. */
 	useEffect(() => {
 		if (status === 'won' || revealed) return;
@@ -363,26 +376,34 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		[status, revealed, selected, given, started, daily, gameId, lv.playing],
 	);
 
-	/* Hint: deduce the next logical cell and explain the technique. */
+	/* Hint: repair first, deduce second. A wrong entry poisons the solver, which reasons
+	   from the grid as played — so clear the bad cells before looking for the next step. */
 	const hint = useCallback(() => {
 		if (status === 'won' || revealed || !gate.ready) return;
-		const h = findHint(entries, puzzle);
-		if (!h) return;
+		const repairing = wrongCells.length > 0;
+		const h = repairing ? null : findHint(entries, puzzle);
+		if (!repairing && !h) return;
 		gate.consume();
 		setEntries((prev) => {
 			const next = prev.map((row) => [...row]);
-			next[h.r][h.c] = h.value;
+			if (repairing) for (const [r, c] of wrongCells) next[r][c] = null;
+			else if (h) next[h.r][h.c] = h.value;
 			return next;
 		});
-		setHinted((prev) => new Set(prev).add(`${h.r},${h.c}`));
-		setHintNote(h.reason);
+		setHinted((prev) => {
+			const next = new Set(prev);
+			if (repairing) for (const [r, c] of wrongCells) next.delete(`${r},${c}`);
+			else if (h) next.add(`${h.r},${h.c}`);
+			return next;
+		});
+		setHintNote(repairing ? repairNote(wrongCells.length) : (h?.reason ?? ''));
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
 			trackGame(gameId, 'game_started');
 		}
 		trackGame(gameId, 'hint_used');
-	}, [status, revealed, entries, puzzle, started, gameId, gate]);
+	}, [status, revealed, entries, puzzle, started, gameId, gate, wrongCells]);
 
 	/* Reveal the full solution (does not count as a win). */
 	const reveal = useCallback(() => {
@@ -692,6 +713,7 @@ const CSS = `
   --cd-bad: #d9534f;
   --cd-line: var(--gray-700);
   --cd-line-strong: var(--gray-100);
+  --cd-given: color-mix(in srgb, var(--gray-0) 12%, transparent);
   --cd-cell: calc(100cqw / var(--n, 4));
 
   width: 100%;
@@ -778,7 +800,12 @@ const CSS = `
   font: inherit; cursor: pointer; padding: 0;
   transition: background 0.08s ease, color 0.08s ease;
 }
-.cd-cell.given { background: var(--gray-900); }
+/* Fixed clues carry a tint on top of whatever the cell's background is, so the selection
+   and conflict highlights still read through it. Colour alone was too easy to miss. */
+.cd-cell.given {
+  cursor: default;
+  background-image: linear-gradient(var(--cd-given), var(--cd-given));
+}
 .cd-cell.sel { background: var(--accent-overlay); box-shadow: inset 0 0 0 2px var(--cd-accent); }
 .cd-cell.bad .cd-val { color: var(--cd-bad); }
 .cd-cell.wondone .cd-val { color: var(--cd-ok); }

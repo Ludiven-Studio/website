@@ -105,7 +105,8 @@ export function placedCells(piece: Piece, pl: Placement): Cell[] {
 	return o.map(([r, c]): Cell => [r + pl.row, c + pl.col]);
 }
 
-const fpKey = (cells: Cell[]): string =>
+/** Order-free key for a set of absolute cells (a placed piece's footprint). */
+export const fpKey = (cells: Cell[]): string =>
 	cells.map(([r, c]) => `${r},${c}`).sort().join(' ');
 
 /** Placement realizing a concrete absolute footprint with this piece. */
