@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	generateBoard, trySwap, findRuns, hasMatch, cagedLeft, cagesLeft, findHint,
+	generateBoard, trySwap, findRuns, hasMatch, cagedLeft, cagesLeft, findHint, finale,
 	isGem, isCage, type Cfg, type Cell, type Gem, type Board,
 } from './engine';
 
@@ -107,6 +107,27 @@ describe('specials', () => {
 		expect(res.valid).toBe(true);
 		const hasSpecial = res.steps[0].grid.flat().some((g) => isGem(g) && !!(g as Gem).special);
 		expect(hasSpecial).toBe(true);
+	});
+});
+
+describe('finale', () => {
+	const cfg: Cfg = { rows: 8, cols: 8, colors: 6, cocottes: 0, cageHits: 2 };
+
+	it('fires one rocket per leftover move and scores them', () => {
+		const b = generateBoard(2024, cfg);
+		const before = JSON.stringify(b.grid);
+		const { rockets, gained } = finale(b, 5);
+		expect(rockets).toHaveLength(5);
+		expect(rockets.every((steps) => steps.length > 0)).toBe(true);
+		expect(gained).toBeGreaterThan(0);
+		expect(gained).toBe(rockets.flat().reduce((s, st) => s + st.gained, 0));
+		expect(JSON.stringify(b.grid)).toBe(before); // the caller replays the steps, so the board stays put
+	});
+
+	it('does nothing with no moves left', () => {
+		const { rockets, gained } = finale(generateBoard(7, cfg), 0);
+		expect(rockets).toHaveLength(0);
+		expect(gained).toBe(0);
 	});
 });
 

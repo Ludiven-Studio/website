@@ -1,5 +1,5 @@
 /*
- * Gem sprites for "La Mine aux Cocottes" — 6 sparkling cut gemstones generated
+ * Gem sprites for "Cages de Cristal" — 6 sparkling cut gemstones generated
  * with the local ComfyUI (SDXL Turbo) via scripts/comfy-gen.mjs, then cut out to
  * transparent PNGs so they sit on the dark faceted board.
  *

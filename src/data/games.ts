@@ -14,7 +14,7 @@ export interface GameTile {
 export const games: GameTile[] = [
 	{
 		id: 'mine',
-		title: 'La Mine aux Cocottes',
+		title: 'Cages de Cristal',
 		pitch: 'Un match-3 de cristaux pour libérer les cocottes prisonnières des cages : aligne diamants, rubis et émeraudes, déclenche fusées, bombes et arc-en-ciel, et sauve toutes les cocottes avant la fin des coups.',
 		icon: 'mine',
 		href: '/jeux/mine',

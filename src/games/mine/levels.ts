@@ -1,4 +1,4 @@
-// La Mine aux Cocottes — levels plan (1-100). Fixed 8×8 board; difficulty ramps the
+// Cages de Cristal — levels plan (1-100). Fixed 8×8 board; difficulty ramps the
 // colour count (5→6), the number of caged cocottes (1→8), and the cage strength
 // (1→2 cracks), with a move budget scaled to the work. Stars come from moves left.
 

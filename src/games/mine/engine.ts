@@ -1,5 +1,5 @@
 /**
- * LA MINE AUX COCOTTES — match-3 engine (pure, tested; no UI).
+ * CAGES DE CRISTAL — match-3 engine (pure, tested; no UI).
  *
  * Swap two adjacent gems to line up ≥3 of a colour. Matches clear, gems (and cages)
  * fall, new ones spill from the top, and cascades chain. Cocottes are trapped in cages:
@@ -466,6 +466,31 @@ export function smash(board: Board, at: [number, number]): SwapResult {
 	const buffers = board.buffers ?? Array.from({ length: cfg.cols }, () => []);
 	const { steps, freed, gained } = resolve(grid, cfg, rng, buffers, { clears: seed, at: null });
 	return { valid: true, grid: steps.length ? steps[steps.length - 1].grid : grid, steps, freed, gained };
+}
+
+/** Rockets fired one per leftover move, once every cocotte is free. Grouped per move so
+ *  the UI can drain the counter as they go.
+ *  Freeing the cocottes early used to end the run on the spot, so the faster you played the
+ *  less you scored — the board still had value the player had earned the right to cash in. */
+export function finale(board: Board, moves: number): { rockets: Step[][]; gained: number } {
+	const cfg = board.cfg;
+	const grid = cloneGrid(board.grid);
+	const rng = board.rngRef?.() ?? Math.random;
+	const buffers = board.buffers ?? Array.from({ length: cfg.cols }, () => []);
+	const kinds: SpecialKind[] = ['rowClear', 'colClear', 'bomb'];
+	const rockets: Step[][] = [];
+	let gained = 0;
+	for (let i = 0; i < moves; i++) {
+		const spots: [number, number][] = [];
+		for (let r = 0; r < cfg.rows; r++) for (let c = 0; c < cfg.cols; c++) if (isGem(grid[r][c])) spots.push([r, c]);
+		if (!spots.length) break;
+		const [r, c] = spots[Math.floor(rng() * spots.length)];
+		(grid[r][c] as Gem).special = kinds[i % kinds.length];
+		const res = resolve(grid, cfg, rng, buffers, { clears: new Set([key(r, c)]), at: null });
+		rockets.push(res.steps);
+		gained += res.gained;
+	}
+	return { rockets, gained };
 }
 
 /** Count cocottes still caged on the grid. */

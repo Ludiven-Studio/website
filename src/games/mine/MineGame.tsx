@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties, type ReactNode } from 'react';
 import {
-	generateBoard, trySwap, smash, findHint, hasAnyMove, shuffle, cagesLeft, canSwap,
+	generateBoard, trySwap, smash, findHint, hasAnyMove, shuffle, cagesLeft, canSwap, finale,
 	isGem, isCage, type Cell, type GenBoard, type Cfg, type SpecialKind, type Step,
 } from './engine';
 import { mineLevels } from './levels';
@@ -16,7 +16,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
-   LA MINE AUX COCOTTES — match-3 pour libérer les cocottes en cage.
+   CAGES DE CRISTAL — match-3 pour libérer les cocottes en cage.
    Gemmes positionnées en absolu par id → échanges/chutes animés en CSS.
    Moteur pur/testé ; l'UI ne fait que rejouer les cascades.
    ===================================================== */
@@ -210,6 +210,9 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	const [flyers, setFlyers] = useState<{ id: number; r: number; c: number; dx: number; dy: number }[]>([]);
 	const [eggs, setEggs] = useState<{ id: number; r: number; c: number }[]>([]);
 	const [counterHit, setCounterHit] = useState(0);
+	const [finaleOn, setFinaleOn] = useState(false); // leftover moves being cashed in as rockets
+	const [wonMoves, setWonMoves] = useState(0); // moves left at the win, before the finale spent them
+	const [finaleGain, setFinaleGain] = useState(0); // points the finale added
 	const [gemImg, setGemImg] = useState(false); // true once generated gem art is available
 
 	const boardRef = useRef<GenBoard | null>(null);
@@ -244,6 +247,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		setSelected(null); setHint(null); setClearing(new Set()); setCombo(0);
 		setHammers(HAMMERS); setHammerArmed(false); setWon(false);
 		setFlyers([]); setEggs([]);
+		setFinaleOn(false); setWonMoves(0); setFinaleGain(0);
 		setStat('playing');
 		animatingRef.current = false;
 		idleRef.current = Date.now();
@@ -338,13 +342,15 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	useEffect(() => { const img = new Image(); img.onload = () => setGemImg(true); img.src = '/assets/mine/gem-1.png'; }, []);
 
 	/* ---------- end of game ---------- */
-	const endGame = useCallback((didWin: boolean) => {
+	// `movesAtEnd` is the budget left when the run was decided — the finale spends it
+	// afterwards, and the stars are earned on what was left, not on what survived it.
+	const endGame = useCallback((didWin: boolean, movesAtEnd = movesRef.current) => {
 		setStat('over'); setWon(didWin);
 		const mode = lv.active ? 'levels' : dailyRef.current ? 'daily' : 'free';
 		const ctx = lv.active ? { level: lv.level } : dailyRef.current ? {} : { diff: freeDiffRef.current };
 		trackGame(gameId, didWin ? 'game_won' : 'game_over', { mode, ...ctx, score: scoreRef.current });
 		if (lv.active) {
-			lv.finish({ won: didWin, score: scoreRef.current, stat: movesRef.current });
+			lv.finish({ won: didWin, score: scoreRef.current, stat: movesAtEnd });
 		} else if (dailyRef.current) {
 			const seed = (boardRef.current as (GenBoard & { seed?: number }) | null)?.seed ?? 1;
 			const caged = boardRef.current ? cagesLeft(boardRef.current) : 0;
@@ -358,9 +364,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	/* ---------- the core: play a swap's cascade ---------- */
 	const idAt = (grid: Cell[][], r: number, c: number): number | null => { const g = grid[r][c]; return isGem(g) ? g.id : null; };
 
-	const runResult = useCallback(async (steps: Step[], gained: number, freed: number) => {
-		animatingRef.current = true;
-		setSelected(null); setHint(null);
+	const playSteps = useCallback(async (steps: Step[], speed = 1) => {
 		for (const step of steps) {
 			const grid = boardRef.current!.grid;
 			const ids = new Set<number>();
@@ -368,20 +372,48 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			setClearing(ids);
 			if (step.combo > 1) setCombo(step.combo);
 			// let the burst/flash play before collapsing the column
-			await sleep(step.cleared.length ? 380 : 60);
+			await sleep((step.cleared.length ? 380 : 60) * speed);
 			// a cocotte just broke free → it flies to the counter and drops an egg (still on the old grid so it pops from the cage)
 			if (step.freedPos.length) spawnFreed(step.freedPos);
 			boardRef.current = { ...boardRef.current!, grid: step.grid };
 			setDisplayGrid(step.grid.map((row) => row.slice()));
 			setClearing(new Set());
 			// hold longer on combos, and longer still on a freed beat so the flight + egg read before the column blast
-			await sleep(step.freedPos.length ? 760 : step.combo > 1 ? 560 : 320);
+			await sleep((step.freedPos.length ? 760 : step.combo > 1 ? 560 : 320) * speed);
 		}
+		setCombo(0);
+	}, [spawnFreed]);
+
+	/* Every cocotte is out: the leftover moves fire as rockets instead of being lost. */
+	const playFinale = useCallback(async () => {
+		if (movesRef.current <= 0) return;
+		const { rockets } = finale(boardRef.current!, movesRef.current);
+		if (rockets.length) {
+			setFinaleOn(true);
+			for (const steps of rockets) {
+				movesRef.current -= 1; setMovesLeft(movesRef.current);
+				const won = steps.reduce((s, x) => s + x.gained, 0);
+				scoreRef.current += won; setScore(scoreRef.current);
+				setFinaleGain((g) => g + won);
+			}
+			setFinaleOn(false);
+		}
+		movesRef.current = 0; setMovesLeft(0);
+	}, [playSteps]);
+
+	const runResult = useCallback(async (steps: Step[], gained: number, freed: number) => {
+		animatingRef.current = true;
+		setSelected(null); setHint(null);
+		await playSteps(steps);
 		scoreRef.current += gained; setScore(scoreRef.current);
 		setCocottesLeft(cagesLeft(boardRef.current!));
-		setCombo(0);
 		// win / lose / shuffle — all cocottes freed (none left on the board OR in the buffers)
-		if (cagesLeft(boardRef.current!) === 0) endGame(true);
+		if (cagesLeft(boardRef.current!) === 0) {
+			const movesAtWin = movesRef.current;
+			setWonMoves(movesAtWin);
+			await playFinale();
+			endGame(true, movesAtWin);
+		}
 		else if (movesRef.current <= 0) endGame(false);
 		else if (!hasAnyMove(boardRef.current!)) {
 			shuffle(boardRef.current!);
@@ -390,7 +422,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		void freed;
 		animatingRef.current = false;
 		idleRef.current = Date.now();
-	}, [endGame]);
+	}, [endGame, playSteps, playFinale]);
 
 	const doSwap = useCallback(async (a: [number, number], b: [number, number]) => {
 		if (animatingRef.current || statusRef.current !== 'playing' || !boardRef.current) return;
@@ -535,7 +567,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			) : daily ? (
 				<div className="mn-tag">{dailyLoading ? 'Préparation…' : `Défi du jour · ${dailyWeekdayLabel()}`}</div>
 			) : (
-				<div className="mn-tag">Mine libre — {cocottesTotal} cocottes à libérer</div>
+				<div className="mn-tag">Partie libre — {cocottesTotal} cocottes à libérer</div>
 			)}
 
 			{!daily && !lv.active && (
@@ -614,6 +646,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 					))}
 					{combo > 1 && <div key={combo} className="mn-halo" aria-hidden="true" />}
 					{combo > 1 && <div className="mn-combo">Combo ×{combo} !</div>}
+					{finaleOn && <div className="mn-finale">🚀 Final ! {movesLeft} coups à brûler</div>}
 
 					{dailyLoading && <div className="mn-overlay"><div className="mn-card">Préparation du défi…</div></div>}
 
@@ -623,7 +656,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 							lastLevel={mineLevels.count}
 							won={lv.won}
 							stars={lv.stars}
-							detail={lv.won ? `Cocottes libérées · ${movesLeft} coups restants` : `${cocottesLeft} cocotte(s) encore en cage`}
+							detail={lv.won ? `Cocottes libérées · ${wonMoves} coups restants` : `${cocottesLeft} cocotte(s) encore en cage`}
 							onNext={() => startLevel(lv.level + 1)}
 							onReplay={() => startLevel(lv.level)}
 							onMenu={lv.backToMenu}
@@ -637,7 +670,8 @@ export default function MineGame({ gameId }: { gameId: string }) {
 									<>
 										<CocotteMini />
 										<h3>Cocottes libérées !</h3>
-										<p className="mn-score">{fmtScore(score)} pts{daily ? '' : ` · ${movesLeft} coups restants`}</p>
+										<p className="mn-score">{fmtScore(score)} pts</p>
+										{wonMoves > 0 && <p className="mn-note">🚀 {wonMoves} coups restants → +{fmtScore(finaleGain)} pts</p>}
 									</>
 								) : (
 									<>
@@ -650,7 +684,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 								) : daily ? (
 									<p className="mn-note">Score classé — reviens demain&nbsp;!</p>
 								) : (
-									<button className="mn-btn primary" onClick={() => newFree()}>↻ Nouvelle mine</button>
+									<button className="mn-btn primary" onClick={() => newFree()}>↻ Nouvelle partie</button>
 								)}
 							</div>
 						</div>
@@ -745,6 +779,8 @@ const CSS = `
 
 .mn-combo { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--mn-accent); color: var(--accent-text-over); font-weight: 800; font-size: 19px; letter-spacing: 0.3px; padding: 7px 20px; border-radius: 999px; pointer-events: none; box-shadow: 0 0 18px var(--mn-accent), 0 4px 12px rgba(0,0,0,0.4); animation: mn-pop 0.6s cubic-bezier(0.2,1.5,0.35,1); z-index: 6; }
 @keyframes mn-pop { 0% { transform: translateX(-50%) scale(0.3); opacity: 0; } 55% { transform: translateX(-50%) scale(1.2); opacity: 1; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+/* sits at the bottom: the combo banner keeps the top and both show during the finale */
+.mn-finale { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: var(--gray-999); color: var(--mn-accent); border: 1.5px solid var(--mn-accent); font-weight: 800; font-size: 15px; padding: 6px 16px; border-radius: 999px; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 6; }
 /* combo halo pulse on the board — remounts each chain step to replay */
 .mn-halo { position: absolute; inset: 0; border-radius: 14px; pointer-events: none; z-index: 5; box-shadow: inset 0 0 42px 6px var(--mn-accent); animation: mn-halo 0.6s ease-out forwards; }
 @keyframes mn-halo { 0% { opacity: 0; } 35% { opacity: 0.9; } 100% { opacity: 0; } }

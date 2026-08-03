@@ -9,7 +9,7 @@ export interface TutorialStep {
 
 export const TUTORIALS: Record<string, TutorialStep[]> = {
 	mine: [
-		{ emoji: '🐔', title: 'Le but', body: 'Des cocottes sont enfermées dans des cages de cristal au fond de la mine. Libère-les toutes avant d\'épuiser ton budget de coups.' },
+		{ emoji: '🐔', title: 'Le but', body: 'Des cocottes sont enfermées dans des cages de cristal. Libère-les toutes avant d\'épuiser ton budget de coups.' },
 		{ emoji: '💎', title: 'Aligner', body: 'Tape une gemme puis une gemme voisine (ou glisse) pour les échanger. Aligne 3 cristaux identiques ou plus pour les faire éclater — d\'autres tombent et les cascades enchaînent (combo ×).' },
 		{ emoji: '🔓', title: 'Libérer', body: 'Un alignement JUSTE À CÔTÉ d\'une cage la fissure. Deux fissures et la cocotte s\'envole ! Vise les cristaux près des cages.' },
 		{ emoji: '🚀', title: 'Spéciaux', body: 'Aligne 4 → une fusée (vide une ligne/colonne). Aligne 5 → un arc-en-ciel (efface toute une couleur). Un L ou T → une bombe (explosion 3×3). Combine-les pour de gros enchaînements et casser plein de cages !' },
