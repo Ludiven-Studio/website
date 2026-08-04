@@ -390,8 +390,11 @@ export default function MineGame({ gameId }: { gameId: string }) {
 		const { rockets } = finale(boardRef.current!, movesRef.current);
 		if (rockets.length) {
 			setFinaleOn(true);
+			// brisker than a normal cascade — a victory lap, and a long tail must not outstay its welcome
+			const speed = Math.min(0.55, 4 / rockets.length);
 			for (const steps of rockets) {
 				movesRef.current -= 1; setMovesLeft(movesRef.current);
+				await playSteps(steps, speed);
 				const won = steps.reduce((s, x) => s + x.gained, 0);
 				scoreRef.current += won; setScore(scoreRef.current);
 				setFinaleGain((g) => g + won);
