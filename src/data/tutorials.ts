@@ -223,7 +223,8 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	golf: [
 		{ emoji: '🏌️', title: 'Le but', body: 'Rentre la balle dans le trou (le drapeau) en un minimum de coups. Le parcours est généré à chaque partie.' },
 		{ emoji: '🎯', title: 'Viser à la fronde', body: 'Touche/clique près de la balle et tire dans le sens OPPOSÉ à la direction voulue : un élastique part de la balle. Plus tu tires loin, plus le coup est puissant. Relâche pour frapper.' },
-		{ emoji: '↩️', title: 'Rebonds & fantômes', body: 'La balle rebondit sur les bords et les murs : sers-t\'en pour contourner les obstacles. Au défi du jour, même trou pour tous, 10 essais, et tu vois les balles fantômes des autres joueurs en direct (classement au moins de coups).' },
+		{ emoji: '🎥', title: 'Les caméras', body: 'Le bouton caméra fait le tour de trois vues : le trou en entier, l\'épaule (juste derrière la balle) et le dessus. Glisse ailleurs que sur la balle pour tourner autour du trou, et les boutons + / − rapprochent la vue. La puissance du coup se mesure à l\'écran : le même geste tape aussi fort dans toutes les vues.' },
+		{ emoji: '↩️', title: 'Rebonds & fantômes', body: 'La balle rebondit sur les bords et les murs : sers-t\'en pour contourner les obstacles. Le terrain a du relief et les virages sont relevés — la balle suit la pente. Au défi du jour, même trou pour tous, 10 essais, et tu vois les balles fantômes des autres joueurs en direct (classement au moins de coups).' },
 	],
 	angry: [
 		{ emoji: '🐔', title: 'Le but', body: 'Fais tomber tous les renards en lançant la cocotte, avec le moins de cocottes possible.' },

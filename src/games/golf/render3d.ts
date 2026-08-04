@@ -113,6 +113,23 @@ export function fitDist(cam: THREE.PerspectiveCamera, hx: number, hz: number, pi
 	);
 }
 
+/**
+ * Azimuth that frames the course tightest, searched around `base`. Looking straight down a
+ * long hole leaves the whole width of the canvas empty; turning ~50° reads the same way
+ * and brings the camera a fifth closer. Ties keep the smallest turn.
+ */
+export function bestAz(cam: THREE.PerspectiveCamera, hx: number, hz: number, base: number, pitch: number): number {
+	let best = base, bestD = Infinity;
+	for (let k = 0; k <= 12; k++) {
+		for (const s of k === 0 ? [0] : [-1, 1]) {
+			const az = base + (s * k * Math.PI) / 36; // ±60°, 5° apart
+			const d = fitDist(cam, hx, hz, pitch, az);
+			if (d < bestD - 1e-6) { bestD = d; best = az; }
+		}
+	}
+	return best;
+}
+
 /** Free every geometry and material a built hole owns. */
 export function disposeHole(grp: THREE.Group) {
 	const mats = new Set<THREE.Material>();

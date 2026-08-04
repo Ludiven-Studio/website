@@ -167,6 +167,18 @@ async function main() {
 			}
 			await sleep(300);
 		},
+		// Levels is the landing mode and resumes asynchronously, so it wins the race against
+		// the generic start and the shot ends up on the levels tag. Come back to Libre once
+		// it has settled, then let the software renderer draw the course.
+		golf: async () => {
+			await sleep(1200);
+			await clickBtn('libre');
+			await sleep(400);
+			await clickBtn('facile'); // short hole → the camera comes in close enough to read
+			await sleep(250);
+			await startCTA();
+			await sleep(2600);
+		},
 	};
 
 	const startGame = async () => {

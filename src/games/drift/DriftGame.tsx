@@ -1280,7 +1280,9 @@ const CSS = `
 }
 /* Site global fullscreen → the track fills the screen; controls stay overlaid. */
 .game-page.gf-full .dr-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.game-page.gf-full .dr-boardwrap { flex: 1; aspect-ratio: auto; }
+/* min-height:0 or the canvas' intrinsic height becomes a floor flex:1 cannot shrink past,
+   and the board overflows the screen in landscape. */
+.game-page.gf-full .dr-boardwrap { flex: 1; min-height: 0; aspect-ratio: auto; }
 .game-page.gf-full .dr-canvas { border-radius: 0; border: none; }
 .game-page.gf-full .dr-help { display: none; }
 .game-page.gf-full .dr-leaderboard { top: 54px; }

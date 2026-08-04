@@ -16,6 +16,7 @@ import {
 	CORNERS,
 	CUP_D,
 	SINK_MS,
+	bestAz,
 	buildHole3D,
 	disposeHole,
 	fitDist,
@@ -67,6 +68,7 @@ const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
 const RELIEF = 0.1; // height scale along the hole — enough to read, flat enough to putt
 const BANK = 5; // cross slope in the turns; the engine already curves the ball there
 const PITCH = 45; // camera tilt (deg) for the framed views
+const TOP_PITCH = 89.5;
 const SHOULDER_PITCH = 30;
 const SHOULDER_DIST = 26;
 // Drag length that means full power, as a share of the canvas height. Read in pixels,
@@ -174,7 +176,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const zoomRef = useRef(1);
 	const camModeRef = useRef<CamMode>('fit');
 	const azRef = useRef(0); // camera azimuth around the target
-	const fitRef = useRef({ x: 0, y: 0, z: 0, hx: 40, hz: 40, az: 0 }); // bounding box of the hole
+	// Bounding box of the hole. `base` is the tee→cup heading; `az`/`azTop` are the framings
+	// derived from it, which depend on the canvas shape and so are refreshed on every resize.
+	const fitRef = useRef({ x: 0, y: 0, z: 0, hx: 40, hz: 40, base: 0, az: 0, azTop: 0 });
 	const orbitRef = useRef<{ x: number; az: number } | null>(null);
 	const sinkRef = useRef<number | null>(null); // timestamp of the drop, null while playing
 	const sinkTimerRef = useRef(0);
@@ -292,6 +296,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		g.renderer.setSize(w, h, false);
 		g.camera.aspect = w / Math.max(1, h);
 		g.camera.updateProjectionMatrix();
+		const f = fitRef.current;
+		f.az = bestAz(g.camera, f.hx, f.hz, f.base, (PITCH * Math.PI) / 180);
+		f.azTop = bestAz(g.camera, f.hx, f.hz, f.base, (TOP_PITCH * Math.PI) / 180);
 	}, []);
 
 	const removeGhost = useCallback((id: string) => {
@@ -444,8 +451,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			// Aim ahead of the ball, not at it, so the fairway fills the frame.
 			g.camera.lookAt(pose.x + Math.cos(azRef.current) * 10, by + 1.2, pose.z + Math.sin(azRef.current) * 10);
 		} else {
-			const pitch = ((mode === 'top' ? 89.5 : PITCH) * Math.PI) / 180;
-			const az = mode === 'top' ? f.az : azRef.current;
+			const pitch = ((mode === 'top' ? TOP_PITCH : PITCH) * Math.PI) / 180;
+			const az = mode === 'top' ? f.azTop : azRef.current;
 			const place = (d: number, tx: number, ty: number, tz: number) => {
 				g.camera.position.set(
 					tx - Math.cos(az) * Math.cos(pitch) * d,
@@ -755,9 +762,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				fitRef.current = {
 					x: fx, y: surfaceY(hole, fx, fz, RELIEF, BANK), z: fz,
 					hx: (maxX - minX) / 2 + 3, hz: (maxZ - minZ) / 2 + 3,
-					az: Math.atan2(hole.cup.z - hole.start.z, hole.cup.x - hole.start.x),
+					base: Math.atan2(hole.cup.z - hole.start.z, hole.cup.x - hole.start.x),
+					az: 0, azTop: 0, // resize() below picks the framing for this canvas
 				};
-				azRef.current = fitRef.current.az;
 				g.ground.position.set(fx, groundYOf(hole, RELIEF), fz);
 
 				// Wrap the shadow frustum around this hole only, so its texels stay small.
@@ -1118,10 +1125,17 @@ const CSS = `
 }
 /* Site global fullscreen → the course fills the screen; controls stay overlaid. */
 .game-page.gf-full .gf-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
-.game-page.gf-full .gf-boardwrap { flex: 1; aspect-ratio: auto; }
+/* min-height:0 or the canvas' intrinsic height becomes a floor flex:1 cannot shrink past,
+   and the board overflows the screen in landscape. */
+.game-page.gf-full .gf-boardwrap { flex: 1; min-height: 0; aspect-ratio: auto; }
 .game-page.gf-full .gf-canvas { border-radius: 0; border: none; }
 .game-page.gf-full .gf-help { display: none; }
 .game-page.gf-full .gf-board { top: 54px; }
+/* Landscape phone: every row above the board costs a tenth of the screen. */
+@media (max-height: 520px) {
+  .game-page.gf-full .gf-leveltag { display: none; }
+  .game-page.gf-full .gf-actions { margin-top: 0.35rem; }
+}
 .gf-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .gf-label { position: absolute; transform: translate(-50%, -120%); white-space: nowrap; font-size: 11px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.55); padding: 1px 6px; border-radius: 999px; }
 .gf-celebrate { position: absolute; inset: 0; pointer-events: none; }

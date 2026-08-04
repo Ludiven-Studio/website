@@ -16,6 +16,7 @@ import {
 	CORNERS,
 	CUP_D,
 	SINK_MS,
+	bestAz,
 	buildHole3D,
 	disposeHole,
 	fitDist,
@@ -136,7 +137,7 @@ export default function GolfProto3D() {
 	// `px`/`pz` give the aim direction on the ground; `pull` is the power, read off the screen.
 	const aimRef = useRef({ active: false, px: 0, pz: 0, pull: 0 });
 	const azRef = useRef(0);
-	const fitRef = useRef({ x: 0, y: 0, z: 0, hx: 40, hz: 40, az: 0 }); // bounding box of the hole
+	const fitRef = useRef({ x: 0, y: 0, z: 0, hx: 40, hz: 40, base: 0 }); // bounding box of the hole
 	const orbitRef = useRef<{ x: number; az: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
 	const occRef = useRef({ hit: 0, deco: 0, total: 0 });
@@ -270,7 +271,7 @@ export default function GolfProto3D() {
 		fitRef.current = {
 			x: fx, y: surfaceY(hole, fx, fz, cam.relief, cam.bank), z: fz,
 			hx: (maxX - minX) / 2 + 3, hz: (maxZ - minZ) / 2 + 3,
-			az: Math.atan2(hole.cup.z - hole.start.z, hole.cup.x - hole.start.x),
+			base: Math.atan2(hole.cup.z - hole.start.z, hole.cup.x - hole.start.x),
 		};
 		g.ground.position.x = fx; g.ground.position.z = fz;
 
@@ -283,7 +284,8 @@ export default function GolfProto3D() {
 		g.sun.target.position.set(fx, 0, fz);
 		g.sun.target.updateMatrixWorld();
 
-		azRef.current = fitRef.current.az;
+		azRef.current = bestAz(g.camera, fitRef.current.hx, fitRef.current.hz, fitRef.current.base,
+			(camRef.current.pitch * Math.PI) / 180);
 		orbitRef.current = null;
 	}, [seed, diff, shape, cam.relief, cam.bank]);
 
@@ -453,7 +455,8 @@ export default function GolfProto3D() {
 				g.camera.lookAt(b.x + Math.cos(azRef.current) * 10, by + 1.2, b.z + Math.sin(azRef.current) * 10);
 			} else {
 				const pitch = ((c.mode === 'top' ? 89.5 : c.pitch) * Math.PI) / 180;
-				const az = c.mode === 'top' ? f.az : azRef.current;
+				// The pitch is a live slider here, so the top view re-frames every frame.
+				const az = c.mode === 'top' ? bestAz(g.camera, f.hx, f.hz, f.base, pitch) : azRef.current;
 				const place = (d: number, tx: number, ty: number, tz: number) => {
 					g.camera.position.set(
 						tx - Math.cos(az) * Math.cos(pitch) * d,
