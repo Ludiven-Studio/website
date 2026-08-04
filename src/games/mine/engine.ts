@@ -426,19 +426,16 @@ export function hasAnyMove(board: Board): boolean {
 	return !!findHint(board);
 }
 
-/** A swap that makes a match (for the hint), or null if none exists. */
+/** A swap that makes a match (for the hint), or null if none exists.
+ *  Delegates to canSwap: it used to accept any pair touching a special, which trySwap
+ *  then refused — the hint pointed at a move the board would only shake at. */
 export function findHint(board: Board): { a: [number, number]; b: [number, number] } | null {
-	const { grid, cfg } = board;
+	const { cfg } = board;
 	for (let r = 0; r < cfg.rows; r++) for (let c = 0; c < cfg.cols; c++) {
-		const cell = grid[r][c];
-		if (!isGem(cell)) continue;
-		if (cell.special === 'rainbow') return { a: [r, c], b: [r, c + 1 < cfg.cols && isGem(grid[r][c + 1]) ? c + 1 : c - 1] }; // rainbow always "works"
 		for (const [dr, dc] of [[0, 1], [1, 0]] as const) {
 			const rr = r + dr, cc = c + dc;
-			if (!inb(cfg, rr, cc) || !isGem(grid[rr][cc])) continue;
-			const g = cloneGrid(grid);
-			[g[r][c], g[rr][cc]] = [g[rr][cc], g[r][c]];
-			if (hasMatch(g) || (isGem(g[r][c]) && (g[r][c] as Gem).special) || (isGem(g[rr][cc]) && (g[rr][cc] as Gem).special)) return { a: [r, c], b: [rr, cc] };
+			if (!inb(cfg, rr, cc)) continue;
+			if (canSwap(board, [r, c], [rr, cc])) return { a: [r, c], b: [rr, cc] };
 		}
 	}
 	return null;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	generateBoard, trySwap, findRuns, hasMatch, cagedLeft, cagesLeft, findHint, finale,
+	generateBoard, trySwap, findRuns, hasMatch, hasAnyMove, cagedLeft, cagesLeft, findHint, finale,
 	isGem, isCage, type Cfg, type Cell, type Gem, type Board,
 } from './engine';
 
@@ -132,6 +132,13 @@ describe('finale', () => {
 });
 
 describe('findHint', () => {
+	// no colour appears 3 times, so nothing can ever match here
+	const deadGrid = (): Cell[][] => [
+		[gem(1), gem(2), gem(3)],
+		[gem(4), gem(5), gem(6)],
+		[gem(2), gem(3), gem(4)],
+	];
+
 	it('returns a swap that is actually valid', () => {
 		const b = mk([
 			[gem(5), gem(1), gem(1)],
@@ -142,5 +149,23 @@ describe('findHint', () => {
 		expect(h).not.toBeNull();
 		const res = trySwap(b, h!.a, h!.b);
 		expect(res.valid).toBe(true);
+	});
+
+	it('ignores a lone special — swapping one into a plain gem does nothing', () => {
+		const grid = deadGrid();
+		grid[0][0] = { color: 1, id: 0, special: 'bomb' };
+		const b = mk(grid);
+		expect(findHint(b)).toBeNull();
+		expect(hasAnyMove(b)).toBe(false);
+	});
+
+	it('points at two adjacent specials, which do detonate', () => {
+		const grid = deadGrid();
+		grid[0][0] = { color: 1, id: 0, special: 'bomb' };
+		grid[0][1] = { color: 2, id: 1, special: 'rowClear' };
+		const b = mk(grid);
+		const h = findHint(b);
+		expect(h).not.toBeNull();
+		expect(trySwap(b, h!.a, h!.b).valid).toBe(true);
 	});
 });
