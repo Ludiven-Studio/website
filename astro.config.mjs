@@ -37,6 +37,7 @@ export default defineConfig({
                     '**/Scene3D*.js',
                     '**/UnrealBloomPass*.js',
                     '**/LaboDemo*.js',
+                    '**/GolfProto3D*.js',
                 ],
                 navigateFallback: null,
                 cleanupOutdatedCaches: true,

@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
 import LaboDemo from '../components/LaboDemo.tsx';
 import Scene3D from '../components/Scene3D.tsx';
+import GolfProto3D from '../components/GolfProto3D.tsx';
 ---
 
 <BaseLayout
@@ -27,6 +28,17 @@ import Scene3D from '../components/Scene3D.tsx';
 		</section>
 
 		<Scene3D client:only="react" />
+
+		<section class="labo-section stack gap-2">
+			<h2>Mini-golf en 3D — proto</h2>
+			<p>
+				Le trou du jeu, mais avec du relief : l'altitude que <a href="/jeux/golf/">/jeux/golf</a> ne dessine
+				qu'en nuances de vert devient une vraie hauteur, et la caméra s'incline. Moteur de physique
+				identique et intact.
+			</p>
+		</section>
+
+		<GolfProto3D client:only="react" />
 	</div>
 </BaseLayout>
 
