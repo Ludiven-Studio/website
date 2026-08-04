@@ -1191,7 +1191,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 
-				{phase === 'menu' && !webglError && !lv.active && (
+				{phase === 'menu' && !lv.booting && !webglError && !lv.active && (
 					<div className="dr-overlay">
 						<div className="dr-card">
 							<h2>Drift</h2>

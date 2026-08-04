@@ -7,7 +7,7 @@
 //   on solve/lose: lv.finish({ won, score, stat?, raw? })
 //   when lv.done: <LevelOutcome ... /> (next/retry/menu)
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getProgression, submitLevel, type GameProgress, type LevelPlan, type LevelResult } from './progression';
 import { earn } from './wallet';
 
@@ -16,6 +16,9 @@ export type LevelPhase = 'off' | 'menu' | 'playing' | 'done';
 export interface UseLevels<Cfg> {
 	phase: LevelPhase;
 	active: boolean; // levels mode is on (menu | playing | done)
+	/** True until the landing is decided. `active` is false while resume() loads progression,
+	    so a menu gated on `!active` alone flashes for ~0.8s before the level opens. */
+	booting: boolean;
 	menu: boolean;
 	playing: boolean;
 	done: boolean;
@@ -41,9 +44,20 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 	const [level, setLevel] = useState(1);
 	const [stars, setStars] = useState(0);
 	const [won, setWon] = useState(false);
+	const [booting, setBooting] = useState(true);
 	const submittedRef = useRef(false);
+	const resumedRef = useRef(false);
+
+	// Games that deep-link straight to the daily never call resume(), so nothing would ever
+	// clear the flag. They settle on the next tick instead: resume() runs in a mount effect,
+	// so by the time this fires we know whether one is coming.
+	useEffect(() => {
+		const t = setTimeout(() => { if (!resumedRef.current) setBooting(false); }, 0);
+		return () => clearTimeout(t);
+	}, []);
 
 	const enter = useCallback(() => {
+		setBooting(false);
 		setPhase('menu');
 		setStars(0);
 		setWon(false);
@@ -54,16 +68,24 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 	const backToMenu = useCallback(() => setPhase('menu'), []);
 
 	const resume = useCallback(async (): Promise<number | null> => {
-		const p = await getProgression(gameId);
+		resumedRef.current = true;
+		let p;
+		try {
+			p = await getProgression(gameId);
+		} catch {
+			setBooting(false); // progression unreachable → fall back to the game's own menu
+			return null;
+		}
 		setProgress({ stars: { ...p.stars }, best: { ...p.best } });
 		const cleared = Object.keys(p.stars).map(Number).filter((n) => p.stars[n] >= 1);
 		const maxCleared = cleared.length ? Math.max(...cleared) : 0;
-		if (maxCleared >= plan.count) { setPhase('menu'); return null; } // all cleared → grid
-		return maxCleared + 1; // next unlocked level → caller auto-starts it
+		if (maxCleared >= plan.count) { setPhase('menu'); setBooting(false); return null; } // all cleared → grid
+		return maxCleared + 1; // next unlocked level → caller auto-starts it, and play() clears booting
 	}, [gameId, plan.count]);
 
 	const play = useCallback((lvl: number): Cfg => {
 		submittedRef.current = false;
+		setBooting(false); // batched with setPhase below, so the menu never gets a frame
 		setLevel(lvl);
 		setStars(0);
 		setWon(false);
@@ -92,7 +114,7 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 	const next = useCallback((): Cfg | null => (level < plan.count ? play(level + 1) : null), [play, level, plan.count]);
 
 	return {
-		phase, active: phase !== 'off', menu: phase === 'menu', playing: phase === 'playing', done: phase === 'done',
+		phase, active: phase !== 'off', booting, menu: phase === 'menu', playing: phase === 'playing', done: phase === 'done',
 		progress, level, stars, won, enter, exit, play, backToMenu, finish, replay, next, resume,
 	};
 }

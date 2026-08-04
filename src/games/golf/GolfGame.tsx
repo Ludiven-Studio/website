@@ -1056,7 +1056,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 
-				{phase === 'menu' && !webglError && !lv.active && (
+				{phase === 'menu' && !lv.booting && !webglError && !lv.active && (
 					<div className="gf-overlay">
 						<div className="gf-card">
 							<h2>Mini-Golf</h2>
