@@ -11,6 +11,18 @@ import {
 	type Ball,
 	type Vec,
 } from '../games/golf/engine';
+import {
+	BALL_VIS,
+	CORNERS,
+	CUP_D,
+	SINK_MS,
+	buildHole3D,
+	disposeHole,
+	fitDist,
+	groundYOf,
+	nearestSample,
+	surfaceY,
+} from '../games/golf/render3d';
 import { mulberry32 } from '../games/prng';
 
 /* =====================================================
@@ -30,23 +42,16 @@ const MODES: [CamMode, string][] = [
 	['top', 'Vue du dessus (jeu actuel)'],
 ];
 const STEP = 1000 / 60;
-// A sharp corner reaches bank 1.39 rad/sample, which as a cross slope would be a wall.
-// Cap it: past this the turn is banked as hard as it can be drawn.
-const BANK_CAP = 0.35;
-const WALL_H = 1.4; // wall height above the floor (the game's flat ribbon y)
 const GRAB_R = 4.5;
-const BALL_VIS = 0.8; // the drawn ball is smaller than the physics one — it read as a boulder
-const CUP_D = 1.8; // cup depth — deep enough that the ball visibly disappears into it
-const SINK_MS = 420;
-const ROCK_H = 1.6;
-const LIP = 0.6; // how far the kerb's outer face hangs below the floor
-const DECK = 1.3; // bridge deck thickness — below it the arch is open water
-const PAVE = 4.5; // paved band around the lane, like the real courses
-const APRON = 10; // where the grass bank beyond the paving lands
-const DROP = 3.4; // how far that bank falls — also the headroom under the bridge
+// Drag length that means full power, as a share of the stage height. Aim used to be
+// measured on the ground plane, so the same gesture was worth half the power from a
+// shoulder camera as it was framed wide — the pull is read in pixels now.
+const DRAG_H = 0.28;
 
 type CamMode = 'fit' | 'shoulder' | 'top';
-interface Cam { pitch: number; dist: number; relief: number; bank: number; zoom: number; mode: CamMode }
+interface Cam {
+	pitch: number; dist: number; relief: number; bank: number; zoom: number; power: number; mode: CamMode;
+}
 
 /* ---------- authored shapes ----------
    A real hole is short, wide and reads as one clear figure; the engine's random walk
@@ -100,483 +105,6 @@ const SHAPES: Shape[] = [
 	mkShape('spiral', 'Spirale', 8, spiralPoly()),
 ];
 
-const bankCache = new WeakMap<Hole, number[]>();
-
-/**
- * Smoothed cross slope. Raw `hole.bank` swings sample to sample — on the horseshoe it goes
- * 0.33, 0.13, -0.10, 0.50 — which as a surface came out as a zigzag fan, not a banked turn.
- */
-function bankAt(hole: Hole, i: number): number {
-	let s = bankCache.get(hole);
-	if (!s) {
-		const R = 4, n = hole.bank.length;
-		s = hole.bank.map((_, k) => {
-			let sum = 0, c = 0;
-			for (let j = Math.max(0, k - R); j <= Math.min(n - 1, k + R); j++) { sum += hole.bank[j]; c++; }
-			return Math.max(-BANK_CAP, Math.min(BANK_CAP, sum / c));
-		});
-		bankCache.set(hole, s);
-	}
-	return s[i];
-}
-
-/**
- * Lane surface at sample `i`, `u` = lateral position (-1 right … +1 left).
- * The two axes are scaled apart on purpose: `rel` flattens the hole along its length,
- * `bk` keeps the turns banked. The engine already pushes the ball sideways in a turn
- * (its own BANK term) — this is what makes that push visible.
- */
-const laneY = (hole: Hole, i: number, u: number, rel: number, bk: number): number =>
-	hole.alt[i] * rel - u * bk * bankAt(hole, i);
-
-/** Nearest centerline sample — same lookup stepBall uses for the relief. */
-function nearestSample(hole: Hole, x: number, z: number): number {
-	let bi = 0, bd = Infinity;
-	for (let i = 0; i < hole.path.length; i++) {
-		const dx = hole.path[i].x - x, dz = hole.path[i].z - z;
-		const dd = dx * dx + dz * dz;
-		if (dd < bd) { bd = dd; bi = i; }
-	}
-	return bi;
-}
-
-/** Surface height under any point: lane (banked) outside the green, dish inside it. */
-function surfaceY(hole: Hole, x: number, z: number, rel: number, bk: number): number {
-	const dCup = Math.hypot(x - hole.cup.x, z - hole.cup.z);
-	if (dCup < hole.greenR) {
-		const centre = hole.alt[hole.alt.length - 1];
-		const rim = hole.alt[hole.cutIdx];
-		return (centre + (rim - centre) * (dCup / hole.greenR)) * rel;
-	}
-	const i = nearestSample(hole, x, z);
-	const p = hole.path[i];
-	const u = ((x - p.x) * p.nx + (z - p.z) * p.nz) / (hole.widths[i] || 1);
-	return laneY(hole, i, Math.max(-1.4, Math.min(1.4, u)), rel, bk);
-}
-
-/**
- * Distance that fits the course rectangle in frame. A bounding sphere would waste most
- * of the screen: these holes are long and narrow, and the tilt shortens them further —
- * the along-view extent only costs `sin(pitch)` of screen height.
- */
-const CORNERS: [number, number][] = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-
-function fitDist(cam: THREE.PerspectiveCamera, hx: number, hz: number, pitch: number, az: number): number {
-	const ca = Math.cos(az), sa = Math.sin(az);
-	let fwd = 0, side = 0;
-	for (const [sx, sz] of CORNERS) {
-		const dx = sx * hx, dz = sz * hz;
-		fwd = Math.max(fwd, Math.abs(dx * ca + dz * sa));
-		side = Math.max(side, Math.abs(-dx * sa + dz * ca));
-	}
-	const vFov = (cam.fov * Math.PI) / 180;
-	const hFov = 2 * Math.atan(Math.tan(vFov / 2) * cam.aspect);
-	return Math.max(
-		(fwd * Math.sin(pitch) * 1.04) / Math.tan(vFov / 2),
-		(side * 1.04) / Math.tan(hFov / 2),
-		18,
-	);
-}
-
-const stripGeom = (pos: number[]): THREE.BufferGeometry => {
-	const g = new THREE.BufferGeometry();
-	g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-	g.computeVertexNormals();
-	return g;
-};
-
-/** Lawn height around the course — where the grassy bank lands. */
-const groundYOf = (hole: Hole, relief: number): number => Math.min(...hole.alt) * relief - DROP;
-
-function buildHole3D(hole: Hole, relief: number, bankv: number): THREE.Group {
-	const grp = new THREE.Group();
-	const { path, cutIdx: cut } = hole;
-	const W = hole.widths;
-	const Y = (a: number) => a * relief; // relief = 0 reproduces today's flat course
-
-	const altMin = Math.min(...hole.alt), altMax = Math.max(...hole.alt);
-	const range = altMax - altMin || 1;
-	const col = (a: number): [number, number, number] => {
-		const t = Math.max(0, Math.min(1, (a - altMin) / range));
-		return [0.16 + t * 0.44, 0.42 + t * 0.48, 0.26 + t * 0.4];
-	};
-
-	// DoubleSide like the shipped game: the corridor strips wind downward, and three.js
-	// flips the normal per-face for lighting only when the material is double-sided.
-	const floorMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
-	const wallMat = new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.8, metalness: 0.02, side: THREE.DoubleSide });
-	const rockMat = new THREE.MeshStandardMaterial({ color: 0x8d8478, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
-
-	const centreA = hole.alt[hole.alt.length - 1], rimA = hole.alt[cut];
-
-	// ---- Lane floor: the two edges now sit at different HEIGHTS, so banked turns bank.
-	const fpos: number[] = [], fcol: number[] = [];
-	const edge = (i: number, side: 1 | -1) => {
-		const p = path[i], w = W[i];
-		return {
-			x: p.x + p.nx * w * side,
-			y: laneY(hole, i, side, relief, bankv),
-			z: p.z + p.nz * w * side,
-			c: col(hole.alt[i]),
-		};
-	};
-	for (let i = 0; i < cut; i++) {
-		const lp = edge(i, 1), rp = edge(i, -1), lq = edge(i + 1, 1), rq = edge(i + 1, -1);
-		fpos.push(lp.x, lp.y, lp.z, rp.x, rp.y, rp.z, lq.x, lq.y, lq.z);
-		fcol.push(...lp.c, ...rp.c, ...lq.c);
-		fpos.push(rp.x, rp.y, rp.z, rq.x, rq.y, rq.z, lq.x, lq.y, lq.z);
-		fcol.push(...rp.c, ...rq.c, ...lq.c);
-	}
-	// ---- Throat. The engine seals the corridor mouth to the green opening with two collision
-	// walls but no surface, so the lane and the green read as two loose slabs. Fill the gap.
-	const gw0 = hole.greenWall[0], gw1 = hole.greenWall[hole.greenWall.length - 1];
-	const mouthL = edge(cut, 1), mouthR = edge(cut, -1);
-	const openL = Math.hypot(mouthL.x - gw0.x, mouthL.z - gw0.z) <= Math.hypot(mouthL.x - gw1.x, mouthL.z - gw1.z) ? gw0 : gw1;
-	const openR = openL === gw0 ? gw1 : gw0;
-	const THROAT = 6;
-	const thr = (side: 1 | -1, u: number) => {
-		const m = side === 1 ? mouthL : mouthR, o = side === 1 ? openL : openR;
-		return {
-			x: m.x + (o.x - m.x) * u,
-			y: m.y + (Y(rimA) - m.y) * u + 0.01,
-			z: m.z + (o.z - m.z) * u,
-			c: col(rimA),
-		};
-	};
-	for (let k = 0; k < THROAT; k++) {
-		const lp = thr(1, k / THROAT), rp = thr(-1, k / THROAT);
-		const lq = thr(1, (k + 1) / THROAT), rq = thr(-1, (k + 1) / THROAT);
-		fpos.push(lp.x, lp.y, lp.z, rp.x, rp.y, rp.z, lq.x, lq.y, lq.z);
-		fcol.push(...lp.c, ...rp.c, ...lq.c);
-		fpos.push(rp.x, rp.y, rp.z, rq.x, rq.y, rq.z, lq.x, lq.y, lq.z);
-		fcol.push(...rp.c, ...rq.c, ...lq.c);
-	}
-
-	const fgeom = new THREE.BufferGeometry();
-	fgeom.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3));
-	fgeom.setAttribute('color', new THREE.Float32BufferAttribute(fcol, 3));
-	fgeom.computeVertexNormals();
-	const floor = new THREE.Mesh(fgeom, floorMat);
-	floor.receiveShadow = true;
-	grp.add(floor);
-
-	// ---- Green: a real dish, low at the cup and rising to the rim. It starts at the cup
-	// radius, not at 0 — a full disc paved over the cup and there was no hole to sink into.
-	const RINGS = 12, SEG = 48;
-	const gpos: number[] = [], gcol: number[] = [];
-	const gp = (ri: number, si: number) => {
-		const d = hole.cupR + (ri / RINGS) * (hole.greenR - hole.cupR);
-		const ang = (si / SEG) * Math.PI * 2;
-		const a = centreA + (rimA - centreA) * (d / hole.greenR);
-		return { x: hole.cup.x + Math.cos(ang) * d, y: Y(a) + 0.02, z: hole.cup.z + Math.sin(ang) * d, c: col(a) };
-	};
-	for (let ri = 0; ri < RINGS; ri++) {
-		for (let si = 0; si < SEG; si++) {
-			const a = gp(ri, si), b = gp(ri + 1, si), c = gp(ri + 1, si + 1), d = gp(ri, si + 1);
-			gpos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
-			gcol.push(...a.c, ...b.c, ...c.c);
-			gpos.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
-			gcol.push(...a.c, ...c.c, ...d.c);
-		}
-	}
-	const ggeom = new THREE.BufferGeometry();
-	ggeom.setAttribute('position', new THREE.Float32BufferAttribute(gpos, 3));
-	ggeom.setAttribute('color', new THREE.Float32BufferAttribute(gcol, 3));
-	ggeom.computeVertexNormals();
-	const greenMesh = new THREE.Mesh(ggeom, floorMat);
-	greenMesh.receiveShadow = true;
-	grp.add(greenMesh);
-
-	// ---- Walls: extruded (inner face + top + outer face) instead of a flat ribbon.
-	const t = 1.0;
-	const wpos: number[] = [];
-	const quad = (
-		a: [number, number, number], b: [number, number, number],
-		c: [number, number, number], d: [number, number, number],
-	) => { wpos.push(...a, ...b, ...c, ...a, ...c, ...d); };
-	// The kerb hangs a short lip below the floor, then a flat paved band and a grass bank
-	// carry the course down to the lawn — the layout of the real courses in the photos.
-	// A single skirt to the lowest point turned the hole into a stone block.
-	const ppos: number[] = [], apos: number[] = [];
-	const push = (
-		out: number[], a: [number, number, number], b: [number, number, number],
-		c: [number, number, number], d: [number, number, number],
-	) => { out.push(...a, ...b, ...c, ...a, ...c, ...d); };
-	const aquad = (
-		a: [number, number, number], b: [number, number, number],
-		c: [number, number, number], d: [number, number, number],
-	) => push(apos, a, b, c, d);
-	const gy = groundYOf(hole, relief);
-	const wallRun = (pts: { ix: number; iz: number; ox: number; oz: number; y: number; over?: boolean }[]) => {
-		for (let k = 0; k < pts.length - 1; k++) {
-			const p = pts[k], q = pts[k + 1];
-			const pt = p.y + WALL_H, qt = q.y + WALL_H;
-			// Over the water the flank stops at the deck underside, leaving the arch open.
-			const pb = p.over ? p.y - DECK : p.y - LIP, qb = q.over ? q.y - DECK : q.y - LIP;
-			quad([p.ix, p.y, p.iz], [p.ix, pt, p.iz], [q.ix, qt, q.iz], [q.ix, q.y, q.iz]); // inner
-			quad([p.ix, pt, p.iz], [p.ox, pt, p.oz], [q.ox, qt, q.oz], [q.ix, qt, q.iz]); // top
-			quad([p.ox, pb, p.oz], [q.ox, qb, q.oz], [q.ox, qt, q.oz], [p.ox, pt, p.oz]); // outer
-			if (p.over || q.over) continue; // no paving or grass over the water
-			// Paving then grass bank, both sliding outward along the kerb normal.
-			const pd = Math.hypot(p.ox - p.ix, p.oz - p.iz) || 1, qd = Math.hypot(q.ox - q.ix, q.oz - q.iz) || 1;
-			const pnx = (p.ox - p.ix) / pd, pnz = (p.oz - p.iz) / pd;
-			const qnx = (q.ox - q.ix) / qd, qnz = (q.oz - q.iz) / qd;
-			const ppx = p.ox + pnx * PAVE, ppz = p.oz + pnz * PAVE;
-			const qpx = q.ox + qnx * PAVE, qpz = q.oz + qnz * PAVE;
-			push(ppos, [p.ox, p.y - LIP, p.oz], [ppx, p.y - LIP, ppz], [qpx, q.y - LIP, qpz], [q.ox, q.y - LIP, q.oz]);
-			aquad(
-				[ppx, p.y - LIP, ppz], [p.ox + pnx * APRON, p.y - DROP, p.oz + pnz * APRON],
-				[q.ox + qnx * APRON, q.y - DROP, q.oz + qnz * APRON], [qpx, q.y - LIP, qpz],
-			);
-		}
-	};
-	for (const side of [1, -1] as const) {
-		const run = [];
-		for (let i = 0; i <= cut; i++) {
-			const p = path[i], w = W[i];
-			run.push({
-				ix: p.x + p.nx * w * side, iz: p.z + p.nz * w * side,
-				ox: p.x + p.nx * (w + t) * side, oz: p.z + p.nz * (w + t) * side,
-				y: laneY(hole, i, side, relief, bankv),
-				over: !!hole.bridge && i >= hole.bridge.lo && i <= hole.bridge.hi,
-			});
-		}
-		wallRun(run);
-	}
-	// Kerb across the throat, so the lane wall runs unbroken into the green ring.
-	const kOut = 1 + t / hole.greenR;
-	for (const side of [1, -1] as const) {
-		const p = path[cut], w = W[cut];
-		const o = side === 1 ? openL : openR;
-		wallRun([
-			{
-				ix: p.x + p.nx * w * side, iz: p.z + p.nz * w * side,
-				ox: p.x + p.nx * (w + t) * side, oz: p.z + p.nz * (w + t) * side,
-				y: laneY(hole, cut, side, relief, bankv),
-			},
-			{
-				ix: o.x, iz: o.z,
-				ox: hole.cup.x + (o.x - hole.cup.x) * kOut, oz: hole.cup.z + (o.z - hole.cup.z) * kOut,
-				y: Y(rimA),
-			},
-		]);
-	}
-	// Tee cap: closes the corridor behind the ball.
-	const p0 = path[0], y0 = Y(hole.alt[0]);
-	const bx = -p0.dirX * t, bz = -p0.dirZ * t;
-	const teeL = { x: p0.x + p0.nx * (W[0] + t), z: p0.z + p0.nz * (W[0] + t) };
-	const teeR = { x: p0.x - p0.nx * (W[0] + t), z: p0.z - p0.nz * (W[0] + t) };
-	quad([teeL.x, y0 - LIP, teeL.z], [teeL.x, y0 + WALL_H, teeL.z], [teeR.x, y0 + WALL_H, teeR.z], [teeR.x, y0 - LIP, teeR.z]);
-	quad([teeL.x, y0 + WALL_H, teeL.z], [teeL.x + bx, y0 + WALL_H, teeL.z + bz], [teeR.x + bx, y0 + WALL_H, teeR.z + bz], [teeR.x, y0 + WALL_H, teeR.z]);
-	push(ppos,
-		[teeL.x, y0 - LIP, teeL.z], [teeR.x, y0 - LIP, teeR.z],
-		[teeR.x + bx * PAVE, y0 - LIP, teeR.z + bz * PAVE], [teeL.x + bx * PAVE, y0 - LIP, teeL.z + bz * PAVE],
-	);
-	aquad(
-		[teeL.x + bx * PAVE, y0 - LIP, teeL.z + bz * PAVE], [teeR.x + bx * PAVE, y0 - LIP, teeR.z + bz * PAVE],
-		[teeR.x + bx * APRON, y0 - DROP, teeR.z + bz * APRON], [teeL.x + bx * APRON, y0 - DROP, teeL.z + bz * APRON],
-	);
-
-	// Green bumper ring, following the dish rim.
-	const gw = hole.greenWall;
-	const ringRun = gw.map((p) => {
-		const k = 1 + t / hole.greenR;
-		return {
-			ix: p.x, iz: p.z,
-			ox: hole.cup.x + (p.x - hole.cup.x) * k, oz: hole.cup.z + (p.z - hole.cup.z) * k,
-			y: Y(rimA),
-		};
-	});
-	wallRun(ringRun);
-	const walls = new THREE.Mesh(stripGeom(wpos), wallMat);
-	walls.castShadow = true;
-	walls.receiveShadow = true;
-	grp.add(walls);
-	const paving = new THREE.Mesh(stripGeom(ppos), new THREE.MeshStandardMaterial({
-		color: 0xa79c8d, roughness: 1, side: THREE.DoubleSide,
-	}));
-	paving.receiveShadow = true;
-	grp.add(paving);
-	const apron = new THREE.Mesh(stripGeom(apos), new THREE.MeshStandardMaterial({
-		color: 0x3c7040, roughness: 1, side: THREE.DoubleSide,
-	}));
-	apron.receiveShadow = true;
-	grp.add(apron);
-
-	// ---- Cup: a real sunk cylinder, not a dark disc.
-	const cupY = Y(centreA) + 0.02;
-	grp.userData.cupY = cupY;
-	const cupWall = new THREE.Mesh(
-		new THREE.CylinderGeometry(hole.cupR, hole.cupR, CUP_D, 28, 1, true),
-		new THREE.MeshStandardMaterial({ color: 0x120f0c, roughness: 1, side: THREE.BackSide }),
-	);
-	cupWall.position.set(hole.cup.x, cupY - CUP_D / 2, hole.cup.z);
-	grp.add(cupWall);
-	const cupFloor = new THREE.Mesh(
-		new THREE.CircleGeometry(hole.cupR, 28),
-		new THREE.MeshBasicMaterial({ color: 0x0a0806 }),
-	);
-	cupFloor.rotation.x = -Math.PI / 2;
-	cupFloor.position.set(hole.cup.x, cupY - CUP_D, hole.cup.z);
-	grp.add(cupFloor);
-	// The rim sits on top of the dish, which now starts at the cup radius — a thin ring at
-	// the same height just z-fought with it and the hole lost its edge.
-	const cupRing = new THREE.Mesh(
-		new THREE.RingGeometry(hole.cupR, hole.cupR + 0.34, 28),
-		new THREE.MeshBasicMaterial({ color: 0xf4f0e6, side: THREE.DoubleSide }),
-	);
-	cupRing.rotation.x = -Math.PI / 2;
-	cupRing.position.set(hole.cup.x, cupY + 0.06, hole.cup.z);
-	cupRing.renderOrder = 1;
-	grp.add(cupRing);
-
-	// ---- Flag: an actual vertical pole, the main landmark once the camera tilts.
-	const pole = new THREE.Mesh(
-		new THREE.CylinderGeometry(0.09, 0.09, 7, 8),
-		new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }),
-	);
-	pole.position.set(hole.cup.x, cupY + 3.5, hole.cup.z);
-	pole.castShadow = true;
-	grp.add(pole);
-	const cloth = new THREE.Mesh(
-		new THREE.PlaneGeometry(2.2, 1.3),
-		new THREE.MeshStandardMaterial({ color: 0xff3b30, side: THREE.DoubleSide, roughness: 0.8 }),
-	);
-	cloth.position.set(hole.cup.x + 1.1, cupY + 6.3, hole.cup.z);
-	grp.add(cloth);
-
-	// ---- Obstacles: boxed rocks with sides, so they read as volumes from an angle.
-	for (const ob of hole.obstacles) {
-		const q = ob.pts;
-		const base = q.map((p) => surfaceY(hole, p.x, p.z, relief, bankv));
-		const top = q.map((_, i) => base[i] + ROCK_H);
-		const opos: number[] = [];
-		for (let k = 0; k < 4; k++) {
-			const a = q[k], b = q[(k + 1) % 4];
-			opos.push(a.x, base[k], a.z, a.x, top[k], a.z, b.x, top[(k + 1) % 4], b.z);
-			opos.push(a.x, base[k], a.z, b.x, top[(k + 1) % 4], b.z, b.x, base[(k + 1) % 4], b.z);
-		}
-		opos.push(q[0].x, top[0], q[0].z, q[1].x, top[1], q[1].z, q[2].x, top[2], q[2].z);
-		opos.push(q[0].x, top[0], q[0].z, q[2].x, top[2], q[2].z, q[3].x, top[3], q[3].z);
-		const rock = new THREE.Mesh(stripGeom(opos), rockMat);
-		rock.castShadow = true;
-		rock.receiveShadow = true;
-		grp.add(rock);
-	}
-
-	// ---- Water + bridge, from the engine's own data (the flat game already draws them).
-	// A pond dug under the arch, not a river across the scene: it only has to explain the
-	// hump, and a short hole with a river through it looked absurd.
-	let stream: { x: number; z: number; r: number } | null = null;
-	if (hole.water && hole.bridge) {
-		const { lo, hi } = hole.bridge;
-		const mid = Math.round((lo + hi) / 2);
-		const pm = path[mid];
-		// Deck underside, so the arch is a real opening rather than a hole in the wall.
-		const spos: number[] = [];
-		for (let i = lo; i < hi; i++) {
-			const a = edge(i, 1), b = edge(i, -1), c = edge(i + 1, 1), d = edge(i + 1, -1);
-			push(spos, [a.x, a.y - DECK, a.z], [b.x, b.y - DECK, b.z], [d.x, d.y - DECK, d.z], [c.x, c.y - DECK, c.z]);
-		}
-		grp.add(new THREE.Mesh(stripGeom(spos), wallMat));
-
-		const along = Math.hypot(path[hi].x - path[lo].x, path[hi].z - path[lo].z) * 0.5 + 4;
-		const across = W[mid] + PAVE + 10;
-		grp.userData.pond = { x: pm.x, z: pm.z, r: Math.max(along, across) * 1.12 };
-		// The lawn is one big plane we cannot cut, so the basin is built up rather than dug:
-		// water just above the grass, held by a low stone kerb.
-		const surf = gy + 0.04;
-		const kerbTop = gy + 0.55;
-		const rim = (ang: number, k: number, y: number): [number, number, number] => [
-			pm.x + pm.dirX * along * k * Math.cos(ang) + pm.nx * across * k * Math.sin(ang),
-			y,
-			pm.z + pm.dirZ * along * k * Math.cos(ang) + pm.nz * across * k * Math.sin(ang),
-		];
-		stream = { x: pm.x, z: pm.z, r: Math.max(along, across) };
-		const SEGP = 32;
-		const wp: number[] = [], bp: number[] = [];
-		for (let k = 0; k < SEGP; k++) {
-			const a0 = (k / SEGP) * Math.PI * 2, a1 = ((k + 1) / SEGP) * Math.PI * 2;
-			wp.push(pm.x, surf, pm.z, ...rim(a0, 1, surf), ...rim(a1, 1, surf));
-			push(bp, rim(a0, 1, surf), rim(a1, 1, surf), rim(a1, 1, kerbTop), rim(a0, 1, kerbTop));
-			push(bp, rim(a0, 1, kerbTop), rim(a1, 1, kerbTop), rim(a1, 1.1, kerbTop), rim(a0, 1.1, kerbTop));
-			push(bp, rim(a0, 1.1, kerbTop), rim(a1, 1.1, kerbTop), rim(a1, 1.1, gy - 0.2), rim(a0, 1.1, gy - 0.2));
-		}
-		grp.add(new THREE.Mesh(stripGeom(bp), new THREE.MeshStandardMaterial({
-			color: 0x9d9284, roughness: 1, side: THREE.DoubleSide,
-		})));
-		grp.add(new THREE.Mesh(stripGeom(wp), new THREE.MeshStandardMaterial({
-			color: 0x2f7fd6, roughness: 0.15, metalness: 0.35, transparent: true, opacity: 0.9, side: THREE.DoubleSide,
-		})));
-	}
-
-	// ---- Planting. At a low camera the course floats on an empty plain. Flowers hug the
-	// paving, shrubs sit behind them, trees stay well back — close conifers looked like toys.
-	const rnd = mulberry32(hole.par * 7919 + hole.path.length);
-	const decor = new THREE.Group();
-	decor.name = 'decor'; // kept apart so the occlusion probe can tell course from scenery
-	grp.add(decor);
-	const icoGeo = new THREE.IcosahedronGeometry(1, 0);
-	const shrubMat = new THREE.MeshStandardMaterial({ color: 0x3a6b33, roughness: 1, flatShading: true });
-	const darkMat = new THREE.MeshStandardMaterial({ color: 0x27502c, roughness: 1, flatShading: true });
-	const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5b4632, roughness: 1 });
-	const petalMats = [0xe8556d, 0xf2b134, 0xe8e0f0, 0xc86bd8, 0xf07f3c].map(
-		(c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, flatShading: true }),
-	);
-	const coneGeo = new THREE.ConeGeometry(1, 3, 7);
-	const trunkGeo = new THREE.CylinderGeometry(0.16, 0.24, 2, 6);
-	const bo = hole.bounds;
-	const spanX = bo.maxX - bo.minX, spanZ = bo.maxZ - bo.minZ;
-	for (let n = 0; n < 1400; n++) {
-		const x = bo.minX - 200 + rnd() * (spanX + 400);
-		const z = bo.minZ - 200 + rnd() * (spanZ + 400);
-		const i = nearestSample(hole, x, z);
-		const clear = Math.min(
-			Math.hypot(hole.path[i].x - x, hole.path[i].z - z) - W[i],
-			Math.hypot(x - hole.cup.x, z - hole.cup.z) - hole.greenR,
-		);
-		if (clear < PAVE + 2) continue;
-		if (stream && Math.hypot(x - stream.x, z - stream.z) < stream.r * 0.75) continue;
-		if (clear < APRON + 7) {
-			// Flower bed: a green tuft with a few petals on top.
-			const s = 0.7 + rnd() * 0.5;
-			const tuft = new THREE.Mesh(icoGeo, shrubMat);
-			tuft.scale.set(s, s * 0.6, s);
-			tuft.position.set(x, gy + s * 0.3, z);
-			decor.add(tuft);
-			const mat = petalMats[Math.floor(rnd() * petalMats.length)];
-			for (let k = 0; k < 3; k++) {
-				const petal = new THREE.Mesh(icoGeo, mat);
-				petal.scale.setScalar(0.26 + rnd() * 0.16);
-				petal.position.set(x + (rnd() - 0.5) * s * 1.8, gy + s * 0.7 + rnd() * 0.4, z + (rnd() - 0.5) * s * 1.8);
-				decor.add(petal);
-			}
-		} else if (clear < 70) {
-			const s = 1.6 + rnd() * 2.6;
-			const shrub = new THREE.Mesh(icoGeo, rnd() < 0.5 ? shrubMat : darkMat);
-			shrub.scale.set(s, s * 0.8, s);
-			shrub.position.set(x, gy + s * 0.55, z);
-			shrub.castShadow = true;
-			decor.add(shrub);
-		} else if (rnd() < 0.45) {
-			// A real tree is many times the lane width — at the old scale they read as bushes.
-			const s = 7 + rnd() * 7;
-			const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-			trunk.scale.setScalar(s);
-			trunk.position.set(x, gy + s, z);
-			decor.add(trunk);
-			const crown = new THREE.Mesh(rnd() < 0.45 ? coneGeo : icoGeo, darkMat);
-			const round = crown.geometry === icoGeo;
-			crown.scale.set(s * 1.5, s * (round ? 1.5 : 1.9), s * 1.5);
-			crown.position.set(x, gy + s * 2 + s * (round ? 1.2 : 2.8), z);
-			crown.castShadow = true;
-			decor.add(crown);
-		}
-	}
-
-	return grp;
-}
-
 export default function GolfProto3D() {
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -584,7 +112,9 @@ export default function GolfProto3D() {
 	const [diff, setDiff] = useState<DiffKey>('moyen');
 	const [shape, setShape] = useState('winding');
 	const [seed, setSeed] = useState(1337);
-	const [cam, setCam] = useState<Cam>({ pitch: 45, dist: 26, relief: 0.1, bank: 5, zoom: 1, mode: 'fit' });
+	const [cam, setCam] = useState<Cam>({
+		pitch: 45, dist: 26, relief: 0.1, bank: 5, zoom: 1, power: 1, mode: 'fit',
+	});
 	const [portrait, setPortrait] = useState(false);
 	const [strokes, setStrokes] = useState(0);
 	const [par, setPar] = useState(0);
@@ -603,7 +133,8 @@ export default function GolfProto3D() {
 	} | null>(null);
 	const holeRef = useRef<Hole | null>(null);
 	const ballRef = useRef<Ball>({ x: 0, z: 0, vx: 0, vz: 0 });
-	const aimRef = useRef<{ active: boolean; px: number; pz: number }>({ active: false, px: 0, pz: 0 });
+	// `px`/`pz` give the aim direction on the ground; `pull` is the power, read off the screen.
+	const aimRef = useRef({ active: false, px: 0, pz: 0, pull: 0 });
 	const azRef = useRef(0);
 	const fitRef = useRef({ x: 0, y: 0, z: 0, hx: 40, hz: 40, az: 0 }); // bounding box of the hole
 	const orbitRef = useRef<{ x: number; az: number } | null>(null);
@@ -720,9 +251,9 @@ export default function GolfProto3D() {
 		occRef.current = { hit: 0, deco: 0, total: 0 };
 		if (g.group) {
 			g.scene.remove(g.group);
-			g.group.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
+			disposeHole(g.group);
 		}
-		const grp = buildHole3D(hole, cam.relief, cam.bank);
+		const grp = buildHole3D(hole, { relief: cam.relief, bank: cam.bank });
 		g.scene.add(grp);
 		g.group = grp;
 		// Sit the surrounding lawn just under the course, else it reads as a floating table.
@@ -780,6 +311,12 @@ export default function GolfProto3D() {
 		return Math.hypot(r.left + ((v.x + 1) / 2) * r.width - cx, r.top + ((1 - v.y) / 2) * r.height - cy);
 	}, []);
 
+	/** Pull in world units for a drag of `px` pixels — the same gesture in any camera. */
+	const pullFromScreen = useCallback((px: number) => {
+		const r = canvasRef.current?.getBoundingClientRect();
+		return (px / ((r?.height || 600) * DRAG_H)) * PARAMS.maxPull;
+	}, []);
+
 	const onPointerDown = (e: React.PointerEvent) => {
 		const hole = holeRef.current, b = ballRef.current;
 		if (!hole || sunk || !isSettled(b)) return;
@@ -790,7 +327,7 @@ export default function GolfProto3D() {
 		// Grab in pixels, not world units: framed whole, the hole is far away and a fixed
 		// world radius shrinks to a couple of pixels — the ball becomes impossible to grab.
 		if (screenDist(e.clientX, e.clientY, b.x, by, b.z) <= 60 || Math.hypot(w.x - b.x, w.z - b.z) <= GRAB_R) {
-			aimRef.current = { active: true, px: w.x, pz: w.z };
+			aimRef.current = { active: true, px: w.x, pz: w.z, pull: 0 };
 		} else {
 			orbitRef.current = { x: e.clientX, az: azRef.current }; // drag away from the ball = turn around it
 		}
@@ -808,15 +345,28 @@ export default function GolfProto3D() {
 		const c = camRef.current;
 		const by = surfaceY(hole, b.x, b.z, c.relief, c.bank) + PARAMS.ballR;
 		const w = worldFromPointer(e.clientX, e.clientY, by);
-		if (w) aimRef.current = { active: true, px: w.x, pz: w.z };
+		if (w) {
+			aimRef.current = {
+				active: true, px: w.x, pz: w.z,
+				pull: pullFromScreen(screenDist(e.clientX, e.clientY, b.x, by - PARAMS.ballR, b.z)),
+			};
+		}
 	};
 
 	const onPointerUp = () => {
 		orbitRef.current = null;
-		if (!aimRef.current.active) return;
+		const aim = aimRef.current;
+		if (!aim.active) return;
 		const b = ballRef.current;
-		const v = aimToVelocity({ x: aimRef.current.px - b.x, z: aimRef.current.pz - b.z });
-		aimRef.current = { active: false, px: 0, pz: 0 };
+		aimRef.current = { active: false, px: 0, pz: 0, pull: 0 };
+		// The ground drag only gives the direction; the power comes from the screen pull.
+		const dx = aim.px - b.x, dz = aim.pz - b.z;
+		const m = Math.hypot(dx, dz);
+		if (!m) return;
+		const v = aimToVelocity(
+			{ x: (dx / m) * aim.pull, z: (dz / m) * aim.pull },
+			{ ...PARAMS, powerScale: PARAMS.powerScale * camRef.current.power },
+		);
 		if (!v) return;
 		b.vx = v.vx; b.vz = v.vz;
 		setStrokes((s) => s + 1);
@@ -870,8 +420,7 @@ export default function GolfProto3D() {
 			g.arrow.visible = aim.active;
 			if (aim.active) {
 				const dx = aim.px - b.x, dz = aim.pz - b.z;
-				const mag = Math.hypot(dx, dz) || 1;
-				const pw = Math.min(mag, PARAMS.maxPull) / PARAMS.maxPull;
+				const pw = Math.min(aim.pull, PARAMS.maxPull) / PARAMS.maxPull;
 				g.arrow.position.set(b.x, by + 0.35, b.z);
 				g.arrow.rotation.y = -Math.atan2(-dz, -dx);
 				g.arrow.scale.set(3 + pw * 10, 1, 1 + pw * 1.6);
@@ -962,12 +511,14 @@ export default function GolfProto3D() {
 				else if (blocked(kids.filter((k) => k.name === 'decor'))) o.deco++;
 			}
 
-			// Where the ball landed on screen, in canvas pixels. The snapshot harness aims its
-			// drags with it — a fixed screen point misses as soon as the framing zooms.
+			// Where the ball is, on screen (canvas pixels) and in the world. The snapshot
+			// harness aims its drags with it — a fixed screen point misses as soon as the
+			// framing zooms — and measures how far a shot rolls.
 			tmpC.set(b.x, ballY, b.z).project(g.camera);
 			(window as unknown as Record<string, unknown>).__gpBall = {
 				x: ((tmpC.x + 1) / 2) * g.renderer.domElement.clientWidth,
 				y: ((1 - tmpC.y) / 2) * g.renderer.domElement.clientHeight,
+				wx: b.x, wz: b.z, speed: Math.hypot(b.vx, b.vz),
 			};
 
 			g.renderer.render(g.scene, g.camera);
@@ -1070,14 +621,21 @@ export default function GolfProto3D() {
 						<input type="range" min="0" max="10" step="1" value={cam.bank}
 							onChange={(e) => set({ bank: +e.target.value })} />
 					</label>
+					<label className="gp-slider">
+						Puissance <b>{cam.power.toFixed(2)}×</b>
+						<input type="range" min="0.6" max="2" step="0.05" value={cam.power}
+							onChange={(e) => set({ power: +e.target.value })} />
+					</label>
 				</div>
 				<p className="gp-note">
 					Tire depuis la balle pour viser (comme dans le jeu), glisse ailleurs pour tourner le trou.
 					Le moteur est celui de <a href="/jeux/golf/">/jeux/golf</a>, inchangé : la balle reste en 2D,
 					seul l'affichage lit l'altitude. <b>Relief 0×</b> = la géométrie plate d'aujourd'hui, juste
 					vue de biais. <b>Dévers</b> incline la piste dans les virages : la poussée latérale existe
-					déjà dans le moteur, ce réglage la rend visible. <b>Balle masquée</b> compte les images où
-					le décor cache la balle — c'est le vrai risque du passage en 3D sur téléphone.
+					déjà dans le moteur, ce réglage la rend visible. La force du tir se mesure en pixels
+					(≈ 28&nbsp;% de la hauteur = plein pot) : le même geste tape pareil quelle que soit la
+					caméra. <b>Balle masquée</b> compte les images où le décor cache la balle — c'est le vrai
+					risque du passage en 3D sur téléphone.
 				</p>
 			</div>
 		</div>

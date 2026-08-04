@@ -26,15 +26,23 @@ const relief = page.locator('.gp-slider input').nth(3);
 const bank = page.locator('.gp-slider input').nth(4);
 
 // Pull the ball back down the fairway: aim drag from the ball toward the camera.
-const swing = async (pull = 55) => {
+// Returns the peak speed just after release — the honest measure of shot power, since
+// how far the ball rolls also depends on the walls it hits.
+const swing = async (pull = 55, drift = 12) => {
 	const b = await stage.boundingBox();
 	const p = await page.evaluate(() => window.__gpBall);
 	const cx = b.x + (p ? p.x : b.width / 2), cy = b.y + (p ? p.y : b.height * 0.72);
 	await page.mouse.move(cx, cy);
 	await page.mouse.down();
-	await page.mouse.move(cx + 12, cy + pull, { steps: 12 });
+	await page.mouse.move(cx + drift, cy + pull, { steps: 12 });
 	await page.mouse.up();
-	await page.waitForTimeout(4500);
+	let peak = 0;
+	for (let i = 0; i < 10; i++) {
+		peak = Math.max(peak, (await page.evaluate(() => window.__gpBall)).speed);
+		await page.waitForTimeout(60);
+	}
+	await page.waitForTimeout(4000);
+	return peak;
 };
 
 // ---- Wide format: framing sweep.
@@ -113,6 +121,21 @@ await shot('phone-shoulder');
 await swing();
 await shot('phone-shoulder-rolling');
 report['épaule 30°'] = (await chips()).slice(1, 3).join(' / ');
+
+// ---- Launch power per camera. Aim used to be measured on the ground plane, so the same
+// drag was worth half the speed from a shoulder camera. These two lines should now match.
+await click(/Format large/);
+await click('Ligne droite');
+for (const [mode, label] of [['large', /Trou entier/], ['épaule', /Caméra d'épaule/]]) {
+	await click(label);
+	const peaks = [];
+	for (const frac of [0.15, 0.3]) {
+		await click('Nouveau trou');
+		const box = await stage.boundingBox();
+		peaks.push(`${frac * 100}%h → ${(await swing(box.height * frac, 0)).toFixed(1)} u/s`);
+	}
+	report[`tir ${mode}`] = peaks.join(' · ');
+}
 
 console.log(JSON.stringify(report, null, 1));
 await browser.close();
