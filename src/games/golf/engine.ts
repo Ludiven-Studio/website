@@ -161,7 +161,8 @@ function makeSegment(ax: number, az: number, bx: number, bz: number, ref: Vec, i
 	return { ax, az, bx, bz, nx, nz };
 }
 
-export function generateHole(rng: Rng, diff: DiffLevel): Hole {
+/** `ctrlOverride` draws an authored shape instead of the random walk (proto only). */
+export function generateHole(rng: Rng, diff: DiffLevel, ctrlOverride?: Vec[]): Hole {
 	const hw = diff.width / 2;
 	const baseStep = diff.length / (diff.bends - 1);
 	const SAMPLES = clamp(Math.round(diff.length / 1.6), 40, 200);
@@ -169,18 +170,7 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	// Only compare samples far enough apart in arc length that being close in space means a real fold.
 	const gap = Math.max(8, Math.ceil((minSep * 1.5) / (diff.length / (SAMPLES - 1))));
 
-	// Winding centerline: more bends, varied section lengths, sharper doglegs (no backtrack).
-	const buildPath = (): PathPoint[] => {
-		const base = -Math.PI / 2 + (rng() - 0.5) * 0.7;
-		let heading = base, x = 0, z = 0;
-		const ctrl: Vec[] = [{ x, z }];
-		for (let i = 1; i < diff.bends; i++) {
-			heading = clamp(heading + (rng() - 0.5) * 2.0, base - 1.5, base + 1.5);
-			const stp = baseStep * (0.6 + rng() * 0.9);
-			x += Math.cos(heading) * stp;
-			z += Math.sin(heading) * stp;
-			ctrl.push({ x, z });
-		}
+	const sampleCtrl = (ctrl: Vec[]): PathPoint[] => {
 		const raw: Vec[] = [];
 		for (let s = 0; s < SAMPLES; s++) raw.push(catmullOpen(ctrl, s / (SAMPLES - 1)));
 		const pp: PathPoint[] = [];
@@ -193,14 +183,34 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 		}
 		return pp;
 	};
+	// Winding centerline: more bends, varied section lengths, sharper doglegs (no backtrack).
+	const buildPath = (): PathPoint[] => {
+		const base = -Math.PI / 2 + (rng() - 0.5) * 0.7;
+		let heading = base, x = 0, z = 0;
+		const ctrl: Vec[] = [{ x, z }];
+		for (let i = 1; i < diff.bends; i++) {
+			heading = clamp(heading + (rng() - 0.5) * 2.0, base - 1.5, base + 1.5);
+			const stp = baseStep * (0.6 + rng() * 0.9);
+			x += Math.cos(heading) * stp;
+			z += Math.sin(heading) * stp;
+			ctrl.push({ x, z });
+		}
+		return sampleCtrl(ctrl);
+	};
 	const selfIntersects = (pp: PathPoint[]): boolean => {
 		for (let i = 0; i < pp.length; i++)
 			for (let j = i + gap; j < pp.length; j++)
 				if (Math.hypot(pp[i].x - pp[j].x, pp[i].z - pp[j].z) < minSep) return true;
 		return false;
 	};
-	let path = buildPath();
-	for (let attempt = 0; attempt < 40 && selfIntersects(path); attempt++) path = buildPath();
+	let path: PathPoint[];
+	if (ctrlOverride) {
+		// An authored shape is kept as drawn — a spiral would never pass the fold check.
+		path = sampleCtrl(ctrlOverride);
+	} else {
+		path = buildPath();
+		for (let attempt = 0; attempt < 40 && selfIntersects(path); attempt++) path = buildPath();
+	}
 
 	// Variable half-width: smooth low-frequency variation (wider/narrower), tapering to a
 	// narrow "mouth" near the cup so the corridor opens into a wider circular green.
@@ -211,7 +221,10 @@ export function generateHole(rng: Rng, diff: DiffLevel): Hole {
 	const widths: number[] = [];
 	for (let i = 0; i < SAMPLES; i++) {
 		const t = i / (SAMPLES - 1);
-		const factor = 1 + 0.34 * Math.sin(t * Math.PI * f1 + ph1) + 0.16 * Math.sin(t * Math.PI * f2 + ph2);
+		// An authored shape is a drawn figure — its lane keeps an even width, like a real course.
+		const factor = ctrlOverride
+			? 1
+			: 1 + 0.34 * Math.sin(t * Math.PI * f1 + ph1) + 0.16 * Math.sin(t * Math.PI * f2 + ph2);
 		let w = clamp(hw * factor, minHalf, hw * 1.6);
 		const nearCup = Math.max(0, 1 - (SAMPLES - 1 - i) / (SAMPLES * 0.12));
 		w = w * (1 - nearCup) + mouthHalf * nearCup;

@@ -38,7 +38,21 @@ const swing = async () => {
 await shot('fit-default');
 await relief.fill('0'); await page.waitForTimeout(1200); await shot('fit-flat');
 await relief.fill('1.6'); await page.waitForTimeout(1200); await shot('fit-relief16');
-await relief.fill('1'); await page.waitForTimeout(1200);
+await relief.fill('0.5'); await page.waitForTimeout(1200);
+
+// ---- Authored shapes: one shot per figure, at the default framing.
+const SHAPES = [['Ligne droite', 'straight'], ['Coude', 'elbow'], ['Double virage', 'ess'],
+	['Fer à cheval', 'horseshoe'], ['Spirale', 'spiral']];
+for (const [label, slug] of SHAPES) {
+	await click(label);
+	await page.waitForTimeout(1200);
+	await shot(`shape-${slug}`);
+}
+// Low angle on a short hole: the only view that shows whether the arch is open.
+await click('Ligne droite');
+await pitch.fill('20'); await page.waitForTimeout(1400); await shot('bridge-low');
+await pitch.fill('45'); await page.waitForTimeout(600);
+await click('Aléatoire (moteur)');
 
 for (const p of [20, 30, 60]) {
 	await pitch.fill(String(p));

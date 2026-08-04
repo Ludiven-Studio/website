@@ -9,6 +9,7 @@ import {
 	isSettled,
 	type Hole,
 	type Ball,
+	type Vec,
 } from '../games/golf/engine';
 import { mulberry32 } from '../games/prng';
 
@@ -29,17 +30,70 @@ const MODES: [CamMode, string][] = [
 	['top', 'Vue du dessus (jeu actuel)'],
 ];
 const STEP = 1000 / 60;
-const BANK_VIS = 4; // the game's shading constant — reused here as a real height
+const BANK_VIS = 2; // the game's shading constant — reused here as a real height
 const WALL_H = 1.4; // wall height above the floor (the game's flat ribbon y)
 const GRAB_R = 4.5;
 const ROCK_H = 1.6;
 const LIP = 0.6; // how far the kerb's outer face hangs below the floor
+const DECK = 1.3; // bridge deck thickness — below it the arch is open water
 const PAVE = 4.5; // paved band around the lane, like the real courses
 const APRON = 10; // where the grass bank beyond the paving lands
-const DROP = 2.4; // how far that bank falls
+const DROP = 3.4; // how far that bank falls — also the headroom under the bridge
 
 type CamMode = 'fit' | 'shoulder' | 'top';
 interface Cam { pitch: number; dist: number; relief: number; mode: CamMode }
+
+/* ---------- authored shapes ----------
+   A real hole is short, wide and reads as one clear figure; the engine's random walk
+   draws long meandering ribbons instead. These are hand-drawn polylines — the engine
+   still does everything else (widths, walls, green, obstacles, relief). */
+interface Shape { key: string; label: string; width: number; length: number; ctrl?: Vec[] }
+
+/** Resample a polyline at even arc length, so Catmull sampling and `ds` stay uniform. */
+function mkShape(key: string, label: string, width: number, poly: Vec[]): Shape {
+	const cum = [0];
+	for (let i = 1; i < poly.length; i++)
+		cum.push(cum[i - 1] + Math.hypot(poly[i].x - poly[i - 1].x, poly[i].z - poly[i - 1].z));
+	const length = cum[cum.length - 1];
+	const N = 16;
+	const ctrl: Vec[] = [];
+	for (let k = 0; k <= N; k++) {
+		const t = (length * k) / N;
+		let i = 1;
+		while (i < cum.length - 1 && cum[i] < t) i++;
+		const u = (t - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
+		ctrl.push({
+			x: poly[i - 1].x + (poly[i].x - poly[i - 1].x) * u,
+			z: poly[i - 1].z + (poly[i].z - poly[i - 1].z) * u,
+		});
+	}
+	return { key, label, width, length, ctrl };
+}
+
+/** Coils in to the middle, where the green sits. Kept narrow so two coils never touch. */
+function spiralPoly(): Vec[] {
+	const pts: Vec[] = [];
+	for (let i = 0; i <= 120; i++) {
+		const t = i / 120;
+		const a = t * 1.6 * Math.PI * 2;
+		const r = 36 + (2 - 36) * t;
+		pts.push({ x: Math.cos(a) * r, z: Math.sin(a) * r });
+	}
+	return pts;
+}
+
+const SHAPES: Shape[] = [
+	{ key: 'winding', label: 'Aléatoire (moteur)', width: 0, length: 0 },
+	mkShape('straight', 'Ligne droite', 15, [{ x: 0, z: 0 }, { x: 0, z: -64 }]),
+	mkShape('elbow', 'Coude', 14, [{ x: 0, z: 0 }, { x: 0, z: -44 }, { x: 44, z: -44 }]),
+	mkShape('ess', 'Double virage', 13, [
+		{ x: 0, z: 0 }, { x: 0, z: -20 }, { x: 28, z: -36 }, { x: 28, z: -60 }, { x: 0, z: -76 },
+	]),
+	mkShape('horseshoe', 'Fer à cheval', 13, [
+		{ x: 0, z: 0 }, { x: 0, z: -40 }, { x: 17, z: -54 }, { x: 34, z: -40 }, { x: 34, z: -4 },
+	]),
+	mkShape('spiral', 'Spirale', 8, spiralPoly()),
+];
 
 /** Height of the lane at path sample `i`, `u` = lateral position (-1 right … +1 left). */
 const laneAlt = (hole: Hole, i: number, u: number): number => hole.alt[i] - u * BANK_VIS * hole.bank[i];
@@ -122,6 +176,8 @@ function buildHole3D(hole: Hole, relief: number): THREE.Group {
 	const wallMat = new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.8, metalness: 0.02, side: THREE.DoubleSide });
 	const rockMat = new THREE.MeshStandardMaterial({ color: 0x8d8478, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
 
+	const centreA = hole.alt[hole.alt.length - 1], rimA = hole.alt[cut];
+
 	// ---- Lane floor: the two edges now sit at different HEIGHTS, so banked turns bank.
 	const fpos: number[] = [], fcol: number[] = [];
 	const edge = (i: number, side: 1 | -1) => {
@@ -136,6 +192,28 @@ function buildHole3D(hole: Hole, relief: number): THREE.Group {
 		fpos.push(rp.x, rp.y, rp.z, rq.x, rq.y, rq.z, lq.x, lq.y, lq.z);
 		fcol.push(...rp.c, ...rq.c, ...lq.c);
 	}
+	// ---- Throat. The engine seals the corridor mouth to the green opening with two collision
+	// walls but no surface, so the lane and the green read as two loose slabs. Fill the gap.
+	const gw0 = hole.greenWall[0], gw1 = hole.greenWall[hole.greenWall.length - 1];
+	const mouthL = edge(cut, 1), mouthR = edge(cut, -1);
+	const openL = Math.hypot(mouthL.x - gw0.x, mouthL.z - gw0.z) <= Math.hypot(mouthL.x - gw1.x, mouthL.z - gw1.z) ? gw0 : gw1;
+	const openR = openL === gw0 ? gw1 : gw0;
+	const THROAT = 6;
+	const thr = (side: 1 | -1, u: number) => {
+		const m = side === 1 ? mouthL : mouthR, o = side === 1 ? openL : openR;
+		const m0 = laneAlt(hole, cut, side);
+		const a = m0 + (rimA - m0) * u;
+		return { x: m.x + (o.x - m.x) * u, y: Y(a) + 0.01, z: m.z + (o.z - m.z) * u, c: col(a) };
+	};
+	for (let k = 0; k < THROAT; k++) {
+		const lp = thr(1, k / THROAT), rp = thr(-1, k / THROAT);
+		const lq = thr(1, (k + 1) / THROAT), rq = thr(-1, (k + 1) / THROAT);
+		fpos.push(lp.x, lp.y, lp.z, rp.x, rp.y, rp.z, lq.x, lq.y, lq.z);
+		fcol.push(...lp.c, ...rp.c, ...lq.c);
+		fpos.push(rp.x, rp.y, rp.z, rq.x, rq.y, rq.z, lq.x, lq.y, lq.z);
+		fcol.push(...rp.c, ...rq.c, ...lq.c);
+	}
+
 	const fgeom = new THREE.BufferGeometry();
 	fgeom.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3));
 	fgeom.setAttribute('color', new THREE.Float32BufferAttribute(fcol, 3));
@@ -145,7 +223,6 @@ function buildHole3D(hole: Hole, relief: number): THREE.Group {
 	grp.add(floor);
 
 	// ---- Green: a real dish, low at the cup and rising to the rim.
-	const centreA = hole.alt[hole.alt.length - 1], rimA = hole.alt[cut];
 	const RINGS = 12, SEG = 48;
 	const gpos: number[] = [], gcol: number[] = [];
 	const gp = (ri: number, si: number) => {
@@ -195,8 +272,8 @@ function buildHole3D(hole: Hole, relief: number): THREE.Group {
 		for (let k = 0; k < pts.length - 1; k++) {
 			const p = pts[k], q = pts[k + 1];
 			const pt = p.y + WALL_H, qt = q.y + WALL_H;
-			// Over the stream the flank runs down to the water, so the hump reads as a bridge.
-			const pb = p.over ? gy : p.y - LIP, qb = q.over ? gy : q.y - LIP;
+			// Over the water the flank stops at the deck underside, leaving the arch open.
+			const pb = p.over ? p.y - DECK : p.y - LIP, qb = q.over ? q.y - DECK : q.y - LIP;
 			quad([p.ix, p.y, p.iz], [p.ix, pt, p.iz], [q.ix, qt, q.iz], [q.ix, q.y, q.iz]); // inner
 			quad([p.ix, pt, p.iz], [p.ox, pt, p.oz], [q.ox, qt, q.oz], [q.ix, qt, q.iz]); // top
 			quad([p.ox, pb, p.oz], [q.ox, qb, q.oz], [q.ox, qt, q.oz], [p.ox, pt, p.oz]); // outer
@@ -226,6 +303,24 @@ function buildHole3D(hole: Hole, relief: number): THREE.Group {
 			});
 		}
 		wallRun(run);
+	}
+	// Kerb across the throat, so the lane wall runs unbroken into the green ring.
+	const kOut = 1 + t / hole.greenR;
+	for (const side of [1, -1] as const) {
+		const p = path[cut], w = W[cut];
+		const o = side === 1 ? openL : openR;
+		wallRun([
+			{
+				ix: p.x + p.nx * w * side, iz: p.z + p.nz * w * side,
+				ox: p.x + p.nx * (w + t) * side, oz: p.z + p.nz * (w + t) * side,
+				y: Y(laneAlt(hole, cut, side)),
+			},
+			{
+				ix: o.x, iz: o.z,
+				ox: hole.cup.x + (o.x - hole.cup.x) * kOut, oz: hole.cup.z + (o.z - hole.cup.z) * kOut,
+				y: Y(rimA),
+			},
+		]);
 	}
 	// Tee cap: closes the corridor behind the ball.
 	const p0 = path[0], y0 = Y(hole.alt[0]);
@@ -326,29 +421,50 @@ function buildHole3D(hole: Hole, relief: number): THREE.Group {
 		grp.add(rock);
 	}
 
-	// ---- Water + bridge, straight from the engine's own data (the flat game already draws
-	// them). The lane humps over the stream, so the water sits down at lawn level and the
-	// paving steps aside — otherwise the bridge reads as a paved causeway.
+	// ---- Water + bridge, from the engine's own data (the flat game already draws them).
+	// A pond dug under the arch, not a river across the scene: it only has to explain the
+	// hump, and a short hole with a river through it looked absurd.
 	let stream: { x: number; z: number; r: number } | null = null;
 	if (hole.water && hole.bridge) {
-		// Build the stream across the lane rather than reusing the flat game's rectangle:
-		// it has to run out to both banks for the hump to read as a bridge.
 		const { lo, hi } = hole.bridge;
-		const pm = path[Math.round((lo + hi) / 2)];
-		const half = Math.max(4, Math.hypot(path[hi].x - path[lo].x, path[hi].z - path[lo].z) * 0.3);
-		const reach = W[Math.round((lo + hi) / 2)] + APRON + 34;
-		const corner = (a: number, b: number) => [
-			pm.x + pm.dirX * half * a + pm.nx * reach * b,
-			gy + 0.05,
-			pm.z + pm.dirZ * half * a + pm.nz * reach * b,
-		] as [number, number, number];
-		stream = { x: pm.x, z: pm.z, r: Math.hypot(half, reach) };
-		const wp: number[] = [];
-		push(wp, corner(1, 1), corner(1, -1), corner(-1, -1), corner(-1, 1));
-		const water = new THREE.Mesh(stripGeom(wp), new THREE.MeshStandardMaterial({
+		const mid = Math.round((lo + hi) / 2);
+		const pm = path[mid];
+		// Deck underside, so the arch is a real opening rather than a hole in the wall.
+		const spos: number[] = [];
+		for (let i = lo; i < hi; i++) {
+			const a = edge(i, 1), b = edge(i, -1), c = edge(i + 1, 1), d = edge(i + 1, -1);
+			push(spos, [a.x, a.y - DECK, a.z], [b.x, b.y - DECK, b.z], [d.x, d.y - DECK, d.z], [c.x, c.y - DECK, c.z]);
+		}
+		grp.add(new THREE.Mesh(stripGeom(spos), wallMat));
+
+		const along = Math.hypot(path[hi].x - path[lo].x, path[hi].z - path[lo].z) * 0.5 + 4;
+		const across = W[mid] + PAVE + 10;
+		grp.userData.pond = { x: pm.x, z: pm.z, r: Math.max(along, across) * 1.12 };
+		// The lawn is one big plane we cannot cut, so the basin is built up rather than dug:
+		// water just above the grass, held by a low stone kerb.
+		const surf = gy + 0.04;
+		const kerbTop = gy + 0.55;
+		const rim = (ang: number, k: number, y: number): [number, number, number] => [
+			pm.x + pm.dirX * along * k * Math.cos(ang) + pm.nx * across * k * Math.sin(ang),
+			y,
+			pm.z + pm.dirZ * along * k * Math.cos(ang) + pm.nz * across * k * Math.sin(ang),
+		];
+		stream = { x: pm.x, z: pm.z, r: Math.max(along, across) };
+		const SEGP = 32;
+		const wp: number[] = [], bp: number[] = [];
+		for (let k = 0; k < SEGP; k++) {
+			const a0 = (k / SEGP) * Math.PI * 2, a1 = ((k + 1) / SEGP) * Math.PI * 2;
+			wp.push(pm.x, surf, pm.z, ...rim(a0, 1, surf), ...rim(a1, 1, surf));
+			push(bp, rim(a0, 1, surf), rim(a1, 1, surf), rim(a1, 1, kerbTop), rim(a0, 1, kerbTop));
+			push(bp, rim(a0, 1, kerbTop), rim(a1, 1, kerbTop), rim(a1, 1.1, kerbTop), rim(a0, 1.1, kerbTop));
+			push(bp, rim(a0, 1.1, kerbTop), rim(a1, 1.1, kerbTop), rim(a1, 1.1, gy - 0.2), rim(a0, 1.1, gy - 0.2));
+		}
+		grp.add(new THREE.Mesh(stripGeom(bp), new THREE.MeshStandardMaterial({
+			color: 0x9d9284, roughness: 1, side: THREE.DoubleSide,
+		})));
+		grp.add(new THREE.Mesh(stripGeom(wp), new THREE.MeshStandardMaterial({
 			color: 0x2f7fd6, roughness: 0.15, metalness: 0.35, transparent: true, opacity: 0.9, side: THREE.DoubleSide,
-		}));
-		grp.add(water);
+		})));
 	}
 
 	// ---- Planting. At a low camera the course floats on an empty plain. Flowers hug the
@@ -423,8 +539,9 @@ export default function GolfProto3D() {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
 	const [diff, setDiff] = useState<DiffKey>('moyen');
+	const [shape, setShape] = useState('winding');
 	const [seed, setSeed] = useState(1337);
-	const [cam, setCam] = useState<Cam>({ pitch: 45, dist: 26, relief: 1, mode: 'fit' });
+	const [cam, setCam] = useState<Cam>({ pitch: 45, dist: 26, relief: 0.5, mode: 'fit' });
 	const [portrait, setPortrait] = useState(false);
 	const [strokes, setStrokes] = useState(0);
 	const [par, setPar] = useState(0);
@@ -530,7 +647,11 @@ export default function GolfProto3D() {
 	useEffect(() => {
 		const g = sceneRef.current;
 		if (!g) return;
-		const hole = generateHole(mulberry32(seed), DIFFS[diff]);
+		// An authored shape brings its own length and width; the difficulty still sets the
+		// cup size, the obstacles and the slopes.
+		const sh = SHAPES.find((s) => s.key === shape) ?? SHAPES[0];
+		const level = sh.ctrl ? { ...DIFFS[diff], length: sh.length, width: sh.width } : DIFFS[diff];
+		const hole = generateHole(mulberry32(seed), level, sh.ctrl);
 		holeRef.current = hole;
 		ballRef.current = { x: hole.start.x, z: hole.start.z, vx: 0, vz: 0 };
 		setStrokes(0);
@@ -547,17 +668,23 @@ export default function GolfProto3D() {
 		// Sit the surrounding lawn just under the course, else it reads as a floating table.
 		g.ground.position.y = groundYOf(hole, cam.relief);
 
+		// The engine's bounds ignore the pond, which the proto adds — widen or it gets cropped.
 		const bo = hole.bounds;
-		const fx = (bo.minX + bo.maxX) / 2, fz = (bo.minZ + bo.maxZ) / 2;
+		const pond = grp.userData.pond as { x: number; z: number; r: number } | undefined;
+		const minX = Math.min(bo.minX, pond ? pond.x - pond.r : Infinity);
+		const maxX = Math.max(bo.maxX, pond ? pond.x + pond.r : -Infinity);
+		const minZ = Math.min(bo.minZ, pond ? pond.z - pond.r : Infinity);
+		const maxZ = Math.max(bo.maxZ, pond ? pond.z + pond.r : -Infinity);
+		const fx = (minX + maxX) / 2, fz = (minZ + maxZ) / 2;
 		fitRef.current = {
 			x: fx, y: altAt(hole, fx, fz) * cam.relief, z: fz,
-			hx: (bo.maxX - bo.minX) / 2 + 3, hz: (bo.maxZ - bo.minZ) / 2 + 3,
+			hx: (maxX - minX) / 2 + 3, hz: (maxZ - minZ) / 2 + 3,
 			az: Math.atan2(hole.cup.z - hole.start.z, hole.cup.x - hole.start.x),
 		};
 		g.ground.position.x = fx; g.ground.position.z = fz;
 		azRef.current = fitRef.current.az;
 		orbitRef.current = null;
-	}, [seed, diff, cam.relief]);
+	}, [seed, diff, shape, cam.relief]);
 
 	/* ---------- input ---------- */
 	const worldFromPointer = useCallback((cx: number, cy: number, y: number) => {
@@ -800,6 +927,14 @@ export default function GolfProto3D() {
 					))}
 				</div>
 				<div className="gp-row">
+					<span className="gp-lab">Forme</span>
+					{SHAPES.map((s) => (
+						<button key={s.key} className={`gp-btn ${shape === s.key ? 'on' : ''}`} onClick={() => setShape(s.key)}>
+							{s.label}
+						</button>
+					))}
+				</div>
+				<div className="gp-row">
 					<label className="gp-slider">
 						Inclinaison <b>{cam.pitch}°</b>
 						<input type="range" min="12" max="85" value={cam.pitch} disabled={cam.mode === 'top'}
@@ -842,6 +977,7 @@ const CSS = `
 .gp-btn { border: 1.5px solid var(--gray-700); background: var(--gray-999_40); color: var(--gray-100); font: inherit; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 7px 14px; cursor: pointer; }
 .gp-btn:hover { border-color: var(--accent-regular); color: var(--gray-0); }
 .gp-btn.on { background: var(--accent-regular); border-color: var(--accent-regular); color: var(--accent-text-over); }
+.gp-lab { font-size: 13px; color: var(--gray-300); }
 .gp-slider { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gray-300); }
 .gp-slider b { color: var(--gray-100); font-variant-numeric: tabular-nums; min-width: 3.2em; }
 .gp-slider input { width: 130px; }
