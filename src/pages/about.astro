@@ -127,6 +127,11 @@ import Hero from '../components/Hero.astro';
 					</table>
 				</div>
 			</section>
+
+			<p class="labo-link">
+				Et pour les curieux, un détour par le <a href="/labo/">labo</a>&nbsp;: mes essais de rendu 3D
+				dans le navigateur.
+			</p>
 		</main>
 
 		<ContactCTA />
@@ -187,6 +192,25 @@ import Hero from '../components/Hero.astro';
 		text-decoration-color: currentColor;
 	}
 
+	.labo-link {
+		margin: -1.5rem 0 0;
+		font-size: var(--text-sm);
+		color: var(--gray-400);
+	}
+
+	.labo-link a {
+		color: inherit;
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: color var(--theme-transition), text-decoration-color var(--theme-transition);
+	}
+
+	.labo-link a:hover,
+	.labo-link a:focus {
+		color: var(--gray-200);
+		text-decoration-color: currentColor;
+	}
+
 	@media (min-width: 50em) {
 		.about {
 			display: grid;
@@ -200,6 +224,10 @@ import Hero from '../components/Hero.astro';
 		section {
 			display: contents;
 			font-size: var(--text-lg);
+		}
+
+		.labo-link {
+			grid-column-start: 2;
 		}
 	}
 </style>
