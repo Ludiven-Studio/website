@@ -277,9 +277,14 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		ballRing.visible = false;
 		scene.add(ballRing);
 
-		const aimArrow = new THREE.Mesh(buildArrowGeom(), new THREE.MeshBasicMaterial({ color: 0x30d158, side: THREE.DoubleSide }));
+		// Drawn over everything: the arrow often runs into a kerb or an obstacle, and the
+		// player still needs to read where the shot points.
+		const aimArrow = new THREE.Mesh(buildArrowGeom(), new THREE.MeshBasicMaterial({
+			color: 0x30d158, side: THREE.DoubleSide, depthTest: false, depthWrite: false,
+		}));
 		aimArrow.visible = false;
 		aimArrow.frustumCulled = false;
+		aimArrow.renderOrder = 12;
 		scene.add(aimArrow);
 
 		const holeGroup = new THREE.Group();

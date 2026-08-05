@@ -89,6 +89,7 @@ export interface Ball {
 
 export interface BallParams {
 	ballR: number;
+	wallPad: number; // extra collision clearance: a ball flush to the kerb hides behind it
 	decel: number; // friction deceleration (units/s²)
 	restitution: number; // wall bounce energy kept
 	captureSpeed: number; // drop in the cup below this speed
@@ -101,6 +102,7 @@ export interface BallParams {
 
 export const PARAMS: BallParams = {
 	ballR: 0.7,
+	wallPad: 0.4,
 	decel: 7,
 	restitution: 0.7,
 	captureSpeed: 8,
@@ -479,7 +481,7 @@ export function stepBall(
 	// Fine enough that a full-speed ball can't skip the cup core.
 	const sub = clamp(Math.ceil((ballSpeed(b) * dt) / hole.coreR), 1, 16);
 	const h = dt / sub;
-	const r = P.ballR;
+	const r = P.ballR + P.wallPad;
 	let sunk = false;
 
 	for (let i = 0; i < sub && !sunk; i++) {
