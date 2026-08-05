@@ -80,7 +80,11 @@ const GRAB_R = 4.5; // world radius around the ball that starts an aim…
 const GRAB_PX = 60; // …or this many pixels, for when the whole hole is framed far away
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🏌️', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
+const INTRO_MS = 1900; // opening flyover, sky → behind the ball
+const CAM_GLIDE_MS = 620; // and the same move when the camera button is pressed
 const tmpV = new THREE.Vector3();
+const camEye = new THREE.Vector3();
+const camLook = new THREE.Vector3();
 
 interface Ghost {
 	mesh: THREE.Mesh;
@@ -176,6 +180,10 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const aimRef = useRef({ active: false, px: 0, pz: 0, pull: 0 });
 	const zoomRef = useRef(1);
 	const camModeRef = useRef<CamMode>('fit');
+	// A camera move is a blend from a frozen pose toward whatever the live mode wants.
+	const camTweenRef = useRef<{ eye: THREE.Vector3; look: THREE.Vector3; t0: number; dur: number } | null>(null);
+	const camLookRef = useRef(new THREE.Vector3());
+	const introRef = useRef(false);
 	const azRef = useRef(0); // camera azimuth around the target
 	// Bounding box of the hole. `base` is the tee→cup heading; `az`/`azTop` are the framings
 	// derived from it, which depend on the canvas shape and so are refreshed on every resize.
@@ -415,7 +423,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		g.shade.visible = sinkRef.current === null;
 
 		// "Touch here to aim" ring around the ball (only when it's the player's turn).
-		const canAim = runningRef.current && !doneRef.current && isSettled(b);
+		const canAim = runningRef.current && !doneRef.current && isSettled(b)
+			&& !introRef.current && !camTweenRef.current;
 		g.ballRing.position.set(pose.x, by + 0.09, pose.z);
 		g.ballRing.visible = canAim && !aimRef.current.active;
 
@@ -434,28 +443,31 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		}
 
 		// Camera. `fit` and `top` both frame the whole hole and differ only by the tilt;
-		// `shoulder` is the other end of the spectrum, close behind the ball.
+		// `shoulder` is the other end of the spectrum, close behind the ball. Every mode is
+		// resolved to an eye + look-at pair, so two of them can be blended.
 		const f = fitRef.current;
-		if (mode === 'shoulder') {
-			const p = hole.path[nearestSample(hole, pose.x, pose.z)];
-			const want = Math.atan2(p.dirZ, p.dirX);
-			if (!orbitRef.current) {
-				let d = ((want - azRef.current + Math.PI) % (Math.PI * 2)) - Math.PI;
-				if (d < -Math.PI) d += Math.PI * 2;
-				azRef.current += d * 0.03; // ease toward "down the fairway"
+		const poseOf = (m: CamMode) => {
+			if (m === 'shoulder') {
+				const p = hole.path[nearestSample(hole, pose.x, pose.z)];
+				const want = Math.atan2(p.dirZ, p.dirX);
+				if (!orbitRef.current) {
+					let d = ((want - azRef.current + Math.PI) % (Math.PI * 2)) - Math.PI;
+					if (d < -Math.PI) d += Math.PI * 2;
+					azRef.current += d * 0.03; // ease toward "down the fairway"
+				}
+				const pitch = (SHOULDER_PITCH * Math.PI) / 180;
+				const flat = Math.cos(pitch) * SHOULDER_DIST;
+				camEye.set(
+					pose.x - Math.cos(azRef.current) * flat,
+					by + Math.sin(pitch) * SHOULDER_DIST,
+					pose.z - Math.sin(azRef.current) * flat,
+				);
+				// Aim ahead of the ball, not at it, so the fairway fills the frame.
+				camLook.set(pose.x + Math.cos(azRef.current) * 10, by + 1.2, pose.z + Math.sin(azRef.current) * 10);
+				return;
 			}
-			const pitch = (SHOULDER_PITCH * Math.PI) / 180;
-			const flat = Math.cos(pitch) * SHOULDER_DIST;
-			g.camera.position.set(
-				pose.x - Math.cos(azRef.current) * flat,
-				by + Math.sin(pitch) * SHOULDER_DIST,
-				pose.z - Math.sin(azRef.current) * flat,
-			);
-			// Aim ahead of the ball, not at it, so the fairway fills the frame.
-			g.camera.lookAt(pose.x + Math.cos(azRef.current) * 10, by + 1.2, pose.z + Math.sin(azRef.current) * 10);
-		} else {
-			const pitch = ((mode === 'top' ? TOP_PITCH : PITCH) * Math.PI) / 180;
-			const az = mode === 'top' ? f.azTop : azRef.current;
+			const pitch = ((m === 'top' ? TOP_PITCH : PITCH) * Math.PI) / 180;
+			const az = m === 'top' ? f.azTop : azRef.current;
 			const place = (d: number, tx: number, ty: number, tz: number) => {
 				g.camera.position.set(
 					tx - Math.cos(az) * Math.cos(pitch) * d,
@@ -464,6 +476,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				);
 				g.camera.lookAt(tx, ty, tz);
 				g.camera.updateMatrixWorld();
+				camLook.set(tx, ty, tz);
 			};
 			// The closed-form fit is only an ortho approximation — under a tilt the near end
 			// of the course grows and spills out. Seed with it, then pull back until the four
@@ -488,7 +501,26 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				return Math.max(mid - r, Math.min(mid + r, v));
 			};
 			place(d / zf, cl(pose.x, f.x, f.hx), f.y + (by - f.y) * (1 - 1 / zf), cl(pose.z, f.z, f.hz));
+			camEye.copy(g.camera.position);
+		};
+
+		if (introRef.current) {
+			introRef.current = false;
+			poseOf('top'); // a hole opens from the sky, then flies down behind the ball
+			camTweenRef.current = { eye: camEye.clone(), look: camLook.clone(), t0: now, dur: INTRO_MS };
 		}
+		poseOf(mode);
+		const tw = camTweenRef.current;
+		if (tw) {
+			const t = Math.min(1, (now - tw.t0) / tw.dur);
+			const k = t * t * (3 - 2 * t); // slow at both ends: it holds the sky shot, then settles
+			camEye.lerpVectors(tw.eye, camEye, k);
+			camLook.lerpVectors(tw.look, camLook, k);
+			if (t >= 1) camTweenRef.current = null;
+		}
+		g.camera.position.copy(camEye);
+		g.camera.lookAt(camLook);
+		camLookRef.current.copy(camLook); // where a glide has to start from, next time
 
 		const k = 0.25;
 		for (const ghost of ghostsRef.current.values()) {
@@ -600,14 +632,23 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const zoomBy = useCallback((factor: number) => {
 		zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, zoomRef.current * factor));
 	}, []);
+	/** Freeze the current view as the start of a blend toward the next one. */
+	const glideCam = useCallback((dur: number) => {
+		const g = g3Ref.current;
+		if (!g) return;
+		camTweenRef.current = {
+			eye: g.camera.position.clone(), look: camLookRef.current.clone(), t0: performance.now(), dur,
+		};
+	}, []);
 	const cycleCam = useCallback(() => {
+		glideCam(CAM_GLIDE_MS);
 		const nv = CAM_NEXT[camModeRef.current];
 		camModeRef.current = nv;
 		setCamMode(nv);
 		zoomRef.current = 1;
 		azRef.current = fitRef.current.az;
 		orbitRef.current = null;
-	}, []);
+	}, [glideCam]);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -632,6 +673,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const aimStart = useCallback((clientX: number, clientY: number) => {
 		if (pinchRef.current) return; // a second finger is zooming — don't (re)arm aim/orbit
 		if (phase !== 'playing') return;
+		// A tap during a camera move cuts it short instead of aiming: the ground under the
+		// pointer is sliding, so the drag that follows would not mean what it looks like.
+		if (introRef.current || camTweenRef.current) { introRef.current = false; glideCam(220); return; }
 		const b = ballRef.current;
 		const by = groundAt(b.x, b.z) + PARAMS.ballR;
 		const p = worldFromPointer(clientX, clientY, by);
@@ -645,7 +689,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		} else {
 			orbitRef.current = { x: clientX, az: azRef.current }; // drag away from the ball = turn around it
 		}
-	}, [phase, worldFromPointer, screenDist, groundAt]);
+	}, [phase, worldFromPointer, screenDist, groundAt, glideCam]);
 
 	const aimMove = useCallback((clientX: number, clientY: number) => {
 		if (pinchRef.current) return;
@@ -781,6 +825,13 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			}
 			resize();
 			placeBallAtStart();
+			// The hole opens on a flyover: high above to show the whole thing, then down
+			// behind the ball, which is where it stays to play.
+			camModeRef.current = 'shoulder';
+			setCamMode('shoulder');
+			azRef.current = Math.atan2(hole.path[0].dirZ, hole.path[0].dirX);
+			camTweenRef.current = null;
+			introRef.current = true;
 
 			lobbyRef.current = lobby;
 			boardRef.current.clear();
