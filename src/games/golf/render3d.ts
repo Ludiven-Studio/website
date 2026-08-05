@@ -585,17 +585,27 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 			quad([p.ix, p.y, p.iz], [p.ix, pt, p.iz], [q.ix, qt, q.iz], [q.ix, q.y, q.iz]); // inner
 			quad([p.ix, pt, p.iz], [p.ox, pt, p.oz], [q.ox, qt, q.oz], [q.ix, qt, q.iz]); // top
 			quad([p.ox, pb, p.oz], [q.ox, qb, q.oz], [q.ox, qt, q.oz], [p.ox, pt, p.oz]); // outer
-			if (p.over || q.over) continue; // no paving or grass over the water
-			// Paving then grass bank, both sliding outward along the kerb normal.
 			const pd = Math.hypot(p.ox - p.ix, p.oz - p.iz) || 1, qd = Math.hypot(q.ox - q.ix, q.oz - q.iz) || 1;
 			const pnx = (p.ox - p.ix) / pd, pnz = (p.oz - p.iz) / pd;
 			const qnx = (q.ox - q.ix) / qd, qnz = (q.oz - q.iz) / qd;
+			if (p.over || q.over) {
+				// No paving or grass over the water, but cap the dry end or its underside shows.
+				const e = p.over ? q : p, nx = p.over ? qnx : pnx, nz = p.over ? qnz : pnz;
+				if (!e.over) aquad(
+					[e.ox, e.y - LIP, e.oz], [e.ox + nx * PAVE, e.y - LIP, e.oz + nz * PAVE],
+					[e.ox + nx * APRON, gy, e.oz + nz * APRON], [e.ox, gy, e.oz],
+				);
+				continue;
+			}
+			// Paving then grass bank, both sliding outward along the kerb normal. The bank
+			// lands ON the lawn plane, not DROP under its own sample: the lawn is flat, so a
+			// per-sample landing left the whole course floating over an open seam.
 			const ppx = p.ox + pnx * PAVE, ppz = p.oz + pnz * PAVE;
 			const qpx = q.ox + qnx * PAVE, qpz = q.oz + qnz * PAVE;
 			push(ppos, [p.ox, p.y - LIP, p.oz], [ppx, p.y - LIP, ppz], [qpx, q.y - LIP, qpz], [q.ox, q.y - LIP, q.oz]);
 			aquad(
-				[ppx, p.y - LIP, ppz], [p.ox + pnx * APRON, p.y - DROP, p.oz + pnz * APRON],
-				[q.ox + qnx * APRON, q.y - DROP, q.oz + qnz * APRON], [qpx, q.y - LIP, qpz],
+				[ppx, p.y - LIP, ppz], [p.ox + pnx * APRON, gy, p.oz + pnz * APRON],
+				[q.ox + qnx * APRON, gy, q.oz + qnz * APRON], [qpx, q.y - LIP, qpz],
 			);
 		}
 	};
@@ -643,8 +653,31 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	);
 	aquad(
 		[teeL.x + bx * PAVE, y0 - LIP, teeL.z + bz * PAVE], [teeR.x + bx * PAVE, y0 - LIP, teeR.z + bz * PAVE],
-		[teeR.x + bx * APRON, y0 - DROP, teeR.z + bz * APRON], [teeL.x + bx * APRON, y0 - DROP, teeL.z + bz * APRON],
+		[teeR.x + bx * APRON, gy, teeR.z + bz * APRON], [teeL.x + bx * APRON, gy, teeL.z + bz * APRON],
 	);
+	// The cap slides backwards and the side runs slide sideways, so their aprons leave a
+	// quarter-turn hole at each tee corner. Fan it shut.
+	const FAN = 4;
+	for (const side of [1, -1] as const) {
+		const o = side === 1 ? teeL : teeR;
+		const dir = (j: number) => {
+			const u = j / FAN;
+			const x = p0.nx * side * (1 - u) - p0.dirX * u, z = p0.nz * side * (1 - u) - p0.dirZ * u;
+			const d = Math.hypot(x, z) || 1;
+			return [x / d, z / d];
+		};
+		for (let j = 0; j < FAN; j++) {
+			const [x0, z0] = dir(j), [x1, z1] = dir(j + 1);
+			ppos.push(
+				o.x, y0 - LIP, o.z, o.x + x0 * PAVE, y0 - LIP, o.z + z0 * PAVE,
+				o.x + x1 * PAVE, y0 - LIP, o.z + z1 * PAVE,
+			);
+			aquad(
+				[o.x + x0 * PAVE, y0 - LIP, o.z + z0 * PAVE], [o.x + x0 * APRON, gy, o.z + z0 * APRON],
+				[o.x + x1 * APRON, gy, o.z + z1 * APRON], [o.x + x1 * PAVE, y0 - LIP, o.z + z1 * PAVE],
+			);
+		}
+	}
 
 	// Green bumper ring, following the dish rim.
 	const gw = hole.greenWall;
