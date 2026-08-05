@@ -623,7 +623,10 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 		wallRun(run);
 	}
 	// Kerb across the throat, so the lane wall runs unbroken into the green ring.
-	const kOut = 1 + t / hole.greenR;
+	// The ring and the green dish are polygons of the same circle but not of the same segment
+	// count, so their chords cross. Both kerbs bite inward to bury the dish edge in the wall,
+	// or the mismatch shows as a bright hairline.
+	const kOut = 1 + t / hole.greenR, kIn = 1 - 0.08 / hole.greenR;
 	for (const side of [1, -1] as const) {
 		const p = path[cut], w = W[cut];
 		const o = side === 1 ? openL : openR;
@@ -634,25 +637,29 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 				y: laneY(hole, cut, side, relief, bankv),
 			},
 			{
-				ix: o.x, iz: o.z,
+				ix: hole.cup.x + (o.x - hole.cup.x) * kIn, iz: hole.cup.z + (o.z - hole.cup.z) * kIn,
 				ox: hole.cup.x + (o.x - hole.cup.x) * kOut, oz: hole.cup.z + (o.z - hole.cup.z) * kOut,
 				y: Y(rimA),
 			},
 		]);
 	}
-	// Tee cap: closes the corridor behind the ball.
-	const p0 = path[0], y0 = Y(hole.alt[0]);
+	// Tee cap: closes the corridor behind the ball. Its corners take the height of the side
+	// runs, or the banking opens a hairline crack where the two meet.
+	const p0 = path[0];
 	const bx = -p0.dirX * t, bz = -p0.dirZ * t;
-	const teeL = { x: p0.x + p0.nx * (W[0] + t), z: p0.z + p0.nz * (W[0] + t) };
-	const teeR = { x: p0.x - p0.nx * (W[0] + t), z: p0.z - p0.nz * (W[0] + t) };
-	quad([teeL.x, y0 - LIP, teeL.z], [teeL.x, y0 + WALL_H, teeL.z], [teeR.x, y0 + WALL_H, teeR.z], [teeR.x, y0 - LIP, teeR.z]);
-	quad([teeL.x, y0 + WALL_H, teeL.z], [teeL.x + bx, y0 + WALL_H, teeL.z + bz], [teeR.x + bx, y0 + WALL_H, teeR.z + bz], [teeR.x, y0 + WALL_H, teeR.z]);
+	const teeL = { x: p0.x + p0.nx * (W[0] + t), z: p0.z + p0.nz * (W[0] + t), y: laneY(hole, 0, 1, relief, bankv) };
+	const teeR = { x: p0.x - p0.nx * (W[0] + t), z: p0.z - p0.nz * (W[0] + t), y: laneY(hole, 0, -1, relief, bankv) };
+	quad([teeL.x, teeL.y - LIP, teeL.z], [teeL.x, teeL.y + WALL_H, teeL.z], [teeR.x, teeR.y + WALL_H, teeR.z], [teeR.x, teeR.y - LIP, teeR.z]); // inner
+	quad([teeL.x, teeL.y + WALL_H, teeL.z], [teeL.x + bx, teeL.y + WALL_H, teeL.z + bz], [teeR.x + bx, teeR.y + WALL_H, teeR.z + bz], [teeR.x, teeR.y + WALL_H, teeR.z]); // top
+	quad([teeL.x + bx, teeL.y + WALL_H, teeL.z + bz], [teeL.x + bx, teeL.y - LIP, teeL.z + bz], [teeR.x + bx, teeR.y - LIP, teeR.z + bz], [teeR.x + bx, teeR.y + WALL_H, teeR.z + bz]); // back
+	for (const o of [teeL, teeR]) // the block juts past where the side runs start: close its ends
+		quad([o.x, o.y + WALL_H, o.z], [o.x + bx, o.y + WALL_H, o.z + bz], [o.x + bx, o.y - LIP, o.z + bz], [o.x, o.y - LIP, o.z]);
 	push(ppos,
-		[teeL.x, y0 - LIP, teeL.z], [teeR.x, y0 - LIP, teeR.z],
-		[teeR.x + bx * PAVE, y0 - LIP, teeR.z + bz * PAVE], [teeL.x + bx * PAVE, y0 - LIP, teeL.z + bz * PAVE],
+		[teeL.x, teeL.y - LIP, teeL.z], [teeR.x, teeR.y - LIP, teeR.z],
+		[teeR.x + bx * PAVE, teeR.y - LIP, teeR.z + bz * PAVE], [teeL.x + bx * PAVE, teeL.y - LIP, teeL.z + bz * PAVE],
 	);
 	aquad(
-		[teeL.x + bx * PAVE, y0 - LIP, teeL.z + bz * PAVE], [teeR.x + bx * PAVE, y0 - LIP, teeR.z + bz * PAVE],
+		[teeL.x + bx * PAVE, teeL.y - LIP, teeL.z + bz * PAVE], [teeR.x + bx * PAVE, teeR.y - LIP, teeR.z + bz * PAVE],
 		[teeR.x + bx * APRON, gy, teeR.z + bz * APRON], [teeL.x + bx * APRON, gy, teeL.z + bz * APRON],
 	);
 	// The cap slides backwards and the side runs slide sideways, so their aprons leave a
@@ -669,26 +676,23 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 		for (let j = 0; j < FAN; j++) {
 			const [x0, z0] = dir(j), [x1, z1] = dir(j + 1);
 			ppos.push(
-				o.x, y0 - LIP, o.z, o.x + x0 * PAVE, y0 - LIP, o.z + z0 * PAVE,
-				o.x + x1 * PAVE, y0 - LIP, o.z + z1 * PAVE,
+				o.x, o.y - LIP, o.z, o.x + x0 * PAVE, o.y - LIP, o.z + z0 * PAVE,
+				o.x + x1 * PAVE, o.y - LIP, o.z + z1 * PAVE,
 			);
 			aquad(
-				[o.x + x0 * PAVE, y0 - LIP, o.z + z0 * PAVE], [o.x + x0 * APRON, gy, o.z + z0 * APRON],
-				[o.x + x1 * APRON, gy, o.z + z1 * APRON], [o.x + x1 * PAVE, y0 - LIP, o.z + z1 * PAVE],
+				[o.x + x0 * PAVE, o.y - LIP, o.z + z0 * PAVE], [o.x + x0 * APRON, gy, o.z + z0 * APRON],
+				[o.x + x1 * APRON, gy, o.z + z1 * APRON], [o.x + x1 * PAVE, o.y - LIP, o.z + z1 * PAVE],
 			);
 		}
 	}
 
 	// Green bumper ring, following the dish rim.
 	const gw = hole.greenWall;
-	const ringRun = gw.map((p) => {
-		const k = 1 + t / hole.greenR;
-		return {
-			ix: p.x, iz: p.z,
-			ox: hole.cup.x + (p.x - hole.cup.x) * k, oz: hole.cup.z + (p.z - hole.cup.z) * k,
-			y: Y(rimA),
-		};
-	});
+	const ringRun = gw.map((p) => ({
+		ix: hole.cup.x + (p.x - hole.cup.x) * kIn, iz: hole.cup.z + (p.z - hole.cup.z) * kIn,
+		ox: hole.cup.x + (p.x - hole.cup.x) * kOut, oz: hole.cup.z + (p.z - hole.cup.z) * kOut,
+		y: Y(rimA),
+	}));
 	wallRun(ringRun);
 	const walls = new THREE.Mesh(stripGeom(wpos), wallMat);
 	walls.castShadow = true;
@@ -801,12 +805,18 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 		const { lo, hi } = hole.bridge;
 		const mid = Math.round((lo + hi) / 2);
 		const pm = path[mid];
-		// Deck underside, so the arch is a real opening rather than a hole in the wall.
+		// Deck underside, so the arch is a real opening rather than a hole in the wall. It
+		// reaches the OUTER face of the kerbs and takes the kerb's own bottom depth at each
+		// sample: a flat soffit under a ramping kerb leaves a slit the background shines through.
 		const spos: number[] = [];
-		for (let i = lo; i < hi; i++) {
-			const a = edge(i, 1), b = edge(i, -1), c = edge(i + 1, 1), d = edge(i + 1, -1);
-			push(spos, [a.x, a.y - DECK, a.z], [b.x, b.y - DECK, b.z], [d.x, d.y - DECK, d.z], [c.x, c.y - DECK, c.z]);
-		}
+		const lo0 = Math.max(0, lo - 1), hi0 = Math.min(path.length - 1, hi + 1);
+		const soffit = (i: number, side: 1 | -1): [number, number, number] => {
+			const p = path[i], w = W[i] + t;
+			const drop = i >= lo && i <= hi ? DECK : LIP;
+			return [p.x + p.nx * w * side, laneY(hole, i, side, relief, bankv) - drop, p.z + p.nz * w * side];
+		};
+		for (let i = lo0; i < hi0; i++)
+			push(spos, soffit(i, 1), soffit(i, -1), soffit(i + 1, -1), soffit(i + 1, 1));
 		grp.add(new THREE.Mesh(stripGeom(spos), wallMat));
 
 		const along = Math.hypot(path[hi].x - path[lo].x, path[hi].z - path[lo].z) * 0.5 + 4;
