@@ -101,6 +101,32 @@ describe('golf engine (corridor)', () => {
 		}
 	});
 
+	it('a footbridge pier stands mid-lane and leaves a passage on both sides', () => {
+		let seen = 0;
+		for (let s = 0; s < 40; s++) {
+			for (const o of generateHole(mulberry32(s), DIFFS.difficile).obstacles) {
+				if (o.kind !== 'pier') continue;
+				seen++;
+				const h = generateHole(mulberry32(s), DIFFS.difficile);
+				const cx = (o.pts[0].x + o.pts[1].x + o.pts[2].x + o.pts[3].x) / 4;
+				const cz = (o.pts[0].z + o.pts[1].z + o.pts[2].z + o.pts[3].z) / 4;
+				let bi = 0, bd = Infinity;
+				h.path.forEach((p, i) => { const d = Math.hypot(p.x - cx, p.z - cz); if (d < bd) { bd = d; bi = i; } });
+				expect(bd).toBeLessThan(0.5); // on the centreline, not against a wall
+				const half = Math.hypot(o.pts[1].x - o.pts[0].x, o.pts[1].z - o.pts[0].z) / 2;
+				expect(h.widths[bi] - half).toBeGreaterThan(PARAMS.ballR * 2 + 1); // room to pass either side
+			}
+		}
+		expect(seen).toBeGreaterThan(0);
+	});
+
+	it('leaves the easiest holes free of piers', () => {
+		for (let s = 0; s < 30; s++) {
+			const h = generateHole(mulberry32(s), DIFFS.facile); // a single obstacle: keep it a plain chicane
+			expect(h.obstacles.every((o) => o.kind === 'chicane')).toBe(true);
+		}
+	});
+
 	it('aimToVelocity launches opposite the pull, clamps power, ignores micro drags', () => {
 		const v = aimToVelocity({ x: 0, z: 10 })!;
 		expect(v.vz).toBeLessThan(0);

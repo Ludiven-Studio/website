@@ -13,7 +13,7 @@ import { mulberry32 } from '../prng';
 // A sharp corner reaches bank 1.39 rad/sample, which as a cross slope would be a wall.
 // Cap it: past this the turn is banked as hard as it can be drawn.
 const BANK_CAP = 0.35;
-const ROCK_H = 1.6;
+const SOCLE_H = 1.2; // taller than the drawn ball, so the collision edge always has a face behind it
 const LIP = 0.6; // how far the kerb's outer face hangs below the floor
 const DECK = 1.3; // bridge deck thickness — below it the arch is open water
 const APRON = 10; // where the grass bank beyond the paving lands
@@ -149,6 +149,187 @@ const stripGeom = (pos: number[]): THREE.BufferGeometry => {
 	return g;
 };
 
+/* =====================================================
+   Obstacle props. The engine only knows a 4-corner footprint and the ball never
+   leaves the ground, so anything above ball height may overhang freely. A stone
+   socle always fills the exact footprint: whatever is built on top never has to
+   explain a bounce.
+   Every prop is modelled around its own origin — socle top, +X along the lane,
+   +Z facing the lane interior.
+   ===================================================== */
+
+type MatFn = (color: number, rough?: number) => THREE.MeshStandardMaterial;
+
+/** A prop the ball can pass under, and which must get out of the way when it does. */
+interface Overhead { mat: THREE.MeshStandardMaterial; x: number; z: number }
+
+/** Gable roof, base at y=0, ridge along X. */
+function gableGeom(hx: number, hz: number, h: number): THREE.BufferGeometry {
+	const p: number[] = [];
+	const quad = (a: number[], b: number[], c: number[], d: number[]) => p.push(...a, ...b, ...c, ...a, ...c, ...d);
+	quad([-hx, 0, -hz], [hx, 0, -hz], [hx, h, 0], [-hx, h, 0]);
+	quad([-hx, 0, hz], [-hx, h, 0], [hx, h, 0], [hx, 0, hz]);
+	p.push(-hx, 0, -hz, -hx, h, 0, -hx, 0, hz);
+	p.push(hx, 0, -hz, hx, 0, hz, hx, h, 0);
+	return stripGeom(p);
+}
+
+function buildCottage(mat: MatFn, L: number, D: number, rnd: () => number): THREE.Group {
+	const g = new THREE.Group();
+	const hx = L / 2 - 0.12, hz = D / 2 - 0.12;
+	const h = 1.7 + rnd() * 0.5;
+	const body = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, h, hz * 2), mat(rnd() < 0.5 ? 0xf2e7d3 : 0xe7d4b9, 0.85));
+	body.position.y = h / 2;
+	g.add(body);
+
+	const roofH = 0.55 + Math.min(hz, 1.1);
+	const roof = new THREE.Mesh(gableGeom(hx + 0.28, hz + 0.28, roofH), mat(0xb1503c, 0.9));
+	roof.position.y = h;
+	g.add(roof);
+
+	const doorH = Math.min(1.0, h * 0.62);
+	const door = new THREE.Mesh(new THREE.BoxGeometry(0.5, doorH, 0.08), mat(0x5a3d2b, 0.8));
+	door.position.set(0, doorH / 2, hz + 0.02);
+	g.add(door);
+
+	const glass = mat(0xf7d774, 0.5);
+	if (hx > 1.0) for (const s of [-1, 1]) {
+		const win = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.06), glass);
+		win.position.set(s * Math.min(hx - 0.3, 1.1), h * 0.62, hz + 0.02);
+		g.add(win);
+	}
+
+	const chim = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.8, 0.26), mat(0x9a6b5c, 0.95));
+	chim.position.set(hx * 0.55, h + roofH * 0.55, 0);
+	g.add(chim);
+	return g;
+}
+
+function buildWindmill(mat: MatFn, L: number, D: number, rnd: () => number, spin: THREE.Object3D[]): THREE.Group {
+	const g = new THREE.Group();
+	const r = Math.min(L, D) / 2 - 0.1;
+	const h = 3.0 + rnd() * 0.6;
+	const tower = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r, h, 12), mat(0xefe4d0, 0.85));
+	tower.position.y = h / 2;
+	g.add(tower);
+	const cap = new THREE.Mesh(new THREE.ConeGeometry(r * 0.8, 0.85, 12), mat(0x8a4a3a, 0.9));
+	cap.position.y = h + 0.42;
+	g.add(cap);
+
+	const wood = mat(0x8b5e3c, 0.85), cloth = mat(0xf7f3e7, 0.9);
+	const hubY = h * 0.88;
+	// the lowest sail tip must stay above the drawn ball, or the sails saw through it
+	const bl = Math.max(1.1, Math.min(2.4, SOCLE_H + hubY - 1.7));
+	const sails = new THREE.Group();
+	sails.position.set(0, hubY, r * 0.8);
+	const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.32, 8), wood);
+	hub.rotation.x = Math.PI / 2;
+	sails.add(hub);
+	for (let k = 0; k < 4; k++) {
+		const blade = new THREE.Group();
+		blade.rotation.z = (k * Math.PI) / 2;
+		const arm = new THREE.Mesh(new THREE.BoxGeometry(0.13, bl, 0.07), wood);
+		arm.position.y = bl / 2;
+		blade.add(arm);
+		const sail = new THREE.Mesh(new THREE.PlaneGeometry(0.46, bl * 0.68), cloth);
+		sail.position.set(0.3, bl * 0.56, 0.05);
+		blade.add(sail);
+		sails.add(blade);
+	}
+	g.add(sails);
+	spin.push(sails);
+	return g;
+}
+
+function buildTower(mat: MatFn, L: number, D: number, rnd: () => number): THREE.Group {
+	const g = new THREE.Group();
+	const r = Math.min(L, D) / 2 - 0.1;
+	const h = 2.6 + rnd() * 0.6;
+	const stone = mat(0xbdb3a4, 0.95);
+	const shaft = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r, h, 10), stone);
+	shaft.position.y = h / 2;
+	g.add(shaft);
+	const cornice = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.04, r * 1.04, 0.2, 10), stone);
+	cornice.position.y = h;
+	g.add(cornice);
+	for (let k = 0; k < 8; k++) {
+		const a = (k * Math.PI * 2) / 8;
+		const m = new THREE.Mesh(new THREE.BoxGeometry(r * 0.4, 0.44, r * 0.4), stone);
+		m.position.set(Math.cos(a) * r * 0.78, h + 0.32, Math.sin(a) * r * 0.78);
+		m.rotation.y = -a;
+		g.add(m);
+	}
+	const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 6), mat(0x6b5a48, 0.8));
+	pole.position.y = h + 0.9;
+	g.add(pole);
+	const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.4), mat(0xd7443a, 0.9));
+	flag.position.set(0.35, h + 1.35, 0);
+	g.add(flag);
+	return g;
+}
+
+/** Pier standing mid-lane, carrying a deck the ball rolls under. `spanHalf` reaches the paving. */
+function buildFootbridge(mat: MatFn, L: number, D: number, spanHalf: number): THREE.Group {
+	const g = new THREE.Group();
+	const stone = mat(0xc3b8a6, 0.95);
+	// Own material, not a cached one: the deck fades when the ball rolls under it, and the
+	// socles must not fade with it.
+	const wood = new THREE.MeshStandardMaterial({
+		color: 0x9a6b43, roughness: 0.85, metalness: 0, side: THREE.DoubleSide, transparent: true,
+	});
+	g.userData.fadeMat = wood;
+	const deckY = 2.7; // above the socle: headroom that reads as an overpass, not a lid
+	const colH = deckY - 0.35;
+	const col = new THREE.Mesh(new THREE.BoxGeometry(L * 0.6, colH, D * 0.6), stone);
+	col.position.y = colH / 2;
+	g.add(col);
+	const cap = new THREE.Mesh(new THREE.BoxGeometry(L * 0.88, 0.24, D * 0.88), stone);
+	cap.position.y = deckY - 0.36;
+	g.add(cap);
+
+	const wide = L + 1.0;
+	const deck = new THREE.Mesh(new THREE.BoxGeometry(wide, 0.26, spanHalf * 2), wood);
+	deck.position.y = deckY;
+	g.add(deck);
+	// The span ends over the paved band, well above it — without an abutment each end
+	// hangs in mid-air. Buried a little, since the band is never perfectly level.
+	const abH = deckY + SOCLE_H + 1.0;
+	for (const s of [-1, 1]) {
+		const ab = new THREE.Mesh(new THREE.BoxGeometry(wide * 0.9, abH, 1.7), stone);
+		ab.position.set(0, deckY - 0.13 - abH / 2, s * (spanHalf - 1.1));
+		g.add(ab);
+	}
+	for (const s of [-1, 1]) {
+		const rail = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, spanHalf * 2), wood);
+		rail.position.set((s * wide) / 2, deckY + 0.78, 0);
+		g.add(rail);
+		for (let k = -3; k <= 3; k++) {
+			const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.78, 0.11), wood);
+			post.position.set((s * wide) / 2, deckY + 0.39, (k / 3) * spanHalf * 0.92);
+			g.add(post);
+		}
+	}
+	return g;
+}
+
+/** Per-frame prop life: the sails turn, and a deck the ball is under fades out of the way. */
+export function animateHole(group: THREE.Group, timeMs: number, bx: number, bz: number): void {
+	const spin = group.userData.spin as THREE.Object3D[] | undefined;
+	if (spin) for (const s of spin) s.rotation.z = timeMs * 0.0006;
+	const fade = group.userData.fade as Overhead[] | undefined;
+	if (fade) for (const f of fade) {
+		const d = Math.hypot(bx - f.x, bz - f.z);
+		f.mat.opacity = Math.max(0.18, Math.min(1, (d - 3.5) / 6));
+	}
+}
+
+/** Stable per-obstacle variety: the same hole always plants the same buildings. */
+function propSeed(x: number, z: number): number {
+	let h = Math.imul(Math.round(x * 16) ^ 0x9e3779b9, 2654435761);
+	h = Math.imul(h ^ (Math.round(z * 16) + 0x85ebca6b), 2246822519);
+	return (h ^ (h >>> 15)) >>> 0;
+}
+
 interface Sprout {
 	key: string;
 	geo: THREE.BufferGeometry;
@@ -267,7 +448,18 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	// normal per-face for lighting only when the material is double-sided.
 	const floorMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
 	const wallMat = new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.8, metalness: 0.02, side: THREE.DoubleSide });
-	const rockMat = new THREE.MeshStandardMaterial({ color: 0x8d8478, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
+	// Props share materials by colour, and only ever create the ones they use — an unused
+	// material would never sit on a mesh, so disposeHole could not find it.
+	const propMats = new Map<string, THREE.MeshStandardMaterial>();
+	const pmat: MatFn = (color, rough = 0.9) => {
+		const k = `${color}|${rough}`;
+		let m = propMats.get(k);
+		if (!m) {
+			m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0, side: THREE.DoubleSide });
+			propMats.set(k, m);
+		}
+		return m;
+	};
 
 	const centreA = hole.alt[hole.alt.length - 1], rimA = hole.alt[cut];
 
@@ -507,24 +699,51 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	cloth.position.set(hole.cup.x + 1.1, cupY + 6.3, hole.cup.z);
 	grp.add(cloth);
 
-	// ---- Obstacles: boxed rocks with sides, so they read as volumes from an angle.
+	// ---- Obstacles: a stone socle on the exact footprint, a little building on top.
+	const spin: THREE.Object3D[] = [];
+	const fade: Overhead[] = [];
 	for (const ob of hole.obstacles) {
 		const q = ob.pts;
 		const base = q.map((p) => surfaceY(hole, p.x, p.z, relief, bankv));
-		const top = q.map((_, i) => base[i] + ROCK_H);
+		// flat top even on a banked lane, so the building above sits level
+		const topY = Math.max(...base) + SOCLE_H;
 		const opos: number[] = [];
 		for (let k = 0; k < 4; k++) {
 			const a = q[k], b = q[(k + 1) % 4];
-			opos.push(a.x, base[k], a.z, a.x, top[k], a.z, b.x, top[(k + 1) % 4], b.z);
-			opos.push(a.x, base[k], a.z, b.x, top[(k + 1) % 4], b.z, b.x, base[(k + 1) % 4], b.z);
+			opos.push(a.x, base[k], a.z, a.x, topY, a.z, b.x, topY, b.z);
+			opos.push(a.x, base[k], a.z, b.x, topY, b.z, b.x, base[(k + 1) % 4], b.z);
 		}
-		opos.push(q[0].x, top[0], q[0].z, q[1].x, top[1], q[1].z, q[2].x, top[2], q[2].z);
-		opos.push(q[0].x, top[0], q[0].z, q[2].x, top[2], q[2].z, q[3].x, top[3], q[3].z);
-		const rock = new THREE.Mesh(stripGeom(opos), rockMat);
-		rock.castShadow = true;
-		rock.receiveShadow = true;
-		grp.add(rock);
+		opos.push(q[0].x, topY, q[0].z, q[1].x, topY, q[1].z, q[2].x, topY, q[2].z);
+		opos.push(q[0].x, topY, q[0].z, q[2].x, topY, q[2].z, q[3].x, topY, q[3].z);
+		const socle = new THREE.Mesh(stripGeom(opos), pmat(0x9c9184, 0.95));
+		socle.castShadow = true;
+		socle.receiveShadow = true;
+		grp.add(socle);
+
+		const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4;
+		const cz = (q[0].z + q[1].z + q[2].z + q[3].z) / 4;
+		const L = Math.hypot(q[2].x - q[1].x, q[2].z - q[1].z); // along the lane
+		const D = Math.hypot(q[1].x - q[0].x, q[1].z - q[0].z); // across it
+		const ax = (q[2].x - q[1].x) / L, az = (q[2].z - q[1].z) / L;
+		const ix = (q[1].x - q[0].x) / D, iz = (q[1].z - q[0].z) / D; // toward the lane interior
+		let th = Math.atan2(-az, ax);
+		if (Math.sin(th) * ix + Math.cos(th) * iz < 0) th += Math.PI; // local +Z must face the lane
+		const rnd = mulberry32(propSeed(cx, cz));
+
+		let prop: THREE.Group;
+		if (ob.kind === 'pier') {
+			prop = buildFootbridge(pmat, L, D, W[nearestSample(hole, cx, cz)] + PAVE);
+			fade.push({ mat: prop.userData.fadeMat as THREE.MeshStandardMaterial, x: cx, z: cz });
+		} else if (D < 1.9 || L / D > 2.4) prop = buildCottage(pmat, L, D, rnd); // a tower would not cover a long thin footprint
+		else if (rnd() < 0.5) prop = buildWindmill(pmat, L, D, rnd, spin);
+		else prop = buildTower(pmat, L, D, rnd);
+		prop.position.set(cx, topY, cz);
+		prop.rotation.y = th;
+		prop.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
+		grp.add(prop);
 	}
+	if (spin.length) grp.userData.spin = spin;
+	if (fade.length) grp.userData.fade = fade;
 
 	// ---- Water + bridge, from the engine's own data (the flat game already drew them).
 	// A pond dug under the arch, not a river across the scene: it only has to explain the

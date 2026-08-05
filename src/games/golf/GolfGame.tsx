@@ -16,6 +16,7 @@ import {
 	CORNERS,
 	CUP_D,
 	SINK_MS,
+	animateHole,
 	bestAz,
 	buildHole3D,
 	disposeHole,
@@ -398,6 +399,8 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		const b = ballRef.current;
 		const mode = camModeRef.current;
 		const by = surfaceY(hole, pose.x, pose.z, RELIEF, BANK);
+
+		animateHole(g.holeGroup, now, pose.x, pose.z);
 
 		// Drop into the cup: the engine snaps the ball to the centre and stops it, so all
 		// that is left is to let it fall out of sight.

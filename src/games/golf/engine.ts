@@ -38,6 +38,8 @@ export interface Segment {
 /** Free-standing obstacle inside the lane (convex polygon corners). */
 export interface Obstacle {
 	pts: Vec[];
+	/** 'chicane' hugs one wall; 'pier' stands mid-lane, holding a footbridge over the hole. */
+	kind: 'chicane' | 'pier';
 }
 
 /**
@@ -276,6 +278,34 @@ export function generateHole(rng: Rng, diff: DiffLevel, ctrlOverride?: Vec[]): H
 	const obstacles: Obstacle[] = [];
 	const used: number[] = [];
 	const loIdx = Math.round(SAMPLES * 0.18), hiIdx = Math.min(Math.round(SAMPLES * 0.82), cutIdx - 2);
+
+	// A footbridge crosses some of the busier holes: its pier stands mid-lane, so the ball has
+	// to pick a side. It takes one slot from the obstacle budget rather than adding to it.
+	// Needs a wide, straight stretch — on a hairpin the pier reads as a wall and the deck
+	// above it sits askew. Placed first so a chicane cannot squat the good spot.
+	if (diff.obstacles >= 2 && rng() < 0.55) {
+		const HALF = 1.15; // pier half-size, both across and along
+		for (let attempt = 0; attempt < 60 && hiIdx > loIdx; attempt++) {
+			const idx = loIdx + Math.floor(rng() * (hiIdx - loIdx));
+			if (idx < 3 || idx > SAMPLES - 4) continue;
+			const p = path[idx];
+			if (widths[idx] - HALF < PARAMS.ballR * 2 + 1.8) continue; // a passage must stay open on BOTH sides
+			const a = path[idx - 3], b = path[idx + 3];
+			if (a.dirX * b.dirX + a.dirZ * b.dirZ < 0.985) continue; // straight enough to span
+			if (Math.hypot(p.x - start.x, p.z - start.z) < 12) continue;
+			if (Math.hypot(p.x - cup.x, p.z - cup.z) < greenR + 8) continue;
+			const corner = (ta: number, na: number): Vec => ({ x: p.x + p.dirX * ta + p.nx * na, z: p.z + p.dirZ * ta + p.nz * na });
+			const pts = [corner(HALF, HALF), corner(HALF, -HALF), corner(-HALF, -HALF), corner(-HALF, HALF)];
+			for (let k = 0; k < 4; k++) {
+				const c = pts[k], d = pts[(k + 1) % 4];
+				segments.push(makeSegment(c.x, c.z, d.x, d.z, p, false));
+			}
+			obstacles.push({ pts, kind: 'pier' });
+			used.push(idx);
+			break;
+		}
+	}
+
 	for (let attempt = 0; attempt < diff.obstacles * 40 && obstacles.length < diff.obstacles && hiIdx > loIdx; attempt++) {
 		const idx = loIdx + Math.floor(rng() * (hiIdx - loIdx));
 		if (used.some((u) => Math.abs(u - idx) < SAMPLES * 0.12)) continue;
@@ -295,7 +325,7 @@ export function generateHole(rng: Rng, diff: DiffLevel, ctrlOverride?: Vec[]): H
 			const a = pts[k], b = pts[(k + 1) % 4];
 			segments.push(makeSegment(a.x, a.z, b.x, b.z, center, false));
 		}
-		obstacles.push({ pts });
+		obstacles.push({ pts, kind: 'chicane' });
 		used.push(idx);
 	}
 

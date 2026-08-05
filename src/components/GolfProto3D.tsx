@@ -16,6 +16,7 @@ import {
 	CORNERS,
 	CUP_D,
 	SINK_MS,
+	animateHole,
 	bestAz,
 	buildHole3D,
 	disposeHole,
@@ -411,6 +412,7 @@ export default function GolfProto3D() {
 				const cupY = (g.group?.userData.cupY as number | undefined) ?? by;
 				ballY = by + vr + (cupY - CUP_D + vr - (by + vr)) * (k * k);
 			}
+			if (g.group) animateHole(g.group, now, b.x, b.z);
 			g.ball.position.set(b.x, ballY, b.z);
 			g.shade.position.set(b.x, by + 0.05, b.z);
 			g.shade.visible = sinkRef.current === null;
