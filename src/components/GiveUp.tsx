@@ -11,9 +11,11 @@ interface Props {
 	onGiveUp: () => void;
 	/** The board is already lost or stuck — reveal straight away, no confirmation. */
 	over?: boolean;
+	/** What giving up costs here. Defaults to the daily wording. */
+	warn?: ReactNode;
 }
 
-export default function GiveUp({ onGiveUp, over }: Props): ReactNode {
+export default function GiveUp({ onGiveUp, over, warn }: Props): ReactNode {
 	const [armed, setArmed] = useState(false);
 
 	return (
@@ -21,7 +23,7 @@ export default function GiveUp({ onGiveUp, over }: Props): ReactNode {
 			<style>{CSS}</style>
 			{armed && !over ? (
 				<div className="gu-confirm">
-					<span className="gu-warn">Le défi du jour sera terminé, sans temps classé.</span>
+					<span className="gu-warn">{warn ?? 'Le défi du jour sera terminé, sans temps classé.'}</span>
 					<span className="gu-row">
 						<button className="gu-btn gu-danger" onClick={onGiveUp}>Voir la solution</button>
 						<button className="gu-btn" onClick={() => setArmed(false)}>Annuler</button>

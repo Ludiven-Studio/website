@@ -20,13 +20,16 @@ import { useHintGate } from '../useHintGate';
    Engine pure/testée dans ./engine.
    ===================================================== */
 
-type Status = 'playing' | 'won' | 'lost';
+/** `stuck` = budget spent but a rescue line is still buyable, so nothing is graded yet. */
+type Status = 'playing' | 'stuck' | 'won' | 'lost';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const LOSS_OFFSET = 100000; // daily: losers ranked after winners (cf. démineur/codecolor)
 const KB = ['AZERTYUIOP', 'QSDFGHJKLM', '#WXCVBN<']; // # = Enter, < = Backspace
 const HINT_EVERY = 30; // free mode only: one more letter drops on its own every 30 s
+const EXTRA_MAX = 3; // rescue lines on offer once the budget is spent
+const EXTRA_COST = 2; // each one adds this to the ranked score, on top of its own guess
 
-interface DailyState { rows: GuessRow[]; current: string; status: Status; hinted?: number[]; }
+interface DailyState { rows: GuessRow[]; current: string; status: Status; hinted?: number[]; extra?: number; }
 interface Msg { text: string; }
 
 const ordinal = (n: number): string => (n === 1 ? '1ʳᵉ' : `${n}ᵉ`);
@@ -47,6 +50,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const [hintIn, setHintIn] = useState(HINT_EVERY);
 	const [hintNote, setHintNote] = useState(''); // what the last hint uncovered
 	const [maxTries, setMaxTries] = useState(MAX_TRIES); // level mode may tighten the budget
+	const [extra, setExtra] = useState(0); // rescue lines bought
 
 	const hintPosRef = useRef<Set<number>>(new Set());
 	const secToHintRef = useRef(HINT_EVERY);
@@ -59,20 +63,23 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const maxTriesRef = useRef(MAX_TRIES);
+	const extraRef = useRef(0);
 
 	const lv = useLevels(gameId, motSecretLevels);
 	const { celebrating } = useCelebration(status === 'won');
 	const len = solution.length;
-	const over = status !== 'playing';
+	const over = status === 'won' || status === 'lost'; // 'stuck' is not graded yet
 	const timed = daily || lv.playing; // both are ranked → hints on a cooldown
 	const gate = useHintGate(timed, status === 'playing' && !dailyLoading);
 	const bestGood = rows.reduce((m, r) => Math.max(m, r.states.filter((s) => s === 'good').length), 0);
-	const cost = status === 'won' ? rows.length : LOSS_OFFSET + (len - bestGood);
+	const penalty = extra * EXTRA_COST;
+	const cost = status === 'won' ? rows.length + penalty : LOSS_OFFSET + (len - bestGood);
 
 	const setRowsBoth = (r: GuessRow[]): void => { rowsRef.current = r; setRows(r); };
 	const setCurrentBoth = (c: string): void => { currentRef.current = c; setCurrent(c); };
 	const setStatusBoth = (s: Status): void => { statusRef.current = s; setStatus(s); };
 	const setSolutionBoth = (s: string): void => { solutionRef.current = s; setSolution(s); };
+	const setExtraBoth = (n: number): void => { extraRef.current = n; setExtra(n); };
 	const resetHints = (): void => { hintPosRef.current = new Set(); setHintPos(new Set()); setHintNote(''); secToHintRef.current = HINT_EVERY; setHintIn(HINT_EVERY); };
 
 	const flash = (text: string): void => {
@@ -85,7 +92,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const newGame = useCallback((key: keyof typeof DIFFS): void => {
 		dailyRef.current = false;
 		setDaily(false); setAlreadyPlayed(false); setRevealed(false);
-		maxTriesRef.current = MAX_TRIES; setMaxTries(MAX_TRIES);
+		maxTriesRef.current = MAX_TRIES; setMaxTries(MAX_TRIES); setExtraBoth(0);
 		setDiffKey(key);
 		const s = pickSolution((Math.random() * 2 ** 31) >>> 0, DIFFS[key].len);
 		setSolutionBoth(s);
@@ -96,13 +103,14 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 	const saveDaily = (nr: GuessRow[], cur: string, st: Status): void => {
 		const sd = dailySeedRef.current;
-		saveDailyRun(gameId, { startedAt: startRef.current, done: st !== 'playing', seed: sd?.seed, diffIndex: sd?.diffIndex, state: { rows: nr, current: cur, status: st, hinted: [...hintPosRef.current] } satisfies DailyState });
+		// 'stuck' still offers a rescue line, so the run is not done yet.
+		saveDailyRun(gameId, { startedAt: startRef.current, done: st === 'won' || st === 'lost', seed: sd?.seed, diffIndex: sd?.diffIndex, state: { rows: nr, current: cur, status: st, hinted: [...hintPosRef.current], extra: extraRef.current } satisfies DailyState });
 	};
 
 	const startDaily = useCallback(async (): Promise<void> => {
 		dailyRef.current = true;
 		setDaily(true); setMsg(null); setRevealed(false); resetHints();
-		maxTriesRef.current = MAX_TRIES; setMaxTries(MAX_TRIES);
+		maxTriesRef.current = MAX_TRIES; setMaxTries(MAX_TRIES); setExtraBoth(0);
 		const lay = (seed: number, di: number): string => {
 			const key = DIFF_ORDER[di] ?? 'facile';
 			dailySeedRef.current = { seed, diffIndex: di };
@@ -116,13 +124,14 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 			const s = lay(run.seed, run.diffIndex ?? 0);
 			const st = (run.state as DailyState) ?? { rows: [], current: s[0], status: 'playing' };
 			setRowsBoth(st.rows ?? []); setCurrentBoth(st.current || s[0]);
+			setExtraBoth(st.extra ?? 0);
 			// Letters already paid for stay uncovered across a reload.
 			const back = new Set(st.hinted ?? []);
 			hintPosRef.current = back; setHintPos(back);
 			setDailyLoading(false);
 			startRef.current = run.startedAt;
 			if (run.done) { setStatusBoth(st.status === 'lost' ? 'lost' : 'won'); setAlreadyPlayed(true); }
-			else { setStatusBoth('playing'); setAlreadyPlayed(false); }
+			else { setStatusBoth(st.status === 'stuck' ? 'stuck' : 'playing'); setAlreadyPlayed(false); }
 			return;
 		}
 		setAlreadyPlayed(false); setStatusBoth('playing');
@@ -141,7 +150,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		const cfg = lv.play(level);
 		dailyRef.current = false;
 		setDaily(false); setAlreadyPlayed(false); setDailyLoading(false); setRevealed(false);
-		maxTriesRef.current = cfg.tries; setMaxTries(cfg.tries);
+		maxTriesRef.current = cfg.tries; setMaxTries(cfg.tries); setExtraBoth(0);
 		const s = pickSolution(cfg.seed, cfg.len);
 		setSolutionBoth(s);
 		setRowsBoth([]); setCurrentBoth(s[0]);
@@ -187,8 +196,8 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 			const nr = [...rowsRef.current, { guess: cur, states: evaluate(cur, sol) }];
 			setRowsBoth(nr);
 			const won = cur === sol;
-			const lost = !won && nr.length >= maxTriesRef.current;
-			const st: Status = won ? 'won' : lost ? 'lost' : 'playing';
+			const full = nr.length >= maxTriesRef.current + extraRef.current;
+			const st: Status = won ? 'won' : !full ? 'playing' : extraRef.current < EXTRA_MAX ? 'stuck' : 'lost';
 			setStatusBoth(st);
 			setCurrentBoth(sol[0]);
 			if (dailyRef.current) saveDaily(nr, sol[0], st);
@@ -241,9 +250,29 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'hint_used');
 	};
 
-	/* Daily: the run is already lost and recorded — showing the word only draws it on screen. */
+	/* Buy one more line once the budget is spent. It costs its own guess plus EXTRA_COST. */
+	const addLine = useCallback((): void => {
+		if (statusRef.current !== 'stuck' || extraRef.current >= EXTRA_MAX) return;
+		setExtraBoth(extraRef.current + 1);
+		setStatusBoth('playing');
+		setCurrentBoth(solutionRef.current[0]);
+		if (dailyRef.current) saveDaily(rowsRef.current, solutionRef.current[0], 'playing');
+		trackGame(gameId, 'extra_row');
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [gameId]);
+
+	/* Reveal the word and close the run: no score, no streak. */
 	const giveUp = useCallback((): void => {
 		setRevealed(true);
+		const graded = statusRef.current === 'won' || statusRef.current === 'lost';
+		if (!graded) {
+			setStatusBoth('lost');
+			if (dailyRef.current) {
+				setAlreadyPlayed(true);
+				const sd = dailySeedRef.current;
+				saveDailyRun(gameId, { startedAt: startRef.current, done: true, abandoned: true, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { rows: rowsRef.current, current: currentRef.current, status: 'lost', hinted: [...hintPosRef.current], extra: extraRef.current } satisfies DailyState });
+			}
+		}
 		trackGame(gameId, 'solution_shown');
 	}, [gameId]);
 
@@ -261,10 +290,10 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => { newGame('facile'); }, [newGame]);
 
-	/* Levels: grade the finished run by guesses used (won → rows.length; lost → over budget). */
+	/* Levels: grade the finished run by guesses used, rescue lines included (lost → over budget). */
 	useEffect(() => {
 		if (!over || !lv.playing) return;
-		lv.finish({ won: status === 'won', score: status === 'won' ? rows.length : maxTries + 1 });
+		lv.finish({ won: status === 'won', score: status === 'won' ? rows.length + penalty : maxTries + extra + penalty + 1 });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [over, status]);
 
@@ -307,7 +336,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 			{lv.active ? (
 				<div className="ms-daily-tag">
-					{lv.menu ? 'Progression — choisis un niveau' : `Niveau ${lv.level} · mot de ${len} lettres · ${maxTries} essais`}
+					{lv.menu ? 'Progression — choisis un niveau' : `Niveau ${lv.level} · mot de ${len} lettres · ${maxTries} essais${extra ? ` +${extra}` : ''}`}
 				</div>
 			) : daily ? (
 				<div className="ms-daily-tag">{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} (${len} lettres)`}</div>
@@ -336,7 +365,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 			<div className="ms-playwrap">
 				{celebrating && <Celebration />}
 				<div className={`ms-board${shake ? ' shake' : ''}`} style={{ ['--len' as string]: len }}>
-					{Array.from({ length: maxTries }, (_, r) => (
+					{Array.from({ length: maxTries + extra }, (_, r) => (
 						<div key={r} className="ms-rowwrap">
 							<div className="ms-row">{Array.from({ length: len }, (_, c) => renderCell(r, c))}</div>
 							{r === rows.length && !over && (
@@ -352,7 +381,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 						lastLevel={motSecretLevels.count}
 						won={lv.won}
 						stars={lv.stars}
-						detail={lv.won ? `Trouvé en ${rows.length} essai${rows.length > 1 ? 's' : ''}` : `Le mot était ${solution}`}
+						detail={lv.won ? `Trouvé en ${rows.length} essai${rows.length > 1 ? 's' : ''}${extra ? ` + ${extra} ligne${extra > 1 ? 's' : ''} de secours` : ''}` : `Le mot était ${solution}`}
 						onNext={() => startLevel(lv.level + 1)}
 						onReplay={() => startLevel(lv.level)}
 						onMenu={lv.backToMenu}
@@ -363,14 +392,26 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 
 			<div className="ms-msg" role="status">{msg?.text ?? ' '}</div>
 
+			{status === 'stuck' && (
+				<div className="ms-stuck">
+					<strong>Plus d'essais&nbsp;!</strong>
+					<span>Il te reste {EXTRA_MAX - extra} ligne{EXTRA_MAX - extra > 1 ? 's' : ''} de secours.</span>
+					<button className="ms-buy" onClick={addLine}>+1 ligne · +{EXTRA_COST} au score</button>
+				</div>
+			)}
+
 			{status === 'lost' && !lv.active && (!daily || revealed) && <div className="ms-reveal">Le mot était <strong>{solution}</strong></div>}
+			{!dailyLoading && !(lv.active && !lv.playing) && (status === 'playing' || status === 'stuck') && rows.length > 0 && (
+				<GiveUp onGiveUp={giveUp} warn={lv.playing ? 'Le niveau sera perdu — tu pourras le rejouer.' : daily ? undefined : 'Le mot sera dévoilé.'} />
+			)}
 			{daily && status === 'lost' && !revealed && <GiveUp over onGiveUp={giveUp} />}
 			{daily && revealed && <RevealNote>Reviens demain pour un nouveau défi&nbsp;!</RevealNote>}
 			{status === 'won' && !lv.active && (
 				<div className="ms-won">
 					{daily
-						? (alreadyPlayed ? <>Défi du jour déjà relevé · <strong>{fmt(rows.length)}</strong> — reviens demain&nbsp;!</> : <>🎉 Trouvé en <strong>{fmt(rows.length)}</strong>&nbsp;!</>)
-						: <>🎉 Trouvé en <strong>{fmt(rows.length)}</strong>&nbsp;! <button className="ms-replay" onClick={() => newGame(diffKey)}>Nouveau mot</button></>}
+						? (alreadyPlayed ? <>Défi du jour déjà relevé · <strong>{fmt(cost)}</strong> — reviens demain&nbsp;!</> : <>🎉 Trouvé en <strong>{fmt(cost)}</strong>&nbsp;!</>)
+						: <>🎉 Trouvé en <strong>{fmt(cost)}</strong>&nbsp;! <button className="ms-replay" onClick={() => newGame(diffKey)}>Nouveau mot</button></>}
+					{extra > 0 && <span className="ms-pen">{rows.length} essai{rows.length > 1 ? 's' : ''} + {extra} ligne{extra > 1 ? 's' : ''} de secours (+{penalty})</span>}
 				</div>
 			)}
 			{status === 'lost' && !daily && !lv.active && <button className="ms-replay" onClick={() => newGame(diffKey)}>Nouveau mot</button>}
@@ -386,7 +427,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 									key={k}
 									className={`ms-key${wide ? ' wide' : ''}${st ? ` ${st}` : ''}`}
 									onClick={() => onKey(k)}
-									disabled={over || dailyLoading}
+									disabled={status !== 'playing' || dailyLoading}
 									aria-label={k === '#' ? 'Valider' : k === '<' ? 'Effacer' : k}
 								>{k === '#' ? '⏎' : k === '<' ? '⌫' : k}</button>
 							);
@@ -396,7 +437,8 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<p className="ms-help">
-				Devine le mot en 6 essais : chaque essai doit être un mot français commençant par la lettre donnée.
+				Devine le mot en {maxTries} essais : chaque essai doit être un mot français commençant par la lettre donnée.
+				À court d'essais, tu peux racheter jusqu'à <strong>{EXTRA_MAX} lignes</strong> de secours, chacune coûte +{EXTRA_COST} au score.
 				L'<strong>indice</strong> dévoile la première lettre encore inconnue (en mode libre, une tombe aussi toute seule toutes les 30&nbsp;s).
 				<span className="ms-legend"><i className="lg good" /> bien placée · <i className="lg present" /> présente · <i className="lg absent" /> absente</span>
 			</p>
@@ -448,6 +490,11 @@ const CSS = `
 .ms-reveal strong { color: var(--accent-regular); letter-spacing: 1px; }
 .ms-won { text-align: center; font-size: 16px; color: var(--gray-0); margin-top: 0.4rem; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .ms-won strong { color: var(--accent-regular); }
+.ms-pen { font-size: 12.5px; color: var(--gray-400); }
+.ms-stuck { margin-top: 0.4rem; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-size: 13.5px; color: var(--gray-300); }
+.ms-stuck strong { color: var(--ms-present); font-size: 15px; }
+.ms-buy { border: 1.5px solid var(--accent-regular); background: transparent; color: var(--accent-regular); font: inherit; font-weight: 700; font-size: 14px; border-radius: 999px; padding: 9px 18px; cursor: pointer; margin-top: 2px; }
+.ms-buy:hover { background: var(--accent-regular); color: var(--accent-text-over); }
 .ms-replay { border: none; background: var(--accent-regular); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; margin-top: 0.4rem; }
 .ms-kb { width: 100%; max-width: 430px; display: flex; flex-direction: column; gap: 6px; margin-top: 0.8rem; }
 .ms-kb-row { display: flex; gap: 5px; justify-content: center; }
