@@ -16,6 +16,8 @@ const BANK_CAP = 0.35;
 const SOCLE_H = 1.2; // taller than the drawn ball, so the collision edge always has a face behind it
 const LIP = 0.6; // how far the kerb's outer face hangs below the floor
 const DECK = 1.3; // bridge deck thickness — below it the arch is open water
+const ARCH = 1.2; // extra height over the bridge, on top of the engine's own hump
+const ARCH_RAMP = 8; // samples the lift fades over on each side — always inside the corridor
 const APRON = 10; // where the grass bank beyond the paving lands
 // World units per texture tile. UVs are planar (floor) or box-mapped (kerbs), so a turn or a
 // wall face never stretches the pattern, and the tile size stays the same across the course.
@@ -56,13 +58,28 @@ export function bankAt(hole: Hole, i: number): number {
 }
 
 /**
+ * Extra height carried over the bridge. The basin cannot be dug — it is built on the flat
+ * lawn — so the engine's own hump left the deck within half a unit of the pond kerb and the
+ * arch read as a slit. Drawing only: the engine's altitude, and the physics, are untouched.
+ */
+function archLift(hole: Hole, i: number): number {
+	const b = hole.bridge;
+	if (!b) return 0;
+	if (i >= b.lo && i <= b.hi) return ARCH;
+	const d = i < b.lo ? b.lo - i : i - b.hi;
+	if (d >= ARCH_RAMP) return 0;
+	const u = 1 - d / ARCH_RAMP;
+	return ARCH * u * u * (3 - 2 * u); // flat at both ends, so the approach keeps no crease
+}
+
+/**
  * Lane surface at sample `i`, `u` = lateral position (-1 right … +1 left).
  * The two axes are scaled apart on purpose: `rel` flattens the hole along its length,
  * `bk` keeps the turns banked. The engine already pushes the ball sideways in a turn
  * (its own BANK term) — this is what makes that push visible.
  */
 export const laneY = (hole: Hole, i: number, u: number, rel: number, bk: number): number =>
-	hole.alt[i] * rel - u * bk * bankAt(hole, i);
+	hole.alt[i] * rel + archLift(hole, i) - u * bk * bankAt(hole, i);
 
 /** Nearest centerline sample — same lookup stepBall uses for the relief. */
 export function nearestSample(hole: Hole, x: number, z: number): number {
