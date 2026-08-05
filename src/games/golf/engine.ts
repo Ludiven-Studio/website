@@ -238,7 +238,15 @@ export function generateHole(rng: Rng, diff: DiffLevel, ctrlOverride?: Vec[]): H
 	const left = path.map((p, i) => ({ x: p.x + p.nx * widths[i], z: p.z + p.nz * widths[i] }));
 	const right = path.map((p, i) => ({ x: p.x - p.nx * widths[i], z: p.z - p.nz * widths[i] }));
 
-	const startIdx = 1;
+	// The tee cap closes the lane at path[0] and the first samples are barely half a unit
+	// apart, so path[1] left the ball touching the wall. Walk forward until it has room.
+	const capDist = (p: Vec) => {
+		const ax = right[0].x - left[0].x, az = right[0].z - left[0].z;
+		const u = clamp(((p.x - left[0].x) * ax + (p.z - left[0].z) * az) / (ax * ax + az * az || 1), 0, 1);
+		return Math.hypot(p.x - (left[0].x + ax * u), p.z - (left[0].z + az * u));
+	};
+	let startIdx = 1;
+	while (startIdx < SAMPLES - 2 && capDist(path[startIdx]) < PARAMS.ballR + 1.5) startIdx++;
 	const start: Vec = { x: path[startIdx].x, z: path[startIdx].z };
 	const cup: Vec = { x: path[SAMPLES - 1].x, z: path[SAMPLES - 1].z };
 	const cupR = diff.cupR;
