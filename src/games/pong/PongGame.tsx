@@ -782,7 +782,6 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				{phase === 'menu' && !lv.active && !daily && (
 					<div className="pg-overlay">
 						<div className="pg-card">
-							<h2>Pong</h2>
 							<p className="pg-sub">Premier à {PONG.maxScore} points gagne.</p>
 							<div className="pg-modes" role="tablist" aria-label="Mode de jeu">
 								<button role="tab" aria-selected={!powers} className={`pg-mode ${!powers ? 'active' : ''}`} onClick={() => setPowers(false)}>Classique</button>

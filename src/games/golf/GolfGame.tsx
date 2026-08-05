@@ -1145,12 +1145,6 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				{phase === 'menu' && !lv.booting && !webglError && !lv.active && (
 					<div className="gf-overlay">
 						<div className="gf-card">
-							<h2>Mini-Golf</h2>
-							<p className="gf-sub">Tire la balle à la fronde, fais des rebonds, rentre en un minimum de coups.</p>
-							<div className="gf-modes" role="tablist" aria-label="Mode">
-								<button role="tab" aria-selected={mode === 'defi'} className={`gf-mode ${mode === 'defi' ? 'active' : ''}`} onClick={() => setMode('defi')}>Défi du jour</button>
-								<button role="tab" aria-selected={mode === 'libre'} className={`gf-mode ${mode === 'libre' ? 'active' : ''}`} onClick={() => setMode('libre')}>Libre</button>
-							</div>
 							{mode === 'libre' && (
 								<div className="gf-modes" role="tablist" aria-label="Niveau">
 									{DIFF_ORDER.map((k) => (

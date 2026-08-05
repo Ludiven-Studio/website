@@ -1194,12 +1194,6 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 				{phase === 'menu' && !lv.booting && !webglError && !lv.active && (
 					<div className="dr-overlay">
 						<div className="dr-card">
-							<h2>Drift</h2>
-							<p className="dr-sub">Les autres pilotes sont des fantômes — bats leur meilleur tour&nbsp;!</p>
-							<div className="dr-modes" role="tablist" aria-label="Mode">
-								<button role="tab" aria-selected={mode === 'defi'} className={`dr-mode ${mode === 'defi' ? 'active' : ''}`} onClick={() => setMode('defi')}>Défi du jour</button>
-								<button role="tab" aria-selected={mode === 'libre'} className={`dr-mode ${mode === 'libre' ? 'active' : ''}`} onClick={() => setMode('libre')}>Libre</button>
-							</div>
 							{mode === 'libre' && (
 								<div className="dr-modes" role="tablist" aria-label="Niveau">
 									{DIFF_ORDER.map((k) => (

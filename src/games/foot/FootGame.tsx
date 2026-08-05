@@ -707,7 +707,6 @@ export default function FootGame({ gameId }: { gameId: string }) {
 				{phase === 'menu' && !lv.active && !daily && (
 					<div className="fo-overlay">
 						<div className="fo-card">
-							<h2>Cocotte Foot</h2>
 							<p className="fo-sub">Premier à {WIN_GOALS} buts gagne. Fonce dans le ballon, il part en tir&nbsp;!</p>
 							<div className="fo-modes" role="tablist" aria-label="Format">
 								<button role="tab" aria-selected={teamSize === 1} className={`fo-mode ${teamSize === 1 ? 'active' : ''}`} onClick={() => setTeamSize(1)}>1 vs 1</button>
