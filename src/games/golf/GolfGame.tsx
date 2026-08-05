@@ -68,6 +68,8 @@ const BALL_COLORS = [0xff3b30, 0x0a84ff, 0xffd60a, 0x30d158, 0xbf5af2];
 const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
 const RELIEF = 0.1; // height scale along the hole — enough to read, flat enough to putt
 const BANK = 5; // cross slope in the turns; the engine already curves the ball there
+const SUN_DIR = new THREE.Vector3(40, 70, 20).normalize();
+const CAM_TAU = 0.08; // how fast the camera catches the pose its mode asks for, in seconds
 const PITCH = 45; // camera tilt (deg) for the framed views
 const TOP_PITCH = 89.5;
 const SHOULDER_PITCH = 30;
@@ -183,6 +185,10 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	// A camera move is a blend from a frozen pose toward whatever the live mode wants.
 	const camTweenRef = useRef<{ eye: THREE.Vector3; look: THREE.Vector3; t0: number; dur: number } | null>(null);
 	const camLookRef = useRef(new THREE.Vector3());
+	// Where the camera actually is, chasing the pose the mode asks for. Without this lag the
+	// eye copies every step the ball takes and the ride reads as a series of nudges.
+	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), on: false });
+	const lastFrameRef = useRef(0);
 	const introRef = useRef(false);
 	const azRef = useRef(0); // camera azimuth around the target
 	// Bounding box of the hole. `base` is the tee→cup heading; `az`/`azTop` are the framings
@@ -218,7 +224,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		}
 		renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 		renderer.shadowMap.enabled = true;
-		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+		// PCFSoftShadowMap is deprecated and silently falls back to plain PCF, which is what
+		// made the edges look like a staircase. VSM is blurred in the map itself.
+		renderer.shadowMap.type = THREE.VSMShadowMap;
 		const scene = new THREE.Scene();
 		scene.background = new THREE.Color(0x87b7e8);
 		scene.fog = new THREE.Fog(0x87b7e8, 260, 900);
@@ -234,6 +242,9 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		sun.shadow.camera.near = 1;
 		sun.shadow.camera.far = 400;
 		sun.shadow.normalBias = 0.03;
+		sun.shadow.bias = -0.0006;
+		sun.shadow.radius = 3;
+		sun.shadow.blurSamples = 8;
 		scene.add(sun);
 		scene.add(sun.target);
 
@@ -412,6 +423,11 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		const b = ballRef.current;
 		const mode = camModeRef.current;
 		const by = surfaceY(hole, pose.x, pose.z, RELIEF, BANK);
+		// Every easing below is written as a time constant, not a per-frame fraction: at 120 Hz
+		// a fixed fraction eases twice as fast as at 60.
+		const dt = Math.min(0.1, Math.max(0, (now - lastFrameRef.current) / 1000)) || 1 / 60;
+		lastFrameRef.current = now;
+		const ease = (tau: number) => 1 - Math.exp(-dt / tau);
 
 		animateHole(g.holeGroup, now, pose.x, pose.z);
 
@@ -458,7 +474,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				if (!orbitRef.current) {
 					let d = ((want - azRef.current + Math.PI) % (Math.PI * 2)) - Math.PI;
 					if (d < -Math.PI) d += Math.PI * 2;
-					azRef.current += d * 0.03; // ease toward "down the fairway"
+					azRef.current += d * ease(0.55); // ease toward "down the fairway"
 				}
 				const pitch = (SHOULDER_PITCH * Math.PI) / 180;
 				const flat = Math.cos(pitch) * SHOULDER_DIST;
@@ -513,6 +529,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			introRef.current = false;
 			poseOf('top'); // a hole opens from the sky, then flies down behind the ball
 			camTweenRef.current = { eye: camEye.clone(), look: camLook.clone(), t0: now, dur: INTRO_MS };
+			camSmoothRef.current.on = false;
 		}
 		poseOf(mode);
 		const tw = camTweenRef.current;
@@ -523,11 +540,16 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			camLook.lerpVectors(tw.look, camLook, k);
 			if (t >= 1) camTweenRef.current = null;
 		}
-		g.camera.position.copy(camEye);
-		g.camera.lookAt(camLook);
-		camLookRef.current.copy(camLook); // where a glide has to start from, next time
+		const cs = camSmoothRef.current;
+		if (!cs.on) { cs.eye.copy(camEye); cs.look.copy(camLook); cs.on = true; }
+		const ck = ease(CAM_TAU);
+		cs.eye.lerp(camEye, ck);
+		cs.look.lerp(camLook, ck);
+		g.camera.position.copy(cs.eye);
+		g.camera.lookAt(cs.look);
+		camLookRef.current.copy(cs.look); // where a glide has to start from, next time
 
-		const k = 0.25;
+		const k = ease(0.06);
 		for (const ghost of ghostsRef.current.values()) {
 			ghost.cur.x += (ghost.target.x - ghost.cur.x) * k;
 			ghost.cur.z += (ghost.target.z - ghost.cur.z) * k;
@@ -823,8 +845,13 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				const R = Math.max(maxX - minX, maxZ - minZ) / 2 + 14;
 				const sc = g.sun.shadow.camera;
 				sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R;
+				// Stand the sun off far enough that the whole box is in front of it, and pull
+				// near/far in around the box — a 1..400 range wastes the depth VSM works from.
+				const D = R + 120;
+				sc.near = Math.max(1, D - R - 40);
+				sc.far = D + R + 40;
 				sc.updateProjectionMatrix();
-				g.sun.position.set(fx + 40, 70, fz + 20);
+				g.sun.position.set(fx + SUN_DIR.x * D, SUN_DIR.y * D, fz + SUN_DIR.z * D);
 				g.sun.target.position.set(fx, 0, fz);
 				g.sun.target.updateMatrixWorld();
 			}

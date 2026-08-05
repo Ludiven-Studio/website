@@ -17,6 +17,9 @@ const SOCLE_H = 1.2; // taller than the drawn ball, so the collision edge always
 const LIP = 0.6; // how far the kerb's outer face hangs below the floor
 const DECK = 1.3; // bridge deck thickness — below it the arch is open water
 const APRON = 10; // where the grass bank beyond the paving lands
+// World units per texture tile. UVs are planar (floor) or box-mapped (kerbs), so a turn or a
+// wall face never stretches the pattern, and the tile size stays the same across the course.
+const TURF = 5.5, STONE = 4.5, PAVING = 3.2;
 
 export const WALL_H = 1.4;
 export const PAVE = 4.5; // paved band around the lane, like the real courses
@@ -72,18 +75,66 @@ export function nearestSample(hole: Hole, x: number, z: number): number {
 	return bi;
 }
 
+/** Lane height over segment `i`, at fraction `f` along it — the floor quad's own bilinear. */
+function segY(hole: Hole, i: number, f: number, x: number, z: number, rel: number, bk: number): number {
+	const j = Math.min(hole.path.length - 1, i + 1);
+	const a = hole.path[i], b = hole.path[j];
+	const px = a.x + (b.x - a.x) * f, pz = a.z + (b.z - a.z) * f;
+	let nx = a.nx + (b.nx - a.nx) * f, nz = a.nz + (b.nz - a.nz) * f;
+	const nl = Math.hypot(nx, nz) || 1;
+	nx /= nl; nz /= nl;
+	const w = hole.widths[i] + (hole.widths[j] - hole.widths[i]) * f;
+	const u = Math.max(-1.4, Math.min(1.4, ((x - px) * nx + (z - pz) * nz) / (w || 1)));
+	return laneY(hole, i, u, rel, bk) * (1 - f) + laneY(hole, j, u, rel, bk) * f;
+}
+
+// How close a runner-up segment has to be to share the height. Inside a tight bend two
+// segments are near-equidistant and the winner flips, which alone was a 0.22 drop.
+const TIE = 1.5;
+
+/**
+ * Lane height at any point, from the projection onto the centreline segments.
+ * Snapping to the nearest *sample* stepped the height every time the ball crossed a
+ * sample boundary, and the camera turned that into a jolt.
+ */
+function laneYAt(hole: Hole, x: number, z: number, rel: number, bk: number): number {
+	const n = hole.path.length;
+	const dist: number[] = [], frac: number[] = [];
+	let best = Infinity;
+	for (let i = 0; i + 1 < n; i++) {
+		const a = hole.path[i], b = hole.path[i + 1];
+		const ax = b.x - a.x, az = b.z - a.z;
+		const l2 = ax * ax + az * az;
+		const t = l2 > 1e-9 ? Math.max(0, Math.min(1, ((x - a.x) * ax + (z - a.z) * az) / l2)) : 0;
+		const d = Math.hypot(a.x + ax * t - x, a.z + az * t - z);
+		dist.push(d); frac.push(t);
+		if (d < best) best = d;
+	}
+	let sum = 0, wsum = 0;
+	for (let i = 0; i < dist.length; i++) {
+		if (dist[i] > best + TIE) continue;
+		const k = 1 - (dist[i] - best) / TIE;
+		const w = k * k;
+		sum += segY(hole, i, frac[i], x, z, rel, bk) * w;
+		wsum += w;
+	}
+	return wsum > 0 ? sum / wsum : 0;
+}
+
 /** Surface height under any point: lane (banked) outside the green, dish inside it. */
 export function surfaceY(hole: Hole, x: number, z: number, rel: number, bk: number): number {
 	const dCup = Math.hypot(x - hole.cup.x, z - hole.cup.z);
-	if (dCup < hole.greenR) {
-		const centre = hole.alt[hole.alt.length - 1];
-		const rim = hole.alt[hole.cutIdx];
-		return (centre + (rim - centre) * (dCup / hole.greenR)) * rel;
-	}
-	const i = nearestSample(hole, x, z);
-	const p = hole.path[i];
-	const u = ((x - p.x) * p.nx + (z - p.z) * p.nz) / (hole.widths[i] || 1);
-	return laneY(hole, i, Math.max(-1.4, Math.min(1.4, u)), rel, bk);
+	const lane = laneYAt(hole, x, z, rel, bk);
+	// The dish is flat-banked while the lane arrives tilted, so cutting from one to the
+	// other at the rim drops the ball. Fade across a band instead.
+	const BLEND = 6;
+	if (dCup > hole.greenR + BLEND) return lane;
+	const centre = hole.alt[hole.alt.length - 1];
+	const rim = hole.alt[hole.cutIdx];
+	const dish = (centre + (rim - centre) * Math.min(1, dCup / hole.greenR)) * rel;
+	if (dCup <= hole.greenR) return dish;
+	const t = (dCup - hole.greenR) / BLEND;
+	return dish + (lane - dish) * (t * t * (3 - 2 * t));
 }
 
 /** Lawn height around the course — where the grassy bank lands. */
@@ -145,9 +196,132 @@ export function disposeHole(grp: THREE.Group) {
 /** A ground vertex: a position plus its altitude tint. */
 interface Vtx { x: number; y: number; z: number; c: [number, number, number] }
 
-const stripGeom = (pos: number[]): THREE.BufferGeometry => {
+/**
+ * Pond surface. Everything is analytic in the fragment shader — the ripple normals, the
+ * Fresnel mix toward a fake sky, the sun glint and the shore foam — so the pond is still
+ * one draw call and needs no reflection pass. `uAlong`/`uAcross` are the ellipse's own
+ * half-axes, which is how the shader knows where the shore is.
+ */
+function waterMat(centre: [number, number], along: [number, number], across: [number, number]): THREE.ShaderMaterial {
+	return new THREE.ShaderMaterial({
+		transparent: true,
+		side: THREE.DoubleSide,
+		uniforms: {
+			uTime: { value: 0 },
+			uCentre: { value: new THREE.Vector2(...centre) },
+			uAlong: { value: new THREE.Vector2(...along) },
+			uAcross: { value: new THREE.Vector2(...across) },
+			uSun: { value: new THREE.Vector3(40, 70, 20).normalize() },
+		},
+		vertexShader: `
+			varying vec3 vWorld;
+			void main() {
+				vec4 wp = modelMatrix * vec4(position, 1.0);
+				vWorld = wp.xyz;
+				gl_Position = projectionMatrix * viewMatrix * wp;
+			}
+		`,
+		fragmentShader: `
+			uniform float uTime;
+			uniform vec2 uCentre, uAlong, uAcross;
+			uniform vec3 uSun;
+			varying vec3 vWorld;
+
+			const vec3 DEEP = vec3(0.04, 0.20, 0.38);
+			const vec3 SHALLOW = vec3(0.16, 0.52, 0.64);
+			const vec3 ZENITH = vec3(0.30, 0.52, 0.84);
+			const vec3 HORIZON = vec3(0.58, 0.74, 0.92);
+
+			// Four rotated sine ripples. The gradient comes out of the same loop, so the
+			// normal is exact and costs nothing extra.
+			float ripple(vec2 p, out vec2 grad) {
+				float h = 0.0;
+				grad = vec2(0.0);
+				vec2 d = normalize(vec2(1.0, 0.35));
+				float f = 1.5, a = 0.035, sp = 1.9;
+				for (int i = 0; i < 4; i++) {
+					float ph = dot(p, d) * f + uTime * sp;
+					h += sin(ph) * a;
+					grad += d * cos(ph) * a * f;
+					d = normalize(vec2(d.x * 0.6 - d.y * 0.8, d.x * 0.8 + d.y * 0.6));
+					f *= 1.85; a *= 0.55; sp *= 1.2;
+				}
+				return h;
+			}
+
+			void main() {
+				vec2 d = vWorld.xz - uCentre;
+				float ea = dot(d, uAlong) / dot(uAlong, uAlong);
+				float eb = dot(d, uAcross) / dot(uAcross, uAcross);
+				float edge = sqrt(ea * ea + eb * eb); // 1 at the stone kerb
+
+				vec2 grad;
+				float h = ripple(vWorld.xz, grad);
+				vec3 n = normalize(vec3(-grad.x, 1.0, -grad.y));
+				vec3 v = normalize(cameraPosition - vWorld);
+				vec3 r = reflect(-v, n);
+
+				float fres = 0.02 + 0.45 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+				vec3 sky = mix(HORIZON, ZENITH, clamp(r.y * 1.4, 0.0, 1.0));
+				float spec = pow(max(dot(r, normalize(uSun)), 0.0), 200.0) * 2.0;
+
+				vec3 body = mix(SHALLOW, DEEP, smoothstep(0.05, 0.75, 1.0 - edge));
+				vec3 col = mix(body, sky, fres) + spec + h * 0.35;
+
+				// Foam rides the ripples, so the waterline wobbles instead of drawing a circle.
+				float foam = smoothstep(0.93, 1.0, edge + h * 0.8);
+				col = mix(col, vec3(0.92, 0.96, 1.0), foam * 0.75);
+				gl_FragColor = vec4(col, mix(0.82, 0.97, max(fres * 2.0, foam)));
+				#include <colorspace_fragment>
+			}
+		`,
+	});
+}
+
+// Loaded once for the session and shared by every hole, so a rebuild costs no decode. The
+// tile size lives in the UVs, not in `repeat`, which is why one texture can serve every mesh.
+const texPool = new Map<string, THREE.Texture>();
+
+/** Give a material its grain. A missing file just leaves the flat colour, which still reads. */
+function grain(mat: THREE.MeshStandardMaterial, file: string): void {
+	if (mat.map) return; // prop materials are shared and reach here once per user
+	const url = `/assets/jeux/golf/${file}`;
+	const have = texPool.get(url);
+	if (have) { mat.map = have; mat.needsUpdate = true; return; }
+	new THREE.TextureLoader().load(url, (t) => {
+		t.wrapS = t.wrapT = THREE.RepeatWrapping;
+		t.colorSpace = THREE.SRGBColorSpace;
+		t.anisotropy = 4;
+		texPool.set(url, t);
+		mat.map = t;
+		mat.needsUpdate = true;
+	}, undefined, () => { /* no asset: keep the flat material */ });
+}
+
+/**
+ * Box-mapped UVs for a triangle soup: every face takes the plane it faces most. A kerb has
+ * a top and two vertical flanks, and a single planar projection would smear the flanks.
+ */
+function boxUV(pos: number[], scale: number): number[] {
+	const uv: number[] = [];
+	for (let i = 0; i + 8 < pos.length; i += 9) {
+		const ux = pos[i + 3] - pos[i], uy = pos[i + 4] - pos[i + 1], uz = pos[i + 5] - pos[i + 2];
+		const vx = pos[i + 6] - pos[i], vy = pos[i + 7] - pos[i + 1], vz = pos[i + 8] - pos[i + 2];
+		const nx = Math.abs(uy * vz - uz * vy), ny = Math.abs(uz * vx - ux * vz), nz = Math.abs(ux * vy - uy * vx);
+		for (let k = 0; k < 3; k++) {
+			const x = pos[i + k * 3] / scale, y = pos[i + k * 3 + 1] / scale, z = pos[i + k * 3 + 2] / scale;
+			if (ny >= nx && ny >= nz) uv.push(x, z);
+			else if (nx >= nz) uv.push(z, y);
+			else uv.push(x, y);
+		}
+	}
+	return uv;
+}
+
+const stripGeom = (pos: number[], uvScale = 0): THREE.BufferGeometry => {
 	const g = new THREE.BufferGeometry();
 	g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+	if (uvScale > 0) g.setAttribute('uv', new THREE.Float32BufferAttribute(boxUV(pos, uvScale), 2));
 	g.computeVertexNormals();
 	return g;
 };
@@ -317,6 +491,8 @@ function buildFootbridge(mat: MatFn, L: number, D: number, spanHalf: number): TH
 
 /** Per-frame prop life: the sails turn, and a deck the ball is under fades out of the way. */
 export function animateHole(group: THREE.Group, timeMs: number, bx: number, bz: number): void {
+	const water = group.userData.water as THREE.ShaderMaterial | undefined;
+	if (water) water.uniforms.uTime.value = timeMs * 0.001;
 	const spin = group.userData.spin as THREE.Object3D[] | undefined;
 	if (spin) for (const s of spin) s.rotation.z = timeMs * 0.0006;
 	const fade = group.userData.fade as Overhead[] | undefined;
@@ -451,6 +627,8 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	// normal per-face for lighting only when the material is double-sided.
 	const floorMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
 	const wallMat = new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.8, metalness: 0.02, side: THREE.DoubleSide });
+	grain(floorMat, 'turf.jpg');
+	grain(wallMat, 'stone.jpg');
 	// Props share materials by colour, and only ever create the ones they use — an unused
 	// material would never sit on a mesh, so disposeHole could not find it.
 	const propMats = new Map<string, THREE.MeshStandardMaterial>();
@@ -469,34 +647,39 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	// ---- Lane floor: the two edges sit at different HEIGHTS, so banked turns bank.
 	// Indexed strips, not a triangle soup: shared vertices let computeVertexNormals average
 	// across the seams, otherwise every face keeps its own normal and the relief reads faceted.
-	const fpos: number[] = [], fcol: number[] = [], fidx: number[] = [];
-	const addStrip = (rows: [Vtx, Vtx][]) => {
-		const base = fpos.length / 3;
-		for (const [l, r] of rows) {
-			fpos.push(l.x, l.y, l.z, r.x, r.y, r.z);
-			fcol.push(...l.c, ...r.c);
+	const fpos: number[] = [], fcol: number[] = [], fuv: number[] = [], fidx: number[] = [];
+	const addGrid = (rows: Vtx[][]) => {
+		const base = fpos.length / 3, cols = rows[0].length;
+		for (const row of rows) for (const v of row) {
+			fpos.push(v.x, v.y, v.z);
+			fcol.push(...v.c);
+			fuv.push(v.x / TURF, v.z / TURF);
 		}
 		for (let k = 0; k + 1 < rows.length; k++) {
-			const a = base + k * 2;
-			fidx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+			for (let c = 0; c + 1 < cols; c++) {
+				const a = base + k * cols + c;
+				fidx.push(a, a + 1, a + cols, a + 1, a + cols + 1, a + cols);
+			}
 		}
 	};
-	const edge = (i: number, side: 1 | -1): Vtx => {
-		const p = path[i], w = W[i];
-		return {
-			x: p.x + p.nx * w * side,
-			y: laneY(hole, i, side, relief, bankv),
-			z: p.z + p.nz * w * side,
-			c: col(hole.alt[i]),
-		};
+	// A row of only two vertices makes every banked quad one twisted patch, and the diagonal
+	// it is cut along shows as a crease. Splitting across the lane flattens each piece.
+	const ACROSS = 6;
+	const lat = (i: number, u: number): Vtx => {
+		const p = path[i], w = W[i] * u;
+		return { x: p.x + p.nx * w, y: laneY(hole, i, u, relief, bankv), z: p.z + p.nz * w, c: col(hole.alt[i]) };
 	};
-	const laneRows: [Vtx, Vtx][] = [];
-	for (let i = 0; i <= cut; i++) laneRows.push([edge(i, 1), edge(i, -1)]);
-	addStrip(laneRows);
+	const laneRows: Vtx[][] = [];
+	for (let i = 0; i <= cut; i++) {
+		const row: Vtx[] = [];
+		for (let c = 0; c <= ACROSS; c++) row.push(lat(i, 1 - (2 * c) / ACROSS));
+		laneRows.push(row);
+	}
+	addGrid(laneRows);
 	// ---- Throat. The engine seals the corridor mouth to the green opening with two collision
 	// walls but no surface, so the lane and the green read as two loose slabs. Fill the gap.
 	const gw0 = hole.greenWall[0], gw1 = hole.greenWall[hole.greenWall.length - 1];
-	const mouthL = edge(cut, 1), mouthR = edge(cut, -1);
+	const mouthL = lat(cut, 1), mouthR = lat(cut, -1);
 	const openL = Math.hypot(mouthL.x - gw0.x, mouthL.z - gw0.z) <= Math.hypot(mouthL.x - gw1.x, mouthL.z - gw1.z) ? gw0 : gw1;
 	const openR = openL === gw0 ? gw1 : gw0;
 	const THROAT = 6;
@@ -509,13 +692,21 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 			c: col(rimA),
 		};
 	};
-	const throatRows: [Vtx, Vtx][] = [];
-	for (let k = 0; k <= THROAT; k++) throatRows.push([thr(1, k / THROAT), thr(-1, k / THROAT)]);
-	addStrip(throatRows);
+	const throatRows: Vtx[][] = [];
+	for (let k = 0; k <= THROAT; k++) {
+		const l = thr(1, k / THROAT), r = thr(-1, k / THROAT), row: Vtx[] = [];
+		for (let c = 0; c <= ACROSS; c++) {
+			const u = c / ACROSS;
+			row.push({ x: l.x + (r.x - l.x) * u, y: l.y + (r.y - l.y) * u, z: l.z + (r.z - l.z) * u, c: l.c });
+		}
+		throatRows.push(row);
+	}
+	addGrid(throatRows);
 
 	const fgeom = new THREE.BufferGeometry();
 	fgeom.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3));
 	fgeom.setAttribute('color', new THREE.Float32BufferAttribute(fcol, 3));
+	fgeom.setAttribute('uv', new THREE.Float32BufferAttribute(fuv, 2));
 	fgeom.setIndex(fidx);
 	fgeom.computeVertexNormals();
 	const floor = new THREE.Mesh(fgeom, floorMat);
@@ -525,7 +716,7 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	// ---- Green: a real dish, low at the cup and rising to the rim. It starts at the cup
 	// radius, not at 0 — a full disc paved over the cup and there was no hole to sink into.
 	const RINGS = 12, SEG = 48;
-	const gpos: number[] = [], gcol: number[] = [], gidx: number[] = [];
+	const gpos: number[] = [], gcol: number[] = [], guv: number[] = [], gidx: number[] = [];
 	const gp = (ri: number, si: number): Vtx => {
 		const d = hole.cupR + (ri / RINGS) * (hole.greenR - hole.cupR);
 		const ang = (si / SEG) * Math.PI * 2;
@@ -537,6 +728,7 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 			const p = gp(ri, si);
 			gpos.push(p.x, p.y, p.z);
 			gcol.push(...p.c);
+			guv.push(p.x / TURF, p.z / TURF);
 		}
 	}
 	// The last segment wraps onto column 0, so the dish has no seam to shade against.
@@ -550,6 +742,7 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	const ggeom = new THREE.BufferGeometry();
 	ggeom.setAttribute('position', new THREE.Float32BufferAttribute(gpos, 3));
 	ggeom.setAttribute('color', new THREE.Float32BufferAttribute(gcol, 3));
+	ggeom.setAttribute('uv', new THREE.Float32BufferAttribute(guv, 2));
 	ggeom.setIndex(gidx);
 	ggeom.computeVertexNormals();
 	const greenMesh = new THREE.Mesh(ggeom, floorMat);
@@ -694,18 +887,18 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 		y: Y(rimA),
 	}));
 	wallRun(ringRun);
-	const walls = new THREE.Mesh(stripGeom(wpos), wallMat);
+	const walls = new THREE.Mesh(stripGeom(wpos, STONE), wallMat);
 	walls.castShadow = true;
 	walls.receiveShadow = true;
 	grp.add(walls);
-	const paving = new THREE.Mesh(stripGeom(ppos), new THREE.MeshStandardMaterial({
-		color: 0xa79c8d, roughness: 1, side: THREE.DoubleSide,
-	}));
+	const paveMat = new THREE.MeshStandardMaterial({ color: 0xa79c8d, roughness: 1, side: THREE.DoubleSide });
+	grain(paveMat, 'paving.jpg');
+	const paving = new THREE.Mesh(stripGeom(ppos, PAVING), paveMat);
 	paving.receiveShadow = true;
 	grp.add(paving);
-	const apron = new THREE.Mesh(stripGeom(apos), new THREE.MeshStandardMaterial({
-		color: 0x3c7040, roughness: 1, side: THREE.DoubleSide,
-	}));
+	const apronMat = new THREE.MeshStandardMaterial({ color: 0x3c7040, roughness: 1, side: THREE.DoubleSide });
+	grain(apronMat, 'turf.jpg');
+	const apron = new THREE.Mesh(stripGeom(apos, TURF), apronMat);
 	apron.receiveShadow = true;
 	grp.add(apron);
 
@@ -767,7 +960,9 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 		}
 		opos.push(q[0].x, topY, q[0].z, q[1].x, topY, q[1].z, q[2].x, topY, q[2].z);
 		opos.push(q[0].x, topY, q[0].z, q[2].x, topY, q[2].z, q[3].x, topY, q[3].z);
-		const socle = new THREE.Mesh(stripGeom(opos), pmat(0x9c9184, 0.95));
+		const socleMat = pmat(0x9c9184, 0.95);
+		grain(socleMat, 'stone.jpg');
+		const socle = new THREE.Mesh(stripGeom(opos, STONE), socleMat);
 		socle.castShadow = true;
 		socle.receiveShadow = true;
 		grp.add(socle);
@@ -817,7 +1012,7 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 		};
 		for (let i = lo0; i < hi0; i++)
 			push(spos, soffit(i, 1), soffit(i, -1), soffit(i + 1, -1), soffit(i + 1, 1));
-		grp.add(new THREE.Mesh(stripGeom(spos), wallMat));
+		grp.add(new THREE.Mesh(stripGeom(spos, STONE), wallMat));
 
 		const along = Math.hypot(path[hi].x - path[lo].x, path[hi].z - path[lo].z) * 0.5 + 4;
 		const across = W[mid] + PAVE + 10;
@@ -841,12 +1036,16 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 			push(bp, rim(a0, 1, kerbTop), rim(a1, 1, kerbTop), rim(a1, 1.1, kerbTop), rim(a0, 1.1, kerbTop));
 			push(bp, rim(a0, 1.1, kerbTop), rim(a1, 1.1, kerbTop), rim(a1, 1.1, gy - 0.2), rim(a0, 1.1, gy - 0.2));
 		}
-		grp.add(new THREE.Mesh(stripGeom(bp), new THREE.MeshStandardMaterial({
-			color: 0x9d9284, roughness: 1, side: THREE.DoubleSide,
-		})));
-		grp.add(new THREE.Mesh(stripGeom(wp), new THREE.MeshStandardMaterial({
-			color: 0x2f7fd6, roughness: 0.15, metalness: 0.35, transparent: true, opacity: 0.9, side: THREE.DoubleSide,
-		})));
+		const pondMat = new THREE.MeshStandardMaterial({ color: 0x9d9284, roughness: 1, side: THREE.DoubleSide });
+		grain(pondMat, 'stone.jpg');
+		grp.add(new THREE.Mesh(stripGeom(bp, STONE), pondMat));
+		const wmat = waterMat(
+			[pm.x, pm.z],
+			[pm.dirX * along, pm.dirZ * along],
+			[pm.nx * across, pm.nz * across],
+		);
+		grp.userData.water = wmat;
+		grp.add(new THREE.Mesh(stripGeom(wp), wmat));
 	}
 
 	// ---- Planting. At a low camera the course floats on an empty plain. Flowers hug the
