@@ -142,6 +142,9 @@ export function disposeHole(grp: THREE.Group) {
 	for (const m of mats) m.dispose();
 }
 
+/** A ground vertex: a position plus its altitude tint. */
+interface Vtx { x: number; y: number; z: number; c: [number, number, number] }
+
 const stripGeom = (pos: number[]): THREE.BufferGeometry => {
 	const g = new THREE.BufferGeometry();
 	g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -464,8 +467,21 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	const centreA = hole.alt[hole.alt.length - 1], rimA = hole.alt[cut];
 
 	// ---- Lane floor: the two edges sit at different HEIGHTS, so banked turns bank.
-	const fpos: number[] = [], fcol: number[] = [];
-	const edge = (i: number, side: 1 | -1) => {
+	// Indexed strips, not a triangle soup: shared vertices let computeVertexNormals average
+	// across the seams, otherwise every face keeps its own normal and the relief reads faceted.
+	const fpos: number[] = [], fcol: number[] = [], fidx: number[] = [];
+	const addStrip = (rows: [Vtx, Vtx][]) => {
+		const base = fpos.length / 3;
+		for (const [l, r] of rows) {
+			fpos.push(l.x, l.y, l.z, r.x, r.y, r.z);
+			fcol.push(...l.c, ...r.c);
+		}
+		for (let k = 0; k + 1 < rows.length; k++) {
+			const a = base + k * 2;
+			fidx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+		}
+	};
+	const edge = (i: number, side: 1 | -1): Vtx => {
 		const p = path[i], w = W[i];
 		return {
 			x: p.x + p.nx * w * side,
@@ -474,13 +490,9 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 			c: col(hole.alt[i]),
 		};
 	};
-	for (let i = 0; i < cut; i++) {
-		const lp = edge(i, 1), rp = edge(i, -1), lq = edge(i + 1, 1), rq = edge(i + 1, -1);
-		fpos.push(lp.x, lp.y, lp.z, rp.x, rp.y, rp.z, lq.x, lq.y, lq.z);
-		fcol.push(...lp.c, ...rp.c, ...lq.c);
-		fpos.push(rp.x, rp.y, rp.z, rq.x, rq.y, rq.z, lq.x, lq.y, lq.z);
-		fcol.push(...rp.c, ...rq.c, ...lq.c);
-	}
+	const laneRows: [Vtx, Vtx][] = [];
+	for (let i = 0; i <= cut; i++) laneRows.push([edge(i, 1), edge(i, -1)]);
+	addStrip(laneRows);
 	// ---- Throat. The engine seals the corridor mouth to the green opening with two collision
 	// walls but no surface, so the lane and the green read as two loose slabs. Fill the gap.
 	const gw0 = hole.greenWall[0], gw1 = hole.greenWall[hole.greenWall.length - 1];
@@ -488,7 +500,7 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	const openL = Math.hypot(mouthL.x - gw0.x, mouthL.z - gw0.z) <= Math.hypot(mouthL.x - gw1.x, mouthL.z - gw1.z) ? gw0 : gw1;
 	const openR = openL === gw0 ? gw1 : gw0;
 	const THROAT = 6;
-	const thr = (side: 1 | -1, u: number) => {
+	const thr = (side: 1 | -1, u: number): Vtx => {
 		const m = side === 1 ? mouthL : mouthR, o = side === 1 ? openL : openR;
 		return {
 			x: m.x + (o.x - m.x) * u,
@@ -497,18 +509,14 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 			c: col(rimA),
 		};
 	};
-	for (let k = 0; k < THROAT; k++) {
-		const lp = thr(1, k / THROAT), rp = thr(-1, k / THROAT);
-		const lq = thr(1, (k + 1) / THROAT), rq = thr(-1, (k + 1) / THROAT);
-		fpos.push(lp.x, lp.y, lp.z, rp.x, rp.y, rp.z, lq.x, lq.y, lq.z);
-		fcol.push(...lp.c, ...rp.c, ...lq.c);
-		fpos.push(rp.x, rp.y, rp.z, rq.x, rq.y, rq.z, lq.x, lq.y, lq.z);
-		fcol.push(...rp.c, ...rq.c, ...lq.c);
-	}
+	const throatRows: [Vtx, Vtx][] = [];
+	for (let k = 0; k <= THROAT; k++) throatRows.push([thr(1, k / THROAT), thr(-1, k / THROAT)]);
+	addStrip(throatRows);
 
 	const fgeom = new THREE.BufferGeometry();
 	fgeom.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3));
 	fgeom.setAttribute('color', new THREE.Float32BufferAttribute(fcol, 3));
+	fgeom.setIndex(fidx);
 	fgeom.computeVertexNormals();
 	const floor = new THREE.Mesh(fgeom, floorMat);
 	floor.receiveShadow = true;
@@ -517,25 +525,32 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 	// ---- Green: a real dish, low at the cup and rising to the rim. It starts at the cup
 	// radius, not at 0 — a full disc paved over the cup and there was no hole to sink into.
 	const RINGS = 12, SEG = 48;
-	const gpos: number[] = [], gcol: number[] = [];
-	const gp = (ri: number, si: number) => {
+	const gpos: number[] = [], gcol: number[] = [], gidx: number[] = [];
+	const gp = (ri: number, si: number): Vtx => {
 		const d = hole.cupR + (ri / RINGS) * (hole.greenR - hole.cupR);
 		const ang = (si / SEG) * Math.PI * 2;
 		const a = centreA + (rimA - centreA) * (d / hole.greenR);
 		return { x: hole.cup.x + Math.cos(ang) * d, y: Y(a) + 0.02, z: hole.cup.z + Math.sin(ang) * d, c: col(a) };
 	};
+	for (let ri = 0; ri <= RINGS; ri++) {
+		for (let si = 0; si < SEG; si++) {
+			const p = gp(ri, si);
+			gpos.push(p.x, p.y, p.z);
+			gcol.push(...p.c);
+		}
+	}
+	// The last segment wraps onto column 0, so the dish has no seam to shade against.
+	const gi = (ri: number, si: number) => ri * SEG + (si % SEG);
 	for (let ri = 0; ri < RINGS; ri++) {
 		for (let si = 0; si < SEG; si++) {
-			const a = gp(ri, si), b = gp(ri + 1, si), c = gp(ri + 1, si + 1), d = gp(ri, si + 1);
-			gpos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
-			gcol.push(...a.c, ...b.c, ...c.c);
-			gpos.push(a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
-			gcol.push(...a.c, ...c.c, ...d.c);
+			const a = gi(ri, si), b = gi(ri + 1, si), c = gi(ri + 1, si + 1), d = gi(ri, si + 1);
+			gidx.push(a, b, c, a, c, d);
 		}
 	}
 	const ggeom = new THREE.BufferGeometry();
 	ggeom.setAttribute('position', new THREE.Float32BufferAttribute(gpos, 3));
 	ggeom.setAttribute('color', new THREE.Float32BufferAttribute(gcol, 3));
+	ggeom.setIndex(gidx);
 	ggeom.computeVertexNormals();
 	const greenMesh = new THREE.Mesh(ggeom, floorMat);
 	greenMesh.receiveShadow = true;
