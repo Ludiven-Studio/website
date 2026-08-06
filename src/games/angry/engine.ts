@@ -125,6 +125,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', foxes: 3, hp: 30, margin: 2, sturdiness: 1 },
 	moyen: { label: 'Moyen', foxes: 4, hp: 45, margin: 2, sturdiness: 2 },
 	difficile: { label: 'Difficile', foxes: 5, hp: 60, margin: 1, sturdiness: 3 },
+	expert: { label: 'Expert', foxes: 6, hp: 75, margin: 1, sturdiness: 4 },
 };
 
 const FOX_R = 6;

@@ -94,11 +94,28 @@ const interleaved = (rng: Rng): Generated => {
 	return { terms: [A(0), B(0), A(1), B(1), A(2)], answer: B(2), rule: `deux suites entrelacées` };
 };
 
+const recurrence = (rng: Rng): Generated => {
+	const k = ri(rng, 2, 3);
+	const d = ri(rng, 1, 4) * (rng() < 0.5 ? -1 : 1);
+	const seq = [ri(rng, 1, 4)];
+	for (let i = 0; i < 5; i++) seq.push(seq[seq.length - 1] * k + d);
+	return { terms: seq.slice(0, 5), answer: seq[5], rule: `×${k} puis ${d > 0 ? `+${d}` : d}` };
+};
+
+const mixedOps = (rng: Rng): Generated => {
+	const r = ri(rng, 2, 3);
+	const d = ri(rng, 2, 6);
+	const seq = [ri(rng, 1, 5)];
+	for (let i = 0; i < 5; i++) seq.push(i % 2 === 0 ? seq[seq.length - 1] * r : seq[seq.length - 1] + d);
+	return { terms: seq.slice(0, 5), answer: seq[5], rule: `×${r} puis +${d}, en alternance` };
+};
+
 export const DIFFS: Record<string, DiffLevel> = {
 	// Facile: not just "+d, +d, +d" — mix in ×2/×3 and two-step alternating additions.
 	facile: { label: 'Facile', families: [arithmetic, geometric, alternating] },
 	moyen: { label: 'Moyen', families: [geometric, alternating, squares, interleaved] },
 	difficile: { label: 'Difficile', families: [fibonacci, quadratic, interleaved] },
+	expert: { label: 'Expert', families: [quadratic, recurrence, mixedOps] },
 };
 
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;

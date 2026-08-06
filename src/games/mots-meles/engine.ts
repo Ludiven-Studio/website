@@ -23,6 +23,8 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 9, count: 7, dirs: FWD }, // sens de lecture seulement
 	moyen: { label: 'Moyen', size: 11, count: 9, dirs: [...FWD, ...DIAG, ...REV_HV] }, // + diagonales + inversés
 	difficile: { label: 'Difficile', size: 13, count: 11, dirs: [...FWD, ...DIAG, ...REV_HV, ...DIAG_UP] }, // 8 directions
+	// 12 = the richest theme's word count, so `count` can't go higher.
+	expert: { label: 'Expert', size: 15, count: 12, dirs: [...FWD, ...DIAG, ...REV_HV, ...DIAG_UP] },
 };
 
 /** Uppercase, strip diacritics, keep A–Z only (idempotent). */

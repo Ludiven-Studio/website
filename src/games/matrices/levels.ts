@@ -4,7 +4,7 @@
 // number of varying features (2 → 4) and widens the template pool.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel, TemplateName } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -25,7 +25,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b5
 const varyFor = (l: number): number => Math.min(4, 2 + Math.floor((l - 1) / 34));
 const tierLabel = (vary: number): string => (vary <= 2 ? 'Facile' : vary === 3 ? 'Moyen' : 'Difficile');
 
-export const matricesLevels: LevelPlan<MatricesLevelCfg> = {
+const basePlan: LevelPlan<MatricesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score', // best-retained = most correct answers (higher is better)
 	config(level: number): MatricesLevelCfg {
@@ -55,3 +55,18 @@ export const matricesLevels: LevelPlan<MatricesLevelCfg> = {
 		return { two: `${cfg.count}/${cfg.count} bonnes`, three: `${cfg.count}/${cfg.count} en ≤ ${fmtCentis(cfg.perfectCentis)}` };
 	},
 };
+
+// 101-200: 6 answer choices instead of 3 and 2 extra questions, on the same per-question clock.
+// The score is capped by `count`, so the hardening is in the questions, not in the star bar.
+export const matricesLevels = extendPlan('matrices', basePlan, {
+	configExt: (base) => {
+		const count = base.count + 2;
+		const perQuestion = base.perfectCentis / base.count;
+		return {
+			...base,
+			diff: { label: 'Expert', vary: 4, templates: ALL_TEMPLATES, options: 6 },
+			count,
+			perfectCentis: Math.round(perQuestion * count),
+		};
+	},
+});

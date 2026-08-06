@@ -3,7 +3,7 @@
 // cover the whole grid with the pieces; stars from solve time (scaled to size).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -16,7 +16,7 @@ export interface PavageLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const pavageLevels: LevelPlan<PavageLevelCfg> = {
+const basePlan: LevelPlan<PavageLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): PavageLevelCfg {
@@ -46,3 +46,20 @@ export const pavageLevels: LevelPlan<PavageLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: the Expert board (8×8), freeing 2 more cells as you climb, on a tighter clock.
+// Staying at 12+ blocked keeps the uniqueness search fast enough for the browser.
+export const pavageLevels = extendPlan('pavage', basePlan, {
+	configExt: (base, level) => {
+		const size = 8;
+		const t = (level - LEVEL_COUNT - 1) / (LEVEL_COUNT - 1); // 0 → 1 over 101-200
+		const blocked = 14 - Math.round(t * 2); // 14 → 12
+		const cells = size * size - blocked;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, size, blocked },
+			threeStarCentis: cells * 340,
+			twoStarCentis: cells * 600,
+		};
+	},
+});

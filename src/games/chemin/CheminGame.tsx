@@ -21,6 +21,7 @@ import { useLevels } from '../../lib/useLevels';
 import { cheminLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHintGate } from '../useHintGate';
+import { diffKeys } from '../../lib/difficulty';
 
 /* =====================================================
    LE CHEMIN (LinkedIn "Zip") — React island.
@@ -474,7 +475,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 			) : (
 				<div className="zp-bar">
 					<div className="zp-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

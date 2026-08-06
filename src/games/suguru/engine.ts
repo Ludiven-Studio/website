@@ -26,6 +26,8 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 5, givens: 13 },
 	moyen: { label: 'Moyen', size: 6, givens: 17 },
 	difficile: { label: 'Difficile', size: 7, givens: 23 },
+	// Stays at 7: an 8×8 partition makes the uniqueness search blow up. The notch is clues.
+	expert: { label: 'Expert', size: 7, givens: 19 },
 };
 
 const N8 = [

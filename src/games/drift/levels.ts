@@ -4,7 +4,7 @@
 // corners (controls 6→10), sharper turns (jitter/alt), and a narrower ribbon.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DriftDiff } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -20,7 +20,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2246822519) ^ 0x1
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-export const driftLevels: LevelPlan<DriftLevelCfg> = {
+const basePlan: LevelPlan<DriftLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): DriftLevelCfg {
@@ -52,3 +52,23 @@ export const driftLevels: LevelPlan<DriftLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: 12-corner circuits, sharper and narrower than the Expert pill, on a tighter lap bar.
+export const driftLevels = extendPlan('drift', basePlan, {
+	configExt: (base, level) => {
+		const t = (level - LEVEL_COUNT) / LEVEL_COUNT; // 0 → 1 across the extended half
+		const diff: DriftDiff = {
+			label: `Niveau ${level}`,
+			controls: 12, // must stay even (chicane alternation)
+			jitter: lerp(0.46, 0.52, t),
+			width: lerp(12, 11, t),
+			alt: lerp(0.24, 0.26, t),
+		};
+		return {
+			...base,
+			diff,
+			threeStarCentis: Math.round(lerp(3100, 3600, t)),
+			twoStarCentis: Math.round(lerp(3900, 4500, t)),
+		};
+	},
+});

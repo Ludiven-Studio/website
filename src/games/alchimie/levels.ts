@@ -8,7 +8,7 @@
 // count is still reported as `stat` for the outcome card.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { ELEMENTS, getElement } from './engine';
 import { fmtSeconds } from '../../lib/scoreFormat';
 
@@ -54,18 +54,21 @@ const buildCost = (() => {
     elements with a recipe qualify (bases excluded, secrets excluded). If there are more
     than 100 candidates we space them evenly across the range so the ramp spans the whole
     tree from shallow to deep; if fewer, we cap the plan at what exists. */
-const TARGETS: string[] = (() => {
-	const candidates = ELEMENTS.filter((el) => el.recipe).map((el) => el.id);
-	candidates.sort((a, b) => {
+const CANDIDATES: string[] = (() => {
+	const ids = ELEMENTS.filter((el) => el.recipe).map((el) => el.id);
+	return ids.sort((a, b) => {
 		const d = buildCost(a) - buildCost(b);
 		return d !== 0 ? d : a.localeCompare(b);
 	});
-	if (candidates.length <= LEVEL_COUNT) return candidates;
+})();
+
+const TARGETS: string[] = (() => {
+	if (CANDIDATES.length <= LEVEL_COUNT) return CANDIDATES;
 	// Even spacing keeps both the shallowest and the deepest targets in the plan.
 	const out: string[] = [];
 	for (let i = 0; i < LEVEL_COUNT; i++) {
-		const idx = Math.round((i * (candidates.length - 1)) / (LEVEL_COUNT - 1));
-		out.push(candidates[idx]);
+		const idx = Math.round((i * (CANDIDATES.length - 1)) / (LEVEL_COUNT - 1));
+		out.push(CANDIDATES[idx]);
 	}
 	return out;
 })();
@@ -82,19 +85,35 @@ const cfgFor = (level: number): AlchimieLevelCfg => {
 	};
 };
 
-export const alchimieLevels: LevelPlan<AlchimieLevelCfg> = {
+const basePlan: LevelPlan<AlchimieLevelCfg> = {
 	count: Math.min(LEVEL_COUNT, TARGETS.length),
 	metric: 'time', // lower is better — score = centiseconds
 	config: cfgFor,
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
 		if (!r.won) return 0;
-		const cfg = cfgFor(level);
+		const cfg = this.config(level);
 		if (r.score <= cfg.threeStar) return 3;
 		if (r.score <= cfg.twoStar) return 2;
 		return 1;
 	},
 	starHint(level: number) {
-		const min = cfgFor(level).minCombos;
-		return { two: `≤ ${fmtSeconds(twoStarSec(min))}`, three: `≤ ${fmtSeconds(threeStarSec(min))}` };
+		const cfg = this.config(level);
+		return { two: `≤ ${fmtSeconds(cfg.twoStar / 100)}`, three: `≤ ${fmtSeconds(cfg.threeStar / 100)}` };
 	},
 };
+
+// 101-200: the deepest targets of the whole tree (mostly never seen in 1-100), on a 15% tighter clock.
+const DEEP: string[] = CANDIDATES.slice(-basePlan.count);
+
+export const alchimieLevels = extendPlan('alchimie', basePlan, {
+	configExt: (base, level) => {
+		const target = DEEP[Math.min(DEEP.length - 1, level - basePlan.count - 1)] ?? base.target;
+		const minCombos = buildCost(target);
+		return {
+			target,
+			minCombos,
+			threeStar: Math.round(threeStarSec(minCombos) * 0.85) * 100,
+			twoStar: Math.round(twoStarSec(minCombos) * 0.85) * 100,
+		};
+	},
+});

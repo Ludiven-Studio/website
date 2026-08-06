@@ -23,6 +23,7 @@ export const ESQUIVE_DIFFS: Record<string, EsquiveDiff> = {
 	facile: { label: 'Facile', spawnEveryMs: 950, baseSpeed: 24, rampEveryMs: 8000, speedRamp: 0.16, spawnRamp: 55, minSpawnMs: 300, burstEveryMs: 26000 },
 	moyen: { label: 'Moyen', spawnEveryMs: 800, baseSpeed: 28, rampEveryMs: 7000, speedRamp: 0.18, spawnRamp: 65, minSpawnMs: 260, burstEveryMs: 22000 },
 	difficile: { label: 'Difficile', spawnEveryMs: 650, baseSpeed: 32, rampEveryMs: 6000, speedRamp: 0.2, spawnRamp: 80, minSpawnMs: 220, burstEveryMs: 18000 },
+	expert: { label: 'Expert', spawnEveryMs: 520, baseSpeed: 36, rampEveryMs: 5000, speedRamp: 0.22, spawnRamp: 95, minSpawnMs: 180, burstEveryMs: 14000 },
 };
 
 const MAX_BURST = 4;

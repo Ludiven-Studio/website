@@ -4,7 +4,7 @@
 // levels ask for more dodging under a tighter field. Score is in tenths of a second.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { EsquiveDiff } from './engine';
 import { fmtSeconds } from '../../lib/scoreFormat';
 
@@ -20,7 +20,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 /** Survival target in tenths of a second: level 1 ≈ 18 s … level 100 ≈ 75 s. */
 const targetTenths = (l: number): number => 180 + Math.round((l - 1) * 5.8);
 
-export const esquiveLevels: LevelPlan<EsquiveLevelCfg> = {
+const basePlan: LevelPlan<EsquiveLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): EsquiveLevelCfg {
@@ -53,3 +53,21 @@ export const esquiveLevels: LevelPlan<EsquiveLevelCfg> = {
 		return { two: `≥ ${s(target * 1.3)}`, three: `≥ ${s(target * 1.6)}` };
 	},
 };
+
+// 101-200: the field picks up where level 100 stops and ends on the Expert pill, target ~75 s → ~91 s.
+export const esquiveLevels = extendPlan('esquive', basePlan, {
+	configExt: (base, level) => {
+		const t = (level - LEVEL_COUNT) / LEVEL_COUNT; // 0 → 1 across the extended half
+		const diff: EsquiveDiff = {
+			label: `Niveau ${level}`,
+			spawnEveryMs: Math.round(650 - 130 * t),
+			baseSpeed: 34 + 2 * t,
+			rampEveryMs: Math.round(5800 - 800 * t),
+			speedRamp: 0.21 + 0.01 * t,
+			spawnRamp: 85 + 10 * t,
+			minSpawnMs: Math.round(210 - 30 * t),
+			burstEveryMs: Math.round(17000 - 3000 * t),
+		};
+		return { ...base, diff, targetTenths: 754 + Math.round(160 * t) };
+	},
+});

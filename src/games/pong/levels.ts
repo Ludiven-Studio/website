@@ -4,7 +4,7 @@
 // (opponent points conceded — fewer = better), a deterministic skill signal.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 
 export interface PongLevelCfg {
 	seed: number;
@@ -17,7 +17,7 @@ export interface PongLevelCfg {
 /** Deterministic per-level seed so a given level is always the same match. */
 const levelSeed = (level: number): number => (Math.imul(level, 2246822519) ^ 0x9e3779b1) >>> 0;
 
-export const pongLevels: LevelPlan<PongLevelCfg> = {
+const basePlan: LevelPlan<PongLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score', // score = winning margin; higher is better
 	config(level: number): PongLevelCfg {
@@ -48,3 +48,17 @@ export const pongLevels: LevelPlan<PongLevelCfg> = {
 		};
 	},
 };
+
+// 101-200: longer matches, a faster serve and an AI that outruns the player's paddle.
+export const pongLevels = extendPlan('pong', basePlan, {
+	configExt: (base, level) => {
+		const t = (level - LEVEL_COUNT - 1) / (LEVEL_COUNT - 1); // 0 → 1
+		return {
+			...base,
+			target: Math.min(15, 12 + Math.floor(t * 3 + 1e-9)), // 12 → 15 points
+			serveSpeed: 135 + t * 35, // 135 → 170 units/s
+			aiReaction: 1.05 + t * 0.13, // 1.05 → 1.18 × paddleSpeed
+			aiError: 1.8 - t * 1.2, // 1.8 → 0.6 field units
+		};
+	},
+});

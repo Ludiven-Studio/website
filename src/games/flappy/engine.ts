@@ -63,6 +63,7 @@ export const FLAPPY_DIFFS: Record<string, FlappyDiff> = {
 	facile: { label: 'Facile', gapH: 34, pipeSpacing: 82, speed: 38 },
 	moyen: { label: 'Moyen', gapH: 28, pipeSpacing: 68, speed: 44 },
 	difficile: { label: 'Difficile', gapH: 23, pipeSpacing: 56, speed: 50 },
+	expert: { label: 'Expert', gapH: 19, pipeSpacing: 46, speed: 56 },
 };
 
 export const flappyConfig = (d: FlappyDiff): FlappyConfig => ({

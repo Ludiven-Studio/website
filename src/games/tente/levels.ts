@@ -4,7 +4,7 @@
 // scaled to the tent count. Tente can't be lost, so a finished run always wins.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -16,7 +16,7 @@ export interface TenteLevelCfg extends DiffLevel {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const tenteLevels: LevelPlan<TenteLevelCfg> = {
+const basePlan: LevelPlan<TenteLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): TenteLevelCfg {
@@ -45,3 +45,18 @@ export const tenteLevels: LevelPlan<TenteLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: always the 12×12 board, six more tents than the base level, on a 10% tighter clock.
+export const tenteLevels = extendPlan('tente', basePlan, {
+	configExt: (base, level) => {
+		const tents = Math.min(30, base.tents + 6);
+		return {
+			...base,
+			label: `Niveau ${level}`,
+			size: 12,
+			tents,
+			threeStarCentis: tents * 450,
+			twoStarCentis: tents * 800,
+		};
+	},
+});

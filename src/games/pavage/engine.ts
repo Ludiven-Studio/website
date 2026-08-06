@@ -41,6 +41,9 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 5, blocked: 3 },
 	moyen: { label: 'Moyen', size: 6, blocked: 4 },
 	difficile: { label: 'Difficile', size: 7, blocked: 7 },
+	// More blocked cells than the ramp suggests: an 8×8 with fewer walls makes the
+	// uniqueness search crawl (seconds per board).
+	expert: { label: 'Expert', size: 8, blocked: 12 },
 };
 
 const ORTH = [

@@ -140,9 +140,13 @@ export const DIFFS = {
 	facile: { label: 'Facile', grain: 250, hp: 0.85, speed: 0.9, spawn: 1.15 },
 	moyen: { label: 'Moyen', grain: 200, hp: 1, speed: 1, spawn: 1 },
 	difficile: { label: 'Difficile', grain: 150, hp: 1.25, speed: 1.12, spawn: 0.82 },
+	expert: { label: 'Expert', grain: 100, hp: 1.5, speed: 1.25, spawn: 0.66 },
 } as const;
+/** Daily order — the server's diffIndex points into this, so it stays at three entries. */
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 export type DiffKey = keyof typeof DIFFS;
+/** Same indices as DIFF_ORDER, plus Expert — what the UI selection indexes into. */
+export const DIFF_KEYS = Object.keys(DIFFS) as DiffKey[];
 
 const FIRST_SPAWN = 20; // grace to set up before the first wave
 export const PROD_INTERVAL = 5; // exported: renderer shows the egg-in-progress
@@ -206,7 +210,7 @@ export function waveType(wave: number, rng: Rng): FoxType {
 }
 
 export function createGame(diffIndex: number, _rng: Rng): State {
-	const key = DIFF_ORDER[diffIndex] ?? 'moyen';
+	const key = DIFF_KEYS[diffIndex] ?? 'moyen';
 	const d = DIFFS[key];
 	return {
 		rows: LANES,

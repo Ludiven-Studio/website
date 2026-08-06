@@ -3,7 +3,7 @@
 // Difficulty ramps the target AND the course: gaps shrink, pipes tighten, scroll speeds up.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 
 export interface FlappyLevelCfg {
 	seed: number;
@@ -21,7 +21,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 /** Smooth lerp over the 1..100 span, `p` in [0,1]. */
 const lerp = (a: number, b: number, p: number): number => a + (b - a) * p;
 
-export const flappyLevels: LevelPlan<FlappyLevelCfg> = {
+const basePlan: LevelPlan<FlappyLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): FlappyLevelCfg {
@@ -45,15 +45,32 @@ export const flappyLevels: LevelPlan<FlappyLevelCfg> = {
 			threeStar: target * 2,
 		};
 	},
-	stars(_level: number, r: LevelResult): 0 | 1 | 2 | 3 {
+	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
 		if (!r.won) return 0;
-		const cfg = flappyLevels.config(_level);
+		const cfg = this.config(level);
 		if (r.score >= cfg.threeStar) return 3;
 		if (r.score >= cfg.twoStar) return 2;
 		return 1;
 	},
 	starHint(level: number): { two: string; three: string } {
-		const cfg = flappyLevels.config(level);
+		const cfg = this.config(level);
 		return { two: `${cfg.twoStar} pts`, three: `${cfg.threeStar} pts` };
 	},
 };
+
+// 101-200: the course picks up where level 100 stops and ends past the Expert pill.
+export const flappyLevels = extendPlan('flappy', basePlan, {
+	configExt: (base, level) => {
+		const p = (level - LEVEL_COUNT) / LEVEL_COUNT; // 0 → 1 across the extended half
+		const target = Math.round(lerp(62, 95, p));
+		return {
+			...base,
+			gapH: Math.round(lerp(20, 17, p) * 10) / 10,
+			pipeSpacing: Math.round(lerp(50, 42, p)),
+			speed: Math.round(lerp(56, 64, p)),
+			target,
+			twoStar: Math.round(target * 1.5),
+			threeStar: target * 2,
+		};
+	},
+});

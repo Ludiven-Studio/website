@@ -45,6 +45,7 @@ import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
+import { withExpert } from '../../lib/difficulty';
 import { golfLevels, type GolfLevelCfg } from './levels';
 
 /* =====================================================
@@ -1176,7 +1177,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 						<div className="gf-card">
 							{mode === 'libre' && (
 								<div className="gf-modes" role="tablist" aria-label="Niveau">
-									{DIFF_ORDER.map((k) => (
+									{withExpert(DIFF_ORDER, gameId).map((k) => (
 										<button key={k} role="tab" aria-selected={diffKey === k} className={`gf-mode ${diffKey === k ? 'active' : ''}`} onClick={() => setDiffKey(k)}>{DIFFS[k].label}</button>
 									))}
 								</div>

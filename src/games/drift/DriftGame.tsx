@@ -30,6 +30,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { useHoldButton } from '../useHoldButton';
 import { driftLevels, type DriftLevelCfg } from './levels';
+import { withExpert } from '../../lib/difficulty';
 
 /* =====================================================
    DRIFT — top-down 3D arcade racing (three.js + Supabase Realtime).
@@ -1196,7 +1197,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 						<div className="dr-card">
 							{mode === 'libre' && (
 								<div className="dr-modes" role="tablist" aria-label="Niveau">
-									{DIFF_ORDER.map((k) => (
+									{withExpert(DIFF_ORDER, gameId).map((k) => (
 										<button key={k} role="tab" aria-selected={diffKey === k} className={`dr-mode ${diffKey === k ? 'active' : ''}`} onClick={() => setDiffKey(k)}>{DRIFT_DIFFS[k].label}</button>
 									))}
 								</div>

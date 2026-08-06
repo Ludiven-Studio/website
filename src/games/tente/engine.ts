@@ -19,6 +19,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 6, tents: 6 },
 	moyen: { label: 'Moyen', size: 8, tents: 11 },
 	difficile: { label: 'Difficile', size: 10, tents: 18 },
+	expert: { label: 'Expert', size: 12, tents: 27 },
 };
 
 export interface TentePuzzle {

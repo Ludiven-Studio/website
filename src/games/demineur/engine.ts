@@ -21,6 +21,7 @@ export const SIZES: Record<string, SizeLevel> = {
 	facile: { label: 'Facile', size: 9, mines: 10 },
 	moyen: { label: 'Moyen', size: 12, mines: 22 },
 	difficile: { label: 'Difficile', size: 14, mines: 30 },
+	expert: { label: 'Expert', size: 16, mines: 42 },
 };
 
 export interface DiffLevel {
@@ -32,7 +33,9 @@ export interface DiffLevel {
 export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', useSubset: false, useEnum: false },
 	moyen: { label: 'Moyen', useSubset: true, useEnum: false },
+	// Every technique is already on at `difficile`, so Expert only raises the board (see SIZES).
 	difficile: { label: 'Difficile', useSubset: true, useEnum: true },
+	expert: { label: 'Expert', useSubset: true, useEnum: true },
 };
 
 export type Coord = { r: number; c: number };

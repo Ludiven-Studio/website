@@ -237,10 +237,43 @@ const interleaved = (rng: Rng): Generated => {
 	return { terms: [A(0), B(0), A(1), B(1), A(2)], answer: B(2), rule: 'deux suites entrelacées' };
 };
 
+// Chiral symbol driving three attributes at once: rotation, mirror and count.
+const rotateMirrorCount = (rng: Rng): Generated => {
+	const shape = pick(rng, CHIRAL_SHAPES);
+	const color = ri(rng, 0, COLORS.length - 1);
+	const step = pick(rng, [90, -90]);
+	const start = ri(rng, 1, 2);
+	const at = (i: number): Cell => ({
+		shape,
+		color,
+		rotation: step * i,
+		flip: i % 2 === 1,
+		count: mod(start - 1 + i, 4) + 1,
+	});
+	return {
+		terms: [0, 1, 2, 3, 4].map(at),
+		answer: at(5),
+		rule: `il pivote de ${step > 0 ? '+' : ''}${step}°, se reflète et le nombre d’éléments augmente`,
+	};
+};
+
+// Two interleaved sub-sequences that both evolve: one rotates, the other grows.
+const interleavedGrow = (rng: Rng): Generated => {
+	const shapeA = pick(rng, ROT_SHAPES);
+	const colorA = ri(rng, 0, COLORS.length - 1);
+	const stepA = pick(rng, [90, -90]);
+	const shapeB = pick(rng, SHAPES);
+	const colorB = ri(rng, 0, COLORS.length - 1);
+	const A = (i: number): Cell => ({ shape: shapeA, color: colorA, rotation: stepA * i, flip: false, count: 1 });
+	const B = (i: number): Cell => ({ shape: shapeB, color: colorB, rotation: 0, flip: false, count: i + 1 });
+	return { terms: [A(0), B(0), A(1), B(1), A(2)], answer: B(2), rule: 'deux suites entrelacées qui évoluent chacune' };
+};
+
 export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', families: [repeat, alternate] },
 	moyen: { label: 'Moyen', families: [rotate, mirror, countGrow] },
 	difficile: { label: 'Difficile', families: [rotateMirror, rotateCount, interleaved] },
+	expert: { label: 'Expert', families: [interleaved, rotateMirrorCount, interleavedGrow] },
 };
 
 /* ---------- Distractors ---------- */

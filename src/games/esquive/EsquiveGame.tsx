@@ -23,6 +23,7 @@ import ModeToggle from '../../components/ModeToggle';
 import { useLevels } from '../../lib/useLevels';
 import { usePointerDrag } from '../usePointerDrag';
 import { esquiveLevels } from './levels';
+import { withExpert } from '../../lib/difficulty';
 
 /* =====================================================
    ESQUIVE — 3D asteroid dodger (three.js + rAF loop).
@@ -789,7 +790,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="es-pills" role="tablist" aria-label="Difficulté">
-					{DIFF_ORDER.map((k) => (
+					{withExpert(DIFF_ORDER, gameId).map((k) => (
 						<button
 							key={k}
 							role="tab"

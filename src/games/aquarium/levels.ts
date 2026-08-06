@@ -3,7 +3,7 @@
 // hidden solution; stars from solve time (scaled to the grid size).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -16,7 +16,7 @@ export interface AquariumLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const aquariumLevels: LevelPlan<AquariumLevelCfg> = {
+const basePlan: LevelPlan<AquariumLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): AquariumLevelCfg {
@@ -49,3 +49,12 @@ export const aquariumLevels: LevelPlan<AquariumLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: always 8×8 with Expert-sized basins (5-8 cells), on a ~15% tighter clock.
+export const aquariumLevels = extendPlan('aquarium', basePlan, {
+	configExt: (base, level) => {
+		const diff: DiffLevel = { label: `Niveau ${level}`, size: 8, minRegion: 5, maxRegion: 8 };
+		const cells = diff.size * diff.size;
+		return { ...base, diff, threeStarCentis: cells * 190, twoStarCentis: cells * 340 };
+	},
+});

@@ -272,6 +272,8 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 	import { formatScore } from '../lib/scoreFormat';
 	import { gameStreak } from '../lib/streak';
 	import { challengeDay, dayBefore } from '../lib/day';
+	import { hasUnlock } from '../lib/wallet';
+	import { LEVEL_COUNT } from '../lib/progression';
 
 	// Favorites toggle — persisted in localStorage, shared key with the home page.
 	const KEY = 'ludiven-favorites';
@@ -393,7 +395,8 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 	};
 
 	// Per-game levels progress badge (🎯 current level), read from the local progression
-	// mirror. Hidden for games with no levels or no progress yet. (LEVEL_COUNT = 100.)
+	// mirror. Hidden for games with no levels or no progress yet. The Expert pack doubles
+	// the cap, so "Fini" must not fire at 100 on a game that now goes to 200.
 	const syncLevels = () => {
 		document.querySelectorAll<HTMLElement>('.level-badge').forEach((badge) => {
 			const id = badge.dataset.gameId;
@@ -414,7 +417,7 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 				return;
 			}
 			const maxCleared = Math.max(...cleared);
-			if (maxCleared >= 100) {
+			if (maxCleared >= LEVEL_COUNT * (hasUnlock(id) ? 2 : 1)) {
 				const total = cleared.reduce((a, n) => a + (stars[n] || 0), 0);
 				badge.textContent = `🎯 Fini · ${total}★`;
 			} else {

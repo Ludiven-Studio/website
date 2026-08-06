@@ -31,7 +31,10 @@ export interface DiffLevel {
 export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', colors: 4, empties: 2, height: 4 },
 	moyen: { label: 'Moyen', colors: 6, empties: 2, height: 4 },
+	// The palette holds 9 colours, so Expert steps up the tubes instead: same +50% of liquid
+	// per tier (16 → 24 → 36 → 54 blocks) with taller tubes.
 	difficile: { label: 'Difficile', colors: 9, empties: 2, height: 4 },
+	expert: { label: 'Expert', colors: 9, empties: 2, height: 6 },
 };
 
 function shuffle<T>(arr: T[], rng: Rng): T[] {

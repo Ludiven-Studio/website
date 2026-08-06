@@ -40,6 +40,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 5, relaxFrac: 0.15 },
 	moyen: { label: 'Moyen', size: 6, relaxFrac: 0.45 },
 	difficile: { label: 'Difficile', size: 7, relaxFrac: 0.8 },
+	expert: { label: 'Expert', size: 8, relaxFrac: 0.9 },
 };
 
 export function shapeOf(h: number, w: number): Shape {

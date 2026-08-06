@@ -96,6 +96,7 @@ export interface DiffLevel {
 	label: string;
 	vary: number; // number of things (features) that change across the grid
 	templates: TemplateName[];
+	options?: number; // multiple-choice count, defaults to N_OPTIONS
 }
 
 const ALL: TemplateName[] = ['simple', 'dots', 'wheel', 'quad'];
@@ -104,6 +105,8 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', vary: 2, templates: ALL },
 	moyen: { label: 'Moyen', vary: 3, templates: ALL },
 	difficile: { label: 'Difficile', vary: 4, templates: ALL },
+	// Every template owns only 4 features, so `vary` caps at 4 — Expert widens the choice instead.
+	expert: { label: 'Expert', vary: 4, templates: ALL, options: 6 },
 };
 
 /** Number of multiple-choice options (incl. the correct one). */
@@ -303,21 +306,22 @@ export function generateQuestion(diff: DiffLevel, rng: Rng = Math.random, force?
 	}
 
 	const { grid, answer } = gen;
+	const nOptions = diff.options ?? N_OPTIONS;
 	const answerKey = cellKey(answer);
 	const byKey = new Map<string, Cell>([[answerKey, answer]]);
 	// 1) plausible near-misses produced by the template itself (one feature off the answer)
 	for (const d of shuffle(gen.distractors, rng)) {
-		if (byKey.size >= N_OPTIONS) break;
+		if (byKey.size >= nOptions) break;
 		byKey.set(cellKey(d), d);
 	}
 	// 2) real cells from elsewhere in the grid (also fully on-theme)
 	for (const cell of shuffle(grid.slice(0, 8), rng)) {
-		if (byKey.size >= N_OPTIONS) break;
+		if (byKey.size >= nOptions) break;
 		byKey.set(cellKey(cell), cell);
 	}
 	// 3) last-resort: recolour the answer (rare — only if the grid is very sparse)
 	let k = 1;
-	while (byKey.size < N_OPTIONS && k <= COLORS.length + 2) {
+	while (byKey.size < nOptions && k <= COLORS.length + 2) {
 		const m = cloneCell(answer);
 		if (m.elements[0]) m.elements[0].color = k++ % COLORS.length;
 		else m.color = k++ % COLORS.length;

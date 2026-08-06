@@ -5,11 +5,11 @@
 // energy-out (too many misses) — is a loss (0★).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 
 export interface TempoLevelCfg {
 	seed: number;
-	diff: number; // ENDLESS_OPTS tier index: 0 (4 lanes) · 1 (5 lanes) · 2 (6 lanes)
+	diff: number; // ENDLESS_OPTS tier index: 0 (4 lanes) · 1 (5 lanes) · 2 (6 lanes) · 3 (Expert)
 	speed: number; // starting-tempo multiplier fed to buildEndlessChart
 	target: number; // score for 1★
 	twoStar: number; // score for 2★
@@ -22,7 +22,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 /** Smooth lerp over the 1..100 span, `p` in [0,1]. */
 const lerp = (a: number, b: number, p: number): number => a + (b - a) * p;
 
-export const tempoLevels: LevelPlan<TempoLevelCfg> = {
+const basePlan: LevelPlan<TempoLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): TempoLevelCfg {
@@ -48,13 +48,28 @@ export const tempoLevels: LevelPlan<TempoLevelCfg> = {
 	},
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
 		if (!r.won) return 0;
-		const cfg = tempoLevels.config(level);
+		const cfg = this.config(level);
 		if (r.score >= cfg.threeStar) return 3;
 		if (r.score >= cfg.twoStar) return 2;
 		return 1;
 	},
 	starHint(level: number): { two: string; three: string } {
-		const cfg = tempoLevels.config(level);
+		const cfg = this.config(level);
 		return { two: `${cfg.twoStar} pts`, three: `${cfg.threeStar} pts` };
 	},
 };
+
+// 101-200: the Expert chart (6 lanes, steeper ramp), a faster start and a target 25% higher.
+export const tempoLevels = extendPlan('tempo', basePlan, {
+	configExt: (base) => {
+		const target = Math.round(base.target * 1.25);
+		return {
+			...base,
+			diff: 3,
+			speed: Math.min(1.6, Math.round((base.speed + 0.25) * 100) / 100),
+			target,
+			twoStar: Math.round(target * 1.4),
+			threeStar: Math.round(target * 1.9),
+		};
+	},
+});

@@ -5,7 +5,7 @@
 // score thresholds scaled to the target.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 
 export interface MeliMeloLevelCfg {
@@ -18,7 +18,7 @@ export interface MeliMeloLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const meliMeloLevels: LevelPlan<MeliMeloLevelCfg> = {
+const basePlan: LevelPlan<MeliMeloLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): MeliMeloLevelCfg {
@@ -50,3 +50,20 @@ export const meliMeloLevels: LevelPlan<MeliMeloLevelCfg> = {
 		return { two: `≥ ${cfg.twoStarPoints} pts`, three: `≥ ${cfg.threeStarPoints} pts` };
 	},
 };
+
+// 101-200: leaner grids (the rich end of the richness band is cut) and a higher target
+// for the same 90 s. minPoints is kept so the target always stays reachable.
+export const meliMeloLevels = extendPlan('meli-melo', basePlan, {
+	configExt: (base, level) => {
+		const minPoints = base.diff.minPoints;
+		const maxPoints = Math.max(minPoints + 20, Math.round(base.diff.maxPoints * 0.6));
+		const target = Math.round(base.target * 1.2);
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, minPoints, maxPoints },
+			target,
+			twoStarPoints: Math.round(target * 1.25),
+			threeStarPoints: Math.round(target * 1.5),
+		};
+	},
+});

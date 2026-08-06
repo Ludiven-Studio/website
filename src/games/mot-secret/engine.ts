@@ -15,11 +15,13 @@ import { parseWords, byLength, hasWord } from '../words';
 export type LetterState = 'good' | 'present' | 'absent';
 export interface GuessRow { guess: string; states: LetterState[]; }
 
-export interface DiffLevel { label: string; len: number; }
+export interface DiffLevel { label: string; len: number; tries?: number; }
 export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', len: 6 },
 	moyen: { label: 'Moyen', len: 7 },
 	difficile: { label: 'Difficile', len: 8 },
+	// The solution pool tops out at 8 letters, so Expert takes a guess away instead.
+	expert: { label: 'Expert', len: 8, tries: 4 },
 };
 
 export const MAX_TRIES = 6;

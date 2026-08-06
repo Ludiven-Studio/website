@@ -5,7 +5,7 @@
 // metric = 'score' (apples eaten, higher is better). Stars reward eating past the target.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { SNAKE_DIFFS, type SnakeDiff } from './engine';
 
 export interface SnakeLevelCfg {
@@ -30,7 +30,7 @@ const BANDS: { min: number; max: number; diff: SnakeDiff; from: number; to: numb
 	{ min: 76, max: 100, diff: EXPERT, from: 24, to: 42 },
 ];
 
-export const snakeLevels: LevelPlan<SnakeLevelCfg> = {
+const basePlan: LevelPlan<SnakeLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score', // score = apples eaten; more is better
 	config(level: number): SnakeLevelCfg {
@@ -61,3 +61,18 @@ export const snakeLevels: LevelPlan<SnakeLevelCfg> = {
 		return { two: `${cfg.twoStarApples} pommes`, three: `${cfg.threeStarApples} pommes` };
 	},
 };
+
+// 101-200: the Expert tier (fastest ticks, densest rock field) and a bigger apple target.
+export const snakeLevels = extendPlan('snake', basePlan, {
+	configExt: (base, level) => {
+		const target = Math.round(base.target * 1.25) + 2;
+		return {
+			...base,
+			diff: SNAKE_DIFFS.expert,
+			target,
+			twoStarApples: target + Math.max(2, Math.round(target * 0.25)),
+			threeStarApples: target + Math.max(4, Math.round(target * 0.5)),
+			label: `Niveau ${level}`,
+		};
+	},
+});

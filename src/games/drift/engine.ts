@@ -44,6 +44,7 @@ export const DRIFT_DIFFS: Record<string, DriftDiff> = {
 	facile: { label: 'Facile', controls: 6, jitter: 0.26, width: 15, alt: 0.18 },
 	moyen: { label: 'Moyen', controls: 8, jitter: 0.36, width: 13.5, alt: 0.22 },
 	difficile: { label: 'Difficile', controls: 10, jitter: 0.44, width: 12.5, alt: 0.2 },
+	expert: { label: 'Expert', controls: 12, jitter: 0.5, width: 11.5, alt: 0.22 },
 };
 
 export interface CarParams {

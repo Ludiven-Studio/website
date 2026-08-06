@@ -1,12 +1,12 @@
 // Casse-Briques levels plan (1-100). A level = clear the whole brick field with a
 // limited number of lives. Difficulty ramps over four bands: the BREAKOUT_DIFFS tier
-// (facile → moyen → difficile, then a custom "expert") sets rows / 2-hit density / ball
-// speed, and within each band the starting lives shrink from generous to tight.
+// (facile → moyen → difficile → expert) sets rows / 2-hit density / ball speed, and
+// within each band the starting lives shrink from generous to tight.
 // WON when the field is cleared; LOST if all lives are spent first.
 // metric = 'score' (points; higher is better). Stars reward finishing with lives to spare.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { BREAKOUT_DIFFS, type BreakoutDiff } from './engine';
 
 export interface CasseBriquesLevelCfg {
@@ -20,18 +20,15 @@ export interface CasseBriquesLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x51ed270b) >>> 0;
 
-// A tougher tier past "difficile": a full 9-row wall, dense 2-hit bricks, fast ball.
-const EXPERT: BreakoutDiff = { label: 'Expert', rows: 9, twoHpChance: 0.72, threeHpChance: 0.3, speed: 104, density: 0.95 };
-
 // Four bands: difficulty tier fixed per band, starting lives ramp from `from` → `to`.
 const BANDS: { min: number; max: number; diff: BreakoutDiff; from: number; to: number }[] = [
 	{ min: 1, max: 25, diff: BREAKOUT_DIFFS.facile, from: 5, to: 3 },
 	{ min: 26, max: 50, diff: BREAKOUT_DIFFS.moyen, from: 5, to: 3 },
 	{ min: 51, max: 75, diff: BREAKOUT_DIFFS.difficile, from: 4, to: 3 },
-	{ min: 76, max: 100, diff: EXPERT, from: 4, to: 2 },
+	{ min: 76, max: 100, diff: BREAKOUT_DIFFS.expert, from: 4, to: 2 },
 ];
 
-export const casseBriquesLevels: LevelPlan<CasseBriquesLevelCfg> = {
+const basePlan: LevelPlan<CasseBriquesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score', // score = points earned; more is better
 	config(level: number): CasseBriquesLevelCfg {
@@ -63,3 +60,16 @@ export const casseBriquesLevels: LevelPlan<CasseBriquesLevelCfg> = {
 		return { two: `${cfg.twoStarLives} vies restantes`, three: `${cfg.threeStarLives} vies restantes` };
 	},
 };
+
+// A tier past the Expert pill: a full 10-row wall, mostly 2- and 3-hit bricks, faster ball.
+const MASTER: BreakoutDiff = { label: 'Maître', rows: 10, twoHpChance: 0.82, threeHpChance: 0.4, speed: 114, density: 0.98 };
+
+// 101-200: the Maître wall on every level, with one life less than the base ramp gave.
+export const casseBriquesLevels = extendPlan('casse-briques', basePlan, {
+	configExt: (base, level) => ({
+		...base,
+		diff: MASTER,
+		lives: Math.max(2, base.lives - 1),
+		label: `Niveau ${level}`,
+	}),
+});

@@ -29,6 +29,7 @@ export const DIFFS: Record<string, Diff> = {
 	facile: { label: 'Facile', size: 4, maxVal: 5, holes: 6 },
 	moyen: { label: 'Moyen', size: 5, maxVal: 7, holes: 9 },
 	difficile: { label: 'Difficile', size: 6, maxVal: 9, holes: 13 },
+	expert: { label: 'Expert', size: 7, maxVal: 11, holes: 17 },
 };
 
 const randInt = (rng: Rng, n: number) => Math.floor(rng() * n);

@@ -22,6 +22,7 @@ import { colorgrammeLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHintGate } from '../useHintGate';
 import { repairNote } from '../repairNote';
+import { diffKeys } from '../../lib/difficulty';
 
 /* =====================================================
    COLORGRAMME — React island. A fully-coloured deduction grid.
@@ -532,7 +533,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 			<div className="co-bar">
 				{!daily && !lv.active && (
 					<div className="co-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

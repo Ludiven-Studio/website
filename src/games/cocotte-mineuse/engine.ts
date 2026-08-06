@@ -63,6 +63,7 @@ export const MINE_DIFFS: Record<string, MineDiff> = {
 	facile: { label: 'Facile', tickMs: 220, lampDrainPerSec: 1 / 100, workbenchDrainFactor: 0.25, stoneDensity: 0.06, oreRichness: 1.2 },
 	moyen: { label: 'Moyen', tickMs: 190, lampDrainPerSec: 1 / 80, workbenchDrainFactor: 0.25, stoneDensity: 0.09, oreRichness: 1.0 },
 	difficile: { label: 'Difficile', tickMs: 165, lampDrainPerSec: 1 / 65, workbenchDrainFactor: 0.25, stoneDensity: 0.13, oreRichness: 0.9 },
+	expert: { label: 'Expert', tickMs: 145, lampDrainPerSec: 1 / 55, workbenchDrainFactor: 0.25, stoneDensity: 0.17, oreRichness: 0.8 },
 };
 
 export interface OreSpec {

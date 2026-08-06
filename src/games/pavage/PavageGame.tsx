@@ -13,6 +13,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { diffKeys } from '../../lib/difficulty';
 import {
 	getDaily,
 	dailyWeekdayLabel,
@@ -714,7 +715,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			<div className="pv-bar">
 				{!daily && !lv.active ? (
 					<div className="pv-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

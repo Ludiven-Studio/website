@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-	balance, earn, buyBlason, owns, equipBlason, equippedBlason,
+	balance, earn, buyBlason, owns, equipBlason, equippedBlason, ownedBlasons,
 	dailyRewardAmount, rewardState, claimDailyReward,
+	buyUnlock, hasUnlock, unlockedGames, unlockId, resetWalletCache,
+	BLASONS, UNLOCK_PRICE,
 } from './wallet';
 import { recordDayActivity } from './streak';
 
@@ -19,6 +21,7 @@ const setDay = (iso: string): void => {
 
 beforeEach(() => {
 	vi.stubGlobal('localStorage', new MemStorage());
+	resetWalletCache(); // the module caches its parse — the stub above is a brand new store
 	vi.useFakeTimers();
 	setDay('2026-03-10');
 });
@@ -77,5 +80,41 @@ describe('wallet', () => {
 		expect(rewardState().amount).toBe(8); // day 2
 		expect(claimDailyReward()).toBe(8);
 		expect(balance()).toBe(13);
+	});
+});
+
+describe('expert packs', () => {
+	it('charges the price once', () => {
+		earn(UNLOCK_PRICE - 1);
+		expect(buyUnlock('sudoku')).toBe(false);
+		expect(hasUnlock('sudoku')).toBe(false);
+		earn(1);
+		expect(buyUnlock('sudoku')).toBe(true);
+		expect(balance()).toBe(0);
+		expect(buyUnlock('sudoku')).toBe(true); // already owned — free
+		expect(balance()).toBe(0);
+		expect(unlockedGames()).toEqual(['sudoku']);
+	});
+
+	it('keeps unlocks out of the blason catalogue', () => {
+		earn(UNLOCK_PRICE);
+		buyUnlock('sudoku');
+		expect(ownedBlasons().map((b) => b.id)).toEqual(['cocotte']);
+		equipBlason(unlockId('sudoku'));
+		expect(equippedBlason()).toBeNull();
+	});
+});
+
+describe('blason catalogue', () => {
+	it('has unique ids and rising prices', () => {
+		expect(new Set(BLASONS.map((b) => b.id)).size).toBe(BLASONS.length);
+		for (let i = 1; i < BLASONS.length; i++) expect(BLASONS[i].price).toBeGreaterThan(BLASONS[i - 1].price);
+	});
+
+	it('offers a legendary tier well past the common one', () => {
+		const legend = BLASONS.filter((b) => b.tier === 'legendaire');
+		expect(legend.length).toBeGreaterThanOrEqual(5);
+		const commonMax = Math.max(...BLASONS.filter((b) => b.tier !== 'legendaire').map((b) => b.price));
+		expect(Math.min(...legend.map((b) => b.price))).toBeGreaterThan(commonMax);
 	});
 });

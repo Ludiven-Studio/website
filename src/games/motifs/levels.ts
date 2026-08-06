@@ -3,7 +3,7 @@
 // hidden partition; stars from solve time (scaled to the grid size).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -16,7 +16,7 @@ export interface MotifsLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const motifsLevels: LevelPlan<MotifsLevelCfg> = {
+const basePlan: LevelPlan<MotifsLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): MotifsLevelCfg {
@@ -46,3 +46,18 @@ export const motifsLevels: LevelPlan<MotifsLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: one grid size bigger (up to 8×8, past the Expert pill) with more hints removed,
+// on a tighter per-cell clock.
+export const motifsLevels = extendPlan('motifs', basePlan, {
+	configExt: (base, level) => {
+		const size = Math.min(8, base.diff.size + 1);
+		const cells = size * size;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, size, relaxFrac: Math.min(0.9, base.diff.relaxFrac + 0.1) },
+			threeStarCentis: cells * 360,
+			twoStarCentis: cells * 630,
+		};
+	},
+});

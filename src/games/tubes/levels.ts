@@ -3,7 +3,7 @@
 // solve time against per-level targets.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -32,7 +32,7 @@ function timeTargets(colors: number, height: number): { two: number; three: numb
 	return { three: Math.round(pours * 240), two: Math.round(pours * 400) };
 }
 
-export const tubesLevels: LevelPlan<TubesLevelCfg> = {
+const basePlan: LevelPlan<TubesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): TubesLevelCfg {
@@ -58,3 +58,19 @@ export const tubesLevels: LevelPlan<TubesLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: all 9 colours, tubes two blocks taller (up to 7), on a 10% tighter clock.
+// Empties stays at 2: with a single spare tube a 9-colour deal is never solvable.
+export const tubesLevels = extendPlan('tubes', basePlan, {
+	configExt: (base, level) => {
+		const colors = 9;
+		const height = Math.min(7, base.diff.height + 2);
+		const pours = colors * height;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, colors, empties: 2, height },
+			threeStarCentis: Math.round(pours * 215),
+			twoStarCentis: Math.round(pours * 360),
+		};
+	},
+});

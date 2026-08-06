@@ -42,11 +42,14 @@ export interface SpeedTier {
 	label: string;
 	speed: number;
 }
-export const SPEEDS: SpeedTier[] = [
-	{ label: 'Facile', speed: 0.8 },
-	{ label: 'Moyen', speed: 1 },
-	{ label: 'Difficile', speed: 1.3 },
-];
+// The daily only ever picks the first three; index 3 is the Expert pill.
+export const SPEED_TIERS: Record<string, SpeedTier> = {
+	facile: { label: 'Facile', speed: 0.8 },
+	moyen: { label: 'Moyen', speed: 1 },
+	difficile: { label: 'Difficile', speed: 1.3 },
+	expert: { label: 'Expert', speed: 1.6 },
+};
+export const SPEEDS: SpeedTier[] = Object.values(SPEED_TIERS);
 
 export interface Tile {
 	time: number; // seconds from song start
@@ -620,6 +623,7 @@ export const ENDLESS_OPTS: EndlessOpts[] = [
 	{ baseTempo: 1.8, rampSec: 130, maxMult: 1.6, lanes: 4 }, // Facile — cap ~78s
 	{ baseTempo: 1.8, rampSec: 110, maxMult: 1.8, lanes: 5 }, // Moyen — cap ~88s
 	{ baseTempo: 1.8, rampSec: 95, maxMult: 2.0, lanes: 6 }, // Difficile — cap ~95s
+	{ baseTempo: 1.8, rampSec: 85, maxMult: 2.2, lanes: 6 }, // Expert — cap ~102s, lanes are capped at LANES
 ];
 export const INTRO_BEATS = 16; // 4 bars: the full chord loop plays once before the first tile
 /**

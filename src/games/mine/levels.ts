@@ -3,7 +3,7 @@
 // (1→2 cracks), with a move budget scaled to the work. Stars come from moves left.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { Cfg } from './engine';
 
 export interface MineLevelCfg {
@@ -33,7 +33,7 @@ export function levelSetup(level: number): MineLevelCfg {
 	};
 }
 
-export const mineLevels: LevelPlan<MineLevelCfg> = {
+const basePlan: LevelPlan<MineLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): MineLevelCfg {
@@ -41,14 +41,29 @@ export const mineLevels: LevelPlan<MineLevelCfg> = {
 	},
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
 		if (!r.won) return 0;
-		const cfg = levelSetup(level);
+		const cfg = this.config(level);
 		const left = r.stat ?? 0; // moves left at the win
 		if (left >= cfg.threeStarLeft) return 3;
 		if (left >= cfg.twoStarLeft) return 2;
 		return 1;
 	},
 	starHint(level: number) {
-		const cfg = levelSetup(level);
+		const cfg = this.config(level);
 		return { two: `${cfg.twoStarLeft} coups restants`, three: `${cfg.threeStarLeft} coups restants` };
 	},
 };
+
+// 101-200: two cracks per cage and a couple more cocottes; the move budget grows by far
+// less than the work does.
+export const mineLevels = extendPlan('mine', basePlan, {
+	configExt: (base) => {
+		const moves = Math.round(base.moves * 1.45);
+		return {
+			...base,
+			cfg: { ...base.cfg, colors: 6, cocottes: base.cfg.cocottes + 2, cageHits: 2 },
+			moves,
+			threeStarLeft: Math.max(1, Math.round(moves * 0.35)),
+			twoStarLeft: Math.max(1, Math.round(moves * 0.15)),
+		};
+	},
+});

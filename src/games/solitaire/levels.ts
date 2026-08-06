@@ -7,7 +7,7 @@
 // differentiator: 1★ = solved, 2★/3★ = solved fast (thresholds scale with peg count).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { createLayout, initialPegs, generateDaily, pegCount, type Variant } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -31,7 +31,7 @@ export function levelPegs(cfg: SolitaireLevelCfg): boolean[] {
 	return generateDaily(cfg.seed, cfg.count);
 }
 
-export const solitaireLevels: LevelPlan<SolitaireLevelCfg> = {
+const basePlan: LevelPlan<SolitaireLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): SolitaireLevelCfg {
@@ -66,3 +66,21 @@ export const solitaireLevels: LevelPlan<SolitaireLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: every partial position sits at the generator's 10-peg cap (still built by the
+// backward walk, so still solvable), a full board every 5th level, and ~15% less time.
+export const solitaireLevels = extendPlan('solitaire', basePlan, {
+	configExt: (base, level) => {
+		const full = level % 5 === 0;
+		const variant: Variant = full && level % 10 === 0 ? 'triangle' : 'anglais';
+		const count = full ? pegCount(initialPegs(createLayout(variant))) : 10;
+		return {
+			...base,
+			variant,
+			full,
+			count,
+			threeStarCentis: count * 190,
+			twoStarCentis: count * 340,
+		};
+	},
+});

@@ -4,7 +4,7 @@
 // raids = better) — a clean, deterministic skill signal for the tower-defense.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { LANES } from './engine';
 
 export interface CocottesLevelCfg {
@@ -22,7 +22,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 /** Waves to survive: ramps 5 → ~34 across the 100 levels. */
 const targetWaveFor = (level: number): number => 5 + Math.floor((level - 1) * 0.3);
 
-export const cocottesRenardsLevels: LevelPlan<CocottesLevelCfg> = {
+const basePlan: LevelPlan<CocottesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): CocottesLevelCfg {
@@ -45,10 +45,22 @@ export const cocottesRenardsLevels: LevelPlan<CocottesLevelCfg> = {
 		return 1;
 	},
 	starHint(level: number) {
-		const wave = targetWaveFor(level);
+		const wave = this.config(level).targetWave;
 		return {
 			two: `Survivre à ${wave} vagues en perdant ≤ 1 nid`,
 			three: `Survivre à ${wave} vagues sans perdre de nid`,
 		};
 	},
 };
+
+// 101-200: twelve more waves to hold, tougher and faster foxes, and less wheat to open with.
+export const cocottesRenardsLevels = extendPlan('cocottes-renards', basePlan, {
+	configExt: (base) => ({
+		...base,
+		hpMul: base.hpMul + 0.25,
+		speedMul: base.speedMul + 0.08,
+		spawnMul: Math.max(0.6, base.spawnMul - 0.06),
+		startGrain: Math.max(125, base.startGrain - 25),
+		targetWave: base.targetWave + 12,
+	}),
+});

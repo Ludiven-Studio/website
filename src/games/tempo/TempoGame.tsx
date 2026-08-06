@@ -7,8 +7,9 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { tempoLevels } from './levels';
-import { LANES, SPEEDS, ENDLESS_OPTS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type ChordBar, type Grade } from './engine';
+import { LANES, SPEEDS, SPEED_TIERS, ENDLESS_OPTS, buildEndlessChart, judgeTiming, comboMult, rankOf, type Chart, type ChordBar, type Grade } from './engine';
 import { startSamplerLoad, playSample, samplerReady, samplerLoading, onSamplerChange } from './sampler';
 
 /* =====================================================
@@ -1356,9 +1357,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="tp-pills">
-					{SPEEDS.map((s, i) => (
-						<button key={s.label} className={`tp-pill ${speedIdx === i ? 'active' : ''}`} onClick={() => armFree(i)} disabled={status === 'running'}>
-							{s.label}
+					{diffKeys(SPEED_TIERS, gameId).map((k, i) => (
+						<button key={k} className={`tp-pill ${speedIdx === i ? 'active' : ''}`} onClick={() => armFree(i)} disabled={status === 'running'}>
+							{SPEEDS[i].label}
 						</button>
 					))}
 					<label className="tp-toggle">

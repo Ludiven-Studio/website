@@ -1,6 +1,6 @@
-/* Shared level-select grid for the progression mode. 100 tiles: locked (🔒),
-   unlocked (playable), and cleared (1-3 ★). Game-agnostic — each game feeds its
-   own GameProgress and handles onPick(level). */
+/* Shared level-select grid for the progression mode. 100 tiles — 200 once the game's
+   Expert pack is bought: locked (🔒), unlocked (playable), and cleared (1-3 ★).
+   Game-agnostic — each game feeds its own GameProgress and handles onPick(level). */
 
 import type { GameProgress } from '../lib/progression';
 import { LEVEL_COUNT, unlockedUpTo } from '../lib/progression';
@@ -14,15 +14,16 @@ interface Props {
 }
 
 function LevelSelectInner({ progress, onPick, title }: Props) {
+	const count = progress.count ?? LEVEL_COUNT;
 	const unlocked = unlockedUpTo(progress);
 	const totalStars = Object.values(progress.stars).reduce((a, b) => a + b, 0);
 
 	return (
 		<div className="ls-wrap">
 			<style>{CSS}</style>
-			<p className="ls-caption">{title ?? `${totalStars} / ${LEVEL_COUNT * 3} ⭐`}</p>
+			<p className="ls-caption">{title ?? `${totalStars} / ${count * 3} ⭐`}</p>
 			<div className="ls-grid" role="list">
-				{Array.from({ length: LEVEL_COUNT }, (_, i) => {
+				{Array.from({ length: count }, (_, i) => {
 					const level = i + 1;
 					const stars: 0 | 1 | 2 | 3 = progress.stars[level] ?? 0;
 					const locked = level > unlocked;

@@ -3,7 +3,7 @@
 // A level = crack the code; stars from how few guesses it took (metric = fewer is better).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 
 export interface CodeColorLevelCfg {
 	seed: number;
@@ -25,7 +25,7 @@ const BANDS: { min: number; max: number; slots: number; colors: number }[] = [
 	{ min: 71, max: 100, slots: 6, colors: 8 },
 ];
 
-export const codecolorLevels: LevelPlan<CodeColorLevelCfg> = {
+const basePlan: LevelPlan<CodeColorLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time', // score = guesses used; fewer is better
 	config(level: number): CodeColorLevelCfg {
@@ -57,3 +57,20 @@ export const codecolorLevels: LevelPlan<CodeColorLevelCfg> = {
 		return { two: `≤ ${cfg.twoStarTries} essais`, three: `≤ ${cfg.threeStarTries} essais` };
 	},
 };
+
+// 101-200: 7-peg codes on the full palette, with a shorter budget and stricter star bars.
+export const codecolorLevels = extendPlan('codecolor', basePlan, {
+	configExt: (base, level) => {
+		const t = (level - LEVEL_COUNT) / LEVEL_COUNT; // 0 → 1 across the extended half
+		const slots = 7;
+		return {
+			...base,
+			slots,
+			colors: 8,
+			tries: Math.round(slots + 6 - 2 * t),
+			threeStarTries: slots,
+			twoStarTries: slots + 2,
+			label: `Niveau ${level}`,
+		};
+	},
+});

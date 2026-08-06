@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
 import GameFold from '../../components/GameFold.astro';
 import Icon from '../../components/Icon.astro';
+import CocottesBar from '../../components/CocottesBar';
 import { games } from '../../data/games';
 
 // Every playable game now has a daily challenge (Pong & Foot race the AI to 3), so the
@@ -44,6 +45,7 @@ const byCategory = CATEGORIES.map((c) => ({
 			</ul>
 			<p class="defi-streak" id="defi-streak" hidden></p>
 			<p class="defi-count" id="defi-count" aria-live="polite"></p>
+			<CocottesBar client:load />
 		</header>
 
 		<div class="defi-sections stack gap-4">

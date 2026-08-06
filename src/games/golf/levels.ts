@@ -5,7 +5,7 @@
 // metric 'time' with score = strokes (lower is better).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 
 export interface GolfLevelCfg {
@@ -22,7 +22,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 
-export const golfLevels: LevelPlan<GolfLevelCfg> = {
+const basePlan: LevelPlan<GolfLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time', // score = strokes; fewer is better
 	config(level: number): GolfLevelCfg {
@@ -57,3 +57,28 @@ export const golfLevels: LevelPlan<GolfLevelCfg> = {
 		return { two: `≤ ${cfg.twoStarStrokes} coups`, three: `≤ ${cfg.threeStarStrokes} coups` };
 	},
 };
+
+// 101-200: longer, narrower holes with a tighter cup and more chicanes than the Expert pill.
+// Par is already clamped at 6, so the stroke targets stay put — the hole is the tightening.
+export const golfLevels = extendPlan('golf', basePlan, {
+	configExt: (base, level) => {
+		const d = base.diff;
+		const length = Math.min(340, d.length + 40);
+		const par = clamp(Math.round(length / 42) + 1, 2, 6);
+		return {
+			...base,
+			diff: {
+				label: `Niveau ${level}`,
+				length,
+				bends: Math.min(17, d.bends + 2),
+				width: Math.max(9.5, d.width - 1),
+				cupR: Math.max(0.95, d.cupR - 0.05),
+				obstacles: Math.min(5, d.obstacles + 1),
+				slopes: Math.min(4, d.slopes + 1),
+			},
+			par,
+			threeStarStrokes: par,
+			twoStarStrokes: par + 1,
+		};
+	},
+});

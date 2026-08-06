@@ -4,7 +4,7 @@
 // solve time; stars gate on correctness (must nail all N) then reward speed.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { DIFFS, generateQuestion, type DiffLevel, type Question } from './engine';
 import { mulberry32 } from '../prng';
 import { fmtCentis } from '../../lib/scoreFormat';
@@ -40,7 +40,7 @@ function tierFor(level: number): { pool: DiffLevel; label: string } {
 	};
 }
 
-export const symbolesLevels: LevelPlan<SymbolesLevelCfg> = {
+const basePlan: LevelPlan<SymbolesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): SymbolesLevelCfg {
@@ -79,3 +79,19 @@ export const symbolesLevels: LevelPlan<SymbolesLevelCfg> = {
 		};
 	},
 };
+
+// 101-200: every question comes from the Expert families, on a clock 10% tighter than level 100.
+// The pass bar stays at N-1: it gates the level, so raising it would make a slip a total loss.
+const EXPERT_CENTIS_PER_Q = 1080;
+
+export const symbolesLevels = extendPlan('symboles', basePlan, {
+	configExt: (base) => ({
+		...base,
+		tierLabel: DIFFS.expert.label,
+		questions: Array.from({ length: QUESTIONS_PER_LEVEL }, (_, i) =>
+			generateQuestion(DIFFS.expert, mulberry32((base.seed + i * 0x9e3779b1) >>> 0)),
+		),
+		threeStarCentis: EXPERT_CENTIS_PER_Q * QUESTIONS_PER_LEVEL,
+		twoStarCentis: EXPERT_CENTIS_PER_Q * QUESTIONS_PER_LEVEL * 2,
+	}),
+});

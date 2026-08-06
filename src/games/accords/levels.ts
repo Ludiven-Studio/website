@@ -9,7 +9,7 @@
 // star metric is `falls` = wrong crossings, not time.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 
 export const CHORDS_PER_LEVEL = 5;
 
@@ -94,7 +94,20 @@ function rng(seed: number): () => number {
 
 const pick = <T>(r: () => number, arr: T[]): T => arr[Math.floor(r() * arr.length) % arr.length];
 
-export const accordsLevels: LevelPlan<AccordsLevelCfg> = {
+function buildChords(r: () => number, pool: AccChordType[], hintChance: number, n: number): AccChordSpec[] {
+	return Array.from({ length: n }, () => {
+		const chord = pick(r, pool);
+		const root = ROOT_LO + Math.floor(r() * (ROOT_HI - ROOT_LO + 1));
+		const instrument = pick(r, INSTR_IDS);
+		// Sorted-target count = number of peaks; maybe pre-lock one as a hint.
+		const noteCount = chord.offs.length;
+		const prefill: number[] = [];
+		if (r() < hintChance) prefill.push(Math.floor(r() * noteCount));
+		return { root, chord, instrument, prefill };
+	});
+}
+
+const basePlan: LevelPlan<AccordsLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score', // best-retained = most chords rebuilt right (higher is better)
 	config(level: number): AccordsLevelCfg {
@@ -104,16 +117,7 @@ export const accordsLevels: LevelPlan<AccordsLevelCfg> = {
 		const r = rng(levelSeed(l));
 		// Higher tiers give fewer prefilled hints; the last tier gives none.
 		const hintChance = tier === 0 ? 0.9 : tier === 1 ? 0.6 : tier === 2 ? 0.35 : 0;
-		const chords: AccChordSpec[] = Array.from({ length: CHORDS_PER_LEVEL }, () => {
-			const chord = pick(r, pool);
-			const root = ROOT_LO + Math.floor(r() * (ROOT_HI - ROOT_LO + 1));
-			const instrument = pick(r, INSTR_IDS);
-			// Sorted-target count = number of peaks; maybe pre-lock one as a hint.
-			const noteCount = chord.offs.length;
-			const prefill: number[] = [];
-			if (r() < hintChance) prefill.push(Math.floor(r() * noteCount));
-			return { root, chord, instrument, prefill };
-		});
+		const chords = buildChords(r, pool, hintChance, CHORDS_PER_LEVEL);
 		return { seed: levelSeed(l), tier, label: TIER_LABELS[tier], count: CHORDS_PER_LEVEL, chords };
 	},
 	// score = chords rebuilt right (0..N); stat = falls (wrong crossings).
@@ -130,3 +134,16 @@ export const accordsLevels: LevelPlan<AccordsLevelCfg> = {
 		return { two: `${cfg.count}/${cfg.count} justes`, three: `${cfg.count}/${cfg.count} sans chute` };
 	},
 };
+
+// 101-200: seven chords instead of five, drawn from the top tier only, with no pre-locked note.
+const EXPERT_CHORDS = 7;
+
+export const accordsLevels = extendPlan('accords', basePlan, {
+	configExt: (base) => ({
+		...base,
+		tier: 3,
+		label: TIER_LABELS[3],
+		count: EXPERT_CHORDS,
+		chords: buildChords(rng(base.seed), POOL[3], 0, EXPERT_CHORDS),
+	}),
+});

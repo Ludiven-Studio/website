@@ -30,6 +30,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', baseLen: 6, minWords: 5, maxWords: 6, minLen: 3 },
 	moyen: { label: 'Moyen', baseLen: 6, minWords: 6, maxWords: 7, minLen: 4 },
 	difficile: { label: 'Difficile', baseLen: 7, minWords: 7, maxWords: 9, minLen: 4 },
+	expert: { label: 'Expert', baseLen: 8, minWords: 8, maxWords: 10, minLen: 4 },
 };
 
 /** Grid must fit a phone screen above the letter wheel. */

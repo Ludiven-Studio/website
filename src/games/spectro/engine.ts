@@ -28,11 +28,15 @@ export interface Diff {
 	maxStep: number;
 	root: number;
 }
-export const DIFFS: Diff[] = [
-	{ label: 'Facile', count: 18, tempo: 1.1, maxStep: 2, root: 55 },
-	{ label: 'Moyen', count: 24, tempo: 1.5, maxStep: 3, root: 55 },
-	{ label: 'Difficile', count: 30, tempo: 1.9, maxStep: 4, root: 55 },
-];
+export const DIFF_PRESETS: Record<string, Diff> = {
+	facile: { label: 'Facile', count: 18, tempo: 1.1, maxStep: 2, root: 55 },
+	moyen: { label: 'Moyen', count: 24, tempo: 1.5, maxStep: 3, root: 55 },
+	difficile: { label: 'Difficile', count: 30, tempo: 1.9, maxStep: 4, root: 55 },
+	expert: { label: 'Expert', count: 36, tempo: 2.3, maxStep: 5, root: 55 },
+};
+
+// Daily and free mode address a tier by index, so keep the array in declaration order.
+export const DIFFS: Diff[] = Object.values(DIFF_PRESETS);
 
 const PENTA = [0, 2, 4, 7, 9]; // major pentatonic — always pleasant
 const DEG_LO = 0;
@@ -42,7 +46,7 @@ const scaleMidi = (root: number, deg: number): number => root + Math.floor(deg /
 
 /** Deterministic melody from a preset difficulty index (free / daily). */
 export function generateMelody(seed: number, diffIndex: number): Melody {
-	return generateMelodyDiff(seed, DIFFS[Math.max(0, Math.min(2, diffIndex))]);
+	return generateMelodyDiff(seed, DIFFS[Math.max(0, Math.min(DIFFS.length - 1, diffIndex))]);
 }
 
 /** Deterministic melody: gentle stepwise walk with occasional leaps and repeats. */

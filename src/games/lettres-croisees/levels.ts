@@ -3,7 +3,7 @@
 // stars come from the solve time, scaled to the target word count.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -17,7 +17,7 @@ export interface LettresCroiseesLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const lettresCroiseesLevels: LevelPlan<LettresCroiseesLevelCfg> = {
+const basePlan: LevelPlan<LettresCroiseesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): LettresCroiseesLevelCfg {
@@ -53,3 +53,18 @@ export const lettresCroiseesLevels: LevelPlan<LettresCroiseesLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: 8-letter base words, more words per grid than the Expert pill, tighter clock.
+export const lettresCroiseesLevels = extendPlan('lettres-croisees', basePlan, {
+	configExt: (base, level) => {
+		const minWords = Math.min(9, base.diff.minWords + 1);
+		const maxWords = minWords + 2;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, baseLen: 8, minWords, maxWords, minLen: 4 },
+			words: maxWords,
+			threeStarCentis: maxWords * 600,
+			twoStarCentis: maxWords * 1050,
+		};
+	},
+});

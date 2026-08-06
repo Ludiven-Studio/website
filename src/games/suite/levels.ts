@@ -7,7 +7,7 @@
 // questions are drawn from (facile → moyen → difficile), matching the engine.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { DIFF_ORDER } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -31,7 +31,7 @@ const diffIndexFor = (l: number): number => {
 	return 0;
 };
 
-export const suiteLevels: LevelPlan<SuiteLevelCfg> = {
+const basePlan: LevelPlan<SuiteLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): SuiteLevelCfg {
@@ -65,3 +65,21 @@ export const suiteLevels: LevelPlan<SuiteLevelCfg> = {
 		};
 	},
 };
+
+// 101-200: the Expert family pool (non-obvious recurrences), 7 questions per set
+// instead of 5, and ~15% less time per question.
+export const suiteLevels = extendPlan('suite', basePlan, {
+	configExt: (base, _level, baseLevel) => {
+		const count = SUITE_QUESTIONS + 2;
+		// Keep the "difficile" per-question budget and cut 15% off it.
+		const perQ = (9 - 4 * (baseLevel / LEVEL_COUNT) + (DIFF_ORDER.length - 1) * 1.5) * 0.85;
+		const threeStarCentis = Math.round(count * perQ * 100);
+		return {
+			...base,
+			diffIndex: DIFF_ORDER.length, // 'expert', appended past the three free tiers
+			count,
+			threeStarCentis,
+			twoStarCentis: Math.round(threeStarCentis * 1.8),
+		};
+	},
+});

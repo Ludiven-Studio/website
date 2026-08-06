@@ -5,7 +5,7 @@
 // thins the ore — you have to dig smarter and craft to keep pace.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { MineDiff } from './engine';
 
 export interface CocotteMineuseCfg {
@@ -20,7 +20,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 /** 0 at level 1, 1 at level 100 — the ramp parameter. */
 const ramp = (level: number): number => (Math.max(1, Math.min(LEVEL_COUNT, level)) - 1) / (LEVEL_COUNT - 1);
 
-export const cocotteMineuseLevels: LevelPlan<CocotteMineuseCfg> = {
+const basePlan: LevelPlan<CocotteMineuseCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): CocotteMineuseCfg {
@@ -41,13 +41,30 @@ export const cocotteMineuseLevels: LevelPlan<CocotteMineuseCfg> = {
 	},
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
 		if (!r.won) return 0;
-		const target = cocotteMineuseLevels.config(level).target;
+		const target = this.config(level).target;
 		if (r.score >= target * 1.8) return 3;
 		if (r.score >= target * 1.35) return 2;
 		return 1;
 	},
 	starHint(level: number) {
-		const target = cocotteMineuseLevels.config(level).target;
+		const target = this.config(level).target;
 		return { two: `Score ≥ ${Math.round(target * 1.35)}`, three: `Score ≥ ${Math.round(target * 1.8)}` };
 	},
 };
+
+// 101-200: the Expert mine — quicker ticks (so a quicker downpour), thicker stone,
+// leaner ore — and a score target raised by a quarter.
+export const cocotteMineuseLevels = extendPlan('cocotte-mineuse', basePlan, {
+	configExt: (base, level) => ({
+		...base,
+		diff: {
+			...base.diff,
+			label: `Niveau ${level}`,
+			tickMs: Math.max(145, base.diff.tickMs - 20),
+			lampDrainPerSec: base.diff.lampDrainPerSec * 1.18,
+			stoneDensity: Math.min(0.17, base.diff.stoneDensity + 0.04),
+			oreRichness: Math.max(0.8, base.diff.oreRichness - 0.1),
+		},
+		target: Math.round(base.target * 1.25),
+	}),
+});

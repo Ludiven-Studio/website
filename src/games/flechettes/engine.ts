@@ -51,6 +51,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', omega: 2.2 },
 	moyen: { label: 'Moyen', omega: 3.1 },
 	difficile: { label: 'Difficile', omega: 4.3 },
+	expert: { label: 'Expert', omega: 5.8 },
 };
 
 export const SWEEP_AMP = 1.02; // travels just PAST the board edge so the outer doubles are reachable

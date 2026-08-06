@@ -6,7 +6,7 @@
 // conflicts; stars from solve time (scaled to how many cells you must place).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { SIZE, type DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -22,7 +22,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b5
 // Max extra clues we ever hand out early (matches the "Facile" preset's generosity).
 const MAX_EXTRA = 10;
 
-export const rondCarreLevels: LevelPlan<RondCarreLevelCfg> = {
+const basePlan: LevelPlan<RondCarreLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): RondCarreLevelCfg {
@@ -53,3 +53,17 @@ export const rondCarreLevels: LevelPlan<RondCarreLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: no extra clue at all, and the leanest board out of a growing draw (Expert), on a tighter clock.
+export const rondCarreLevels = extendPlan('rond-carre', basePlan, {
+	configExt: (base, level) => {
+		const t = (level - LEVEL_COUNT - 1) / (LEVEL_COUNT - 1); // 0 → 1
+		const emptyCells = SIZE * SIZE - 14;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, extraGivens: 0, candidates: 4 + Math.round(t * 8) }, // 4 → 12
+			threeStarCentis: emptyCells * 340,
+			twoStarCentis: emptyCells * 600,
+		};
+	},
+});

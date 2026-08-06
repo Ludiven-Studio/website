@@ -21,6 +21,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { usePointerDrag } from '../usePointerDrag';
 import { casseBriquesLevels } from './levels';
+import { withExpert } from '../../lib/difficulty';
 
 /* =====================================================
    CASSE-BRIQUES — real-time React island (canvas + rAF loop).
@@ -557,7 +558,7 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="cb-pills" role="tablist" aria-label="Difficulté">
-					{DIFF_ORDER.map((k) => (
+					{withExpert(DIFF_ORDER, gameId).map((k) => (
 						<button
 							key={k}
 							role="tab"

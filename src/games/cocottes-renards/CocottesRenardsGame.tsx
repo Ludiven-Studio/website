@@ -8,6 +8,7 @@ import {
 	FOX,
 	DIFFS,
 	DIFF_ORDER,
+	DIFF_KEYS,
 	PROD_INTERVAL,
 	createGame,
 	placeTower,
@@ -36,6 +37,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { cocottesRenardsLevels, type CocottesLevelCfg } from './levels';
+import { diffKeys } from '../../lib/difficulty';
 
 /* =====================================================
    COCOTTES VS RENARDS — real-time lane tower-defense island.
@@ -1026,7 +1028,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				});
 			} else {
 				try {
-					localStorage.setItem(bestKey(DIFF_ORDER[diffIdxRef.current] ?? 'moyen'), String(nb));
+					localStorage.setItem(bestKey(DIFF_KEYS[diffIdxRef.current] ?? 'moyen'), String(nb));
 				} catch {
 					/* ignore */
 				}
@@ -1145,7 +1147,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			triesRef.current = 0;
 			setTries(0);
 			setDiffKey(key);
-			diffIdxRef.current = DIFF_ORDER.indexOf(key);
+			diffIdxRef.current = DIFF_KEYS.indexOf(key);
 			seedRef.current = (Math.random() * 2 ** 32) >>> 0;
 			stateRef.current = createGame(diffIdxRef.current, mulberry32(seedRef.current));
 			resetFx(stateRef.current);
@@ -1432,7 +1434,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			) : (
 				<div className="cr-bar">
 					<div className="cr-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as DiffKey[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button key={k} role="tab" aria-selected={diffKey === k} className={`cr-pill ${diffKey === k ? 'active' : ''}`} onClick={() => armFree(k)}>
 								{DIFFS[k].label}
 							</button>

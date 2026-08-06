@@ -3,7 +3,7 @@
 // (fewer is better), so metric 'time' (lower = better) is used, with score = cost.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { SizeLevel } from './engine';
 
 export interface BatailleLevelCfg {
@@ -27,7 +27,7 @@ function fleetFor(size: number, l: number): number[] {
 	return fleet.filter((len) => len <= size).sort((a, b) => b - a);
 }
 
-export const batailleLevels: LevelPlan<BatailleLevelCfg> = {
+const basePlan: LevelPlan<BatailleLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time', // score = shots + sonars, lower is better → 'time' direction
 	config(level: number): BatailleLevelCfg {
@@ -55,3 +55,18 @@ export const batailleLevels: LevelPlan<BatailleLevelCfg> = {
 		return { two: `≤ ${cfg.twoStarCost} coups`, three: `≤ ${cfg.threeStarCost} coups` };
 	},
 };
+
+// 101-200: a wider sea with one extra ship, two sonars fewer and ~15% tighter shot targets.
+export const batailleLevels = extendPlan('bataille', basePlan, {
+	configExt: (base, level) => {
+		const size = Math.min(14, base.sizeLvl.size + 2);
+		const fleet = [...base.sizeLvl.fleet, 5].filter((len) => len <= size).sort((a, b) => b - a);
+		const shipCells = fleet.reduce((a, b) => a + b, 0);
+		return {
+			...base,
+			sizeLvl: { label: `Niveau ${level}`, size, fleet, sonars: Math.max(3, base.sizeLvl.sonars - 2) },
+			threeStarCost: Math.round(shipCells + size * 1.2),
+			twoStarCost: Math.round(shipCells + size * 2.7),
+		};
+	},
+});

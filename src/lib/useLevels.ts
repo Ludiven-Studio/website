@@ -61,8 +61,8 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 		setPhase('menu');
 		setStars(0);
 		setWon(false);
-		void getProgression(gameId).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best } }));
-	}, [gameId]);
+		void getProgression(gameId).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: plan.count }));
+	}, [gameId, plan]);
 
 	const exit = useCallback(() => setPhase('off'), []);
 	const backToMenu = useCallback(() => setPhase('menu'), []);
@@ -76,7 +76,7 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 			setBooting(false); // progression unreachable → fall back to the game's own menu
 			return null;
 		}
-		setProgress({ stars: { ...p.stars }, best: { ...p.best } });
+		setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: plan.count });
 		const cleared = Object.keys(p.stars).map(Number).filter((n) => p.stars[n] >= 1);
 		const maxCleared = cleared.length ? Math.max(...cleared) : 0;
 		if (maxCleared >= plan.count) { setPhase('menu'); setBooting(false); return null; } // all cleared → grid
@@ -106,7 +106,7 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 			void submitLevel({
 				gameId, level, stars: s as 1 | 2 | 3, score: Math.round(r.score),
 				metricIsTime: plan.metric === 'time', rawData: r.raw,
-			}).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best } }));
+			}).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: plan.count }));
 		}
 	}, [gameId, level, plan, progress]);
 

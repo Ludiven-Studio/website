@@ -5,7 +5,7 @@
 // A level = solve the grid; stars from solve time, scaled to the grid's cell count.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -18,7 +18,7 @@ export interface SuguruLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const suguruLevels: LevelPlan<SuguruLevelCfg> = {
+const basePlan: LevelPlan<SuguruLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): SuguruLevelCfg {
@@ -53,3 +53,18 @@ export const suguruLevels: LevelPlan<SuguruLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: still 5×5 (bigger grids can stall the generator), but fewer clues than any
+// base level and ~12% less time per empty cell.
+export const suguruLevels = extendPlan('suguru', basePlan, {
+	configExt: (base, level) => {
+		const givens = Math.max(6, base.diff.givens - 2);
+		const empties = 25 - givens;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, size: 5, givens },
+			threeStarCentis: empties * 175,
+			twoStarCentis: empties * 320,
+		};
+	},
+});

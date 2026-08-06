@@ -11,6 +11,8 @@ import type { Rng } from '../prng';
 export interface DiffLevel {
 	label: string;
 	size: number;
+	/** Hardest technique the board must force. Defaults to the size's own floor. */
+	minTier?: 1 | 2 | 3 | 4;
 }
 
 export interface ReinesPuzzle {
@@ -25,6 +27,9 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 6 },
 	moyen: { label: 'Moyen', size: 7 },
 	difficile: { label: 'Difficile', size: 8 },
+	// 8 is the size cap (palette + unique-solution limit), so Expert raises the
+	// reasoning floor instead: the board must need the "wipe" exclusions.
+	expert: { label: 'Expert', size: 8, minTier: 4 },
 };
 
 // Fixed, clearly distinct palette (one solid colour per region, n <= 8).
@@ -670,8 +675,8 @@ const minTierForSize = (n: number): 1 | 2 | 3 => (n >= 8 ? 3 : n >= 7 ? 2 : 1);
 /** Solvable with the size's full rule set, and NOT with anything easier than `min`.
  *  Tiers are cumulative, so "needs tier ≥ min" is just "tier min-1 cannot finish it".
  *  The cheap easier tier runs first: it rejects the giveaway boards for almost nothing. */
-function meetsTier(regions: number[][], n: number, max: 3 | 4, min: 1 | 2 | 3): boolean {
-	if (min > 1 && solveByLogic(regions, n, (min - 1) as 1 | 2)) return false;
+function meetsTier(regions: number[][], n: number, max: 3 | 4, min: 1 | 2 | 3 | 4): boolean {
+	if (min > 1 && solveByLogic(regions, n, (min - 1) as 1 | 2 | 3)) return false;
 	return !!solveByLogic(regions, n, max);
 }
 
@@ -680,7 +685,7 @@ function meetsTier(regions: number[][], n: number, max: 3 | 4, min: 1 | 2 | 3): 
 export function generateReines(diff: DiffLevel, rng: Rng = Math.random): ReinesPuzzle {
 	const n = diff.size;
 	const tier = tierForSize(n);
-	const minTier = minTierForSize(n);
+	const minTier = diff.minTier ?? minTierForSize(n);
 	for (let attempt = 0; attempt < 600; attempt++) {
 		const solution = randomSolution(n, rng);
 		if (!solution) continue;

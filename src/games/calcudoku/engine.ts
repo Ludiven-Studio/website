@@ -32,6 +32,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 4, maxCage: 3 },
 	moyen: { label: 'Moyen', size: 5, maxCage: 4 },
 	difficile: { label: 'Difficile', size: 6, maxCage: 4 },
+	expert: { label: 'Expert', size: 7, maxCage: 4 },
 };
 
 function shuffle<T>(arr: T[], rng: Rng): T[] {

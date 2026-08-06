@@ -3,7 +3,7 @@
 // every row and column; stars from solve time, scaled to the hole count.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { Diff } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -16,7 +16,7 @@ export interface SommeTouteLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const sommeTouteLevels: LevelPlan<SommeTouteLevelCfg> = {
+const basePlan: LevelPlan<SommeTouteLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): SommeTouteLevelCfg {
@@ -46,3 +46,19 @@ export const sommeTouteLevels: LevelPlan<SommeTouteLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: one size bigger (up to the Expert 7×7), a wider value range, more holes
+// and ~15% less time per hole.
+export const sommeTouteLevels = extendPlan('somme-toute', basePlan, {
+	configExt: (base, level) => {
+		const size = Math.min(7, base.diff.size + 1);
+		const maxVal = Math.min(11, base.diff.maxVal + 2);
+		const holes = Math.min(size * size - 1, base.diff.holes + 4);
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, size, maxVal, holes },
+			threeStarCentis: holes * 190,
+			twoStarCentis: holes * 340,
+		};
+	},
+});

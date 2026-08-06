@@ -6,7 +6,7 @@
 // harder as you climb. Metric is 'score' (higher is better).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 
 export const THROWS_PER_LEVEL = 5;
@@ -22,7 +22,7 @@ export interface FlechettesLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const flechettesLevels: LevelPlan<FlechettesLevelCfg> = {
+const basePlan: LevelPlan<FlechettesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): FlechettesLevelCfg {
@@ -55,3 +55,18 @@ export const flechettesLevels: LevelPlan<FlechettesLevelCfg> = {
 		return { two: `${cfg.twoStar} pts`, three: `${cfg.threeStar} pts` };
 	},
 };
+
+// 101-200: sweeps faster than the Expert pill and a higher points target.
+// Stars stay under 5×60, the most a run can ever score.
+export const flechettesLevels = extendPlan('flechettes', basePlan, {
+	configExt: (base, level) => {
+		const target = Math.min(210, Math.round(base.target * 1.1));
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, omega: Math.min(5.8, base.diff.omega + 1.5) },
+			target,
+			twoStar: Math.min(300, Math.round(target * 1.25)),
+			threeStar: Math.min(300, Math.round(target * 1.55)),
+		};
+	},
+});

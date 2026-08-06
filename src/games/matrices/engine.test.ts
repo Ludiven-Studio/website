@@ -8,13 +8,14 @@ describe('matrices engine', () => {
 	it('produces a 3×3 grid with exactly one correct option, all visually distinct', () => {
 		for (const key of Object.keys(DIFFS)) {
 			for (let s = 0; s < 40; s++) {
+				const n = DIFFS[key].options ?? N_OPTIONS;
 				const q = generateQuestion(DIFFS[key], mulberry32(1000 * (s + 1) + DIFFS[key].vary));
 				expect(q.grid.length, `${key} grid size`).toBe(9);
-				expect(q.options.length, `${key} options`).toBe(N_OPTIONS);
+				expect(q.options.length, `${key} options`).toBe(n);
 				expect(q.answerIndex).toBe(8);
 				const answerKey = cellKey(q.grid[8]);
 				const keys = q.options.map(cellKey);
-				expect(new Set(keys).size, `${key} options distinct`).toBe(N_OPTIONS);
+				expect(new Set(keys).size, `${key} options distinct`).toBe(n);
 				expect(keys.filter((k) => k === answerKey).length, `${key} exactly one correct`).toBe(1);
 			}
 		}
@@ -31,8 +32,8 @@ describe('matrices engine', () => {
 		}
 	});
 
-	it('varies exactly `vary` things: facile 2, moyen 3, difficile 4 — for every family', () => {
-		const expected: Record<string, number> = { facile: 2, moyen: 3, difficile: 4 };
+	it('varies exactly `vary` things: facile 2, moyen 3, difficile/expert 4 — for every family', () => {
+		const expected: Record<string, number> = { facile: 2, moyen: 3, difficile: 4, expert: 4 };
 		for (const key of Object.keys(DIFFS)) {
 			for (const t of ALL_TEMPLATES) {
 				for (let s = 0; s < 12; s++) {

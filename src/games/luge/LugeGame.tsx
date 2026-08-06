@@ -661,8 +661,10 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	const [webglError, setWebglError] = useState(false);
 	const [steerSide, setSteerSide] = useState<'left' | 'right' | null>(null); // hold-a-side steering (visual state)
 	const [levelsMode, setLevelsMode] = useState(false);
-	const [levelMenu, setLevelMenu] = useState(false); // showing the 100-level grid
-	const [progress, setProgress] = useState<GameProgress>({ stars: {}, best: {} });
+	const [levelMenu, setLevelMenu] = useState(false); // showing the level grid
+	// This game drives progression itself instead of useLevels, so it has to carry the
+	// plan's `count` — that's what tells LevelSelect the Expert pack doubled the ladder.
+	const [progress, setProgress] = useState<GameProgress>({ stars: {}, best: {}, count: lugeLevels.count });
 	const [currentLevel, setCurrentLevel] = useState(1);
 	const [levelWon, setLevelWon] = useState(false);
 	const [earnedStars, setEarnedStars] = useState(0);
@@ -1155,7 +1157,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			void submitLevel({
 				gameId, level, stars: stars as 1 | 2 | 3, score: st.score, metricIsTime: false,
 				rawData: { dist: Math.floor(st.s), lives: st.lives },
-			}).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best } }));
+			}).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: lugeLevels.count }));
 		}
 		trackGame(gameId, 'game_over', { score: st.score });
 	}, [gameId, stop]);
@@ -1446,7 +1448,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		setStatus('ready');
 		setDifficultyBaseline(0);
 		armWorld(lugeLevels.config(1).seed); // idle board behind the grid
-		void getProgression(gameId).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best } }));
+		void getProgression(gameId).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: lugeLevels.count }));
 	}, [gameId, stop, armWorld]);
 
 	const playLevel = useCallback((level: number) => {

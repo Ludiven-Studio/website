@@ -5,7 +5,7 @@
 // touching the generator or the ramp below, and paste the tables it prints.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { GenParams } from './engine';
 
 export interface TectoniqueLevelCfg extends GenParams {
@@ -45,7 +45,7 @@ const targets = (par: number): { three: number; two: number } => ({
 	two: Math.round(par * 2),
 });
 
-export const tectoniqueLevels: LevelPlan<TectoniqueLevelCfg> = {
+const basePlan: LevelPlan<TectoniqueLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): TectoniqueLevelCfg {
@@ -81,9 +81,30 @@ export const tectoniqueLevels: LevelPlan<TectoniqueLevelCfg> = {
 	},
 };
 
-/** Free play and the daily share three bands; the daily picks with the server's difficulty index. */
+// 101-200: a 9×9 floor, two more crystals and one more blocker of each kind. PAR is not measured
+// for these, so it is scaled off the base one — the crystals carry most of the coup count.
+export const tectoniqueLevels = extendPlan('tectonique', basePlan, {
+	configExt: (base) => {
+		const n = 9;
+		const crystals = Math.min(13, base.crystals + 2);
+		return {
+			...base,
+			n,
+			crystals,
+			rocks: base.rocks + 1,
+			pillars: base.pillars + 1,
+			allLocks: 1,
+			holes: n - 2,
+			par: Math.round((base.par * crystals * 1.1) / base.crystals),
+		};
+	},
+});
+
+/** Free play and the daily share three bands; the daily picks with the server's difficulty index.
+    The fourth is the Expert pill, which the daily never deals. */
 export const TECTONIQUE_BANDS: GenParams[] = [
 	{ n: 6, crystals: 5, rowLocks: 0, colLocks: 0, allLocks: 0, rocks: 2, pillars: 1, holes: 4 },
 	{ n: 7, crystals: 7, rowLocks: 1, colLocks: 1, allLocks: 0, rocks: 4, pillars: 2, holes: 5 },
 	{ n: 8, crystals: 10, rowLocks: 1, colLocks: 1, allLocks: 1, rocks: 5, pillars: 3, holes: 6 },
+	{ n: 9, crystals: 12, rowLocks: 1, colLocks: 1, allLocks: 1, rocks: 6, pillars: 4, holes: 7 },
 ];

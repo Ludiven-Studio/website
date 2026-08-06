@@ -2,6 +2,7 @@
 import BaseLayout from './BaseLayout.astro';
 import Icon from '../components/Icon.astro';
 import GameTutorial from '../components/GameTutorial.astro';
+import CocottesBar from '../components/CocottesBar';
 
 interface Props {
 	title: string;
@@ -23,6 +24,7 @@ const { title, description, heading, tagline, gameId } = Astro.props;
 			<h1>{heading}</h1>
 			<p>{tagline}</p>
 			<GameTutorial gameId={gameId} />
+			<CocottesBar client:load />
 		</header>
 
 		<slot />

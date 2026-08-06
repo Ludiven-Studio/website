@@ -18,6 +18,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { useHintGate } from '../useHintGate';
 import { repairNote } from '../repairNote';
 import { suguruLevels } from './levels';
@@ -468,7 +469,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 			<div className="sg-bar">
 				{!daily && !lv.active ? (
 					<div className="sg-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

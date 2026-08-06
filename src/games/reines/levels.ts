@@ -5,7 +5,7 @@
 // stars come from solve time, scaled to n^2 (bigger board = more cells to reason on).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -22,7 +22,7 @@ const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9
 // solution beyond that (see engine growRegions / countSolutions).
 const sizeFor = (l: number): number => (l <= 40 ? 6 : l <= 75 ? 7 : 8);
 
-export const reinesLevels: LevelPlan<ReinesLevelCfg> = {
+const basePlan: LevelPlan<ReinesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): ReinesLevelCfg {
@@ -48,3 +48,18 @@ export const reinesLevels: LevelPlan<ReinesLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: always 8×8, and the board must force the hardest deduction tier (Expert),
+// on a clock that keeps tightening.
+export const reinesLevels = extendPlan('reines', basePlan, {
+	configExt: (base, level) => {
+		const n = 8;
+		const t = (level - LEVEL_COUNT - 1) / (LEVEL_COUNT - 1); // 0 → 1
+		return {
+			...base,
+			size: { label: `Niveau ${level}`, size: n, minTier: 4 as const },
+			threeStarCentis: Math.round(n * n * (85 - t * 15)),
+			twoStarCentis: Math.round(n * n * (160 - t * 25)),
+		};
+	},
+});

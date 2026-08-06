@@ -81,6 +81,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', balls: 3, spread: 26, nearCushion: false },
 	moyen: { label: 'Moyen', balls: 4, spread: 20, nearCushion: false },
 	difficile: { label: 'Difficile', balls: 5, spread: 14, nearCushion: true },
+	expert: { label: 'Expert', balls: 6, spread: 10, nearCushion: true },
 };
 
 const nearPocket = (x: number, y: number, t: Table) =>

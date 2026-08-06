@@ -17,6 +17,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { billardLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
+import { diffKeys } from '../../lib/difficulty';
 
 /* =====================================================
    BILLARD — React island (2D canvas).
@@ -29,7 +30,7 @@ type Status = 'aiming' | 'rolling' | 'won';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const STEP = 1000 / 60;
 const GRAB_R = 18; // table units: start aiming when grabbing near the cue ball
-const COLORS = ['#e6566f', '#f0a830', '#5b8def', '#2f9e6f', '#9b6cf0']; // colour balls 0..4
+const COLORS = ['#e6566f', '#f0a830', '#5b8def', '#2f9e6f', '#9b6cf0', '#20c4c0']; // colour balls 0..5
 const CUE_COLOR = '#f4f4f2';
 const FELT = '#0f7a52';
 const FELT_DARK = '#0c6644';
@@ -541,7 +542,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						<span className="bi-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</div>
 					<div className="bi-hud-actions">
-						{!daily && !lv.active && (Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{!daily && !lv.active && diffKeys(DIFFS, gameId).map((k) => (
 							<button key={k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)}>{DIFFS[k].label}</button>
 						))}
 						{!lv.menu && (

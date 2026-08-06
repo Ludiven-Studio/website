@@ -18,6 +18,7 @@ import GiveUp, { RevealNote } from '../../components/GiveUp';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { useHintGate } from '../useHintGate';
 import { repairNote } from '../repairNote';
 import { sudokuLevels } from './levels';
@@ -465,7 +466,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 						))}
 					</div>
 					<div className="sk-group" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

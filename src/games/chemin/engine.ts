@@ -25,6 +25,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 5, checkpoints: 4 },
 	moyen: { label: 'Moyen', size: 6, checkpoints: 4 },
 	difficile: { label: 'Difficile', size: 7, checkpoints: 3 },
+	expert: { label: 'Expert', size: 8, checkpoints: 3 },
 };
 
 const NEI = [

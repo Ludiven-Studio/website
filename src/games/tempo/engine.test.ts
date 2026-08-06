@@ -71,7 +71,7 @@ describe('tempo engine', () => {
 
 	it('speed scales the chart faster', () => {
 		expect(buildEndlessChart(3, 1.3, { count: 200 }).totalTime).toBeLessThan(buildEndlessChart(3, 0.8, { count: 200 }).totalTime);
-		expect(SPEEDS.length).toBe(3);
+		expect(SPEEDS.length).toBe(4);
 	});
 
 	it('accelerates: later beats come closer together', () => {

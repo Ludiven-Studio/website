@@ -4,7 +4,7 @@
 // deterministic skill signal, like luge grading on lives.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 
 export interface AngryLevelCfg {
@@ -30,7 +30,7 @@ function levelBudget(l: number, foxes: number): number {
 	return foxes + bonus;
 }
 
-export const angryLevels: LevelPlan<AngryLevelCfg> = {
+const basePlan: LevelPlan<AngryLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score', // score = shots left, so more-left ranks higher
 	config(level: number): AngryLevelCfg {
@@ -56,3 +56,21 @@ export const angryLevels: LevelPlan<AngryLevelCfg> = {
 		return { two: `≥ ${two} cocottes restantes`, three: `≥ ${three} cocottes restantes` };
 	},
 };
+
+// 101-200: one more fox, sturdier fortresses, tougher foxes, and only two spare cocottes.
+export const angryLevels = extendPlan('angry', basePlan, {
+	configExt: (base, level) => {
+		const foxes = Math.min(9, base.diff.foxes + 1);
+		return {
+			...base,
+			diff: {
+				label: `Niveau ${level}`,
+				foxes,
+				hp: Math.round(base.diff.hp * 1.25),
+				margin: 0,
+				sturdiness: base.diff.sturdiness + 1,
+			},
+			budget: foxes + 2,
+		};
+	},
+});

@@ -19,6 +19,8 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 6, minRegion: 3, maxRegion: 5 },
 	moyen: { label: 'Moyen', size: 7, minRegion: 4, maxRegion: 6 },
 	difficile: { label: 'Difficile', size: 8, minRegion: 4, maxRegion: 7 },
+	// Stays 8×8: 9×9 makes the uniqueness check exponential. Bigger basins are the notch.
+	expert: { label: 'Expert', size: 8, minRegion: 5, maxRegion: 8 },
 };
 
 export interface AquariumPuzzle {

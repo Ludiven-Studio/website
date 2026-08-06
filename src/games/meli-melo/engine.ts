@@ -29,6 +29,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', minPoints: 100, maxPoints: 999999 },
 	moyen: { label: 'Moyen', minPoints: 55, maxPoints: 99 },
 	difficile: { label: 'Difficile', minPoints: 25, maxPoints: 54 },
+	expert: { label: 'Expert', minPoints: 10, maxPoints: 24 },
 };
 
 export interface BoggleGrid {

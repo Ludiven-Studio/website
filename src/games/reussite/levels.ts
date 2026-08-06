@@ -9,13 +9,13 @@
 // Metric = time (solve time in centiseconds; lower is better).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface ReussiteLevelCfg {
 	seed: number;
 	draw: number; // 1 | 2 | 3
-	passes: number; // stock recycles allowed (Infinity = unlimited)
+	passes: number; // stock recycles allowed (UNLIMITED_PASSES = as good as unlimited)
 	label: string; // e.g. "Pioche 1 · passes ∞"
 	twoStarCentis: number;
 	threeStarCentis: number;
@@ -26,16 +26,20 @@ export interface ReussiteLevelCfg {
 // Well-spread deterministic seed per level (odd multiplier + xor so neighbours differ a lot).
 const levelSeed = (level: number): number => (Math.imul(level, 2246822519) ^ 0x9e3779b9) >>> 0;
 
+// A level config must stay finite (it is walked and validated number by number), so
+// "unlimited" is a ceiling no deal can reach instead of Infinity.
+const UNLIMITED_PASSES = 99;
+
 // Difficulty ramp: draw-1 (unlimited) for the solvable early game, draw-2 mid, draw-3 late,
 // with pass limits appearing on the hardest stretch.
 function ramp(l: number): { draw: number; passes: number; label: string } {
-	if (l <= 40) return { draw: 1, passes: Infinity, label: 'Pioche 1 · passes ∞' };
-	if (l <= 70) return { draw: 2, passes: Infinity, label: 'Pioche 2 · passes ∞' };
-	if (l <= 90) return { draw: 3, passes: Infinity, label: 'Pioche 3 · passes ∞' };
+	if (l <= 40) return { draw: 1, passes: UNLIMITED_PASSES, label: 'Pioche 1 · passes ∞' };
+	if (l <= 70) return { draw: 2, passes: UNLIMITED_PASSES, label: 'Pioche 2 · passes ∞' };
+	if (l <= 90) return { draw: 3, passes: UNLIMITED_PASSES, label: 'Pioche 3 · passes ∞' };
 	return { draw: 3, passes: 3, label: 'Pioche 3 · 3 passes' };
 }
 
-export const reussiteLevels: LevelPlan<ReussiteLevelCfg> = {
+const basePlan: LevelPlan<ReussiteLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time', // score = solve time in centiseconds (lower is better)
 	config(level: number): ReussiteLevelCfg {
@@ -66,3 +70,20 @@ export const reussiteLevels: LevelPlan<ReussiteLevelCfg> = {
 		};
 	},
 };
+
+// 101-200: draw-3 deals only, with a hard pass limit, a tighter clock and move ceiling.
+export const reussiteLevels = extendPlan('reussite', basePlan, {
+	configExt: (base, level) => {
+		const passes = level <= 150 ? 2 : 1;
+		return {
+			...base,
+			draw: 3,
+			passes,
+			label: `Pioche 3 · ${passes} passe${passes > 1 ? 's' : ''}`,
+			threeStarCentis: Math.round(base.threeStarCentis * 0.85),
+			twoStarCentis: Math.round(base.twoStarCentis * 0.85),
+			threeStarMoves: Math.round(base.threeStarMoves * 0.9),
+			twoStarMoves: Math.round(base.twoStarMoves * 0.9),
+		};
+	},
+});

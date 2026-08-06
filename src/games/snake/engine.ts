@@ -33,6 +33,7 @@ export const SNAKE_DIFFS: Record<string, SnakeDiff> = {
 	facile: { label: 'Facile', baseTick: 170, minTick: 90, accel: 3, rocks: 0 },
 	moyen: { label: 'Moyen', baseTick: 140, minTick: 75, accel: 4, rocks: 6 },
 	difficile: { label: 'Difficile', baseTick: 110, minTick: 60, accel: 5, rocks: 12 },
+	expert: { label: 'Expert', baseTick: 85, minTick: 50, accel: 6, rocks: 18 },
 };
 
 export type SnakeStatus = 'playing' | 'over';

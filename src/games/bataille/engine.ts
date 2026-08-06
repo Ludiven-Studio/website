@@ -22,6 +22,7 @@ export const SIZES: Record<string, SizeLevel> = {
 	facile: { label: 'Facile', size: 8, fleet: [3, 3, 2, 2], sonars: 8 },
 	moyen: { label: 'Moyen', size: 10, fleet: [4, 3, 3, 2, 2], sonars: 7 },
 	difficile: { label: 'Difficile', size: 12, fleet: [5, 4, 3, 3, 2], sonars: 6 },
+	expert: { label: 'Expert', size: 14, fleet: [6, 5, 4, 3, 3, 2], sonars: 5 },
 };
 
 export interface HuntPuzzle {

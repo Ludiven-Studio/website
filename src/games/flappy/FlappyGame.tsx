@@ -18,6 +18,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { flappyLevels } from './levels';
+import { withExpert } from '../../lib/difficulty';
 
 /* =====================================================
    FLAPPY COCOTTE — real-time React island (canvas + rAF loop).
@@ -606,7 +607,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="fl-pills" role="tablist" aria-label="Difficulté">
-					{DIFF_ORDER.map((k) => (
+					{withExpert(DIFF_ORDER, gameId).map((k) => (
 						<button
 							key={k}
 							role="tab"

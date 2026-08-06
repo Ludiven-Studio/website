@@ -4,7 +4,7 @@
 // time (scaled to the cell count).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -17,7 +17,7 @@ export interface CheminLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const cheminLevels: LevelPlan<CheminLevelCfg> = {
+const basePlan: LevelPlan<CheminLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): CheminLevelCfg {
@@ -47,3 +47,18 @@ export const cheminLevels: LevelPlan<CheminLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: 8×8 (the Expert pill), then 9×9 past level 150, always on the 3-anchor
+// minimum and on a tighter clock per cell.
+export const cheminLevels = extendPlan('chemin', basePlan, {
+	configExt: (base, level) => {
+		const size = level > 150 ? 9 : 8;
+		const cells = size * size;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, size, checkpoints: 3 },
+			threeStarCentis: cells * 190,
+			twoStarCentis: cells * 350,
+		};
+	},
+});

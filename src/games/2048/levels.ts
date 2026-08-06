@@ -6,7 +6,7 @@
 // how few moves it took.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { DIFFS, type DiffKey } from './engine';
 
 export interface TwentyFortyEightLevelCfg {
@@ -33,7 +33,7 @@ const BANDS: { min: number; max: number; target: number; diffKey: DiffKey; from:
 	{ min: 91, max: 100, target: 2048, diffKey: 'moyen', from: 1100, to: 900 },
 ];
 
-export const twentyFortyEightLevels: LevelPlan<TwentyFortyEightLevelCfg> = {
+const basePlan: LevelPlan<TwentyFortyEightLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time', // score = moves used; fewer is better
 	config(level: number): TwentyFortyEightLevelCfg {
@@ -65,6 +65,21 @@ export const twentyFortyEightLevels: LevelPlan<TwentyFortyEightLevelCfg> = {
 		return { two: `≤ ${cfg.twoStarMoves} coups`, three: `≤ ${cfg.threeStarMoves} coups` };
 	},
 };
+
+// 101-200: the same targets on a 15% shorter move budget, and star cuts that
+// only pay off for a near-optimal run.
+export const twentyFortyEightLevels = extendPlan('2048', basePlan, {
+	configExt: (base, level) => {
+		const moves = Math.max(1, Math.round(base.moves * 0.85));
+		return {
+			...base,
+			moves,
+			threeStarMoves: Math.max(1, Math.round(moves * 0.6)),
+			twoStarMoves: Math.max(1, Math.round(moves * 0.78)),
+			label: `Niveau ${level}`,
+		};
+	},
+});
 
 // Board size used by a level, exposed so the UI can label the grid.
 export const levelSize = (level: number): number => DIFFS[twentyFortyEightLevels.config(level).diffKey].size;

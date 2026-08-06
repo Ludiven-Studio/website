@@ -3,7 +3,7 @@
 // find ALL the theme's words; stars from total solve time (scaled to word count + size).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -22,7 +22,7 @@ export interface MotsMelesLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const motsMelesLevels: LevelPlan<MotsMelesLevelCfg> = {
+const basePlan: LevelPlan<MotsMelesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): MotsMelesLevelCfg {
@@ -56,3 +56,18 @@ export const motsMelesLevels: LevelPlan<MotsMelesLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: bigger grids (up to 15×15), one more word, always 8 directions, tighter clock.
+export const motsMelesLevels = extendPlan('mots-meles', basePlan, {
+	configExt: (base, level) => {
+		const size = Math.min(15, base.diff.size + 2);
+		const count = Math.min(12, base.diff.count + 1);
+		const perWord = Math.round((200 + 12 * size) * 0.88);
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, size, count, dirs: [...FWD, ...DIAG, ...REV_HV, ...DIAG_UP] },
+			threeStarCentis: count * perWord,
+			twoStarCentis: count * perWord * 2,
+		};
+	},
+});

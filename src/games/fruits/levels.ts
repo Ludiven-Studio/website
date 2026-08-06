@@ -6,7 +6,7 @@
 // scaled by tier (harder puzzles fairly get more time).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -27,7 +27,7 @@ const tierOf = (l: number): { mul: boolean; system: boolean; label: string } => 
 	return { mul: false, system: true, label: 'Difficile' };
 };
 
-export const fruitsLevels: LevelPlan<FruitsLevelCfg> = {
+const basePlan: LevelPlan<FruitsLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): FruitsLevelCfg {
@@ -58,3 +58,17 @@ export const fruitsLevels: LevelPlan<FruitsLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: always the simultaneous system, bigger values than the Expert pill, on a tighter clock.
+export const fruitsLevels = extendPlan('fruits', basePlan, {
+	configExt: (base, level) => {
+		const max = Math.min(15, base.diff.max + 3);
+		const threeSec = Math.round((42 + (max - 8) * 2) * 0.85);
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, n: 3, max, mul: false, system: true },
+			threeStarCentis: threeSec * 100,
+			twoStarCentis: Math.round(threeSec * 1.9) * 100,
+		};
+	},
+});

@@ -16,6 +16,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { useHintGate } from '../useHintGate';
 import { suiteLevels, SUITE_QUESTIONS, type SuiteLevelCfg } from './levels';
 
@@ -37,9 +38,13 @@ interface DailyState {
 	qIndex: number;
 }
 
+// Level configs may point past the three free tiers, so resolve through the full list.
+const ALL_DIFFS = [...DIFF_ORDER, 'expert'] as const;
+const keyAt = (i: number): keyof typeof DIFFS => ALL_DIFFS[i] ?? 'facile';
+
 /** Deterministic question stream: question i is fully reproducible from (seed, i). */
 const seededQ = (seed: number, diffIndex: number, i: number): Question =>
-	generateQuestion(DIFFS[DIFF_ORDER[diffIndex] ?? 'facile'], mulberry32((seed + i * 0x9e3779b1) >>> 0));
+	generateQuestion(DIFFS[keyAt(diffIndex)], mulberry32((seed + i * 0x9e3779b1) >>> 0));
 const dailyQ = seededQ;
 
 export default function SuiteGame({ gameId }: { gameId: string }) {
@@ -98,7 +103,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		setAlreadyPlayed(false);
 		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
-		setDiffKey(DIFF_ORDER[cfg.diffIndex] ?? 'facile');
+		setDiffKey(keyAt(cfg.diffIndex));
 		setQuestion(seededQ(cfg.seed, cfg.diffIndex, 0));
 		setScore(0);
 		setQIndex(0);
@@ -359,6 +364,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 	};
 
 	const armed = (daily || lv.playing) && !started;
+	const lvCount = lvCfgRef.current?.count ?? SUITE_QUESTIONS;
 
 	return (
 		<div className="su-root">
@@ -377,13 +383,13 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 				<div className="su-daily-tag">
 					{lv.menu
 						? 'Progression — enchaîne les niveaux pour débloquer les suivants'
-						: `Niveau ${lv.level} · ${DIFFS[diffKey].label} · question ${Math.min(qIndex + 1, SUITE_QUESTIONS)}/${SUITE_QUESTIONS}`}
+						: `Niveau ${lv.level} · ${DIFFS[diffKey].label} · question ${Math.min(qIndex + 1, lvCount)}/${lvCount}`}
 				</div>
 			)}
 
 			{lv.active && lv.playing && (
 				<div className="su-daily-status">
-					<span className="su-score">Bonnes {score}/{SUITE_QUESTIONS}</span>
+					<span className="su-score">Bonnes {score}/{lvCount}</span>
 					<span className="su-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 				</div>
 			)}
@@ -403,7 +409,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 			) : (
 				<div className="su-bar">
 					<div className="su-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

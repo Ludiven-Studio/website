@@ -30,6 +30,7 @@ import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
 import { demineurLevels } from './levels';
 import { useHintGate } from '../useHintGate';
+import { withExpert } from '../../lib/difficulty';
 
 /* =====================================================
    DÉMINEUR LOGIQUE — React island.
@@ -40,7 +41,7 @@ import { useHintGate } from '../useHintGate';
    ===================================================== */
 
 type Status = 'playing' | 'won' | 'lost';
-type DiffKey = keyof typeof SIZES; // 'facile' | 'moyen' | 'difficile' (size + technique in one axis)
+type DiffKey = keyof typeof SIZES; // size + technique in one axis
 
 const DIFF_ORDER: DiffKey[] = ['facile', 'moyen', 'difficile'];
 
@@ -412,7 +413,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			<div className="dm-bar">
 				{!daily && !lv.active && (
 					<div className="dm-pills" role="tablist" aria-label="Difficulté">
-						{DIFF_ORDER.map((k) => (
+						{withExpert(DIFF_ORDER, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

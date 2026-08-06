@@ -27,6 +27,7 @@ export interface RondCarrePuzzle {
 export interface DiffLevel {
 	label: string;
 	extraGivens: number; // revealed beyond the minimal set (more = easier)
+	candidates?: number; // boards to draw, keeping the one with the fewest clues (default 1)
 }
 
 export const SIZE = 6;
@@ -35,6 +36,9 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', extraGivens: 8 },
 	moyen: { label: 'Moyen', extraGivens: 4 },
 	difficile: { label: 'Difficile', extraGivens: 0 },
+	// Difficile already strips to the minimal set, so Expert picks the leanest board
+	// out of several draws instead (a random draw carries 6 to 14 clues).
+	expert: { label: 'Expert', extraGivens: 0, candidates: 8 },
 };
 
 const edgeId = (a: number, b: number, total: number) =>
@@ -150,6 +154,17 @@ export function countSolutions(
 
 /** Generate a uniquely-solvable puzzle. */
 export function generateRondCarre(diff: DiffLevel, rng: Rng = Math.random): RondCarrePuzzle {
+	let best: RondCarrePuzzle | null = null;
+	let bestClues = Infinity;
+	for (let i = 0; i < Math.max(1, diff.candidates ?? 1); i++) {
+		const p = buildOne(diff, rng);
+		const clues = p.given.reduce((s, row) => s + row.filter((v) => v !== 0).length, 0) + p.constraints.length;
+		if (clues < bestClues) { best = p; bestClues = clues; }
+	}
+	return best!;
+}
+
+function buildOne(diff: DiffLevel, rng: Rng): RondCarrePuzzle {
 	const n = SIZE;
 	const solution = randomFullGrid(n, rng);
 

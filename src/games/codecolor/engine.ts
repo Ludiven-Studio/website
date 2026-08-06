@@ -18,6 +18,8 @@ export const LEVELS: Record<string, Level> = {
 	facile: { label: 'Facile', slots: 4, colors: 6, tries: 30 },
 	moyen: { label: 'Moyen', slots: 5, colors: 7, tries: 30 },
 	difficile: { label: 'Difficile', slots: 6, colors: 8, tries: 30 },
+	// The palette stops at 8 hues, so Expert widens the code instead: 7 of the 8 colours.
+	expert: { label: 'Expert', slots: 7, colors: 8, tries: 30 },
 };
 
 export interface Feedback {
@@ -100,7 +102,7 @@ export interface HintResult {
 
 /**
  * Every distinct-colour code still consistent with the feedback of each past guess.
- * Brute force is fine here: the palette caps at 8 colours and 6 slots → P(8,6) = 20160 codes.
+ * Brute force is fine here: the palette caps at 8 colours and 7 slots → P(8,7) = 40320 codes.
  */
 export function consistentCodes(slots: number, colors: number, rows: GuessRow[]): number[][] {
 	const out: number[][] = [];

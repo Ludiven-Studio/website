@@ -8,7 +8,10 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
 import { leaderboardEnabled } from './leaderboard';
 import { playerId } from './scores';
+import { hasUnlock } from './wallet';
 
+// Stays 100: ~30 levels.ts use it as the ramp denominator, so raising it would flatten
+// every difficulty curve. The Expert pack raises `plan.count` instead.
 export const LEVEL_COUNT = 100;
 
 /** Result of a finished level run. `score` = time in centiseconds (time games) or points (score games).
@@ -34,9 +37,64 @@ export interface LevelPlan<Cfg> {
 export interface GameProgress {
 	stars: Record<number, 1 | 2 | 3>; // level → best stars (absent = never cleared)
 	best: Record<number, number>; // level → best score/time
+	count?: number; // effective level cap — the plan's, once the Expert pack is bought
 }
 
 const emptyProgress = (): GameProgress => ({ stars: {}, best: {} });
+
+export interface ExtendOpts<Cfg> {
+	/** Which base level an extended level replays. Default: the upper half, in order. */
+	mapBack?(level: number, baseCount: number): number;
+	/** The real hardening, written per game — this is where the Expert notch goes. */
+	configExt(base: Cfg, level: number, baseLevel: number): Cfg;
+}
+
+/** Deterministic reshuffle of a level seed, so 101-200 are new boards, not replays. */
+const mixSeed = (seed: number, level: number): number => {
+	let x = (Math.imul(seed | 0, 2654435761) ^ Math.imul(level, 40503)) >>> 0;
+	x = Math.imul(x ^ (x >>> 16), 2246822507) >>> 0;
+	x = Math.imul(x ^ (x >>> 13), 3266489909) >>> 0;
+	return ((x ^ (x >>> 16)) >>> 0) % 1_000_000;
+};
+
+/**
+ * Double a game's level plan: 101-200 replay the upper half of the ramp with a fresh seed
+ * and the game's own hardening on top. `count` is a getter, so LevelOutcome and useLevels
+ * pick the new cap up on their own the moment the pack is bought.
+ */
+export function extendPlan<Cfg>(gameId: string, plan: LevelPlan<Cfg>, opts: ExtendOpts<Cfg>): LevelPlan<Cfg> {
+	const base = plan.count;
+	// The extended half stretches the upper half of the ramp over twice as many levels.
+	const start = Math.floor(base / 2) + 1;
+	const back = (l: number): number => Math.max(1, Math.min(base, opts.mapBack
+		? opts.mapBack(l, base)
+		: base <= 1 ? 1 : start + Math.floor(((l - base - 1) * (base - start)) / (base - 1))));
+	return {
+		get count(): number {
+			return hasUnlock(gameId) ? base * 2 : base;
+		},
+		metric: plan.metric,
+		config(level: number): Cfg {
+			if (level <= base) return plan.config(level);
+			const b = back(level);
+			const cfg = { ...plan.config(b) } as Cfg & { seed?: number };
+			if (typeof cfg.seed === 'number') cfg.seed = mixSeed(cfg.seed, level);
+			return opts.configExt(cfg, level, b);
+		},
+		// Plans grade with `this.config(level)`. Past the base count that has to resolve to the
+		// hardened config, so `this` is swapped for one that hands back exactly that.
+		stars(level, r) {
+			if (level <= base) return plan.stars(level, r);
+			const cfg = this.config(level);
+			return plan.stars.call({ ...plan, config: () => cfg }, back(level), r);
+		},
+		starHint(level) {
+			if (level <= base) return plan.starHint(level);
+			const cfg = this.config(level);
+			return plan.starHint.call({ ...plan, config: () => cfg }, back(level));
+		},
+	};
+}
 
 const localKey = (gameId: string): string => `ludiven-progress-${gameId}`;
 
@@ -66,7 +124,7 @@ export function unlockedUpTo(p: GameProgress): number {
 		const n = Number(lvl);
 		if (p.stars[n] >= 1 && n > max) max = n;
 	}
-	return Math.min(LEVEL_COUNT, max + 1);
+	return Math.min(p.count ?? LEVEL_COUNT, max + 1);
 }
 
 /** Read the player's progression: localStorage first (instant), then reconcile with the server. */

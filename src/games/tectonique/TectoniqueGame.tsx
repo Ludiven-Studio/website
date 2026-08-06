@@ -11,6 +11,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHoldButton } from '../useHoldButton';
@@ -88,7 +89,15 @@ const KIND_CLASS: Record<number, string> = {
 	[PLATE]: 'plate', [HERO]: 'hero', [ROCK]: 'rock', [PILLAR]: 'pillar',
 	[LOCK_ROW]: 'lockrow', [LOCK_COL]: 'lockcol', [LOCK_ALL]: 'lockall',
 };
-const FREE_LABELS = ['Facile', 'Moyen', 'Difficile'];
+// Tier i reads TECTONIQUE_BANDS[i]. The daily only ever deals the first three;
+// Expert is a pill the pack adds.
+const FREE_TIERS = {
+	facile: { label: 'Facile' },
+	moyen: { label: 'Moyen' },
+	difficile: { label: 'Difficile' },
+	expert: { label: 'Expert' },
+};
+const FREE_LABELS = Object.values(FREE_TIERS).map((t) => t.label);
 
 // Arrows + ZQSD/WASD, both keyboard layouts. They nudge the line the hero stands on.
 const KEY_MOVES: Record<string, [Axis, -1 | 1] | undefined> = {
@@ -734,15 +743,15 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="tk-pills" role="tablist" aria-label="Difficulté">
-					{FREE_LABELS.map((label, i) => (
+					{diffKeys(FREE_TIERS, gameId).map((k, i) => (
 						<button
-							key={label}
+							key={k}
 							role="tab"
 							aria-selected={freeDiff === i}
 							className={`tk-pill ${freeDiff === i ? 'active' : ''}`}
 							onClick={() => newFree(i)}
 						>
-							{label}
+							{FREE_LABELS[i]}
 						</button>
 					))}
 				</div>

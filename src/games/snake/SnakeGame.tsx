@@ -21,6 +21,7 @@ import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
+import { withExpert } from '../../lib/difficulty';
 import { usePointerDrag } from '../usePointerDrag';
 import { snakeLevels } from './levels';
 
@@ -665,7 +666,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="sn-pills" role="tablist" aria-label="Difficulté">
-					{DIFF_ORDER.map((k) => (
+					{withExpert(DIFF_ORDER, gameId).map((k) => (
 						<button
 							key={k}
 							role="tab"

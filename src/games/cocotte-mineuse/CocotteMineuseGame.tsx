@@ -15,6 +15,7 @@ import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
+import { withExpert } from '../../lib/difficulty';
 
 /* =====================================================
    COCOTTE MINEUSE — real-time React island (canvas + rAF loop).
@@ -685,7 +686,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="cm-pills" role="tablist" aria-label="Difficulté">
-					{DIFF_ORDER.map((k) => (
+					{withExpert(DIFF_ORDER, gameId).map((k) => (
 						<button
 							key={k}
 							role="tab"

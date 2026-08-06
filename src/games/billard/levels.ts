@@ -5,7 +5,7 @@
 // the cushions on the harder levels.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 
 export interface BillardLevelCfg {
@@ -17,7 +17,7 @@ export interface BillardLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9e3779b9) >>> 0;
 
-export const billardLevels: LevelPlan<BillardLevelCfg> = {
+const basePlan: LevelPlan<BillardLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time', // score = strokes used (lower is better)
 	config(level: number): BillardLevelCfg {
@@ -47,3 +47,17 @@ export const billardLevels: LevelPlan<BillardLevelCfg> = {
 		return { two: `≤ ${cfg.twoStarShots} coups`, three: `≤ ${cfg.threeStarShots} coups` };
 	},
 };
+
+// 101-200: one more ball than the Expert rack allows on the pill, clusters even tighter,
+// balls always on the rails, and fewer strokes allowed per ball.
+export const billardLevels = extendPlan('billard', basePlan, {
+	configExt: (base, level) => {
+		const balls = Math.min(6, base.diff.balls + 1);
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, balls, spread: Math.max(10, base.diff.spread - 4), nearCushion: true },
+			threeStarShots: Math.ceil(balls * 1.55),
+			twoStarShots: Math.ceil(balls * 2.4),
+		};
+	},
+});

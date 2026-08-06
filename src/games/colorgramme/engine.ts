@@ -33,6 +33,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', size: 5, colors: 2 },
 	moyen: { label: 'Moyen', size: 6, colors: 3 },
 	difficile: { label: 'Difficile', size: 8, colors: 3 }, // 3 colours: keep the big grid but drop the 4th colour (opaque, ungrokkable by eye)
+	expert: { label: 'Expert', size: 9, colors: 3 }, // same reason: grow the grid, never the palette
 };
 
 /** Clue of one fully-coloured line: ordered block lengths grouped by colour. */

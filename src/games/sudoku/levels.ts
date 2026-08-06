@@ -3,7 +3,7 @@
 // stars from solve time, scaled to the grid's cell count and difficulty.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { SIZES, type Variant, type DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -24,7 +24,7 @@ const BANDS: { max: number; min: number; variant: Variant; from: number; to: num
 	{ min: 41, max: 100, variant: SIZES['9'], from: 0.42, to: 0.62 },
 ];
 
-export const sudokuLevels: LevelPlan<SudokuLevelCfg> = {
+const basePlan: LevelPlan<SudokuLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): SudokuLevelCfg {
@@ -58,3 +58,18 @@ export const sudokuLevels: LevelPlan<SudokuLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: 9×9 only, emptier than the Expert pill, and on a tighter clock per empty cell.
+export const sudokuLevels = extendPlan('sudoku', basePlan, {
+	configExt: (base, level) => {
+		const removeFrac = Math.min(0.72, base.diff.removeFrac + 0.1);
+		const empties = Math.round(SIZES['9'].size ** 2 * removeFrac);
+		return {
+			...base,
+			variant: SIZES['9'],
+			diff: { label: `Niveau ${level}`, removeFrac },
+			threeStarCentis: empties * 150,
+			twoStarCentis: empties * 280,
+		};
+	},
+});

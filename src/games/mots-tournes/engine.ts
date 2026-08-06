@@ -35,6 +35,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', rows: 4, cols: 4, minWords: 3, maxWords: 4, minLen: 4, maxLen: 6, maxEmpty: 2 },
 	moyen: { label: 'Moyen', rows: 5, cols: 5, minWords: 4, maxWords: 5, minLen: 4, maxLen: 7, maxEmpty: 3 },
 	difficile: { label: 'Difficile', rows: 6, cols: 5, minWords: 5, maxWords: 6, minLen: 4, maxLen: 8, maxEmpty: 4 },
+	expert: { label: 'Expert', rows: 6, cols: 6, minWords: 6, maxWords: 7, minLen: 4, maxLen: 9, maxEmpty: 5 },
 };
 
 /** Blank (wall) cells carry this sentinel; the trace can't pass through them. */

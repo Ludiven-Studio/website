@@ -4,7 +4,7 @@
 // stars come from the goal MARGIN (how dominant the win was). metric 'score' = margin.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 
 export interface FootLevelCfg {
 	teamSize: 1 | 2; // 1v1 (early) → 2v2 (from level 26)
@@ -17,7 +17,7 @@ export interface FootLevelCfg {
 
 const clampLevel = (level: number): number => Math.max(1, Math.min(LEVEL_COUNT, level));
 
-export const footLevels: LevelPlan<FootLevelCfg> = {
+const basePlan: LevelPlan<FootLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score', // margin — higher is better
 	config(level: number): FootLevelCfg {
@@ -47,3 +47,18 @@ export const footLevels: LevelPlan<FootLevelCfg> = {
 		return { two: `+${cfg.twoStarMargin} d'écart`, three: `+${cfg.threeStarMargin} d'écart` };
 	},
 };
+
+// 101-200: longer matches, opponents at full skill, a weaker teammate and wider star margins.
+export const footLevels = extendPlan('foot', basePlan, {
+	configExt: (base) => {
+		const target = Math.min(12, base.target + 2);
+		return {
+			...base,
+			target,
+			oppSkill: 1,
+			mateSkill: Math.max(0.15, base.mateSkill - 0.15),
+			twoStarMargin: Math.max(3, Math.round(target * 0.5)),
+			threeStarMargin: Math.max(4, Math.round(target * 0.8)),
+		};
+	},
+});

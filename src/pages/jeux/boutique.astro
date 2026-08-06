@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
+import BoutiquePanel from '../../components/BoutiquePanel';
+import { games } from '../../data/games';
+import { NO_EXPERT } from '../../lib/difficulty';
+
+const packs = games
+	.filter((g) => g.status === 'play' && g.href)
+	.map((g) => ({ id: g.id, title: g.title, href: g.href!, expert: !NO_EXPERT.has(g.id) }));
+---
+
+<BaseLayout
+	title="Boutique cocottes | Jeux Ludiven Studio"
+	description="Dépense tes cocottes : blasons décoratifs et packs Expert qui ouvrent une difficulté de plus et 100 niveaux supplémentaires par jeu."
+	noindex
+>
+	<div class="wrapper stack gap-6">
+		<header class="shop-hero stack gap-3">
+			<a class="back" href="/jeux/">
+				<Icon icon="arrow-left" size="1em" /> Tous les jeux
+			</a>
+			<h1>🐔 Boutique</h1>
+			<p>
+				Les cocottes se gagnent en jouant : récompense de retour quotidienne, premier défi du jour
+				et étoiles de niveaux. Elles achètent des <strong>blasons</strong> et des
+				<strong>packs Expert</strong>.
+			</p>
+		</header>
+
+		<BoutiquePanel games={packs} client:load />
+	</div>
+</BaseLayout>
+
+<style>
+	.shop-hero {
+		text-align: center;
+		align-items: center;
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--gray-300);
+		text-decoration: none;
+		font-family: var(--font-brand);
+		font-weight: 500;
+		font-size: var(--text-sm);
+	}
+	.back:hover,
+	.back:focus-visible {
+		color: var(--accent-regular);
+	}
+	.shop-hero h1 {
+		font-size: var(--text-3xl);
+	}
+	.shop-hero p {
+		color: var(--gray-300);
+		max-width: 60ch;
+	}
+</style>

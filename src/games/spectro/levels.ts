@@ -4,7 +4,7 @@
 // as a fraction of the melody's max reachable score.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { maxScore, type Diff } from './engine';
 
 export interface SpectroLevelCfg {
@@ -18,7 +18,7 @@ export interface SpectroLevelCfg {
 /** Deterministic per-level seed so a given level is always the same melody. */
 const levelSeed = (level: number): number => (Math.imul(level, 2246822519) ^ 0x27d4eb2f) >>> 0;
 
-export const spectroLevels: LevelPlan<SpectroLevelCfg> = {
+const basePlan: LevelPlan<SpectroLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): SpectroLevelCfg {
@@ -52,3 +52,26 @@ export const spectroLevels: LevelPlan<SpectroLevelCfg> = {
 		return { two: `${cfg.two} pts`, three: `${cfg.three} pts` };
 	},
 };
+
+// 101-200: longer and faster melodies with wider leaps, and a bigger share of the
+// perfect run to clear. Shares stay under 1 so 3★ is always reachable.
+export const spectroLevels = extendPlan('spectro', basePlan, {
+	configExt: (base, level, baseLevel) => {
+		const count = base.diff.count + 8;
+		const max = maxScore(count);
+		const clearFrac = 0.46 + 0.22 * ((baseLevel - 1) / (LEVEL_COUNT - 1)); // 46% → 68%
+		return {
+			...base,
+			diff: {
+				label: `Niveau ${level}`,
+				count,
+				tempo: base.diff.tempo + 0.35,
+				maxStep: 6,
+				root: base.diff.root,
+			},
+			target: Math.round(max * clearFrac),
+			two: Math.round(max * (clearFrac + 0.13)),
+			three: Math.round(max * (clearFrac + 0.24)),
+		};
+	},
+});

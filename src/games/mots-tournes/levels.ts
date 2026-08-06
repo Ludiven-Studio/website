@@ -4,7 +4,7 @@
 // to the total cell count so a bigger grid gets more time.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -17,7 +17,7 @@ export interface MotsTournesLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const motsTournesLevels: LevelPlan<MotsTournesLevelCfg> = {
+const basePlan: LevelPlan<MotsTournesLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): MotsTournesLevelCfg {
@@ -60,3 +60,26 @@ export const motsTournesLevels: LevelPlan<MotsTournesLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: the Expert grid (6×6), one word more, longer words and a tighter clock.
+export const motsTournesLevels = extendPlan('mots-tournes', basePlan, {
+	configExt: (base, level) => {
+		const rows = 6, cols = 6;
+		const cells = rows * cols;
+		return {
+			...base,
+			diff: {
+				...base.diff,
+				label: `Niveau ${level}`,
+				rows,
+				cols,
+				minWords: base.diff.minWords + 1,
+				maxWords: base.diff.maxWords + 1,
+				maxLen: Math.min(9, base.diff.maxLen + 1),
+				maxEmpty: base.diff.maxEmpty + 1,
+			},
+			threeStarCentis: cells * 145,
+			twoStarCentis: cells * 250,
+		};
+	},
+});

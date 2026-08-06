@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fmtCentis } from '../../lib/scoreFormat';
 import { makeGrid, lineCells, matchIndex, findHint, DIFFS, type Grid, type Cell, type Hint } from './engine';
+import { diffKeys } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
@@ -281,7 +282,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 			) : (
 				<div className="mm-bar">
 					<div className="mm-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button key={k} role="tab" aria-selected={diffKey === k} className={`mm-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newGame(k)}>
 								{DIFFS[k].label}
 							</button>

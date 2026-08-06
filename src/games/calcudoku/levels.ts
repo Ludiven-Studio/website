@@ -3,7 +3,7 @@
 // A level = solve the grid; stars from solve time (scaled to the grid size).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -16,7 +16,7 @@ export interface CalcudokuLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const calcudokuLevels: LevelPlan<CalcudokuLevelCfg> = {
+const basePlan: LevelPlan<CalcudokuLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): CalcudokuLevelCfg {
@@ -53,3 +53,19 @@ export const calcudokuLevels: LevelPlan<CalcudokuLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+const EXPERT_SIZE = 7;
+
+// 101-200: 7×7 only (past the Expert pill), cages one cell bigger than the base ramp,
+// and a tighter clock per cell.
+export const calcudokuLevels = extendPlan('calcudoku', basePlan, {
+	configExt: (base, level) => {
+		const cells = EXPERT_SIZE * EXPERT_SIZE;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, size: EXPERT_SIZE, maxCage: Math.min(5, base.diff.maxCage + 1) },
+			threeStarCentis: cells * 520,
+			twoStarCentis: cells * 1000,
+		};
+	},
+});

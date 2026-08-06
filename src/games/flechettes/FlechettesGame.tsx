@@ -14,6 +14,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { flechettesLevels } from './levels';
 
 /* =====================================================
@@ -428,7 +429,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			) : (
 				<div className="da-bar">
 					<div className="da-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button key={k} role="tab" aria-selected={diffKey === k} className={`da-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFree(k)}>
 								{DIFFS[k].label}
 							</button>

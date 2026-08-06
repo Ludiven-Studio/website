@@ -92,6 +92,7 @@ export const BREAKOUT_DIFFS: Record<string, BreakoutDiff> = {
 	facile: { label: 'Facile', rows: 4, twoHpChance: 0.16, threeHpChance: 0.03, speed: 66, density: 0.6 },
 	moyen: { label: 'Moyen', rows: 6, twoHpChance: 0.4, threeHpChance: 0.1, speed: 78, density: 0.78 },
 	difficile: { label: 'Difficile', rows: 8, twoHpChance: 0.6, threeHpChance: 0.22, speed: 92, density: 0.9 },
+	expert: { label: 'Expert', rows: 9, twoHpChance: 0.72, threeHpChance: 0.3, speed: 104, density: 0.95 },
 };
 
 export const breakoutConfig = (): BreakoutConfig => ({ ...BASE });

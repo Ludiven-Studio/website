@@ -10,6 +10,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { lettresCroiseesLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHintGate } from '../useHintGate';
@@ -372,7 +373,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 				<>
 					<div className="lc-bar">
 						<div className="lc-pills" role="tablist" aria-label="Difficulté">
-							{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+							{diffKeys(DIFFS, gameId).map((k) => (
 								<button key={k} role="tab" aria-selected={diffKey === k} className={`lc-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newGame(k)}>{DIFFS[k].label}</button>
 							))}
 						</div>

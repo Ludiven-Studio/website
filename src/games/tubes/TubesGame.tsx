@@ -28,6 +28,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { tubesLevels } from './levels';
 import { getProgression, submitLevel, type GameProgress } from '../../lib/progression';
+import { diffKeys } from '../../lib/difficulty';
 import { useHintGate } from '../useHintGate';
 
 /* =====================================================
@@ -96,7 +97,9 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	const [fresh, setFresh] = useState<Fresh | null>(null);
 	const [levelsMode, setLevelsMode] = useState(false);
 	const [levelMenu, setLevelMenu] = useState(false);
-	const [progress, setProgress] = useState<GameProgress>({ stars: {}, best: {} });
+	// Drives progression itself instead of useLevels, so it has to carry the plan's `count`
+	// — that's what tells LevelSelect the Expert pack doubled the ladder.
+	const [progress, setProgress] = useState<GameProgress>({ stars: {}, best: {}, count: tubesLevels.count });
 	const [currentLevel, setCurrentLevel] = useState(1);
 	const [earnedStars, setEarnedStars] = useState(0);
 	const startRef = useRef<number>(0);
@@ -206,7 +209,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		setHintMove(null);
 		setFresh(null);
 		setHistory([]);
-		void getProgression(gameId).then((prog) => setProgress({ stars: { ...prog.stars }, best: { ...prog.best } }));
+		void getProgression(gameId).then((prog) => setProgress({ stars: { ...prog.stars }, best: { ...prog.best }, count: tubesLevels.count }));
 	}, [gameId]);
 
 	const playLevel = useCallback((level: number) => {
@@ -285,7 +288,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 			void submitLevel({
 				gameId, level: currentLevel, stars: stars as 1 | 2 | 3, score: finalCentis, metricIsTime: true,
 				rawData: { moves },
-			}).then((prog) => setProgress({ stars: { ...prog.stars }, best: { ...prog.best } }));
+			}).then((prog) => setProgress({ stars: { ...prog.stars }, best: { ...prog.best }, count: tubesLevels.count }));
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [levelsMode, levelMenu, status]);
@@ -489,7 +492,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 			<div className="ws-bar">
 				{!daily && !levelsMode ? (
 					<div className="ws-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

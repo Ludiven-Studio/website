@@ -3,7 +3,7 @@
 // time, scaled to the cell count.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import type { DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
@@ -16,7 +16,7 @@ export interface ColorgrammeLevelCfg {
 
 const levelSeed = (level: number): number => (Math.imul(level, 22695477) ^ 0x1b56c4e9) >>> 0;
 
-export const colorgrammeLevels: LevelPlan<ColorgrammeLevelCfg> = {
+const basePlan: LevelPlan<ColorgrammeLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time',
 	config(level: number): ColorgrammeLevelCfg {
@@ -45,3 +45,18 @@ export const colorgrammeLevels: LevelPlan<ColorgrammeLevelCfg> = {
 		return { two: `≤ ${fmtCentis(cfg.twoStarCentis)}`, three: `≤ ${fmtCentis(cfg.threeStarCentis)}` };
 	},
 };
+
+// 101-200: 9×9 grids, one size past the Expert pill, on a tighter clock per cell.
+export const colorgrammeLevels = extendPlan('colorgramme', basePlan, {
+	configExt: (base, level) => {
+		const t = (level - LEVEL_COUNT) / LEVEL_COUNT; // 0 → 1 across the extended half
+		const size = 9;
+		const cells = size * size;
+		return {
+			...base,
+			diff: { label: `Niveau ${level}`, size, colors: 3 },
+			threeStarCentis: Math.round(cells * (150 - 25 * t)),
+			twoStarCentis: Math.round(cells * (280 - 45 * t)),
+		};
+	},
+});

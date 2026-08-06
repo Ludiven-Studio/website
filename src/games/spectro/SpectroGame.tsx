@@ -7,8 +7,9 @@ import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { spectroLevels } from './levels';
-import { DIFFS, generateMelody, generateMelodyDiff, judge, comboMult, rankOf, type Melody, type Grade } from './engine';
+import { DIFFS, DIFF_PRESETS, generateMelody, generateMelodyDiff, judge, comboMult, rankOf, type Melody, type Grade } from './engine';
 
 /* =====================================================
    SPECTRO — melodic pitch-tracing runner (prototype).
@@ -572,9 +573,9 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="sp-pills" role="tablist" aria-label="Difficulté">
-					{DIFFS.map((d, i) => (
-						<button key={d.label} role="tab" aria-selected={diffIdx === i} className={`sp-pill ${diffIdx === i ? 'active' : ''}`} onClick={() => armFree(i)}>
-							{d.label}
+					{diffKeys(DIFF_PRESETS, gameId).map((k, i) => (
+						<button key={k} role="tab" aria-selected={diffIdx === i} className={`sp-pill ${diffIdx === i ? 'active' : ''}`} onClick={() => armFree(i)}>
+							{DIFF_PRESETS[k].label}
 						</button>
 					))}
 				</div>

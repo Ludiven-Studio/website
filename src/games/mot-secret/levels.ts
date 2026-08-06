@@ -3,7 +3,7 @@
 // hidden word; stars from how few guesses it took (metric = fewer is better).
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 
 export interface MotSecretLevelCfg {
 	seed: number;
@@ -24,7 +24,7 @@ const BANDS: { min: number; max: number; len: number }[] = [
 	{ min: 71, max: 100, len: 7 },
 ];
 
-export const motSecretLevels: LevelPlan<MotSecretLevelCfg> = {
+const basePlan: LevelPlan<MotSecretLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'time', // score = guesses used; fewer is better
 	config(level: number): MotSecretLevelCfg {
@@ -55,3 +55,18 @@ export const motSecretLevels: LevelPlan<MotSecretLevelCfg> = {
 		return { two: `≤ ${cfg.twoStarTries} essais`, three: `≤ ${cfg.threeStarTries} essais` };
 	},
 };
+
+// 101-200: one letter longer (8 is the pool's ceiling) with one guess less.
+export const motSecretLevels = extendPlan('mot-secret', basePlan, {
+	configExt: (base, level) => {
+		const tries = Math.max(5, base.tries - 1);
+		return {
+			...base,
+			len: Math.min(8, base.len + 1),
+			tries,
+			threeStarTries: Math.max(2, tries - 3),
+			twoStarTries: Math.max(3, tries - 1),
+			label: `Niveau ${level}`,
+		};
+	},
+});

@@ -16,6 +16,7 @@ import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import { useLevels } from '../../lib/useLevels';
 import { useHintGate } from '../useHintGate';
+import { withExpert } from '../../lib/difficulty';
 import { codecolorLevels } from './levels';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
@@ -340,7 +341,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="cc-pills" role="tablist" aria-label="Difficulté">
-					{DIFF_ORDER.map((k) => (
+					{withExpert(DIFF_ORDER, gameId).map((k) => (
 						<button
 							key={k}
 							role="tab"

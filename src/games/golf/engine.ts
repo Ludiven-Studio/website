@@ -127,6 +127,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', length: 135, bends: 7, width: 15, cupR: 1.35, obstacles: 1, slopes: 1 },
 	moyen: { label: 'Moyen', length: 200, bends: 10, width: 13, cupR: 1.2, obstacles: 2, slopes: 2 },
 	difficile: { label: 'Difficile', length: 265, bends: 13, width: 11, cupR: 1.05, obstacles: 3, slopes: 3 },
+	expert: { label: 'Expert', length: 330, bends: 16, width: 9.5, cupR: 0.95, obstacles: 4, slopes: 4 },
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));

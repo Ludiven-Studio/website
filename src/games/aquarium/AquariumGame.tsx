@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fmtCentis } from '../../lib/scoreFormat';
 import { DIFFS, generateAquarium, findHint, type AquariumPuzzle } from './engine';
 import { mulberry32 } from '../prng';
+import { diffKeys } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
 import {
 	getDaily,
@@ -412,7 +413,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 			<div className="aq-bar">
 				{!daily && !lv.active && (
 					<div className="aq-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

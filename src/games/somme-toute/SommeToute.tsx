@@ -18,6 +18,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { diffKeys } from '../../lib/difficulty';
 import { sommeTouteLevels } from './levels';
 import { useHintGate } from '../useHintGate';
 import { repairNote } from '../repairNote';
@@ -460,7 +461,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 			) : (
 				<div className="st-bar">
 					<div className="st-pills" role="tablist" aria-label="Difficulté">
-						{Object.entries(DIFFS).map(([key, d]) => (
+						{diffKeys(DIFFS, gameId).map((key) => (
 							<button
 								key={key}
 								role="tab"
@@ -468,7 +469,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 								className={`st-pill ${diffKey === key ? 'active' : ''}`}
 								onClick={() => newGame(key as keyof typeof DIFFS)}
 							>
-								{d.label}
+								{DIFFS[key].label}
 							</button>
 						))}
 					</div>

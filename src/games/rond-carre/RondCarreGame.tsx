@@ -3,6 +3,7 @@ import { fmtCentis } from '../../lib/scoreFormat';
 import { DIFFS, SIZE, generateRondCarre, findHint, type Cell, type RondCarrePuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { diffKeys } from '../../lib/difficulty';
 import {
 	getDaily,
 	dailyWeekdayLabel,
@@ -422,7 +423,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="rc-pills" role="tablist" aria-label="Difficulté">
-					{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+					{diffKeys(DIFFS, gameId).map((k) => (
 						<button
 							key={k}
 							role="tab"

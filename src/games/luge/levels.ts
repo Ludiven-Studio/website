@@ -3,7 +3,7 @@
 // better) — a clean, deterministic skill signal for an endless runner.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
-import { LEVEL_COUNT } from '../../lib/progression';
+import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
 import { LUGE } from './engine';
 
 export interface LugeLevelCfg {
@@ -15,7 +15,7 @@ export interface LugeLevelCfg {
 /** Deterministic per-level seed so a given level is always the same descent. */
 const levelSeed = (level: number): number => (Math.imul(level, 2654435761) ^ 0x9e3779b1) >>> 0;
 
-export const lugeLevels: LevelPlan<LugeLevelCfg> = {
+const basePlan: LevelPlan<LugeLevelCfg> = {
 	count: LEVEL_COUNT,
 	metric: 'score',
 	config(level: number): LugeLevelCfg {
@@ -37,3 +37,12 @@ export const lugeLevels: LevelPlan<LugeLevelCfg> = {
 		return { two: 'En perdant ≤ 1 vie', three: 'Sans perdre de vie' };
 	},
 };
+
+// 101-200: start deeper in the difficulty ramp (near the asymptote) and run a third further.
+export const lugeLevels = extendPlan('luge', basePlan, {
+	configExt: (base) => ({
+		...base,
+		baseline: base.baseline + 3000,
+		targetDist: Math.round(base.targetDist * 1.3),
+	}),
+});

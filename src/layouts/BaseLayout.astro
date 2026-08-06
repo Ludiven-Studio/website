@@ -26,7 +26,7 @@ const { title, description, image, type, noindex, lang = 'fr', altLang } = Astro
 const site = Astro.site!;
 const path = Astro.url.pathname;
 const pageUrl = new URL(path, site).href;
-const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path) && !/^\/jeux\/defi\/?$/.test(path); // a game page, not the index or the daily hub
+const isGamePage = /^\/jeux\/[^/]+\/?$/.test(path) && !/^\/jeux\/(defi|boutique)\/?$/.test(path); // a game page, not the index, the daily hub or the shop
 // Matched game (if any) — reused for JSON-LD and the auto OG preview image.
 const m = path.match(/^\/jeux\/([^/]+)\/?$/);
 const g = m ? games.find((x) => x.id === m[1] || x.href === `/jeux/${m[1]}`) : undefined;

@@ -38,6 +38,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', n: 3, max: 9, mul: false, system: false },
 	moyen: { label: 'Moyen', n: 3, max: 10, mul: true, system: false },
 	difficile: { label: 'Difficile', n: 3, max: 10, mul: false, system: true },
+	expert: { label: 'Expert', n: 3, max: 14, mul: false, system: true },
 };
 
 // Single-item, unambiguous fruits only — avoid 🍒 (two cherries) / 🍇 (a bunch), which read

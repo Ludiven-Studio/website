@@ -9,6 +9,7 @@ import {
 	type Shot,
 } from './engine';
 import { mulberry32 } from '../prng';
+import { withExpert } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
 import {
 	getDaily,
@@ -411,7 +412,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				</div>
 			) : (
 				<div className="ba-pills" role="tablist" aria-label="Difficulté">
-					{DIFF_ORDER.map((k) => (
+					{withExpert(DIFF_ORDER, gameId).map((k) => (
 						<button
 							key={k}
 							role="tab"

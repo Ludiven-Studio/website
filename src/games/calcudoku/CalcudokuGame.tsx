@@ -21,6 +21,7 @@ import { useLevels } from '../../lib/useLevels';
 import { useHintGate } from '../useHintGate';
 import { repairNote } from '../repairNote';
 import { calcudokuLevels } from './levels';
+import { diffKeys } from '../../lib/difficulty';
 
 /* =====================================================
    CALCUDOKU (KenKen) — React island.
@@ -494,7 +495,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					<div className="cd-timer chrono">{fmtTime(elapsed)}</div>
 				) : (
 					<div className="cd-pills" role="tablist" aria-label="Difficulté">
-						{(Object.keys(DIFFS) as (keyof typeof DIFFS)[]).map((k) => (
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
 								key={k}
 								role="tab"

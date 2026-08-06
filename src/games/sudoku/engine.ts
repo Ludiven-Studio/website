@@ -42,6 +42,7 @@ export const DIFFS: Record<string, DiffLevel> = {
 	facile: { label: 'Facile', removeFrac: 0.4 },
 	moyen: { label: 'Moyen', removeFrac: 0.5 },
 	difficile: { label: 'Difficile', removeFrac: 0.58 },
+	expert: { label: 'Expert', removeFrac: 0.68 },
 };
 
 const FULL = (n: number) => ((1 << (n + 1)) - 1) & ~1; // bits 1..n set
