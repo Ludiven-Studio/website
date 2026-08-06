@@ -141,7 +141,7 @@ export const games: GameTile[] = [
 	{
 		id: 'circuit',
 		title: 'Circuit',
-		pitch: 'Fais pivoter les tuyaux d\'un quart de tour pour rebrancher tout le réseau sur le générateur, sans laisser un embout dans le vide. Défi du jour à graine partagée.',
+		pitch: 'Fais pivoter les tuyaux d\'un quart de tour pour rebrancher tout le réseau sur le générateur et rallumer chaque ampoule. Défi du jour à graine partagée.',
 		icon: 'circuit',
 		href: '/jeux/circuit',
 		status: 'play',

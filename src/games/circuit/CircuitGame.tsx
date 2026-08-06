@@ -50,7 +50,22 @@ const SIDE: readonly (readonly [number, number])[] = [[50, 0], [100, 50], [50, 1
 
 const zeros = (n: number): number[] => new Array<number>(n).fill(0);
 
-function Tile({ base, spin, lit }: { base: number; spin: number; lit: boolean }) {
+/**
+ * A dead end is a bulb. Drawn hanging from a north wire, then turned to face its own arm.
+ * The cap is wider than the wire and keeps its thread grooves once lit — without them the
+ * glass and the cap melt into one blob and the whole thing reads as a lollipop.
+ */
+function Bulb({ side }: { side: number }) {
+	return (
+		<g transform={`rotate(${side * 90} 50 50)`}>
+			<circle className="cir-glass" cx={50} cy={57} r={20} />
+			<rect className="cir-socket" x={39} y={23} width={22} height={17} rx={3} />
+			<path className="cir-thread" d="M40 29h20M40 35h20" />
+		</g>
+	);
+}
+
+function Tile({ base, spin, lit, source }: { base: number; spin: number; lit: boolean; source: boolean }) {
 	const arms = [0, 1, 2, 3].filter((d) => base & BIT[d]);
 	return (
 		<svg
@@ -62,8 +77,8 @@ function Tile({ base, spin, lit }: { base: number; spin: number; lit: boolean })
 			{arms.map((d) => (
 				<line key={d} x1={50} y1={50} x2={SIDE[d][0]} y2={SIDE[d][1]} />
 			))}
-			{arms.length === 1 ? (
-				<rect className="cir-end" x={28} y={28} width={44} height={44} rx={12} />
+			{arms.length === 1 && !source ? (
+				<Bulb side={arms[0]} />
 			) : (
 				<circle className="cir-hub" cx={50} cy={50} r={10} />
 			)}
@@ -521,7 +536,7 @@ export default function CircuitGame({ gameId }: { gameId: string }) {
 					>
 						{puzzle.start.map((base, i) => (
 							<div key={i} className={`cir-cell ${lit[i] ? 'lit' : ''}`}>
-								<Tile base={base} spin={spin[i] ?? 0} lit={!!lit[i]} />
+								<Tile base={base} spin={spin[i] ?? 0} lit={!!lit[i]} source={i === puzzle.source} />
 								{i === puzzle.source && <span className="cir-src">⚡</span>}
 							</div>
 						))}
@@ -607,6 +622,8 @@ const CSS = `
 .cir-root {
   --cir-accent: var(--accent-regular);
   --cir-off: var(--gray-500);
+  /* Bulbs glow warm, not accent: filled with the wire colour they read as plain dots. */
+  --cir-lit: #ffc23d;
   /* Fluid cell: the board fills its (capped) container, so bigger grids get
      smaller cells and the board never exceeds mobile width. */
   --cir-cell: calc(100cqw / var(--n, 5));
@@ -719,13 +736,19 @@ const CSS = `
   transition: stroke 0.18s ease;
 }
 .cir-tile .cir-hub { fill: var(--cir-off); transition: fill 0.18s ease; }
-.cir-tile .cir-end {
-  fill: var(--gray-999); stroke: var(--cir-off); stroke-width: 12;
-  transition: fill 0.18s ease, stroke 0.18s ease;
+.cir-tile .cir-socket { fill: var(--cir-off); transition: fill 0.18s ease; }
+.cir-tile .cir-thread { stroke: var(--gray-999); stroke-width: 3; stroke-linecap: round; fill: none; }
+.cir-tile .cir-glass {
+  fill: var(--gray-999); stroke: var(--cir-off); stroke-width: 7;
+  transition: fill 0.18s ease, stroke 0.18s ease, filter 0.18s ease;
 }
 .cir-tile.lit line { stroke: var(--cir-accent); }
 .cir-tile.lit .cir-hub { fill: var(--cir-accent); }
-.cir-tile.lit .cir-end { fill: var(--cir-accent); stroke: var(--cir-accent); }
+.cir-tile.lit .cir-socket { fill: var(--cir-accent); }
+.cir-tile.lit .cir-glass {
+  fill: var(--cir-lit); stroke: var(--cir-lit);
+  filter: drop-shadow(0 0 5px var(--cir-lit));
+}
 
 .cir-src {
   position: absolute; z-index: 2;
