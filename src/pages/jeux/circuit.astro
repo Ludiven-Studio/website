@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import CircuitGame from '../../games/circuit/CircuitGame.tsx';
+---
+
+<GamePage
+	title="Circuit | Jeux Ludiven Studio"
+	description="Circuit : fais pivoter chaque tuyau d'un quart de tour pour rebrancher tout le réseau sur le générateur, sans laisser un seul embout dans le vide. Grilles 4×4 à 9×9, bords qui bouclent en Expert, 100 niveaux et un défi du jour. Un casse-tête signé Ludiven Studio."
+	heading="Circuit"
+	tagline="Fais pivoter les tuyaux pour rallumer tout le réseau"
+	gameId="circuit"
+>
+	<CircuitGame client:only="react" gameId="circuit" />
+</GamePage>

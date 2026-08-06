@@ -139,6 +139,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'circuit',
+		title: 'Circuit',
+		pitch: 'Fais pivoter les tuyaux d\'un quart de tour pour rebrancher tout le réseau sur le générateur, sans laisser un embout dans le vide. Défi du jour à graine partagée.',
+		icon: 'circuit',
+		href: '/jeux/circuit',
+		status: 'play',
+	},
+	{
 		id: 'suite',
 		title: 'Suite mystère',
 		pitch: 'Devine la règle cachée et complète la séquence. En choix multiple.',

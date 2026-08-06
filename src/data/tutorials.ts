@@ -117,6 +117,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🖱️', title: 'Comment jouer', body: 'Glisse depuis le 1 pour dessiner. Touche une case déjà tracée pour revenir en arrière.' },
 		{ emoji: '💡', title: 'Astuce', body: 'Les murs bloquent certains passages. Indice prolonge le chemin correct ; après 1 min, tu peux voir la solution.' },
 	],
+	circuit: [
+		{ emoji: '⚡', title: 'Le but', body: 'Toutes les tuiles doivent être alimentées par le générateur ⚡, et aucun tuyau ne doit rester dans le vide. Les tuiles allumées se colorent : c\'est ta boussole.' },
+		{ emoji: '👆', title: 'Comment jouer', body: 'Touche une tuile pour la faire pivoter d\'un quart de tour dans le sens des aiguilles. Sur ordinateur, le clic droit tourne dans l\'autre sens.' },
+		{ emoji: '💡', title: 'Astuce', body: 'Commence par les bords : un tuyau ne peut pas sortir de la grille, donc les tuiles du contour n\'ont souvent qu\'une seule orientation possible. Puis remonte le courant depuis le générateur.' },
+		{ emoji: '🔁', title: 'Expert', body: 'En Expert et à partir du niveau 101, les bords bouclent : un tuyau qui sort à droite ressort à gauche. Les indices du contour disparaissent — tout se déduit du réseau lui-même.' },
+	],
 	suite: [
 		{ emoji: '🔢', title: 'Le but', body: 'Devine le terme suivant d\'une suite gouvernée par une règle cachée.' },
 		{ emoji: '✅', title: 'Comment jouer', body: 'Choisis la bonne réponse. Bonne réponse → on enchaîne et le score monte ; une erreur termine la manche.' },
