@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
 	const { game_id, player_id, level, stars, score } = payload;
 	if (typeof game_id !== 'string' || !game_id) return bad('game_id is required');
 	if (typeof player_id !== 'string' || !UUID_RE.test(player_id)) return bad('player_id must be a UUID');
-	if (!Number.isInteger(level) || level < 1 || level > 100) return bad('level must be 1..100');
+	if (!Number.isInteger(level) || level < 1 || level > 200) return bad('level must be 1..200');
 	if (!Number.isInteger(stars) || stars < 1 || stars > 3) return bad('stars must be 1..3');
 	if (!Number.isInteger(score) || score < 0) return bad('score must be a non-negative integer');
 
