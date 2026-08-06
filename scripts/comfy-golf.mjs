@@ -4,10 +4,11 @@
  *   - turf.jpg   fairway and green
  *   - stone.jpg  kerbs, bridge, obstacle socles
  *   - paving.jpg the paved band around the lane
+ *   - forest.jpg treeline strip wrapped around the horizon
  * The three course textures multiply a coloured material, so they are flattened toward
  * white: they add grain, the material keeps the palette. A saturated tile would fight it.
  *
- * Usage: node scripts/comfy-golf.mjs [--preview] [--regen] [grass|turf|stone|paving ...]
+ * Usage: node scripts/comfy-golf.mjs [--preview] [--regen] [grass|turf|stone|paving|forest ...]
  */
 import { resolve } from 'node:path';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -17,7 +18,8 @@ import { submit, waitForImages, download } from './comfy-gen.mjs';
 const preview = process.argv.includes('--preview');
 const OUT = preview ? resolve('D:/tmp/comfy/golf') : resolve('public/assets/jeux/golf');
 await mkdir(OUT, { recursive: true });
-const NAMES = ['grass', 'turf', 'stone', 'paving'];
+const NAMES = ['grass', 'turf', 'stone', 'paving', 'forest'];
+const SKY = '#87b7e8'; // the scene's background and fog colour — the strip has to end on it
 const ONLY = process.argv.filter((a) => NAMES.includes(a));
 const want = (n) => ONLY.length === 0 || ONLY.includes(n);
 const TILE_NEG = 'seams, border, frame, vignette, strong shadows, lighting gradient, object, text, watermark, perspective, blurry, path, dirt patch, flowers, ball, hole';
@@ -96,5 +98,49 @@ if (want('paving')) {
 	});
 	await flatten(paving, 170, 0.3).toFile(resolve(OUT, 'paving.jpg'));
 	console.log('✓ paving.jpg');
+}
+// The horizon ring. Not a tile like the others: a strip wrapped around the course, cut to the
+// band that holds the treeline and faded into the sky colour at the top so its rim vanishes.
+if (want('forest')) {
+	const SRC = 1024, H = 256, LAP = 224;
+	const W = SRC - LAP;
+	const forest = await gen({
+		id: 'forest',
+		prompt: 'panorama of a distant pine and oak forest treeline, unbroken canopy, no gaps, seen from a meadow, soft daylight, plain blue sky',
+		negative: 'text, watermark, close-up trunks, single dominant tree, path, road, building, people, animals, mountains, sunset, dramatic clouds, vignette, blur',
+		w: SRC,
+		h: 384,
+		steps: 9,
+	});
+	const m = await sharp(forest).metadata();
+	const full = await sharp(forest)
+		.extract({ left: 0, top: Math.round(m.height * 0.06), width: m.width, height: Math.round(m.height * 0.49) })
+		.resize(SRC, H, { fit: 'fill' })
+		.modulate({ saturation: 0.95 })
+		.linear(1.05, 2)
+		.toBuffer();
+	// Fade the last LAP columns back over the first ones, then drop them: the tile now wraps.
+	// A mirrored strip would too, but its butterfly reads as an obvious landmark on the horizon.
+	const ramp = Buffer.from(
+		`<svg width="${LAP}" height="${H}"><defs><linearGradient id="r" x1="0" y1="0" x2="1" y2="0">`
+		+ '<stop offset="0" stop-color="#fff" stop-opacity="1"/>'
+		+ '<stop offset="1" stop-color="#fff" stop-opacity="0"/>'
+		+ `</linearGradient></defs><rect width="${LAP}" height="${H}" fill="url(#r)"/></svg>`,
+	);
+	const tail = await sharp(full).extract({ left: W, top: 0, width: LAP, height: H })
+		.ensureAlpha().composite([{ input: ramp, blend: 'dest-in' }]).png().toBuffer();
+	const tile = await sharp(full).composite([{ input: tail, left: 0, top: 0 }])
+		.extract({ left: 0, top: 0, width: W, height: H }).toBuffer();
+	const sky = Buffer.from(
+		`<svg width="${W}" height="${H}"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1">`
+		+ `<stop offset="0" stop-color="${SKY}" stop-opacity="1"/>`
+		+ `<stop offset="0.16" stop-color="${SKY}" stop-opacity="1"/>`
+		+ `<stop offset="0.30" stop-color="${SKY}" stop-opacity="0"/>`
+		+ `</linearGradient></defs><rect width="${W}" height="${H}" fill="url(#s)"/></svg>`,
+	);
+	await sharp(tile).composite([{ input: sky, left: 0, top: 0 }])
+		.jpeg({ quality: 88 })
+		.toFile(resolve(OUT, 'forest.jpg'));
+	console.log('✓ forest.jpg');
 }
 console.log('done →', OUT);

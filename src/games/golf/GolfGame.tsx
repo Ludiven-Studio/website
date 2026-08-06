@@ -80,6 +80,14 @@ const DRAG_H = 0.28;
 const ZOOM_MAX = 5;
 const GRAB_R = 4.5; // world radius around the ball that starts an aim…
 const GRAB_PX = 60; // …or this many pixels, for when the whole hole is framed far away
+// Forest ring on the horizon. Far enough out that the fog carries most of it, and its foot is
+// sunk under the rough so the treeline starts exactly at the horizon with no gap. The rough has
+// to reach past SKY_R, or the ring would stand over nothing.
+const GROUND = 1500;
+const SKY_R = 600;
+const SKY_H = 130;
+const SKY_SINK = 10;
+const SKY_REP = 14; // strip repeats around the ring — one tile is ~270 units of horizon
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🏌️', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
 const INTRO_MS = 1900; // opening flyover, sky → behind the ball
@@ -103,6 +111,7 @@ interface Scene3D {
 	ballRing: THREE.Mesh; // "touch here to aim" hint around the ball
 	aimArrow: THREE.Mesh;
 	ground: THREE.Mesh;
+	backdrop: THREE.Mesh; // forest ring on the horizon
 	holeGroup: THREE.Group;
 	disposables: { dispose: () => void }[];
 }
@@ -250,7 +259,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 
 		// Big rough-grass ground so off-lane is always covered as the camera roams.
 		const ground = new THREE.Mesh(
-			new THREE.PlaneGeometry(900, 900),
+			new THREE.PlaneGeometry(GROUND, GROUND),
 			new THREE.MeshStandardMaterial({ color: 0x2f5d33, roughness: 1 }),
 		);
 		ground.rotation.x = -Math.PI / 2;
@@ -259,12 +268,30 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		// AI grass on the rough (wrap-repeated); stays flat green until it loads / if it 404s.
 		new THREE.TextureLoader().load('/assets/jeux/golf/grass.jpg', (t) => {
 			t.wrapS = t.wrapT = THREE.RepeatWrapping;
-			t.repeat.set(200, 200);
+			t.repeat.set(GROUND / 4.5, GROUND / 4.5); // one tile per 4.5 units, whatever the plane
 			t.colorSpace = THREE.SRGBColorSpace;
 			const gm = ground.material as THREE.MeshStandardMaterial;
 			gm.map = t;
 			gm.color.set(0xffffff);
 			gm.needsUpdate = true;
+		});
+
+		// Forest on the horizon. Unlit and opaque: the top of the strip is already the sky
+		// colour, so the rim reads as distance and the fog carries it into the background.
+		const backdrop = new THREE.Mesh(
+			new THREE.CylinderGeometry(SKY_R, SKY_R, SKY_H, 48, 1, true),
+			new THREE.MeshBasicMaterial({ color: 0x87b7e8, side: THREE.BackSide }),
+		);
+		scene.add(backdrop);
+		new THREE.TextureLoader().load('/assets/jeux/golf/forest.jpg', (t) => {
+			t.wrapS = THREE.RepeatWrapping;
+			t.wrapT = THREE.ClampToEdgeWrapping;
+			t.repeat.set(SKY_REP, 1);
+			t.colorSpace = THREE.SRGBColorSpace;
+			const bm = backdrop.material as THREE.MeshBasicMaterial;
+			bm.map = t;
+			bm.color.set(0xffffff);
+			bm.needsUpdate = true;
 		});
 
 		const ball = makeBall(0xffffff);
@@ -302,10 +329,11 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		scene.add(holeGroup);
 
 		g3Ref.current = {
-			renderer, scene, camera, sun, ball, shade, ballRing, aimArrow, ground, holeGroup,
+			renderer, scene, camera, sun, ball, shade, ballRing, aimArrow, ground, backdrop, holeGroup,
 			disposables: [
 				aimArrow.geometry, aimArrow.material as THREE.Material,
 				ball.geometry, ball.material as THREE.Material, ground.geometry, ground.material as THREE.Material,
+				backdrop.geometry, backdrop.material as THREE.Material,
 				shade.geometry, shade.material as THREE.Material,
 				ballRing.geometry, ballRing.material as THREE.Material,
 			],
@@ -840,6 +868,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					az: 0, azTop: 0, // resize() below picks the framing for this canvas
 				};
 				g.ground.position.set(fx, groundYOf(hole, RELIEF), fz);
+				g.backdrop.position.set(fx, groundYOf(hole, RELIEF) + SKY_H / 2 - SKY_SINK, fz);
 
 				// Wrap the shadow frustum around this hole only, so its texels stay small.
 				const R = Math.max(maxX - minX, maxZ - minZ) / 2 + 14;
