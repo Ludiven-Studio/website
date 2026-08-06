@@ -817,6 +817,9 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 				[ppx, p.y - LIP, ppz], [p.ox + pnx * APRON, gy, p.oz + pnz * APRON],
 				[q.ox + qnx * APRON, gy, q.oz + qnz * APRON], [qpx, q.y - LIP, qpz],
 			);
+			// The bank is a ribbon over open space, and from under the arch you looked straight
+			// at its back. A wall down to the lawn, hidden behind the bank, closes the course.
+			quad([ppx, p.y - LIP, ppz], [qpx, q.y - LIP, qpz], [qpx, gy, qpz], [ppx, gy, ppz]);
 		}
 	};
 	for (const side of [1, -1] as const) {
@@ -1029,6 +1032,17 @@ export function buildHole3D(hole: Hole, opts: Build3DOpts): THREE.Group {
 		};
 		for (let i = lo0; i < hi0; i++)
 			push(spos, soffit(i, 1), soffit(i, -1), soffit(i + 1, -1), soffit(i + 1, 1));
+		// The lane floor is a ribbon with no underside, so each arch mouth opened onto the
+		// hollow beneath it. Wall each mouth off, floor down to soffit. The wall breaks at the
+		// kerb: one plane from outer face to outer face would cut through a banked floor.
+		for (const i of [lo0, hi0]) {
+			const p = path[i];
+			const end = (side: 1 | -1, w: number, drop: number): [number, number, number] =>
+				[p.x + p.nx * w * side, laneY(hole, i, side, relief, bankv) - drop, p.z + p.nz * w * side];
+			push(spos, end(1, W[i], 0), end(-1, W[i], 0), end(-1, W[i], LIP), end(1, W[i], LIP));
+			for (const side of [1, -1] as const)
+				push(spos, end(side, W[i] + t, 0), end(side, W[i], 0), end(side, W[i], LIP), end(side, W[i] + t, LIP));
+		}
 		grp.add(new THREE.Mesh(stripGeom(spos, STONE), wallMat));
 
 		const along = Math.hypot(path[hi].x - path[lo].x, path[hi].z - path[lo].z) * 0.5 + 4;
