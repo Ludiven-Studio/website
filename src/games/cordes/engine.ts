@@ -59,6 +59,9 @@ const NB: readonly (readonly [number, number])[] = [[-1, 0], [1, 0], [0, -1], [0
 /** Shortest rope worth drawing: two cells is a straight line between neighbours. */
 const MIN_CELLS = 3;
 
+/** How far apart the two pegs of one rope must sit, in cells. */
+const SPAN = 2;
+
 /** Twice the signed area of (o, a, b) — positive when the turn is counter-clockwise. */
 const turn = (o: Pt, a: Pt, b: Pt): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
@@ -294,6 +297,19 @@ function carve(diff: DiffLevel, rng: Rng): number[][] {
 	for (let r = 0; r < ropes; r++) {
 		while (paths[r].length < MIN_CELLS && steal(r));
 	}
+
+	// Two pegs of the same colour a cell apart read as a pair nobody has to think about.
+	// A rope that coils back has both tips in the same corner, so walking a tip back along
+	// its own body pulls it away — a shorter rope, but two ends the player can tell apart.
+	for (const path of paths) {
+		while (path.length > MIN_CELLS) {
+			const head = gap(path[0], path[path.length - 1]);
+			const dropFront = gap(path[1], path[path.length - 1]);
+			const dropBack = gap(path[0], path[path.length - 2]);
+			if (head >= SPAN * SPAN || Math.max(dropFront, dropBack) <= head) break;
+			owner[dropFront > dropBack ? path.shift()! : path.pop()!] = -1;
+		}
+	}
 	return paths;
 }
 
@@ -339,9 +355,14 @@ function deal(diff: DiffLevel, rng: Rng): CordesPuzzle {
  * never reach its target still returns its hardest board rather than looping.
  */
 export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesPuzzle {
-	// About one deal in a hundred fences a rope in at two cells, which draws as a bare
-	// segment; ranking it below every real board is enough to make it disappear.
-	const rate = (p: CordesPuzzle): number => (p.solution.some((r) => r.length < 3) ? -1 : tangleCount(p));
+	// Two rejects, both ranked below every real board so they simply disappear: a rope
+	// fenced in at two cells, which draws as a bare segment, and a pair of pegs closer
+	// than three peg-widths, which the eye pairs up without any thinking.
+	const rate = (p: CordesPuzzle): number => {
+		if (p.solution.some((r) => r.length < 3)) return -1;
+		if (p.ends.some(([a, b]) => Math.hypot(a.x - b.x, a.y - b.y) < 6 * p.pegR)) return -1;
+		return tangleCount(p);
+	};
 	let best = deal(diff, rng);
 	let bestScore = rate(best);
 	for (let i = 0; i < 400 && bestScore < diff.tangle; i++) {

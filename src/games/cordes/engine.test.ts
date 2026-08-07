@@ -111,6 +111,8 @@ function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 	}
 
 	for (let r = 0; r < ropes; r++) {
+		// Three peg-widths apart at least: closer than that and the eye pairs them up for free.
+		expect(dist(p.ends[r][0], p.ends[r][1])).toBeGreaterThanOrEqual(6 * p.pegR);
 		expect(p.solution[r].length).toBeGreaterThan(2);
 		expect(p.solution[r][0]).toEqual(p.ends[r][0]);
 		expect(p.solution[r][p.solution[r].length - 1]).toEqual(p.ends[r][1]);
