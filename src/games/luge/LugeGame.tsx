@@ -28,6 +28,7 @@ import { getProgression, submitLevel, type GameProgress } from '../../lib/progre
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelOutcome from '../../components/LevelOutcome';
 import LevelSelect from '../../components/LevelSelect';
 import ModeToggle from '../../components/ModeToggle';
 
@@ -1692,31 +1693,16 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				)}
 				{dailyLoading && <div className="lg-overlay"><div className="lg-overlay-card">Préparation…</div></div>}
 				{!webglError && status === 'over' && levelsMode && (
-					<div className="lg-overlay">
-						<div className="lg-overlay-card">
-							<p className="lg-go-title">{levelWon ? `Niveau ${currentLevel} réussi !` : '💥 Dans le décor !'}</p>
-							{levelWon && (
-								<p className="lg-go-stars" aria-label={`${earnedStars} étoiles sur 3`}>
-									{[1, 2, 3].map((s) => (
-										<span key={s} className={s <= earnedStars ? 'on' : ''}>★</span>
-									))}
-								</p>
-							)}
-							<p className="lg-go-score">Distance {dist} m · Score {fmtPts(score)}</p>
-							<div className="lg-go-btns">
-								<button className="lg-startbtn sm" onClick={() => { levelMenuRef.current = true; targetDistRef.current = 0; setLevelMenu(true); statusRef.current = 'ready'; setStatus('ready'); }}>
-									🗺 Carte
-								</button>
-								{levelWon && currentLevel < lugeLevels.count ? (
-									<button className="lg-startbtn sm" onClick={() => playLevel(currentLevel + 1)}>
-										Niveau {currentLevel + 1} →
-									</button>
-								) : (
-									<button className="lg-startbtn sm" onClick={() => playLevel(currentLevel)}>↻ Rejouer</button>
-								)}
-							</div>
-						</div>
-					</div>
+					<LevelOutcome
+						level={currentLevel}
+						lastLevel={lugeLevels.count}
+						won={levelWon}
+						stars={earnedStars}
+						detail={`Distance ${dist} m · Score ${fmtPts(score)}`}
+						onNext={() => playLevel(currentLevel + 1)}
+						onReplay={() => playLevel(currentLevel)}
+						onMenu={() => { levelMenuRef.current = true; targetDistRef.current = 0; setLevelMenu(true); statusRef.current = 'ready'; setStatus('ready'); }}
+					/>
 				)}
 				{!webglError && status === 'over' && !levelsMode && (
 					<div className="lg-overlay">
@@ -1776,9 +1762,6 @@ const CSS = `
 
 .lg-boardwrap { position: relative; width: 100%; }
 .lg-boardwrap.hidden { display: none; }
-.lg-go-stars { font-size: 30px; letter-spacing: 4px; color: var(--gray-600); margin: 0.2rem 0; }
-.lg-go-stars .on { color: #f5a623; }
-.lg-go-btns { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
 .lg-canvas {
   width: 100%; aspect-ratio: 16 / 10; display: block;
   background: #cfe0f0; border: 1px solid var(--gray-800); border-radius: 12px;

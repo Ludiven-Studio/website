@@ -23,6 +23,7 @@ import {
 import GiveUp, { RevealNote } from '../../components/GiveUp';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelOutcome from '../../components/LevelOutcome';
 import LevelSelect from '../../components/LevelSelect';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
@@ -542,7 +543,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={progress} onPick={playLevel} />
 			) : (
 			<div className="ws-boardwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !levelsMode && <Celebration />}
 				<div className={`ws-board ${daily && !started ? 'blurred' : ''}`}>
 					{tubeRows.map((row, ri) => (
 						<div className="ws-row" key={ri}>
@@ -629,27 +630,17 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && levelsMode && (
-					<div className="ws-win" role="dialog" aria-label="Niveau réussi">
-						<div className="ws-wincard">
-							<p className="ws-winstars" aria-label={`${earnedStars} étoiles sur 3`}>
-								{[1, 2, 3].map((s) => (
-									<span key={s} className={s <= earnedStars ? 'on' : ''}>★</span>
-								))}
-							</p>
-							<h2>Niveau {currentLevel} réussi !</h2>
-							<p className="ws-wintime">{fmtTime(elapsed)}</p>
-							<p className="ws-windiff">{moves} coups</p>
-							<div className="ws-winbtns">
-								<button className="ws-replay ghost" onClick={armLevels}>🗺 Carte</button>
-								{currentLevel < tubesLevels.count ? (
-									<button className="ws-replay" onClick={() => playLevel(currentLevel + 1)}>Niveau {currentLevel + 1} →</button>
-								) : (
-									<button className="ws-replay" onClick={() => playLevel(currentLevel)}>↻ Rejouer</button>
-								)}
-							</div>
-						</div>
-					</div>
+				{levelsMode && status === 'won' && (
+					<LevelOutcome
+						level={currentLevel}
+						lastLevel={tubesLevels.count}
+						won
+						stars={earnedStars}
+						detail={`${fmtTime(elapsed)} · ${moves} coups`}
+						onNext={() => playLevel(currentLevel + 1)}
+						onReplay={() => playLevel(currentLevel)}
+						onMenu={armLevels}
+					/>
 				)}
 			</div>
 			)}
@@ -817,10 +808,6 @@ const CSS = `
 .ws-wintime { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 0; color: var(--ws-accent); }
 .ws-windiff { color: var(--gray-300); font-size: 13px; margin: 2px 0 14px; }
 .ws-replay { border: none; background: var(--ws-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
-.ws-replay.ghost { background: transparent; color: var(--gray-300); border: 1.5px solid var(--gray-700); }
-.ws-winbtns { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
-.ws-winstars { font-size: 30px; letter-spacing: 4px; color: var(--gray-600); margin: 0 0 2px; }
-.ws-winstars .on { color: #f5a623; }
 
 @keyframes ws-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
