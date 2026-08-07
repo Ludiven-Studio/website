@@ -7,7 +7,7 @@ export interface GameTile {
 	icon: keyof typeof iconPaths;
 	href?: string;
 	status: 'play' | 'soon';
-	category?: 'logique' | 'mots' | 'adresse' | 'multi'; // defaults to logique
+	category?: 'maths' | 'grilles' | 'logique' | 'mots' | 'adresse' | 'multi'; // defaults to logique
 	image?: string; // optional presentation thumbnail, e.g. '/assets/jeux/<id>.png' (shown only if set)
 }
 
@@ -27,6 +27,7 @@ export const games: GameTile[] = [
 		icon: '2048',
 		href: '/jeux/2048',
 		status: 'play',
+		category: 'maths',
 	},
 	{
 		id: 'mots-meles',
@@ -80,6 +81,7 @@ export const games: GameTile[] = [
 		icon: 'scales',
 		href: '/jeux/somme-toute',
 		status: 'play',
+		category: 'maths',
 	},
 	{
 		id: 'solitaire',
@@ -113,6 +115,7 @@ export const games: GameTile[] = [
 		icon: 'grid-nine',
 		href: '/jeux/sudoku',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'reines',
@@ -121,6 +124,7 @@ export const games: GameTile[] = [
 		icon: 'crown',
 		href: '/jeux/reines',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'calcudoku',
@@ -129,6 +133,7 @@ export const games: GameTile[] = [
 		icon: 'cage-sum',
 		href: '/jeux/calcudoku',
 		status: 'play',
+		category: 'maths',
 	},
 	{
 		id: 'chemin',
@@ -137,6 +142,7 @@ export const games: GameTile[] = [
 		icon: 'winding-path',
 		href: '/jeux/chemin',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'circuit',
@@ -161,6 +167,7 @@ export const games: GameTile[] = [
 		icon: 'sequence',
 		href: '/jeux/suite',
 		status: 'play',
+		category: 'maths',
 	},
 	{
 		id: 'fruits',
@@ -169,6 +176,7 @@ export const games: GameTile[] = [
 		icon: 'fruits',
 		href: '/jeux/fruits',
 		status: 'play',
+		category: 'maths',
 	},
 	{
 		id: 'matrices',
@@ -193,6 +201,7 @@ export const games: GameTile[] = [
 		icon: 'circle-square',
 		href: '/jeux/rond-carre',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'suguru',
@@ -201,6 +210,7 @@ export const games: GameTile[] = [
 		icon: 'grid-dots',
 		href: '/jeux/suguru',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'motifs',
@@ -209,6 +219,7 @@ export const games: GameTile[] = [
 		icon: 'partition',
 		href: '/jeux/motifs',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'pavage',
@@ -217,6 +228,7 @@ export const games: GameTile[] = [
 		icon: 'tetromino',
 		href: '/jeux/pavage',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'tubes',
@@ -233,6 +245,7 @@ export const games: GameTile[] = [
 		icon: 'palette',
 		href: '/jeux/colorgramme',
 		status: 'play',
+		category: 'grilles',
 	},
 	// Tente & Aquarium temporarily disabled (code kept; re-add entries to re-enable).
 	{
@@ -242,6 +255,7 @@ export const games: GameTile[] = [
 		icon: 'ship',
 		href: '/jeux/bataille',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'demineur',
@@ -250,6 +264,7 @@ export const games: GameTile[] = [
 		icon: 'mine',
 		href: '/jeux/demineur',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'tectonique',
