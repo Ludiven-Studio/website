@@ -25,13 +25,15 @@ export interface DiffLevel {
 	/** The hidden generation grid — bigger means longer, more tangled routes. */
 	cols: number;
 	rows: number;
+	/** How many ropes must refuse to be drawn as a straight line between their two pegs. */
+	tangle: number;
 }
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', ropes: 3, cols: 5, rows: 5 },
-	moyen: { label: 'Moyen', ropes: 4, cols: 6, rows: 6 },
-	difficile: { label: 'Difficile', ropes: 5, cols: 7, rows: 7 },
-	expert: { label: 'Expert', ropes: 7, cols: 8, rows: 8 },
+	facile: { label: 'Facile', ropes: 3, cols: 5, rows: 5, tangle: 2 },
+	moyen: { label: 'Moyen', ropes: 4, cols: 6, rows: 6, tangle: 2 },
+	difficile: { label: 'Difficile', ropes: 5, cols: 7, rows: 7, tangle: 3 },
+	expert: { label: 'Expert', ropes: 7, cols: 8, rows: 8, tangle: 4 },
 };
 
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
@@ -198,6 +200,19 @@ function carve(diff: DiffLevel, rng: Rng): number[][] {
 		return owner[n] < 0 ? n : -1;
 	};
 
+	const gap = (a: number, b: number): number =>
+		((a % cols) - (b % cols)) ** 2 + (Math.floor(a / cols) - Math.floor(b / cols)) ** 2;
+
+	// A rope that coils back ends with its two pegs side by side, and the straight line
+	// between them is then the answer. Pulling each tip away from the other stretches the
+	// rope across the board, so its chord has to cut through someone else's.
+	const pickAway = (open: number[], other: number): number => {
+		if (rng() < 0.25) return open[Math.floor(rng() * open.length)];
+		let best = open[0];
+		for (const n of open) if (gap(n, other) > gap(best, other)) best = n;
+		return best;
+	};
+
 	/** Add one free cell to either tip of `r`. */
 	const grow = (r: number): boolean => {
 		for (const tip of [paths[r].length - 1, 0]) {
@@ -207,7 +222,7 @@ function carve(diff: DiffLevel, rng: Rng): number[][] {
 				if (n >= 0) open.push(n);
 			}
 			if (!open.length) continue;
-			const n = open[Math.floor(rng() * open.length)];
+			const n = pickAway(open, paths[r][tip === 0 ? paths[r].length - 1 : 0]);
 			owner[n] = r;
 			if (tip === 0) paths[r].unshift(n);
 			else paths[r].push(n);
@@ -227,12 +242,11 @@ function carve(diff: DiffLevel, rng: Rng): number[][] {
 				const n = free(head, dc, dr);
 				if (n >= 0) open.push(n);
 			}
-			// Stop early sometimes, so ropes are not all the same length.
-			if (open.length === 0 || (paths[r].length >= MIN_CELLS + 1 && rng() < 0.12)) {
+			if (open.length === 0) {
 				live[r] = false;
 				continue;
 			}
-			const n = open[Math.floor(rng() * open.length)];
+			const n = pickAway(open, paths[r][0]);
 			owner[n] = r;
 			paths[r].push(n);
 		}
@@ -262,15 +276,34 @@ function carve(diff: DiffLevel, rng: Rng): number[][] {
 		return false;
 	};
 
+	// Soak up the leftover cells from both tips. Long snakes are what push a rope's two pegs
+	// apart, and pegs far apart are what make the straight line between them run into someone.
+	for (let spread = true; spread; ) {
+		spread = false;
+		for (let r = 0; r < ropes; r++) if (grow(r)) spread = true;
+	}
+
 	// A straight two-cell rope is not worth drawing, and a one-cell one has no second peg.
-	// Grow the runts into whatever is left, then take from a long rope once space runs out.
+	// Nothing is free by now, so the runts take from whichever long rope they touch.
 	for (let r = 0; r < ropes; r++) {
-		while (paths[r].length < MIN_CELLS && (grow(r) || steal(r)));
+		while (paths[r].length < MIN_CELLS && steal(r));
 	}
 	return paths;
 }
 
-export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesPuzzle {
+/**
+ * How many ropes cannot simply be drawn straight from peg to peg — either the chord runs
+ * into another rope's chord, or it grazes a peg that isn't its own. This is the whole
+ * difficulty of the game: at zero, joining the dots with a ruler is the answer.
+ */
+export function tangleCount(p: CordesPuzzle): number {
+	const straight = p.ends.map(([a, b]) => [a, b]);
+	let n = 0;
+	for (let r = 0; r < p.ropes; r++) if (ropeFault(straight[r], r, straight, p) !== null) n++;
+	return n;
+}
+
+function deal(diff: DiffLevel, rng: Rng): CordesPuzzle {
 	const { cols, rows } = diff;
 	const jitter = 0.15;
 	const centre = (idx: number, wobble: boolean): Pt => ({
@@ -291,6 +324,28 @@ export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesP
 	// Pegs sit at most `jitter` off their cell centre, so a foreign route stays at least
 	// (0.5 - jitter) of a cell away. The radius has to fit under that or the answer is illegal.
 	return { ropes: ends.length, ends, solution, pegR: 0.3 / Math.max(cols, rows) };
+}
+
+/**
+ * Deal until the board is worth solving. Carving is cheap, so rejecting the trivial deals
+ * costs a few hundred microseconds; the best one seen is kept so a cramped frame that can
+ * never reach its target still returns its hardest board rather than looping.
+ */
+export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesPuzzle {
+	// About one deal in a hundred fences a rope in at two cells, which draws as a bare
+	// segment; ranking it below every real board is enough to make it disappear.
+	const rate = (p: CordesPuzzle): number => (p.solution.some((r) => r.length < 3) ? -1 : tangleCount(p));
+	let best = deal(diff, rng);
+	let bestScore = rate(best);
+	for (let i = 0; i < 60 && bestScore < diff.tangle; i++) {
+		const p = deal(diff, rng);
+		const s = rate(p);
+		if (s > bestScore) {
+			best = p;
+			bestScore = s;
+		}
+	}
+	return best;
 }
 
 export interface CordesHint {

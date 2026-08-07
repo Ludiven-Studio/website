@@ -11,6 +11,7 @@ import {
 	ropeFault,
 	segCross,
 	selfCrosses,
+	tangleCount,
 	type CordesPuzzle,
 	type Pt,
 } from './engine';
@@ -124,6 +125,17 @@ describe('cordes generation', () => {
 
 		it(`${diff.label}: every board ships a legal answer`, () => {
 			for (let s = 0; s < 60; s++) expectLegalBoard(generateCordes(diff, mulberry32(700 + s * 37 + diff.ropes)), diff.ropes);
+		});
+	}
+
+	for (const key of Object.keys(DIFFS)) {
+		const diff = DIFFS[key];
+
+		it(`${diff.label}: a ruler is never the answer`, () => {
+			for (let s = 0; s < 40; s++) {
+				const p = generateCordes(diff, mulberry32(2200 + s * 41 + diff.ropes));
+				expect(tangleCount(p)).toBeGreaterThanOrEqual(diff.tangle);
+			}
 		});
 	}
 

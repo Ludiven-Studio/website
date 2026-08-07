@@ -1,5 +1,6 @@
-// Cordes levels plan (1-100). Two ropes on a small frame, up to six on a wide one: what
-// gets harder is the number of routes that have to share the same space, not the drawing.
+// Cordes levels plan (1-100). Three ropes on a small frame, up to six on a wide one. Two
+// things get harder: the number of routes sharing the space, and how many of them refuse
+// to be drawn straight — a board where joining the dots works is not a puzzle.
 // A level = tie every rope; stars come from solve time.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
@@ -24,11 +25,12 @@ const basePlan: LevelPlan<CordesLevelCfg> = {
 	metric: 'time',
 	config(level: number): CordesLevelCfg {
 		const l = Math.max(1, Math.min(LEVEL_COUNT, level));
-		const ropes = Math.min(6, 2 + Math.floor((l - 1) / 20)); // 2 → 6
-		const side = Math.min(7, 4 + Math.floor((l - 1) / 25)); // 4 → 7
+		const ropes = Math.min(6, 3 + Math.floor((l - 1) / 25)); // 3 → 6
+		const side = Math.min(7, 5 + Math.floor((l - 1) / 34)); // 5 → 7
+		const tangle = Math.min(4, 2 + Math.floor((l - 1) / 40)); // 2 → 4
 		return {
 			seed: levelSeed(l),
-			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side },
+			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, tangle },
 			threeStarCentis: targets(ropes, 400, 500),
 			twoStarCentis: targets(ropes, 1000, 1100),
 		};
@@ -53,7 +55,7 @@ export const cordesLevels = extendPlan('cordes', basePlan, {
 		const ropes = level > 150 ? 8 : 7;
 		return {
 			...base,
-			diff: { label: `Niveau ${level}`, ropes, cols: 8, rows: 8 },
+			diff: { label: `Niveau ${level}`, ropes, cols: 8, rows: 8, tangle: level > 150 ? 5 : 4 },
 			threeStarCentis: targets(ropes, 600, 560),
 			twoStarCentis: targets(ropes, 1400, 1200),
 		};

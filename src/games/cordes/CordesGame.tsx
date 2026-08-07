@@ -57,6 +57,16 @@ const STEP = 0.016;
 
 const nulls = (n: number): Board => new Array<Pt[] | null>(n).fill(null);
 
+/* The saved daily board is raw coordinates, so it only means something on the pegs it was
+   drawn against. GEN_V bumps with the generator: an attempt saved against an older board
+   is dropped instead of redrawn as scribbles over the new pegs. */
+const GEN_V = 2;
+const packBoard = (ropes: Board) => ({ v: GEN_V, ropes });
+const unpackBoard = (saved: unknown, n: number): Board | null => {
+	const o = saved as { v?: number; ropes?: Board } | null;
+	return o && o.v === GEN_V && Array.isArray(o.ropes) && o.ropes.length === n ? o.ropes : null;
+};
+
 const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
 
 const pointsAttr = (path: Pt[]): string => path.map((p) => `${p.x * V},${p.y * V}`).join(' ');
@@ -163,19 +173,22 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 			setDiffKey(dk);
 			const p = generateCordes(DIFFS[dk], mulberry32(run.seed));
 			deal(p);
-			setRopes((run.state as Board) ?? nulls(p.ropes));
+			const saved = unpackBoard(run.state, p.ropes);
 			setStarted(true);
 			if (run.done && run.abandoned) {
 				// Gave up earlier today: the stored board IS the solution, and it never won.
+				setRopes(saved ?? p.solution.slice());
 				setAlreadyPlayed(true);
 				setRevealed(true);
 				setStatus('playing');
 				setElapsed(run.finalTime ?? 0);
 			} else if (run.done) {
+				setRopes(saved ?? nulls(p.ropes));
 				setAlreadyPlayed(true);
 				setStatus('won');
 				setElapsed(run.finalTime ?? 0);
 			} else {
+				setRopes(saved ?? nulls(p.ropes));
 				setAlreadyPlayed(false);
 				setStatus('playing');
 				startRef.current = run.startedAt;
@@ -216,7 +229,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 				done: false,
 				seed: sd?.seed,
 				diffIndex: sd?.diffIndex,
-				state: nulls(puzzle.ropes),
+				state: packBoard(nulls(puzzle.ropes)),
 			});
 		}
 	}, [gameId, puzzle, daily]);
@@ -250,7 +263,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: ropes,
+			state: packBoard(ropes),
 		});
 	}, [daily, started, status, revealed, ropes, gameId]);
 
@@ -265,7 +278,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 			finalTime,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: ropes,
+			state: packBoard(ropes),
 		};
 		saveDailyRun(gameId, snapshot);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -447,7 +460,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 			abandoned: true,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: puzzle.solution,
+			state: packBoard(puzzle.solution),
 		});
 		trackGame(gameId, 'solution_shown');
 	}, [puzzle, gameId]);
