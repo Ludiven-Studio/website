@@ -584,7 +584,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="mo-boardwrap" style={{ ['--n' as string]: size }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`mo-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					ref={boardRef}

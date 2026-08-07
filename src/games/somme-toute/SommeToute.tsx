@@ -516,7 +516,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="st-boardwrap" style={{ ['--n' as string]: size }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`st-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--st-cell)) auto` }}

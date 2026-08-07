@@ -526,7 +526,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="sg-boardwrap" style={{ ['--n' as string]: size }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`sg-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--sg-cell))` }}

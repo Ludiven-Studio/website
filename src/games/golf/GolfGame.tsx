@@ -1096,7 +1096,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 					onPointerCancel={onPointerUp}
 				/>
 				<div ref={labelsRef} className="gf-labels" />
-				{celebrating && <div className="gf-celebrate"><Celebration /></div>}
+				{celebrating && !lv.active && <div className="gf-celebrate"><Celebration /></div>}
 
 				{phase === 'playing' && (
 					<div className="gf-hud">

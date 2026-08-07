@@ -390,7 +390,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 				<div className="lc-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div className={`lc-play ${armed ? 'blurred' : ''}`}>
 					<div className="lc-gridcol">
 					<div className="lc-grid" style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellPx}px)`, gridTemplateRows: `repeat(${puzzle.rows}, ${cellPx}px)` }}>

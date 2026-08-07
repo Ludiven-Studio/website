@@ -485,7 +485,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="rc-boardwrap" style={{ ['--n' as string]: n }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div className={`rc-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}>
 					{Array.from({ length: n }).map((_, r) =>
 						Array.from({ length: n }).map((_, c) => {

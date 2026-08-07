@@ -487,7 +487,7 @@ export default function ReinesGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="rn-boardwrap" style={{ ['--n' as string]: size }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`rn-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--rn-cell))` }}

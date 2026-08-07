@@ -580,7 +580,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="cd-boardwrap" style={{ ['--n' as string]: size }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`cd-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, var(--cd-cell))` }}

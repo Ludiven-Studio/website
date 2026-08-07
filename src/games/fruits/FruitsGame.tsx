@@ -311,7 +311,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="fr-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div className={`fr-eqs ${armed ? 'blurred' : ''}`}>
 					{question.equations.map((eq, i) => <EquationRow key={i} q={question} eq={eq} />)}
 				</div>

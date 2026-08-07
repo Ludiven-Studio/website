@@ -365,7 +365,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 			<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="ms-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div className={`ms-board${shake ? ' shake' : ''}`} style={{ ['--len' as string]: len }}>
 					{Array.from({ length: maxTries + extra }, (_, r) => (
 						<div key={r} className="ms-rowwrap">

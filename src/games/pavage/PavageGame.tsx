@@ -780,7 +780,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="pv-boardwrap" style={{ ['--n' as string]: size }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					ref={boardCbRef}
 					className={`pv-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}

@@ -635,7 +635,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			    it when a level starts — unmounting left it at the default 300×150 (stretched). */}
 			<div className="reu-playwrap" ref={wrapRef} hidden={lv.active && lv.menu}>
 				<canvas ref={canvasRef} className={`reu-canvas${started ? '' : ' reu-blur'}`} onPointerDown={pointer.onPointerDown} />
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 
 				{lv.done && (
 					<LevelOutcome

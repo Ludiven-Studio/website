@@ -518,7 +518,7 @@ export default function CircuitGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="cir-boardwrap" style={{ ['--n' as string]: n }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				{status === 'loading' || !puzzle ? (
 					<div className="cir-loading">Génération…</div>
 				) : (

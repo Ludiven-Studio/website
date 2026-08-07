@@ -673,7 +673,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 						onMenu={() => { levelsRef.current = false; lv.backToMenu(); setPhase('menu'); }}
 					/>
 				)}
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 
 				{phase === 'playing' && (
 					<>

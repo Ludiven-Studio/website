@@ -527,7 +527,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="sk-boardwrap" style={{ ['--n' as string]: size }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`sk-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{

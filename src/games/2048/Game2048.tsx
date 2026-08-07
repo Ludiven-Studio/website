@@ -541,7 +541,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="g2-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`g2-board ${armed ? 'blurred' : ''}`}
 					style={{ ['--n' as string]: size }}

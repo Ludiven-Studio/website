@@ -1,6 +1,8 @@
 /* Shared end-of-level card for the progression mode: 1-3 stars on a win (with
    Next / Replay / Map), or a retry prompt on a loss. Game-agnostic. */
 
+import Celebration, { useOutcomeHold } from './Celebration';
+
 interface Props {
 	level: number;
 	lastLevel: number;
@@ -14,6 +16,12 @@ interface Props {
 }
 
 export default function LevelOutcome({ level, lastLevel, won, stars, onNext, onReplay, onMenu, detail }: Props) {
+	// Every game mounts this the instant the level ends, so the card used to land straight on
+	// top of the board. The cocotte gets that second instead — she owns the outcome here, which
+	// is why games hide their own celebration while a level is running.
+	const ready = useOutcomeHold();
+	if (!ready) return <Celebration won={won} />;
+
 	return (
 		<div className="lo-wrap" role="dialog" aria-label={won ? 'Niveau réussi' : 'Niveau échoué'}>
 			<style>{CSS}</style>

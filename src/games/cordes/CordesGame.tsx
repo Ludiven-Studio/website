@@ -559,7 +559,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="cor-boardwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				{status === 'loading' || !puzzle ? (
 					<div className="cor-loading">Génération…</div>
 				) : (

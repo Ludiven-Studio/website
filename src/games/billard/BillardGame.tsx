@@ -569,7 +569,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="bi-playwrap" ref={wrapRef}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<canvas ref={canvasRef} className="bi-canvas" onPointerDown={onPointerDown} />
 
 				{scratchFlash && <div className="bi-scratch">Pénalité · +1 coup</div>}

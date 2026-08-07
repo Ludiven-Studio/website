@@ -304,7 +304,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 			) : (
 			<>
 			<div className="mm-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					ref={boardRef}
 					className={`mm-grid ${armed ? 'blurred' : ''}`}

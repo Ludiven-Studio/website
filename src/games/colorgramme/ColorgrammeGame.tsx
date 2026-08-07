@@ -635,7 +635,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="co-boardwrap" style={{ ['--n' as string]: size }}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`co-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}
 					style={{

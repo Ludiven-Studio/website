@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 
 /**
- * Victory celebration: a ~1s confetti burst over the solved board, then the popup.
+ * End-of-game beat: the cocotte reacts for ~1s over the board — confetti and a thumbs-up on a
+ * win, a slumped shrug on a loss — and only then may a popup cover it.
  * `<Celebration />` is an overlay — drop it inside the board's position:relative wrapper.
- * `useCelebration(won)` gates the final popup: hold it for ~1s while confetti plays, so the
- * solved grid stays visible. Honors prefers-reduced-motion (no confetti, popup immediate).
+ * `useCelebration(won)` gates the free-play win card; `useOutcomeHold()` gates the level card.
+ * Honors prefers-reduced-motion (no animation, popup immediate).
  */
 
 const COLORS = ['#ff5d8f', '#ffd166', '#06d6a0', '#4cc9f0', '#b388ff', '#ff8c42', '#ef476f'];
@@ -15,6 +16,25 @@ const prefersReducedMotion = (): boolean =>
 	typeof window !== 'undefined' &&
 	typeof window.matchMedia === 'function' &&
 	window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * False while the cocotte owns the board, true once she has had her moment. Callers mount on
+ * the outcome itself, so the hold starts on mount and runs whether the player won or lost.
+ */
+export function useOutcomeHold(): boolean {
+	const [over, setOver] = useState(false);
+
+	useEffect(() => {
+		if (prefersReducedMotion()) {
+			setOver(true);
+			return;
+		}
+		const t = setTimeout(() => setOver(true), HOLD_MS);
+		return () => clearTimeout(t);
+	}, []);
+
+	return over;
+}
 
 /** While `won` is true: `celebrating` for ~1s, then `showWin` flips on (popup gate). */
 export function useCelebration(won: boolean): { celebrating: boolean; showWin: boolean } {
@@ -45,7 +65,7 @@ export function useCelebration(won: boolean): { celebrating: boolean; showWin: b
 	return { celebrating: celebrating && won, showWin: showWin && won };
 }
 
-export default function Celebration() {
+export default function Celebration({ won = true }: { won?: boolean }) {
 	const pieces = useMemo(
 		() =>
 			Array.from({ length: PIECES }, (_, i) => ({
@@ -59,7 +79,7 @@ export default function Celebration() {
 	);
 	return (
 		<div className="lv-celebrate" aria-hidden="true">
-			{pieces.map((p, i) => (
+			{won && pieces.map((p, i) => (
 				<span
 					key={i}
 					className="lv-confetti"
@@ -72,26 +92,59 @@ export default function Celebration() {
 					}}
 				/>
 			))}
-			{/* Shared Ludiven mascot: a plump front-facing cocotte gives a thumbs-up on every win. */}
-			<svg className="lv-cocotte" viewBox="0 0 110 108" aria-hidden="true">
+			{/* Shared Ludiven mascot: the same plump cocotte cheers a win and sags at a loss. */}
+			<svg className={won ? 'lv-cocotte' : 'lv-cocotte sad'} viewBox="0 0 110 108" aria-hidden="true">
 				<g fill="#e0413a">
-					<circle cx="42" cy="21" r="7" />
-					<circle cx="52" cy="15" r="8.5" />
-					<circle cx="62" cy="21" r="7" />
+					{won ? (
+						<>
+							<circle cx="42" cy="21" r="7" />
+							<circle cx="52" cy="15" r="8.5" />
+							<circle cx="62" cy="21" r="7" />
+						</>
+					) : (
+						/* the comb flops over to one side */
+						<g transform="rotate(-15 50 26)">
+							<circle cx="40" cy="25" r="6.5" />
+							<circle cx="50" cy="20" r="8" />
+							<circle cx="61" cy="24" r="6" />
+						</g>
+					)}
 				</g>
 				<ellipse cx="18" cy="64" rx="11" ry="19" fill="#eef0ea" />
-				{/* raised right wing (arm) */}
-				<path d="M 70 60 Q 84 60 89 47" stroke="#eef0ea" strokeWidth="12" strokeLinecap="round" fill="none" />
+				{won ? (
+					/* raised right wing (arm) */
+					<path d="M 70 60 Q 84 60 89 47" stroke="#eef0ea" strokeWidth="12" strokeLinecap="round" fill="none" />
+				) : (
+					/* both wings hang limp, clear of the body so they read at 60px */
+					<g stroke="#eef0ea" strokeWidth="12" strokeLinecap="round" fill="none">
+						<path d="M 70 58 Q 86 70 84 88" />
+						<path d="M 30 58 Q 14 70 16 88" />
+					</g>
+				)}
 				<ellipse cx="50" cy="62" rx="35" ry="33" fill="#fdfdfb" stroke="#e6e6df" strokeWidth="1.5" />
-				{/* thumbs-up hand: wide fist + thumb up on the side */}
-				<g fill="#fdfdfb" stroke="#e6e6df" strokeWidth="1.4">
-					<rect x="80" y="32" width="20" height="15" rx="6.5" />
-					<rect x="80" y="18" width="9.5" height="17" rx="4.75" />
-				</g>
-				<circle cx="39" cy="51" r="5" fill="#2a2a2a" />
-				<circle cx="61" cy="51" r="5" fill="#2a2a2a" />
-				<circle cx="40.6" cy="49.2" r="1.6" fill="#fff" />
-				<circle cx="62.6" cy="49.2" r="1.6" fill="#fff" />
+				{won && (
+					/* thumbs-up hand: wide fist + thumb up on the side */
+					<g fill="#fdfdfb" stroke="#e6e6df" strokeWidth="1.4">
+						<rect x="80" y="32" width="20" height="15" rx="6.5" />
+						<rect x="80" y="18" width="9.5" height="17" rx="4.75" />
+					</g>
+				)}
+				{won ? (
+					<>
+						<circle cx="39" cy="51" r="5" fill="#2a2a2a" />
+						<circle cx="61" cy="51" r="5" fill="#2a2a2a" />
+						<circle cx="40.6" cy="49.2" r="1.6" fill="#fff" />
+						<circle cx="62.6" cy="49.2" r="1.6" fill="#fff" />
+					</>
+				) : (
+					/* shut eyes sagging downwards, under brows raised at the inner ends */
+					<g stroke="#2a2a2a" strokeWidth="3.2" strokeLinecap="round" fill="none">
+						<path d="M 34 48 Q 39 56 44 49" />
+						<path d="M 56 49 Q 61 56 66 48" />
+						<path d="M 32 44 L 44 39" strokeWidth="2.6" />
+						<path d="M 68 44 L 56 39" strokeWidth="2.6" />
+					</g>
+				)}
 				<polygon points="50,56 43,63 57,63" fill="#f5a623" />
 				<circle cx="46" cy="68" r="3.6" fill="#e0413a" />
 				<circle cx="54" cy="68" r="3.6" fill="#e0413a" />
@@ -145,6 +198,13 @@ const CSS = `
 	72% { transform: scale(1) translateY(0); }
 	86% { transform: scale(1) translateY(-6px); }
 	100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+/* No bounce on a loss: she comes up short, sinks and tips over. */
+.lv-cocotte.sad { animation: lv-cocotte-sad 1s cubic-bezier(0.3, 0.9, 0.4, 1) forwards; }
+@keyframes lv-cocotte-sad {
+	0% { transform: scale(0.55) translateY(-10px) rotate(0); opacity: 0; }
+	45% { transform: scale(1) translateY(0) rotate(0); opacity: 1; }
+	100% { transform: scale(1) translateY(5px) rotate(7deg); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .lv-celebrate { display: none; } }
 `;

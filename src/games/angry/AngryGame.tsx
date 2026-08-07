@@ -613,7 +613,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 			)}
 
 			<div className="co-playwrap" ref={wrapRef}>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<canvas ref={canvasRef} className="co-canvas" onPointerDown={onPointerDown} />
 				{status === 'won' && !lv.active && (
 					<div className="co-overlay">

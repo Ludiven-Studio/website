@@ -472,7 +472,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="ba-boardwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`ba-board ${armed ? 'blurred' : ''} ${sonarMode ? 'sonar' : ''}`}
 					style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}

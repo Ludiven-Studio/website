@@ -492,7 +492,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="mx-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 
 				<div className={`mx-grid ${armed ? 'blurred' : ''}`} aria-label="Matrice">
 					{question.grid.map((cell, i) => (

@@ -365,7 +365,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 				) : (
 				<>
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 
 				<div className={`cc-board ${armed ? 'blurred' : ''}`}>
 					{rows.map((row, ri) => (

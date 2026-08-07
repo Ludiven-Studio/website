@@ -689,7 +689,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			<div className="sol-playwrap" ref={wrapRef}>
 				<canvas ref={canvasRef} className={`sol-canvas${started ? '' : ' sol-blur'}`} onPointerDown={pointer.onPointerDown} />
 
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				{dailyLoading && (
 					<div className="sol-overlay">
 						<div className="sol-card">Préparation du défi…</div>

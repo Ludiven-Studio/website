@@ -472,7 +472,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="aq-boardwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`aq-board ${daily && !started ? 'blurred' : ''}`}
 					style={{

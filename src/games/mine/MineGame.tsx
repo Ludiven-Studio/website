@@ -607,7 +607,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 					className={`mn-board ${shake ? 'shake' : ''}`}
 					style={{ ['--cols' as string]: cfg.cols, ['--rows' as string]: cfg.rows }}
 				>
-					{celebrating && <Celebration />}
+					{celebrating && !lv.active && <Celebration />}
 					{/* gems + cages layer (animated, non-interactive) */}
 					{displayGrid.map((row, r) =>
 						row.map((cell, c) => {

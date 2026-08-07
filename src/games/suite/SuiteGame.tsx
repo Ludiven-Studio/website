@@ -432,7 +432,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="su-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div className={`su-seq ${armed ? 'blurred' : ''}`} aria-label="Séquence">
 					{question.terms.map((t, i) => (
 						<span key={i} className="su-term">

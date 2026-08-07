@@ -323,7 +323,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 			<div className="mm-timerbar"><div className={`mm-timerfill${status === 'playing' && secs <= 10 ? ' urgent' : ''}`} style={{ width: `${(remaining / (DURATION_S * 1000)) * 100}%` }} /></div>
 
 			<div className="mm-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div className={`mm-boardwrap${armed || status === 'ended' ? ' blurred' : ''}`}>
 					<div
 						ref={boardRef}

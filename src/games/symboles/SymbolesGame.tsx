@@ -462,7 +462,7 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<div className="sy-playwrap">
-				{celebrating && <Celebration />}
+				{celebrating && !lv.active && <Celebration />}
 				<div className={`sy-seq ${armed ? 'blurred' : ''}`} aria-label="Séquence">
 					{question.terms.map((t, i) => (
 						<span key={i} className="sy-term">
