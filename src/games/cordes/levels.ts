@@ -5,7 +5,7 @@
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
-import { frameFor, type DiffLevel } from './engine';
+import { depthFor, frameFor, type DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface CordesLevelCfg {
@@ -29,7 +29,7 @@ const basePlan: LevelPlan<CordesLevelCfg> = {
 		const side = frameFor(ropes);
 		return {
 			seed: levelSeed(l),
-			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, tangle: ropes },
+			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, tangle: ropes, depth: depthFor(ropes) },
 			threeStarCentis: targets(ropes, 400, 500),
 			twoStarCentis: targets(ropes, 1000, 1100),
 		};
@@ -55,7 +55,7 @@ export const cordesLevels = extendPlan('cordes', basePlan, {
 		const side = frameFor(ropes);
 		return {
 			...base,
-			diff: { label: `Niveau ${level}`, ropes, cols: side, rows: side, tangle: ropes },
+			diff: { label: `Niveau ${level}`, ropes, cols: side, rows: side, tangle: ropes, depth: depthFor(ropes) },
 			threeStarCentis: targets(ropes, 600, 560),
 			twoStarCentis: targets(ropes, 1400, 1200),
 		};

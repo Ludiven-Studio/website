@@ -27,6 +27,8 @@ export interface DiffLevel {
 	rows: number;
 	/** How many ropes must refuse to be drawn as a straight line between their two pegs. */
 	tangle: number;
+	/** How many ropes must be caught between two others, not just crossed by one. */
+	depth: number;
 }
 
 /**
@@ -35,11 +37,14 @@ export interface DiffLevel {
  */
 export const frameFor = (ropes: number): number => ropes + (ropes < 7 ? 2 : 3);
 
+/** How many ropes a frame should hold between two others. Past six there is room for one more. */
+export const depthFor = (ropes: number): number => (ropes < 7 ? 2 : 3);
+
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', ropes: 3, cols: 5, rows: 5, tangle: 3 },
-	moyen: { label: 'Moyen', ropes: 4, cols: 6, rows: 6, tangle: 4 },
-	difficile: { label: 'Difficile', ropes: 5, cols: 7, rows: 7, tangle: 5 },
-	expert: { label: 'Expert', ropes: 7, cols: 10, rows: 10, tangle: 7 },
+	facile: { label: 'Facile', ropes: 3, cols: 5, rows: 5, tangle: 3, depth: 2 },
+	moyen: { label: 'Moyen', ropes: 4, cols: 6, rows: 6, tangle: 4, depth: 2 },
+	difficile: { label: 'Difficile', ropes: 5, cols: 7, rows: 7, tangle: 5, depth: 2 },
+	expert: { label: 'Expert', ropes: 7, cols: 10, rows: 10, tangle: 7, depth: 3 },
 };
 
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
@@ -313,6 +318,12 @@ function carve(diff: DiffLevel, rng: Rng): number[][] {
 	return paths;
 }
 
+/** How many other ropes cut each rope's straight peg-to-peg line. */
+function chordDepths(p: CordesPuzzle): number[] {
+	const chord = p.ends.map(([a, b]) => [a, b]);
+	return chord.map((c, r) => chord.reduce((n, o, i) => n + (i !== r && pathsCross(c, o) ? 1 : 0), 0));
+}
+
 /**
  * How many ropes have their straight peg-to-peg line cut by another rope's. This is the
  * whole difficulty of the game: a rope nobody crosses is one the player joins with a ruler
@@ -320,10 +331,15 @@ function carve(diff: DiffLevel, rng: Rng): number[][] {
  * miss on screen, so it does not count here.
  */
 export function tangleCount(p: CordesPuzzle): number {
-	const chord = p.ends.map(([a, b]) => [a, b]);
-	let n = 0;
-	for (let r = 0; r < p.ropes; r++) if (chord.some((o, i) => i !== r && pathsCross(chord[r], o))) n++;
-	return n;
+	return chordDepths(p).filter((d) => d >= 1).length;
+}
+
+/**
+ * How many ropes are caught between two others. Dodging one rope is a detour anybody sees;
+ * being hemmed in on both sides is what forces the player to decide who goes round whom.
+ */
+export function tangleDepth(p: CordesPuzzle): number {
+	return chordDepths(p).filter((d) => d >= 2).length;
 }
 
 function deal(diff: DiffLevel, rng: Rng): CordesPuzzle {
@@ -349,6 +365,9 @@ function deal(diff: DiffLevel, rng: Rng): CordesPuzzle {
 	return { ropes: ends.length, ends, solution, pegR: 0.3 / Math.max(cols, rows) };
 }
 
+/** Ranks a board above any other with fewer crossed ropes, however deeply tangled it is. */
+const RANK = 16;
+
 /**
  * Deal until every rope is worth drawing. One deal costs tens of microseconds, so hundreds
  * of rejections stay under a frame; the best one seen is kept so a cramped frame that can
@@ -361,11 +380,12 @@ export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesP
 	const rate = (p: CordesPuzzle): number => {
 		if (p.solution.some((r) => r.length < 3)) return -1;
 		if (p.ends.some(([a, b]) => Math.hypot(a.x - b.x, a.y - b.y) < 6 * p.pegR)) return -1;
-		return tangleCount(p);
+		return RANK * tangleCount(p) + tangleDepth(p);
 	};
+	const want = RANK * diff.tangle + diff.depth;
 	let best = deal(diff, rng);
 	let bestScore = rate(best);
-	for (let i = 0; i < 400 && bestScore < diff.tangle; i++) {
+	for (let i = 0; i < 400 && bestScore < want; i++) {
 		const p = deal(diff, rng);
 		const s = rate(p);
 		if (s > bestScore) {

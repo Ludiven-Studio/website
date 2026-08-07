@@ -12,6 +12,7 @@ import {
 	segCross,
 	selfCrosses,
 	tangleCount,
+	tangleDepth,
 	type CordesPuzzle,
 	type Pt,
 } from './engine';
@@ -134,16 +135,21 @@ describe('cordes generation', () => {
 		const diff = DIFFS[key];
 
 		it(`${diff.label}: a ruler is never the answer`, () => {
-			// The target is every rope, reached by rejection; the odd board that runs out of
-			// tries still has to leave at most one rope joinable with a straight line.
+			// Two targets, both reached by rejection: every rope crossed, and enough of them
+			// caught between two others. A board that runs out of tries still has to leave at
+			// most one rope joinable with a straight line — the deeper target is best-effort,
+			// so it only has to land on most boards, not all.
 			let full = 0;
+			let deep = 0;
 			for (let s = 0; s < 60; s++) {
 				const p = generateCordes(diff, mulberry32(2200 + s * 41 + diff.ropes));
 				const t = tangleCount(p);
 				expect(t).toBeGreaterThanOrEqual(diff.tangle - 1);
 				if (t >= diff.tangle) full++;
+				if (tangleDepth(p) >= diff.depth) deep++;
 			}
 			expect(full).toBeGreaterThanOrEqual(54);
+			expect(deep).toBeGreaterThanOrEqual(30);
 		});
 	}
 
