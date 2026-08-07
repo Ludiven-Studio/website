@@ -1,11 +1,11 @@
-// Cordes levels plan (1-100). Three ropes on a small frame, up to six on a wide one. Two
-// things get harder: the number of routes sharing the space, and how many of them refuse
-// to be drawn straight — a board where joining the dots works is not a puzzle.
+// Cordes levels plan (1-100). Three ropes on a small frame, up to six on a wide one. Every
+// rope has to refuse the straight line between its two pegs: one rope you can just join up
+// is one rope the player never thinks about.
 // A level = tie every rope; stars come from solve time.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
-import type { DiffLevel } from './engine';
+import { frameFor, type DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface CordesLevelCfg {
@@ -26,11 +26,10 @@ const basePlan: LevelPlan<CordesLevelCfg> = {
 	config(level: number): CordesLevelCfg {
 		const l = Math.max(1, Math.min(LEVEL_COUNT, level));
 		const ropes = Math.min(6, 3 + Math.floor((l - 1) / 25)); // 3 → 6
-		const side = Math.min(7, 5 + Math.floor((l - 1) / 34)); // 5 → 7
-		const tangle = Math.min(4, 2 + Math.floor((l - 1) / 40)); // 2 → 4
+		const side = frameFor(ropes);
 		return {
 			seed: levelSeed(l),
-			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, tangle },
+			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, tangle: ropes },
 			threeStarCentis: targets(ropes, 400, 500),
 			twoStarCentis: targets(ropes, 1000, 1100),
 		};
@@ -53,9 +52,10 @@ const basePlan: LevelPlan<CordesLevelCfg> = {
 export const cordesLevels = extendPlan('cordes', basePlan, {
 	configExt: (base, level) => {
 		const ropes = level > 150 ? 8 : 7;
+		const side = frameFor(ropes);
 		return {
 			...base,
-			diff: { label: `Niveau ${level}`, ropes, cols: 8, rows: 8, tangle: level > 150 ? 5 : 4 },
+			diff: { label: `Niveau ${level}`, ropes, cols: side, rows: side, tangle: ropes },
 			threeStarCentis: targets(ropes, 600, 560),
 			twoStarCentis: targets(ropes, 1400, 1200),
 		};

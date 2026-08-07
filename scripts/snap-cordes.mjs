@@ -11,7 +11,11 @@ for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 520, height: 980 }, deviceScaleFactor: 3, hasTouch: true });
-await ctx.addInitScript(() => localStorage.setItem('ludiven-tuto-seen', '["cordes"]'));
+await ctx.addInitScript(() => {
+	localStorage.setItem('ludiven-tuto-seen', '["cordes"]');
+	// Owning the pack is what puts the Expert pill on screen — the widest frame we ship.
+	localStorage.setItem('ludiven-cocottes', JSON.stringify({ balance: 0, owned: ['expert:cordes'] }));
+});
 const page = await ctx.newPage();
 page.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE', m.text()); });
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
@@ -106,6 +110,11 @@ for (let i = 0; i < 12 && !(await page.locator('.cor-win').count()); i++) {
 }
 await sleep(500);
 await shot('4-difficile-solved');
+
+/* ---- 5. Expert: seven ropes on a 10x10 frame — pegs must stay big enough to tap. ---- */
+await fresh('Expert');
+console.log('--- expert, fresh ---', await gauge());
+await shot('5-expert');
 
 console.log('→ D:/tmp/cordes-*.png');
 await browser.close();

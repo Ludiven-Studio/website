@@ -29,11 +29,17 @@ export interface DiffLevel {
 	tangle: number;
 }
 
+/**
+ * Frame side for a rope count. Every extra rope makes it harder to keep them all tangled,
+ * so the crowd needs more room — past six they need a whole extra ring.
+ */
+export const frameFor = (ropes: number): number => ropes + (ropes < 7 ? 2 : 3);
+
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', ropes: 3, cols: 5, rows: 5, tangle: 2 },
-	moyen: { label: 'Moyen', ropes: 4, cols: 6, rows: 6, tangle: 2 },
-	difficile: { label: 'Difficile', ropes: 5, cols: 7, rows: 7, tangle: 3 },
-	expert: { label: 'Expert', ropes: 7, cols: 8, rows: 8, tangle: 4 },
+	facile: { label: 'Facile', ropes: 3, cols: 5, rows: 5, tangle: 3 },
+	moyen: { label: 'Moyen', ropes: 4, cols: 6, rows: 6, tangle: 4 },
+	difficile: { label: 'Difficile', ropes: 5, cols: 7, rows: 7, tangle: 5 },
+	expert: { label: 'Expert', ropes: 7, cols: 10, rows: 10, tangle: 7 },
 };
 
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
@@ -292,14 +298,15 @@ function carve(diff: DiffLevel, rng: Rng): number[][] {
 }
 
 /**
- * How many ropes cannot simply be drawn straight from peg to peg — either the chord runs
- * into another rope's chord, or it grazes a peg that isn't its own. This is the whole
- * difficulty of the game: at zero, joining the dots with a ruler is the answer.
+ * How many ropes have their straight peg-to-peg line cut by another rope's. This is the
+ * whole difficulty of the game: a rope nobody crosses is one the player joins with a ruler
+ * and never thinks about. Grazing a peg would count as a fault too, but it reads as a near
+ * miss on screen, so it does not count here.
  */
 export function tangleCount(p: CordesPuzzle): number {
-	const straight = p.ends.map(([a, b]) => [a, b]);
+	const chord = p.ends.map(([a, b]) => [a, b]);
 	let n = 0;
-	for (let r = 0; r < p.ropes; r++) if (ropeFault(straight[r], r, straight, p) !== null) n++;
+	for (let r = 0; r < p.ropes; r++) if (chord.some((o, i) => i !== r && pathsCross(chord[r], o))) n++;
 	return n;
 }
 
@@ -327,8 +334,8 @@ function deal(diff: DiffLevel, rng: Rng): CordesPuzzle {
 }
 
 /**
- * Deal until the board is worth solving. Carving is cheap, so rejecting the trivial deals
- * costs a few hundred microseconds; the best one seen is kept so a cramped frame that can
+ * Deal until every rope is worth drawing. One deal costs tens of microseconds, so hundreds
+ * of rejections stay under a frame; the best one seen is kept so a cramped frame that can
  * never reach its target still returns its hardest board rather than looping.
  */
 export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesPuzzle {
@@ -337,7 +344,7 @@ export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesP
 	const rate = (p: CordesPuzzle): number => (p.solution.some((r) => r.length < 3) ? -1 : tangleCount(p));
 	let best = deal(diff, rng);
 	let bestScore = rate(best);
-	for (let i = 0; i < 60 && bestScore < diff.tangle; i++) {
+	for (let i = 0; i < 400 && bestScore < diff.tangle; i++) {
 		const p = deal(diff, rng);
 		const s = rate(p);
 		if (s > bestScore) {

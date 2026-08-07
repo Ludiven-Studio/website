@@ -60,7 +60,7 @@ const nulls = (n: number): Board => new Array<Pt[] | null>(n).fill(null);
 /* The saved daily board is raw coordinates, so it only means something on the pegs it was
    drawn against. GEN_V bumps with the generator: an attempt saved against an older board
    is dropped instead of redrawn as scribbles over the new pegs. */
-const GEN_V = 2;
+const GEN_V = 3;
 const packBoard = (ropes: Board) => ({ v: GEN_V, ropes });
 const unpackBoard = (saved: unknown, n: number): Board | null => {
 	const o = saved as { v?: number; ropes?: Board } | null;
