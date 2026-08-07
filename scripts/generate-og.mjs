@@ -167,6 +167,28 @@ async function main() {
 			}
 			await sleep(300);
 		},
+		// Both land on Niveaux, and their tab reads "🎲 Libre" — the anchored FREE_RE misses it,
+		// so the generic start leaves the shot on the level grid. Steer to free mode by hand.
+		circuit: async () => {
+			await sleep(900);
+			await clickBtn('libre');
+			await sleep(400);
+			await clickBtn('difficile');
+			await sleep(700);
+		},
+		// Same, plus a fresh board is only a handful of pegs. Hint the ropes in to show the
+		// mechanic, one short of the full set so the win card stays out of the shot.
+		cordes: async () => {
+			await sleep(900);
+			await clickBtn('libre');
+			await sleep(400);
+			await clickBtn('difficile');
+			await sleep(700);
+			for (let i = 0; i < 4; i++) {
+				await page.locator('.cor-act').first().click().catch(() => {});
+				await sleep(260);
+			}
+		},
 		// Levels is the landing mode and resumes asynchronously, so it wins the race against
 		// the generic start and the shot ends up on the levels tag. Come back to Libre once
 		// it has settled, then let the software renderer draw the course.
@@ -203,9 +225,10 @@ async function main() {
 			await page.waitForSelector('.game-page [class$="-root"]', { timeout: 12000 }).catch(() => {});
 			const title = await page.$eval('.game-head h1', (el) => el.textContent?.trim()).catch(() => id);
 
-			// Hide site chrome, center the game on a dark backdrop.
+			// Hide site chrome, center the game on a dark backdrop. The leaderboard pill floats
+			// over the board in free mode, so it counts as chrome too.
 			await page.addStyleTag({
-				content: `nav, footer, .game-head { display: none !important; }
+				content: `nav, footer, .game-head, .lbc-root { display: none !important; }
 					.game-page { max-width: none !important; width: 100vw; min-height: 100vh; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; }
 					body, .backgrounds { background: ${process.env.OG_BG || 'linear-gradient(160deg, #f0d5e8, #d8cfef, #c6d4f1)'} !important; }
 					${process.env.OG_CSS || ''}`, // OG_CSS='.lc-root{zoom:0.75}' → extra per-run tweaks (e.g. fit tall games)
