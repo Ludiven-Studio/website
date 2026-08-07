@@ -42,7 +42,7 @@ describe('DIFF_ORDER stays at three entries', () => {
 	}
 
 	it('finds every declaration', () => {
-		expect(decls.length).toBeGreaterThanOrEqual(39);
+		expect(decls.length).toBeGreaterThanOrEqual(40);
 	});
 
 	for (const [file, decl] of decls) {
@@ -60,7 +60,7 @@ describe('Expert tier wiring', () => {
 	);
 
 	it('gates Expert in enough games', () => {
-		expect(gated.length).toBeGreaterThanOrEqual(36);
+		expect(gated.length).toBeGreaterThanOrEqual(37);
 	});
 
 	for (const g of gated) {

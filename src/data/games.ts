@@ -147,6 +147,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'cordes',
+		title: 'Cordes',
+		pitch: 'Relie chaque piquet à son jumeau d\'un trait à main levée, sans croiser une autre corde ni sortir du cadre. Défi du jour à graine partagée.',
+		icon: 'cordes',
+		href: '/jeux/cordes',
+		status: 'play',
+	},
+	{
 		id: 'suite',
 		title: 'Suite mystère',
 		pitch: 'Devine la règle cachée et complète la séquence. En choix multiple.',

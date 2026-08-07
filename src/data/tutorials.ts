@@ -123,6 +123,12 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Astuce', body: 'Commence par les bords : un tuyau ne peut pas sortir de la grille, donc les tuiles du contour n\'ont souvent qu\'une seule orientation possible. Puis remonte le courant depuis le générateur.' },
 		{ emoji: '🔁', title: 'Expert', body: 'En Expert et à partir du niveau 101, les bords bouclent : un tuyau qui sort à droite ressort à gauche. Les indices du contour disparaissent — tout se déduit du réseau lui-même.' },
 	],
+	cordes: [
+		{ emoji: '🪢', title: 'Le but', body: 'Chaque piquet a un jumeau de la même couleur. Relie-les tous d\'un trait, sans qu\'aucune corde n\'en croise une autre ni ne sorte du cadre.' },
+		{ emoji: '👆', title: 'Comment jouer', body: 'Pose ton doigt sur un piquet et glisse jusqu\'à son jumeau : la corde te suit. Reviens en arrière sur ton tracé pour l\'effacer, touche une corde posée pour la retirer.' },
+		{ emoji: '🚧', title: 'Elle s\'arrête', body: 'Une corde ne peut pas passer là où c\'est interdit : au lieu de te sanctionner, elle refuse d\'avancer. Contourne l\'obstacle et elle repart.' },
+		{ emoji: '💡', title: 'Astuce', body: 'Le cadre fait tout : ce sont ses bords qui empêchent de contourner par l\'extérieur. Trace d\'abord les cordes coincées contre un bord, il reste ensuite plus de place au milieu.' },
+	],
 	suite: [
 		{ emoji: '🔢', title: 'Le but', body: 'Devine le terme suivant d\'une suite gouvernée par une règle cachée.' },
 		{ emoji: '✅', title: 'Comment jouer', body: 'Choisis la bonne réponse. Bonne réponse → on enchaîne et le score monte ; une erreur termine la manche.' },

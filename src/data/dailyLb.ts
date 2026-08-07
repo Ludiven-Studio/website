@@ -41,6 +41,7 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	tente: { fmt: centis },
 	chemin: { fmt: centis },
 	circuit: { fmt: centis },
+	cordes: { fmt: centis },
 	matrices: { fmt: centis },
 	reines: { fmt: centis },
 	symboles: { fmt: centis },
