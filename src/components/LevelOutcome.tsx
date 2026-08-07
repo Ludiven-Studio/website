@@ -17,10 +17,11 @@ interface Props {
 
 export default function LevelOutcome({ level, lastLevel, won, stars, onNext, onReplay, onMenu, detail }: Props) {
 	// Every game mounts this the instant the level ends, so the card used to land straight on
-	// top of the board. The cocotte gets that second instead — she owns the outcome here, which
-	// is why games hide their own celebration while a level is running.
-	const ready = useOutcomeHold();
-	if (!ready) return <Celebration won={won} />;
+	// top of the board. Now the board is left alone for half a second, then the cocotte gets
+	// hers — which is why games hide their own celebration while a level is running.
+	const phase = useOutcomeHold();
+	if (phase === 'board') return null;
+	if (phase === 'beat') return <Celebration won={won} />;
 
 	return (
 		<div className="lo-wrap" role="dialog" aria-label={won ? 'Niveau réussi' : 'Niveau échoué'}>

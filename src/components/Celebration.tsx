@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 
 /**
- * End-of-game beat: the cocotte reacts for ~1s over the board — confetti and a thumbs-up on a
- * win, a slumped shrug on a loss — and only then may a popup cover it.
+ * End-of-game beat: the finished board is left alone for a moment, then the cocotte reacts for
+ * ~1s over it — confetti and a thumbs-up on a win, a slumped shrug on a loss — and only after
+ * that may a popup cover the whole thing.
  * `<Celebration />` is an overlay — drop it inside the board's position:relative wrapper.
  * `useCelebration(won)` gates the free-play win card; `useOutcomeHold()` gates the level card.
  * Honors prefers-reduced-motion (no animation, popup immediate).
@@ -10,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 const COLORS = ['#ff5d8f', '#ffd166', '#06d6a0', '#4cc9f0', '#b388ff', '#ff8c42', '#ef476f'];
 const PIECES = 26;
+const LEAD_MS = 500; // the board keeps the stage for half a second — the last move deserves a look
 const HOLD_MS = 1100;
 
 const prefersReducedMotion = (): boolean =>
@@ -18,22 +20,26 @@ const prefersReducedMotion = (): boolean =>
 	window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
- * False while the cocotte owns the board, true once she has had her moment. Callers mount on
- * the outcome itself, so the hold starts on mount and runs whether the player won or lost.
+ * The three acts of an ending: `board` shows the finished grid untouched, `beat` belongs to the
+ * cocotte, `card` lets the popup in. Callers mount on the outcome, win or lose, so it runs on mount.
  */
-export function useOutcomeHold(): boolean {
-	const [over, setOver] = useState(false);
+export function useOutcomeHold(): 'board' | 'beat' | 'card' {
+	const [phase, setPhase] = useState<'board' | 'beat' | 'card'>('board');
 
 	useEffect(() => {
 		if (prefersReducedMotion()) {
-			setOver(true);
+			setPhase('card');
 			return;
 		}
-		const t = setTimeout(() => setOver(true), HOLD_MS);
-		return () => clearTimeout(t);
+		const a = setTimeout(() => setPhase('beat'), LEAD_MS);
+		const b = setTimeout(() => setPhase('card'), LEAD_MS + HOLD_MS);
+		return () => {
+			clearTimeout(a);
+			clearTimeout(b);
+		};
 	}, []);
 
-	return over;
+	return phase;
 }
 
 /** While `won` is true: `celebrating` for ~1s, then `showWin` flips on (popup gate). */
