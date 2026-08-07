@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
  * ~1s over it — confetti and a thumbs-up on a win, a slumped shrug on a loss — and only after
  * that may a popup cover the whole thing.
  * `<Celebration />` is an overlay — drop it inside the board's position:relative wrapper.
- * `useCelebration(won)` gates the free-play win card; `useOutcomeHold()` gates the level card.
+ * `useCelebration(won)` gates the free-play and daily win card; `useOutcomeHold()` the level card.
  * Honors prefers-reduced-motion (no animation, popup immediate).
  */
 
@@ -42,7 +42,7 @@ export function useOutcomeHold(): 'board' | 'beat' | 'card' {
 	return phase;
 }
 
-/** While `won` is true: `celebrating` for ~1s, then `showWin` flips on (popup gate). */
+/** Same three acts for free play and the daily: board alone, then `celebrating`, then `showWin`. */
 export function useCelebration(won: boolean): { celebrating: boolean; showWin: boolean } {
 	const [celebrating, setCelebrating] = useState(false);
 	const [showWin, setShowWin] = useState(false);
@@ -57,13 +57,17 @@ export function useCelebration(won: boolean): { celebrating: boolean; showWin: b
 			setShowWin(true);
 			return;
 		}
-		setCelebrating(true);
+		setCelebrating(false);
 		setShowWin(false);
-		const t = setTimeout(() => {
+		const a = setTimeout(() => setCelebrating(true), LEAD_MS);
+		const b = setTimeout(() => {
 			setShowWin(true);
 			setCelebrating(false);
-		}, HOLD_MS);
-		return () => clearTimeout(t);
+		}, LEAD_MS + HOLD_MS);
+		return () => {
+			clearTimeout(a);
+			clearTimeout(b);
+		};
 	}, [won]);
 
 	// AND with the live `won`: state is updated in an effect (one render late), so without
