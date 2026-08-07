@@ -12,7 +12,7 @@ import {
 	segCross,
 	selfCrosses,
 	tangleCount,
-	tangleDepth,
+	wallCount,
 	type CordesPuzzle,
 	type Pt,
 } from './engine';
@@ -31,6 +31,7 @@ const bare: CordesPuzzle = {
 		[{ x: 0.1, y: 0.5 }, { x: 0.3, y: 0.02 }, { x: 0.7, y: 0.02 }, { x: 0.9, y: 0.5 }],
 		[{ x: 0.5, y: 0.1 }, { x: 0.5, y: 0.9 }],
 	],
+	anchored: [false, false],
 	pegR: 0.04,
 };
 
@@ -95,23 +96,28 @@ describe('cordes rules', () => {
 	});
 });
 
+const onFrame = (p: Pt): boolean => p.x <= 0 || p.x >= 1 || p.y <= 0 || p.y >= 1;
+
 /** The board's own answer must obey every rule the player is held to. */
 function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 	expect(p.ropes).toBe(ropes);
 	expect(p.solution).toHaveLength(ropes);
 	expect(p.ends).toHaveLength(ropes);
+	expect(p.anchored).toHaveLength(ropes);
 
 	const pegs = p.ends.flat();
 	for (let i = 0; i < pegs.length; i++) {
-		expect(pegs[i].x).toBeGreaterThan(0);
-		expect(pegs[i].x).toBeLessThan(1);
-		expect(pegs[i].y).toBeGreaterThan(0);
-		expect(pegs[i].y).toBeLessThan(1);
+		expect(pegs[i].x).toBeGreaterThanOrEqual(0);
+		expect(pegs[i].x).toBeLessThanOrEqual(1);
+		expect(pegs[i].y).toBeGreaterThanOrEqual(0);
+		expect(pegs[i].y).toBeLessThanOrEqual(1);
 		// A tap must never be ambiguous between two pegs.
 		for (let j = i + 1; j < pegs.length; j++) expect(dist(pegs[i], pegs[j])).toBeGreaterThan(2 * p.pegR);
 	}
 
 	for (let r = 0; r < ropes; r++) {
+		// The flag has to tell the truth: a wall is a rope with both pegs nailed to the frame.
+		expect(onFrame(p.ends[r][0]) && onFrame(p.ends[r][1])).toBe(p.anchored[r]);
 		// Three peg-widths apart at least: closer than that and the eye pairs them up for free.
 		expect(dist(p.ends[r][0], p.ends[r][1])).toBeGreaterThanOrEqual(6 * p.pegR);
 		expect(p.solution[r].length).toBeGreaterThan(2);
@@ -134,22 +140,20 @@ describe('cordes generation', () => {
 	for (const key of Object.keys(DIFFS)) {
 		const diff = DIFFS[key];
 
-		it(`${diff.label}: a ruler is never the answer`, () => {
-			// Two targets, both reached by rejection: every rope crossed, and enough of them
-			// caught between two others. A board that runs out of tries still has to leave at
-			// most one rope joinable with a straight line — the deeper target is best-effort,
-			// so it only has to land on most boards, not all.
+		it(`${diff.label}: the walls are there and a ruler is never the answer`, () => {
+			// The walls are built, not hoped for, so every board must have them all. The tangle
+			// is only rejection sampling on top: two ropes always refuse the ruler, the rest of
+			// the target lands on most boards.
+			const walls = Math.min(diff.walls, Math.floor((diff.ropes - 1) / 2));
 			let full = 0;
-			let deep = 0;
 			for (let s = 0; s < 60; s++) {
 				const p = generateCordes(diff, mulberry32(2200 + s * 41 + diff.ropes));
+				expect(wallCount(p)).toBe(walls);
 				const t = tangleCount(p);
-				expect(t).toBeGreaterThanOrEqual(diff.tangle - 1);
+				expect(t).toBeGreaterThanOrEqual(2);
 				if (t >= diff.tangle) full++;
-				if (tangleDepth(p) >= diff.depth) deep++;
 			}
-			expect(full).toBeGreaterThanOrEqual(54);
-			expect(deep).toBeGreaterThanOrEqual(30);
+			expect(full).toBeGreaterThanOrEqual(42);
 		});
 	}
 

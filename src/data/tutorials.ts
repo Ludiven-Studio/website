@@ -127,7 +127,8 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🪢', title: 'Le but', body: 'Chaque piquet a un jumeau de la même couleur. Relie-les tous d\'un trait, sans qu\'aucune corde n\'en croise une autre ni ne sorte du cadre.' },
 		{ emoji: '👆', title: 'Comment jouer', body: 'Pose ton doigt sur un piquet et glisse jusqu\'à son jumeau : la corde te suit. Reviens en arrière sur ton tracé pour l\'effacer, touche une corde posée pour la retirer.' },
 		{ emoji: '🚧', title: 'Elle s\'arrête', body: 'Une corde ne peut pas passer là où c\'est interdit : au lieu de te sanctionner, elle refuse d\'avancer. Contourne l\'obstacle et elle repart.' },
-		{ emoji: '💡', title: 'Astuce', body: 'Le cadre fait tout : ce sont ses bords qui empêchent de contourner par l\'extérieur. Trace d\'abord les cordes coincées contre un bord, il reste ensuite plus de place au milieu.' },
+		{ emoji: '📌', title: 'Les piquets du cadre', body: 'Certains piquets sont plantés dans le bord. La corde qui relie deux piquets du bord coupe le plateau en deux : impossible de la contourner, tout ce qui est d\'un côté y reste.' },
+		{ emoji: '💡', title: 'Astuce', body: 'Trace d\'abord ces cordes-là : chaque paire restante n\'a ensuite plus qu\'un seul côté possible. Si une paire se retrouve à cheval sur une corde déjà posée, c\'est cette corde-là qu\'il faut refaire, pas la tienne.' },
 	],
 	suite: [
 		{ emoji: '🔢', title: 'Le but', body: 'Devine le terme suivant d\'une suite gouvernée par une règle cachée.' },

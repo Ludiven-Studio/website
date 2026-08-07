@@ -600,10 +600,11 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 							{puzzle.ends.map((pair, r) => pair.map((peg, e) => (
 								<circle
 									key={`${r}-${e}`}
-									className="cor-peg"
+									className={`cor-peg ${puzzle.anchored[r] ? 'nailed' : ''}`}
 									cx={peg.x * V}
 									cy={peg.y * V}
-									r={pegView}
+									// A peg on the frame shows only half of itself, so draw it bigger to weigh the same.
+									r={puzzle.anchored[r] ? pegView * 1.35 : pegView}
 									fill={HUE[r % HUE.length]}
 								/>
 							)))}
@@ -790,6 +791,7 @@ const CSS = `
 .cor-rope.draft { opacity: 0.5; stroke-dasharray: 3 2.4; }
 .cor-head { fill: var(--gray-999); stroke-width: 1.4; }
 .cor-peg { stroke: var(--gray-999); stroke-width: 1.2; }
+.cor-peg.nailed { stroke: var(--gray-200); stroke-width: 2; }
 
 .cor-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
 .cor-overlay {

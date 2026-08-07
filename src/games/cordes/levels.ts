@@ -1,11 +1,11 @@
-// Cordes levels plan (1-100). Three ropes on a small frame, up to six on a wide one. Every
-// rope has to refuse the straight line between its two pegs: one rope you can just join up
-// is one rope the player never thinks about.
+// Cordes levels plan (1-100). Three ropes on a small frame, up to six on a wide one. Most
+// ropes have to refuse the straight line between their two pegs, and at least one is nailed
+// to the frame at both ends: that one cuts the board, so it decides where the others go.
 // A level = tie every rope; stars come from solve time.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
-import { depthFor, frameFor, type DiffLevel } from './engine';
+import { frameFor, tangleFor, wallsFor, type DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface CordesLevelCfg {
@@ -29,7 +29,7 @@ const basePlan: LevelPlan<CordesLevelCfg> = {
 		const side = frameFor(ropes);
 		return {
 			seed: levelSeed(l),
-			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, tangle: ropes, depth: depthFor(ropes) },
+			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, tangle: tangleFor(ropes), walls: wallsFor(ropes) },
 			threeStarCentis: targets(ropes, 400, 500),
 			twoStarCentis: targets(ropes, 1000, 1100),
 		};
@@ -55,7 +55,7 @@ export const cordesLevels = extendPlan('cordes', basePlan, {
 		const side = frameFor(ropes);
 		return {
 			...base,
-			diff: { label: `Niveau ${level}`, ropes, cols: side, rows: side, tangle: ropes, depth: depthFor(ropes) },
+			diff: { label: `Niveau ${level}`, ropes, cols: side, rows: side, tangle: tangleFor(ropes), walls: wallsFor(ropes) },
 			threeStarCentis: targets(ropes, 600, 560),
 			twoStarCentis: targets(ropes, 1400, 1200),
 		};
