@@ -24,9 +24,9 @@ export interface PackedField {
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 /**
- * The one way a duration is shown: whole seconds. "43 s" under a minute, "1:23" above.
- * Values stay stored to the hundredth, so records and ties still sort exactly — the
- * precision is simply never displayed, because a flickering decimal reads as noise.
+ * How a clock the player watches is shown: whole seconds. "43 s" under a minute, "1:23"
+ * above. A decimal that flickers ten times a second reads as noise, so a running chrono
+ * and a star target keep it hidden; a ranking uses `fmtExact` instead.
  * Truncate rather than round: a chrono must never show a second the player hasn't spent
  * (a "≤ 15 s" star would otherwise look missed at 15 s displayed / 14.6 s real).
  */
@@ -37,6 +37,24 @@ export const fmtSeconds = (totalSec: number): string => {
 
 /** Live-timer / result label from centiseconds. */
 export const fmtCentis = (cs: number): string => fmtSeconds(cs / 100);
+
+/**
+ * The same duration with every digit that was really stored, `div` being what a second is
+ * counted in. A ranking is read once, not watched: two players both showing "32 s" while
+ * one ranks above the other is unreadable, and the hundredths are the whole explanation.
+ * Never shows a digit the value does not have — tenths stay tenths.
+ */
+export function fmtExact(v: number, div: number): string {
+	const dec = div >= 100 ? 2 : div >= 10 ? 1 : 0;
+	if (dec === 0) return fmtSeconds(v / div);
+	const t = Math.max(0, Math.floor(v));
+	const whole = Math.floor(t / div);
+	const frac = String(Math.floor(((t % div) * 10 ** dec) / div)).padStart(dec, '0');
+	return whole < 60 ? `${whole},${frac} s` : `${Math.floor(whole / 60)}:${pad2(whole % 60)},${frac}`;
+}
+
+/** Ranking-grade label from centiseconds. */
+export const fmtCentisExact = (cs: number): string => fmtExact(cs, 100);
 
 /** Pack fields (highest significance first) into one integer. Each field must be < radix. */
 export const encodePacked = (radix: number, fields: number[]): number =>
@@ -69,14 +87,13 @@ export function formatScore(f: ScoreFormat, v: number): string {
 		case 'count':
 			return `${v} ${v > 1 ? f.many : f.one}`;
 		case 'duration':
-			return fmtSeconds(v / f.div);
+			return fmtExact(v, f.div);
 		case 'packed': {
 			const parts = decodePacked(f.radix, f.fields.length, v);
 			return f.fields
 				.map((fl, i) => {
 					const raw = fl.base != null ? fl.base - parts[i] : parts[i];
-					const x = fl.div ? raw / fl.div : raw;
-					const s = fl.as === 'time' ? fmtSeconds(x) : String(x);
+					const s = fl.as === 'time' ? fmtExact(raw, fl.div ?? 1) : String(fl.div ? raw / fl.div : raw);
 					return fl.unit ? `${s} ${fl.unit}` : s;
 				})
 				.join(f.sep ?? ' · ');

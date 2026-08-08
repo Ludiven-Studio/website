@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encodePacked, decodePacked, formatScore, fmtCentis, fmtSeconds, type ScoreFormat } from './scoreFormat';
+import { encodePacked, decodePacked, formatScore, fmtCentis, fmtExact, fmtSeconds, type ScoreFormat } from './scoreFormat';
 
 describe('packed encode/decode', () => {
 	it('round-trips and orders lexicographically', () => {
@@ -35,36 +35,46 @@ describe('formatScore', () => {
 		expect(fmtSeconds(-5)).toBe('0 s');
 	});
 
+	it('shows only the digits the stored unit really has', () => {
+		expect(fmtExact(583, 100)).toBe('5,83 s');
+		expect(fmtExact(6842, 100)).toBe('1:08,42');
+		expect(fmtExact(123, 10)).toBe('12,3 s'); // tenths stay tenths
+		expect(fmtExact(8340, 1000)).toBe('8,34 s'); // ms cut down to hundredths
+		expect(fmtExact(65000, 1000)).toBe('1:05,00');
+		expect(fmtExact(42, 1)).toBe('42 s'); // whole seconds: no decimal to invent
+		expect(fmtExact(-5, 100)).toBe('0,00 s');
+	});
+
 	it('scales durations to seconds whatever the stored unit', () => {
-		expect(formatScore({ kind: 'duration', div: 10 }, 123)).toBe('12 s'); // esquive tenths
-		expect(formatScore({ kind: 'duration', div: 1000 }, 8340)).toBe('8 s'); // drift ms
-		expect(formatScore({ kind: 'duration', div: 1000 }, 65000)).toBe('1:05');
+		expect(formatScore({ kind: 'duration', div: 10 }, 123)).toBe('12,3 s'); // esquive tenths
+		expect(formatScore({ kind: 'duration', div: 1000 }, 8340)).toBe('8,34 s'); // drift ms
+		expect(formatScore({ kind: 'duration', div: 1000 }, 65000)).toBe('1:05,00');
 	});
 
 	it('renders time races from centiseconds', () => {
 		const centis: ScoreFormat = { kind: 'duration', div: 100 };
-		expect(fmtCentis(583)).toBe('5 s');
-		expect(formatScore(centis, 583)).toBe('5 s');
-		expect(formatScore(centis, 4312)).toBe('43 s');
-		expect(formatScore(centis, 8345)).toBe('1:23');
+		expect(fmtCentis(583)).toBe('5 s'); // the live chrono stays whole
+		expect(formatScore(centis, 583)).toBe('5,83 s');
+		expect(formatScore(centis, 4312)).toBe('43,12 s');
+		expect(formatScore(centis, 8345)).toBe('1:23,45');
 	});
 
 	it('renders packed count + time', () => {
 		const f: ScoreFormat = { kind: 'packed', radix: 100000, fields: [{ as: 'int', unit: 'coups' }, { as: 'time', div: 10 }] };
-		expect(formatScore(f, encodePacked(100000, [3, 420]))).toBe('3 coups · 42 s');
+		expect(formatScore(f, encodePacked(100000, [3, 420]))).toBe('3 coups · 42,0 s');
 		// centisecond packed (billard/golf/angry)
 		const cc: ScoreFormat = { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'coups' }, { as: 'time', div: 100 }] };
-		expect(formatScore(cc, encodePacked(10_000_000, [3, 8345]))).toBe('3 coups · 1:23');
+		expect(formatScore(cc, encodePacked(10_000_000, [3, 8345]))).toBe('3 coups · 1:23,45');
 		// inverted `base` field (réussite): stored (52 - cards) so "more cards" sorts ascending, rendered back to the count
 		const reu: ScoreFormat = { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'cartes', base: 52 }, { as: 'time', div: 100 }] };
-		expect(formatScore(reu, encodePacked(10_000_000, [52 - 40, 8345]))).toBe('40 cartes · 1:23');
-		expect(formatScore(reu, encodePacked(10_000_000, [0, 4312]))).toBe('52 cartes · 43 s');
+		expect(formatScore(reu, encodePacked(10_000_000, [52 - 40, 8345]))).toBe('40 cartes · 1:23,45');
+		expect(formatScore(reu, encodePacked(10_000_000, [0, 4312]))).toBe('52 cartes · 43,12 s');
 	});
 
-	it('still orders hundredth-apart records even though it shows the same label', () => {
+	it('tells hundredth-apart records apart, which is what ranks them', () => {
 		const centis: ScoreFormat = { kind: 'duration', div: 100 };
-		expect(formatScore(centis, 4300)).toBe(formatScore(centis, 4399)); // same on screen…
-		expect(4300).toBeLessThan(4399); // …but the stored value still breaks the tie
+		expect(formatScore(centis, 4300)).toBe('43,00 s');
+		expect(formatScore(centis, 4399)).toBe('43,99 s');
 	});
 
 	it('branches on a loss threshold', () => {
