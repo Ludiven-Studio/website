@@ -36,6 +36,11 @@ describe('word lists', () => {
 });
 
 describe('helpers', () => {
+	it('parseWords decodes front-coded tokens', () => {
+		expect(parseWords('0CHAT 4S 2IEN 0ZEBRE')).toEqual(['CHAT', 'CHATS', 'CHIEN', 'ZEBRE']);
+		expect(parseWords('  0ABRI\n0BUT  ')).toEqual(['ABRI', 'BUT']);
+	});
+
 	it('mergeSorted merges disjoint sorted lists', () => {
 		expect(mergeSorted(['A', 'C', 'E'], ['B', 'D'])).toEqual(['A', 'B', 'C', 'D', 'E']);
 		expect(mergeSorted([], ['X'])).toEqual(['X']);
