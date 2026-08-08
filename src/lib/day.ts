@@ -29,6 +29,10 @@ export const challengeDay = (d: Date = new Date()): string => {
 /** YYYYMMDD as an integer — the PRNG seed input. */
 export const challengeDayNumber = (d: Date = new Date()): number => Number(challengeDay(d).replace(/-/g, ''));
 
+/** Days elapsed since 1970-01-01 — a contiguous counter, for content walked day after day. */
+export const challengeDayOrdinal = (d: Date = new Date()): number =>
+	Math.floor(Date.parse(`${challengeDay(d)}T12:00:00Z`) / 86400000);
+
 /** Day of week of the challenge day (0=Sunday), in Europe/Paris. Noon UTC dodges any DST edge. */
 export const challengeWeekday = (d: Date = new Date()): number => new Date(`${challengeDay(d)}T12:00:00Z`).getUTCDay();
 

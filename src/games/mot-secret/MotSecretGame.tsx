@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { pickSolution, isValidGuess, evaluate, bestKnown, knownGood, DIFFS, MAX_TRIES, type GuessRow, type LetterState } from './engine';
+import { pickSolutionAt, isValidGuess, evaluate, bestKnown, knownGood, DIFFS, MAX_TRIES, type GuessRow, type LetterState } from './engine';
 import { diffKeys } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
-import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { getDaily, dailyTierOrdinal, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -35,9 +35,23 @@ interface Msg { text: string; }
 
 const ordinal = (n: number): string => (n === 1 ? '1ʳᵉ' : `${n}ᵉ`);
 
+// Free mode also draws without replacement: a per-length counter walks the shuffled pool.
+// Its start is random so two players don't open on the same word.
+const freeNth = (len: number): number => {
+	const key = `ludiven-motsecret-free-${len}`;
+	try {
+		const prev = localStorage.getItem(key);
+		const n = (prev == null ? (Math.random() * 1e6) | 0 : Number(prev) + 1) >>> 0;
+		localStorage.setItem(key, String(n));
+		return n;
+	} catch {
+		return (Math.random() * 1e6) | 0;
+	}
+};
+
 export default function MotSecretGame({ gameId }: { gameId: string }) {
 	const [diffKey, setDiffKey] = useState<keyof typeof DIFFS>('facile');
-	const [solution, setSolution] = useState<string>(() => pickSolution(1, DIFFS.facile.len));
+	const [solution, setSolution] = useState<string>(() => pickSolutionAt(DIFFS.facile.len, 0));
 	const [rows, setRows] = useState<GuessRow[]>([]);
 	const [current, setCurrent] = useState<string>(solution[0]);
 	const [status, setStatus] = useState<Status>('playing');
@@ -96,7 +110,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		const tries = DIFFS[key].tries ?? MAX_TRIES;
 		maxTriesRef.current = tries; setMaxTries(tries); setExtraBoth(0);
 		setDiffKey(key);
-		const s = pickSolution((Math.random() * 2 ** 31) >>> 0, DIFFS[key].len);
+		const s = pickSolutionAt(DIFFS[key].len, freeNth(DIFFS[key].len));
 		setSolutionBoth(s);
 		setRowsBoth([]); setCurrentBoth(s[0]);
 		setStatusBoth('playing'); setMsg(null); resetHints();
@@ -117,7 +131,8 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 			const key = DIFF_ORDER[di] ?? 'facile';
 			dailySeedRef.current = { seed, diffIndex: di };
 			setDiffKey(key);
-			const s = pickSolution(seed, DIFFS[key].len);
+			// The word follows the day, not the seed: same for everyone, and never a repeat.
+			const s = pickSolutionAt(DIFFS[key].len, dailyTierOrdinal());
 			setSolutionBoth(s);
 			return s;
 		};
@@ -153,7 +168,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		dailyRef.current = false;
 		setDaily(false); setAlreadyPlayed(false); setDailyLoading(false); setRevealed(false);
 		maxTriesRef.current = cfg.tries; setMaxTries(cfg.tries); setExtraBoth(0);
-		const s = pickSolution(cfg.seed, cfg.len);
+		const s = pickSolutionAt(cfg.len, level);
 		setSolutionBoth(s);
 		setRowsBoth([]); setCurrentBoth(s[0]);
 		setStatusBoth('playing'); setMsg(null); resetHints();

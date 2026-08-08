@@ -2,7 +2,7 @@
 // Inactive until SUPABASE_URL + SUPABASE_ANON_KEY are set in src/data/site.ts.
 
 import { dateSeed } from '../games/prng';
-import { challengeDay, challengeWeekday } from './day';
+import { challengeDay, challengeDayOrdinal, challengeWeekday } from './day';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
 import { trackGame } from './analytics';
 import { recordDailyDone } from './streak';
@@ -36,12 +36,24 @@ export const dailySeed = (gameId: string, d: Date = new Date()): number =>
 const WEEKDAYS_FR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 export const dailyWeekdayLabel = (d: Date = new Date()): string => WEEKDAYS_FR[challengeWeekday(d)];
 
+// Sun..Sat → difficulty tier: Mon/Tue facile, Wed/Thu/Fri moyen, Sat/Sun difficile.
+const TIER_BY_WEEKDAY = [2, 0, 0, 1, 1, 1, 2];
+
 /** Difficulty tier 0..2, easier early week → harder weekend (client fallback). */
-export const dailyDifficultyIndex = (d: Date = new Date()): number => {
-	const dow = challengeWeekday(d); // 0=Sun..6=Sat
-	if (dow === 1 || dow === 2) return 0; // Mon/Tue → facile
-	if (dow >= 3 && dow <= 5) return 1; // Wed/Thu/Fri → moyen
-	return 2; // Sat/Sun → difficile
+export const dailyDifficultyIndex = (d: Date = new Date()): number => TIER_BY_WEEKDAY[challengeWeekday(d)];
+
+/**
+ * How many dailies of the same tier came before this one. A tier only comes round 2-3 days
+ * a week, so content walked without repetition needs this dense counter, not the day number.
+ */
+export const dailyTierOrdinal = (d: Date = new Date()): number => {
+	const ord = challengeDayOrdinal(d);
+	const weekdayOf = (o: number): number => (o + 4) % 7; // day 0 = 1970-01-01, a Thursday
+	const tier = TIER_BY_WEEKDAY[weekdayOf(ord)];
+	const weeks = Math.floor(ord / 7);
+	let n = weeks * TIER_BY_WEEKDAY.filter((t) => t === tier).length;
+	for (let i = weeks * 7; i < ord; i++) if (TIER_BY_WEEKDAY[weekdayOf(i)] === tier) n++;
+	return n;
 };
 
 const NAME_KEY = 'ludiven-player';

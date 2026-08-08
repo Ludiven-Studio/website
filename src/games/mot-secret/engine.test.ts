@@ -1,23 +1,32 @@
 import { describe, it, expect } from 'vitest';
-import { pickSolution, solutionPool, isValidGuess, evaluate, bestKnown, knownGood, DIFFS, type GuessRow } from './engine';
+import { pickSolutionAt, solutionPool, isValidGuess, evaluate, bestKnown, knownGood, DIFFS, type GuessRow } from './engine';
 import { EXTENDED_RAW } from '../words/extended';
 import { parseWords } from '../words';
 
 const row = (guess: string, solution: string): GuessRow => ({ guess, states: evaluate(guess, solution) });
 
 describe('mot-secret engine', () => {
-	it('pickSolution is deterministic and draws from the pool', () => {
+	it('pickSolutionAt is deterministic and draws from the pool', () => {
 		for (const diff of Object.values(DIFFS)) {
-			const a = pickSolution(42, diff.len);
-			expect(pickSolution(42, diff.len)).toBe(a);
+			const a = pickSolutionAt(diff.len, 42);
+			expect(pickSolutionAt(diff.len, 42)).toBe(a);
 			expect(a).toHaveLength(diff.len);
 			expect(solutionPool(diff.len)).toContain(a);
 		}
-		expect(pickSolution(1, 6)).not.toBe(pickSolution(2, 6));
+		expect(pickSolutionAt(6, 1)).not.toBe(pickSolutionAt(6, 2));
+	});
+
+	it('pickSolutionAt never repeats within a pass over the pool', () => {
+		for (const len of [6, 7, 8]) {
+			const n = solutionPool(len).length;
+			const seen = new Set<string>();
+			for (let i = 0; i < n; i++) seen.add(pickSolutionAt(len, i));
+			expect(seen.size).toBe(n);
+		}
 	});
 
 	it('solution pools are large', () => {
-		for (const len of [6, 7, 8]) expect(solutionPool(len).length).toBeGreaterThanOrEqual(200);
+		for (const len of [6, 7, 8]) expect(solutionPool(len).length).toBeGreaterThanOrEqual(800);
 	});
 
 	it('isValidGuess: length, first letter, dictionary', () => {

@@ -37,10 +37,31 @@ export function solutionPool(len: number): string[] {
 	return p;
 }
 
-/** Deterministic solution for a seed + length. */
-export function pickSolution(seed: number, len: number): string {
-	const pool = solutionPool(len);
-	return pool[Math.floor(mulberry32(seed)() * pool.length)];
+const orders = new Map<number, string[]>();
+
+/** The pool in one fixed, deterministic shuffled order (memoized). */
+function order(len: number): string[] {
+	let o = orders.get(len);
+	if (!o) {
+		o = solutionPool(len).slice();
+		const rnd = mulberry32((Math.imul(len, 0x9e3779b1) ^ 0x85ebca6b) >>> 0);
+		for (let i = o.length - 1; i > 0; i--) {
+			const j = Math.floor(rnd() * (i + 1));
+			[o[i], o[j]] = [o[j], o[i]];
+		}
+		orders.set(len, o);
+	}
+	return o;
+}
+
+/**
+ * Draw number `nth` for this length, without replacement: the pool is walked in a shuffled
+ * order, so a word cannot come back before every other one has been used. The daily counts
+ * its draws with dailyTierOrdinal — 1400 six-letter words at ~2 a week is 13 years.
+ */
+export function pickSolutionAt(len: number, nth: number): string {
+	const o = order(len);
+	return o[((nth % o.length) + o.length) % o.length];
 }
 
 export type GuessCheck = { ok: true } | { ok: false; reason: 'length' | 'first' | 'dict' };
