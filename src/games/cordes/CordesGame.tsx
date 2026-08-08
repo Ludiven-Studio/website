@@ -8,6 +8,7 @@ import {
 	findHint,
 	generateCordes,
 	inBox,
+	isNailed,
 	isSolved,
 	ropeFault,
 	segHitsPath,
@@ -61,7 +62,7 @@ const nulls = (n: number): Board => new Array<Pt[] | null>(n).fill(null);
 /* The saved daily board is raw coordinates, so it only means something on the pegs it was
    drawn against. GEN_V bumps with the generator: an attempt saved against an older board
    is dropped instead of redrawn as scribbles over the new pegs. */
-const GEN_V = 5;
+const GEN_V = 7;
 const packBoard = (ropes: Board) => ({ v: GEN_V, ropes });
 const unpackBoard = (saved: unknown, n: number): Board | null => {
 	const o = saved as { v?: number; ropes?: Board } | null;
@@ -603,11 +604,11 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 							{puzzle.ends.map((pair, r) => pair.map((peg, e) => (
 								<circle
 									key={`${r}-${e}`}
-									className={`cor-peg ${puzzle.anchored[r] ? 'nailed' : ''}`}
+									className={`cor-peg ${isNailed(peg) ? 'nailed' : ''}`}
 									cx={peg.x * V}
 									cy={peg.y * V}
 									// A peg on the frame shows only half of itself, so draw it bigger to weigh the same.
-									r={puzzle.anchored[r] ? pegView * 1.35 : pegView}
+									r={isNailed(peg) ? pegView * 1.35 : pegView}
 									fill={HUE[r % HUE.length]}
 								/>
 							)))}

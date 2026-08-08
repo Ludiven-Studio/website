@@ -3,19 +3,26 @@ import {
 	DIFFS,
 	DIFF_ORDER,
 	applyHint,
+	coilCount,
+	detours,
 	distToSeg,
 	findHint,
 	generateCordes,
+	isNailed,
 	isSolved,
 	pathsCross,
 	ropeFault,
 	segCross,
 	selfCrosses,
+	spikeCount,
 	tangleCount,
+	tangleDepth,
 	wallCount,
 	type CordesPuzzle,
+	type DiffLevel,
 	type Pt,
 } from './engine';
+import { cordesLevels } from './levels';
 import { mulberry32, dateSeed } from '../prng';
 
 const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
@@ -96,8 +103,6 @@ describe('cordes rules', () => {
 	});
 });
 
-const onFrame = (p: Pt): boolean => p.x <= 0 || p.x >= 1 || p.y <= 0 || p.y >= 1;
-
 /** The board's own answer must obey every rule the player is held to. */
 function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 	expect(p.ropes).toBe(ropes);
@@ -117,7 +122,7 @@ function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 
 	for (let r = 0; r < ropes; r++) {
 		// The flag has to tell the truth: a wall is a rope with both pegs nailed to the frame.
-		expect(onFrame(p.ends[r][0]) && onFrame(p.ends[r][1])).toBe(p.anchored[r]);
+		expect(isNailed(p.ends[r][0]) && isNailed(p.ends[r][1])).toBe(p.anchored[r]);
 		// Three peg-widths apart at least: closer than that and the eye pairs them up for free.
 		expect(dist(p.ends[r][0], p.ends[r][1])).toBeGreaterThanOrEqual(6 * p.pegR);
 		expect(p.solution[r].length).toBeGreaterThan(2);
@@ -128,34 +133,81 @@ function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 	expect(isSolved(p.solution, p)).toBe(true);
 }
 
-describe('cordes generation', () => {
+// Ranking a hundred deals against each other costs a tenth of a second on the widest board,
+// which puts a forty-board sample well past the default five seconds.
+describe('cordes generation', { timeout: 60_000 }, () => {
+	const dealt = new Map<string, CordesPuzzle[]>();
+
+	/**
+	 * Boards of one shape. Dealt once and shared between the assertions below: a board is a
+	 * hundred deals ranked against each other, which makes it by far the slowest thing here.
+	 */
+	const sample = (diff: DiffLevel, n = 40): CordesPuzzle[] => {
+		const got = dealt.get(diff.label) ?? [];
+		for (let s = got.length; s < n; s++) got.push(generateCordes(diff, mulberry32(2200 + s * 41 + diff.ropes)));
+		dealt.set(diff.label, got);
+		return got.slice(0, n);
+	};
+
+	const meanBy = (boards: CordesPuzzle[], f: (p: CordesPuzzle) => number): number =>
+		boards.reduce((s, p) => s + f(p), 0) / boards.length;
+
 	for (const key of Object.keys(DIFFS)) {
 		const diff = DIFFS[key];
 
-		it(`${diff.label}: every board ships a legal answer`, () => {
-			for (let s = 0; s < 60; s++) expectLegalBoard(generateCordes(diff, mulberry32(700 + s * 37 + diff.ropes)), diff.ropes);
-		});
-	}
-
-	for (const key of Object.keys(DIFFS)) {
-		const diff = DIFFS[key];
-
-		it(`${diff.label}: the walls are there and a ruler is never the answer`, () => {
-			// The walls are built, not hoped for, so every board must have them all. The tangle
-			// is only rejection sampling on top: two ropes always refuse the ruler, the rest of
-			// the target lands on most boards.
-			const walls = Math.min(diff.walls, Math.floor((diff.ropes - 1) / 2));
-			let full = 0;
-			for (let s = 0; s < 60; s++) {
-				const p = generateCordes(diff, mulberry32(2200 + s * 41 + diff.ropes));
-				expect(wallCount(p)).toBe(walls);
-				const t = tangleCount(p);
-				expect(t).toBeGreaterThanOrEqual(2);
-				if (t >= diff.tangle) full++;
+		it(`${diff.label}: every board ships a legal answer, and a ruler is never that answer`, () => {
+			// Walls and spikes are built, not hoped for, so every board must have them all. The
+			// tangle is only rejection sampling on top, so it is a floor, not the target.
+			const boards = sample(diff);
+			for (const p of boards) {
+				expectLegalBoard(p, diff.ropes);
+				expect(wallCount(p)).toBe(diff.walls);
+				expect(spikeCount(p)).toBe(diff.spikes);
+				expect(tangleCount(p)).toBeGreaterThanOrEqual(2);
+				// Two spikes always catch somebody: that is the whole reason they are dealt.
+				if (diff.coils >= 2) expect(coilCount(p)).toBeGreaterThanOrEqual(2);
 			}
-			expect(full).toBeGreaterThanOrEqual(42);
+			if (diff.coils >= 3) {
+				const coiled = boards.filter((p) => coilCount(p) >= 3).length;
+				expect(coiled).toBeGreaterThanOrEqual(32); // 80% ask for three real detours
+			}
+			if (diff.nested >= 1) {
+				const deep = boards.filter((p) => tangleDepth(p) >= 2).length;
+				expect(deep).toBeGreaterThanOrEqual(24); // 60% carry a rope caught on both sides
+			}
 		});
 	}
+
+	it('a spike is nailed by one end only, and its free tip is out in the open', () => {
+		for (const p of sample(DIFFS.expert, 20)) {
+			const spikes = p.ends.filter(([a, b]) => isNailed(a) !== isNailed(b));
+			expect(spikes).toHaveLength(DIFFS.expert.spikes);
+			for (const [a, b] of spikes) {
+				const tip = isNailed(a) ? b : a;
+				// A tip a step from the edge is rounded for nothing; the cost is the reach.
+				expect(Math.min(tip.x, 1 - tip.x, tip.y, 1 - tip.y)).toBeGreaterThan(0.15);
+			}
+		}
+	});
+
+	it('a harder tier is never a flatter board', () => {
+		// The bug this guards: walls slice the board, and a slice holding one lone rope is a
+		// pocket where that rope crosses nobody. Difficile used to buy a second wall with its
+		// fifth rope, which left one rope per slice and made it *shallower* than Moyen.
+		const boards = [...DIFF_ORDER, 'expert'].map((k) => sample(DIFFS[k]));
+		for (const f of [tangleDepth, coilCount, (p: CordesPuzzle) => Math.max(...detours(p))]) {
+			const got = boards.map((b) => meanBy(b, f));
+			for (let i = 1; i < got.length; i++) expect(got[i]).toBeGreaterThan(got[i - 1]);
+		}
+	});
+
+	it('every level 1-200 deals a legal board', () => {
+		for (const level of [1, 30, 60, 90, 120, 180]) {
+			const { diff } = cordesLevels.config(level);
+			expect(diff.walls + diff.spikes).toBeLessThanOrEqual(diff.ropes - 2);
+			for (const p of sample(diff, 12)) expectLegalBoard(p, diff.ropes);
+		}
+	});
 
 	it('is deterministic: same seed -> identical board', () => {
 		const seed = dateSeed(new Date('2026-08-07T00:00:00Z'));

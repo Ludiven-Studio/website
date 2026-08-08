@@ -127,8 +127,8 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🪢', title: 'Le but', body: 'Chaque piquet a un jumeau de la même couleur. Relie-les tous d\'un trait, sans qu\'aucune corde n\'en croise une autre ni ne sorte du cadre.' },
 		{ emoji: '👆', title: 'Comment jouer', body: 'Pose ton doigt sur un piquet et glisse jusqu\'à son jumeau : la corde te suit. Reviens en arrière sur ton tracé pour l\'effacer, touche une corde posée pour la retirer.' },
 		{ emoji: '🚧', title: 'Elle s\'arrête', body: 'Une corde ne peut pas passer là où c\'est interdit : au lieu de te sanctionner, elle refuse d\'avancer. Contourne l\'obstacle et elle repart.' },
-		{ emoji: '📌', title: 'Les piquets du cadre', body: 'Certains piquets sont plantés dans le bord. La corde qui relie deux piquets du bord coupe le plateau en deux : impossible de la contourner, tout ce qui est d\'un côté y reste.' },
-		{ emoji: '💡', title: 'Astuce', body: 'Trace d\'abord ces cordes-là : chaque paire restante n\'a ensuite plus qu\'un seul côté possible. Si une paire se retrouve à cheval sur une corde déjà posée, c\'est cette corde-là qu\'il faut refaire, pas la tienne.' },
+		{ emoji: '📌', title: 'Les piquets du cadre', body: 'Certains piquets sont plantés dans le bord. Une corde qui n\'y tient que par un bout barre la route : pour passer de l\'autre côté, il faut faire tout le tour de sa pointe libre, plantée au fond du plateau. Et celle qui relie deux piquets du bord coupe carrément le plateau en deux.' },
+		{ emoji: '💡', title: 'Astuce', body: 'Trace ces cordes-là en premier : ce sont elles qui décident du chemin de toutes les autres. Ensuite, pour chaque paire, demande-toi de quel côté de chaque pointe elle doit passer — il faut parfois s\'enrouler autour de deux pointes de suite. Si une paire se retrouve à cheval sur une corde déjà posée, c\'est cette corde-là qu\'il faut refaire, pas la tienne.' },
 	],
 	suite: [
 		{ emoji: '🔢', title: 'Le but', body: 'Devine le terme suivant d\'une suite gouvernée par une règle cachée.' },

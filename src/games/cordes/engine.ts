@@ -9,9 +9,14 @@
  * open plane. A rope between two pegs on the edge does cut the board, and then every other
  * pair has to be on the right side of it. Those are the "walls".
  *
+ * Nailed by one end only, a rope is a "spike": it cuts nothing, so it is always dodgeable,
+ * but dodging costs the whole trip out to its free tip and back. Two spikes reaching in from
+ * opposite edges is what makes a rope coil, and the coil is what the board is played for.
+ *
  * A board is solvable by construction. Generation slices the hidden grid with the walls
- * first, fills each slice with its own pairs, smooths the routes into curves and keeps only
- * their ends — the player never sees the lattice and draws freehand. No solver.
+ * first, drives the spikes into the slices, fills what is left with its own pairs, smooths
+ * the routes into curves and keeps only their ends — the player never sees the lattice and
+ * draws freehand. No solver.
  */
 
 import type { Rng } from '../prng';
@@ -32,31 +37,57 @@ export interface DiffLevel {
 	tangle: number;
 	/** How many ropes are nailed to the frame at both ends — see `carve`. */
 	walls: number;
+	/** How many ropes are nailed to the frame by one end, tip loose inside — see `spikeSlice`. */
+	spikes: number;
+	/** How many ropes must be caught between two others — see `tangleDepth`. */
+	nested: number;
+	/** How many ropes must go the long way round a spike — see `detours`. */
+	coils: number;
 }
 
-/**
- * Frame side for a rope count. Every extra rope makes it harder to keep them all tangled,
- * so the crowd needs more room — past six they need a whole extra ring.
- */
-export const frameFor = (ropes: number): number => ropes + (ropes < 7 ? 2 : 3);
+/** Frame side for a rope count. The spikes eat the middle, so the crowd needs the two spare rings. */
+export const frameFor = (ropes: number): number => ropes + 2;
 
 /**
- * How many walls a rope count can carry. Each wall splits the board once more, and every
- * slice needs a pair of its own or the wall has nobody to separate — hence ropes >= 2w+1.
+ * How many walls a rope count can carry. A wall splits the board, and a half holding a single
+ * rope is a pocket where that rope crosses nobody — measured, a wall costs more crossing than
+ * it buys at every size. It survives only on the smallest board, where there is no room to
+ * drive a spike in and the two halves are the whole question.
  */
-export const wallsFor = (ropes: number): number => Math.min(3, Math.floor((ropes - 1) / 2));
+export const wallsFor = (ropes: number): number => (ropes <= 3 ? 1 : 0);
 
 /**
- * How many ropes should refuse the straight line. Penned into its own slice, a rope has
- * fewer chords to run into, so asking for all of them would only spin the deal.
+ * How many spikes a rope count can carry. One makes a rope go the long way round; two reaching
+ * in from opposite edges is what makes it coil. Roughly half the ropes, which measures as the
+ * point where the free space stops being a corridor and starts being a maze.
  */
-export const tangleFor = (ropes: number): number => Math.max(2, ropes - (ropes < 6 ? 1 : 2));
+export const spikesFor = (ropes: number): number => (ropes <= 3 ? 0 : Math.min(4, Math.round(ropes / 2)));
+
+/**
+ * How many ropes should refuse the straight line. This is a floor the deal has to clear, not
+ * a maximum to chase: set past what a board of this size actually reaches, it stops being a
+ * target and just spends the whole budget every time.
+ */
+export const tangleFor = (ropes: number): number => Math.max(2, Math.round(ropes * 0.55));
+
+/**
+ * How many ropes should be caught between two others. This is the second level of thought —
+ * without it a board is a set of independent "go round that one" calls, each obvious.
+ */
+export const nestedFor = (ropes: number): number => Math.max(0, Math.floor((ropes - 2) / 2));
+
+/**
+ * How many ropes should be dragged off their straight line for good. This is the one the
+ * player feels directly: a rope walked out and back round a spike is the only kind that
+ * cannot be drawn at a glance.
+ */
+export const coilsFor = (ropes: number): number => spikesFor(ropes);
 
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', ropes: 3, cols: 5, rows: 5, tangle: 2, walls: 1 },
-	moyen: { label: 'Moyen', ropes: 4, cols: 6, rows: 6, tangle: 3, walls: 1 },
-	difficile: { label: 'Difficile', ropes: 5, cols: 7, rows: 7, tangle: 4, walls: 2 },
-	expert: { label: 'Expert', ropes: 7, cols: 10, rows: 10, tangle: 5, walls: 3 },
+	facile: { label: 'Facile', ropes: 3, cols: 5, rows: 5, tangle: 2, walls: 1, spikes: 0, nested: 0, coils: 0 },
+	moyen: { label: 'Moyen', ropes: 4, cols: 6, rows: 6, tangle: 3, walls: 0, spikes: 2, nested: 1, coils: 2 },
+	difficile: { label: 'Difficile', ropes: 6, cols: 8, rows: 8, tangle: 5, walls: 0, spikes: 3, nested: 2, coils: 3 },
+	expert: { label: 'Expert', ropes: 8, cols: 10, rows: 10, tangle: 7, walls: 0, spikes: 4, nested: 3, coils: 4 },
 };
 
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
@@ -131,6 +162,9 @@ export function selfCrosses(path: Pt[]): boolean {
 }
 
 export const inBox = (p: Pt): boolean => p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+
+/** A peg driven into the frame. Only a rope holding one of these is an obstacle worth the name. */
+export const isNailed = (p: Pt): boolean => p.x <= 0 || p.x >= 1 || p.y <= 0 || p.y >= 1;
 
 /** Pegs the rope `rope` must keep clear of — every peg except its own two. */
 export function hitsForeignPeg(path: Pt[], rope: number, p: CordesPuzzle): boolean {
@@ -318,6 +352,51 @@ function cutSlice(mask: Mask, cols: number, rows: number, rng: Rng): { path: num
 	return null;
 }
 
+/** How many cells a cell sits from the nearest edge of the frame. */
+function frameGap(cell: number, cols: number, rows: number): number {
+	const c = cell % cols;
+	const r = Math.floor(cell / cols);
+	return Math.min(c, cols - 1 - c, r, rows - 1 - r);
+}
+
+/**
+ * Drive a rope in from the frame and stop it dead in the middle of the slice. It separates
+ * nobody — the free tip can always be walked round — so it is rejected the moment it pens
+ * anything off, and what it costs is the trip out to that tip and back.
+ */
+function spikeSlice(mask: Mask, cols: number, rows: number, rng: Rng): { path: number[]; rest: Mask } | null {
+	const doors: number[] = [];
+	let far = 0;
+	for (let i = 0; i < mask.length; i++) {
+		if (!mask[i]) continue;
+		if (onFrame(i, cols, rows)) doors.push(i);
+		else far = Math.max(far, frameGap(i, cols, rows));
+	}
+	// Only the deepest cells of the slice will do. A tip a step from the edge is rounded for
+	// nothing; the whole cost of a spike is how far in the player has to reach to get past it.
+	const deep: number[] = [];
+	for (let i = 0; i < mask.length; i++) if (mask[i] && frameGap(i, cols, rows) >= far) deep.push(i);
+	if (!doors.length || far < 2) return null;
+
+	// And it has to span half the board, or the coil it asks for is a bulge.
+	const reach = Math.max(MIN_CELLS, Math.round((Math.min(cols, rows) + 1) / 2));
+	for (let attempt = 0; attempt < 80; attempt++) {
+		const s = doors[Math.floor(rng() * doors.length)];
+		const e = deep[Math.floor(rng() * deep.length)];
+		const path = wander(mask, cols, rows, s, e, rng);
+		if (!path || path.length < reach) continue;
+		// The tip is the way round, so it must not touch the frame again: a spike that comes
+		// back out to an edge is a wall, and a wall is a different question entirely.
+		if (path.slice(1).some((c) => onFrame(c, cols, rows))) continue;
+		const parts = pieces(mask, cols, rows, path);
+		if (parts.length !== 1) continue;
+		const rest = new Uint8Array(mask.length);
+		for (const c of parts[0]) rest[c] = 1;
+		return { path, rest };
+	}
+	return null;
+}
+
 /**
  * Grow `count` ropes one cell at a time inside one slice, in turn. Round-robin matters: a
  * rope grown to full length before the others would fence them in against an edge.
@@ -462,51 +541,64 @@ function fill(mask: Mask, count: number, cols: number, rows: number, rng: Rng): 
 	return paths;
 }
 
+/** Which tips of a carved rope get nailed to the frame: the head, the tail, or both. */
+const HEAD = 1;
+const TAIL = 2;
+
 interface Carved {
 	paths: number[][];
-	/** True for the walls — carved first, so they come first. */
-	anchored: boolean[];
+	/** `HEAD | TAIL` per rope: 3 is a wall, 1 a spike, 0 an arc loose at both ends. */
+	nails: number[];
 }
 
 /**
- * Slice the board with the walls, then fill each slice with its own pairs. Carving the walls
- * first is what guarantees a wall has somebody on either side: a slice always gets a pair.
+ * Slice the board with the walls, drive the spikes into the slices, then fill what is left
+ * with the remaining pairs. Carving the walls first is what guarantees a wall has somebody on
+ * either side: a slice always gets a pair.
  */
 function carve(diff: DiffLevel, rng: Rng): Carved {
 	const { cols, rows, ropes } = diff;
-	const walls = Math.min(diff.walls, Math.floor((ropes - 1) / 2));
 	const slices: Mask[] = [new Uint8Array(cols * rows).fill(1)];
-	const wallPaths: number[][] = [];
+	const paths: number[][] = [];
+	const nails: number[] = [];
+	const widest = (): number => {
+		let w = 0;
+		for (let i = 1; i < slices.length; i++) if (maskSize(slices[i]) > maskSize(slices[w])) w = i;
+		return w;
+	};
 
-	for (let w = 0; w < walls; w++) {
-		let widest = 0;
-		for (let i = 1; i < slices.length; i++) if (maskSize(slices[i]) > maskSize(slices[widest])) widest = i;
-		const cut = cutSlice(slices[widest], cols, rows, rng);
+	for (let w = 0; w < diff.walls; w++) {
+		const i = widest();
+		const cut = cutSlice(slices[i], cols, rows, rng);
 		if (!cut) break;
-		wallPaths.push(cut.path);
-		slices.splice(widest, 1, ...cut.parts);
+		paths.push(cut.path);
+		nails.push(HEAD | TAIL);
+		slices.splice(i, 1, ...cut.parts);
+	}
+
+	for (let s = 0; s < diff.spikes; s++) {
+		const i = widest();
+		const spike = spikeSlice(slices[i], cols, rows, rng);
+		if (!spike) break;
+		paths.push(spike.path);
+		nails.push(HEAD); // `wander` starts at the door, so the head is the nailed end
+		slices[i] = spike.rest;
 	}
 
 	// One pair per slice, then the spares to the roomiest — a cramped slice with three ropes
 	// in it draws as a knot nobody can read.
-	const rest = ropes - wallPaths.length;
+	const rest = ropes - paths.length;
 	const room = slices.map((_, i) => i).sort((a, b) => maskSize(slices[b]) - maskSize(slices[a]));
 	const share = slices.map(() => 0);
 	for (let i = 0; i < rest; i++) share[room[i % room.length]]++;
 
-	const paths: number[][] = [];
-	const anchored: boolean[] = [];
-	for (const p of wallPaths) {
-		paths.push(p);
-		anchored.push(true);
-	}
 	for (let i = 0; i < slices.length; i++) {
 		for (const p of fill(slices[i], share[i], cols, rows, rng)) {
 			paths.push(p);
-			anchored.push(false);
+			nails.push(0);
 		}
 	}
-	return { paths, anchored };
+	return { paths, nails };
 }
 
 /** How many other ropes cut each rope's straight peg-to-peg line. */
@@ -516,18 +608,19 @@ function chordDepths(p: CordesPuzzle): number[] {
 }
 
 /**
- * How many ropes have their straight peg-to-peg line cut by another rope's. This is the
- * whole difficulty of the game: a rope nobody crosses is one the player joins with a ruler
- * and never thinks about. Grazing a peg would count as a fault too, but it reads as a near
- * miss on screen, so it does not count here.
+ * How many ropes have their straight peg-to-peg line cut by another rope's. This is how wide
+ * the difficulty is spread: a rope nobody crosses is one the player joins with a ruler and
+ * never thinks about. Grazing a peg would count as a fault too, but it reads as a near miss
+ * on screen, so it does not count here.
  */
 export function tangleCount(p: CordesPuzzle): number {
 	return chordDepths(p).filter((d) => d >= 1).length;
 }
 
 /**
- * How many ropes are caught between two others. Not a target — the walls carry the puzzle
- * now — but it still tells two boards apart when both have their walls and their tangle.
+ * How many ropes are caught between two others — how *deep* the difficulty goes. "Go round
+ * that one" is a call the player makes without looking up; being hemmed in on both sides is
+ * what forces them to read the whole board first, so this is a generation target of its own.
  */
 export function tangleDepth(p: CordesPuzzle): number {
 	return chordDepths(p).filter((d) => d >= 2).length;
@@ -536,6 +629,51 @@ export function tangleDepth(p: CordesPuzzle): number {
 /** Ropes nailed to the frame at both ends — the ones that cut the board in two. */
 export function wallCount(p: CordesPuzzle): number {
 	return p.anchored.filter(Boolean).length;
+}
+
+/** The free tip of each spike, or null for a wall and for an arc loose at both ends. */
+function spikeTips(p: CordesPuzzle): (Pt | null)[] {
+	return p.ends.map(([a, b]) => {
+		if (isNailed(a) === isNailed(b)) return null;
+		return isNailed(a) ? b : a;
+	});
+}
+
+/** Ropes nailed to the frame by one end only — dodgeable, but never for free. */
+export function spikeCount(p: CordesPuzzle): number {
+	return spikeTips(p).filter(Boolean).length;
+}
+
+/**
+ * How far past the ruler each rope is dragged, as a multiple of its own straight line. Only a
+ * spike counts: a wall cannot be rounded at all — the board puts nobody on its far side — and
+ * an arc loose at both ends is dodged for almost nothing. Rounding a spike costs the trip out
+ * to its free tip and back, and a rope that has to round two of them is the coil.
+ */
+export function detours(p: CordesPuzzle): number[] {
+	const tips = spikeTips(p);
+	return p.ends.map(([a, b], r) => {
+		const span = Math.hypot(b.x - a.x, b.y - a.y);
+		const along = (t: Pt): number => (t.x - a.x) * (b.x - a.x) + (t.y - a.y) * (b.y - a.y);
+		const via = tips
+			.filter((t, o): t is Pt => t !== null && o !== r && pathsCross([a, b], p.solution[o]))
+			.sort((u, v) => along(u) - along(v));
+		if (!via.length || span === 0) return 1;
+		let len = 0;
+		for (const [i, t] of [...via, b].entries()) {
+			const from = i === 0 ? a : via[i - 1];
+			len += Math.hypot(t.x - from.x, t.y - from.y);
+		}
+		return len / span;
+	});
+}
+
+/** A rope only counts as coiled once going round costs it a fifth of its own length. */
+const COILED = 1.2;
+
+/** How many ropes cannot be drawn without a real detour round a spike. */
+export function coilCount(p: CordesPuzzle): number {
+	return detours(p).filter((d) => d >= COILED).length;
 }
 
 function deal(diff: DiffLevel, rng: Rng): CordesPuzzle {
@@ -568,15 +706,13 @@ function deal(diff: DiffLevel, rng: Rng): CordesPuzzle {
 		if (cellPath.length < 2) continue;
 		const last = cellPath.length - 1;
 		const pts = cellPath.map((c, k) => centre(c, k === 0 || k === last));
-		if (carved.anchored[i]) {
-			pts[0] = nail(cellPath[0], pts[0]);
-			pts[last] = nail(cellPath[last], pts[last]);
-		}
+		if (carved.nails[i] & HEAD) pts[0] = nail(cellPath[0], pts[0]);
+		if (carved.nails[i] & TAIL) pts[last] = nail(cellPath[last], pts[last]);
 		// Chaikin keeps the two ends where they are, so a nailed peg stays on the frame.
 		const smooth = chaikin(pts, 2);
 		solution.push(smooth);
 		ends.push([smooth[0], smooth[smooth.length - 1]]);
-		anchored.push(carved.anchored[i]);
+		anchored.push(carved.nails[i] === (HEAD | TAIL));
 	}
 
 	// Pegs sit at most `jitter` off their cell centre, so a foreign route stays at least
@@ -584,18 +720,27 @@ function deal(diff: DiffLevel, rng: Rng): CordesPuzzle {
 	return { ropes: ends.length, ends, solution, anchored, pegR: 0.3 / Math.max(cols, rows) };
 }
 
-/** Ranks a board above any other with fewer crossed ropes, however deeply tangled it is. */
+/** Ranks a board above any other carrying less crossing, however it is spread. */
 const RANK = 16;
-/** And a wall outranks every amount of tangle: one cut is worth more than any detour. */
-const WALL_RANK = 4096;
+/** A rope that has to go the long way round outranks any amount of plain crossing. */
+const COIL_RANK = 512;
+/** And the frame-nailed ropes outrank both: they are what makes a coil possible at all. */
+const NAIL_RANK = 8192;
+/**
+ * How many boards a deal may go through. A coil is rare per deal, so this is what buys them —
+ * and it is the whole cost of generation. Measured on the widest board, doubling it again
+ * bought a tenth of a coil for a third more time.
+ */
+const DEALS = 120;
 
 /**
- * Deal until every rope is worth drawing. One deal costs a fraction of a millisecond, so a
- * hundred rejections stay under a frame; the best one seen is kept so a cramped frame that
- * can never reach its target still returns its hardest board rather than looping.
+ * Deal until every rope is worth drawing: all the walls and spikes, `coils` ropes dragged off
+ * their straight line for good, `tangle` off the ruler and `nested` of them caught between two
+ * others. Coils are the rare one, so the budget is what buys them — the best board seen is
+ * kept, and a cramped frame that can never reach its target returns its hardest board rather
+ * than looping.
  */
 export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesPuzzle {
-	const walls = Math.min(diff.walls, Math.floor((diff.ropes - 1) / 2));
 	// Three rejects, all ranked below every real board so they simply disappear: a slice too
 	// cramped to hold its pairs, a rope fenced in at two cells, which draws as a bare segment,
 	// and a pair of pegs closer than three peg-widths, which the eye pairs up for free.
@@ -603,12 +748,16 @@ export function generateCordes(diff: DiffLevel, rng: Rng = Math.random): CordesP
 		if (p.ropes !== diff.ropes) return -1;
 		if (p.solution.some((r) => r.length < 3)) return -1;
 		if (p.ends.some(([a, b]) => Math.hypot(a.x - b.x, a.y - b.y) < 6 * p.pegR)) return -1;
-		return WALL_RANK * wallCount(p) + RANK * tangleCount(p) + tangleDepth(p);
+		return NAIL_RANK * (wallCount(p) + spikeCount(p))
+			+ COIL_RANK * coilCount(p)
+			+ RANK * (tangleCount(p) + tangleDepth(p)) + tangleDepth(p);
 	};
-	const want = WALL_RANK * walls + RANK * diff.tangle;
+	const want = NAIL_RANK * (diff.walls + diff.spikes)
+		+ COIL_RANK * diff.coils
+		+ RANK * (diff.tangle + diff.nested) + diff.nested;
 	let best = deal(diff, rng);
 	let bestScore = rate(best);
-	for (let i = 0; i < 120 && bestScore < want; i++) {
+	for (let i = 0; i < DEALS && bestScore < want; i++) {
 		const p = deal(diff, rng);
 		const s = rate(p);
 		if (s > bestScore) {

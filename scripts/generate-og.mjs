@@ -184,7 +184,7 @@ async function main() {
 			await sleep(400);
 			await clickBtn('difficile');
 			await sleep(700);
-			for (let i = 0; i < 4; i++) {
+			for (let i = 0; i < 5; i++) {
 				await page.locator('.cor-act').first().click().catch(() => {});
 				await sleep(260);
 			}
