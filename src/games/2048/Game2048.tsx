@@ -18,6 +18,7 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -566,8 +567,8 @@ export default function Game2048({ gameId }: { gameId: string }) {
 						<div className="g2-overlay-card g2-over">
 							{daily ? (
 								alreadyPlayed
-									? <>Défi du jour terminé · <strong>{score}</strong><span>reviens demain&nbsp;!</span></>
-									: <>🎉 Terminé · <strong>{score}</strong><span>reviens demain pour un nouveau défi</span></>
+									? <>Défi du jour terminé · <strong>{score}</strong><DailyDone>Reviens demain&nbsp;!</DailyDone></>
+									: <>🎉 Terminé · <strong>{score}</strong><DailyDone>Reviens demain pour un nouveau défi&nbsp;!</DailyDone></>
 							) : (
 								<>{timedOut ? '⏱ Temps écoulé' : 'Plus de coups'} · <strong>{score}</strong><button className="g2-replay" onClick={() => armFree(diffKey)}>Rejouer</button></>
 							)}
@@ -637,7 +638,6 @@ const CSS = `
 .g2-overlay-card { background: var(--gray-999); border: 2px solid var(--g2-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); text-align: center; }
 .g2-over { display: flex; flex-direction: column; gap: 8px; align-items: center; font-size: 16px; color: var(--gray-0); }
 .g2-over strong { color: var(--g2-accent); font-size: 22px; font-variant-numeric: tabular-nums; }
-.g2-over span { color: var(--gray-300); font-size: 13px; }
 .g2-startbtn { border: none; background: var(--g2-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg); }
 .g2-replay { border: none; background: var(--g2-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 9px 22px; cursor: pointer; margin-top: 4px; }
 .g2-help { max-width: 400px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1.1rem; }

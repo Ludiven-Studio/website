@@ -17,6 +17,7 @@ import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
@@ -843,7 +844,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 								{daily ? <>Temps {fmtSec(score)} · Meilleur {fmtSec(best)}</> : <>Temps {fmtSec(score)} · Record {fmtSec(best)}</>}
 							</p>
 							{daily && alreadyPlayed ? (
-								<p className="es-overlay-note">Reviens demain&nbsp;!</p>
+								<DailyDone />
 							) : (
 								<button className="es-startbtn sm" onClick={start}>
 									↻ Rejouer{daily ? ` (${remaining} restant${remaining > 1 ? 's' : ''})` : ''}

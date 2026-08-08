@@ -10,6 +10,7 @@ import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../l
 import { useLevels } from '../../lib/useLevels';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
@@ -683,9 +684,9 @@ export default function MineGame({ gameId }: { gameId: string }) {
 									</>
 								)}
 								{daily && alreadyPlayed ? (
-									<p className="mn-note">Défi du jour terminé — reviens demain&nbsp;!</p>
+									<DailyDone />
 								) : daily ? (
-									<p className="mn-note">Score classé — reviens demain&nbsp;!</p>
+									<DailyDone>Score classé — reviens demain&nbsp;!</DailyDone>
 								) : (
 									<button className="mn-btn primary" onClick={() => newFree()}>↻ Nouvelle partie</button>
 								)}

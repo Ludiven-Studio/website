@@ -3,6 +3,7 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -727,14 +728,11 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 							{daily ? (
 								<>
 									<h3>{alreadyPlayed ? '✓ Défi déjà relevé' : '🎉 Résolu !'}</h3>
-									<p>
+									<DailyDone>
 										{alreadyPlayed
 											? <>Ton temps du jour&nbsp;: <strong>{finalCentis != null ? fmtCentis(finalCentis) : chrono}</strong>. Reviens demain pour un nouveau défi&nbsp;!</>
 											: <>En <strong>{finalCentis != null ? fmtCentis(finalCentis) : chrono}</strong> et {moves} coups. Un seul essai&nbsp;: ton temps est classé — reviens demain&nbsp;!</>}
-									</p>
-									<div className="sol-cardbtns">
-										<a className="sol-btn primary" href="/jeux/defi/">🗓 Tous les défis</a>
-									</div>
+									</DailyDone>
 								</>
 							) : (
 								<>

@@ -17,6 +17,7 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -715,7 +716,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 								{daily ? <>Score {score} · Meilleur {best}</> : <>Score {score} · Record {best}</>}
 							</p>
 							{daily && alreadyPlayed ? (
-								<p className="sn-overlay-note">Reviens demain&nbsp;!</p>
+								<DailyDone />
 							) : (
 								<button className="sn-startbtn sm" onClick={start}>
 									↻ Rejouer{daily ? ` (${MAX_TRIES - tries} restant${MAX_TRIES - tries > 1 ? 's' : ''})` : ''}
@@ -794,7 +795,6 @@ const CSS = `
   background: var(--gray-999); border: 2px solid var(--sn-accent); border-radius: 16px;
   padding: 18px 26px; text-align: center; box-shadow: var(--shadow-lg); color: var(--gray-0);
 }
-.sn-overlay-note { color: var(--gray-300); font-size: 13px; margin: 0; }
 .sn-go-title { font-family: var(--font-brand); font-weight: 600; font-size: 20px; margin: 0 0 4px; }
 .sn-go-score { color: var(--gray-300); font-size: 14px; margin: 0 0 12px; font-variant-numeric: tabular-nums; }
 .sn-startbtn {

@@ -32,6 +32,7 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -1546,7 +1547,7 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 					<div className="cr-overlay">
 						<div className="cr-overlay-card cr-over">
 							{daily && alreadyPlayed ? (
-								<>Défi du jour terminé · <strong>{best}</strong><span>reviens demain&nbsp;!</span></>
+								<>Défi du jour terminé · <strong>{best}</strong><DailyDone>Reviens demain&nbsp;!</DailyDone></>
 							) : (
 								<>
 									<span className="cr-over-title">🦊 Tous les nids ont été pillés&nbsp;!</span>

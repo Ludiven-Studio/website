@@ -3,6 +3,7 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import LevelSelect from '../../components/LevelSelect';
@@ -670,10 +671,10 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 							{daily ? (
 								<>
 									<h3>{alreadyPlayed && !won ? '✓ Défi terminé' : won ? '🎉 Réussite !' : '✓ Défi relevé'}</h3>
-									<p>
+									<DailyDone>
 										<strong>{cards}/52</strong> cartes · <strong>{chrono}</strong>{jokers < JOKERS ? ` · 🃏${JOKERS - jokers}` : ''}.<br />
 										Un seul essai&nbsp;: ton score est classé — reviens demain&nbsp;!
-									</p>
+									</DailyDone>
 								</>
 							) : (
 								<>

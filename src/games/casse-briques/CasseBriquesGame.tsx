@@ -15,6 +15,7 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -616,7 +617,7 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 									</p>
 									<p className="cb-go-score">{daily ? <>Score {score} · Meilleur {best}</> : <>Score {score} · Record {best}</>}</p>
 									{daily && alreadyPlayed ? (
-										<p className="cb-overlay-note">Reviens demain&nbsp;!</p>
+										<DailyDone />
 									) : (
 										<button className="cb-startbtn sm" onClick={start}>
 											↻ Rejouer{daily ? ` (${MAX_TRIES - tries} restant${MAX_TRIES - tries > 1 ? 's' : ''})` : ''}
@@ -804,7 +805,6 @@ const CSS = `
 /* Standalone label over the armed board (ready gate) — dark chip, always readable. */
 .cb-go-chip { margin: 0; font-family: var(--font-brand); font-weight: 700; font-size: 14px; color: #fff; background: rgba(10, 12, 16, 0.7); border-radius: 999px; padding: 6px 14px; backdrop-filter: blur(3px); }
 .cb-go-score { margin: 0; color: var(--gray-300); font-size: 13.5px; font-weight: 600; }
-.cb-overlay-note { margin: 0; color: var(--gray-300); font-size: 13px; }
 .cb-startbtn {
   border: none; background: var(--accent-regular); color: var(--accent-text-over);
   font: inherit; font-weight: 700; font-size: 17px; border-radius: 999px; padding: 13px 34px; cursor: pointer;

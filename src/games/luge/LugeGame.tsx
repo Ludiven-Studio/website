@@ -28,6 +28,7 @@ import { getProgression, submitLevel, type GameProgress } from '../../lib/progre
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import LevelOutcome from '../../components/LevelOutcome';
 import LevelSelect from '../../components/LevelSelect';
 import ModeToggle from '../../components/ModeToggle';
@@ -1712,7 +1713,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 								Score {fmtPts(score)} · Distance {dist} m · {daily ? 'Meilleur' : 'Record'} {fmtPts(best)}
 							</p>
 							{daily && alreadyPlayed ? (
-								<p className="lg-overlay-note">Reviens demain&nbsp;!</p>
+								<DailyDone />
 							) : (
 								<button className="lg-startbtn sm" onClick={start}>
 									↻ Rejouer{daily ? ` (${remaining} restant${remaining > 1 ? 's' : ''})` : ''}

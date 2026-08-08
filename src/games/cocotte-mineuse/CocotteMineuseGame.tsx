@@ -12,6 +12,7 @@ import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDa
 import { useLevels } from '../../lib/useLevels';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
+import DailyDone from '../../components/DailyDone';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
@@ -788,7 +789,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 							)}
 							<p className="cm-go-score">Score {score} · {daily ? 'Meilleur' : 'Record'} {best}</p>
 							{daily && alreadyPlayed ? (
-								<p className="cm-overlay-note">Reviens demain&nbsp;!</p>
+								<DailyDone />
 							) : (
 								<button className="cm-startbtn sm" onClick={start}>
 									↻ Rejouer{daily ? ` (${MAX_TRIES - tries} restant${MAX_TRIES - tries > 1 ? 's' : ''})` : ''}

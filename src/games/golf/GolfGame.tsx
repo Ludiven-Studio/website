@@ -39,6 +39,7 @@ import {
 } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
 import Leaderboard from '../../components/Leaderboard';
+import DailyDone from '../../components/DailyDone';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { usePointerDrag } from '../usePointerDrag';
 import ModeToggle from '../../components/ModeToggle';
@@ -1133,7 +1134,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 							<p className="gf-winscore">{strokes} coups · {fmtTime(elapsed)} · <strong>{parTag(strokes)}</strong></p>
 							{mode === 'defi' ? (
 								alreadyPlayed || triesRef.current >= MAX_TRIES ? (
-									<p className="gf-sub">Défi terminé · meilleur <strong>{best != null ? formatScore(DAILY_LB.golf.fmt, best) : '—'}</strong> — reviens demain&nbsp;!</p>
+									<DailyDone>Défi terminé · meilleur <strong>{best != null ? formatScore(DAILY_LB.golf.fmt, best) : '—'}</strong> — reviens demain&nbsp;!</DailyDone>
 								) : (
 									<button className="gf-play sm" onClick={newAttempt}>↻ Rejouer ({MAX_TRIES - tries} restant{MAX_TRIES - tries > 1 ? 's' : ''})</button>
 								)
