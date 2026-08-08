@@ -81,7 +81,7 @@ export interface DailyRun {
 	diffIndex?: number;
 	state?: unknown; // game-specific (e.g. Sudoku entries)
 	// The player asked to see the solution instead of finishing. The attempt is spent
-	// (no replay today) but it earned nothing: no score, no streak, no cocottes.
+	// (no replay today) but it earned nothing: no score, no streak, no cocoins.
 	abandoned?: boolean;
 }
 
@@ -110,7 +110,7 @@ export function saveDailyRun(game: string, run: DailyRun): void {
 				} else {
 					trackGame(game, 'daily_done');
 					recordDailyDone(game); // first completion today → advance the streaks
-					earn(10); // cocottes bonus for finishing a daily challenge
+					earn(10); // cocoins bonus for finishing a daily challenge
 				}
 			}
 		}

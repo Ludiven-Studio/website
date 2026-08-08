@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe('daily run rewards', () => {
-	it('a finished daily advances the streak and pays cocottes', () => {
+	it('a finished daily advances the streak and pays cocoins', () => {
 		const before = balance();
 		saveDailyRun('sudoku', { startedAt: Date.now(), done: true, finalTime: 4300 });
 		expect(gameStreak('sudoku').count).toBe(1);

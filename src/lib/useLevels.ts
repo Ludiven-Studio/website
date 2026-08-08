@@ -102,7 +102,7 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 		setPhase('done');
 		if (s >= 1) {
 			const gained = Math.max(0, s - (progress.stars[level] ?? 0));
-			if (gained > 0) earn(gained * 3); // cocottes for newly-earned stars
+			if (gained > 0) earn(gained * 3); // cocoins for newly-earned stars
 			void submitLevel({
 				gameId, level, stars: s as 1 | 2 | 3, score: Math.round(r.score),
 				metricIsTime: plan.metric === 'time', rawData: r.raw,
