@@ -18,6 +18,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { diffKeys } from '../../lib/difficulty';
 import { sommeTouteLevels } from './levels';
 import { useHintGate } from '../useHintGate';
@@ -76,15 +77,18 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	);
 
 	/* Timer */
+	// ready-gate: chrono starts on ▶ Commencer
+	const ticking =
+		status === 'playing' && !revealed && (started || (!daily && !lv.playing));
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (status !== 'playing' || revealed) return;
-		if ((daily || lv.playing) && !started) return; // ready-gate: chrono starts on ▶ Commencer
+		if (!ticking) return;
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
 			50,
 		);
 		return () => clearInterval(id);
-	}, [status, revealed, daily, lv.playing, started]);
+	}, [ticking]);
 
 	/* Win detection */
 	useEffect(() => {

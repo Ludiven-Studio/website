@@ -30,6 +30,7 @@ import Celebration, { useCelebration } from '../../components/Celebration';
 import { tubesLevels } from './levels';
 import { getProgression, submitLevel, type GameProgress } from '../../lib/progression';
 import { diffKeys } from '../../lib/difficulty';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { useHintGate } from '../useHintGate';
 
 /* =====================================================
@@ -260,11 +261,13 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	}, [started, daily, gameId]);
 
 	/* Timer */
+	const ticking = status === 'playing' && started && !revealed;
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (status !== 'playing' || !started || revealed) return;
+		if (!ticking) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [status, started, revealed]);
+	}, [ticking]);
 
 	/* Win detection */
 	useEffect(() => {

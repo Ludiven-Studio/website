@@ -16,6 +16,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { diffKeys } from '../../lib/difficulty';
 import { useHintGate } from '../useHintGate';
 import { suiteLevels, SUITE_QUESTIONS, type SuiteLevelCfg } from './levels';
@@ -84,15 +85,16 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	/* Daily / level chrono. */
+	const ticking = (daily || lv.playing) && started && status === 'playing';
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		const running = (daily || lv.playing) && started;
-		if (!running || status !== 'playing') return;
+		if (!ticking) return;
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
 			50,
 		);
 		return () => clearInterval(id);
-	}, [daily, started, lv.playing, status]);
+	}, [ticking]);
 
 	/* Levels mode: run a fixed set of N seeded questions in sequence. */
 	const startLevel = useCallback((level: number) => {

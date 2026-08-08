@@ -16,6 +16,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { diffKeys } from '../../lib/difficulty';
 import { useHintGate } from '../useHintGate';
 import { symbolesLevels, QUESTIONS_PER_LEVEL } from './levels';
@@ -131,15 +132,16 @@ export default function SymbolesGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	/* Daily / levels chrono. */
+	const ticking = (daily || lv.playing) && started && status === 'playing';
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		const running = (daily || lv.playing) && started;
-		if (!running || status !== 'playing') return;
+		if (!ticking) return;
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
 			50,
 		);
 		return () => clearInterval(id);
-	}, [daily, started, status, lv.playing]);
+	}, [ticking]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);

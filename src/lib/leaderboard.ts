@@ -74,12 +74,17 @@ export const setPlayerName = (name: string): void => {
 
 /** Snapshot of today's daily attempt (one try per device, resumable). */
 export interface DailyRun {
+	/** Chrono epoch, NOT a real date: games read it as `Date.now() - startedAt`. It is
+	 *  rebased on load so time spent away from the game is not billed — see elapsedMs. */
 	startedAt: number;
 	done: boolean;
 	finalTime?: number;
 	seed?: number;
 	diffIndex?: number;
 	state?: unknown; // game-specific (e.g. Sudoku entries)
+	/** Play time accrued so far, stamped on every save. Leaving the page and coming back
+	 *  resumes from this instead of the wall clock, so a break costs nothing. */
+	elapsedMs?: number;
 	// The player asked to see the solution instead of finishing. The attempt is spent
 	// (no replay today) but it earned nothing: no score, no streak, no cocoins.
 	abandoned?: boolean;
@@ -87,10 +92,20 @@ export interface DailyRun {
 
 const runKey = (game: string): string => `ludiven-dailyrun-${game}-${todayKey()}`;
 
+/** Dailies that are a fixed-duration race rather than a chrono. Their countdown has to
+ *  keep burning while the player is away, or the blitz could be solved a slice at a time. */
+const WALL_CLOCK_DAILIES = new Set(['meli-melo']);
+
 export function loadDailyRun(game: string): DailyRun | null {
 	try {
 		const raw = localStorage.getItem(runKey(game));
-		return raw ? (JSON.parse(raw) as DailyRun) : null;
+		if (!raw) return null;
+		const run = JSON.parse(raw) as DailyRun;
+		// Hand back an epoch that already discounts the break. Runs saved before elapsedMs
+		// existed have none, and keep their old wall-clock behaviour.
+		if (!run.done && run.elapsedMs != null && !WALL_CLOCK_DAILIES.has(game))
+			return { ...run, startedAt: Date.now() - run.elapsedMs };
+		return run;
 	} catch {
 		return null;
 	}
@@ -100,7 +115,8 @@ export function saveDailyRun(game: string, run: DailyRun): void {
 	try {
 		// One-shot Umami events (first save of the day = daily played; first save with done = daily finished).
 		const prevRaw = localStorage.getItem(runKey(game));
-		localStorage.setItem(runKey(game), JSON.stringify(run));
+		const stamped = run.done ? run : { ...run, elapsedMs: Math.max(0, Date.now() - run.startedAt) };
+		localStorage.setItem(runKey(game), JSON.stringify(stamped));
 		if (prevRaw === null) trackGame(game, 'daily_played');
 		if (run.done) {
 			const prevDone = prevRaw ? (JSON.parse(prevRaw) as DailyRun).done === true : false;
@@ -114,6 +130,22 @@ export function saveDailyRun(game: string, run: DailyRun): void {
 				}
 			}
 		}
+	} catch {
+		/* ignore */
+	}
+}
+
+/** Bank the chrono without touching the board — for when the page is hidden mid-thought.
+ *  Saves only happen on a move, so without this a long pause after the last move would
+ *  rewind to that move. Ignores a finished run. */
+export function checkpointDailyClock(game: string, elapsedMs: number): void {
+	try {
+		const raw = localStorage.getItem(runKey(game));
+		if (!raw) return;
+		const run = JSON.parse(raw) as DailyRun;
+		if (run.done) return;
+		run.elapsedMs = Math.max(0, Math.round(elapsedMs));
+		localStorage.setItem(runKey(game), JSON.stringify(run));
 	} catch {
 		/* ignore */
 	}

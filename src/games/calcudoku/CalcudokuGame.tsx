@@ -18,6 +18,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { useHintGate } from '../useHintGate';
 import { repairNote } from '../repairNote';
 import { calcudokuLevels } from './levels';
@@ -241,14 +242,16 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 	}, [gameId]);
 
 	/* Timer */
+	const ticking = status === 'playing' && started && !revealed;
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (status !== 'playing' || !started || revealed) return;
+		if (!ticking) return;
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
 			50,
 		);
 		return () => clearInterval(id);
-	}, [status, started, revealed]);
+	}, [ticking]);
 
 	/* Latin conflicts (row / col duplicates). */
 	const conflicts = useMemo(() => {

@@ -11,6 +11,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { diffKeys } from '../../lib/difficulty';
 import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
@@ -324,11 +325,13 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	}, [gameId, daily]);
 
 	/* Timer */
+	const ticking = status === 'playing' && started;
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (status !== 'playing' || !started) return;
+		if (!ticking) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [status, started]);
+	}, [ticking]);
 
 	/** Nothing gives: shudder whatever is holding the line, rather than the whole board.
 	    Cleared first, so two jams in a row really replay the animation. */

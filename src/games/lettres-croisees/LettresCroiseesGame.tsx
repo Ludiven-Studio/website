@@ -10,6 +10,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { diffKeys } from '../../lib/difficulty';
 import { lettresCroiseesLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
@@ -73,11 +74,13 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	const gate = useHintGate(timed, status === 'playing' && !armed);
 
 	/* Daily chrono. */
+	const dailyTicking = daily && started && status === 'playing';
+	usePlayClock(startRef, dailyTicking, daily ? gameId : null);
 	useEffect(() => {
-		if (!daily || !started || status !== 'playing') return;
+		if (!dailyTicking) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, started, status]);
+	}, [dailyTicking]);
 
 	const setSelBoth = (s: number[]): void => { selRef.current = s; setSel(s); };
 	const setFoundBoth = (f: string[]): void => { foundRef.current = f; setFound(f); };
@@ -182,11 +185,13 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	/* Levels chrono. */
+	const levelsTicking = lv.playing && started && status === 'playing';
+	usePlayClock(startRef, levelsTicking, null);
 	useEffect(() => {
-		if (!lv.playing || !started || status !== 'playing') return;
+		if (!levelsTicking) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [lv.playing, started, status]);
+	}, [levelsTicking]);
 
 	/* Grade the level once every grid word is filled. */
 	useEffect(() => {

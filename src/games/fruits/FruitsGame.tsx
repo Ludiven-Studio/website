@@ -11,6 +11,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { diffKeys } from '../../lib/difficulty';
 import { useHintGate } from '../useHintGate';
 import { fruitsLevels } from './levels';
@@ -72,11 +73,13 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
+	const ticking = (daily || lv.playing) && started && status === 'playing';
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (!(daily || lv.playing) || !started || status !== 'playing') return;
+		if (!ticking) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, lv.playing, started, status]);
+	}, [ticking]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);

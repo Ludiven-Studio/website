@@ -18,6 +18,7 @@ import GiveUp, { RevealNote } from '../../components/GiveUp';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { diffKeys } from '../../lib/difficulty';
 import { useHintGate } from '../useHintGate';
 import { repairNote } from '../repairNote';
@@ -221,14 +222,16 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	}, [gameId]);
 
 	/* Timer */
+	const ticking = status === 'playing' && started && !revealed;
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (status !== 'playing' || !started || revealed) return;
+		if (!ticking) return;
 		const id = setInterval(
 			() => setElapsed(Math.round((Date.now() - startRef.current) / 10)),
 			50,
 		);
 		return () => clearInterval(id);
-	}, [status, started, revealed]);
+	}, [ticking]);
 
 	/* Conflicts: cells whose value is duplicated in row / col / box. */
 	const conflicts = useMemo(() => {

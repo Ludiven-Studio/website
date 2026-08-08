@@ -13,6 +13,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { useHintGate } from '../useHintGate';
 import { matricesLevels } from './levels';
 
@@ -156,12 +157,13 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 	useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
 	// Chrono runs for the daily and for a level in progress.
+	const ticking = status === 'playing' && started && !revealed && (daily || lv.playing);
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (status !== 'playing' || !started || revealed) return;
-		if (!daily && !lv.playing) return;
+		if (!ticking) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, started, status, revealed, lv.playing]);
+	}, [ticking]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		if (timer.current) clearTimeout(timer.current);

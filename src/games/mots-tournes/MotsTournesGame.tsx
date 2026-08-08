@@ -11,6 +11,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { motsTournesLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHintGate } from '../useHintGate';
@@ -62,12 +63,13 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 	const gate = useHintGate(timed, status === 'playing' && !armed);
 
 	/* Daily / levels chrono. */
+	const ticking = status === 'playing' && (daily || lv.playing) && started;
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (status !== 'playing') return;
-		if (!(((daily || lv.playing) && started))) return;
+		if (!ticking) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, started, status, lv.playing]);
+	}, [ticking]);
 
 	/* Levels mode: start a level from its config; grade on completion. */
 	const startLevel = useCallback((level: number): void => {

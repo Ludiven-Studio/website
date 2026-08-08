@@ -11,6 +11,7 @@ import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { motsMelesLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHintGate } from '../useHintGate';
@@ -62,11 +63,13 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 	const gate = useHintGate(timed, status === 'playing' && started);
 
 	/* Daily / levels chrono. */
+	const ticking = (daily || lv.playing) && started && status === 'playing';
+	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
-		if (!(daily || lv.playing) || !started || status !== 'playing') return;
+		if (!ticking) return;
 		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 50);
 		return () => clearInterval(id);
-	}, [daily, lv.playing, started, status]);
+	}, [ticking]);
 
 	/* Levels mode: start a level from its config; grade on solve (all words found). */
 	const startLevel = useCallback((level: number) => {
