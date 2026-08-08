@@ -10,7 +10,7 @@ import {
 	type ScoreRow,
 } from '../lib/leaderboard';
 import { games } from '../data/games';
-import { fmtCentis } from '../lib/scoreFormat';
+import { fmtCentisExact } from '../lib/scoreFormat';
 import { isSecured } from '../data/securedGames';
 import { submitScore, getLeaderboard } from '../lib/scores';
 import { gameStreak } from '../lib/streak';
@@ -29,9 +29,11 @@ interface Props {
 	/** Custom rows source (e.g. lib/scores getLeaderboard). When set, the internal
 	    submitDaily is skipped — the game submits through the Edge Function itself. */
 	source?: () => Promise<ScoreRow[]>;
+	/** Share + "tous les défis" row. Off when the board is only a peek (free mode corner). */
+	actions?: boolean;
 }
 
-function LeaderboardInner({ game, metric, submitValue, format, source }: Props) {
+function LeaderboardInner({ game, metric, submitValue, format, source, actions = true }: Props) {
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
 	const [editing, setEditing] = useState(false);
@@ -40,9 +42,12 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 	const [error, setError] = useState(false);
 	const [submitFailed, setSubmitFailed] = useState(false);
 	const [shareMsg, setShareMsg] = useState('');
+	const [dayValue, setDayValue] = useState<number | null>(null); // today's own result, this run or an earlier one
 	const lastSubmittedRef = useRef<number | null>(null); // last value sent (re-submit when it improves)
 
 	const secured = isSecured(game);
+	// A few boards log under "<id>-t" (the timed variant); the page and the streak use the bare id.
+	const gameId = games.some((g) => g.id === game) ? game : game.replace(/-t$/, '');
 	const load = useCallback(async () => {
 		setLoading(true);
 		// Submit whenever the value changes (e.g. a new best lap). Secured games go through
@@ -83,18 +88,24 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 
 	// Persist the player's own best-of-day (offline-safe, pre-formatted) so game cards
 	// (and the /jeux/defi hub) can show "record en cours". Keyed by day + leaderboard id.
+	// The same blob feeds `dayValue`: a game only passes `submitValue` on the run itself, so
+	// without this a player coming back to a daily already done loses the share and the way out.
 	useEffect(() => {
-		if (submitValue == null) return;
 		try {
 			const key = `ludiven-dayrec-${game}-${todayKey()}`;
 			const prev = JSON.parse(localStorage.getItem(key) || 'null') as { v: number } | null;
+			if (submitValue == null) {
+				setDayValue(prev ? prev.v : null);
+				return;
+			}
 			const better = !prev || (metric === 'time' ? submitValue < prev.v : submitValue > prev.v);
 			if (better) {
-				const t = format ? format(submitValue) : metric === 'time' ? fmtCentis(submitValue) : String(submitValue);
+				const t = format ? format(submitValue) : metric === 'time' ? fmtCentisExact(submitValue) : String(submitValue);
 				localStorage.setItem(key, JSON.stringify({ v: submitValue, m: metric, t }));
 			}
+			setDayValue(better ? submitValue : prev!.v);
 		} catch {
-			/* ignore */
+			setDayValue(submitValue ?? null);
 		}
 	}, [submitValue, game, metric, format]);
 
@@ -114,16 +125,16 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 
 	const me = name.toLowerCase();
 	const myBlason = equippedBlason(); // shown next to your own name (public display needs the backend)
-	const fmt = format ?? ((v: number) => (metric === 'time' ? fmtCentis(v) : String(v)));
+	const fmt = format ?? ((v: number) => (metric === 'time' ? fmtCentisExact(v) : String(v)));
 	const showInput = editing || (submitValue != null && !name);
 
 	// Spoiler-free result share (Wordle-style): score/rank + same-daily deep link.
 	const share = async (): Promise<void> => {
-		if (submitValue == null) return;
-		const title = games.find((g) => g.id === game)?.title ?? game;
-		const url = `${location.origin}/jeux/${game}?defi`;
-		const line = metric === 'time' ? `⏱️ ${fmt(submitValue)}` : `🏆 ${fmt(submitValue)} pts`;
-		const st = gameStreak(game);
+		if (dayValue == null) return;
+		const title = games.find((g) => g.id === gameId)?.title ?? gameId;
+		const url = `${location.origin}/jeux/${gameId}?defi`;
+		const line = metric === 'time' ? `⏱️ ${fmt(dayValue)}` : `🏆 ${fmt(dayValue)} pts`;
+		const st = gameStreak(gameId);
 		const streakLine = st.count > 0 ? `\n🔥 ${st.count} jour${st.count > 1 ? 's' : ''} d'affilée` : '';
 		const text = `${title} — Défi du jour\n${line}${streakLine}`;
 		try {
@@ -145,9 +156,11 @@ function LeaderboardInner({ game, metric, submitValue, format, source }: Props) 
 			<style>{CSS}</style>
 			<h3 className="lb-title">Classement du jour</h3>
 
-			{submitValue != null && (
+			{actions && (
 				<div className="lb-share-row">
-					<button className="lb-share" onClick={share}>📣 Partager mon score</button>
+					{dayValue != null && (
+						<button className="lb-share" onClick={share}>📣 Partager mon score</button>
+					)}
 					<a className="lb-back" href="/jeux/defi/">🗓 Tous les défis</a>
 					{shareMsg && <span className="lb-share-msg">{shareMsg}</span>}
 				</div>

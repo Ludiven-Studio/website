@@ -26,7 +26,7 @@ export default function LeaderboardCorner({ game, metric, format, source }: Prop
 					<button className="lbc-close" onClick={() => setOpen(false)} aria-label="Fermer">
 						✕
 					</button>
-					<Leaderboard game={game} metric={metric} format={format} source={source} />
+					<Leaderboard game={game} metric={metric} format={format} source={source} actions={false} />
 				</div>
 			)}
 			<button className="lbc-pill" onClick={() => setOpen((o) => !o)} aria-expanded={open}>

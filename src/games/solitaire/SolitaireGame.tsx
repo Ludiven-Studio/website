@@ -732,6 +732,9 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 											? <>Ton temps du jour&nbsp;: <strong>{finalCentis != null ? fmtCentis(finalCentis) : chrono}</strong>. Reviens demain pour un nouveau défi&nbsp;!</>
 											: <>En <strong>{finalCentis != null ? fmtCentis(finalCentis) : chrono}</strong> et {moves} coups. Un seul essai&nbsp;: ton temps est classé — reviens demain&nbsp;!</>}
 									</p>
+									<div className="sol-cardbtns">
+										<a className="sol-btn primary" href="/jeux/defi/">🗓 Tous les défis</a>
+									</div>
 								</>
 							) : (
 								<>
@@ -800,7 +803,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{daily ? (
-				<Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? submitCentis : undefined} format={fmtCentis} />
+				<Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? submitCentis : undefined} />
 			) : !lv.active ? (
 				<LeaderboardCorner game={gameId} metric="time" />
 			) : null}
@@ -845,7 +848,7 @@ const CSS = `
 .sol-card p { color: var(--gray-200); font-size: 13.5px; line-height: 1.5; margin: 0 0 0.9rem; }
 .sol-cardbtns { display: flex; gap: 8px; justify-content: center; }
 .sol-controls { display: flex; gap: 8px; margin-top: 0.8rem; flex-wrap: wrap; justify-content: center; }
-.sol-btn { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 999px; padding: 9px 18px; cursor: pointer; }
+.sol-btn { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13.5px; border-radius: 999px; padding: 9px 18px; cursor: pointer; text-decoration: none; }
 .sol-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .sol-btn.primary { background: var(--sol); color: var(--accent-text-over); border-color: var(--sol); }
 .sol-help { max-width: 440px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 0.9rem; }
