@@ -2,7 +2,8 @@
 import BaseLayout from './BaseLayout.astro';
 import Icon from '../components/Icon.astro';
 import GameTutorial from '../components/GameTutorial.astro';
-import CocottesBar from '../components/CocottesBar';
+import CocoinBar from '../components/CocoinBar';
+import CocoinToast from '../components/CocoinToast';
 
 interface Props {
 	title: string;
@@ -24,10 +25,13 @@ const { title, description, heading, tagline, gameId } = Astro.props;
 			<h1>{heading}</h1>
 			<p>{tagline}</p>
 			<GameTutorial gameId={gameId} />
-			<CocottesBar client:load />
+			<CocoinBar client:load />
 		</header>
 
 		<slot />
+
+		{/* Outside .game-head on purpose: fullscreen hides the head, not the reward. */}
+		<CocoinToast client:idle />
 	</div>
 </BaseLayout>
 

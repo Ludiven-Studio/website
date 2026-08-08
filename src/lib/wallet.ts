@@ -1,6 +1,8 @@
-// Local "cocottes" currency: a balance, an escalating daily-return reward, cosmetic
+// Local "cocoin" currency: a balance, an escalating daily-return reward, cosmetic
 // blasons, and per-game "Expert" packs (a 4th difficulty + levels 101-200). All
 // device-local (localStorage), no signup — casually cheatable. See [[currency-cocottes]].
+// The storage key and the analytics names still say "cocottes" — renaming them would
+// wipe every player's balance.
 
 import { activityStreak } from './streak';
 import { challengeDay } from './day';
@@ -10,11 +12,14 @@ const KEY = 'ludiven-cocottes';
 /** Fired on every wallet mutation so React islands on the page refresh together. */
 export const WALLET_EVENT = 'ludiven:wallet';
 
+/** Fired when the balance grows, with the gain in `detail.amount` — drives the toast. */
+export const EARN_EVENT = 'ludiven:earn';
+
 export interface Blason {
 	id: string;
 	emoji: string;
 	label: string;
-	price: number; // in cocottes
+	price: number; // in cocoins
 	tier?: 'commun' | 'legendaire';
 }
 
@@ -106,17 +111,29 @@ function write(w: WalletData): void {
 	}
 }
 
+// Every gain goes through here, so a single listener can show it — no game has to call
+// anything to get its "+N cocoins" toast.
+function announceGain(amount: number): void {
+	try {
+		window.dispatchEvent(new CustomEvent(EARN_EVENT, { detail: { amount } }));
+	} catch {
+		/* no window (tests run on node) */
+	}
+}
+
 /** Drop the cached parse — for tests that swap the localStorage stub. */
 export const resetWalletCache = (): void => { cache = null; };
 
 export const balance = (): number => read().balance;
 
-/** Add cocottes (level clears, daily challenges, rewards). Returns the new balance. */
+/** Add cocoins (level clears, daily challenges, rewards). Returns the new balance. */
 export function earn(amount: number): number {
 	if (amount <= 0) return balance();
 	const w = read();
-	w.balance += Math.round(amount);
+	const gain = Math.round(amount);
+	w.balance += gain;
 	write(w);
+	announceGain(gain);
 	return w.balance;
 }
 
@@ -169,7 +186,7 @@ export const dailyRewardAmount = (streakDay: number): number => Math.min(25, 5 +
 export interface RewardState {
 	playedToday: boolean;
 	canClaim: boolean;
-	amount: number; // cocottes for claiming today
+	amount: number; // cocoins for claiming today
 }
 
 /** Today's reward status. Requires having played a game today; one claim per day. */
@@ -188,5 +205,6 @@ export function claimDailyReward(): number {
 	w.balance += st.amount;
 	w.lastReward = challengeDay();
 	write(w);
+	announceGain(st.amount);
 	return st.amount;
 }

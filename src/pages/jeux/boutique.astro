@@ -2,6 +2,8 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Icon from '../../components/Icon.astro';
 import BoutiquePanel from '../../components/BoutiquePanel';
+import Cocoin from '../../components/Cocoin';
+import CocoinToast from '../../components/CocoinToast';
 import { games } from '../../data/games';
 import { NO_EXPERT } from '../../lib/difficulty';
 
@@ -11,8 +13,8 @@ const packs = games
 ---
 
 <BaseLayout
-	title="Boutique cocottes | Jeux Ludiven Studio"
-	description="Dépense tes cocottes : blasons décoratifs et packs Expert qui ouvrent une difficulté de plus et 100 niveaux supplémentaires par jeu."
+	title="Boutique cocoins | Jeux Ludiven Studio"
+	description="Dépense tes cocoins : blasons décoratifs et packs Expert qui ouvrent une difficulté de plus et 100 niveaux supplémentaires par jeu."
 	noindex
 >
 	<div class="wrapper stack gap-6">
@@ -20,15 +22,16 @@ const packs = games
 			<a class="back" href="/jeux/">
 				<Icon icon="arrow-left" size="1em" /> Tous les jeux
 			</a>
-			<h1>🐔 Boutique</h1>
+			<h1><Cocoin size={38} /> Boutique</h1>
 			<p>
-				Les cocottes se gagnent en jouant : récompense de retour quotidienne, premier défi du jour
-				et étoiles de niveaux. Elles achètent des <strong>blasons</strong> et des
-				<strong>packs Expert</strong>.
+				Les <strong>cocoins</strong> se gagnent en jouant : récompense de retour quotidienne,
+				premier défi du jour et étoiles de niveaux. Ils achètent des <strong>blasons</strong> et
+				des <strong>packs Expert</strong>.
 			</p>
 		</header>
 
 		<BoutiquePanel games={packs} client:load />
+		<CocoinToast client:idle />
 	</div>
 </BaseLayout>
 
@@ -52,6 +55,9 @@ const packs = games
 		color: var(--accent-regular);
 	}
 	.shop-hero h1 {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
 		font-size: var(--text-3xl);
 	}
 	.shop-hero p {

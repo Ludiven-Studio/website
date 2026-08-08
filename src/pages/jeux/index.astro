@@ -3,7 +3,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
 import GameFold from '../../components/GameFold.astro';
 import SuggestionForm from '../../components/SuggestionForm.astro';
-import CocottesBar from '../../components/CocottesBar';
+import CocoinBar from '../../components/CocoinBar';
+import CocoinToast from '../../components/CocoinToast';
 import { games } from '../../data/games';
 
 const NUM_FR = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize'];
@@ -47,7 +48,8 @@ const byCategory = CATEGORIES.map((c) => ({
 				<p class="games-streak" id="games-streak" hidden></p>
 		</header>
 
-			<div class="games-wallet"><CocottesBar client:load /></div>
+			<div class="games-wallet"><CocoinBar client:load /></div>
+			<CocoinToast client:idle />
 
 		<div class="games-sections stack gap-4">
 			{

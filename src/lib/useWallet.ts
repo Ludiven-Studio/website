@@ -9,6 +9,8 @@ export interface WalletView {
 	equipped: string | null;
 	reward: RewardState;
 	unlocked: string[];
+	/** False until the first read. The initial 0 → real balance jump is not a gain. */
+	ready: boolean;
 	refresh: () => void;
 }
 
@@ -19,12 +21,14 @@ export function useWallet(): WalletView {
 	const [equipped, setEquipped] = useState<string | null>(null);
 	const [reward, setReward] = useState<RewardState>(NEUTRAL);
 	const [unlocked, setUnlocked] = useState<string[]>([]);
+	const [ready, setReady] = useState(false);
 
 	const refresh = useCallback(() => {
 		setBal(balance());
 		setEquipped(equippedBlason()?.id ?? null);
 		setReward(rewardState());
 		setUnlocked(unlockedGames());
+		setReady(true);
 	}, []);
 
 	useEffect(() => {
@@ -42,5 +46,5 @@ export function useWallet(): WalletView {
 		};
 	}, [refresh]);
 
-	return { balance: bal, equipped, reward, unlocked, refresh };
+	return { balance: bal, equipped, reward, unlocked, ready, refresh };
 }

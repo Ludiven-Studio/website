@@ -5,8 +5,9 @@ import {
 } from '../lib/wallet';
 import { useWallet } from '../lib/useWallet';
 import { trackEvent } from '../lib/analytics';
+import Cocoin from './Cocoin';
 
-/* The cocottes shop: daily reward, blasons (common + legendary), and the per-game
+/* The cocoin shop: daily reward, blasons (common + legendary), and the per-game
    Expert packs — a pack unlocks the Expert difficulty and levels 101-200 at once. */
 
 export interface PackGame {
@@ -31,7 +32,7 @@ export default function BoutiquePanel({ games }: { games: PackGame[] }) {
 		const g = claimDailyReward();
 		if (g > 0) {
 			trackEvent('cocottes:reward_claim', { amount: g });
-			flash(`+${g} 🐔 récompense du jour !`);
+			refresh(); // CocoinToast shows the "+N cocoins"
 		}
 	};
 	const buy = (b: Blason) => {
@@ -68,7 +69,14 @@ export default function BoutiquePanel({ games }: { games: PackGame[] }) {
 						{eq ? 'Équipé ✓' : 'Équiper'}
 					</button>
 				) : (
-					<button className="bp-buy" disabled={balance < b.price} onClick={() => buy(b)}>{b.price} 🐔</button>
+					<button
+						className="bp-buy"
+						disabled={balance < b.price}
+						onClick={() => buy(b)}
+						aria-label={`Acheter ${b.label} pour ${b.price} cocoins`}
+					>
+						{b.price} <Cocoin size={14} />
+					</button>
 				)}
 			</div>
 		);
@@ -79,13 +87,15 @@ export default function BoutiquePanel({ games }: { games: PackGame[] }) {
 			<style>{CSS}</style>
 
 			<div className="bp-bar">
-				<span className="bp-bal" title="Tes cocottes">🐔 {balance}</span>
+				<span className="bp-bal" title="Tes cocoins" aria-label={`${balance} cocoins`}>
+					<Cocoin size={20} /> {balance}
+				</span>
 				{reward.canClaim ? (
 					<button className="bp-claim" onClick={claim}>🎁 Récompense du jour · +{reward.amount}</button>
 				) : reward.playedToday ? (
 					<span className="bp-note">✓ Récompense du jour prise</span>
 				) : (
-					<span className="bp-note">Joue un jeu pour ta récompense (+{reward.amount} 🐔)</span>
+					<span className="bp-note">Joue un jeu pour ta récompense (+{reward.amount} <Cocoin size={14} />)</span>
 				)}
 			</div>
 			{msg && <div className="bp-msg">{msg}</div>}
@@ -100,7 +110,7 @@ export default function BoutiquePanel({ games }: { games: PackGame[] }) {
 			</section>
 
 			<section className="bp-sec">
-				<h2>🔓 Packs Expert · {UNLOCK_PRICE} 🐔</h2>
+				<h2>🔓 Packs Expert · {UNLOCK_PRICE} <Cocoin size={20} /></h2>
 				<p className="bp-sub">
 					Un pack par jeu. Il ouvre d'un coup la difficulté <strong>Expert</strong> et les
 					<strong> niveaux 101 à 200</strong>, nettement plus durs.
@@ -126,8 +136,13 @@ export default function BoutiquePanel({ games }: { games: PackGame[] }) {
 								{has ? (
 									<a className="bp-eq on" href={g.href}>Jouer →</a>
 								) : (
-									<button className="bp-buy" disabled={balance < UNLOCK_PRICE} onClick={() => buyPack(g)}>
-										{UNLOCK_PRICE} 🐔
+									<button
+										className="bp-buy"
+										disabled={balance < UNLOCK_PRICE}
+										onClick={() => buyPack(g)}
+										aria-label={`Acheter le pack Expert ${g.title} pour ${UNLOCK_PRICE} cocoins`}
+									>
+										{UNLOCK_PRICE} <Cocoin size={14} />
 									</button>
 								)}
 							</div>
@@ -146,7 +161,10 @@ const CSS = `
   display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px;
   background: var(--gray-999); border: 1.5px solid var(--gray-800); border-radius: 999px; padding: 8px 14px;
 }
-.bp-bal { font-weight: 800; font-size: 16px; color: var(--gray-0); font-variant-numeric: tabular-nums; }
+.bp-bal {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 800; font-size: 16px; color: var(--gray-0); font-variant-numeric: tabular-nums;
+}
 .bp-claim {
   border: none; background: var(--accent-regular); color: var(--accent-text-over);
   font: inherit; font-weight: 700; font-size: 13.5px; border-radius: 999px; padding: 8px 16px; cursor: pointer;
@@ -175,6 +193,7 @@ const CSS = `
 .bp-label { flex: 1; font-size: 13px; font-weight: 600; color: var(--gray-100); }
 .bp-only { font-style: normal; font-size: 11px; font-weight: 500; color: var(--gray-400); }
 .bp-buy, .bp-eq {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   border: none; font: inherit; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 5px 11px;
   cursor: pointer; background: var(--accent-regular); color: var(--accent-text-over);
   white-space: nowrap; text-decoration: none;
