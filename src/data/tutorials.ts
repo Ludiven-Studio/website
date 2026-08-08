@@ -114,7 +114,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 	],
 	chemin: [
 		{ emoji: '🎯', title: 'Le but', body: 'Trace un seul chemin qui remplit toutes les cases en passant par les nombres dans l\'ordre, du 1 jusqu\'au dernier.' },
-		{ emoji: '🖱️', title: 'Comment jouer', body: 'Glisse depuis le 1 pour dessiner. Touche une case déjà tracée pour revenir en arrière.' },
+		{ emoji: '🖱️', title: 'Comment jouer', body: 'Glisse depuis le 1 pour dessiner. Pour corriger, repars d\'une case déjà tracée : la suite est effacée et tu continues à partir de là.' },
 		{ emoji: '💡', title: 'Astuce', body: 'Les murs bloquent certains passages. Indice prolonge le chemin correct ; après 1 min, tu peux voir la solution.' },
 	],
 	circuit: [

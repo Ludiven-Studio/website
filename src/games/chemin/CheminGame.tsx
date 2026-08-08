@@ -63,8 +63,6 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	const lv = useLevels(gameId, cheminLevels);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const drawing = useRef(false);
-	const moved = useRef(false);
-	const downCell = useRef<[number, number] | null>(null);
 	const lastCell = useRef<[number, number] | null>(null);
 	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
 	const gate = useHintGate(timed, status === 'playing' && started && !revealed);
@@ -338,7 +336,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		[status, revealed, started, puzzle, wallSet],
 	);
 
-	/* Deliberate click on an already-traced cell: cut the path back to it. */
+	/* Cut the path back to a cell it already goes through. */
 	const truncateTo = useCallback(
 		(cell: [number, number]) => {
 			if (status !== 'playing' || revealed) return;
@@ -365,9 +363,11 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		const cell = cellFromCoords(clientX, clientY);
 		if (!cell) return;
 		drawing.current = true;
-		moved.current = false;
-		downCell.current = cell;
 		lastCell.current = cell;
+		// Pressing a cell already on the path picks it back up there: the tail is dropped and
+		// the drag carries on from that cell. Both updates queue, so `step` sees the cut path
+		// and does nothing.
+		truncateTo(cell);
 		step(cell);
 	};
 	const moveDrag = (clientX: number, clientY: number) => {
@@ -377,12 +377,9 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		if (!cell) return;
 		if (lastCell.current && cell[0] === lastCell.current[0] && cell[1] === lastCell.current[1]) return;
 		lastCell.current = cell;
-		moved.current = true;
 		step(cell);
 	};
 	const endDrag = () => {
-		if ((daily || lv.playing) && !started) return;
-		if (drawing.current && !moved.current && downCell.current) truncateTo(downCell.current); // deliberate tap
 		drawing.current = false;
 	};
 
@@ -658,7 +655,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 			) : (
 				<p className="zp-help">
 					Glisse depuis le 1 pour tracer un chemin qui passe par tous les nombres dans l'ordre et
-					remplit toutes les cases. Touche une case du tracé pour revenir en arrière.
+					remplit toutes les cases. Repars d'une case du tracé pour reprendre à partir de là.
 				</p>
 			)}
 		</div>
