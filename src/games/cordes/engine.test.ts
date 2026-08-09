@@ -1,23 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
+	CLEAR,
 	DIFFS,
 	DIFF_ORDER,
 	applyHint,
-	coilCount,
-	detours,
 	distToSeg,
 	findHint,
 	generateCordes,
-	isNailed,
 	isSolved,
 	pathsCross,
 	ropeFault,
 	segCross,
 	selfCrosses,
-	spikeCount,
-	tangleCount,
-	tangleDepth,
-	wallCount,
 	type CordesPuzzle,
 	type DiffLevel,
 	type Pt,
@@ -38,7 +32,7 @@ const bare: CordesPuzzle = {
 		[{ x: 0.1, y: 0.5 }, { x: 0.3, y: 0.02 }, { x: 0.7, y: 0.02 }, { x: 0.9, y: 0.5 }],
 		[{ x: 0.5, y: 0.1 }, { x: 0.5, y: 0.9 }],
 	],
-	anchored: [false, false],
+	detours: [1.5, 1],
 	pegR: 0.04,
 };
 
@@ -93,8 +87,14 @@ describe('cordes rules', () => {
 		expect(ropeFault([
 			a, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.2 }, { x: 0.3, y: 0.7 }, b,
 		], 0, [], bare)).toBe('se croise elle-même');
-		expect(ropeFault([a, { x: 0.5, y: 0.1 }, b], 0, [], bare)).toBe('passe sur un piquet');
+		expect(ropeFault([a, { x: 0.5, y: 0.1 }, b], 0, [], bare)).toBe('passe trop près d’un piquet');
 		expect(ropeFault([a, b], 0, bare.solution, bare)).toBe('croise une autre corde');
+	});
+
+	it('the clearance is wider than the peg itself', () => {
+		// 0.05 off the peg: outside the drawn circle (0.04), inside the halo (0.064).
+		expect(CLEAR).toBeGreaterThan(1);
+		expect(ropeFault([a, { x: 0.5, y: 0.15 }, b], 0, [], bare)).toBe('passe trop près d’un piquet');
 	});
 
 	it('an unfinished board is not solved', () => {
@@ -108,23 +108,20 @@ function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 	expect(p.ropes).toBe(ropes);
 	expect(p.solution).toHaveLength(ropes);
 	expect(p.ends).toHaveLength(ropes);
-	expect(p.anchored).toHaveLength(ropes);
+	expect(p.detours).toHaveLength(ropes);
 
 	const pegs = p.ends.flat();
 	for (let i = 0; i < pegs.length; i++) {
-		expect(pegs[i].x).toBeGreaterThanOrEqual(0);
-		expect(pegs[i].x).toBeLessThanOrEqual(1);
-		expect(pegs[i].y).toBeGreaterThanOrEqual(0);
-		expect(pegs[i].y).toBeLessThanOrEqual(1);
+		// Every peg whole and loose inside the frame — nothing nailed to the edge any more.
+		expect(Math.min(pegs[i].x, 1 - pegs[i].x, pegs[i].y, 1 - pegs[i].y)).toBeGreaterThanOrEqual(p.pegR);
 		// A tap must never be ambiguous between two pegs.
 		for (let j = i + 1; j < pegs.length; j++) expect(dist(pegs[i], pegs[j])).toBeGreaterThan(2 * p.pegR);
 	}
 
 	for (let r = 0; r < ropes; r++) {
-		// The flag has to tell the truth: a wall is a rope with both pegs nailed to the frame.
-		expect(isNailed(p.ends[r][0]) && isNailed(p.ends[r][1])).toBe(p.anchored[r]);
 		// Three peg-widths apart at least: closer than that and the eye pairs them up for free.
 		expect(dist(p.ends[r][0], p.ends[r][1])).toBeGreaterThanOrEqual(6 * p.pegR);
+		expect(p.detours[r]).toBeGreaterThanOrEqual(1);
 		expect(p.solution[r].length).toBeGreaterThan(2);
 		expect(p.solution[r][0]).toEqual(p.ends[r][0]);
 		expect(p.solution[r][p.solution[r].length - 1]).toEqual(p.ends[r][1]);
@@ -133,15 +130,14 @@ function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 	expect(isSolved(p.solution, p)).toBe(true);
 }
 
-// Ranking a hundred deals against each other costs a tenth of a second on the widest board,
-// which puts a forty-board sample well past the default five seconds.
-describe('cordes generation', { timeout: 60_000 }, () => {
+const hardCount = (p: CordesPuzzle): number => p.detours.filter((d) => d >= 1.3).length;
+
+// A board is up to 48 deals each solved on the raster, so a forty-board sample is well
+// past the default five seconds.
+describe('cordes generation', { timeout: 120_000 }, () => {
 	const dealt = new Map<string, CordesPuzzle[]>();
 
-	/**
-	 * Boards of one shape. Dealt once and shared between the assertions below: a board is a
-	 * hundred deals ranked against each other, which makes it by far the slowest thing here.
-	 */
+	/** Boards of one shape, dealt once and shared between the assertions below. */
 	const sample = (diff: DiffLevel, n = 40): CordesPuzzle[] => {
 		const got = dealt.get(diff.label) ?? [];
 		for (let s = got.length; s < n; s++) got.push(generateCordes(diff, mulberry32(2200 + s * 41 + diff.ropes)));
@@ -155,56 +151,34 @@ describe('cordes generation', { timeout: 60_000 }, () => {
 	for (const key of Object.keys(DIFFS)) {
 		const diff = DIFFS[key];
 
-		it(`${diff.label}: every board ships a legal answer, and a ruler is never that answer`, () => {
-			// Walls and spikes are built, not hoped for, so every board must have them all. The
-			// tangle is only rejection sampling on top, so it is a floor, not the target.
+		it(`${diff.label}: every board ships a legal answer and enough forced detours`, () => {
 			const boards = sample(diff);
-			for (const p of boards) {
-				expectLegalBoard(p, diff.ropes);
-				expect(wallCount(p)).toBe(diff.walls);
-				expect(spikeCount(p)).toBe(diff.spikes);
-				expect(tangleCount(p)).toBeGreaterThanOrEqual(2);
-				// Two spikes always catch somebody: that is the whole reason they are dealt.
-				if (diff.coils >= 2) expect(coilCount(p)).toBeGreaterThanOrEqual(2);
-			}
-			if (diff.coils >= 3) {
-				const coiled = boards.filter((p) => coilCount(p) >= 3).length;
-				expect(coiled).toBeGreaterThanOrEqual(32); // 80% ask for three real detours
-			}
-			if (diff.nested >= 1) {
-				const deep = boards.filter((p) => tangleDepth(p) >= 2).length;
-				expect(deep).toBeGreaterThanOrEqual(24); // 60% carry a rope caught on both sides
-			}
+			for (const p of boards) expectLegalBoard(p, diff.ropes);
+			// The detour target is rejection sampling, so it is reached, not guaranteed.
+			const reached = boards.filter((p) => hardCount(p) >= diff.hard).length;
+			expect(reached).toBeGreaterThanOrEqual(36); // 90%
 		});
 	}
 
-	it('a spike is nailed by one end only, and its free tip is out in the open', () => {
-		for (const p of sample(DIFFS.expert, 20)) {
-			const spikes = p.ends.filter(([a, b]) => isNailed(a) !== isNailed(b));
-			expect(spikes).toHaveLength(DIFFS.expert.spikes);
-			for (const [a, b] of spikes) {
-				const tip = isNailed(a) ? b : a;
-				// A tip a step from the edge is rounded for nothing; the cost is the reach.
-				expect(Math.min(tip.x, 1 - tip.x, tip.y, 1 - tip.y)).toBeGreaterThan(0.15);
+	it('hard tiers carry their fence: one peg seals an edge, none touches it', () => {
+		for (const key of ['difficile', 'expert']) {
+			for (const p of sample(DIFFS[key], 20)) {
+				const edge = (peg: Pt): number => Math.min(peg.x, 1 - peg.x, peg.y, 1 - peg.y);
+				const sealed = p.ends.flat().filter((peg) => edge(peg) < CLEAR * p.pegR);
+				expect(sealed.length).toBeGreaterThanOrEqual(1);
 			}
 		}
 	});
 
 	it('a harder tier is never a flatter board', () => {
-		// The bug this guards: walls slice the board, and a slice holding one lone rope is a
-		// pocket where that rope crosses nobody. Difficile used to buy a second wall with its
-		// fifth rope, which left one rope per slice and made it *shallower* than Moyen.
 		const boards = [...DIFF_ORDER, 'expert'].map((k) => sample(DIFFS[k]));
-		for (const f of [tangleDepth, coilCount, (p: CordesPuzzle) => Math.max(...detours(p))]) {
-			const got = boards.map((b) => meanBy(b, f));
-			for (let i = 1; i < got.length; i++) expect(got[i]).toBeGreaterThan(got[i - 1]);
-		}
+		const got = boards.map((b) => meanBy(b, hardCount));
+		for (let i = 1; i < got.length; i++) expect(got[i]).toBeGreaterThan(got[i - 1]);
 	});
 
 	it('every level 1-200 deals a legal board', () => {
 		for (const level of [1, 30, 60, 90, 120, 180]) {
 			const { diff } = cordesLevels.config(level);
-			expect(diff.walls + diff.spikes).toBeLessThanOrEqual(diff.ropes - 2);
 			for (const p of sample(diff, 12)) expectLegalBoard(p, diff.ropes);
 		}
 	});
@@ -228,7 +202,7 @@ describe('cordes hints', () => {
 	for (const key of Object.keys(DIFFS)) {
 		const diff = DIFFS[key];
 
-		it(`${diff.label}: hints finish the board, one rope at a time`, () => {
+		it(`${diff.label}: hints finish the board, one rope at a time`, { timeout: 60_000 }, () => {
 			for (let s = 0; s < 8; s++) {
 				const p = generateCordes(diff, mulberry32(1500 + s * 19 + diff.ropes));
 				let ropes: (Pt[] | null)[] = [];

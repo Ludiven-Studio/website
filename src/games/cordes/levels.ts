@@ -1,12 +1,11 @@
-// Cordes levels plan (1-100). Three ropes on a small frame, up to six on a wide one. Most
-// ropes have to refuse the straight line between their two pegs and a couple are hemmed in on
-// both sides, but what costs the time is the spikes: from four ropes up, half the board is
-// nailed to the frame by one end, and getting past one of those means going round its free
-// tip. A level = tie every rope; stars come from solve time.
+// Cordes levels plan (1-100). Three ropes on a small frame, up to six on a wide one. From
+// four ropes up each peg is paired with a far-away partner, so the straight lines all cross;
+// from six, a fence of pegs seals one edge and the only way past is round its inner tip.
+// A level = tie every rope; stars come from solve time.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
 import { LEVEL_COUNT, extendPlan } from '../../lib/progression';
-import { coilsFor, frameFor, nestedFor, spikesFor, tangleFor, wallsFor, type DiffLevel } from './engine';
+import { farFor, fenceFor, frameFor, hardFor, type DiffLevel } from './engine';
 import { fmtCentis } from '../../lib/scoreFormat';
 
 export interface CordesLevelCfg {
@@ -30,7 +29,7 @@ const basePlan: LevelPlan<CordesLevelCfg> = {
 		const side = frameFor(ropes);
 		return {
 			seed: levelSeed(l),
-			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, tangle: tangleFor(ropes), walls: wallsFor(ropes), spikes: spikesFor(ropes), nested: nestedFor(ropes), coils: coilsFor(ropes) },
+			diff: { label: `Niveau ${l}`, ropes, cols: side, rows: side, far: farFor(ropes), fence: fenceFor(ropes), hard: hardFor(ropes) },
 			threeStarCentis: targets(ropes, 600, 700),
 			twoStarCentis: targets(ropes, 1400, 1500),
 		};
@@ -48,7 +47,7 @@ const basePlan: LevelPlan<CordesLevelCfg> = {
 	},
 };
 
-// 101-200: seven then eight ropes on the widest frame, carrying four spikes. Past six the free
+// 101-200: seven then eight ropes on the widest frame, fence included. Past six the free
 // space stops being obvious — most routes have exactly one way round — so the clock stays
 // generous per rope.
 export const cordesLevels = extendPlan('cordes', basePlan, {
@@ -57,7 +56,7 @@ export const cordesLevels = extendPlan('cordes', basePlan, {
 		const side = frameFor(ropes);
 		return {
 			...base,
-			diff: { label: `Niveau ${level}`, ropes, cols: side, rows: side, tangle: tangleFor(ropes), walls: wallsFor(ropes), spikes: spikesFor(ropes), nested: nestedFor(ropes), coils: coilsFor(ropes) },
+			diff: { label: `Niveau ${level}`, ropes, cols: side, rows: side, far: farFor(ropes), fence: fenceFor(ropes), hard: hardFor(ropes) },
 			threeStarCentis: targets(ropes, 800, 800),
 			twoStarCentis: targets(ropes, 1800, 1650),
 		};

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fmtCentis } from '../../lib/scoreFormat';
 import {
+	CLEAR,
 	DIFFS,
 	DIFF_ORDER,
 	applyHint,
@@ -8,7 +9,6 @@ import {
 	findHint,
 	generateCordes,
 	inBox,
-	isNailed,
 	isSolved,
 	ropeFault,
 	segHitsPath,
@@ -62,7 +62,7 @@ const nulls = (n: number): Board => new Array<Pt[] | null>(n).fill(null);
 /* The saved daily board is raw coordinates, so it only means something on the pegs it was
    drawn against. GEN_V bumps with the generator: an attempt saved against an older board
    is dropped instead of redrawn as scribbles over the new pegs. */
-const GEN_V = 7;
+const GEN_V = 8;
 const packBoard = (ropes: Board) => ({ v: GEN_V, ropes });
 const unpackBoard = (saved: unknown, n: number): Board | null => {
 	const o = saved as { v?: number; ropes?: Board } | null;
@@ -325,7 +325,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 		}
 		for (let r = 0; r < p.ends.length; r++) {
 			if (r === rope) continue;
-			for (const peg of p.ends[r]) if (distToSeg(peg, h, c) < p.pegR) return false;
+			for (const peg of p.ends[r]) if (distToSeg(peg, h, c) < p.pegR * CLEAR) return false;
 		}
 		return true;
 	}, []);
@@ -575,6 +575,17 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 						aria-label="Cordes à relier"
 					>
 						<svg viewBox={`0 0 ${V} ${V}`} className="cor-svg" aria-hidden="true">
+							{/* Clearance halo: the zone a foreign rope may not enter. */}
+							{puzzle.ends.map((pair, r) => pair.map((peg, e) => (
+								<circle
+									key={`h${r}-${e}`}
+									className="cor-halo"
+									cx={peg.x * V}
+									cy={peg.y * V}
+									r={puzzle.pegR * CLEAR * V}
+									fill={HUE[r % HUE.length]}
+								/>
+							)))}
 							{ropes.map((path, r) => {
 								if (!path || path.length < 2) return null;
 								const done = ropeFault(path, r, ropes, puzzle) === null;
@@ -604,11 +615,10 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 							{puzzle.ends.map((pair, r) => pair.map((peg, e) => (
 								<circle
 									key={`${r}-${e}`}
-									className={`cor-peg ${isNailed(peg) ? 'nailed' : ''}`}
+									className="cor-peg"
 									cx={peg.x * V}
 									cy={peg.y * V}
-									// A peg on the frame shows only half of itself, so draw it bigger to weigh the same.
-									r={isNailed(peg) ? pegView * 1.35 : pegView}
+									r={pegView}
 									fill={HUE[r % HUE.length]}
 								/>
 							)))}
@@ -795,7 +805,7 @@ const CSS = `
 .cor-rope.draft { opacity: 0.5; stroke-dasharray: 3 2.4; }
 .cor-head { fill: var(--gray-999); stroke-width: 1.4; }
 .cor-peg { stroke: var(--gray-999); stroke-width: 1.2; }
-.cor-peg.nailed { stroke: var(--gray-200); stroke-width: 2; }
+.cor-halo { opacity: 0.16; }
 
 .cor-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
 .cor-overlay {
