@@ -53,6 +53,9 @@ export const ROPE_R = 0.008;
 /** Centre-line distance a foreign rope must keep from a peg: the halo plus its own body. */
 export const clearOf = (pegR: number): number => CLEAR * pegR + ROPE_R;
 
+/** Centre-line distance two ropes must keep: one body each, so they touch at worst. */
+export const ROPE_GAP = 2 * ROPE_R;
+
 /** Frame side for a rope count — keeps the peg radius shrinking as the crowd grows. */
 export const frameFor = (ropes: number): number => ropes + 2;
 
@@ -89,6 +92,8 @@ export interface CordesPuzzle {
 	detours: number[];
 }
 
+const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
+
 /** Twice the signed area of (o, a, b) — positive when the turn is counter-clockwise. */
 const turn = (o: Pt, a: Pt, b: Pt): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
@@ -124,6 +129,35 @@ export function segHitsPath(a: Pt, b: Pt, path: Pt[], skipTail = 0): boolean {
 export function pathsCross(p: Pt[], q: Pt[]): boolean {
 	for (let i = 0; i < p.length - 1; i++) {
 		if (segHitsPath(p[i], p[i + 1], q)) return true;
+	}
+	return false;
+}
+
+/** Distance between two segments — zero once they meet. */
+export function segDist(a: Pt, b: Pt, c: Pt, d: Pt): number {
+	if (segCross(a, b, c, d)) return 0;
+	return Math.min(distToSeg(a, c, d), distToSeg(b, c, d), distToSeg(c, a, b), distToSeg(d, a, b));
+}
+
+/** Do two ropes run closer than `min`, body included? Crossing counts, it is distance zero. */
+export function pathsTooClose(p: Pt[], q: Pt[], min: number): boolean {
+	for (let i = 0; i < p.length - 1; i++) {
+		const a = p[i];
+		const b = p[i + 1];
+		// Boxes first: ropes are long and mostly far apart, so the real test is rarely needed.
+		const x0 = Math.min(a.x, b.x) - min;
+		const x1 = Math.max(a.x, b.x) + min;
+		const y0 = Math.min(a.y, b.y) - min;
+		const y1 = Math.max(a.y, b.y) + min;
+		for (let j = 0; j < q.length - 1; j++) {
+			const c = q[j];
+			const d = q[j + 1];
+			if (c.x < x0 && d.x < x0) continue;
+			if (c.x > x1 && d.x > x1) continue;
+			if (c.y < y0 && d.y < y0) continue;
+			if (c.y > y1 && d.y > y1) continue;
+			if (segDist(a, b, c, d) < min) return true;
+		}
 	}
 	return false;
 }
@@ -175,6 +209,7 @@ export function ropeFault(path: Pt[], rope: number, others: (Pt[] | null)[], p: 
 		const o = others[r];
 		if (r === rope || !o) continue;
 		if (pathsCross(path, o)) return 'croise une autre corde';
+		if (pathsTooClose(path, o, ROPE_GAP)) return 'passe trop près d’une corde';
 	}
 	return null;
 }
@@ -186,6 +221,57 @@ export function isSolved(ropes: (Pt[] | null)[], p: CordesPuzzle): boolean {
 		if (!path || ropeFault(path, r, ropes, p) !== null) return false;
 	}
 	return true;
+}
+
+export interface Grab {
+	rope: number;
+	/** Which of the rope's pegs was taken, or -1 for the loose head of a rope left hanging. */
+	end: number;
+}
+
+/**
+ * What a tap at `c` takes hold of. Pegs sit closer together than the finger's reach, so the
+ * nearest one in reach wins — first-come would hand the tap to whichever rope is drawn first.
+ */
+export function grabAt(c: Pt, ropes: (Pt[] | null)[], p: CordesPuzzle, reach: number): Grab | null {
+	let best: Grab | null = null;
+	let bestD = reach;
+	for (let r = 0; r < p.ropes; r++) {
+		const path = ropes[r];
+		if (path && path.length > 0 && ropeFault(path, r, ropes, p) !== null) {
+			const d = dist(c, path[path.length - 1]);
+			if (d < bestD) {
+				bestD = d;
+				best = { rope: r, end: -1 };
+			}
+		}
+		for (let e = 0; e < 2; e++) {
+			const d = dist(c, p.ends[r][e]);
+			if (d < bestD) {
+				bestD = d;
+				best = { rope: r, end: e };
+			}
+		}
+	}
+	return best;
+}
+
+/** The rope a tap rubs out: the nearest one passing within `reach`, or -1. */
+export function ropeAt(c: Pt, ropes: (Pt[] | null)[], reach: number): number {
+	let best = -1;
+	let bestD = reach;
+	for (let r = 0; r < ropes.length; r++) {
+		const path = ropes[r];
+		if (!path) continue;
+		for (let i = 0; i < path.length - 1; i++) {
+			const d = distToSeg(c, path[i], path[i + 1]);
+			if (d < bestD) {
+				bestD = d;
+				best = r;
+			}
+		}
+	}
+	return best;
 }
 
 /** Corner-cutting. New points sit on the old segments, so a smoothed route never leaves its corridor. */
@@ -265,11 +351,14 @@ function blocksFor(ends: [Pt, Pt][], rope: number, pegR: number): Uint8Array {
 	return blocked;
 }
 
+// A generation runs thousands of searches, so the two big buffers are cut once and reused.
+const prev = new Int32Array(G * G);
+const queue = new Int32Array(G * G);
+
 function bfs(blocked: Uint8Array, s: number, e: number): number[] | null {
 	if (blocked[s] || blocked[e]) return null;
-	const prev = new Int32Array(G * G).fill(-2);
+	prev.fill(-2);
 	prev[s] = -1;
-	const queue = new Int32Array(G * G);
 	queue[0] = s;
 	let head = 0;
 	let tail = 1;
@@ -277,15 +366,21 @@ function bfs(blocked: Uint8Array, s: number, e: number): number[] | null {
 		const cur = queue[head++];
 		if (cur === e) break;
 		const x = xi(cur);
-		const y = yi(cur);
-		for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
-			const nx = x + dx;
-			const ny = y + dy;
-			if (nx < 0 || nx >= G || ny < 0 || ny >= G) continue;
-			const n = ny * G + nx;
-			if (blocked[n] || prev[n] !== -2) continue;
-			prev[n] = cur;
-			queue[tail++] = n;
+		if (x > 0 && !blocked[cur - 1] && prev[cur - 1] === -2) {
+			prev[cur - 1] = cur;
+			queue[tail++] = cur - 1;
+		}
+		if (x < G - 1 && !blocked[cur + 1] && prev[cur + 1] === -2) {
+			prev[cur + 1] = cur;
+			queue[tail++] = cur + 1;
+		}
+		if (cur >= G && !blocked[cur - G] && prev[cur - G] === -2) {
+			prev[cur - G] = cur;
+			queue[tail++] = cur - G;
+		}
+		if (cur < G * G - G && !blocked[cur + G] && prev[cur + G] === -2) {
+			prev[cur + G] = cur;
+			queue[tail++] = cur + G;
 		}
 	}
 	if (prev[e] === -2) return null;
@@ -295,6 +390,38 @@ function bfs(blocked: Uint8Array, s: number, e: number): number[] | null {
 }
 
 const manhattan = (s: number, e: number): number => Math.abs(xi(s) - xi(e)) + Math.abs(yi(s) - yi(e));
+
+/** Cell offsets a placed route blocks around itself: both bodies, plus the finger's slack. */
+const STAMP: number[] = (() => {
+	const rr = (ROPE_GAP + SLACK) * G;
+	const out: number[] = [];
+	for (let dy = -Math.ceil(rr); dy <= Math.ceil(rr); dy++) {
+		for (let dx = -Math.ceil(rr); dx <= Math.ceil(rr); dx++) {
+			if (Math.hypot(dx, dy) <= rr) out.push(dy * G + dx, dx);
+		}
+	}
+	return out;
+})();
+
+/** Paint a route's corridor into `walls`. Offsets carry their dx so the row cannot wrap. */
+function stampRoute(walls: Uint8Array, path: number[]): void {
+	for (const c of path) {
+		const x = xi(c);
+		for (let k = 0; k < STAMP.length; k += 2) {
+			const nx = x + STAMP[k + 1];
+			if (nx < 0 || nx >= G) continue;
+			const n = c + STAMP[k];
+			if (n >= 0 && n < G * G) walls[n] = 1;
+		}
+	}
+}
+
+/** `dst |= src`, four cells at a time. */
+function orInto(dst: Uint8Array, src: Uint8Array): void {
+	const a = new Uint32Array(dst.buffer);
+	const b = new Uint32Array(src.buffer);
+	for (let i = 0; i < a.length; i++) a[i] |= b[i];
+}
 
 interface Solve {
 	/** Per rope, route length over the straight peg-to-peg distance (both in L1, so it cancels). */
@@ -325,7 +452,7 @@ function solveBoard(ends: [Pt, Pt][], pegR: number, rng: Rng): Solve | null {
 		orders.push(o);
 	}
 	for (const order of orders) {
-		const walls: number[] = [];
+		const walls = new Uint8Array(G * G);
 		const detours: number[] = Array(ends.length).fill(1);
 		const routes: number[][] = Array(ends.length);
 		let ok = true;
@@ -333,7 +460,7 @@ function solveBoard(ends: [Pt, Pt][], pegR: number, rng: Rng): Solve | null {
 			const s = cellOf(ends[r][0]);
 			const e = cellOf(ends[r][1]);
 			const blocked = base[r].slice();
-			for (const c of walls) blocked[c] = 1;
+			orInto(blocked, walls);
 			for (const peg of ends[r]) blocked[cellOf(peg)] = 0;
 			const path = bfs(blocked, s, e);
 			if (!path) {
@@ -342,7 +469,7 @@ function solveBoard(ends: [Pt, Pt][], pegR: number, rng: Rng): Solve | null {
 			}
 			detours[r] = (path.length - 1) / Math.max(1, manhattan(s, e));
 			routes[r] = path;
-			for (const c of path) walls.push(c);
+			stampRoute(walls, path);
 		}
 		if (ok) return { detours, routes };
 	}
@@ -350,8 +477,6 @@ function solveBoard(ends: [Pt, Pt][], pegR: number, rng: Rng): Solve | null {
 }
 
 /* ---------------- dealing ---------------- */
-
-const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
  * Two scattered pegs stay this far apart: nine tenths of the gap a rope needs, so a close
@@ -447,12 +572,42 @@ function deal(diff: DiffLevel, rng: Rng, pegR: number): [Pt, Pt][] | null {
 	return ends;
 }
 
-/** Cell path → smooth curve pinned on the exact pegs. Thinning halves the staircase first. */
+/** Drop the points that sit within `tol` of the line they interrupt (Douglas-Peucker). */
+function simplify(pts: Pt[], tol: number): Pt[] {
+	if (pts.length < 3) return pts;
+	const keep = new Uint8Array(pts.length);
+	keep[0] = 1;
+	keep[pts.length - 1] = 1;
+	const stack: number[] = [0, pts.length - 1];
+	while (stack.length) {
+		const b = stack.pop()!;
+		const a = stack.pop()!;
+		let far = -1;
+		let fd = tol;
+		for (let i = a + 1; i < b; i++) {
+			const d = distToSeg(pts[i], pts[a], pts[b]);
+			if (d > fd) {
+				fd = d;
+				far = i;
+			}
+		}
+		if (far < 0) continue;
+		keep[far] = 1;
+		stack.push(a, far, far, b);
+	}
+	return pts.filter((_, i) => keep[i] === 1);
+}
+
+/**
+ * Cell path → smooth curve pinned on the exact pegs. A raster route is nearly all straight
+ * runs, so it is thinned, smoothed, then stripped back down: a rope of eight hundred points
+ * costs the same to look at and a hundred times as much to compare with its neighbours.
+ */
 function toRoute(cells: number[], a: Pt, b: Pt): Pt[] {
 	const pts = cells
 		.filter((_, i) => i % 2 === 0 || i === cells.length - 1)
 		.map((c) => ({ x: (xi(c) + 0.5) / G, y: (yi(c) + 0.5) / G }));
-	const out = chaikin(pts, 2);
+	const out = simplify(chaikin(pts, 2), 0.3 / G);
 	out[0] = a;
 	out[out.length - 1] = b;
 	return out;
@@ -461,7 +616,7 @@ function toRoute(cells: number[], a: Pt, b: Pt): Pt[] {
 /** A rope counts as hard once its route runs 30% past the straight line. */
 const HARD = 1.3;
 /** Boards a generation may go through. Reaching the tier's target usually takes far fewer. */
-const DEALS = 48;
+const DEALS = 96;
 
 /**
  * Deal and solve until `hard` ropes are forced off their straight line, keeping the best
@@ -518,7 +673,7 @@ export function applyHint(ropes: (Pt[] | null)[], hint: CordesHint, p: CordesPuz
 	for (let r = 0; r < p.ropes; r++) {
 		const o = next[r];
 		if (r === hint.rope || !o) continue;
-		if (pathsCross(o, hint.path)) next[r] = null;
+		if (pathsCross(o, hint.path) || pathsTooClose(o, hint.path, ROPE_GAP)) next[r] = null;
 	}
 	return next;
 }

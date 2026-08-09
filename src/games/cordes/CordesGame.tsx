@@ -3,6 +3,7 @@ import { fmtCentis } from '../../lib/scoreFormat';
 import {
 	CLEAR,
 	DIFFS,
+	ROPE_GAP,
 	ROPE_R,
 	clearOf,
 	DIFF_ORDER,
@@ -10,8 +11,11 @@ import {
 	distToSeg,
 	findHint,
 	generateCordes,
+	grabAt,
 	inBox,
 	isSolved,
+	pathsTooClose,
+	ropeAt,
 	ropeFault,
 	segHitsPath,
 	type CordesPuzzle,
@@ -323,7 +327,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 		for (let r = 0; r < board.length; r++) {
 			const o = board[r];
 			if (r === rope || !o) continue;
-			if (segHitsPath(h, c, o)) return false;
+			if (pathsTooClose([h, c], o, ROPE_GAP)) return false; // crossing is distance zero
 		}
 		for (let r = 0; r < p.ends.length; r++) {
 			if (r === rope) continue;
@@ -340,41 +344,30 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 		const board = ropesRef.current;
 		const grab = Math.max(puzzle.pegR * 2.4, 0.05);
 
-		// Pick up a rope left hanging, right where it stopped.
-		for (let r = 0; r < puzzle.ropes; r++) {
-			const path = board[r];
-			if (!path || ropeFault(path, r, board, puzzle) === null) continue;
-			const head = path[path.length - 1];
-			if (dist(c, head) > grab) continue;
-			const from = path[0];
-			const target = dist(from, puzzle.ends[r][0]) < dist(from, puzzle.ends[r][1]) ? puzzle.ends[r][1] : puzzle.ends[r][0];
-			drawRef.current = { rope: r, target, path: path.slice() };
+		// A peg, or the loose head of a rope left hanging — whichever is nearest.
+		const g = grabAt(c, board, puzzle, grab);
+		if (g) {
+			const [a, b] = puzzle.ends[g.rope];
+			if (g.end < 0) {
+				const path = board[g.rope]!;
+				const from = path[0];
+				drawRef.current = { rope: g.rope, target: dist(from, a) < dist(from, b) ? b : a, path: path.slice() };
+			} else {
+				// Starting again from a peg throws away whatever that rope had.
+				const peg = puzzle.ends[g.rope][g.end];
+				drawRef.current = { rope: g.rope, target: g.end === 0 ? b : a, path: [peg] };
+				put(g.rope, [peg]);
+				setHintNote('');
+			}
 			begin();
 			return;
 		}
 
-		// Start again from a peg — whatever that rope had is thrown away.
-		for (let r = 0; r < puzzle.ropes; r++) {
-			for (let e = 0; e < 2; e++) {
-				if (dist(c, puzzle.ends[r][e]) > grab) continue;
-				drawRef.current = { rope: r, target: puzzle.ends[r][1 - e], path: [puzzle.ends[r][e]] };
-				put(r, [puzzle.ends[r][e]]);
-				setHintNote('');
-				begin();
-				return;
-			}
-		}
-
 		// Otherwise a tap on a rope rubs it out.
-		for (let r = 0; r < puzzle.ropes; r++) {
-			const path = board[r];
-			if (!path) continue;
-			for (let i = 0; i < path.length - 1; i++) {
-				if (distToSeg(c, path[i], path[i + 1]) > grab * 0.6) continue;
-				put(r, null);
-				setHintNote('');
-				return;
-			}
+		const hit = ropeAt(c, board, grab * 0.6);
+		if (hit >= 0) {
+			put(hit, null);
+			setHintNote('');
 		}
 	};
 

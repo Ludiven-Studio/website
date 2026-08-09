@@ -3,14 +3,18 @@ import {
 	CLEAR,
 	DIFFS,
 	DIFF_ORDER,
+	ROPE_GAP,
 	ROPE_R,
 	applyHint,
 	clearOf,
 	distToSeg,
 	findHint,
 	generateCordes,
+	grabAt,
 	isSolved,
 	pathsCross,
+	pathsTooClose,
+	ropeAt,
 	ropeFault,
 	segCross,
 	selfCrosses,
@@ -107,9 +111,54 @@ describe('cordes rules', () => {
 		expect(ropeFault([a, { x: 0.5, y: ROPE_R / 2 }, b], 0, [], bare)).toBe('sort du cadre');
 	});
 
+	it('two ropes may not run shoulder to shoulder', () => {
+		// Neither of these crosses the answer above — only the first has its body against it.
+		const near = [{ x: 0.35, y: 0.03 }, { x: 0.65, y: 0.03 }];
+		const far = [{ x: 0.35, y: 0.08 }, { x: 0.65, y: 0.08 }];
+		expect(pathsCross(bare.solution[0], near)).toBe(false);
+		expect(ropeFault(bare.solution[0], 0, [null, near], bare)).toBe('passe trop près d’une corde');
+		expect(ropeFault(bare.solution[0], 0, [null, far], bare)).toBeNull();
+	});
+
 	it('an unfinished board is not solved', () => {
 		expect(isSolved([bare.solution[0], null], bare)).toBe(false);
 		expect(isSolved([], bare)).toBe(false);
+	});
+});
+
+describe('cordes picking', () => {
+	/** Two pegs closer together than a finger's reach — the tap has to choose. */
+	const crowd: CordesPuzzle = {
+		ropes: 2,
+		ends: [
+			[{ x: 0.5, y: 0.5 }, { x: 0.1, y: 0.1 }],
+			[{ x: 0.6, y: 0.5 }, { x: 0.9, y: 0.9 }],
+		],
+		solution: [],
+		detours: [1, 1],
+		pegR: 0.04,
+	};
+	const empty = [null, null];
+
+	it('takes the nearest peg, not the first rope with one in reach', () => {
+		expect(grabAt({ x: 0.58, y: 0.5 }, empty, crowd, 0.15)).toEqual({ rope: 1, end: 0 });
+		expect(grabAt({ x: 0.52, y: 0.5 }, empty, crowd, 0.15)).toEqual({ rope: 0, end: 0 });
+		expect(grabAt({ x: 0.9, y: 0.9 }, empty, crowd, 0.15)).toEqual({ rope: 1, end: 1 });
+		expect(grabAt({ x: 0.5, y: 0.9 }, empty, crowd, 0.1)).toBeNull();
+	});
+
+	it('a rope left hanging is picked up by its head', () => {
+		const ropes = [[{ x: 0.5, y: 0.5 }, { x: 0.3, y: 0.3 }], null];
+		expect(grabAt({ x: 0.31, y: 0.3 }, ropes, crowd, 0.15)).toEqual({ rope: 0, end: -1 });
+		// Still nearer to the peg it started from: that is a restart, not a resume.
+		expect(grabAt({ x: 0.49, y: 0.5 }, ropes, crowd, 0.15)).toEqual({ rope: 0, end: 0 });
+	});
+
+	it('a tap off every peg rubs out the nearest rope', () => {
+		const ropes = [[{ x: 0.5, y: 0.5 }, { x: 0.3, y: 0.3 }], [{ x: 0.6, y: 0.5 }, { x: 0.9, y: 0.9 }]];
+		expect(ropeAt({ x: 0.4, y: 0.4 }, ropes, 0.05)).toBe(0);
+		expect(ropeAt({ x: 0.75, y: 0.75 }, ropes, 0.05)).toBe(1);
+		expect(ropeAt({ x: 0.1, y: 0.9 }, ropes, 0.05)).toBe(-1);
 	});
 });
 
@@ -132,15 +181,16 @@ function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 		// Three peg-widths apart at least: closer than that and the eye pairs them up for free.
 		expect(dist(p.ends[r][0], p.ends[r][1])).toBeGreaterThanOrEqual(6 * p.pegR);
 		expect(p.detours[r]).toBeGreaterThanOrEqual(1);
-		expect(p.solution[r].length).toBeGreaterThan(2);
+		// A run with no bend simplifies down to its two pegs, so two points is a real route.
+		expect(p.solution[r].length).toBeGreaterThanOrEqual(2);
 		expect(p.solution[r][0]).toEqual(p.ends[r][0]);
 		expect(p.solution[r][p.solution[r].length - 1]).toEqual(p.ends[r][1]);
 		expect(ropeFault(p.solution[r], r, p.solution, p)).toBeNull();
 	}
 	expect(isSolved(p.solution, p)).toBe(true);
 
-	// Legal is not enough: a route that shaves a halo cannot be redrawn with a finger, so the
-	// board only ships routes that keep a spare half-width of rope on each side.
+	// Legal is not enough: a route that shaves a halo or a neighbour cannot be redrawn with a
+	// finger, so the board only ships routes with a spare half-width of rope on each side.
 	for (let r = 0; r < ropes; r++) {
 		for (let q = 0; q < ropes; q++) {
 			if (q === r) continue;
@@ -150,6 +200,7 @@ function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 						.toBeGreaterThanOrEqual(clearOf(p.pegR) + ROPE_R);
 				}
 			}
+			expect(pathsTooClose(p.solution[r], p.solution[q], ROPE_GAP + ROPE_R)).toBe(false);
 		}
 	}
 }
