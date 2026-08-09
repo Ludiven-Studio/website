@@ -161,6 +161,15 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'bulles',
+		title: 'Bulles',
+		pitch: 'Vise et tire des bulles de couleur sur la grappe suspendue : trois qui se touchent tombent, et tout ce qu\'elles retenaient tombe avec. Vide le tableau en un minimum de tirs.',
+		icon: 'bulles',
+		href: '/jeux/bulles',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'suite',
 		title: 'Suite mystère',
 		pitch: 'Devine la règle cachée et complète la séquence. En choix multiple.',

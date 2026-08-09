@@ -123,6 +123,13 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Astuce', body: 'Commence par les bords : un tuyau ne peut pas sortir de la grille, donc les tuiles du contour n\'ont souvent qu\'une seule orientation possible. Puis remonte le courant depuis le générateur.' },
 		{ emoji: '🔁', title: 'Expert', body: 'En Expert et à partir du niveau 101, les bords bouclent : un tuyau qui sort à droite ressort à gauche. Les indices du contour disparaissent — tout se déduit du réseau lui-même.' },
 	],
+	bulles: [
+		{ emoji: '🫧', title: 'Le but', body: 'Un radeau de bulles de couleur est accroché en haut de l\'écran. Vide-le entièrement, en un minimum de tirs.' },
+		{ emoji: '👆', title: 'Comment jouer', body: 'Glisse le doigt (ou la souris) pour orienter le canon, relâche pour tirer. La bulle part, se colle où elle arrive, et le tir suivant se charge tout seul.' },
+		{ emoji: '3️⃣', title: 'La règle', body: 'Trois bulles de la même couleur qui se touchent tombent. En dessous de trois, la bulle reste collée — et te gêne.' },
+		{ emoji: '⛓️', title: 'La chute', body: 'Tout ce qui n\'est plus rattaché au plafond tombe aussi. Viser le bon point d\'accroche fait donc bien plus de dégâts que viser le gros paquet.' },
+		{ emoji: '💡', title: 'Astuce', body: 'Les murs font rebondir la bulle : c\'est souvent le seul moyen d\'atteindre un côté. Chaque tableau a un « par » prouvé par le solveur — les 3 étoiles se jouent à un tir près. Indice montre le meilleur tir.' },
+	],
 	cordes: [
 		{ emoji: '🪢', title: 'Le but', body: 'Chaque piquet a un jumeau de la même couleur. Relie-les tous d\'un trait, sans qu\'aucune corde n\'en croise une autre ni ne sorte du cadre.' },
 		{ emoji: '👆', title: 'Comment jouer', body: 'Pose ton doigt sur un piquet et glisse jusqu\'à son jumeau : la corde te suit. Reviens en arrière sur ton tracé pour l\'effacer, touche une corde posée pour la retirer.' },
