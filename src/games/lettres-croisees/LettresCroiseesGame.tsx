@@ -394,7 +394,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 			{lv.active && lv.menu ? (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
-				<div className="lc-playwrap">
+				<div className="lc-playwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div className={`lc-play ${armed ? 'blurred' : ''}`}>
 					<div className="lc-gridcol">

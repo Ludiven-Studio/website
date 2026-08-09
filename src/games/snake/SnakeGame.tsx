@@ -686,7 +686,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 				<span className="sn-best">{lv.active ? `Objectif ${targetRef.current}` : `Record ${best}`}</span>
 			</div>
 
-			<div className="sn-boardwrap">
+			<div className="sn-boardwrap edge-safe">
 				{lv.active && lv.menu ? (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 				) : (

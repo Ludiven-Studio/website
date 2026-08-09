@@ -634,7 +634,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			)}
 			{/* Keep the canvas mounted (hidden under the grid) so the ResizeObserver re-sizes
 			    it when a level starts — unmounting left it at the default 300×150 (stretched). */}
-			<div className="reu-playwrap" ref={wrapRef} hidden={lv.active && lv.menu}>
+			<div className="reu-playwrap edge-safe" ref={wrapRef} hidden={lv.active && lv.menu}>
 				<canvas ref={canvasRef} className={`reu-canvas${started ? '' : ' reu-blur'}`} onPointerDown={pointer.onPointerDown} />
 				{celebrating && !lv.active && <Celebration />}
 

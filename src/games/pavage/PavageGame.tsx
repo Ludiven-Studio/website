@@ -782,7 +782,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			{lv.active && lv.menu ? (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
-			<div className="pv-boardwrap" style={{ ['--n' as string]: size }}>
+			<div className="pv-boardwrap edge-safe" style={{ ['--n' as string]: size }}>
 				{celebrating && !lv.active && <Celebration />}
 				<div
 					ref={boardCbRef}

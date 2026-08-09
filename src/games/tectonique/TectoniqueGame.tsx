@@ -793,7 +793,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			{lv.active && lv.menu ? (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
-				<div className="tk-boardwrap">
+				<div className="tk-boardwrap edge-safe">
 					{celebrating && !lv.active && <Celebration />}
 					<div
 						className={`tk-board ${gated ? 'blurred' : ''}`}

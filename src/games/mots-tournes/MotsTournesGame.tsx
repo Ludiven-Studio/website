@@ -321,7 +321,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 			{lv.active && lv.menu ? (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
-			<div className="wt-playwrap">
+			<div className="wt-playwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div className={`wt-board ${armed ? 'blurred' : ''}`} style={{ aspectRatio: `${puzzle.cols} / ${puzzle.rows}`, ['--cols' as string]: puzzle.cols }}>
 					{/* layer 1: neutral tiles (interactive) */}

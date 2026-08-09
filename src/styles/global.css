@@ -209,6 +209,17 @@ table, th, td {
 	flex-direction: column;
 }
 
+/* iOS hands the outer ~24px of each screen edge to its own back-swipe, and the wrapper's
+   gutter is 24px, so a board that fills the column starts flush against it: dragging a piece
+   from the left column left the page instead. Games played by dragging pull their playfield
+   in. `width` and not `max-width`, so each board keeps its own ceiling on wider screens. */
+@media (pointer: coarse) {
+	.game-page .edge-safe {
+		width: min(100%, 100vw - 5rem);
+		margin-inline: auto;
+	}
+}
+
 /* iOS Safari only honors the -webkit- prefixed user-select: without it, rapid
    taps on touch controls select text (steer arrows, grid cells) instead of playing. */
 .game-page {

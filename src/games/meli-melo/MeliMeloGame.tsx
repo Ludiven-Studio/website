@@ -324,7 +324,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 
 			<div className="mm-playwrap">
 				{celebrating && !lv.active && <Celebration />}
-				<div className={`mm-boardwrap${armed || status === 'ended' ? ' blurred' : ''}`}>
+				<div className={`mm-boardwrap edge-safe${armed || status === 'ended' ? ' blurred' : ''}`}>
 					<div
 						ref={boardRef}
 						className="mm-board"

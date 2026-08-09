@@ -602,7 +602,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			{lv.active && lv.menu ? (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
-			<div className="mn-boardwrap">
+			<div className="mn-boardwrap edge-safe">
 				<div
 					ref={wrapRef}
 					className={`mn-board ${shake ? 'shake' : ''}`}

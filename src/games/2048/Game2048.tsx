@@ -541,7 +541,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 			{lv.active && lv.menu ? (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
-			<div className="g2-playwrap">
+			<div className="g2-playwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div
 					className={`g2-board ${armed ? 'blurred' : ''}`}

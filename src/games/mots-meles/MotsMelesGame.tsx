@@ -306,7 +306,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
 			<>
-			<div className="mm-playwrap">
+			<div className="mm-playwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div
 					ref={boardRef}

@@ -478,7 +478,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			) : (
 			<div className="al-stage">
 				<div className="al-left">
-					<div className="al-board" ref={boardRef}>
+					<div className="al-board edge-safe" ref={boardRef}>
 						{tokens.length === 0 && <div className="al-board-hint">Lâche une carte sur une autre pour fusionner ✨</div>}
 						{tokens.map((t) => {
 							const el = getElement(t.id)!;

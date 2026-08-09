@@ -529,7 +529,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 			{lv.active && lv.menu ? (
 				<LevelSelect progress={lv.progress} onPick={startLevel} />
 			) : (
-			<div className="zp-boardwrap" style={{ ['--n' as string]: n }}>
+			<div className="zp-boardwrap edge-safe" style={{ ['--n' as string]: n }}>
 				{celebrating && !lv.active && <Celebration />}
 				{status === 'loading' || !puzzle ? (
 					<div className="zp-loading">Génération…</div>

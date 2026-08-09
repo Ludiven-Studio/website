@@ -810,7 +810,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 				<span className="es-best">Record {fmtSec(best)}</span>
 			</div>
 
-			<div className="es-boardwrap">
+			<div className="es-boardwrap edge-safe">
 				<canvas
 					ref={canvasRef}
 					className="es-canvas"
