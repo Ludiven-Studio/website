@@ -127,7 +127,7 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🪢', title: 'Le but', body: 'Chaque piquet a un jumeau de la même couleur. Relie-les tous d\'un trait, sans qu\'aucune corde n\'en croise une autre ni ne sorte du cadre.' },
 		{ emoji: '👆', title: 'Comment jouer', body: 'Pose ton doigt sur un piquet et glisse jusqu\'à son jumeau : la corde te suit. Reviens en arrière sur ton tracé pour l\'effacer, touche une corde posée pour la retirer.' },
 		{ emoji: '🚧', title: 'Elle s\'arrête', body: 'Une corde ne peut pas passer là où c\'est interdit : au lieu de te sanctionner, elle refuse d\'avancer. Contourne l\'obstacle et elle repart.' },
-		{ emoji: '🌀', title: 'Le halo des piquets', body: 'Chaque piquet est entouré d\'un halo : une corde étrangère ne peut pas y entrer. Deux piquets proches ferment donc le passage entre eux, et un piquet collé au bord ferme le passage le long du mur.' },
+		{ emoji: '🌀', title: 'Le halo des piquets', body: 'Chaque piquet est entouré d\'un halo : une corde étrangère ne peut pas y entrer, épaisseur comprise. Si tu vois la place pour le trait, elle passe. Deux piquets proches ferment donc le passage entre eux, et un piquet collé au bord ferme le passage le long du mur.' },
 		{ emoji: '💡', title: 'Astuce', body: 'Repère les chapelets de piquets serrés : leurs halos forment une barrière qu\'il faut contourner en entier. Demande-toi de quel côté de chaque piquet ta corde doit passer. Si une paire se retrouve coincée par une corde déjà posée, c\'est cette corde-là qu\'il faut refaire, pas la tienne.' },
 	],
 	suite: [

@@ -3,6 +3,8 @@ import { fmtCentis } from '../../lib/scoreFormat';
 import {
 	CLEAR,
 	DIFFS,
+	ROPE_R,
+	clearOf,
 	DIFF_ORDER,
 	applyHint,
 	distToSeg,
@@ -62,7 +64,7 @@ const nulls = (n: number): Board => new Array<Pt[] | null>(n).fill(null);
 /* The saved daily board is raw coordinates, so it only means something on the pegs it was
    drawn against. GEN_V bumps with the generator: an attempt saved against an older board
    is dropped instead of redrawn as scribbles over the new pegs. */
-const GEN_V = 8;
+const GEN_V = 9;
 const packBoard = (ropes: Board) => ({ v: GEN_V, ropes });
 const unpackBoard = (saved: unknown, n: number): Board | null => {
 	const o = saved as { v?: number; ropes?: Board } | null;
@@ -325,7 +327,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 		}
 		for (let r = 0; r < p.ends.length; r++) {
 			if (r === rope) continue;
-			for (const peg of p.ends[r]) if (distToSeg(peg, h, c) < p.pegR * CLEAR) return false;
+			for (const peg of p.ends[r]) if (distToSeg(peg, h, c) < clearOf(p.pegR)) return false;
 		}
 		return true;
 	}, []);
@@ -595,6 +597,7 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 										className={`cor-rope ${done ? 'done' : 'draft'}`}
 										points={pointsAttr(path)}
 										stroke={HUE[r % HUE.length]}
+										strokeWidth={ROPE_R * 2 * V}
 									/>
 								);
 							})}
@@ -799,8 +802,9 @@ const CSS = `
   position: static; transform: none; margin: 14px auto 0;
 }
 
+/* Width comes from the engine (ROPE_R): the drawn rope is exactly what the rules measure. */
 .cor-rope {
-  fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
 }
 .cor-rope.draft { opacity: 0.5; stroke-dasharray: 3 2.4; }
 .cor-head { fill: var(--gray-999); stroke-width: 1.4; }

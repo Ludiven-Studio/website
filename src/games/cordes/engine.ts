@@ -3,9 +3,10 @@
  * Join every pair of pegs with a hand-drawn rope. Ropes stay inside the frame, never cross
  * — neither each other nor themselves — and keep their distance from every foreign peg.
  *
- * All pegs are loose inside the board; the puzzle comes from the clearance rule. A rope may
- * not come within CLEAR peg-radii of a foreign peg, so two pegs close together shut the
- * passage between them, and a peg close to the frame shuts the passage along the wall.
+ * All pegs are loose inside the board; the puzzle comes from the clearance rule. Every peg
+ * wears a halo of CLEAR peg-radii and no foreign rope may enter it — body included, so the
+ * drawn rope always fits in the gap it is shown. Two pegs close together shut the passage
+ * between them, and a peg close to the frame shuts the passage along the wall.
  * Difficulty is built from that:
  *  - each peg paired with a far-away partner, so the straight lines all cross;
  *  - on the hard tiers a "fence": a chain of pegs marching in from one edge, every gap
@@ -40,8 +41,17 @@ export interface DiffLevel {
 	hard: number;
 }
 
-/** A rope must stay this many peg radii away from a foreign peg. */
+/** Radius of the halo drawn round every peg, in peg radii. No foreign rope may enter it. */
 export const CLEAR = 1.6;
+
+/**
+ * Half the drawn rope, in board units. Rules are written on the rope's centre line, so every
+ * limit is widened by this: what the eye measures is the gap left for the whole rope.
+ */
+export const ROPE_R = 0.008;
+
+/** Centre-line distance a foreign rope must keep from a peg: the halo plus its own body. */
+export const clearOf = (pegR: number): number => CLEAR * pegR + ROPE_R;
 
 /** Frame side for a rope count — keeps the peg radius shrinking as the crowd grows. */
 export const frameFor = (ropes: number): number => ropes + 2;
@@ -128,11 +138,13 @@ export function selfCrosses(path: Pt[]): boolean {
 	return false;
 }
 
-export const inBox = (p: Pt): boolean => p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+/** The whole rope stays in the frame, so its centre line stops half a width short of it. */
+export const inBox = (p: Pt): boolean =>
+	p.x >= ROPE_R && p.x <= 1 - ROPE_R && p.y >= ROPE_R && p.y <= 1 - ROPE_R;
 
 /** Pegs the rope `rope` must keep clear of — every peg except its own two. */
 export function hitsForeignPeg(path: Pt[], rope: number, p: CordesPuzzle): boolean {
-	const rr = p.pegR * CLEAR;
+	const rr = clearOf(p.pegR);
 	for (let r = 0; r < p.ends.length; r++) {
 		if (r === rope) continue;
 		for (const peg of p.ends[r]) {
@@ -196,7 +208,7 @@ function chaikin(pts: Pt[], rounds: number): Pt[] {
 /* ---------------- raster solve ---------------- */
 
 /** Raster side. Three-plus cells under the smallest clearance radius keeps corridors honest. */
-const G = 96;
+const G = 128;
 
 /**
  * Extra clearance carved around pegs during generation, in cells. Routes are thinned and
@@ -204,6 +216,13 @@ const G = 96;
  * finished curve strictly clear of the real limit.
  */
 const MARGIN = 1.2;
+
+/**
+ * Room carved for the finger, on top of the rule and during generation only. The rules let a
+ * rope shave a halo, but no thumb can thread a hairline: every route a board ships keeps a
+ * spare half-width on each side, so a passage that looks open really can be drawn.
+ */
+const SLACK = ROPE_R;
 
 const xi = (c: number): number => c % G;
 const yi = (c: number): number => Math.floor(c / G);
@@ -213,10 +232,19 @@ const cellOf = (p: Pt): number => {
 	return y * G + x;
 };
 
-/** Cells rope `rope` may not enter: near a foreign peg, plus `extra` (already-routed ropes). */
-function blocksFor(ends: [Pt, Pt][], rope: number, pegR: number, extra?: Uint8Array): Uint8Array {
-	const blocked = extra ? Uint8Array.from(extra) : new Uint8Array(G * G);
-	const rr = CLEAR * pegR + MARGIN / G;
+/** Cells rope `rope` may never enter: too near a foreign peg, or too near the frame. */
+function blocksFor(ends: [Pt, Pt][], rope: number, pegR: number): Uint8Array {
+	const blocked = new Uint8Array(G * G);
+	const rr = clearOf(pegR) + SLACK + MARGIN / G;
+	const band = Math.ceil((ROPE_R + SLACK + MARGIN / G) * G - 0.5);
+	for (let i = 0; i < band; i++) {
+		for (let k = 0; k < G; k++) {
+			blocked[i * G + k] = 1;
+			blocked[(G - 1 - i) * G + k] = 1;
+			blocked[k * G + i] = 1;
+			blocked[k * G + G - 1 - i] = 1;
+		}
+	}
 	for (let r = 0; r < ends.length; r++) {
 		if (r === rope) continue;
 		for (const peg of ends[r]) {
@@ -279,8 +307,11 @@ interface Solve {
  * The first order routes the most constrained ropes first, the rest are shuffles.
  */
 function solveBoard(ends: [Pt, Pt][], pegR: number, rng: Rng): Solve | null {
+	// The peg mask only depends on which rope is being routed, so it is worth keeping: the
+	// orders below reuse it a hundred times, adding nothing but the routes already placed.
+	const base = ends.map((_, r) => blocksFor(ends, r, pegR));
 	const floor = ends.map(([a, z], r) => {
-		const path = bfs(blocksFor(ends, r, pegR), cellOf(a), cellOf(z));
+		const path = bfs(base[r], cellOf(a), cellOf(z));
 		return path ? (path.length - 1) / Math.max(1, manhattan(cellOf(a), cellOf(z))) : null;
 	});
 	if (floor.some((d) => d === null)) return null;
@@ -294,21 +325,24 @@ function solveBoard(ends: [Pt, Pt][], pegR: number, rng: Rng): Solve | null {
 		orders.push(o);
 	}
 	for (const order of orders) {
-		const walls = new Uint8Array(G * G);
+		const walls: number[] = [];
 		const detours: number[] = Array(ends.length).fill(1);
 		const routes: number[][] = Array(ends.length);
 		let ok = true;
 		for (const r of order) {
 			const s = cellOf(ends[r][0]);
 			const e = cellOf(ends[r][1]);
-			const path = bfs(blocksFor(ends, r, pegR, walls), s, e);
+			const blocked = base[r].slice();
+			for (const c of walls) blocked[c] = 1;
+			for (const peg of ends[r]) blocked[cellOf(peg)] = 0;
+			const path = bfs(blocked, s, e);
 			if (!path) {
 				ok = false;
 				break;
 			}
 			detours[r] = (path.length - 1) / Math.max(1, manhattan(s, e));
 			routes[r] = path;
-			for (const c of path) walls[c] = 1;
+			for (const c of path) walls.push(c);
 		}
 		if (ok) return { detours, routes };
 	}
@@ -319,14 +353,17 @@ function solveBoard(ends: [Pt, Pt][], pegR: number, rng: Rng): Solve | null {
 
 const dist = (a: Pt, b: Pt): number => Math.hypot(a.x - b.x, a.y - b.y);
 
-/** Pegs any closer than this, in radii, read as shut by the clearance rule on purpose. */
-const minGapFor = (pegR: number): number => (CLEAR + 0.45) * pegR;
+/**
+ * Two scattered pegs stay this far apart: nine tenths of the gap a rope needs, so a close
+ * pair reads as shut — but they never pile into a knot no finger could thread.
+ */
+const minGapFor = (pegR: number): number => 2 * clearOf(pegR) * 0.9;
 
 /**
- * How far scattered pegs keep from the frame, in radii. Wide of the clearance radius, so
- * the wall-side corridor is always comfortable — only the fence is allowed to seal a wall.
+ * How far scattered pegs keep from the frame: a rope's body plus its slack on top of the
+ * halo, so the wall-side corridor is always drawable — only the fence may seal a wall.
  */
-const EDGE = 3.2;
+const edgeFor = (pegR: number): number => clearOf(pegR) + ROPE_R + 3 * SLACK;
 
 /** Draw pegs one by one, each at least `minGap` from all placed ones. */
 function scatter(rng: Rng, count: number, minGap: number, placed: Pt[], margin: number): Pt[] {
@@ -359,11 +396,12 @@ function fenceChain(rng: Rng, pegR: number, links: number): Pt[] | null {
 	let dir = side === 0 ? Math.PI / 2 : side === 1 ? -Math.PI / 2 : side === 2 ? 0 : Math.PI;
 	for (let i = 1; i < links; i++) {
 		dir += (rng() - 0.5) * 1.2;
-		const gap = pegR * (2.3 + rng() * (2 * CLEAR - 0.3 - 2.3));
+		const gap = pegR * 2.3 + rng() * (2 * clearOf(pegR) - pegR * 2.6);
 		const prev = chain[i - 1];
 		const p = { x: prev.x + Math.cos(dir) * gap, y: prev.y + Math.sin(dir) * gap };
 		// A chain that wanders back to a wall would seal it and cut the board in two.
-		if (p.x < EDGE * pegR || p.x > 1 - EDGE * pegR || p.y < EDGE * pegR || p.y > 1 - EDGE * pegR) return null;
+		const m = edgeFor(pegR);
+		if (p.x < m || p.x > 1 - m || p.y < m || p.y > 1 - m) return null;
 		chain.push(p);
 	}
 	const half = links / 2;
@@ -383,7 +421,7 @@ function deal(diff: DiffLevel, rng: Rng, pegR: number): [Pt, Pt][] | null {
 		placed = chain;
 	}
 	const need = 2 * (diff.ropes - ends.length);
-	const pegs = scatter(rng, need, minGapFor(pegR), placed, EDGE * pegR);
+	const pegs = scatter(rng, need, minGapFor(pegR), placed, edgeFor(pegR));
 	if (pegs.length < need) return null;
 	if (diff.far) {
 		// Long chords cross a lot: each peg takes the farthest partner still free.

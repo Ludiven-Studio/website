@@ -3,7 +3,9 @@ import {
 	CLEAR,
 	DIFFS,
 	DIFF_ORDER,
+	ROPE_R,
 	applyHint,
+	clearOf,
 	distToSeg,
 	findHint,
 	generateCordes,
@@ -97,6 +99,14 @@ describe('cordes rules', () => {
 		expect(ropeFault([a, { x: 0.5, y: 0.15 }, b], 0, [], bare)).toBe('passe trop près d’un piquet');
 	});
 
+	it('the rope is measured by its body, not by its centre line', () => {
+		// Centre line 0.066 off the peg: just outside the halo (0.064), but half the rope is in it.
+		expect(ropeFault([a, { x: 0.5, y: 0.166 }, b], 0, [], bare)).toBe('passe trop près d’un piquet');
+		expect(ropeFault([a, { x: 0.5, y: 0.19 }, b], 0, [], bare)).toBeNull();
+		// Same on the frame: the rope stops half a width short of it.
+		expect(ropeFault([a, { x: 0.5, y: ROPE_R / 2 }, b], 0, [], bare)).toBe('sort du cadre');
+	});
+
 	it('an unfinished board is not solved', () => {
 		expect(isSolved([bare.solution[0], null], bare)).toBe(false);
 		expect(isSolved([], bare)).toBe(false);
@@ -128,6 +138,20 @@ function expectLegalBoard(p: CordesPuzzle, ropes: number): void {
 		expect(ropeFault(p.solution[r], r, p.solution, p)).toBeNull();
 	}
 	expect(isSolved(p.solution, p)).toBe(true);
+
+	// Legal is not enough: a route that shaves a halo cannot be redrawn with a finger, so the
+	// board only ships routes that keep a spare half-width of rope on each side.
+	for (let r = 0; r < ropes; r++) {
+		for (let q = 0; q < ropes; q++) {
+			if (q === r) continue;
+			for (const peg of p.ends[q]) {
+				for (let i = 0; i < p.solution[r].length - 1; i++) {
+					expect(distToSeg(peg, p.solution[r][i], p.solution[r][i + 1]))
+						.toBeGreaterThanOrEqual(clearOf(p.pegR) + ROPE_R);
+				}
+			}
+		}
+	}
 }
 
 const hardCount = (p: CordesPuzzle): number => p.detours.filter((d) => d >= 1.3).length;
