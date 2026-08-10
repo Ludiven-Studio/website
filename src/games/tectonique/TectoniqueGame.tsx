@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { formatScore, fmtCentis, encodePacked } from '../../lib/scoreFormat';
@@ -674,8 +674,9 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	const gems = useMemo(() => (board ? board.crystals.flatMap((c, i) => (c ? [i] : [])) : []), [board]);
 
 	// The hen's two belts render on top of the crossing ones, with their end drums lit.
-	const laneR = board ? Math.floor(heroIndex(board) / n) : -1;
-	const laneC = board ? heroIndex(board) % n : -1;
+	const heroIdx = board ? heroIndex(board) : -1;
+	const laneR = heroIdx >= 0 ? Math.floor(heroIdx / n) : -1;
+	const laneC = heroIdx >= 0 ? heroIdx % n : -1;
 
 	/** A piece jammed against the wall or a rock stays put while the rest of its line runs on. */
 	const offsetOf = (idx: number): { x: number; y: number } => {
@@ -685,6 +686,13 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			y: offsets[lineKey('col', idx % n)] ?? 0,
 		};
 	};
+
+	/** The turntable rides with the hen, so it stays under her mid-slide. */
+	const crossAt = ((): CSSProperties | null => {
+		if (heroIdx < 0) return null;
+		const o = offsetOf(heroIdx);
+		return { transform: `translate(${(laneC + o.x) * 100}%, ${(laneR + o.y) * 100}%)` };
+	})();
 
 	/** The belt surface travels with its line: one cell of texture per cell of shift. */
 	const beltPos = (axis: Axis, index: number): string => {
@@ -813,6 +821,9 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						))}
 						{heroBelts}
 
+						{/* The hen's cell is a turntable, not one belt running over another: both serve it. */}
+						{crossAt && <div className="tk-cross" aria-hidden="true" style={crossAt} />}
+
 						{sprites.map((s) => {
 							const o = offsetOf(s.idx);
 							return (
@@ -825,6 +836,15 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 								</div>
 							);
 						})}
+
+						{/* Over the hen, or she hides them: a chevron on every side she can be pushed to. */}
+						{crossAt && (
+							<div className="tk-cross arrows" aria-hidden="true" style={crossAt}>
+								{(['up', 'down', 'left', 'right'] as const).map((d) => (
+									<span key={d} className={`tk-arw ${d}${can[d] ? '' : ' off'}`} />
+								))}
+							</div>
+						)}
 
 						{gems.map((i) => (
 							<div
@@ -954,7 +974,9 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="tk-help">
-				Seules la ligne et la colonne où se trouve la cocotte 🐔 peuvent bouger. Attrape la ligne au
+				Seules la ligne et la colonne où se trouve la cocotte 🐔 peuvent bouger&nbsp;: sous elle, le
+				croisement est un plateau tournant desservi par les deux tapis, et les chevrons autour d'elle
+				montrent les directions encore ouvertes. Attrape la ligne au
 				doigt&nbsp;: le tapis suit la main, et il garde son élan quand tu lâches — il continue tout seul
 				jusqu'à ce que le frottement l'arrête. Un nouvel appui le coupe net. Les flèches du clavier et le
 				pavé ci-dessus lui donnent une impulsion, et servent aussi de frein. Un coup, c'est un tapis, pas
@@ -1071,6 +1093,48 @@ const CSS = `
 .tk-belt.on { filter: brightness(1.22); }
 .tk-belt.h.on { box-shadow: 0 0 12px 3px rgba(0, 0, 0, 0.6), inset 0 4px 5px -3px rgba(255, 255, 255, 0.2), inset 0 -5px 6px -3px rgba(0, 0, 0, 0.9); }
 .tk-belt.v.on { box-shadow: 0 0 12px 3px rgba(0, 0, 0, 0.6), inset 4px 0 5px -3px rgba(255, 255, 255, 0.2), inset -5px 0 6px -3px rgba(0, 0, 0, 0.9); }
+
+/* The hen's cell is the one place both belts serve. A turntable plate settles the crossing —
+   no belt runs over the other there — and a chevron marks every side she can be pushed to. */
+.tk-cross {
+  position: absolute; top: 0; left: 0;
+  width: calc(100% / var(--n)); height: calc(100% / var(--n));
+  pointer-events: none; will-change: transform;
+}
+/* Round, so it never reads as one more crate. */
+.tk-cross::before {
+  content: ''; position: absolute; inset: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #545b63, #22262b 76%);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.16), 0 0 9px rgba(0, 0, 0, 0.6);
+}
+.tk-cross.arrows::before { content: none; }
+.tk-arw {
+  --a: calc(var(--tk-cell) * 0.095);
+  position: absolute; width: 0; height: 0;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.85));
+}
+.tk-arw.off { opacity: 0.16; }
+.tk-arw.up {
+  top: 3%; left: 50%; transform: translateX(-50%);
+  border-left: var(--a) solid transparent; border-right: var(--a) solid transparent;
+  border-bottom: var(--a) solid #e6ebf1;
+}
+.tk-arw.down {
+  bottom: 3%; left: 50%; transform: translateX(-50%);
+  border-left: var(--a) solid transparent; border-right: var(--a) solid transparent;
+  border-top: var(--a) solid #e6ebf1;
+}
+.tk-arw.left {
+  left: 3%; top: 50%; transform: translateY(-50%);
+  border-top: var(--a) solid transparent; border-bottom: var(--a) solid transparent;
+  border-right: var(--a) solid #e6ebf1;
+}
+.tk-arw.right {
+  right: 3%; top: 50%; transform: translateY(-50%);
+  border-top: var(--a) solid transparent; border-bottom: var(--a) solid transparent;
+  border-left: var(--a) solid #e6ebf1;
+}
 
 /* Faint cell ticks, under the crossing columns. */
 .tk-grid {
