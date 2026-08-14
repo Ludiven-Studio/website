@@ -627,10 +627,6 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				<p className="sk-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
-			)}
-
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{lv.active && lv.menu ? null : revealed ? (
@@ -660,6 +656,10 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 						doit contenir tous les chiffres une seule fois.
 					</p>
 				</>
+			)}
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 		</div>
 	);

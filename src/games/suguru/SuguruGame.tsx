@@ -615,10 +615,6 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 				<p className="sg-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
-			)}
-
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{revealed ? (
@@ -648,6 +644,10 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 						toucher, même en diagonale.
 					</p>
 				</>
+			)}
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 		</div>
 	);

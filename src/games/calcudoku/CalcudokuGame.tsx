@@ -671,10 +671,6 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				<p className="cd-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
-			)}
-
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
 			{lv.active && lv.menu ? null : revealed ? (
@@ -703,6 +699,10 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 						Touche une case puis un chiffre de 1 à {size}. Besoin d'aide ? Ouvre «&nbsp;?&nbsp;» en haut.
 					</p>
 				</>
+			)}
+
+			{daily && (
+				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 		</div>
 	);

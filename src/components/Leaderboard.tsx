@@ -43,7 +43,11 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	const [submitFailed, setSubmitFailed] = useState(false);
 	const [shareMsg, setShareMsg] = useState('');
 	const [dayValue, setDayValue] = useState<number | null>(null); // today's own result, this run or an earlier one
+	// Only the inline daily board folds; the corner peek (actions=false) stays open, plain title.
+	const collapsible = actions;
+	const [open, setOpen] = useState<boolean>(!collapsible || submitValue != null);
 	const lastSubmittedRef = useRef<number | null>(null); // last value sent (re-submit when it improves)
+	const userToggledRef = useRef(false); // once the player folds/unfolds by hand, stop auto-opening
 
 	const secured = isSecured(game);
 	// A few boards log under "<id>-t" (the timed variant); the page and the streak use the bare id.
@@ -109,6 +113,18 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 		}
 	}, [submitValue, game, metric, format]);
 
+	// Open the board once there is something to show (a fresh run or today's stored result),
+	// unless the player has already set the fold by hand.
+	useEffect(() => {
+		if (userToggledRef.current || !collapsible) return;
+		if (submitValue != null || dayValue != null) setOpen(true);
+	}, [submitValue, dayValue, collapsible]);
+
+	const toggle = () => {
+		userToggledRef.current = true;
+		setOpen((o) => !o);
+	};
+
 	const save = () => {
 		const n = draft.trim().slice(0, 20);
 		if (!n) return;
@@ -152,10 +168,19 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	};
 
 	return (
-		<div className="lb-root">
+		<div className={`lb-root ${open ? '' : 'is-folded'}`}>
 			<style>{CSS}</style>
-			<h3 className="lb-title">Classement du jour</h3>
+			{collapsible ? (
+				<button className="lb-title" onClick={toggle} aria-expanded={open}>
+					<span>Classement du jour</span>
+					<span className="lb-chev" aria-hidden="true">▾</span>
+				</button>
+			) : (
+				<h3 className="lb-title lb-title-static">Classement du jour</h3>
+			)}
 
+			{open && (
+			<>
 			{actions && (
 				<div className="lb-share-row">
 					{dayValue != null && (
@@ -229,6 +254,8 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 					)}
 				</>
 			)}
+			</>
+			)}
 		</div>
 	);
 }
@@ -258,9 +285,18 @@ const CSS = `
   font-family: var(--font-body);
 }
 .lb-title {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; margin: 0 0 0.75rem; padding: 8px 12px;
+  border: 1.5px solid var(--gray-800); border-radius: 999px; background: var(--gray-999_40);
   font-family: var(--font-brand); font-weight: 600; font-size: 16px;
-  text-align: center; margin: 0 0 0.75rem; color: var(--gray-0);
+  color: var(--gray-0); cursor: pointer;
+  transition: border-color var(--theme-transition), color var(--theme-transition);
 }
+.lb-title:hover, .lb-title:focus-visible { border-color: var(--accent-regular); }
+.lb-title-static { border: none; background: none; padding: 0; cursor: default; }
+.lb-chev { font-size: 12px; color: var(--gray-300); transition: transform 0.2s ease; }
+.lb-root.is-folded { margin-bottom: 0; }
+.lb-root.is-folded .lb-chev { transform: rotate(-90deg); }
 .lb-msg { text-align: center; color: var(--gray-300); font-size: 13px; line-height: 1.5; margin: 0; }
 
 .lb-err { display: flex; flex-direction: column; align-items: center; gap: 10px; }
