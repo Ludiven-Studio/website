@@ -16,7 +16,9 @@ const WOOD = 0x5a3722;
 const WOOD_DARK = 0x3a2416;
 const RAIL_W = 5; // rail width outward from the cushion line
 const RAIL_H = 2 * BALL_R; // rail top above the felt
-const BODY_H = 9; // table body thickness (felt down to where it meets the floor)
+const BODY_H = 9; // table body thickness under the felt
+const LEG_H = 32; // legs raise the table off the floor
+const LEG_W = 9;
 const POCKET_D = 8; // how deep a pocket sinks below the felt
 
 // Corner signs for the framing math.
@@ -55,18 +57,30 @@ export function buildTable3D(table: Table): Table3D {
 	const floorGeo = keep(new THREE.PlaneGeometry(w * 6, h * 10));
 	const floor = new THREE.Mesh(floorGeo, floorMat);
 	floor.rotation.x = -Math.PI / 2;
-	floor.position.y = -BODY_H;
+	floor.position.y = -(BODY_H + LEG_H);
 	floor.receiveShadow = true;
 	grp.add(floor);
 
 	// Table body: a wood block just under the felt, a touch wider so a frame shows around it.
 	const bodyMat = keep(new THREE.MeshStandardMaterial({ color: WOOD_DARK, roughness: 0.7 }));
-	const bodyGeo = keep(new THREE.BoxGeometry(w + 2 * RAIL_W + 3, BODY_H, h + 2 * RAIL_W + 3));
+	const bodyHalfX = hw + RAIL_W + 1.5, bodyHalfZ = hh + RAIL_W + 1.5;
+	const bodyGeo = keep(new THREE.BoxGeometry(bodyHalfX * 2, BODY_H, bodyHalfZ * 2));
 	const body = new THREE.Mesh(bodyGeo, bodyMat);
 	body.position.y = -BODY_H / 2 - 0.1;
 	body.castShadow = true;
 	body.receiveShadow = true;
 	grp.add(body);
+
+	// Four legs down to the floor, inset from the corners.
+	const legGeo = keep(new THREE.BoxGeometry(LEG_W, LEG_H, LEG_W));
+	const legX = bodyHalfX - LEG_W / 2 - 3, legZ = bodyHalfZ - LEG_W / 2 - 3;
+	for (const sx of [-1, 1] as const) for (const sz of [-1, 1] as const) {
+		const leg = new THREE.Mesh(legGeo, bodyMat);
+		leg.position.set(sx * legX, -BODY_H - LEG_H / 2, sz * legZ);
+		leg.castShadow = true;
+		leg.receiveShadow = true;
+		grp.add(leg);
+	}
 
 	// Felt bed.
 	const feltMat = new THREE.MeshStandardMaterial({ color: FELT, roughness: 0.95, metalness: 0 });
@@ -89,7 +103,10 @@ export function buildTable3D(table: Table): Table3D {
 		if (len <= 0.5) return;
 		const mid = (a + b) / 2;
 		const railCz = edge - inward * RAIL_W / 2; // rail sits outside the cushion line
-		const cushCz = edge + inward * CUSH_W / 2; // cushion pokes back over the felt
+		// The engine bounces a ball when its centre is BALL_R from the rail, i.e. its surface
+		// reaches the table edge — so the cushion nose must sit flush with that edge, not over
+		// the felt, or balls visibly cross it.
+		const cushCz = edge - inward * CUSH_W / 2;
 		if (axis === 'x') {
 			const rail = new THREE.Mesh(keep(new THREE.BoxGeometry(len, RAIL_H, RAIL_W)), railMat);
 			rail.position.set(mid, RAIL_H / 2, railCz);

@@ -115,10 +115,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const azRef = useRef(0);
 	const fitRef = useRef({ hx: 120, hz: 70, base: 0, az: 0, azTop: 0 });
 	const orbitRef = useRef<{ x: number; az: number } | null>(null);
+	const panRef = useRef({ x: 0, z: 0 }); // fit/top look-target offset (two-finger pan)
 	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), on: false });
 	const lastFrameRef = useRef(0);
+	const lastDistRef = useRef(200); // camera→target distance, for the pan pixel→world scale
 	const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-	const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
+	const pinchRef = useRef<{ dist: number; zoom: number; cx: number; cy: number; panX: number; panZ: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
 
 	const { celebrating } = useCelebration(status === 'won');
@@ -251,6 +253,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		aimRef.current = null;
 		orbitRef.current = null;
 		zoomRef.current = 1;
+		panRef.current = { x: 0, z: 0 };
 		azRef.current = fitRef.current.az;
 		camModeRef.current = 'fit';
 		setCamMode('fit');
@@ -475,18 +478,25 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		camModeRef.current = nv;
 		setCamMode(nv);
 		zoomRef.current = 1;
+		panRef.current = { x: 0, z: 0 };
 		if (nv === 'fit') azRef.current = fitRef.current.az;
 	}, []);
 
-	const pinchDist = (): number => {
+	const twoFinger = (): { dist: number; cx: number; cy: number } | null => {
 		const pts = [...pointersRef.current.values()];
-		return pts.length < 2 ? 0 : Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+		if (pts.length < 2) return null;
+		return {
+			dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+			cx: (pts[0].x + pts[1].x) / 2,
+			cy: (pts[0].y + pts[1].y) / 2,
+		};
 	};
 
 	const onPointerDown = useCallback((e: React.PointerEvent) => {
 		pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		if (pointersRef.current.size >= 2) {
-			pinchRef.current = { dist: pinchDist(), zoom: zoomRef.current };
+		const tf = twoFinger();
+		if (tf) {
+			pinchRef.current = { dist: tf.dist, zoom: zoomRef.current, cx: tf.cx, cy: tf.cy, panX: panRef.current.x, panZ: panRef.current.z };
 			aimRef.current = null;
 			orbitRef.current = null;
 			powerRef.current = 0;
@@ -497,10 +507,19 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const onPointerMove = useCallback((e: React.PointerEvent) => {
 		if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		if (pinchRef.current) {
-			const d = pinchDist();
-			if (d > 0) zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, pinchRef.current.zoom * (d / pinchRef.current.dist)));
-		}
+		const p = pinchRef.current, tf = twoFinger(), g = g3Ref.current;
+		if (!p || !tf || !g) return;
+		// Pinch → zoom; drag the two-finger centroid → pan the look target along the ground.
+		if (tf.dist > 0) zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, p.zoom * (tf.dist / p.dist)));
+		const H = canvasRef.current?.clientHeight || 600;
+		const wpp = (2 * lastDistRef.current * Math.tan((g.camera.fov * Math.PI / 180) / 2)) / H; // world per pixel
+		const right = new THREE.Vector3().setFromMatrixColumn(g.camera.matrixWorld, 0); right.y = 0; right.normalize();
+		const fwd = new THREE.Vector3(); g.camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+		const dx = tf.cx - p.cx, dy = tf.cy - p.cy;
+		const t = tableRef.current;
+		const clamp = (v: number, lim: number) => Math.max(-lim, Math.min(lim, v));
+		panRef.current.x = clamp(p.panX - dx * wpp * right.x - dy * wpp * fwd.x, t.w / 2 + 20);
+		panRef.current.z = clamp(p.panZ - dx * wpp * right.z - dy * wpp * fwd.z, t.h / 2 + 20);
 	}, []);
 
 	const onPointerUp = useCallback((e: React.PointerEvent) => {
@@ -620,12 +639,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const flat = Math.cos(pitch) * dist;
 			camEye.set(cx - tx * flat, Math.sin(pitch) * dist + BALL_R, cz - tz * flat);
 			camLook.set(cx + tx * 24, BALL_R + 3, cz + tz * 24);
+			lastDistRef.current = dist;
 		} else {
 			const pitch = ((mode === 'top' ? PITCH_TOP : PITCH_FIT) * Math.PI) / 180;
 			const az = mode === 'top' ? f.azTop : azRef.current;
 			const d = fitDist(g.camera, f.hx, f.hz, pitch, az) / zoom;
-			camEye.set(-Math.cos(az) * Math.cos(pitch) * d, Math.sin(pitch) * d, -Math.sin(az) * Math.cos(pitch) * d);
-			camLook.set(0, 0, 0);
+			const pan = panRef.current;
+			camEye.set(pan.x - Math.cos(az) * Math.cos(pitch) * d, Math.sin(pitch) * d, pan.z - Math.sin(az) * Math.cos(pitch) * d);
+			camLook.set(pan.x, 0, pan.z);
+			lastDistRef.current = d;
 		}
 		const cs = camSmoothRef.current;
 		if (!cs.on) { cs.eye.copy(camEye); cs.look.copy(camLook); cs.on = true; }
