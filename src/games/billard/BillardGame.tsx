@@ -10,11 +10,12 @@ import {
 } from './render3d';
 import { initMatch8, applyShot, groupOf, type Match8, type Group } from './rules8';
 import { chooseShot } from './ai8';
+import { joinRandom, joinByCode, makeCode, multiplayerAvailable, seedFromRoom, type BilliardMatch } from './net';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
-import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, playerName } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
@@ -101,6 +102,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	// 8-ball (Libre)
 	const [match8, setMatch8] = useState<Match8 | null>(null); // mirror of match8Ref for the HUD
 	const [placing, setPlacing] = useState(false); // ball-in-hand: drag to place the cue
+	// Multiplayer (Libre online)
+	const [mpPhase, setMpPhase] = useState<'off' | 'menu' | 'connecting' | 'waiting' | 'playing'>('off');
+	const [mpCode, setMpCode] = useState<string | null>(null); // code to share / joined with
+	const [mpOpp, setMpOpp] = useState<string | null>(null); // opponent name
+	const [mpPlayer, setMpPlayer] = useState<0 | 1>(0); // my player index online
+	const [mpMsg, setMpMsg] = useState<string | null>(null);
+	const [codeInput, setCodeInput] = useState('');
 
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -133,6 +141,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const aiThinkingRef = useRef(false); // AI turn scheduled/running — block human input
 	const runAiShotRef = useRef<() => void>(() => {});
 	const levelSkillRef = useRef(0.5); // AI strength for the current Niveaux level
+	// Multiplayer
+	const netRef = useRef<BilliardMatch | null>(null);
+	const onlineRef = useRef(false); // opponent is a remote human, not the AI
+	const myPlayerRef = useRef<0 | 1>(0);
+	const startedOnlineRef = useRef(false); // guard against starting the match twice on presence sync
 
 	// Camera / view state read inside the raf loop.
 	const camModeRef = useRef<CamMode>('fit');
@@ -153,6 +166,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const setStat = (s: Status) => { statusRef.current = s; setStatus(s); };
 	const freeBestKey = (k: string) => `ludiven-billard-best-${k}`;
+	const localPlayer = (): 0 | 1 => (onlineRef.current ? myPlayerRef.current : HUMAN); // the player at this device
 
 	/* ---------- three.js scene (built once) ---------- */
 	const initScene = useCallback((): boolean => {
@@ -465,6 +479,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const cue = balls.find((b) => b.kind === 'cue');
 		if (cue && cue.potted) { seenRef.current.delete(balls.indexOf(cue)); cue.potted = false; cue.x = t.cueStart.x; cue.y = t.cueStart.y; cue.vx = cue.vy = 0; } // un-pot on scratch
 		if (next.lastFoul) { setScratchFlash(true); setTimeout(() => setScratchFlash(false), 1500); }
+		const me = onlineRef.current ? myPlayerRef.current : HUMAN; // the player at this device
 		if (next.winner !== null) {
 			setStat('won');
 			if (lv.active) {
@@ -474,18 +489,87 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			}
 			return;
 		}
-		if (next.turn === AI) {
+		if (next.turn === me) { // my turn to aim
+			if (next.ballInHand === me) { placingRef.current = true; setPlacing(true); }
+			setStat('aiming');
+		} else if (onlineRef.current) { // remote opponent shoots — wait for their shot message
+			setStat('aiming');
+		} else { // local AI opponent
 			aiThinkingRef.current = true;
 			setStat('aiming');
 			window.setTimeout(() => runAiShotRef.current(), 700);
-		} else {
-			if (next.ballInHand === HUMAN) { placingRef.current = true; setPlacing(true); }
-			setStat('aiming');
 		}
 	};
 
 	const onSettled = () => { if (eightBallRef.current) resolveShot8(); else resolveShot(); };
 	runAiShotRef.current = runAiShot;
+
+	/* ---------- Multiplayer (Libre online, deterministic lockstep) ---------- */
+	const leaveOnline = () => {
+		netRef.current?.leave(); netRef.current = null;
+		onlineRef.current = false; startedOnlineRef.current = false;
+		setMpPhase('off'); setMpCode(null); setMpOpp(null); setMpMsg(null);
+		newFreeTable(diffKey); // back to vs-AI
+	};
+
+	const startOnlineMatch = () => {
+		const net = netRef.current;
+		if (!net || startedOnlineRef.current) return;
+		startedOnlineRef.current = true;
+		onlineRef.current = true;
+		eightBallRef.current = true;
+		myPlayerRef.current = net.isHost() ? 0 : 1;
+		setMpPlayer(myPlayerRef.current);
+		setDaily(false);
+		lv.exit();
+		net.onShot((s) => { // remote fired — replay it on our identical sim
+			const m = match8Ref.current;
+			if (!m || m.winner !== null || m.turn === myPlayerRef.current) return;
+			const cue = ballsRef.current.find((b) => b.kind === 'cue');
+			if (!cue) return;
+			cue.x = s.px; cue.y = s.py; cue.potted = false; cue.vx = s.vx; cue.vy = s.vy;
+			if (m.ballInHand != null) { match8Ref.current = { ...m, ballInHand: null }; setMatch8(match8Ref.current); }
+			placingRef.current = false; setPlacing(false);
+			startShot8();
+		});
+		layRack(DIFFS.facile, seedFromRoom(net.roomId)); // same rack on both peers
+		setMpMsg(null);
+		setMpPhase('playing');
+	};
+
+	const watchPeers = () => {
+		netRef.current?.onPeers((peers) => {
+			if (peers.length >= 1) { setMpOpp(peers[0].name); startOnlineMatch(); }
+			else if (onlineRef.current) { setMpMsg('Adversaire parti'); }
+		});
+	};
+
+	const mpQuickMatch = async () => {
+		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		setMpPhase('connecting'); setMpMsg(null); setMpCode(null);
+		const net = await joinRandom((playerName() || 'Joueur').slice(0, 16));
+		if (!net) { setMpPhase('menu'); setMpMsg('Aucune partie libre, réessaie'); return; }
+		netRef.current = net; setMpPhase('waiting'); watchPeers();
+	};
+
+	const mpCreateCode = async () => {
+		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		const code = makeCode();
+		setMpPhase('connecting'); setMpMsg(null); setMpCode(code);
+		const net = await joinByCode((playerName() || 'Joueur').slice(0, 16), code);
+		if (!net) { setMpPhase('menu'); setMpMsg('Erreur de connexion'); return; }
+		netRef.current = net; setMpPhase('waiting'); watchPeers();
+	};
+
+	const mpJoinCode = async () => {
+		const code = codeInput.trim().toUpperCase();
+		if (!code) return;
+		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		setMpPhase('connecting'); setMpMsg(null); setMpCode(code);
+		const net = await joinByCode((playerName() || 'Joueur').slice(0, 16), code);
+		if (!net) { setMpPhase('menu'); setMpMsg('Code plein ou invalide'); return; }
+		netRef.current = net; setMpPhase('waiting'); watchPeers();
+	};
 
 	/* ---------- Pointer helpers (raycast into the table) ---------- */
 	/** Engine-space point under the pointer on the felt plane (y = 0). */
@@ -539,7 +623,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		}
 		// In 8-ball you may only aim on your turn (otherwise the drag just moves the view).
 		const canAim = !eightBallRef.current
-			|| (!!match8Ref.current && match8Ref.current.turn === HUMAN && match8Ref.current.winner === null && !aiThinkingRef.current);
+			|| (!!match8Ref.current && match8Ref.current.turn === localPlayer() && match8Ref.current.winner === null && !aiThinkingRef.current);
 		const p = worldFromPointer(clientX, clientY);
 		const near = cue && (cueScreenDist(clientX, clientY, cue) <= GRAB_PX
 			|| (p != null && Math.hypot(p.x - cue.x, p.y - cue.y) <= GRAB_R));
@@ -581,14 +665,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		aimRef.current = null;
 		powerRef.current = 0;
 		if (!aim || statusRef.current !== 'aiming') return;
-		if (eightBallRef.current) { // 8-ball human shot — no strokes, no daily tries
+		if (eightBallRef.current) { // 8-ball shot — no strokes, no daily tries
 			const m = match8Ref.current;
-			if (!m || m.turn !== HUMAN || m.winner !== null || aiThinkingRef.current || placingRef.current) return;
+			if (!m || m.turn !== localPlayer() || m.winner !== null || aiThinkingRef.current || placingRef.current) return;
 			const v = aimToVelocity(aim.pull);
 			if (!v) return;
 			const cue = cueBall();
 			if (!cue) return;
 			cue.vx = v.vx; cue.vy = v.vy;
+			if (onlineRef.current) netRef.current?.sendShot({ vx: v.vx, vy: v.vy, px: cue.x, py: cue.y }); // tell the remote
 			startShot8();
 			return;
 		}
@@ -893,12 +978,22 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			status: statusRef.current,
 			rolling: rollingRef.current,
 			eightBall: eightBallRef.current,
+			online: onlineRef.current,
+			myPlayer: myPlayerRef.current,
+			cueScreen: (() => { // the cue's client x,y (for the smoke test to aim precisely)
+				const g = g3Ref.current, cv = canvasRef.current, cue = ballsRef.current.find((b) => b.kind === 'cue');
+				if (!g || !cv || !cue) return null;
+				const r = cv.getBoundingClientRect();
+				const v = new THREE.Vector3(cue.x - tableRef.current.w / 2, BALL_R, cue.y - tableRef.current.h / 2).project(g.camera);
+				return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+			})(),
 		});
-		return () => { delete w.__billard; };
+		return () => { delete w.__billard; netRef.current?.leave(); netRef.current = null; };
 	}, []);
 
 	const dailyMode = daily && !lv.active;
 	const triesLeft = MAX_TRIES - tries;
+	const myIdx = mpPhase === 'playing' ? mpPlayer : HUMAN; // whose winner state means "me"
 	const exhausted = dailyMode && triesLeft <= 0;
 	// 8-ball = everything except Défi (daily). Libre + Niveaux are 8-ball.
 	const is8 = !daily;
@@ -932,7 +1027,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					<div className="bi-stats">
 						{is8 ? (
 							<>
-								<span className="bi-stat">{match8?.winner != null ? (match8.winner === HUMAN ? '🏆 Gagné' : '❌ Perdu') : match8?.turn === HUMAN ? '🎯 À toi' : '🤖 Ordi'}</span>
+								<span className="bi-stat">{match8?.winner != null ? (match8.winner === myIdx ? '🏆 Gagné' : '❌ Perdu') : match8?.turn === myIdx ? '🎯 À toi' : (mpPhase === 'playing' ? '⏳ Adversaire' : '🤖 Ordi')}</span>
 								<span className="bi-stat">{match8?.open ? 'Table ouverte' : `${groupLabel(myGroup)} · ${myLeft}`}</span>
 							</>
 						) : (
@@ -944,11 +1039,17 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						)}
 					</div>
 					<div className="bi-hud-actions">
-						{!daily && !lv.active && diffKeys(DIFFS, gameId).map((k) => (
-							<button key={k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)}>{DIFFS[k].label}</button>
+						{is8 && !lv.active && mpPhase === 'off' && diffKeys(DIFFS, gameId).map((k) => (
+							<button key={k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)} title="Force de l’IA">{DIFFS[k].label}</button>
 						))}
+						{is8 && !lv.active && mpPhase === 'off' && (
+							<button className="bi-act" onClick={() => { setMpMsg(null); setMpPhase('menu'); }} aria-label="Jouer en ligne" title="Jouer en ligne">👥</button>
+						)}
+						{mpPhase === 'playing' && (
+							<button className="bi-act" onClick={leaveOnline} aria-label="Quitter la partie en ligne" title="Quitter la partie en ligne">🚪</button>
+						)}
 						<button className="bi-act" onClick={cycleCam} aria-label="Changer de vue" title="Changer de vue">{CAM_LABEL[camMode]}</button>
-						{!lv.menu && (
+						{!lv.menu && mpPhase !== 'playing' && mpPhase !== 'waiting' && mpPhase !== 'connecting' && (
 							<button
 								className="bi-act"
 								onClick={restart}
@@ -972,7 +1073,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				)}
 				{is8 && !lv.active && match8 && match8.winner == null && (
 					<div className="bi-daily-tag bi-daily-hud">
-						{match8.lastFoul || match8.lastEvent || (match8.open ? 'Table ouverte — empoche pour choisir pleines ou rayées' : `Toi : ${groupLabel(myGroup)} · Ordi : ${groupLabel(oppGroup)}`)}
+						{mpPhase === 'playing' ? `En ligne vs ${mpOpp || 'adversaire'} · ` : ''}
+						{match8.lastFoul || match8.lastEvent || (match8.open ? 'Table ouverte — empoche pour choisir pleines ou rayées' : `Toi : ${groupLabel(myGroup)} · ${mpPhase === 'playing' ? (mpOpp || 'Adv') : 'Ordi'} : ${groupLabel(oppGroup)}`)}
 					</div>
 				)}
 			</div>
@@ -1006,12 +1108,42 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{/* 8-ball win/loss card (Libre). */}
+				{/* 8-ball win/loss card (Libre — vs AI or online). */}
 				{eightWin && (
 					<div className="bi-overlay">
 						<div className="bi-overlay-card">
-							{match8?.winner === HUMAN ? '🏆 Tu as gagné !' : '❌ L’ordinateur gagne'}
-							<button className="bi-replay" onClick={() => newFreeTable(diffKey)}>Nouvelle partie</button>
+							{match8?.winner === myIdx ? '🏆 Tu as gagné !' : (mpPhase === 'playing' ? '❌ L’adversaire gagne' : '❌ L’ordinateur gagne')}
+							{mpPhase === 'playing'
+								? <button className="bi-replay" onClick={leaveOnline}>Quitter</button>
+								: <button className="bi-replay" onClick={() => newFreeTable(diffKey)}>Nouvelle partie</button>}
+						</div>
+					</div>
+				)}
+
+				{/* Multiplayer menu / connection. */}
+				{is8 && (mpPhase === 'menu' || mpPhase === 'connecting' || mpPhase === 'waiting') && (
+					<div className="bi-overlay">
+						<div className="bi-overlay-card bi-mp">
+							{mpPhase === 'menu' ? (
+								<>
+									<div className="bi-mp-title">Jouer en ligne</div>
+									<button className="bi-replay" onClick={mpQuickMatch}>⚡ Partie rapide</button>
+									<button className="bi-replay" onClick={mpCreateCode}>🔑 Créer un code ami</button>
+									<div className="bi-mp-join">
+										<input value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 4))} maxLength={4} placeholder="CODE" aria-label="Code ami" />
+										<button className="bi-replay" onClick={mpJoinCode}>Rejoindre</button>
+									</div>
+									{mpMsg && <span className="bi-spent">{mpMsg}</span>}
+									<button className="bi-act" onClick={() => setMpPhase('off')}>Retour</button>
+								</>
+							) : (
+								<>
+									<div className="bi-mp-title">{mpPhase === 'connecting' ? 'Connexion…' : 'En attente d’un joueur…'}</div>
+									{mpCode && <div className="bi-mp-code">Code : <strong>{mpCode}</strong></div>}
+									{mpMsg && <span className="bi-spent">{mpMsg}</span>}
+									<button className="bi-act" onClick={leaveOnline}>Annuler</button>
+								</>
+							)}
 						</div>
 					</div>
 				)}
@@ -1099,6 +1231,13 @@ const CSS = `
 
 .bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
 .bi-place { top: auto; bottom: 14px; background: var(--bi-accent); }
+
+.bi-mp { min-width: 240px; gap: 10px; }
+.bi-mp-title { font-family: var(--font-brand); font-weight: 700; font-size: 17px; }
+.bi-mp-join { display: flex; gap: 6px; width: 100%; }
+.bi-mp-join input { flex: 1; min-width: 0; text-align: center; letter-spacing: 3px; text-transform: uppercase; font: inherit; font-weight: 700; border-radius: 999px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); padding: 8px 10px; }
+.bi-mp-code { font-size: 15px; color: var(--gray-100); }
+.bi-mp-code strong { font-size: 22px; letter-spacing: 4px; color: var(--bi-accent); }
 
 .bi-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .bi-overlay-card { background: var(--gray-999); border: 2px solid var(--bi-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
