@@ -718,7 +718,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					seenRef.current.add(i);
 					let bp = t.pockets[0], bd = Infinity;
 					for (const p of t.pockets) { const d = Math.hypot(b.x - p.x, b.y - p.y); if (d < bd) { bd = d; bp = p; } }
-					sinksRef.current.push({ idx: i, t0: now, px: bp.x, py: bp.y });
+					// Drop toward the anchor (the visible hole), not the inward-nudged capture centre.
+					sinksRef.current.push({ idx: i, t0: now, px: bp.anchor.x, py: bp.anchor.y });
 				}
 			}
 			sinksRef.current = sinksRef.current.filter((s) => now - s.t0 < SINK_MS);
@@ -891,9 +892,10 @@ const CSS = `
 .bi-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .bi-daily-hud { background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); pointer-events: none; }
 
-/* Fullscreen has no room outside the table, so the HUD floats back over it —
-   same on a wide screen, where it no longer sits under the thumb. */
-.game-page.gf-full .bi-topbar { position: absolute; top: 10px; left: 10px; right: 10px; width: auto; margin: 0; z-index: 3; pointer-events: none; }
+/* Fullscreen: keep the HUD (level/score info + controls) as a bar ABOVE the table, in flow,
+   so it never sits over the play surface; the canvas fills the space below it. */
+.game-page.gf-full .bi-topbar { width: 100%; margin: 0 0 6px; z-index: 3; }
+/* Wide WINDOWED screens have room around the 16/10 table, so the HUD floats over the corners. */
 @media (min-width: 50em) {
   .bi-topbar { position: absolute; top: 10px; left: 10px; right: 10px; width: auto; margin: 0; z-index: 3; pointer-events: none; }
 }

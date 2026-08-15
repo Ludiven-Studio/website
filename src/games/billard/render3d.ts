@@ -11,10 +11,9 @@ export const CUE_COLOR = 0xf4f4f2;
 export const BALL_COLORS = [0xe6566f, 0xf0a830, 0x5b8def, 0x2f9e6f, 0x9b6cf0, 0x20c4c0];
 
 const FELT = 0x0f7a52;
-const FELT_DARK = 0x0c6644;
 const WOOD = 0x5a3722;
 const WOOD_DARK = 0x3a2416;
-const RAIL_W = 5; // rail width outward from the cushion line
+const BORDER = 13; // wooden frame width around the felt (holds the pocket mouths)
 const RAIL_H = 2 * BALL_R; // rail top above the felt
 const BODY_H = 9; // table body thickness under the felt
 const LEG_H = 32; // legs raise the table off the floor
@@ -61,9 +60,10 @@ export function buildTable3D(table: Table): Table3D {
 	floor.receiveShadow = true;
 	grp.add(floor);
 
-	// Table body: a wood block just under the felt, a touch wider so a frame shows around it.
+	// Table body: a wood block just under the felt, matching the frame footprint.
+	const foX = hw + BORDER, foZ = hh + BORDER;
 	const bodyMat = keep(new THREE.MeshStandardMaterial({ color: WOOD_DARK, roughness: 0.7 }));
-	const bodyHalfX = hw + RAIL_W + 1.5, bodyHalfZ = hh + RAIL_W + 1.5;
+	const bodyHalfX = foX - 2, bodyHalfZ = foZ - 2; // inset so the rounded frame hides its sharp corners
 	const bodyGeo = keep(new THREE.BoxGeometry(bodyHalfX * 2, BODY_H, bodyHalfZ * 2));
 	const body = new THREE.Mesh(bodyGeo, bodyMat);
 	body.position.y = -BODY_H / 2 - 0.1;
@@ -82,71 +82,80 @@ export function buildTable3D(table: Table): Table3D {
 		grp.add(leg);
 	}
 
-	// Felt bed.
+	// Felt bed — covers the whole footprint so green shows through the pocket mouths cut into the
+	// frame. The wood frame on top hides the border, leaving the playfield + the pocket openings.
 	const feltMat = new THREE.MeshStandardMaterial({ color: FELT, roughness: 0.95, metalness: 0 });
-	const feltGeo = keep(new THREE.PlaneGeometry(w, h));
+	const feltGeo = keep(new THREE.PlaneGeometry(2 * foX, 2 * foZ));
 	const felt = new THREE.Mesh(feltGeo, feltMat);
 	felt.rotation.x = -Math.PI / 2;
+	felt.position.y = 0.01;
 	felt.receiveShadow = true;
 	grp.add(felt);
 
-	const railMat = keep(new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.5, metalness: 0.05 }));
-	const cushMat = keep(new THREE.MeshStandardMaterial({ color: FELT_DARK, roughness: 0.95 }));
-
-	const gap = table.pockets[0].r + 2; // clearance each side of a pocket → the mouths stay open on top
-	const CUSH_H = RAIL_H * 0.62, CUSH_W = 1.8;
-
-	// A rail segment: wood bar + a green cushion on its inner face. Split around the pockets so
-	// the mouths stay OPEN and visible from above; the cushion nose is flush with the table edge
-	// (where the engine bounces the ball).
-	const addRail = (axis: 'x' | 'z', a: number, b: number, edge: number, inward: 1 | -1) => {
-		const len = b - a;
-		if (len <= 0.5) return;
-		const mid = (a + b) / 2;
-		const railCz = edge - inward * RAIL_W / 2;
-		const cushCz = edge - inward * CUSH_W / 2;
-		if (axis === 'x') {
-			const rail = new THREE.Mesh(keep(new THREE.BoxGeometry(len, RAIL_H, RAIL_W)), railMat);
-			rail.position.set(mid, RAIL_H / 2, railCz); rail.castShadow = true; rail.receiveShadow = true; grp.add(rail);
-			const cush = new THREE.Mesh(keep(new THREE.BoxGeometry(len, CUSH_H, CUSH_W)), cushMat);
-			cush.position.set(mid, CUSH_H / 2, cushCz); cush.receiveShadow = true; grp.add(cush);
-		} else {
-			const rail = new THREE.Mesh(keep(new THREE.BoxGeometry(RAIL_W, RAIL_H, len)), railMat);
-			rail.position.set(railCz, RAIL_H / 2, mid); rail.castShadow = true; rail.receiveShadow = true; grp.add(rail);
-			const cush = new THREE.Mesh(keep(new THREE.BoxGeometry(CUSH_W, CUSH_H, len)), cushMat);
-			cush.position.set(cushCz, CUSH_H / 2, mid); cush.receiveShadow = true; grp.add(cush);
-		}
+	// Continuous wooden frame, EXTRUDED from a shape whose inner contour is scalloped at each
+	// pocket — the frame stays continuous (real corners) while the six mouths are truly cut out
+	// and open on top. Rounded outer corners for a softer, prettier rail.
+	const Rc = 8, Rm = 6.5; // corner / middle pocket opening radii
+	const contour: THREE.Vector2[] = [];
+	const arc = (cx: number, cz: number, r: number, a0: number, a1: number) => {
+		const N = 16;
+		for (let i = 0; i <= N; i++) { const a = a0 + (a1 - a0) * (i / N); contour.push(new THREE.Vector2(cx + r * Math.cos(a), cz + r * Math.sin(a))); }
 	};
-	addRail('x', -hw + gap, -gap, -hh, +1);
-	addRail('x', gap, hw - gap, -hh, +1);
-	addRail('x', -hw + gap, -gap, hh, -1);
-	addRail('x', gap, hw - gap, hh, -1);
-	addRail('z', -hh + gap, hh - gap, -hw, +1);
-	addRail('z', -hh + gap, hh - gap, hw, -1);
+	arc(-hw, -hh, Rc, Math.PI / 2, 2 * Math.PI);   // top-left (270° outward bulge)
+	arc(0, -hh, Rm, Math.PI, 2 * Math.PI);         // top-middle (180°)
+	arc(hw, -hh, Rc, Math.PI, 2.5 * Math.PI);      // top-right
+	arc(hw, hh, Rc, 1.5 * Math.PI, 3 * Math.PI);   // bottom-right
+	arc(0, hh, Rm, 0, Math.PI);                    // bottom-middle
+	arc(-hw, hh, Rc, 0, 1.5 * Math.PI);            // bottom-left
+	contour.reverse(); // wind opposite to the CCW outer outline so it reads as a hole
 
-	// Fill the wood BEHIND each pocket so the corner reads as a real corner, not an open notch,
-	// while the mouth still opens toward the felt and stays visible from the top. Corner pockets
-	// get a diagonal "jaw"; the middle pockets get a straight block behind the rail gap.
+	const OR = 16; // outer corner radius (generous, to soften the boxy look)
+	const outline = new THREE.Shape();
+	outline.moveTo(-foX + OR, -foZ);
+	outline.lineTo(foX - OR, -foZ);
+	outline.quadraticCurveTo(foX, -foZ, foX, -foZ + OR);
+	outline.lineTo(foX, foZ - OR);
+	outline.quadraticCurveTo(foX, foZ, foX - OR, foZ);
+	outline.lineTo(-foX + OR, foZ);
+	outline.quadraticCurveTo(-foX, foZ, -foX, foZ - OR);
+	outline.lineTo(-foX, -foZ + OR);
+	outline.quadraticCurveTo(-foX, -foZ, -foX + OR, -foZ);
+	outline.holes.push(new THREE.Path(contour));
+
+	const railMat = keep(new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.5, metalness: 0.05 }));
+	// A bevel rounds the top edge of the rail and flares the pocket mouths — softens the boxy look.
+	const frameGeo = keep(new THREE.ExtrudeGeometry(outline, {
+		depth: RAIL_H - 1.4, bevelEnabled: true, bevelThickness: 1.4, bevelSize: 1.4, bevelSegments: 3, curveSegments: 10,
+	}));
+	frameGeo.rotateX(-Math.PI / 2); // shape XY plane → lie flat, extruded up along +Y
+	const frame = new THREE.Mesh(frameGeo, railMat);
+	frame.castShadow = true; frame.receiveShadow = true;
+	grp.add(frame);
+
+	// Pockets: black mouth flush with the felt (visible from the top) + a sunk cylinder for depth.
+	const holeMat = keep(new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 1, side: THREE.DoubleSide }));
 	for (const p of table.pockets) {
-		const px = p.x - hw, pz = p.y - hh;
-		if (Math.abs(px) < hw * 0.5) { // middle pocket on a long rail
-			const sz = Math.sign(pz) || 1;
-			const blk = new THREE.Mesh(keep(new THREE.BoxGeometry(2 * gap, RAIL_H, RAIL_W)), railMat);
-			blk.position.set(0, RAIL_H / 2, sz * (hh + RAIL_W / 2));
-			blk.castShadow = true; blk.receiveShadow = true; grp.add(blk);
-		} else {
-			const sx = Math.sign(px) || 1, sz = Math.sign(pz) || 1;
-			const off = p.r * 0.7 + RAIL_W * 0.5;
-			const jaw = new THREE.Mesh(keep(new THREE.BoxGeometry(2 * gap + RAIL_W, RAIL_H, RAIL_W)), railMat);
-			jaw.position.set(px + sx * off, RAIL_H / 2, pz + sz * off);
-			jaw.rotation.y = (sx * sz > 0 ? 1 : -1) * Math.PI / 4;
-			jaw.castShadow = true; jaw.receiveShadow = true; grp.add(jaw);
-		}
+		// Sit the black on the ANCHOR (true corner/edge point), where the frame cuts the mouth —
+		// the engine's pocket centre is nudged inward, which left the hole off from the notch.
+		const px = p.anchor.x - hw, pz = p.anchor.y - hh;
+		const R = (Math.abs(px) < hw * 0.5 ? Rm : Rc) * 0.9; // black fills most of the mouth opening
+		const wall = new THREE.Mesh(keep(new THREE.CylinderGeometry(R, R * 0.7, POCKET_D, 24, 1, true)), holeMat);
+		wall.position.set(px, -POCKET_D / 2 + 0.1, pz);
+		grp.add(wall);
+		const floorDisc = new THREE.Mesh(keep(new THREE.CircleGeometry(R * 0.7, 24)), holeMat);
+		floorDisc.rotation.x = -Math.PI / 2;
+		floorDisc.position.set(px, -POCKET_D + 0.2, pz);
+		grp.add(floorDisc);
+		const mouth = new THREE.Mesh(keep(new THREE.CircleGeometry(R, 24)), holeMat);
+		mouth.rotation.x = -Math.PI / 2;
+		mouth.position.set(px, 0.05, pz);
+		grp.add(mouth);
 	}
 
-	// Diamond sights on the rail tops — the classic little markers, for looks.
+	// Diamond sights on the rail top — the classic little markers, for looks.
 	const diaMat = keep(new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.5 }));
 	const diaGeo = keep(new THREE.CircleGeometry(1.3, 4));
+	const dOff = BORDER * 0.5;
 	const diamond = (x: number, z: number) => {
 		const d = new THREE.Mesh(diaGeo, diaMat);
 		d.rotation.x = -Math.PI / 2; d.rotation.z = Math.PI / 4;
@@ -154,29 +163,12 @@ export function buildTable3D(table: Table): Table3D {
 		grp.add(d);
 	};
 	for (const fr of [0.28, 0.5, 0.72]) {
-		diamond(-hw * fr, -hh - RAIL_W / 2); diamond(hw * fr, -hh - RAIL_W / 2);
-		diamond(-hw * fr, hh + RAIL_W / 2); diamond(hw * fr, hh + RAIL_W / 2);
+		diamond(-hw * fr, -hh - dOff); diamond(hw * fr, -hh - dOff);
+		diamond(-hw * fr, hh + dOff); diamond(hw * fr, hh + dOff);
 	}
 	for (const fr of [0.5]) {
-		diamond(-hw - RAIL_W / 2, -hh * fr); diamond(-hw - RAIL_W / 2, hh * fr);
-		diamond(hw + RAIL_W / 2, -hh * fr); diamond(hw + RAIL_W / 2, hh * fr);
-	}
-
-	// Pockets: a dark sunk cylinder + a dark mouth ring flush with the felt.
-	const holeMat = keep(new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 1, side: THREE.DoubleSide }));
-	for (const p of table.pockets) {
-		const px = p.x - hw, pz = p.y - hh;
-		const wall = new THREE.Mesh(keep(new THREE.CylinderGeometry(p.r, p.r * 0.7, POCKET_D, 24, 1, true)), holeMat);
-		wall.position.set(px, -POCKET_D / 2 + 0.1, pz);
-		grp.add(wall);
-		const floorDisc = new THREE.Mesh(keep(new THREE.CircleGeometry(p.r * 0.7, 24)), holeMat);
-		floorDisc.rotation.x = -Math.PI / 2;
-		floorDisc.position.set(px, -POCKET_D + 0.2, pz);
-		grp.add(floorDisc);
-		const mouth = new THREE.Mesh(keep(new THREE.CircleGeometry(p.r, 24)), holeMat);
-		mouth.rotation.x = -Math.PI / 2;
-		mouth.position.set(px, 0.06, pz);
-		grp.add(mouth);
+		diamond(-hw - dOff, -hh * fr); diamond(-hw - dOff, hh * fr);
+		diamond(hw + dOff, -hh * fr); diamond(hw + dOff, hh * fr);
 	}
 
 	return {
