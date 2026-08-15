@@ -71,6 +71,7 @@ interface Scene3D {
 	ballMeshes: THREE.Mesh[]; // index-aligned with ballsRef.current
 	aimLine: THREE.Line;
 	objLine: THREE.Line;
+	cueLine: THREE.Line;
 	pullLine: THREE.Line;
 	contact: THREE.Mesh;
 }
@@ -201,7 +202,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			return l;
 		};
 		const aimLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, depthWrite: false }));
-		const objLine = mkLine(new THREE.LineBasicMaterial({ color: 0xdfe7ff, transparent: true, opacity: 0.85, depthWrite: false }));
+		const objLine = mkLine(new THREE.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95, depthWrite: false })); // struck ball's path (amber)
+		const cueLine = mkLine(new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 2.5, gapSize: 2, transparent: true, opacity: 0.85, depthWrite: false })); // cue's own deflection (white)
 		const pullLine = mkLine(new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false }));
 		const contact = new THREE.Mesh(
 			new THREE.RingGeometry(BALL_R * 0.9, BALL_R * 1.25, 24),
@@ -210,7 +212,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		contact.rotation.x = -Math.PI / 2; contact.visible = false; contact.renderOrder = 11;
 		scene.add(contact);
 
-		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, pullLine, contact };
+		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, pullLine, contact };
 		return true;
 	}, []);
 
@@ -611,11 +613,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const aim = aimRef.current;
 		const cue = balls.find((b) => b.kind === 'cue');
 		const showAim = aim && cue && statusRef.current === 'aiming' && Math.hypot(aim.pull.x, aim.pull.y) > 0.5;
-		g.aimLine.visible = g.objLine.visible = g.pullLine.visible = g.contact.visible = false;
+		g.aimLine.visible = g.objLine.visible = g.cueLine.visible = g.pullLine.visible = g.contact.visible = false;
 		if (showAim && aim && cue) {
-			const m = Math.hypot(aim.pull.x, aim.pull.y) || 1;
-			const dir = { x: -aim.pull.x / m, y: -aim.pull.y / m };
-			const pred = predictCue(balls, t, { x: cue.x, y: cue.y }, dir);
+			const pred = predictCue(balls, t, aim.pull);
 			const Y = 0.5;
 			const pts: THREE.Vector3[] = [];
 			for (let s = 0; s < pred.segs.length; s++) {
@@ -638,6 +638,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					new THREE.Vector3(pred.object.to.x - hw, Y, pred.object.to.y - hh),
 				]);
 				g.objLine.visible = true;
+			}
+			if (pred.cueAfter) {
+				g.cueLine.geometry.setFromPoints([
+					new THREE.Vector3(pred.cueAfter.from.x - hw, Y, pred.cueAfter.from.y - hh),
+					new THREE.Vector3(pred.cueAfter.to.x - hw, Y, pred.cueAfter.to.y - hh),
+				]);
+				g.cueLine.computeLineDistances();
+				g.cueLine.visible = true;
 			}
 			// Pull marker: from the cue back along the drag, showing how hard the shot is.
 			g.pullLine.geometry.setFromPoints([

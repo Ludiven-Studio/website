@@ -5,7 +5,7 @@
  * z = ey - h/2); the felt sits at world y = 0 and a ball's centre at y = BALL_R.
  */
 import * as THREE from 'three';
-import { BALL_R, type Table, type Ball, type Vec } from './engine';
+import { BALL_R, aimToVelocity, stepBalls, type Table, type Ball, type Vec } from './engine';
 
 export const CUE_COLOR = 0xf4f4f2;
 export const BALL_COLORS = [0xe6566f, 0xf0a830, 0x5b8def, 0x2f9e6f, 0x9b6cf0, 0x20c4c0];
@@ -216,81 +216,64 @@ export function bestAz(cam: THREE.PerspectiveCamera, hx: number, hz: number, bas
 	return best;
 }
 
-/* ---------- Aim prediction (in engine space) ---------- */
+/* ---------- Aim prediction (simulated with the real engine, in engine space) ---------- */
 
 export interface AimPrediction {
-	segs: { from: Vec; to: Vec }[]; // cue-ball path (with cushion bounces), engine coords
+	segs: { from: Vec; to: Vec }[]; // cue-ball path (real bounces), engine coords
 	contact: Vec | null; // where the cue first meets a ball
-	object: { from: Vec; to: Vec } | null; // that ball's launch direction (short guide)
-	pocket: boolean; // the cue line ends in a pocket mouth
+	object: { from: Vec; to: Vec } | null; // that ball's resulting direction
+	cueAfter: { from: Vec; to: Vec } | null; // the cue ball's OWN direction after the contact
+	pocket: boolean; // the cue drops into a pocket
 }
 
-const dot = (ax: number, ay: number, bx: number, by: number) => ax * bx + ay * by;
-
-/** Nearest positive t where a ray hits a circle of radius `rad` centred at c. */
-function rayCircle(px: number, py: number, dx: number, dy: number, cx: number, cy: number, rad: number): number {
-	const ox = px - cx, oy = py - cy;
-	const b = dot(ox, oy, dx, dy);
-	const c = ox * ox + oy * oy - rad * rad;
-	const disc = b * b - c;
-	if (disc < 0) return Infinity;
-	const s = Math.sqrt(disc);
-	const t1 = -b - s;
-	if (t1 > 1e-4) return t1;
-	const t2 = -b + s;
-	return t2 > 1e-4 ? t2 : Infinity;
-}
+const AIM_SETTLE = 2.4; // engine's at-rest speed
+const AIM_MAX_STEPS = 600; // ~10 s at 60 Hz — the cue always stops or hits well before this
 
 /**
- * Trace the cue ball from its centre along a unit shot direction: straight until it meets
- * another ball, bouncing off the cushion rectangle up to a couple of times. Purely
- * geometric (no engine step) — an aim aid, not a simulation of the whole shot.
+ * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone:
+ * exact cushion bounces (including the pocket-mouth gaps) and a length limited by friction, so
+ * the guide matches what actually happens. The line stops at the first ball the cue meets; we
+ * also return that ball's launch direction and the cue's own deflected direction — after a
+ * contact the white ball never keeps going straight.
  */
-export function predictCue(balls: Ball[], table: Table, cue: Vec, dir: Vec): AimPrediction {
-	const { w, h } = table;
-	const lo = BALL_R, hiX = w - BALL_R, hiY = h - BALL_R; // cue-centre bounds
-	const others = balls.filter((b) => b.kind !== 'cue' && !b.potted);
-	const segs: { from: Vec; to: Vec }[] = [];
-	let px = cue.x, py = cue.y, dx = dir.x, dy = dir.y;
+export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPrediction {
+	const empty: AimPrediction = { segs: [], contact: null, object: null, cueAfter: null, pocket: false };
+	const vel = aimToVelocity(pull);
+	if (!vel) return empty;
+	// Clone so the simulation never touches the live balls.
+	const sim: Ball[] = balls.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, r: b.r, kind: b.kind, color: b.color, potted: b.potted }));
+	const cue = sim.find((b) => b.kind === 'cue');
+	if (!cue) return empty;
+	cue.vx = vel.vx; cue.vy = vel.vy;
+
+	const pts: Vec[] = [{ x: cue.x, y: cue.y }];
+	let dx = vel.vx, dy = vel.vy; { const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l; }
 	let contact: Vec | null = null;
-	let object: { from: Vec; to: Vec } | null = null;
+	let object: AimPrediction['object'] = null;
+	let cueAfter: AimPrediction['cueAfter'] = null;
 	let pocket = false;
-	let budget = 260; // total path length drawn
 
-	for (let bounce = 0; bounce < 3 && budget > 1; bounce++) {
-		// First ball hit along this segment.
-		let tBall = Infinity, hit: Ball | null = null;
-		for (const b of others) {
-			const t = rayCircle(px, py, dx, dy, b.x, b.y, 2 * BALL_R);
-			if (t < tBall) { tBall = t; hit = b; }
-		}
-		// Cushion (rectangle) crossing along this segment.
-		let tWall = Infinity, nx = 0, ny = 0;
-		if (dx > 1e-6) { const t = (hiX - px) / dx; if (t < tWall) { tWall = t; nx = -1; ny = 0; } }
-		else if (dx < -1e-6) { const t = (lo - px) / dx; if (t < tWall) { tWall = t; nx = 1; ny = 0; } }
-		if (dy > 1e-6) { const t = (hiY - py) / dy; if (t < tWall) { tWall = t; nx = 0; ny = -1; } }
-		else if (dy < -1e-6) { const t = (lo - py) / dy; if (t < tWall) { tWall = t; nx = 0; ny = 1; } }
-
-		const t = Math.min(tBall, tWall, budget);
-		const ex = px + dx * t, ey = py + dy * t;
-		segs.push({ from: { x: px, y: py }, to: { x: ex, y: ey } });
-		budget -= t;
-
-		if (tBall <= tWall && hit && t < budget + t) {
-			// Meets a ball: mark contact and the object ball's launch line, then stop.
-			contact = { x: ex, y: ey };
-			const ox = hit.x - ex, oy = hit.y - ey;
-			const ol = Math.hypot(ox, oy) || 1;
-			object = { from: { x: hit.x, y: hit.y }, to: { x: hit.x + (ox / ol) * 16, y: hit.y + (oy / ol) * 16 } };
+	for (let s = 0; s < AIM_MAX_STEPS; s++) {
+		stepBalls(sim, table, 1 / 60);
+		// First contact: an object ball has been set moving (only the cue moved until now).
+		const hit = sim.find((b) => b.kind !== 'cue' && !b.potted && (b.vx !== 0 || b.vy !== 0));
+		if (hit) {
+			contact = { x: cue.x, y: cue.y };
+			const ol = Math.hypot(hit.vx, hit.vy) || 1;
+			object = { from: { x: hit.x, y: hit.y }, to: { x: hit.x + (hit.vx / ol) * 22, y: hit.y + (hit.vy / ol) * 22 } };
+			const cl = Math.hypot(cue.vx, cue.vy);
+			if (cl > AIM_SETTLE) cueAfter = { from: { x: cue.x, y: cue.y }, to: { x: cue.x + (cue.vx / cl) * 18, y: cue.y + (cue.vy / cl) * 18 } };
 			break;
 		}
-		if (!Number.isFinite(tWall)) break;
-		// Cushion: a mouth crossing drops the ball (pocket); otherwise reflect and continue.
-		const nearPocket = table.pockets.some((p) => Math.hypot(ex - p.anchor.x, ey - p.anchor.y) < p.r + BALL_R);
-		if (nearPocket) { pocket = true; break; }
-		if (nx !== 0) dx = -dx;
-		if (ny !== 0) dy = -dy;
-		px = ex; py = ey;
+		if (cue.potted) { pocket = true; pts.push({ x: cue.x, y: cue.y }); break; }
+		const sp = Math.hypot(cue.vx, cue.vy);
+		if (sp < AIM_SETTLE) { pts.push({ x: cue.x, y: cue.y }); break; }
+		// Record a corner only where the cue changes heading (a cushion bounce).
+		const ndx = cue.vx / sp, ndy = cue.vy / sp;
+		if (ndx * dx + ndy * dy < 0.9995) { pts.push({ x: cue.x, y: cue.y }); dx = ndx; dy = ndy; }
 	}
-	return { segs, contact, object, pocket };
+	if (contact) pts.push(contact);
+	const segs: { from: Vec; to: Vec }[] = [];
+	for (let i = 1; i < pts.length; i++) segs.push({ from: pts[i - 1], to: pts[i] });
+	return { segs, contact, object, cueAfter, pocket };
 }
