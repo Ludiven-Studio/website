@@ -83,6 +83,7 @@ interface Scene3D {
 	cueLine: THREE.Line;
 	pullLine: THREE.Line;
 	contact: THREE.Mesh;
+	placeRing: THREE.Mesh; // pulsing ring around the cue during ball-in-hand
 }
 
 export default function BillardGame({ gameId }: { gameId: string }) {
@@ -247,7 +248,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		contact.rotation.x = -Math.PI / 2; contact.visible = false; contact.renderOrder = 11;
 		scene.add(contact);
 
-		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, pullLine, contact };
+		// Ball-in-hand marker: a bright ring that pulses around the cue while the human places it.
+		const placeRing = new THREE.Mesh(
+			new THREE.RingGeometry(BALL_R * 1.35, BALL_R * 1.95, 32),
+			new THREE.MeshBasicMaterial({ color: 0x30d158, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }),
+		);
+		placeRing.rotation.x = -Math.PI / 2; placeRing.visible = false; placeRing.renderOrder = 12;
+		scene.add(placeRing);
+
+		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, pullLine, contact, placeRing };
 		return true;
 	}, []);
 
@@ -873,6 +882,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			g.pullLine.visible = true;
 		}
 
+		// Ball-in-hand: pulse a ring around the cue so it's obvious the player must place it.
+		const placing = placingRef.current && cue && !cue.potted;
+		g.placeRing.visible = !!placing;
+		if (placing && cue) {
+			const s = 1 + 0.14 * Math.sin(now * 0.006);
+			g.placeRing.position.set(cue.x - hw, 0.4, cue.y - hh);
+			g.placeRing.scale.set(s, s, s);
+		}
+
 		// Camera pose for the current mode, then eased toward it.
 		const mode = camModeRef.current, f = fitRef.current;
 		const zoom = Math.max(1, zoomRef.current);
@@ -994,6 +1012,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const dailyMode = daily && !lv.active;
 	const triesLeft = MAX_TRIES - tries;
 	const myIdx = mpPhase === 'playing' ? mpPlayer : HUMAN; // whose winner state means "me"
+	const oppLabel = mpPhase === 'playing' ? `👤 ${mpOpp || 'Adversaire'}`
+		: lv.active ? `🤖 IA ${Math.round(billardLevels.config(lv.level).skill * 100)}%`
+		: `🤖 IA ${Math.round((AI_SKILL[diffKey] ?? 0.6) * 100)}%`;
+	const myTurn = !!match8 && match8.winner == null && match8.turn === myIdx;
+	const oppTurn = !!match8 && match8.winner == null && match8.turn !== myIdx;
 	const exhausted = dailyMode && triesLeft <= 0;
 	// 8-ball = everything except Défi (daily). Libre + Niveaux are 8-ball.
 	const is8 = !daily;
@@ -1059,6 +1082,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 							>↻</button>
 						)}
 					</div>
+					{is8 && match8 && (
+						<div className="bi-vs">
+							<span className={`bi-vs-p ${myTurn ? 'on' : ''}`}>😎 Toi</span>
+							<span className="bi-vs-mid">{match8.winner != null ? '🏁' : 'vs'}</span>
+							<span className={`bi-vs-p ${oppTurn ? 'on' : ''}`}>{oppLabel}</span>
+						</div>
+					)}
 				</div>
 				{dailyMode && (
 					<div className="bi-daily-tag bi-daily-hud">
@@ -1094,7 +1124,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				)}
 
 				{scratchFlash && <div className="bi-scratch">{is8 ? (match8?.lastFoul ?? 'Faute') : 'Pénalité · +1 coup'}</div>}
-				{is8 && placing && <div className="bi-scratch bi-place">Bille en main — glisse pour placer la blanche</div>}
+				{is8 && placing && (
+					<div className="bi-place">
+						<span className="bi-place-icon">✋</span>
+						<span className="bi-place-title">Bille en main — à toi de placer la blanche</span>
+						<span className="bi-place-sub">Glisse la boule blanche sur le tapis, puis relâche pour viser</span>
+					</div>
+				)}
 
 				{/* Arcade win card (Défi only; free mode is 8-ball). */}
 				{status === 'won' && daily && (
@@ -1230,7 +1266,11 @@ const CSS = `
 .bi-act:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
-.bi-place { top: auto; bottom: 14px; background: var(--bi-accent); }
+.bi-place { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; max-width: 92%; padding: 10px 18px; border-radius: 16px; background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(30,150,60,0.96)); color: #fff; box-shadow: var(--shadow-lg); animation: bi-place-pop 1.6s ease-in-out infinite; }
+.bi-place-icon { font-size: 20px; line-height: 1; }
+.bi-place-title { font-weight: 800; font-size: 14px; }
+.bi-place-sub { font-weight: 600; font-size: 12px; opacity: 0.92; }
+@keyframes bi-place-pop { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.04); } }
 
 .bi-mp { min-width: 240px; gap: 10px; }
 .bi-mp-title { font-family: var(--font-brand); font-weight: 700; font-size: 17px; }
@@ -1238,6 +1278,11 @@ const CSS = `
 .bi-mp-join input { flex: 1; min-width: 0; text-align: center; letter-spacing: 3px; text-transform: uppercase; font: inherit; font-weight: 700; border-radius: 999px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); padding: 8px 10px; }
 .bi-mp-code { font-size: 15px; color: var(--gray-100); }
 .bi-mp-code strong { font-size: 22px; letter-spacing: 4px; color: var(--bi-accent); }
+
+.bi-vs { display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 2px; pointer-events: none; flex-wrap: wrap; }
+.bi-vs-p { background: rgba(20,14,10,0.6); color: #e8ddcf; font-weight: 700; font-size: 13px; padding: 5px 13px; border-radius: 999px; backdrop-filter: blur(4px); border: 1.5px solid transparent; box-shadow: 0 1px 3px rgba(0,0,0,0.35); transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition); }
+.bi-vs-p.on { background: var(--bi-accent); color: var(--accent-text-over); border-color: var(--bi-accent); box-shadow: 0 0 12px color-mix(in srgb, var(--bi-accent) 70%, transparent); }
+.bi-vs-mid { color: #d8cbb8; font-size: 11px; font-weight: 700; opacity: 0.75; }
 
 .bi-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .bi-overlay-card { background: var(--gray-999); border: 2px solid var(--bi-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }

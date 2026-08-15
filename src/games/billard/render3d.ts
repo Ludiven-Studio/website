@@ -5,7 +5,7 @@
  * z = ey - h/2); the felt sits at world y = 0 and a ball's centre at y = BALL_R.
  */
 import * as THREE from 'three';
-import { BALL_R, aimToVelocity, stepBalls, type Table, type Ball, type Vec } from './engine';
+import { BALL_R, stepBalls, type Table, type Ball, type Vec } from './engine';
 
 export const CUE_COLOR = 0xf4f4f2;
 export const BALL_COLORS = [0xe6566f, 0xf0a830, 0x5b8def, 0x2f9e6f, 0x9b6cf0, 0x20c4c0];
@@ -275,25 +275,28 @@ export interface AimPrediction {
 const AIM_SETTLE = 2.4; // engine's at-rest speed
 const AIM_MAX_STEPS = 600; // ~10 s at 60 Hz — the cue always stops or hits well before this
 
+const GUIDE_SPEED = 135; // fixed reference speed for the aim line — DIRECTION guide, not power-scaled
+
 /**
  * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone:
- * exact cushion bounces (including the pocket-mouth gaps) and a length limited by friction, so
- * the guide matches what actually happens. The line stops at the first ball the cue meets; we
- * also return that ball's launch direction and the cue's own deflected direction — after a
- * contact the white ball never keeps going straight.
+ * exact cushion bounces (including the pocket-mouth gaps). The guide is a DIRECTION aid, so it
+ * runs at a fixed reference speed (not the actual pull) — otherwise a soft aim shrinks it to a
+ * useless stub. The line stops at the first ball the cue meets; contact geometry (object launch
+ * + cue deflection directions) is power-independent, so it stays correct. Power is shown by the
+ * line colour + the pull marker instead.
  */
 export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPrediction {
 	const empty: AimPrediction = { segs: [], contact: null, object: null, cueAfter: null, pocket: false };
-	const vel = aimToVelocity(pull);
-	if (!vel) return empty;
+	const m = Math.hypot(pull.x, pull.y);
+	if (m < 3) return empty; // below MIN_PULL the shot does nothing → no guide
 	// Clone so the simulation never touches the live balls.
 	const sim: Ball[] = balls.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, r: b.r, kind: b.kind, color: b.color, potted: b.potted }));
 	const cue = sim.find((b) => b.kind === 'cue');
 	if (!cue) return empty;
-	cue.vx = vel.vx; cue.vy = vel.vy;
+	let dx = -pull.x / m, dy = -pull.y / m; // shot direction (opposite the pull)
+	cue.vx = dx * GUIDE_SPEED; cue.vy = dy * GUIDE_SPEED;
 
 	const pts: Vec[] = [{ x: cue.x, y: cue.y }];
-	let dx = vel.vx, dy = vel.vy; { const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l; }
 	let contact: Vec | null = null;
 	let object: AimPrediction['object'] = null;
 	let cueAfter: AimPrediction['cueAfter'] = null;
