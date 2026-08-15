@@ -410,8 +410,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const wpp = (2 * lastDistRef.current * Math.tan((g.camera.fov * Math.PI / 180) / 2)) / H;
 		const right = new THREE.Vector3().setFromMatrixColumn(g.camera.matrixWorld, 0); right.y = 0; right.normalize();
 		const fwd = new THREE.Vector3(); g.camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
-		panRef.current.x = startPanX - dxPx * wpp * right.x - dyPx * wpp * fwd.x;
-		panRef.current.z = startPanZ - dxPx * wpp * right.z - dyPx * wpp * fwd.z;
+		// Drag down (dy > 0) should pull the table down-screen, i.e. move the target along +fwd.
+		panRef.current.x = startPanX - dxPx * wpp * right.x + dyPx * wpp * fwd.x;
+		panRef.current.z = startPanZ - dxPx * wpp * right.z + dyPx * wpp * fwd.z;
 	}, []);
 
 	/* ---------- One finger: aim from the cue (slingshot) or pan the view; two fingers: zoom + turn. ---------- */
