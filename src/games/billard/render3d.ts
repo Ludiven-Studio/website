@@ -128,12 +128,34 @@ export function buildTable3D(table: Table): Table3D {
 		grp.add(leg);
 	}
 
-	// Felt bed — covers the whole footprint so green shows through the pocket mouths cut into the
-	// frame. The wood frame on top hides the border, leaving the playfield + the pocket openings.
+	// Rounded outer outline shared by the felt bed and the wood frame — its rounded corners are why
+	// the felt no longer pokes out past the wood at the four corners (a plain rectangle did).
+	const OR = 16; // outer corner radius (generous, to soften the boxy look)
+	const buildOuter = (): THREE.Shape => {
+		const s = new THREE.Shape();
+		s.moveTo(-foX + OR, -foZ);
+		s.lineTo(foX - OR, -foZ);
+		s.quadraticCurveTo(foX, -foZ, foX, -foZ + OR);
+		s.lineTo(foX, foZ - OR);
+		s.quadraticCurveTo(foX, foZ, foX - OR, foZ);
+		s.lineTo(-foX + OR, foZ);
+		s.quadraticCurveTo(-foX, foZ, -foX, foZ - OR);
+		s.lineTo(-foX, -foZ + OR);
+		s.quadraticCurveTo(-foX, -foZ, -foX + OR, -foZ);
+		return s;
+	};
+
+	// Felt bed — the rounded footprint, so green shows through the pocket mouths cut into the frame
+	// but never past the frame's rounded outer corners. UVs normalised so the felt texture tiles.
 	const feltMat = new THREE.MeshStandardMaterial({ color: FELT, roughness: 0.95, metalness: 0 });
-	const feltGeo = keep(new THREE.PlaneGeometry(2 * foX, 2 * foZ));
+	const feltGeo = keep(new THREE.ShapeGeometry(buildOuter(), 12));
+	feltGeo.computeBoundingBox();
+	const fbb = feltGeo.boundingBox!;
+	const fpos = feltGeo.attributes.position, fuv = feltGeo.attributes.uv;
+	for (let i = 0; i < fuv.count; i++) fuv.setXY(i, (fpos.getX(i) - fbb.min.x) / (fbb.max.x - fbb.min.x), (fpos.getY(i) - fbb.min.y) / (fbb.max.y - fbb.min.y));
+	fuv.needsUpdate = true;
+	feltGeo.rotateX(-Math.PI / 2); // shape XY plane → lie flat, matching the frame's orientation
 	const felt = new THREE.Mesh(feltGeo, feltMat);
-	felt.rotation.x = -Math.PI / 2;
 	felt.position.y = 0.01;
 	felt.receiveShadow = true;
 	grp.add(felt);
@@ -155,17 +177,7 @@ export function buildTable3D(table: Table): Table3D {
 	arc(-hw, hh, Rc, 0, 1.5 * Math.PI);            // bottom-left
 	contour.reverse(); // wind opposite to the CCW outer outline so it reads as a hole
 
-	const OR = 16; // outer corner radius (generous, to soften the boxy look)
-	const outline = new THREE.Shape();
-	outline.moveTo(-foX + OR, -foZ);
-	outline.lineTo(foX - OR, -foZ);
-	outline.quadraticCurveTo(foX, -foZ, foX, -foZ + OR);
-	outline.lineTo(foX, foZ - OR);
-	outline.quadraticCurveTo(foX, foZ, foX - OR, foZ);
-	outline.lineTo(-foX + OR, foZ);
-	outline.quadraticCurveTo(-foX, foZ, -foX, foZ - OR);
-	outline.lineTo(-foX, -foZ + OR);
-	outline.quadraticCurveTo(-foX, -foZ, -foX + OR, -foZ);
+	const outline = buildOuter();
 	outline.holes.push(new THREE.Path(contour));
 
 	const railMat = keep(new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.5, metalness: 0.05 }));

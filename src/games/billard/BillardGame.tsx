@@ -48,6 +48,7 @@ const SHOULDER_DIST = 150;
 const D2R = Math.PI / 180;
 const MIN_PITCH = 14 * D2R, MAX_PITCH = 89 * D2R; // tilt limits for the two-finger vertical drag
 const PITCH_PER_PX = 0.005; // radians of tilt per pixel of two-finger vertical drag
+const ORBIT_PER_PX = 0.007; // radians of turn per pixel of right-button horizontal drag (PC)
 const CAM_TAU = 0.09; // camera catch-up time constant (s)
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🎱', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
@@ -729,9 +730,24 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		pitchRef.current = (nv === 'top' ? PITCH_TOP : PITCH_FIT) * D2R;
 	}, []);
 
-	// Single finger → aim/orbit (usePointerDrag). A pinch already owns the gesture via pinchRef.
+	// Right-button drag → orbit the view (turn azimuth + tilt pitch), like the two-finger twist on touch.
+	const orbitDragRef = useRef<{ x: number; y: number; az: number; pitch: number } | null>(null);
 	const onPointerDown = useCallback((e: React.PointerEvent) => {
 		if (pinchRef.current) return;
+		if (e.button === 2 || (e.button === 0 && e.altKey)) { // right-click (or Alt+left) rotates
+			e.preventDefault();
+			orbitDragRef.current = { x: e.clientX, y: e.clientY, az: azRef.current, pitch: pitchRef.current };
+			const onMove = (m: PointerEvent) => {
+				const o = orbitDragRef.current;
+				if (!o) return;
+				azRef.current = o.az - (m.clientX - o.x) * ORBIT_PER_PX;
+				pitchRef.current = Math.max(MIN_PITCH, Math.min(MAX_PITCH, o.pitch + (m.clientY - o.y) * PITCH_PER_PX));
+			};
+			const onUp = () => { orbitDragRef.current = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
+			window.addEventListener('pointermove', onMove);
+			window.addEventListener('pointerup', onUp);
+			return;
+		}
 		onAimPointerDown(e);
 	}, [onAimPointerDown]);
 
@@ -1115,6 +1131,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					ref={canvasRef}
 					className="bi-canvas"
 					onPointerDown={onPointerDown}
+					onContextMenu={(e) => e.preventDefault()}
 				/>
 
 				{webglError && (
