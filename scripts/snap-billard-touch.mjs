@@ -56,6 +56,16 @@ console.log('→ twist (rotate)');
 await touch('touchEnd', []);
 await sleep(400);
 
+// TILT: two fingers slide DOWN together (distance/angle kept) → tilt toward top-down.
+let ta = [400, 280], tb = [520, 280];
+await touch('touchStart', [ta, tb]);
+for (let i = 1; i <= 12; i++) { ta = [400, 280 + i * 12]; tb = [520, 280 + i * 12]; await touch('touchMove', [ta, tb]); await sleep(20); }
+await sleep(300);
+await page.screenshot({ path: resolve(`${OUT}/billard-touch-tilt.png`) });
+console.log('→ tilt');
+await touch('touchEnd', []);
+await sleep(400);
+
 // ZOOM: two fingers spreading apart → zoom in.
 let za = [420, 360], zb = [480, 360];
 await touch('touchStart', [za, zb]);

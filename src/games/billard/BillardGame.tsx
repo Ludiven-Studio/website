@@ -43,6 +43,9 @@ const FRAME_MARGIN = 16; // world units of felt framed around the table
 const ZOOM_MAX = 4;
 const PITCH_FIT = 46, PITCH_TOP = 88, SHOULDER_PITCH = 23;
 const SHOULDER_DIST = 150;
+const D2R = Math.PI / 180;
+const MIN_PITCH = 14 * D2R, MAX_PITCH = 89 * D2R; // tilt limits for the two-finger vertical drag
+const PITCH_PER_PX = 0.005; // radians of tilt per pixel of two-finger vertical drag
 const CAM_TAU = 0.09; // camera catch-up time constant (s)
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🎱', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
@@ -113,13 +116,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const camModeRef = useRef<CamMode>('fit');
 	const zoomRef = useRef(1);
 	const azRef = useRef(0);
+	const pitchRef = useRef(PITCH_FIT * D2R); // camera tilt for fit/top (two-finger vertical)
 	const fitRef = useRef({ hx: 120, hz: 70, base: 0, az: 0, azTop: 0 });
 	const panDragRef = useRef<{ x: number; y: number; panX: number; panZ: number } | null>(null); // one-finger pan
 	const panRef = useRef({ x: 0, z: 0 }); // fit/top look-target offset
 	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), on: false });
 	const lastFrameRef = useRef(0);
 	const lastDistRef = useRef(200); // camera→target distance, for the pan pixel→world scale
-	const pinchRef = useRef<{ dist: number; zoom: number; ang: number; az: number } | null>(null);
+	const pinchRef = useRef<{ dist: number; zoom: number; ang: number; az: number; cy: number; pitch: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
 
 	const { celebrating } = useCelebration(status === 'won');
@@ -254,6 +258,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		zoomRef.current = 1;
 		panRef.current = { x: 0, z: 0 };
 		azRef.current = fitRef.current.az;
+		pitchRef.current = PITCH_FIT * D2R;
 		camModeRef.current = 'fit';
 		setCamMode('fit');
 		camSmoothRef.current.on = false;
@@ -492,6 +497,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		zoomRef.current = 1;
 		panRef.current = { x: 0, z: 0 };
 		azRef.current = nv === 'top' ? fitRef.current.azTop : fitRef.current.az;
+		pitchRef.current = (nv === 'top' ? PITCH_TOP : PITCH_FIT) * D2R;
 	}, []);
 
 	// Single finger → aim/orbit (usePointerDrag). A pinch already owns the gesture via pinchRef.
@@ -511,12 +517,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const gesture = (t: TouchList) => ({
 			dist: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY),
 			ang: Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX),
+			cy: (t[0].clientY + t[1].clientY) / 2,
 		});
 		const onTouchStart = (e: TouchEvent) => {
 			if (e.touches.length < 2) return;
 			e.preventDefault();
 			const gg = gesture(e.touches);
-			pinchRef.current = { dist: gg.dist, zoom: zoomRef.current, ang: gg.ang, az: azRef.current };
+			pinchRef.current = { dist: gg.dist, zoom: zoomRef.current, ang: gg.ang, az: azRef.current, cy: gg.cy, pitch: pitchRef.current };
 			aimRef.current = null; panDragRef.current = null; powerRef.current = 0;
 		};
 		const onTouchMove = (e: TouchEvent) => {
@@ -524,12 +531,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			if (!p || e.touches.length < 2) return;
 			e.preventDefault();
 			const gg = gesture(e.touches);
-			// Spread → zoom; twist the two-finger line → turn the view (orbit the azimuth).
+			// Spread → zoom; twist the two-finger line → turn the view; slide both up/down → tilt.
 			if (gg.dist > 0) zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, p.zoom * (gg.dist / p.dist)));
 			let dAng = gg.ang - p.ang;
 			while (dAng > Math.PI) dAng -= 2 * Math.PI;
 			while (dAng < -Math.PI) dAng += 2 * Math.PI;
 			azRef.current = p.az - dAng;
+			// Slide the centroid down → tilt toward top-down; up → tilt toward the horizon.
+			pitchRef.current = Math.max(MIN_PITCH, Math.min(MAX_PITCH, p.pitch + (gg.cy - p.cy) * PITCH_PER_PX));
 		};
 		const onTouchEnd = (e: TouchEvent) => { if (e.touches.length < 2) pinchRef.current = null; };
 		cv.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -651,7 +660,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			camLook.set(cx + tx * 24, BALL_R + 3, cz + tz * 24);
 			lastDistRef.current = dist;
 		} else {
-			const pitch = ((mode === 'top' ? PITCH_TOP : PITCH_FIT) * Math.PI) / 180;
+			const pitch = pitchRef.current;
 			const az = azRef.current;
 			const d = fitDist(g.camera, f.hx, f.hz, pitch, az) / zoom;
 			const pan = panRef.current;
@@ -832,7 +841,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. La ligne montre la trajectoire prévue. 1 doigt ailleurs déplace la vue, 2 doigts pour zoomer et pivoter, 🎥 pour changer d'angle.
+				c'est puissant. La ligne montre la trajectoire prévue. 1 doigt ailleurs déplace la vue, 2 doigts pour zoomer, pivoter et incliner (haut/bas), 🎥 pour changer d'angle.
 				{lv.active ? ' Moins tu joues de coups, plus tu gagnes d\'étoiles.' : daily ? ` Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.` : ` Record : ${bestLabel}.`}
 			</p>
 
