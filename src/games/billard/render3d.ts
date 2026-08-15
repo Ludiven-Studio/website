@@ -301,8 +301,11 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 	const empty: AimPrediction = { segs: [], contact: null, object: null, cueAfter: null, pocket: false };
 	const m = Math.hypot(pull.x, pull.y);
 	if (m < 3) return empty; // below MIN_PULL the shot does nothing → no guide
-	// Clone so the simulation never touches the live balls.
-	const sim: Ball[] = balls.map((b) => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, r: b.r, kind: b.kind, color: b.color, potted: b.potted }));
+	// Clone at rest — the aim always simulates from a still table. Balls that settled keep a tiny
+	// residual velocity (below the engine's at-rest cutoff, never zeroed), which would otherwise
+	// count as "already moving" and fire the first-contact test on step 1, collapsing the guide to
+	// a stub at the cue. Only the cue is launched, below.
+	const sim: Ball[] = balls.map((b) => ({ x: b.x, y: b.y, vx: 0, vy: 0, r: b.r, kind: b.kind, color: b.color, potted: b.potted }));
 	const cue = sim.find((b) => b.kind === 'cue');
 	if (!cue) return empty;
 	let dx = -pull.x / m, dy = -pull.y / m; // shot direction (opposite the pull)
