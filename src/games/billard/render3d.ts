@@ -90,52 +90,77 @@ export function buildTable3D(table: Table): Table3D {
 	felt.receiveShadow = true;
 	grp.add(felt);
 
-	// Rails (wood) + cloth cushions (felt-dark) on their inner face, split around the pockets.
-	const railMat = keep(new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.55, metalness: 0.05 }));
+	const railMat = keep(new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.5, metalness: 0.05 }));
 	const cushMat = keep(new THREE.MeshStandardMaterial({ color: FELT_DARK, roughness: 0.95 }));
-	const gap = table.pockets[0].r + 1.6; // clearance each side of a pocket mouth
-	const CUSH_H = RAIL_H * 0.7, CUSH_W = 1.6;
 
-	// A straight rail piece running along X or Z, from a..b (world coord on that axis),
-	// with its inner face at `edge` (the cushion line) facing `inward` (+1 or -1).
+	const gap = table.pockets[0].r + 2; // clearance each side of a pocket → the mouths stay open on top
+	const CUSH_H = RAIL_H * 0.62, CUSH_W = 1.8;
+
+	// A rail segment: wood bar + a green cushion on its inner face. Split around the pockets so
+	// the mouths stay OPEN and visible from above; the cushion nose is flush with the table edge
+	// (where the engine bounces the ball).
 	const addRail = (axis: 'x' | 'z', a: number, b: number, edge: number, inward: 1 | -1) => {
 		const len = b - a;
 		if (len <= 0.5) return;
 		const mid = (a + b) / 2;
-		const railCz = edge - inward * RAIL_W / 2; // rail sits outside the cushion line
-		// The engine bounces a ball when its centre is BALL_R from the rail, i.e. its surface
-		// reaches the table edge — so the cushion nose must sit flush with that edge, not over
-		// the felt, or balls visibly cross it.
+		const railCz = edge - inward * RAIL_W / 2;
 		const cushCz = edge - inward * CUSH_W / 2;
 		if (axis === 'x') {
 			const rail = new THREE.Mesh(keep(new THREE.BoxGeometry(len, RAIL_H, RAIL_W)), railMat);
-			rail.position.set(mid, RAIL_H / 2, railCz);
-			rail.castShadow = true; rail.receiveShadow = true;
-			grp.add(rail);
+			rail.position.set(mid, RAIL_H / 2, railCz); rail.castShadow = true; rail.receiveShadow = true; grp.add(rail);
 			const cush = new THREE.Mesh(keep(new THREE.BoxGeometry(len, CUSH_H, CUSH_W)), cushMat);
-			cush.position.set(mid, CUSH_H / 2, cushCz);
-			cush.receiveShadow = true;
-			grp.add(cush);
+			cush.position.set(mid, CUSH_H / 2, cushCz); cush.receiveShadow = true; grp.add(cush);
 		} else {
 			const rail = new THREE.Mesh(keep(new THREE.BoxGeometry(RAIL_W, RAIL_H, len)), railMat);
-			rail.position.set(railCz, RAIL_H / 2, mid);
-			rail.castShadow = true; rail.receiveShadow = true;
-			grp.add(rail);
+			rail.position.set(railCz, RAIL_H / 2, mid); rail.castShadow = true; rail.receiveShadow = true; grp.add(rail);
 			const cush = new THREE.Mesh(keep(new THREE.BoxGeometry(CUSH_W, CUSH_H, len)), cushMat);
-			cush.position.set(cushCz, CUSH_H / 2, mid);
-			cush.receiveShadow = true;
-			grp.add(cush);
+			cush.position.set(cushCz, CUSH_H / 2, mid); cush.receiveShadow = true; grp.add(cush);
 		}
 	};
-
-	// Long edges (top/bottom): two segments each, split by the middle pocket.
 	addRail('x', -hw + gap, -gap, -hh, +1);
 	addRail('x', gap, hw - gap, -hh, +1);
 	addRail('x', -hw + gap, -gap, hh, -1);
 	addRail('x', gap, hw - gap, hh, -1);
-	// Short edges (left/right): one segment, corner pockets only.
 	addRail('z', -hh + gap, hh - gap, -hw, +1);
 	addRail('z', -hh + gap, hh - gap, hw, -1);
+
+	// Fill the wood BEHIND each pocket so the corner reads as a real corner, not an open notch,
+	// while the mouth still opens toward the felt and stays visible from the top. Corner pockets
+	// get a diagonal "jaw"; the middle pockets get a straight block behind the rail gap.
+	for (const p of table.pockets) {
+		const px = p.x - hw, pz = p.y - hh;
+		if (Math.abs(px) < hw * 0.5) { // middle pocket on a long rail
+			const sz = Math.sign(pz) || 1;
+			const blk = new THREE.Mesh(keep(new THREE.BoxGeometry(2 * gap, RAIL_H, RAIL_W)), railMat);
+			blk.position.set(0, RAIL_H / 2, sz * (hh + RAIL_W / 2));
+			blk.castShadow = true; blk.receiveShadow = true; grp.add(blk);
+		} else {
+			const sx = Math.sign(px) || 1, sz = Math.sign(pz) || 1;
+			const off = p.r * 0.7 + RAIL_W * 0.5;
+			const jaw = new THREE.Mesh(keep(new THREE.BoxGeometry(2 * gap + RAIL_W, RAIL_H, RAIL_W)), railMat);
+			jaw.position.set(px + sx * off, RAIL_H / 2, pz + sz * off);
+			jaw.rotation.y = (sx * sz > 0 ? 1 : -1) * Math.PI / 4;
+			jaw.castShadow = true; jaw.receiveShadow = true; grp.add(jaw);
+		}
+	}
+
+	// Diamond sights on the rail tops — the classic little markers, for looks.
+	const diaMat = keep(new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.5 }));
+	const diaGeo = keep(new THREE.CircleGeometry(1.3, 4));
+	const diamond = (x: number, z: number) => {
+		const d = new THREE.Mesh(diaGeo, diaMat);
+		d.rotation.x = -Math.PI / 2; d.rotation.z = Math.PI / 4;
+		d.position.set(x, RAIL_H + 0.03, z);
+		grp.add(d);
+	};
+	for (const fr of [0.28, 0.5, 0.72]) {
+		diamond(-hw * fr, -hh - RAIL_W / 2); diamond(hw * fr, -hh - RAIL_W / 2);
+		diamond(-hw * fr, hh + RAIL_W / 2); diamond(hw * fr, hh + RAIL_W / 2);
+	}
+	for (const fr of [0.5]) {
+		diamond(-hw - RAIL_W / 2, -hh * fr); diamond(-hw - RAIL_W / 2, hh * fr);
+		diamond(hw + RAIL_W / 2, -hh * fr); diamond(hw + RAIL_W / 2, hh * fr);
+	}
 
 	// Pockets: a dark sunk cylinder + a dark mouth ring flush with the felt.
 	const holeMat = keep(new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 1, side: THREE.DoubleSide }));
