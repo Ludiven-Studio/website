@@ -19,6 +19,17 @@ await page.waitForSelector('.bi-canvas');
 try { await page.locator('.tuto-close').click({ timeout: 2500 }); } catch {}
 await sleep(1200);
 
+// WINDOWED (not fullscreen) portrait — measure banner vs canvas.
+{
+	await page.screenshot({ path: resolve(`${OUT}/billard-hud-windowed.png`) });
+	const info = await page.evaluate(() => {
+		const tag = document.querySelector('.bi-daily-tag'); const cv = document.querySelector('.bi-canvas');
+		return { tag: tag?.getBoundingClientRect(), cv: cv?.getBoundingClientRect() };
+	});
+	console.log('WINDOWED banner bottom:', info.tag?.bottom, ' canvas top:', info.cv?.top,
+		info.tag && info.cv ? (info.tag.bottom <= info.cv.top + 1 ? 'OK: above canvas' : 'OVERLAPS canvas') : 'n/a');
+}
+
 // Enter REAL fullscreen the way the site does: toggle the gf-full class + notify the game.
 await page.evaluate(() => {
 	document.querySelector('.game-page')?.classList.add('gf-full');
