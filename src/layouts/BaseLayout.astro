@@ -74,7 +74,27 @@ if (path === '/' || path === '') {
 			// @vite-pwa/astro skips auto-injection when it doesn't manage the manifest,
 			// so we register its generated sw.js ourselves.
 			if ('serviceWorker' in navigator) {
-				addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+				addEventListener('load', () => {
+					const sw = navigator.serviceWorker;
+					// No controller on the very first visit → the first "controllerchange" is the
+					// initial claim, not an update, so don't reload then.
+					const hadController = !!sw.controller;
+					let reloaded = false;
+					sw.register('/sw.js').then((reg) => reg.update()).catch(() => {});
+					// A new sw.js took control (skipWaiting + clientsClaim) → reload ONCE to pick up
+					// the fresh assets, so a deploy applies without a manual cache clear.
+					sw.addEventListener('controllerchange', () => {
+						if (reloaded || !hadController) return;
+						reloaded = true;
+						location.reload();
+					});
+					// Re-check for a new sw.js when a long-lived tab/PWA regains focus.
+					document.addEventListener('visibilitychange', () => {
+						if (document.visibilityState === 'visible') {
+							sw.getRegistration().then((r) => r && r.update()).catch(() => {});
+						}
+					});
+				});
 			}
 		</script>
 
