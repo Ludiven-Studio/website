@@ -323,7 +323,9 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 			const ol = Math.hypot(hit.vx, hit.vy) || 1;
 			object = { from: { x: hit.x, y: hit.y }, to: { x: hit.x + (hit.vx / ol) * 22, y: hit.y + (hit.vy / ol) * 22 } };
 			const cl = Math.hypot(cue.vx, cue.vy);
-			if (cl > AIM_SETTLE) cueAfter = { from: { x: cue.x, y: cue.y }, to: { x: cue.x + (cue.vx / cl) * 18, y: cue.y + (cue.vy / cl) * 18 } };
+			// Where the WHITE ball rolls on after the hit. Long enough to read as its own path even when
+			// the cue started right next to the object ball (the pre-contact stub is then tiny).
+			if (cl > AIM_SETTLE) cueAfter = { from: { x: cue.x, y: cue.y }, to: { x: cue.x + (cue.vx / cl) * 40, y: cue.y + (cue.vy / cl) * 40 } };
 			break;
 		}
 		if (cue.potted) { pocket = true; pts.push({ x: cue.x, y: cue.y }); break; }

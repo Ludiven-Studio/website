@@ -240,7 +240,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		};
 		const aimLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, depthWrite: false }));
 		const objLine = mkLine(new THREE.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95, depthWrite: false })); // struck ball's path (amber)
-		const cueLine = mkLine(new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 2.5, gapSize: 2, transparent: true, opacity: 0.85, depthWrite: false })); // cue's own deflection (white)
+		const cueLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, opacity: 0.95, depthWrite: false })); // cue's own path after contact (same green as the aim = "the white ball")
 		const pullLine = mkLine(new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false }));
 		const contact = new THREE.Mesh(
 			new THREE.RingGeometry(BALL_R * 0.9, BALL_R * 1.25, 24),
@@ -888,6 +888,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					new THREE.Vector3(pred.cueAfter.to.x - hw, Y, pred.cueAfter.to.y - hh),
 				]);
 				g.cueLine.computeLineDistances();
+				(g.cueLine.material as THREE.LineDashedMaterial).color.copy((g.aimLine.material as THREE.LineDashedMaterial).color); // white-ball path = same power colour before & after contact
 				g.cueLine.visible = true;
 			}
 			// Pull marker: from the cue back along the drag, showing how hard the shot is.
