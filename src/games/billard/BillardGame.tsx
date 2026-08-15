@@ -114,13 +114,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const zoomRef = useRef(1);
 	const azRef = useRef(0);
 	const fitRef = useRef({ hx: 120, hz: 70, base: 0, az: 0, azTop: 0 });
-	const orbitRef = useRef<{ x: number; az: number } | null>(null);
-	const panRef = useRef({ x: 0, z: 0 }); // fit/top look-target offset (two-finger pan)
+	const panDragRef = useRef<{ x: number; y: number; panX: number; panZ: number } | null>(null); // one-finger pan
+	const panRef = useRef({ x: 0, z: 0 }); // fit/top look-target offset
 	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), on: false });
 	const lastFrameRef = useRef(0);
 	const lastDistRef = useRef(200); // camera→target distance, for the pan pixel→world scale
-	const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-	const pinchRef = useRef<{ dist: number; zoom: number; cx: number; cy: number; panX: number; panZ: number } | null>(null);
+	const pinchRef = useRef<{ dist: number; zoom: number; ang: number; az: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
 
 	const { celebrating } = useCelebration(status === 'won');
@@ -251,7 +250,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		finishedRef.current = false;
 		rollingRef.current = false;
 		aimRef.current = null;
-		orbitRef.current = null;
+		panDragRef.current = null;
 		zoomRef.current = 1;
 		panRef.current = { x: 0, z: 0 };
 		azRef.current = fitRef.current.az;
@@ -403,9 +402,21 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const cueBall = () => ballsRef.current.find((b) => b.kind === 'cue');
 
-	/* ---------- Aim (slingshot) + orbit, coord-based so pointer and native touch feed it ---------- */
+	/** Pan the look target by a screen-pixel drag, mapped through the camera basis to the ground. */
+	const applyPan = useCallback((startPanX: number, startPanZ: number, dxPx: number, dyPx: number) => {
+		const g = g3Ref.current;
+		if (!g) return;
+		const H = canvasRef.current?.clientHeight || 600;
+		const wpp = (2 * lastDistRef.current * Math.tan((g.camera.fov * Math.PI / 180) / 2)) / H;
+		const right = new THREE.Vector3().setFromMatrixColumn(g.camera.matrixWorld, 0); right.y = 0; right.normalize();
+		const fwd = new THREE.Vector3(); g.camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+		panRef.current.x = startPanX - dxPx * wpp * right.x - dyPx * wpp * fwd.x;
+		panRef.current.z = startPanZ - dxPx * wpp * right.z - dyPx * wpp * fwd.z;
+	}, []);
+
+	/* ---------- One finger: aim from the cue (slingshot) or pan the view; two fingers: zoom + turn. ---------- */
 	const aimStart = useCallback((clientX: number, clientY: number) => {
-		if (pinchRef.current) return; // a second finger is zooming
+		if (pinchRef.current) return; // two fingers own the gesture
 		const cue = cueBall();
 		const p = worldFromPointer(clientX, clientY);
 		const near = cue && (cueScreenDist(clientX, clientY, cue) <= GRAB_PX
@@ -414,14 +425,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			aimRef.current = { pull: { x: 0, y: 0 } };
 			powerRef.current = 0;
 		} else {
-			orbitRef.current = { x: clientX, az: azRef.current }; // drag away from the ball turns the view
+			panDragRef.current = { x: clientX, y: clientY, panX: panRef.current.x, panZ: panRef.current.z }; // one finger drags the view
 		}
 	}, [worldFromPointer, cueScreenDist]);
 
 	const aimMove = useCallback((clientX: number, clientY: number) => {
 		if (pinchRef.current) return;
-		if (orbitRef.current) {
-			azRef.current = orbitRef.current.az + (clientX - orbitRef.current.x) * 0.008;
+		if (panDragRef.current) {
+			applyPan(panDragRef.current.panX, panDragRef.current.panZ, clientX - panDragRef.current.x, clientY - panDragRef.current.y);
 			return;
 		}
 		if (!aimRef.current) return;
@@ -431,11 +442,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (!p) return;
 		aimRef.current.pull = { x: p.x - cue.x, y: p.y - cue.y };
 		powerRef.current = pullPower(aimRef.current.pull);
-	}, [worldFromPointer]);
+	}, [worldFromPointer, applyPan]);
 
 	const aimEnd = useCallback(() => {
 		if (pinchRef.current) return;
-		if (orbitRef.current) { orbitRef.current = null; return; }
+		if (panDragRef.current) { panDragRef.current = null; return; }
 		const aim = aimRef.current;
 		aimRef.current = null;
 		powerRef.current = 0;
@@ -479,60 +490,58 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setCamMode(nv);
 		zoomRef.current = 1;
 		panRef.current = { x: 0, z: 0 };
-		if (nv === 'fit') azRef.current = fitRef.current.az;
+		azRef.current = nv === 'top' ? fitRef.current.azTop : fitRef.current.az;
 	}, []);
 
-	const twoFinger = (): { dist: number; cx: number; cy: number } | null => {
-		const pts = [...pointersRef.current.values()];
-		if (pts.length < 2) return null;
-		return {
-			dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
-			cx: (pts[0].x + pts[1].x) / 2,
-			cy: (pts[0].y + pts[1].y) / 2,
-		};
-	};
-
+	// Single finger → aim/orbit (usePointerDrag). A pinch already owns the gesture via pinchRef.
 	const onPointerDown = useCallback((e: React.PointerEvent) => {
-		pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		const tf = twoFinger();
-		if (tf) {
-			pinchRef.current = { dist: tf.dist, zoom: zoomRef.current, cx: tf.cx, cy: tf.cy, panX: panRef.current.x, panZ: panRef.current.z };
-			aimRef.current = null;
-			orbitRef.current = null;
-			powerRef.current = 0;
-			return;
-		}
+		if (pinchRef.current) return;
 		onAimPointerDown(e);
 	}, [onAimPointerDown]);
-
-	const onPointerMove = useCallback((e: React.PointerEvent) => {
-		if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-		const p = pinchRef.current, tf = twoFinger(), g = g3Ref.current;
-		if (!p || !tf || !g) return;
-		// Pinch → zoom; drag the two-finger centroid → pan the look target along the ground.
-		if (tf.dist > 0) zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, p.zoom * (tf.dist / p.dist)));
-		const H = canvasRef.current?.clientHeight || 600;
-		const wpp = (2 * lastDistRef.current * Math.tan((g.camera.fov * Math.PI / 180) / 2)) / H; // world per pixel
-		const right = new THREE.Vector3().setFromMatrixColumn(g.camera.matrixWorld, 0); right.y = 0; right.normalize();
-		const fwd = new THREE.Vector3(); g.camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
-		const dx = tf.cx - p.cx, dy = tf.cy - p.cy;
-		const t = tableRef.current;
-		const clamp = (v: number, lim: number) => Math.max(-lim, Math.min(lim, v));
-		panRef.current.x = clamp(p.panX - dx * wpp * right.x - dy * wpp * fwd.x, t.w / 2 + 20);
-		panRef.current.z = clamp(p.panZ - dx * wpp * right.z - dy * wpp * fwd.z, t.h / 2 + 20);
-	}, []);
-
-	const onPointerUp = useCallback((e: React.PointerEvent) => {
-		pointersRef.current.delete(e.pointerId);
-		if (pointersRef.current.size < 2) pinchRef.current = null;
-	}, []);
 
 	useEffect(() => {
 		const cv = canvasRef.current;
 		if (!cv) return;
 		const onWheel = (e: WheelEvent) => { e.preventDefault(); zoomBy(e.deltaY > 0 ? 1 / 1.12 : 1.12); };
 		cv.addEventListener('wheel', onWheel, { passive: false });
-		return () => cv.removeEventListener('wheel', onWheel);
+
+		// Two-finger pinch (zoom) + centroid drag (pan). NATIVE non-passive touch listeners —
+		// React's multi-touch pointer events are dead on real iOS (see the ios-touch memory).
+		const gesture = (t: TouchList) => ({
+			dist: Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY),
+			ang: Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX),
+		});
+		const onTouchStart = (e: TouchEvent) => {
+			if (e.touches.length < 2) return;
+			e.preventDefault();
+			const gg = gesture(e.touches);
+			pinchRef.current = { dist: gg.dist, zoom: zoomRef.current, ang: gg.ang, az: azRef.current };
+			aimRef.current = null; panDragRef.current = null; powerRef.current = 0;
+		};
+		const onTouchMove = (e: TouchEvent) => {
+			const p = pinchRef.current;
+			if (!p || e.touches.length < 2) return;
+			e.preventDefault();
+			const gg = gesture(e.touches);
+			// Spread → zoom; twist the two-finger line → turn the view (orbit the azimuth).
+			if (gg.dist > 0) zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, p.zoom * (gg.dist / p.dist)));
+			let dAng = gg.ang - p.ang;
+			while (dAng > Math.PI) dAng -= 2 * Math.PI;
+			while (dAng < -Math.PI) dAng += 2 * Math.PI;
+			azRef.current = p.az - dAng;
+		};
+		const onTouchEnd = (e: TouchEvent) => { if (e.touches.length < 2) pinchRef.current = null; };
+		cv.addEventListener('touchstart', onTouchStart, { passive: false });
+		cv.addEventListener('touchmove', onTouchMove, { passive: false });
+		cv.addEventListener('touchend', onTouchEnd);
+		cv.addEventListener('touchcancel', onTouchEnd);
+		return () => {
+			cv.removeEventListener('wheel', onWheel);
+			cv.removeEventListener('touchstart', onTouchStart);
+			cv.removeEventListener('touchmove', onTouchMove);
+			cv.removeEventListener('touchend', onTouchEnd);
+			cv.removeEventListener('touchcancel', onTouchEnd);
+		};
 	}, [zoomBy]);
 
 	/* ---------- Resize wiring ---------- */
@@ -642,9 +651,18 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			lastDistRef.current = dist;
 		} else {
 			const pitch = ((mode === 'top' ? PITCH_TOP : PITCH_FIT) * Math.PI) / 180;
-			const az = mode === 'top' ? f.azTop : azRef.current;
+			const az = azRef.current;
 			const d = fitDist(g.camera, f.hx, f.hz, pitch, az) / zoom;
 			const pan = panRef.current;
+			// Keep the cue ball on screen: whatever the pan/zoom, pull the look target back
+			// toward the cue if the current framing would push it out of frame.
+			if (cue) {
+				const cgx = cue.x - hw, cgz = cue.y - hh;
+				const visHalf = d * Math.tan((g.camera.fov * Math.PI / 180) / 2) * Math.min(1, g.camera.aspect);
+				const maxOff = Math.max(0, visHalf * 0.8 - BALL_R * 3);
+				const ox = pan.x - cgx, oz = pan.z - cgz, od = Math.hypot(ox, oz);
+				if (od > maxOff && od > 1e-3) { pan.x = cgx + (ox / od) * maxOff; pan.z = cgz + (oz / od) * maxOff; }
+			}
 			camEye.set(pan.x - Math.cos(az) * Math.cos(pitch) * d, Math.sin(pitch) * d, pan.z - Math.sin(az) * Math.cos(pitch) * d);
 			camLook.set(pan.x, 0, pan.z);
 			lastDistRef.current = d;
@@ -770,9 +788,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					ref={canvasRef}
 					className="bi-canvas"
 					onPointerDown={onPointerDown}
-					onPointerMove={onPointerMove}
-					onPointerUp={onPointerUp}
-					onPointerCancel={onPointerUp}
 				/>
 
 				{webglError && (
@@ -816,7 +831,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. La ligne montre la trajectoire prévue. Glisse ailleurs pour tourner la vue, 🎥 pour changer d'angle.
+				c'est puissant. La ligne montre la trajectoire prévue. 1 doigt ailleurs déplace la vue, 2 doigts pour zoomer et pivoter, 🎥 pour changer d'angle.
 				{lv.active ? ' Moins tu joues de coups, plus tu gagnes d\'étoiles.' : daily ? ` Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.` : ` Record : ${bestLabel}.`}
 			</p>
 
