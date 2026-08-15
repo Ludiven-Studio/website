@@ -82,7 +82,6 @@ interface Scene3D {
 	aimLine: THREE.Line;
 	objLine: THREE.Line;
 	cueLine: THREE.Line;
-	pullLine: THREE.Line;
 	contact: THREE.Mesh;
 	placeRing: THREE.Mesh; // pulsing ring around the cue during ball-in-hand
 }
@@ -231,7 +230,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const ballGroup = new THREE.Group();
 		scene.add(ballGroup);
 
-		// Aim gizmos: dashed cue path, object-ball guide, pull marker, contact ring.
+		// Aim gizmos: dashed cue-ball path, object-ball guide (amber), contact ring.
 		const mkLine = (mat: THREE.LineBasicMaterial | THREE.LineDashedMaterial) => {
 			const l = new THREE.Line(new THREE.BufferGeometry(), mat);
 			l.frustumCulled = false; l.visible = false; l.renderOrder = 10;
@@ -241,7 +240,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const aimLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, depthWrite: false }));
 		const objLine = mkLine(new THREE.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95, depthWrite: false })); // struck ball's path (amber)
 		const cueLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, opacity: 0.95, depthWrite: false })); // cue's own path after contact (same green as the aim = "the white ball")
-		const pullLine = mkLine(new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false }));
 		const contact = new THREE.Mesh(
 			new THREE.RingGeometry(BALL_R * 0.9, BALL_R * 1.25, 24),
 			new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }),
@@ -257,7 +255,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		placeRing.rotation.x = -Math.PI / 2; placeRing.visible = false; placeRing.renderOrder = 12;
 		scene.add(placeRing);
 
-		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, pullLine, contact, placeRing };
+		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, contact, placeRing };
 		return true;
 	}, []);
 
@@ -856,7 +854,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const aim = aimRef.current;
 		const cue = balls.find((b) => b.kind === 'cue');
 		const showAim = aim && cue && statusRef.current === 'aiming' && Math.hypot(aim.pull.x, aim.pull.y) > 0.5;
-		g.aimLine.visible = g.objLine.visible = g.cueLine.visible = g.pullLine.visible = g.contact.visible = false;
+		g.aimLine.visible = g.objLine.visible = g.cueLine.visible = g.contact.visible = false;
 		if (showAim && aim && cue) {
 			const pred = predictCue(balls, t, aim.pull);
 			const Y = 0.5;
@@ -891,12 +889,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				(g.cueLine.material as THREE.LineDashedMaterial).color.copy((g.aimLine.material as THREE.LineDashedMaterial).color); // white-ball path = same power colour before & after contact
 				g.cueLine.visible = true;
 			}
-			// Pull marker: from the cue back along the drag, showing how hard the shot is.
-			g.pullLine.geometry.setFromPoints([
-				new THREE.Vector3(cue.x - hw, Y, cue.y - hh),
-				new THREE.Vector3(cue.x + aim.pull.x - hw, Y, cue.y + aim.pull.y - hh),
-			]);
-			g.pullLine.visible = true;
 		}
 
 		// Ball-in-hand: pulse a ring around the cue so it's obvious the player must place it.
@@ -1223,7 +1215,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. La ligne montre la trajectoire prévue. 1 doigt ailleurs déplace la vue, 2 doigts pour zoomer, pivoter et incliner (haut/bas), 🎥 pour changer d'angle.
+				c'est puissant. La ligne pointillée montre le trajet de la blanche (avant et après le choc), la ligne orange celui de la bille visée. 1 doigt ailleurs déplace la vue, 2 doigts (ou clic droit sur PC) pour pivoter et incliner, molette ou pincement pour zoomer, 🎥 pour changer d'angle.
 				{is8 ? ' 8-ball vs l\'ordinateur : empoche ton groupe (pleines ou rayées) puis la noire en dernier. Les pastilles règlent la force de l\'IA.'
 					: lv.active ? ' Moins tu joues de coups, plus tu gagnes d\'étoiles.'
 					: ` Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.`}
