@@ -1,20 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import {
-	makeTable, generateRack, stepBalls, aimToVelocity, pullPower, isSettled,
+	makeTable, generateRack, generateRack8, stepBalls, aimToVelocity, pullPower, isSettled,
 	encodeScore, DIFFS, BALL_R, type Ball, type DiffLevel, type Table, type Vec,
 } from './engine';
 import {
-	buildTable3D, makeBallMesh, fitDist, bestAz, predictCue,
+	buildTable3D, makeBallMesh, makeBall8Mesh, fitDist, bestAz, predictCue,
 	CUE_COLOR, BALL_COLORS, type Table3D,
 } from './render3d';
+import { initMatch8, applyShot, groupOf, type Match8, type Group } from './rules8';
+import { chooseShot } from './ai8';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
-import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import LevelSelect from '../../components/LevelSelect';
@@ -59,6 +60,13 @@ const fmtTime = (s: number) => fmtCentis(Math.round(s * 100));
 interface DailyState { best?: number; tries: number; }
 const MAX_TRIES = 10; // daily attempts per day; best of the day is ranked
 
+// 8-ball (Libre): you = 0, computer = 1. AI strength maps from the difficulty pills.
+const HUMAN = 0 as const, AI = 1 as const;
+const AI_SKILL: Record<string, number> = { facile: 0.35, moyen: 0.6, difficile: 0.82, expert: 0.95 };
+interface ShotAcc { firstHitNumber: number | null; potted: number[]; scratched: boolean; railAfterContact: boolean; contactSeen: boolean; }
+const emptyAcc = (): ShotAcc => ({ firstHitNumber: null, potted: [], scratched: false, railAfterContact: false, contactSeen: false });
+const groupLabel = (g: Group | null): string => (g === 'solid' ? 'pleines' : g === 'stripe' ? 'rayées' : '—');
+
 type SinkInfo = { idx: number; t0: number; px: number; py: number }; // px/py: pocket centre (engine)
 
 interface Scene3D {
@@ -90,6 +98,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [tries, setTries] = useState(0); // daily attempts used today
+	// 8-ball (Libre)
+	const [match8, setMatch8] = useState<Match8 | null>(null); // mirror of match8Ref for the HUD
+	const [placing, setPlacing] = useState(false); // ball-in-hand: drag to place the cue
 
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -112,6 +123,16 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const bestRef = useRef<number | null>(null);
 	const triesRef = useRef(0);
+	// 8-ball refs (read inside the raf loop / async turns)
+	const eightBallRef = useRef(false); // Libre = 8-ball; Défi / Niveaux = arcade (Phase 1)
+	const match8Ref = useRef<Match8 | null>(null);
+	const shotAccRef = useRef<ShotAcc>(emptyAcc());
+	const boardBeforeRef = useRef<number[]>([]); // ball numbers on the table BEFORE the shot
+	const placingRef = useRef(false); // human is placing the cue (ball in hand)
+	const placeDragRef = useRef(false); // a placement drag is in progress
+	const aiThinkingRef = useRef(false); // AI turn scheduled/running — block human input
+	const runAiShotRef = useRef<() => void>(() => {});
+	const levelSkillRef = useRef(0.5); // AI strength for the current Niveaux level
 
 	// Camera / view state read inside the raf loop.
 	const camModeRef = useRef<CamMode>('fit');
@@ -223,10 +244,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		for (const m of g.ballMeshes) {
 			g.ballGroup.remove(m);
 			m.geometry.dispose();
-			(m.material as THREE.Material).dispose();
+			const mat = m.material as THREE.MeshStandardMaterial;
+			mat.map?.dispose();
+			mat.dispose();
 		}
 		g.ballMeshes = ballsRef.current.map((b) => {
-			const mesh = makeBallMesh(b.kind === 'cue' ? CUE_COLOR : BALL_COLORS[b.color] ?? 0xffffff);
+			const mesh = eightBallRef.current
+				? makeBall8Mesh(b.kind === 'cue' ? -1 : b.color)
+				: makeBallMesh(b.kind === 'cue' ? CUE_COLOR : BALL_COLORS[b.color] ?? 0xffffff);
 			g.ballGroup.add(mesh);
 			return mesh;
 		});
@@ -248,7 +273,21 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	/* ---------- Table setup ---------- */
 	const layRack = useCallback((diff: DiffLevel, seed: number) => {
 		const t = tableRef.current;
-		ballsRef.current = generateRack(t, mulberry32(seed), diff);
+		const eightBall = eightBallRef.current;
+		if (eightBall) {
+			ballsRef.current = generateRack8(t, mulberry32(seed));
+			match8Ref.current = initMatch8(HUMAN);
+			setMatch8(match8Ref.current);
+		} else {
+			ballsRef.current = generateRack(t, mulberry32(seed), diff);
+			match8Ref.current = null;
+			setMatch8(null);
+		}
+		shotAccRef.current = emptyAcc();
+		boardBeforeRef.current = [];
+		placingRef.current = false; setPlacing(false);
+		placeDragRef.current = false;
+		aiThinkingRef.current = false;
 		sinksRef.current = [];
 		seenRef.current.clear();
 		strokesRef.current = 0;
@@ -275,11 +314,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		layRack(DIFFS[key], seed);
 	}, [layRack]);
 
-	/* ---------- Levels mode: seeded rack; grade on the sink-all win (strokes). ---------- */
+	/* ---------- Niveaux: 8-ball vs an AI whose strength ramps with the level. ---------- */
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
 		setDaily(false);
-		layRack(cfg.diff, cfg.seed);
+		eightBallRef.current = true;
+		levelSkillRef.current = cfg.skill;
+		layRack(DIFFS.facile, cfg.seed); // diff ignored by the 8-ball rack
 	}, [lv, layRack]);
 
 	const armLevels = useCallback(() => {
@@ -298,6 +339,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const newFreeTable = useCallback((key: keyof typeof DIFFS) => {
 		setDaily(false);
+		eightBallRef.current = true; // Libre = 8-ball vs the computer
 		setDiffKey(key);
 		triesRef.current = 0;
 		setTries(0);
@@ -310,6 +352,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const startDaily = useCallback(async () => {
 		setDaily(true);
+		eightBallRef.current = false; // Défi keeps the arcade rules
 		setDailyLoading(true);
 		const run = loadDailyRun(gameId);
 		const { seed, diffIndex } = run?.seed != null ? { seed: run.seed, diffIndex: run.diffIndex ?? 0 } : await getDaily(gameId);
@@ -382,6 +425,68 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		}
 	}, [daily, diffKey, gameId, lv]);
 
+	/* ---------- 8-ball (Libre vs the computer) — plain fns, wired via refs each render ---------- */
+	const moveCueTo = (cue: Ball, p: Vec) => {
+		const t = tableRef.current, r = BALL_R;
+		const x = Math.max(r, Math.min(t.w - r, p.x)), y = Math.max(r, Math.min(t.h - r, p.y));
+		for (const b of ballsRef.current) if (b !== cue && !b.potted && Math.hypot(b.x - x, b.y - y) < 2 * r) return; // no overlap
+		for (const pk of t.pockets) if (Math.hypot(x - pk.x, y - pk.y) < pk.r + r) return; // not over a pocket
+		cue.x = x; cue.y = y; cue.vx = cue.vy = 0;
+	};
+
+	const startShot8 = () => {
+		shotAccRef.current = emptyAcc();
+		boardBeforeRef.current = ballsRef.current.filter((b) => b.kind === 'color' && !b.potted).map((b) => b.color);
+		rollingRef.current = true;
+		setStat('rolling');
+	};
+
+	const runAiShot = () => {
+		const balls = ballsRef.current, t = tableRef.current, m = match8Ref.current;
+		if (!m || m.winner !== null || m.turn !== AI) { aiThinkingRef.current = false; return; }
+		const cue = balls.find((b) => b.kind === 'cue');
+		if (!cue) { aiThinkingRef.current = false; return; }
+		if (m.ballInHand === AI) { cue.x = t.cueStart.x; cue.y = t.cueStart.y; cue.potted = false; match8Ref.current = { ...m, ballInHand: null }; setMatch8(match8Ref.current); }
+		const skill = lv.active ? levelSkillRef.current : (AI_SKILL[diffKey] ?? 0.6);
+		const shot = chooseShot(balls, t, m.groups[AI], skill, Math.random);
+		cue.vx = shot.vx; cue.vy = shot.vy;
+		startShot8();
+		aiThinkingRef.current = false;
+	};
+
+	const resolveShot8 = () => {
+		const balls = ballsRef.current, t = tableRef.current, prev = match8Ref.current;
+		if (!prev) return;
+		const acc = shotAccRef.current;
+		const next = applyShot(prev, { firstHitNumber: acc.firstHitNumber, potted: acc.potted, scratched: acc.scratched, railAfterContact: acc.railAfterContact }, { remaining: boardBeforeRef.current });
+		match8Ref.current = next;
+		setMatch8(next);
+		setRemaining(balls.filter((b) => b.kind === 'color' && !b.potted).length);
+		const cue = balls.find((b) => b.kind === 'cue');
+		if (cue && cue.potted) { seenRef.current.delete(balls.indexOf(cue)); cue.potted = false; cue.x = t.cueStart.x; cue.y = t.cueStart.y; cue.vx = cue.vy = 0; } // un-pot on scratch
+		if (next.lastFoul) { setScratchFlash(true); setTimeout(() => setScratchFlash(false), 1500); }
+		if (next.winner !== null) {
+			setStat('won');
+			if (lv.active) {
+				const oppGroup = next.groups[AI];
+				const oppLeft = oppGroup ? balls.filter((b) => b.kind === 'color' && !b.potted && groupOf(b.color) === oppGroup).length : 0;
+				lv.finish({ won: next.winner === HUMAN, score: oppLeft, stat: oppLeft });
+			}
+			return;
+		}
+		if (next.turn === AI) {
+			aiThinkingRef.current = true;
+			setStat('aiming');
+			window.setTimeout(() => runAiShotRef.current(), 700);
+		} else {
+			if (next.ballInHand === HUMAN) { placingRef.current = true; setPlacing(true); }
+			setStat('aiming');
+		}
+	};
+
+	const onSettled = () => { if (eightBallRef.current) resolveShot8(); else resolveShot(); };
+	runAiShotRef.current = runAiShot;
+
 	/* ---------- Pointer helpers (raycast into the table) ---------- */
 	/** Engine-space point under the pointer on the felt plane (y = 0). */
 	const worldFromPointer = useCallback((clientX: number, clientY: number): Vec | null => {
@@ -426,10 +531,19 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const aimStart = useCallback((clientX: number, clientY: number) => {
 		if (pinchRef.current) return; // two fingers own the gesture
 		const cue = cueBall();
+		if (eightBallRef.current && placingRef.current && cue) { // ball in hand: drag places the cue
+			const pp = worldFromPointer(clientX, clientY);
+			if (pp) moveCueTo(cue, pp);
+			placeDragRef.current = true;
+			return;
+		}
+		// In 8-ball you may only aim on your turn (otherwise the drag just moves the view).
+		const canAim = !eightBallRef.current
+			|| (!!match8Ref.current && match8Ref.current.turn === HUMAN && match8Ref.current.winner === null && !aiThinkingRef.current);
 		const p = worldFromPointer(clientX, clientY);
 		const near = cue && (cueScreenDist(clientX, clientY, cue) <= GRAB_PX
 			|| (p != null && Math.hypot(p.x - cue.x, p.y - cue.y) <= GRAB_R));
-		if (statusRef.current === 'aiming' && cue && near) {
+		if (statusRef.current === 'aiming' && canAim && cue && near) {
 			aimRef.current = { pull: { x: 0, y: 0 } };
 			powerRef.current = 0;
 		} else {
@@ -439,6 +553,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const aimMove = useCallback((clientX: number, clientY: number) => {
 		if (pinchRef.current) return;
+		if (placeDragRef.current) { const cue = cueBall(); const pp = worldFromPointer(clientX, clientY); if (cue && pp) moveCueTo(cue, pp); return; }
 		if (panDragRef.current) {
 			applyPan(panDragRef.current.panX, panDragRef.current.panZ, clientX - panDragRef.current.x, clientY - panDragRef.current.y);
 			return;
@@ -454,11 +569,29 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const aimEnd = useCallback(() => {
 		if (pinchRef.current) return;
+		if (placeDragRef.current) { // commit ball-in-hand placement (no shot fired)
+			placeDragRef.current = false;
+			placingRef.current = false; setPlacing(false);
+			if (match8Ref.current && match8Ref.current.ballInHand === HUMAN) { match8Ref.current = { ...match8Ref.current, ballInHand: null }; setMatch8(match8Ref.current); }
+			setStat('aiming');
+			return;
+		}
 		if (panDragRef.current) { panDragRef.current = null; return; }
 		const aim = aimRef.current;
 		aimRef.current = null;
 		powerRef.current = 0;
 		if (!aim || statusRef.current !== 'aiming') return;
+		if (eightBallRef.current) { // 8-ball human shot — no strokes, no daily tries
+			const m = match8Ref.current;
+			if (!m || m.turn !== HUMAN || m.winner !== null || aiThinkingRef.current || placingRef.current) return;
+			const v = aimToVelocity(aim.pull);
+			if (!v) return;
+			const cue = cueBall();
+			if (!cue) return;
+			cue.vx = v.vx; cue.vy = v.vy;
+			startShot8();
+			return;
+		}
 		if (daily && startRef.current === 0 && triesRef.current >= MAX_TRIES) return; // out of daily tries
 		const v = aimToVelocity(aim.pull);
 		if (!v) return;
@@ -577,7 +710,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		};
 	}, [resize]);
 
-	resolveShotRef.current = resolveShot; // keep the run-once loop calling the latest resolveShot
+	resolveShotRef.current = onSettled; // dispatch to 8-ball or arcade resolution (latest closure)
 
 	/* ---------- Scene update (per frame) ---------- */
 	const updateScene = useCallback((now: number) => {
@@ -711,7 +844,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			while (accRef.current >= STEP) {
 				accRef.current -= STEP;
 				if (rollingRef.current) {
-					stepBalls(ballsRef.current, t, STEP / 1000);
+					const r = stepBalls(ballsRef.current, t, STEP / 1000);
+					if (eightBallRef.current) { // accumulate the shot for the 8-ball rules
+						const acc = shotAccRef.current;
+						if (r.firstHit !== null && !acc.contactSeen) { acc.contactSeen = true; acc.firstHitNumber = r.firstHit; }
+						if (r.railHit && acc.contactSeen) acc.railAfterContact = true;
+						if (r.pottedColors.length) acc.potted.push(...r.pottedColors);
+						if (r.scratched) acc.scratched = true;
+					}
 					if (isSettled(ballsRef.current)) {
 						rollingRef.current = false;
 						resolveShotRef.current();
@@ -743,11 +883,32 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	/* ---------- Init (free table on mount) ---------- */
 	useEffect(() => { newFreeTable('facile'); }, [newFreeTable]);
 
-	const bestLabel = best == null ? '—' : formatScore(DAILY_LB.billard.fmt, best);
+	// Read-only state snapshot for the Playwright smoke check (harmless).
+	useEffect(() => {
+		const w = window as unknown as { __billard?: () => unknown };
+		w.__billard = () => ({
+			n: ballsRef.current.length,
+			potted: ballsRef.current.filter((b) => b.potted).length,
+			match8: match8Ref.current,
+			status: statusRef.current,
+			rolling: rollingRef.current,
+			eightBall: eightBallRef.current,
+		});
+		return () => { delete w.__billard; };
+	}, []);
+
 	const dailyMode = daily && !lv.active;
 	const triesLeft = MAX_TRIES - tries;
 	const exhausted = dailyMode && triesLeft <= 0;
+	// 8-ball = everything except Défi (daily). Libre + Niveaux are 8-ball.
+	const is8 = !daily;
+	const myGroup: Group | null = match8?.groups[HUMAN] ?? null;
+	const oppGroup: Group | null = match8?.groups[AI] ?? null;
+	const colorLeft = ballsRef.current.filter((b) => b.kind === 'color' && !b.potted);
+	const myLeft = myGroup ? colorLeft.filter((b) => groupOf(b.color) === myGroup).length : 0;
+	const eightWin = is8 && !lv.active && match8?.winner != null; // Libre card; Niveaux uses LevelOutcome
 	const restartLabel = lv.active ? 'Recommencer le niveau'
+		: is8 ? 'Nouvelle partie'
 		: dailyMode ? (exhausted ? 'Essais du jour épuisés' : `Recommencer (${triesLeft} essai${triesLeft > 1 ? 's' : ''} restant${triesLeft > 1 ? 's' : ''})`)
 		: 'Nouvelle table';
 
@@ -769,9 +930,18 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						/>
 					</div>
 					<div className="bi-stats">
-						<span className="bi-stat">🎱 {strokes}</span>
-						<span className="bi-stat">🎯 {remaining}</span>
-						<span className="bi-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
+						{is8 ? (
+							<>
+								<span className="bi-stat">{match8?.winner != null ? (match8.winner === HUMAN ? '🏆 Gagné' : '❌ Perdu') : match8?.turn === HUMAN ? '🎯 À toi' : '🤖 Ordi'}</span>
+								<span className="bi-stat">{match8?.open ? 'Table ouverte' : `${groupLabel(myGroup)} · ${myLeft}`}</span>
+							</>
+						) : (
+							<>
+								<span className="bi-stat">🎱 {strokes}</span>
+								<span className="bi-stat">🎯 {remaining}</span>
+								<span className="bi-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
+							</>
+						)}
 					</div>
 					<div className="bi-hud-actions">
 						{!daily && !lv.active && diffKeys(DIFFS, gameId).map((k) => (
@@ -796,13 +966,19 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				)}
 				{lv.active && !lv.menu && (
 					<div className="bi-daily-tag bi-daily-hud">
-						{`Niveau ${lv.level} · ${billardLevels.config(lv.level).diff.balls} boules · ${billardLevels.starHint(lv.level).three} / ${billardLevels.starHint(lv.level).two}`}
+						{`Niveau ${lv.level} · IA ${Math.round(billardLevels.config(lv.level).skill * 100)}%`}
+						{match8 && match8.winner == null ? ` · ${match8.lastFoul || match8.lastEvent || (match8.open ? 'table ouverte' : `toi : ${groupLabel(myGroup)}`)}` : ''}
+					</div>
+				)}
+				{is8 && !lv.active && match8 && match8.winner == null && (
+					<div className="bi-daily-tag bi-daily-hud">
+						{match8.lastFoul || match8.lastEvent || (match8.open ? 'Table ouverte — empoche pour choisir pleines ou rayées' : `Toi : ${groupLabel(myGroup)} · Ordi : ${groupLabel(oppGroup)}`)}
 					</div>
 				)}
 			</div>
 
 			<div className="bi-playwrap" ref={wrapRef}>
-				{celebrating && !lv.active && <Celebration />}
+				{celebrating && !lv.active && (!is8 || match8?.winner === HUMAN) && <Celebration />}
 				<canvas
 					ref={canvasRef}
 					className="bi-canvas"
@@ -815,16 +991,27 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{scratchFlash && <div className="bi-scratch">Pénalité · +1 coup</div>}
-				{status === 'won' && !lv.active && (
+				{scratchFlash && <div className="bi-scratch">{is8 ? (match8?.lastFoul ?? 'Faute') : 'Pénalité · +1 coup'}</div>}
+				{is8 && placing && <div className="bi-scratch bi-place">Bille en main — glisse pour placer la blanche</div>}
+
+				{/* Arcade win card (Défi only; free mode is 8-ball). */}
+				{status === 'won' && daily && (
 					<div className="bi-overlay">
 						<div className="bi-overlay-card">
 							🎉 Gagné en <strong>{strokes} coups</strong> · {fmtTime(elapsed)}
 							{exhausted ? <span className="bi-spent">Défi terminé pour aujourd'hui</span> : (
-								<button className="bi-replay" onClick={restart}>
-									{daily ? `Rejouer la table (${triesLeft} restant${triesLeft > 1 ? 's' : ''})` : 'Nouvelle table'}
-								</button>
+								<button className="bi-replay" onClick={restart}>{`Rejouer la table (${triesLeft} restant${triesLeft > 1 ? 's' : ''})`}</button>
 							)}
+						</div>
+					</div>
+				)}
+
+				{/* 8-ball win/loss card (Libre). */}
+				{eightWin && (
+					<div className="bi-overlay">
+						<div className="bi-overlay-card">
+							{match8?.winner === HUMAN ? '🏆 Tu as gagné !' : '❌ L’ordinateur gagne'}
+							<button className="bi-replay" onClick={() => newFreeTable(diffKey)}>Nouvelle partie</button>
 						</div>
 					</div>
 				)}
@@ -840,7 +1027,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						lastLevel={billardLevels.count}
 						won={lv.won}
 						stars={lv.stars}
-						detail={`${strokes} coups`}
+						detail={lv.won ? 'Victoire sur l’ordinateur' : 'Battu par l’ordinateur'}
 						onNext={() => startLevel(lv.level + 1)}
 						onReplay={() => startLevel(lv.level)}
 						onMenu={lv.backToMenu}
@@ -851,7 +1038,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
 				c'est puissant. La ligne montre la trajectoire prévue. 1 doigt ailleurs déplace la vue, 2 doigts pour zoomer, pivoter et incliner (haut/bas), 🎥 pour changer d'angle.
-				{lv.active ? ' Moins tu joues de coups, plus tu gagnes d\'étoiles.' : daily ? ` Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.` : ` Record : ${bestLabel}.`}
+				{is8 ? ' 8-ball vs l\'ordinateur : empoche ton groupe (pleines ou rayées) puis la noire en dernier. Les pastilles règlent la force de l\'IA.'
+					: lv.active ? ' Moins tu joues de coups, plus tu gagnes d\'étoiles.'
+					: ` Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.`}
 			</p>
 
 			{daily && !lv.active && <Leaderboard
@@ -859,11 +1048,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				game={`${gameId}-t`}
 				metric="time"
 				submitValue={status === 'won' && best != null ? best : undefined}
-				format={(v) => formatScore(DAILY_LB.billard.fmt, v)}
-			/>}
-			{!daily && !lv.active && <LeaderboardCorner
-				game={`${gameId}-t`}
-				metric="time"
 				format={(v) => formatScore(DAILY_LB.billard.fmt, v)}
 			/>}
 		</div>
@@ -913,7 +1097,8 @@ const CSS = `
 .bi-act:hover:not(:disabled) { border-color: var(--bi-accent); color: #fff; }
 .bi-act:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); }
+.bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
+.bi-place { top: auto; bottom: 14px; background: var(--bi-accent); }
 
 .bi-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .bi-overlay-card { background: var(--gray-999); border: 2px solid var(--bi-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }

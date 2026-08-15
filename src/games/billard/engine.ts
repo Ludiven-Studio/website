@@ -124,47 +124,104 @@ export function generateRack(table: Table, rng: Rng, diff: DiffLevel): Ball[] {
 	return balls;
 }
 
+/**
+ * Standard 8-ball rack: cue on the head spot + 15 numbered balls in a triangle at the foot spot.
+ * The ball NUMBER (1-15) is stored in `color` (1-7 solids, 8 black, 9-15 stripes). Official
+ * constraints: the 8 in the centre of the 3rd row, the two back corners one solid + one stripe,
+ * the rest seeded-shuffled. Deterministic given `rng`, on a fixed grid (no anti-overlap loop).
+ */
+export function generateRack8(table: Table, rng: Rng): Ball[] {
+	const EPS = 0.1; // touching-but-not-overlapping spacing
+	const rowDX = Math.sqrt(3) * (BALL_R + EPS / 2);
+	const dy = 2 * BALL_R + EPS;
+	const apexX = table.w * 0.72, cy = table.h / 2; // apex on the foot spot, opening toward the foot rail
+	const slots: { x: number; y: number; row: number; k: number }[] = [];
+	for (let row = 0; row < 5; row++)
+		for (let k = 0; k <= row; k++)
+			slots.push({ x: apexX + row * rowDX, y: cy + (k - row / 2) * dy, row, k });
+
+	const shuffle = (arr: number[]): number[] => { // seeded Fisher-Yates
+		for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+		return arr;
+	};
+	const solids = [1, 2, 3, 4, 5, 6, 7];
+	const stripes = [9, 10, 11, 12, 13, 14, 15];
+	const backSolid = solids.splice(Math.floor(rng() * solids.length), 1)[0];
+	const backStripe = stripes.splice(Math.floor(rng() * stripes.length), 1)[0];
+	const cornerSolidLeft = rng() < 0.5;
+	const rest = shuffle([...solids, ...stripes]); // the remaining 12 numbers
+
+	const idx = (row: number, k: number) => slots.findIndex((s) => s.row === row && s.k === k);
+	const num = new Array<number>(slots.length).fill(-1);
+	num[idx(2, 1)] = 8; // 8 in the centre of the third row
+	num[idx(4, 0)] = cornerSolidLeft ? backSolid : backStripe;
+	num[idx(4, 4)] = cornerSolidLeft ? backStripe : backSolid;
+	let ri = 0;
+	for (let i = 0; i < slots.length; i++) if (num[i] === -1) num[i] = rest[ri++];
+
+	const cue: Ball = { x: table.cueStart.x, y: table.cueStart.y, vx: 0, vy: 0, r: BALL_R, kind: 'cue', color: -1, potted: false };
+	const balls: Ball[] = [cue];
+	for (let i = 0; i < slots.length; i++)
+		balls.push({ x: slots[i].x, y: slots[i].y, vx: 0, vy: 0, r: BALL_R, kind: 'color', color: num[i], potted: false });
+	return balls;
+}
+
 /* ---------- Physics ---------- */
 
 const inMouthY = (y: number, h: number) => y < MOUTH || y > h - MOUTH; // corner pockets on side rails
 const inMouthX = (x: number, w: number) => x < MOUTH || x > w - MOUTH || Math.abs(x - w / 2) < MOUTH;
 
-function reflectWalls(b: Ball, t: Table) {
+/** Reflect off the cushions; returns true if a cushion actually bounced the ball (for the
+ *  8-ball "a ball must reach a rail" rule — the caller gates it on contact). */
+function reflectWalls(b: Ball, t: Table): boolean {
 	const r = b.r;
-	if (b.x < r && b.vx < 0 && !inMouthY(b.y, t.h)) { b.x = r; b.vx = -b.vx * CUSHION_REST; }
-	else if (b.x > t.w - r && b.vx > 0 && !inMouthY(b.y, t.h)) { b.x = t.w - r; b.vx = -b.vx * CUSHION_REST; }
-	if (b.y < r && b.vy < 0 && !inMouthX(b.x, t.w)) { b.y = r; b.vy = -b.vy * CUSHION_REST; }
-	else if (b.y > t.h - r && b.vy > 0 && !inMouthX(b.x, t.w)) { b.y = t.h - r; b.vy = -b.vy * CUSHION_REST; }
+	let bounced = false;
+	if (b.x < r && b.vx < 0 && !inMouthY(b.y, t.h)) { b.x = r; b.vx = -b.vx * CUSHION_REST; bounced = true; }
+	else if (b.x > t.w - r && b.vx > 0 && !inMouthY(b.y, t.h)) { b.x = t.w - r; b.vx = -b.vx * CUSHION_REST; bounced = true; }
+	if (b.y < r && b.vy < 0 && !inMouthX(b.x, t.w)) { b.y = r; b.vy = -b.vy * CUSHION_REST; bounced = true; }
+	else if (b.y > t.h - r && b.vy > 0 && !inMouthX(b.x, t.w)) { b.y = t.h - r; b.vy = -b.vy * CUSHION_REST; bounced = true; }
 	// safety: a ball that missed the throat shouldn't escape forever
 	const M = POCKET_R + r;
 	if (b.x < -M) { b.x = -M; b.vx = Math.abs(b.vx) * CUSHION_REST; }
 	else if (b.x > t.w + M) { b.x = t.w + M; b.vx = -Math.abs(b.vx) * CUSHION_REST; }
 	if (b.y < -M) { b.y = -M; b.vy = Math.abs(b.vy) * CUSHION_REST; }
 	else if (b.y > t.h + M) { b.y = t.h + M; b.vy = -Math.abs(b.vy) * CUSHION_REST; }
+	return bounced;
 }
 
-function collide(a: Ball, b: Ball) {
+/** Resolve a ball-ball collision; returns true if an impulse was actually applied. */
+function collide(a: Ball, b: Ball): boolean {
 	const dx = b.x - a.x, dy = b.y - a.y;
 	const d = len(dx, dy);
 	const min = a.r + b.r;
-	if (d <= 0 || d >= min) return;
+	if (d <= 0 || d >= min) return false;
 	const nx = dx / d, ny = dy / d;
 	const overlap = (min - d) / 2;
 	a.x -= nx * overlap; a.y -= ny * overlap;
 	b.x += nx * overlap; b.y += ny * overlap;
 	const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-	if (vn >= 0) return; // separating
+	if (vn >= 0) return false; // separating
 	const imp = (-(1 + BALL_REST) * vn) / 2; // equal masses
 	a.vx -= imp * nx; a.vy -= imp * ny;
 	b.vx += imp * nx; b.vy += imp * ny;
+	return true;
 }
 
-export interface StepResult { balls: Ball[]; pottedColors: number[]; scratched: boolean; }
+export interface StepResult {
+	balls: Ball[];
+	pottedColors: number[];
+	scratched: boolean;
+	// 8-ball foul reporting (Défi / tests ignore these). Per-call; the game accumulates over a shot.
+	firstHit: number | null; // color/number of the FIRST object ball the cue touched this call
+	railHit: boolean; // did any ball bounce off a cushion this call (unconditional)
+}
 
 /** Advance the simulation by `dt` seconds (sub-stepped to avoid tunnelling). */
 export function stepBalls(balls: Ball[], table: Table, dt: number): StepResult {
 	const pottedColors: number[] = [];
 	let scratched = false;
+	let firstHit: number | null = null;
+	let railHit = false;
 	const active = balls.filter((b) => !b.potted);
 	let maxV = 0;
 	for (const b of active) maxV = Math.max(maxV, len(b.vx, b.vy));
@@ -176,11 +233,16 @@ export function stepBalls(balls: Ball[], table: Table, dt: number): StepResult {
 			if (b.potted) continue;
 			b.x += b.vx * h;
 			b.y += b.vy * h;
-			reflectWalls(b, table);
+			if (reflectWalls(b, table)) railHit = true;
 		}
 		for (let i = 0; i < active.length; i++)
 			for (let j = i + 1; j < active.length; j++)
-				if (!active[i].potted && !active[j].potted) collide(active[i], active[j]);
+				if (!active[i].potted && !active[j].potted && collide(active[i], active[j]) && firstHit === null) {
+					// Record the first object ball the CUE touches (for the "hit own group first" rule).
+					const a = active[i], b = active[j];
+					if (a.kind === 'cue' && b.kind === 'color') firstHit = b.color;
+					else if (b.kind === 'cue' && a.kind === 'color') firstHit = a.color;
+				}
 		for (const b of active) {
 			if (b.potted) continue;
 			const sp = len(b.vx, b.vy);
@@ -203,7 +265,7 @@ export function stepBalls(balls: Ball[], table: Table, dt: number): StepResult {
 			}
 		}
 	}
-	return { balls, pottedColors, scratched };
+	return { balls, pottedColors, scratched, firstHit, railHit };
 }
 
 /** Slingshot: shoot opposite the pull; power ∝ pull length, capped. */

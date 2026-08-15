@@ -23,10 +23,56 @@ const POCKET_D = 8; // how deep a pocket sinks below the felt
 // Corner signs for the framing math.
 const CORNERS: [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 
-/** Ball sphere. Cue is white; colour balls carry their palette colour. */
+/** Ball sphere. Cue is white; colour balls carry their palette colour. (Arcade / Défi only.) */
 export function makeBallMesh(color: number): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(BALL_R, 28, 20);
 	const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.22, metalness: 0.04 });
+	const m = new THREE.Mesh(geo, mat);
+	m.castShadow = true;
+	m.receiveShadow = false;
+	return m;
+}
+
+/* ---------- 8-ball: numbered / striped balls ---------- */
+
+// Real pool hues by number (1-7 solids, 8 black). Stripes 9-15 reuse hues 1-7.
+const BALL8_COLORS: Record<number, number> = {
+	1: 0xf6c026, 2: 0x1f5fd6, 3: 0xd8352a, 4: 0x7a3fa0, 5: 0xef7d1a, 6: 0x1f8a4c, 7: 0x7a2432, 8: 0x18181a,
+};
+const hueOf = (n: number): number => (n <= 8 ? BALL8_COLORS[n] : BALL8_COLORS[n - 8]);
+
+/** Canvas texture for one pool ball (solid / stripe / 8 / cue), mapped onto the sphere. */
+export function makeBallTexture(number: number): THREE.CanvasTexture {
+	const S = 128;
+	const c = document.createElement('canvas');
+	c.width = c.height = S;
+	const g = c.getContext('2d') as CanvasRenderingContext2D;
+	const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
+	if (number <= 0) { // cue
+		g.fillStyle = '#f4f4f2'; g.fillRect(0, 0, S, S);
+		g.fillStyle = '#e04030'; g.beginPath(); g.arc(S / 2, S / 2, 5, 0, Math.PI * 2); g.fill();
+	} else if (number >= 9) { // stripe: white ball with a coloured band across the equator
+		g.fillStyle = '#f2f0ea'; g.fillRect(0, 0, S, S);
+		g.fillStyle = hex(hueOf(number)); g.fillRect(0, S * 0.32, S, S * 0.36);
+	} else { // solid / 8
+		g.fillStyle = hex(BALL8_COLORS[number]); g.fillRect(0, 0, S, S);
+	}
+	if (number > 0) { // white number spot
+		g.fillStyle = '#f8f8f5'; g.beginPath(); g.arc(S / 2, S / 2, S * 0.19, 0, Math.PI * 2); g.fill();
+		g.fillStyle = '#141414'; g.font = `bold ${Math.round(S * 0.22)}px system-ui, sans-serif`;
+		g.textAlign = 'center'; g.textBaseline = 'middle';
+		g.fillText(String(number), S / 2, S * 0.53);
+	}
+	const tex = new THREE.CanvasTexture(c);
+	tex.colorSpace = THREE.SRGBColorSpace;
+	tex.anisotropy = 4;
+	return tex;
+}
+
+/** Sphere textured for its pool number (cue = number ≤ 0). Caller disposes geo+mat+map. */
+export function makeBall8Mesh(number: number): THREE.Mesh {
+	const geo = new THREE.SphereGeometry(BALL_R, 28, 20);
+	const mat = new THREE.MeshStandardMaterial({ map: makeBallTexture(number), roughness: 0.22, metalness: 0.04 });
 	const m = new THREE.Mesh(geo, mat);
 	m.castShadow = true;
 	m.receiveShadow = false;

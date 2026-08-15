@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-	makeTable, generateRack, stepBalls, aimToVelocity, isSettled,
+	makeTable, generateRack, generateRack8, stepBalls, aimToVelocity, isSettled,
 	encodeScore, decodeScore, BALL_R, DIFFS, type Ball,
 } from './engine';
 import { mulberry32 } from '../prng';
@@ -91,6 +91,44 @@ describe('billard engine', () => {
 				for (let j = i + 1; j < a.length; j++)
 					expect(Math.hypot(a[i].x - a[j].x, a[i].y - a[j].y), 'no overlap').toBeGreaterThan(2 * BALL_R - 0.01);
 		}
+	});
+
+	it('reports the number of the FIRST object ball the cue touches', () => {
+		const t = makeTable();
+		const cue = ball({ x: 50, y: 50, vx: 140, vy: 0, kind: 'cue', color: -1 });
+		const a = ball({ x: 72, y: 50, color: 3 }); // nearer
+		const b = ball({ x: 130, y: 50, color: 7 }); // farther
+		let first: number | null = null;
+		for (let i = 0; i < 120 && first === null; i++) { const r = stepBalls([cue, a, b], t, 1 / 120); if (r.firstHit !== null) first = r.firstHit; }
+		expect(first).toBe(3);
+	});
+
+	it('railHit is true when a ball bounces off a cushion, false when it does not', () => {
+		const t = makeTable();
+		expect(stepBalls([ball({ x: t.w - BALL_R - 0.2, y: 50, vx: 120, vy: 0 })], t, 1 / 120).railHit).toBe(true);
+		expect(stepBalls([ball({ x: 100, y: 50, vx: 20, vy: 0 })], t, 1 / 240).railHit).toBe(false);
+	});
+
+	it('generateRack8 is deterministic: cue + 15 numbered balls (1-15), no overlap, in bounds', () => {
+		const t = makeTable();
+		const a = generateRack8(t, mulberry32(7));
+		const b = generateRack8(t, mulberry32(7));
+		expect(a).toEqual(b);
+		expect(a.length).toBe(16);
+		expect(a.filter((x) => x.kind === 'cue').length).toBe(1);
+		expect(a.find((x) => x.kind === 'cue')!.color).toBe(-1);
+		const nums = a.filter((x) => x.kind === 'color').map((x) => x.color).sort((p, q) => p - q);
+		expect(nums).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
+		for (const ba of a) {
+			expect(ba.x).toBeGreaterThanOrEqual(0);
+			expect(ba.x).toBeLessThanOrEqual(t.w);
+			expect(ba.y).toBeGreaterThanOrEqual(0);
+			expect(ba.y).toBeLessThanOrEqual(t.h);
+			for (const p of t.pockets) expect(Math.hypot(ba.x - p.x, ba.y - p.y), 'not inside a pocket mouth').toBeGreaterThan(p.r);
+		}
+		for (let i = 0; i < a.length; i++)
+			for (let j = i + 1; j < a.length; j++)
+				expect(Math.hypot(a[i].x - a[j].x, a[i].y - a[j].y), 'no overlap').toBeGreaterThan(2 * BALL_R - 0.01);
 	});
 
 	it('encodeScore/decodeScore round-trips and orders by strokes then time', () => {
