@@ -900,13 +900,9 @@ const CSS = `
 .bi-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .bi-daily-hud { background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); pointer-events: none; }
 
-/* Fullscreen: keep the HUD (level/score info + controls) as a bar ABOVE the table, in flow,
-   so it never sits over the play surface; the canvas fills the space below it. */
-.game-page.gf-full .bi-topbar { width: 100%; margin: 0 0 6px; z-index: 3; }
-/* Wide WINDOWED screens have room around the 16/10 table, so the HUD floats over the corners. */
-@media (min-width: 50em) {
-  .bi-topbar { position: absolute; top: 10px; left: 10px; right: 10px; width: auto; margin: 0; z-index: 3; pointer-events: none; }
-}
+/* The HUD (level/score info + controls) is always a bar ABOVE the table, in flow — never over
+   the play surface — in every mode (windowed, wide screens, and fullscreen). */
+.game-page.gf-full .bi-topbar { margin: 0 0 6px; z-index: 3; }
 
 .bi-stats { display: flex; gap: 6px; font-weight: 700; font-size: 13px; flex-wrap: wrap; }
 .bi-stat { background: rgba(20,14,10,0.6); color: #f4ece2; border-radius: 999px; padding: 5px 11px; backdrop-filter: blur(4px); box-shadow: 0 1px 3px rgba(0,0,0,0.35); font-variant-numeric: tabular-nums; }

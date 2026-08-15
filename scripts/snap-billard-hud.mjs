@@ -19,6 +19,23 @@ await page.waitForSelector('.bi-canvas');
 try { await page.locator('.tuto-close').click({ timeout: 2500 }); } catch {}
 await sleep(1200);
 
+// WIDE WINDOWED (desktop ≥50em, not fullscreen) — the case the user reported.
+{
+	await page.setViewportSize({ width: 1230, height: 880 });
+	await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+	await sleep(700);
+	await page.screenshot({ path: resolve(`${OUT}/billard-hud-wide.png`) });
+	const info = await page.evaluate(() => {
+		const tag = document.querySelector('.bi-daily-tag'); const cv = document.querySelector('.bi-canvas');
+		return { tag: tag?.getBoundingClientRect(), cv: cv?.getBoundingClientRect() };
+	});
+	console.log('WIDE banner bottom:', info.tag?.bottom, ' canvas top:', info.cv?.top,
+		info.tag && info.cv ? (info.tag.bottom <= info.cv.top + 1 ? 'OK: above canvas' : 'OVERLAPS canvas') : 'n/a');
+	await page.setViewportSize({ width: 390, height: 780 });
+	await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+	await sleep(500);
+}
+
 // WINDOWED (not fullscreen) portrait — measure banner vs canvas.
 {
 	await page.screenshot({ path: resolve(`${OUT}/billard-hud-windowed.png`) });
