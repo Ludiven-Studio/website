@@ -312,8 +312,8 @@ export interface AimPrediction {
 const AIM_SETTLE = 2.4; // engine's at-rest speed
 const AIM_MAX_STEPS = 600; // ~10 s at 60 Hz — the cue always stops or hits well before this
 
-const GUIDE_SPEED = 185; // fixed reference speed for the aim line (DIRECTION guide) — high enough that
-// the traced bounce path reaches a ball before friction stops it, instead of ending in open felt
+const GUIDE_SPEED = 160; // fixed reference speed for the aim line (DIRECTION guide). Sets how far the
+// bank preview reaches before friction stops it (distance ∝ speed²); tuned so it isn't overly long
 
 /**
  * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone. The
