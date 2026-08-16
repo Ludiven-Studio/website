@@ -51,6 +51,8 @@ const PITCH_PER_PX = 0.005; // radians of tilt per pixel of two-finger vertical 
 const ORBIT_PER_PX = 0.007; // radians of turn per pixel of right-button horizontal drag (PC)
 const CAM_TAU = 0.09; // camera catch-up time constant (s) — snappy for user orbit/pan/zoom
 const CAM_TAU_SLOW = 0.42; // slower, cinematic glide when auto-placing behind the cue on your turn
+const CAM_FOLLOW_TAU = 0.16; // smooth tracking while the balls roll
+const FOLLOW_MARGIN = 16, FOLLOW_MIN_X = 56, FOLLOW_MIN_Z = 32; // min framed half-extents so a lone ball isn't over-zoomed
 const STRIKE_MS = 460; // final forward swing duration before the ball is released
 const STRIKE_HIT = 0.6; // fraction of the swing at which the tip reaches the ball (fire here)
 const STRIKE_FOLLOW = 8; // follow-through past contact
@@ -511,7 +513,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			pitchRef.current = (view === 'top' ? PITCH_TOP : PITCH_FIT) * D2R;
 		}
 	};
-	const enterActionCam = () => setView('fit'); // pull back to the whole table for the shot
+	const enterActionCam = () => { setView('fit'); camTauRef.current = CAM_FOLLOW_TAU; }; // whole table, then track the roll
 	const restoreCam = () => setView(userCamRef.current); // back to the player's chosen view on their turn
 
 	// Swing the cue stick at the ball, then fire `release` at contact (see the raf loop). Adds a beat
@@ -1005,17 +1007,33 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			g.cueStick.visible = false;
 		}
 
-		// One free orbit camera: az / pitch / pan / zoom are set once by setView() at a situation change
-		// and freely changed by the player (right-drag / two-finger / wheel) — the pose is never re-locked
-		// per frame, so the user can always adjust the angle. It just eases toward the current values.
+		// Free orbit camera: az/pitch/pan/zoom are set by setView() at a situation change and then freely
+		// changed by the player — never re-locked per frame. EXCEPTION: while the balls roll, the camera
+		// auto-frames the shot (the cue + every ball in motion) so you always see the ball you just hit —
+		// panning and zooming to follow the action, not just a static wide shot. The player can still
+		// change the viewing ANGLE (right-drag / two-finger) during the roll.
 		const f = fitRef.current;
-		const zoom = Math.max(1, zoomRef.current);
-		const pitch = pitchRef.current;
-		const az = azRef.current;
-		const d = fitDist(g.camera, f.hx, f.hz, pitch, az) / zoom;
-		const pan = panRef.current;
-		camEye.set(pan.x - Math.cos(az) * Math.cos(pitch) * d, Math.sin(pitch) * d, pan.z - Math.sin(az) * Math.cos(pitch) * d);
-		camLook.set(pan.x, 0, pan.z);
+		const pitch = pitchRef.current, az = azRef.current;
+		let panX: number, panZ: number, d: number;
+		if (statusRef.current === 'rolling') {
+			let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, any = false;
+			for (const b of balls) {
+				if (b.potted) continue;
+				if (b.kind !== 'cue' && Math.hypot(b.vx, b.vy) <= 1) continue; // the cue + balls actually moving
+				const x = b.x - hw, z = b.y - hh;
+				minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); any = true;
+			}
+			if (!any) { minX = maxX = minZ = maxZ = 0; }
+			panX = (minX + maxX) / 2; panZ = (minZ + maxZ) / 2;
+			const bx = Math.max(FOLLOW_MIN_X, (maxX - minX) / 2 + FOLLOW_MARGIN);
+			const bz = Math.max(FOLLOW_MIN_Z, (maxZ - minZ) / 2 + FOLLOW_MARGIN);
+			d = fitDist(g.camera, bx, bz, pitch, az);
+		} else {
+			d = fitDist(g.camera, f.hx, f.hz, pitch, az) / Math.max(1, zoomRef.current);
+			panX = panRef.current.x; panZ = panRef.current.z;
+		}
+		camEye.set(panX - Math.cos(az) * Math.cos(pitch) * d, Math.sin(pitch) * d, panZ - Math.sin(az) * Math.cos(pitch) * d);
+		camLook.set(panX, 0, panZ);
 		lastDistRef.current = d;
 		const cs = camSmoothRef.current;
 		if (!cs.on) { cs.eye.copy(camEye); cs.look.copy(camLook); cs.on = true; }
