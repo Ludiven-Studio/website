@@ -94,6 +94,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const [elapsed, setElapsed] = useState(0);
 	const [best, setBest] = useState<number | null>(null);
 	const [scratchFlash, setScratchFlash] = useState(false);
+	const [cancelFlash, setCancelFlash] = useState(false); // brief "shot cancelled" toast (PC left+right)
 	const [camMode, setCamMode] = useState<CamMode>('fit');
 	const [webglError, setWebglError] = useState(false);
 	// Daily
@@ -755,6 +756,16 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const onWheel = (e: WheelEvent) => { e.preventDefault(); zoomBy(e.deltaY > 0 ? 1 / 1.12 : 1.12); };
 		cv.addEventListener('wheel', onWheel, { passive: false });
 
+		// PC: pressing left + right together cancels the shot being aimed, so you can reposition the
+		// camera and re-aim. Mouse-button chording fires mousedown reliably (a 2nd pointerdown may not).
+		const onMouseDown = (e: MouseEvent) => {
+			if ((e.buttons & 1) && (e.buttons & 2) && aimRef.current) {
+				aimRef.current = null; powerRef.current = 0;
+				setCancelFlash(true); setTimeout(() => setCancelFlash(false), 900);
+			}
+		};
+		cv.addEventListener('mousedown', onMouseDown);
+
 		// Two-finger pinch (zoom) + centroid drag (pan). NATIVE non-passive touch listeners —
 		// React's multi-touch pointer events are dead on real iOS (see the ios-touch memory).
 		const gesture = (t: TouchList) => ({
@@ -790,6 +801,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		cv.addEventListener('touchcancel', onTouchEnd);
 		return () => {
 			cv.removeEventListener('wheel', onWheel);
+			cv.removeEventListener('mousedown', onMouseDown);
 			cv.removeEventListener('touchstart', onTouchStart);
 			cv.removeEventListener('touchmove', onTouchMove);
 			cv.removeEventListener('touchend', onTouchEnd);
@@ -1004,6 +1016,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			match8: match8Ref.current,
 			status: statusRef.current,
 			rolling: rollingRef.current,
+			aiming: !!aimRef.current,
+			strokes: strokesRef.current,
 			eightBall: eightBallRef.current,
 			online: onlineRef.current,
 			myPlayer: myPlayerRef.current,
@@ -1134,6 +1148,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				)}
 
 				{scratchFlash && <div className="bi-scratch">{is8 ? (match8?.lastFoul ?? 'Faute') : 'Pénalité · +1 coup'}</div>}
+				{cancelFlash && <div className="bi-scratch bi-cancel">Tir annulé</div>}
 				{is8 && placing && (
 					<div className="bi-place">
 						<span className="bi-place-icon">✋</span>
@@ -1215,7 +1230,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. La ligne pointillée montre le trajet de la blanche (avant et après le choc), la ligne orange celui de la bille visée. 1 doigt ailleurs déplace la vue, 2 doigts (ou clic droit sur PC) pour pivoter et incliner, molette ou pincement pour zoomer, 🎥 pour changer d'angle.
+				c'est puissant. La ligne pointillée montre le trajet de la blanche (avant et après le choc), la ligne orange celui de la bille visée. 1 doigt ailleurs déplace la vue, 2 doigts (ou clic droit sur PC) pour pivoter et incliner, molette ou pincement pour zoomer, 🎥 pour changer d'angle. Sur PC, clic gauche + droit ensemble annule le tir en préparation.
 				{is8 ? ' 8-ball vs l\'ordinateur : empoche ton groupe (pleines ou rayées) puis la noire en dernier. Les pastilles règlent la force de l\'IA.'
 					: lv.active ? ' Moins tu joues de coups, plus tu gagnes d\'étoiles.'
 					: ` Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.`}
@@ -1276,6 +1291,7 @@ const CSS = `
 .bi-act:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
+.bi-cancel { background: rgba(20,14,10,0.82); }
 .bi-place { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; max-width: 92%; padding: 10px 18px; border-radius: 16px; background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(30,150,60,0.96)); color: #fff; box-shadow: var(--shadow-lg); animation: bi-place-pop 1.6s ease-in-out infinite; }
 .bi-place-icon { font-size: 20px; line-height: 1; }
 .bi-place-title { font-weight: 800; font-size: 14px; }
