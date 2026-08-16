@@ -580,11 +580,22 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	runAiShotRef.current = runAiShot;
 
 	/* ---------- Multiplayer (Libre online, deterministic lockstep) ---------- */
-	const leaveOnline = () => {
-		netRef.current?.leave(); netRef.current = null;
+	// Tear down any online session/state WITHOUT laying a table (the caller picks the next mode).
+	const resetOnline = () => {
+		if (netRef.current) { netRef.current.leave(); netRef.current = null; }
 		onlineRef.current = false; startedOnlineRef.current = false;
 		setMpPhase('off'); setMpCode(null); setMpOpp(null); setMpMsg(null);
-		newFreeTable(diffKey); // back to vs-AI
+	};
+	const leaveOnline = () => { resetOnline(); newFreeTable(diffKey); }; // back to vs-AI
+	// The "En ligne" tab: drop any level/daily/online state, lay a clean Libre table as the backdrop
+	// (the online match re-racks on connect; backing out of the menu leaves a consistent Libre game),
+	// then open the match menu.
+	const enterOnline = () => {
+		resetOnline();
+		if (lv.active) lv.exit();
+		newFreeTable(diffKey);
+		setMpMsg(null);
+		setMpPhase('menu');
 	};
 
 	const startOnlineMatch = () => {
@@ -1185,11 +1196,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					<div className="bi-modetoggle">
 						<ModeToggle
 							daily={daily}
-							onFree={() => { if (lv.active) { lv.exit(); newFreeTable(diffKey); } else if (daily) newFreeTable(diffKey); }}
-							onDaily={() => { lv.exit(); startDaily(); }}
+							onFree={() => { if (mpPhase !== 'off') leaveOnline(); else if (lv.active) { lv.exit(); newFreeTable(diffKey); } else if (daily) newFreeTable(diffKey); }}
+							onDaily={() => { resetOnline(); lv.exit(); startDaily(); }}
 							showLevels
 							levelsActive={lv.active}
-							onLevels={armLevels}
+							onLevels={() => { resetOnline(); armLevels(); }}
+							showOnline
+							onlineActive={mpPhase !== 'off'}
+							onOnline={enterOnline}
 						/>
 					</div>
 					<div className="bi-stats">
@@ -1210,9 +1224,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						{is8 && !lv.active && mpPhase === 'off' && diffKeys(DIFFS, gameId).map((k) => (
 							<button key={k} className={`bi-pill ${diffKey === k ? 'active' : ''}`} onClick={() => newFreeTable(k)} title="Force de l’IA">{DIFFS[k].label}</button>
 						))}
-						{is8 && !lv.active && mpPhase === 'off' && (
-							<button className="bi-act" onClick={() => { setMpMsg(null); setMpPhase('menu'); }} aria-label="Jouer en ligne" title="Jouer en ligne">👥</button>
-						)}
 						{mpPhase === 'playing' && (
 							<button className="bi-act" onClick={leaveOnline} aria-label="Quitter la partie en ligne" title="Quitter la partie en ligne">🚪</button>
 						)}

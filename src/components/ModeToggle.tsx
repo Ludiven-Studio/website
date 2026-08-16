@@ -13,9 +13,13 @@ interface Props {
 	showLevels?: boolean;
 	levelsActive?: boolean;
 	onLevels?: () => void;
+	/** Opt-in online segment (e.g. billard multiplayer). When set, `onlineActive` + `onOnline` required. */
+	showOnline?: boolean;
+	onlineActive?: boolean;
+	onOnline?: () => void;
 }
 
-export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsActive, onLevels }: Props) {
+export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsActive, onLevels, showOnline, onlineActive, onOnline }: Props) {
 	const onDailyRef = useRef(onDaily);
 	onDailyRef.current = onDaily;
 
@@ -38,15 +42,15 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 	}, []);
 
 	// With the third segment the label 'Mode libre' is too wide on phones — shorten.
-	const freeActive = !daily && !levelsActive;
+	const freeActive = !daily && !levelsActive && !onlineActive;
 	return (
-		<div className={`dt-toggle ${showLevels ? 'three' : ''}`} role="tablist" aria-label="Mode">
+		<div className={`dt-toggle ${showLevels ? 'three' : ''} ${showOnline ? 'four' : ''}`} role="tablist" aria-label="Mode">
 			<style>{CSS}</style>
 			{showLevels && (
 				<button
 					role="tab"
-					aria-selected={!!levelsActive}
-					className={`dt-seg ${levelsActive ? 'active' : ''}`}
+					aria-selected={!!levelsActive && !onlineActive}
+					className={`dt-seg ${levelsActive && !onlineActive ? 'active' : ''}`}
 					onClick={onLevels}
 				>
 					🎯 Niveaux
@@ -54,8 +58,8 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 			)}
 			<button
 				role="tab"
-				aria-selected={daily && !levelsActive}
-				className={`dt-seg ${daily && !levelsActive ? 'active' : ''}`}
+				aria-selected={daily && !levelsActive && !onlineActive}
+				className={`dt-seg ${daily && !levelsActive && !onlineActive ? 'active' : ''}`}
 				onClick={onDaily}
 			>
 				🏆 {showLevels ? 'Défi' : 'Défi du jour'}
@@ -68,6 +72,16 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 			>
 				🎲 {showLevels ? 'Libre' : 'Mode libre'}
 			</button>
+			{showOnline && (
+				<button
+					role="tab"
+					aria-selected={!!onlineActive}
+					className={`dt-seg ${onlineActive ? 'active' : ''}`}
+					onClick={onOnline}
+				>
+					👥 En ligne
+				</button>
+			)}
 		</div>
 	);
 }
@@ -86,6 +100,8 @@ const CSS = `
   box-shadow: var(--shadow-sm);
 }
 .dt-toggle.three { max-width: 440px; }
+.dt-toggle.four { max-width: 520px; }
+.dt-toggle.four .dt-seg { font-size: 12.5px; padding: 10px 3px; }
 .dt-seg {
   flex: 1;
   border: none;
