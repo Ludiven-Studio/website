@@ -349,12 +349,12 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 		const hit = sim.find((b) => b.kind !== 'cue' && !b.potted && (b.vx !== 0 || b.vy !== 0));
 		if (hit) {
 			contact = { x: cue.x, y: cue.y };
+			// At contact we show just two SHORT lines: the struck ball's direction and the cue's own
+			// deflection (both power-independent). They're the whole story once a ball is met.
 			const ol = Math.hypot(hit.vx, hit.vy) || 1;
-			object = { from: { x: hit.x, y: hit.y }, to: { x: hit.x + (hit.vx / ol) * 22, y: hit.y + (hit.vy / ol) * 22 } };
+			object = { from: { x: hit.x, y: hit.y }, to: { x: hit.x + (hit.vx / ol) * 20, y: hit.y + (hit.vy / ol) * 20 } };
 			const cl = Math.hypot(cue.vx, cue.vy);
-			// Where the WHITE ball rolls on after the hit. Long enough to read as its own path even when
-			// the cue started right next to the object ball (the pre-contact stub is then tiny).
-			if (cl > AIM_SETTLE) cueAfter = { from: { x: cue.x, y: cue.y }, to: { x: cue.x + (cue.vx / cl) * 40, y: cue.y + (cue.vy / cl) * 40 } };
+			if (cl > AIM_SETTLE) cueAfter = { from: { x: cue.x, y: cue.y }, to: { x: cue.x + (cue.vx / cl) * 20, y: cue.y + (cue.vy / cl) * 20 } };
 			break;
 		}
 		if (cue.potted) { pocket = true; pts.push({ x: cue.x, y: cue.y }); break; }
@@ -364,7 +364,21 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 		// a miss shows its bank path. It stops as soon as it meets a ball (the `hit` check above) or
 		// when the cue runs out of roll — never an endless zigzag.
 		const ndx = cue.vx / sp, ndy = cue.vy / sp;
-		if (ndx * dx + ndy * dy < 0.9995) { pts.push({ x: cue.x, y: cue.y }); dx = ndx; dy = ndy; }
+		if (ndx * dx + ndy * dy < 0.9995) {
+			// Snap the corner onto the exact rail the cue hit — recording the post-step position left it
+			// a few units inside the felt, so the two segments met off the cushion and looked disjointed.
+			const prev = pts[pts.length - 1];
+			let corner: Vec = { x: cue.x, y: cue.y };
+			if (Math.sign(ndx) !== Math.sign(dx) && dx !== 0) {
+				const railX = dx > 0 ? table.w - BALL_R : BALL_R;
+				corner = { x: railX, y: prev.y + dy * ((railX - prev.x) / dx) };
+			} else if (Math.sign(ndy) !== Math.sign(dy) && dy !== 0) {
+				const railY = dy > 0 ? table.h - BALL_R : BALL_R;
+				corner = { x: prev.x + dx * ((railY - prev.y) / dy), y: railY };
+			}
+			pts.push(corner);
+			dx = ndx; dy = ndy;
+		}
 	}
 	if (contact) pts.push(contact);
 	const segs: { from: Vec; to: Vec }[] = [];
