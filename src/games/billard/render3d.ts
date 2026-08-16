@@ -308,7 +308,7 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 	const sim: Ball[] = balls.map((b) => ({ x: b.x, y: b.y, vx: 0, vy: 0, r: b.r, kind: b.kind, color: b.color, potted: b.potted }));
 	const cue = sim.find((b) => b.kind === 'cue');
 	if (!cue) return empty;
-	let dx = -pull.x / m, dy = -pull.y / m; // shot direction (opposite the pull)
+	const dx = -pull.x / m, dy = -pull.y / m; // shot direction (opposite the pull)
 	cue.vx = dx * GUIDE_SPEED; cue.vy = dy * GUIDE_SPEED;
 
 	const pts: Vec[] = [{ x: cue.x, y: cue.y }];
