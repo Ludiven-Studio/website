@@ -1394,9 +1394,9 @@ const CSS = `
 .bi-topbar { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 10px; }
 .bi-hud-top { width: 100%; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; pointer-events: none; }
 .bi-hud-top > * { pointer-events: auto; }
-/* Libre/Défi toggle: hidden in the windowed view, shown only in fullscreen. */
-.bi-modetoggle { display: none; }
-.game-page.gf-full .bi-modetoggle { display: block; }
+/* Niveaux / Défi / Libre toggle — always visible so modes (and multiplayer, in Libre) are reachable
+   without going fullscreen. The topbar wraps on narrow screens. */
+.bi-modetoggle { display: block; }
 .bi-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .bi-daily-hud { background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); pointer-events: none; }
 
