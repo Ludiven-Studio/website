@@ -920,7 +920,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				pts.push(new THREE.Vector3(pred.segs[s].to.x - hw, Y, pred.segs[s].to.y - hh));
 			}
 			if (pts.length >= 2) {
-				g.aimLine.geometry.setFromPoints(pts);
+				// Fresh geometry each time: setFromPoints REUSES the old position buffer and only
+				// overwrites up to its old vertex count, so a long bank path left stale segments behind
+				// when the next aim was a short direct line. Dispose + rebuild sizes it exactly.
+				g.aimLine.geometry.dispose();
+				g.aimLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
 				g.aimLine.computeLineDistances();
 				(g.aimLine.material as THREE.LineDashedMaterial).color.setHSL(0.35, 0.9, 0.42 + 0.23 * powerRef.current); // always green; brighter = harder (no orange clash with the struck-ball line)
 				g.aimLine.visible = true;
