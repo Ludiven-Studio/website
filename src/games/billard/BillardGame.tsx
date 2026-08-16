@@ -101,7 +101,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const [best, setBest] = useState<number | null>(null);
 	const [scratchFlash, setScratchFlash] = useState(false);
 	const [cancelFlash, setCancelFlash] = useState(false); // brief "shot cancelled" toast (PC left+right)
-	const [camMode, setCamMode] = useState<CamMode>('fit');
+	const [camMode, setCamMode] = useState<CamMode>('shoulder');
 	const [webglError, setWebglError] = useState(false);
 	// Daily
 	const [daily, setDaily] = useState(false);
@@ -160,8 +160,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const strikeRef = useRef<{ vx: number; vy: number; dx: number; dy: number; cx: number; cy: number; back: number; warmups: number; t0: number; fired: boolean; release: () => void } | null>(null);
 
 	// Camera / view state read inside the raf loop.
-	const userCamRef = useRef<CamMode>('fit'); // the view the player picked, restored after the action cam
-	const camModeRef = useRef<CamMode>('fit');
+	const userCamRef = useRef<CamMode>('shoulder'); // the view the player picked, restored after the action cam
+	const camModeRef = useRef<CamMode>('shoulder');
 	const zoomRef = useRef(1);
 	const azRef = useRef(0);
 	const pitchRef = useRef(PITCH_FIT * D2R); // camera tilt for fit/top (two-finger vertical)
@@ -338,9 +338,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		panRef.current = { x: 0, z: 0 };
 		azRef.current = fitRef.current.az;
 		pitchRef.current = PITCH_FIT * D2R;
-		camModeRef.current = 'fit';
-		userCamRef.current = 'fit';
-		setCamMode('fit');
+		camModeRef.current = 'shoulder'; // aim from behind the cue ball by default
+		userCamRef.current = 'shoulder';
+		setCamMode('shoulder');
 		strikeRef.current = null;
 		camSmoothRef.current.on = false;
 		setStrokes(0);
@@ -1005,9 +1005,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const az = azRef.current;
 			const d = fitDist(g.camera, f.hx, f.hz, pitch, az) / zoom;
 			const pan = panRef.current;
-			// Keep the cue ball on screen: whatever the pan/zoom, pull the look target back
-			// toward the cue if the current framing would push it out of frame.
-			if (cue) {
+			// While AIMING, keep the cue ball on screen (pull the look target toward it if framing would
+			// push it out). During the shot we leave the pan centred so the whole table — every ball in
+			// motion — stays in view instead of the camera chasing the cue.
+			if (cue && statusRef.current === 'aiming') {
 				const cgx = cue.x - hw, cgz = cue.y - hh;
 				const visHalf = d * Math.tan((g.camera.fov * Math.PI / 180) / 2) * Math.min(1, g.camera.aspect);
 				const maxOff = Math.max(0, visHalf * 0.8 - BALL_R * 3);
@@ -1107,6 +1108,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			match8: match8Ref.current,
 			status: statusRef.current,
 			rolling: rollingRef.current,
+			moving: ballsRef.current.filter((b) => !b.potted && Math.hypot(b.vx, b.vy) > 0.2).length,
 			aiming: !!aimRef.current,
 			strokes: strokesRef.current,
 			eightBall: eightBallRef.current,
