@@ -290,12 +290,12 @@ const AIM_MAX_STEPS = 600; // ~10 s at 60 Hz — the cue always stops or hits we
 const GUIDE_SPEED = 135; // fixed reference speed for the aim line — DIRECTION guide, not power-scaled
 
 /**
- * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone:
- * exact cushion bounces (including the pocket-mouth gaps). The guide is a DIRECTION aid, so it
- * runs at a fixed reference speed (not the actual pull) — otherwise a soft aim shrinks it to a
- * useless stub. The line stops at the first ball the cue meets; contact geometry (object launch
- * + cue deflection directions) is power-independent, so it stays correct. Power is shown by the
- * line colour + the pull marker instead.
+ * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone. The
+ * guide is a DIRECTION aid, so it runs at a fixed reference speed (not the actual pull) — otherwise
+ * a soft aim shrinks it to a useless stub. It shows only the DIRECT aim: a straight line to the
+ * first ball or the first cushion, never hypothetical multi-bounce paths. On a ball contact it adds
+ * the two resulting directions (struck ball + cue deflection), which are power-independent. Power is
+ * shown by the line colour instead.
  */
 export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPrediction {
 	const empty: AimPrediction = { segs: [], contact: null, object: null, cueAfter: null, pocket: false };
@@ -334,9 +334,10 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 		if (cue.potted) { pocket = true; pts.push({ x: cue.x, y: cue.y }); break; }
 		const sp = Math.hypot(cue.vx, cue.vy);
 		if (sp < AIM_SETTLE) { pts.push({ x: cue.x, y: cue.y }); break; }
-		// Record a corner only where the cue changes heading (a cushion bounce).
+		// Stop at the FIRST cushion — a heading change means the cue bounced. We show only the direct
+		// aim (up to the first ball or the first rail), never the hypothetical multi-bounce path.
 		const ndx = cue.vx / sp, ndy = cue.vy / sp;
-		if (ndx * dx + ndy * dy < 0.9995) { pts.push({ x: cue.x, y: cue.y }); dx = ndx; dy = ndy; }
+		if (ndx * dx + ndy * dy < 0.9995) { pts.push({ x: cue.x, y: cue.y }); break; }
 	}
 	if (contact) pts.push(contact);
 	const segs: { from: Vec; to: Vec }[] = [];
