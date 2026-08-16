@@ -44,7 +44,7 @@ const pull = async (page, withCancel) => {
 	if (withCancel) { await page.mouse.down({ button: 'right' }); await sleep(120); }
 	await page.mouse.up(); // release left
 	if (withCancel) { await page.mouse.up({ button: 'right' }); }
-	await sleep(70); // snap before the shot settles: a real fire has rolling=true here
+	await sleep(200); // a real fire is now 'striking' (cue-stick swing) before it rolls
 	const toast = await page.locator('.bi-cancel').count();
 	return { mid, end: await snap(page), toast };
 };
@@ -54,14 +54,14 @@ const a = await open();
 const s0 = await snap(a);
 console.log('initial snap:', { status: s0.status, eightBall: s0.eightBall, match8turn: s0.match8?.turn });
 const ctrl = await pull(a, false);
-console.log('control (no cancel): aiming@drag', ctrl.mid.aiming, '→ rolling', ctrl.end.rolling);
+console.log('control (no cancel): aiming@drag', ctrl.mid.aiming, '→ status', ctrl.end.status);
 
-// Cancel: left+right → no shot → rolling stays false + toast shown.
+// Cancel: left+right → no shot → status stays 'aiming' + toast shown.
 const b = await open();
 const canc = await pull(b, true);
-console.log('cancel (left+right): aiming@drag', canc.mid.aiming, '→ rolling', canc.end.rolling, '· toast', canc.toast);
+console.log('cancel (left+right): aiming@drag', canc.mid.aiming, '→ status', canc.end.status, '· toast', canc.toast);
 
-const ok = ctrl.mid.aiming && canc.mid.aiming && ctrl.end.rolling === true && canc.end.rolling === false && canc.toast === 1;
+const ok = ctrl.mid.aiming && canc.mid.aiming && ctrl.end.status !== 'aiming' && canc.end.status === 'aiming' && canc.toast === 1;
 console.log(ok ? 'OK: left+right cancelled the shot (control fired, cancel did not)' : 'FAIL: check the numbers above');
 
 await browser.close();

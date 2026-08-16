@@ -33,6 +33,31 @@ export function makeBallMesh(color: number): THREE.Mesh {
 	return m;
 }
 
+/** A cue stick, lying along local +X with the tip at x=0 (butt at +X). The caller positions and
+ *  swings it during the strike animation; hidden the rest of the time. */
+export function makeCueStick(): THREE.Group {
+	const g = new THREE.Group();
+	const L = 82, tipR = 0.55, buttR = 1.7;
+	const alongX = (geo: THREE.CylinderGeometry, cx: number) => { geo.rotateZ(-Math.PI / 2); geo.translate(cx, 0, 0); return geo; };
+	const shaft = new THREE.Mesh(
+		alongX(new THREE.CylinderGeometry(buttR, tipR, L, 16), L / 2), // radiusTop=butt (+X), radiusBottom=tip (x=0)
+		new THREE.MeshStandardMaterial({ color: 0xcaa06a, roughness: 0.5, metalness: 0.05 }),
+	);
+	shaft.castShadow = true;
+	g.add(shaft);
+	g.add(new THREE.Mesh( // pale ferrule + tip at the striking end
+		alongX(new THREE.CylinderGeometry(tipR + 0.15, tipR, 2, 16), 1),
+		new THREE.MeshStandardMaterial({ color: 0xf4f0e6, roughness: 0.6 }),
+	));
+	g.add(new THREE.Mesh( // darker wrap near the butt
+		alongX(new THREE.CylinderGeometry(buttR + 0.05, buttR * 0.82, L * 0.28, 16), L - L * 0.14),
+		new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 0.5 }),
+	));
+	g.visible = false;
+	g.renderOrder = 13;
+	return g;
+}
+
 /* ---------- 8-ball: numbered / striped balls ---------- */
 
 // Real pool hues by number (1-7 solids, 8 black). Stripes 9-15 reuse hues 1-7.

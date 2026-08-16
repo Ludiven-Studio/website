@@ -5,7 +5,7 @@ import {
 	encodeScore, DIFFS, BALL_R, type Ball, type DiffLevel, type Table, type Vec,
 } from './engine';
 import {
-	buildTable3D, makeBallMesh, makeBall8Mesh, fitDist, bestAz, predictCue,
+	buildTable3D, makeBallMesh, makeBall8Mesh, makeCueStick, fitDist, bestAz, predictCue,
 	CUE_COLOR, BALL_COLORS, type Table3D,
 } from './render3d';
 import { initMatch8, applyShot, groupOf, type Match8, type Group } from './rules8';
@@ -33,7 +33,7 @@ import { diffKeys } from '../../lib/difficulty';
    Moteur pur/testé 2D dans ./engine ; seul le rendu (render3d.ts) est 3D.
    ===================================================== */
 
-type Status = 'aiming' | 'rolling' | 'won';
+type Status = 'aiming' | 'striking' | 'rolling' | 'won';
 type CamMode = 'fit' | 'shoulder' | 'top';
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 const STEP = 1000 / 60;
@@ -50,6 +50,10 @@ const MIN_PITCH = 14 * D2R, MAX_PITCH = 89 * D2R; // tilt limits for the two-fin
 const PITCH_PER_PX = 0.005; // radians of tilt per pixel of two-finger vertical drag
 const ORBIT_PER_PX = 0.007; // radians of turn per pixel of right-button horizontal drag (PC)
 const CAM_TAU = 0.09; // camera catch-up time constant (s)
+const STRIKE_MS = 520; // cue-stick swing duration before the ball is released
+const STRIKE_HIT = 0.62; // fraction of the swing at which the tip reaches the ball (fire here)
+const STRIKE_BACK = 30; // how far the tip is drawn back at the start of the swing (world units)
+const STRIKE_FOLLOW = 8; // follow-through past contact
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🎱', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
 const SUN_DIR = new THREE.Vector3(30, 90, 40).normalize();
@@ -84,6 +88,7 @@ interface Scene3D {
 	cueLine: THREE.Line;
 	contact: THREE.Mesh;
 	placeRing: THREE.Mesh; // pulsing ring around the cue during ball-in-hand
+	cueStick: THREE.Group; // swung at the ball on each shot (player + AI)
 }
 
 export default function BillardGame({ gameId }: { gameId: string }) {
@@ -149,7 +154,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const myPlayerRef = useRef<0 | 1>(0);
 	const startedOnlineRef = useRef(false); // guard against starting the match twice on presence sync
 
+	// Cue-strike animation: set on fire, advanced in the raf loop; releases the ball at contact.
+	const strikeRef = useRef<{ vx: number; vy: number; dx: number; dy: number; cx: number; cy: number; t0: number; fired: boolean; release: () => void } | null>(null);
+
 	// Camera / view state read inside the raf loop.
+	const userCamRef = useRef<CamMode>('fit'); // the view the player picked, restored after the action cam
 	const camModeRef = useRef<CamMode>('fit');
 	const zoomRef = useRef(1);
 	const azRef = useRef(0);
@@ -256,7 +265,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		placeRing.rotation.x = -Math.PI / 2; placeRing.visible = false; placeRing.renderOrder = 12;
 		scene.add(placeRing);
 
-		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, contact, placeRing };
+		const cueStick = makeCueStick();
+		scene.add(cueStick);
+
+		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, contact, placeRing, cueStick };
 		return true;
 	}, []);
 
@@ -324,7 +336,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		azRef.current = fitRef.current.az;
 		pitchRef.current = PITCH_FIT * D2R;
 		camModeRef.current = 'fit';
+		userCamRef.current = 'fit';
 		setCamMode('fit');
+		strikeRef.current = null;
 		camSmoothRef.current.on = false;
 		setStrokes(0);
 		setRemaining(ballsRef.current.filter((b) => b.kind === 'color').length);
@@ -444,6 +458,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				localStorage.setItem(freeBestKey(diffKey), String(newBest));
 			}
 		} else {
+			restoreCam();
 			setStat('aiming');
 		}
 	}, [daily, diffKey, gameId, lv]);
@@ -464,6 +479,32 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setStat('rolling');
 	};
 
+	// Pull the view back to frame the whole table for the shot (smooth via the camera easing);
+	// keep the player's chosen view in userCamRef to restore once it is their turn to aim again.
+	const enterActionCam = () => {
+		camModeRef.current = 'fit'; setCamMode('fit');
+		zoomRef.current = 1; panRef.current = { x: 0, z: 0 };
+		pitchRef.current = PITCH_FIT * D2R; azRef.current = fitRef.current.az;
+	};
+	const restoreCam = () => {
+		const m = userCamRef.current;
+		camModeRef.current = m; setCamMode(m);
+		zoomRef.current = 1; panRef.current = { x: 0, z: 0 };
+		pitchRef.current = (m === 'top' ? PITCH_TOP : PITCH_FIT) * D2R;
+		azRef.current = m === 'top' ? fitRef.current.azTop : fitRef.current.az;
+	};
+
+	// Swing the cue stick at the ball, then fire `release` at contact (see the raf loop). Adds a beat
+	// before every shot (player release + AI) and pulls the camera back to watch the balls scatter.
+	const beginStrike = (vx: number, vy: number, release: () => void) => {
+		const cue = ballsRef.current.find((b) => b.kind === 'cue');
+		const m = Math.hypot(vx, vy);
+		if (!cue || m < 1e-3) { release(); return; } // nothing to swing at — just fire
+		strikeRef.current = { vx, vy, dx: vx / m, dy: vy / m, cx: cue.x, cy: cue.y, t0: -1, fired: false, release };
+		setStat('striking');
+		enterActionCam();
+	};
+
 	const runAiShot = () => {
 		const balls = ballsRef.current, t = tableRef.current, m = match8Ref.current;
 		if (!m || m.winner !== null || m.turn !== AI) { aiThinkingRef.current = false; return; }
@@ -472,8 +513,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (m.ballInHand === AI) { cue.x = t.cueStart.x; cue.y = t.cueStart.y; cue.potted = false; match8Ref.current = { ...m, ballInHand: null }; setMatch8(match8Ref.current); }
 		const skill = lv.active ? levelSkillRef.current : (AI_SKILL[diffKey] ?? 0.6);
 		const shot = chooseShot(balls, t, m.groups[AI], skill, Math.random);
-		cue.vx = shot.vx; cue.vy = shot.vy;
-		startShot8();
+		beginStrike(shot.vx, shot.vy, startShot8);
 		aiThinkingRef.current = false;
 	};
 
@@ -498,8 +538,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			}
 			return;
 		}
-		if (next.turn === me) { // my turn to aim
+		if (next.turn === me) { // my turn to aim — bring my chosen view back
 			if (next.ballInHand === me) { placingRef.current = true; setPlacing(true); }
+			restoreCam();
 			setStat('aiming');
 		} else if (onlineRef.current) { // remote opponent shoots — wait for their shot message
 			setStat('aiming');
@@ -536,10 +577,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			if (!m || m.winner !== null || m.turn === myPlayerRef.current) return;
 			const cue = ballsRef.current.find((b) => b.kind === 'cue');
 			if (!cue) return;
-			cue.x = s.px; cue.y = s.py; cue.potted = false; cue.vx = s.vx; cue.vy = s.vy;
+			cue.x = s.px; cue.y = s.py; cue.potted = false; cue.vx = 0; cue.vy = 0;
 			if (m.ballInHand != null) { match8Ref.current = { ...m, ballInHand: null }; setMatch8(match8Ref.current); }
 			placingRef.current = false; setPlacing(false);
-			startShot8();
+			beginStrike(s.vx, s.vy, startShot8); // animate the opponent's stroke too
 		});
 		layRack(DIFFS.facile, seedFromRoom(net.roomId)); // same rack on both peers
 		setMpMsg(null);
@@ -681,9 +722,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			if (!v) return;
 			const cue = cueBall();
 			if (!cue) return;
-			cue.vx = v.vx; cue.vy = v.vy;
-			if (onlineRef.current) netRef.current?.sendShot({ vx: v.vx, vy: v.vy, px: cue.x, py: cue.y }); // tell the remote
-			startShot8();
+			if (onlineRef.current) netRef.current?.sendShot({ vx: v.vx, vy: v.vy, px: cue.x, py: cue.y }); // tell the remote (it animates its own strike)
+			beginStrike(v.vx, v.vy, startShot8);
 			return;
 		}
 		if (daily && startRef.current === 0 && triesRef.current >= MAX_TRIES) return; // out of daily tries
@@ -691,7 +731,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (!v) return;
 		const cue = cueBall();
 		if (!cue) return;
-		cue.vx = v.vx; cue.vy = v.vy;
 		if (startRef.current === 0) {
 			startRef.current = Date.now();
 			trackGame(gameId, 'game_started');
@@ -707,8 +746,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		}
 		strokesRef.current += 1;
 		setStrokes(strokesRef.current);
-		rollingRef.current = true;
-		setStat('rolling');
+		beginStrike(v.vx, v.vy, () => { rollingRef.current = true; setStat('rolling'); });
 	}, [daily, gameId]);
 
 	// Single-pointer aim/orbit via Pointer Events (mouse, touch, pen) — reliable on iOS.
@@ -722,6 +760,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const cycleCam = useCallback(() => {
 		const nv = CAM_NEXT[camModeRef.current];
 		camModeRef.current = nv;
+		userCamRef.current = nv; // remember the player's choice so the action cam can restore it
 		setCamMode(nv);
 		zoomRef.current = 1;
 		panRef.current = { x: 0, z: 0 };
@@ -912,6 +951,23 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			g.placeRing.scale.set(s, s, s);
 		}
 
+		// Cue stick: swing it at the ball during a strike (windup → contact → follow-through).
+		const strike = strikeRef.current;
+		if (strike) {
+			const e = strike.t0 < 0 ? 0 : Math.max(0, Math.min(1, (now - strike.t0) / STRIKE_MS));
+			const off = e < STRIKE_HIT
+				? -STRIKE_BACK * (1 - (e / STRIKE_HIT) ** 2) // draw back → contact (ease-in)
+				: STRIKE_FOLLOW * ((e - STRIKE_HIT) / (1 - STRIKE_HIT)); // follow through
+			const dxw = strike.dx, dzw = strike.dy; // engine dir maps straight to world (x, z)
+			const tipX = (strike.cx - hw) - dxw * (BALL_R - off);
+			const tipZ = (strike.cy - hh) - dzw * (BALL_R - off);
+			g.cueStick.position.set(tipX, BALL_R, tipZ);
+			g.cueStick.rotation.set(0, Math.atan2(dzw, -dxw), 0); // local +X (toward butt) points back up-cue
+			g.cueStick.visible = true;
+		} else {
+			g.cueStick.visible = false;
+		}
+
 		// Camera pose for the current mode, then eased toward it.
 		const mode = camModeRef.current, f = fitRef.current;
 		const zoom = Math.max(1, zoomRef.current);
@@ -964,6 +1020,19 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			if (!lastRef.current) lastRef.current = now;
 			const dt = Math.min(now - lastRef.current, 200);
 			lastRef.current = now;
+			// Cue-strike swing: hold+thrust, release the ball at contact, clear when the swing ends.
+			const strike = strikeRef.current;
+			if (strike) {
+				if (strike.t0 < 0) strike.t0 = now;
+				const e = (now - strike.t0) / STRIKE_MS;
+				if (!strike.fired && e >= STRIKE_HIT) {
+					strike.fired = true;
+					const cue = ballsRef.current.find((b) => b.kind === 'cue');
+					if (cue) { cue.vx = strike.vx; cue.vy = strike.vy; }
+					strike.release();
+				}
+				if (e >= 1) strikeRef.current = null;
+			}
 			accRef.current += dt;
 			while (accRef.current >= STEP) {
 				accRef.current -= STEP;
@@ -1047,6 +1116,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const oppGroup: Group | null = match8?.groups[AI] ?? null;
 	const colorLeft = ballsRef.current.filter((b) => b.kind === 'color' && !b.potted);
 	const myLeft = myGroup ? colorLeft.filter((b) => groupOf(b.color) === myGroup).length : 0;
+	// Group cleared → only the 8 left to pot (correct for the local player, incl. online player 1).
+	const meGroup: Group | null = match8?.groups[myIdx] ?? null;
+	const meLeft = meGroup ? colorLeft.filter((b) => groupOf(b.color) === meGroup).length : 0;
+	const onBlack = is8 && !!match8 && match8.winner == null && !match8.open && !!meGroup && meLeft === 0;
 	const eightWin = is8 && !lv.active && match8?.winner != null; // Libre card; Niveaux uses LevelOutcome
 	const restartLabel = lv.active ? 'Recommencer le niveau'
 		: is8 ? 'Nouvelle partie'
@@ -1130,6 +1203,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						{match8.lastFoul || match8.lastEvent || (match8.open ? 'Table ouverte — empoche pour choisir pleines ou rayées' : `Toi : ${groupLabel(myGroup)} · ${mpPhase === 'playing' ? (mpOpp || 'Adv') : 'Ordi'} : ${groupLabel(oppGroup)}`)}
 					</div>
 				)}
+				{onBlack && <div className="bi-daily-tag bi-daily-hud bi-onblack">🎱 Plus que la noire à rentrer !</div>}
 			</div>
 
 			<div className="bi-playwrap" ref={wrapRef}>
@@ -1292,6 +1366,7 @@ const CSS = `
 
 .bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
 .bi-cancel { background: rgba(20,14,10,0.82); }
+.bi-onblack { background: linear-gradient(180deg, #2b2b2f, #111114); color: #ffe08a; font-weight: 800; border: 1px solid rgba(255,224,138,0.5); }
 .bi-place { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; max-width: 92%; padding: 10px 18px; border-radius: 16px; background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(30,150,60,0.96)); color: #fff; box-shadow: var(--shadow-lg); animation: bi-place-pop 1.6s ease-in-out infinite; }
 .bi-place-icon { font-size: 20px; line-height: 1; }
 .bi-place-title { font-weight: 800; font-size: 14px; }
