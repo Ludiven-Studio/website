@@ -78,9 +78,10 @@ export function applyShot(state: Match8, shot: Shot8, board: Board8): Match8 {
 			fWrongFirst = groupCleared ? fg !== 'eight' : fg !== myGroup;
 		}
 	}
-	const fNoRail = !fNoContact && potted.length === 0 && !shot.railAfterContact;
 	const fScratch = shot.scratched;
-	const foul = fNoContact || fWrongFirst || fNoRail || fScratch;
+	// NB: no "no-rail after contact" foul — it's a WPA/BCA tournament rule most casual players don't
+	// know and it isn't in the common French rule sets, so we leave it out.
+	const foul = fNoContact || fWrongFirst || fScratch;
 
 	// --- 8-ball terminal resolution (highest priority) ---
 	if (eightPotted) {
@@ -108,8 +109,7 @@ export function applyShot(state: Match8, shot: Shot8, board: Board8): Match8 {
 		next.ballInHand = opp;
 		next.lastFoul = fScratch ? 'Faute : blanche rentrée — bille en main'
 			: fNoContact ? 'Faute : aucune bille touchée — bille en main'
-			: fWrongFirst ? 'Faute : mauvaise bille d’abord — bille en main'
-			: 'Faute : aucune bande après contact — bille en main';
+			: 'Faute : mauvaise bille d’abord — bille en main';
 		return next;
 	}
 

@@ -87,10 +87,10 @@ describe('assigned table', () => {
 		expect(s.turn).toBe(0);
 		expect(s.ballInHand).toBeNull();
 	});
-	it('no pot and no rail after contact is a foul (no-rail)', () => {
+	it('legal contact but no pot and no rail is NOT a foul (no-rail rule removed) — turn just passes', () => {
 		const s = applyShot(assigned0(), shot({ firstHitNumber: 3, potted: [], railAfterContact: false }), board(ALL));
-		expect(s.ballInHand).toBe(1);
 		expect(s.turn).toBe(1);
+		expect(s.ballInHand).toBeNull();
 	});
 	it('clean miss with a rail passes the turn without ball-in-hand', () => {
 		const s = applyShot(assigned0(), shot({ firstHitNumber: 3, potted: [], railAfterContact: true }), board(ALL));
