@@ -334,13 +334,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		rollingRef.current = false;
 		aimRef.current = null;
 		panDragRef.current = null;
-		zoomRef.current = 1;
-		panRef.current = { x: 0, z: 0 };
-		azRef.current = fitRef.current.az;
-		pitchRef.current = PITCH_FIT * D2R;
-		camModeRef.current = 'shoulder'; // aim from behind the cue ball by default
-		userCamRef.current = 'shoulder';
-		setCamMode('shoulder');
+		userCamRef.current = 'shoulder'; // aim from behind the cue ball by default
+		setView('shoulder');
 		strikeRef.current = null;
 		camSmoothRef.current.on = false;
 		setStrokes(0);
@@ -482,20 +477,28 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setStat('rolling');
 	};
 
-	// Pull the view back to frame the whole table for the shot (smooth via the camera easing);
-	// keep the player's chosen view in userCamRef to restore once it is their turn to aim again.
-	const enterActionCam = () => {
-		camModeRef.current = 'fit'; setCamMode('fit');
-		zoomRef.current = 1; panRef.current = { x: 0, z: 0 };
-		pitchRef.current = PITCH_FIT * D2R; azRef.current = fitRef.current.az;
+	// Snap the camera to a preset for the new situation. It only sets az/pitch/pan/zoom ONCE — the
+	// render reads those each frame, so the player stays free to orbit/pan/zoom afterwards; nothing
+	// re-locks the view until the next situation change (which eases smoothly to the new preset).
+	const setView = (view: CamMode) => {
+		camModeRef.current = view; setCamMode(view);
+		const f = fitRef.current, g = g3Ref.current, t = tableRef.current;
+		zoomRef.current = 1;
+		const cue = ballsRef.current.find((b) => b.kind === 'cue');
+		if (view === 'shoulder' && cue && g) {
+			const cgx = cue.x - t.w / 2, cgz = cue.y - t.h / 2, r = Math.hypot(cgx, cgz) || 1;
+			panRef.current = { x: cgx - (cgx / r) * 22, z: cgz - (cgz / r) * 22 }; // look a touch down-table
+			azRef.current = Math.atan2(-cgz, -cgx); // camera behind the cue (far side from the centre)
+			pitchRef.current = SHOULDER_PITCH * D2R;
+			zoomRef.current = Math.max(1, fitDist(g.camera, f.hx, f.hz, pitchRef.current, azRef.current) / SHOULDER_DIST);
+		} else {
+			panRef.current = { x: 0, z: 0 };
+			azRef.current = view === 'top' ? f.azTop : f.az;
+			pitchRef.current = (view === 'top' ? PITCH_TOP : PITCH_FIT) * D2R;
+		}
 	};
-	const restoreCam = () => {
-		const m = userCamRef.current;
-		camModeRef.current = m; setCamMode(m);
-		zoomRef.current = 1; panRef.current = { x: 0, z: 0 };
-		pitchRef.current = (m === 'top' ? PITCH_TOP : PITCH_FIT) * D2R;
-		azRef.current = m === 'top' ? fitRef.current.azTop : fitRef.current.az;
-	};
+	const enterActionCam = () => setView('fit'); // pull back to the whole table for the shot
+	const restoreCam = () => setView(userCamRef.current); // back to the player's chosen view on their turn
 
 	// Swing the cue stick at the ball, then fire `release` at contact (see the raf loop). Adds a beat
 	// before every shot (player release + AI) and pulls the camera back to watch the balls scatter.
@@ -764,13 +767,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const cycleCam = useCallback(() => {
 		const nv = CAM_NEXT[camModeRef.current];
-		camModeRef.current = nv;
 		userCamRef.current = nv; // remember the player's choice so the action cam can restore it
-		setCamMode(nv);
-		zoomRef.current = 1;
-		panRef.current = { x: 0, z: 0 };
-		azRef.current = nv === 'top' ? fitRef.current.azTop : fitRef.current.az;
-		pitchRef.current = (nv === 'top' ? PITCH_TOP : PITCH_FIT) * D2R;
+		setView(nv);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	// Right-button drag → orbit the view (turn azimuth + tilt pitch), like the two-finger twist on touch.
@@ -988,37 +987,18 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			g.cueStick.visible = false;
 		}
 
-		// Camera pose for the current mode, then eased toward it.
-		const mode = camModeRef.current, f = fitRef.current;
+		// One free orbit camera: az / pitch / pan / zoom are set once by setView() at a situation change
+		// and freely changed by the player (right-drag / two-finger / wheel) — the pose is never re-locked
+		// per frame, so the user can always adjust the angle. It just eases toward the current values.
+		const f = fitRef.current;
 		const zoom = Math.max(1, zoomRef.current);
-		if (mode === 'shoulder' && cue) {
-			const cx = cue.x - hw, cz = cue.y - hh;
-			let tx = -cx, tz = -cz; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
-			const pitch = (SHOULDER_PITCH * Math.PI) / 180;
-			const dist = SHOULDER_DIST / zoom;
-			const flat = Math.cos(pitch) * dist;
-			camEye.set(cx - tx * flat, Math.sin(pitch) * dist + BALL_R, cz - tz * flat);
-			camLook.set(cx + tx * 24, BALL_R + 3, cz + tz * 24);
-			lastDistRef.current = dist;
-		} else {
-			const pitch = pitchRef.current;
-			const az = azRef.current;
-			const d = fitDist(g.camera, f.hx, f.hz, pitch, az) / zoom;
-			const pan = panRef.current;
-			// While AIMING, keep the cue ball on screen (pull the look target toward it if framing would
-			// push it out). During the shot we leave the pan centred so the whole table — every ball in
-			// motion — stays in view instead of the camera chasing the cue.
-			if (cue && statusRef.current === 'aiming') {
-				const cgx = cue.x - hw, cgz = cue.y - hh;
-				const visHalf = d * Math.tan((g.camera.fov * Math.PI / 180) / 2) * Math.min(1, g.camera.aspect);
-				const maxOff = Math.max(0, visHalf * 0.8 - BALL_R * 3);
-				const ox = pan.x - cgx, oz = pan.z - cgz, od = Math.hypot(ox, oz);
-				if (od > maxOff && od > 1e-3) { pan.x = cgx + (ox / od) * maxOff; pan.z = cgz + (oz / od) * maxOff; }
-			}
-			camEye.set(pan.x - Math.cos(az) * Math.cos(pitch) * d, Math.sin(pitch) * d, pan.z - Math.sin(az) * Math.cos(pitch) * d);
-			camLook.set(pan.x, 0, pan.z);
-			lastDistRef.current = d;
-		}
+		const pitch = pitchRef.current;
+		const az = azRef.current;
+		const d = fitDist(g.camera, f.hx, f.hz, pitch, az) / zoom;
+		const pan = panRef.current;
+		camEye.set(pan.x - Math.cos(az) * Math.cos(pitch) * d, Math.sin(pitch) * d, pan.z - Math.sin(az) * Math.cos(pitch) * d);
+		camLook.set(pan.x, 0, pan.z);
+		lastDistRef.current = d;
 		const cs = camSmoothRef.current;
 		if (!cs.on) { cs.eye.copy(camEye); cs.look.copy(camLook); cs.on = true; }
 		const ck = ease(CAM_TAU);
