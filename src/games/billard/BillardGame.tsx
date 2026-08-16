@@ -49,7 +49,8 @@ const D2R = Math.PI / 180;
 const MIN_PITCH = 14 * D2R, MAX_PITCH = 89 * D2R; // tilt limits for the two-finger vertical drag
 const PITCH_PER_PX = 0.005; // radians of tilt per pixel of two-finger vertical drag
 const ORBIT_PER_PX = 0.007; // radians of turn per pixel of right-button horizontal drag (PC)
-const CAM_TAU = 0.09; // camera catch-up time constant (s)
+const CAM_TAU = 0.09; // camera catch-up time constant (s) — snappy for user orbit/pan/zoom
+const CAM_TAU_SLOW = 0.42; // slower, cinematic glide when auto-placing behind the cue on your turn
 const STRIKE_MS = 460; // final forward swing duration before the ball is released
 const STRIKE_HIT = 0.6; // fraction of the swing at which the tip reaches the ball (fire here)
 const STRIKE_FOLLOW = 8; // follow-through past contact
@@ -169,6 +170,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const panDragRef = useRef<{ x: number; y: number; panX: number; panZ: number } | null>(null); // one-finger pan
 	const panRef = useRef({ x: 0, z: 0 }); // fit/top look-target offset
 	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), on: false });
+	const camTauRef = useRef(CAM_TAU); // eased down to CAM_TAU on user input, up to CAM_TAU_SLOW for auto-placement
 	const lastFrameRef = useRef(0);
 	const lastDistRef = useRef(200); // camera→target distance, for the pan pixel→world scale
 	const pinchRef = useRef<{ dist: number; zoom: number; ang: number; az: number; cy: number; pitch: number } | null>(null);
@@ -482,13 +484,25 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	// re-locks the view until the next situation change (which eases smoothly to the new preset).
 	const setView = (view: CamMode) => {
 		camModeRef.current = view; setCamMode(view);
+		camTauRef.current = view === 'shoulder' ? CAM_TAU_SLOW : CAM_TAU; // glide slowly behind the cue
 		const f = fitRef.current, g = g3Ref.current, t = tableRef.current;
 		zoomRef.current = 1;
 		const cue = ballsRef.current.find((b) => b.kind === 'cue');
 		if (view === 'shoulder' && cue && g) {
-			const cgx = cue.x - t.w / 2, cgz = cue.y - t.h / 2, r = Math.hypot(cgx, cgz) || 1;
-			panRef.current = { x: cgx - (cgx / r) * 22, z: cgz - (cgz / r) * 22 }; // look a touch down-table
-			azRef.current = Math.atan2(-cgz, -cgx); // camera behind the cue (far side from the centre)
+			// Face the nearest ball of our group (or the nearest ball if the table is open / group cleared).
+			const me = onlineRef.current ? myPlayerRef.current : HUMAN;
+			const myGroup = match8Ref.current?.groups[me] ?? null;
+			const objs = ballsRef.current.filter((b) => b.kind === 'color' && !b.potted);
+			let cands = myGroup ? objs.filter((b) => groupOf(b.color) === myGroup) : objs;
+			if (cands.length === 0) cands = objs;
+			let tx = 1, tz = 0, bd = Infinity; // fallback: down the table
+			for (const b of cands) {
+				const dx = b.x - cue.x, dz = b.y - cue.y, d = Math.hypot(dx, dz);
+				if (d > 1e-3 && d < bd) { bd = d; tx = dx / d; tz = dz / d; }
+			}
+			const cgx = cue.x - t.w / 2, cgz = cue.y - t.h / 2;
+			panRef.current = { x: cgx + tx * 22, z: cgz + tz * 22 }; // look a touch toward the target ball
+			azRef.current = Math.atan2(tz, tx); // camera behind the cue, facing the target
 			pitchRef.current = SHOULDER_PITCH * D2R;
 			zoomRef.current = Math.max(1, fitDist(g.camera, f.hx, f.hz, pitchRef.current, azRef.current) / SHOULDER_DIST);
 		} else {
@@ -660,6 +674,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const applyPan = useCallback((startPanX: number, startPanZ: number, dxPx: number, dyPx: number) => {
 		const g = g3Ref.current;
 		if (!g) return;
+		camTauRef.current = CAM_TAU; // user is moving the view → respond snappily
 		const H = canvasRef.current?.clientHeight || 600;
 		const wpp = (2 * lastDistRef.current * Math.tan((g.camera.fov * Math.PI / 180) / 2)) / H;
 		const right = new THREE.Vector3().setFromMatrixColumn(g.camera.matrixWorld, 0); right.y = 0; right.normalize();
@@ -762,6 +777,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Zoom (wheel + pinch) and camera cycle ---------- */
 	const zoomBy = useCallback((f: number) => {
+		camTauRef.current = CAM_TAU; // user is adjusting the view → respond snappily
 		zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, zoomRef.current * f));
 	}, []);
 
@@ -782,6 +798,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const onMove = (m: PointerEvent) => {
 				const o = orbitDragRef.current;
 				if (!o) return;
+				camTauRef.current = CAM_TAU; // user is orbiting → respond snappily
 				azRef.current = o.az - (m.clientX - o.x) * ORBIT_PER_PX;
 				pitchRef.current = Math.max(MIN_PITCH, Math.min(MAX_PITCH, o.pitch + (m.clientY - o.y) * PITCH_PER_PX));
 			};
@@ -827,6 +844,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const p = pinchRef.current;
 			if (!p || e.touches.length < 2) return;
 			e.preventDefault();
+			camTauRef.current = CAM_TAU; // user is adjusting the view → respond snappily
 			const gg = gesture(e.touches);
 			// Spread → zoom; twist the two-finger line → turn the view; slide both up/down → tilt.
 			if (gg.dist > 0) zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, p.zoom * (gg.dist / p.dist)));
@@ -1001,7 +1019,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		lastDistRef.current = d;
 		const cs = camSmoothRef.current;
 		if (!cs.on) { cs.eye.copy(camEye); cs.look.copy(camLook); cs.on = true; }
-		const ck = ease(CAM_TAU);
+		const ck = ease(camTauRef.current);
 		cs.eye.lerp(camEye, ck);
 		cs.look.lerp(camLook, ck);
 		g.camera.position.copy(cs.eye);
