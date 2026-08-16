@@ -50,10 +50,11 @@ const MIN_PITCH = 14 * D2R, MAX_PITCH = 89 * D2R; // tilt limits for the two-fin
 const PITCH_PER_PX = 0.005; // radians of tilt per pixel of two-finger vertical drag
 const ORBIT_PER_PX = 0.007; // radians of turn per pixel of right-button horizontal drag (PC)
 const CAM_TAU = 0.09; // camera catch-up time constant (s)
-const STRIKE_MS = 520; // cue-stick swing duration before the ball is released
-const STRIKE_HIT = 0.62; // fraction of the swing at which the tip reaches the ball (fire here)
-const STRIKE_BACK = 30; // how far the tip is drawn back at the start of the swing (world units)
+const STRIKE_MS = 460; // final forward swing duration before the ball is released
+const STRIKE_HIT = 0.6; // fraction of the swing at which the tip reaches the ball (fire here)
 const STRIKE_FOLLOW = 8; // follow-through past contact
+const WARMUP_MS = 300; // duration of one AI practice stroke (back-and-forth) before the real swing
+const STICK_MIN = 7, STICK_RANGE = 34; // cue drawn back this much (min + power·range) while aiming
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🎱', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
 const SUN_DIR = new THREE.Vector3(30, 90, 40).normalize();
@@ -155,7 +156,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const startedOnlineRef = useRef(false); // guard against starting the match twice on presence sync
 
 	// Cue-strike animation: set on fire, advanced in the raf loop; releases the ball at contact.
-	const strikeRef = useRef<{ vx: number; vy: number; dx: number; dy: number; cx: number; cy: number; t0: number; fired: boolean; release: () => void } | null>(null);
+	// `warmups` = practice strokes before the swing (AI only); `back` = draw-back distance.
+	const strikeRef = useRef<{ vx: number; vy: number; dx: number; dy: number; cx: number; cy: number; back: number; warmups: number; t0: number; fired: boolean; release: () => void } | null>(null);
 
 	// Camera / view state read inside the raf loop.
 	const userCamRef = useRef<CamMode>('fit'); // the view the player picked, restored after the action cam
@@ -496,11 +498,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	// Swing the cue stick at the ball, then fire `release` at contact (see the raf loop). Adds a beat
 	// before every shot (player release + AI) and pulls the camera back to watch the balls scatter.
-	const beginStrike = (vx: number, vy: number, release: () => void) => {
+	// warmups = AI practice strokes; back = draw-back distance (matches the aiming stick for the human).
+	const beginStrike = (vx: number, vy: number, release: () => void, opts?: { back?: number; warmups?: number }) => {
 		const cue = ballsRef.current.find((b) => b.kind === 'cue');
 		const m = Math.hypot(vx, vy);
 		if (!cue || m < 1e-3) { release(); return; } // nothing to swing at — just fire
-		strikeRef.current = { vx, vy, dx: vx / m, dy: vy / m, cx: cue.x, cy: cue.y, t0: -1, fired: false, release };
+		const back = opts?.back ?? STICK_MIN + Math.min(1, m / 195) * STICK_RANGE;
+		strikeRef.current = { vx, vy, dx: vx / m, dy: vy / m, cx: cue.x, cy: cue.y, back, warmups: opts?.warmups ?? 0, t0: -1, fired: false, release };
 		setStat('striking');
 		enterActionCam();
 	};
@@ -513,7 +517,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (m.ballInHand === AI) { cue.x = t.cueStart.x; cue.y = t.cueStart.y; cue.potted = false; match8Ref.current = { ...m, ballInHand: null }; setMatch8(match8Ref.current); }
 		const skill = lv.active ? levelSkillRef.current : (AI_SKILL[diffKey] ?? 0.6);
 		const shot = chooseShot(balls, t, m.groups[AI], skill, Math.random);
-		beginStrike(shot.vx, shot.vy, startShot8);
+		beginStrike(shot.vx, shot.vy, startShot8, { warmups: Math.random() < 0.5 ? 1 : 2 }); // AI lines up with a stroke or two
 		aiThinkingRef.current = false;
 	};
 
@@ -547,7 +551,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		} else { // local AI opponent
 			aiThinkingRef.current = true;
 			setStat('aiming');
-			window.setTimeout(() => runAiShotRef.current(), 700);
+			window.setTimeout(() => runAiShotRef.current(), 450); // brief think; the warmup strokes add the rest of the beat
 		}
 	};
 
@@ -723,7 +727,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const cue = cueBall();
 			if (!cue) return;
 			if (onlineRef.current) netRef.current?.sendShot({ vx: v.vx, vy: v.vy, px: cue.x, py: cue.y }); // tell the remote (it animates its own strike)
-			beginStrike(v.vx, v.vy, startShot8);
+			beginStrike(v.vx, v.vy, startShot8, { back: STICK_MIN + pullPower(aim.pull) * STICK_RANGE });
 			return;
 		}
 		if (daily && startRef.current === 0 && triesRef.current >= MAX_TRIES) return; // out of daily tries
@@ -746,7 +750,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		}
 		strokesRef.current += 1;
 		setStrokes(strokesRef.current);
-		beginStrike(v.vx, v.vy, () => { rollingRef.current = true; setStat('rolling'); });
+		beginStrike(v.vx, v.vy, () => { rollingRef.current = true; setStat('rolling'); }, { back: STICK_MIN + pullPower(aim.pull) * STICK_RANGE });
 	}, [daily, gameId]);
 
 	// Single-pointer aim/orbit via Pointer Events (mouse, touch, pen) — reliable on iOS.
@@ -951,19 +955,30 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			g.placeRing.scale.set(s, s, s);
 		}
 
-		// Cue stick: swing it at the ball during a strike (windup → contact → follow-through).
-		const strike = strikeRef.current;
-		if (strike) {
-			const e = strike.t0 < 0 ? 0 : Math.max(0, Math.min(1, (now - strike.t0) / STRIKE_MS));
-			const off = e < STRIKE_HIT
-				? -STRIKE_BACK * (1 - (e / STRIKE_HIT) ** 2) // draw back → contact (ease-in)
-				: STRIKE_FOLLOW * ((e - STRIKE_HIT) / (1 - STRIKE_HIT)); // follow through
-			const dxw = strike.dx, dzw = strike.dy; // engine dir maps straight to world (x, z)
-			const tipX = (strike.cx - hw) - dxw * (BALL_R - off);
-			const tipZ = (strike.cy - hh) - dzw * (BALL_R - off);
-			g.cueStick.position.set(tipX, BALL_R, tipZ);
+		// Cue stick: follows the aim while you draw back, then swings on the strike (AI adds warmups).
+		const placeStick = (cx: number, cy: number, dxw: number, dzw: number, off: number) => {
+			// off: 0 = tip on the ball, negative = drawn back, positive = follow-through past contact.
+			g.cueStick.position.set((cx - hw) - dxw * (BALL_R - off), BALL_R, (cy - hh) - dzw * (BALL_R - off));
 			g.cueStick.rotation.set(0, Math.atan2(dzw, -dxw), 0); // local +X (toward butt) points back up-cue
 			g.cueStick.visible = true;
+		};
+		const strike = strikeRef.current;
+		if (strike) {
+			const tt = strike.t0 < 0 ? 0 : now - strike.t0;
+			const warmDur = strike.warmups * WARMUP_MS;
+			let off: number;
+			if (tt < warmDur) { // practice stroke: a small back-and-forth near the ball, never touching it
+				const u = (tt % WARMUP_MS) / WARMUP_MS;
+				off = -strike.back * (0.22 + 0.5 * (0.5 - 0.5 * Math.cos(2 * Math.PI * u)));
+			} else { // real swing: full draw → contact at STRIKE_HIT → follow-through
+				const e = Math.min(1, (tt - warmDur) / STRIKE_MS);
+				off = e < STRIKE_HIT ? -strike.back * (1 - (e / STRIKE_HIT) ** 2) : STRIKE_FOLLOW * ((e - STRIKE_HIT) / (1 - STRIKE_HIT));
+			}
+			placeStick(strike.cx, strike.cy, strike.dx, strike.dy, off);
+		} else if (aim && cue && statusRef.current === 'aiming' && !placingRef.current) {
+			const pm = Math.hypot(aim.pull.x, aim.pull.y);
+			if (pm > 1) placeStick(cue.x, cue.y, -aim.pull.x / pm, -aim.pull.y / pm, -(STICK_MIN + pullPower(aim.pull) * STICK_RANGE));
+			else g.cueStick.visible = false;
 		} else {
 			g.cueStick.visible = false;
 		}
@@ -1020,18 +1035,20 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			if (!lastRef.current) lastRef.current = now;
 			const dt = Math.min(now - lastRef.current, 200);
 			lastRef.current = now;
-			// Cue-strike swing: hold+thrust, release the ball at contact, clear when the swing ends.
+			// Cue-strike swing: optional AI practice strokes, then thrust; release the ball at contact.
 			const strike = strikeRef.current;
 			if (strike) {
 				if (strike.t0 < 0) strike.t0 = now;
-				const e = (now - strike.t0) / STRIKE_MS;
-				if (!strike.fired && e >= STRIKE_HIT) {
+				const tt = now - strike.t0;
+				const warmDur = strike.warmups * WARMUP_MS;
+				const fireAt = warmDur + STRIKE_HIT * STRIKE_MS;
+				if (!strike.fired && tt >= fireAt) {
 					strike.fired = true;
 					const cue = ballsRef.current.find((b) => b.kind === 'cue');
 					if (cue) { cue.vx = strike.vx; cue.vy = strike.vy; }
 					strike.release();
 				}
-				if (e >= 1) strikeRef.current = null;
+				if (tt >= warmDur + STRIKE_MS) strikeRef.current = null;
 			}
 			accRef.current += dt;
 			while (accRef.current >= STEP) {

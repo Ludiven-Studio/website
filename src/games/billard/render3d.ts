@@ -311,17 +311,17 @@ export interface AimPrediction {
 
 const AIM_SETTLE = 2.4; // engine's at-rest speed
 const AIM_MAX_STEPS = 600; // ~10 s at 60 Hz — the cue always stops or hits well before this
-const AIM_MAX_BOUNCES = 3; // on a miss, show at most this many cushion banks (keeps the guide tidy)
 
-const GUIDE_SPEED = 135; // fixed reference speed for the aim line — DIRECTION guide, not power-scaled
+const GUIDE_SPEED = 185; // fixed reference speed for the aim line (DIRECTION guide) — high enough that
+// the traced bounce path reaches a ball before friction stops it, instead of ending in open felt
 
 /**
  * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone. The
  * guide is a DIRECTION aid, so it runs at a fixed reference speed (not the actual pull) — otherwise
  * a soft aim shrinks it to a useless stub. If the cue hits a ball, the line stops at contact and
  * adds the two resulting directions (struck ball + cue deflection), which are power-independent —
- * no cushion clutter. If it MISSES every ball, it traces the cushion bounces (capped) so you can
- * plan a bank. Power is shown by the line colour instead.
+ * no cushion clutter. If it MISSES every ball, it traces the cushion bounces up to the first ball it
+ * meets (or until the cue would stop) so you can plan a bank. Power is shown by the line colour.
  */
 export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPrediction {
 	const empty: AimPrediction = { segs: [], contact: null, object: null, cueAfter: null, pocket: false };
@@ -342,7 +342,6 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 	let object: AimPrediction['object'] = null;
 	let cueAfter: AimPrediction['cueAfter'] = null;
 	let pocket = false;
-	let bounces = 0;
 
 	for (let s = 0; s < AIM_MAX_STEPS; s++) {
 		stepBalls(sim, table, 1 / 60);
@@ -362,13 +361,10 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 		const sp = Math.hypot(cue.vx, cue.vy);
 		if (sp < AIM_SETTLE) { pts.push({ x: cue.x, y: cue.y }); break; }
 		// A heading change means the cue bounced off a cushion: record the corner and keep tracing so
-		// a miss shows its bank path. Capped so it stays a hint, not a table-wide zigzag.
+		// a miss shows its bank path. It stops as soon as it meets a ball (the `hit` check above) or
+		// when the cue runs out of roll — never an endless zigzag.
 		const ndx = cue.vx / sp, ndy = cue.vy / sp;
-		if (ndx * dx + ndy * dy < 0.9995) {
-			pts.push({ x: cue.x, y: cue.y });
-			dx = ndx; dy = ndy;
-			if (++bounces >= AIM_MAX_BOUNCES) break;
-		}
+		if (ndx * dx + ndy * dy < 0.9995) { pts.push({ x: cue.x, y: cue.y }); dx = ndx; dy = ndy; }
 	}
 	if (contact) pts.push(contact);
 	const segs: { from: Vec; to: Vec }[] = [];
