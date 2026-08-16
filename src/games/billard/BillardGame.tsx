@@ -242,7 +242,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const ballGroup = new THREE.Group();
 		scene.add(ballGroup);
 
-		// Aim gizmos: dashed cue-ball path, object-ball guide (amber), contact ring.
+		// Aim gizmos: dashed GREEN cue-ball path (before + after contact), solid ORANGE struck-ball
+		// guide, contact ring. The two colours never overlap so the lines stay readable.
 		const mkLine = (mat: THREE.LineBasicMaterial | THREE.LineDashedMaterial) => {
 			const l = new THREE.Line(new THREE.BufferGeometry(), mat);
 			l.frustumCulled = false; l.visible = false; l.renderOrder = 10;
@@ -250,7 +251,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			return l;
 		};
 		const aimLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, depthWrite: false }));
-		const objLine = mkLine(new THREE.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95, depthWrite: false })); // struck ball's path (amber)
+		const objLine = mkLine(new THREE.LineBasicMaterial({ color: 0xff8a1e, transparent: true, opacity: 0.98, depthWrite: false })); // struck ball's path (orange)
 		const cueLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, opacity: 0.95, depthWrite: false })); // cue's own path after contact (same green as the aim = "the white ball")
 		const contact = new THREE.Mesh(
 			new THREE.RingGeometry(BALL_R * 0.9, BALL_R * 1.25, 24),
@@ -921,7 +922,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			if (pts.length >= 2) {
 				g.aimLine.geometry.setFromPoints(pts);
 				g.aimLine.computeLineDistances();
-				(g.aimLine.material as THREE.LineDashedMaterial).color.setHSL((1 - powerRef.current) / 3, 0.85, 0.55);
+				(g.aimLine.material as THREE.LineDashedMaterial).color.setHSL(0.35, 0.9, 0.42 + 0.23 * powerRef.current); // always green; brighter = harder (no orange clash with the struck-ball line)
 				g.aimLine.visible = true;
 			}
 			if (pred.contact) {
