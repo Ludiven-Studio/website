@@ -177,6 +177,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const lastDistRef = useRef(200); // camera→target distance, for the pan pixel→world scale
 	const pinchRef = useRef<{ dist: number; zoom: number; ang: number; az: number; cy: number; pitch: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
+	const rollAxisRef = useRef(new THREE.Vector3()); // scratch axis for the rolling-ball spin
 
 	const { celebrating } = useCelebration(status === 'won');
 	const lv = useLevels(gameId, billardLevels);
@@ -904,12 +905,20 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const dt = Math.min(0.1, Math.max(0, (now - lastFrameRef.current) / 1000)) || 1 / 60;
 		lastFrameRef.current = now;
 		const ease = (tau: number) => 1 - Math.exp(-dt / tau);
+		const rollAxis = rollAxisRef.current;
 
-		// Balls (with pot-drop animation).
+		// Balls (with pot-drop animation). Rolling: spin the mesh about the horizontal axis perpendicular
+		// to its velocity by distance/radius, so the number/stripe visibly turns instead of sliding.
 		for (let i = 0; i < balls.length; i++) {
 			const b = balls[i], mesh = g.ballMeshes[i];
 			if (!mesh) continue;
-			if (!b.potted) { mesh.visible = true; mesh.position.set(b.x - hw, BALL_R, b.y - hh); continue; }
+			if (!b.potted) {
+				mesh.visible = true;
+				const sp = Math.hypot(b.vx, b.vy);
+				if (sp > 0.4) { rollAxis.set(b.vy, 0, -b.vx).normalize(); mesh.rotateOnWorldAxis(rollAxis, (sp * dt) / BALL_R); }
+				mesh.position.set(b.x - hw, BALL_R, b.y - hh);
+				continue;
+			}
 			const sink = sinksRef.current.find((s) => s.idx === i);
 			if (sink) {
 				const e = Math.min(1, (now - sink.t0) / SINK_MS);
