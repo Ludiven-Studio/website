@@ -189,6 +189,16 @@ function reflectWalls(b: Ball, t: Table): boolean {
 	return bounced;
 }
 
+/** Push a ball back inside the cushions (position only, no bounce). The safety net for embedding
+ *  that reflectWalls misses: a ball shoved into a rail by a collision (which resolves overlaps
+ *  without any wall clamp) and then at rest — reflectWalls only clamps a ball moving INTO the wall.
+ *  Skips the pocket mouths so balls can still drop. */
+function clampInside(b: Ball, t: Table): void {
+	const r = b.r;
+	if (!inMouthY(b.y, t.h)) { if (b.x < r) b.x = r; else if (b.x > t.w - r) b.x = t.w - r; }
+	if (!inMouthX(b.x, t.w)) { if (b.y < r) b.y = r; else if (b.y > t.h - r) b.y = t.h - r; }
+}
+
 /** Resolve a ball-ball collision; returns true if an impulse was actually applied. */
 function collide(a: Ball, b: Ball): boolean {
 	const dx = b.x - a.x, dy = b.y - a.y;
@@ -243,6 +253,8 @@ export function stepBalls(balls: Ball[], table: Table, dt: number): StepResult {
 					if (a.kind === 'cue' && b.kind === 'color') firstHit = b.color;
 					else if (b.kind === 'cue' && a.kind === 'color') firstHit = a.color;
 				}
+		// Undo any rail penetration a collision just caused, so no ball ends the step embedded.
+		for (const b of active) if (!b.potted) clampInside(b, table);
 		for (const b of active) {
 			if (b.potted) continue;
 			const sp = len(b.vx, b.vy);
