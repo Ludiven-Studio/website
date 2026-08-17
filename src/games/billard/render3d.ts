@@ -318,11 +318,10 @@ const GUIDE_SPEED = 160; // fixed reference speed for the aim line (DIRECTION gu
 /**
  * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone. The
  * guide is a DIRECTION aid, so it runs at a fixed reference speed (not the actual pull) — otherwise
- * a soft aim shrinks it to a useless stub. Two clean cases: if the cue hits a ball DIRECTLY (before
- * any cushion), the line stops at contact and adds the two short resulting directions (struck ball +
- * cue deflection). If it first hits a cushion, it becomes a bank preview: it traces the rebonds (and
- * ends where it would meet a ball) with no contact lines — so a ball hit never piles extra green
- * segments onto the banks. Power is shown by the line colour.
+ * a soft aim shrinks it to a useless stub. The line traces the cue's path with its cushion rebonds
+ * and stops at the FIRST ball it meets — directly or after banks — showing the contact ring plus the
+ * two short resulting directions (struck ball + cue deflection) there, as if it were a direct hit.
+ * A pure miss just shows the bank path until the cue would stop. Power is shown by the line colour.
  */
 export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPrediction {
 	const empty: AimPrediction = { segs: [], contact: null, object: null, cueAfter: null, pocket: false };
@@ -343,19 +342,15 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 	let object: AimPrediction['object'] = null;
 	let cueAfter: AimPrediction['cueAfter'] = null;
 	let pocket = false;
-	let bounced = false; // has the cue hit a cushion yet? once it has, we only draw the bank path
 
 	for (let s = 0; s < AIM_MAX_STEPS; s++) {
 		stepBalls(sim, table, 1 / 60);
 		// First contact: an object ball has been set moving (only the cue moved until now).
 		const hit = sim.find((b) => b.kind !== 'cue' && !b.potted && (b.vx !== 0 || b.vy !== 0));
 		if (hit) {
-			// Banked into a ball: the aim already showed rebonds, so just end the path here — NO contact
-			// ring or resulting-direction lines (that would pile extra green segments onto the banks).
-			if (bounced) { pts.push({ x: cue.x, y: cue.y }); break; }
+			// The cue meets a ball (directly or after banks): mark the contact and show two SHORT lines —
+			// the struck ball's direction and the cue's own deflection (both power-independent).
 			contact = { x: cue.x, y: cue.y };
-			// A DIRECT hit: show just two SHORT lines — the struck ball's direction and the cue's own
-			// deflection (both power-independent). They're the whole story once a ball is met.
 			const ol = Math.hypot(hit.vx, hit.vy) || 1;
 			object = { from: { x: hit.x, y: hit.y }, to: { x: hit.x + (hit.vx / ol) * 20, y: hit.y + (hit.vy / ol) * 20 } };
 			const cl = Math.hypot(cue.vx, cue.vy);
@@ -383,7 +378,6 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 			}
 			pts.push(corner);
 			dx = ndx; dy = ndy;
-			bounced = true;
 		}
 	}
 	if (contact) pts.push(contact);
