@@ -5,7 +5,7 @@
  * z = ey - h/2); the felt sits at world y = 0 and a ball's centre at y = BALL_R.
  */
 import * as THREE from 'three';
-import { BALL_R, stepBalls, type Table, type Ball, type Vec } from './engine';
+import { BALL_R, stepBalls, pullPower, type Table, type Ball, type Vec } from './engine';
 
 export const CUE_COLOR = 0xf4f4f2;
 export const BALL_COLORS = [0xe6566f, 0xf0a830, 0x5b8def, 0x2f9e6f, 0x9b6cf0, 0x20c4c0];
@@ -312,16 +312,17 @@ export interface AimPrediction {
 const AIM_SETTLE = 2.4; // engine's at-rest speed
 const AIM_MAX_STEPS = 600; // ~10 s at 60 Hz — the cue always stops or hits well before this
 
-const GUIDE_SPEED = 160; // fixed reference speed for the aim line (DIRECTION guide). Sets how far the
-// bank preview reaches before friction stops it (distance ∝ speed²); tuned so it isn't overly long
+// The aim runs at a speed that GROWS WITH THE PULL, so the line's reach reflects the force: a soft
+// aim shows a short line, a hard aim a long one (distance ∝ speed²). Floored so it stays readable.
+const GUIDE_MIN = 70, GUIDE_MAX = 160;
 
 /**
- * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone. The
- * guide is a DIRECTION aid, so it runs at a fixed reference speed (not the actual pull) — otherwise
- * a soft aim shrinks it to a useless stub. The line traces the cue's path with its cushion rebonds
- * and stops at the FIRST ball it meets — directly or after banks — showing the contact ring plus the
- * two short resulting directions (struck ball + cue deflection) there, as if it were a direct hit.
- * A pure miss just shows the bank path until the cue would stop. Power is shown by the line colour.
+ * Predict the cue ball's path by SIMULATING it with the real engine (stepBalls) on a clone. The aim
+ * runs at a speed that scales with the pull (floored for readability), so the line's REACH reflects
+ * the force. It traces the cue's path with its cushion rebonds and stops at the FIRST ball it meets —
+ * directly or after banks — showing the contact ring plus the two short resulting directions (struck
+ * ball + cue deflection) there, as if it were a direct hit. A pure miss just shows the bank path
+ * until the cue would stop. Force is also shown by the line colour (green → orange → red).
  */
 export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPrediction {
 	const empty: AimPrediction = { segs: [], contact: null, object: null, cueAfter: null, pocket: false };
@@ -335,7 +336,8 @@ export function predictCue(balls: Ball[], table: Table, pull: Vec): AimPredictio
 	const cue = sim.find((b) => b.kind === 'cue');
 	if (!cue) return empty;
 	let dx = -pull.x / m, dy = -pull.y / m; // shot direction (opposite the pull)
-	cue.vx = dx * GUIDE_SPEED; cue.vy = dy * GUIDE_SPEED;
+	const guide = GUIDE_MIN + (GUIDE_MAX - GUIDE_MIN) * pullPower(pull); // reach grows with the force
+	cue.vx = dx * guide; cue.vy = dy * guide;
 
 	const pts: Vec[] = [{ x: cue.x, y: cue.y }];
 	let contact: Vec | null = null;

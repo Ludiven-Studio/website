@@ -78,6 +78,22 @@ interface ShotAcc { firstHitNumber: number | null; potted: number[]; scratched: 
 const emptyAcc = (): ShotAcc => ({ firstHitNumber: null, potted: [], scratched: false, railAfterContact: false, contactSeen: false });
 const groupLabel = (g: Group | null): string => (g === 'solid' ? 'pleines' : g === 'stripe' ? 'rayées' : '—');
 
+/* Critically-damped smoothing (Unity SmoothDamp) for a Vector3 — natural ease-in/ease-out with
+   velocity continuity, so the camera never jerks when the target changes mid-glide. Mutates cur+vel. */
+const AXES = ['x', 'y', 'z'] as const;
+function smoothDampV3(cur: THREE.Vector3, target: THREE.Vector3, vel: THREE.Vector3, smoothTime: number, dt: number): void {
+	const st = Math.max(0.0001, smoothTime);
+	const omega = 2 / st;
+	const x = omega * dt;
+	const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+	for (const k of AXES) {
+		const change = cur[k] - target[k];
+		const temp = (vel[k] + omega * change) * dt;
+		vel[k] = (vel[k] - omega * temp) * exp;
+		cur[k] = target[k] + (change + temp) * exp;
+	}
+}
+
 type SinkInfo = { idx: number; t0: number; px: number; py: number }; // px/py: pocket centre (engine)
 
 interface Scene3D {
@@ -172,7 +188,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const fitRef = useRef({ hx: 120, hz: 70, base: 0, az: 0, azTop: 0 });
 	const panDragRef = useRef<{ x: number; y: number; panX: number; panZ: number } | null>(null); // one-finger pan
 	const panRef = useRef({ x: 0, z: 0 }); // fit/top look-target offset
-	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), on: false });
+	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), velEye: new THREE.Vector3(), velLook: new THREE.Vector3(), on: false });
 	const camTauRef = useRef(CAM_TAU); // eased down to CAM_TAU on user input, up to CAM_TAU_SLOW for auto-placement
 	const lastFrameRef = useRef(0);
 	const lastDistRef = useRef(200); // camera→target distance, for the pan pixel→world scale
@@ -916,7 +932,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const balls = ballsRef.current;
 		const dt = Math.min(0.1, Math.max(0, (now - lastFrameRef.current) / 1000)) || 1 / 60;
 		lastFrameRef.current = now;
-		const ease = (tau: number) => 1 - Math.exp(-dt / tau);
 		const rollAxis = rollAxisRef.current;
 
 		// Balls (with pot-drop animation). Rolling: spin the mesh about the horizontal axis perpendicular
@@ -966,7 +981,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				g.aimLine.geometry.dispose();
 				g.aimLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
 				g.aimLine.computeLineDistances();
-				(g.aimLine.material as THREE.LineDashedMaterial).color.setHSL(0.33 - 0.25 * powerRef.current, 0.95, 0.5); // hue green (soft) → orange (hard) = force gauge; struck-ball line is blue so no clash
+				(g.aimLine.material as THREE.LineDashedMaterial).color.setHSL(0.33 * (1 - powerRef.current), 0.95, 0.5); // force gauge: green (soft) → orange → red (max); struck-ball line is blue so no clash
 				g.aimLine.visible = true;
 			}
 			if (pred.contact) {
@@ -1058,10 +1073,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		camLook.set(panX, 0, panZ);
 		lastDistRef.current = d;
 		const cs = camSmoothRef.current;
-		if (!cs.on) { cs.eye.copy(camEye); cs.look.copy(camLook); cs.on = true; }
-		const ck = ease(camTauRef.current);
-		cs.eye.lerp(camEye, ck);
-		cs.look.lerp(camLook, ck);
+		if (!cs.on) { cs.eye.copy(camEye); cs.look.copy(camLook); cs.velEye.set(0, 0, 0); cs.velLook.set(0, 0, 0); cs.on = true; }
+		smoothDampV3(cs.eye, camEye, cs.velEye, camTauRef.current, dt); // natural ease-in/out, no jerk on target change
+		smoothDampV3(cs.look, camLook, cs.velLook, camTauRef.current, dt);
 		g.camera.position.copy(cs.eye);
 		g.camera.lookAt(cs.look);
 
