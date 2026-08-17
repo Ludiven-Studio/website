@@ -43,7 +43,7 @@ const SINK_MS = 320; // pot drop animation
 const FRAME_MARGIN = 16; // world units of felt framed around the table
 
 const ZOOM_MAX = 4;
-const PITCH_FIT = 46, PITCH_TOP = 88, SHOULDER_PITCH = 16; // lower = less plunging behind-the-cue start view
+const PITCH_FIT = 46, PITCH_TOP = 88, SHOULDER_PITCH = 20; // behind-the-cue start view: raised a touch off the felt, but not plunging
 const SHOULDER_DIST = 150;
 const STICK_TILT = 0.28; // radians the cue butt is lifted (~16°) so the shaft stays above the rails
 const D2R = Math.PI / 180;
