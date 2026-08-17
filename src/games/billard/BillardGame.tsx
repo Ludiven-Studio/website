@@ -43,8 +43,7 @@ const SINK_MS = 320; // pot drop animation
 const FRAME_MARGIN = 16; // world units of felt framed around the table
 
 const ZOOM_MAX = 4;
-const PITCH_FIT = 46, PITCH_TOP = 88, SHOULDER_PITCH = 20; // behind-the-cue start view: raised a touch off the felt, but not plunging
-const SHOULDER_DIST = 150;
+const PITCH_FIT = 46, PITCH_TOP = 88, SHOULDER_PITCH = 42; // elevated 3/4 start view (whole table, looking down it from behind the cue)
 const STICK_TILT = 0.28; // radians the cue butt is lifted (~16°) so the shaft stays above the rails
 const D2R = Math.PI / 180;
 const MIN_PITCH = 14 * D2R, MAX_PITCH = 89 * D2R; // tilt limits for the two-finger vertical drag
@@ -505,11 +504,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const setView = (view: CamMode) => {
 		camModeRef.current = view; setCamMode(view);
 		camTauRef.current = view === 'shoulder' ? CAM_TAU_SLOW : CAM_TAU; // glide slowly behind the cue
-		const f = fitRef.current, g = g3Ref.current, t = tableRef.current;
+		const f = fitRef.current;
 		zoomRef.current = 1;
 		const cue = ballsRef.current.find((b) => b.kind === 'cue');
-		if (view === 'shoulder' && cue && g) {
-			// Face the nearest ball of our group (or the nearest ball if the table is open / group cleared).
+		if (view === 'shoulder' && cue) {
+			// Elevated 3/4 view of the WHOLE table, looking down it toward the nearest ball of our group
+			// (or the nearest ball if the table is open / group cleared) — the cue sits in the foreground.
 			const me = onlineRef.current ? myPlayerRef.current : HUMAN;
 			const myGroup = match8Ref.current?.groups[me] ?? null;
 			const objs = ballsRef.current.filter((b) => b.kind === 'color' && !b.potted);
@@ -520,11 +520,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				const dx = b.x - cue.x, dz = b.y - cue.y, d = Math.hypot(dx, dz);
 				if (d > 1e-3 && d < bd) { bd = d; tx = dx / d; tz = dz / d; }
 			}
-			const cgx = cue.x - t.w / 2, cgz = cue.y - t.h / 2;
-			panRef.current = { x: cgx + tx * 22, z: cgz + tz * 22 }; // look a touch toward the target ball
-			azRef.current = Math.atan2(tz, tx); // camera behind the cue, facing the target
+			panRef.current = { x: 0, z: 0 }; // centred so the whole table fits (perspective keeps the cue foreground)
+			azRef.current = Math.atan2(tz, tx); // face down the table toward the target
 			pitchRef.current = SHOULDER_PITCH * D2R;
-			zoomRef.current = Math.max(1, fitDist(g.camera, f.hx, f.hz, pitchRef.current, azRef.current) / SHOULDER_DIST);
 		} else {
 			panRef.current = { x: 0, z: 0 };
 			azRef.current = view === 'top' ? f.azTop : f.az;
