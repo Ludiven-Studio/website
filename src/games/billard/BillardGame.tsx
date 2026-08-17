@@ -43,8 +43,9 @@ const SINK_MS = 320; // pot drop animation
 const FRAME_MARGIN = 16; // world units of felt framed around the table
 
 const ZOOM_MAX = 4;
-const PITCH_FIT = 46, PITCH_TOP = 88, SHOULDER_PITCH = 23;
+const PITCH_FIT = 46, PITCH_TOP = 88, SHOULDER_PITCH = 16; // lower = less plunging behind-the-cue start view
 const SHOULDER_DIST = 150;
+const STICK_TILT = 0.28; // radians the cue butt is lifted (~16°) so the shaft stays above the rails
 const D2R = Math.PI / 180;
 const MIN_PITCH = 14 * D2R, MAX_PITCH = 89 * D2R; // tilt limits for the two-finger vertical drag
 const PITCH_PER_PX = 0.005; // radians of tilt per pixel of two-finger vertical drag
@@ -1004,6 +1005,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			// off: 0 = tip on the ball, negative = drawn back, positive = follow-through past contact.
 			g.cueStick.position.set((cx - hw) - dxw * (BALL_R - off), BALL_R, (cy - hh) - dzw * (BALL_R - off));
 			g.cueStick.rotation.set(0, Math.atan2(dzw, -dxw), 0); // local +X (toward butt) points back up-cue
+			g.cueStick.rotateZ(STICK_TILT); // raise the butt so the shaft clears the rails instead of clipping through
 			g.cueStick.visible = true;
 		};
 		const strike = strikeRef.current;
