@@ -120,6 +120,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const [best, setBest] = useState<number | null>(null);
 	const [scratchFlash, setScratchFlash] = useState(false);
 	const [cancelFlash, setCancelFlash] = useState(false); // brief "shot cancelled" toast (PC left+right)
+	const [groupFlash, setGroupFlash] = useState<string | null>(null); // "you're solids/stripes" banner when groups get decided
 	const [camMode, setCamMode] = useState<CamMode>('shoulder');
 	const [webglError, setWebglError] = useState(false);
 	// Daily
@@ -569,6 +570,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (cue && cue.potted) { seenRef.current.delete(balls.indexOf(cue)); cue.potted = false; cue.x = t.cueStart.x; cue.y = t.cueStart.y; cue.vx = cue.vy = 0; } // un-pot on scratch
 		if (next.lastFoul) { setScratchFlash(true); setTimeout(() => setScratchFlash(false), 1500); }
 		const me = onlineRef.current ? myPlayerRef.current : HUMAN; // the player at this device
+		if (prev.open && !next.open && next.groups[me]) { // the table just got assigned — announce my colour
+			const msg = `🎱 Tu joues les ${groupLabel(next.groups[me])} !`;
+			setGroupFlash(msg); setTimeout(() => setGroupFlash(null), 2600);
+		}
 		if (next.winner !== null) {
 			setStat('won');
 			if (lv.active) {
@@ -1297,6 +1302,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 				{scratchFlash && <div className="bi-scratch">{is8 ? (match8?.lastFoul ?? 'Faute') : 'Pénalité · +1 coup'}</div>}
 				{cancelFlash && <div className="bi-scratch bi-cancel">Tir annulé</div>}
+				{groupFlash && <div className="bi-groupflash">{groupFlash}</div>}
 				{is8 && placing && (
 					<div className="bi-place">
 						<span className="bi-place-icon">✋</span>
@@ -1441,6 +1447,8 @@ const CSS = `
 .bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
 .bi-cancel { background: rgba(20,14,10,0.82); }
 .bi-onblack { background: linear-gradient(180deg, #2b2b2f, #111114); color: #ffe08a; font-weight: 800; border: 1px solid rgba(255,224,138,0.5); }
+.bi-groupflash { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; padding: 14px 26px; border-radius: 18px; background: linear-gradient(180deg, var(--bi-accent), rgba(20,14,10,0.9)); color: #fff; font-weight: 800; font-size: 18px; text-align: center; box-shadow: var(--shadow-lg); animation: bi-group-pop 0.4s ease-out; pointer-events: none; }
+@keyframes bi-group-pop { 0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; } 60% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 .bi-place { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; max-width: 92%; padding: 10px 18px; border-radius: 16px; background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(30,150,60,0.96)); color: #fff; box-shadow: var(--shadow-lg); animation: bi-place-pop 1.6s ease-in-out infinite; }
 .bi-place-icon { font-size: 20px; line-height: 1; }
 .bi-place-title { font-weight: 800; font-size: 14px; }
