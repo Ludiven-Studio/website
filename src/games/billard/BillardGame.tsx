@@ -256,7 +256,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			return l;
 		};
 		const aimLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, depthWrite: false }));
-		const objLine = mkLine(new THREE.LineBasicMaterial({ color: 0xff8a1e, transparent: true, opacity: 0.98, depthWrite: false })); // struck ball's path (orange)
+		const objLine = mkLine(new THREE.LineBasicMaterial({ color: 0x38b6ff, transparent: true, opacity: 0.98, depthWrite: false })); // struck ball's path (blue — distinct from the power-tinted cue line)
 		const cueLine = mkLine(new THREE.LineDashedMaterial({ color: 0x30d158, dashSize: 3, gapSize: 2, transparent: true, opacity: 0.95, depthWrite: false })); // cue's own path after contact (same green as the aim = "the white ball")
 		const contact = new THREE.Mesh(
 			new THREE.RingGeometry(BALL_R * 0.9, BALL_R * 1.25, 24),
@@ -965,7 +965,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				g.aimLine.geometry.dispose();
 				g.aimLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
 				g.aimLine.computeLineDistances();
-				(g.aimLine.material as THREE.LineDashedMaterial).color.setHSL(0.35, 0.9, 0.42 + 0.23 * powerRef.current); // always green; brighter = harder (no orange clash with the struck-ball line)
+				(g.aimLine.material as THREE.LineDashedMaterial).color.setHSL(0.33 - 0.25 * powerRef.current, 0.95, 0.5); // hue green (soft) → orange (hard) = force gauge; struck-ball line is blue so no clash
 				g.aimLine.visible = true;
 			}
 			if (pred.contact) {
@@ -1364,7 +1364,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 			<p className="bi-help">
 				Glisse depuis la boule blanche puis relâche : tu tires dans le sens opposé, plus tu tires loin plus
-				c'est puissant. La ligne pointillée montre le trajet de la blanche (avant et après le choc), la ligne orange celui de la bille visée. 1 doigt ailleurs déplace la vue, 2 doigts (ou clic droit sur PC) pour pivoter et incliner, molette ou pincement pour zoomer, 🎥 pour changer d'angle. Sur PC, clic gauche + droit ensemble annule le tir en préparation.
+				c'est puissant. La ligne pointillée montre le trajet de la blanche — sa couleur va du vert (doux) à l'orange (fort) selon la force —, la ligne bleue celle de la bille visée. 1 doigt ailleurs déplace la vue, 2 doigts (ou clic droit sur PC) pour pivoter et incliner, molette ou pincement pour zoomer, 🎥 pour changer d'angle. Sur PC, clic gauche + droit ensemble annule le tir en préparation.
 				{is8 ? ' 8-ball vs l\'ordinateur : empoche ton groupe (pleines ou rayées) puis la noire en dernier. Les pastilles règlent la force de l\'IA.'
 					: lv.active ? ' Moins tu joues de coups, plus tu gagnes d\'étoiles.'
 					: ` Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.`}
