@@ -11,7 +11,16 @@ export interface CourseItem {
 	qty: string | null;
 	checked: boolean;
 	sort: number;
+	category_id: string | null; // null = the "Sans catégorie" bucket
 	created_at: string;
+}
+
+/** A store aisle. Belongs to the space, not the list, so the walking order
+ *  survives "new list". `sort` IS that walking order. */
+export interface Category {
+	id: string;
+	name: string;
+	sort: number;
 }
 
 export interface HistoryEntry {
@@ -24,6 +33,7 @@ export interface HistoryEntry {
 
 export interface Snapshot {
 	spaceId: string;
+	categories: Category[];
 	active: { id: string; title: string; items: CourseItem[] };
 	history: HistoryEntry[];
 }
@@ -51,8 +61,22 @@ export const getList = (spaceId: string, listId: string): Promise<{ id: string; 
 	call('get_list', { spaceId, listId });
 export const addItem = (spaceId: string, label: string, qty?: string): Promise<{ item: CourseItem }> =>
 	call('add_item', { spaceId, label, qty });
-export const updateItem = (spaceId: string, itemId: string, patch: { checked?: boolean; label?: string; qty?: string }): Promise<{ item: CourseItem }> =>
+export const updateItem = (spaceId: string, itemId: string, patch: { checked?: boolean; label?: string; qty?: string; categoryId?: string | null }): Promise<{ item: CourseItem }> =>
 	call('update_item', { spaceId, itemId, ...patch });
+
+/** Commit a drag: `orderedIds` is the target aisle's full new order. Also moves
+ *  items into `categoryId` when they came from another aisle. */
+export const reorderItems = (spaceId: string, categoryId: string | null, orderedIds: string[]): Promise<{ ok: true }> =>
+	call('reorder_items', { spaceId, categoryId, orderedIds });
+
+export const addCategory = (spaceId: string, name: string): Promise<{ category: Category }> =>
+	call('add_category', { spaceId, name });
+export const renameCategory = (spaceId: string, categoryId: string, name: string): Promise<{ ok: true }> =>
+	call('rename_category', { spaceId, categoryId, name });
+export const deleteCategory = (spaceId: string, categoryId: string): Promise<{ ok: true }> =>
+	call('delete_category', { spaceId, categoryId });
+export const reorderCategories = (spaceId: string, orderedIds: string[]): Promise<{ ok: true }> =>
+	call('reorder_categories', { spaceId, orderedIds });
 export const deleteItem = (spaceId: string, itemId: string): Promise<{ ok: true }> =>
 	call('delete_item', { spaceId, itemId });
 export const clearChecked = (spaceId: string, listId: string): Promise<{ ok: true }> =>

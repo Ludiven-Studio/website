@@ -25,14 +25,76 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
 const clean = (v: unknown, max: number): string => String(v ?? '').trim().slice(0, max);
 
-interface ItemRow { id: string; label: string; qty: string | null; checked: boolean; sort: number; created_at: string; }
+interface ItemRow { id: string; label: string; qty: string | null; checked: boolean; sort: number; category_id: string | null; created_at: string; }
 interface ListRow { id: string; space_id: string; title: string; archived_at: string | null; created_at: string; }
+interface CategoryRow { id: string; name: string; sort: number; }
+
+const ITEM_COLS = 'id, label, qty, checked, sort, category_id, created_at';
+
+/** Aisles a brand-new space starts with, in supermarket walking order. All editable. */
+const DEFAULT_CATEGORIES = [
+	'Fruits et légumes', 'Boulangerie', 'Viande & poisson', 'Frais', 'Surgelés',
+	'Épicerie', "P'tit dej", 'Goûters', 'Boissons', 'Entretien',
+];
+
+/** Fold case + accents so "Lait", "lait" and "LAIT" share one filing memory.
+ *  Combining marks are dropped by code point rather than by a regex holding
+ *  literal combining characters, which would be invisible and encoding-fragile. */
+const labelKey = (label: string): string =>
+	[...label.normalize('NFD')]
+		.filter((ch) => { const c = ch.codePointAt(0)!; return c < 0x300 || c > 0x36f; })
+		.join('')
+		.toLowerCase()
+		.trim();
 
 /** Ensure a space exists. Returns its id or null. */
 async function requireSpace(db: SupabaseClient, spaceId: unknown): Promise<string | null> {
 	if (!isUuid(spaceId)) return null;
 	const { data } = await db.from('courses_spaces').select('id').eq('id', spaceId).maybeSingle();
 	return data ? (data.id as string) : null;
+}
+
+/** A space's aisles, seeding the defaults the first time (covers spaces created
+ *  before categories existed, so no migration backfill is needed). */
+async function categoriesOf(db: SupabaseClient, spaceId: string): Promise<CategoryRow[]> {
+	const read = async (): Promise<CategoryRow[]> => {
+		const { data } = await db.from('courses_categories').select('id, name, sort').eq('space_id', spaceId).order('sort').order('created_at');
+		return (data ?? []) as CategoryRow[];
+	};
+	const existing = await read();
+	if (existing.length) return existing;
+	await db.from('courses_categories').insert(
+		DEFAULT_CATEGORIES.map((name, i) => ({ space_id: spaceId, name, sort: i + 1 })),
+	);
+	return read();
+}
+
+/** Confirm a category belongs to the space. Null id = the "Sans catégorie" bucket. */
+async function categoryInSpace(db: SupabaseClient, spaceId: string, categoryId: unknown): Promise<string | null | false> {
+	if (categoryId === null || categoryId === undefined || categoryId === '') return null;
+	if (!isUuid(categoryId)) return false;
+	const { data } = await db.from('courses_categories').select('id').eq('id', categoryId).eq('space_id', spaceId).maybeSingle();
+	return data ? (data.id as string) : false;
+}
+
+/** Where this label was filed last time, if anywhere. */
+async function rememberedCategory(db: SupabaseClient, spaceId: string, label: string): Promise<string | null> {
+	const { data } = await db.from('courses_item_memory').select('category_id')
+		.eq('space_id', spaceId).eq('label_key', labelKey(label)).maybeSingle();
+	return data ? (data.category_id as string) : null;
+}
+
+/** Teach the space where this label belongs (or forget it when uncategorised). */
+async function rememberCategory(db: SupabaseClient, spaceId: string, label: string, categoryId: string | null): Promise<void> {
+	const key = labelKey(label);
+	if (!key) return;
+	if (categoryId === null) {
+		await db.from('courses_item_memory').delete().eq('space_id', spaceId).eq('label_key', key);
+		return;
+	}
+	await db.from('courses_item_memory')
+		.upsert({ space_id: spaceId, label_key: key, category_id: categoryId, updated_at: new Date().toISOString() },
+			{ onConflict: 'space_id,label_key' });
 }
 
 /** Load a list and confirm it belongs to the given space. */
@@ -52,12 +114,13 @@ async function activeList(db: SupabaseClient, spaceId: string): Promise<ListRow>
 }
 
 const itemsOf = async (db: SupabaseClient, listId: string): Promise<ItemRow[]> => {
-	const { data } = await db.from('courses_items').select('id, label, qty, checked, sort, created_at').eq('list_id', listId).order('sort').order('created_at');
+	const { data } = await db.from('courses_items').select(ITEM_COLS).eq('list_id', listId).order('sort').order('created_at');
 	return (data ?? []) as ItemRow[];
 };
 
-/** Whole-space snapshot: active list + its items + archived history (with item counts). */
+/** Whole-space snapshot: aisles + active list + its items + archived history. */
 async function snapshot(db: SupabaseClient, spaceId: string) {
+	const categories = await categoriesOf(db, spaceId);
 	const active = await activeList(db, spaceId);
 	const items = await itemsOf(db, active.id);
 	const { data: archived } = await db.from('courses_lists')
@@ -68,7 +131,7 @@ async function snapshot(db: SupabaseClient, spaceId: string) {
 		id: l.id, title: l.title, created_at: l.created_at, archived_at: l.archived_at,
 		count: Array.isArray(l.courses_items) && l.courses_items[0] ? (l.courses_items[0] as { count: number }).count : 0,
 	}));
-	return { spaceId, active: { id: active.id, title: active.title, items }, history };
+	return { spaceId, categories, active: { id: active.id, title: active.title, items }, history };
 }
 
 /** Archive the current active list (if any) so a fresh one can take its place. */
@@ -113,11 +176,22 @@ Deno.serve(async (req) => {
 				const list = await activeList(db, spaceId);
 				const label = clean(body.label, 120);
 				if (!label) return bad('empty label');
+				await categoriesOf(db, spaceId); // seed aisles before any filing happens
+				// Explicit category wins; otherwise fall back to where this label went last time.
+				let categoryId: string | null;
+				if ('categoryId' in body) {
+					const resolved = await categoryInSpace(db, spaceId, body.categoryId);
+					if (resolved === false) return bad('unknown category', 404);
+					categoryId = resolved;
+					await rememberCategory(db, spaceId, label, categoryId);
+				} else {
+					categoryId = await rememberedCategory(db, spaceId, label);
+				}
 				const { data: last } = await db.from('courses_items').select('sort').eq('list_id', list.id).order('sort', { ascending: false }).limit(1).maybeSingle();
 				const sort = (last?.sort ?? 0) + 1;
 				const { data: item, error } = await db.from('courses_items')
-					.insert({ list_id: list.id, label, qty: clean(body.qty, 40) || null, sort })
-					.select('id, label, qty, checked, sort, created_at').single<ItemRow>();
+					.insert({ list_id: list.id, label, qty: clean(body.qty, 40) || null, sort, category_id: categoryId })
+					.select(ITEM_COLS).single<ItemRow>();
 				if (error) throw error;
 				return json({ item });
 			}
@@ -133,10 +207,17 @@ Deno.serve(async (req) => {
 				if (typeof body.checked === 'boolean') patch.checked = body.checked;
 				if (typeof body.label === 'string') { const l = clean(body.label, 120); if (l) patch.label = l; }
 				if ('qty' in body) patch.qty = clean(body.qty, 40) || null;
+				if ('categoryId' in body) {
+					const resolved = await categoryInSpace(db, spaceId, body.categoryId);
+					if (resolved === false) return bad('unknown category', 404);
+					patch.category_id = resolved;
+				}
 				if (!Object.keys(patch).length) return bad('nothing to update');
 				const { data: item, error } = await db.from('courses_items').update(patch).eq('id', body.itemId)
-					.select('id, label, qty, checked, sort, created_at').single<ItemRow>();
+					.select(ITEM_COLS).single<ItemRow>();
 				if (error) throw error;
+				// Filing an item by hand teaches the space where that label belongs.
+				if ('categoryId' in body) await rememberCategory(db, spaceId, item.label, item.category_id);
 				return json({ item });
 			}
 
@@ -147,6 +228,69 @@ Deno.serve(async (req) => {
 					.eq('courses_lists.space_id', spaceId).maybeSingle();
 				if (!owned) return bad('unknown item', 404);
 				await db.from('courses_items').delete().eq('id', body.itemId);
+				return json({ ok: true });
+			}
+
+			// One action covers both dropping an item elsewhere in its aisle and
+			// dragging it into another: the client sends the target aisle's full
+			// order. Items left behind keep their relative order (their sorts just
+			// leave a gap), so the source aisle needs no second round-trip.
+			case 'reorder_items': {
+				const ids = Array.isArray(body.orderedIds) ? body.orderedIds : null;
+				if (!ids || !ids.every(isUuid)) return bad('orderedIds must be uuids');
+				if (ids.length > 300) return bad('too many items');
+				const resolved = await categoryInSpace(db, spaceId, body.categoryId);
+				if (resolved === false) return bad('unknown category', 404);
+				const list = await activeList(db, spaceId);
+				// Every id must be an item of this space's active list — never trust the client.
+				const { data: owned } = await db.from('courses_items').select('id, label').eq('list_id', list.id).in('id', ids);
+				const rows = (owned ?? []) as { id: string; label: string }[];
+				if (rows.length !== ids.length) return bad('unknown item', 404);
+				const byId = new Map(rows.map((r) => [r.id, r.label]));
+				await Promise.all(ids.map((id, i) =>
+					db.from('courses_items').update({ sort: i + 1, category_id: resolved }).eq('id', id),
+				));
+				// Dragging into an aisle is also a filing decision worth remembering.
+				await Promise.all(ids.map((id) => rememberCategory(db, spaceId, byId.get(id as string)!, resolved)));
+				return json({ ok: true });
+			}
+
+			case 'add_category': {
+				const name = clean(body.name, 40);
+				if (!name) return bad('empty name');
+				const cats = await categoriesOf(db, spaceId);
+				if (cats.length >= 40) return bad('too many categories');
+				const sort = (cats.at(-1)?.sort ?? 0) + 1;
+				const { data: category, error } = await db.from('courses_categories')
+					.insert({ space_id: spaceId, name, sort }).select('id, name, sort').single<CategoryRow>();
+				if (error) throw error;
+				return json({ category });
+			}
+
+			case 'rename_category': {
+				const resolved = await categoryInSpace(db, spaceId, body.categoryId);
+				if (resolved === false || resolved === null) return bad('unknown category', 404);
+				const name = clean(body.name, 40);
+				if (!name) return bad('empty name');
+				await db.from('courses_categories').update({ name }).eq('id', resolved);
+				return json({ ok: true });
+			}
+
+			// Items filed under a deleted aisle are NOT deleted — the FK is ON DELETE
+			// SET NULL, so they drop back into "Sans catégorie".
+			case 'delete_category': {
+				const resolved = await categoryInSpace(db, spaceId, body.categoryId);
+				if (resolved === false || resolved === null) return bad('unknown category', 404);
+				await db.from('courses_categories').delete().eq('id', resolved);
+				return json({ ok: true });
+			}
+
+			case 'reorder_categories': {
+				const ids = Array.isArray(body.orderedIds) ? body.orderedIds : null;
+				if (!ids || !ids.every(isUuid)) return bad('orderedIds must be uuids');
+				const { data: owned } = await db.from('courses_categories').select('id').eq('space_id', spaceId).in('id', ids);
+				if ((owned ?? []).length !== ids.length) return bad('unknown category', 404);
+				await Promise.all(ids.map((id, i) => db.from('courses_categories').update({ sort: i + 1 }).eq('id', id)));
 				return json({ ok: true });
 			}
 
@@ -181,7 +325,7 @@ Deno.serve(async (req) => {
 				if (error) throw error;
 				if (srcItems.length) {
 					// Copy items unchecked, keep their order.
-					const rows = srcItems.map((it, i) => ({ list_id: fresh.id, label: it.label, qty: it.qty, checked: false, sort: i + 1 }));
+					const rows = srcItems.map((it, i) => ({ list_id: fresh.id, label: it.label, qty: it.qty, checked: false, sort: i + 1, category_id: it.category_id }));
 					await db.from('courses_items').insert(rows);
 				}
 				return json(await snapshot(db, spaceId));
