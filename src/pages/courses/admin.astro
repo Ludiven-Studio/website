@@ -1,0 +1,15 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import CoursesAdmin from '../../components/courses/CoursesAdmin';
+import '../../styles/courses.css';
+---
+
+<BaseLayout
+	title="Listes de courses"
+	description="Toutes les listes de courses."
+	noindex
+>
+	<div class="wrapper">
+		<CoursesAdmin client:only="react" />
+	</div>
+</BaseLayout>

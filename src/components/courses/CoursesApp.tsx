@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
 	type Snapshot, type CourseItem, type Category, type HistoryEntry, type RecentSpace,
 	createSpace, getSpace, getList, addItem, updateItem, deleteItem,
-	clearChecked, newList, reuseList, reorderItems,
+	clearChecked, newList, reuseList, reorderItems, renameList,
 	addCategory, renameCategory, deleteCategory, reorderCategories,
 	recentSpaces, rememberSpace, coursesEnabled,
 } from '../../lib/courses';
@@ -223,6 +223,7 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 	const [qty, setQty] = useState('');
 	const [copied, setCopied] = useState(false);
 	const [editing, setEditing] = useState<CourseItem | null>(null);
+	const [naming, setNaming] = useState(false);
 	const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed(spaceId));
 	// While dragging we render from this local copy so the row follows the finger;
 	// null means "just use the server snapshot".
@@ -306,7 +307,11 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 		<>
 			<div className="co-head">
 				<div className="co-title-row">
-					<h1>Liste de courses</h1>
+					<h1>
+						<button className="co-title-btn" onClick={() => setNaming(true)} title="Renommer la liste">
+							{snap.active.title || 'Liste de courses'}
+						</button>
+					</h1>
 					{peers > 0 && <span className="co-peer" title="Une autre personne est connectée">● {peers + 1}</span>}
 				</div>
 				<div className="co-tools">
@@ -397,6 +402,14 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 					</button>
 				</div>
 			</div>
+
+			{naming && (
+				<RenameSheet
+					heading="Renommer la liste" value={snap.active.title} busy={busy}
+					onClose={() => setNaming(false)}
+					onSave={async (n) => { await mutate(() => renameList(spaceId, snap.active.id, n)); setNaming(false); }}
+				/>
+			)}
 
 			{editing && (
 				<ItemEditor
@@ -559,7 +572,7 @@ function CategoriesView({ snap, spaceId, busy, onBack, mutate }: {
 
 			{renaming && (
 				<RenameSheet
-					category={renaming} busy={busy}
+					heading="Renommer le rayon" value={renaming.name} busy={busy}
 					onClose={() => setRenaming(null)}
 					onSave={async (n) => { await mutate(() => renameCategory(spaceId, renaming.id, n)); setRenaming(null); }}
 				/>
@@ -568,14 +581,14 @@ function CategoriesView({ snap, spaceId, busy, onBack, mutate }: {
 	);
 }
 
-function RenameSheet({ category, busy, onClose, onSave }: {
-	category: Category; busy: boolean; onClose: () => void; onSave: (name: string) => void;
+export function RenameSheet({ heading, value, busy, onClose, onSave }: {
+	heading: string; value: string; busy: boolean; onClose: () => void; onSave: (name: string) => void;
 }) {
-	const [name, setName] = useState(category.name);
+	const [name, setName] = useState(value);
 	return (
 		<div className="co-modal" onClick={onClose}>
 			<div className="co-sheet" onClick={(e) => e.stopPropagation()}>
-				<h2>Renommer le rayon</h2>
+				<h2>{heading}</h2>
 				<label className="co-field">
 					<span>Nom</span>
 					<input

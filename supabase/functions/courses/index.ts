@@ -47,6 +47,17 @@ const labelKey = (label: string): string =>
 		.toLowerCase()
 		.trim();
 
+/** Operator key for the admin dashboard. It lives ONLY here: the site is a
+ *  static build, so anything shipped to the browser would be public. Unset =
+ *  the dashboard stays locked rather than open. */
+const ADMIN_KEY = Deno.env.get('COURSES_ADMIN_KEY') ?? '';
+function isAdmin(v: unknown): boolean {
+	if (!ADMIN_KEY || typeof v !== 'string' || v.length !== ADMIN_KEY.length) return false;
+	let diff = 0;
+	for (let i = 0; i < v.length; i++) diff |= v.charCodeAt(i) ^ ADMIN_KEY.charCodeAt(i);
+	return diff === 0; // compare every char so a wrong key can't be found byte by byte
+}
+
 /** Ensure a space exists. Returns its id or null. */
 async function requireSpace(db: SupabaseClient, spaceId: unknown): Promise<string | null> {
 	if (!isUuid(spaceId)) return null;
@@ -156,6 +167,62 @@ Deno.serve(async (req) => {
 			const { data: space, error } = await db.from('courses_spaces').insert({}).select('id').single();
 			if (error) throw error;
 			return json(await snapshot(db, space.id as string));
+		}
+
+		// Admin dashboard: it spans every space, so it is gated by the operator
+		// key instead of a space uuid.
+		if (action === 'admin_list' || action === 'admin_delete_space') {
+			if (!isAdmin(body.adminKey)) return bad('forbidden', 403);
+
+			if (action === 'admin_delete_space') {
+				if (!isUuid(body.targetSpaceId)) return bad('bad space id');
+				// Lists, items, aisles and filing memory all cascade from the space.
+				await db.from('courses_spaces').delete().eq('id', body.targetSpaceId);
+				return json({ ok: true });
+			}
+
+			const { data: spaces } = await db.from('courses_spaces').select('id, created_at').limit(500);
+			const { data: lists } = await db.from('courses_lists').select('id, space_id, title, archived_at, created_at').limit(2000);
+			const { data: items } = await db.from('courses_items').select('list_id, checked, created_at').limit(20000);
+
+			const listsOfSpace = new Map<string, ListRow[]>();
+			for (const l of (lists ?? []) as ListRow[]) {
+				if (!listsOfSpace.has(l.space_id)) listsOfSpace.set(l.space_id, []);
+				listsOfSpace.get(l.space_id)!.push(l);
+			}
+			const statsOfList = new Map<string, { total: number; checked: number; last: string }>();
+			for (const it of (items ?? []) as { list_id: string; checked: boolean; created_at: string }[]) {
+				const s = statsOfList.get(it.list_id) ?? { total: 0, checked: 0, last: '' };
+				s.total++;
+				if (it.checked) s.checked++;
+				if (it.created_at > s.last) s.last = it.created_at;
+				statsOfList.set(it.list_id, s);
+			}
+
+			const rows = ((spaces ?? []) as { id: string; created_at: string }[]).map((sp) => {
+				const own = listsOfSpace.get(sp.id) ?? [];
+				const active = own.find((l) => !l.archived_at) ?? null;
+				const stats = active ? statsOfList.get(active.id) : undefined;
+				// ISO timestamps sort lexicographically, so a plain > works here.
+				let last = sp.created_at;
+				for (const l of own) {
+					if (l.created_at > last) last = l.created_at;
+					const s = statsOfList.get(l.id);
+					if (s && s.last > last) last = s.last;
+				}
+				return {
+					id: sp.id,
+					created_at: sp.created_at,
+					title: active?.title ?? '',
+					activeListId: active?.id ?? null, // lets the dashboard reuse rename_list
+					items: stats?.total ?? 0,
+					checked: stats?.checked ?? 0,
+					archived: own.filter((l) => l.archived_at).length,
+					lastActivity: last,
+				};
+			});
+			rows.sort((a, b) => (a.lastActivity < b.lastActivity ? 1 : -1));
+			return json({ spaces: rows });
 		}
 
 		// Everything else needs a valid space uuid.

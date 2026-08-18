@@ -67,6 +67,14 @@ await A.waitForTimeout(1200);
 check((await labelsIn(A, 'Frais')).includes('Lait'), '"Lait" classe dans Frais via la fiche article');
 await A.screenshot({ path: shot('5-rayons') });
 
+// ---- 3a. Name the list itself (the title doubles as the dashboard label) ----
+await A.locator('.co-title-btn').click();
+await A.locator('.co-sheet input').fill('Courses de la semaine');
+await A.getByRole('button', { name: 'Enregistrer' }).click();
+await A.locator('.co-sheet').waitFor({ state: 'detached', timeout: 10000 });
+await A.waitForFunction(() => document.querySelector('.co-title-btn')?.textContent === 'Courses de la semaine', null, { timeout: 15000 });
+check(true, 'liste renommee depuis son titre');
+
 // ---- 3b. Rename an item, set then clear its quantity ----
 const openEditor = async (row) => {
 	await A.locator('.co-row', { hasText: row }).locator('.co-main').click();

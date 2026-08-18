@@ -88,6 +88,27 @@ export const newList = (spaceId: string, title = ''): Promise<Snapshot> =>
 export const reuseList = (spaceId: string, sourceListId: string, title = ''): Promise<Snapshot> =>
 	call('reuse_list', { spaceId, sourceListId, title });
 
+// ---- Admin dashboard ----
+
+/** One row of the operator view: a space and how busy its active list is. */
+export interface AdminSpace {
+	id: string;
+	title: string;
+	activeListId: string | null;
+	items: number;
+	checked: number;
+	archived: number;
+	created_at: string;
+	lastActivity: string;
+}
+
+/** The key is never stored in the bundle: it is typed (or carried in ?k=) and
+ *  only ever checked inside the Edge Function. */
+export const adminList = (adminKey: string): Promise<{ spaces: AdminSpace[] }> =>
+	call('admin_list', { adminKey });
+export const adminDeleteSpace = (adminKey: string, targetSpaceId: string): Promise<{ ok: true }> =>
+	call('admin_delete_space', { adminKey, targetSpaceId });
+
 // ---- Recent spaces (so a returning device finds its list without the SMS) ----
 
 const RECENT_KEY = 'ludiven-courses-spaces';
