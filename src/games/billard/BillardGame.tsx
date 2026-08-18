@@ -153,6 +153,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const resolveShotRef = useRef<() => void>(() => {});
 	const accRef = useRef(0);
 	const lastRef = useRef(0);
+	// Ball positions before the last physics step, and how far into the next one we are. The
+	// simulation runs at a fixed 60 Hz while the screen refreshes at its own rate, so drawing raw
+	// engine positions skips or doubles a step now and then — visible as stutter against the smoothly
+	// eased camera. Rendering between the two states hides the mismatch.
+	const prevPosRef = useRef<{ x: number; y: number }[]>([]);
+	const alphaRef = useRef(1);
 	const powerRef = useRef(0); // 0..1, for the aim-line colour
 	const sinksRef = useRef<SinkInfo[]>([]); // active pot drops
 	const seenRef = useRef<Set<number>>(new Set()); // ball indices already dropping
@@ -936,6 +942,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const dt = Math.min(0.1, Math.max(0, (now - lastFrameRef.current) / 1000)) || 1 / 60;
 		lastFrameRef.current = now;
 		const rollAxis = rollAxisRef.current;
+		const alpha = alphaRef.current;
 
 		// Balls (with pot-drop animation). Rolling: spin the mesh about the horizontal axis perpendicular
 		// to its velocity by distance/radius, so the number/stripe visibly turns instead of sliding.
@@ -946,7 +953,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				mesh.visible = true;
 				const sp = Math.hypot(b.vx, b.vy);
 				if (sp > 0.4) { rollAxis.set(b.vy, 0, -b.vx).normalize(); mesh.rotateOnWorldAxis(rollAxis, (sp * dt) / BALL_R); }
-				mesh.position.set(b.x - hw, BALL_R, b.y - hh);
+				const p = alpha < 1 ? prevPosRef.current[i] : undefined;
+				const px = p ? p.x + (b.x - p.x) * alpha : b.x;
+				const pz = p ? p.y + (b.y - p.y) * alpha : b.y;
+				mesh.position.set(px - hw, BALL_R, pz - hh);
 				continue;
 			}
 			const sink = sinksRef.current.find((s) => s.idx === i);
@@ -1115,6 +1125,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			while (accRef.current >= STEP) {
 				accRef.current -= STEP;
 				if (rollingRef.current) {
+					const bs = ballsRef.current, pp = prevPosRef.current;
+					if (pp.length !== bs.length) prevPosRef.current = bs.map((b) => ({ x: b.x, y: b.y }));
+					else for (let i = 0; i < bs.length; i++) { pp[i].x = bs[i].x; pp[i].y = bs[i].y; }
 					const r = stepBalls(ballsRef.current, t, STEP / 1000);
 					if (eightBallRef.current) { // accumulate the shot for the 8-ball rules
 						const acc = shotAccRef.current;
@@ -1129,6 +1142,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					}
 				}
 			}
+			// Only the roll is interpolated: aiming and ball-in-hand move the cue outside the fixed step.
+			alphaRef.current = rollingRef.current ? accRef.current / STEP : 1;
 			// Spawn a drop animation for any ball that just fell.
 			const balls = ballsRef.current;
 			for (let i = 0; i < balls.length; i++) {
