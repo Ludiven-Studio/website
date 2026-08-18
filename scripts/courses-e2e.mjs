@@ -11,7 +11,7 @@ const check = (cond, label) => (cond ? ok : ko).push(label);
 
 /** Drag one element onto another with real pointer events (useDragSort listens
  *  on pointerdown + document pointermove/up, so a synthetic dispatch won't do). */
-async function dragOnto(page, handle, target) {
+async function dragOnto(page, handle, target, onStep) {
 	const h = await handle.boundingBox();
 	const t = await target.boundingBox();
 	await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
@@ -23,6 +23,7 @@ async function dragOnto(page, handle, target) {
 			h.y + h.height / 2 + ((t.y + t.height / 2 - h.y - h.height / 2) * i) / 6,
 		);
 		await page.waitForTimeout(40);
+		if (onStep) await onStep();
 	}
 	await page.mouse.up();
 	await page.waitForTimeout(1200);
@@ -112,7 +113,14 @@ check((await labelsIn(A, 'Frais')).includes('LAIT'), 'MEMOIRE: re-taper "LAIT" l
 const tomatesGrip = A.locator('.co-row', { hasText: 'Tomates' }).locator('.co-grip');
 // An aisle with nothing in it is a chip in the strip under the list, not a section.
 const legumesChip = A.locator('.co-chip', { hasText: 'Fruits et légumes' });
-await dragOnto(A, tomatesGrip, legumesChip);
+// The strip must be frozen for the whole drag. Recomputing it from the live
+// draft made a chip vanish under the finger, which re-aimed the drop onto its
+// neighbour, which refilled the first one — it flickered every few pixels.
+const shelfStates = new Set();
+const sampleShelf = async () => shelfStates.add((await A.locator('.co-chip').allInnerTexts()).join('|'));
+await sampleShelf();
+await dragOnto(A, tomatesGrip, legumesChip, sampleShelf);
+check(shelfStates.size === 1, `strip des rayons vides fige pendant le drag (${shelfStates.size} etat(s))`);
 check((await labelsIn(A, 'Fruits et légumes')).includes('Tomates'), 'GLISSER-DEPOSER: "Tomates" depose dans Fruits et legumes');
 
 // Dragging is also a filing decision -> it must be remembered too.

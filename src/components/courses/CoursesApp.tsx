@@ -231,10 +231,13 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 
 	const items = draft ?? snap.active.items;
 	const sections = useMemo(() => buildSections(snap.categories, items), [snap.categories, items]);
-	// Empty aisles would be eight dead headers on a fresh list, so they live in a
-	// compact strip under the list instead — still droppable, no wasted screen.
-	const filled = sections.filter((s) => s.items.length);
-	const emptyAisles = sections.filter((s) => !s.items.length);
+	// Which aisles hold something, read from the SERVER snapshot — so it stays put
+	// for the whole drag. Deriving it from the draft made chips and headers appear
+	// and vanish under the finger every few pixels, which re-aimed the drop.
+	const stocked = useMemo(
+		() => new Set(snap.active.items.map((i) => zoneOf(i.category_id))),
+		[snap.active.items],
+	);
 	const remaining = items.filter((i) => !i.checked).length;
 	const done = items.length - remaining;
 
@@ -266,6 +269,7 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 			const from = arr.findIndex((i) => i.id === draggedId);
 			if (from < 0) return arr;
 			const target = catOf(zone);
+			if (arr[from].category_id === target) return cur; // its own aisle: passing over it must change nothing
 			const [d] = arr.splice(from, 1);
 			const at = arr.findIndex((i) => i.category_id === target);
 			arr.splice(at < 0 ? arr.length : at, 0, { ...d, category_id: target });
@@ -285,6 +289,13 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 	const { draggingId, handleProps } = useDragSort({
 		onHoverRow: moveBeside, onHoverZone: moveIntoZone, onDrop: commitDrag,
 	});
+
+	// Empty aisles would be eight dead headers on a fresh list, so they live in a
+	// compact strip under the list instead — still droppable, no wasted screen.
+	// While dragging, an aisle emptied by the drag keeps its header rather than
+	// jumping to the strip: the layout must not move under the finger.
+	const filled = sections.filter((s) => s.items.length || (draggingId && stocked.has(zoneOf(s.id))));
+	const shelf = sections.filter((s) => !stocked.has(zoneOf(s.id)));
 
 	const add = () => {
 		const l = label.trim();
@@ -378,11 +389,11 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 				</div>
 			)}
 
-			{emptyAisles.length > 0 && items.length > 0 && (
+			{shelf.length > 0 && items.length > 0 && (
 				<div className={`co-shelf${draggingId ? ' co-shelf-active' : ''}`}>
 					<span className="co-shelf-title">{draggingId ? 'Déposer dans…' : 'Rayons vides'}</span>
 					<div className="co-chips">
-						{emptyAisles.map((s) => (
+						{shelf.map((s) => (
 							<span className="co-chip" key={zoneOf(s.id)} data-drop-zone={zoneOf(s.id)}>{s.name}</span>
 						))}
 					</div>
