@@ -70,12 +70,21 @@ const hs = await snap(host);
 check((await snap(guest)).stickVisible === false, 'pas de canne adverse avant le geste');
 
 // The host grabs the cue and pulls WITHOUT releasing: the guest must grow a ghost stick.
-const cs = hs.cueScreen;
+// The grab can miss while the camera is still gliding (cueScreen is a projection), so re-read
+// the ball and try again instead of running the whole scenario on a drag that never took.
 const box = await host.locator('.bi-canvas').boundingBox();
-const pullY = Math.min(cs.y + 150, box.y + box.height - 14);
-await host.mouse.move(cs.x, cs.y);
-await host.mouse.down();
-await host.mouse.move(cs.x + 5, pullY, { steps: 20 });
+let cs = hs.cueScreen, pullY = 0;
+for (let i = 0; i < 4; i++) {
+	cs = (await snap(host)).cueScreen;
+	pullY = Math.min(cs.y + 150, box.y + box.height - 14);
+	await host.mouse.move(cs.x, cs.y);
+	await host.mouse.down();
+	await host.mouse.move(cs.x + 5, pullY, { steps: 20 });
+	if ((await snap(host)).aiming) break;
+	await host.mouse.up();
+	await sleep(1200);
+}
+check((await snap(host)).aiming === true, 'le host tient la canne');
 
 let g = null;
 for (let i = 0; i < 30; i++) { await sleep(200); g = await snap(guest); if (g?.stickVisible && g?.remoteAim?.live) break; await host.mouse.move(cs.x + 6, pullY - (i % 2), { steps: 2 }); }
@@ -104,6 +113,18 @@ check(gAfter?.placing === true, 'le guest a la bille en main apres la faute');
 check(gAfter?.camMode === 'top', `la camera passe en vue du haut (${gAfter?.camMode})`);
 await sleep(1400); // let the camera glide there
 await guest.screenshot({ path: resolve(`${OUT}/billard-bih-top.png`) });
+
+// A gesture started AWAY from the white ball turns the view — it must not drop the ball there.
+// No drag here on purpose: panning would flag the camera as user-set and the restore check below
+// (which only fires on an untouched camera) would no longer mean anything.
+const far = (await snap(guest)).cueScreen;
+await guest.mouse.move(far.x + 220, far.y - 120);
+await guest.mouse.down();
+await guest.mouse.up();
+await sleep(500);
+const gAway = await snap(guest);
+check(gAway?.placing === true, 'un geste loin de la bille ne valide pas le placement');
+check(Math.hypot(gAway.cueScreen.x - far.x, gAway.cueScreen.y - far.y) < 2, 'la blanche ne saute pas sous le doigt');
 
 // Placing the ball gives the player's own view back.
 const gcs = (await snap(guest)).cueScreen;

@@ -123,7 +123,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const [best, setBest] = useState<number | null>(null);
 	const [scratchFlash, setScratchFlash] = useState(false);
 	const [cancelFlash, setCancelFlash] = useState(false); // brief "shot cancelled" toast (PC left+right)
-	const [groupFlash, setGroupFlash] = useState<string | null>(null); // "you're solids/stripes" banner when groups get decided
+	// Announces the hand-over between shots (and the solids/stripes assignment, in the same card so
+	// the two never stack): whose turn it is now was easy to miss on the HUD alone.
+	const [turnFlash, setTurnFlash] = useState<{ mine: boolean; title: string; sub: string | null } | null>(null);
 	const [camMode, setCamMode] = useState<CamMode>('shoulder');
 	const [webglError, setWebglError] = useState(false);
 	// Daily
@@ -206,6 +208,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const panRef = useRef({ x: 0, z: 0 }); // fit/top look-target offset
 	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), velEye: new THREE.Vector3(), velLook: new THREE.Vector3(), on: false });
 	const camTauRef = useRef(CAM_TAU); // eased down to CAM_TAU on user input, up to CAM_TAU_SLOW for auto-placement
+	const camMovedRef = useRef(false); // player turned/panned/zoomed since the last preset — don't yank it back
+	const turnFlashTimer = useRef<number | null>(null);
 	const lastFrameRef = useRef(0);
 	const lastDistRef = useRef(200); // camera→target distance, for the pan pixel→world scale
 	const pinchRef = useRef<{ dist: number; zoom: number; ang: number; az: number; cy: number; pitch: number } | null>(null);
@@ -536,6 +540,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	// re-locks the view until the next situation change (which eases smoothly to the new preset).
 	const setView = (view: CamMode) => {
 		camModeRef.current = view; setCamMode(view);
+		camMovedRef.current = false;
 		camTauRef.current = view === 'shoulder' ? CAM_TAU_SLOW : CAM_TAU; // glide slowly behind the cue
 		const f = fitRef.current;
 		zoomRef.current = 1;
@@ -590,6 +595,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		aiThinkingRef.current = false;
 	};
 
+	const announceTurn = (mine: boolean, title: string, sub: string | null) => {
+		if (turnFlashTimer.current) window.clearTimeout(turnFlashTimer.current);
+		setTurnFlash({ mine, title, sub });
+		turnFlashTimer.current = window.setTimeout(() => setTurnFlash(null), sub ? 2400 : 1500); // matches the CSS animation
+	};
+
 	const resolveShot8 = () => {
 		const balls = ballsRef.current, t = tableRef.current, prev = match8Ref.current;
 		if (!prev) return;
@@ -602,9 +613,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (cue && cue.potted) { seenRef.current.delete(balls.indexOf(cue)); cue.potted = false; cue.x = t.cueStart.x; cue.y = t.cueStart.y; cue.vx = cue.vy = 0; } // un-pot on scratch
 		if (next.lastFoul) { setScratchFlash(true); setTimeout(() => setScratchFlash(false), 1500); }
 		const me = onlineRef.current ? myPlayerRef.current : HUMAN; // the player at this device
-		if (prev.open && !next.open && next.groups[me]) { // the table just got assigned — announce my colour
-			const msg = `🎱 Tu joues les ${groupLabel(next.groups[me])} !`;
-			setGroupFlash(msg); setTimeout(() => setGroupFlash(null), 2600);
+		const groupMsg = prev.open && !next.open && next.groups[me] ? `🎱 Tu joues les ${groupLabel(next.groups[me])} !` : null;
+		if (next.winner === null && (next.turn !== prev.turn || groupMsg)) {
+			const mine = next.turn === me;
+			const opp = onlineRef.current ? (mpOpp || 'ton adversaire') : 'l’ordi';
+			announceTurn(mine, mine ? '🎯 À toi de jouer' : `⏳ Au tour de ${opp}`, groupMsg);
 		}
 		if (next.winner !== null) {
 			setStat('won');
@@ -753,7 +766,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const applyPan = useCallback((startPanX: number, startPanZ: number, dxPx: number, dyPx: number) => {
 		const g = g3Ref.current;
 		if (!g) return;
-		camTauRef.current = CAM_TAU; // user is moving the view → respond snappily
+		camTauRef.current = CAM_TAU; camMovedRef.current = true; // user is moving the view → respond snappily
 		const H = canvasRef.current?.clientHeight || 600;
 		const wpp = (2 * lastDistRef.current * Math.tan((g.camera.fov * Math.PI / 180) / 2)) / H;
 		const right = new THREE.Vector3().setFromMatrixColumn(g.camera.matrixWorld, 0); right.y = 0; right.normalize();
@@ -767,10 +780,18 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const aimStart = useCallback((clientX: number, clientY: number) => {
 		if (pinchRef.current) return; // two fingers own the gesture
 		const cue = cueBall();
-		if (eightBallRef.current && placingRef.current && cue) { // ball in hand: drag places the cue
+		if (eightBallRef.current && placingRef.current && cue) {
+			// Ball in hand: only a drag STARTED ON the white ball places it. Anywhere else turns the
+			// view — you need to look around the table before deciding where to put it.
 			const pp = worldFromPointer(clientX, clientY);
-			if (pp) moveCueTo(cue, pp);
-			placeDragRef.current = true;
+			const onCue = cueScreenDist(clientX, clientY, cue) <= GRAB_PX
+				|| (pp != null && Math.hypot(pp.x - cue.x, pp.y - cue.y) <= GRAB_R);
+			if (onCue) {
+				if (pp) moveCueTo(cue, pp);
+				placeDragRef.current = true;
+			} else {
+				panDragRef.current = { x: clientX, y: clientY, panX: panRef.current.x, panZ: panRef.current.z };
+			}
 			return;
 		}
 		// In 8-ball you may only aim on your turn (otherwise the drag just moves the view).
@@ -810,7 +831,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			placeDragRef.current = false;
 			placingRef.current = false; setPlacing(false);
 			if (match8Ref.current && match8Ref.current.ballInHand === HUMAN) { match8Ref.current = { ...match8Ref.current, ballInHand: null }; setMatch8(match8Ref.current); }
-			restoreCam(); // done placing — back to the player's own view to aim
+			if (!camMovedRef.current) restoreCam(); // done placing — back to the player's own view, unless they set one up
 			const placed = cueBall();
 			if (placed) streamAim(placed, null, true);
 			setStat('aiming');
@@ -862,7 +883,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Zoom (wheel + pinch) and camera cycle ---------- */
 	const zoomBy = useCallback((f: number) => {
-		camTauRef.current = CAM_TAU; // user is adjusting the view → respond snappily
+		camTauRef.current = CAM_TAU; camMovedRef.current = true; // user is adjusting the view → respond snappily
 		zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, zoomRef.current * f));
 	}, []);
 
@@ -883,7 +904,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const onMove = (m: PointerEvent) => {
 				const o = orbitDragRef.current;
 				if (!o) return;
-				camTauRef.current = CAM_TAU; // user is orbiting → respond snappily
+				camTauRef.current = CAM_TAU; camMovedRef.current = true; // user is orbiting → respond snappily
 				azRef.current = o.az - (m.clientX - o.x) * ORBIT_PER_PX;
 				pitchRef.current = Math.max(MIN_PITCH, Math.min(MAX_PITCH, o.pitch + (m.clientY - o.y) * PITCH_PER_PX));
 			};
@@ -929,7 +950,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const p = pinchRef.current;
 			if (!p || e.touches.length < 2) return;
 			e.preventDefault();
-			camTauRef.current = CAM_TAU; // user is adjusting the view → respond snappily
+			camTauRef.current = CAM_TAU; camMovedRef.current = true; // user is adjusting the view → respond snappily
 			const gg = gesture(e.touches);
 			// Spread → zoom; twist the two-finger line → turn the view; slide both up/down → tilt.
 			if (gg.dist > 0) zoomRef.current = Math.max(1, Math.min(ZOOM_MAX, p.zoom * (gg.dist / p.dist)));
@@ -1199,6 +1220,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					}
 					if (isSettled(ballsRef.current)) {
 						rollingRef.current = false;
+						// isSettled tolerates a crawl (speed < SETTLE), so a ball can end the shot with
+						// leftover velocity. The physics stops but the mesh spin reads that velocity —
+						// the ball would keep turning on the spot forever. Park them for real.
+						for (const b of ballsRef.current) { b.vx = 0; b.vy = 0; }
 						resolveShotRef.current();
 					}
 				}
@@ -1382,12 +1407,17 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 				{scratchFlash && <div className="bi-scratch">{is8 ? (match8?.lastFoul ?? 'Faute') : 'Pénalité · +1 coup'}</div>}
 				{cancelFlash && <div className="bi-scratch bi-cancel">Tir annulé</div>}
-				{groupFlash && <div className="bi-groupflash">{groupFlash}</div>}
+				{turnFlash && (
+					<div className={`bi-turnflash ${turnFlash.mine ? 'mine' : ''} ${turnFlash.sub ? 'long' : ''}`}>
+						<span className="bi-turnflash-title">{turnFlash.title}</span>
+						{turnFlash.sub && <span className="bi-turnflash-sub">{turnFlash.sub}</span>}
+					</div>
+				)}
 				{is8 && placing && (
 					<div className="bi-place">
 						<span className="bi-place-icon">✋</span>
 						<span className="bi-place-title">Bille en main</span>
-						<span className="bi-place-sub">glisse la blanche, relâche pour viser</span>
+						<span className="bi-place-sub">glisse la blanche · ailleurs, tu tournes la vue</span>
 					</div>
 				)}
 
@@ -1494,11 +1524,15 @@ const CSS = `
 /* Play area holds the canvas + all controls overlaid (immersive). */
 .bi-playwrap { width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
 .bi-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; background: #14100c; }
-/* Site global fullscreen: the table fills the whole screen, UI overlaid. */
+/* Site global fullscreen: fullscreen means the TABLE is fullscreen. Drop the page padding and
+   float the HUD over the cloth — the bar itself is tap-through, only its pills catch a finger,
+   so an aim drag started anywhere between them still reaches the canvas. */
+.game-page.gf-full:has(.bi-root) { padding: 0; }
 .game-page.gf-full .bi-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .bi-help { display: none; }
 .game-page.gf-full .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
 .game-page.gf-full .bi-hud-top { padding-right: 122px; }
+.game-page.gf-full .bi-hud-top > * { pointer-events: auto; }
 
 /* HUD stacked above the table: on a phone an overlaid banner covers the cushion
    and swallows the drag that aims the shot. */
@@ -1511,9 +1545,13 @@ const CSS = `
 .bi-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .bi-daily-hud { background: rgba(20,14,10,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; margin: 0; backdrop-filter: blur(4px); pointer-events: none; }
 
-/* The HUD (level/score info + controls) is always a bar ABOVE the table, in flow — never over
-   the play surface — in every mode (windowed, wide screens, and fullscreen). */
-.game-page.gf-full .bi-topbar { margin: 0 0 6px; z-index: 3; }
+/* Windowed, the HUD is a bar ABOVE the table, in flow. In fullscreen it floats over the top of
+   the cloth so no pixel of screen is spent on chrome; the notch/rounded corners are respected. */
+.game-page.gf-full .bi-topbar {
+  position: absolute; inset: 0 0 auto 0; margin: 0; z-index: 3; gap: 6px; pointer-events: none;
+  padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+}
+.game-page.gf-full .bi-topbar > * { pointer-events: none; }
 
 .bi-stats { display: flex; gap: 6px; font-weight: 700; font-size: 13px; flex-wrap: wrap; }
 .bi-stat { background: rgba(20,14,10,0.6); color: #f4ece2; border-radius: 999px; padding: 5px 11px; backdrop-filter: blur(4px); box-shadow: 0 1px 3px rgba(0,0,0,0.35); font-variant-numeric: tabular-nums; }
@@ -1524,13 +1562,26 @@ const CSS = `
 .bi-act:hover:not(:disabled) { border-color: var(--bi-accent); color: #fff; }
 .bi-act:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.bi-scratch { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
+.bi-scratch { position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
 .bi-cancel { background: rgba(20,14,10,0.82); }
 .bi-onblack { background: linear-gradient(180deg, #2b2b2f, #111114); color: #ffe08a; font-weight: 800; border: 1px solid rgba(255,224,138,0.5); }
-.bi-groupflash { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; padding: 14px 26px; border-radius: 18px; background: linear-gradient(180deg, var(--bi-accent), rgba(20,14,10,0.9)); color: #fff; font-weight: 800; font-size: 18px; text-align: center; box-shadow: var(--shadow-lg); animation: bi-group-pop 0.4s ease-out; pointer-events: none; }
-@keyframes bi-group-pop { 0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; } 60% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
-/* One flat pill hugging the top edge: placing happens on the cloth, so the banner must not sit on it. */
-.bi-place { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: row; align-items: baseline; gap: 7px; text-align: center; max-width: 92%; padding: 5px 14px; border-radius: 999px; background: linear-gradient(180deg, rgba(48,209,88,0.94), rgba(30,150,60,0.94)); color: #fff; box-shadow: var(--shadow-md); animation: bi-place-pop 1.6s ease-in-out infinite; pointer-events: none; }
+/* Hand-over card: slides in, holds, slides out on its own — the JS timer only unmounts it. */
+.bi-turnflash { position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 13px 28px; border-radius: 18px; text-align: center; color: #fff; background: linear-gradient(180deg, rgba(24,18,14,0.94), rgba(16,11,8,0.9)); border: 2px solid rgba(255,255,255,0.16); box-shadow: var(--shadow-lg); pointer-events: none; animation: bi-turn-card 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) forwards; }
+.bi-turnflash.mine { background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(24,140,60,0.96)); border-color: rgba(255,255,255,0.4); }
+.bi-turnflash.long { animation-duration: 2.4s; }
+.bi-turnflash-title { font-family: var(--font-brand); font-weight: 800; font-size: 20px; }
+.bi-turnflash-sub { font-weight: 700; font-size: 14px; opacity: 0.95; }
+@keyframes bi-turn-card {
+  0% { opacity: 0; transform: translate(-50%, -50%) translateX(-70px) scale(0.9); }
+  14% { opacity: 1; transform: translate(-50%, -50%) translateX(0) scale(1.07); }
+  24% { transform: translate(-50%, -50%) scale(1); }
+  78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) translateX(70px) scale(0.94); }
+}
+@media (prefers-reduced-motion: reduce) { .bi-turnflash { animation: bi-turn-fade 1.5s linear forwards; } @keyframes bi-turn-fade { 0%, 100% { opacity: 0; } 10%, 85% { opacity: 1; } } }
+/* One flat pill on the bottom edge: placing happens on the cloth, so the banner must not sit on it,
+   and the top belongs to the HUD once fullscreen overlays it. */
+.bi-place { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: row; align-items: baseline; gap: 7px; text-align: center; max-width: 92%; padding: 5px 14px; border-radius: 999px; background: linear-gradient(180deg, rgba(48,209,88,0.94), rgba(30,150,60,0.94)); color: #fff; box-shadow: var(--shadow-md); animation: bi-place-pop 1.6s ease-in-out infinite; pointer-events: none; }
 .bi-place-icon { font-size: 14px; line-height: 1; }
 .bi-place-title { font-weight: 800; font-size: 13px; }
 .bi-place-sub { font-weight: 600; font-size: 12px; opacity: 0.9; }

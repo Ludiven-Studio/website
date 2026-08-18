@@ -106,6 +106,27 @@
 		let on = false; // our own state (native API may be absent — iOS)
 		let synthetic = false; // guards our self-dispatched re-measure ping
 
+		// Keep the screen lit while playing fullscreen: a game can go a long while without a tap
+		// (watching the balls roll, waiting for the opponent) and the phone would dim mid-shot.
+		// The lock is dropped by the browser whenever the tab hides, so re-take it on the way back.
+		let wake: any = null;
+		const keepAwake = async (): Promise<void> => {
+			if (wake || !navigator.wakeLock) return;
+			try {
+				wake = await navigator.wakeLock.request('screen');
+				wake.addEventListener?.('release', () => { wake = null; });
+			} catch {
+				/* denied, unsupported, or not visible — the game just doesn't hold the screen */
+			}
+		};
+		const letSleep = (): void => {
+			try { void wake?.release(); } catch { /* already gone */ }
+			wake = null;
+		};
+		document.addEventListener('visibilitychange', () => {
+			if (on && document.visibilityState === 'visible') void keepAwake();
+		});
+
 		const setLabel = (): void => {
 			btn.textContent = on ? '⛶ Quitter le plein écran' : '⛶ Plein écran';
 		};
@@ -129,11 +150,13 @@
 			} catch {
 				/* iOS / denied — the class-based overlay already fills the screen */
 			}
+			void keepAwake();
 			setLabel();
 			notify();
 		};
 		const exit = (): void => {
 			on = false;
+			letSleep();
 			target.classList.remove('gf-full');
 			html.classList.remove('gf-full');
 			try {
