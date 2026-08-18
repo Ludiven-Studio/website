@@ -38,6 +38,7 @@ console.log('geo:', geo);
 check(geo.wrap.w === geo.vw && geo.wrap.x === 0, 'la table occupe toute la largeur');
 check(geo.wrap.y === 0 && Math.abs(geo.wrap.h - geo.vh) < 1, 'la table occupe toute la hauteur');
 check(geo.bar.y < geo.wrap.h / 3, 'le HUD est superpose en haut du jeu');
+check(geo.bar.h < geo.vh * 0.12, `le HUD reste une bande fine (${Math.round(geo.bar.h)}px)`);
 await page.screenshot({ path: resolve(`${OUT}/billard-fs-hud.png`) });
 
 // A drag between the HUD pills must reach the canvas, not be swallowed by the bar.

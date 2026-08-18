@@ -1297,7 +1297,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	// 8-ball = everything except Défi (daily). Libre + Niveaux are 8-ball.
 	const is8 = !daily;
 	const myGroup: Group | null = match8?.groups[HUMAN] ?? null;
-	const oppGroup: Group | null = match8?.groups[AI] ?? null;
 	const colorLeft = ballsRef.current.filter((b) => b.kind === 'color' && !b.potted);
 	const myLeft = myGroup ? colorLeft.filter((b) => groupOf(b.color) === myGroup).length : 0;
 	// Group cleared → only the 8 left to pot (correct for the local player, incl. online player 1).
@@ -1333,7 +1332,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					<div className="bi-stats">
 						{is8 ? (
 							<>
-								<span className="bi-stat">{match8?.winner != null ? (match8.winner === myIdx ? '🏆 Gagné' : '❌ Perdu') : match8?.turn === myIdx ? '🎯 À toi' : (mpPhase === 'playing' ? '⏳ Adversaire' : '🤖 Ordi')}</span>
+								{/* No "whose turn" pill: the vs bar below highlights it and the hand-over card announces it. */}
+								{match8?.winner != null && <span className="bi-stat">{match8.winner === myIdx ? '🏆 Gagné' : '❌ Perdu'}</span>}
+								{lv.active && !lv.menu && <span className="bi-stat">🎯 Niveau {lv.level}</span>}
 								<span className="bi-stat">{match8?.open ? 'Table ouverte' : `${groupLabel(myGroup)} · ${myLeft}`}</span>
 							</>
 						) : (
@@ -1375,17 +1376,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label} · Essai ${Math.min(Math.max(tries, 1), MAX_TRIES)}/${MAX_TRIES}`}
 					</div>
 				)}
-				{lv.active && !lv.menu && (
-					<div className="bi-daily-tag bi-daily-hud">
-						{`Niveau ${lv.level} · IA ${Math.round(billardLevels.config(lv.level).skill * 100)}%`}
-						{match8 && match8.winner == null ? ` · ${match8.lastFoul || match8.lastEvent || (match8.open ? 'table ouverte' : `toi : ${groupLabel(myGroup)}`)}` : ''}
-					</div>
-				)}
-				{is8 && !lv.active && match8 && match8.winner == null && (
-					<div className="bi-daily-tag bi-daily-hud">
-						{mpPhase === 'playing' ? `En ligne vs ${mpOpp || 'adversaire'} · ` : ''}
-						{match8.lastFoul || match8.lastEvent || (match8.open ? 'Table ouverte — empoche pour choisir pleines ou rayées' : `Toi : ${groupLabel(myGroup)} · ${mpPhase === 'playing' ? (mpOpp || 'Adv') : 'Ordi'} : ${groupLabel(oppGroup)}`)}
-					</div>
+				{/* Only what nothing else on screen says: the AI strength is on the vs bar, the level and the
+				    group on their own pills — so this line is just what happened on the last shot. */}
+				{is8 && match8 && match8.winner == null && !lv.menu && (match8.lastFoul || match8.lastEvent) && (
+					<div className="bi-daily-tag bi-daily-hud">{match8.lastFoul || match8.lastEvent}</div>
 				)}
 				{onBlack && <div className="bi-daily-tag bi-daily-hud bi-onblack">🎱 Plus que la noire à rentrer !</div>}
 			</div>
@@ -1531,8 +1525,22 @@ const CSS = `
 .game-page.gf-full .bi-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .bi-help { display: none; }
 .game-page.gf-full .bi-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
-.game-page.gf-full .bi-hud-top { padding-right: 122px; }
+.game-page.gf-full .bi-hud-top { padding-right: 122px; align-items: center; gap: 6px; }
 .game-page.gf-full .bi-hud-top > * { pointer-events: auto; }
+/* Fullscreen means the table is the interface: drop the mode tabs (they only leave the game, and
+   they collide with the Quitter button) and shrink the rest so it costs one thin line of cloth. */
+.game-page.gf-full .bi-modetoggle { display: none; }
+.game-page.gf-full .bi-vs { order: -1; margin-top: 0; }
+/* Controls go to the bottom corner, where a thumb is: the top edge then carries information only. */
+.game-page.gf-full .bi-hud-actions {
+  position: fixed; z-index: 4; max-width: 45vw;
+  right: max(8px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom));
+}
+.game-page.gf-full .bi-stat,
+.game-page.gf-full .bi-vs-p { font-size: 12px; padding: 4px 10px; }
+.game-page.gf-full .bi-act { font-size: 14px; padding: 4px 10px; min-width: 32px; }
+.game-page.gf-full .bi-pill { font-size: 12px; padding: 4px 10px; }
+.game-page.gf-full .bi-daily-hud { font-size: 12px; padding: 4px 12px; max-width: 96%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* HUD stacked above the table: on a phone an overlaid banner covers the cushion
    and swallows the drag that aims the shot. */
