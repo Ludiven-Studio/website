@@ -126,15 +126,20 @@ const gAway = await snap(guest);
 check(gAway?.placing === true, 'un geste loin de la bille ne valide pas le placement');
 check(Math.hypot(gAway.cueScreen.x - far.x, gAway.cueScreen.y - far.y) < 2, 'la blanche ne saute pas sous le doigt');
 
-// Placing the ball gives the player's own view back.
+// Dropping the ball is not committing: only the button below the table validates.
 const gcs = (await snap(guest)).cueScreen;
 await guest.mouse.move(gcs.x, gcs.y);
 await guest.mouse.down();
 await guest.mouse.move(gcs.x - 40, gcs.y + 20, { steps: 10 });
 await guest.mouse.up();
 await sleep(700);
+check((await snap(guest))?.placing === true, 'lacher la bille ne valide pas encore le placement');
+
+// The validate button gives the player's own view back.
+await guest.locator('.bi-placeok').click();
+await sleep(700);
 const gPlaced = await snap(guest);
-check(gPlaced?.placing === false, 'la bille en main est validee au relachement');
+check(gPlaced?.placing === false, 'le bouton valide le placement');
 check(gPlaced?.camMode === 'shoulder', `la vue du joueur revient apres le placement (${gPlaced?.camMode})`);
 
 console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');

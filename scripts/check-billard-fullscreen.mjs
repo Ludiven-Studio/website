@@ -53,11 +53,18 @@ check((await snap()).aiming === true, 'la visee demarre bien sous le HUD superpo
 await page.mouse.up();
 
 // Wait for the break to settle: no ball may keep any speed (they would spin on the spot forever).
-let s = null;
-for (let i = 0; i < 80; i++) { await sleep(250); s = await snap(); if (!s?.rolling && s?.match8?.broken) break; }
-console.log('after break:', { potted: s?.potted, moving: s?.moving, turn: s?.match8?.turn });
+// Sample the framing on the way: a ball you just hit must never leave the screen (edge > 1).
+let s = null, movOut = 0, movEdge = 0, edge = 0;
+for (let i = 0; i < 300; i++) {
+	await sleep(70); s = await snap();
+	if (s?.rolling) { movOut = Math.max(movOut, s.frame.movingOut); movEdge = Math.max(movEdge, s.frame.movingEdge); edge = Math.max(edge, s.frame.edge); }
+	if (!s?.rolling && s?.match8?.broken) break;
+}
+console.log('after break:', { potted: s?.potted, moving: s?.moving, turn: s?.match8?.turn }, 'framing:', { movOut, movEdge: +movEdge.toFixed(2), edge: +edge.toFixed(2) });
 check(s?.rolling === false, 'le tir est resolu');
 check(s?.moving === 0, `aucune boule ne garde de vitesse apres le tir (${s?.moving})`);
+check(movOut === 0, `aucune boule en mouvement ne sort du cadre (bord max ${movEdge.toFixed(2)})`);
+check(edge < 2, `la table reste lisible pendant le roulement (bord max ${edge.toFixed(2)})`);
 
 // The hand-over card: it shows the moment the turn changes.
 let sawCard = false, cardText = '';

@@ -52,7 +52,10 @@ const ORBIT_PER_PX = 0.007; // radians of turn per pixel of right-button horizon
 const CAM_TAU = 0.09; // camera catch-up time constant (s) — snappy for user orbit/pan/zoom
 const CAM_TAU_SLOW = 0.42; // slower, cinematic glide when auto-placing behind the cue on your turn
 const CAM_FOLLOW_TAU = 0.16; // smooth tracking while the balls roll
-const FOLLOW_MARGIN = 16, FOLLOW_MIN_X = 56, FOLLOW_MIN_Z = 32; // min framed half-extents so a lone ball isn't over-zoomed
+const FOLLOW_MARGIN = 16, FOLLOW_MIN_X = 84, FOLLOW_MIN_Z = 46; // min framed half-extents: keep most of the cloth, a lone slow ball must not become a close-up
+const FOLLOW_LEAD = 0.35; // s of travel added to the framed box: the camera eases, so frame where the balls WILL be
+const SHOULDER_ZOOM = 1.55; // your turn: closer than the whole table, otherwise the shot is unreadable
+const SHOULDER_AHEAD = 30; // look this far past the cue ball, down the line you are shooting
 const STRIKE_MS = 460; // final forward swing duration before the ball is released
 const STRIKE_HIT = 0.6; // fraction of the swing at which the tip reaches the ball (fire here)
 const STRIKE_FOLLOW = 8; // follow-through past contact
@@ -209,6 +212,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const camSmoothRef = useRef({ eye: new THREE.Vector3(), look: new THREE.Vector3(), velEye: new THREE.Vector3(), velLook: new THREE.Vector3(), on: false });
 	const camTauRef = useRef(CAM_TAU); // eased down to CAM_TAU on user input, up to CAM_TAU_SLOW for auto-placement
 	const camMovedRef = useRef(false); // player turned/panned/zoomed since the last preset — don't yank it back
+	const rollSeenRef = useRef<Set<number>>(new Set()); // balls this shot set in motion — the framed cast
 	const turnFlashTimer = useRef<number | null>(null);
 	const lastFrameRef = useRef(0);
 	const lastDistRef = useRef(200); // camera→target distance, for the pan pixel→world scale
@@ -512,6 +516,18 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		cue.x = x; cue.y = y; cue.vx = cue.vy = 0;
 	};
 
+	/** Ball in hand is over: the player pressed the button under the table. Releasing the drag can't
+	    do it — you need to let go, look around and move the ball again before committing. */
+	const confirmPlacement = () => {
+		placeDragRef.current = false;
+		placingRef.current = false; setPlacing(false);
+		if (match8Ref.current && match8Ref.current.ballInHand === HUMAN) { match8Ref.current = { ...match8Ref.current, ballInHand: null }; setMatch8(match8Ref.current); }
+		if (!camMovedRef.current) restoreCam(); // back to the player's own view, unless they set one up
+		const placed = cueBall();
+		if (placed) streamAim(placed, null, true);
+		setStat('aiming');
+	};
+
 	/** Broadcast where we point and how hard we pull, so the opponent sees our cue stick move. */
 	const streamAim = (cue: Ball, pull: Vec | null, force = false) => {
 		const net = netRef.current;
@@ -558,7 +574,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				const dx = b.x - cue.x, dz = b.y - cue.y, d = Math.hypot(dx, dz);
 				if (d > 1e-3 && d < bd) { bd = d; tx = dx / d; tz = dz / d; }
 			}
-			panRef.current = { x: 0, z: 0 }; // centred so the whole table fits (perspective keeps the cue foreground)
+			// Look just past the cue ball along that line and come closer: framing the whole table from
+			// here leaves the balls tiny, and the shot is what the player is reading.
+			const t = tableRef.current;
+			panRef.current = {
+				x: Math.max(-f.hx, Math.min(f.hx, cue.x - t.w / 2 + tx * SHOULDER_AHEAD)),
+				z: Math.max(-f.hz, Math.min(f.hz, cue.y - t.h / 2 + tz * SHOULDER_AHEAD)),
+			};
+			zoomRef.current = SHOULDER_ZOOM;
 			azRef.current = Math.atan2(tz, tx); // face down the table toward the target
 			pitchRef.current = SHOULDER_PITCH * D2R;
 		} else {
@@ -827,14 +850,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const aimEnd = useCallback(() => {
 		if (pinchRef.current) return;
-		if (placeDragRef.current) { // commit ball-in-hand placement (no shot fired)
+		if (placeDragRef.current) { // dropped the ball somewhere — the button below is what validates
 			placeDragRef.current = false;
-			placingRef.current = false; setPlacing(false);
-			if (match8Ref.current && match8Ref.current.ballInHand === HUMAN) { match8Ref.current = { ...match8Ref.current, ballInHand: null }; setMatch8(match8Ref.current); }
-			if (!camMovedRef.current) restoreCam(); // done placing — back to the player's own view, unless they set one up
-			const placed = cueBall();
-			if (placed) streamAim(placed, null, true);
-			setStat('aiming');
+			const moved = cueBall();
+			if (moved) streamAim(moved, null, true);
 			return;
 		}
 		if (panDragRef.current) { panDragRef.current = null; return; }
@@ -1149,11 +1168,21 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		let panX: number, panZ: number, d: number;
 		if (statusRef.current === 'rolling') {
 			let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, any = false;
-			for (const b of balls) {
+			const seen = rollSeenRef.current;
+			for (let i = 0; i < balls.length; i++) {
+				const b = balls[i];
 				if (b.potted) continue;
-				if (b.kind !== 'cue' && Math.hypot(b.vx, b.vy) <= 1) continue; // the cue + balls actually moving
+				if (Math.hypot(b.vx, b.vy) > 1) seen.add(i);
+				// The cue + everything this shot set in motion: dropping a ball once it slows down would
+				// swing the camera away from where the action just happened.
+				if (b.kind !== 'cue' && !seen.has(i)) continue;
 				const x = b.x - hw, z = b.y - hh;
-				minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); any = true;
+				// Where it will be once the camera gets there — clamped to the cloth, a rail sends it back.
+				const lx = Math.max(-hw, Math.min(hw, x + b.vx * FOLLOW_LEAD));
+				const lz = Math.max(-hh, Math.min(hh, z + b.vy * FOLLOW_LEAD));
+				minX = Math.min(minX, x, lx); maxX = Math.max(maxX, x, lx);
+				minZ = Math.min(minZ, z, lz); maxZ = Math.max(maxZ, z, lz);
+				any = true;
 			}
 			if (!any) { minX = maxX = minZ = maxZ = 0; }
 			panX = (minX + maxX) / 2; panZ = (minZ + maxZ) / 2;
@@ -1161,6 +1190,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const bz = Math.max(FOLLOW_MIN_Z, (maxZ - minZ) / 2 + FOLLOW_MARGIN);
 			d = fitDist(g.camera, bx, bz, pitch, az);
 		} else {
+			rollSeenRef.current.clear(); // the next shot starts from an empty cast
 			d = fitDist(g.camera, f.hx, f.hz, pitch, az) / Math.max(1, zoomRef.current);
 			panX = panRef.current.x; panZ = panRef.current.z;
 		}
@@ -1274,6 +1304,22 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			placing: placingRef.current,
 			remoteAim: remoteAimRef.current,
 			stickVisible: !!g3Ref.current?.cueStick.visible,
+			frame: (() => { // how the balls sit in the frame — the smoke test samples this while they roll
+				const g = g3Ref.current, t = tableRef.current;
+				if (!g) return { out: 0, edge: 0, movingOut: 0, movingEdge: 0 };
+				let out = 0, edge = 0, movingOut = 0, movingEdge = 0;
+				for (const b of ballsRef.current) {
+					if (b.potted) continue;
+					const v = new THREE.Vector3(b.x - t.w / 2, BALL_R, b.y - t.h / 2).project(g.camera);
+					const e = Math.max(Math.abs(v.x), Math.abs(v.y)); // 1 = the frame edge
+					if (e > 1) out++;
+					if (e > edge) edge = e;
+					if (b.kind !== 'cue' && Math.hypot(b.vx, b.vy) <= 1) continue;
+					if (e > 1) movingOut++;
+					if (e > movingEdge) movingEdge = e;
+				}
+				return { out, edge, movingOut, movingEdge };
+			})(),
 			cueScreen: (() => { // the cue's client x,y (for the smoke test to aim precisely)
 				const g = g3Ref.current, cv = canvasRef.current, cue = ballsRef.current.find((b) => b.kind === 'cue');
 				if (!g || !cv || !cue) return null;
@@ -1408,11 +1454,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 				{is8 && placing && (
-					<div className="bi-place">
-						<span className="bi-place-icon">✋</span>
-						<span className="bi-place-title">Bille en main</span>
-						<span className="bi-place-sub">glisse la blanche · ailleurs, tu tournes la vue</span>
-					</div>
+					<>
+						<div className="bi-place">
+							<span className="bi-place-icon">✋</span>
+							<span className="bi-place-title">Bille en main</span>
+							<span className="bi-place-sub">glisse la blanche · ailleurs, tu tournes la vue</span>
+						</div>
+						<button className="bi-placeok" onClick={confirmPlacement}>✓ Je place ici</button>
+					</>
 				)}
 
 				{/* Arcade win card (Défi only; free mode is 8-ball). */}
@@ -1570,7 +1619,7 @@ const CSS = `
 .bi-act:hover:not(:disabled) { border-color: var(--bi-accent); color: #fff; }
 .bi-act:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.bi-scratch { position: absolute; bottom: 44px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
+.bi-scratch { position: absolute; bottom: 104px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
 .bi-cancel { background: rgba(20,14,10,0.82); }
 .bi-onblack { background: linear-gradient(180deg, #2b2b2f, #111114); color: #ffe08a; font-weight: 800; border: 1px solid rgba(255,224,138,0.5); }
 /* Hand-over card: slides in, holds, slides out on its own — the JS timer only unmounts it. */
@@ -1589,10 +1638,13 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) { .bi-turnflash { animation: bi-turn-fade 1.5s linear forwards; } @keyframes bi-turn-fade { 0%, 100% { opacity: 0; } 10%, 85% { opacity: 1; } } }
 /* One flat pill on the bottom edge: placing happens on the cloth, so the banner must not sit on it,
    and the top belongs to the HUD once fullscreen overlays it. */
-.bi-place { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: row; align-items: baseline; gap: 7px; text-align: center; max-width: 92%; padding: 5px 14px; border-radius: 999px; background: linear-gradient(180deg, rgba(48,209,88,0.94), rgba(30,150,60,0.94)); color: #fff; box-shadow: var(--shadow-md); animation: bi-place-pop 1.6s ease-in-out infinite; pointer-events: none; }
+.bi-place { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: row; align-items: baseline; gap: 7px; text-align: center; max-width: 92%; padding: 5px 14px; border-radius: 999px; background: linear-gradient(180deg, rgba(48,209,88,0.94), rgba(30,150,60,0.94)); color: #fff; box-shadow: var(--shadow-md); animation: bi-place-pop 1.6s ease-in-out infinite; pointer-events: none; }
 .bi-place-icon { font-size: 14px; line-height: 1; }
 .bi-place-title { font-weight: 800; font-size: 13px; }
 .bi-place-sub { font-weight: 600; font-size: 12px; opacity: 0.9; }
+/* Sits under the info pill, thumb height: nothing else validates the placement. */
+.bi-placeok { position: absolute; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); }
+.bi-placeok:hover { filter: brightness(1.08); }
 @keyframes bi-place-pop { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.04); } }
 
 .bi-mp { min-width: 240px; gap: 10px; }
