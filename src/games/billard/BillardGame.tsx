@@ -58,6 +58,9 @@ const STRIKE_HIT = 0.6; // fraction of the swing at which the tip reaches the ba
 const STRIKE_FOLLOW = 8; // follow-through past contact
 const WARMUP_MS = 300; // duration of one AI practice stroke (back-and-forth) before the real swing
 const STICK_MIN = 7, STICK_RANGE = 34; // cue drawn back this much (min + power·range) while aiming
+const AIM_SEND_MS = 80; // online: how often we broadcast our aim so the opponent sees our stick
+const AIM_STALE_MS = 2500; // hide the opponent's stick if their stream goes quiet (tab hidden, drop)
+const AIM_TAU = 0.06; // smoothing of the received aim — the stream is far slower than the frame rate
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🎱', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
 const SUN_DIR = new THREE.Vector3(30, 90, 40).normalize();
@@ -180,6 +183,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const onlineRef = useRef(false); // opponent is a remote human, not the AI
 	const myPlayerRef = useRef<0 | 1>(0);
 	const startedOnlineRef = useRef(false); // guard against starting the match twice on presence sync
+	// The opponent's live aim, so their cue stick shows on our table while they line the shot up.
+	// Purely cosmetic: the shot message is still what drives the simulation. `to` is the last one
+	// received, `at` the eased pose we actually draw — the stream arrives ~12x a second, the screen
+	// refreshes much faster, so drawing raw messages would make the stick jump.
+	const remoteAimRef = useRef<{ px: number; py: number; dx: number; dy: number; power: number; live: boolean; seen: number } | null>(null);
+	const remoteStickRef = useRef({ px: 0, py: 0, dx: 1, dy: 0, power: 0, on: false });
+	const aimSentRef = useRef(0); // last aim broadcast (ms), to throttle the stream
 
 	// Cue-strike animation: set on fire, advanced in the raf loop; releases the ball at contact.
 	// `warmups` = practice strokes before the swing (AI only); `back` = draw-back distance.
@@ -498,6 +508,22 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		cue.x = x; cue.y = y; cue.vx = cue.vy = 0;
 	};
 
+	/** Broadcast where we point and how hard we pull, so the opponent sees our cue stick move. */
+	const streamAim = (cue: Ball, pull: Vec | null, force = false) => {
+		const net = netRef.current;
+		if (!onlineRef.current || !net) return;
+		const now = Date.now();
+		if (!force && now - aimSentRef.current < AIM_SEND_MS) return;
+		aimSentRef.current = now;
+		const m = pull ? Math.hypot(pull.x, pull.y) : 0;
+		net.sendAim({
+			px: cue.x, py: cue.y,
+			dx: m > 1e-3 ? -pull!.x / m : 0, dy: m > 1e-3 ? -pull!.y / m : 0,
+			power: pull ? pullPower(pull) : 0,
+			live: m > 1,
+		});
+	};
+
 	const startShot8 = () => {
 		shotAccRef.current = emptyAcc();
 		boardBeforeRef.current = ballsRef.current.filter((b) => b.kind === 'color' && !b.potted).map((b) => b.color);
@@ -590,8 +616,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			return;
 		}
 		if (next.turn === me) { // my turn to aim — bring my chosen view back
-			if (next.ballInHand === me) { placingRef.current = true; setPlacing(true); }
-			restoreCam();
+			if (next.ballInHand === me) { // placing needs the whole table, not a low 3/4 view
+				placingRef.current = true; setPlacing(true);
+				setView('top');
+			} else restoreCam();
 			setStat('aiming');
 		} else if (onlineRef.current) { // remote opponent shoots — wait for their shot message
 			setStat('aiming');
@@ -610,6 +638,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const resetOnline = () => {
 		if (netRef.current) { netRef.current.leave(); netRef.current = null; }
 		onlineRef.current = false; startedOnlineRef.current = false;
+		remoteAimRef.current = null; remoteStickRef.current.on = false;
 		setMpPhase('off'); setMpCode(null); setMpOpp(null); setMpMsg(null);
 	};
 	const leaveOnline = () => { resetOnline(); newFreeTable(diffKey); }; // back to vs-AI
@@ -642,7 +671,17 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			cue.x = s.px; cue.y = s.py; cue.potted = false; cue.vx = 0; cue.vy = 0;
 			if (m.ballInHand != null) { match8Ref.current = { ...m, ballInHand: null }; setMatch8(match8Ref.current); }
 			placingRef.current = false; setPlacing(false);
+			remoteAimRef.current = null;
 			beginStrike(s.vx, s.vy, startShot8); // animate the opponent's stroke too
+		});
+		net.onAim((a) => { // remote is lining up — show their stick (and their ball-in-hand placing)
+			const m = match8Ref.current;
+			if (!m || m.winner !== null || m.turn === myPlayerRef.current || rollingRef.current || strikeRef.current) return;
+			remoteAimRef.current = { ...a, seen: performance.now() }; // rAF clock — updateScene compares against it
+			// Their ball in hand: follow the white ball they are dragging. Cosmetic — the shot message
+			// carries the final position, so a lost or late aim can never desync the two tables.
+			const cue = ballsRef.current.find((b) => b.kind === 'cue');
+			if (cue && m.ballInHand != null && !cue.potted) { cue.x = a.px; cue.y = a.py; }
 		});
 		layRack(DIFFS.facile, seedFromRoom(net.roomId)); // same rack on both peers
 		setMpMsg(null);
@@ -750,7 +789,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 	const aimMove = useCallback((clientX: number, clientY: number) => {
 		if (pinchRef.current) return;
-		if (placeDragRef.current) { const cue = cueBall(); const pp = worldFromPointer(clientX, clientY); if (cue && pp) moveCueTo(cue, pp); return; }
+		if (placeDragRef.current) { const cue = cueBall(); const pp = worldFromPointer(clientX, clientY); if (cue && pp) { moveCueTo(cue, pp); streamAim(cue, null); } return; }
 		if (panDragRef.current) {
 			applyPan(panDragRef.current.panX, panDragRef.current.panZ, clientX - panDragRef.current.x, clientY - panDragRef.current.y);
 			return;
@@ -762,6 +801,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (!p) return;
 		aimRef.current.pull = { x: p.x - cue.x, y: p.y - cue.y };
 		powerRef.current = pullPower(aimRef.current.pull);
+		streamAim(cue, aimRef.current.pull);
 	}, [worldFromPointer, applyPan]);
 
 	const aimEnd = useCallback(() => {
@@ -770,6 +810,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			placeDragRef.current = false;
 			placingRef.current = false; setPlacing(false);
 			if (match8Ref.current && match8Ref.current.ballInHand === HUMAN) { match8Ref.current = { ...match8Ref.current, ballInHand: null }; setMatch8(match8Ref.current); }
+			restoreCam(); // done placing — back to the player's own view to aim
+			const placed = cueBall();
+			if (placed) streamAim(placed, null, true);
 			setStat('aiming');
 			return;
 		}
@@ -777,6 +820,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const aim = aimRef.current;
 		aimRef.current = null;
 		powerRef.current = 0;
+		const released = cueBall();
+		if (aim && released) streamAim(released, null, true); // drop the stick on the opponent's screen
 		if (!aim || statusRef.current !== 'aiming') return;
 		if (eightBallRef.current) { // 8-ball shot — no strokes, no daily tries
 			const m = match8Ref.current;
@@ -1054,7 +1099,23 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			if (pm > 1) placeStick(cue.x, cue.y, -aim.pull.x / pm, -aim.pull.y / pm, -(STICK_MIN + pullPower(aim.pull) * STICK_RANGE));
 			else g.cueStick.visible = false;
 		} else {
-			g.cueStick.visible = false;
+			// Online: the opponent's stick, eased toward the last aim message so it glides instead of
+			// stepping at the stream rate. It vanishes if their stream goes quiet (tab hidden, drop).
+			const r = remoteAimRef.current, st = remoteStickRef.current;
+			if (r && r.live && statusRef.current === 'aiming' && now - r.seen < AIM_STALE_MS) {
+				if (!st.on) { st.px = r.px; st.py = r.py; st.dx = r.dx; st.dy = r.dy; st.power = r.power; st.on = true; }
+				else {
+					const k = 1 - Math.exp(-dt / AIM_TAU);
+					st.px += (r.px - st.px) * k; st.py += (r.py - st.py) * k;
+					st.dx += (r.dx - st.dx) * k; st.dy += (r.dy - st.dy) * k;
+					st.power += (r.power - st.power) * k;
+				}
+				const dm = Math.hypot(st.dx, st.dy) || 1;
+				placeStick(st.px, st.py, st.dx / dm, st.dy / dm, -(STICK_MIN + st.power * STICK_RANGE));
+			} else {
+				st.on = false;
+				g.cueStick.visible = false;
+			}
 		}
 
 		// Free orbit camera: az/pitch/pan/zoom are set by setView() at a situation change and then freely
@@ -1184,6 +1245,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			eightBall: eightBallRef.current,
 			online: onlineRef.current,
 			myPlayer: myPlayerRef.current,
+			camMode: camModeRef.current,
+			placing: placingRef.current,
+			remoteAim: remoteAimRef.current,
+			stickVisible: !!g3Ref.current?.cueStick.visible,
 			cueScreen: (() => { // the cue's client x,y (for the smoke test to aim precisely)
 				const g = g3Ref.current, cv = canvasRef.current, cue = ballsRef.current.find((b) => b.kind === 'cue');
 				if (!g || !cv || !cue) return null;
@@ -1321,8 +1386,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				{is8 && placing && (
 					<div className="bi-place">
 						<span className="bi-place-icon">✋</span>
-						<span className="bi-place-title">Bille en main — à toi de placer la blanche</span>
-						<span className="bi-place-sub">Glisse la boule blanche sur le tapis, puis relâche pour viser</span>
+						<span className="bi-place-title">Bille en main</span>
+						<span className="bi-place-sub">glisse la blanche, relâche pour viser</span>
 					</div>
 				)}
 
@@ -1464,10 +1529,11 @@ const CSS = `
 .bi-onblack { background: linear-gradient(180deg, #2b2b2f, #111114); color: #ffe08a; font-weight: 800; border: 1px solid rgba(255,224,138,0.5); }
 .bi-groupflash { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5; padding: 14px 26px; border-radius: 18px; background: linear-gradient(180deg, var(--bi-accent), rgba(20,14,10,0.9)); color: #fff; font-weight: 800; font-size: 18px; text-align: center; box-shadow: var(--shadow-lg); animation: bi-group-pop 0.4s ease-out; pointer-events: none; }
 @keyframes bi-group-pop { 0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; } 60% { transform: translate(-50%, -50%) scale(1.08); } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
-.bi-place { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; max-width: 92%; padding: 10px 18px; border-radius: 16px; background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(30,150,60,0.96)); color: #fff; box-shadow: var(--shadow-lg); animation: bi-place-pop 1.6s ease-in-out infinite; }
-.bi-place-icon { font-size: 20px; line-height: 1; }
-.bi-place-title { font-weight: 800; font-size: 14px; }
-.bi-place-sub { font-weight: 600; font-size: 12px; opacity: 0.92; }
+/* One flat pill hugging the top edge: placing happens on the cloth, so the banner must not sit on it. */
+.bi-place { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: row; align-items: baseline; gap: 7px; text-align: center; max-width: 92%; padding: 5px 14px; border-radius: 999px; background: linear-gradient(180deg, rgba(48,209,88,0.94), rgba(30,150,60,0.94)); color: #fff; box-shadow: var(--shadow-md); animation: bi-place-pop 1.6s ease-in-out infinite; pointer-events: none; }
+.bi-place-icon { font-size: 14px; line-height: 1; }
+.bi-place-title { font-weight: 800; font-size: 13px; }
+.bi-place-sub { font-weight: 600; font-size: 12px; opacity: 0.9; }
 @keyframes bi-place-pop { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.04); } }
 
 .bi-mp { min-width: 240px; gap: 10px; }

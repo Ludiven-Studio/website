@@ -1,6 +1,7 @@
 /* Throwaway: 8-ball multiplayer over the REAL Supabase Realtime. Two browser contexts — one
    creates a friend code, the other joins — then a break from the host must replay identically
-   on both peers (deterministic lockstep). Needs network to reach Supabase. */
+   on both peers (deterministic lockstep). Also covers the two cosmetic aids: the opponent's cue
+   stick streamed while they aim, and the top view during ball in hand. Needs network. */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -30,19 +31,17 @@ const mk = async (label) => {
 	await page.addStyleTag({ content: FS });
 	await page.evaluate(() => { document.querySelector('.game-page')?.classList.add('faux-fs'); window.dispatchEvent(new Event('resize')); });
 	await sleep(700);
-	await page.locator('.bi-modetoggle button:has-text("Libre")').click(); // switch to Libre 8-ball
-	await sleep(700);
-	// Hide the toggle again so the topbar shrinks back to the layout where the break grab works.
-	await page.addStyleTag({ content: '.faux-fs .bi-modetoggle { display: none !important; }' });
-	await sleep(200);
 	return page;
 };
 const snap = (p) => p.evaluate(() => (window.__billard ? window.__billard() : null));
+const setCam = async (p, want) => { for (let i = 0; i < 4; i++) { if ((await snap(p)).camMode === want) return; await p.locator('.bi-act[title="Changer de vue"]').click(); await sleep(900); } };
+let fails = 0;
+const check = (ok, what) => { console.log(`${ok ? 'OK  ' : 'FAIL'} ${what}`); if (!ok) fails++; };
 
 const A = await mk('A'), B = await mk('B');
 
 // A creates a code.
-await A.locator('.bi-act[title="Jouer en ligne"]').click();
+await A.locator('.bi-modetoggle button:has-text("En ligne")').click();
 await A.locator('button:has-text("Créer un code")').click();
 await sleep(2500);
 const code = (await A.locator('.bi-mp-code strong').textContent().catch(() => null))?.trim();
@@ -50,7 +49,7 @@ console.log('code:', code);
 if (!code) { console.log('FAIL: no code (Supabase unreachable?)'); await browser.close(); server.kill(); process.exit(1); }
 
 // B joins with the code.
-await B.locator('.bi-act[title="Jouer en ligne"]').click();
+await B.locator('.bi-modetoggle button:has-text("En ligne")').click();
 await B.locator('.bi-mp-join input').fill(code);
 await B.locator('.bi-mp-join button:has-text("Rejoindre")').click();
 
@@ -60,26 +59,63 @@ for (let i = 0; i < 50; i++) { await sleep(300); a = await snap(A); b = await sn
 console.log('A:', a && { n: a.n, turn: a.match8?.turn }, ' B:', b && { n: b.n, turn: b.match8?.turn });
 if (!(a?.n === 16 && b?.n === 16)) { console.log('FAIL: both peers did not reach a 16-ball match'); await browser.close(); server.kill(); process.exit(1); }
 
-// The host is player 0 and breaks. Fire the break on whichever page has myPlayer === 0.
-const hostPage = a.myPlayer === 0 ? A : B;
-const hs = a.myPlayer === 0 ? a : b;
-console.log('host is', a.myPlayer === 0 ? 'A' : 'B', 'cueScreen', hs.cueScreen);
-{
-	const cs = hs.cueScreen;
-	const box = await hostPage.locator('.bi-canvas').boundingBox();
-	const pullY = Math.min(cs.y + 150, box.y + box.height - 14); // stay on-screen
-	await hostPage.mouse.move(cs.x, cs.y); await hostPage.mouse.down(); // grab the cue exactly
-	await hostPage.mouse.move(cs.x + 5, pullY, { steps: 14 }); // pull down → break up-table
-	await sleep(150); await hostPage.mouse.up();
-}
-// Wait for the break to settle on both.
-for (let i = 0; i < 60; i++) { await sleep(250); a = await snap(A); b = await snap(B); if (!a?.rolling && !b?.rolling && a?.match8?.broken) break; }
-console.log('after break — A:', a && { potted: a.potted, broken: a.match8?.broken, turn: a.match8?.turn, open: a.match8?.open },
-	' B:', b && { potted: b.potted, broken: b.match8?.broken, turn: b.match8?.turn, open: b.match8?.open });
-await A.screenshot({ path: resolve(`${OUT}/billard-mp-A.png`) });
-await B.screenshot({ path: resolve(`${OUT}/billard-mp-B.png`) });
-const same = a && b && a.potted === b.potted && a.match8?.turn === b.match8?.turn && a.match8?.broken === b.match8?.broken;
-console.log(same ? 'OK: both peers agree after the break (lockstep)' : 'CHECK: peers diverged');
+const host = a.myPlayer === 0 ? A : B, guest = a.myPlayer === 0 ? B : A;
+console.log('host is', a.myPlayer === 0 ? 'A' : 'B');
+// Hide the mode toggle again so the topbar shrinks back to the layout where the break grab works,
+// then let the camera finish easing — cueScreen is only trustworthy once it has settled.
+for (const p of [A, B]) await p.addStyleTag({ content: '.faux-fs .bi-modetoggle { display: none !important; }' });
+await sleep(2500);
+const hs = await snap(host);
 
+check((await snap(guest)).stickVisible === false, 'pas de canne adverse avant le geste');
+
+// The host grabs the cue and pulls WITHOUT releasing: the guest must grow a ghost stick.
+const cs = hs.cueScreen;
+const box = await host.locator('.bi-canvas').boundingBox();
+const pullY = Math.min(cs.y + 150, box.y + box.height - 14);
+await host.mouse.move(cs.x, cs.y);
+await host.mouse.down();
+await host.mouse.move(cs.x + 5, pullY, { steps: 20 });
+
+let g = null;
+for (let i = 0; i < 30; i++) { await sleep(200); g = await snap(guest); if (g?.stickVisible && g?.remoteAim?.live) break; await host.mouse.move(cs.x + 6, pullY - (i % 2), { steps: 2 }); }
+console.log('guest remoteAim:', g?.remoteAim);
+check(!!g?.remoteAim?.live, 'le guest recoit la visee adverse (live)');
+check(g?.stickVisible === true, 'la canne adverse est affichee chez le guest');
+check(!!g?.remoteAim && g.remoteAim.power > 0.05, `la puissance suit le tirage (${g?.remoteAim?.power?.toFixed(2)})`);
+await setCam(guest, 'top'); // the whole table, so the ghost stick is in frame on the shot
+await host.mouse.move(cs.x + 7, pullY - 2, { steps: 2 }); // keep the stream alive
+await sleep(600);
+await guest.screenshot({ path: resolve(`${OUT}/billard-mp-oppcue.png`) });
+await setCam(guest, 'shoulder'); // so the top view we expect below is not the one we picked
+
+// Ease the pull down to a feather tap, then release: the cue rolls a few units and touches
+// nothing — a foul, so the guest gets ball in hand.
+await host.mouse.move(cs.x + 5, cs.y + 40, { steps: 12 });
+await sleep(200);
+await host.mouse.up();
+for (let i = 0; i < 60; i++) { await sleep(250); a = await snap(A); b = await snap(B); if (!a?.rolling && !b?.rolling && a?.match8?.broken) break; }
+console.log('after break — A:', a && { potted: a.potted, turn: a.match8?.turn, bih: a.match8?.ballInHand },
+	' B:', b && { potted: b.potted, turn: b.match8?.turn, bih: b.match8?.ballInHand });
+check(a?.potted === b?.potted && a?.match8?.turn === b?.match8?.turn && a?.match8?.broken === b?.match8?.broken, 'lockstep conserve apres le tir');
+const gAfter = await snap(guest);
+check(!gAfter?.remoteAim || gAfter.remoteAim.live === false, 'la canne fantome est retiree apres le tir');
+check(gAfter?.placing === true, 'le guest a la bille en main apres la faute');
+check(gAfter?.camMode === 'top', `la camera passe en vue du haut (${gAfter?.camMode})`);
+await sleep(1400); // let the camera glide there
+await guest.screenshot({ path: resolve(`${OUT}/billard-bih-top.png`) });
+
+// Placing the ball gives the player's own view back.
+const gcs = (await snap(guest)).cueScreen;
+await guest.mouse.move(gcs.x, gcs.y);
+await guest.mouse.down();
+await guest.mouse.move(gcs.x - 40, gcs.y + 20, { steps: 10 });
+await guest.mouse.up();
+await sleep(700);
+const gPlaced = await snap(guest);
+check(gPlaced?.placing === false, 'la bille en main est validee au relachement');
+check(gPlaced?.camMode === 'shoulder', `la vue du joueur revient apres le placement (${gPlaced?.camMode})`);
+
+console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');
 await browser.close();
 server.kill();

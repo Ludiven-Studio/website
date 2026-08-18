@@ -16,6 +16,12 @@ const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no ambiguous chars (
 export interface BilliardPeer { id: string; name: string; }
 /** A fired shot: cue velocity + the cue's position at fire (covers ball-in-hand + keeps peers exact). */
 export interface ShotMsg { vx: number; vy: number; px: number; py: number; }
+/**
+ * Live aim, streamed while the opponent draws back so the other screen can show their cue stick.
+ * Cosmetic only — never touches the simulation; `live` false means they let go or are still
+ * placing the ball in hand (move the white ball, hide the stick).
+ */
+export interface AimMsg { px: number; py: number; dx: number; dy: number; power: number; live: boolean; }
 
 export interface BilliardMatch {
 	roomId: string;
@@ -24,6 +30,8 @@ export interface BilliardMatch {
 	isHost: () => boolean;
 	sendShot: (s: ShotMsg) => void;
 	onShot: (cb: (s: ShotMsg) => void) => void;
+	sendAim: (a: AimMsg) => void;
+	onAim: (cb: (a: AimMsg) => void) => void;
 	onPeers: (cb: (peers: BilliardPeer[]) => void) => void;
 	leave: () => void;
 }
@@ -31,7 +39,8 @@ export interface BilliardMatch {
 let client: SupabaseClient | null = null;
 function getClient(): SupabaseClient | null {
 	if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
-	if (!client) client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 10 } } });
+	// 20/s: the aim stream sends ~12 messages a second on top of the odd shot.
+	if (!client) client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 20 } } });
 	return client;
 }
 
@@ -79,8 +88,9 @@ function subscribeAndSync(ch: RealtimeChannel, selfId: string): Promise<Billiard
 async function openRoom(c: SupabaseClient, roomId: string, name: string, code: string | null): Promise<BilliardMatch | null> {
 	const selfId = randomId();
 	const ch = c.channel(roomId, { config: { presence: { key: selfId }, broadcast: { self: false } } });
-	const cb: { shot?: (s: ShotMsg) => void; peers?: (p: BilliardPeer[]) => void } = {};
+	const cb: { shot?: (s: ShotMsg) => void; aim?: (a: AimMsg) => void; peers?: (p: BilliardPeer[]) => void } = {};
 	ch.on('broadcast', { event: 'shot' }, ({ payload }) => cb.shot?.(payload as ShotMsg));
+	ch.on('broadcast', { event: 'aim' }, ({ payload }) => cb.aim?.(payload as AimMsg));
 	ch.on('presence', { event: 'sync' }, () => cb.peers?.(peersOf(ch, selfId)));
 
 	const peers = await subscribeAndSync(ch, selfId);
@@ -94,6 +104,8 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 		isHost: () => allIds(ch, selfId)[0] === selfId,
 		sendShot: (s) => { void ch.send({ type: 'broadcast', event: 'shot', payload: s }); },
 		onShot: (fn) => { cb.shot = fn; },
+		sendAim: (a) => { void ch.send({ type: 'broadcast', event: 'aim', payload: a }); },
+		onAim: (fn) => { cb.aim = fn; },
 		onPeers: (fn) => { cb.peers = fn; fn(peersOf(ch, selfId)); },
 		leave: () => { void ch.untrack().then(() => ch.unsubscribe()); },
 	};
