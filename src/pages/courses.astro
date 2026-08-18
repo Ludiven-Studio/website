@@ -1,0 +1,192 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CoursesApp from '../components/courses/CoursesApp';
+---
+
+<BaseLayout
+	title="Liste de courses"
+	description="Liste de courses partagée."
+	noindex
+>
+	<div class="wrapper">
+		<CoursesApp client:only="react" />
+	</div>
+</BaseLayout>
+
+<style is:global>
+	.co-root {
+		max-width: 640px;
+		margin: 0 auto;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.co-intro,
+	.co-empty,
+	.co-error {
+		color: var(--gray-300);
+		line-height: 1.5;
+	}
+	.co-empty { text-align: center; padding: 2rem 0; }
+	.co-error {
+		color: #ffb4b4;
+		background: rgba(255, 80, 80, 0.12);
+		border-radius: 0.6rem;
+		padding: 0.6rem 0.9rem;
+		cursor: pointer;
+	}
+
+	/* ---- Buttons & inputs ---- */
+	.co-btn {
+		font-family: var(--font-brand);
+		font-size: var(--text-sm);
+		color: var(--gray-100);
+		background: var(--gray-800, #232739);
+		border: 1px solid var(--gray-700, #343a52);
+		border-radius: 0.6rem;
+		padding: 0.5rem 0.85rem;
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.co-btn:hover:not(:disabled),
+	.co-btn:focus-visible {
+		border-color: var(--accent-regular);
+		color: var(--accent-regular);
+	}
+	.co-btn:disabled { opacity: 0.45; cursor: default; }
+	.co-btn-primary {
+		background: var(--accent-regular);
+		border-color: var(--accent-regular);
+		color: var(--accent-text-over, #fff);
+		font-weight: 600;
+	}
+	.co-btn-primary:hover:not(:disabled) { color: var(--accent-text-over, #fff); filter: brightness(1.08); }
+	.co-icon { padding: 0.5rem 0.7rem; font-size: 1.1rem; line-height: 1; }
+	.co-big { align-self: center; font-size: var(--text-lg); padding: 0.8rem 1.6rem; }
+
+	.co-in {
+		font-family: var(--font-body);
+		font-size: 1rem; /* >=16px so iOS Safari doesn't zoom on focus */
+		color: var(--gray-100);
+		background: var(--gray-999, #13151f);
+		border: 1px solid var(--gray-700, #343a52);
+		border-radius: 0.6rem;
+		padding: 0.65rem 0.8rem;
+	}
+	.co-in:focus-visible { outline: none; border-color: var(--accent-regular); }
+
+	/* ---- Header ---- */
+	.co-head {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+	}
+	.co-head h1 { font-size: var(--text-2xl); margin: 0; }
+	.co-title-row { display: flex; align-items: center; gap: 0.6rem; flex: 1; }
+	.co-tools { display: flex; gap: 0.4rem; margin-left: auto; }
+	.co-peer {
+		font-size: var(--text-sm);
+		color: #7ee0a0;
+		font-family: var(--font-brand);
+	}
+
+	/* ---- Add row ---- */
+	.co-add { display: flex; gap: 0.5rem; }
+	.co-in-label { flex: 1; min-width: 0; }
+	.co-in-qty { width: 4.5rem; text-align: center; }
+
+	/* ---- Item list ---- */
+	.co-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+	.co-row {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		padding: 0.6rem 0.7rem;
+		background: var(--gray-999, #13151f);
+		border: 1px solid var(--gray-800, #232739);
+		border-radius: 0.6rem;
+	}
+	.co-row-static { padding-left: 0.9rem; }
+	.co-label { flex: 1; min-width: 0; color: var(--gray-100); word-break: break-word; }
+	.co-qty {
+		font-family: var(--font-brand);
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+		background: var(--gray-800, #232739);
+		border-radius: 0.4rem;
+		padding: 0.15rem 0.5rem;
+	}
+	.co-row-done .co-label { text-decoration: line-through; color: var(--gray-400, #6a7290); }
+	.co-row-done { opacity: 0.7; }
+
+	.co-check { position: relative; display: inline-flex; cursor: pointer; }
+	.co-check input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+	.co-box {
+		width: 1.5rem; height: 1.5rem;
+		border: 2px solid var(--gray-600, #4a5170);
+		border-radius: 0.45rem;
+		display: inline-block;
+		transition: background 0.12s, border-color 0.12s;
+	}
+	.co-check input:checked + .co-box {
+		background: var(--accent-regular);
+		border-color: var(--accent-regular);
+	}
+	.co-check input:checked + .co-box::after {
+		content: '✓';
+		color: #fff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+		font-size: 1rem;
+		font-weight: 700;
+	}
+	.co-del {
+		background: none;
+		border: none;
+		color: var(--gray-500, #565e7d);
+		font-size: 1.4rem;
+		line-height: 1;
+		cursor: pointer;
+		padding: 0 0.2rem;
+	}
+	.co-del:hover { color: #ff8080; }
+
+	/* ---- Footer ---- */
+	.co-foot {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+		border-top: 1px solid var(--gray-800, #232739);
+		padding-top: 0.9rem;
+	}
+	.co-count { color: var(--gray-300); font-size: var(--text-sm); }
+	.co-foot-actions { display: flex; gap: 0.4rem; margin-left: auto; }
+
+	/* ---- Recents / history ---- */
+	.co-recents { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 1rem; }
+	.co-recents h2 { font-size: var(--text-md); color: var(--gray-200); }
+	.co-recent, .co-hrow {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem;
+		padding: 0.7rem 0.9rem;
+		background: var(--gray-999, #13151f);
+		border: 1px solid var(--gray-800, #232739);
+		border-radius: 0.6rem;
+		text-decoration: none;
+		color: var(--gray-100);
+		cursor: pointer;
+	}
+	.co-recent:hover, .co-hrow:hover { border-color: var(--accent-regular); }
+	.co-recent small, .co-hrow small { color: var(--gray-400, #6a7290); }
+	.co-hmain { display: flex; flex-direction: column; gap: 0.15rem; }
+	.co-hlabel { color: var(--gray-100); }
+	.co-hcount { color: var(--gray-300); font-size: var(--text-sm); white-space: nowrap; }
+</style>
