@@ -156,7 +156,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const [cancelFlash, setCancelFlash] = useState(false); // brief "shot cancelled" toast (PC left+right)
 	// Announces the hand-over between shots (and the solids/stripes assignment, in the same card so
 	// the two never stack): whose turn it is now was easy to miss on the HUD alone.
-	const [turnFlash, setTurnFlash] = useState<{ mine: boolean; title: string; sub: string | null } | null>(null);
+	const [turnFlash, setTurnFlash] = useState<{ mine: boolean; title: string; sub: string | null; pot?: boolean } | null>(null);
 	const [camMode, setCamMode] = useState<CamMode>('shoulder');
 	const [webglError, setWebglError] = useState(false);
 	// Daily
@@ -579,6 +579,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const resolveShot = useCallback(() => {
 		const balls = ballsRef.current;
 		const cue = balls.find((b) => b.kind === 'cue')!;
+		const scratched = cue.potted; // no pot celebration on a penalty shot
 		if (cue.potted) {
 			// scratch: respawn cue at start + 1 stroke penalty (let its drop finish on its own)
 			seenRef.current.delete(balls.indexOf(cue));
@@ -620,6 +621,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				localStorage.setItem(freeBestKey(diffKey), String(newBest));
 			}
 		} else {
+			const sank = shotAccRef.current.potted.length;
+			if (sank > 0 && !scratched) {
+				announceTurn(true, sank > 1 ? `🔥 ${sank} boules d’un coup !` : '🎱 Boule rentrée !', `plus que ${left} sur la table`, true);
+			}
 			restoreCam();
 			setStat('aiming');
 		}
@@ -736,9 +741,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		aiThinkingRef.current = false;
 	};
 
-	const announceTurn = (mine: boolean, title: string, sub: string | null) => {
+	const announceTurn = (mine: boolean, title: string, sub: string | null, pot = false) => {
 		if (turnFlashTimer.current) window.clearTimeout(turnFlashTimer.current);
-		setTurnFlash({ mine, title, sub });
+		setTurnFlash({ mine, title, sub, pot });
 		turnFlashTimer.current = window.setTimeout(() => setTurnFlash(null), sub ? 2400 : 1500); // matches the CSS animation
 	};
 
@@ -755,10 +760,21 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		if (next.lastFoul) { setScratchFlash(true); setTimeout(() => setScratchFlash(false), 1500); sfx.foul(); }
 		const me = onlineRef.current ? myPlayerRef.current : HUMAN; // the player at this device
 		const groupMsg = prev.open && !next.open && next.groups[me] ? `🎱 Tu joues les ${groupLabel(next.groups[me])} !` : null;
-		if (next.winner === null && (next.turn !== prev.turn || groupMsg)) {
-			const mine = next.turn === me;
+		const pots = acc.potted.filter((n) => n !== 8).length; // the black ends the match, it has its own card
+		if (next.winner === null) {
 			const opp = onlineRef.current ? (mpOpp || 'ton adversaire') : 'l’ordi';
-			announceTurn(mine, mine ? '🎯 À toi de jouer' : `⏳ Au tour de ${opp}`, groupMsg);
+			if (next.turn !== prev.turn) {
+				const mine = next.turn === me;
+				announceTurn(mine, mine ? '🎯 À toi de jouer' : `⏳ Au tour de ${opp}`, groupMsg);
+			} else if (pots > 0 && !next.lastFoul) {
+				// The shooter keeps the table: celebrate the pot(s) instead of a turn card.
+				const mine = prev.turn === me;
+				announceTurn(mine, mine
+					? (pots > 1 ? `🔥 ${pots} boules d’un coup !` : '🎱 Boule rentrée !')
+					: `🎱 ${opp} rentre ${pots > 1 ? `${pots} boules` : 'une boule'}`, groupMsg, mine);
+			} else if (groupMsg) {
+				announceTurn(next.turn === me, '🎯 À toi de jouer', groupMsg);
+			}
 		}
 		if (next.winner !== null) {
 			if (next.winner === me) sfx.win(); else sfx.lose();
@@ -1013,7 +1029,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		}
 		strokesRef.current += 1;
 		setStrokes(strokesRef.current);
-		beginStrike(v.vx, v.vy, () => { rollingRef.current = true; setStat('rolling'); }, { back: STICK_MIN + pullPower(aim.pull) * STICK_RANGE });
+		beginStrike(v.vx, v.vy, () => { shotAccRef.current = emptyAcc(); rollingRef.current = true; setStat('rolling'); }, { back: STICK_MIN + pullPower(aim.pull) * STICK_RANGE });
 	}, [daily, gameId]);
 
 	// Single-pointer aim/orbit via Pointer Events (mouse, touch, pen) — reliable on iOS.
@@ -1465,7 +1481,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					imps.length = 0;
 					const r = stepBalls(ballsRef.current, t, STEP / 1000, imps);
 					for (const im of imps) onImpact(im, now);
-					if (eightBallRef.current) { // accumulate the shot for the 8-ball rules
+					{ // accumulate the shot: 8-ball rules read it, and every mode counts pots for the flash card
 						const acc = shotAccRef.current;
 						if (r.firstHit !== null && !acc.contactSeen) { acc.contactSeen = true; acc.firstHitNumber = r.firstHit; }
 						if (r.railHit && acc.contactSeen) acc.railAfterContact = true;
@@ -1714,7 +1730,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				{scratchFlash && <div className="bi-scratch">{is8 ? (match8?.lastFoul ?? 'Faute') : 'Pénalité · +1 coup'}</div>}
 				{cancelFlash && <div className="bi-scratch bi-cancel">Tir annulé</div>}
 				{turnFlash && (
-					<div className={`bi-turnflash ${turnFlash.mine ? 'mine' : ''} ${turnFlash.sub ? 'long' : ''}`}>
+					<div className={`bi-turnflash ${turnFlash.mine ? 'mine' : ''} ${turnFlash.sub ? 'long' : ''} ${turnFlash.pot ? 'pot' : ''}`}>
 						<span className="bi-turnflash-title">{turnFlash.title}</span>
 						{turnFlash.sub && <span className="bi-turnflash-sub">{turnFlash.sub}</span>}
 					</div>
@@ -1897,6 +1913,7 @@ const CSS = `
 /* Hand-over card: slides in, holds, slides out on its own — the JS timer only unmounts it. */
 .bi-turnflash { position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 13px 28px; border-radius: 18px; text-align: center; color: #fff; background: linear-gradient(180deg, rgba(24,18,14,0.94), rgba(16,11,8,0.9)); border: 2px solid rgba(255,255,255,0.16); box-shadow: var(--shadow-lg); pointer-events: none; animation: bi-turn-card 1.5s cubic-bezier(0.2, 0.9, 0.25, 1) forwards; }
 .bi-turnflash.mine { background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(24,140,60,0.96)); border-color: rgba(255,255,255,0.4); }
+.bi-turnflash.pot.mine { background: linear-gradient(180deg, rgba(255,193,64,0.97), rgba(219,140,22,0.97)); border-color: rgba(255,255,255,0.5); color: #2c1a04; }
 .bi-turnflash.long { animation-duration: 2.4s; }
 .bi-turnflash-title { font-family: var(--font-brand); font-weight: 800; font-size: 20px; }
 .bi-turnflash-sub { font-weight: 700; font-size: 14px; opacity: 0.95; }
