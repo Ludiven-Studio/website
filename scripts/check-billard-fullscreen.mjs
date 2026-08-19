@@ -109,6 +109,18 @@ for (let i = 0; i < 50 && !calm; i++) {
 }
 check(calm, 'les FX se resorbent une fois la table immobile (ralenti revenu a 1)');
 
+// Cinematic letterbox: both bars mounted, hidden while the table is calm.
+const bars = await page.evaluate(() => {
+	const wrap = document.querySelector('.bi-playwrap').getBoundingClientRect();
+	const els = [...document.querySelectorAll('.bi-cinebar')].map((el) => {
+		const r = el.getBoundingClientRect();
+		return r.bottom > wrap.top + 1 && r.top < wrap.bottom - 1; // visible inside the table?
+	});
+	return { n: els.length, visible: els.filter(Boolean).length };
+});
+check(bars.n === 2 && bars.visible === 0, `les bandes cinema existent et restent hors champ au calme (${bars.n} barres, ${bars.visible} visibles)`);
+check((await snap()).slow.cine === false, 'pas de mode cinema quand rien ne se passe');
+
 console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');
 await browser.close();
 server.kill();

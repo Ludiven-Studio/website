@@ -60,7 +60,12 @@ const FOLLOW_LEAD = 0.35; // s of travel added to the framed box: the camera eas
 const HITSTOP_SPEED = 65; // closing speed that earns a freeze-frame (a full break arrives ~75-100)
 const HITSTOP_COOLDOWN = 800; // ms between freezes, so a break doesn't stutter
 const SLOWMO_FAR = 0.55, SLOWMO_NEAR = 0.18; // pocket threat: mild on engage, deepest right at the mouth
-const SLOWMO_NEAR_8 = 0.1; // the black bottoms out even deeper
+// Cinematic tier: a decisive ball (the black, or the arcade table's last one) heading for a
+// pocket letterboxes the view, starts the slow-mo far earlier and digs deeper.
+const CINE_SCALE = 0.07; // the decisive ramp bottoms out here (vs SLOWMO_NEAR)
+const CINE_RANGE = 6.5; // engage this many pocket radii out (vs SLOWMO_RANGE)
+const CINE_AIM = 0.85; // that far out, the ball must really head at the pocket
+const CINE_HOLD = 650; // ms: the decisive drop lingers longer under the bars
 const SLOWMO_RANGE = 3.2; // engage within this many pocket radii of the mouth
 const SLOWMO_AIM = 0.75; // min cos(velocity, pocket direction)
 const SLOWMO_MIN_SPEED = 22; // a crawling ball earns no drama
@@ -248,9 +253,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const hitStopRef = useRef(0); // ms of freeze left
 	const hitStopCoolRef = useRef(0); // no new freeze before this timestamp
 	const slowRef = useRef(1); // smoothed sim-time scale (1 = real time)
-	const slowHoldRef = useRef({ ms: 0, scale: 1 }); // lingering slow-mo after the last trigger
+	const slowHoldRef = useRef({ ms: 0, scale: 1, cine: false }); // lingering slow-mo after the last trigger
 	const slowBornRef = useRef(0); // times engaged — smoke tests
 	const slowHitBornRef = useRef(0); // times the pre-contact anticipation opened the slow-mo — smoke tests
+	const slowCineBornRef = useRef(0); // times the cinematic tier engaged — smoke tests
+	const cineRef = useRef(false); // letterbox bars currently shown (frame-loop mirror of the state)
 	const slowFocusRef = useRef<{ idx: number; idx2?: number; px: number; py: number } | null>(null); // what the punch-in frames: a live ball + (a second ball | a fixed point)
 	const contactSeenRef = useRef(true); // this shot's first ball contact already happened (no more anticipation)
 	const shakeRef = useRef(0); // current shake amplitude (world units)
@@ -261,6 +268,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const skinRef = useRef(skin);
 	const woodTexRef = useRef<{ felt?: THREE.Texture; floor?: THREE.Texture }>({}); // kept across skin swaps
 	const [sound, setSound] = useState(() => sfx.isEnabled());
+	const [cine, setCine] = useState(false); // cinematic letterbox on a decisive ball
 
 	const { celebrating } = useCelebration(status === 'won');
 	const lv = useLevels(gameId, billardLevels);
@@ -440,8 +448,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			// The drop itself always plays at the deepest slow-mo, however coarse the frames were.
 			const hold = slowHoldRef.current;
 			if (hold.ms <= 0) slowBornRef.current++;
-			hold.ms = Math.max(hold.ms, SLOWMO_HOLD);
-			hold.scale = Math.min(hold.scale, SLOWMO_NEAR);
+			const cinema = hold.cine && hold.ms > 0; // a decisive drop stays letterboxed and digs deeper
+			hold.ms = Math.max(hold.ms, cinema ? CINE_HOLD : SLOWMO_HOLD);
+			hold.scale = Math.min(hold.scale, cinema ? CINE_SCALE : SLOWMO_NEAR);
 			g.fx.ring(x, z, 0xffd76a, true); // a pot always celebrates, whatever the entry speed
 			g.fx.burst(x, z, Math.max(50, im.speed));
 			shakeRef.current = Math.min(SHAKE_MAX, shakeRef.current + 0.5);
@@ -1359,9 +1368,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			let slowTarget = 1;
 			if (rollingRef.current) {
 				let bestSc = 2; // the deepest trigger this frame owns the camera focus
-				const engage = (sc: number, holdMs: number, focus: { idx: number; idx2?: number; px: number; py: number }) => {
+				const engage = (sc: number, holdMs: number, focus: { idx: number; idx2?: number; px: number; py: number }, cinema = false) => {
 					const hold = slowHoldRef.current;
 					if (hold.ms <= 0) slowBornRef.current++;
+					if (cinema && !hold.cine) { hold.cine = true; slowCineBornRef.current++; }
 					hold.ms = Math.max(hold.ms, holdMs);
 					hold.scale = Math.min(hold.scale, sc);
 					slowTarget = Math.min(slowTarget, sc);
@@ -1394,24 +1404,30 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					}
 				}
 				// Pocket threat: mild at the engage range, ramping to its deepest right at the mouth.
+				// Decisive balls (the black, or the arcade table's last one) use the cinematic tier.
+				const left = balls.filter((bb) => !bb.potted && bb.kind !== 'cue').length;
 				for (let i = 0; i < balls.length; i++) {
 					const b = balls[i];
 					if (b.potted) continue;
 					const sp = Math.hypot(b.vx, b.vy);
 					if (sp < SLOWMO_MIN_SPEED) continue;
+					const cinema = b.kind !== 'cue' && (eightBallRef.current ? b.color === 8 : left === 1);
+					const range = cinema ? CINE_RANGE : SLOWMO_RANGE;
 					for (const p of t.pockets) {
 						const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy);
-						if (d > p.r * SLOWMO_RANGE || d < 1e-3) continue;
-						if ((b.vx * dx + b.vy * dy) / (sp * d) < SLOWMO_AIM) continue;
-						const near = eightBallRef.current && b.kind !== 'cue' && b.color === 8 ? SLOWMO_NEAR_8 : SLOWMO_NEAR;
-						const prox = Math.max(0, Math.min(1, (d - p.r) / (p.r * (SLOWMO_RANGE - 1))));
-						engage(near + (SLOWMO_FAR - near) * prox, SLOWMO_HOLD, { idx: i, px: p.anchor.x, py: p.anchor.y });
+						if (d > p.r * range || d < 1e-3) continue;
+						if ((b.vx * dx + b.vy * dy) / (sp * d) < (cinema ? CINE_AIM : SLOWMO_AIM)) continue;
+						const near = cinema ? CINE_SCALE : SLOWMO_NEAR;
+						const prox = Math.max(0, Math.min(1, (d - p.r) / (p.r * (range - 1))));
+						engage(near + (SLOWMO_FAR - near) * prox, cinema ? CINE_HOLD : SLOWMO_HOLD, { idx: i, px: p.anchor.x, py: p.anchor.y }, cinema);
 					}
 				}
 			}
 			const hold = slowHoldRef.current;
 			if (hold.ms > 0) { hold.ms -= dt; slowTarget = Math.min(slowTarget, hold.scale); }
-			else { hold.scale = 1; slowFocusRef.current = null; }
+			else { hold.scale = 1; hold.cine = false; slowFocusRef.current = null; }
+			const cineOn = hold.cine && hold.ms > 0;
+			if (cineOn !== cineRef.current) { cineRef.current = cineOn; setCine(cineOn); }
 			const tau = slowTarget < slowRef.current ? SLOWMO_TAU_IN : SLOWMO_TAU_OUT;
 			slowRef.current += (slowTarget - slowRef.current) * Math.min(1, dt / tau);
 			if (slowRef.current > 0.995) slowRef.current = 1;
@@ -1513,7 +1529,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			remoteAim: remoteAimRef.current,
 			stickVisible: !!g3Ref.current?.cueStick.visible,
 			fx: g3Ref.current ? { ...g3Ref.current.fx.stats(), maxImpact: maxImpactRef.current } : null,
-			slow: { born: slowBornRef.current, bornHit: slowHitBornRef.current, scale: +slowRef.current.toFixed(3), focus: !!slowFocusRef.current, camDist: +lastDistRef.current.toFixed(1) },
+			slow: { born: slowBornRef.current, bornHit: slowHitBornRef.current, bornCine: slowCineBornRef.current, cine: cineRef.current, scale: +slowRef.current.toFixed(3), focus: !!slowFocusRef.current, camDist: +lastDistRef.current.toFixed(1) },
 			skin: skinRef.current,
 			sound: sfx.stats(),
 			frame: (() => { // how the balls sit in the frame — the smoke test samples this while they roll
@@ -1539,6 +1555,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				return t.pockets.map((p) => {
 					const v = new THREE.Vector3(p.anchor.x - t.w / 2, 0, p.anchor.y - t.h / 2).project(g.camera);
 					return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+				});
+			})(),
+			ballScreens: (() => { // every ball's client x,y (smoke tests line up shots with them)
+				const g = g3Ref.current, cv = canvasRef.current;
+				if (!g || !cv) return null;
+				const r = cv.getBoundingClientRect(), t = tableRef.current;
+				return ballsRef.current.map((b) => {
+					const v = new THREE.Vector3(b.x - t.w / 2, BALL_R, b.y - t.h / 2).project(g.camera);
+					return { kind: b.kind, color: b.color, potted: b.potted, x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
 				});
 			})(),
 			cueScreen: (() => { // the cue's client x,y (for the smoke test to aim precisely)
@@ -1681,6 +1706,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						<div className="bi-overlay-card">Ton appareil ne peut pas afficher la table 3D (WebGL indisponible).</div>
 					</div>
 				)}
+
+				{/* Cinematic letterbox: always mounted so the bars can slide out. */}
+				<div className={`bi-cinebar top ${cine ? 'on' : ''}`} aria-hidden="true" />
+				<div className={`bi-cinebar bot ${cine ? 'on' : ''}`} aria-hidden="true" />
 
 				{scratchFlash && <div className="bi-scratch">{is8 ? (match8?.lastFoul ?? 'Faute') : 'Pénalité · +1 coup'}</div>}
 				{cancelFlash && <div className="bi-scratch bi-cancel">Tir annulé</div>}
@@ -1855,6 +1884,13 @@ const CSS = `
 .bi-act { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(20,14,10,0.55); color: #f0e6da; font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 6px 12px; min-width: 36px; cursor: pointer; backdrop-filter: blur(4px); }
 .bi-act:hover:not(:disabled) { border-color: var(--bi-accent); color: #fff; }
 .bi-act:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Cinematic letterbox: two bars slide over the table while a decisive ball threatens a pocket. */
+.bi-cinebar { position: absolute; left: 0; width: 100%; height: 11%; background: #000; z-index: 4; pointer-events: none; transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.bi-cinebar.top { top: 0; transform: translateY(-102%); }
+.bi-cinebar.bot { bottom: 0; transform: translateY(102%); }
+.bi-cinebar.on { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .bi-cinebar { transition: opacity 0.3s linear; transform: none; opacity: 0; } .bi-cinebar.on { opacity: 1; } }
 
 .bi-scratch { position: absolute; bottom: 104px; left: 50%; transform: translateX(-50%); z-index: 3; background: #d9534f; color: #fff; font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; box-shadow: var(--shadow-md); text-align: center; max-width: 90%; }
 .bi-cancel { background: rgba(20,14,10,0.82); }
