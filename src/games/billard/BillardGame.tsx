@@ -1722,9 +1722,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				{is8 && placing && (
 					<>
 						<div className="bi-place">
-							<span className="bi-place-icon">✋</span>
-							<span className="bi-place-title">Bille en main</span>
-							<span className="bi-place-sub">glisse la blanche · ailleurs, tu tournes la vue</span>
+							<span className="bi-place-title">✋ Bille en main</span>
+							<span className="bi-place-sub"><span>glisse la blanche</span> · <span>ailleurs, tu tournes la vue</span></span>
 						</div>
 						<button className="bi-placeok" onClick={confirmPlacement}>✓ Je place ici</button>
 					</>
@@ -1911,10 +1910,10 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) { .bi-turnflash { animation: bi-turn-fade 1.5s linear forwards; } @keyframes bi-turn-fade { 0%, 100% { opacity: 0; } 10%, 85% { opacity: 1; } } }
 /* One flat pill on the bottom edge: placing happens on the cloth, so the banner must not sit on it,
    and the top belongs to the HUD once fullscreen overlays it. */
-.bi-place { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: row; align-items: baseline; gap: 7px; text-align: center; max-width: 92%; padding: 5px 14px; border-radius: 999px; background: linear-gradient(180deg, rgba(48,209,88,0.94), rgba(30,150,60,0.94)); color: #fff; box-shadow: var(--shadow-md); animation: bi-place-pop 1.6s ease-in-out infinite; pointer-events: none; }
-.bi-place-icon { font-size: 14px; line-height: 1; }
-.bi-place-title { font-weight: 800; font-size: 13px; }
-.bi-place-sub { font-weight: 600; font-size: 12px; opacity: 0.9; }
+.bi-place { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; max-width: 92%; padding: 7px 18px; border-radius: 14px; background: linear-gradient(180deg, rgba(48,209,88,0.94), rgba(30,150,60,0.94)); color: #fff; box-shadow: var(--shadow-md); animation: bi-place-pop 1.6s ease-in-out infinite; pointer-events: none; }
+.bi-place-title { font-weight: 800; font-size: 14px; white-space: nowrap; }
+.bi-place-sub { font-weight: 600; font-size: 12px; opacity: 0.92; line-height: 1.35; }
+.bi-place-sub > span { white-space: nowrap; } /* a narrow screen breaks at the separator, never inside a clause */
 /* Sits under the info pill, thumb height: nothing else validates the placement. */
 .bi-placeok { position: absolute; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); }
 .bi-placeok:hover { filter: brightness(1.08); }
