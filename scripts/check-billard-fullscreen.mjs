@@ -54,9 +54,10 @@ await page.mouse.up();
 
 // Wait for the break to settle: no ball may keep any speed (they would spin on the spot forever).
 // Sample the framing on the way: a ball you just hit must never leave the screen (edge > 1).
-let s = null, movOut = 0, movEdge = 0, edge = 0;
+let s = null, movOut = 0, movEdge = 0, edge = 0, minScale = 1;
 for (let i = 0; i < 300; i++) {
 	await sleep(70); s = await snap();
+	if (s?.slow) minScale = Math.min(minScale, s.slow.scale);
 	if (s?.rolling) { movOut = Math.max(movOut, s.frame.movingOut); movEdge = Math.max(movEdge, s.frame.movingEdge); edge = Math.max(edge, s.frame.edge); }
 	if (!s?.rolling && s?.match8?.broken) break;
 }
@@ -68,9 +69,11 @@ check(edge < 2, `la table reste lisible pendant le roulement (bord max ${edge.to
 
 // Impact FX: the break must have spawned sparks and laid trail points (cumulative counters,
 // so no frame-rate luck).
-console.log('fx:', s?.fx);
+console.log('fx:', s?.fx, 'slow:', s?.slow, 'minScale:', minScale);
 check(s?.fx?.bornSparks > 10, `le break fait jaillir des etincelles (${s?.fx?.bornSparks} emises)`);
 check(s?.fx?.bornTrailPts > 8, `les boules laissent des trainees (${s?.fx?.bornTrailPts} points)`);
+// Slow-mo is seed-dependent (a ball must actually bear down on a pocket) — only assert coherence.
+if (minScale < 1) check(s?.slow?.born > 0, `le ralenti observe est bien compte (${s?.slow?.born}x, min ${minScale})`);
 
 // The hand-over card: it shows the moment the turn changes.
 let sawCard = false, cardText = '';
@@ -93,9 +96,9 @@ let calm = false;
 for (let i = 0; i < 50 && !calm; i++) {
 	await sleep(300);
 	const c = await snap();
-	calm = !c.rolling && c.fx.sparks === 0 && c.fx.trailPts === 0;
+	calm = !c.rolling && c.fx.sparks === 0 && c.fx.trailPts === 0 && c.slow.scale === 1;
 }
-check(calm, 'les FX se resorbent une fois la table immobile');
+check(calm, 'les FX se resorbent une fois la table immobile (ralenti revenu a 1)');
 
 console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');
 await browser.close();
