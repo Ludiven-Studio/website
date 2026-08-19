@@ -11,6 +11,7 @@ import {
 import { hasTheme } from '../../lib/wallet';
 import { initMatch8, applyShot, groupOf, type Match8, type Group } from './rules8';
 import { chooseShot } from './ai8';
+import * as sfx from './sfx';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, seedFromRoom, type BilliardMatch } from './net';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
@@ -250,6 +251,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	});
 	const skinRef = useRef(skin);
 	const woodTexRef = useRef<{ felt?: THREE.Texture; floor?: THREE.Texture }>({}); // kept across skin swaps
+	const [sound, setSound] = useState(() => sfx.isEnabled());
 
 	const { celebrating } = useCelebration(status === 'won');
 	const lv = useLevels(gameId, billardLevels);
@@ -409,6 +411,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const x = im.x - t.w / 2, z = im.y - t.h / 2;
 		if (im.kind === 'ball' && im.speed > maxImpactRef.current) maxImpactRef.current = im.speed;
 		if (im.kind === 'ball') {
+			sfx.ballHit(im.speed); // sound triggers below the visual threshold: soft touches are audible
 			if (im.speed < 18) return; // grazes stay quiet
 			g.fx.burst(x, z, im.speed);
 			if (im.speed > 45) g.fx.ring(x, z, 0xffffff);
@@ -418,10 +421,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				hitStopCoolRef.current = now + HITSTOP_COOLDOWN;
 			}
 		} else if (im.kind === 'rail') {
+			sfx.railHit(im.speed);
 			if (im.speed < 32) return;
 			g.fx.burst(x, z, im.speed * 0.55);
 			shakeRef.current = Math.min(SHAKE_MAX, shakeRef.current + im.speed * 0.0025);
 		} else {
+			sfx.pocket();
 			g.fx.ring(x, z, 0xffd76a, true); // a pot always celebrates, whatever the entry speed
 			g.fx.burst(x, z, Math.max(50, im.speed));
 			shakeRef.current = Math.min(SHAKE_MAX, shakeRef.current + 0.5);
@@ -561,10 +566,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			setStrokes(strokesRef.current);
 			setScratchFlash(true);
 			setTimeout(() => setScratchFlash(false), 1100);
+			sfx.foul();
 		}
 		const left = balls.filter((b) => b.kind === 'color' && !b.potted).length;
 		setRemaining(left);
 		if (left === 0) {
+			sfx.win();
 			finishedRef.current = true;
 			const timeSec = (Date.now() - startRef.current) / 1000;
 			const score = encodeScore(strokesRef.current, timeSec);
@@ -721,7 +728,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setRemaining(balls.filter((b) => b.kind === 'color' && !b.potted).length);
 		const cue = balls.find((b) => b.kind === 'cue');
 		if (cue && cue.potted) { seenRef.current.delete(balls.indexOf(cue)); cue.potted = false; cue.x = t.cueStart.x; cue.y = t.cueStart.y; cue.vx = cue.vy = 0; } // un-pot on scratch
-		if (next.lastFoul) { setScratchFlash(true); setTimeout(() => setScratchFlash(false), 1500); }
+		if (next.lastFoul) { setScratchFlash(true); setTimeout(() => setScratchFlash(false), 1500); sfx.foul(); }
 		const me = onlineRef.current ? myPlayerRef.current : HUMAN; // the player at this device
 		const groupMsg = prev.open && !next.open && next.groups[me] ? `🎱 Tu joues les ${groupLabel(next.groups[me])} !` : null;
 		if (next.winner === null && (next.turn !== prev.turn || groupMsg)) {
@@ -730,6 +737,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			announceTurn(mine, mine ? '🎯 À toi de jouer' : `⏳ Au tour de ${opp}`, groupMsg);
 		}
 		if (next.winner !== null) {
+			if (next.winner === me) sfx.win(); else sfx.lose();
 			setStat('won');
 			if (lv.active) {
 				const oppGroup = next.groups[AI];
@@ -1003,6 +1011,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	// Right-button drag → orbit the view (turn azimuth + tilt pitch), like the two-finger twist on touch.
 	const orbitDragRef = useRef<{ x: number; y: number; az: number; pitch: number } | null>(null);
 	const onPointerDown = useCallback((e: React.PointerEvent) => {
+		sfx.unlock(); // iOS needs a user gesture before any sound can play
 		if (pinchRef.current) return;
 		if (e.button === 2 || (e.button === 0 && e.altKey)) { // right-click (or Alt+left) rotates
 			e.preventDefault();
@@ -1346,6 +1355,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			const tau = slowTarget < slowRef.current ? SLOWMO_TAU_IN : SLOWMO_TAU_OUT;
 			slowRef.current += (slowTarget - slowRef.current) * Math.min(1, dt / tau);
 			if (slowRef.current > 0.995) slowRef.current = 1;
+			sfx.setRate(0.55 + 0.45 * slowRef.current); // impacts pitch down with the slow-mo
 			const realDt = dt;
 			dt *= slowRef.current;
 			// The chrono must not pay for the cinematics: push the start epoch by the skipped time.
@@ -1359,6 +1369,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				const fireAt = warmDur + STRIKE_HIT * STRIKE_MS;
 				if (!strike.fired && tt >= fireAt) {
 					strike.fired = true;
+					sfx.cueStrike(Math.hypot(strike.vx, strike.vy));
 					const cue = ballsRef.current.find((b) => b.kind === 'cue');
 					if (cue) { cue.vx = strike.vx; cue.vy = strike.vy; }
 					strike.release();
@@ -1442,6 +1453,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			fx: g3Ref.current ? { ...g3Ref.current.fx.stats(), maxImpact: maxImpactRef.current } : null,
 			slow: { born: slowBornRef.current, scale: +slowRef.current.toFixed(3) },
 			skin: skinRef.current,
+			sound: sfx.stats(),
 			frame: (() => { // how the balls sit in the frame — the smoke test samples this while they roll
 				const g = g3Ref.current, t = tableRef.current;
 				if (!g) return { out: 0, edge: 0, movingOut: 0, movingEdge: 0 };
@@ -1545,6 +1557,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						{mpPhase === 'playing' && (
 							<button className="bi-act" onClick={leaveOnline} aria-label="Quitter la partie en ligne" title="Quitter la partie en ligne">🚪</button>
 						)}
+						<button
+							className="bi-act"
+							onClick={() => { const on = !sound; sfx.setEnabled(on); setSound(on); }}
+							aria-pressed={sound}
+							aria-label="Son"
+							title={sound ? 'Couper le son' : 'Activer le son'}
+						>{sound ? '🔊' : '🔇'}</button>
 						<button className="bi-act" onClick={cycleCam} aria-label="Changer de vue" title="Changer de vue">{CAM_LABEL[camMode]}</button>
 						{hasTheme('billard-tron') && (
 							<button

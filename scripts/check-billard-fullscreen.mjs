@@ -12,7 +12,7 @@ const OUT = 'D:/tmp/comfy';
 const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
 for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
+const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--autoplay-policy=no-user-gesture-required'] });
 const ctx = await browser.newContext({ viewport: { width: 820, height: 680 }, deviceScaleFactor: 1 });
 const page = await ctx.newPage();
 page.on('console', (m) => { if (m.type() === 'error') console.log('ERR:', m.text()); });
@@ -74,6 +74,15 @@ check(s?.fx?.bornSparks > 10, `le break fait jaillir des etincelles (${s?.fx?.bo
 check(s?.fx?.bornTrailPts > 8, `les boules laissent des trainees (${s?.fx?.bornTrailPts} points)`);
 // Slow-mo is seed-dependent (a ball must actually bear down on a pocket) — only assert coherence.
 if (minScale < 1) check(s?.slow?.born > 0, `le ralenti observe est bien compte (${s?.slow?.born}x, min ${minScale})`);
+
+// SFX: the cue strike + the break clacks must have fired sounds (cumulative counter).
+console.log('sound:', s?.sound);
+check(s?.sound?.played > 2, `des sons ont ete joues pendant le break (${s?.sound?.played})`);
+const sndBtn = page.locator('button[aria-label="Son"]');
+await sndBtn.click();
+check((await snap()).sound.enabled === false, 'le bouton coupe le son');
+await sndBtn.click();
+check((await snap()).sound.enabled === true, 'et le retablit');
 
 // The hand-over card: it shows the moment the turn changes.
 let sawCard = false, cardText = '';
