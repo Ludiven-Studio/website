@@ -13,6 +13,17 @@ export const BALL_COLORS = [0xe6566f, 0xf0a830, 0x5b8def, 0x2f9e6f, 0x9b6cf0, 0x
 const FELT = 0x0f7a52;
 const WOOD = 0x5a3722;
 const WOOD_DARK = 0x3a2416;
+
+/** Cosmetic table skin — 'tron' is the cocoin-shop neon theme. Physics never sees it. */
+export type TableSkin = 'classic' | 'tron';
+export const TRON = {
+	background: 0x05070d,
+	felt: 0x0a1424,
+	frame: 0x101a2e,
+	body: 0x0a0f1e,
+	neonInner: 0x35e8ff, // cushion edge — Tron cyan
+	neonOuter: 0xff8c2a, // outer frame — Tron orange
+};
 const BORDER = 13; // wooden frame width around the felt (holds the pocket mouths)
 const RAIL_H = 2 * BALL_R; // rail top above the felt
 const BODY_H = 9; // table body thickness under the felt
@@ -24,9 +35,10 @@ const POCKET_D = 8; // how deep a pocket sinks below the felt
 const CORNERS: [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 
 /** Ball sphere. Cue is white; colour balls carry their palette colour. (Arcade / Défi only.) */
-export function makeBallMesh(color: number): THREE.Mesh {
+export function makeBallMesh(color: number, glow = false): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(BALL_R, 28, 20);
 	const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.22, metalness: 0.04 });
+	if (glow) mat.emissive.copy(new THREE.Color(color).multiplyScalar(0.4));
 	const m = new THREE.Mesh(geo, mat);
 	m.castShadow = true;
 	m.receiveShadow = false;
@@ -96,9 +108,10 @@ export function makeBallTexture(number: number): THREE.CanvasTexture {
 }
 
 /** Sphere textured for its pool number (cue = number ≤ 0). Caller disposes geo+mat+map. */
-export function makeBall8Mesh(number: number): THREE.Mesh {
+export function makeBall8Mesh(number: number, glow = false): THREE.Mesh {
 	const geo = new THREE.SphereGeometry(BALL_R, 28, 20);
 	const mat = new THREE.MeshStandardMaterial({ map: makeBallTexture(number), roughness: 0.22, metalness: 0.04 });
+	if (glow) { mat.emissiveMap = mat.map; mat.emissive.set(0x555f6e); } // glow through its own pattern
 	const m = new THREE.Mesh(geo, mat);
 	m.castShadow = true;
 	m.receiveShadow = false;
@@ -116,15 +129,29 @@ export interface Table3D {
  * The whole static scenery: floor, table body, felt, cushioned rails with pocket gaps,
  * and the six pockets. Built once — makeTable() never changes between racks.
  */
-export function buildTable3D(table: Table): Table3D {
+export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D {
 	const { w, h } = table;
 	const hw = w / 2, hh = h / 2;
+	const tron = skin === 'tron';
 	const grp = new THREE.Group();
 	const disposables: { dispose(): void }[] = [];
 	const keep = <T extends { dispose(): void }>(o: T): T => { disposables.push(o); return o; };
 
 	// Floor the table stands on — tiled texture attached later, flat brown until then.
-	const floorMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 1 });
+	// Tron gets its own generated grid, so the caller must NOT attach the wood textures.
+	const floorMat = new THREE.MeshStandardMaterial({ color: tron ? 0xffffff : 0x3a2a1c, roughness: 1 });
+	if (tron) {
+		const c = document.createElement('canvas');
+		c.width = c.height = 64;
+		const g2 = c.getContext('2d') as CanvasRenderingContext2D;
+		g2.fillStyle = '#04060c'; g2.fillRect(0, 0, 64, 64);
+		g2.strokeStyle = '#0d3242'; g2.lineWidth = 2; g2.strokeRect(1, 1, 62, 62);
+		const tex = keep(new THREE.CanvasTexture(c));
+		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+		tex.repeat.set(30, 50);
+		tex.colorSpace = THREE.SRGBColorSpace;
+		floorMat.map = tex;
+	}
 	const floorGeo = keep(new THREE.PlaneGeometry(w * 6, h * 10));
 	const floor = new THREE.Mesh(floorGeo, floorMat);
 	floor.rotation.x = -Math.PI / 2;
@@ -134,7 +161,7 @@ export function buildTable3D(table: Table): Table3D {
 
 	// Table body: a wood block just under the felt, matching the frame footprint.
 	const foX = hw + BORDER, foZ = hh + BORDER;
-	const bodyMat = keep(new THREE.MeshStandardMaterial({ color: WOOD_DARK, roughness: 0.7 }));
+	const bodyMat = keep(new THREE.MeshStandardMaterial({ color: tron ? TRON.body : WOOD_DARK, roughness: 0.7 }));
 	const bodyHalfX = foX - 2, bodyHalfZ = foZ - 2; // inset so the rounded frame hides its sharp corners
 	const bodyGeo = keep(new THREE.BoxGeometry(bodyHalfX * 2, BODY_H, bodyHalfZ * 2));
 	const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -173,7 +200,7 @@ export function buildTable3D(table: Table): Table3D {
 
 	// Felt bed — the rounded footprint, so green shows through the pocket mouths cut into the frame
 	// but never past the frame's rounded outer corners. UVs normalised so the felt texture tiles.
-	const feltMat = new THREE.MeshStandardMaterial({ color: FELT, roughness: 0.95, metalness: 0 });
+	const feltMat = new THREE.MeshStandardMaterial({ color: tron ? TRON.felt : FELT, roughness: tron ? 0.85 : 0.95, metalness: 0 });
 	const feltGeo = keep(new THREE.ShapeGeometry(buildOuter(), 12));
 	feltGeo.computeBoundingBox();
 	const fbb = feltGeo.boundingBox!;
@@ -206,7 +233,9 @@ export function buildTable3D(table: Table): Table3D {
 	const outline = buildOuter();
 	outline.holes.push(new THREE.Path(contour));
 
-	const railMat = keep(new THREE.MeshStandardMaterial({ color: WOOD, roughness: 0.5, metalness: 0.05 }));
+	const railMat = keep(new THREE.MeshStandardMaterial(
+		tron ? { color: TRON.frame, roughness: 0.35, metalness: 0.55 } : { color: WOOD, roughness: 0.5, metalness: 0.05 },
+	));
 	// A bevel rounds the top edge of the rail and flares the pocket mouths — softens the boxy look.
 	const frameGeo = keep(new THREE.ExtrudeGeometry(outline, {
 		depth: RAIL_H - 1.4, bevelEnabled: true, bevelThickness: 1.4, bevelSize: 1.4, bevelSegments: 3, curveSegments: 10,
@@ -236,8 +265,25 @@ export function buildTable3D(table: Table): Table3D {
 		grp.add(mouth);
 	}
 
+	// Neon light strips: one along the cushion's inner top edge (the contour already traces the
+	// felt boundary incl. pocket mouths), one along the rounded outer outline. Tron only.
+	if (tron) {
+		const tube = (pts: THREE.Vector2[], y: number, r: number, color: number) => {
+			const curve = new THREE.CatmullRomCurve3(pts.map((v) => new THREE.Vector3(v.x, v.y, 0)), true);
+			const geo = keep(new THREE.TubeGeometry(curve, Math.min(400, pts.length * 3), r, 6, true));
+			geo.rotateX(-Math.PI / 2); // same lay-flat transform as the frame, so both align
+			geo.translate(0, y, 0);
+			const m = new THREE.Mesh(geo, keep(new THREE.MeshBasicMaterial({ color, toneMapped: false })));
+			grp.add(m);
+		};
+		tube(contour, RAIL_H - 0.5, 0.55, TRON.neonInner);
+		tube(buildOuter().getPoints(10), RAIL_H + 0.1, 0.5, TRON.neonOuter);
+	}
+
 	// Diamond sights on the rail top — the classic little markers, for looks.
-	const diaMat = keep(new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.5 }));
+	const diaMat = keep(tron
+		? new THREE.MeshBasicMaterial({ color: TRON.neonInner, toneMapped: false })
+		: new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.5 }));
 	const diaGeo = keep(new THREE.CircleGeometry(1.3, 4));
 	const dOff = BORDER * 0.5;
 	const diamond = (x: number, z: number) => {

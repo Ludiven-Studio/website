@@ -46,6 +46,22 @@ export const BLASONS: Blason[] = [
 /** One purchase per game: unlocks the Expert difficulty *and* levels 101-200. */
 export const UNLOCK_PRICE = 200;
 
+export interface GameTheme {
+	id: string;
+	emoji: string;
+	label: string;
+	desc: string;
+	href: string; // the game the theme skins
+	price: number;
+}
+
+// Cosmetic in-game themes, owned like blasons ('skin:' namespaced in the same array).
+export const THEMES: GameTheme[] = [
+	{ id: 'billard-tron', emoji: '🌌', label: 'Billard Néon', desc: 'feutre nuit, néons façon Tron', href: '/jeux/billard/', price: 150 },
+];
+
+export const themeId = (id: string): string => `skin:${id}`;
+
 // Unlocks live in the same `owned` array as blasons, namespaced. No extra storage key,
 // no migration — but every blason lookup must go through BLASONS, never through `owned`.
 export const unlockId = (gameId: string): string => `expert:${gameId}`;
@@ -161,6 +177,22 @@ export function equipBlason(id: string | null): void {
 		w.equipped = id;
 		write(w);
 	}
+}
+
+export const hasTheme = (id: string): boolean => read().owned.includes(themeId(id));
+
+/** Buy a cosmetic theme. Returns true on success (or if already owned). */
+export function buyTheme(id: string): boolean {
+	const t = THEMES.find((x) => x.id === id);
+	if (!t) return false;
+	const w = read();
+	const key = themeId(id);
+	if (w.owned.includes(key)) return true;
+	if (w.balance < t.price) return false;
+	w.balance -= t.price;
+	w.owned.push(key);
+	write(w);
+	return true;
 }
 
 export const hasUnlock = (gameId: string): boolean => read().owned.includes(unlockId(gameId));

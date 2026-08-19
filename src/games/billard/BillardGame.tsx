@@ -6,8 +6,9 @@ import {
 } from './engine';
 import {
 	buildTable3D, makeBallMesh, makeBall8Mesh, makeCueStick, makeFx, fitDist, bestAz, predictCue,
-	ball8Hue, CUE_COLOR, BALL_COLORS, type Table3D, type Fx,
+	ball8Hue, CUE_COLOR, BALL_COLORS, TRON, type Table3D, type Fx, type TableSkin,
 } from './render3d';
+import { hasTheme } from '../../lib/wallet';
 import { initMatch8, applyShot, groupOf, type Match8, type Group } from './rules8';
 import { chooseShot } from './ai8';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, seedFromRoom, type BilliardMatch } from './net';
@@ -79,6 +80,8 @@ const AIM_TAU = 0.06; // smoothing of the received aim — the stream is far slo
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🎱', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
 const SUN_DIR = new THREE.Vector3(30, 90, 40).normalize();
+const SKIN_KEY = 'billard-theme'; // 'tron' once bought in the boutique and toggled on
+const BG_CLASSIC = 0x14100c;
 
 const camEye = new THREE.Vector3();
 const camLook = new THREE.Vector3();
@@ -242,6 +245,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const slowBornRef = useRef(0); // times engaged — smoke tests
 	const shakeRef = useRef(0); // current shake amplitude (world units)
 	const maxImpactRef = useRef(0); // hardest contact seen since load — threshold tuning + smoke tests
+	const [skin, setSkin] = useState<TableSkin>(() => {
+		try { return hasTheme('billard-tron') && localStorage.getItem(SKIN_KEY) === 'tron' ? 'tron' : 'classic'; } catch { return 'classic'; }
+	});
+	const skinRef = useRef(skin);
+	const woodTexRef = useRef<{ felt?: THREE.Texture; floor?: THREE.Texture }>({}); // kept across skin swaps
 
 	const { celebrating } = useCelebration(status === 'won');
 	const lv = useLevels(gameId, billardLevels);
@@ -251,6 +259,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const localPlayer = (): 0 | 1 => (onlineRef.current ? myPlayerRef.current : HUMAN); // the player at this device
 
 	/* ---------- three.js scene (built once) ---------- */
+	/* Put the wood textures back on the current table materials (classic skin only). */
+	const attachWoodTextures = useCallback(() => {
+		const g = g3Ref.current, wt = woodTexRef.current;
+		if (!g || skinRef.current === 'tron') return;
+		if (wt.felt) { g.table3d.feltMat.map = wt.felt; g.table3d.feltMat.color.set(0xffffff); g.table3d.feltMat.needsUpdate = true; }
+		if (wt.floor) { g.table3d.floorMat.map = wt.floor; g.table3d.floorMat.color.set(0xffffff); g.table3d.floorMat.needsUpdate = true; }
+	}, []);
+
 	const initScene = useCallback((): boolean => {
 		if (g3Ref.current) return true;
 		if (!canvasRef.current) return false;
@@ -266,7 +282,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		renderer.shadowMap.type = THREE.VSMShadowMap;
 
 		const scene = new THREE.Scene();
-		scene.background = new THREE.Color(0x14100c);
+		scene.background = new THREE.Color(skinRef.current === 'tron' ? TRON.background : BG_CLASSIC);
 		const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 3000);
 
 		scene.add(new THREE.HemisphereLight(0xffffff, 0x2a1e14, 0.9));
@@ -287,21 +303,24 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		scene.add(sun);
 		scene.add(sun.target); // target defaults to origin = table centre
 
-		const table3d = buildTable3D(t);
+		const table3d = buildTable3D(t, skinRef.current);
 		scene.add(table3d.group);
 
-		// AI felt + floor textures (flat colours until they load / if they 404).
+		// AI felt + floor textures (flat colours until they load / if they 404). Kept in a ref so
+		// a skin swap back to classic can re-attach them; Tron uses its own generated materials.
 		new THREE.TextureLoader().load('/assets/jeux/billard/felt.jpg', (tex) => {
 			tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
 			tex.repeat.set(10, 5);
 			tex.colorSpace = THREE.SRGBColorSpace;
-			table3d.feltMat.map = tex; table3d.feltMat.color.set(0xffffff); table3d.feltMat.needsUpdate = true;
+			woodTexRef.current.felt = tex;
+			attachWoodTextures();
 		});
 		new THREE.TextureLoader().load('/assets/jeux/billard/floor.jpg', (tex) => {
 			tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
 			tex.repeat.set(10, 16);
 			tex.colorSpace = THREE.SRGBColorSpace;
-			table3d.floorMat.map = tex; table3d.floorMat.color.set(0xffffff); table3d.floorMat.needsUpdate = true;
+			woodTexRef.current.floor = tex;
+			attachWoodTextures();
 		});
 
 		// Frame the whole table (plus a felt margin) for the fit / top views.
@@ -342,7 +361,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, contact, placeRing, cueStick, fx: makeFx(scene) };
 		return true;
-	}, []);
+	}, [attachWoodTextures]);
 
 	/* Rebuild the ball meshes for the current rack (count changes with difficulty). */
 	const syncBallMeshes = useCallback(() => {
@@ -356,14 +375,31 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			mat.dispose();
 		}
 		g.ballMeshes = ballsRef.current.map((b) => {
+			const glow = skinRef.current === 'tron';
 			const mesh = eightBallRef.current
-				? makeBall8Mesh(b.kind === 'cue' ? -1 : b.color)
-				: makeBallMesh(b.kind === 'cue' ? CUE_COLOR : BALL_COLORS[b.color] ?? 0xffffff);
+				? makeBall8Mesh(b.kind === 'cue' ? -1 : b.color, glow)
+				: makeBallMesh(b.kind === 'cue' ? CUE_COLOR : BALL_COLORS[b.color] ?? 0xffffff, glow);
 			g.ballGroup.add(mesh);
 			return mesh;
 		});
 		g.fx.resetTrails(); // indices (and colours) change with the rack
 	}, []);
+
+	/* Swap the table skin live: rebuild the static scenery, keep everything else. */
+	const applySkin = useCallback((next: TableSkin) => {
+		skinRef.current = next;
+		setSkin(next);
+		try { localStorage.setItem(SKIN_KEY, next); } catch { /* storage unavailable */ }
+		const g = g3Ref.current;
+		if (!g) return;
+		g.scene.remove(g.table3d.group);
+		g.table3d.dispose();
+		g.table3d = buildTable3D(tableRef.current, next);
+		g.scene.add(g.table3d.group);
+		g.scene.background = new THREE.Color(next === 'tron' ? TRON.background : BG_CLASSIC);
+		attachWoodTextures();
+		syncBallMeshes(); // ball materials change too (neon glow)
+	}, [attachWoodTextures, syncBallMeshes]);
 
 	/** Turn one engine impact into drama: sparks + ring, camera shake, and — for the hardest
 	    hits only, throttled — a few frozen frames. All of it render-side. */
@@ -1405,6 +1441,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			stickVisible: !!g3Ref.current?.cueStick.visible,
 			fx: g3Ref.current ? { ...g3Ref.current.fx.stats(), maxImpact: maxImpactRef.current } : null,
 			slow: { born: slowBornRef.current, scale: +slowRef.current.toFixed(3) },
+			skin: skinRef.current,
 			frame: (() => { // how the balls sit in the frame — the smoke test samples this while they roll
 				const g = g3Ref.current, t = tableRef.current;
 				if (!g) return { out: 0, edge: 0, movingOut: 0, movingEdge: 0 };
@@ -1509,6 +1546,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 							<button className="bi-act" onClick={leaveOnline} aria-label="Quitter la partie en ligne" title="Quitter la partie en ligne">🚪</button>
 						)}
 						<button className="bi-act" onClick={cycleCam} aria-label="Changer de vue" title="Changer de vue">{CAM_LABEL[camMode]}</button>
+						{hasTheme('billard-tron') && (
+							<button
+								className="bi-act"
+								onClick={() => applySkin(skin === 'tron' ? 'classic' : 'tron')}
+								aria-pressed={skin === 'tron'}
+								aria-label="Thème néon"
+								title={skin === 'tron' ? 'Repasser en table classique' : 'Activer le thème néon'}
+							>🌌</button>
+						)}
 						{!lv.menu && mpPhase !== 'playing' && mpPhase !== 'waiting' && mpPhase !== 'connecting' && (
 							<button
 								className="bi-act"

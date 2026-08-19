@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
 	claimDailyReward, BLASONS, buyBlason, equipBlason, owns,
 	buyUnlock, hasUnlock, UNLOCK_PRICE, type Blason,
+	THEMES, buyTheme, hasTheme, type GameTheme,
 } from '../lib/wallet';
 import { useWallet } from '../lib/useWallet';
 import { trackEvent } from '../lib/analytics';
@@ -47,6 +48,12 @@ export default function BoutiquePanel({ games }: { games: PackGame[] }) {
 		equipBlason(on ? id : null);
 		trackEvent('cocottes:equip_blason', { blason: on ? id : 'none' });
 		refresh();
+	};
+	const buySkin = (t: GameTheme) => {
+		if (buyTheme(t.id)) {
+			trackEvent('cocottes:buy_theme', { theme: t.id, price: t.price });
+			flash(`${t.emoji} ${t.label} débloqué ! Active-le dans le jeu.`);
+		}
 	};
 	const buyPack = (g: PackGame) => {
 		if (buyUnlock(g.id)) {
@@ -107,6 +114,37 @@ export default function BoutiquePanel({ games }: { games: PackGame[] }) {
 				<h3 className="bp-legend-head">✨ Légendaires</h3>
 				<p className="bp-sub">Le but lointain : des mois de parties pour les réunir tous.</p>
 				<div className="bp-grid">{BLASONS.filter((b) => b.tier === 'legendaire').map(blason)}</div>
+			</section>
+
+			<section className="bp-sec">
+				<h2>🎨 Thèmes de jeu</h2>
+				<p className="bp-sub">Des habillages alternatifs, à activer dans le jeu une fois débloqués.</p>
+				<div className="bp-grid">
+					{THEMES.map((t) => {
+						const has = hasTheme(t.id);
+						return (
+							<div key={t.id} className={`bp-item ${has ? 'equipped' : ''}`}>
+								<span className="bp-emoji" aria-hidden="true">{t.emoji}</span>
+								<span className="bp-label">
+									{t.label}
+									<em className="bp-only"> {t.desc}</em>
+								</span>
+								{has ? (
+									<a className="bp-eq on" href={t.href}>Jouer →</a>
+								) : (
+									<button
+										className="bp-buy"
+										disabled={balance < t.price}
+										onClick={() => buySkin(t)}
+										aria-label={`Acheter ${t.label} pour ${t.price} cocoins`}
+									>
+										{t.price} <Cocoin size={14} />
+									</button>
+								)}
+							</div>
+						);
+					})}
+				</div>
 			</section>
 
 			<section className="bp-sec">
