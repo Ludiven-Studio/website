@@ -59,13 +59,19 @@ const FOLLOW_LEAD = 0.35; // s of travel added to the framed box: the camera eas
 // Impact drama (render-only — the physics never sees any of it).
 const HITSTOP_SPEED = 65; // closing speed that earns a freeze-frame (a full break arrives ~75-100)
 const HITSTOP_COOLDOWN = 800; // ms between freezes, so a break doesn't stutter
-const SLOWMO_SCALE = 0.35; // sim-time factor while a ball bears down on a pocket
-const SLOWMO_SCALE_8 = 0.22; // deeper drama when the black threatens to drop
+const SLOWMO_FAR = 0.55, SLOWMO_NEAR = 0.18; // pocket threat: mild on engage, deepest right at the mouth
+const SLOWMO_NEAR_8 = 0.1; // the black bottoms out even deeper
 const SLOWMO_RANGE = 3.2; // engage within this many pocket radii of the mouth
 const SLOWMO_AIM = 0.75; // min cos(velocity, pocket direction)
 const SLOWMO_MIN_SPEED = 22; // a crawling ball earns no drama
 const SLOWMO_HOLD = 420; // ms the effect lingers past the trigger, so the drop itself plays slow
 const SLOWMO_TAU_IN = 70, SLOWMO_TAU_OUT = 200; // ms, ease into / out of slow motion
+const SLOWMO_TTI = 0.1; // s: anticipate the shot's first ball contact this far ahead
+const SLOWMO_HIT = 0.5; // lighter slow for that pre-contact beat (the hit-stop takes over at contact)
+const SLOWMO_HIT_SPEED = 85; // only a hard closing speed earns the anticipation
+const SLOWMO_HOLD_HIT = 240; // shorter linger for the contact beat
+const SLOWMO_FOCUS_BELOW = 0.9; // punch the camera in once the slow-mo really bites
+const FOCUS_MARGIN = 12, FOCUS_MIN_X = 34, FOCUS_MIN_Z = 24; // close-up half-extents on the slow-mo action
 const SHAKE_TAU = 0.14; // s, camera shake decay
 const SHAKE_MAX = 2.2; // world units of jitter at full amplitude
 const SHOULDER_ZOOM = 1.55; // your turn: closer than the whole table, otherwise the shot is unreadable
@@ -244,6 +250,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const slowRef = useRef(1); // smoothed sim-time scale (1 = real time)
 	const slowHoldRef = useRef({ ms: 0, scale: 1 }); // lingering slow-mo after the last trigger
 	const slowBornRef = useRef(0); // times engaged — smoke tests
+	const slowHitBornRef = useRef(0); // times the pre-contact anticipation opened the slow-mo — smoke tests
+	const slowFocusRef = useRef<{ idx: number; idx2?: number; px: number; py: number } | null>(null); // what the punch-in frames: a live ball + (a second ball | a fixed point)
+	const contactSeenRef = useRef(true); // this shot's first ball contact already happened (no more anticipation)
 	const shakeRef = useRef(0); // current shake amplitude (world units)
 	const maxImpactRef = useRef(0); // hardest contact seen since load — threshold tuning + smoke tests
 	const [skin, setSkin] = useState<TableSkin>(() => {
@@ -411,6 +420,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const x = im.x - t.w / 2, z = im.y - t.h / 2;
 		if (im.kind === 'ball' && im.speed > maxImpactRef.current) maxImpactRef.current = im.speed;
 		if (im.kind === 'ball') {
+			contactSeenRef.current = true; // the anticipated hit landed
 			sfx.ballHit(im.speed); // sound triggers below the visual threshold: soft touches are audible
 			if (im.speed < 18) return; // grazes stay quiet
 			g.fx.burst(x, z, im.speed);
@@ -427,6 +437,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			shakeRef.current = Math.min(SHAKE_MAX, shakeRef.current + im.speed * 0.0025);
 		} else {
 			sfx.pocket();
+			// The drop itself always plays at the deepest slow-mo, however coarse the frames were.
+			const hold = slowHoldRef.current;
+			if (hold.ms <= 0) slowBornRef.current++;
+			hold.ms = Math.max(hold.ms, SLOWMO_HOLD);
+			hold.scale = Math.min(hold.scale, SLOWMO_NEAR);
 			g.fx.ring(x, z, 0xffd76a, true); // a pot always celebrates, whatever the entry speed
 			g.fx.burst(x, z, Math.max(50, im.speed));
 			shakeRef.current = Math.min(SHAKE_MAX, shakeRef.current + 0.5);
@@ -1284,8 +1299,19 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			}
 			if (!any) { minX = maxX = minZ = maxZ = 0; }
 			panX = (minX + maxX) / 2; panZ = (minZ + maxZ) / 2;
-			const bx = Math.max(FOLLOW_MIN_X, (maxX - minX) / 2 + FOLLOW_MARGIN);
-			const bz = Math.max(FOLLOW_MIN_Z, (maxZ - minZ) / 2 + FOLLOW_MARGIN);
+			let bx = Math.max(FOLLOW_MIN_X, (maxX - minX) / 2 + FOLLOW_MARGIN);
+			let bz = Math.max(FOLLOW_MIN_Z, (maxZ - minZ) / 2 + FOLLOW_MARGIN);
+			// Slow-mo punch-in: once the slow-mo bites, frame just the action — the threatened
+			// ball and its pocket (or the two balls about to meet). The smoothing glides in/out.
+			const focus = slowFocusRef.current;
+			if (focus && slowRef.current < SLOWMO_FOCUS_BELOW) {
+				const a = balls[focus.idx], b2 = focus.idx2 != null ? balls[focus.idx2] : null;
+				const x1 = (a.potted ? focus.px : a.x) - hw, z1 = (a.potted ? focus.py : a.y) - hh;
+				const x2 = (b2 && !b2.potted ? b2.x : focus.px) - hw, z2 = (b2 && !b2.potted ? b2.y : focus.py) - hh;
+				panX = (x1 + x2) / 2; panZ = (z1 + z2) / 2;
+				bx = Math.max(FOCUS_MIN_X, Math.abs(x2 - x1) / 2 + FOCUS_MARGIN);
+				bz = Math.max(FOCUS_MIN_Z, Math.abs(z2 - z1) / 2 + FOCUS_MARGIN);
+			}
 			d = fitDist(g.camera, bx, bz, pitch, az);
 		} else {
 			rollSeenRef.current.clear(); // the next shot starts from an empty cast
@@ -1332,7 +1358,44 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			// keep real time), so lockstep peers still compute the exact same shot.
 			let slowTarget = 1;
 			if (rollingRef.current) {
-				for (const b of ballsRef.current) {
+				let bestSc = 2; // the deepest trigger this frame owns the camera focus
+				const engage = (sc: number, holdMs: number, focus: { idx: number; idx2?: number; px: number; py: number }) => {
+					const hold = slowHoldRef.current;
+					if (hold.ms <= 0) slowBornRef.current++;
+					hold.ms = Math.max(hold.ms, holdMs);
+					hold.scale = Math.min(hold.scale, sc);
+					slowTarget = Math.min(slowTarget, sc);
+					if (sc < bestSc) { bestSc = sc; slowFocusRef.current = focus; }
+				};
+				const balls = ballsRef.current;
+				// Anticipation: the shot's first ball contact, seen SLOWMO_TTI ahead when it will be hard.
+				// The window widens to this frame's sim span, so a coarse frame can't jump past the contact.
+				const look = Math.max(SLOWMO_TTI, dt / 1000);
+				if (!contactSeenRef.current) {
+					const cue = balls.find((b) => b.kind === 'cue');
+					if (cue && !cue.potted) {
+						for (let i = 0; i < balls.length; i++) {
+							const c = balls[i];
+							if (c === cue || c.potted) continue;
+							const rx = cue.x - c.x, ry = cue.y - c.y;
+							const vx = cue.vx - c.vx, vy = cue.vy - c.vy;
+							const v2 = vx * vx + vy * vy;
+							if (v2 < SLOWMO_HIT_SPEED * SLOWMO_HIT_SPEED) continue;
+							const bq = 2 * (rx * vx + ry * vy);
+							if (bq >= 0) continue; // moving apart
+							const disc = bq * bq - 4 * v2 * (rx * rx + ry * ry - 4 * BALL_R * BALL_R);
+							if (disc <= 0) continue; // will miss
+							const tti = (-bq - Math.sqrt(disc)) / (2 * v2);
+							if (tti > 0 && tti < look) {
+								if (slowHoldRef.current.ms <= 0) slowHitBornRef.current++;
+								engage(SLOWMO_HIT, SLOWMO_HOLD_HIT, { idx: balls.indexOf(cue), idx2: i, px: c.x, py: c.y });
+							}
+						}
+					}
+				}
+				// Pocket threat: mild at the engage range, ramping to its deepest right at the mouth.
+				for (let i = 0; i < balls.length; i++) {
+					const b = balls[i];
 					if (b.potted) continue;
 					const sp = Math.hypot(b.vx, b.vy);
 					if (sp < SLOWMO_MIN_SPEED) continue;
@@ -1340,18 +1403,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 						const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy);
 						if (d > p.r * SLOWMO_RANGE || d < 1e-3) continue;
 						if ((b.vx * dx + b.vy * dy) / (sp * d) < SLOWMO_AIM) continue;
-						const sc = eightBallRef.current && b.kind !== 'cue' && b.color === 8 ? SLOWMO_SCALE_8 : SLOWMO_SCALE;
-						const hold = slowHoldRef.current;
-						if (hold.ms <= 0) slowBornRef.current++;
-						hold.ms = SLOWMO_HOLD;
-						hold.scale = Math.min(hold.scale, sc);
-						slowTarget = Math.min(slowTarget, sc);
+						const near = eightBallRef.current && b.kind !== 'cue' && b.color === 8 ? SLOWMO_NEAR_8 : SLOWMO_NEAR;
+						const prox = Math.max(0, Math.min(1, (d - p.r) / (p.r * (SLOWMO_RANGE - 1))));
+						engage(near + (SLOWMO_FAR - near) * prox, SLOWMO_HOLD, { idx: i, px: p.anchor.x, py: p.anchor.y });
 					}
 				}
 			}
 			const hold = slowHoldRef.current;
 			if (hold.ms > 0) { hold.ms -= dt; slowTarget = Math.min(slowTarget, hold.scale); }
-			else hold.scale = 1;
+			else { hold.scale = 1; slowFocusRef.current = null; }
 			const tau = slowTarget < slowRef.current ? SLOWMO_TAU_IN : SLOWMO_TAU_OUT;
 			slowRef.current += (slowTarget - slowRef.current) * Math.min(1, dt / tau);
 			if (slowRef.current > 0.995) slowRef.current = 1;
@@ -1370,6 +1430,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				if (!strike.fired && tt >= fireAt) {
 					strike.fired = true;
 					sfx.cueStrike(Math.hypot(strike.vx, strike.vy));
+					contactSeenRef.current = false; // a fresh shot: anticipation armed again
+					slowFocusRef.current = null;
 					const cue = ballsRef.current.find((b) => b.kind === 'cue');
 					if (cue) { cue.vx = strike.vx; cue.vy = strike.vy; }
 					strike.release();
@@ -1451,7 +1513,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			remoteAim: remoteAimRef.current,
 			stickVisible: !!g3Ref.current?.cueStick.visible,
 			fx: g3Ref.current ? { ...g3Ref.current.fx.stats(), maxImpact: maxImpactRef.current } : null,
-			slow: { born: slowBornRef.current, scale: +slowRef.current.toFixed(3) },
+			slow: { born: slowBornRef.current, bornHit: slowHitBornRef.current, scale: +slowRef.current.toFixed(3), focus: !!slowFocusRef.current, camDist: +lastDistRef.current.toFixed(1) },
 			skin: skinRef.current,
 			sound: sfx.stats(),
 			frame: (() => { // how the balls sit in the frame — the smoke test samples this while they roll
