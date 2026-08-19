@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import {
 	makeTable, generateRack, generateRack8, stepBalls, aimToVelocity, pullPower, isSettled,
-	encodeScore, DIFFS, BALL_R, type Ball, type DiffLevel, type Table, type Vec,
+	encodeScore, DIFFS, BALL_R, type Ball, type DiffLevel, type Table, type Vec, type Impact,
 } from './engine';
 import {
-	buildTable3D, makeBallMesh, makeBall8Mesh, makeCueStick, fitDist, bestAz, predictCue,
-	CUE_COLOR, BALL_COLORS, type Table3D,
+	buildTable3D, makeBallMesh, makeBall8Mesh, makeCueStick, makeFx, fitDist, bestAz, predictCue,
+	ball8Hue, CUE_COLOR, BALL_COLORS, type Table3D, type Fx,
 } from './render3d';
 import { initMatch8, applyShot, groupOf, type Match8, type Group } from './rules8';
 import { chooseShot } from './ai8';
@@ -54,6 +54,11 @@ const CAM_TAU_SLOW = 0.42; // slower, cinematic glide when auto-placing behind t
 const CAM_FOLLOW_TAU = 0.16; // smooth tracking while the balls roll
 const FOLLOW_MARGIN = 16, FOLLOW_MIN_X = 84, FOLLOW_MIN_Z = 46; // min framed half-extents: keep most of the cloth, a lone slow ball must not become a close-up
 const FOLLOW_LEAD = 0.35; // s of travel added to the framed box: the camera eases, so frame where the balls WILL be
+// Impact drama (render-only — the physics never sees any of it).
+const HITSTOP_SPEED = 65; // closing speed that earns a freeze-frame (a full break arrives ~75-100)
+const HITSTOP_COOLDOWN = 800; // ms between freezes, so a break doesn't stutter
+const SHAKE_TAU = 0.14; // s, camera shake decay
+const SHAKE_MAX = 2.2; // world units of jitter at full amplitude
 const SHOULDER_ZOOM = 1.55; // your turn: closer than the whole table, otherwise the shot is unreadable
 const SHOULDER_AHEAD = 30; // look this far past the cue ball, down the line you are shooting
 const STRIKE_MS = 460; // final forward swing duration before the ball is released
@@ -115,6 +120,7 @@ interface Scene3D {
 	contact: THREE.Mesh;
 	placeRing: THREE.Mesh; // pulsing ring around the cue during ball-in-hand
 	cueStick: THREE.Group; // swung at the ball on each shot (player + AI)
+	fx: Fx; // sparks / shock rings / trails
 }
 
 export default function BillardGame({ gameId }: { gameId: string }) {
@@ -219,6 +225,13 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const pinchRef = useRef<{ dist: number; zoom: number; ang: number; az: number; cy: number; pitch: number } | null>(null);
 	const rayRef = useRef(new THREE.Raycaster());
 	const rollAxisRef = useRef(new THREE.Vector3()); // scratch axis for the rolling-ball spin
+	// Impact drama, all render-side: a shared scratch array for the engine's events, a freeze-frame
+	// timer that pauses the accumulator (never the simulation itself), and a decaying camera shake.
+	const impactsRef = useRef<Impact[]>([]);
+	const hitStopRef = useRef(0); // ms of freeze left
+	const hitStopCoolRef = useRef(0); // no new freeze before this timestamp
+	const shakeRef = useRef(0); // current shake amplitude (world units)
+	const maxImpactRef = useRef(0); // hardest contact seen since load — threshold tuning + smoke tests
 
 	const { celebrating } = useCelebration(status === 'won');
 	const lv = useLevels(gameId, billardLevels);
@@ -317,7 +330,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const cueStick = makeCueStick();
 		scene.add(cueStick);
 
-		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, contact, placeRing, cueStick };
+		g3Ref.current = { renderer, scene, camera, sun, table3d, ballGroup, ballMeshes: [], aimLine, objLine, cueLine, contact, placeRing, cueStick, fx: makeFx(scene) };
 		return true;
 	}, []);
 
@@ -339,6 +352,34 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			g.ballGroup.add(mesh);
 			return mesh;
 		});
+		g.fx.resetTrails(); // indices (and colours) change with the rack
+	}, []);
+
+	/** Turn one engine impact into drama: sparks + ring, camera shake, and — for the hardest
+	    hits only, throttled — a few frozen frames. All of it render-side. */
+	const onImpact = useCallback((im: Impact, now: number) => {
+		const g = g3Ref.current, t = tableRef.current;
+		if (!g) return;
+		const x = im.x - t.w / 2, z = im.y - t.h / 2;
+		if (im.kind === 'ball' && im.speed > maxImpactRef.current) maxImpactRef.current = im.speed;
+		if (im.kind === 'ball') {
+			if (im.speed < 18) return; // grazes stay quiet
+			g.fx.burst(x, z, im.speed);
+			if (im.speed > 45) g.fx.ring(x, z, 0xffffff);
+			shakeRef.current = Math.min(SHAKE_MAX, shakeRef.current + im.speed * 0.012);
+			if (im.speed > HITSTOP_SPEED && now >= hitStopCoolRef.current) {
+				hitStopRef.current = Math.min(90, 30 + im.speed * 0.3);
+				hitStopCoolRef.current = now + HITSTOP_COOLDOWN;
+			}
+		} else if (im.kind === 'rail') {
+			if (im.speed < 32) return;
+			g.fx.burst(x, z, im.speed * 0.55);
+			shakeRef.current = Math.min(SHAKE_MAX, shakeRef.current + im.speed * 0.0025);
+		} else {
+			g.fx.ring(x, z, 0xffd76a, true); // a pot always celebrates, whatever the entry speed
+			g.fx.burst(x, z, Math.max(50, im.speed));
+			shakeRef.current = Math.min(SHAKE_MAX, shakeRef.current + 0.5);
+		}
 	}, []);
 
 	/* ---------- Camera framing for this canvas ---------- */
@@ -1042,6 +1083,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				const px = p ? p.x + (b.x - p.x) * alpha : b.x;
 				const pz = p ? p.y + (b.y - p.y) * alpha : b.y;
 				mesh.position.set(px - hw, BALL_R, pz - hh);
+				g.fx.trailPoint(i, px - hw, pz - hh, sp,
+					b.kind === 'cue' ? CUE_COLOR : eightBallRef.current ? ball8Hue(b.color) : BALL_COLORS[b.color] ?? 0xffffff);
 				continue;
 			}
 			const sink = sinksRef.current.find((s) => s.idx === i);
@@ -1203,7 +1246,15 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		smoothDampV3(cs.look, camLook, cs.velLook, camTauRef.current, dt);
 		g.camera.position.copy(cs.eye);
 		g.camera.lookAt(cs.look);
+		if (shakeRef.current > 0.02) { // impact shake: raw jitter on top of the smoothing, decaying fast
+			const a = shakeRef.current;
+			g.camera.position.x += (Math.random() * 2 - 1) * a;
+			g.camera.position.y += (Math.random() * 2 - 1) * a * 0.5;
+			g.camera.position.z += (Math.random() * 2 - 1) * a;
+			shakeRef.current = a * Math.exp(-dt / SHAKE_TAU);
+		} else shakeRef.current = 0;
 
+		g.fx.update(dt);
 		g.renderer.render(g.scene, g.camera);
 	}, []);
 
@@ -1216,8 +1267,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 
 		const frame = (now: number) => {
 			if (!lastRef.current) lastRef.current = now;
-			const dt = Math.min(now - lastRef.current, 200);
+			let dt = Math.min(now - lastRef.current, 200);
 			lastRef.current = now;
+			// Hit-stop: a hard contact freezes the SIMULATION clock for a few frames (the camera and
+			// FX keep breathing on real time). The engine itself never skips or scales a step, so
+			// lockstep peers still compute the exact same shot.
+			if (hitStopRef.current > 0) { hitStopRef.current -= dt; dt = 0; }
 			// Cue-strike swing: optional AI practice strokes, then thrust; release the ball at contact.
 			const strike = strikeRef.current;
 			if (strike) {
@@ -1240,7 +1295,10 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					const bs = ballsRef.current, pp = prevPosRef.current;
 					if (pp.length !== bs.length) prevPosRef.current = bs.map((b) => ({ x: b.x, y: b.y }));
 					else for (let i = 0; i < bs.length; i++) { pp[i].x = bs[i].x; pp[i].y = bs[i].y; }
-					const r = stepBalls(ballsRef.current, t, STEP / 1000);
+					const imps = impactsRef.current;
+					imps.length = 0;
+					const r = stepBalls(ballsRef.current, t, STEP / 1000, imps);
+					for (const im of imps) onImpact(im, now);
 					if (eightBallRef.current) { // accumulate the shot for the 8-ball rules
 						const acc = shotAccRef.current;
 						if (r.firstHit !== null && !acc.contactSeen) { acc.contactSeen = true; acc.firstHitNumber = r.firstHit; }
@@ -1304,6 +1362,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			placing: placingRef.current,
 			remoteAim: remoteAimRef.current,
 			stickVisible: !!g3Ref.current?.cueStick.visible,
+			fx: g3Ref.current ? { ...g3Ref.current.fx.stats(), maxImpact: maxImpactRef.current } : null,
 			frame: (() => { // how the balls sit in the frame — the smoke test samples this while they roll
 				const g = g3Ref.current, t = tableRef.current;
 				if (!g) return { out: 0, edge: 0, movingOut: 0, movingEdge: 0 };

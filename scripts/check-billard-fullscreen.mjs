@@ -66,6 +66,12 @@ check(s?.moving === 0, `aucune boule ne garde de vitesse apres le tir (${s?.movi
 check(movOut === 0, `aucune boule en mouvement ne sort du cadre (bord max ${movEdge.toFixed(2)})`);
 check(edge < 2, `la table reste lisible pendant le roulement (bord max ${edge.toFixed(2)})`);
 
+// Impact FX: the break must have spawned sparks and laid trail points (cumulative counters,
+// so no frame-rate luck).
+console.log('fx:', s?.fx);
+check(s?.fx?.bornSparks > 10, `le break fait jaillir des etincelles (${s?.fx?.bornSparks} emises)`);
+check(s?.fx?.bornTrailPts > 8, `les boules laissent des trainees (${s?.fx?.bornTrailPts} points)`);
+
 // The hand-over card: it shows the moment the turn changes.
 let sawCard = false, cardText = '';
 for (let i = 0; i < 60; i++) {
@@ -81,6 +87,15 @@ console.log('carte:', cardText);
 check(sawCard, 'la carte de changement de joueur apparait');
 for (let i = 0; i < 40; i++) { if (!(await page.locator('.bi-turnflash').count())) break; await sleep(200); }
 check((await page.locator('.bi-turnflash').count()) === 0, 'la carte disparait toute seule');
+
+// Nothing may keep glowing forever: wait for a quiet moment (the AI may shoot again in between).
+let calm = false;
+for (let i = 0; i < 50 && !calm; i++) {
+	await sleep(300);
+	const c = await snap();
+	calm = !c.rolling && c.fx.sparks === 0 && c.fx.trailPts === 0;
+}
+check(calm, 'les FX se resorbent une fois la table immobile');
 
 console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');
 await browser.close();

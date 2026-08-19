@@ -173,13 +173,13 @@ const inMouthX = (x: number, w: number) => x < MOUTH || x > w - MOUTH || Math.ab
 
 /** Reflect off the cushions; returns true if a cushion actually bounced the ball (for the
  *  8-ball "a ball must reach a rail" rule — the caller gates it on contact). */
-function reflectWalls(b: Ball, t: Table): boolean {
+function reflectWalls(b: Ball, t: Table, impacts?: Impact[]): boolean {
 	const r = b.r;
 	let bounced = false;
-	if (b.x < r && b.vx < 0 && !inMouthY(b.y, t.h)) { b.x = r; b.vx = -b.vx * CUSHION_REST; bounced = true; }
-	else if (b.x > t.w - r && b.vx > 0 && !inMouthY(b.y, t.h)) { b.x = t.w - r; b.vx = -b.vx * CUSHION_REST; bounced = true; }
-	if (b.y < r && b.vy < 0 && !inMouthX(b.x, t.w)) { b.y = r; b.vy = -b.vy * CUSHION_REST; bounced = true; }
-	else if (b.y > t.h - r && b.vy > 0 && !inMouthX(b.x, t.w)) { b.y = t.h - r; b.vy = -b.vy * CUSHION_REST; bounced = true; }
+	if (b.x < r && b.vx < 0 && !inMouthY(b.y, t.h)) { impacts?.push({ kind: 'rail', x: r, y: b.y, speed: -b.vx }); b.x = r; b.vx = -b.vx * CUSHION_REST; bounced = true; }
+	else if (b.x > t.w - r && b.vx > 0 && !inMouthY(b.y, t.h)) { impacts?.push({ kind: 'rail', x: t.w - r, y: b.y, speed: b.vx }); b.x = t.w - r; b.vx = -b.vx * CUSHION_REST; bounced = true; }
+	if (b.y < r && b.vy < 0 && !inMouthX(b.x, t.w)) { impacts?.push({ kind: 'rail', x: b.x, y: r, speed: -b.vy }); b.y = r; b.vy = -b.vy * CUSHION_REST; bounced = true; }
+	else if (b.y > t.h - r && b.vy > 0 && !inMouthX(b.x, t.w)) { impacts?.push({ kind: 'rail', x: b.x, y: t.h - r, speed: b.vy }); b.y = t.h - r; b.vy = -b.vy * CUSHION_REST; bounced = true; }
 	// safety: a ball that missed the throat shouldn't escape forever
 	const M = POCKET_R + r;
 	if (b.x < -M) { b.x = -M; b.vx = Math.abs(b.vx) * CUSHION_REST; }
@@ -199,22 +199,31 @@ function clampInside(b: Ball, t: Table): void {
 	if (!inMouthX(b.x, t.w)) { if (b.y < r) b.y = r; else if (b.y > t.h - r) b.y = t.h - r; }
 }
 
-/** Resolve a ball-ball collision; returns true if an impulse was actually applied. */
-function collide(a: Ball, b: Ball): boolean {
+/** Resolve a ball-ball collision; returns the closing speed (0 = no impulse applied). */
+function collide(a: Ball, b: Ball): number {
 	const dx = b.x - a.x, dy = b.y - a.y;
 	const d = len(dx, dy);
 	const min = a.r + b.r;
-	if (d <= 0 || d >= min) return false;
+	if (d <= 0 || d >= min) return 0;
 	const nx = dx / d, ny = dy / d;
 	const overlap = (min - d) / 2;
 	a.x -= nx * overlap; a.y -= ny * overlap;
 	b.x += nx * overlap; b.y += ny * overlap;
 	const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-	if (vn >= 0) return false; // separating
+	if (vn >= 0) return 0; // separating
 	const imp = (-(1 + BALL_REST) * vn) / 2; // equal masses
 	a.vx -= imp * nx; a.vy -= imp * ny;
 	b.vx += imp * nx; b.vy += imp * ny;
-	return true;
+	return -vn;
+}
+
+/** A contact the render layer may want to dramatise. Purely observational: reporting them
+ *  changes nothing in the simulation, so lockstep peers stay bit-identical. */
+export interface Impact {
+	kind: 'ball' | 'rail' | 'pocket';
+	x: number;
+	y: number;
+	speed: number; // closing / entry speed (units/s)
 }
 
 export interface StepResult {
@@ -226,8 +235,9 @@ export interface StepResult {
 	railHit: boolean; // did any ball bounce off a cushion this call (unconditional)
 }
 
-/** Advance the simulation by `dt` seconds (sub-stepped to avoid tunnelling). */
-export function stepBalls(balls: Ball[], table: Table, dt: number): StepResult {
+/** Advance the simulation by `dt` seconds (sub-stepped to avoid tunnelling).
+ *  `impacts` (optional out-array) collects every contact for FX — free when omitted. */
+export function stepBalls(balls: Ball[], table: Table, dt: number, impacts?: Impact[]): StepResult {
 	const pottedColors: number[] = [];
 	let scratched = false;
 	let firstHit: number | null = null;
@@ -243,16 +253,21 @@ export function stepBalls(balls: Ball[], table: Table, dt: number): StepResult {
 			if (b.potted) continue;
 			b.x += b.vx * h;
 			b.y += b.vy * h;
-			if (reflectWalls(b, table)) railHit = true;
+			if (reflectWalls(b, table, impacts)) railHit = true;
 		}
 		for (let i = 0; i < active.length; i++)
-			for (let j = i + 1; j < active.length; j++)
-				if (!active[i].potted && !active[j].potted && collide(active[i], active[j]) && firstHit === null) {
+			for (let j = i + 1; j < active.length; j++) {
+				const a = active[i], b = active[j];
+				if (a.potted || b.potted) continue;
+				const sp = collide(a, b);
+				if (sp <= 0) continue;
+				impacts?.push({ kind: 'ball', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, speed: sp });
+				if (firstHit === null) {
 					// Record the first object ball the CUE touches (for the "hit own group first" rule).
-					const a = active[i], b = active[j];
 					if (a.kind === 'cue' && b.kind === 'color') firstHit = b.color;
 					else if (b.kind === 'cue' && a.kind === 'color') firstHit = a.color;
 				}
+			}
 		// Undo any rail penetration a collision just caused, so no ball ends the step embedded.
 		for (const b of active) if (!b.potted) clampInside(b, table);
 		for (const b of active) {
@@ -269,6 +284,7 @@ export function stepBalls(balls: Ball[], table: Table, dt: number): StepResult {
 			for (const p of table.pockets) {
 				// drop once the ball is ~half into the mouth (centre within r + half a ball)
 				if (len(b.x - p.x, b.y - p.y) < p.r + b.r * 0.5) {
+					impacts?.push({ kind: 'pocket', x: p.anchor.x, y: p.anchor.y, speed: len(b.vx, b.vy) });
 					b.potted = true; b.vx = 0; b.vy = 0;
 					if (b.kind === 'cue') scratched = true;
 					else pottedColors.push(b.color);

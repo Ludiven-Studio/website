@@ -65,6 +65,7 @@ const BALL8_COLORS: Record<number, number> = {
 	1: 0xf6c026, 2: 0x1f5fd6, 3: 0xd8352a, 4: 0x7a3fa0, 5: 0xef7d1a, 6: 0x1f8a4c, 7: 0x7a2432, 8: 0x18181a,
 };
 const hueOf = (n: number): number => (n <= 8 ? BALL8_COLORS[n] : BALL8_COLORS[n - 8]);
+export const ball8Hue = hueOf; // for the FX layer (trail colours)
 
 /** Canvas texture for one pool ball (solid / stripe / 8 / cue), mapped onto the sphere. */
 export function makeBallTexture(number: number): THREE.CanvasTexture {
@@ -262,6 +263,212 @@ export function buildTable3D(table: Table): Table3D {
 			for (const d of disposables) d.dispose();
 			feltMat.dispose();
 			floorMat.dispose();
+		},
+	};
+}
+
+/* ---------- Impact FX: sparks, shock rings, motion trails (render-only) ----------
+   Fed by the engine's Impact events + per-frame ball positions. Everything is pooled and
+   additive-blended (no postprocessing), so it stays cheap on mobile. */
+
+const SPARK_MAX = 240;
+const SPARK_LIFE = 0.45; // s
+const SPARK_GRAV = 130;
+const RING_MAX = 8;
+const RING_LIFE = 0.34; // s
+const TRAIL_PTS = 12; // stored points per ball trail
+const TRAIL_DIST = 2.4; // engine units between stored points
+const TRAIL_W = BALL_R * 0.8; // ribbon half-width at the head
+const TRAIL_MIN_SPEED = 12; // below this the trail retracts instead of growing
+const TRAIL_JUMP = 25; // min gap treated as a teleport (scratch respot) — restart, don't streak
+
+interface TrailState {
+	mesh: THREE.Mesh;
+	geo: THREE.BufferGeometry;
+	pts: { x: number; z: number }[]; // immutable anchors, one every TRAIL_DIST of travel
+	head: { x: number; z: number } | null; // live ball position — the ribbon's tip, never an anchor
+	color: THREE.Color;
+	fed: boolean; // the ball moved this frame — a fed trail never drains (the point cap trims it)
+	drain: number; // s until the tail loses its next point (once the ball slows down)
+}
+
+export interface Fx {
+	burst(x: number, z: number, speed: number): void; // sparks proportional to the hit
+	ring(x: number, z: number, color: number, big?: boolean): void; // shockwave on the cloth
+	trailPoint(i: number, x: number, z: number, speed: number, color: number): void;
+	resetTrails(): void;
+	update(dt: number): void;
+	stats(): { sparks: number; rings: number; trailPts: number; bornSparks: number; bornRings: number; bornTrailPts: number; trailResets: number }; // for the smoke tests
+	dispose(): void;
+}
+
+export function makeFx(scene: THREE.Scene): Fx {
+	// Sparks: one Points cloud; a particle fades by darkening its vertex colour (additive → black = gone).
+	const sPos = new Float32Array(SPARK_MAX * 3);
+	const sCol = new Float32Array(SPARK_MAX * 3);
+	const sVel = new Float32Array(SPARK_MAX * 3);
+	const sLife = new Float32Array(SPARK_MAX);
+	sPos.fill(-999);
+	const sGeo = new THREE.BufferGeometry();
+	sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+	sGeo.setAttribute('color', new THREE.BufferAttribute(sCol, 3));
+	const sparks = new THREE.Points(sGeo, new THREE.PointsMaterial({
+		size: 1.7, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+	}));
+	sparks.frustumCulled = false;
+	sparks.renderOrder = 14;
+	scene.add(sparks);
+	let sNext = 0;
+
+	// Shock rings: a small pool of flat rings that expand and fade on the cloth.
+	const rings: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; age: number; big: boolean }[] = [];
+	const ringGeo = new THREE.RingGeometry(0.82, 1, 28);
+	for (let i = 0; i < RING_MAX; i++) {
+		const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+		const mesh = new THREE.Mesh(ringGeo, mat);
+		mesh.rotation.x = -Math.PI / 2;
+		mesh.visible = false;
+		mesh.renderOrder = 7;
+		scene.add(mesh);
+		rings.push({ mesh, mat, age: Infinity, big: false });
+	}
+	let rNext = 0;
+	let sBorn = 0, rBorn = 0, tBorn = 0, tResets = 0; // lifetime spawn totals — pooled live counts are too easy to miss between frames
+
+	// Trails: one tapered ribbon per ball, rebuilt from its recent path each frame.
+	const trails = new Map<number, TrailState>();
+	const trailMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+	const trailIndex: number[] = [];
+	for (let k = 0; k < TRAIL_PTS; k++) trailIndex.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2); // TRAIL_PTS anchors + the head
+	const makeTrail = (color: number): TrailState => {
+		const geo = new THREE.BufferGeometry();
+		geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((TRAIL_PTS + 1) * 2 * 3), 3));
+		geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array((TRAIL_PTS + 1) * 2 * 3), 3));
+		geo.setIndex(trailIndex);
+		geo.setDrawRange(0, 0);
+		const mesh = new THREE.Mesh(geo, trailMat);
+		mesh.frustumCulled = false;
+		mesh.renderOrder = 6;
+		scene.add(mesh);
+		// Lightened so dark balls (the 8!) still leave a visible additive streak.
+		return { mesh, geo, pts: [], head: null, color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.3), fed: false, drain: 0 };
+	};
+	const rebuildTrail = (tr: TrailState) => {
+		const n = tr.pts.length + (tr.head ? 1 : 0);
+		if (n < 2) { tr.geo.setDrawRange(0, 0); return; }
+		const at = (k: number) => (k < tr.pts.length ? tr.pts[k] : tr.head!);
+		const pos = tr.geo.attributes.position as THREE.BufferAttribute;
+		const col = tr.geo.attributes.color as THREE.BufferAttribute;
+		for (let k = 0; k < n; k++) {
+			const p = at(k);
+			const q = k < n - 1 ? at(k + 1) : at(k - 1);
+			let dx = q.x - p.x, dz = q.z - p.z;
+			const dl = Math.hypot(dx, dz) || 1;
+			dx /= dl; dz /= dl;
+			const w = TRAIL_W * (k / (n - 1)); // tapers from nothing (tail) to full width (head)
+			pos.setXYZ(k * 2, p.x - dz * w, 0.22, p.z + dx * w);
+			pos.setXYZ(k * 2 + 1, p.x + dz * w, 0.22, p.z - dx * w);
+			const f = 0.5 * (k / (n - 1)) ** 1.6;
+			col.setXYZ(k * 2, tr.color.r * f, tr.color.g * f, tr.color.b * f);
+			col.setXYZ(k * 2 + 1, tr.color.r * f, tr.color.g * f, tr.color.b * f);
+		}
+		pos.needsUpdate = true;
+		col.needsUpdate = true;
+		tr.geo.setDrawRange(0, (n - 1) * 6);
+	};
+
+	return {
+		burst(x, z, speed) {
+			const count = Math.min(20, 5 + Math.floor(speed / 12));
+			sBorn += count;
+			for (let c = 0; c < count; c++) {
+				const i = sNext; sNext = (sNext + 1) % SPARK_MAX;
+				const a = Math.random() * Math.PI * 2;
+				const up = 12 + Math.random() * (18 + speed * 0.25);
+				const out = (4 + Math.random() * 14) * (0.5 + speed / 160);
+				sPos[i * 3] = x; sPos[i * 3 + 1] = BALL_R * 0.9; sPos[i * 3 + 2] = z;
+				sVel[i * 3] = Math.cos(a) * out; sVel[i * 3 + 1] = up; sVel[i * 3 + 2] = Math.sin(a) * out;
+				sLife[i] = SPARK_LIFE * (0.6 + Math.random() * 0.4);
+			}
+		},
+		ring(x, z, color, big) {
+			const r = rings[rNext]; rNext = (rNext + 1) % RING_MAX;
+			rBorn++;
+			r.age = 0; r.big = !!big;
+			r.mat.color.set(color);
+			r.mesh.position.set(x, 0.25, z);
+			r.mesh.visible = true;
+		},
+		trailPoint(i, x, z, speed, color) {
+			let tr = trails.get(i);
+			if (!tr) { tr = makeTrail(color); trails.set(i, tr); }
+			if (speed <= TRAIL_MIN_SPEED) return; // update() drains it
+			tr.fed = true;
+			if (!tr.head || !tr.pts.length) { tr.pts.length = 0; tr.pts.push({ x, z }); tr.head = { x, z }; tBorn++; return; }
+			// Anchors never move: distance from the last one accumulates until a new one drops.
+			const last = tr.pts[tr.pts.length - 1];
+			const gx = x - last.x, gz = z - last.z, gap = Math.hypot(gx, gz);
+			// One slow frame moves a fast ball far — a gap only counts as a teleport when it outruns
+			// half a second of travel (true teleports happen at rest, so this stays safe).
+			if (gap > Math.max(TRAIL_JUMP, speed * 0.5)) { tr.pts.length = 0; tr.pts.push({ x, z }); tr.head = { x, z }; tResets++; return; }
+			// Lay anchors along the whole travel: the trail length must not depend on the frame rate.
+			const steps = Math.floor(gap / TRAIL_DIST);
+			for (let k = 1; k <= steps; k++) tr.pts.push({ x: last.x + (gx * k * TRAIL_DIST) / gap, z: last.z + (gz * k * TRAIL_DIST) / gap });
+			tBorn += steps;
+			if (tr.pts.length > TRAIL_PTS) tr.pts.splice(0, tr.pts.length - TRAIL_PTS);
+			tr.head.x = x; tr.head.z = z;
+		},
+		resetTrails() {
+			for (const tr of trails.values()) { scene.remove(tr.mesh); tr.geo.dispose(); }
+			trails.clear();
+		},
+		update(dt) {
+			for (let i = 0; i < SPARK_MAX; i++) {
+				if (sLife[i] <= 0) continue;
+				sLife[i] -= dt;
+				if (sLife[i] <= 0 || sPos[i * 3 + 1] < 0.1) { sLife[i] = 0; sPos[i * 3 + 1] = -999; sCol[i * 3] = sCol[i * 3 + 1] = sCol[i * 3 + 2] = 0; continue; }
+				sVel[i * 3 + 1] -= SPARK_GRAV * dt;
+				sPos[i * 3] += sVel[i * 3] * dt;
+				sPos[i * 3 + 1] += sVel[i * 3 + 1] * dt;
+				sPos[i * 3 + 2] += sVel[i * 3 + 2] * dt;
+				const f = Math.max(0, sLife[i] / SPARK_LIFE);
+				sCol[i * 3] = f; sCol[i * 3 + 1] = f * 0.92; sCol[i * 3 + 2] = f * 0.7; // warm white → dark
+			}
+			(sGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+			(sGeo.attributes.color as THREE.BufferAttribute).needsUpdate = true;
+			for (const r of rings) {
+				if (r.age >= RING_LIFE) { r.mesh.visible = false; continue; }
+				r.age += dt;
+				const e = Math.min(1, r.age / RING_LIFE);
+				const s = (r.big ? 3.5 : 2) + e * (r.big ? 26 : 15);
+				r.mesh.scale.set(s, s, s);
+				r.mat.opacity = 0.75 * (1 - e) ** 1.4;
+			}
+			for (const tr of trails.values()) {
+				if (tr.fed) { tr.fed = false; tr.drain = 0.045; }
+				else if (tr.pts.length) {
+					tr.drain -= dt;
+					// The tail burns down once the ball rests; the head goes with the last anchor.
+					if (tr.drain <= 0) { tr.pts.shift(); tr.drain = 0.045; if (!tr.pts.length) tr.head = null; }
+				}
+				rebuildTrail(tr);
+			}
+		},
+		stats() {
+			let sparksAlive = 0, ringsAlive = 0, trailPts = 0;
+			for (let i = 0; i < SPARK_MAX; i++) if (sLife[i] > 0) sparksAlive++;
+			for (const r of rings) if (r.mesh.visible) ringsAlive++;
+			for (const tr of trails.values()) trailPts += tr.pts.length;
+			return { sparks: sparksAlive, rings: ringsAlive, trailPts, bornSparks: sBorn, bornRings: rBorn, bornTrailPts: tBorn, trailResets: tResets };
+		},
+		dispose() {
+			this.resetTrails();
+			scene.remove(sparks);
+			sGeo.dispose();
+			(sparks.material as THREE.Material).dispose();
+			for (const r of rings) { scene.remove(r.mesh); r.mat.dispose(); }
+			ringGeo.dispose();
+			trailMat.dispose();
 		},
 	};
 }
