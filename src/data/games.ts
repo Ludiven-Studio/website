@@ -153,6 +153,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'lumen',
+		title: 'Lumen',
+		pitch: 'Guide la lumière avec miroirs et prismes : le blanc se sépare en rouge, vert et bleu, les rayons se mélangent, et chaque capteur exige exactement sa couleur. Défi du jour à graine partagée.',
+		icon: 'lumen',
+		href: '/jeux/lumen',
+		status: 'play',
+	},
+	{
 		id: 'cordes',
 		title: 'Cordes',
 		pitch: 'Relie chaque piquet à son jumeau d\'un trait à main levée, sans croiser une autre corde ni sortir du cadre. Défi du jour à graine partagée.',

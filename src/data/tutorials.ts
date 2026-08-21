@@ -130,6 +130,13 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '⛓️', title: 'La chute', body: 'Tout ce qui n\'est plus rattaché au plafond tombe aussi. Viser le bon point d\'accroche fait donc bien plus de dégâts que viser le gros paquet.' },
 		{ emoji: '💡', title: 'Astuce', body: 'Les murs font rebondir la bulle : c\'est souvent le seul moyen d\'atteindre un côté. Chaque tableau a un « par » prouvé par le solveur — les 3 étoiles se jouent à un tir près. Indice montre le meilleur tir.' },
 	],
+	lumen: [
+		{ emoji: '💡', title: 'Le but', body: 'Des sources émettent de la lumière blanche. Guide-la avec tes miroirs et tes prismes pour que CHAQUE capteur reçoive exactement sa couleur — celle de son anneau.' },
+		{ emoji: '🎯', title: 'Exactement', body: 'Exactement, c\'est strict : du blanc sur un capteur rouge, c\'est raté. Un capteur allumé de la mauvaise couleur affiche ✕ ; à la bonne couleur, ✓.' },
+		{ emoji: '🌈', title: 'Les couleurs', body: 'Le prisme sépare le blanc : le vert continue tout droit, le rouge part à gauche, le bleu à droite. Deux rayons sur un même capteur se mélangent : rouge + vert = jaune, rouge + bleu = magenta, vert + bleu = cyan, les trois = blanc.' },
+		{ emoji: '👆', title: 'Comment jouer', body: 'Glisse une pièce de la réserve vers une case libre. Touche une pièce posée pour la faire pivoter (clic droit : sens inverse), ressors-la de la grille pour la remettre en réserve. Le prisme n\'accepte la lumière que par sa face plate.' },
+		{ emoji: '🏆', title: 'Indice & défi', body: 'Le bouton Indice répare d\'abord une pièce mal placée, puis pose la suivante. Au défi du jour, même grille pour tout le monde : le plus rapide gagne.' },
+	],
 	cordes: [
 		{ emoji: '🪢', title: 'Le but', body: 'Chaque piquet a un jumeau de la même couleur. Relie-les tous d\'un trait, sans qu\'aucune corde n\'en croise une autre ni ne sorte du cadre.' },
 		{ emoji: '👆', title: 'Comment jouer', body: 'Pose ton doigt sur un piquet et glisse jusqu\'à son jumeau : la corde te suit. Reviens en arrière sur ton tracé pour l\'effacer, touche une corde posée pour la retirer.' },

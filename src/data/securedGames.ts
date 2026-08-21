@@ -45,6 +45,7 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	chemin: 'time',
 	circuit: 'time',
 	cordes: 'time',
+	lumen: 'time',
 	fruits: 'time',
 	tente: 'time',
 	bataille: 'time',

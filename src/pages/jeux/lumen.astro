@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import LumenGame from '../../games/lumen/LumenGame.tsx';
+---
+
+<GamePage
+	title="Lumen | Jeux Ludiven Studio"
+	description="Lumen : guide des rayons de lumière avec des miroirs et des prismes. Le blanc se sépare en rouge, vert et bleu, les rayons se mélangent, et chaque capteur exige exactement sa couleur. 100 niveaux et un défi du jour. Un jeu de logique signé Ludiven Studio."
+	heading="Lumen"
+	tagline="Guide la lumière : miroirs, prismes et capteurs de couleur"
+	gameId="lumen"
+>
+	<LumenGame client:only="react" gameId="lumen" />
+</GamePage>
