@@ -43,7 +43,7 @@ async function fresh(label) {
 	await sleep(400);
 }
 
-/* Cell centres in page px + which cells hold a piece (from the SVG transforms). */
+/* Cell centres in page px, occupied cells, and the highlighted (movable) cells. */
 async function boardInfo() {
 	return page.evaluate(() => {
 		const board = document.querySelector('.lum-board');
@@ -55,8 +55,13 @@ async function boardInfo() {
 			const m = /translate\((\d+) (\d+)\)/.exec(g.getAttribute('transform'));
 			if (m) occ.add((+m[2] / 100) * n + (+m[1] / 100));
 		});
+		const manip = [...svg.querySelectorAll('rect.lum-manip')].map((r) => {
+			const col = (Number(r.getAttribute('x')) - 7) / 100;
+			const row = (Number(r.getAttribute('y')) - 7) / 100;
+			return row * n + col;
+		});
 		const cell = rect.width / n;
-		return { n, occ: [...occ], left: rect.left, top: rect.top, cell };
+		return { n, occ: [...occ], manip, left: rect.left, top: rect.top, cell };
 	});
 }
 
@@ -95,23 +100,16 @@ console.log('--- facile, fresh ---', await gauge(), '· beam lines:', await beam
 console.log('tray slots:', await page.locator('.lum-slot').count());
 await shot('1-facile-fresh');
 
-/* The tray sits below the fold at 520x980: scroll it in or the touch lands on <html>
-   (browser steals the gesture as a scroll -> pointercancel) and coordinates go stale. */
-async function trayInView() {
-	await page.locator('.lum-tray').scrollIntoViewIfNeeded();
-	await sleep(250);
-}
-
-/* ---- 2. Mouse drag a tray piece onto a free cell. ---- */
+/* ---- 2. Mouse drag a highlighted (scattered) piece onto a free cell. ---- */
 {
-	await trayInView();
 	const info = await boardInfo();
+	console.log('highlighted pieces:', info.manip.length);
 	const freeIdx = Array.from({ length: info.n * info.n }, (_, i) => i).find((i) => !info.occ.includes(i));
-	const slot = await page.locator('.lum-slot:not(.dimmed)').first().boundingBox();
-	await mouseDrag({ x: slot.x + slot.width / 2, y: slot.y + slot.height / 2 }, cellCenter(info, freeIdx));
+	await mouseDrag(cellCenter(info, info.manip[0]), cellCenter(info, freeIdx));
 	await sleep(200);
-	console.log('after mouse drag → dimmed slots:', await page.locator('.lum-slot.dimmed').count());
-	/* Tap the placed piece: it must rotate (SVG changes), not move. */
+	const after2 = await boardInfo();
+	console.log('after mouse drag → piece moved:', after2.manip.includes(freeIdx) ? 'yes' : 'NO');
+	/* Tap the moved piece: it must rotate (SVG changes), not move. */
 	const before = await page.evaluate(() => document.querySelector('.lum-svg').innerHTML);
 	const c = cellCenter(info, freeIdx);
 	await page.mouse.click(c.x, c.y);
@@ -121,16 +119,15 @@ async function trayInView() {
 	await shot('2-dragged');
 }
 
-/* ---- 3. Touch drag proof (fresh grid so the tray is full). ---- */
+/* ---- 3. Touch drag proof (fresh grid, fresh scatter). ---- */
 await fresh();
 {
-	await trayInView();
 	const info = await boardInfo();
 	const freeIdx = Array.from({ length: info.n * info.n }, (_, i) => i).find((i) => !info.occ.includes(i));
-	const slot = await page.locator('.lum-slot:not(.dimmed)').first().boundingBox();
-	await touchDrag({ x: slot.x + slot.width / 2, y: slot.y + slot.height / 2 }, cellCenter(info, freeIdx));
+	await touchDrag(cellCenter(info, info.manip[0]), cellCenter(info, freeIdx));
 	await sleep(200);
-	console.log('after TOUCH drag → dimmed slots:', await page.locator('.lum-slot.dimmed').count());
+	const after3 = await boardInfo();
+	console.log('after TOUCH drag → piece moved:', after3.manip.includes(freeIdx) ? 'yes' : 'NO');
 	await shot('3-touch-dragged');
 }
 

@@ -1,6 +1,7 @@
 /**
- * LUMEN — pure engine (no UI). White light leaves the sources, mirrors bend it,
- * prisms split it into R/G/B, and every sensor must end up with EXACTLY its colour.
+ * LUMEN — pure engine (no UI). Light leaves the sources (white or a single colour),
+ * mirrors bend it, prisms split it into R/G/B from any face, and every sensor must
+ * end up with EXACTLY its colour.
  *
  * Colour is a 3-bit mask (1=R, 2=G, 4=B); mixing is a bitwise OR. The engine never
  * names colours — only the UI does. Boards are solvable by construction: the
@@ -19,6 +20,7 @@ export interface Piece {
 	type: PieceType;
 	rot: number;
 	expect?: Mask; // sensors only
+	mask?: Mask; // sources only: emitted colour (default white)
 	fixed: boolean;
 }
 
@@ -32,15 +34,17 @@ export interface DiffLevel {
 	walls: number;
 	/** Fixed decoy mirrors the player cannot touch. */
 	decoys: number;
+	/** Chance a deal colours its sources (needs >= 2 sources to matter). */
+	colored: number;
 }
 
 // A sensor STOPS a ray, so sensors <= sources + 2*prisms; slack under that cap is
 // what allows mixed-colour sensors (a mix eats two rays).
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', size: 5, sources: 2, mirrors: 2, prisms: 0, sensors: 2, walls: 1, decoys: 0 },
-	moyen: { label: 'Moyen', size: 6, sources: 1, mirrors: 3, prisms: 1, sensors: 2, walls: 2, decoys: 0 },
-	difficile: { label: 'Difficile', size: 7, sources: 2, mirrors: 4, prisms: 1, sensors: 3, walls: 3, decoys: 0 },
-	expert: { label: 'Expert', size: 8, sources: 2, mirrors: 5, prisms: 2, sensors: 4, walls: 4, decoys: 2 },
+	facile: { label: 'Facile', size: 5, sources: 2, mirrors: 2, prisms: 0, sensors: 2, walls: 1, decoys: 0, colored: 0.7 },
+	moyen: { label: 'Moyen', size: 6, sources: 1, mirrors: 3, prisms: 1, sensors: 2, walls: 2, decoys: 0, colored: 0.35 },
+	difficile: { label: 'Difficile', size: 7, sources: 2, mirrors: 4, prisms: 1, sensors: 3, walls: 3, decoys: 0, colored: 0.55 },
+	expert: { label: 'Expert', size: 8, sources: 2, mirrors: 5, prisms: 2, sensors: 4, walls: 4, decoys: 2, colored: 0.5 },
 };
 
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
@@ -71,9 +75,14 @@ export interface LumenPuzzle {
 	fixed: { idx: number; piece: Piece }[];
 	tray: TrayPiece[]; // shuffled; rotations are the player's problem
 	solution: SolutionSlot[];
+	start: Placement[]; // scattered opening spots (tray order); empty = start from the tray
 }
 
-export const ROTS: Record<'mirror' | 'prism', number> = { mirror: 2, prism: 4 };
+// Prism: 3 rots = the 3 cyclic colour orders (a 4th would repeat one — forbidden).
+export const ROTS: Record<'mirror' | 'prism', number> = { mirror: 2, prism: 3 };
+
+/** Dir offsets for the prism channels: left of travel, straight, right of travel. */
+const PRISM_BEND = [3, 0, 1] as const;
 
 export const rotCW = (type: 'mirror' | 'prism', rot: number): number => (rot + 1) % ROTS[type];
 
@@ -123,7 +132,7 @@ export function trace(size: number, board: (Piece | null)[]): TraceResult {
 	for (let i = 0; i < board.length; i++) {
 		const p = board[i];
 		if (p?.type === 'source')
-			rays.push({ r: Math.floor(i / size), c: i % size, d: p.rot as Dir, mask: 7 });
+			rays.push({ r: Math.floor(i / size), c: i % size, d: p.rot as Dir, mask: p.mask ?? 7 });
 	}
 
 	while (rays.length > 0) {
@@ -149,13 +158,14 @@ export function trace(size: number, board: (Piece | null)[]): TraceResult {
 				sensorMask.set(idx, (sensorMask.get(idx) ?? 0) | mask);
 			} else if (p.type === 'mirror') {
 				rays.push({ r, c, d: MIRROR[p.rot % 2][d], mask });
-			} else if (p.type === 'prism' && d === (p.rot + 2) % 4) {
-				// Accepted through the input face: G straight, R left, B right.
-				if (mask & 2) rays.push({ r, c, d, mask: 2 });
-				if (mask & 1) rays.push({ r, c, d: ((d + 3) % 4) as Dir, mask: 1 });
-				if (mask & 4) rays.push({ r, c, d: ((d + 1) % 4) as Dir, mask: 4 });
+			} else if (p.type === 'prism') {
+				// Every face refracts; rot cycles which channel bends left / straight / right
+				// (rot 0: R left, G straight, B right).
+				for (let ch = 0; ch < 3; ch++)
+					if (mask & (1 << ch))
+						rays.push({ r, c, d: ((d + PRISM_BEND[(ch + p.rot) % 3]) % 4) as Dir, mask: 1 << ch });
 			}
-			break; // wall / source / wrong prism face absorb; the rest re-emitted above
+			break; // wall / source absorb; the rest re-emitted above
 		}
 		if (endR !== startR || endC !== startC)
 			segments.push({ r0: startR, c0: startC, r1: endR, c1: endC, mask });
@@ -202,12 +212,34 @@ export function generateLumen(diff: DiffLevel, rng: Rng = Math.random): LumenPuz
 		const j = Math.floor(rng() * (i + 1));
 		[order[i], order[j]] = [order[j], order[i]];
 	}
-	return {
+	const puzzle: LumenPuzzle = {
 		size,
 		fixed: hardPass.fixed,
 		tray: order.map((s, id) => ({ id, type: s.type })),
 		solution: hardPass.pieces,
+		start: [],
 	};
+
+	// Pieces open scattered IN the scene, badly placed: never on a solution cell (a
+	// lucky drop would leak the answer) and never an already-won board.
+	const blocked = new Set<number>();
+	for (const f of hardPass.fixed) blocked.add(f.idx);
+	for (const s of hardPass.pieces) blocked.add(s.idx);
+	for (let tries = 0; tries < 20; tries++) {
+		const taken = new Set(blocked);
+		const start = order.map((s) => {
+			const cells: number[] = [];
+			for (let i = 0; i < size * size; i++) if (!taken.has(i)) cells.push(i);
+			const idx = cells[Math.floor(rng() * cells.length)];
+			taken.add(idx);
+			return { idx, rot: Math.floor(rng() * ROTS[s.type]) };
+		});
+		if (!isSolved({ ...puzzle, start }, start)) {
+			puzzle.start = start;
+			break;
+		}
+	}
+	return puzzle;
 }
 
 /** One construction attempt; null when a hard gate fails. */
@@ -221,6 +253,10 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 	const pick = (cells: number[]): number => cells[Math.floor(rng() * cells.length)];
 
 	// Sources: at least 2 cells of runway so the first beam exists on the board.
+	// A coloured deal gives each source a distinct primary: beams become tellable
+	// apart, and two of them can mix on a sensor without any prism.
+	const primaries = [1, 2, 4];
+	const colourDeal = diff.sources >= 2 && rng() < diff.colored;
 	for (let s = 0; s < diff.sources; s++) {
 		let ok = false;
 		for (let t = 0; t < 40 && !ok; t++) {
@@ -232,7 +268,10 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 				if (rr >= 0 && rr < size && cc >= 0 && cc < size) dirs.push(d as Dir);
 			}
 			if (dirs.length === 0) continue;
-			board[idx] = { type: 'source', rot: dirs[Math.floor(rng() * dirs.length)], fixed: true };
+			const mask = colourDeal && primaries.length > 0
+				? primaries.splice(Math.floor(rng() * primaries.length), 1)[0]
+				: 7;
+			board[idx] = { type: 'source', rot: dirs[Math.floor(rng() * dirs.length)], mask, fixed: true };
 			ok = true;
 		}
 		if (!ok) return null;
@@ -289,10 +328,7 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 			const keys = [...cells.keys()];
 			if (keys.length === 0) return false;
 			const idx = keys[Math.floor(rng() * keys.length)];
-			const dirs = cells.get(idx) as Dir[];
-			const d = dirs[Math.floor(rng() * dirs.length)];
-			// Prism: input face toward the incoming beam, or it would just absorb it.
-			const rot = type === 'mirror' ? Math.floor(rng() * 2) : (d + 2) % 4;
+			const rot = Math.floor(rng() * ROTS[type]);
 			board[idx] = { type, rot, fixed: false };
 			// A piece dropped upstream of a placed prism starves it: undo and retry.
 			if (prismsAlive()) { pieces.push({ idx, type, rot }); return true; }
@@ -387,7 +423,7 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 	}
 
 	// Hard gate: doing nothing must never win.
-	const puzzleLike: LumenPuzzle = { size, fixed, tray: [], solution: [] };
+	const puzzleLike: LumenPuzzle = { size, fixed, tray: [], solution: [], start: [] };
 	const bare = new Array<Piece | null>(size * size).fill(null);
 	for (const f of fixed) bare[f.idx] = f.piece;
 	const bareTrace = trace(size, bare);

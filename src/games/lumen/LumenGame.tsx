@@ -40,8 +40,9 @@ import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    LUMEN — React island.
-   Drag mirrors and prisms from the tray onto the grid; white light splits into
-   R/G/B and every sensor must receive EXACTLY its colour (additive mixing).
+   Drag mirrors and prisms from the tray onto the grid; light (white or a single
+   colour) splits into R/G/B and every sensor must receive EXACTLY its colour
+   (additive mixing).
    Engine is pure/tested; the construction ships as `solution` for the hints.
    ===================================================== */
 
@@ -79,14 +80,19 @@ interface SavedState {
 	placements: (Placement | null)[];
 }
 
+/* Opening layout: pieces scattered in the scene (or an empty tray when no scatter). */
+const startPlacements = (p: LumenPuzzle): (Placement | null)[] =>
+	p.tray.map((_, i) => (p.start[i] ? { ...p.start[i] } : null));
+
 /* ---------- SVG glyphs (100×100 tile space) ---------- */
 
-function SourceGlyph({ rot }: { rot: number }) {
+function SourceGlyph({ rot, mask }: { rot: number; mask: Mask }) {
+	const col = MASK_COLOR[mask] ?? '#ffffff';
 	return (
 		<g transform={`rotate(${rot * 90} 50 50)`}>
-			<circle cx={50} cy={50} r={26} fill="#0d1428" stroke="#e8ecff" strokeWidth={5} />
-			<polygon points="50,4 36,26 64,26" fill="#ffffff" />
-			<circle cx={50} cy={50} r={9} fill="#ffffff" />
+			<circle cx={50} cy={50} r={26} fill="#0d1428" stroke={col} strokeWidth={5} />
+			<polygon points="50,4 36,26 64,26" fill={col} />
+			<circle cx={50} cy={50} r={9} fill={col} />
 		</g>
 	);
 }
@@ -102,14 +108,15 @@ function MirrorGlyph({ rot, decoy }: { rot: number; decoy?: boolean }) {
 }
 
 function PrismGlyph({ rot }: { rot: number }) {
-	// Flat face = input face (rot 0 → light enters from the top). The three ticks show
-	// where each channel leaves: green straight, red left of travel, blue right.
+	// Any face refracts, so the triangle never turns: the ticks preview an entry from
+	// the top and rot cycles which colour leaves on each side (left / straight / right).
+	const side = (bendIdx: number): string => MASK_COLOR[1 << (((bendIdx - rot) % 3 + 3) % 3)];
 	return (
-		<g transform={`rotate(${rot * 90} 50 50)`}>
+		<g>
 			<polygon points="20,24 80,24 50,82" fill="#1b2340" stroke="#8ea2ff" strokeWidth={5} strokeLinejoin="round" />
-			<line x1={50} y1={62} x2={50} y2={84} stroke={MASK_COLOR[2]} strokeWidth={6} strokeLinecap="round" />
-			<line x1={62} y1={46} x2={84} y2={46} stroke={MASK_COLOR[1]} strokeWidth={6} strokeLinecap="round" />
-			<line x1={38} y1={46} x2={16} y2={46} stroke={MASK_COLOR[4]} strokeWidth={6} strokeLinecap="round" />
+			<line x1={50} y1={62} x2={50} y2={84} stroke={side(1)} strokeWidth={6} strokeLinecap="round" />
+			<line x1={62} y1={46} x2={84} y2={46} stroke={side(0)} strokeWidth={6} strokeLinecap="round" />
+			<line x1={38} y1={46} x2={16} y2={46} stroke={side(2)} strokeWidth={6} strokeLinecap="round" />
 			<line x1={30} y1={24} x2={70} y2={24} stroke="#ffffff" strokeWidth={5} strokeLinecap="round" />
 		</g>
 	);
@@ -147,18 +154,23 @@ function SensorGlyph({ expect, got }: { expect: Mask; got: Mask }) {
 }
 
 function WallGlyph() {
+	// Bright rim + brick joints: the block has to read against the dark board.
 	return (
 		<g>
-			<rect x={16} y={16} width={68} height={68} rx={10} fill="#141a2c" stroke="#303a5c" strokeWidth={4} />
-			<line x1={30} y1={50} x2={70} y2={50} stroke="#303a5c" strokeWidth={4} />
-			<line x1={50} y1={30} x2={50} y2={70} stroke="#303a5c" strokeWidth={4} />
+			<rect x={14} y={14} width={72} height={72} rx={10} fill="#2b3560" stroke="#8496cf" strokeWidth={5} />
+			<line x1={17} y1={40} x2={83} y2={40} stroke="#111730" strokeWidth={4} />
+			<line x1={17} y1={62} x2={83} y2={62} stroke="#111730" strokeWidth={4} />
+			<line x1={50} y1={17} x2={50} y2={40} stroke="#111730" strokeWidth={4} />
+			<line x1={32} y1={40} x2={32} y2={62} stroke="#111730" strokeWidth={4} />
+			<line x1={68} y1={40} x2={68} y2={62} stroke="#111730" strokeWidth={4} />
+			<line x1={50} y1={62} x2={50} y2={83} stroke="#111730" strokeWidth={4} />
 		</g>
 	);
 }
 
 function PieceGlyph({ piece, got }: { piece: Piece; got?: Mask }) {
 	switch (piece.type) {
-		case 'source': return <SourceGlyph rot={piece.rot} />;
+		case 'source': return <SourceGlyph rot={piece.rot} mask={piece.mask ?? 7} />;
 		case 'mirror': return <MirrorGlyph rot={piece.rot} decoy={piece.fixed} />;
 		case 'prism': return <PrismGlyph rot={piece.rot} />;
 		case 'sensor': return <SensorGlyph expect={piece.expect ?? 0} got={got ?? 0} />;
@@ -191,6 +203,35 @@ export function BoardView({
 	const board = useMemo(() => boardFrom(puzzle, placements), [puzzle, placements]);
 	const traced = useMemo(() => trace(n, board), [n, board]);
 
+	/* Segment endpoints classified for FX: what does each beam land on? */
+	const beams = useMemo(() => {
+		const stepR = [-1, 0, 1, 0], stepC = [0, 1, 0, -1];
+		return traced.segments.map((s) => {
+			const d = s.r1 < s.r0 ? 0 : s.c1 > s.c0 ? 1 : s.r1 > s.r0 ? 2 : 3;
+			const end = board[s.r1 * n + s.c1];
+			const exits = !end && (s.r1 + stepR[d] < 0 || s.r1 + stepR[d] >= n || s.c1 + stepC[d] < 0 || s.c1 + stepC[d] >= n);
+			const kind =
+				end?.type === 'wall' || end?.type === 'source' ? 'spark'
+				: end?.type === 'prism' ? 'refract'
+				: end?.type === 'mirror' ? 'bounce'
+				: end?.type === 'sensor' ? 'hit'
+				: exits ? 'exit' : 'none';
+			const x1 = s.c1 * 100 + 50, y1 = s.r1 * 100 + 50;
+			// A sparking beam stops on the obstacle face, not at its centre.
+			const cut = kind === 'spark' ? 32 : 0;
+			return {
+				x0: s.c0 * 100 + 50, y0: s.r0 * 100 + 50,
+				x1, y1,
+				ex: x1 - cut * stepC[d], ey: y1 - cut * stepR[d],
+				ux: stepC[d], uy: stepR[d],
+				angle: [270, 0, 90, 180][d],
+				col: MASK_COLOR[s.mask] ?? '#fff',
+				kind,
+				fromSource: board[s.r0 * n + s.c0]?.type === 'source',
+			};
+		});
+	}, [traced, board, n]);
+
 	return (
 		<div
 			className={`lum-board ${blurred ? 'blurred' : ''}`}
@@ -204,6 +245,9 @@ export function BoardView({
 				<defs>
 					<filter id="lumGlow" x="-60%" y="-60%" width="220%" height="220%">
 						<feGaussianBlur stdDeviation="8" />
+					</filter>
+					<filter id="lumBloom" x="-80%" y="-80%" width="260%" height="260%">
+						<feGaussianBlur stdDeviation="18" />
 					</filter>
 				</defs>
 				{/* grid lines */}
@@ -227,6 +271,20 @@ export function BoardView({
 						strokeWidth={3}
 					/>
 				)}
+				{/* marching ants under player pieces: "you can grab me" */}
+				<g>
+					{placements.map((pl, i) => pl && (
+						<rect
+							key={i}
+							className="lum-manip"
+							x={(pl.idx % n) * 100 + 7}
+							y={Math.floor(pl.idx / n) * 100 + 7}
+							width={86} height={86} rx={16}
+							fill="none" stroke="#9fb4ff" strokeWidth={2.5} strokeDasharray="10 9"
+							style={{ animationDelay: `${((i * 0.37) % 1.4).toFixed(2)}s` }}
+						/>
+					))}
+				</g>
 				{/* pieces */}
 				<g>
 					{board.map((p, i) =>
@@ -237,19 +295,88 @@ export function BoardView({
 						) : null,
 					)}
 				</g>
-				{/* beams — screen blend so crossing red+green reads yellow */}
+				{/* beams — screen blend so crossing red+green reads yellow. Blur filters sit on
+				    static groups only: an animated child inside a filtered group would force the
+				    filter to re-render every frame. */}
 				<g style={{ mixBlendMode: 'screen' }}>
-					{traced.segments.map((s, i) => {
-						const x0 = s.c0 * 100 + 50, y0 = s.r0 * 100 + 50;
-						const x1 = s.c1 * 100 + 50, y1 = s.r1 * 100 + 50;
-						const col = MASK_COLOR[s.mask] ?? '#fff';
-						return (
-							<g key={i}>
-								<line x1={x0} y1={y0} x2={x1} y2={y1} stroke={col} strokeWidth={26} strokeLinecap="round" filter="url(#lumGlow)" opacity={0.55} />
-								<line x1={x0} y1={y0} x2={x1} y2={y1} stroke={col} strokeWidth={7} strokeLinecap="round" opacity={0.95} />
+					<g filter="url(#lumBloom)" opacity={0.35}>
+						{beams.map((b, i) => (
+							<line key={i} x1={b.x0} y1={b.y0} x2={b.ex} y2={b.ey} stroke={b.col} strokeWidth={42} strokeLinecap="round" />
+						))}
+					</g>
+					<g filter="url(#lumGlow)" opacity={0.6}>
+						{beams.map((b, i) => (
+							<line key={i} x1={b.x0} y1={b.y0} x2={b.ex} y2={b.ey} stroke={b.col} strokeWidth={18} strokeLinecap="round" />
+						))}
+						{beams.map((b, i) => b.kind === 'exit' && (
+							<line key={`x${i}`} x1={b.x1} y1={b.y1} x2={b.x1 + 46 * b.ux} y2={b.y1 + 46 * b.uy} stroke={b.col} strokeWidth={14} strokeLinecap="round" opacity={0.5} />
+						))}
+					</g>
+					<g>
+						{beams.map((b, i) => (
+							<line key={i} x1={b.x0} y1={b.y0} x2={b.ex} y2={b.ey} stroke={b.col} strokeWidth={6.5} strokeLinecap="round" opacity={0.95} />
+						))}
+						{beams.map((b, i) => b.kind === 'exit' && (
+							<line key={`x${i}`} x1={b.x1} y1={b.y1} x2={b.x1 + 42 * b.ux} y2={b.y1 + 42 * b.uy} stroke={b.col} strokeWidth={4.5} strokeLinecap="round" opacity={0.35} />
+						))}
+					</g>
+					{/* white-hot core kept under 1: the flow pulses must stay visible on white beams */}
+					<g>
+						{beams.map((b, i) => (
+							<line key={i} x1={b.x0} y1={b.y0} x2={b.ex} y2={b.ey} stroke="#fff" strokeWidth={2.4} strokeLinecap="round" opacity={0.6} />
+						))}
+					</g>
+					{/* travelling dashes give each laser its direction */}
+					<g>
+						{beams.map((b, i) => (
+							<line
+								key={i}
+								className="lum-flow"
+								x1={b.x0} y1={b.y0} x2={b.ex} y2={b.ey}
+								stroke="#fff" strokeWidth={3.4} strokeLinecap="round" strokeDasharray="16 84"
+								style={{ animationDelay: `${((i * 0.31) % 1.15).toFixed(2)}s` }}
+							/>
+						))}
+					</g>
+					{/* impact FX: sparks on obstacles, glints on bounces/splits, halo on fed sensors */}
+					<g>
+						{beams.map((b, i) => {
+							if (b.kind === 'spark')
+								return (
+									<g key={i} transform={`translate(${b.ex} ${b.ey}) rotate(${b.angle + 180})`}>
+										<circle r={15} fill={b.col} opacity={0.3} className="lum-throb" />
+										<circle r={7} fill={b.col} opacity={0.55} className="lum-throb" style={{ animationDelay: '0.3s' }} />
+										<circle r={3.5} fill="#fff" opacity={0.9} />
+										{[-40, -12, 16, 42].map((spread, j) => (
+											<g key={j} transform={`rotate(${spread})`}>
+												<line
+													x1={8} y1={0} x2={19} y2={0}
+													stroke={j % 2 ? '#fff' : b.col} strokeWidth={4} strokeLinecap="round"
+													className="lum-spark"
+													style={{ animationDelay: `${((j * 0.17 + i * 0.11) % 0.55).toFixed(2)}s` }}
+												/>
+											</g>
+										))}
+									</g>
+								);
+							if (b.kind === 'bounce' || b.kind === 'refract')
+								return (
+									<g key={i}>
+										<circle cx={b.x1} cy={b.y1} r={11} fill={b.col} opacity={0.3} className="lum-throb" />
+										<circle cx={b.x1} cy={b.y1} r={4.5} fill="#fff" opacity={0.8} />
+									</g>
+								);
+							if (b.kind === 'hit')
+								return <circle key={i} cx={b.x1} cy={b.y1} r={30} fill={b.col} opacity={0.3} className="lum-throb" />;
+							return null;
+						})}
+						{beams.map((b, i) => b.fromSource && (
+							<g key={`s${i}`}>
+								<circle cx={b.x0} cy={b.y0} r={14} fill="#fff" opacity={0.35} className="lum-throb" style={{ animationDelay: '0.5s' }} />
+								<circle cx={b.x0} cy={b.y0} r={6} fill="#fff" opacity={0.9} />
 							</g>
-						);
-					})}
+						))}
+					</g>
 				</g>
 			</svg>
 		</div>
@@ -325,7 +452,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 		setDrag(null);
 		const p = generateLumen(DIFFS[dk]);
 		setPuzzle(p);
-		setPlacements(p.tray.map(() => null));
+		setPlacements(startPlacements(p));
 		setStatus('playing');
 	}, []);
 
@@ -346,7 +473,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 		setDrag(null);
 		const p = generateLumen(cfg.diff, mulberry32(cfg.seed));
 		setPuzzle(p);
-		setPlacements(p.tray.map(() => null));
+		setPlacements(startPlacements(p));
 		setStatus('playing');
 		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 	}, [lv]);
@@ -389,7 +516,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 			const p = generateLumen(DIFFS[dk], mulberry32(run.seed));
 			setPuzzle(p);
 			const saved = run.state as SavedState | undefined;
-			setPlacements(saved?.placements ?? p.tray.map(() => null));
+			setPlacements(saved?.placements ?? startPlacements(p));
 			setStarted(true);
 			if (run.done && run.abandoned) {
 				// Gave up earlier today: the stored placements ARE the solution, and it never won.
@@ -422,7 +549,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 		setDiffKey(dk);
 		const p = generateLumen(DIFFS[dk], mulberry32(seed));
 		setPuzzle(p);
-		setPlacements(p.tray.map(() => null));
+		setPlacements(startPlacements(p));
 		setStatus('playing');
 		setDailyLoading(false);
 	}, [gameId]);
@@ -444,15 +571,15 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 				done: false,
 				seed: sd?.seed,
 				diffIndex: sd?.diffIndex,
-				state: { placements: puzzle.tray.map(() => null) } satisfies SavedState,
+				state: { placements: startPlacements(puzzle) } satisfies SavedState,
 			});
 		}
 	}, [gameId, puzzle, daily]);
 
-	/* Clear my pieces without resetting the attempt (chrono keeps running). */
+	/* Back to the opening layout without resetting the attempt (chrono keeps running). */
 	const resetDailyEntries = useCallback(() => {
 		if (!puzzle) return;
-		const empty = puzzle.tray.map(() => null);
+		const empty = startPlacements(puzzle);
 		setPlacements(empty);
 		setHintNote('');
 		const sd = dailySeedRef.current;
@@ -628,13 +755,27 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 				if (t) moveTo(t.clientX, t.clientY); // land on the last real position
 				endDrag();
 			};
+			// Some touch environments (Chromium emulation, hybrid touchscreens) surface
+			// the gesture as pointer events only. Dead on iOS, so both can coexist;
+			// endDrag is idempotent when both fire.
+			const onPtrMove = (e: PointerEvent) => moveTo(e.clientX, e.clientY);
+			const onPtrUp = (e: PointerEvent) => {
+				moveTo(e.clientX, e.clientY);
+				endDrag();
+			};
 			window.addEventListener('touchmove', onTouchMove, { passive: false });
 			window.addEventListener('touchend', onTouchEnd, { passive: false });
 			window.addEventListener('touchcancel', onTouchEnd, { passive: false });
+			window.addEventListener('pointermove', onPtrMove);
+			window.addEventListener('pointerup', onPtrUp);
+			window.addEventListener('pointercancel', onPtrUp);
 			return () => {
 				window.removeEventListener('touchmove', onTouchMove);
 				window.removeEventListener('touchend', onTouchEnd);
 				window.removeEventListener('touchcancel', onTouchEnd);
+				window.removeEventListener('pointermove', onPtrMove);
+				window.removeEventListener('pointerup', onPtrUp);
+				window.removeEventListener('pointercancel', onPtrUp);
 				window.removeEventListener('keydown', onKey);
 			};
 		}
@@ -687,7 +828,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 
 	const resetPlacements = useCallback(() => {
 		if (!puzzle || revealed) return;
-		setPlacements(puzzle.tray.map(() => null));
+		setPlacements(startPlacements(puzzle));
 		setHintNote('');
 		if (status === 'won') setStatus('playing');
 	}, [puzzle, revealed, status]);
@@ -804,10 +945,10 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 						<button className="lum-act" onClick={reveal}>👁 Voir la solution</button>
 					)}
 					{!daily && !lv.active && (
-						<button className="lum-act" onClick={resetPlacements}>⌫ Tout reprendre</button>
+						<button className="lum-act" onClick={resetPlacements}>↺ Position de départ</button>
 					)}
 					{daily && started && (
-						<button className="lum-act" onClick={resetDailyEntries}>↺ Vider mes saisies</button>
+						<button className="lum-act" onClick={resetDailyEntries}>↺ Position de départ</button>
 					)}
 				</div>
 			)}
@@ -891,8 +1032,9 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 				<p className="lum-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{/* Tray — fixed slots; a placed / dragged piece leaves a greyed placeholder. */}
-			{puzzle && status === 'playing' && !revealed && interactive && !(lv.active && lv.menu) && (
+			{/* Tray — hidden while everything sits on the board; holds pieces pulled off-grid. */}
+			{puzzle && status === 'playing' && !revealed && interactive && !(lv.active && lv.menu)
+				&& (drag?.from === 'tray' || placements.some((pl, i) => !pl && drag?.trayIndex !== i)) && (
 				<div className="lum-tray" aria-label="Pièces à placer" ref={blockTouchStart}>
 					{puzzle.tray.map((tp, i) => {
 						const dimmed = !!placements[i] || drag?.trayIndex === i;
@@ -931,9 +1073,10 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 				)
 			) : !(lv.active && lv.menu) ? (
 				<p className="lum-help">
-					Glisse les miroirs et les prismes sur la grille pour guider la lumière. Touche une
-					pièce posée pour la faire pivoter, ressors-la de la grille pour la reprendre. Chaque
-					capteur veut EXACTEMENT sa couleur — du blanc sur un capteur rouge, c'est raté.
+					Les pièces entourées d'un pointillé sont à toi : elles sont mal placées. Glisse-les
+					pour guider la lumière, touche une pièce pour la faire pivoter — pivoter un prisme
+					change quelle couleur sort de quel côté. Chaque capteur veut EXACTEMENT sa couleur
+					— du blanc sur un capteur rouge, c'est raté.
 				</p>
 			) : null}
 
@@ -1048,10 +1191,30 @@ const CSS = `
   border-radius: 10px;
   overflow: hidden;
   background: #070b16;
+  box-shadow: 0 0 18px rgba(90,120,255,0.22), inset 0 0 70px rgba(60,80,180,0.16);
   touch-action: none;
   user-select: none;
 }
 .lum-svg { display: block; width: 100%; height: 100%; }
+.lum-svg .lum-flow { opacity: 0.9; animation: lum-flow 1.15s linear infinite; }
+@keyframes lum-flow { to { stroke-dashoffset: -200; } }
+.lum-svg .lum-throb {
+  transform-box: fill-box; transform-origin: center;
+  animation: lum-throb 1s ease-in-out infinite;
+}
+@keyframes lum-throb { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+.lum-svg .lum-manip { opacity: 0.55; animation: lum-manip 1.4s linear infinite; }
+@keyframes lum-manip { to { stroke-dashoffset: -38; } }
+.lum-svg .lum-spark { animation: lum-spark 0.55s linear infinite; }
+@keyframes lum-spark {
+  0% { transform: translateX(0); opacity: 0.95; }
+  100% { transform: translateX(24px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lum-svg .lum-flow, .lum-svg .lum-throb, .lum-svg .lum-spark, .lum-svg .lum-manip { animation: none; }
+  .lum-svg .lum-flow { opacity: 0; }
+  .lum-svg .lum-spark { opacity: 0.6; }
+}
 .lum-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
 
 .lum-tray {

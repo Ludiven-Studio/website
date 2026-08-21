@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LumenGame, { BoardView, MASK_COLOR } from './LumenGame';
-import { DIFFS, generateLumen, solutionPlacements } from './engine';
+import { DIFFS, generateLumen, solutionPlacements, type LumenPuzzle } from './engine';
 import { mulberry32 } from '../prng';
 
 describe('LumenGame — SSR smoke', () => {
@@ -44,5 +44,33 @@ describe('BoardView — sensor ring colour matches its contract', () => {
 			expect(html).toContain('✓');
 			expect(html).not.toContain('✕');
 		}
+	});
+});
+
+describe('BoardView — beam FX', () => {
+	// 3×3, source at (1,0) firing east into a wall at (1,2): spark + flow + charge.
+	const walled: LumenPuzzle = {
+		size: 3,
+		fixed: [
+			{ idx: 3, piece: { type: 'source', rot: 1, fixed: true } },
+			{ idx: 5, piece: { type: 'wall', rot: 0, fixed: true } },
+		],
+		tray: [],
+		solution: [],
+		start: [],
+	};
+
+	it('a beam into a wall sparks, flows and shows the source charge', () => {
+		const html = renderToStaticMarkup(<BoardView puzzle={walled} placements={[]} />);
+		expect(html).toContain('lum-spark');
+		expect(html).toContain('lum-flow');
+		expect(html).toContain('lum-throb');
+	});
+
+	it('a beam leaving the grid fades out instead of sparking', () => {
+		const open: LumenPuzzle = { ...walled, fixed: [walled.fixed[0]] };
+		const html = renderToStaticMarkup(<BoardView puzzle={open} placements={[]} />);
+		expect(html).not.toContain('lum-spark');
+		expect(html).toContain('lum-flow');
 	});
 });

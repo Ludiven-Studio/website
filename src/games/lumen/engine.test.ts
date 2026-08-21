@@ -17,7 +17,7 @@ import {
 } from './engine';
 import { mulberry32, dateSeed } from '../prng';
 
-const src = (rot: number): Piece => ({ type: 'source', rot, fixed: true });
+const src = (rot: number, mask?: number): Piece => ({ type: 'source', rot, mask, fixed: true });
 const sensor = (expect = 0): Piece => ({ type: 'sensor', rot: 0, expect, fixed: true });
 const mirror = (rot: number): Piece => ({ type: 'mirror', rot, fixed: false });
 const prism = (rot: number): Piece => ({ type: 'prism', rot, fixed: false });
@@ -56,44 +56,42 @@ describe('lumen mirrors', () => {
 });
 
 describe('lumen prisms', () => {
-	it('splits white through the input face: G straight, R left, B right', () => {
-		for (let rot = 0; rot < 4; rot++) {
-			const a = (rot + 2) % 4; // accepted travel direction
-			const b = empty(3);
-			b[(1 - STEP[a][0]) * 3 + (1 - STEP[a][1])] = src(a);
-			b[4] = prism(rot);
-			const gIdx = (1 + STEP[a][0]) * 3 + (1 + STEP[a][1]);
-			const rIdx = (1 + STEP[(a + 3) % 4][0]) * 3 + (1 + STEP[(a + 3) % 4][1]);
-			const bIdx = (1 + STEP[(a + 1) % 4][0]) * 3 + (1 + STEP[(a + 1) % 4][1]);
-			b[gIdx] = sensor();
-			b[rIdx] = sensor();
-			b[bIdx] = sensor();
-			const t = trace(3, b);
-			expect(t.sensorMask.get(gIdx)).toBe(2);
-			expect(t.sensorMask.get(rIdx)).toBe(1);
-			expect(t.sensorMask.get(bIdx)).toBe(4);
-		}
+	// PRISM_BEND: dir offsets per bend slot — left, straight, right of travel.
+	const BEND = [3, 0, 1];
+
+	it('splits white from EVERY face; rot cycles which colour bends where', () => {
+		for (let rot = 0; rot < 3; rot++)
+			for (let d = 0; d < 4; d++) {
+				const b = empty(3);
+				b[(1 - STEP[d][0]) * 3 + (1 - STEP[d][1])] = src(d);
+				b[4] = prism(rot);
+				const outIdx = (ch: number): number => {
+					const o = (d + BEND[(ch + rot) % 3]) % 4;
+					return (1 + STEP[o][0]) * 3 + (1 + STEP[o][1]);
+				};
+				for (let ch = 0; ch < 3; ch++) b[outIdx(ch)] = sensor();
+				const t = trace(3, b);
+				for (let ch = 0; ch < 3; ch++) expect(t.sensorMask.get(outIdx(ch))).toBe(1 << ch);
+			}
 	});
 
-	it('absorbs rays hitting any other face', () => {
-		for (let rot = 0; rot < 4; rot++)
-			for (let d = 0; d < 4; d++) {
-				if (d === (rot + 2) % 4) continue;
-				const b = empty(3);
-				const sIdx = (1 - STEP[d][0]) * 3 + (1 - STEP[d][1]);
-				b[sIdx] = src(d);
-				b[4] = prism(rot);
-				for (let i = 0; i < 9; i++) if (i !== 4 && i !== sIdx && b[i] === null) b[i] = sensor();
-				expect(trace(3, b).sensorMask.size).toBe(0);
-			}
+	it('never sends a channel back toward the source', () => {
+		for (let rot = 0; rot < 3; rot++) {
+			const b = empty(3);
+			b[3] = src(1); // (1,0) fires E into the prism
+			b[4] = prism(rot);
+			const t = trace(3, b);
+			// No segment leaves the prism travelling W (back along the entry).
+			expect(t.segments.some((s) => s.r0 === 1 && s.c0 === 1 && s.c1 < 1)).toBe(false);
+		}
 	});
 
 	it('a red-only ray through a second prism still turns left', () => {
 		const b = empty(3);
 		b[3] = src(1); // (1,0) fires E, white
-		b[4] = prism(3); // (1,1) input face W: splits
-		b[1] = prism(2); // (0,1) input face S: catches the red going N
-		b[0] = sensor(); // (0,0): red turned left (W)
+		b[4] = prism(0); // (1,1): R left (N), G straight (E), B right (S)
+		b[1] = prism(0); // (0,1) catches the red going N: red-only, turns left again (W)
+		b[0] = sensor(); // (0,0)
 		b[5] = sensor(); // (1,2): green went straight
 		b[7] = sensor(); // (2,1): blue turned right (S)
 		const t = trace(3, b);
@@ -103,11 +101,39 @@ describe('lumen prisms', () => {
 	});
 });
 
+describe('lumen coloured sources', () => {
+	it('a coloured source emits only its mask', () => {
+		const b = empty(3);
+		b[3] = src(1, 1); // (1,0) fires E, red only
+		b[5] = sensor();
+		const t = trace(3, b);
+		expect(t.sensorMask.get(5)).toBe(1);
+	});
+
+	it('two primaries mix on one sensor without any prism', () => {
+		const b = empty(3);
+		b[3] = src(1, 1); // (1,0) red fires E
+		b[7] = src(0, 4); // (2,1) blue fires N
+		b[4] = sensor(); // (1,1): red + blue = magenta
+		expect(trace(3, b).sensorMask.get(4)).toBe(5);
+	});
+
+	it('a coloured source through a prism keeps only its channel', () => {
+		const b = empty(3);
+		b[3] = src(1, 4); // (1,0) blue fires E
+		b[4] = prism(0); // blue bends right (S)
+		b[7] = sensor(); // (2,1)
+		const t = trace(3, b);
+		expect(t.sensorMask.get(7)).toBe(4);
+		expect(t.sensorMask.size).toBe(1);
+	});
+});
+
 describe('lumen mixing and sensors', () => {
 	it('accumulates additively: R and G land on one sensor as yellow (3)', () => {
 		const b = empty(3);
 		b[3] = src(1); // (1,0) E
-		b[4] = prism(3); // (1,1): G -> E, R -> N, B -> S
+		b[4] = prism(0); // (1,1): G -> E, R -> N, B -> S
 		b[1] = mirror(0); // (0,1) `/`: red N -> E
 		b[2] = mirror(1); // (0,2) `\`: red E -> S
 		b[5] = sensor(); // (1,2): green from the W, red from the N
@@ -197,6 +223,22 @@ describe('lumen generation', () => {
 		}
 	});
 
+	it('colours sources as distinct primaries, and some facile deals stay white', () => {
+		let coloured = 0, white = 0;
+		for (let s = 0; s < 30; s++) {
+			const p = generateLumen(DIFFS.facile, mulberry32(9000 + s * 41));
+			const masks = p.fixed
+				.filter((f) => f.piece.type === 'source')
+				.map((f) => f.piece.mask ?? 7);
+			if (masks.every((m) => m === 7)) { white++; continue; }
+			coloured++;
+			for (const m of masks) expect([1, 2, 4]).toContain(m);
+			expect(new Set(masks).size).toBe(masks.length);
+		}
+		expect(coloured).toBeGreaterThan(0);
+		expect(white).toBeGreaterThan(0);
+	});
+
 	it('is deterministic: same seed -> identical puzzle', () => {
 		const seed = dateSeed(new Date('2026-08-21T00:00:00Z'));
 		for (const key of ['facile', 'expert']) {
@@ -205,6 +247,49 @@ describe('lumen generation', () => {
 			expect(a).toEqual(b);
 		}
 	});
+});
+
+describe('lumen scattered start', () => {
+	for (const key of Object.keys(DIFFS)) {
+		const diff = DIFFS[key];
+
+		it(`${diff.label}: every piece opens on the board, off the solution, unsolved`, () => {
+			for (let s = 0; s < 10; s++) {
+				const p = generateLumen(diff, mulberry32(4400 + s * 23 + diff.size));
+				expect(p.start.length).toBe(p.tray.length);
+
+				const fixedCells = new Set(p.fixed.map((f) => f.idx));
+				const solCells = new Set(p.solution.map((sl) => sl.idx));
+				const used = new Set<number>();
+				for (let i = 0; i < p.start.length; i++) {
+					const pl = p.start[i];
+					expect(fixedCells.has(pl.idx)).toBe(false);
+					expect(solCells.has(pl.idx)).toBe(false);
+					expect(used.has(pl.idx)).toBe(false);
+					used.add(pl.idx);
+					expect(pl.rot).toBeGreaterThanOrEqual(0);
+					expect(pl.rot).toBeLessThan(ROTS[p.tray[i].type]);
+				}
+				expect(isSolved(p, p.start)).toBe(false);
+			}
+		});
+
+		it(`${diff.label}: from the scatter, hints repair then place and win`, () => {
+			for (let s = 0; s < 4; s++) {
+				const p = generateLumen(diff, mulberry32(4700 + s * 19 + diff.size));
+				let placements: (Placement | null)[] = p.start.map((pl) => ({ ...pl }));
+				let steps = 0;
+				for (;;) {
+					const h = findHint(p, placements);
+					if (!h) break;
+					placements = applyHint(placements, h);
+					// Worst case: one remove + one place per scattered piece.
+					expect(++steps).toBeLessThanOrEqual(2 * p.solution.length);
+				}
+				expect(isSolved(p, placements)).toBe(true);
+			}
+		});
+	}
 });
 
 describe('lumen board assembly', () => {
@@ -233,7 +318,7 @@ describe('lumen board assembly', () => {
 
 	it('rotCW wraps per piece type', () => {
 		expect(rotCW('mirror', 1)).toBe(0);
-		expect(rotCW('prism', 3)).toBe(0);
+		expect(rotCW('prism', 2)).toBe(0);
 		expect(rotCW('prism', 0)).toBe(1);
 	});
 });

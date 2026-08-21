@@ -131,10 +131,10 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '💡', title: 'Astuce', body: 'Les murs font rebondir la bulle : c\'est souvent le seul moyen d\'atteindre un côté. Chaque tableau a un « par » prouvé par le solveur — les 3 étoiles se jouent à un tir près. Indice montre le meilleur tir.' },
 	],
 	lumen: [
-		{ emoji: '💡', title: 'Le but', body: 'Des sources émettent de la lumière blanche. Guide-la avec tes miroirs et tes prismes pour que CHAQUE capteur reçoive exactement sa couleur — celle de son anneau.' },
+		{ emoji: '💡', title: 'Le but', body: 'Des sources émettent de la lumière — blanche ou déjà colorée. Guide-la avec tes miroirs et tes prismes pour que CHAQUE capteur reçoive exactement sa couleur — celle de son anneau.' },
 		{ emoji: '🎯', title: 'Exactement', body: 'Exactement, c\'est strict : du blanc sur un capteur rouge, c\'est raté. Un capteur allumé de la mauvaise couleur affiche ✕ ; à la bonne couleur, ✓.' },
-		{ emoji: '🌈', title: 'Les couleurs', body: 'Le prisme sépare le blanc : le vert continue tout droit, le rouge part à gauche, le bleu à droite. Deux rayons sur un même capteur se mélangent : rouge + vert = jaune, rouge + bleu = magenta, vert + bleu = cyan, les trois = blanc.' },
-		{ emoji: '👆', title: 'Comment jouer', body: 'Glisse une pièce de la réserve vers une case libre. Touche une pièce posée pour la faire pivoter (clic droit : sens inverse), ressors-la de la grille pour la remettre en réserve. Le prisme n\'accepte la lumière que par sa face plate.' },
+		{ emoji: '🌈', title: 'Les couleurs', body: 'Le prisme sépare la lumière par n\'importe quelle face : une couleur continue tout droit, une part à gauche, une à droite — le faire pivoter échange les rôles. Deux rayons sur un même capteur se mélangent : rouge + vert = jaune, rouge + bleu = magenta, vert + bleu = cyan, les trois = blanc.' },
+		{ emoji: '👆', title: 'Comment jouer', body: 'Tes pièces sont déjà sur la grille, mais mal placées — le pointillé lumineux les entoure. Glisse-les vers la bonne case, touche une pièce pour la faire pivoter (clic droit : sens inverse), ressors-la de la grille pour la mettre en réserve.' },
 		{ emoji: '🏆', title: 'Indice & défi', body: 'Le bouton Indice répare d\'abord une pièce mal placée, puis pose la suivante. Au défi du jour, même grille pour tout le monde : le plus rapide gagne.' },
 	],
 	cordes: [

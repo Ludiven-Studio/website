@@ -42,6 +42,8 @@ const basePlan: LevelPlan<LumenLevelCfg> = {
 				sensors,
 				walls: Math.min(3, Math.floor(l / 25)),
 				decoys: 0,
+				// Early levels lean on coloured sources: two beams you can tell apart.
+				colored: l < 20 ? 0.8 : 0.5,
 			},
 			threeStarCentis: targets(pieces, 1200, 900),
 			twoStarCentis: targets(pieces, 2600, 1800),
@@ -77,6 +79,7 @@ export const lumenLevels = extendPlan('lumen', basePlan, {
 				sensors: 4,
 				walls: 3,
 				decoys: 2,
+				colored: 0.4,
 			},
 			threeStarCentis: targets(pieces, 1800, 1200),
 			twoStarCentis: targets(pieces, 3800, 2400),
