@@ -14,8 +14,8 @@ const FELT = 0x0f7a52;
 const WOOD = 0x5a3722;
 const WOOD_DARK = 0x3a2416;
 
-/** Cosmetic table skins — cocoin-shop themes ('tron' neon). Physics never sees them. */
-export type TableSkin = 'classic' | 'tron';
+/** Cosmetic table skins — cocoin-shop themes ('tron' neon, 'western' saloon). Physics never sees them. */
+export type TableSkin = 'classic' | 'tron' | 'western';
 export const TRON = {
 	background: 0x05070d,
 	felt: 0x0a1424,
@@ -23,6 +23,14 @@ export const TRON = {
 	body: 0x0a0f1e,
 	neonInner: 0x35e8ff, // cushion edge — Tron cyan
 	neonOuter: 0xff8c2a, // outer frame — Tron orange
+};
+export const WESTERN = {
+	background: 0x2b1a10, // warm saloon dusk
+	felt: 0xa87c42, // whisky-tan baize
+	frame: 0x46281a, // dark leather
+	body: 0x2c180c,
+	rope: 0xb98d54, // lasso laid along the outer frame
+	brass: 0xc9963a, // inner trim + diamond sights
 };
 const BORDER = 13; // wooden frame width around the felt (holds the pocket mouths)
 const RAIL_H = 2 * BALL_R; // rail top above the felt
@@ -133,13 +141,14 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 	const { w, h } = table;
 	const hw = w / 2, hh = h / 2;
 	const tron = skin === 'tron';
+	const western = skin === 'western';
 	const grp = new THREE.Group();
 	const disposables: { dispose(): void }[] = [];
 	const keep = <T extends { dispose(): void }>(o: T): T => { disposables.push(o); return o; };
 
 	// Floor the table stands on — tiled texture attached later, flat brown until then.
 	// Themed skins get their own generated floor, so the caller must NOT attach the wood textures.
-	const floorMat = new THREE.MeshStandardMaterial({ color: tron ? 0xffffff : 0x3a2a1c, roughness: 1 });
+	const floorMat = new THREE.MeshStandardMaterial({ color: tron || western ? 0xffffff : 0x3a2a1c, roughness: 1 });
 	if (tron) {
 		const c = document.createElement('canvas');
 		c.width = c.height = 64;
@@ -149,6 +158,27 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 		const tex = keep(new THREE.CanvasTexture(c));
 		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
 		tex.repeat.set(30, 50);
+		tex.colorSpace = THREE.SRGBColorSpace;
+		floorMat.map = tex;
+	} else if (western) {
+		// Saloon plank floor: four boards per tile, dark seams, a few wavy grain strokes.
+		const c = document.createElement('canvas');
+		c.width = c.height = 128;
+		const g2 = c.getContext('2d') as CanvasRenderingContext2D;
+		const boards = ['#6b4526', '#75502c', '#644023', '#70492a'];
+		for (let p = 0; p < 4; p++) {
+			const y0 = p * 32;
+			g2.fillStyle = boards[p]; g2.fillRect(0, y0, 128, 32);
+			g2.fillStyle = '#3f2412'; g2.fillRect(0, y0, 128, 2);
+			g2.strokeStyle = 'rgba(63,36,18,0.5)'; g2.lineWidth = 1;
+			for (let i = 0; i < 3; i++) {
+				const gy = y0 + 8 + i * 8;
+				g2.beginPath(); g2.moveTo(0, gy); g2.bezierCurveTo(40, gy - 3, 90, gy + 3, 128, gy); g2.stroke();
+			}
+		}
+		const tex = keep(new THREE.CanvasTexture(c));
+		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+		tex.repeat.set(8, 14);
 		tex.colorSpace = THREE.SRGBColorSpace;
 		floorMat.map = tex;
 	}
@@ -161,7 +191,7 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 
 	// Table body: a wood block just under the felt, matching the frame footprint.
 	const foX = hw + BORDER, foZ = hh + BORDER;
-	const bodyMat = keep(new THREE.MeshStandardMaterial({ color: tron ? TRON.body : WOOD_DARK, roughness: 0.7 }));
+	const bodyMat = keep(new THREE.MeshStandardMaterial({ color: tron ? TRON.body : western ? WESTERN.body : WOOD_DARK, roughness: 0.7 }));
 	const bodyHalfX = foX - 2, bodyHalfZ = foZ - 2; // inset so the rounded frame hides its sharp corners
 	const bodyGeo = keep(new THREE.BoxGeometry(bodyHalfX * 2, BODY_H, bodyHalfZ * 2));
 	const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -200,7 +230,7 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 
 	// Felt bed — the rounded footprint, so green shows through the pocket mouths cut into the frame
 	// but never past the frame's rounded outer corners. UVs normalised so the felt texture tiles.
-	const feltMat = new THREE.MeshStandardMaterial({ color: tron ? TRON.felt : FELT, roughness: tron ? 0.85 : 0.95, metalness: 0 });
+	const feltMat = new THREE.MeshStandardMaterial({ color: tron ? TRON.felt : western ? WESTERN.felt : FELT, roughness: tron ? 0.85 : 0.95, metalness: 0 });
 	const feltGeo = keep(new THREE.ShapeGeometry(buildOuter(), 12));
 	feltGeo.computeBoundingBox();
 	const fbb = feltGeo.boundingBox!;
@@ -235,6 +265,7 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 
 	const railMat = keep(new THREE.MeshStandardMaterial(
 		tron ? { color: TRON.frame, roughness: 0.35, metalness: 0.55 }
+		: western ? { color: WESTERN.frame, roughness: 0.7, metalness: 0.08 }
 		: { color: WOOD, roughness: 0.5, metalness: 0.05 },
 	));
 	// A bevel rounds the top edge of the rail and flares the pocket mouths — softens the boxy look.
@@ -266,9 +297,9 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 		grp.add(mouth);
 	}
 
-	// Neon strips along the rails. Straight polylines — a Catmull-Rom through these
-	// points overshoots every corner and the strip wanders off the table.
-	if (tron) {
+	// Trim strips along the rails: Tron neon, Western rope + brass. Straight polylines — a
+	// Catmull-Rom through these points overshoots every corner and the strip wanders off the table.
+	if (tron || western) {
 		const polyTube = (pts: THREE.Vector2[], y: number, r: number, mat: THREE.Material) => {
 			const path = new THREE.CurvePath<THREE.Vector3>();
 			for (let i = 0; i < pts.length; i++) {
@@ -298,13 +329,20 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 		// or crossing a pocket mouth at full height never reaches it (ball top 2R < strip bottom + offset).
 		const inner = offsetOut(contour, 2.0);
 		const outer = offsetOut(buildOuter().getPoints(24), -0.8); // sits ON the frame, not over its edge
-		polyTube(inner, RAIL_H + 0.2, 0.45, keep(new THREE.MeshBasicMaterial({ color: TRON.neonInner, toneMapped: false })));
-		polyTube(outer, RAIL_H + 0.1, 0.5, keep(new THREE.MeshBasicMaterial({ color: TRON.neonOuter, toneMapped: false })));
+		if (tron) {
+			polyTube(inner, RAIL_H + 0.2, 0.45, keep(new THREE.MeshBasicMaterial({ color: TRON.neonInner, toneMapped: false })));
+			polyTube(outer, RAIL_H + 0.1, 0.5, keep(new THREE.MeshBasicMaterial({ color: TRON.neonOuter, toneMapped: false })));
+		} else {
+			polyTube(inner, RAIL_H + 0.2, 0.35, keep(new THREE.MeshStandardMaterial({ color: WESTERN.brass, roughness: 0.35, metalness: 0.8 })));
+			polyTube(outer, RAIL_H + 0.1, 0.75, keep(new THREE.MeshStandardMaterial({ color: WESTERN.rope, roughness: 0.9, metalness: 0 })));
+		}
 	}
 
 	// Diamond sights on the rail top — the classic little markers, for looks.
 	const diaMat = keep(tron
 		? new THREE.MeshBasicMaterial({ color: TRON.neonInner, toneMapped: false })
+		: western
+		? new THREE.MeshStandardMaterial({ color: WESTERN.brass, roughness: 0.3, metalness: 0.85 })
 		: new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.5 }));
 	const diaGeo = keep(new THREE.CircleGeometry(1.3, 4));
 	const dOff = BORDER * 0.5;

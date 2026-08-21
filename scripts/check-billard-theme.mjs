@@ -1,5 +1,5 @@
-/* Tron theme: own it via localStorage, check the boutique section, the in-game toggle,
-   the live rebuild both ways, FX on the neon table, and that no purchase = no theme. */
+/* Table themes (Tron + Western): own them via localStorage, check the boutique section,
+   the in-game cycle button, the live rebuilds, FX on the neon table, and no purchase = no theme. */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -21,7 +21,7 @@ const check = (ok, what) => { console.log(`${ok ? 'OK  ' : 'FAIL'} ${what}`); if
 
 // Own the theme + start with it active.
 await page.addInitScript(() => {
-	localStorage.setItem('ludiven-cocottes', JSON.stringify({ balance: 40, owned: ['cocotte', 'skin:billard-tron'], equipped: null, lastReward: '' }));
+	localStorage.setItem('ludiven-cocottes', JSON.stringify({ balance: 40, owned: ['cocotte', 'skin:billard-tron', 'skin:billard-western'], equipped: null, lastReward: '' }));
 	localStorage.setItem('billard-theme', 'tron');
 });
 
@@ -30,6 +30,7 @@ await page.goto(`${base}/jeux/boutique/`, { waitUntil: 'networkidle' });
 await sleep(600);
 check((await page.locator('text=Thèmes de jeu').count()) > 0, 'la boutique a une section Thèmes');
 check((await page.locator('text=Billard Néon').count()) > 0, 'le thème Billard Néon y figure');
+check((await page.locator('text=Billard Saloon').count()) > 0, 'le thème Billard Saloon y figure');
 const themeItem = page.locator('.bp-item', { hasText: 'Billard Néon' });
 check((await themeItem.locator('a:has-text("Jouer")').count()) > 0, 'le thème possédé montre "Jouer →"');
 await themeItem.screenshot({ path: resolve(`${OUT}/billard-tron-shop.png`) });
@@ -45,9 +46,13 @@ await sleep(2500);
 check((await snap()).skin === 'tron', 'la partie demarre avec le skin tron');
 await page.screenshot({ path: resolve(`${OUT}/billard-tron-table.png`) });
 
-// Toggle back to classic and again to tron — live rebuild both ways.
-const btn = page.locator('button[aria-label="Thème néon"]');
+// The theme button cycles tron → western → classic → tron, rebuilding the table live.
+const btn = page.locator('button[aria-label="Changer de thème"]');
 check((await btn.count()) === 1, 'le bouton de theme est present');
+await btn.click();
+await sleep(800);
+check((await snap()).skin === 'western', 'passage au skin western');
+await page.screenshot({ path: resolve(`${OUT}/billard-western-table.png`) });
 await btn.click();
 await sleep(800);
 check((await snap()).skin === 'classic', 'retour a la table classique');
@@ -83,7 +88,7 @@ await p2.locator('.bi-modetoggle button:has-text("Libre")').click();
 await sleep(900);
 const s2 = await p2.evaluate(() => window.__billard());
 check(s2.skin === 'classic', 'sans achat, la pref est ignoree (classic)');
-check((await p2.locator('button[aria-label="Thème néon"]').count()) === 0, 'sans achat, pas de bouton theme');
+check((await p2.locator('button[aria-label="Changer de thème"]').count()) === 0, 'sans achat, pas de bouton theme');
 
 console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');
 await browser.close();

@@ -6,7 +6,7 @@ import {
 } from './engine';
 import {
 	buildTable3D, makeBallMesh, makeBall8Mesh, makeCueStick, makeFx, fitDist, bestAz, predictCue,
-	ball8Hue, CUE_COLOR, BALL_COLORS, TRON, type Table3D, type Fx, type TableSkin,
+	ball8Hue, CUE_COLOR, BALL_COLORS, TRON, WESTERN, type Table3D, type Fx, type TableSkin,
 } from './render3d';
 import { hasTheme } from '../../lib/wallet';
 import { initMatch8, applyShot, groupOf, type Match8, type Group } from './rules8';
@@ -92,8 +92,11 @@ const AIM_TAU = 0.06; // smoothing of the received aim — the stream is far slo
 const CAM_LABEL: Record<CamMode, string> = { fit: '🎥', shoulder: '🎱', top: '🛰' };
 const CAM_NEXT: Record<CamMode, CamMode> = { fit: 'shoulder', shoulder: 'top', top: 'fit' };
 const SUN_DIR = new THREE.Vector3(30, 90, 40).normalize();
-const SKIN_KEY = 'billard-theme'; // 'tron' once bought in the boutique and toggled on
+const SKIN_KEY = 'billard-theme'; // 'tron' / 'western' once bought in the boutique and toggled on
 const BG_CLASSIC = 0x14100c;
+const SKIN_EMOJI: Record<TableSkin, string> = { classic: '🎱', tron: '🌌', western: '🤠' };
+const SKIN_TITLE: Record<TableSkin, string> = { classic: 'Repasser en table classique', tron: 'Passer au thème néon', western: 'Passer au thème saloon' };
+const bgOf = (s: TableSkin) => (s === 'tron' ? TRON.background : s === 'western' ? WESTERN.background : BG_CLASSIC);
 
 const camEye = new THREE.Vector3();
 const camLook = new THREE.Vector3();
@@ -263,7 +266,12 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const shakeRef = useRef(0); // current shake amplitude (world units)
 	const maxImpactRef = useRef(0); // hardest contact seen since load — threshold tuning + smoke tests
 	const [skin, setSkin] = useState<TableSkin>(() => {
-		try { return hasTheme('billard-tron') && localStorage.getItem(SKIN_KEY) === 'tron' ? 'tron' : 'classic'; } catch { return 'classic'; }
+		try {
+			const saved = localStorage.getItem(SKIN_KEY);
+			if (saved === 'tron' && hasTheme('billard-tron')) return 'tron';
+			if (saved === 'western' && hasTheme('billard-western')) return 'western';
+		} catch { /* storage unavailable */ }
+		return 'classic';
 	});
 	const skinRef = useRef(skin);
 	const woodTexRef = useRef<{ felt?: THREE.Texture; floor?: THREE.Texture }>({}); // kept across skin swaps
@@ -281,7 +289,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	/* Put the wood textures back on the current table materials (classic skin only). */
 	const attachWoodTextures = useCallback(() => {
 		const g = g3Ref.current, wt = woodTexRef.current;
-		if (!g || skinRef.current === 'tron') return;
+		if (!g || skinRef.current !== 'classic') return;
 		if (wt.felt) { g.table3d.feltMat.map = wt.felt; g.table3d.feltMat.color.set(0xffffff); g.table3d.feltMat.needsUpdate = true; }
 		if (wt.floor) { g.table3d.floorMat.map = wt.floor; g.table3d.floorMat.color.set(0xffffff); g.table3d.floorMat.needsUpdate = true; }
 	}, []);
@@ -301,7 +309,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		renderer.shadowMap.type = THREE.VSMShadowMap;
 
 		const scene = new THREE.Scene();
-		scene.background = new THREE.Color(skinRef.current === 'tron' ? TRON.background : BG_CLASSIC);
+		scene.background = new THREE.Color(bgOf(skinRef.current));
 		const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 3000);
 
 		scene.add(new THREE.HemisphereLight(0xffffff, 0x2a1e14, 0.9));
@@ -415,7 +423,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		g.table3d.dispose();
 		g.table3d = buildTable3D(tableRef.current, next);
 		g.scene.add(g.table3d.group);
-		g.scene.background = new THREE.Color(next === 'tron' ? TRON.background : BG_CLASSIC);
+		g.scene.background = new THREE.Color(bgOf(next));
 		attachWoodTextures();
 		syncBallMeshes(); // ball materials change too (neon glow)
 	}, [attachWoodTextures, syncBallMeshes]);
@@ -1612,6 +1620,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 	const meLeft = meGroup ? colorLeft.filter((b) => groupOf(b.color) === meGroup).length : 0;
 	const onBlack = is8 && !!match8 && match8.winner == null && !match8.open && !!meGroup && meLeft === 0;
 	const eightWin = is8 && !lv.active && match8?.winner != null; // Libre card; Niveaux uses LevelOutcome
+	// The theme button cycles through the owned skins (classic is always in the ring).
+	const ownedSkins: TableSkin[] = ['classic', ...(hasTheme('billard-tron') ? (['tron'] as const) : []), ...(hasTheme('billard-western') ? (['western'] as const) : [])];
+	const nextSkin = ownedSkins[(ownedSkins.indexOf(skin) + 1) % ownedSkins.length];
 	const restartLabel = lv.active ? 'Recommencer le niveau'
 		: is8 ? 'Nouvelle partie'
 		: dailyMode ? (exhausted ? 'Essais du jour épuisés' : `Recommencer (${triesLeft} essai${triesLeft > 1 ? 's' : ''} restant${triesLeft > 1 ? 's' : ''})`)
@@ -1668,14 +1679,14 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 							title={sound ? 'Couper le son' : 'Activer le son'}
 						>{sound ? '🔊' : '🔇'}</button>
 						<button className="bi-act" onClick={cycleCam} aria-label="Changer de vue" title="Changer de vue">{CAM_LABEL[camMode]}</button>
-						{hasTheme('billard-tron') && (
+						{ownedSkins.length > 1 && (
 							<button
 								className="bi-act"
-								onClick={() => applySkin(skin === 'tron' ? 'classic' : 'tron')}
-								aria-pressed={skin === 'tron'}
-								aria-label="Thème néon"
-								title={skin === 'tron' ? 'Repasser en table classique' : 'Activer le thème néon'}
-							>🌌</button>
+								onClick={() => applySkin(nextSkin)}
+								aria-pressed={skin !== 'classic'}
+								aria-label="Changer de thème"
+								title={SKIN_TITLE[nextSkin]}
+							>{SKIN_EMOJI[nextSkin]}</button>
 						)}
 						{!lv.menu && mpPhase !== 'playing' && mpPhase !== 'waiting' && mpPhase !== 'connecting' && (
 							<button

@@ -58,6 +58,7 @@ export interface GameTheme {
 // Cosmetic in-game themes, owned like blasons ('skin:' namespaced in the same array).
 export const THEMES: GameTheme[] = [
 	{ id: 'billard-tron', emoji: '🌌', label: 'Billard Néon', desc: 'feutre nuit, néons façon Tron', href: '/jeux/billard/', price: 150 },
+	{ id: 'billard-western', emoji: '🤠', label: 'Billard Saloon', desc: 'feutre whisky, corde et laiton façon western', href: '/jeux/billard/', price: 150 },
 ];
 
 export const themeId = (id: string): string => `skin:${id}`;
