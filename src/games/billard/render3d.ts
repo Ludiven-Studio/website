@@ -14,7 +14,7 @@ const FELT = 0x0f7a52;
 const WOOD = 0x5a3722;
 const WOOD_DARK = 0x3a2416;
 
-/** Cosmetic table skin — 'tron' is the cocoin-shop neon theme. Physics never sees it. */
+/** Cosmetic table skins — cocoin-shop themes ('tron' neon). Physics never sees them. */
 export type TableSkin = 'classic' | 'tron';
 export const TRON = {
 	background: 0x05070d,
@@ -138,7 +138,7 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 	const keep = <T extends { dispose(): void }>(o: T): T => { disposables.push(o); return o; };
 
 	// Floor the table stands on — tiled texture attached later, flat brown until then.
-	// Tron gets its own generated grid, so the caller must NOT attach the wood textures.
+	// Themed skins get their own generated floor, so the caller must NOT attach the wood textures.
 	const floorMat = new THREE.MeshStandardMaterial({ color: tron ? 0xffffff : 0x3a2a1c, roughness: 1 });
 	if (tron) {
 		const c = document.createElement('canvas');
@@ -234,7 +234,8 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 	outline.holes.push(new THREE.Path(contour));
 
 	const railMat = keep(new THREE.MeshStandardMaterial(
-		tron ? { color: TRON.frame, roughness: 0.35, metalness: 0.55 } : { color: WOOD, roughness: 0.5, metalness: 0.05 },
+		tron ? { color: TRON.frame, roughness: 0.35, metalness: 0.55 }
+		: { color: WOOD, roughness: 0.5, metalness: 0.05 },
 	));
 	// A bevel rounds the top edge of the rail and flares the pocket mouths — softens the boxy look.
 	const frameGeo = keep(new THREE.ExtrudeGeometry(outline, {
@@ -265,19 +266,40 @@ export function buildTable3D(table: Table, skin: TableSkin = 'classic'): Table3D
 		grp.add(mouth);
 	}
 
-	// Neon light strips: one along the cushion's inner top edge (the contour already traces the
-	// felt boundary incl. pocket mouths), one along the rounded outer outline. Tron only.
+	// Neon strips along the rails. Straight polylines — a Catmull-Rom through these
+	// points overshoots every corner and the strip wanders off the table.
 	if (tron) {
-		const tube = (pts: THREE.Vector2[], y: number, r: number, color: number) => {
-			const curve = new THREE.CatmullRomCurve3(pts.map((v) => new THREE.Vector3(v.x, v.y, 0)), true);
-			const geo = keep(new THREE.TubeGeometry(curve, Math.min(400, pts.length * 3), r, 6, true));
+		const polyTube = (pts: THREE.Vector2[], y: number, r: number, mat: THREE.Material) => {
+			const path = new THREE.CurvePath<THREE.Vector3>();
+			for (let i = 0; i < pts.length; i++) {
+				const a = pts[i], b = pts[(i + 1) % pts.length];
+				path.add(new THREE.LineCurve3(new THREE.Vector3(a.x, a.y, 0), new THREE.Vector3(b.x, b.y, 0)));
+			}
+			const geo = keep(new THREE.TubeGeometry(path, Math.min(600, pts.length * 2), r, 6, true));
 			geo.rotateX(-Math.PI / 2); // same lay-flat transform as the frame, so both align
 			geo.translate(0, y, 0);
-			const m = new THREE.Mesh(geo, keep(new THREE.MeshBasicMaterial({ color, toneMapped: false })));
-			grp.add(m);
+			grp.add(new THREE.Mesh(geo, mat));
 		};
-		tube(contour, RAIL_H - 0.5, 0.55, TRON.neonInner);
-		tube(buildOuter().getPoints(10), RAIL_H + 0.1, 0.5, TRON.neonOuter);
+		// Push a closed outline off the felt: bisector normals, signed area picks the outward side.
+		const offsetOut = (pts: THREE.Vector2[], off: number): THREE.Vector2[] => {
+			const n = pts.length;
+			let area = 0;
+			for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; area += a.x * b.y - b.x * a.y; }
+			const s = area > 0 ? -1 : 1;
+			return pts.map((p, i) => {
+				const q = pts[(i - 1 + n) % n], r2 = pts[(i + 1) % n];
+				const d1 = new THREE.Vector2(p.x - q.x, p.y - q.y).normalize();
+				const d2 = new THREE.Vector2(r2.x - p.x, r2.y - p.y).normalize();
+				const v = new THREE.Vector2(s * -(d1.y + d2.y), s * (d1.x + d2.x)).normalize();
+				return new THREE.Vector2(p.x + v.x * off, p.y + v.y * off);
+			});
+		};
+		// Inner strip on the rail top, 2 units back from the cushion nose: a ball hugging the rail
+		// or crossing a pocket mouth at full height never reaches it (ball top 2R < strip bottom + offset).
+		const inner = offsetOut(contour, 2.0);
+		const outer = offsetOut(buildOuter().getPoints(24), -0.8); // sits ON the frame, not over its edge
+		polyTube(inner, RAIL_H + 0.2, 0.45, keep(new THREE.MeshBasicMaterial({ color: TRON.neonInner, toneMapped: false })));
+		polyTube(outer, RAIL_H + 0.1, 0.5, keep(new THREE.MeshBasicMaterial({ color: TRON.neonOuter, toneMapped: false })));
 	}
 
 	// Diamond sights on the rail top — the classic little markers, for looks.
