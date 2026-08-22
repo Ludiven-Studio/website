@@ -677,6 +677,7 @@ function layoutRows(n: number): number[][] {
 const CSS = `
 .ws-root {
   --ws-accent: var(--accent-regular);
+  --ws-shelf: #5fbfae;
   width: 100%;
   max-width: 520px;
   margin-inline: auto;
@@ -714,7 +715,24 @@ const CSS = `
 .ws-boardwrap { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; }
 .ws-board { display: flex; flex-direction: column; gap: 18px; align-items: center; padding: 8px 0; }
 .ws-board.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
-.ws-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.ws-row { position: relative; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding-bottom: 14px; }
+
+/* Glass shelf under each row, like the lab the game card is set in. ::before is the
+   light it spills underneath, ::after the plank the tubes stand on. */
+.ws-row::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -10px; height: 26px;
+  background: radial-gradient(70% 100% at 50% 0%, color-mix(in srgb, var(--ws-shelf) 45%, transparent), transparent 75%);
+  filter: blur(4px); pointer-events: none;
+}
+.ws-row::after {
+  content: ''; position: absolute; left: -18px; right: -18px; bottom: 0; height: 14px;
+  border-radius: 3px 3px 6px 6px; pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--ws-shelf) 30%, #fff) 0 3px,
+    color-mix(in srgb, var(--ws-shelf) 62%, transparent) 3px 62%,
+    color-mix(in srgb, var(--ws-shelf) 78%, transparent) 62% 100%);
+  box-shadow: 0 9px 18px -9px rgba(0, 0, 0, 0.6), inset 0 -3px 5px -3px rgba(0, 0, 0, 0.4);
+}
 
 .ws-tube {
   position: relative; isolation: isolate; width: 48px; height: calc(48px * var(--h, 4) * 0.64);

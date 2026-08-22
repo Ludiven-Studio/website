@@ -593,10 +593,19 @@ const CSS = `
   position: relative; min-height: 380px; border-radius: 18px; overflow: hidden;
   background:
     radial-gradient(120% 90% at 50% -10%, rgba(160,140,255,0.16), transparent 60%),
+    /* the two hanging lamps of the game card, spilling onto the workbench */
+    radial-gradient(40% 48% at 7% 0%, rgba(255,176,74,0.20), transparent 70%),
+    radial-gradient(40% 48% at 93% 0%, rgba(255,176,74,0.15), transparent 70%),
     repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 26px),
     repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 26px),
     linear-gradient(160deg, #241b3a, #1a1730 60%, #201a37);
   border: 1px solid var(--gray-800); touch-action: none;
+}
+/* Wooden edge of the workbench the board rests on. */
+.al-board::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 11px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(122,79,48,0.85), rgba(58,37,22,0.9));
+  box-shadow: inset 0 1px 0 rgba(255,214,170,0.28);
 }
 .al-board-hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 30px; color: rgba(255,255,255,0.6); font-size: 14px; pointer-events: none; }
 

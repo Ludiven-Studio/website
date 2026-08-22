@@ -685,7 +685,18 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
+/* Gilded frame, like the throne hall the game card is set in. */
+.rn-boardwrap::before {
+  content: '';
+  position: absolute;
+  inset: -13px;
+  border-radius: 16px;
+  pointer-events: none;
+  background: linear-gradient(155deg, #f0d489, #c39442 42%, #8d6524);
+  box-shadow: 0 12px 26px -14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 245, 214, 0.75);
+}
 .rn-board {
+  position: relative;
   width: 100%;
   display: grid;
   border: 3px solid var(--rn-line-strong);
