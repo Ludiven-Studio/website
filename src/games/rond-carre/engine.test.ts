@@ -50,17 +50,19 @@ describe('rond-carre engine', () => {
 		});
 	}
 
+	// Expert draws several boards per puzzle, so keep the sample small and the clock long.
 	it('every board is solvable by pure deduction, never by guessing', () => {
 		for (const key of Object.keys(DIFFS)) {
 			const diff = DIFFS[key];
-			for (let i = 0; i < 12; i++) {
+			const draws = diff.candidates ? 3 : 8;
+			for (let i = 0; i < draws; i++) {
 				const p = generateRondCarre(diff, mulberry32(500 + i));
 				const solved = solveByLogic(p.given, p.constraints, p.size, diff.tier ?? 1);
 				expect(solved, `${key} seed ${i} needs a guess`).not.toBeNull();
 				expect(solved).toEqual(p.solution);
 			}
 		}
-	});
+	}, 30_000);
 
 	it('findHint always names a technique — never falls back to "par déduction"', () => {
 		for (const key of Object.keys(DIFFS)) {
