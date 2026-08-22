@@ -156,6 +156,12 @@ function RepeaterGlyph({ rot }: { rot: number }) {
 function SensorGlyph({ expect, got }: { expect: Mask; got: Mask }) {
 	const exact = got === expect;
 	const lit = got !== 0;
+	// Recipe: a mixed target (cyan/magenta/yellow/white) shows one coloured pill per
+	// primary it needs, so the player sees how to build it. Shown while the sensor is
+	// still dark — the ✓/✕ takes over once any light arrives.
+	const parts = [1, 2, 4].filter((b) => expect & b);
+	const showRecipe = !lit && parts.length >= 2;
+	const dotX = (i: number): number => 50 + (i - (parts.length - 1) / 2) * 13;
 	return (
 		<g>
 			<circle
@@ -168,6 +174,9 @@ function SensorGlyph({ expect, got }: { expect: Mask; got: Mask }) {
 				data-expect={expect}
 			/>
 			<circle cx={50} cy={50} r={19} fill={lit ? MASK_COLOR[got] : '#0c1122'} data-got={got} />
+			{showRecipe && parts.map((b, i) => (
+				<circle key={b} cx={dotX(i)} cy={50} r={5.5} fill={MASK_COLOR[b]} stroke="#0c1122" strokeWidth={1.5} />
+			))}
 			{lit && (
 				<text
 					x={50}
