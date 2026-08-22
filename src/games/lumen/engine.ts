@@ -14,9 +14,9 @@ import type { Rng } from '../prng';
 
 export type Dir = 0 | 1 | 2 | 3; // N E S W, clockwise from the top
 export type Mask = number; // bits 1=R 2=G 4=B; 0 = no light
-export type PieceType = 'source' | 'sensor' | 'wall' | 'mirror' | 'prism' | 'combiner';
+export type PieceType = 'source' | 'sensor' | 'wall' | 'mirror' | 'prism' | 'combiner' | 'repeater';
 /** Pieces the player can hold and rotate. */
-export type MobileType = 'mirror' | 'prism' | 'combiner';
+export type MobileType = 'mirror' | 'prism' | 'combiner' | 'repeater';
 
 export interface Piece {
 	type: PieceType;
@@ -35,6 +35,8 @@ export interface DiffLevel {
 	sensors: number;
 	/** Combiners merge every ray they receive into ONE beam out of their arrow. */
 	combiners: number;
+	/** Repeaters copy one incoming beam out of TWO adjacent faces — one source, many sensors. */
+	repeaters: number;
 	walls: number;
 	/** Fixed decoy mirrors the player cannot touch. */
 	decoys: number;
@@ -45,10 +47,10 @@ export interface DiffLevel {
 // A sensor STOPS a ray, so sensors <= sources + 2*prisms; slack under that cap is
 // what allows mixed-colour sensors (a mix eats two rays).
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', size: 5, sources: 2, mirrors: 2, prisms: 0, sensors: 2, combiners: 0, walls: 1, decoys: 0, colored: 0.7 },
-	moyen: { label: 'Moyen', size: 6, sources: 2, mirrors: 3, prisms: 1, sensors: 2, combiners: 1, walls: 2, decoys: 0, colored: 0.5 },
-	difficile: { label: 'Difficile', size: 7, sources: 2, mirrors: 4, prisms: 1, sensors: 3, combiners: 1, walls: 3, decoys: 0, colored: 0.55 },
-	expert: { label: 'Expert', size: 8, sources: 2, mirrors: 5, prisms: 2, sensors: 4, combiners: 1, walls: 4, decoys: 2, colored: 0.5 },
+	facile: { label: 'Facile', size: 5, sources: 2, mirrors: 2, prisms: 0, sensors: 2, combiners: 0, repeaters: 0, walls: 1, decoys: 0, colored: 0.7 },
+	moyen: { label: 'Moyen', size: 6, sources: 2, mirrors: 3, prisms: 1, sensors: 2, combiners: 1, repeaters: 0, walls: 2, decoys: 0, colored: 0.5 },
+	difficile: { label: 'Difficile', size: 7, sources: 2, mirrors: 4, prisms: 1, sensors: 3, combiners: 1, repeaters: 1, walls: 3, decoys: 0, colored: 0.55 },
+	expert: { label: 'Expert', size: 8, sources: 2, mirrors: 5, prisms: 2, sensors: 4, combiners: 1, repeaters: 1, walls: 4, decoys: 2, colored: 0.5 },
 };
 
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
@@ -83,8 +85,8 @@ export interface LumenPuzzle {
 }
 
 // Prism: 3 rots = the 3 cyclic colour orders (a 4th would repeat one — forbidden).
-// Combiner: rot = output direction.
-export const ROTS: Record<MobileType, number> = { mirror: 2, prism: 3, combiner: 4 };
+// Combiner: rot = output direction. Repeater: rot = first of its two adjacent output faces.
+export const ROTS: Record<MobileType, number> = { mirror: 2, prism: 3, combiner: 4, repeater: 4 };
 
 /** Dir offsets for the prism channels: left of travel, straight, right of travel. */
 const PRISM_BEND = [3, 0, 1] as const;
@@ -178,6 +180,11 @@ export function trace(size: number, board: (Piece | null)[]): TraceResult {
 					combined.set(idx, acc);
 					rays.push({ r, c, d: p.rot as Dir, mask: acc });
 				}
+			} else if (p.type === 'repeater') {
+				// Copy the whole incoming beam out of the two adjacent faces (rot, rot+1).
+				// `seen` on the outgoing cells bounds it, so duplication can't run away.
+				rays.push({ r, c, d: p.rot as Dir, mask });
+				rays.push({ r, c, d: ((p.rot + 1) % 4) as Dir, mask });
 			}
 			break; // wall / source absorb; the rest re-emitted above
 		}
@@ -411,6 +418,9 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 	};
 	// Prisms first: mirrors then land on coloured beams and route the mixes.
 	for (let m = 0; m < diff.prisms; m++) if (!putOnBeam('prism')) return null;
+	// Repeaters duplicate a beam, so more sensors can hang off one source. A miss is
+	// survivable (like combiners) — skip rather than kill the deal.
+	for (let m = 0; m < diff.repeaters; m++) putOnBeam('repeater');
 	for (let m = 0; m < diff.mirrors; m++) if (!putOnBeam('mirror')) return null;
 	// Combiners merge rays 2-into-1, shrinking the ray budget — a miss is survivable,
 	// so a failed drop skips the piece instead of killing the deal.
@@ -537,6 +547,8 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 
 function softGates(deal: Deal, diff: DiffLevel): boolean {
 	if (deal.preSatisfied > 0) return false; // no sensor should come for free
+	// Repeaters are an optional simplifier, not a promised piece — kept out of this survival
+	// gate so a stripped one never forces a reroll (and never inflates the fallback rate).
 	if (deal.pieces.length < diff.mirrors + diff.prisms + diff.combiners - 1) return false; // at most one stripped
 	// The tier promises its signature pieces: a stripped prism / skipped combiner rerolls.
 	if (diff.prisms > 0 && !deal.pieces.some((p) => p.type === 'prism')) return false;
@@ -550,7 +562,7 @@ function softGates(deal: Deal, diff: DiffLevel): boolean {
 /** Absolute fallback: shrink the ask, then a handmade one-mirror deal. Never spins. */
 function desperateDeal(size: number, diff: DiffLevel, rng: Rng): Deal {
 	// Stripping the prisms shrinks the ray budget to `sources` — cap sensors with it.
-	const easier: DiffLevel = { ...diff, walls: 0, decoys: 0, prisms: 0, combiners: 0, sensors: Math.max(1, Math.min(diff.sources, diff.sensors - 1)) };
+	const easier: DiffLevel = { ...diff, walls: 0, decoys: 0, prisms: 0, combiners: 0, repeaters: 0, sensors: Math.max(1, Math.min(diff.sources, diff.sensors - 1)) };
 	for (let t = 0; t < 400; t++) {
 		const d = dealOnce(size, easier, rng);
 		if (d) return d;
@@ -569,13 +581,27 @@ function desperateDeal(size: number, diff: DiffLevel, rng: Rng): Deal {
 }
 
 export type LumenHint =
-	| { kind: 'remove'; trayIndex: number; reason: string }
 	| { kind: 'rotate'; trayIndex: number; rot: number; reason: string }
-	| { kind: 'place'; trayIndex: number; idx: number; rot: number; reason: string };
+	| { kind: 'move'; trayIndex: number; idx: number; rot: number; reason: string };
+
+/** A harmless empty cell to slide a blocker onto: its start spot if free, else any free
+ *  non-slot, non-fixed cell. Pieces live in the scene, so a hint parks — never a tray. */
+function freeParkCell(p: LumenPuzzle, occupied: Set<number>, prefer?: number): number {
+	const isFixed = new Set(p.fixed.map((f) => f.idx));
+	const isSlot = new Set(p.solution.map((s) => s.idx));
+	const ok = (c: number): boolean => c >= 0 && !occupied.has(c) && !isFixed.has(c) && !isSlot.has(c);
+	if (prefer !== undefined && ok(prefer)) return prefer;
+	for (let c = 0; c < p.size * p.size; c++) if (ok(c)) return c;
+	return -1;
+}
 
 /**
- * The hint repairs the grid before advancing it: first pull back a piece sitting on a
- * wrong cell, then fix a wrong rotation, only then place the next solution piece.
+ * The hint is always constructive and never uses a tray — pieces stay in the scene.
+ * 1) a piece on the right cell but turned wrong → rotate it;
+ * 2) otherwise move a piece straight onto a free solution slot (a misplaced piece first,
+ *    so the move also clears the cell it was squatting);
+ * 3) deadlock only (every free-able slot is blocked): slide one squatter off its slot onto
+ *    a harmless free cell so the next hint can fill it.
  * Same-type pieces are interchangeable, so two equivalent mirrors never get swapped.
  */
 export function findHint(p: LumenPuzzle, placements: (Placement | null)[]): LumenHint | null {
@@ -584,32 +610,52 @@ export function findHint(p: LumenPuzzle, placements: (Placement | null)[]): Lume
 	const slotByIdx = new Map<number, SolutionSlot>();
 	for (const s of p.solution) slotByIdx.set(s.idx, s);
 
-	const matched = new Set<number>(); // solution idx already claimed by a placed piece
-	let wrongCell = -1, wrongRot = -1;
+	const matched = new Set<number>(); // solution cell already claimed by a correct piece
+	const occupied = new Set<number>(); // every cell a player piece currently sits on
+	const correct = new Array<boolean>(p.tray.length).fill(false);
+	let wrongRot = -1;
 	for (let i = 0; i < p.tray.length; i++) {
 		const pl = placements[i];
 		if (!pl) continue;
+		occupied.add(pl.idx);
 		const slot = slotByIdx.get(pl.idx);
-		if (!slot || slot.type !== p.tray[i].type || matched.has(pl.idx)) {
-			if (wrongCell < 0) wrongCell = i;
-			continue;
+		if (slot && slot.type === p.tray[i].type && !matched.has(pl.idx)) {
+			matched.add(pl.idx);
+			correct[i] = true;
+			if (pl.rot !== slot.rot && wrongRot < 0) wrongRot = i;
 		}
-		matched.add(pl.idx);
-		if (pl.rot !== slot.rot && wrongRot < 0) wrongRot = i;
 	}
-	if (wrongCell >= 0)
-		return { kind: 'remove', trayIndex: wrongCell, reason: 'Cette pièce n\'est pas à sa place : retour au plateau.' };
+
 	if (wrongRot >= 0) {
 		const slot = slotByIdx.get((placements[wrongRot] as Placement).idx) as SolutionSlot;
 		return { kind: 'rotate', trayIndex: wrongRot, rot: slot.rot, reason: 'Bonne case, mauvaise orientation : on la tourne.' };
 	}
 
 	for (const slot of p.solution) {
-		if (matched.has(slot.idx)) continue;
+		if (matched.has(slot.idx) || occupied.has(slot.idx)) continue; // the slot's cell must be free
+		let floating = -1, misplaced = -1;
 		for (let i = 0; i < p.tray.length; i++) {
-			if (placements[i] || p.tray[i].type !== slot.type) continue;
-			return { kind: 'place', trayIndex: i, idx: slot.idx, rot: slot.rot, reason: 'Une pièce posée là fait avancer la lumière.' };
+			if (p.tray[i].type !== slot.type || correct[i]) continue;
+			if (placements[i]) { misplaced = i; break; } // moving it also frees its old cell
+			if (floating < 0) floating = i;
 		}
+		const src = misplaced >= 0 ? misplaced : floating;
+		if (src >= 0)
+			return {
+				kind: 'move', trayIndex: src, idx: slot.idx, rot: slot.rot,
+				reason: placements[src]
+					? 'Cette pièce va directement à sa place.'
+					: 'Une pièce posée là fait avancer la lumière.',
+			};
+	}
+
+	// Every free-able slot is blocked by a squatter — slide one off onto a harmless cell.
+	for (let i = 0; i < p.tray.length; i++) {
+		const pl = placements[i];
+		if (!pl || correct[i] || !slotByIdx.has(pl.idx)) continue; // only pieces squatting a real slot block progress
+		const home = freeParkCell(p, occupied, p.start[i]?.idx);
+		if (home >= 0)
+			return { kind: 'move', trayIndex: i, idx: home, rot: pl.rot, reason: 'Cette pièce en bloque une autre : on la dégage.' };
 	}
 	return null; // solved some other valid way, or nothing left to say
 }
@@ -627,8 +673,7 @@ export function solutionPlacements(p: LumenPuzzle): Placement[] {
 /** Pure: placements with the hint applied. */
 export function applyHint(placements: (Placement | null)[], h: LumenHint): (Placement | null)[] {
 	const next = placements.slice();
-	if (h.kind === 'remove') next[h.trayIndex] = null;
-	else if (h.kind === 'rotate') next[h.trayIndex] = { ...(next[h.trayIndex] as Placement), rot: h.rot };
+	if (h.kind === 'rotate') next[h.trayIndex] = { ...(next[h.trayIndex] as Placement), rot: h.rot };
 	else next[h.trayIndex] = { idx: h.idx, rot: h.rot };
 	return next;
 }

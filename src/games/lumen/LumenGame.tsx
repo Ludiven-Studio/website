@@ -40,9 +40,10 @@ import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    LUMEN — React island.
-   Drag mirrors, prisms and combiners from the tray onto the grid; light (white or
-   a single colour) splits into R/G/B, combiners merge rays back into one beam, and
-   every sensor must receive EXACTLY its colour (additive mixing).
+   Drag mirrors, prisms, combiners and repeaters from the tray onto the grid; light
+   (white or a single colour) splits into R/G/B, combiners merge rays back into one
+   beam, repeaters copy a beam out of two faces, and every sensor must receive EXACTLY
+   its colour (additive mixing).
    Engine is pure/tested; the construction ships as `solution` for the hints.
    ===================================================== */
 
@@ -137,6 +138,21 @@ function CombinerGlyph({ rot }: { rot: number }) {
 	);
 }
 
+function RepeaterGlyph({ rot }: { rot: number }) {
+	// Splitter: one node, two bright output arrows on the adjacent faces rot and rot+1.
+	return (
+		<g transform={`rotate(${rot * 90} 50 50)`}>
+			<circle cx={50} cy={50} r={22} fill="#1b2340" stroke="#8ea2ff" strokeWidth={5} />
+			{/* North output */}
+			<line x1={50} y1={46} x2={50} y2={26} stroke="#ffffff" strokeWidth={7} strokeLinecap="round" />
+			<polygon points="50,6 39,26 61,26" fill="#ffffff" />
+			{/* East output */}
+			<line x1={54} y1={50} x2={74} y2={50} stroke="#ffffff" strokeWidth={7} strokeLinecap="round" />
+			<polygon points="94,50 74,39 74,61" fill="#ffffff" />
+		</g>
+	);
+}
+
 function SensorGlyph({ expect, got }: { expect: Mask; got: Mask }) {
 	const exact = got === expect;
 	const lit = got !== 0;
@@ -189,6 +205,7 @@ function PieceGlyph({ piece, got }: { piece: Piece; got?: Mask }) {
 		case 'mirror': return <MirrorGlyph rot={piece.rot} decoy={piece.fixed} />;
 		case 'prism': return <PrismGlyph rot={piece.rot} />;
 		case 'combiner': return <CombinerGlyph rot={piece.rot} />;
+		case 'repeater': return <RepeaterGlyph rot={piece.rot} />;
 		case 'sensor': return <SensorGlyph expect={piece.expect ?? 0} got={got ?? 0} />;
 		case 'wall': return <WallGlyph />;
 	}
@@ -228,7 +245,7 @@ export function BoardView({
 			const exits = !end && (s.r1 + stepR[d] < 0 || s.r1 + stepR[d] >= n || s.c1 + stepC[d] < 0 || s.c1 + stepC[d] >= n);
 			const kind =
 				end?.type === 'wall' || end?.type === 'source' ? 'spark'
-				: end?.type === 'prism' || end?.type === 'combiner' ? 'refract'
+				: end?.type === 'prism' || end?.type === 'combiner' || end?.type === 'repeater' ? 'refract'
 				: end?.type === 'mirror' ? 'bounce'
 				: end?.type === 'sensor' ? 'hit'
 				: exits ? 'exit' : 'none';
@@ -1019,9 +1036,12 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 					<div className="lum-win" role="dialog" aria-label="Capteurs satisfaits">
 						<div className="lum-wincard">
 							<div className="lum-winmark">💡</div>
-							<h2>Toute la lumière est en place&nbsp;!</h2>
-							<p className="lum-wintime">{fmtTime(elapsed)}</p>
-							<p className="lum-windiff">{DIFFS[diffKey].label} · {n}×{n}</p>
+							<div className="lum-wintext">
+								<strong>Toute la lumière est en place&nbsp;!</strong>
+								<span className="lum-winsub">
+									<span className="lum-wintime">{fmtTime(elapsed)}</span> · {DIFFS[diffKey].label} · {n}×{n}
+								</span>
+							</div>
 							<button className="lum-replay" onClick={() => newGame(diffKey)}>
 								Rejouer
 							</button>
@@ -1067,7 +1087,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 												beginDrag(i, 0, 'tray', null, e.clientX, e.clientY, e.pointerType === 'touch');
 											}
 								}
-								aria-label={tp.type === 'mirror' ? 'Miroir' : tp.type === 'prism' ? 'Prisme' : 'Mélangeur'}
+								aria-label={tp.type === 'mirror' ? 'Miroir' : tp.type === 'prism' ? 'Prisme' : tp.type === 'combiner' ? 'Mélangeur' : 'Répéteur'}
 							>
 								<svg viewBox="0 0 100 100" aria-hidden="true">
 									<PieceGlyph piece={{ type: tp.type, rot: 0, fixed: false }} />
@@ -1091,9 +1111,10 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 				<p className="lum-help">
 					Les pièces entourées d'un pointillé sont à toi : elles sont mal placées. Glisse-les
 					pour guider la lumière, touche une pièce pour la faire pivoter — pivoter un prisme
-					change quelle couleur sort de quel côté, et le mélangeur fusionne tous les rayons
-					reçus en un seul faisceau vers sa flèche. Chaque capteur veut EXACTEMENT sa couleur
-					— du blanc sur un capteur rouge, c'est raté.
+					change quelle couleur sort de quel côté, le mélangeur fusionne tous les rayons
+					reçus en un seul faisceau vers sa flèche, et le répéteur recopie un faisceau vers
+					ses deux flèches. Chaque capteur veut EXACTEMENT sa couleur — du blanc sur un
+					capteur rouge, c'est raté.
 				</p>
 			) : null}
 
@@ -1299,16 +1320,21 @@ const CSS = `
   color: var(--gray-300); font-size: 14px; font-weight: 500;
 }
 
+/* Docked at the bottom, no blur: the solved board (the whole point) stays visible. */
 .lum-win {
-  position: absolute; inset: -8px; z-index: 10; display: flex; align-items: center; justify-content: center;
-  background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; animation: lum-fade 0.25s ease;
+  position: absolute; inset: -8px; z-index: 10; display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 10px; pointer-events: none; animation: lum-fade 0.25s ease;
 }
-.lum-wincard { background: var(--gray-999); border: 2px solid var(--lum-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg); }
-.lum-wincard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 22px; color: var(--gray-0); }
-.lum-winmark { font-size: 30px; }
-.lum-wintime { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 0; color: var(--lum-accent); }
-.lum-windiff { color: var(--gray-300); font-size: 13px; margin: 2px 0 14px; }
-.lum-replay { border: none; background: var(--lum-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 26px; cursor: pointer; }
+.lum-wincard {
+  pointer-events: auto; display: flex; align-items: center; gap: 14px; max-width: 96%;
+  background: var(--gray-999); border: 2px solid var(--lum-accent); border-radius: 16px; padding: 10px 14px; box-shadow: var(--shadow-lg);
+}
+.lum-winmark { font-size: 26px; flex: none; }
+.lum-wintext { display: flex; flex-direction: column; text-align: left; line-height: 1.25; min-width: 0; }
+.lum-wintext strong { font-family: var(--font-brand); font-weight: 600; font-size: 15px; color: var(--gray-0); }
+.lum-winsub, .lum-windiff { color: var(--gray-300); font-size: 12.5px; }
+.lum-wintime { color: var(--lum-accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+.lum-replay { flex: none; border: none; background: var(--lum-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 9px 20px; cursor: pointer; }
 
 @keyframes lum-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {

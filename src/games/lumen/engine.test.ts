@@ -56,6 +56,35 @@ describe('lumen mirrors', () => {
 	});
 });
 
+describe('lumen repeaters', () => {
+	const repeater = (rot: number): Piece => ({ type: 'repeater', rot, fixed: false });
+
+	it('copies the whole incoming beam out of its two adjacent faces (rot, rot+1)', () => {
+		for (let rot = 0; rot < 4; rot++) {
+			const b = empty(3);
+			b[3] = src(1, 5); // (1,0) fires E into the centre, colour R|B (mask 5)
+			b[4] = repeater(rot);
+			const outs = [rot, (rot + 1) % 4];
+			const tgt = (d: number): number => (1 + STEP[d][0]) * 3 + (1 + STEP[d][1]);
+			for (const d of outs) if (tgt(d) !== 3) b[tgt(d)] = sensor(); // 3 = the source cell, absorbs
+			const t = trace(3, b);
+			for (const d of outs) if (tgt(d) !== 3) expect(t.sensorMask.get(tgt(d))).toBe(5); // full mask, both outputs
+		}
+	});
+
+	it('feeds two sensors from a single source', () => {
+		const b = empty(3);
+		b[3] = src(1); // (1,0) fires E, white
+		b[4] = repeater(0); // outputs N and E
+		b[1] = sensor(); // (0,1) — the N copy
+		b[5] = sensor(); // (1,2) — the E copy
+		const t = trace(3, b);
+		expect(t.sensorMask.get(1)).toBe(7);
+		expect(t.sensorMask.get(5)).toBe(7);
+		expect(t.sensorMask.size).toBe(2);
+	});
+});
+
 describe('lumen prisms', () => {
 	// PRISM_BEND: dir offsets per bend slot — left, straight, right of travel.
 	const BEND = [3, 0, 1];
@@ -329,7 +358,7 @@ describe('lumen scattered start', () => {
 			}
 		});
 
-		it(`${diff.label}: from the scatter, hints repair then place and win`, () => {
+		it(`${diff.label}: from the scatter, hints move pieces home and win`, () => {
 			for (let s = 0; s < 4; s++) {
 				const p = generateLumen(diff, mulberry32(4700 + s * 19 + diff.size));
 				let placements: (Placement | null)[] = p.start.map((pl) => ({ ...pl }));
@@ -338,8 +367,8 @@ describe('lumen scattered start', () => {
 					const h = findHint(p, placements);
 					if (!h) break;
 					placements = applyHint(placements, h);
-					// Worst case: one remove + one place per scattered piece.
-					expect(++steps).toBeLessThanOrEqual(2 * p.solution.length);
+					// Worst case per piece: park a squatter + move it home, plus a rotation.
+					expect(++steps).toBeLessThanOrEqual(3 * p.solution.length);
 				}
 				expect(isSolved(p, placements)).toBe(true);
 			}
@@ -391,7 +420,7 @@ describe('lumen hints', () => {
 				for (;;) {
 					const h = findHint(p, placements);
 					if (!h) break;
-					expect(h.kind).toBe('place'); // nothing to repair on a clean board
+					expect(h.kind).toBe('move'); // nothing to repair on a clean board
 					expect(h.reason.length).toBeGreaterThan(0);
 					placements = applyHint(placements, h);
 					expect(++steps).toBeLessThanOrEqual(p.solution.length);
@@ -403,20 +432,43 @@ describe('lumen hints', () => {
 		});
 	}
 
-	it('a piece on a wrong cell gets pulled back first', () => {
+	it('a piece dragged off its slot is moved right back, never parked in a tray', () => {
 		const p = generateLumen(DIFFS.moyen, mulberry32(9091));
 		const solCells = new Set(p.solution.map((s) => s.idx));
 		const fixedCells = new Set(p.fixed.map((f) => f.idx));
 		let stray = -1;
 		for (let i = 0; i < p.size * p.size; i++)
 			if (!solCells.has(i) && !fixedCells.has(i)) { stray = i; break; }
-		expect(stray).toBeGreaterThanOrEqual(0);
 
-		const placements = new Array<Placement | null>(p.tray.length).fill(null);
-		placements[0] = { idx: stray, rot: 0 };
+		// Whole solution placed, then one piece dragged onto a stray cell: its slot is now
+		// free, so the hint moves that same piece straight back — no tray, one step.
+		const placements: (Placement | null)[] = solutionPlacements(p);
+		const home = (placements[0] as Placement).idx;
+		placements[0] = { idx: stray, rot: (placements[0] as Placement).rot };
 		const h = findHint(p, placements);
-		expect(h?.kind).toBe('remove');
+		expect(h?.kind).toBe('move');
 		expect((h as { trayIndex: number }).trayIndex).toBe(0);
+		expect((h as { idx: number }).idx).toBe(home);
+	});
+
+	it('a hint never sends a piece to the tray (no-tray doctrine)', () => {
+		for (const key of Object.keys(DIFFS)) {
+			for (let s = 0; s < 3; s++) {
+				const p = generateLumen(DIFFS[key], mulberry32(5100 + s * 13 + DIFFS[key].size));
+				let placements: (Placement | null)[] = p.start.map((pl) => ({ ...pl }));
+				let steps = 0;
+				for (;;) {
+					const h = findHint(p, placements);
+					if (!h) break;
+					const before = placements.filter((x) => x === null).length;
+					placements = applyHint(placements, h);
+					const after = placements.filter((x) => x === null).length;
+					expect(after).toBeLessThanOrEqual(before); // a hint never creates a null (tray) slot
+					expect(++steps).toBeLessThanOrEqual(3 * p.solution.length);
+				}
+				expect(isSolved(p, placements)).toBe(true);
+			}
+		}
 	});
 
 	it('a wrong rotation on the right cell gets rotated, not removed', () => {
