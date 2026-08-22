@@ -28,9 +28,10 @@ const basePlan: LevelPlan<LumenLevelCfg> = {
 		const size = 5 + (l >= 35 ? 1 : 0) + (l >= 69 ? 1 : 0); // 5 → 7
 		const mirrors = 2 + Math.min(3, Math.floor((l - 1) / 25)); // 2 → 5
 		const prisms = l >= 70 ? 2 : l >= 20 ? 1 : 0;
+		const combiners = l >= 55 ? 1 : 0;
 		// Ray budget: sensors <= sources + 2*prisms, with slack so mixes can appear.
 		const sensors = 2 + (l >= 45 ? 1 : 0) + (l >= 70 ? 1 : 0); // 2 → 4
-		const pieces = mirrors + prisms;
+		const pieces = mirrors + prisms + combiners;
 		return {
 			seed: levelSeed(l),
 			diff: {
@@ -40,6 +41,7 @@ const basePlan: LevelPlan<LumenLevelCfg> = {
 				mirrors,
 				prisms,
 				sensors,
+				combiners,
 				walls: Math.min(3, Math.floor(l / 25)),
 				decoys: 0,
 				// Early levels lean on coloured sources: two beams you can tell apart.
@@ -67,7 +69,7 @@ const basePlan: LevelPlan<LumenLevelCfg> = {
 export const lumenLevels = extendPlan('lumen', basePlan, {
 	configExt: (base, level) => {
 		const mirrors = level > 150 ? 5 : 4;
-		const pieces = mirrors + 2;
+		const pieces = mirrors + 3;
 		return {
 			...base,
 			diff: {
@@ -77,6 +79,7 @@ export const lumenLevels = extendPlan('lumen', basePlan, {
 				mirrors,
 				prisms: 2,
 				sensors: 4,
+				combiners: 1,
 				walls: 3,
 				decoys: 2,
 				colored: 0.4,

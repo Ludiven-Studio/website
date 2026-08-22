@@ -14,7 +14,9 @@ import type { Rng } from '../prng';
 
 export type Dir = 0 | 1 | 2 | 3; // N E S W, clockwise from the top
 export type Mask = number; // bits 1=R 2=G 4=B; 0 = no light
-export type PieceType = 'source' | 'sensor' | 'wall' | 'mirror' | 'prism';
+export type PieceType = 'source' | 'sensor' | 'wall' | 'mirror' | 'prism' | 'combiner';
+/** Pieces the player can hold and rotate. */
+export type MobileType = 'mirror' | 'prism' | 'combiner';
 
 export interface Piece {
 	type: PieceType;
@@ -31,6 +33,8 @@ export interface DiffLevel {
 	mirrors: number;
 	prisms: number;
 	sensors: number;
+	/** Combiners merge every ray they receive into ONE beam out of their arrow. */
+	combiners: number;
 	walls: number;
 	/** Fixed decoy mirrors the player cannot touch. */
 	decoys: number;
@@ -41,10 +45,10 @@ export interface DiffLevel {
 // A sensor STOPS a ray, so sensors <= sources + 2*prisms; slack under that cap is
 // what allows mixed-colour sensors (a mix eats two rays).
 export const DIFFS: Record<string, DiffLevel> = {
-	facile: { label: 'Facile', size: 5, sources: 2, mirrors: 2, prisms: 0, sensors: 2, walls: 1, decoys: 0, colored: 0.7 },
-	moyen: { label: 'Moyen', size: 6, sources: 1, mirrors: 3, prisms: 1, sensors: 2, walls: 2, decoys: 0, colored: 0.35 },
-	difficile: { label: 'Difficile', size: 7, sources: 2, mirrors: 4, prisms: 1, sensors: 3, walls: 3, decoys: 0, colored: 0.55 },
-	expert: { label: 'Expert', size: 8, sources: 2, mirrors: 5, prisms: 2, sensors: 4, walls: 4, decoys: 2, colored: 0.5 },
+	facile: { label: 'Facile', size: 5, sources: 2, mirrors: 2, prisms: 0, sensors: 2, combiners: 0, walls: 1, decoys: 0, colored: 0.7 },
+	moyen: { label: 'Moyen', size: 6, sources: 2, mirrors: 3, prisms: 1, sensors: 2, combiners: 1, walls: 2, decoys: 0, colored: 0.5 },
+	difficile: { label: 'Difficile', size: 7, sources: 2, mirrors: 4, prisms: 1, sensors: 3, combiners: 1, walls: 3, decoys: 0, colored: 0.55 },
+	expert: { label: 'Expert', size: 8, sources: 2, mirrors: 5, prisms: 2, sensors: 4, combiners: 1, walls: 4, decoys: 2, colored: 0.5 },
 };
 
 export const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
@@ -56,7 +60,7 @@ const MIRROR: readonly (readonly Dir[])[] = [[1, 0, 3, 2], [3, 2, 1, 0]];
 
 export interface TrayPiece {
 	id: number;
-	type: 'mirror' | 'prism';
+	type: MobileType;
 }
 
 export interface Placement {
@@ -66,7 +70,7 @@ export interface Placement {
 
 export interface SolutionSlot {
 	idx: number;
-	type: 'mirror' | 'prism';
+	type: MobileType;
 	rot: number;
 }
 
@@ -79,12 +83,13 @@ export interface LumenPuzzle {
 }
 
 // Prism: 3 rots = the 3 cyclic colour orders (a 4th would repeat one — forbidden).
-export const ROTS: Record<'mirror' | 'prism', number> = { mirror: 2, prism: 3 };
+// Combiner: rot = output direction.
+export const ROTS: Record<MobileType, number> = { mirror: 2, prism: 3, combiner: 4 };
 
 /** Dir offsets for the prism channels: left of travel, straight, right of travel. */
 const PRISM_BEND = [3, 0, 1] as const;
 
-export const rotCW = (type: 'mirror' | 'prism', rot: number): number => (rot + 1) % ROTS[type];
+export const rotCW = (type: MobileType, rot: number): number => (rot + 1) % ROTS[type];
 
 /** Live board: fixed pieces + player placements (placements[i] pairs with tray[i]). */
 export function boardFrom(p: LumenPuzzle, placements: (Placement | null)[]): (Piece | null)[] {
@@ -126,6 +131,7 @@ interface Ray {
 export function trace(size: number, board: (Piece | null)[]): TraceResult {
 	const segments: BeamSeg[] = [];
 	const sensorMask = new Map<number, Mask>();
+	const combined = new Map<number, Mask>(); // per-combiner accumulated input
 	const seen = new Uint8Array(size * size * 4);
 	const rays: Ray[] = [];
 
@@ -164,13 +170,29 @@ export function trace(size: number, board: (Piece | null)[]): TraceResult {
 				for (let ch = 0; ch < 3; ch++)
 					if (mask & (1 << ch))
 						rays.push({ r, c, d: ((d + PRISM_BEND[(ch + p.rot) % 3]) % 4) as Dir, mask: 1 << ch });
+			} else if (p.type === 'combiner') {
+				// Re-emit the OR of every ray received so far out of the rot face; the
+				// accumulator only grows, so each re-emission carries new light and dies out.
+				const acc = (combined.get(idx) ?? 0) | mask;
+				if (acc !== combined.get(idx)) {
+					combined.set(idx, acc);
+					rays.push({ r, c, d: p.rot as Dir, mask: acc });
+				}
 			}
 			break; // wall / source absorb; the rest re-emitted above
 		}
 		if (endR !== startR || endC !== startC)
 			segments.push({ r0: startR, c0: startC, r1: endR, c1: endC, mask });
 	}
-	return { segments, sensorMask };
+	// A combiner re-emits growing masks along one path: merge the duplicate segments.
+	const byPath = new Map<string, BeamSeg>();
+	for (const seg of segments) {
+		const key = `${seg.r0},${seg.c0},${seg.r1},${seg.c1}`;
+		const prev = byPath.get(key);
+		if (prev) prev.mask |= seg.mask;
+		else byPath.set(key, seg);
+	}
+	return { segments: [...byPath.values()], sensorMask };
 }
 
 /** Win: every sensor holds EXACTLY its expected mask — a superset fails too. */
@@ -186,6 +208,27 @@ function sensorsMatch(p: LumenPuzzle, got: Map<number, Mask>): boolean {
 
 const popcount = (m: Mask): number => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1);
 
+/** Masks of every segment passing through each EMPTY cell. */
+function crossMasks(size: number, board: (Piece | null)[], segments: BeamSeg[]): Map<number, Mask[]> {
+	const cross = new Map<number, Mask[]>();
+	for (const seg of segments) {
+		const dr = Math.sign(seg.r1 - seg.r0), dc = Math.sign(seg.c1 - seg.c0);
+		let r = seg.r0 + dr, c = seg.c0 + dc;
+		for (;;) {
+			const idx = r * size + c;
+			if (board[idx] === null) {
+				const arr = cross.get(idx) ?? [];
+				arr.push(seg.mask);
+				cross.set(idx, arr);
+			}
+			if (r === seg.r1 && c === seg.c1) break;
+			r += dr;
+			c += dc;
+		}
+	}
+	return cross;
+}
+
 interface Deal {
 	fixed: { idx: number; piece: Piece }[];
 	pieces: SolutionSlot[];
@@ -198,7 +241,7 @@ export function generateLumen(diff: DiffLevel, rng: Rng = Math.random): LumenPuz
 	const size = Math.max(4, Math.floor(diff.size));
 	let hardPass: Deal | null = null;
 
-	for (let attempt = 0; attempt < 160; attempt++) {
+	for (let attempt = 0; attempt < 240; attempt++) {
 		const deal = dealOnce(size, diff, rng);
 		if (!deal) continue;
 		hardPass = deal;
@@ -257,7 +300,12 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 	// apart, and two of them can mix on a sensor without any prism.
 	const primaries = [1, 2, 4];
 	const colourDeal = diff.sources >= 2 && rng() < diff.colored;
-	for (let s = 0; s < diff.sources; s++) {
+	// Primary beams never multiply (a prism keeps their single channel) and a combiner
+	// eats one ray (two in, one out): coloured deals fund it with an extra source and
+	// cap the sensors at the rays that survive — else they starve and skew out.
+	const nSources = colourDeal ? Math.min(3, diff.sources + diff.combiners) : diff.sources;
+	const nSensors = colourDeal ? Math.min(diff.sensors, Math.max(2, nSources - diff.combiners)) : diff.sensors;
+	for (let s = 0; s < nSources; s++) {
 		let ok = false;
 		for (let t = 0; t < 40 && !ok; t++) {
 			const idx = pick(free());
@@ -322,7 +370,7 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 		}
 		return true;
 	};
-	const putOnBeam = (type: 'mirror' | 'prism'): boolean => {
+	const putOnBeam = (type: MobileType): boolean => {
 		for (let tries = 0; tries < 12; tries++) {
 			const cells = beamCells();
 			const keys = [...cells.keys()];
@@ -336,9 +384,37 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 		}
 		return false;
 	};
+	// A combiner wants a cell where two beams already cross, so it truly merges;
+	// fallback: any beam cell (it then just redirects). Output needs 2 cells of runway.
+	const putCombiner = (): boolean => {
+		for (let tries = 0; tries < 12; tries++) {
+			const t = trace(size, board);
+			const cross = crossMasks(size, board, t.segments);
+			if (cross.size === 0) return false;
+			const merging: number[] = [];
+			for (const [idx, masks] of cross) if (new Set(masks).size >= 2) merging.push(idx);
+			const pool = merging.length > 0 ? merging : [...cross.keys()];
+			const idx = pool[Math.floor(rng() * pool.length)];
+			const r = Math.floor(idx / size), c = idx % size;
+			const dirs: Dir[] = [];
+			for (let d = 0; d < 4; d++) {
+				const rr = r + STEP[d][0] * 2, cc = c + STEP[d][1] * 2;
+				if (rr >= 0 && rr < size && cc >= 0 && cc < size) dirs.push(d as Dir);
+			}
+			if (dirs.length === 0) continue;
+			const rot = dirs[Math.floor(rng() * dirs.length)];
+			board[idx] = { type: 'combiner', rot, fixed: false };
+			if (prismsAlive()) { pieces.push({ idx, type: 'combiner', rot }); return true; }
+			board[idx] = null;
+		}
+		return false;
+	};
 	// Prisms first: mirrors then land on coloured beams and route the mixes.
 	for (let m = 0; m < diff.prisms; m++) if (!putOnBeam('prism')) return null;
 	for (let m = 0; m < diff.mirrors; m++) if (!putOnBeam('mirror')) return null;
+	// Combiners merge rays 2-into-1, shrinking the ray budget — a miss is survivable,
+	// so a failed drop skips the piece instead of killing the deal.
+	for (let m = 0; m < diff.combiners; m++) putCombiner();
 	// Decoys lie off-beam: fixed scenery the light never touches at deal time.
 	for (let m = 0; m < diff.decoys; m++) {
 		const on = beamCells();
@@ -350,7 +426,7 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 	// Sensors one at a time, re-tracing between each: a sensor sits on the LAST in-grid
 	// cell of a ray that escaped, so placing it never disturbs that ray upstream — but it
 	// can now absorb other beams crossing the cell, hence the fresh trace every time.
-	for (let s = 0; s < diff.sensors; s++) {
+	for (let s = 0; s < nSensors; s++) {
 		const t = trace(size, board);
 		const spots = new Map<number, Mask>();
 		for (const seg of t.segments) {
@@ -362,30 +438,16 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 			spots.set(idx, (spots.get(idx) ?? 0) | seg.mask);
 		}
 		// A sensor eats one whole ray, so a mix needs a spare one: when more rays escape
-		// than sensors remain, drop the sensor where two colours cross and ask for the mix.
-		if (spots.size > diff.sensors - s) {
-			const cross = new Map<number, Mask[]>();
-			for (const seg of t.segments) {
-				const dr = Math.sign(seg.r1 - seg.r0), dc = Math.sign(seg.c1 - seg.c0);
-				let r = seg.r0 + dr, c = seg.c0 + dc;
-				for (;;) {
-					const idx = r * size + c;
-					if (board[idx] === null) {
-						const arr = cross.get(idx) ?? [];
-						arr.push(seg.mask);
-						cross.set(idx, arr);
-					}
-					if (r === seg.r1 && c === seg.c1) break;
-					r += dr;
-					c += dc;
-				}
-			}
+		// than sensors remain — or none escape at all (a combiner swallowed them) — drop
+		// the sensor where two colours cross and ask for the mix.
+		if (spots.size > nSensors - s || spots.size === 0) {
+			const cross = crossMasks(size, board, t.segments);
 			const merges: number[] = [];
 			for (const [idx, masks] of cross) {
 				const union = masks.reduce((a, b) => a | b, 0);
 				if (new Set(masks).size >= 2 && popcount(union) === 2) merges.push(idx);
 			}
-			if (merges.length > 0 && rng() < 0.85) {
+			if (merges.length > 0 && (spots.size === 0 || rng() < 0.85)) {
 				board[merges[Math.floor(rng() * merges.length)]] = { type: 'sensor', rot: 0, expect: 0, fixed: true };
 				continue;
 			}
@@ -475,7 +537,10 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 
 function softGates(deal: Deal, diff: DiffLevel): boolean {
 	if (deal.preSatisfied > 0) return false; // no sensor should come for free
-	if (deal.pieces.length < diff.mirrors + diff.prisms - 1) return false; // at most one stripped
+	if (deal.pieces.length < diff.mirrors + diff.prisms + diff.combiners - 1) return false; // at most one stripped
+	// The tier promises its signature pieces: a stripped prism / skipped combiner rerolls.
+	if (diff.prisms > 0 && !deal.pieces.some((p) => p.type === 'prism')) return false;
+	if (diff.combiners > 0 && !deal.pieces.some((p) => p.type === 'combiner')) return false;
 	if (diff.prisms > 0 && !deal.expects.some((m) => m !== 7 && popcount(m) <= 2)) return false;
 	if (diff.size >= 6 && new Set(deal.expects).size < 2) return false;
 	if (diff.size >= 7 && !deal.expects.some((m) => popcount(m) === 2)) return false;
@@ -485,7 +550,7 @@ function softGates(deal: Deal, diff: DiffLevel): boolean {
 /** Absolute fallback: shrink the ask, then a handmade one-mirror deal. Never spins. */
 function desperateDeal(size: number, diff: DiffLevel, rng: Rng): Deal {
 	// Stripping the prisms shrinks the ray budget to `sources` — cap sensors with it.
-	const easier: DiffLevel = { ...diff, walls: 0, decoys: 0, prisms: 0, sensors: Math.max(1, Math.min(diff.sources, diff.sensors - 1)) };
+	const easier: DiffLevel = { ...diff, walls: 0, decoys: 0, prisms: 0, combiners: 0, sensors: Math.max(1, Math.min(diff.sources, diff.sensors - 1)) };
 	for (let t = 0; t < 400; t++) {
 		const d = dealOnce(size, easier, rng);
 		if (d) return d;

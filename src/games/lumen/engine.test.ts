@@ -21,6 +21,7 @@ const src = (rot: number, mask?: number): Piece => ({ type: 'source', rot, mask,
 const sensor = (expect = 0): Piece => ({ type: 'sensor', rot: 0, expect, fixed: true });
 const mirror = (rot: number): Piece => ({ type: 'mirror', rot, fixed: false });
 const prism = (rot: number): Piece => ({ type: 'prism', rot, fixed: false });
+const combiner = (rot: number): Piece => ({ type: 'combiner', rot, fixed: false });
 
 const empty = (size: number): (Piece | null)[] => new Array(size * size).fill(null);
 
@@ -129,6 +130,45 @@ describe('lumen coloured sources', () => {
 	});
 });
 
+describe('lumen combiners', () => {
+	it('merges rays from two faces into ONE beam out of the arrow', () => {
+		const b = empty(3);
+		b[3] = src(1, 1); // (1,0) red fires E
+		b[7] = src(0, 2); // (2,1) green fires N
+		b[4] = combiner(1); // (1,1) arrow E
+		b[5] = sensor(); // (1,2)
+		const t = trace(3, b);
+		expect(t.sensorMask.get(5)).toBe(3);
+		expect(t.sensorMask.size).toBe(1);
+		// The growing re-emissions collapse into a single output segment.
+		const out = t.segments.filter((s) => s.r0 === 1 && s.c0 === 1);
+		expect(out.length).toBe(1);
+		expect(out[0].mask).toBe(3);
+	});
+
+	it('accepts a ray on EVERY face and redirects it out of rot', () => {
+		for (let d = 0; d < 4; d++)
+			for (let rot = 0; rot < 4; rot++) {
+				if (rot === (d + 2) % 4) continue; // arrow aims at the source cell itself
+				const b = empty(3);
+				b[(1 - STEP[d][0]) * 3 + (1 - STEP[d][1])] = src(d, 4);
+				b[4] = combiner(rot);
+				const target = (1 + STEP[rot][0]) * 3 + (1 + STEP[rot][1]);
+				b[target] = sensor();
+				const t = trace(3, b);
+				expect(t.sensorMask.get(target)).toBe(4);
+			}
+	});
+
+	it('terminates when the arrow fires back along the incoming ray', () => {
+		const b = empty(3);
+		b[3] = src(1); // (1,0) fires E
+		b[4] = combiner(3); // (1,1) arrow W, straight back into the source
+		const t = trace(3, b);
+		expect(t.sensorMask.size).toBe(0);
+	});
+});
+
 describe('lumen mixing and sensors', () => {
 	it('accumulates additively: R and G land on one sensor as yellow (3)', () => {
 		const b = empty(3);
@@ -219,7 +259,11 @@ describe('lumen generation', () => {
 			const p = generateLumen(diff, mulberry32(5150 + diff.size));
 			expect(p.tray.filter((t) => t.type === 'mirror').length).toBeLessThanOrEqual(diff.mirrors);
 			expect(p.tray.filter((t) => t.type === 'prism').length).toBeLessThanOrEqual(diff.prisms);
-			expect(p.fixed.filter((f) => f.piece.type === 'source').length).toBe(diff.sources);
+			expect(p.tray.filter((t) => t.type === 'combiner').length).toBeLessThanOrEqual(diff.combiners);
+			// Coloured deals may add one primary source to fund the combiner.
+			const srcCount = p.fixed.filter((f) => f.piece.type === 'source').length;
+			expect(srcCount).toBeGreaterThanOrEqual(diff.sources);
+			expect(srcCount).toBeLessThanOrEqual(Math.min(3, diff.sources + diff.combiners));
 		}
 	});
 
@@ -237,6 +281,17 @@ describe('lumen generation', () => {
 		}
 		expect(coloured).toBeGreaterThan(0);
 		expect(white).toBeGreaterThan(0);
+	});
+
+	it('moyen and difficile deal coloured sources too', () => {
+		for (const key of ['moyen', 'difficile']) {
+			let coloured = 0;
+			for (let s = 0; s < 30; s++) {
+				const p = generateLumen(DIFFS[key], mulberry32(6100 + s * 13));
+				if (p.fixed.some((f) => f.piece.type === 'source' && (f.piece.mask ?? 7) !== 7)) coloured++;
+			}
+			expect(coloured).toBeGreaterThan(0);
+		}
 	});
 
 	it('is deterministic: same seed -> identical puzzle', () => {
@@ -320,6 +375,7 @@ describe('lumen board assembly', () => {
 		expect(rotCW('mirror', 1)).toBe(0);
 		expect(rotCW('prism', 2)).toBe(0);
 		expect(rotCW('prism', 0)).toBe(1);
+		expect(rotCW('combiner', 3)).toBe(0);
 	});
 });
 

@@ -40,9 +40,9 @@ import { useHintGate } from '../useHintGate';
 
 /* =====================================================
    LUMEN — React island.
-   Drag mirrors and prisms from the tray onto the grid; light (white or a single
-   colour) splits into R/G/B and every sensor must receive EXACTLY its colour
-   (additive mixing).
+   Drag mirrors, prisms and combiners from the tray onto the grid; light (white or
+   a single colour) splits into R/G/B, combiners merge rays back into one beam, and
+   every sensor must receive EXACTLY its colour (additive mixing).
    Engine is pure/tested; the construction ships as `solution` for the hints.
    ===================================================== */
 
@@ -108,16 +108,31 @@ function MirrorGlyph({ rot, decoy }: { rot: number; decoy?: boolean }) {
 }
 
 function PrismGlyph({ rot }: { rot: number }) {
-	// Any face refracts, so the triangle never turns: the ticks preview an entry from
-	// the top and rot cycles which colour leaves on each side (left / straight / right).
+	// Schematic, not grid-aligned: a NEUTRAL ray enters (the real colour depends on the
+	// source) and fans out left / straight / right of travel, the order cycling with rot.
 	const side = (bendIdx: number): string => MASK_COLOR[1 << (((bendIdx - rot) % 3 + 3) % 3)];
 	return (
 		<g>
-			<polygon points="20,24 80,24 50,82" fill="#1b2340" stroke="#8ea2ff" strokeWidth={5} strokeLinejoin="round" />
-			<line x1={50} y1={62} x2={50} y2={84} stroke={side(1)} strokeWidth={6} strokeLinecap="round" />
-			<line x1={62} y1={46} x2={84} y2={46} stroke={side(0)} strokeWidth={6} strokeLinecap="round" />
-			<line x1={38} y1={46} x2={16} y2={46} stroke={side(2)} strokeWidth={6} strokeLinecap="round" />
-			<line x1={30} y1={24} x2={70} y2={24} stroke="#ffffff" strokeWidth={5} strokeLinecap="round" />
+			<line x1={11} y1={41} x2={37} y2={48} stroke="#93a1c6" strokeWidth={5} strokeLinecap="round" />
+			<polygon points="50,20 81,74 19,74" fill="#1b2340" stroke="#8ea2ff" strokeWidth={5} strokeLinejoin="round" />
+			<line x1={37} y1={48} x2={64} y2={48} stroke="#ffffff" strokeWidth={4} strokeLinecap="round" opacity={0.35} />
+			<line x1={64} y1={48} x2={88} y2={34} stroke={side(0)} strokeWidth={5} strokeLinecap="round" />
+			<line x1={64} y1={48} x2={90} y2={48} stroke={side(1)} strokeWidth={5} strokeLinecap="round" />
+			<line x1={64} y1={48} x2={88} y2={62} stroke={side(2)} strokeWidth={5} strokeLinecap="round" />
+		</g>
+	);
+}
+
+function CombinerGlyph({ rot }: { rot: number }) {
+	// Funnel: dim ticks on the three intake faces, bright arrow on the output face.
+	return (
+		<g transform={`rotate(${rot * 90} 50 50)`}>
+			<circle cx={50} cy={50} r={24} fill="#1b2340" stroke="#8ea2ff" strokeWidth={5} />
+			<line x1={84} y1={50} x2={68} y2={50} stroke="#5a688f" strokeWidth={6} strokeLinecap="round" />
+			<line x1={50} y1={84} x2={50} y2={68} stroke="#5a688f" strokeWidth={6} strokeLinecap="round" />
+			<line x1={16} y1={50} x2={32} y2={50} stroke="#5a688f" strokeWidth={6} strokeLinecap="round" />
+			<line x1={50} y1={44} x2={50} y2={26} stroke="#ffffff" strokeWidth={7} strokeLinecap="round" />
+			<polygon points="50,6 38,26 62,26" fill="#ffffff" />
 		</g>
 	);
 }
@@ -173,6 +188,7 @@ function PieceGlyph({ piece, got }: { piece: Piece; got?: Mask }) {
 		case 'source': return <SourceGlyph rot={piece.rot} mask={piece.mask ?? 7} />;
 		case 'mirror': return <MirrorGlyph rot={piece.rot} decoy={piece.fixed} />;
 		case 'prism': return <PrismGlyph rot={piece.rot} />;
+		case 'combiner': return <CombinerGlyph rot={piece.rot} />;
 		case 'sensor': return <SensorGlyph expect={piece.expect ?? 0} got={got ?? 0} />;
 		case 'wall': return <WallGlyph />;
 	}
@@ -212,7 +228,7 @@ export function BoardView({
 			const exits = !end && (s.r1 + stepR[d] < 0 || s.r1 + stepR[d] >= n || s.c1 + stepC[d] < 0 || s.c1 + stepC[d] >= n);
 			const kind =
 				end?.type === 'wall' || end?.type === 'source' ? 'spark'
-				: end?.type === 'prism' ? 'refract'
+				: end?.type === 'prism' || end?.type === 'combiner' ? 'refract'
 				: end?.type === 'mirror' ? 'bounce'
 				: end?.type === 'sensor' ? 'hit'
 				: exits ? 'exit' : 'none';
@@ -1051,7 +1067,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 												beginDrag(i, 0, 'tray', null, e.clientX, e.clientY, e.pointerType === 'touch');
 											}
 								}
-								aria-label={tp.type === 'mirror' ? 'Miroir' : 'Prisme'}
+								aria-label={tp.type === 'mirror' ? 'Miroir' : tp.type === 'prism' ? 'Prisme' : 'Mélangeur'}
 							>
 								<svg viewBox="0 0 100 100" aria-hidden="true">
 									<PieceGlyph piece={{ type: tp.type, rot: 0, fixed: false }} />
@@ -1075,7 +1091,8 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 				<p className="lum-help">
 					Les pièces entourées d'un pointillé sont à toi : elles sont mal placées. Glisse-les
 					pour guider la lumière, touche une pièce pour la faire pivoter — pivoter un prisme
-					change quelle couleur sort de quel côté. Chaque capteur veut EXACTEMENT sa couleur
+					change quelle couleur sort de quel côté, et le mélangeur fusionne tous les rayons
+					reçus en un seul faisceau vers sa flèche. Chaque capteur veut EXACTEMENT sa couleur
 					— du blanc sur un capteur rouge, c'est raté.
 				</p>
 			) : null}
