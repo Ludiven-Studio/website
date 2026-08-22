@@ -189,6 +189,22 @@ async function main() {
 				await sleep(260);
 			}
 		},
+		// Auto-play flaps once and the bird hits the ground: "Aïe ! Score 0". Flap at the
+		// altitude-neutral cadence (a tap's rise is cancelled by ~460ms of gravity), then
+		// freeze while the first pipe is on screen but still short of the bird (~4.4s in).
+		flappy: async () => {
+			await sleep(900);
+			await clickBtn('libre');
+			await sleep(400);
+			await clickBtn('facile'); // widest gaps, slowest scroll → the most forgiving drift
+			await sleep(250);
+			await startCTA();
+			for (let i = 0; i < 9; i++) {
+				await page.keyboard.press('ArrowUp');
+				await sleep(430);
+			}
+			await freeze();
+		},
 		// Levels is the landing mode and resumes asynchronously, so it wins the race against
 		// the generic start and the shot ends up on the levels tag. Come back to Libre once
 		// it has settled, then let the software renderer draw the course.
