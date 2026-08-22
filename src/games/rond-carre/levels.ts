@@ -62,7 +62,7 @@ export const rondCarreLevels = extendPlan('rond-carre', basePlan, {
 		const emptyCells = SIZE * SIZE - 1;
 		return {
 			...base,
-			diff: { label: `Niveau ${level}`, extraGivens: 0, candidates: 3 + Math.round(t * 3), tier: 2 }, // 3 → 6
+			diff: { label: `Niveau ${level}`, extraGivens: 0, candidates: 3 + Math.round(t * 3), tier: 2 as const }, // 3 → 6
 			threeStarCentis: emptyCells * 210,
 			twoStarCentis: emptyCells * 380,
 		};
