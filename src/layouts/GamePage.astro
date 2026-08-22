@@ -4,6 +4,7 @@ import Icon from '../components/Icon.astro';
 import GameTutorial from '../components/GameTutorial.astro';
 import CocoinBar from '../components/CocoinBar';
 import CocoinToast from '../components/CocoinToast';
+import { games } from '../data/games';
 
 interface Props {
 	title: string;
@@ -14,9 +15,13 @@ interface Props {
 }
 
 const { title, description, heading, tagline, gameId } = Astro.props;
+// Every listed game has a backdrop (scripts/comfy-thumbs.mjs writes it next to the card);
+// the few unlisted pages don't.
+const hasArt = games.some((g) => g.id === gameId);
 ---
 
 <BaseLayout title={title} description={description}>
+	{hasArt && <div class="game-art" style={`--art: url('/assets/jeux/art/${gameId}.jpg')`} aria-hidden="true" />}
 	<div class="wrapper game-page stack gap-8">
 		<header class="game-head stack gap-2">
 			<a class="back" href="/jeux/">
@@ -36,6 +41,35 @@ const { title, description, heading, tagline, gameId } = Astro.props;
 </BaseLayout>
 
 <style>
+	/* Same key art as the game card, blurred behind the board: card and game share a scene. */
+	.game-art {
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		pointer-events: none;
+		/* Bottom-anchored: the scenes are painted with their ground plane down there, so the
+		   props end up around the board while the nav keeps the site gradient. */
+		background: center bottom / cover no-repeat;
+		/* The light page is bright pastel: a plain overlay washes the art out, multiply keeps
+		   its colours. Dark pages need the opposite, the art is what lights them. */
+		mix-blend-mode: multiply;
+		opacity: 0.3;
+		mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.6) 18%, #000 45%);
+		-webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.6) 18%, #000 45%);
+	}
+	/* Loaded late like the other page backgrounds, so it never competes with the board. */
+	:global(:root.loaded) .game-art {
+		background-image: var(--art);
+	}
+	:global(:root.theme-dark) .game-art {
+		mix-blend-mode: normal;
+		opacity: 0.34;
+	}
+	@media (forced-colors: active) {
+		.game-art {
+			display: none;
+		}
+	}
 	.game-page {
 		align-items: center;
 	}

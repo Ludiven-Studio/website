@@ -5,7 +5,8 @@
  *   npm run build && npm run og      # refresh the raw captures first
  *   node scripts/comfy-thumbs.mjs [id ...] [--no-gen]
  *
- * Writes public/assets/jeux/<id>.jpg (card, 16:10) and og/<id>.jpg (1200x630).
+ * Writes public/assets/jeux/<id>.jpg (card, 16:10), og/<id>.jpg (1200x630) and
+ * art/<id>.jpg (blurred backdrop, shown behind the board on the game page).
  * The capture is kept at public/assets/jeux/raw/<id>.jpg (gitignored) so a rerun
  * can recompose without a new capture — always run `npm run og` first if it is
  * missing, otherwise the backup would keep an already-composed thumbnail.
@@ -285,6 +286,14 @@ async function compose(id, artPath, shotPath, W, H, outPath) {
 		.toFile(outPath);
 }
 
+/**
+ * Ambient backdrop for the game page: the very same key art, so the scene behind the
+ * board echoes the card. Blurred at export time — a runtime CSS blur on a full-screen
+ * layer is expensive on mobile.
+ */
+const backdrop = (artPath, outPath) =>
+	sharp(artPath).resize(640).blur(5).jpeg({ quality: 58 }).toFile(outPath);
+
 async function main() {
 	const ids = process.argv.slice(2).filter((a) => !a.startsWith('-'));
 	const targets = ids.length ? ids : Object.keys(THEMES);
@@ -292,6 +301,7 @@ async function main() {
 
 	await mkdir(RAW, { recursive: true });
 	await mkdir(ART, { recursive: true });
+	await mkdir(resolve(OUT, 'art'), { recursive: true });
 
 	// Keep the pristine screenshot: after the first run, <id>.jpg is a composite.
 	for (const id of targets) {
@@ -317,6 +327,7 @@ async function main() {
 		const raw = resolve(RAW, `${id}.jpg`);
 		await compose(id, art, raw, CARD_W, CARD_H, resolve(OUT, `${id}.jpg`));
 		await compose(id, art, raw, OG_W, OG_H, resolve(OUT, 'og', `${id}.jpg`));
+		await backdrop(art, resolve(OUT, 'art', `${id}.jpg`));
 		console.log(`  ✓ ${id}`);
 	}
 }
