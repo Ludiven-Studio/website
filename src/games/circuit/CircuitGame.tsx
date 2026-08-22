@@ -702,6 +702,21 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
+/* Riveted copper plate, like the steampunk workshop the game card is set in. */
+.cir-boardwrap::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 15px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 2.4px at 7px 7px, #ffe2b6, #7d4a1f 75%, transparent) no-repeat,
+    radial-gradient(circle 2.4px at calc(100% - 7px) 7px, #ffe2b6, #7d4a1f 75%, transparent) no-repeat,
+    radial-gradient(circle 2.4px at 7px calc(100% - 7px), #ffe2b6, #7d4a1f 75%, transparent) no-repeat,
+    radial-gradient(circle 2.4px at calc(100% - 7px) calc(100% - 7px), #ffe2b6, #7d4a1f 75%, transparent) no-repeat,
+    linear-gradient(155deg, #e3ad72, #a76a33 45%, #70401d);
+  box-shadow: 0 12px 24px -14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 231, 197, 0.65);
+}
 .cir-loading {
   display: flex; align-items: center; justify-content: center;
   width: 100%; aspect-ratio: 1 / 1;

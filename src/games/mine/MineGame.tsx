@@ -746,6 +746,12 @@ const CSS = `
 .mn-stat strong { color: var(--mn-accent); }
 
 .mn-boardwrap { position: relative; width: 100%; }
+/* Cavern rim and its magenta glow, like the crystal cave the game card is set in. */
+.mn-boardwrap::before {
+  content: ''; position: absolute; inset: -11px; border-radius: 20px; pointer-events: none;
+  background: linear-gradient(160deg, #5c4a70, #372c48 45%, #241c33);
+  box-shadow: 0 0 26px -3px rgba(212, 74, 188, 0.45), inset 0 1px 0 rgba(228, 206, 255, 0.35);
+}
 .mn-board { position: relative; width: 100%; aspect-ratio: 1; border-radius: 14px; background: linear-gradient(160deg, #241a33, #14101f); border: 2px solid var(--gray-800); overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; box-shadow: var(--shadow-md); }
 .mn-board.shake { animation: mn-shake 0.3s; }
 @keyframes mn-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }

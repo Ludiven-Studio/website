@@ -782,6 +782,14 @@ const CSS = `
   max-width: min(520px, calc(52px * var(--n, 6)));
   margin-inline: auto;
 }
+/* Edge of the wooden desk the grid rests on, like the night study the game card is set in. */
+.sk-boardwrap::after {
+  content: ''; position: absolute; pointer-events: none;
+  left: -6px; right: -6px; bottom: -11px; height: 13px;
+  border-radius: 2px 2px 5px 5px;
+  background: linear-gradient(180deg, #c68e54 0 4px, #8a5e37 4px 62%, #543821);
+  box-shadow: 0 8px 15px -8px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 222, 180, 0.45);
+}
 .sk-board {
   width: 100%;
   aspect-ratio: 1 / 1;

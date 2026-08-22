@@ -835,6 +835,16 @@ const CSS = `
 .sol-stat { background: var(--gray-900); border-radius: 999px; padding: 6px 14px; font-variant-numeric: tabular-nums; }
 .sol-stat strong { margin-left: 4px; color: var(--sol); }
 .sol-playwrap { position: relative; width: 100%; max-width: 440px; display: flex; justify-content: center; }
+/* Fireplace light of the room on the game card, spilling around the wooden board.
+   Behind the canvas (z-index) so it never dulls the marbles. */
+.sol-playwrap::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  inset: -30px -26px -16px;
+  background:
+    radial-gradient(52% 62% at 8% 46%, rgba(255,150,48,0.62), rgba(255,126,40,0.18) 58%, transparent 80%),
+    radial-gradient(46% 56% at 96% 62%, rgba(255,178,96,0.3), transparent 72%);
+  filter: blur(11px);
+}
 .sol-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 16px; box-shadow: var(--shadow-md); cursor: pointer; }
 /* Armed board: hidden behind the ▶ Commencer gate until the player starts. */
 .sol-canvas.sol-blur { filter: blur(7px); cursor: default; }

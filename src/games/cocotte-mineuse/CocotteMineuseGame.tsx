@@ -1100,6 +1100,19 @@ const CSS = `
 
 .cm-boardwrap { position: relative; width: 100%; max-width: 380px; margin-inline: auto; }
 .cm-boardwrap.hidden { display: none; }
+/* Timber pit props at the shaft mouth, like the mine the game card is set in:
+   a lintel beam across the top and a stub post under each end. */
+.cm-boardwrap::before {
+  content: ''; position: absolute; z-index: 2; pointer-events: none;
+  left: -6px; right: -6px; top: -11px; height: 46px;
+  background:
+    linear-gradient(90deg, #8a5a30, #5d3a1d) left 0 top 11px / 7px 35px no-repeat,
+    linear-gradient(90deg, #5d3a1d, #8a5a30) right 0 top 11px / 7px 35px no-repeat,
+    linear-gradient(180deg, #a06d39 0 40%, #6b4222) left top / 100% 11px no-repeat;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+/* Fullscreen centres a smaller canvas inside a tall wrap — the beam would float off it. */
+.game-page.gf-full .cm-boardwrap::before { display: none; }
 .cm-levelselect { width: 100%; margin-top: 0.25rem; }
 /* Site global fullscreen → the board fits the remaining space (portrait ratio preserved). */
 .game-page.gf-full .cm-root { max-width: none; width: 100%; height: 100%; }
