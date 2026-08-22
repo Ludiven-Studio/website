@@ -775,6 +775,24 @@ const CSS = `
 .sn-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; }
 
 .sn-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
+/* Jungle undergrowth at the foot of the board, like the clearing on the game card.
+   Each conic tile cuts one blade; two tile sizes (masks add up) vary the heights. */
+.sn-boardwrap::after {
+  content: ''; position: absolute; pointer-events: none;
+  left: -4px; right: -4px; bottom: -19px; height: 22px;
+  background: linear-gradient(180deg, #57a341, #1f5c26);
+  -webkit-mask-image:
+    conic-gradient(from 164deg at 50% 0%, #000 0 32deg, transparent 0),
+    conic-gradient(from 162deg at 50% 0%, #000 0 36deg, transparent 0);
+  mask-image:
+    conic-gradient(from 164deg at 50% 0%, #000 0 32deg, transparent 0),
+    conic-gradient(from 162deg at 50% 0%, #000 0 36deg, transparent 0);
+  -webkit-mask-size: 15px 100%, 9px 62%; mask-size: 15px 100%, 9px 62%;
+  -webkit-mask-position: 0 0, 6px 100%; mask-position: 0 0, 6px 100%;
+  -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
+}
+/* Fullscreen centres a smaller canvas inside a tall wrap — the grass would float off it. */
+.game-page.gf-full .sn-boardwrap::after { display: none; }
 /* Site global fullscreen → the board fits the REMAINING space (a square, no overflow in landscape). */
 .game-page.gf-full .sn-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .sn-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }

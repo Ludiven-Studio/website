@@ -1114,6 +1114,15 @@ const CSS = `
 .pv-boardwrap {
   position: relative; width: 100%; max-width: 420px; margin-inline: auto; container-type: inline-size;
 }
+/* Conveyor belt of the factory floor on the game card. */
+.pv-boardwrap::after {
+  content: ''; position: absolute; left: -10px; right: -10px; bottom: -19px; height: 16px;
+  border-radius: 3px; pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 12px, rgba(255, 255, 255, 0.16) 12px 15px),
+    linear-gradient(180deg, #414a5e, #232936);
+  box-shadow: 0 8px 16px -9px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
 .pv-board {
   width: 100%;
   display: grid; border: 2.5px solid var(--gray-0); border-radius: 6px; overflow: hidden;

@@ -599,6 +599,17 @@ const CSS = `
 .su-act:disabled { opacity: 0.5; cursor: default; }
 
 .su-playwrap { width: 100%; position: relative; }
+/* Cloud the staircase floats on, like the pastel sky on the game card. */
+.su-playwrap::after {
+  content: ''; position: absolute; left: 18%; right: 18%; bottom: -26px; height: 34px;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 70% at 22% 62%, #fff 70%, transparent 72%),
+    radial-gradient(46% 100% at 52% 58%, #fff 70%, transparent 72%),
+    radial-gradient(34% 62% at 80% 66%, #fff 70%, transparent 72%);
+  filter: blur(6px);
+  opacity: 0.4;
+}
 
 .su-seq {
   display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;

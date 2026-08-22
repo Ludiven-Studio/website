@@ -1052,6 +1052,18 @@ const CSS = `
 
 /* The gutter around the board holds the belt end drums. */
 .tk-boardwrap { position: relative; width: 100%; max-width: 448px; margin-inline: auto; container-type: inline-size; padding: 14px; box-sizing: border-box; }
+/* Riveted steel floor of the cave workshop on the game card — the wrap's own padding
+   leaves it visible all around the board. */
+.tk-boardwrap::before {
+  content: ''; position: absolute; inset: 0; border-radius: 18px; pointer-events: none;
+  background:
+    radial-gradient(circle 2.4px at 9px 9px, #b8c4cf, #38414b 75%, transparent) no-repeat,
+    radial-gradient(circle 2.4px at calc(100% - 9px) 9px, #b8c4cf, #38414b 75%, transparent) no-repeat,
+    radial-gradient(circle 2.4px at 9px calc(100% - 9px), #b8c4cf, #38414b 75%, transparent) no-repeat,
+    radial-gradient(circle 2.4px at calc(100% - 9px) calc(100% - 9px), #b8c4cf, #38414b 75%, transparent) no-repeat,
+    linear-gradient(160deg, #6a747f, #414a54 45%, #2b323a);
+  box-shadow: 0 0 22px -6px rgba(60, 210, 200, 0.35), inset 0 1px 0 rgba(214, 228, 240, 0.4);
+}
 .tk-board {
   position: relative;
   width: 100%; aspect-ratio: 1 / 1;

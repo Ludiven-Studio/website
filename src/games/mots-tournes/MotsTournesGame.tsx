@@ -429,6 +429,17 @@ const CSS = `
 .wt-theme { background: var(--wt); color: var(--accent-text-over); border-radius: 999px; padding: 5px 12px; }
 .wt-count, .wt-time { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
 .wt-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
+/* Torn parchment edge under the ribbons, like the scriptorium on the game card. */
+.wt-playwrap::after {
+  content: ''; position: absolute; left: 4%; right: 4%; bottom: -18px; height: 16px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #efe2c6, #d8c39a);
+  -webkit-mask-image: radial-gradient(circle 7px at 50% 100%, transparent 96%, #000 100%);
+  mask-image: radial-gradient(circle 7px at 50% 100%, transparent 96%, #000 100%);
+  -webkit-mask-size: 15px 100%;
+  mask-size: 15px 100%;
+  filter: drop-shadow(0 3px 3px rgba(90, 70, 40, 0.35));
+}
 .wt-board { position: relative; width: 100%; max-width: 440px; container-type: inline-size; }
 .wt-board.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
 /* layer 1 — neutral tiles (interactive) */

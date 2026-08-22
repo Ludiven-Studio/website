@@ -783,6 +783,16 @@ const CSS = `
 .cb-buff { background: rgba(10, 12, 16, 0.7); backdrop-filter: blur(3px); border: 1px solid var(--accent-regular); color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; }
 
 .cb-boardwrap { position: relative; width: 100%; }
+/* Retro grid floor receding under the board, like the neon arcade on the game card. */
+.cb-boardwrap::after {
+  content: ''; position: absolute; pointer-events: none;
+  left: -6px; right: -6px; bottom: -22px; height: 24px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 21px, rgba(120, 240, 255, 0.55) 21px 23px),
+    linear-gradient(180deg, rgba(190, 90, 255, 0.4), rgba(120, 240, 255, 0.1));
+  -webkit-mask-image: linear-gradient(180deg, #000, transparent);
+  mask-image: linear-gradient(180deg, #000, transparent);
+}
 .cb-canvas {
   width: 100%; aspect-ratio: 100 / 132; display: block;
   background: var(--gray-999); border: 1px solid var(--gray-800); border-radius: 12px;

@@ -719,7 +719,14 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
+/* Mosaic paving of the mediterranean courtyard on the game card. */
+.sg-boardwrap::before {
+  content: ''; position: absolute; inset: -13px; border-radius: 9px; pointer-events: none;
+  background: repeating-conic-gradient(#d8714c 0 25%, #3f95a2 0 50%) 0 0 / 22px 22px;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35), 0 10px 20px -14px rgba(0, 0, 0, 0.5);
+}
 .sg-board {
+  position: relative; /* keeps the grid above the mosaic */
   width: 100%;
   display: grid; border: 2.5px solid var(--sg-line-strong); border-radius: 6px; overflow: hidden; background: var(--gray-999);
 }

@@ -1519,6 +1519,15 @@ const CSS = `
 .tp-stat.hot strong { color: #ffe08a; }
 .tp-stat em { font-style: normal; color: #ffd166; margin-left: 3px; }
 .tp-playwrap { position: relative; display: flex; justify-content: center; }
+/* Stage spotlights spilling past the track, like the neon concert stage on the game card. */
+.tp-playwrap::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  inset: -24px -30px -18px;
+  background:
+    radial-gradient(42% 60% at 12% 30%, rgba(178, 92, 255, 0.5), transparent 74%),
+    radial-gradient(42% 60% at 88% 34%, rgba(70, 214, 255, 0.45), transparent 74%);
+  filter: blur(13px);
+}
 .tp-canvas { display: block; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 14px; box-shadow: var(--shadow-md); cursor: pointer; }
 .tp-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); padding: 1rem; border-radius: 14px; }
 .tp-card { background: var(--gray-999); border: 2px solid var(--tp); border-radius: 16px; padding: 20px 24px; max-width: 20rem; text-align: center; box-shadow: var(--shadow-lg); }

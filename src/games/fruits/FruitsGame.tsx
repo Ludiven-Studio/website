@@ -397,7 +397,20 @@ const CSS = `
 .fr-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; }
 
 .fr-playwrap { width: 100%; position: relative; display: flex; flex-direction: column; align-items: center; }
-.fr-eqs { display: flex; flex-direction: column; gap: 8px; align-items: center; background: var(--gray-999); border: 1.5px solid var(--gray-800); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow-sm); }
+.fr-eqs { position: relative; display: flex; flex-direction: column; gap: 8px; align-items: center; background: var(--gray-999); border: 1.5px solid var(--gray-800); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow-sm); }
+/* Striped awning of the market stall on the game card. The mask bites a semicircle
+   out of the bottom of each 16px tile, which is also one stripe — hence the scallops. */
+.fr-eqs::before {
+  content: ''; position: absolute; left: -12px; right: -12px; top: -24px; height: 21px;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg, #d9534f 0 16px, #f6efe3 16px 32px);
+  border-radius: 5px 5px 0 0;
+  -webkit-mask-image: radial-gradient(circle 8px at 50% 100%, transparent 98%, #000 100%);
+  mask-image: radial-gradient(circle 8px at 50% 100%, transparent 98%, #000 100%);
+  -webkit-mask-size: 16px 100%;
+  mask-size: 16px 100%;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.25));
+}
 .fr-eq { display: flex; align-items: center; gap: 6px; font-size: 26px; line-height: 1; }
 .fr-fruit { font-size: 28px; }
 .fr-coef { font-size: 18px; font-weight: 800; color: var(--gray-0); margin-right: 1px; vertical-align: 0.12em; }

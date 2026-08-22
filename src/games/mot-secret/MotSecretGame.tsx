@@ -484,6 +484,14 @@ const CSS = `
 .ms-hintbtn:disabled { opacity: 0.45; cursor: not-allowed; }
 .ms-hintnote { color: var(--ms-present); font-weight: 600; }
 .ms-playwrap { position: relative; width: 100%; display: flex; justify-content: center; }
+/* Studio spotlight pool, like the misty stage the tiles stand on the game card.
+   Behind the tiles (z-index) so it never washes out the letters. */
+.ms-playwrap::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  inset: -22px -10px -26px;
+  background: radial-gradient(58% 66% at 50% 42%, rgba(255, 246, 214, 0.55), rgba(255, 240, 200, 0.14) 62%, transparent 82%);
+  filter: blur(12px);
+}
 .ms-board { display: flex; flex-direction: column; gap: 5px; }
 .ms-board.shake { animation: ms-shake 0.35s; }
 @keyframes ms-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-7px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }

@@ -907,6 +907,13 @@ const CSS = `
   padding: 1rem; overflow-y: auto; background: rgba(8,10,18,0.72); border-radius: 14px;
 }
 .pg-stage { position: relative; width: 100%; max-width: 680px; aspect-ratio: 5 / 3; }
+/* CRT bloom around the court, like the dark neon arcade room on the game card. */
+.pg-stage::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  inset: -20px; border-radius: 22px;
+  background: radial-gradient(60% 70% at 50% 50%, rgba(64, 226, 232, 0.35), transparent 74%);
+  filter: blur(12px);
+}
 .pg-canvas { width: 100%; height: 100%; display: block; object-fit: contain; border-radius: 14px; background: #0b0e14; touch-action: none; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
 /* Site global fullscreen. Landscape: the court fills the screen. Portrait: keep the
    5/3 court at FULL WIDTH (a band), UI around — not a tiny centred strip. */

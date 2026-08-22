@@ -625,6 +625,13 @@ const CSS = `
 .g2-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .g2-board { position: relative; width: 100%; max-width: 460px; aspect-ratio: 1; background: var(--gray-800); border-radius: 12px; container-type: inline-size; touch-action: none; user-select: none; -webkit-user-select: none; }
 .g2-board.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
+/* Gallery plinth the cubes are displayed on, like the game card. */
+.g2-playwrap::after {
+  content: ''; position: absolute; left: 14%; right: 14%; bottom: -22px; height: 19px;
+  border-radius: 4px 4px 7px 7px; pointer-events: none;
+  background: linear-gradient(180deg, #f6ecdc 0 5px, #e0d0b8 5px 62%, #b39c7d);
+  box-shadow: 0 13px 22px -12px rgba(70, 50, 25, 0.55);
+}
 .g2-cells { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--n), 1fr); grid-template-rows: repeat(var(--n), 1fr); }
 .g2-slot { margin: 6px; background: var(--gray-900); border-radius: 8px; }
 .g2-tile { position: absolute; top: 0; left: 0; width: calc(100% / var(--n)); height: calc(100% / var(--n)); transform: translate(calc(var(--c) * 100%), calc(var(--r) * 100%)); transition: transform 120ms ease; will-change: transform; }

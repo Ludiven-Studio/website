@@ -618,6 +618,15 @@ const CSS = `
 .sy-act:disabled { opacity: 0.5; cursor: default; }
 
 .sy-playwrap { width: 100%; position: relative; }
+/* Torches of the stone chamber on the game card, one either side of the glyphs. */
+.sy-playwrap::before {
+  content: ''; position: absolute; inset: -26px -10px auto; height: 150px; z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(26% 42% at 4% 22%, rgba(255, 168, 74, 0.5), transparent 70%),
+    radial-gradient(26% 42% at 96% 22%, rgba(180, 108, 255, 0.42), transparent 70%);
+  filter: blur(10px);
+}
 
 .sy-seq {
   display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;

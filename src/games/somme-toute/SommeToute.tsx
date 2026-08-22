@@ -810,6 +810,13 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
+/* Marble table and its brass edge, like the balance scale on the game card. */
+.st-boardwrap::after {
+  content: ''; position: absolute; left: -12px; right: -12px; bottom: -21px; height: 16px;
+  border-radius: 3px 3px 6px 6px; pointer-events: none;
+  background: linear-gradient(180deg, #d9b25f 0 3px, #f2ece2 3px 55%, #cfc5b6);
+  box-shadow: 0 10px 18px -10px rgba(0, 0, 0, 0.5);
+}
 .st-board {
   width: 100%;
   display: grid;

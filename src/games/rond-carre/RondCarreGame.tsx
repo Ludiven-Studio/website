@@ -685,6 +685,13 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
+/* Pedestal of the pastel studio on the game card. */
+.rc-boardwrap::after {
+  content: ''; position: absolute; left: 12%; right: 12%; bottom: -21px; height: 18px;
+  border-radius: 4px 4px 7px 7px; pointer-events: none;
+  background: linear-gradient(180deg, #f5eeff 0 5px, #ded1ef 5px 65%, #b7a5d1);
+  box-shadow: 0 12px 20px -12px rgba(60, 40, 90, 0.5);
+}
 .rc-board {
   position: relative;
   width: 100%;

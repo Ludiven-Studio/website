@@ -909,6 +909,15 @@ const CSS = `
 .es-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; }
 
 .es-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
+/* Nebula haze around the arena, like the deep space on the game card. */
+.es-boardwrap::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  inset: -26px;
+  background:
+    radial-gradient(46% 52% at 18% 22%, rgba(150, 82, 232, 0.5), transparent 72%),
+    radial-gradient(44% 50% at 84% 78%, rgba(64, 132, 232, 0.42), transparent 74%);
+  filter: blur(14px);
+}
 /* Site global fullscreen → the arena fits the REMAINING space (a square, no overflow in landscape). */
 .game-page.gf-full .es-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .es-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }

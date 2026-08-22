@@ -652,7 +652,14 @@ const CSS = `
 .ba-hint { color: var(--ba-accent); font-size: 12.5px; font-weight: 500; }
 
 .ba-boardwrap { position: relative; width: 100%; max-width: min(460px, calc(46px * var(--n, 8))); margin-inline: auto; container-type: inline-size; }
+/* Steel rim and radar glow of the naval bridge on the game card. */
+.ba-boardwrap::before {
+  content: ''; position: absolute; inset: -12px; border-radius: 12px; pointer-events: none;
+  background: linear-gradient(160deg, #55606e, #2c333d 45%, #1b2028);
+  box-shadow: 0 0 22px -4px rgba(64, 220, 138, 0.4), inset 0 1px 0 rgba(200, 215, 230, 0.35);
+}
 .ba-board {
+  position: relative; /* keeps the sea above the rim */
   width: 100%; display: grid; gap: 2px; touch-action: manipulation; user-select: none;
   background: #0e3a52 url('/assets/jeux/bataille/water.jpg') center/cover; border-radius: 6px; padding: 2px;
 }

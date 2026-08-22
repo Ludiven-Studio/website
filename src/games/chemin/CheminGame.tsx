@@ -743,6 +743,12 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
+/* Raked white sand around the path, like the zen garden the game card is set in. */
+.zp-boardwrap::before {
+  content: ''; position: absolute; inset: -15px; border-radius: 14px; pointer-events: none;
+  background: repeating-linear-gradient(90deg, #efe8d9 0 5px, #dbd0ba 5px 6px);
+  box-shadow: inset 0 0 12px rgba(120, 105, 80, 0.35), 0 10px 20px -14px rgba(0, 0, 0, 0.45);
+}
 .zp-loading {
   display: flex; align-items: center; justify-content: center;
   width: 100%; aspect-ratio: 1 / 1;

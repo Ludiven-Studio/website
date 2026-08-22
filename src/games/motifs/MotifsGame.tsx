@@ -760,7 +760,18 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
+/* Fabric border and its running stitch, like the quilting workshop on the game card. */
+.mo-boardwrap::before {
+  content: ''; position: absolute; inset: -14px; border-radius: 10px; pointer-events: none;
+  background: linear-gradient(150deg, #e9dbc7, #d6bfa1);
+  box-shadow: 0 10px 20px -14px rgba(0, 0, 0, 0.5);
+}
+.mo-boardwrap::after {
+  content: ''; position: absolute; inset: -7px; border-radius: 7px; pointer-events: none;
+  border: 1.5px dashed rgba(120, 92, 60, 0.7);
+}
 .mo-board {
+  position: relative; /* keeps the grid above the fabric */
   width: 100%;
   --mo-cell: calc(100cqw / var(--n, 5));
   display: grid; border: 2px solid var(--mo-line); border-radius: 6px; overflow: hidden;
