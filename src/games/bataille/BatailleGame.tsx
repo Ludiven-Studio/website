@@ -697,7 +697,7 @@ const CSS = `
 .ba-overlay-card { background: var(--gray-999); border: 2px solid var(--ba-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); }
 .ba-startbtn { border: none; background: var(--ba-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg); }
 
-.ba-win { position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; }
+.ba-win { position: absolute; inset: -8px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; border-radius: 16px; }
 .ba-wincard { background: var(--gray-999); border: 2px solid var(--ba-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg); }
 .ba-wincard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 22px; color: var(--gray-0); }
 .ba-winmark { font-size: 30px; }

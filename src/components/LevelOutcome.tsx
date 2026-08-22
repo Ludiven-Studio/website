@@ -50,8 +50,9 @@ export default function LevelOutcome({ level, lastLevel, won, stars, onNext, onR
 }
 
 const CSS = `
-.lo-wrap { position: absolute; inset: -8px; z-index: 10; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; animation: lo-fade 0.25s ease; }
-.lo-card { background: var(--gray-999); border: 2px solid var(--accent-regular); border-radius: 20px; padding: 22px 30px; text-align: center; box-shadow: var(--shadow-lg); max-width: 320px; }
+/* Docked at the bottom, no blur: the solved board (the point of the puzzle) stays visible. */
+.lo-wrap { position: absolute; inset: -8px; z-index: 10; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; pointer-events: none; animation: lo-fade 0.25s ease; }
+.lo-card { pointer-events: auto; background: var(--gray-999); border: 2px solid var(--accent-regular); border-radius: 20px; padding: 16px 26px; text-align: center; box-shadow: var(--shadow-lg); max-width: 320px; }
 .lo-card h2 { font-family: var(--font-brand); font-weight: 600; margin: 4px 0 2px; font-size: 22px; color: var(--gray-0); }
 .lo-stars { font-size: 32px; letter-spacing: 5px; color: var(--gray-600); margin: 0 0 4px; }
 .lo-stars .on { color: #f5a623; }

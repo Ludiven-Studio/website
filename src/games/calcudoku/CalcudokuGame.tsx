@@ -849,8 +849,8 @@ const CSS = `
 }
 
 .cd-win {
-  position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center;
-  background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; animation: cd-fade 0.25s ease;
+  position: absolute; inset: -8px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px;
+  border-radius: 16px; animation: cd-fade 0.25s ease;
 }
 .cd-wincard { background: var(--gray-999); border: 2px solid var(--cd-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg); }
 .cd-wincard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 24px; color: var(--gray-0); }

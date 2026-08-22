@@ -796,8 +796,8 @@ const CSS = `
 }
 
 .mo-win {
-  position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center;
-  background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px;
+  position: absolute; inset: -8px; display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 10px; border-radius: 16px;
 }
 .mo-wincard {
   background: var(--gray-999); border: 2px solid var(--mo-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg);

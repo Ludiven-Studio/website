@@ -872,10 +872,9 @@ const CSS = `
   position: absolute;
   inset: -8px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  background: var(--accent-subtle-overlay, rgba(0,0,0,0.04));
-  backdrop-filter: blur(3px);
+  padding-bottom: 10px;
   border-radius: 16px;
   animation: sk-fade 0.25s ease;
 }

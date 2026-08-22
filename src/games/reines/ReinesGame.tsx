@@ -735,9 +735,8 @@ const CSS = `
 
 .rn-win {
   position: absolute; inset: -8px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--accent-subtle-overlay, rgba(0,0,0,0.04));
-  backdrop-filter: blur(3px); border-radius: 16px;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 10px; border-radius: 16px;
   animation: rn-fade 0.25s ease;
 }
 .rn-wincard {

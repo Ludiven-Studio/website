@@ -597,7 +597,7 @@ const CSS = `
 .cc-overlay-card { background: var(--gray-999); border: 2px solid var(--cc-accent); border-radius: 16px; padding: 16px 24px; box-shadow: var(--shadow-lg); color: var(--gray-300); }
 .cc-startbtn { border: none; background: var(--cc-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 18px; border-radius: 999px; padding: 14px 40px; cursor: pointer; box-shadow: var(--shadow-lg); }
 
-.cc-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; z-index: 3; }
+.cc-end { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; border-radius: 16px; z-index: 3; }
 .cc-endcard { background: var(--gray-999); border: 2px solid var(--cc-accent); border-radius: 20px; padding: 24px 32px; text-align: center; box-shadow: var(--shadow-lg); }
 .cc-endcard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 22px; color: var(--gray-0); }
 .cc-endmark { font-size: 30px; }

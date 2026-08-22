@@ -1271,6 +1271,11 @@ const CSS = `
   animation: tk-fade 0.25s ease;
 }
 .tk-win { background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; }
+/* solved board stays visible: no dim/blur, card docked at bottom */
+.tk-overlay.tk-win[aria-label="Grille résolue"] {
+  align-items: flex-end; padding-bottom: 10px;
+  background: none; backdrop-filter: none;
+}
 .tk-card {
   background: var(--gray-999); border: 2px solid var(--tk-accent); border-radius: 20px;
   padding: 22px 30px; text-align: center; box-shadow: var(--shadow-lg);

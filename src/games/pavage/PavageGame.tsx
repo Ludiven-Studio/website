@@ -1176,8 +1176,8 @@ const CSS = `
 .pv-revealed-note { display: flex; align-items: center; gap: 14px; margin-top: 1.5rem; color: var(--gray-300); font-size: 14px; font-weight: 500; }
 
 .pv-win {
-  position: absolute; inset: -8px; display: flex; align-items: center; justify-content: center;
-  background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px;
+  position: absolute; inset: -8px; display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 10px; border-radius: 16px;
 }
 .pv-wincard {
   background: var(--gray-999); border: 2px solid var(--pv-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg);

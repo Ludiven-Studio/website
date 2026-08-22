@@ -804,7 +804,7 @@ const CSS = `
 .ws-daily-won { text-align: center; font-size: 16px; color: var(--gray-0); margin: 0 0 0.75rem; }
 .ws-daily-won strong { color: var(--ws-accent); font-variant-numeric: tabular-nums; }
 
-.ws-win { position: absolute; inset: -8px; z-index: 10; display: flex; align-items: center; justify-content: center; background: var(--accent-subtle-overlay, rgba(0,0,0,0.04)); backdrop-filter: blur(3px); border-radius: 16px; }
+.ws-win { position: absolute; inset: -8px; z-index: 10; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; border-radius: 16px; }
 .ws-wincard { background: var(--gray-999); border: 2px solid var(--ws-accent); border-radius: 20px; padding: 26px 34px; text-align: center; box-shadow: var(--shadow-lg); }
 .ws-wincard h2 { font-family: var(--font-brand); font-weight: 600; margin: 6px 0 2px; font-size: 24px; color: var(--gray-0); }
 .ws-winmark { font-size: 30px; }
