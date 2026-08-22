@@ -504,27 +504,44 @@ function dealOnce(size: number, diff: DiffLevel, rng: Rng): Deal | null {
 	for (const f of fixed)
 		if (f.piece.type === 'sensor' && (bareTrace.sensorMask.get(f.idx) ?? 0) === f.piece.expect) preSatisfied++;
 
-	// Every shipped piece must be load-bearing — but a piece the light no longer needs
-	// is stripped rather than failing the deal: with spare rays around, mirrors often
-	// land on a ray no sensor drinks. Loop until stable (removals can interact).
+	// Nothing survives that the light no longer needs — neither player pieces nor sources.
+	// A piece on a ray no sensor drinks, or a source firing into a wall (the coloured path
+	// over-provisions one to fund a combiner), is stripped rather than failing the deal: a
+	// useless source in the scene is a red herring the player cannot act on. Strip both in
+	// one fixpoint: dropping a source can orphan the piece that only routed its beam, and
+	// dropping a piece can leave a source firing at nothing. (At least one source always
+	// survives — without light no sensor is met, so the last needed source is load-bearing.)
+	// True when the current board fails some sensor — i.e. what we just pulled was needed.
+	const breaksASensor = (): boolean => {
+		const t = trace(size, board);
+		for (const f of fixed)
+			if (f.piece.type === 'sensor' && (t.sensorMask.get(f.idx) ?? 0) !== f.piece.expect) return true;
+		return false;
+	};
 	for (;;) {
 		let stripped = false;
 		for (let i = pieces.length - 1; i >= 0; i--) {
-			const without = board.slice();
-			without[pieces[i].idx] = null;
-			const t = trace(size, without);
-			let changed = false;
-			for (const f of fixed)
-				if (f.piece.type === 'sensor' && (t.sensorMask.get(f.idx) ?? 0) !== f.piece.expect) changed = true;
-			if (!changed) {
-				board[pieces[i].idx] = null;
-				pieces.splice(i, 1);
-				stripped = true;
-			}
+			const keep = board[pieces[i].idx];
+			board[pieces[i].idx] = null;
+			if (breaksASensor()) board[pieces[i].idx] = keep; // load-bearing → restore
+			else { pieces.splice(i, 1); stripped = true; }
+		}
+		for (const f of fixed) {
+			if (f.piece.type !== 'source' || board[f.idx] === null) continue;
+			board[f.idx] = null;
+			if (breaksASensor()) board[f.idx] = f.piece; // load-bearing → restore
+			else { bare[f.idx] = null; stripped = true; } // useless → keep it gone
 		}
 		if (!stripped) break;
 	}
 	if (pieces.length === 0) return null;
+
+	for (let i = fixed.length - 1; i >= 0; i--) if (board[fixed[i].idx] === null) fixed.splice(i, 1);
+	// The freebie count is stale once sources drop out — recompute it from the trimmed scene.
+	const bareNow = trace(size, bare);
+	preSatisfied = 0;
+	for (const f of fixed)
+		if (f.piece.type === 'sensor' && (bareNow.sensorMask.get(f.idx) ?? 0) === f.piece.expect) preSatisfied++;
 
 	// Hard gate: enough beam work, and no sensor glued right onto a source.
 	// Scale with the piece count: 2.5*size is unreachable on a small board whose few
