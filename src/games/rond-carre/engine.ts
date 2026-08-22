@@ -28,7 +28,11 @@ export interface DiffLevel {
 	label: string;
 	extraGivens: number; // revealed beyond the minimal set (more = easier)
 	candidates?: number; // boards to draw, keeping the one with the fewest clues (default 1)
+	tier?: SolveTier; // deduction techniques the board may require (default 1)
 }
+
+/** 1 = neighbour signs, no-3 and line balance. 2 = adds "all fillings of a line agree". */
+export type SolveTier = 1 | 2;
 
 export const SIZE = 6;
 
@@ -37,8 +41,8 @@ export const DIFFS: Record<string, DiffLevel> = {
 	moyen: { label: 'Moyen', extraGivens: 4 },
 	difficile: { label: 'Difficile', extraGivens: 0 },
 	// Difficile already strips to the minimal set, so Expert picks the leanest board
-	// out of several draws instead (a random draw carries 6 to 14 clues).
-	expert: { label: 'Expert', extraGivens: 0, candidates: 8 },
+	// out of several draws instead, and allows the harder line-fillings technique.
+	expert: { label: 'Expert', extraGivens: 0, candidates: 8, tier: 2 },
 };
 
 const edgeId = (a: number, b: number, total: number) =>
@@ -80,6 +84,133 @@ function randomFullGrid(n: number, rng: Rng): Cell[][] {
 	};
 
 	place(0);
+	return g;
+}
+
+/** All ways to complete one line (row or column) using only that line's own rules. */
+function lineFillings(line: Cell[], edges: (boolean | undefined)[], half: number): Cell[][] {
+	const n = line.length;
+	const out: Cell[][] = [];
+	const cur = [...line];
+	const cnt = [0, 0, 0];
+	for (const x of line) if (x) cnt[x]++;
+	const walk = (i: number) => {
+		if (out.length > 64) return; // safety net; a 6-cell line never gets close
+		if (i === n) {
+			out.push([...cur]);
+			return;
+		}
+		const fixed = line[i] !== 0;
+		for (const v of fixed ? [line[i]] : ([1, 2] as Cell[])) {
+			if (!fixed && cnt[v] >= half) continue;
+			if (i >= 2 && cur[i - 1] === v && cur[i - 2] === v) continue;
+			const e = edges[i - 1]; // sign between i-1 and i
+			if (i > 0 && e !== undefined && e !== (cur[i - 1] === v)) continue;
+			cur[i] = v;
+			if (!fixed) cnt[v]++;
+			walk(i + 1);
+			if (!fixed) cnt[v]--;
+		}
+		cur[i] = line[i];
+	};
+	walk(0);
+	return out;
+}
+
+/**
+ * Solve using human techniques only, never guessing. Returns the filled grid, or
+ * null if the board stalls (needs a guess) or contradicts itself. This is what
+ * makes generation guess-free: a clue is only dropped if this still solves.
+ */
+export function solveByLogic(
+	given: Cell[][],
+	constraints: Constraint[],
+	n: number,
+	tier: SolveTier = 1,
+): Cell[][] | null {
+	const total = n * n;
+	const half = n / 2;
+	const cons = new Map<number, boolean>();
+	for (const { a, b, eq } of constraints)
+		cons.set(edgeId(a[0] * n + a[1], b[0] * n + b[1], total), eq);
+	const sign = (r1: number, c1: number, r2: number, c2: number) =>
+		cons.get(edgeId(r1 * n + c1, r2 * n + c2, total));
+
+	const g: Cell[][] = given.map((row) => [...row]);
+	const at = (r: number, c: number): Cell => (r < 0 || r >= n || c < 0 || c >= n ? 0 : g[r][c]);
+	const count = (cells: [number, number][], v: Cell) =>
+		cells.reduce((s, [r, c]) => s + (g[r][c] === v ? 1 : 0), 0);
+
+	const rowCells = (r: number) => Array.from({ length: n }, (_, c): [number, number] => [r, c]);
+	const colCells = (c: number) => Array.from({ length: n }, (_, r): [number, number] => [r, c]);
+
+	const allowed = (r: number, c: number, v: Cell): boolean => {
+		if (count(rowCells(r), v) >= half || count(colCells(c), v) >= half) return false;
+		if (
+			(at(r, c - 1) === v && at(r, c - 2) === v) ||
+			(at(r, c + 1) === v && at(r, c + 2) === v) ||
+			(at(r, c - 1) === v && at(r, c + 1) === v) ||
+			(at(r - 1, c) === v && at(r - 2, c) === v) ||
+			(at(r + 1, c) === v && at(r + 2, c) === v) ||
+			(at(r - 1, c) === v && at(r + 1, c) === v)
+		)
+			return false;
+		for (const [dr, dc] of [
+			[0, -1],
+			[0, 1],
+			[-1, 0],
+			[1, 0],
+		]) {
+			const nr = r + dr;
+			const nc = c + dc;
+			if (nr < 0 || nr >= n || nc < 0 || nc >= n || g[nr][nc] === 0) continue;
+			const e = sign(r, c, nr, nc);
+			if (e !== undefined && e !== (g[nr][nc] === v)) return false;
+		}
+		return true;
+	};
+
+	let empty = 0;
+	for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (g[r][c] === 0) empty++;
+
+	while (empty > 0) {
+		let progress = false;
+		for (let r = 0; r < n && !progress; r++)
+			for (let c = 0; c < n && !progress; c++) {
+				if (g[r][c] !== 0) continue;
+				const ok = ([1, 2] as Cell[]).filter((v) => allowed(r, c, v));
+				if (ok.length === 0) return null;
+				if (ok.length === 1) {
+					g[r][c] = ok[0];
+					empty--;
+					progress = true;
+				}
+			}
+		if (progress) continue;
+		if (tier < 2) return null;
+
+		// Tier 2: every valid filling of a line agrees on a cell → that cell is settled.
+		for (let i = 0; i < 2 * n && !progress; i++) {
+			const cells = i < n ? rowCells(i) : colCells(i - n);
+			const line = cells.map(([r, c]) => g[r][c]);
+			const edges = cells
+				.slice(0, n - 1)
+				.map(([r, c], k) => sign(r, c, cells[k + 1][0], cells[k + 1][1]));
+			const fills = lineFillings(line, edges, half);
+			if (fills.length === 0) return null;
+			for (let k = 0; k < n; k++) {
+				if (line[k] !== 0) continue;
+				const v = fills[0][k];
+				if (!fills.every((f) => f[k] === v)) continue;
+				const [r, c] = cells[k];
+				if (!allowed(r, c, v)) return null;
+				g[r][c] = v;
+				empty--;
+				progress = true;
+			}
+		}
+		if (!progress) return null;
+	}
 	return g;
 }
 
@@ -178,11 +309,14 @@ function buildOne(diff: DiffLevel, rng: Rng): RondCarrePuzzle {
 				allCons.push({ a: [r, c], b: [r + 1, c], eq: solution[r][c] === solution[r + 1][c] });
 		}
 
-	// Start fully revealed (trivially unique), then strip clues while unique —
-	// givens first (Tango feel: few givens, several constraints), then constraints.
+	// Start fully revealed, then strip clues while the board stays solvable by pure
+	// deduction — givens first (Tango feel: few givens, several signs), then signs.
+	// The test is solveByLogic, not uniqueness: a unique board can still need a guess.
 	const given: Cell[][] = solution.map((row) => [...row]);
 	const consActive = new Array(allCons.length).fill(true);
 	const activeCons = () => allCons.filter((_, i) => consActive[i]);
+	const tier = diff.tier ?? 1;
+	const stillDeducible = () => solveByLogic(given, activeCons(), n, tier) !== null;
 
 	const cells = shuffle(
 		Array.from({ length: n * n }, (_, i): [number, number] => [Math.floor(i / n), i % n]),
@@ -191,11 +325,11 @@ function buildOne(diff: DiffLevel, rng: Rng): RondCarrePuzzle {
 	for (const [r, c] of cells) {
 		const keep = given[r][c];
 		given[r][c] = 0;
-		if (countSolutions(given, activeCons(), n, 2) !== 1) given[r][c] = keep;
+		if (!stillDeducible()) given[r][c] = keep;
 	}
 	for (const i of shuffle(Array.from({ length: allCons.length }, (_, j) => j), rng)) {
 		consActive[i] = false;
-		if (countSolutions(given, activeCons(), n, 2) !== 1) consActive[i] = true;
+		if (!stillDeducible()) consActive[i] = true;
 	}
 
 	// Easier levels: reveal extra givens (adding clues never breaks uniqueness).
@@ -321,7 +455,37 @@ export function findHint(marks: Cell[][], puzzle: RondCarrePuzzle): HintResult |
 		if (h) return h;
 	}
 
-	// 5) Fallback.
+	// 5) Every valid filling of a line agrees on one cell (the Expert technique).
+	const cons = new Map<number, boolean>();
+	for (const { a, b, eq } of puzzle.constraints)
+		cons.set(edgeId(a[0] * n + a[1], b[0] * n + b[1], n * n), eq);
+	for (let i = 0; i < 2 * n; i++) {
+		const cells: [number, number][] =
+			i < n
+				? Array.from({ length: n }, (_, c): [number, number] => [i, c])
+				: Array.from({ length: n }, (_, r): [number, number] => [r, i - n]);
+		const line = cells.map(([r, c]) => v(r, c));
+		const edges = cells
+			.slice(0, n - 1)
+			.map(([r, c], k) =>
+				cons.get(edgeId(r * n + c, cells[k + 1][0] * n + cells[k + 1][1], n * n)),
+			);
+		const fills = lineFillings(line, edges, half);
+		for (let k = 0; k < n; k++) {
+			const [r, c] = cells[k];
+			if (line[k] !== 0 || !editable(r, c) || fills.length === 0) continue;
+			const want = fills[0][k];
+			if (!fills.every((f) => f[k] === want) || want !== solution[r][c]) continue;
+			return {
+				r,
+				c,
+				value: want,
+				reason: `Toutes les façons de remplir ${i < n ? 'cette ligne' : 'cette colonne'} mettent un ${SYM(want)} ici.`,
+			};
+		}
+	}
+
+	// 6) Fallback.
 	for (let r = 0; r < n; r++)
 		for (let c = 0; c < n; c++)
 			if (editable(r, c) && v(r, c) === 0)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DIFFS, SIZE, generateRondCarre, countSolutions, findHint, type Cell } from './engine';
+import { DIFFS, SIZE, generateRondCarre, countSolutions, findHint, solveByLogic, type Cell } from './engine';
 import { mulberry32, dateSeed } from '../prng';
 
 function isValidSolution(sol: number[][], n: number): boolean {
@@ -49,6 +49,32 @@ describe('rond-carre engine', () => {
 			expect(countSolutions(p.given, p.constraints, n, 2)).toBe(1);
 		});
 	}
+
+	it('every board is solvable by pure deduction, never by guessing', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const diff = DIFFS[key];
+			for (let i = 0; i < 12; i++) {
+				const p = generateRondCarre(diff, mulberry32(500 + i));
+				const solved = solveByLogic(p.given, p.constraints, p.size, diff.tier ?? 1);
+				expect(solved, `${key} seed ${i} needs a guess`).not.toBeNull();
+				expect(solved).toEqual(p.solution);
+			}
+		}
+	});
+
+	it('findHint always names a technique — never falls back to "par déduction"', () => {
+		for (const key of Object.keys(DIFFS)) {
+			const p = generateRondCarre(DIFFS[key], mulberry32(700 + DIFFS[key].extraGivens));
+			const n = p.size;
+			const marks: Cell[][] = Array.from({ length: n }, () => new Array(n).fill(0) as Cell[]);
+			for (let step = 0; step < n * n; step++) {
+				const h = findHint(marks, p);
+				if (!h) break;
+				expect(h.reason, `${key} step ${step}`).not.toContain('Par déduction');
+				marks[h.r][h.c] = h.value;
+			}
+		}
+	});
 
 	it('easier levels reveal more givens', () => {
 		const count = (k: keyof typeof DIFFS) =>

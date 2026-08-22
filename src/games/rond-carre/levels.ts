@@ -30,15 +30,15 @@ const basePlan: LevelPlan<RondCarreLevelCfg> = {
 		// Given ramp: L1 hands out MAX_EXTRA extra clues, tapering to 0 by the last levels.
 		const extraGivens = Math.max(0, Math.round(MAX_EXTRA * (1 - (l - 1) / (LEVEL_COUNT - 1))));
 		const diff: DiffLevel = { label: `Niveau ${l}`, extraGivens };
-		// Cells the player must fill ≈ total minus the minimal set (~14) minus extras.
-		// Estimate empties so star targets scale with the actual deduction load.
-		const emptyCells = Math.max(6, SIZE * SIZE - 14 - extraGivens);
-		// ~4 s/cell for 3★, ~7 s/cell for 2★.
+		// The minimal set is a single given (the ●/■ flip symmetry needs one seed cell),
+		// so the player fills everything else. Star targets scale with that load.
+		const emptyCells = Math.max(6, SIZE * SIZE - 1 - extraGivens);
+		// ~2.5 s/cell for 3★, ~4.5 s/cell for 2★.
 		return {
 			seed: levelSeed(l),
 			diff,
-			threeStarCentis: emptyCells * 400,
-			twoStarCentis: emptyCells * 700,
+			threeStarCentis: emptyCells * 250,
+			twoStarCentis: emptyCells * 450,
 		};
 	},
 	stars(level: number, r: LevelResult): 0 | 1 | 2 | 3 {
@@ -54,16 +54,17 @@ const basePlan: LevelPlan<RondCarreLevelCfg> = {
 	},
 };
 
-// 101-200: no extra clue at all, and the leanest board out of a growing draw (Expert), on a tighter clock.
+// 101-200: no extra clue, the leanest board out of a growing draw, and boards that
+// may require the harder "all fillings of a line agree" technique (tier 2).
 export const rondCarreLevels = extendPlan('rond-carre', basePlan, {
 	configExt: (base, level) => {
 		const t = (level - LEVEL_COUNT - 1) / (LEVEL_COUNT - 1); // 0 → 1
-		const emptyCells = SIZE * SIZE - 14;
+		const emptyCells = SIZE * SIZE - 1;
 		return {
 			...base,
-			diff: { label: `Niveau ${level}`, extraGivens: 0, candidates: 4 + Math.round(t * 8) }, // 4 → 12
-			threeStarCentis: emptyCells * 340,
-			twoStarCentis: emptyCells * 600,
+			diff: { label: `Niveau ${level}`, extraGivens: 0, candidates: 3 + Math.round(t * 3), tier: 2 }, // 3 → 6
+			threeStarCentis: emptyCells * 210,
+			twoStarCentis: emptyCells * 380,
 		};
 	},
 });
