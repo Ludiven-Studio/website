@@ -114,8 +114,132 @@ const scrim = (W, H) =>
 		<rect width="${W}" height="${H}" fill="url(#g)"/>
 	</svg>`);
 
+/*
+ * Per-game touch-up drawn on the capture, in its 1200x630 coordinates.
+ * Mot Secret is captured on a fresh word, so its grid would read as an empty box.
+ */
+export const OVERLAYS = {
+	'mot-secret': () => {
+		const cell = 41, x0 = 497, y0 = 155;
+		const marks = [];
+		for (let r = 0; r < 6; r++) {
+			for (let c = r === 0 ? 1 : 0; c < 6; c++) {
+				if (r > 0) {
+					marks.push(`<rect x="${x0 + c * cell - 20}" y="${y0 + r * cell - 20}" width="40" height="40"
+						rx="8" fill="#f0eafb"/>`);
+				}
+				marks.push(`<text x="${x0 + c * cell}" y="${y0 + r * cell + 10}" text-anchor="middle"
+					font-family="Verdana,sans-serif" font-size="26" font-weight="700"
+					fill="${r === 0 ? '#4b2e83' : '#9c85c4'}">?</text>`);
+			}
+		}
+		return `<svg width="1200" height="630">${marks.join('')}</svg>`;
+	},
+};
+
+// Hand-picked crop, when the detection below has nothing solid to latch onto.
+export const CROPS = {
+	'mot-secret': { left: 394, top: 133, width: 412, height: 257 }, // faint grid, dense keyboard
+	'lettres-croisees': { left: 271, top: 134, width: 658, height: 411 }, // the wheel outshines the grid
+};
+
+/**
+ * Bounding box of the playfield in a capture, in 16:10. The page background is a
+ * smooth diagonal gradient, so it is modelled by interpolating each row between its
+ * left and right gutter: whatever differs from it is the board. Full-bleed games
+ * have no gutter, the model then matches nothing and the whole frame is kept.
+ */
+export async function contentBox(shotPath, W, H) {
+	const SW = 300;
+	const { data, info } = await sharp(shotPath).removeAlpha().resize(SW).raw().toBuffer({ resolveWithObject: true });
+	const { width: w, height: h, channels: ch } = info;
+	const px = (x, y) => {
+		const i = (y * w + x) * ch;
+		return [data[i], data[i + 1], data[i + 2]];
+	};
+	const edge = (y, side) => {
+		const acc = [0, 0, 0];
+		for (let k = 0; k < 3; k++) {
+			const c = px(side === 0 ? k : w - 1 - k, y);
+			acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2];
+		}
+		return acc.map((v) => v / 3);
+	};
+
+	const y0 = Math.round(h * 0.1); // below the mode tabs
+	const y1 = Math.round(h * 0.97);
+	const mask = new Uint8Array(w * h);
+	const rowHits = new Int32Array(h);
+	for (let y = y0; y < y1; y++) {
+		const l = edge(y, 0), r = edge(y, 1);
+		for (let x = 0; x < w; x++) {
+			const t = x / (w - 1);
+			const [pr, pg, pb] = px(x, y);
+			const d =
+				Math.abs(pr - (l[0] + (r[0] - l[0]) * t)) +
+				Math.abs(pg - (l[1] + (r[1] - l[1]) * t)) +
+				Math.abs(pb - (l[2] + (r[2] - l[2]) * t));
+			if (d > 20) {
+				mask[y * w + x] = 1;
+				rowHits[y]++;
+			}
+		}
+	}
+
+	/**
+	 * Longest unbroken run of detailed lines, tolerating the gaps inside a board.
+	 * A run crossing the middle of the capture wins over a longer one off to the
+	 * side: that is the playfield, not the keyboard or the score panel.
+	 */
+	const runOf = (hits, from, to, min, gap) => {
+		const runs = [];
+		let a = -1, miss = 0;
+		for (let i = from; i < to; i++) {
+			if (hits[i] >= min) {
+				if (a < 0) a = i;
+				miss = 0;
+			} else if (a >= 0 && ++miss > gap) {
+				runs.push([a, i - miss]);
+				a = -1;
+			}
+		}
+		if (a >= 0) runs.push([a, to - 1]);
+		if (!runs.length) return [0, -1];
+		const mid = (from + to) / 2;
+		const hit = runs.filter(([s, e]) => s <= mid && e >= mid);
+		return (hit.length ? hit : runs).sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
+	};
+
+	const [ry0, ry1] = runOf(rowHits, y0, y1, w * 0.12, Math.round(h * 0.03));
+	const colHits = new Int32Array(w);
+	for (let y = ry0; y <= ry1; y++) for (let x = 0; x < w; x++) if (mask[y * w + x]) colHits[x]++;
+	const [rx0, rx1] = runOf(colHits, 0, w, (ry1 - ry0) * 0.12, Math.round(w * 0.03));
+	if (ry1 <= ry0 || rx1 <= rx0) return { left: 0, top: 0, width: W, height: H };
+
+	const s = W / w; // back to full-resolution coordinates
+	const pad = W * 0.02;
+	let bx = rx0 * s - pad, by = ry0 * s - pad;
+	let bw = (rx1 - rx0 + 1) * s + pad * 2, bh = (ry1 - ry0 + 1) * s + pad * 2;
+
+	// Grow to 16:10 around the centre, then slide back inside the capture.
+	if (bw / bh < 1.6) { const t = bh * 1.6; bx -= (t - bw) / 2; bw = t; }
+	else { const t = bw / 1.6; by -= (t - bh) / 2; bh = t; }
+	if (bw > W) { bh *= W / bw; bw = W; }
+	if (bh > H) { bw *= H / bh; bh = H; }
+	bx = Math.min(Math.max(0, bx), W - bw);
+	by = Math.min(Math.max(0, by), H - bh);
+
+	const left = Math.round(bx), top = Math.round(by);
+	return {
+		left,
+		top,
+		width: Math.min(Math.round(bw), W - left),
+		height: Math.min(Math.round(bh), H - top),
+	};
+}
+
 /** Compose one canvas: themed art + the capture shown on a screen standing in the scene. */
-async function compose(artPath, shotPath, W, H, outPath) {
+async function compose(id, artPath, shotPath, W, H, outPath) {
 	const sw = Math.round(W * 0.44);
 	const sh = Math.round((sw * 10) / 16);
 	const bz = Math.round(W * 0.013);
@@ -125,17 +249,16 @@ async function compose(artPath, shotPath, W, H, outPath) {
 	const y = Math.round(H - H * 0.07 - bz * 3.8 - sh);
 
 	// Zoom on the playfield: on a card the screen is only ~160px wide, so the mode
-	// tabs and the side margins have to go or nothing is readable.
+	// tabs and the page margins have to go or nothing is readable.
 	const meta = await sharp(shotPath).metadata();
-	const ch = Math.round(meta.height * 0.72);
-	const cw = Math.min(meta.width, Math.round((ch * 16) / 10));
-	const screen = await sharp(shotPath)
-		.extract({
-			left: Math.round((meta.width - cw) / 2),
-			top: Math.round(meta.height * 0.22),
-			width: cw,
-			height: ch,
-		})
+	const draw = OVERLAYS[id];
+	const shot = draw
+		? await sharp(shotPath).composite([{ input: Buffer.from(draw()), top: 0, left: 0 }]).png().toBuffer()
+		: shotPath;
+	const box = CROPS[id] ?? (await contentBox(shot, meta.width, meta.height));
+	if (process.env.DEBUG_BOX) console.log(id, box);
+	const screen = await sharp(shot)
+		.extract(box)
 		.resize(sw, sh, { fit: 'cover' })
 		.composite([{ input: roundMask(sw, sh, r), blend: 'dest-in' }])
 		.png()
@@ -161,36 +284,41 @@ async function compose(artPath, shotPath, W, H, outPath) {
 		.toFile(outPath);
 }
 
-const ids = process.argv.slice(2).filter((a) => !a.startsWith('-'));
-const targets = ids.length ? ids : Object.keys(THEMES);
-const skipGen = process.argv.includes('--no-gen');
+async function main() {
+	const ids = process.argv.slice(2).filter((a) => !a.startsWith('-'));
+	const targets = ids.length ? ids : Object.keys(THEMES);
+	const skipGen = process.argv.includes('--no-gen');
 
-await mkdir(RAW, { recursive: true });
-await mkdir(ART, { recursive: true });
+	await mkdir(RAW, { recursive: true });
+	await mkdir(ART, { recursive: true });
 
-// Keep the pristine screenshot: after the first run, <id>.jpg is a composite.
-for (const id of targets) {
-	const raw = resolve(RAW, `${id}.jpg`);
-	if (!(await exists(raw))) await copyFile(resolve(OUT, `${id}.jpg`), raw);
+	// Keep the pristine screenshot: after the first run, <id>.jpg is a composite.
+	for (const id of targets) {
+		const raw = resolve(RAW, `${id}.jpg`);
+		if (!(await exists(raw))) await copyFile(resolve(OUT, `${id}.jpg`), raw);
+	}
+
+	if (!skipGen) {
+		const jobs = targets.map((id) => ({
+			id,
+			prompt: promptFor(id),
+			negative: NEG,
+			w: 1024,
+			h: 640,
+			steps: 8,
+			out: resolve(ART, `${id}.png`),
+		}));
+		await run(jobs);
+	}
+
+	for (const id of targets) {
+		const art = resolve(ART, `${id}.png`);
+		const raw = resolve(RAW, `${id}.jpg`);
+		await compose(id, art, raw, CARD_W, CARD_H, resolve(OUT, `${id}.jpg`));
+		await compose(id, art, raw, OG_W, OG_H, resolve(OUT, 'og', `${id}.jpg`));
+		console.log(`  ✓ ${id}`);
+	}
 }
 
-if (!skipGen) {
-	const jobs = targets.map((id) => ({
-		id,
-		prompt: promptFor(id),
-		negative: NEG,
-		w: 1024,
-		h: 640,
-		steps: 8,
-		out: resolve(ART, `${id}.png`),
-	}));
-	await run(jobs);
-}
-
-for (const id of targets) {
-	const art = resolve(ART, `${id}.png`);
-	const raw = resolve(RAW, `${id}.jpg`);
-	await compose(art, raw, CARD_W, CARD_H, resolve(OUT, `${id}.jpg`));
-	await compose(art, raw, OG_W, OG_H, resolve(OUT, 'og', `${id}.jpg`));
-	console.log(`  ✓ ${id}`);
-}
+// The helpers above stay importable; the pipeline only runs when called directly.
+if (process.argv[1].endsWith('comfy-thumbs.mjs')) await main();
