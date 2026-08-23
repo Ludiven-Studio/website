@@ -397,16 +397,6 @@ const CSS = `
 .mm-theme { background: var(--mm-accent); color: var(--accent-text-over); border-radius: 999px; padding: 5px 12px; }
 .mm-count, .mm-time { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
 .mm-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
-/* Row of book spines on their shelf, like the library nook on the game card. */
-.mm-playwrap::after {
-  content: ''; position: absolute; left: 8%; right: 8%; bottom: -26px; height: 22px;
-  pointer-events: none;
-  background:
-    linear-gradient(180deg, #8a5e37 0 3px, #5b3d22 3px 100%) bottom / 100% 7px no-repeat,
-    repeating-linear-gradient(90deg,
-      #b5533f 0 9px, #d9a441 9px 16px, #3f7d8c 16px 26px, #7a4f9c 26px 33px, #4d8a52 33px 43px) top / 100% 15px no-repeat;
-  box-shadow: 0 10px 18px -10px rgba(0, 0, 0, 0.55);
-}
 .mm-grid { width: 100%; max-width: 460px; aspect-ratio: 1; display: grid; gap: 2px; container-type: inline-size; background: var(--gray-800); border: 2px solid var(--gray-800); border-radius: 12px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mm-cell { display: flex; align-items: center; justify-content: center; background: var(--gray-999); color: var(--gray-0); font-weight: 700; font-size: calc(100cqi / var(--n) * 0.5); text-transform: uppercase; }
 .mm-cell.found { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); } /* background = per-word colour (inline) */
