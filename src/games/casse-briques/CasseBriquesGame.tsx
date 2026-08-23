@@ -645,7 +645,7 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 
 			<p className="cb-help">
 				Glisse la raquette pour renvoyer la cocotte et casser tout le mur. Attrape les bonus qui tombent :
-				📏 raquette large, ⚡ multi-cocottes, 💥 cocotte puissante, 🔥 cocotte de feu (traverse et casse tout),
+				📏 raquette large, ⚡ multi-cocottes, 💥 cocotte puissante, 🔥 cocotte de feu (traverse les briques qu'elle casse),
 				🥚 cocotte qui se dédouble à chaque rebond (jusqu'à 16), ❤️ vie, 🐢 ralenti. Chaque brique piégée
 				affiche son bonus : vise-la, et tous les 200 points un bonus tombe tout seul. Les briques
 				sombres demandent jusqu'à 3 coups. Perce les alvéoles du mur, la cocotte y rebondit comme

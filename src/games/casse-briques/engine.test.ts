@@ -14,6 +14,7 @@ import {
 	CLEAR_POINTS,
 	type BreakoutState,
 	type Ball,
+	type Brick,
 } from './engine';
 
 const cfg = BREAKOUT_CFG;
@@ -221,16 +222,23 @@ describe('casse-briques engine', () => {
 		expect(after.alive).toBe(false);
 	});
 
-	it('pierce bonus wipes every brick it touches and never deflects the ball', () => {
-		let s = launch(fresh(3));
-		s = applyBonus(s, 'pierce', cfg);
-		const target = s.bricks.find((b) => b.maxHp === 2)!;
-		const ball: Ball = { x: target.x + target.w / 2, y: target.y + target.h + cfg.ballR + 0.2, vx: 0, vy: -s.speed, stuck: false };
-		s = { ...s, balls: [ball], bonuses: [] };
-		s = stepBreakout(s, 1 / 60, cfg, s.paddleX);
-		const hit = s.bricks.find((b) => b.col === target.col && b.row === target.row)!;
-		expect(hit.alive).toBe(false); // 2-hit brick gone in a single pass
-		expect(s.balls[0].vy).toBeLessThan(0); // still flying straight up, no deflection
+	it('pierce bonus flies through the bricks it breaks but bounces on armour', () => {
+		const shootAt = (s: BreakoutState, target: Brick): BreakoutState => {
+			const ball: Ball = { x: target.x + target.w / 2, y: target.y + target.h + cfg.ballR + 0.2, vx: 0, vy: -s.speed, stuck: false };
+			return stepBreakout({ ...s, balls: [ball], bonuses: [] }, 1 / 60, cfg, s.paddleX);
+		};
+
+		let s = applyBonus(launch(fresh(3)), 'pierce', cfg);
+		const plain = s.bricks.find((b) => b.maxHp === 1)!;
+		const done = shootAt(s, plain);
+		expect(done.bricks.find((b) => b.col === plain.col && b.row === plain.row)!.alive).toBe(false);
+		expect(done.balls[0].vy).toBeLessThan(0); // broke it, so it keeps flying straight up
+
+		const armour = s.bricks.find((b) => b.maxHp === 2)!;
+		s = shootAt(s, armour);
+		const hit = s.bricks.find((b) => b.col === armour.col && b.row === armour.row)!;
+		expect(hit.alive).toBe(true); // one hit left: armour still stops the fire ball
+		expect(s.balls[0].vy).toBeGreaterThan(0); // deflected back down
 	});
 
 	it('split bonus twins a ball on every bounce, capped at maxBalls', () => {

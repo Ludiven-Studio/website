@@ -6,9 +6,9 @@
  *
  * Balls keep a constant speed (classic breakout): only their direction changes on a
  * bounce. That target speed ramps up as the wall empties (hunting the last bricks was
- * the slow part). The "slow" bonus lowers it for a while, "pierce" makes a ball wipe
- * every brick it touches without bouncing, and "split" twins a ball on each bounce up
- * to the ball cap.
+ * the slow part). The "slow" bonus lowers it for a while, "pierce" lets a ball fly
+ * through the bricks it breaks (armoured ones still stop it), and "split" twins a ball
+ * on each bounce up to the ball cap.
  *
  * The paddle is a convex ARC: bounces reflect about the surface normal at the contact
  * point, so the incoming angle matters instead of being overwritten by a steer nudge.
@@ -73,7 +73,7 @@ const BASE = {
 	wideMs: 12000,
 	powerMs: 10000,
 	slowMs: 9000,
-	pierceMs: 7000,
+	pierceMs: 5000,
 	splitMs: 8000,
 	slowFactor: 0.68,
 	startLives: 3,
@@ -465,13 +465,16 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 			}
 		}
 
-		// Bricks: "pierce" wipes every brick it overlaps and flies straight on; otherwise
-		// one collision per step, reflected on the nearest axis.
+		// Bricks: one collision per step, reflected on the nearest axis. "pierce" flies on
+		// through the bricks it actually breaks — armour still stops it, so the power
+		// carves a tunnel instead of erasing the wall.
 		for (const br of bricks) {
 			if (!br.alive) continue;
 			if (b.x + cfg.ballR < br.x || b.x - cfg.ballR > br.x + br.w) continue;
 			if (b.y + cfg.ballR < br.y || b.y - cfg.ballR > br.y + br.h) continue;
-			if (!pierce) {
+			const dmg = power ? 2 : 1;
+			const through = pierce && br.hp - dmg <= 0;
+			if (!through) {
 				// Decide bounce axis from the smaller overlap.
 				const overlapX = Math.min(b.x + cfg.ballR - br.x, br.x + br.w - (b.x - cfg.ballR));
 				const overlapY = Math.min(b.y + cfg.ballR - br.y, br.y + br.h - (b.y - cfg.ballR));
@@ -479,13 +482,13 @@ export function stepBreakout(state: BreakoutState, dt: number, cfg: BreakoutConf
 				else b.vy = b.y < br.y + br.h / 2 ? -Math.abs(b.vy) : Math.abs(b.vy);
 				bounced = true;
 			}
-			br.hp = pierce ? 0 : br.hp - (power ? 2 : 1);
+			br.hp -= dmg;
 			if (br.hp <= 0) {
 				br.alive = false;
 				score += BRICK_POINTS * br.maxHp;
 				if (br.bonus) state = { ...state, bonuses: [...state.bonuses, { x: br.x + br.w / 2, y: br.y + br.h / 2, kind: br.bonus }] };
 			}
-			if (!pierce) break;
+			if (!through) break;
 		}
 
 		// Below the floor → the ball is lost (dropped from the list).
