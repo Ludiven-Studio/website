@@ -84,6 +84,8 @@ const { id, title, count } = Astro.props;
 			/* ignore */
 		}
 		d.addEventListener('toggle', () => {
+			// The search opens/closes folds on its own; don't save that as a choice.
+			if (document.documentElement.dataset.gameSearch === 'on') return;
 			try {
 				localStorage.setItem(KEY(id), d.open ? 'open' : 'closed');
 			} catch {

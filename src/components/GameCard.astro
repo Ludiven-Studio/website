@@ -24,9 +24,18 @@ const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 // Compact tiles drop the media block, so the same scene becomes the tile background
 // instead (the 640 px variant, already used as the game page backdrop).
 const art = compact && playable && id ? `/assets/jeux/art/${id}.jpg` : undefined;
+// Search haystack, accent-stripped so "melee" finds "Mots Mêlés". Built here rather
+// than read from the DOM because compact tiles don't render the pitch.
+const COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
+const searchText = [title, pitch, id]
+	.filter(Boolean)
+	.join(' ')
+	.normalize('NFD')
+	.replace(COMBINING, '')
+	.toLowerCase();
 ---
 
-<div class:list={['game-card-wrap', { 'has-fav': showFavorite }]} data-game-id={id}>
+<div class:list={['game-card-wrap', { 'has-fav': showFavorite }]} data-game-id={id} data-search={searchText}>
 	<Tag
 		class:list={['game-card', { soon: !playable, compact }]}
 		{...playable ? { href } : { 'aria-disabled': 'true' }}

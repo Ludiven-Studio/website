@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
 import GameFold from '../../components/GameFold.astro';
+import GameSearch from '../../components/GameSearch.astro';
 import Icon from '../../components/Icon.astro';
 import CocoinBar from '../../components/CocoinBar';
 import CocoinToast from '../../components/CocoinToast';
@@ -53,6 +54,7 @@ const byCategory = CATEGORIES.map((c) => ({
 		<CocoinToast client:idle />
 
 		<div class="defi-sections stack gap-4">
+			<GameSearch total={dailyGames.length} />
 			{
 				byCategory.map((c) => (
 					<GameFold id={c.id} title={c.title} count={c.games.length}>

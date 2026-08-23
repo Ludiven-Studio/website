@@ -1,0 +1,204 @@
+---
+// Live filter over the game tiles on the page. Works on any grid of GameCard
+// (full or compact): it matches the card's `data-search` haystack, hides the
+// tiles that miss, and opens the folds that still hold a result.
+
+interface Props {
+	placeholder?: string;
+	total: number;
+}
+
+const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
+---
+
+<div class="game-search">
+	<div class="gs-field">
+		<span class="gs-icon" aria-hidden="true">🔍</span>
+		<input
+			type="search"
+			id="game-search"
+			class="gs-input"
+			placeholder={placeholder}
+			autocomplete="off"
+			enterkeyhint="search"
+			aria-label="Rechercher un jeu"
+			aria-describedby="game-search-status"
+		/>
+		<button type="button" class="gs-clear" aria-label="Effacer la recherche" hidden>✕</button>
+	</div>
+	<p class="gs-status" id="game-search-status" data-total={total} aria-live="polite" hidden></p>
+</div>
+
+<style>
+	.game-search {
+		width: min(100%, 30rem);
+		margin-inline: auto;
+	}
+
+	.gs-field {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.55rem 0.9rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 999px;
+		background: var(--gray-999);
+		transition: border-color var(--theme-transition);
+	}
+
+	.gs-field:focus-within {
+		border-color: var(--accent-regular);
+	}
+
+	.gs-icon {
+		font-size: var(--text-md);
+		line-height: 1;
+	}
+
+	.gs-input {
+		flex: 1;
+		min-width: 0;
+		border: none;
+		background: transparent;
+		color: var(--gray-0);
+		font: inherit;
+		font-size: var(--text-md);
+	}
+
+	.gs-input:focus {
+		outline: none;
+	}
+
+	/* The native clear cross sits badly in the pill and can't be styled — use ours. */
+	.gs-input::-webkit-search-cancel-button {
+		display: none;
+	}
+
+	.gs-clear {
+		border: none;
+		background: var(--gray-900);
+		color: var(--gray-200);
+		border-radius: 999px;
+		width: 1.6rem;
+		height: 1.6rem;
+		display: grid;
+		place-items: center;
+		font-size: var(--text-sm);
+		cursor: pointer;
+		padding: 0;
+	}
+
+	.gs-clear:hover,
+	.gs-clear:focus-visible {
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+	}
+
+	.gs-clear[hidden] {
+		display: none;
+	}
+
+	.gs-status {
+		margin: 0.55rem 0 0;
+		text-align: center;
+		font-size: var(--text-sm);
+		font-weight: 600;
+		color: var(--gray-300);
+	}
+
+	.gs-status[hidden] {
+		display: none;
+	}
+
+	.gs-status strong {
+		color: var(--accent-regular);
+	}
+</style>
+
+<style is:global>
+	.gs-hidden {
+		display: none !important;
+	}
+</style>
+
+<script>
+	const input = document.querySelector<HTMLInputElement>('.gs-input');
+	const clearBtn = document.querySelector<HTMLButtonElement>('.gs-clear');
+	const status = document.querySelector<HTMLElement>('.gs-status');
+	if (input && status) {
+		const total = Number(status.dataset.total || 0);
+		const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-search]'));
+		const items = cards.map((card) => ({
+			hay: card.dataset.search || '',
+			el: (card.closest('li') as HTMLElement | null) ?? card,
+		}));
+		const folds = Array.from(document.querySelectorAll<HTMLDetailsElement>('.game-fold'));
+		// Fold state and header text the player had, restored when the search is cleared.
+		// The défi page writes its own "3/12 faits" meta, so we save whatever is there.
+		const userOpen = new WeakMap<HTMLDetailsElement, boolean>();
+		const userMeta = new WeakMap<HTMLDetailsElement, string>();
+		let searching = false;
+
+		const norm = (s: string) =>
+			s.normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '').toLowerCase().trim();
+
+		const apply = () => {
+			const words = norm(input.value).split(/\s+/).filter(Boolean);
+			const on = words.length > 0;
+			if (clearBtn) clearBtn.hidden = !on;
+
+			if (on && !searching)
+				for (const f of folds) {
+					userOpen.set(f, f.open);
+					userMeta.set(f, f.querySelector('[data-fold-meta]')?.textContent ?? '');
+				}
+			searching = on;
+			// Tell GameFold not to persist the opens/closes we drive here.
+			if (on) document.documentElement.dataset.gameSearch = 'on';
+
+			let hits = 0;
+			for (const { hay, el } of items) {
+				const match = !on || words.every((w) => hay.includes(w));
+				el.classList.toggle('gs-hidden', !match);
+				if (match) hits++;
+			}
+
+			for (const f of folds) {
+				const grid = f.querySelector('.fold-body');
+				const kept = grid
+					? Array.from(grid.querySelectorAll<HTMLElement>('[data-search]')).filter(
+							(c) => !((c.closest('li') as HTMLElement | null) ?? c).classList.contains('gs-hidden'),
+						).length
+					: 0;
+				f.classList.toggle('gs-hidden', on && !kept);
+				f.open = on ? kept > 0 : (userOpen.get(f) ?? f.open);
+				const meta = f.querySelector('[data-fold-meta]');
+				if (meta) meta.textContent = on ? `${kept} résultat${kept > 1 ? 's' : ''}` : (userMeta.get(f) ?? meta.textContent);
+			}
+
+			if (!on) {
+				status.hidden = true;
+				// `toggle` fires as a task, so release the guard after this turn.
+				setTimeout(() => delete document.documentElement.dataset.gameSearch, 0);
+				return;
+			}
+			status.hidden = false;
+			status.innerHTML = hits
+				? `<strong>${hits}</strong> jeu${hits > 1 ? 'x' : ''} sur ${total}`
+				: `Aucun jeu ne correspond à « ${input.value.trim()} »`;
+		};
+
+		input.addEventListener('input', apply);
+		input.addEventListener('search', apply); // native clear cross on some browsers
+		clearBtn?.addEventListener('click', () => {
+			input.value = '';
+			apply();
+			input.focus();
+		});
+		input.addEventListener('keydown', (e) => {
+			if (e.key !== 'Escape' || !input.value) return;
+			input.value = '';
+			apply();
+		});
+	}
+</script>
