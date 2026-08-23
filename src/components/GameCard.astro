@@ -21,9 +21,9 @@ const Tag = playable ? 'a' : 'div';
 const showFavorite = favorite && playable && id;
 // Convention: a generated screenshot at /assets/jeux/<id>.jpg. onerror removes it if absent.
 const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
-// Compact tiles drop the media block, so the same scene becomes the tile background
-// instead (the 640 px variant, already used as the game page backdrop).
-const art = compact && playable && id ? `/assets/jeux/art/${id}.jpg` : undefined;
+// Compact tiles show the very same key art, in a small crisp copy: the full card is
+// ~180 kB, and art/<id>.jpg is blurred at export time (cf. scripts/game-tiles.mjs).
+const tile = compact && playable && id ? `/assets/jeux/tile/${id}.jpg` : undefined;
 // Search haystack, accent-stripped so "melee" finds "Mots Mêlés". Built here rather
 // than read from the DOM because compact tiles don't render the pitch.
 const COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
@@ -39,24 +39,40 @@ const searchText = [title, pitch, id]
 	<Tag
 		class:list={['game-card', { soon: !playable, compact }]}
 		{...playable ? { href } : { 'aria-disabled': 'true' }}
-		{...art ? { style: `--card-art: url('${art}')` } : {}}
 	>
-		{media && !compact && (
+		{(compact ? tile : media) && (
 			<div class="game-card-media">
-				<img src={media} alt="" loading="lazy" onerror="this.parentElement.remove()" />
+				<img src={compact ? tile : media} alt="" loading="lazy" onerror="this.parentElement.remove()" />
 			</div>
 		)}
-		<div class="game-card-top">
-			<Icon icon={icon} color="var(--accent-regular)" size="2.5rem" gradient />
-			<span class:list={['badge', { soon: !playable }]}>
-				{playable ? 'Jouer' : 'Bientôt'}
-			</span>
-		</div>
+		{
+			compact ? (
+				!playable && <span class="badge soon">Bientôt</span>
+			) : (
+				<div class="game-card-top">
+					<Icon icon={icon} color="var(--accent-regular)" size="2.5rem" gradient />
+					<span class:list={['badge', { soon: !playable }]}>{playable ? 'Jouer' : 'Bientôt'}</span>
+				</div>
+			)
+		}
 		<h3>{title}</h3>
-		{playable && id && daily && <span class="daily-chip" data-game-id={id} hidden />}
-			{playable && id && daily && <span class="streak-badge" data-game-id={id} hidden />}
-			{playable && id && <span class="level-badge" data-game-id={id} hidden />}
-		{!compact && <p>{pitch}</p>}
+		{
+			compact ? (
+				// One line of chips: the art already says which game it is, and levels belong
+				// on the catalogue, not on the daily tile.
+				<div class="chip-row">
+					{playable && id && daily && <span class="daily-chip" data-game-id={id} data-short hidden />}
+					{playable && id && daily && <span class="streak-badge" data-game-id={id} hidden />}
+				</div>
+			) : (
+				<Fragment>
+					{playable && id && daily && <span class="daily-chip" data-game-id={id} hidden />}
+					{playable && id && daily && <span class="streak-badge" data-game-id={id} hidden />}
+					{playable && id && <span class="level-badge" data-game-id={id} hidden />}
+					<p>{pitch}</p>
+				</Fragment>
+			)
+		}
 	</Tag>
 	{
 		showFavorite && (
@@ -156,43 +172,83 @@ const searchText = [title, pitch, id]
 		cursor: default;
 	}
 
-	/* Compact tile: the game's key art becomes the background. It sits behind the
-	   card's own translucent fill, which is what keeps the text readable. */
+	/* Compact tile: full-bleed key art, then a two-line caption. */
 	.game-card.compact {
 		position: relative;
 		overflow: hidden;
-		/* Denser fill than the plain card: this is the scrim that keeps the text legible. */
-		background-color: color-mix(in srgb, var(--gray-999) 76%, transparent);
-	}
-
-	:global(.theme-dark) .game-card.compact {
-		background-color: color-mix(in srgb, var(--gray-999) 68%, transparent);
-	}
-
-	.game-card.compact::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		z-index: -1;
-		background-image: var(--card-art);
-		background-size: cover;
-		background-position: center;
-		/* Scale past the edges so the blur has no transparent rim. */
-		transform: scale(1.08);
-		filter: blur(1px);
-	}
-
-	/* Over art the translucent pills lose their edge — sit them on the card fill. */
-	.game-card.compact .daily-chip,
-	.game-card.compact .level-badge,
-	.game-card.compact .streak-badge {
-		backdrop-filter: blur(6px);
-		background-color: color-mix(in srgb, var(--gray-999) 78%, transparent);
-	}
-
-	/* Accent-on-accent-overlay vanishes over art — give this one an opaque bed. */
-	.game-card.compact .level-badge {
+		gap: 0;
+		padding: 0;
+		border-radius: 1.1rem;
 		background-color: var(--gray-999);
+	}
+
+	.game-card.compact .game-card-media {
+		border-radius: 0;
+		flex: none;
+		transition: filter var(--theme-transition);
+	}
+
+	.game-card.compact .game-card-media img {
+		transition: transform var(--theme-transition);
+	}
+
+	a.game-card.compact:hover .game-card-media img,
+	a.game-card.compact:focus-visible .game-card-media img {
+		transform: scale(1.06);
+	}
+
+	.game-card.compact h3 {
+		font-size: var(--text-base);
+		line-height: 1.2;
+		margin: 0.55rem 0.7rem 0;
+	}
+
+	.game-card.compact .badge.soon {
+		align-self: flex-start;
+		margin: 0.55rem 0.7rem 0;
+	}
+
+	.chip-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.3rem;
+		margin: 0.35rem 0.7rem 0.6rem;
+	}
+
+	.chip-row .daily-chip {
+		display: block;
+		min-width: 0;
+		max-width: 100%;
+		font-size: 12px;
+		padding: 3px 8px;
+		line-height: 1.4;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	/* Done today: the art steps back and a check takes the corner, so the caption can
+	   keep its full contrast instead of fading away with the tile. */
+	:global(.is-done) .game-card.compact .game-card-media {
+		filter: grayscale(0.85) brightness(0.7);
+	}
+
+	:global(.is-done) .game-card.compact::after {
+		content: '✓';
+		position: absolute;
+		top: 0.45rem;
+		right: 0.45rem;
+		width: 1.5rem;
+		height: 1.5rem;
+		border-radius: 999rem;
+		display: grid;
+		place-items: center;
+		font-weight: 700;
+		font-size: 0.85rem;
+		color: var(--accent-text-over);
+		background: var(--accent-regular);
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 	}
 
 	.game-card-media {
@@ -389,6 +445,8 @@ const searchText = [title, pitch, id]
 				/* ignore */
 			}
 			const recTxt = rec?.t ? `${rec.t}${rec.m === 'score' ? ' pts' : ''}` : '';
+			// Compact tiles have room for one short line; the rest goes to the tooltip.
+			const short = chip.hasAttribute('data-short');
 			chip.classList.toggle('done', done);
 			chip.classList.toggle('progress', started && !done);
 			// Tag the card so pages (e.g. the daily page) can reorder / dim by status.
@@ -404,15 +462,23 @@ const searchText = [title, pitch, id]
 				chip.title = `Record du jour${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 				const val = formatScore(cfg!.fmt, top.value);
 				const who = `${val ? `${val} · ` : ''}${top.name}`;
-				chip.textContent = `${done ? '✓ ' : ''}🏆 ${who}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
+				chip.title = `Record du jour : ${who}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
+				chip.textContent = short
+					? `🏆 ${val || top.name}`
+					: `${done ? '✓ ' : ''}🏆 ${who}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 			} else if (done || started) {
-				chip.textContent = done
+				const mark = done ? '✓' : '⏳';
+				chip.textContent = short
 					? recTxt
-						? `✓ Record du jour : ${recTxt}`
-						: '✓ Défi du jour fait'
-					: recTxt
-						? `⏳ En cours · ${recTxt}`
-						: '⏳ Défi en cours';
+						? `${mark} ${recTxt}`
+						: `${mark} ${done ? 'Fait' : 'En cours'}`
+					: done
+						? recTxt
+							? `✓ Record du jour : ${recTxt}`
+							: '✓ Défi du jour fait'
+						: recTxt
+							? `⏳ En cours · ${recTxt}`
+							: '⏳ Défi en cours';
 			} else {
 				// No record yet today (the daily board resets each morning): fall back to
 				// yesterday's record, else invite to be the first.
@@ -421,9 +487,12 @@ const searchText = [title, pitch, id]
 					const nb = ytop.players || 0;
 					chip.title = `Record d'hier${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 					const val = formatScore(cfg!.fmt, ytop.value);
-					chip.textContent = `🏆 Hier : ${val ? `${val} · ` : ''}${ytop.name}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
+					chip.textContent = short
+						? `🏆 Hier ${val || ytop.name}`
+						: `🏆 Hier : ${val ? `${val} · ` : ''}${ytop.name}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 				} else {
-					chip.textContent = "🏆 Sois le premier aujourd'hui !";
+					chip.title = "Personne n'a encore joué le défi du jour";
+					chip.textContent = short ? '🏆 Sois le premier' : "🏆 Sois le premier aujourd'hui !";
 				}
 			}
 			chip.hidden = false;

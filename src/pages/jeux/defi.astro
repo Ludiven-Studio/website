@@ -138,18 +138,6 @@ const byCategory = CATEGORIES.map((c) => ({
 		grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
 		gap: 0.85rem;
 	}
-	/* compact tiles: tighter than the full cards on /jeux */
-	.defi-grid :global(.game-card) {
-		padding: 1rem 1.1rem;
-		gap: 0.55rem;
-		border-radius: 1.1rem;
-	}
-	.defi-grid :global(.game-card h3) {
-		font-size: var(--text-base);
-	}
-	/* done challenges fade back so the ones left to do stand out */
-	.defi-grid li.is-done { opacity: 0.5; transition: opacity var(--theme-transition); }
-	.defi-grid li.is-done:hover { opacity: 0.85; }
 
 	.defi-streak {
 		align-self: center;

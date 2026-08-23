@@ -16,6 +16,7 @@ import { mkdir, copyFile, access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { run } from './comfy-gen.mjs';
 import { THEMES } from './thumb-themes.mjs';
+import { tile } from './game-tiles.mjs';
 
 const OUT = resolve('public/assets/jeux');
 const RAW = resolve(OUT, 'raw');
@@ -302,6 +303,7 @@ async function main() {
 	await mkdir(RAW, { recursive: true });
 	await mkdir(ART, { recursive: true });
 	await mkdir(resolve(OUT, 'art'), { recursive: true });
+	await mkdir(resolve(OUT, 'tile'), { recursive: true });
 
 	// Keep the pristine screenshot: after the first run, <id>.jpg is a composite.
 	for (const id of targets) {
@@ -328,6 +330,7 @@ async function main() {
 		await compose(id, art, raw, CARD_W, CARD_H, resolve(OUT, `${id}.jpg`));
 		await compose(id, art, raw, OG_W, OG_H, resolve(OUT, 'og', `${id}.jpg`));
 		await backdrop(art, resolve(OUT, 'art', `${id}.jpg`));
+		await tile(resolve(OUT, `${id}.jpg`), resolve(OUT, 'tile', `${id}.jpg`));
 		console.log(`  ✓ ${id}`);
 	}
 }
