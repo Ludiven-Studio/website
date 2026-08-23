@@ -602,13 +602,6 @@ const CSS = `
 .mx-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; }
 
 .mx-playwrap { width: 100%; position: relative; display: flex; flex-direction: column; align-items: center; }
-/* Marble rail the frames hang above, like the museum wall on the game card. */
-.mx-playwrap::after {
-  content: ''; position: absolute; left: 20%; right: 20%; bottom: -20px; height: 14px;
-  border-radius: 3px 3px 6px 6px; pointer-events: none;
-  background: linear-gradient(180deg, #f4f1ec 0 4px, #ddd7cd 4px 60%, #b3aca1);
-  box-shadow: 0 10px 18px -11px rgba(0, 0, 0, 0.45);
-}
 .mx-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 300px; }
 .mx-gcell {
   aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center;

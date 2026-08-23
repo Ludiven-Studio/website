@@ -666,13 +666,6 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
-/* Ground fog of the misty field on the game card. */
-.dm-boardwrap::after {
-  content: ''; position: absolute; left: -26px; right: -26px; bottom: -22px; height: 44px;
-  pointer-events: none;
-  background: radial-gradient(58% 100% at 50% 100%, rgba(196, 210, 226, 0.9), rgba(196, 210, 226, 0.3) 55%, transparent 78%);
-  filter: blur(7px);
-}
 .dm-board {
   width: 100%;
   display: grid;

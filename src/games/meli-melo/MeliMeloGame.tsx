@@ -446,17 +446,6 @@ const CSS = `
 .mm-timerfill.urgent { background: #e0484d; }
 .mm-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .mm-boardwrap { width: min(88vw, 340px); position: relative; }
-/* Gingham tablecloth under the grid, like the kitchen table on the game card. */
-.mm-boardwrap::after {
-  content: ''; position: absolute; pointer-events: none;
-  left: -10px; right: -10px; bottom: -18px; height: 20px;
-  border-radius: 3px;
-  background:
-    repeating-linear-gradient(90deg, rgba(214, 74, 74, 0.55) 0 11px, transparent 11px 22px),
-    repeating-linear-gradient(0deg, rgba(214, 74, 74, 0.55) 0 11px, transparent 11px 22px),
-    #f3e6d2;
-  box-shadow: 0 8px 14px -9px rgba(0, 0, 0, 0.5);
-}
 .mm-boardwrap.blurred { filter: blur(6px); opacity: 0.5; pointer-events: none; }
 .mm-board { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; aspect-ratio: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mm-cell { background: var(--gray-900); border: 2px solid var(--gray-800); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: clamp(22px, 8vw, 34px); color: var(--gray-0); }

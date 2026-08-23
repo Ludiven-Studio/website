@@ -789,28 +789,6 @@ const CSS = `
 }
 .cor-svg { display: block; width: 100%; height: 100%; }
 
-/* Tuft of meadow grass at the foot of the frame, like the field the pegs are planted in
-   on the game card. Each conic tile cuts one blade — apex at the top, base at the bottom.
-   Two layers of different tile sizes (masks add up) so the blades aren't all one height. */
-.cor-boardwrap::after {
-  content: ''; position: absolute; pointer-events: none;
-  left: -4px; right: -4px; bottom: -20px; height: 24px;
-  background: linear-gradient(180deg, #a3d477, #4b8b39);
-  -webkit-mask-image:
-    conic-gradient(from 164deg at 50% 0%, #000 0 32deg, transparent 0),
-    conic-gradient(from 162deg at 50% 0%, #000 0 36deg, transparent 0);
-  mask-image:
-    conic-gradient(from 164deg at 50% 0%, #000 0 32deg, transparent 0),
-    conic-gradient(from 162deg at 50% 0%, #000 0 36deg, transparent 0);
-  -webkit-mask-size: 15px 100%, 9px 62%;
-  mask-size: 15px 100%, 9px 62%;
-  -webkit-mask-position: 0 0, 6px 100%;
-  mask-position: 0 0, 6px 100%;
-  -webkit-mask-repeat: repeat-x;
-  mask-repeat: repeat-x;
-  filter: drop-shadow(0 3px 4px rgba(40, 70, 30, 0.3));
-}
-
 /* Elsewhere the leaderboard pill floats over inert padding. Here the frame's edge is the
    whole point of the puzzle, and a peg can sit within a tenth of it, so let the pill flow. */
 .cor-root .lbc-root {

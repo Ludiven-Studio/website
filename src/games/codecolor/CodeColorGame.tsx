@@ -558,19 +558,6 @@ const CSS = `
 
 .cc-boardwrap { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.9rem; }
 .cc-board { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 6px; }
-/* Bank of indicator bulbs on a dark panel, like the retro computer lab on the game card. */
-.cc-boardwrap::after {
-  content: ''; position: absolute; left: 12%; right: 12%; bottom: -24px; height: 18px;
-  border-radius: 4px; pointer-events: none;
-  background:
-    radial-gradient(circle 3.4px at 12% 50%, #ff6b6b 92%, transparent),
-    radial-gradient(circle 3.4px at 29% 50%, #ffd166 92%, transparent),
-    radial-gradient(circle 3.4px at 46% 50%, #4ade80 92%, transparent),
-    radial-gradient(circle 3.4px at 63% 50%, #38bdf8 92%, transparent),
-    radial-gradient(circle 3.4px at 80% 50%, #c084fc 92%, transparent),
-    linear-gradient(180deg, #2a3040, #141822);
-  box-shadow: 0 9px 18px -10px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
 .cc-reveal { margin-top: -0.3rem; }
 .cc-row { display: flex; align-items: center; gap: 10px; }
 .cc-row.active { background: var(--gray-900); border-radius: 12px; padding: 6px 8px; }

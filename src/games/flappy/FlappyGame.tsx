@@ -723,18 +723,6 @@ const CSS = `
 .fl-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; }
 
 .fl-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
-/* Grassy ground under the board, like the sunny meadow the pipes rise from on the game card. */
-.fl-boardwrap::after {
-  content: ''; position: absolute; pointer-events: none;
-  left: -6px; right: -6px; bottom: -17px; height: 19px;
-  border-radius: 0 0 6px 6px;
-  background: linear-gradient(180deg, #7fc95a 0 6px, #4f9a3a 6px 60%, #3a7530);
-  -webkit-mask-image: radial-gradient(circle 9px at 50% 100%, #000 96%, transparent 100%);
-  mask-image: radial-gradient(circle 9px at 50% 100%, #000 96%, transparent 100%);
-  -webkit-mask-size: 18px 100%; mask-size: 18px 100%;
-  -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-}
-.game-page.gf-full .fl-boardwrap::after { display: none; }
 /* Levels menu: keep the canvas mounted (rAF/render) but hide it behind the level grid. */
 .fl-boardwrap.hidden { display: none; }
 /* Site global fullscreen → the board fits the REMAINING space (a square, no overflow in landscape). */

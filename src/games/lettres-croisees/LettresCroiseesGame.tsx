@@ -515,13 +515,6 @@ const CSS = `
 .lc-count, .lc-time, .lc-bonus { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
 .lc-bonus { color: #eec95c; }
 .lc-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
-/* Coffee ring left on the café table, like the game card. */
-.lc-playwrap::after {
-  content: ''; position: absolute; right: 4%; bottom: -14px; width: 54px; height: 54px;
-  border-radius: 50%; pointer-events: none;
-  border: 3px solid rgba(122, 79, 44, 0.28);
-  box-shadow: inset 0 0 0 1px rgba(122, 79, 44, 0.12);
-}
 .lc-play { width: 100%; display: flex; flex-direction: column; align-items: center; }
 .lc-play.blurred { filter: blur(5px); opacity: 0.5; pointer-events: none; }
 .lc-gridcol { display: flex; align-items: center; justify-content: center; }

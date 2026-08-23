@@ -884,19 +884,6 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
-/* Painter palette under the grid, like the studio on the game card. */
-.co-boardwrap::after {
-  content: ''; position: absolute; left: 8%; right: 8%; bottom: -23px; height: 19px;
-  border-radius: 4px 4px 9px 9px; pointer-events: none;
-  background:
-    radial-gradient(circle 4px at 14% 52%, #e2574c 96%, transparent),
-    radial-gradient(circle 4px at 32% 52%, #f0b429 96%, transparent),
-    radial-gradient(circle 4px at 50% 52%, #3f9a63 96%, transparent),
-    radial-gradient(circle 4px at 68% 52%, #3b7dd8 96%, transparent),
-    radial-gradient(circle 4px at 86% 52%, #8a4fbf 96%, transparent),
-    linear-gradient(180deg, #dcb079, #8b5f34);
-  box-shadow: 0 9px 16px -10px rgba(0, 0, 0, 0.55);
-}
 .co-board {
   width: 100%;
   display: grid;

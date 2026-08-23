@@ -704,15 +704,6 @@ const CSS = `
 .co-stats { display: flex; gap: 0.5rem; font-weight: 700; font-size: 13px; margin-bottom: 0.75rem; flex-wrap: wrap; justify-content: center; }
 .co-stat { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 12px; font-variant-numeric: tabular-nums; }
 .co-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
-/* Canyon rock ledge under the scene, like the desert on the game card. */
-.co-playwrap::after {
-  content: ''; position: absolute; pointer-events: none;
-  left: 0; right: 0; bottom: -16px; height: 18px;
-  border-radius: 0 0 8px 8px;
-  background: linear-gradient(180deg, #d9a463 0 5px, #b57840 5px 55%, #8a5528);
-  box-shadow: 0 8px 14px -9px rgba(0, 0, 0, 0.55);
-}
-.game-page.gf-full .co-playwrap::after { display: none; }
 .co-canvas { display: block; border-radius: 10px; box-shadow: var(--shadow-md); touch-action: none; cursor: crosshair; background: #bfe3ff; }
 .co-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .co-overlay-scroll { background: var(--gray-999); border-radius: 10px; align-items: flex-start; overflow-y: auto; padding: 12px; }

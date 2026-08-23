@@ -899,17 +899,6 @@ const CSS = `
   max-width: 380px;
   margin-inline: auto;
 }
-/* Sandy seabed under the board, like the reef the bubbles rise through on the game card. */
-.bul-boardwrap::after {
-  content: ''; position: absolute; pointer-events: none;
-  left: -8px; right: -8px; bottom: -16px; height: 18px;
-  border-radius: 0 0 10px 10px;
-  background: linear-gradient(180deg, #e8d3a4 0 5px, #cbb07c 5px 60%, #a98e5d);
-  -webkit-mask-image: radial-gradient(circle 10px at 50% 100%, #000 98%, transparent 100%);
-  mask-image: radial-gradient(circle 10px at 50% 100%, #000 98%, transparent 100%);
-  -webkit-mask-size: 20px 100%; mask-size: 20px 100%;
-  -webkit-mask-repeat: repeat-x; mask-repeat: repeat-x;
-}
 .bul-loading {
   display: flex; align-items: center; justify-content: center;
   width: 100%; aspect-ratio: 3 / 4;

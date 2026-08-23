@@ -793,16 +793,11 @@ const CSS = `
   margin-inline: auto;
   container-type: inline-size;
 }
-/* Green board and its chalk tray, like the classroom the game card is set in. */
+/* Green board, like the classroom the game card is set in. */
 .cd-boardwrap::before {
   content: ''; position: absolute; inset: -14px -14px -22px; border-radius: 10px; pointer-events: none;
   background: linear-gradient(160deg, #3d6a50, #2b4b39);
   box-shadow: 0 12px 24px -14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(214, 240, 222, 0.25);
-}
-.cd-boardwrap::after {
-  content: ''; position: absolute; left: -14px; right: -14px; bottom: -22px; height: 9px; pointer-events: none;
-  border-radius: 0 0 10px 10px;
-  background: linear-gradient(180deg, #bd8d54, #6d4826);
 }
 .cd-board {
   position: relative; /* keeps the grid above the chalkboard */
