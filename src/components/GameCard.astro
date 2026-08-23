@@ -58,11 +58,14 @@ const searchText = [title, pitch, id]
 		<h3>{title}</h3>
 		{
 			compact ? (
-				// One line of chips: the art already says which game it is, and levels belong
-				// on the catalogue, not on the daily tile.
-				<div class="chip-row">
-					{playable && id && daily && <span class="daily-chip" data-game-id={id} data-short hidden />}
-					{playable && id && daily && <span class="streak-badge" data-game-id={id} hidden />}
+				// The title rides the art as a plaque, so the panel below is free for the
+				// record itself. Levels belong on the catalogue, not on the daily tile.
+				<div class="tile-info">
+					<div class="chip-row">
+						{playable && id && daily && <span class="daily-chip" data-game-id={id} data-short hidden />}
+						{playable && id && daily && <span class="streak-badge" data-game-id={id} hidden />}
+					</div>
+					{playable && id && daily && <span class="tile-note" hidden />}
 				</div>
 			) : (
 				<Fragment>
@@ -197,10 +200,27 @@ const searchText = [title, pitch, id]
 		transform: scale(1.06);
 	}
 
+	/* Plaque over the art: the scenes are prompted with their ground plane at the
+	   bottom, so the top strip is sky and the title always lands on quiet pixels. */
 	.game-card.compact h3 {
+		position: absolute;
+		top: 0.4rem;
+		left: 0.4rem;
+		max-width: calc(100% - 0.8rem);
+		margin: 0;
+		padding: 0.18rem 0.45rem;
+		border-radius: 0.55rem;
 		font-size: var(--text-base);
-		line-height: 1.2;
-		margin: 0.55rem 0.7rem 0;
+		line-height: 1.15;
+		color: #fff;
+		background: rgba(18, 14, 28, 0.58);
+		backdrop-filter: blur(6px);
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+	}
+
+	/* Only a done tile carries the corner check — give the plaque room just then. */
+	:global(.is-done) .game-card.compact h3 {
+		max-width: calc(100% - 2.6rem);
 	}
 
 	.game-card.compact .badge.soon {
@@ -208,12 +228,32 @@ const searchText = [title, pitch, id]
 		margin: 0.55rem 0.7rem 0;
 	}
 
+	.tile-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		padding: 0.5rem 0.6rem 0.6rem;
+	}
+
 	.chip-row {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.3rem;
-		margin: 0.35rem 0.7rem 0.6rem;
+	}
+
+	.tile-note {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		font-size: 11px;
+		line-height: 1.3;
+		color: var(--gray-400);
+	}
+
+	.tile-note[hidden] {
+		display: none;
 	}
 
 	.chip-row .daily-chip {
@@ -445,8 +485,17 @@ const searchText = [title, pitch, id]
 				/* ignore */
 			}
 			const recTxt = rec?.t ? `${rec.t}${rec.m === 'score' ? ' pts' : ''}` : '';
-			// Compact tiles have room for one short line; the rest goes to the tooltip.
+			// Compact tiles split the record: the value in the chip, who holds it below.
 			const short = chip.hasAttribute('data-short');
+			const note = short ? chip.closest('.game-card')?.querySelector<HTMLElement>('.tile-note') : null;
+			const setNote = (txt: string) => {
+				if (!note) return;
+				note.textContent = txt;
+				note.hidden = !txt;
+			};
+			// "joueur" rather than "participant": the note has to hold on one line.
+			const holder = (name: string, players: number) =>
+				`${name}${players ? ` · ${players} joueur${players > 1 ? 's' : ''}` : ''}`;
 			chip.classList.toggle('done', done);
 			chip.classList.toggle('progress', started && !done);
 			// Tag the card so pages (e.g. the daily page) can reorder / dim by status.
@@ -459,13 +508,13 @@ const searchText = [title, pitch, id]
 			const top = cfg ? tops[cfg.lbId || id] : undefined;
 			if (top) {
 				const nb = top.players || 0;
-				chip.title = `Record du jour${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 				const val = formatScore(cfg!.fmt, top.value);
 				const who = `${val ? `${val} · ` : ''}${top.name}`;
 				chip.title = `Record du jour : ${who}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
 				chip.textContent = short
 					? `🏆 ${val || top.name}`
 					: `${done ? '✓ ' : ''}🏆 ${who}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
+				setNote(holder(top.name, nb));
 			} else if (done || started) {
 				const mark = done ? '✓' : '⏳';
 				chip.textContent = short
@@ -479,6 +528,7 @@ const searchText = [title, pitch, id]
 						: recTxt
 							? `⏳ En cours · ${recTxt}`
 							: '⏳ Défi en cours';
+				setNote(recTxt ? 'Ton record du jour' : '');
 			} else {
 				// No record yet today (the daily board resets each morning): fall back to
 				// yesterday's record, else invite to be the first.
@@ -490,9 +540,11 @@ const searchText = [title, pitch, id]
 					chip.textContent = short
 						? `🏆 Hier ${val || ytop.name}`
 						: `🏆 Hier : ${val ? `${val} · ` : ''}${ytop.name}${nb ? ` · ${nb} participant${nb > 1 ? 's' : ''}` : ''}`;
+					setNote(holder(ytop.name, nb));
 				} else {
 					chip.title = "Personne n'a encore joué le défi du jour";
 					chip.textContent = short ? '🏆 Sois le premier' : "🏆 Sois le premier aujourd'hui !";
+					setNote('');
 				}
 			}
 			chip.hidden = false;
