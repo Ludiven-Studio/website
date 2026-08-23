@@ -6,12 +6,13 @@ interface Props {
 	id: string; // category id → localStorage key
 	title: string;
 	count: number;
+	hidden?: boolean; // sections filled client-side start hidden, e.g. favorites
 }
 
-const { id, title, count } = Astro.props;
+const { id, title, count, hidden = false } = Astro.props;
 ---
 
-<details class="game-fold" data-fold-id={id} open>
+<details class="game-fold" data-fold-id={id} open hidden={hidden}>
 	<summary>
 		<span class="fold-caret" aria-hidden="true">▸</span>
 		<span class="fold-title">{title}</span>
@@ -25,6 +26,9 @@ const { id, title, count } = Astro.props;
 <style>
 	.game-fold {
 		width: 100%;
+	}
+	.game-fold[hidden] {
+		display: none;
 	}
 	.game-fold summary {
 		list-style: none;

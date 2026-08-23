@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import GameCard from '../../components/GameCard.astro';
 import GameFold from '../../components/GameFold.astro';
 import GameSearch from '../../components/GameSearch.astro';
+import GameFavorites from '../../components/GameFavorites.astro';
 import SuggestionForm from '../../components/SuggestionForm.astro';
 import CocoinBar from '../../components/CocoinBar';
 import CocoinToast from '../../components/CocoinToast';
@@ -54,6 +55,10 @@ const byCategory = CATEGORIES.map((c) => ({
 
 		<div class="games-sections stack gap-4">
 			<GameSearch total={games.length} />
+			<GameFold id="favoris" title="⭐ Favoris" count={0} hidden>
+				<ul class="games-grid" data-fav-grid></ul>
+			</GameFold>
+			<GameFavorites />
 			{
 				byCategory.map((c) => (
 					<GameFold id={c.id} title={c.title} count={c.games.length}>

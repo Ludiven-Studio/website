@@ -152,6 +152,7 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 					userOpen.set(f, f.open);
 					userMeta.set(f, f.querySelector('[data-fold-meta]')?.textContent ?? '');
 				}
+			const wasSearching = searching;
 			searching = on;
 			// Tell GameFold not to persist the opens/closes we drive here.
 			if (on) document.documentElement.dataset.gameSearch = 'on';
@@ -173,7 +174,10 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 				f.classList.toggle('gs-hidden', on && !kept);
 				f.open = on ? kept > 0 : (userOpen.get(f) ?? f.open);
 				const meta = f.querySelector('[data-fold-meta]');
-				if (meta) meta.textContent = on ? `${kept} résultat${kept > 1 ? 's' : ''}` : (userMeta.get(f) ?? meta.textContent);
+				// Only put the header back on the turn the search ends — the count is the
+				// page's to own again after that (favorites move cards between sections).
+				if (meta && on) meta.textContent = `${kept} résultat${kept > 1 ? 's' : ''}`;
+				else if (meta && wasSearching) meta.textContent = userMeta.get(f) ?? meta.textContent;
 			}
 
 			if (!on) {
@@ -190,6 +194,8 @@ const { placeholder = 'Rechercher un jeu…', total } = Astro.props;
 
 		input.addEventListener('input', apply);
 		input.addEventListener('search', apply); // native clear cross on some browsers
+		// A card just moved to (or out of) the favorites fold — re-filter it in place.
+		document.addEventListener('favorites-applied', () => searching && apply());
 		clearBtn?.addEventListener('click', () => {
 			input.value = '';
 			apply();

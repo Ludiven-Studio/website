@@ -1,0 +1,72 @@
+---
+// Behaviour only — the page renders the fold and an empty `[data-fav-grid]` list so
+// the grid keeps the page's own styles. This moves the favorite cards into that list
+// (never copies them, so counts and search stay right) and puts them back on untoggle.
+---
+
+<script>
+	const KEY = 'ludiven-favorites';
+
+	const grid = document.querySelector<HTMLElement>('[data-fav-grid]');
+	const fold = grid?.closest('details');
+	if (grid && fold) {
+		const li = new Map<string, HTMLElement>();
+		const home = new Map<string, HTMLElement>();
+		// Position in the category before any move, so a card comes back where it was.
+		const rank = new WeakMap<Element, number>();
+
+		document.querySelectorAll<HTMLElement>('.game-card-wrap[data-game-id]').forEach((wrap) => {
+			const id = wrap.dataset.gameId;
+			const item = wrap.closest('li');
+			const parent = item?.parentElement;
+			if (!id || !item || !parent || li.has(id)) return;
+			li.set(id, item);
+			home.set(id, parent);
+		});
+		document.querySelectorAll<HTMLElement>('.fold-body > ul').forEach((list) => {
+			Array.from(list.children).forEach((item, i) => rank.set(item, i));
+		});
+
+		const read = (): string[] => {
+			try {
+				const v = JSON.parse(localStorage.getItem(KEY) || '[]');
+				return Array.isArray(v) ? v : [];
+			} catch {
+				return [];
+			}
+		};
+
+		const restore = (id: string) => {
+			const item = li.get(id)!;
+			const parent = home.get(id)!;
+			const i = rank.get(item) ?? 0;
+			const after = Array.from(parent.children).find((c) => (rank.get(c) ?? -1) > i);
+			parent.insertBefore(item, after ?? null);
+		};
+
+		const apply = () => {
+			const favs = read().filter((id) => li.has(id));
+			for (const [id, item] of li) if (!favs.includes(id) && item.parentElement === grid) restore(id);
+			for (const id of favs) grid.appendChild(li.get(id)!);
+
+			fold.hidden = favs.length === 0;
+			// Sections gained or lost cards — the défi page rewrites these with its own
+			// "3/12 faits" right after, on the event below.
+			document.querySelectorAll<HTMLElement>('.game-fold').forEach((f) => {
+				const meta = f.querySelector('[data-fold-meta]');
+				const n = f.querySelectorAll('.game-card-wrap').length;
+				if (meta) meta.textContent = `${n} jeu${n > 1 ? 'x' : ''}`;
+			});
+			document.dispatchEvent(new Event('favorites-applied'));
+		};
+
+		apply();
+		// The heart writes localStorage from its own click listener; run after it.
+		document.addEventListener('click', (e) => {
+			if ((e.target as HTMLElement).closest('.fav-toggle')) setTimeout(apply, 0);
+		});
+		window.addEventListener('storage', (e) => {
+			if (e.key === KEY) apply();
+		});
+	}
+</script>
