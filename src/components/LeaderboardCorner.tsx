@@ -12,14 +12,17 @@ interface Props {
 	format?: (v: number) => string;
 	/** Custom rows source, forwarded to Leaderboard (cf. lib/scores getLeaderboard). */
 	source?: () => Promise<ScoreRow[]>;
+	/** 'right' shrinks the pill to its trophy and pins it to the corner — for games whose
+	    controls live along the bottom of the board (bulles aims there). */
+	side?: 'center' | 'right';
 }
 
-export default function LeaderboardCorner({ game, metric, format, source }: Props) {
+export default function LeaderboardCorner({ game, metric, format, source, side = 'center' }: Props) {
 	const [open, setOpen] = useState(false);
 	if (!leaderboardEnabled()) return null;
 
 	return (
-		<div className="lbc-root">
+		<div className={`lbc-root ${side === 'right' ? 'lbc-side' : ''}`}>
 			<style>{CSS}</style>
 			{open && (
 				<div className="lbc-panel">
@@ -29,8 +32,13 @@ export default function LeaderboardCorner({ game, metric, format, source }: Prop
 					<Leaderboard game={game} metric={metric} format={format} source={source} actions={false} />
 				</div>
 			)}
-			<button className="lbc-pill" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-				🏆 Classement du jour
+			<button
+				className="lbc-pill"
+				onClick={() => setOpen((o) => !o)}
+				aria-expanded={open}
+				aria-label="Classement du jour"
+			>
+				🏆<span className="lbc-label"> Classement du jour</span>
 			</button>
 		</div>
 	);
@@ -41,6 +49,11 @@ const CSS = `
   position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 50;
   display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
+.lbc-root.lbc-side {
+  left: auto; right: 12px; transform: none; align-items: flex-end;
+}
+.lbc-side .lbc-pill { padding: 9px 11px; font-size: 16px; }
+.lbc-side .lbc-label { display: none; }
 .lbc-pill {
   border: none; background: var(--accent-regular); color: var(--accent-text-over);
   font: inherit; font-weight: 700; font-size: 13px; border-radius: 999px;

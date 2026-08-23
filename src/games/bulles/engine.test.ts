@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	DIFFS,
 	DIFF_ORDER,
+	MAX_AIM,
 	MIN_POP,
 	R,
 	applyShot,
@@ -18,7 +19,9 @@ import {
 	nextColour,
 	orphans,
 	palette,
+	ray,
 	rowLen,
+	shooterOf,
 	shotBudget,
 	solve,
 	type Grid,
@@ -140,6 +143,37 @@ describe('bulles — flight', () => {
 	it('the aim is repeatable', () => {
 		const g = raft();
 		expect(fly(g, 0.4)!.cell).toBe(fly(g, 0.4)!.cell);
+	});
+
+	it('the sight line stays in the board and ends where the bubble stops', () => {
+		const g = raft();
+		for (let i = -20; i <= 20; i++) {
+			const angle = (i / 20) * MAX_AIM;
+			const pts = ray(g, angle);
+			expect(pts.length).toBeGreaterThanOrEqual(2);
+			expect(pts[0]).toEqual(shooterOf(g));
+			for (const p of pts) {
+				expect(p.x).toBeGreaterThanOrEqual(R - 1e-6);
+				expect(p.x).toBeLessThanOrEqual(boardW(g.cols) - R + 1e-6);
+			}
+			const f = fly(g, angle);
+			if (!f) continue;
+			const end = pts[pts.length - 1];
+			const cell = centreOf(g, f.cell);
+			// Free contact point, so it sits within a bubble of the cell it settles in.
+			expect(Math.hypot(end.x - cell.x, end.y - cell.y)).toBeLessThan(2 * R);
+		}
+	});
+
+	it('the sight sweeps smoothly — no jump between neighbouring angles', () => {
+		const g = raft();
+		let prev: { x: number; y: number } | null = null;
+		for (let i = -60; i <= 60; i++) {
+			const pts = ray(g, (i / 60) * 0.8);
+			const end = pts[pts.length - 1];
+			if (prev && pts.length === 2) expect(Math.hypot(end.x - prev.x, end.y - prev.y)).toBeLessThan(R);
+			prev = pts.length === 2 ? end : null;
+		}
 	});
 });
 

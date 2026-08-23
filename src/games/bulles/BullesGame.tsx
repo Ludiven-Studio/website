@@ -19,6 +19,7 @@ import {
 	gridOf,
 	isLost,
 	nextColour,
+	ray,
 	shooterOf,
 	type BullesPuzzle,
 	type Grid,
@@ -66,6 +67,16 @@ const SPEED = 62;
 /** How much of the aim the guide gives away: the cannon, the first wall, and one more leg. */
 const GUIDE_LEGS = 3;
 
+/** Idle bubbles drifting up behind the raft. x is a share of the width. */
+const DECOR = [
+	{ x: 0.12, r: 0.48, dur: 13, delay: 0 },
+	{ x: 0.31, r: 0.3, dur: 17, delay: 4 },
+	{ x: 0.46, r: 0.66, dur: 21, delay: 9 },
+	{ x: 0.62, r: 0.36, dur: 15, delay: 2 },
+	{ x: 0.79, r: 0.54, dur: 19, delay: 11 },
+	{ x: 0.91, r: 0.26, dur: 12, delay: 6 },
+];
+
 /* The saved daily attempt is a raw cell array, so it only means something on the board it was
    dealt from. GEN_V bumps with the generator: an attempt saved against an older deal is
    dropped instead of painted over the new one. */
@@ -94,7 +105,8 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	const [started, setStarted] = useState(false);
 	const [hintAim, setHintAim] = useState<number | null>(null);
 	const [hintNote, setHintNote] = useState('');
-	const [aim, setAim] = useState<number | null>(null);
+	const [aim, setAim] = useState(0); // where the sight points, kept between shots
+	const [aiming, setAiming] = useState(false);
 	const [flying, setFlying] = useState(false);
 	const [burst, setBurst] = useState<{ cell: number; colour: number }[]>([]);
 	const [elapsed, setElapsed] = useState(0);
@@ -106,7 +118,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const boardRef = useRef<SVGSVGElement>(null);
-	const bubbleRef = useRef<SVGCircleElement>(null);
+	const bubbleRef = useRef<SVGGElement>(null);
 	const rafRef = useRef(0);
 	const animRef = useRef<{ pts: Pt[]; legs: number[]; total: number; t0: number; cell: number; colour: number } | null>(null);
 	const gridRef = useRef<Grid | null>(null);
@@ -131,7 +143,8 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		setGrid(gridOf(p));
 		setShots(0);
 		setBurst([]);
-		setAim(null);
+		setAim(0);
+		setAiming(false);
 		setHintAim(null);
 		animRef.current = null;
 		setFlying(false);
@@ -305,8 +318,9 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		const t = a.legs[i] > 0 ? rest / a.legs[i] : 0;
 		const el = bubbleRef.current;
 		if (el) {
-			el.setAttribute('cx', String(p0.x + (p1.x - p0.x) * t));
-			el.setAttribute('cy', String(p0.y + (p1.y - p0.y) * t));
+			const x = p0.x + (p1.x - p0.x) * t;
+			const y = p0.y + (p1.y - p0.y) * t;
+			el.setAttribute('transform', `translate(${x} ${y})`);
 		}
 		rafRef.current = requestAnimationFrame(frame);
 	}, [land]);
@@ -326,7 +340,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		}
 		animRef.current = { pts: f.path, legs, total, t0: performance.now(), cell: f.cell, colour };
 		setFlying(true);
-		setAim(null);
+		setAiming(false);
 		setHintAim(null);
 		setBurst([]);
 		begin();
@@ -337,36 +351,41 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 
 	/* ---------- Aiming ---------- */
 
-	const angleAt = useCallback((clientX: number, clientY: number): number | null => {
+	/**
+	 * Above the cannon the sight points straight at the finger. Level with it or below, the
+	 * bottom of the board is a dial: sliding left and right sweeps the sight, so a thumb
+	 * resting under the board still aims.
+	 */
+	const angleAt = useCallback((clientX: number, clientY: number): number => {
 		const el = boardRef.current;
 		const g = gridRef.current;
-		if (!el || !g) return null;
+		if (!el || !g) return 0;
 		const rect = el.getBoundingClientRect();
 		const x = ((clientX - rect.left) / rect.width) * boardW(g.cols);
 		const y = ((clientY - rect.top) / rect.height) * boardH(g.rows);
 		const sh = shooterOf(g);
 		const dy = y - sh.y;
-		if (dy > -R) return null; // level with the cannon or below: no shot to take
-		const a = Math.atan2(x - sh.x, -dy);
+		const a = dy < -R ? Math.atan2(x - sh.x, -dy) : ((x - sh.x) / (boardW(g.cols) / 2)) * MAX_AIM;
 		return Math.max(-MAX_AIM, Math.min(MAX_AIM, a));
 	}, []);
 
 	const onPress = (clientX: number, clientY: number) => {
 		if (!armedRef.current) return;
+		setAiming(true);
 		setAim(angleAt(clientX, clientY));
 	};
 
 	const onMove = (clientX: number, clientY: number) => {
 		if (!armedRef.current) return;
-		const a = angleAt(clientX, clientY);
-		if (a !== null) setAim(a);
+		setAim(angleAt(clientX, clientY));
 	};
 
 	const onRelease = (clientX: number, clientY: number) => {
 		if (!armedRef.current) return;
-		const a = angleAt(clientX, clientY) ?? aim;
-		setAim(null);
-		if (a !== null) shoot(a);
+		const a = angleAt(clientX, clientY);
+		setAim(a);
+		setAiming(false);
+		shoot(a);
 	};
 
 	const { onPointerDown } = usePointerDrag(onPress, onMove, onRelease);
@@ -450,8 +469,13 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	const dailyScore = encodePacked(10_000_000, [shots, Math.min(9_999_999, elapsed)]);
 	const fmtPacked = (v: number): string => formatScore(DAILY_LB.bulles.fmt, v);
 
-	const guide = grid && (hintAim ?? aim) !== null ? fly(grid, (hintAim ?? aim) as number) : null;
-	const guidePts = guide ? guide.path.slice(0, hintAim !== null ? guide.path.length : GUIDE_LEGS) : null;
+	const sight = hintAim ?? aim; // where the barrel points, hint takes over while it shows
+	const showGuide = grid !== null && status === 'playing' && !flying && (aiming || hintAim !== null);
+	const sightPts = showGuide && grid ? ray(grid, sight) : null;
+	const guidePts = sightPts ? sightPts.slice(0, hintAim !== null ? sightPts.length : GUIDE_LEGS) : null;
+	// The ghost only shows when the whole line is on screen, so a bounced shot keeps its secret.
+	const ghost =
+		grid && sightPts && (hintAim !== null || sightPts.length <= GUIDE_LEGS) ? fly(grid, sight) : null;
 
 	const W = grid ? boardW(grid.cols) : 20;
 	const H = grid ? boardH(grid.rows) : 27;
@@ -516,7 +540,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 			{grid && status !== 'loading' && !(lv.active && lv.menu) && (
 				<div className="bul-gauge" aria-live="polite">
 					🎯 <strong>{shots}</strong> tirs · par {par} · <strong>{left}</strong> bulles ·{' '}
-					{/* The corner leaderboard pill can sit right over the cannon, so the loaded colour is repeated here. */}
+					{/* The cannon is small and often under a thumb, so the loaded colour is repeated here. */}
 					<span className="bul-chip" style={{ background: HUE[loaded % HUE.length] }} aria-label="Bulle chargée" />
 				</div>
 			)}
@@ -557,6 +581,64 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 						role="application"
 						aria-label="Tableau de bulles"
 					>
+						<defs>
+							{/* One sheen for every bubble: bright top-left, dark rim — the soap look. */}
+							<radialGradient id="bul-sheen" cx="34%" cy="28%" r="76%">
+								<stop offset="0%" stopColor="#fff" stopOpacity="0.72" />
+								<stop offset="24%" stopColor="#fff" stopOpacity="0.2" />
+								<stop offset="58%" stopColor="#fff" stopOpacity="0" />
+								<stop offset="84%" stopColor="#000" stopOpacity="0.06" />
+								<stop offset="100%" stopColor="#000" stopOpacity="0.26" />
+							</radialGradient>
+							{/* Same idea as the sheen but no dark rim — the decor must not read as a pebble on dark. */}
+							<radialGradient id="bul-film" cx="36%" cy="30%" r="72%">
+								<stop offset="0%" stopColor="#fff" stopOpacity="0.6" />
+								<stop offset="34%" stopColor="#fff" stopOpacity="0.2" />
+								<stop offset="74%" stopColor="#fff" stopOpacity="0.09" />
+								<stop offset="93%" stopColor="#fff" stopOpacity="0.34" />
+								<stop offset="100%" stopColor="#fff" stopOpacity="0.04" />
+							</radialGradient>
+							<linearGradient id="bul-water" x1="0" y1="0" x2="0" y2="1">
+								<stop offset="0%" stopColor="#7ec8ff" stopOpacity="0.16" />
+								<stop offset="55%" stopColor="#3f8fd8" stopOpacity="0.1" />
+								<stop offset="100%" stopColor="#12508f" stopOpacity="0.22" />
+							</linearGradient>
+							<g id="bul-shine">
+								<circle r={R * 0.95} fill="url(#bul-sheen)" />
+								<ellipse
+									cx={-R * 0.32}
+									cy={-R * 0.36}
+									rx={R * 0.3}
+									ry={R * 0.19}
+									fill="#fff"
+									opacity="0.8"
+									transform={`rotate(-28 ${-R * 0.32} ${-R * 0.36})`}
+								/>
+								<path
+									className="bul-rimlight"
+									d={`M ${-R * 0.66} ${R * 0.5} A ${R * 0.84} ${R * 0.84} 0 0 0 ${R * 0.5} ${R * 0.68}`}
+									fill="none"
+									stroke="#fff"
+									strokeOpacity="0.4"
+									strokeWidth={R * 0.1}
+									strokeLinecap="round"
+								/>
+							</g>
+						</defs>
+
+						<rect className="bul-sea" x={0} y={0} width={W} height={H} fill="url(#bul-water)" />
+						{DECOR.map((d, i) => (
+							<circle
+								key={`d${i}`}
+								className="bul-drift"
+								cx={d.x * W}
+								cy={H - 1}
+								r={d.r}
+								fill="url(#bul-film)"
+								style={{ animationDuration: `${d.dur}s`, animationDelay: `-${d.delay}s` }}
+							/>
+						))}
+
 						{/* The lane the raft must never reach. */}
 						<line
 							className="bul-lane"
@@ -574,45 +656,89 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 							/>
 						)}
 
+						{ghost && (
+							<circle
+								className="bul-ghost"
+								cx={centreOf(grid, ghost.cell).x}
+								cy={centreOf(grid, ghost.cell).y}
+								r={R * 0.9}
+								stroke={HUE[loaded % HUE.length]}
+							/>
+						)}
+
 						{Array.from(grid.cells).map((v, k) => {
 							if (v < 0) return null;
 							const c = centreOf(grid, k);
-							return <circle key={k} className="bul-bubble" cx={c.x} cy={c.y} r={R * 0.95} fill={HUE[v % HUE.length]} />;
+							return (
+								<g key={k}>
+									<circle className="bul-bubble" cx={c.x} cy={c.y} r={R * 0.95} fill={HUE[v % HUE.length]} />
+									<use href="#bul-shine" x={c.x} y={c.y} />
+								</g>
+							);
 						})}
 
 						{burst.map(({ cell, colour }) => {
 							const c = centreOf(grid, cell);
 							return (
-								<circle
-									key={`b${cell}`}
-									className="bul-burst"
-									cx={c.x}
-									cy={c.y}
-									r={R * 0.95}
-									fill={HUE[colour % HUE.length]}
-								/>
+								<g key={`b${cell}`} className="bul-burst">
+									<circle className="bul-burst-fill" cx={c.x} cy={c.y} r={R * 0.95} fill={HUE[colour % HUE.length]} />
+									<circle
+										className="bul-burst-ring"
+										cx={c.x}
+										cy={c.y}
+										r={R * 0.95}
+										stroke={HUE[colour % HUE.length]}
+									/>
+								</g>
 							);
 						})}
 
+						{/* Cannon: a shell base and a barrel that follows the sight. */}
+						{status === 'playing' && (
+							<g
+								className="bul-cannon"
+								transform={`translate(${shooterOf(grid).x} ${shooterOf(grid).y}) rotate(${(sight * 180) / Math.PI})`}
+							>
+								<rect className="bul-barrel" x={-R * 0.46} y={-R * 2.7} width={R * 0.92} height={R * 2.9} rx={R * 0.46} />
+								<line className="bul-notch" x1={0} y1={-R * 2.5} x2={0} y2={-R * 1.7} />
+							</g>
+						)}
+						<ellipse
+							className="bul-base"
+							cx={shooterOf(grid).x}
+							cy={shooterOf(grid).y + R * 0.35}
+							rx={R * 1.8}
+							ry={R * 0.9}
+						/>
+
 						{flying && animRef.current && (
-							<circle
+							<g
 								ref={bubbleRef}
-								className="bul-bubble"
-								cx={animRef.current.pts[0].x}
-								cy={animRef.current.pts[0].y}
-								r={R * 0.95}
-								fill={HUE[animRef.current.colour % HUE.length]}
-							/>
+								className="bul-flyer"
+								transform={`translate(${animRef.current.pts[0].x} ${animRef.current.pts[0].y})`}
+							>
+								<circle
+									className="bul-bubble"
+									cx={0}
+									cy={0}
+									r={R * 0.95}
+									fill={HUE[animRef.current.colour % HUE.length]}
+								/>
+								<use href="#bul-shine" />
+							</g>
 						)}
 
 						{status === 'playing' && !flying && (
-							<circle
-								className="bul-loaded"
-								cx={shooterOf(grid).x}
-								cy={shooterOf(grid).y}
-								r={R * 0.95}
-								fill={HUE[loaded % HUE.length]}
-							/>
+							<g>
+								<circle
+									className="bul-loaded"
+									cx={shooterOf(grid).x}
+									cy={shooterOf(grid).y}
+									r={R * 0.95}
+									fill={HUE[loaded % HUE.length]}
+								/>
+								<use href="#bul-shine" x={shooterOf(grid).x} y={shooterOf(grid).y} />
+							</g>
 						)}
 					</svg>
 				)}
@@ -681,13 +807,16 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 				format={fmtPacked}
 			/>}
 
-			{!daily && !lv.active && <LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} />}
+			{!daily && !lv.active && (
+				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" />
+			)}
 
 			{gaveUp ? (
 				<RevealNote />
 			) : (
 				<p className="bul-help">
-					Vise avec le doigt et relâche pour tirer. Trois bulles de la même couleur qui se
+					Glisse de gauche à droite pour orienter le viseur — ou vise un point du tableau — puis
+					relâche pour tirer. Trois bulles de la même couleur qui se
 					touchent tombent, et tout ce qu'elles retenaient tombe avec elles. Vide le tableau
 					en {par + THREE_STAR_OVER} tirs ou moins pour trois étoiles.
 				</p>
@@ -795,18 +924,39 @@ const CSS = `
   user-select: none;
 }
 
-.bul-bubble { stroke: rgba(0, 0, 0, 0.22); stroke-width: 0.08; }
-.bul-loaded { stroke: var(--gray-100); stroke-width: 0.14; }
+.bul-bubble { stroke: rgba(255, 255, 255, 0.4); stroke-width: 0.06; }
+.bul-loaded { stroke: var(--gray-100); stroke-width: 0.12; }
 .bul-lane { stroke: var(--gray-700); stroke-width: 0.08; stroke-dasharray: 0.6 0.5; }
+.bul-sea, .bul-drift, .bul-base, .bul-cannon, .bul-ghost { pointer-events: none; }
+
+/* Idle bubbles rising behind the raft. */
+.bul-drift {
+  stroke: var(--gray-300); stroke-opacity: 0.55; stroke-width: 0.06;
+  animation: bul-rise linear infinite;
+}
+
 .bul-guide {
-  fill: none; stroke-width: 0.22; stroke-dasharray: 0.7 0.6; opacity: 0.75;
+  fill: none; stroke-width: 0.2; stroke-dasharray: 0.55 0.5; opacity: 0.8;
   stroke-linecap: round; stroke-linejoin: round;
 }
 .bul-guide.hinted { opacity: 1; stroke-width: 0.32; stroke-dasharray: none; }
-.bul-burst {
-  pointer-events: none;
+/* Where the bubble would settle — only drawn when the whole line is visible anyway. */
+.bul-ghost { fill: none; stroke-width: 0.12; stroke-dasharray: 0.34 0.3; opacity: 0.65; }
+
+/* Mid-scale greys so the cannon keeps its contrast in both themes. */
+.bul-base { fill: var(--gray-700); stroke: var(--gray-400); stroke-width: 0.07; }
+.bul-barrel { fill: var(--gray-500); stroke: var(--gray-300); stroke-width: 0.07; }
+.bul-notch { stroke: var(--gray-999); stroke-width: 0.11; stroke-linecap: round; opacity: 0.8; }
+
+.bul-burst { pointer-events: none; }
+.bul-burst-fill {
   transform-box: fill-box; transform-origin: center;
-  animation: bul-pop 0.32s ease-out forwards;
+  animation: bul-pop 0.34s ease-out forwards;
+}
+.bul-burst-ring {
+  fill: none; stroke-width: 0.16;
+  transform-box: fill-box; transform-origin: center;
+  animation: bul-ring 0.44s ease-out forwards;
 }
 
 .bul-svg.blurred { filter: blur(5px); opacity: 0.45; pointer-events: none; }
@@ -860,8 +1010,19 @@ const CSS = `
   from { opacity: 0.9; transform: scale(1); }
   to { opacity: 0; transform: scale(1.7); }
 }
+@keyframes bul-ring {
+  from { opacity: 0.85; transform: scale(0.55); }
+  to { opacity: 0; transform: scale(2.4); }
+}
+@keyframes bul-rise {
+  from { transform: translateY(0); opacity: 0; }
+  12% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  to { transform: translateY(-32px); opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   .bul-win, .bul-overlay { animation: none; }
-  .bul-burst { animation-duration: 0.01s; }
+  .bul-drift { animation: none; opacity: 0; }
+  .bul-burst-fill, .bul-burst-ring { animation-duration: 0.01s; }
 }
 `;

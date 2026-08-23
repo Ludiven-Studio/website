@@ -279,6 +279,49 @@ export function fly(g: Grid, angle: number): Flight | null {
 	return null;
 }
 
+/**
+ * The line a shot at `angle` actually travels: cannon, one point per wall bounce, then the
+ * spot where the bubble first touches something. Unlike `fly` it never snaps to a cell, so
+ * the sight sweeps smoothly instead of jumping from one cell centre to the next.
+ */
+export function ray(g: Grid, angle: number): Pt[] {
+	const sh = shooterOf(g);
+	const wall = boardW(g.cols) - R;
+	let x = sh.x;
+	let y = sh.y;
+	let dx = Math.sin(angle) * STEP;
+	const dy = -Math.cos(angle) * STEP;
+	const path: Pt[] = [sh];
+	if (dy >= 0) return path;
+	const reach = R + deepestRow(g) * ROW_H + 2 * R;
+	for (let i = 0; i < MAX_STEPS; i++) {
+		const px = x;
+		const py = y;
+		x += dx;
+		y += dy;
+		if (x < R) {
+			x = 2 * R - x;
+			dx = -dx;
+			path.push({ x: R, y });
+		} else if (x > wall) {
+			x = 2 * wall - x;
+			dx = -dx;
+			path.push({ x: wall, y });
+		}
+		if (y > reach) continue;
+		if (y <= R) {
+			path.push({ x, y: R });
+			return path;
+		}
+		if (hits(g, x, y)) {
+			path.push({ x: px, y: py });
+			return path;
+		}
+	}
+	path.push({ x, y });
+	return path;
+}
+
 /* ---------------- colours ---------------- */
 
 /** Colours still up there, low to high. */
