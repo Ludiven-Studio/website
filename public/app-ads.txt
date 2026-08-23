@@ -1,3 +1,4 @@
+google.com, pub-4926259916191147, DIRECT, f08c47fec0942fa0
 risecodes.com, 68d54e2fe125150001dd91e2, RESELLER
 sharethrough.com, UvcAx8IL, RESELLER, d53b998a7bd4ecd2
 sharethrough.com, 5294, RESELLER, d53b998a7bd4ecd2
