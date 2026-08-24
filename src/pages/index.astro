@@ -27,6 +27,8 @@ const projects = (await getCollection('work'))
 	.sort((a, b) => b.data.publishDate.valueOf() - a.data.publishDate.valueOf())
 	.slice(0, 4);
 
+const playableCount = games.filter((g) => g.status === 'play').length;
+
 // Full Astro Component Syntax:
 // https://docs.astro.build/basics/astro-components/
 ---
@@ -37,6 +39,15 @@ const projects = (await getCollection('work'))
 >
 	<div class="stack gap-20 lg:gap-48">
 		<div class="wrapper stack gap-8 lg:gap-20">
+			<a class="daily-banner" href="/jeux/defi/">
+				<span class="db-icon" aria-hidden="true">🎯</span>
+				<span class="db-text">
+					<strong>Le défi du jour t'attend</strong>
+					<span data-db-sub>{playableCount} jeux gratuits, sans pub ni compte — un nouveau défi chaque jour</span>
+				</span>
+				<span class="db-cta">Jouer</span>
+			</a>
+
 			<header class="hero">
 				<Hero
 					title="Bienvenue chez Ludiven Studio"
@@ -68,32 +79,6 @@ const projects = (await getCollection('work'))
 		</div>
 
 		<main class="wrapper stack gap-20 lg:gap-48">
-			<section class="section with-background with-cta">
-				<header class="section-header stack gap-2 lg:gap-4">
-					<h2>Projets & réalisations</h2>
-					<p>Un aperçu de mon savoir-faire : projets récents et collaborations menées au fil des années</p>
-				</header>
-
-				<div class="gallery">
-					<Grid variant="offset">
-						{
-							projects.map((project) => (
-								<li>
-									<PortfolioPreview project={project} />
-								</li>
-							))
-						}
-					</Grid>
-				</div>
-
-				<div class="cta">
-					<CallToAction href="/work/">
-						Tous les projets
-						<Icon icon="arrow-right" size="1.2em" />
-					</CallToAction>
-				</div>
-			</section>
-
 			<section class="section with-background with-cta" id="games-section">
 				<header class="section-header stack gap-2 lg:gap-4">
 					<h2>Jeux de logique et d'adresse</h2>
@@ -158,6 +143,32 @@ const projects = (await getCollection('work'))
 					</CallToAction>
 				</div>
 			</section>
+
+			<section class="section with-background with-cta bg-variant">
+				<header class="section-header stack gap-2 lg:gap-4">
+					<h2>Projets & réalisations</h2>
+					<p>Un aperçu de mon savoir-faire : projets récents et collaborations menées au fil des années</p>
+				</header>
+
+				<div class="gallery">
+					<Grid variant="offset">
+						{
+							projects.map((project) => (
+								<li>
+									<PortfolioPreview project={project} />
+								</li>
+							))
+						}
+					</Grid>
+				</div>
+
+				<div class="cta">
+					<CallToAction href="/work/">
+						Tous les projets
+						<Icon icon="arrow-right" size="1.2em" />
+					</CallToAction>
+				</div>
+			</section>
 <!-- 
 			<section class="section with-background bg-variant">
 				
@@ -188,6 +199,17 @@ const projects = (await getCollection('work'))
 </BaseLayout>
 
 <script>
+	import { globalStreak } from '../lib/streak';
+
+	// Returning players see their streak in the daily banner — the reason to tap is
+	// "don't break it", not the catalogue size.
+	const sub = document.querySelector('[data-db-sub]');
+	if (sub) {
+		const st = globalStreak();
+		if (st.atRisk) sub.textContent = `🔥 Ta série de ${st.count} jour${st.count > 1 ? 's' : ''} est en jeu — joue un défi aujourd'hui !`;
+		else if (st.playedToday && st.count > 1) sub.textContent = `🔥 ${st.count} jours d'affilée — défi du jour fait. Un autre ?`;
+	}
+
 	// Lead the home teaser with the visitor's favorites. Fewer than 3 favorites →
 	// favorites first, then fill up to 3 with other games. 3+ favorites → favorites only.
 	const MIN = 3;
@@ -229,6 +251,67 @@ const projects = (await getCollection('work'))
 </script>
 
 <style>
+	/* One-tap entry to today's challenge, above the freelance hero: the games audience
+	   gets its action before any scrolling. */
+	.daily-banner {
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+		padding: 0.8rem 1.1rem;
+		border: 1.5px solid var(--accent-regular);
+		border-radius: 1.1rem;
+		background: var(--gradient-subtle);
+		text-decoration: none;
+		color: var(--gray-0);
+		box-shadow: var(--shadow-sm);
+		transition: box-shadow var(--theme-transition), transform 0.15s ease;
+	}
+	.daily-banner:hover,
+	.daily-banner:focus-visible {
+		box-shadow: var(--shadow-md);
+		transform: translateY(-1px);
+	}
+	.db-icon {
+		font-size: 1.6rem;
+		line-height: 1;
+	}
+	.db-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		min-width: 0;
+		flex: 1;
+	}
+	.db-text strong {
+		font-family: var(--font-brand);
+		font-weight: 700;
+		font-size: var(--text-base);
+	}
+	.db-text span {
+		color: var(--gray-300);
+		font-size: var(--text-sm);
+		line-height: 1.35;
+	}
+	.db-cta {
+		flex: none;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-family: var(--font-brand);
+		font-weight: 700;
+		font-size: var(--text-base);
+		border-radius: 999rem;
+		padding: 0.5rem 1.4rem;
+		box-shadow: var(--shadow-sm);
+	}
+	@media (min-width: 50em) {
+		.daily-banner {
+			padding: 1rem 1.5rem;
+		}
+		.db-text strong {
+			font-size: var(--text-md);
+		}
+	}
+
 	.hero {
 		display: flex;
 		flex-direction: column;

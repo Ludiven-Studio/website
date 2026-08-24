@@ -15,6 +15,7 @@ import { isSecured } from '../data/securedGames';
 import { submitScore, getLeaderboard } from '../lib/scores';
 import { gameStreak } from '../lib/streak';
 import { equippedBlason } from '../lib/wallet';
+import { trackEvent } from '../lib/analytics';
 import ErrorBoundary from './ErrorBoundary';
 
 // Time leaderboards store CENTISECONDS; a game may still pass its own `format`.
@@ -144,15 +145,22 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	const fmt = format ?? ((v: number) => (metric === 'time' ? fmtCentisExact(v) : String(v)));
 	const showInput = editing || (submitValue != null && !name);
 
-	// Spoiler-free result share (Wordle-style): score/rank + same-daily deep link.
+	// Spoiler-free result share (Wordle-style): score/rank + a challenge deep link that
+	// carries the sharer's name and value, so the receiver lands on the same daily with
+	// a score to beat (see DefiChallenge).
 	const share = async (): Promise<void> => {
 		if (dayValue == null) return;
 		const title = games.find((g) => g.id === gameId)?.title ?? gameId;
-		const url = `${location.origin}/jeux/${gameId}?defi`;
+		const extra = new URLSearchParams({ vs: String(dayValue), d: todayKey() });
+		if (name) extra.set('de', name);
+		const url = `${location.origin}/jeux/${gameId}?defi&${extra}`;
 		const line = metric === 'time' ? `⏱️ ${fmt(dayValue)}` : `🏆 ${fmt(dayValue)} pts`;
+		const rank = rows.findIndex((r) => r.name.toLowerCase() === me);
+		const rankLine =
+			rank < 0 ? '' : ` · ${rank < 3 ? ['🥇 1er', '🥈 2e', '🥉 3e'][rank] : `${rank + 1}e`}${rows.length > 1 ? ` sur ${rows.length}` : ''}`;
 		const st = gameStreak(gameId);
-		const streakLine = st.count > 0 ? `\n🔥 ${st.count} jour${st.count > 1 ? 's' : ''} d'affilée` : '';
-		const text = `${title} — Défi du jour\n${line}${streakLine}`;
+		const streakLine = st.count > 1 ? `\n🔥 ${st.count} jours d'affilée` : '';
+		const text = `${title} — Défi du jour\n${line}${rankLine}${streakLine}\nPeux-tu me battre ?`;
 		try {
 			if (navigator.share) {
 				await navigator.share({ title: `${title} — Défi du jour`, text, url });
@@ -164,6 +172,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 		} catch {
 			return; // user cancelled — no toast
 		}
+		trackEvent('defi:share', { game: gameId });
 		setTimeout(() => setShareMsg(''), 1600);
 	};
 
