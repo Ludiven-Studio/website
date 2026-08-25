@@ -14,11 +14,14 @@ import {
 	centreOf,
 	cloneGrid,
 	countBubbles,
+	dealSurvival,
+	descend,
 	fly,
 	generateBulles,
 	gridOf,
 	isLost,
 	nextColour,
+	randomRow,
 	ray,
 	shooterOf,
 	type BullesPuzzle,
@@ -67,6 +70,12 @@ const SPEED = 62;
 /** How much of the aim the guide gives away: the cannon, the first wall, and one more leg. */
 const GUIDE_LEGS = 3;
 
+/** Survival: rows hanging at the start, and total board height the raft grows into. */
+const SURVIE_START_ROWS = 3;
+const SURVIE_TOTAL_ROWS = 12;
+/** Best survival run, kept per device. */
+const SURVIE_BEST_KEY = 'bulles-survie-best';
+
 /** Idle bubbles drifting up behind the raft. x is a share of the width. */
 const DECOR = [
 	{ x: 0.12, r: 0.48, dur: 13, delay: 0 },
@@ -108,12 +117,15 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	const [aim, setAim] = useState(0); // where the sight points, kept between shots
 	const [aiming, setAiming] = useState(false);
 	const [flying, setFlying] = useState(false);
-	const [burst, setBurst] = useState<{ cell: number; colour: number }[]>([]);
+	const [burst, setBurst] = useState<{ x: number; y: number; colour: number }[]>([]);
 	const [elapsed, setElapsed] = useState(0);
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already closed today
 	const [gaveUp, setGaveUp] = useState(false);
+	const [survie, setSurvie] = useState(false); // endless mode: a new row descends each shot
+	const [survieBest, setSurvieBest] = useState(0);
+	const [survieNewRecord, setSurvieNewRecord] = useState(false);
 
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
@@ -125,9 +137,15 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	const shotsRef = useRef(0);
 	const statusRef = useRef<Status>('loading');
 	const armedRef = useRef(false); // the board takes shots right now
+	const survieRef = useRef(false); // read inside the shot pipeline without churning its deps
+	const survieRng = useRef<() => number>(() => 0); // drives each descended row's colours
+	const survieColoursRef = useRef(3);
+	const survieBestRef = useRef(0); // best BEFORE the current run, for new-record detection
 	gridRef.current = grid;
 	shotsRef.current = shots;
 	statusRef.current = status;
+	survieRef.current = survie;
+	survieBestRef.current = survieBest;
 
 	const lv = useLevels(gameId, bullesLevels);
 	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
@@ -152,6 +170,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 
 	const newGame = useCallback((dk: keyof typeof DIFFS) => {
 		setDaily(false);
+		setSurvie(false);
 		setAlreadyPlayed(false);
 		setGaveUp(false);
 		setDiffKey(dk);
@@ -167,10 +186,34 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		newGame('facile');
 	}, [newGame]);
 
+	/* Survival: an endless board that grows a new ceiling row after every shot. No solver,
+	   no par — the score is how many shots you last before the raft reaches the lane. */
+	const newSurvival = useCallback((dk: keyof typeof DIFFS) => {
+		const diff = DIFFS[dk];
+		const seed = Math.floor(Math.random() * 0x7fffffff);
+		survieRng.current = mulberry32((seed ^ 0x9e3779b1) >>> 0);
+		survieColoursRef.current = diff.colours;
+		const g = dealSurvival(diff.cols, diff.colours, SURVIE_START_ROWS, SURVIE_TOTAL_ROWS, survieRng.current);
+		setDaily(false);
+		setSurvie(true);
+		setSurvieNewRecord(false);
+		setAlreadyPlayed(false);
+		setGaveUp(false);
+		setDiffKey(dk);
+		setHintNote('');
+		setStatus('loading');
+		deal({ cols: g.cols, rows: g.rows, colours: diff.colours, cells: g.cells.slice(), seed, par: 0 });
+		startRef.current = Date.now();
+		setElapsed(0);
+		setStarted(true); // survival isn't gated: play begins at once
+		setStatus('playing');
+	}, [deal]);
+
 	/* Levels mode: start a level from its config; grade on a cleared or drowned board. */
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
 		setDaily(false);
+		setSurvie(false);
 		setGaveUp(false);
 		setHintNote('');
 		setStatus('loading');
@@ -182,6 +225,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 
 	const armLevels = useCallback(() => {
 		setDaily(false);
+		setSurvie(false);
 		lv.enter();
 	}, [lv]);
 
@@ -197,6 +241,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
+		setSurvie(false);
 		setGaveUp(false);
 		setHintNote('');
 
@@ -293,11 +338,14 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		if (!a || !g) return;
 		const next = cloneGrid(g);
 		const blast = applyShot(next, a.cell, a.colour);
-		// The old grid has every colour but the shot's own — it landed on an empty cell.
-		setBurst([...blast.popped, ...blast.dropped].map((cell) => ({
-			cell,
-			colour: cell === a.cell ? a.colour : g.cells[cell],
-		})));
+		// Burst marks are drawn at absolute positions, not cell indices — a survival descent
+		// reshuffles indices, so an index-based mark would jump to the wrong cell.
+		setBurst([...blast.popped, ...blast.dropped].map((cell) => {
+			const c = centreOf(g, cell);
+			return { x: c.x, y: c.y, colour: cell === a.cell ? a.colour : g.cells[cell] };
+		}));
+		// Survival: pull the whole raft down one row and seed a fresh ceiling after the shot.
+		if (survieRef.current) descend(next, randomRow(next.cols, survieColoursRef.current, survieRng.current));
 		setGrid(next);
 		setShots((s) => s + 1);
 	}, []);
@@ -395,13 +443,29 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		if (!grid || status !== 'playing' || flying) return;
 		if (timed && !started) return;
 		if (lv.active && !lv.playing) return;
-		if (countBubbles(grid) === 0) {
+		if (!survie && countBubbles(grid) === 0) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		} else if (isLost(grid)) {
 			setStatus('lost');
 		}
-	}, [grid, status, flying, timed, started, lv.active, lv.playing, gameId]);
+	}, [grid, status, flying, timed, started, survie, lv.active, lv.playing, gameId]);
+
+	/* Survival best score, kept per device. */
+	useEffect(() => {
+		const v = Number(localStorage.getItem(SURVIE_BEST_KEY) || 0);
+		if (Number.isFinite(v)) setSurvieBest(v);
+	}, []);
+
+	// Compare against the best BEFORE this run via a ref, so beating it once doesn't re-fire.
+	useEffect(() => {
+		if (!survie || status !== 'lost') return;
+		if (shots > survieBestRef.current) {
+			localStorage.setItem(SURVIE_BEST_KEY, String(shots));
+			setSurvieBest(shots);
+			setSurvieNewRecord(true);
+		}
+	}, [survie, status, shots]);
 
 	/* Grade the level once it is over. Score is the shot count; par rides along as `stat`. */
 	useEffect(() => {
@@ -486,7 +550,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 
 			<ModeToggle
 				daily={daily}
-				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily || survie) newGame(diffKey); }}
 				onDaily={() => { lv.exit(); startDaily(); }}
 				showLevels
 				levelsActive={lv.active}
@@ -508,27 +572,51 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
 				</div>
 			) : (
-				<div className="bul-bar">
-					<div className="bul-pills" role="tablist" aria-label="Difficulté">
-						{diffKeys(DIFFS, gameId).map((k) => (
-							<button
-								key={k}
-								role="tab"
-								aria-selected={diffKey === k}
-								className={`bul-pill ${diffKey === k ? 'active' : ''}`}
-								onClick={() => newGame(k)}
-							>
-								{DIFFS[k].label}
-							</button>
-						))}
-					</div>
-					<div className="bul-bar-right">
-						<div className="bul-timer chrono">{fmtTime(elapsed)}</div>
-						<button className="bul-new" onClick={() => newGame(diffKey)} aria-label="Nouveau tableau">
-							↻
+				<>
+					<div className="bul-submode" role="tablist" aria-label="Mode de jeu libre">
+						<button
+							role="tab"
+							aria-selected={!survie}
+							className={`bul-sub ${!survie ? 'active' : ''}`}
+							onClick={() => newGame(diffKey)}
+						>
+							🧩 Classique
+						</button>
+						<button
+							role="tab"
+							aria-selected={survie}
+							className={`bul-sub ${survie ? 'active' : ''}`}
+							onClick={() => newSurvival(diffKey)}
+						>
+							🌊 Survie
 						</button>
 					</div>
-				</div>
+					<div className="bul-bar">
+						<div className="bul-pills" role="tablist" aria-label="Difficulté">
+							{diffKeys(DIFFS, gameId).map((k) => (
+								<button
+									key={k}
+									role="tab"
+									aria-selected={diffKey === k}
+									className={`bul-pill ${diffKey === k ? 'active' : ''}`}
+									onClick={() => (survie ? newSurvival(k) : newGame(k))}
+								>
+									{DIFFS[k].label}
+								</button>
+							))}
+						</div>
+						<div className="bul-bar-right">
+							<div className="bul-timer chrono">{fmtTime(elapsed)}</div>
+							<button
+								className="bul-new"
+								onClick={() => (survie ? newSurvival(diffKey) : newGame(diffKey))}
+								aria-label="Nouveau tableau"
+							>
+								↻
+							</button>
+						</div>
+					</div>
+				</>
 			))}
 
 			{!lv.active && daily && (
@@ -539,7 +627,11 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 
 			{grid && status !== 'loading' && !(lv.active && lv.menu) && (
 				<div className="bul-gauge" aria-live="polite">
-					🎯 <strong>{shots}</strong> tirs · par {par} · <strong>{left}</strong> bulles ·{' '}
+					{survie ? (
+						<>🌊 <strong>{shots}</strong> tirs · record {survieBest} · <strong>{left}</strong> bulles · </>
+					) : (
+						<>🎯 <strong>{shots}</strong> tirs · par {par} · <strong>{left}</strong> bulles · </>
+					)}
 					{/* The cannon is small and often under a thumb, so the loaded colour is repeated here. */}
 					<span className="bul-chip" style={{ background: HUE[loaded % HUE.length] }} aria-label="Bulle chargée" />
 				</div>
@@ -677,21 +769,12 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 							);
 						})}
 
-						{burst.map(({ cell, colour }) => {
-							const c = centreOf(grid, cell);
-							return (
-								<g key={`b${cell}`} className="bul-burst">
-									<circle className="bul-burst-fill" cx={c.x} cy={c.y} r={R * 0.95} fill={HUE[colour % HUE.length]} />
-									<circle
-										className="bul-burst-ring"
-										cx={c.x}
-										cy={c.y}
-										r={R * 0.95}
-										stroke={HUE[colour % HUE.length]}
-									/>
-								</g>
-							);
-						})}
+						{burst.map(({ x, y, colour }, i) => (
+							<g key={`b${i}`} className="bul-burst">
+								<circle className="bul-burst-fill" cx={x} cy={y} r={R * 0.95} fill={HUE[colour % HUE.length]} />
+								<circle className="bul-burst-ring" cx={x} cy={y} r={R * 0.95} stroke={HUE[colour % HUE.length]} />
+							</g>
+						))}
 
 						{/* Cannon: a shell base and a barrel that follows the sight. */}
 						{status === 'playing' && (
@@ -757,7 +840,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && !lv.active && (
+				{showWin && !daily && !lv.active && !survie && (
 					<div className="bul-win" role="dialog" aria-label="Tableau vidé">
 						<div className="bul-wincard">
 							<div className="bul-winmark">🫧</div>
@@ -769,7 +852,21 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'lost' && !daily && !lv.active && (
+				{status === 'lost' && !daily && !lv.active && survie && (
+					<div className="bul-win" role="dialog" aria-label="Survie terminée">
+						<div className="bul-wincard">
+							<div className="bul-winmark">{survieNewRecord ? '🏅' : '🌊'}</div>
+							<h2>Survie terminée</h2>
+							<p className="bul-wintime">{shots} tirs</p>
+							<p className="bul-windiff">
+								{survieNewRecord ? 'Nouveau record !' : `record ${survieBest}`} · {DIFFS[diffKey].label}
+							</p>
+							<button className="bul-replay" onClick={() => newSurvival(diffKey)}>Rejouer</button>
+						</div>
+					</div>
+				)}
+
+				{status === 'lost' && !daily && !lv.active && !survie && (
 					<div className="bul-win" role="dialog" aria-label="Bulles descendues trop bas">
 						<div className="bul-wincard">
 							<div className="bul-winmark">😵</div>
@@ -807,7 +904,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 				format={fmtPacked}
 			/>}
 
-			{!daily && !lv.active && (
+			{!daily && !lv.active && !survie && (
 				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" />
 			)}
 
@@ -817,8 +914,10 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 				<p className="bul-help">
 					Glisse de gauche à droite pour orienter le viseur — ou vise un point du tableau — puis
 					relâche pour tirer. Trois bulles de la même couleur qui se
-					touchent tombent, et tout ce qu'elles retenaient tombe avec elles. Vide le tableau
-					en {par + THREE_STAR_OVER} tirs ou moins pour trois étoiles.
+					touchent tombent, et tout ce qu'elles retenaient tombe avec elles.{' '}
+					{survie
+						? 'Mode Survie : une nouvelle ligne descend à chaque tir. Tiens le plus longtemps possible avant que les bulles touchent le bas.'
+						: `Vide le tableau en ${par + THREE_STAR_OVER} tirs ou moins pour trois étoiles.`}
 				</p>
 			)}
 		</div>
@@ -868,6 +967,16 @@ const CSS = `
   border: none; background: var(--gray-800); color: var(--gray-0);
   font-size: 16px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;
 }
+
+/* Classique / Survie switch, shown only in free play. */
+.bul-submode { display: flex; gap: 6px; width: 100%; margin-bottom: 0.6rem; }
+.bul-sub {
+  flex: 1;
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 10px; cursor: pointer;
+  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
+}
+.bul-sub.active { background: var(--bul-accent); color: var(--accent-text-over); border-color: var(--bul-accent); }
 
 .bul-gauge {
   color: var(--gray-300); font-size: 13px; font-weight: 500;

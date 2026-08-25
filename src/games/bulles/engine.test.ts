@@ -9,6 +9,8 @@ import {
 	boardW,
 	centreOf,
 	countBubbles,
+	dealSurvival,
+	descend,
 	fly,
 	generateBulles,
 	gridOf,
@@ -19,6 +21,7 @@ import {
 	nextColour,
 	orphans,
 	palette,
+	randomRow,
 	ray,
 	rowLen,
 	shooterOf,
@@ -104,6 +107,39 @@ describe('bulles — shots', () => {
 		const g = make(4, 4, [[0]]);
 		expect(isLost(g)).toBe(false);
 		g.cells[3 * 4] = 0;
+		expect(isLost(g)).toBe(true);
+	});
+
+	it('descend drops every bubble straight down by one row', () => {
+		const g = make(6, 8, [[0, 1, 2, 3, 4, 5]]);
+		const before = Array.from({ length: 6 }, (_, c) => centreOf(g, c));
+		descend(g, new Array(6).fill(-1)); // empty ceiling: only the shift is tested
+		// Row 0 is gone, its bubbles are now in row 1 at the same x, one ROW_H lower.
+		for (let c = 0; c < 6; c++) {
+			expect(g.cells[6 + c]).toBe(c); // colours were 0..5 left to right
+			const now = centreOf(g, 6 + c);
+			expect(now.x).toBeCloseTo(before[c].x, 6);
+			expect(now.y).toBeCloseTo(before[c].y + Math.sqrt(3), 6);
+		}
+	});
+
+	it('descend keeps neighbourhoods mutual (parity stays consistent)', () => {
+		const g = make(6, 8, [[0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4]]);
+		descend(g, randomRow(6, 3, () => 0.5));
+		for (let k = 0; k < g.cols * g.rows; k++) {
+			if (g.cells[k] < 0) continue;
+			for (const n of neighbours(g, k)) {
+				const a = centreOf(g, k);
+				const b = centreOf(g, n);
+				expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeCloseTo(2 * R, 6);
+			}
+		}
+	});
+
+	it('descend that pushes a bubble to the lane is a loss', () => {
+		const g = dealSurvival(6, 3, 1, 4, () => 0.5); // one row, board is 4 tall
+		expect(isLost(g)).toBe(false);
+		for (let i = 0; i < 3; i++) descend(g, randomRow(6, 3, () => 0.5));
 		expect(isLost(g)).toBe(true);
 	});
 

@@ -35,9 +35,18 @@ export interface Grid {
 	rows: number;
 	/** Row-major, `cols` wide whatever the row holds. -1 is empty. */
 	cells: Int8Array;
+	/** 0 = row 0 is the long/even one (the default). A descended raft toggles this so a
+	    one-row drop stays a straight vertical drop instead of a half-bubble sideways shift. */
+	parity?: number;
 }
 
-export const rowLen = (cols: number, r: number): number => (r % 2 === 0 ? cols : cols - 1);
+export const rowLen = (cols: number, r: number, parity = 0): number =>
+	(r + parity) % 2 === 0 ? cols : cols - 1;
+
+/** Parity-aware row helpers: with parity toggled, which array row counts as "even" flips. */
+const pOf = (g: Grid): number => g.parity ?? 0;
+const isEvenRow = (g: Grid, r: number): boolean => ((r + pOf(g)) & 1) === 0;
+const rowLenG = (g: Grid, r: number): number => (isEvenRow(g, r) ? g.cols : g.cols - 1);
 
 export const boardW = (cols: number): number => 2 * R * cols;
 
@@ -52,10 +61,10 @@ export const rowOf = (g: Grid, k: number): number => Math.floor(k / g.cols);
 
 export function centreOf(g: Grid, k: number): Pt {
 	const r = rowOf(g, k);
-	return { x: R + 2 * R * (k % g.cols) + (r % 2 ? R : 0), y: R + r * ROW_H };
+	return { x: R + 2 * R * (k % g.cols) + (isEvenRow(g, r) ? 0 : R), y: R + r * ROW_H };
 }
 
-export const cloneGrid = (g: Grid): Grid => ({ cols: g.cols, rows: g.rows, cells: g.cells.slice() });
+export const cloneGrid = (g: Grid): Grid => ({ cols: g.cols, rows: g.rows, parity: pOf(g), cells: g.cells.slice() });
 
 export function countBubbles(g: Grid): number {
 	let n = 0;
@@ -66,7 +75,7 @@ export function countBubbles(g: Grid): number {
 /** The lowest row still holding a bubble, or -1 on an empty board. */
 export function deepestRow(g: Grid): number {
 	for (let r = g.rows - 1; r >= 0; r--) {
-		for (let c = 0; c < rowLen(g.cols, r); c++) if (g.cells[r * g.cols + c] >= 0) return r;
+		for (let c = 0; c < rowLenG(g, r); c++) if (g.cells[r * g.cols + c] >= 0) return r;
 	}
 	return -1;
 }
@@ -81,17 +90,17 @@ function nbrs(g: Grid, k: number): number {
 	const r = (k / g.cols) | 0;
 	const c = k - r * g.cols;
 	// Odd rows sit half a bubble right of the even ones, so the pair above shifts with parity.
-	const a = r % 2 ? c : c - 1;
+	const a = isEvenRow(g, r) ? c - 1 : c;
 	let n = 0;
 	if (c > 0) NB[n++] = k - 1;
-	if (c + 1 < rowLen(g.cols, r)) NB[n++] = k + 1;
+	if (c + 1 < rowLenG(g, r)) NB[n++] = k + 1;
 	if (r > 0) {
-		const len = rowLen(g.cols, r - 1);
+		const len = rowLenG(g, r - 1);
 		if (a >= 0 && a < len) NB[n++] = (r - 1) * g.cols + a;
 		if (a + 1 >= 0 && a + 1 < len) NB[n++] = (r - 1) * g.cols + a + 1;
 	}
 	if (r + 1 < g.rows) {
-		const len = rowLen(g.cols, r + 1);
+		const len = rowLenG(g, r + 1);
 		if (a >= 0 && a < len) NB[n++] = (r + 1) * g.cols + a;
 		if (a + 1 >= 0 && a + 1 < len) NB[n++] = (r + 1) * g.cols + a + 1;
 	}
@@ -141,7 +150,7 @@ export function groupAt(g: Grid, k: number): number[] {
 export function orphans(g: Grid): number[] {
 	const held = marks(g.cells.length);
 	const queue: number[] = [];
-	for (let c = 0; c < rowLen(g.cols, 0); c++) {
+	for (let c = 0; c < rowLenG(g, 0); c++) {
 		if (g.cells[c] >= 0) {
 			held[c] = 1;
 			queue.push(c);
@@ -180,6 +189,24 @@ export function applyShot(g: Grid, k: number, colour: number): Blast {
 	return { popped: patch, dropped };
 }
 
+/* ---------------- descent (survival) ---------------- */
+
+/**
+ * Push the whole raft down one row and seed a fresh ceiling row from `top` (one colour per
+ * column, left to right; -1 leaves a gap). Toggling parity keeps every bubble's x, so the
+ * drop is straight down. Mutates `g`; the old bottom row falls off the board — the caller
+ * checks `isLost` afterwards.
+ */
+export function descend(g: Grid, top: number[]): void {
+	for (let r = g.rows - 2; r >= 0; r--) {
+		const src = r * g.cols;
+		for (let c = 0; c < g.cols; c++) g.cells[src + g.cols + c] = g.cells[src + c];
+	}
+	g.parity = pOf(g) ^ 1;
+	const len = rowLenG(g, 0);
+	for (let c = 0; c < g.cols; c++) g.cells[c] = c < len ? (top[c] ?? -1) : -1;
+}
+
 /* ---------------- flight ---------------- */
 
 const STEP = 0.12 * R;
@@ -192,8 +219,8 @@ function hits(g: Grid, x: number, y: number): boolean {
 	for (let r = r0; r <= r1; r++) {
 		const dy = y - (R + r * ROW_H);
 		if (dy * dy >= 4 * R * R) continue;
-		const off = r % 2 ? R : 0;
-		const len = rowLen(g.cols, r);
+		const off = isEvenRow(g, r) ? 0 : R;
+		const len = rowLenG(g, r);
 		const c0 = Math.max(0, Math.floor((x - off - 3 * R) / (2 * R)));
 		const c1 = Math.min(len - 1, Math.ceil((x - off + 3 * R) / (2 * R)));
 		for (let c = c0; c <= c1; c++) {
@@ -218,8 +245,8 @@ function snap(g: Grid, x: number, y: number): number | null {
 	let best = -1;
 	let bestD = Infinity;
 	for (let r = r0; r <= r1; r++) {
-		const off = r % 2 ? R : 0;
-		const len = rowLen(g.cols, r);
+		const off = isEvenRow(g, r) ? 0 : R;
+		const len = rowLenG(g, r);
 		for (let c = 0; c < len; c++) {
 			const k = r * g.cols + c;
 			if (g.cells[k] >= 0) continue;
@@ -536,4 +563,27 @@ export function generateBulles(diff: DiffLevel, rng: Rng = Math.random): BullesP
 	}
 	if (!best) throw new Error('bulles: no solvable deal');
 	return best;
+}
+
+/* ---------------- survival deals ---------------- */
+
+/** A full ceiling row of random colours — what `descend` pushes in after every shot. */
+export function randomRow(cols: number, colours: number, rng: Rng): number[] {
+	const row: number[] = new Array(cols);
+	for (let c = 0; c < cols; c++) row[c] = Math.floor(rng() * colours);
+	return row;
+}
+
+/**
+ * A survival board: `startRows` full rows hanging from the ceiling with `totalRows` of room
+ * below them for the raft to grow into as it descends. No solver, no par — it plays until the
+ * raft reaches the lane.
+ */
+export function dealSurvival(cols: number, colours: number, startRows: number, totalRows: number, rng: Rng): Grid {
+	const g: Grid = { cols, rows: totalRows, parity: 0, cells: new Int8Array(cols * totalRows).fill(-1) };
+	for (let r = 0; r < startRows; r++) {
+		const len = rowLenG(g, r);
+		for (let c = 0; c < len; c++) g.cells[r * cols + c] = Math.floor(rng() * colours);
+	}
+	return g;
 }
