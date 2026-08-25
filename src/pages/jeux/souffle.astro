@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import SouffleGame from '../../games/souffle/SouffleGame.tsx';
+---
+
+<GamePage
+	title="Souffle | Jeux Ludiven Studio"
+	description="Souffle : d'un glissement de doigt, envoie un souffle de vent — la plume file en ligne droite et ne s'arrête qu'au premier rocher ou contre la haie, en cueillant toutes les fleurs qu'elle frôle. Enchaîne les souffles pour butiner tout le pré en le moins de coups possible. Un casse-tête tout doux signé Ludiven Studio."
+	heading="Souffle"
+	tagline="Souffle la plume de rocher en rocher, cueille toutes les fleurs"
+	gameId="souffle"
+>
+	<SouffleGame client:only="react" />
+</GamePage>
