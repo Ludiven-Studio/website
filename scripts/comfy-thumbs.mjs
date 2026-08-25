@@ -144,6 +144,7 @@ export const CROPS = {
 	'mot-secret': { left: 394, top: 133, width: 412, height: 257 }, // faint grid, dense keyboard
 	'lettres-croisees': { left: 271, top: 134, width: 658, height: 411 }, // the wheel outshines the grid
 	flappy: { left: 391, top: 190, width: 418, height: 261 }, // square board: keep the hen and the gap
+	bulles: { left: 408, top: 214, width: 384, height: 240 }, // free board is tall + half-empty; frame the bubbles
 };
 
 /**
