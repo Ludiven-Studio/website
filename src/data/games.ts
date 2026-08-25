@@ -285,10 +285,18 @@ export const games: GameTile[] = [
 	},
 	{
 		id: 'tectonique',
-		title: 'Tectonique',
-		pitch: 'Attrape la ligne ou la colonne où se trouve la cocotte et lance le tapis : il garde son élan quand tu lâches, à toi de le couper au bon moment. La cocotte et les bacs en plastique se tassent contre le mur et les trous se referment pour de bon. Les caisses en fer voyagent avec le tapis et arrêtent toute la ligne dès qu\'elles butent, les plots la bloquent net, et les piliers scellés au sol la coupent en deux — et si tu t\'enfermes, la partie s\'arrête. Promène la cocotte sur les cristaux. 100 niveaux et un défi du jour.',
+		title: 'Tapis',
+		pitch: 'Attrape la ligne ou la colonne où se trouve la cocotte et lance le tapis roulant : il garde son élan quand tu lâches, à toi de le couper au bon moment. La cocotte et les bacs se tassent contre le mur ou contre les piliers scellés au sol, et les trous se referment pour de bon — si tu t\'enfermes, la partie s\'arrête. Promène la cocotte sur les cristaux. 100 niveaux et un défi du jour.',
 		icon: 'tectonique',
-		href: '/jeux/tectonique',
+		href: '/jeux/tapis',
+		status: 'play',
+	},
+	{
+		id: 'souffle',
+		title: 'Souffle',
+		pitch: 'D\'un glissement de doigt, envoie un souffle de vent : la plume file en ligne droite et ne s\'arrête qu\'au premier rocher ou contre la haie, en cueillant toutes les fleurs qu\'elle frôle. Butine tout le pré en le moins de souffles possible — et reviens en arrière autant que tu veux.',
+		icon: 'souffle',
+		href: '/jeux/souffle',
 		status: 'play',
 	},
 	{

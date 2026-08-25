@@ -1,7 +1,8 @@
-// Tectonique levels plan (1-100). The grid grows 6×6 → 8×8, the crystals and the blockers
-// pile up with it. Scoring counts coups, and a coup is a belt, not a cell: driving the same
-// line on and on, either way, stays one coup. The stars compare that count to PAR, a
-// near-optimal solve measured offline — rerun `npx tsx scripts/tectonique-par.ts` after
+// Tapis levels plan (1-100). Two piece kinds only — crates that slide and stack, pillars
+// bolted to the frame — so a push stays easy to read. The grid grows 6×6 → 7×7 and the
+// crystals pile up with it. Scoring counts coups, and a coup is a belt, not a cell: driving
+// the same line on and on, either way, stays one coup. The stars compare that count to PAR,
+// a near-optimal solve measured offline — rerun `npx tsx scripts/tectonique-par.ts` after
 // touching the generator or the ramp below, and paste the tables it prints.
 
 import type { LevelPlan, LevelResult } from '../../lib/progression';
@@ -22,20 +23,20 @@ const clampLevel = (level: number): number => Math.max(1, Math.min(LEVEL_COUNT, 
 
 /** Which candidate grid each level kept, printed by scripts/tectonique-par.ts alongside PAR. */
 const SALT: number[] = [
-	0, 2, 2, 8, 5, 3, 1, 9, 7, 4, 4, 4, 5, 4, 3, 3, 5, 1, 5, 9,
-	9, 6, 1, 3, 1, 0, 3, 0, 7, 0, 0, 1, 0, 5, 2, 6, 0, 1, 0, 1,
-	7, 1, 1, 0, 3, 5, 1, 6, 4, 8, 8, 1, 9, 7, 5, 2, 3, 2, 0, 8,
-	8, 2, 0, 0, 8, 0, 9, 0, 7, 2, 5, 2, 6, 8, 4, 5, 3, 9, 9, 0,
-	7, 1, 2, 0, 0, 7, 8, 1, 2, 4, 5, 1, 8, 6, 1, 2, 0, 4, 5, 0,
+	5, 6, 7, 1, 2, 4, 0, 4, 2, 4, 4, 1, 4, 2, 5, 1, 1, 1, 5, 2,
+	3, 8, 3, 2, 1, 3, 2, 1, 6, 6, 5, 2, 7, 0, 3, 8, 6, 4, 4, 5,
+	0, 8, 9, 0, 0, 1, 3, 3, 8, 1, 0, 6, 3, 5, 5, 2, 2, 3, 2, 7,
+	5, 3, 1, 3, 9, 0, 1, 8, 9, 4, 0, 4, 8, 2, 0, 4, 1, 1, 1, 2,
+	2, 6, 1, 5, 5, 8, 5, 1, 7, 0, 3, 2, 9, 3, 9, 0, 2, 3, 1, 2,
 ];
 
 /** Near-optimal coups per level, printed by scripts/tectonique-par.ts. */
 const PAR: number[] = [
-	7, 6, 7, 7, 7, 7, 7, 8, 9, 9, 9, 9, 10, 10, 10, 9, 10, 13, 11, 12,
-	12, 12, 12, 11, 13, 13, 12, 14, 14, 14, 14, 15, 16, 16, 16, 14, 16, 17, 18, 18,
-	16, 17, 18, 18, 19, 19, 18, 19, 19, 20, 21, 22, 18, 19, 20, 19, 22, 22, 23, 24,
-	23, 22, 23, 21, 26, 24, 24, 24, 22, 25, 26, 25, 24, 27, 26, 26, 28, 28, 28, 29,
-	27, 32, 27, 29, 28, 29, 30, 33, 32, 30, 24, 29, 32, 33, 32, 32, 33, 33, 34, 33,
+	5, 5, 6, 6, 6, 6, 7, 7, 7, 6, 9, 9, 8, 7, 9, 9, 8, 9, 10, 10,
+	10, 10, 12, 11, 11, 11, 11, 13, 11, 12, 13, 11, 13, 13, 13, 14, 14, 14, 16, 16,
+	14, 14, 16, 17, 16, 14, 15, 17, 15, 19, 19, 18, 19, 18, 21, 18, 19, 18, 17, 20,
+	21, 20, 18, 20, 19, 21, 22, 22, 21, 17, 25, 25, 25, 23, 25, 20, 24, 24, 24, 23,
+	25, 25, 23, 24, 26, 24, 23, 26, 28, 21, 28, 28, 21, 25, 22, 29, 28, 29, 23, 26,
 ];
 
 // Coups are coarse — a whole belt each — so a slip costs a bigger share of the par than a stray
@@ -50,19 +51,18 @@ const basePlan: LevelPlan<TectoniqueLevelCfg> = {
 	metric: 'time',
 	config(level: number): TectoniqueLevelCfg {
 		const l = clampLevel(level);
-		const n = l >= 55 ? 8 : l >= 25 ? 7 : 6;
-		const crystals = Math.min(n === 6 ? 6 : n === 7 ? 8 : 10, 4 + Math.floor((l - 1) / 10));
-		// A post freezes its whole line, so they stay rare; the rocks and the pillars carry the
-		// difficulty — a pillar is what stops every push from ending against the outer wall.
-		const locks = l >= 40 ? 2 : l >= 14 ? 1 : 0;
+		const n = l >= 45 ? 7 : 6;
+		const crystals = Math.min(n === 6 ? 7 : 9, 4 + Math.floor((l - 1) / 9));
+		// Crates and pillars only: the crystals carry the ramp, the pillars give a push
+		// somewhere to stop other than the outer wall.
 		return {
 			n,
 			crystals,
-			rowLocks: locks,
-			colLocks: locks,
-			allLocks: l >= 55 ? 1 : 0,
-			rocks: Math.min(n - 2, 2 + Math.floor((l - 1) / 12)),
-			pillars: l < 8 ? 0 : Math.min(3, 1 + Math.floor((l - 8) / 30)),
+			rowLocks: 0,
+			colLocks: 0,
+			allLocks: 0,
+			rocks: 0,
+			pillars: l < 6 ? 0 : Math.min(3, 1 + Math.floor((l - 6) / 32)),
 			holes: n - 2,
 			seed: levelSeed(l, SALT[l - 1] ?? 0),
 			par: PAR[l - 1] ?? 8 * crystals,
@@ -81,19 +81,17 @@ const basePlan: LevelPlan<TectoniqueLevelCfg> = {
 	},
 };
 
-// 101-200: a 9×9 floor, two more crystals and one more blocker of each kind. PAR is not measured
+// 101-200: an 8×8 floor, two more crystals and one more pillar. PAR is not measured
 // for these, so it is scaled off the base one — the crystals carry most of the coup count.
 export const tectoniqueLevels = extendPlan('tectonique', basePlan, {
 	configExt: (base) => {
-		const n = 9;
-		const crystals = Math.min(13, base.crystals + 2);
+		const n = 8;
+		const crystals = Math.min(11, base.crystals + 2);
 		return {
 			...base,
 			n,
 			crystals,
-			rocks: base.rocks + 1,
 			pillars: base.pillars + 1,
-			allLocks: 1,
 			holes: n - 2,
 			par: Math.round((base.par * crystals * 1.1) / base.crystals),
 		};
@@ -103,8 +101,8 @@ export const tectoniqueLevels = extendPlan('tectonique', basePlan, {
 /** Free play and the daily share three bands; the daily picks with the server's difficulty index.
     The fourth is the Expert pill, which the daily never deals. */
 export const TECTONIQUE_BANDS: GenParams[] = [
-	{ n: 6, crystals: 5, rowLocks: 0, colLocks: 0, allLocks: 0, rocks: 2, pillars: 1, holes: 4 },
-	{ n: 7, crystals: 7, rowLocks: 1, colLocks: 1, allLocks: 0, rocks: 4, pillars: 2, holes: 5 },
-	{ n: 8, crystals: 10, rowLocks: 1, colLocks: 1, allLocks: 1, rocks: 5, pillars: 3, holes: 6 },
-	{ n: 9, crystals: 12, rowLocks: 1, colLocks: 1, allLocks: 1, rocks: 6, pillars: 4, holes: 7 },
+	{ n: 6, crystals: 4, rowLocks: 0, colLocks: 0, allLocks: 0, rocks: 0, pillars: 1, holes: 4 },
+	{ n: 6, crystals: 6, rowLocks: 0, colLocks: 0, allLocks: 0, rocks: 0, pillars: 2, holes: 4 },
+	{ n: 7, crystals: 8, rowLocks: 0, colLocks: 0, allLocks: 0, rocks: 0, pillars: 2, holes: 5 },
+	{ n: 8, crystals: 10, rowLocks: 0, colLocks: 0, allLocks: 0, rocks: 0, pillars: 3, holes: 6 },
 ];

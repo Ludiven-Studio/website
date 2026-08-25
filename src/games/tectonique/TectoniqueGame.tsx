@@ -48,7 +48,7 @@ import {
 } from './engine';
 
 /* =====================================================
-   TECTONIQUE — React island.
+   TAPIS (gameId stays "tectonique", the original name) — React island.
    The floor is a lattice of conveyor belts. Grab the hen's row or column and drag it: the
    belt follows the finger cell by cell, and it keeps the speed it had when you let go —
    so it coasts on, and you cut it with a second press. The crystals hover in place: ride
@@ -105,6 +105,10 @@ const KEY_MOVES: Record<string, [Axis, -1 | 1] | undefined> = {
 	ArrowLeft: ['row', -1], ArrowRight: ['row', 1], ArrowUp: ['col', -1], ArrowDown: ['col', 1],
 	q: ['row', -1], a: ['row', -1], d: ['row', 1], z: ['col', -1], w: ['col', -1], s: ['col', 1],
 };
+
+/* Daily-run state is versioned: GEN_V bumps with the generator or the bands, so a board
+   saved under an older deal is discarded instead of decoded onto a different grid. */
+const GEN_V = 2;
 
 const DRY_HINT = 12; // coups without a crystal before the way out is offered
 const REPLAY_MS = 330; // slowest step of the solution playback
@@ -277,7 +281,8 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			const diffIndex = run.diffIndex ?? 0;
 			seedRef.current = { seed: run.seed, diffIndex };
 			const fresh = build(run.seed, diffIndex);
-			const saved = (run.state as { cells?: string } | undefined)?.cells;
+			const s = run.state as { v?: number; cells?: string } | undefined;
+			const saved = s?.v === GEN_V ? s.cells : undefined;
 			const resumed = saved ? decodeBoard(fresh.board.n, saved) : undefined;
 			setDailyLoading(false);
 			setStarted(true);
@@ -648,7 +653,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: { cells: encodeBoard(board) },
+			state: { v: GEN_V, cells: encodeBoard(board) },
 		});
 	}, [daily, started, status, board, gameId]);
 
@@ -662,7 +667,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			finalTime: finalRef.current,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: { cells: encodeBoard(board) },
+			state: { v: GEN_V, cells: encodeBoard(board) },
 		});
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [daily, status, alreadyPlayed, gameId]);
@@ -688,11 +693,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 	};
 
 	/** The turntable rides with the hen, so it stays under her mid-slide. */
-	const crossAt = ((): CSSProperties | null => {
-		if (heroIdx < 0) return null;
-		const o = offsetOf(heroIdx);
-		return { transform: `translate(${(laneC + o.x) * 100}%, ${(laneR + o.y) * 100}%)` };
-	})();
+	const heroOff = heroIdx >= 0 ? offsetOf(heroIdx) : { x: 0, y: 0 };
+	const crossAt: CSSProperties | null = heroIdx < 0
+		? null
+		: { transform: `translate(${(laneC + heroOff.x) * 100}%, ${(laneR + heroOff.y) * 100}%)` };
 
 	/** The belt surface travels with its line: one cell of texture per cell of shift. */
 	const beltPos = (axis: Axis, index: number): string => {
@@ -700,13 +704,39 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		return `calc(${(shifts[k] ?? 0) + (offsets[k] ?? 0)} * var(--tk-cell))`;
 	};
 
-	// The hen's two belts, the last pushed one on the very top: the belt you drive passes in front.
+	/** A one-cell blank in a hero belt, at the turntable: neither belt rides over the other. */
+	const gapMask = (deg: number, k: number): string => {
+		const a = (k * 100) / n;
+		const b = ((k + 1) * 100) / n;
+		return `linear-gradient(${deg}deg, #000 0, #000 ${a}%, transparent ${a}%, transparent ${b}%, #000 ${b}%)`;
+	};
+
+	// The hen's two belts. The blank travels with her, so both stop flat at the crossing;
+	// mid-slide the driven belt shows through the other's blank, still without any cast shadow.
 	const heroBelts = [
 		laneR >= 0 && (
-			<div key="hr" className="tk-belt h on" style={{ top: `calc(${(laneR * 100) / n}% + 4px)`, backgroundPositionX: beltPos('row', laneR) }} />
+			<div
+				key="hr"
+				className="tk-belt h on"
+				style={{
+					top: `calc(${(laneR * 100) / n}% + 4px)`,
+					backgroundPositionX: beltPos('row', laneR),
+					WebkitMaskImage: gapMask(90, laneC + heroOff.x),
+					maskImage: gapMask(90, laneC + heroOff.x),
+				}}
+			/>
 		),
 		laneC >= 0 && (
-			<div key="hc" className="tk-belt v on" style={{ left: `calc(${(laneC * 100) / n}% + 4px)`, backgroundPositionY: beltPos('col', laneC) }} />
+			<div
+				key="hc"
+				className="tk-belt v on"
+				style={{
+					left: `calc(${(laneC * 100) / n}% + 4px)`,
+					backgroundPositionY: beltPos('col', laneC),
+					WebkitMaskImage: gapMask(180, laneR + heroOff.y),
+					maskImage: gapMask(180, laneR + heroOff.y),
+				}}
+			/>
 		),
 	];
 	if (front === 'row') heroBelts.reverse();
@@ -808,7 +838,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						ref={elRef}
 						onPointerDown={swipe.onPointerDown}
 						role="application"
-						aria-label="Grille de Tectonique"
+						aria-label="Grille de Tapis"
 					>
 						{/* One physical band per lane. Draw order does the crossing: plain rows, grid
 						    ticks, plain columns, then the hen's two belts ride over everything. */}
@@ -983,11 +1013,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				une case&nbsp;: relance le même autant que tu veux, dans un sens comme dans l'autre, ça reste le
 				même coup — tu ne paies qu'en changeant de tapis. Le sol est un quadrillage de
 				tapis roulants : la cocotte et les bacs en plastique glissent dessus et se tassent contre le mur
-				ou contre ce qui les arrête — le tapis, lui, continue de tourner dessous. Les caisses en fer,
-				pleines de pièces lourdes, sont boulonnées au tapis et voyagent exactement avec lui : dès
-				qu'une caisse bute, toute sa ligne s'arrête. Les
-				plots, vissés à travers le tapis, bloquent net leur ligne ; leur rainure montre le seul sens où le
-				tapis peut encore les emmener, et le plot boulonné n'en a aucune. Les piliers rayés jaune et
+				ou contre ce qui les arrête — le tapis, lui, continue de tourner dessous. Les piliers rayés jaune et
 				noir sont scellés au bâti&nbsp;: le tapis tourne toujours autour, mais rien ne les traverse — ils
 				coupent leur ligne en deux et donnent enfin où s'arrêter ailleurs qu'au bord. Les 💎 flottent au-dessus et ne
 				bougent jamais — c'est la cocotte qui doit leur passer dessus. Les trous se referment pour de
@@ -1101,10 +1127,10 @@ const CSS = `
     inset 4px 0 5px -3px rgba(255, 255, 255, 0.16),
     inset -5px 0 6px -3px rgba(0, 0, 0, 0.9);
 }
-/* The hen's two belts pass in front: brighter, and casting on the lanes they cross. */
+/* The hen's two belts: brighter, but flat — no cast shadow, they meet the turntable level. */
 .tk-belt.on { filter: brightness(1.22); }
-.tk-belt.h.on { box-shadow: 0 0 12px 3px rgba(0, 0, 0, 0.6), inset 0 4px 5px -3px rgba(255, 255, 255, 0.2), inset 0 -5px 6px -3px rgba(0, 0, 0, 0.9); }
-.tk-belt.v.on { box-shadow: 0 0 12px 3px rgba(0, 0, 0, 0.6), inset 4px 0 5px -3px rgba(255, 255, 255, 0.2), inset -5px 0 6px -3px rgba(0, 0, 0, 0.9); }
+.tk-belt.h.on { box-shadow: inset 0 4px 5px -3px rgba(255, 255, 255, 0.2), inset 0 -5px 6px -3px rgba(0, 0, 0, 0.9); }
+.tk-belt.v.on { box-shadow: inset 4px 0 5px -3px rgba(255, 255, 255, 0.2), inset -5px 0 6px -3px rgba(0, 0, 0, 0.9); }
 
 /* The hen's cell is the one place both belts serve. A turntable plate settles the crossing —
    no belt runs over the other there — and a chevron marks every side she can be pushed to. */

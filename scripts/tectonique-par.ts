@@ -125,8 +125,9 @@ function solve(start: Board, width: number, maxDepth: number): { par: number; be
 const BEAM = 4000;
 const bestEffort = (b: Board): { par: number | null; beamed: boolean } => solve(b, BEAM, 25) ?? { par: null, beamed: true };
 
-/** The ramp we want to feel: the ladder is judged on this, not on the raw luck of one seed. */
-const wanted = (l: number): number => Math.round(6 + (l - 1) * 0.28);
+/** The ramp we want to feel: the ladder is judged on this, not on the raw luck of one seed.
+    Gentler than the old five-piece ramp — crates and pillars only cap what a grid can cost. */
+const wanted = (l: number): number => Math.round(5 + (l - 1) * 0.25);
 const VARIANTS = 10;
 
 const pars: number[] = [];

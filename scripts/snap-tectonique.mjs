@@ -27,7 +27,7 @@ const freeDirs = () =>
 		['up', 'down', 'left', 'right'].filter((d) => !document.querySelector(`.tk-dbtn.${d}`).disabled));
 
 async function fresh() {
-	await page.goto(`${base}/jeux/tectonique/`, { waitUntil: 'networkidle' });
+	await page.goto(`${base}/jeux/tapis/`, { waitUntil: 'networkidle' });
 	await page.waitForSelector('.tk-board');
 	const start = page.locator('.tk-start');
 	if (await start.count()) { try { await start.first().click(); } catch {} }

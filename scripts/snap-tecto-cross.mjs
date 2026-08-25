@@ -15,7 +15,7 @@ await ctx.addInitScript(() => localStorage.setItem('ludiven-tuto-seen', '["tecto
 const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
 
-await page.goto(`${base}/jeux/tectonique/`, { waitUntil: 'networkidle' });
+await page.goto(`${base}/jeux/tapis/`, { waitUntil: 'networkidle' });
 await page.waitForSelector('.tk-board');
 const start = page.locator('.tk-start');
 if (await start.count()) { try { await start.first().click(); } catch {} }
