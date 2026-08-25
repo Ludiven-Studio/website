@@ -3,6 +3,7 @@ import { trackGame } from '../../lib/analytics';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
+import LeavesMode from './LeavesMode';
 import {
 	SOUFFLE_BANDS,
 	applyGust,
@@ -17,13 +18,34 @@ import {
 } from './engine';
 
 /* =====================================================
-   SOUFFLE — React island (prototype, free play only).
-   Swipe anywhere on the meadow: one gust, and the feather glides until the first rock or
-   the hedge stops it, brushing every flower on the way. The four ghost feathers show
-   where each gust would land — tapping one blows that way too. Undo is free.
+   SOUFFLE — React island (prototype, free play only). Two winds, side by side:
+   🪶 Plume — swipe = one gust, the feather glides until the first rock or the hedge,
+   brushing every flower on the way; ghost feathers preview (and play) each landing.
+   🍂 Feuilles (LeavesMode) — draw persistent currents, the leaves ride them to the vortex.
    ===================================================== */
 
 const GAME_ID = 'souffle';
+
+type Mode = 'plume' | 'feuilles';
+const MODE_KEY = 'ludiven-souffle-mode';
+
+export default function SouffleGame() {
+	const [mode, setMode] = useState<Mode>(() => (localStorage.getItem(MODE_KEY) === 'feuilles' ? 'feuilles' : 'plume'));
+	const pick = (m: Mode): void => {
+		setMode(m);
+		localStorage.setItem(MODE_KEY, m);
+	};
+	return (
+		<div className="sf-shell">
+			<style>{CSS}</style>
+			<div className="sf-modes" role="tablist" aria-label="Mode de jeu">
+				<button role="tab" aria-selected={mode === 'plume'} className={`sf-mode ${mode === 'plume' ? 'active' : ''}`} onClick={() => pick('plume')}>🪶 Plume</button>
+				<button role="tab" aria-selected={mode === 'feuilles'} className={`sf-mode ${mode === 'feuilles' ? 'active' : ''}`} onClick={() => pick('feuilles')}>🍂 Feuilles</button>
+			</div>
+			{mode === 'plume' ? <FeatherMode /> : <LeavesMode />}
+		</div>
+	);
+}
 
 const TIERS = ['Brise', 'Vent', 'Tempête'];
 const DIR_NAME = ['le haut', 'la droite', 'le bas', 'la gauche'];
@@ -40,7 +62,7 @@ const bloomAt = (idx: number): string => BLOOM[(idx * 7 + 3) % BLOOM.length];
 interface Pop { id: number; idx: number; glyph: string }
 interface Gust { id: number; idx: number; axis: 'h' | 'v' }
 
-export default function SouffleGame() {
+function FeatherMode() {
 	const [puzzle, setPuzzle] = useState<SoufflePuzzle | null>(null);
 	const [hist, setHist] = useState<SouffleState[]>([]);
 	const [diff, setDiff] = useState(0);
@@ -166,8 +188,6 @@ export default function SouffleGame() {
 
 	return (
 		<div className="sf-root" style={{ ['--n' as string]: n }}>
-			<style>{CSS}</style>
-
 			<div className="sf-pills" role="tablist" aria-label="Difficulté">
 				{TIERS.map((t, i) => (
 					<button
@@ -274,6 +294,14 @@ const CSS = `
   flex-direction: column;
   align-items: center;
 }
+
+.sf-shell { width: 100%; }
+.sf-modes { display: flex; gap: 6px; justify-content: center; margin-bottom: 0.9rem; }
+.sf-mode {
+  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
+  font: inherit; font-weight: 600; font-size: 14px; border-radius: 999px; padding: 8px 16px; cursor: pointer;
+}
+.sf-mode.active { background: var(--accent-regular); color: var(--accent-text-over); border-color: var(--accent-regular); }
 
 .sf-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.75rem; }
 .sf-pill {

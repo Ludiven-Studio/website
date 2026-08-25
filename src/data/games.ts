@@ -294,7 +294,7 @@ export const games: GameTile[] = [
 	{
 		id: 'souffle',
 		title: 'Souffle',
-		pitch: 'D\'un glissement de doigt, envoie un souffle de vent : la plume file en ligne droite et ne s\'arrête qu\'au premier rocher ou contre la haie, en cueillant toutes les fleurs qu\'elle frôle. Butine tout le pré en le moins de souffles possible — et reviens en arrière autant que tu veux.',
+		pitch: 'Deux vents au choix. Plume : un glissement de doigt, et la plume file en ligne droite jusqu\'au premier rocher, en cueillant toutes les fleurs qu\'elle frôle. Feuilles : dessine des courants d\'air qui restent sur le pré, coupe-les et fais-les se rejoindre pour porter toutes les feuilles jusqu\'au tourbillon. Le moins de souffle possible.',
 		icon: 'souffle',
 		href: '/jeux/souffle',
 		status: 'play',
