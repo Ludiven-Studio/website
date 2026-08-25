@@ -14,7 +14,6 @@ import {
 	centreOf,
 	cloneGrid,
 	countBubbles,
-	dealSurvival,
 	descend,
 	fly,
 	generateBulles,
@@ -70,11 +69,21 @@ const SPEED = 62;
 /** How much of the aim the guide gives away: the cannon, the first wall, and one more leg. */
 const GUIDE_LEGS = 3;
 
-/** Survival: rows hanging at the start, and total board height the raft grows into. */
-const SURVIE_START_ROWS = 3;
-const SURVIE_TOTAL_ROWS = 12;
-/** Best survival run, kept per device. */
-const SURVIE_BEST_KEY = 'bulles-survie-best';
+/** Free play: the classic deal is padded to this many rows so the raft has room to descend into. */
+const FREE_TOTAL_ROWS = 13;
+/** A fresh ceiling row descends on this real-time clock (ms) in free play. */
+const DESCEND_MS = 10_000;
+/** Free-play records, kept per device and difficulty. */
+const winKey = (dk: string): string => `bulles-libre-win-${dk}`; // fastest clear (centis)
+const survKey = (dk: string): string => `bulles-libre-surv-${dk}`; // longest hold (centis)
+
+/** Pad a classic deal into a taller grid so the descending raft has room to grow. */
+function padDeal(p: BullesPuzzle, totalRows: number): Grid {
+	const rows = Math.max(totalRows, p.rows);
+	const g: Grid = { cols: p.cols, rows, parity: 0, cells: new Int8Array(p.cols * rows).fill(-1) };
+	g.cells.set(p.cells.subarray(0, Math.min(p.cells.length, g.cells.length)));
+	return g;
+}
 
 /** Idle bubbles drifting up behind the raft. x is a share of the width. */
 const DECOR = [
@@ -123,9 +132,10 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already closed today
 	const [gaveUp, setGaveUp] = useState(false);
-	const [survie, setSurvie] = useState(false); // endless mode: a new row descends each shot
-	const [survieBest, setSurvieBest] = useState(0);
-	const [survieNewRecord, setSurvieNewRecord] = useState(false);
+	// Free-play scores are time (centis): fastest to clear the board, or longest held before drowning.
+	const [bestWin, setBestWin] = useState(0);
+	const [bestSurv, setBestSurv] = useState(0);
+	const [newRecord, setNewRecord] = useState(false);
 
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
@@ -137,17 +147,20 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	const shotsRef = useRef(0);
 	const statusRef = useRef<Status>('loading');
 	const armedRef = useRef(false); // the board takes shots right now
-	const survieRef = useRef(false); // read inside the shot pipeline without churning its deps
-	const survieRng = useRef<() => number>(() => 0); // drives each descended row's colours
-	const survieColoursRef = useRef(3);
-	const survieBestRef = useRef(0); // best BEFORE the current run, for new-record detection
+	const descendRng = useRef<() => number>(() => 0); // drives each descended row's colours
+	const descendColoursRef = useRef(3);
+	const bestWinRef = useRef(0); // records BEFORE the current run, for new-record detection
+	const bestSurvRef = useRef(0);
+	const flyingRef = useRef(false); // a shot is in the air — hold the descent off
 	gridRef.current = grid;
 	shotsRef.current = shots;
 	statusRef.current = status;
-	survieRef.current = survie;
-	survieBestRef.current = survieBest;
+	bestWinRef.current = bestWin;
+	bestSurvRef.current = bestSurv;
+	flyingRef.current = flying;
 
 	const lv = useLevels(gameId, bullesLevels);
+	const freeMode = !daily && !lv.active; // free play: the raft descends on a clock, scored by time
 	const timed = daily || lv.playing; // both race the chrono → hints on a cooldown
 	const ready = status === 'playing' && (!timed || started);
 	armedRef.current = ready && !flying;
@@ -156,9 +169,9 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	const par = puzzle?.par ?? 0;
 	const loaded = grid && status === 'playing' ? nextColour(grid, puzzle?.seed ?? 0, shots) : 0;
 
-	const deal = useCallback((p: BullesPuzzle) => {
+	const deal = useCallback((p: BullesPuzzle, g?: Grid) => {
 		setPuzzle(p);
-		setGrid(gridOf(p));
+		setGrid(g ?? gridOf(p));
 		setShots(0);
 		setBurst([]);
 		setAim(0);
@@ -168,17 +181,24 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		setFlying(false);
 	}, []);
 
+	/* Free play: a classic solvable deal that also descends one row every DESCEND_MS. Clear it
+	   fast to win (score = time), or hold out as long as you can before it drowns you. */
 	const newGame = useCallback((dk: keyof typeof DIFFS) => {
+		const diff = DIFFS[dk];
+		const p = generateBulles(diff);
+		descendRng.current = mulberry32((p.seed ^ 0x9e3779b1) >>> 0);
+		descendColoursRef.current = diff.colours;
 		setDaily(false);
-		setSurvie(false);
 		setAlreadyPlayed(false);
 		setGaveUp(false);
+		setNewRecord(false);
 		setDiffKey(dk);
 		setStatus('loading');
-		setStarted(false);
 		setHintNote('');
+		deal(p, padDeal(p, FREE_TOTAL_ROWS));
+		startRef.current = Date.now();
 		setElapsed(0);
-		deal(generateBulles(DIFFS[dk]));
+		setStarted(true); // the clock (and the descent) run from the moment the board appears
 		setStatus('playing');
 	}, [deal]);
 
@@ -186,34 +206,10 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		newGame('facile');
 	}, [newGame]);
 
-	/* Survival: an endless board that grows a new ceiling row after every shot. No solver,
-	   no par — the score is how many shots you last before the raft reaches the lane. */
-	const newSurvival = useCallback((dk: keyof typeof DIFFS) => {
-		const diff = DIFFS[dk];
-		const seed = Math.floor(Math.random() * 0x7fffffff);
-		survieRng.current = mulberry32((seed ^ 0x9e3779b1) >>> 0);
-		survieColoursRef.current = diff.colours;
-		const g = dealSurvival(diff.cols, diff.colours, SURVIE_START_ROWS, SURVIE_TOTAL_ROWS, survieRng.current);
-		setDaily(false);
-		setSurvie(true);
-		setSurvieNewRecord(false);
-		setAlreadyPlayed(false);
-		setGaveUp(false);
-		setDiffKey(dk);
-		setHintNote('');
-		setStatus('loading');
-		deal({ cols: g.cols, rows: g.rows, colours: diff.colours, cells: g.cells.slice(), seed, par: 0 });
-		startRef.current = Date.now();
-		setElapsed(0);
-		setStarted(true); // survival isn't gated: play begins at once
-		setStatus('playing');
-	}, [deal]);
-
 	/* Levels mode: start a level from its config; grade on a cleared or drowned board. */
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
 		setDaily(false);
-		setSurvie(false);
 		setGaveUp(false);
 		setHintNote('');
 		setStatus('loading');
@@ -225,7 +221,6 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 
 	const armLevels = useCallback(() => {
 		setDaily(false);
-		setSurvie(false);
 		lv.enter();
 	}, [lv]);
 
@@ -241,7 +236,6 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
 		setDaily(true);
-		setSurvie(false);
 		setGaveUp(false);
 		setHintNote('');
 
@@ -328,6 +322,21 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		return () => clearInterval(id);
 	}, [ticking]);
 
+	/* Free play: the raft descends on a real-time clock (one row every DESCEND_MS),
+	   held off while a shot is in the air or the tab is hidden. */
+	useEffect(() => {
+		if (!freeMode || status !== 'playing' || !started) return;
+		const id = setInterval(() => {
+			if (document.hidden || flyingRef.current) return;
+			const g = gridRef.current;
+			if (!g || statusRef.current !== 'playing') return;
+			const next = cloneGrid(g);
+			descend(next, randomRow(next.cols, descendColoursRef.current, descendRng.current));
+			setGrid(next);
+		}, DESCEND_MS);
+		return () => clearInterval(id);
+	}, [freeMode, status, started]);
+
 	/* ---------- Shooting ---------- */
 
 	const land = useCallback(() => {
@@ -344,8 +353,6 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 			const c = centreOf(g, cell);
 			return { x: c.x, y: c.y, colour: cell === a.cell ? a.colour : g.cells[cell] };
 		}));
-		// Survival: pull the whole raft down one row and seed a fresh ceiling after the shot.
-		if (survieRef.current) descend(next, randomRow(next.cols, survieColoursRef.current, survieRng.current));
 		setGrid(next);
 		setShots((s) => s + 1);
 	}, []);
@@ -443,29 +450,38 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		if (!grid || status !== 'playing' || flying) return;
 		if (timed && !started) return;
 		if (lv.active && !lv.playing) return;
-		if (!survie && countBubbles(grid) === 0) {
+		if (countBubbles(grid) === 0) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		} else if (isLost(grid)) {
 			setStatus('lost');
 		}
-	}, [grid, status, flying, timed, started, survie, lv.active, lv.playing, gameId]);
+	}, [grid, status, flying, timed, started, lv.active, lv.playing, gameId]);
 
-	/* Survival best score, kept per device. */
+	/* Free-play records, per difficulty. */
 	useEffect(() => {
-		const v = Number(localStorage.getItem(SURVIE_BEST_KEY) || 0);
-		if (Number.isFinite(v)) setSurvieBest(v);
-	}, []);
+		setBestWin(Number(localStorage.getItem(winKey(diffKey)) || 0));
+		setBestSurv(Number(localStorage.getItem(survKey(diffKey)) || 0));
+	}, [diffKey]);
 
-	// Compare against the best BEFORE this run via a ref, so beating it once doesn't re-fire.
+	// Freeze the finish time and file it: fastest clear on a win, longest hold on a loss.
+	// Compare against the record BEFORE this run via refs, so beating it once doesn't re-fire.
 	useEffect(() => {
-		if (!survie || status !== 'lost') return;
-		if (shots > survieBestRef.current) {
-			localStorage.setItem(SURVIE_BEST_KEY, String(shots));
-			setSurvieBest(shots);
-			setSurvieNewRecord(true);
+		if (!freeMode || (status !== 'won' && status !== 'lost')) return;
+		const centis = Math.round((Date.now() - startRef.current) / 10);
+		setElapsed(centis);
+		if (status === 'won') {
+			if (bestWinRef.current === 0 || centis < bestWinRef.current) {
+				localStorage.setItem(winKey(diffKey), String(centis));
+				setBestWin(centis);
+				setNewRecord(true);
+			}
+		} else if (centis > bestSurvRef.current) {
+			localStorage.setItem(survKey(diffKey), String(centis));
+			setBestSurv(centis);
+			setNewRecord(true);
 		}
-	}, [survie, status, shots]);
+	}, [freeMode, status, diffKey]);
 
 	/* Grade the level once it is over. Score is the shot count; par rides along as `stat`. */
 	useEffect(() => {
@@ -550,7 +566,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 
 			<ModeToggle
 				daily={daily}
-				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily || survie) newGame(diffKey); }}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diffKey); } else if (daily) newGame(diffKey); }}
 				onDaily={() => { lv.exit(); startDaily(); }}
 				showLevels
 				levelsActive={lv.active}
@@ -572,51 +588,27 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 						: `Défi du jour · ${dailyWeekdayLabel()} · ${DIFFS[diffKey].label}`}
 				</div>
 			) : (
-				<>
-					<div className="bul-submode" role="tablist" aria-label="Mode de jeu libre">
-						<button
-							role="tab"
-							aria-selected={!survie}
-							className={`bul-sub ${!survie ? 'active' : ''}`}
-							onClick={() => newGame(diffKey)}
-						>
-							🧩 Classique
-						</button>
-						<button
-							role="tab"
-							aria-selected={survie}
-							className={`bul-sub ${survie ? 'active' : ''}`}
-							onClick={() => newSurvival(diffKey)}
-						>
-							🌊 Survie
-						</button>
-					</div>
-					<div className="bul-bar">
-						<div className="bul-pills" role="tablist" aria-label="Difficulté">
-							{diffKeys(DIFFS, gameId).map((k) => (
-								<button
-									key={k}
-									role="tab"
-									aria-selected={diffKey === k}
-									className={`bul-pill ${diffKey === k ? 'active' : ''}`}
-									onClick={() => (survie ? newSurvival(k) : newGame(k))}
-								>
-									{DIFFS[k].label}
-								</button>
-							))}
-						</div>
-						<div className="bul-bar-right">
-							<div className="bul-timer chrono">{fmtTime(elapsed)}</div>
+				<div className="bul-bar">
+					<div className="bul-pills" role="tablist" aria-label="Difficulté">
+						{diffKeys(DIFFS, gameId).map((k) => (
 							<button
-								className="bul-new"
-								onClick={() => (survie ? newSurvival(diffKey) : newGame(diffKey))}
-								aria-label="Nouveau tableau"
+								key={k}
+								role="tab"
+								aria-selected={diffKey === k}
+								className={`bul-pill ${diffKey === k ? 'active' : ''}`}
+								onClick={() => newGame(k)}
 							>
-								↻
+								{DIFFS[k].label}
 							</button>
-						</div>
+						))}
 					</div>
-				</>
+					<div className="bul-bar-right">
+						<div className="bul-timer chrono">{fmtTime(elapsed)}</div>
+						<button className="bul-new" onClick={() => newGame(diffKey)} aria-label="Nouveau tableau">
+							↻
+						</button>
+					</div>
+				</div>
 			))}
 
 			{!lv.active && daily && (
@@ -627,8 +619,8 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 
 			{grid && status !== 'loading' && !(lv.active && lv.menu) && (
 				<div className="bul-gauge" aria-live="polite">
-					{survie ? (
-						<>🌊 <strong>{shots}</strong> tirs · record {survieBest} · <strong>{left}</strong> bulles · </>
+					{freeMode ? (
+						<>🫧 <strong>{left}</strong> bulles · </>
 					) : (
 						<>🎯 <strong>{shots}</strong> tirs · par {par} · <strong>{left}</strong> bulles · </>
 					)}
@@ -840,38 +832,24 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{showWin && !daily && !lv.active && !survie && (
+				{showWin && freeMode && (
 					<div className="bul-win" role="dialog" aria-label="Tableau vidé">
 						<div className="bul-wincard">
-							<div className="bul-winmark">🫧</div>
+							<div className="bul-winmark">{newRecord ? '🏅' : '🫧'}</div>
 							<h2>Tableau vidé&nbsp;!</h2>
-							<p className="bul-wintime">{shots} tirs</p>
-							<p className="bul-windiff">par {par} · {fmtTime(elapsed)} · {DIFFS[diffKey].label}</p>
+							<p className="bul-wintime">{fmtTime(elapsed)}</p>
+							<p className="bul-windiff">{newRecord ? 'Record de vitesse !' : bestWin ? `record ${fmtTime(bestWin)}` : ''} · {DIFFS[diffKey].label}</p>
 							<button className="bul-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 						</div>
 					</div>
 				)}
 
-				{status === 'lost' && !daily && !lv.active && survie && (
-					<div className="bul-win" role="dialog" aria-label="Survie terminée">
-						<div className="bul-wincard">
-							<div className="bul-winmark">{survieNewRecord ? '🏅' : '🌊'}</div>
-							<h2>Survie terminée</h2>
-							<p className="bul-wintime">{shots} tirs</p>
-							<p className="bul-windiff">
-								{survieNewRecord ? 'Nouveau record !' : `record ${survieBest}`} · {DIFFS[diffKey].label}
-							</p>
-							<button className="bul-replay" onClick={() => newSurvival(diffKey)}>Rejouer</button>
-						</div>
-					</div>
-				)}
-
-				{status === 'lost' && !daily && !lv.active && !survie && (
+				{status === 'lost' && freeMode && (
 					<div className="bul-win" role="dialog" aria-label="Bulles descendues trop bas">
 						<div className="bul-wincard">
-							<div className="bul-winmark">😵</div>
-							<h2>Les bulles sont descendues</h2>
-							<p className="bul-windiff">{shots} tirs · {left} bulles restantes</p>
+							<div className="bul-winmark">{newRecord ? '🏅' : '🌊'}</div>
+							<h2>Tenu {fmtTime(elapsed)}</h2>
+							<p className="bul-windiff">{newRecord ? 'Record de survie !' : bestSurv ? `record ${fmtTime(bestSurv)}` : ''} · {DIFFS[diffKey].label}</p>
 							<button className="bul-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 						</div>
 					</div>
@@ -904,7 +882,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 				format={fmtPacked}
 			/>}
 
-			{!daily && !lv.active && !survie && (
+			{!daily && !lv.active && (
 				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" />
 			)}
 
@@ -915,8 +893,8 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 					Glisse de gauche à droite pour orienter le viseur — ou vise un point du tableau — puis
 					relâche pour tirer. Trois bulles de la même couleur qui se
 					touchent tombent, et tout ce qu'elles retenaient tombe avec elles.{' '}
-					{survie
-						? 'Mode Survie : une nouvelle ligne descend à chaque tir. Tiens le plus longtemps possible avant que les bulles touchent le bas.'
+					{freeMode
+						? 'Une nouvelle ligne descend toutes les 10 secondes : vide le tableau le plus vite possible, ou tiens le plus longtemps avant que les bulles touchent le bas.'
 						: `Vide le tableau en ${par + THREE_STAR_OVER} tirs ou moins pour trois étoiles.`}
 				</p>
 			)}
@@ -967,16 +945,6 @@ const CSS = `
   border: none; background: var(--gray-800); color: var(--gray-0);
   font-size: 16px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-weight: 700; line-height: 1;
 }
-
-/* Classique / Survie switch, shown only in free play. */
-.bul-submode { display: flex; gap: 6px; width: 100%; margin-bottom: 0.6rem; }
-.bul-sub {
-  flex: 1;
-  border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
-  font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 10px; cursor: pointer;
-  transition: color var(--theme-transition), background-color var(--theme-transition), border-color var(--theme-transition);
-}
-.bul-sub.active { background: var(--bul-accent); color: var(--accent-text-over); border-color: var(--bul-accent); }
 
 .bul-gauge {
   color: var(--gray-300); font-size: 13px; font-weight: 500;
