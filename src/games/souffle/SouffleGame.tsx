@@ -1,8 +1,19 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { trackGame } from '../../lib/analytics';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import ModeToggle from '../../components/ModeToggle';
+import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { DAILY_LB } from '../../data/dailyLb';
+import { formatScore, fmtCentis, encodePacked } from '../../lib/scoreFormat';
+import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
 import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
+import { souffleLevels } from './levels';
 import {
 	SOUFFLE_BANDS,
 	applyGust,
@@ -17,12 +28,17 @@ import {
 } from './engine';
 
 /* =====================================================
-   SOUFFLE — React island (prototype, free play only).
+   SOUFFLE — React island.
    Swipe = one gust: the feather glides until the first rock or the hedge, brushing
    every flower on the way; ghost feathers preview (and play) each landing.
+   Modes: levels 1-100 (gusts vs par), daily (gusts + chrono tiebreak), free play.
    ===================================================== */
 
 const GAME_ID = 'souffle';
+
+/* Daily-run state is versioned: bump with the generator or the bands, so a state
+   saved under an older deal is discarded instead of decoded onto a different grid. */
+const GEN_V = 1;
 
 const TIERS = ['Brise', 'Vent', 'Tempête'];
 const DIR_NAME = ['le haut', 'la droite', 'le bas', 'la gauche'];
@@ -39,6 +55,8 @@ const bloomAt = (idx: number): string => BLOOM[(idx * 7 + 3) % BLOOM.length];
 interface Pop { id: number; idx: number; glyph: string }
 interface Gust { id: number; idx: number; axis: 'h' | 'v' }
 
+interface DailyState { v?: number; pos?: number; flowers?: number[]; gusts?: number }
+
 export default function SouffleGame() {
 	const [puzzle, setPuzzle] = useState<SoufflePuzzle | null>(null);
 	const [hist, setHist] = useState<SouffleState[]>([]);
@@ -47,6 +65,11 @@ export default function SouffleGame() {
 	const [gusts, setGusts] = useState<Gust[]>([]);
 	const [shake, setShake] = useState(0); // a refused gust wobbles the feather
 	const [glideMs, setGlideMs] = useState(300);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [started, setStarted] = useState(false); // daily ready-gate
+	const [elapsed, setElapsed] = useState(0); // centis, daily chrono (tiebreak)
 
 	const idRef = useRef(0);
 	const shakeRef = useRef(0);
@@ -54,23 +77,159 @@ export default function SouffleGame() {
 	histRef.current = hist;
 	const puzzleRef = useRef(puzzle);
 	puzzleRef.current = puzzle;
+	const seedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
+	const startRef = useRef(0);
+	const finalRef = useRef(0); // chrono at the daily win
+	const lv = useLevels(GAME_ID, souffleLevels);
 
 	const cur: SouffleState | null = hist.length ? hist[hist.length - 1] : null;
 	const won = cur ? isWon(cur) : false;
 
-	const newGame = useCallback((d: number) => {
-		setDiff(d);
-		const p = generateSouffle(mulberry32(Math.floor(Math.random() * 0xffffffff)), SOUFFLE_BANDS[d] ?? SOUFFLE_BANDS[0]);
+	const gated = daily && !started && !alreadyPlayed;
+	const locked = dailyLoading || gated || (daily && alreadyPlayed);
+	const lockedRef = useRef(locked);
+	lockedRef.current = locked;
+
+	const deal = useCallback((p: SoufflePuzzle, resume?: SouffleState) => {
 		setPuzzle(p);
-		setHist([startState(p)]);
+		setHist([resume ?? startState(p)]);
 		setPops([]);
 		setGusts([]);
-		trackGame(GAME_ID, 'game_started');
 	}, []);
+
+	const newGame = useCallback((d: number) => {
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setDiff(d);
+		deal(generateSouffle(mulberry32((Math.floor(Math.random() * 0xffffffff)) || 1), SOUFFLE_BANDS[d] ?? SOUFFLE_BANDS[0]));
+		trackGame(GAME_ID, 'game_started');
+	}, [deal]);
 
 	useEffect(() => { newGame(0); }, [newGame]);
 
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		deal(generateSouffle(mulberry32(cfg.seed), cfg));
+		trackGame(GAME_ID, 'game_started');
+	}, [lv, deal]);
+
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level.
+	// A ?defi deep link opens the daily instead (ModeToggle fires it) — skip auto-resume then.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	/* Daily challenge: one attempt per device, resumable mid-run. Server seed + difficulty. */
+	const startDaily = useCallback(async () => {
+		if (lv.active) lv.exit();
+		setDaily(true);
+		const build = (seed: number, diffIndex: number): SoufflePuzzle =>
+			generateSouffle(mulberry32(seed), SOUFFLE_BANDS[diffIndex] ?? SOUFFLE_BANDS[0]);
+
+		const run = loadDailyRun(GAME_ID);
+		if (run && run.seed != null) {
+			const diffIndex = run.diffIndex ?? 0;
+			seedRef.current = { seed: run.seed, diffIndex };
+			const p = build(run.seed, diffIndex);
+			const s = run.state as DailyState | undefined;
+			const kept = new Set(s?.flowers ?? []);
+			const resumed: SouffleState | undefined = s?.v === GEN_V && s.pos != null
+				? { pos: s.pos, flowers: p.flowers.map((_, i) => kept.has(i)), gusts: s.gusts ?? 0 }
+				: undefined;
+			setDailyLoading(false);
+			setStarted(true);
+			deal(p, resumed);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				finalRef.current = run.finalTime ?? 0;
+				setElapsed(finalRef.current);
+			} else {
+				setAlreadyPlayed(false);
+				startRef.current = run.startedAt;
+				setElapsed(Math.round((Date.now() - run.startedAt) / 10));
+			}
+			return;
+		}
+
+		setAlreadyPlayed(false);
+		setStarted(false);
+		setElapsed(0);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(GAME_ID);
+		seedRef.current = { seed, diffIndex };
+		deal(build(seed, diffIndex));
+		setDailyLoading(false);
+	}, [lv, deal]);
+
+	/* Commencer: consumes the attempt and starts the tiebreak chrono. */
+	const startTimer = useCallback(() => {
+		const now = Date.now();
+		startRef.current = now;
+		setStarted(true);
+		setElapsed(0);
+		trackGame(GAME_ID, 'game_started');
+		const sd = seedRef.current;
+		saveDailyRun(GAME_ID, { startedAt: now, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex });
+	}, []);
+
+	/* Chrono (daily only): the gust count ranks first, this splits the ties. */
+	const ticking = daily && started && !alreadyPlayed && !won;
+	usePlayClock(startRef, ticking, daily ? GAME_ID : null);
+	useEffect(() => {
+		if (!ticking) return;
+		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 250);
+		return () => clearInterval(id);
+	}, [ticking]);
+
+	/* Persist the in-progress daily attempt (resume after reload). */
+	useEffect(() => {
+		if (!daily || !started || alreadyPlayed || won || !cur) return;
+		const sd = seedRef.current;
+		saveDailyRun(GAME_ID, {
+			startedAt: startRef.current,
+			done: false,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { v: GEN_V, pos: cur.pos, flowers: cur.flowers.flatMap((f, i) => (f ? [i] : [])), gusts: cur.gusts },
+		});
+	}, [daily, started, alreadyPlayed, won, cur]);
+
+	/* Lock the daily attempt on the win. */
+	useEffect(() => {
+		if (!daily || !won || alreadyPlayed || !cur) return;
+		if (!finalRef.current) {
+			finalRef.current = Math.max(1, Math.round((Date.now() - startRef.current) / 10));
+			setElapsed(finalRef.current);
+		}
+		const sd = seedRef.current;
+		saveDailyRun(GAME_ID, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: finalRef.current,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+			state: { v: GEN_V, pos: cur.pos, flowers: [], gusts: cur.gusts },
+		});
+	}, [daily, won, alreadyPlayed, cur]);
+
+	/* Grade the level on the win — Souffle cannot be lost, undo goes all the way back. */
+	useEffect(() => {
+		if (!lv.playing || !won || !cur) return;
+		lv.finish({ won: true, score: cur.gusts, raw: { par: puzzleRef.current?.par } });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, won]);
+
 	const blow = useCallback((dir: Dir) => {
+		if (lockedRef.current) return;
 		const p = puzzleRef.current;
 		const h = histRef.current;
 		const s = h.length ? h[h.length - 1] : null;
@@ -101,13 +260,16 @@ export default function SouffleGame() {
 	}, []);
 
 	const undo = useCallback(() => {
-		setHist((h) => (h.length > 1 ? h.slice(0, -1) : h));
+		if (lockedRef.current) return;
+		setHist((h) => (h.length > 1 && !isWon(h[h.length - 1]) ? h.slice(0, -1) : h));
 	}, []);
 
 	const restart = useCallback(() => {
+		if (lockedRef.current) return;
 		const p = puzzleRef.current;
-		if (p) setHist([startState(p)]);
-	}, []);
+		const h = histRef.current;
+		if (p && !(h.length && isWon(h[h.length - 1]) && daily)) setHist([startState(p)]);
+	}, [daily]);
 
 	/* Swipe: the first clear direction fires the gust, then the finger is spent until it lifts. */
 	const dragRef = useRef({ x: 0, y: 0, fired: true });
@@ -150,12 +312,12 @@ export default function SouffleGame() {
 
 	/** Where each gust would land — the ghosts the player can read, or tap. */
 	const ghosts = useMemo(() => {
-		if (!puzzle || !cur || won) return [];
+		if (!puzzle || !cur || won || locked) return [];
 		return ([0, 1, 2, 3] as Dir[]).flatMap((d) => {
 			const path = glide(puzzle.n, puzzle.rocks, cur.pos, d);
 			return path.length ? [{ dir: d, idx: path[path.length - 1] }] : [];
 		});
-	}, [puzzle, cur, won]);
+	}, [puzzle, cur, won, locked]);
 
 	const at = (idx: number): { transform: string } => ({
 		transform: `translate(${(idx % n) * 100}%, ${Math.floor(idx / n) * 100}%)`,
@@ -163,89 +325,164 @@ export default function SouffleGame() {
 
 	const { celebrating, showWin } = useCelebration(won);
 
+	// Gusts rank first, the chrono only splits ties — ascending-is-better like every packed score.
+	const dailyScore = encodePacked(10_000_000, [cur?.gusts ?? 0, Math.min(9_999_999, finalRef.current)]);
+
 	return (
 		<div className="sf-root" style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
 
-			<div className="sf-pills" role="tablist" aria-label="Difficulté">
-				{TIERS.map((t, i) => (
-					<button
-						key={t}
-						role="tab"
-						aria-selected={diff === i}
-						className={`sf-pill ${diff === i ? 'active' : ''}`}
-						onClick={() => newGame(i)}
-					>
-						{t}
-					</button>
-				))}
-			</div>
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diff); } else if (daily) newGame(diff); }}
+				onDaily={() => { void startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
 
-			<div className="sf-bar">
-				<span className="sf-chip">💨 {cur?.gusts ?? 0}</span>
-				<span className="sf-chip">🎯 par {puzzle?.par ?? 0}</span>
-				<span className="sf-chip">🌼 {total - left}/{total}</span>
-				<button className="sf-btn" onClick={undo} disabled={hist.length < 2 || won} aria-label="Annuler le dernier souffle">↩</button>
-				<button className="sf-btn" onClick={restart} disabled={hist.length < 2} aria-label="Recommencer ce pré">↻</button>
-				<button className="sf-act" onClick={() => newGame(diff)}>Nouveau pré</button>
-			</div>
-
-			<div className="sf-boardwrap edge-safe">
-				{celebrating && <Celebration />}
-				<div
-					className="sf-board"
-					onPointerDown={swipe.onPointerDown}
-					role="application"
-					aria-label="Pré de Souffle — glisse pour souffler la plume"
-				>
-					{rocks.map((i) => (
-						<div key={`r${i}`} className="sf-cell sf-rock" style={at(i)}><span>🪨</span></div>
-					))}
-					{blooms.map((i) => (
-						<div key={`f${i}`} className="sf-cell sf-flower" style={at(i)}><span>{bloomAt(i)}</span></div>
-					))}
-					{pops.map((p) => (
-						<div key={p.id} className="sf-cell sf-pop" style={at(p.idx)}><span>{p.glyph}</span></div>
-					))}
-					{gusts.map((g) => (
-						<div key={g.id} className={`sf-gust ${g.axis}`} style={at(g.idx)} />
-					))}
-					{ghosts.map((g) => (
+			{lv.active ? (
+				<div className="sf-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${n}×${n}`}
+				</div>
+			) : daily ? (
+				<div className="sf-tag">
+					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${TIERS[seedRef.current?.diffIndex ?? 0]}`}
+				</div>
+			) : (
+				<div className="sf-pills" role="tablist" aria-label="Difficulté">
+					{TIERS.map((t, i) => (
 						<button
-							key={g.dir}
-							className="sf-cell sf-ghost"
-							style={at(g.idx)}
-							onClick={() => blow(g.dir)}
-							aria-label={`Souffler vers ${DIR_NAME[g.dir]}`}
+							key={t}
+							role="tab"
+							aria-selected={diff === i}
+							className={`sf-pill ${diff === i ? 'active' : ''}`}
+							onClick={() => newGame(i)}
 						>
-							<span>🪶</span>
+							{t}
 						</button>
 					))}
-					{cur && (
-						<div
-							className={`sf-cell sf-feather${shake ? ' bump' : ''}${won ? ' rest' : ''}`}
-							style={{ ...at(cur.pos), transitionDuration: `${glideMs}ms` }}
-						>
-							<span>🪶</span>
-						</div>
-					)}
+				</div>
+			)}
 
-					{showWin && puzzle && cur && (
-						<div className="sf-overlay" role="dialog" aria-label="Pré butiné">
-							<div className="sf-card">
-								<div className="sf-mark">🌼</div>
-								<h2>Toutes les fleurs !</h2>
-								<p className="sf-big">{cur.gusts} souffles</p>
-								<p className="sf-sub">{cur.gusts <= puzzle.par ? 'Le vent ne pouvait pas faire mieux 🎐' : `par ${puzzle.par}`}</p>
-								<div className="sf-row">
-									<button className="sf-start" onClick={restart}>Rejouer</button>
-									<button className="sf-start ghost" onClick={() => newGame(diff)}>Nouveau pré</button>
-								</div>
-							</div>
-						</div>
+			{!(lv.active && lv.menu) && (
+				<div className="sf-bar">
+					<span className="sf-chip">💨 {cur?.gusts ?? 0}</span>
+					<span className="sf-chip">🎯 par {puzzle?.par ?? 0}</span>
+					<span className="sf-chip">🌼 {total - left}/{total}</span>
+					{daily && <span className="sf-chip">⏱ {fmtCentis(elapsed)}</span>}
+					<button className="sf-btn" onClick={undo} disabled={locked || hist.length < 2 || won} aria-label="Annuler le dernier souffle">↩</button>
+					<button className="sf-btn" onClick={restart} disabled={locked || hist.length < 2 || (daily && won)} aria-label="Recommencer ce pré">↻</button>
+					{!daily && !lv.active && (
+						<button className="sf-act" onClick={() => newGame(diff)}>Nouveau pré</button>
 					)}
 				</div>
-			</div>
+			)}
+
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
+				<div className="sf-boardwrap edge-safe">
+					{celebrating && !lv.active && <Celebration />}
+					<div
+						className={`sf-board ${gated && !dailyLoading ? 'blurred' : ''}`}
+						onPointerDown={swipe.onPointerDown}
+						role="application"
+						aria-label="Pré de Souffle — glisse pour souffler la plume"
+					>
+						{rocks.map((i) => (
+							<div key={`r${i}`} className="sf-cell sf-rock" style={at(i)}><span>🪨</span></div>
+						))}
+						{blooms.map((i) => (
+							<div key={`f${i}`} className="sf-cell sf-flower" style={at(i)}><span>{bloomAt(i)}</span></div>
+						))}
+						{pops.map((p) => (
+							<div key={p.id} className="sf-cell sf-pop" style={at(p.idx)}><span>{p.glyph}</span></div>
+						))}
+						{gusts.map((g) => (
+							<div key={g.id} className={`sf-gust ${g.axis}`} style={at(g.idx)} />
+						))}
+						{ghosts.map((g) => (
+							<button
+								key={g.dir}
+								className="sf-cell sf-ghost"
+								style={at(g.idx)}
+								onClick={() => blow(g.dir)}
+								aria-label={`Souffler vers ${DIR_NAME[g.dir]}`}
+							>
+								<span>🪶</span>
+							</button>
+						))}
+						{cur && (
+							<div
+								className={`sf-cell sf-feather${shake ? ' bump' : ''}${won ? ' rest' : ''}`}
+								style={{ ...at(cur.pos), transitionDuration: `${glideMs}ms` }}
+							>
+								<span>🪶</span>
+							</div>
+						)}
+
+						{daily && dailyLoading && (
+							<div className="sf-overlay"><div className="sf-card"><p className="sf-sub">Préparation…</p></div></div>
+						)}
+
+						{gated && !dailyLoading && puzzle && (
+							<div className="sf-overlay">
+								<button className="sf-start big" onClick={startTimer}>▶ Commencer</button>
+							</div>
+						)}
+
+						{showWin && !daily && !lv.active && puzzle && cur && (
+							<div className="sf-overlay" role="dialog" aria-label="Pré butiné">
+								<div className="sf-card">
+									<div className="sf-mark">🌼</div>
+									<h2>Toutes les fleurs !</h2>
+									<p className="sf-big">{cur.gusts} souffles</p>
+									<p className="sf-sub">{cur.gusts <= puzzle.par ? 'Le vent ne pouvait pas faire mieux 🎐' : `par ${puzzle.par}`}</p>
+									<div className="sf-row">
+										<button className="sf-start" onClick={restart}>Rejouer</button>
+										<button className="sf-start ghost" onClick={() => newGame(diff)}>Nouveau pré</button>
+									</div>
+								</div>
+							</div>
+						)}
+					</div>
+
+					{lv.done && cur && (
+						<LevelOutcome
+							level={lv.level}
+							lastLevel={souffleLevels.count}
+							won={lv.won}
+							stars={lv.stars}
+							detail={`${cur.gusts} souffles · par ${puzzle?.par ?? 0}`}
+							onNext={() => startLevel(lv.level + 1)}
+							onReplay={() => startLevel(lv.level)}
+							onMenu={lv.backToMenu}
+						/>
+					)}
+				</div>
+			)}
+
+			{daily && (won || alreadyPlayed) && cur && (
+				<div className="sf-done">
+					{alreadyPlayed
+						? <>Défi du jour déjà relevé · <strong>{cur.gusts} souffles</strong> en {fmtCentis(finalRef.current)} — reviens demain&nbsp;!</>
+						: <>🎉 Pré butiné en <strong>{cur.gusts} souffles</strong> · {fmtCentis(finalRef.current)}</>}
+				</div>
+			)}
+
+			{daily && !dailyLoading && (
+				<Leaderboard
+					game={`${GAME_ID}-t`}
+					metric="time"
+					submitValue={won || alreadyPlayed ? dailyScore : undefined}
+					format={(v) => formatScore(DAILY_LB.souffle.fmt, v)}
+				/>
+			)}
+
+			{!daily && !lv.active && (
+				<LeaderboardCorner game={`${GAME_ID}-t`} metric="time" format={(v) => formatScore(DAILY_LB.souffle.fmt, v)} />
+			)}
 
 			<p className="sf-help">
 				Glisse le doigt (ou flèches / ZQSD)&nbsp;: un souffle envoie la plume 🪶 en ligne droite, et
@@ -274,6 +511,7 @@ const CSS = `
   align-items: center;
 }
 
+.sf-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
 .sf-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.75rem; }
 .sf-pill {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
@@ -311,6 +549,7 @@ const CSS = `
   touch-action: none;
   user-select: none;
 }
+.sf-board.blurred > :not(.sf-overlay) { filter: blur(7px); }
 
 .sf-cell {
   position: absolute; top: 0; left: 0;
@@ -396,6 +635,12 @@ const CSS = `
   font: inherit; font-weight: 700; font-size: 14px; border-radius: 999px; padding: 9px 18px; cursor: pointer;
 }
 .sf-start.ghost { background: transparent; color: var(--gray-0); border: 1.5px solid var(--gray-700); }
+.sf-start.big { font-size: 16px; padding: 13px 26px; box-shadow: var(--shadow-md, 0 10px 30px rgba(0, 0, 0, 0.25)); }
+
+.sf-done {
+  margin-top: 0.9rem; text-align: center;
+  color: var(--gray-100); font-size: 14px;
+}
 
 .sf-help {
   max-width: 440px; margin: 1rem auto 0; text-align: center;

@@ -17,6 +17,8 @@ export const THEMES = {
 	solitaire: 'a polished wooden peg board and glass marbles on a table, fireplace room, warm light',
 	reussite: 'a cosy lounge with a green felt card table, face-down playing cards fanned out, art deco lamp',
 	tectonique: 'an underground crystal cave with a metal conveyor floor, stone pillars and iron crates, teal glow',
+	souffle: 'a sunny summer meadow of wildflowers with a single white feather drifting on the breeze, mossy rocks, hedge border, soft wind streaks',
+	feuilles: 'an autumn meadow under falling orange leaves, swirling wind currents drawn in the air, a small leaf whirlwind, golden afternoon light',
 
 	// Maths & reasoning
 	'2048': 'a minimalist gallery of glossy stacked cubes in warm amber and cream tones, soft studio light',

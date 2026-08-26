@@ -1,9 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { trackGame } from '../../lib/analytics';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import ModeToggle from '../../components/ModeToggle';
+import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { DAILY_LB } from '../../data/dailyLb';
+import { formatScore } from '../../lib/scoreFormat';
+import { useLevels } from '../../lib/useLevels';
 import { usePlayClock } from '../../lib/usePlayClock';
 import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
+import { feuillesLevels } from './levels';
 import {
 	DR, DC,
 	FEUILLES_BANDS,
@@ -16,14 +26,17 @@ import {
 	type Dir,
 	type FeuillesBoard,
 	type FlowState,
+	type GenParams,
 	type Leaf,
 } from './engine';
 
 /* =====================================================
-   FEUILLES — React island (prototype, free play only).
+   FEUILLES — React island.
    Leaves rain on the meadow; the finger draws persistent wind currents that carry
    them to the vortex. Drawing over a stream cuts it there, brooks merge into rivers.
-   Reach the target count — the chrono is the score.
+   Modes: levels 1-100 (chrono vs star thresholds), daily (chrono, one attempt), free play.
+   The daily saves no leaf state — a reload replays the same seeded storm from scratch
+   while the chrono keeps running, so reloading is strictly a loss.
    ===================================================== */
 
 const GAME_ID = 'feuilles';
@@ -54,6 +67,11 @@ export default function FeuillesGame() {
 	const [now, setNow] = useState(0);
 	const [fades, setFades] = useState<Fade[]>([]);
 	const [swirls, setSwirls] = useState<Swirl[]>([]);
+	const [params, setParams] = useState<GenParams>(FEUILLES_BANDS[0]);
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+	const [started, setStarted] = useState(false); // ready-gate (levels + daily)
 
 	const idRef = useRef(0);
 	const boardElRef = useRef<HTMLDivElement>(null);
@@ -63,60 +81,183 @@ export default function FeuillesGame() {
 	flowRef.current = flow;
 	const leavesRef = useRef(leaves);
 	leavesRef.current = leaves;
-	const wonRef = useRef(won);
-	wonRef.current = won;
 	const collectedRef = useRef(collected);
 	collectedRef.current = collected;
-	const diffRef = useRef(diff);
-	diffRef.current = diff;
+	const paramsRef = useRef(params);
+	paramsRef.current = params;
 	const rngRef = useRef(mulberry32(1));
 	const leafIdRef = useRef(0);
 	const beatRef = useRef(0);
 	const seedRef = useRef(1);
+	const dailyRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const startRef = useRef(0);
 	const winMsRef = useRef(0);
+	const finalRef = useRef(0); // daily chrono at the win, centiseconds
 	const strokeRef = useRef(0);
 	const lastCellRef = useRef(-1);
+	const lv = useLevels(GAME_ID, feuillesLevels);
+
+	/* One flag rules the storm: the interval, the finger and the buttons all obey it. */
+	const running = !!board && started && !won && !dailyLoading && !(daily && alreadyPlayed);
+	const lockedRef = useRef(!running);
+	lockedRef.current = !running;
+	const startedRef = useRef(started);
+	startedRef.current = started;
+	const wonRef = useRef(won);
+	wonRef.current = won;
+	const gated = !!board && !started && !dailyLoading;
 
 	/* Same seed → same board AND the same rain, so Rejouer replays the very same storm. */
-	const newGame = useCallback((d: number, seed?: number) => {
-		setDiff(d);
-		const s = seed ?? (Math.floor(Math.random() * 0xffffffff) || 1);
-		seedRef.current = s;
-		const rng = mulberry32(s);
+	const redeal = useCallback((seed: number, p: GenParams) => {
+		seedRef.current = seed;
+		const rng = mulberry32(seed);
 		rngRef.current = rng;
-		const band = FEUILLES_BANDS[d] ?? FEUILLES_BANDS[0];
-		const b = generateBoard(rng, band);
-		const first = spawnLeaves(rng, b, band.seed, 0);
+		const b = generateBoard(rng, p);
+		const first = spawnLeaves(rng, b, p.startLeaves, 0);
 		leafIdRef.current = first.nextId;
 		beatRef.current = 0;
-		startRef.current = Date.now();
 		setBoard(b);
 		setFlow(emptyFlow(b.n));
 		setLeaves(first.leaves);
 		setCollected(0);
 		setBreath(0);
 		setWon(false);
-		setNow(Date.now());
 		setFades([]);
 		setSwirls([]);
-		trackGame(GAME_ID, 'game_started');
 	}, []);
+
+	const newGame = useCallback((d: number) => {
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setDiff(d);
+		const p = FEUILLES_BANDS[d] ?? FEUILLES_BANDS[0];
+		setParams(p);
+		paramsRef.current = p;
+		redeal(Math.floor(Math.random() * 0xffffffff) || 1, p);
+		startRef.current = Date.now();
+		setNow(Date.now());
+		setStarted(true); // free play has no gate — the chrono is only a companion
+		trackGame(GAME_ID, 'game_started');
+	}, [redeal]);
 
 	useEffect(() => { newGame(0); }, [newGame]);
 
-	const restart = useCallback(() => newGame(diffRef.current, seedRef.current), [newGame]);
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		setDaily(false);
+		setAlreadyPlayed(false);
+		setParams(cfg);
+		paramsRef.current = cfg;
+		redeal(cfg.seed, cfg);
+		setStarted(false); // the chrono is the score — it only runs once armed
+	}, [lv, redeal]);
 
-	usePlayClock(startRef, !!board && !won);
+	const armLevels = useCallback(() => {
+		setDaily(false);
+		lv.enter();
+	}, [lv]);
+
+	// Levels is the default landing: resume at the next unlocked level.
+	// A ?defi deep link opens the daily instead (ModeToggle fires it) — skip auto-resume then.
+	useEffect(() => {
+		const q = new URLSearchParams(location.search);
+		if (q.has('defi') || q.get('mode') === 'defi' || q.get('mode') === 'daily') return;
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	/* Daily challenge: one attempt per device. No leaf state is saved — a reload replays
+	   the same storm from scratch while the chrono keeps counting from the original start. */
+	const startDaily = useCallback(async () => {
+		if (lv.active) lv.exit();
+		setDaily(true);
+
+		const arm = (seed: number, diffIndex: number): GenParams => {
+			const band = FEUILLES_BANDS[diffIndex] ?? FEUILLES_BANDS[0];
+			dailyRef.current = { seed, diffIndex };
+			setParams(band);
+			paramsRef.current = band;
+			redeal(seed, band);
+			return band;
+		};
+
+		const run = loadDailyRun(GAME_ID);
+		if (run && run.seed != null) {
+			arm(run.seed, run.diffIndex ?? 0);
+			setDailyLoading(false);
+			setStarted(true);
+			if (run.done) {
+				setAlreadyPlayed(true);
+				finalRef.current = run.finalTime ?? 0;
+			} else {
+				setAlreadyPlayed(false);
+				startRef.current = run.startedAt;
+				setNow(Date.now());
+			}
+			return;
+		}
+
+		setAlreadyPlayed(false);
+		setStarted(false);
+		setDailyLoading(true);
+		const { seed, diffIndex } = await getDaily(GAME_ID);
+		arm(seed, diffIndex);
+		setDailyLoading(false);
+	}, [lv, redeal]);
+
+	/* Commencer: starts the chrono; in daily it also consumes the attempt. */
+	const startTimer = useCallback(() => {
+		const t = Date.now();
+		startRef.current = t;
+		setStarted(true);
+		setNow(t);
+		trackGame(GAME_ID, 'game_started');
+		if (daily) {
+			const sd = dailyRef.current;
+			saveDailyRun(GAME_ID, { startedAt: t, done: false, seed: sd?.seed, diffIndex: sd?.diffIndex });
+		}
+	}, [daily]);
+
+	const restart = useCallback(() => {
+		if (!startedRef.current || (daily && (alreadyPlayed || wonRef.current))) return;
+		redeal(seedRef.current, paramsRef.current);
+		if (!daily) {
+			startRef.current = Date.now(); // daily keeps its chrono — restarting is never free
+			setNow(Date.now());
+		}
+	}, [daily, alreadyPlayed, redeal]);
+
+	usePlayClock(startRef, running, daily ? GAME_ID : null);
+
+	/* Lock the daily attempt on the win. */
+	useEffect(() => {
+		if (!daily || !won || alreadyPlayed) return;
+		if (!finalRef.current) finalRef.current = Math.max(1, Math.round(winMsRef.current / 10));
+		const sd = dailyRef.current;
+		saveDailyRun(GAME_ID, {
+			startedAt: startRef.current,
+			done: true,
+			finalTime: finalRef.current,
+			seed: sd?.seed,
+			diffIndex: sd?.diffIndex,
+		});
+	}, [daily, won, alreadyPlayed]);
+
+	/* Grade the level on the win — Feuilles cannot be lost, only be slow. */
+	useEffect(() => {
+		if (!lv.playing || !won) return;
+		lv.finish({ won: true, score: Math.max(1, Math.round(winMsRef.current / 10)) });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [lv.playing, won]);
 
 	/* The wind never stops: one beat every TICK ms, whatever the finger is doing. */
 	useEffect(() => {
 		const t = window.setInterval(() => {
 			const b = boardRef.current;
 			const f = flowRef.current;
-			if (!b || !f || wonRef.current) return;
+			if (!b || !f || lockedRef.current) return;
 			setNow(Date.now());
-			const band = FEUILLES_BANDS[diffRef.current] ?? FEUILLES_BANDS[0];
+			const p = paramsRef.current;
 			const r = tickLeaves(b, f.dirs, leavesRef.current);
 			let next = r.leaves;
 			if (r.collected.length) {
@@ -126,8 +267,8 @@ export default function FeuillesGame() {
 				window.setTimeout(() => setSwirls((prev) => prev.filter((x) => !ids.has(x.id))), 700);
 				const total = collectedRef.current + r.collected.length;
 				setCollected(total);
-				if (total >= band.target) {
-					winMsRef.current = Date.now() - startRef.current;
+				if (total >= p.target) {
+					winMsRef.current = Math.max(1, Date.now() - startRef.current);
 					setLeaves(next);
 					setWon(true);
 					trackGame(GAME_ID, 'game_won');
@@ -135,7 +276,7 @@ export default function FeuillesGame() {
 				}
 			}
 			// And the rain keeps falling.
-			if (++beatRef.current % band.spawnEvery === 0) {
+			if (++beatRef.current % p.spawnEvery === 0) {
 				const drop = spawnLeaves(rngRef.current, b, 1, leafIdRef.current);
 				leafIdRef.current = drop.nextId;
 				next = [...next, ...drop.leaves];
@@ -159,7 +300,7 @@ export default function FeuillesGame() {
 	   stroke's last cell stays arrowless — the mouth of the stream, where leaves pool. */
 	const swipe = usePointerDrag(
 		(x, y) => {
-			if (wonRef.current || !flowRef.current) return;
+			if (lockedRef.current || !flowRef.current) return;
 			const s = startStroke(flowRef.current);
 			setFlow(s.flow);
 			strokeRef.current = s.id;
@@ -168,7 +309,7 @@ export default function FeuillesGame() {
 		(x, y) => {
 			const b = boardRef.current;
 			let f = flowRef.current;
-			if (!b || !f || wonRef.current) return;
+			if (!b || !f || lockedRef.current) return;
 			const c = cellAt(x, y);
 			if (c < 0 || c === lastCellRef.current) return;
 			let last = lastCellRef.current;
@@ -202,8 +343,10 @@ export default function FeuillesGame() {
 	/* ---------- Render ---------- */
 
 	const n = board?.n ?? 0;
-	const band = FEUILLES_BANDS[diff] ?? FEUILLES_BANDS[0];
-	const elapsed = won ? winMsRef.current : Math.max(0, now - startRef.current);
+	const shownCollected = daily && alreadyPlayed ? params.target : collected;
+	const elapsed = daily && alreadyPlayed
+		? finalRef.current * 10
+		: won ? winMsRef.current : started ? Math.max(0, now - startRef.current) : 0;
 
 	const at = (idx: number): { left: string; top: string } => ({
 		left: `${((idx % n) * 100) / n}%`,
@@ -220,72 +363,159 @@ export default function FeuillesGame() {
 		<div className="fl-root" style={{ ['--n' as string]: n }}>
 			<style>{CSS}</style>
 
-			<div className="fl-pills" role="tablist" aria-label="Difficulté">
-				{TIERS.map((t, i) => (
+			<ModeToggle
+				daily={daily}
+				onFree={() => { if (lv.active) { lv.exit(); newGame(diff); } else if (daily) newGame(diff); }}
+				onDaily={() => { void startDaily(); }}
+				showLevels
+				levelsActive={lv.active}
+				onLevels={armLevels}
+			/>
+
+			{lv.active ? (
+				<div className="fl-tag">
+					{lv.menu ? 'Progression — réussis un niveau pour débloquer le suivant' : `Niveau ${lv.level} · ${params.target} feuilles`}
+				</div>
+			) : daily ? (
+				<div className="fl-tag">
+					{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${TIERS[dailyRef.current?.diffIndex ?? 0]}`}
+				</div>
+			) : (
+				<div className="fl-pills" role="tablist" aria-label="Difficulté">
+					{TIERS.map((t, i) => (
+						<button
+							key={t}
+							role="tab"
+							aria-selected={diff === i}
+							className={`fl-pill ${diff === i ? 'active' : ''}`}
+							onClick={() => newGame(i)}
+						>
+							{t}
+						</button>
+					))}
+				</div>
+			)}
+
+			{!(lv.active && lv.menu) && (
+				<div className="fl-bar">
+					<span className="fl-chip">🍂 {shownCollected}/{params.target}</span>
+					<span className="fl-chip">⏱ {fmt(elapsed)}</span>
+					<span className="fl-chip">💨 {breath}</span>
 					<button
-						key={t}
-						role="tab"
-						aria-selected={diff === i}
-						className={`fl-pill ${diff === i ? 'active' : ''}`}
-						onClick={() => newGame(i)}
+						className="fl-btn"
+						onClick={restart}
+						disabled={!started || dailyLoading || (won && (daily || lv.active)) || (daily && alreadyPlayed)}
+						aria-label="Recommencer ce pré"
 					>
-						{t}
+						↻
 					</button>
-				))}
-			</div>
-
-			<div className="fl-bar">
-				<span className="fl-chip">🍂 {collected}/{band.target}</span>
-				<span className="fl-chip">⏱ {fmt(elapsed)}</span>
-				<span className="fl-chip">💨 {breath}</span>
-				<button className="fl-btn" onClick={restart} aria-label="Recommencer ce pré">↻</button>
-				<button className="fl-act" onClick={() => newGame(diff)}>Nouveau pré</button>
-			</div>
-
-			<div className="fl-boardwrap edge-safe">
-				{celebrating && <Celebration />}
-				<div
-					className="fl-board"
-					ref={boardElRef}
-					onPointerDown={swipe.onPointerDown}
-					role="application"
-					aria-label="Pré d'automne — dessine des courants d'air"
-				>
-					{flow?.dirs.map((d, i) => (d != null ? <div key={`c${i}`} className={`fl-cur d${d}`} style={at(i)} /> : null))}
-					{fades.map((f) => (
-						<div key={f.id} className="fl-fade" style={at(f.idx)} />
-					))}
-					{rocks.map((i) => (
-						<div key={`r${i}`} className="fl-cell fl-rock" style={tr(i)}><span>{OBST[(i * 7 + 1) % 3 === 0 ? 1 : 0]}</span></div>
-					))}
-					{board && (
-						<div className="fl-cell fl-vortex" style={tr(board.vortex)}><span>🌀</span></div>
-					)}
-					{leaves.map((l) => (
-						<div key={l.id} className="fl-cell fl-leaf" style={{ ...tr(l.cell), transitionDuration: `${TICK}ms` }}>
-							<span style={jitter(l.id)}><span className="fl-drop">{LEAF[l.id % LEAF.length]}</span></span>
-						</div>
-					))}
-					{board && swirls.map((s) => (
-						<div key={s.id} className="fl-cell fl-in" style={tr(board.vortex)}><span>{s.glyph}</span></div>
-					))}
-
-					{showWin && (
-						<div className="fl-overlay" role="dialog" aria-label="Objectif atteint">
-							<div className="fl-card">
-								<div className="fl-mark">🌀</div>
-								<h2>{band.target} feuilles !</h2>
-								<p className="fl-big">⏱ {fmt(winMsRef.current)}</p>
-								<p className="fl-sub">💨 {breath} souffle</p>
-								<div className="fl-row">
-									<button className="fl-start" onClick={restart}>Rejouer</button>
-									<button className="fl-start ghost" onClick={() => newGame(diff)}>Nouveau pré</button>
-								</div>
-							</div>
-						</div>
+					{!daily && !lv.active && (
+						<button className="fl-act" onClick={() => newGame(diff)}>Nouveau pré</button>
 					)}
 				</div>
-			</div>
+			)}
+
+			{lv.active && lv.menu ? (
+				<LevelSelect progress={lv.progress} onPick={startLevel} />
+			) : (
+				<div className="fl-boardwrap edge-safe">
+					{celebrating && !lv.active && <Celebration />}
+					<div
+						className={`fl-board ${gated ? 'blurred' : ''}`}
+						ref={boardElRef}
+						onPointerDown={swipe.onPointerDown}
+						role="application"
+						aria-label="Pré d'automne — dessine des courants d'air"
+					>
+						{flow?.dirs.map((d, i) => (d != null ? <div key={`c${i}`} className={`fl-cur d${d}`} style={at(i)} /> : null))}
+						{fades.map((f) => (
+							<div key={f.id} className="fl-fade" style={at(f.idx)} />
+						))}
+						{rocks.map((i) => (
+							<div key={`r${i}`} className="fl-cell fl-rock" style={tr(i)}><span>{OBST[(i * 7 + 1) % 3 === 0 ? 1 : 0]}</span></div>
+						))}
+						{board && (
+							<div className="fl-cell fl-vortex" style={tr(board.vortex)}><span>🌀</span></div>
+						)}
+						{leaves.map((l) => (
+							<div key={l.id} className="fl-cell fl-leaf" style={{ ...tr(l.cell), transitionDuration: `${TICK}ms` }}>
+								<span style={jitter(l.id)}><span className="fl-drop">{LEAF[l.id % LEAF.length]}</span></span>
+							</div>
+						))}
+						{board && swirls.map((s) => (
+							<div key={s.id} className="fl-cell fl-in" style={tr(board.vortex)}><span>{s.glyph}</span></div>
+						))}
+
+						{daily && dailyLoading && (
+							<div className="fl-overlay"><div className="fl-card"><p className="fl-sub">Préparation…</p></div></div>
+						)}
+
+						{gated && (
+							<div className="fl-overlay">
+								<button className="fl-start big" onClick={startTimer}>▶ Commencer</button>
+							</div>
+						)}
+
+						{daily && alreadyPlayed && (
+							<div className="fl-overlay" role="dialog" aria-label="Défi déjà relevé">
+								<div className="fl-card">
+									<div className="fl-mark">🌀</div>
+									<h2>Défi déjà relevé</h2>
+									<p className="fl-big">⏱ {fmt(finalRef.current * 10)}</p>
+									<p className="fl-sub">Reviens demain pour une nouvelle tempête&nbsp;!</p>
+								</div>
+							</div>
+						)}
+
+						{showWin && !daily && !lv.active && (
+							<div className="fl-overlay" role="dialog" aria-label="Objectif atteint">
+								<div className="fl-card">
+									<div className="fl-mark">🌀</div>
+									<h2>{params.target} feuilles !</h2>
+									<p className="fl-big">⏱ {fmt(winMsRef.current)}</p>
+									<p className="fl-sub">💨 {breath} souffle</p>
+									<div className="fl-row">
+										<button className="fl-start" onClick={restart}>Rejouer</button>
+										<button className="fl-start ghost" onClick={() => newGame(diff)}>Nouveau pré</button>
+									</div>
+								</div>
+							</div>
+						)}
+					</div>
+
+					{lv.done && (
+						<LevelOutcome
+							level={lv.level}
+							lastLevel={feuillesLevels.count}
+							won={lv.won}
+							stars={lv.stars}
+							detail={`⏱ ${fmt(winMsRef.current)} · 💨 ${breath} souffle`}
+							onNext={() => startLevel(lv.level + 1)}
+							onReplay={() => startLevel(lv.level)}
+							onMenu={lv.backToMenu}
+						/>
+					)}
+				</div>
+			)}
+
+			{daily && won && !alreadyPlayed && (
+				<div className="fl-done">
+					🎉 {params.target} feuilles avalées en <strong>{fmt(finalRef.current * 10)}</strong>
+				</div>
+			)}
+
+			{daily && !dailyLoading && (
+				<Leaderboard
+					game={GAME_ID}
+					metric="time"
+					submitValue={won || alreadyPlayed ? finalRef.current : undefined}
+					format={(v) => formatScore(DAILY_LB.feuilles.fmt, v)}
+				/>
+			)}
+
+			{!daily && !lv.active && (
+				<LeaderboardCorner game={GAME_ID} metric="time" format={(v) => formatScore(DAILY_LB.feuilles.fmt, v)} />
+			)}
 
 			<p className="fl-help">
 				Les feuilles tombent sans arrêt sur le pré. Dessine des courants d'air avec le doigt&nbsp;:
@@ -314,6 +544,7 @@ const CSS = `
   align-items: center;
 }
 
+.fl-tag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin-bottom: 0.75rem; }
 .fl-pills { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 0.75rem; }
 .fl-pill {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-300);
@@ -330,6 +561,7 @@ const CSS = `
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-0);
   width: 36px; height: 36px; border-radius: 50%; font-size: 16px; cursor: pointer; line-height: 1;
 }
+.fl-btn:disabled { opacity: 0.35; cursor: default; }
 .fl-act {
   border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-0);
   font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 7px 14px; cursor: pointer;
@@ -350,6 +582,7 @@ const CSS = `
   touch-action: none;
   user-select: none;
 }
+.fl-board.blurred > :not(.fl-overlay) { filter: blur(7px); }
 
 .fl-cell {
   position: absolute; top: 0; left: 0;
@@ -459,6 +692,12 @@ const CSS = `
   font: inherit; font-weight: 700; font-size: 14px; border-radius: 999px; padding: 9px 18px; cursor: pointer;
 }
 .fl-start.ghost { background: transparent; color: var(--gray-0); border: 1.5px solid var(--gray-700); }
+.fl-start.big { font-size: 16px; padding: 13px 26px; box-shadow: var(--shadow-md, 0 10px 30px rgba(0, 0, 0, 0.25)); }
+
+.fl-done {
+  margin-top: 0.9rem; text-align: center;
+  color: var(--gray-100); font-size: 14px;
+}
 
 .fl-help {
   max-width: 440px; margin: 1rem auto 0; text-align: center;

@@ -94,4 +94,8 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	// packed count is the crystals MISSED — which keeps ascending-is-better and needs no `base`.
 	// Old plain-centis rows decode as "0 raté", i.e. a full clear, which is what they were.
 	tectonique: { lbId: 'tectonique-t', fmt: packed('ratés') },
+	// Souffle: fewest gusts to clear the meadow, chrono tiebreak, logged under `<id>-t`.
+	souffle: { lbId: 'souffle-t', fmt: packed('souffles') },
+	// Feuilles: chrono to reach the day's leaf target.
+	feuilles: { fmt: centis },
 };

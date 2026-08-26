@@ -37,7 +37,7 @@ export interface GenParams {
 	n: number;
 	rocks: number;
 	target: number; // leaves to collect — the win condition
-	seed: number; // leaves already on the ground at the start
+	startLeaves: number; // leaves already on the ground at the start
 	spawnEvery: number; // beats between two falling leaves
 }
 
@@ -55,9 +55,9 @@ export interface TickResult {
 
 /** Free play difficulty bands — small meadows, generous rain. */
 export const FEUILLES_BANDS: GenParams[] = [
-	{ n: 6, rocks: 5, target: 30, seed: 10, spawnEvery: 2 },
-	{ n: 7, rocks: 8, target: 45, seed: 14, spawnEvery: 2 },
-	{ n: 8, rocks: 12, target: 60, seed: 18, spawnEvery: 1 },
+	{ n: 6, rocks: 5, target: 30, startLeaves: 10, spawnEvery: 2 },
+	{ n: 7, rocks: 8, target: 45, startLeaves: 14, spawnEvery: 2 },
+	{ n: 8, rocks: 12, target: 60, startLeaves: 18, spawnEvery: 1 },
 ];
 
 export const emptyFlow = (n: number): FlowState => ({

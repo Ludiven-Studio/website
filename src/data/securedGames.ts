@@ -53,6 +53,7 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	symboles: 'time',
 	reines: 'time',
 	drift: 'time',
+	feuilles: 'time',
 	// Packed count+time (logged under `<id>-t`) — value is ascending-is-better already.
 	'golf-t': 'time',
 	'tectonique-t': 'time',
@@ -61,6 +62,7 @@ export const SECURED_GAMES: Record<string, Metric> = {
 	'bulles-t': 'time',
 	'flechettes-t': 'time',
 	'reussite-t': 'time',
+	'souffle-t': 'time',
 	// Threshold win/loss bands — wins sort below the loss offset, so ascending works.
 	demineur: 'time',
 	codecolor: 'time',
