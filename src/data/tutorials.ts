@@ -220,7 +220,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🪶', title: 'Le but', body: 'Une plume s\'est posée dans le pré. Envoie-la cueillir toutes les fleurs en le moins de souffles possible — elle frôle et ramasse tout ce qu\'elle croise, case d\'arrivée comprise.' },
 		{ emoji: '💨', title: 'Souffler', body: 'Glisse le doigt sur le pré (ou flèches / ZQSD) : un souffle envoie la plume en ligne droite, et elle file jusqu\'au premier rocher ou jusqu\'à la haie qui borde le pré — impossible de s\'arrêter en route. Les plumes fantômes montrent où chaque souffle la poserait : touche l\'une d\'elles pour souffler dans cette direction.' },
 		{ emoji: '↩️', title: 'Se tromper', body: 'Un souffle raté n\'est jamais grave : ↩ revient en arrière autant que tu veux, et ↻ repose la plume au départ du même pré. Le par affiché, c\'est le chemin du vent lui-même — le pré se cueille toujours en autant de souffles.' },
-		{ emoji: '🍂', title: 'Mode Feuilles', body: 'L\'autre vent du jeu : dessine des courants d\'air avec le doigt — chaque case traversée reçoit une flèche qui reste. Les feuilles suivent le courant de leur case, battement après battement, jusqu\'au tourbillon 🌀 qui les avale. Repasser sur un courant le coupe à cet endroit : l\'aval s\'évapore, l\'amont se déverse dans ton nouveau tracé — les ruisseaux se rejoignent en rivières. Ramasse toutes les feuilles en dessinant le moins de cases possible : le souffle dépensé, c\'est ton score.' },
+	],
+	feuilles: [
+		{ emoji: '🍂', title: 'Le but', body: 'L\'automne fait pleuvoir les feuilles un peu partout sur le pré, sans arrêt. Porte-les jusqu\'au tourbillon 🌀 qui les avale, et atteins l\'objectif le plus vite possible — le chrono, c\'est le score.' },
+		{ emoji: '💨', title: 'Dessiner le vent', body: 'Dessine des courants d\'air avec le doigt : chaque case traversée reçoit une flèche qui reste. À chaque battement, chaque feuille suit la flèche de sa case. Une feuille sans courant se pose et attend ; les arbres et rochers bloquent le vent.' },
+		{ emoji: '✂️', title: 'Couper et rejoindre', body: 'Tracer par-dessus un courant le coupe à cet endroit : son aval s\'évapore, son amont se déverse dans ton nouveau tracé. Fais converger les ruisseaux en rivières de vent — un seul grand fleuve vers le tourbillon ramasse tout le pré.' },
 	],
 	codecolor: [
 		{ emoji: '🎨', title: 'Le but', body: 'Un code de couleurs est caché. Devine-le en un minimum d\'essais. Le code n\'a que des couleurs différentes (pas de doublon).' },

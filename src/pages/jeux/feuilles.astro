@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import FeuillesGame from '../../games/feuilles/FeuillesGame.tsx';
+---
+
+<GamePage
+	title="Feuilles | Jeux Ludiven Studio"
+	description="Feuilles : l'automne fait pleuvoir les feuilles sur le pré. Dessine des courants d'air persistants avec le doigt, coupe-les et fais-les converger pour porter les feuilles jusqu'au tourbillon qui les avale. Atteins l'objectif le plus vite possible — le chrono, c'est le score. Un jeu de vent signé Ludiven Studio."
+	heading="Feuilles"
+	tagline="Dessine les courants d'air, porte les feuilles au tourbillon"
+	gameId="feuilles"
+>
+	<FeuillesGame client:only="react" />
+</GamePage>
