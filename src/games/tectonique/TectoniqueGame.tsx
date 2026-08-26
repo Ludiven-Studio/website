@@ -838,7 +838,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 						ref={elRef}
 						onPointerDown={swipe.onPointerDown}
 						role="application"
-						aria-label="Grille de Tapis"
+						aria-label="Grille de Tapis roulants"
 					>
 						{/* One physical band per lane. Draw order does the crossing: plain rows, grid
 						    ticks, plain columns, then the hen's two belts ride over everything. */}

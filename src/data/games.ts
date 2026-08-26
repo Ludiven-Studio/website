@@ -285,7 +285,7 @@ export const games: GameTile[] = [
 	},
 	{
 		id: 'tectonique',
-		title: 'Tapis',
+		title: 'Tapis roulants',
 		pitch: 'Attrape la ligne ou la colonne où se trouve la cocotte et lance le tapis roulant : il garde son élan quand tu lâches, à toi de le couper au bon moment. La cocotte et les bacs se tassent contre le mur ou contre les piliers scellés au sol, et les trous se referment pour de bon — si tu t\'enfermes, la partie s\'arrête. Promène la cocotte sur les cristaux. 100 niveaux et un défi du jour.',
 		icon: 'tectonique',
 		href: '/jeux/tapis',
@@ -298,6 +298,7 @@ export const games: GameTile[] = [
 		icon: 'souffle',
 		href: '/jeux/souffle',
 		status: 'play',
+		category: 'grilles',
 	},
 	{
 		id: 'feuilles',
