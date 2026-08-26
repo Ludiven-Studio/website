@@ -57,10 +57,16 @@ gallery:
 
 <h2>Disponibilité</h2>
 <p>
-  L'application est disponible sur le
-  <a href="https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=fr" target="_blank">Google Play Store</a>.
-  La version iOS est en cours de validation chez Apple&nbsp;: <strong>bientôt sur l'App Store</strong>.
+  L'application est disponible sur <strong>Android</strong> et <strong>iOS</strong>&nbsp;:
 </p>
+<div class="store-badges">
+  <a href="https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=fr" target="_blank" rel="noopener">
+    <img class="badge-play" src="/assets/badges/google-play-fr.png" alt="Disponible sur Google Play">
+  </a>
+  <a href="https://apps.apple.com/fr/app/petanque-scanner/id6670211733" target="_blank" rel="noopener">
+    <img class="badge-appstore" src="/assets/badges/app-store-fr.svg" alt="Télécharger dans l'App Store">
+  </a>
+</div>
 <p>
   À consulter également&nbsp;: la <a href="/petanque-ar/confidentialite">politique de confidentialité</a>
   et les <a href="/petanque-ar/cgu">conditions d'utilisation</a> de l'application.

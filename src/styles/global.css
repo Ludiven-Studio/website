@@ -234,6 +234,33 @@ table, th, td {
 	user-select: text;
 }
 
+/* Store badges (Google Play / App Store). The Play PNG ships with built-in padding
+   (~250px tall for a ~166px badge), so it gets a larger box plus negative margins
+   to visually match the padding-free App Store SVG. */
+.store-badges {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 1.5rem;
+	margin-top: 1.5rem;
+}
+.store-badges img {
+	border: 0 !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	background: none !important;
+}
+.store-badges .badge-appstore {
+	height: 3.5rem;
+	width: auto;
+}
+.store-badges .badge-play {
+	height: 5.25rem;
+	width: auto;
+	margin: -0.875rem;
+}
+
 /* Running chronos. Reserve the width of the longest label ("12:05") so the ticking
    value never resizes its chip and nudges the buttons next to it. */
 .chrono {
