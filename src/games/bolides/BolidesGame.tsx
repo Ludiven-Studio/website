@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createGame, resetGame, stepGame, pct, NAMES, PALETTE, DIFFS, type GameState } from './engine';
 import { createRenderer, type Renderer } from './render3d';
-import { useHoldButton } from '../useHoldButton';
+import { usePointerDrag } from '../usePointerDrag';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, saveDailyRun, loadDailyRun, dailyWeekdayLabel } from '../../lib/leaderboard';
 import { formatScore } from '../../lib/scoreFormat';
@@ -38,9 +38,13 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [result, setResult] = useState({ pct: 0, best: 0, rank: 0, diff: 1 });
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const boardRef = useRef<HTMLDivElement>(null);
+	const joyBaseRef = useRef<HTMLDivElement>(null);
+	const joyKnobRef = useRef<HTMLDivElement>(null);
 	const stateRef = useRef<GameState>(createGame());
 	const rendererRef = useRef<Renderer | null>(null);
-	const keysRef = useRef({ left: false, right: false });
+	const keysRef = useRef({ left: false, right: false, up: false, down: false });
+	const dragRef = useRef({ active: false, steer: 0, throttle: 0, ox: 0, oy: 0 });
 	const rafRef = useRef(0);
 	const lastRef = useRef(0);
 	const accRef = useRef(0);
@@ -106,10 +110,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		const dt = Math.min(now - lastRef.current, 200);
 		lastRef.current = now;
 		accRef.current += dt;
-		const steer = (keysRef.current.right ? 1 : 0) - (keysRef.current.left ? 1 : 0);
+		const k = keysRef.current, d = dragRef.current;
+		const steer = d.active ? d.steer : (k.right ? 1 : 0) - (k.left ? 1 : 0);
+		const throttle = d.active ? d.throttle : (k.up ? 1 : 0) - (k.down ? 1 : 0);
 		while (runningRef.current && accRef.current >= STEP) {
 			accRef.current -= STEP;
-			stepGame(s, steer, STEP / 1000);
+			stepGame(s, steer, throttle, STEP / 1000);
 		}
 		const alpha = Math.min(1, accRef.current / STEP);
 		if (r) r.frame(s, alpha, dt / 1000);
@@ -195,13 +201,15 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	/* Keyboard steering. */
+	/* Keyboard: steer (left/right) + throttle/brake (up/down). */
 	useEffect(() => {
 		const NAV = new Set([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
-		const set = (k: string, down: boolean): boolean => {
+		const set = (key: string, down: boolean): boolean => {
 			const r = keysRef.current;
-			if (k === 'ArrowLeft' || k === 'a' || k === 'q') return ((r.left = down), true);
-			if (k === 'ArrowRight' || k === 'd') return ((r.right = down), true);
+			if (key === 'ArrowLeft' || key === 'a' || key === 'q') return ((r.left = down), true);
+			if (key === 'ArrowRight' || key === 'd') return ((r.right = down), true);
+			if (key === 'ArrowUp' || key === 'w' || key === 'z') return ((r.up = down), true);
+			if (key === 'ArrowDown' || key === 's') return ((r.down = down), true);
 			return false;
 		};
 		const onDown = (e: KeyboardEvent) => {
@@ -214,8 +222,44 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
 	}, []);
 
-	const holdLeft = useHoldButton(() => { keysRef.current.left = true; }, () => { keysRef.current.left = false; });
-	const holdRight = useHoldButton(() => { keysRef.current.right = true; }, () => { keysRef.current.right = false; });
+	/* Touch/mouse: a relative joystick where the finger lands — up/down = throttle/brake,
+	   left/right = steer. Positioned via refs so dragging never rerenders React. */
+	const JOY_R = 62; // px radius for full deflection
+	const positionJoy = (cx: number, cy: number, dx: number, dy: number) => {
+		const rect = boardRef.current?.getBoundingClientRect();
+		if (!rect) return;
+		const base = joyBaseRef.current, knob = joyKnobRef.current;
+		if (base) { base.style.left = `${cx - rect.left}px`; base.style.top = `${cy - rect.top}px`; }
+		if (knob) {
+			const cl = (v: number) => Math.max(-JOY_R, Math.min(JOY_R, v));
+			knob.style.left = `${cx - rect.left + cl(dx)}px`;
+			knob.style.top = `${cy - rect.top + cl(dy)}px`;
+		}
+	};
+	const drag = usePointerDrag(
+		(cx, cy) => {
+			if (!runningRef.current) return; // only while a run is live
+			const d = dragRef.current;
+			d.active = true; d.ox = cx; d.oy = cy; d.steer = 0; d.throttle = 0;
+			if (joyBaseRef.current) joyBaseRef.current.style.display = 'block';
+			if (joyKnobRef.current) joyKnobRef.current.style.display = 'block';
+			positionJoy(cx, cy, 0, 0);
+		},
+		(cx, cy) => {
+			const d = dragRef.current;
+			if (!d.active) return;
+			const dx = cx - d.ox, dy = cy - d.oy;
+			d.steer = Math.max(-1, Math.min(1, dx / JOY_R));
+			d.throttle = Math.max(-1, Math.min(1, -dy / JOY_R)); // up = accelerate
+			positionJoy(d.ox, d.oy, dx, dy);
+		},
+		() => {
+			const d = dragRef.current;
+			d.active = false; d.steer = 0; d.throttle = 0;
+			if (joyBaseRef.current) joyBaseRef.current.style.display = 'none';
+			if (joyKnobRef.current) joyKnobRef.current.style.display = 'none';
+		},
+	);
 
 	return (
 		<div className="bo-root">
@@ -223,24 +267,22 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 			<ModeToggle daily={mode === 'defi'} onFree={() => switchMode('libre')} onDaily={() => switchMode('defi')} />
 
-			<div className="bo-boardwrap">
-				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Bolides" />
+			<div className="bo-boardwrap" ref={boardRef}>
+				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Bolides" onPointerDown={drag.onPointerDown} />
+
+				{/* Relative drag joystick (shown at the finger while dragging). */}
+				<div ref={joyBaseRef} className="bo-joy-base" />
+				<div ref={joyKnobRef} className="bo-joy-knob" />
 
 				{phase === 'playing' && (
-					<>
-						<ol className="bo-leaderboard">
-							{board.map((r) => (
-								<li key={r.id} className={r.me ? 'me' : ''}>
-									<span className="bo-dot" style={{ background: hex(PALETTE[r.id]) }} />
-									{r.name} · {r.pct.toFixed(1)}%
-								</li>
-							))}
-						</ol>
-						<div className="bo-touch">
-							<button className="bo-tbtn" ref={holdLeft} aria-label="Gauche">◀</button>
-							<button className="bo-tbtn" ref={holdRight} aria-label="Droite">▶</button>
-						</div>
-					</>
+					<ol className="bo-leaderboard">
+						{board.map((r) => (
+							<li key={r.id} className={r.me ? 'me' : ''}>
+								<span className="bo-dot" style={{ background: hex(PALETTE[r.id]) }} />
+								{r.name} · {r.pct.toFixed(1)}%
+							</li>
+						))}
+					</ol>
 				)}
 
 				{webglError && <div className="bo-overlay"><div className="bo-card">3D indisponible (WebGL manquant).</div></div>}
@@ -261,7 +303,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							</p>
 							<button className="bo-play" onClick={play}>▶ Jouer</button>
 							{status && <p className="bo-hint">{status}</p>}
-							<p className="bo-hint">Tourne avec ◀ ▶ / A-D / flèches. L'accélération est automatique.</p>
+							<p className="bo-hint">Glisse le doigt : haut/bas = accélérer/freiner, gauche/droite = tourner. Clavier : flèches ou ZQSD.</p>
 						</div>
 					</div>
 				)}
@@ -301,8 +343,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="bo-help">
-				Tourne à gauche / droite, l'accélération est automatique. Le but&nbsp;: contrôler le plus grand pourcentage
-				de l'arène. Sors, boucle, reviens → capture. Ne laisse personne couper ta trace ; coupe la leur.
+				<strong>Glisse le doigt</strong> sur l'écran : haut/bas pour accélérer ou freiner, gauche/droite pour tourner
+				(au clavier&nbsp;: flèches ou ZQSD). Le but&nbsp;: contrôler le plus grand pourcentage de l'arène. Sors, boucle,
+				reviens → capture. Ne laisse personne couper ta trace ; coupe la leur.
 				{mode === 'defi' && ' Le défi du jour partage la même arène et le même classement pour tout le monde.'}
 			</p>
 		</div>
@@ -329,9 +372,9 @@ const CSS = `
 .bo-leaderboard li { display: flex; align-items: center; gap: 6px; }
 .bo-leaderboard li.me { color: #ffe27a; }
 .bo-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-.bo-touch { position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; }
-.bo-tbtn { pointer-events: auto; width: 96px; height: 96px; border-radius: 24px; border: none; background: rgba(255,255,255,0.22); color: #fff; font-weight: 800; font-size: 34px; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: none; }
-.bo-tbtn:active { background: rgba(255,255,255,0.4); }
+.bo-joy-base, .bo-joy-knob { position: absolute; display: none; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 3; }
+.bo-joy-base { width: 124px; height: 124px; background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.25); }
+.bo-joy-knob { width: 56px; height: 56px; background: rgba(255,255,255,0.35); border: 2px solid rgba(255,255,255,0.55); }
 .bo-actions { display: flex; gap: 10px; justify-content: center; margin-top: 0.7rem; }
 .bo-restart, .bo-quit { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 18px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .bo-restart { background: var(--bo-accent); color: var(--accent-text-over); border-color: transparent; }

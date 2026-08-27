@@ -20,9 +20,12 @@ export const NAMES = ['', 'TOI', 'Rouge', 'Vert', 'Jaune'];
 export const CAR_COUNT = 4; // 1 player + 3 bots
 
 export const CFG = {
-	speed: 19, // constant forward speed (units/s)
-	turnRadius: 5.4, // tighter = more agile; sets the max turn rate with speed
-	steerResp: 9, // how fast the applied turn eases toward the input (inertia)
+	cruise: 17, // speed at neutral throttle (units/s) — cars always roll forward
+	maxSpeed: 28, // full throttle
+	minSpeed: 7, // hard brake (never a full stop, so a trail keeps forming)
+	accelResp: 2.6, // how fast speed eases toward the throttle target (weight/inertia)
+	turnRadius: 5.4, // tighter = more agile; turn rate scales with speed (constant radius)
+	steerResp: 9, // how fast the applied turn eases toward the input (steering inertia)
 	driftFrac: 0.6, // |turnRate| above this fraction of the max = drifting (cosmetic)
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
 	wallMargin: 3, // bots start turning back this far from the arena wall
@@ -40,7 +43,6 @@ export const DIFFS = [
 	{ label: 'Difficile', aggro: 0.55, outMax: 38 },
 ] as const;
 
-const MAX_TURN = CFG.speed / CFG.turnRadius;
 const randSeed = () => (Math.random() * 2 ** 31) >>> 0;
 
 export interface BotState {
@@ -58,6 +60,7 @@ export interface Car {
 	x: number;
 	z: number;
 	heading: number; // radians, 0 = +x
+	speed: number; // current forward speed (eased toward the throttle target)
 	px: number; // pose before the last step (render interpolation)
 	pz: number;
 	ph: number;
@@ -148,6 +151,7 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.z = cellCenterZ(cr * GRID + cc);
 	car.heading = Math.atan2(-car.z, -car.x); // face the arena centre
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
+	car.speed = CFG.cruise;
 	car.turnRate = 0;
 	car.alive = true;
 	car.outside = false;
@@ -191,7 +195,7 @@ export function createGame(seed = randSeed(), diff = 1): GameState {
 			color: PALETTE[id],
 			isBot: i !== 0,
 			alive: true,
-			x: 0, z: 0, heading: 0, px: 0, pz: 0, ph: 0, turnRate: 0,
+			x: 0, z: 0, heading: 0, speed: CFG.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
 			drifting: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
 		};
@@ -222,14 +226,19 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff): void 
 
 /* ---------- physics ---------- */
 
-function stepCar(car: Car, steer: number, dt: number): void {
+/** `steer` and `throttle` are both in [-1, 1]. throttle > 0 accelerates, < 0 brakes. */
+function stepCar(car: Car, steer: number, throttle: number, dt: number): void {
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
-	const target = steer * MAX_TURN;
-	car.turnRate += (target - car.turnRate) * Math.min(1, dt * CFG.steerResp);
+	const targetSpeed = throttle >= 0
+		? CFG.cruise + (CFG.maxSpeed - CFG.cruise) * throttle
+		: CFG.cruise + (CFG.cruise - CFG.minSpeed) * throttle;
+	car.speed += (targetSpeed - car.speed) * Math.min(1, dt * CFG.accelResp);
+	const maxTurn = car.speed / CFG.turnRadius; // constant turn radius → tighter arcs when slow
+	car.turnRate += (steer * maxTurn - car.turnRate) * Math.min(1, dt * CFG.steerResp);
 	car.heading += car.turnRate * dt;
-	car.x += Math.cos(car.heading) * CFG.speed * dt;
-	car.z += Math.sin(car.heading) * CFG.speed * dt;
-	car.drifting = Math.abs(car.turnRate) > MAX_TURN * CFG.driftFrac;
+	car.x += Math.cos(car.heading) * car.speed * dt;
+	car.z += Math.sin(car.heading) * car.speed * dt;
+	car.drifting = Math.abs(car.turnRate) > maxTurn * CFG.driftFrac && car.speed > CFG.minSpeed * 1.4;
 }
 
 /* ---------- death & capture ---------- */
@@ -396,7 +405,7 @@ function botSteer(s: GameState, car: Car, dt: number): number {
 			b.turnDir = s.rng() < 0.5 ? -1 : 1;
 			b.budget = CFG.botOutMin + s.rng() * (diff.outMax - CFG.botOutMin);
 		}
-		b.budget -= CFG.speed * dt;
+		b.budget -= car.speed * dt;
 		if (b.budget <= 0) b.phase = 'return';
 		return b.turnDir * CFG.botArc; // gentle constant arc traces a loop
 	}
@@ -405,8 +414,9 @@ function botSteer(s: GameState, car: Car, dt: number): number {
 
 /* ---------- main step ---------- */
 
-/** Advance the whole simulation by one fixed step. `playerSteer` in [-1, 1]. */
-export function stepGame(s: GameState, playerSteer: number, dt: number): void {
+/** Advance the whole simulation by one fixed step. `playerSteer`/`playerThrottle` in [-1, 1].
+ *  Bots cruise (throttle 0) and only steer. */
+export function stepGame(s: GameState, playerSteer: number, playerThrottle: number, dt: number): void {
 	s.clock += dt;
 	for (const car of s.cars) {
 		if (!car.alive) {
@@ -414,7 +424,7 @@ export function stepGame(s: GameState, playerSteer: number, dt: number): void {
 			continue;
 		}
 		const steer = car.isBot ? botSteer(s, car, dt) : playerSteer;
-		stepCar(car, steer, dt);
+		stepCar(car, steer, car.isBot ? 0 : playerThrottle, dt);
 		updateGrid(s, car);
 	}
 }

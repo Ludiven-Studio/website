@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGame, stepGame, resetGame, pct, TOTAL, type GameState } from './engine';
+import { createGame, stepGame, resetGame, pct, TOTAL, CFG, type GameState } from './engine';
 
 /** Recount ownership straight from the grid — the source of truth for setOwner bookkeeping. */
 function recount(s: GameState): number[] {
@@ -20,7 +20,7 @@ describe('bolides engine', () => {
 	it('keeps counts consistent with the grid through captures and kills', () => {
 		const s = createGame();
 		for (let i = 0; i < 2000; i++) {
-			stepGame(s, i % 120 < 60 ? 1 : -1, 1 / 60);
+			stepGame(s, i % 120 < 60 ? 1 : -1, i % 80 < 40 ? 1 : -1, 1 / 60);
 			if (i % 97 === 0) expect(s.counts).toEqual(recount(s));
 		}
 		expect(s.counts).toEqual(recount(s));
@@ -32,7 +32,7 @@ describe('bolides engine', () => {
 		const home0 = s.counts[1];
 		let peak = home0;
 		for (let i = 0; i < 800; i++) {
-			stepGame(s, 1, 1 / 60); // constant hard turn -> a circle that pokes out and returns
+			stepGame(s, 1, 0, 1 / 60); // constant hard turn -> a circle that pokes out and returns
 			peak = Math.max(peak, s.counts[1]);
 		}
 		expect(peak).toBeGreaterThan(home0); // an enclosed loop was claimed
@@ -43,9 +43,21 @@ describe('bolides engine', () => {
 	it('resets cleanly in place', () => {
 		const s = createGame();
 		const fresh = recount(createGame());
-		for (let i = 0; i < 500; i++) stepGame(s, 1, 1 / 60);
+		for (let i = 0; i < 500; i++) stepGame(s, 1, 0, 1 / 60);
 		resetGame(s);
 		expect(recount(s)).toEqual(fresh);
 		expect(s.clock).toBe(0);
+	});
+
+	it('throttle accelerates and brake slows the player', () => {
+		const up = createGame();
+		for (let i = 0; i < 60; i++) stepGame(up, 0, 1, 1 / 60); // full throttle
+		expect(up.cars[0].speed).toBeGreaterThan(CFG.cruise + 1);
+		expect(up.cars[0].speed).toBeLessThanOrEqual(CFG.maxSpeed + 1e-6);
+
+		const down = createGame();
+		for (let i = 0; i < 60; i++) stepGame(down, 0, -1, 1 / 60); // full brake
+		expect(down.cars[0].speed).toBeLessThan(CFG.cruise - 1);
+		expect(down.cars[0].speed).toBeGreaterThanOrEqual(CFG.minSpeed - 1e-6);
 	});
 });

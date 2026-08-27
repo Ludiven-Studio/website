@@ -7,13 +7,15 @@
    ===================================================== */
 import * as THREE from 'three';
 import {
-	ARENA, GRID, HALF, PALETTE, TOTAL,
+	ARENA, GRID, HALF, PALETTE, TOTAL, angleDiff,
 	type GameState, type Car,
 } from './engine';
 
-const HEIGHT = 60; // camera altitude
-const BACK = 40; // camera pull-back (sets the tilt)
-const LOOKAHEAD = 14; // frame shifts ahead of the player's heading
+// Rocket-League-style chase cam: low, behind the car, looking where it's going.
+const CAM_DIST = 17; // how far behind the car
+const CAM_HEIGHT = 9.5; // how high above
+const CAM_LOOK = 9; // look-at point ahead of the car
+const CAM_LOOK_Y = 1.5; // aim slightly above the ground
 const MAX_PARTICLES = 400;
 
 const rgb = (hex: number) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255] as const;
@@ -79,7 +81,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 	const scene = new THREE.Scene();
 	scene.background = new THREE.Color('#0b0e14');
 	scene.fog = new THREE.Fog('#0b0e14', 120, 240);
-	const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 500);
+	const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 500);
 
 	scene.add(new THREE.AmbientLight(0xaab2c6, 1.15));
 	const dir = new THREE.DirectionalLight(0xffffff, 1.35);
@@ -192,7 +194,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		trailTex.needsUpdate = true;
 	};
 
-	const camTarget = { x: state.cars[0].x, z: state.cars[0].z };
+	let camHeading = state.cars[0].heading; // eased so quick turns don't whip the camera
 	const shake = { t: 0, mag: 0 };
 
 	const resize = () => {
@@ -266,21 +268,19 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		pGeo.attributes.position.needsUpdate = true;
 		pGeo.attributes.color.needsUpdate = true;
 
-		// Camera: north-up, tilted, eased toward a point ahead of the player.
-		const tx = pp.x + Math.cos(pp.heading) * LOOKAHEAD;
-		const tz = pp.z + Math.sin(pp.heading) * LOOKAHEAD;
-		const k = Math.min(1, dtSec * 3.5);
-		camTarget.x += (tx - camTarget.x) * k;
-		camTarget.z += (tz - camTarget.z) * k;
-		let sx = 0, sz = 0;
+		// Chase cam: ease the follow heading toward the car, then sit behind + above it.
+		camHeading += angleDiff(pp.heading, camHeading) * Math.min(1, dtSec * 4);
+		const cdx = Math.cos(camHeading), cdz = Math.sin(camHeading);
+		let sx = 0, sy = 0, sz = 0;
 		if (shake.t > 0) {
 			shake.t -= dtSec;
 			const m = shake.mag * Math.max(0, shake.t / 0.35);
 			sx = (Math.random() * 2 - 1) * m;
+			sy = (Math.random() * 2 - 1) * m * 0.5;
 			sz = (Math.random() * 2 - 1) * m;
 		}
-		camera.position.set(camTarget.x + sx, HEIGHT, camTarget.z + BACK + sz);
-		camera.lookAt(camTarget.x, 0, camTarget.z);
+		camera.position.set(pp.x - cdx * CAM_DIST + sx, CAM_HEIGHT + sy, pp.z - cdz * CAM_DIST + sz);
+		camera.lookAt(pp.x + cdx * CAM_LOOK, CAM_LOOK_Y, pp.z + cdz * CAM_LOOK);
 		renderer.render(scene, camera);
 	};
 
@@ -291,8 +291,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		decalTex.needsUpdate = true;
 		particles.length = 0;
 		shake.t = 0;
-		camTarget.x = state.cars[0].x;
-		camTarget.z = state.cars[0].z;
+		camHeading = state.cars[0].heading;
 		paintTerritory();
 	};
 
