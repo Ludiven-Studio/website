@@ -21,11 +21,15 @@ const MAX_PARTICLES = 400;
 const rgb = (hex: number) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255] as const;
 const mix = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
 
+// Neutral tarmac must read as a lit surface (not a black void) so colours pop against it
+// and the chase cam has a sense of speed — grid lines every 20 cells help both.
+const NEUTRAL: [number, number, number] = [64, 72, 88];
+const GRID_LINE: [number, number, number] = [84, 94, 112];
 // Pastel territory fill (light tint of the car colour) vs the vivid trail colour.
 const TERRITORY_LUT: [number, number, number][] = PALETTE.map((hex, i) => {
 	const [r, g, b] = rgb(hex);
-	if (i === 0) return [22, 26, 34]; // neutral ground
-	return [mix(r, 255, 0.5), mix(g, 255, 0.5), mix(b, 255, 0.5)];
+	if (i === 0) return NEUTRAL;
+	return [mix(r, 255, 0.42), mix(g, 255, 0.42), mix(b, 255, 0.42)];
 });
 
 /** A flat quad in the XZ plane, UVs aligned so world (x,z) -> canvas (col,row). */
@@ -80,7 +84,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 
 	const scene = new THREE.Scene();
 	scene.background = new THREE.Color('#0b0e14');
-	scene.fog = new THREE.Fog('#0b0e14', 120, 240);
+	scene.fog = new THREE.Fog('#0b0e14', 160, 320);
 	const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 500);
 
 	scene.add(new THREE.AmbientLight(0xaab2c6, 1.15));
@@ -103,7 +107,14 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		const d = terrImg.data;
 		const owner = state.owner;
 		for (let i = 0; i < TOTAL; i++) {
-			const [r, g, b] = TERRITORY_LUT[owner[i]];
+			const id = owner[i];
+			let r: number, g: number, b: number;
+			if (id === 0) {
+				const col = i % GRID, row = (i / GRID) | 0;
+				[r, g, b] = (col % 20 === 0 || row % 20 === 0) ? GRID_LINE : NEUTRAL;
+			} else {
+				[r, g, b] = TERRITORY_LUT[id];
+			}
 			const o = i * 4;
 			d[o] = r; d[o + 1] = g; d[o + 2] = b; d[o + 3] = 255;
 		}
@@ -114,6 +125,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 	const mkTex = (c: HTMLCanvasElement, linear: boolean) => {
 		const t = new THREE.CanvasTexture(c);
 		t.flipY = false;
+		t.colorSpace = THREE.SRGBColorSpace; // authored RGB reads correctly under lighting
 		t.magFilter = linear ? THREE.LinearFilter : THREE.NearestFilter;
 		t.minFilter = linear ? THREE.LinearFilter : THREE.NearestFilter;
 		t.generateMipmaps = false;
