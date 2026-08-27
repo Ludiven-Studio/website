@@ -10,6 +10,7 @@
 export type ScoreFormat =
 	| { kind: 'plain'; fmt: 'score' | 'time' | 'num' | 'name' } // raw value ("N pts", seconds, "N", hidden)
 	| { kind: 'count'; one: string; many: string } // "N essai" / "N essais"
+	| { kind: 'percentage'; div?: number; decimals?: number } // (v/div) rendered as "12,3 %"
 	| { kind: 'duration'; div: number } // seconds = v/div
 	| { kind: 'packed'; radix: number; fields: PackedField[]; sep?: string } // several fields in one int
 	| { kind: 'threshold'; at: number; below: ScoreFormat; aboveLabel: string; aboveShowsDelta?: boolean };
@@ -86,6 +87,10 @@ export function formatScore(f: ScoreFormat, v: number): string {
 			}
 		case 'count':
 			return `${v} ${v > 1 ? f.many : f.one}`;
+		case 'percentage': {
+			const dec = f.decimals ?? 0;
+			return `${(v / (f.div ?? 1)).toFixed(dec).replace('.', ',')} %`;
+		}
 		case 'duration':
 			return fmtExact(v, f.div);
 		case 'packed': {

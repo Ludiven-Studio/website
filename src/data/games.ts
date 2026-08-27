@@ -345,6 +345,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'bolides',
+		title: 'Bolides',
+		pitch: 'Un « paper.io » au volant : sors de ta zone, trace une boucle et reviens la refermer pour capturer le terrain. Coupe la trace des rivaux pour les éliminer — et garde la tienne à l\'abri. Prototype.',
+		icon: 'car',
+		href: '/jeux/bolides',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'golf',
 		title: 'Mini-Golf',
 		pitch: 'Vise à la fronde, fais rebondir la balle sur les murs et rentre en un minimum de coups. En 3D, avec des fantômes multijoueur au défi du jour.',

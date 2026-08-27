@@ -98,4 +98,6 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	souffle: { lbId: 'souffle-t', fmt: packed('souffles') },
 	// Feuilles: chrono to reach the day's leaf target.
 	feuilles: { fmt: centis },
+	// Bolides: best % of the arena controlled, stored as tenths of a percent (0..1000).
+	bolides: { fmt: { kind: 'percentage', div: 10, decimals: 1 } },
 };
