@@ -19,7 +19,9 @@ const CAM_LOOK_Y = 1.5; // aim slightly above the ground
 const MAX_PARTICLES = 400;
 
 const rgb = (hex: number) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255] as const;
+const cssHex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const mix = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
+const TAU = Math.PI * 2;
 
 // Neutral tarmac must read as a lit surface (not a black void) so colours pop against it
 // and the chase cam has a sense of speed — grid lines every 20 cells help both.
@@ -69,6 +71,7 @@ interface Particle { x: number; z: number; y: number; vx: number; vy: number; vz
 export interface Renderer {
 	frame(state: GameState, alpha: number, dtSec: number): void;
 	reset(): void; // clear trail + skid overlays and repaint territory (instant Rejouer)
+	setMinimap(canvas: HTMLCanvasElement | null): void; // top-down overview drawn each frame
 	resize(): void;
 	dispose(): void;
 }
@@ -208,6 +211,35 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 
 	let camHeading = state.cars[0].heading; // eased so quick turns don't whip the camera
 	const shake = { t: 0, mag: 0 };
+	let miniCtx: CanvasRenderingContext2D | null = null;
+	const setMinimap = (c: HTMLCanvasElement | null) => { miniCtx = c ? c.getContext('2d') : null; };
+
+	// Top-down overview: territory + trails (scaled from their canvases) + car dots.
+	const drawMinimap = (s: GameState) => {
+		if (!miniCtx) return;
+		const W = miniCtx.canvas.width, H = miniCtx.canvas.height;
+		miniCtx.imageSmoothingEnabled = false;
+		miniCtx.clearRect(0, 0, W, H);
+		miniCtx.drawImage(terr.c, 0, 0, GRID, GRID, 0, 0, W, H);
+		miniCtx.drawImage(trailC.c, 0, 0, GRID, GRID, 0, 0, W, H);
+		for (const car of s.cars) {
+			if (!car.alive) continue;
+			const mx = ((car.x + HALF) / ARENA) * W, my = ((car.z + HALF) / ARENA) * H;
+			miniCtx.fillStyle = cssHex(PALETTE[car.id]);
+			miniCtx.beginPath();
+			miniCtx.arc(mx, my, car.isBot ? 2.4 : 3.4, 0, TAU);
+			miniCtx.fill();
+			if (!car.isBot) {
+				miniCtx.strokeStyle = '#fff';
+				miniCtx.lineWidth = 1.4;
+				miniCtx.stroke();
+				miniCtx.beginPath(); // heading tick
+				miniCtx.moveTo(mx, my);
+				miniCtx.lineTo(mx + Math.cos(car.heading) * 7, my + Math.sin(car.heading) * 7);
+				miniCtx.stroke();
+			}
+		}
+	};
 
 	const resize = () => {
 		const w = canvas.clientWidth, h = canvas.clientHeight || Math.round(w * 0.625);
@@ -294,6 +326,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		camera.position.set(pp.x - cdx * CAM_DIST + sx, CAM_HEIGHT + sy, pp.z - cdz * CAM_DIST + sz);
 		camera.lookAt(pp.x + cdx * CAM_LOOK, CAM_LOOK_Y, pp.z + cdz * CAM_LOOK);
 		renderer.render(scene, camera);
+		drawMinimap(s);
 	};
 
 	const reset = () => {
@@ -319,5 +352,5 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		terrTex.dispose(); decalTex.dispose(); trailTex.dispose();
 	};
 
-	return { frame, reset, resize, dispose };
+	return { frame, reset, setMinimap, resize, dispose };
 }

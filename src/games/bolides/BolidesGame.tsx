@@ -38,6 +38,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [result, setResult] = useState({ pct: 0, best: 0, rank: 0, diff: 1 });
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const miniRef = useRef<HTMLCanvasElement>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const joyBaseRef = useRef<HTMLDivElement>(null);
 	const joyKnobRef = useRef<HTMLDivElement>(null);
@@ -66,6 +67,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		if (!canvasRef.current) return false;
 		const r = createRenderer(canvasRef.current, stateRef.current);
 		if (!r) { setWebglError(true); return false; }
+		r.setMinimap(miniRef.current);
 		rendererRef.current = r;
 		return true;
 	}, []);
@@ -274,6 +276,15 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				<div ref={joyBaseRef} className="bo-joy-base" />
 				<div ref={joyKnobRef} className="bo-joy-knob" />
 
+				<canvas
+					ref={miniRef}
+					className="bo-minimap"
+					width={150}
+					height={150}
+					style={{ display: phase === 'playing' ? 'block' : 'none' }}
+					aria-hidden="true"
+				/>
+
 				{phase === 'playing' && (
 					<ol className="bo-leaderboard">
 						{board.map((r) => (
@@ -372,6 +383,12 @@ const CSS = `
 .bo-leaderboard li { display: flex; align-items: center; gap: 6px; }
 .bo-leaderboard li.me { color: #ffe27a; }
 .bo-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.bo-minimap {
+  position: absolute; top: 8px; left: 8px; width: 108px; height: 108px; z-index: 1;
+  border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35);
+  pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+.game-page.gf-full .bo-minimap { width: 132px; height: 132px; }
 .bo-joy-base, .bo-joy-knob { position: absolute; display: none; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 3; }
 .bo-joy-base { width: 124px; height: 124px; background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.25); }
 .bo-joy-knob { width: 56px; height: 56px; background: rgba(255,255,255,0.35); border: 2px solid rgba(255,255,255,0.55); }
