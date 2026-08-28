@@ -55,6 +55,7 @@ export const THEMES = {
 	esquive: 'deep space with drifting asteroids and a purple nebula, distant stars',
 	luge: 'a snowy alpine slope at dusk, pine trees and powder snow, distant peaks, cold blue sky',
 	drift: 'a neon race circuit at night, tyre barriers and floodlights, wet asphalt with skid marks',
+	bolides: 'a floodlit arena at night, dark asphalt floor painted with large blocks of glowing blue and red territory, curving light-trail streaks across the ground, low stands and floodlight towers',
 	golf: 'a sunny mini-golf course, green turf, a little windmill obstacle and a flag, blue sky',
 	angry: 'a desert canyon with rickety wooden towers and a giant slingshot, warm sunset sky',
 	flechettes: 'a cosy pub corner, dartboard on a wooden wall, hanging lamps, warm amber light',

@@ -145,6 +145,7 @@ export const CROPS = {
 	'lettres-croisees': { left: 271, top: 134, width: 658, height: 411 }, // the wheel outshines the grid
 	flappy: { left: 391, top: 190, width: 418, height: 261 }, // square board: keep the hen and the gap
 	bulles: { left: 408, top: 214, width: 384, height: 240 }, // free board is tall + half-empty; frame the bubbles
+	bolides: { left: 281, top: 69, width: 638, height: 399 }, // full-bleed board: no gutter for the auto-crop to find
 };
 
 /**

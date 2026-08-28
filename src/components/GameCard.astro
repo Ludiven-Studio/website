@@ -13,9 +13,10 @@ interface Props {
 	image?: string;
 	daily?: boolean; // false for games without a daily challenge (e.g. multiplayer)
 	compact?: boolean; // drop the image + pitch → a small tile (used on the daily page)
+	art?: boolean; // catalogue tile: key art + title, status reduced to corner pips
 }
 
-const { title, pitch, icon, href, status = 'play', id, favorite = false, image, daily = true, compact = false } = Astro.props;
+const { title, pitch, icon, href, status = 'play', id, favorite = false, image, daily = true, compact = false, art = false } = Astro.props;
 const playable = status === 'play' && href;
 const Tag = playable ? 'a' : 'div';
 const showFavorite = favorite && playable && id;
@@ -23,7 +24,7 @@ const showFavorite = favorite && playable && id;
 const media = image ?? (playable && id ? `/assets/jeux/${id}.jpg` : undefined);
 // Compact tiles show the very same key art, in a small crisp copy: the full card is
 // ~180 kB, and art/<id>.jpg is blurred at export time (cf. scripts/game-tiles.mjs).
-const tile = compact && playable && id ? `/assets/jeux/tile/${id}.jpg` : undefined;
+const small = (compact || art) && playable && id ? `/assets/jeux/tile/${id}.jpg` : undefined;
 // Search haystack, accent-stripped so "melee" finds "Mots Mêlés". Built here rather
 // than read from the DOM because compact tiles don't render the pitch.
 const COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
@@ -37,16 +38,25 @@ const searchText = [title, pitch, id]
 
 <div class:list={['game-card-wrap', { 'has-fav': showFavorite }]} data-game-id={id} data-search={searchText}>
 	<Tag
-		class:list={['game-card', { soon: !playable, compact }]}
+		class:list={['game-card', { soon: !playable, compact, art }]}
 		{...playable ? { href } : { 'aria-disabled': 'true' }}
 	>
-		{(compact ? tile : media) && (
+		{art ? (
+			// No art yet for this game (or it 404s) → the icon stands in, so the tile stays
+			// recognisable instead of collapsing to a bare title.
 			<div class="game-card-media">
-				<img src={compact ? tile : media} alt="" loading="lazy" onerror="this.parentElement.remove()" />
+				<Icon icon={icon} color="var(--accent-regular)" size="2.5rem" gradient />
+				{small && <img src={small} alt="" loading="lazy" onerror="this.hidden = true" />}
 			</div>
+		) : (
+			(compact ? small : media) && (
+				<div class="game-card-media">
+					<img src={compact ? small : media} alt="" loading="lazy" onerror="this.parentElement.remove()" />
+				</div>
+			)
 		)}
 		{
-			compact ? (
+			compact || art ? (
 				!playable && <span class="badge soon">Bientôt</span>
 			) : (
 				<div class="game-card-top">
@@ -57,7 +67,14 @@ const searchText = [title, pitch, id]
 		}
 		<h3>{title}</h3>
 		{
-			compact ? (
+			art ? (
+				// Status as pips, not sentences: the catalogue is scanned, not read.
+				<div class="pips">
+					{playable && id && daily && <span class="pip daily-chip" data-game-id={id} data-pip hidden />}
+					{playable && id && daily && <span class="pip streak-badge" data-game-id={id} data-pip hidden />}
+					{playable && id && <span class="pip level-badge" data-game-id={id} data-pip hidden />}
+				</div>
+			) : compact ? (
 				// The title rides the art as a plaque, so the panel below is free for the
 				// record itself. Levels belong on the catalogue, not on the daily tile.
 				<div class="tile-info">
@@ -176,7 +193,8 @@ const searchText = [title, pitch, id]
 	}
 
 	/* Compact tile: full-bleed key art, then a two-line caption. */
-	.game-card.compact {
+	.game-card.compact,
+	.game-card.art {
 		position: relative;
 		overflow: hidden;
 		gap: 0;
@@ -185,19 +203,99 @@ const searchText = [title, pitch, id]
 		background-color: var(--gray-999);
 	}
 
-	.game-card.compact .game-card-media {
+	.game-card.compact .game-card-media,
+	.game-card.art .game-card-media {
 		border-radius: 0;
 		flex: none;
 		transition: filter var(--theme-transition);
 	}
 
-	.game-card.compact .game-card-media img {
+	.game-card.compact .game-card-media img,
+	.game-card.art .game-card-media img {
 		transition: transform var(--theme-transition);
 	}
 
 	a.game-card.compact:hover .game-card-media img,
-	a.game-card.compact:focus-visible .game-card-media img {
+	a.game-card.compact:focus-visible .game-card-media img,
+	a.game-card.art:hover .game-card-media img,
+	a.game-card.art:focus-visible .game-card-media img {
 		transform: scale(1.06);
+	}
+
+	/* Catalogue tile: the art IS the card. Name over a scrim at the bottom, status pips
+	   top-right — nothing to read, the grid is scanned. */
+	.game-card.art {
+		aspect-ratio: 16 / 10;
+	}
+
+	.game-card.art .game-card-media {
+		position: absolute;
+		inset: 0;
+		aspect-ratio: auto;
+		display: grid;
+		place-items: center;
+	}
+
+	.game-card.art .game-card-media img {
+		position: absolute;
+		inset: 0;
+	}
+
+	.game-card.art h3 {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		margin: 0;
+		padding: 1.5rem 2.2rem 0.4rem 0.6rem;
+		font-size: var(--text-base);
+		line-height: 1.2;
+		color: #fff;
+		background: linear-gradient(to top, rgba(10, 8, 16, 0.88) 32%, rgba(10, 8, 16, 0));
+		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+	}
+
+	.pips {
+		position: absolute;
+		top: 0.35rem;
+		right: 0.35rem;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 3px;
+	}
+
+	.pips .pip {
+		align-self: flex-end;
+		margin: 0;
+		font-size: 11px;
+		padding: 2px 7px;
+		line-height: 1.35;
+		white-space: nowrap;
+		backdrop-filter: blur(4px);
+	}
+
+	.pips .daily-chip {
+		border-color: rgba(255, 255, 255, 0.35);
+		background: rgba(18, 14, 28, 0.55);
+		color: #fff;
+	}
+
+	.pips .daily-chip.done {
+		border-color: var(--accent-regular);
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+	}
+
+	/* The heart rides the scrim instead of reserving a row under the art. */
+	.game-card-wrap.has-fav .game-card.art {
+		padding-bottom: 0;
+	}
+
+	.game-card-wrap:has(.game-card.art) .fav-toggle {
+		bottom: 0.15rem;
+		right: 0.3rem;
+		color: rgba(255, 255, 255, 0.8);
 	}
 
 	/* Plaque over the art: the scenes are prompted with their ground plane at the
@@ -223,9 +321,19 @@ const searchText = [title, pitch, id]
 		max-width: calc(100% - 2.6rem);
 	}
 
-	.game-card.compact .badge.soon {
+	.game-card.compact .badge.soon,
+	.game-card.art .badge.soon {
 		align-self: flex-start;
 		margin: 0.55rem 0.7rem 0;
+	}
+
+	.game-card.art .badge.soon {
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 1;
+		background: rgba(18, 14, 28, 0.6);
+		color: #fff;
 	}
 
 	.tile-info {
@@ -503,6 +611,14 @@ const searchText = [title, pitch, id]
 			wrap?.classList.toggle('daily-done', done);
 			wrap?.classList.toggle('daily-todo', !done);
 			wrap?.dispatchEvent(new CustomEvent('daily-status', { bubbles: true, detail: { id, done, started } }));
+			// A pip says where YOU stand today, not who holds the record — a catalogue tile
+			// that always shows something would be 42 badges of noise.
+			if (chip.hasAttribute('data-pip')) {
+				chip.textContent = done ? '✓' : '⏳';
+				chip.title = done ? 'Défi du jour fait' : 'Défi du jour en cours';
+				chip.hidden = !done && !started;
+				return;
+			}
 			// Community record of the day (Supabase), shown even for games not yet played.
 			const cfg = DAILY_LB[id];
 			const top = cfg ? tops[cfg.lbId || id] : undefined;
@@ -581,20 +697,22 @@ const searchText = [title, pitch, id]
 			} catch {
 				/* ignore */
 			}
+			const pip = badge.hasAttribute('data-pip');
 			const cleared = Object.keys(stars).map(Number).filter((n) => stars[n] >= 1);
 			if (cleared.length === 0) {
-				// Not played yet → invite to start at level 1.
+				// Not played yet → invite to start at level 1. A pip stays quiet instead:
+				// "🎯1" on every untouched tile would say nothing.
+				badge.hidden = pip;
 				badge.textContent = '🎯 Niveau 1';
 				badge.title = 'Commence les niveaux';
-				badge.hidden = false;
 				return;
 			}
 			const maxCleared = Math.max(...cleared);
 			if (maxCleared >= LEVEL_COUNT * (hasUnlock(id) ? 2 : 1)) {
 				const total = cleared.reduce((a, n) => a + (stars[n] || 0), 0);
-				badge.textContent = `🎯 Fini · ${total}★`;
+				badge.textContent = pip ? '🎯✓' : `🎯 Fini · ${total}★`;
 			} else {
-				badge.textContent = `🎯 Niveau ${maxCleared + 1}`;
+				badge.textContent = pip ? `🎯${maxCleared + 1}` : `🎯 Niveau ${maxCleared + 1}`;
 			}
 			badge.title = 'Ta progression en mode Niveaux';
 			badge.hidden = false;

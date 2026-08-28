@@ -217,6 +217,16 @@ async function main() {
 			await startCTA();
 			await sleep(2600);
 		},
+		// A fresh arena is four tiny home squares. Drive a full circle so the shot shows
+		// the trail closing and the captured patch that follows.
+		bolides: async () => {
+			// A fresh arena is four tiny home squares — nothing to look at. Let the bots
+			// paint it instead of steering: any loop we could drive blind closes on our own
+			// trail and kills the car. Left alone the player just scrapes along the rail.
+			await sleep(16000);
+			await page.addStyleTag({ content: '.bo-respawn { display: none }' });
+			await sleep(300);
+		},
 	};
 
 	const startGame = async () => {

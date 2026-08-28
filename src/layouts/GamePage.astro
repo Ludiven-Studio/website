@@ -25,19 +25,24 @@ const hasDaily = gameId in DAILY_LB;
 
 <BaseLayout title={title} description={description}>
 	{hasArt && <div class="game-art" style={`--art: url('/assets/jeux/art/${gameId}.jpg')`} aria-hidden="true" />}
-	<div class="wrapper game-page stack gap-8">
-		<header class="game-head stack gap-2">
+	<div class="wrapper game-page stack gap-4">
+		{/* Kept to one line so the board is reachable without scrolling on a phone —
+		    the pitch, the rules and the wallet wait below it. */}
+		<header class="game-head">
 			<a class="back" href="/jeux/">
 				<Icon icon="arrow-left" size="1em" /> Tous les jeux
 			</a>
 			<h1>{heading}</h1>
-			<p>{tagline}</p>
 			{hasDaily && <DefiChallenge client:load gameId={gameId} />}
-			<GameTutorial gameId={gameId} />
-			<CocoinBar client:load />
 		</header>
 
 		<slot />
+
+		<footer class="game-foot stack gap-3">
+			<p class="game-pitch">{tagline}</p>
+			<GameTutorial gameId={gameId} />
+			<CocoinBar client:load />
+		</footer>
 
 		{/* Outside .game-head on purpose: fullscreen hides the head, not the reward. */}
 		<CocoinToast client:idle />
@@ -78,8 +83,29 @@ const hasDaily = gameId in DAILY_LB;
 		align-items: center;
 	}
 	.game-head {
-		text-align: center;
+		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
+		justify-content: center;
+		gap: 0.35rem 0.9rem;
+		width: 100%;
+		text-align: center;
+	}
+	/* The challenge banner and the injected fullscreen button take their own line. */
+	.game-head :global(.dc-banner),
+	.game-head :global(.gf-btn) {
+		flex-basis: 100%;
+	}
+	.game-foot {
+		align-items: center;
+		text-align: center;
+		width: 100%;
+		margin-top: 1.25rem;
+	}
+	.game-pitch {
+		max-width: 60ch;
+		margin: 0;
+		color: var(--gray-300);
 	}
 	.back {
 		display: inline-flex;
@@ -96,15 +122,12 @@ const hasDaily = gameId in DAILY_LB;
 		color: var(--accent-regular);
 	}
 	.game-head h1 {
-		font-size: var(--text-3xl);
-		margin-top: 0.5rem;
-	}
-	.game-head p {
-		color: var(--gray-300);
+		font-size: var(--text-xl);
+		margin: 0;
 	}
 	@media (min-width: 50em) {
 		.game-head h1 {
-			font-size: var(--text-4xl);
+			font-size: var(--text-2xl);
 		}
 	}
 </style>
