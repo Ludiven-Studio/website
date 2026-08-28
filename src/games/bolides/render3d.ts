@@ -31,18 +31,20 @@ const GRID_LINE: [number, number, number] = [84, 94, 112];
 const TERRITORY_LUT: [number, number, number][] = PALETTE.map((hex, i) => {
 	const [r, g, b] = rgb(hex);
 	if (i === 0) return NEUTRAL;
-	return [mix(r, 255, 0.42), mix(g, 255, 0.42), mix(b, 255, 0.42)];
+	return [mix(r, 255, 0.3), mix(g, 255, 0.3), mix(b, 255, 0.3)];
 });
 
 /** A flat quad in the XZ plane, UVs aligned so world (x,z) -> canvas (col,row). */
 function groundQuad(y: number): THREE.BufferGeometry {
 	const g = new THREE.BufferGeometry();
 	// A(0,0) B(1,0) C(1,1) D(0,1)  with texture.flipY=false so v=0 is canvas row 0.
+	// Wound A-C-B / A-D-C: in XZ that is counter-clockwise seen from above, so the
+	// front face points +Y. The naive A-B-C order faces DOWN and gets back-face culled.
 	const pos = [
-		-HALF, y, -HALF, HALF, y, -HALF, HALF, y, HALF,
-		-HALF, y, -HALF, HALF, y, HALF, -HALF, y, HALF,
+		-HALF, y, -HALF, HALF, y, HALF, HALF, y, -HALF,
+		-HALF, y, -HALF, -HALF, y, HALF, HALF, y, HALF,
 	];
-	const uv = [0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1];
+	const uv = [0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1];
 	g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
 	g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
 	g.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(18).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
@@ -138,7 +140,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 	const decalTex = mkTex(decal.c, false);
 	const trailTex = mkTex(trailC.c, false);
 
-	const terrMesh = new THREE.Mesh(groundQuad(0), new THREE.MeshStandardMaterial({ map: terrTex, roughness: 1 }));
+	// Unlit on purpose: the territory colour IS the information, so it must read exactly as
+	// authored (same pixels as the minimap) instead of being dimmed by the lighting rig.
+	const terrMesh = new THREE.Mesh(groundQuad(0), new THREE.MeshBasicMaterial({ map: terrTex }));
 	const decalMesh = new THREE.Mesh(groundQuad(0.012), new THREE.MeshBasicMaterial({ map: decalTex, transparent: true, depthWrite: false }));
 	const trailMesh = new THREE.Mesh(groundQuad(0.024), new THREE.MeshBasicMaterial({ map: trailTex, transparent: true, depthWrite: false }));
 	scene.add(terrMesh, decalMesh, trailMesh);
@@ -288,6 +292,8 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 				paintDecal(bx, bz);
 				if (Math.random() < 0.6) spawn(bx, bz, 0xdfe4ea, 2, 1.5, 1, 1.6, 0.5);
 			}
+			// Rail scrape: sparks sell the speed the guard rail is eating.
+			if (car.scraping) spawn(pose.x, pose.z, 0xffb020, 4, 2.5, 2, 1.3, 0.35);
 		}
 
 		// Particles.

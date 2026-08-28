@@ -267,7 +267,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		<div className="bo-root">
 			<style>{CSS}</style>
 
-			<ModeToggle daily={mode === 'defi'} onFree={() => switchMode('libre')} onDaily={() => switchMode('defi')} />
+			<div className="bo-modetoggle">
+				<ModeToggle daily={mode === 'defi'} onFree={() => switchMode('libre')} onDaily={() => switchMode('defi')} />
+			</div>
 
 			<div className="bo-boardwrap" ref={boardRef}>
 				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Bolides" onPointerDown={drag.onPointerDown} />
@@ -344,13 +346,15 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			)}
 
 			{mode === 'defi' && (
-				<Leaderboard
-					key={`lb-${gameId}-${attempt}`}
-					game={gameId}
-					metric="score"
-					submitValue={phase === 'dead' ? submitVal : undefined}
-					format={fmtPct}
-				/>
+				<div className="bo-lb">
+					<Leaderboard
+						key={`lb-${gameId}-${attempt}`}
+						game={gameId}
+						metric="score"
+						submitValue={phase === 'dead' ? submitVal : undefined}
+						format={fmtPct}
+					/>
+				</div>
 			)}
 
 			<p className="bo-help">
@@ -371,10 +375,24 @@ const CSS = `
   border: 1px solid var(--gray-800); border-radius: 12px;
   touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
 }
+/* Fullscreen means the ARENA is fullscreen: drop the page padding, let the board eat the
+   viewport and float the few controls over it. The mode tabs and the online leaderboard only
+   leave the game, so they go away until we come back out. */
+.game-page.gf-full:has(.bo-root) { padding: 0; }
 .game-page.gf-full .bo-root { max-width: none; width: 100%; height: 100%; display: flex; flex-direction: column; }
 .game-page.gf-full .bo-boardwrap { flex: 1; min-height: 0; aspect-ratio: auto; }
 .game-page.gf-full .bo-canvas { border-radius: 0; border: none; }
-.game-page.gf-full .bo-help { display: none; }
+.game-page.gf-full .bo-overlay { border-radius: 0; }
+.game-page.gf-full .bo-help,
+.game-page.gf-full .bo-modetoggle,
+.game-page.gf-full .bo-lb { display: none; }
+/* Keep the standings clear of the "⛶ Quitter" button pinned to the same corner. */
+.game-page.gf-full .bo-leaderboard { top: max(54px, calc(env(safe-area-inset-top) + 46px)); }
+.game-page.gf-full .bo-minimap { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
+.game-page.gf-full .bo-actions {
+  position: fixed; z-index: 4; margin: 0;
+  right: max(8px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom));
+}
 .bo-leaderboard {
   position: absolute; top: 8px; right: 8px; margin: 0; padding: 8px 12px; list-style: none;
   background: rgba(0,0,0,0.55); color: #fff; border-radius: 10px; font-size: 12.5px; font-weight: 700;

@@ -28,6 +28,7 @@ export const CFG = {
 	steerResp: 9, // how fast the applied turn eases toward the input (steering inertia)
 	driftFrac: 0.6, // |turnRate| above this fraction of the max = drifting (cosmetic)
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
+	wallDrag: 4, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
 	wallMargin: 3, // bots start turning back this far from the arena wall
 	respawn: 2.4, // seconds before a dead bot comes back
 	homeHalf: 9, // half-size (in cells) of a starting/respawn territory square
@@ -44,6 +45,8 @@ export const DIFFS = [
 ] as const;
 
 const randSeed = () => (Math.random() * 2 ** 31) >>> 0;
+
+const WALL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
 export interface BotState {
 	phase: 'in' | 'out' | 'return';
@@ -66,6 +69,7 @@ export interface Car {
 	ph: number;
 	turnRate: number; // current (eased) angular velocity
 	drifting: boolean;
+	scraping: boolean; // rubbing the arena rail (slowed down; renderer throws sparks)
 	outside: boolean; // currently laying a trail (out of own territory)
 	trail: number[]; // ordered cell indices of the active trail
 	respawnAt: number; // clock time (s) to respawn (bots)
@@ -156,6 +160,7 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.alive = true;
 	car.outside = false;
 	car.drifting = false;
+	car.scraping = false;
 	car.trail.length = 0;
 	car.bot.phase = 'in';
 	car.bot.budget = 0;
@@ -196,7 +201,7 @@ export function createGame(seed = randSeed(), diff = 1): GameState {
 			isBot: i !== 0,
 			alive: true,
 			x: 0, z: 0, heading: 0, speed: CFG.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
-			drifting: false, outside: false, trail: [], respawnAt: 0,
+			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
 		};
 		s.cars.push(car);
@@ -241,6 +246,36 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number): void {
 	car.drifting = Math.abs(car.turnRate) > maxTurn * CFG.driftFrac && car.speed > CFG.minSpeed * 1.4;
 }
 
+/** Arena edges are guard rails, not a death trap: clamp back inside and ease the heading along
+ *  the wall so the car scrapes past instead of stopping dead. The rail bleeds speed, which is
+ *  what keeps a full perimeter lap (it encloses the whole map) a long, exposed gamble. */
+function slideWalls(car: Car, dt: number): void {
+	const lim = HALF - CELL;
+	const outX = car.x < -lim ? -1 : car.x > lim ? 1 : 0;
+	const outZ = car.z < -lim ? -1 : car.z > lim ? 1 : 0;
+	car.scraping = outX !== 0 || outZ !== 0;
+	if (!car.scraping) return;
+	if (outX) car.x = outX * lim;
+	if (outZ) car.z = outZ * lim;
+
+	// Steer to the cardinal direction closest to the current heading that doesn't push further
+	// into a wall we're already touching. On a straight wall that keeps the car running along
+	// it; wedged in a corner only the two ways out qualify, so the heading can't flip-flop —
+	// which would drive the car back over its own trail and kill it.
+	let tangent = car.heading;
+	let best = Infinity;
+	for (const [dx, dz] of WALL_DIRS) {
+		if ((outX !== 0 && dx === outX) || (outZ !== 0 && dz === outZ)) continue;
+		const a = Math.atan2(dz, dx);
+		const d = Math.abs(angleDiff(a, car.heading));
+		if (d < best) { best = d; tangent = a; }
+	}
+
+	car.heading += angleDiff(tangent, car.heading) * Math.min(1, dt * 5);
+	car.turnRate = 0;
+	car.speed += (CFG.minSpeed - car.speed) * Math.min(1, dt * CFG.wallDrag);
+}
+
 /* ---------- death & capture ---------- */
 
 function clearTrail(s: GameState, car: Car): void {
@@ -256,6 +291,7 @@ function killCar(s: GameState, car: Car, byPlayer: boolean, killer: number): voi
 	clearTrail(s, car);
 	car.alive = false;
 	car.drifting = false;
+	car.scraping = false;
 	if (killer) s.events.push({ type: 'kill', killer, victim: car.id, x: car.x, z: car.z });
 	s.events.push({ type: 'death', id: car.id, x: car.x, z: car.z, isPlayer: !car.isBot });
 	if (car.isBot) car.respawnAt = s.clock + CFG.respawn;
@@ -311,11 +347,6 @@ function respawn(s: GameState, car: Car): void {
 /* ---------- per-step grid logic (trail, kill, capture) ---------- */
 
 function updateGrid(s: GameState, car: Car): void {
-	// Out of bounds = death (adds risk at the edges; bots avoid it, see botSteer).
-	if (car.x < -HALF || car.x > HALF || car.z < -HALF || car.z > HALF) {
-		killCar(s, car, false, 0);
-		return;
-	}
 	const cell = cellAt(car.x, car.z);
 	const inside = s.owner[cell] === car.id;
 
@@ -373,7 +404,7 @@ function botSteer(s: GameState, car: Car, dt: number): number {
 	const home = centroid(s, car.id);
 	const diff = DIFFS[s.diff] ?? DIFFS[1];
 
-	// Turn away from a wall we're about to hit, whatever the current plan.
+	// Peel away from a wall we're about to hit: scraping it is survivable but wastes the run.
 	const ahead = 6;
 	const nx = car.x + Math.cos(car.heading) * ahead;
 	const nz = car.z + Math.sin(car.heading) * ahead;
@@ -425,6 +456,7 @@ export function stepGame(s: GameState, playerSteer: number, playerThrottle: numb
 		}
 		const steer = car.isBot ? botSteer(s, car, dt) : playerSteer;
 		stepCar(car, steer, car.isBot ? 0 : playerThrottle, dt);
+		slideWalls(car, dt);
 		updateGrid(s, car);
 	}
 }

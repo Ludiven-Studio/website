@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGame, stepGame, resetGame, pct, TOTAL, CFG, type GameState } from './engine';
+import { createGame, stepGame, resetGame, pct, TOTAL, HALF, CFG, type GameState } from './engine';
 
 /** Recount ownership straight from the grid — the source of truth for setOwner bookkeeping. */
 function recount(s: GameState): number[] {
@@ -47,6 +47,30 @@ describe('bolides engine', () => {
 		resetGame(s);
 		expect(recount(s)).toEqual(fresh);
 		expect(s.clock).toBe(0);
+	});
+
+	it('slides along the arena wall instead of dying there', () => {
+		const s = createGame();
+		const me = s.cars[0];
+		me.x = HALF - 1; me.z = 0; me.heading = 0; // nose into the east wall
+		me.px = me.x; me.pz = me.z;
+		for (let i = 0; i < 600; i++) stepGame(s, 0, 1, 1 / 60);
+		expect(me.alive).toBe(true);
+		expect(me.x).toBeLessThanOrEqual(HALF);
+		expect(Math.abs(me.z)).toBeGreaterThan(5); // scraped along the wall, didn't stall
+		// The rail must stay a bad line: full throttle on it is slower than open track.
+		expect(me.speed).toBeLessThan(CFG.cruise);
+	});
+
+	it('survives a corner instead of flip-flopping onto its own trail', () => {
+		const s = createGame();
+		const me = s.cars[0];
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; }); // isolate the corner
+		me.x = HALF - 2; me.z = HALF - 2; me.heading = Math.PI / 4; // straight into the SE corner
+		me.px = me.x; me.pz = me.z;
+		for (let i = 0; i < 900; i++) stepGame(s, 0, 1, 1 / 60);
+		expect(me.alive).toBe(true);
+		expect(Math.hypot(me.x - HALF, me.z - HALF)).toBeGreaterThan(10); // slid out of the corner
 	});
 
 	it('throttle accelerates and brake slows the player', () => {
