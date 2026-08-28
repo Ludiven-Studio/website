@@ -73,6 +73,50 @@ describe('bolides engine', () => {
 		expect(Math.hypot(me.x - HALF, me.z - HALF)).toBeGreaterThan(10); // slid out of the corner
 	});
 
+	it('respawns the player at the start point instead of ending the run', () => {
+		const s = createGame();
+		const me = s.cars[0];
+		me.x = 0; me.z = 0; me.heading = 0; // out in neutral ground: a hard circle self-crosses
+		me.px = me.x; me.pz = me.z;
+		let died = -1, back = -1;
+		for (let i = 0; i < 900 && back < 0; i++) {
+			stepGame(s, 1, 0, 1 / 60);
+			if (died < 0 && !me.alive) died = i;
+			else if (died >= 0 && me.alive) back = i;
+		}
+		expect(died).toBeGreaterThan(0);
+		expect(s.over).toBe(false); // dying is a setback, not the end of the run
+		expect((back - died) / 60).toBeCloseTo(CFG.respawnPlayer, 1);
+		expect(Math.hypot(me.x + HALF * 0.5, me.z + HALF * 0.5)).toBeLessThan(1); // back on START_POS[0]
+	});
+
+	it('ends the run as soon as a car passes the win threshold', () => {
+		const s = createGame();
+		for (let i = 0; i < Math.floor(TOTAL * 0.55); i++) {
+			const old = s.owner[i];
+			if (old === 1) continue;
+			s.owner[i] = 1; s.counts[old]--; s.counts[1]++;
+		}
+		stepGame(s, 0, 0, 1 / 60);
+		expect(s.over).toBe(true);
+		expect(s.winner).toBe(1);
+		const frozen = s.clock;
+		stepGame(s, 1, 1, 1 / 60);
+		expect(s.clock).toBe(frozen); // a decided run no longer simulates
+	});
+
+	it('awards the buzzer to the biggest territory', () => {
+		const s = createGame();
+		s.clock = CFG.timeLimit - 1 / 120; // one step short of the buzzer
+		s.counts[3] += 500; // make Vert the leader without crossing the win threshold
+		s.counts[0] -= 500;
+		expect(s.over).toBe(false);
+		stepGame(s, 0, 0, 1 / 60);
+		expect(s.over).toBe(true);
+		expect(s.overByTime).toBe(true);
+		expect(s.winner).toBe(3);
+	});
+
 	it('throttle accelerates and brake slows the player', () => {
 		const up = createGame();
 		for (let i = 0; i < 60; i++) stepGame(up, 0, 1, 1 / 60); // full throttle

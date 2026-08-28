@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createGame, resetGame, stepGame, pct, NAMES, PALETTE, DIFFS, type GameState } from './engine';
+import { createGame, resetGame, stepGame, pct, NAMES, PALETTE, DIFFS, CFG, type GameState } from './engine';
 import { createRenderer, type Renderer } from './render3d';
 import { usePointerDrag } from '../usePointerDrag';
 import { trackGame } from '../../lib/analytics';
@@ -13,7 +13,8 @@ import ModeToggle from '../../components/ModeToggle';
    BOLIDES — React shell. Owns the fixed-step loop and the HUD; the simulation
    (engine.ts) and the 3D (render3d.ts) run outside React state so per-frame car
    moves never trigger a rerender. Loop: sortir -> tracer -> reboucler -> capturer;
-   couper une trace ennemie = kill; se faire couper = mort -> Rejouer instantané.
+   couper une trace ennemie = kill. Mourir ne finit pas la partie : on réapparaît au
+   point de départ après 3 s. La course s'arrête quand quelqu'un dépasse 50 %.
    Défi du jour = arène + bots déterministes (seed partagé) ; score = meilleur %.
    ===================================================== */
 
@@ -24,6 +25,7 @@ const STEP = 1000 / 60;
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 const toTenths = (p: number) => Math.round(p * 10); // % -> stored tenths of a percent
 const fmtPct = (v: number) => formatScore(DAILY_LB.bolides.fmt, v);
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 interface Row { id: number; name: string; pct: number; me: boolean }
 
@@ -35,7 +37,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [status, setStatus] = useState('');
 	const [attempt, setAttempt] = useState(0); // remounts the Leaderboard so a replay retries its submit
 	const [submitVal, setSubmitVal] = useState<number | undefined>(undefined);
-	const [result, setResult] = useState({ pct: 0, best: 0, rank: 0, diff: 1 });
+	const [respawnIn, setRespawnIn] = useState(0); // seconds left before the player is back
+	const [left, setLeft] = useState<number>(CFG.timeLimit); // seconds left in the race
+	const [result, setResult] = useState({ pct: 0, best: 0, rank: 0, diff: 1, won: false, winner: 0, deaths: 0, byTime: false });
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const miniRef = useRef<HTMLCanvasElement>(null);
@@ -52,6 +56,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const hudAccRef = useRef(0);
 	const runningRef = useRef(false);
 	const bestPctRef = useRef(0); // peak % during the current run
+	const deathsRef = useRef(0); // player wrecks this run (cosmetic, shown on the end card)
 	const dailyBestRef = useRef(0); // best % across today's attempts
 	const modeRef = useRef<Mode>('defi');
 
@@ -83,6 +88,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		stop();
 		const peak = Math.max(pct(s, 1), bestPctRef.current);
 		const rank = 1 + s.cars.filter((c) => c.id !== 1 && pct(s, c.id) > pct(s, 1)).length;
+		const end = { won: s.winner === 1, winner: s.winner, deaths: deathsRef.current, byTime: s.overByTime };
 		if (modeRef.current === 'defi') {
 			const prev = loadDailyRun(gameId);
 			const prevState = (prev?.state as DailyState | undefined) ?? { best: 0, tries: 0 };
@@ -97,9 +103,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			});
 			setSubmitVal(toTenths(best));
 			setAttempt((a) => a + 1);
-			setResult({ pct: peak, best, rank, diff: s.diff });
+			setResult({ pct: peak, best, rank, diff: s.diff, ...end });
 		} else {
-			setResult({ pct: peak, best: peak, rank, diff: s.diff });
+			setResult({ pct: peak, best: peak, rank, diff: s.diff, ...end });
 		}
 		setPhase('dead');
 		trackGame(gameId, 'game_over', { mode: modeRef.current === 'defi' ? 'daily' : 'free' });
@@ -120,14 +126,21 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			stepGame(s, steer, throttle, STEP / 1000);
 		}
 		const alpha = Math.min(1, accRef.current / STEP);
+		for (const e of s.events) if (e.type === 'death' && e.isPlayer) deathsRef.current++;
 		if (r) r.frame(s, alpha, dt / 1000);
 		s.events.length = 0; // consumed by the renderer (FX) this frame
 
 		bestPctRef.current = Math.max(bestPctRef.current, pct(s, 1));
 		hudAccRef.current += dt;
-		if (hudAccRef.current >= 140) { hudAccRef.current = 0; syncBoard(); }
+		if (hudAccRef.current >= 140) {
+			hudAccRef.current = 0;
+			syncBoard();
+			const me = s.cars[0];
+			setRespawnIn(me.alive ? 0 : Math.max(1, Math.ceil(me.respawnAt - s.clock)));
+			setLeft(Math.max(0, Math.ceil(CFG.timeLimit - s.clock)));
+		}
 
-		if (!s.cars[0].alive) { endGame(); return; }
+		if (s.over) { endGame(); return; }
 		rafRef.current = requestAnimationFrame(frame);
 	}, [syncBoard, endGame]);
 
@@ -137,6 +150,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		accRef.current = 0;
 		hudAccRef.current = 0;
 		bestPctRef.current = 0;
+		deathsRef.current = 0;
+		setRespawnIn(0);
+		setLeft(CFG.timeLimit);
 		rafRef.current = requestAnimationFrame(frame);
 	}, [frame]);
 
@@ -295,7 +311,15 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 								{r.name} · {r.pct.toFixed(1)}%
 							</li>
 						))}
+						<li className="goal">{mmss(left)} · KO à {CFG.winPct} %</li>
 					</ol>
+				)}
+
+				{phase === 'playing' && respawnIn > 0 && (
+					<div className="bo-respawn">
+						<strong>Reparti dans {respawnIn}…</strong>
+						<span>Tu repars du point de départ, ton terrain reste à toi.</span>
+					</div>
 				)}
 
 				{webglError && <div className="bo-overlay"><div className="bo-card">3D indisponible (WebGL manquant).</div></div>}
@@ -306,8 +330,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							<h2>Bolides</h2>
 							<p className="bo-sub">
 								Sors de ta zone, trace une boucle et reviens chez toi pour <strong>capturer</strong> le terrain.
-								Plus la boucle est grande, plus tu gagnes — mais ta trace est vulnérable : si un rival la coupe, tu exploses.
-								Coupe la leur pour les éliminer.
+								<strong> {Math.round(CFG.timeLimit / 60)} minutes</strong> : le plus grand territoire l'emporte,
+								ou victoire immédiate à <strong>{CFG.winPct} %</strong>. Ta trace est vulnérable : si un rival la coupe,
+								tu exploses — coupe la leur pour les éliminer. Une sortie de piste ne coûte que {CFG.respawnPlayer} s :
+								tu repars du point de départ, ton terrain reste à toi.
 							</p>
 							<p className="bo-modehint">
 								{mode === 'defi'
@@ -324,10 +350,20 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				{phase === 'dead' && (
 					<div className="bo-overlay">
 						<div className="bo-card">
-							<h2>Éliminé</h2>
+							<h2>{result.won ? 'Arène conquise !' : 'Perdu'}</h2>
+							<p className="bo-sub">
+								{result.byTime
+									? `Temps écoulé — ${result.won ? 'tu gardes' : `${NAMES[result.winner] ?? 'un rival'} garde`} le plus grand territoire.`
+									: result.won
+										? `Tu as passé la barre des ${CFG.winPct} %.`
+										: `${NAMES[result.winner] ?? 'Un rival'} a pris ${CFG.winPct} % de l'arène avant toi.`}
+							</p>
 							<p className="bo-score">
 								{result.pct.toFixed(1)}%
-								<span>de terrain · {result.rank}<sup>{result.rank === 1 ? 'er' : 'e'}</sup> sur {board.length || 4}</span>
+								<span>
+									de terrain · {result.rank}<sup>{result.rank === 1 ? 'er' : 'e'}</sup> sur {board.length || 4}
+									{result.deaths > 0 && ` · ${result.deaths} sortie${result.deaths > 1 ? 's' : ''} de piste`}
+								</span>
 							</p>
 							{mode === 'defi' && (
 								<p className="bo-best">Meilleur du jour : <strong>{fmtPct(toTenths(result.best))}</strong> · {DIFFS[result.diff]?.label}</p>
@@ -359,8 +395,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 			<p className="bo-help">
 				<strong>Glisse le doigt</strong> sur l'écran : haut/bas pour accélérer ou freiner, gauche/droite pour tourner
-				(au clavier&nbsp;: flèches ou ZQSD). Le but&nbsp;: contrôler le plus grand pourcentage de l'arène. Sors, boucle,
-				reviens → capture. Ne laisse personne couper ta trace ; coupe la leur.
+				(au clavier&nbsp;: flèches ou ZQSD). Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
+				Sors, boucle, reviens → capture. Ne laisse personne couper ta trace ; coupe la leur. Te faire couper ne finit
+				pas la partie&nbsp;: tu réapparais au point de départ après 3&nbsp;s, mais les rivaux, eux, continuent.
 				{mode === 'defi' && ' Le défi du jour partage la même arène et le même classement pour tout le monde.'}
 			</p>
 		</div>
@@ -400,7 +437,15 @@ const CSS = `
 }
 .bo-leaderboard li { display: flex; align-items: center; gap: 6px; }
 .bo-leaderboard li.me { color: #ffe27a; }
+.bo-leaderboard li.goal { color: rgba(255,255,255,0.6); font-weight: 600; font-size: 11px; border-top: 1px solid rgba(255,255,255,0.18); padding-top: 4px; margin-top: 1px; }
 .bo-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.bo-respawn {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; text-align: center;
+  background: rgba(6,8,16,0.72); color: #fff; border-radius: 14px; padding: 14px 22px; pointer-events: none;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.bo-respawn strong { font-family: var(--font-brand); font-size: 22px; font-weight: 600; }
+.bo-respawn span { font-size: 12px; color: var(--gray-300); }
 .bo-minimap {
   position: absolute; top: 8px; left: 8px; width: 108px; height: 108px; z-index: 1;
   border-radius: 8px; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35);

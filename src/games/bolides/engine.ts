@@ -30,7 +30,10 @@ export const CFG = {
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
 	wallDrag: 4, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
 	wallMargin: 3, // bots start turning back this far from the arena wall
+	winPct: 50, // first car past this share of the arena wins the run
+	timeLimit: 180, // hard race length: at the buzzer the biggest share wins
 	respawn: 2.4, // seconds before a dead bot comes back
+	respawnPlayer: 3, // dying costs the player tempo in the race, not the run
 	homeHalf: 9, // half-size (in cells) of a starting/respawn territory square
 	botOutMin: 9, // bot excursion distance budget (world units)
 	botArc: 0.55, // how hard a bot arcs while outside (steer magnitude)
@@ -79,7 +82,8 @@ export interface Car {
 export type GameEvent =
 	| { type: 'capture'; id: number; cx: number; cz: number; gain: number }
 	| { type: 'kill'; killer: number; victim: number; x: number; z: number }
-	| { type: 'death'; id: number; x: number; z: number; isPlayer: boolean };
+	| { type: 'death'; id: number; x: number; z: number; isPlayer: boolean }
+	| { type: 'win'; id: number; byTime: boolean };
 
 export interface GameState {
 	owner: Uint8Array; // cell -> owner id
@@ -89,6 +93,9 @@ export interface GameState {
 	sumC: number[]; // running sum of col per id (for centroid)
 	sumR: number[];
 	clock: number; // seconds since start
+	over: boolean; // someone passed CFG.winPct (or the clock ran out) — the run is decided
+	winner: number; // car id that won (0 while the run is live)
+	overByTime: boolean; // won on the clock with the biggest share, not by passing winPct
 	seed: number; // arena/bot seed (a daily shares it so everyone faces the same setup)
 	diff: number; // difficulty index into DIFFS
 	rng: Rng; // seeded PRNG — never Math.random in the sim, or the daily wouldn't be shared
@@ -183,6 +190,9 @@ export function createGame(seed = randSeed(), diff = 1): GameState {
 		sumC: new Array(CAR_COUNT + 1).fill(0),
 		sumR: new Array(CAR_COUNT + 1).fill(0),
 		clock: 0,
+		over: false,
+		winner: 0,
+		overByTime: false,
 		seed,
 		diff,
 		rng: mulberry32(seed),
@@ -220,6 +230,9 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff): void 
 	s.sumC.fill(0);
 	s.sumR.fill(0);
 	s.clock = 0;
+	s.over = false;
+	s.winner = 0;
+	s.overByTime = false;
 	s.seed = seed;
 	s.diff = diff;
 	s.rng = mulberry32(seed);
@@ -294,7 +307,7 @@ function killCar(s: GameState, car: Car, byPlayer: boolean, killer: number): voi
 	car.scraping = false;
 	if (killer) s.events.push({ type: 'kill', killer, victim: car.id, x: car.x, z: car.z });
 	s.events.push({ type: 'death', id: car.id, x: car.x, z: car.z, isPlayer: !car.isBot });
-	if (car.isBot) car.respawnAt = s.clock + CFG.respawn;
+	car.respawnAt = s.clock + (car.isBot ? CFG.respawn : CFG.respawnPlayer);
 	void byPlayer;
 }
 
@@ -446,12 +459,14 @@ function botSteer(s: GameState, car: Car, dt: number): number {
 /* ---------- main step ---------- */
 
 /** Advance the whole simulation by one fixed step. `playerSteer`/`playerThrottle` in [-1, 1].
- *  Bots cruise (throttle 0) and only steer. */
+ *  Bots cruise (throttle 0) and only steer. Dying never ends a run — it costs a respawn delay;
+ *  the run ends when someone owns more than `CFG.winPct` of the arena. */
 export function stepGame(s: GameState, playerSteer: number, playerThrottle: number, dt: number): void {
+	if (s.over) return;
 	s.clock += dt;
 	for (const car of s.cars) {
 		if (!car.alive) {
-			if (car.isBot && s.clock >= car.respawnAt) respawn(s, car);
+			if (s.clock >= car.respawnAt) respawn(s, car);
 			continue;
 		}
 		const steer = car.isBot ? botSteer(s, car, dt) : playerSteer;
@@ -459,6 +474,23 @@ export function stepGame(s: GameState, playerSteer: number, playerThrottle: numb
 		slideWalls(car, dt);
 		updateGrid(s, car);
 	}
+	const target = (TOTAL * CFG.winPct) / 100;
+	for (let id = 1; id <= CAR_COUNT; id++) {
+		if (s.counts[id] > target) finish(s, id, false);
+	}
+	if (!s.over && s.clock >= CFG.timeLimit) {
+		let lead = 1;
+		for (let id = 2; id <= CAR_COUNT; id++) if (s.counts[id] > s.counts[lead]) lead = id;
+		finish(s, lead, true);
+	}
+}
+
+function finish(s: GameState, id: number, byTime: boolean): void {
+	if (s.over) return;
+	s.over = true;
+	s.winner = id;
+	s.overByTime = byTime;
+	s.events.push({ type: 'win', id, byTime });
 }
 
 /** Percentage of the arena a car controls (0..100). */
