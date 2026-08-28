@@ -195,6 +195,21 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		decalTex.needsUpdate = true;
 	};
 
+	// Skid marks used to stay for the whole race and ended up masking the territory
+	// underneath, which IS the score. Fade them in steps: an 8-bit alpha ignores a
+	// per-frame nudge too small to round down. A mark is gone in ~9 s.
+	let decalFadeAcc = 0;
+	const fadeDecals = (dtSec: number) => {
+		decalFadeAcc += dtSec;
+		if (decalFadeAcc < 0.35) return;
+		decalFadeAcc = 0;
+		decal.ctx.globalCompositeOperation = 'destination-out';
+		decal.ctx.fillStyle = 'rgba(0,0,0,0.1)';
+		decal.ctx.fillRect(0, 0, GRID, GRID);
+		decal.ctx.globalCompositeOperation = 'source-over';
+		decalTex.needsUpdate = true;
+	};
+
 	// --- trail overlay: repaint the cells the engine flagged as changed ---
 	const applyTrailDirty = () => {
 		if (state.trailDirty.length === 0) return;
@@ -267,6 +282,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		// Consume engine output.
 		if (s.captureFlag) { paintTerritory(); s.captureFlag = false; }
 		applyTrailDirty();
+		fadeDecals(dtSec);
 		for (const e of s.events) {
 			if (e.type === 'capture') spawn(e.cx, e.cz, PALETTE[e.id], 6, 3, 26, 2.2, 0.8);
 			else if (e.type === 'death') { spawn(e.x, e.z, PALETTE[e.id], 14, 5, 40, 2.6, 0.9); shake.t = 0.35; shake.mag = e.isPlayer ? 1.6 : 0.7; }
@@ -283,9 +299,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 			mesh.visible = car.alive;
 			if (!car.alive) continue;
 			const pose = carPose(car, alpha);
-			const wobble = car.drifting ? Math.sign(car.turnRate) * 0.18 : 0;
 			mesh.position.set(pose.x, 0, pose.z);
-			mesh.rotation.y = -pose.heading + wobble;
+			// No cosmetic wobble any more: the nose really does point off the travel line.
+			mesh.rotation.y = -pose.heading;
 			if (car.drifting) {
 				const bx = pose.x - Math.cos(pose.heading) * 1.3;
 				const bz = pose.z - Math.sin(pose.heading) * 1.3;
@@ -341,6 +357,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		trailTex.needsUpdate = true;
 		decalTex.needsUpdate = true;
 		particles.length = 0;
+		decalFadeAcc = 0;
 		shake.t = 0;
 		camHeading = state.cars[0].heading;
 		paintTerritory();

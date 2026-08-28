@@ -22,6 +22,8 @@ type Phase = 'menu' | 'playing' | 'dead';
 type Mode = 'libre' | 'defi';
 interface DailyState { best: number; tries: number }
 const STEP = 1000 / 60;
+// Kept under CFG.driftJab on purpose: holding a key carves, it never breaks traction.
+const KEY_RAMP = 2.2; // steer units per second when a key is held (~0.45 s to full lock)
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 const toTenths = (p: number) => Math.round(p * 10); // % -> stored tenths of a percent
 const fmtPct = (v: number) => formatScore(DAILY_LB.bolides.fmt, v);
@@ -49,6 +51,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const stateRef = useRef<GameState>(createGame());
 	const rendererRef = useRef<Renderer | null>(null);
 	const keysRef = useRef({ left: false, right: false, up: false, down: false });
+	const keySteerRef = useRef(0); // ramped key steer, see frame()
+	const lastTapRef = useRef({ key: '', at: 0 }); // double-tap a side = flick the wheel over
 	const dragRef = useRef({ active: false, steer: 0, throttle: 0, ox: 0, oy: 0 });
 	const rafRef = useRef(0);
 	const lastRef = useRef(0);
@@ -119,7 +123,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		lastRef.current = now;
 		accRef.current += dt;
 		const k = keysRef.current, d = dragRef.current;
-		const steer = d.active ? d.steer : (k.right ? 1 : 0) - (k.left ? 1 : 0);
+		// A key is all-or-nothing, so ramp it: tapped straight to ±1 the car snaps to full
+		// lock and there is no way to hold a shallow line.
+		const target = (k.right ? 1 : 0) - (k.left ? 1 : 0);
+		const rate = (dt / 1000) * KEY_RAMP;
+		keySteerRef.current += Math.max(-rate, Math.min(rate, target - keySteerRef.current));
+		const steer = d.active ? d.steer : keySteerRef.current;
 		const throttle = d.active ? d.throttle : (k.up ? 1 : 0) - (k.down ? 1 : 0);
 		while (runningRef.current && accRef.current >= STEP) {
 			accRef.current -= STEP;
@@ -151,6 +160,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		hudAccRef.current = 0;
 		bestPctRef.current = 0;
 		deathsRef.current = 0;
+		keySteerRef.current = 0;
 		setRespawnIn(0);
 		setLeft(CFG.timeLimit);
 		rafRef.current = requestAnimationFrame(frame);
@@ -232,6 +242,17 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		};
 		const onDown = (e: KeyboardEvent) => {
 			const used = set(e.key, true);
+			// A held key can only ramp, so it always grips. Double-tapping a side slams the
+			// steer over in one frame — that is the keyboard's flick, and it breaks traction.
+			if (used && !e.repeat) {
+				const k = keysRef.current;
+				const dir = k.left && !k.right ? -1 : k.right && !k.left ? 1 : 0;
+				if (dir !== 0) {
+					const now = performance.now();
+					if (e.key === lastTapRef.current.key && now - lastTapRef.current.at < 260) keySteerRef.current = dir;
+					lastTapRef.current = { key: e.key, at: now };
+				}
+			}
 			if (used || (runningRef.current && NAV.has(e.key))) e.preventDefault();
 		};
 		const onUp = (e: KeyboardEvent) => { set(e.key, false); };
@@ -242,7 +263,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 	/* Touch/mouse: a relative joystick where the finger lands — up/down = throttle/brake,
 	   left/right = steer. Positioned via refs so dragging never rerenders React. */
-	const JOY_R = 62; // px radius for full deflection
+	const JOY_R = 96; // px radius for full deflection — a long throw is what buys small corrections
+	// Squared response: the first third of the throw barely turns, full lock still sits at the rim.
+	const expo = (v: number) => v * Math.abs(v);
 	const positionJoy = (cx: number, cy: number, dx: number, dy: number) => {
 		const rect = boardRef.current?.getBoundingClientRect();
 		if (!rect) return;
@@ -267,8 +290,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			const d = dragRef.current;
 			if (!d.active) return;
 			const dx = cx - d.ox, dy = cy - d.oy;
-			d.steer = Math.max(-1, Math.min(1, dx / JOY_R));
-			d.throttle = Math.max(-1, Math.min(1, -dy / JOY_R)); // up = accelerate
+			d.steer = expo(Math.max(-1, Math.min(1, dx / JOY_R)));
+			d.throttle = Math.max(-1, Math.min(1, -dy / (JOY_R * 0.65))); // up = accelerate
 			positionJoy(d.ox, d.oy, dx, dy);
 		},
 		() => {
@@ -342,7 +365,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							</p>
 							<button className="bo-play" onClick={play}>▶ Jouer</button>
 							{status && <p className="bo-hint">{status}</p>}
-							<p className="bo-hint">Glisse le doigt : haut/bas = accélérer/freiner, gauche/droite = tourner. Clavier : flèches ou ZQSD.</p>
+							<p className="bo-hint">Glisse le doigt : haut/bas = accélérer/freiner, gauche/droite = tourner. Un coup sec sur le côté = drift. Clavier : flèches ou ZQSD, double-tape un côté pour drifter.</p>
 						</div>
 					</div>
 				)}
@@ -394,8 +417,11 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="bo-help">
-				<strong>Glisse le doigt</strong> sur l'écran : haut/bas pour accélérer ou freiner, gauche/droite pour tourner
-				(au clavier&nbsp;: flèches ou ZQSD). Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
+				<strong>Glisse le doigt</strong> sur l'écran : haut/bas pour accélérer ou freiner, gauche/droite pour tourner.
+				Un mouvement progressif trace une courbe posée&nbsp;; un coup sec sur le côté fait <strong>drifter</strong>&nbsp;:
+				l'arrière glisse, puis la voiture se replace et boucle le virage bien plus vite
+				(au clavier&nbsp;: flèches ou ZQSD, double-tape un côté pour partir en glisse).
+				Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
 				Sors, boucle, reviens → capture. Ne laisse personne couper ta trace ; coupe la leur. Te faire couper ne finit
 				pas la partie&nbsp;: tu réapparais au point de départ après 3&nbsp;s, mais les rivaux, eux, continuent.
 				{mode === 'defi' && ' Le défi du jour partage la même arène et le même classement pour tout le monde.'}
@@ -453,7 +479,7 @@ const CSS = `
 }
 .game-page.gf-full .bo-minimap { width: 132px; height: 132px; }
 .bo-joy-base, .bo-joy-knob { position: absolute; display: none; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 3; }
-.bo-joy-base { width: 124px; height: 124px; background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.25); }
+.bo-joy-base { width: 192px; height: 192px; background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.25); }
 .bo-joy-knob { width: 56px; height: 56px; background: rgba(255,255,255,0.35); border: 2px solid rgba(255,255,255,0.55); }
 .bo-actions { display: flex; gap: 10px; justify-content: center; margin-top: 0.7rem; }
 .bo-restart, .bo-quit { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 18px; cursor: pointer; -webkit-tap-highlight-color: transparent; }

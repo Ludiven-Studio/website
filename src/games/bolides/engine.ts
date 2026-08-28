@@ -24,9 +24,15 @@ export const CFG = {
 	maxSpeed: 28, // full throttle
 	minSpeed: 7, // hard brake (never a full stop, so a trail keeps forming)
 	accelResp: 2.6, // how fast speed eases toward the throttle target (weight/inertia)
-	turnRadius: 5.4, // tighter = more agile; turn rate scales with speed (constant radius)
-	steerResp: 9, // how fast the applied turn eases toward the input (steering inertia)
-	driftFrac: 0.6, // |turnRate| above this fraction of the max = drifting (cosmetic)
+	turnRadius: 8, // gripped turning circle; a drift tightens it (see driftBoost)
+	steerResp: 5.5, // how fast the applied turn eases toward the input (steering inertia)
+	grip: 18, // how fast the travel direction catches the heading — the gap is the slide
+	driftGrip: 6, // grip while sliding: ~30° of slip at cruise, which is what reads as a drift
+	driftBoost: 1.5, // the nose swings harder mid-drift, so a slide corners tighter than grip
+	driftJab: 2.6, // steer units/s that break traction — a flick does, a slow finger sweep doesn't
+	driftLock: 0.6, // a jab under this much lock is just a correction
+	driftMinSpeed: 12, // the tyres always hold below this
+	driftHold: 0.7, // seconds a break lasts, refreshed by another jab
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
 	wallDrag: 4, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
 	wallMargin: 3, // bots start turning back this far from the arena wall
@@ -71,6 +77,9 @@ export interface Car {
 	pz: number;
 	ph: number;
 	turnRate: number; // current (eased) angular velocity
+	vh: number; // heading the car actually travels along; lags `heading` when grip is low
+	steerPrev: number; // last frame's steer input (jab detection)
+	driftT: number; // seconds of traction loss left
 	drifting: boolean;
 	scraping: boolean; // rubbing the arena rail (slowed down; renderer throws sparks)
 	outside: boolean; // currently laying a trail (out of own territory)
@@ -164,6 +173,9 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
 	car.speed = CFG.cruise;
 	car.turnRate = 0;
+	car.vh = car.heading;
+	car.steerPrev = 0;
+	car.driftT = 0;
 	car.alive = true;
 	car.outside = false;
 	car.drifting = false;
@@ -211,6 +223,7 @@ export function createGame(seed = randSeed(), diff = 1): GameState {
 			isBot: i !== 0,
 			alive: true,
 			x: 0, z: 0, heading: 0, speed: CFG.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
+			vh: 0, steerPrev: 0, driftT: 0,
 			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
 		};
@@ -251,12 +264,24 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number): void {
 		? CFG.cruise + (CFG.maxSpeed - CFG.cruise) * throttle
 		: CFG.cruise + (CFG.cruise - CFG.minSpeed) * throttle;
 	car.speed += (targetSpeed - car.speed) * Math.min(1, dt * CFG.accelResp);
-	const maxTurn = car.speed / CFG.turnRadius; // constant turn radius → tighter arcs when slow
+
+	// How FAST the wheel is thrown decides the corner, not just how far: sweep the input
+	// and the car carves a wide gripped arc, snap it over and the back steps out.
+	const jab = Math.abs(steer - car.steerPrev) / Math.max(dt, 1e-4);
+	car.steerPrev = steer;
+	if (jab > CFG.driftJab && Math.abs(steer) > CFG.driftLock && car.speed > CFG.driftMinSpeed) {
+		car.driftT = CFG.driftHold;
+	}
+	car.driftT = Math.max(0, car.driftT - dt);
+	car.drifting = car.driftT > 0;
+
+	const maxTurn = (car.speed / CFG.turnRadius) * (car.drifting ? CFG.driftBoost : 1);
 	car.turnRate += (steer * maxTurn - car.turnRate) * Math.min(1, dt * CFG.steerResp);
 	car.heading += car.turnRate * dt;
-	car.x += Math.cos(car.heading) * car.speed * dt;
-	car.z += Math.sin(car.heading) * car.speed * dt;
-	car.drifting = Math.abs(car.turnRate) > maxTurn * CFG.driftFrac && car.speed > CFG.minSpeed * 1.4;
+	// The car travels along vh, not where its nose points — that gap IS the slide.
+	car.vh += angleDiff(car.heading, car.vh) * Math.min(1, dt * (car.drifting ? CFG.driftGrip : CFG.grip));
+	car.x += Math.cos(car.vh) * car.speed * dt;
+	car.z += Math.sin(car.vh) * car.speed * dt;
 }
 
 /** Arena edges are guard rails, not a death trap: clamp back inside and ease the heading along
@@ -286,6 +311,8 @@ function slideWalls(car: Car, dt: number): void {
 
 	car.heading += angleDiff(tangent, car.heading) * Math.min(1, dt * 5);
 	car.turnRate = 0;
+	car.vh = car.heading; // the rail kills a slide: no sliding along the wall
+	car.driftT = 0;
 	car.speed += (CFG.minSpeed - car.speed) * Math.min(1, dt * CFG.wallDrag);
 }
 
