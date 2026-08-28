@@ -264,6 +264,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	/* Touch/mouse: a relative joystick where the finger lands — up/down = throttle/brake,
 	   left/right = steer. Positioned via refs so dragging never rerenders React. */
 	const JOY_R = 96; // px radius for full deflection — a long throw is what buys small corrections
+	const JOY_VIS = 0.5; // the ring is drawn at half that radius (see .bo-joy-base)
 	// Squared response: the first third of the throw barely turns, full lock still sits at the rim.
 	const expo = (v: number) => v * Math.abs(v);
 	const positionJoy = (cx: number, cy: number, dx: number, dy: number) => {
@@ -272,7 +273,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		const base = joyBaseRef.current, knob = joyKnobRef.current;
 		if (base) { base.style.left = `${cx - rect.left}px`; base.style.top = `${cy - rect.top}px`; }
 		if (knob) {
-			const cl = (v: number) => Math.max(-JOY_R, Math.min(JOY_R, v));
+			// The ring is drawn smaller than the throw so it doesn't sit over half the arena;
+			// the knob is scaled to match, so the rim still means full lock.
+			const cl = (v: number) => Math.max(-JOY_R, Math.min(JOY_R, v)) * JOY_VIS;
 			knob.style.left = `${cx - rect.left + cl(dx)}px`;
 			knob.style.top = `${cy - rect.top + cl(dy)}px`;
 		}
@@ -479,8 +482,8 @@ const CSS = `
 }
 .game-page.gf-full .bo-minimap { width: 132px; height: 132px; }
 .bo-joy-base, .bo-joy-knob { position: absolute; display: none; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 3; }
-.bo-joy-base { width: 192px; height: 192px; background: rgba(255,255,255,0.10); border: 2px solid rgba(255,255,255,0.25); }
-.bo-joy-knob { width: 56px; height: 56px; background: rgba(255,255,255,0.35); border: 2px solid rgba(255,255,255,0.55); }
+.bo-joy-base { width: 96px; height: 96px; background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.14); }
+.bo-joy-knob { width: 34px; height: 34px; background: rgba(255,255,255,0.16); border: 1.5px solid rgba(255,255,255,0.32); }
 .bo-actions { display: flex; gap: 10px; justify-content: center; margin-top: 0.7rem; }
 .bo-restart, .bo-quit { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 8px 18px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .bo-restart { background: var(--bo-accent); color: var(--accent-text-over); border-color: transparent; }
