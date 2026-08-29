@@ -286,6 +286,8 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		for (const e of s.events) {
 			if (e.type === 'capture') spawn(e.cx, e.cz, PALETTE[e.id], 6, 3, 26, 2.2, 0.8);
 			else if (e.type === 'death') { spawn(e.x, e.z, PALETTE[e.id], 14, 5, 40, 2.6, 0.9); shake.t = 0.35; shake.mag = e.isPlayer ? 1.6 : 0.7; }
+			// Snapping your own line is a setback, not a crash: a puff, and a nudge if it's you.
+			else if (e.type === 'snap') { spawn(e.x, e.z, PALETTE[e.id], 7, 2, 16, 1.8, 0.5); if (e.isPlayer) { shake.t = 0.2; shake.mag = 0.5; } }
 		}
 		// events are cleared by the React loop after both render + UI have read them.
 

@@ -425,8 +425,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				l'arrière glisse, puis la voiture se replace et boucle le virage bien plus vite
 				(au clavier&nbsp;: flèches ou ZQSD, double-tape un côté pour partir en glisse).
 				Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
-				Sors, boucle, reviens → capture. Ne laisse personne couper ta trace ; coupe la leur. Te faire couper ne finit
-				pas la partie&nbsp;: tu réapparais au point de départ après 3&nbsp;s, mais les rivaux, eux, continuent.
+				Sors, boucle, reviens → capture. Recroiser ta propre trace efface la boucle en cours, sans plus&nbsp;:
+				tu repars de là. En revanche, si un rival coupe ta trace, tu réapparais au point de départ après 3&nbsp;s
+				pendant que les autres continuent — alors coupe la leur en premier.
 				{mode === 'defi' && ' Le défi du jour partage la même arène et le même classement pour tout le monde.'}
 			</p>
 		</div>

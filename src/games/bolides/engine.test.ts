@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGame, stepGame, resetGame, pct, TOTAL, HALF, CFG, type GameState } from './engine';
+import { createGame, stepGame, resetGame, pct, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, type GameState } from './engine';
 
 /** Recount ownership straight from the grid — the source of truth for setOwner bookkeeping. */
 function recount(s: GameState): number[] {
@@ -73,20 +73,50 @@ describe('bolides engine', () => {
 		expect(Math.hypot(me.x - HALF, me.z - HALF)).toBeGreaterThan(10); // slid out of the corner
 	});
 
+	it('drops the loop, not the car, when you cross your own line', () => {
+		const s = createGame();
+		const me = s.cars[0];
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; }); // no rival blades around
+		me.x = 0; me.z = 0; me.heading = 0; // out in neutral ground: a hard circle self-crosses
+		me.px = me.x; me.pz = me.z;
+		let snaps = 0, read = 0;
+		for (let i = 0; i < 600; i++) {
+			const before = me.trail.length;
+			stepGame(s, 1, 0, 1 / 60);
+			for (; read < s.events.length; read++) {
+				if (s.events[read].type !== 'snap') continue;
+				snaps++;
+				expect(before).toBeGreaterThan(CFG.grace); // never the fresh tail
+				expect(me.trail.length).toBe(0); // the whole loop is gone
+			}
+			expect(me.alive).toBe(true);
+		}
+		expect(snaps).toBeGreaterThan(0);
+	});
+
 	it('respawns the player at the start point instead of ending the run', () => {
 		const s = createGame();
 		const me = s.cars[0];
-		me.x = 0; me.z = 0; me.heading = 0; // out in neutral ground: a hard circle self-crosses
+		const foe = s.cars[1];
+		me.x = 0; me.z = 0; me.heading = 0; // neutral ground: drive straight and lay a line
 		me.px = me.x; me.pz = me.z;
-		let died = -1, back = -1;
-		for (let i = 0; i < 900 && back < 0; i++) {
-			stepGame(s, 1, 0, 1 / 60);
-			if (died < 0 && !me.alive) died = i;
-			else if (died >= 0 && me.alive) back = i;
+		for (let i = 0; i < 40; i++) stepGame(s, 0, 0, 1 / 60);
+		expect(me.trail.length).toBeGreaterThan(CFG.grace);
+		// Only a rival's blade kills now, so put one on the middle of the player's line.
+		const cut = me.trail[me.trail.length >> 1];
+		foe.alive = true;
+		foe.x = cellCenterX(cut); foe.z = cellCenterZ(cut);
+		foe.px = foe.x; foe.pz = foe.z;
+		stepGame(s, 0, 0, 1 / 600); // short step so the foe stays on that cell
+		expect(me.alive).toBe(false);
+		const died = s.clock;
+		let back = -1;
+		for (let i = 0; i < 400 && back < 0; i++) {
+			stepGame(s, 0, 0, 1 / 60);
+			if (me.alive) back = s.clock;
 		}
-		expect(died).toBeGreaterThan(0);
 		expect(s.over).toBe(false); // dying is a setback, not the end of the run
-		expect((back - died) / 60).toBeCloseTo(CFG.respawnPlayer, 1);
+		expect(back - died).toBeCloseTo(CFG.respawnPlayer, 1);
 		expect(Math.hypot(me.x + HALF * 0.5, me.z + HALF * 0.5)).toBeLessThan(1); // back on START_POS[0]
 	});
 

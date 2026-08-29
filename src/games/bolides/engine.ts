@@ -92,6 +92,7 @@ export type GameEvent =
 	| { type: 'capture'; id: number; cx: number; cz: number; gain: number }
 	| { type: 'kill'; killer: number; victim: number; x: number; z: number }
 	| { type: 'death'; id: number; x: number; z: number; isPlayer: boolean }
+	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean } // cut your own trail
 	| { type: 'win'; id: number; byTime: boolean };
 
 export interface GameState {
@@ -402,10 +403,12 @@ function updateGrid(s: GameState, car: Car): void {
 		const victim = s.cars[t - 1];
 		killCar(s, victim, !car.isBot, car.id); // cut an enemy trail
 	} else if (t === car.id) {
-		// self-crossing dies, except on the fresh tail (grace) right after leaving.
+		// Crossing your OWN line costs the loop, not the car — only a rival's blade kills.
+		// The fresh tail is spared, or leaving home would snap the trail on the first pixel.
 		const idx = car.trail.indexOf(cell);
 		if (idx >= 0 && idx < car.trail.length - CFG.grace) {
-			killCar(s, car, false, 0);
+			clearTrail(s, car);
+			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: !car.isBot });
 			return;
 		}
 	}
