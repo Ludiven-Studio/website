@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { createGame, stepGame, resetGame, pct, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, type GameState } from './engine';
+import { createGame as newGame, stepGame, resetGame, pct, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, type GameState } from './engine';
+
+// createGame() defaults to a random seed, so the bots would play a different game on every run
+// and every assertion below would be a coin toss. Pin it: a failure here must be reproducible.
+const SEED = 20260829;
+const createGame = (seed = SEED) => newGame(seed);
 
 /** Recount ownership straight from the grid — the source of truth for setOwner bookkeeping. */
 function recount(s: GameState): number[] {
@@ -52,6 +57,7 @@ describe('bolides engine', () => {
 	it('slides along the arena wall instead of dying there', () => {
 		const s = createGame();
 		const me = s.cars[0];
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; }); // the rail alone, no rival blade
 		me.x = HALF - 1; me.z = 0; me.heading = 0; // nose into the east wall
 		me.px = me.x; me.pz = me.z;
 		for (let i = 0; i < 600; i++) stepGame(s, 0, 1, 1 / 60);
