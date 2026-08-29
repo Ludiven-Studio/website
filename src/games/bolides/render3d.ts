@@ -17,6 +17,16 @@ const CAM_DIST = 17; // how far behind the car
 const CAM_HEIGHT = 9.5; // how high above
 const CAM_LOOK = 9; // look-at point ahead of the car
 const CAM_LOOK_Y = 1.5; // aim slightly above the ground
+// Faster than the old 4 because the camera now chases vh, which is itself a lowpass of the
+// heading: at 4 the two lags added and the nose reached 92 deg off screen-forward, which reads
+// as a spin, not a drift. See the sweep in the "vague 8" section of the plan.
+const CAM_EASE = 7;
+// Body attitude. The car's nose is local +X, so rotation.x is roll and rotation.z is pitch.
+// Roll is driven by lateral acceleration (speed x turnRate), not by turnRate alone: turnRate
+// hits speed/turnRadius = 5.2 rad/s flat out, so the old `turnRate * 0.18` sat pinned at the
+// 0.22 clamp any time the wheel was touched — a permanent 13 deg tilt.
+const ROLL_K = 0.0013, ROLL_MAX = 0.10; // ~4 deg at cruise, 5.7 deg flat out
+const PITCH_K = 0.0016, PITCH_MAX = 0.06;
 // Measured live occupancy: 53 mean / 99 peak in free 4-car driving, but 316/320 with four
 // simultaneous kills, and spawn() silently drops past the cap — a kill landing during a snap
 // starved the trail head and rail sparks for a full second. Smoke sat pinned at 32/32, so drift
@@ -216,15 +226,27 @@ function makeChevronTexture(): THREE.CanvasTexture {
 /** Diagonal hazard stripes, tiling in world units (ExtrudeGeometry UVs are world coordinates).
     Amber over near-black is the one marking that belongs to no owner. */
 function makeHazardTexture(a: number, b: number, duty: number): THREE.CanvasTexture {
-	const N = 64;
+	// 4 stripe periods per tile either way, so the world scale set by `repeat` does not move.
+	// Doubled to 32 texels a period and blended across the edge instead of stepping: a stripe
+	// is 0.74 world units, which is under a pixel by mid-arena, and no mip level can average a
+	// binary diagonal away — that is the rail moire.
+	const P = 32, N = P * 4;
 	const c = document.createElement('canvas');
 	c.width = c.height = N;
 	const ctx = c.getContext('2d')!;
 	const img = ctx.createImageData(N, N);
 	const d = new Uint32Array(img.data.buffer);
 	const [ar, ag, ab] = rgb(a), [br, bg, bb] = rgb(b);
-	const A = pack(ar, ag, ab), B = pack(br, bg, bb);
-	for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) d[y * N + x] = ((x + y) & 15) < duty ? A : B;
+	const half = duty / 32; // half the amber band, in period units (`duty` stays out of 16)
+	for (let y = 0; y < N; y++) {
+		for (let x = 0; x < N; x++) {
+			let o = ((x + y) % P) / P - half; // centred on the band, wrapped to [-0.5, 0.5)
+			if (o > 0.5) o -= 1; else if (o < -0.5) o += 1;
+			// 1.4 texels of blend: enough to kill the step, narrow enough to stay a stripe.
+			const k = Math.max(0, Math.min(1, (half - Math.abs(o)) * P / 1.4 + 0.5));
+			d[y * N + x] = pack(br + (ar - br) * k, bg + (ag - bg) * k, bb + (ab - bb) * k);
+		}
+	}
 	ctx.putImageData(img, 0, 0);
 	const t = new THREE.CanvasTexture(c);
 	t.colorSpace = THREE.SRGBColorSpace;
@@ -579,7 +601,15 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	} catch {
 		return null;
 	}
-	renderer.setPixelRatio(Math.min(coarse ? 1.5 : 2, window.devicePixelRatio || 1));
+	// On a dpr-1 monitor this used to render at 1.0 and MSAA only covers geometry edges, so the
+	// magnified 2-texel-per-unit floor stepped visibly. Supersampling the whole frame is what
+	// fixes it: measured on one frozen frame, hard-step amplitude in the mid+near bands falls
+	// 5.63 -> 2.24 at 1.5x while overall detail energy holds at 4.1, i.e. the staircase goes and
+	// the sharpness stays. 2x measured no better than 1.5x (2.56) for 4x the fill, so 1.5 is the
+	// floor and a real high-dpi screen still caps at 2. Phones keep their thermal budget.
+	renderer.setPixelRatio(coarse
+		? Math.min(1.5, window.devicePixelRatio || 1)
+		: Math.min(2, Math.max(1.5, window.devicePixelRatio || 1)));
 	// Neutral, not ACES: ACES rotates hue on saturated primaries and the four identities
 	// have to stay bleu/rouge/vert/jaune and match the 2-D minimap byte for byte.
 	renderer.toneMapping = THREE.NeutralToneMapping;
@@ -836,14 +866,14 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	// you must not cross has to be identifiable at any camera height.
 	const wallHazTex = makeHazardTexture(0xFFB86A, 0x000000, 5);
 	wallHazTex.repeat.set(0.34, 0.34);
-	wallHazTex.anisotropy = Math.min(4, maxAniso);
+	wallHazTex.anisotropy = maxAniso; // the rail is the grazing-angle surface aniso exists for
 	scene.add(new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({
 		color: 0x0D0B20, roughness: 0.7, metalness: 0.2, emissive: 0xFFFFFF, emissiveMap: wallHazTex, emissiveIntensity: 0.26,
 	})));
 	// White-lilac, not magenta: magenta is one hue step from the red fill and reads as territory.
 	const capHazTex = makeHazardTexture(0xFFC07A, 0xDCCBFF, 5);
 	capHazTex.repeat.set(0.34, 0.34);
-	capHazTex.anisotropy = Math.min(4, maxAniso);
+	capHazTex.anisotropy = maxAniso; // the rail is the grazing-angle surface aniso exists for
 	const capGeo = new THREE.ExtrudeGeometry(ringShape(HALF + 2.2, HALF - 0.2), { depth: 0.1, bevelEnabled: false });
 	capGeo.rotateX(-Math.PI / 2);
 	capGeo.computeBoundingBox();
@@ -1140,7 +1170,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	};
 
 	const heroCar = (s: GameState) => s.cars[s.hero - 1] ?? s.cars[0];
-	let camHeading = heroCar(state).heading; // eased so quick turns don't whip the camera
+	let camHeading = heroCar(state).vh; // eased so quick turns don't whip the camera
 	const shake = { t: 0, dur: 0.35, mag: 0 };
 	// A weaker source must not cut a bigger shake short.
 	const setShake = (mag: number, dur: number) => {
@@ -1403,8 +1433,12 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			mesh.position.set(pose.x, 0, pose.z);
 			// No cosmetic wobble any more: the nose really does point off the travel line.
 			spin.rotation.y = -pose.heading;
-			spin.rotation.x = Math.max(-0.22, Math.min(0.22, car.turnRate * 0.18)); // lean into the corner
-			spin.rotation.z = Math.max(-0.06, Math.min(0.06, (car.speed - prevSpeed[i]) * 0.05));
+			// Negated: a car rolls AWAY from the corner onto its outer suspension. Only a
+			// motorbike leans in, and leaning a car in is what read as a wrong-axis spin.
+			spin.rotation.x = Math.max(-ROLL_MAX, Math.min(ROLL_MAX, -car.turnRate * car.speed * ROLL_K));
+			// Real acceleration, not a per-frame speed delta: the old form doubled at 30 fps.
+			const accel = (car.speed - prevSpeed[i]) / Math.max(fxDt, 1e-3);
+			spin.rotation.z = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, accel * PITCH_K));
 			prevSpeed[i] = car.speed;
 			// The chip must never fall under a readable size just because the car is far away.
 			const dx = pose.x - camera.position.x, dz = pose.z - camera.position.z;
@@ -1503,7 +1537,11 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		stepPool(smoke, fxDt);
 
 		// Chase cam: ease the follow heading toward the car, then sit behind + above it.
-		camHeading += angleDiff(pp.heading, camHeading) * Math.min(1, fxDt * 4);
+		// Follow where the car TRAVELS (vh), not where its nose points. Locked to the nose, the
+		// engine's slip angle — 10 deg gripped, 30 deg drifting — was invisible: the car stayed
+		// square on screen and only the world slid, so the one body motion left to see was the
+		// roll. Behind the velocity vector, the nose visibly swings out and the drift reads.
+		camHeading += angleDiff(hero.vh, camHeading) * Math.min(1, fxDt * CAM_EASE);
 		const cdx = Math.cos(camHeading), cdz = Math.sin(camHeading);
 		// A DirectionalLight only uses position - target, so every car ahead of the hero picks
 		// up the same cyan edge — which is exactly the separation a crossing rival needs.
@@ -1566,7 +1604,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		fx.rush = 0;
 		fx.risk = 0;
 		fov = FOV_BASE;
-		camHeading = heroCar(state).heading;
+		camHeading = heroCar(state).vh;
 		paintTerritory(false); // also refills panel96 and raises lightDirty
 		lightC.ctx.clearRect(0, 0, LIGHT_N, LIGHT_N);
 		lightTex.needsUpdate = true;

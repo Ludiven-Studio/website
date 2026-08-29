@@ -21,11 +21,15 @@ let rate = 1; // pitch factor for one-shots (slow-mo hook, 1 = real time)
 let played = 0; // lifetime one-shots past the enabled gate — handy in a smoke test
 const lastAt: Record<string, number> = {};
 
-interface EngineLoop { o1: OscillatorNode; o2: OscillatorNode; o3: OscillatorNode; lp: BiquadFilterNode; g: GainNode }
+interface EngineLoop {
+	o1: OscillatorNode; o2: OscillatorNode; sub: OscillatorNode;
+	src: AudioBufferSourceNode; nbp: BiquadFilterNode; ng: GainNode;
+	lp: BiquadFilterNode; g: GainNode;
+}
 interface NoiseLoop { src: AudioBufferSourceNode; f1: BiquadFilterNode; f2: BiquadFilterNode; g: GainNode; lfo: OscillatorNode | null; lfoG: GainNode | null }
 
 let eng: EngineLoop | null = null;
-let engF = -1, engCut = -1, engG = -1;
+let engF = -1, engCut = -1, engG = -1, engAir = -1;
 let skidL: NoiseLoop | null = null;
 let skidF = -1, skidG = -1;
 let scrapeL: NoiseLoop | null = null;
@@ -202,19 +206,32 @@ function whoosh(c: AudioContext, f0: number, f1: number, q: number, peak: number
 
 /* ---------- continuous loops ---------- */
 
+// What the ear calls "engine" is an exhaust pulse train at the firing rate — a 4-stroke fires
+// twice per revolution, so 70 Hz off the throttle to 190 Hz flat out — not a musical pitch.
+// `rpm` is speed/maxSpeed and speed never leaves [minSpeed, maxSpeed], so the reachable range
+// is rpm 0.25..1 and F0/F1 are solved for that, not for 0..1.
+const ENG_F0 = 30, ENG_F1 = 160;
+const ENG_HARM = 14;
+// Harmonic rolloff. Flatter reads as a synth lead, steeper as a featureless hum; 0.85 measured
+// best on the phone band (300-3000 Hz) without giving the 2 kHz buzz back.
+const ENG_TILT = 0.85;
+
 function buildEngine(c: AudioContext): EngineLoop {
 	const lp = c.createBiquadFilter();
 	lp.type = 'lowpass';
 	lp.frequency.value = 700;
-	lp.Q.value = 3;
+	lp.Q.value = 0.7; // was 3: a resonant peak sweeping to 4.5 kHz is the mosquito whine itself
 	const g = c.createGain();
 	g.gain.value = 0.0001;
 	lp.connect(g); g.connect(master!);
-	// Two saws a few cents apart beat against each other: that wobble is the motor.
-	const mk = (type: OscillatorType, f: number, detune: number, level: number) => {
+
+	const re = new Float32Array(ENG_HARM + 1), im = new Float32Array(ENG_HARM + 1);
+	for (let n = 1; n <= ENG_HARM; n++) im[n] = Math.pow(n, -ENG_TILT) * (n % 2 ? 1 : 0.62);
+	const wave = c.createPeriodicWave(re, im);
+	const mk = (detune: number, level: number, periodic: boolean) => {
 		const o = c.createOscillator();
-		o.type = type;
-		o.frequency.value = f;
+		if (periodic) o.setPeriodicWave(wave); else o.type = 'sine';
+		o.frequency.value = ENG_F0 + ENG_F1 * 0.6;
 		o.detune.value = detune;
 		const vg = c.createGain();
 		vg.gain.value = level;
@@ -222,10 +239,27 @@ function buildEngine(c: AudioContext): EngineLoop {
 		o.start();
 		return o;
 	};
-	const o1 = mk('sawtooth', 180, -9, 0.5);
-	const o2 = mk('sawtooth', 180, 11, 0.5);
-	const o3 = mk('square', 360, 4, 0.3); // upper partial: what a phone speaker actually reproduces
-	return { o1, o2, o3, lp, g };
+	// 4 cents, not 10. Two saws 20 cents apart at the old 465 Hz beat at 5.4 Hz — dead centre
+	// of the band the ear hears as roughness, which is what made it an insect. At 190 Hz an
+	// 8-cent spread beats at 0.9 Hz: thickness, no tremolo.
+	const o1 = mk(-4, 0.85, true);
+	const o2 = mk(4, 0.85, true);
+	const sub = mk(0, 0.2, false);
+
+	// Intake turbulence. A pure harmonic stack still reads as a synth; broadband air under the
+	// tone is what makes it a machine moving gas.
+	const src = c.createBufferSource();
+	src.buffer = noiseBuf;
+	src.loop = true;
+	const nbp = c.createBiquadFilter();
+	nbp.type = 'bandpass';
+	nbp.frequency.value = 500;
+	nbp.Q.value = 0.8;
+	const ng = c.createGain();
+	ng.gain.value = 0.0001;
+	src.connect(nbp); nbp.connect(ng); ng.connect(lp);
+	src.start(0, Math.random());
+	return { o1, o2, sub, src, nbp, ng, lp, g };
 }
 
 function buildNoiseLoop(c: AudioContext, t1: BiquadFilterType, f1v: number, q1: number, t2: BiquadFilterType, f2v: number, q2: number, wobbleHz: number): NoiseLoop {
@@ -265,15 +299,17 @@ export function engine(rpm: number, load: number): void {
 	const e = eng ?? (eng = buildEngine(c));
 	const r = clamp01(rpm);
 	const l = clamp01(load);
-	const f = 165 + r * 300;
-	const cut = 620 + r * 3000 + l * 900;
-	const gain = 0.03 + r * 0.045 + l * 0.028;
+	const f = ENG_F0 + r * ENG_F1;
+	const cut = 420 + r * 1600 + l * 700;
+	const gain = 0.026 + r * 0.028 + l * 0.015;
+	const air = 0.14 + l * 0.21;
 	const now = c.currentTime;
-	if (Math.abs(f - engF) > 0.4) {
+	if (Math.abs(f - engF) > 0.2) {
 		engF = f;
 		e.o1.frequency.setTargetAtTime(f, now, 0.05);
 		e.o2.frequency.setTargetAtTime(f, now, 0.05);
-		e.o3.frequency.setTargetAtTime(f * 2, now, 0.05);
+		e.sub.frequency.setTargetAtTime(f, now, 0.05);
+		e.nbp.frequency.setTargetAtTime(220 + r * 700, now, 0.08);
 	}
 	if (Math.abs(cut - engCut) > 8) {
 		engCut = cut;
@@ -282,6 +318,10 @@ export function engine(rpm: number, load: number): void {
 	if (Math.abs(gain - engG) > 0.002) {
 		engG = gain;
 		e.g.gain.setTargetAtTime(gain, now, 0.05);
+	}
+	if (Math.abs(air - engAir) > 0.004) {
+		engAir = air;
+		e.ng.gain.setTargetAtTime(air, now, 0.06);
 	}
 }
 
@@ -328,9 +368,9 @@ export function stopLoops(): void {
 	const c = ctx;
 	if (!c) return;
 	if (eng) {
-		fade(eng, [eng.o1, eng.o2, eng.o3], [eng.lp], c);
+		fade(eng, [eng.o1, eng.o2, eng.sub, eng.src], [eng.lp, eng.nbp, eng.ng], c);
 		eng = null;
-		engF = engCut = engG = -1;
+		engF = engCut = engG = engAir = -1;
 	}
 	for (const l of [skidL, scrapeL]) {
 		if (!l) continue;
