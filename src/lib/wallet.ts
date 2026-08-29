@@ -63,6 +63,8 @@ export const THEMES: GameTheme[] = [
 
 export const themeId = (id: string): string => `skin:${id}`;
 
+export const carId = (id: string): string => `car:${id}`;
+
 // Unlocks live in the same `owned` array as blasons, namespaced. No extra storage key,
 // no migration — but every blason lookup must go through BLASONS, never through `owned`.
 export const unlockId = (gameId: string): string => `expert:${gameId}`;
@@ -191,6 +193,22 @@ export function buyTheme(id: string): boolean {
 	if (w.owned.includes(key)) return true;
 	if (w.balance < t.price) return false;
 	w.balance -= t.price;
+	w.owned.push(key);
+	write(w);
+	return true;
+}
+
+export const hasCar = (id: string): boolean => read().owned.includes(carId(id));
+
+// The price is a parameter, not a lookup: wallet.ts is imported by nearly every page, so it
+// must never pull a game module (and the bolides engine) into every bundle.
+/** Buy a bolide. Returns true on success (or if already owned). */
+export function buyCar(id: string, price: number): boolean {
+	const key = carId(id);
+	const w = read();
+	if (w.owned.includes(key)) return true;
+	if (w.balance < price) return false;
+	w.balance -= price;
 	w.owned.push(key);
 	write(w);
 	return true;

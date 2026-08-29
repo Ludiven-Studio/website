@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
 	createGame as newGame, stepGame, stepGuest, resetGame, collectEvents, buildSim, applySim,
-	pct, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, type GameState, type NetEvent,
+	setCarLookup, BASE_CAR, GRID, pct, cellCenterX, cellCenterZ, TOTAL, HALF, CFG,
+	type Car, type GameState, type NetEvent,
 } from './engine';
+import { BOLIDES, DEFAULT_CAR, carCfg } from './cars';
+import { goCars, type GoMsg } from './net';
+
+// The engine can't import the roster (cars.ts is built from CFG), so the roster is installed.
+setCarLookup(carCfg);
 
 // createGame() defaults to a random seed, so the bots would play a different game on every run
 // and every assertion below would be a coin toss. Pin it: a failure here must be reproducible.
@@ -185,5 +191,168 @@ describe('bolides engine', () => {
 		for (let i = 0; i < 60; i++) stepGame(down, 0, -1, 1 / 60); // full brake
 		expect(down.cars[0].speed).toBeLessThan(CFG.cruise - 1);
 		expect(down.cars[0].speed).toBeGreaterThanOrEqual(CFG.minSpeed - 1e-6);
+	});
+});
+
+/* ---------- the roster: one bolide per seat ---------- */
+
+const MIXED = ['bunker', 'comet', 'hornet', 'drifter'];
+
+/** A fixed input tape: the same steer/throttle every run, so only the sim can differ. */
+const TAPE = Array.from({ length: 1800 }, (_, i) => [i % 120 < 60 ? 1 : -1, i % 80 < 40 ? 1 : -1] as const);
+
+/** Row 100 is neutral ground: every home square sits in rows 41-59 or 141-159. */
+const rowCell = (row: number, col: number) => row * GRID + col;
+
+/** Lay `n` trail cells along a neutral row, exactly as updateGrid would. */
+function layTrail(s: GameState, car: Car, row: number, n: number): void {
+	car.trail.length = 0;
+	for (let k = 0; k < n; k++) {
+		const cell = rowCell(row, 50 + k);
+		s.trail[cell] = car.id;
+		car.trail.push(cell);
+	}
+}
+
+/** Park the attacker on `cell` and take one step short enough that it stays there. */
+function driveOnto(s: GameState, attacker: Car, cell: number): void {
+	attacker.x = cellCenterX(cell); attacker.z = cellCenterZ(cell);
+	attacker.px = attacker.x; attacker.pz = attacker.z;
+	attacker.heading = 0; attacker.vh = 0;
+	s.events.length = 0;
+	stepGame(s, 0, 0, 1 / 600);
+}
+
+describe('bolides roster', () => {
+	it('gives every seat the roster table its id names, and falls back on an unknown id', () => {
+		for (const b of BOLIDES) {
+			const s = newGame(SEED, 1, [b.id, b.id, b.id, b.id]);
+			for (const car of s.cars) {
+				expect(car.carId).toBe(b.id);
+				expect(car.cfg).toEqual(carCfg(b.id));
+			}
+		}
+		const junk = newGame(SEED, 1, ['no-such-car', '', 'bunker']);
+		expect(junk.cars[0].cfg).toEqual(carCfg(DEFAULT_CAR));
+		expect(junk.cars[1].cfg).toEqual(carCfg(DEFAULT_CAR));
+		expect(junk.cars[2].cfg).toEqual(carCfg('bunker'));
+		expect(junk.cars[3].cfg).toEqual(BASE_CAR); // no entry at all -> the base car
+	});
+
+	it('defaults to the base car, which is the shipped CFG', () => {
+		const s = createGame();
+		for (const car of s.cars) {
+			expect(car.carId).toBe(DEFAULT_CAR);
+			expect(car.cfg).toEqual({ ...CFG, shield: 0 });
+			expect(car.cfg).toEqual(carCfg(DEFAULT_CAR));
+		}
+	});
+
+	it('re-seats the roster on reset and keeps it when none is passed', () => {
+		const s = createGame();
+		resetGame(s, SEED, 1, MIXED);
+		expect(s.cars.map((c) => c.carId)).toEqual(MIXED);
+		resetGame(s, SEED, 1);
+		expect(s.cars.map((c) => c.carId)).toEqual(MIXED);
+	});
+
+	it('replays the same seed and roster to the very same counts and add stream', () => {
+		const play = () => {
+			const s = newGame(SEED, 2, MIXED);
+			s.record = true;
+			for (const [steer, throttle] of TAPE) {
+				stepGame(s, steer, throttle, 1 / 60);
+				s.events.length = 0;
+			}
+			return { counts: s.counts.slice(), add: s.netAdd.slice(), clock: s.clock };
+		};
+		const a = play();
+		const b = play();
+		expect(a.add.length).toBeGreaterThan(100); // the tape really drove a race
+		expect(b.counts).toEqual(a.counts);
+		expect(b.add).toEqual(a.add);
+		expect(b.clock).toBe(a.clock);
+	});
+
+	it('replays a mixed-roster host tick onto a guest and lands on the very same grid', () => {
+		const host = newGame(SEED, 1, MIXED);
+		host.record = true;
+		const guest = newGame(SEED, 1, MIXED);
+		guest.hero = 2;
+		for (const c of guest.cars) { c.remote = c.id !== guest.hero; c.isBot = false; }
+		const pending: NetEvent[] = [];
+		let snaps = 0;
+		for (let i = 0; i < 3000 && !host.over; i++) {
+			stepGame(host, i % 120 < 60 ? 1 : -1, 1, 1 / 60);
+			snaps += host.events.filter((e) => e.type === 'snap').length;
+			collectEvents(host, pending);
+			host.events.length = 0;
+			stepGuest(guest, i % 90 < 45 ? -1 : 1, 1, 1 / 60);
+			if (i % 3 === 2) applySim(guest, buildSim(host, pending));
+		}
+		expect(host.clock).toBeGreaterThan(10);
+		expect(snaps).toBeGreaterThan(0); // snaps are the shield's channel to the guests
+		expect(guest.owner).toEqual(host.owner);
+		expect(guest.trail).toEqual(host.trail);
+	});
+});
+
+describe('bolides shield', () => {
+	/** Attacker in seat 1, victim in seat 2 with a long trail on a neutral row. */
+	function duel(victimCar: string) {
+		const s = newGame(SEED, 1, ['roadster', victimCar, 'roadster', 'roadster']);
+		const attacker = s.cars[0];
+		const victim = s.cars[1];
+		s.cars.slice(2).forEach((c) => { c.alive = false; c.respawnAt = 1e9; });
+		// The victim sits home so its own updateGrid leaves the hand-laid trail alone.
+		victim.outside = false;
+		layTrail(s, victim, 100, 100);
+		layTrail(s, attacker, 98, 12);
+		attacker.outside = true;
+		return { s, attacker, victim };
+	}
+
+	it('refuses the cut on a bunker fresh trail and snaps the attacker instead', () => {
+		const { s, attacker, victim } = duel('bunker');
+		const fresh = victim.trail[victim.trail.length - 1];
+		driveOnto(s, attacker, fresh);
+		expect(victim.alive).toBe(true);
+		expect(victim.trail.length).toBe(100); // the armoured line is untouched
+		expect(attacker.trail.length).toBe(0); // its own loop is gone
+		expect(s.events.some((e) => e.type === 'snap' && e.id === attacker.id)).toBe(true);
+		expect(s.events.some((e) => e.type === 'kill')).toBe(false);
+	});
+
+	it('kills a bunker normally on trail older than the shield window', () => {
+		const { s, attacker, victim } = duel('bunker');
+		expect(victim.cfg.shield).toBeGreaterThan(0);
+		expect(victim.cfg.shield).toBeLessThan(100); // the hand-laid trail must outlive the window
+		const old = victim.trail[0];
+		driveOnto(s, attacker, old);
+		expect(victim.alive).toBe(false);
+		expect(s.events.some((e) => e.type === 'kill' && e.killer === attacker.id)).toBe(true);
+		expect(attacker.trail.length).toBeGreaterThan(0); // the attacker keeps its loop
+	});
+
+	it('kills an unshielded car even on its freshest cell', () => {
+		const { s, attacker, victim } = duel('comet');
+		expect(victim.cfg.shield).toBe(0);
+		driveOnto(s, attacker, victim.trail[victim.trail.length - 1]);
+		expect(victim.alive).toBe(false);
+		expect(s.events.some((e) => e.type === 'kill' && e.killer === attacker.id)).toBe(true);
+	});
+});
+
+describe('bolides go message', () => {
+	it('reads a seat roster and degrades to the default car on junk', () => {
+		const base: GoMsg = { seed: 1, diff: 1, ids: ['a', 'b', 'c', 'd'] };
+		expect(goCars({ ...base, cars: MIXED }, 4)).toEqual(MIXED);
+		expect(goCars(base, 4)).toEqual(new Array(4).fill(DEFAULT_CAR)); // an older host
+		expect(goCars({ ...base, cars: ['bunker'] }, 4)).toEqual(['bunker', DEFAULT_CAR, DEFAULT_CAR, DEFAULT_CAR]);
+		const junk = { ...base, cars: [1, null, { id: 'x' }, 'comet'] } as unknown as GoMsg;
+		expect(goCars(junk, 4)).toEqual([DEFAULT_CAR, DEFAULT_CAR, DEFAULT_CAR, 'comet']);
+		expect(goCars({ ...base, cars: 'bunker' } as unknown as GoMsg, 4)).toEqual(new Array(4).fill(DEFAULT_CAR));
+		// An unknown id must still build a car, not throw.
+		expect(() => newGame(SEED, 1, goCars({ ...base, cars: ['ghost'] }, 4))).not.toThrow();
 	});
 });

@@ -11,6 +11,7 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../data/site';
 import type { NetPose, SimMsg } from './engine';
+import { DEFAULT_CAR } from './cars';
 
 export const MAX_PLAYERS = 4;
 const MAX_ROOMS = 16;
@@ -21,8 +22,15 @@ export interface BolidePeer { id: string; name: string; playing: boolean }
 
 /** A driver's own car, sent by whoever owns it. */
 export interface PoseMsg { i: string; p: NetPose }
-/** Host -> everyone: the race starts now. `ids` freezes the seat order for the whole race. */
-export interface GoMsg { seed: number; diff: number; ids: string[] }
+/** Host -> everyone: the race starts now. `ids` freezes the seat order for the whole race,
+ *  `cars` the bolide each seat drives (parallel to `ids`; missing entries = the default car). */
+export interface GoMsg { seed: number; diff: number; ids: string[]; cars?: string[] }
+
+/** Seat -> bolide id, tolerant of an older host, a short list or a garbage payload. */
+export function goCars(go: GoMsg, seats: number): string[] {
+	const src = Array.isArray(go.cars) ? go.cars : [];
+	return Array.from({ length: seats }, (_, i) => (typeof src[i] === 'string' ? src[i] : DEFAULT_CAR));
+}
 /** Host -> everyone while waiting: seconds left on the auto-start, or -1 for "still alone". */
 export interface LobbyMsg { in: number }
 

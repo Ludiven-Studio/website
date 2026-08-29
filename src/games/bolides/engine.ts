@@ -7,6 +7,7 @@
    drives the fixed-step loop.
    ===================================================== */
 import { mulberry32, type Rng } from '../prng';
+import type { CarCfg } from './cars';
 
 export const ARENA = 100; // world units, square centred on the origin (−50..+50)
 export const GRID = 200; // logical cells per side
@@ -15,7 +16,7 @@ export const HALF = ARENA / 2;
 export const TOTAL = GRID * GRID;
 
 // id 0 = neutral. Cars are ids 1..N. Colours are vivid so trails read at a glance.
-export const PALETTE = [0x1b2028, 0x2f6bff, 0xff3b30, 0x30d158, 0xffd60a]; // neutral, blue, red, green, yellow
+export const PALETTE = [0x0B0F1E, 0x3D8BFF, 0xFF2E63, 0x1DE9A0, 0xFFD400]; // neutral, blue, pink, mint, yellow
 export const NAMES = ['', 'TOI', 'Rouge', 'Vert', 'Jaune'];
 export const CAR_COUNT = 4; // 1 player + 3 bots
 
@@ -53,6 +54,25 @@ export const DIFFS = [
 	{ label: 'Difficile', aggro: 0.55, outMax: 38 },
 ] as const;
 
+/* ---------- per-car config ----------
+   Every car drives on its own copy of CFG, so a roster of five bolides is just five tables.
+   The roster itself lives in cars.ts, which builds its tables FROM CFG — so the engine must
+   never import it back at runtime (the cycle would read CFG before it is initialised). The
+   roster registers itself through setCarLookup(); until it does, every seat is the base car,
+   which is byte-identical to the shipped CFG. */
+
+export const BASE_CAR_ID = 'roadster';
+export const BASE_CAR: CarCfg = { ...CFG, shield: 0 };
+
+/** A seat's car: an id resolved through the installed roster, or a ready-made table. */
+export type CarPick = string | CarCfg;
+
+let lookupCar: (id: string) => CarCfg = () => BASE_CAR;
+export const setCarLookup = (fn: (id: string) => CarCfg): void => { lookupCar = fn; };
+
+const pickCfg = (p: CarPick | undefined): CarCfg => (p === undefined ? BASE_CAR : typeof p === 'string' ? lookupCar(p) : p);
+const pickId = (p: CarPick | undefined): string => (typeof p === 'string' ? p : BASE_CAR_ID);
+
 const randSeed = () => (Math.random() * 2 ** 31) >>> 0;
 
 const WALL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
@@ -68,6 +88,8 @@ export interface BotState {
 
 export interface Car {
 	id: number;
+	carId: string; // roster id of the bolide in this seat
+	cfg: CarCfg; // that bolide's handling table — the engine reads this, never CFG, per car
 	color: number;
 	isBot: boolean;
 	alive: boolean;
@@ -171,7 +193,7 @@ export const angleDiff = (a: number, b: number) => {
 /** Paint a square home territory around a world point and drop the car in its centre. */
 function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	const cc = colOf(x), cr = rowOf(z);
-	const h = CFG.homeHalf;
+	const h = CFG.homeHalf; // arena tiling, same square for everyone
 	for (let r = cr - h; r <= cr + h; r++) {
 		if (r < 0 || r >= GRID) continue;
 		for (let c = cc - h; c <= cc + h; c++) {
@@ -184,7 +206,7 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.heading = Math.atan2(-car.z, -car.x); // face the arena centre
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
 	car.netX = car.x; car.netZ = car.z; car.netH = car.heading; // else a ghost is dragged back to where it died
-	car.speed = CFG.cruise;
+	car.speed = car.cfg.cruise;
 	car.turnRate = 0;
 	car.vh = car.heading;
 	car.steerPrev = 0;
@@ -206,7 +228,8 @@ const START_POS = [
 	[HALF * 0.5, HALF * 0.5],
 ];
 
-export function createGame(seed = randSeed(), diff = 1): GameState {
+/** `cars` holds one roster id (or ready-made table) per seat; omit it for an all-base grid. */
+export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[]): GameState {
 	const s: GameState = {
 		owner: new Uint8Array(TOTAL),
 		trail: new Uint8Array(TOTAL),
@@ -233,12 +256,16 @@ export function createGame(seed = randSeed(), diff = 1): GameState {
 	s.counts[0] = TOTAL; // every cell starts neutral; setOwner debits this as homes are claimed
 	for (let i = 0; i < CAR_COUNT; i++) {
 		const id = i + 1;
+		const pick = cars?.[i];
+		const cfg = pickCfg(pick);
 		const car: Car = {
 			id,
+			carId: pickId(pick),
+			cfg,
 			color: PALETTE[id],
 			isBot: i !== 0,
 			alive: true,
-			x: 0, z: 0, heading: 0, speed: CFG.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
+			x: 0, z: 0, heading: 0, speed: cfg.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
 			vh: 0, steerPrev: 0, driftT: 0,
 			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
@@ -251,8 +278,9 @@ export function createGame(seed = randSeed(), diff = 1): GameState {
 }
 
 /** Full reset in place for an instant "Rejouer" (keeps the typed arrays). Re-seeds so a
- *  daily replay faces the exact same arena; pass no seed for a fresh random libre run. */
-export function resetGame(s: GameState, seed = randSeed(), diff = s.diff): void {
+ *  daily replay faces the exact same arena; pass no seed for a fresh random libre run.
+ *  `cars` re-seats the roster; omit it to keep the bolides already in place. */
+export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?: readonly CarPick[]): void {
 	s.owner.fill(0);
 	s.trail.fill(0);
 	s.counts.fill(0);
@@ -270,34 +298,38 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff): void 
 	s.trailDirty.length = 0;
 	s.netAdd.length = 0;
 	s.captureFlag = true;
-	for (let i = 0; i < s.cars.length; i++) makeHome(s, s.cars[i], START_POS[i][0], START_POS[i][1]);
+	for (let i = 0; i < s.cars.length; i++) {
+		if (cars) { s.cars[i].carId = pickId(cars[i]); s.cars[i].cfg = pickCfg(cars[i]); }
+		makeHome(s, s.cars[i], START_POS[i][0], START_POS[i][1]);
+	}
 }
 
 /* ---------- physics ---------- */
 
 /** `steer` and `throttle` are both in [-1, 1]. throttle > 0 accelerates, < 0 brakes. */
 function stepCar(car: Car, steer: number, throttle: number, dt: number): void {
+	const cfg = car.cfg;
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
 	const targetSpeed = throttle >= 0
-		? CFG.cruise + (CFG.maxSpeed - CFG.cruise) * throttle
-		: CFG.cruise + (CFG.cruise - CFG.minSpeed) * throttle;
-	car.speed += (targetSpeed - car.speed) * Math.min(1, dt * CFG.accelResp);
+		? cfg.cruise + (cfg.maxSpeed - cfg.cruise) * throttle
+		: cfg.cruise + (cfg.cruise - cfg.minSpeed) * throttle;
+	car.speed += (targetSpeed - car.speed) * Math.min(1, dt * cfg.accelResp);
 
 	// How FAST the wheel is thrown decides the corner, not just how far: sweep the input
 	// and the car carves a wide gripped arc, snap it over and the back steps out.
 	const jab = Math.abs(steer - car.steerPrev) / Math.max(dt, 1e-4);
 	car.steerPrev = steer;
-	if (jab > CFG.driftJab && Math.abs(steer) > CFG.driftLock && car.speed > CFG.driftMinSpeed) {
-		car.driftT = CFG.driftHold;
+	if (jab > cfg.driftJab && Math.abs(steer) > cfg.driftLock && car.speed > cfg.driftMinSpeed) {
+		car.driftT = cfg.driftHold;
 	}
 	car.driftT = Math.max(0, car.driftT - dt);
 	car.drifting = car.driftT > 0;
 
-	const maxTurn = (car.speed / CFG.turnRadius) * (car.drifting ? CFG.driftBoost : 1);
-	car.turnRate += (steer * maxTurn - car.turnRate) * Math.min(1, dt * CFG.steerResp);
+	const maxTurn = (car.speed / cfg.turnRadius) * (car.drifting ? cfg.driftBoost : 1);
+	car.turnRate += (steer * maxTurn - car.turnRate) * Math.min(1, dt * cfg.steerResp);
 	car.heading += car.turnRate * dt;
 	// The car travels along vh, not where its nose points — that gap IS the slide.
-	car.vh += angleDiff(car.heading, car.vh) * Math.min(1, dt * (car.drifting ? CFG.driftGrip : CFG.grip));
+	car.vh += angleDiff(car.heading, car.vh) * Math.min(1, dt * (car.drifting ? cfg.driftGrip : cfg.grip));
 	car.x += Math.cos(car.vh) * car.speed * dt;
 	car.z += Math.sin(car.vh) * car.speed * dt;
 }
@@ -344,7 +376,7 @@ function slideWalls(car: Car, dt: number): void {
 	car.turnRate = 0;
 	car.vh = car.heading; // the rail kills a slide: no sliding along the wall
 	car.driftT = 0;
-	car.speed += (CFG.minSpeed - car.speed) * Math.min(1, dt * CFG.wallDrag);
+	car.speed += (car.cfg.minSpeed - car.speed) * Math.min(1, dt * car.cfg.wallDrag);
 }
 
 /* ---------- death & capture ---------- */
@@ -426,6 +458,16 @@ function respawn(s: GameState, car: Car): void {
 
 /* ---------- per-step grid logic (trail, kill, capture) ---------- */
 
+/** Blindé rule: the last `shield` cells a car laid can't be cut. Scanning that fixed window
+ *  beats trail.indexOf(), which is O(trail) on a line that runs into the thousands. */
+function shielded(victim: Car, cell: number): boolean {
+	const n = victim.cfg.shield;
+	if (n <= 0) return false;
+	const from = Math.max(0, victim.trail.length - n);
+	for (let i = victim.trail.length - 1; i >= from; i--) if (victim.trail[i] === cell) return true;
+	return false;
+}
+
 function updateGrid(s: GameState, car: Car): void {
 	const cell = cellAt(car.x, car.z);
 	const inside = s.owner[cell] === car.id;
@@ -440,12 +482,20 @@ function updateGrid(s: GameState, car: Car): void {
 	const t = s.trail[cell];
 	if (t !== 0 && t !== car.id) {
 		const victim = s.cars[t - 1];
+		if (shielded(victim, cell)) {
+			// Snapping the attacker is not spite: it can't claim this cell, so its own ring would
+			// keep a one-cell hole, the fill would leak and the loop would die anyway — invisibly.
+			clearTrail(s, car);
+			mark(s);
+			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
+			return;
+		}
 		killCar(s, victim, !car.isBot, car.id); // cut an enemy trail
 	} else if (t === car.id) {
 		// Crossing your OWN line costs the loop, not the car — only a rival's blade kills.
 		// The fresh tail is spared, or leaving home would snap the trail on the first pixel.
 		const idx = car.trail.indexOf(cell);
-		if (idx >= 0 && idx < car.trail.length - CFG.grace) {
+		if (idx >= 0 && idx < car.trail.length - car.cfg.grace) {
 			clearTrail(s, car);
 			mark(s);
 			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
@@ -466,7 +516,7 @@ function updateGrid(s: GameState, car: Car): void {
 /** Nearest enemy trail cell within range, or null. Trails are short so this stays cheap. */
 function nearestEnemyTrail(s: GameState, car: Car): { x: number; z: number } | null {
 	let best: { x: number; z: number } | null = null;
-	let bestD = CFG.botAggroRange * CFG.botAggroRange;
+	let bestD = car.cfg.botAggroRange * car.cfg.botAggroRange;
 	for (const other of s.cars) {
 		if (other.id === car.id || !other.alive || other.trail.length === 0) continue;
 		for (const cell of other.trail) {
@@ -483,7 +533,8 @@ function steerTo(car: Car, tx: number, tz: number): number {
 	return Math.max(-1, Math.min(1, angleDiff(desired, car.heading) / 0.5));
 }
 
-function botSteer(s: GameState, car: Car, dt: number): number {
+/** Exported so a balance sweep can drive the car under test with the exact rival policy. */
+export function botSteer(s: GameState, car: Car, dt: number): number {
 	const b = car.bot;
 	const home = centroid(s, car.id);
 	const diff = DIFFS[s.diff] ?? DIFFS[1];
@@ -492,7 +543,7 @@ function botSteer(s: GameState, car: Car, dt: number): number {
 	const ahead = 6;
 	const nx = car.x + Math.cos(car.heading) * ahead;
 	const nz = car.z + Math.sin(car.heading) * ahead;
-	const m = CFG.wallMargin;
+	const m = car.cfg.wallMargin;
 	if (nx < -HALF + m || nx > HALF - m || nz < -HALF + m || nz > HALF - m) {
 		return steerTo(car, home.x, home.z);
 	}
@@ -518,11 +569,11 @@ function botSteer(s: GameState, car: Car, dt: number): number {
 		if (b.phase === 'in') {
 			b.phase = 'out';
 			b.turnDir = s.rng() < 0.5 ? -1 : 1;
-			b.budget = CFG.botOutMin + s.rng() * (diff.outMax - CFG.botOutMin);
+			b.budget = car.cfg.botOutMin + s.rng() * (diff.outMax - car.cfg.botOutMin);
 		}
 		b.budget -= car.speed * dt;
 		if (b.budget <= 0) b.phase = 'return';
-		return b.turnDir * CFG.botArc; // gentle constant arc traces a loop
+		return b.turnDir * car.cfg.botArc; // gentle constant arc traces a loop
 	}
 	return steerTo(car, home.x, home.z); // curve back to close the loop
 }
@@ -531,8 +582,13 @@ function botSteer(s: GameState, car: Car, dt: number): number {
 
 /** Advance the whole simulation by one fixed step. `playerSteer`/`playerThrottle` in [-1, 1].
  *  Bots cruise (throttle 0) and only steer. Dying never ends a run — it costs a respawn delay;
- *  the run ends when someone owns more than `CFG.winPct` of the arena. */
-export function stepGame(s: GameState, playerSteer: number, playerThrottle: number, dt: number): void {
+ *  the run ends when someone owns more than `CFG.winPct` of the arena.
+ *  `drive`/`gas` swap the bot policy — a balance sweep uses them, the game never passes them. */
+export function stepGame(
+	s: GameState, playerSteer: number, playerThrottle: number, dt: number,
+	drive: (s: GameState, car: Car, dt: number) => number = botSteer,
+	gas: (s: GameState, car: Car, dt: number) => number = () => 0,
+): void {
 	if (s.over) return;
 	s.clock += dt;
 	for (const car of s.cars) {
@@ -545,7 +601,7 @@ export function stepGame(s: GameState, playerSteer: number, playerThrottle: numb
 		} else if (car.id === s.hero) {
 			stepCar(car, playerSteer, playerThrottle, dt);
 		} else {
-			stepCar(car, botSteer(s, car, dt), 0, dt);
+			stepCar(car, drive(s, car, dt), gas(s, car, dt), dt);
 		}
 		slideWalls(car, dt);
 		updateGrid(s, car);
