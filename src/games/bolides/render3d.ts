@@ -7,7 +7,7 @@
    ===================================================== */
 import * as THREE from 'three';
 import {
-	ARENA, GRID, HALF, PALETTE, TOTAL, angleDiff,
+	ARENA, CFG, GRID, HALF, PALETTE, TOTAL, angleDiff,
 	type GameState, type Car,
 } from './engine';
 
@@ -17,6 +17,8 @@ const CAM_HEIGHT = 9.5; // how high above
 const CAM_LOOK = 9; // look-at point ahead of the car
 const CAM_LOOK_Y = 1.5; // aim slightly above the ground
 const MAX_PARTICLES = 400;
+const FOV_BASE = 62;
+const FOV_KICK = 9; // extra degrees at top speed — the arcade "it's going fast" cue
 
 const rgb = (hex: number) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255] as const;
 const cssHex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -32,6 +34,13 @@ const TERRITORY_LUT: [number, number, number][] = PALETTE.map((hex, i) => {
 	const [r, g, b] = rgb(hex);
 	if (i === 0) return NEUTRAL;
 	return [mix(r, 255, 0.3), mix(g, 255, 0.3), mix(b, 255, 0.3)];
+});
+// Territory is drawn pastel so trails stay legible on top, but a flat pastel blob has no shape.
+// Outline every border cell in the full colour and the map reads as claimed land, not a stain.
+const BORDER_LUT: [number, number, number][] = PALETTE.map((hex, i) => {
+	const [r, g, b] = rgb(hex);
+	if (i === 0) return NEUTRAL;
+	return [mix(r, 0, 0.3), mix(g, 0, 0.3), mix(b, 0, 0.3)];
 });
 
 /** A flat quad in the XZ plane, UVs aligned so world (x,z) -> canvas (col,row). */
@@ -51,9 +60,45 @@ function groundQuad(y: number): THREE.BufferGeometry {
 	return g;
 }
 
-function makeCarMesh(color: number): THREE.Group {
+/** Soft round blob, used for the glow pooled under each car. */
+function makeBlobTexture(): THREE.CanvasTexture {
+	const c = document.createElement('canvas');
+	c.width = c.height = 64;
+	const ctx = c.getContext('2d')!;
+	const rad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+	rad.addColorStop(0, 'rgba(255,255,255,1)');
+	rad.addColorStop(0.4, 'rgba(255,255,255,0.4)');
+	rad.addColorStop(1, 'rgba(255,255,255,0)');
+	ctx.fillStyle = rad;
+	ctx.fillRect(0, 0, 64, 64);
+	const t = new THREE.CanvasTexture(c);
+	t.colorSpace = THREE.SRGBColorSpace;
+	return t;
+}
+
+/** Vertical gradient read as an equirect skybox: a horizon to drive toward, instead of a void. */
+function makeSkyTexture(): THREE.CanvasTexture {
+	const c = document.createElement('canvas');
+	c.width = 4; c.height = 256;
+	const ctx = c.getContext('2d')!;
+	const grad = ctx.createLinearGradient(0, 0, 0, 256);
+	grad.addColorStop(0, '#0a0f1c');
+	grad.addColorStop(0.42, '#1d2b4d');
+	grad.addColorStop(0.5, '#2d3c6b');
+	grad.addColorStop(0.58, '#18213a');
+	grad.addColorStop(1, '#080b12');
+	ctx.fillStyle = grad;
+	ctx.fillRect(0, 0, 4, 256);
+	const t = new THREE.CanvasTexture(c);
+	t.mapping = THREE.EquirectangularReflectionMapping;
+	t.colorSpace = THREE.SRGBColorSpace;
+	return t;
+}
+
+function makeCarMesh(color: number, blob: THREE.Texture): THREE.Group {
 	const g = new THREE.Group();
-	const body = new THREE.MeshStandardMaterial({ color, metalness: 0.4, roughness: 0.4 });
+	// Emissive, or the chase cam sees a dark silhouette and you lose track of your own colour.
+	const body = new THREE.MeshStandardMaterial({ color, metalness: 0.4, roughness: 0.4, emissive: color, emissiveIntensity: 0.4 });
 	const dark = new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.6 });
 	const glass = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, metalness: 0.3, roughness: 0.15 });
 	const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
@@ -64,6 +109,17 @@ function makeCarMesh(color: number): THREE.Group {
 	add(new THREE.BoxGeometry(1.3, 0.35, 1.05), glass, -0.1, 0.82, 0); // cabin
 	const wheel = new THREE.BoxGeometry(0.7, 0.45, 0.35);
 	for (const sx of [0.9, -0.9]) for (const sz of [0.75, -0.75]) add(wheel, dark, sx, 0.32, sz);
+
+	// Underglow: it tells you at a glance which colour you are, even from the chase cam where
+	// the roof is all you see, and it makes a rival readable across the arena.
+	const glow = new THREE.Mesh(
+		new THREE.PlaneGeometry(6, 6),
+		new THREE.MeshBasicMaterial({ map: blob, color, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+	);
+	glow.rotation.x = -Math.PI / 2;
+	glow.position.y = 0.05;
+	g.add(glow);
+
 	g.userData.mats = [body, dark, glass];
 	return g;
 }
@@ -88,9 +144,13 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 	renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 
 	const scene = new THREE.Scene();
-	scene.background = new THREE.Color('#0b0e14');
-	scene.fog = new THREE.Fog('#0b0e14', 160, 320);
-	const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 500);
+	const skyTex = makeSkyTexture();
+	scene.background = skyTex;
+	// Fog matches the horizon band so the far side of the arena melts into the sky instead of
+	// ending on a hard line.
+	scene.fog = new THREE.Fog('#18213a', 150, 330);
+	const camera = new THREE.PerspectiveCamera(FOV_BASE, 1, 0.1, 500);
+	let fov = FOV_BASE;
 
 	scene.add(new THREE.AmbientLight(0xaab2c6, 1.15));
 	const dir = new THREE.DirectionalLight(0xffffff, 1.35);
@@ -113,12 +173,17 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		const owner = state.owner;
 		for (let i = 0; i < TOTAL; i++) {
 			const id = owner[i];
+			const col = i % GRID, row = (i / GRID) | 0;
 			let r: number, g: number, b: number;
 			if (id === 0) {
-				const col = i % GRID, row = (i / GRID) | 0;
 				[r, g, b] = (col % 20 === 0 || row % 20 === 0) ? GRID_LINE : NEUTRAL;
 			} else {
-				[r, g, b] = TERRITORY_LUT[id];
+				// Two cells thick: a one-cell rim is smoothed away by the texture filter as soon
+				// as the camera backs off, and the outline is the whole point.
+				const edge = col < 2 || col >= GRID - 2 || row < 2 || row >= GRID - 2
+					|| owner[i - 1] !== id || owner[i + 1] !== id || owner[i - GRID] !== id || owner[i + GRID] !== id
+					|| owner[i - 2] !== id || owner[i + 2] !== id || owner[i - 2 * GRID] !== id || owner[i + 2 * GRID] !== id;
+				[r, g, b] = edge ? BORDER_LUT[id] : TERRITORY_LUT[id];
 			}
 			const o = i * 4;
 			d[o] = r; d[o + 1] = g; d[o + 2] = b; d[o + 3] = 255;
@@ -139,13 +204,17 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 	const terrTex = mkTex(terr.c, true);
 	const decalTex = mkTex(decal.c, false);
 	const trailTex = mkTex(trailC.c, false);
+	// Same canvas read a second time, but smoothed: added under the crisp trail it bleeds the
+	// colour outward, so a line looks like a lit wall rather than a row of pixels.
+	const trailGlowTex = mkTex(trailC.c, true);
 
 	// Unlit on purpose: the territory colour IS the information, so it must read exactly as
 	// authored (same pixels as the minimap) instead of being dimmed by the lighting rig.
 	const terrMesh = new THREE.Mesh(groundQuad(0), new THREE.MeshBasicMaterial({ map: terrTex }));
 	const decalMesh = new THREE.Mesh(groundQuad(0.012), new THREE.MeshBasicMaterial({ map: decalTex, transparent: true, depthWrite: false }));
+	const glowMesh = new THREE.Mesh(groundQuad(0.018), new THREE.MeshBasicMaterial({ map: trailGlowTex, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
 	const trailMesh = new THREE.Mesh(groundQuad(0.024), new THREE.MeshBasicMaterial({ map: trailTex, transparent: true, depthWrite: false }));
-	scene.add(terrMesh, decalMesh, trailMesh);
+	scene.add(terrMesh, decalMesh, glowMesh, trailMesh);
 	paintTerritory();
 
 	// Thin border walls so the arena edge reads (and looks like a track boundary).
@@ -157,8 +226,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 	}
 
 	// --- cars ---
+	const blobTex = makeBlobTexture();
 	const carMeshes: THREE.Group[] = state.cars.map((c) => {
-		const m = makeCarMesh(c.color);
+		const m = makeCarMesh(c.color, blobTex);
 		scene.add(m);
 		return m;
 	});
@@ -183,6 +253,35 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 				x, z, y: 0.5, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vy: up * (0.4 + Math.random()),
 				life, max: life, r: r / 255, g: g / 255, b: b / 255, size,
 			});
+		}
+	};
+
+	// --- capture rings: the shockwave that makes closing a loop feel like it paid off ---
+	const ringGeo = new THREE.RingGeometry(0.82, 1, 56);
+	const rings = Array.from({ length: 5 }, () => {
+		const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+		m.rotation.x = -Math.PI / 2;
+		m.position.y = 0.4;
+		m.visible = false;
+		scene.add(m);
+		return { mesh: m, life: 0 };
+	});
+	const RING_LIFE = 0.75;
+	const popRing = (x: number, z: number, color: number) => {
+		const slot = rings.find((r) => r.life <= 0) ?? rings[0];
+		slot.life = RING_LIFE;
+		slot.mesh.position.set(x, 0.4, z);
+		(slot.mesh.material as THREE.MeshBasicMaterial).color.setHex(color);
+	};
+	const stepRings = (dtSec: number) => {
+		for (const r of rings) {
+			if (r.life <= 0) { r.mesh.visible = false; continue; }
+			r.life -= dtSec;
+			const t = 1 - Math.max(0, r.life) / RING_LIFE;
+			r.mesh.visible = r.life > 0;
+			const s = 3 + t * 34;
+			r.mesh.scale.set(s, s, 1);
+			(r.mesh.material as THREE.MeshBasicMaterial).opacity = (1 - t) ** 1.6;
 		}
 	};
 
@@ -226,9 +325,11 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		}
 		state.trailDirty.length = 0;
 		trailTex.needsUpdate = true;
+		trailGlowTex.needsUpdate = true;
 	};
 
-	let camHeading = state.cars[0].heading; // eased so quick turns don't whip the camera
+	const heroCar = (s: GameState) => s.cars[s.hero - 1] ?? s.cars[0];
+	let camHeading = heroCar(state).heading; // eased so quick turns don't whip the camera
 	const shake = { t: 0, mag: 0 };
 	let miniCtx: CanvasRenderingContext2D | null = null;
 	const setMinimap = (c: HTMLCanvasElement | null) => { miniCtx = c ? c.getContext('2d') : null; };
@@ -243,12 +344,13 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		miniCtx.drawImage(trailC.c, 0, 0, GRID, GRID, 0, 0, W, H);
 		for (const car of s.cars) {
 			if (!car.alive) continue;
+			const hero = car.id === s.hero;
 			const mx = ((car.x + HALF) / ARENA) * W, my = ((car.z + HALF) / ARENA) * H;
 			miniCtx.fillStyle = cssHex(PALETTE[car.id]);
 			miniCtx.beginPath();
-			miniCtx.arc(mx, my, car.isBot ? 2.4 : 3.4, 0, TAU);
+			miniCtx.arc(mx, my, hero ? 3.4 : car.isBot ? 2.4 : 2.9, 0, TAU);
 			miniCtx.fill();
-			if (!car.isBot) {
+			if (hero) {
 				miniCtx.strokeStyle = '#fff';
 				miniCtx.lineWidth = 1.4;
 				miniCtx.stroke();
@@ -283,16 +385,17 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		if (s.captureFlag) { paintTerritory(); s.captureFlag = false; }
 		applyTrailDirty();
 		fadeDecals(dtSec);
+		stepRings(dtSec);
 		for (const e of s.events) {
-			if (e.type === 'capture') spawn(e.cx, e.cz, PALETTE[e.id], 6, 3, 26, 2.2, 0.8);
+			if (e.type === 'capture') { spawn(e.cx, e.cz, PALETTE[e.id], 6, 3, 26, 2.2, 0.8); popRing(e.cx, e.cz, PALETTE[e.id]); }
 			else if (e.type === 'death') { spawn(e.x, e.z, PALETTE[e.id], 14, 5, 40, 2.6, 0.9); shake.t = 0.35; shake.mag = e.isPlayer ? 1.6 : 0.7; }
 			// Snapping your own line is a setback, not a crash: a puff, and a nudge if it's you.
 			else if (e.type === 'snap') { spawn(e.x, e.z, PALETTE[e.id], 7, 2, 16, 1.8, 0.5); if (e.isPlayer) { shake.t = 0.2; shake.mag = 0.5; } }
+			else if (e.type === 'respawn') spawn(e.x, e.z, PALETTE[e.id], 5, 4, 22, 2, 0.7);
 		}
 		// events are cleared by the React loop after both render + UI have read them.
 
-		const player = s.cars[0];
-		const pp = carPose(player, alpha);
+		const pp = carPose(heroCar(s), alpha);
 
 		// Cars: transform, drift wobble, skid decals + smoke.
 		for (let i = 0; i < s.cars.length; i++) {
@@ -347,6 +450,12 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 			sy = (Math.random() * 2 - 1) * m * 0.5;
 			sz = (Math.random() * 2 - 1) * m;
 		}
+		// Speed opens the lens and brakes close it back in — the road rushes without the car
+		// actually moving any faster, which is the cheapest sense of speed there is.
+		const t = Math.max(-0.4, Math.min(1, (heroCar(s).speed - CFG.cruise) / (CFG.maxSpeed - CFG.cruise)));
+		fov += (FOV_BASE + FOV_KICK * t - fov) * Math.min(1, dtSec * 3);
+		camera.fov = fov;
+		camera.updateProjectionMatrix();
 		camera.position.set(pp.x - cdx * CAM_DIST + sx, CAM_HEIGHT + sy, pp.z - cdz * CAM_DIST + sz);
 		camera.lookAt(pp.x + cdx * CAM_LOOK, CAM_LOOK_Y, pp.z + cdz * CAM_LOOK);
 		renderer.render(scene, camera);
@@ -357,11 +466,14 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 		trailC.ctx.clearRect(0, 0, GRID, GRID);
 		decal.ctx.clearRect(0, 0, GRID, GRID);
 		trailTex.needsUpdate = true;
+		trailGlowTex.needsUpdate = true;
 		decalTex.needsUpdate = true;
 		particles.length = 0;
+		for (const r of rings) { r.life = 0; r.mesh.visible = false; }
 		decalFadeAcc = 0;
 		shake.t = 0;
-		camHeading = state.cars[0].heading;
+		fov = FOV_BASE;
+		camHeading = heroCar(state).heading;
 		paintTerritory();
 	};
 
@@ -374,7 +486,8 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState): Ren
 				if (Array.isArray(m)) m.forEach((x) => x.dispose()); else m.dispose();
 			}
 		});
-		terrTex.dispose(); decalTex.dispose(); trailTex.dispose();
+		terrTex.dispose(); decalTex.dispose(); trailTex.dispose(); trailGlowTex.dispose();
+		blobTex.dispose(); skyTex.dispose();
 	};
 
 	return { frame, reset, setMinimap, resize, dispose };

@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { createGame as newGame, stepGame, resetGame, pct, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, type GameState } from './engine';
+import {
+	createGame as newGame, stepGame, stepGuest, resetGame, collectEvents, buildSim, applySim,
+	pct, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, type GameState, type NetEvent,
+} from './engine';
 
 // createGame() defaults to a random seed, so the bots would play a different game on every run
 // and every assertion below would be a coin toss. Pin it: a failure here must be reproducible.
@@ -151,6 +154,25 @@ describe('bolides engine', () => {
 		expect(s.over).toBe(true);
 		expect(s.overByTime).toBe(true);
 		expect(s.winner).toBe(3);
+	});
+
+	it('replays a host tick onto a guest and lands on the very same grid', () => {
+		const host = createGame();
+		host.record = true;
+		const guest = createGame(); // same seed -> same arena; the grid then comes only from the host
+		guest.hero = 2;
+		for (const c of guest.cars) { c.remote = c.id !== guest.hero; c.isBot = false; }
+		const pending: NetEvent[] = [];
+		for (let i = 0; i < 3000 && !host.over; i++) {
+			stepGame(host, i % 120 < 60 ? 1 : -1, 1, 1 / 60);
+			collectEvents(host, pending);
+			host.events.length = 0; // the shell drains them every frame; collecting twice would double them
+			stepGuest(guest, i % 90 < 45 ? -1 : 1, 1, 1 / 60);
+			if (i % 3 === 2) applySim(guest, buildSim(host, pending)); // 20 Hz, like the real send rate
+		}
+		expect(host.clock).toBeGreaterThan(10); // the run really happened
+		expect(guest.owner).toEqual(host.owner);
+		expect(guest.trail).toEqual(host.trail);
 	});
 
 	it('throttle accelerates and brake slows the player', () => {

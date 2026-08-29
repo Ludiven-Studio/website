@@ -57,6 +57,8 @@ const randSeed = () => (Math.random() * 2 ** 31) >>> 0;
 
 const WALL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
+const NET_EASE = 10; // how fast a ghost is pulled onto the pose its owner last reported
+
 export interface BotState {
 	phase: 'in' | 'out' | 'return';
 	turnDir: number; // +1 / −1 arc direction while outside
@@ -86,6 +88,11 @@ export interface Car {
 	trail: number[]; // ordered cell indices of the active trail
 	respawnAt: number; // clock time (s) to respawn (bots)
 	bot: BotState;
+	// --- online only: this car is driven by someone else, so we dead-reckon it between packets ---
+	remote: boolean;
+	netX: number; // last pose reported by its driver; the ghost is eased toward it
+	netZ: number;
+	netH: number;
 }
 
 export type GameEvent =
@@ -93,6 +100,7 @@ export type GameEvent =
 	| { type: 'kill'; killer: number; victim: number; x: number; z: number }
 	| { type: 'death'; id: number; x: number; z: number; isPlayer: boolean }
 	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean } // cut your own trail
+	| { type: 'respawn'; id: number; x: number; z: number }
 	| { type: 'win'; id: number; byTime: boolean };
 
 export interface GameState {
@@ -112,6 +120,9 @@ export interface GameState {
 	events: GameEvent[]; // FX/UI to consume this frame, then clear
 	trailDirty: number[]; // cells whose trail pixel changed (render repaints these)
 	captureFlag: boolean; // a capture/respawn happened -> render repaints the whole territory
+	hero: number; // car id the camera follows and the HUD calls "you" (1 offline)
+	record: boolean; // online host: log trail additions into netAdd so they can be broadcast
+	netAdd: number[]; // (carId << 16) | cell for every trail cell claimed since the last drain
 	// scratch buffers reused by the flood fill (avoid per-capture allocation)
 	scratch: Uint8Array;
 	stack: Int32Array;
@@ -172,6 +183,7 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.z = cellCenterZ(cr * GRID + cc);
 	car.heading = Math.atan2(-car.z, -car.x); // face the arena centre
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
+	car.netX = car.x; car.netZ = car.z; car.netH = car.heading; // else a ghost is dragged back to where it died
 	car.speed = CFG.cruise;
 	car.turnRate = 0;
 	car.vh = car.heading;
@@ -212,6 +224,9 @@ export function createGame(seed = randSeed(), diff = 1): GameState {
 		events: [],
 		trailDirty: [],
 		captureFlag: true, // force an initial full territory paint
+		hero: 1,
+		record: false,
+		netAdd: [],
 		scratch: new Uint8Array(TOTAL),
 		stack: new Int32Array(TOTAL),
 	};
@@ -227,6 +242,7 @@ export function createGame(seed = randSeed(), diff = 1): GameState {
 			vh: 0, steerPrev: 0, driftT: 0,
 			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
+			remote: false, netX: 0, netZ: 0, netH: 0,
 		};
 		s.cars.push(car);
 		makeHome(s, car, START_POS[i][0], START_POS[i][1]);
@@ -252,6 +268,7 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff): void 
 	s.rng = mulberry32(seed);
 	s.events.length = 0;
 	s.trailDirty.length = 0;
+	s.netAdd.length = 0;
 	s.captureFlag = true;
 	for (let i = 0; i < s.cars.length; i++) makeHome(s, s.cars[i], START_POS[i][0], START_POS[i][1]);
 }
@@ -283,6 +300,19 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number): void {
 	car.vh += angleDiff(car.heading, car.vh) * Math.min(1, dt * (car.drifting ? CFG.driftGrip : CFG.grip));
 	car.x += Math.cos(car.vh) * car.speed * dt;
 	car.z += Math.sin(car.vh) * car.speed * dt;
+}
+
+/** A car somebody else drives: coast along its last known heading, then ease onto the pose its
+ *  owner reported. Easing instead of snapping keeps every step sub-cell, so the trail the grid
+ *  lays under a ghost stays unbroken even though poses only arrive 20x/s. */
+function stepGhost(car: Car, dt: number): void {
+	car.px = car.x; car.pz = car.z; car.ph = car.heading;
+	car.x += Math.cos(car.vh) * car.speed * dt;
+	car.z += Math.sin(car.vh) * car.speed * dt;
+	const k = Math.min(1, dt * NET_EASE);
+	car.x += (car.netX - car.x) * k;
+	car.z += (car.netZ - car.z) * k;
+	car.heading += angleDiff(car.netH, car.heading) * k;
 }
 
 /** Arena edges are guard rails, not a death trap: clamp back inside and ease the heading along
@@ -319,6 +349,11 @@ function slideWalls(car: Car, dt: number): void {
 
 /* ---------- death & capture ---------- */
 
+/** Online host only. A 0 can never be a packed cell (car ids start at 1), so it marks "the next
+ *  event happens here" inside the add stream. A capture that lands between two trail cells has
+ *  to be replayed between them too, or the guest floods a loop the host never had. */
+const mark = (s: GameState) => { if (s.record) s.netAdd.push(0); };
+
 function clearTrail(s: GameState, car: Car): void {
 	for (const cell of car.trail) {
 		if (s.trail[cell] === car.id) { s.trail[cell] = 0; s.trailDirty.push(cell); }
@@ -333,8 +368,9 @@ function killCar(s: GameState, car: Car, byPlayer: boolean, killer: number): voi
 	car.alive = false;
 	car.drifting = false;
 	car.scraping = false;
+	mark(s);
 	if (killer) s.events.push({ type: 'kill', killer, victim: car.id, x: car.x, z: car.z });
-	s.events.push({ type: 'death', id: car.id, x: car.x, z: car.z, isPlayer: !car.isBot });
+	s.events.push({ type: 'death', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
 	car.respawnAt = s.clock + (car.isBot ? CFG.respawn : CFG.respawnPlayer);
 	void byPlayer;
 }
@@ -374,6 +410,7 @@ function capture(s: GameState, car: Car): void {
 		if (s.owner[cell] !== id && visited[cell] === 0) setOwner(s, cell, id);
 	}
 	s.captureFlag = true;
+	mark(s);
 	const g = centroid(s, id);
 	s.events.push({ type: 'capture', id, cx: g.x, cz: g.z, gain: s.counts[id] - before });
 }
@@ -383,6 +420,8 @@ function respawn(s: GameState, car: Car): void {
 	const p = START_POS[car.id - 1];
 	makeHome(s, car, p[0], p[1]);
 	s.captureFlag = true;
+	mark(s);
+	s.events.push({ type: 'respawn', id: car.id, x: car.x, z: car.z });
 }
 
 /* ---------- per-step grid logic (trail, kill, capture) ---------- */
@@ -408,7 +447,8 @@ function updateGrid(s: GameState, car: Car): void {
 		const idx = car.trail.indexOf(cell);
 		if (idx >= 0 && idx < car.trail.length - CFG.grace) {
 			clearTrail(s, car);
-			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: !car.isBot });
+			mark(s);
+			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
 			return;
 		}
 	}
@@ -416,6 +456,7 @@ function updateGrid(s: GameState, car: Car): void {
 		s.trail[cell] = car.id;
 		car.trail.push(cell);
 		s.trailDirty.push(cell);
+		if (s.record) s.netAdd.push((car.id << 16) | cell);
 	}
 	car.outside = true;
 }
@@ -499,8 +540,13 @@ export function stepGame(s: GameState, playerSteer: number, playerThrottle: numb
 			if (s.clock >= car.respawnAt) respawn(s, car);
 			continue;
 		}
-		const steer = car.isBot ? botSteer(s, car, dt) : playerSteer;
-		stepCar(car, steer, car.isBot ? 0 : playerThrottle, dt);
+		if (car.remote) {
+			stepGhost(car, dt); // someone else's car: dead-reckon between packets
+		} else if (car.id === s.hero) {
+			stepCar(car, playerSteer, playerThrottle, dt);
+		} else {
+			stepCar(car, botSteer(s, car, dt), 0, dt);
+		}
 		slideWalls(car, dt);
 		updateGrid(s, car);
 	}
@@ -525,3 +571,129 @@ function finish(s: GameState, id: number, byTime: boolean): void {
 
 /** Percentage of the arena a car controls (0..100). */
 export const pct = (s: GameState, id: number) => (s.counts[id] / TOTAL) * 100;
+
+/* ---------- online (transport lives in net.ts) ----------
+   The grid is 40 000 cells, far too big to broadcast, so the host never sends it. Instead
+   every client keeps its own copy and the host sends only what it cannot derive: the poses
+   of the cars it drives, the trail cells that were claimed, and the handful of discrete
+   events (capture / snap / kill / respawn). Those replay identically on every client because
+   they all built the same arena from the same seed, so the grids stay in step. Territory
+   counts ride along anyway — they are the score, and must never be a guess. */
+
+const r2 = (v: number) => Math.round(v * 100) / 100;
+
+/** One car's pose as its own driver sees it. Short on purpose: this flies 20x/s. */
+export interface NetPose { id: number; x: number; z: number; h: number; vh: number; sp: number; f: number }
+
+/** What the host tells everyone happened to the grid. Anything else is derived locally. */
+export type NetEvent =
+	| { k: 'cap'; id: number }
+	| { k: 'snap'; id: number; x: number; z: number }
+	| { k: 'kill'; id: number; x: number; z: number; by: number }
+	| { k: 'rsp'; id: number };
+
+/** One host tick. `a` packs trail cells as (carId << 16) | cell — a cell index fits in 16 bits. */
+export interface SimMsg { t: number; p: NetPose[]; a: number[]; e: NetEvent[]; n: number[]; w: number; wt: number }
+
+export const readPose = (car: Car): NetPose => ({
+	id: car.id, x: r2(car.x), z: r2(car.z), h: r2(car.heading), vh: r2(car.vh), sp: r2(car.speed),
+	f: (car.drifting ? 1 : 0) | (car.scraping ? 2 : 0),
+});
+
+/** Adopt a pose reported by a remote driver. Only the target moves — `stepGhost` eases onto it. */
+export function setRemotePose(s: GameState, p: NetPose): void {
+	const car = s.cars[p.id - 1];
+	if (!car || !car.remote || !car.alive) return;
+	car.netX = p.x; car.netZ = p.z; car.netH = p.h;
+	car.vh = p.vh; car.speed = p.sp;
+	car.drifting = (p.f & 1) !== 0; car.scraping = (p.f & 2) !== 0;
+}
+
+/** Host side, every frame: keep the grid events that the guests can't derive. `events` is
+ *  cleared each frame but we only broadcast 20x/s, so they have to pile up in `out`. */
+export function collectEvents(s: GameState, out: NetEvent[]): void {
+	let by = 0; // a 'kill' event always immediately precedes its victim's 'death'
+	for (const ev of s.events) {
+		if (ev.type === 'kill') by = ev.killer;
+		else if (ev.type === 'death') { out.push({ k: 'kill', id: ev.id, x: r2(ev.x), z: r2(ev.z), by }); by = 0; }
+		else if (ev.type === 'capture') out.push({ k: 'cap', id: ev.id });
+		else if (ev.type === 'snap') out.push({ k: 'snap', id: ev.id, x: r2(ev.x), z: r2(ev.z) });
+		else if (ev.type === 'respawn') out.push({ k: 'rsp', id: ev.id });
+	}
+}
+
+/** Host side, at send rate: package the tick and empty both pending buffers. */
+export function buildSim(s: GameState, pending: NetEvent[]): SimMsg {
+	const msg: SimMsg = {
+		t: r2(s.clock),
+		p: s.cars.filter((c) => !c.remote && c.alive).map(readPose),
+		a: s.netAdd.slice(),
+		e: pending.slice(),
+		n: s.counts.slice(),
+		w: s.winner,
+		wt: s.overByTime ? 1 : 0,
+	};
+	s.netAdd.length = 0;
+	pending.length = 0;
+	return msg;
+}
+
+function applyEvent(s: GameState, ev: NetEvent): void {
+	const car = s.cars[ev.id - 1];
+	if (!car) return;
+	const isPlayer = ev.id === s.hero;
+	if (ev.k === 'cap') {
+		capture(s, car);
+	} else if (ev.k === 'snap') {
+		clearTrail(s, car);
+		s.events.push({ type: 'snap', id: ev.id, x: ev.x, z: ev.z, isPlayer });
+	} else if (ev.k === 'kill') {
+		clearTrail(s, car);
+		car.alive = false; car.drifting = false; car.scraping = false;
+		car.respawnAt = s.clock + (car.isBot ? CFG.respawn : CFG.respawnPlayer); // for the countdown only
+		if (ev.by) s.events.push({ type: 'kill', killer: ev.by, victim: ev.id, x: ev.x, z: ev.z });
+		s.events.push({ type: 'death', id: ev.id, x: ev.x, z: ev.z, isPlayer });
+	} else {
+		makeHome(s, car, START_POS[ev.id - 1][0], START_POS[ev.id - 1][1]);
+		s.captureFlag = true;
+		s.events.push({ type: 'respawn', id: ev.id, x: car.x, z: car.z });
+	}
+}
+
+/** Guest side: fold one host tick into the local state. Our own car is skipped — we drive it.
+ *  The add stream carries a 0 wherever an event fired, so both replay in the host's order. */
+export function applySim(s: GameState, m: SimMsg): void {
+	s.clock = m.t;
+	for (const p of m.p) if (p.id !== s.hero) setRemotePose(s, p);
+	let next = 0;
+	for (const packed of m.a) {
+		if (packed === 0) {
+			if (next < m.e.length) applyEvent(s, m.e[next++]);
+			continue;
+		}
+		const cell = packed & 0xffff;
+		const id = packed >>> 16;
+		if (s.trail[cell] !== 0) continue;
+		s.trail[cell] = id;
+		s.cars[id - 1]?.trail.push(cell);
+		s.trailDirty.push(cell);
+	}
+	for (; next < m.e.length; next++) applyEvent(s, m.e[next]);
+	// The host's tally wins outright: a stray cell would show up as a wrong score otherwise.
+	for (let i = 0; i < m.n.length; i++) s.counts[i] = m.n[i];
+	if (m.w && !s.over) {
+		s.over = true; s.winner = m.w; s.overByTime = m.wt === 1;
+		s.events.push({ type: 'win', id: m.w, byTime: m.wt === 1 });
+	}
+}
+
+/** Guest side step: we own our car and nothing else. No grid work — the host rules on trails,
+ *  captures and kills, and `applySim` brings its verdict back. */
+export function stepGuest(s: GameState, steer: number, throttle: number, dt: number): void {
+	if (s.over) return;
+	for (const car of s.cars) {
+		if (!car.alive) continue;
+		if (car.id === s.hero) { stepCar(car, steer, throttle, dt); slideWalls(car, dt); }
+		else stepGhost(car, dt);
+	}
+}

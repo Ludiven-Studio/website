@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createGame, resetGame, stepGame, pct, NAMES, PALETTE, DIFFS, CFG, type GameState } from './engine';
+import {
+	createGame, resetGame, stepGame, stepGuest, applySim, setRemotePose, collectEvents, buildSim, readPose,
+	pct, NAMES, PALETTE, DIFFS, CFG, CAR_COUNT, type GameState, type NetEvent,
+} from './engine';
+import { joinRandom, joinByCode, makeCode, multiplayerAvailable, MAX_PLAYERS, type Match, type BolidePeer, type GoMsg } from './net';
 import { createRenderer, type Renderer } from './render3d';
 import { usePointerDrag } from '../usePointerDrag';
 import { trackGame } from '../../lib/analytics';
-import { getDaily, saveDailyRun, loadDailyRun, dailyWeekdayLabel } from '../../lib/leaderboard';
+import { getDaily, saveDailyRun, loadDailyRun, dailyWeekdayLabel, playerName } from '../../lib/leaderboard';
 import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
@@ -19,9 +23,12 @@ import ModeToggle from '../../components/ModeToggle';
    ===================================================== */
 
 type Phase = 'menu' | 'playing' | 'dead';
-type Mode = 'libre' | 'defi';
+type Mode = 'libre' | 'defi' | 'online';
+type MpPhase = 'menu' | 'connecting' | 'lobby'; // what the online tab shows before the flag drops
 interface DailyState { best: number; tries: number }
 const STEP = 1000 / 60;
+const NET_MS = 50; // 20 packets/s — a pose is 6 numbers, a host tick a few dozen
+const AUTO_START = 8; // seconds the host waits once a second driver shows up
 // Kept under CFG.driftJab on purpose: holding a key carves, it never breaks traction.
 const KEY_RAMP = 2.2; // steer units per second when a key is held (~0.45 s to full lock)
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
@@ -42,6 +49,13 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [respawnIn, setRespawnIn] = useState(0); // seconds left before the player is back
 	const [left, setLeft] = useState<number>(CFG.timeLimit); // seconds left in the race
 	const [result, setResult] = useState({ pct: 0, best: 0, rank: 0, diff: 1, won: false, winner: 0, deaths: 0, byTime: false });
+	const [labels, setLabels] = useState<string[]>(NAMES.slice()); // car id -> HUD name (driver names online)
+	const [mpPhase, setMpPhase] = useState<MpPhase>('menu');
+	const [mpCode, setMpCode] = useState<string | null>(null);
+	const [codeInput, setCodeInput] = useState('');
+	const [roster, setRoster] = useState<BolidePeer[]>([]);
+	const [lobbyIn, setLobbyIn] = useState(-1); // auto-start countdown, -1 = waiting for a second driver
+	const [amHost, setAmHost] = useState(false);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const miniRef = useRef<HTMLCanvasElement>(null);
@@ -63,10 +77,20 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const deathsRef = useRef(0); // player wrecks this run (cosmetic, shown on the end card)
 	const dailyBestRef = useRef(0); // best % across today's attempts
 	const modeRef = useRef<Mode>('defi');
+	const matchRef = useRef<Match | null>(null);
+	const onlineRef = useRef({ host: false, active: false }); // active = the flag has dropped
+	const seatsRef = useRef<string[]>([]); // frozen roster: index = seat = car id - 1
+	const pendingRef = useRef<NetEvent[]>([]); // host: grid events waiting for the next packet
+	const netAccRef = useRef(0);
+	const ignoreRef = useRef<number[]>([]); // car id -> clock before which its poses are stale
+	const countRef = useRef(-1); // host's auto-start countdown
+
+	const labelsRef = useRef<string[]>(NAMES.slice());
+	const applyLabels = useCallback((l: string[]) => { labelsRef.current = l; setLabels(l); }, []);
 
 	const syncBoard = useCallback(() => {
 		const s = stateRef.current;
-		const rows: Row[] = s.cars.map((c) => ({ id: c.id, name: NAMES[c.id], pct: pct(s, c.id), me: !c.isBot }));
+		const rows: Row[] = s.cars.map((c) => ({ id: c.id, name: labelsRef.current[c.id], pct: pct(s, c.id), me: c.id === s.hero }));
 		rows.sort((a, b) => b.pct - a.pct);
 		setBoard(rows);
 	}, []);
@@ -90,9 +114,13 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const endGame = useCallback(() => {
 		const s = stateRef.current;
 		stop();
-		const peak = Math.max(pct(s, 1), bestPctRef.current);
-		const rank = 1 + s.cars.filter((c) => c.id !== 1 && pct(s, c.id) > pct(s, 1)).length;
-		const end = { won: s.winner === 1, winner: s.winner, deaths: deathsRef.current, byTime: s.overByTime };
+		onlineRef.current.active = false;
+		matchRef.current?.setPlaying(false);
+		countRef.current = -1; // the rematch gets a full countdown, not the tail of the last one
+		setLobbyIn(-1);
+		const peak = Math.max(pct(s, s.hero), bestPctRef.current);
+		const rank = 1 + s.cars.filter((c) => c.id !== s.hero && pct(s, c.id) > pct(s, s.hero)).length;
+		const end = { won: s.winner === s.hero, winner: s.winner, deaths: deathsRef.current, byTime: s.overByTime };
 		if (modeRef.current === 'defi') {
 			const prev = loadDailyRun(gameId);
 			const prevState = (prev?.state as DailyState | undefined) ?? { best: 0, tries: 0 };
@@ -130,21 +158,40 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		keySteerRef.current += Math.max(-rate, Math.min(rate, target - keySteerRef.current));
 		const steer = d.active ? d.steer : keySteerRef.current;
 		const throttle = d.active ? d.throttle : (k.up ? 1 : 0) - (k.down ? 1 : 0);
+		const net = onlineRef.current;
 		while (runningRef.current && accRef.current >= STEP) {
 			accRef.current -= STEP;
-			stepGame(s, steer, throttle, STEP / 1000);
+			// A guest only drives its own car; the host rules on the grid and sends the verdict.
+			if (net.active && !net.host) stepGuest(s, steer, throttle, STEP / 1000);
+			else stepGame(s, steer, throttle, STEP / 1000);
 		}
 		const alpha = Math.min(1, accRef.current / STEP);
-		for (const e of s.events) if (e.type === 'death' && e.isPlayer) deathsRef.current++;
+		for (const e of s.events) {
+			if (e.type === 'death' && e.isPlayer) deathsRef.current++;
+			// A driver we just put back home keeps sending poses from the crash site for one RTT.
+			else if (e.type === 'respawn') ignoreRef.current[e.id] = s.clock + 1;
+		}
+		if (net.active && net.host) collectEvents(s, pendingRef.current);
 		if (r) r.frame(s, alpha, dt / 1000);
 		s.events.length = 0; // consumed by the renderer (FX) this frame
 
-		bestPctRef.current = Math.max(bestPctRef.current, pct(s, 1));
+		if (net.active) {
+			netAccRef.current += dt;
+			if (netAccRef.current >= NET_MS) {
+				netAccRef.current = 0;
+				const m = matchRef.current;
+				const me = s.cars[s.hero - 1];
+				if (m && net.host) m.sendSim(buildSim(s, pendingRef.current));
+				else if (m && me?.alive) m.sendPose({ i: m.selfId, p: readPose(me) });
+			}
+		}
+
+		bestPctRef.current = Math.max(bestPctRef.current, pct(s, s.hero));
 		hudAccRef.current += dt;
 		if (hudAccRef.current >= 140) {
 			hudAccRef.current = 0;
 			syncBoard();
-			const me = s.cars[0];
+			const me = s.cars[s.hero - 1];
 			setRespawnIn(me.alive ? 0 : Math.max(1, Math.ceil(me.respawnAt - s.clock)));
 			setLeft(Math.max(0, Math.ceil(CFG.timeLimit - s.clock)));
 		}
@@ -161,22 +208,27 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		bestPctRef.current = 0;
 		deathsRef.current = 0;
 		keySteerRef.current = 0;
+		netAccRef.current = 0;
 		setRespawnIn(0);
 		setLeft(CFG.timeLimit);
 		rafRef.current = requestAnimationFrame(frame);
 	}, [frame]);
 
-	/** Start a run for the given seed/diff and go live. */
+	/** Start a run for the given seed/diff and go live. Offline: car 1 is ours, the rest are bots. */
 	const launch = useCallback((seed: number, diff: number) => {
 		const s = stateRef.current;
 		resetGame(s, seed, diff);
+		s.hero = 1;
+		s.record = false;
+		for (const car of s.cars) { car.remote = false; car.isBot = car.id !== 1; }
+		applyLabels(NAMES.slice());
 		rendererRef.current?.reset();
 		rendererRef.current?.resize();
 		setSubmitVal(undefined);
 		syncBoard();
 		setPhase('playing');
 		run();
-	}, [run, syncBoard]);
+	}, [run, syncBoard, applyLabels]);
 
 	const play = useCallback(async () => {
 		if (!ensureRenderer()) return;
@@ -206,8 +258,163 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_started', { mode: 'daily' });
 	}, [ensureRenderer, mode, launch, gameId]);
 
-	const backToMenu = useCallback(() => { stop(); setPhase('menu'); }, [stop]);
-	const switchMode = useCallback((m: Mode) => { stop(); setMode(m); setPhase('menu'); }, [stop]);
+	/* ---------- online ---------- */
+
+	/** Everyone runs this on `go`: the seat order is frozen in `ids`, so each client works out
+	 *  which car is its own and which are ghosts without another round trip. */
+	const beginRace = useCallback((go: GoMsg) => {
+		const m = matchRef.current;
+		if (!m || !ensureRenderer()) return;
+		const seat = go.ids.indexOf(m.selfId);
+		if (seat < 0) return; // we arrived after the roster froze — sit this one out in the lobby
+		const host = go.ids[0] === m.selfId;
+		onlineRef.current = { host, active: true };
+		seatsRef.current = go.ids;
+		modeRef.current = 'online';
+		pendingRef.current.length = 0;
+		ignoreRef.current = [];
+
+		const peers = m.peers();
+		const labs = new Array(CAR_COUNT + 1).fill('');
+		for (let id = 1; id <= CAR_COUNT; id++) {
+			const who = go.ids[id - 1];
+			labs[id] = !who ? NAMES[id] : who === m.selfId ? 'Toi' : peers.find((p) => p.id === who)?.name || 'Joueur';
+		}
+		applyLabels(labs);
+
+		const s = stateRef.current;
+		resetGame(s, go.seed, go.diff);
+		s.hero = seat + 1;
+		s.record = host; // only the host logs trail cells for broadcast
+		for (const car of s.cars) {
+			const taken = car.id - 1 < go.ids.length;
+			car.isBot = !taken;
+			// The host drives the bots; a guest owns nothing but its own car.
+			car.remote = host ? taken && car.id !== s.hero : car.id !== s.hero;
+		}
+		m.setPlaying(true);
+		setStatus('');
+		setSubmitVal(undefined);
+		rendererRef.current?.reset();
+		rendererRef.current?.resize();
+		syncBoard();
+		setPhase('playing');
+		run();
+		trackGame(gameId, 'game_started', { mode: 'online' });
+	}, [ensureRenderer, applyLabels, syncBoard, run, gameId]);
+
+	const startOnlineRace = useCallback(() => {
+		const m = matchRef.current;
+		if (!m) return;
+		const go: GoMsg = { seed: (Math.random() * 2 ** 31) >>> 0, diff: 1, ids: m.ids() };
+		m.sendGo(go);
+		beginRace(go);
+	}, [beginRace]);
+
+	const leaveOnline = useCallback(() => {
+		stop();
+		matchRef.current?.leave();
+		matchRef.current = null;
+		onlineRef.current = { host: false, active: false };
+		setRoster([]);
+		setMpCode(null);
+		setLobbyIn(-1);
+		setAmHost(false);
+		setMpPhase('menu');
+		setPhase('menu');
+	}, [stop]);
+
+	/** Attach every channel handler once, right after joining. */
+	const wire = useCallback((m: Match) => {
+		m.onPeers((peers) => {
+			setRoster(peers);
+			setAmHost(m.isHost());
+			const net = onlineRef.current;
+			if (!net.active) return;
+			const hostId = seatsRef.current[0];
+			if (hostId && hostId !== m.selfId && !peers.some((p) => p.id === hostId)) {
+				setStatus("L'hôte a quitté — course interrompue.");
+				endGame();
+				return;
+			}
+			if (!net.host) return;
+			// A driver who leaves mid-race hands their car over to a bot rather than freezing it.
+			const here = new Set(peers.map((p) => p.id));
+			seatsRef.current.forEach((id, i) => {
+				const car = stateRef.current.cars[i];
+				if (!car || !car.remote || id === m.selfId || here.has(id)) return;
+				car.remote = false;
+				car.isBot = true;
+			});
+		});
+		m.onLobby((l) => setLobbyIn(l.in));
+		m.onGo((go) => beginRace(go));
+		m.onPose((msg) => {
+			const net = onlineRef.current;
+			if (!net.active || !net.host) return;
+			const s = stateRef.current;
+			if (s.clock < (ignoreRef.current[msg.p.id] ?? 0)) return; // stale: sent before they saw the respawn
+			setRemotePose(s, msg.p);
+		});
+		m.onSim((sm) => {
+			const net = onlineRef.current;
+			if (net.active && !net.host) applySim(stateRef.current, sm);
+		});
+	}, [beginRace, endGame]);
+
+	const enterLobby = useCallback(async (make: () => Promise<Match | null>, code: string | null, fail: string) => {
+		if (!multiplayerAvailable()) { setStatus('Multijoueur indisponible.'); return; }
+		setStatus('');
+		setMpCode(code);
+		setMpPhase('connecting');
+		const m = await make();
+		if (!m) { setMpPhase('menu'); setStatus(fail); return; }
+		matchRef.current = m;
+		countRef.current = -1;
+		setLobbyIn(-1);
+		wire(m);
+		setMpPhase('lobby');
+	}, [wire]);
+
+	const me16 = () => (playerName() || 'Joueur').slice(0, 16);
+	const mpQuick = () => enterLobby(() => joinRandom(me16()), null, 'Aucun salon libre, réessaie.');
+	const mpCreate = () => { const c = makeCode(); return enterLobby(() => joinByCode(me16(), c), c, 'Connexion impossible.'); };
+	const mpJoin = () => {
+		const c = codeInput.trim().toUpperCase();
+		if (!c) return;
+		return enterLobby(() => joinByCode(me16(), c), c, 'Code plein ou invalide.');
+	};
+
+	/* Host's auto-start: once a second driver is here, count down out loud so everyone sees it. */
+	useEffect(() => {
+		if (mode !== 'online' || mpPhase !== 'lobby') return;
+		const id = setInterval(() => {
+			const m = matchRef.current;
+			if (!m || !m.isHost() || onlineRef.current.active) return;
+			const others = m.peers().length;
+			if (others === 0) countRef.current = -1;
+			else if (others + 1 >= MAX_PLAYERS) countRef.current = 0;
+			else countRef.current = countRef.current < 0 ? AUTO_START : countRef.current - 1;
+			setLobbyIn(countRef.current);
+			m.sendLobby({ in: countRef.current });
+			if (countRef.current === 0) startOnlineRace();
+		}, 1000);
+		return () => clearInterval(id);
+	}, [mode, mpPhase, startOnlineRace]);
+
+	const backToMenu = useCallback(() => {
+		stop();
+		if (modeRef.current === 'online') { leaveOnline(); return; }
+		setPhase('menu');
+	}, [stop, leaveOnline]);
+
+	const switchMode = useCallback((m: Mode) => {
+		stop();
+		if (matchRef.current) leaveOnline();
+		setMode(m);
+		setMpPhase('menu');
+		setPhase('menu');
+	}, [stop, leaveOnline]);
 
 	/* Show the arena as a still preview behind the menu; wire resize + cleanup. */
 	useEffect(() => {
@@ -305,12 +512,24 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		},
 	);
 
+	// Same sort as net.ts ids(): index in this list is the seat, so the dot matches the car colour.
+	const selfId = matchRef.current?.selfId ?? '';
+	const seatList = [...roster.map((p) => ({ id: p.id, name: p.name, me: false })), { id: selfId, name: 'Toi', me: true }]
+		.sort((a, b) => (a.id < b.id ? -1 : 1));
+
 	return (
 		<div className="bo-root">
 			<style>{CSS}</style>
 
 			<div className="bo-modetoggle">
-				<ModeToggle daily={mode === 'defi'} onFree={() => switchMode('libre')} onDaily={() => switchMode('defi')} />
+				<ModeToggle
+					daily={mode === 'defi'}
+					onFree={() => switchMode('libre')}
+					onDaily={() => switchMode('defi')}
+					showOnline
+					onlineActive={mode === 'online'}
+					onOnline={() => switchMode('online')}
+				/>
 			</div>
 
 			<div className="bo-boardwrap" ref={boardRef}>
@@ -333,8 +552,14 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 					<ol className="bo-leaderboard">
 						{board.map((r) => (
 							<li key={r.id} className={r.me ? 'me' : ''}>
-								<span className="bo-dot" style={{ background: hex(PALETTE[r.id]) }} />
-								{r.name} · {r.pct.toFixed(1)}%
+								<span className="bo-row">
+									<span className="bo-dot" style={{ background: hex(PALETTE[r.id]) }} />
+									{r.name} · {r.pct.toFixed(1)}%
+								</span>
+								{/* Distance to the 50 % buzzer, which the raw number alone never makes obvious. */}
+								<span className="bo-bar">
+									<span style={{ width: `${Math.min(100, (r.pct / CFG.winPct) * 100)}%`, background: hex(PALETTE[r.id]) }} />
+								</span>
 							</li>
 						))}
 						<li className="goal">{mmss(left)} · KO à {CFG.winPct} %</li>
@@ -350,7 +575,67 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 				{webglError && <div className="bo-overlay"><div className="bo-card">3D indisponible (WebGL manquant).</div></div>}
 
-				{phase === 'menu' && !webglError && (
+				{phase === 'menu' && !webglError && mode === 'online' && (
+					<div className="bo-overlay">
+						<div className="bo-card">
+							{mpPhase === 'lobby' ? (
+								<>
+									<h2>Salon</h2>
+									{mpCode && <p className="bo-code">Code&nbsp;: <strong>{mpCode}</strong></p>}
+									<ul className="bo-roster">
+										{seatList.map((p, i) => (
+											<li key={p.id} className={p.me ? 'me' : ''}>
+												<span className="bo-dot" style={{ background: hex(PALETTE[i + 1]) }} />{p.name}
+											</li>
+										))}
+									</ul>
+									<p className="bo-modehint">
+										{roster.length + 1}/{MAX_PLAYERS} pilotes · les places libres sont tenues par des bots
+									</p>
+									<p className="bo-sub">
+										{roster.length === 0
+											? 'En attente d\'un autre pilote… partage ton code, ou laisse tourner.'
+											: lobbyIn >= 0
+												? `Départ dans ${lobbyIn}…`
+												: 'Départ imminent…'}
+									</p>
+									{amHost && roster.length > 0 && <button className="bo-play" onClick={startOnlineRace}>▶ Lancer maintenant</button>}
+									<button className="bo-quit bo-leave" onClick={leaveOnline}>Quitter le salon</button>
+								</>
+							) : mpPhase === 'connecting' ? (
+								<>
+									<h2>Connexion…</h2>
+									<p className="bo-sub">Recherche d'un salon libre.</p>
+									<button className="bo-quit bo-leave" onClick={leaveOnline}>Annuler</button>
+								</>
+							) : (
+								<>
+									<h2>Course en ligne</h2>
+									<p className="bo-sub">
+										Jusqu'à <strong>{MAX_PLAYERS} pilotes</strong> dans la même arène. Mêmes règles&nbsp;:
+										boucle pour capturer, coupe la trace d'un rival pour l'envoyer au stand.
+										Les places vides sont tenues par des bots.
+									</p>
+									<button className="bo-play" onClick={mpQuick}>⚡ Partie rapide</button>
+									<button className="bo-second" onClick={mpCreate}>🔑 Créer un code ami</button>
+									<div className="bo-join">
+										<input
+											value={codeInput}
+											onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 4))}
+											placeholder="CODE"
+											maxLength={4}
+											aria-label="Code ami"
+										/>
+										<button onClick={mpJoin} disabled={codeInput.trim().length < 4}>Rejoindre</button>
+									</div>
+									{status && <p className="bo-hint">{status}</p>}
+								</>
+							)}
+						</div>
+					</div>
+				)}
+
+				{phase === 'menu' && !webglError && mode !== 'online' && (
 					<div className="bo-overlay">
 						<div className="bo-card">
 							<h2>Bolides</h2>
@@ -379,10 +664,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							<h2>{result.won ? 'Arène conquise !' : 'Perdu'}</h2>
 							<p className="bo-sub">
 								{result.byTime
-									? `Temps écoulé — ${result.won ? 'tu gardes' : `${NAMES[result.winner] ?? 'un rival'} garde`} le plus grand territoire.`
+									? `Temps écoulé — ${result.won ? 'tu gardes' : `${labels[result.winner] ?? 'un rival'} garde`} le plus grand territoire.`
 									: result.won
 										? `Tu as passé la barre des ${CFG.winPct} %.`
-										: `${NAMES[result.winner] ?? 'Un rival'} a pris ${CFG.winPct} % de l'arène avant toi.`}
+										: `${labels[result.winner] ?? 'Un rival'} a pris ${CFG.winPct} % de l'arène avant toi.`}
 							</p>
 							<p className="bo-score">
 								{result.pct.toFixed(1)}%
@@ -394,7 +679,19 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							{mode === 'defi' && (
 								<p className="bo-best">Meilleur du jour : <strong>{fmtPct(toTenths(result.best))}</strong> · {DIFFS[result.diff]?.label}</p>
 							)}
-							<button className="bo-play" onClick={play}>↺ Rejouer</button>
+							{mode === 'online' ? (
+								<>
+									<p className="bo-hint bo-rematch">
+										{roster.length === 0
+											? 'Tout le monde est parti — reste ou quitte le salon.'
+											: lobbyIn >= 0 ? `Revanche dans ${lobbyIn}…` : 'Revanche imminente…'}
+									</p>
+									{amHost && roster.length > 0 && <button className="bo-play" onClick={startOnlineRace}>↺ Relancer</button>}
+									<button className="bo-quit bo-leave" onClick={leaveOnline}>Quitter le salon</button>
+								</>
+							) : (
+								<button className="bo-play" onClick={play}>↺ Rejouer</button>
+							)}
 						</div>
 					</div>
 				)}
@@ -402,7 +699,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 			{phase === 'playing' && (
 				<div className="bo-actions">
-					<button className="bo-restart" onClick={play}>↺ Recommencer</button>
+					{mode !== 'online' && <button className="bo-restart" onClick={play}>↺ Recommencer</button>}
 					<button className="bo-quit" onClick={backToMenu}>Quitter</button>
 				</div>
 			)}
@@ -429,6 +726,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				tu repars de là. En revanche, si un rival coupe ta trace, tu réapparais au point de départ après 3&nbsp;s
 				pendant que les autres continuent — alors coupe la leur en premier.
 				{mode === 'defi' && ' Le défi du jour partage la même arène et le même classement pour tout le monde.'}
+				{mode === 'online' && ` En ligne, jusqu'à ${MAX_PLAYERS} pilotes courent dans la même arène : partie rapide pour tomber sur n'importe qui, code ami pour jouer entre vous. Les places libres restent tenues par des bots.`}
 			</p>
 		</div>
 	);
@@ -465,9 +763,12 @@ const CSS = `
   background: rgba(0,0,0,0.55); color: #fff; border-radius: 10px; font-size: 12.5px; font-weight: 700;
   font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 3px;
 }
-.bo-leaderboard li { display: flex; align-items: center; gap: 6px; }
+.bo-leaderboard li { display: flex; flex-direction: column; gap: 3px; min-width: 118px; }
+.bo-row { display: flex; align-items: center; gap: 6px; }
+.bo-bar { display: block; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.16); overflow: hidden; }
+.bo-bar span { display: block; height: 100%; border-radius: 2px; transition: width 0.14s linear; }
 .bo-leaderboard li.me { color: #ffe27a; }
-.bo-leaderboard li.goal { color: rgba(255,255,255,0.6); font-weight: 600; font-size: 11px; border-top: 1px solid rgba(255,255,255,0.18); padding-top: 4px; margin-top: 1px; }
+.bo-leaderboard li.goal { display: block; color: rgba(255,255,255,0.6); font-weight: 600; font-size: 11px; border-top: 1px solid rgba(255,255,255,0.18); padding-top: 4px; margin-top: 1px; }
 .bo-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .bo-respawn {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; text-align: center;
@@ -500,5 +801,21 @@ const CSS = `
 .bo-score sup { font-size: 0.6em; }
 .bo-best { color: var(--gray-300); font-size: 13px; margin: 0 0 16px; }
 .bo-best strong { color: var(--gray-0); }
+.bo-second { display: block; margin: 10px auto 0; border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 14px; border-radius: 999px; padding: 10px 22px; cursor: pointer; }
+.bo-leave { display: block; margin: 12px auto 0; }
+.bo-join { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+.bo-join input {
+  width: 108px; text-align: center; font: inherit; font-weight: 800; font-size: 18px; letter-spacing: 3px;
+  text-transform: uppercase; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0);
+  border-radius: 12px; padding: 8px 6px;
+}
+.bo-join button { border: 1.5px solid var(--gray-700); background: var(--gray-900); color: var(--gray-0); font: inherit; font-weight: 600; font-size: 13px; border-radius: 12px; padding: 8px 14px; cursor: pointer; }
+.bo-join button:disabled { opacity: 0.45; cursor: default; }
+.bo-code { font-size: 13px; color: var(--gray-300); margin: 0 0 10px; }
+.bo-code strong { font-size: 26px; letter-spacing: 5px; color: var(--bo-accent); font-family: var(--font-brand); }
+.bo-roster { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 5px; align-items: center; font-size: 13.5px; font-weight: 600; }
+.bo-roster li { display: flex; align-items: center; gap: 7px; }
+.bo-roster li.me { color: #ffe27a; }
+.bo-rematch { margin-bottom: 4px; }
 .bo-help { max-width: 460px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin: 1rem auto 0; }
 `;
