@@ -82,6 +82,21 @@ const hatchAt = (id: number, col: number, row: number) =>
 				: false;
 const HATCH_K = [128, 128, 102, 102, 100]; // 128 = x1.0
 
+// Sub-cell asphalt grain, baked from SDXL by scripts/comfy-bolides.mjs. It cannot go into the
+// territory canvas: the minimap and the score read those bytes directly. So it lives in the
+// terrain shader as a pure value modulation — the same multiplier on r, g and b, centred on the
+// tile's own mean so the arena keeps its average brightness and no owner hue shifts.
+const GRAIN_URL = '/assets/jeux/bolides/grain.png';
+const GRAIN_MEAN = 0.36; // measured off the baked PNG (mean 91.8/255), not guessed
+// 8 tiles over the arena = 12.5 world units each, which lands the texel near screen resolution in
+// the chase frame. Swept: near-field high-pass energy on the floor is 0.41 bare, 1.57 at repeat 4,
+// 3.37 at 8, 2.45 at 16, 1.65 at 24 — 4 is undersampled into blotches that read as stains and 24
+// is mipped back to flat.
+const GRAIN_REPEAT = 8;
+// 0.5 peaks at 13% luma deviation. 0.9 doubles the high-pass but also doubles the chroma drift
+// (63/1000 vs 38/1000 max), and the floor colour is the score.
+const GRAIN_K = 0.5;
+
 // Paint is darkened ~73% toward the substrate so the hue is carried by emission, not by diffuse:
 // with the light buffer lifting the ground, a paler body just read as a grey soap bar.
 const BODY_DIFFUSE = [0, 0x152C51, 0x4B1226, 0x0C4536, 0x4B3F0A];
@@ -549,6 +564,7 @@ export interface Renderer {
 	frame(state: GameState, alpha: number, dtSec: number): void;
 	reset(): void; // clear trail + skid overlays and repaint territory (instant Rejouer)
 	setMinimap(canvas: HTMLCanvasElement | null): void; // top-down overview drawn each frame
+	snapshotMap(canvas: HTMLCanvasElement): void; // the arena as it was left, for the end card
 	resize(): void;
 	dispose(): void;
 }
@@ -733,11 +749,26 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	// Unlit on purpose: the territory colour IS the score. It does take a capped haze though —
 	// the minimap already guarantees the authored pixels, and a big field needs depth.
 	const terrMat = new THREE.MeshBasicMaterial({ map: terrTex, toneMapped: false, fog: true });
+	// grainK stays 0 until the PNG lands: an unloaded sampler binds to three's empty texture, and
+	// a black grain would flash the whole floor dark on the first frames. Both knobs stay uniforms
+	// so scripts/bolides-v7.mjs can re-sweep them against a shipped build.
+	const grainU = { grainMap: { value: null as THREE.Texture | null }, grainK: { value: 0 }, grainRep: { value: GRAIN_REPEAT } };
+	const grainTex = new THREE.TextureLoader().load(GRAIN_URL, () => { grainU.grainK.value = GRAIN_K; });
+	grainTex.wrapS = grainTex.wrapT = THREE.RepeatWrapping;
+	grainTex.colorSpace = THREE.NoColorSpace; // a multiplier, not a colour: no sRGB decode
+	grainTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+	grainU.grainMap.value = grainTex;
+	terrMat.userData.grain = grainU;
 	terrMat.onBeforeCompile = (sh) => {
+		sh.uniforms.grainMap = grainU.grainMap;
+		sh.uniforms.grainK = grainU.grainK;
+		sh.uniforms.grainRep = grainU.grainRep;
+		sh.fragmentShader = `uniform sampler2D grainMap;\nuniform float grainK;\nuniform float grainRep;\n${sh.fragmentShader}`;
 		// Near-field darkening then a real fog mix: paint under the camera has to stay a glow on
 		// asphalt, and paint at the horizon has to sit back in the air.
 		sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>',
-			'#ifdef USE_FOG\n'
+			`gl_FragColor.rgb *= 1.0 + grainK * ( texture2D( grainMap, vMapUv * grainRep ).r - ${GRAIN_MEAN.toFixed(3)} );\n`
+			+ '#ifdef USE_FOG\n'
 			+ 'gl_FragColor.rgb *= mix( 0.70, 1.0, smoothstep( 0.0, 26.0, vFogDepth ) );\n'
 			+ 'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, smoothstep( fogNear, fogFar, vFogDepth ) * 0.80 );\n'
 			+ '#endif');
@@ -1184,6 +1215,18 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		}
 	};
 
+	// Same two blits as the overview, minus the car dots: the end card is about the ground that
+	// changed hands over three minutes, and a dot on it just reads as "here is where you stopped".
+	const snapshotMap = (c: HTMLCanvasElement) => {
+		const g = c.getContext('2d');
+		if (!g) return;
+		g.imageSmoothingEnabled = true;
+		g.imageSmoothingQuality = 'high';
+		g.clearRect(0, 0, c.width, c.height);
+		g.drawImage(terr.c, 0, 0, GRID, GRID, 0, 0, c.width, c.height);
+		g.drawImage(trailC.c, 0, 0, TRAIL_W, TRAIL_W, 0, 0, c.width, c.height);
+	};
+
 	const resize = () => {
 		const w = canvas.clientWidth, h = canvas.clientHeight || Math.round(w * 0.625);
 		renderer.setSize(w, h, false);
@@ -1539,12 +1582,12 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				if (Array.isArray(m)) m.forEach((x) => x.dispose()); else m.dispose();
 			}
 		});
-		terrTex.dispose(); decalTex.dispose(); trailTex.dispose(); lightTex.dispose();
+		terrTex.dispose(); decalTex.dispose(); trailTex.dispose(); lightTex.dispose(); grainTex.dispose();
 		blobTex.dispose(); glowTex.dispose(); roundelTex.dispose();
 		rampTex.dispose(); ledTex.dispose(); skyTex.dispose(); envTex.dispose(); chevTex.dispose();
 		wallHazTex.dispose(); capHazTex.dispose();
 		for (const c of chevrons) { c.material.dispose(); camera.remove(c); }
 	};
 
-	return { fx, frame, reset, setMinimap, resize, dispose };
+	return { fx, frame, reset, setMinimap, snapshotMap, resize, dispose };
 }

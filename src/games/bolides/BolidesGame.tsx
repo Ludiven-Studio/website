@@ -207,6 +207,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		rafRef.current = 0;
 	}, []);
 
+	// Ref callback, not an effect: it fires once when the end card mounts, and the arena canvases
+	// still hold the final frame at that point.
+	const finalMapRef = useCallback((el: HTMLCanvasElement | null) => {
+		if (el) rendererRef.current?.snapshotMap(el);
+	}, []);
+
 	const endGame = useCallback(() => {
 		const s = stateRef.current;
 		stop();
@@ -1062,16 +1068,23 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 										? `Tu as passé la barre des ${CFG.winPct} %.`
 										: `${labels[result.winner] ?? 'Un rival'} a pris ${CFG.winPct} % de l'arène avant toi.`}
 							</p>
-							<p className="bo-score">
-								{result.pct.toFixed(1)}%
-								<span>
-									de terrain · {result.rank}<sup>{result.rank === 1 ? 'er' : 'e'}</sup> sur {board.length || 4}
-									{result.deaths > 0 && ` · ${result.deaths} sortie${result.deaths > 1 ? 's' : ''} de piste`}
-								</span>
-							</p>
-							{mode === 'defi' && (
-								<p className="bo-best">Meilleur du jour : <strong>{fmtPct(toTenths(result.best))}</strong> · {DIFFS[result.diff]?.label}</p>
-							)}
+							{/* Map beside the score, not above it: stacked, it pushed Rejouer under the
+							    card's own scroll on a windowed desktop board (487px of content for 382). */}
+							<div className="bo-recap">
+								<canvas ref={finalMapRef} className="bo-finalmap" width={320} height={320} role="img" aria-label="Carte finale de l'arène" />
+								<div className="bo-recaptext">
+									<p className="bo-score">
+										{result.pct.toFixed(1)}%
+										<span>
+											de terrain · {result.rank}<sup>{result.rank === 1 ? 'er' : 'e'}</sup> sur {board.length || 4}
+											{result.deaths > 0 && ` · ${result.deaths} sortie${result.deaths > 1 ? 's' : ''} de piste`}
+										</span>
+									</p>
+									{mode === 'defi' && (
+										<p className="bo-best">Meilleur du jour : <strong>{fmtPct(toTenths(result.best))}</strong> · {DIFFS[result.diff]?.label}</p>
+									)}
+								</div>
+							</div>
 							{mode === 'online' ? (
 								<>
 									<p className="bo-hint bo-rematch">
@@ -1279,6 +1292,13 @@ const CSS = `
 .bo-score sup { font-size: 0.6em; }
 .bo-best { color: var(--bo-ink-dim); font-size: 13px; margin: 0 0 16px; }
 .bo-best strong { color: #fff; }
+/* Final arena, drawn from the same canvases as the overview. Dark plate under it, or the
+   unclaimed tarmac blends into the card and the map loses its own edges. */
+.bo-recap { display: flex; align-items: center; gap: 14px; margin: 6px 0 14px; }
+.bo-recaptext { flex: 1; min-width: 0; }
+.bo-recap .bo-score { margin: 0; }
+.bo-recap .bo-best { margin: 6px 0 0; }
+.bo-finalmap { flex: none; width: 132px; height: 132px; border-radius: 10px; border: 1px solid rgba(140,120,220,0.38); background: #05030F; box-shadow: 0 8px 22px rgba(0,0,0,0.45); }
 .bo-second { display: block; margin: 10px auto 0; border: 1.5px solid var(--bo-line); background: rgba(255,255,255,0.07); color: var(--bo-ink); font: inherit; font-weight: 600; font-size: 14px; border-radius: 999px; padding: 10px 22px; cursor: pointer; }
 .bo-second:hover { border-color: var(--bo-blue); color: #fff; }
 .bo-leave { display: block; margin: 12px auto 0; }
@@ -1416,6 +1436,8 @@ const CSS = `
   .bo-sub { font-size: 12px; line-height: 1.45; margin-bottom: 8px; }
   .bo-modehint { margin-bottom: 10px; }
   .bo-play { font-size: 15px; padding: 11px 26px; }
+  .bo-recap { gap: 10px; margin-bottom: 10px; }
+  .bo-finalmap { width: 104px; height: 104px; }
   .bo-garagecard { padding: 12px 14px; }
   .bo-cars { grid-template-columns: 1fr; min-height: 40vh; }
   .bo-fair { font-size: 10px; margin: 6px 0; }
