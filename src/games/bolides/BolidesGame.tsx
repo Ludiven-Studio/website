@@ -28,7 +28,7 @@ type MpPhase = 'menu' | 'connecting' | 'lobby'; // what the online tab shows bef
 interface DailyState { best: number; tries: number }
 const STEP = 1000 / 60;
 const NET_MS = 50; // 20 packets/s — a pose is 6 numbers, a host tick a few dozen
-const AUTO_START = 8; // seconds the host waits once a second driver shows up
+const AUTO_START = 10; // seconds the host waits once a second driver shows up
 // Kept under CFG.driftJab on purpose: holding a key carves, it never breaks traction.
 const KEY_RAMP = 2.2; // steer units per second when a key is held (~0.45 s to full lock)
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
@@ -54,7 +54,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [mpCode, setMpCode] = useState<string | null>(null);
 	const [codeInput, setCodeInput] = useState('');
 	const [roster, setRoster] = useState<BolidePeer[]>([]);
-	const [lobbyIn, setLobbyIn] = useState(-1); // auto-start countdown, -1 = waiting for a second driver
+	const [lobbyIn, setLobbyIn] = useState(-1); // auto-start countdown, -1 = no one else yet, nothing ticking
 	const [amHost, setAmHost] = useState(false);
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,6 +84,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const netAccRef = useRef(0);
 	const ignoreRef = useRef<number[]>([]); // car id -> clock before which its poses are stale
 	const countRef = useRef(-1); // host's auto-start countdown
+	const seenRef = useRef(0); // drivers counted last tick; a newcomer rewinds the countdown
 
 	const labelsRef = useRef<string[]>(NAMES.slice());
 	const applyLabels = useCallback((l: string[]) => { labelsRef.current = l; setLabels(l); }, []);
@@ -117,6 +118,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		onlineRef.current.active = false;
 		matchRef.current?.setPlaying(false);
 		countRef.current = -1; // the rematch gets a full countdown, not the tail of the last one
+		seenRef.current = 0;
 		setLobbyIn(-1);
 		const peak = Math.max(pct(s, s.hero), bestPctRef.current);
 		const rank = 1 + s.cars.filter((c) => c.id !== s.hero && pct(s, c.id) > pct(s, s.hero)).length;
@@ -371,6 +373,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		if (!m) { setMpPhase('menu'); setStatus(fail); return; }
 		matchRef.current = m;
 		countRef.current = -1;
+		seenRef.current = 0;
 		setLobbyIn(-1);
 		wire(m);
 		setMpPhase('lobby');
@@ -385,16 +388,20 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		return enterLobby(() => joinByCode(me16(), c), c, 'Code plein ou invalide.');
 	};
 
-	/* Host's auto-start: once a second driver is here, count down out loud so everyone sees it. */
+	/* Host's auto-start: once a second driver is here, count down out loud so everyone sees it.
+	   Alone, nothing ticks — the host launches against bots whenever they feel like it. */
 	useEffect(() => {
 		if (mode !== 'online' || mpPhase !== 'lobby') return;
 		const id = setInterval(() => {
 			const m = matchRef.current;
 			if (!m || !m.isHost() || onlineRef.current.active) return;
-			const others = m.peers().length;
-			if (others === 0) countRef.current = -1;
-			else if (others + 1 >= MAX_PLAYERS) countRef.current = 0;
-			else countRef.current = countRef.current < 0 ? AUTO_START : countRef.current - 1;
+			const here = m.peers().length + 1;
+			const grew = here > seenRef.current; // a latecomer gets the full countdown, not its tail
+			seenRef.current = here;
+			if (here < 2) countRef.current = -1;
+			else if (grew || countRef.current < 0) countRef.current = AUTO_START;
+			else countRef.current -= 1;
+			if (here >= MAX_PLAYERS) countRef.current = 0; // grid full, no reason to wait
 			setLobbyIn(countRef.current);
 			m.sendLobby({ in: countRef.current });
 			if (countRef.current === 0) startOnlineRace();
@@ -594,12 +601,18 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 									</p>
 									<p className="bo-sub">
 										{roster.length === 0
-											? 'En attente d\'un autre pilote… partage ton code, ou laisse tourner.'
-											: lobbyIn >= 0
-												? `Départ dans ${lobbyIn}…`
+											? 'Personne d\'autre pour l\'instant — partage ton code, ou pars seul contre les bots.'
+											: lobbyIn > 0
+												? `Départ automatique dans ${lobbyIn}…`
 												: 'Départ imminent…'}
 									</p>
-									{amHost && roster.length > 0 && <button className="bo-play" onClick={startOnlineRace}>▶ Lancer maintenant</button>}
+									{amHost ? (
+										<button className="bo-play" onClick={startOnlineRace}>
+											{roster.length === 0 ? '▶ Jouer contre les bots' : '▶ Lancer maintenant'}
+										</button>
+									) : (
+										<p className="bo-hint">L'hôte peut lancer la course avant la fin du décompte.</p>
+									)}
 									<button className="bo-quit bo-leave" onClick={leaveOnline}>Quitter le salon</button>
 								</>
 							) : mpPhase === 'connecting' ? (
@@ -614,7 +627,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 									<p className="bo-sub">
 										Jusqu'à <strong>{MAX_PLAYERS} pilotes</strong> dans la même arène. Mêmes règles&nbsp;:
 										boucle pour capturer, coupe la trace d'un rival pour l'envoyer au stand.
-										Les places vides sont tenues par des bots.
+										Dès qu'un second pilote arrive, la course part toute seule en {AUTO_START} s —
+										l'hôte peut lancer avant. Les places vides sont tenues par des bots.
 									</p>
 									<button className="bo-play" onClick={mpQuick}>⚡ Partie rapide</button>
 									<button className="bo-second" onClick={mpCreate}>🔑 Créer un code ami</button>
@@ -683,10 +697,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 								<>
 									<p className="bo-hint bo-rematch">
 										{roster.length === 0
-											? 'Tout le monde est parti — reste ou quitte le salon.'
-											: lobbyIn >= 0 ? `Revanche dans ${lobbyIn}…` : 'Revanche imminente…'}
+											? 'Plus personne dans le salon — relance contre les bots ou quitte.'
+											: lobbyIn > 0 ? `Revanche dans ${lobbyIn}…` : 'Revanche imminente…'}
 									</p>
-									{amHost && roster.length > 0 && <button className="bo-play" onClick={startOnlineRace}>↺ Relancer</button>}
+									{amHost && <button className="bo-play" onClick={startOnlineRace}>↺ Relancer</button>}
 									<button className="bo-quit bo-leave" onClick={leaveOnline}>Quitter le salon</button>
 								</>
 							) : (
