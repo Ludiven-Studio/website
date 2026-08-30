@@ -142,7 +142,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const carsRef = useRef<HTMLUListElement>(null);
 	const stateRef = useRef<GameState>(createGame());
 	const rendererRef = useRef<Renderer | null>(null);
-	const keysRef = useRef({ left: false, right: false, up: false, down: false });
+	const keysRef = useRef({ left: false, right: false, up: false });
 	const keySteerRef = useRef(0); // ramped key steer, see frame()
 	const lastTapRef = useRef({ key: '', at: 0 }); // double-tap a side = flick the wheel over
 	const dragRef = useRef({ active: false, steer: 0, throttle: 0, ox: 0, oy: 0 });
@@ -260,7 +260,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		// not per rendered frame, so how far the wheel is over never depends on the frame rate.
 		const target = (k.right ? 1 : 0) - (k.left ? 1 : 0);
 		const rate = (STEP / 1000) * KEY_RAMP;
-		const throttle = d.active ? d.throttle : (k.up ? 1 : 0) - (k.down ? 1 : 0);
+		// No brake anywhere: -1 is the car's base speed, and the gas is the only way up from it.
+		const throttle = d.active ? d.throttle : (k.up ? 1 : -1);
 		const net = onlineRef.current;
 		while (runningRef.current && accRef.current >= STEP) {
 			accRef.current -= STEP;
@@ -290,7 +291,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 		// Every frame, unconditionally: 0 is how a loop is stopped, and it fades instead of cutting.
 		const sp01 = Math.min(1, hero.speed / hero.cfg.maxSpeed);
-		sfx.engine(sp01, Math.max(0, throttle));
+		// The whole [-1, 1] is now gas, so clamping the negative half to 0 would leave half the
+		// throw with an identical engine note.
+		sfx.engine(sp01, (throttle + 1) / 2);
 		sfx.skid(hero.drifting ? sp01 : 0);
 		sfx.scrape(hero.scraping ? sp01 : 0);
 
@@ -724,7 +727,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		return () => { delete w.__bolides; };
 	}, []);
 
-	/* Keyboard: steer (left/right) + throttle/brake (up/down). */
+	/* Keyboard: steer (left/right) + gas (up). There is no brake key: the car always rolls. */
 	useEffect(() => {
 		const NAV = new Set([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 		const set = (key: string, down: boolean): boolean => {
@@ -732,7 +735,6 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			if (key === 'ArrowLeft' || key === 'a' || key === 'q') return ((r.left = down), true);
 			if (key === 'ArrowRight' || key === 'd') return ((r.right = down), true);
 			if (key === 'ArrowUp' || key === 'w' || key === 'z') return ((r.up = down), true);
-			if (key === 'ArrowDown' || key === 's') return ((r.down = down), true);
 			return false;
 		};
 		const onDown = (e: KeyboardEvent) => {
@@ -756,8 +758,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
 	}, []);
 
-	/* Touch/mouse: a relative joystick where the finger lands — up/down = throttle/brake,
-	   left/right = steer. Positioned via refs so dragging never rerenders React. */
+	/* Touch/mouse: a relative joystick where the finger lands — how FAR it is dragged is the
+	   speed, how far sideways is the steer. Positioned via refs so dragging never rerenders. */
 	const JOY_R = 96; // px radius for full deflection — a long throw is what buys small corrections
 	const JOY_VIS = 0.5; // the ring is drawn at half that radius (see .bo-joy-base)
 	// Squared response: the first third of the throw barely turns, full lock still sits at the rim.
@@ -779,7 +781,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		(cx, cy) => {
 			if (!runningRef.current) return; // only while a run is live
 			const d = dragRef.current;
-			d.active = true; d.ox = cx; d.oy = cy; d.steer = 0; d.throttle = 0;
+			d.active = true; d.ox = cx; d.oy = cy; d.steer = 0; d.throttle = -1; // -1 is the floor, not a brake
 			if (joyBaseRef.current) joyBaseRef.current.style.display = 'block';
 			if (joyKnobRef.current) joyKnobRef.current.style.display = 'block';
 			positionJoy(cx, cy, 0, 0);
@@ -789,12 +791,15 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			if (!d.active) return;
 			const dx = cx - d.ox, dy = cy - d.oy;
 			d.steer = expo(Math.max(-1, Math.min(1, dx / JOY_R)));
-			d.throttle = Math.max(-1, Math.min(1, -dy / (JOY_R * 0.65))); // up = accelerate
+			// Speed is the DISTANCE from where the finger landed, whatever the direction. On the
+			// old up/down axis, pulling sideways to steer cut the throttle, so every corner was
+			// paid for in speed. Now a full-lock throw is also full gas.
+			d.throttle = Math.min(1, Math.hypot(dx, dy) / JOY_R) * 2 - 1;
 			positionJoy(d.ox, d.oy, dx, dy);
 		},
 		() => {
 			const d = dragRef.current;
-			d.active = false; d.steer = 0; d.throttle = 0;
+			d.active = false; d.steer = 0; d.throttle = -1;
 			if (joyBaseRef.current) joyBaseRef.current.style.display = 'none';
 			if (joyKnobRef.current) joyKnobRef.current.style.display = 'none';
 		},
@@ -958,7 +963,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				)}
 
 				{phase === 'playing' && startHint && respawnIn === 0 && (
-					<div className="bo-startchip">Glisse&nbsp;: haut = gaz, côté = braquer</div>
+					<div className="bo-startchip">Glisse&nbsp;: écart = vitesse, côté = braquer</div>
 				)}
 
 				{webglError && <div className="bo-overlay"><div className="bo-card">3D indisponible (WebGL manquant).</div></div>}
@@ -1052,7 +1057,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							<button className="bo-play" onClick={play}>▶ Jouer</button>
 							{garageButton}
 							{status && <p className="bo-hint">{status}</p>}
-							<p className="bo-hint">Glisse&nbsp;: haut = gaz, côté = braquer. Doucement ça tourne court&nbsp;; tenir le virage sur la peinture (ou à fond sur le sol nu) fait drifter. Clavier&nbsp;: flèches ou ZQSD.</p>
+							<p className="bo-hint">Glisse&nbsp;: plus tu t'éloignes du doigt, plus tu vas vite (pas de frein) ; le côté braque. Doucement ça tourne court&nbsp;; tenir le virage sur la peinture (ou à fond sur le sol nu) fait drifter. Clavier&nbsp;: flèches ou ZQSD.</p>
 						</div>
 					</div>
 				)}
@@ -1132,13 +1137,17 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="bo-help">
-				<strong>Glisse le doigt</strong> sur l'écran : haut/bas pour accélérer ou freiner, gauche/droite pour tourner.
+				<strong>Glisse le doigt</strong> sur l'écran : la caisse n'a pas de frein, elle roule toujours.
+				C'est l'<strong>écart au point où tu as posé le doigt</strong> qui donne la vitesse, dans n'importe
+				quelle direction&nbsp;: doigt immobile = allure minimale, doigt loin = plein gaz. Le côté (gauche/droite)
+				braque. Braquer à fond coûte donc zéro vitesse (au clavier&nbsp;: flèches ou ZQSD, ↑ = gaz).
 				Plus tu roules lentement, plus tu tournes court&nbsp;: au ralenti la caisse pivote presque sur place,
-				à pleine vitesse elle ouvre grand le virage (au clavier&nbsp;: flèches ou ZQSD).
+				à pleine vitesse elle ouvre grand le virage.
 				Ce qui fait <strong>drifter</strong>, c'est l'appui, pas le coup de volant&nbsp;: sur la
 				<strong> peinture fraîche</strong> il suffit de <strong>tenir</strong> le virage à allure normale pour partir
-				en travers&nbsp;; sur le <strong>sol nu</strong> les pneus tiennent, sauf à fond. Lève le pied ou freine
-				et l'adhérence revient. En glisse tu perds de la vitesse mais tu boucles plus court&nbsp;: c'est le marché.
+				en travers&nbsp;; sur le <strong>sol nu</strong> les pneus tiennent, sauf à fond. Ramène le doigt
+				vers son point de départ et l'adhérence revient. En glisse tu perds de la vitesse mais tu boucles
+				plus court&nbsp;: c'est le marché.
 				Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
 				Sors, boucle, reviens → capture. Recroiser ta propre trace efface la boucle en cours, sans plus&nbsp;:
 				tu repars de là. En revanche, si un rival coupe ta trace, tu réapparais au point de départ après 3&nbsp;s

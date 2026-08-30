@@ -81,7 +81,7 @@ export const BOLIDES: Bolide[] = [
 	},
 	{
 		id: 'comet', label: 'Comète', emoji: '☄️', price: 60,
-		pitch: 'Elle avale le terrain à pleine vitesse, mais met une éternité à relancer après un frein.',
+		pitch: 'Elle avale le terrain à pleine vitesse, mais met une éternité à relancer une fois retombée au ralenti.',
 		tint: '#FF7A2E',
 		bars: { speed: 4, accel: 1, grip: 3, trail: 3 },
 		cfg: resolve('comet', 0),
