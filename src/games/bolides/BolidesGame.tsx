@@ -35,8 +35,7 @@ interface DailyState { best: number; tries: number }
 const STEP = 1000 / 60;
 const NET_MS = 50; // 20 packets/s — a pose is 6 numbers, a host tick a few dozen
 const AUTO_START = 10; // seconds the host waits once a second driver shows up
-// Kept under the local car's driftJab on purpose: holding a key carves, it never breaks traction.
-const KEY_RAMP = 0.85; // share of the car's jab threshold, per second (~0.45 s to full lock)
+const KEY_RAMP = 2.2; // steer units per second (~0.45 s to full lock) — a key is all-or-nothing
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 const toTenths = (p: number) => Math.round(p * 10); // % -> stored tenths of a percent
 const fmtPct = (v: number) => formatScore(DAILY_LB.bolides.fmt, v);
@@ -258,10 +257,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		const k = keysRef.current, d = dragRef.current;
 		// A key is all-or-nothing, so ramp it: tapped straight to ±1 the car snaps to full
 		// lock and there is no way to hold a shallow line. The ramp advances per PHYSICS step,
-		// not per rendered frame: the engine reads |dsteer|/(1/60), so a long frame would push a
-		// mere key hold past driftJab and make traction depend on the frame rate.
+		// not per rendered frame, so how far the wheel is over never depends on the frame rate.
 		const target = (k.right ? 1 : 0) - (k.left ? 1 : 0);
-		const rate = (STEP / 1000) * KEY_RAMP * hero.cfg.driftJab;
+		const rate = (STEP / 1000) * KEY_RAMP;
 		const throttle = d.active ? d.throttle : (k.up ? 1 : 0) - (k.down ? 1 : 0);
 		const net = onlineRef.current;
 		while (runningRef.current && accRef.current >= STEP) {
@@ -1054,7 +1052,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							<button className="bo-play" onClick={play}>▶ Jouer</button>
 							{garageButton}
 							{status && <p className="bo-hint">{status}</p>}
-							<p className="bo-hint">Glisse&nbsp;: haut = gaz, côté = braquer, coup sec = drift (sur la peinture, ou à fond sur le sol nu). Clavier&nbsp;: flèches ou ZQSD.</p>
+							<p className="bo-hint">Glisse&nbsp;: haut = gaz, côté = braquer. Doucement ça tourne court&nbsp;; tenir le virage sur la peinture (ou à fond sur le sol nu) fait drifter. Clavier&nbsp;: flèches ou ZQSD.</p>
 						</div>
 					</div>
 				)}
@@ -1135,12 +1133,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 			<p className="bo-help">
 				<strong>Glisse le doigt</strong> sur l'écran : haut/bas pour accélérer ou freiner, gauche/droite pour tourner.
-				Un mouvement progressif trace une courbe posée&nbsp;; un coup sec sur le côté fait <strong>drifter</strong>&nbsp;:
-				l'arrière glisse, puis la voiture se replace et boucle le virage bien plus vite
-				(au clavier&nbsp;: flèches ou ZQSD, double-tape un côté pour partir en glisse).
-				Sur la <strong>peinture fraîche</strong> ça part à n'importe quelle allure&nbsp;; sur le <strong>sol nu</strong> les
-				pneus tiennent, sauf à pleine vitesse&nbsp;: gaz à fond pendant une demi-seconde, puis coup sec,
-				et tu pars aussi en travers — mais lâche l'accélérateur et l'adhérence revient tout de suite.
+				Plus tu roules lentement, plus tu tournes court&nbsp;: au ralenti la caisse pivote presque sur place,
+				à pleine vitesse elle ouvre grand le virage (au clavier&nbsp;: flèches ou ZQSD).
+				Ce qui fait <strong>drifter</strong>, c'est l'appui, pas le coup de volant&nbsp;: sur la
+				<strong> peinture fraîche</strong> il suffit de <strong>tenir</strong> le virage à allure normale pour partir
+				en travers&nbsp;; sur le <strong>sol nu</strong> les pneus tiennent, sauf à fond. Lève le pied ou freine
+				et l'adhérence revient. En glisse tu perds de la vitesse mais tu boucles plus court&nbsp;: c'est le marché.
 				Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
 				Sors, boucle, reviens → capture. Recroiser ta propre trace efface la boucle en cours, sans plus&nbsp;:
 				tu repars de là. En revanche, si un rival coupe ta trace, tu réapparais au point de départ après 3&nbsp;s

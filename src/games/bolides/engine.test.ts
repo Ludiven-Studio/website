@@ -67,24 +67,38 @@ describe('bolides engine', () => {
 		expect(pct(s, 1)).toBeLessThanOrEqual(100);
 	});
 
-	it('breaks traction on paint at cruise, on bare ground only flat out', () => {
-		// A fresh car already rolls at cruise with steerPrev 0, so one full-lock step is a flick:
-		// |dsteer|/dt = 60, far past any driftJab.
-		const flick = (onPaint: boolean, throttle: number) => {
+	it('breaks traction on cornering load: paint at cruise, bare ground only flat out', () => {
+		// The wheel is RAMPED here, like a held arrow key (KEY_RAMP in BolidesGame.tsx). What
+		// breaks traction is the cornering load, not how fast the wheel moved: the retired jab
+		// model could not be triggered by a hold at all, so paint felt dead to a keyboard player.
+		const corner = (onPaint: boolean, throttle: number) => {
 			const s = createGame();
 			const car = s.cars[0];
 			if (!onPaint) { car.x = 0; car.z = 0; } // the arena centre belongs to nobody at kickoff
 			expect(s.owner[cellAt(car.x, car.z)] === 0).toBe(!onPaint);
-			// Hold the car on the surface under test while it reaches the throttle's speed: the
-			// gate reads speed, and a rolling car would wander onto the other surface.
+			// Pin the car on the surface under test: it must reach the throttle's speed without
+			// wandering onto the other one.
 			const home = { x: car.x, z: car.z };
-			for (let i = 0; i < 120; i++) { stepGame(s, 0, throttle, 1 / 60); car.x = home.x; car.z = home.z; }
-			stepGame(s, 1, throttle, 1 / 60);
-			return car.drifting;
+			const step = (steer: number) => { stepGame(s, steer, throttle, 1 / 60); car.x = home.x; car.z = home.z; };
+			for (let i = 0; i < 240; i++) step(0);
+			car.heading = 0; car.vh = 0; car.turnRate = 0;
+			let steer = 0, drifted = false, curve = 0;
+			for (let i = 0; i < 180; i++) {
+				steer = Math.min(1, steer + 2.2 / 60);
+				const was = car.vh;
+				step(steer);
+				drifted ||= car.drifting;
+				// The radius that matters is the PATH's: vh is where the car actually goes.
+				if (i >= 150) curve += (Math.abs(angleDiff(car.vh, was)) * 60) / car.speed;
+			}
+			return { drifted, radius: 30 / curve };
 		};
-		expect(flick(true, 0)).toBe(true);
-		expect(flick(false, 0)).toBe(false);
-		expect(flick(false, 1)).toBe(true);
+		expect(corner(true, -1).drifted).toBe(false); // crawling on paint: the tyres hold
+		expect(corner(true, 0).drifted).toBe(true); // cruise on paint: hold the corner and it goes
+		expect(corner(false, 0).drifted).toBe(false); // cruise on bare ground: grip
+		expect(corner(false, 1).drifted).toBe(true); // flat out on bare ground: it goes too
+		// Slow cars pivot, fast cars run wide. Both rows grip, so this is the tyres, not a slide.
+		expect(corner(false, -1).radius).toBeLessThan(corner(false, 0).radius);
 	});
 
 	it('resets cleanly in place', () => {
@@ -315,8 +329,11 @@ describe('bolides roster', () => {
 		for (const c of guest.cars) { c.remote = c.id !== guest.hero; c.isBot = false; }
 		const pending: NetEvent[] = [];
 		let snaps = 0;
+		// Long arcs one way, shorter the other: the tape has to CROSS ITS OWN LINE or the snap
+		// assertion below is vacuous. A flat-out corner now runs wide (the radius opens with
+		// speed), so the old 60-frame alternation never closes a loop any more.
 		for (let i = 0; i < 3000 && !host.over; i++) {
-			stepGame(host, i % 120 < 60 ? 1 : -1, 1, 1 / 60);
+			stepGame(host, i % 400 < 300 ? 1 : -1, 1, 1 / 60);
 			snaps += host.events.filter((e) => e.type === 'snap').length;
 			collectEvents(host, pending);
 			host.events.length = 0;

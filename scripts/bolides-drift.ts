@@ -12,11 +12,10 @@ const MARKS = [0.8, 1.5, 2.2];
 const deg = (r: number) => (r * 180) / Math.PI;
 
 /** Drive the player with a steer input that reaches full lock in `rise` seconds. */
-function corner(rise: number, noJab = false) {
+function corner(rise: number) {
 	const s = createGame(7, 1);
 	const me = s.cars[0];
 	me.x = 0; me.z = 0; me.heading = 0; me.vh = 0; me.px = 0; me.pz = 0;
-	if (noJab) me.steerPrev = 1; // control: full lock from frame 0, traction never breaks
 	let t = 0, maxSlip = 0, drift = 0, turned = 0;
 	const at: Record<number, number> = {};
 	for (let i = 0; i < 150; i++) {
@@ -38,8 +37,8 @@ const show = (label: string, r: ReturnType<typeof corner>) =>
 		MARKS.map((m) => ` ${deg(r.at[m]).toFixed(0).padStart(3)} deg @${m}s`).join(''),
 	);
 
-console.log(`grip radius ${CFG.turnRadius} u, jab threshold ${CFG.driftJab}/s, boost ${CFG.driftBoost}`);
+console.log(`grip radius ${CFG.turnRadius} u at top speed, load limits ${CFG.gripPaint} paint / ${CFG.gripBare} bare, boost ${CFG.driftBoost}`);
 show('slow sweep (1.0 s)', corner(1.0));
 show('normal sweep (0.5 s)', corner(0.5));
 show('flick (0.12 s)', corner(0.12));
-show('same lock, gripped', corner(0, true));
+show('full lock, frame 0', corner(0));

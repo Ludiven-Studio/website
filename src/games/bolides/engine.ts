@@ -28,24 +28,25 @@ export const CFG = {
 	// Measured, not eyeballed (scripts/bolides-hand.mjs). At radius 8 one 400 ms key press cost
 	// 43° of heading and 9.7 units sideways, and 19.6° of that arrived AFTER release — no line
 	// could be trimmed. Radius 13 halves it (26°, 4.4 units) and cuts the coast to 6.8°.
-	turnRadius: 13, // gripped turning circle; a drift tightens it (see driftBoost)
+	turnRadius: 13, // gripped turning circle AT TOP SPEED; a drift tightens it (see driftBoost)
+	slowRadius: 0.62, // share of turnRadius left at a standstill — slow cars pivot, fast ones run wide
 	steerResp: 9, // how fast the applied turn eases toward the input (steering inertia)
 	grip: 26, // how fast the travel direction catches the heading — the gap is the slide
-	// driftGrip 6 was not a slide: travel followed the nose 80% of the way, and the flick gained
-	// LESS direction than simply gripping for the same time (vsGrip 0.74). Swept again for "the
-	// drift is a bit exaggerated" (scripts/bolides-hand.mjs): 2.4 cuts peak slip 62° -> 45° and the
-	// snap-back 42° -> 33° while vsGrip stays 1.26, so the flick is worth exactly as much as before.
-	// Lowering driftBoost instead would have paid for the calmer look with vsGrip.
-	driftGrip: 2.4, // grip while sliding: the nose leads, travel lags — that gap is the drift
-	driftBoost: 2, // the nose swings harder mid-drift, so a slide corners tighter than grip
-	driftJab: 2.6, // steer units/s that break traction — a flick does, a slow finger sweep doesn't
-	driftLock: 0.6, // a jab under this much lock is just a correction
-	driftMinSpeed: 12, // on paint, the tyres always hold below this
-	// Bare ground only lets go flat out. A fraction of the car's OWN maxSpeed, not an absolute:
-	// at 0.86 the Frelon (top 23.8) breaks at 20.5 and the Comète (31.9) at 27.4, so every car
-	// needs the same last third of the throttle. Cruise sits well under it on all five.
-	driftBareFrac: 0.86,
-	driftHold: 0.7, // seconds a break lasts, refreshed by another jab
+	maxSlip: 0.7, // radians (40°) of sideways the car can hold — the drift's visual ceiling
+	// Sideways tyres are brakes. Without this a slide is a plough: the path radius is speed^2 over
+	// the grip limit, so flat out on paint the car could only run a 77-unit arc. Scrubbing lets a
+	// drift trade speed for a tighter line, which is the whole point of throwing the car sideways.
+	scrub: 1.2, // speed bled per second at full slip, eased by sin(slip)
+	driftBoost: 1.3, // the nose swings harder mid-drift; the PATH is still capped by grip below
+	// What breaks traction is the cornering LOAD (speed x yaw rate), not how fast the wheel was
+	// thrown: the old jab test could not be passed by holding a key at all, so a keyboard player
+	// never drifted anywhere (measured, scripts/bolides-trac.mjs — every hold row read "non").
+	// Both are a share of the car's OWN flat-out corner (maxSpeed^2 / turnRadius), never absolute:
+	// against a fixed load the Frelon (top 23.8) could not have broken traction on bare ground at
+	// any speed it can reach, so the rule would have quietly skipped one car in the garage.
+	gripPaint: 0.33, // wet paint gives up around cruise — hold a corner there and it goes
+	gripBare: 0.76, // bare ground holds until the last quarter of the throttle
+	driftHold: 0.7, // seconds a break lasts once the load drops back under the limit
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
 	wallDrag: 4, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
 	wallMargin: 3, // bots start turning back this far from the arena wall
@@ -114,7 +115,6 @@ export interface Car {
 	ph: number;
 	turnRate: number; // current (eased) angular velocity
 	vh: number; // heading the car actually travels along; lags `heading` when grip is low
-	steerPrev: number; // last frame's steer input (jab detection)
 	driftT: number; // seconds of traction loss left
 	drifting: boolean;
 	scraping: boolean; // rubbing the arena rail (slowed down; renderer throws sparks)
@@ -221,7 +221,6 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.speed = car.cfg.cruise;
 	car.turnRate = 0;
 	car.vh = car.heading;
-	car.steerPrev = 0;
 	car.driftT = 0;
 	car.alive = true;
 	car.outside = false;
@@ -278,7 +277,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 			isBot: i !== 0,
 			alive: true,
 			x: 0, z: 0, heading: 0, speed: cfg.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
-			vh: 0, steerPrev: 0, driftT: 0,
+			vh: 0, driftT: 0,
 			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
 			remote: false, netX: 0, netZ: 0, netH: 0,
@@ -319,7 +318,7 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?:
 /* ---------- physics ---------- */
 
 /** `steer` and `throttle` are both in [-1, 1]. throttle > 0 accelerates, < 0 brakes.
- *  `painted` is the surface under the car: only wet paint lets the tyres go. */
+ *  `painted` is the surface under the car: wet paint gives up long before bare ground. */
 function stepCar(car: Car, steer: number, throttle: number, dt: number, painted: boolean): void {
 	const cfg = car.cfg;
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
@@ -328,25 +327,30 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number, painted:
 		: cfg.cruise + (cfg.cruise - cfg.minSpeed) * throttle;
 	car.speed += (targetSpeed - car.speed) * Math.min(1, dt * cfg.accelResp);
 
-	// How FAST the wheel is thrown decides the corner, not just how far: sweep the input
-	// and the car carves a wide gripped arc, snap it over and the back steps out.
-	const jab = Math.abs(steer - car.steerPrev) / Math.max(dt, 1e-4);
-	car.steerPrev = steer;
-	// Wet paint lets go at any pace; bare ground only at the top of the throttle.
-	const slipSpeed = painted ? cfg.driftMinSpeed : cfg.maxSpeed * cfg.driftBareFrac;
-	if (jab > cfg.driftJab && Math.abs(steer) > cfg.driftLock && car.speed > slipSpeed) {
-		car.driftT = cfg.driftHold;
-	}
-	// The tyres bite back the moment the car drops under the surface's threshold, so a slide dies
-	// on braking and on rolling off the paint at cruise — it never coasts on a surface that grips.
-	car.driftT = car.speed > slipSpeed ? Math.max(0, car.driftT - dt) : 0;
-	car.drifting = car.driftT > 0;
-
-	const maxTurn = (car.speed / cfg.turnRadius) * (car.drifting ? cfg.driftBoost : 1);
+	// Slow cars pivot, fast cars run wide: the gripped circle opens up with speed.
+	const radius = cfg.turnRadius * (cfg.slowRadius + (1 - cfg.slowRadius) * Math.min(1, car.speed / cfg.maxSpeed));
+	const maxTurn = (car.speed / radius) * (car.drifting ? cfg.driftBoost : 1);
 	car.turnRate += (steer * maxTurn - car.turnRate) * Math.min(1, dt * cfg.steerResp);
 	car.heading += car.turnRate * dt;
-	// The car travels along vh, not where its nose points — that gap IS the slide.
-	car.vh += angleDiff(car.heading, car.vh) * Math.min(1, dt * (car.drifting ? cfg.driftGrip : cfg.grip));
+
+	// The car travels along vh, not where its nose points — that gap IS the slide. What the tyres
+	// cap is how hard the PATH can bend (lateral accel), never how far the nose swings: capping the
+	// nose instead turned a slide into a donut, tighter than gripping, so sliding always won.
+	const want = angleDiff(car.heading, car.vh) * Math.min(1, dt * cfg.grip);
+	const flatOut = (cfg.maxSpeed * cfg.maxSpeed) / cfg.turnRadius; // this car's hardest corner
+	const maxBend = ((painted ? cfg.gripPaint : cfg.gripBare) * flatOut / Math.max(car.speed, 1)) * dt;
+	const slid = Math.abs(want) > maxBend;
+	car.vh += slid ? Math.sign(want) * maxBend : want;
+	car.driftT = slid ? cfg.driftHold : Math.max(0, car.driftT - dt);
+	car.drifting = car.driftT > 0;
+	// A slide has a ceiling: sideways the tyres scrub, so the nose stops running away from the path.
+	const slip = angleDiff(car.heading, car.vh);
+	if (Math.abs(slip) > cfg.maxSlip) {
+		car.heading = car.vh + Math.sign(slip) * cfg.maxSlip;
+		car.turnRate *= 0.5;
+	}
+	car.speed -= car.speed * cfg.scrub * Math.abs(Math.sin(slip)) * dt;
+
 	car.x += Math.cos(car.vh) * car.speed * dt;
 	car.z += Math.sin(car.vh) * car.speed * dt;
 }

@@ -1651,7 +1651,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 
 		// Chase cam: ease the follow heading toward the car, then sit behind + above it.
 		// Follow where the car TRAVELS (vh), not where its nose points. Locked to the nose, the
-		// engine's slip angle — 10 deg gripped, 30 deg drifting — was invisible: the car stayed
+		// engine's slip angle — a couple of degrees gripped, 40 drifting — was invisible: the car stayed
 		// square on screen and only the world slid, so the one body motion left to see was the
 		// roll. Behind the velocity vector, the nose visibly swings out and the drift reads.
 		camHeading += angleDiff(hero.vh, camHeading) * Math.min(1, fxDt * CAM_EASE);

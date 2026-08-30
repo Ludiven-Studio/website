@@ -36,9 +36,9 @@ type Mul = Partial<Record<keyof typeof CFG, number>>;
 const MULS: Record<string, Mul> = {
 	roadster: {},
 	comet: { cruise: 1.14, maxSpeed: 1.14, accelResp: 0.65, turnRadius: 0.87, steerResp: 0.85, driftBoost: 0.87 },
-	hornet: { maxSpeed: 0.85, accelResp: 1.45, turnRadius: 1.02, steerResp: 1.28, grip: 1.35, driftGrip: 1.20, minSpeed: 1.35, wallDrag: 0.55, driftBoost: 1.10 },
-	drifter: { maxSpeed: 1.05, turnRadius: 0.89, grip: 0.85, driftGrip: 0.55, driftBoost: 0.80, driftJab: 0.80, driftMinSpeed: 0.85, driftHold: 1.45 },
-	bunker: { cruise: 0.91, maxSpeed: 0.88, minSpeed: 1.30, accelResp: 0.85, turnRadius: 0.93, steerResp: 0.90, grip: 1.10, driftGrip: 1.30, driftBoost: 0.80, driftJab: 1.35, wallDrag: 0.70 },
+	hornet: { maxSpeed: 0.85, accelResp: 1.45, turnRadius: 1.02, steerResp: 1.28, grip: 1.35, gripPaint: 1.18, gripBare: 1.18, minSpeed: 1.35, wallDrag: 0.55, driftBoost: 1.10 },
+	drifter: { maxSpeed: 1.05, turnRadius: 0.89, grip: 0.65, driftBoost: 0.80, gripPaint: 0.72, gripBare: 0.72, maxSlip: 1.30, driftHold: 1.45 },
+	bunker: { cruise: 0.91, maxSpeed: 0.88, minSpeed: 1.30, accelResp: 0.85, turnRadius: 0.93, steerResp: 0.90, grip: 1.10, driftBoost: 0.80, gripPaint: 1.15, gripBare: 1.15, wallDrag: 0.70 },
 };
 
 function resolve(id: string, shield: number): CarCfg {
@@ -54,7 +54,7 @@ function resolve(id: string, shield: number): CarCfg {
    Each axis is the geometric mean of the cfg ratios that feed it, against the roadster:
      Vitesse  cruise, maxSpeed
      Reprise  accelResp
-     Accroche grip, driftGrip, tightness (turnRadius inverted — a smaller circle is better)
+     Accroche grip, tightness (turnRadius inverted — a smaller circle is better), gripPaint
      Trace    grace + shield, over grace
    The written `bars` are checked against this in cars.test.ts, so they cannot quietly lie. */
 
@@ -67,7 +67,7 @@ const bar = (r: number): number => (r < 1 / 1.22 ? 1 : r < 1 / 1.08 ? 2 : r <= 1
 export const carBars = (c: CarCfg): Bolide['bars'] => ({
 	speed: bar(gmean(c.cruise / CFG.cruise, c.maxSpeed / CFG.maxSpeed)),
 	accel: bar(c.accelResp / CFG.accelResp),
-	grip: bar(gmean(c.grip / CFG.grip, c.driftGrip / CFG.driftGrip, CFG.turnRadius / c.turnRadius)),
+	grip: bar(gmean(c.grip / CFG.grip, CFG.turnRadius / c.turnRadius, c.gripPaint / CFG.gripPaint)),
 	trail: bar((c.grace + c.shield) / CFG.grace),
 });
 
