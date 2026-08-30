@@ -6,8 +6,11 @@ import AstroPWA from '@vite-pwa/astro';
 // https://astro.build/config
 export default defineConfig({
     site: 'https://www.ludiven-studio.fr',
-    // Tectonique became "Tapis" — keep the old URL alive for shared links.
-    redirects: { '/jeux/tectonique': '/jeux/tapis' },
+    // Renamed games — keep the old URLs alive for shared links.
+    redirects: {
+        '/jeux/tectonique': '/jeux/tapis',
+        '/jeux/bolides': '/jeux/caisses-a-peinture',
+    },
     integrations: [
         react(),
         // Keep noindex pages (labo, legal pages) out of the sitemap — submitting

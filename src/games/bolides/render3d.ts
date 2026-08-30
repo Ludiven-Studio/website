@@ -113,7 +113,64 @@ const GRAIN_K = 0.5;
 // 2 px — so this only picks how thick the line reads. Territory is cell-shaped, so a diagonal is a
 // staircase of 1 cell whatever the width; 0.7 is the widest that still reads as a drawn line rather
 // than a painted band, and it hides that staircase best.
-const EDGE_W = 0.7;
+// Ceiling is 0.5 and that is structural, not a taste call: the coverage field ramps from 1 to 0
+// across exactly one cell, so the distance it can express tops out half a cell either side of the
+// iso-line. 0.7 was chosen to hide the old staircase; there is no staircase left to hide.
+// Re-swept 0.25-0.50 on the new floor (scripts/bolides-v10.mjs): the drawn width grows 1-2-3 px and
+// then stops, 0.45 and 0.50 both reading 3 — the ceiling is real and 0.45 already sits on it.
+const EDGE_W = 0.45;
+// Depth of the per-car motif on owned ground, as a fraction of the fill value. Value only, never
+// hue — the territory colour is the score. Swept 0.06-0.24 (scripts/bolides-v10.mjs) against both
+// guardrails and neither binds: max hue and chroma drift on interior pixels stay at the shot-to-shot
+// noise floor at every setting, and high-pass energy is flat in all three depth bands, so the
+// ~8.7-cell period never aliases. 0.10 was invisible at 1x; 0.20 sits inside the measured bracket.
+const PAT_K = 0.20;
+
+/** Owned ground, grid and contour, all analytic. Injected at `fog_fragment`, so it runs on an
+ *  already sRGB-encoded gl_FragColor and every colour here is sRGB 0-1. */
+const FLOOR_FRAG = `
+vec2 gP = vMapUv * ${GRID}.0;
+float cpp = max( length( fwidth( gP ) ), 1e-6 );
+float aa = max( 0.5 * cpp, 1e-4 );
+
+float lw = max( 0.5, aa );
+vec2 q10 = abs( gP / 10.0 - floor( gP / 10.0 + 0.5 ) ) * 10.0;
+vec2 q50 = abs( gP / 50.0 - floor( gP / 50.0 + 0.5 ) ) * 50.0;
+float gFade = min( 1.0, 0.5 / lw );
+float g10 = ( 1.0 - smoothstep( lw - aa, lw + aa, min( q10.x, q10.y ) ) ) * gFade;
+float g50 = ( 1.0 - smoothstep( lw - aa, lw + aa, min( q50.x, q50.y ) ) ) * gFade;
+vec3 neutral = mix( mix( gl_FragColor.rgb, gridMinor, g10 ), gridMajor, g50 );
+
+vec4 cv = texture2D( covMap, vMapUv );
+float cM = max( max( cv.r, cv.g ), max( cv.b, cv.a ) );
+vec4 sel = step( cM - 0.001, cv ) * step( 0.001, cM );
+sel /= max( 1.0, dot( sel, vec4( 1.0 ) ) );
+// Signed distance to the 0.5 iso-line, in cells. Away from a boundary the gradient collapses and
+// this saturates to a large magnitude, which is what we want: deep inside or far outside.
+float gpc = length( vec2( dFdx( cM ), dFdy( cM ) ) ) / cpp;
+float dC = ( cM - 0.5 ) / max( gpc, 1e-4 );
+
+vec3 own = fillCol[1] * sel.r + fillCol[2] * sel.g + fillCol[3] * sel.b + fillCol[4] * sel.a;
+vec3 lin = lineCol[1] * sel.r + lineCol[2] * sel.g + lineCol[3] * sel.b + lineCol[4] * sel.a;
+
+float ws = pow( vMapUv.x, 1.8 );
+float dw = min( min( vMapUv.x, vMapUv.y ), min( 1.0 - vMapUv.x, 1.0 - vMapUv.y ) ) * ${GRID}.0;
+float rb = pow( max( 0.0, 1.0 - dw / 28.0 ), 1.7 );
+float shade = 0.80 + 0.32 * min( 1.0, ws * 0.9 + rb * 0.5 );
+
+float m1 = sin( ( gP.x + gP.y ) * 0.72 );
+float m2 = cos( gP.x * 0.85 ) * cos( gP.y * 0.85 );
+float m3 = sin( ( abs( fract( gP.y / 16.0 ) - 0.5 ) * 32.0 + gP.x ) * 0.55 );
+float m4 = 0.5 * ( sin( gP.x * 0.8 ) + sin( gP.y * 0.8 ) );
+float mot = m1 * sel.r + m2 * sel.g + m3 * sel.b + m4 * sel.a;
+// Fade the motif out before its period reaches the pixel, or it turns into moire at the horizon.
+mot *= patK * ( 1.0 - smoothstep( 0.30, 0.85, cpp ) );
+
+float fillM = smoothstep( -aa, aa, dC );
+float eW = max( edgeW, aa );
+float eM = ( 1.0 - smoothstep( eW - aa, eW + aa, abs( dC ) ) ) * min( 1.0, edgeW / eW );
+gl_FragColor.rgb = mix( mix( neutral, own * shade * ( 1.0 + mot ), fillM ), lin, eM * edgeK );
+`;
 
 // Paint is darkened ~73% toward the substrate so the hue is carried by emission, not by diffuse:
 // with the light buffer lifting the ground, a paler body just read as a grey soap bar.
@@ -335,6 +392,9 @@ function makeSkyTexture(): THREE.CanvasTexture {
 /** Parametric silhouette. One construction, five recognisable bodies. */
 interface CarShape {
 	len: number; wid: number; deck: number; nose: number; // top-down profile + extrude depth
+	// Body floor above the ground. Keep ride + deck >= 2 * max(wheelR, rearR) or a wheel pokes
+	// through the deck and out of the canopy.
+	ride: number;
 	wheelR: number; wheelW: number; rearR: number; rearW: number;
 	wheelX: readonly number[]; wheelZ: number; wheelSeg: number; cock: number;
 	canopyR: number; canopyX: number; cage: boolean; plough: boolean;
@@ -344,58 +404,58 @@ interface CarShape {
 }
 
 const BASE_SHAPE: CarShape = {
-	len: 1.30, wid: 0.75, deck: 0.52, nose: 0.30,
-	wheelR: 0.30, wheelW: 0.28, rearR: 0.30, rearW: 0.28,
-	wheelX: [0.92, -0.92], wheelZ: 0.80, wheelSeg: 10, cock: 0,
-	canopyR: 0.55, canopyX: 0.25, cage: false, plough: false,
+	len: 1.30, wid: 0.75, deck: 0.48, nose: 0.30, ride: 0.32,
+	wheelR: 0.37, wheelW: 0.34, rearR: 0.37, rearW: 0.34,
+	wheelX: [0.92, -0.92], wheelZ: 0.86, wheelSeg: 10, cock: 0,
+	canopyR: 0.50, canopyX: 0.25, cage: false, plough: false,
 	wing: 0, wingX: 0, wingY: 0, canard: false,
 	glowL: 5, glowW: 5, glowOp: 0.24,
-	roundelX: -0.80, roundelY: 0.75,
+	roundelX: -0.80, roundelY: 0.83,
 };
 
 const CAR_SHAPES: Record<string, CarShape> = {
 	roadster: BASE_SHAPE,
 	comet: {
 		...BASE_SHAPE,
-		len: 1.70, wid: 0.62, deck: 0.40, nose: 0.55,
-		wheelR: 0.29, wheelW: 0.24, rearR: 0.31, rearW: 0.28,
-		wheelX: [1.22, -1.22], wheelZ: 0.70,
+		len: 1.70, wid: 0.62, deck: 0.44, nose: 0.55, ride: 0.24,
+		wheelR: 0.32, wheelW: 0.26, rearR: 0.34, rearW: 0.30,
+		wheelX: [1.22, -1.22], wheelZ: 0.74,
 		canopyR: 0.46, canopyX: -0.30,
 		wing: 1.5, wingX: -1.55, wingY: 1.05,
 		glowL: 7, glowW: 5, glowOp: 0.25,
-		roundelX: -1.05, roundelY: 0.63,
+		roundelX: -1.05, roundelY: 0.71,
 	},
 	hornet: {
 		...BASE_SHAPE,
-		len: 1.00, wid: 0.82, deck: 0.60, nose: 0.28,
-		wheelR: 0.34, wheelW: 0.36, rearR: 0.34, rearW: 0.36,
-		wheelX: [0.66, -0.66], wheelZ: 0.85,
+		len: 1.00, wid: 0.82, deck: 0.54, nose: 0.28, ride: 0.34,
+		wheelR: 0.40, wheelW: 0.40, rearR: 0.40, rearW: 0.40,
+		wheelX: [0.66, -0.66], wheelZ: 0.90,
 		canopyR: 0.56, canopyX: 0, canard: true,
 		glowOp: 0.28,
-		roundelX: -0.58, roundelY: 0.83,
+		roundelX: -0.58, roundelY: 0.91,
 	},
 	drifter: {
 		...BASE_SHAPE,
-		len: 1.25, wid: 0.60, deck: 0.55, nose: 0.32,
-		wheelR: 0.26, wheelW: 0.22, rearR: 0.36, rearW: 0.44,
-		wheelX: [0.95, -0.95], wheelZ: 0.72, cock: 0.35,
+		len: 1.25, wid: 0.60, deck: 0.50, nose: 0.32, ride: 0.30,
+		wheelR: 0.32, wheelW: 0.26, rearR: 0.39, rearW: 0.48,
+		wheelX: [0.95, -0.95], wheelZ: 0.78, cock: 0.35,
 		canopyR: 0.48, canopyX: -0.15,
 		wing: 1.3, wingX: -1.35, wingY: 1.20,
 		glowL: 6.5, glowW: 6.5, glowOp: 0.27,
-		roundelX: -0.70, roundelY: 0.78,
+		roundelX: -0.70, roundelY: 0.86,
 	},
 	bunker: {
 		...BASE_SHAPE,
-		len: 1.20, wid: 0.90, deck: 0.70, nose: 0.45,
-		wheelR: 0.32, wheelW: 0.36, rearR: 0.32, rearW: 0.36,
-		wheelX: [1.0, 0, -1.0], wheelZ: 0.90, wheelSeg: 8,
+		len: 1.20, wid: 0.90, deck: 0.62, nose: 0.45, ride: 0.38,
+		wheelR: 0.38, wheelW: 0.42, rearR: 0.38, rearW: 0.42,
+		wheelX: [1.0, 0, -1.0], wheelZ: 0.94, wheelSeg: 8,
 		canopyR: 0, cage: true, plough: true,
 		glowL: 7.5, glowW: 7.5, glowOp: 0.28,
-		roundelX: -0.25, roundelY: 1.45,
+		roundelX: -0.25, roundelY: 1.55,
 	},
 };
 
-/** Top-down silhouette, extruded and laid flat: nose at +X, floor at y = 0.20. */
+/** Top-down silhouette, extruded and laid flat: nose at +X, floor at y = sh.ride. */
 function bodyGeometry(sh: CarShape): THREE.BufferGeometry {
 	const L = sh.len, W = sh.wid, N = sh.nose;
 	const s = new THREE.Shape();
@@ -415,14 +475,14 @@ function bodyGeometry(sh: CarShape): THREE.BufferGeometry {
 	});
 	g.rotateX(-Math.PI / 2); // extrude axis +Z -> world +Y, nose at +X
 	g.computeBoundingBox();
-	g.translate(0, 0.20 - g.boundingBox!.min.y, 0);
+	g.translate(0, sh.ride - g.boundingBox!.min.y, 0);
 	return g;
 }
 
 function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: THREE.Texture, roundelTex: THREE.Texture, env: THREE.Texture): THREE.Group {
 	const sh = shape;
 	const color = PALETTE[id];
-	const top = 0.20 + sh.deck;
+	const top = sh.ride + sh.deck;
 
 	const paint: THREE.BufferGeometry[] = [bodyGeometry(sh)];
 	const trim: THREE.BufferGeometry[] = [];
@@ -445,7 +505,7 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 	if (sh.plough) {
 		const p = new THREE.BoxGeometry(0.5, 0.6, sh.wid * 2.1);
 		p.rotateZ(-0.25);
-		p.translate(sh.len + 0.15, 0.5, 0);
+		p.translate(sh.len + 0.15, sh.ride + 0.30, 0);
 		paint.push(p);
 	}
 	if (sh.wing > 0) {
@@ -461,7 +521,7 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 	if (sh.canard) {
 		for (const pz of [sh.wid * 0.9, -sh.wid * 0.9]) {
 			const cn = new THREE.BoxGeometry(0.25, 0.06, 0.5);
-			cn.translate(sh.len * 0.9, 0.35, pz);
+			cn.translate(sh.len * 0.9, sh.ride + 0.15, pz);
 			trim.push(cn);
 		}
 	}
@@ -650,8 +710,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		return { c, ctx: c.getContext('2d')! };
 	};
 	const terr = mkCanvas();   // with the baked rim: the minimap and the end card read this one
-	const paint = mkCanvas();   // same paint WITHOUT the rim: the 3D floor, which draws its own line
-	const edge = mkCanvas();   // rgb = that cell's line colour, a = owner id — the shader's input
+	const base = mkCanvas();   // neutral floor only, uploaded once: owned paint is a shader mix now
 	const decal = mkCanvas();
 	const trailC = mkCanvas(GRID * TRAIL_SS);
 	const TRAIL_W = GRID * TRAIL_SS;
@@ -667,11 +726,15 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		t.anisotropy = Math.min(aniso, maxAniso);
 		return t;
 	};
-	const paintTex = mkTex(paint.c, true, true, 8);
-	// Nearest and mip-free on purpose: the shader reads owner ids out of it, and a filtered id is
-	// a made-up id. The line it draws is antialiased analytically instead.
-	const edgeTex = mkTex(edge.c, false, false, 1);
-	edgeTex.colorSpace = THREE.NoColorSpace; // sampled after colorspace_fragment, so already sRGB
+	const baseTex = mkTex(base.c, true, true, 8);
+	// One channel per car, 255 where that car owns the cell. Linear magnification turns those
+	// steps into a continuous coverage field whose 0.5 iso-line is a curve, not a staircase — that
+	// is the whole contour. A DataTexture and not a canvas: canvas 2D stores premultiplied, so a
+	// car-1 cell (r 255, a 0) would read back as r 0 and that car's territory would vanish.
+	const cov = new Uint8Array(TOTAL * 4);
+	const covTex = new THREE.DataTexture(cov, GRID, GRID);
+	covTex.magFilter = covTex.minFilter = THREE.LinearFilter;
+	covTex.colorSpace = THREE.NoColorSpace; // coverage, not colour
 	const decalTex = mkTex(decal.c, true, false, 2);
 	const trailTex = mkTex(trailC.c, true, true, 4);
 
@@ -688,12 +751,11 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 
 	const terrImg = terr.ctx.createImageData(GRID, GRID);
 	const terr32 = new Uint32Array(terrImg.data.buffer);
-	const paintImg = paint.ctx.createImageData(GRID, GRID);
-	const paint32 = new Uint32Array(paintImg.data.buffer);
-	const edgeImg = edge.ctx.createImageData(GRID, GRID);
-	const edge32 = new Uint32Array(edgeImg.data.buffer);
-	// Ids spread over the byte range so nearest sampling can tell them apart with a fat epsilon.
-	const ID_A = [0, 51, 102, 153, 204];
+	const baseImg = base.ctx.createImageData(GRID, GRID);
+	const base32 = new Uint32Array(baseImg.data.buffer);
+	const cov32 = new Uint32Array(cov.buffer);
+	// One-hot per car, in the channel order the shader reads back as .rgba.
+	const COV32 = [0, pack(255, 0, 0, 0), pack(0, 255, 0, 0), pack(0, 0, 255, 0), pack(0, 0, 0, 255)];
 	const emisImg = emis.ctx.createImageData(GRID, GRID);
 	const emis32 = new Uint32Array(emisImg.data.buffer);
 	// Baked neutral floor: a sun wash toward +X plus a violet bleed off the four rails, so the
@@ -708,19 +770,23 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		const col = i % GRID, row = (i / GRID) | 0;
 		const isMaj = col % 50 === 0 || row % 50 === 0;
 		const isMin = col % 10 === 0 || row % 10 === 0;
-		const base = isMaj ? GRID_MAJOR : isMin ? GRID_MINOR : NEUTRAL;
+		const tint = isMaj ? GRID_MAJOR : isMin ? GRID_MINOR : NEUTRAL;
 		const k = (isMaj || isMin) ? 0.35 : 1;
 		const ws = Math.pow(col / (GRID - 1), 1.8);
 		const dw = Math.min(col, row, GRID - 1 - col, GRID - 1 - row);
 		const rb = dw < 28 ? Math.pow(1 - dw / 28, 1.7) : 0;
 		const d = ((col * 7 + row * 13) % 3) - 1; // dither, kills the gradient banding
-		SUB[i] = pack(
-			Math.min(255, base[0] + k * (ws * SUN[0] + rb * RAIL[0]) + d) | 0,
-			Math.min(255, base[1] + k * (ws * SUN[1] + rb * RAIL[1]) + d) | 0,
-			Math.min(255, base[2] + k * (ws * SUN[2] + rb * RAIL[2]) + d) | 0,
-		);
+		const wash = (c: number, j: number) => Math.min(255, c + k * (ws * SUN[j] + rb * RAIL[j]) + d) | 0;
+		SUB[i] = pack(wash(tint[0], 0), wash(tint[1], 1), wash(tint[2], 2));
+		// The 3D floor gets the same wash with NO grid lines: one texel per cell magnified over
+		// half a world unit can only ever be a blurry, shimmering line, whatever its resolution.
+		// The shader rules them instead, antialiased against the pixel footprint. SUB keeps them
+		// because the minimap reads it at 1 cell per pixel, where a baked line is exactly right.
+		base32[i] = pack(wash(NEUTRAL[0], 0), wash(NEUTRAL[1], 1), wash(NEUTRAL[2], 2));
 		SHADE[i] = (0.80 + 0.32 * Math.min(1, ws * 0.9 + rb * 0.5)) * 128;
 	}
+	base.ctx.putImageData(baseImg, 0, 0);
+	baseTex.needsUpdate = true;
 
 	// Land-grab flash: the cells that changed hands, lit as the shape the player actually drew.
 	const gainC = mkCanvas();
@@ -744,6 +810,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	const heroEmis = new Uint32Array(5);
 	const syncHeroLut = (h: number) => {
 		heroLit = h;
+		syncLineCol(h);
 		for (let i = 1; i <= 4; i++) {
 			const w = mixHex(PALETTE[i], 0xFFFFFF, 0.55);
 			heroRim[i] = pack((w >> 16) & 255, (w >> 8) & 255, w & 255);
@@ -764,7 +831,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				prevOwner[i] = id;
 				if (id !== 0) { gain32[i] = GAIN32[id]; gained++; } else gain32[i] = 0;
 			} else gain32[i] = 0;
-			if (id === 0) { terr32[i] = SUB[i]; paint32[i] = SUB[i]; edge32[i] = 0; emis32[i] = 0; continue; }
+			if (id === 0) { terr32[i] = SUB[i]; cov32[i] = 0; emis32[i] = 0; continue; }
 			const col = i % GRID, row = (i / GRID) | 0;
 			// Two cells thick: a one-cell rim is smoothed away as soon as the minimap shrinks it,
 			// and this is what drawMinimap reads as the shape of the map.
@@ -777,14 +844,10 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			const body = mulShade(seamAt(id, col, row) ? SEAM32[id] : FILL32[id], k);
 			// The rim stays unmodulated so the hot edge stays hot; only the interior takes the light.
 			terr32[i] = isEdge ? (mine ? heroRim[id] : RIM32[id]) : body;
-			paint32[i] = body; // the floor gets no baked rim at all — the shader draws the line
-			edge32[i] = ((mine ? heroRim[id] : RIM32[id]) & 0x00FFFFFF) | (ID_A[id] << 24);
+			cov32[i] = COV32[id];
 		}
 		terr.ctx.putImageData(terrImg, 0, 0);
-		paint.ctx.putImageData(paintImg, 0, 0);
-		edge.ctx.putImageData(edgeImg, 0, 0);
-		paintTex.needsUpdate = true;
-		edgeTex.needsUpdate = true;
+		covTex.needsUpdate = true;
 		emis.ctx.putImageData(emisImg, 0, 0);
 		panel96.ctx.clearRect(0, 0, LIGHT_N, LIGHT_N);
 		panel96.ctx.drawImage(emis.c, 0, 0, GRID, GRID, 0, 0, LIGHT_N, LIGHT_N);
@@ -801,7 +864,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 
 	// Unlit on purpose: the territory colour IS the score. It does take a capped haze though —
 	// the minimap already guarantees the authored pixels, and a big field needs depth.
-	const terrMat = new THREE.MeshBasicMaterial({ map: paintTex, toneMapped: false, fog: true });
+	const terrMat = new THREE.MeshBasicMaterial({ map: baseTex, toneMapped: false, fog: true });
 	// grainK stays 0 until the PNG lands: an unloaded sampler binds to three's empty texture, and
 	// a black grain would flash the whole floor dark on the first frames. Both knobs stay uniforms
 	// so scripts/bolides-v7.mjs can re-sweep them against a shipped build.
@@ -812,39 +875,41 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	grainTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 	grainU.grainMap.value = grainTex;
 	terrMat.userData.grain = grainU;
-	// Zone borders. A rim baked into a 200x200 texture and magnified over 100 units is a soft
-	// band: measured at 23 px of colourless smear in the near field (scripts/bolides-v9.mjs).
-	// This draws the boundary instead — constant width in cells, antialiased against the pixel
-	// footprint, and faded rather than aliased once it goes under a pixel at the horizon. Same frame
-	// after: 21 px at the 90th percentile instead of 53, and the flank ramp 4 px -> 2 px.
-	const edgeU = { edgeMap: { value: edgeTex }, edgeK: { value: 1 }, edgeW: { value: EDGE_W } };
+	// Owned ground: shape, fill, line and motif all come out of the coverage field, so the whole
+	// floor above the wash is analytic. Colours are sRGB 0-1 because this runs after
+	// colorspace_fragment, i.e. on an already-encoded gl_FragColor — same reason the old baked rim
+	// was sampled with NoColorSpace.
+	const v3 = (c: readonly number[]) => new THREE.Vector3(c[0] / 255, c[1] / 255, c[2] / 255);
+	const fillCol = TERRITORY_LUT.map(v3);
+	const lineCol = BORDER_LUT.map(v3);
+	const edgeU = {
+		covMap: { value: covTex }, edgeK: { value: 1 }, edgeW: { value: EDGE_W }, patK: { value: PAT_K },
+		fillCol: { value: fillCol }, lineCol: { value: lineCol },
+		gridMinor: { value: v3(GRID_MINOR) }, gridMajor: { value: v3(GRID_MAJOR) },
+	};
 	terrMat.userData.edge = edgeU;
+	// "Mine" is a brightness property here too: the hero's own line is the washed-out variant, and
+	// the hero seat is not always id 1 online.
+	const syncLineCol = (h: number) => {
+		for (let i = 1; i <= 4; i++) {
+			const w = i === h ? mixHex(PALETTE[i], 0xFFFFFF, 0.55) : 0;
+			lineCol[i].copy(i === h ? v3([(w >> 16) & 255, (w >> 8) & 255, w & 255]) : v3(BORDER_LUT[i]));
+		}
+	};
 	terrMat.onBeforeCompile = (sh) => {
 		sh.uniforms.grainMap = grainU.grainMap;
 		sh.uniforms.grainK = grainU.grainK;
 		sh.uniforms.grainRep = grainU.grainRep;
-		sh.uniforms.edgeMap = edgeU.edgeMap;
-		sh.uniforms.edgeK = edgeU.edgeK;
-		sh.uniforms.edgeW = edgeU.edgeW;
+		for (const k of ['covMap', 'edgeK', 'edgeW', 'patK', 'fillCol', 'lineCol', 'gridMinor', 'gridMajor'] as const) {
+			sh.uniforms[k] = edgeU[k];
+		}
 		sh.fragmentShader = 'uniform sampler2D grainMap;\nuniform float grainK;\nuniform float grainRep;\n'
-			+ `uniform sampler2D edgeMap;\nuniform float edgeK;\nuniform float edgeW;\n${sh.fragmentShader}`;
+			+ 'uniform sampler2D covMap;\nuniform float edgeK;\nuniform float edgeW;\nuniform float patK;\n'
+			+ 'uniform vec3 fillCol[5];\nuniform vec3 lineCol[5];\nuniform vec3 gridMinor;\nuniform vec3 gridMajor;\n'
+			+ sh.fragmentShader;
 		// Near-field darkening then a real fog mix: paint under the camera has to stay a glow on
 		// asphalt, and paint at the horizon has to sit back in the air.
-		sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>',
-			`vec2 eP = vMapUv * ${GRID}.0;\n`
-			+ 'vec2 eC = floor( eP );\n'
-			+ `vec4 e0 = texture2D( edgeMap, ( eC + 0.5 ) / ${GRID}.0 );\n`
-			+ 'if ( e0.a > 0.01 ) {\n'
-			+ '  float eD = 1e6;\n'
-			+ `  if ( abs( texture2D( edgeMap, ( eC + vec2( -0.5, 0.5 ) ) / ${GRID}.0 ).a - e0.a ) > 0.02 || eC.x < 0.5 ) eD = min( eD, eP.x - eC.x );\n`
-			+ `  if ( abs( texture2D( edgeMap, ( eC + vec2( 1.5, 0.5 ) ) / ${GRID}.0 ).a - e0.a ) > 0.02 || eC.x > ${GRID - 1}.5 - 1.0 ) eD = min( eD, eC.x + 1.0 - eP.x );\n`
-			+ `  if ( abs( texture2D( edgeMap, ( eC + vec2( 0.5, -0.5 ) ) / ${GRID}.0 ).a - e0.a ) > 0.02 || eC.y < 0.5 ) eD = min( eD, eP.y - eC.y );\n`
-			+ `  if ( abs( texture2D( edgeMap, ( eC + vec2( 0.5, 1.5 ) ) / ${GRID}.0 ).a - e0.a ) > 0.02 || eC.y > ${GRID - 1}.5 - 1.0 ) eD = min( eD, eC.y + 1.0 - eP.y );\n`
-			+ '  float eA = max( 0.5 * length( fwidth( eP ) ), 1e-4 );\n'
-			+ '  float eW = max( edgeW, eA );\n' // sub-pixel lines fade out instead of shimmering
-			+ '  float eM = ( 1.0 - smoothstep( eW - eA, eW + eA, eD ) ) * min( 1.0, edgeW / eW );\n'
-			+ '  gl_FragColor.rgb = mix( gl_FragColor.rgb, e0.rgb, eM * edgeK );\n'
-			+ '}\n'
+		sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', FLOOR_FRAG
 			+ `gl_FragColor.rgb *= 1.0 + grainK * ( texture2D( grainMap, vMapUv * grainRep ).r - ${GRAIN_MEAN.toFixed(3)} );\n`
 			+ '#ifdef USE_FOG\n'
 			+ 'gl_FragColor.rgb *= mix( 0.70, 1.0, smoothstep( 0.0, 26.0, vFogDepth ) );\n'
@@ -1668,7 +1733,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				if (Array.isArray(m)) m.forEach((x) => x.dispose()); else m.dispose();
 			}
 		});
-		paintTex.dispose(); edgeTex.dispose(); decalTex.dispose(); trailTex.dispose(); lightTex.dispose(); grainTex.dispose();
+		baseTex.dispose(); covTex.dispose(); decalTex.dispose(); trailTex.dispose(); lightTex.dispose(); grainTex.dispose();
 		blobTex.dispose(); glowTex.dispose(); roundelTex.dispose();
 		rampTex.dispose(); ledTex.dispose(); skyTex.dispose(); envTex.dispose(); chevTex.dispose();
 		wallHazTex.dispose(); capHazTex.dispose();

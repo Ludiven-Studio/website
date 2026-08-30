@@ -909,7 +909,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="bo-boardwrap" ref={boardRef}>
-				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Bolides" onPointerDown={drag.onPointerDown} />
+				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Caisses à peinture" onPointerDown={drag.onPointerDown} />
 
 				{/* Before the minimap and the standings in DOM order, so it never darkens them. */}
 				{phase === 'playing' && (
@@ -1038,9 +1038,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				{phase === 'menu' && !webglError && !garage && mode !== 'online' && (
 					<div className="bo-overlay">
 						<div className="bo-card">
-							<h2>Bolides</h2>
+							<h2>Caisses à peinture</h2>
 							<p className="bo-sub">
-								Sors de ta zone, trace une boucle, reviens chez toi pour <strong>capturer</strong>.
+								Sors de ta zone, trace une boucle, reviens chez toi pour <strong>repeindre</strong>.
 								<strong> {Math.round(CFG.timeLimit / 60)} minutes</strong>, ou victoire immédiate
 								à <strong>{CFG.winPct} %</strong>.
 							</p>

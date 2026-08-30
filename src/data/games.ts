@@ -346,10 +346,10 @@ export const games: GameTile[] = [
 	},
 	{
 		id: 'bolides',
-		title: 'Bolides',
-		pitch: 'Un « paper.io » au volant : sors de ta zone, trace une boucle et reviens la refermer pour capturer le terrain. Coupe la trace des rivaux pour les éliminer — et garde la tienne à l\'abri. Prototype.',
+		title: 'Caisses à peinture',
+		pitch: 'Un « paper.io » au volant : quatre couleurs pour une arène. Sors de ta zone, trace une boucle et reviens la refermer pour repeindre le terrain. Coupe la trace des rivaux pour les éliminer — et garde la tienne à l\'abri. Prototype.',
 		icon: 'car',
-		href: '/jeux/bolides',
+		href: '/jeux/caisses-a-peinture',
 		status: 'play',
 		category: 'adresse',
 	},
