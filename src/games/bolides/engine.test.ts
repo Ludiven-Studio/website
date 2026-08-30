@@ -45,8 +45,10 @@ describe('bolides engine', () => {
 		const s = createGame();
 		const home0 = s.counts[1];
 		let peak = home0;
-		for (let i = 0; i < 800; i++) {
-			stepGame(s, 1, 0, 1 / 60); // constant hard turn -> a circle that pokes out and returns
+		// Straight out, then hold full lock: the loop must be wider than the turning circle, else
+		// the car meets its own trail before it gets home and the trail is wiped.
+		for (let i = 0; i < 600; i++) {
+			stepGame(s, i < 60 ? 0 : 1, 0, 1 / 60);
 			peak = Math.max(peak, s.counts[1]);
 		}
 		expect(peak).toBeGreaterThan(home0); // an enclosed loop was claimed
@@ -340,6 +342,32 @@ describe('bolides shield', () => {
 		driveOnto(s, attacker, victim.trail[victim.trail.length - 1]);
 		expect(victim.alive).toBe(false);
 		expect(s.events.some((e) => e.type === 'kill' && e.killer === attacker.id)).toBe(true);
+	});
+
+	/** Put the victim's freshest cell on ground the attacker owns, and keep the attacker's own
+	 *  loop out of it (outside = false) so the cut is the only thing under test. */
+	function trespass(victimCar: string) {
+		const d = duel(victimCar);
+		const cell = d.s.owner.findIndex((o) => o === d.attacker.id);
+		d.s.trail[cell] = d.victim.id;
+		d.victim.trail.push(cell);
+		d.attacker.outside = false;
+		return { ...d, cell };
+	}
+
+	it('cuts a rival trail that crosses your own ground', () => {
+		const { s, attacker, victim, cell } = trespass('comet');
+		driveOnto(s, attacker, cell);
+		expect(victim.alive).toBe(false);
+		expect(s.events.some((e) => e.type === 'kill' && e.killer === attacker.id)).toBe(true);
+	});
+
+	it('holds the bunker shield at home without snapping the defender', () => {
+		const { s, attacker, victim, cell } = trespass('bunker');
+		driveOnto(s, attacker, cell);
+		expect(victim.alive).toBe(true);
+		expect(attacker.trail.length).toBe(12); // no ring at stake at home, so nothing to lose
+		expect(s.events.some((e) => e.type === 'snap')).toBe(false);
 	});
 });
 

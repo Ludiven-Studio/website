@@ -1,0 +1,10 @@
+engine-low.wav, engine-mid.wav, engine-high.wav
+
+Cut from "Large car interior start & drive; speeds" in the USC Optical Sound Effects
+Library (SSE Library: VEHICLES), https://archive.org/details/SSE_Library_VEHICLES
+License: CC0 1.0 Universal (public domain dedication),
+https://creativecommons.org/publicdomain/zero/1.0/
+
+One car, one microphone, three revs, so crossfading them never changes instrument.
+Each loop is trimmed to a whole number of firing cycles with a wrap-around crossfade
+and resampled to 16 kHz by scripts/bolides-eng.mjs.

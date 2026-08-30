@@ -56,6 +56,16 @@ export default defineConfig({
                             expiration: { maxEntries: 150, maxAgeSeconds: 60 * 60 * 24 * 30 },
                         },
                     },
+                    {
+                        // Engine loops. WebAudio fetches them itself, so request.destination is ''
+                        // and the image rule above never matches — go by extension instead.
+                        urlPattern: ({ url }) => url.pathname.endsWith('.wav'),
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'ludiven-audio',
+                            expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 90 },
+                        },
+                    },
                 ],
             },
         }),

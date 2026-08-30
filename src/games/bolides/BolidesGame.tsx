@@ -1139,7 +1139,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
 				Sors, boucle, reviens → capture. Recroiser ta propre trace efface la boucle en cours, sans plus&nbsp;:
 				tu repars de là. En revanche, si un rival coupe ta trace, tu réapparais au point de départ après 3&nbsp;s
-				pendant que les autres continuent — alors coupe la leur en premier.
+				pendant que les autres continuent — alors coupe la leur en premier. Une trace se coupe
+				<strong> partout</strong>, y compris chez toi&nbsp;: le rival qui traverse ton territoire y laisse
+				une ligne que tu peux trancher sans sortir de chez toi.
 				{mode === 'defi' && ' Le défi du jour partage la même arène et le même classement pour tout le monde.'}
 				{mode === 'online' && ` En ligne, jusqu'à ${MAX_PLAYERS} pilotes courent dans la même arène : partie rapide pour tomber sur n'importe qui, code ami pour jouer entre vous. Les places libres restent tenues par des bots.`}
 			</p>

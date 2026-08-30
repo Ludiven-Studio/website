@@ -1,7 +1,7 @@
 /**
- * BOLIDES — procedural sound (WebAudio, no assets). Three per-frame loops (engine,
- * skid, scrape) plus one one-shot per GameEvent, all synthesized: detuned saws for the
- * motor, filtered noise for the tyres, shaped tones + a shared short reverb for the cues.
+ * BOLIDES — WebAudio. Three per-frame loops (engine, skid, scrape) plus one one-shot per
+ * GameEvent. The motor is three recorded loops crossfaded by revs; everything else is
+ * synthesized: filtered noise for the tyres, shaped tones + a shared short reverb for the cues.
  * Render-side only — nothing here feeds back into the sim, so Math.random is fine.
  */
 
@@ -22,14 +22,15 @@ let played = 0; // lifetime one-shots past the enabled gate — handy in a smoke
 const lastAt: Record<string, number> = {};
 
 interface EngineLoop {
-	o1: OscillatorNode; o2: OscillatorNode; sub: OscillatorNode;
-	src: AudioBufferSourceNode; nbp: BiquadFilterNode; ng: GainNode;
-	lp: BiquadFilterNode; g: GainNode;
+	srcs: AudioBufferSourceNode[]; tg: GainNode[];
+	hp: BiquadFilterNode; pk: BiquadFilterNode; hs: BiquadFilterNode; lp: BiquadFilterNode; g: GainNode;
 }
 interface NoiseLoop { src: AudioBufferSourceNode; f1: BiquadFilterNode; f2: BiquadFilterNode; g: GainNode; lfo: OscillatorNode | null; lfoG: GainNode | null }
 
 let eng: EngineLoop | null = null;
-let engF = -1, engCut = -1, engG = -1, engAir = -1;
+let engBufs: AudioBuffer[] | null = null;
+let engLoading = false;
+let engF = -1, engCut = -1, engG = -1, engHi = -1;
 let skidL: NoiseLoop | null = null;
 let skidF = -1, skidG = -1;
 let scrapeL: NoiseLoop | null = null;
@@ -123,6 +124,7 @@ export const stats = () => ({
 	enabled: isEnabled(),
 	ctx: ctx?.state ?? 'none',
 	loops: { engine: !!eng, skid: !!skidL, scrape: !!scrapeL },
+	engSamples: engBufs ? engBufs.map((b) => Math.round(b.duration * 1000)) : null,
 });
 
 /* ---------- one-shot plumbing ---------- */
@@ -206,60 +208,77 @@ function whoosh(c: AudioContext, f0: number, f1: number, q: number, peak: number
 
 /* ---------- continuous loops ---------- */
 
-// What the ear calls "engine" is an exhaust pulse train at the firing rate — a 4-stroke fires
-// twice per revolution, so 70 Hz off the throttle to 190 Hz flat out — not a musical pitch.
-// `rpm` is speed/maxSpeed and speed never leaves [minSpeed, maxSpeed], so the reachable range
-// is rpm 0.25..1 and F0/F1 are solved for that, not for 0..1.
-const ENG_F0 = 30, ENG_F1 = 160;
-const ENG_HARM = 14;
-// Harmonic rolloff. Flatter reads as a synth lead, steeper as a featureless hum; 0.85 measured
-// best on the phone band (300-3000 Hz) without giving the 2 kHz buzz back.
-const ENG_TILT = 0.85;
+// Three loops off ONE car and ONE mic, so crossfading them never changes instrument: USC Optical
+// Sound Effects Library, archive.org item SSE_Library_VEHICLES, CC0 1.0. Cut to a whole number of
+// firing cycles with a wrap-around crossfade by scripts/bolides-eng.mjs; f0 below is what that
+// script measured by autocorrelation. WAV on purpose — iOS Safari decodes no Vorbis, and MP3/AAC
+// keep their encoder padding, which is a gap at every wrap.
+const ENG_TIERS = [
+	{ url: '/assets/jeux/bolides/engine-low.wav', f0: 68.8 },
+	{ url: '/assets/jeux/bolides/engine-mid.wav', f0: 93.4 },
+	{ url: '/assets/jeux/bolides/engine-high.wav', f0: 120.5 },
+];
+// Firing rate to pitch the loops to. `rpm` is speed/maxSpeed and speed never leaves
+// [minSpeed, maxSpeed], so the reachable range is 0.25..1 and this is solved for that: rpm 0.25
+// plays the low loop untouched, rpm 1 stretches the high one by 15%. No tier is ever pitched far
+// enough to sound like a different car.
+const ENG_F0 = 46, ENG_F1 = 92;
+// How far a loop is stretched, in octaves, before it is silent. The tiers sit 0.44 and 0.37
+// octaves apart, so 0.45 keeps two of them audible at a time and never all three.
+const ENG_SPREAD = 0.45;
 
-function buildEngine(c: AudioContext): EngineLoop {
-	const lp = c.createBiquadFilter();
-	lp.type = 'lowpass';
-	lp.frequency.value = 700;
-	lp.Q.value = 0.7; // was 3: a resonant peak sweeping to 4.5 kHz is the mosquito whine itself
+function loadEngine(c: AudioContext): void {
+	if (engLoading) return;
+	engLoading = true;
+	Promise.all(ENG_TIERS.map((t) => fetch(t.url).then((r) => r.arrayBuffer()).then((b) => c.decodeAudioData(b))))
+		.then((bufs) => { engBufs = bufs; })
+		.catch(() => { engLoading = false; }); // let a later frame retry; the motor stays silent
+}
+
+function buildEngine(c: AudioContext, bufs: AudioBuffer[]): EngineLoop {
 	const g = c.createGain();
 	g.gain.value = 0.0001;
-	lp.connect(g); g.connect(master!);
+	// Raw, 83% of this recording's energy sits under 200 Hz — a phone speaker moves none of it,
+	// which is how a real car ends up quieter than a synth. Cut what cannot be played and buy it
+	// back at 1.1 kHz: 12% of the energy lands in the 300-3000 Hz band before, 61% after, while
+	// the 3-15 Hz roughness the old motor was flagged for drops from 0.37 raw to 0.08.
+	const hp = c.createBiquadFilter();
+	hp.type = 'highpass';
+	hp.frequency.value = 220;
+	hp.Q.value = 0.7;
+	const pk = c.createBiquadFilter();
+	pk.type = 'peaking';
+	pk.frequency.value = 1100;
+	pk.Q.value = 0.9;
+	pk.gain.value = 8;
+	// Then a throttle-driven shelf and lowpass, kept deliberately closed: opening them added a
+	// third more energy over 2 kHz and nothing in the 300-3000 Hz band a phone can play. What
+	// separates this from the old "ovni" is spectral flatness, 25x the synth's, not brightness.
+	const hs = c.createBiquadFilter();
+	hs.type = 'highshelf';
+	hs.frequency.value = 1800;
+	hs.gain.value = 0;
+	const lp = c.createBiquadFilter();
+	lp.type = 'lowpass';
+	lp.frequency.value = 1200;
+	lp.Q.value = 0.7;
+	hp.connect(pk); pk.connect(hs); hs.connect(lp); lp.connect(g); g.connect(master!);
 
-	const re = new Float32Array(ENG_HARM + 1), im = new Float32Array(ENG_HARM + 1);
-	for (let n = 1; n <= ENG_HARM; n++) im[n] = Math.pow(n, -ENG_TILT) * (n % 2 ? 1 : 0.62);
-	const wave = c.createPeriodicWave(re, im);
-	const mk = (detune: number, level: number, periodic: boolean) => {
-		const o = c.createOscillator();
-		if (periodic) o.setPeriodicWave(wave); else o.type = 'sine';
-		o.frequency.value = ENG_F0 + ENG_F1 * 0.6;
-		o.detune.value = detune;
-		const vg = c.createGain();
-		vg.gain.value = level;
-		o.connect(vg); vg.connect(lp);
-		o.start();
-		return o;
-	};
-	// 4 cents, not 10. Two saws 20 cents apart at the old 465 Hz beat at 5.4 Hz — dead centre
-	// of the band the ear hears as roughness, which is what made it an insect. At 190 Hz an
-	// 8-cent spread beats at 0.9 Hz: thickness, no tremolo.
-	const o1 = mk(-4, 0.85, true);
-	const o2 = mk(4, 0.85, true);
-	const sub = mk(0, 0.2, false);
-
-	// Intake turbulence. A pure harmonic stack still reads as a synth; broadband air under the
-	// tone is what makes it a machine moving gas.
-	const src = c.createBufferSource();
-	src.buffer = noiseBuf;
-	src.loop = true;
-	const nbp = c.createBiquadFilter();
-	nbp.type = 'bandpass';
-	nbp.frequency.value = 500;
-	nbp.Q.value = 0.8;
-	const ng = c.createGain();
-	ng.gain.value = 0.0001;
-	src.connect(nbp); nbp.connect(ng); ng.connect(lp);
-	src.start(0, Math.random());
-	return { o1, o2, sub, src, nbp, ng, lp, g };
+	const srcs: AudioBufferSourceNode[] = [];
+	const tg: GainNode[] = [];
+	for (const buf of bufs) {
+		const s = c.createBufferSource();
+		s.buffer = buf;
+		s.loop = true;
+		const v = c.createGain();
+		v.gain.value = 0.0001;
+		s.connect(v); v.connect(hp);
+		// Random phase: the tiers are the same car seconds apart, so starting them aligned would
+		// comb-filter the overlap into a flanger.
+		s.start(0, Math.random() * buf.duration);
+		srcs.push(s); tg.push(v);
+	}
+	return { srcs, tg, hp, pk, hs, lp, g };
 }
 
 function buildNoiseLoop(c: AudioContext, t1: BiquadFilterType, f1v: number, q1: number, t2: BiquadFilterType, f2v: number, q2: number, wobbleHz: number): NoiseLoop {
@@ -296,20 +315,28 @@ export function engine(rpm: number, load: number): void {
 	if (!isEnabled()) return;
 	const c = ensureCtx();
 	if (!c) return;
-	const e = eng ?? (eng = buildEngine(c));
+	if (!engBufs) { loadEngine(c); return; } // silent until the loops land, never a synth stand-in
+	const e = eng ?? (eng = buildEngine(c, engBufs));
 	const r = clamp01(rpm);
 	const l = clamp01(load);
 	const f = ENG_F0 + r * ENG_F1;
-	const cut = 420 + r * 1600 + l * 700;
-	const gain = 0.026 + r * 0.028 + l * 0.015;
-	const air = 0.14 + l * 0.21;
+	const cut = 900 + r * 1500 + l * 1000;
+	const gain = 0.17 + r * 0.19 + l * 0.085; // trimmed to the old motor's level, within 1 dB
+	const hi = l * 2.5 - 1; // dB: closing the throttle dulls it, opening it bites
 	const now = c.currentTime;
 	if (Math.abs(f - engF) > 0.2) {
 		engF = f;
-		e.o1.frequency.setTargetAtTime(f, now, 0.05);
-		e.o2.frequency.setTargetAtTime(f, now, 0.05);
-		e.sub.frequency.setTargetAtTime(f, now, 0.05);
-		e.nbp.frequency.setTargetAtTime(220 + r * 700, now, 0.08);
+		// Equal power, so the sum keeps its level as the mix walks from one loop to the next.
+		let sum = 0;
+		const w = ENG_TIERS.map((t) => {
+			const v = Math.max(0, 1 - Math.abs(Math.log2(f / t.f0)) / ENG_SPREAD);
+			sum += v;
+			return v;
+		});
+		for (let i = 0; i < e.srcs.length; i++) {
+			e.srcs[i].playbackRate.setTargetAtTime(f / ENG_TIERS[i].f0, now, 0.05);
+			e.tg[i].gain.setTargetAtTime(Math.max(0.0001, Math.sqrt(w[i] / (sum || 1))), now, 0.05);
+		}
 	}
 	if (Math.abs(cut - engCut) > 8) {
 		engCut = cut;
@@ -319,9 +346,9 @@ export function engine(rpm: number, load: number): void {
 		engG = gain;
 		e.g.gain.setTargetAtTime(gain, now, 0.05);
 	}
-	if (Math.abs(air - engAir) > 0.004) {
-		engAir = air;
-		e.ng.gain.setTargetAtTime(air, now, 0.06);
+	if (Math.abs(hi - engHi) > 0.1) {
+		engHi = hi;
+		e.hs.gain.setTargetAtTime(hi, now, 0.08);
 	}
 }
 
@@ -368,9 +395,9 @@ export function stopLoops(): void {
 	const c = ctx;
 	if (!c) return;
 	if (eng) {
-		fade(eng, [eng.o1, eng.o2, eng.sub, eng.src], [eng.lp, eng.nbp, eng.ng], c);
+		fade(eng, eng.srcs, [eng.hp, eng.pk, eng.hs, eng.lp, ...eng.tg], c);
 		eng = null;
-		engF = engCut = engG = engAir = -1;
+		engF = engCut = engG = engHi = -1;
 	}
 	for (const l of [skidL, scrapeL]) {
 		if (!l) continue;

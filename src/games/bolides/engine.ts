@@ -25,11 +25,17 @@ export const CFG = {
 	maxSpeed: 28, // full throttle
 	minSpeed: 7, // hard brake (never a full stop, so a trail keeps forming)
 	accelResp: 2.6, // how fast speed eases toward the throttle target (weight/inertia)
-	turnRadius: 8, // gripped turning circle; a drift tightens it (see driftBoost)
-	steerResp: 5.5, // how fast the applied turn eases toward the input (steering inertia)
-	grip: 18, // how fast the travel direction catches the heading — the gap is the slide
-	driftGrip: 6, // grip while sliding: ~30° of slip at cruise, which is what reads as a drift
-	driftBoost: 1.5, // the nose swings harder mid-drift, so a slide corners tighter than grip
+	// Measured, not eyeballed (scripts/bolides-hand.mjs). At radius 8 one 400 ms key press cost
+	// 43° of heading and 9.7 units sideways, and 19.6° of that arrived AFTER release — no line
+	// could be trimmed. Radius 13 halves it (26°, 4.4 units) and cuts the coast to 6.8°.
+	turnRadius: 13, // gripped turning circle; a drift tightens it (see driftBoost)
+	steerResp: 9, // how fast the applied turn eases toward the input (steering inertia)
+	grip: 26, // how fast the travel direction catches the heading — the gap is the slide
+	// driftGrip 6 was not a slide: travel followed the nose 80% of the way, and the flick gained
+	// LESS direction than simply gripping for the same time (vsGrip 0.74). 1.2 gives ~60° of peak
+	// slip and vsGrip 1.26 — the car goes sideways, and the flick is worth doing.
+	driftGrip: 1.2, // grip while sliding: the nose leads, travel lags — that gap is the drift
+	driftBoost: 2, // the nose swings harder mid-drift, so a slide corners tighter than grip
 	driftJab: 2.6, // steer units/s that break traction — a flick does, a slow finger sweep doesn't
 	driftLock: 0.6, // a jab under this much lock is just a correction
 	driftMinSpeed: 12, // the tyres always hold below this
@@ -471,6 +477,25 @@ function shielded(victim: Car, cell: number): boolean {
 function updateGrid(s: GameState, car: Car): void {
 	const cell = cellAt(car.x, car.z);
 	const inside = s.owner[cell] === car.id;
+	const t = s.trail[cell];
+
+	// A rival's line is cut wherever it runs, your own ground included. This check used to sit
+	// below the `inside` return, which made a car standing at home both harmless and unable to be
+	// harmed there — the one place a trail should be most exposed.
+	if (t !== 0 && t !== car.id) {
+		const victim = s.cars[t - 1];
+		if (!shielded(victim, cell)) {
+			killCar(s, victim, !car.isBot, car.id);
+		} else if (!inside) {
+			// Snapping the attacker is not spite: it can't claim this cell, so its own ring would
+			// keep a one-cell hole, the fill would leak and the loop would die anyway — invisibly.
+			// At home there is no ring at stake, so the shield simply holds.
+			clearTrail(s, car);
+			mark(s);
+			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
+			return;
+		}
+	}
 
 	if (inside) {
 		if (car.outside) capture(s, car); // returned home with a live trail -> capture
@@ -478,20 +503,7 @@ function updateGrid(s: GameState, car: Car): void {
 		return;
 	}
 
-	// Outside own territory: collisions first, then lay trail.
-	const t = s.trail[cell];
-	if (t !== 0 && t !== car.id) {
-		const victim = s.cars[t - 1];
-		if (shielded(victim, cell)) {
-			// Snapping the attacker is not spite: it can't claim this cell, so its own ring would
-			// keep a one-cell hole, the fill would leak and the loop would die anyway — invisibly.
-			clearTrail(s, car);
-			mark(s);
-			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
-			return;
-		}
-		killCar(s, victim, !car.isBot, car.id); // cut an enemy trail
-	} else if (t === car.id) {
+	if (t === car.id) {
 		// Crossing your OWN line costs the loop, not the car — only a rival's blade kills.
 		// The fresh tail is spared, or leaving home would snap the trail on the first pixel.
 		const idx = car.trail.indexOf(cell);

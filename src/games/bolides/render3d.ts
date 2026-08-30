@@ -107,6 +107,14 @@ const GRAIN_REPEAT = 8;
 // (63/1000 vs 38/1000 max), and the floor colour is the score.
 const GRAIN_K = 0.5;
 
+// Half-width of the zone border, in cells (a cell is 0.5 world units), so the drawn line is
+// 2 x EDGE_W wide where two territories meet and EDGE_W wide against neutral ground. Swept over
+// 0.40-1.20 (scripts/bolides-v9.mjs): every width is equally crisp — the 10-90% flank ramp stays at
+// 2 px — so this only picks how thick the line reads. Territory is cell-shaped, so a diagonal is a
+// staircase of 1 cell whatever the width; 0.7 is the widest that still reads as a drawn line rather
+// than a painted band, and it hides that staircase best.
+const EDGE_W = 0.7;
+
 // Paint is darkened ~73% toward the substrate so the hue is carried by emission, not by diffuse:
 // with the light buffer lifting the ground, a paler body just read as a grey soap bar.
 const BODY_DIFFUSE = [0, 0x152C51, 0x4B1226, 0x0C4536, 0x4B3F0A];
@@ -641,7 +649,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		c.width = c.height = n;
 		return { c, ctx: c.getContext('2d')! };
 	};
-	const terr = mkCanvas();
+	const terr = mkCanvas();   // with the baked rim: the minimap and the end card read this one
+	const paint = mkCanvas();   // same paint WITHOUT the rim: the 3D floor, which draws its own line
+	const edge = mkCanvas();   // rgb = that cell's line colour, a = owner id — the shader's input
 	const decal = mkCanvas();
 	const trailC = mkCanvas(GRID * TRAIL_SS);
 	const TRAIL_W = GRID * TRAIL_SS;
@@ -657,7 +667,11 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		t.anisotropy = Math.min(aniso, maxAniso);
 		return t;
 	};
-	const terrTex = mkTex(terr.c, true, true, 8);
+	const paintTex = mkTex(paint.c, true, true, 8);
+	// Nearest and mip-free on purpose: the shader reads owner ids out of it, and a filtered id is
+	// a made-up id. The line it draws is antialiased analytically instead.
+	const edgeTex = mkTex(edge.c, false, false, 1);
+	edgeTex.colorSpace = THREE.NoColorSpace; // sampled after colorspace_fragment, so already sRGB
 	const decalTex = mkTex(decal.c, true, false, 2);
 	const trailTex = mkTex(trailC.c, true, true, 4);
 
@@ -674,6 +688,12 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 
 	const terrImg = terr.ctx.createImageData(GRID, GRID);
 	const terr32 = new Uint32Array(terrImg.data.buffer);
+	const paintImg = paint.ctx.createImageData(GRID, GRID);
+	const paint32 = new Uint32Array(paintImg.data.buffer);
+	const edgeImg = edge.ctx.createImageData(GRID, GRID);
+	const edge32 = new Uint32Array(edgeImg.data.buffer);
+	// Ids spread over the byte range so nearest sampling can tell them apart with a fat epsilon.
+	const ID_A = [0, 51, 102, 153, 204];
 	const emisImg = emis.ctx.createImageData(GRID, GRID);
 	const emis32 = new Uint32Array(emisImg.data.buffer);
 	// Baked neutral floor: a sun wash toward +X plus a violet bleed off the four rails, so the
@@ -744,24 +764,27 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				prevOwner[i] = id;
 				if (id !== 0) { gain32[i] = GAIN32[id]; gained++; } else gain32[i] = 0;
 			} else gain32[i] = 0;
-			if (id === 0) { terr32[i] = SUB[i]; emis32[i] = 0; continue; }
+			if (id === 0) { terr32[i] = SUB[i]; paint32[i] = SUB[i]; edge32[i] = 0; emis32[i] = 0; continue; }
 			const col = i % GRID, row = (i / GRID) | 0;
-			// Two cells thick: a one-cell rim is smoothed away as soon as the camera backs
-			// off, and it is also what drawMinimap reads as the shape of the map.
-			const edge = col < 2 || col >= GRID - 2 || row < 2 || row >= GRID - 2
+			// Two cells thick: a one-cell rim is smoothed away as soon as the minimap shrinks it,
+			// and this is what drawMinimap reads as the shape of the map.
+			const isEdge = col < 2 || col >= GRID - 2 || row < 2 || row >= GRID - 2
 				|| owner[i - 1] !== id || owner[i + 1] !== id || owner[i - GRID] !== id || owner[i + GRID] !== id
 				|| owner[i - 2] !== id || owner[i + 2] !== id || owner[i - 2 * GRID] !== id || owner[i + 2 * GRID] !== id;
 			const mine = id === hero;
-			emis32[i] = edge ? (mine ? heroEmis[id] : RIM_E32[id]) : BODY_E32[id];
+			emis32[i] = isEdge ? (mine ? heroEmis[id] : RIM_E32[id]) : BODY_E32[id];
+			const sh = SHADE[i], k = hatchAt(id, col, row) ? (sh * HATCH_K[id]) >> 7 : sh;
+			const body = mulShade(seamAt(id, col, row) ? SEAM32[id] : FILL32[id], k);
 			// The rim stays unmodulated so the hot edge stays hot; only the interior takes the light.
-			if (edge) terr32[i] = mine ? heroRim[id] : RIM32[id];
-			else {
-				const s = SHADE[i], k = hatchAt(id, col, row) ? (s * HATCH_K[id]) >> 7 : s;
-				terr32[i] = mulShade(seamAt(id, col, row) ? SEAM32[id] : FILL32[id], k);
-			}
+			terr32[i] = isEdge ? (mine ? heroRim[id] : RIM32[id]) : body;
+			paint32[i] = body; // the floor gets no baked rim at all — the shader draws the line
+			edge32[i] = ((mine ? heroRim[id] : RIM32[id]) & 0x00FFFFFF) | (ID_A[id] << 24);
 		}
 		terr.ctx.putImageData(terrImg, 0, 0);
-		terrTex.needsUpdate = true;
+		paint.ctx.putImageData(paintImg, 0, 0);
+		edge.ctx.putImageData(edgeImg, 0, 0);
+		paintTex.needsUpdate = true;
+		edgeTex.needsUpdate = true;
 		emis.ctx.putImageData(emisImg, 0, 0);
 		panel96.ctx.clearRect(0, 0, LIGHT_N, LIGHT_N);
 		panel96.ctx.drawImage(emis.c, 0, 0, GRID, GRID, 0, 0, LIGHT_N, LIGHT_N);
@@ -778,7 +801,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 
 	// Unlit on purpose: the territory colour IS the score. It does take a capped haze though —
 	// the minimap already guarantees the authored pixels, and a big field needs depth.
-	const terrMat = new THREE.MeshBasicMaterial({ map: terrTex, toneMapped: false, fog: true });
+	const terrMat = new THREE.MeshBasicMaterial({ map: paintTex, toneMapped: false, fog: true });
 	// grainK stays 0 until the PNG lands: an unloaded sampler binds to three's empty texture, and
 	// a black grain would flash the whole floor dark on the first frames. Both knobs stay uniforms
 	// so scripts/bolides-v7.mjs can re-sweep them against a shipped build.
@@ -789,15 +812,40 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	grainTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 	grainU.grainMap.value = grainTex;
 	terrMat.userData.grain = grainU;
+	// Zone borders. A rim baked into a 200x200 texture and magnified over 100 units is a soft
+	// band: measured at 23 px of colourless smear in the near field (scripts/bolides-v9.mjs).
+	// This draws the boundary instead — constant width in cells, antialiased against the pixel
+	// footprint, and faded rather than aliased once it goes under a pixel at the horizon. Same frame
+	// after: 21 px at the 90th percentile instead of 53, and the flank ramp 4 px -> 2 px.
+	const edgeU = { edgeMap: { value: edgeTex }, edgeK: { value: 1 }, edgeW: { value: EDGE_W } };
+	terrMat.userData.edge = edgeU;
 	terrMat.onBeforeCompile = (sh) => {
 		sh.uniforms.grainMap = grainU.grainMap;
 		sh.uniforms.grainK = grainU.grainK;
 		sh.uniforms.grainRep = grainU.grainRep;
-		sh.fragmentShader = `uniform sampler2D grainMap;\nuniform float grainK;\nuniform float grainRep;\n${sh.fragmentShader}`;
+		sh.uniforms.edgeMap = edgeU.edgeMap;
+		sh.uniforms.edgeK = edgeU.edgeK;
+		sh.uniforms.edgeW = edgeU.edgeW;
+		sh.fragmentShader = 'uniform sampler2D grainMap;\nuniform float grainK;\nuniform float grainRep;\n'
+			+ `uniform sampler2D edgeMap;\nuniform float edgeK;\nuniform float edgeW;\n${sh.fragmentShader}`;
 		// Near-field darkening then a real fog mix: paint under the camera has to stay a glow on
 		// asphalt, and paint at the horizon has to sit back in the air.
 		sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>',
-			`gl_FragColor.rgb *= 1.0 + grainK * ( texture2D( grainMap, vMapUv * grainRep ).r - ${GRAIN_MEAN.toFixed(3)} );\n`
+			`vec2 eP = vMapUv * ${GRID}.0;\n`
+			+ 'vec2 eC = floor( eP );\n'
+			+ `vec4 e0 = texture2D( edgeMap, ( eC + 0.5 ) / ${GRID}.0 );\n`
+			+ 'if ( e0.a > 0.01 ) {\n'
+			+ '  float eD = 1e6;\n'
+			+ `  if ( abs( texture2D( edgeMap, ( eC + vec2( -0.5, 0.5 ) ) / ${GRID}.0 ).a - e0.a ) > 0.02 || eC.x < 0.5 ) eD = min( eD, eP.x - eC.x );\n`
+			+ `  if ( abs( texture2D( edgeMap, ( eC + vec2( 1.5, 0.5 ) ) / ${GRID}.0 ).a - e0.a ) > 0.02 || eC.x > ${GRID - 1}.5 - 1.0 ) eD = min( eD, eC.x + 1.0 - eP.x );\n`
+			+ `  if ( abs( texture2D( edgeMap, ( eC + vec2( 0.5, -0.5 ) ) / ${GRID}.0 ).a - e0.a ) > 0.02 || eC.y < 0.5 ) eD = min( eD, eP.y - eC.y );\n`
+			+ `  if ( abs( texture2D( edgeMap, ( eC + vec2( 0.5, 1.5 ) ) / ${GRID}.0 ).a - e0.a ) > 0.02 || eC.y > ${GRID - 1}.5 - 1.0 ) eD = min( eD, eC.y + 1.0 - eP.y );\n`
+			+ '  float eA = max( 0.5 * length( fwidth( eP ) ), 1e-4 );\n'
+			+ '  float eW = max( edgeW, eA );\n' // sub-pixel lines fade out instead of shimmering
+			+ '  float eM = ( 1.0 - smoothstep( eW - eA, eW + eA, eD ) ) * min( 1.0, edgeW / eW );\n'
+			+ '  gl_FragColor.rgb = mix( gl_FragColor.rgb, e0.rgb, eM * edgeK );\n'
+			+ '}\n'
+			+ `gl_FragColor.rgb *= 1.0 + grainK * ( texture2D( grainMap, vMapUv * grainRep ).r - ${GRAIN_MEAN.toFixed(3)} );\n`
 			+ '#ifdef USE_FOG\n'
 			+ 'gl_FragColor.rgb *= mix( 0.70, 1.0, smoothstep( 0.0, 26.0, vFogDepth ) );\n'
 			+ 'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, smoothstep( fogNear, fogFar, vFogDepth ) * 0.80 );\n'
@@ -1620,7 +1668,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				if (Array.isArray(m)) m.forEach((x) => x.dispose()); else m.dispose();
 			}
 		});
-		terrTex.dispose(); decalTex.dispose(); trailTex.dispose(); lightTex.dispose(); grainTex.dispose();
+		paintTex.dispose(); edgeTex.dispose(); decalTex.dispose(); trailTex.dispose(); lightTex.dispose(); grainTex.dispose();
 		blobTex.dispose(); glowTex.dispose(); roundelTex.dispose();
 		rampTex.dispose(); ledTex.dispose(); skyTex.dispose(); envTex.dispose(); chevTex.dispose();
 		wallHazTex.dispose(); capHazTex.dispose();
