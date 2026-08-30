@@ -257,15 +257,17 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		accRef.current += dt;
 		const k = keysRef.current, d = dragRef.current;
 		// A key is all-or-nothing, so ramp it: tapped straight to ±1 the car snaps to full
-		// lock and there is no way to hold a shallow line.
+		// lock and there is no way to hold a shallow line. The ramp advances per PHYSICS step,
+		// not per rendered frame: the engine reads |dsteer|/(1/60), so a long frame would push a
+		// mere key hold past driftJab and make traction depend on the frame rate.
 		const target = (k.right ? 1 : 0) - (k.left ? 1 : 0);
-		const rate = (dt / 1000) * KEY_RAMP * hero.cfg.driftJab;
-		keySteerRef.current += Math.max(-rate, Math.min(rate, target - keySteerRef.current));
-		const steer = d.active ? d.steer : keySteerRef.current;
+		const rate = (STEP / 1000) * KEY_RAMP * hero.cfg.driftJab;
 		const throttle = d.active ? d.throttle : (k.up ? 1 : 0) - (k.down ? 1 : 0);
 		const net = onlineRef.current;
 		while (runningRef.current && accRef.current >= STEP) {
 			accRef.current -= STEP;
+			keySteerRef.current += Math.max(-rate, Math.min(rate, target - keySteerRef.current));
+			const steer = d.active ? d.steer : keySteerRef.current;
 			// A guest only drives its own car; the host rules on the grid and sends the verdict.
 			if (net.active && !net.host) stepGuest(s, steer, throttle, STEP / 1000);
 			else stepGame(s, steer, throttle, STEP / 1000);
@@ -1052,7 +1054,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							<button className="bo-play" onClick={play}>▶ Jouer</button>
 							{garageButton}
 							{status && <p className="bo-hint">{status}</p>}
-							<p className="bo-hint">Glisse&nbsp;: haut = gaz, côté = braquer, coup sec = drift. Clavier&nbsp;: flèches ou ZQSD.</p>
+							<p className="bo-hint">Glisse&nbsp;: haut = gaz, côté = braquer, coup sec = drift (sur la peinture, ou à fond sur le sol nu). Clavier&nbsp;: flèches ou ZQSD.</p>
 						</div>
 					</div>
 				)}
@@ -1136,6 +1138,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				Un mouvement progressif trace une courbe posée&nbsp;; un coup sec sur le côté fait <strong>drifter</strong>&nbsp;:
 				l'arrière glisse, puis la voiture se replace et boucle le virage bien plus vite
 				(au clavier&nbsp;: flèches ou ZQSD, double-tape un côté pour partir en glisse).
+				Sur la <strong>peinture fraîche</strong> ça part à n'importe quelle allure&nbsp;; sur le <strong>sol nu</strong> les
+				pneus tiennent, sauf à pleine vitesse&nbsp;: gaz à fond pendant une demi-seconde, puis coup sec,
+				et tu pars aussi en travers — mais lâche l'accélérateur et l'adhérence revient tout de suite.
 				Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
 				Sors, boucle, reviens → capture. Recroiser ta propre trace efface la boucle en cours, sans plus&nbsp;:
 				tu repars de là. En revanche, si un rival coupe ta trace, tu réapparais au point de départ après 3&nbsp;s

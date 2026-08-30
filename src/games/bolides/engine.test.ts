@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	createGame as newGame, stepGame, stepGuest, resetGame, collectEvents, buildSim, applySim,
-	setCarLookup, BASE_CAR, GRID, pct, cellCenterX, cellCenterZ, TOTAL, HALF, CFG,
+	setCarLookup, BASE_CAR, GRID, pct, cellAt, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, angleDiff,
 	type Car, type GameState, type NetEvent,
 } from './engine';
 import { BOLIDES, DEFAULT_CAR, carCfg } from './cars';
@@ -43,17 +43,48 @@ describe('bolides engine', () => {
 
 	it('captures territory when the player loops back home', () => {
 		const s = createGame();
+		const car = s.cars[0];
 		const home0 = s.counts[1];
 		let peak = home0;
-		// Straight out, then hold full lock: the loop must be wider than the turning circle, else
-		// the car meets its own trail before it gets home and the trail is wiped.
-		for (let i = 0; i < 600; i++) {
-			stepGame(s, i < 60 ? 0 : 1, 0, 1 / 60);
+		// Out on a straight line, then steer at the home centroid until the loop closes. Holding
+		// full lock instead is a knife-edge path — it encloses at exactly 60 straight-out frames
+		// and at neither 40 nor 80 — so it tests one trajectory rather than the capture rule.
+		let back = false;
+		for (let i = 0; i < 900; i++) {
+			if (car.outside && car.trail.length > 40) back = true;
+			let steer = 0;
+			if (back) {
+				const n = s.counts[1] || 1;
+				const home = Math.round(s.sumR[1] / n) * GRID + Math.round(s.sumC[1] / n);
+				const want = Math.atan2(cellCenterZ(home) - car.z, cellCenterX(home) - car.x);
+				steer = Math.max(-1, Math.min(1, angleDiff(want, car.heading) * 2));
+			}
+			stepGame(s, steer, 0, 1 / 60);
 			peak = Math.max(peak, s.counts[1]);
 		}
 		expect(peak).toBeGreaterThan(home0); // an enclosed loop was claimed
 		expect(pct(s, 1)).toBeGreaterThanOrEqual(0);
 		expect(pct(s, 1)).toBeLessThanOrEqual(100);
+	});
+
+	it('breaks traction on paint at cruise, on bare ground only flat out', () => {
+		// A fresh car already rolls at cruise with steerPrev 0, so one full-lock step is a flick:
+		// |dsteer|/dt = 60, far past any driftJab.
+		const flick = (onPaint: boolean, throttle: number) => {
+			const s = createGame();
+			const car = s.cars[0];
+			if (!onPaint) { car.x = 0; car.z = 0; } // the arena centre belongs to nobody at kickoff
+			expect(s.owner[cellAt(car.x, car.z)] === 0).toBe(!onPaint);
+			// Hold the car on the surface under test while it reaches the throttle's speed: the
+			// gate reads speed, and a rolling car would wander onto the other surface.
+			const home = { x: car.x, z: car.z };
+			for (let i = 0; i < 120; i++) { stepGame(s, 0, throttle, 1 / 60); car.x = home.x; car.z = home.z; }
+			stepGame(s, 1, throttle, 1 / 60);
+			return car.drifting;
+		};
+		expect(flick(true, 0)).toBe(true);
+		expect(flick(false, 0)).toBe(false);
+		expect(flick(false, 1)).toBe(true);
 	});
 
 	it('resets cleanly in place', () => {

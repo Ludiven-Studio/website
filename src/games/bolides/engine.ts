@@ -32,13 +32,19 @@ export const CFG = {
 	steerResp: 9, // how fast the applied turn eases toward the input (steering inertia)
 	grip: 26, // how fast the travel direction catches the heading — the gap is the slide
 	// driftGrip 6 was not a slide: travel followed the nose 80% of the way, and the flick gained
-	// LESS direction than simply gripping for the same time (vsGrip 0.74). 1.2 gives ~60° of peak
-	// slip and vsGrip 1.26 — the car goes sideways, and the flick is worth doing.
-	driftGrip: 1.2, // grip while sliding: the nose leads, travel lags — that gap is the drift
+	// LESS direction than simply gripping for the same time (vsGrip 0.74). Swept again for "the
+	// drift is a bit exaggerated" (scripts/bolides-hand.mjs): 2.4 cuts peak slip 62° -> 45° and the
+	// snap-back 42° -> 33° while vsGrip stays 1.26, so the flick is worth exactly as much as before.
+	// Lowering driftBoost instead would have paid for the calmer look with vsGrip.
+	driftGrip: 2.4, // grip while sliding: the nose leads, travel lags — that gap is the drift
 	driftBoost: 2, // the nose swings harder mid-drift, so a slide corners tighter than grip
 	driftJab: 2.6, // steer units/s that break traction — a flick does, a slow finger sweep doesn't
 	driftLock: 0.6, // a jab under this much lock is just a correction
-	driftMinSpeed: 12, // the tyres always hold below this
+	driftMinSpeed: 12, // on paint, the tyres always hold below this
+	// Bare ground only lets go flat out. A fraction of the car's OWN maxSpeed, not an absolute:
+	// at 0.86 the Frelon (top 23.8) breaks at 20.5 and the Comète (31.9) at 27.4, so every car
+	// needs the same last third of the throttle. Cruise sits well under it on all five.
+	driftBareFrac: 0.86,
 	driftHold: 0.7, // seconds a break lasts, refreshed by another jab
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
 	wallDrag: 4, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
@@ -312,8 +318,9 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?:
 
 /* ---------- physics ---------- */
 
-/** `steer` and `throttle` are both in [-1, 1]. throttle > 0 accelerates, < 0 brakes. */
-function stepCar(car: Car, steer: number, throttle: number, dt: number): void {
+/** `steer` and `throttle` are both in [-1, 1]. throttle > 0 accelerates, < 0 brakes.
+ *  `painted` is the surface under the car: only wet paint lets the tyres go. */
+function stepCar(car: Car, steer: number, throttle: number, dt: number, painted: boolean): void {
 	const cfg = car.cfg;
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
 	const targetSpeed = throttle >= 0
@@ -325,10 +332,14 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number): void {
 	// and the car carves a wide gripped arc, snap it over and the back steps out.
 	const jab = Math.abs(steer - car.steerPrev) / Math.max(dt, 1e-4);
 	car.steerPrev = steer;
-	if (jab > cfg.driftJab && Math.abs(steer) > cfg.driftLock && car.speed > cfg.driftMinSpeed) {
+	// Wet paint lets go at any pace; bare ground only at the top of the throttle.
+	const slipSpeed = painted ? cfg.driftMinSpeed : cfg.maxSpeed * cfg.driftBareFrac;
+	if (jab > cfg.driftJab && Math.abs(steer) > cfg.driftLock && car.speed > slipSpeed) {
 		car.driftT = cfg.driftHold;
 	}
-	car.driftT = Math.max(0, car.driftT - dt);
+	// The tyres bite back the moment the car drops under the surface's threshold, so a slide dies
+	// on braking and on rolling off the paint at cruise — it never coasts on a surface that grips.
+	car.driftT = car.speed > slipSpeed ? Math.max(0, car.driftT - dt) : 0;
 	car.drifting = car.driftT > 0;
 
 	const maxTurn = (car.speed / cfg.turnRadius) * (car.drifting ? cfg.driftBoost : 1);
@@ -608,12 +619,14 @@ export function stepGame(
 			if (s.clock >= car.respawnAt) respawn(s, car);
 			continue;
 		}
+		// The surface under the car sets how hard it is to break traction (see stepCar).
+		const painted = s.owner[cellAt(car.x, car.z)] !== 0;
 		if (car.remote) {
 			stepGhost(car, dt); // someone else's car: dead-reckon between packets
 		} else if (car.id === s.hero) {
-			stepCar(car, playerSteer, playerThrottle, dt);
+			stepCar(car, playerSteer, playerThrottle, dt, painted);
 		} else {
-			stepCar(car, drive(s, car, dt), gas(s, car, dt), dt);
+			stepCar(car, drive(s, car, dt), gas(s, car, dt), dt, painted);
 		}
 		slideWalls(car, dt);
 		updateGrid(s, car);
@@ -761,7 +774,10 @@ export function stepGuest(s: GameState, steer: number, throttle: number, dt: num
 	if (s.over) return;
 	for (const car of s.cars) {
 		if (!car.alive) continue;
-		if (car.id === s.hero) { stepCar(car, steer, throttle, dt); slideWalls(car, dt); }
+		if (car.id === s.hero) {
+			stepCar(car, steer, throttle, dt, s.owner[cellAt(car.x, car.z)] !== 0);
+			slideWalls(car, dt);
+		}
 		else stepGhost(car, dt);
 	}
 }
