@@ -27,6 +27,11 @@ const CAM_EASE = 7;
 // 0.22 clamp any time the wheel was touched — a permanent 13 deg tilt.
 const ROLL_K = 0.0013, ROLL_MAX = 0.10; // ~4 deg at cruise, 5.7 deg flat out
 const PITCH_K = 0.0016, PITCH_MAX = 0.06;
+// Front wheels. True Ackermann runs 15 deg braked down to 9 flat out (scripts/bolides-uturn.mjs),
+// far too subtle from the chase cam, so the angle is exaggerated. The clamp has to stay above
+// K x the braked figure, or the slow corner saturates and the spread the player should feel
+// flattens right back out. STEER_EASE keeps the interpolated pose's jitter out of the hubs.
+const STEER_K = 2.4, STEER_MAX = 0.7, STEER_EASE = 14;
 // Measured live occupancy: 53 mean / 99 peak in free 4-car driving, but 316/320 with four
 // simultaneous kills, and spawn() silently drops past the cap — a kill landing during a snap
 // starved the trail head and rail sparks for a full second. Smoke sat pinned at 32/32, so drift
@@ -526,14 +531,18 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 		}
 	}
 
-	// Wheels: one geometry. The cylinder axis is +Y, so rotateX(PI/2) lays it on +Z.
+	// Wheels: the cylinder axis is +Y, so rotateX(PI/2) lays it on +Z. Everything but the front
+	// axle is merged into the body; the front pair stay separate meshes so they can steer, each
+	// hung at its own hub so turning them does not walk them out of the arch.
 	const wl: THREE.BufferGeometry[] = [];
+	const steered: { geo: THREE.BufferGeometry; at: [number, number, number] }[] = [];
 	for (const wx of sh.wheelX) {
 		const rear = wx < 0;
 		const r = rear ? sh.rearR : sh.wheelR, w = rear ? sh.rearW : sh.wheelW;
 		for (const wz of [sh.wheelZ, -sh.wheelZ]) {
 			const g = new THREE.CylinderGeometry(r, r, w, sh.wheelSeg);
 			g.rotateX(Math.PI / 2);
+			if (wx > 0) { steered.push({ geo: g, at: [wx, r, wz] }); continue; }
 			if (sh.cock && !rear) g.rotateY(sh.cock);
 			g.translate(wx, r, wz);
 			wl.push(g);
@@ -564,6 +573,7 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 	// a mixed list, so everything is flattened first.
 	const flat = (list: THREE.BufferGeometry[]) => mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)), false)!;
 	if (!trim.length) trim.push(new THREE.BoxGeometry(0, 0, 0)); // keep the 4 material groups aligned
+	if (!wl.length) wl.push(new THREE.BoxGeometry(0, 0, 0)); // ditto: a car could be front-axle only
 	const shell = flat(paint); // reused, ungrouped, by the outline pass: one extra draw call
 	// mergeGeometries(list, true) makes one group per input, so each part is pre-merged flat.
 	const geo = mergeGeometries([shell, flat(trim), flat(wl), flat(st)], true)!;
@@ -595,6 +605,14 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 	spin.add(outline);
 	spin.add(new THREE.Mesh(geo, mats));
 
+	const wheels = steered.map((s) => {
+		const m = new THREE.Mesh(s.geo, mats[2]);
+		m.position.set(...s.at);
+		m.rotation.y = sh.cock; // the Toupie's front wheels are cocked at rest; steering adds to it
+		spin.add(m);
+		return m;
+	});
+
 	const glowMat = new THREE.MeshBasicMaterial({
 		map: glowTex, color, transparent: true, opacity: sh.glowOp, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
 	});
@@ -617,6 +635,10 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 	spin.add(roundel);
 
 	root.userData.spin = spin;
+	root.userData.wheels = wheels;
+	// Ackermann needs the axle gap, and it is not the same on a Comète as on a Frelon.
+	root.userData.wheelbase = sh.wheelX[0] - sh.wheelX[sh.wheelX.length - 1];
+	root.userData.cock = sh.cock;
 	root.userData.mats = mats;
 	root.userData.glow = glowMat;
 	root.userData.glowOp = sh.glowOp;
@@ -1046,7 +1068,12 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	const carSpins: THREE.Group[] = carMeshes.map((m) => m.userData.spin as THREE.Group);
 	const carGlows: THREE.MeshBasicMaterial[] = carMeshes.map((m) => m.userData.glow as THREE.MeshBasicMaterial);
 	const carRoundels: THREE.Mesh[] = carMeshes.map((m) => m.userData.roundel as THREE.Mesh);
+	const carWheels: THREE.Mesh[][] = carMeshes.map((m) => m.userData.wheels as THREE.Mesh[]);
+	const carBase = carMeshes.map((m) => m.userData.wheelbase as number);
+	const carCock = carMeshes.map((m) => m.userData.cock as number);
 	const prevSpeed = new Float32Array(state.cars.length);
+	const prevHeading = new Float32Array(state.cars.length);
+	const steerAng = new Float32Array(state.cars.length);
 
 	// "Which one am I" answered by shape, not by paint.
 	const heroRing = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.65, 40), new THREE.MeshBasicMaterial({
@@ -1541,7 +1568,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				trailSnapN[i] = n;
 			}
 			mesh.visible = car.alive;
-			if (!car.alive) { prevSpeed[i] = car.speed; continue; }
+			if (!car.alive) { prevSpeed[i] = car.speed; prevHeading[i] = car.heading; continue; }
 			const pose = carPose(car, alpha);
 			mesh.position.set(pose.x, 0, pose.z);
 			// No cosmetic wobble any more: the nose really does point off the travel line.
@@ -1553,6 +1580,14 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			const accel = (car.speed - prevSpeed[i]) / Math.max(fxDt, 1e-3);
 			spin.rotation.z = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, accel * PITCH_K));
 			prevSpeed[i] = car.speed;
+			// Front wheels. Ackermann off the RENDERED yaw rate, not off car.turnRate: a remote
+			// car is eased onto the poses its owner sends and never runs the physics, so its
+			// turnRate is frozen at 0 and its wheels would sit dead straight all race.
+			const yaw = angleDiff(pose.heading, prevHeading[i]) / Math.max(fxDt, 1e-3);
+			prevHeading[i] = pose.heading;
+			const want = Math.atan2(carBase[i] * yaw, Math.max(car.speed, 4)) * STEER_K;
+			steerAng[i] += (Math.max(-STEER_MAX, Math.min(STEER_MAX, want)) - steerAng[i]) * Math.min(1, fxDt * STEER_EASE);
+			for (const w of carWheels[i]) w.rotation.y = carCock[i] + steerAng[i];
 			// The chip must never fall under a readable size just because the car is far away.
 			const dx = pose.x - camera.position.x, dz = pose.z - camera.position.z;
 			const d = Math.sqrt(dx * dx + dz * dz);

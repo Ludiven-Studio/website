@@ -25,11 +25,12 @@ export const CFG = {
 	maxSpeed: 28, // full throttle
 	minSpeed: 7, // hard brake (never a full stop, so a trail keeps forming)
 	accelResp: 2.6, // how fast speed eases toward the throttle target (weight/inertia)
-	// Measured, not eyeballed (scripts/bolides-hand.mjs). At radius 8 one 400 ms key press cost
-	// 43° of heading and 9.7 units sideways, and 19.6° of that arrived AFTER release — no line
-	// could be trimmed. Radius 13 halves it (26°, 4.4 units) and cuts the coast to 6.8°.
-	turnRadius: 13, // gripped turning circle AT TOP SPEED; a drift tightens it (see driftBoost)
-	slowRadius: 0.62, // share of turnRadius left at a standstill — slow cars pivot, fast ones run wide
+	// These two are solved as a PAIR (scripts/bolides-uturn.mjs): what matters is the spread
+	// between the slow corner and the fast one. 15/0.30 halves a U-turn's corridor at the brakes
+	// (18.6 -> 14.2 units, 4.5 s -> 3.6 s) while leaving the cruise circle where it was (11.1 ->
+	// 10.9), which is the one that must not move — land per loop goes as cruise x radius.
+	turnRadius: 15, // gripped turning circle AT TOP SPEED; a drift tightens it (see driftBoost)
+	slowRadius: 0.30, // share of turnRadius left at a standstill — slow cars pivot, fast ones run wide
 	steerResp: 9, // how fast the applied turn eases toward the input (steering inertia)
 	grip: 26, // how fast the travel direction catches the heading — the gap is the slide
 	maxSlip: 0.7, // radians (40°) of sideways the car can hold — the drift's visual ceiling
@@ -44,7 +45,9 @@ export const CFG = {
 	// Both are a share of the car's OWN flat-out corner (maxSpeed^2 / turnRadius), never absolute:
 	// against a fixed load the Frelon (top 23.8) could not have broken traction on bare ground at
 	// any speed it can reach, so the rule would have quietly skipped one car in the garage.
-	gripPaint: 0.33, // wet paint gives up around cruise — hold a corner there and it goes
+	// gripPaint tracks turnRadius: the share is of flatOut, so widening the circle would have
+	// quietly loosened the paint too and a drift would no longer loop shorter than a grip.
+	gripPaint: 0.38, // wet paint gives up around cruise — hold a corner there and it goes
 	gripBare: 0.76, // bare ground holds until the last quarter of the throttle
 	driftHold: 0.7, // seconds a break lasts once the load drops back under the limit
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
