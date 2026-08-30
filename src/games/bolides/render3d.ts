@@ -1583,7 +1583,9 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			// Front wheels. Ackermann off the RENDERED yaw rate, not off car.turnRate: a remote
 			// car is eased onto the poses its owner sends and never runs the physics, so its
 			// turnRate is frozen at 0 and its wheels would sit dead straight all race.
-			const yaw = angleDiff(pose.heading, prevHeading[i]) / Math.max(fxDt, 1e-3);
+			// Negated for the same reason spin.rotation.y is: the hubs hang inside that mirrored
+			// frame, so a left-hand corner needs a NEGATIVE local angle or they steer outwards.
+			const yaw = -angleDiff(pose.heading, prevHeading[i]) / Math.max(fxDt, 1e-3);
 			prevHeading[i] = pose.heading;
 			const want = Math.atan2(carBase[i] * yaw, Math.max(car.speed, 4)) * STEER_K;
 			steerAng[i] += (Math.max(-STEER_MAX, Math.min(STEER_MAX, want)) - steerAng[i]) * Math.min(1, fxDt * STEER_EASE);
