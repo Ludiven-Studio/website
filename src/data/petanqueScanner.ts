@@ -1,6 +1,10 @@
 // Copy for the Pétanque Scanner landing pages (/petanque-scanner/ and /en/petanque-scanner/).
 // Kept in one file so the two languages can't drift apart when the app changes.
 
+// App Store links carry no country code on purpose: Apple then redirects to the
+// visitor's own storefront. A hardcoded /fr/ or /us/ shows a "switch store?" wall
+// to everyone abroad — Belgian and Swiss players read the French page too.
+
 import type { iconPaths } from '../components/IconPaths';
 
 export interface LandingCopy {
@@ -52,7 +56,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=fr',
 			playAlt: 'Disponible sur Google Play',
-			apple: 'https://apps.apple.com/fr/app/petanque-scanner/id6670211733',
+			apple: 'https://apps.apple.com/app/id6670211733',
 			appleAlt: 'Télécharger dans l\'App Store',
 		},
 		stepsTitle: 'Comment ça marche',
@@ -163,7 +167,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=en',
 			playAlt: 'Get it on Google Play',
-			apple: 'https://apps.apple.com/us/app/petanque-scanner/id6670211733',
+			apple: 'https://apps.apple.com/app/id6670211733',
 			appleAlt: 'Download on the App Store',
 		},
 		stepsTitle: 'How it works',

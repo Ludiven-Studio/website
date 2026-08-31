@@ -144,7 +144,7 @@ gallery:
   <a href="https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=fr" target="_blank" rel="noopener">
     <img class="badge-play" src="/assets/badges/google-play-fr.png" alt="Disponible sur Google Play">
   </a>
-  <a href="https://apps.apple.com/fr/app/petanque-scanner/id6670211733" target="_blank" rel="noopener">
+  <a href="https://apps.apple.com/app/id6670211733" target="_blank" rel="noopener">
     <img class="badge-appstore" src="/assets/badges/app-store-fr.svg" alt="Télécharger dans l'App Store">
   </a>
 </div>
