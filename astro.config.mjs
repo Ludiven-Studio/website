@@ -10,6 +10,9 @@ export default defineConfig({
     redirects: {
         '/jeux/tectonique': '/jeux/tapis',
         '/jeux/bolides': '/jeux/caisses-a-peinture',
+        // The legal pages live under the app's internal code name and are declared as-is
+        // in both store listings — don't move them, just stop 404ing on the parent.
+        '/petanque-ar': '/petanque-scanner/',
     },
     integrations: [
         react(),

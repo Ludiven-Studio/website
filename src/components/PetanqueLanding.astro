@@ -1,0 +1,299 @@
+---
+// The Pétanque Scanner product page, shared by /petanque-scanner/ and its English twin.
+// The portfolio entry at /work/petanque-scanner/ covers the research instead.
+
+import Hero from './Hero.astro';
+import Icon from './Icon.astro';
+import ContactCTA from './ContactCTA.astro';
+import LangSwitch from './LangSwitch.astro';
+import { copy, APP_NAME, HERO, SCREENS } from '../data/petanqueScanner';
+
+interface Props {
+	lang: 'fr' | 'en';
+	altLang: string;
+}
+
+const { lang, altLang } = Astro.props;
+const t = copy[lang];
+const play = `/assets/badges/google-play-${lang}.png`;
+const apple = `/assets/badges/app-store-${lang}.svg`;
+
+const jsonLd = [
+	{
+		'@context': 'https://schema.org',
+		'@type': 'MobileApplication',
+		name: APP_NAME,
+		description: t.description,
+		url: new URL(Astro.url.pathname, Astro.site).href,
+		applicationCategory: 'SportsApplication',
+		operatingSystem: 'Android, iOS',
+		inLanguage: lang,
+		author: { '@type': 'Organization', name: 'Ludiven Studio' },
+		offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+	},
+	{
+		'@context': 'https://schema.org',
+		'@type': 'FAQPage',
+		mainEntity: t.faq.map((f) => ({
+			'@type': 'Question',
+			name: f.q,
+			acceptedAnswer: { '@type': 'Answer', text: f.a },
+		})),
+	},
+];
+---
+
+<div class="stack gap-20">
+	<main class="wrapper stack gap-15">
+		<div class="stack gap-8">
+			<LangSwitch lang={lang} href={altLang} />
+			<Hero title={APP_NAME} tagline={t.tagline} align="start" />
+			<div class="store-badges">
+				<a href={t.badges.play} target="_blank" rel="noopener">
+					<img class="badge-play" src={play} alt={t.badges.playAlt} />
+				</a>
+				<a href={t.badges.apple} target="_blank" rel="noopener">
+					<img class="badge-appstore" src={apple} alt={t.badges.appleAlt} />
+				</a>
+			</div>
+			<img class="cover" src={HERO} alt={t.heroAlt} />
+		</div>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.stepsTitle}</h2>
+			<div class="box steps">
+				{t.steps.map((s, i) => (
+					<div class="stack gap-2 lg:gap-4">
+						<Icon icon={s.icon} color="var(--accent-regular)" size="2.5rem" gradient />
+						<h3><span class="step-n">{i + 1}</span>{s.title}</h3>
+						<p>{s.body}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.featuresTitle}</h2>
+			<div class="box grid-2">
+				{t.features.map((f) => (
+					<div>
+						<h3>{f.title}</h3>
+						<p>{f.body}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="screens stack gap-6">
+			<h2 class="section-title">{t.galleryTitle}</h2>
+			<div class="screens-grid">
+				{SCREENS.map((src) => <img src={src} alt="" loading="lazy" decoding="async" />)}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.limitsTitle}</h2>
+			<p class="lead">{t.limitsIntro}</p>
+			<div class="box grid-2">
+				{t.limits.map((l) => (
+					<div>
+						<h3>{l.title}</h3>
+						<p>{l.body}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.priceTitle}</h2>
+			<div class="box">
+				<p>{t.priceBody}</p>
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.faqTitle}</h2>
+			<div class="box faq">
+				{t.faq.map((f) => (
+					<details>
+						<summary>{f.q}</summary>
+						<p>{f.a}</p>
+					</details>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2 class="section-title">{t.makingOfTitle}</h2>
+			<div class="box">
+				<p>{t.makingOfBody}</p>
+				<p class="making-of-cta">
+					<a href={t.makingOfHref}>{t.makingOfCta} <Icon icon="arrow-right" size="1em" /></a>
+				</p>
+			</div>
+		</section>
+
+		<section class="stack gap-4 closing">
+			<h2 class="section-title">{t.closing}</h2>
+			<div class="store-badges">
+				<a href={t.badges.play} target="_blank" rel="noopener">
+					<img class="badge-play" src={play} alt={t.badges.playAlt} />
+				</a>
+				<a href={t.badges.apple} target="_blank" rel="noopener">
+					<img class="badge-appstore" src={apple} alt={t.badges.appleAlt} />
+				</a>
+			</div>
+			<p class="legal">
+				{t.legalIntro} <a href={t.privacy.href}>{t.privacy.label}</a> · <a href={t.terms.href}>{t.terms.label}</a>
+			</p>
+		</section>
+	</main>
+
+	<ContactCTA lang={lang} />
+</div>
+
+<script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+
+<style>
+	.box {
+		border: 1px solid var(--gray-800);
+		border-radius: 0.75rem;
+		padding: 1.5rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.section-title {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+
+	.cover {
+		width: 100%;
+		height: auto;
+		border-radius: 1.5rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.lead {
+		max-width: 60ch;
+	}
+
+	.steps,
+	.grid-2 {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 2.5rem;
+	}
+
+	.steps h3,
+	.grid-2 h3 {
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+	}
+
+	.step-n {
+		display: inline-block;
+		min-width: 1.6em;
+		color: var(--accent-regular);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.box p {
+		color: var(--gray-400);
+	}
+
+	.screens {
+		text-align: center;
+	}
+
+	.screens-grid {
+		display: grid;
+		gap: 1.25rem;
+		align-items: start;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	}
+
+	.screens-grid img {
+		width: 100%;
+		height: auto;
+		border-radius: 1.25rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+		background: var(--gradient-subtle);
+	}
+
+	.faq {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.faq details {
+		border-bottom: 1px solid var(--gray-800);
+		padding: 0.75rem 0;
+	}
+
+	.faq details:last-child {
+		border-bottom: 0;
+	}
+
+	.faq summary {
+		cursor: pointer;
+		color: var(--gray-0);
+		font-family: var(--font-brand);
+		font-size: var(--text-md);
+	}
+
+	.faq details p {
+		margin-top: 0.75rem;
+		max-width: 65ch;
+	}
+
+	.making-of-cta {
+		margin-top: 1rem;
+	}
+
+	.making-of-cta a {
+		color: var(--accent-text-over);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+
+	.making-of-cta a:hover,
+	.making-of-cta a:focus {
+		text-decoration-color: currentColor;
+	}
+
+	.closing {
+		text-align: center;
+	}
+
+	.legal {
+		color: var(--gray-400);
+		font-size: var(--text-sm);
+	}
+
+	@media (min-width: 50em) {
+		.box {
+			border-radius: 1.5rem;
+			padding: 2.5rem;
+		}
+
+		.steps {
+			grid-template-columns: repeat(3, 1fr);
+			gap: 3rem;
+		}
+
+		.grid-2 {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 2.5rem 5rem;
+		}
+
+		.screens-grid {
+			grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+			gap: 1.75rem;
+		}
+	}
+</style>
