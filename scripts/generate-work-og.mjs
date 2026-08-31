@@ -22,11 +22,14 @@ const OUT = path.join(PUB, 'assets', 'work', 'og');
 
 const W = 1200;
 const H = 630;
-const TARGET = W / H;
 const BG = '#090b11'; // --gray-999, dark theme background
-// Past this much aspect drift a cover crop starts eating the subject (portrait
-// heroes, square logos) — letterbox those on the brand background instead.
-const MAX_DRIFT = 0.15;
+
+// Nobody displays the 1.91:1 we hand them: Reddit re-crops the card to ~1.75:1
+// (eats 4% of the width per side), Twitter to 2:1 (eats the height). Our heroes
+// carry their title flush left, so a full-bleed image loses the first letter of
+// every line. Inset the hero inside a safe box and let the crops eat the margin.
+const SAFE_W = Math.round(W * 0.88);
+const SAFE_H = Math.round(H * 0.92);
 
 await mkdir(OUT, { recursive: true });
 
@@ -52,16 +55,26 @@ for (const file of files) {
 	}
 
 	const meta = await sharp(src).metadata();
-	const drift = Math.abs(meta.width / meta.height - TARGET) / TARGET;
-	const fit = drift <= MAX_DRIFT ? 'cover' : 'contain';
 
-	await sharp(src)
-		.resize(W, H, { fit, background: BG })
+	// The margin is a blurred, darkened zoom of the hero itself, so the inset
+	// reads as depth of field rather than as letterboxing.
+	const backdrop = await sharp(src)
+		.resize(W, H, { fit: 'cover' })
+		.blur(28)
+		.modulate({ brightness: 0.5 })
 		.flatten({ background: BG })
+		.toBuffer();
+
+	let fg = sharp(src).resize(SAFE_W, SAFE_H, { fit: 'inside' });
+	// Logos ship with alpha — sit them on a clean panel instead of the blur.
+	if (meta.hasAlpha) fg = fg.flatten({ background: BG });
+
+	await sharp(backdrop)
+		.composite([{ input: await fg.toBuffer(), gravity: 'center' }])
 		.jpeg({ quality: 82, mozjpeg: true })
 		.toFile(path.join(OUT, `${slug}.jpg`));
 
-	console.log(`OK ${slug.padEnd(20)} ${meta.width}x${meta.height} ${meta.format} -> ${fit}`);
+	console.log(`OK ${slug.padEnd(20)} ${meta.width}x${meta.height} ${meta.format}`);
 	done++;
 }
 
