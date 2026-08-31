@@ -40,8 +40,9 @@ const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 const toTenths = (p: number) => Math.round(p * 10); // % -> stored tenths of a percent
 const fmtPct = (v: number) => formatScore(DAILY_LB.bolides.fmt, v);
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+// Five columns share ~262px on a phone, so a label has 47px: "Accroche" needs 55 and overflows.
 const BAR_LABELS: [keyof Bolide['bars'], string][] = [
-	['speed', 'Vitesse'], ['accel', 'Reprise'], ['grip', 'Accroche'], ['trail', 'Trace'],
+	['speed', 'Vitesse'], ['accel', 'Reprise'], ['turn', 'Virage'], ['grip', 'Appui'], ['trail', 'Trace'],
 ];
 
 // Base-5 digits of the seed: deterministic, so the daily deals the same field to everyone.
@@ -890,8 +891,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 					})}
 				</ul>
 				<p className="bo-fair">
-					Aucun bolide n'est plus fort qu'un autre&nbsp;: taux de victoire mesuré entre 22&nbsp;% et 29&nbsp;%
-					sur 1 200 courses simulées. Ils se jouent différemment, c'est tout.
+					Chaque bolide a un point fort et le paie ailleurs&nbsp;: taux de victoire mesuré entre 23&nbsp;%
+					et 28&nbsp;% sur 2 800 courses simulées, pour une part équitable de 25&nbsp;%. Aucun n'est
+					meilleur&nbsp;: ils se jouent différemment.
 				</p>
 				<button className="bo-play bo-garageclose" onClick={() => setGarage(false)}>Fermer</button>
 			</div>
@@ -914,7 +916,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="bo-boardwrap" ref={boardRef}>
-				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Caisses à peinture" onPointerDown={drag.onPointerDown} />
+				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Course de peinture" onPointerDown={drag.onPointerDown} />
 
 				{/* Before the minimap and the standings in DOM order, so it never darkens them. */}
 				{phase === 'playing' && (
@@ -1043,7 +1045,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				{phase === 'menu' && !webglError && !garage && mode !== 'online' && (
 					<div className="bo-overlay">
 						<div className="bo-card">
-							<h2>Caisses à peinture</h2>
+							<h2>Course de peinture</h2>
 							<p className="bo-sub">
 								Sors de ta zone, trace une boucle, reviens chez toi pour <strong>repeindre</strong>.
 								<strong> {Math.round(CFG.timeLimit / 60)} minutes</strong>, ou victoire immédiate
@@ -1406,10 +1408,11 @@ const CSS = `
 .bo-carbody { flex: 1; min-width: 0; }
 .bo-carhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
 .bo-carname { font-size: 14px; font-weight: 700; color: #fff; }
-.bo-carbars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 8px; margin: 5px 0 0; }
-.bo-statline { display: flex; flex-direction: column; gap: 3px; }
-.bo-statline em { font-style: normal; font-size: 8.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--bo-ink-dim); display: flex; justify-content: flex-start; gap: 4px; }
-.bo-statline em b { color: #fff; font-size: 9.5px; }
+.bo-carbars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 5px; margin: 5px 0 0; }
+.bo-statline { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+/* Five columns in a 290px card leaves ~47px each, so the label must stay unspaced and nowrap. */
+.bo-statline em { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; white-space: nowrap; color: var(--bo-ink-dim); display: flex; justify-content: flex-start; gap: 2px; }
+.bo-statline em b { color: #fff; font-size: 8.5px; }
 /* Five countable pips beat a length you have to eyeball. Empty pips stay visible, the full tick
    over the third marks the free car's reference, green = above it, amber = below. */
 .bo-statbar { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; height: 8px; }
@@ -1421,7 +1424,8 @@ const CSS = `
 .bo-pitch { margin: 5px 0 0; font-size: 11px; line-height: 1.4; color: var(--bo-ink-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .bo-cars li.on .bo-pitch, .bo-cars li:hover .bo-pitch { -webkit-line-clamp: 6; }
 /* No hover means no escape hatch, and the clamp always cuts at the drawback clause. */
-@media (hover: none) { .bo-pitch { -webkit-line-clamp: 4; } }
+/* No hover to expand it on touch, so a clamped pitch is simply unreadable there. */
+@media (hover: none) { .bo-pitch { -webkit-line-clamp: 6; } }
 .bo-buywrap { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .bo-pick, .bo-buy {
   flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px;

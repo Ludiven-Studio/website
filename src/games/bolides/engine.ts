@@ -21,37 +21,50 @@ export const NAMES = ['', 'TOI', 'Rouge', 'Vert', 'Jaune'];
 export const CAR_COUNT = 4; // 1 player + 3 bots
 
 export const CFG = {
-	cruise: 17, // speed at neutral throttle (units/s) — cars always roll forward
-	maxSpeed: 28, // full throttle
-	minSpeed: 7, // hard brake (never a full stop, so a trail keeps forming)
-	accelResp: 2.6, // how fast speed eases toward the throttle target (weight/inertia)
+	// The three speeds scale together on purpose. Whether a throttle drifts is v^2/R(v) against
+	// share x maxSpeed^2/turnRadius, and both sides are homogeneous: the ratio collapses to
+	// u^2/(s + (1-s)u) with u = v/maxSpeed. So raising the speeds in the SAME proportion leaves the
+	// drift story bit-identical (measured, scripts/bolides-uturn.mjs) — raising maxSpeed alone does
+	// not, and cost the paint its cruise drift outright.
+	cruise: 20.6, // speed at neutral throttle (units/s) — cars always roll forward
+	maxSpeed: 34, // full throttle
+	minSpeed: 8.5, // hard brake (never a full stop, so a trail keeps forming)
+	// Every RATE below (1/s) is scaled by k/m too, k being the speed factor and m the radius one.
+	// Leave them behind and the car answers just as slowly while its corners got quicker, which is
+	// not "sluggish" evenly: it hands the race to whichever car already had the fastest responses
+	// (measured, the Frelon went 25.6 -> 34.4 % of wins with the rates left at their old values).
+	accelResp: 3.95, // how fast speed eases toward the throttle target (weight/inertia)
 	// These two are solved as a PAIR (scripts/bolides-uturn.mjs): what matters is the spread
-	// between the slow corner and the fast one. 15/0.30 halves a U-turn's corridor at the brakes
-	// (18.6 -> 14.2 units, 4.5 s -> 3.6 s) while leaving the cruise circle where it was (11.1 ->
-	// 10.9), which is the one that must not move — land per loop goes as cruise x radius.
-	turnRadius: 15, // gripped turning circle AT TOP SPEED; a drift tightens it (see driftBoost)
+	// between the slow corner and the fast one. 12/0.30 keeps a braked U-turn inside an 11.4-unit
+	// corridor (2.4 s) against 17.6 flat out. Land per loop goes as cruise x radius, so the two
+	// moves are deliberately opposite: 20.6 x 12 = 247 against the old 17 x 15 = 255, i.e. the race
+	// pacing is untouched (135 s -> 130 s over 700 seeded bot races) while a flat-out corner loses
+	// a quarter of its corridor (24.0 -> 17.6) and a third of its time (2.20 s -> 1.50 s).
+	turnRadius: 12, // gripped turning circle AT TOP SPEED; a drift tightens it (see driftBoost)
 	slowRadius: 0.30, // share of turnRadius left at a standstill — slow cars pivot, fast ones run wide
-	steerResp: 9, // how fast the applied turn eases toward the input (steering inertia)
-	grip: 26, // how fast the travel direction catches the heading — the gap is the slide
+	steerResp: 13.7, // how fast the applied turn eases toward the input (steering inertia)
+	grip: 39.5, // how fast the travel direction catches the heading — the gap is the slide
 	maxSlip: 0.7, // radians (40°) of sideways the car can hold — the drift's visual ceiling
 	// Sideways tyres are brakes. Without this a slide is a plough: the path radius is speed^2 over
-	// the grip limit, so flat out on paint the car could only run a 77-unit arc. Scrubbing lets a
+	// the grip limit, so flat out on paint the car could only run a 63-unit arc. Scrubbing lets a
 	// drift trade speed for a tighter line, which is the whole point of throwing the car sideways.
-	scrub: 1.2, // speed bled per second at full slip, eased by sin(slip)
+	scrub: 2.21, // speed bled per second at full slip, eased by sin(slip)
 	driftBoost: 1.3, // the nose swings harder mid-drift; the PATH is still capped by grip below
 	// What breaks traction is the cornering LOAD (speed x yaw rate), not how fast the wheel was
 	// thrown: the old jab test could not be passed by holding a key at all, so a keyboard player
 	// never drifted anywhere (measured, scripts/bolides-trac.mjs — every hold row read "non").
-	// Both are a share of the car's OWN flat-out corner (maxSpeed^2 / turnRadius), never absolute:
-	// against a fixed load the Frelon (top 23.8) could not have broken traction on bare ground at
-	// any speed it can reach, so the rule would have quietly skipped one car in the garage.
-	// gripPaint tracks turnRadius: the share is of flatOut, so widening the circle would have
+	// Both are a share of FLAT_OUT, the roster's reference corner — not the car's own. They used to
+	// scale with each car's maxSpeed^2 / turnRadius, which let a top-end multiplier buy traction for
+	// free (the Comete's +18 % top speed was +51 % of grip, and it drifted 0.0 % of the race).
+	// The reason that per-car form existed still holds under the global one: a slow car does not
+	// become undriftable, it just needs more lock, because the RADIUS law is roster-referenced too.
+	// gripPaint tracks turnRadius: the share is of FLAT_OUT, so widening the base circle would have
 	// quietly loosened the paint too and a drift would no longer loop shorter than a grip.
 	gripPaint: 0.38, // wet paint gives up around cruise — hold a corner there and it goes
 	gripBare: 0.76, // bare ground holds until the last quarter of the throttle
-	driftHold: 0.7, // seconds a break lasts once the load drops back under the limit
+	driftHold: 0.46, // seconds a break lasts once the load drops back under the limit
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
-	wallDrag: 4, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
+	wallDrag: 6.1, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
 	wallMargin: 3, // bots start turning back this far from the arena wall
 	winPct: 50, // first car past this share of the arena wins the run
 	timeLimit: 180, // hard race length: at the buzzer the biggest share wins
@@ -62,6 +75,10 @@ export const CFG = {
 	botArc: 0.55, // how hard a bot arcs while outside (steer magnitude)
 	botAggroRange: 14, // how close an enemy trail must be to tempt a bot
 } as const;
+
+/** The reference hardest corner, shared by every car so that a roster multiplier means one thing.
+ *  Both the turning circle and the traction ceiling are measured against it (see stepCar). */
+const FLAT_OUT = (CFG.maxSpeed * CFG.maxSpeed) / CFG.turnRadius;
 
 // Daily difficulty (diffIndex 0..2): harder = bolder, more aggressive bots = more danger.
 export const DIFFS = [
@@ -330,8 +347,14 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number, painted:
 		: cfg.cruise + (cfg.cruise - cfg.minSpeed) * throttle;
 	car.speed += (targetSpeed - car.speed) * Math.min(1, dt * cfg.accelResp);
 
-	// Slow cars pivot, fast cars run wide: the gripped circle opens up with speed.
-	const radius = cfg.turnRadius * (cfg.slowRadius + (1 - cfg.slowRadius) * Math.min(1, car.speed / cfg.maxSpeed));
+	// Slow cars pivot, fast cars run wide: the gripped circle opens up with speed. The reference is
+	// the ROSTER's top speed, not the car's own: normalising by cfg.maxSpeed made every car reach
+	// exactly turnRadius at its own limit, which erases top speed from the geometry and turns
+	// maxSpeed into an anti-knob — raising it only lowers speed/maxSpeed, so the CRUISE corner
+	// tightens, the loops shrink and the car lands less. Measured (scripts/bolides-bal.mjs, SOLO=1):
+	// +20 % top speed alone cost 27 points of win rate, -15 % gained 31. Nothing moves for the free
+	// car, whose maxSpeed IS the reference.
+	const radius = cfg.turnRadius * (cfg.slowRadius + (1 - cfg.slowRadius) * Math.min(1.5, car.speed / CFG.maxSpeed));
 	const maxTurn = (car.speed / radius) * (car.drifting ? cfg.driftBoost : 1);
 	car.turnRate += (steer * maxTurn - car.turnRate) * Math.min(1, dt * cfg.steerResp);
 	car.heading += car.turnRate * dt;
@@ -340,8 +363,11 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number, painted:
 	// cap is how hard the PATH can bend (lateral accel), never how far the nose swings: capping the
 	// nose instead turned a slide into a donut, tighter than gripping, so sliding always won.
 	const want = angleDiff(car.heading, car.vh) * Math.min(1, dt * cfg.grip);
-	const flatOut = (cfg.maxSpeed * cfg.maxSpeed) / cfg.turnRadius; // this car's hardest corner
-	const maxBend = ((painted ? cfg.gripPaint : cfg.gripBare) * flatOut / Math.max(car.speed, 1)) * dt;
+	// Roster-wide reference corner, for the same reason as the radius above: scaled by the car's own
+	// maxSpeed, a +18 % top end quietly bought +51 % of traction (the Comete drifted 0.0 % of the
+	// race) and no garage bar could show it, because the multiplier it came from was gripPaint x1.
+	// Referenced globally, gripPaint/gripBare mean one absolute load ceiling for every car.
+	const maxBend = ((painted ? cfg.gripPaint : cfg.gripBare) * FLAT_OUT / Math.max(car.speed, 1)) * dt;
 	const slid = Math.abs(want) > maxBend;
 	car.vh += slid ? Math.sign(want) * maxBend : want;
 	car.driftT = slid ? cfg.driftHold : Math.max(0, car.driftT - dt);

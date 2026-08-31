@@ -25,13 +25,16 @@ const CAM_EASE = 7;
 // Roll is driven by lateral acceleration (speed x turnRate), not by turnRate alone: turnRate
 // hits speed/turnRadius = 5.2 rad/s flat out, so the old `turnRate * 0.18` sat pinned at the
 // 0.22 clamp any time the wheel was touched — a permanent 13 deg tilt.
-const ROLL_K = 0.0013, ROLL_MAX = 0.10; // ~4 deg at cruise, 5.7 deg flat out
+// K follows the hardest corner (maxSpeed^2 / turnRadius): at 0.0013 the new 96-unit flat-out load
+// pinned the clamp, which is the same permanent-tilt bug as above one level up.
+const ROLL_K = 0.0009, ROLL_MAX = 0.10; // ~2.5 deg at cruise, 5 deg flat out
 const PITCH_K = 0.0016, PITCH_MAX = 0.06;
-// Front wheels. True Ackermann runs 15 deg braked down to 9 flat out (scripts/bolides-uturn.mjs),
+// Front wheels. True Ackermann runs 18 deg braked down to 11 flat out (scripts/bolides-uturn.mjs),
 // far too subtle from the chase cam, so the angle is exaggerated. The clamp has to stay above
 // K x the braked figure, or the slow corner saturates and the spread the player should feel
-// flattens right back out. STEER_EASE keeps the interpolated pose's jitter out of the hubs.
-const STEER_K = 2.4, STEER_MAX = 0.7, STEER_EASE = 14;
+// flattens right back out — 0.7 did exactly that once turnRadius went to 12.
+// STEER_EASE keeps the interpolated pose's jitter out of the hubs.
+const STEER_K = 2.4, STEER_MAX = 0.78, STEER_EASE = 14;
 // Measured live occupancy: 53 mean / 99 peak in free 4-car driving, but 316/320 with four
 // simultaneous kills, and spawn() silently drops past the cap — a kill landing during a snap
 // starved the trail head and rail sparks for a full second. Smoke sat pinned at 32/32, so drift

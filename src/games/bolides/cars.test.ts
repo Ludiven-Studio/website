@@ -23,9 +23,9 @@ afterEach(() => {
 const CFG_KEYS = Object.keys(CFG).sort();
 
 describe('bolides roster', () => {
-	it('gives every car four bars in 0-5, none of them flat', () => {
+	it('gives every car five bars in 0-5, none of them flat', () => {
 		for (const b of BOLIDES) {
-			const bars = [b.bars.speed, b.bars.accel, b.bars.grip, b.bars.trail];
+			const bars = [b.bars.speed, b.bars.accel, b.bars.turn, b.bars.grip, b.bars.trail];
 			for (const v of bars) {
 				expect(Number.isInteger(v)).toBe(true);
 				expect(v).toBeGreaterThanOrEqual(0);
@@ -67,7 +67,7 @@ describe('bolides roster', () => {
 	});
 
 	it('gives every paid car a bar under the free roadster, and none a clean sweep', () => {
-		const axes = ['speed', 'accel', 'grip', 'trail'] as const;
+		const axes = ['speed', 'accel', 'turn', 'grip', 'trail'] as const;
 		const free = carById(DEFAULT_CAR).bars;
 		for (const b of BOLIDES) {
 			if (b.price === 0) continue;

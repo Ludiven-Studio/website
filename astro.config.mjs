@@ -9,7 +9,8 @@ export default defineConfig({
     // Renamed games — keep the old URLs alive for shared links.
     redirects: {
         '/jeux/tectonique': '/jeux/tapis',
-        '/jeux/bolides': '/jeux/caisses-a-peinture',
+        '/jeux/bolides': '/jeux/course-de-peinture',
+        '/jeux/caisses-a-peinture': '/jeux/course-de-peinture',
         // The legal pages live under the app's internal code name and are declared as-is
         // in both store listings — don't move them, just stop 404ing on the parent.
         '/petanque-ar': '/petanque-scanner/',

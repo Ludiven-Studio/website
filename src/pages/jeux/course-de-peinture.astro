@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import BolidesGame from '../../games/bolides/BolidesGame.tsx';
+---
+
+<GamePage
+	title="Course de peinture | Jeux Ludiven Studio"
+	description="Course de peinture : quatre couleurs se disputent l'arène. Sors de ta zone, trace une boucle et repeins le terrain à ta couleur — mais ne laisse personne couper ta trace. Un mini-jeu d'adresse signé Ludiven Studio."
+	heading="Course de peinture"
+	tagline="Quatre bolides, quatre couleurs, une seule arène"
+	gameId="bolides"
+>
+	<BolidesGame client:only="react" gameId="bolides" />
+</GamePage>

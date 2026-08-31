@@ -346,10 +346,10 @@ export const games: GameTile[] = [
 	},
 	{
 		id: 'bolides',
-		title: 'Caisses à peinture',
+		title: 'Course de peinture',
 		pitch: 'Un « paper.io » au volant : quatre couleurs pour une arène. Sors de ta zone, trace une boucle et reviens la refermer pour repeindre le terrain. Coupe la trace des rivaux pour les éliminer — et garde la tienne à l\'abri. Prototype.',
 		icon: 'car',
-		href: '/jeux/caisses-a-peinture',
+		href: '/jeux/course-de-peinture',
 		status: 'play',
 		category: 'adresse',
 	},
