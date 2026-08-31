@@ -11,6 +11,7 @@
     "test": "vitest run",
     "lint": "eslint .",
     "og": "node scripts/generate-og.mjs",
+    "og:work": "node scripts/generate-work-og.mjs",
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
