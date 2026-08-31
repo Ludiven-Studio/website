@@ -51,7 +51,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		description:
 			'Application gratuite de réalité augmentée : visez les boules, tournez autour, et lisez la distance de chaque boule au cochonnet. Tout est calculé sur le téléphone, sans réseau ni compte. Android et iOS.',
 		tagline:
-			'Fin de mène, deux boules au ras du cochonnet, et personne autour du terrain n\'est d\'accord. Lancez un scan, tournez quelques secondes autour du jeu, et l\'application affiche la distance de chaque boule — posée en réalité augmentée sur le terrain.',
+			'Deux boules de chaque côté du cochonnet, à un mètre ou deux, et l\'œil ne tranche pas : de loin, on ne compare pas deux distances. Lancez un scan, tournez quelques secondes autour du jeu, et l\'application affiche la distance de chaque boule — posée en réalité augmentée sur le terrain.',
 		heroAlt: 'Trois boules et un cochonnet sur un terrain, avec les mesures affichées en réalité augmentée',
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=fr',
@@ -162,7 +162,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		description:
 			'A free augmented-reality app: point your phone at the boules, walk around them, and read how far each one is from the jack. Everything runs on the phone, with no signal and no account. Android and iOS.',
 		tagline:
-			'End of a round, two boules within a hair of the jack, and nobody around the pitch agrees. Start a scan, walk around the game for a few seconds, and the app shows how far each boule is — drawn in augmented reality right on the ground.',
+			'Two boules either side of the jack, a metre or two out, and your eye can\'t call it: at that range you cannot compare two distances. Start a scan, walk around the game for a few seconds, and the app shows how far each boule is — drawn in augmented reality right on the ground.',
 		heroAlt: 'Three boules and a jack on a pitch, with the measurements drawn in augmented reality',
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=en',
