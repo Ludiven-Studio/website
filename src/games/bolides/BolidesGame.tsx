@@ -143,7 +143,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const carsRef = useRef<HTMLUListElement>(null);
 	const stateRef = useRef<GameState>(createGame());
 	const rendererRef = useRef<Renderer | null>(null);
-	const keysRef = useRef({ left: false, right: false, up: false });
+	const keysRef = useRef({ left: false, right: false, up: false, down: false });
 	const keySteerRef = useRef(0); // ramped key steer, see frame()
 	const lastTapRef = useRef({ key: '', at: 0 }); // double-tap a side = flick the wheel over
 	const dragRef = useRef({ active: false, steer: 0, throttle: 0, ox: 0, oy: 0 });
@@ -261,8 +261,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		// not per rendered frame, so how far the wheel is over never depends on the frame rate.
 		const target = (k.right ? 1 : 0) - (k.left ? 1 : 0);
 		const rate = (STEP / 1000) * KEY_RAMP;
-		// No brake anywhere: -1 is the car's base speed, and the gas is the only way up from it.
-		const throttle = d.active ? d.throttle : (k.up ? 1 : -1);
+		// Hands off the keys is CRUISE, not the brake. It used to be `k.up ? 1 : -1`, and throttle -1
+		// is stepCar's hard brake (8.5) while every bot rolls at cruise (20.6) forever — measured
+		// with scripts/bolides-bal.mjs, a keyboard player won 0 of 350 races either way they played
+		// it. The engine's throttle axis is analogue; only the keyboard was collapsing it, onto the
+		// wrong end. Now: nothing = the bots' pace, up = 34, down = 8.5.
+		const throttle = d.active ? d.throttle : (k.up ? 1 : 0) - (k.down ? 1 : 0);
 		const net = onlineRef.current;
 		while (runningRef.current && accRef.current >= STEP) {
 			accRef.current -= STEP;
@@ -728,7 +732,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		return () => { delete w.__bolides; };
 	}, []);
 
-	/* Keyboard: steer (left/right) + gas (up). There is no brake key: the car always rolls. */
+	/* Keyboard: steer (left/right) + throttle (up gas, down brake, nothing = cruise). */
 	useEffect(() => {
 		const NAV = new Set([' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 		const set = (key: string, down: boolean): boolean => {
@@ -736,6 +740,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			if (key === 'ArrowLeft' || key === 'a' || key === 'q') return ((r.left = down), true);
 			if (key === 'ArrowRight' || key === 'd') return ((r.right = down), true);
 			if (key === 'ArrowUp' || key === 'w' || key === 'z') return ((r.up = down), true);
+			if (key === 'ArrowDown' || key === 's') return ((r.down = down), true);
 			return false;
 		};
 		const onDown = (e: KeyboardEvent) => {
@@ -759,8 +764,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
 	}, []);
 
-	/* Touch/mouse: a relative joystick where the finger lands — how FAR it is dragged is the
-	   speed, how far sideways is the steer. Positioned via refs so dragging never rerenders. */
+	/* Touch/mouse: a relative joystick where the finger lands — sideways is the steer, up/down is
+	   the throttle, and the pose point is cruise. Positioned via refs so dragging never rerenders. */
 	const JOY_R = 96; // px radius for full deflection — a long throw is what buys small corrections
 	const JOY_VIS = 0.5; // the ring is drawn at half that radius (see .bo-joy-base)
 	// Squared response: the first third of the throw barely turns, full lock still sits at the rim.
@@ -782,7 +787,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		(cx, cy) => {
 			if (!runningRef.current) return; // only while a run is live
 			const d = dragRef.current;
-			d.active = true; d.ox = cx; d.oy = cy; d.steer = 0; d.throttle = -1; // -1 is the floor, not a brake
+			d.active = true; d.ox = cx; d.oy = cy; d.steer = 0; d.throttle = 0; // 0 is cruise, the bots' pace
 			if (joyBaseRef.current) joyBaseRef.current.style.display = 'block';
 			if (joyKnobRef.current) joyKnobRef.current.style.display = 'block';
 			positionJoy(cx, cy, 0, 0);
@@ -792,15 +797,15 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			if (!d.active) return;
 			const dx = cx - d.ox, dy = cy - d.oy;
 			d.steer = expo(Math.max(-1, Math.min(1, dx / JOY_R)));
-			// Speed is the DISTANCE from where the finger landed, whatever the direction. On the
-			// old up/down axis, pulling sideways to steer cut the throttle, so every corner was
-			// paid for in speed. Now a full-lock throw is also full gas.
-			d.throttle = Math.min(1, Math.hypot(dx, dy) / JOY_R) * 2 - 1;
+			// Two axes, not a radius. As a radius, steering full lock forced full gas and the pose
+			// point was the brake floor; the reason that shape was tried — a sideways pull costing
+			// speed — is gone now that a centred stick means cruise instead of 8.5.
+			d.throttle = Math.max(-1, Math.min(1, -dy / JOY_R));
 			positionJoy(d.ox, d.oy, dx, dy);
 		},
 		() => {
 			const d = dragRef.current;
-			d.active = false; d.steer = 0; d.throttle = -1;
+			d.active = false; d.steer = 0; d.throttle = 0;
 			if (joyBaseRef.current) joyBaseRef.current.style.display = 'none';
 			if (joyKnobRef.current) joyKnobRef.current.style.display = 'none';
 		},
@@ -965,7 +970,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				)}
 
 				{phase === 'playing' && startHint && respawnIn === 0 && (
-					<div className="bo-startchip">Glisse&nbsp;: écart = vitesse, côté = braquer</div>
+					<div className="bo-startchip">Glisse&nbsp;: côté = braquer, haut/bas = vitesse</div>
 				)}
 
 				{webglError && <div className="bo-overlay"><div className="bo-card">3D indisponible (WebGL manquant).</div></div>}
@@ -1059,7 +1064,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							<button className="bo-play" onClick={play}>▶ Jouer</button>
 							{garageButton}
 							{status && <p className="bo-hint">{status}</p>}
-							<p className="bo-hint">Glisse&nbsp;: plus tu t'éloignes du doigt, plus tu vas vite (pas de frein) ; le côté braque. Doucement ça tourne court&nbsp;; tenir le virage sur la peinture (ou à fond sur le sol nu) fait drifter. Clavier&nbsp;: flèches ou ZQSD.</p>
+							<p className="bo-hint">Glisse&nbsp;: le côté braque, le haut/bas gère la vitesse ; doigt immobile = allure de croisière. Doucement ça tourne court&nbsp;; tenir le virage sur la peinture (ou à fond sur le sol nu) fait drifter. Clavier&nbsp;: flèches ou ZQSD.</p>
 						</div>
 					</div>
 				)}
@@ -1139,10 +1144,11 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="bo-help">
-				<strong>Glisse le doigt</strong> sur l'écran : la caisse n'a pas de frein, elle roule toujours.
-				C'est l'<strong>écart au point où tu as posé le doigt</strong> qui donne la vitesse, dans n'importe
-				quelle direction&nbsp;: doigt immobile = allure minimale, doigt loin = plein gaz. Le côté (gauche/droite)
-				braque. Braquer à fond coûte donc zéro vitesse (au clavier&nbsp;: flèches ou ZQSD, ↑ = gaz).
+				<strong>Glisse le doigt</strong> sur l'écran : la caisse ne s'arrête jamais, elle roule toujours.
+				Le <strong>côté</strong> (gauche/droite) braque, le <strong>haut/bas</strong> gère la vitesse&nbsp;:
+				doigt immobile = allure de croisière, celle des rivaux&nbsp;; vers le haut = plein gaz,
+				vers le bas = tu ralentis. Braquer à fond ne coûte donc rien
+				(au clavier&nbsp;: flèches ou ZQSD, ↑ = gaz, ↓ = ralentir, rien = croisière).
 				Plus tu roules lentement, plus tu tournes court&nbsp;: au ralenti la caisse pivote presque sur place,
 				à pleine vitesse elle ouvre grand le virage.
 				Ce qui fait <strong>drifter</strong>, c'est l'appui, pas le coup de volant&nbsp;: sur la
