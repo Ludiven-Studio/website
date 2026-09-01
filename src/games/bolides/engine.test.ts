@@ -241,6 +241,59 @@ describe('bolides engine', () => {
 	});
 });
 
+describe('bolides pedal driving', () => {
+	/** Hero alone on row 100 (neutral the whole way), nose east, rolling at cruise. `x0` has to
+	 *  leave room for the WHOLE run: touching the rail is what wallDrag clamps the speed with, and
+	 *  a reverse that ends on the wall reads as "the pedal never worked". */
+	function solo(pedal: boolean, x0: number) {
+		const s = createGame();
+		const me = s.cars[0];
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; }); // no rival blades
+		me.pedal = pedal;
+		me.x = x0; me.z = 0; me.heading = 0; me.speed = CFG.cruise;
+		me.px = me.x; me.pz = me.z;
+		return { s, me };
+	}
+
+	it('stops on a released pedal and backs up on a negative one', () => {
+		const { s, me } = solo(true, 0);
+		for (let i = 0; i < 120; i++) stepGame(s, 0, 0, 1 / 60);
+		expect(Math.abs(me.speed)).toBeLessThan(0.5); // hands off really is a standstill
+		for (let i = 0; i < 120; i++) stepGame(s, 0, -1, 1 / 60);
+		expect(me.speed).toBeLessThan(-1);
+		// Reverse is a correction tool: it must stay slower than the pace everyone else keeps.
+		expect(me.speed).toBeGreaterThanOrEqual(-CFG.maxSpeed * CFG.pedalReverse - 1e-6);
+	});
+
+	it('leaves cruise mode alone: 0 is the bots pace and the car never goes backwards', () => {
+		const { s, me } = solo(false, -40);
+		for (let i = 0; i < 120; i++) stepGame(s, 0, 0, 1 / 60);
+		expect(me.speed).toBeCloseTo(CFG.cruise, 1);
+		for (let i = 0; i < 120; i++) stepGame(s, 0, -1, 1 / 60);
+		expect(me.speed).toBeGreaterThanOrEqual(CFG.minSpeed - 1e-6);
+	});
+
+	it('hands the trail back cell by cell when reversing instead of snapping the loop', () => {
+		const { s, me } = solo(true, -30);
+		for (let i = 0; i < 60; i++) stepGame(s, 0, 1, 1 / 60);
+		// The pedal travels down through zero, so the line keeps growing until the car really backs
+		// up. Snapshot at that moment, or the deceleration's own cells look like a failed rewind.
+		for (let i = 0; i < 120 && me.speed >= 0; i++) stepGame(s, 0, -1, 1 / 60);
+		expect(me.speed).toBeLessThan(0);
+		const laid = me.trail.slice();
+		expect(laid.length).toBeGreaterThan(CFG.grace); // long enough that a self-cross would snap
+		s.events.length = 0;
+		for (let i = 0; i < 120; i++) stepGame(s, 0, -1, 1 / 60);
+		expect(me.alive).toBe(true);
+		expect(s.events.some((e) => e.type === 'snap')).toBe(false); // backing up never costs the loop
+		expect(me.trail.length).toBeGreaterThan(0);
+		expect(me.trail.length).toBeLessThan(laid.length);
+		expect(me.trail).toEqual(laid.slice(0, me.trail.length)); // a prefix: only the tail went back
+		for (const c of laid.slice(me.trail.length)) expect(s.trail[c]).toBe(0);
+		for (const c of me.trail) expect(s.trail[c]).toBe(me.id);
+	});
+});
+
 /* ---------- the roster: one bolide per seat ---------- */
 
 const MIXED = ['bunker', 'comet', 'hornet', 'drifter'];

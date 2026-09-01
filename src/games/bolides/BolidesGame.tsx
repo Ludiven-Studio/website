@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import {
 	createGame, resetGame, stepGame, stepGuest, applySim, setRemotePose, collectEvents, buildSim, readPose,
 	pct, NAMES, PALETTE, DIFFS, CFG, CAR_COUNT, type GameState, type NetEvent,
@@ -9,7 +9,6 @@ import { createRenderer, type Renderer } from './render3d';
 // must stay even if only one symbol is used.
 import { BOLIDES, DEFAULT_CAR, carById, ownedCars, selectedCar, selectCar, type Bolide } from './cars';
 import * as sfx from './sfx';
-import { usePointerDrag } from '../usePointerDrag';
 import { trackGame, trackEvent } from '../../lib/analytics';
 import { getDaily, saveDailyRun, loadDailyRun, dailyWeekdayLabel, playerName } from '../../lib/leaderboard';
 import { balance, buyCar, WALLET_EVENT } from '../../lib/wallet';
@@ -36,6 +35,39 @@ const STEP = 1000 / 60;
 const NET_MS = 50; // 20 packets/s — a pose is 6 numbers, a host tick a few dozen
 const AUTO_START = 10; // seconds the host waits once a second driver shows up
 const KEY_RAMP = 2.2; // steer units per second (~0.45 s to full lock) — a key is all-or-nothing
+
+/* Driving schemes. `cruise` is the measured-fair default: hands off, the car rolls at the bots'
+   pace. `pedal` opens the bottom of the range — hands off it stops, and the pedal reverses.
+   Pedal is offline-only: reversing gives trail cells back (engine rewindTrail) and the netcode
+   can only ever ADD cells, so a guest's line would drift from the host's. */
+const DRIVES = ['cruise', 'pedal'] as const;
+const STICKS = ['one', 'two'] as const;
+type Drive = (typeof DRIVES)[number];
+type Stick = (typeof STICKS)[number];
+const DRIVE_KEY = 'bolides-drive';
+const STICK_KEY = 'bolides-stick';
+// A key is all-or-nothing, so pedal mode ramps it: hold longer, go faster. Without this the mode
+// would only have three speeds and "plus ou moins vite" would be a lie.
+const PEDAL_RAMP = 1.1; // travel per second (~0.9 s stop to full, ~0.55 s to the bots' cruise)
+const PEDAL_RELEASE = 2.0; // hands off it comes back to zero faster than it went down
+/** Pedal mode's throttle: travel toward ±1 while a key is held, coast back to a stop when not. */
+const stepPedal = (v: number, gas: number, dt: number): number => {
+	if (gas) return Math.max(-1, Math.min(1, v + gas * dt * PEDAL_RAMP));
+	const back = dt * PEDAL_RELEASE;
+	return v > 0 ? Math.max(0, v - back) : Math.min(0, v + back);
+};
+const readPref = <T extends string>(key: string, allowed: readonly T[], fallback: T): T => {
+	try {
+		const v = localStorage.getItem(key) as T | null;
+		if (v && (allowed as readonly string[]).includes(v)) return v;
+	} catch { /* storage unavailable */ }
+	return fallback;
+};
+const writePref = (key: string, v: string): void => {
+	try { localStorage.setItem(key, v); } catch { /* storage unavailable */ }
+};
+type ThumbAxes = 'both' | 'steer' | 'gas';
+interface Thumb { id: number; ox: number; oy: number; axes: ThumbAxes }
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 const toTenths = (p: number) => Math.round(p * 10); // % -> stored tenths of a percent
 const fmtPct = (v: number) => formatScore(DAILY_LB.bolides.fmt, v);
@@ -129,6 +161,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [lobbyIn, setLobbyIn] = useState(-1); // auto-start countdown, -1 = no one else yet, nothing ticking
 	const [amHost, setAmHost] = useState(false);
 	const [car, setCar] = useState<string>(() => selectedCar());
+	const [drive, setDrive] = useState<Drive>(() => readPref(DRIVE_KEY, DRIVES, 'cruise'));
+	const [stick, setStick] = useState<Stick>(() => readPref(STICK_KEY, STICKS, 'one'));
 	const [garage, setGarage] = useState(false);
 	const [coins, setCoins] = useState(0);
 	const [bought, setBought] = useState<{ id: string; price: number } | null>(null); // one-shot buy feedback
@@ -139,6 +173,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const boardRef = useRef<HTMLDivElement>(null);
 	const joyBaseRef = useRef<HTMLDivElement>(null);
 	const joyKnobRef = useRef<HTMLDivElement>(null);
+	const joyBase2Ref = useRef<HTMLDivElement>(null); // two-thumb layout only: the right-hand pedal
+	const joyKnob2Ref = useRef<HTMLDivElement>(null);
 	const vigRef = useRef<HTMLDivElement>(null);
 	const carsRef = useRef<HTMLUListElement>(null);
 	const stateRef = useRef<GameState>(createGame());
@@ -146,7 +182,13 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const keysRef = useRef({ left: false, right: false, up: false, down: false });
 	const keySteerRef = useRef(0); // ramped key steer, see frame()
 	const lastTapRef = useRef({ key: '', at: 0 }); // double-tap a side = flick the wheel over
-	const dragRef = useRef({ active: false, steer: 0, throttle: 0, ox: 0, oy: 0 });
+	// Each axis says separately whether a thumb owns it: in the two-thumb layout one can be down
+	// while the other isn't, and the free one must fall back to the keys.
+	const dragRef = useRef({ steerOn: false, gasOn: false, steer: 0, throttle: 0 });
+	const thumbsRef = useRef<(Thumb | null)[]>([null, null]); // [0] = steer side, [1] = throttle side
+	const pedalRef = useRef(0); // pedal-mode throttle, ramped inside the fixed step
+	const driveRef = useRef<Drive>(drive); // read from the loop, which never reruns on state
+	const stickRef = useRef<Stick>(stick);
 	const rafRef = useRef(0);
 	const lastRef = useRef(0);
 	const accRef = useRef(0);
@@ -266,12 +308,21 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		// with scripts/bolides-bal.mjs, a keyboard player won 0 of 350 races either way they played
 		// it. The engine's throttle axis is analogue; only the keyboard was collapsing it, onto the
 		// wrong end. Now: nothing = the bots' pace, up = 34, down = 8.5.
-		const throttle = d.active ? d.throttle : (k.up ? 1 : 0) - (k.down ? 1 : 0);
+		const keyGas = (k.up ? 1 : 0) - (k.down ? 1 : 0);
+		// Pedal mode's throttle is state, ramped per physics step below; cruise mode's is direct.
+		const pedal = hero.pedal;
+		let throttle = pedal ? pedalRef.current : d.gasOn ? d.throttle : keyGas;
 		const net = onlineRef.current;
 		while (runningRef.current && accRef.current >= STEP) {
 			accRef.current -= STEP;
 			keySteerRef.current += Math.max(-rate, Math.min(rate, target - keySteerRef.current));
-			const steer = d.active ? d.steer : keySteerRef.current;
+			if (pedal) {
+				// A thumb on the stick writes straight into the pedal, so lifting it carries on from
+				// there instead of snapping the car back to a standstill.
+				pedalRef.current = d.gasOn ? d.throttle : stepPedal(pedalRef.current, keyGas, STEP / 1000);
+				throttle = pedalRef.current;
+			}
+			const steer = d.steerOn ? d.steer : keySteerRef.current;
 			// A guest only drives its own car; the host rules on the grid and sends the verdict.
 			if (net.active && !net.host) stepGuest(s, steer, throttle, STEP / 1000);
 			else stepGame(s, steer, throttle, STEP / 1000);
@@ -335,7 +386,14 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		bestPctRef.current = 0;
 		deathsRef.current = 0;
 		keySteerRef.current = 0;
+		pedalRef.current = 0;
 		netAccRef.current = 0;
+		// A thumb still counted as down from the last run would pin the throttle before the flag.
+		thumbsRef.current = [null, null];
+		dragRef.current = { steerOn: false, gasOn: false, steer: 0, throttle: 0 };
+		for (const r of [joyBaseRef, joyKnobRef, joyBase2Ref, joyKnob2Ref]) {
+			if (r.current) r.current.style.display = 'none';
+		}
 		setRespawnIn(0);
 		setFirstDeath(false);
 		setLeft(CFG.timeLimit);
@@ -357,7 +415,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		resetGame(s, seed, diff, ids);
 		s.hero = 1;
 		s.record = false;
-		for (const c of s.cars) { c.remote = false; c.isBot = c.id !== 1; }
+		for (const c of s.cars) { c.remote = false; c.isBot = c.id !== 1; c.pedal = false; }
+		s.cars[0].pedal = driveRef.current === 'pedal';
 		applyLabels(NAMES.slice());
 		seatCars(ids);
 		rendererRef.current?.reset();
@@ -442,6 +501,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		for (const c of s.cars) {
 			const taken = c.id - 1 < go.ids.length;
 			c.isBot = !taken;
+			c.pedal = false; // online is cruise-only: rewinding a trail can't be sent over the wire
 			// The host drives the bots; a guest owns nothing but its own car.
 			c.remote = host ? taken && c.id !== s.hero : c.id !== s.hero;
 		}
@@ -633,6 +693,22 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		rendererRef.current?.frame(s, 1, 0);
 	}, [mpPhase, rejoinLobby, seatCars]);
 
+	const pickDrive = useCallback((d: Drive) => {
+		driveRef.current = d;
+		setDrive(d);
+		writePref(DRIVE_KEY, d);
+		sfx.ui();
+		trackEvent('bolides:drive', { drive: d });
+	}, []);
+
+	const pickStick = useCallback((v: Stick) => {
+		stickRef.current = v;
+		setStick(v);
+		writePref(STICK_KEY, v);
+		sfx.ui();
+		trackEvent('bolides:stick', { stick: v });
+	}, []);
+
 	const buy = useCallback((b: Bolide) => {
 		if (!buyCar(b.id, b.price)) return;
 		trackEvent('cocottes:buy_car', { car: b.id, price: b.price });
@@ -728,7 +804,14 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	/* Read-only snapshot for the Playwright smoke checks (harmless). */
 	useEffect(() => {
 		const w = window as unknown as { __bolides?: () => unknown };
-		w.__bolides = () => ({ car: carRef.current, seats: seatCarsRef.current, sound: sfx.stats() });
+		w.__bolides = () => {
+			const s = stateRef.current;
+			const hero = s.cars[s.hero - 1];
+			return {
+				car: carRef.current, seats: seatCarsRef.current, sound: sfx.stats(),
+				pedal: hero.pedal, speed: hero.speed, heading: hero.heading, trail: hero.trail.length,
+			};
+		};
 		return () => { delete w.__bolides; };
 	}, []);
 
@@ -764,16 +847,26 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
 	}, []);
 
-	/* Touch/mouse: a relative joystick where the finger lands — sideways is the steer, up/down is
-	   the throttle, and the pose point is cruise. Positioned via refs so dragging never rerenders. */
+	/* Touch/mouse: relative sticks that appear where the thumb lands. One-thumb = a single stick
+	   driving both axes (sideways steers, up/down is the throttle). Two-thumb = the board splits
+	   down the middle, left steers and right is the throttle, so full lock and full gas stop
+	   competing for one throw. usePointerDrag only tracks one pointer, so the slots are keyed by
+	   pointerId here — same document-level listeners, which is the part iOS actually accepts. */
 	const JOY_R = 96; // px radius for full deflection — a long throw is what buys small corrections
 	const JOY_VIS = 0.5; // the ring is drawn at half that radius (see .bo-joy-base)
 	// Squared response: the first third of the throw barely turns, full lock still sits at the rim.
 	const expo = (v: number) => v * Math.abs(v);
-	const positionJoy = (cx: number, cy: number, dx: number, dy: number) => {
+	const showJoy = (slot: number, on: boolean) => {
+		const base = slot ? joyBase2Ref.current : joyBaseRef.current;
+		const knob = slot ? joyKnob2Ref.current : joyKnobRef.current;
+		if (base) base.style.display = on ? 'block' : 'none';
+		if (knob) knob.style.display = on ? 'block' : 'none';
+	};
+	const positionJoy = (slot: number, cx: number, cy: number, dx: number, dy: number) => {
 		const rect = boardRef.current?.getBoundingClientRect();
 		if (!rect) return;
-		const base = joyBaseRef.current, knob = joyKnobRef.current;
+		const base = slot ? joyBase2Ref.current : joyBaseRef.current;
+		const knob = slot ? joyKnob2Ref.current : joyKnobRef.current;
 		if (base) { base.style.left = `${cx - rect.left}px`; base.style.top = `${cy - rect.top}px`; }
 		if (knob) {
 			// The ring is drawn smaller than the throw so it doesn't sit over half the arena;
@@ -783,33 +876,58 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			knob.style.top = `${cy - rect.top + cl(dy)}px`;
 		}
 	};
-	const drag = usePointerDrag(
-		(cx, cy) => {
-			if (!runningRef.current) return; // only while a run is live
+	const releaseThumb = (slot: number) => {
+		const t = thumbsRef.current[slot];
+		if (!t) return;
+		thumbsRef.current[slot] = null;
+		const d = dragRef.current;
+		// 0 means cruise here and a standstill in pedal mode; either way it is the neutral the
+		// engine expects, and pedal mode has already copied it into pedalRef.
+		if (t.axes !== 'gas') { d.steerOn = false; d.steer = 0; }
+		if (t.axes !== 'steer') { d.gasOn = false; d.throttle = 0; }
+		showJoy(slot, false);
+	};
+	const onBoardDown = (ev: ReactPointerEvent) => {
+		if (!runningRef.current) return; // only while a run is live
+		const rect = boardRef.current?.getBoundingClientRect();
+		const right = stickRef.current === 'two' && !!rect && ev.clientX - rect.left > rect.width / 2;
+		const slot = right ? 1 : 0;
+		const axes: ThumbAxes = stickRef.current === 'two' ? (right ? 'gas' : 'steer') : 'both';
+		if (thumbsRef.current[slot]) return; // that side already has a thumb on it
+		thumbsRef.current[slot] = { id: ev.pointerId, ox: ev.clientX, oy: ev.clientY, axes };
+		const d = dragRef.current;
+		if (axes !== 'gas') { d.steerOn = true; d.steer = 0; }
+		if (axes !== 'steer') { d.gasOn = true; d.throttle = 0; }
+		showJoy(slot, true);
+		positionJoy(slot, ev.clientX, ev.clientY, 0, 0);
+	};
+	useEffect(() => {
+		const find = (id: number) => thumbsRef.current.findIndex((t) => t?.id === id);
+		const onMove = (ev: PointerEvent) => {
+			const slot = find(ev.pointerId);
+			const t = thumbsRef.current[slot];
+			if (!t) return;
+			const dx = ev.clientX - t.ox, dy = ev.clientY - t.oy;
 			const d = dragRef.current;
-			d.active = true; d.ox = cx; d.oy = cy; d.steer = 0; d.throttle = 0; // 0 is cruise, the bots' pace
-			if (joyBaseRef.current) joyBaseRef.current.style.display = 'block';
-			if (joyKnobRef.current) joyKnobRef.current.style.display = 'block';
-			positionJoy(cx, cy, 0, 0);
-		},
-		(cx, cy) => {
-			const d = dragRef.current;
-			if (!d.active) return;
-			const dx = cx - d.ox, dy = cy - d.oy;
-			d.steer = expo(Math.max(-1, Math.min(1, dx / JOY_R)));
+			if (t.axes !== 'gas') d.steer = expo(Math.max(-1, Math.min(1, dx / JOY_R)));
 			// Two axes, not a radius. As a radius, steering full lock forced full gas and the pose
 			// point was the brake floor; the reason that shape was tried — a sideways pull costing
 			// speed — is gone now that a centred stick means cruise instead of 8.5.
-			d.throttle = Math.max(-1, Math.min(1, -dy / JOY_R));
-			positionJoy(d.ox, d.oy, dx, dy);
-		},
-		() => {
-			const d = dragRef.current;
-			d.active = false; d.steer = 0; d.throttle = 0;
-			if (joyBaseRef.current) joyBaseRef.current.style.display = 'none';
-			if (joyKnobRef.current) joyKnobRef.current.style.display = 'none';
-		},
-	);
+			if (t.axes !== 'steer') d.throttle = Math.max(-1, Math.min(1, -dy / JOY_R));
+			// A single-axis stick only shows its own travel, or the ring wanders off under the thumb.
+			positionJoy(slot, t.ox, t.oy, t.axes === 'gas' ? 0 : dx, t.axes === 'steer' ? 0 : dy);
+		};
+		const onUp = (ev: PointerEvent) => releaseThumb(find(ev.pointerId));
+		document.addEventListener('pointermove', onMove);
+		document.addEventListener('pointerup', onUp);
+		document.addEventListener('pointercancel', onUp);
+		return () => {
+			document.removeEventListener('pointermove', onMove);
+			document.removeEventListener('pointerup', onUp);
+			document.removeEventListener('pointercancel', onUp);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Same sort as net.ts ids(): index in this list is the seat, so the dot matches the car colour.
 	const selfId = matchRef.current?.selfId ?? '';
@@ -817,6 +935,32 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		...roster.map((p) => ({ id: p.id, name: peerNameOf(p.name), car: peerCarOf(p.name), me: false })),
 		{ id: selfId, name: 'Toi', car, me: true },
 	].sort((a, b) => (a.id < b.id ? -1 : 1));
+
+	// The touch row is hidden by a media query, not by matchMedia: an island that renders a
+	// different tree on the server than on the client hydrates into a mismatch.
+	const settings = (
+		<div className="bo-set">
+			<div className="bo-setrow">
+				<span>Conduite</span>
+				<span className="bo-seg">
+					<button className={drive === 'cruise' ? 'on' : ''} onClick={() => pickDrive('cruise')}>Croisière</button>
+					<button className={drive === 'pedal' ? 'on' : ''} onClick={() => pickDrive('pedal')}>Pédale</button>
+				</span>
+			</div>
+			<div className="bo-setrow bo-touchonly">
+				<span>Tactile</span>
+				<span className="bo-seg">
+					<button className={stick === 'one' ? 'on' : ''} onClick={() => pickStick('one')}>Un pouce</button>
+					<button className={stick === 'two' ? 'on' : ''} onClick={() => pickStick('two')}>Deux pouces</button>
+				</span>
+			</div>
+			<p className="bo-sethint">
+				{drive === 'pedal'
+					? 'Pédale : doigt levé, la caisse s’arrête. ↑ accélère tant que tu tiens, ↓ freine puis passe en marche arrière — et reculer efface ta trace. Hors ligne seulement.'
+					: 'Croisière : la caisse roule toujours à l’allure des rivaux. ↑ plein gaz, ↓ ralentit. Pas de marche arrière.'}
+			</p>
+		</div>
+	);
 
 	const mine = carById(car);
 	const garageButton = (
@@ -921,16 +1065,19 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="bo-boardwrap" ref={boardRef}>
-				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Course de peinture" onPointerDown={drag.onPointerDown} />
+				<canvas ref={canvasRef} className="bo-canvas" role="img" aria-label="Course de peinture" onPointerDown={onBoardDown} />
 
 				{/* Before the minimap and the standings in DOM order, so it never darkens them. */}
 				{phase === 'playing' && (
 					<div className="bo-vignette" ref={vigRef}><i className="bo-rushtint" /></div>
 				)}
 
-				{/* Relative drag joystick (shown at the finger while dragging). */}
+				{/* Relative drag sticks (shown at the thumb while dragging); the second one only
+				    ever appears in the two-thumb layout. */}
 				<div ref={joyBaseRef} className="bo-joy-base" />
 				<div ref={joyKnobRef} className="bo-joy-knob" />
+				<div ref={joyBase2Ref} className="bo-joy-base" />
+				<div ref={joyKnob2Ref} className="bo-joy-knob" />
 
 				<canvas
 					ref={miniRef}
@@ -970,7 +1117,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				)}
 
 				{phase === 'playing' && startHint && respawnIn === 0 && (
-					<div className="bo-startchip">Glisse&nbsp;: côté = braquer, haut/bas = vitesse</div>
+					<div className="bo-startchip">
+						{stick === 'two' ? 'Pouce gauche = braquer · pouce droit = vitesse' : 'Glisse : côté = braquer, haut/bas = vitesse'}
+						{drive === 'pedal' && mode !== 'online' && ' · à fond en bas = marche arrière'}
+					</div>
 				)}
 
 				{webglError && <div className="bo-overlay"><div className="bo-card">3D indisponible (WebGL manquant).</div></div>}
@@ -1063,8 +1213,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 							</p>
 							<button className="bo-play" onClick={play}>▶ Jouer</button>
 							{garageButton}
+							{settings}
 							{status && <p className="bo-hint">{status}</p>}
-							<p className="bo-hint">Glisse&nbsp;: le côté braque, le haut/bas gère la vitesse ; doigt immobile = allure de croisière. Doucement ça tourne court&nbsp;; tenir le virage sur la peinture (ou à fond sur le sol nu) fait drifter. Clavier&nbsp;: flèches ou ZQSD.</p>
+							<p className="bo-hint">Le côté braque, le haut/bas gère la vitesse. Doucement ça tourne court&nbsp;; tenir le virage sur la peinture (ou à fond sur le sol nu) fait drifter. Clavier&nbsp;: flèches ou ZQSD.</p>
 						</div>
 					</div>
 				)}
@@ -1324,6 +1475,16 @@ const CSS = `
 .bo-second { display: block; margin: 10px auto 0; border: 1.5px solid var(--bo-line); background: rgba(255,255,255,0.07); color: var(--bo-ink); font: inherit; font-weight: 600; font-size: 14px; border-radius: 999px; padding: 10px 22px; cursor: pointer; }
 .bo-second:hover { border-color: var(--bo-blue); color: #fff; }
 .bo-leave { display: block; margin: 12px auto 0; }
+
+/* --- driving settings --- */
+.bo-set { margin: 14px 0 0; border-top: 1px solid var(--bo-line); padding-top: 12px; }
+.bo-setrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: var(--bo-ink-dim); }
+.bo-touchonly { display: none; }
+@media (pointer: coarse) { .bo-touchonly { display: flex; } }
+.bo-seg { display: flex; border: 1.5px solid var(--bo-line); border-radius: 999px; overflow: hidden; }
+.bo-seg button { border: none; background: transparent; color: var(--bo-ink-dim); font: inherit; font-weight: 600; font-size: 12px; padding: 6px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.bo-seg button.on { background: var(--bo-blue); color: #06040F; }
+.bo-sethint { color: var(--bo-ink-dim); font-size: 11px; line-height: 1.5; margin: 0; text-align: left; }
 .bo-join { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
 .bo-join input {
   width: 108px; text-align: center; font: inherit; font-weight: 800; font-size: 18px; letter-spacing: 3px;
