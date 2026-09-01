@@ -241,6 +241,45 @@ describe('bolides engine', () => {
 	});
 });
 
+describe('bolides home squares', () => {
+	const homeCells = (s: GameState, id: number) => {
+		const out: number[] = [];
+		for (let i = 0; i < TOTAL; i++) if (s.home[i] === id) out.push(i);
+		return out;
+	};
+
+	it('never lets a rival capture swallow a start square', () => {
+		const s = createGame();
+		const foe = s.cars[1];
+		// A ring wide enough to enclose Rouge's whole corner AND the foe's own ground, so the foe is
+		// standing inside its territory the moment the loop closes. Driving it would take a lap of
+		// bot-dependent steering; a trail is just a list of cells, so hand it one.
+		const r0 = 20, r1 = 80, c0 = 20, c1 = 180;
+		const ring: number[] = [];
+		for (let c = c0; c <= c1; c++) { ring.push(r0 * GRID + c); ring.push(r1 * GRID + c); }
+		for (let r = r0 + 1; r < r1; r++) { ring.push(r * GRID + c0); ring.push(r * GRID + c1); }
+		for (const cell of ring) { s.trail[cell] = foe.id; foe.trail.push(cell); }
+		foe.outside = true;
+
+		const mine = homeCells(s, 1);
+		expect(mine.length).toBe((CFG.homeHalf * 2 + 1) ** 2);
+		const before = s.counts[2];
+		stepGame(s, 0, 0, 1 / 600); // short step: nobody leaves its cell, so only the capture happens
+		expect(s.counts[2]).toBeGreaterThan(before); // the capture really ran
+		for (const cell of mine) expect(s.owner[cell]).toBe(1);
+		expect(s.counts[1]).toBeGreaterThanOrEqual(mine.length);
+		// The point of the rule: there is always ground to come home to, so a loop can still close.
+		expect(s.owner[cellAt(s.cars[0].x, s.cars[0].z)]).toBe(1);
+		expect(s.counts).toEqual(recount(s));
+	});
+
+	it('rebuilds the mask on reset', () => {
+		const s = createGame();
+		resetGame(s);
+		for (let id = 1; id <= 4; id++) expect(homeCells(s, id).length).toBe((CFG.homeHalf * 2 + 1) ** 2);
+	});
+});
+
 describe('bolides pedal driving', () => {
 	/** Hero alone on row 100 (neutral the whole way), nose east, rolling at cruise. `x0` has to
 	 *  leave room for the WHOLE run: touching the rail is what wallDrag clamps the speed with, and

@@ -165,6 +165,7 @@ export type GameEvent =
 
 export interface GameState {
 	owner: Uint8Array; // cell -> owner id
+	home: Uint8Array; // cell -> car id whose start square this is (0 = none); never changes hands
 	trail: Uint8Array; // cell -> car id whose active trail sits here (0 = none)
 	cars: Car[];
 	counts: number[]; // owned cell count per id (index 0 = neutral)
@@ -201,6 +202,10 @@ export const cellCenterZ = (cell: number) => (Math.floor(cell / GRID) + 0.5) * C
 function setOwner(s: GameState, cell: number, id: number): void {
 	const old = s.owner[cell];
 	if (old === id) return;
+	// A start square never changes colour. Swallowed by a rival capture, its owner had nowhere left
+	// to come home to, so no loop could ever be closed again.
+	const h = s.home[cell];
+	if (h !== 0 && h !== id) return;
 	s.owner[cell] = id;
 	const col = cell % GRID;
 	const row = (cell / GRID) | 0;
@@ -236,7 +241,9 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 		if (r < 0 || r >= GRID) continue;
 		for (let c = cc - h; c <= cc + h; c++) {
 			if (c < 0 || c >= GRID) continue;
-			setOwner(s, r * GRID + c, car.id);
+			const cell = r * GRID + c;
+			s.home[cell] = car.id;
+			setOwner(s, cell, car.id);
 		}
 	}
 	car.x = cellCenterX(cr * GRID + cc);
@@ -269,6 +276,7 @@ const START_POS = [
 export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[]): GameState {
 	const s: GameState = {
 		owner: new Uint8Array(TOTAL),
+		home: new Uint8Array(TOTAL),
 		trail: new Uint8Array(TOTAL),
 		cars: [],
 		counts: new Array(CAR_COUNT + 1).fill(0),
@@ -319,6 +327,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
  *  `cars` re-seats the roster; omit it to keep the bolides already in place. */
 export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?: readonly CarPick[]): void {
 	s.owner.fill(0);
+	s.home.fill(0);
 	s.trail.fill(0);
 	s.counts.fill(0);
 	s.counts[0] = TOTAL;
