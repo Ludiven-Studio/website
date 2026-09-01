@@ -63,9 +63,6 @@ export const CFG = {
 	gripPaint: 0.38, // wet paint gives up around cruise — hold a corner there and it goes
 	gripBare: 0.76, // bare ground holds until the last quarter of the throttle
 	driftHold: 0.46, // seconds a break lasts once the load drops back under the limit
-	// Pedal mode only (car.pedal): share of maxSpeed available backwards. Reverse is a correction
-	// tool, not a way to travel — at 0.35 it barely beats the brake floor cruise mode sits on.
-	pedalReverse: 0.35,
 	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
 	wallDrag: 6.1, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
 	wallMargin: 3, // bots start turning back this far from the arena wall
@@ -142,9 +139,6 @@ export interface Car {
 	drifting: boolean;
 	scraping: boolean; // rubbing the arena rail (slowed down; renderer throws sparks)
 	outside: boolean; // currently laying a trail (out of own territory)
-	// Pedal driving: throttle 0 is a full stop and the throttle may go negative. Set on the hero
-	// only, from the player's setting — bots and ghosts always drive the cruise mapping.
-	pedal: boolean;
 	trail: number[]; // ordered cell indices of the active trail
 	respawnAt: number; // clock time (s) to respawn (bots)
 	bot: BotState;
@@ -251,7 +245,9 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.heading = Math.atan2(-car.z, -car.x); // face the arena centre
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
 	car.netX = car.x; car.netZ = car.z; car.netH = car.heading; // else a ghost is dragged back to where it died
-	car.speed = car.cfg.cruise;
+	// Everyone leaves from a standstill and accelerates rather than being dropped in at cruise.
+	// No extra bot code needed: throttle 0 targets cruise, so they ease back up on their own.
+	car.speed = 0;
 	car.turnRate = 0;
 	car.vh = car.heading;
 	car.driftT = 0;
@@ -265,11 +261,14 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.bot.aggroTimer = 0;
 }
 
-const START_POS = [
-	[-HALF * 0.5, -HALF * 0.5],
-	[HALF * 0.5, -HALF * 0.5],
-	[-HALF * 0.5, HALF * 0.5],
-	[HALF * 0.5, HALF * 0.5],
+// ±40, not ±25: nearer the corners so bots close their loop before the clock.
+// Measured 2026-09-01 (bolides-corner.mjs): races decided-by-time 51 % → 24 %,
+// end 156 s → 133 s. ±45 breaks it — cars jam the ±50 wall and loops distort.
+export const START_POS = [
+	[-HALF * 0.8, -HALF * 0.8],
+	[HALF * 0.8, -HALF * 0.8],
+	[-HALF * 0.8, HALF * 0.8],
+	[HALF * 0.8, HALF * 0.8],
 ];
 
 /** `cars` holds one roster id (or ready-made table) per seat; omit it for an all-base grid. */
@@ -312,7 +311,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 			alive: true,
 			x: 0, z: 0, heading: 0, speed: cfg.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
 			vh: 0, driftT: 0,
-			drifting: false, scraping: false, outside: false, pedal: false, trail: [], respawnAt: 0,
+			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
 			remote: false, netX: 0, netZ: 0, netH: 0,
 		};
@@ -357,13 +356,11 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?:
 function stepCar(car: Car, steer: number, throttle: number, dt: number, painted: boolean): void {
 	const cfg = car.cfg;
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
-	// Two throttle mappings. Cruise: the car always rolls, 0 is cfg.cruise and the floor is
-	// minSpeed. Pedal: 0 really is a full stop and it goes negative (see cfg.pedalReverse).
-	const targetSpeed = car.pedal
-		? cfg.maxSpeed * throttle * (throttle < 0 ? cfg.pedalReverse : 1)
-		: throttle >= 0
-			? cfg.cruise + (cfg.maxSpeed - cfg.cruise) * throttle
-			: cfg.cruise + (cfg.cruise - cfg.minSpeed) * throttle;
+	// The car always rolls: 0 is cfg.cruise, the bots' pace, and the brake floor is minSpeed.
+	// Braking is the grip/steering tool — the radius law below tightens as speed drops.
+	const targetSpeed = throttle >= 0
+		? cfg.cruise + (cfg.maxSpeed - cfg.cruise) * throttle
+		: cfg.cruise + (cfg.cruise - cfg.minSpeed) * throttle;
 	car.speed += (targetSpeed - car.speed) * Math.min(1, dt * cfg.accelResp);
 
 	// Slow cars pivot, fast cars run wide: the gripped circle opens up with speed. The reference is
@@ -373,12 +370,10 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number, painted:
 	// tightens, the loops shrink and the car lands less. Measured (scripts/bolides-bal.mjs, SOLO=1):
 	// +20 % top speed alone cost 27 points of win rate, -15 % gained 31. Nothing moves for the free
 	// car, whose maxSpeed IS the reference.
-	// |speed|, because pedal mode can run it negative: signed, the bracket crosses zero and radius
-	// flips sign, which sends the car into an instant spin the moment it backs up.
+	// |speed| is defensive: the throttle floor is minSpeed, but a hard scrub step could still
+	// overshoot through zero, and a signed bracket flips the radius into an instant spin.
 	const spd = Math.abs(car.speed);
 	const radius = cfg.turnRadius * (cfg.slowRadius + (1 - cfg.slowRadius) * Math.min(1.5, spd / CFG.maxSpeed));
-	// maxTurn keeps the SIGN of speed: reversing with the wheel over swings the nose the other way,
-	// which is what a real car does and what makes backing into a line feel right.
 	const maxTurn = (car.speed / radius) * (car.drifting ? cfg.driftBoost : 1);
 	car.turnRate += (steer * maxTurn - car.turnRate) * Math.min(1, dt * cfg.steerResp);
 	car.heading += car.turnRate * dt;
@@ -484,8 +479,7 @@ function killCar(s: GameState, car: Car, byPlayer: boolean, killer: number): voi
 /** Close the loop: trail cells + everything they enclose become the car's territory. */
 function capture(s: GameState, car: Car): void {
 	const id = car.id;
-	// Reversing can hand the whole trail back before the car gets home (see rewindTrail), and a
-	// border flood over 40k cells to enclose nothing is not free.
+	// Cheap guard: a border flood over 40k cells to enclose nothing is not free.
 	if (car.trail.length === 0) { car.outside = false; return; }
 	const before = s.counts[id];
 	// 1. the trail itself becomes owned.
@@ -535,8 +529,6 @@ function respawn(s: GameState, car: Car): void {
 
 /* ---------- per-step grid logic (trail, kill, capture) ---------- */
 
-const REWIND_SCAN = 8; // cells of tail searched when reversing — a step never covers more than one
-
 /** Blindé rule: the last `shield` cells a car laid can't be cut. Scanning that fixed window
  *  beats trail.indexOf(), which is O(trail) on a line that runs into the thousands. */
 function shielded(victim: Car, cell: number): boolean {
@@ -545,23 +537,6 @@ function shielded(victim: Car, cell: number): boolean {
 	const from = Math.max(0, victim.trail.length - n);
 	for (let i = victim.trail.length - 1; i >= from; i--) if (victim.trail[i] === cell) return true;
 	return false;
-}
-
-/** Reversing un-draws the line: give back every tail cell the car has just backed out of.
- *  Bounded scan like shielded() — a step is well under a cell, so the match is in the last few.
- *  Without this, reverse would be unusable: backing past `grace` onto your own line clears the
- *  whole loop, so the pedal's bottom half would just be a "lose your work" button. */
-function rewindTrail(s: GameState, car: Car, cell: number): void {
-	const from = Math.max(0, car.trail.length - REWIND_SCAN);
-	for (let i = car.trail.length - 1; i >= from; i--) {
-		if (car.trail[i] !== cell) continue;
-		for (let j = car.trail.length - 1; j > i; j--) {
-			const c = car.trail[j];
-			if (s.trail[c] === car.id) { s.trail[c] = 0; s.trailDirty.push(c); }
-		}
-		car.trail.length = i + 1; // the cell under the car stays: it is still on the line
-		return;
-	}
 }
 
 function updateGrid(s: GameState, car: Car): void {
@@ -590,12 +565,6 @@ function updateGrid(s: GameState, car: Car): void {
 	if (inside) {
 		if (car.outside) capture(s, car); // returned home with a live trail -> capture
 		car.outside = false;
-		return;
-	}
-
-	// Going backwards neither lays nor cuts: it hands the tail back, cell by cell.
-	if (car.speed < 0) {
-		rewindTrail(s, car, cell);
 		return;
 	}
 

@@ -36,26 +36,9 @@ const NET_MS = 50; // 20 packets/s — a pose is 6 numbers, a host tick a few do
 const AUTO_START = 10; // seconds the host waits once a second driver shows up
 const KEY_RAMP = 2.2; // steer units per second (~0.45 s to full lock) — a key is all-or-nothing
 
-/* Driving schemes. `cruise` is the measured-fair default: hands off, the car rolls at the bots'
-   pace. `pedal` opens the bottom of the range — hands off it stops, and the pedal reverses.
-   Pedal is offline-only: reversing gives trail cells back (engine rewindTrail) and the netcode
-   can only ever ADD cells, so a guest's line would drift from the host's. */
-const DRIVES = ['cruise', 'pedal'] as const;
 const STICKS = ['one', 'two'] as const;
-type Drive = (typeof DRIVES)[number];
 type Stick = (typeof STICKS)[number];
-const DRIVE_KEY = 'bolides-drive';
 const STICK_KEY = 'bolides-stick';
-// A key is all-or-nothing, so pedal mode ramps it: hold longer, go faster. Without this the mode
-// would only have three speeds and "plus ou moins vite" would be a lie.
-const PEDAL_RAMP = 1.1; // travel per second (~0.9 s stop to full, ~0.55 s to the bots' cruise)
-const PEDAL_RELEASE = 2.0; // hands off it comes back to zero faster than it went down
-/** Pedal mode's throttle: travel toward ±1 while a key is held, coast back to a stop when not. */
-const stepPedal = (v: number, gas: number, dt: number): number => {
-	if (gas) return Math.max(-1, Math.min(1, v + gas * dt * PEDAL_RAMP));
-	const back = dt * PEDAL_RELEASE;
-	return v > 0 ? Math.max(0, v - back) : Math.min(0, v + back);
-};
 const readPref = <T extends string>(key: string, allowed: readonly T[], fallback: T): T => {
 	try {
 		const v = localStorage.getItem(key) as T | null;
@@ -161,7 +144,6 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [lobbyIn, setLobbyIn] = useState(-1); // auto-start countdown, -1 = no one else yet, nothing ticking
 	const [amHost, setAmHost] = useState(false);
 	const [car, setCar] = useState<string>(() => selectedCar());
-	const [drive, setDrive] = useState<Drive>(() => readPref(DRIVE_KEY, DRIVES, 'cruise'));
 	const [stick, setStick] = useState<Stick>(() => readPref(STICK_KEY, STICKS, 'one'));
 	const [garage, setGarage] = useState(false);
 	const [coins, setCoins] = useState(0);
@@ -173,7 +155,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const boardRef = useRef<HTMLDivElement>(null);
 	const joyBaseRef = useRef<HTMLDivElement>(null);
 	const joyKnobRef = useRef<HTMLDivElement>(null);
-	const joyBase2Ref = useRef<HTMLDivElement>(null); // two-thumb layout only: the right-hand pedal
+	const joyBase2Ref = useRef<HTMLDivElement>(null); // two-thumb layout only: the right-hand throttle
 	const joyKnob2Ref = useRef<HTMLDivElement>(null);
 	const vigRef = useRef<HTMLDivElement>(null);
 	const carsRef = useRef<HTMLUListElement>(null);
@@ -186,8 +168,6 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	// while the other isn't, and the free one must fall back to the keys.
 	const dragRef = useRef({ steerOn: false, gasOn: false, steer: 0, throttle: 0 });
 	const thumbsRef = useRef<(Thumb | null)[]>([null, null]); // [0] = steer side, [1] = throttle side
-	const pedalRef = useRef(0); // pedal-mode throttle, ramped inside the fixed step
-	const driveRef = useRef<Drive>(drive); // read from the loop, which never reruns on state
 	const stickRef = useRef<Stick>(stick);
 	const rafRef = useRef(0);
 	const lastRef = useRef(0);
@@ -309,19 +289,11 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		// it. The engine's throttle axis is analogue; only the keyboard was collapsing it, onto the
 		// wrong end. Now: nothing = the bots' pace, up = 34, down = 8.5.
 		const keyGas = (k.up ? 1 : 0) - (k.down ? 1 : 0);
-		// Pedal mode's throttle is state, ramped per physics step below; cruise mode's is direct.
-		const pedal = hero.pedal;
-		let throttle = pedal ? pedalRef.current : d.gasOn ? d.throttle : keyGas;
+		const throttle = d.gasOn ? d.throttle : keyGas;
 		const net = onlineRef.current;
 		while (runningRef.current && accRef.current >= STEP) {
 			accRef.current -= STEP;
 			keySteerRef.current += Math.max(-rate, Math.min(rate, target - keySteerRef.current));
-			if (pedal) {
-				// A thumb on the stick writes straight into the pedal, so lifting it carries on from
-				// there instead of snapping the car back to a standstill.
-				pedalRef.current = d.gasOn ? d.throttle : stepPedal(pedalRef.current, keyGas, STEP / 1000);
-				throttle = pedalRef.current;
-			}
 			const steer = d.steerOn ? d.steer : keySteerRef.current;
 			// A guest only drives its own car; the host rules on the grid and sends the verdict.
 			if (net.active && !net.host) stepGuest(s, steer, throttle, STEP / 1000);
@@ -386,7 +358,6 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		bestPctRef.current = 0;
 		deathsRef.current = 0;
 		keySteerRef.current = 0;
-		pedalRef.current = 0;
 		netAccRef.current = 0;
 		// A thumb still counted as down from the last run would pin the throttle before the flag.
 		thumbsRef.current = [null, null];
@@ -415,8 +386,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		resetGame(s, seed, diff, ids);
 		s.hero = 1;
 		s.record = false;
-		for (const c of s.cars) { c.remote = false; c.isBot = c.id !== 1; c.pedal = false; }
-		s.cars[0].pedal = driveRef.current === 'pedal';
+		for (const c of s.cars) { c.remote = false; c.isBot = c.id !== 1; }
 		applyLabels(NAMES.slice());
 		seatCars(ids);
 		rendererRef.current?.reset();
@@ -501,7 +471,6 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		for (const c of s.cars) {
 			const taken = c.id - 1 < go.ids.length;
 			c.isBot = !taken;
-			c.pedal = false; // online is cruise-only: rewinding a trail can't be sent over the wire
 			// The host drives the bots; a guest owns nothing but its own car.
 			c.remote = host ? taken && c.id !== s.hero : c.id !== s.hero;
 		}
@@ -693,14 +662,6 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		rendererRef.current?.frame(s, 1, 0);
 	}, [mpPhase, rejoinLobby, seatCars]);
 
-	const pickDrive = useCallback((d: Drive) => {
-		driveRef.current = d;
-		setDrive(d);
-		writePref(DRIVE_KEY, d);
-		sfx.ui();
-		trackEvent('bolides:drive', { drive: d });
-	}, []);
-
 	const pickStick = useCallback((v: Stick) => {
 		stickRef.current = v;
 		setStick(v);
@@ -809,7 +770,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			const hero = s.cars[s.hero - 1];
 			return {
 				car: carRef.current, seats: seatCarsRef.current, sound: sfx.stats(),
-				pedal: hero.pedal, speed: hero.speed, heading: hero.heading, trail: hero.trail.length,
+				speed: hero.speed, heading: hero.heading, trail: hero.trail.length,
 			};
 		};
 		return () => { delete w.__bolides; };
@@ -881,8 +842,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		if (!t) return;
 		thumbsRef.current[slot] = null;
 		const d = dragRef.current;
-		// 0 means cruise here and a standstill in pedal mode; either way it is the neutral the
-		// engine expects, and pedal mode has already copied it into pedalRef.
+		// 0 is the neutral the engine expects: the bots' cruise, not the brake.
 		if (t.axes !== 'gas') { d.steerOn = false; d.steer = 0; }
 		if (t.axes !== 'steer') { d.gasOn = false; d.throttle = 0; }
 		showJoy(slot, false);
@@ -940,13 +900,6 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	// different tree on the server than on the client hydrates into a mismatch.
 	const settings = (
 		<div className="bo-set">
-			<div className="bo-setrow">
-				<span>Conduite</span>
-				<span className="bo-seg">
-					<button className={drive === 'cruise' ? 'on' : ''} onClick={() => pickDrive('cruise')}>Croisière</button>
-					<button className={drive === 'pedal' ? 'on' : ''} onClick={() => pickDrive('pedal')}>Pédale</button>
-				</span>
-			</div>
 			<div className="bo-setrow bo-touchonly">
 				<span>Tactile</span>
 				<span className="bo-seg">
@@ -955,9 +908,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				</span>
 			</div>
 			<p className="bo-sethint">
-				{drive === 'pedal'
-					? 'Pédale : doigt levé, la caisse s’arrête. ↑ accélère tant que tu tiens, ↓ freine puis passe en marche arrière — et reculer efface ta trace. Hors ligne seulement.'
-					: 'Croisière : la caisse roule toujours à l’allure des rivaux. ↑ plein gaz, ↓ ralentit. Pas de marche arrière.'}
+				La caisse roule toute seule à l’allure des rivaux. ↑ plein gaz, ↓ freine — et ralentir
+				resserre le virage et rend de l’adhérence : freine avant d’attaquer une courbe.
 			</p>
 		</div>
 	);
@@ -1119,8 +1071,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				{phase === 'playing' && startHint && respawnIn === 0 && (
 					<div className="bo-startchip">
 						{stick === 'two' ? 'Pouce gauche = braquer · pouce droit = vitesse' : 'Glisse : côté = braquer, haut/bas = vitesse'}
-						{drive === 'pedal' && mode !== 'online' && ' · à fond en bas = marche arrière'}
-					</div>
+						</div>
 				)}
 
 				{webglError && <div className="bo-overlay"><div className="bo-card">3D indisponible (WebGL manquant).</div></div>}
@@ -1478,11 +1429,11 @@ const CSS = `
 
 /* --- driving settings --- */
 .bo-set { margin: 14px 0 0; border-top: 1px solid var(--bo-line); padding-top: 12px; }
-.bo-setrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: var(--bo-ink-dim); }
+.bo-setrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 12.5px; font-weight: 600; color: var(--bo-ink-dim); }
 .bo-touchonly { display: none; }
 @media (pointer: coarse) { .bo-touchonly { display: flex; } }
 .bo-seg { display: flex; border: 1.5px solid var(--bo-line); border-radius: 999px; overflow: hidden; }
-.bo-seg button { border: none; background: transparent; color: var(--bo-ink-dim); font: inherit; font-weight: 600; font-size: 12px; padding: 6px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.bo-seg button { border: none; background: transparent; color: var(--bo-ink-dim); font: inherit; font-weight: 600; font-size: 12px; padding: 6px 12px; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .bo-seg button.on { background: var(--bo-blue); color: #06040F; }
 .bo-sethint { color: var(--bo-ink-dim); font-size: 11px; line-height: 1.5; margin: 0; text-align: left; }
 .bo-join { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }

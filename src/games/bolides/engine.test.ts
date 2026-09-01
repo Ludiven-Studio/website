@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	createGame as newGame, stepGame, stepGuest, resetGame, collectEvents, buildSim, applySim,
 	setCarLookup, BASE_CAR, GRID, pct, cellAt, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, angleDiff,
+	START_POS,
 	type Car, type GameState, type NetEvent,
 } from './engine';
 import { BOLIDES, DEFAULT_CAR, carCfg } from './cars';
@@ -179,7 +180,7 @@ describe('bolides engine', () => {
 		}
 		expect(s.over).toBe(false); // dying is a setback, not the end of the run
 		expect(back - died).toBeCloseTo(CFG.respawnPlayer, 1);
-		expect(Math.hypot(me.x + HALF * 0.5, me.z + HALF * 0.5)).toBeLessThan(1); // back on START_POS[0]
+		expect(Math.hypot(me.x - START_POS[0][0], me.z - START_POS[0][1])).toBeLessThan(1); // back on START_POS[0]
 	});
 
 	it('ends the run as soon as a car passes the win threshold', () => {
@@ -235,6 +236,7 @@ describe('bolides engine', () => {
 		expect(up.cars[0].speed).toBeLessThanOrEqual(CFG.maxSpeed + 1e-6);
 
 		const down = createGame();
+		down.cars[0].speed = CFG.cruise; // everyone now leaves from a standstill: brake needs a rolling car
 		for (let i = 0; i < 60; i++) stepGame(down, 0, -1, 1 / 60); // full brake
 		expect(down.cars[0].speed).toBeLessThan(CFG.cruise - 1);
 		expect(down.cars[0].speed).toBeGreaterThanOrEqual(CFG.minSpeed - 1e-6);
@@ -254,7 +256,9 @@ describe('bolides home squares', () => {
 		// A ring wide enough to enclose Rouge's whole corner AND the foe's own ground, so the foe is
 		// standing inside its territory the moment the loop closes. Driving it would take a lap of
 		// bot-dependent steering; a trail is just a list of cells, so hand it one.
-		const r0 = 20, r1 = 80, c0 = 20, c1 = 180;
+		// Bounds track START_POS: the squares sit at ±40 (cells 20 and 180), so the ring has to
+		// clear them on the outside while still enclosing both corners.
+		const r0 = 5, r1 = 60, c0 = 5, c1 = 194;
 		const ring: number[] = [];
 		for (let c = c0; c <= c1; c++) { ring.push(r0 * GRID + c); ring.push(r1 * GRID + c); }
 		for (let r = r0 + 1; r < r1; r++) { ring.push(r * GRID + c0); ring.push(r * GRID + c1); }
@@ -280,56 +284,35 @@ describe('bolides home squares', () => {
 	});
 });
 
-describe('bolides pedal driving', () => {
-	/** Hero alone on row 100 (neutral the whole way), nose east, rolling at cruise. `x0` has to
-	 *  leave room for the WHOLE run: touching the rail is what wallDrag clamps the speed with, and
-	 *  a reverse that ends on the wall reads as "the pedal never worked". */
-	function solo(pedal: boolean, x0: number) {
+describe('bolides driving', () => {
+	/** Hero alone on row 100 (neutral the whole way), nose east, rolling at cruise. `x0` leaves
+	 *  room for the whole run: touching the rail is what wallDrag clamps the speed with. */
+	function solo(x0: number) {
 		const s = createGame();
 		const me = s.cars[0];
 		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; }); // no rival blades
-		me.pedal = pedal;
 		me.x = x0; me.z = 0; me.heading = 0; me.speed = CFG.cruise;
 		me.px = me.x; me.pz = me.z;
 		return { s, me };
 	}
 
-	it('stops on a released pedal and backs up on a negative one', () => {
-		const { s, me } = solo(true, 0);
-		for (let i = 0; i < 120; i++) stepGame(s, 0, 0, 1 / 60);
-		expect(Math.abs(me.speed)).toBeLessThan(0.5); // hands off really is a standstill
-		for (let i = 0; i < 120; i++) stepGame(s, 0, -1, 1 / 60);
-		expect(me.speed).toBeLessThan(-1);
-		// Reverse is a correction tool: it must stay slower than the pace everyone else keeps.
-		expect(me.speed).toBeGreaterThanOrEqual(-CFG.maxSpeed * CFG.pedalReverse - 1e-6);
-	});
-
-	it('leaves cruise mode alone: 0 is the bots pace and the car never goes backwards', () => {
-		const { s, me } = solo(false, -40);
+	it('holds the bots pace on 0 and never goes backwards on the brake', () => {
+		const { s, me } = solo(-40);
 		for (let i = 0; i < 120; i++) stepGame(s, 0, 0, 1 / 60);
 		expect(me.speed).toBeCloseTo(CFG.cruise, 1);
 		for (let i = 0; i < 120; i++) stepGame(s, 0, -1, 1 / 60);
 		expect(me.speed).toBeGreaterThanOrEqual(CFG.minSpeed - 1e-6);
 	});
 
-	it('hands the trail back cell by cell when reversing instead of snapping the loop', () => {
-		const { s, me } = solo(true, -30);
-		for (let i = 0; i < 60; i++) stepGame(s, 0, 1, 1 / 60);
-		// The pedal travels down through zero, so the line keeps growing until the car really backs
-		// up. Snapshot at that moment, or the deceleration's own cells look like a failed rewind.
-		for (let i = 0; i < 120 && me.speed >= 0; i++) stepGame(s, 0, -1, 1 / 60);
-		expect(me.speed).toBeLessThan(0);
-		const laid = me.trail.slice();
-		expect(laid.length).toBeGreaterThan(CFG.grace); // long enough that a self-cross would snap
-		s.events.length = 0;
-		for (let i = 0; i < 120; i++) stepGame(s, 0, -1, 1 / 60);
-		expect(me.alive).toBe(true);
-		expect(s.events.some((e) => e.type === 'snap')).toBe(false); // backing up never costs the loop
-		expect(me.trail.length).toBeGreaterThan(0);
-		expect(me.trail.length).toBeLessThan(laid.length);
-		expect(me.trail).toEqual(laid.slice(0, me.trail.length)); // a prefix: only the tail went back
-		for (const c of laid.slice(me.trail.length)) expect(s.trail[c]).toBe(0);
-		for (const c of me.trail) expect(s.trail[c]).toBe(me.id);
+	it('braking tightens the circle: the grip tool the mode is built on', () => {
+		// Same lock, two speeds. The claim in the settings copy is about the RADIUS, not the angular
+		// rate — a fast car swings its nose quicker (speed/radius) while tracing a much wider arc.
+		const radius = (throttle: number) => {
+			const { s, me } = solo(-40);
+			for (let i = 0; i < 180; i++) stepGame(s, 1, throttle, 1 / 60);
+			return Math.abs(me.speed / me.turnRate);
+		};
+		expect(radius(-1)).toBeLessThan(radius(1));
 	});
 });
 
@@ -340,7 +323,7 @@ const MIXED = ['bunker', 'comet', 'hornet', 'drifter'];
 /** A fixed input tape: the same steer/throttle every run, so only the sim can differ. */
 const TAPE = Array.from({ length: 1800 }, (_, i) => [i % 120 < 60 ? 1 : -1, i % 80 < 40 ? 1 : -1] as const);
 
-/** Row 100 is neutral ground: every home square sits in rows 41-59 or 141-159. */
+/** Row 100 is neutral ground: every home square sits in rows 11-29 or 171-189. */
 const rowCell = (row: number, col: number) => row * GRID + col;
 
 /** Lay `n` trail cells along a neutral row, exactly as updateGrid would. */
