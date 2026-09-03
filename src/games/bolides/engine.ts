@@ -539,8 +539,9 @@ function shielded(victim: Car, cell: number): boolean {
 	return false;
 }
 
-function updateGrid(s: GameState, car: Car): void {
-	const cell = cellAt(car.x, car.z);
+/** One cell of the path the car swept this step. Returns true when the rest of the sweep must be
+ *  dropped: the trail is already gone, so there is nothing left to lay behind us. */
+function visitCell(s: GameState, car: Car, cell: number): boolean {
 	const inside = s.owner[cell] === car.id;
 	const t = s.trail[cell];
 
@@ -558,14 +559,14 @@ function updateGrid(s: GameState, car: Car): void {
 			clearTrail(s, car);
 			mark(s);
 			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
-			return;
+			return true;
 		}
 	}
 
 	if (inside) {
 		if (car.outside) capture(s, car); // returned home with a live trail -> capture
 		car.outside = false;
-		return;
+		return false;
 	}
 
 	if (t === car.id) {
@@ -576,7 +577,7 @@ function updateGrid(s: GameState, car: Car): void {
 			clearTrail(s, car);
 			mark(s);
 			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
-			return;
+			return true;
 		}
 	}
 	if (s.trail[cell] === 0) {
@@ -586,6 +587,26 @@ function updateGrid(s: GameState, car: Car): void {
 		if (s.record) s.netAdd.push((car.id << 16) | cell);
 	}
 	car.outside = true;
+	return false;
+}
+
+/** The grid only sees whole cells, but one step at full throttle covers more than one. Walking the
+ *  segment sub-cell keeps consecutive trail cells touching, which the border flood in capture()
+ *  needs: it is 4-connected, so a single skipped cell is a hole it leaks through and the loop dies
+ *  with no feedback at all. Measured (scripts/bolides-gap.mjs): on a due-east straight at full
+ *  throttle 24 % of the links skipped a cell, against 0 % at cruise — which is why only the player
+ *  ever saw it. A diagonal link is fine: an 8-connected wall still blocks a 4-connected fill. */
+function updateGrid(s: GameState, car: Car): void {
+	const dx = car.x - car.px, dz = car.z - car.pz;
+	const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (CELL * 0.5)));
+	let last = -1;
+	for (let i = 1; i <= steps; i++) {
+		const t = i / steps;
+		const cell = cellAt(car.px + dx * t, car.pz + dz * t);
+		if (cell === last) continue;
+		last = cell;
+		if (visitCell(s, car, cell)) return;
+	}
 }
 
 /* ---------- bots ---------- */

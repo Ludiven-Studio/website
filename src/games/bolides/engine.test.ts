@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	createGame as newGame, stepGame, stepGuest, resetGame, collectEvents, buildSim, applySim,
-	setCarLookup, BASE_CAR, GRID, pct, cellAt, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, angleDiff,
+	setCarLookup, BASE_CAR, GRID, CELL, pct, cellAt, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, angleDiff,
 	START_POS,
 	type Car, type GameState, type NetEvent,
 } from './engine';
@@ -155,6 +155,26 @@ describe('bolides engine', () => {
 			expect(me.alive).toBe(true);
 		}
 		expect(snaps).toBeGreaterThan(0);
+	});
+
+	it('lays a trail with no gap in it, even flat out', () => {
+		// capture()'s border flood is 4-connected, so ONE skipped cell is a hole it leaks through and
+		// the loop dies with no feedback at all. A step at top speed covers more than a cell, so the
+		// grid has to walk the segment: 24 % of the links skipped a cell before it did.
+		const s = createGame();
+		const me = s.cars[0];
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; }); // no blade, no snap
+		me.x = -40; me.z = 0; me.heading = 0; me.vh = 0; // due east: the worst case, one axis eats it all
+		me.px = me.x; me.pz = me.z;
+		for (let i = 0; i < 400 && me.x < 45; i++) stepGame(s, 0, 1, 1 / 60);
+		expect(me.speed * (1 / 60)).toBeGreaterThan(CELL); // it really did cover >1 cell per step
+		expect(me.trail.length).toBeGreaterThan(100);
+		for (let i = 1; i < me.trail.length; i++) {
+			const a = me.trail[i - 1], b = me.trail[i];
+			const dr = Math.abs(((a / GRID) | 0) - ((b / GRID) | 0));
+			const dc = Math.abs((a % GRID) - (b % GRID));
+			expect(Math.max(dr, dc)).toBe(1); // touching, corner included: a diagonal wall still seals
+		}
 	});
 
 	it('respawns the player at the start point instead of ending the run', () => {
@@ -406,9 +426,11 @@ describe('bolides roster', () => {
 		let snaps = 0;
 		// Long arcs one way, shorter the other: the tape has to CROSS ITS OWN LINE or the snap
 		// assertion below is vacuous. A flat-out corner now runs wide (the radius opens with
-		// speed), so the old 60-frame alternation never closes a loop any more.
+		// speed), so the old 60-frame alternation never closes a loop any more. Retuned again to
+		// 300/220 once the trail became continuous: 400/300 drew a clean spiral that never met
+		// itself (measured over the tapes in scripts/_bosnap.mjs).
 		for (let i = 0; i < 3000 && !host.over; i++) {
-			stepGame(host, i % 400 < 300 ? 1 : -1, 1, 1 / 60);
+			stepGame(host, i % 300 < 220 ? 1 : -1, 1, 1 / 60);
 			snaps += host.events.filter((e) => e.type === 'snap').length;
 			collectEvents(host, pending);
 			host.events.length = 0;
