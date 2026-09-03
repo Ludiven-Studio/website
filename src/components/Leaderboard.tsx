@@ -357,4 +357,7 @@ const CSS = `
 .lb-rank { font-weight: 700; color: var(--gray-300); text-align: center; font-variant-numeric: tabular-nums; }
 .lb-pname { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-val { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-regular); }
+/* On the player's own row the accent value sat on the accent overlay — purple on purple, unreadable
+   in dark theme. Match the name's color so it keeps the contrast the rest of the row already has. */
+.lb-row.me .lb-val { color: var(--gray-0); }
 `;
