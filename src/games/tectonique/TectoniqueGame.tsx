@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { formatScore, fmtCentis, encodePacked } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
@@ -563,6 +564,7 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent): void => {
+			if (isTypingTarget(e.target)) return; // KEY_MOVES holds letters: leave them to the pseudo field
 			const hit = KEY_MOVES[e.key] ?? KEY_MOVES[e.key.toLowerCase()];
 			if (!hit) return;
 			e.preventDefault();

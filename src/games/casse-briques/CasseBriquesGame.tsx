@@ -12,6 +12,7 @@ import {
 	type BonusKind,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -474,6 +475,7 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // a/q/d and Space are typeable: leave them to the pseudo field
 			const dir = keyDir(e.key);
 			if (dir) {
 				e.preventDefault();

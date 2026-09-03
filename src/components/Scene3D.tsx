@@ -3,6 +3,7 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, AdaptiveDpr } from '@react-three/drei';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
+import { isTypingTarget } from '../lib/keyboard';
 import { heightAt, slopeAt, mulberry32 } from './terrainNoise';
 import GradientSky from './GradientSky';
 import PostFX from './PostFX';
@@ -243,7 +244,7 @@ function WalkControls({ seed }: { seed: number }) {
 	useEffect(() => {
 		camera.position.set(0, heightAt(0, 0, seed) + EYE, 12); look.yaw = 0; look.pitch = -0.08;
 		const el = gl.domElement;
-		const kd = (e: KeyboardEvent) => { keys[e.code] = true; if (e.code.startsWith('Arrow')) e.preventDefault(); };
+		const kd = (e: KeyboardEvent) => { if (isTypingTarget(e.target)) return; keys[e.code] = true; if (e.code.startsWith('Arrow')) e.preventDefault(); };
 		const ku = (e: KeyboardEvent) => { keys[e.code] = false; };
 		const pd = (e: PointerEvent) => { look.dragging = true; look.lx = e.clientX; look.ly = e.clientY; el.style.cursor = 'grabbing'; };
 		const pm = (e: PointerEvent) => { if (!look.dragging) return; look.yaw -= (e.clientX - look.lx) * 0.0026; look.pitch = Math.max(-1.2, Math.min(1.0, look.pitch - (e.clientY - look.ly) * 0.0026)); look.lx = e.clientX; look.ly = e.clientY; };

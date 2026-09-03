@@ -22,6 +22,7 @@ import {
 import { lugeLevels } from './levels';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { formatScore } from '../../lib/scoreFormat';
 import { getProgression, submitLevel, type GameProgress } from '../../lib/progression';
@@ -1476,6 +1477,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			return false;
 		};
 		const onKeyDown = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // a/q/d are letters: leave them to the pseudo field
 			if (setKey(e.key, true)) {
 				e.preventDefault();
 				if (statusRef.current === 'ready' && !levelMenuRef.current) start();

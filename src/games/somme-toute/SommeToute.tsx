@@ -3,6 +3,7 @@ import { fmtCentis } from '../../lib/scoreFormat';
 import { DIFFS, generatePuzzle, findHint, type Game } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import {
 	getDaily,
 	dailyWeekdayLabel,
@@ -389,6 +390,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 	/* Keyboard (desktop) */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // digits and Backspace belong to the pseudo field when it has focus
 			if (status === 'won' || revealed) return;
 			const d = parseInt(e.key, 10);
 			if (d >= 1 && d <= maxVal) placeValue(d);

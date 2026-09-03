@@ -11,6 +11,7 @@ import { footLevels } from './levels';
 import { playerName, setPlayerName, loadDailyRun, saveDailyRun, dailyWeekdayLabel } from '../../lib/leaderboard';
 import { fmtCentis } from '../../lib/scoreFormat';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { useLevels } from '../../lib/useLevels';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -599,6 +600,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		const k = keysRef.current;
 		const down = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // a/q/d/w/z and Space are typeable: leave them to the pseudo field
 			if (['ArrowLeft', 'ArrowRight', 'ArrowUp', ' '].includes(e.key)) e.preventDefault();
 			if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'q') { if (!k.left) registerTap('left'); k.left = true; } // rising edge only (skip auto-repeat)
 			else if (e.key === 'ArrowRight' || e.key === 'd') { if (!k.right) registerTap('right'); k.right = true; }

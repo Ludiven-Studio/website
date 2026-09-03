@@ -4,6 +4,7 @@ import {
 	type Hit,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
@@ -256,7 +257,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 			}
 		};
 		const onDown = (e: PointerEvent) => { e.preventDefault(); lock(); };
-		const onKey = (e: KeyboardEvent) => { if ((e.code === 'Space' || e.key === ' ') && !e.repeat) { e.preventDefault(); lock(); } };
+		const onKey = (e: KeyboardEvent) => { if (isTypingTarget(e.target)) return; if ((e.code === 'Space' || e.key === ' ') && !e.repeat) { e.preventDefault(); lock(); } };
 		cv.addEventListener('pointerdown', onDown);
 		window.addEventListener('keydown', onKey);
 		return () => {

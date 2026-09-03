@@ -5,6 +5,7 @@ import { mulberry32 } from '../prng';
 import { usePointerDrag } from '../usePointerDrag';
 import { playerName, setPlayerName, getDaily, loadDailyRun, saveDailyRun, dailyWeekdayLabel } from '../../lib/leaderboard';
 import { fmtCentis } from '../../lib/scoreFormat';
+import { isTypingTarget } from '../../lib/keyboard';
 import { useLevels } from '../../lib/useLevels';
 import { pongLevels, type PongLevelCfg } from './levels';
 import LevelSelect from '../../components/LevelSelect';
@@ -653,6 +654,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	/* ---------- input ---------- */
 	useEffect(() => {
 		const down = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // w/z/s and the power digits are typeable: leave them to the pseudo field
 			if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
 			if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'z') inputDirRef.current = -1;
 			else if (e.key === 'ArrowDown' || e.key === 's') inputDirRef.current = 1;

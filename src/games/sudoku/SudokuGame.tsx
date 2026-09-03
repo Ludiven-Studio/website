@@ -3,6 +3,7 @@ import { fmtCentis } from '../../lib/scoreFormat';
 import { SIZES, DIFFS, generateSudoku, findHint, type SudokuPuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import {
 	getDaily,
 	dailyWeekdayLabel,
@@ -403,6 +404,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	/* Keyboard (desktop). */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // digits and Backspace belong to the pseudo field when it has focus
 			if (status === 'won' || revealed) return;
 			const d = parseInt(e.key, 10);
 			if (d >= 1 && d <= size) placeValue(d);

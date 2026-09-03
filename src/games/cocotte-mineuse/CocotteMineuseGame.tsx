@@ -8,6 +8,7 @@ import { cocotteMineuseLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
 import { useHoldButton } from '../useHoldButton';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { useLevels } from '../../lib/useLevels';
 import Leaderboard from '../../components/Leaderboard';
@@ -575,6 +576,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		};
 		const TOOLS: Record<string, ToolId> = { '1': 'torche', '2': 'bombe', '3': 'pioche', '4': 'etai', '5': 'detecteur' };
 		const onKey = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // letters and tool digits are typeable: leave them to the pseudo field
 			if (e.key === 'Escape' && benchRef.current) { benchRef.current = false; setBench(false); return; }
 			const dir = KEYS[e.key];
 			if (dir) { e.preventDefault(); if (!e.repeat) pressDir(dir); return; } // our tick drives the repeat

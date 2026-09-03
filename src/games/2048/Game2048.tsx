@@ -15,6 +15,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -422,6 +423,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 			w: 'up', s: 'down', a: 'left', d: 'right', z: 'up', q: 'left',
 		};
 		const onKey = (e: KeyboardEvent): void => {
+			if (isTypingTarget(e.target)) return; // w/s/a/d/z/q are letters: leave them to the pseudo field
 			const dir = KEYS[e.key];
 			if (dir) {
 				e.preventDefault();

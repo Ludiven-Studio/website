@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -290,6 +291,7 @@ export default function SouffleGame() {
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent): void => {
+			if (isTypingTarget(e.target)) return; // KEY_DIRS holds z/w/d/s/q/a: leave those letters to the pseudo field
 			const dir = KEY_DIRS[e.key] ?? KEY_DIRS[e.key.toLowerCase()];
 			if (dir == null) return;
 			e.preventDefault();

@@ -13,6 +13,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { diffKeys } from '../../lib/difficulty';
 import {
 	getDaily,
@@ -510,6 +511,7 @@ export default function PavageGame({ gameId }: { gameId: string }) {
 			});
 		};
 		const onKey = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // r is a letter: leave it to the pseudo field
 			if (!rotate) return;
 			if (e.key === 'r' || e.key === 'R') {
 				e.preventDefault();

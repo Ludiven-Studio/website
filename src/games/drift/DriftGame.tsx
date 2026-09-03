@@ -21,6 +21,7 @@ import { mulberry32 } from '../prng';
 import { joinRace, multiplayerAvailable, MAX_PLAYERS, type Race, type Peer, type PosMsg, type LapMsg } from './net';
 import { playerName, setPlayerName, getDaily, dailyWeekdayLabel, saveDailyRun, loadDailyRun } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
@@ -1057,6 +1058,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			return false;
 		};
 		const onDown = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // a/q/d are letters: leave them to the pseudo field
 			const used = set(e.key, true);
 			// While racing, swallow arrows/space/pageup-down so they don't scroll the page.
 			if (used || (runningRef.current && NAV.has(e.key))) e.preventDefault();

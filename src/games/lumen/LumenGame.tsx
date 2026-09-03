@@ -19,6 +19,7 @@ import {
 } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { diffKeys } from '../../lib/difficulty';
 import {
 	getDaily,
@@ -777,6 +778,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 			});
 		};
 		const onKey = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // r is a letter: leave it to the pseudo field
 			if (e.key === 'r' || e.key === 'R') {
 				e.preventDefault();
 				setDrag((d) => (d ? { ...d, rot: rotCW(puzzle.tray[d.trayIndex].type, d.rot) } : d));

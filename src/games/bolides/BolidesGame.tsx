@@ -13,6 +13,7 @@ import { trackGame, trackEvent } from '../../lib/analytics';
 import { getDaily, saveDailyRun, loadDailyRun, dailyWeekdayLabel, playerName } from '../../lib/leaderboard';
 import { balance, buyCar, WALLET_EVENT } from '../../lib/wallet';
 import { formatScore } from '../../lib/scoreFormat';
+import { isTypingTarget } from '../../lib/keyboard';
 import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import ModeToggle from '../../components/ModeToggle';
@@ -788,6 +789,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			return false;
 		};
 		const onDown = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // z/q/s/d are letters: never steal them from the pseudo or lobby-code field
 			const used = set(e.key, true);
 			// A held key can only ramp, so it always grips. Double-tapping a side slams the
 			// steer over in one frame — that is the keyboard's flick, and it breaks traction.
@@ -802,6 +804,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			}
 			if (used || (runningRef.current && NAV.has(e.key))) e.preventDefault();
 		};
+		// keyup is deliberately unguarded: clearing a key is always safe, and skipping it would
+		// leave a key stuck down if the player tabs into a field mid-press.
 		const onUp = (e: KeyboardEvent) => { set(e.key, false); };
 		window.addEventListener('keydown', onDown, { passive: false });
 		window.addEventListener('keyup', onUp);

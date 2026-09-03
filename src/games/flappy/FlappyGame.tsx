@@ -10,6 +10,7 @@ import {
 	type FlappyState,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -497,6 +498,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		const isFlapKey = (k: string) => k === ' ' || k === 'ArrowUp' || k === 'w';
 		const onKeyDown = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // Space and w are typeable: leave them to the pseudo field
 			if (!isFlapKey(e.key)) return;
 			e.preventDefault();
 			if (e.repeat) return; // auto-repeat: holding already armed, don't re-flap

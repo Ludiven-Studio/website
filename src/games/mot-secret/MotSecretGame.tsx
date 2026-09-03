@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { pickSolutionAt, isValidGuess, evaluate, bestKnown, knownGood, DIFFS, MAX_TRIES, type GuessRow, type LetterState } from './engine';
 import { diffKeys } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyTierOrdinal, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -232,8 +233,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		const onDown = (e: KeyboardEvent): void => {
 			if (e.ctrlKey || e.metaKey || e.altKey) return;
-			const t = e.target as HTMLElement | null;
-			if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+			if (isTypingTarget(e.target)) return;
 			if (e.key === 'Enter') { onKey('#'); e.preventDefault(); return; }
 			if (e.key === 'Backspace') { onKey('<'); e.preventDefault(); return; }
 			const ch = e.key.normalize('NFD').replace(/\p{Diacritic}/gu, '').toUpperCase();

@@ -3,6 +3,7 @@ import { fmtCentis } from '../../lib/scoreFormat';
 import { DIFFS, generateSuguru, findHint, type SuguruPuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import {
 	getDaily,
 	dailyWeekdayLabel,
@@ -419,6 +420,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 	/* Keyboard. */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // digits and Backspace belong to the pseudo field when it has focus
 			if (status === 'won' || revealed || (daily && !started)) return;
 			const d = parseInt(e.key, 10);
 			if (d >= 1 && d <= maxDigit) placeValue(d);

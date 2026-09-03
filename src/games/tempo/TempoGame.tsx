@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -960,6 +961,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		document.addEventListener('fullscreenchange', onFs);
 		document.addEventListener('webkitfullscreenchange', onFs);
 		const onKeyDown = (e: KeyboardEvent): void => {
+			if (isTypingTarget(e.target)) return; // the lane keys are letters: leave them to the pseudo field
 			const lane = keysOf().indexOf(e.key.toLowerCase());
 			if (lane < 0 || !runningRef.current || autoRef.current) return;
 			e.preventDefault();

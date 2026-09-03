@@ -12,6 +12,7 @@ import {
 	type EsquiveState,
 } from './engine';
 import { trackGame } from '../../lib/analytics';
+import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
@@ -659,6 +660,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 			return false;
 		};
 		const onKeyDown = (e: KeyboardEvent) => {
+			if (isTypingTarget(e.target)) return; // a/q/d/w/z/s are letters: leave them to the pseudo field
 			const used = setKey(e.key, true);
 			if (used) {
 				e.preventDefault();
