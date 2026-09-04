@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	createGame as newGame, stepGame, stepGuest, resetGame, collectEvents, buildSim, applySim,
-	setCarLookup, BASE_CAR, GRID, CELL, pct, cellAt, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, ITEM, angleDiff,
+	setCarLookup, BASE_CAR, GRID, CELL, pct, cellAt, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, ITEM, KIND, angleDiff,
 	START_POS,
 	type Car, type GameState, type NetEvent,
 } from './engine';
@@ -547,7 +547,7 @@ describe('bolides pickups', () => {
 		expect(s.items).toHaveLength(ITEM.plan.length);
 		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; });
 		const me = s.cars[0];
-		s.items[0].shield = false; // a slot's kind is redrawn on every respawn; pin it to test grip
+		s.items[0].kind = KIND.grip; // a slot's kind is redrawn on every respawn; pin it to test grip
 		const { x, z } = s.items[0];
 		me.x = x; me.z = z; me.px = x; me.pz = z;
 		stepGame(s, 0, 0, 1 / 60);
@@ -615,6 +615,33 @@ describe('bolides pickups', () => {
 		expect(crossOwnLine(ITEM.shield)).toEqual({ len: 100, snapped: false });
 	});
 
+	/** Solo, one straight line at full throttle over ground owned by `owner`. No steering, so the
+	 *  only thing that can move the speed is the surface — and the arena is 100 wide, so 1.5 s from
+	 *  x = -40 never reaches the far rail, whose slide would cap the speed itself. */
+	const straightLine = (owner: number, zoneT: number) => {
+		const s = newGame(SEED);
+		s.owner.fill(owner);
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; });
+		const me = s.cars[0];
+		me.x = -40; me.z = 0; me.px = -40; me.pz = 0;
+		me.heading = 0; me.vh = 0; me.speed = CFG.cruise;
+		for (let i = 0; i < 90; i++) {
+			s.cars[owner - 1].zoneT = zoneT; // held on, so the whole run is under the same surface
+			stepGame(s, 0, 1, 1 / 60);
+		}
+		expect(Math.abs(me.x)).toBeLessThan(HALF - 1);
+		return me.speed;
+	};
+
+	it('turns your paint into tar for everyone but you', () => {
+		// Control first, same seed and same line: without the item, foe paint is as fast as any.
+		const clear = straightLine(2, 0);
+		expect(clear).toBeGreaterThan(CFG.cruise);
+		expect(straightLine(2, ITEM.zone)).toBeLessThan(CFG.cruise);
+		// Your own tar never sticks to you, or the item would cost more than it pays.
+		expect(straightLine(1, ITEM.zone)).toBeCloseTo(clear, 6);
+	});
+
 	it('stays out of the arena unless asked for — the daily and the online race never see one', () => {
 		// Free play only: the daily is a ranked score tuned over hundreds of races, and a guest
 		// runs stepGuest, which has no grid and so could never agree on who grabbed what.
@@ -627,7 +654,7 @@ describe('bolides pickups', () => {
 			s.events.length = 0;
 		}
 		expect(items).toBe(0);
-		expect(s.cars.every((c) => c.gripT === 0 && c.shieldT === 0)).toBe(true);
+		expect(s.cars.every((c) => c.gripT === 0 && c.shieldT === 0 && c.zoneT === 0)).toBe(true);
 	});
 });
 

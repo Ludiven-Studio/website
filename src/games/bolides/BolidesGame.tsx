@@ -135,6 +135,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [respawnIn, setRespawnIn] = useState(0); // seconds left before the player is back
 	const [gripIn, setGripIn] = useState(0); // seconds of grip bonus left (free play only)
 	const [shieldIn, setShieldIn] = useState(0); // seconds of shield left
+	const [zoneIn, setZoneIn] = useState(0); // seconds my paint stays tar for the others
 	const [firstDeath, setFirstDeath] = useState(false); // the "what happened" line, once per run
 	const [startHint, setStartHint] = useState(false); // touch control chip, first seconds of a race
 	const [left, setLeft] = useState<number>(CFG.timeLimit); // seconds left in the race
@@ -309,7 +310,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			else if (e.type === 'kill') { if (e.killer === s.hero) sfx.kill(); }
 			else if (e.type === 'death') { if (e.isPlayer) { deathsRef.current++; sfx.death(); setFirstDeath(deathsRef.current === 1); } }
 			else if (e.type === 'snap') { if (e.isPlayer) sfx.snap(); }
-			else if (e.type === 'item') { if (e.id === s.hero) sfx.item(e.shield); }
+			else if (e.type === 'item') { if (e.id === s.hero) sfx.item(e.kind); }
 			else if (e.type === 'win') { if (e.id === s.hero) sfx.win(); else sfx.lose(); }
 			else if (e.type === 'respawn') {
 				// A driver we just put back home keeps sending poses from the crash site for one RTT.
@@ -349,6 +350,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			setRespawnIn(hero.alive ? 0 : Math.max(1, Math.ceil(hero.respawnAt - s.clock)));
 			setGripIn(Math.ceil(hero.gripT));
 			setShieldIn(Math.ceil(hero.shieldT));
+			setZoneIn(Math.ceil(hero.zoneT));
 			setLeft(Math.max(0, Math.ceil(CFG.timeLimit - s.clock)));
 		}
 
@@ -780,8 +782,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			return {
 				car: carRef.current, seats: seatCarsRef.current, sound: sfx.stats(),
 				speed: hero.speed, heading: hero.heading, trail: hero.trail.length,
-				x: hero.x, z: hero.z, gripT: hero.gripT, shieldT: hero.shieldT, clock: s.clock,
-				items: s.items.filter((i) => s.clock >= i.at).map((i) => ({ x: i.x, z: i.z, shield: i.shield })),
+				x: hero.x, z: hero.z, gripT: hero.gripT, shieldT: hero.shieldT, zoneT: hero.zoneT, clock: s.clock,
+				items: s.items.filter((i) => s.clock >= i.at).map((i) => ({ x: i.x, z: i.z, kind: i.kind })),
 			};
 		};
 		return () => { delete w.__bolides; };
@@ -1082,9 +1084,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'playing' && respawnIn === 0 && (gripIn > 0 || shieldIn > 0) && (
+				{phase === 'playing' && respawnIn === 0 && (gripIn > 0 || shieldIn > 0 || zoneIn > 0) && (
 					<div className="bo-buffs">
 						{shieldIn > 0 && <span className="bo-grip bo-shield">🛡 Intouchable <b>{shieldIn}s</b></span>}
+						{zoneIn > 0 && <span className="bo-grip bo-tar">💧 Zone gluante <b>{zoneIn}s</b></span>}
 						{gripIn > 0 && <span className="bo-grip">⚡ Adhérence <b>{gripIn}s</b></span>}
 					</div>
 				)}
@@ -1292,9 +1295,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			{mode === 'libre' && (
 				<div className="bo-items">
 					<b>Les pastilles (partie libre)</b>
-					<p><span className="bo-dot bo-dot-grip" /> <b>Adhérence</b> — pendant {ITEM.grip}&nbsp;s la peinture accroche comme le sol nu&nbsp;: tu traces au cordeau là où ça glissait.</p>
-					<p><span className="bo-dot bo-dot-shield" /> <b>Intouchable</b> — pendant {ITEM.shield}&nbsp;s ta trace ne se coupe plus. Le rival qui essaie casse sa propre boucle.</p>
-					<p className="bo-items-note">Elles attendent en travers de chaque camp et au centre, et reviennent {ITEM.respawn}&nbsp;s après&nbsp;: celle de ta porte, tu la reprends à chaque boucle bouclée. Hors du défi du jour, qui reste la même course pour tout le monde.</p>
+					<p><span className="bo-dot bo-dot-grip" /> <b>⚡ Adhérence</b> — pendant {ITEM.grip}&nbsp;s la peinture accroche comme le sol nu&nbsp;: tu traces au cordeau là où ça glissait.</p>
+					<p><span className="bo-dot bo-dot-shield" /> <b>🛡 Intouchable</b> — pendant {ITEM.shield}&nbsp;s ta trace ne se coupe plus. Le rival qui essaie casse sa propre boucle.</p>
+					<p><span className="bo-dot bo-dot-tar" /> <b>💧 Zone gluante</b> — pendant {ITEM.zone}&nbsp;s ta peinture colle&nbsp;: les autres y roulent au ralenti, toi non. Ton terrain devient un piège.</p>
+					<p className="bo-items-note">Une devant chaque camp, deux au centre, dix au hasard dans l&apos;arène&nbsp;; elles reviennent {ITEM.respawn}&nbsp;s après avoir été prises. Le dessin sur la pastille dit laquelle c&apos;est. Hors du défi du jour, qui reste la même course pour tout le monde.</p>
 				</div>
 			)}
 		</div>
@@ -1395,6 +1399,7 @@ const CSS = `
   box-shadow: 0 0 14px rgba(143,246,255,0.35);
 }
 .bo-shield { color: #FFEAFA; border-color: rgba(255,155,232,0.6); box-shadow: 0 0 14px rgba(255,155,232,0.35); }
+.bo-tar { color: #F1E6FF; border-color: rgba(197,139,255,0.6); box-shadow: 0 0 14px rgba(197,139,255,0.35); }
 .bo-grip b { font-family: var(--font-brand); }
 @media (pointer: coarse) { .bo-startchip { display: block; } }
 .game-page.gf-full .bo-respawn, .game-page.gf-full .bo-startchip { bottom: max(10px, calc(env(safe-area-inset-bottom) + 6px)); }
@@ -1608,6 +1613,7 @@ const CSS = `
 .bo-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 1px; }
 .bo-dot-grip { background: #8FF6FF; box-shadow: 0 0 8px rgba(143,246,255,0.8); }
 .bo-dot-shield { background: #FF9BE8; box-shadow: 0 0 8px rgba(255,155,232,0.8); }
+.bo-dot-tar { background: #C58BFF; box-shadow: 0 0 8px rgba(197,139,255,0.8); }
 
 /* --- narrow / short: the board is the game, the HUD is a garnish --- */
 @media (max-width: 700px), (max-height: 560px) {

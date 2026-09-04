@@ -54,10 +54,10 @@ const mixHex = (a: number, b: number, t: number) => {
 	const [ar, ag, ab] = rgb(a), [br, bg, bb] = rgb(b);
 	return (mix(ar, br, t) << 16) | (mix(ag, bg, t) << 8) | mix(ab, bb, t);
 };
-const ITEM_COL = 0x8FF6FF; // grip pickup: cyan-white, the one hue no car can claim
-// Shield pickup. Hue AND shape differ (pink, a ring instead of a diamond): at 30 units out a
-// pastille is a dozen pixels, and colour alone is not a cue you can rely on at that size.
-const SHIELD_COL = 0xFF9BE8;
+// One colour per pickup kind, in engine KIND order. Cyan, pink and violet are the three hues no
+// car can claim, so a pastille is never read as a patch of somebody's paint. The colour is the
+// second cue though, not the first: with three kinds on the floor the glyph carries the name.
+const ITEM_COL = [0x8FF6FF, 0xFF9BE8, 0xC58BFF];
 
 const TAU = Math.PI * 2;
 // Little-endian byte order (every shipping target), so a canvas pixel is one u32 store.
@@ -183,6 +183,15 @@ float fillM = smoothstep( -aa, aa, dC );
 float eW = max( edgeW, aa );
 float eM = ( 1.0 - smoothstep( eW - aa, eW + aa, abs( dC ) ) ) * min( 1.0, edgeW / eW );
 gl_FragColor.rgb = mix( mix( neutral, own * shade * ( 1.0 + mot ), fillM ), lin, eM * edgeK );
+
+// Tar: the owner of this ground is running the sticky-zone item, so every rival crossing it is
+// slowed. Crawling blobs OVER the paint and never a flat wash — the hue underneath is the score.
+float tarM = dot( sel, tarOn ) * fillM;
+if ( tarM > 0.002 ) {
+	float b = sin( gP.x * 0.31 + tarT ) + sin( gP.y * 0.37 - tarT * 0.8 ) + sin( ( gP.x - gP.y ) * 0.21 + tarT * 1.4 );
+	float blob = smoothstep( 0.1, 1.6, b ) * ( 1.0 - smoothstep( 0.30, 0.85, cpp ) );
+	gl_FragColor.rgb = mix( gl_FragColor.rgb, mix( vec3( 0.05, 0.04, 0.09 ), vec3( 0.56, 0.36, 0.88 ), blob ), tarM * ( 0.28 + 0.40 * blob ) );
+}
 `;
 
 // Paint is darkened ~73% toward the substrate so the hue is carried by emission, not by diffuse:
@@ -250,6 +259,46 @@ function makeGlowTexture(): THREE.CanvasTexture {
 	rad.addColorStop(1.00, 'rgba(255,255,255,0)');
 	ctx.fillStyle = rad;
 	ctx.fillRect(0, 0, 128, 128);
+	const t = new THREE.CanvasTexture(c);
+	t.colorSpace = THREE.SRGBColorSpace;
+	return t;
+}
+
+/** One badge per pickup kind: dark disc, coloured rim, white glyph. The glyph is what names the
+ *  item — from the chase cam a pastille is a dozen pixels wide, and three hues alone do not sort
+ *  into three rules. The glyphs match the HUD chips, so the chip that lights up says which one it
+ *  was. Drawn here rather than loaded: it stays crisp at any DPR and costs no request. */
+function makeItemTexture(kind: number): THREE.CanvasTexture {
+	const c = document.createElement('canvas');
+	c.width = c.height = 128;
+	const ctx = c.getContext('2d')!;
+	ctx.fillStyle = '#080B16';
+	ctx.beginPath(); ctx.arc(64, 64, 52, 0, TAU); ctx.fill();
+	ctx.strokeStyle = cssHex(ITEM_COL[kind]); ctx.lineWidth = 10;
+	ctx.beginPath(); ctx.arc(64, 64, 52, 0, TAU); ctx.stroke();
+	ctx.fillStyle = ctx.strokeStyle = '#F4FAFF';
+	ctx.lineJoin = ctx.lineCap = 'round';
+	if (kind === 1) {
+		ctx.lineWidth = 11;
+		ctx.beginPath();
+		ctx.moveTo(64, 26); ctx.lineTo(94, 40); ctx.lineTo(94, 68);
+		ctx.quadraticCurveTo(94, 92, 64, 104);
+		ctx.quadraticCurveTo(34, 92, 34, 68);
+		ctx.lineTo(34, 40); ctx.closePath();
+		ctx.stroke();
+	} else if (kind === 2) {
+		ctx.beginPath();
+		ctx.moveTo(64, 22);
+		ctx.bezierCurveTo(64, 22, 92, 58, 92, 74);
+		ctx.arc(64, 74, 28, 0, Math.PI);
+		ctx.bezierCurveTo(36, 58, 64, 22, 64, 22);
+		ctx.fill();
+	} else {
+		ctx.beginPath();
+		ctx.moveTo(78, 22); ctx.lineTo(44, 70); ctx.lineTo(62, 70); ctx.lineTo(50, 106);
+		ctx.lineTo(86, 56); ctx.lineTo(67, 56); ctx.closePath();
+		ctx.fill();
+	}
 	const t = new THREE.CanvasTexture(c);
 	t.colorSpace = THREE.SRGBColorSpace;
 	return t;
@@ -916,6 +965,10 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		covMap: { value: covTex }, edgeK: { value: 1 }, edgeW: { value: EDGE_W }, patK: { value: PAT_K },
 		fillCol: { value: fillCol }, lineCol: { value: lineCol },
 		gridMinor: { value: v3(GRID_MINOR) }, gridMajor: { value: v3(GRID_MAJOR) },
+		// One tar level per car, in the coverage channel order. Reading the owner out of the same
+		// field the floor is already drawn from means the effect follows the territory as it is won
+		// and lost, with nothing stamped on the cells.
+		tarOn: { value: new THREE.Vector4() }, tarT: { value: 0 },
 	};
 	terrMat.userData.edge = edgeU;
 	// "Mine" is a brightness property here too: the hero's own line is the washed-out variant, and
@@ -930,12 +983,13 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		sh.uniforms.grainMap = grainU.grainMap;
 		sh.uniforms.grainK = grainU.grainK;
 		sh.uniforms.grainRep = grainU.grainRep;
-		for (const k of ['covMap', 'edgeK', 'edgeW', 'patK', 'fillCol', 'lineCol', 'gridMinor', 'gridMajor'] as const) {
+		for (const k of ['covMap', 'edgeK', 'edgeW', 'patK', 'fillCol', 'lineCol', 'gridMinor', 'gridMajor', 'tarOn', 'tarT'] as const) {
 			sh.uniforms[k] = edgeU[k];
 		}
 		sh.fragmentShader = 'uniform sampler2D grainMap;\nuniform float grainK;\nuniform float grainRep;\n'
 			+ 'uniform sampler2D covMap;\nuniform float edgeK;\nuniform float edgeW;\nuniform float patK;\n'
 			+ 'uniform vec3 fillCol[5];\nuniform vec3 lineCol[5];\nuniform vec3 gridMinor;\nuniform vec3 gridMajor;\n'
+			+ 'uniform vec4 tarOn;\nuniform float tarT;\n'
 			+ sh.fragmentShader;
 		// Near-field darkening then a real fog mix: paint under the camera has to stay a glow on
 		// asphalt, and paint at the horizon has to sit back in the air.
@@ -1100,18 +1154,18 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	riskRing.visible = false;
 	scene.add(riskRing);
 
-	// Pickups. Cyan and pink are the two hues no car owns, so a pastille can never be misread as a
-	// patch of somebody's paint — which is the only thing else on that floor. Built even when the
-	// mode is off; the slots simply stay hidden.
-	const itemGeo = new THREE.OctahedronGeometry(0.6);
-	const shieldGeo = new THREE.TorusGeometry(0.55, 0.16, 8, 20);
+	// Pickups. A badge that always faces the camera, not a spinning solid: a glyph is the only cue
+	// that survives at a dozen pixels, and a glyph on a solid turns away half the time. Built even
+	// when the mode is off; the slots simply stay hidden.
+	const itemMats = [0, 1, 2].map((k) => new THREE.SpriteMaterial({
+		map: makeItemTexture(k), transparent: true, depthWrite: false, fog: false, toneMapped: false,
+	}));
 	const itemRingGeo = new THREE.RingGeometry(1.0, 1.3, 32);
 	const itemSlots = Array.from({ length: ITEM.plan.length }, () => {
 		const g = new THREE.Group();
-		const core = new THREE.Mesh(itemGeo, new THREE.MeshBasicMaterial({ color: ITEM_COL, fog: false, toneMapped: false }));
-		const shield = new THREE.Mesh(shieldGeo, new THREE.MeshBasicMaterial({ color: SHIELD_COL, fog: false, toneMapped: false }));
+		const badge = new THREE.Sprite(itemMats[0]);
 		const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-			map: glowTex, color: ITEM_COL, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false,
+			map: glowTex, color: ITEM_COL[0], transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false,
 		}));
 		halo.scale.set(3.6, 3.6, 1);
 		halo.position.y = 1;
@@ -1120,14 +1174,14 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		// Its OUTER edge is the grab reach, scaled per slot below — a doorway reaches 3.5 units and
 		// drawing it as a dot would teach a rule the engine does not follow.
 		const ring = new THREE.Mesh(itemRingGeo, new THREE.MeshBasicMaterial({
-			color: ITEM_COL, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false,
+			color: ITEM_COL[0], transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false,
 		}));
 		ring.rotation.x = -Math.PI / 2;
 		ring.position.y = 0.05;
-		g.add(core, shield, halo, ring);
+		g.add(badge, halo, ring);
 		g.visible = false;
 		scene.add(g);
-		return { g, core, shield, halo, ring };
+		return { g, badge, halo, ring };
 	});
 
 	// Rail contact flare, ON the rail. A billboard, not a quad in the wall plane: you always
@@ -1396,7 +1450,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		// Under the car dots: a pickup must never hide the rival about to cut your line.
 		for (const it of s.items) {
 			if (s.clock < it.at) continue;
-			miniCtx.fillStyle = cssHex(it.shield ? SHIELD_COL : ITEM_COL);
+			miniCtx.fillStyle = cssHex(ITEM_COL[it.kind] ?? ITEM_COL[0]);
 			const mx = ((it.x + HALF) / ARENA) * W, my = ((it.z + HALF) / ARENA) * H;
 			miniCtx.beginPath();
 			miniCtx.arc(mx, my, 2.2 * k, 0, TAU);
@@ -1591,7 +1645,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			} else if (e.type === 'item') {
 				// A small clean pop: it is a gain, so it must not borrow the kill's shards nor the
 				// capture's shockwave — the two beats the player already reads instantly.
-				const col = e.shield ? SHIELD_COL : ITEM_COL;
+				const col = ITEM_COL[e.kind] ?? ITEM_COL[0];
 				spawn(burst, e.x, e.z, col, 3.5, 4.5, 18, 0.55, 1.4, 0, 0, 1);
 				popRing(e.x, e.z, col, 1.4, 14);
 				if (e.id === s.hero) setShake(0.22, 0.10);
@@ -1717,26 +1771,31 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			if (wallFlare < 2) scrapeGlow.position.set((wallFlare === 0 ? 1 : -1) * (HALF - 0.05), 1.0, bz);
 			else scrapeGlow.position.set(bx, 1.0, (wallFlare === 2 ? 1 : -1) * (HALF - 0.05));
 		}
-		// Pickups: bob + spin so a static chip on a static floor still catches the eye, and pulse the
-		// ground ring in place of any spawn animation.
+		// Pickups: bob + breathe so a static chip on a static floor still catches the eye, and pulse
+		// the ground ring in place of any spawn animation.
 		for (let i = 0; i < itemSlots.length; i++) {
 			const it = s.items[i], o = itemSlots[i];
 			const live = !!it && s.clock >= it.at;
 			o.g.visible = live;
 			if (!live || !it) continue;
 			o.g.position.set(it.x, 0, it.z);
-			const col = it.shield ? SHIELD_COL : ITEM_COL;
-			o.core.visible = !it.shield;
-			o.shield.visible = it.shield;
-			const body = it.shield ? o.shield : o.core;
-			body.position.y = 1 + Math.sin(fxTime * 3 + i) * 0.22;
-			body.rotation.set(fxTime * 0.9, fxTime * 1.6, 0);
+			const col = ITEM_COL[it.kind] ?? ITEM_COL[0];
+			o.badge.material = itemMats[it.kind] ?? itemMats[0];
+			const beat = Math.sin(fxTime * 3 + i);
+			o.badge.position.y = 1 + beat * 0.22;
+			o.badge.scale.setScalar(1.7 + beat * 0.12);
 			(o.halo.material as THREE.SpriteMaterial).color.setHex(col);
 			o.ring.scale.setScalar((it.role >= 0 ? ITEM.doorR : ITEM.radius) / 1.3);
 			const rm = o.ring.material as THREE.MeshBasicMaterial;
 			rm.color.setHex(col);
 			rm.opacity = 0.35 + 0.25 * Math.sin(fxTime * 3 + i);
 		}
+		// Tarred ground, one level per car. Ramped over the last second so the paint drains back to
+		// normal instead of snapping — the rule stops being true gradually enough to feel it.
+		edgeU.tarT.value = fxTime * 0.6;
+		const tar = edgeU.tarOn.value;
+		tar.set(0, 0, 0, 0);
+		for (const car of s.cars) tar.setComponent(car.id - 1, Math.min(1, car.zoneT));
 
 		heroRing.visible = hero.alive;
 		riskRing.visible = hero.alive && risk > 0.02;
@@ -1749,7 +1808,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			// The ownership ring doubles as the bonus gauge: cyan for as long as the grip lasts, so
 			// the timer is under the car and not in a corner of the HUD nobody looks at while racing.
 			// Shield wins the ring when both run: it is the one that decides whether you survive.
-			const buff = hero.shieldT > 0 ? SHIELD_COL : hero.gripT > 0 ? ITEM_COL : 0;
+			const buff = hero.shieldT > 0 ? ITEM_COL[1] : hero.zoneT > 0 ? ITEM_COL[2] : hero.gripT > 0 ? ITEM_COL[0] : 0;
 			mat.color.setHex(buff ? mixHex(PALETTE[s.hero], buff, 0.75) : PALETTE[s.hero]);
 			mat.opacity = 0.55 + risk * (0.15 + 0.3 * beat);
 			heroRing.scale.setScalar(1 + risk * 0.12 * beat);

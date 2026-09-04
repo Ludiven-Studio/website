@@ -87,9 +87,9 @@ const FLAT_OUT = (CFG.maxSpeed * CFG.maxSpeed) / CFG.turnRadius;
    is the empty item list, so the ranked daily and the lockstep online race are untouched. */
 export const ITEM = {
 	// One slot per role, in order. 0..3 = the doorway of that seat's home, -1 = the arena hub,
-	// -2 = anywhere. Doorways beat uniform spawns because a loop ALWAYS comes home to close, so
-	// the bonus is picked up on the way back out — over the paint, where it is worth having.
-	plan: [0, 1, 2, 3, -1, -1],
+	// -2 = anywhere. A doorway is the one post you can COUNT on, because a loop always comes home
+	// to close; the loose ones are what make the arena worth looking at on the way there.
+	plan: [0, 1, 2, 3, -1, -1, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2],
 	radius: 1.6, // world units: how close the car has to pass to grab one
 	// Same, for a doorway slot — but wider, because a home edge is ~44 units round and a dot on it
 	// is a lottery: at 1.6 the doorways FED LESS than uniform spawns (8.5 grabs a race against
@@ -105,17 +105,26 @@ export const ITEM = {
 	// The share is not a difficulty knob, it is how loud the arena is: at 0 / 0.5 / 1 a race has
 	// 23.9 / 21.4 / 18.8 kills and 0 / 11.4 / 24.1 blades broken on a shield. Half keeps the blade
 	// the main way a loop dies, and adds a second one that costs the ATTACKER instead.
-	shieldShare: 0.5, // share of respawns that come back as a shield instead of grip
 	shield: 5, // seconds the shield holds
+	// The third kind: your paint turns to tar for everyone but you. It is the one item that pays
+	// for OWNING ground rather than for driving, so it is the defender's answer to the blade.
+	// Watch the sign: braking tightens the circle in this engine, so slowing a rival also lets it
+	// corner shorter. `tar` is a target-speed multiplier, `zone` how long the paint stays sticky.
+	tar: 0.55,
+	zone: 6,
+	weights: [1, 1, 1], // grip / shield / tar, drawn fresh on every respawn
 	door: 5.5, // distance from a home centre to its doorway ring — just outside the painted square
 	hub: 16, // hub slots stay inside this radius of the arena middle
 	margin: 8, // keep loose spawns this far from the rail — a pickup on the wall is a trap
 };
 
+/** The three pickups, in `ITEM.weights` order. */
+export const KIND = { grip: 0, shield: 1, tar: 2 } as const;
+
 /** A pickup slot. `at` is the clock time it goes live; before that the slot is dark. `role` is its
- *  entry in ITEM.plan and never changes, so a slot always comes back to its post. `shield` is
+ *  entry in ITEM.plan and never changes, so a slot always comes back to its post. `kind` is
  *  redrawn on every respawn, so the same post is not always the same bonus. */
-export interface Item { x: number; z: number; at: number; role: number; shield: boolean }
+export interface Item { x: number; z: number; at: number; role: number; kind: number }
 
 // Daily difficulty (diffIndex 0..2): harder = bolder, more aggressive bots = more danger.
 export const DIFFS = [
@@ -175,6 +184,7 @@ export interface Car {
 	driftT: number; // seconds of traction loss left
 	gripT: number; // seconds of pickup grip left: paint holds like bare ground while it runs
 	shieldT: number; // seconds of pickup shield left: the whole trail is uncuttable, by anyone
+	zoneT: number; // seconds this car's PAINT stays tar: rivals crossing it are slowed, not us
 	drifting: boolean;
 	scraping: boolean; // rubbing the arena rail (slowed down; renderer throws sparks)
 	outside: boolean; // currently laying a trail (out of own territory)
@@ -196,7 +206,7 @@ export type GameEvent =
 	// (self) or breaking your blade on a shielded rival (not self). `lost` is the trail it cost.
 	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean; self: boolean; lost: number }
 	| { type: 'respawn'; id: number; x: number; z: number }
-	| { type: 'item'; id: number; x: number; z: number; shield: boolean } // grabbed a pickup
+	| { type: 'item'; id: number; x: number; z: number; kind: number } // grabbed a pickup, see KIND
 	| { type: 'win'; id: number; byTime: boolean };
 
 export interface GameState {
@@ -296,6 +306,7 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.driftT = 0;
 	car.gripT = 0; // a bonus does not survive the wreck that ended the run it was helping
 	car.shieldT = 0;
+	car.zoneT = 0;
 	car.alive = true;
 	car.outside = false;
 	car.drifting = false;
@@ -320,7 +331,8 @@ export const START_POS = [
  *  home sides that face the arena: the two behind it look at the wall and nobody drives there. */
 function placeItem(s: GameState, it: Item, delay: number): void {
 	it.at = s.clock + delay;
-	it.shield = s.rng() < ITEM.shieldShare;
+	let roll = s.rng() * ITEM.weights.reduce((a, b) => a + b, 0);
+	it.kind = ITEM.weights.findIndex((w) => (roll -= w) < 0);
 	if (it.role >= 0) {
 		const [cx, cz] = START_POS[it.role % START_POS.length];
 		const along = (s.rng() * 2 - 1) * ITEM.door;
@@ -343,7 +355,7 @@ function seedItems(s: GameState, on: boolean): void {
 	s.items.length = 0;
 	if (!on) return;
 	for (const role of ITEM.plan) {
-		const it: Item = { x: 0, z: 0, at: 0, role, shield: false };
+		const it: Item = { x: 0, z: 0, at: 0, role, kind: KIND.grip };
 		placeItem(s, it, 0);
 		s.items.push(it);
 	}
@@ -360,10 +372,12 @@ function stepItems(s: GameState): void {
 			if (!car.alive) continue;
 			const dx = car.x - it.x, dz = car.z - it.z;
 			if (dx * dx + dz * dz > r * r) continue;
-			// Refreshes, never stacks. The two kinds do stack with each other: they answer different
-			// deaths, so holding both is the reward for a good lap, not a compounding buff.
-			if (it.shield) car.shieldT = ITEM.shield; else car.gripT = ITEM.grip;
-			s.events.push({ type: 'item', id: car.id, x: it.x, z: it.z, shield: it.shield });
+			// Refreshes, never stacks. The kinds do stack with each other: they answer different
+			// deaths, so holding two is the reward for a good lap, not a compounding buff.
+			if (it.kind === KIND.shield) car.shieldT = ITEM.shield;
+			else if (it.kind === KIND.tar) car.zoneT = ITEM.zone;
+			else car.gripT = ITEM.grip;
+			s.events.push({ type: 'item', id: car.id, x: it.x, z: it.z, kind: it.kind });
 			placeItem(s, it, ITEM.respawn);
 			break;
 		}
@@ -411,7 +425,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 			isBot: i !== 0,
 			alive: true,
 			x: 0, z: 0, heading: 0, speed: cfg.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
-			vh: 0, driftT: 0, gripT: 0, shieldT: 0,
+			vh: 0, driftT: 0, gripT: 0, shieldT: 0, zoneT: 0,
 			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
 			remote: false, netX: 0, netZ: 0, netH: 0,
@@ -455,15 +469,16 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?:
 /* ---------- physics ---------- */
 
 /** `steer` and `throttle` are both in [-1, 1]. throttle > 0 accelerates, < 0 brakes.
- *  `painted` is the surface under the car: wet paint gives up long before bare ground. */
-function stepCar(car: Car, steer: number, throttle: number, dt: number, painted: boolean): void {
+ *  `painted` is the surface under the car: wet paint gives up long before bare ground.
+ *  `drag` caps the target speed — 1 is normal, ITEM.tar is a rival's tarred paint. */
+function stepCar(car: Car, steer: number, throttle: number, dt: number, painted: boolean, drag = 1): void {
 	const cfg = car.cfg;
 	car.px = car.x; car.pz = car.z; car.ph = car.heading;
 	// The car always rolls: 0 is cfg.cruise, the bots' pace, and the brake floor is minSpeed.
 	// Braking is the grip/steering tool — the radius law below tightens as speed drops.
-	const targetSpeed = throttle >= 0
+	const targetSpeed = (throttle >= 0
 		? cfg.cruise + (cfg.maxSpeed - cfg.cruise) * throttle
-		: cfg.cruise + (cfg.cruise - cfg.minSpeed) * throttle;
+		: cfg.cruise + (cfg.cruise - cfg.minSpeed) * throttle) * drag;
 	car.speed += (targetSpeed - car.speed) * Math.min(1, dt * cfg.accelResp);
 
 	// Slow cars pivot, fast cars run wide: the gripped circle opens up with speed. The reference is
@@ -803,14 +818,20 @@ export function stepGame(
 		}
 		if (car.gripT > 0) car.gripT = Math.max(0, car.gripT - dt);
 		if (car.shieldT > 0) car.shieldT = Math.max(0, car.shieldT - dt);
+		if (car.zoneT > 0) car.zoneT = Math.max(0, car.zoneT - dt);
 		// The surface under the car sets how hard it is to break traction (see stepCar).
-		const painted = s.owner[cellAt(car.x, car.z)] !== 0;
+		const owner = s.owner[cellAt(car.x, car.z)];
+		const painted = owner !== 0;
+		// Tarred rival paint. Read off the OWNER of the ground, so the effect follows the territory
+		// as it is won and lost — nothing has to be stamped on the cells.
+		const host = owner !== 0 && owner !== car.id ? s.cars[owner - 1] : undefined;
+		const drag = host && host.zoneT > 0 ? ITEM.tar : 1;
 		if (car.remote) {
 			stepGhost(car, dt); // someone else's car: dead-reckon between packets
 		} else if (car.id === s.hero) {
-			stepCar(car, playerSteer, playerThrottle, dt, painted);
+			stepCar(car, playerSteer, playerThrottle, dt, painted, drag);
 		} else {
-			stepCar(car, drive(s, car, dt), gas(s, car, dt), dt, painted);
+			stepCar(car, drive(s, car, dt), gas(s, car, dt), dt, painted, drag);
 		}
 		slideWalls(car, dt);
 		updateGrid(s, car);

@@ -479,13 +479,20 @@ export function countdown(n: number): void {
 	tone(c, 'sine', 1320, 1320, 0.11, 0.42, 0.01);
 }
 
-/** Pickup grabbed: two rising blips, the arcade "got it" and nothing heavier — it fires every few
- *  seconds and must not compete with a capture. The shield answers a fifth lower and closes on a
- *  metal tap, so the ear tells the two kinds apart without looking at the pastille. */
-export function item(shield = false): void {
+/** Pickup grabbed, `kind` as in engine KIND: two rising blips, the arcade "got it" and nothing
+ *  heavier — it fires every few seconds and must not compete with a capture. Each kind gets its
+ *  own interval and tail, so the ear tells the three apart without looking at the pastille. */
+export function item(kind = 0): void {
 	const c = gate('item', 90);
 	if (!c) return;
-	if (shield) {
+	if (kind === 2) {
+		// Falling, not rising: this one arms the ground behind you, it does not lift the car.
+		tone(c, 'triangle', 587, 587, 0.16, 0.12);
+		tone(c, 'triangle', 392, 392, 0.16, 0.24, 0.07);
+		noiseHit(c, 'lowpass', 380, 3, 0.10, 0.26, 0.07);
+		return;
+	}
+	if (kind === 1) {
 		tone(c, 'triangle', 523, 523, 0.16, 0.12);
 		tone(c, 'triangle', 784, 784, 0.14, 0.20, 0.07);
 		noiseHit(c, 'bandpass', 2600, 6, 0.05, 0.10, 0.07);
