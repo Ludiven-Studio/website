@@ -390,7 +390,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	}, [startHint]);
 
 	/** Start a run for the given seed/diff and go live. Offline: car 1 is ours, the rest are bots.
-	 *  `items` is free play only: the daily is a ranked score and the online race is lockstep. */
+	 *  `items` is off online only: the slots respawn off the seeded rng, which every client shares,
+	 *  but a remote car is dead-reckoned between packets, so the grabs would land on different
+	 *  frames and the buffs would differ per screen. The daily is fine — it runs on one machine. */
 	const launch = useCallback((seed: number, diff: number, items = false) => {
 		const s = stateRef.current;
 		const ids = offlineCars(carRef.current, seed);
@@ -443,7 +445,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			dailyBestRef.current = 0;
 		}
 		setStatus('');
-		launch(seed, diff);
+		launch(seed, diff, true);
 		trackGame(gameId, 'game_started', { mode: 'daily', car: carRef.current });
 	}, [ensureRenderer, mode, launch, gameId, goImmersive]);
 
@@ -1295,13 +1297,13 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				{mode === 'online' && ` En ligne, jusqu'à ${MAX_PLAYERS} pilotes courent dans la même arène : partie rapide pour tomber sur n'importe qui, code ami pour jouer entre vous. Les places libres restent tenues par des bots.`}
 			</p>
 
-			{mode === 'libre' && (
+			{mode !== 'online' && (
 				<div className="bo-items">
-					<b>Les pastilles (partie libre)</b>
+					<b>Les pastilles</b>
 					<p><span className="bo-dot bo-dot-grip" /> <b>⚡ Adhérence</b> — pendant {ITEM.grip}&nbsp;s la peinture accroche comme le sol nu&nbsp;: tu traces au cordeau là où ça glissait.</p>
 					<p><span className="bo-dot bo-dot-shield" /> <b>🛡 Intouchable</b> — pendant {ITEM.shield}&nbsp;s ta trace ne se coupe plus. Le rival qui essaie y perd la sienne.</p>
 					<p><span className="bo-dot bo-dot-tar" /> <b>💧 Zone gluante</b> — pendant {ITEM.zone}&nbsp;s ta peinture colle&nbsp;: les autres y roulent au ralenti, toi non. Ton terrain devient un piège.</p>
-					<p className="bo-items-note">Une devant chaque camp, deux au centre, dix au hasard dans l&apos;arène&nbsp;; elles reviennent {ITEM.respawn}&nbsp;s après avoir été prises. Le dessin sur la pastille dit laquelle c&apos;est. Hors du défi du jour, qui reste la même course pour tout le monde.</p>
+					<p className="bo-items-note">Une devant chaque camp, deux au centre, dix au hasard dans l&apos;arène&nbsp;; elles reviennent {ITEM.respawn}&nbsp;s après avoir été prises. Le dessin sur la pastille dit laquelle c&apos;est. Dans le défi du jour aussi&nbsp;: elles sortent de la graine partagée, donc tout le monde a exactement la même course. Pas en ligne.</p>
 				</div>
 			)}
 		</div>

@@ -127,10 +127,15 @@ export const KIND = { grip: 0, shield: 1, tar: 2 } as const;
 export interface Item { x: number; z: number; at: number; role: number; kind: number }
 
 // Daily difficulty (diffIndex 0..2): harder = bolder, more aggressive bots = more danger.
+// `itemR` is how far a bot turns aside for a pickup. It does not scale with difficulty because no
+// setting made a bot stronger: swept 8 to 34, every one lost ground to the bot that ignores the
+// pastilles, 23.4 % of the arena down to 22.5 at r=8 and 20.5 by r=12. 8 is the price of the habit,
+// not a reward for it — it doubles what a bot collects for the smallest measured loss. The ramp
+// lives in aggro and outMax. Facile ignores them entirely.
 export const DIFFS = [
-	{ label: 'Facile', aggro: 0.18, outMax: 20 },
-	{ label: 'Moyen', aggro: 0.35, outMax: 28 },
-	{ label: 'Difficile', aggro: 0.55, outMax: 38 },
+	{ label: 'Facile', aggro: 0.18, outMax: 20, itemR: 0 },
+	{ label: 'Moyen', aggro: 0.35, outMax: 28, itemR: 8 },
+	{ label: 'Difficile', aggro: 0.55, outMax: 38, itemR: 8 },
 ] as const;
 
 /* ---------- per-car config ----------
@@ -755,6 +760,23 @@ function nearestEnemyTrail(s: GameState, car: Car): { x: number; z: number } | n
 	return best;
 }
 
+/** Nearest live pickup worth a detour: close enough, and roughly ahead. Forward-only matters — a
+ *  pastille behind the car is reached by turning back across our own trail, which now closes the
+ *  ring where it lies instead of losing it, so the bot would bank a worthless one. */
+function nearestItem(s: GameState, car: Car, range: number): Item | null {
+	let best: Item | null = null;
+	let bestD = range * range;
+	for (const it of s.items) {
+		if (s.clock < it.at) continue;
+		const dx = it.x - car.x, dz = it.z - car.z;
+		const d = dx * dx + dz * dz;
+		if (d >= bestD) continue;
+		if (Math.abs(angleDiff(Math.atan2(dz, dx), car.heading)) > 1.1) continue;
+		bestD = d; best = it;
+	}
+	return best;
+}
+
 function steerTo(car: Car, tx: number, tz: number): number {
 	const desired = Math.atan2(tz - car.z, tx - car.x);
 	return Math.max(-1, Math.min(1, angleDiff(desired, car.heading) / 0.5));
@@ -792,6 +814,10 @@ export function botSteer(s: GameState, car: Car, dt: number): number {
 			if (prey) return steerTo(car, prey.x, prey.z);
 		}
 	}
+	if (diff.itemR > 0) {
+		const loot = nearestItem(s, car, diff.itemR);
+		if (loot) return steerTo(car, loot.x, loot.z);
+	}
 	if (b.phase !== 'return') {
 		if (b.phase === 'in') {
 			b.phase = 'out';
@@ -802,6 +828,10 @@ export function botSteer(s: GameState, car: Car, dt: number): number {
 		if (b.budget <= 0) b.phase = 'return';
 		return b.turnDir * car.cfg.botArc; // gentle constant arc traces a loop
 	}
+	// Bots always drive the ring home, self-cut rule or not: closing it where they stand was swept
+	// from 16 to 32 units out and lost everywhere, 22.7 % of wins down to 0.7-5.3 %. A ring pays
+	// pi*r^2 for 2*pi*r, so stopping early is a shortcut, never a gain — and the bot pays it in
+	// exposure, 5.1 deaths a race up to 8.0.
 	return steerTo(car, home.x, home.z); // curve back to close the loop
 }
 
