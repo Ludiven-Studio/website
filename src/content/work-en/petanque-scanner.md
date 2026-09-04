@@ -2,11 +2,11 @@
 title: Pétanque Scanner - 2026
 publishDate: 2026-08-22 00:00:00
 img: /assets/petanque-ar/hero.avif
-img_alt: Pétanque Scanner — measure the point to the centimetre with your phone
+img_alt: Pétanque Scanner — measure the point with your phone, in augmented reality
 role: Developer
 org: Ludiven Studio
 description: |
-  Measuring a distance to the centimetre on a pétanque pitch with nothing but a phone — no depth sensor, no marker on the ground. A detector trained entirely on synthetic images, triangulation by accumulated rays, and the experiment log, failures included.
+  Measuring how far each boule sits from the jack with nothing but a phone — no depth sensor, no marker on the ground. A detector trained entirely on synthetic images, triangulation by accumulated rays, and three experiments written up, two of which failed.
 tags:
   - Unity
   - AR Foundation
@@ -36,7 +36,7 @@ gallery:
 
 <h2>The problem</h2>
 <p>
-  Measuring the gap between boules and the jack needs a 3D position, accurate to the centimetre, on
+  Measuring the gap between boules and the jack needs a 3D position down to the millimetre, on
   uneven ground. With nothing but a phone, none of the obvious routes hold up: a single image carries no
   scale, and depth APIs vary too much between devices to be trusted on fine gravel at a metre and a half.
   Placing a marker on the ground would fix the scale, but it would force an accessory on the player —
@@ -56,6 +56,12 @@ gallery:
   metric</strong>. Rays that cross cleanly mean a reliable position; scattered rays mean an unstable
   detection. That is the score shown live during the scan, and it is what stops the app from announcing a
   wrong number with confidence.
+</p>
+<p>
+  Worth stating plainly: <strong>the app displays the millimetre, it does not guarantee it</strong>. The
+  resolution of a number is not its accuracy: accuracy tops out at a few millimetres in good conditions,
+  and degrades as soon as the boules are poorly seen. That is exactly what the confidence score is for:
+  saying when the millimetre on screen means anything.
 </p>
 
 <h2>The data: fully synthetic</h2>

@@ -47,7 +47,7 @@ export const SCREENS = [
 
 export const copy: Record<'fr' | 'en', LandingCopy> = {
 	fr: {
-		title: 'Pétanque Scanner — mesurez le point au centimètre avec votre téléphone',
+		title: 'Pétanque Scanner — savoir qui a le point avec votre téléphone',
 		description:
 			'Application gratuite de réalité augmentée : visez les boules, tournez autour, et lisez la distance de chaque boule au cochonnet. Tout est calculé sur le téléphone, sans réseau ni compte. Android et iOS.',
 		tagline:
@@ -80,8 +80,8 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		featuresTitle: 'Ce que ça change',
 		features: [
 			{
-				title: 'Au centimètre',
-				body: 'Chaque boule est mesurée par rapport au cochonnet et le classement est affiché directement sur le terrain, pas dans un tableau.',
+				title: 'Sans se baisser',
+				body: 'Chaque boule est mesurée par rapport au cochonnet, et le classement s\'affiche directement sur le terrain, pas dans un tableau. Personne n\'a besoin de s\'accroupir pour trancher.',
 			},
 			{
 				title: 'Sans réseau',
@@ -112,7 +112,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 				body: 'Petit, et souvent masqué par une boule. C\'est lui qui met l\'application en échec le plus souvent — un mode « magnétise » permet de le recaler à la main.',
 			},
 			{
-				title: 'À quelques millimètres, sortez le réglet',
+				title: 'À quelques millimètres, sortez le mètre',
 				body: 'L\'application tranche les écarts visibles. Deux boules collées au cochonnet resteront une affaire de mesure manuelle.',
 			},
 		],
@@ -124,11 +124,11 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		faq: [
 			{
 				q: 'Est-ce que je peux l\'utiliser en compétition ?',
-				a: 'Non. En partie officielle, seule la mesure de l\'arbitre compte. L\'application est faite pour les parties amicales, quand personne n\'a de réglet sous la main.',
+				a: 'Non. En partie officielle, seule la mesure de l\'arbitre compte. L\'application est faite pour les parties amicales, quand personne n\'a de mètre sous la main.',
 			},
 			{
 				q: 'Quelle est la précision réelle ?',
-				a: 'De l\'ordre du centimètre quand les boules sont bien visibles. Un indice de confiance s\'affiche pendant le scan : s\'il reste bas, c\'est que la mesure ne doit pas être prise au sérieux.',
+				a: 'L\'affichage descend au millimètre, mais la justesse est autre chose : quelques millimètres au mieux, quand les boules sont bien visibles et que vous avez tourné autour du jeu. Un indice de confiance s\'affiche pendant le scan : s\'il reste bas, c\'est que la mesure ne doit pas être prise au sérieux.',
 			},
 			{
 				q: 'Est-ce que ça fonctionne sans connexion ?',
@@ -158,7 +158,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		closing: 'Disponible sur Android et iOS',
 	},
 	en: {
-		title: 'Pétanque Scanner — measure the point to the centimetre with your phone',
+		title: 'Pétanque Scanner — see who has the point with your phone',
 		description:
 			'A free augmented-reality app: point your phone at the boules, walk around them, and read how far each one is from the jack. Everything runs on the phone, with no signal and no account. Android and iOS.',
 		tagline:
@@ -191,8 +191,8 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		featuresTitle: 'What it gives you',
 		features: [
 			{
-				title: 'Down to the centimetre',
-				body: 'Every boule is measured against the jack and the ranking is drawn on the pitch itself, not buried in a table.',
+				title: 'Nobody crouches down',
+				body: 'Every boule is measured against the jack, and the ranking is drawn on the pitch itself, not buried in a table. No one has to kneel down to settle it.',
 			},
 			{
 				title: 'Works with no signal',
@@ -223,8 +223,8 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 				body: 'Small, and often hidden behind a boule. It is what trips the app up most often — a "magnet" mode lets you nudge it back into place by hand.',
 			},
 			{
-				title: 'Within a few millimetres, go get the measure',
-				body: 'The app settles gaps you can see. Two boules touching the jack stay a job for a proper measuring tool.',
+				title: 'Within a few millimetres, get the tape measure out',
+				body: 'The app settles gaps you can see. Two boules touching the jack stay a job for the tape measure.',
 			},
 		],
 		priceTitle: 'What it costs',
@@ -235,11 +235,11 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		faq: [
 			{
 				q: 'Can I use it in competition?',
-				a: 'No. In an official game, only the referee\'s measurement counts. The app is built for friendly games, when nobody has a measure to hand.',
+				a: 'No. In an official game, only the referee\'s measurement counts. The app is built for friendly games, when nobody has a tape measure to hand.',
 			},
 			{
 				q: 'How accurate is it really?',
-				a: 'Around a centimetre when the boules are clearly visible. A confidence score is shown during the scan: if it stays low, the measurement should not be trusted.',
+				a: 'The reading goes down to the millimetre, but accuracy is another matter: a few millimetres at best, when the boules are clearly visible and you have walked around the game. A confidence score is shown during the scan: if it stays low, the measurement should not be trusted.',
 			},
 			{
 				q: 'Does it work offline?',

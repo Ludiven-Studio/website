@@ -2,11 +2,11 @@
 title: Pétanque Scanner - 2026
 publishDate: 2026-08-22 00:00:00
 img: /assets/petanque-ar/hero.avif
-img_alt: Pétanque Scanner — mesurer le point au centimètre avec son téléphone
+img_alt: Pétanque Scanner — mesurer le point avec son téléphone, en réalité augmentée
 role: Développeur
 org: Ludiven Studio
 description: |
-  Mesurer une distance au centimètre sur un terrain de pétanque avec un simple téléphone, sans capteur de profondeur ni repère posé au sol. Détecteur de vision entraîné entièrement sur images de synthèse, triangulation par accumulation de rayons, et le journal des expériences — y compris celles qui ont échoué.
+  Mesurer l'écart des boules au cochonnet avec un simple téléphone, sans capteur de profondeur ni repère posé au sol. Détecteur de vision entraîné entièrement sur images de synthèse, triangulation par accumulation de rayons, et trois expériences détaillées dont deux ratées.
 tags:
   - Unity
   - AR Foundation
@@ -36,7 +36,7 @@ gallery:
 
 <h2>Le problème</h2>
 <p>
-  Mesurer l'écart entre deux boules et un cochonnet demande une position 3D, au centimètre, sur un sol
+  Mesurer l'écart entre deux boules et un cochonnet demande une position 3D au millimètre, sur un sol
   irrégulier. Avec un téléphone seul, aucune des voies évidentes ne tient&nbsp;: une image unique ne
   donne aucune échelle, et les API de profondeur varient trop d'un appareil à l'autre pour être fiables
   sur du gravier fin à un mètre cinquante. Poser un marqueur au sol réglerait l'échelle, mais imposerait
@@ -56,6 +56,13 @@ gallery:
   une mesure de confiance gratuite</strong>. Des rayons qui se croisent proprement signifient une position
   fiable&nbsp;; des rayons dispersés signalent une détection instable. C'est cet indice qui s'affiche en
   direct pendant le scan, et il évite d'annoncer un chiffre faux avec aplomb.
+</p>
+<p>
+  La distinction mérite d'être posée&nbsp;: <strong>l'application affiche le millimètre, mais ne le
+  garantit pas</strong>. La résolution du chiffre n'est pas sa justesse&nbsp;: celle-ci plafonne à
+  quelques millimètres dans les bonnes conditions, et se dégrade dès que les boules sont mal vues. C'est
+  précisément le rôle de l'indice de confiance&nbsp;: dire quand le millimètre affiché veut dire quelque
+  chose.
 </p>
 
 <h2>Les données&nbsp;: tout en synthèse</h2>
