@@ -133,9 +133,11 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0); // remounts the Leaderboard so a replay retries its submit
 	const [submitVal, setSubmitVal] = useState<number | undefined>(undefined);
 	const [respawnIn, setRespawnIn] = useState(0); // seconds left before the player is back
-	const [gripIn, setGripIn] = useState(0); // seconds of grip bonus left (free play only)
+	const [gripIn, setGripIn] = useState(0); // seconds of grip bonus left (not online)
 	const [shieldIn, setShieldIn] = useState(0); // seconds of shield left
 	const [zoneIn, setZoneIn] = useState(0); // seconds my paint stays tar for the others
+	const [boostIn, setBoostIn] = useState(0); // seconds of extra top speed left
+	const [wideIn, setWideIn] = useState(0); // seconds the trail is laid wide
 	const [firstDeath, setFirstDeath] = useState(false); // the "what happened" line, once per run
 	const [startHint, setStartHint] = useState(false); // touch control chip, first seconds of a race
 	const [left, setLeft] = useState<number>(CFG.timeLimit); // seconds left in the race
@@ -311,6 +313,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			else if (e.type === 'death') { if (e.isPlayer) { deathsRef.current++; sfx.death(); setFirstDeath(deathsRef.current === 1); } }
 			else if (e.type === 'snap') { if (e.isPlayer) sfx.snap(); }
 			else if (e.type === 'item') { if (e.id === s.hero) sfx.item(e.kind); }
+			else if (e.type === 'blast') { if (e.id === s.hero) sfx.splat(); }
 			else if (e.type === 'win') { if (e.id === s.hero) sfx.win(); else sfx.lose(); }
 			else if (e.type === 'respawn') {
 				// A driver we just put back home keeps sending poses from the crash site for one RTT.
@@ -351,6 +354,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			setGripIn(Math.ceil(hero.gripT));
 			setShieldIn(Math.ceil(hero.shieldT));
 			setZoneIn(Math.ceil(hero.zoneT));
+			setBoostIn(Math.ceil(hero.boostT));
+			setWideIn(Math.ceil(hero.wideT));
 			setLeft(Math.max(0, Math.ceil(CFG.timeLimit - s.clock)));
 		}
 
@@ -1086,11 +1091,13 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'playing' && respawnIn === 0 && (gripIn > 0 || shieldIn > 0 || zoneIn > 0) && (
+				{phase === 'playing' && respawnIn === 0 && (gripIn > 0 || shieldIn > 0 || zoneIn > 0 || boostIn > 0 || wideIn > 0) && (
 					<div className="bo-buffs">
 						{shieldIn > 0 && <span className="bo-grip bo-shield">🛡 Intouchable <b>{shieldIn}s</b></span>}
+						{boostIn > 0 && <span className="bo-grip bo-boost">⏩ Boost <b>{boostIn}s</b></span>}
 						{zoneIn > 0 && <span className="bo-grip bo-tar">💧 Zone gluante <b>{zoneIn}s</b></span>}
 						{gripIn > 0 && <span className="bo-grip">⚡ Adhérence <b>{gripIn}s</b></span>}
+						{wideIn > 0 && <span className="bo-grip bo-wide">↔ Trace large <b>{wideIn}s</b></span>}
 					</div>
 				)}
 
@@ -1303,7 +1310,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 					<p><span className="bo-dot bo-dot-grip" /> <b>⚡ Adhérence</b> — pendant {ITEM.grip}&nbsp;s la peinture accroche comme le sol nu&nbsp;: tu traces au cordeau là où ça glissait.</p>
 					<p><span className="bo-dot bo-dot-shield" /> <b>🛡 Intouchable</b> — pendant {ITEM.shield}&nbsp;s ta trace ne se coupe plus. Le rival qui essaie y perd la sienne.</p>
 					<p><span className="bo-dot bo-dot-tar" /> <b>💧 Zone gluante</b> — pendant {ITEM.zone}&nbsp;s ta peinture colle&nbsp;: les autres y roulent au ralenti, toi non. Ton terrain devient un piège.</p>
-					<p className="bo-items-note">Une devant chaque camp, deux au centre, dix au hasard dans l&apos;arène&nbsp;; elles reviennent {ITEM.respawn}&nbsp;s après avoir été prises. Le dessin sur la pastille dit laquelle c&apos;est. Dans le défi du jour aussi&nbsp;: elles sortent de la graine partagée, donc tout le monde a exactement la même course. Pas en ligne.</p>
+					<p><span className="bo-dot bo-dot-rocket" /> <b>💥 Roquettes</b> — {ITEM.blasts} obus partent en cloche et retombent en taches de ta couleur, en étoile autour de l&apos;endroit où tu arrives — jamais sur ta trajectoire. Peu de terrain, mais chaque tache est un camp avancé&nbsp;: touche-en une en traçant et ta boucle se referme là-bas.</p>
+					<p><span className="bo-dot bo-dot-boost" /> <b>⏩ Boost</b> — pendant {ITEM.boostT}&nbsp;s tu roules plus vite. Attention&nbsp;: plus vite veut aussi dire virages plus larges.</p>
+					<p><span className="bo-dot bo-dot-wide" /> <b>↔ Trace large</b> — pendant {ITEM.wide}&nbsp;s ta ligne est trois fois plus épaisse. Elle prend plus de sol et coupe plus loin, mais toi aussi tu la retrouves plus vite en travers.</p>
+					<p className="bo-items-note">Une devant chaque camp, deux au centre, dix au hasard dans l&apos;arène&nbsp;; elles reviennent {ITEM.respawn}&nbsp;s après avoir été prises. Le dessin sur la pastille dit laquelle c&apos;est, et tant qu&apos;un effet dure il s&apos;affiche au-dessus de la voiture. Dans le défi du jour aussi&nbsp;: elles sortent de la graine partagée, donc tout le monde a exactement la même course. Pas en ligne.</p>
 				</div>
 			)}
 		</div>
@@ -1395,7 +1405,9 @@ const CSS = `
 /* Top centre: the bottom belongs to the two thumbs, and the corners to the map and the board. */
 .bo-buffs {
   position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3;
-  display: flex; gap: 6px; pointer-events: none;
+  /* Five can run at once, which is wider than a phone: wrap rather than push chips off the edge. */
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+  max-width: 92vw; pointer-events: none;
 }
 .bo-grip {
   white-space: nowrap; color: #EAFEFF;
@@ -1405,6 +1417,8 @@ const CSS = `
 }
 .bo-shield { color: #FFEAFA; border-color: rgba(255,155,232,0.6); box-shadow: 0 0 14px rgba(255,155,232,0.35); }
 .bo-tar { color: #F1E6FF; border-color: rgba(197,139,255,0.6); box-shadow: 0 0 14px rgba(197,139,255,0.35); }
+.bo-boost { color: #FFFBE0; border-color: rgba(255,240,122,0.6); box-shadow: 0 0 14px rgba(255,240,122,0.35); }
+.bo-wide { color: #E9FFF3; border-color: rgba(156,255,200,0.6); box-shadow: 0 0 14px rgba(156,255,200,0.35); }
 .bo-grip b { font-family: var(--font-brand); }
 @media (pointer: coarse) { .bo-startchip { display: block; } }
 .game-page.gf-full .bo-respawn, .game-page.gf-full .bo-startchip { bottom: max(10px, calc(env(safe-area-inset-bottom) + 6px)); }
@@ -1619,6 +1633,9 @@ const CSS = `
 .bo-dot-grip { background: #8FF6FF; box-shadow: 0 0 8px rgba(143,246,255,0.8); }
 .bo-dot-shield { background: #FF9BE8; box-shadow: 0 0 8px rgba(255,155,232,0.8); }
 .bo-dot-tar { background: #C58BFF; box-shadow: 0 0 8px rgba(197,139,255,0.8); }
+.bo-dot-rocket { background: #FFB27A; box-shadow: 0 0 8px rgba(255,178,122,0.8); }
+.bo-dot-boost { background: #FFF07A; box-shadow: 0 0 8px rgba(255,240,122,0.8); }
+.bo-dot-wide { background: #9CFFC8; box-shadow: 0 0 8px rgba(156,255,200,0.8); }
 
 /* --- narrow / short: the board is the game, the HUD is a garnish --- */
 @media (max-width: 700px), (max-height: 560px) {

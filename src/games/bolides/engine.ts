@@ -80,11 +80,13 @@ export const CFG = {
  *  Both the turning circle and the traction ceiling are measured against it (see stepCar). */
 const FLAT_OUT = (CFG.maxSpeed * CFG.maxSpeed) / CFG.turnRadius;
 
-/* Grip pickups. The one bonus axis the physics already has a hole for: the surface under the car
-   picks gripPaint or gripBare, so "keep bare-ground grip on paint" is one term in stepCar and
-   nothing else moves. Speed bonuses are NOT the same thing — the turning radius opens with speed,
-   so a boost widens your corners and a slow spell tightens the victim's. Off by default: the flag
-   is the empty item list, so the ranked daily and the lockstep online race are untouched. */
+/* Pickups. Six kinds, and none of them is free: the turning radius opens with speed, so anything
+   that touches the throttle also widens your corners, and land rate is roughly cruise x turnRadius.
+   Every kind below carries the sweep that sized it (scripts/bolides-pow.mjs) — grade a change on the
+   leader's ARENA SHARE, which barely moves, not on win %, which is worth +-2.5 pt at 300 races.
+   Off by default: the flag is the empty item list, so the lockstep online race is untouched. A guest
+   runs stepGuest, which has no grid and dead-reckons the others, so no two clients could agree on
+   who grabbed what. Free play and the daily both ask for them — the daily off the shared seed. */
 export const ITEM = {
 	// One slot per role, in order. 0..3 = the doorway of that seat's home, -1 = the arena hub,
 	// -2 = anywhere. A doorway is the one post you can COUNT on, because a loop always comes home
@@ -112,19 +114,81 @@ export const ITEM = {
 	// corner shorter. `tar` is a target-speed multiplier, `zone` how long the paint stays sticky.
 	tar: 0.55,
 	zone: 6,
-	weights: [1, 1, 1], // grip / shield / tar, drawn fresh on every respawn
+	// The fourth kind: four shells lob out of the car and paint where they land. It is the only pickup
+	// that claims ground WITHOUT closing a loop, so it stays small on purpose — the point is not the
+	// cells, it is that every splat is somewhere `owner[cell] === you`, and landing on one closes a
+	// ring (see visitCell). A rocket is a forward camp, and only incidentally a few tiles. That is how
+	// it measures too (bolides-pow.mjs, 300 races an arena): captures 348 against 281 with no pickups
+	// at all, and every other pickup arena sits BELOW that baseline (245 to 297) — the rocket is the
+	// only one of the six that makes the race close more rings, not fewer. It pays for it in nothing:
+	// the leader takes 43.6 % against the shipped three's 43.8 %.
+	blasts: 4, // splats per pickup, spaced evenly right round the aim point
+	blastR: 2.4, // world radius of one splat
+	blastD: 7, // throw radius: every shell lands exactly this far from the aim point
+	// Share of the car's travel during the flight that the aim point is pushed forward by. 1 aims where
+	// the car WILL be — the physical answer, since a shell fired from a moving car keeps its speed, and
+	// the only one that lands the paint in front of the player. But it also drops paint on the car's own
+	// path, and touching your own cell closes your ring, so a lead can force a tiny involuntary loop.
+	// Swept (bolides-arc.mjs, 300 races at 0 / 0.5 / 1 / 1.4): captures 311/347/348/364 while the leader
+	// holds at 44.0/43.1/43.6/43.8, i.e. flat inside the +-2.5 pt noise. So the lead buys the rocket its
+	// forward camps back without handing anyone the race. Over-leading is where it turns: 1.4 buys its
+	// extra captures by shrinking them (297 cells each against 318), which is the forced-ring effect
+	// blastSpin exists to avoid. Full lead and no further.
+	blastLead: 1,
+	// Flight seconds; the paint lands when the shell does, never before. It also sets how far the throw
+	// reaches, since the aim point leads by speed x blastT. Shortening it to 0.36 to bring the impacts
+	// closer was tried and measured worse (bolides-onscreen.mjs): impacts in frame fell from 92 % to
+	// 83 % and the arc's on-screen height did not move, because a nearer splat lands under the car and
+	// drops off the BOTTOM edge. The lob needs the range to clear the car's own tail.
+	blastT: 0.62,
+	// Each shell also aims at where the car will be when IT lands, so the four are not a square on the
+	// ground: the later ones sit further up the road. That is the figure the player reads — a rosette
+	// smeared along the path, straddling it on both sides.
+	blastGap: 0.11, // stagger between the four, so they arrive as four beats and not one
+	// Bearing of the first shell, relative to the car's heading; the rest are spaced evenly right round
+	// from there. A quarter turn is what keeps the rosette OFF the car's own line: with the shells 90 deg
+	// apart, an offset of 0 would plant one dead ahead, on the exact spot the car is driving into, and
+	// a splat is a cell you own — touching your own cell closes your ring (see visitCell), so that shell
+	// would be a "bank my loop now" button that fires whether the player wanted it or not.
+	// The mechanism is real and it was measured (bolides-arc.mjs, 300 races at 0 / 22 / 45 deg): pointing
+	// a shell down the nose lifts captures to 367/377 against 348 and drops the cells each one banks to
+	// 296/287 against 318 — more rings, each of them smaller, which is what a forced ring looks like.
+	// It just never decides anything: the leader holds 43.0/42.4/43.6, flat inside the +-2.5 pt noise.
+	// So it is a feel call, and 45 deg is the one that leaves the driving to the driver.
+	// This replaced a random cone. The cone's width turned out not to matter at all either (300 races at
+	// each of 360/135/90/60/35 deg gave captures 323/343/327/327/309 and the leader 44.1/44.2/43.8/43.3/
+	// 43.9), which is what made a fixed, readable pattern free to adopt.
+	blastSpin: Math.PI / 4,
+	// The fifth: more top speed. It compounds — the corner radius grows with speed (see stepCar) and
+	// land rate is roughly cruise x turnRadius — so it was swept before it was tuned, and 1.35 held
+	// permanently lands on 59.0 % of wins against the shield's 62.0. It is not a new ceiling, it is
+	// the shipped one. What it really buys is PACE: an arena of nothing but boost ends at 141 s with
+	// 43 % of races decided by the clock, against 158 s and 57 % for the shipped three.
+	boost: 1.35,
+	boostT: 4,
+	// The sixth: a fatter line. It is the weakest of the six on ground (30.1 % of the arena held
+	// permanently, against 26.1 for grip and 38.7 for the shield) and the point is elsewhere: it is
+	// the only kind that makes the arena BLOODIER, 27.1 kills a race against 19.1. You meet your own
+	// line sooner, and every rival meets it sooner too.
+	wide: 6, // seconds
+	wideR: 1, // cells laid either side of the path
+	weights: [1, 1, 1, 1, 1, 1], // grip / shield / tar / rocket / boost / wide, redrawn per respawn
 	door: 5.5, // distance from a home centre to its doorway ring — just outside the painted square
 	hub: 16, // hub slots stay inside this radius of the arena middle
 	margin: 8, // keep loose spawns this far from the rail — a pickup on the wall is a trap
 };
 
-/** The three pickups, in `ITEM.weights` order. */
-export const KIND = { grip: 0, shield: 1, tar: 2 } as const;
+/** The pickups, in `ITEM.weights` order. */
+export const KIND = { grip: 0, shield: 1, tar: 2, rocket: 3, boost: 4, wide: 5 } as const;
 
 /** A pickup slot. `at` is the clock time it goes live; before that the slot is dark. `role` is its
  *  entry in ITEM.plan and never changes, so a slot always comes back to its post. `kind` is
  *  redrawn on every respawn, so the same post is not always the same bonus. */
 export interface Item { x: number; z: number; at: number; role: number; kind: number }
+
+/** A rocket shell in flight. Target and landing time are fixed at launch, so the arc the renderer
+ *  draws and the paint the sim lays are the same throw — no drift, and the daily stays replayable. */
+export interface Shot { id: number; x: number; z: number; at: number }
 
 // Daily difficulty (diffIndex 0..2): harder = bolder, more aggressive bots = more danger.
 // `itemR` is how far a bot turns aside for a pickup. It does not scale with difficulty because no
@@ -190,6 +254,8 @@ export interface Car {
 	gripT: number; // seconds of pickup grip left: paint holds like bare ground while it runs
 	shieldT: number; // seconds of pickup shield left: the whole trail is uncuttable, by anyone
 	zoneT: number; // seconds this car's PAINT stays tar: rivals crossing it are slowed, not us
+	boostT: number; // seconds of extra top speed left
+	wideT: number; // seconds the trail is laid ITEM.wideR cells either side of the path
 	drifting: boolean;
 	scraping: boolean; // rubbing the arena rail (slowed down; renderer throws sparks)
 	outside: boolean; // currently laying a trail (out of own territory)
@@ -214,6 +280,10 @@ export type GameEvent =
 	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean; lost: number }
 	| { type: 'respawn'; id: number; x: number; z: number }
 	| { type: 'item'; id: number; x: number; z: number; kind: number } // grabbed a pickup, see KIND
+	// A shell left the car. `t` is its flight time, so the renderer can arc it and arrive with the
+	// paint instead of guessing a duration the sim would then contradict.
+	| { type: 'rocket'; id: number; x0: number; z0: number; x: number; z: number; t: number }
+	| { type: 'blast'; id: number; x: number; z: number; r: number } // one rocket splat landed
 	| { type: 'win'; id: number; byTime: boolean };
 
 export interface GameState {
@@ -222,6 +292,7 @@ export interface GameState {
 	trail: Uint8Array; // cell -> car id whose active trail sits here (0 = none)
 	cars: Car[];
 	items: Item[]; // grip pickups; EMPTY is how the mode is switched off (daily + online)
+	shots: Shot[]; // rocket shells still in the air; they paint on landing, see stepShots
 	counts: number[]; // owned cell count per id (index 0 = neutral)
 	sumC: number[]; // running sum of col per id (for centroid)
 	sumR: number[];
@@ -314,6 +385,8 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.gripT = 0; // a bonus does not survive the wreck that ended the run it was helping
 	car.shieldT = 0;
 	car.zoneT = 0;
+	car.boostT = 0;
+	car.wideT = 0;
 	car.alive = true;
 	car.outside = false;
 	car.drifting = false;
@@ -368,6 +441,63 @@ function seedItems(s: GameState, on: boolean): void {
 	}
 }
 
+/** Fire the shells. Nothing is painted here: the target and the landing time are all that is
+ *  decided, and the rng is rolled once per shell at launch so the daily replays the same throw
+ *  whatever the frame rate. The renderer arcs each shell over `t` and lands with the paint. */
+function launchBlast(s: GameState, car: Car): void {
+	const edge = HALF - 1;
+	for (let i = 0; i < ITEM.blasts; i++) {
+		const t = ITEM.blastT + i * ITEM.blastGap;
+		// The shell inherits the car's speed, or the car simply outruns it: at cruise it covers 13
+		// units while one is in the air against a 7 unit throw, so every splat landed behind the
+		// camera and the player saw paint appear from nowhere. Measured before the lead existed
+		// (bolides-onscreen.mjs): 31 % of impacts in frame, and the misses were 14 off the bottom
+		// edge and 9 behind the camera — not one was off to a side, which is what killed the theory
+		// that the throw cone was too wide. With the lead it is 96 %.
+		const lead = car.speed * t * ITEM.blastLead;
+		const a = car.heading + ITEM.blastSpin + (i * 2 * Math.PI) / ITEM.blasts;
+		// Fixed range, not a draw: the four are meant to read as one figure, and a per-shell radius
+		// stops them looking like a rosette at all. It also closes a hole the draw left open — a
+		// radius near 0 dropped a splat ON the car, and standing on your own cell closes your ring
+		// (see visitCell), so a standstill launch could bank a 0-cell loop you never asked for.
+		const cx = car.x + Math.cos(car.heading) * lead;
+		const cz = car.z + Math.sin(car.heading) * lead;
+		const x = Math.max(-edge, Math.min(edge, cx + Math.cos(a) * ITEM.blastD));
+		const z = Math.max(-edge, Math.min(edge, cz + Math.sin(a) * ITEM.blastD));
+		s.shots.push({ id: car.id, x, z, at: s.clock + t });
+		s.events.push({ type: 'rocket', id: car.id, x0: car.x, z0: car.z, x, z, t });
+	}
+}
+
+/** Land every shell that is due. A splat is a disc of the shooter's paint: ground claimed without
+ *  closing a loop, so it is deliberately tiny — 3 discs of radius 2.4 is under 1 % of the arena.
+ *  `setOwner` still refuses another car's home square, so a rocket can never lock a rival out.
+ *  A dead shooter still lands its shells: the throw was paid for before the crash. */
+function stepShots(s: GameState): void {
+	if (!s.shots.length) return;
+	let hit = false;
+	for (let i = s.shots.length - 1; i >= 0; i--) {
+		const sh = s.shots[i];
+		if (s.clock < sh.at) continue;
+		s.shots.splice(i, 1);
+		const rc = Math.ceil(ITEM.blastR / CELL);
+		const c0 = colOf(sh.x), r0 = rowOf(sh.z);
+		for (let dr = -rc; dr <= rc; dr++) {
+			const row = r0 + dr;
+			if (row < 0 || row >= GRID) continue;
+			for (let dc = -rc; dc <= rc; dc++) {
+				const col = c0 + dc;
+				if (col < 0 || col >= GRID) continue;
+				if (dc * dc + dr * dr > rc * rc) continue;
+				setOwner(s, row * GRID + col, sh.id);
+			}
+		}
+		s.events.push({ type: 'blast', id: sh.id, x: sh.x, z: sh.z, r: ITEM.blastR });
+		hit = true;
+	}
+	if (hit) { s.captureFlag = true; mark(s); }
+}
+
 /** Grabbed by driving over it — no aim, no button, so nothing has to change on the touch layout.
  *  Bots collect too (they just don't go looking), or the item would be a pure player handicap
  *  on the bots' side of the balance. */
@@ -383,8 +513,12 @@ function stepItems(s: GameState): void {
 			// deaths, so holding two is the reward for a good lap, not a compounding buff.
 			if (it.kind === KIND.shield) car.shieldT = ITEM.shield;
 			else if (it.kind === KIND.tar) car.zoneT = ITEM.zone;
-			else car.gripT = ITEM.grip;
+			else if (it.kind === KIND.boost) car.boostT = ITEM.boostT;
+			else if (it.kind === KIND.wide) car.wideT = ITEM.wide;
+			else if (it.kind === KIND.grip) car.gripT = ITEM.grip;
 			s.events.push({ type: 'item', id: car.id, x: it.x, z: it.z, kind: it.kind });
+			// After the event, so the FX reads grab-then-launch.
+			if (it.kind === KIND.rocket) launchBlast(s, car);
 			placeItem(s, it, ITEM.respawn);
 			break;
 		}
@@ -392,7 +526,7 @@ function stepItems(s: GameState): void {
 }
 
 /** `cars` holds one roster id (or ready-made table) per seat; omit it for an all-base grid.
- *  `items` turns the grip pickups on — free play only, see ITEM. */
+ *  `items` turns the pickups on — everywhere but online, see ITEM. */
 export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[], items = false): GameState {
 	const s: GameState = {
 		owner: new Uint8Array(TOTAL),
@@ -416,6 +550,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 		hero: 1,
 		record: false,
 		netAdd: [],
+		shots: [],
 		scratch: new Uint8Array(TOTAL),
 		stack: new Int32Array(TOTAL),
 	};
@@ -432,7 +567,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 			isBot: i !== 0,
 			alive: true,
 			x: 0, z: 0, heading: 0, speed: cfg.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
-			vh: 0, driftT: 0, gripT: 0, shieldT: 0, zoneT: 0,
+			vh: 0, driftT: 0, gripT: 0, shieldT: 0, zoneT: 0, boostT: 0, wideT: 0,
 			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
 			remote: false, netX: 0, netZ: 0, netH: 0,
@@ -465,6 +600,7 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?:
 	s.events.length = 0;
 	s.trailDirty.length = 0;
 	s.netAdd.length = 0;
+	s.shots.length = 0;
 	s.captureFlag = true;
 	for (let i = 0; i < s.cars.length; i++) {
 		if (cars) { s.cars[i].carId = pickId(cars[i]); s.cars[i].cfg = pickCfg(cars[i]); }
@@ -708,8 +844,11 @@ function visitCell(s: GameState, car: Car, cell: number): boolean {
 		// Crossing your OWN line CLOSES the loop instead of losing it, so a zone can be won far from
 		// home. The fresh tail is spared, or leaving home would close on the first pixel. No shield
 		// check: the shield guards the line against rivals, it must not block your own landing.
+		// A fat line lays several cells per step, so the fresh-tail window has to be counted in cells
+		// too or the same metre of driving would suddenly be "old enough" to close on.
+		const fresh = car.cfg.grace * (car.wideT > 0 ? 1 + 2 * ITEM.wideR : 1);
 		const idx = car.trail.indexOf(cell);
-		if (idx >= 0 && idx < car.trail.length - car.cfg.grace) {
+		if (idx >= 0 && idx < car.trail.length - fresh) {
 			capture(s, car, idx);
 			return true;
 		}
@@ -724,6 +863,18 @@ function visitCell(s: GameState, car: Car, cell: number): boolean {
 	return false;
 }
 
+/** A flank cell of a fat trail. Paint only at lay time: no kill test and no self-cut test, so a car
+ *  can never wreck itself on the cell it is laying this very step. The cell does enter `s.trail` and
+ *  `car.trail`, so from the next step on it cuts a rival and closes your own ring exactly like the
+ *  centre line — a fat line is both more dangerous and a bigger target. */
+function laySide(s: GameState, car: Car, cell: number): void {
+	if (!car.outside || s.owner[cell] === car.id || s.trail[cell] !== 0) return;
+	s.trail[cell] = car.id;
+	car.trail.push(cell);
+	s.trailDirty.push(cell);
+	if (s.record) s.netAdd.push((car.id << 16) | cell);
+}
+
 /** The grid only sees whole cells, but one step at full throttle covers more than one. Walking the
  *  segment sub-cell keeps consecutive trail cells touching, which the border flood in capture()
  *  needs: it is 4-connected, so a single skipped cell is a hole it leaks through and the loop dies
@@ -732,14 +883,22 @@ function visitCell(s: GameState, car: Car, cell: number): boolean {
  *  ever saw it. A diagonal link is fine: an 8-connected wall still blocks a 4-connected fill. */
 function updateGrid(s: GameState, car: Car): void {
 	const dx = car.x - car.px, dz = car.z - car.pz;
-	const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (CELL * 0.5)));
+	const len = Math.hypot(dx, dz);
+	const steps = Math.max(1, Math.ceil(len / (CELL * 0.5)));
+	const wide = car.wideT > 0 && len > 1e-6 ? ITEM.wideR : 0;
+	const nx = wide ? -dz / len : 0, nz = wide ? dx / len : 0;
 	let last = -1;
 	for (let i = 1; i <= steps; i++) {
 		const t = i / steps;
-		const cell = cellAt(car.px + dx * t, car.pz + dz * t);
+		const x = car.px + dx * t, z = car.pz + dz * t;
+		const cell = cellAt(x, z);
 		if (cell === last) continue;
 		last = cell;
 		if (visitCell(s, car, cell)) return;
+		for (let k = 1; k <= wide; k++) {
+			laySide(s, car, cellAt(x + nx * CELL * k, z + nz * CELL * k));
+			laySide(s, car, cellAt(x - nx * CELL * k, z - nz * CELL * k));
+		}
 	}
 }
 
@@ -856,13 +1015,17 @@ export function stepGame(
 		if (car.gripT > 0) car.gripT = Math.max(0, car.gripT - dt);
 		if (car.shieldT > 0) car.shieldT = Math.max(0, car.shieldT - dt);
 		if (car.zoneT > 0) car.zoneT = Math.max(0, car.zoneT - dt);
+		if (car.boostT > 0) car.boostT = Math.max(0, car.boostT - dt);
+		if (car.wideT > 0) car.wideT = Math.max(0, car.wideT - dt);
 		// The surface under the car sets how hard it is to break traction (see stepCar).
 		const owner = s.owner[cellAt(car.x, car.z)];
 		const painted = owner !== 0;
 		// Tarred rival paint. Read off the OWNER of the ground, so the effect follows the territory
 		// as it is won and lost — nothing has to be stamped on the cells.
 		const host = owner !== 0 && owner !== car.id ? s.cars[owner - 1] : undefined;
-		const drag = host && host.zoneT > 0 ? ITEM.tar : 1;
+		// Tar and boost ride the same channel on purpose: being slowed on rival paint while boosting
+		// should read as one net speed, not as two rules arguing.
+		const drag = (host && host.zoneT > 0 ? ITEM.tar : 1) * (car.boostT > 0 ? ITEM.boost : 1);
 		if (car.remote) {
 			stepGhost(car, dt); // someone else's car: dead-reckon between packets
 		} else if (car.id === s.hero) {
@@ -873,6 +1036,7 @@ export function stepGame(
 		slideWalls(car, dt);
 		updateGrid(s, car);
 	}
+	stepShots(s); // before stepItems: a shell lands on the clock it was given, not a frame late
 	if (s.items.length) stepItems(s);
 	const target = (TOTAL * CFG.winPct) / 100;
 	for (let id = 1; id <= CAR_COUNT; id++) {

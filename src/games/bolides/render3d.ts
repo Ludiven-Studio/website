@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
-	ARENA, CELL, CFG, GRID, HALF, ITEM, PALETTE, TOTAL, angleDiff,
+	ARENA, CELL, CFG, GRID, HALF, ITEM, KIND, PALETTE, TOTAL, angleDiff,
 	type GameState, type Car,
 } from './engine';
 
@@ -54,10 +54,11 @@ const mixHex = (a: number, b: number, t: number) => {
 	const [ar, ag, ab] = rgb(a), [br, bg, bb] = rgb(b);
 	return (mix(ar, br, t) << 16) | (mix(ag, bg, t) << 8) | mix(ab, bb, t);
 };
-// One colour per pickup kind, in engine KIND order. Cyan, pink and violet are the three hues no
-// car can claim, so a pastille is never read as a patch of somebody's paint. The colour is the
-// second cue though, not the first: with three kinds on the floor the glyph carries the name.
-const ITEM_COL = [0x8FF6FF, 0xFF9BE8, 0xC58BFF];
+// One colour per pickup kind, in engine KIND order. Three kinds could all sit on hues no car
+// claims; six cannot, so the rule changed: every pastille hue is pale — well above the luma of any
+// bodywork — and the glyph, not the colour, is what names the item. Same six drive the HUD chips,
+// the roof icons and the floor rings, so one hue means one rule everywhere it appears.
+const ITEM_COL = [0x8FF6FF, 0xFF9BE8, 0xC58BFF, 0xFFB27A, 0xFFF07A, 0x9CFFC8];
 
 const TAU = Math.PI * 2;
 // Little-endian byte order (every shipping target), so a canvas pixel is one u32 store.
@@ -278,7 +279,7 @@ function makeItemTexture(kind: number): THREE.CanvasTexture {
 	ctx.beginPath(); ctx.arc(64, 64, 52, 0, TAU); ctx.stroke();
 	ctx.fillStyle = ctx.strokeStyle = '#F4FAFF';
 	ctx.lineJoin = ctx.lineCap = 'round';
-	if (kind === 1) {
+	if (kind === 1) { // shield
 		ctx.lineWidth = 11;
 		ctx.beginPath();
 		ctx.moveTo(64, 26); ctx.lineTo(94, 40); ctx.lineTo(94, 68);
@@ -286,14 +287,36 @@ function makeItemTexture(kind: number): THREE.CanvasTexture {
 		ctx.quadraticCurveTo(34, 92, 34, 68);
 		ctx.lineTo(34, 40); ctx.closePath();
 		ctx.stroke();
-	} else if (kind === 2) {
+	} else if (kind === 2) { // tar: a droplet
 		ctx.beginPath();
 		ctx.moveTo(64, 22);
 		ctx.bezierCurveTo(64, 22, 92, 58, 92, 74);
 		ctx.arc(64, 74, 28, 0, Math.PI);
 		ctx.bezierCurveTo(36, 58, 64, 22, 64, 22);
 		ctx.fill();
-	} else {
+	} else if (kind === 3) { // rocket: a burst, the one silhouette with spikes on every side
+		ctx.beginPath();
+		for (let k = 0; k < 12; k++) {
+			const a = (k / 12) * TAU - Math.PI / 2, r = k % 2 ? 17 : 42;
+			ctx[k ? 'lineTo' : 'moveTo'](64 + Math.cos(a) * r, 64 + Math.sin(a) * r);
+		}
+		ctx.closePath(); ctx.fill();
+	} else if (kind === 4) { // boost: a double chevron, read as "forward" at any size
+		ctx.lineWidth = 13;
+		for (const ox of [-16, 14]) {
+			ctx.beginPath();
+			ctx.moveTo(48 + ox, 32); ctx.lineTo(80 + ox, 64); ctx.lineTo(48 + ox, 96);
+			ctx.stroke();
+		}
+	} else if (kind === 5) { // wide: a band with an arrow head out of each side
+		ctx.lineWidth = 13;
+		ctx.beginPath(); ctx.moveTo(26, 64); ctx.lineTo(102, 64); ctx.stroke();
+		for (const [tip, dir] of [[26, 1], [102, -1]] as const) {
+			ctx.beginPath();
+			ctx.moveTo(tip + dir * 26, 38); ctx.lineTo(tip, 64); ctx.lineTo(tip + dir * 26, 90);
+			ctx.stroke();
+		}
+	} else { // grip: a bolt
 		ctx.beginPath();
 		ctx.moveTo(78, 22); ctx.lineTo(44, 70); ctx.lineTo(62, 70); ctx.lineTo(50, 106);
 		ctx.lineTo(86, 56); ctx.lineTo(67, 56); ctx.closePath();
@@ -588,21 +611,18 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 		}
 	}
 
-	// Wheels: the cylinder axis is +Y, so rotateX(PI/2) lays it on +Z. Everything but the front
-	// axle is merged into the body; the front pair stay separate meshes so they can steer, each
-	// hung at its own hub so turning them does not walk them out of the arch.
+	// Wheels: the cylinder axis is +Y, so rotateX(PI/2) lays it on +Z. Every hub is its own mesh,
+	// each at its own position so turning one does not walk it out of the arch. The rear pair used
+	// to be merged into the body — 2 draw calls cheaper, but then the grip bonus could only swell
+	// half the car, which reads as a broken model rather than as fat tyres.
 	const wl: THREE.BufferGeometry[] = [];
-	const steered: { geo: THREE.BufferGeometry; at: [number, number, number] }[] = [];
+	const hubs: { geo: THREE.BufferGeometry; at: [number, number, number]; steer: boolean }[] = [];
 	for (const wx of sh.wheelX) {
-		const rear = wx < 0;
-		const r = rear ? sh.rearR : sh.wheelR, w = rear ? sh.rearW : sh.wheelW;
+		const r = wx < 0 ? sh.rearR : sh.wheelR, w = wx < 0 ? sh.rearW : sh.wheelW;
 		for (const wz of [sh.wheelZ, -sh.wheelZ]) {
 			const g = new THREE.CylinderGeometry(r, r, w, sh.wheelSeg);
 			g.rotateX(Math.PI / 2);
-			if (wx > 0) { steered.push({ geo: g, at: [wx, r, wz] }); continue; }
-			if (sh.cock && !rear) g.rotateY(sh.cock);
-			g.translate(wx, r, wz);
-			wl.push(g);
+			hubs.push({ geo: g, at: [wx, r, wz], steer: wx > 0 });
 		}
 	}
 
@@ -630,7 +650,7 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 	// a mixed list, so everything is flattened first.
 	const flat = (list: THREE.BufferGeometry[]) => mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)), false)!;
 	if (!trim.length) trim.push(new THREE.BoxGeometry(0, 0, 0)); // keep the 4 material groups aligned
-	if (!wl.length) wl.push(new THREE.BoxGeometry(0, 0, 0)); // ditto: a car could be front-axle only
+	wl.push(new THREE.BoxGeometry(0, 0, 0)); // the tyre slot is empty now, but the 4 groups must line up
 	const shell = flat(paint); // reused, ungrouped, by the outline pass: one extra draw call
 	// mergeGeometries(list, true) makes one group per input, so each part is pre-merged flat.
 	const geo = mergeGeometries([shell, flat(trim), flat(wl), flat(st)], true)!;
@@ -662,13 +682,14 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 	spin.add(outline);
 	spin.add(new THREE.Mesh(geo, mats));
 
-	const wheels = steered.map((s) => {
-		const m = new THREE.Mesh(s.geo, mats[2]);
-		m.position.set(...s.at);
-		m.rotation.y = sh.cock; // the Toupie's front wheels are cocked at rest; steering adds to it
+	const hubMeshes = hubs.map((h) => {
+		const m = new THREE.Mesh(h.geo, mats[2]);
+		m.position.set(...h.at);
+		m.rotation.y = h.steer ? sh.cock : 0; // the Toupie's FRONT wheels are cocked at rest
 		spin.add(m);
 		return m;
 	});
+	const wheels = hubMeshes.filter((_, k) => hubs[k].steer);
 
 	const glowMat = new THREE.MeshBasicMaterial({
 		map: glowTex, color, transparent: true, opacity: sh.glowOp, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
@@ -679,6 +700,16 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 	// quad hanging behind the car reads as a floating rhombus.
 	glow.position.set(sh.roundelX * 0.6, 0.05, 0);
 	spin.add(glow);
+
+	// Boost afterburner. Flat on the floor rather than a vertical flame: the chase cam stares at the
+	// back of the car, so an upright quad would stand between the camera and the thing it follows.
+	const boostGlow = new THREE.Mesh(new THREE.PlaneGeometry(5.0, 1.9), new THREE.MeshBasicMaterial({
+		map: glowTex, color: ITEM_COL[4], transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false,
+	}));
+	boostGlow.rotation.x = -Math.PI / 2;
+	boostGlow.position.set(-sh.len * 1.9, 0.06, 0);
+	boostGlow.visible = false;
+	spin.add(boostGlow);
 
 	// The roof roundel is the identity cue that survives colour blindness and the minimap downscale.
 	const rg = new THREE.PlaneGeometry(1.15, 1.15);
@@ -693,13 +724,17 @@ function makeCarMesh(id: number, shape: CarShape, blob: THREE.Texture, glowTex: 
 
 	root.userData.spin = spin;
 	root.userData.wheels = wheels;
+	root.userData.hubs = hubMeshes;
 	// Ackermann needs the axle gap, and it is not the same on a Comète as on a Frelon.
 	root.userData.wheelbase = sh.wheelX[0] - sh.wheelX[sh.wheelX.length - 1];
 	root.userData.cock = sh.cock;
 	root.userData.mats = mats;
 	root.userData.glow = glowMat;
+	root.userData.glowMesh = glow;
 	root.userData.glowOp = sh.glowOp;
 	root.userData.roundel = roundel;
+	root.userData.boostGlow = boostGlow;
+	root.userData.top = top + sh.canopyR; // roof height, so a buff icon hangs off the model
 	return root;
 }
 
@@ -1131,6 +1166,13 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	const carGlows: THREE.MeshBasicMaterial[] = carMeshes.map((m) => m.userData.glow as THREE.MeshBasicMaterial);
 	const carRoundels: THREE.Mesh[] = carMeshes.map((m) => m.userData.roundel as THREE.Mesh);
 	const carWheels: THREE.Mesh[][] = carMeshes.map((m) => m.userData.wheels as THREE.Mesh[]);
+	const carHubs: THREE.Mesh[][] = carMeshes.map((m) => m.userData.hubs as THREE.Mesh[]);
+	// A hub sits at y = its own radius, so scaling the offset by the same factor keeps the contact
+	// patch exactly on the road. Swelling in place would sink a quarter of the tyre into the asphalt.
+	const carHubY = carHubs.map((ws) => ws.map((w) => w.position.y));
+	const carGlowMesh: THREE.Mesh[] = carMeshes.map((m) => m.userData.glowMesh as THREE.Mesh);
+	const carBoost: THREE.Mesh[] = carMeshes.map((m) => m.userData.boostGlow as THREE.Mesh);
+	const carTop = carMeshes.map((m) => m.userData.top as number);
 	const carBase = carMeshes.map((m) => m.userData.wheelbase as number);
 	const carCock = carMeshes.map((m) => m.userData.cock as number);
 	const prevSpeed = new Float32Array(state.cars.length);
@@ -1157,7 +1199,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	// Pickups. A badge that always faces the camera, not a spinning solid: a glyph is the only cue
 	// that survives at a dozen pixels, and a glyph on a solid turns away half the time. Built even
 	// when the mode is off; the slots simply stay hidden.
-	const itemMats = [0, 1, 2].map((k) => new THREE.SpriteMaterial({
+	const itemMats = ITEM_COL.map((_, k) => new THREE.SpriteMaterial({
 		map: makeItemTexture(k), transparent: true, depthWrite: false, fog: false, toneMapped: false,
 	}));
 	const itemRingGeo = new THREE.RingGeometry(1.0, 1.3, 32);
@@ -1183,6 +1225,52 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		scene.add(g);
 		return { g, badge, halo, ring };
 	});
+
+	// Shield bubble: a real sphere around the car, not a decal, because "englobe la voiture" is the
+	// whole message. Fresnel rather than flat alpha — a uniform additive ball just washes the car out,
+	// while a rim that brightens where the surface turns away reads as glass and leaves the paintwork
+	// legible. One clone per car so each carries its own fade.
+	const bubbleMat = new THREE.ShaderMaterial({
+		uniforms: { uCol: { value: new THREE.Color(ITEM_COL[1]) }, uK: { value: 0 } },
+		vertexShader: `
+			varying vec3 vN; varying vec3 vV;
+			void main() {
+				vN = normalize(normalMatrix * normal);
+				vec4 mv = modelViewMatrix * vec4(position, 1.0);
+				vV = normalize(-mv.xyz);
+				gl_Position = projectionMatrix * mv;
+			}`,
+		fragmentShader: `
+			uniform vec3 uCol; uniform float uK;
+			varying vec3 vN; varying vec3 vV;
+			void main() {
+				float f = 1.0 - abs(dot(normalize(vN), normalize(vV)));
+				gl_FragColor = vec4(uCol * (0.06 + 1.35 * pow(f, 2.6)) * uK, 1.0);
+			}`,
+		transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
+	});
+	const bubbleGeo = new THREE.SphereGeometry(1.75, 20, 14);
+	const bubbles = state.cars.map(() => {
+		const m = new THREE.Mesh(bubbleGeo, bubbleMat.clone());
+		m.visible = false;
+		scene.add(m);
+		return m;
+	});
+
+	// Roof icons: which powers a car is running, on EVERY car, not just the hero. A rival closing on
+	// your line while it is untouchable is a different decision from a rival closing on your line,
+	// and until now nothing on screen told them apart. Five slots because all five timers can stack.
+	const BUFF_MAX = 5;
+	const buffIcons = state.cars.map(() => Array.from({ length: BUFF_MAX }, () => {
+		const sp = new THREE.Sprite(itemMats[0]);
+		sp.visible = false;
+		scene.add(sp);
+		return sp;
+	}));
+	// Laid out across the CAMERA's right, never world X: a row built on a world axis is seen edge-on
+	// from half the arena and collapses into a single icon.
+	const camRight = new THREE.Vector3();
+	const buffKinds: number[] = []; // reused every car every frame — this runs 4x60 times a second
 
 	// Rail contact flare, ON the rail. A billboard, not a quad in the wall plane: you always
 	// slide ALONG a wall, so a wall-plane quad is seen edge-on and collapses to a white bar.
@@ -1303,6 +1391,69 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			const s = Math.max(0.2, r.start + t * r.grow);
 			r.mesh.scale.set(s, s, 1);
 			(r.mesh.material as THREE.MeshBasicMaterial).opacity = (1 - t) ** 1.6;
+		}
+	};
+
+	// --- rocket shells in flight ---
+	// The sim owns the throw: engine `launchBlast` fixes the target and the landing clock, and sends
+	// both here on the 'rocket' event. This only draws the arc between launch and landing, so the
+	// paint always appears under the shell that carried it. Sixteen slots — four cars, four each.
+	const shells = Array.from({ length: 16 }, () => {
+		const mat = new THREE.SpriteMaterial({
+			map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false,
+		});
+		const head = new THREE.Sprite(mat);
+		// Two tail sprites sampled behind the head on the same curve. A stretched sprite cannot
+		// follow an arc — a sprite is always axis-aligned on screen — so the tail has to be points.
+		const tail = [0, 1].map(() => new THREE.Sprite(mat.clone()));
+		// Flat on the floor, not a sprite: this one says WHERE, and a billboard would lie about the
+		// spot as soon as the camera swung round. The pop ring's crisp band, not the soft glow blob —
+		// measured on frame 3 of bolides-buffx4, a glow marker read as vague bloom, not as a target.
+		const mark = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+			map: rampTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false,
+		}));
+		mark.rotation.x = -Math.PI / 2;
+		mark.position.y = 0.05;
+		for (const o of [head, ...tail, mark]) { o.visible = false; scene.add(o); }
+		return { head, tail, mark, x0: 0, z0: 0, x: 0, z: 0, h: 0, t: 1, life: 0 };
+	});
+	const fireShell = (id: number, x0: number, z0: number, x: number, z: number, t: number) => {
+		let slot = shells[0];
+		for (const sh of shells) if (sh.life <= 0) { slot = sh; break; }
+		const col = PALETTE[id];
+		slot.x0 = x0; slot.z0 = z0; slot.x = x; slot.z = z; slot.t = t; slot.life = t;
+		// Flat, not scaled by range: every shell is up for the same blastT, and a lob's apex follows its
+		// flight time, not how far it goes. The old distance term was fitted when a throw was 0-7 units
+		// wide; once the launch started leading the car the range jumped to ~18 and took the apex with
+		// it, putting the shells up by the horizon looking like fireworks instead of paint coming down.
+		slot.h = 4.4;
+		(slot.head.material as THREE.SpriteMaterial).color.setHex(mixHex(col, 0xFFFFFF, 0.3));
+		for (const tp of slot.tail) (tp.material as THREE.SpriteMaterial).color.setHex(col);
+		(slot.mark.material as THREE.MeshBasicMaterial).color.setHex(col);
+	};
+	const stepShells = (dtSec: number) => {
+		for (const sh of shells) {
+			if (sh.life <= 0) {
+				if (sh.head.visible) for (const o of [sh.head, ...sh.tail, sh.mark]) o.visible = false;
+				continue;
+			}
+			sh.life -= dtSec;
+			const u = Math.min(1, 1 - Math.max(0, sh.life) / sh.t);
+			const at = (k: number, o: THREE.Object3D, size: number) => {
+				const p = Math.max(0, k);
+				o.position.set(sh.x0 + (sh.x - sh.x0) * p, 0.35 + 4 * sh.h * p * (1 - p), sh.z0 + (sh.z - sh.z0) * p);
+				o.scale.setScalar(size);
+				o.visible = true;
+			};
+			at(u, sh.head, 2.0);
+			at(u - 0.07, sh.tail[0], 1.35);
+			at(u - 0.14, sh.tail[1], 0.85);
+			// The marker tightens onto the splat radius as the shell falls: a countdown, not a decoration.
+			sh.mark.position.set(sh.x, 0.05, sh.z);
+			const ms = 5.5 - (5.5 - ITEM.blastR) * u;
+			sh.mark.scale.set(ms, ms, 1);
+			(sh.mark.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.6 * u;
+			sh.mark.visible = true;
 		}
 	};
 
@@ -1598,6 +1749,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		applyTrail(s);
 		fadeDecals(fxDt);
 		stepRings(fxDt);
+		stepShells(fxDt);
 
 		const pp = carPose(heroCar(s), alpha);
 
@@ -1649,6 +1801,17 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				spawn(burst, e.x, e.z, col, 3.5, 4.5, 18, 0.55, 1.4, 0, 0, 1);
 				popRing(e.x, e.z, col, 1.4, 14);
 				if (e.id === s.hero) setShake(0.22, 0.10);
+			} else if (e.type === 'rocket') {
+				fireShell(e.id, e.x0, e.z0, e.x, e.z, e.t);
+				spawn(burst, e.x0, e.z0, mixHex(PALETTE[e.id], 0xFFFFFF, 0.5), 2.5, 5.5, 5, 0.3, 1.2, 0, 0, 0.8);
+			} else if (e.type === 'blast') {
+				// In the CAR's paint, not the pastille's: the splat is ground you now own, and the
+				// player has to read it as territory or the forward-base trick never gets found.
+				// A ring is affordable again now that the four land ITEM.blastGap apart instead of
+				// all on one frame; four rings inside 0.33 s still fit the pool of seven.
+				spawn(burst, e.x, e.z, mixHex(PALETTE[e.id], 0xFFFFFF, 0.35), 4.5, 3.2, 16, 0.5, 1.1, 0, 0, e.r * 1.6);
+				popRing(e.x, e.z, PALETTE[e.id], 1.2, 9);
+				if (e.id === s.hero) setShake(0.18, 0.12);
 			}
 		}
 		// events are cleared by the React loop after both render + UI have read them.
@@ -1664,6 +1827,10 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		foeCol.setHex(under && under !== s.hero ? PALETTE[under] : 0xFF4FA3);
 		rim.color.copy(RIM_COOL).lerp(foeCol, risk * 0.7);
 
+		// One frame stale — the camera is placed below, after the cars — which is invisible at 60 fps
+		// and saves recomputing the view matrix in the middle of the loop.
+		camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+
 		let wallFlare = 0, wallFlareK = 0;
 		// Cars: transform, body attitude, skid decals + smoke.
 		for (let i = 0; i < s.cars.length; i++) {
@@ -1676,7 +1843,13 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				trailSnapN[i] = n;
 			}
 			mesh.visible = car.alive;
-			if (!car.alive) { prevSpeed[i] = car.speed; prevHeading[i] = car.heading; continue; }
+			if (!car.alive) {
+				// The bubble and the icons hang in the scene, not off the car, so they have to be put
+				// away by hand or a wreck leaves its shield floating over the crash site.
+				bubbles[i].visible = false;
+				for (const sp of buffIcons[i]) sp.visible = false;
+				prevSpeed[i] = car.speed; prevHeading[i] = car.heading; continue;
+			}
 			const pose = carPose(car, alpha);
 			mesh.position.set(pose.x, 0, pose.z);
 			// No cosmetic wobble any more: the nose really does point off the travel line.
@@ -1706,6 +1879,61 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			const gk = d < 18 ? 1 : Math.max(0.25, 18 / d);
 			carGlows[i].opacity = (mesh.userData.glowOp as number) * gk
 				* (car.id === s.hero ? 1 + risk * 0.55 * Math.sin(fxTime * 9) : 1);
+
+			// Powers in flight, one body cue each, on every car and not just the hero: a rival closing
+			// on your line while it is untouchable is a different decision from a rival closing on
+			// your line, and nothing on screen used to tell those apart. Tar is the exception — it is
+			// already painted across the ground it owns, so a second cue on the car would be noise.
+			const swell = 1 + 0.30 * Math.min(1, car.gripT * 2);
+			for (let k = 0; k < carHubs[i].length; k++) {
+				carHubs[i][k].scale.setScalar(swell);
+				carHubs[i][k].position.y = carHubY[i][k] * swell;
+			}
+			const bub = bubbles[i];
+			bub.visible = car.shieldT > 0;
+			if (bub.visible) {
+				bub.position.set(pose.x, 0.9, pose.z);
+				// Faded over the last second rather than switched off: a shield that ends on a frame
+				// boundary is a death the player never saw coming.
+				(bub.material as THREE.ShaderMaterial).uniforms.uK.value
+					= Math.min(1, car.shieldT) * (0.85 + 0.15 * Math.sin(fxTime * 7 + i));
+			}
+			const bg = carBoost[i];
+			bg.visible = car.boostT > 0;
+			if (bg.visible) {
+				(bg.material as THREE.MeshBasicMaterial).opacity
+					= 0.30 * Math.min(1, car.boostT * 1.5) * (0.72 + 0.28 * Math.sin(fxTime * 22 + i));
+				if ((frameNo & 1) === 0) {
+					const bx = pose.x - Math.cos(pose.heading) * 1.5, bz = pose.z - Math.sin(pose.heading) * 1.5;
+					const tv = -car.speed * 0.35; // thrown backwards, or the flame outruns its own car
+					spawn(burst, bx, bz, ITEM_COL[KIND.boost], 1.0, 1.0, 2, 0.32, 1.2,
+						Math.cos(pose.heading) * tv, Math.sin(pose.heading) * tv, 0.6);
+				}
+			}
+			// A fat line spreads the car's own underglow with it. Measured: it reads on a RIVAL and barely
+			// on the hero, whose ring sits right on top of it. For the hero the cue is the ring hue and the
+				// roof icon — plus a line three cells wide, which is hard to miss to begin with.
+			carGlowMesh[i].scale.y = 1 + Math.min(1, car.wideT);
+
+			buffKinds.length = 0;
+			if (car.gripT > 0) buffKinds.push(KIND.grip);
+			if (car.shieldT > 0) buffKinds.push(KIND.shield);
+			if (car.zoneT > 0) buffKinds.push(KIND.tar);
+			if (car.boostT > 0) buffKinds.push(KIND.boost);
+			if (car.wideT > 0) buffKinds.push(KIND.wide);
+			const icons = buffIcons[i];
+			// Same floor as the roundel below it: at 30 units out a roof is a few pixels, and the icon
+			// is the only thing left that still names the rule this car is running.
+			const isz = 0.62 * (d < 20 ? 1 : Math.min(2.4, d / 20));
+			for (let k = 0; k < icons.length; k++) {
+				icons[k].visible = k < buffKinds.length;
+				if (!icons[k].visible) continue;
+				icons[k].material = itemMats[buffKinds[k]];
+				const off = (k - (buffKinds.length - 1) / 2) * isz * 1.2;
+				icons[k].position.set(pose.x + camRight.x * off, carTop[i] + 1.15 + 0.09 * Math.sin(fxTime * 3 + k),
+					pose.z + camRight.z * off);
+				icons[k].scale.setScalar(isz);
+			}
 			if (car.drifting) {
 				const bx = pose.x - Math.cos(pose.heading) * 1.3;
 				const bz = pose.z - Math.sin(pose.heading) * 1.3;
@@ -1805,10 +2033,15 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			// outer ring, in the complement of the ground being crossed, so it cannot blend into it.
 			const beat = 0.5 + 0.5 * Math.sin(fxTime * 9);
 			const mat = heroRing.material as THREE.MeshBasicMaterial;
-			// The ownership ring doubles as the bonus gauge: cyan for as long as the grip lasts, so
-			// the timer is under the car and not in a corner of the HUD nobody looks at while racing.
-			// Shield wins the ring when both run: it is the one that decides whether you survive.
-			const buff = hero.shieldT > 0 ? ITEM_COL[1] : hero.zoneT > 0 ? ITEM_COL[2] : hero.gripT > 0 ? ITEM_COL[0] : 0;
+			// The ownership ring doubles as a bonus gauge, so a timer sits under the car instead of in
+			// a corner of the HUD nobody reads while racing. Only ONE hue fits a ring, so they are
+			// ranked by what the moment costs: surviving first, then pace, then the rest. The roof
+			// icons above are the complete list — this is the "something is running" cue.
+			const buff = hero.shieldT > 0 ? ITEM_COL[KIND.shield]
+				: hero.boostT > 0 ? ITEM_COL[KIND.boost]
+					: hero.zoneT > 0 ? ITEM_COL[KIND.tar]
+						: hero.gripT > 0 ? ITEM_COL[KIND.grip]
+							: hero.wideT > 0 ? ITEM_COL[KIND.wide] : 0;
 			mat.color.setHex(buff ? mixHex(PALETTE[s.hero], buff, 0.75) : PALETTE[s.hero]);
 			mat.opacity = 0.55 + risk * (0.15 + 0.3 * beat);
 			heroRing.scale.setScalar(1 + risk * 0.12 * beat);
@@ -1876,6 +2109,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		burst.live = 0; smoke.live = 0;
 		burst.geo.setDrawRange(0, 0); smoke.geo.setDrawRange(0, 0);
 		for (const r of rings) { r.life = 0; r.delay = 0; r.mesh.visible = false; }
+		for (const sh of shells) { sh.life = 0; for (const o of [sh.head, ...sh.tail, sh.mark]) o.visible = false; }
 		decalFadeAcc = 0;
 		miniAcc = 0;
 		ledAcc = 0;

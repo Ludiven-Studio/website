@@ -665,9 +665,9 @@ describe('bolides pickups', () => {
 		expect(straightLine(1, ITEM.zone)).toBeCloseTo(clear, 6);
 	});
 
-	it('stays out of the arena unless asked for — the daily and the online race never see one', () => {
-		// Free play only: the daily is a ranked score tuned over hundreds of races, and a guest
-		// runs stepGuest, which has no grid and so could never agree on who grabbed what.
+	it('stays out of the arena unless asked for — an online race never sees one', () => {
+		// Free play and the daily ask for them; a guest must not get them, because stepGuest has no
+		// grid and dead-reckons the other cars, so no two clients would agree on who grabbed what.
 		const s = createGame();
 		expect(s.items).toHaveLength(0);
 		let items = 0;
@@ -678,6 +678,207 @@ describe('bolides pickups', () => {
 		}
 		expect(items).toBe(0);
 		expect(s.cars.every((c) => c.gripT === 0 && c.shieldT === 0 && c.zoneT === 0)).toBe(true);
+		expect(s.cars.every((c) => c.boostT === 0 && c.wideT === 0)).toBe(true);
+	});
+});
+
+describe('bolides rocket', () => {
+	/** Solo, one live slot pinned to `kind` and parked under the car, then the single step that takes
+	 *  it. Every other slot is held dark so nothing else can fire in the same tick. `hold` keeps
+	 *  stepping with the car pinned, so a distance check measures the throw and not the drive.
+	 *  `speed` is pinned too, and defaults to a standstill: the throw leads the car by its own speed,
+	 *  so leaving it to the race would make every landing spot depend on the launch tick. */
+	function grab(kind: number, x: number, z: number, hold = 0, speed = 0) {
+		const s = newGame(SEED, 1, undefined, true);
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; });
+		const me = s.cars[0];
+		me.x = x; me.z = z; me.px = x; me.pz = z;
+		me.heading = 0; me.vh = 0; me.speed = speed;
+		for (const it of s.items) it.at = 1e9;
+		Object.assign(s.items[0], { at: 0, kind, x, z });
+		s.events.length = 0;
+		stepGame(s, 0, 0, 1 / 600);
+		for (let i = 0; i < Math.ceil(hold * 600); i++) {
+			me.x = x; me.z = z; me.px = x; me.pz = z; me.speed = 0;
+			stepGame(s, 0, 0, 1 / 600);
+		}
+		return { s, me };
+	}
+
+	const FLIGHT = ITEM.blastT + ITEM.blasts * ITEM.blastGap + 0.05; // last shell down, plus a margin
+
+	it('throws the shells before it paints anything', () => {
+		// The whole point of the arc: on the frame you grab it nothing is on the ground yet. If the
+		// paint landed here the renderer would be drawing shells over territory they had not hit.
+		const before = newGame(SEED, 1, undefined, true).counts[1];
+		const { s } = grab(KIND.rocket, 0, 0);
+		expect(s.events.filter((e) => e.type === 'rocket')).toHaveLength(ITEM.blasts);
+		expect(s.events.some((e) => e.type === 'blast')).toBe(false);
+		expect(s.shots).toHaveLength(ITEM.blasts);
+		expect(s.counts[1]).toBe(before);
+	});
+
+	it('lands each shell exactly where its own arc was announced', () => {
+		const { s } = grab(KIND.rocket, 0, 0, FLIGHT);
+		const fired = s.events.filter((e) => e.type === 'rocket');
+		const landed = s.events.filter((e) => e.type === 'blast');
+		expect(landed).toHaveLength(fired.length);
+		// Pairwise and in order: the renderer arcs shell k to fired[k] and must find the splat there.
+		for (let k = 0; k < fired.length; k++) {
+			expect(landed[k].x).toBe(fired[k].x);
+			expect(landed[k].z).toBe(fired[k].z);
+		}
+		expect(s.shots).toHaveLength(0); // nothing left in the air
+	});
+
+	it('leads a moving car, so the paint lands in front of it and not behind', () => {
+		// Why the lead exists at all: a shell is up for blastT, and at cruise the car covers ~13 units
+		// in that time against a 7 unit throw. Without the lead every splat landed behind the camera
+		// (bolides-onscreen.mjs measured 31 % of impacts in frame).
+		// Same pinned spot and the same heading in both runs, so the rosette is identical and the ONLY
+		// difference left between the two sets of targets is the lead itself.
+		const still = grab(KIND.rocket, 0, 0).s.events.filter((e) => e.type === 'rocket');
+		const fast = grab(KIND.rocket, 0, 0, 0, CFG.cruise).s.events.filter((e) => e.type === 'rocket');
+		expect(fast).toHaveLength(still.length);
+		let prev = 0;
+		for (let k = 0; k < fast.length; k++) {
+			// Heading is 0, so the whole lead is +x and none of it may leak sideways.
+			expect(fast[k].z).toBeCloseTo(still[k].z, 6);
+			const push = fast[k].x - still[k].x;
+			expect(push).toBeGreaterThan(prev); // later shells fly longer, so they lead further
+			prev = push;
+		}
+		// It has to be worth the trouble: the last shell leads by more than the whole throw radius,
+		// which is what puts the landing spot clear of the car's tail.
+		expect(prev).toBeGreaterThan(ITEM.blastD);
+	});
+
+	it('lays the shells in a rosette, with none of them dead ahead', () => {
+		// The pattern the player is meant to read: four shells a quarter turn apart, the first one
+		// blastSpin off the nose. It matters beyond looks — a shell landing straight ahead paints the
+		// cell the car is about to drive into, and arriving on your own cell closes your ring, so it
+		// would bank a loop nobody asked for. Standstill, so the aim point is the car itself.
+		const { s, me } = grab(KIND.rocket, 0, 0);
+		const fired = s.events.filter((e) => e.type === 'rocket');
+		expect(fired).toHaveLength(4);
+		// Measured across the path, never along it. Heading is 0, so the lead is entirely +x and every
+		// shell carries a different one (it flies blastGap longer than the one before) — the sideways
+		// offset is the only part of the throw the lead cannot touch, and it is the part that says
+		// whether a shell is dead ahead.
+		const side = fired.map((e) => e.z - me.z);
+		for (let k = 0; k < side.length; k++) {
+			const want = ITEM.blastD * Math.sin(ITEM.blastSpin + (k * 2 * Math.PI) / ITEM.blasts);
+			expect(side[k]).toBeCloseTo(want, 6);
+		}
+		// Two each side: the rosette straddles the car's line instead of sitting on it, and nothing is
+		// close enough to the nose for its splat to reach the cell the car is driving into.
+		expect(side.filter((v) => v > 0)).toHaveLength(2);
+		expect(Math.min(...side.map(Math.abs))).toBeGreaterThan(ITEM.blastR);
+	});
+
+	it('splats your paint around you without closing a loop', () => {
+		const { s, me } = grab(KIND.rocket, 0, 0, FLIGHT);
+		const blasts = s.events.filter((e) => e.type === 'blast');
+		expect(blasts).toHaveLength(ITEM.blasts);
+		for (const b of blasts) {
+			expect(b.id).toBe(me.id);
+			expect(Math.hypot(b.x - me.x, b.z - me.z)).toBeLessThan(ITEM.blastD + 1);
+		}
+		// The ground is real, and it is small on purpose: this is the only pickup that paints without
+		// a ring, so it is a forward camp first and a handful of tiles second.
+		const won = s.counts[1] - newGame(SEED, 1, undefined, true).counts[1];
+		expect(won).toBeGreaterThan(50);
+		expect(won).toBeLessThan(TOTAL * 0.01);
+		expect(s.counts).toEqual(recount(s));
+		// No ring was closed, so nothing of the run-out was banked and the trail is untouched.
+		expect(s.events.some((e) => e.type === 'capture')).toBe(false);
+	});
+
+	it('never takes a square of a rival home', () => {
+		// Fired point blank into seat 2's home. setOwner refuses another car's home cell, so the worst
+		// a rocket can do is ring the square — it can never lock a rival out of its own respawn.
+		const [hx, hz] = START_POS[1];
+		const { s } = grab(KIND.rocket, hx, hz, FLIGHT);
+		for (let i = 0; i < TOTAL; i++) if (s.home[i] === 2) expect(s.owner[i]).toBe(2);
+		expect(s.counts[1]).toBeGreaterThan(newGame(SEED, 1, undefined, true).counts[1]); // not vacuous
+	});
+});
+
+describe('bolides boost and wide trail', () => {
+	/** Solo, one straight line at full throttle from the west side, boost held on or off. Same shape
+	 *  as the tar run above: nothing steers, so only the speed term can move the answer. */
+	const topSpeed = (boostT: number) => {
+		const s = newGame(SEED);
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; });
+		const me = s.cars[0];
+		me.x = -40; me.z = 0; me.px = -40; me.pz = 0;
+		me.heading = 0; me.vh = 0; me.speed = CFG.cruise;
+		for (let i = 0; i < 90; i++) {
+			me.boostT = boostT;
+			stepGame(s, 0, 1, 1 / 60);
+		}
+		expect(Math.abs(me.x)).toBeLessThan(HALF - 1); // never reached the rail, whose slide caps speed
+		return me.speed;
+	};
+
+	it('lifts the top speed above the roster maximum', () => {
+		const flat = topSpeed(0);
+		expect(flat).toBeCloseTo(CFG.maxSpeed, 0);
+		expect(topSpeed(ITEM.boostT)).toBeGreaterThan(flat * 1.1);
+	});
+
+	/** Drive due east across neutral ground, wide or not, and hand back the line it laid. Seat 2 is
+	 *  kept alive to play the blade; seats 3 and 4 are out of the way. */
+	const line = (wideT: number) => {
+		const s = newGame(SEED);
+		s.cars.slice(2).forEach((c) => { c.alive = false; c.respawnAt = 1e9; });
+		const me = s.cars[0];
+		me.x = -20; me.z = 0; me.px = -20; me.pz = 0;
+		me.heading = 0; me.vh = 0; me.speed = CFG.cruise; me.outside = true;
+		s.cars[1].outside = false; // its own loop stays out of this
+		for (let i = 0; i < 60; i++) {
+			me.wideT = wideT;
+			stepGame(s, 0, 0, 1 / 60);
+		}
+		return { s, me, foe: s.cars[1] };
+	};
+
+	const rows = (car: Car) => new Set(car.trail.map((c) => Math.floor(c / GRID)));
+
+	it('lays ITEM.wideR cells either side of the path', () => {
+		expect(rows(line(0).me).size).toBe(1); // due east on one row: the control has to be a hairline
+		expect(rows(line(ITEM.wide).me).size).toBe(1 + 2 * ITEM.wideR);
+	});
+
+	it('makes a flank cell cut like any other, so a fat line is a fat target too', () => {
+		const { s, me, foe } = line(ITEM.wide);
+		const mid = Math.floor(me.trail[0] / GRID); // visitCell pushes the centre cell before its flanks
+		const flank = me.trail.filter((c) => Math.floor(c / GRID) !== mid);
+		expect(flank.length).toBeGreaterThan(20);
+		driveOnto(s, foe, flank[0]);
+		expect(me.alive).toBe(false);
+		expect(s.events.some((e) => e.type === 'kill' && e.killer === foe.id)).toBe(true);
+	});
+
+	/** Full lock out of home until the first ring closes: how long the car had to drive to earn it. */
+	const ringClock = (wideT: number) => {
+		const s = newGame(SEED);
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; });
+		for (let i = 0; i < 1200; i++) {
+			s.cars[0].wideT = wideT;
+			stepGame(s, 1, 0, 1 / 60);
+			if (s.events.some((e) => e.type === 'capture' && e.id === 1)) return s.clock;
+			s.events.length = 0;
+		}
+		return -1;
+	};
+
+	it('still has to draw a real ring while the line is fat', () => {
+		// A fat line pushes 1 + 2*wideR cells per step, so an unscaled `grace` window would be spent in
+		// a third of the driving and the car would close on the cell beside it for no ground at all.
+		const flat = ringClock(0);
+		expect(flat).toBeGreaterThan(0);
+		expect(ringClock(ITEM.wide)).toBeGreaterThan(flat * 0.7);
 	});
 });
 

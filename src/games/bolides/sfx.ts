@@ -481,10 +481,31 @@ export function countdown(n: number): void {
 
 /** Pickup grabbed, `kind` as in engine KIND: two rising blips, the arcade "got it" and nothing
  *  heavier — it fires every few seconds and must not compete with a capture. Each kind gets its
- *  own interval and tail, so the ear tells the three apart without looking at the pastille. */
+ *  own interval and tail, so the ear tells the six apart without looking at the pastille. */
 export function item(kind = 0): void {
 	const c = gate('item', 90);
 	if (!c) return;
+	if (kind === 3) {
+		// The launch, not the landing — four shells leaving at once is what earns the body hit here.
+		// The splats answer for themselves a beat later, through `splat`.
+		tone(c, 'square', 330, 110, 0.10, 0.20);
+		noiseHit(c, 'lowpass', 700, 1.2, 0.20, 0.30, 0.02);
+		noiseHit(c, 'bandpass', 1800, 3, 0.07, 0.16, 0.10);
+		return;
+	}
+	if (kind === 4) {
+		// The same rush as a drift boost, quieter: it is the pickup blip, not the payoff.
+		whoosh(c, 600, 3000, 1.4, 0.11, 0.24);
+		tone(c, 'sawtooth', 330, 990, 0.10, 0.22);
+		return;
+	}
+	if (kind === 5) {
+		// Two voices spreading apart, because that is what the trail does.
+		tone(c, 'triangle', 660, 494, 0.13, 0.22);
+		tone(c, 'triangle', 660, 880, 0.13, 0.22);
+		noiseHit(c, 'bandpass', 1400, 4, 0.05, 0.14, 0.08);
+		return;
+	}
 	if (kind === 2) {
 		// Falling, not rising: this one arms the ground behind you, it does not lift the car.
 		tone(c, 'triangle', 587, 587, 0.16, 0.12);
@@ -501,6 +522,15 @@ export function item(kind = 0): void {
 	tone(c, 'triangle', 784, 784, 0.16, 0.10);
 	tone(c, 'triangle', 1175, 1175, 0.14, 0.16, 0.07);
 	tone(c, 'sine', 2349, 2349, 0.05, 0.12, 0.07);
+}
+
+/** A rocket shell hitting the ground. Short and wet — four land 0.11 s apart, so anything with a
+ *  tail would smear into one long noise instead of four beats. */
+export function splat(): void {
+	const c = gate('splat', 60);
+	if (!c) return;
+	noiseHit(c, 'lowpass', 900, 1, 0.16, 0.13);
+	tone(c, 'sine', 240, 90, 0.12, 0.14);
 }
 
 /** Drift boost released: a filtered rush plus a pitch sweep up. */
