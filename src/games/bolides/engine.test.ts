@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	createGame as newGame, stepGame, stepGuest, resetGame, collectEvents, buildSim, applySim,
-	setCarLookup, BASE_CAR, GRID, CELL, pct, cellAt, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, angleDiff,
+	setCarLookup, BASE_CAR, GRID, CELL, pct, cellAt, cellCenterX, cellCenterZ, TOTAL, HALF, CFG, ITEM, angleDiff,
 	START_POS,
 	type Car, type GameState, type NetEvent,
 } from './engine';
@@ -513,6 +513,121 @@ describe('bolides shield', () => {
 		expect(victim.alive).toBe(true);
 		expect(attacker.trail.length).toBe(12); // no ring at stake at home, so nothing to lose
 		expect(s.events.some((e) => e.type === 'snap')).toBe(false);
+	});
+});
+
+describe('bolides pickups', () => {
+	/** Solo on a fully painted arena: the car never leaves the slippery surface, so the corner
+	 *  under test is the same one every time and only the bonus can change its outcome. */
+	const cornerOnPaint = (gripT: number) => {
+		const s = newGame(SEED);
+		s.owner.fill(1);
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; });
+		const me = s.cars[0];
+		me.x = 0; me.z = 0; me.px = 0; me.pz = 0;
+		me.heading = 0; me.vh = 0; me.speed = CFG.cruise;
+		let drift = 0;
+		for (let i = 0; i < 90; i++) {
+			me.gripT = gripT; // held on, so the whole corner is measured under the same surface
+			stepGame(s, 1, 0, 1 / 60);
+			if (me.drifting) drift++;
+		}
+		return drift;
+	};
+
+	it('makes paint hold like bare ground while it runs', () => {
+		// The bonus is one term in stepCar's traction ceiling. The only proof worth having is that
+		// the corner which breaks traction on paint stops breaking it under the bonus.
+		expect(cornerOnPaint(0)).toBeGreaterThan(30);
+		expect(cornerOnPaint(10)).toBe(0);
+	});
+
+	it('is grabbed by driving over it, and the slot goes dark then returns to its post', () => {
+		const s = newGame(SEED, 1, undefined, true);
+		expect(s.items).toHaveLength(ITEM.plan.length);
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; });
+		const me = s.cars[0];
+		s.items[0].shield = false; // a slot's kind is redrawn on every respawn; pin it to test grip
+		const { x, z } = s.items[0];
+		me.x = x; me.z = z; me.px = x; me.pz = z;
+		stepGame(s, 0, 0, 1 / 60);
+		expect(me.gripT).toBe(ITEM.grip);
+		expect(s.events.some((e) => e.type === 'item' && e.id === me.id)).toBe(true);
+		expect(s.items[0].at).toBeGreaterThan(s.clock); // taken: the slot is dark for ITEM.respawn
+		expect(s.items[0].x === x && s.items[0].z === z).toBe(false);
+	});
+
+	it('keeps a doorway slot on the arena side of its own home, before and after a grab', () => {
+		// The whole point of the doorway: a loop always comes home to close, so the bonus is picked
+		// up on the way back OUT, over one's own paint. A slot drifting away breaks that promise.
+		const s = newGame(SEED, 1, undefined, true);
+		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; });
+		const me = s.cars[0];
+		const [cx, cz] = START_POS[0];
+		for (let i = 0; i < 6; i++) {
+			const it = s.items[0];
+			expect(Math.max(Math.abs(it.x - cx), Math.abs(it.z - cz))).toBeCloseTo(ITEM.door, 6);
+			expect(Math.abs(it.x) < Math.abs(cx) || Math.abs(it.z) < Math.abs(cz)).toBe(true); // arena side
+			expect(Math.max(Math.abs(it.x), Math.abs(it.z))).toBeLessThan(HALF);
+			it.at = 0; // light it back up, then take it again to force a fresh placement
+			me.x = it.x; me.z = it.z; me.px = it.x; me.pz = it.z;
+			stepGame(s, 0, 0, 1 / 60);
+		}
+	});
+
+	/** Attacker in seat 1, victim in seat 2 with a long trail on neutral ground, both away from home
+	 *  so nothing but the cut under test moves. Same shape as the bunker duel above. */
+	function duel() {
+		const s = newGame(SEED, 1, ['roadster', 'comet', 'roadster', 'roadster']);
+		const attacker = s.cars[0];
+		const victim = s.cars[1];
+		s.cars.slice(2).forEach((c) => { c.alive = false; c.respawnAt = 1e9; });
+		victim.outside = false;
+		layTrail(s, victim, 100, 100);
+		layTrail(s, attacker, 98, 12);
+		attacker.outside = true;
+		return { s, attacker, victim };
+	}
+
+	it('makes the whole trail uncuttable and breaks the blade of whoever tries', () => {
+		// The half worth having: loops die to a rival 23.7x a race and to a self-cut 1.3x. Under the
+		// shield even the oldest cell holds, which the car's own cfg.shield window never covers.
+		const { s, attacker, victim } = duel();
+		expect(victim.cfg.shield).toBe(0); // no built-in armour: the pickup is the only thing at work
+		victim.shieldT = ITEM.shield;
+		driveOnto(s, attacker, victim.trail[0]);
+		expect(victim.alive).toBe(true);
+		expect(victim.trail.length).toBe(100);
+		expect(attacker.trail.length).toBe(0);
+		expect(s.events.some((e) => e.type === 'snap' && e.id === attacker.id && !e.self)).toBe(true);
+	});
+
+	it('lets you drive through your own line while it runs', () => {
+		// Run the untreated control first, or "the trail survived" proves nothing about the shield.
+		const crossOwnLine = (shieldT: number) => {
+			const { s, victim } = duel();
+			victim.outside = true;
+			victim.shieldT = shieldT;
+			driveOnto(s, victim, victim.trail[0]);
+			return { len: victim.trail.length, snapped: s.events.some((e) => e.type === 'snap') };
+		};
+		expect(crossOwnLine(0)).toEqual({ len: 0, snapped: true });
+		expect(crossOwnLine(ITEM.shield)).toEqual({ len: 100, snapped: false });
+	});
+
+	it('stays out of the arena unless asked for — the daily and the online race never see one', () => {
+		// Free play only: the daily is a ranked score tuned over hundreds of races, and a guest
+		// runs stepGuest, which has no grid and so could never agree on who grabbed what.
+		const s = createGame();
+		expect(s.items).toHaveLength(0);
+		let items = 0;
+		for (let i = 0; i < 1200; i++) {
+			stepGame(s, i % 300 < 220 ? 1 : -1, 1, 1 / 60);
+			items += s.events.filter((e) => e.type === 'item').length;
+			s.events.length = 0;
+		}
+		expect(items).toBe(0);
+		expect(s.cars.every((c) => c.gripT === 0 && c.shieldT === 0)).toBe(true);
 	});
 });
 

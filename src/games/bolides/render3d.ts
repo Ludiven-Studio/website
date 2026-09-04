@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
-	ARENA, CELL, CFG, GRID, HALF, PALETTE, TOTAL, angleDiff,
+	ARENA, CELL, CFG, GRID, HALF, ITEM, PALETTE, TOTAL, angleDiff,
 	type GameState, type Car,
 } from './engine';
 
@@ -54,6 +54,11 @@ const mixHex = (a: number, b: number, t: number) => {
 	const [ar, ag, ab] = rgb(a), [br, bg, bb] = rgb(b);
 	return (mix(ar, br, t) << 16) | (mix(ag, bg, t) << 8) | mix(ab, bb, t);
 };
+const ITEM_COL = 0x8FF6FF; // grip pickup: cyan-white, the one hue no car can claim
+// Shield pickup. Hue AND shape differ (pink, a ring instead of a diamond): at 30 units out a
+// pastille is a dozen pixels, and colour alone is not a cue you can rely on at that size.
+const SHIELD_COL = 0xFF9BE8;
+
 const TAU = Math.PI * 2;
 // Little-endian byte order (every shipping target), so a canvas pixel is one u32 store.
 const pack = (r: number, g: number, b: number, a = 255) => (((a << 24) | (b << 16) | (g << 8) | r) >>> 0);
@@ -1095,6 +1100,36 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	riskRing.visible = false;
 	scene.add(riskRing);
 
+	// Pickups. Cyan and pink are the two hues no car owns, so a pastille can never be misread as a
+	// patch of somebody's paint — which is the only thing else on that floor. Built even when the
+	// mode is off; the slots simply stay hidden.
+	const itemGeo = new THREE.OctahedronGeometry(0.6);
+	const shieldGeo = new THREE.TorusGeometry(0.55, 0.16, 8, 20);
+	const itemRingGeo = new THREE.RingGeometry(1.0, 1.3, 32);
+	const itemSlots = Array.from({ length: ITEM.plan.length }, () => {
+		const g = new THREE.Group();
+		const core = new THREE.Mesh(itemGeo, new THREE.MeshBasicMaterial({ color: ITEM_COL, fog: false, toneMapped: false }));
+		const shield = new THREE.Mesh(shieldGeo, new THREE.MeshBasicMaterial({ color: SHIELD_COL, fog: false, toneMapped: false }));
+		const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+			map: glowTex, color: ITEM_COL, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false,
+		}));
+		halo.scale.set(3.6, 3.6, 1);
+		halo.position.y = 1;
+		// The ground ring is what makes it findable: from the chase cam a floating chip 30 units out
+		// is a few pixels, while a mark ON the floor keeps the perspective that says "over there".
+		// Its OUTER edge is the grab reach, scaled per slot below — a doorway reaches 3.5 units and
+		// drawing it as a dot would teach a rule the engine does not follow.
+		const ring = new THREE.Mesh(itemRingGeo, new THREE.MeshBasicMaterial({
+			color: ITEM_COL, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false,
+		}));
+		ring.rotation.x = -Math.PI / 2;
+		ring.position.y = 0.05;
+		g.add(core, shield, halo, ring);
+		g.visible = false;
+		scene.add(g);
+		return { g, core, shield, halo, ring };
+	});
+
 	// Rail contact flare, ON the rail. A billboard, not a quad in the wall plane: you always
 	// slide ALONG a wall, so a wall-plane quad is seen edge-on and collapses to a white bar.
 	// Doubles as the proximity warning when the hero closes on a boundary.
@@ -1358,6 +1393,15 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		miniCtx.drawImage(trailC.c, 0, 0, TRAIL_W, TRAIL_W, 0, 0, W, H);
 		miniCtx.textAlign = 'center';
 		miniCtx.textBaseline = 'middle';
+		// Under the car dots: a pickup must never hide the rival about to cut your line.
+		for (const it of s.items) {
+			if (s.clock < it.at) continue;
+			miniCtx.fillStyle = cssHex(it.shield ? SHIELD_COL : ITEM_COL);
+			const mx = ((it.x + HALF) / ARENA) * W, my = ((it.z + HALF) / ARENA) * H;
+			miniCtx.beginPath();
+			miniCtx.arc(mx, my, 2.2 * k, 0, TAU);
+			miniCtx.fill();
+		}
 		for (const car of s.cars) {
 			if (!car.alive) continue;
 			const hero = car.id === s.hero;
@@ -1544,6 +1588,13 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			} else if (e.type === 'respawn') {
 				spawn(burst, e.x, e.z, PALETTE[e.id], 5, 4, 22, 0.7);
 				const i = carIndex(s, e.id); if (i >= 0) decalOk[i] = 0;
+			} else if (e.type === 'item') {
+				// A small clean pop: it is a gain, so it must not borrow the kill's shards nor the
+				// capture's shockwave — the two beats the player already reads instantly.
+				const col = e.shield ? SHIELD_COL : ITEM_COL;
+				spawn(burst, e.x, e.z, col, 3.5, 4.5, 18, 0.55, 1.4, 0, 0, 1);
+				popRing(e.x, e.z, col, 1.4, 14);
+				if (e.id === s.hero) setShake(0.22, 0.10);
 			}
 		}
 		// events are cleared by the React loop after both render + UI have read them.
@@ -1666,6 +1717,27 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			if (wallFlare < 2) scrapeGlow.position.set((wallFlare === 0 ? 1 : -1) * (HALF - 0.05), 1.0, bz);
 			else scrapeGlow.position.set(bx, 1.0, (wallFlare === 2 ? 1 : -1) * (HALF - 0.05));
 		}
+		// Pickups: bob + spin so a static chip on a static floor still catches the eye, and pulse the
+		// ground ring in place of any spawn animation.
+		for (let i = 0; i < itemSlots.length; i++) {
+			const it = s.items[i], o = itemSlots[i];
+			const live = !!it && s.clock >= it.at;
+			o.g.visible = live;
+			if (!live || !it) continue;
+			o.g.position.set(it.x, 0, it.z);
+			const col = it.shield ? SHIELD_COL : ITEM_COL;
+			o.core.visible = !it.shield;
+			o.shield.visible = it.shield;
+			const body = it.shield ? o.shield : o.core;
+			body.position.y = 1 + Math.sin(fxTime * 3 + i) * 0.22;
+			body.rotation.set(fxTime * 0.9, fxTime * 1.6, 0);
+			(o.halo.material as THREE.SpriteMaterial).color.setHex(col);
+			o.ring.scale.setScalar((it.role >= 0 ? ITEM.doorR : ITEM.radius) / 1.3);
+			const rm = o.ring.material as THREE.MeshBasicMaterial;
+			rm.color.setHex(col);
+			rm.opacity = 0.35 + 0.25 * Math.sin(fxTime * 3 + i);
+		}
+
 		heroRing.visible = hero.alive;
 		riskRing.visible = hero.alive && risk > 0.02;
 		if (hero.alive) {
@@ -1674,7 +1746,11 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			// outer ring, in the complement of the ground being crossed, so it cannot blend into it.
 			const beat = 0.5 + 0.5 * Math.sin(fxTime * 9);
 			const mat = heroRing.material as THREE.MeshBasicMaterial;
-			mat.color.setHex(PALETTE[s.hero]);
+			// The ownership ring doubles as the bonus gauge: cyan for as long as the grip lasts, so
+			// the timer is under the car and not in a corner of the HUD nobody looks at while racing.
+			// Shield wins the ring when both run: it is the one that decides whether you survive.
+			const buff = hero.shieldT > 0 ? SHIELD_COL : hero.gripT > 0 ? ITEM_COL : 0;
+			mat.color.setHex(buff ? mixHex(PALETTE[s.hero], buff, 0.75) : PALETTE[s.hero]);
 			mat.opacity = 0.55 + risk * (0.15 + 0.3 * beat);
 			heroRing.scale.setScalar(1 + risk * 0.12 * beat);
 			if (riskRing.visible) {

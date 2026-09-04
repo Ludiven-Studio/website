@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import {
 	createGame, resetGame, stepGame, stepGuest, applySim, setRemotePose, collectEvents, buildSim, readPose,
-	pct, NAMES, PALETTE, DIFFS, CFG, CAR_COUNT, type GameState, type NetEvent,
+	pct, NAMES, PALETTE, DIFFS, CFG, ITEM, CAR_COUNT, type GameState, type NetEvent,
 } from './engine';
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, goCars, MAX_PLAYERS, type Match, type BolidePeer, type GoMsg } from './net';
 import { createRenderer, type Renderer } from './render3d';
@@ -133,6 +133,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0); // remounts the Leaderboard so a replay retries its submit
 	const [submitVal, setSubmitVal] = useState<number | undefined>(undefined);
 	const [respawnIn, setRespawnIn] = useState(0); // seconds left before the player is back
+	const [gripIn, setGripIn] = useState(0); // seconds of grip bonus left (free play only)
+	const [shieldIn, setShieldIn] = useState(0); // seconds of shield left
 	const [firstDeath, setFirstDeath] = useState(false); // the "what happened" line, once per run
 	const [startHint, setStartHint] = useState(false); // touch control chip, first seconds of a race
 	const [left, setLeft] = useState<number>(CFG.timeLimit); // seconds left in the race
@@ -307,6 +309,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			else if (e.type === 'kill') { if (e.killer === s.hero) sfx.kill(); }
 			else if (e.type === 'death') { if (e.isPlayer) { deathsRef.current++; sfx.death(); setFirstDeath(deathsRef.current === 1); } }
 			else if (e.type === 'snap') { if (e.isPlayer) sfx.snap(); }
+			else if (e.type === 'item') { if (e.id === s.hero) sfx.item(e.shield); }
 			else if (e.type === 'win') { if (e.id === s.hero) sfx.win(); else sfx.lose(); }
 			else if (e.type === 'respawn') {
 				// A driver we just put back home keeps sending poses from the crash site for one RTT.
@@ -344,6 +347,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			vigRef.current?.style.setProperty('--bo-rush', (r?.fx.rush ?? 0).toFixed(2));
 			syncBoard();
 			setRespawnIn(hero.alive ? 0 : Math.max(1, Math.ceil(hero.respawnAt - s.clock)));
+			setGripIn(Math.ceil(hero.gripT));
+			setShieldIn(Math.ceil(hero.shieldT));
 			setLeft(Math.max(0, Math.ceil(CFG.timeLimit - s.clock)));
 		}
 
@@ -367,6 +372,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			if (r.current) r.current.style.display = 'none';
 		}
 		setRespawnIn(0);
+		setGripIn(0);
+		setShieldIn(0);
 		setFirstDeath(false);
 		setLeft(CFG.timeLimit);
 		setStartHint(true);
@@ -380,11 +387,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		return () => clearTimeout(t);
 	}, [startHint]);
 
-	/** Start a run for the given seed/diff and go live. Offline: car 1 is ours, the rest are bots. */
-	const launch = useCallback((seed: number, diff: number) => {
+	/** Start a run for the given seed/diff and go live. Offline: car 1 is ours, the rest are bots.
+	 *  `items` is free play only: the daily is a ranked score and the online race is lockstep. */
+	const launch = useCallback((seed: number, diff: number, items = false) => {
 		const s = stateRef.current;
 		const ids = offlineCars(carRef.current, seed);
-		resetGame(s, seed, diff, ids);
+		resetGame(s, seed, diff, ids, items);
 		s.hero = 1;
 		s.record = false;
 		for (const c of s.cars) { c.remote = false; c.isBot = c.id !== 1; }
@@ -414,7 +422,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		modeRef.current = mode;
 		if (mode === 'libre') {
 			dailyBestRef.current = 0;
-			launch((Math.random() * 2 ** 31) >>> 0, 1);
+			launch((Math.random() * 2 ** 31) >>> 0, 1, true);
 			trackGame(gameId, 'game_started', { mode: 'free', car: carRef.current });
 			return;
 		}
@@ -772,6 +780,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			return {
 				car: carRef.current, seats: seatCarsRef.current, sound: sfx.stats(),
 				speed: hero.speed, heading: hero.heading, trail: hero.trail.length,
+				x: hero.x, z: hero.z, gripT: hero.gripT, shieldT: hero.shieldT, clock: s.clock,
+				items: s.items.filter((i) => s.clock >= i.at).map((i) => ({ x: i.x, z: i.z, shield: i.shield })),
 			};
 		};
 		return () => { delete w.__bolides; };
@@ -1072,6 +1082,13 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
+				{phase === 'playing' && respawnIn === 0 && (gripIn > 0 || shieldIn > 0) && (
+					<div className="bo-buffs">
+						{shieldIn > 0 && <span className="bo-grip bo-shield">🛡 Intouchable <b>{shieldIn}s</b></span>}
+						{gripIn > 0 && <span className="bo-grip">⚡ Adhérence <b>{gripIn}s</b></span>}
+					</div>
+				)}
+
 				{phase === 'playing' && startHint && respawnIn === 0 && (
 					<div className="bo-startchip">
 						{stick === 'two' ? 'Pouce gauche = braquer · pouce droit = vitesse' : 'Glisse : côté = braquer, haut/bas = vitesse'}
@@ -1271,6 +1288,15 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				{mode === 'defi' && ' Le défi du jour partage la même arène et le même classement pour tout le monde.'}
 				{mode === 'online' && ` En ligne, jusqu'à ${MAX_PLAYERS} pilotes courent dans la même arène : partie rapide pour tomber sur n'importe qui, code ami pour jouer entre vous. Les places libres restent tenues par des bots.`}
 			</p>
+
+			{mode === 'libre' && (
+				<div className="bo-items">
+					<b>Les pastilles (partie libre)</b>
+					<p><span className="bo-dot bo-dot-grip" /> <b>Adhérence</b> — pendant {ITEM.grip}&nbsp;s la peinture accroche comme le sol nu&nbsp;: tu traces au cordeau là où ça glissait.</p>
+					<p><span className="bo-dot bo-dot-shield" /> <b>Intouchable</b> — pendant {ITEM.shield}&nbsp;s ta trace ne se coupe plus. Le rival qui essaie casse sa propre boucle.</p>
+					<p className="bo-items-note">Elles attendent en travers de chaque camp et au centre, et reviennent {ITEM.respawn}&nbsp;s après&nbsp;: celle de ta porte, tu la reprends à chaque boucle bouclée. Hors du défi du jour, qui reste la même course pour tout le monde.</p>
+				</div>
+			)}
 		</div>
 	);
 }
@@ -1299,6 +1325,7 @@ const CSS = `
 .game-page.gf-full .bo-canvas { border-radius: 0; border: none; }
 .game-page.gf-full .bo-overlay { border-radius: 0; }
 .game-page.gf-full .bo-help,
+.game-page.gf-full .bo-items,
 .game-page.gf-full .bo-modetoggle,
 .game-page.gf-full .bo-lb { display: none; }
 /* Keep the standings clear of the "⛶ Quitter" button pinned to the same corner. */
@@ -1356,6 +1383,19 @@ const CSS = `
   animation: bo-chip 2.6s ease-out forwards;
 }
 @keyframes bo-chip { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+/* Top centre: the bottom belongs to the two thumbs, and the corners to the map and the board. */
+.bo-buffs {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3;
+  display: flex; gap: 6px; pointer-events: none;
+}
+.bo-grip {
+  white-space: nowrap; color: #EAFEFF;
+  background: rgba(6,8,16,0.80); border: 1px solid rgba(143,246,255,0.55); border-radius: 999px;
+  padding: 4px 12px; font-size: 13px; font-weight: 700;
+  box-shadow: 0 0 14px rgba(143,246,255,0.35);
+}
+.bo-shield { color: #FFEAFA; border-color: rgba(255,155,232,0.6); box-shadow: 0 0 14px rgba(255,155,232,0.35); }
+.bo-grip b { font-family: var(--font-brand); }
 @media (pointer: coarse) { .bo-startchip { display: block; } }
 .game-page.gf-full .bo-respawn, .game-page.gf-full .bo-startchip { bottom: max(10px, calc(env(safe-area-inset-bottom) + 6px)); }
 .bo-minimap {
@@ -1559,6 +1599,15 @@ const CSS = `
 .bo-short { font-style: normal; font-size: 9px; font-weight: 700; color: var(--bo-ink-dim); white-space: nowrap; }
 .bo-garageclose { align-self: center; flex: none; font-size: 14px; padding: 9px 26px; margin-top: 2px; }
 .bo-help { max-width: 460px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin: 1rem auto 0; }
+/* The pickups are a rule, not a footnote: left-aligned, one line each, a pip in the pastille's own
+   colour so the card and the arena teach the same thing. */
+.bo-items { max-width: 460px; margin: 0.75rem auto 0; padding: 10px 14px; border: 1px solid var(--bo-line); border-radius: 12px; background: rgba(12,10,28,0.45); color: var(--bo-ink); font-size: 13px; line-height: 1.5; }
+.bo-items > b { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--bo-ink-dim); }
+.bo-items p { margin: 0 0 5px; }
+.bo-items-note { color: var(--bo-ink-dim); font-size: 12px; }
+.bo-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 1px; }
+.bo-dot-grip { background: #8FF6FF; box-shadow: 0 0 8px rgba(143,246,255,0.8); }
+.bo-dot-shield { background: #FF9BE8; box-shadow: 0 0 8px rgba(255,155,232,0.8); }
 
 /* --- narrow / short: the board is the game, the HUD is a garnish --- */
 @media (max-width: 700px), (max-height: 560px) {
@@ -1566,7 +1615,7 @@ const CSS = `
   /* 3/4 pins the board to 436px on a 390px phone, so max-height never binds and 155px of the
      screen is wasted. While racing the board takes the height it is allowed. */
   .bo-root.racing .bo-boardwrap { aspect-ratio: auto; height: 70svh; max-height: none; }
-  .bo-root.racing .bo-help, .bo-root.racing .bo-modetoggle { display: none; }
+  .bo-root.racing .bo-help, .bo-root.racing .bo-items, .bo-root.racing .bo-modetoggle { display: none; }
   /* The menu overlay is the idle state, not a modal: it must stay inside the board or it
      covers the mode tabs and the page for good. It gets a taller board and a tighter card
      instead, so the CTA still lands above the fold. */

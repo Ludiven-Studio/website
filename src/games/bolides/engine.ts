@@ -80,6 +80,43 @@ export const CFG = {
  *  Both the turning circle and the traction ceiling are measured against it (see stepCar). */
 const FLAT_OUT = (CFG.maxSpeed * CFG.maxSpeed) / CFG.turnRadius;
 
+/* Grip pickups. The one bonus axis the physics already has a hole for: the surface under the car
+   picks gripPaint or gripBare, so "keep bare-ground grip on paint" is one term in stepCar and
+   nothing else moves. Speed bonuses are NOT the same thing — the turning radius opens with speed,
+   so a boost widens your corners and a slow spell tightens the victim's. Off by default: the flag
+   is the empty item list, so the ranked daily and the lockstep online race are untouched. */
+export const ITEM = {
+	// One slot per role, in order. 0..3 = the doorway of that seat's home, -1 = the arena hub,
+	// -2 = anywhere. Doorways beat uniform spawns because a loop ALWAYS comes home to close, so
+	// the bonus is picked up on the way back out — over the paint, where it is worth having.
+	plan: [0, 1, 2, 3, -1, -1],
+	radius: 1.6, // world units: how close the car has to pass to grab one
+	// Same, for a doorway slot — but wider, because a home edge is ~44 units round and a dot on it
+	// is a lottery: at 1.6 the doorways FED LESS than uniform spawns (8.5 grabs a race against
+	// 14.2). Widening feeds twice a lap (13.6 -> 27.7 -> 54.3 grabs at 1.6 / 3.5 / 6) but eats the
+	// slide it is meant to reward (drift 53.9 -> 49.8 -> 41.4 %). 3.5 is the last width that keeps
+	// the paint slippery, so a doorway is a band across the camp mouth, not a dot.
+	doorR: 3.5,
+	respawn: 3, // seconds before a taken slot lights back up
+	grip: 5, // seconds the grip bonus runs
+	// The second kind. Measured 2026-09-04 (bolides-item.mjs): loops die to a rival's blade 23.7x
+	// per race and to a self-cut 1.3x, so "nobody can cut you" is the half worth having — but both
+	// halves ride the same flag, because to the player it is one idea: your line is untouchable.
+	// The share is not a difficulty knob, it is how loud the arena is: at 0 / 0.5 / 1 a race has
+	// 23.9 / 21.4 / 18.8 kills and 0 / 11.4 / 24.1 blades broken on a shield. Half keeps the blade
+	// the main way a loop dies, and adds a second one that costs the ATTACKER instead.
+	shieldShare: 0.5, // share of respawns that come back as a shield instead of grip
+	shield: 5, // seconds the shield holds
+	door: 5.5, // distance from a home centre to its doorway ring — just outside the painted square
+	hub: 16, // hub slots stay inside this radius of the arena middle
+	margin: 8, // keep loose spawns this far from the rail — a pickup on the wall is a trap
+};
+
+/** A pickup slot. `at` is the clock time it goes live; before that the slot is dark. `role` is its
+ *  entry in ITEM.plan and never changes, so a slot always comes back to its post. `shield` is
+ *  redrawn on every respawn, so the same post is not always the same bonus. */
+export interface Item { x: number; z: number; at: number; role: number; shield: boolean }
+
 // Daily difficulty (diffIndex 0..2): harder = bolder, more aggressive bots = more danger.
 export const DIFFS = [
 	{ label: 'Facile', aggro: 0.18, outMax: 20 },
@@ -136,6 +173,8 @@ export interface Car {
 	turnRate: number; // current (eased) angular velocity
 	vh: number; // heading the car actually travels along; lags `heading` when grip is low
 	driftT: number; // seconds of traction loss left
+	gripT: number; // seconds of pickup grip left: paint holds like bare ground while it runs
+	shieldT: number; // seconds of pickup shield left: the whole trail is uncuttable, by anyone
 	drifting: boolean;
 	scraping: boolean; // rubbing the arena rail (slowed down; renderer throws sparks)
 	outside: boolean; // currently laying a trail (out of own territory)
@@ -153,8 +192,11 @@ export type GameEvent =
 	| { type: 'capture'; id: number; cx: number; cz: number; gain: number }
 	| { type: 'kill'; killer: number; victim: number; x: number; z: number }
 	| { type: 'death'; id: number; x: number; z: number; isPlayer: boolean }
-	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean } // cut your own trail
+	// Lost the loop but not the car. `self` splits the two ways that happens: crossing your own line
+	// (self) or breaking your blade on a shielded rival (not self). `lost` is the trail it cost.
+	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean; self: boolean; lost: number }
 	| { type: 'respawn'; id: number; x: number; z: number }
+	| { type: 'item'; id: number; x: number; z: number; shield: boolean } // grabbed a pickup
 	| { type: 'win'; id: number; byTime: boolean };
 
 export interface GameState {
@@ -162,6 +204,7 @@ export interface GameState {
 	home: Uint8Array; // cell -> car id whose start square this is (0 = none); never changes hands
 	trail: Uint8Array; // cell -> car id whose active trail sits here (0 = none)
 	cars: Car[];
+	items: Item[]; // grip pickups; EMPTY is how the mode is switched off (daily + online)
 	counts: number[]; // owned cell count per id (index 0 = neutral)
 	sumC: number[]; // running sum of col per id (for centroid)
 	sumR: number[];
@@ -251,6 +294,8 @@ function makeHome(s: GameState, car: Car, x: number, z: number): void {
 	car.turnRate = 0;
 	car.vh = car.heading;
 	car.driftT = 0;
+	car.gripT = 0; // a bonus does not survive the wreck that ended the run it was helping
+	car.shieldT = 0;
 	car.alive = true;
 	car.outside = false;
 	car.drifting = false;
@@ -271,13 +316,69 @@ export const START_POS = [
 	[HALF * 0.8, HALF * 0.8],
 ];
 
-/** `cars` holds one roster id (or ready-made table) per seat; omit it for an all-base grid. */
-export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[]): GameState {
+/** Put a slot back on its post, live in `delay` seconds. A doorway slot only ever uses the two
+ *  home sides that face the arena: the two behind it look at the wall and nobody drives there. */
+function placeItem(s: GameState, it: Item, delay: number): void {
+	it.at = s.clock + delay;
+	it.shield = s.rng() < ITEM.shieldShare;
+	if (it.role >= 0) {
+		const [cx, cz] = START_POS[it.role % START_POS.length];
+		const along = (s.rng() * 2 - 1) * ITEM.door;
+		const sx = Math.sign(cx) || 1, sz = Math.sign(cz) || 1;
+		if (s.rng() < 0.5) { it.x = cx - sx * ITEM.door; it.z = cz + along; }
+		else { it.x = cx + along; it.z = cz - sz * ITEM.door; }
+		return;
+	}
+	if (it.role === -1) {
+		const a = s.rng() * Math.PI * 2, r = Math.sqrt(s.rng()) * ITEM.hub;
+		it.x = Math.cos(a) * r; it.z = Math.sin(a) * r;
+		return;
+	}
+	const span = ARENA - ITEM.margin * 2;
+	it.x = -HALF + ITEM.margin + s.rng() * span;
+	it.z = -HALF + ITEM.margin + s.rng() * span;
+}
+
+function seedItems(s: GameState, on: boolean): void {
+	s.items.length = 0;
+	if (!on) return;
+	for (const role of ITEM.plan) {
+		const it: Item = { x: 0, z: 0, at: 0, role, shield: false };
+		placeItem(s, it, 0);
+		s.items.push(it);
+	}
+}
+
+/** Grabbed by driving over it — no aim, no button, so nothing has to change on the touch layout.
+ *  Bots collect too (they just don't go looking), or the item would be a pure player handicap
+ *  on the bots' side of the balance. */
+function stepItems(s: GameState): void {
+	for (const it of s.items) {
+		if (s.clock < it.at) continue;
+		const r = it.role >= 0 ? ITEM.doorR : ITEM.radius;
+		for (const car of s.cars) {
+			if (!car.alive) continue;
+			const dx = car.x - it.x, dz = car.z - it.z;
+			if (dx * dx + dz * dz > r * r) continue;
+			// Refreshes, never stacks. The two kinds do stack with each other: they answer different
+			// deaths, so holding both is the reward for a good lap, not a compounding buff.
+			if (it.shield) car.shieldT = ITEM.shield; else car.gripT = ITEM.grip;
+			s.events.push({ type: 'item', id: car.id, x: it.x, z: it.z, shield: it.shield });
+			placeItem(s, it, ITEM.respawn);
+			break;
+		}
+	}
+}
+
+/** `cars` holds one roster id (or ready-made table) per seat; omit it for an all-base grid.
+ *  `items` turns the grip pickups on — free play only, see ITEM. */
+export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[], items = false): GameState {
 	const s: GameState = {
 		owner: new Uint8Array(TOTAL),
 		home: new Uint8Array(TOTAL),
 		trail: new Uint8Array(TOTAL),
 		cars: [],
+		items: [],
 		counts: new Array(CAR_COUNT + 1).fill(0),
 		sumC: new Array(CAR_COUNT + 1).fill(0),
 		sumR: new Array(CAR_COUNT + 1).fill(0),
@@ -310,7 +411,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 			isBot: i !== 0,
 			alive: true,
 			x: 0, z: 0, heading: 0, speed: cfg.cruise, px: 0, pz: 0, ph: 0, turnRate: 0,
-			vh: 0, driftT: 0,
+			vh: 0, driftT: 0, gripT: 0, shieldT: 0,
 			drifting: false, scraping: false, outside: false, trail: [], respawnAt: 0,
 			bot: { phase: 'in', turnDir: 1, budget: 0, aggroTimer: 0 },
 			remote: false, netX: 0, netZ: 0, netH: 0,
@@ -318,13 +419,14 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 		s.cars.push(car);
 		makeHome(s, car, START_POS[i][0], START_POS[i][1]);
 	}
+	seedItems(s, items); // after the homes: makeHome does not touch the rng, but the order is the seed
 	return s;
 }
 
 /** Full reset in place for an instant "Rejouer" (keeps the typed arrays). Re-seeds so a
  *  daily replay faces the exact same arena; pass no seed for a fresh random libre run.
  *  `cars` re-seats the roster; omit it to keep the bolides already in place. */
-export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?: readonly CarPick[]): void {
+export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?: readonly CarPick[], items = false): void {
 	s.owner.fill(0);
 	s.home.fill(0);
 	s.trail.fill(0);
@@ -347,6 +449,7 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?:
 		if (cars) { s.cars[i].carId = pickId(cars[i]); s.cars[i].cfg = pickCfg(cars[i]); }
 		makeHome(s, s.cars[i], START_POS[i][0], START_POS[i][1]);
 	}
+	seedItems(s, items);
 }
 
 /* ---------- physics ---------- */
@@ -386,7 +489,9 @@ function stepCar(car: Car, steer: number, throttle: number, dt: number, painted:
 	// maxSpeed, a +18 % top end quietly bought +51 % of traction (the Comete drifted 0.0 % of the
 	// race) and no garage bar could show it, because the multiplier it came from was gripPaint x1.
 	// Referenced globally, gripPaint/gripBare mean one absolute load ceiling for every car.
-	const maxBend = ((painted ? cfg.gripPaint : cfg.gripBare) * FLAT_OUT / Math.max(spd, 1)) * dt;
+	// The pickup lifts the paint's ceiling to bare ground: while it runs the surface stops mattering.
+	const hold = painted && car.gripT <= 0 ? cfg.gripPaint : cfg.gripBare;
+	const maxBend = (hold * FLAT_OUT / Math.max(spd, 1)) * dt;
 	const slid = Math.abs(want) > maxBend;
 	car.vh += slid ? Math.sign(want) * maxBend : want;
 	car.driftT = slid ? cfg.driftHold : Math.max(0, car.driftT - dt);
@@ -550,15 +655,16 @@ function visitCell(s: GameState, car: Car, cell: number): boolean {
 	// harmed there — the one place a trail should be most exposed.
 	if (t !== 0 && t !== car.id) {
 		const victim = s.cars[t - 1];
-		if (!shielded(victim, cell)) {
+		if (victim.shieldT <= 0 && !shielded(victim, cell)) {
 			killCar(s, victim, !car.isBot, car.id);
 		} else if (!inside) {
 			// Snapping the attacker is not spite: it can't claim this cell, so its own ring would
 			// keep a one-cell hole, the fill would leak and the loop would die anyway — invisibly.
 			// At home there is no ring at stake, so the shield simply holds.
+			const lost = car.trail.length;
 			clearTrail(s, car);
 			mark(s);
-			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
+			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero, self: false, lost });
 			return true;
 		}
 	}
@@ -569,14 +675,15 @@ function visitCell(s: GameState, car: Car, cell: number): boolean {
 		return false;
 	}
 
-	if (t === car.id) {
+	if (t === car.id && car.shieldT <= 0) {
 		// Crossing your OWN line costs the loop, not the car — only a rival's blade kills.
 		// The fresh tail is spared, or leaving home would snap the trail on the first pixel.
 		const idx = car.trail.indexOf(cell);
 		if (idx >= 0 && idx < car.trail.length - car.cfg.grace) {
+			const lost = car.trail.length;
 			clearTrail(s, car);
 			mark(s);
-			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero });
+			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero, self: true, lost });
 			return true;
 		}
 	}
@@ -694,6 +801,8 @@ export function stepGame(
 			if (s.clock >= car.respawnAt) respawn(s, car);
 			continue;
 		}
+		if (car.gripT > 0) car.gripT = Math.max(0, car.gripT - dt);
+		if (car.shieldT > 0) car.shieldT = Math.max(0, car.shieldT - dt);
 		// The surface under the car sets how hard it is to break traction (see stepCar).
 		const painted = s.owner[cellAt(car.x, car.z)] !== 0;
 		if (car.remote) {
@@ -706,6 +815,7 @@ export function stepGame(
 		slideWalls(car, dt);
 		updateGrid(s, car);
 	}
+	if (s.items.length) stepItems(s);
 	const target = (TOTAL * CFG.winPct) / 100;
 	for (let id = 1; id <= CAR_COUNT; id++) {
 		if (s.counts[id] > target) finish(s, id, false);
@@ -744,7 +854,7 @@ export interface NetPose { id: number; x: number; z: number; h: number; vh: numb
 /** What the host tells everyone happened to the grid. Anything else is derived locally. */
 export type NetEvent =
 	| { k: 'cap'; id: number }
-	| { k: 'snap'; id: number; x: number; z: number }
+	| { k: 'snap'; id: number; x: number; z: number; sf: number }
 	| { k: 'kill'; id: number; x: number; z: number; by: number }
 	| { k: 'rsp'; id: number };
 
@@ -773,7 +883,7 @@ export function collectEvents(s: GameState, out: NetEvent[]): void {
 		if (ev.type === 'kill') by = ev.killer;
 		else if (ev.type === 'death') { out.push({ k: 'kill', id: ev.id, x: r2(ev.x), z: r2(ev.z), by }); by = 0; }
 		else if (ev.type === 'capture') out.push({ k: 'cap', id: ev.id });
-		else if (ev.type === 'snap') out.push({ k: 'snap', id: ev.id, x: r2(ev.x), z: r2(ev.z) });
+		else if (ev.type === 'snap') out.push({ k: 'snap', id: ev.id, x: r2(ev.x), z: r2(ev.z), sf: ev.self ? 1 : 0 });
 		else if (ev.type === 'respawn') out.push({ k: 'rsp', id: ev.id });
 	}
 }
@@ -801,8 +911,9 @@ function applyEvent(s: GameState, ev: NetEvent): void {
 	if (ev.k === 'cap') {
 		capture(s, car);
 	} else if (ev.k === 'snap') {
+		const lost = car.trail.length;
 		clearTrail(s, car);
-		s.events.push({ type: 'snap', id: ev.id, x: ev.x, z: ev.z, isPlayer });
+		s.events.push({ type: 'snap', id: ev.id, x: ev.x, z: ev.z, isPlayer, self: ev.sf === 1, lost });
 	} else if (ev.k === 'kill') {
 		clearTrail(s, car);
 		car.alive = false; car.drifting = false; car.scraping = false;

@@ -479,6 +479,23 @@ export function countdown(n: number): void {
 	tone(c, 'sine', 1320, 1320, 0.11, 0.42, 0.01);
 }
 
+/** Pickup grabbed: two rising blips, the arcade "got it" and nothing heavier — it fires every few
+ *  seconds and must not compete with a capture. The shield answers a fifth lower and closes on a
+ *  metal tap, so the ear tells the two kinds apart without looking at the pastille. */
+export function item(shield = false): void {
+	const c = gate('item', 90);
+	if (!c) return;
+	if (shield) {
+		tone(c, 'triangle', 523, 523, 0.16, 0.12);
+		tone(c, 'triangle', 784, 784, 0.14, 0.20, 0.07);
+		noiseHit(c, 'bandpass', 2600, 6, 0.05, 0.10, 0.07);
+		return;
+	}
+	tone(c, 'triangle', 784, 784, 0.16, 0.10);
+	tone(c, 'triangle', 1175, 1175, 0.14, 0.16, 0.07);
+	tone(c, 'sine', 2349, 2349, 0.05, 0.12, 0.07);
+}
+
 /** Drift boost released: a filtered rush plus a pitch sweep up. */
 export function boost(): void {
 	const c = gate('boost', 220);
