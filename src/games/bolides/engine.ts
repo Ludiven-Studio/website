@@ -63,7 +63,7 @@ export const CFG = {
 	gripPaint: 0.38, // wet paint gives up around cruise — hold a corner there and it goes
 	gripBare: 0.76, // bare ground holds until the last quarter of the throttle
 	driftHold: 0.46, // seconds a break lasts once the load drops back under the limit
-	grace: 14, // trail cells near the tail that can't kill you (avoid instant self-death)
+	grace: 14, // tail cells that can't close a loop — the shortest ring you are allowed to fill
 	wallDrag: 6.1, // scraping the rail bleeds speed to minSpeed — else a perimeter lap wins the map
 	wallMargin: 3, // bots start turning back this far from the arena wall
 	winPct: 50, // first car past this share of the arena wins the run
@@ -199,12 +199,14 @@ export interface Car {
 }
 
 export type GameEvent =
-	| { type: 'capture'; id: number; cx: number; cz: number; gain: number }
+	// `from` is where the closing ring started in the trail: 0 coming home, the crossing point on a
+	// self-cut. The guests need it to fill the same cells (see collectEvents).
+	| { type: 'capture'; id: number; from: number; cx: number; cz: number; gain: number }
 	| { type: 'kill'; killer: number; victim: number; x: number; z: number }
 	| { type: 'death'; id: number; x: number; z: number; isPlayer: boolean }
-	// Lost the loop but not the car. `self` splits the two ways that happens: crossing your own line
-	// (self) or breaking your blade on a shielded rival (not self). `lost` is the trail it cost.
-	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean; self: boolean; lost: number }
+	// Lost the loop but not the car. Since a self-cut fills, the only way left is breaking your own
+	// blade on a shielded rival. `lost` is the trail it cost.
+	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean; lost: number }
 	| { type: 'respawn'; id: number; x: number; z: number }
 	| { type: 'item'; id: number; x: number; z: number; kind: number } // grabbed a pickup, see KIND
 	| { type: 'win'; id: number; byTime: boolean };
@@ -596,11 +598,18 @@ function killCar(s: GameState, car: Car, byPlayer: boolean, killer: number): voi
 	void byPlayer;
 }
 
-/** Close the loop: trail cells + everything they enclose become the car's territory. */
-function capture(s: GameState, car: Car): void {
+/** Close the loop: trail cells + everything they enclose become the car's territory. `from` is where
+ *  the ring starts. A self-cut passes the crossing point, so the run out from home is dropped and
+ *  the fill is an island where the loop was drawn, not a thread back to camp. */
+function capture(s: GameState, car: Car, from = 0): void {
 	const id = car.id;
 	// Cheap guard: a border flood over 40k cells to enclose nothing is not free.
 	if (car.trail.length === 0) { car.outside = false; return; }
+	for (let i = 0; i < from; i++) {
+		const cell = car.trail[i];
+		if (s.trail[cell] === id) { s.trail[cell] = 0; s.trailDirty.push(cell); }
+	}
+	if (from > 0) car.trail.splice(0, from);
 	const before = s.counts[id];
 	// 1. the trail itself becomes owned.
 	for (const cell of car.trail) {
@@ -635,7 +644,7 @@ function capture(s: GameState, car: Car): void {
 	s.captureFlag = true;
 	mark(s);
 	const g = centroid(s, id);
-	s.events.push({ type: 'capture', id, cx: g.x, cz: g.z, gain: s.counts[id] - before });
+	s.events.push({ type: 'capture', id, from, cx: g.x, cz: g.z, gain: s.counts[id] - before });
 }
 
 function respawn(s: GameState, car: Car): void {
@@ -679,7 +688,7 @@ function visitCell(s: GameState, car: Car, cell: number): boolean {
 			const lost = car.trail.length;
 			clearTrail(s, car);
 			mark(s);
-			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero, self: false, lost });
+			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero, lost });
 			return true;
 		}
 	}
@@ -690,15 +699,13 @@ function visitCell(s: GameState, car: Car, cell: number): boolean {
 		return false;
 	}
 
-	if (t === car.id && car.shieldT <= 0) {
-		// Crossing your OWN line costs the loop, not the car — only a rival's blade kills.
-		// The fresh tail is spared, or leaving home would snap the trail on the first pixel.
+	if (t === car.id) {
+		// Crossing your OWN line CLOSES the loop instead of losing it, so a zone can be won far from
+		// home. The fresh tail is spared, or leaving home would close on the first pixel. No shield
+		// check: the shield guards the line against rivals, it must not block your own landing.
 		const idx = car.trail.indexOf(cell);
 		if (idx >= 0 && idx < car.trail.length - car.cfg.grace) {
-			const lost = car.trail.length;
-			clearTrail(s, car);
-			mark(s);
-			s.events.push({ type: 'snap', id: car.id, x: car.x, z: car.z, isPlayer: car.id === s.hero, self: true, lost });
+			capture(s, car, idx);
 			return true;
 		}
 	}
@@ -874,8 +881,8 @@ export interface NetPose { id: number; x: number; z: number; h: number; vh: numb
 
 /** What the host tells everyone happened to the grid. Anything else is derived locally. */
 export type NetEvent =
-	| { k: 'cap'; id: number }
-	| { k: 'snap'; id: number; x: number; z: number; sf: number }
+	| { k: 'cap'; id: number; i: number } // i = where the ring starts, see the capture event
+	| { k: 'snap'; id: number; x: number; z: number }
 	| { k: 'kill'; id: number; x: number; z: number; by: number }
 	| { k: 'rsp'; id: number };
 
@@ -903,8 +910,8 @@ export function collectEvents(s: GameState, out: NetEvent[]): void {
 	for (const ev of s.events) {
 		if (ev.type === 'kill') by = ev.killer;
 		else if (ev.type === 'death') { out.push({ k: 'kill', id: ev.id, x: r2(ev.x), z: r2(ev.z), by }); by = 0; }
-		else if (ev.type === 'capture') out.push({ k: 'cap', id: ev.id });
-		else if (ev.type === 'snap') out.push({ k: 'snap', id: ev.id, x: r2(ev.x), z: r2(ev.z), sf: ev.self ? 1 : 0 });
+		else if (ev.type === 'capture') out.push({ k: 'cap', id: ev.id, i: ev.from });
+		else if (ev.type === 'snap') out.push({ k: 'snap', id: ev.id, x: r2(ev.x), z: r2(ev.z) });
 		else if (ev.type === 'respawn') out.push({ k: 'rsp', id: ev.id });
 	}
 }
@@ -930,11 +937,11 @@ function applyEvent(s: GameState, ev: NetEvent): void {
 	if (!car) return;
 	const isPlayer = ev.id === s.hero;
 	if (ev.k === 'cap') {
-		capture(s, car);
+		capture(s, car, ev.i);
 	} else if (ev.k === 'snap') {
 		const lost = car.trail.length;
 		clearTrail(s, car);
-		s.events.push({ type: 'snap', id: ev.id, x: ev.x, z: ev.z, isPlayer, self: ev.sf === 1, lost });
+		s.events.push({ type: 'snap', id: ev.id, x: ev.x, z: ev.z, isPlayer, lost });
 	} else if (ev.k === 'kill') {
 		clearTrail(s, car);
 		car.alive = false; car.drifting = false; car.scraping = false;

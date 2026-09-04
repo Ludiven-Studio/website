@@ -136,25 +136,43 @@ describe('bolides engine', () => {
 		expect(Math.hypot(me.x - HALF, me.z - HALF)).toBeGreaterThan(10); // slid out of the corner
 	});
 
-	it('drops the loop, not the car, when you cross your own line', () => {
+	it('fills the loop, away from home, when you cross your own line', () => {
 		const s = createGame();
 		const me = s.cars[0];
 		s.cars.slice(1).forEach((b) => { b.alive = false; b.respawnAt = 1e9; }); // no rival blades around
 		me.x = 0; me.z = 0; me.heading = 0; // out in neutral ground: a hard circle self-crosses
 		me.px = me.x; me.pz = me.z;
-		let snaps = 0, read = 0;
+		let closes = 0, read = 0;
 		for (let i = 0; i < 600; i++) {
 			const before = me.trail.length;
 			stepGame(s, 1, 0, 1 / 60);
 			for (; read < s.events.length; read++) {
-				if (s.events[read].type !== 'snap') continue;
-				snaps++;
+				const ev = s.events[read];
+				expect(ev.type).not.toBe('snap'); // crossing your own line never costs the loop now
+				// from > 0 is the self-cut: re-entering the island just won is an ordinary capture.
+				if (ev.type !== 'capture' || ev.from === 0) continue;
+				closes++;
 				expect(before).toBeGreaterThan(CFG.grace); // never the fresh tail
-				expect(me.trail.length).toBe(0); // the whole loop is gone
+				expect(ev.gain).toBeGreaterThan(0); // the ring really enclosed something
 			}
 			expect(me.alive).toBe(true);
 		}
-		expect(snaps).toBeGreaterThan(0);
+		expect(closes).toBeGreaterThan(0);
+		// The point of the rule: flood the player's ground out of its start square and some of what
+		// it owns is not reached — a zone standing on its own, away from the main one.
+		const seen = new Uint8Array(TOTAL);
+		const stack = [cellAt(START_POS[0][0], START_POS[0][1])];
+		seen[stack[0]] = 1;
+		while (stack.length) {
+			const cell = stack.pop()!;
+			const col = cell % GRID;
+			for (const n of [col > 0 ? cell - 1 : -1, col < GRID - 1 ? cell + 1 : -1, cell - GRID, cell + GRID]) {
+				if (n >= 0 && n < TOTAL && !seen[n] && s.owner[n] === 1) { seen[n] = 1; stack.push(n); }
+			}
+		}
+		let detached = 0;
+		for (let c = 0; c < TOTAL; c++) if (s.owner[c] === 1 && !seen[c]) detached++;
+		expect(detached).toBeGreaterThan(0);
 	});
 
 	it('lays a trail with no gap in it, even flat out', () => {
@@ -423,22 +441,23 @@ describe('bolides roster', () => {
 		guest.hero = 2;
 		for (const c of guest.cars) { c.remote = c.id !== guest.hero; c.isBot = false; }
 		const pending: NetEvent[] = [];
-		let snaps = 0;
-		// Long arcs one way, shorter the other: the tape has to CROSS ITS OWN LINE or the snap
-		// assertion below is vacuous. A flat-out corner now runs wide (the radius opens with
-		// speed), so the old 60-frame alternation never closes a loop any more. Retuned again to
-		// 300/220 once the trail became continuous: 400/300 drew a clean spiral that never met
-		// itself (measured over the tapes in scripts/_bosnap.mjs).
+		let rings = 0;
+		// Long arcs one way, shorter the other: the tape has to CROSS ITS OWN LINE or the assertion
+		// below is vacuous. A self-cut fills only the ring, so the guest has to be told where that
+		// ring started — get it wrong and it owns the run-out too, which is the one desync this
+		// rule can cause. A flat-out corner now runs wide (the radius opens with speed), so the old
+		// 60-frame alternation never closes a loop any more. Retuned again to 300/220 once the trail
+		// became continuous: 400/300 drew a clean spiral that never met itself (scripts/_bosnap.mjs).
 		for (let i = 0; i < 3000 && !host.over; i++) {
 			stepGame(host, i % 300 < 220 ? 1 : -1, 1, 1 / 60);
-			snaps += host.events.filter((e) => e.type === 'snap').length;
+			rings += host.events.filter((e) => e.type === 'capture' && e.from > 0).length;
 			collectEvents(host, pending);
 			host.events.length = 0;
 			stepGuest(guest, i % 90 < 45 ? -1 : 1, 1, 1 / 60);
 			if (i % 3 === 2) applySim(guest, buildSim(host, pending));
 		}
 		expect(host.clock).toBeGreaterThan(10);
-		expect(snaps).toBeGreaterThan(0); // snaps are the shield's channel to the guests
+		expect(rings).toBeGreaterThan(0); // the tape really closed a loop on itself
 		expect(guest.owner).toEqual(host.owner);
 		expect(guest.trail).toEqual(host.trail);
 	});
@@ -599,20 +618,24 @@ describe('bolides pickups', () => {
 		expect(victim.alive).toBe(true);
 		expect(victim.trail.length).toBe(100);
 		expect(attacker.trail.length).toBe(0);
-		expect(s.events.some((e) => e.type === 'snap' && e.id === attacker.id && !e.self)).toBe(true);
+		expect(s.events.some((e) => e.type === 'snap' && e.id === attacker.id)).toBe(true);
 	});
 
-	it('lets you drive through your own line while it runs', () => {
-		// Run the untreated control first, or "the trail survived" proves nothing about the shield.
+	it('never blocks your own landing, shield up or down', () => {
+		// The shield guards the line against rivals. Were it to stop a self-cut too it would stop the
+		// fill, so the pickup that promises "untouchable" would quietly cost you the zone.
 		const crossOwnLine = (shieldT: number) => {
 			const { s, victim } = duel();
 			victim.outside = true;
 			victim.shieldT = shieldT;
 			driveOnto(s, victim, victim.trail[0]);
-			return { len: victim.trail.length, snapped: s.events.some((e) => e.type === 'snap') };
+			return {
+				len: victim.trail.length,
+				landed: s.events.some((e) => e.type === 'capture' && e.id === victim.id),
+			};
 		};
-		expect(crossOwnLine(0)).toEqual({ len: 0, snapped: true });
-		expect(crossOwnLine(ITEM.shield)).toEqual({ len: 100, snapped: false });
+		expect(crossOwnLine(0)).toEqual({ len: 0, landed: true });
+		expect(crossOwnLine(ITEM.shield)).toEqual({ len: 0, landed: true });
 	});
 
 	/** Solo, one straight line at full throttle over ground owned by `owner`. No steering, so the

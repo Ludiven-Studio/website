@@ -1177,7 +1177,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 						<div className="bo-card">
 							<h2>Course de peinture</h2>
 							<p className="bo-sub">
-								Sors de ta zone, trace une boucle, reviens chez toi pour <strong>repeindre</strong>.
+								Sors de ta zone et boucle pour <strong>repeindre</strong>&nbsp;: reviens chez toi, ou recroise ta
+								propre trace pour fermer sur place.
 								<strong> {Math.round(CFG.timeLimit / 60)} minutes</strong>, ou victoire immédiate
 								à <strong>{CFG.winPct} %</strong>.
 							</p>
@@ -1283,8 +1284,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				vers son point de départ et l'adhérence revient. En glisse tu perds de la vitesse mais tu boucles
 				plus court&nbsp;: c'est le marché.
 				Le but&nbsp;: être le premier à contrôler {CFG.winPct}&nbsp;% de l'arène.
-				Sors, boucle, reviens → capture. Recroiser ta propre trace efface la boucle en cours, sans plus&nbsp;:
-				tu repars de là. En revanche, si un rival coupe ta trace, tu réapparais au point de départ après 3&nbsp;s
+				Sors, boucle, reviens → capture. Tu peux aussi <strong>recroiser ta propre trace</strong>&nbsp;: la boucle
+				se referme sur place et se remplit, même loin de chez toi — de quoi poser des zones détachées de
+				la principale. Une petite boucle rapporte moins qu'un grand tour, mais tu la ramènes à coup sûr.
+				En revanche, si un rival coupe ta trace, tu réapparais au point de départ après 3&nbsp;s
 				pendant que les autres continuent — alors coupe la leur en premier. Une trace se coupe
 				<strong> partout</strong>, y compris chez toi&nbsp;: le rival qui traverse ton territoire y laisse
 				une ligne que tu peux trancher sans sortir de chez toi.
@@ -1296,7 +1299,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				<div className="bo-items">
 					<b>Les pastilles (partie libre)</b>
 					<p><span className="bo-dot bo-dot-grip" /> <b>⚡ Adhérence</b> — pendant {ITEM.grip}&nbsp;s la peinture accroche comme le sol nu&nbsp;: tu traces au cordeau là où ça glissait.</p>
-					<p><span className="bo-dot bo-dot-shield" /> <b>🛡 Intouchable</b> — pendant {ITEM.shield}&nbsp;s ta trace ne se coupe plus. Le rival qui essaie casse sa propre boucle.</p>
+					<p><span className="bo-dot bo-dot-shield" /> <b>🛡 Intouchable</b> — pendant {ITEM.shield}&nbsp;s ta trace ne se coupe plus. Le rival qui essaie y perd la sienne.</p>
 					<p><span className="bo-dot bo-dot-tar" /> <b>💧 Zone gluante</b> — pendant {ITEM.zone}&nbsp;s ta peinture colle&nbsp;: les autres y roulent au ralenti, toi non. Ton terrain devient un piège.</p>
 					<p className="bo-items-note">Une devant chaque camp, deux au centre, dix au hasard dans l&apos;arène&nbsp;; elles reviennent {ITEM.respawn}&nbsp;s après avoir été prises. Le dessin sur la pastille dit laquelle c&apos;est. Hors du défi du jour, qui reste la même course pour tout le monde.</p>
 				</div>
