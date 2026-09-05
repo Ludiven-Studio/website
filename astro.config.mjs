@@ -6,6 +6,10 @@ import AstroPWA from '@vite-pwa/astro';
 // https://astro.build/config
 export default defineConfig({
     site: 'https://www.ludiven-studio.fr',
+    // Vite's default baseline claims Safari 16, but three.js ships class static blocks, which
+    // Safari only parses from 16.4. A parse error takes the whole module graph down, so an
+    // iPhone below 16.4 got a black page on every 3D game, in every mode — not a render bug.
+    vite: { build: { target: ['es2020', 'safari15'] } },
     // Renamed games — keep the old URLs alive for shared links.
     redirects: {
         '/jeux/tectonique': '/jeux/tapis',
