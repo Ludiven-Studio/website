@@ -265,6 +265,29 @@ function makeGlowTexture(): THREE.CanvasTexture {
 	return t;
 }
 
+/** The head of a shell in flight: a hard-rimmed spiky disc, deliberately NOT a glow. An additive
+ *  blob is camouflage in this arena — every other bright thing is one — which is the same reason
+ *  the landing marker gave its glow up for a crisp band. Dark spikes keep the silhouette over
+ *  bright paint, the pale core keeps it over dark tarmac, and the spikes echo the rocket badge so
+ *  the thing in the air reads as the thing that was picked up. */
+function makeShellTexture(): THREE.CanvasTexture {
+	const c = document.createElement('canvas');
+	c.width = c.height = 128;
+	const ctx = c.getContext('2d')!;
+	ctx.fillStyle = '#080B16';
+	ctx.beginPath();
+	for (let k = 0; k < 12; k++) {
+		const a = (k / 12) * TAU - Math.PI / 2, r = k % 2 ? 38 : 62;
+		ctx[k ? 'lineTo' : 'moveTo'](64 + Math.cos(a) * r, 64 + Math.sin(a) * r);
+	}
+	ctx.closePath(); ctx.fill();
+	ctx.fillStyle = '#FFFFFF';
+	ctx.beginPath(); ctx.arc(64, 64, 34, 0, TAU); ctx.fill();
+	const t = new THREE.CanvasTexture(c);
+	t.colorSpace = THREE.SRGBColorSpace;
+	return t;
+}
+
 /** One badge per pickup kind: dark disc, coloured rim, white glyph. The glyph is what names the
  *  item — from the chase cam a pastille is a dozen pixels wide, and three hues alone do not sort
  *  into three rules. The glyphs match the HUD chips, so the chip that lights up says which one it
@@ -1150,6 +1173,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 	// --- cars ---
 	const blobTex = makeBlobTexture();
 	const glowTex = makeGlowTexture();
+	const shellTex = makeShellTexture();
 	const roundelTex = makeRoundelTexture();
 	// Prefiltered, or a raw equirect envMap mirrors the sky sharply whatever the roughness and
 	// the bodywork washes out to white against the horizon band.
@@ -1402,7 +1426,13 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		const mat = new THREE.SpriteMaterial({
 			map: glowTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false,
 		});
-		const head = new THREE.Sprite(mat);
+		const halo = new THREE.Sprite(mat);
+		// The read is carried by an opaque, hard-edged core, and the halo is only its bloom. Alone,
+		// the halo was a soft additive blob in an arena where every bright thing is one, and the
+		// shell simply did not register in flight.
+		const head = new THREE.Sprite(new THREE.SpriteMaterial({
+			map: shellTex, transparent: true, depthWrite: false, fog: false, toneMapped: false,
+		}));
 		// Two tail sprites sampled behind the head on the same curve. A stretched sprite cannot
 		// follow an arc — a sprite is always axis-aligned on screen — so the tail has to be points.
 		const tail = [0, 1].map(() => new THREE.Sprite(mat.clone()));
@@ -1414,8 +1444,8 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		}));
 		mark.rotation.x = -Math.PI / 2;
 		mark.position.y = 0.05;
-		for (const o of [head, ...tail, mark]) { o.visible = false; scene.add(o); }
-		return { head, tail, mark, x0: 0, z0: 0, x: 0, z: 0, h: 0, t: 1, life: 0 };
+		for (const o of [halo, head, ...tail, mark]) { o.visible = false; scene.add(o); }
+		return { halo, head, tail, mark, x0: 0, z0: 0, x: 0, z: 0, h: 0, t: 1, life: 0 };
 	});
 	const fireShell = (id: number, x0: number, z0: number, x: number, z: number, t: number) => {
 		let slot = shells[0];
@@ -1427,14 +1457,17 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		// wide; once the launch started leading the car the range jumped to ~18 and took the apex with
 		// it, putting the shells up by the horizon looking like fireworks instead of paint coming down.
 		slot.h = 4.4;
-		(slot.head.material as THREE.SpriteMaterial).color.setHex(mixHex(col, 0xFFFFFF, 0.3));
+		// Mostly white: the owner is already said by the halo, the tail and the landing ring, and a
+		// core in the owner's own colour vanishes the moment it flies over that owner's paint.
+		(slot.head.material as THREE.SpriteMaterial).color.setHex(mixHex(col, 0xFFFFFF, 0.75));
+		(slot.halo.material as THREE.SpriteMaterial).color.setHex(mixHex(col, 0xFFFFFF, 0.3));
 		for (const tp of slot.tail) (tp.material as THREE.SpriteMaterial).color.setHex(col);
 		(slot.mark.material as THREE.MeshBasicMaterial).color.setHex(col);
 	};
 	const stepShells = (dtSec: number) => {
 		for (const sh of shells) {
 			if (sh.life <= 0) {
-				if (sh.head.visible) for (const o of [sh.head, ...sh.tail, sh.mark]) o.visible = false;
+				if (sh.head.visible) for (const o of [sh.halo, sh.head, ...sh.tail, sh.mark]) o.visible = false;
 				continue;
 			}
 			sh.life -= dtSec;
@@ -1445,9 +1478,10 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 				o.scale.setScalar(size);
 				o.visible = true;
 			};
-			at(u, sh.head, 2.0);
-			at(u - 0.07, sh.tail[0], 1.35);
-			at(u - 0.14, sh.tail[1], 0.85);
+			at(u, sh.head, 3.0);
+			at(u, sh.halo, 5.0);
+			at(u - 0.07, sh.tail[0], 1.9);
+			at(u - 0.14, sh.tail[1], 1.2);
 			// The marker tightens onto the splat radius as the shell falls: a countdown, not a decoration.
 			sh.mark.position.set(sh.x, 0.05, sh.z);
 			const ms = 5.5 - (5.5 - ITEM.blastR) * u;
@@ -2109,7 +2143,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 		burst.live = 0; smoke.live = 0;
 		burst.geo.setDrawRange(0, 0); smoke.geo.setDrawRange(0, 0);
 		for (const r of rings) { r.life = 0; r.delay = 0; r.mesh.visible = false; }
-		for (const sh of shells) { sh.life = 0; for (const o of [sh.head, ...sh.tail, sh.mark]) o.visible = false; }
+		for (const sh of shells) { sh.life = 0; for (const o of [sh.halo, sh.head, ...sh.tail, sh.mark]) o.visible = false; }
 		decalFadeAcc = 0;
 		miniAcc = 0;
 		ledAcc = 0;
@@ -2143,7 +2177,7 @@ export function createRenderer(canvas: HTMLCanvasElement, state: GameState, carI
 			}
 		});
 		baseTex.dispose(); covTex.dispose(); decalTex.dispose(); trailTex.dispose(); lightTex.dispose(); grainTex.dispose();
-		blobTex.dispose(); glowTex.dispose(); roundelTex.dispose();
+		blobTex.dispose(); glowTex.dispose(); shellTex.dispose(); roundelTex.dispose();
 		rampTex.dispose(); ledTex.dispose(); skyTex.dispose(); envTex.dispose(); chevTex.dispose();
 		wallHazTex.dispose(); capHazTex.dispose();
 		for (const c of chevrons) { c.material.dispose(); camera.remove(c); }
