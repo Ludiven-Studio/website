@@ -18,6 +18,10 @@ import { DAILY_LB } from '../../data/dailyLb';
 import Leaderboard from '../../components/Leaderboard';
 import ModeToggle from '../../components/ModeToggle';
 import Cocoin from '../../components/Cocoin';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
+import { useLevels } from '../../lib/useLevels';
+import { bolidesLevels } from './levels';
 
 /* =====================================================
    BOLIDES — React shell. Owns the fixed-step loop and the HUD; the simulation
@@ -68,18 +72,9 @@ const botCar = (seed: number, seat: number): string => BOLIDES[Math.floor(seed /
 const offlineCars = (hero: string, seed: number): string[] =>
 	Array.from({ length: CAR_COUNT }, (_, i) => (i === 0 ? hero : botCar(seed, i)));
 
-// Presence only carries a name, so the car rides in it. Split on the first separator and
-// only trust a known id, so an older client just reads as the default car.
-const CAR_SEP = '|';
-const tagName = (car: string, name: string) => `${car}${CAR_SEP}${name}`;
-const peerCarOf = (raw: string): string => {
-	const id = raw.slice(0, raw.indexOf(CAR_SEP));
-	return BOLIDES.some((b) => b.id === id) ? id : DEFAULT_CAR;
-};
-const peerNameOf = (raw: string): string => {
-	const i = raw.indexOf(CAR_SEP);
-	return i > 0 && BOLIDES.some((b) => b.id === raw.slice(0, i)) ? raw.slice(i + 1) : raw;
-};
+/** A peer's bolide, or the default one if they announced something we don't ship. */
+const peerCar = (car: string | undefined): string =>
+	(car && BOLIDES.some((b) => b.id === car) ? car : DEFAULT_CAR);
 
 interface Row { id: number; name: string; pct: number; me: boolean; rank: number }
 const PIPS = [0, 1, 2, 3, 4];
@@ -156,6 +151,15 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [bought, setBought] = useState<{ id: string; price: number } | null>(null); // one-shot buy feedback
 	const [sound, setSound] = useState(() => sfx.isEnabled());
 
+	const [levelReady, setLevelReady] = useState(false); // levels: arena built, clock held until ▶
+	const lv = useLevels(gameId, bolidesLevels);
+	// The rAF loop keeps the `frame` closure it was started with, so anything it reaches must be
+	// stable or it reads a stale render. `lv` is a fresh object every render, hence the ref.
+	const lvRef = useRef(lv);
+	lvRef.current = lv;
+	// `on` is what tells endGame to grade a level instead of saving a daily run.
+	const levelRef = useRef({ on: false, target: 0 });
+
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const miniRef = useRef<HTMLCanvasElement>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
@@ -195,7 +199,6 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const carRef = useRef<string>(car); // our pick, read from the loop and from net callbacks
 	const seatCarsRef = useRef<string[]>(offlineCars(car, stateRef.current.seed)); // index = seat
 	const meshSigRef = useRef(''); // the field the renderer built its meshes for
-	const rejoinRef = useRef<{ make: (name: string) => Promise<Match | null>; code: string | null; fail: string } | null>(null);
 
 	const labelsRef = useRef<string[]>(NAMES.slice());
 	const applyLabels = useCallback((l: string[]) => { labelsRef.current = l; setLabels(l); }, []);
@@ -253,6 +256,19 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		const peak = Math.max(pct(s, s.hero), bestPctRef.current);
 		const rank = 1 + s.cars.filter((c) => c.id !== s.hero && pct(s, c.id) > pct(s, s.hero)).length;
 		const end = { won: s.winner === s.hero, winner: s.winner, deaths: deathsRef.current, byTime: s.overByTime };
+		const level = levelRef.current;
+		if (level.on) {
+			// Winning the race is 3★, so it has to travel separately: the target alone can never
+			// prove it (you can clear 45 % and still finish second).
+			lvRef.current.finish({
+				score: toTenths(peak), won: peak >= level.target,
+				stat: s.winner === s.hero ? 1 : 0,
+			});
+			setResult({ pct: peak, best: peak, rank, diff: s.diff, ...end });
+			setPhase('dead');
+			trackGame(gameId, 'game_over', { mode: 'levels' });
+			return;
+		}
 		if (modeRef.current === 'defi') {
 			const prev = loadDailyRun(gameId);
 			const prevState = (prev?.state as DailyState | undefined) ?? { best: 0, tries: 0 };
@@ -356,7 +372,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			setZoneIn(Math.ceil(hero.zoneT));
 			setBoostIn(Math.ceil(hero.boostT));
 			setWideIn(Math.ceil(hero.wideT));
-			setLeft(Math.max(0, Math.ceil(CFG.timeLimit - s.clock)));
+			setLeft(Math.max(0, Math.ceil(s.limit - s.clock)));
 		}
 
 		if (s.over) { endGame(); return; }
@@ -382,7 +398,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		setGripIn(0);
 		setShieldIn(0);
 		setFirstDeath(false);
-		setLeft(CFG.timeLimit);
+		setLeft(Math.ceil(stateRef.current.limit));
 		setStartHint(true);
 		rafRef.current = requestAnimationFrame(frame);
 	}, [frame]);
@@ -398,10 +414,11 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	 *  `items` is off online only: the slots respawn off the seeded rng, which every client shares,
 	 *  but a remote car is dead-reckoned between packets, so the grabs would land on different
 	 *  frames and the buffs would differ per screen. The daily is fine — it runs on one machine. */
-	const launch = useCallback((seed: number, diff: number, items = false) => {
+	const launch = useCallback((seed: number, diff: number, items = false, limit: number = CFG.timeLimit, hold = false) => {
 		const s = stateRef.current;
 		const ids = offlineCars(carRef.current, seed);
 		resetGame(s, seed, diff, ids, items);
+		s.limit = limit;
 		s.hero = 1;
 		s.record = false;
 		for (const c of s.cars) { c.remote = false; c.isBot = c.id !== 1; }
@@ -412,7 +429,11 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		setSubmitVal(undefined);
 		syncBoard();
 		setPhase('playing');
-		run();
+		if (!hold) { run(); return; }
+		// Held: paint the grid once so the gate sits over the real arena, not an empty canvas.
+		// dt has to clear the minimap's 25 Hz gate, or the overview stays a black square.
+		setLeft(Math.ceil(s.limit));
+		rendererRef.current?.frame(s, 0, 0.05);
 	}, [run, syncBoard, applyLabels, seatCars]);
 
 	/** On a touch device the page-sized board is a stamp, so borrow the shared "Plein écran"
@@ -428,6 +449,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		goImmersive();
 		setGarage(false);
 		if (!ensureRenderer()) return;
+		levelRef.current.on = false;
 		modeRef.current = mode;
 		if (mode === 'libre') {
 			dailyBestRef.current = 0;
@@ -454,6 +476,38 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_started', { mode: 'daily', car: carRef.current });
 	}, [ensureRenderer, mode, launch, gameId, goImmersive]);
 
+	/** Levels run on the free-play scoring path: same race, but the run is graded against the
+	 *  level's target instead of being written to today's daily. The arena is built and drawn,
+	 *  then held: levels 101-200 race a 75 s clock, which must not tick while the goal is read. */
+	const startLevel = useCallback((level: number) => {
+		setGarage(false);
+		if (!ensureRenderer()) return;
+		const cfg = lvRef.current.play(level);
+		levelRef.current = { on: true, target: cfg.target };
+		modeRef.current = 'libre';
+		dailyBestRef.current = 0;
+		setLevelReady(true);
+		launch(cfg.seed, cfg.diff, true, cfg.limit, true);
+	}, [ensureRenderer, launch]);
+
+	/** Release the gate. This is the click the browser wants: sound and fullscreen need one. */
+	const beginLevel = useCallback(() => {
+		sfx.unlock();
+		goImmersive();
+		setLevelReady(false);
+		run();
+		trackGame(gameId, 'game_started', { mode: 'levels', car: carRef.current, level: lvRef.current.level });
+	}, [run, gameId, goImmersive]);
+
+	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
+	// The race is built but gated, so nothing runs and no clock ticks until ▶ Commencer.
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		void lvRef.current.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	/* ---------- online ---------- */
 
 	/** Everyone runs this on `go`: the seat order is frozen in `ids`, so each client works out
@@ -475,7 +529,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		for (let id = 1; id <= CAR_COUNT; id++) {
 			const who = go.ids[id - 1];
 			const peer = peers.find((p) => p.id === who);
-			labs[id] = !who ? NAMES[id] : who === m.selfId ? 'Toi' : (peer && peerNameOf(peer.name)) || 'Joueur';
+			labs[id] = !who ? NAMES[id] : who === m.selfId ? 'Toi' : peer?.name || 'Joueur';
 		}
 		applyLabels(labs);
 
@@ -516,7 +570,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			const who = ids[i];
 			if (!who) return botCar(seed, i);
 			if (who === m.selfId) return carRef.current;
-			return peerCarOf(peers.find((p) => p.id === who)?.name ?? '');
+			return peerCar(peers.find((p) => p.id === who)?.car);
 		});
 		const go: GoMsg = { seed, diff: 1, ids, cars };
 		m.sendGo(go);
@@ -577,7 +631,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		});
 	}, [beginRace, endGame]);
 
-	const enterLobby = useCallback(async (make: (name: string) => Promise<Match | null>, code: string | null, fail: string) => {
+	const enterLobby = useCallback(async (make: (name: string, car: string) => Promise<Match | null>, code: string | null, fail: string) => {
 		if (!multiplayerAvailable()) { setStatus('Multijoueur indisponible.'); return; }
 		sfx.unlock();
 		goImmersive();
@@ -585,8 +639,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		setGarage(false);
 		setMpCode(code);
 		setMpPhase('connecting');
-		rejoinRef.current = { make, code, fail };
-		const m = await make(tagName(carRef.current, me16()));
+		const m = await make(me16(), carRef.current);
 		if (!m) { setMpPhase('menu'); setStatus(fail); return; }
 		matchRef.current = m;
 		countRef.current = -1;
@@ -597,12 +650,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	}, [wire, goImmersive]);
 
 	const me16 = () => (playerName() || 'Joueur').slice(0, 16);
-	const mpQuick = () => enterLobby((n) => joinRandom(n), null, 'Aucun salon libre, réessaie.');
-	const mpCreate = () => { const c = makeCode(); return enterLobby((n) => joinByCode(n, c), c, 'Connexion impossible.'); };
+	const mpQuick = () => enterLobby(joinRandom, null, 'Aucun salon libre, réessaie.');
+	const mpCreate = () => { const c = makeCode(); return enterLobby((n, k) => joinByCode(n, c, k), c, 'Connexion impossible.'); };
 	const mpJoin = () => {
 		const c = codeInput.trim().toUpperCase();
 		if (!c) return;
-		return enterLobby((n) => joinByCode(n, c), c, 'Code plein ou invalide.');
+		return enterLobby((n, k) => joinByCode(n, c, k), c, 'Code plein ou invalide.');
 	};
 
 	/* Host's auto-start: once a second driver is here, count down out loud so everyone sees it.
@@ -630,6 +683,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const backToMenu = useCallback(() => {
 		stop();
 		if (modeRef.current === 'online') { leaveOnline(); return; }
+		// Quitting a level lands on the grid, not on the free-play card behind it.
+		setLevelReady(false);
+		if (levelRef.current.on) { levelRef.current.on = false; lvRef.current.backToMenu(); }
 		setPhase('menu');
 	}, [stop, leaveOnline]);
 
@@ -640,25 +696,24 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		setGarage(false);
 		setMpPhase('menu');
 		setPhase('menu');
+		setLevelReady(false);
+		levelRef.current.on = false;
+		lvRef.current.exit();
+	}, [stop, leaveOnline]);
+
+	/** The 🎯 tab: drop whatever is running and show the level grid. */
+	const armLevels = useCallback(() => {
+		stop();
+		if (matchRef.current) leaveOnline();
+		setGarage(false);
+		setMpPhase('menu');
+		setPhase('menu');
+		setLevelReady(false);
+		levelRef.current.on = false;
+		lvRef.current.enter();
 	}, [stop, leaveOnline]);
 
 	/* ---------- garage ---------- */
-
-	/** Presence announces the car inside the driver name and net.ts cannot re-announce it,
-	 *  so swapping bolides in a lobby is a quick leave and re-join of the same room. */
-	const rejoinLobby = useCallback(async () => {
-		const j = rejoinRef.current;
-		if (!j) return;
-		matchRef.current?.leave();
-		matchRef.current = null;
-		onlineRef.current = { host: false, active: false };
-		setRoster([]);
-		setAmHost(false);
-		setLobbyIn(-1);
-		setMpPhase('connecting');
-		await new Promise((r) => setTimeout(r, 900)); // let our old presence drop before we re-appear
-		await enterLobby(j.make, j.code, j.fail);
-	}, [enterLobby]);
 
 	const pickCar = useCallback((id: string) => {
 		selectCar(id);
@@ -669,7 +724,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		sfx.ui();
 		trackEvent('bolides:pick_car', { car: now });
 		if (runningRef.current) return;
-		if (mpPhase === 'lobby') { void rejoinLobby(); return; }
+		// In a lobby the swap is just a fresh presence announce; the room never notices.
+		if (mpPhase === 'lobby') { matchRef.current?.setCar(now); return; }
 		// Refresh the still preview so the menu shows the bolide that was just picked.
 		const s = stateRef.current;
 		const ids = offlineCars(now, s.seed);
@@ -678,7 +734,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		rendererRef.current?.reset();
 		rendererRef.current?.resize();
 		rendererRef.current?.frame(s, 1, 0);
-	}, [mpPhase, rejoinLobby, seatCars]);
+	}, [mpPhase, seatCars]);
 
 	const pickStick = useCallback((v: Stick) => {
 		stickRef.current = v;
@@ -915,7 +971,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	// Same sort as net.ts ids(): index in this list is the seat, so the dot matches the car colour.
 	const selfId = matchRef.current?.selfId ?? '';
 	const seatList = [
-		...roster.map((p) => ({ id: p.id, name: peerNameOf(p.name), car: peerCarOf(p.name), me: false })),
+		...roster.map((p) => ({ id: p.id, name: p.name, car: peerCar(p.car), me: false })),
 		{ id: selfId, name: 'Toi', car, me: true },
 	].sort((a, b) => (a.id < b.id ? -1 : 1));
 
@@ -1030,11 +1086,14 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 			<div className="bo-modetoggle">
 				<ModeToggle
-					daily={mode === 'defi'}
+					daily={mode === 'defi' && !lv.active}
 					onFree={() => switchMode('libre')}
 					onDaily={() => switchMode('defi')}
+					showLevels
+					levelsActive={lv.active}
+					onLevels={armLevels}
 					showOnline
-					onlineActive={mode === 'online'}
+					onlineActive={mode === 'online' && !lv.active}
 					onOnline={() => switchMode('online')}
 				/>
 			</div>
@@ -1080,7 +1139,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 								</span>
 							</li>
 						))}
-						<li className="goal">{mmss(left)} · KO à {CFG.winPct} %</li>
+						<li className="goal">
+							{mmss(left)} · {lv.active ? `objectif ${levelRef.current.target} %` : `KO à ${CFG.winPct} %`}
+						</li>
 					</ol>
 				)}
 
@@ -1111,7 +1172,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 
 				{garage && !webglError && carPicker}
 
-				{phase === 'menu' && !webglError && !garage && mode === 'online' && (
+				{phase === 'menu' && !webglError && !garage && !lv.active && mode === 'online' && (
 					<div className="bo-overlay">
 						<div className="bo-card">
 							{mpPhase === 'lobby' ? (
@@ -1181,7 +1242,33 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'menu' && !webglError && !garage && mode !== 'online' && (
+				{levelReady && lv.playing && !webglError && !garage && (
+					<div className="bo-overlay">
+						<div className="bo-card">
+							<h2>Niveau {lv.level}</h2>
+							<p className="bo-sub">
+								Repeins <strong>{levelRef.current.target} %</strong> de l'arène en {mmss(left)}.
+							</p>
+							<button className="bo-play" onClick={beginLevel}>▶ Commencer</button>
+						</div>
+					</div>
+				)}
+
+				{phase === 'menu' && !webglError && !garage && lv.active && lv.menu && (
+					<div className="bo-overlay">
+						<div className="bo-card bo-levels">
+							<h2>Niveaux</h2>
+							<p className="bo-sub">
+								Repeins la part d'arène demandée avant le buzzer. <strong>★★</strong> demande une part plus
+								grosse, <strong>★★★</strong> se gagne en finissant la course en tête.
+							</p>
+							<LevelSelect progress={lv.progress} onPick={startLevel} />
+						</div>
+					</div>
+				)}
+
+				{/* `booting` too: resume() leaves `active` false while it loads, and the card would flash. */}
+				{phase === 'menu' && !webglError && !garage && !lv.active && !lv.booting && mode !== 'online' && (
 					<div className="bo-overlay">
 						<div className="bo-card">
 							<h2>Course de peinture</h2>
@@ -1205,7 +1292,20 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{phase === 'dead' && !garage && (
+				{phase === 'dead' && !garage && lv.active && lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={lv.progress.count ?? bolidesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={() => { lv.backToMenu(); setPhase('menu'); }}
+						detail={`${result.pct.toFixed(1)} % repeints · objectif ${levelRef.current.target} %`}
+					/>
+				)}
+
+				{phase === 'dead' && !garage && !lv.active && (
 					<div className="bo-overlay">
 						<div className="bo-card">
 							<h2>{result.won ? 'Arène conquise !' : 'Perdu'}</h2>
@@ -1256,7 +1356,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="bo-actions">
-				{phase === 'playing' && mode !== 'online' && <button className="bo-restart" onClick={play}>↺ Recommencer</button>}
+				{phase === 'playing' && mode !== 'online' && (
+					<button className="bo-restart" onClick={lv.active ? () => startLevel(lv.level) : play}>↺ Recommencer</button>
+				)}
 				{phase === 'playing' && <button className="bo-quit" onClick={backToMenu}>Quitter</button>}
 				<button
 					className="bo-act"
@@ -1267,7 +1369,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				>{sound ? '🔊' : '🔇'}</button>
 			</div>
 
-			{mode === 'defi' && (
+			{mode === 'defi' && !lv.active && (
 				<div className="bo-lb">
 					<Leaderboard
 						key={`lb-${gameId}-${attempt}`}
@@ -1473,6 +1575,8 @@ const CSS = `
 .bo-card::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 .bo-card::-webkit-scrollbar-track { background: rgba(90,70,140,0.16); border-radius: 4px; }
 .bo-card::-webkit-scrollbar-thumb { background: var(--bo-neon); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+/* 100 tiles need more than the 360px a text card wants; the grid itself is responsive. */
+.bo-levels { max-width: 520px; width: 100%; padding: 18px 16px; }
 .bo-card h2 { font-family: var(--font-brand); font-weight: 600; font-size: 26px; margin: 0 0 8px; color: var(--bo-blue); }
 .bo-card strong { color: #fff; }
 .bo-sub { color: var(--bo-ink-dim); font-size: 13px; margin: 0 0 12px; line-height: 1.55; }

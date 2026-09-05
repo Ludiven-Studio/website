@@ -6,7 +6,7 @@ import {
 	type Car, type GameState, type NetEvent,
 } from './engine';
 import { BOLIDES, DEFAULT_CAR, carCfg } from './cars';
-import { goCars, type GoMsg } from './net';
+import { goCars, rosterOf, type GoMsg } from './net';
 
 // The engine can't import the roster (cars.ts is built from CFG), so the roster is installed.
 setCarLookup(carCfg);
@@ -246,6 +246,21 @@ describe('bolides engine', () => {
 		expect(s.over).toBe(true);
 		expect(s.overByTime).toBe(true);
 		expect(s.winner).toBe(3);
+	});
+
+	it('blows the buzzer early on a shortened race, and forgets it on reset', () => {
+		const s = createGame();
+		s.limit = 60;
+		s.clock = 60 - 1 / 120;
+		stepGame(s, 0, 0, 1 / 60);
+		expect(s.over).toBe(true);
+		expect(s.overByTime).toBe(true);
+
+		resetGame(s, 7);
+		expect(s.limit).toBe(CFG.timeLimit);
+		s.clock = 60;
+		stepGame(s, 0, 0, 1 / 60);
+		expect(s.over).toBe(false);
 	});
 
 	it('replays a host tick onto a guest and lands on the very same grid', () => {
@@ -893,5 +908,21 @@ describe('bolides go message', () => {
 		expect(goCars({ ...base, cars: 'bunker' } as unknown as GoMsg, 4)).toEqual(new Array(4).fill(DEFAULT_CAR));
 		// An unknown id must still build a car, not throw.
 		expect(() => newGame(SEED, 1, goCars({ ...base, cars: ['ghost'] }, 4))).not.toThrow();
+	});
+});
+
+describe('bolides presence roster', () => {
+	const meta = (id: string, car: string) => ({ id, name: id, car, playing: false });
+
+	it('drops self, sorts by id, and fills in a missing car', () => {
+		const r = rosterOf([meta('c', 'comet'), meta('me', 'bunker'), { ...meta('a', ''), car: undefined }] as never, 'me');
+		expect(r.map((p) => p.id)).toEqual(['a', 'c']);
+		expect(r[0].car).toBe(DEFAULT_CAR);
+	});
+
+	it('collapses a doubled id to its newest meta, so a car swap cannot double a seat', () => {
+		const r = rosterOf([meta('a', 'comet'), meta('b', 'hornet'), meta('a', 'bunker')], 'me');
+		expect(r.map((p) => p.id)).toEqual(['a', 'b']);
+		expect(r[0].car).toBe('bunker');
 	});
 });

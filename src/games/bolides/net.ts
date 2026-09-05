@@ -18,7 +18,7 @@ const MAX_ROOMS = 16;
 const SYNC_WAIT_MS = 600;
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no ambiguous chars (0/O, 1/I/L)
 
-export interface BolidePeer { id: string; name: string; playing: boolean }
+export interface BolidePeer { id: string; name: string; car: string; playing: boolean }
 
 /** A driver's own car, sent by whoever owns it. */
 export interface PoseMsg { i: string; p: NetPose }
@@ -43,6 +43,8 @@ export interface Match {
 	ids: () => string[];
 	peers: () => BolidePeer[];
 	setPlaying: (v: boolean) => void;
+	/** Re-announce the bolide we drive — swapping cars in the lobby, without leaving it. */
+	setCar: (car: string) => void;
 	sendPose: (m: PoseMsg) => void;
 	sendSim: (m: SimMsg) => void;
 	sendGo: (m: GoMsg) => void;
@@ -67,16 +69,23 @@ export const makeCode = (): string => Array.from({ length: 4 }, () => CODE_ALPHA
 
 const randomId = (): string => `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
 
-interface PresMeta { id: string; name: string; playing: boolean }
+interface PresMeta { id: string; name: string; car: string; playing: boolean }
+
+/** Fold raw presence metas into the roster. Re-announcing (a car swap) briefly leaves two metas
+ *  under one key, so an id must collapse to its newest one — a doubled id doubles a seat. */
+export function rosterOf(metas: PresMeta[], selfId: string): BolidePeer[] {
+	const seen = new Map<string, BolidePeer>();
+	// A client from before presence carried the car sends none; it just drives the default one.
+	for (const m of metas) {
+		if (!m || m.id === selfId || typeof m.id !== 'string') continue;
+		seen.set(m.id, { id: m.id, name: m.name, car: m.car || DEFAULT_CAR, playing: !!m.playing });
+	}
+	return [...seen.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+}
 
 function peersOf(ch: RealtimeChannel, selfId: string): BolidePeer[] {
 	const state = ch.presenceState<PresMeta>();
-	const peers: BolidePeer[] = [];
-	for (const key of Object.keys(state)) {
-		for (const m of state[key]) if (m.id !== selfId) peers.push({ id: m.id, name: m.name, playing: !!m.playing });
-	}
-	peers.sort((a, b) => (a.id < b.id ? -1 : 1));
-	return peers;
+	return rosterOf(Object.keys(state).flatMap((k) => state[k]), selfId);
 }
 
 /** Subscribe, wait for the first presence sync (or a short timeout), and report current peers. */
@@ -94,7 +103,7 @@ function subscribeAndSync(ch: RealtimeChannel, selfId: string): Promise<BolidePe
 
 /** Subscribe to a room, join its presence, and build the Match handle.
  *  Returns null when the room can't take us: full, or (for quick match) already racing. */
-async function openRoom(c: SupabaseClient, roomId: string, name: string, code: string | null, skipBusy: boolean): Promise<Match | null> {
+async function openRoom(c: SupabaseClient, roomId: string, name: string, car: string, code: string | null, skipBusy: boolean): Promise<Match | null> {
 	const selfId = randomId();
 	const ch = c.channel(roomId, { config: { presence: { key: selfId }, broadcast: { self: false } } });
 
@@ -114,7 +123,9 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 		return null;
 	}
 	let playing = false;
-	await ch.track({ id: selfId, name, playing } satisfies PresMeta);
+	let mine = car;
+	const announce = () => ch.track({ id: selfId, name, car: mine, playing } satisfies PresMeta);
+	await announce();
 
 	const ids = () => [selfId, ...peersOf(ch, selfId).map((p) => p.id)].sort();
 	const send = (event: string, payload: unknown) => { void ch.send({ type: 'broadcast', event, payload }); };
@@ -126,7 +137,8 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 		isHost: () => ids()[0] === selfId,
 		ids,
 		peers: () => peersOf(ch, selfId),
-		setPlaying: (v) => { if (v === playing) return; playing = v; void ch.track({ id: selfId, name, playing } satisfies PresMeta); },
+		setPlaying: (v) => { if (v === playing) return; playing = v; void announce(); },
+		setCar: (v) => { if (v === mine) return; mine = v; void announce(); },
 		sendPose: (m) => send('pose', m),
 		sendSim: (m) => send('sim', m),
 		sendGo: (m) => send('go', m),
@@ -142,21 +154,21 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 
 /** Auto-match into the first room that is neither full nor already racing.
  *  Probing in order means everyone piles into the same room, which is what fills a grid. */
-export async function joinRandom(name: string): Promise<Match | null> {
+export async function joinRandom(name: string, car: string): Promise<Match | null> {
 	const c = getClient();
 	if (!c) return null;
 	for (let slot = 0; slot < MAX_ROOMS; slot++) {
-		const m = await openRoom(c, `bolides-q-${slot}`, name, null, true);
+		const m = await openRoom(c, `bolides-q-${slot}`, name, car, null, true);
 		if (m) return m;
 	}
 	return null;
 }
 
 /** Join (or create) the room for a shared code; null if multiplayer is off or that room is full. */
-export async function joinByCode(name: string, code: string): Promise<Match | null> {
+export async function joinByCode(name: string, code: string, car: string): Promise<Match | null> {
 	const c = getClient();
 	if (!c) return null;
 	const norm = code.trim().toUpperCase();
 	if (!norm) return null;
-	return openRoom(c, `bolides-c-${norm}`, name, norm, false);
+	return openRoom(c, `bolides-c-${norm}`, name, car, norm, false);
 }

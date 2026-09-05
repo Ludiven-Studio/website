@@ -297,6 +297,7 @@ export interface GameState {
 	sumC: number[]; // running sum of col per id (for centroid)
 	sumR: number[];
 	clock: number; // seconds since start
+	limit: number; // race length in seconds; levels shorten it, everything else keeps CFG.timeLimit
 	over: boolean; // someone passed CFG.winPct (or the clock ran out) — the run is decided
 	winner: number; // car id that won (0 while the run is live)
 	overByTime: boolean; // won on the clock with the biggest share, not by passing winPct
@@ -538,6 +539,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 		sumC: new Array(CAR_COUNT + 1).fill(0),
 		sumR: new Array(CAR_COUNT + 1).fill(0),
 		clock: 0,
+		limit: CFG.timeLimit,
 		over: false,
 		winner: 0,
 		overByTime: false,
@@ -591,6 +593,7 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?:
 	s.sumC.fill(0);
 	s.sumR.fill(0);
 	s.clock = 0;
+	s.limit = CFG.timeLimit; // a shortened level race must not leak into the next run
 	s.over = false;
 	s.winner = 0;
 	s.overByTime = false;
@@ -1042,7 +1045,7 @@ export function stepGame(
 	for (let id = 1; id <= CAR_COUNT; id++) {
 		if (s.counts[id] > target) finish(s, id, false);
 	}
-	if (!s.over && s.clock >= CFG.timeLimit) {
+	if (!s.over && s.clock >= s.limit) {
 		let lead = 1;
 		for (let id = 2; id <= CAR_COUNT; id++) if (s.counts[id] > s.counts[lead]) lead = id;
 		finish(s, lead, true);

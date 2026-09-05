@@ -13,6 +13,7 @@ import { angryLevels } from './angry/levels';
 import { aquariumLevels } from './aquarium/levels';
 import { batailleLevels } from './bataille/levels';
 import { billardLevels } from './billard/levels';
+import { bolidesLevels } from './bolides/levels';
 import { bullesLevels } from './bulles/levels';
 import { calcudokuLevels } from './calcudoku/levels';
 import { casseBriquesLevels } from './casse-briques/levels';
@@ -68,6 +69,7 @@ const PLANS: [string, LevelPlan<any>][] = [
 	['aquarium', aquariumLevels],
 	['bataille', batailleLevels],
 	['billard', billardLevels],
+	['bolides', bolidesLevels],
 	['bulles', bullesLevels],
 	['calcudoku', calcudokuLevels],
 	['casse-briques', casseBriquesLevels],
@@ -147,7 +149,7 @@ afterAll(() => vi.unstubAllGlobals());
 describe('level plans, Expert pack on', () => {
 	it('covers every game that ships a plan', () => {
 		expect(new Set(PLANS.map(([id]) => id)).size).toBe(PLANS.length);
-		expect(PLANS.length).toBe(52);
+		expect(PLANS.length).toBe(53);
 	});
 
 	for (const [id, plan] of PLANS) {
