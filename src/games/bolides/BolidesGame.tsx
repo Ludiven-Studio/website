@@ -1080,8 +1080,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		</div>
 	);
 
+	// A held level gate is not a race. `racing` hides the mode tabs on a phone, and levels are the
+	// landing mode, so counting the gate left no way to ever reach Défi, Libre or En ligne there.
+	const racing = phase === 'playing' && !levelReady;
+
 	return (
-		<div className={`bo-root${phase === 'playing' ? ' racing' : ''}`}>
+		<div className={`bo-root${racing ? ' racing' : ''}`}>
 			<style>{CSS}</style>
 
 			<div className="bo-modetoggle">
