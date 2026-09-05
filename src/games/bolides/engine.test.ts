@@ -680,9 +680,8 @@ describe('bolides pickups', () => {
 		expect(straightLine(1, ITEM.zone)).toBeCloseTo(clear, 6);
 	});
 
-	it('stays out of the arena unless asked for — an online race never sees one', () => {
-		// Free play and the daily ask for them; a guest must not get them, because stepGuest has no
-		// grid and dead-reckons the other cars, so no two clients would agree on who grabbed what.
+	it('stays out of the arena unless asked for', () => {
+		// Every mode asks for them, so the off path only survives if something still tests it.
 		const s = createGame();
 		expect(s.items).toHaveLength(0);
 		let items = 0;
@@ -694,6 +693,83 @@ describe('bolides pickups', () => {
 		expect(items).toBe(0);
 		expect(s.cars.every((c) => c.gripT === 0 && c.shieldT === 0 && c.zoneT === 0)).toBe(true);
 		expect(s.cars.every((c) => c.boostT === 0 && c.wideT === 0)).toBe(true);
+	});
+
+	it('replays the grabs onto a guest: same slots, same buffs, same grid', () => {
+		// Same harness as the roster desync test, pickups on. The host rules on every grab and the
+		// guest only obeys, so a slot that drifted or a buff that never expired shows up here.
+		const host = newGame(SEED, 1, undefined, true);
+		host.record = true;
+		const guest = newGame(SEED, 1, undefined, true);
+		guest.hero = 2;
+		for (const c of guest.cars) { c.remote = c.id !== guest.hero; c.isBot = false; }
+		const pending: NetEvent[] = [];
+		const TIMERS = ['gripT', 'shieldT', 'zoneT', 'boostT', 'wideT'] as const;
+		let grabs = 0, lit = 0, gap = 0;
+		for (let i = 0; i < 3000 && !host.over; i++) {
+			stepGame(host, i % 300 < 220 ? 1 : -1, 1, 1 / 60);
+			grabs += host.events.filter((e) => e.type === 'item').length;
+			collectEvents(host, pending);
+			host.events.length = 0;
+			stepGuest(guest, i % 90 < 45 ? -1 : 1, 1, 1 / 60);
+			if (i % 3 !== 2) continue;
+			applySim(guest, buildSim(host, pending));
+			// Sampled every packet, not at the buzzer: by then every timer has run out on both sides
+			// and the comparison would hold whatever the guest did.
+			for (const t of TIMERS) for (let c = 0; c < host.cars.length; c++) {
+				if (host.cars[c][t] > 0) lit++;
+				gap = Math.max(gap, Math.abs(guest.cars[c][t] - host.cars[c][t]));
+			}
+		}
+		applySim(guest, buildSim(host, pending)); // flush the last frames before comparing the grid
+		expect(host.clock).toBeGreaterThan(10);
+		expect(grabs).toBeGreaterThan(0); // a green run that grabbed nothing would prove nothing
+		expect(lit).toBeGreaterThan(100); // and buffs really were running while we watched
+		expect(guest.owner).toEqual(host.owner);
+		expect(guest.trail).toEqual(host.trail);
+		// A guest hears about its buff up to 3 frames late and runs it down from there, so its timers
+		// trail the host's by that much and never more. Same lag the kills already carry.
+		expect(gap).toBeLessThan(0.1);
+		guest.items.forEach((it, n) => {
+			const h = host.items[n];
+			expect(it.kind).toBe(h.kind);
+			// The slot travels rounded to 2 decimals; the grab radius is metres, so that is exact enough.
+			expect(it.x).toBeCloseTo(h.x, 1);
+			expect(it.z).toBeCloseTo(h.z, 1);
+			expect(it.at).toBeCloseTo(h.at, 1);
+		});
+	});
+
+	it('marks the stream once per broadcast event, rockets and grabs included', () => {
+		// A 0 in netAdd says "an event happens here". One missing mark and every later event of the
+		// tick replays against the wrong trail cell — a desync that never throws.
+		const s = newGame(SEED, 1, undefined, true);
+		s.record = true;
+		const pending: NetEvent[] = [];
+		for (let i = 0; i < 3000 && !s.over; i++) {
+			stepGame(s, i % 300 < 220 ? 1 : -1, 1, 1 / 60);
+			collectEvents(s, pending);
+			s.events.length = 0;
+		}
+		const seen = (k: NetEvent['k']) => pending.filter((e) => e.k === k).length;
+		expect(seen('cap')).toBeGreaterThan(0);
+		expect(seen('item')).toBeGreaterThan(0);
+		expect(seen('blast')).toBeGreaterThan(0); // shells really landed during the same run
+		// A trail cell is (carId << 16) | cell with carId >= 1, so only a marker can be 0.
+		expect(s.netAdd.filter((v) => v === 0)).toHaveLength(pending.length);
+	});
+
+	it('marks every shell of a salvo, not the salvo', () => {
+		// Two shells landing on the same tick is the one case the race above never produced, and it
+		// is exactly where a single mark per salvo would slip by. Hand-place them.
+		const s = newGame(SEED, 1, undefined, true);
+		s.record = true;
+		s.shots.push({ id: 1, x: 0, z: 0, at: 0 }, { id: 2, x: 10, z: 10, at: 0 });
+		const pending: NetEvent[] = [];
+		stepGame(s, 0, 0, 1 / 60);
+		collectEvents(s, pending);
+		expect(pending.filter((e) => e.k === 'blast')).toHaveLength(2);
+		expect(s.netAdd.filter((v) => v === 0)).toHaveLength(pending.length);
 	});
 });
 

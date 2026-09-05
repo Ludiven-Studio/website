@@ -84,9 +84,11 @@ const FLAT_OUT = (CFG.maxSpeed * CFG.maxSpeed) / CFG.turnRadius;
    that touches the throttle also widens your corners, and land rate is roughly cruise x turnRadius.
    Every kind below carries the sweep that sized it (scripts/bolides-pow.mjs) — grade a change on the
    leader's ARENA SHARE, which barely moves, not on win %, which is worth +-2.5 pt at 300 races.
-   Off by default: the flag is the empty item list, so the lockstep online race is untouched. A guest
-   runs stepGuest, which has no grid and dead-reckons the others, so no two clients could agree on
-   who grabbed what. Free play and the daily both ask for them — the daily off the shared seed. */
+   Off by default; every mode asks for them, the daily off the shared seed. Online they are the
+   host's call like every other grid ruling: only the host runs stepItems, and it broadcasts the
+   grab (see the 'item' NetEvent). A guest must never decide one itself — it dead-reckons the other
+   cars, so it would grab on a different frame, and it must never roll its own rng for the respawn
+   or the slots would drift apart. */
 export const ITEM = {
 	// One slot per role, in order. 0..3 = the doorway of that seat's home, -1 = the arena hub,
 	// -2 = anywhere. A doorway is the one post you can COUNT on, because a loop always comes home
@@ -279,7 +281,8 @@ export type GameEvent =
 	// blade on a shielded rival. `lost` is the trail it cost.
 	| { type: 'snap'; id: number; x: number; z: number; isPlayer: boolean; lost: number }
 	| { type: 'respawn'; id: number; x: number; z: number }
-	| { type: 'item'; id: number; x: number; z: number; kind: number } // grabbed a pickup, see KIND
+	// `n` is the slot in s.items, which the host needs to tell the guests which post was emptied.
+	| { type: 'item'; id: number; n: number; x: number; z: number; kind: number } // see KIND
 	// A shell left the car. `t` is its flight time, so the renderer can arc it and arrive with the
 	// paint instead of guessing a duration the sim would then contradict.
 	| { type: 'rocket'; id: number; x0: number; z0: number; x: number; z: number; t: number }
@@ -291,7 +294,7 @@ export interface GameState {
 	home: Uint8Array; // cell -> car id whose start square this is (0 = none); never changes hands
 	trail: Uint8Array; // cell -> car id whose active trail sits here (0 = none)
 	cars: Car[];
-	items: Item[]; // grip pickups; EMPTY is how the mode is switched off (daily + online)
+	items: Item[]; // pickup slots; EMPTY is how the mode is switched off
 	shots: Shot[]; // rocket shells still in the air; they paint on landing, see stepShots
 	counts: number[]; // owned cell count per id (index 0 = neutral)
 	sumC: number[]; // running sum of col per id (for centroid)
@@ -466,6 +469,9 @@ function launchBlast(s: GameState, car: Car): void {
 		const x = Math.max(-edge, Math.min(edge, cx + Math.cos(a) * ITEM.blastD));
 		const z = Math.max(-edge, Math.min(edge, cz + Math.sin(a) * ITEM.blastD));
 		s.shots.push({ id: car.id, x, z, at: s.clock + t });
+		// Broadcast too, but only so a guest can draw the arc: a guest never runs stepShots, so its
+		// paint comes from the 'blast' the host sends when the shell actually lands.
+		mark(s);
 		s.events.push({ type: 'rocket', id: car.id, x0: car.x, z0: car.z, x, z, t });
 	}
 }
@@ -481,43 +487,48 @@ function stepShots(s: GameState): void {
 		const sh = s.shots[i];
 		if (s.clock < sh.at) continue;
 		s.shots.splice(i, 1);
-		const rc = Math.ceil(ITEM.blastR / CELL);
-		const c0 = colOf(sh.x), r0 = rowOf(sh.z);
-		for (let dr = -rc; dr <= rc; dr++) {
-			const row = r0 + dr;
-			if (row < 0 || row >= GRID) continue;
-			for (let dc = -rc; dc <= rc; dc++) {
-				const col = c0 + dc;
-				if (col < 0 || col >= GRID) continue;
-				if (dc * dc + dr * dr > rc * rc) continue;
-				setOwner(s, row * GRID + col, sh.id);
-			}
-		}
-		s.events.push({ type: 'blast', id: sh.id, x: sh.x, z: sh.z, r: ITEM.blastR });
+		// One mark per shell, not one per salvo: a broadcast event and its marker have to match 1:1
+		// or every later event in the tick replays against the wrong trail cell.
+		mark(s);
+		paintBlast(s, sh.id, sh.x, sh.z);
 		hit = true;
 	}
-	if (hit) { s.captureFlag = true; mark(s); }
+	if (hit) s.captureFlag = true;
+}
+
+/** Stamp one splat. A pure function of (id, x, z) — no rng — which is what lets a guest replay the
+ *  host's 'blast' and land on the very same cells. */
+function paintBlast(s: GameState, id: number, x: number, z: number): void {
+	const rc = Math.ceil(ITEM.blastR / CELL);
+	const c0 = colOf(x), r0 = rowOf(z);
+	for (let dr = -rc; dr <= rc; dr++) {
+		const row = r0 + dr;
+		if (row < 0 || row >= GRID) continue;
+		for (let dc = -rc; dc <= rc; dc++) {
+			const col = c0 + dc;
+			if (col < 0 || col >= GRID) continue;
+			if (dc * dc + dr * dr > rc * rc) continue;
+			setOwner(s, row * GRID + col, id);
+		}
+	}
+	s.events.push({ type: 'blast', id, x, z, r: ITEM.blastR });
 }
 
 /** Grabbed by driving over it — no aim, no button, so nothing has to change on the touch layout.
  *  Bots collect too (they just don't go looking), or the item would be a pure player handicap
  *  on the bots' side of the balance. */
 function stepItems(s: GameState): void {
-	for (const it of s.items) {
+	for (let n = 0; n < s.items.length; n++) {
+		const it = s.items[n];
 		if (s.clock < it.at) continue;
 		const r = it.role >= 0 ? ITEM.doorR : ITEM.radius;
 		for (const car of s.cars) {
 			if (!car.alive) continue;
 			const dx = car.x - it.x, dz = car.z - it.z;
 			if (dx * dx + dz * dz > r * r) continue;
-			// Refreshes, never stacks. The kinds do stack with each other: they answer different
-			// deaths, so holding two is the reward for a good lap, not a compounding buff.
-			if (it.kind === KIND.shield) car.shieldT = ITEM.shield;
-			else if (it.kind === KIND.tar) car.zoneT = ITEM.zone;
-			else if (it.kind === KIND.boost) car.boostT = ITEM.boostT;
-			else if (it.kind === KIND.wide) car.wideT = ITEM.wide;
-			else if (it.kind === KIND.grip) car.gripT = ITEM.grip;
-			s.events.push({ type: 'item', id: car.id, x: it.x, z: it.z, kind: it.kind });
+			grantItem(car, it.kind);
+			mark(s);
+			s.events.push({ type: 'item', id: car.id, n, x: it.x, z: it.z, kind: it.kind });
 			// After the event, so the FX reads grab-then-launch.
 			if (it.kind === KIND.rocket) launchBlast(s, car);
 			placeItem(s, it, ITEM.respawn);
@@ -526,8 +537,19 @@ function stepItems(s: GameState): void {
 	}
 }
 
+/** Refreshes, never stacks. The kinds do stack with each other: they answer different deaths, so
+ *  holding two is the reward for a good lap, not a compounding buff. Shared with the guest side,
+ *  which grants the very same buff off the host's 'item' event instead of deciding it. */
+function grantItem(car: Car, kind: number): void {
+	if (kind === KIND.shield) car.shieldT = ITEM.shield;
+	else if (kind === KIND.tar) car.zoneT = ITEM.zone;
+	else if (kind === KIND.boost) car.boostT = ITEM.boostT;
+	else if (kind === KIND.wide) car.wideT = ITEM.wide;
+	else if (kind === KIND.grip) car.gripT = ITEM.grip;
+}
+
 /** `cars` holds one roster id (or ready-made table) per seat; omit it for an all-base grid.
- *  `items` turns the pickups on — everywhere but online, see ITEM. */
+ *  `items` turns the pickups on; online they are the host's call, see ITEM. */
 export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[], items = false): GameState {
 	const s: GameState = {
 		owner: new Uint8Array(TOTAL),
@@ -1015,20 +1037,11 @@ export function stepGame(
 			if (s.clock >= car.respawnAt) respawn(s, car);
 			continue;
 		}
-		if (car.gripT > 0) car.gripT = Math.max(0, car.gripT - dt);
-		if (car.shieldT > 0) car.shieldT = Math.max(0, car.shieldT - dt);
-		if (car.zoneT > 0) car.zoneT = Math.max(0, car.zoneT - dt);
-		if (car.boostT > 0) car.boostT = Math.max(0, car.boostT - dt);
-		if (car.wideT > 0) car.wideT = Math.max(0, car.wideT - dt);
+		ageBuffs(car, dt);
 		// The surface under the car sets how hard it is to break traction (see stepCar).
 		const owner = s.owner[cellAt(car.x, car.z)];
 		const painted = owner !== 0;
-		// Tarred rival paint. Read off the OWNER of the ground, so the effect follows the territory
-		// as it is won and lost — nothing has to be stamped on the cells.
-		const host = owner !== 0 && owner !== car.id ? s.cars[owner - 1] : undefined;
-		// Tar and boost ride the same channel on purpose: being slowed on rival paint while boosting
-		// should read as one net speed, not as two rules arguing.
-		const drag = (host && host.zoneT > 0 ? ITEM.tar : 1) * (car.boostT > 0 ? ITEM.boost : 1);
+		const drag = dragOn(s, car, owner);
 		if (car.remote) {
 			stepGhost(car, dt); // someone else's car: dead-reckon between packets
 		} else if (car.id === s.hero) {
@@ -1081,7 +1094,12 @@ export type NetEvent =
 	| { k: 'cap'; id: number; i: number } // i = where the ring starts, see the capture event
 	| { k: 'snap'; id: number; x: number; z: number }
 	| { k: 'kill'; id: number; x: number; z: number; by: number }
-	| { k: 'rsp'; id: number };
+	| { k: 'rsp'; id: number }
+	// A pickup was taken. `n` is the slot, and nx/nz/nat/nk are where and what it comes back as:
+	// the respawn is rolled from the host's rng, so it has to travel or the slots drift apart.
+	| { k: 'item'; id: number; n: number; kind: number; x: number; z: number; nx: number; nz: number; nat: number; nk: number }
+	| { k: 'blast'; id: number; x: number; z: number } // a shell landed: paint this splat
+	| { k: 'rkt'; id: number; x0: number; z0: number; x: number; z: number; t: number }; // FX only
 
 /** One host tick. `a` packs trail cells as (carId << 16) | cell — a cell index fits in 16 bits. */
 export interface SimMsg { t: number; p: NetPose[]; a: number[]; e: NetEvent[]; n: number[]; w: number; wt: number }
@@ -1100,6 +1118,25 @@ export function setRemotePose(s: GameState, p: NetPose): void {
 	car.drifting = (p.f & 1) !== 0; car.scraping = (p.f & 2) !== 0;
 }
 
+/** Run down the pickup timers. Every car, on every client: a rival's zoneT decides whether OUR
+ *  wheels are on tar, so a guest has to age the whole grid's buffs, not just its own. */
+function ageBuffs(car: Car, dt: number): void {
+	if (car.gripT > 0) car.gripT = Math.max(0, car.gripT - dt);
+	if (car.shieldT > 0) car.shieldT = Math.max(0, car.shieldT - dt);
+	if (car.zoneT > 0) car.zoneT = Math.max(0, car.zoneT - dt);
+	if (car.boostT > 0) car.boostT = Math.max(0, car.boostT - dt);
+	if (car.wideT > 0) car.wideT = Math.max(0, car.wideT - dt);
+}
+
+/** Tarred rival paint, read off the OWNER of the ground so the effect follows the territory as it
+ *  is won and lost — nothing has to be stamped on the cells. Tar and boost ride the same channel on
+ *  purpose: being slowed on rival paint while boosting should read as one net speed, not as two
+ *  rules arguing. */
+function dragOn(s: GameState, car: Car, owner: number): number {
+	const ground = owner !== 0 && owner !== car.id ? s.cars[owner - 1] : undefined;
+	return (ground && ground.zoneT > 0 ? ITEM.tar : 1) * (car.boostT > 0 ? ITEM.boost : 1);
+}
+
 /** Host side, every frame: keep the grid events that the guests can't derive. `events` is
  *  cleared each frame but we only broadcast 20x/s, so they have to pile up in `out`. */
 export function collectEvents(s: GameState, out: NetEvent[]): void {
@@ -1110,6 +1147,17 @@ export function collectEvents(s: GameState, out: NetEvent[]): void {
 		else if (ev.type === 'capture') out.push({ k: 'cap', id: ev.id, i: ev.from });
 		else if (ev.type === 'snap') out.push({ k: 'snap', id: ev.id, x: r2(ev.x), z: r2(ev.z) });
 		else if (ev.type === 'respawn') out.push({ k: 'rsp', id: ev.id });
+		else if (ev.type === 'item') {
+			// The slot has already been put back by the time we collect, so it carries its own future.
+			const it = s.items[ev.n];
+			out.push({
+				k: 'item', id: ev.id, n: ev.n, kind: ev.kind, x: r2(ev.x), z: r2(ev.z),
+				nx: r2(it.x), nz: r2(it.z), nat: r2(it.at), nk: it.kind,
+			});
+		} else if (ev.type === 'blast') out.push({ k: 'blast', id: ev.id, x: r2(ev.x), z: r2(ev.z) });
+		else if (ev.type === 'rocket') {
+			out.push({ k: 'rkt', id: ev.id, x0: r2(ev.x0), z0: r2(ev.z0), x: r2(ev.x), z: r2(ev.z), t: r2(ev.t) });
+		}
 	}
 }
 
@@ -1145,6 +1193,19 @@ function applyEvent(s: GameState, ev: NetEvent): void {
 		car.respawnAt = s.clock + (car.isBot ? CFG.respawn : CFG.respawnPlayer); // for the countdown only
 		if (ev.by) s.events.push({ type: 'kill', killer: ev.by, victim: ev.id, x: ev.x, z: ev.z });
 		s.events.push({ type: 'death', id: ev.id, x: ev.x, z: ev.z, isPlayer });
+	} else if (ev.k === 'item') {
+		// The host grabbed FOR us: our own buff starts a packet late, the same lag kills already
+		// carry. Predicting it locally would let a buff appear and then be taken back, which reads
+		// worse than the delay.
+		grantItem(car, ev.kind);
+		const it = s.items[ev.n];
+		if (it) { it.x = ev.nx; it.z = ev.nz; it.at = ev.nat; it.kind = ev.nk; }
+		s.events.push({ type: 'item', id: ev.id, n: ev.n, x: ev.x, z: ev.z, kind: ev.kind });
+	} else if (ev.k === 'blast') {
+		paintBlast(s, ev.id, ev.x, ev.z);
+		s.captureFlag = true;
+	} else if (ev.k === 'rkt') {
+		s.events.push({ type: 'rocket', id: ev.id, x0: ev.x0, z0: ev.z0, x: ev.x, z: ev.z, t: ev.t });
 	} else {
 		makeHome(s, car, START_POS[ev.id - 1][0], START_POS[ev.id - 1][1]);
 		s.captureFlag = true;
@@ -1185,8 +1246,12 @@ export function stepGuest(s: GameState, steer: number, throttle: number, dt: num
 	if (s.over) return;
 	for (const car of s.cars) {
 		if (!car.alive) continue;
+		// Every car, not just ours: the buffs the host hands out have to run down here too, and a
+		// rival's tar is read off its own zoneT when we drive over its paint.
+		ageBuffs(car, dt);
 		if (car.id === s.hero) {
-			stepCar(car, steer, throttle, dt, s.owner[cellAt(car.x, car.z)] !== 0);
+			const owner = s.owner[cellAt(car.x, car.z)];
+			stepCar(car, steer, throttle, dt, owner !== 0, dragOn(s, car, owner));
 			slideWalls(car, dt);
 		}
 		else stepGhost(car, dt);

@@ -128,7 +128,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [attempt, setAttempt] = useState(0); // remounts the Leaderboard so a replay retries its submit
 	const [submitVal, setSubmitVal] = useState<number | undefined>(undefined);
 	const [respawnIn, setRespawnIn] = useState(0); // seconds left before the player is back
-	const [gripIn, setGripIn] = useState(0); // seconds of grip bonus left (not online)
+	const [gripIn, setGripIn] = useState(0); // seconds of grip bonus left
 	const [shieldIn, setShieldIn] = useState(0); // seconds of shield left
 	const [zoneIn, setZoneIn] = useState(0); // seconds my paint stays tar for the others
 	const [boostIn, setBoostIn] = useState(0); // seconds of extra top speed left
@@ -411,9 +411,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	}, [startHint]);
 
 	/** Start a run for the given seed/diff and go live. Offline: car 1 is ours, the rest are bots.
-	 *  `items` is off online only: the slots respawn off the seeded rng, which every client shares,
-	 *  but a remote car is dead-reckoned between packets, so the grabs would land on different
-	 *  frames and the buffs would differ per screen. The daily is fine — it runs on one machine. */
+	 *  Online has its own entry point, `beginRace` — there the pickups are the host's call and
+	 *  travel back as events, because a guest dead-reckons the others and could not agree on who
+	 *  grabbed what. */
 	const launch = useCallback((seed: number, diff: number, items = false, limit: number = CFG.timeLimit, hold = false) => {
 		const s = stateRef.current;
 		const ids = offlineCars(carRef.current, seed);
@@ -537,7 +537,8 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		// apart by one, every client would simulate different physics and the race would desync.
 		const cars = goCars(go, CAR_COUNT);
 		const s = stateRef.current;
-		resetGame(s, go.seed, go.diff, cars);
+		// Pickups on: the seed comes from this very message, so every client sows the same slots.
+		resetGame(s, go.seed, go.diff, cars, true);
 		s.hero = seat + 1;
 		s.record = host; // only the host logs trail cells for broadcast
 		for (const c of s.cars) {
@@ -847,6 +848,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				speed: hero.speed, heading: hero.heading, trail: hero.trail.length,
 				x: hero.x, z: hero.z, gripT: hero.gripT, shieldT: hero.shieldT, zoneT: hero.zoneT, clock: s.clock,
 				items: s.items.filter((i) => s.clock >= i.at).map((i) => ({ x: i.x, z: i.z, kind: i.kind })),
+				// Dark slots and every car's buffs too: online, a desync reads as two clients
+				// disagreeing on those, and the live-only list above would hide a dark slot.
+				slots: s.items.map((i) => ({ x: i.x, z: i.z, at: i.at, kind: i.kind })),
+				buffs: s.cars.map((c) => [c.gripT, c.shieldT, c.zoneT, c.boostT, c.wideT]),
 			};
 		};
 		return () => { delete w.__bolides; };
