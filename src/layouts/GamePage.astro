@@ -141,6 +141,13 @@ const hasDaily = gameId in DAILY_LB;
 	:global(:root.loaded) .game-art {
 		background-image: var(--art);
 	}
+	/* Fullscreen turned WHITE on iOS 18 — every game, no error, the exit button gone with the
+	   rest. This layer was the cause: a fixed, masked, multiply-blended plane still compositing
+	   under a sibling that also becomes fixed. Free to drop, since .game-page.gf-full covers the
+	   viewport with an opaque background — the art is already invisible there. */
+	:global(html.gf-full) .game-art {
+		display: none;
+	}
 	:global(:root.theme-dark) .game-art {
 		mix-blend-mode: normal;
 		opacity: 0.34;
