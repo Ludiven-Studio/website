@@ -1,0 +1,134 @@
+---
+// Throwaway diagnostic page: the fullscreen overlay vanishes on iOS and no desktop engine
+// reproduces it, so measure it on the device instead. Lives under /jeux/ on purpose — that is
+// what makes BaseLayout inject the real GameFullscreen component, so this tests the shipped
+// mechanism, not a copy of it. Delete once the iOS bug is understood.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Diagnostic plein écran" description="Page de test interne." noindex={true}>
+	<!-- Outside .game-page on purpose: it has to survive the overlay disappearing. -->
+	<div class="dg-panel">
+		<p class="dg-help">Appuie sur un bouton. L'écran passe en plein écran 1,5 s puis revient tout seul.</p>
+		<button type="button" id="dg-run">Test plein écran</button>
+		<button type="button" id="dg-run-scrolled">Test après avoir défilé</button>
+		<button type="button" id="dg-copy">Copier le résultat</button>
+		<pre id="dg-out">—</pre>
+	</div>
+
+	<div class="wrapper game-page stack gap-4">
+		<header class="game-head">
+			<h1>Diagnostic</h1>
+		</header>
+		<div class="dg-fake">
+			<p>ZONE DE JEU</p>
+			<p>Si tu lis ceci en plein écran, le calque fonctionne.</p>
+		</div>
+		<footer class="game-foot stack gap-3">
+			<p>pied de page</p>
+		</footer>
+	</div>
+</BaseLayout>
+
+<style>
+	.dg-panel {
+		position: relative;
+		z-index: 50;
+		padding: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		align-items: flex-start;
+	}
+	.dg-panel button {
+		font: inherit;
+		font-size: 1rem;
+		padding: 10px 16px;
+		border-radius: 10px;
+		border: 2px solid var(--gray-500);
+		background: var(--gray-999);
+		color: var(--gray-0);
+	}
+	.dg-help {
+		margin: 0;
+		color: var(--gray-200);
+	}
+	/* Hidden while the test runs, or this panel would keep the body from collapsing and the
+	   measurement would not match a real game page. The result is read after the auto-exit. */
+	:global(html.gf-full) .dg-panel {
+		display: none;
+	}
+	#dg-out {
+		white-space: pre-wrap;
+		word-break: break-all;
+		font-size: 12px;
+		line-height: 1.35;
+		color: var(--gray-0);
+		background: var(--gray-999);
+		border: 1px solid var(--gray-700);
+		border-radius: 8px;
+		padding: 8px;
+		width: 100%;
+		margin: 0;
+	}
+	.dg-fake {
+		background: #7c3aed;
+		color: #fff;
+		font-weight: 700;
+		padding: 2rem 1rem;
+		border-radius: 12px;
+		width: 100%;
+		text-align: center;
+	}
+</style>
+
+<script>
+	const out = document.getElementById('dg-out')!;
+	const rect = (sel: string) => {
+		const el = document.querySelector(sel) as HTMLElement | null;
+		if (!el) return `${sel}: absent`;
+		const b = el.getBoundingClientRect();
+		const s = getComputedStyle(el);
+		return `${sel}: ${Math.round(b.x)},${Math.round(b.y)} ${Math.round(b.width)}x${Math.round(b.height)} pos=${s.position} h=${s.height} disp=${s.display} vis=${s.visibility}`;
+	};
+	const snap = (tag: string) => {
+		const vv = window.visualViewport;
+		const de = document.documentElement;
+		const mid = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+		return [
+			`[${tag}]`,
+			`inner ${innerWidth}x${innerHeight} dpr=${devicePixelRatio} scrollY=${Math.round(scrollY)}`,
+			vv ? `visual ${Math.round(vv.width)}x${Math.round(vv.height)} offTop=${Math.round(vv.offsetTop)} pageTop=${Math.round(vv.pageTop)} scale=${vv.scale}` : 'visual: absent',
+			`html client=${de.clientWidth}x${de.clientHeight} scroll=${de.scrollWidth}x${de.scrollHeight}`,
+			`body client=${document.body.clientWidth}x${document.body.clientHeight} scroll=${document.body.scrollWidth}x${document.body.scrollHeight}`,
+			rect('.game-page'),
+			rect('.gf-exit'),
+			rect('.dg-fake'),
+			`centre écran = ${mid ? mid.tagName + '.' + String(mid.className).slice(0, 30) : 'rien'}`,
+		].join('\n');
+	};
+
+	const run = (scrollFirst: boolean) => {
+		const btn = document.querySelector('.gf-btn') as HTMLButtonElement | null;
+		if (!btn) { out.textContent = 'bouton plein écran absent'; return; }
+		if (scrollFirst) scrollTo(0, 400);
+		setTimeout(() => {
+			const before = snap('avant');
+			btn.click();
+			setTimeout(() => {
+				const during = snap('pendant');
+				btn.click();
+				setTimeout(() => {
+					const ua = navigator.userAgent;
+					out.textContent = `${ua}\n\n${before}\n\n${during}\n\n${snap('après')}`;
+				}, 300);
+			}, 1500);
+		}, scrollFirst ? 400 : 0);
+	};
+
+	document.getElementById('dg-run')!.addEventListener('click', () => run(false));
+	document.getElementById('dg-run-scrolled')!.addEventListener('click', () => run(true));
+	document.getElementById('dg-copy')!.addEventListener('click', () => {
+		void navigator.clipboard?.writeText(out.textContent || '');
+	});
+</script>
