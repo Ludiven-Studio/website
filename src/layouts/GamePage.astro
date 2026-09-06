@@ -25,8 +25,7 @@ const hasDaily = gameId in DAILY_LB;
 
 <BaseLayout title={title} description={description}>
 	<script>
-		// Watch the game island and speak up if it never rendered. `load` has already waited for
-		// the whole module graph, so an island still empty a few seconds later is a dead one.
+		// Watch the game island and speak up when it dies, in either of the two ways it can.
 		const page = document.querySelector('.game-page');
 		const box = document.querySelector('.game-down') as HTMLElement | null;
 		if (page && box) {
@@ -35,13 +34,39 @@ const hasDaily = gameId in DAILY_LB;
 			// below, and it is legitimately empty until a reward pops.
 			const end = kids.findIndex((el) => el.classList.contains('game-foot'));
 			const island = kids.find((el, i) => i < end && el.tagName === 'ASTRO-ISLAND');
-			if (island) {
-				addEventListener('load', () => setTimeout(() => {
-					if (!island.childElementCount) box.classList.add('on');
-				}, 4000));
-			}
 			const btn = box.querySelector('button')!;
+			let reloadOnly = false;
+			const show = (crashed: boolean) => {
+				if (box.classList.contains('on')) return;
+				if (crashed) {
+					reloadOnly = true;
+					box.querySelector('.game-down-title')!.textContent = "Le jeu s'est interrompu.";
+					box.querySelector('.game-down-hint')!.textContent = 'Une erreur inattendue a arrêté la partie.';
+					btn.textContent = 'Recharger la page';
+				}
+				box.classList.add('on');
+			};
+			if (island) {
+				// Never rendered. `load` has already waited for the whole module graph, so an
+				// island still empty a few seconds later is dead, not slow.
+				addEventListener('load', () => setTimeout(() => {
+					if (!island.childElementCount) show(false);
+				}, 4000));
+				// Rendered, then emptied: React unmounts the whole root on an uncaught render or
+				// effect error, so the island dropping back to zero children IS the crash. A throw
+				// from a rAF callback leaves the DOM intact and is not caught here — an
+				// ErrorBoundary would miss that one just the same.
+				let mounted = false;
+				const obs = new MutationObserver(() => {
+					if (island.childElementCount) { mounted = true; return; }
+					if (!mounted) return;
+					obs.disconnect();
+					show(true);
+				});
+				obs.observe(island, { childList: true });
+			}
 			btn.addEventListener('click', () => {
+				if (reloadOnly) return location.reload();
 				btn.disabled = true;
 				btn.textContent = 'Nettoyage…';
 				// Both, not just the caches: a worker whose install failed keeps serving the old
@@ -71,9 +96,10 @@ const hasDaily = gameId in DAILY_LB;
 
 		<slot />
 
-		{/* A game can fail to load outright — a cached chunk importing a hash the deploy removed.
-		    Astro only console.errors that, so the page sits blank and says nothing. This lives
-		    OUTSIDE the island on purpose: when the island dies, it is all that is left. */}
+		{/* A game can fail to load outright — a cached chunk importing a hash the deploy removed —
+		    or crash mid-play. Astro only console.errors the first, React says nothing about the
+		    second, so the page just sits blank. This lives OUTSIDE the island on purpose: when the
+		    island dies, it is all that is left. */}
 		<div class="game-down">
 			<p class="game-down-title">Le jeu n'a pas pu se charger.</p>
 			<p class="game-down-hint">La version gardée en mémoire par ton navigateur est peut-être trop ancienne.</p>
