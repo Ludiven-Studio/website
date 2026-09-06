@@ -24,6 +24,39 @@ const hasDaily = gameId in DAILY_LB;
 ---
 
 <BaseLayout title={title} description={description}>
+	<script>
+		// Watch the game island and speak up if it never rendered. `load` has already waited for
+		// the whole module graph, so an island still empty a few seconds later is a dead one.
+		const page = document.querySelector('.game-page');
+		const box = document.querySelector('.game-down') as HTMLElement | null;
+		if (page && box) {
+			const kids = [...page.children];
+			// Only an island ABOVE the footer is the game: the cocoin toast is one too, it sits
+			// below, and it is legitimately empty until a reward pops.
+			const end = kids.findIndex((el) => el.classList.contains('game-foot'));
+			const island = kids.find((el, i) => i < end && el.tagName === 'ASTRO-ISLAND');
+			if (island) {
+				addEventListener('load', () => setTimeout(() => {
+					if (!island.childElementCount) box.classList.add('on');
+				}, 4000));
+			}
+			const btn = box.querySelector('button')!;
+			btn.addEventListener('click', () => {
+				btn.disabled = true;
+				btn.textContent = 'Nettoyage…';
+				// Both, not just the caches: a worker whose install failed keeps serving the old
+				// ones, so deleting the caches alone would leave it to fill them again.
+				const caches$ = 'caches' in window
+					? caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k))))
+					: Promise.resolve();
+				const sw$ = navigator.serviceWorker
+					? navigator.serviceWorker.getRegistrations().then((rs) => Promise.all(rs.map((r) => r.unregister())))
+					: Promise.resolve();
+				Promise.all([caches$, sw$]).catch(() => {}).then(() => location.reload());
+			});
+		}
+	</script>
+
 	{hasArt && <div class="game-art" style={`--art: url('/assets/jeux/art/${gameId}.jpg')`} aria-hidden="true" />}
 	<div class="wrapper game-page stack gap-4">
 		{/* Kept to one line so the board is reachable without scrolling on a phone —
@@ -37,6 +70,16 @@ const hasDaily = gameId in DAILY_LB;
 		</header>
 
 		<slot />
+
+		{/* A game can fail to load outright — a cached chunk importing a hash the deploy removed.
+		    Astro only console.errors that, so the page sits blank and says nothing. This lives
+		    OUTSIDE the island on purpose: when the island dies, it is all that is left. */}
+		<div class="game-down">
+			<p class="game-down-title">Le jeu n'a pas pu se charger.</p>
+			<p class="game-down-hint">La version gardée en mémoire par ton navigateur est peut-être trop ancienne.</p>
+			<button type="button">Vider le cache et réessayer</button>
+			<a href="/jeux/">Retour aux jeux</a>
+		</div>
 
 		<footer class="game-foot stack gap-3">
 			<p class="game-pitch">{tagline}</p>
@@ -95,6 +138,50 @@ const hasDaily = gameId in DAILY_LB;
 	.game-head :global(.dc-banner),
 	.game-head :global(.gf-btn) {
 		flex-basis: 100%;
+	}
+	/* Hidden until the watchdog says otherwise. Centred on its own because fullscreen hides the
+	   head and the footer, so this ends up alone on the screen. */
+	.game-down {
+		display: none;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.6rem;
+		margin: auto;
+		padding: 1.5rem 1.25rem;
+		max-width: 34ch;
+		text-align: center;
+		border: 1px solid var(--gray-800);
+		border-radius: 12px;
+		background: var(--gray-999);
+	}
+	.game-down.on {
+		display: flex;
+	}
+	.game-down-title {
+		margin: 0;
+		font-family: var(--font-brand);
+		font-weight: 600;
+		color: var(--gray-0);
+	}
+	.game-down-hint {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+	.game-down button {
+		font: inherit;
+		font-weight: 600;
+		font-size: var(--text-sm);
+		padding: 8px 18px;
+		border: none;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		cursor: pointer;
+	}
+	.game-down a {
+		font-size: var(--text-sm);
+		color: var(--gray-300);
 	}
 	.game-foot {
 		align-items: center;
