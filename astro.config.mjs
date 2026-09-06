@@ -44,15 +44,15 @@ export default defineConfig({
                 // Precache the whole app shell: every page + its JS/CSS/fonts → games play
                 // offline after the first visit. Big images are cached on demand instead.
                 globPatterns: ['**/*.{html,js,css,svg,woff2,webmanifest}'],
-                // The /labo 3D demos pull ~1 MB of three.js — keep them out of the precache
-                // (labo is experimental and excluded from the sitemap).
-                globIgnores: [
-                    '**/three.module*.js',
-                    '**/Scene3D*.js',
-                    '**/UnrealBloomPass*.js',
-                    '**/LaboDemo*.js',
-                    '**/GolfProto3D*.js',
-                ],
+                // Precache EVERY js chunk. Skipping three.module*.js used to save 1 MB, but six
+                // precached games import it by hash: after a deploy the stale precache served the
+                // old game chunk, its `import './three.module.<oldhash>.js'` 404ed, and the island
+                // never mounted — a blank fullscreen overlay, white or black depending on theme.
+                // With hashed filenames the only safe rule is: if it is reachable, cache it.
+                // The one exception is this legacy store-listing page: it has no index.html, so
+                // workbox derives the URL "PetanqueARDistances", which 404s — and a single bad
+                // entry aborts the WHOLE install, leaving every visitor on a frozen old worker.
+                globIgnores: ['**/PetanqueARDistances/**'],
                 navigateFallback: null,
                 cleanupOutdatedCaches: true,
                 maximumFileSizeToCacheInBytes: 3_500_000,
