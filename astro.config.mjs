@@ -26,7 +26,6 @@ export default defineConfig({
         sitemap({
             filter: (page) =>
                 !page.includes('/labo') &&
-                !page.includes('/jeux/diagnostic') &&
                 !page.includes('/courses') &&
                 !page.includes('/confidentialite') &&
                 !page.includes('/mentions-legales'),

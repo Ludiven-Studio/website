@@ -5,7 +5,6 @@ import GameTutorial from '../components/GameTutorial.astro';
 import CocoinBar from '../components/CocoinBar';
 import CocoinToast from '../components/CocoinToast';
 import DefiChallenge from '../components/DefiChallenge';
-import FullscreenDiag from '../components/FullscreenDiag.astro';
 import { games } from '../data/games';
 import { DAILY_LB } from '../data/dailyLb';
 
@@ -84,7 +83,6 @@ const hasDaily = gameId in DAILY_LB;
 	</script>
 
 	{hasArt && <div class="game-art" style={`--art: url('/assets/jeux/art/${gameId}.jpg')`} aria-hidden="true" />}
-	<FullscreenDiag />
 	<div class="wrapper game-page stack gap-4">
 		{/* Kept to one line so the board is reachable without scrolling on a phone —
 		    the pitch, the rules and the wallet wait below it. */}
