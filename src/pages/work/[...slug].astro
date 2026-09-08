@@ -172,6 +172,38 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 		margin-top: 1rem;
 	}
 
+	.content :global(.download) {
+		text-align: center;
+		margin-top: 1.5rem;
+	}
+
+	.content :global(.download-btn) {
+		display: inline-flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.15rem;
+		padding: 0.75rem 1.75rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-weight: 600;
+		text-decoration: none;
+		box-shadow: var(--shadow-sm);
+		transition: transform var(--theme-transition), box-shadow var(--theme-transition);
+	}
+
+	.content :global(.download-btn:hover),
+	.content :global(.download-btn:focus) {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md);
+	}
+
+	.content :global(.download-ver) {
+		font-size: var(--text-sm);
+		font-weight: 400;
+		opacity: 0.85;
+	}
+
 	.content :global(h1),
 	.content :global(h2),
 	.content :global(h3),

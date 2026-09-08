@@ -43,6 +43,12 @@ gallery:
 <p>
   J'ai accompagné la réalisation du projet en tant que lead&nbsp;: participation transverse à l'ensemble du jeu, et surtout mise en place de tout le volet multijoueur pour les duels en ligne. J'ai également assuré le suivi de deux alternants tout au long du développement.
 </p>
+<p class="download">
+  <a class="download-btn" href="/assets/skoolz/Skoolz_1.1.6.apk" download>
+    <span>Télécharger l'APK Android</span>
+    <span class="download-ver">v1.1.6 · 76 Mo</span>
+  </a>
+</p>
 <h3>Au programme</h3>
 <ul>
   <li><strong>Duels en ligne</strong> — des affrontements en temps réel où la rapidité et la justesse des réponses font la différence.</li>

@@ -43,6 +43,12 @@ gallery:
 <p>
   I led the project: cross-cutting work across the whole game, and above all building the entire multiplayer side behind the online duels. I also mentored two apprentices throughout development.
 </p>
+<p class="download">
+  <a class="download-btn" href="/assets/skoolz/Skoolz_1.1.6.apk" download>
+    <span>Download the Android APK</span>
+    <span class="download-ver">v1.1.6 · 76 MB</span>
+  </a>
+</p>
 <h3>What's inside</h3>
 <ul>
   <li><strong>Online duels</strong> — real-time matches where speed and accuracy both decide the winner.</li>
