@@ -1,0 +1,33 @@
+---
+// Official store badges, reused from the Pétanque Scanner landing (same assets +
+// global .store-badges styling). Renders whichever of the two URLs is provided.
+interface Props {
+	appStore?: string | undefined;
+	playStore?: string | undefined;
+	lang?: 'fr' | 'en';
+}
+
+const { appStore, playStore, lang = 'fr' } = Astro.props;
+const play = `/assets/badges/google-play-${lang}.png`;
+const apple = `/assets/badges/app-store-${lang}.svg`;
+
+const alt =
+	lang === 'en'
+		? { play: 'Get it on Google Play', apple: 'Download on the App Store' }
+		: { play: 'Disponible sur Google Play', apple: "Télécharger dans l'App Store" };
+---
+
+{(appStore || playStore) && (
+	<div class="store-badges">
+		{playStore && (
+			<a href={playStore} target="_blank" rel="noopener">
+				<img class="badge-play" src={play} alt={alt.play} />
+			</a>
+		)}
+		{appStore && (
+			<a href={appStore} target="_blank" rel="noopener">
+				<img class="badge-appstore" src={apple} alt={alt.apple} />
+			</a>
+		)}
+	</div>
+)}

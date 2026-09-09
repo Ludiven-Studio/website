@@ -6,6 +6,8 @@ img_alt: Logo de Skoolz, jeu de quiz scolaire en duel
 description: |
   Accompagnement, en tant que lead, à la réalisation de Skoolz : un jeu de quiz scolaire où les personnages s'affrontent en duel en ligne. Mise en place de tout le volet multijoueur et suivi de deux alternants.
 role: Lead développeur
+appStore: https://apps.apple.com/fr/app/skoolz/id6744245849
+playStore: https://play.google.com/store/apps/details?id=com.EssentialZ.Skoolz&hl=fr
 tags:
   - Multijoueur
   - Temps réel

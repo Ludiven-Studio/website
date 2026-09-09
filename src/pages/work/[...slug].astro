@@ -8,6 +8,7 @@ import Hero from '../../components/Hero.astro';
 import Icon from '../../components/Icon.astro';
 import Pill from '../../components/Pill.astro';
 import LangSwitch from '../../components/LangSwitch.astro';
+import StoreBadges from '../../components/StoreBadges.astro';
 
 interface Props {
 	entry: CollectionEntry<'work'>;
@@ -47,6 +48,7 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 								{entry.data.tags.map((t) => <Pill>{t}</Pill>)}
 							</div>
 							<p class="description">{entry.data.description}</p>
+							<StoreBadges appStore={entry.data.appStore} playStore={entry.data.playStore} lang="fr" />
 						</div>
 					</Hero>
 				</div>

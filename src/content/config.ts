@@ -14,6 +14,8 @@ const workSchema = z.object({
 	galleryLayout: z.enum(['phone', 'wide']).optional(),
 	role: z.string().optional(),
 	org: z.string().optional(),
+	appStore: z.string().url().optional(),
+	playStore: z.string().url().optional(),
 });
 
 export const collections = {

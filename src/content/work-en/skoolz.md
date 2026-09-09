@@ -6,6 +6,8 @@ img_alt: Skoolz logo, a school quiz game played as a duel
 description: |
   Lead developer on Skoolz, a school quiz game where characters face off in online duels. Built the whole multiplayer side and mentored two apprentices.
 role: Lead developer
+appStore: https://apps.apple.com/fr/app/skoolz/id6744245849
+playStore: https://play.google.com/store/apps/details?id=com.EssentialZ.Skoolz&hl=fr
 tags:
   - Multiplayer
   - Real time
