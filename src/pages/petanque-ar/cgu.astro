@@ -15,7 +15,7 @@ import Hero from '../../components/Hero.astro';
 
 		<p class="updated">
 			Application <strong>Pétanque AR</strong> (<code>com.raphbenpro.petanquear</code>) — dernière mise à
-			jour&nbsp;: 25 juillet 2026.
+			jour&nbsp;: 10 septembre 2026.
 		</p>
 
 		<div class="summary">
@@ -59,6 +59,16 @@ import Hero from '../../components/Hero.astro';
 				entre eux et vous les présenter à l'écran.
 			</p>
 			<p>
+				Si votre téléphone ne prend pas en charge la réalité augmentée, l'Application bascule automatiquement
+				dans un <strong>mode photo</strong>&nbsp;: vous cadrez le terrain et déclenchez une prise de vue unique,
+				à partir de laquelle le classement des boules est estimé. Ce mode désigne la boule la plus proche et
+				affiche une <strong>distance approximative</strong>, présentée comme telle dans l'Application. Reposant
+				sur une seule image, il est par nature plus sensible à l'angle de prise de vue que le mode en réalité
+				augmentée&nbsp;: l'avertissement de précision ci-dessous s'y applique avec d'autant plus de force.
+				Lorsque l'écart entre les deux premières boules est trop faible pour être tranché de façon fiable,
+				l'Application vous l'indique et vous invite à mesurer au mètre.
+			</p>
+			<p>
 				<strong>Avertissement important sur la précision.</strong> Les distances affichées sont des
 				<strong>estimations</strong> produites par un traitement automatique d'images et par le suivi de mouvement
 				du téléphone. Leur exactitude dépend de nombreux facteurs que l'éditeur ne maîtrise pas&nbsp;: luminosité,
@@ -76,11 +86,13 @@ import Hero from '../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>4. Accès et prérequis techniques</h2>
 			<p>
-				L'utilisation de l'Application suppose un smartphone compatible avec les technologies de réalité augmentée
-				ARCore (Android) ou ARKit (iOS), une version du système d'exploitation prise en charge, et l'autorisation
-				d'accès à la caméra. Sans accès à la caméra, l'Application ne peut pas fonctionner. Une connexion Internet
-				est nécessaire pour l'affichage des publicités et pour la réalisation d'un achat, mais le scan lui-même
-				fonctionne hors ligne.
+				L'utilisation de l'Application suppose une version du système d'exploitation prise en charge et
+				l'autorisation d'accès à la caméra. <strong>Sans accès à la caméra, l'Application ne peut pas
+				fonctionner.</strong> Le mode principal, en réalité augmentée, requiert un smartphone compatible ARCore
+				(Android) ou ARKit (iOS)&nbsp;; sur un appareil non compatible, l'Application reste utilisable et
+				bascule automatiquement dans le mode photo décrit au §3. Une connexion Internet est nécessaire pour
+				l'affichage des publicités et pour la réalisation d'un achat, mais le scan lui-même fonctionne hors
+				ligne.
 			</p>
 			<p>Aucune création de compte n'est requise. Les coûts de connexion et d'équipement restent à votre charge.</p>
 		</section>

@@ -16,13 +16,13 @@ import Hero from '../../components/Hero.astro';
 		<p class="updated">
 			Cette politique concerne <strong>l'application mobile Pétanque AR</strong>
 			(<code>com.raphbenpro.petanquear</code>), et non le site ludiven-studio.fr, qui dispose de sa
-			<a href="/confidentialite">propre politique</a>. Dernière mise à jour&nbsp;: 25 juillet 2026.
+			<a href="/confidentialite">propre politique</a>. Dernière mise à jour&nbsp;: 10 septembre 2026.
 		</p>
 
 		<div class="summary">
 			<p><strong>L'essentiel&nbsp;:</strong></p>
 			<ul>
-				<li><strong>Les images de votre caméra ne quittent jamais votre appareil.</strong> La détection des boules est calculée localement sur le téléphone. Aucune photo, aucune vidéo, aucune image n'est envoyée à un serveur, ni enregistrée durablement.</li>
+				<li><strong>Les images de votre caméra ne quittent jamais votre appareil.</strong> La détection des boules est calculée localement sur le téléphone. Aucune photo, aucune vidéo, aucune image n'est envoyée à un serveur, ni enregistrée durablement — y compris dans le mode photo, où l'image du déclenchement reste en mémoire vive.</li>
 				<li>Nous n'avons <strong>aucun serveur</strong> et <strong>aucun compte utilisateur</strong>. Nous ne connaissons ni votre nom, ni votre e-mail, ni votre position.</li>
 				<li>La publicité et la mesure d'audience ne sont activées <strong>qu'avec votre consentement</strong>, demandé au premier lancement. Vous pouvez le retirer à tout moment.</li>
 				<li>L'achat <strong>Premium supprime la publicité</strong> et, dans ce cas, le SDK publicitaire n'est même pas démarré.</li>
@@ -56,6 +56,15 @@ import Hero from '../../components/Hero.astro';
 				<li>Seul le résultat du calcul (des positions en 3 dimensions et des distances) est utilisé pour l'affichage, et il disparaît quand vous quittez le scan.</li>
 			</ul>
 			<p>
+				<strong>Mode photo.</strong> Sur les téléphones qui ne prennent pas en charge la réalité augmentée,
+				l'application bascule automatiquement dans un mode où vous cadrez le terrain puis appuyez sur un
+				déclencheur, au lieu de filmer en continu. Le principe reste identique&nbsp;: l'image saisie au
+				déclenchement est analysée <strong>en mémoire vive uniquement</strong>. Elle n'est ni enregistrée dans un
+				fichier, ni ajoutée à votre galerie, ni transmise&nbsp;; elle est libérée dès que vous quittez le mode
+				photo. L'application ne demande d'ailleurs <strong>aucune autorisation d'accès à vos photos</strong>&nbsp;:
+				seule l'autorisation caméra est requise.
+			</p>
+			<p>
 				En conséquence, l'usage de la caméra ne donne lieu à <strong>aucune collecte de données personnelles</strong>
 				par l'éditeur.
 			</p>
@@ -86,6 +95,12 @@ import Hero from '../../components/Hero.astro';
 							<td>Mesure d'audience&nbsp;: comprendre quelles fonctions sont utilisées et améliorer l'application</td>
 							<td>Consentement</td>
 							<td>Google (Firebase Analytics)</td>
+						</tr>
+						<tr>
+							<td>Les mêmes événements d'usage (voir §5), accompagnés de&nbsp;: plateforme (Android ou iOS), version de l'application, langue du téléphone, définition de l'écran, système d'exploitation</td>
+							<td>Mesure d'audience, en complément de la précédente&nbsp;: obtenir un tableau de bord simple et sans cookie</td>
+							<td>Consentement</td>
+							<td>Umami Software, Inc. (Umami Cloud)</td>
 						</tr>
 						<tr>
 							<td>Jeton de notification push</td>
@@ -155,15 +170,35 @@ import Hero from '../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>5. Mesure d'audience&nbsp;: les événements exacts</h2>
 			<p>
-				Par souci de transparence, voici la liste exhaustive des événements envoyés à Firebase Analytics
+				Par souci de transparence, voici la liste exhaustive des événements envoyés
 				<em>lorsque vous avez consenti</em>. Aucun ne contient de donnée que vous auriez saisie, ni d'identifiant
-				que nous aurions créé.
+				que nous aurions créé, ni le résultat de vos parties.
+			</p>
+			<p>
+				Depuis septembre 2026, ces événements sont adressés à <strong>deux</strong> outils de mesure, qui
+				reçoivent exactement la même liste&nbsp;: <strong>Firebase Analytics</strong> (Google) et
+				<strong>Umami Cloud</strong>. Le second est un outil de statistiques sans cookie, utilisé parce qu'il
+				donne une vue simple et lisible de l'usage&nbsp;; il est décrit en détail plus bas.
 			</p>
 			<ul>
 				<li><code>scan_started</code> — un scan démarre</li>
 				<li><code>scan_completed</code> — un scan aboutit, avec le nombre de scans réalisés dans la journée</li>
 				<li><code>scan_blocked_quota</code> — un scan est refusé car la limite quotidienne est atteinte</li>
+				<li><code>floor_confirmed</code> — vous avez validé la détection du sol</li>
+				<li><code>cochonet_redo</code> — vous demandez de rechercher à nouveau le cochonnet</li>
+				<li><code>ar_incompatible_shown</code> — votre téléphone ne gère pas la réalité augmentée&nbsp;; l'information vous est présentée</li>
+				<li><code>photo_offer_shown</code> / <code>photo_offer_declined</code> — le mode photo vous est proposé, ou vous le refusez</li>
+				<li><code>photo_mode_entered</code> — le mode photo démarre, avec la raison (bascule automatique, proposition acceptée, ou choix dans les réglages)</li>
+				<li><code>photo_mode_exited</code> — le mode photo est quitté</li>
+				<li><code>photo_shutter</code> — vous déclenchez une photo, avec l'indication de réussite ou d'échec du calcul</li>
+				<li><code>photo_retake</code> — vous reprenez une photo</li>
+				<li><code>photo_camera_unavailable</code> — la caméra n'a pas pu être ouverte</li>
+				<li><code>settings_opened</code> — l'écran de réglages est ouvert</li>
+				<li><code>settings_action</code> — une action y est déclenchée&nbsp;: consentement, politique de confidentialité, conditions d'utilisation, ou restauration d'achat</li>
 				<li><code>paywall_shown</code> / <code>paywall_dismissed</code> — l'écran d'offre Premium est affiché ou fermé, avec le motif d'affichage</li>
+				<li><code>paywall_watch_ad</code> — vous choisissez de regarder une publicité pour recharger vos scans</li>
+				<li><code>ad_reward_earned</code> — la publicité a été regardée jusqu'au bout et les scans sont rechargés</li>
+				<li><code>ad_unavailable</code> — aucune publicité n'était disponible à afficher</li>
 				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — étapes d'un achat, avec le motif d'échec le cas échéant</li>
 				<li><code>premium_restore_success</code> — un achat antérieur a été restauré</li>
 				<li><code>iap_receipt_invalid</code> — une preuve d'achat n'a pas pu être validée</li>
@@ -174,6 +209,24 @@ import Hero from '../../components/Hero.astro';
 				À ces événements, Firebase ajoute automatiquement des informations techniques standard (modèle d'appareil,
 				version du système d'exploitation, version de l'application, pays déduit de l'adresse IP, première
 				ouverture, durée de session).
+			</p>
+			<p>
+				<strong>Ce qu'Umami reçoit, précisément.</strong> Chaque événement est envoyé à
+				<code>cloud.umami.is</code> avec, et rien de plus&nbsp;: le nom de l'événement, un identifiant de site
+				qui nous appartient, la plateforme (<code>android</code> ou <code>ios</code>), la version de
+				l'application, la langue de votre téléphone, la définition de votre écran, et le nom de votre système
+				d'exploitation. <strong>Aucun identifiant publicitaire, aucun numéro d'appareil, aucun cookie, aucun
+				identifiant persistant</strong> n'y figure. Comme pour toute requête sur Internet, le serveur voit
+				nécessairement votre adresse IP&nbsp;; selon la documentation d'Umami, celle-ci n'est pas conservée&nbsp;:
+				elle sert uniquement à déduire un pays et à calculer une empreinte anonyme renouvelée chaque jour, qui ne
+				permet ni de vous suivre d'un jour à l'autre, ni de vous reconnaître dans une autre application.
+			</p>
+			<p>
+				<strong>Une exception, en toute transparence&nbsp;:</strong> si vous <em>refusez</em> le consentement, un
+				unique événement <code>consent_declined</code> est envoyé à Umami, afin que nous sachions quelle
+				proportion d'utilisateurs refuse. Il ne contient aucun identifiant et n'est suivi d'aucun autre envoi&nbsp;:
+				la mesure d'audience reste entièrement désactivée. Si vous préférez qu'absolument rien ne parte, refusez le
+				consentement <em>et</em> utilisez l'application hors connexion, ou achetez le Premium.
 			</p>
 		</section>
 
@@ -237,6 +290,7 @@ import Hero from '../../components/Hero.astro';
 			</p>
 			<ul>
 				<li><strong>Google Ireland Limited / Google LLC</strong> — publicité (AdMob), mesure d'audience (Firebase Analytics), notifications (Firebase Cloud Messaging), gestion du consentement (UMP), heure de référence (Firebase Realtime Database).</li>
+				<li><strong>Umami Software, Inc.</strong> (société de droit américain) — mesure d'audience sans cookie, via le service Umami Cloud.</li>
 				<li><strong>Apple Inc.</strong> et <strong>Google LLC</strong> — distribution de l'application et traitement des achats intégrés.</li>
 			</ul>
 			<p>
@@ -250,7 +304,8 @@ import Hero from '../../components/Hero.astro';
 			<h2>11. Durées de conservation</h2>
 			<ul>
 				<li><strong>Images de la caméra</strong>&nbsp;: le temps du calcul, en mémoire vive uniquement (quelques millisecondes).</li>
-				<li><strong>Données de mesure d'audience</strong>&nbsp;: conservées par Firebase Analytics <strong>14 mois au maximum</strong>, selon la durée paramétrée dans la console Firebase. Les rapports agrégés (non rattachables à un appareil) peuvent être conservés au-delà.</li>
+				<li><strong>Données de mesure d'audience — Firebase</strong>&nbsp;: conservées par Firebase Analytics <strong>14 mois au maximum</strong>, selon la durée paramétrée dans la console Firebase. Les rapports agrégés (non rattachables à un appareil) peuvent être conservés au-delà.</li>
+				<li><strong>Données de mesure d'audience — Umami</strong>&nbsp;: conservées sous forme de statistiques d'événements tant que notre compte de mesure reste actif. Ces données ne sont rattachées à aucun identifiant d'appareil et ne permettent pas de reconstituer le parcours d'une personne.</li>
 				<li><strong>Compteur de scans</strong>&nbsp;: réinitialisé chaque jour.</li>
 				<li><strong>Indicateur de Premium et choix de consentement</strong>&nbsp;: conservés sur l'appareil jusqu'à la désinstallation ou jusqu'au retrait de votre consentement.</li>
 			</ul>
