@@ -58,6 +58,76 @@ function isAdmin(v: unknown): boolean {
 	return diff === 0; // compare every char so a wrong key can't be found byte by byte
 }
 
+// ---- Email recovery (Resend) ----
+// Not a login: an email is only a channel to mail back the space links when a
+// device's localStorage "recents" are gone. Links themselves stay the secret.
+
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
+const FROM_EMAIL = Deno.env.get('COURSES_FROM_EMAIL') ?? '';
+const APP_URL = Deno.env.get('COURSES_APP_URL') ?? 'https://www.ludiven-studio.fr';
+const emailConfigured = (): boolean => Boolean(RESEND_API_KEY && FROM_EMAIL);
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normEmail = (v: unknown): string | null => {
+	const e = String(v ?? '').trim().toLowerCase().slice(0, 254);
+	return EMAIL_RE.test(e) ? e : null;
+};
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const listLink = (spaceId: string): string => `${APP_URL}/courses?l=${spaceId}`;
+
+/** Active-list titles for a set of spaces, for readable link labels. */
+async function spaceTitles(db: SupabaseClient, ids: string[]): Promise<Map<string, string>> {
+	const m = new Map<string, string>();
+	if (!ids.length) return m;
+	const { data } = await db.from('courses_lists').select('space_id, title').is('archived_at', null).in('space_id', ids);
+	for (const r of (data ?? []) as { space_id: string; title: string }[]) m.set(r.space_id, r.title ?? '');
+	return m;
+}
+
+async function sendListsEmail(to: string, spaces: { id: string; title: string }[]): Promise<void> {
+	if (!spaces.length) return;
+	const rows = spaces.map((s) =>
+		`<li style="margin:8px 0"><a href="${listLink(s.id)}">${esc(s.title || 'Liste de courses')}</a></li>`,
+	).join('');
+	const html = `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:15px;color:#222;line-height:1.5">
+<p>Voici ${spaces.length > 1 ? 'tes listes de courses' : 'ta liste de courses'} :</p>
+<ul style="padding-left:20px">${rows}</ul>
+<p style="color:#888;font-size:13px">Garde ce message : ces liens sont la clé d'accès à tes listes. Ne les partage qu'avec les personnes avec qui tu veux faire les courses.</p>
+</div>`;
+	const res = await fetch('https://api.resend.com/emails', {
+		method: 'POST',
+		headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+		body: JSON.stringify({ from: FROM_EMAIL, to, subject: 'Tes listes de courses', html }),
+	});
+	// Throw so the caller neither marks the throttle nor tells the user it was
+	// sent: a swallowed Resend error looks exactly like a delivered email.
+	if (!res.ok) throw new Error(`resend ${res.status}: ${await res.text().catch(() => '')}`.slice(0, 300));
+}
+
+// One send per email per minute — keeps the endpoint from spamming an address.
+const THROTTLE_MS = 60_000;
+async function throttled(db: SupabaseClient, email: string): Promise<boolean> {
+	const { data } = await db.from('courses_email_throttle').select('last_sent_at').eq('email', email).maybeSingle();
+	return Boolean(data && Date.now() - new Date(data.last_sent_at as string).getTime() < THROTTLE_MS);
+}
+async function markSent(db: SupabaseClient, email: string, nowIso: string): Promise<void> {
+	await db.from('courses_email_throttle').upsert({ email, last_sent_at: nowIso }, { onConflict: 'email' });
+}
+
+/** Mail an address the full set of spaces linked to it. Returns false when
+ *  nothing was sent (throttled, or nothing linked) so a caller that may report
+ *  it — link_spaces — never claims an email went out. */
+async function mailLinkedSpaces(db: SupabaseClient, email: string, nowIso: string): Promise<boolean> {
+	if (await throttled(db, email)) return false;
+	const { data: links } = await db.from('courses_emails').select('space_id').eq('email', email);
+	const ids = ((links ?? []) as { space_id: string }[]).map((r) => r.space_id);
+	if (!ids.length) return false;
+	const titles = await spaceTitles(db, ids);
+	await sendListsEmail(email, ids.map((id) => ({ id, title: titles.get(id) ?? '' })));
+	await markSent(db, email, nowIso);
+	return true;
+}
+
 /** Ensure a space exists. Returns its id or null. */
 async function requireSpace(db: SupabaseClient, spaceId: unknown): Promise<string | null> {
 	if (!isUuid(spaceId)) return null;
@@ -223,6 +293,39 @@ Deno.serve(async (req) => {
 			});
 			rows.sort((a, b) => (a.lastActivity < b.lastActivity ? 1 : -1));
 			return json({ spaces: rows });
+		}
+
+		// Link an email to spaces the caller already holds, then mail the links
+		// back (also serves as confirmation). Holding a space uuid is the
+		// authorization to attach an email to it.
+		if (action === 'link_spaces') {
+			if (!emailConfigured()) return bad("l'envoi d'emails n'est pas configuré", 503);
+			const email = normEmail(body.email);
+			if (!email) return bad('email invalide');
+			const ids = Array.isArray(body.spaceIds) ? [...new Set(body.spaceIds.filter(isUuid))] as string[] : [];
+			if (!ids.length) return bad('no spaces');
+			const { data: existing } = await db.from('courses_spaces').select('id').in('id', ids);
+			const valid = ((existing ?? []) as { id: string }[]).map((r) => r.id);
+			if (!valid.length) return bad('unknown space', 404);
+			await db.from('courses_emails').upsert(
+				valid.map((space_id) => ({ email, space_id })),
+				{ onConflict: 'email,space_id' },
+			);
+			// The caller owns these spaces, so telling it whether the mail went out
+			// leaks nothing — and saying "sent" when the throttle swallowed it would.
+			const sent = await mailLinkedSpaces(db, email, now);
+			return json({ ok: true, sent });
+		}
+
+		// Recover from a fresh device: mail an address its linked spaces. Always a
+		// neutral response so the endpoint never reveals whether an email is known
+		// — here `sent` WOULD be that oracle, so it is deliberately not returned.
+		if (action === 'request_lists') {
+			if (!emailConfigured()) return bad("l'envoi d'emails n'est pas configuré", 503);
+			const email = normEmail(body.email);
+			if (!email) return bad('email invalide');
+			await mailLinkedSpaces(db, email, now);
+			return json({ ok: true });
 		}
 
 		// Everything else needs a valid space uuid.

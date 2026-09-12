@@ -295,6 +295,8 @@
 	/* ---- Recents / history ---- */
 	.co-recents { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 1rem; }
 	.co-recents h2 { font-size: var(--text-md); color: var(--gray-200); }
+	.co-recover { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin-top: 1.6rem; }
+	.co-recover h2 { font-size: var(--text-md); color: var(--gray-200); }
 	.co-recent, .co-hrow {
 		display: flex;
 		align-items: center;

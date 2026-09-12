@@ -88,6 +88,18 @@ export const newList = (spaceId: string, title = ''): Promise<Snapshot> =>
 export const reuseList = (spaceId: string, sourceListId: string, title = ''): Promise<Snapshot> =>
 	call('reuse_list', { spaceId, sourceListId, title });
 
+// ---- Email recovery ----
+// Not a login: an email is a channel to get the space links mailed back when a
+// device's localStorage recents are gone. link_spaces attaches spaces the caller
+// already holds; request_lists mails whatever is linked (always neutral).
+
+/** `sent` is false when the throttle swallowed the mail — the link is saved
+ *  either way, so the UI must not promise an email that is not coming. */
+export const linkSpaces = (email: string, spaceIds: string[]): Promise<{ ok: true; sent: boolean }> =>
+	call('link_spaces', { email, spaceIds });
+export const requestLists = (email: string): Promise<{ ok: true }> =>
+	call('request_lists', { email });
+
 // ---- Admin dashboard ----
 
 /** One row of the operator view: a space and how busy its active list is. */

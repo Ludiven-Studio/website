@@ -5,6 +5,7 @@ import {
 	clearChecked, newList, reuseList, reorderItems, renameList,
 	addCategory, renameCategory, deleteCategory, reorderCategories,
 	recentSpaces, rememberSpace, coursesEnabled,
+	linkSpaces, requestLists,
 } from '../../lib/courses';
 import { joinSpace, type CoursesLink } from '../../games/courses/net';
 import { useDragSort } from './useDragSort';
@@ -46,6 +47,7 @@ export default function CoursesApp() {
 	const [error, setError] = useState<string | null>(null);
 	const [booted, setBooted] = useState(false);
 	const [recents, setRecents] = useState<RecentSpace[]>([]);
+	const [emailSheet, setEmailSheet] = useState(false);
 	const linkRef = useRef<CoursesLink | null>(null);
 
 	useEffect(() => {
@@ -131,6 +133,32 @@ export default function CoursesApp() {
 							</a>
 						))}
 					</div>
+				)}
+
+				<div className="co-recover">
+					<h2>Retrouver mes listes</h2>
+					<p className="co-note">
+						Lie tes listes à ton email pour les retrouver sur un autre appareil : tu recevras les liens
+						par mail.
+					</p>
+					<button className="co-btn" onClick={() => setEmailSheet(true)}>
+						{recents.length ? 'Lier mes listes à mon email' : 'Recevoir mes listes par email'}
+					</button>
+				</div>
+
+				{emailSheet && (
+					<EmailSheet
+						heading={recents.length ? 'Lier mes listes à mon email' : 'Retrouver mes listes'}
+						note={recents.length
+							? 'On enverra à cette adresse les liens de tes listes, et elle servira à les retrouver plus tard sur un autre appareil.'
+							: 'Saisis l\'adresse à laquelle tu as lié tes listes : tu recevras les liens par email.'}
+						cta="Envoyer"
+						onClose={() => setEmailSheet(false)}
+						onSubmit={async (email) => {
+							if (!recents.length) { await requestLists(email); return; }
+							return (await linkSpaces(email, recents.map((r) => r.id))).sent;
+						}}
+					/>
 				)}
 			</div>
 		);
@@ -224,6 +252,7 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 	const [copied, setCopied] = useState(false);
 	const [editing, setEditing] = useState<CourseItem | null>(null);
 	const [naming, setNaming] = useState(false);
+	const [emailing, setEmailing] = useState(false);
 	const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed(spaceId));
 	// While dragging we render from this local copy so the row follows the finger;
 	// null means "just use the server snapshot".
@@ -327,6 +356,7 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 				</div>
 				<div className="co-tools">
 					<button className="co-btn" onClick={share}>{copied ? 'Lien copié ✓' : 'Partager'}</button>
+					<button className="co-btn" onClick={() => setEmailing(true)}>Mon email</button>
 					<button className="co-btn" onClick={onOpenCategories}>Rayons</button>
 					<button className="co-btn" onClick={onOpenHistory}>Historique</button>
 					<button className="co-btn co-icon" onClick={onReload} title="Rafraîchir" aria-label="Rafraîchir">↻</button>
@@ -426,6 +456,16 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 				<ItemEditor
 					item={editing} categories={snap.categories} spaceId={spaceId} busy={busy}
 					onClose={() => setEditing(null)} mutate={mutate}
+				/>
+			)}
+
+			{emailing && (
+				<EmailSheet
+					heading="Lier ma liste à mon email"
+					note="On enverra à cette adresse le lien de cette liste. Elle te servira à la retrouver plus tard sur un autre appareil."
+					cta="Envoyer le lien"
+					onClose={() => setEmailing(false)}
+					onSubmit={async (email) => (await linkSpaces(email, [spaceId])).sent}
 				/>
 			)}
 		</>
@@ -614,6 +654,74 @@ export function RenameSheet({ heading, value, busy, onClose, onSave }: {
 						Enregistrer
 					</button>
 				</div>
+			</div>
+		</div>
+	);
+}
+
+/** Collect an email to link/recover lists. Response is deliberately neutral —
+ *  it never says whether the address already had lists. */
+function EmailSheet({ heading, note, cta, onClose, onSubmit }: {
+	heading: string; note: string; cta: string;
+	onClose: () => void;
+	/** Resolves false when the server saved the link but sent no mail (throttle). */
+	onSubmit: (email: string) => Promise<boolean | void>;
+}) {
+	const [email, setEmail] = useState('');
+	const [sending, setSending] = useState(false);
+	const [done, setDone] = useState<'sent' | 'throttled' | null>(null);
+	const [err, setErr] = useState<string | null>(null);
+	const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+	const submit = async () => {
+		if (!valid || sending) return;
+		setSending(true); setErr(null);
+		try {
+			const sent = await onSubmit(email.trim().toLowerCase());
+			setDone(sent === false ? 'throttled' : 'sent');
+		} catch (e) {
+			setErr(e instanceof Error ? e.message : 'Erreur');
+		} finally {
+			setSending(false);
+		}
+	};
+
+	return (
+		<div className="co-modal" onClick={onClose}>
+			<div className="co-sheet" onClick={(e) => e.stopPropagation()}>
+				<h2>{heading}</h2>
+				{done ? (
+					<>
+						<p className="co-note">
+							{done === 'throttled'
+								? "C'est enregistré, mais aucun email n'est reparti : un message vient déjà d'être envoyé à cette adresse. Réessaie dans une minute."
+								: "C'est envoyé. Si des listes sont liées à cette adresse, tu vas recevoir un email avec les liens — pense à vérifier les spams."}
+						</p>
+						<div className="co-sheet-actions">
+							<button className="co-btn co-btn-primary" onClick={onClose}>Fermer</button>
+						</div>
+					</>
+				) : (
+					<>
+						<p className="co-note">{note}</p>
+						<label className="co-field">
+							<span>Email</span>
+							<input
+								className="co-in" type="email" value={email} autoFocus placeholder="toi@exemple.fr"
+								onChange={(e) => setEmail(e.target.value)}
+								onKeyDown={(e) => e.key === 'Enter' && submit()}
+								autoComplete="email" enterKeyHint="send"
+							/>
+						</label>
+						{err && <p className="co-error">{err}</p>}
+						<div className="co-sheet-actions">
+							<button className="co-btn" onClick={onClose}>Annuler</button>
+							<button className="co-btn co-btn-primary" onClick={submit} disabled={sending || !valid}>
+								{sending ? '…' : cta}
+							</button>
+						</div>
+					</>
+				)}
 			</div>
 		</div>
 	);
