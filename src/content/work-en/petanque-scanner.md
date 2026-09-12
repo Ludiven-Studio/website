@@ -20,11 +20,17 @@ galleryTitle: The app in use
 galleryLayout: phone
 gallery:
   - src: /assets/petanque-ar/screen-01.webp
-    alt: Scan in progress — three boules measured at 15.1 cm, 19.0 cm and 28.3 cm from the jack
+    alt: Scan in progress — six boules measured in augmented reality, from 20.7 cm to 32.2 cm off the jack
   - src: /assets/petanque-ar/screen-02.webp
-    alt: Another layout of boules, with the distance ranking drawn in augmented reality
+    alt: Green grid laid over the pitch, to confirm before the measurement starts
   - src: /assets/petanque-ar/screen-03.webp
-    alt: Premium screen — watch an ad to refill your scans, or buy the lifetime Premium
+    alt: The same measurement from another angle — walking around the game sharpens the distances
+  - src: /assets/petanque-ar/screen-04.webp
+    alt: Photo mode — a single shot, phone held flat, for devices without AR
+  - src: /assets/petanque-ar/screen-05.webp
+    alt: Photo mode result — the closest boule circled in green, about 20 cm from the jack
+  - src: /assets/petanque-ar/screen-06.webp
+    alt: Premium screen — three free scans a day, or lifetime Premium with no subscription
   - src: /assets/petanque-ar/premium.webp
     alt: Lifetime Premium artwork — unlimited measurements, no ads
 ---

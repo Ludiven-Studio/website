@@ -43,6 +43,9 @@ export const SCREENS = [
 	'/assets/petanque-ar/screen-01.webp',
 	'/assets/petanque-ar/screen-02.webp',
 	'/assets/petanque-ar/screen-03.webp',
+	'/assets/petanque-ar/screen-04.webp',
+	'/assets/petanque-ar/screen-05.webp',
+	'/assets/petanque-ar/screen-06.webp',
 ];
 
 export const copy: Record<'fr' | 'en', LandingCopy> = {

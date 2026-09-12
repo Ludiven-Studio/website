@@ -20,11 +20,17 @@ galleryTitle: L'application en situation
 galleryLayout: phone
 gallery:
   - src: /assets/petanque-ar/screen-01.webp
-    alt: Scan en cours — trois boules mesurées à 15,1 cm, 19,0 cm et 28,3 cm du cochonnet
+    alt: Scan en cours — six boules mesurées en réalité augmentée, de 20,7 cm à 32,2 cm du cochonnet
   - src: /assets/petanque-ar/screen-02.webp
-    alt: Autre configuration de boules, avec le classement des distances affiché en réalité augmentée
+    alt: Quadrillage vert posé sur le terrain, à valider avant de lancer la mesure
   - src: /assets/petanque-ar/screen-03.webp
-    alt: Écran Premium — regarder une publicité pour recharger ses scans, ou passer en Premium à vie
+    alt: La même mesure vue sous un autre angle — tourner autour du jeu affine les distances
+  - src: /assets/petanque-ar/screen-04.webp
+    alt: Mode photo — une seule prise de vue, téléphone à plat, pour les appareils sans AR
+  - src: /assets/petanque-ar/screen-05.webp
+    alt: Résultat du mode photo — la boule la plus proche cerclée de vert, à environ 20 cm du cochonnet
+  - src: /assets/petanque-ar/screen-06.webp
+    alt: Écran Premium — trois scans gratuits par jour, ou Premium à vie sans abonnement
   - src: /assets/petanque-ar/premium.webp
     alt: Visuel Premium à vie — mesures illimitées et sans publicité
 ---
