@@ -59,8 +59,12 @@ export const createSpace = (): Promise<Snapshot> => call('create_space');
 export const getSpace = (spaceId: string): Promise<Snapshot> => call('get_space', { spaceId });
 export const getList = (spaceId: string, listId: string): Promise<{ id: string; title: string; created_at: string; items: CourseItem[] }> =>
 	call('get_list', { spaceId, listId });
-export const addItem = (spaceId: string, label: string, qty?: string): Promise<{ item: CourseItem }> =>
-	call('add_item', { spaceId, label, qty });
+/** Leave `categoryId` undefined to let the space file the item where that label
+ *  went last time; pass null to force "Sans catégorie". JSON.stringify drops an
+ *  undefined value, so the key is absent from the body and the server takes the
+ *  remembered-category branch — passing null would instead ERASE that memory. */
+export const addItem = (spaceId: string, label: string, qty?: string, categoryId?: string | null): Promise<{ item: CourseItem }> =>
+	call('add_item', { spaceId, label, qty, categoryId });
 export const updateItem = (spaceId: string, itemId: string, patch: { checked?: boolean; label?: string; qty?: string; categoryId?: string | null }): Promise<{ item: CourseItem }> =>
 	call('update_item', { spaceId, itemId, ...patch });
 

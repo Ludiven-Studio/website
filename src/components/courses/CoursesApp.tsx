@@ -23,6 +23,9 @@ const fmtDate = (iso: string): string =>
 
 // The uncategorised bucket has no uuid; 'none' is its stand-in in DOM attributes.
 const NONE = 'none';
+// Add-row only: "let the space decide". Distinct from NONE, which is the explicit
+// choice of no aisle — and which also wipes what the space learned for that label.
+const AUTO = 'auto';
 const zoneOf = (categoryId: string | null): string => categoryId ?? NONE;
 const catOf = (zone: string): string | null => (zone === NONE ? null : zone);
 
@@ -249,6 +252,7 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 }) {
 	const [label, setLabel] = useState('');
 	const [qty, setQty] = useState('');
+	const [addCat, setAddCat] = useState<string>(AUTO);
 	const [copied, setCopied] = useState(false);
 	const [editing, setEditing] = useState<CourseItem | null>(null);
 	const [naming, setNaming] = useState(false);
@@ -329,8 +333,9 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 	const add = () => {
 		const l = label.trim();
 		if (!l) return;
-		setLabel(''); setQty('');
-		void mutate(() => addItem(spaceId, l, qty.trim() || undefined));
+		const chosen = addCat; // read before the reset below
+		setLabel(''); setQty(''); setAddCat(AUTO);
+		void mutate(() => addItem(spaceId, l, qty.trim() || undefined, chosen === AUTO ? undefined : catOf(chosen)));
 	};
 
 	const share = async () => {
@@ -377,6 +382,14 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 					autoComplete="off"
 				/>
 				<button className="co-btn co-btn-primary" onClick={add} disabled={busy || !label.trim()}>+</button>
+				<select
+					className="co-in co-in-cat" value={addCat} aria-label="Rayon du nouvel article"
+					onChange={(e) => setAddCat(e.target.value)}
+				>
+					<option value={AUTO}>Rayon : automatique</option>
+					{snap.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+					<option value={NONE}>Sans catégorie</option>
+				</select>
 			</div>
 
 			{items.length === 0 ? (
