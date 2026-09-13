@@ -124,7 +124,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 			},
 			{
 				title: 'À quelques millimètres, sortez le mètre',
-				body: 'L\'application tranche les écarts visibles. Deux boules collées au cochonnet resteront une affaire de mesure manuelle.',
+				body: 'L\'application tranche les écarts visibles. Quand deux boules sont à quasi-égale distance du cochonnet — peu importe qu\'elles en soient à dix centimètres ou à deux mètres — l\'écart passe sous la précision de la mesure, et seul un vrai mètre les départagera.',
 			},
 		],
 		priceTitle: 'Combien ça coûte',
@@ -240,7 +240,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 			},
 			{
 				title: 'Within a few millimetres, get the tape measure out',
-				body: 'The app settles gaps you can see. Two boules touching the jack stay a job for the tape measure.',
+				body: 'The app settles gaps you can see. When two boules sit almost the same distance from the jack — whether that is ten centimetres or two metres away — the gap falls below what the measurement can resolve, and only a real tape measure will separate them.',
 			},
 		],
 		priceTitle: 'What it costs',
