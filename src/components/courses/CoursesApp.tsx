@@ -9,6 +9,7 @@ import {
 } from '../../lib/courses';
 import { joinSpace, type CoursesLink } from '../../games/courses/net';
 import { useDragSort } from './useDragSort';
+import { usePinToHome, type PinPlatform } from './usePinToHome';
 
 // Read/replace the ?l=<spaceId> secret in the URL without a full navigation.
 const spaceFromUrl = (): string | null => new URLSearchParams(window.location.search).get('l');
@@ -257,7 +258,9 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 	const [editing, setEditing] = useState<CourseItem | null>(null);
 	const [naming, setNaming] = useState(false);
 	const [emailing, setEmailing] = useState(false);
+	const [pinning, setPinning] = useState(false);
 	const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed(spaceId));
+	const pin = usePinToHome(snap.active.title);
 	// While dragging we render from this local copy so the row follows the finger;
 	// null means "just use the server snapshot".
 	const [draft, setDraft] = useState<CourseItem[] | null>(null);
@@ -362,6 +365,7 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 				<div className="co-tools">
 					<button className="co-btn" onClick={share}>{copied ? 'Lien copié ✓' : 'Partager'}</button>
 					<button className="co-btn" onClick={() => setEmailing(true)}>Mon email</button>
+					{!pin.installed && <button className="co-btn" onClick={() => setPinning(true)}>Épingler</button>}
 					<button className="co-btn" onClick={onOpenCategories}>Rayons</button>
 					<button className="co-btn" onClick={onOpenHistory}>Historique</button>
 					<button className="co-btn co-icon" onClick={onReload} title="Rafraîchir" aria-label="Rafraîchir">↻</button>
@@ -469,6 +473,13 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 				<ItemEditor
 					item={editing} categories={snap.categories} spaceId={spaceId} busy={busy}
 					onClose={() => setEditing(null)} mutate={mutate}
+				/>
+			)}
+
+			{pinning && (
+				<PinSheet
+					platform={pin.platform} nativePrompt={pin.nativePrompt}
+					onClose={() => setPinning(false)}
 				/>
 			)}
 
@@ -666,6 +677,51 @@ export function RenameSheet({ heading, value, busy, onClose, onSave }: {
 					<button className="co-btn co-btn-primary" onClick={() => onSave(name.trim())} disabled={busy || !name.trim()}>
 						Enregistrer
 					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/** Explain how to put this list on the home screen. The steps are manual on iOS
+ *  (Safari offers no install API); Chrome hands us a real install dialog. */
+function PinSheet({ platform, nativePrompt, onClose }: {
+	platform: PinPlatform; nativePrompt: (() => void) | null; onClose: () => void;
+}) {
+	return (
+		<div className="co-modal" onClick={onClose}>
+			<div className="co-sheet" onClick={(e) => e.stopPropagation()}>
+				<h2>Épingler cette liste</h2>
+				<p className="co-note">
+					L'icône créée rouvrira directement cette liste — même si ton navigateur oublie tes listes
+					récentes, ce qui arrive sur iPhone au bout de quelques semaines sans visite.
+				</p>
+				{platform === 'ios' && (
+					<ol className="co-steps">
+						<li>Touche le bouton <strong>Partager</strong> de Safari (le carré avec une flèche, en bas).</li>
+						<li>Fais défiler et choisis <strong>« Sur l'écran d'accueil »</strong>.</li>
+						<li>Valide avec <strong>Ajouter</strong>.</li>
+					</ol>
+				)}
+				{platform === 'android' && !nativePrompt && (
+					<ol className="co-steps">
+						<li>Ouvre le menu <strong>⋮</strong> de Chrome, en haut à droite.</li>
+						<li>Choisis <strong>« Ajouter à l'écran d'accueil »</strong> ou « Installer l'application ».</li>
+					</ol>
+				)}
+				{platform === 'desktop' && !nativePrompt && (
+					<p className="co-note">
+						Sur ordinateur, ajoute simplement cette page à tes favoris&nbsp;: c'est l'adresse complète
+						qui donne accès à la liste.
+					</p>
+				)}
+				<div className="co-sheet-actions">
+					<button className="co-btn" onClick={onClose}>Fermer</button>
+					{nativePrompt && (
+						<button className="co-btn co-btn-primary" onClick={() => { nativePrompt(); onClose(); }}>
+							Installer
+						</button>
+					)}
 				</div>
 			</div>
 		</div>

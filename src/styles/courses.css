@@ -82,7 +82,7 @@
 	/* min-width pushes the tools onto their own row rather than letting them
 	   squeeze the title into three lines on a phone. */
 	.co-title-row { display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 12rem; }
-	.co-tools { display: flex; gap: 0.4rem; margin-left: auto; }
+	.co-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-left: auto; }
 	.co-peer {
 		font-size: var(--text-sm);
 		color: #7ee0a0;
@@ -297,6 +297,7 @@
 	/* ---- Recents / history ---- */
 	.co-recents { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 1rem; }
 	.co-recents h2 { font-size: var(--text-md); color: var(--gray-200); }
+	.co-steps { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.4rem; color: var(--gray-200); font-size: var(--text-sm); line-height: 1.4; }
 	.co-recover { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin-top: 1.6rem; }
 	.co-recover h2 { font-size: var(--text-md); color: var(--gray-200); }
 	.co-recent, .co-hrow {
