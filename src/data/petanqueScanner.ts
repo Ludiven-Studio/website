@@ -17,6 +17,9 @@ export interface LandingCopy {
 	steps: { icon: keyof typeof iconPaths; title: string; body: string }[];
 	featuresTitle: string;
 	features: { title: string; body: string }[];
+	photoTitle: string;
+	photoBody: string;
+	photoNote: string;
 	limitsTitle: string;
 	limitsIntro: string;
 	limits: { title: string; body: string }[];
@@ -52,7 +55,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 	fr: {
 		title: 'Pétanque Scanner — savoir qui a le point avec votre téléphone',
 		description:
-			'Application gratuite de réalité augmentée : visez les boules, tournez autour, et lisez la distance de chaque boule au cochonnet. Tout est calculé sur le téléphone, sans réseau ni compte. Android et iOS.',
+			'Application gratuite de réalité augmentée : visez les boules, tournez autour, et lisez la distance de chaque boule au cochonnet. Un mode photo prend le relais sur les téléphones sans AR. Tout est calculé sur le téléphone, sans réseau ni compte.',
 		tagline:
 			'Deux boules de chaque côté du cochonnet, à un mètre ou deux, et l\'œil ne tranche pas : de loin, on ne compare pas deux distances. Lancez un scan, tournez quelques secondes autour du jeu, et l\'application affiche la distance de chaque boule — posée en réalité augmentée sur le terrain.',
 		heroAlt: 'Trois boules et un cochonnet sur un terrain, avec les mesures affichées en réalité augmentée',
@@ -99,6 +102,11 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 				body: 'Gratuit tous les jours. Si vous voulez l\'illimité, c\'est un achat unique — aucun prélèvement mensuel.',
 			},
 		],
+		photoTitle: 'Et si votre téléphone ne gère pas la réalité augmentée ?',
+		photoBody:
+			'Il y a un mode photo. Vous tenez le téléphone à plat au-dessus du jeu, vous prenez une seule photo, et l\'application y place le cochonnet et les boules : la plus proche est cerclée de vert, avec l\'écart qui la sépare de la suivante. Aucune réalité augmentée n\'est nécessaire — il suffit d\'une caméra.',
+		photoNote:
+			'Sur un appareil non compatible, l\'application bascule toute seule dans ce mode : pas de menu, rien à régler. Sur les autres, le mode photo reste accessible dans les réglages, pratique quand la place manque pour tourner autour du jeu. La contrepartie est connue : une seule photo donne une mesure moins sûre qu\'un scan sous plusieurs angles.',
 		limitsTitle: 'Ce que l\'application ne fait pas',
 		limitsIntro: 'Autant le dire tout de suite, ça évitera les mauvaises surprises sur le terrain.',
 		limits: [
@@ -143,7 +151,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 			},
 			{
 				q: 'Quels téléphones sont compatibles ?',
-				a: 'Les téléphones Android compatibles ARCore et les iPhone compatibles ARKit, soit la grande majorité des modèles sortis depuis 2018.',
+				a: 'Le scan en réalité augmentée demande un Android compatible ARCore ou un iPhone compatible ARKit, soit la grande majorité des modèles sortis depuis 2018. Sur les téléphones qui ne le sont pas, l\'application bascule automatiquement en mode photo : elle reste utilisable.',
 			},
 			{
 				q: 'Faut-il poser un repère au sol ?',
@@ -163,7 +171,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 	en: {
 		title: 'Pétanque Scanner — see who has the point with your phone',
 		description:
-			'A free augmented-reality app: point your phone at the boules, walk around them, and read how far each one is from the jack. Everything runs on the phone, with no signal and no account. Android and iOS.',
+			'A free augmented-reality app: point your phone at the boules, walk around them, and read how far each one is from the jack. A photo mode takes over on phones without AR. Everything runs on the phone, with no signal and no account.',
 		tagline:
 			'Two boules either side of the jack, a metre or two out, and your eye can\'t call it: at that range you cannot compare two distances. Start a scan, walk around the game for a few seconds, and the app shows how far each boule is — drawn in augmented reality right on the ground.',
 		heroAlt: 'Three boules and a jack on a pitch, with the measurements drawn in augmented reality',
@@ -210,6 +218,11 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 				body: 'Free every day. If you want unlimited, it is a one-off purchase — nothing monthly.',
 			},
 		],
+		photoTitle: 'What if your phone has no augmented reality?',
+		photoBody:
+			'There is a photo mode. Hold the phone flat above the game, take a single photo, and the app places the jack and the boules on it: the closest one is circled in green, with the gap to the next one. No augmented reality needed — a camera is enough.',
+		photoNote:
+			'On a device without AR support the app switches to this mode by itself: no menu, nothing to set up. On every other phone the photo mode stays available in the settings, which helps when there is no room to walk around the game. The trade-off is plain: one photo is a less reliable measurement than a scan from several angles.',
 		limitsTitle: 'What it does not do',
 		limitsIntro: 'Better said upfront, so the pitch holds no surprises.',
 		limits: [
@@ -254,7 +267,7 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 			},
 			{
 				q: 'Which phones are supported?',
-				a: 'Android phones with ARCore and iPhones with ARKit, which covers the large majority of models released since 2018.',
+				a: 'The augmented-reality scan needs an Android with ARCore or an iPhone with ARKit, which covers the large majority of models released since 2018. Phones without it fall back to photo mode automatically, so the app stays usable.',
 			},
 			{
 				q: 'Do I need to place a marker on the ground?',
