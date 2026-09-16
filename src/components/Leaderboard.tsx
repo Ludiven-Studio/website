@@ -41,7 +41,10 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	const [rows, setRows] = useState<ScoreRow[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(false);
-	const [submitFailed, setSubmitFailed] = useState(false);
+	// 'network' is worth a retry; 'rejected' means the server refused the value itself,
+	// so re-sending it would fail identically. Both must be visible: a silent drop is
+	// how a legit sub-3s Cordes run vanished with no message.
+	const [submitFailed, setSubmitFailed] = useState<'network' | 'rejected' | null>(null);
 	const [shareMsg, setShareMsg] = useState('');
 	const [dayValue, setDayValue] = useState<number | null>(null); // today's own result, this run or an earlier one
 	// Only the inline daily board folds; the corner peek (actions=false) stays open, plain title.
@@ -61,18 +64,20 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 		// Kept separate from the read so a failed POST never hides the board.
 		if (!source && submitValue != null && name && submitValue !== lastSubmittedRef.current) {
 			lastSubmittedRef.current = submitValue;
-			let failed = false;
+			let failed: 'network' | 'rejected' | null = null;
 			try {
 				if (secured) {
 					const r = await submitScore({ gameId: game, score: submitValue, isDailyChallenge: true });
-					failed = !r.ok && r.error === 'network error';
+					// 'leaderboard disabled' is a config state, not a lost score — line 210 says so already.
+					if (!r.ok && r.error !== 'leaderboard disabled')
+						failed = r.error === 'network error' ? 'network' : 'rejected';
 				} else {
 					await submitDaily(game, submitValue, metric);
 				}
 			} catch {
-				failed = true;
+				failed = 'network';
 			}
-			if (failed) lastSubmittedRef.current = null; // let a retry re-attempt the submit
+			if (failed === 'network') lastSubmittedRef.current = null; // let a retry re-attempt the submit
 			setSubmitFailed(failed);
 		}
 		// Read the board — throws on a network/HTTP failure (vs. a legit empty board).
@@ -202,8 +207,14 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 
 			{submitFailed && !error && (
 				<p className="lb-warn">
-					⚠️ Ton score n'a pas pu être envoyé.{' '}
-					<button className="lb-link" onClick={load}>Réessayer</button>
+					{submitFailed === 'network' ? (
+						<>
+							⚠️ Ton score n'a pas pu être envoyé.{' '}
+							<button className="lb-link" onClick={load}>Réessayer</button>
+						</>
+					) : (
+						<>⚠️ Ton score n'a pas été retenu par le classement.</>
+					)}
 				</p>
 			)}
 
