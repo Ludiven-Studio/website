@@ -56,6 +56,12 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number 
 const elevationFor = (s: Sim, intent: Intent): number =>
 	intent === 'shoot' ? 0.36 : 0.45 + s.t.surface.rollFriction * 0.35;
 
+export const SHOOT_ELEV = 0.36;
+
+/* A tir is aimed AT the boule, so its speed is a direct function of range — never solveSpeed, which
+   solves for where the boule comes to REST and so arrives with no energy left to shoot with. */
+export const shootSpeed = (range: number): number => Math.min(13, 6.2 + range * 0.42);
+
 /** Is something of ours or theirs sitting on the path? Then pointing is risky. */
 export function laneBlocked(bs: Boule[], from: { x: number; y: number }, to: { x: number; y: number }): boolean {
 	const dx = to.x - from.x, dy = to.y - from.y;
@@ -181,7 +187,7 @@ export function planThrow(s: Sim, jack: Boule, state: Match13, side: Side, skill
 
 	// A tir is thrown flat and fast straight at the boule; a point is solved for its resting spot.
 	const ideal = intent === 'shoot'
-		? Math.min(13, 6.2 + len * 0.42)
+		? shootSpeed(len)
 		: solveSpeed(s, from, side, dirX, dirY, len, elev);
 
 	const ang = (ANG_WORST + (ANG_BEST - ANG_WORST) * k) * gauss(rng, s.t.seed);

@@ -18,11 +18,22 @@ import {
 	CAM_PITCH_MIN, CAM_PITCH_MAX, BOULE_R, type Pitch3D, type Fx,
 } from './render3d';
 import { petanqueLevels } from './levels';
+import {
+	makeCourse, stationBodies, gradeShot, encodeDaily, COURSE_CIRCLE, STATIONS, MAX_DAILY_SCORE,
+	GRADE_LABEL, KIND_LABEL, type DailyCourse, type Grade,
+} from './daily';
 import { usePointerDrag } from '../usePointerDrag';
 import { isTypingTarget } from '../../lib/keyboard';
 import { trackGame } from '../../lib/analytics';
 import { withExpert } from '../../lib/difficulty';
 import { useLevels } from '../../lib/useLevels';
+import { usePlayClock } from '../../lib/usePlayClock';
+import { formatScore, fmtCentis } from '../../lib/scoreFormat';
+import { DAILY_LB } from '../../data/dailyLb';
+import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
+import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -62,7 +73,10 @@ const LOOK_TAU = 0.18;
 const PITCH_TAU = 0.25;
 const AI_THINK_MS = 700;
 const END_CARD_MS = 2800;
+const STATION_CARD_MS = 1500; // the daily has 12 of these, so it holds the card half as long
 const ROLL_CAP = 24; // s of simulated roll before we call it settled anyway
+const TOUCH_M = 0.01; // the target counts as touched once it has actually shifted
+const LB_ID = (gameId: string): string => `${gameId}-t`;
 
 const DUST: Record<SurfaceId, number> = {
 	'terre-battue': 0xc08a52,
@@ -72,6 +86,8 @@ const DUST: Record<SurfaceId, number> = {
 };
 
 const LOFT_LABEL = (e: number): string => (e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette');
+
+const sumGrades = (g: Grade[]): number => g.reduce<number>((a, b) => a + b, 0);
 
 const dist2 = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
 	Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
@@ -100,6 +116,16 @@ const HALO_PER_M = 0.016; // ring radius per metre of camera distance — ~20 px
 const HALO_MIN_R = 0.09; // m, so it never shrinks inside a boule up close
 
 interface EndCard { text: string; mine: boolean }
+
+/* The daily is a shooting course, not a match: one boule per station, graded 5/3/1/0. `target` and
+   `targetAt` are the boule to knock out and where it stood before the shot — the grade is the
+   difference between the two, so it has to be captured when the station is laid. */
+interface DailyState {
+	course: DailyCourse;
+	grades: Grade[];
+	target: Boule | null;
+	targetAt: { x: number; y: number } | null;
+}
 
 const killMesh = (m: THREE.Mesh | null): void => {
 	if (!m) return;
@@ -159,6 +185,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const wantLook = useRef(new THREE.Vector3());
 	const placeRef = useRef<{ x: number; y: number } | null>(null);
 
+	// Daily. `dailyRef` is null in every other mode, which is what the settle branch tests on.
+	const dailyRef = useRef<DailyState | null>(null);
+	const startRef = useRef(0);
+
 	const [match, setMatch] = useState<Match13>(matchRef.current);
 	const [status, setStatus] = useState<Status>('aim');
 	const [power, setPower] = useState(0);
@@ -169,6 +199,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [webglError, setWebglError] = useState(false);
 	const [placeOk, setPlaceOk] = useState(false);
 
+	const [daily, setDaily] = useState(false);
+	const [dailyLoading, setDailyLoading] = useState(false);
+	const [dailyDone, setDailyDone] = useState(false);
+	const [dailyScore, setDailyScore] = useState<number | null>(null);
+	const [station, setStationNo] = useState(0);
+	const [points, setPoints] = useState(0);
+	const [elapsed, setElapsed] = useState(0); // centis
+
 	const lv = useLevels(gameId, petanqueLevels);
 	// Callback refs: the rAF loop and settle() must not take `lv` as a dep, or the loop restarts
 	// every render and the physics freezes (see angry / billard).
@@ -177,7 +215,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const lvFinishRef = useRef(lv.finish);
 	lvFinishRef.current = lv.finish;
 
-	const won = match.phase === 'match-done' && match.winner === HUMAN;
+	const won = daily ? dailyDone : match.phase === 'match-done' && match.winner === HUMAN;
 	const { celebrating } = useCelebration(won);
 
 	/* ---------- scene ---------- */
@@ -300,17 +338,107 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const newGame = useCallback((key: DiffKey) => {
 		const d = DIFFS[key];
 		diffRef.current = key;
-		setDiff(key);
+		dailyRef.current = null;
+		setDaily(false);
 		if (!layMatch({ seed: (Math.random() * 1e9) | 0, surface: d.surface, amp: d.amp, target: 13 })) return;
+		setDiff(key);
 		trackGame(gameId, 'game_started', { mode: 'libre', diff: key });
 	}, [gameId, layMatch]);
 
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
 		levelSkillRef.current = cfg.skill;
+		dailyRef.current = null;
+		setDaily(false);
 		if (!layMatch(cfg)) return;
 		trackGame(gameId, 'game_started', { mode: 'niveaux', level });
 	}, [gameId, layMatch, lv]);
+
+	/* ---------- the daily: a shooting course ---------- */
+
+	/** Lay the course's pitch. The circle is pinned to COURSE_CIRCLE, which is what daily.ts
+	 *  measured its station distances from. Turn stays HUMAN for all 12 stations, and that alone
+	 *  keeps the AI out: the rAF loop only wakes it on `turn === AI`. */
+	const layCourse = useCallback((course: DailyCourse): boolean => {
+		if (!initScene()) return false;
+		const g = g3Ref.current;
+		if (!g) return false;
+
+		if (simRef.current) clearBodies();
+		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
+		const t = makeTerrain(course.seed, SURFACES[course.surface], course.amp);
+		g.pitch = buildPitch3D(t);
+		g.scene.add(g.pitch.group);
+
+		simRef.current = { t, bs: [], rng: course.seed & 0xffff };
+		prevRef.current = [];
+		targetRef.current = 13;
+		matchRef.current = { ...initMatch13(13, HUMAN), phase: 'play', circle: { ...COURSE_CIRCLE } };
+		setMatch(matchRef.current);
+		setCard(null);
+		setOver(false);
+		aiPendingRef.current = false;
+		powerRef.current = 0; yawRef.current = 0; aimRef.current = null;
+		setPower(0);
+		placeRef.current = null; setPlaceOk(false);
+		clearArc();
+		return true;
+	}, [clearArc, clearBodies, initScene]);
+
+	/** Put station `i` on the ground and hand the aim back to the player. */
+	const setStation = useCallback((i: number) => {
+		const d = dailyRef.current, s = simRef.current;
+		if (!d || !s) return;
+		clearBodies();
+		const bodies = stationBodies(d.course.stations[i], s.t);
+		for (const b of bodies) addBody(b);
+		d.target = bodies[0];
+		d.targetAt = { x: bodies[0].x, y: bodies[0].y };
+		setStationNo(i);
+		setCard(null);
+		powerRef.current = 0; yawRef.current = 0; aimRef.current = null;
+		setPower(0);
+		clearArc();
+		statusRef.current = 'aim';
+		setStatus('aim');
+	}, [addBody, clearArc, clearBodies]);
+
+	/** One attempt per device, resumable station by station. The seed comes from the server. */
+	const startDaily = useCallback(async () => {
+		setDaily(true);
+		setDailyLoading(true);
+		// The seed fetch is a real await, so the old match must be frozen for its duration: 'over' is
+		// the one status that neither lets the player throw nor wakes the AI.
+		statusRef.current = 'over';
+		setStatus('over');
+		aiPendingRef.current = false;
+		const run = loadDailyRun(gameId);
+		const seed = run?.seed ?? (await getDaily(gameId)).seed;
+		const grades = (run?.state as { grades?: Grade[] } | undefined)?.grades ?? [];
+
+		dailyRef.current = { course: makeCourse(seed), grades, target: null, targetAt: null };
+		if (!layCourse(dailyRef.current.course)) { setDailyLoading(false); return; }
+		setDailyLoading(false);
+		setPoints(sumGrades(grades));
+
+		const finished = grades.length >= STATIONS;
+		setDailyDone(finished);
+		if (finished) {
+			const centis = run?.finalTime ?? 0;
+			setElapsed(centis);
+			setDailyScore(encodeDaily(sumGrades(grades), centis * 10));
+			setStationNo(STATIONS - 1);
+			setOver(true);
+			statusRef.current = 'over';
+			setStatus('over');
+			return;
+		}
+		startRef.current = run?.startedAt ?? Date.now();
+		setElapsed(Math.round((Date.now() - startRef.current) / 10));
+		setDailyScore(null);
+		setStation(grades.length);
+		trackGame(gameId, 'game_started', { mode: 'defi' });
+	}, [gameId, layCourse, setStation]);
 
 	/* ---------- throwing ---------- */
 
@@ -387,6 +515,48 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const m = matchRef.current;
 		const j = jackRef.current;
 
+		const d = dailyRef.current;
+		if (d && d.target && d.targetAt) {
+			const shooter = s.bs[s.bs.length - 1];
+			const at = d.targetAt;
+			const moved = dist2(d.target, at);
+			const grade = gradeShot({
+				hit: moved > TOUCH_M || !d.target.live,
+				moved,
+				rollOn: dist2(shooter, at),
+				targetLive: d.target.live,
+				shooterLive: shooter.live,
+			});
+			d.grades.push(grade);
+			const total = sumGrades(d.grades);
+			setPoints(total);
+			setCard({ text: `${GRADE_LABEL[grade]} · +${grade}`, mine: grade >= 3 });
+
+			const last = d.grades.length >= STATIONS;
+			const centis = Math.round((Date.now() - startRef.current) / 10);
+			saveDailyRun(gameId, {
+				startedAt: startRef.current,
+				done: last,
+				finalTime: last ? centis : undefined,
+				seed: d.course.seed,
+				state: { grades: d.grades },
+			});
+			if (!last) {
+				statusRef.current = 'end';
+				setStatus('end');
+				endAtRef.current = performance.now() + STATION_CARD_MS;
+				return;
+			}
+			setElapsed(centis);
+			setDailyScore(encodeDaily(total, centis * 10));
+			setDailyDone(true);
+			setOver(true);
+			statusRef.current = 'over';
+			setStatus('over');
+			trackGame(gameId, 'game_won', { mode: 'defi', points: total });
+			return;
+		}
+
 		if (m.phase === 'throw-jack' && j) {
 			const next = applyJack(m, j);
 			matchRef.current = next;
@@ -437,12 +607,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	/** Clear the ground and start the next end. Runs on the card's timer, or on a click. */
 	const nextEnd = useCallback(() => {
 		if (statusRef.current !== 'end') return;
+		const d = dailyRef.current;
+		if (d) { setStation(d.grades.length); return; }
 		clearBodies();
 		setCard(null);
 		aiPendingRef.current = false;
 		statusRef.current = 'aim';
 		setStatus('aim');
-	}, [clearBodies]);
+	}, [clearBodies, setStation]);
 
 	/* ---------- hand placing the jack ---------- */
 
@@ -783,7 +955,24 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		return () => cancelAnimationFrame(raf);
 	}, []);
 
-	useEffect(() => { newGame('moyen'); }, [newGame]);
+	/* Landing. A free pitch goes up at once so the canvas is never blank, then the ladder takes
+	   over on the level the player is actually on. A ?defi deep link is ModeToggle's job. */
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		newGame('moyen');
+		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	/* The daily chrono is the leaderboard tiebreak, so it must not bill time spent away. */
+	const ticking = daily && !dailyDone && !dailyLoading;
+	usePlayClock(startRef, ticking, daily ? gameId : null);
+	useEffect(() => {
+		if (!ticking) return;
+		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 200);
+		return () => clearInterval(id);
+	}, [ticking]);
 
 	useEffect(() => () => {
 		const g = g3Ref.current;
@@ -855,20 +1044,38 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			power: powerRef.current,
 			loft: elevationForPitch(camPitchRef.current),
 			fx: g3Ref.current?.fx.stats() ?? null,
+			// Everything the daily needs is derived from dailyRef, never from state: this effect
+			// runs once, so any state it closed over would be the mount value forever.
+			daily: dailyRef.current ? {
+				surface: dailyRef.current.course.surface,
+				station: Math.min(dailyRef.current.grades.length, STATIONS - 1),
+				points: sumGrades(dailyRef.current.grades),
+				grades: [...dailyRef.current.grades],
+				done: dailyRef.current.grades.length >= STATIONS,
+			} : null,
 			// Screen size of each body and of its halo — a boule 10 m out is a couple of pixels,
 			// so this is the only honest way to ask whether the board is readable.
 			seen: screenSizes(),
 			bow: arcBow(),
 		});
 		return () => { delete (window as unknown as { __petanque?: unknown }).__petanque; };
-	}, []);
+	}, [screenSizes, arcBow]);
 
 
 	/* ---------- HUD ---------- */
 
 	const myTurn = match.turn === HUMAN;
-	const holder = jackRef.current && status !== 'placing' ? pointHolder(simRef.current?.bs ?? [], jackRef.current) : null;
-	const hint = status === 'placing'
+	const holder = !daily && jackRef.current && status !== 'placing' ? pointHolder(simRef.current?.bs ?? [], jackRef.current) : null;
+	const course = dailyRef.current?.course ?? null;
+	const st = course?.stations[station] ?? null;
+	const fmtPacked = (v: number): string => formatScore(DAILY_LB.petanque.fmt, v);
+
+	const hint = daily
+		? (dailyDone ? `Parcours terminé · ${points} / ${MAX_DAILY_SCORE}`
+			: status === 'rolling' ? 'La boule roule…'
+			: st ? `${KIND_LABEL[st.kind]} à ${st.dist} m — tire !`
+			: 'Préparation du défi…')
+		: status === 'placing'
 		? (myTurn ? '✋ Touche le sol pour poser le bouchon' : 'L’adversaire place le bouchon…')
 		: status === 'rolling' ? 'La boule roule…'
 		: !myTurn ? 'L’adversaire réfléchit…'
@@ -883,32 +1090,57 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 			<div className="pe-topbar">
 				<div className="pe-hud-top">
+					<div className="pe-modetoggle">
+						<ModeToggle
+							daily={daily}
+							onFree={() => { if (lv.active) lv.exit(); newGame(diff); }}
+							onDaily={() => { lv.exit(); void startDaily(); }}
+							showLevels
+							levelsActive={lv.active}
+							onLevels={() => { setDaily(false); dailyRef.current = null; lv.enter(); }}
+						/>
+					</div>
 					<div className="pe-stats">
-						<span className="pe-stat">🏆 {match.scores[HUMAN]} — {match.scores[AI]}</span>
-						<span className="pe-stat">Mène {match.endNo}</span>
-						{lv.active && !lv.menu && <span className="pe-stat">🎯 Niveau {lv.level}</span>}
-						<span className="pe-stat pe-boules">
-							<span className="pe-dots me">{'●'.repeat(match.left[HUMAN])}{'○'.repeat(BOULES_PER_SIDE - match.left[HUMAN])}</span>
-							<span className="pe-dots foe">{'●'.repeat(match.left[AI])}{'○'.repeat(BOULES_PER_SIDE - match.left[AI])}</span>
-						</span>
+						{daily ? (
+							<>
+								<span className="pe-stat">🎯 Atelier {Math.min(station + 1, STATIONS)}/{STATIONS}</span>
+								<span className="pe-stat">🏆 {points} / {MAX_DAILY_SCORE}</span>
+								<span className="pe-stat">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
+							</>
+						) : (
+							<>
+								<span className="pe-stat">🏆 {match.scores[HUMAN]} — {match.scores[AI]}</span>
+								<span className="pe-stat">Mène {match.endNo}</span>
+								{lv.active && !lv.menu && <span className="pe-stat">🎯 Niveau {lv.level}</span>}
+								<span className="pe-stat pe-boules">
+									<span className="pe-dots me">{'●'.repeat(match.left[HUMAN])}{'○'.repeat(BOULES_PER_SIDE - match.left[HUMAN])}</span>
+									<span className="pe-dots foe">{'●'.repeat(match.left[AI])}{'○'.repeat(BOULES_PER_SIDE - match.left[AI])}</span>
+								</span>
+							</>
+						)}
 					</div>
 					<div className="pe-hud-actions">
-						<button className={`pe-pill ${lv.active ? 'active' : ''}`} onClick={() => { if (lv.active) return; lv.enter(); }} title="Ladder de 100 niveaux">🎯 Niveaux</button>
-						{lv.active
-							? <button className="pe-pill" onClick={() => { lv.exit(); newGame(diff); }} title="Partie libre">🎲 Libre</button>
-							: withExpert(DIFF_ORDER, gameId).map((k) => (
-								<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title="Force de l’adversaire et terrain">{DIFFS[k as DiffKey].label}</button>
-							))}
+						{!daily && !lv.active && withExpert(DIFF_ORDER, gameId).map((k) => (
+							<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title="Force de l’adversaire et terrain">{DIFFS[k as DiffKey].label}</button>
+						))}
 						<button className="pe-act" onClick={() => { overRef.current = !overRef.current; }} aria-label="Vue d’ensemble" title="Vue d’ensemble (V)">🎥</button>
-						<button className="pe-act" onClick={() => { if (lv.active) startLevel(lv.level); else newGame(diff); }} aria-label="Recommencer" title="Recommencer">↻</button>
+						{!daily && (
+							<button className="pe-act" onClick={() => { if (lv.active) startLevel(lv.level); else newGame(diff); }} aria-label="Recommencer" title="Recommencer">↻</button>
+						)}
 					</div>
 				</div>
-				<div className="pe-vs">
-					<span className={`pe-vs-p ${myTurn && status !== 'rolling' ? 'on' : ''}`}>😎 Toi</span>
-					<span className="pe-vs-mid">vs</span>
-					<span className={`pe-vs-p ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>🤖 {lv.active ? `IA ${Math.round(levelSkillRef.current * 100)}%` : DIFFS[diff].label}</span>
-				</div>
-				{match.lastEvent && status !== 'end' && <div className="pe-tag">{match.lastEvent}</div>}
+				{daily ? (
+					<div className="pe-tag">
+						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${course ? SURFACES[course.surface].label : ''}`}
+					</div>
+				) : (
+					<div className="pe-vs">
+						<span className={`pe-vs-p ${myTurn && status !== 'rolling' ? 'on' : ''}`}>😎 Toi</span>
+						<span className="pe-vs-mid">vs</span>
+						<span className={`pe-vs-p ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>🤖 {lv.active ? `IA ${Math.round(levelSkillRef.current * 100)}%` : DIFFS[diff].label}</span>
+					</div>
+				)}
+				{!daily && match.lastEvent && status !== 'end' && <div className="pe-tag">{match.lastEvent}</div>}
 			</div>
 
 			<div className="pe-playwrap" ref={wrapRef}>
@@ -942,7 +1174,19 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className={`pe-endcard ${card.mine ? 'mine' : ''}`} onClick={nextEnd}>{card.text}</div>
 				)}
 
-				{over && !lv.active && (
+				{over && daily && (
+					<div className="pe-overlay">
+						<div className="pe-card">
+							🎯 Parcours terminé
+							<strong>{points} / {MAX_DAILY_SCORE} · {fmtCentis(elapsed)}</strong>
+							<span className="pe-grades">{dailyRef.current?.grades.map((g, i) => (
+								<span key={i} className={`pe-grade g${g}`}>{g}</span>
+							))}</span>
+						</div>
+					</div>
+				)}
+
+				{over && !daily && !lv.active && (
 					<div className="pe-overlay">
 						<div className="pe-card">
 							{match.winner === HUMAN ? '🏆 Tu gagnes la partie !' : '❌ L’adversaire gagne'}
@@ -972,10 +1216,24 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
+			{daily && <Leaderboard
+				key={`lb-${points}-${dailyDone ? 1 : 0}`}
+				game={LB_ID(gameId)}
+				metric="time"
+				submitValue={dailyDone && dailyScore != null ? dailyScore : undefined}
+				format={fmtPacked}
+			/>}
+
+			{!daily && !lv.active && (
+				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" />
+			)}
+
 			<p className="pe-help">
 				Glisse vers le <strong>haut</strong> pour la puissance, sur les <strong>côtés</strong> pour la direction, relâche pour lancer.
 				L’<strong>inclinaison de la caméra</strong> règle la hauteur du lob : caméra rasante = portée haute, caméra plongeante = roulette.
-				Bouchon entre 6 et 10 m, sinon c’est à l’adversaire de le poser. Celui qui n’a pas le point rejoue. Premier à {match.target}.
+				{daily
+					? ` Défi du jour : ${STATIONS} ateliers, une boule chacun. Carreau = 5 pts, cible sortie = 3, touchée en place = 1. Le chrono départage les ex æquo.`
+					: <> Bouchon entre 6 et 10 m, sinon c’est à l’adversaire de le poser. Celui qui n’a pas le point rejoue. Premier à {match.target}.</>}
 			</p>
 		</div>
 	);
@@ -1005,6 +1263,10 @@ const CSS = `
 }
 .game-page.gf-full .pe-topbar > * { pointer-events: none; }
 .game-page.gf-full .pe-hud-top > * { pointer-events: auto; }
+/* Fullscreen means the pitch is the interface: the mode tabs only leave the game, and they
+   collide with the Quitter button. Same call as billard. */
+.game-page.gf-full .pe-modetoggle { display: none; }
+.game-page.gf-full .pe-vs { order: -1; margin-top: 0; }
 .game-page.gf-full .pe-hud-actions {
   position: fixed; z-index: 4; max-width: 45vw;
   right: max(8px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom));
@@ -1016,6 +1278,14 @@ const CSS = `
 .pe-hud-top { width: 100%; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; pointer-events: none; }
 .pe-hud-top > * { pointer-events: auto; }
 .pe-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+/* Niveaux / Défi / Libre — kept out of fullscreen, so windowed is the only place modes are reachable. */
+.pe-modetoggle { display: block; }
+.pe-grades { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
+.pe-grade { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: rgba(255,255,255,0.12); color: #f4ece2; }
+.pe-grade.g5 { background: #30d158; color: #06240f; }
+.pe-grade.g3 { background: #ffc107; color: #3a2a00; }
+.pe-grade.g1 { background: #7a6a55; }
+.pe-grade.g0 { background: rgba(255,95,86,0.35); }
 
 .pe-stats { display: flex; gap: 6px; font-weight: 700; font-size: 13px; flex-wrap: wrap; }
 .pe-stat { background: rgba(28,20,12,0.6); color: #f4ece2; border-radius: 999px; padding: 5px 11px; backdrop-filter: blur(4px); box-shadow: 0 1px 3px rgba(0,0,0,0.35); font-variant-numeric: tabular-nums; }

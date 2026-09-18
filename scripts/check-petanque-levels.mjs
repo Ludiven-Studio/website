@@ -25,12 +25,20 @@ await page.waitForSelector('.pe-canvas');
 try { await page.locator('.tuto-close').click({ timeout: 2500 }); } catch {}
 await page.waitForFunction(() => window.__petanque && window.__petanque().status === 'aim', null, { timeout: 15000 });
 
-// Free play first, so a broken Niveaux cannot pass by accident.
-check((await page.evaluate(() => window.__petanque().match.target)) === 13, 'free play opens a match to 13');
+/* The landing is levels-first (lv.resume), so a fresh device lands ON level 1, not on free play.
+   Checked before anything is clicked: a landing that silently fell back to a free match to 13
+   would otherwise still pass every step below. */
+check((await page.evaluate(() => window.__petanque().match.target)) === 5, 'a fresh device lands on level 1 (match to 5)');
 
-await page.getByRole('button', { name: /Niveaux/ }).click();
+// Free play, so a broken Niveaux cannot pass by accident.
+// ModeToggle segments declare role="tab", so they are not buttons to the a11y tree.
+await page.getByRole('tab', { name: /Libre/ }).click();
+await sleep(600);
+check((await page.evaluate(() => window.__petanque().match.target)) === 13, 'Libre opens a match to 13');
+
+await page.getByRole('tab', { name: /Niveaux/ }).click();
 await page.waitForSelector('.pe-levels .ls-wrap', { timeout: 5000 });
-check(true, 'the Niveaux pill opens the level picker');
+check(true, 'the Niveaux tab opens the level picker');
 
 await page.locator('.pe-levels').getByText('1', { exact: true }).first().click();
 await page.waitForFunction(() => !document.querySelector('.pe-levels'), null, { timeout: 5000 });
@@ -41,10 +49,10 @@ check(s.match.target === 5, `level 1 starts a match to 5 (got ${s.match.target})
 check(s.status === 'aim', `the level is playable (status ${s.status})`);
 check(await page.locator('.pe-stat', { hasText: 'Niveau 1' }).count() > 0, 'the HUD shows the level badge');
 
-// Back to free play: the mode pills must swap back, and the match must reset to 13.
-await page.getByRole('button', { name: /Libre/ }).click();
+// Back to free play: the tab must swap back, and the match must reset to 13.
+await page.getByRole('tab', { name: /Libre/ }).click();
 await sleep(600);
-check((await page.evaluate(() => window.__petanque().match.target)) === 13, 'the Libre pill returns to a match to 13');
+check((await page.evaluate(() => window.__petanque().match.target)) === 13, 'the Libre tab returns to a match to 13');
 
 console.log(errs.length ? `\nPAGE ERRORS:\n${errs.join('\n')}` : '\nno page errors');
 await browser.close();

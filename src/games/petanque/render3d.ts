@@ -57,8 +57,10 @@ function groundTexture(id: SurfaceId, grains: number, dot: number): THREE.Canvas
 		g.globalAlpha = 0.10 + rnd() * 0.16;
 		g.beginPath();
 		// Draw every dot four times across the seam so the tile wraps without a visible grid.
-		for (const ox of [0, x > S - r * 2 ? -S : S]) for (const oy of [0, y > S - r * 2 ? -S : S])
-			g.moveTo(x + ox + r, y + oy), g.arc(x + ox, y + oy, r, 0, Math.PI * 2);
+		for (const ox of [0, x > S - r * 2 ? -S : S]) for (const oy of [0, y > S - r * 2 ? -S : S]) {
+			g.moveTo(x + ox + r, y + oy);
+			g.arc(x + ox, y + oy, r, 0, Math.PI * 2);
+		}
 		g.fill();
 	}
 	g.globalAlpha = 1;

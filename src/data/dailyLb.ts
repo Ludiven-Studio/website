@@ -100,4 +100,11 @@ export const DAILY_LB: Record<string, DailyLbCfg> = {
 	feuilles: { fmt: centis },
 	// Bolides: best % of the arena controlled, stored as tenths of a percent (0..1000).
 	bolides: { fmt: { kind: 'percentage', div: 10, decimals: 1 } },
+	// Pétanque: shooting course, 12 stations scored 5/3/1/0, so the board has a hard ceiling at 60
+	// and good players TIE on it — measured, 5 to 8 of 200 hit a perfect 60. Hence the chrono
+	// tiebreak. Stored as (60 - points) so "more points" still sorts ascending, like reussite.
+	petanque: {
+		lbId: 'petanque-t',
+		fmt: { kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'pts', base: 60 }, { as: 'time', div: 100 }] },
+	},
 };
