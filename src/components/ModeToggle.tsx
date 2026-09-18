@@ -38,7 +38,6 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 		if (!wantsDaily) return;
 		const id = setTimeout(() => onDailyRef.current(), 0);
 		return () => clearTimeout(id);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	// With the third segment the label 'Mode libre' is too wide on phones — shorten.

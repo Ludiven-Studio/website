@@ -252,7 +252,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 	/* Win: full coverage, checkpoints in order. */
 	useEffect(() => {
 		if (!puzzle || status !== 'playing' || revealed) return;
-			if (daily && !started) return; // skip win-check on a daily not yet started
+		if (daily && !started) return; // skip win-check on a daily not yet started
 		if (lv.active && !lv.playing) return; // levels grid open, not playing
 		if (path.length !== puzzle.size * puzzle.size) return;
 		if (errors.size > 0) return;
@@ -260,7 +260,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		if (puzzle.numbers[last[0]][last[1]] !== puzzle.k) return;
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [path, puzzle, status, revealed, errors, gameId, daily, started]);
+	}, [path, puzzle, status, revealed, errors, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {
@@ -292,13 +292,14 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [daily, status, alreadyPlayed, gameId]);
 
-	const begin = () => {
+	// Stable identity: step and hint both list it, and both already depend on `started`.
+	const begin = useCallback(() => {
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
 			trackGame(gameId, 'game_started');
 		}
-	};
+	}, [started, gameId]);
 
 	/* Blocked edges (flat-index pairs a<b -> id a*total+b). */
 	const wallSet = useMemo(() => {
@@ -336,7 +337,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				return prev;
 			});
 		},
-		[status, revealed, started, puzzle, wallSet],
+		[status, revealed, puzzle, wallSet, begin],
 	);
 
 	/* Cut the path back to a cell it already goes through. */
@@ -348,7 +349,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 				return idx !== -1 ? prev.slice(0, idx + 1) : prev;
 			});
 		},
-		[status],
+		[status, revealed],
 	);
 
 	const cellFromCoords = (clientX: number, clientY: number): [number, number] | null => {
@@ -413,7 +414,7 @@ export default function CheminGame({ gameId }: { gameId: string }) {
 		setPath(sol.slice(0, prefix + 1).map((p) => [...p] as [number, number])); // exactly one step further
 		begin();
 		trackGame(gameId, 'hint_used');
-	}, [puzzle, status, revealed, path, gameId, gate]);
+	}, [puzzle, status, revealed, path, gameId, gate, begin]);
 
 	/* Reveal the full path (does not count as a win). */
 	const reveal = useCallback(() => {

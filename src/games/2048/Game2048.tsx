@@ -147,7 +147,8 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		if (isNew) cleanupRef.current = window.setTimeout(() => setTiles(tilesRef.current.slice()), 200);
 	};
 
-	const persistDaily = (done: boolean): void => {
+	// Stable identity: the move handler depends on it.
+	const persistDaily = useCallback((done: boolean): void => {
 		const s = stateRef.current;
 		const sd = dailySeedRef.current;
 		if (!s) return;
@@ -159,7 +160,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 			diffIndex: sd?.diffIndex,
 			state: { board: s.board, score: s.score, cursor: s.cursor } satisfies DailyState,
 		});
-	};
+	}, [gameId]);
 
 	const commitFreeBest = (sc: number): void => {
 		if (sc > bestRef.current) {
@@ -261,9 +262,8 @@ export default function Game2048({ gameId }: { gameId: string }) {
 				trackGame(gameId, 'game_over');
 				if (dailyRef.current) persistDaily(true);
 			}
-			// eslint-disable-next-line react-hooks/exhaustive-deps
 		},
-		[gameId],
+		[gameId, persistDaily],
 	);
 
 	const armFree = useCallback((key: DiffKey) => {

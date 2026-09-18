@@ -636,6 +636,9 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 			restoreCam();
 			setStat('aiming');
 		}
+		// restoreCam is one of the plain fns wired via refs each render (see below) — listing it would
+		// re-make this callback constantly and restart the shot loop.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [daily, diffKey, gameId, lv]);
 
 	/* ---------- 8-ball (Libre vs the computer) — plain fns, wired via refs each render ---------- */
@@ -1038,6 +1041,8 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		strokesRef.current += 1;
 		setStrokes(strokesRef.current);
 		beginStrike(v.vx, v.vy, () => { shotAccRef.current = emptyAcc(); rollingRef.current = true; setStat('rolling'); }, { back: STICK_MIN + pullPower(aim.pull) * STICK_RANGE });
+		// beginStrike / startShot8 are plain fns re-made every render, on purpose.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [daily, gameId]);
 
 	// Single-pointer aim/orbit via Pointer Events (mouse, touch, pen) — reliable on iOS.
@@ -1053,7 +1058,6 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		const nv = CAM_NEXT[camModeRef.current];
 		userCamRef.current = nv; // remember the player's choice so the action cam can restore it
 		setView(nv);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	// Right-button drag → orbit the view (turn azimuth + tilt pitch), like the two-finger twist on touch.

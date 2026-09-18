@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-	dartScore, applyThrow, sweep, SWEEP_AMP, encodeScore, DIFFS, SECTOR_ORDER, RINGS, START_SCORE,
+	dartScore, applyThrow, sweep, encodeScore, DIFFS, SECTOR_ORDER, RINGS, START_SCORE,
 	type Hit,
 } from './engine';
 import { trackGame } from '../../lib/analytics';

@@ -1037,7 +1037,6 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			return nb;
 		});
 		trackGame(gameId, 'game_over', { score: sc });
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId, stop, onLevelLoss]);
 
 	const frame = useCallback(
@@ -1077,8 +1076,10 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 				return;
 			}
 			rafRef.current = requestAnimationFrame(frame);
-			// eslint-disable-next-line react-hooks/exhaustive-deps
 		},
+		// detectEvents is re-made every render; listing it would change `frame`, and the effect that
+		// starts the rAF loop depends on `frame` — the loop would restart on every render.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 		[draw, onGameOver, onLevelClear],
 	);
 
@@ -1134,7 +1135,6 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		}
 		draw();
 		rafRef.current = requestAnimationFrame(frame);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId, best, draw, frame]);
 
 	/* ---------- Modes ---------- */
@@ -1164,7 +1164,6 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			}
 			setBest(b);
 			draw();
-			// eslint-disable-next-line react-hooks/exhaustive-deps
 		},
 		[stop, draw],
 	);
@@ -1202,7 +1201,6 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		const { seed, diffIndex } = await getDaily(gameId);
 		applyDaily(seed, diffIndex, null);
 		setDailyLoading(false);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId, stop, draw]);
 
 	/* ---------- Levels mode ---------- */
@@ -1233,7 +1231,6 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		setScore(0);
 		setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, nests: LANES, cd: {} });
 		draw();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv, stop, draw]);
 
 	const armLevels = useCallback(() => {
@@ -1254,7 +1251,6 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		setHud({ grain: Math.floor(stateRef.current.grain), wave: 0, nests: LANES, cd: {} });
 		setStat('ready');
 		draw();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv, stop, draw]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).

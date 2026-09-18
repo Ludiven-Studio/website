@@ -259,7 +259,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			setStatus('won');
 			trackGame(gameId, 'game_won');
 		}
-	}, [grid, over, puzzle, gameId, daily, started]);
+	}, [grid, over, puzzle, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Persist the in-progress daily attempt. */
 	useEffect(() => {
@@ -324,7 +324,7 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 			});
 			removeHint(r, c);
 		},
-		[over, daily, started, grid, begin, puzzle, removeHint, lv.playing],
+		[over, daily, started, grid, begin, removeHint, lv.playing],
 	);
 
 	const onCellClick = (r: number, c: number) => (flagMode ? toggleFlag(r, c) : doReveal(r, c));

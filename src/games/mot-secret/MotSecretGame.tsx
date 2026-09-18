@@ -118,11 +118,12 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		trackGame(gameId, 'game_started', { difficulty: key, mode: 'free' });
 	}, [gameId]);
 
-	const saveDaily = (nr: GuessRow[], cur: string, st: Status): void => {
+	// Stable identity: the key handler and startDaily both depend on it.
+	const saveDaily = useCallback((nr: GuessRow[], cur: string, st: Status): void => {
 		const sd = dailySeedRef.current;
 		// 'stuck' still offers a rescue line, so the run is not done yet.
 		saveDailyRun(gameId, { startedAt: startRef.current, done: st === 'won' || st === 'lost', seed: sd?.seed, diffIndex: sd?.diffIndex, state: { rows: nr, current: cur, status: st, hinted: [...hintPosRef.current], extra: extraRef.current } satisfies DailyState });
-	};
+	}, [gameId]);
 
 	const startDaily = useCallback(async (): Promise<void> => {
 		dailyRef.current = true;
@@ -161,7 +162,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		startRef.current = Date.now();
 		trackGame(gameId, 'game_started', { mode: 'daily' });
 		saveDaily([], s[0], 'playing');
-	}, [gameId]);
+	}, [gameId, saveDaily]);
 
 	/* Levels mode: find a word from the level config (no chrono → no ready-gate). */
 	const startLevel = useCallback((level: number): void => {
@@ -227,7 +228,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 			setCurrentBoth(next);
 			if (dailyRef.current) saveDaily(rowsRef.current, next, 'playing');
 		}
-	}, [gameId, dailyLoading]);
+	}, [gameId, dailyLoading, saveDaily]);
 
 	/* Physical keyboard. */
 	useEffect(() => {

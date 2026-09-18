@@ -282,7 +282,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 			setStatus('won');
 			trackGame(gameId, 'game_won', { cost });
 		}
-	}, [shots, over, puzzle, daily, started, gameId, cost]);
+	}, [shots, over, puzzle, daily, started, gameId, cost, lv.active, lv.playing]);
 
 	/* Persist the in-progress daily attempt. */
 	useEffect(() => {

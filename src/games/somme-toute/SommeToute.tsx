@@ -111,7 +111,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setStatus('won');
 		setSelected(null);
 		trackGame(gameId, 'game_won');
-	}, [entries, status, revealed, size, rowT, colT, cellValue, gameId, daily, started]);
+	}, [entries, status, revealed, size, rowT, colT, cellValue, gameId, daily, started, lv.active, lv.playing]);
 
 	const newGame = useCallback((key: keyof typeof DIFFS) => {
 		const d = DIFFS[key];

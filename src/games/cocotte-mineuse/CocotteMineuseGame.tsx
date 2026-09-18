@@ -318,6 +318,10 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			return nb;
 		});
 		trackGame(gameId, 'game_over', { score: sc });
+		// The rule wants `lv` for the method CALL, but useLevels returns a fresh object every render:
+		// listing it would re-make this callback constantly, and the rAF loop depends on it. The one
+		// method used is listed instead. Same call at every lv.* site below.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId, stop, lv.finish]);
 
 	const syncHud = useCallback((st: MineState) => {
@@ -424,6 +428,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		syncHud(st);
 		try { setBest(Number(localStorage.getItem(BEST_KEY) ?? '0') || 0); } catch { setBest(0); }
 		draw();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [stop, draw, diffKey, syncHud, lv.exit]);
 
 	const startDaily = useCallback(async () => {
@@ -475,6 +480,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		setStatus('ready');
 		setDailyLoading(false);
 		draw();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId, stop, draw, syncHud, lv.exit]);
 
 	/* ---- Levels (progression) ---- */
@@ -492,6 +498,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		setDeathCause(null);
 		setStatus('ready');
 		lv.enter();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [stop, lv.enter]);
 
 	// Play a level: build the run from its config, store the target, then arm it in the
@@ -516,6 +523,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		setStatus('ready');
 		syncHud(st);
 		draw();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv.play, stop, syncHud, draw]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).

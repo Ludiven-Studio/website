@@ -109,6 +109,9 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		applyPuzzle(generatePuzzle((Math.random() * 2 ** 31) >>> 0, DIFFS[key]));
 		setStatus('playing');
 		trackGame(gameId, 'game_started', { difficulty: key, mode: 'free' });
+		// applyPuzzle is re-made every render but only writes refs and setters — listing it would
+		// churn this callback for nothing.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId]);
 
 	const startDaily = useCallback(async (): Promise<void> => {
@@ -139,6 +142,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		const { seed, diffIndex } = await getDaily(gameId);
 		lay(seed, diffIndex);
 		setDailyLoading(false);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId]);
 
 	const startTimer = useCallback((): void => {

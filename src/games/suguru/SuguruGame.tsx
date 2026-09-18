@@ -300,7 +300,7 @@ export default function SuguruGame({ gameId }: { gameId: string }) {
 		setStatus('won');
 		setSelected(null);
 		trackGame(gameId, 'game_won');
-	}, [entries, status, revealed, size, value, conflicts, gameId, daily, started]);
+	}, [entries, status, revealed, size, value, conflicts, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Persist the in-progress daily attempt (resume after reload). */
 	useEffect(() => {

@@ -288,7 +288,6 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		setCards(foundationCount(gameRef.current));
 		geoRef.current = null;
 		trackGame(gameId, 'game_started', { level, mode: 'levels' });
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv, gameId]);
 
 	const armLevels = useCallback((): void => {

@@ -391,6 +391,8 @@ export default function PongGame({ gameId }: { gameId: string }) {
 				}
 			});
 		},
+		// quitToMenu is declared just below, so naming it here would be a use-before-init.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 		[startMatch],
 	);
 

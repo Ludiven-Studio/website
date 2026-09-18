@@ -74,10 +74,11 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		toastTimer.current = setTimeout(() => setToast(null), 1100);
 	};
 
-	const saveDaily = (nf: string[], done: boolean): void => {
+	// Stable identity: it is a dep of endRun, which the timer effect tears down on.
+	const saveDaily = useCallback((nf: string[], done: boolean): void => {
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, { startedAt: startRef.current, done, seed: sd?.seed, diffIndex: sd?.diffIndex, state: { found: nf } satisfies DailyState });
-	};
+	}, [gameId]);
 
 	const endRun = useCallback((): void => {
 		if (statusRef.current !== 'playing') return;
@@ -85,7 +86,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		setPathBoth([]);
 		if (dailyRef.current) saveDaily(foundRef.current, true);
 		trackGame(gameId, 'game_won', { score: score(foundRef.current) });
-	}, [gameId]);
+	}, [gameId, saveDaily]);
 
 	/* Wall-clock timer — reloads never pause it. */
 	useEffect(() => {
@@ -148,7 +149,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		const { seed, diffIndex } = await getDaily(gameId);
 		lay(seed, diffIndex);
 		setDailyLoading(false);
-	}, [gameId]);
+	}, [gameId, saveDaily]);
 
 	const startTimer = useCallback((): void => {
 		startRef.current = Date.now();
@@ -156,7 +157,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		setStatusBoth('playing');
 		trackGame(gameId, 'game_started', { mode: dailyRef.current ? 'daily' : 'free', difficulty: diffKey });
 		if (dailyRef.current) saveDaily([], false);
-	}, [gameId, diffKey]);
+	}, [gameId, diffKey, saveDaily]);
 
 	/* Levels mode: start a level from its config; chrono starts immediately, grade when it ends. */
 	const startLevel = useCallback((level: number): void => {

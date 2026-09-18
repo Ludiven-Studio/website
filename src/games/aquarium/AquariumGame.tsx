@@ -241,7 +241,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 			for (let c = 0; c < size; c++) if ((grid[r][c] === 1) !== solution[r][c]) return;
 		setStatus('won');
 		trackGame(gameId, 'game_won');
-	}, [grid, status, revealed, size, solution, gameId, daily, started]);
+	}, [grid, status, revealed, size, solution, gameId, daily, started, lv.active, lv.playing]);
 
 	/* Per row/col water tallies (for clue feedback). */
 	const rowWater = useMemo(

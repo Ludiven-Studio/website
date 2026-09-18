@@ -250,7 +250,6 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 			});
 		}
 		trackGame(gameId, 'game_over', { score });
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId]);
 
 	/* ---------- Modes ---------- */
@@ -316,7 +315,6 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		seedRef.current = cfg.seed;
 		applyMelody(generateMelodyDiff(cfg.seed, cfg.diff));
 		setStat('ready');
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv, applyMelody]);
 
 	const armLevels = useCallback((): void => {
@@ -326,7 +324,6 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		setStat('ready');
 		lv.enter();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [lv]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).

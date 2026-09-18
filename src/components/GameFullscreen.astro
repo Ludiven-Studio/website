@@ -97,10 +97,17 @@
 
 <script>
 	(() => {
-		const d = document as any;
+		// Safari only ships the webkit-prefixed fullscreen names, and lib.dom does not declare them.
+		type FsDocument = Document & {
+			webkitFullscreenElement?: Element | null;
+			webkitExitFullscreen?: () => void;
+		};
+		type FsElement = HTMLElement & { webkitRequestFullscreen?: () => void };
+
+		const d = document as FsDocument;
 		const html = document.documentElement;
 		const host = document.querySelector('.game-head');
-		const target = document.querySelector('.game-page') as any;
+		const target = document.querySelector<FsElement>('.game-page');
 		if (!host || !target) return;
 
 		const nativeFsEl = (): Element | null => d.fullscreenElement || d.webkitFullscreenElement || null;
@@ -110,7 +117,7 @@
 		// Keep the screen lit while playing fullscreen: a game can go a long while without a tap
 		// (watching the balls roll, waiting for the opponent) and the phone would dim mid-shot.
 		// The lock is dropped by the browser whenever the tab hides, so re-take it on the way back.
-		let wake: any = null;
+		let wake: WakeLockSentinel | null = null;
 		const keepAwake = async (): Promise<void> => {
 			if (wake || !navigator.wakeLock) return;
 			try {

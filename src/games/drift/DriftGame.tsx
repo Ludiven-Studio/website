@@ -795,7 +795,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			}
 			rafRef.current = requestAnimationFrame(frame);
 		},
-		[renderFrame, name, syncBoard],
+		[renderFrame, name, syncBoard, gameId],
 	);
 
 	/* ---- Start / stop a race ---- */
@@ -1073,6 +1073,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 	}, []);
 
 	useEffect(() => {
+		const ghosts = ghostsRef.current; // same Map for the component's life; read here, used in cleanup
 		const onResize = () => resize();
 		const onFs = () => requestAnimationFrame(resize); // re-measure after the fullscreen box applies
 		window.addEventListener('resize', onResize);
@@ -1086,7 +1087,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			raceRef.current?.leave();
 			const g = g3Ref.current;
 			if (g) {
-				for (const id of [...ghostsRef.current.keys()]) removeGhost(id);
+				for (const id of [...ghosts.keys()]) removeGhost(id);
 				g.trackGeom.dispose();
 				g.trackMat.dispose();
 				g.deco.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });

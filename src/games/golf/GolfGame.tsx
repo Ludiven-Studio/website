@@ -1038,6 +1038,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	}, [stop, removeGhost]);
 
 	useEffect(() => {
+		const ghosts = ghostsRef.current; // same Map for the component's life; read here, used in cleanup
 		const onResize = () => resize();
 		const onFs = () => requestAnimationFrame(resize); // re-measure after the fullscreen box applies
 		window.addEventListener('resize', onResize);
@@ -1052,7 +1053,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			lobbyRef.current?.leave();
 			const g = g3Ref.current;
 			if (g) {
-				for (const id of [...ghostsRef.current.keys()]) removeGhost(id);
+				for (const id of [...ghosts.keys()]) removeGhost(id);
 				disposeHole(g.holeGroup);
 				g.disposables.forEach((d) => d.dispose());
 				g.renderer.dispose();

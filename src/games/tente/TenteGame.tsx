@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fmtCentis } from '../../lib/scoreFormat';
-import { DIFFS, generateTente, findHint, type TentePuzzle, type Coord } from './engine';
+import { DIFFS, generateTente, findHint, type TentePuzzle } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import {

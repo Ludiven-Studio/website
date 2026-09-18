@@ -470,7 +470,7 @@ describe('luge simulation', () => {
 	});
 
 	it('fork: hitting the separator nose head-on crashes and snaps to the safe lane', () => {
-		const { seed, segs, fork } = findFork();
+		const { segs, fork } = findFork();
 		const f = fork.fork!;
 		const noseAbs = fork.startS + f.noseS;
 		const st: LugeState = { ...createLuge(), s: noseAbs - 0.2, lat: 0, speed: 20 };

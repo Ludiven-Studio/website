@@ -741,7 +741,6 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			});
 		}
 		trackGame(gameId, 'game_over', { score });
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [gameId]);
 
 	/* ---------- Input ---------- */
