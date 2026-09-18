@@ -243,11 +243,23 @@ export function makeBouleMesh(side: 0 | 1 | -1): THREE.Mesh {
 	return m;
 }
 
-/** The throwing circle, drawn flat on the ground and re-laid each end. */
-export function makeCircleMesh(): THREE.Mesh {
-	const geo = new THREE.RingGeometry(0.24, 0.26, 40);
-	geo.rotateX(-Math.PI / 2);
-	const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xf2e9d8, transparent: true, opacity: 0.85 }));
+export const CIRCLE_R = 0.25; // m — the official throwing circle is 35 to 50 cm across
+
+/**
+ * A ring laid ON the ground: every vertex is sampled on the heightfield. A flat disc does not work
+ * here — the relief is a few centimetres and the ring spans half a metre (six metres for the jack
+ * window), so a flat one sinks under the terrain over most of its arc and reads as missing.
+ */
+export function groundRing(t: Terrain, cx: number, cy: number, r: number, color: number, tube = 0.022): THREE.Mesh {
+	const n = Math.max(48, Math.round(r * 24));
+	const pts: THREE.Vector3[] = [];
+	for (let i = 0; i < n; i++) {
+		const a = (i / n) * Math.PI * 2;
+		const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+		pts.push(new THREE.Vector3(wx(x), heightAt(t, x, y) + tube, wz(y)));
+	}
+	const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), n, tube, 5, true);
+	const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color }));
 	m.renderOrder = 4;
 	return m;
 }
@@ -275,16 +287,31 @@ export const elevationForPitch = (pitch: number): number => {
    0/0/0 px on the line, 146/45/11 px one shoulder out. */
 const SHOULDER = 0.55; // m
 
-/** Stand the camera behind the circle, looking down the lane. `yaw` is the lateral swing. */
-export function aimCamera(cam: THREE.PerspectiveCamera, circle: { x: number; y: number }, dir: 1 | -1, pitch: number, yaw: number, dist: number, ground: number): void {
+export const EYE_H = 1.58; // m — a standing player's eye, for the first-person view
+export const WALK_MAX = 9.0; // m up the lane: far enough to stand over the longest legal head
+const FPV_BACK = 0.35; // the first-person eye stands just behind the circle, not on it
+
+/**
+ * Stand the camera behind the circle, looking down the lane. `yaw` is the lateral swing.
+ *
+ * `walk` is how far up the lane the player has stepped to read the head, and it deliberately does
+ * NOT touch `pitch`: pitch is the loft control, so walking up to look must never change the throw.
+ * `fpv` stands the eye up at head height instead of floating it behind the shoulder — it keeps a
+ * reduced shoulder offset on purpose, because an eye exactly on the throw line flattens the arc to
+ * a straight segment and hides the whole mechanic (measurement J).
+ *
+ * The caller aims the look direction itself, so no lookAt here.
+ */
+export function aimCamera(cam: THREE.PerspectiveCamera, circle: { x: number; y: number }, dir: 1 | -1, pitch: number, yaw: number, dist: number, ground: number, walk = 0, fpv = false): void {
 	const fx = Math.sin(yaw) * dir, fz = Math.cos(yaw) * dir; // forward, in engine axes
-	const back = dist * Math.cos(pitch);
+	const back = fpv ? FPV_BACK : dist * Math.cos(pitch);
+	const side = fpv ? SHOULDER * 0.55 : SHOULDER;
+	const up = fpv ? EYE_H : 0.35 + dist * Math.sin(pitch);
 	cam.position.set(
-		wx(circle.x) - fx * back + fz * SHOULDER,
-		ground + 0.35 + dist * Math.sin(pitch),
-		wz(circle.y) - fz * back - fx * SHOULDER,
+		wx(circle.x) + fx * (walk - back) + fz * side,
+		ground + up,
+		wz(circle.y) + fz * (walk - back) - fx * side,
 	);
-	cam.lookAt(wx(circle.x) + fx * 2.2, ground + 0.15, wz(circle.y) + fz * 2.2);
 }
 
 /** Frame the whole pitch — used for the replay/overview shot between throws. */
@@ -340,6 +367,27 @@ export function predictThrow(s: Sim, from: { x: number; y: number }, v: { vx: nu
 		if (rolled > PREVIEW_ROLL || speed2(b) === 0 || r.hitBoule) break;
 	}
 	return { air, land, roll, blocked };
+}
+
+/**
+ * The opponent's aim, drawn as a line laid ON the ground from their circle to where their throw
+ * would land. Deliberately NOT their arc: `predictThrow` replays the whole engine, and the aim
+ * stream lands about twelve times a second, so drawing their real parabola would spend the frame
+ * budget on someone else's guesswork. This is pure geometry and carries what actually matters —
+ * their direction and their length.
+ */
+export function aimRay(t: Terrain, cx: number, cy: number, hx: number, hy: number, len: number, color: number): THREE.Mesh {
+	const n = 24;
+	const pts: THREE.Vector3[] = [];
+	for (let i = 0; i <= n; i++) {
+		const d = (i / n) * len;
+		const x = cx + hx * d, y = cy + hy * d;
+		pts.push(new THREE.Vector3(wx(x), heightAt(t, x, y) + 0.02, wz(y)));
+	}
+	const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n, 0.026, 5, false);
+	const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, depthWrite: false }));
+	m.renderOrder = 7;
+	return m;
 }
 
 /** A fat tube along a polyline. Rebuilt per aim change, not per frame. */

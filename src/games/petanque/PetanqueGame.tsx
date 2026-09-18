@@ -1,27 +1,31 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import {
-	makeTerrain, SURFACES, heightAt, PITCH_W, PITCH_L, type SurfaceId,
+	makeTerrain, SURFACES, heightAt, PITCH_W, PITCH_L, type SurfaceId, type Terrain,
 } from './terrain';
 import {
-	makeBoule, makeJack, place, stepSim, isSettled, throwVelocity,
+	makeBoule, makeJack, place, stepSim, isSettled, throwVelocity, G,
 	type Sim, type Boule, type Impact,
 } from './engine';
 import {
-	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder,
+	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder, other,
 	MIN_JACK, MAX_JACK, EDGE, BOULES_PER_SIDE, type Match13, type Side,
 } from './rules13';
 import { planThrow, planJack, launch } from './ai';
 import {
-	buildPitch3D, makeBouleMesh, makeCircleMesh, makeMarker, makeHalo, arcMesh, predictThrow,
+	buildPitch3D, makeBouleMesh, groundRing, makeMarker, makeHalo, arcMesh, aimRay, predictThrow,
 	aimCamera, overviewCamera, elevationForPitch, addLights, makeFx, wx, wz,
-	CAM_PITCH_MIN, CAM_PITCH_MAX, BOULE_R, type Pitch3D, type Fx,
+	CAM_PITCH_MIN, CAM_PITCH_MAX, BOULE_R, CIRCLE_R, WALK_MAX, type Pitch3D, type Fx,
 } from './render3d';
 import { petanqueLevels } from './levels';
 import {
 	makeCourse, stationBodies, gradeShot, encodeDaily, COURSE_CIRCLE, STATIONS, MAX_DAILY_SCORE,
 	GRADE_LABEL, KIND_LABEL, type DailyCourse, type Grade,
 } from './daily';
+import {
+	joinRandom, joinByCode, makeCode, seedFromRoom, multiplayerAvailable,
+	type PetanqueMatchNet, type AimMsg, type SyncMsg,
+} from './net';
 import { usePointerDrag } from '../usePointerDrag';
 import { isTypingTarget } from '../../lib/keyboard';
 import { trackGame } from '../../lib/analytics';
@@ -30,7 +34,7 @@ import { useLevels } from '../../lib/useLevels';
 import { usePlayClock } from '../../lib/usePlayClock';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
-import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
+import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, playerName } from '../../lib/leaderboard';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -71,10 +75,17 @@ const CAM_DIST = 2.7;
 const ROLL_PITCH = 0.40; // the view lifts while the boules run, whatever loft was chosen
 const LOOK_TAU = 0.18;
 const PITCH_TAU = 0.25;
+const WALK_TAU = 0.30;
+const WALK_STEP = 1.5; // m per press — a stride, so three taps put you at a short head
+const LOOK_FAR = 7.5; // m ahead when there is no jack yet to look at
+const LOOK_MIN = 2.2; // m the look target keeps in front of the eye, however far you walked
 const AI_THINK_MS = 700;
 const END_CARD_MS = 2800;
 const STATION_CARD_MS = 1500; // the daily has 12 of these, so it holds the card half as long
 const ROLL_CAP = 24; // s of simulated roll before we call it settled anyway
+const AIM_SEND_MS = 80; // ~12 aim frames a second, same rate billard settled on
+const AIM_STALE_MS = 2500; // stop drawing their arc if the stream dries up (tab hidden, drop)
+const ONLINE_SURFACE: SurfaceId = 'gravier-fin'; // neutral ground, so neither seat is favoured
 const TOUCH_M = 0.01; // the target counts as touched once it has actually shifted
 const LB_ID = (gameId: string): string => `${gameId}-t`;
 
@@ -86,6 +97,14 @@ const DUST: Record<SurfaceId, number> = {
 };
 
 const LOFT_LABEL = (e: number): string => (e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette');
+
+const VIEW_ORDER = ['epaule', 'premiere', 'dessus'] as const;
+type ViewKey = (typeof VIEW_ORDER)[number];
+const VIEWS: Record<ViewKey, { icon: string; label: string }> = {
+	epaule: { icon: '🎥', label: 'Par-dessus l’épaule' },
+	premiere: { icon: '👁', label: 'Première personne' },
+	dessus: { icon: '🛩', label: 'Vue d’ensemble' },
+};
 
 const sumGrades = (g: Grade[]): number => g.reduce<number>((a, b) => a + b, 0);
 
@@ -101,9 +120,12 @@ interface Scene3D {
 	fx: Fx;
 	bodies: THREE.Group; // boules + jack
 	meshes: THREE.Mesh[]; // index-aligned with sim.bs
-	circle: THREE.Mesh;
 	marker: THREE.Mesh;
+	circle: THREE.Group; // the throwing circle, re-laid on the terrain whenever it moves
 	rings: THREE.Group; // legal jack window, shown while throwing or placing it
+	laidAt: { x: number; y: number } | null; // circle both groups were built for
+	ray: THREE.Group; // the opponent's aim, online only
+	rayAt: number; // `seen` of the aim message the ray was built from
 	halos: THREE.Mesh[]; // index-aligned with sim.bs — see makeHalo
 	arcAir: THREE.Mesh | null;
 	arcRoll: THREE.Mesh | null;
@@ -134,19 +156,14 @@ const killMesh = (m: THREE.Mesh | null): void => {
 	m.parent?.remove(m);
 };
 
-/** The two guide rings that show where the jack may legally land. */
-function windowRings(): THREE.Group {
-	const g = new THREE.Group();
-	for (const [r, c] of [[MIN_JACK, 0xffd166], [MAX_JACK, 0xffd166]] as const) {
-		const geo = new THREE.RingGeometry(r - 0.035, r + 0.035, 96);
-		geo.rotateX(-Math.PI / 2);
-		const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide }));
-		m.renderOrder = 3;
-		g.add(m);
+const killGroup = (g: THREE.Group): void => {
+	for (const c of [...g.children]) {
+		g.remove(c);
+		const m = c as THREE.Mesh;
+		m.geometry?.dispose();
+		(m.material as THREE.Material | undefined)?.dispose();
 	}
-	g.visible = false;
-	return g;
-}
+};
 
 export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -179,8 +196,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const aimDirtyRef = useRef(false);
 	const camPitchRef = useRef(0.55);
 	const viewPitchRef = useRef(0.55);
-	const overRef = useRef(false);
 	const pinchRef = useRef<{ cy: number; pitch: number } | null>(null);
+	// Where the eye stands. `walk` is metres stepped up the lane to read the head — an inspection
+	// move only: it never touches pitch, which is the loft control, so the throw cannot change.
+	const viewRef = useRef<ViewKey>('epaule');
+	const walkRef = useRef(0);
+	const walkViewRef = useRef(0);
 	const lookRef = useRef(new THREE.Vector3());
 	const wantLook = useRef(new THREE.Vector3());
 	const placeRef = useRef<{ x: number; y: number } | null>(null);
@@ -189,12 +210,26 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const dailyRef = useRef<DailyState | null>(null);
 	const startRef = useRef(0);
 
+	// Online. `mySideRef` is the seat this device plays; offline it is always HUMAN, so every
+	// "is it mine" test can read it unconditionally.
+	const netRef = useRef<PetanqueMatchNet | null>(null);
+	const onlineRef = useRef(false);
+	const startedOnlineRef = useRef(false);
+	const mySideRef = useRef<Side>(HUMAN);
+	const aimSentRef = useRef(0);
+	const remoteAimRef = useRef<(AimMsg & { seen: number }) | null>(null);
+	// The host settles before us, so its ruling can land while our own boules are still running.
+	// Queued here and drained in onSettled, so a correction never interrupts a roll.
+	const pendingSyncRef = useRef<SyncMsg | null>(null);
+
 	const [match, setMatch] = useState<Match13>(matchRef.current);
 	const [status, setStatus] = useState<Status>('aim');
 	const [power, setPower] = useState(0);
 	const [loft, setLoft] = useState(() => elevationForPitch(0.55));
 	const [diff, setDiff] = useState<DiffKey>('moyen');
 	const [over, setOver] = useState(false);
+	const [view, setView] = useState<ViewKey>('epaule');
+	const [walk, setWalk] = useState(0);
 	const [card, setCard] = useState<EndCard | null>(null);
 	const [webglError, setWebglError] = useState(false);
 	const [placeOk, setPlaceOk] = useState(false);
@@ -207,6 +242,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [points, setPoints] = useState(0);
 	const [elapsed, setElapsed] = useState(0); // centis
 
+	const [mpPhase, setMpPhase] = useState<'off' | 'menu' | 'connecting' | 'waiting' | 'playing'>('off');
+	const [mpCode, setMpCode] = useState<string | null>(null);
+	const [mpOpp, setMpOpp] = useState<string | null>(null);
+	const [mpMsg, setMpMsg] = useState<string | null>(null);
+	const [mySide, setMySide] = useState<Side>(HUMAN);
+	const [codeInput, setCodeInput] = useState('');
+
 	const lv = useLevels(gameId, petanqueLevels);
 	// Callback refs: the rAF loop and settle() must not take `lv` as a dep, or the loop restarts
 	// every render and the physics freezes (see angry / billard).
@@ -215,7 +257,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const lvFinishRef = useRef(lv.finish);
 	lvFinishRef.current = lv.finish;
 
-	const won = daily ? dailyDone : match.phase === 'match-done' && match.winner === HUMAN;
+	const won = daily ? dailyDone : match.phase === 'match-done' && match.winner === mySide;
 	const { celebrating } = useCelebration(won);
 
 	/* ---------- scene ---------- */
@@ -239,21 +281,37 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const lights = addLights(scene);
 		const bodies = new THREE.Group();
 		scene.add(bodies);
-		const circle = makeCircleMesh();
-		scene.add(circle);
 		const marker = makeMarker(0x30d158);
 		marker.visible = false;
 		scene.add(marker);
-		const rings = windowRings();
+		const circle = new THREE.Group();
+		scene.add(circle);
+		const rings = new THREE.Group();
+		rings.visible = false;
 		scene.add(rings);
+		const ray = new THREE.Group();
+		ray.visible = false;
+		scene.add(ray);
 
 		g3Ref.current = {
-			renderer, scene, camera, lights, bodies, circle, marker, rings,
+			renderer, scene, camera, lights, bodies, marker, circle, rings, laidAt: null, ray, rayAt: 0,
 			pitch: null as unknown as Pitch3D, // filled by newGame, which always runs next
 			fx: makeFx(scene),
 			meshes: [], halos: [], arcAir: null, arcRoll: null,
 		};
 		return true;
+	}, []);
+
+	/** Re-lay the throwing circle and the legal jack window on the terrain. Once per end. */
+	const layGround = useCallback(() => {
+		const g = g3Ref.current, s = simRef.current;
+		if (!g || !s) return;
+		const c = matchRef.current.circle;
+		killGroup(g.circle);
+		killGroup(g.rings);
+		g.circle.add(groundRing(s.t, c.x, c.y, CIRCLE_R, 0xf2e9d8));
+		for (const r of [MIN_JACK, MAX_JACK]) g.rings.add(groundRing(s.t, c.x, c.y, r, 0xffd166, 0.016));
+		g.laidAt = { x: c.x, y: c.y };
 	}, []);
 
 	const resize = useCallback(() => {
@@ -468,20 +526,41 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setStatus('rolling');
 		powerRef.current = 0;
 		setPower(0);
+		// Come back to the circle for the throw: a boule leaving from behind the eye is unreadable.
+		walkRef.current = 0;
+		setWalk(0);
 	}, [addBody, clearArc]);
+
+	/** Cosmetic aim stream, so their screen sees us drawing back. Never feeds the simulation. */
+	const streamAim = useCallback((live: boolean) => {
+		const net = netRef.current;
+		if (!onlineRef.current || !net) return;
+		const now = performance.now();
+		if (live && now - aimSentRef.current < AIM_SEND_MS) return;
+		aimSentRef.current = now;
+		net.sendAim({ yaw: yawRef.current, power: powerRef.current, loft: elevationForPitch(camPitchRef.current), live });
+	}, []);
 
 	const throwFromAim = useCallback(() => {
 		const m = matchRef.current;
 		const h = aimHeading();
 		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), elevationForPitch(camPitchRef.current));
-		doThrow(m.turn, v, m.phase === 'throw-jack');
-	}, [aimHeading, doThrow]);
+		const jack = m.phase === 'throw-jack';
+		// Velocities, never angles: converting an angle calls sin/cos, and two JS engines may not
+		// round those the same way. This is the one message the other board cannot do without.
+		if (onlineRef.current) netRef.current?.sendThrow({ ...v, jack });
+		streamAim(false);
+		doThrow(m.turn, v, jack);
+	}, [aimHeading, doThrow, streamAim]);
 
 	/* ---------- what the AI does when its turn comes ---------- */
 
 	const aiAct = useCallback(() => {
 		const s = simRef.current, m = matchRef.current, g = g3Ref.current;
 		if (!s || !g) return;
+		// The think timer spans frames, so the turn can move between arming and firing. Without this
+		// the AI throws on the player's turn, and applySettled bills the boule to the player.
+		if (m.turn !== AI || m.winner !== null || (m.phase === 'play' && m.left[AI] <= 0)) return;
 		const skill = lvActiveRef.current ? levelSkillRef.current : DIFFS[diffRef.current].skill;
 		const rng = rngRef.current++;
 
@@ -509,7 +588,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- one body has come to rest ---------- */
 
-	const onSettled = useCallback(() => {
+	const settle = useCallback(() => {
 		const s = simRef.current, g = g3Ref.current;
 		if (!s || !g) return;
 		const m = matchRef.current;
@@ -565,7 +644,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				statusRef.current = 'placing';
 				setStatus('placing');
 				placeRef.current = { x: next.circle.x, y: next.circle.y + next.dir * 7.4 };
-				setPlaceOk(next.turn === HUMAN);
+				setPlaceOk(next.turn === mySideRef.current);
 			} else {
 				statusRef.current = 'aim';
 				setStatus('aim');
@@ -584,7 +663,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		}
 		const before = next.scores[0] + next.scores[1];
 		const done = finishEnd(next, s.bs, j);
-		const mine = done.scores[HUMAN] > next.scores[HUMAN];
+		const me = mySideRef.current;
+		const mine = done.scores[me] > next.scores[me];
 		const got = done.scores[0] + done.scores[1] - before;
 		matchRef.current = done;
 		setMatch(done);
@@ -594,15 +674,62 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		endAtRef.current = performance.now() + END_CARD_MS;
 		if (done.phase === 'match-done') {
 			setOver(true);
-			const win = done.winner === HUMAN;
-			if (lvActiveRef.current) {
-				const conceded = done.scores[AI];
+			const win = done.winner === me;
+			// A level is a match against the AI; an online win must never bank one.
+			if (lvActiveRef.current && !onlineRef.current) {
+				const conceded = done.scores[other(me)];
 				lvFinishRef.current({ won: win, score: targetRef.current - conceded, stat: conceded });
 			}
 			trackGame(gameId, win ? 'game_won' : 'game_over',
-				lvActiveRef.current ? { mode: 'niveaux' } : { mode: 'libre', diff: diffRef.current });
+				onlineRef.current ? { mode: 'en-ligne' }
+				: lvActiveRef.current ? { mode: 'niveaux' }
+				: { mode: 'libre', diff: diffRef.current });
 		}
 	}, [gameId]);
+
+	/**
+	 * The host rules at rest. Positions and the state it derived go out together, so a float that
+	 * drifted on one peer cannot survive into the next throw. The guest still runs its own rules
+	 * first (so its cards and its "who has the point" read instantly) and simply adopts this after —
+	 * which makes the correction self-healing instead of a blocking wait that could hang the game.
+	 */
+	const applySync = useCallback((msg: SyncMsg) => {
+		const s = simRef.current;
+		if (!s) return;
+		// A mismatched count means the ground was already cleared for the next end, so these
+		// positions belong to bodies that no longer exist. Dropping is the only safe move.
+		if (s.bs.length * 4 !== msg.bs.length) return;
+		for (let i = 0; i < s.bs.length; i++) {
+			const b = s.bs[i], k = i * 4;
+			b.x = msg.bs[k]; b.y = msg.bs[k + 1]; b.z = msg.bs[k + 2];
+			b.live = msg.bs[k + 3] === 1;
+			b.vx = 0; b.vy = 0; b.vz = 0; b.rolling = false;
+		}
+		matchRef.current = msg.match;
+		setMatch(msg.match);
+		// The status is only realigned when we are idle. Both peers ran the same rules on the same
+		// board, so what differs is a float — cutting a card or a roll short would cost more.
+		if (statusRef.current === 'aim' || statusRef.current === 'placing') {
+			const want: Status = msg.match.phase === 'place-jack' ? 'placing' : 'aim';
+			statusRef.current = want;
+			setStatus(want);
+			setPlaceOk(want === 'placing' && msg.match.turn === mySideRef.current && placeRef.current !== null);
+		}
+	}, []);
+
+	const onSettled = useCallback(() => {
+		settle();
+		const s = simRef.current, net = netRef.current;
+		if (!s || !onlineRef.current || !net || dailyRef.current) return;
+		if (net.isHost()) {
+			const bs: number[] = [];
+			for (const b of s.bs) bs.push(b.x, b.y, b.z, b.live ? 1 : 0);
+			net.sendSync({ bs, match: matchRef.current });
+			return;
+		}
+		const q = pendingSyncRef.current;
+		if (q) { pendingSyncRef.current = null; applySync(q); }
+	}, [applySync, settle]);
 
 	/** Clear the ground and start the next end. Runs on the card's timer, or on a click. */
 	const nextEnd = useCallback(() => {
@@ -615,6 +742,124 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		statusRef.current = 'aim';
 		setStatus('aim');
 	}, [clearBodies, setStation]);
+
+	/* ---------- online 1v1 ---------- */
+
+	/** Drop the session without laying a pitch — the caller decides what comes next. */
+	const resetOnline = useCallback(() => {
+		if (netRef.current) { netRef.current.leave(); netRef.current = null; }
+		onlineRef.current = false;
+		startedOnlineRef.current = false;
+		mySideRef.current = HUMAN;
+		setMySide(HUMAN);
+		remoteAimRef.current = null;
+		pendingSyncRef.current = null;
+		setMpPhase('off'); setMpCode(null); setMpOpp(null); setMpMsg(null);
+	}, []);
+
+	const startOnlineMatch = useCallback(() => {
+		const net = netRef.current;
+		if (!net || startedOnlineRef.current) return;
+		startedOnlineRef.current = true;
+		onlineRef.current = true;
+		// Host is side 0, which is also the side initMatch13 gives the first jack to.
+		const side: Side = net.isHost() ? 0 : 1;
+		mySideRef.current = side;
+		setMySide(side);
+		setDaily(false);
+		dailyRef.current = null;
+		lv.exit();
+
+		net.onThrow((t) => {
+			// Their throw can land while our end card is still up: they moved on, so we do too.
+			if (statusRef.current === 'end') nextEnd();
+			const m = matchRef.current;
+			if (m.turn === mySideRef.current || m.winner !== null) return;
+			remoteAimRef.current = null;
+			doThrow(m.turn, t, t.jack);
+		});
+		net.onPlace((p) => {
+			const s = simRef.current, j = jackRef.current;
+			if (!s || !j || statusRef.current !== 'placing' || matchRef.current.turn === mySideRef.current) return;
+			j.x = p.x; j.y = p.y; j.live = true;
+			place(s.t, j);
+			matchRef.current = applyPlacedJack(matchRef.current);
+			setMatch(matchRef.current);
+			placeRef.current = null;
+			setPlaceOk(false);
+			statusRef.current = 'aim';
+			setStatus('aim');
+		});
+		net.onAim((a) => {
+			if (matchRef.current.turn === mySideRef.current || statusRef.current === 'rolling') return;
+			remoteAimRef.current = { ...a, seen: performance.now() };
+		});
+		net.onSync((msg) => {
+			if (statusRef.current === 'rolling') { pendingSyncRef.current = msg; return; }
+			applySync(msg);
+		});
+
+		// Same terrain on both peers, from the room id alone. Neutral ground: on gravel this coarse
+		// neither seat gets an edge, and the first jack is the only thing the host does differently.
+		layMatch({ seed: seedFromRoom(net.roomId), surface: ONLINE_SURFACE, amp: DIFFS.moyen.amp, target: 13 });
+		setMpMsg(null);
+		setMpPhase('playing');
+		trackGame(gameId, 'game_started', { mode: 'en-ligne' });
+	}, [applySync, doThrow, gameId, layMatch, lv, nextEnd]);
+
+	const watchPeers = useCallback(() => {
+		netRef.current?.onPeers((peers) => {
+			if (peers.length >= 1) { setMpOpp(peers[0].name); startOnlineMatch(); }
+			else if (onlineRef.current) setMpMsg('Adversaire parti');
+		});
+	}, [startOnlineMatch]);
+
+	const enterOnline = useCallback(() => {
+		resetOnline();
+		if (lv.active) lv.exit();
+		dailyRef.current = null;
+		// A clean Libre pitch as the backdrop: the online match re-lays on connect, and backing out
+		// of the menu then leaves a game that is actually playable.
+		newGame(diffRef.current);
+		setMpMsg(null);
+		setMpPhase('menu');
+	}, [lv, newGame, resetOnline]);
+
+	const leaveOnline = useCallback(() => {
+		resetOnline();
+		newGame(diffRef.current);
+	}, [newGame, resetOnline]);
+
+	const me = (): string => (playerName() || 'Joueur').slice(0, 16);
+
+	const mpQuickMatch = useCallback(async () => {
+		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		setMpPhase('connecting'); setMpMsg(null); setMpCode(null);
+		const net = await joinRandom(me());
+		if (!net) { setMpPhase('menu'); setMpMsg('Aucune partie libre, réessaie'); return; }
+		netRef.current = net; setMpPhase('waiting'); watchPeers();
+	}, [watchPeers]);
+
+	const mpCreateCode = useCallback(async () => {
+		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		const code = makeCode();
+		setMpPhase('connecting'); setMpMsg(null); setMpCode(code);
+		const net = await joinByCode(me(), code);
+		if (!net) { setMpPhase('menu'); setMpMsg('Erreur de connexion'); return; }
+		netRef.current = net; setMpPhase('waiting'); watchPeers();
+	}, [watchPeers]);
+
+	const mpJoinCode = useCallback(async () => {
+		const code = codeInput.trim().toUpperCase();
+		if (!code) return;
+		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		setMpPhase('connecting'); setMpMsg(null); setMpCode(code);
+		const net = await joinByCode(me(), code);
+		if (!net) { setMpPhase('menu'); setMpMsg('Code plein ou invalide'); return; }
+		netRef.current = net; setMpPhase('waiting'); watchPeers();
+	}, [codeInput, watchPeers]);
+
+	useEffect(() => () => { netRef.current?.leave(); }, []);
 
 	/* ---------- hand placing the jack ---------- */
 
@@ -649,6 +894,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		j.x = p.x; j.y = p.y; j.live = true;
 		place(s.t, j);
 		if (jackCheck(matchRef.current.circle, j) !== 'ok') return; // legalise() should make this dead code
+		if (onlineRef.current) netRef.current?.sendPlace({ x: p.x, y: p.y });
 		matchRef.current = applyPlacedJack(matchRef.current);
 		setMatch(matchRef.current);
 		placeRef.current = null;
@@ -660,10 +906,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	/* ---------- the aim drag ---------- */
 
 	const canAim = (): boolean =>
-		statusRef.current === 'aim' && matchRef.current.turn === HUMAN && !pinchRef.current;
+		statusRef.current === 'aim' && matchRef.current.turn === mySideRef.current && !pinchRef.current;
 
 	const aimStart = useCallback((x: number, y: number) => {
-		if (statusRef.current === 'placing' && matchRef.current.turn === HUMAN) {
+		if (statusRef.current === 'placing' && matchRef.current.turn === mySideRef.current) {
 			const p = pickGround(x, y);
 			if (p) { placeRef.current = legalise(p); setPlaceOk(true); }
 			return;
@@ -685,7 +931,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		powerRef.current = p;
 		yawRef.current = yw;
 		setPower(p);
-	}, []);
+		streamAim(true);
+	}, [streamAim]);
 
 	const aimEnd = useCallback(() => {
 		const a = aimRef.current;
@@ -695,10 +942,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			powerRef.current = 0;
 			setPower(0);
 			aimDirtyRef.current = true;
+			streamAim(false);
 			return;
 		}
 		throwFromAim();
-	}, [throwFromAim]);
+	}, [streamAim, throwFromAim]);
 
 	const { onPointerDown } = usePointerDrag(aimStart, aimMove, aimEnd);
 
@@ -708,6 +956,19 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		camPitchRef.current = Math.max(CAM_PITCH_MIN, Math.min(CAM_PITCH_MAX, camPitchRef.current + d));
 		setLoft(elevationForPitch(camPitchRef.current));
 		aimDirtyRef.current = true;
+	}, []);
+
+	/** Step up the lane to read the head, or back down to the circle. Inspection only. */
+	const walkBy = useCallback((d: number) => {
+		const w = Math.max(0, Math.min(WALK_MAX, walkRef.current + d));
+		walkRef.current = w;
+		setWalk(w);
+	}, []);
+
+	const cycleView = useCallback(() => {
+		const next = VIEW_ORDER[(VIEW_ORDER.indexOf(viewRef.current) + 1) % VIEW_ORDER.length];
+		viewRef.current = next;
+		setView(next);
 	}, []);
 
 	useEffect(() => {
@@ -755,11 +1016,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			if (isTypingTarget(e.target)) return;
 			if (e.key === 'ArrowUp') { e.preventDefault(); tiltBy(-0.06); }
 			else if (e.key === 'ArrowDown') { e.preventDefault(); tiltBy(0.06); }
-			else if (e.key === 'v' || e.key === 'V') { overRef.current = !overRef.current; }
+			else if (e.key === 'v' || e.key === 'V') cycleView();
+			else if (e.key === 'w' || e.key === 'W') { e.preventDefault(); walkBy(WALK_STEP); }
+			else if (e.key === 's' || e.key === 'S') { e.preventDefault(); walkBy(-WALK_STEP); }
+			else if (e.key === 'c' || e.key === 'C') walkBy(-WALK_MAX);
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
-	}, [tiltBy]);
+	}, [cycleView, tiltBy, walkBy]);
 
 	useEffect(() => {
 		const wrap = wrapRef.current;
@@ -807,7 +1071,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		g.arcAir = g.arcRoll = null;
 		g.marker.visible = false;
 		const m = matchRef.current;
-		if (statusRef.current !== 'aim' || m.turn !== HUMAN || powerRef.current < 0.06) return;
+		if (statusRef.current !== 'aim' || m.turn !== mySideRef.current || powerRef.current < 0.06) return;
 
 		const asJack = m.phase === 'throw-jack';
 		const h = aimHeading();
@@ -835,7 +1099,6 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const tick = useCallback((now: number, dt: number) => {
 		const g = g3Ref.current, s = simRef.current;
 		if (!g || !s || !g.pitch) return;
-		const m = matchRef.current;
 
 		// Physics, fixed step. The guard keeps a stalled tab from simulating minutes in one frame.
 		if (statusRef.current === 'rolling') {
@@ -861,8 +1124,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			alphaRef.current = 1;
 		}
 
-		// The AI takes a beat before playing, otherwise its throw reads as a glitch.
-		if ((statusRef.current === 'aim' || statusRef.current === 'placing') && m.turn === AI && !aiPendingRef.current) {
+		// Read the match AFTER the step, never before. A boule that settles in this very frame hands
+		// the turn over inside onSettled, and a stale `turn` here armed the AI on the player's turn —
+		// which is how the AI came to replay while it held the point and to throw a fourth boule.
+		const m = matchRef.current;
+
+		// The AI takes a beat before playing, otherwise its throw reads as a glitch. Online, seat 1
+		// is a person: waking the AI here would play their boule for them.
+		if (!onlineRef.current
+			&& (statusRef.current === 'aim' || statusRef.current === 'placing') && m.turn === AI && !aiPendingRef.current) {
 			aiPendingRef.current = true;
 			aiAtRef.current = now + AI_THINK_MS;
 		}
@@ -899,11 +1169,26 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			halo.scale.set(rr, 1, rr);
 		}
 
-		// The circle and the legal window follow the end, not the frame.
-		g.circle.position.set(wx(m.circle.x), heightAt(s.t, m.circle.x, m.circle.y) + 0.004, wz(m.circle.y));
-		const showRings = m.phase === 'throw-jack' || m.phase === 'place-jack';
-		g.rings.visible = showRings;
-		if (showRings) g.rings.position.set(wx(m.circle.x), heightAt(s.t, m.circle.x, m.circle.y) + 0.006, wz(m.circle.y));
+		// The circle and the legal window are sampled on the terrain, so they are rebuilt when the
+		// circle moves — once an end — and never touched per frame.
+		if (!g.laidAt || g.laidAt.x !== m.circle.x || g.laidAt.y !== m.circle.y) layGround();
+		g.rings.visible = m.phase === 'throw-jack' || m.phase === 'place-jack';
+
+		// The opponent drawing back. Built once per message, not per frame, and dropped when the
+		// stream dries up — a frozen ray would read as an aim they are still holding.
+		const ra = remoteAimRef.current;
+		const showRay = ra !== null && ra.live && now - ra.seen < AIM_STALE_MS && statusRef.current !== 'rolling';
+		if (!showRay) {
+			if (g.ray.visible) { killGroup(g.ray); g.ray.visible = false; g.rayAt = 0; }
+		} else if (ra && g.rayAt !== ra.seen) {
+			g.rayAt = ra.seen;
+			killGroup(g.ray);
+			const v = speedOf(ra.power);
+			const reach = Math.min(PITCH_L - 1, (v * v * Math.sin(2 * ra.loft)) / G);
+			g.ray.add(aimRay(s.t, m.circle.x, m.circle.y,
+				Math.sin(ra.yaw) * m.dir, Math.cos(ra.yaw) * m.dir, reach, HALO[1]));
+			g.ray.visible = true;
+		}
 
 		// While the human places the jack by hand, the jack itself is the marker.
 		if (statusRef.current === 'placing' && placeRef.current && jackRef.current) {
@@ -916,25 +1201,36 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		g.fx.update(dt);
 
 		/* --- camera --- */
-		if (overRef.current) {
+		if (viewRef.current === 'dessus') {
 			overviewCamera(g.camera, jackRef.current ?? m.circle);
 		} else {
 			const rolling = statusRef.current === 'rolling';
 			const wantPitch = rolling ? Math.max(camPitchRef.current, ROLL_PITCH) : camPitchRef.current;
 			viewPitchRef.current += (wantPitch - viewPitchRef.current) * (1 - Math.exp(-dt / PITCH_TAU));
+			// Walking is eased too, otherwise a tap on the step buttons teleports the eye.
+			walkViewRef.current += (walkRef.current - walkViewRef.current) * (1 - Math.exp(-dt / WALK_TAU));
 			const ground = heightAt(s.t, m.circle.x, m.circle.y);
-			aimCamera(g.camera, m.circle, m.dir, viewPitchRef.current, yawRef.current, CAM_DIST, ground);
+			aimCamera(g.camera, m.circle, m.dir, viewPitchRef.current, yawRef.current, CAM_DIST, ground,
+				walkViewRef.current, viewRef.current === 'premiere');
 			const h = aimHeading();
 			const live = rolling ? s.bs.find((b) => b.live && Math.sqrt(b.vx * b.vx + b.vy * b.vy) > 0.05) : undefined;
 			const focus = live ?? (statusRef.current === 'placing' ? placeRef.current : null);
 			const want = wantLook.current;
-			if (focus) want.set(wx(focus.x), ground + 0.1, wz(focus.y));
-			else want.set(wx(m.circle.x) + h.x * 2.2, ground + 0.15, wz(m.circle.y) + h.y * 2.2);
+			if (focus) {
+				want.set(wx(focus.x), ground + 0.1, wz(focus.y));
+			} else {
+				// Look at the HEAD, not at the ground in front of the circle. Staring 2.2 m out put the
+				// boules — 6 to 10 m away — as a few pixels at the top of the frame, which is what made
+				// the situation unreadable. Never behind the eye: always at least LOOK_MIN past it.
+				const j = jackRef.current;
+				const far = Math.max(walkViewRef.current + LOOK_MIN, j && j.live ? dist2(m.circle, j) : LOOK_FAR);
+				want.set(wx(m.circle.x) + h.x * far, ground + 0.15, wz(m.circle.y) + h.y * far);
+			}
 			if (lookRef.current.lengthSq() === 0) lookRef.current.copy(want);
 			lookRef.current.lerp(want, 1 - Math.exp(-dt / LOOK_TAU));
 			g.camera.lookAt(lookRef.current);
 		}
-	}, [aiAct, aimHeading, nextEnd, onImpact, onSettled, rebuildArc]);
+	}, [aiAct, aimHeading, layGround, nextEnd, onImpact, onSettled, rebuildArc]);
 
 	const tickRef = useRef(tick);
 	tickRef.current = tick;
@@ -1040,9 +1336,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			status: statusRef.current,
 			match: matchRef.current,
 			bodies: simRef.current?.bs.length ?? 0,
+			// What the GROUND holds, which is not the same question as the rules' `left`. The bug that
+			// let the AI throw a fourth boule billed it to the other side, so `left` stayed plausible
+			// while the ground did not. Also what the multiplayer guard compares between two peers.
+			bs: (simRef.current?.bs ?? []).map((b) => ({ x: b.x, y: b.y, z: b.z, side: b.side, live: b.live })),
 			jack: jackRef.current ? { x: jackRef.current.x, y: jackRef.current.y, live: jackRef.current.live } : null,
 			power: powerRef.current,
 			loft: elevationForPitch(camPitchRef.current),
+			view: viewRef.current,
+			walk: walkRef.current,
 			fx: g3Ref.current?.fx.stats() ?? null,
 			// Everything the daily needs is derived from dailyRef, never from state: this effect
 			// runs once, so any state it closed over would be the mount value forever.
@@ -1057,6 +1359,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			// so this is the only honest way to ask whether the board is readable.
 			seen: screenSizes(),
 			bow: arcBow(),
+			online: onlineRef.current ? { side: mySideRef.current, host: netRef.current?.isHost() ?? false } : null,
+			// The opponent drawing back, and whether their ray is actually on screen. Two questions:
+			// the message can land and the ray still not be built.
+			oppAim: remoteAimRef.current ? { power: remoteAimRef.current.power, live: remoteAimRef.current.live } : null,
+			rayVisible: g3Ref.current?.ray.visible ?? false,
+			// Online, two peers agreeing on the rules means nothing if they stand on different ground.
+			// The checksum walks the real heightfield rather than trusting that the same seed rebuilds it.
+			terrain: terrainStamp(simRef.current?.t ?? null),
 		});
 		return () => { delete (window as unknown as { __petanque?: unknown }).__petanque; };
 	}, [screenSizes, arcBow]);
@@ -1064,7 +1374,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- HUD ---------- */
 
-	const myTurn = match.turn === HUMAN;
+	// Online the guest sits in seat 1, so the HUD reads every score and every boule count through
+	// `mySide`. Offline it is always HUMAN, which makes this the same code in both modes.
+	const foeSide = other(mySide);
+	const online = mpPhase === 'playing';
+	const myTurn = match.turn === mySide;
 	const holder = !daily && jackRef.current && status !== 'placing' ? pointHolder(simRef.current?.bs ?? [], jackRef.current) : null;
 	const course = dailyRef.current?.course ?? null;
 	const st = course?.stations[station] ?? null;
@@ -1078,10 +1392,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		: status === 'placing'
 		? (myTurn ? '✋ Touche le sol pour poser le bouchon' : 'L’adversaire place le bouchon…')
 		: status === 'rolling' ? 'La boule roule…'
-		: !myTurn ? 'L’adversaire réfléchit…'
+		: !myTurn ? (online ? 'L’adversaire joue…' : 'L’adversaire réfléchit…')
 		: match.phase === 'throw-jack' ? 'À toi de lancer le bouchon'
-		: holder === HUMAN ? 'Tu as le point'
-		: holder === AI ? 'L’adversaire a le point'
+		: holder === mySide ? 'Tu as le point'
+		: holder === foeSide ? 'L’adversaire a le point'
 		: 'À toi de jouer';
 
 	return (
@@ -1093,11 +1407,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className="pe-modetoggle">
 						<ModeToggle
 							daily={daily}
-							onFree={() => { if (lv.active) lv.exit(); newGame(diff); }}
-							onDaily={() => { lv.exit(); void startDaily(); }}
+							onFree={() => { if (lv.active) lv.exit(); resetOnline(); newGame(diff); }}
+							onDaily={() => { lv.exit(); resetOnline(); void startDaily(); }}
 							showLevels
 							levelsActive={lv.active}
-							onLevels={() => { setDaily(false); dailyRef.current = null; lv.enter(); }}
+							onLevels={() => { setDaily(false); dailyRef.current = null; resetOnline(); lv.enter(); }}
+							showOnline={multiplayerAvailable()}
+							onlineActive={mpPhase !== 'off'}
+							onOnline={enterOnline}
 						/>
 					</div>
 					<div className="pe-stats">
@@ -1109,22 +1426,24 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 							</>
 						) : (
 							<>
-								<span className="pe-stat">🏆 {match.scores[HUMAN]} — {match.scores[AI]}</span>
+								<span className="pe-stat">🏆 {match.scores[mySide]} — {match.scores[foeSide]}</span>
 								<span className="pe-stat">Mène {match.endNo}</span>
 								{lv.active && !lv.menu && <span className="pe-stat">🎯 Niveau {lv.level}</span>}
 								<span className="pe-stat pe-boules">
-									<span className="pe-dots me">{'●'.repeat(match.left[HUMAN])}{'○'.repeat(BOULES_PER_SIDE - match.left[HUMAN])}</span>
-									<span className="pe-dots foe">{'●'.repeat(match.left[AI])}{'○'.repeat(BOULES_PER_SIDE - match.left[AI])}</span>
+									<span className="pe-dots me">{'●'.repeat(match.left[mySide])}{'○'.repeat(BOULES_PER_SIDE - match.left[mySide])}</span>
+									<span className="pe-dots foe">{'●'.repeat(match.left[foeSide])}{'○'.repeat(BOULES_PER_SIDE - match.left[foeSide])}</span>
 								</span>
 							</>
 						)}
 					</div>
 					<div className="pe-hud-actions">
-						{!daily && !lv.active && withExpert(DIFF_ORDER, gameId).map((k) => (
+						{!daily && !lv.active && mpPhase === 'off' && withExpert(DIFF_ORDER, gameId).map((k) => (
 							<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title="Force de l’adversaire et terrain">{DIFFS[k as DiffKey].label}</button>
 						))}
-						<button className="pe-act" onClick={() => { overRef.current = !overRef.current; }} aria-label="Vue d’ensemble" title="Vue d’ensemble (V)">🎥</button>
-						{!daily && (
+						<button className="pe-act" onClick={cycleView} aria-label={VIEWS[view].label} title={`${VIEWS[view].label} (V)`}>{VIEWS[view].icon}</button>
+						{mpPhase !== 'off' ? (
+							<button className="pe-act" onClick={leaveOnline} aria-label="Quitter la partie en ligne" title="Quitter la partie en ligne">🚪</button>
+						) : !daily && (
 							<button className="pe-act" onClick={() => { if (lv.active) startLevel(lv.level); else newGame(diff); }} aria-label="Recommencer" title="Recommencer">↻</button>
 						)}
 					</div>
@@ -1137,7 +1456,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className="pe-vs">
 						<span className={`pe-vs-p ${myTurn && status !== 'rolling' ? 'on' : ''}`}>😎 Toi</span>
 						<span className="pe-vs-mid">vs</span>
-						<span className={`pe-vs-p ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>🤖 {lv.active ? `IA ${Math.round(levelSkillRef.current * 100)}%` : DIFFS[diff].label}</span>
+						<span className={`pe-vs-p ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>
+								{online ? `🧑 ${mpOpp ?? 'Adversaire'}` : `🤖 ${lv.active ? `IA ${Math.round(levelSkillRef.current * 100)}%` : DIFFS[diff].label}`}
+							</span>
 					</div>
 				)}
 				{!daily && match.lastEvent && status !== 'end' && <div className="pe-tag">{match.lastEvent}</div>}
@@ -1159,6 +1480,17 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className="pe-loft-bar"><div className="pe-loft-fill" style={{ height: `${Math.round(((loft - 0.17) / (0.92 - 0.17)) * 100)}%` }} /></div>
 					<span className="pe-loft-hint">molette / 2 doigts</span>
 				</div>
+
+				{/* Walk up the lane to read the head. Loft lives on the left, the feet on the right, so
+				    the two are never confused — walking must not read as a throw change. */}
+				{view !== 'dessus' && (
+					<div className="pe-walk">
+						<button className="pe-walk-btn" onClick={() => walkBy(WALK_STEP)} disabled={walk >= WALK_MAX} aria-label="Avancer vers le bouchon" title="Avancer (W)">▲</button>
+						<div className="pe-walk-bar"><div className="pe-walk-fill" style={{ height: `${Math.round((walk / WALK_MAX) * 100)}%` }} /></div>
+						<button className="pe-walk-btn" onClick={() => walkBy(-WALK_STEP)} disabled={walk <= 0} aria-label="Reculer" title="Reculer (S)">▼</button>
+						<span className="pe-walk-label">{walk > 0 ? `+${walk.toFixed(1)} m` : 'au cercle'}</span>
+					</div>
+				)}
 
 				<div className="pe-power" aria-hidden="true">
 					<div className="pe-power-fill" style={{ width: `${Math.round(power * 100)}%` }} />
@@ -1189,9 +1521,39 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{over && !daily && !lv.active && (
 					<div className="pe-overlay">
 						<div className="pe-card">
-							{match.winner === HUMAN ? '🏆 Tu gagnes la partie !' : '❌ L’adversaire gagne'}
-							<strong>{match.scores[HUMAN]} — {match.scores[AI]}</strong>
-							<button className="pe-replay" onClick={() => newGame(diff)}>Nouvelle partie</button>
+							{match.winner === mySide ? '🏆 Tu gagnes la partie !' : '❌ L’adversaire gagne'}
+							<strong>{match.scores[mySide]} — {match.scores[foeSide]}</strong>
+							{online
+								? <button className="pe-replay" onClick={leaveOnline}>Quitter</button>
+								: <button className="pe-replay" onClick={() => newGame(diff)}>Nouvelle partie</button>}
+						</div>
+					</div>
+				)}
+
+				{/* Lobby. Shown over a playable Libre pitch, so backing out leaves a real game. */}
+				{(mpPhase === 'menu' || mpPhase === 'connecting' || mpPhase === 'waiting') && (
+					<div className="pe-overlay">
+						<div className="pe-card pe-mp">
+							{mpPhase === 'menu' ? (
+								<>
+									<div className="pe-mp-title">Jouer en ligne</div>
+									<button className="pe-replay" onClick={mpQuickMatch}>⚡ Partie rapide</button>
+									<button className="pe-replay" onClick={mpCreateCode}>🔑 Créer un code ami</button>
+									<div className="pe-mp-join">
+										<input value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 4))} maxLength={4} placeholder="CODE" aria-label="Code ami" />
+										<button className="pe-replay" onClick={mpJoinCode}>Rejoindre</button>
+									</div>
+									{mpMsg && <span className="pe-mp-msg">{mpMsg}</span>}
+									<button className="pe-act" onClick={leaveOnline}>Retour</button>
+								</>
+							) : (
+								<>
+									<div className="pe-mp-title">{mpPhase === 'connecting' ? 'Connexion…' : 'En attente d’un joueur…'}</div>
+									{mpCode && <div className="pe-mp-code">Code : <strong>{mpCode}</strong></div>}
+									{mpMsg && <span className="pe-mp-msg">{mpMsg}</span>}
+									<button className="pe-act" onClick={leaveOnline}>Annuler</button>
+								</>
+							)}
 						</div>
 					</div>
 				)}
@@ -1237,6 +1599,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			</p>
 		</div>
 	);
+}
+
+/** Identity of the ground, for the multiplayer guard. Strided so it costs nothing per snapshot. */
+function terrainStamp(t: Terrain | null): { seed: number; surface: SurfaceId; amp: number; pebbles: number; sum: number } | null {
+	if (!t) return null;
+	let sum = 0;
+	for (let i = 0; i < t.hs.length; i += 97) sum += t.hs[i];
+	return { seed: t.seed, surface: t.surface.id, amp: t.amp, pebbles: t.pebbles.length, sum: Math.round(sum * 1e6) / 1e6 };
 }
 
 const SPIN = new THREE.Vector3();
@@ -1311,6 +1681,15 @@ const CSS = `
 .pe-loft-fill { width: 100%; background: linear-gradient(180deg, #ffd166, #f4801f); transition: height 0.08s linear; }
 .pe-loft-hint { color: #f0e6da; font-size: 10px; opacity: 0.8; text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
 
+/* Mirror of the loft gauge on the right edge — the feet, not the arm. */
+.pe-walk { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.pe-walk-btn { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(28,20,12,0.55); color: #f0e6da; font: inherit; font-weight: 700; font-size: 13px; line-height: 1; border-radius: 999px; width: 30px; height: 26px; cursor: pointer; backdrop-filter: blur(4px); }
+.pe-walk-btn:hover:not(:disabled) { border-color: var(--pe-accent); color: #fff; }
+.pe-walk-btn:disabled { opacity: 0.35; cursor: default; }
+.pe-walk-bar { width: 9px; height: 86px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+.pe-walk-fill { width: 100%; background: linear-gradient(180deg, #8ce99a, #30d158); transition: height 0.12s linear; }
+.pe-walk-label { color: #f0e6da; font-size: 10px; font-weight: 700; opacity: 0.85; text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
+
 .pe-power { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(12px, env(safe-area-inset-bottom)); width: min(58%, 280px); height: 9px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); overflow: hidden; z-index: 3; pointer-events: none; }
 .pe-power-fill { height: 100%; background: linear-gradient(90deg, #8ce99a, #ffd166 55%, #ff6b6b); }
 
@@ -1327,6 +1706,14 @@ const CSS = `
 .pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .pe-card strong { color: var(--pe-accent); font-size: 22px; font-variant-numeric: tabular-nums; }
 .pe-replay { border: none; background: var(--pe-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }
+
+.pe-mp { min-width: 240px; }
+.pe-mp-title { font-family: var(--font-brand); font-weight: 700; font-size: 17px; }
+.pe-mp-join { display: flex; gap: 6px; width: 100%; }
+.pe-mp-join input { flex: 1; min-width: 0; text-align: center; letter-spacing: 3px; text-transform: uppercase; font: inherit; font-weight: 700; border-radius: 999px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); padding: 8px 10px; }
+.pe-mp-code { font-size: 15px; color: var(--gray-100); }
+.pe-mp-code strong { font-size: 22px; letter-spacing: 4px; }
+.pe-mp-msg { font-size: 13px; color: var(--gray-200); }
 
 .pe-help { max-width: 480px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1rem; }
 `;
