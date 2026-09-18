@@ -17,10 +17,15 @@ import {
 	aimCamera, overviewCamera, elevationForPitch, addLights, makeFx, wx, wz,
 	CAM_PITCH_MIN, CAM_PITCH_MAX, BOULE_R, type Pitch3D, type Fx,
 } from './render3d';
+import { petanqueLevels } from './levels';
 import { usePointerDrag } from '../usePointerDrag';
 import { isTypingTarget } from '../../lib/keyboard';
 import { trackGame } from '../../lib/analytics';
+import { withExpert } from '../../lib/difficulty';
+import { useLevels } from '../../lib/useLevels';
 import Celebration, { useCelebration } from '../../components/Celebration';
+import LevelSelect from '../../components/LevelSelect';
+import LevelOutcome from '../../components/LevelOutcome';
 
 /* =====================================================
    PETANQUE — React island, 3D pitch (three.js).
@@ -37,11 +42,12 @@ const AI: Side = 1;
 const STEP = 1000 / 60;
 
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
-type DiffKey = (typeof DIFF_ORDER)[number];
+type DiffKey = (typeof DIFF_ORDER)[number] | 'expert';
 const DIFFS: Record<DiffKey, { label: string; skill: number; surface: SurfaceId; amp: number }> = {
 	facile: { label: 'Facile', skill: 0.34, surface: 'terre-battue', amp: 0.018 },
 	moyen: { label: 'Moyen', skill: 0.62, surface: 'gravier-fin', amp: 0.032 },
 	difficile: { label: 'Difficile', skill: 0.86, surface: 'gravier-gros', amp: 0.050 },
+	expert: { label: 'Expert', skill: 0.95, surface: 'gravier-gros', amp: 0.070 },
 };
 
 const MIN_SPEED = 3.0;
@@ -133,6 +139,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	const statusRef = useRef<Status>('aim');
 	const diffRef = useRef<DiffKey>('moyen');
+	const levelSkillRef = useRef(0.25); // the ladder's skill, read by the rAF loop
+	const targetRef = useRef(13);
 	const aiPendingRef = useRef(false);
 	const aiAtRef = useRef(0);
 	const endAtRef = useRef(0);
@@ -160,6 +168,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [card, setCard] = useState<EndCard | null>(null);
 	const [webglError, setWebglError] = useState(false);
 	const [placeOk, setPlaceOk] = useState(false);
+
+	const lv = useLevels(gameId, petanqueLevels);
+	// Callback refs: the rAF loop and settle() must not take `lv` as a dep, or the loop restarts
+	// every render and the physics freezes (see angry / billard).
+	const lvActiveRef = useRef(false);
+	lvActiveRef.current = lv.active;
+	const lvFinishRef = useRef(lv.finish);
+	lvFinishRef.current = lv.finish;
 
 	const won = match.phase === 'match-done' && match.winner === HUMAN;
 	const { celebrating } = useCelebration(won);
@@ -252,24 +268,22 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- a new game ---------- */
 
-	const newGame = useCallback((key: DiffKey) => {
-		if (!initScene()) return;
+	/** Lay a fresh pitch and match. Shared by free play and by the levels ladder. */
+	const layMatch = useCallback((cfg: { seed: number; surface: SurfaceId; amp: number; target: number }): boolean => {
+		if (!initScene()) return false;
 		const g = g3Ref.current;
-		if (!g) return;
-		const d = DIFFS[key];
-		diffRef.current = key;
-		setDiff(key);
+		if (!g) return false;
 
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
-		const seed = (Math.random() * 1e9) | 0;
-		const t = makeTerrain(seed, SURFACES[d.surface], d.amp);
+		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp);
 		g.pitch = buildPitch3D(t);
 		g.scene.add(g.pitch.group);
 
-		simRef.current = { t, bs: [], rng: seed & 0xffff };
+		simRef.current = { t, bs: [], rng: cfg.seed & 0xffff };
 		prevRef.current = [];
-		matchRef.current = initMatch13(13, HUMAN);
+		targetRef.current = cfg.target;
+		matchRef.current = initMatch13(cfg.target, HUMAN);
 		setMatch(matchRef.current);
 		statusRef.current = 'aim';
 		setStatus('aim');
@@ -280,8 +294,23 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setPower(0);
 		placeRef.current = null; setPlaceOk(false);
 		clearArc();
+		return true;
+	}, [clearArc, clearBodies, initScene]);
+
+	const newGame = useCallback((key: DiffKey) => {
+		const d = DIFFS[key];
+		diffRef.current = key;
+		setDiff(key);
+		if (!layMatch({ seed: (Math.random() * 1e9) | 0, surface: d.surface, amp: d.amp, target: 13 })) return;
 		trackGame(gameId, 'game_started', { mode: 'libre', diff: key });
-	}, [clearArc, clearBodies, gameId, initScene]);
+	}, [gameId, layMatch]);
+
+	const startLevel = useCallback((level: number) => {
+		const cfg = lv.play(level);
+		levelSkillRef.current = cfg.skill;
+		if (!layMatch(cfg)) return;
+		trackGame(gameId, 'game_started', { mode: 'niveaux', level });
+	}, [gameId, layMatch, lv]);
 
 	/* ---------- throwing ---------- */
 
@@ -325,7 +354,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const aiAct = useCallback(() => {
 		const s = simRef.current, m = matchRef.current, g = g3Ref.current;
 		if (!s || !g) return;
-		const skill = DIFFS[diffRef.current].skill;
+		const skill = lvActiveRef.current ? levelSkillRef.current : DIFFS[diffRef.current].skill;
 		const rng = rngRef.current++;
 
 		if (m.phase === 'place-jack') {
@@ -395,7 +424,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		endAtRef.current = performance.now() + END_CARD_MS;
 		if (done.phase === 'match-done') {
 			setOver(true);
-			trackGame(gameId, done.winner === HUMAN ? 'game_won' : 'game_over', { mode: 'libre', diff: diffRef.current });
+			const win = done.winner === HUMAN;
+			if (lvActiveRef.current) {
+				const conceded = done.scores[AI];
+				lvFinishRef.current({ won: win, score: targetRef.current - conceded, stat: conceded });
+			}
+			trackGame(gameId, win ? 'game_won' : 'game_over',
+				lvActiveRef.current ? { mode: 'niveaux' } : { mode: 'libre', diff: diffRef.current });
 		}
 	}, [gameId]);
 
@@ -851,29 +886,34 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className="pe-stats">
 						<span className="pe-stat">🏆 {match.scores[HUMAN]} — {match.scores[AI]}</span>
 						<span className="pe-stat">Mène {match.endNo}</span>
+						{lv.active && !lv.menu && <span className="pe-stat">🎯 Niveau {lv.level}</span>}
 						<span className="pe-stat pe-boules">
 							<span className="pe-dots me">{'●'.repeat(match.left[HUMAN])}{'○'.repeat(BOULES_PER_SIDE - match.left[HUMAN])}</span>
 							<span className="pe-dots foe">{'●'.repeat(match.left[AI])}{'○'.repeat(BOULES_PER_SIDE - match.left[AI])}</span>
 						</span>
 					</div>
 					<div className="pe-hud-actions">
-						{DIFF_ORDER.map((k) => (
-							<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k)} title="Force de l’adversaire et terrain">{DIFFS[k].label}</button>
-						))}
+						<button className={`pe-pill ${lv.active ? 'active' : ''}`} onClick={() => { if (lv.active) return; lv.enter(); }} title="Ladder de 100 niveaux">🎯 Niveaux</button>
+						{lv.active
+							? <button className="pe-pill" onClick={() => { lv.exit(); newGame(diff); }} title="Partie libre">🎲 Libre</button>
+							: withExpert(DIFF_ORDER, gameId).map((k) => (
+								<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title="Force de l’adversaire et terrain">{DIFFS[k as DiffKey].label}</button>
+							))}
 						<button className="pe-act" onClick={() => { overRef.current = !overRef.current; }} aria-label="Vue d’ensemble" title="Vue d’ensemble (V)">🎥</button>
-						<button className="pe-act" onClick={() => newGame(diff)} aria-label="Nouvelle partie" title="Nouvelle partie">↻</button>
+						<button className="pe-act" onClick={() => { if (lv.active) startLevel(lv.level); else newGame(diff); }} aria-label="Recommencer" title="Recommencer">↻</button>
 					</div>
 				</div>
 				<div className="pe-vs">
 					<span className={`pe-vs-p ${myTurn && status !== 'rolling' ? 'on' : ''}`}>😎 Toi</span>
 					<span className="pe-vs-mid">vs</span>
-					<span className={`pe-vs-p ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>🤖 {DIFFS[diff].label}</span>
+					<span className={`pe-vs-p ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>🤖 {lv.active ? `IA ${Math.round(levelSkillRef.current * 100)}%` : DIFFS[diff].label}</span>
 				</div>
 				{match.lastEvent && status !== 'end' && <div className="pe-tag">{match.lastEvent}</div>}
 			</div>
 
 			<div className="pe-playwrap" ref={wrapRef}>
-				{celebrating && <Celebration />}
+				{/* Niveaux has its own outcome beat (LevelOutcome), so the confetti must not double up. */}
+				{celebrating && !lv.active && <Celebration />}
 				<canvas ref={canvasRef} className="pe-canvas" onPointerDown={onPointerDown} onContextMenu={(e) => e.preventDefault()} />
 
 				{webglError && (
@@ -902,7 +942,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className={`pe-endcard ${card.mine ? 'mine' : ''}`} onClick={nextEnd}>{card.text}</div>
 				)}
 
-				{over && (
+				{over && !lv.active && (
 					<div className="pe-overlay">
 						<div className="pe-card">
 							{match.winner === HUMAN ? '🏆 Tu gagnes la partie !' : '❌ L’adversaire gagne'}
@@ -911,12 +951,31 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
+
+				{lv.active && lv.menu && (
+					<div className="pe-overlay pe-levels">
+						<LevelSelect progress={lv.progress} onPick={startLevel} />
+					</div>
+				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={petanqueLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Gagné ${match.scores[HUMAN]} — ${match.scores[AI]}` : `Battu ${match.scores[HUMAN]} — ${match.scores[AI]}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
 			</div>
 
 			<p className="pe-help">
 				Glisse vers le <strong>haut</strong> pour la puissance, sur les <strong>côtés</strong> pour la direction, relâche pour lancer.
 				L’<strong>inclinaison de la caméra</strong> règle la hauteur du lob : caméra rasante = portée haute, caméra plongeante = roulette.
-				Bouchon entre 6 et 10 m, sinon c’est à l’adversaire de le poser. Celui qui n’a pas le point rejoue. Premier à 13.
+				Bouchon entre 6 et 10 m, sinon c’est à l’adversaire de le poser. Celui qui n’a pas le point rejoue. Premier à {match.target}.
 			</p>
 		</div>
 	);
@@ -994,6 +1053,7 @@ const CSS = `
 .pe-endcard.mine { background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(24,140,60,0.96)); border-color: rgba(255,255,255,0.4); }
 
 .pe-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; }
+.pe-levels { align-items: flex-start; overflow-y: auto; padding: 16px 12px; background: color-mix(in srgb, var(--gray-999) 82%, transparent); }
 .pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .pe-card strong { color: var(--pe-accent); font-size: 22px; font-variant-numeric: tabular-nums; }
 .pe-replay { border: none; background: var(--pe-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }
