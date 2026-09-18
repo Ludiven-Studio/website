@@ -538,19 +538,55 @@ export function makeFx(scene: THREE.Scene): Fx {
 
 /* ---------- lights ---------- */
 
-/** Warm midday sun plus a sky bounce. Shadows are what make the relief readable. */
+/**
+ * Warm afternoon sun plus a sky bounce. Shadows are what make the relief readable — and what makes a
+ * boule read as a sphere instead of a sticker, which is not the same thing and was the harder one.
+ *
+ * The sun sits at 35 deg, not overhead. A boule's contact shadow is offset by r/tan(elevation), so at
+ * the old 51 deg that was 3 cm — under one radius — and the shadow hid behind the boule itself. The
+ * body was always correctly shaded; nothing tied it to the ground. Measured on the ground under a
+ * boule at 2.4 m, against a 2.0 floor taken on bare ground beside it:
+ *
+ *     origin 51 deg / normalBias 0.02 / square box / radius 3   12.1 levels
+ *     35 deg                                                    17.3
+ *     + normalBias 0.002                                        24.8
+ *     + fitted box                                              27.9
+ *     + intensity 2.6                                           35.8
+ *     + radius 1.5                                              44.5
+ *
+ * Intensity went 1.9 -> 2.6 because an up-facing normal receives sin(elevation): that puts the ground
+ * back at the exact level it had before the sun moved (130), and deepens the shadow at the same time,
+ * since shadow depth is the direct/ambient ratio. Instrument: scripts/measure-petanque-boule.mjs.
+ */
 export function addLights(scene: THREE.Scene): { dispose(): void } {
 	scene.add(new THREE.HemisphereLight(0xdcefff, 0x6b5a3a, 1.0));
-	const sun = new THREE.DirectionalLight(0xfff0d4, 1.9);
-	sun.position.set(6, 9, -4);
+	const sun = new THREE.DirectionalLight(0xfff0d4, 2.6);
+	sun.position.set(6, 5, -4);
 	sun.castShadow = true;
 	sun.shadow.mapSize.set(2048, 2048);
 	sun.shadow.bias = -0.0004;
-	sun.shadow.normalBias = 0.02;
-	sun.shadow.radius = 3;
+	// 2 cm of normal offset on a 3.75 cm boule pushes most of the contact shadow off. This read as a
+	// dead knob while the sun was at 51 deg — there was no shadow left for it to eat.
+	sun.shadow.normalBias = 0.002;
+	sun.shadow.radius = 1.5;
+	/* Fit the shadow box to the pitch in LIGHT space rather than to a square that circumscribes it.
+	   A boule is 7.5 cm, so its contact shadow is only ~10 texels wide at 15 m / 2048 — half of them
+	   were being spent on empty apron. Derived from the sun direction, so moving the sun cannot
+	   silently un-fit the box. */
 	const cam = sun.shadow.camera as THREE.OrthographicCamera;
-	cam.left = -PITCH_L / 2; cam.right = PITCH_L / 2;
-	cam.top = PITCH_L / 2; cam.bottom = -PITCH_L / 2;
+	const dir = sun.position.clone().normalize(); // the target is the origin
+	const right = new THREE.Vector3(0, 1, 0).cross(dir).normalize();
+	const up = dir.clone().cross(right).normalize();
+	let ex = 0, ey = 0;
+	for (const sx of [-1, 1]) {
+		for (const sz of [-1, 1]) {
+			const c = new THREE.Vector3((sx * PITCH_W) / 2 + sx * BORDER_W, 0, (sz * PITCH_L) / 2 + sz * BORDER_W);
+			ex = Math.max(ex, Math.abs(c.dot(right)));
+			ey = Math.max(ey, Math.abs(c.dot(up)));
+		}
+	}
+	cam.left = -ex; cam.right = ex;
+	cam.top = ey + BORDER_H; cam.bottom = -ey - BORDER_H;
 	cam.near = 0.5; cam.far = 40;
 	cam.updateProjectionMatrix();
 	scene.add(sun);

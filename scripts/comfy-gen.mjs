@@ -11,6 +11,7 @@
  */
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const COMFY = process.env.COMFY_URL ?? 'http://127.0.0.1:8188';
 const CKPT = 'sd_xl_turbo_1.0_fp16.safetensors';
@@ -52,7 +53,19 @@ export async function waitForImages(promptId, timeoutMs = 120000) {
 			const imgs = Object.values(entry.outputs).flatMap((o) => o.images ?? []);
 			if (imgs.length) return imgs;
 		}
-		if (entry?.status?.status_str === 'error') throw new Error(`ComfyUI error on ${promptId}`);
+		// Carry the server's own reason. Without it the throw names only a uuid, and the cause
+		// (a CUDA failure, a bad node) has to be dug out of /history by hand.
+		if (entry?.status?.status_str === 'error') {
+			const e = (entry.status.messages ?? []).find((m) => m[0] === 'execution_error')?.[1];
+			throw new Error(e
+				? `ComfyUI ${e.node_type} (node ${e.node_id}): ${e.exception_type}: ${e.exception_message?.split('\n')[0]}`
+				: `ComfyUI error on ${promptId}`);
+		}
+		// A prompt identical to an earlier one comes back "success" with every node cached and
+		// outputs EMPTY. Without this the poll just spins to the timeout and blames the network.
+		if (entry?.status?.completed && !Object.keys(entry.outputs ?? {}).length) {
+			throw new Error(`${promptId} finished with no image: ComfyUI replayed a cached execution. Change the seed to force a new render.`);
+		}
 		if (Date.now() - t0 > timeoutMs) throw new Error(`timeout waiting for ${promptId}`);
 		await sleep(500);
 	}
@@ -90,7 +103,9 @@ const DEMO = [
 ];
 
 // Run the demo batch only when invoked directly (not when imported as a module).
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+// pathToFileURL, not a hand-built string: on Windows it yields file:///D:/... (three slashes),
+// so the hand-built two-slash form never matched and the batch silently did nothing.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
 	const jobsArg = process.argv[2];
 	const jobs = jobsArg ? JSON.parse(await (await import('node:fs/promises')).readFile(jobsArg, 'utf8')) : DEMO;
 	await run(jobs);
