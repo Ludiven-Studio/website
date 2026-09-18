@@ -217,6 +217,46 @@ async function main() {
 			await startCTA();
 			await sleep(2600);
 		},
+		// A bare pitch with the help text under it is the whole card otherwise. Go fullscreen
+		// (class only — requestFullscreen breaks the later screenshots), then actually play:
+		// the jack, then boules, so the shot has something to be about.
+		petanque: async () => {
+			await sleep(1200);
+			await page.evaluate(() => {
+				document.querySelector('.game-page')?.classList.add('gf-full');
+				document.documentElement.classList.add('gf-full');
+				window.dispatchEvent(new Event('resize'));
+			});
+			await sleep(900);
+			const box = await page.locator('.pe-canvas').boundingBox();
+			if (!box) return;
+			const cx = box.x + box.width * 0.5, cy = box.y + box.height * 0.8;
+			// Wait for MY turn to aim: the AI thinks between throws, and dragging during its turn
+			// does nothing at all.
+			const myAim = () => page.waitForFunction(
+				() => { const s = window.__petanque?.(); return s && s.status === 'aim' && s.match.turn === 0; },
+				null, { timeout: 45000 },
+			).catch(() => {});
+			const throwIt = async (dx, up, hold) => {
+				await myAim();
+				await page.mouse.move(cx, cy);
+				await page.mouse.down();
+				await page.mouse.move(cx + dx, cy - up, { steps: 12 });
+				await sleep(hold ? 800 : 220);
+				if (hold) return;
+				await page.mouse.up();
+				// Wait for the release to register. Polling for "my aim turn" straight away re-reads
+				// the frame before it and throws a second time, which quietly spent every boule.
+				await page.waitForFunction(() => window.__petanque?.().status !== 'aim', null, { timeout: 10000 }).catch(() => {});
+			};
+			// Jack, then ONE boule. Two of the three plus the AI's replies closed the end, and the
+			// card landed on "0 — 3 · Mène 2". With two boules still in hand the end cannot end.
+			await throwIt(0, 118);
+			await throwIt(22, 132);
+			// Hold the last drag: the live arc and the landing ring are the mechanic. Leave the
+			// camera grazing — that is the full lob, and the lob is what bows the arc on screen.
+			await throwIt(12, 128, true);
+		},
 		// A fresh arena is four tiny home squares. Drive a full circle so the shot shows
 		// the trail closing and the captured patch that follows.
 		bolides: async () => {

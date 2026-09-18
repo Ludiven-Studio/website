@@ -1,0 +1,30 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
+---
+
+<GamePage
+	title="Pétanque | Jeux Ludiven Studio"
+	description="Pétanque 3D en tête-à-tête, 13 points : glisse pour doser ta boule, incline la caméra pour choisir ta portée, et compose avec le relief et les graviers du terrain."
+	heading="Pétanque"
+	tagline="Glisse pour doser, incline la caméra pour la portée — premier à 13"
+	gameId="petanque"
+>
+	<PetanqueGame client:only="react" gameId="petanque" />
+	<p class="pe-scanner">
+		Vous jouez pour de vrai ? <a href="/petanque-scanner/">Pétanque Scanner</a> mesure vos points au téléphone.
+	</p>
+</GamePage>
+
+<style>
+	.pe-scanner {
+		margin: 1.4rem auto 0;
+		text-align: center;
+		font-size: 0.9rem;
+		opacity: 0.7;
+	}
+	/* Fullscreen only hides .game-head and .game-foot, so this one has to opt out itself. */
+	:global(.game-page.gf-full) .pe-scanner {
+		display: none;
+	}
+</style>

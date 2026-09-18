@@ -48,10 +48,15 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number 
 	return Math.sqrt(dx * dx + dy * dy);
 };
 
-/** Keep the circle where a 6 m throw still fits on the pitch. Real play moves it back too. */
+/**
+ * Keep the circle where a legal throw still fits on the pitch. Real play moves it back too.
+ * The margin matters: clamping to exactly MIN_JACK leaves a single legal distance, so a hand
+ * placed jack would have nowhere to go.
+ */
+const ROOM = 1.5;
 export function nextCircle(jackY: number, dir: 1 | -1): number {
-	const lo = dir === 1 ? EDGE : EDGE + MIN_JACK;
-	const hi = dir === 1 ? PITCH_L - EDGE - MIN_JACK : PITCH_L - EDGE;
+	const lo = dir === 1 ? EDGE : EDGE + MIN_JACK + ROOM;
+	const hi = dir === 1 ? PITCH_L - EDGE - MIN_JACK - ROOM : PITCH_L - EDGE;
 	return jackY < lo ? lo : jackY > hi ? hi : jackY;
 }
 

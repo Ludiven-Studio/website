@@ -390,6 +390,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'petanque',
+		title: 'Pétanque',
+		pitch: 'Tête-à-tête en 13 points sur un vrai terrain 4×15 : glisse pour doser, incline la caméra pour choisir ta portée, et joue le relief, les graviers et les cailloux.',
+		icon: 'petanque',
+		href: '/jeux/petanque',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'drift',
 		title: 'Drift',
 		pitch: 'Course 3D multi sur circuit aléatoire : meilleur tour, drift auto, jusqu\'à 4 joueurs.',

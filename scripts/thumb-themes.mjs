@@ -60,6 +60,7 @@ export const THEMES = {
 	angry: 'a desert canyon with rickety wooden towers and a giant slingshot, warm sunset sky',
 	flechettes: 'a cosy pub corner, dartboard on a wooden wall, hanging lamps, warm amber light',
 	billard: 'a western saloon billiard room, green baize table, hanging lamp, wooden bar, warm amber light',
+	petanque: 'a sunny village boules pitch under plane trees, long strip of pale gravel edged with wooden planks, dappled shade, southern french square with a café terrace behind, warm afternoon light',
 
 	// Multiplayer
 	pong: 'a dark neon arcade room, glowing grid lines and a cyan centre stripe, retro CRT glow',
