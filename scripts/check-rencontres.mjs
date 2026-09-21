@@ -22,6 +22,7 @@ const BASE = `http://localhost:${PORT}`;
 const KEY = process.env.MEETUPS_ADMIN_KEY ?? '';
 const PLAYER_A = '00000000-0000-4000-8000-00000000a001';
 const PLAYER_B = '00000000-0000-4000-8000-00000000a002';
+const PLAYER_C = '00000000-0000-4000-8000-00000000a003';
 const OFF_MAP = { lat: 43.0, lng: -3.0 };
 
 const site = readFileSync(new URL('../src/data/site.ts', import.meta.url), 'utf8');
@@ -218,12 +219,30 @@ try {
 		await B.waitForSelector('.re-list', { timeout: 15000 });
 		await B.locator('.re-segbtn', { hasText: 'Tout' }).click();
 		check(!(await B.locator('.re-list').innerText()).includes('Guard'), 'une partie annulee sort de la carte');
+
+		// ---- 9. The purge must give the IP its quota back ----
+		// A create charges two counters, the player AND the IP. This guard runs from a
+		// real machine, so a purge that forgets the IP row bans that machine for the
+		// rest of the day — and the symptom is "refused, with an empty map", which
+		// reads as a server bug rather than as leftovers. It happened.
+		const quotaCreate = () => fn({
+			action: 'create_event', playerId: PLAYER_C, ...OFF_MAP,
+			startsAt: iso(3 * 86400e3), endsAt: iso(3 * 86400e3 + 3 * 3600e3),
+			format: 'doublette', playersNeeded: 4, roleNeeded: 'any',
+			organizerName: 'Guard', organizerSeats: 1,
+		});
+		let refused = false;
+		for (let i = 0; i < 8 && !refused; i++) refused = (await quotaCreate()).status === 429;
+		check(refused, 'le quota de creation finit par refuser');
+		await fn({ action: 'admin_purge_player', adminKey: KEY, targetPlayerId: PLAYER_C });
+		// Only the IP row can explain a refusal now: the player row was just dropped.
+		check((await quotaCreate()).ok, 'apres le nettoyage, une creation repasse');
 	}
 } catch (e) {
 	fail.push(`EXCEPTION ${e.message}`);
 } finally {
 	if (KEY) {
-		for (const p of [PLAYER_A, PLAYER_B]) {
+		for (const p of [PLAYER_A, PLAYER_B, PLAYER_C]) {
 			const r = await fn({ action: 'admin_purge_player', adminKey: KEY, targetPlayerId: p });
 			check(r.ok, `nettoyage de ${p}`);
 		}

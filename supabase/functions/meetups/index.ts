@@ -410,6 +410,11 @@ Deno.serve(async (req) => {
 				await db.from('meetup_events').delete().eq('organizer_id', body.targetPlayerId);
 				await db.from('meetup_spots').delete().eq('first_organizer', body.targetPlayerId).eq('source', 'user');
 				await db.from('meetup_quota').delete().eq('subject', body.targetPlayerId);
+				// Every create charged two counters, the player AND the IP. Clearing only the
+				// player leaves the guard's runs banning its own machine for the rest of the
+				// day, with an empty map as the only symptom. Same caller, same hash.
+				const purgeIp = await ipKey(req);
+				if (purgeIp) await db.from('meetup_quota').delete().eq('subject', purgeIp);
 				return json({ ok: true });
 			}
 
