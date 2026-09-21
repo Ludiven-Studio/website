@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import RencontresApp from '../components/rencontres/RencontresApp';
+// Leaflet's stylesheet is aggressively global (it styles bare .leaflet-* classes
+// and sets sizing on its container's children). Importing it from the page keeps
+// it out of the island's chunk, so it never ships to a page that has no map.
+import 'leaflet/dist/leaflet.css';
+import '../styles/rencontres.css';
+
+const title = 'Rencontres pétanque — trouve une partie près de chez toi | Ludiven Studio';
+const description = "La carte des parties de pétanque autour de Saint-Jean-de-Bournay et de l'Isère : qui joue, quand, et combien il manque de joueurs. Sans inscription.";
+---
+
+<BaseLayout title={title} description={description}>
+	<div class="wrapper">
+		<RencontresApp client:only="react" />
+	</div>
+</BaseLayout>

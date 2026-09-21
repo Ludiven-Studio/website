@@ -7,6 +7,9 @@ public/assets/jeux/raw/
 # supabase CLI local state + deno check lockfile (byproducts, not repo config)
 supabase/.temp/
 deno.lock
+# local copy of the function secrets, for the seed and the guard (node --env-file).
+# Not named .env*: that one is read at build time and has no business here.
+supabase/.secrets.env
 # generated types
 .astro/
 

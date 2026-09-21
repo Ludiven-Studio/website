@@ -58,9 +58,24 @@ export default defineConfig({
                 maximumFileSizeToCacheInBytes: 3_500_000,
                 runtimeCaching: [
                     {
+                        // OSM map tiles (/rencontres). MUST come before the image rule: tiles are
+                        // <img>, so they would otherwise land in ludiven-images and one pan (~30
+                        // tiles at z15) would evict the game art from a 150-entry cache.
+                        // The tile layer sets crossOrigin — without it these are opaque responses,
+                        // padded to ~7 MB each, which blows the origin quota and takes the precache
+                        // (i.e. every page) down with it.
+                        urlPattern: ({ url }) => url.hostname.endsWith('tile.openstreetmap.org'),
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'ludiven-tiles',
+                            expiration: { maxEntries: 250, maxAgeSeconds: 60 * 60 * 24 * 7, purgeOnQuotaError: true },
+                            cacheableResponse: { statuses: [0, 200] },
+                        },
+                    },
+                    {
                         // On-demand cache for images (game art, OG, backgrounds).
-                        // Same-origin only in practice; Supabase (other origin, JSON) never matches.
-                        urlPattern: ({ request }) => request.destination === 'image',
+                        // Same-origin only: a cross-origin <img> has no business evicting ours.
+                        urlPattern: ({ request, sameOrigin }) => sameOrigin && request.destination === 'image',
                         handler: 'StaleWhileRevalidate',
                         options: {
                             cacheName: 'ludiven-images',

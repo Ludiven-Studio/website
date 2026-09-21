@@ -47,6 +47,38 @@ import Hero from '../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
+			<h2>Carte des rencontres (pétanque)</h2>
+			<p>
+				La page <a href="/rencontres">Rencontres pétanque</a> fonctionne <strong>sans compte, sans
+				mail et sans mot de passe</strong>. Quand tu publies une partie ou que tu t'y inscris, sont
+				enregistrés chez Supabase&nbsp;: le <strong>prénom que tu saisis</strong> (c'est le seul
+				texte libre du service), le créneau, le format, le nombre de places, et la
+				<strong>position de l'épingle que tu poses sur la carte</strong> — celle du terrain, jamais
+				celle de ton appareil. Le même identifiant technique anonyme que pour les classements
+				rattache tes annonces à ton navigateur.
+			</p>
+			<p>
+				Pour limiter les abus sans compte, le site compte le nombre d'annonces et d'inscriptions par
+				jour et par visiteur. Ton adresse IP n'est <strong>jamais stockée</strong>&nbsp;: elle est
+				transformée en empreinte non réversible, mélangée à un secret connu du seul serveur. Sans ce
+				secret, l'empreinte ne peut pas être ramenée à une adresse.
+			</p>
+			<p>
+				Le bouton «&nbsp;autour de moi&nbsp;» demande ta position uniquement quand tu cliques
+				dessus. Elle sert à centrer la carte sur ton écran et <strong>n'est pas envoyée</strong>.
+				Les fonds de carte proviennent d'<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>
+				et le nom d'un terrain est retrouvé via leur service Nominatim, appelé par notre serveur et
+				non par ton navigateur.
+			</p>
+			<p>
+				Une partie terminée ou annulée disparaît de la carte immédiatement. Pour faire retirer une
+				annonce, un prénom ou une inscription, écris à
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>&nbsp;: c'est
+				supprimé sans justification à fournir.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
 			<h2>Données stockées sur ton appareil</h2>
 			<p>
 				Ta progression, tes favoris, tes préférences (thème, tutoriels déjà vus) et l'état de tes
@@ -69,8 +101,9 @@ import Hero from '../components/Hero.astro';
 			<h2>Destinataires et sous-traitants</h2>
 			<p>
 				Tes données ne sont ni vendues ni cédées. Elles sont uniquement traitées par nos
-				prestataires techniques&nbsp;: Supabase (base de données des scores, UE) et GitHub Pages
-				(hébergement du site).
+				prestataires techniques&nbsp;: Supabase (base de données des scores et des rencontres, UE),
+				GitHub Pages (hébergement du site) et la Fondation OpenStreetMap (fonds de carte et noms de
+				lieux de la page Rencontres).
 			</p>
 		</section>
 
