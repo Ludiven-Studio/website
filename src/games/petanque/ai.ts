@@ -198,6 +198,32 @@ export function planThrow(s: Sim, jack: Boule, state: Match13, side: Side, skill
 	return { intent, vx: v.vx, vy: v.vy, vz: v.vz, aim };
 }
 
+/* The player's jack spread. Aiming the jack is a choice, so it must cost something — but a jack
+   that misses the legal window drops into hand-placing, which is a worse game. ~0.22 m of lateral
+   sigma at 8 m, and about as much along the lane. */
+export const JACK_SPREAD_PLAYER = { ang: 0.028, spd: 0.015 };
+
+/**
+ * Throw the jack at `aim`. `spread` is the caller's error budget: the AI passes its skill band,
+ * the player a small fixed one. One code path, so both are covered by the same tests.
+ */
+export function jackThrow(
+	s: Sim, state: Match13, aim: { x: number; y: number },
+	spread: { ang: number; spd: number }, rng: number,
+): { vx: number; vy: number; vz: number; aim: { x: number; y: number } } {
+	const from = state.circle;
+	const dx = aim.x - from.x, dy = aim.y - from.y;
+	const len = Math.sqrt(dx * dx + dy * dy) || 1;
+	const dirX = dx / len, dirY = dy / len;
+	const elev = 0.5;
+
+	const ideal = solveSpeed(s, from, 0, dirX, dirY, len, elev, true);
+	const ang = spread.ang * gauss(rng + 5, s.t.seed);
+	const spd = ideal * (1 + spread.spd * gauss(rng + 1223, s.t.seed));
+	const v = throwVelocity(dirX - ang * dirY, dirY + ang * dirX, spd, elev);
+	return { ...v, aim };
+}
+
 /**
  * The jack throw. Aimed at the comfortable middle of the legal window, so a weak opponent still
  * misses it often enough for the hand-placing rule to come up.
@@ -207,17 +233,10 @@ export function planJack(s: Sim, state: Match13, skill: number, rng: number): { 
 	const from = state.circle;
 	const want = (MIN_JACK + MAX_JACK) / 2 + gauss(rng + 77, s.t.seed) * 0.6;
 	const lateral = gauss(rng + 313, s.t.seed) * 0.35;
-	const aim = { x: from.x + lateral, y: from.y + state.dir * want };
-	const dx = aim.x - from.x, dy = aim.y - from.y;
-	const len = Math.sqrt(dx * dx + dy * dy) || 1;
-	const dirX = dx / len, dirY = dy / len;
-	const elev = 0.5;
-
-	const ideal = solveSpeed(s, from, 0, dirX, dirY, len, elev, true);
-	const ang = (ANG_WORST + (ANG_BEST - ANG_WORST) * k) * 6 * gauss(rng + 5, s.t.seed);
-	const spd = ideal * (1 + (SPD_WORST + (SPD_BEST - SPD_WORST) * k) * 1.5 * gauss(rng + 1223, s.t.seed));
-	const v = throwVelocity(dirX - ang * dirY, dirY + ang * dirX, spd, elev);
-	return { ...v, aim };
+	return jackThrow(s, state, { x: from.x + lateral, y: from.y + state.dir * want }, {
+		ang: (ANG_WORST + (ANG_BEST - ANG_WORST) * k) * 6,
+		spd: (SPD_WORST + (SPD_BEST - SPD_WORST) * k) * 1.5,
+	}, rng);
 }
 
 /** Skill for a levels ladder position, 1-based. */

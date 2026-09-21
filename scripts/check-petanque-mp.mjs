@@ -89,8 +89,16 @@ const at = (p, fx, fy) => {
 
 /* One throw. The gauge is read BEFORE the release: a negated wait on `status !== 'rolling'` passes
    instantly on exactly the failure it should catch, so a dead drag would certify itself. */
+/* Middle of the throwing strip, asked of the page. The strip is clamped in px, so a fraction of the
+   canvas height is a guess that drifts off it on a tall canvas. */
+const armAt = async (page) => {
+	const box = boxes.get(page);
+	const arm = await page.evaluate(() => window.__petanque().arm);
+	return { x: box.x + box.width * 0.5, y: box.y + (arm.top + arm.height) / 2 };
+};
+
 async function throwOn(page, other) {
-	const s = at(page, 0.5, 0.8);
+	const s = await armAt(page);
 	await page.mouse.move(s.x, s.y);
 	await page.mouse.down();
 	await page.mouse.move(s.x, s.y - 130, { steps: 14 });
@@ -124,8 +132,19 @@ async function placeOn(page) {
 	const t = at(page, 0.5, 0.42);
 	await page.mouse.click(t.x, t.y);
 	await sleep(300);
-	await page.locator('.pe-placeok').click({ timeout: 5000 });
+	await page.getByRole('button', { name: /Poser ici/ }).click({ timeout: 5000 });
 	await sleep(800);
+}
+
+/* The jack is aimed with a ring and thrown with a button, so it never streams an aim — which is
+   why `aimSeen` below now means a real boule was watched being drawn back, not the jack. */
+async function throwJackOn(page) {
+	await page.getByRole('button', { name: /Lancer le bouchon/ }).click({ timeout: 6000 });
+	await page.waitForFunction(() => window.__petanque().status === 'rolling', null, { timeout: 5000 });
+	for (const p of [A, B]) {
+		await p.waitForFunction(() => window.__petanque().status !== 'rolling', null, { timeout: 45000 });
+	}
+	await sleep(900);
 }
 
 /** Every float both boards hold, in a form a string compare can judge. */
@@ -151,6 +170,12 @@ for (let step = 0; step < 40 && thrown < BOULES + 1; step++) {
 	if (a.status === 'placing') {
 		if ((await snap(page)).status === 'placing') await placeOn(page);
 		else await sleep(400);
+		continue;
+	}
+
+	if (a.match.phase === 'throw-jack') {
+		await throwJackOn(page);
+		thrown++;
 		continue;
 	}
 

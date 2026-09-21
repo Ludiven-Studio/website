@@ -296,22 +296,45 @@ const FPV_BACK = 0.35; // the first-person eye stands just behind the circle, no
  *
  * `walk` is how far up the lane the player has stepped to read the head, and it deliberately does
  * NOT touch `pitch`: pitch is the loft control, so walking up to look must never change the throw.
- * `fpv` stands the eye up at head height instead of floating it behind the shoulder — it keeps a
+ * `walkDir` is the ground axis the feet travel along; it defaults to the yaw heading so every call
+ * that omits it is unchanged. The zoom passes the circle-to-head axis instead, because a yaw swung
+ * to its limit leaves metres of lateral error at 8 m and the end-of-travel distance would not be
+ * `ZOOM_DIST` any more.
+ * `fpv` stands the eye up at `eyeH` instead of floating it behind the shoulder — it keeps a
  * reduced shoulder offset on purpose, because an eye exactly on the throw line flattens the arc to
  * a straight segment and hides the whole mechanic (measurement J).
  *
  * The caller aims the look direction itself, so no lookAt here.
  */
-export function aimCamera(cam: THREE.PerspectiveCamera, circle: { x: number; y: number }, dir: 1 | -1, pitch: number, yaw: number, dist: number, ground: number, walk = 0, fpv = false): void {
+export function aimCamera(cam: THREE.PerspectiveCamera, circle: { x: number; y: number }, dir: 1 | -1, pitch: number, yaw: number, dist: number, ground: number, walk = 0, fpv = false, walkDir?: { x: number; y: number }, eyeH = EYE_H): void {
 	const fx = Math.sin(yaw) * dir, fz = Math.cos(yaw) * dir; // forward, in engine axes
+	const wxd = walkDir ? walkDir.x : fx, wzd = walkDir ? walkDir.y : fz;
 	const back = fpv ? FPV_BACK : dist * Math.cos(pitch);
 	const side = fpv ? SHOULDER * 0.55 : SHOULDER;
-	const up = fpv ? EYE_H : 0.35 + dist * Math.sin(pitch);
+	const up = fpv ? eyeH : 0.35 + dist * Math.sin(pitch);
 	cam.position.set(
-		wx(circle.x) + fx * (walk - back) + fz * side,
+		wx(circle.x) + wxd * walk - fx * back + fz * side,
 		ground + up,
-		wz(circle.y) + fz * (walk - back) - fx * side,
+		wz(circle.y) + wzd * walk - fz * back - fx * side,
 	);
+}
+
+/* ---------- zoom ---------- */
+
+/* Measured in a 620x388 canvas — the page everyone lands on, NOT fullscreen: a boule 8 m out is
+   4.9 px across. Readability is `BOULE_R / tan(vfov/2) * H / m`, so the fix has to move both
+   terms. Walking to 1.5 m carries 5.3x, narrowing to 26 deg carries the rest.
+   `ZOOM_EYE` is the other half of it: the eye height is part of the distance, and a standing
+   1.58 m eye 1.5 m out is really 2.15 m from the boule. The player crouches instead. */
+export const ZOOM_DIST = 1.5; // m of ground between the eye and the head at full zoom
+export const ZOOM_EYE = 0.95; // m — crouched
+/* A chosen stop, not an aspect conversion, so it deliberately sits below VFOV_MIN and never goes
+   through verticalFov(). Lowering VFOV_MIN instead would narrow the Tete view too. */
+export const ZOOM_VFOV = 26;
+
+/** How far the feet travel for a zoom of `t`, so that at `t = 1` the eye sits `ZOOM_DIST` out. */
+export function zoomWalk(reach: number, t: number): number {
+	return Math.max(0, reach - ZOOM_DIST + FPV_BACK) * t;
 }
 
 /* ---------- field of view ---------- */
@@ -336,6 +359,13 @@ export function haloRadius(dist: number, fovDeg: number, perM: number, minR: num
 	const k = Math.tan((fovDeg * Math.PI) / 360) / HALO_REF_TAN;
 	return Math.max(minR, dist * perM) * k;
 }
+
+/* The floor is the one term the fov division above does NOT reach: `minR` is already in world
+   metres, so a floored halo keeps a fixed size while the boule it rings grows as 1/tan(fov/2).
+   At full zoom that put the ring inside the boule. Scale the floor the same way, and it holds its
+   apparent size at every field. */
+export const haloFloorFor = (minR: number, fovDeg: number): number =>
+	(minR * HALO_REF_TAN) / Math.tan((fovDeg * Math.PI) / 360);
 
 /* ---------- inspection cameras ---------- */
 

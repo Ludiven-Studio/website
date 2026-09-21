@@ -49,7 +49,9 @@ check(start.match.turn === 0, 'the course never hands the turn to the AI');
 // Not fullscreen here: the canvas runs past the fold, and a drag aimed below it hits nothing.
 await page.locator('.pe-canvas').scrollIntoViewIfNeeded();
 const box = await page.locator('.pe-canvas').boundingBox();
-const cx = box.x + box.width * 0.5, cy = box.y + box.height * 0.8;
+// The strip is clamped in px, so its top is asked for rather than guessed as a share of the height.
+const arm = await page.evaluate(() => window.__petanque().arm);
+const cx = box.x + box.width * 0.5, cy = box.y + (arm.top + arm.height) / 2;
 
 /** Drag up for power, sideways for direction, release — the player's own gesture. */
 async function throwIt(dx, dyUp) {

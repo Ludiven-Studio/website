@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { makeTerrain, SURFACES, type SurfaceId } from './terrain';
 import { makeBoule, makeJack, place, settle, cloneSim, throwVelocity, type Sim, type Boule } from './engine';
-import { initMatch13, type Match13 } from './rules13';
+import { initMatch13, jackCheck, MIN_JACK, MAX_JACK, type Match13 } from './rules13';
 import {
-	planThrow, planJack, solveSpeed, launch, laneBlocked, decide, skillForLevel,
-	MIN_SKILL, MAX_SKILL,
+	planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, solveSpeed, launch, laneBlocked, decide,
+	skillForLevel, MIN_SKILL, MAX_SKILL,
 } from './ai';
 
 const board = (id: SurfaceId = 'terre-battue', amp = 0.02): Sim =>
@@ -174,5 +174,70 @@ describe('the jack throw', () => {
 		};
 		expect(rate(MAX_SKILL)).toBeGreaterThan(0.8);
 		expect(rate(MIN_SKILL)).toBeLessThan(rate(MAX_SKILL));
+	});
+
+	/* The player now picks the spot and the jack is THROWN at it. That only reads as a choice if the
+	   jack actually turns up there, and only stays a gamble if it does not turn up exactly there. */
+	it('goes where the player pointed, with a spread that still costs something', () => {
+		/* Swept, not sampled. The browser guard can only ever throw ONE jack, so the claim that the
+		   ring is honoured has to be a distribution and it has to live here. Both ends of the legal
+		   window and the roughest relief are in, because the whole miss is bounce, not aim. */
+		const miss: number[] = [];
+		for (const id of ['terre-battue', 'gravier-gros', 'sable'] as SurfaceId[]) {
+			for (const amp of [0.02, 0.12]) {
+				for (const want of [6.2, 8, 9.8]) {
+					for (let k = 0; k < 12; k++) {
+						const s = board(id, amp);
+						const m = state({ phase: 'throw-jack' });
+						const aim = { x: m.circle.x, y: m.circle.y + m.dir * want };
+						const j = launch(s, m.circle, 0, jackThrow(s, m, aim, JACK_SPREAD_PLAYER, k * 7 + 3), true);
+						s.bs.push(j);
+						settle(s, undefined, 30);
+						miss.push(dist(aim, j));
+					}
+				}
+			}
+		}
+		miss.sort((a, b) => a - b);
+		const mean = miss.reduce((a, b) => a + b, 0) / miss.length;
+		expect(mean).toBeLessThan(0.6); // the spot is the throw, not a suggestion
+		expect(miss[Math.floor(miss.length * 0.95)]).toBeLessThan(1.2); // 19 jacks in 20 land on the ring
+		expect(miss[miss.length - 1]).toBeGreaterThan(0.1); // and never a free placement
+	});
+
+	/* The ring may only offer spots the throw can reach. The UI clamps the aim to MIN+0.5 / MAX-1.0,
+	   asymmetric because a speed error stretches outwards; at the raw edges the far one missed the
+	   window 48 % of the time, which turned "choose your spot" into a coin flip for hand placing.
+	   These are the two numbers that margin was cut from, so they belong in a test. */
+	it('keeps the aimable window inside what the throw can hit', () => {
+		const rate = (want: number): number => {
+			let out = 0, n = 0;
+			for (const id of ['terre-battue', 'gravier-gros', 'sable'] as SurfaceId[]) {
+				for (const amp of [0.02, 0.14]) {
+					for (let k = 0; k < 20; k++) {
+						const s = board(id, amp);
+						const m = state({ phase: 'throw-jack' });
+						const aim = { x: m.circle.x, y: m.circle.y + m.dir * want };
+						const j = launch(s, m.circle, 0, jackThrow(s, m, aim, JACK_SPREAD_PLAYER, k * 7 + 3), true);
+						s.bs.push(j);
+						settle(s, undefined, 30);
+						n++;
+						if (jackCheck(m.circle, j) !== 'ok') out++;
+					}
+				}
+			}
+			return out / n;
+		};
+		expect(rate(MIN_JACK + 0.5)).toBeLessThan(0.05); // the near end of the ring
+		expect(rate(MAX_JACK - 1.0)).toBeLessThan(0.05); // and the far one
+		expect(rate(MAX_JACK - 0.15)).toBeGreaterThan(0.1); // the raw edge really is the trap
+	});
+
+	it('is the one code path the AI uses, so the AI jack is unchanged', () => {
+		const s = board();
+		const m = state({ phase: 'throw-jack' });
+		expect(planJack(s, m, 0.7, 5)).toEqual(planJack(s, m, 0.7, 5));
+		const aim = planJack(s, m, 0.7, 5).aim;
+		expect(jackThrow(s, m, aim, { ang: 0, spd: 0 }, 5).aim).toEqual(aim);
 	});
 });

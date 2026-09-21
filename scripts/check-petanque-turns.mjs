@@ -47,7 +47,11 @@ await sleep(1200);
 
 const state = () => page.evaluate(() => window.__petanque());
 const box = await page.locator('.pe-canvas').boundingBox();
-const cx = box.x + box.width * 0.5, cy = box.y + box.height * 0.8;
+const cx = box.x + box.width * 0.5;
+/* Middle of the throwing strip, read off the game. The strip is clamped in px (90-170), so a fixed
+   fraction of the canvas height drifts out of it on a tall canvas and the drag lands on nothing. */
+const arm = await page.evaluate(() => window.__petanque().arm);
+const cy = box.y + (arm.top + arm.height) / 2;
 
 const near = (a, b) => Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 /** The side holding the point, from the ground alone — null when nothing is down yet. */
@@ -84,8 +88,17 @@ async function humanThrow() {
 async function placeJack() {
 	await page.mouse.click(cx, box.y + box.height * 0.42);
 	await sleep(250);
-	await page.locator('.pe-placeok').click({ timeout: 4000 });
+	await page.getByRole('button', { name: /Poser ici/ }).click({ timeout: 4000 });
 	await sleep(400);
+}
+
+/* The jack is aimed with a ring from the top view and thrown with a button — the strip is inert in
+   that phase, so a drag here would sit there for ever and the end would never start. */
+async function throwJack() {
+	await page.getByRole('button', { name: /Lancer le bouchon/ }).click({ timeout: 6000 });
+	await page.waitForFunction(() => window.__petanque().status === 'rolling', null, { timeout: 4000 });
+	await page.waitForFunction(() => window.__petanque().status !== 'rolling', null, { timeout: 40000 });
+	await sleep(350);
 }
 
 let overflow = null; // first side seen with too many boules down
@@ -100,6 +113,10 @@ for (let step = 0; step < 60; step++) {
 	if (s.status === 'rolling') { await sleep(250); continue; }
 	if (s.status === 'placing') {
 		if (s.match.turn === 0) await placeJack(); else await sleep(300);
+		continue;
+	}
+	if (s.status === 'aim' && s.match.phase === 'throw-jack') {
+		if (s.match.turn === 0) await throwJack(); else await sleep(300);
 		continue;
 	}
 	// Once the player is locked out, stop throwing but keep watching: the end still has to finish

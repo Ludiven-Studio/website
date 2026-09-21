@@ -12,6 +12,10 @@ import { resolve } from 'node:path';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // A phone is the case that hurts: a tall canvas spends its field on sky, not on the head.
 const PORTRAIT = process.argv.includes('--portrait');
+/* Fullscreen is the BEST case: 760 px of canvas. The page everyone actually lands on is
+   `.pe-root` capped at 620 px wide with a 16/10 wrap, so the canvas is 620x388 — 1.5x smaller,
+   and every px figure taken in fullscreen reads that much too optimistic. Measure here. */
+const WINDOWED = process.argv.includes('--windowed');
 const VP = PORTRAIT ? { width: 390, height: 844 } : { width: 1000, height: 760 };
 const PORT = 4370;
 const base = `http://localhost:${PORT}`;
@@ -29,16 +33,23 @@ try { await page.locator('.tuto-close').click({ timeout: 2500 }); } catch {}
 await page.waitForFunction(() => window.__petanque && window.__petanque().status === 'aim', null, { timeout: 15000 });
 await page.getByRole('tab', { name: /Libre/ }).click();
 await sleep(700);
-await page.evaluate(() => {
-	document.querySelector('.game-page')?.classList.add('gf-full');
-	document.documentElement.classList.add('gf-full');
-	window.dispatchEvent(new Event('resize'));
-});
+if (!WINDOWED) {
+	await page.evaluate(() => {
+		document.querySelector('.game-page')?.classList.add('gf-full');
+		document.documentElement.classList.add('gf-full');
+		window.dispatchEvent(new Event('resize'));
+	});
+}
 await sleep(1500);
 
 const state = () => page.evaluate(() => window.__petanque());
+await page.locator('.pe-canvas').scrollIntoViewIfNeeded();
 const box = await page.locator('.pe-canvas').boundingBox();
-const cx = box.x + box.width * 0.5, cy = box.y + box.height * 0.8;
+console.log(`canvas ${Math.round(box.width)}x${Math.round(box.height)}${WINDOWED ? ' (windowed)' : ' (fullscreen)'}`);
+// Middle of the throwing strip, asked of the game: it is clamped in px, so a fixed share of the
+// canvas height drifts off it between the two viewports.
+const arm = await page.evaluate(() => window.__petanque().arm);
+const cx = box.x + box.width * 0.5, cy = box.y + arm.top + (box.height - arm.top) * 0.45;
 const H = box.height;
 
 async function throwOne() {
@@ -52,10 +63,20 @@ async function throwOne() {
 	await sleep(400);
 }
 
+/* The jack is aimed with a ring and thrown with a button — the strip is inert in that phase, so a
+   drag here would sit there until the wait for `rolling` timed out. */
+async function throwJack() {
+	await page.getByRole('button', { name: /Lancer le bouchon/ }).click({ timeout: 6000 });
+	await page.waitForFunction(() => window.__petanque().status === 'rolling', null, { timeout: 4000 });
+	await page.waitForFunction(() => window.__petanque().status !== 'rolling', null, { timeout: 40000 });
+	await sleep(400);
+}
+
 // Jack, then boules until both sides have something down.
 for (let i = 0; i < 12; i++) {
 	const s = await state();
 	if (s.status !== 'aim' || s.match.turn !== 0) { await sleep(300); continue; }
+	if (s.match.phase === 'throw-jack') { await throwJack(); continue; }
 	if (s.bs.filter((b) => b.side >= 0).length >= 3) break;
 	await throwOne();
 }
@@ -97,8 +118,11 @@ const toView = (i) => page.locator('.pe-view').nth(i).click(); // labels drop un
 
 await toView(0);
 await report('jeu, circle');
-for (let i = 0; i < 4; i++) { await page.keyboard.press('w'); await sleep(120); }
-await report('jeu, +6 m');
+// All the way to the stop, and wait out the ease: the field and the walk are both first-order, so
+// a fixed number of key presses used to sample the middle of the animation.
+for (let i = 0; i < 8; i++) { await page.keyboard.press('w'); await sleep(120); }
+await page.waitForFunction(() => window.__petanque().zoomView > 0.98, null, { timeout: 8000 }).catch(() => {});
+await report('jeu, full zoom');
 await page.keyboard.press('c');
 await toView(1);
 await report('head view');
