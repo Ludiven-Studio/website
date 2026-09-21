@@ -153,7 +153,13 @@ export default function MeetupMap({
 		markers.current.clear();
 		for (const e of events) {
 			const m = L.marker([e.lat, e.lng], { icon: ICONS.event, title: e.label || 'Terrain' })
-				.on('click', () => cb.current.onSelect(e.id))
+				// Same rule as the terrains above, and the case that made it necessary:
+				// a marker over the pin you were aiming for opened its event, which
+				// closed the half-filled form without a word.
+				.on('click', () => {
+					if (cb.current.picking) cb.current.onPick(e.lat, e.lng);
+					else cb.current.onSelect(e.id);
+				})
 				.on('mouseover', () => cb.current.onHover(e.id))
 				.on('mouseout', () => cb.current.onHover(null))
 				.addTo(layer);

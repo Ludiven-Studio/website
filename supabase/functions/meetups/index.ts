@@ -80,7 +80,13 @@ const parisDay = (d: Date = new Date()): string =>
 	new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' })
 		.format(d);
 
-const CREATE_CAP = 3;
+/** Open, not-yet-finished games one organizer may have on the map at once.
+ *  A standing limit, not a daily one: posting and deleting three used to lock
+ *  the day out with nothing to show for it. Deleting frees a slot at once. */
+const MAX_ACTIVE_EVENTS = 3;
+/** Daily creates per IP. Only a flood guard now, so it sits well above what one
+ *  person does: three active games each for a household on one connection. */
+const CREATE_IP_CAP = 12;
 const JOIN_CAP = 20;
 
 const ADMIN_KEY = Deno.env.get('MEETUPS_ADMIN_KEY') ?? '';
@@ -108,14 +114,17 @@ async function ipKey(req: Request): Promise<string | null> {
 
 /** Count one action for the player AND for the IP. Both must stay under the cap:
  *  a shared café wifi is the case the player counter alone would miss, and a
- *  cleared localStorage is the case the IP counter alone would miss. */
+ *  cleared localStorage is the case the IP counter alone would miss.
+ *  Creates skip the player counter — MAX_ACTIVE_EVENTS is their real limit, and
+ *  a second daily one on top would just be the old lockout under another name. */
 async function overQuota(
 	db: SupabaseClient, req: Request, playerId: string, kind: 'creates' | 'joins',
 ): Promise<boolean> {
 	const day = parisDay();
-	const cap = kind === 'creates' ? CREATE_CAP : JOIN_CAP;
-	const args = kind === 'creates' ? { p_creates: 1, p_joins: 0 } : { p_creates: 0, p_joins: 1 };
-	const subjects: [string, string][] = [['player', playerId]];
+	const creates = kind === 'creates';
+	const cap = creates ? CREATE_IP_CAP : JOIN_CAP;
+	const args = creates ? { p_creates: 1, p_joins: 0 } : { p_creates: 0, p_joins: 1 };
+	const subjects: [string, string][] = creates ? [] : [['player', playerId]];
 	const ip = await ipKey(req);
 	if (ip) subjects.push(['ip', ip]);
 	for (const [k, subject] of subjects) {
@@ -123,6 +132,15 @@ async function overQuota(
 		if (typeof data === 'number' && data > cap) return true;
 	}
 	return false;
+}
+
+/** Games this organizer still has running. `status` alone is not enough: a game
+ *  that has finished is over whether or not anyone cancelled it. */
+async function activeEvents(db: SupabaseClient, playerId: string, nowIso: string): Promise<number> {
+	const { count } = await db.from('meetup_events')
+		.select('id', { count: 'exact', head: true })
+		.eq('organizer_id', playerId).eq('status', 'open').gte('ends_at', nowIso);
+	return count ?? 0;
 }
 
 // ---- reads ----
@@ -257,6 +275,30 @@ Deno.serve(async (req) => {
 				return json({ event: shapeEvent(data as Record<string, unknown>), signups: signups ?? [], isOrganizer });
 			}
 
+			// « Mes parties ». Ownership is the secret, as everywhere else — organizer_id
+			// would list someone else's games to anyone who copied their playerId.
+			// Cancelled and finished games are returned too: a list that hides them
+			// cannot explain why a slot is free, or let you reopen the link you shared.
+			case 'my_events': {
+				const items = Array.isArray(body.items) ? body.items : [];
+				const pairs = (items as Record<string, unknown>[])
+					// Secrets are uuid-shaped by construction, and checking that is also what
+					// makes them safe to splice into the filter below.
+					.filter((p) => isUuid(p?.eventId) && isUuid(p?.secret))
+					.slice(0, 40);
+				let events: Record<string, unknown>[] = [];
+				if (pairs.length) {
+					const filter = pairs.map((p) => `and(id.eq.${p.eventId},secret.eq.${p.secret})`).join(',');
+					const { data, error } = await db.from('meetup_events').select(EMBED).or(filter).order('starts_at');
+					if (error) throw error;
+					events = (data ?? []).map((r) => shapeEvent(r as Record<string, unknown>));
+				}
+				// Counted by organizer, not off the list above: those two differ once a
+				// secret is lost, and the number that decides the cap is this one.
+				const active = isUuid(body.playerId) ? await activeEvents(db, body.playerId, nowIso) : 0;
+				return json({ events, active, max: MAX_ACTIVE_EVENTS });
+			}
+
 			case 'create_event': {
 				if (!isUuid(body.playerId)) return bad('bad playerId');
 				const slotError = validateSlot(body.startsAt, body.endsAt, nowMs);
@@ -275,6 +317,9 @@ Deno.serve(async (req) => {
 				const freePin = !isUuid(body.spotId);
 				if (freePin && !isPlausibleFr(lat, lng)) return bad('Position hors zone.');
 
+				if (await activeEvents(db, body.playerId, nowIso) >= MAX_ACTIVE_EVENTS) {
+					return bad(`Tu as déjà ${MAX_ACTIVE_EVENTS} parties en ligne. Supprimes-en une dans « Mes parties ».`, 429);
+				}
 				// Charged once, after validation and before any write, so a typo
 				// never costs a slot and a rejected flood still does.
 				if (await overQuota(db, req, body.playerId, 'creates')) {
@@ -332,6 +377,23 @@ Deno.serve(async (req) => {
 					patch.players_needed = body.playersNeeded;
 				}
 				const { error } = await db.from('meetup_events').update(patch).eq('id', body.eventId);
+				if (error) throw error;
+				return json({ ok: true });
+			}
+
+			// The other half of cancel: with nobody signed up there is no link anyone
+			// holds and no one to tell, so the row goes for good rather than sitting in
+			// the organizer's list forever. The signup check is the whole gate, and it
+			// is made here and not in the client — the client can be lied to.
+			case 'delete_event': {
+				if (!isUuid(body.eventId) || typeof body.secret !== 'string') return bad('bad request');
+				const { data: own } = await db.from('meetup_events')
+					.select('id').eq('id', body.eventId).eq('secret', body.secret).maybeSingle();
+				if (!own) return bad('forbidden', 403);
+				const { count } = await db.from('meetup_signups')
+					.select('id', { count: 'exact', head: true }).eq('event_id', body.eventId);
+				if ((count ?? 0) > 0) return bad('Des joueurs sont inscrits : annule la partie plutôt que de la supprimer.', 409);
+				const { error } = await db.from('meetup_events').delete().eq('id', body.eventId);
 				if (error) throw error;
 				return json({ ok: true });
 			}

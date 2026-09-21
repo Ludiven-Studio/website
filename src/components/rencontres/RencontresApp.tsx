@@ -2,15 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { playerId } from '../../lib/scores';
 import { trackEvent } from '../../lib/analytics';
 import {
-	listMeetups, getMeetup, createMeetup, updateMeetup, cancelMeetup, joinMeetup, leaveMeetup,
-	meetupsEnabled, rememberSecret, secretFor, savedName, saveName,
+	listMeetups, getMeetup, createMeetup, updateMeetup, cancelMeetup, deleteMeetup, joinMeetup, leaveMeetup,
+	myMeetups, meetupsEnabled, rememberSecret, secretFor, forgetSecret, savedName, saveName,
 } from '../../lib/meetups';
 import {
 	applyFilters, DATE_LABEL, DEFAULT_FILTERS,
 	type DateFilter, type Filters, type RoleFilter,
 } from '../../lib/meetupFilters';
 import {
-	FORMAT_LABEL, ROLE_LABEL, seatsLeft, validateSignup,
+	FORMAT_LABEL, MAX_ACTIVE_EVENTS, ROLE_LABEL, seatsLeft, validateSignup,
 	type MeetupEvent, type MeetupSignup, type MeetupSpot, type Role,
 } from '../../lib/meetupRules';
 import {
@@ -22,6 +22,7 @@ import { distanceM, formatDistance, isPlausibleFr, nearest } from '../../lib/mee
 import MeetupMap, { type MapHandle } from './MeetupMap';
 import CreateForm, { type Draft } from './CreateForm';
 import EventPanel from './EventPanel';
+import MyGames from './MyGames';
 import { formatShortDay, formatTime } from './format';
 
 const DATES: DateFilter[] = ['today', 'weekend', 'week', 'all'];
@@ -69,6 +70,8 @@ export default function RencontresApp() {
 	const [places, setPlaces] = useState<Place[]>([]);
 	const [naming, setNaming] = useState<string | null>(null); // the draft name, while adding a place
 	const [pinning, setPinning] = useState(false);
+	const [mine, setMine] = useState<MeetupEvent[]>([]);
+	const [cap, setCap] = useState({ active: 0, max: MAX_ACTIVE_EVENTS });
 	const mapRef = useRef<MapHandle>(null);
 	const okRef = useRef<HTMLDivElement>(null);
 	// The map is the page, so the icon must open the map — not whatever game card
@@ -81,6 +84,16 @@ export default function RencontresApp() {
 		setSpots(r.spots);
 		return r.events;
 	}, []);
+
+	/** Never fatal: « Mes parties » is a convenience, and the map has to open even
+	 *  when a stored secret points at a game that no longer exists. */
+	const loadMine = useCallback(async () => {
+		try {
+			const r = await myMeetups(pid);
+			setMine(r.events);
+			setCap({ active: r.active, max: r.max });
+		} catch { /* keep the last list */ }
+	}, [pid]);
 
 	const openEvent = useCallback(async (id: string, fromUrl?: string | null) => {
 		const secret = secretFor(id, fromUrl);
@@ -112,16 +125,18 @@ export default function RencontresApp() {
 			} finally {
 				setLoading(false);
 			}
+			await loadMine();
 			if (wanted) await openEvent(wanted, url.get('k'));
 		})();
-	}, [load, openEvent]);
+	}, [load, loadMine, openEvent]);
 
 	/** After any write: the list and the open card must agree, or the seat counter
 	 *  on the map contradicts the one in the panel. */
 	const refresh = useCallback(async (eventId: string) => {
 		await load();
+		await loadMine();
 		await openEvent(eventId);
-	}, [load, openEvent]);
+	}, [load, loadMine, openEvent]);
 
 	const closeEvent = useCallback(() => {
 		setDetail(null);
@@ -131,9 +146,13 @@ export default function RencontresApp() {
 		setUrl(null);
 	}, []);
 
-	/** Proof of ownership. The ?k= link wins so a cleared browser can still get back in. */
-	const secretOf = (eventId: string): string | undefined =>
-		secretFor(eventId, new URLSearchParams(window.location.search).get('k'));
+	/** Proof of ownership. The ?k= link wins so a cleared browser can still get back
+	 *  in — but only for the event the link names. « Mes parties » asks about rows the
+	 *  URL says nothing about, and handing them the open card's key is a silent 403. */
+	const secretOf = (eventId: string): string | undefined => {
+		const q = new URLSearchParams(window.location.search);
+		return secretFor(eventId, q.get('e') === eventId ? q.get('k') : null);
+	};
 
 	const run = useCallback(async (fn: () => Promise<void>) => {
 		setBusy(true);
@@ -205,6 +224,45 @@ export default function RencontresApp() {
 		});
 	}, [detail, refresh, run]);
 
+	/* Same button, two outcomes, and the row's label says which: with nobody signed
+	   up the game leaves for good, otherwise it is cancelled so the link can still
+	   tell the players it is off. The seat count decides here AND on the server —
+	   this one only picks the wording, a stale count gets a 409 back. */
+	const onRemoveMine = useCallback((e: MeetupEvent) => {
+		const secret = secretOf(e.id);
+		if (!secret) { setError('Lien d\'organisateur manquant.'); return; }
+		const joined = e.seats_taken - e.organizer_seats;
+		const ask = joined > 0
+			? `Annuler cette partie ? ${joined} joueur(s) inscrit(s) : le lien restera en ligne pour les prévenir.`
+			: 'Supprimer cette partie ? Personne n\'est inscrit, elle disparaîtra pour de bon.';
+		if (!window.confirm(ask)) return;
+		void run(async () => {
+			if (joined > 0) {
+				await cancelMeetup(e.id, secret);
+				trackEvent('meetup_cancel');
+			} else {
+				await deleteMeetup(e.id, secret);
+				forgetSecret(e.id);
+				trackEvent('meetup_delete');
+			}
+			if (detail?.event.id === e.id && joined === 0) closeEvent();
+			await load();
+			await loadMine();
+			setFlash(joined > 0 ? 'Partie annulée.' : 'Partie supprimée.');
+		});
+	}, [closeEvent, detail, load, loadMine, run]);
+
+	/** Only forgets the secret. The game stays up — this is the exit for a finished
+	 *  one whose signups keep it from being deleted. */
+	const onForgetMine = useCallback((id: string) => {
+		forgetSecret(id);
+		setMine((list) => list.filter((e) => e.id !== id));
+	}, []);
+
+	const onEditMine = useCallback((id: string) => {
+		void (async () => { await openEvent(id); setEditing(true); })();
+	}, [openEvent]);
+
 	/** `at` = a known terrain the player clicked, so posting there is one tap and the
 	 *  pin lands exactly on the spot instead of near it. */
 	const startCreate = useCallback((at?: { lat: number; lng: number }) => {
@@ -231,9 +289,10 @@ export default function RencontresApp() {
 			setPin(null);
 			setCreated(r);
 			await load();
+			await loadMine();
 			await openEvent(r.id, r.secret);
 		});
-	}, [load, openEvent, pid, pin, run]);
+	}, [load, loadMine, openEvent, pid, pin, run]);
 
 	// Button only, never on load (spec §8): a map that asks for your position the
 	// second it opens reads as a tracker, and the answer is usually "block".
@@ -317,6 +376,12 @@ export default function RencontresApp() {
 	useEffect(() => {
 		if (created || flash || panelError) okRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}, [created, flash, panelError]);
+
+	/* « Modifier » is clicked from a list that can sit a screen away from the form
+	   it opens, which is the same trap as the banner above: a form nobody sees. */
+	useEffect(() => {
+		if (editing) okRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}, [editing]);
 
 	if (!meetupsEnabled()) return <p className="re-empty">Le service n'est pas disponible.</p>;
 
@@ -451,6 +516,21 @@ export default function RencontresApp() {
 					Tu joues à plusieurs endroits&nbsp;? Centre la carte sur l'un d'eux et enregistre-le.
 					Les distances partiront de tes lieux, pas d'un seul.
 				</p>
+			)}
+
+			{/* Above the map on purpose: the cap is spent from the button right above,
+			    and « 3 / 3 en ligne » is the only thing that explains the refusal. */}
+			{mine.length > 0 && (
+				<MyGames
+					events={mine}
+					active={cap.active}
+					max={cap.max}
+					busy={busy}
+					onOpen={(id) => { void openEvent(id); }}
+					onEdit={onEditMine}
+					onRemove={onRemoveMine}
+					onForget={onForgetMine}
+				/>
 			)}
 
 			{creating && !pin && (

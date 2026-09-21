@@ -3,6 +3,7 @@
 // to them — deliberately, because meetup_events carries the organizer `secret`.
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../data/site';
+import { MAX_ACTIVE_EVENTS } from './meetupRules';
 import type { Format, MeetupEvent, MeetupSignup, MeetupSpot, Role } from './meetupRules';
 
 export const meetupsEnabled = (): boolean => Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
@@ -54,6 +55,11 @@ export const updateMeetup = (eventId: string, secret: string, patch: Partial<Eve
 export const cancelMeetup = (eventId: string, secret: string): Promise<{ ok: true }> =>
 	call('cancel_event', { eventId, secret });
 
+/** Refused with 409 once anyone has signed up — cancel then, so the link keeps
+ *  telling them the game is off. */
+export const deleteMeetup = (eventId: string, secret: string): Promise<{ ok: true }> =>
+	call('delete_event', { eventId, secret });
+
 export const joinMeetup = (eventId: string, playerId: string, playerName: string, seats: number, role: Role): Promise<{ ok: true }> =>
 	call('join', { eventId, playerId, playerName, seats, role });
 
@@ -78,6 +84,22 @@ export const rememberSecret = (eventId: string, secret: string): void => {
 /** The ?k= in the URL wins: it is how a cleared browser gets back in. */
 export const secretFor = (eventId: string, fromUrl?: string | null): string | undefined =>
 	fromUrl || readSecrets()[eventId];
+
+export const forgetSecret = (eventId: string): void => {
+	try {
+		const { [eventId]: _gone, ...rest } = readSecrets();
+		localStorage.setItem(SECRETS_KEY, JSON.stringify(rest));
+	} catch { /* private mode */ }
+};
+
+/** « Mes parties ». The device is the only place that knows which games are mine,
+ *  so the list is a lookup by secret — the server never indexes by browser. */
+export const myMeetups = async (playerId: string): Promise<{ events: MeetupEvent[]; active: number; max: number }> => {
+	const items = Object.entries(readSecrets()).map(([eventId, secret]) => ({ eventId, secret }));
+	// Nothing to look up and nothing to show: skip the round trip on every first visit.
+	if (!items.length) return { events: [], active: 0, max: MAX_ACTIVE_EVENTS };
+	return call('my_events', { playerId, items });
+};
 
 export const savedName = (): string => {
 	try { return localStorage.getItem(NAME_KEY) ?? ''; } catch { return ''; }

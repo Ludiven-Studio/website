@@ -31,6 +31,9 @@ const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${what}`); i
 const uuid = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const iso = (msAhead) => new Date(Date.now() + msAhead).toISOString();
 
+// Mirror of MAX_ACTIVE_EVENTS. The cap is a standing one: deleting frees a slot.
+const MAX_ACTIVE = 3;
+
 // ---- the fake meetups function ----
 
 const S1 = uuid(101);
@@ -71,6 +74,11 @@ const makeBackend = () => {
 
 	const handle = (b) => {
 		const find = () => state.events.find((e) => e.id === b.eventId);
+		// Mine = the ones this browser holds a secret for, which is also how the real
+		// function counts, minus the organizer_id fallback it has and this has not.
+		const activeMine = () => state.events.filter(
+			(e) => state.secrets[e.id] && e.status === 'open' && Date.parse(e.ends_at) >= Date.now(),
+		).length;
 		switch (b.action) {
 			case 'list':
 				return ok({ events: state.events.filter((e) => e.status === 'open'), spots: state.spots });
@@ -79,10 +87,30 @@ const makeBackend = () => {
 				if (!e) return bad('unknown event', 404);
 				return ok({ event: e, signups: state.signups[e.id] ?? [], isOrganizer: Boolean(b.secret) && b.secret === state.secrets[e.id] });
 			}
+			case 'my_events': {
+				const events = (b.items ?? [])
+					.filter((p) => state.secrets[p.eventId] === p.secret)
+					.map((p) => state.events.find((e) => e.id === p.eventId))
+					.filter(Boolean);
+				return ok({ events, active: activeMine(), max: MAX_ACTIVE });
+			}
+			case 'delete_event': {
+				const e = find();
+				if (!e || state.secrets[e.id] !== b.secret) return bad('forbidden', 403);
+				if ((state.signups[e.id] ?? []).length) {
+					return bad('Des joueurs sont inscrits : annule la partie plutôt que de la supprimer.', 409);
+				}
+				state.events = state.events.filter((x) => x !== e);
+				delete state.secrets[e.id];
+				return ok({ ok: true });
+			}
 			case 'create_event': {
 				if (state.refuseNextCreate) {
 					state.refuseNextCreate = false;
 					return bad("Trop de parties créées aujourd'hui. Réessaie demain.", 429);
+				}
+				if (activeMine() >= MAX_ACTIVE) {
+					return bad(`Tu as déjà ${MAX_ACTIVE} parties en ligne. Supprimes-en une dans « Mes parties ».`, 429);
 				}
 				const id = uuid(next++);
 				const secret = `secret-${id}`;
@@ -165,6 +193,16 @@ const onScreen = async (selector) => {
 	const box = await page.locator(selector).first().boundingBox();
 	const vh = page.viewportSize().height;
 	return Boolean(box) && box.y + box.height > 0 && box.y < vh;
+};
+
+/** Same claim, but the scroll that gets it there is animated: polling proves it
+ *  arrives, a single read right after the click only proves it had not yet. */
+const waitOnScreen = async (selector, ms = 4000) => {
+	for (let i = 0; i * 100 < ms; i++) {
+		if (await onScreen(selector)) return true;
+		await sleep(100);
+	}
+	return false;
 };
 
 const clickMap = async (fx, fy) => {
@@ -282,8 +320,107 @@ try {
 	await page.waitForSelector('.re-form', { timeout: 10000 });
 	check(await page.locator('.re-pinstate--set').count() === 1, 'poser une partie sur ce terrain part avec l epingle deja posee');
 	check(await page.locator('.re-form button[type="submit"]').isEnabled(), 'donc le bouton publier est actif tout de suite');
+
+	// ---- 8. « Mes parties » : la liste, le quota, la suppression ----
+	/* Le defaut d origine : le quota etait un compteur journalier jamais rembourse,
+	   donc poser puis supprimer trois fois bloquait la journee avec une carte vide et
+	   rien a montrer. Le cap compte maintenant les parties EN LIGNE. */
+	const postGame = async () => {
+		await page.locator('.re-bar .re-btn', { hasText: 'Poser une partie' }).click();
+		await page.waitForSelector('.re-form');
+		await clickMap(0.5, 0.5);
+		await field('Ton prénom').locator('input').fill('Raph');
+		const go = page.locator('.re-form button[type="submit"]');
+		await go.scrollIntoViewIfNeeded();
+		await go.click();
+		await page.waitForSelector('.re-secret', { timeout: 10000 });
+		await page.locator('.re-secret .re-btn', { hasText: 'noté' }).click();
+		await page.locator('.re-panel .re-close').click();
+	};
+	const mineRows = async (n) => page.waitForFunction(
+		(want) => document.querySelectorAll('.re-mine-row').length === want, n, { timeout: 10000 },
+	);
+	/* Counted, never assumed to be zero: the game cancelled back in block 4 is
+	   already sitting in the passees, so the delete below has to be read as a
+	   delta or it measures that one instead. */
+	const pastCount = async () => {
+		const link = page.locator('.re-mine .re-link');
+		if (await link.count() === 0) return 0;
+		return Number((await link.innerText()).match(/\((\d+)\)/)?.[1] ?? 0);
+	};
+
+	await postGame();
+	await page.waitForSelector('.re-mine-row', { timeout: 10000 });
+	check(await page.locator('.re-mine-row').count() === 1, 'la partie posee apparait dans Mes parties');
+	check(
+		(await page.locator('.re-mine-cap').innerText()).includes(`1 / ${MAX_ACTIVE}`),
+		'le compteur dit combien de parties sont en ligne',
+	);
+	check(
+		await page.locator('.re-mine-row .re-btn--danger', { hasText: 'Supprimer' }).count() === 1,
+		'sans inscrit, le bouton propose de supprimer pour de bon',
+	);
+
+	await postGame();
+	await postGame();
+	check(await page.locator('.re-mine-row').count() === MAX_ACTIVE, 'les trois parties sont listees');
+
+	await page.locator('.re-bar .re-btn', { hasText: 'Poser une partie' }).click();
+	await page.waitForSelector('.re-form');
+	await clickMap(0.5, 0.5);
+	await field('Ton prénom').locator('input').fill('Raph');
+	await page.locator('.re-form button[type="submit"]').scrollIntoViewIfNeeded();
+	await page.locator('.re-form button[type="submit"]').click();
+	await page.waitForSelector('.re-form .re-error', { timeout: 10000 });
+	check(
+		(await page.locator('.re-form .re-error').innerText()).includes('Mes parties'),
+		'la quatrieme est refusee, et le refus dit ou aller liberer la place',
+	);
+	await page.locator('.re-form .re-btn--ghost').click();
+
+	// Rendre la place tout de suite est tout le changement : avant, c etait demain.
+	const pastBefore = await pastCount();
+	await page.locator('.re-mine-row .re-btn--danger').first().click();
+	await mineRows(MAX_ACTIVE - 1);
+	check((await page.locator('.re-mine-cap').innerText()).includes(`2 / ${MAX_ACTIVE}`), 'supprimer redescend le compteur');
+	check(await pastCount() === pastBefore, 'une partie sans inscrit part pour de bon, pas dans les passees');
+	await postGame();
+	check(await page.locator('.re-mine-row').count() === MAX_ACTIVE, 'et la place liberee laisse en reposer une');
+
+	// Un inscrit change la regle : on annule, le lien doit rester pour le prevenir.
+	const joined = backend.state.events.find((e) => backend.state.secrets[e.id] && e.status === 'open');
+	backend.state.signups[joined.id] = [{ player_id: uuid(555), player_name: 'Léa', seats: 1, role: 'any' }];
+	joined.seats_taken += 1;
+	await page.reload({ waitUntil: 'networkidle' });
+	await page.waitForSelector('.re-mine-row', { timeout: 15000 });
+	const cancelBtn = page.locator('.re-mine-row .re-btn--danger', { hasText: 'Annuler' });
+	check(await cancelBtn.count() === 1, 'avec un inscrit, le bouton dit annuler et pas supprimer');
+	check((await cancelBtn.innerText()).includes('1 inscrit'), 'et il dit combien de monde est concerne');
+	await cancelBtn.click();
+	await mineRows(MAX_ACTIVE - 1);
+	check(await pastCount() === pastBefore + 1, 'la partie annulee quitte les parties en ligne');
+	await page.locator('.re-mine .re-link').click();
+	check(
+		(await page.locator('.re-mine-row--off', { hasText: '1 inscrit' }).innerText()).includes('Annulée'),
+		'mais elle reste consultable dans les parties passees',
+	);
+
+	// ---- 9. Modifier depuis la liste, sans repasser par la carte ----
+	await page.locator('.re-mine-row:not(.re-mine-row--off) .re-btn--ghost', { hasText: 'Modifier' }).first().click();
+	await page.waitForSelector('.re-form', { timeout: 10000 });
+	check((await page.locator('.re-form h2').innerText()).includes('Modifier'), 'Modifier ouvre le formulaire d edition');
+	check(await waitOnScreen('.re-form'), 'et le formulaire est amene dans la fenetre');
+	await page.locator('.re-form label').filter({ hasText: 'Format' }).locator('select').selectOption('mini-tournoi');
+	await page.locator('.re-form button[type="submit"]').click();
+	await page.waitForSelector('.re-panel .re-ok--loud', { timeout: 10000 });
+	check(
+		await page.locator('.re-mine-row', { hasText: 'Mini-tournoi' }).count() === 1,
+		'et la liste montre le nouveau format sans recharger',
+	);
 } catch (e) {
-	fail.push(`EXCEPTION ${e.message}`);
+	// With the stack: a thrown step has no check line, so without it the failure
+	// names an action that appears five times in this file.
+	fail.push(`EXCEPTION ${e.stack ?? e.message}`);
 } finally {
 	await browser.close();
 	server.kill();

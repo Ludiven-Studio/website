@@ -20,6 +20,9 @@ export const MAX_NAME = 24;
 export const MAX_SEATS = 4;
 export const MAX_DURATION_MS = 12 * 3600_000;
 export const MAX_AHEAD_MS = 60 * 86400_000;
+/** Open, not-yet-finished games one organizer may have at once. Deleting one
+ *  frees a slot immediately — it is a standing limit, not a daily count. */
+export const MAX_ACTIVE_EVENTS = 3;
 
 export const FORMAT_LABEL: Record<Format, string> = {
 	'tete-a-tete': 'Tête-à-tête',
