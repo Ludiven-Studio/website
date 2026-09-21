@@ -250,7 +250,7 @@ export const CIRCLE_R = 0.25; // m — the official throwing circle is 35 to 50 
  * here — the relief is a few centimetres and the ring spans half a metre (six metres for the jack
  * window), so a flat one sinks under the terrain over most of its arc and reads as missing.
  */
-export function groundRing(t: Terrain, cx: number, cy: number, r: number, color: number, tube = 0.022): THREE.Mesh {
+export function groundRing(t: Terrain, cx: number, cy: number, r: number, color: number, tube = 0.022, opacity = 1): THREE.Mesh {
 	const n = Math.max(48, Math.round(r * 24));
 	const pts: THREE.Vector3[] = [];
 	for (let i = 0; i < n; i++) {
@@ -259,7 +259,12 @@ export function groundRing(t: Terrain, cx: number, cy: number, r: number, color:
 		pts.push(new THREE.Vector3(wx(x), heightAt(t, x, y) + tube, wz(y)));
 	}
 	const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), n, tube, 5, true);
-	const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color }));
+	// `depthWrite: false` on the see-through ones: six of them cross, and a tube that wrote depth
+	// would punch a hole in every ring drawn after it.
+	const mat = new THREE.MeshBasicMaterial(opacity < 1
+		? { color, transparent: true, opacity, depthWrite: false }
+		: { color });
+	const m = new THREE.Mesh(geo, mat);
 	m.renderOrder = 4;
 	return m;
 }

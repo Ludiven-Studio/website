@@ -8,8 +8,8 @@ import {
 	type Sim, type Boule, type Impact,
 } from './engine';
 import {
-	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder, other,
-	MIN_JACK, MAX_JACK, EDGE, BOULES_PER_SIDE, type Match13, type Side,
+	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder, endScore, other,
+	MIN_JACK, MAX_JACK, EDGE, BOULES_PER_SIDE, type Match13, type Side, type Played,
 } from './rules13';
 import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai';
 import {
@@ -95,6 +95,7 @@ const LOOK_FAR = 7.5; // m ahead when there is no jack yet to look at
 const LOOK_MIN = 2.2; // m the look target keeps in front of the eye, however far you walked
 const AI_THINK_MS = 700;
 const END_CARD_MS = 2800;
+const END_TABLE_MS = 6000; // the end-of-end card carries a table of six rows — reading it takes longer
 const STATION_CARD_MS = 1500; // the daily has 12 of these, so it holds the card half as long
 const ROLL_CAP = 24; // s of simulated roll before we call it settled anyway
 const AIM_SEND_MS = 80; // ~12 aim frames a second, same rate billard settled on
@@ -170,6 +171,8 @@ interface Scene3D {
 	rayAt: number; // `seen` of the aim message the ray was built from
 	jackAim: THREE.Group; // where the jack is being aimed, from the top view
 	jackAimAt: { x: number; y: number } | null; // the spot that ring was sampled on the terrain for
+	dists: THREE.Group; // one see-through ring per boule, centred on the jack — who holds the point
+	distsKey: string; // the head those rings were sampled for; they are rebuilt when it changes
 	halos: THREE.Mesh[]; // index-aligned with sim.bs — see makeHalo
 	arcAir: THREE.Mesh | null;
 	arcRoll: THREE.Mesh | null;
@@ -182,6 +185,12 @@ const HALO_PER_M = 0.016; // ring radius per metre of camera distance — ~20 px
 const HALO_MIN_R = 0.09; // m, so it never shrinks inside a boule up close
 const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
 
+/* One ring per boule, centred on the jack: the smallest one holds the point, and every ring inside
+   the opponent's first is a point. Six of them cross, so they are thin and see-through — the head
+   they explain has to stay readable through them. */
+const DIST_TUBE = 0.014;
+const DIST_ALPHA = 0.45;
+
 /* One pointer, three surfaces: the bottom strip is the arm, the rest of the image turns the camera,
    and while the jack is being aimed or placed by hand the whole canvas points at the ground. */
 type DragMode = 'arm' | 'look' | 'place' | 'jackaim';
@@ -193,10 +202,38 @@ const INTRO_HOLD = 0.8; // s held on it
 const INTRO_BACK = 0.7; // s coming back
 const INTRO_STOP = 1.8; // m — a head closer than this is already readable, so no walk-up
 const INTRO_ZOOM = 0.85; // not quite the stop: the walk-up shows the head, it does not inspect it
+/* The look after a boule has come to rest — "va voir ce que ça a donné". Same machinery, shorter
+   and closer: this one is a verdict, not a walk-up, so it goes all the way in. The AI waits it out
+   (see `aiAtRef`), otherwise its next throw lands while the eye is still up the lane. */
+const REVIEW_OUT = 0.55;
+const REVIEW_HOLD = 0.7;
+const REVIEW_BACK = 0.55;
+const REVIEW_MS = (REVIEW_OUT + REVIEW_HOLD + REVIEW_BACK) * 1000;
 type IntroStage = 'out' | 'hold' | 'back';
-interface Intro { stage: IntroStage; until: number }
+/** `hold` and `back` are carried, in ms: the walk-up and the review run the same three stages on
+ *  different clocks. */
+interface Intro { stage: IntroStage; until: number; hold: number; back: number }
 
-interface EndCard { text: string; mine: boolean }
+/** One boule in the end-of-end table: how far from the jack, and whether it scored. */
+interface BouleRow { side: Side; d: number; counts: boolean }
+interface EndCard { text: string; mine: boolean; rows: BouleRow[] }
+
+/**
+ * The end-of-end table, in the umpire's order. Which boules count is asked of `endScore` rather
+ * than re-derived here: a table that disagreed with the score it sits next to would be worse than
+ * no table at all. Sorted ascending, the winner's first `points` boules ARE the scoring ones.
+ */
+function bouleTable(bs: readonly Played[], jack: Played): BouleRow[] {
+	if (!jack.live) return [];
+	const rows = bs
+		.filter((b) => b.live && (b.side === 0 || b.side === 1))
+		.map((b) => ({ side: b.side as Side, d: dist2(b, jack), counts: false }))
+		.sort((a, b) => a.d - b.d);
+	const res = endScore(bs as Played[], jack);
+	let left = res.points;
+	for (const r of rows) r.counts = res.side !== null && r.side === res.side && left-- > 0;
+	return rows;
+}
 
 /* The daily is a shooting course, not a match: one boule per station, graded 5/3/1/0. `target` and
    `targetAt` are the boule to knock out and where it stood before the shot — the grade is the
@@ -206,6 +243,25 @@ interface DailyState {
 	grades: Grade[];
 	target: Boule | null;
 	targetAt: { x: number; y: number } | null;
+}
+
+/** The end-of-end table: everything on the ground, nearest first, scoring boules marked. */
+function BouleTable({ rows, mySide }: { rows: readonly BouleRow[]; mySide: Side }) {
+	return (
+		<div className="pe-table">
+			<span className="pe-table-cap">Distances au bouchon</span>
+			<ol>
+				{rows.map((r, i) => (
+					<li key={i} className={r.counts ? 'won' : ''}>
+						<span style={{ color: hex(HALO[r.side]) }}>●</span>
+						<span>{r.side === mySide ? 'Toi' : 'Adv'}</span>
+						<span className="pe-table-d">{r.d < 1 ? `${Math.round(r.d * 100)} cm` : `${r.d.toFixed(2)} m`}</span>
+						<span className="pe-table-pt">{r.counts ? '★' : ''}</span>
+					</li>
+				))}
+			</ol>
+		</div>
+	);
 }
 
 const killMesh = (m: THREE.Mesh | null): void => {
@@ -284,6 +340,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const headDistRef = useRef(HEAD_DIST_0);
 	const fovRef = useRef(0); // 0 means "snap on the next frame" — no zoom-in on load or mode change
 	const introRef = useRef<Intro | null>(null);
+	const reviewUntilRef = useRef(0); // the AI holds off until the look at the last boule is over
+	const distsRef = useRef(true); // the distance rings, mirrored to state for the button
 	const turnKeyRef = useRef('');
 	// Both jack phases borrow the top view and give it back: aiming the throw, then hand-placing if
 	// the throw missed the window. One ref, because the two never overlap.
@@ -322,6 +380,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	// Mirrors `jackAimRef` for the confirm button. Written from gesture handlers only, never `tick`.
 	const [jackAim, setJackAim] = useState<{ x: number; y: number } | null>(null);
 	const [callArm, setCallArm] = useState(true); // the strip pulses until it has been used once
+	const [dists, setDists] = useState(true);
 
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -384,10 +443,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const jackAim = new THREE.Group();
 		jackAim.visible = false;
 		scene.add(jackAim);
+		const dists = new THREE.Group();
+		dists.visible = false;
+		scene.add(dists);
 
 		g3Ref.current = {
 			renderer, scene, camera, lights, bodies, marker, circle, rings, laidAt: null, ray, rayAt: 0,
-			jackAim, jackAimAt: null,
+			jackAim, jackAimAt: null, dists, distsKey: '',
 			pitch: null as unknown as Pitch3D, // filled by newGame, which always runs next
 			fx: makeFx(scene),
 			meshes: [], halos: [], arcAir: null, arcRoll: null,
@@ -465,6 +527,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		jackAimRef.current = null;
 		setJackAim(null);
 		introRef.current = null;
+		reviewUntilRef.current = 0;
 		dragRef.current = null;
 		zoomRef.current = 0; zoomViewRef.current = 0; setZoom(0);
 		magRef.current = 1; magShownRef.current = 1; setMag(1);
@@ -704,9 +767,29 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const cancelIntro = useCallback((keepZoom = false) => {
 		if (!introRef.current) return;
 		introRef.current = null;
+		// A player who taps through the review has seen enough — and must not keep the AI waiting
+		// for a beat that is no longer playing.
+		reviewUntilRef.current = 0;
 		if (keepZoom) return;
 		zoomRef.current = 0;
 		setZoom(0);
+	}, []);
+
+	/**
+	 * Go and look at what the throw did, then come back. Armed on every settle that leaves the end
+	 * open — a boule lands 6 to 10 m out, and from the circle the difference between holding the
+	 * point and losing it is a few pixels. Same three-stage timer as the walk-up, but all the way
+	 * in. Not at the end of an end: the table is the verdict there, and it would sit on top of this.
+	 */
+	const reviewHead = useCallback((now: number) => {
+		const s = simRef.current, j = jackRef.current;
+		if (dailyRef.current || !s || !j || !j.live) return;
+		if (viewRef.current !== 'jeu') return; // the other two views already ARE an inspection
+		if (!s.bs.some((b) => b.live && b !== j)) return;
+		zoomRef.current = 1;
+		setZoom(1);
+		introRef.current = { stage: 'out', until: now + REVIEW_OUT * 1000, hold: REVIEW_HOLD * 1000, back: REVIEW_BACK * 1000 };
+		reviewUntilRef.current = now + REVIEW_MS;
 	}, []);
 
 	const setViewKey = useCallback((k: ViewKey) => {
@@ -798,7 +881,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			d.grades.push(grade);
 			const total = sumGrades(d.grades);
 			setPoints(total);
-			setCard({ text: `${GRADE_LABEL[grade]} · +${grade}`, mine: grade >= 3 });
+			setCard({ text: `${GRADE_LABEL[grade]} · +${grade}`, mine: grade >= 3, rows: [] });
 
 			const last = d.grades.length >= STATIONS;
 			const centis = Math.round((Date.now() - startRef.current) / 10);
@@ -849,6 +932,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (next.phase !== 'end-done') {
 			statusRef.current = 'aim';
 			setStatus('aim');
+			reviewHead(performance.now());
 			return;
 		}
 		const before = next.scores[0] + next.scores[1];
@@ -858,10 +942,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const got = done.scores[0] + done.scores[1] - before;
 		matchRef.current = done;
 		setMatch(done);
-		setCard({ text: done.lastEvent ?? (got ? `${got} point${got > 1 ? 's' : ''}` : 'Mène nulle'), mine });
+		// The table is read off the ground BEFORE it is cleared for the next end, and off the same
+		// distances the score came from — see `bouleTable`.
+		const rows = bouleTable(s.bs, j);
+		setCard({ text: done.lastEvent ?? (got ? `${got} point${got > 1 ? 's' : ''}` : 'Mène nulle'), mine, rows });
 		statusRef.current = done.phase === 'match-done' ? 'over' : 'end';
 		setStatus(statusRef.current);
-		endAtRef.current = performance.now() + END_CARD_MS;
+		endAtRef.current = performance.now() + (rows.length ? END_TABLE_MS : END_CARD_MS);
 		if (done.phase === 'match-done') {
 			setOver(true);
 			const win = done.winner === me;
@@ -875,7 +962,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				: lvActiveRef.current ? { mode: 'niveaux' }
 				: { mode: 'libre', diff: diffRef.current });
 		}
-	}, [enterJackView, gameId]);
+	}, [enterJackView, gameId, reviewHead]);
 
 	/**
 	 * The host rules at rest. Positions and the state it derived go out together, so a float that
@@ -1243,7 +1330,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		}
 		if (viewRef.current === 'tete') {
 			headYawRef.current = d.a0 - (x - d.x0) * YAW_PER_PX * 2;
-			headPitchRef.current = Math.max(HEAD_PITCH_MIN, Math.min(HEAD_PITCH_MAX, d.b0 - (y - d.y0) * PITCH_PER_PX));
+			// Opposite sign to the game view on purpose. There the drag grabs the WORLD, because the
+			// tilt is the loft and pulling down has to raise the lob. Here the drag moves the EYE
+			// around the head, which is what every orbit control does — and what the game view does
+			// read as backwards once you are no longer aiming.
+			headPitchRef.current = Math.max(HEAD_PITCH_MIN, Math.min(HEAD_PITCH_MAX, d.b0 + (y - d.y0) * PITCH_PER_PX));
 			return;
 		}
 		if (viewRef.current !== 'jeu') return;
@@ -1468,13 +1559,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const maybeIntro = useCallback((now: number) => {
 		const m = matchRef.current, s = simRef.current;
 		if (dailyRef.current || !s) return;
+		// The review is armed on the settle that hands the turn over, one step before this runs.
+		// It goes to the same place, so restarting it here would only cut it short.
+		if (introRef.current) return;
 		if (statusRef.current !== 'aim' || m.turn !== mySideRef.current) return;
 		if (viewRef.current !== 'jeu' || m.phase !== 'play') return;
 		if (!s.bs.some((b) => b.live)) return; // nothing to go and look at yet
 		if (dist2(m.circle, headFocus()) < INTRO_STOP) return;
 		zoomRef.current = INTRO_ZOOM;
 		setZoom(INTRO_ZOOM);
-		introRef.current = { stage: 'out', until: now + INTRO_OUT * 1000 };
+		introRef.current = { stage: 'out', until: now + INTRO_OUT * 1000, hold: INTRO_HOLD * 1000, back: INTRO_BACK * 1000 };
 	}, [headFocus]);
 
 	/* ---------- per-frame ---------- */
@@ -1524,9 +1618,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		}
 		const intro = introRef.current;
 		if (intro && now >= intro.until) {
-			if (intro.stage === 'out') introRef.current = { stage: 'hold', until: now + INTRO_HOLD * 1000 };
+			if (intro.stage === 'out') introRef.current = { ...intro, stage: 'hold', until: now + intro.hold };
 			else if (intro.stage === 'hold') {
-				introRef.current = { stage: 'back', until: now + INTRO_BACK * 1000 };
+				introRef.current = { ...intro, stage: 'back', until: now + intro.back };
 				zoomRef.current = 0;
 				setZoom(0);
 			} else introRef.current = null;
@@ -1537,7 +1631,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (!onlineRef.current
 			&& (statusRef.current === 'aim' || statusRef.current === 'placing') && m.turn === AI && !aiPendingRef.current) {
 			aiPendingRef.current = true;
-			aiAtRef.current = now + AI_THINK_MS;
+			// Never mid-review: the AI throwing while the eye is still up the lane looking at the last
+			// boule reads as a boule appearing out of nowhere.
+			aiAtRef.current = Math.max(now + AI_THINK_MS, reviewUntilRef.current);
 		}
 		if (aiPendingRef.current && now >= aiAtRef.current) {
 			aiPendingRef.current = false;
@@ -1589,6 +1685,30 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			g.jackAim.add(groundRing(s.t, ja.x, ja.y, JACK_AIM_R, HALO[2], 0.02));
 			g.jackAim.add(groundRing(s.t, ja.x, ja.y, JACK_AIM_R * 0.4, HALO[2], 0.02));
 			g.jackAimAt = { x: ja.x, y: ja.y };
+		}
+
+		/* One ring per boule, centred on the jack. Hidden while anything moves: a ring is a measurement,
+		   and a measurement of a rolling boule is a lie. Keyed on the resting positions rather than
+		   rebuilt per frame — each ring is sampled on the relief, which is 48 to 96 segments of tube. */
+		const jk = jackRef.current;
+		/* Kept up through 'end' on purpose, and not gated on the phase: `finishEnd` has already
+		   flipped it to 'throw-jack' by then, and that is the exact moment the player is counting. */
+		const showDists = distsRef.current && !dailyRef.current && !!jk && jk.live
+			&& (statusRef.current === 'end' || (statusRef.current === 'aim' && m.phase === 'play'));
+		g.dists.visible = showDists;
+		if (!showDists) {
+			g.distsKey = '';
+		} else if (jk) {
+			let key = `${jk.x.toFixed(3)},${jk.y.toFixed(3)}`;
+			for (const b of s.bs) if (b.live && b !== jk) key += `|${b.x.toFixed(3)},${b.y.toFixed(3)}`;
+			if (key !== g.distsKey) {
+				g.distsKey = key;
+				killGroup(g.dists);
+				for (const b of s.bs) {
+					if (!b.live || b === jk || (b.side !== 0 && b.side !== 1)) continue;
+					g.dists.add(groundRing(s.t, jk.x, jk.y, dist2(b, jk), HALO[b.side], DIST_TUBE, DIST_ALPHA));
+				}
+			}
 		}
 
 		// The opponent drawing back. Built once per message, not per frame, and dropped when the
@@ -1876,6 +1996,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				frozen: dragRef.current?.mode === 'arm',
 			},
 			cam: { yaw: camYawRef.current, pitch: camPitchRef.current },
+			// The head view orbits on its own angles, so the game view's pitch says nothing about it.
+			head: { yaw: headYawRef.current, pitch: headPitchRef.current, dist: headDistRef.current },
 			// The jack target, so "the tap moved it and it stayed legal" is a number, not a screenshot.
 			jackAim: jackAimRef.current ? { ...jackAimRef.current } : null,
 			view: viewRef.current,
@@ -1891,6 +2013,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				return { top: Math.round(armTop(r) - r.top), height: Math.round(r.height), mode: dragRef.current?.mode ?? null };
 			})(),
 			intro: introRef.current ? introRef.current.stage : null,
+			// The distance rings, from the SCENE and not from the toggle: "the button is on" and
+			// "there are six rings on the ground" are two different claims.
+			dists: {
+				on: distsRef.current,
+				visible: g3Ref.current?.dists.visible ?? false,
+				rings: g3Ref.current?.dists.children.length ?? 0,
+			},
 			fx: g3Ref.current?.fx.stats() ?? null,
 			// Everything the daily needs is derived from dailyRef, never from state: this effect
 			// runs once, so any state it closed over would be the mount value forever.
@@ -2004,6 +2133,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						{!daily && !lv.active && mpPhase === 'off' && withExpert(DIFF_ORDER, gameId).map((k) => (
 							<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title="Force de l’adversaire et terrain">{DIFFS[k as DiffKey].label}</button>
 						))}
+						{/* `pe-act`, not `pe-view`: the camera guards count the view segments and assert
+						    there are exactly three of them. */}
+						{!daily && (
+							<button className={`pe-act ${dists ? 'on' : ''}`} aria-pressed={dists}
+								onClick={() => { distsRef.current = !dists; setDists(!dists); }}
+								aria-label="Cercles de distance au bouchon" title="Cercles de distance au bouchon">◎</button>
+						)}
 						{mpPhase !== 'off' ? (
 							<button className="pe-act" onClick={leaveOnline} aria-label="Quitter la partie en ligne" title="Quitter la partie en ligne">🚪</button>
 						) : !daily && (
@@ -2129,7 +2265,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				)}
 
 				{card && !over && (
-					<div className={`pe-endcard ${card.mine ? 'mine' : ''}`} onClick={nextEnd}>{card.text}</div>
+					<div className={`pe-endcard ${card.mine ? 'mine' : ''}`} onClick={nextEnd}>
+						<span>{card.text}</span>
+						{card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} />}
+					</div>
 				)}
 
 				{over && daily && (
@@ -2149,6 +2288,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						<div className="pe-card">
 							{match.winner === mySide ? '🏆 Tu gagnes la partie !' : '❌ L’adversaire gagne'}
 							<strong>{match.scores[mySide]} — {match.scores[foeSide]}</strong>
+							{/* The last end's table: the boule that ended the match is the one people argue about. */}
+							{card && card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} />}
 							{online
 								? <button className="pe-replay" onClick={leaveOnline}>Quitter</button>
 								: <button className="pe-replay" onClick={() => newGame(diff)}>Nouvelle partie</button>}
@@ -2300,6 +2441,7 @@ const CSS = `
 .pe-pill.active { background: var(--pe-accent); color: var(--accent-text-over); border-color: var(--pe-accent); }
 .pe-act { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(28,20,12,0.55); color: #f0e6da; font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 6px 12px; min-width: 36px; cursor: pointer; backdrop-filter: blur(4px); }
 .pe-act:hover { border-color: var(--pe-accent); color: #fff; }
+.pe-act.on { border-color: var(--pe-accent); background: rgba(231,150,60,0.34); color: #fff; }
 
 /* The TV board. The active side is marked three times — ring, pulsing dot, and the hint at the
    bottom — because on a phone any one of them alone is missable. */
@@ -2372,6 +2514,17 @@ const CSS = `
 
 .pe-endcard { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 5; padding: 12px 26px; border-radius: 16px; text-align: center; font-weight: 800; font-size: 17px; color: #fff; background: linear-gradient(180deg, rgba(34,24,16,0.94), rgba(22,15,10,0.92)); border: 2px solid rgba(255,255,255,0.18); box-shadow: var(--shadow-lg); cursor: pointer; }
 .pe-endcard.mine { background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(24,140,60,0.96)); border-color: rgba(255,255,255,0.4); }
+.pe-endcard { display: flex; flex-direction: column; gap: 8px; align-items: center; max-width: 88%; }
+
+.pe-table { width: 100%; min-width: 14rem; font-weight: 600; font-size: 13.5px; }
+.pe-table-cap { display: block; opacity: 0.72; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 3px; }
+.pe-table ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.pe-table li { display: grid; grid-template-columns: 1em 2.6em 1fr 1em; gap: 6px; align-items: center; text-align: left; padding: 2px 6px; border-radius: 6px; background: rgba(0,0,0,0.22); }
+.pe-table li.won { background: rgba(255,255,255,0.22); }
+.pe-table-d { text-align: right; font-variant-numeric: tabular-nums; }
+.pe-table-pt { text-align: center; color: #ffd166; }
+.pe-card .pe-table li { background: color-mix(in srgb, var(--gray-0) 8%, transparent); }
+.pe-card .pe-table li.won { background: color-mix(in srgb, var(--pe-accent) 26%, transparent); }
 
 .pe-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; }
 .pe-levels { align-items: flex-start; overflow-y: auto; padding: 16px 12px; background: color-mix(in srgb, var(--gray-999) 82%, transparent); }

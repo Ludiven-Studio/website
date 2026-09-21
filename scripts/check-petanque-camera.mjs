@@ -168,7 +168,12 @@ const wanted = (await state()).jackAim;
 await page.getByRole('button', { name: /Lancer le bouchon/ }).click({ timeout: 6000 });
 await settled();
 const jacked = await state();
-check(jacked.jack && jacked.jack.live, 'the jack is down');
+/* Two legal outcomes, and the script has always described both — it just asserted one of them.
+   The jack is thrown with a real spread, so missing the 6-10 m window is the rule doing its job,
+   not a camera bug. Demanding `live` here went red in two of four consecutive runs, for a reason
+   the very next branch prints as normal. What must hold is that it landed in ONE of the two. */
+check(Boolean(jacked.jack && jacked.jack.live) || jacked.match.phase === 'place-jack',
+	`the jack throw resolved (phase ${jacked.match.phase})`);
 if (jacked.jack && jacked.jack.live && jacked.match.phase === 'play') {
 	/* ONE throw, so the bound has to be one a single sample can carry. Measured over 2400 deals
 	   (every surface x 3 relief amplitudes x 5 distances): mean 0.35 m, p95 0.80, max 2.51 — the
@@ -231,8 +236,13 @@ const freed = await state();
 check(Math.abs(freed.cam.yaw) > YAW_MAX + 0.1, `a long drag takes the camera past the throwing limit (${freed.cam.yaw.toFixed(2)} rad vs ${YAW_MAX})`);
 check(Math.abs(freed.aim.yaw) <= YAW_MAX + 1e-9, `and the aim is still clamped to it (${freed.aim.yaw.toFixed(2)} rad)`);
 
-/* The aim is SAMPLED: put a finger in the strip, keep dragging sideways, and nothing about the
-   throw may move. Without this assertion "the aim is sampled" is judged by eye. */
+/* What the strip owns once it is held. The LOFT is sampled at the press and cannot move — that is
+   the whole mechanic, since the pitch is the loft and the eye has nowhere to go mid-throw. The yaw
+   is the exception: dragging sideways in the strip steers the throw, and only the throw. So the
+   camera must sit still while the aim swings — the opposite of the rest of this file, where the
+   camera leads and the aim follows.
+   This block asserted "nothing may move" until the steering shipped, and went on passing by
+   accident only while the aim happened to sit at its clamp. */
 await page.mouse.move(cx, armY);
 await page.mouse.down();
 await page.mouse.move(cx, armY - 90, { steps: 8 });
@@ -242,8 +252,12 @@ await page.mouse.move(cx + 200, armY - 90, { steps: 12 });
 await sleep(260);
 const dragged5 = await state();
 check(held5.aim.frozen && dragged5.aim.frozen, 'the strip reports the aim as frozen while it is held');
-check(dragged5.aim.yaw === held5.aim.yaw && dragged5.aim.loft === held5.aim.loft,
-	`the aim does not move once the strip is held (${held5.aim.yaw} -> ${dragged5.aim.yaw})`);
+check(dragged5.aim.loft === held5.aim.loft,
+	`the loft cannot move once the strip is held (${held5.aim.loft} -> ${dragged5.aim.loft})`);
+check(dragged5.cam.yaw === held5.cam.yaw && dragged5.cam.pitch === held5.cam.pitch,
+	`and steering the throw leaves the camera where it was (yaw ${held5.cam.yaw.toFixed(3)} -> ${dragged5.cam.yaw.toFixed(3)})`);
+check(dragged5.aim.yaw < held5.aim.yaw - 0.05 && Math.abs(dragged5.aim.yaw) <= YAW_MAX + 1e-9,
+	`a sideways drag in the strip steers the throw, inside its limit (${held5.aim.yaw.toFixed(3)} -> ${dragged5.aim.yaw.toFixed(3)} rad)`);
 check(held5.zoom === 0, `arming drops the zoom, so the arc never starts behind the eye (zoom ${held5.zoom})`);
 
 /* ---------- 6. the arc still reads as an arc, and the lob still fits (complaint 5) ---------- */
