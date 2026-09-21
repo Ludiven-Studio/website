@@ -94,6 +94,18 @@ describe('applyFilters', () => {
 		expect(applyFilters([full], DEFAULT_FILTERS, NOW)).toHaveLength(1);
 	});
 
+	it('keeps a game near ANY saved place, which is the point of having several', () => {
+		const here = ev();
+		const lyon = ev({ lat: 45.7578, lng: 4.8320 });
+		const paris = ev({ lat: 48.8566, lng: 2.3522 });
+		const places = [{ name: 'Maison', lat: 45.4489, lng: 5.1381 }, { name: 'Lyon', lat: 45.7578, lng: 4.8320 }];
+		const f = { ...DEFAULT_FILTERS, nearPlaces: true };
+
+		expect(applyFilters([here, lyon, paris], f, NOW, places).map((e) => e.id)).toEqual([here.id, lyon.id]);
+		// No place saved: the flag constrains nothing, rather than emptying the map.
+		expect(applyFilters([here, lyon, paris], f, NOW)).toHaveLength(3);
+	});
+
 	it('does not mutate its input', () => {
 		const list = [ev({ starts_at: inDays(3) }), ev({ starts_at: inDays(1) })];
 		const before = list.map((e) => e.id);

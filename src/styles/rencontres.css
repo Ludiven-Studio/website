@@ -122,6 +122,104 @@
 	font-size: var(--text-sm);
 }
 
+/* ---- Home ports ---- */
+.re-places {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+.re-place {
+	display: inline-flex;
+	align-items: stretch;
+	border: 1px solid var(--gray-700);
+	border-radius: 0.6rem;
+	overflow: hidden;
+	background: var(--gray-800);
+}
+.re-place-go,
+.re-place-off {
+	font-family: var(--font-brand);
+	font-size: var(--text-sm);
+	color: var(--gray-100);
+	background: none;
+	border: none;
+	padding: 0.5rem 0.7rem;
+	cursor: pointer;
+}
+.re-place-go:hover { color: var(--accent-regular); }
+.re-place-off {
+	padding-left: 0.4rem;
+	padding-right: 0.6rem;
+	color: var(--gray-300);
+	border-left: 1px solid var(--gray-700);
+	font-size: 1.1rem;
+	line-height: 1;
+}
+.re-place-off:hover { color: #b12a2a; }
+.re-naming {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem;
+}
+.re-naming input {
+	font-family: var(--font-body);
+	font-size: 1rem; /* >=16px so iOS Safari doesn't zoom on focus */
+	color: var(--gray-100);
+	background: var(--gray-999);
+	border: 1px solid var(--gray-700);
+	border-radius: 0.6rem;
+	padding: 0.55rem 0.7rem;
+	max-width: 11rem;
+}
+.re-hint--places { font-size: var(--text-sm); }
+
+/* ---- Install ---- */
+.re-install {
+	margin-top: 0.5rem;
+	font-family: var(--font-brand);
+	font-size: var(--text-sm);
+	color: var(--gray-100);
+	background: var(--gray-800);
+	border: 1px solid var(--gray-700);
+	border-radius: 999rem;
+	padding: 0.4rem 0.9rem;
+	cursor: pointer;
+}
+.re-install:hover { color: var(--accent-regular); border-color: var(--accent-regular); }
+
+.re-modal {
+	position: fixed;
+	inset: 0;
+	/* Above the map, whose Leaflet panes climb to 1000 — but the map container
+	   already confines them, so this only has to clear the page itself. */
+	z-index: 1200;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1rem;
+	background: rgba(0, 0, 0, 0.5);
+}
+.re-sheet {
+	max-width: 26rem;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 0.7rem;
+	background: var(--gray-999);
+	border: 1px solid var(--gray-700);
+	border-radius: 0.8rem;
+	padding: 1.2rem;
+}
+.re-sheet h2 { margin: 0; font-size: var(--text-lg); }
+.re-steps {
+	margin: 0;
+	padding-left: 1.2rem;
+	color: var(--gray-100);
+	line-height: 1.6;
+}
+
 /* ---- Map ---- */
 .re-map {
 	/* Leaflet panes carry z-index up to 1000. Positioning the container with a

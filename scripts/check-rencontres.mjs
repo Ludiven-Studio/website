@@ -110,6 +110,46 @@ try {
 		`ludiven-images ne bouge pas (${before['ludiven-images'] ?? 0} -> ${after['ludiven-images'] ?? 0})`,
 	);
 
+	// ---- 2ter. Home ports, which live only in this browser ----
+	// The first player to answer the map summers at a campsite and winters in Lyon.
+	// Nothing here touches the backend, so the whole feature is one localStorage
+	// round trip — and that round trip is the only thing that can break it, hence
+	// the reload.
+	const addPlaceNamed = async (label) => {
+		await A.locator('.re-places .re-btn', { hasText: 'Enregistrer ce lieu' }).click();
+		await A.locator('.re-naming input').fill(label);
+		await A.locator('.re-naming button[type="submit"]').click();
+	};
+	await addPlaceNamed('Camping');
+	// Drag first: two pins within 500 m are the same home port, so without this the
+	// second save would rename the first and the count would stay at 1.
+	const drag = await A.locator('.re-map').boundingBox();
+	await A.mouse.move(drag.x + drag.width * 0.7, drag.y + drag.height * 0.6);
+	await A.mouse.down();
+	await A.mouse.move(drag.x + drag.width * 0.2, drag.y + drag.height * 0.3, { steps: 12 });
+	await A.mouse.up();
+	await addPlaceNamed('Lyon');
+	check(await A.locator('.re-place').count() === 2, `deux lieux enregistres (${await A.locator('.re-place').count()})`);
+	check((await A.locator('.re-places').innerText()).includes('Camping'), 'le nom donne est celui affiche');
+	check(await A.locator('.re-pin--home').count() === 2, 'chaque lieu a sa pastille sur la carte');
+	check(await A.locator('.re-places .re-check').count() === 1, 'le filtre "mes lieux" apparait avec les lieux');
+
+	await A.reload({ waitUntil: 'networkidle' });
+	await A.waitForSelector('.re-map', { timeout: 15000 });
+	check(await A.locator('.re-place').count() === 2, 'les lieux survivent au rechargement');
+
+	await A.locator('.re-place-off').first().click();
+	await A.locator('.re-place-off').first().click();
+	check(await A.locator('.re-places .re-check').count() === 0, 'sans lieu, le filtre disparait au lieu de vider la carte');
+	check(await A.locator('.re-hint--places').count() === 1, "l'invitation a enregistrer un lieu revient");
+
+	// ---- 2quater. "Plutôt une appli à télécharger" — it already is one ----
+	await A.locator('.re-install').click();
+	await A.waitForSelector('.re-sheet', { timeout: 5000 });
+	check((await A.locator('.re-sheet').innerText()).length > 40, "la fiche d'installation dit quoi faire");
+	await A.locator('.re-sheet .re-btn--ghost', { hasText: 'Fermer' }).click();
+	check(await A.locator('.re-sheet').count() === 0, 'elle se referme');
+
 	// ---- 3. Zero anon grant: the tables have no reader but the function ----
 	const direct = await fetch(`${SUPABASE_URL}/rest/v1/meetup_events?select=id&limit=1`, {
 		headers: { apikey: ANON, Authorization: `Bearer ${ANON}` },

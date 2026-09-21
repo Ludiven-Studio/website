@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 import L from 'leaflet';
 import type { MeetupEvent, MeetupSpot } from '../../lib/meetupRules';
+import type { Place } from '../../lib/meetupPlaces';
 
 // Saint-Jean-de-Bournay — the launch area (spec §6).
 export const HOME: [number, number] = [45.4489, 5.1381];
@@ -8,11 +9,14 @@ export const HOME: [number, number] = [45.4489, 5.1381];
 export interface MapHandle {
 	flyTo(lat: number, lng: number, zoom?: number): void;
 	fitAll(): void;
+	/** What "ajouter ce lieu" means: wherever the player has just panned to. */
+	center(): { lat: number; lng: number } | null;
 }
 
 interface Props {
 	events: readonly MeetupEvent[];
 	spots: readonly MeetupSpot[];
+	places: readonly Place[];
 	hoveredId: string | null;
 	selectedId: string | null;
 	/** When set, a click on the map drops the pin instead of selecting an event. */
@@ -44,13 +48,24 @@ const ICONS = {
 	pick: icon('re-pin--pick', '#2fbf71', '#146b3c'),
 };
 
+// A disc, not a teardrop: a home port is not a game, and one glance has to say so.
+const HOME_ICON = L.divIcon({
+	html: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">'
+		+ '<circle cx="12" cy="12" r="10" fill="#2c7fb8" stroke="#14405e" stroke-width="2"/>'
+		+ '<path d="M12 6l5 5h-2v5h-6v-5H7z" fill="#fff"/></svg>',
+	className: 're-pin re-pin--home',
+	iconSize: [22, 22],
+	iconAnchor: [11, 11],
+});
+
 export default function MeetupMap({
-	events, spots, hoveredId, selectedId, picking, pin, onHover, onSelect, onPick, handle,
+	events, spots, places, hoveredId, selectedId, picking, pin, onHover, onSelect, onPick, handle,
 }: Props) {
 	const boxRef = useRef<HTMLDivElement>(null);
 	const mapRef = useRef<L.Map | null>(null);
 	const eventLayer = useRef<L.LayerGroup | null>(null);
 	const spotLayer = useRef<L.LayerGroup | null>(null);
+	const placeLayer = useRef<L.LayerGroup | null>(null);
 	const pinMarker = useRef<L.Marker | null>(null);
 	const markers = useRef(new Map<string, L.Marker>());
 	// Read inside Leaflet handlers, which are bound once — a captured prop would
@@ -70,6 +85,8 @@ export default function MeetupMap({
 			crossOrigin: true,
 			attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 		}).addTo(map);
+		// Added in painting order: home ports sit under the games they exist to find.
+		placeLayer.current = L.layerGroup().addTo(map);
 		spotLayer.current = L.layerGroup().addTo(map);
 		eventLayer.current = L.layerGroup().addTo(map);
 		map.on('click', (e: L.LeafletMouseEvent) => {
@@ -89,7 +106,22 @@ export default function MeetupMap({
 			if (pts.length) mapRef.current?.fitBounds(L.latLngBounds(pts).pad(0.2), { maxZoom: 14 });
 			else mapRef.current?.setView(HOME, 11);
 		},
+		center: () => {
+			const c = mapRef.current?.getCenter();
+			return c ? { lat: c.lat, lng: c.lng } : null;
+		},
 	}), [events]);
+
+	useEffect(() => {
+		const layer = placeLayer.current;
+		if (!layer) return;
+		layer.clearLayers();
+		for (const p of places) {
+			L.marker([p.lat, p.lng], { icon: HOME_ICON, interactive: false })
+				.bindTooltip(p.name, { direction: 'top' })
+				.addTo(layer);
+		}
+	}, [places]);
 
 	// Known places, drawn under the events. Unconfirmed user pins show hollow —
 	// a pin in someone's garden stays faint and dies on its own (spec §6).

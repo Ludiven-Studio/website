@@ -9,7 +9,7 @@ import {
 } from '../../lib/courses';
 import { joinSpace, type CoursesLink } from '../../games/courses/net';
 import { useDragSort } from './useDragSort';
-import { usePinToHome, type PinPlatform } from './usePinToHome';
+import { usePinToHome, type PinPlatform } from '../../lib/usePinToHome';
 
 // Read/replace the ?l=<spaceId> secret in the URL without a full navigation.
 const spaceFromUrl = (): string | null => new URLSearchParams(window.location.search).get('l');
@@ -260,7 +260,7 @@ function ListView({ snap, peers, busy, spaceId, onOpenHistory, onOpenCategories,
 	const [emailing, setEmailing] = useState(false);
 	const [pinning, setPinning] = useState(false);
 	const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed(spaceId));
-	const pin = usePinToHome(snap.active.title);
+	const pin = usePinToHome({ name: snap.active.title || 'Liste de courses', scope: '/courses' });
 	// While dragging we render from this local copy so the row follows the finger;
 	// null means "just use the server snapshot".
 	const [draft, setDraft] = useState<CourseItem[] | null>(null);
