@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { playerId } from '../../lib/scores';
 import { trackEvent } from '../../lib/analytics';
 import {
-	listMeetups, getMeetup, createMeetup, cancelMeetup, joinMeetup, leaveMeetup,
+	listMeetups, getMeetup, createMeetup, updateMeetup, cancelMeetup, joinMeetup, leaveMeetup,
 	meetupsEnabled, rememberSecret, secretFor, savedName, saveName,
 } from '../../lib/meetups';
 import {
@@ -11,11 +11,11 @@ import {
 } from '../../lib/meetupFilters';
 import {
 	FORMAT_LABEL, ROLE_LABEL, seatsLeft, validateSignup,
-	type Format, type MeetupEvent, type MeetupSignup, type MeetupSpot, type Role,
+	type MeetupEvent, type MeetupSignup, type MeetupSpot, type Role,
 } from '../../lib/meetupRules';
 import { distanceM, formatDistance, isPlausibleFr } from '../../lib/meetupGeo';
 import MeetupMap, { type MapHandle } from './MeetupMap';
-import CreateForm from './CreateForm';
+import CreateForm, { type Draft } from './CreateForm';
 import EventPanel from './EventPanel';
 import { formatShortDay, formatTime } from './format';
 
@@ -50,6 +50,7 @@ export default function RencontresApp() {
 	const [hoveredId, setHoveredId] = useState<string | null>(null);
 	const [detail, setDetail] = useState<Detail | null>(null);
 	const [creating, setCreating] = useState(false);
+	const [editing, setEditing] = useState(false);
 	const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
 	const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
 	const [locating, setLocating] = useState(false);
@@ -70,6 +71,7 @@ export default function RencontresApp() {
 			const d = await getMeetup(id, secret);
 			setDetail(d);
 			setCreating(false);
+			setEditing(false);
 			setUrl(id, d.isOrganizer ? secret : null);
 			mapRef.current?.flyTo(d.event.lat, d.event.lng);
 		} catch (e) {
@@ -105,8 +107,13 @@ export default function RencontresApp() {
 	const closeEvent = useCallback(() => {
 		setDetail(null);
 		setCreated(null);
+		setEditing(false);
 		setUrl(null);
 	}, []);
+
+	/** Proof of ownership. The ?k= link wins so a cleared browser can still get back in. */
+	const secretOf = (eventId: string): string | undefined =>
+		secretFor(eventId, new URLSearchParams(window.location.search).get('k'));
 
 	const run = useCallback(async (fn: () => Promise<void>) => {
 		setBusy(true);
@@ -142,9 +149,26 @@ export default function RencontresApp() {
 		});
 	}, [detail, pid, refresh, run]);
 
+	const onEditSubmit = useCallback((v: Draft) => {
+		if (!detail) return;
+		const secret = secretOf(detail.event.id);
+		if (!secret) { setError('Lien d\'organisateur manquant.'); return; }
+		void run(async () => {
+			// Only what update_event accepts. The organizer name and seats are not in the
+			// patch, so sending them would be a silent no-op the form would take for a save.
+			await updateMeetup(detail.event.id, secret, {
+				startsAt: v.startsAt, endsAt: v.endsAt, format: v.format,
+				playersNeeded: v.playersNeeded, roleNeeded: v.roleNeeded,
+			});
+			trackEvent('meetup_edit', { format: v.format });
+			setEditing(false);
+			await refresh(detail.event.id);
+		});
+	}, [detail, refresh, run]);
+
 	const onCancel = useCallback(() => {
 		if (!detail) return;
-		const secret = secretFor(detail.event.id, new URLSearchParams(window.location.search).get('k'));
+		const secret = secretOf(detail.event.id);
 		if (!secret) { setError('Lien d\'organisateur manquant.'); return; }
 		if (!window.confirm('Annuler cette partie ? Les inscrits ne seront pas prévenus.')) return;
 		void run(async () => {
@@ -156,16 +180,14 @@ export default function RencontresApp() {
 
 	const startCreate = useCallback(() => {
 		setCreating(true);
+		setEditing(false);
 		setDetail(null);
 		setCreated(null);
 		setPin(null);
 		setUrl(null);
 	}, []);
 
-	const onCreateSubmit = useCallback((v: {
-		startsAt: string; endsAt: string; format: Format; playersNeeded: number;
-		roleNeeded: Role; organizerName: string; organizerSeats: number;
-	}) => {
+	const onCreateSubmit = useCallback((v: Draft) => {
 		if (!pin) { setError('Pose une épingle sur la carte.'); return; }
 		void run(async () => {
 			const r = await createMeetup({ playerId: pid, lat: pin.lat, lng: pin.lng, ...v });
@@ -308,6 +330,27 @@ export default function RencontresApp() {
 				</div>
 			)}
 
+			{detail && editing && (
+				<CreateForm
+					key={`edit-${detail.event.id}`}
+					pin={null}
+					name={name}
+					busy={busy}
+					initial={{
+						startsAt: detail.event.starts_at,
+						endsAt: detail.event.ends_at,
+						format: detail.event.format,
+						playersNeeded: detail.event.players_needed,
+						roleNeeded: detail.event.role_needed,
+						organizerName: detail.event.organizer_name,
+						organizerSeats: detail.event.organizer_seats,
+					}}
+					onPickAgain={() => { /* the spot is fixed once the game is posted */ }}
+					onCancel={() => setEditing(false)}
+					onSubmit={onEditSubmit}
+				/>
+			)}
+
 			{detail && (
 				<EventPanel
 					key={detail.event.id}
@@ -320,6 +363,7 @@ export default function RencontresApp() {
 					shareUrl={shareUrl(detail.event.id)}
 					onJoin={onJoin}
 					onLeave={onLeave}
+					onEdit={() => setEditing(true)}
 					onCancel={onCancel}
 					onClose={closeEvent}
 				/>

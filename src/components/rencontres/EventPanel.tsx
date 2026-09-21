@@ -14,12 +14,13 @@ interface Props {
 	shareUrl: string;
 	onJoin(seats: number, role: Role, name: string): void;
 	onLeave(): void;
+	onEdit(): void;
 	onCancel(): void;
 	onClose(): void;
 }
 
 export default function EventPanel({
-	event, signups, isOrganizer, playerId, name, busy, shareUrl, onJoin, onLeave, onCancel, onClose,
+	event, signups, isOrganizer, playerId, name, busy, shareUrl, onJoin, onLeave, onEdit, onCancel, onClose,
 }: Props) {
 	const mine = signups.find((s) => s.player_id === playerId);
 	const [seats, setSeats] = useState(mine?.seats ?? 1);
@@ -82,7 +83,22 @@ export default function EventPanel({
 			</ul>
 
 			{!cancelled && !past && (
-				mine ? (
+				/* The organizer already holds seats through `organizer_seats`, so offering them the
+				   signup form reads as "post another one" — which is what it used to do. Their
+				   action here is to change the game, not to enter it. */
+				isOrganizer ? (
+					<div className="re-actions">
+						<p className="re-ok">Tu organises cette partie.</p>
+						<button type="button" className="re-btn" disabled={busy} onClick={onEdit}>
+							Modifier la partie
+						</button>
+						{mine && (
+							<button type="button" className="re-btn re-btn--ghost" disabled={busy} onClick={onLeave}>
+								Me désinscrire
+							</button>
+						)}
+					</div>
+				) : mine ? (
 					<div className="re-actions">
 						<p className="re-ok">Tu es inscrit{mine.seats > 1 ? ` à ${mine.seats}` : ''}.</p>
 						<button type="button" className="re-btn re-btn--ghost" disabled={busy} onClick={onLeave}>

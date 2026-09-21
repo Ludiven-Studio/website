@@ -5,31 +5,45 @@ import {
 } from '../../lib/meetupRules';
 import { defaultStart, toLocalInput } from './format';
 
+export interface Draft {
+	startsAt: string; endsAt: string; format: Format; playersNeeded: number;
+	roleNeeded: Role; organizerName: string; organizerSeats: number;
+}
+
 interface Props {
 	pin: { lat: number; lng: number } | null;
 	name: string;
 	busy: boolean;
+	/** Present = edit an existing game rather than post a new one. The spot and the
+	 *  organizer are then fixed: `update_event` patches the slot, the format, the role
+	 *  and the head count, and refuses everything else. Showing a field the server
+	 *  would drop is how a form starts lying. */
+	initial?: Draft | null;
 	onPickAgain(): void;
 	onCancel(): void;
-	onSubmit(v: {
-		startsAt: string; endsAt: string; format: Format; playersNeeded: number;
-		roleNeeded: Role; organizerName: string; organizerSeats: number;
-	}): void;
+	onSubmit(v: Draft): void;
 }
 
 const DURATIONS = [1, 2, 3, 4, 6];
 
 /** Entirely closed except the first name: every other field is a list or a date
  *  (spec §8). Nothing here needs moderating. */
-export default function CreateForm({ pin, name, busy, onPickAgain, onCancel, onSubmit }: Props) {
-	const [start, setStart] = useState(() => toLocalInput(defaultStart()));
-	const [hours, setHours] = useState(3);
-	const [format, setFormat] = useState<Format>('doublette');
-	const [playersNeeded, setPlayersNeeded] = useState(4);
-	const [roleNeeded, setRoleNeeded] = useState<Role>('any');
-	const [organizerName, setOrganizerName] = useState(name);
-	const [organizerSeats, setOrganizerSeats] = useState(1);
+export default function CreateForm({ pin, name, busy, initial, onPickAgain, onCancel, onSubmit }: Props) {
+	const editing = Boolean(initial);
+	const [start, setStart] = useState(() => toLocalInput(initial ? new Date(initial.startsAt) : defaultStart()));
+	const [hours, setHours] = useState(() => (initial
+		? Math.max(1, Math.round((Date.parse(initial.endsAt) - Date.parse(initial.startsAt)) / 3600_000))
+		: 3));
+	const [format, setFormat] = useState<Format>(initial?.format ?? 'doublette');
+	const [playersNeeded, setPlayersNeeded] = useState(initial?.playersNeeded ?? 4);
+	const [roleNeeded, setRoleNeeded] = useState<Role>(initial?.roleNeeded ?? 'any');
+	const [organizerName, setOrganizerName] = useState(initial?.organizerName ?? name);
+	const [organizerSeats, setOrganizerSeats] = useState(initial?.organizerSeats ?? 1);
 	const [error, setError] = useState<string | null>(null);
+
+	// A duration off the list (an older game, a hand-made row) must still show its own
+	// value, or the select renders blank and silently re-times the game on save.
+	const durations = DURATIONS.includes(hours) ? DURATIONS : [...DURATIONS, hours].sort((a, b) => a - b);
 
 	const submit = (e: React.FormEvent): void => {
 		e.preventDefault();
@@ -42,20 +56,26 @@ export default function CreateForm({ pin, name, busy, onPickAgain, onCancel, onS
 		};
 		const problem = validateEvent(draft);
 		if (problem) { setError(problem); return; }
-		if (!pin) { setError('Pose une épingle sur la carte.'); return; }
+		if (!editing && !pin) { setError('Pose une épingle sur la carte.'); return; }
 		setError(null);
 		onSubmit(draft);
 	};
 
 	return (
 		<form className="re-form" onSubmit={submit}>
-			<h2>Poser une partie</h2>
+			<h2>{editing ? 'Modifier la partie' : 'Poser une partie'}</h2>
 
-			<p className={`re-pinstate ${pin ? 're-pinstate--set' : ''}`}>
-				{pin
-					? <>Épingle posée. <button type="button" className="re-link" onClick={onPickAgain}>Déplacer</button></>
-					: <>Touche la carte pour poser l'épingle à l'endroit où vous jouez.</>}
-			</p>
+			{editing ? (
+				<p className="re-hint">
+					Le terrain et les inscrits ne bougent pas. Pour jouer ailleurs, annule cette partie et repose-en une.
+				</p>
+			) : (
+				<p className={`re-pinstate ${pin ? 're-pinstate--set' : ''}`}>
+					{pin
+						? <>Épingle posée. <button type="button" className="re-link" onClick={onPickAgain}>Déplacer</button></>
+						: <>Touche la carte pour poser l'épingle à l'endroit où vous jouez.</>}
+				</p>
+			)}
 
 			<label>
 				<span>Quand</span>
@@ -65,7 +85,7 @@ export default function CreateForm({ pin, name, busy, onPickAgain, onCancel, onS
 			<label>
 				<span>Durée</span>
 				<select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
-					{DURATIONS.map((h) => <option key={h} value={h}>{h} h</option>)}
+					{durations.map((h) => <option key={h} value={h}>{h} h</option>)}
 				</select>
 			</label>
 
@@ -90,24 +110,30 @@ export default function CreateForm({ pin, name, busy, onPickAgain, onCancel, onS
 				</select>
 			</label>
 
-			<label>
-				<span>Ton prénom</span>
-				<input value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} maxLength={24} placeholder="Raph" required />
-			</label>
+			{!editing && (
+				<>
+					<label>
+						<span>Ton prénom</span>
+						<input value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} maxLength={24} placeholder="Raph" required />
+					</label>
 
-			<label>
-				<span>Tu viens à</span>
-				<select value={organizerSeats} onChange={(e) => setOrganizerSeats(Number(e.target.value))}>
-					{[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
-				</select>
-			</label>
+					<label>
+						<span>Tu viens à</span>
+						<select value={organizerSeats} onChange={(e) => setOrganizerSeats(Number(e.target.value))}>
+							{[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+						</select>
+					</label>
+				</>
+			)}
 
 			{error && <p className="re-error">{error}</p>}
 
 			<div className="re-formactions">
-				<button type="button" className="re-btn re-btn--ghost" onClick={onCancel}>Annuler</button>
-				<button type="submit" className="re-btn" disabled={busy || !pin}>
-					{busy ? 'Envoi…' : 'Publier la partie'}
+				<button type="button" className="re-btn re-btn--ghost" onClick={onCancel}>
+					{editing ? 'Revenir' : 'Annuler'}
+				</button>
+				<button type="submit" className="re-btn" disabled={busy || (!editing && !pin)}>
+					{busy ? 'Envoi…' : editing ? 'Enregistrer' : 'Publier la partie'}
 				</button>
 			</div>
 		</form>
