@@ -10,13 +10,16 @@ import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// A phone is the case that hurts: a tall canvas spends its field on sky, not on the head.
+const PORTRAIT = process.argv.includes('--portrait');
+const VP = PORTRAIT ? { width: 390, height: 844 } : { width: 1000, height: 760 };
 const PORT = 4370;
 const base = `http://localhost:${PORT}`;
 const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
 for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
-const ctx = await browser.newContext({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 });
+const ctx = await browser.newContext({ viewport: VP, deviceScaleFactor: 1 });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log(`THROW ${e.message}`));
 
@@ -57,22 +60,48 @@ for (let i = 0; i < 12; i++) {
 	await throwOne();
 }
 
-const report = async (tag) => {
+/* The turn-start walk-up borrows the head view's field while it holds, so a fixed sleep used to
+   sample whatever the animation was doing — the pixels read like a 36 degree field in a 49 degree
+   view. Wait it out instead. */
+const settled = async () => {
+	// The whole walk-up is 2.4 s; anything longer means there is no intro and we are burning the
+	// end away, which empties the ground we came to measure.
+	for (let i = 0; i < 15; i++) {
+		if ((await state()).intro === null) break;
+		await sleep(200);
+	}
 	await sleep(1100); // the look target and the walk are both eased
+};
+
+const report = async (tag) => {
+	await settled();
 	const s = await state();
-	const ba = s.seen.filter((x) => x.side >= 0);
-	if (!ba.length) { console.log(`${tag.padEnd(16)} nothing down`); return; }
+	// Walking up the lane can leave a boule behind the eye, where `py` is meaningless.
+	const ba = s.seen.filter((x) => x.side >= 0 && x.py > -H && x.py < 2 * H);
+	if (!ba.length) {
+		console.log(`${tag.padEnd(16)} nothing down (status ${s.status}, end ${s.match.endNo}, `
+			+ `left ${s.match.left.join('/')}, ${s.bs.filter((b) => b.live).length} live)`);
+		return;
+	}
 	const body = Math.min(...ba.map((x) => x.body));
 	const lowest = Math.min(...ba.map((x) => x.py));
-	console.log(`${tag.padEnd(16)} boules=${ba.length} smallest=${body}px topmost=${Math.round((lowest / H) * 100)}% of frame `
+	// px alone depends on where the AI landed; body * m / height depends on nothing but the field.
+	const big = ba.reduce((a, x) => (x.body > a.body ? x : a));
+	const perM = ((big.body * big.m) / H).toFixed(4);
+	console.log(`${tag.padEnd(16)} fov=${s.fov} perMetre=${perM} boules=${ba.length} smallest=${body}px `
+		+ `topmost=${Math.round((lowest / H) * 100)}% of frame `
 		+ ba.map((x) => `[s${x.side} ${x.m}m ${x.body}px y${Math.round((x.py / H) * 100)}%]`).join(' '));
 };
 
-await report('at the circle');
+const toView = (i) => page.locator('.pe-view').nth(i).click(); // labels drop under 420 px
+
+await toView(0);
+await report('jeu, circle');
 for (let i = 0; i < 4; i++) { await page.keyboard.press('w'); await sleep(120); }
-await report('walked +6 m');
-await page.keyboard.press('v');
-await report('first person');
+await report('jeu, +6 m');
+await page.keyboard.press('c');
+await toView(1);
+await report('head view');
 
 await browser.close();
 server.kill();

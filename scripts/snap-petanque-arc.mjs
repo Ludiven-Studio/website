@@ -7,6 +7,9 @@ import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// `--view=N` presses V N times first. The throwing view is the one that must bow: an eye closer to
+// the throw line flattens the arc, so each view needs its own number.
+const VIEW_PRESSES = Number(process.argv.find((a) => a.startsWith('--view='))?.slice(7) ?? 0);
 const PORT = 4364;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
@@ -31,6 +34,7 @@ await page.evaluate(() => {
 await sleep(1500);
 
 const state = () => page.evaluate(() => window.__petanque());
+for (let i = 0; i < VIEW_PRESSES; i++) { await page.keyboard.press('v'); await sleep(400); }
 const box = await page.locator('.pe-canvas').boundingBox();
 const cx = box.x + box.width * 0.5, cy = box.y + box.height * 0.8;
 

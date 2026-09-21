@@ -314,10 +314,86 @@ export function aimCamera(cam: THREE.PerspectiveCamera, circle: { x: number; y: 
 	);
 }
 
-/** Frame the whole pitch — used for the replay/overview shot between throws. */
-export function overviewCamera(cam: THREE.PerspectiveCamera, focus: { x: number; y: number }): void {
-	cam.position.set(wx(focus.x) - 1.2, 5.4, wz(focus.y) - 5.2);
-	cam.lookAt(wx(focus.x), 0, wz(focus.y));
+/* ---------- field of view ---------- */
+
+/* Measured at 1000x760: a boule 13 m out was 4 px across at the stock 58 deg vertical. What the
+   player actually reads is the width of the lane, so intent is written horizontally and converted
+   per aspect. The upper clamp is the stock value on purpose: a portrait phone is already spending
+   its whole field on sky, and widening it there would make the very case that hurts worse. */
+export const VFOV_MIN = 34;
+export const VFOV_MAX = 58;
+
+export function verticalFov(hfovDeg: number, aspect: number): number {
+	const v = (2 * Math.atan(Math.tan((hfovDeg * Math.PI) / 360) / aspect) * 180) / Math.PI;
+	return Math.max(VFOV_MIN, Math.min(VFOV_MAX, v));
+}
+
+/* The halo radius was tuned at 58 deg. Apparent size is constant in distance but NOT in fov, so
+   narrowing the view would fatten every ring unless the fov is divided back out. */
+const HALO_REF_TAN = Math.tan((VFOV_MAX * Math.PI) / 360);
+
+export function haloRadius(dist: number, fovDeg: number, perM: number, minR: number): number {
+	const k = Math.tan((fovDeg * Math.PI) / 360) / HALO_REF_TAN;
+	return Math.max(minR, dist * perM) * k;
+}
+
+/* ---------- inspection cameras ---------- */
+
+export const HEAD_DIST_MIN = 1.8;
+export const HEAD_DIST_MAX = 7.0;
+export const HEAD_PITCH_MIN = 0.18;
+export const HEAD_PITCH_MAX = 1.25;
+
+/**
+ * Orbit an eye around the head. Its yaw and pitch are its own on purpose: this view must never
+ * read or write the aim yaw or the camera pitch, because that pitch is the loft.
+ */
+export function headCamera(cam: THREE.PerspectiveCamera, focus: { x: number; y: number }, yaw: number, pitch: number, dist: number, ground: number): void {
+	const c = Math.cos(pitch);
+	cam.position.set(
+		wx(focus.x) - Math.sin(yaw) * dist * c,
+		Math.max(ground + 0.45, ground + dist * Math.sin(pitch)),
+		wz(focus.y) - Math.cos(yaw) * dist * c,
+	);
+	cam.lookAt(wx(focus.x), ground + 0.1, wz(focus.y));
+}
+
+const TOP_TILT = 1.15; // rad off horizontal — not straight down, so the relief still reads
+const TOP_MARGIN = 1.12;
+
+/**
+ * Frame a span centred on `focus` rather than guess an offset. The fixed offset this replaced
+ * followed the jack, so a jack thrown off the pitch dragged the eye out with it and left the
+ * player with the legal window behind the camera.
+ *
+ * The tilt is what makes this non-obvious: at TOP_TILT the frame is not a rectangle on the ground,
+ * and sizing it as if the eye looked straight down puts the NEAR edge behind the camera. So the
+ * height is solved from the near edge in camera space, which is the binding one at every aspect.
+ *
+ * Reads `fov` and `aspect`, so it must be called after the frame's fov is set.
+ */
+export function topCamera(cam: THREE.PerspectiveCamera, focus: { x: number; y: number }, dir: 1 | -1, along: number, across: number, ground: number): void {
+	const vt = Math.tan((cam.fov * Math.PI) / 360);
+	const st = Math.sin(TOP_TILT), ct = Math.cos(TOP_TILT);
+	const n = along / 2, w = across / 2;
+	// Near edge, vertically: depth = h/st − n·ct, offset = n·st, and |offset/depth| must stay under vt.
+	const hv = (n * st * (st + vt * ct)) / vt;
+	// Same edge, horizontally — it is the shallowest point, so it is where width runs out first.
+	const hh = st * (w / (vt * cam.aspect) + n * ct);
+	const h = Math.max(hv, hh) * TOP_MARGIN;
+	cam.position.set(wx(focus.x), ground + h, wz(focus.y) - dir * (h / Math.tan(TOP_TILT)));
+	cam.lookAt(wx(focus.x), ground, wz(focus.y));
+}
+
+/**
+ * A span anchored on the circle and reaching `far` metres up the lane, for the top view. Anchoring
+ * on the circle rather than on what you are looking at is the point: while the jack is being placed
+ * by hand it is still live wherever the bad throw left it, so centring on it walked the eye off the
+ * pitch and left the legal window behind the camera.
+ */
+export function laneFrame(circle: { x: number; y: number }, dir: 1 | -1, far: number): { focus: { x: number; y: number }; along: number } {
+	const along = far + 2.5;
+	return { focus: { x: circle.x, y: circle.y + dir * (along / 2 - 1) }, along };
 }
 
 /* ---------- aim prediction ---------- */

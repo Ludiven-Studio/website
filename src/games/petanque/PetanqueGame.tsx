@@ -14,8 +14,10 @@ import {
 import { planThrow, planJack, launch } from './ai';
 import {
 	buildPitch3D, makeBouleMesh, groundRing, makeMarker, makeHalo, arcMesh, aimRay, predictThrow,
-	aimCamera, overviewCamera, elevationForPitch, addLights, makeFx, wx, wz,
-	CAM_PITCH_MIN, CAM_PITCH_MAX, BOULE_R, CIRCLE_R, WALK_MAX, type Pitch3D, type Fx,
+	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius,
+	elevationForPitch, addLights, makeFx, wx, wz,
+	CAM_PITCH_MIN, CAM_PITCH_MAX, HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
+	BOULE_R, CIRCLE_R, WALK_MAX, type Pitch3D, type Fx,
 } from './render3d';
 import { petanqueLevels } from './levels';
 import {
@@ -76,6 +78,7 @@ const ROLL_PITCH = 0.40; // the view lifts while the boules run, whatever loft w
 const LOOK_TAU = 0.18;
 const PITCH_TAU = 0.25;
 const WALK_TAU = 0.30;
+const WALK_DRAG_TAU = 0.08; // under a thumb, the slow ease reads as lag
 const WALK_STEP = 1.5; // m per press — a stride, so three taps put you at a short head
 const LOOK_FAR = 7.5; // m ahead when there is no jack yet to look at
 const LOOK_MIN = 2.2; // m the look target keeps in front of the eye, however far you walked
@@ -98,13 +101,28 @@ const DUST: Record<SurfaceId, number> = {
 
 const LOFT_LABEL = (e: number): string => (e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette');
 
-const VIEW_ORDER = ['epaule', 'premiere', 'dessus'] as const;
+/* Three views, and only the first one throws: the camera IS the aim, so a view that does not stand
+   behind the circle has no direction to give. */
+const VIEW_ORDER = ['jeu', 'tete', 'dessus'] as const;
 type ViewKey = (typeof VIEW_ORDER)[number];
 const VIEWS: Record<ViewKey, { icon: string; label: string }> = {
-	epaule: { icon: '🎥', label: 'Par-dessus l’épaule' },
-	premiere: { icon: '👁', label: 'Première personne' },
-	dessus: { icon: '🛩', label: 'Vue d’ensemble' },
+	jeu: { icon: '👁', label: 'Vue de jeu' },
+	tete: { icon: '🔍', label: 'Zoom sur les boules' },
+	dessus: { icon: '🛩', label: 'Vue de dessus' },
 };
+/* Horizontal intent, converted to three's vertical fov per aspect. A boule 13 m out measured 4 px
+   across at the stock 58 deg, which is what "on ne voit pas les boules au loin" was. */
+const VIEW_HFOV: Record<ViewKey, number> = { jeu: 62, tete: 44, dessus: 74 };
+const FOV_TAU = 0.22;
+
+const ARM_H = 0.25; // share of the canvas height that is the throwing arm, not the camera
+const ARM_MIN_PX = 90;
+const ARM_MAX_PX = 170;
+
+const HEAD_DIST_0 = 4.2; // m — where the orbit starts when you open the head view
+const HEAD_PITCH_0 = 0.62;
+
+const ARC_NEAR = 1.5; // m — arc points nearer than this are in the hand, not in the flight
 
 const sumGrades = (g: Grade[]): number => g.reduce<number>((a, b) => a + b, 0);
 
@@ -136,6 +154,20 @@ interface Scene3D {
 const HALO = [0x30d158, 0xff5f56, 0xffc107]; // you · opponent · jack
 const HALO_PER_M = 0.016; // ring radius per metre of camera distance — ~20 px on a 700 px canvas
 const HALO_MIN_R = 0.09; // m, so it never shrinks inside a boule up close
+const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
+
+/* One pointer, three surfaces: the bottom strip is the arm, the rest of the image turns the camera,
+   and while the jack is being placed by hand the whole canvas places it. */
+type DragMode = 'arm' | 'look' | 'place';
+interface Drag { mode: DragMode; x0: number; y0: number; a0: number; b0: number }
+
+/* The walk-up before a throw. Only a timer: the existing walk easing does the whole move. */
+const INTRO_OUT = 0.9; // s walking out
+const INTRO_HOLD = 0.8; // s stood over the head, with the field tightening
+const INTRO_BACK = 0.7; // s walking back
+const INTRO_STOP = 1.8; // m short of the head — you look at it, you do not stand on it
+type IntroStage = 'out' | 'hold' | 'back';
+interface Intro { stage: IntroStage; until: number }
 
 interface EndCard { text: string; mine: boolean }
 
@@ -189,22 +221,32 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const endAtRef = useRef(0);
 	const rngRef = useRef(1); // AI plan counter — one per throw, so two plans never coincide
 
-	// Aim state.
-	const aimRef = useRef<{ x0: number; y0: number } | null>(null);
+	// Aim state. `camPitchRef` is the loft: exactly two writers, `tiltBy` and a look drag in the
+	// game view. Nothing else in this file may touch it.
+	const dragRef = useRef<Drag | null>(null);
 	const powerRef = useRef(0);
 	const yawRef = useRef(0);
 	const aimDirtyRef = useRef(false);
 	const camPitchRef = useRef(0.55);
 	const viewPitchRef = useRef(0.55);
-	const pinchRef = useRef<{ cy: number; pitch: number } | null>(null);
+	const pinchRef = useRef(false); // a second finger voids the gesture, it never aims
 	// Where the eye stands. `walk` is metres stepped up the lane to read the head — an inspection
 	// move only: it never touches pitch, which is the loft control, so the throw cannot change.
-	const viewRef = useRef<ViewKey>('epaule');
+	const viewRef = useRef<ViewKey>('jeu');
 	const walkRef = useRef(0);
 	const walkViewRef = useRef(0);
+	const walkDragRef = useRef(false);
 	const lookRef = useRef(new THREE.Vector3());
 	const wantLook = useRef(new THREE.Vector3());
 	const placeRef = useRef<{ x: number; y: number } | null>(null);
+	// The head view orbits on its own angles, so inspecting the boules can never move the throw.
+	const headYawRef = useRef(0);
+	const headPitchRef = useRef(HEAD_PITCH_0);
+	const headDistRef = useRef(HEAD_DIST_0);
+	const fovRef = useRef(0); // 0 means "snap on the next frame" — no zoom-in on load or mode change
+	const introRef = useRef<Intro | null>(null);
+	const turnKeyRef = useRef('');
+	const viewBeforePlaceRef = useRef<ViewKey | null>(null);
 
 	// Daily. `dailyRef` is null in every other mode, which is what the settle branch tests on.
 	const dailyRef = useRef<DailyState | null>(null);
@@ -228,7 +270,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [loft, setLoft] = useState(() => elevationForPitch(0.55));
 	const [diff, setDiff] = useState<DiffKey>('moyen');
 	const [over, setOver] = useState(false);
-	const [view, setView] = useState<ViewKey>('epaule');
+	const [view, setView] = useState<ViewKey>('jeu');
 	const [walk, setWalk] = useState(0);
 	const [card, setCard] = useState<EndCard | null>(null);
 	const [webglError, setWebglError] = useState(false);
@@ -362,6 +404,25 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		g.marker.visible = false;
 	}, []);
 
+	/** Back to the throwing view, feet at the circle, aim straight. Every mode entry runs this: a
+	 *  player who left the camera on the top view would otherwise start the timed daily unable to
+	 *  throw, and the chrono is the leaderboard tiebreak. */
+	const resetCamera = useCallback(() => {
+		viewRef.current = 'jeu';
+		setView('jeu');
+		viewBeforePlaceRef.current = null;
+		introRef.current = null;
+		dragRef.current = null;
+		walkRef.current = 0; walkViewRef.current = 0; setWalk(0);
+		yawRef.current = 0;
+		headYawRef.current = 0;
+		headPitchRef.current = HEAD_PITCH_0;
+		headDistRef.current = HEAD_DIST_0;
+		fovRef.current = 0;
+		lookRef.current.set(0, 0, 0); // zero means "snap", so a new pitch never gets a travelling shot
+		turnKeyRef.current = '';
+	}, []);
+
 	/* ---------- a new game ---------- */
 
 	/** Lay a fresh pitch and match. Shared by free play and by the levels ladder. */
@@ -386,12 +447,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setCard(null);
 		setOver(false);
 		aiPendingRef.current = false;
-		powerRef.current = 0; yawRef.current = 0; aimRef.current = null;
+		powerRef.current = 0;
 		setPower(0);
 		placeRef.current = null; setPlaceOk(false);
+		resetCamera();
 		clearArc();
 		return true;
-	}, [clearArc, clearBodies, initScene]);
+	}, [clearArc, clearBodies, initScene, resetCamera]);
 
 	const newGame = useCallback((key: DiffKey) => {
 		const d = DIFFS[key];
@@ -436,12 +498,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setCard(null);
 		setOver(false);
 		aiPendingRef.current = false;
-		powerRef.current = 0; yawRef.current = 0; aimRef.current = null;
+		powerRef.current = 0;
 		setPower(0);
 		placeRef.current = null; setPlaceOk(false);
+		resetCamera();
 		clearArc();
 		return true;
-	}, [clearArc, clearBodies, initScene]);
+	}, [clearArc, clearBodies, initScene, resetCamera]);
 
 	/** Put station `i` on the ground and hand the aim back to the player. */
 	const setStation = useCallback((i: number) => {
@@ -454,7 +517,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		d.targetAt = { x: bodies[0].x, y: bodies[0].y };
 		setStationNo(i);
 		setCard(null);
-		powerRef.current = 0; yawRef.current = 0; aimRef.current = null;
+		powerRef.current = 0; yawRef.current = 0; dragRef.current = null;
 		setPower(0);
 		clearArc();
 		statusRef.current = 'aim';
@@ -553,6 +616,54 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		doThrow(m.turn, v, jack);
 	}, [aimHeading, doThrow, streamAim]);
 
+	/* ---------- which view we are in ---------- */
+
+	/**
+	 * Any contact ends the walk-up — and walks the feet back, because stepping out was never the
+	 * player's doing. Leaving them stranded put the eye five metres up the lane while the boule
+	 * still leaves from the circle behind it, so the preview arc started off the top of the frame.
+	 * The walk controls opt out with `keepWalk`: they are taking the feet over on purpose.
+	 */
+	const cancelIntro = useCallback((keepWalk = false) => {
+		if (!introRef.current) return;
+		introRef.current = null;
+		if (keepWalk) return;
+		walkRef.current = 0;
+		setWalk(0);
+	}, []);
+
+	const setViewKey = useCallback((k: ViewKey) => {
+		if (viewRef.current === k) return;
+		cancelIntro();
+		dragRef.current = null;
+		if (viewRef.current === 'jeu') {
+			powerRef.current = 0;
+			setPower(0);
+			aimDirtyRef.current = true;
+			streamAim(false); // else their screen keeps a half-drawn ray of ours for ever
+		}
+		if (k === 'tete') headYawRef.current = yawRef.current; // open where the player was looking
+		lookRef.current.set(0, 0, 0); // zero means snap, not a travelling shot across the pitch
+		viewRef.current = k;
+		setView(k);
+	}, [cancelIntro, streamAim]);
+
+	const cycleView = useCallback(() => {
+		setViewKey(VIEW_ORDER[(VIEW_ORDER.indexOf(viewRef.current) + 1) % VIEW_ORDER.length]);
+	}, [setViewKey]);
+
+	/** Hand placing only makes sense from above — from the circle you cannot see the legal ring. */
+	const enterPlaceView = useCallback(() => {
+		if (viewBeforePlaceRef.current === null) viewBeforePlaceRef.current = viewRef.current;
+		setViewKey('dessus');
+	}, [setViewKey]);
+
+	const leavePlaceView = useCallback(() => {
+		const v = viewBeforePlaceRef.current;
+		viewBeforePlaceRef.current = null;
+		if (v) setViewKey(v);
+	}, [setViewKey]);
+
 	/* ---------- what the AI does when its turn comes ---------- */
 
 	const aiAct = useCallback(() => {
@@ -645,6 +756,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				setStatus('placing');
 				placeRef.current = { x: next.circle.x, y: next.circle.y + next.dir * 7.4 };
 				setPlaceOk(next.turn === mySideRef.current);
+				if (next.turn === mySideRef.current) enterPlaceView();
 			} else {
 				statusRef.current = 'aim';
 				setStatus('aim');
@@ -685,7 +797,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				: lvActiveRef.current ? { mode: 'niveaux' }
 				: { mode: 'libre', diff: diffRef.current });
 		}
-	}, [gameId]);
+	}, [enterPlaceView, gameId]);
 
 	/**
 	 * The host rules at rest. Positions and the state it derived go out together, so a float that
@@ -713,9 +825,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			const want: Status = msg.match.phase === 'place-jack' ? 'placing' : 'aim';
 			statusRef.current = want;
 			setStatus(want);
-			setPlaceOk(want === 'placing' && msg.match.turn === mySideRef.current && placeRef.current !== null);
+			const mine = msg.match.turn === mySideRef.current;
+			setPlaceOk(want === 'placing' && mine && placeRef.current !== null);
+			if (want === 'placing' && mine) enterPlaceView(); else if (want === 'aim') leavePlaceView();
 		}
-	}, []);
+	}, [enterPlaceView, leavePlaceView]);
 
 	const onSettled = useCallback(() => {
 		settle();
@@ -789,6 +903,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			setPlaceOk(false);
 			statusRef.current = 'aim';
 			setStatus('aim');
+			leavePlaceView();
 		});
 		net.onAim((a) => {
 			if (matchRef.current.turn === mySideRef.current || statusRef.current === 'rolling') return;
@@ -805,7 +920,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setMpMsg(null);
 		setMpPhase('playing');
 		trackGame(gameId, 'game_started', { mode: 'en-ligne' });
-	}, [applySync, doThrow, gameId, layMatch, lv, nextEnd]);
+	}, [applySync, doThrow, gameId, layMatch, leavePlaceView, lv, nextEnd]);
 
 	const watchPeers = useCallback(() => {
 		netRef.current?.onPeers((peers) => {
@@ -901,43 +1016,106 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setPlaceOk(false);
 		statusRef.current = 'aim';
 		setStatus('aim');
-	}, []);
+		leavePlaceView();
+	}, [leavePlaceView]);
+
+	/* ---------- camera controls ---------- */
+
+	const tiltBy = useCallback((d: number) => {
+		cancelIntro();
+		camPitchRef.current = Math.max(CAM_PITCH_MIN, Math.min(CAM_PITCH_MAX, camPitchRef.current + d));
+		setLoft(elevationForPitch(camPitchRef.current));
+		aimDirtyRef.current = true;
+	}, [cancelIntro]);
+
+	/** Step up the lane to read the head, or back down to the circle. Inspection only. */
+	const walkBy = useCallback((d: number) => {
+		cancelIntro(true);
+		const w = Math.max(0, Math.min(WALK_MAX, walkRef.current + d));
+		walkRef.current = w;
+		setWalk(w);
+	}, [cancelIntro]);
 
 	/* ---------- the aim drag ---------- */
 
-	const canAim = (): boolean =>
-		statusRef.current === 'aim' && matchRef.current.turn === mySideRef.current && !pinchRef.current;
+	/** Top of the throwing strip, in client px. Below it is the arm, above it is the camera. */
+	const armTop = useCallback((r: DOMRect): number =>
+		r.bottom - Math.max(ARM_MIN_PX, Math.min(ARM_MAX_PX, r.height * ARM_H)), []);
+
+	const canThrow = useCallback((): boolean =>
+		statusRef.current === 'aim' && matchRef.current.turn === mySideRef.current
+		&& viewRef.current === 'jeu' && !pinchRef.current, []);
 
 	const aimStart = useCallback((x: number, y: number) => {
+		cancelIntro(); // any contact interrupts the walk-up
+		const cv = canvasRef.current;
+		if (!cv) return;
 		if (statusRef.current === 'placing' && matchRef.current.turn === mySideRef.current) {
+			const p = pickGround(x, y);
+			if (p) { placeRef.current = legalise(p); setPlaceOk(true); }
+			dragRef.current = { mode: 'place', x0: x, y0: y, a0: 0, b0: 0 };
+			return;
+		}
+		if (y >= armTop(cv.getBoundingClientRect())) {
+			// The strip is the arm. Off the game view there is nothing to throw, so a tap here brings
+			// the game view back rather than being a dead zone.
+			if (viewRef.current !== 'jeu') { setViewKey('jeu'); return; }
+			if (!canThrow()) return;
+			// Back on the circle: the walk is for reading the head, and the boule leaves from the
+			// circle whatever the eye is doing. Previewing an arc that starts behind you is nonsense,
+			// and `doThrow` walks you back anyway — this only makes it happen before the preview.
+			walkRef.current = 0;
+			setWalk(0);
+			powerRef.current = 0;
+			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: 0, b0: 0 };
+			aimDirtyRef.current = true;
+			return;
+		}
+		// The top view holds still: the tap that places the jack must land where it was aimed.
+		if (viewRef.current === 'dessus') return;
+		dragRef.current = viewRef.current === 'tete'
+			? { mode: 'look', x0: x, y0: y, a0: headYawRef.current, b0: headPitchRef.current }
+			: { mode: 'look', x0: x, y0: y, a0: yawRef.current, b0: camPitchRef.current };
+	}, [armTop, canThrow, cancelIntro, legalise, pickGround, setViewKey]);
+
+	const aimMove = useCallback((x: number, y: number) => {
+		const d = dragRef.current;
+		if (!d) return;
+		if (d.mode === 'place') {
+			if (statusRef.current !== 'placing') return;
 			const p = pickGround(x, y);
 			if (p) { placeRef.current = legalise(p); setPlaceOk(true); }
 			return;
 		}
-		if (!canAim()) return;
-		aimRef.current = { x0: x, y0: y };
-		powerRef.current = 0;
-		yawRef.current = 0;
-		aimDirtyRef.current = true;
-	}, [legalise, pickGround]);
-
-	const aimMove = useCallback((x: number, y: number) => {
-		const a = aimRef.current;
-		if (!a || !canAim()) return;
-		const p = Math.max(0, Math.min(1, (a.y0 - y) / POWER_PX));
+		if (d.mode === 'arm') {
+			if (!canThrow()) return;
+			const p = Math.max(0, Math.min(1, (d.y0 - y) / POWER_PX));
+			if (p !== powerRef.current) aimDirtyRef.current = true;
+			powerRef.current = p;
+			setPower(p);
+			// Only the arm streams. A player idly turning the camera would push 12 messages a second
+			// for as long as they kept looking around.
+			if (p >= 0.06) streamAim(true);
+			return;
+		}
+		if (viewRef.current === 'tete') {
+			headYawRef.current = d.a0 - (x - d.x0) * YAW_PER_PX * 2;
+			headPitchRef.current = Math.max(HEAD_PITCH_MIN, Math.min(HEAD_PITCH_MAX, d.b0 - (y - d.y0) * PITCH_PER_PX));
+			return;
+		}
+		if (viewRef.current !== 'jeu') return;
 		// Drag right aims right on screen: the camera looks down -yaw, so the sign flips here.
-		const yw = Math.max(-YAW_MAX, Math.min(YAW_MAX, -(x - a.x0) * YAW_PER_PX));
-		if (p !== powerRef.current || yw !== yawRef.current) aimDirtyRef.current = true;
-		powerRef.current = p;
-		yawRef.current = yw;
-		setPower(p);
-		streamAim(true);
-	}, [streamAim]);
+		yawRef.current = Math.max(-YAW_MAX, Math.min(YAW_MAX, d.a0 - (x - d.x0) * YAW_PER_PX));
+		// Grab the world: pull down, the eye rises, the camera grazes — which is the high lob.
+		camPitchRef.current = Math.max(CAM_PITCH_MIN, Math.min(CAM_PITCH_MAX, d.b0 - (y - d.y0) * PITCH_PER_PX));
+		setLoft(elevationForPitch(camPitchRef.current));
+		aimDirtyRef.current = true;
+	}, [canThrow, legalise, pickGround, streamAim]);
 
 	const aimEnd = useCallback(() => {
-		const a = aimRef.current;
-		aimRef.current = null;
-		if (!a || !canAim()) return;
+		const d = dragRef.current;
+		dragRef.current = null;
+		if (!d || d.mode !== 'arm' || !canThrow()) return;
 		if (powerRef.current < 0.06) { // a tap, not a throw
 			powerRef.current = 0;
 			setPower(0);
@@ -946,70 +1124,74 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			return;
 		}
 		throwFromAim();
-	}, [streamAim, throwFromAim]);
+	}, [canThrow, streamAim, throwFromAim]);
 
 	const { onPointerDown } = usePointerDrag(aimStart, aimMove, aimEnd);
 
-	/* ---------- camera controls ---------- */
-
-	const tiltBy = useCallback((d: number) => {
-		camPitchRef.current = Math.max(CAM_PITCH_MIN, Math.min(CAM_PITCH_MAX, camPitchRef.current + d));
-		setLoft(elevationForPitch(camPitchRef.current));
-		aimDirtyRef.current = true;
-	}, []);
-
-	/** Step up the lane to read the head, or back down to the circle. Inspection only. */
-	const walkBy = useCallback((d: number) => {
-		const w = Math.max(0, Math.min(WALK_MAX, walkRef.current + d));
+	/* The walk slider. A DOM sibling above the canvas, so the canvas handler never sees the event
+	   and no stopPropagation is needed. Its own usePointerDrag instance: each one binds its own
+	   element and posts its own document listeners. */
+	const walkTrackRef = useRef<HTMLDivElement | null>(null);
+	const walkTo = useCallback((clientY: number) => {
+		const el = walkTrackRef.current;
+		if (!el) return;
+		const r = el.getBoundingClientRect();
+		const w = Math.max(0, Math.min(1, (r.bottom - clientY) / Math.max(1, r.height))) * WALK_MAX;
 		walkRef.current = w;
 		setWalk(w);
 	}, []);
-
-	const cycleView = useCallback(() => {
-		const next = VIEW_ORDER[(VIEW_ORDER.indexOf(viewRef.current) + 1) % VIEW_ORDER.length];
-		viewRef.current = next;
-		setView(next);
-	}, []);
+	const { onPointerDown: onWalkDown } = usePointerDrag(
+		(_x, y) => { cancelIntro(true); walkDragRef.current = true; walkTo(y); },
+		(_x, y) => walkTo(y),
+		() => { walkDragRef.current = false; },
+	);
+	const onWalkKey = useCallback((e: React.KeyboardEvent) => {
+		const d = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? WALK_STEP
+			: e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? -WALK_STEP
+			: e.key === 'Home' ? -WALK_MAX : e.key === 'End' ? WALK_MAX : 0;
+		if (!d) return;
+		e.preventDefault();
+		walkBy(d);
+	}, [walkBy]);
 
 	useEffect(() => {
 		const cv = canvasRef.current;
 		if (!cv) return;
-		// The wheel is the loft knob, not a zoom: the loft IS the mechanic, so it gets the obvious input.
-		const onWheel = (e: WheelEvent) => { e.preventDefault(); tiltBy(e.deltaY > 0 ? 0.06 : -0.06); };
+		// The wheel is the loft knob in the game view, because the loft IS the mechanic. In the head
+		// view there is no loft to set, so it becomes the obvious thing there: zoom.
+		const onWheel = (e: WheelEvent) => {
+			e.preventDefault();
+			const up = e.deltaY < 0;
+			if (viewRef.current === 'jeu') tiltBy(up ? -0.06 : 0.06);
+			else if (viewRef.current === 'tete') {
+				cancelIntro();
+				headDistRef.current = Math.max(HEAD_DIST_MIN, Math.min(HEAD_DIST_MAX, headDistRef.current + (up ? -0.45 : 0.45)));
+			}
+		};
 		cv.addEventListener('wheel', onWheel, { passive: false });
 
-		// Two-finger vertical slide tilts the camera. Native non-passive listeners: React's
-		// multi-touch pointer events are dead on a real iPhone (ios-touch-input memory).
+		// A second finger cancels the gesture instead of doing anything. Native listeners: React's
+		// multi-touch pointer events are dead on a real iPhone (ios-touch-input memory). This is what
+		// stops a two-finger page gesture from firing a boule.
 		const onTouchStart = (e: TouchEvent) => {
 			if (e.touches.length < 2) return;
-			e.preventDefault();
-			pinchRef.current = { cy: (e.touches[0].clientY + e.touches[1].clientY) / 2, pitch: camPitchRef.current };
-			aimRef.current = null;
+			pinchRef.current = true;
+			dragRef.current = null;
 			powerRef.current = 0;
 			setPower(0);
-		};
-		const onTouchMove = (e: TouchEvent) => {
-			const p = pinchRef.current;
-			if (!p || e.touches.length < 2) return;
-			e.preventDefault();
-			const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-			camPitchRef.current = Math.max(CAM_PITCH_MIN, Math.min(CAM_PITCH_MAX, p.pitch + (cy - p.cy) * PITCH_PER_PX));
-			setLoft(elevationForPitch(camPitchRef.current));
 			aimDirtyRef.current = true;
 		};
-		const onTouchEnd = (e: TouchEvent) => { if (e.touches.length < 2) pinchRef.current = null; };
-		cv.addEventListener('touchstart', onTouchStart, { passive: false });
-		cv.addEventListener('touchmove', onTouchMove, { passive: false });
+		const onTouchEnd = (e: TouchEvent) => { if (e.touches.length < 2) pinchRef.current = false; };
+		cv.addEventListener('touchstart', onTouchStart, { passive: true });
 		cv.addEventListener('touchend', onTouchEnd);
 		cv.addEventListener('touchcancel', onTouchEnd);
 		return () => {
 			cv.removeEventListener('wheel', onWheel);
 			cv.removeEventListener('touchstart', onTouchStart);
-			cv.removeEventListener('touchmove', onTouchMove);
 			cv.removeEventListener('touchend', onTouchEnd);
 			cv.removeEventListener('touchcancel', onTouchEnd);
 		};
-	}, [tiltBy]);
+	}, [cancelIntro, tiltBy]);
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
@@ -1071,7 +1253,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		g.arcAir = g.arcRoll = null;
 		g.marker.visible = false;
 		const m = matchRef.current;
-		if (statusRef.current !== 'aim' || m.turn !== mySideRef.current || powerRef.current < 0.06) return;
+		if (statusRef.current !== 'aim' || m.turn !== mySideRef.current || viewRef.current !== 'jeu'
+			|| powerRef.current < 0.06) return;
 
 		const asJack = m.phase === 'throw-jack';
 		const h = aimHeading();
@@ -1093,6 +1276,41 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			g.marker.visible = true;
 		}
 	}, [aimHeading]);
+
+	/* ---------- where the action is ---------- */
+
+	/** The head: the live jack, else the centre of what is on the ground, else a point down the
+	 *  lane. Both inspection views point at this, and the walk-up walks towards it. */
+	const headFocus = useCallback((): { x: number; y: number } => {
+		const m = matchRef.current, s = simRef.current;
+		const j = jackRef.current;
+		if (j && j.live) return { x: j.x, y: j.y };
+		const live = (s?.bs ?? []).filter((b) => b.live);
+		if (live.length) {
+			let x = 0, y = 0;
+			for (const b of live) { x += b.x; y += b.y; }
+			return { x: x / live.length, y: y / live.length };
+		}
+		return { x: m.circle.x, y: m.circle.y + m.dir * LOOK_FAR };
+	}, []);
+
+	/**
+	 * Walk out, look at the head, walk back — as a player would before throwing. Only a timer: the
+	 * existing walk easing does the whole move, so this never touches the pitch or the yaw and the
+	 * throw is identical before and after. Skipped in the daily, where the chrono is the tiebreak.
+	 */
+	const maybeIntro = useCallback((now: number) => {
+		const m = matchRef.current, s = simRef.current;
+		if (dailyRef.current || !s) return;
+		if (statusRef.current !== 'aim' || m.turn !== mySideRef.current) return;
+		if (viewRef.current !== 'jeu' || m.phase !== 'play') return;
+		if (!s.bs.some((b) => b.live)) return; // nothing to go and look at yet
+		const out = Math.min(WALK_MAX, Math.max(0, dist2(m.circle, headFocus()) - INTRO_STOP));
+		if (out < 1) return;
+		walkRef.current = out;
+		setWalk(out);
+		introRef.current = { stage: 'out', until: now + INTRO_OUT * 1000 };
+	}, [headFocus]);
 
 	/* ---------- per-frame ---------- */
 
@@ -1129,6 +1347,25 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		// which is how the AI came to replay while it held the point and to throw a fourth boule.
 		const m = matchRef.current;
 
+		// A new turn resets the aim. This used to live in aimStart, but now that the camera IS the
+		// aim, zeroing the yaw on every press would swing the view out from under the player.
+		const key = `${m.endNo}:${m.turn}:${m.phase}:${m.left[0]}${m.left[1]}`;
+		if (key !== turnKeyRef.current) {
+			turnKeyRef.current = key;
+			yawRef.current = 0;
+			aimDirtyRef.current = true;
+			maybeIntro(now);
+		}
+		const intro = introRef.current;
+		if (intro && now >= intro.until) {
+			if (intro.stage === 'out') introRef.current = { stage: 'hold', until: now + INTRO_HOLD * 1000 };
+			else if (intro.stage === 'hold') {
+				introRef.current = { stage: 'back', until: now + INTRO_BACK * 1000 };
+				walkRef.current = 0;
+				setWalk(0);
+			} else introRef.current = null;
+		}
+
 		// The AI takes a beat before playing, otherwise its throw reads as a glitch. Online, seat 1
 		// is a person: waking the AI here would play their boule for them.
 		if (!onlineRef.current
@@ -1164,8 +1401,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			halo.visible = b.live;
 			if (!b.live) continue;
 			halo.position.set(wx(bx), heightAt(s.t, bx, by) + 0.008, wz(by));
-			// Radius grows with camera distance, so the ring keeps its apparent size.
-			const rr = Math.max(HALO_MIN_R, halo.position.distanceTo(g.camera.position) * HALO_PER_M);
+			// Grows with camera distance AND with the field, so the ring keeps its apparent size.
+			const rr = haloRadius(halo.position.distanceTo(g.camera.position), g.camera.fov, HALO_PER_M, HALO_MIN_R);
 			halo.scale.set(rr, 1, rr);
 		}
 
@@ -1200,18 +1437,42 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 		g.fx.update(dt);
 
-		/* --- camera --- */
-		if (viewRef.current === 'dessus') {
-			overviewCamera(g.camera, jackRef.current ?? m.circle);
+		/* --- camera: focus, then field, then pose --- */
+		const view = viewRef.current;
+		const ground = heightAt(s.t, m.circle.x, m.circle.y);
+
+		// The field comes before the pose: topCamera solves its height from the fov.
+		const wantFov = verticalFov(VIEW_HFOV[introRef.current?.stage === 'hold' ? 'tete' : view], g.camera.aspect);
+		fovRef.current = fovRef.current === 0 ? wantFov
+			: fovRef.current + (wantFov - fovRef.current) * (1 - Math.exp(-dt / FOV_TAU));
+		if (Math.abs(g.camera.fov - fovRef.current) > 1e-3) {
+			g.camera.fov = fovRef.current;
+			g.camera.updateProjectionMatrix();
+		}
+
+		if (view === 'dessus') {
+			// Anchored on the CIRCLE, never on the jack. While the jack is placed by hand it is still
+			// live wherever the illegal throw left it, so following it dragged the eye off the pitch
+			// and left the legal window behind the camera.
+			const jackPhase = m.phase === 'throw-jack' || m.phase === 'place-jack';
+			const far = jackPhase ? MAX_JACK : Math.max(MIN_JACK, dist2(m.circle, headFocus()));
+			const fr = laneFrame(m.circle, m.dir, far);
+			topCamera(g.camera, fr.focus, m.dir, fr.along, PITCH_W + 1, ground);
+		} else if (view === 'tete') {
+			// Its own yaw and pitch: inspecting the boules must never move the throw.
+			const hf = headFocus();
+			headCamera(g.camera, hf, headYawRef.current, headPitchRef.current, headDistRef.current,
+				heightAt(s.t, hf.x, hf.y));
 		} else {
 			const rolling = statusRef.current === 'rolling';
 			const wantPitch = rolling ? Math.max(camPitchRef.current, ROLL_PITCH) : camPitchRef.current;
 			viewPitchRef.current += (wantPitch - viewPitchRef.current) * (1 - Math.exp(-dt / PITCH_TAU));
-			// Walking is eased too, otherwise a tap on the step buttons teleports the eye.
-			walkViewRef.current += (walkRef.current - walkViewRef.current) * (1 - Math.exp(-dt / WALK_TAU));
-			const ground = heightAt(s.t, m.circle.x, m.circle.y);
+			// Walking is eased too, otherwise a tap on the step buttons teleports the eye. Under a
+			// thumb on the slider the same easing reads as latency, so the drag gets a shorter one.
+			const wtau = walkDragRef.current ? WALK_DRAG_TAU : WALK_TAU;
+			walkViewRef.current += (walkRef.current - walkViewRef.current) * (1 - Math.exp(-dt / wtau));
 			aimCamera(g.camera, m.circle, m.dir, viewPitchRef.current, yawRef.current, CAM_DIST, ground,
-				walkViewRef.current, viewRef.current === 'premiere');
+				walkViewRef.current, true);
 			const h = aimHeading();
 			const live = rolling ? s.bs.find((b) => b.live && Math.sqrt(b.vx * b.vx + b.vy * b.vy) > 0.05) : undefined;
 			const focus = live ?? (statusRef.current === 'placing' ? placeRef.current : null);
@@ -1230,7 +1491,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			lookRef.current.lerp(want, 1 - Math.exp(-dt / LOOK_TAU));
 			g.camera.lookAt(lookRef.current);
 		}
-	}, [aiAct, aimHeading, layGround, nextEnd, onImpact, onSettled, rebuildArc]);
+	}, [aiAct, aimHeading, headFocus, layGround, maybeIntro, nextEnd, onImpact, onSettled, rebuildArc]);
 
 	const tickRef = useRef(tick);
 	tickRef.current = tick;
@@ -1298,11 +1559,34 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				side: b.side,
 				m: Math.round(far * 10) / 10,
 				body: Math.round(b.r * 2 * k),
-				halo: Math.round(Math.max(HALO_MIN_R, far * HALO_PER_M) * 2 * k),
+				halo: Math.round(haloRadius(far, g.camera.fov, HALO_PER_M, HALO_MIN_R) * 2 * k),
 				px: Math.round(((p.x + 1) / 2) * w),
 				py: Math.round(((1 - p.y) / 2) * h),
 			};
 		}).filter(Boolean);
+	}, []);
+
+	/**
+	 * The previewed arc in CSS pixels, minus its first metre and a half. Those points sit inside the
+	 * player's own hand: at a grazing camera they fall thirty degrees below the axis, off the frame,
+	 * and they swamped both numbers below — one read 5947 px of bow. The flight is the question.
+	 */
+	const arcScreen = useCallback((): { x: number; y: number; on: boolean }[] => {
+		const g = g3Ref.current;
+		if (!g) return [];
+		const el = g.renderer.domElement, w = el.clientWidth, h = el.clientHeight;
+		const v = new THREE.Vector3();
+		const out: { x: number; y: number; on: boolean }[] = [];
+		for (const p of arcPtsRef.current) {
+			if (p.distanceTo(g.camera.position) < ARC_NEAR) continue;
+			v.copy(p).project(g.camera);
+			out.push({
+				x: ((v.x + 1) / 2) * w,
+				y: ((1 - v.y) / 2) * h,
+				on: Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1 && v.z <= 1,
+			});
+		}
+		return out;
 	}, []);
 
 	/**
@@ -1312,14 +1596,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	 * invisible. This is the number that guards it.
 	 */
 	const arcBow = useCallback((): number => {
-		const g = g3Ref.current, pts = arcPtsRef.current;
-		if (!g || pts.length < 3) return 0;
-		const el = g.renderer.domElement, w = el.clientWidth, h = el.clientHeight;
-		const v = new THREE.Vector3();
-		const flat = pts.map((p) => {
-			v.copy(p).project(g.camera);
-			return { x: ((v.x + 1) / 2) * w, y: ((1 - v.y) / 2) * h };
-		});
+		const flat = arcScreen();
+		if (flat.length < 3) return 0;
 		const a = flat[0], b = flat[flat.length - 1];
 		const dx = b.x - a.x, dy = b.y - a.y;
 		const len = Math.sqrt(dx * dx + dy * dy);
@@ -1327,6 +1605,31 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		let max = 0;
 		for (const p of flat) max = Math.max(max, Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len);
 		return Math.round(max);
+	}, [arcScreen]);
+
+	/** Share of the previewed arc that actually projects inside the frame. A tighter field can crop
+	 *  the apex of a lob, and `bow` alone would not see it. */
+	const arcOnScreen = useCallback((): number => {
+		const flat = arcScreen();
+		if (!flat.length) return 1;
+		return Math.round((flat.filter((p) => p.on).length / flat.length) * 100) / 100;
+	}, [arcScreen]);
+
+	/** Bug 7 as a number: with the top view up, is the whole legal jack window on screen? */
+	const topFrames = useCallback((): { circle: boolean; near: boolean; far: boolean } | null => {
+		const g = g3Ref.current;
+		if (!g || viewRef.current !== 'dessus') return null;
+		const c = matchRef.current.circle, dir = matchRef.current.dir;
+		const v = new THREE.Vector3();
+		const on = (x: number, y: number): boolean => {
+			v.set(wx(x), 0, wz(y)).project(g.camera);
+			return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1 && v.z <= 1;
+		};
+		return {
+			circle: on(c.x, c.y),
+			near: on(c.x, c.y + dir * MIN_JACK),
+			far: on(c.x, c.y + dir * MAX_JACK),
+		};
 	}, []);
 
 	// Read-only snapshot for the smoke check.
@@ -1345,6 +1648,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			loft: elevationForPitch(camPitchRef.current),
 			view: viewRef.current,
 			walk: walkRef.current,
+			fov: Math.round((g3Ref.current?.camera.fov ?? 0) * 10) / 10,
+			// Where the arm strip starts, in canvas-relative px, and what the current drag is doing.
+			arm: (() => {
+				const cv = canvasRef.current;
+				if (!cv) return null;
+				const r = cv.getBoundingClientRect();
+				return { top: Math.round(armTop(r) - r.top), height: Math.round(r.height), mode: dragRef.current?.mode ?? null };
+			})(),
+			intro: introRef.current ? introRef.current.stage : null,
 			fx: g3Ref.current?.fx.stats() ?? null,
 			// Everything the daily needs is derived from dailyRef, never from state: this effect
 			// runs once, so any state it closed over would be the mount value forever.
@@ -1359,6 +1671,20 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			// so this is the only honest way to ask whether the board is readable.
 			seen: screenSizes(),
 			bow: arcBow(),
+			arcOnScreen: arcOnScreen(),
+			// How many points the two numbers above were judged on, and which edge loses the rest:
+			// "the arc is cropped" is four different bugs and they have four different fixes.
+			arc: (() => {
+				const cv = canvasRef.current, pts = arcScreen();
+				const w = cv?.clientWidth ?? 0;
+				const off = { left: 0, right: 0, up: 0, down: 0 };
+				for (const p of pts.filter((q) => !q.on)) {
+					if (p.x < 0) off.left++; else if (p.x > w) off.right++;
+					else if (p.y < 0) off.up++; else off.down++;
+				}
+				return { n: pts.length, ...off };
+			})(),
+			topFrames: topFrames(),
 			online: onlineRef.current ? { side: mySideRef.current, host: netRef.current?.isHost() ?? false } : null,
 			// The opponent drawing back, and whether their ray is actually on screen. Two questions:
 			// the message can land and the ray still not be built.
@@ -1369,7 +1695,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			terrain: terrainStamp(simRef.current?.t ?? null),
 		});
 		return () => { delete (window as unknown as { __petanque?: unknown }).__petanque; };
-	}, [screenSizes, arcBow]);
+	}, [arcBow, arcOnScreen, arcScreen, armTop, screenSizes, topFrames]);
 
 
 	/* ---------- HUD ---------- */
@@ -1390,12 +1716,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			: st ? `${KIND_LABEL[st.kind]} à ${st.dist} m — tire !`
 			: 'Préparation du défi…')
 		: status === 'placing'
-		? (myTurn ? '✋ Touche le sol pour poser le bouchon' : 'L’adversaire place le bouchon…')
+		? (myTurn ? '✋ Touche le sol dans l’anneau jaune' : 'L’adversaire place le bouchon…')
 		: status === 'rolling' ? 'La boule roule…'
 		: !myTurn ? (online ? 'L’adversaire joue…' : 'L’adversaire réfléchit…')
+		: view !== 'jeu' ? '👁 Repasse en vue Jeu pour lancer'
 		: match.phase === 'throw-jack' ? 'À toi de lancer le bouchon'
-		: holder === mySide ? 'Tu as le point'
-		: holder === foeSide ? 'L’adversaire a le point'
+		: holder === mySide ? '🎯 Tu as le point — à toi de jouer'
+		: holder === foeSide ? 'L’adversaire a le point — à toi de jouer'
 		: 'À toi de jouer';
 
 	return (
@@ -1425,22 +1752,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 								<span className="pe-stat">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
 							</>
 						) : (
-							<>
-								<span className="pe-stat">🏆 {match.scores[mySide]} — {match.scores[foeSide]}</span>
-								<span className="pe-stat">Mène {match.endNo}</span>
-								{lv.active && !lv.menu && <span className="pe-stat">🎯 Niveau {lv.level}</span>}
-								<span className="pe-stat pe-boules">
-									<span className="pe-dots me">{'●'.repeat(match.left[mySide])}{'○'.repeat(BOULES_PER_SIDE - match.left[mySide])}</span>
-									<span className="pe-dots foe">{'●'.repeat(match.left[foeSide])}{'○'.repeat(BOULES_PER_SIDE - match.left[foeSide])}</span>
-								</span>
-							</>
+							lv.active && !lv.menu && <span className="pe-stat">🎯 Niveau {lv.level}</span>
 						)}
 					</div>
 					<div className="pe-hud-actions">
 						{!daily && !lv.active && mpPhase === 'off' && withExpert(DIFF_ORDER, gameId).map((k) => (
 							<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title="Force de l’adversaire et terrain">{DIFFS[k as DiffKey].label}</button>
 						))}
-						<button className="pe-act" onClick={cycleView} aria-label={VIEWS[view].label} title={`${VIEWS[view].label} (V)`}>{VIEWS[view].icon}</button>
 						{mpPhase !== 'off' ? (
 							<button className="pe-act" onClick={leaveOnline} aria-label="Quitter la partie en ligne" title="Quitter la partie en ligne">🚪</button>
 						) : !daily && (
@@ -1453,14 +1771,42 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${course ? SURFACES[course.surface].label : ''}`}
 					</div>
 				) : (
-					<div className="pe-vs">
-						<span className={`pe-vs-p ${myTurn && status !== 'rolling' ? 'on' : ''}`}>😎 Toi</span>
-						<span className="pe-vs-mid">vs</span>
-						<span className={`pe-vs-p ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>
+					/* The TV board: who plays, how many boules each side has left, and the score.
+					   Boules are coloured by SIDE, never a hardcoded green and red — online the guest
+					   sits in seat 1, so its own rings are the red ones. */
+					<div className="pe-board">
+						<div className={`pe-side ${myTurn && status !== 'rolling' ? 'on' : ''}`}>
+							<span className="pe-side-name">😎 Toi</span>
+							<span className="pe-dots" style={{ color: hex(HALO[mySide]) }}>
+								{'●'.repeat(match.left[mySide])}{'○'.repeat(BOULES_PER_SIDE - match.left[mySide])}
+							</span>
+							<span className="pe-pt">{holder === mySide ? '🎯' : ''}</span>
+						</div>
+						<div className="pe-board-mid">
+							<span className="pe-board-score">{match.scores[mySide]} — {match.scores[foeSide]}</span>
+							<span className="pe-board-end">Mène {match.endNo}</span>
+						</div>
+						<div className={`pe-side foe ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>
+							<span className="pe-pt">{holder === foeSide ? '🎯' : ''}</span>
+							<span className="pe-dots" style={{ color: hex(HALO[foeSide]) }}>
+								{'●'.repeat(match.left[foeSide])}{'○'.repeat(BOULES_PER_SIDE - match.left[foeSide])}
+							</span>
+							<span className="pe-side-name">
 								{online ? `🧑 ${mpOpp ?? 'Adversaire'}` : `🤖 ${lv.active ? `IA ${Math.round(levelSkillRef.current * 100)}%` : DIFFS[diff].label}`}
 							</span>
+						</div>
 					</div>
 				)}
+				{/* Its own row, never inside pe-hud-actions: that one goes fixed bottom-right in
+				    fullscreen, where it would sit on the throwing strip and on the Quitter button. */}
+				<div className="pe-views" role="tablist" aria-label="Vue de la caméra">
+					{VIEW_ORDER.map((k) => (
+						<button key={k} role="tab" aria-selected={view === k} className={`pe-view ${view === k ? 'on' : ''}`}
+							onClick={() => setViewKey(k)} title={`${VIEWS[k].label} (V)`}>
+							{VIEWS[k].icon} <span className="pe-view-txt">{VIEWS[k].label}</span>
+						</button>
+					))}
+				</div>
 				{!daily && match.lastEvent && status !== 'end' && <div className="pe-tag">{match.lastEvent}</div>}
 			</div>
 
@@ -1475,22 +1821,47 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 				{/* The loft gauge. The camera-drives-loft mechanic is invented here, so nothing on
 				    screen may leave it implicit — this gauge is the tutorial. */}
-				<div className="pe-loft">
-					<span className="pe-loft-label">{LOFT_LABEL(loft)}</span>
-					<div className="pe-loft-bar"><div className="pe-loft-fill" style={{ height: `${Math.round(((loft - 0.17) / (0.92 - 0.17)) * 100)}%` }} /></div>
-					<span className="pe-loft-hint">molette / 2 doigts</span>
-				</div>
+				{view === 'jeu' && (
+					<div className="pe-loft">
+						<span className="pe-loft-label">{LOFT_LABEL(loft)}</span>
+						<div className="pe-loft-bar"><div className="pe-loft-fill" style={{ height: `${Math.round(((loft - 0.17) / (0.92 - 0.17)) * 100)}%` }} /></div>
+						<span className="pe-loft-hint">glisse sur l’image</span>
+					</div>
+				)}
 
 				{/* Walk up the lane to read the head. Loft lives on the left, the feet on the right, so
 				    the two are never confused — walking must not read as a throw change. */}
-				{view !== 'dessus' && (
+				{view === 'jeu' && (
 					<div className="pe-walk">
 						<button className="pe-walk-btn" onClick={() => walkBy(WALK_STEP)} disabled={walk >= WALK_MAX} aria-label="Avancer vers le bouchon" title="Avancer (W)">▲</button>
-						<div className="pe-walk-bar"><div className="pe-walk-fill" style={{ height: `${Math.round((walk / WALK_MAX) * 100)}%` }} /></div>
+						<div
+							ref={walkTrackRef}
+							className="pe-walk-bar"
+							role="slider"
+							tabIndex={0}
+							aria-label="Avancer vers les boules"
+							aria-valuemin={0}
+							aria-valuemax={Math.round(WALK_MAX)}
+							aria-valuenow={Math.round(walk * 10) / 10}
+							aria-valuetext={walk > 0 ? `${walk.toFixed(1)} mètres devant le cercle` : 'au cercle'}
+							onPointerDown={onWalkDown}
+							onKeyDown={onWalkKey}
+						>
+							<div className="pe-walk-fill" style={{ height: `${Math.round((walk / WALK_MAX) * 100)}%` }} />
+						</div>
 						<button className="pe-walk-btn" onClick={() => walkBy(-WALK_STEP)} disabled={walk <= 0} aria-label="Reculer" title="Reculer (S)">▼</button>
 						<span className="pe-walk-label">{walk > 0 ? `+${walk.toFixed(1)} m` : 'au cercle'}</span>
 					</div>
 				)}
+
+				{/* The arm. Purely a drawing: the hit test lives in aimStart, so there is exactly one
+				    way into a throw and this cannot swallow a camera drag. */}
+				<div className={`pe-arm ${view === 'jeu' ? '' : 'off'}`} aria-hidden="true">
+					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
+					<span className="pe-arm-label">
+						{view === 'jeu' ? 'Glisse vers le haut pour lancer' : '👁 Touche ici pour revenir en vue Jeu'}
+					</span>
+				</div>
 
 				<div className="pe-power" aria-hidden="true">
 					<div className="pe-power-fill" style={{ width: `${Math.round(power * 100)}%` }} />
@@ -1591,8 +1962,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="pe-help">
-				Glisse vers le <strong>haut</strong> pour la puissance, sur les <strong>côtés</strong> pour la direction, relâche pour lancer.
-				L’<strong>inclinaison de la caméra</strong> règle la hauteur du lob : caméra rasante = portée haute, caméra plongeante = roulette.
+				La <strong>bande du bas</strong>, c’est ton bras : glisse vers le haut pour la puissance, relâche pour lancer.
+				Partout ailleurs sur l’image, tu <strong>tournes la caméra</strong> — et la caméra, c’est ta visée : latéral = direction,
+				vertical = hauteur du lob (caméra rasante = portée haute, caméra plongeante = roulette).
+				Les vues 🔍 et 🛩 servent à regarder ; on ne lance qu’en vue 👁.
 				{daily
 					? ` Défi du jour : ${STATIONS} ateliers, une boule chacun. Carreau = 5 pts, cible sortie = 3, touchée en place = 1. Le chrono départage les ex æquo.`
 					: <> Bouchon entre 6 et 10 m, sinon c’est à l’adversaire de le poser. Celui qui n’a pas le point rejoue. Premier à {match.target}.</>}
@@ -1636,12 +2009,15 @@ const CSS = `
 /* Fullscreen means the pitch is the interface: the mode tabs only leave the game, and they
    collide with the Quitter button. Same call as billard. */
 .game-page.gf-full .pe-modetoggle { display: none; }
-.game-page.gf-full .pe-vs { order: -1; margin-top: 0; }
+.game-page.gf-full .pe-board { order: -1; margin-top: 0; }
+/* Only pe-hud-top children get their pointer events back above, so the views row needs its own
+   rule — without it the segments are dead in fullscreen, on the platform that needs them most. */
+.game-page.gf-full .pe-views { pointer-events: auto; }
 .game-page.gf-full .pe-hud-actions {
   position: fixed; z-index: 4; max-width: 45vw;
   right: max(8px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom));
 }
-.game-page.gf-full .pe-stat, .game-page.gf-full .pe-vs-p { font-size: 12px; padding: 4px 10px; }
+.game-page.gf-full .pe-stat { font-size: 12px; padding: 4px 10px; }
 .game-page.gf-full .pe-act, .game-page.gf-full .pe-pill { font-size: 12px; padding: 4px 10px; }
 
 .pe-topbar { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -1668,10 +2044,25 @@ const CSS = `
 .pe-act { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(28,20,12,0.55); color: #f0e6da; font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 6px 12px; min-width: 36px; cursor: pointer; backdrop-filter: blur(4px); }
 .pe-act:hover { border-color: var(--pe-accent); color: #fff; }
 
-.pe-vs { display: flex; align-items: center; gap: 8px; justify-content: center; pointer-events: none; flex-wrap: wrap; }
-.pe-vs-p { background: rgba(28,20,12,0.6); color: #e8ddcf; font-weight: 700; font-size: 13px; padding: 5px 13px; border-radius: 999px; backdrop-filter: blur(4px); border: 1.5px solid transparent; }
-.pe-vs-p.on { background: var(--pe-accent); color: var(--accent-text-over); border-color: var(--pe-accent); }
-.pe-vs-mid { color: #d8cbb8; font-size: 11px; font-weight: 700; opacity: 0.75; }
+/* The TV board. The active side is marked three times — ring, pulsing dot, and the hint at the
+   bottom — because on a phone any one of them alone is missable. */
+.pe-board { width: 100%; max-width: 460px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; background: rgba(28,20,12,0.62); border: 1.5px solid rgba(255,255,255,0.14); border-radius: 14px; padding: 5px 9px; backdrop-filter: blur(4px); pointer-events: none; }
+.pe-side { display: flex; align-items: center; gap: 6px; min-width: 0; border: 1.5px solid transparent; border-radius: 999px; padding: 2px 7px; }
+.pe-side.foe { justify-content: flex-end; }
+.pe-side.on { border-color: var(--pe-accent); background: color-mix(in srgb, var(--pe-accent) 22%, transparent); }
+.pe-side.on .pe-side-name::after { content: '●'; margin-left: 5px; font-size: 9px; color: var(--pe-accent); animation: pe-beat 1.1s ease-in-out infinite; }
+@keyframes pe-beat { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.pe-side-name { color: #f0e6da; font-weight: 700; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pe-dots { letter-spacing: 1px; font-size: 13px; line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+.pe-pt { font-size: 11px; width: 13px; text-align: center; }
+.pe-board-mid { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.pe-board-score { color: #fff; font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+.pe-board-end { color: #d8cbb8; font-size: 10px; font-weight: 700; opacity: 0.85; }
+
+.pe-views { display: flex; gap: 2px; background: rgba(28,20,12,0.6); border: 1.5px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 2px; backdrop-filter: blur(4px); }
+.pe-view { border: none; background: transparent; color: #e8ddcf; font: inherit; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 4px 11px; cursor: pointer; white-space: nowrap; }
+.pe-view.on { background: var(--pe-accent); color: var(--accent-text-over); }
+@media (max-width: 420px) { .pe-view-txt { display: none; } }
 .pe-tag { background: rgba(28,20,12,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; text-align: center; max-width: 96%; }
 
 /* Vertical gauge on the left edge: it is the only thing telling the player the camera is a control. */
@@ -1686,9 +2077,18 @@ const CSS = `
 .pe-walk-btn { border: 1.5px solid rgba(255,255,255,0.28); background: rgba(28,20,12,0.55); color: #f0e6da; font: inherit; font-weight: 700; font-size: 13px; line-height: 1; border-radius: 999px; width: 30px; height: 26px; cursor: pointer; backdrop-filter: blur(4px); }
 .pe-walk-btn:hover:not(:disabled) { border-color: var(--pe-accent); color: #fff; }
 .pe-walk-btn:disabled { opacity: 0.35; cursor: default; }
-.pe-walk-bar { width: 9px; height: 86px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+/* Draggable: the thumb sets the distance directly. The ▲▼ stay as the accessible fallback. */
+.pe-walk-bar { width: 16px; height: 96px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; cursor: ns-resize; touch-action: none; }
+.pe-walk-bar:focus-visible { outline: 2px solid var(--pe-accent); outline-offset: 2px; }
 .pe-walk-fill { width: 100%; background: linear-gradient(180deg, #8ce99a, #30d158); transition: height 0.12s linear; }
 .pe-walk-label { color: #f0e6da; font-size: 10px; font-weight: 700; opacity: 0.85; text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
+
+/* The throwing strip. Drawing only — aimStart owns the hit test, so there is one path into a
+   throw and this can never swallow a camera drag. */
+.pe-arm { position: absolute; left: 0; right: 0; bottom: 0; height: clamp(90px, 25%, 170px); z-index: 2; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border-top: 1.5px dashed rgba(255,255,255,0.3); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.34) 100%); }
+.pe-arm.off { border-top-style: dotted; border-top-color: rgba(255,255,255,0.18); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.2) 100%); }
+.pe-arm-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(140,233,154,0.10), rgba(255,107,107,0.30)); }
+.pe-arm-label { position: relative; color: #f0e6da; font-size: 10.5px; font-weight: 700; opacity: 0.75; text-shadow: 0 1px 3px rgba(0,0,0,0.8); margin-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 34px); }
 
 .pe-power { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(12px, env(safe-area-inset-bottom)); width: min(58%, 280px); height: 9px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); overflow: hidden; z-index: 3; pointer-events: none; }
 .pe-power-fill { height: 100%; background: linear-gradient(90deg, #8ce99a, #ffd166 55%, #ff6b6b); }
