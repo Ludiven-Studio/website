@@ -6,7 +6,7 @@ import ContactCTA from '../../components/ContactCTA.astro';
 import LangSwitch from '../../components/LangSwitch.astro';
 import type { iconPaths } from '../../components/IconPaths';
 
-// Mirrors /services — keep both lists in step when the offer changes.
+// Mirrors /prestations — keep both lists in step when the offer changes.
 const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
 	{ icon: 'code', title: 'Unity development', body: 'From the idea to a shipped product: Unity apps and games — mobile, desktop and WebGL — with code built to last.' },
 	{ icon: 'mobile', title: 'iOS & Android apps', body: 'Your apps built with Unity, with real access to native features (sensors, notifications, offline mode), then shipped to the App Store and Google Play: signed builds, certificates, store listings and review rules.' },
@@ -40,11 +40,11 @@ const jsonLd = {
 };
 ---
 
-<BaseLayout title={title} description={description} lang="en" altLang="/services/">
+<BaseLayout title={title} description={description} lang="en" altLang="/prestations/">
 	<div class="stack gap-20">
 		<main class="wrapper stack gap-12">
 			<div class="stack gap-8">
-				<LangSwitch lang="en" href="/services/" />
+				<LangSwitch lang="en" href="/prestations/" />
 				<Hero
 					title="Services"
 					tagline="A Unity developer since 2010, I take your project from concept to production: apps, games and immersive experiences — in France and remotely."

@@ -1,145 +1,119 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Hero from '../components/Hero.astro';
-import Icon from '../components/Icon.astro';
-import ContactCTA from '../components/ContactCTA.astro';
-import LangSwitch from '../components/LangSwitch.astro';
-import type { iconPaths } from '../components/IconPaths';
 
-// Two tiers: the offers a client actually buys, then the finer work that comes with them.
-const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
-	{ icon: 'code', title: 'Développement Unity', body: 'De l\'idée au produit livré : applications et jeux sous Unity — mobile, desktop et WebGL — avec un code pensé pour durer.' },
-	{ icon: 'mobile', title: 'Applications mobiles iOS & Android', body: 'Vos applications développées sous Unity avec un vrai accès aux fonctions natives (capteurs, notifications, hors-ligne), puis publiées sur l\'App Store et Google Play : builds signés, certificats, fiches store et règles de validation.' },
-	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Des expériences immersives VR/XR pour la formation, la simulation ou le jeu, sur casque comme sur mobile.' },
-	{ icon: 'strategy', title: 'Multijoueur temps réel', body: 'Du temps réel qui tient la route : synchronisation, netcode, serveurs headless, avec Photon ou Netcode for GameObjects — du prototype à la production.' },
-	{ icon: 'scales', title: 'Audit, reprise & optimisation', body: 'Audit, correction de bugs, montée de version et déblocage des problèmes tenaces. Puis les perfs : plus de fluidité, moins de mémoire, un build plus léger.' },
-	{ icon: 'pencil-line', title: 'Formation & accompagnement', body: 'Sessions sur-mesure sur Unity et C#, encadrement technique, revues de code et suivi d\'alternants ou de développeurs juniors.' },
+// The whole hub. Adding a service = adding one entry here.
+const services: { emoji: string; title: string; pitch: string; href: string; note: string }[] = [
+	{
+		emoji: '🛒',
+		title: 'Mes courses',
+		pitch: "Une liste de courses partagée entre plusieurs téléphones, rangée par rayon. Elle se met à jour en direct pendant que l'autre fait les courses.",
+		href: '/courses',
+		note: 'Sans inscription · lien à partager',
+	},
+	{
+		emoji: '🎯',
+		title: 'Rencontres pétanque',
+		pitch: "La carte des parties de pétanque autour de toi. Vois qui joue, quand, et combien il manque de joueurs — ou pose la tienne en deux minutes.",
+		href: '/rencontres',
+		note: 'Sans inscription · Isère et alentours',
+	},
 ];
 
-// Finer work, usually bundled with a prestation above rather than sold on its own.
-const focused: { title: string; body: string }[] = [
-	{ title: 'Structuration de projet', body: 'Architecture, organisation du code et bonnes pratiques pour un projet Unity qui reste sain.' },
-	{ title: 'Gameplays & moteur physique', body: 'Des mécaniques originales conçues selon votre idée, collisions et simulations réglées finement.' },
-	{ title: 'Interfaces & menus in-game', body: 'Des écrans clairs, réactifs et agréables à utiliser.' },
-	{ title: 'AssetBundles & Addressables', body: 'Chargement et gestion des ressources à la demande, proprement.' },
-	{ title: 'Outils internes & debug', body: 'Une boîte à outils maison et des raccourcis de test pour accélérer le développement et la QA.' },
-	{ title: 'Localisation multilingue', body: 'Des textes prêts à être traduits et affichés en plusieurs langues.' },
-	{ title: 'Sons & musiques', body: 'Intégration audio : SFX, musiques et réglages de volume.' },
-];
-
-const title = 'Services — Développement Unity, mobile, VR & multijoueur | Ludiven Studio';
-const description = 'Prestations de développement Unity : applications mobiles, jeux, expériences VR/XR et multijoueur temps réel, de la conception à la mise en production. Développeur Unity depuis 2010, en France et à distance.';
-
-const jsonLd = {
-	'@context': 'https://schema.org',
-	'@type': 'ProfessionalService',
-	name: 'Ludiven Studio',
-	url: 'https://www.ludiven-studio.fr/services/',
-	description,
-	areaServed: { '@type': 'Country', name: 'France' },
-	provider: { '@type': 'Organization', name: 'Ludiven Studio', url: 'https://www.ludiven-studio.fr/' },
-	serviceType: [...services, ...focused].map((s) => s.title),
-};
+const title = 'Services en ligne gratuits, sans inscription | Ludiven Studio';
+const description = "Des petits services web gratuits et utilisables sans compte : liste de courses partagée, carte des parties de pétanque près de chez vous.";
 ---
 
-<BaseLayout title={title} description={description} altLang="/en/services/">
+<BaseLayout title={title} description={description}>
 	<div class="stack gap-20">
 		<main class="wrapper stack gap-12">
-			<div class="stack gap-8">
-				<LangSwitch lang="fr" href="/en/services/" />
-				<Hero
-					title="Services"
-					tagline="Développeur Unity depuis 2010, je vous accompagne de la conception à la mise en production : applications, jeux et expériences immersives — en France comme à distance."
-					align="start"
-				/>
+			<Hero
+				title="Services"
+				tagline="Des petits services en ligne, gratuits et sans inscription. Tu ouvres le lien, tu t'en sers, c'est tout."
+				align="start"
+			/>
+
+			<div class="services">
+				{services.map((t) => (
+					<a class="service" href={t.href}>
+						<span class="service-emoji" aria-hidden="true">{t.emoji}</span>
+						<h2>{t.title}</h2>
+						<p>{t.pitch}</p>
+						<span class="service-note">{t.note}</span>
+					</a>
+				))}
 			</div>
 
-			<section class="stack gap-4">
-				<h2 class="section-title">Prestations</h2>
-				<div class="box services">
-					{services.map((s) => (
-						<div class="stack gap-2 lg:gap-4">
-							<Icon icon={s.icon} color="var(--accent-regular)" size="2.5rem" gradient />
-							<h3>{s.title}</h3>
-							<p>{s.body}</p>
-						</div>
-					))}
-				</div>
-			</section>
-
-			<section class="stack gap-4">
-				<h2 class="section-title">Interventions ciblées</h2>
-				<div class="box focused">
-					{focused.map((s) => (
-						<div>
-							<h3>{s.title}</h3>
-							<p>{s.body}</p>
-						</div>
-					))}
-				</div>
-			</section>
+			<p class="services-more">
+				D'autres services arriveront ici au fil de l'eau. Une idée&nbsp;?
+				<a href="/about#contact">Dis-la-moi</a>.
+			</p>
 		</main>
-
-		<ContactCTA />
 	</div>
-
-	<script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
 </BaseLayout>
 
 <style>
-	.box {
-		border: 1px solid var(--gray-800);
-		border-radius: 0.75rem;
-		padding: 1.5rem;
-		background-color: var(--gray-999_40);
-		box-shadow: var(--shadow-sm);
+	.services {
+		display: grid;
+		gap: 1.5rem;
+		grid-template-columns: 1fr;
 	}
 
-	.section-title {
+	.service {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding: 1.75rem;
+		border-radius: 0.9rem;
+		background: var(--gray-999_40);
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-sm);
+		color: var(--gray-300);
+		text-decoration: none;
+		transition:
+			border-color var(--theme-transition),
+			box-shadow var(--theme-transition),
+			transform var(--theme-transition);
+	}
+
+	.service:hover,
+	.service:focus-visible {
+		border-color: var(--accent-regular);
+		box-shadow: var(--shadow-md);
+		transform: translateY(-2px);
+	}
+
+	.service-emoji {
+		font-size: 2.25rem;
+		line-height: 1;
+	}
+
+	.service h2 {
 		font-size: var(--text-xl);
 		color: var(--gray-0);
 	}
 
-	.services {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 2.5rem;
+	.service p {
+		margin: 0;
+		line-height: 1.5;
 	}
 
-	.services h3 {
-		font-size: var(--text-lg);
+	.service-note {
+		margin-top: auto;
+		padding-top: 0.5rem;
+		font-size: var(--text-sm);
+		color: var(--accent-regular);
 	}
 
-	.focused {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 1.5rem;
-	}
-
-	.focused h3 {
-		font-size: var(--text-md);
-		color: var(--gray-0);
-	}
-
-	.services p,
-	.focused p {
+	.services-more {
 		color: var(--gray-400);
+		font-size: var(--text-sm);
 	}
 
 	@media (min-width: 50em) {
-		.box {
-			border-radius: 1.5rem;
-			padding: 2.5rem;
-		}
-
 		.services {
 			grid-template-columns: repeat(2, 1fr);
-			gap: 3rem 5rem;
-		}
-
-		.focused {
-			grid-template-columns: repeat(2, 1fr);
-			gap: 1.75rem 5rem;
+			gap: 2rem;
 		}
 	}
 </style>

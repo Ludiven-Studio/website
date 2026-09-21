@@ -15,6 +15,10 @@ export default defineConfig({
         '/jeux/tectonique': '/jeux/tapis',
         '/jeux/bolides': '/jeux/course-de-peinture',
         '/jeux/caisses-a-peinture': '/jeux/course-de-peinture',
+        // Renamed pages: the Unity offer moved to /prestations so /services could
+        // become the free-services hub. Old /services links land on the hub — no
+        // redirect is possible, a real page now owns that path.
+        '/outils': '/services',
         // The legal pages live under the app's internal code name and are declared as-is
         // in both store listings — don't move them, just stop 404ing on the parent.
         '/petanque-ar': '/petanque-scanner/',
