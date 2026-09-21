@@ -138,6 +138,7 @@ const JACK_AIM_R = 0.45; // m — the target ring for the jack throw, a bullseye
    official answer to it — it is just no longer the coin flip the far edge used to be. */
 const AIM_LO = MIN_JACK + 0.5, AIM_HI = MAX_JACK - 1.0;
 
+const AIM_DEAD_PX = 8; // sideways slack before a power pull counts as a direction change
 const ARM_H = 0.25; // share of the canvas height that is the throwing arm, not the camera
 const ARM_MIN_PX = 90;
 const ARM_MAX_PX = 170;
@@ -249,9 +250,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* Camera and aim are two different things, and used to be one. The camera is free — look
 	   wherever you like, whenever you like. The aim is SAMPLED off it the instant a drag starts in
-	   the throwing strip, and frozen for the rest of that drag: the rest of the gesture is power
-	   only. That is what lets the view be a view and still be the thing that sets the throw.
-	   `aimPitchRef` is the loft. Exactly two writers: `syncAim`, and the sample in `aimStart`. */
+	   the throwing strip; from there the strip owns it and the camera cannot take it back.
+	   Inside that drag, up/down is power and left/right is direction — so a throw can be lined up
+	   without disturbing the framing the player chose.
+	   `aimPitchRef` is the loft, and it IS frozen for the drag: the pitch has nowhere to go in a
+	   gesture whose vertical axis is already power.
+	   Writers: `syncAim`, the sample in `aimStart`, and the yaw steer in `aimMove`. */
 	const dragRef = useRef<Drag | null>(null);
 	const powerRef = useRef(0);
 	const camYawRef = useRef(0);
@@ -1182,11 +1186,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			zoomRef.current = 0;
 			setZoom(0);
 			powerRef.current = 0;
-			// Sample the aim off the camera HERE, and nowhere after: this is the moment the player
-			// commits to a direction and a loft. `syncAim` refuses once the drag is armed, so the
-			// order matters — arm second.
+			// Sample the aim off the camera HERE: this is the moment the player commits to a loft,
+			// and the starting direction the sideways steer works from. `syncAim` refuses once the
+			// drag is armed, so the order matters — arm second.
 			syncAim();
-			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: 0, b0: 0 };
+			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: aimYawRef.current, b0: 0 };
 			setArmed(true);
 			aimDirtyRef.current = true;
 			return;
@@ -1221,7 +1225,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (d.mode === 'arm') {
 			if (!canThrow()) return;
 			const p = Math.max(0, Math.min(1, (d.y0 - y) / POWER_PX));
-			if (p !== powerRef.current) aimDirtyRef.current = true;
+			// Sideways in the strip steers the throw and nothing else — the eye keeps the framing it
+			// had. Same rad-per-px as the camera drag, so the gesture reads the same wherever the
+			// thumb is. The dead band is not polish: a thumb pulling 190 px down wanders 10-30 px
+			// sideways on the way, which without it is a degree or two of drift nobody asked for.
+			const dx = x - d.x0;
+			const steer = Math.abs(dx) <= AIM_DEAD_PX ? 0 : dx - Math.sign(dx) * AIM_DEAD_PX;
+			const yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, d.a0 - steer * YAW_PER_PX));
+			if (p !== powerRef.current || yaw !== aimYawRef.current) aimDirtyRef.current = true;
+			aimYawRef.current = yaw;
 			powerRef.current = p;
 			setPower(p);
 			// Only the arm streams. A player idly turning the camera would push 12 messages a second
@@ -2097,6 +2109,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<span className="pe-arm-label">
 						{jackPhase ? '🎯 Vise sur le terrain, puis valide'
 							: view !== 'jeu' ? '👁 Touche ici pour revenir en vue Jeu'
+							: power > 0 ? '◀ ▶ oriente le tir · lâche pour lancer'
 							: '▲ Glisse vers le haut depuis ici pour lancer'}
 					</span>
 				</div>
