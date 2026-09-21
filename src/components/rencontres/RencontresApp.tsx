@@ -14,8 +14,8 @@ import {
 	type MeetupEvent, type MeetupSignup, type MeetupSpot, type Role,
 } from '../../lib/meetupRules';
 import {
-	addPlace, nearestPlace, readPlaces, removePlace, savePlaces,
-	MAX_PLACES, NEAR_M, type Place,
+	addPlace, isNearPlaces, nearestPlace, readPlaces, removePlace, savePlaces,
+	MAX_PLACES, NEAR_M, SAME_PLACE_M, type Place,
 } from '../../lib/meetupPlaces';
 import { usePinToHome, type PinPlatform } from '../../lib/usePinToHome';
 import { distanceM, formatDistance, isPlausibleFr, nearest } from '../../lib/meetupGeo';
@@ -63,11 +63,14 @@ export default function RencontresApp() {
 	const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
 	const [locating, setLocating] = useState(false);
 	const [created, setCreated] = useState<{ id: string; secret: string } | null>(null);
+	const [flash, setFlash] = useState<string | null>(null);
+	const [spotId, setSpotId] = useState<string | null>(null);
 	const [name, setName] = useState('');
 	const [places, setPlaces] = useState<Place[]>([]);
 	const [naming, setNaming] = useState<string | null>(null); // the draft name, while adding a place
 	const [pinning, setPinning] = useState(false);
 	const mapRef = useRef<MapHandle>(null);
+	const okRef = useRef<HTMLDivElement>(null);
 	// The map is the page, so the icon must open the map — not whatever game card
 	// happened to be open, which is what the live URL would carry.
 	const toHome = usePinToHome({ name: 'Rencontres pétanque', scope: '/rencontres', startUrl: PAGE_URL });
@@ -86,6 +89,7 @@ export default function RencontresApp() {
 			setDetail(d);
 			setCreating(false);
 			setEditing(false);
+			setSpotId(null);
 			setUrl(id, d.isOrganizer ? secret : null);
 			mapRef.current?.flyTo(d.event.lat, d.event.lng);
 		} catch (e) {
@@ -122,6 +126,7 @@ export default function RencontresApp() {
 	const closeEvent = useCallback(() => {
 		setDetail(null);
 		setCreated(null);
+		setFlash(null);
 		setEditing(false);
 		setUrl(null);
 	}, []);
@@ -132,6 +137,10 @@ export default function RencontresApp() {
 
 	const run = useCallback(async (fn: () => Promise<void>) => {
 		setBusy(true);
+		// Drop the previous verdict before the new one: leaving a stale refusal on
+		// screen during the retry is how a second attempt reads as a second failure.
+		setError(null);
+		setFlash(null);
 		try {
 			await fn();
 			setError(null);
@@ -152,6 +161,7 @@ export default function RencontresApp() {
 			setName(who);
 			trackEvent('meetup_join', { format: detail.event.format });
 			await refresh(detail.event.id);
+			setFlash('Inscription enregistrée.');
 		});
 	}, [detail, pid, refresh, run]);
 
@@ -161,6 +171,7 @@ export default function RencontresApp() {
 			await leaveMeetup(detail.event.id, pid);
 			trackEvent('meetup_leave');
 			await refresh(detail.event.id);
+			setFlash('Tu es désinscrit.');
 		});
 	}, [detail, pid, refresh, run]);
 
@@ -178,6 +189,7 @@ export default function RencontresApp() {
 			trackEvent('meetup_edit', { format: v.format });
 			setEditing(false);
 			await refresh(detail.event.id);
+			setFlash('Modifications enregistrées.');
 		});
 	}, [detail, refresh, run]);
 
@@ -193,12 +205,17 @@ export default function RencontresApp() {
 		});
 	}, [detail, refresh, run]);
 
-	const startCreate = useCallback(() => {
+	/** `at` = a known terrain the player clicked, so posting there is one tap and the
+	 *  pin lands exactly on the spot instead of near it. */
+	const startCreate = useCallback((at?: { lat: number; lng: number }) => {
 		setCreating(true);
 		setEditing(false);
 		setDetail(null);
 		setCreated(null);
-		setPin(null);
+		setFlash(null);
+		setError(null);
+		setSpotId(null);
+		setPin(at ?? null);
 		setUrl(null);
 	}, []);
 
@@ -239,15 +256,23 @@ export default function RencontresApp() {
 		savePlaces(next);
 	}, []);
 
+	const savePlaceAt = useCallback((label: string, lat: number, lng: number) => {
+		commitPlaces(addPlace(places, label, lat, lng));
+		trackEvent('meetup_place_add');
+	}, [commitPlaces, places]);
+
 	/* The map centre, not the geolocation: the winter address is exactly the one
 	   you are NOT standing in when you save it. Pan there, name it, done. */
 	const saveCurrentPlace = useCallback((label: string) => {
 		const c = mapRef.current?.center();
 		if (!c) return;
-		commitPlaces(addPlace(places, label, c.lat, c.lng));
-		trackEvent('meetup_place_add');
+		savePlaceAt(label, c.lat, c.lng);
 		setNaming(null);
-	}, [commitPlaces, places]);
+	}, [savePlaceAt]);
+
+	/** Already a home port? Then the button must say so instead of quietly renaming
+	 *  the one that is there. Same threshold addPlace merges on. */
+	const isSavedPlace = (lat: number, lng: number): boolean => isNearPlaces(places, lat, lng, SAME_PLACE_M);
 
 	const dropPlace = useCallback((index: number) => {
 		const next = removePlace(places, index);
@@ -276,6 +301,22 @@ export default function RencontresApp() {
 	const shown = useMemo(() => applyFilters(events, filters, new Date(), places), [events, filters, places]);
 	const shareUrl = (id: string): string => `${window.location.origin}/rencontres/?e=${id}`;
 	const secretUrl = created ? `${window.location.origin}/rencontres/?e=${created.id}&k=${created.secret}` : '';
+	const spot = spotId ? spots.find((s) => s.id === spotId) ?? null : null;
+
+	/* The page is two screens tall, so a banner pinned to the top is a banner
+	   nobody reads: the whole "Publier ne fait rien" report was a refusal
+	   rendered above the fold while the player was looking at the button. The
+	   verdict goes to the surface that asked for it. */
+	const formOpen = creating || editing;
+	const formError = formOpen ? error : null;
+	const panelError = !formOpen && detail ? error : null;
+	const pageError = !formOpen && !detail ? error : null;
+
+	/* Whatever just came back — good or bad — has to be on screen, and after a
+	   publish the form unmounts and the page shrinks under the scroll position. */
+	useEffect(() => {
+		if (created || flash || panelError) okRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}, [created, flash, panelError]);
 
 	if (!meetupsEnabled()) return <p className="re-empty">Le service n'est pas disponible.</p>;
 
@@ -297,8 +338,8 @@ export default function RencontresApp() {
 				)}
 			</header>
 
-			{error && (
-				<p className="re-error" role="alert" onClick={() => setError(null)}>{error}</p>
+			{pageError && (
+				<p className="re-error" role="alert" onClick={() => setError(null)}>{pageError}</p>
 			)}
 
 			<div className="re-bar">
@@ -339,7 +380,7 @@ export default function RencontresApp() {
 				<button type="button" className="re-btn re-btn--ghost" disabled={locating} onClick={locate}>
 					{locating ? 'Localisation…' : '📍 Autour de moi'}
 				</button>
-				<button type="button" className="re-btn" onClick={startCreate}>+ Poser une partie</button>
+				<button type="button" className="re-btn" onClick={() => startCreate()}>+ Poser une partie</button>
 			</div>
 
 			{/* Home ports. One player summers at a campsite and winters in Lyon, and
@@ -427,6 +468,7 @@ export default function RencontresApp() {
 				pin={pin}
 				onHover={setHoveredId}
 				onSelect={(id) => { void openEvent(id); }}
+				onSelectSpot={setSpotId}
 				onPick={(lat, lng) => {
 					if (!isPlausibleFr(lat, lng)) { setError('Choisis un endroit en France.'); return; }
 					setError(null);
@@ -434,19 +476,51 @@ export default function RencontresApp() {
 				}}
 			/>
 
+			{/* A terrain used to be a dot with a tooltip and nothing else — 115 of them,
+			    all inert. Clicking one now leads somewhere. */}
+			{spot && !creating && (
+				<section className="re-panel">
+					<button type="button" className="re-close" onClick={() => setSpotId(null)} aria-label="Fermer">×</button>
+					<h2>📍 {spot.label || 'Terrain'}</h2>
+					{spot.commune && spot.commune !== spot.label && <p className="re-where">{spot.commune}</p>}
+					{!spot.confirmed && <p className="re-hint">Terrain signalé par un joueur, pas encore confirmé.</p>}
+					<p className="re-hint">Aucune partie posée ici pour l'instant.</p>
+					<div className="re-actions">
+						<button
+							type="button"
+							className="re-btn"
+							onClick={() => startCreate({ lat: spot.lat, lng: spot.lng })}
+						>
+							+ Poser une partie ici
+						</button>
+						<button
+							type="button"
+							className="re-btn re-btn--ghost"
+							disabled={isSavedPlace(spot.lat, spot.lng)}
+							onClick={() => savePlaceAt(spot.commune || spot.label || 'Mon lieu', spot.lat, spot.lng)}
+						>
+							{isSavedPlace(spot.lat, spot.lng) ? '🏠 Lieu enregistré' : '🏠 Enregistrer ce lieu'}
+						</button>
+					</div>
+				</section>
+			)}
+
 			{creating && (
 				<CreateForm
 					pin={pin}
 					name={name}
 					busy={busy}
+					error={formError}
 					onPickAgain={() => setPin(null)}
-					onCancel={() => { setCreating(false); setPin(null); }}
+					onCancel={() => { setCreating(false); setPin(null); setError(null); }}
 					onSubmit={onCreateSubmit}
 				/>
 			)}
 
+			<div className="re-focus" ref={okRef}>
 			{created && (
 				<div className="re-secret">
+					<p className="re-ok re-ok--loud">✅ Ta partie est en ligne.</p>
 					<p><strong>Garde ce lien</strong> pour modifier ou annuler ta partie. C'est le seul moyen : il n'y a ni compte ni mail.</p>
 					<input className="re-secretlink" readOnly value={secretUrl} onFocus={(e) => e.currentTarget.select()} />
 					<div className="re-secretrow">
@@ -470,6 +544,7 @@ export default function RencontresApp() {
 					pin={null}
 					name={name}
 					busy={busy}
+					error={formError}
 					initial={{
 						startsAt: detail.event.starts_at,
 						endsAt: detail.event.ends_at,
@@ -494,14 +569,22 @@ export default function RencontresApp() {
 					playerId={pid}
 					name={name}
 					busy={busy}
+					error={panelError}
+					flash={flash}
+					placeSaved={isSavedPlace(detail.event.lat, detail.event.lng)}
 					shareUrl={shareUrl(detail.event.id)}
 					onJoin={onJoin}
 					onLeave={onLeave}
 					onEdit={() => setEditing(true)}
 					onCancel={onCancel}
 					onClose={closeEvent}
+					onSavePlace={() => savePlaceAt(
+						detail.event.commune || detail.event.label || 'Mon lieu',
+						detail.event.lat, detail.event.lng,
+					)}
 				/>
 			)}
+			</div>
 
 			<section className="re-list" aria-label="Parties">
 				{loading && <p className="re-empty">Chargement…</p>}

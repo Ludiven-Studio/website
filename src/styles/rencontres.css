@@ -307,6 +307,20 @@
 	line-height: 1.6;
 }
 .re-ok { margin: 0; color: #1f8f56; }
+/* A publish that succeeded has to be as loud as one that failed. */
+.re-ok--loud {
+	font-family: var(--font-brand);
+	font-size: var(--text-lg);
+	background: rgba(31, 143, 86, 0.14);
+	border-radius: 0.6rem;
+	padding: 0.5rem 0.8rem;
+}
+.re-focus {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+.re-focus:empty { display: none; }
 .re-actions,
 .re-tools {
 	display: flex;

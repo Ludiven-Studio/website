@@ -24,6 +24,7 @@ interface Props {
 	pin: { lat: number; lng: number } | null;
 	onHover(id: string | null): void;
 	onSelect(id: string): void;
+	onSelectSpot(id: string): void;
 	onPick(lat: number, lng: number): void;
 	handle?: Ref<MapHandle>;
 }
@@ -59,7 +60,8 @@ const HOME_ICON = L.divIcon({
 });
 
 export default function MeetupMap({
-	events, spots, places, hoveredId, selectedId, picking, pin, onHover, onSelect, onPick, handle,
+	events, spots, places, hoveredId, selectedId, picking, pin,
+	onHover, onSelect, onSelectSpot, onPick, handle,
 }: Props) {
 	const boxRef = useRef<HTMLDivElement>(null);
 	const mapRef = useRef<L.Map | null>(null);
@@ -70,8 +72,8 @@ export default function MeetupMap({
 	const markers = useRef(new Map<string, L.Marker>());
 	// Read inside Leaflet handlers, which are bound once — a captured prop would
 	// be the value from the frame the map was created on.
-	const cb = useRef({ onPick, onSelect, onHover, picking });
-	cb.current = { onPick, onSelect, onHover, picking };
+	const cb = useRef({ onPick, onSelect, onSelectSpot, onHover, picking });
+	cb.current = { onPick, onSelect, onSelectSpot, onHover, picking };
 
 	useEffect(() => {
 		// Strict mode mounts twice; a second init on the same node throws
@@ -132,8 +134,14 @@ export default function MeetupMap({
 		const busy = new Set(events.map((e) => e.spot_id));
 		for (const s of spots) {
 			if (busy.has(s.id)) continue;
-			L.marker([s.lat, s.lng], { icon: s.confirmed ? ICONS.spot : ICONS.hollow, opacity: 0.85, interactive: false })
+			L.marker([s.lat, s.lng], { icon: s.confirmed ? ICONS.spot : ICONS.hollow, opacity: 0.85 })
 				.bindTooltip(s.label || 'Terrain', { direction: 'top' })
+				// While picking, a marker would otherwise swallow the click that is
+				// trying to drop the pin. Snapping to the terrain is the better answer.
+				.on('click', () => {
+					if (cb.current.picking) cb.current.onPick(s.lat, s.lng);
+					else cb.current.onSelectSpot(s.id);
+				})
 				.addTo(layer);
 		}
 	}, [spots, events]);

@@ -11,16 +11,23 @@ interface Props {
 	playerId: string;
 	name: string;
 	busy: boolean;
+	/** The verdict of the last action taken here, shown here. A page-level banner
+	 *  sits a screen away and reads as nothing having happened. */
+	error?: string | null;
+	flash?: string | null;
+	placeSaved: boolean;
 	shareUrl: string;
 	onJoin(seats: number, role: Role, name: string): void;
 	onLeave(): void;
 	onEdit(): void;
 	onCancel(): void;
 	onClose(): void;
+	onSavePlace(): void;
 }
 
 export default function EventPanel({
-	event, signups, isOrganizer, playerId, name, busy, shareUrl, onJoin, onLeave, onEdit, onCancel, onClose,
+	event, signups, isOrganizer, playerId, name, busy, error, flash, placeSaved, shareUrl,
+	onJoin, onLeave, onEdit, onCancel, onClose, onSavePlace,
 }: Props) {
 	const mine = signups.find((s) => s.player_id === playerId);
 	const [seats, setSeats] = useState(mine?.seats ?? 1);
@@ -82,6 +89,9 @@ export default function EventPanel({
 				))}
 			</ul>
 
+			{flash && <p className="re-ok re-ok--loud" role="status">✅ {flash}</p>}
+			{error && <p className="re-error" role="alert">{error}</p>}
+
 			{!cancelled && !past && (
 				/* The organizer already holds seats through `organizer_seats`, so offering them the
 				   signup form reads as "post another one" — which is what it used to do. Their
@@ -134,6 +144,9 @@ export default function EventPanel({
 			)}
 
 			<div className="re-tools">
+				<button type="button" className="re-btn re-btn--ghost" disabled={placeSaved} onClick={onSavePlace}>
+					{placeSaved ? '🏠 Lieu enregistré' : '🏠 Enregistrer ce lieu'}
+				</button>
 				<button type="button" className="re-btn re-btn--ghost" onClick={ics}>📅 Ajouter à mon agenda</button>
 				<button type="button" className="re-btn re-btn--ghost" onClick={share}>
 					{copied ? '✔ Lien copié' : '🔗 Partager'}

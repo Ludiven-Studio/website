@@ -19,6 +19,9 @@ interface Props {
 	 *  and the head count, and refuses everything else. Showing a field the server
 	 *  would drop is how a form starts lying. */
 	initial?: Draft | null;
+	/** What the server said. It belongs here and not in a page banner: the form is
+	 *  a screen tall, and a refusal painted above it reads as nothing happening. */
+	error?: string | null;
 	onPickAgain(): void;
 	onCancel(): void;
 	onSubmit(v: Draft): void;
@@ -28,7 +31,7 @@ const DURATIONS = [1, 2, 3, 4, 6];
 
 /** Entirely closed except the first name: every other field is a list or a date
  *  (spec §8). Nothing here needs moderating. */
-export default function CreateForm({ pin, name, busy, initial, onPickAgain, onCancel, onSubmit }: Props) {
+export default function CreateForm({ pin, name, busy, initial, error: refused, onPickAgain, onCancel, onSubmit }: Props) {
 	const editing = Boolean(initial);
 	const [start, setStart] = useState(() => toLocalInput(initial ? new Date(initial.startsAt) : defaultStart()));
 	const [hours, setHours] = useState(() => (initial
@@ -126,7 +129,9 @@ export default function CreateForm({ pin, name, busy, initial, onPickAgain, onCa
 				</>
 			)}
 
-			{error && <p className="re-error">{error}</p>}
+			{/* Local first: it is the fresher of the two, since a draft that fails here
+			    never reached the server. */}
+			{(error ?? refused) && <p className="re-error" role="alert">{error ?? refused}</p>}
 
 			<div className="re-formactions">
 				<button type="button" className="re-btn re-btn--ghost" onClick={onCancel}>
