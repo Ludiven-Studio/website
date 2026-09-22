@@ -2492,8 +2492,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				)}
 
 				{over && daily && (
-					<div className="pe-overlay">
-						<div className="pe-card">
+					<div className="pe-overlay pe-aside">
+						<div className="pe-card pe-endpanel">
 							🎯 Parcours terminé
 							<strong>{points} / {MAX_DAILY_SCORE} · {fmtCentis(elapsed)}</strong>
 							<span className="pe-grades">{dailyRef.current?.grades.map((g, i) => (
@@ -2504,8 +2504,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				)}
 
 				{over && !daily && !lv.active && (
-					<div className="pe-overlay">
-						<div className="pe-card">
+					<div className="pe-overlay pe-aside">
+						<div className="pe-card pe-endpanel">
 							{match.winner === mySide ? '🏆 Tu gagnes la partie !' : '❌ L’adversaire gagne'}
 							<strong>{match.scores[mySide]} — {match.scores[foeSide]}</strong>
 							{/* The last end's table: the boule that ended the match is the one people argue about. */}
@@ -2862,6 +2862,25 @@ const CSS = `
 .pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; margin: auto; }
 .pe-card strong { color: var(--pe-accent); font-size: 22px; font-variant-numeric: tabular-nums; }
 .pe-replay { border: none; background: var(--pe-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }
+
+/* The result panel docks LEFT instead of taking the middle. A partie ends on the one arrangement of
+   boules everybody wants to look at — whose is in, by how much, where the jack finished — and a
+   centred card covered exactly that. The overlay stops taking presses so the pitch behind stays
+   draggable; only the panel itself does. It starts below the mode tabs (they own the top-left) and
+   is narrow enough to leave the lane readable; scripts/snap-petanque-phone.mjs counts it as a real
+   part, unlike the modal cards, because now it CAN collide with something.
+   pe-aside, not pe-side: .pe-side is already the TV board's two halves. The rules here are scoped by
+   .pe-overlay so they would not have leaked, but any probe asking the DOM for .pe-side would. */
+.pe-overlay.pe-aside { justify-content: flex-start; align-items: flex-start; pointer-events: none; padding: clamp(56px, 25vh, 216px) 8px 8px max(10px, env(safe-area-inset-left)); }
+.pe-overlay.pe-aside .pe-card { pointer-events: auto; width: clamp(214px, 52vw, 380px); margin: 0; }
+@media (orientation: landscape) and (max-height: 520px) {
+  /* Lying down, 844x390 of HUD leaves no free rectangle: the audit's own boxes say the left column
+     is tabs down to y 126 and the leaderboard pill out to x 56, and 212 px of panel does not fit in
+     what is left above the launch band. So it starts just under the tabs, clears the pill, and takes
+     the band — which is inert, and dead anyway once the match is over. */
+  .pe-overlay.pe-aside { align-items: flex-start; padding: 132px 8px 8px max(64px, env(safe-area-inset-left)); }
+  .pe-overlay.pe-aside .pe-card { width: clamp(214px, 34vw, 340px); }
+}
 
 .pe-mp { min-width: min(240px, 100%); }
 /* A short landing area (a phone in windowed mode is ~240 px of pitch) has to give the lobby every

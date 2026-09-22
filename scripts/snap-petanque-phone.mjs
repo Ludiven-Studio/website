@@ -48,7 +48,8 @@ const PARTS = {
 	legend: '.pe-board-marks',
 	power: '.pe-power',
 	tag: '.pe-tag',
-	card: '.pe-card',
+	card: '.pe-card:not(.pe-endpanel)', // modal cards only — see the exemption in the pair loop
+	endpanel: '.pe-endpanel', // the end-of-match panel docks to one side, so it CAN really collide
 	lbc: '.lbc-pill', // shared chrome, pinned by LeaderboardCorner: it lands here without asking
 };
 
@@ -131,7 +132,9 @@ const audit = async (tag) => {
 			const a = boxes[keys[i]], b = boxes[keys[j]];
 			const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
 			const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
-			// A card is a modal: it is MEANT to cover the HUD, so it is not a collision either.
+			/* A card is a modal: it is MEANT to cover the HUD, so it is not a collision either. The
+			   end panel is exempt from the exemption — it sits on ONE side so the pitch stays visible
+			   behind it, which is only true if nothing else is under it. */
 			if (!(ox > 1 && oy > 1) || keys[i] === 'card' || keys[j] === 'card'
 				|| nested.includes(`${keys[i]}x${keys[j]}`)) continue;
 			/* Only a pair where BOTH sides take pointer events can steal a press — and the bottom band
@@ -253,6 +256,39 @@ await sleep(2500);
 await page.keyboard.press('v'); // head view: the zoom slider joins the HUD
 await sleep(1400);
 all.push(...await audit('7-head'));
+
+/* The end of a partie. Forced through __petanqueOver rather than played: 13 points against the AI
+   is minutes of guard, and this state would then be the only one never audited — which is exactly
+   how the result card shipped sitting in the middle of the pitch.
+   The pair pass above answers "does it cover the HUD". It does not answer the ask, which was that
+   the panel stops covering the GAME, so that is measured on its own: the share of the canvas it
+   takes, which side of the canvas it stays on, and how many boules end up underneath it. */
+await page.evaluate(() => window.__petanqueOver());
+await sleep(700);
+all.push(...await audit('8-fin'));
+const fin = await page.evaluate(() => {
+	const el = document.querySelector('.pe-endpanel');
+	const cv = document.querySelector('.pe-canvas').getBoundingClientRect();
+	if (!el) return { panel: null, cv };
+	const p = el.getBoundingClientRect();
+	const seen = window.__petanque().seen;
+	const under = seen.filter((b) => {
+		const x = cv.left + b.px, y = cv.top + b.py;
+		return x >= p.left && x <= p.right && y >= p.top && y <= p.bottom;
+	}).length;
+	return { panel: { x: p.x, y: p.y, w: p.width, h: p.height, right: p.right }, cv, n: seen.length, under };
+});
+if (!fin.panel) all.push('8-fin: no .pe-endpanel on screen at the end of the match');
+else {
+	const share = (fin.panel.w * fin.panel.h) / (fin.cv.width * fin.cv.height);
+	const rightEdge = (fin.panel.right - fin.cv.left) / fin.cv.width;
+	console.log(`    fin: panneau ${Math.round(fin.panel.w)}x${Math.round(fin.panel.h)} @ ${Math.round(fin.panel.x)},${Math.round(fin.panel.y)}`
+		+ ` · ${(share * 100).toFixed(0)} % du terrain · bord droit a ${(rightEdge * 100).toFixed(0)} % · ${fin.under}/${fin.n} boules dessous`);
+	// "Sur un cote" is these two numbers, and neither of them is a screenshot: it stays in the left
+	// half, and it leaves most of the ground uncovered.
+	if (rightEdge > 0.6) all.push(`8-fin: the end panel reaches ${(rightEdge * 100).toFixed(0)} % across — not on a side`);
+	if (share > 0.35) all.push(`8-fin: the end panel covers ${(share * 100).toFixed(0)} % of the pitch`);
+}
 
 console.log(errs.length ? `PAGE ERRORS:\n${errs.join('\n')}` : 'no page errors');
 console.log(all.length ? `\n${all.length} blocking overlap(s) to fix:\n  ${all.join('\n  ')}` : '\nno blocking overlap in any state');
