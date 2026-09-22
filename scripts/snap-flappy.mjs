@@ -1,16 +1,12 @@
 /* Throwaway: clean in-game screenshot of the Flappy canvas (flaps to stay alive). */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4323;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) {
-	try { if ((await fetch(base)).ok) break; } catch {}
-	await sleep(300);
-}
+const server = await startServer(PORT);
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 520, height: 620 }, deviceScaleFactor: 2 });
@@ -36,4 +32,4 @@ await sharp(out)
 	.toFile(resolve('D:/tmp/comfy/flappy-hen.png'));
 console.log('→', out, '+ flappy-hen.png');
 await browser.close();
-server.kill();
+server.stop();

@@ -1,16 +1,12 @@
 /* Throwaway: in-game screenshot of the Esquive (3D/WebGL) canvas. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4324;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) {
-	try { if ((await fetch(base)).ok) break; } catch {}
-	await sleep(300);
-}
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 520, height: 620 }, deviceScaleFactor: 2 });
@@ -34,4 +30,4 @@ await sleep(120);
 await page.locator('.es-canvas').screenshot({ path: resolve('D:/tmp/comfy/esquive-ingame.png') });
 console.log('→ D:/tmp/comfy/esquive-ingame.png');
 await browser.close();
-server.kill();
+server.stop();

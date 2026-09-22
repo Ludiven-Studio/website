@@ -3,15 +3,14 @@
    on both peers (deterministic lockstep). Also covers the two cosmetic aids: the opponent's cue
    stick streamed while they aim, and the top view during ball in hand. Needs network. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4357;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const FS = `
@@ -46,7 +45,7 @@ await A.locator('button:has-text("Créer un code")').click();
 await sleep(2500);
 const code = (await A.locator('.bi-mp-code strong').textContent().catch(() => null))?.trim();
 console.log('code:', code);
-if (!code) { console.log('FAIL: no code (Supabase unreachable?)'); await browser.close(); server.kill(); process.exit(1); }
+if (!code) { console.log('FAIL: no code (Supabase unreachable?)'); await browser.close(); server.stop(); process.exit(1); }
 
 // B joins with the code.
 await B.locator('.bi-modetoggle button:has-text("En ligne")').click();
@@ -57,7 +56,7 @@ await B.locator('.bi-mp-join button:has-text("Rejoindre")').click();
 let a, b;
 for (let i = 0; i < 50; i++) { await sleep(300); a = await snap(A); b = await snap(B); if (a?.n === 16 && b?.n === 16 && a?.match8 && b?.match8) break; }
 console.log('A:', a && { n: a.n, turn: a.match8?.turn }, ' B:', b && { n: b.n, turn: b.match8?.turn });
-if (!(a?.n === 16 && b?.n === 16)) { console.log('FAIL: both peers did not reach a 16-ball match'); await browser.close(); server.kill(); process.exit(1); }
+if (!(a?.n === 16 && b?.n === 16)) { console.log('FAIL: both peers did not reach a 16-ball match'); await browser.close(); server.stop(); process.exit(1); }
 
 const host = a.myPlayer === 0 ? A : B, guest = a.myPlayer === 0 ? B : A;
 console.log('host is', a.myPlayer === 0 ? 'A' : 'B');
@@ -144,4 +143,4 @@ check(gPlaced?.camMode === 'shoulder', `la vue du joueur revient apres le placem
 
 console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');
 await browser.close();
-server.kill();
+server.stop();

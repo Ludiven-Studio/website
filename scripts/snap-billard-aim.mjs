@@ -1,15 +1,14 @@
 /* Throwaway: check the simulated aim guide — stops at the first ball, shows the struck ball's
    line (amber) + the cue's own deflection (white), and real cushion bounces on a miss. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4347;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 1000, height: 720 }, deviceScaleFactor: 2 });
@@ -43,4 +42,4 @@ console.log('→ aim-hit (holding, no fire)');
 await page.mouse.up();
 
 await browser.close();
-server.kill();
+server.stop();

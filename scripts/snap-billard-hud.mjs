@@ -1,15 +1,14 @@
 /* Throwaway: verify the level/score HUD is ABOVE the table (out of the play zone) in REAL
    fullscreen (the .gf-full class the site toggles), portrait — not the faux-fs sim. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4343;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2, hasTouch: true });
@@ -67,4 +66,4 @@ console.log('banner bottom:', info.tag?.bottom, ' canvas top:', info.cv?.top,
 	info.tag && info.cv ? (info.tag.bottom <= info.cv.top + 1 ? 'OK: above canvas' : 'OVERLAPS canvas') : 'n/a');
 
 await browser.close();
-server.kill();
+server.stop();

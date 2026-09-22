@@ -1,13 +1,12 @@
 /* Throwaway: simulate .game-page fullscreen for golf to verify it fills wide + controls overlay. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4325;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] });
 const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 });
@@ -37,4 +36,4 @@ await sleep(900);
 await page.screenshot({ path: resolve('D:/tmp/comfy/golf-fs.png') });
 console.log('→ D:/tmp/comfy/golf-fs.png');
 await browser.close();
-server.kill();
+server.stop();

@@ -2,14 +2,12 @@
    Grabs the cue, pulls, then presses the right button before releasing — expect status still
    'aiming' and rolling false (control run without the right press fires → rolling true). */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { startServer } from './preview-server.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4352;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const snap = (p) => p.evaluate(() => (window.__billard ? window.__billard() : null));
@@ -65,4 +63,4 @@ const ok = ctrl.mid.aiming && canc.mid.aiming && ctrl.end.status !== 'aiming' &&
 console.log(ok ? 'OK: left+right cancelled the shot (control fired, cancel did not)' : 'FAIL: check the numbers above');
 
 await browser.close();
-server.kill();
+server.stop();

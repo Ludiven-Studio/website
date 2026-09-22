@@ -1,15 +1,14 @@
 /* Table themes (Tron + Western): own them via localStorage, check the boutique section,
    the in-game cycle button, the live rebuilds, FX on the neon table, and no purchase = no theme. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4365;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 820, height: 680 }, deviceScaleFactor: 1 });
@@ -92,4 +91,4 @@ check((await p2.locator('button[aria-label="Changer de thème"]').count()) === 0
 
 console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');
 await browser.close();
-server.kill();
+server.stop();

@@ -1,15 +1,14 @@
 /* Throwaway smoke check: 8-ball Libre/Niveaux renders 16 balls, a human break advances the
    match, and the AI takes its turn. Deterministic rules live in the Vitest suites. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4351;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 900, height: 720 }, deviceScaleFactor: 1 });
@@ -32,7 +31,7 @@ await sleep(1800);
 const snap = () => page.evaluate(() => (window.__billard ? window.__billard() : null));
 let s = await snap();
 console.log('initial:', s && { n: s.n, eightBall: s.eightBall, turn: s.match8?.turn, broken: s.match8?.broken, open: s.match8?.open });
-if (!s || s.n !== 16) { console.log('FAIL: expected 16 balls (cue + 15), got', s?.n); await browser.close(); server.kill(); process.exit(1); }
+if (!s || s.n !== 16) { console.log('FAIL: expected 16 balls (cue + 15), got', s?.n); await browser.close(); server.stop(); process.exit(1); }
 
 // Human break: drag from the cue (foreground low-centre) hard into the rack.
 const box = await page.locator('.bi-canvas').boundingBox();
@@ -59,4 +58,4 @@ console.log('→', `${OUT}/billard-8ball.png`);
 console.log('brokeSeen:', brokeSeen, '| rollingPhases:', rollingPhases, brokeSeen && rollingPhases >= 2 ? 'OK: break + AI turn' : 'CHECK');
 
 await browser.close();
-server.kill();
+server.stop();

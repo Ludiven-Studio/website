@@ -26,7 +26,7 @@
    Usage: node scripts/measure-petanque-boule.mjs [--tag avant]
 */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
 
@@ -36,8 +36,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4372;
 const OUT = 'D:/tmp/comfy';
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch { /* not up yet */ } await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 });
@@ -195,5 +194,5 @@ console.log(`ombre de contact moyenne ${show(avg(() => true, 'ombre'))} niveaux 
 console.log(`capture : ${shotPath}`);
 
 await browser.close();
-server.kill();
+server.stop();
 process.exit(0);

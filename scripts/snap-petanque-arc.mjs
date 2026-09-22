@@ -3,7 +3,7 @@
    vertical plane through the eye — which projects to a dead straight segment at every loft.
    Holds a drag and reads `bow` from the debug snapshot at several camera pitches. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -13,8 +13,7 @@ const VIEW_PRESSES = Number(process.argv.find((a) => a.startsWith('--view='))?.s
 const PORT = 4364;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 });
@@ -57,5 +56,5 @@ await page.mouse.up();
 
 console.log(errs.length ? `PAGE ERRORS:\n${errs.join('\n')}` : 'no page errors');
 await browser.close();
-server.kill();
+server.stop();
 process.exit(0);

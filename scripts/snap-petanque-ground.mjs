@@ -3,15 +3,14 @@
    that the page opens straight into fullscreen. Run at desktop AND phone size: the Quitter button
    only collides with the score board on a narrow screen. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4373;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const errs = [];
@@ -77,5 +76,5 @@ await run('phone', { width: 390, height: 844 });
 
 console.log(errs.length ? `PAGE ERRORS:\n${errs.join('\n')}` : 'no page errors');
 await browser.close();
-server.kill();
+server.stop();
 process.exit(0);

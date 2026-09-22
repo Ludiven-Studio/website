@@ -1,14 +1,13 @@
 /* Throwaway: check the Bolides ground actually renders (the quad used to be back-face
    culled, so the arena looked like a black void) and that fullscreen fills the viewport. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4331;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 900, height: 700 }, deviceScaleFactor: 1 });
@@ -41,4 +40,4 @@ await page.screenshot({ path: resolve('D:/tmp/bolides-wall.png') });
 console.log('still playing after wall run =', await page.evaluate(() => !!document.querySelector('.bo-actions')));
 
 await browser.close();
-server.kill();
+server.stop();

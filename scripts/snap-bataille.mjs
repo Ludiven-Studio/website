@@ -1,13 +1,12 @@
 /* Throwaway: fire at every cell of Bataille (→ fleet sunk) to preview the revealed board. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4323;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 640, height: 760 }, deviceScaleFactor: 2 });
@@ -30,4 +29,4 @@ await sleep(150);
 await page.locator('.ba-boardwrap').screenshot({ path: resolve('D:/tmp/comfy/bataille-revealed.png') });
 console.log('→ D:/tmp/comfy/bataille-revealed.png');
 await browser.close();
-server.kill();
+server.stop();

@@ -1,13 +1,11 @@
 /* Throwaway: cave portals + longer/wider tunnels (TEMP: tunnel @ seg 2, fork @ seg 4). */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { startServer } from './preview-server.mjs';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4341;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'dev', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 200; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT, { mode: 'dev', tries: 200 });
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 await ctx.addInitScript(() => localStorage.setItem('ludiven-tuto-seen', '["luge"]'));

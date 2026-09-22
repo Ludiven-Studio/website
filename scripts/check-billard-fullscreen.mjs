@@ -2,15 +2,14 @@
    HUD overlaid on it (and still tap-through), a shot must leave no ball spinning on the spot, and
    the hand-over card must show then leave on its own. Single player, no network. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4363;
 const base = `http://localhost:${PORT}`;
 const OUT = 'D:/tmp/comfy';
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--autoplay-policy=no-user-gesture-required'] });
 const ctx = await browser.newContext({ viewport: { width: 820, height: 680 }, deviceScaleFactor: 1 });
@@ -123,4 +122,4 @@ check((await snap()).slow.cine === false, 'pas de mode cinema quand rien ne se p
 
 console.log(fails ? `\n${fails} FAIL` : '\nTOUT OK');
 await browser.close();
-server.kill();
+server.stop();

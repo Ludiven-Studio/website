@@ -11,7 +11,7 @@
 // otherwise the script spawns `astro preview` on port 4321 and shuts it down at the end.
 
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -26,20 +26,6 @@ const FREE_RE = /mode libre|^\s*libre\s*$/i;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function waitForServer(url, timeout = 40000) {
-	const t0 = Date.now();
-	for (;;) {
-		try {
-			const res = await fetch(url, { method: 'HEAD' });
-			if (res.ok || res.status === 404) return;
-		} catch {
-			/* not up yet */
-		}
-		if (Date.now() - t0 > timeout) throw new Error(`Serveur injoignable: ${url}`);
-		await sleep(400);
-	}
-}
-
 async function main() {
 	await mkdir(path.join(OUT, 'og'), { recursive: true });
 
@@ -47,8 +33,7 @@ async function main() {
 	let base = process.env.OG_BASE;
 	if (!base) {
 		base = `http://localhost:${PORT}`;
-		server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: ROOT, shell: true, stdio: 'ignore' });
-		await waitForServer(base);
+		server = await startServer(PORT);
 	}
 
 	const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader'] }); // software WebGL for 3D games
@@ -340,7 +325,7 @@ async function main() {
 	}
 
 	await browser.close();
-	if (server) server.kill();
+	if (server) server.stop();
 	console.log(`Terminé : ${ok}/${jeux.length} jeux capturés → public/assets/jeux/`);
 }
 

@@ -1,12 +1,11 @@
 /* Throwaway: verify the 3 UX fixes — MM end overlay (time-shifted), MS row ✓ button, LC hint button. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4329;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 375, height: 720 }, deviceScaleFactor: 2 });
 const errors = [];
@@ -64,5 +63,5 @@ async function open(slug, sel) {
 
 console.log(errors.length ? 'ERRORS: ' + errors.join(' | ') : 'no console errors');
 await browser.close();
-server.kill();
+server.stop();
 process.exit(0);

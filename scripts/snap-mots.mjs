@@ -1,12 +1,11 @@
 /* Throwaway: smoke-test the 3 new word games (mobile viewport) — console errors + screenshots. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4329;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 const browser = await chromium.launch();
 const vp = { width: 375, height: 720 }; // iPhone SE-ish
 
@@ -37,5 +36,5 @@ await shot('meli-melo', '.mm-board', resolve('D:/tmp/mm-mobile.png'), async (pag
 	await sleep(500);
 });
 await browser.close();
-server.kill();
+server.stop();
 process.exit(0);

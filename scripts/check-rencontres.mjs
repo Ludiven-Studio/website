@@ -13,9 +13,8 @@
    authority) because a Deno root cannot import from src/. Each case is refused by
    the shipped form AND by the deployed function, or they have drifted. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 const PORT = 4401;
 const BASE = `http://localhost:${PORT}`;
@@ -50,8 +49,7 @@ const local = (msAhead) => {
 	return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(BASE)).ok) break; } catch { /* not up yet */ } await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch();
 const newPage = async (playerId) => {
@@ -288,7 +286,7 @@ try {
 		}
 	}
 	await browser.close();
-	server.kill();
+	server.stop();
 }
 
 console.log(fail.length ? `\n${fail.length} echec(s):\n- ${fail.join('\n- ')}` : '\nTout est vert.');

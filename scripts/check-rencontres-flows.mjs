@@ -17,8 +17,7 @@
    blocked: a SW would serve the function call itself and route() would never see
    it. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { startServer } from './preview-server.mjs';
 
 const PORT = 4402;
 const BASE = `http://localhost:${PORT}`;
@@ -170,8 +169,7 @@ const makeBackend = () => {
 
 // ---- harness ----
 
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(BASE)).ok) break; } catch { /* not up yet */ } await sleep(300); }
+const server = await startServer(PORT);
 
 const backend = makeBackend();
 const browser = await chromium.launch();
@@ -423,7 +421,7 @@ try {
 	fail.push(`EXCEPTION ${e.stack ?? e.message}`);
 } finally {
 	await browser.close();
-	server.kill();
+	server.stop();
 }
 
 console.log(fail.length ? `\n${fail.length} echec(s):\n- ${fail.join('\n- ')}` : '\nTout est vert.');

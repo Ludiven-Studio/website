@@ -1,12 +1,11 @@
 /* Throwaway: simulate .game-page fullscreen in LANDSCAPE (short) for grid games to check the board fits. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
+import { startServer } from './preview-server.mjs';
 import { resolve } from 'node:path';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4327;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 const browser = await chromium.launch();
 // Mimic the :fullscreen rules for each game via a .faux-fs class.
 const CSS = (p, board) => `
@@ -34,4 +33,4 @@ const land = { width: 800, height: 360 };
 await shot(`${base}/jeux/2048/`, '.g2-board', CSS('g2', { wrap: 'playwrap', el: 'board' }), resolve('D:/tmp/comfy/2048-land.png'), land);
 await shot(`${base}/jeux/sudoku/`, '.sk-board', CSS('sk', { wrap: 'boardwrap', el: 'board' }), resolve('D:/tmp/comfy/sudoku-land.png'), land);
 await browser.close();
-server.kill();
+server.stop();
