@@ -44,16 +44,19 @@ const state = () => page.evaluate(() => window.__petanque());
 await page.locator('.pe-canvas').scrollIntoViewIfNeeded();
 const box = await page.locator('.pe-canvas').boundingBox();
 console.log(`canvas ${Math.round(box.width)}x${Math.round(box.height)}${WINDOWED ? ' (windowed)' : ' (fullscreen)'}`);
-// Middle of the throwing strip, asked of the game: it is clamped in px, so a fixed share of the
-// canvas height drifts off it between the two viewports.
+// Middle of the launch pad, asked of the game: it is a fixed box centred on the bottom edge, so a
+// fixed share of the canvas misses it, and its own height is not the canvas height.
 const arm = await page.evaluate(() => window.__petanque().arm);
-const cx = box.x + box.width * 0.5, cy = box.y + arm.top + (box.height - arm.top) * 0.45;
+const cx = box.x + arm.cx, cy = box.y + arm.cy;
+/* Pulls aim at the SEAM, not 132 px above the press: power is measured from the pad's top, so a
+   press-relative pull from the middle of the pad wastes half the pad as dead travel. */
+const seam = box.y + arm.top;
 const H = box.height;
 
 async function throwOne() {
 	await page.mouse.move(cx, cy);
 	await page.mouse.down();
-	await page.mouse.move(cx, cy - 132, { steps: 12 });
+	await page.mouse.move(cx, seam - 132, { steps: 12 });
 	await sleep(250);
 	await page.mouse.up();
 	await page.waitForFunction(() => window.__petanque().status === 'rolling', null, { timeout: 4000 });

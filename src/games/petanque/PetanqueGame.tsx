@@ -46,8 +46,9 @@ import LevelOutcome from '../../components/LevelOutcome';
 
 /* =====================================================
    PETANQUE — React island, 3D pitch (three.js).
-   Le point de pose du doigt dans la bande du bas — la planche d'envol — décide de l'angle : en bas
-   c'est rasant, en haut on plombe. Puis glisser vers le haut = puissance, latéral = direction.
+   Le point de pose du doigt sur la planche d'envol — un pavé fixe posé en bas au centre — décide de
+   l'angle : plus on part d'en bas, plus on plombe ; le haut de la planche est rasant. Puis glisser
+   vers le haut = puissance, latéral = direction.
    La caméra est libre et ne touche plus au tir. Tête-à-tête en 13, 3 boules,
    règle officielle (celui qui n'a pas le point rejoue).
    Moteur pur et testé dans ./engine + ./rules13 ; ce fichier ne fait que le piloter.
@@ -158,8 +159,11 @@ const LOFT_0 = 0.55; // rad — where the loft sits before the first throw, mid-
 const LOFT_LABEL = (e: number): string =>
 	e > 1.0 ? 'Plomb' : e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette';
 
-/* The graduations drawn on the launch board, bottom to top. Four, not a continuous ruler: what the
-   thumb has to find is a band, and a band is what the labels name. */
+/* The graduations drawn on the launch board. Four, not a continuous ruler: what the thumb has to
+   find is a band, and a band is what the labels name.
+   `t` is the LOFT parameter (0 grazing, 1 plomb), which is not the same as its place on screen: the
+   board is drawn upside down on purpose, so t = 1 is at the BOTTOM. Starting the gesture low and
+   swinging all the way up is the lob; starting near the seam is the flat roll. */
 const BOARD_MARKS: readonly { t: number; label: string }[] = [
 	{ t: 0.04, label: 'Roulette' },
 	{ t: 0.32, label: 'Demi' },
@@ -194,11 +198,11 @@ const JACK_AIM_R = 0.45; // m — the target ring for the jack throw, a bullseye
 const AIM_LO = MIN_JACK + 0.5, AIM_HI = MAX_JACK - 1.0;
 
 const AIM_DEAD_PX = 8; // sideways slack before a power pull counts as a direction change
-/* The launch board. Taller than the plain strip it replaced: it now carries the whole loft range,
-   so at 90 px a thumb crossed two bands by landing 25 px off. */
-const ARM_H = 0.30; // share of the canvas height that is the board, not the camera
-const ARM_MIN_PX = 110;
-const ARM_MAX_PX = 200;
+/* The launch board: a FIXED pad, centred on the bottom edge, where a full-width band used to take
+   30 % of the canvas. The band was the largest object on screen and almost all of it was empty.
+   The height is the one number that may not shrink freely — at 90 px a thumb crossed two
+   graduations by landing 25 px off, which is what sized the old board and still holds. The values
+   live in the CSS below; the hit test reads the element, so there is one source of truth. */
 const BOARD_PAD_PX = 10; // the top and bottom bands reach the ends of the board, not a hair short
 
 const HEAD_DIST_0 = 4.2; // m — where the orbit starts when you open the head view
@@ -341,6 +345,7 @@ const killGroup = (g: THREE.Group): void => {
 export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
+	const armElRef = useRef<HTMLDivElement | null>(null); // the launch pad, read back for the hit test
 	const g3Ref = useRef<Scene3D | null>(null);
 	const arcPtsRef = useRef<THREE.Vector3[]>([]);
 	const sunForceRef = useRef<{ el: number; az: number; seed?: number } | null>(null); // measurement hook only
@@ -1353,17 +1358,20 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- the aim drag ---------- */
 
-	/** Top of the launch board, in client px. Below it is the arm, above it is the camera. */
-	const armTop = useCallback((r: DOMRect): number =>
-		r.bottom - Math.max(ARM_MIN_PX, Math.min(ARM_MAX_PX, r.height * ARM_H)), []);
+	/** The launch pad in client px, asked of the element that draws it. The box is laid out by CSS,
+	 *  so reading it back is the only way the hit test cannot drift from the drawing — the old
+	 *  version re-derived the same clamp in JS and in a custom property. */
+	const armBox = useCallback((): DOMRect | null => armElRef.current?.getBoundingClientRect() ?? null, []);
 
-	/** Where a touch sits on the board, 0 at the bottom edge and 1 at the top. The padding is what
-	 *  lets a thumb reach a full plomb without having to land exactly on the seam. */
-	const boardAt = useCallback((r: DOMRect, y: number): number => {
-		const top = armTop(r) + BOARD_PAD_PX, bot = r.bottom - BOARD_PAD_PX;
-		const t = (bot - y) / Math.max(1, bot - top);
+	/** The loft a touch on the pad asks for: 1 (plomb) at the bottom edge, 0 (grazing) at the top.
+	 *  Upside down against the screen on purpose — the gesture that lobs is the one that starts low
+	 *  and has the whole pad to swing through. The padding lets a thumb reach a full plomb without
+	 *  having to land exactly on the edge. */
+	const boardAt = useCallback((b: DOMRect, y: number): number => {
+		const top = b.top + BOARD_PAD_PX, bot = b.bottom - BOARD_PAD_PX;
+		const t = (y - top) / Math.max(1, bot - top);
 		return t < 0 ? 0 : t > 1 ? 1 : t;
-	}, [armTop]);
+	}, []);
 
 	/* The jack has its own path — aimed with a ring, thrown with a button — so the strip stays inert
 	   during that phase. Two ways to throw the same jack would mean one of them ignores the ring. */
@@ -1382,8 +1390,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			dragRef.current = { mode: 'place', x0: x, y0: y, a0: 0, b0: 0 };
 			return;
 		}
-		const rect = cv.getBoundingClientRect();
-		if (y >= armTop(rect)) {
+		const pad = armBox();
+		// A box now, not a half-plane: the pad no longer spans the width, so the pitch on either side
+		// of it has to stay a camera drag. That is the point of shrinking it.
+		if (pad && x >= pad.left && x <= pad.right && y >= pad.top && y <= pad.bottom) {
 			// The board is the arm. Off the game view there is nothing to throw, so a tap here brings
 			// the game view back rather than being a dead zone — unless the jack is being aimed, where
 			// leaving the top view mid-gesture would throw away the spot the player just picked.
@@ -1400,13 +1410,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			// the camera in the same beat, as the direction the sideways steer works from.
 			// `syncAim` refuses once the drag is armed, so the order matters — arm second.
 			syncAim();
-			const loftNow = elevationForBoard(boardAt(rect, y));
+			const loftNow = elevationForBoard(boardAt(pad, y));
 			aimLoftRef.current = loftNow;
 			setLoft(loftNow);
 			// b0 carries the seam for an arm drag, because power is measured from the seam and not from
 			// the press point: the board is the safe zone, and a pull that has not cleared it is not a
 			// throw yet. Sampled once here — the rect cannot move under a finger that is already down.
-			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: aimYawRef.current, b0: armTop(rect) };
+			// Declared cost of the inversion: the seam is the pad's TOP, so a plomb pressed at the
+			// bottom drags the whole pad before it charges, while a roulette charges at once.
+			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: aimYawRef.current, b0: pad.top };
 			setArmed(true);
 			aimDirtyRef.current = true;
 			return;
@@ -1423,7 +1435,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		dragRef.current = viewRef.current === 'tete'
 			? { mode: 'look', x0: x, y0: y, a0: headYawRef.current, b0: headPitchRef.current }
 			: { mode: 'look', x0: x, y0: y, a0: camYawRef.current, b0: camPitchRef.current };
-	}, [armTop, boardAt, canThrow, cancelIntro, jackAiming, legalise, moveJackAim, pickGround, setViewKey, syncAim]);
+	}, [armBox, boardAt, canThrow, cancelIntro, jackAiming, legalise, moveJackAim, pickGround, setViewKey, syncAim]);
 
 	const aimMove = useCallback((x: number, y: number) => {
 		const d = dragRef.current;
@@ -2199,14 +2211,19 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			zoomView: Math.round(zoomViewRef.current * 1000) / 1000,
 			mag: Math.round(magRef.current * 100) / 100,
 			fov: Math.round((g3Ref.current?.camera.fov ?? 0) * 10) / 10,
-			// Where the launch board starts, in canvas-relative px, and what the current drag is doing.
+			// The launch pad's real box in canvas-relative px, plus its centre, and what the drag is
+			// doing. The centre is reported rather than left to be derived: guards used to read
+			// `(top + height) / 2`, where `height` was the CANVAS height — right only while the pad
+			// ran to the bottom edge across the full width, which it no longer does.
 			// `pad` is the dead margin at each end, so a guard can aim a press at a known loft.
 			arm: (() => {
-				const cv = canvasRef.current;
-				if (!cv) return null;
-				const r = cv.getBoundingClientRect();
+				const cv = canvasRef.current, el = armElRef.current;
+				if (!cv || !el) return null;
+				const r = cv.getBoundingClientRect(), b = el.getBoundingClientRect();
 				return {
-					top: Math.round(armTop(r) - r.top), height: Math.round(r.height),
+					left: Math.round(b.left - r.left), top: Math.round(b.top - r.top),
+					width: Math.round(b.width), height: Math.round(b.height),
+					cx: Math.round(b.left - r.left + b.width / 2), cy: Math.round(b.top - r.top + b.height / 2),
 					pad: BOARD_PAD_PX, mode: dragRef.current?.mode ?? null,
 				};
 			})(),
@@ -2261,7 +2278,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			terrain: terrainStamp(simRef.current?.t ?? null),
 		});
 		return () => { delete (window as unknown as { __petanque?: unknown }).__petanque; };
-	}, [arcBow, arcOnScreen, arcScreen, armTop, screenSizes, topFrames]);
+	}, [arcBow, arcOnScreen, arcScreen, screenSizes, topFrames]);
 
 
 	/* ---------- HUD ---------- */
@@ -2417,7 +2434,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className={`pe-loft${armed ? ' frozen' : ''}`}>
 						<span className="pe-loft-label">{LOFT_LABEL(loft)}</span>
 						<div className="pe-loft-bar"><div className="pe-loft-fill" style={{ height: `${Math.round(boardForElevation(loft) * 100)}%` }} /></div>
-						<span className="pe-loft-hint">{armed ? 'angle verrouillé' : 'plus haut = plus lobé'}</span>
+						<span className="pe-loft-hint">{armed ? 'angle verrouillé' : 'plus bas = plus lobé'}</span>
 					</div>
 				)}
 
@@ -2451,7 +2468,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{/* The launch board. Purely a drawing: the hit test lives in aimStart, so there is
 				    exactly one way into a throw and this cannot swallow a camera drag. It pulses until
 				    the first contact of the session — the whole complaint was that nobody found it. */}
-				<div className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} aria-hidden="true">
+				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} aria-hidden="true">
 					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
 					{/* The graduations. Where the finger lands decides the angle, and a board with no
 					    marks on it would make that a secret. */}
@@ -2461,7 +2478,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 								<span
 									key={mk.label}
 									className={`pe-board-mark${mk.label === boardBand ? ' on' : ''}`}
-									style={{ bottom: `calc(${BOARD_PAD_PX}px + ${mk.t} * (100% - ${BOARD_PAD_PX * 2}px))` }}
+									style={{ top: `calc(${BOARD_PAD_PX}px + ${mk.t} * (100% - ${BOARD_PAD_PX * 2}px))` }}
 								>
 									{mk.label}
 								</span>
@@ -2615,8 +2632,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 			<p className="pe-help">
 				Partout sur l’image, tu <strong>tournes la caméra librement</strong> — elle ne touche jamais au tir.
-				La <strong>bande du bas</strong>, c’est ta <strong>planche d’envol</strong> : la hauteur à laquelle tu poses le
-				doigt choisit l’angle, du ras du sol (roulette) au plomb bien haut, et la graduation te dit où tu en es.
+				Le <strong>pavé en bas au centre</strong>, c’est ta <strong>planche d’envol</strong> : la hauteur à laquelle tu
+				poses le doigt choisit l’angle — <strong>tout en bas = plomb</strong>, tout en haut = roulette au ras du sol — et
+				la graduation te dit où tu en es.
 				Glisse vers le haut pour la puissance, sur le côté pour corriger la direction, relâche pour lancer.
 				Le curseur 🔍 (ou la molette) t’<strong>avance sur les boules</strong> pour les voir de près, sans jamais toucher au tir.
 				Le <strong>bouchon se vise</strong> : vu de dessus, touche le terrain pour poser le cercle, puis lance-le dessus.
@@ -2646,11 +2664,18 @@ const CSS = `
   position: relative;
 }
 
-/* The height of the launch board, named once. Everything that must sit CLEAR of the board keys off
-   it, because anything keyed off the viewport bottom instead walks into the graduations as soon as
-   a safe-area inset appears — a percentage in a bottom offset resolves against this same box, so
-   the two uses give the same pixels. */
-.pe-playwrap { --pe-arm-h: clamp(110px, 30%, 200px); width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
+/* The launch pad's box, named once. Everything that must sit CLEAR of the pad keys off these, because
+   anything keyed off the viewport bottom instead walks into the graduations as soon as a safe-area
+   inset appears — a percentage in a bottom offset resolves against this same box, so the two uses
+   give the same pixels.
+   The height is a FIXED 150 px, not a share of the canvas: a thumb needs a band it can find, and at
+   90 px a press landed 25 px off and crossed two graduations.
+   The clamp is a floor, not a preference. On the WINDOWED page the canvas is 16/10 of the column —
+   390x213 on a phone — where 45 % is 96 px, under that measured floor. So the floor wins and the pad
+   takes 29 % of that canvas: a canvas that short has no room to be both readable and small, and the
+   old full-width band took 52 % of it. Fullscreen, which is where the game is played, gets the 150.
+   No backticks anywhere in this block: it is a template literal, and one closes the string. */
+.pe-playwrap { --pe-arm-h: clamp(110px, 45%, 150px); --pe-arm-w: min(220px, calc(100% - 24px)); --pe-arm-b: 16px; width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
 .pe-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; background: #7fb4dd; }
 
 /* Fullscreen means the PITCH is fullscreen: the HUD floats over it and costs no pixel of ground. */
@@ -2714,16 +2739,15 @@ const CSS = `
 /* Only pe-hud-top children get their pointer events back above, so the views row needs its own
    rule — without it the segments are dead in fullscreen, on the platform that needs them most. */
 .game-page.gf-full .pe-views { pointer-events: auto; }
-/* Clears the launch board instead of sitting in the bottom corner. That corner IS the board now, and
-   the board is the only way to throw, so a button parked there is a dead patch of the one surface the
-   player has to press — measured at 176x96 px on a 390 px phone, the right 45% of it. In fullscreen
-   the stage is the viewport, so this 30vh is the same pixels as the board's own 30%; the two copies
-   are kept honest by the actions-over-board check in scripts/snap-petanque-phone.mjs. The 40px is the
-   seam stack — power bar then state line — that now lives just above the board. */
+/* Clears the launch pad instead of sitting in the bottom corner. The pad is 220 px wide and centred,
+   so the corner is pitch again — but the button would still stand over it, and the pad is the only
+   way to throw. In fullscreen the stage is the viewport, so this repeats the pad's own box in vh;
+   the two copies are kept honest by the actions-over-board check in scripts/snap-petanque-phone.mjs.
+   The 40px is the seam stack — power bar then state line — that lives just above the pad. */
 .game-page.gf-full .pe-hud-actions {
   position: fixed; z-index: 4; max-width: 45vw;
   right: max(8px, env(safe-area-inset-right));
-  bottom: calc(max(10px, env(safe-area-inset-bottom)) + clamp(110px, 30vh, 200px) + 40px);
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + clamp(110px, 45vh, 150px) + 16px + 40px);
 }
 .game-page.gf-full .pe-stat { font-size: 12px; padding: 4px 10px; }
 .game-page.gf-full .pe-act, .game-page.gf-full .pe-pill { font-size: 12px; padding: 4px 10px; }
@@ -2776,7 +2800,9 @@ const CSS = `
 /* Vertical gauge on the left edge: the angle the board is currently offering, named. */
 .pe-loft { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 5px; pointer-events: none; }
 .pe-loft-label { background: rgba(28,20,12,0.62); color: #ffe8b0; font-weight: 800; font-size: 11.5px; padding: 3px 9px; border-radius: 999px; backdrop-filter: blur(4px); white-space: nowrap; }
-.pe-loft-bar { width: 9px; height: 96px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+/* Fills DOWNWARD: it is a readout of the pad, and on the pad a plomb is the bottom. A gauge that
+   filled up for a lob would teach the opposite of the gesture. */
+.pe-loft-bar { width: 9px; height: 96px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; }
 .pe-loft-fill { width: 100%; background: linear-gradient(180deg, #ffd166, #f4801f); transition: height 0.08s linear; }
 .pe-loft-hint { color: #f0e6da; font-size: 10px; opacity: 0.8; text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
 /* Held board: the angle is committed. A solid ring says "this is the value that leaves". */
@@ -2797,43 +2823,48 @@ const CSS = `
 .pe-zoom-thumb { position: absolute; left: 50%; width: 22px; height: 14px; margin-left: -11px; border-radius: 999px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.5); transition: bottom 0.12s linear; pointer-events: none; }
 .pe-zoom-label { color: #f0e6da; font-size: 11px; font-weight: 700; opacity: 0.9; text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
 
-/* The throwing strip. Drawing only — aimStart owns the hit test, so there is one path into a
-   throw and this can never swallow a camera drag. */
-/* The strip has to READ as a control. A 30 %-opacity dotted rule did not: players never found it.
-   Solid accent edge, a dashed echo under it, and a darker floor. ARM_H owns the height — four
-   Playwright guards slide from height * 0.8 and land inside it. */
-.pe-arm { position: absolute; left: 0; right: 0; bottom: 0; height: var(--pe-arm-h); z-index: 2; pointer-events: none; border-top: 2px solid rgba(255,209,102,0.85); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.46) 100%); }
+/* The launch pad. Drawing only — aimStart owns the hit test, so there is one path into a throw and
+   this can never swallow a camera drag.
+   It has to READ as a control. A 30 %-opacity dotted rule did not: players never found it. Solid
+   accent edge all the way round, a dashed echo under the seam, and a darker floor.
+   It used to be a full-width band eating 30 % of the canvas, almost all of it empty. Now it is a
+   fixed pad on the bottom edge, centred: everything left and right of it went back to being pitch,
+   and the drag there is the camera again. Centred and not in the dead middle of the screen, because
+   the hand would then cover the very lane it is aiming down. */
+.pe-arm { position: absolute; left: 50%; transform: translateX(-50%); bottom: var(--pe-arm-b); width: var(--pe-arm-w); height: var(--pe-arm-h); z-index: 2; pointer-events: none; border: 2px solid rgba(255,209,102,0.85); border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, rgba(20,14,9,0.12) 0%, rgba(20,14,9,0.5) 100%); }
 .pe-arm::before { content: ''; position: absolute; left: 0; right: 0; top: 4px; border-top: 1.5px dashed rgba(255,209,102,0.45); }
-.pe-arm.off { border-top-color: rgba(255,255,255,0.3); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.24) 100%); }
+.pe-arm.off { border-color: rgba(255,255,255,0.3); background: linear-gradient(180deg, rgba(20,14,9,0.08) 0%, rgba(20,14,9,0.26) 100%); }
 .pe-arm.off::before { border-top-color: rgba(255,255,255,0.16); }
 .pe-arm.call { animation: pe-arm-call 2.2s ease-in-out infinite; }
-@keyframes pe-arm-call { 0%, 100% { border-top-color: rgba(255,209,102,0.85); } 50% { border-top-color: rgba(255,209,102,0.25); } }
+@keyframes pe-arm-call { 0%, 100% { border-color: rgba(255,209,102,0.85); } 50% { border-color: rgba(255,209,102,0.25); } }
 @media (prefers-reduced-motion: reduce) { .pe-arm.call { animation: none; } }
 .pe-arm-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(140,233,154,0.10), rgba(255,107,107,0.30)); }
 /* The one line above the board. It sits OUTSIDE the board on purpose: the board is a surface the
    thumb lands on, and its middle is the part the thumb lands on most. This was two elements printed
    one above the other down there, which is how the bottom of the screen ended up with four rows of
    text in 80 px. Ellipsised rather than wrapped — a second line would push into the seam. */
-.pe-arm-label { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--pe-arm-h) + 11px); z-index: 3; background: rgba(28,20,12,0.6); color: #f4ece2; font-weight: 600; font-size: 12.5px; padding: 4px 13px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+.pe-arm-label { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--pe-arm-b) + var(--pe-arm-h) + 11px); z-index: 3; background: rgba(28,20,12,0.6); color: #f4ece2; font-weight: 600; font-size: 12.5px; padding: 4px 13px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
 /* Finger down, nothing pulled yet: letting go here throws nothing. Said in words AND in colour,
    because the board looks identical whether it is armed or merely touched. */
 .pe-arm-label.warn { background: rgba(120,34,28,0.72); color: #ffd7d2; font-weight: 700; }
 
-/* The graduations hug the left edge instead of running across the middle. Same reason as the line
-   above: a word printed in the centre of the board is a word under the thumb that is about to press
-   there. The tick is what points at the height; the word only names it. */
-.pe-board-marks { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 0; bottom: 0; width: 96px; pointer-events: none; }
-.pe-board-mark { position: absolute; left: 0; right: 0; text-align: left; color: #f0e6da; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.62; text-shadow: 0 1px 3px rgba(0,0,0,0.85); transform: translateY(50%); }
+/* The graduations live INSIDE the pad now — the pad is only 220 px wide, so there is no "beside it"
+   left to hug. The word sits left, the tick reaches right: the tick is what points at the height,
+   the word only names it. Placed from the top and not from the bottom, because the board is upside
+   down on purpose — Plomb is the bottom row and Roulette the top one. */
+.pe-board-marks { position: absolute; left: 10px; right: 10px; top: 0; bottom: 0; pointer-events: none; }
+.pe-board-mark { position: absolute; left: 0; right: 0; text-align: left; color: #f0e6da; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.62; text-shadow: 0 1px 3px rgba(0,0,0,0.85); transform: translateY(-50%); }
 .pe-board-mark::after { content: ''; position: absolute; top: 50%; right: 0; width: 30px; border-top: 1.5px solid rgba(255,255,255,0.3); }
 .pe-board-mark.on { color: #ffd166; opacity: 1; font-size: 11px; }
 .pe-board-mark.on::after { border-top-color: rgba(255,209,102,0.85); }
 /* Held with nothing pulled: the board is the cancel surface, so it says so with its own skin. */
-.pe-arm.hold { border-top-color: rgba(255,138,128,0.85); background: linear-gradient(180deg, rgba(60,16,12,0) 0%, rgba(80,20,14,0.5) 100%); }
+.pe-arm.hold { border-color: rgba(255,138,128,0.85); background: linear-gradient(180deg, rgba(60,16,12,0.12) 0%, rgba(80,20,14,0.5) 100%); }
 .pe-arm.hold::before { border-top-color: rgba(255,138,128,0.45); }
 
-/* Rides the seam instead of standing in the middle of the bottom band, where it printed straight
-   over the "Roulette" graduation — and where the thumb that sets it covers it anyway. */
-.pe-power { position: absolute; left: 0; right: 0; bottom: calc(var(--pe-arm-h) + 3px); height: 4px; background: rgba(28,20,12,0.45); overflow: hidden; z-index: 3; pointer-events: none; }
+/* Rides the seam instead of standing inside the pad, where it printed straight over the "Roulette"
+   graduation — and where the thumb that sets it covers it anyway. Same width as the pad, so it reads
+   as that pad's gauge and not as a bar belonging to the whole screen. */
+.pe-power { position: absolute; left: 50%; transform: translateX(-50%); width: var(--pe-arm-w); border-radius: 999px; bottom: calc(var(--pe-arm-b) + var(--pe-arm-h) + 3px); height: 4px; background: rgba(28,20,12,0.45); overflow: hidden; z-index: 3; pointer-events: none; }
 .pe-power-fill { height: 100%; background: linear-gradient(90deg, #8ce99a, #ffd166 55%, #ff6b6b); }
 
 

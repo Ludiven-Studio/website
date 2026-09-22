@@ -229,23 +229,30 @@ all.push(...await audit('4-eye')); // the throwing view: strip, legend, hint, ev
 }
 
 /* Held, mid-pull: the one moment the power bar, the lit legend mark and the arc are all on screen
-   together — and the only state where the strip is not just a passive band at the bottom. */
-const bot = box.y + box.height;
-await page.mouse.move(cx, bot - 40);
+   together — and the only state where the pad is not just a passive box at the bottom.
+   Both ends are pressed, and which end is which SWAPPED with the inversion: the top of the pad is
+   now the grazing roulette and the bottom the plomb. The pull is always measured from the pad's
+   top, because power is measured from the seam — a press-relative pull from the bottom would land
+   back inside the safe zone and fire nothing. */
+const padBox = await page.evaluate(() => {
+	const r = document.querySelector('.pe-arm').getBoundingClientRect();
+	return { top: r.top, bottom: r.bottom };
+});
+await page.mouse.move(cx, padBox.top + 14);
 await page.mouse.down();
-await page.mouse.move(cx, bot - 40 - 130, { steps: 14 });
+await page.mouse.move(cx, padBox.top - 130, { steps: 14 });
 await sleep(700);
 all.push(...await audit('5-armed-roulette'));
-await page.mouse.move(cx, bot - 40, { steps: 4 }); // back to power 0: do not fire
+console.log(`    loft ${(((await state()).loft) * 180 / Math.PI).toFixed(1)} deg`);
+await page.mouse.move(cx, padBox.top + 14, { steps: 4 }); // back to power 0: do not fire
 await sleep(150);
 await page.mouse.up();
 await sleep(400);
 
-// And the other end of the board: a full plomb, where the legend has to read "Plomb".
-const stripTop = await page.evaluate(() => document.querySelector('.pe-arm').getBoundingClientRect().top);
-await page.mouse.move(cx, stripTop + 14);
+// And the other end of the pad: a full plomb, where the legend has to read "Plomb".
+await page.mouse.move(cx, padBox.bottom - 14);
 await page.mouse.down();
-await page.mouse.move(cx, stripTop + 14 - 130, { steps: 14 });
+await page.mouse.move(cx, padBox.top - 130, { steps: 14 });
 await sleep(700);
 all.push(...await audit('6-armed-plomb'));
 console.log(`    loft ${(((await state()).loft) * 180 / Math.PI).toFixed(1)} deg`);

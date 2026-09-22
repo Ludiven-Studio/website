@@ -47,15 +47,18 @@ check(start.match.turn === 0, 'the course never hands the turn to the AI');
 // Not fullscreen here: the canvas runs past the fold, and a drag aimed below it hits nothing.
 await page.locator('.pe-canvas').scrollIntoViewIfNeeded();
 const box = await page.locator('.pe-canvas').boundingBox();
-// The strip is clamped in px, so its top is asked for rather than guessed as a share of the height.
+// The launch pad is a fixed box centred on the bottom edge, so its centre is asked for rather than
+// guessed as a share of the canvas — or derived from a canvas height that no longer bounds it.
 const arm = await page.evaluate(() => window.__petanque().arm);
-const cx = box.x + box.width * 0.5, cy = box.y + (arm.top + arm.height) / 2;
+const cx = box.x + arm.cx, cy = box.y + arm.cy;
 
-/** Drag up for power, sideways for direction, release — the player's own gesture. */
+/** Drag up for power, sideways for direction, release — the player's own gesture.
+ *  `dyUp` is measured from the SEAM (the pad's top), because that is where the island measures power
+ *  from: a press-relative pull from the middle of the pad spends half the pad on dead travel. */
 async function throwIt(dx, dyUp) {
 	await page.mouse.move(cx, cy);
 	await page.mouse.down();
-	await page.mouse.move(cx + dx, cy - dyUp, { steps: 14 });
+	await page.mouse.move(cx + dx, box.y + arm.top - dyUp, { steps: 14 });
 	await sleep(400);
 	// Check the gauge BEFORE releasing. Waiting on `status !== 'rolling'` alone passes instantly
 	// when the drag missed the canvas, so a throw that never happened would read as a pass.

@@ -44,9 +44,14 @@ await sleep(1200);
 const state = () => page.evaluate(() => window.__petanque());
 const box = await page.locator('.pe-canvas').boundingBox();
 const cx = box.x + box.width * 0.5;
+/* The launch pad is a fixed box centred on the bottom edge, so its centre is asked for rather than
+   derived: (top + height) / 2 used the CANVAS height and only held while the pad reached the bottom. */
 const arm = await page.evaluate(() => window.__petanque().arm);
-const cy = box.y + (arm.top + arm.height) / 2;
-const lookY = box.y + arm.top * 0.45; // camera area, clear of the throwing strip
+const cy = box.y + arm.cy;
+/* Pulls aim at the SEAM, not 132 px above the press: power is measured from the pad's top, so a
+   press-relative pull from the middle of the pad wastes half the pad as dead travel. */
+const seam = box.y + arm.top;
+const lookY = box.y + arm.top * 0.45; // camera area, above the pad
 
 const drag = async (x, y, dx, dy, steps = 10) => {
 	await page.mouse.move(x, y);
@@ -97,7 +102,7 @@ async function checkInversion() {
 async function humanThrow() {
 	await page.mouse.move(cx, cy);
 	await page.mouse.down();
-	await page.mouse.move(cx, cy - 132, { steps: 12 });
+	await page.mouse.move(cx, seam - 132, { steps: 12 });
 	await sleep(250);
 	const armed = (await state()).power;
 	await page.mouse.up();

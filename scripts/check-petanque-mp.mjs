@@ -87,19 +87,25 @@ const at = (p, fx, fy) => {
 
 /* One throw. The gauge is read BEFORE the release: a negated wait on `status !== 'rolling'` passes
    instantly on exactly the failure it should catch, so a dead drag would certify itself. */
-/* Middle of the throwing strip, asked of the page. The strip is clamped in px, so a fraction of the
-   canvas height is a guess that drifts off it on a tall canvas. */
+/* Middle of the launch pad, asked of the page. The pad is a fixed box centred on the bottom edge, so
+   a fraction of the canvas misses it — and its centre is reported rather than derived, because the
+   old (top + height) / 2 read the CANVAS height.
+   `seam` is the pad's top, and the pull below aims there rather than 130 px above the press: power
+   is measured from the seam, so a press-relative pull from the middle of the pad only charges
+   130 - 75 = 55 px. That read as "la visée n'a pas pris" at power 0.29 — the drag worked, the
+   instrument was pulling 75 px of dead travel. */
 const armAt = async (page) => {
 	const box = boxes.get(page);
 	const arm = await page.evaluate(() => window.__petanque().arm);
-	return { x: box.x + box.width * 0.5, y: box.y + (arm.top + arm.height) / 2 };
+	return { x: box.x + arm.cx, y: box.y + arm.cy, seam: box.y + arm.top };
 };
 
 async function throwOn(page, other) {
 	const s = await armAt(page);
+	const pull = s.seam - 130;
 	await page.mouse.move(s.x, s.y);
 	await page.mouse.down();
-	await page.mouse.move(s.x, s.y - 130, { steps: 14 });
+	await page.mouse.move(s.x, pull, { steps: 14 });
 	await sleep(300);
 	const armed = (await snap(page)).power;
 	if (armed < 0.3) {
@@ -112,7 +118,7 @@ async function throwOn(page, other) {
 	for (let i = 0; i < 12; i++) {
 		seen = await snap(other);
 		if (seen?.oppAim?.live && seen.rayVisible) break;
-		await page.mouse.move(s.x + (i % 2 ? 3 : -3), s.y - 130 - (i % 3), { steps: 2 });
+		await page.mouse.move(s.x + (i % 2 ? 3 : -3), pull - (i % 3), { steps: 2 });
 		await sleep(150);
 	}
 	aimSeen = aimSeen || !!seen?.oppAim?.live;

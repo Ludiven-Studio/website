@@ -84,21 +84,22 @@ const state = () => page.evaluate(() => window.__petanque());
 let box = await page.locator('.pe-canvas').boundingBox();
 let cx = box.x + box.width * 0.5;
 
-// Ask the page where the arm starts rather than guessing a fraction: the strip is a clamp, so its
-// share of the canvas is not the same number in the two viewports.
+// Ask the page for the pad's box rather than guessing a fraction: it is a fixed 220x150 pad centred
+// on the bottom edge, so its share of the canvas is not the same number in the two viewports — and
+// its own height is not the canvas height, which the old derivation quietly assumed.
 let arm0 = (await state()).arm;
-let armY = box.y + arm0.top + (box.height - arm0.top) * 0.45;
+let armY = box.y + arm0.cy;
 let lookY = box.y + arm0.top * 0.45;
-/* A client y that lands on a KNOWN loft: `t` runs 0 at the bottom of the board to 1 at its top,
-   inside the dead margin the island reports as `arm.pad`. Guessing a fraction of the strip would
-   make every loft assertion below a function of the viewport. */
+/* A client y that lands on a KNOWN loft. `t` is the LOFT (0 grazing, 1 plomb) and the board is drawn
+   upside down on purpose, so t = 1 is the BOTTOM of the pad: a plomb is the gesture that starts low
+   and swings through the whole pad. Inside the dead margin the island reports as `arm.pad`. */
 const boardY = (t) => {
-	const bot = box.height - arm0.pad, top = arm0.top + arm0.pad;
-	return box.y + bot - t * (bot - top);
+	const top = arm0.top + arm0.pad, bot = arm0.top + arm0.height - arm0.pad;
+	return box.y + top + t * (bot - top);
 };
 console.log(`viewport ${VP.width}x${VP.height} · canvas ${Math.round(box.width)}x${Math.round(box.height)} `
-	+ `· arm starts at ${arm0.top}px (${Math.round((arm0.top / arm0.height) * 100)}%)`);
-check(lookY > box.y + 40 && armY < box.y + box.height - 10, 'the arm strip and the camera area are both reachable');
+	+ `· pad ${arm0.width}x${arm0.height} at ${arm0.left},${arm0.top}`);
+check(lookY > box.y + 40 && armY < box.y + box.height - 10, 'the launch pad and the camera area are both reachable');
 
 const viewNow = async () => (await state()).view;
 // By position, not by name: under 420 px the segments drop their label and keep only the icon, so
@@ -247,14 +248,33 @@ const pressAt = async (t) => {
 	await sleep(200);
 	return s;
 };
-const lowPress = await pressAt(0.02);
-const highPress = await pressAt(0.98);
+const lowPress = await pressAt(0.02); // the TOP of the pad — the board is upside down on purpose
+const highPress = await pressAt(0.98); // the BOTTOM of the pad
 check(highPress.loft > lowPress.loft + 0.5,
 	`the press point IS the loft (${(lowPress.loft * 180 / Math.PI).toFixed(1)} -> ${(highPress.loft * 180 / Math.PI).toFixed(1)} deg)`);
-check(lowPress.loft < 0.25, `the bottom of the board is a roulette (${(lowPress.loft * 180 / Math.PI).toFixed(1)} deg)`);
+/* The inversion, asserted in SCREEN px off the PAD'S OWN BOX — not through boardY. boardY is this
+   script's model of the island; if both flipped together every assertion above would still pass
+   while the screen taught the opposite gesture. So: press 14 px inside each end, ask the loft. */
+const padEnds = await page.evaluate(() => {
+	const r = document.querySelector('.pe-arm').getBoundingClientRect();
+	return { top: r.top + 14, bottom: r.bottom - 14 };
+});
+const pressY = async (y) => {
+	await page.mouse.move(cx, y);
+	await page.mouse.down();
+	await sleep(200);
+	const s = await state();
+	await page.mouse.up();
+	await sleep(200);
+	return s;
+};
+const padTop = await pressY(padEnds.top), padBot = await pressY(padEnds.bottom);
+check(padBot.loft > padTop.loft + 0.5,
+	`pressing LOW on the pad lobs and pressing HIGH grazes (${(padTop.loft * 180 / Math.PI).toFixed(1)} -> ${(padBot.loft * 180 / Math.PI).toFixed(1)} deg)`);
+check(lowPress.loft < 0.25, `the top of the pad is a roulette (${(lowPress.loft * 180 / Math.PI).toFixed(1)} deg)`);
 /* 60 deg is the floor for something worth calling a plomb, and it is well past the 53 deg the old
    camera-driven loft topped out at — which is what "l'angle max n'est pas assez élevé" was. */
-check(highPress.loft > 1.05, `and the top is a real plomb (${(highPress.loft * 180 / Math.PI).toFixed(1)} deg)`);
+check(highPress.loft > 1.05, `and the bottom is a real plomb (${(highPress.loft * 180 / Math.PI).toFixed(1)} deg)`);
 check(Math.abs(highPress.aim.board - 1) < 0.05 && highPress.aim.board > lowPress.aim.board,
 	`the gauge reads the board back out of the loft (${lowPress.aim.board.toFixed(2)} -> ${highPress.aim.board.toFixed(2)})`);
 
@@ -328,8 +348,10 @@ check(Math.abs(centred) < 0.05, `the eye can be brought back onto the lane (yaw 
 /* Press at `t` on the board, then pull for power. `eye` tilts the camera first: the frame is now
    the player's business alone, and a lob wants the eye lifted the same way a real one wants a
    raised chin. Pulled to a y above the SEAM, not 130 px above the press: power is measured from
-   the seam so the board reads zero, and a press-relative pull from low on the board stopped short
-   of the seam and got cancelled by the safe zone — which is exactly what the safe zone is for. */
+   the seam so the pad reads zero, and a press-relative pull stopped short of the seam and got
+   cancelled by the safe zone — which is exactly what the safe zone is for. Since the inversion,
+   a plomb is pressed at the pad's far end, so it drags the whole 150 px before it charges at all:
+   that is the declared cost, and pulling to a seam-relative y is what keeps it out of this guard. */
 const pullY = (px) => Math.max(box.y + 8, box.y + arm0.top - px);
 const armAt = async (t, eye = 0) => {
 	if (eye) { await drag(cx, lookY, 0, eye, 260); }
@@ -370,7 +392,7 @@ const relax = async (t) => {
 	await sleep(200);
 };
 
-const mid = await armAt(0.35); // low on the board: a flatter throw
+const mid = await armAt(0.35); // high on the pad: a flatter throw
 check(mid.zoom === 0, `drawing the arm back puts the feet back on the circle (zoom ${mid.zoom})`);
 check(mid.bow >= 12, `the arc bows off a straight line at mid loft (${mid.bow} px over ${mid.arc.n} pts, loft ${(mid.loft * 180 / Math.PI).toFixed(1)} deg)`);
 check(lostOnTheWayDown(mid).length === 0, `the mid-loft flight is whole from the apex to the ground (${JSON.stringify(mid.arc)})`);
@@ -390,7 +412,7 @@ await relax(0.35);
 const cancelled = await state();
 check(cancelled.status === 'aim', `and releasing there throws nothing (status ${cancelled.status})`);
 
-// Top of the board, eye lifted: a full plomb. The lift is the declared cost of freeing the camera —
+// Bottom of the pad, eye lifted: a full plomb. The lift is the declared cost of freeing the camera —
 // the loft no longer tilts the view for you, so framing a 70 deg arc is now a thing you do.
 const high = await armAt(0.98, 80);
 check(lostOnTheWayDown(high).length === 0,
@@ -499,7 +521,7 @@ await page.locator('.pe-canvas').scrollIntoViewIfNeeded();
 box = await page.locator('.pe-canvas').boundingBox();
 cx = box.x + box.width * 0.5;
 arm0 = (await state()).arm;
-armY = box.y + arm0.top + (box.height - arm0.top) * 0.45;
+armY = box.y + arm0.cy;
 lookY = box.y + arm0.top * 0.45;
 console.log(`     windowed canvas ${Math.round(box.width)}x${Math.round(box.height)} — this is the one that decides`);
 
@@ -566,30 +588,50 @@ if (!ba.length) {
 		+ (out === ba.length ? ' — the known review-zoom lottery, see above' : ''));
 }
 
-/* ---------- 11. the throwing strip can be SEEN ---------- */
+/* ---------- 11. the launch pad can be SEEN, and it is a PAD ---------- */
 
 // Computed style, never the source: an island's <style> is global, and a prefix collision from
 // another island would repaint this and leave the source looking right.
 const armCss = await page.evaluate(() => {
 	const el = document.querySelector('.pe-arm');
 	if (!el) return null;
-	const cs = getComputedStyle(el);
+	const cs = getComputedStyle(el), b = el.getBoundingClientRect();
+	const cv = document.querySelector('.pe-canvas').getBoundingClientRect();
 	return {
-		h: el.getBoundingClientRect().height,
-		w: cs.borderTopWidth,
+		h: b.height, w: b.width,
+		// Its centre against the canvas centre, and how far its bottom sits off the canvas bottom.
+		offCentre: (b.left + b.right) / 2 - (cv.left + cv.right) / 2,
+		share: (b.width * b.height) / (cv.width * cv.height),
+		hCanvas: cv.height,
+		fromBottom: cv.bottom - b.bottom,
+		bw: cs.borderTopWidth,
 		style: cs.borderTopStyle,
 		colour: cs.borderTopColor,
 		label: document.querySelector('.pe-arm-label')?.textContent?.trim() ?? '',
 	};
 });
-check(!!armCss, 'the throwing strip is in the DOM');
+check(!!armCss, 'the launch pad is in the DOM');
 if (armCss) {
-	check(parseFloat(armCss.w) >= 2, `its top edge is a solid rule, not a hairline (${armCss.w} ${armCss.style})`);
+	check(parseFloat(armCss.bw) >= 2, `its edge is a solid rule, not a hairline (${armCss.bw} ${armCss.style})`);
 	check(armCss.style === 'solid', `and solid rather than dotted (${armCss.style})`);
-	// An accent edge, not a grey one: the old 30 %-opacity white is why nobody found the strip.
+	// An accent edge, not a grey one: the old 30 %-opacity white is why nobody found the pad.
 	const rgb = (armCss.colour.match(/[\d.]+/g) ?? []).map(Number);
 	check(rgb.length >= 3 && rgb[0] > 180 && rgb[2] < rgb[0] * 0.7, `and drawn in the accent colour (${armCss.colour})`);
-	check(armCss.h > 60, `it is a real strip, not a line (${Math.round(armCss.h)} px tall)`);
+	// The height is the one number that may not shrink freely: at 90 px a thumb crossed two
+	// graduations by landing 25 px off. The rest is what "fixed and not too big" has to mean —
+	// a bounded box, centred, near the bottom edge, and no longer a third of the picture.
+	check(armCss.h >= 110 && armCss.h <= 160, `it is tall enough to aim on and no taller (${Math.round(armCss.h)} px)`);
+	check(armCss.w <= 240, `it is a pad, not a band across the screen (${Math.round(armCss.w)} px wide)`);
+	check(Math.abs(armCss.offCentre) <= 4, `centred on the canvas (off by ${Math.round(armCss.offCentre)} px)`);
+	check(armCss.fromBottom > 0 && armCss.fromBottom < 40, `sitting just above the bottom edge (${Math.round(armCss.fromBottom)} px off it)`);
+	/* Share of the canvas — gated only where the canvas has room to give any back. On the windowed
+	   phone page the canvas is 16/10 of a 390 px column, i.e. 213 px tall, and a pad that clears the
+	   110 px readability floor is a quarter of it whatever it is doing. Printing it there rather than
+	   asserting it: a gate that cannot be met by a correct build is a gate that gets loosened until
+	   it means nothing. The old full-width band took 52 % of that same canvas. */
+	const shareTxt = `${Math.round(armCss.share * 100)} % of the canvas (the full-width band took 30 % in fullscreen, 52 % here)`;
+	if (armCss.hCanvas >= 320) check(armCss.share < 0.16, `and it gives the pitch back — ${shareTxt}`);
+	else console.log(`     canvas only ${Math.round(armCss.hCanvas)} px tall, too short to gate the share: pad is ${shareTxt}`);
 	check(armCss.label.length > 10, `it says what it is for ("${armCss.label}")`);
 }
 
@@ -599,10 +641,12 @@ const marks = await page.evaluate(() => [...document.querySelectorAll('.pe-board
 	.map((el) => ({ label: el.textContent.trim(), bottom: el.getBoundingClientRect().bottom, on: el.classList.contains('on') })));
 check(marks.length >= 4, `the board is graduated (${marks.length} marks: ${marks.map((m) => m.label).join(', ')})`);
 if (marks.length >= 2) {
-	// Bottom of the board = grazing, top = plomb. Drawn upside down it would teach the wrong gesture.
+	/* Bottom of the pad = plomb, top = grazing roulette. This is the inversion the board now teaches:
+	   the lob is the gesture that starts lowest and has the whole pad to swing through, and drawn the
+	   other way up the legend would name the opposite of what the thumb does. */
 	const roulette = marks.find((m) => /roulette/i.test(m.label)), plomb = marks.find((m) => /plomb/i.test(m.label));
-	check(!!roulette && !!plomb && roulette.bottom > plomb.bottom,
-		'the roulette mark is below the plomb mark, which is the gesture it is teaching');
+	check(!!roulette && !!plomb && plomb.bottom > roulette.bottom,
+		'the plomb mark is below the roulette mark, which is the gesture it is teaching');
 	check(marks.filter((m) => m.on).length === 1, `exactly one mark is lit, the one the loft is on (${marks.filter((m) => m.on).map((m) => m.label).join('/') || 'none'})`);
 }
 

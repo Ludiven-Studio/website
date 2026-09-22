@@ -41,13 +41,17 @@ await sleep(1200);
 await shot('start');
 
 const box = await page.locator('.pe-canvas').boundingBox();
-const cx = box.x + box.width * 0.5, cy = box.y + box.height * 0.8;
+/* The launch pad's own box, not a share of the canvas: the pad is a fixed 220x150 on the bottom
+   edge, so height * 0.8 lands inside it on a 760 px canvas and just above it on an 844 px one. */
+const arm = await page.evaluate(() => window.__petanque().arm);
+const cx = box.x + arm.cx, cy = box.y + arm.cy;
 
-/** Drag up for power, sideways for direction, then release. */
+/** Drag up for power, sideways for direction, then release.
+ *  `dyUp` is measured from the SEAM (the pad's top), because that is where power starts. */
 async function throwIt(dx, dyUp, tag) {
 	await page.mouse.move(cx, cy);
 	await page.mouse.down();
-	await page.mouse.move(cx + dx, cy - dyUp, { steps: 14 });
+	await page.mouse.move(cx + dx, box.y + arm.top - dyUp, { steps: 14 });
 	await sleep(500); // the arc is rebuilt on the next tick
 	if (tag) await shot(tag);
 	await page.mouse.up();

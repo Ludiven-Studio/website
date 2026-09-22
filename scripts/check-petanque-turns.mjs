@@ -46,10 +46,16 @@ await sleep(1200);
 const state = () => page.evaluate(() => window.__petanque());
 const box = await page.locator('.pe-canvas').boundingBox();
 const cx = box.x + box.width * 0.5;
-/* Middle of the throwing strip, read off the game. The strip is clamped in px (90-170), so a fixed
-   fraction of the canvas height drifts out of it on a tall canvas and the drag lands on nothing. */
+/* Middle of the launch pad, read off the game. The pad is a fixed 220x150 box centred on the bottom
+   edge, so any fraction of the canvas misses it — and the centre is asked for rather than derived,
+   because the old (top + height) / 2 used the CANVAS height and only worked while the pad ran to
+   the bottom edge. */
 const arm = await page.evaluate(() => window.__petanque().arm);
-const cy = box.y + (arm.top + arm.height) / 2;
+const cy = box.y + arm.cy;
+/* Pulls aim at the SEAM, not 132 px above the press: power is measured from the pad's top, so a
+   press-relative pull from the middle of the pad wastes half the pad as dead travel and threw at
+   power 0.30 where it used to throw at 0.69. */
+const seam = box.y + arm.top;
 
 const near = (a, b) => Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 /** The side holding the point, from the ground alone — null when nothing is down yet. */
@@ -70,7 +76,7 @@ const down = (s, side) => s.bs.filter((b) => b.side === side).length;
 async function humanThrow() {
 	await page.mouse.move(cx, cy);
 	await page.mouse.down();
-	await page.mouse.move(cx, cy - 132, { steps: 12 });
+	await page.mouse.move(cx, seam - 132, { steps: 12 });
 	await sleep(250);
 	const armed = (await state()).power;
 	await page.mouse.up();
