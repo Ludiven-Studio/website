@@ -2584,10 +2584,36 @@ const CSS = `
 .game-page.gf-full .pe-hud-top > * { pointer-events: auto; }
 /* Billard hides the mode tabs in fullscreen, but billard is not opened in fullscreen: here the page
    starts there, so hiding them would make Niveaux, Défi and En ligne unreachable without quitting
-   first — and nothing on screen would say so. Kept, as a 2x2 block over the sky. */
-.game-page.gf-full .pe-modetoggle { max-width: min(46%, 300px); }
-.game-page.gf-full .pe-modetoggle .dt-toggle { margin: 0; flex-wrap: wrap; border-radius: 16px; padding: 3px; gap: 3px; }
-.game-page.gf-full .pe-modetoggle .dt-seg { flex: 1 1 calc(50% - 3px); font-size: 12px; padding: 6px 4px; }
+   first — and nothing on screen would say so. Kept, but out of the middle.
+
+   The mode tabs and the camera views used to stack UNDER the scoreboard, three bands of chrome down
+   the centre of the pitch — which is where the boules go. They are two edge columns instead: left is
+   what you play, right is what you look at, and the centre keeps the score alone. Both hang off the
+   Quitter button, whose height the fullscreen shell measures because the label is translated. */
+.game-page.gf-full .pe-hud-top,
+.game-page.gf-full .pe-views {
+  position: absolute; z-index: 4;
+  top: calc(max(12px, env(safe-area-inset-top)) + var(--gf-exit-h, 36px) + 8px);
+}
+.game-page.gf-full .pe-hud-top {
+  left: max(8px, env(safe-area-inset-left));
+  width: 124px; flex-direction: column; align-items: stretch; gap: 6px;
+}
+.game-page.gf-full .pe-views { right: max(8px, env(safe-area-inset-right)); flex-direction: column; border-radius: 16px; }
+.game-page.gf-full .pe-view { text-align: left; }
+.game-page.gf-full .pe-modetoggle { width: 100%; }
+.game-page.gf-full .pe-modetoggle .dt-toggle { margin: 0; flex-direction: column; flex-wrap: nowrap; border-radius: 16px; padding: 3px; gap: 3px; }
+.game-page.gf-full .pe-modetoggle .dt-seg { flex: none; font-size: 12px; padding: 7px 9px; text-align: left; }
+/* Below ~560px the two side gauges sit close enough to the top that a full-height column walks into
+   them — loft on the left, zoom on the right, both centred on a screen that is barely taller than
+   they are. Short screens keep the wide blocks, still parked in their corner: centre clear either way. */
+@media (max-height: 560px) {
+  .game-page.gf-full .pe-hud-top { width: auto; max-width: 46vw; flex-direction: row; align-items: flex-start; }
+  .game-page.gf-full .pe-modetoggle { width: 188px; }
+  .game-page.gf-full .pe-modetoggle .dt-toggle { flex-direction: row; flex-wrap: wrap; }
+  .game-page.gf-full .pe-modetoggle .dt-seg { flex: 1 1 calc(50% - 3px); padding: 6px 4px; text-align: center; }
+  .game-page.gf-full .pe-views { flex-direction: row; border-radius: 999px; }
+}
 /* Here the tabs sit on the sky, not on the page background, so they wear the HUD's own skin — the
    same dark glass as .pe-stat — instead of a white slab that reads as a hole cut in the scene. */
 .game-page.gf-full .pe-modetoggle .dt-toggle { background: rgba(28,20,12,0.62); border-color: rgba(255,255,255,0.16); box-shadow: none; backdrop-filter: blur(4px); }

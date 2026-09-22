@@ -1,7 +1,8 @@
-/* Throwaway: what the game actually looks like on a phone, and WHERE the UI overlaps itself.
-   The layout only breaks on a narrow screen — the exit button is fixed to the corner at the top of
-   the z stack, the action row is fixed to the other corner, and the throwing strip owns the bottom
-   band — so every shot here is 390x844 and every one of them is audited, not just looked at.
+/* Throwaway: what the game actually looks like, and WHERE the UI overlaps itself.
+   Defaults to a 390x844 phone — the exit button is fixed to one corner at the top of the z stack,
+   the action row to the other, and the throwing strip owns the bottom band, so a narrow screen is
+   where it breaks. PET_W/PET_H move the viewport: the HUD columns are keyed off the two side
+   gauges, which are vertically centred, so landscape is a second shape and not a smaller one.
    Overlap is reported as a rectangle intersection: an eye misses a 4 px collision, and a screenshot
    of a translucent chip on a dark pitch hides it completely. */
 import { chromium } from 'playwright';
@@ -16,12 +17,17 @@ const OUT = 'D:/tmp/comfy';
 const server = await startServer(PORT, { mode: process.env.PET_DEV ? 'dev' : 'preview' });
 const { base } = server;
 
+const VW = Number(process.env.PET_W || 390);
+const VH = Number(process.env.PET_H || 844);
+const PHONE = VW < 900; // a desktop context with isMobile on gets the phone viewport meta, not the layout
+const SUF = VW === 390 && VH === 844 ? '' : `-${VW}x${VH}`;
+
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({
-	viewport: { width: 390, height: 844 },
+	viewport: { width: VW, height: VH },
 	deviceScaleFactor: 2, // a phone renders at 2x, and hairlines only show up there
-	isMobile: true,
-	hasTouch: true,
+	isMobile: PHONE,
+	hasTouch: PHONE,
 });
 const page = await ctx.newPage();
 const errs = [];
@@ -142,10 +148,11 @@ const audit = async (tag) => {
 	}
 	for (const s of strays) console.log(`    ON THE BOARD  ${s}`);
 	for (const s of inked) console.log(`    INK ON INK    ${s}`);
-	await page.screenshot({ path: resolve(`${OUT}/phone-${tag}.png`) });
+	await page.screenshot({ path: resolve(`${OUT}/phone-${tag}${SUF}.png`) });
 	/* The whole-page shot is 844 px tall and gets looked at as a thumbnail, which is where a 3 px
 	   collision hides. The band is where the text piles up, so it also comes out at its own size. */
-	await page.screenshot({ path: resolve(`${OUT}/band-${tag}.png`), clip: { x: 0, y: 844 - 250, width: 390, height: 250 } });
+	const bandH = Math.min(250, VH);
+	await page.screenshot({ path: resolve(`${OUT}/band-${tag}${SUF}.png`), clip: { x: 0, y: VH - bandH, width: VW, height: bandH } });
 	return [
 		...blocking.map((h) => `${tag}: ${h}`),
 		...strays.map((s) => `${tag}: pressable on the board — ${s}`),
