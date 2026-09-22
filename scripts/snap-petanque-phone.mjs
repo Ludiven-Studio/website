@@ -48,8 +48,11 @@ const PARTS = {
 	legend: '.pe-board-marks',
 	power: '.pe-power',
 	tag: '.pe-tag',
-	card: '.pe-card:not(.pe-endpanel)', // modal cards only — see the exemption in the pair loop
+	card: '.pe-card:not(.pe-endpanel):not(.pe-endcard)', // modal cards only — see the exemption in the pair loop
 	endpanel: '.pe-endpanel', // the end-of-match panel docks to one side, so it CAN really collide
+	// On the end panel's rails since the end-of-end review: it docks aside and the camera holds the
+	// layout behind it, so it is chrome that can collide, not a curtain that excuses itself.
+	endcard: '.pe-endcard',
 	lbc: '.lbc-pill', // shared chrome, pinned by LeaderboardCorner: it lands here without asking
 };
 
@@ -264,6 +267,80 @@ await page.keyboard.press('v'); // head view: the zoom slider joins the HUD
 await sleep(1400);
 all.push(...await audit('7-head'));
 
+/* The end of a MENE, which unlike the end of a partie cannot be forced: `__petanqueOver` sets
+   `over`, and the card's own condition is `card && !over` — so the one hook that reaches an end
+   state is the one hook that makes this card impossible. It is played out instead. The boules
+   already on the ground from step 6 shorten it; the AI answers on its own.
+   It is not audited by proxy off `.pe-endpanel`: same rails, but this card carries the distance
+   table, so it is the taller of the two and portrait is where that lands on the launch pad. */
+{
+	const armBox = await page.locator('.pe-canvas').boundingBox();
+	const arm = await page.evaluate(() => window.__petanque().arm);
+	const px = armBox.x + arm.cx, py = armBox.y + arm.cy;
+	const seam = armBox.y + arm.top - 130; // power is read from the pad's TOP seam, never from the press
+	for (let step = 0; step < 40; step++) {
+		const s = await state();
+		if (s.status === 'end' || s.status === 'over') break;
+		if (s.status === 'rolling' || s.status === 'placing') { await sleep(250); continue; }
+		if (s.match.turn !== 0) { await sleep(250); continue; }
+		if (s.match.phase === 'throw-jack') {
+			await page.getByRole('button', { name: /Lancer le bouchon/ }).click({ timeout: 6000 });
+			await page.waitForFunction(() => window.__petanque().status !== 'rolling', null, { timeout: 40000 });
+			await sleep(300);
+			continue;
+		}
+		// The walk-up runs on every turn and a drag cancels it, so wait it out before pressing.
+		await page.waitForFunction(() => !window.__petanque().intro, null, { timeout: 9000 }).catch(() => {});
+		await page.mouse.move(px, py);
+		await page.mouse.down();
+		await page.mouse.move(px, seam, { steps: 12 });
+		await sleep(250);
+		await page.mouse.up();
+		await page.waitForFunction(() => window.__petanque().status !== 'rolling', null, { timeout: 40000 }).catch(() => {});
+		await sleep(400);
+	}
+	const at = await state();
+	if (at.status !== 'end') all.push(`8-mene: the end never landed (status ${at.status}) — nothing was audited here`);
+	else {
+		all.push(...await audit('8-mene'));
+		const mene = await page.evaluate(() => {
+			const el = document.querySelector('.pe-endcard');
+			const cv = document.querySelector('.pe-canvas').getBoundingClientRect();
+			if (!el) return null;
+			const r = el.getBoundingClientRect();
+			const seen = window.__petanque().seen;
+			const under = seen.filter((b) => {
+				const x = cv.left + b.px, y = cv.top + b.py;
+				return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+			}).length;
+			/* The largest UNBROKEN band the card leaves. "Bord droit a 60 %" is a landscape question:
+			   standing up there is no side — 214 px of card in a 390 px canvas — and the card docks to
+			   the bottom band instead. What the ask actually wants, on both shapes, is that the layout
+			   still has a big clear rectangle to live in, so that is what gets measured. */
+			const free = Math.max(
+				(r.left - cv.left) * cv.height, (cv.right - r.right) * cv.height,
+				cv.width * (r.top - cv.top), cv.width * (cv.bottom - r.bottom),
+			) / (cv.width * cv.height);
+			return { w: r.width, h: r.height, x: r.x - cv.left, y: r.y - cv.top,
+				cw: cv.width, ch: cv.height, n: seen.length, under, free };
+		});
+		if (!mene) all.push('8-mene: status is `end` but no .pe-endcard on screen');
+		else {
+			const share = (mene.w * mene.h) / (mene.cw * mene.ch);
+			console.log(`    mene: carte ${Math.round(mene.w)}x${Math.round(mene.h)} @ ${Math.round(mene.x)},${Math.round(mene.y)}`
+				+ ` · ${(share * 100).toFixed(0)} % du terrain · bande libre ${(mene.free * 100).toFixed(0)} %`
+				+ ` · ${mene.under}/${mene.n} boules dessous`);
+			if (mene.free < 0.55) all.push(`8-mene: the end card leaves only a ${(mene.free * 100).toFixed(0)} % band — the layout has nowhere to go`);
+			if (share > 0.35) all.push(`8-mene: the end card covers ${(share * 100).toFixed(0)} % of the pitch`);
+			// The point of the whole change: the verdict is shown ON the layout it judges.
+			if (mene.under > 0) all.push(`8-mene: ${mene.under} boule(s) hidden behind the end card`);
+			if (mene.n === 0) all.push('8-mene: no boule in frame behind the end card — the layout is not being shown');
+		}
+		await page.locator('.pe-endcard').click();
+		await sleep(900);
+	}
+}
+
 /* The end of a partie. Forced through __petanqueOver rather than played: 13 points against the AI
    is minutes of guard, and this state would then be the only one never audited — which is exactly
    how the result card shipped sitting in the middle of the pitch.
@@ -272,7 +349,7 @@ all.push(...await audit('7-head'));
    takes, which side of the canvas it stays on, and how many boules end up underneath it. */
 await page.evaluate(() => window.__petanqueOver());
 await sleep(700);
-all.push(...await audit('8-fin'));
+all.push(...await audit('9-fin'));
 const fin = await page.evaluate(() => {
 	const el = document.querySelector('.pe-endpanel');
 	const cv = document.querySelector('.pe-canvas').getBoundingClientRect();
@@ -285,7 +362,7 @@ const fin = await page.evaluate(() => {
 	}).length;
 	return { panel: { x: p.x, y: p.y, w: p.width, h: p.height, right: p.right }, cv, n: seen.length, under };
 });
-if (!fin.panel) all.push('8-fin: no .pe-endpanel on screen at the end of the match');
+if (!fin.panel) all.push('9-fin: no .pe-endpanel on screen at the end of the match');
 else {
 	const share = (fin.panel.w * fin.panel.h) / (fin.cv.width * fin.cv.height);
 	const rightEdge = (fin.panel.right - fin.cv.left) / fin.cv.width;
@@ -293,8 +370,8 @@ else {
 		+ ` · ${(share * 100).toFixed(0)} % du terrain · bord droit a ${(rightEdge * 100).toFixed(0)} % · ${fin.under}/${fin.n} boules dessous`);
 	// "Sur un cote" is these two numbers, and neither of them is a screenshot: it stays in the left
 	// half, and it leaves most of the ground uncovered.
-	if (rightEdge > 0.6) all.push(`8-fin: the end panel reaches ${(rightEdge * 100).toFixed(0)} % across — not on a side`);
-	if (share > 0.35) all.push(`8-fin: the end panel covers ${(share * 100).toFixed(0)} % of the pitch`);
+	if (rightEdge > 0.6) all.push(`9-fin: the end panel reaches ${(rightEdge * 100).toFixed(0)} % across — not on a side`);
+	if (share > 0.35) all.push(`9-fin: the end panel covers ${(share * 100).toFixed(0)} % of the pitch`);
 }
 
 console.log(errs.length ? `PAGE ERRORS:\n${errs.join('\n')}` : 'no page errors');

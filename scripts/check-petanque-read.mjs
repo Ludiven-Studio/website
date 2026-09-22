@@ -201,6 +201,66 @@ check((await state()).dists.on === true, 'and puts them back');
 
 await page.waitForSelector('.pe-table', { timeout: 20000 }).catch(() => {});
 const fin = await state();
+
+/* ---------- 5. the end of an end shows the LAYOUT, not the next empty lane ---------- */
+
+/* `finishEnd` scores and advances in the same beat, so the circle jumps to where the jack was and
+   the game view re-seats itself there — with its back to the boules just counted. Measured before
+   the fix: 7 live bodies, all seven projected off-frame, behind a card sitting dead centre.
+   The circle is taken from the last sample at REST, because `match.circle` is already the next
+   end's by the time the card is up — that swap is the bug itself. */
+{
+	const canvas = await page.evaluate(() => {
+		const r = document.querySelector('.pe-canvas').getBoundingClientRect();
+		const el = document.querySelector('.pe-endcard');
+		const c = el ? el.getBoundingClientRect() : null;
+		return { w: r.width, h: r.height, card: c ? { x: c.x - r.x, y: c.y - r.y, w: c.width, h: c.height } : null };
+	});
+	const live = fin.bs.filter((b) => b.live);
+	const seen = fin.seen.filter((b) => b.m !== undefined);
+	const inFrame = seen.filter((b) => b.px >= 0 && b.px <= canvas.w && b.py >= 0 && b.py <= canvas.h);
+	console.log(`     plan final: ${inFrame.length}/${seen.length} corps dans le cadre`
+		+ ` · ${live.length} vivants · vue ${fin.view}`);
+	check(seen.length > 0 && inFrame.length === seen.length,
+		`every boule still on the ground is in frame (${inFrame.length}/${seen.length})`);
+
+	check(!!canvas.card, 'the verdict card is up');
+	if (canvas.card) {
+		const c = canvas.card;
+		const under = seen.filter((b) => b.px >= c.x && b.px <= c.x + c.w && b.py >= c.y && b.py <= c.y + c.h);
+		const share = (c.w * c.h) / (canvas.w * canvas.h);
+		/* The largest unbroken band left over, not "how far right does it reach". Standing up there is
+		   no side to dock to — 214 px of card in a 390 px canvas — and the card takes the bottom band
+		   instead. One metric has to answer for both shapes, or the two guards mean different things
+		   by "aside". Kept in step with scripts/snap-petanque-phone.mjs. */
+		const free = Math.max(c.x * canvas.h, (canvas.w - c.x - c.w) * canvas.h,
+			canvas.w * c.y, canvas.w * (canvas.h - c.y - c.h)) / (canvas.w * canvas.h);
+		console.log(`     carte ${Math.round(c.w)}x${Math.round(c.h)} @ ${Math.round(c.x)},${Math.round(c.y)}`
+			+ ` · ${(share * 100).toFixed(0)} % du terrain · bande libre ${(free * 100).toFixed(0)} %`
+			+ ` · ${under.length} corps dessous`);
+		// Same three numbers the end-of-match panel is held to: on a side, small, and off the boules.
+		check(free >= 0.55, `the card leaves the layout a band to live in (${(free * 100).toFixed(0)} %)`);
+		check(share <= 0.35, `and it is a panel, not a curtain (${(share * 100).toFixed(0)} % of the pitch)`);
+		check(under.length === 0, `no boule is hidden behind the verdict (${under.length})`);
+	}
+
+	/* Framed from the wrong end would pass every check above: the layout is still all in frame, just
+	   seen from behind. So the eye is asked which SIDE of the head it stands on, against the circle
+	   this end was actually thrown from. */
+	const from = resting.length ? resting[resting.length - 1].match.circle : null;
+	const hf = fin.jack && fin.jack.live
+		? { x: fin.jack.x, y: fin.jack.y }
+		: live.length
+			? { x: live.reduce((a, b) => a + b.x, 0) / live.length, y: live.reduce((a, b) => a + b.y, 0) / live.length }
+			: null;
+	if (from && hf && fin.cam.eye) {
+		const dot = (fin.cam.eye.x - hf.x) * (from.x - hf.x) + (fin.cam.eye.y - hf.y) * (from.y - hf.y);
+		console.log(`     oeil ${fin.cam.eye.x.toFixed(1)},${fin.cam.eye.y.toFixed(1)} · tete ${hf.x.toFixed(1)},${hf.y.toFixed(1)}`
+			+ ` · cercle joue ${from.x.toFixed(1)},${from.y.toFixed(1)} · dot ${dot.toFixed(2)}`);
+		check(dot > 0, `the eye stands on the side the end was thrown from (dot ${dot.toFixed(2)})`);
+	} else check(false, 'the circle, the head and the eye were all readable');
+}
+
 const table = await page.evaluate(() => {
 	const el = document.querySelector('.pe-table');
 	if (!el) return null;

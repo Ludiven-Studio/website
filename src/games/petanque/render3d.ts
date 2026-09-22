@@ -644,14 +644,28 @@ export const HEAD_PITCH_MAX = 1.25;
  * Orbit an eye around the head. Its yaw and pitch are its own on purpose: this view must never
  * read or write the aim yaw or the camera pitch, because that pitch is the loft.
  */
-export function headCamera(cam: THREE.PerspectiveCamera, focus: { x: number; y: number }, yaw: number, pitch: number, dist: number, ground: number): void {
+export function headCamera(cam: THREE.PerspectiveCamera, focus: { x: number; y: number }, yaw: number, pitch: number, dist: number, ground: number, pan?: { x: number; y: number }): void {
 	const c = Math.cos(pitch);
-	cam.position.set(
-		wx(focus.x) - Math.sin(yaw) * dist * c,
-		Math.max(ground + 0.45, ground + dist * Math.sin(pitch)),
-		wz(focus.y) - Math.cos(yaw) * dist * c,
-	);
-	cam.lookAt(wx(focus.x), ground + 0.1, wz(focus.y));
+	const ex = wx(focus.x) - Math.sin(yaw) * dist * c;
+	const ey = Math.max(ground + 0.45, ground + dist * Math.sin(pitch));
+	const ez = wz(focus.y) - Math.cos(yaw) * dist * c;
+	const tx = wx(focus.x), ty = ground + 0.1, tz = wz(focus.y);
+	if (!pan || (pan.x === 0 && pan.y === 0)) {
+		cam.position.set(ex, ey, ez);
+		cam.lookAt(tx, ty, tz);
+		return;
+	}
+	/* A pan in CAMERA space: the eye and its target move together, so the picture slides across the
+	   frame and nothing about the shot itself changes. That is what lets a panel own a corner of the
+	   screen without the subject moving — the subject stays put and the frame steps aside. */
+	const fwd = new THREE.Vector3(tx - ex, ty - ey, tz - ez).normalize();
+	const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+	const up = new THREE.Vector3().crossVectors(right, fwd);
+	const ox = right.x * pan.x + up.x * pan.y;
+	const oy = right.y * pan.x + up.y * pan.y;
+	const oz = right.z * pan.x + up.z * pan.y;
+	cam.position.set(ex + ox, ey + oy, ez + oz);
+	cam.lookAt(tx + ox, ty + oy, tz + oz);
 }
 
 const TOP_TILT = 1.15; // rad off horizontal — not straight down, so the relief still reads

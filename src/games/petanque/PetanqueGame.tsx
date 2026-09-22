@@ -28,6 +28,7 @@ import {
 	joinRandom, joinByCode, makeCode, seedFromRoom, multiplayerAvailable,
 	type PetanqueMatchNet, type AimMsg, type SyncMsg,
 } from './net';
+import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { isTypingTarget } from '../../lib/keyboard';
 import { trackGame } from '../../lib/analytics';
@@ -207,6 +208,14 @@ const BOARD_PAD_PX = 10; // the top and bottom bands reach the ends of the board
 
 const HEAD_DIST_0 = 4.2; // m — where the orbit starts when you open the head view
 const HEAD_PITCH_0 = 0.62;
+
+/* The end-of-end review. `finishEnd` advances the match in the same beat it scores it, so by the
+   time the card is up the circle has already jumped to where the jack was and the game view is
+   sitting at the NEXT end with its back to the boules just counted — measured as 7 live bodies
+   with every one of them projected off-frame. The verdict has to be shown ON the layout it judges,
+   so the end seats the head orbit on it and the card docks aside instead of covering it. */
+const END_PITCH = 0.9; // rad — looking down on the layout, near a plan without being straight down
+const END_FIT = 1.3; // margin on the fitted distance, so nothing sits on the frame edge
 
 const ARC_NEAR = 1.5; // m — arc points nearer than this are in the hand, not in the flight
 
@@ -402,7 +411,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const headPitchRef = useRef(HEAD_PITCH_0);
 	const headDistRef = useRef(HEAD_DIST_0);
 	const fovRef = useRef(0); // 0 means "snap on the next frame" — no zoom-in on load or mode change
+	// Camera-space slide, in metres, so the verdict card can own a band of the screen without the
+	// layout moving. Zero except during the end-of-end review; cleared by any view change.
+	const headPanRef = useRef({ x: 0, y: 0 });
 	const introRef = useRef<Intro | null>(null);
+	// The view the end-of-end review borrowed, handed back when the next end starts. Null once it has
+	// been given back, so a player who picks a view DURING the review keeps it.
+	const viewBeforeEndRef = useRef<ViewKey | null>(null);
 	const reviewUntilRef = useRef(0); // the AI holds off until the look at the last boule is over
 	const distsRef = useRef(true); // the distance rings, mirrored to state for the button
 	const turnKeyRef = useRef('');
@@ -451,6 +466,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [jackAim, setJackAim] = useState<{ x: number; y: number } | null>(null);
 	const [callArm, setCallArm] = useState(true); // the strip pulses until it has been used once
 	const [dists, setDists] = useState(true);
+	const [sound, setSound] = useState(() => sfx.isEnabled());
 
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -919,6 +935,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			aimDirtyRef.current = true;
 			streamAim(false); // else their screen keeps a half-drawn ray of ours for ever
 		}
+		headPanRef.current = { x: 0, y: 0 }; // the review's slide belongs to the review, not to the view
 		if (k === 'tete') headYawRef.current = camYawRef.current; // open where the player was looking
 		// Back to the eye: face the head, not the lane axis. Coming home from a top view with the
 		// camera still pointing where it was left is how the jack ended up off screen.
@@ -931,6 +948,87 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const cycleView = useCallback(() => {
 		setViewKey(VIEW_ORDER[(VIEW_ORDER.indexOf(viewRef.current) + 1) % VIEW_ORDER.length]);
 	}, [setViewKey]);
+
+	/**
+	 * Slide the picture out from under the verdict card and shrink it to what is left.
+	 * `r` is the layout's radius about the head, in metres, as measured by `frameEnd`.
+	 *
+	 * The card's box is READ, never assumed: its height follows the number of rows in the table, so
+	 * any constant here would be right for one row count and wrong for the rest. The free rectangle
+	 * is the best of the four full-span bands the card leaves — in landscape that is the strip beside
+	 * it, in portrait the one above it, and nothing has to know which.
+	 */
+	const fitAround = useCallback((r: number) => {
+		const cv = canvasRef.current?.getBoundingClientRect();
+		const el = document.querySelector('.pe-endcard')?.getBoundingClientRect();
+		const cam = g3Ref.current?.camera;
+		if (!cv || !el || !cam || cv.width < 1 || cv.height < 1) return;
+		const bands = [
+			{ x: cv.left, y: cv.top, w: el.left - cv.left, h: cv.height },
+			{ x: el.right, y: cv.top, w: cv.right - el.right, h: cv.height },
+			{ x: cv.left, y: cv.top, w: cv.width, h: el.top - cv.top },
+			{ x: cv.left, y: el.bottom, w: cv.width, h: cv.bottom - el.bottom },
+		];
+		/* Publish the card's real height so the bottom-right action row can step over it in portrait.
+		   Measured rather than declared: the card grows with the number of rows in the table, and the
+		   CSS that has to clear it cannot see that. */
+		document.documentElement.style.setProperty('--pe-review-h', `${Math.round(el.height)}px`);
+		let best = bands[0];
+		for (const b of bands) if (b.w * b.h > best.w * best.h) best = b;
+		if (best.w < 40 || best.h < 40) return; // the card owns the screen: leave the plain fit alone
+		const vTan = Math.tan((cam.fov * Math.PI) / 360);
+		const hTan = vTan * cam.aspect;
+		/* Both axes, and the vertical one foreshortened: the layout lies flat, so its along-axis
+		   extent shrinks by sin(pitch) while the across-axis one does not. */
+		const span = r * END_FIT;
+		const dist = Math.max(span / (hTan * (best.w / cv.width)),
+			(span * Math.sin(END_PITCH)) / (vTan * (best.h / cv.height)));
+		headDistRef.current = Math.max(HEAD_DIST_MIN, Math.min(HEAD_DIST_MAX, dist));
+		/* Pan the camera the OPPOSITE way to the picture: to put the layout in a band left of centre,
+		   the eye steps right. Screen y grows downward and the camera's up does not, which is why the
+		   vertical term keeps the sign the horizontal one flips. */
+		const fx = (best.x + best.w / 2 - (cv.left + cv.width / 2)) / (cv.width / 2);
+		const fy = (best.y + best.h / 2 - (cv.top + cv.height / 2)) / (cv.height / 2);
+		headPanRef.current = { x: -fx * headDistRef.current * hTan, y: fy * headDistRef.current * vTan };
+	}, []);
+
+	/**
+	 * Seat the head orbit on the layout that just scored, seen from the side it was thrown from.
+	 * `from` is passed in rather than read off the match: `finishEnd` has already moved the circle
+	 * to the next end by the time this runs, which is the whole bug.
+	 * The orbit's own refs are what gets written, so the player can keep dragging to look around —
+	 * a camera held by the tick would have swallowed the drag.
+	 */
+	const frameEnd = useCallback((from: { x: number; y: number }) => {
+		const s = simRef.current;
+		if (!s) return;
+		const hf = headFocus();
+		// Radius of the whole layout about the head, so a boule knocked wide is still in the picture.
+		let r = 0.6;
+		for (const b of s.bs) {
+			if (!b.live) continue;
+			const dx = b.x - hf.x, dy = b.y - hf.y;
+			r = Math.max(r, Math.sqrt(dx * dx + dy * dy) + b.r);
+		}
+		setViewKey('tete'); // first: it seeds the yaw from the aim, and we want our own
+		/* Fitted to the HORIZONTAL half-angle. The vertical one is tighter on a wide canvas, but the
+		   layout is flat on the ground, so its along-axis extent is foreshortened by sin(pitch) and
+		   the across-axis one is not — the wide axis is the binding constraint. */
+		const fit = (r * END_FIT) / Math.tan((VIEW_HFOV.tete * Math.PI) / 360);
+		headDistRef.current = Math.max(HEAD_DIST_MIN, Math.min(HEAD_DIST_MAX, fit));
+		headPitchRef.current = END_PITCH;
+		/* Stand where the throw came from. `headCamera` puts the eye at focus - (sin yaw, cos yaw)·d,
+		   so pointing that offset back at `from` means yaw = atan2 of the head-ward direction. */
+		const ux = hf.x - from.x, uy = hf.y - from.y;
+		const d = Math.sqrt(ux * ux + uy * uy);
+		if (d > 1e-3) headYawRef.current = Math.atan2(ux / d, uy / d);
+		/* The fit above centres the layout on the CANVAS, and the card is about to take a piece of
+		   that canvas — in portrait, 6 of 7 boules landed behind it. So it is re-fitted to the
+		   rectangle the card leaves free, once the card is really in the DOM: its height follows the
+		   number of rows, and a constant guessed here would be wrong at every other row count.
+		   Two frames, because the first is the one React commits the card on. */
+		requestAnimationFrame(() => requestAnimationFrame(() => fitAround(r)));
+	}, [fitAround, headFocus, setViewKey]);
 
 	/** The jack is both aimed and hand-placed from above — from the circle you cannot see the ring. */
 	const enterJackView = useCallback(() => {
@@ -1068,9 +1166,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		statusRef.current = done.phase === 'match-done' ? 'over' : 'end';
 		setStatus(statusRef.current);
 		endAtRef.current = performance.now() + (rows.length ? END_TABLE_MS : END_CARD_MS);
+		/* Hold the layout the card is about. `next` is the match BEFORE `finishEnd` advanced it, so
+		   `next.circle` is the circle this end was actually thrown from — `done.circle` is already
+		   the next one, and standing there is what left the boules behind the eye. */
+		viewBeforeEndRef.current = viewRef.current;
+		frameEnd(next.circle);
 		if (done.phase === 'match-done') {
 			setOver(true);
 			const win = done.winner === me;
+			if (win) sfx.win(); else sfx.lose();
 			// A level is a match against the AI; an online win must never bank one.
 			if (lvActiveRef.current && !onlineRef.current) {
 				const conceded = done.scores[other(me)];
@@ -1081,7 +1185,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				: lvActiveRef.current ? { mode: 'niveaux' }
 				: { mode: 'libre', diff: diffRef.current });
 		}
-	}, [enterJackView, gameId, reviewHead]);
+	}, [enterJackView, frameEnd, gameId, reviewHead]);
 
 	/**
 	 * The host rules at rest. Positions and the state it derived go out together, so a float that
@@ -1135,11 +1239,19 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const d = dailyRef.current;
 		if (d) { setStation(d.grades.length); return; }
 		clearBodies();
+		/* Give the borrowed view back — AFTER the ground is cleared, or `setViewKey('jeu')` aims the
+		   eye at the head that is about to stop existing. Skipped when the player picked a view
+		   during the review: an explicit press outranks what we took. */
+		const was = viewBeforeEndRef.current;
+		viewBeforeEndRef.current = null;
+		headPanRef.current = { x: 0, y: 0 }; // here too: setViewKey is a no-op when the view is unchanged
+		document.documentElement.style.removeProperty('--pe-review-h');
+		if (was && viewRef.current === 'tete') setViewKey(was);
 		setCard(null);
 		aiPendingRef.current = false;
 		statusRef.current = 'aim';
 		setStatus('aim');
-	}, [clearBodies, setStation]);
+	}, [clearBodies, setStation, setViewKey]);
 
 	/* ---------- online 1v1 ---------- */
 
@@ -1381,6 +1493,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		&& viewRef.current === 'jeu' && !pinchRef.current, []);
 
 	const aimStart = useCallback((x: number, y: number) => {
+		sfx.unlock(); // first canvas contact of the session is the gesture iOS needs to arm audio
 		cancelIntro(); // any contact interrupts the walk-up
 		const cv = canvasRef.current;
 		if (!cv) return;
@@ -1640,12 +1753,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (im.kind === 'ground') {
 			if (im.speed < 1.2) return;
 			g.fx.puff(x, im.z - BOULE_R, z, im.speed, DUST[s.t.surface.id]);
+			sfx.groundHit(im.speed, s.t.surface.id);
 		} else if (im.kind === 'boule') {
 			g.fx.puff(x, im.z, z, im.speed * 0.6, 0xf2e6d2);
 			if (im.speed > 3.5) g.fx.ring(x, im.z - BOULE_R, z, 0xffd166);
+			sfx.clack(im.speed);
 		} else if (im.kind === 'pebble') {
 			if (im.speed < 1) return;
 			g.fx.puff(x, im.z + 0.01, z, im.speed * 0.35, DUST[s.t.surface.id]);
+			sfx.pebble(im.speed);
 		}
 	}, []);
 
@@ -1921,7 +2037,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			// Its own yaw and pitch: inspecting the boules must never move the throw.
 			const hf = headFocus();
 			headCamera(g.camera, hf, headYawRef.current, headPitchRef.current, headDistRef.current,
-				heightAt(s.t, hf.x, hf.y));
+				heightAt(s.t, hf.x, hf.y), headPanRef.current);
 		} else {
 			const rolling = statusRef.current === 'rolling';
 			const wantPitch = rolling ? Math.max(camPitchRef.current, ROLL_PITCH) : camPitchRef.current;
@@ -2201,7 +2317,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				board: boardForElevation(aimLoftRef.current),
 				frozen: dragRef.current?.mode === 'arm',
 			},
-			cam: { yaw: camYawRef.current, pitch: camPitchRef.current },
+			/* `eye` is in PITCH metres, not world units, so a guard can ask which side of the head the
+			   camera stands on without redoing the wx/wz offset. A yaw alone cannot answer that: flip
+			   it by pi and the boules are still all in frame, perfectly framed from the wrong end. */
+			cam: (() => {
+				const p = g3Ref.current?.camera.position;
+				return {
+					yaw: camYawRef.current, pitch: camPitchRef.current,
+					eye: p ? { x: p.x + PITCH_W / 2, y: p.z + PITCH_L / 2, h: p.y } : null,
+				};
+			})(),
 			// The head view orbits on its own angles, so the game view's pitch says nothing about it.
 			head: { yaw: headYawRef.current, pitch: headPitchRef.current, dist: headDistRef.current },
 			// The jack target, so "the tap moved it and it stayed legal" is a number, not a screenshot.
@@ -2236,6 +2361,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				rings: g3Ref.current?.dists.children.length ?? 0,
 			},
 			fx: g3Ref.current?.fx.stats() ?? null,
+			// Sound is driven by the same impacts as the FX, so `played` rising is the only proof it
+			// fired; a muted run must leave it flat. The smoke test reads exactly this.
+			sound: sfx.stats(),
 			// Everything the daily needs is derived from dailyRef, never from state: this effect
 			// runs once, so any state it closed over would be the mount value forever.
 			daily: dailyRef.current ? {
@@ -2291,7 +2419,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	// The board only throws in the game view, and never during the jack phase — the jack has its
 	// own ring-and-button path. Anywhere else it is a drawing with a tap-to-return on it.
 	const jackPhase = match.phase === 'throw-jack';
-	const armLive = view === 'jeu' && !jackPhase;
+	// `over` too: the pad cannot throw once the match is done, and it was still drawing itself live
+	// under the end panel — the audit only ever missed it because the view happened to be `tete`.
+	const armLive = view === 'jeu' && !jackPhase && !over;
 	// Which graduation lights up: the one nearest where the finger would have to land.
 	const boardT = boardForElevation(loft);
 	const boardBand = BOARD_MARKS.reduce((a, b) =>
@@ -2372,6 +2502,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						) : !daily && (
 							<button className="pe-act" onClick={() => { if (lv.active) startLevel(lv.level); else newGame(diff); }} aria-label="Recommencer" title="Recommencer">↻</button>
 						)}
+						<button className={`pe-act ${sound ? 'on' : ''}`} aria-pressed={sound}
+							onClick={() => { const on = !sound; sfx.setEnabled(on); setSound(on); }}
+							aria-label={sound ? 'Couper le son' : 'Activer le son'} title={sound ? 'Couper le son' : 'Activer le son'}>{sound ? '🔊' : '🔇'}</button>
 					</div>
 				</div>
 				{daily ? (
@@ -2502,9 +2635,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				)}
 
 				{card && !over && (
-					<div className={`pe-endcard ${card.mine ? 'mine' : ''}`} onClick={nextEnd}>
-						<span>{card.text}</span>
-						{card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} />}
+					<div className="pe-overlay pe-aside pe-aside-review">
+						<div className={`pe-card pe-endcard ${card.mine ? 'mine' : ''}`} onClick={nextEnd}>
+							<span>{card.text}</span>
+							{card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} />}
+						</div>
 					</div>
 				)}
 
@@ -2871,9 +3006,12 @@ const CSS = `
 .pe-placeok { position: absolute; left: 50%; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); }
 .pe-placeok:hover { filter: brightness(1.08); }
 
-.pe-endcard { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 5; padding: 12px 26px; border-radius: 16px; text-align: center; font-weight: 800; font-size: 17px; color: #fff; background: linear-gradient(180deg, rgba(34,24,16,0.94), rgba(22,15,10,0.92)); border: 2px solid rgba(255,255,255,0.18); box-shadow: var(--shadow-lg); cursor: pointer; }
+/* The end-of-end verdict. It used to sit dead centre, which was wrong twice over: it covered the
+   pitch, and the pitch behind it was the NEXT end's empty lane anyway, because finishEnd moves the
+   circle in the same beat it scores. It docks aside now, on the same rails as the end-of-match
+   panel, and the camera holds the layout it is a verdict about. Only the tint is its own. */
+.pe-endcard { font-weight: 800; font-size: 17px; cursor: pointer; }
 .pe-endcard.mine { background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(24,140,60,0.96)); border-color: rgba(255,255,255,0.4); }
-.pe-endcard { display: flex; flex-direction: column; gap: 8px; align-items: center; max-width: 88%; }
 
 .pe-table { width: 100%; min-width: 14rem; font-weight: 600; font-size: 13.5px; }
 .pe-table-cap { display: block; opacity: 0.72; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 3px; }
@@ -2911,6 +3049,34 @@ const CSS = `
      the band — which is inert, and dead anyway once the match is over. */
   .pe-overlay.pe-aside { align-items: flex-start; padding: 132px 8px 8px max(64px, env(safe-area-inset-left)); }
   .pe-overlay.pe-aside .pe-card { width: clamp(214px, 34vw, 340px); }
+}
+/* Standing up, there is no side at all: the card is 214 px at its narrowest and the canvas is 390.
+   Measured, the aside dock left 6 of 7 boules behind it. So the verdict takes the bottom band, which
+   while it is up is as dead as the landscape band is once a match is over — the same argument, one
+   axis round. The camera then fits the layout into the band above; it reads the card's real box, so
+   this rule and that fit cannot drift apart.
+   AFTER the .pe-aside rules, not before: same specificity, so the later one wins and writing this
+   above them changed nothing at all. */
+@media (orientation: portrait) {
+  /* Dock to the BOTTOM band — align-items is the cross axis of the row, justify-content the main one
+     (swapping the two sent the card to the right edge, 98 % across). Centre it and a full-width card
+     splits the screen into two 36 % bands, neither big enough to hold the layout; pushed to the edge,
+     the other side opens to ~70 %. */
+  .pe-overlay.pe-aside-review { justify-content: center; align-items: flex-end; padding: 8px; }
+  .pe-overlay.pe-aside-review .pe-card { width: 96%; }
+  /* The bottom band is the launch furniture's — the pad, its power bar, its one-line label. All of it
+     is aim-only and dead while a verdict is up, so it is hidden, not collided with: the audit skips
+     display:none and so does the eye. The camera fits the layout into the band this frees above. */
+  .game-page.gf-full:has(.pe-aside-review) .pe-arm,
+  .game-page.gf-full:has(.pe-aside-review) .pe-power,
+  .game-page.gf-full:has(.pe-aside-review) .pe-arm-label { display: none; }
+  /* The action row normally clears the launch pad; while the verdict is up the card is what sits
+     there instead, and it is taller. It steps over the card's MEASURED height (frameEnd publishes
+     it) — a constant would be wrong at every table size but one. Not hidden: the ◎ that draws the
+     distance rings is the one control you actually want while reading a verdict. */
+  .game-page.gf-full:has(.pe-aside-review) .pe-hud-actions {
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + var(--pe-review-h, 260px) + 12px);
+  }
 }
 
 .pe-mp { min-width: min(240px, 100%); }
