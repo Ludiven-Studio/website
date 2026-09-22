@@ -8,6 +8,7 @@
 import { chromium } from 'playwright';
 import { resolve } from 'node:path';
 import { startServer } from './preview-server.mjs';
+import { skyStats } from './sky-stats.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4500;
@@ -190,6 +191,39 @@ await page.waitForFunction(() => window.__petanque().status === 'rolling', null,
 await page.waitForFunction(() => window.__petanque().status !== 'rolling', null, { timeout: 40000 });
 await sleep(2000);
 all.push(...await audit('4-eye')); // the throwing view: strip, legend, hint, everything at once
+
+/* The sky is drawn per deal, so every other shot here shows the single sky this seed happened to
+   roll — which proves nothing about the other end of the range. These two force both ends through
+   the game's own code path and crop to the horizon band, so "a low sun really does redden it" is
+   two files to lay side by side rather than a claim. The deal's own sun is put back afterwards
+   (to the degree, which is all __petanque reports) so the shots below are unaffected. */
+{
+	const was = (await state()).sun;
+	await page.addStyleTag({ content: 'html.pe-no-hud .pe-board, html.pe-no-hud .pe-hud-actions, html.pe-no-hud .pe-views, html.pe-no-hud .dt-toggle, html.pe-no-hud .pe-stats, html.pe-no-hud .gf-exit, html.pe-no-hud .pe-arm-label, html.pe-no-hud .lbc-root, html.pe-no-hud .pe-tag { visibility: hidden !important }' });
+	/* The seed is pinned as well as the angles. Haze, rayleigh and cloud cover are seeded off the
+	   DEAL, and this script opens a fresh free-play deal every run — so without it two runs draw two
+	   different skies and the difference gets billed to whatever was edited in between.
+	   Three seeds at the same high sun, because "the dome is white" and "this seed is a hazy day" are
+	   the same picture, and only a spread over seeds tells them apart.
+	   `temoin` is exposure 0, i.e. the raw dome Sky.js hands a renderer with no tone mapping. It is
+	   the untreated control, taken from the SAME build at the SAME framing — two runs of this script
+	   frame the eye view off wherever the jack landed, so a before/after across runs is not one. */
+	for (const [tag, el, az, seed, expo] of [['temoin', 46, 40, 1337, 0], ['bas', 10, 200, 1337, -1],
+		['haut', 46, 40, 1337, -1], ['haut-b', 46, 40, 24, -1], ['haut-c', 46, 40, 91, -1]]) {
+		await page.evaluate(([e, a, s, x]) => window.__petanqueSun(e, a, s, x), [el, az, seed, expo]);
+		await sleep(900);
+		const path = resolve(`${OUT}/sky-${tag}${SUF}.png`);
+		// The chrome comes off for the shot: it is opaque, it covers a third of the band, and leaving
+		// it in forced the probe to reject by luminance — which is the very thing being measured.
+		await page.evaluate(() => document.documentElement.classList.add('pe-no-hud'));
+		await sleep(150);
+		await page.screenshot({ path, clip: { x: 0, y: 0, width: VW, height: Math.min(300, VH) } });
+		await page.evaluate(() => document.documentElement.classList.remove('pe-no-hud'));
+		console.log(`    ciel ${tag.padEnd(7)} el ${String(el).padStart(2)} az ${az} graine ${String(seed).padStart(4)} · ${await skyStats(path)}`);
+	}
+	if (was) await page.evaluate(([e, a]) => window.__petanqueSun(e, a, undefined, -1), [was.el, was.az]);
+	await sleep(600);
+}
 
 /* Held, mid-pull: the one moment the power bar, the lit legend mark and the arc are all on screen
    together — and the only state where the strip is not just a passive band at the bottom. */

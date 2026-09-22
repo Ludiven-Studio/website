@@ -6,6 +6,7 @@
  * (x = ex - PITCH_W/2, y = ez, z = ey - PITCH_L/2). World +Y is up, as three.js expects.
  */
 import * as THREE from 'three';
+import { Sky } from 'three/addons/objects/Sky.js';
 import {
 	type Terrain, type SurfaceId, PITCH_W, PITCH_L, CELL, heightAt, hashN,
 } from './terrain';
@@ -71,23 +72,28 @@ function groundTexture(id: SurfaceId, grains: number, dot: number): THREE.Canvas
 	return tex;
 }
 
-/** Vertical sky gradient on a big inward-facing sphere. */
-function skyTexture(): THREE.CanvasTexture {
+/** A soft round blot. The painted shadow under the decor, and the contact shadow under a boule. */
+function blobTexture(): THREE.CanvasTexture {
+	const S = 128;
 	const c = document.createElement('canvas');
-	c.width = 4;
-	c.height = 256;
+	c.width = c.height = S;
 	const g = c.getContext('2d') as CanvasRenderingContext2D;
-	const grad = g.createLinearGradient(0, 0, 0, 256);
-	grad.addColorStop(0, '#3f8fd6');
-	grad.addColorStop(0.55, '#9fd0ef');
-	grad.addColorStop(0.78, '#e6e2c8');
-	grad.addColorStop(1, '#b8a97e');
+	const grad = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+	// Not a linear falloff: a linear one has a visible rim where it reaches zero, and a rim is the
+	// one thing a shadow must not have — it reads as a painted disc, which is what this replaces.
+	grad.addColorStop(0, 'rgba(255,255,255,1)');
+	grad.addColorStop(0.45, 'rgba(255,255,255,0.78)');
+	grad.addColorStop(0.75, 'rgba(255,255,255,0.26)');
+	grad.addColorStop(1, 'rgba(255,255,255,0)');
 	g.fillStyle = grad;
-	g.fillRect(0, 0, 4, 256);
+	g.fillRect(0, 0, S, S);
 	const tex = new THREE.CanvasTexture(c);
 	tex.colorSpace = THREE.SRGBColorSpace;
 	return tex;
 }
+
+let blobMap: THREE.CanvasTexture | null = null;
+const blob = (): THREE.CanvasTexture => (blobMap ??= blobTexture());
 
 /** A boule's fine machined grooves, as a bump-ish roughness pattern. */
 function bouleTexture(): THREE.CanvasTexture {
@@ -110,6 +116,75 @@ function bouleTexture(): THREE.CanvasTexture {
 	return tex;
 }
 
+/* ---------- the sun ---------- */
+
+const D2R = Math.PI / 180;
+export const SUN_EL_MIN = 10 * D2R;
+export const SUN_EL_MAX = 46 * D2R;
+const SUN_NOMINAL = 35 * D2R; // the elevation every number in addLights was measured at
+const DIRECT_FLAT = 2.6 * Math.sin(SUN_NOMINAL); // what an up-facing normal got at that elevation
+
+const mix = (a: number, b: number, k: number): number => a + (b - a) * k;
+
+export interface SunSetup {
+	el: number; // rad above the horizon
+	az: number; // rad in the ground plane, 0 = +X (across the lane), ±PI/2 = down the lane
+	dir: THREE.Vector3; // unit, from the pitch TOWARDS the sun
+	color: THREE.Color;
+	intensity: number;
+	skyColor: THREE.Color;
+	groundColor: THREE.Color;
+	hemi: number;
+	turbidity: number;
+	rayleigh: number;
+	clouds: number;
+	cloudSeed: number;
+}
+
+/**
+ * One sun per deal, off the terrain seed. Both ends of the range are constraints, not taste:
+ *
+ * - it stops climbing at 46 deg. A boule's cast shadow is offset by r/tan(elevation), so past ~50 deg
+ *   it retreats under the boule and the body goes back to reading as a sticker — the complaint the
+ *   fixed 35 deg sun was chosen to answer in the first place (the table in addLights).
+ * - a LOW sun stays near the lateral. The lane runs along Z and the ends alternate, so "behind the
+ *   player" is not a stable half of the sky: a sunset nobody has to squint into has to be off BOTH
+ *   ends, which leaves the sides. The budget opens as the sun climbs and is gone by the top.
+ *
+ * Consequence, measured rather than assumed (scripts/measure-petanque-sun.mjs): the sun is never on
+ * screen. The lateral rule holds it 48 deg off the lane at best, the field covers ~29, and the game
+ * view is aimed at the ground — 0 of 70 reachable positions land in frame, even tilted fully up.
+ * That is why there is no lens flare: it could not fire. Move the azimuth and that changes.
+ *
+ * Below 20 deg the scene really does dim: full compensation would need intensity 8.6 at 10 deg, which
+ * blows out every surface that faces the sun to buy a flat ground that never changes. Capped instead,
+ * and the sky bounce warms and lifts to meet it — a sunset is supposed to be darker than an afternoon.
+ */
+export function sunFor(seed: number): SunSetup {
+	const el = mix(SUN_EL_MIN, SUN_EL_MAX, hashN(11, seed));
+	const k = (el - SUN_EL_MIN) / (SUN_EL_MAX - SUN_EL_MIN);
+	const spread = mix(42, 90, k) * D2R; // how far off the lateral the azimuth may stray
+	const az = (hashN(12, seed) * 2 - 1) * spread + (hashN(13, seed) < 0.5 ? 0 : Math.PI);
+	const warm = Math.max(0, Math.min(1, (20 * D2R - el) / (10 * D2R)));
+	return {
+		el,
+		az,
+		dir: new THREE.Vector3(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)),
+		color: new THREE.Color(0xfff0d4).lerp(new THREE.Color(0xff9c52), warm),
+		intensity: Math.min(4.5, DIRECT_FLAT / Math.sin(el)),
+		skyColor: new THREE.Color(0xdcefff).lerp(new THREE.Color(0xffc9a0), warm),
+		groundColor: new THREE.Color(0x6b5a3a).lerp(new THREE.Color(0x7a5230), warm),
+		hemi: mix(1.0, 1.4, warm),
+		turbidity: mix(2.2, 6.5, hashN(14, seed)),
+		rayleigh: mix(1.1, 2.8, hashN(15, seed)),
+		clouds: mix(0.12, 0.52, hashN(16, seed)),
+		/* The cloud pattern is seeded and then FROZEN. Sky.js drifts it off a `time` uniform, and at
+		   the stock speed that is ~12 noise units over a two-minute end — visible, and it would make
+		   every pixel probe in scripts/ unreproducible. One deal, one sky. */
+		cloudSeed: hashN(17, seed) * 4000,
+	};
+}
+
 /* ---------- the decor ---------- */
 
 const DECOR_NEAR = 7.0; // m from the centre — nothing stands closer, the eye walks 9 m up the lane
@@ -121,7 +196,15 @@ const LANE_KEEP = 4.6; // m either side of the lane axis: the far end has to sta
  * replay draws the same boulodrome — but also the reason the far end stops reading as a void: with
  * nothing but a flat apron out there the eye has no scale and the long throws all looked the same.
  */
-function buildDecor(grp: THREE.Group, seed: number, y: number, keep: <T extends { dispose(): void }>(o: T) => T): void {
+function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, keep: <T extends { dispose(): void }>(o: T) => T): void {
+	/* The decor's shadows are PAINTED, not cast. The shadow camera is fitted tight to the 4x15 m
+	   pitch so a 7.5 cm boule gets the texels it needs; a 23 m decor ring in the same map is a 10x
+	   wider box, which buys a tree shadow by throwing away the boule shadow this whole file was
+	   re-tuned to save. Everything out there stands on the APRON, which is a flat disc — the usual
+	   objection to a flat decal (it sinks under the relief) has no receiver here to be true of.
+	   Declared cost: a painted shadow falls on the apron only, never on another tree or on a plank. */
+	const blots: { x: number; z: number; h: number; r: number }[] = [];
+
 	/* Anywhere on the apron ring except the corridor the lane is read down. Rejected spots are
 	   simply skipped — pushing them sideways instead piles decor along the keep-out line. */
 	const spots: { x: number; z: number; r: number }[] = [];
@@ -172,6 +255,11 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, keep: <T extends 
 				new THREE.Vector3(rad, rad * 0.86, rad),
 			];
 		});
+		// The crown is what casts: thrown from the middle of the foliage, not from the foot.
+		for (const t0 of trees) {
+			const h = 2.4 + t0.r * 2.2;
+			blots.push({ x: t0.x, z: t0.z, h: h + 0.5, r: 1.2 + t0.r * 0.6 });
+		}
 	}
 
 	if (bushes.length) {
@@ -182,6 +270,7 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, keep: <T extends 
 			const b = bushes[i], rad = 0.35 + b.r * 0.55;
 			return [new THREE.Vector3(b.x, y + rad * 0.45, b.z), new THREE.Vector3(rad, rad * 0.7, rad)];
 		});
+		for (const b of bushes) blots.push({ x: b.x, z: b.z, h: (0.35 + b.r * 0.55) * 0.5, r: 0.4 + b.r * 0.55 });
 	}
 
 	// Two benches, one each side, square to the pitch — the only straight lines out there, and what
@@ -200,6 +289,43 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, keep: <T extends 
 			leg.position.set(bx, y + 0.21, s * 2.2 + e * 0.7);
 			grp.add(leg);
 		}
+		blots.push({ x: bx, z: s * 2.2, h: 0.45, r: 0.75 });
+	}
+
+	if (blots.length) {
+		const geo = keep(new THREE.PlaneGeometry(2, 2));
+		geo.rotateX(-Math.PI / 2); // local +x runs along world +x, local +y along world +z
+		const mat = keep(new THREE.MeshBasicMaterial({
+			map: blob(), color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false,
+		}));
+		const inst = new THREE.InstancedMesh(geo, mat, blots.length);
+		inst.renderOrder = 1; // over the apron, under every ring and ray the HUD draws on the ground
+		const sx = -Math.cos(sun.az), sz = -Math.sin(sun.az); // away from the sun, in the ground plane
+		const reach = Math.tan(Math.PI / 2 - sun.el); // how far a metre of height throws its shadow
+		fill(inst, (i) => {
+			const b = blots[i];
+			/* Clamped to the apron's own edge rather than to a constant: a low sun throws a 5 m
+			   shadow off a tall tree, and the far ones would end up painted past the rim and
+			   hanging over the sky. Measured per instance, so no magic number goes stale if the
+			   decor ring or the apron moves. */
+			const room = Math.max(0, SURROUND - Math.hypot(b.x, b.z) - b.r);
+			const off = Math.min(b.h * reach, room);
+			const long = Math.min(b.r + off * 0.5, b.r + room * 0.5);
+			return [
+				new THREE.Vector3(b.x + sx * off * 0.5, y + 0.012, b.z + sz * off * 0.5),
+				new THREE.Vector3(long, 1, b.r),
+			];
+		});
+		// `fill` composes with the identity quaternion, so the stretch has to be turned by hand.
+		const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+		const p = new THREE.Vector3(), s = new THREE.Vector3();
+		for (let i = 0; i < inst.count; i++) {
+			inst.getMatrixAt(i, m);
+			m.decompose(p, q, s);
+			q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(-sz, sx));
+			inst.setMatrixAt(i, m.compose(p, q, s));
+		}
+		inst.instanceMatrix.needsUpdate = true;
 	}
 }
 
@@ -208,23 +334,18 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, keep: <T extends 
 export interface Pitch3D {
 	group: THREE.Group;
 	groundMat: THREE.MeshStandardMaterial;
-	sky: THREE.Mesh;
 	dispose(): void;
 }
 
 /**
- * The whole static scene for one terrain: sky, apron, displaced ground, planks, pebbles.
+ * The whole static scene for one terrain: apron, displaced ground, planks, pebbles, decor.
  * Built once per deal and never touched again — nothing here is rebuilt per frame.
+ * The sky is not here: it belongs to the sun, which outlives the pitch (see addLights).
  */
-export function buildPitch3D(t: Terrain): Pitch3D {
+export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
 	const grp = new THREE.Group();
 	const junk: { dispose(): void }[] = [];
 	const keep = <T extends { dispose(): void }>(o: T): T => { junk.push(o); return o; };
-
-	const skyGeo = keep(new THREE.SphereGeometry(SURROUND * 3, 24, 16));
-	const sky = new THREE.Mesh(skyGeo, keep(new THREE.MeshBasicMaterial({ map: keep(skyTexture()), side: THREE.BackSide, depthWrite: false })));
-	sky.renderOrder = -1;
-	grp.add(sky);
 
 	// Ground: one displaced plane, ~12 k triangles. Re-displacing it every frame would be the
 	// single easiest way to lose mobile, so it is built here and left alone.
@@ -249,7 +370,7 @@ export function buildPitch3D(t: Terrain): Pitch3D {
 	apron.receiveShadow = true;
 	grp.add(apron);
 
-	buildDecor(grp, t.seed, apron.position.y, keep);
+	buildDecor(grp, t.seed, apron.position.y, sun, keep);
 
 	geo.computeVertexNormals();
 	const uv = geo.attributes.uv as THREE.BufferAttribute;
@@ -311,7 +432,6 @@ export function buildPitch3D(t: Terrain): Pitch3D {
 	return {
 		group: grp,
 		groundMat,
-		sky,
 		dispose() {
 			for (const d of junk) d.dispose();
 			groundMat.dispose();
@@ -336,6 +456,43 @@ export function makeBouleMesh(side: 0 | 1 | -1): THREE.Mesh {
 	m.castShadow = true;
 	m.receiveShadow = false;
 	return m;
+}
+
+const CONTACT_LIFT = 0.008; // m of clearance, so the decal never fights the ground it sits on
+
+/**
+ * The darkening right under a body, which the shadow map does not draw: a cast shadow is directional
+ * and walks away as the sun climbs, and "the boules do not read" was always loudest at the top of
+ * that range. This is the ambient half — an occlusion term that sits under the body at every sun
+ * angle, which is what lets the sun vary at all.
+ *
+ * Small on purpose. Sampled ground rings exist in this file because a flat one spanning half a metre
+ * sinks under the relief; this one spans 16 cm and is tilted onto the local normal instead, which is
+ * two heightAt pairs a frame rather than a rebuilt mesh.
+ */
+export function makeContactShadow(r: number): THREE.Mesh {
+	const geo = new THREE.PlaneGeometry(2, 2);
+	geo.rotateX(-Math.PI / 2);
+	const mat = new THREE.MeshBasicMaterial({
+		map: blob(), color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false,
+	});
+	const m = new THREE.Mesh(geo, mat);
+	m.scale.setScalar(r * 2.1);
+	m.renderOrder = 2; // over the ground, under the halo that names whose boule it is
+	return m;
+}
+
+const N_UP = new THREE.Vector3(0, 1, 0);
+const N_TMP = new THREE.Vector3();
+
+/** Lay a flat decal on the heightfield at (x, y), tilted onto the local slope. */
+export function layFlat(m: THREE.Mesh, t: Terrain, x: number, y: number): void {
+	const d = CELL;
+	const hx = heightAt(t, x + d, y) - heightAt(t, x - d, y);
+	const hy = heightAt(t, x, y + d) - heightAt(t, x, y - d);
+	N_TMP.set(-hx, 2 * d, -hy).normalize();
+	m.quaternion.setFromUnitVectors(N_UP, N_TMP);
+	m.position.set(wx(x), heightAt(t, x, y) + CONTACT_LIFT, wz(y));
 }
 
 export const CIRCLE_R = 0.25; // m — the official throwing circle is 35 to 50 cm across
@@ -757,7 +914,11 @@ export function makeFx(scene: THREE.Scene): Fx {
  * Warm afternoon sun plus a sky bounce. Shadows are what make the relief readable — and what makes a
  * boule read as a sphere instead of a sticker, which is not the same thing and was the harder one.
  *
- * The sun sits at 35 deg, not overhead. A boule's contact shadow is offset by r/tan(elevation), so at
+ * The sun is now seeded per deal (sunFor) and this whole block is re-run for it, but the table below
+ * is why its range stops where it does. It was measured at a fixed 35 deg, which is still the middle
+ * of that range and still the reference every constant here carries.
+ *
+ * 35 deg, not overhead. A boule's contact shadow is offset by r/tan(elevation), so at
  * the old 51 deg that was 3 cm — under one radius — and the shadow hid behind the boule itself. The
  * body was always correctly shaded; nothing tied it to the ground. Measured on the ground under a
  * boule at 2.4 m, against a 2.0 floor taken on bare ground beside it:
@@ -773,10 +934,36 @@ export function makeFx(scene: THREE.Scene): Fx {
  * back at the exact level it had before the sun moved (130), and deepens the shadow at the same time,
  * since shadow depth is the direct/ambient ratio. Instrument: scripts/measure-petanque-boule.mjs.
  */
-export function addLights(scene: THREE.Scene): { dispose(): void } {
-	scene.add(new THREE.HemisphereLight(0xdcefff, 0x6b5a3a, 1.0));
+export interface Lights {
+	/** Re-aim everything for one deal. `force` is the measurement hook, in radians.
+	 *  Its `seed` overrides the deal's for the haze and the clouds, which are seeded too — without it
+	 *  two runs of the same probe compare two skies and call the difference a change. */
+	setSun(seed: number, force?: { el: number; az: number; seed?: number }): SunSetup;
+	current(): SunSetup;
+	/** Measurement hook. 0 gives the raw, untone-mapped dome — the control row for SKY_EXPOSURE, so
+	 *  before and after come out of ONE build at one framing instead of two runs. Negative restores
+	 *  the shipped value, which the probe must not carry a copy of. */
+	setSkyExposure(v: number): void;
+	dispose(): void;
+}
+
+const SUN_DIST = 30; // m — only has to clear the pitch; the shadow camera's near plane rides on it
+/* Picked on the `ciel` sweep in scripts/snap-petanque-phone.mjs, mean colour of the dome with the
+   HUD hidden, at the two ends of the elevation range:
+     exposure   sun 46 deg          sun 10 deg
+     raw        lum 255  sat  1 %   (white — the control row the probe still prints)
+     0.15       lum 161  sat 40 %   lum  63  sat 43 %
+     0.25       lum 190  sat 35 %   lum  81  sat 41 %
+     0.35       lum 207  sat 30 %   lum  95  sat 40 %
+     0.50       lum 224  sat 25 %   lum 111  sat 38 %
+   Saturation is what "blue sky" means here and it only ever falls as the exposure rises, so the
+   choice is the lowest one whose dusk sky is not night: 0.15 reads as an hour later than it is. */
+const SKY_EXPOSURE = 0.25;
+
+export function addLights(scene: THREE.Scene): Lights {
+	const hemi = new THREE.HemisphereLight(0xdcefff, 0x6b5a3a, 1.0);
+	scene.add(hemi);
 	const sun = new THREE.DirectionalLight(0xfff0d4, 2.6);
-	sun.position.set(6, 5, -4);
 	sun.castShadow = true;
 	sun.shadow.mapSize.set(2048, 2048);
 	sun.shadow.bias = -0.0004;
@@ -784,29 +971,87 @@ export function addLights(scene: THREE.Scene): { dispose(): void } {
 	// dead knob while the sun was at 51 deg — there was no shadow left for it to eat.
 	sun.shadow.normalBias = 0.002;
 	sun.shadow.radius = 1.5;
-	/* Fit the shadow box to the pitch in LIGHT space rather than to a square that circumscribes it.
-	   A boule is 7.5 cm, so its contact shadow is only ~10 texels wide at 15 m / 2048 — half of them
-	   were being spent on empty apron. Derived from the sun direction, so moving the sun cannot
-	   silently un-fit the box. */
-	const cam = sun.shadow.camera as THREE.OrthographicCamera;
-	const dir = sun.position.clone().normalize(); // the target is the origin
-	const right = new THREE.Vector3(0, 1, 0).cross(dir).normalize();
-	const up = dir.clone().cross(right).normalize();
-	let ex = 0, ey = 0;
-	for (const sx of [-1, 1]) {
-		for (const sz of [-1, 1]) {
-			const c = new THREE.Vector3((sx * PITCH_W) / 2 + sx * BORDER_W, 0, (sz * PITCH_L) / 2 + sz * BORDER_W);
-			ex = Math.max(ex, Math.abs(c.dot(right)));
-			ey = Math.max(ey, Math.abs(c.dot(up)));
-		}
-	}
-	cam.left = -ex; cam.right = ex;
-	cam.top = ey + BORDER_H; cam.bottom = -ey - BORDER_H;
-	cam.near = 0.5; cam.far = 40;
-	cam.updateProjectionMatrix();
 	scene.add(sun);
 	scene.add(sun.target);
-	return { dispose: () => { scene.remove(sun); scene.remove(sun.target); sun.dispose(); } };
+
+	/* The Preetham sky from three's addons rather than a canvas gradient: it is the same handful of
+	   uniforms the sun already carries, so a low sun reddens the horizon and lifts a glow around
+	   itself for free — a gradient would need that painted in by hand and it would not track the
+	   azimuth. No asset, so nothing new to precache and nothing to go missing offline. */
+	const sky = new Sky();
+	sky.scale.setScalar(SURROUND * 20);
+	/* Sky.js is authored for a tone-mapped renderer — its own example runs ACES at exposure 0.5 — and
+	   this one has none, so the dome came out flat white at every sun above the horizon. Turning on
+	   tone mapping globally would move the ground, the shadow depths and every number measured in this
+	   file at once, so the curve is applied to the sky alone: same exponential shape, scoped to the one
+	   material that needs it. Exposure picked by scripts/snap-petanque-phone.mjs (the `ciel` lines). */
+	sky.material.uniforms.skyExposure = { value: SKY_EXPOSURE };
+	sky.material.fragmentShader = `uniform float skyExposure;\n${sky.material.fragmentShader}`
+		.replace('gl_FragColor = vec4( texColor, 1.0 );',
+			'gl_FragColor = vec4( skyExposure > 0.0 ? vec3( 1.0 ) - exp( -texColor * skyExposure ) : texColor, 1.0 );');
+	scene.add(sky);
+
+	let now = sunFor(0);
+
+	const setSun = (seed: number, force?: { el: number; az: number; seed?: number }): SunSetup => {
+		const s = sunFor(force?.seed ?? seed);
+		if (force) {
+			s.el = force.el;
+			s.az = force.az;
+			s.dir.set(Math.cos(s.az) * Math.cos(s.el), Math.sin(s.el), Math.sin(s.az) * Math.cos(s.el));
+			s.intensity = Math.min(4.5, DIRECT_FLAT / Math.sin(s.el));
+		}
+		now = s;
+		hemi.color.copy(s.skyColor);
+		hemi.groundColor.copy(s.groundColor);
+		hemi.intensity = s.hemi;
+		sun.color.copy(s.color);
+		sun.intensity = s.intensity;
+		sun.position.copy(s.dir).multiplyScalar(SUN_DIST);
+
+		const u = sky.material.uniforms;
+		u.sunPosition.value.copy(s.dir);
+		u.turbidity.value = s.turbidity;
+		u.rayleigh.value = s.rayleigh;
+		u.cloudCoverage.value = s.clouds;
+		u.time.value = s.cloudSeed;
+
+		/* Fit the shadow box to the pitch in LIGHT space rather than to a square that circumscribes
+		   it. A boule is 7.5 cm, so its contact shadow is only ~10 texels wide at 15 m / 2048 — half
+		   of them were being spent on empty apron. Re-fitted on every sun, which is the whole reason
+		   it was derived from the direction and not written out as four numbers. */
+		const cam = sun.shadow.camera as THREE.OrthographicCamera;
+		const right = new THREE.Vector3(0, 1, 0).cross(s.dir).normalize();
+		const up = s.dir.clone().cross(right).normalize();
+		let ex = 0, ey = 0;
+		for (const sx of [-1, 1]) {
+			for (const sz of [-1, 1]) {
+				const c = new THREE.Vector3((sx * PITCH_W) / 2 + sx * BORDER_W, 0, (sz * PITCH_L) / 2 + sz * BORDER_W);
+				ex = Math.max(ex, Math.abs(c.dot(right)));
+				ey = Math.max(ey, Math.abs(c.dot(up)));
+			}
+		}
+		cam.left = -ex; cam.right = ex;
+		cam.top = ey + BORDER_H; cam.bottom = -ey - BORDER_H;
+		// The box now travels with the sun, so both planes have to as well: a 10 deg sun stands the
+		// light 30 m out and almost on the ground, where a fixed far of 40 clipped half the pitch.
+		cam.near = 0.5; cam.far = SUN_DIST + PITCH_L;
+		cam.updateProjectionMatrix();
+		return s;
+	};
+	setSun(0);
+
+	return {
+		setSun,
+		current: () => now,
+		setSkyExposure(v) { sky.material.uniforms.skyExposure.value = v < 0 ? SKY_EXPOSURE : v; },
+		dispose() {
+			scene.remove(hemi); scene.remove(sun); scene.remove(sun.target); scene.remove(sky);
+			hemi.dispose(); sun.dispose();
+			sky.geometry.dispose();
+			sky.material.dispose();
+		},
+	};
 }
 
 export { BOULE_R, JACK_R, CELL, speed3, isSettled };

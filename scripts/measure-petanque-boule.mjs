@@ -23,7 +23,12 @@
    `rej` is printed because a filter that never fires and a filter that eats everything both look
    like a clean number here.
 
-   Usage: node scripts/measure-petanque-boule.mjs [--tag avant]
+   The sun is drawn from the deal's seed, and Défi station 1 always draws the same one — so the
+   default run says nothing about the rest of the elevation range. `--sun 46,90` forces an angle
+   through the game's own code path, which is how the top of the range gets checked instead of
+   assumed: high sun means short cast shadows, and the contact disc exists precisely for that case.
+
+   Usage: node scripts/measure-petanque-boule.mjs [--tag avant] [--sun <elevation>,<azimut>]
 */
 import { chromium } from 'playwright';
 import { startServer } from './preview-server.mjs';
@@ -70,6 +75,13 @@ for (let i = 0; i < Number(arg('walk', 5)); i++) { await page.keyboard.press('w'
 await page.keyboard.press('v');
 await sleep(1400);
 
+const SUN = arg('sun', null);
+if (SUN) {
+	const [el, az] = SUN.split(',').map(Number);
+	await page.evaluate(([e, a]) => window.__petanqueSun(e, a), [el, az ?? 0]);
+	await sleep(900);
+}
+
 const shotPath = resolve(`${OUT}/pet-boule-${TAG}.png`);
 await page.screenshot({ path: shotPath });
 const { data, info } = await sharp(shotPath).removeAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -100,7 +112,7 @@ function annulus(b, r0, r1, others) {
 }
 
 console.log(`\n${TAG} · gradient DANS le disque, puis ombre de contact AUTOUR`);
-console.log(`vue ${info.width}x${info.height} · corps ${JSON.stringify(s.seen)}\n`);
+console.log(`vue ${info.width}x${info.height} · soleil ${s.sun ? `el ${s.sun.el}° az ${s.sun.az}°` : '?'}${SUN ? ' (forcé)' : ''} · corps ${JSON.stringify(s.seen)}\n`);
 console.log('corps          taille    dist   écart   ampl    sol  ombre    %   rej%');
 const rows = [];
 for (const b of s.seen) {

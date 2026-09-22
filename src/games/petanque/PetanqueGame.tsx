@@ -15,9 +15,9 @@ import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai
 import {
 	buildPitch3D, makeBouleMesh, groundRing, makeMarker, makeHalo, arcMesh, aimRay, predictThrow,
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
-	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz,
+	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz, makeContactShadow, layFlat,
 	HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
-	BOULE_R, CIRCLE_R, WALK_MAX, EYE_H, ZOOM_EYE, ZOOM_VFOV, type Pitch3D, type Fx,
+	BOULE_R, CIRCLE_R, WALK_MAX, EYE_H, ZOOM_EYE, ZOOM_VFOV, type Pitch3D, type Fx, type Lights,
 } from './render3d';
 import { petanqueLevels } from './levels';
 import {
@@ -216,7 +216,7 @@ interface Scene3D {
 	scene: THREE.Scene;
 	camera: THREE.PerspectiveCamera;
 	pitch: Pitch3D;
-	lights: { dispose(): void };
+	lights: Lights;
 	fx: Fx;
 	bodies: THREE.Group; // boules + jack
 	meshes: THREE.Mesh[]; // index-aligned with sim.bs
@@ -231,6 +231,7 @@ interface Scene3D {
 	dists: THREE.Group; // one see-through ring per boule, centred on the jack — who holds the point
 	distsKey: string; // the head those rings were sampled for; they are rebuilt when it changes
 	halos: THREE.Mesh[]; // index-aligned with sim.bs — see makeHalo
+	shades: THREE.Mesh[]; // index-aligned too — the contact shadow under each body
 	arcAir: THREE.Mesh | null;
 	arcRoll: THREE.Mesh | null;
 }
@@ -342,6 +343,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const g3Ref = useRef<Scene3D | null>(null);
 	const arcPtsRef = useRef<THREE.Vector3[]>([]);
+	const sunForceRef = useRef<{ el: number; az: number; seed?: number } | null>(null); // measurement hook only
 
 	const simRef = useRef<Sim | null>(null);
 	const matchRef = useRef<Match13>(initMatch13(13, HUMAN));
@@ -515,7 +517,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			jackAim, jackAimAt: null, dists, distsKey: '',
 			pitch: null as unknown as Pitch3D, // filled by newGame, which always runs next
 			fx: makeFx(scene),
-			meshes: [], halos: [], arcAir: null, arcRoll: null,
+			meshes: [], halos: [], shades: [], arcAir: null, arcRoll: null,
 		};
 		return true;
 	}, []);
@@ -553,6 +555,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const h = makeHalo(b.side === -1 ? HALO[2] : HALO[b.side]);
 		g.bodies.add(h);
 		g.halos.push(h);
+		const sh = makeContactShadow(b.r);
+		g.bodies.add(sh);
+		g.shades.push(sh);
 		prevRef.current.push({ x: b.x, y: b.y, z: b.z });
 		return b;
 	}, []);
@@ -560,13 +565,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const clearBodies = useCallback(() => {
 		const g = g3Ref.current, s = simRef.current;
 		if (!g || !s) return;
-		for (const m of [...g.meshes, ...g.halos]) {
+		for (const m of [...g.meshes, ...g.halos, ...g.shades]) {
 			g.bodies.remove(m);
 			m.geometry.dispose();
 			(m.material as THREE.Material).dispose();
 		}
 		g.meshes = [];
 		g.halos = [];
+		g.shades = [];
 		s.bs = [];
 		prevRef.current = [];
 		jackRef.current = null;
@@ -614,7 +620,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp, cfg.slope === undefined ? {} : { slope: cfg.slope });
-		g.pitch = buildPitch3D(t);
+		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined));
 		g.scene.add(g.pitch.group);
 
 		simRef.current = { t, bs: [], rng: cfg.seed & 0xffff };
@@ -685,7 +691,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(course.seed, SURFACES[course.surface], course.amp);
-		g.pitch = buildPitch3D(t);
+		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined));
 		g.scene.add(g.pitch.group);
 
 		simRef.current = { t, bs: [], rng: course.seed & 0xffff };
@@ -1774,6 +1780,21 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				SPIN.set(b.vy, 0, -b.vx).normalize();
 				mesh.rotateOnWorldAxis(SPIN, (sp * dt) / b.r);
 			}
+			/* The contact shadow follows the ground point, not the body: a boule in the air keeps its
+			   mark under where it will land, which is the only cue the eye has for the height of a
+			   lob. Hidden once it is a metre up, where a mark that size stops meaning anything. */
+			const shade = g.shades[i];
+			if (shade) {
+				const air = bz - heightAt(s.t, bx, by) - b.r;
+				shade.visible = b.live && air < 1.0;
+				if (shade.visible) {
+					layFlat(shade, s.t, bx, by);
+					const f = 1 - Math.max(0, air) * 0.85;
+					(shade.material as THREE.MeshBasicMaterial).opacity = 0.5 * f;
+					shade.scale.setScalar(b.r * 2.1 * (1 + Math.max(0, air) * 0.5));
+				}
+			}
+
 			const halo = g.halos[i];
 			if (!halo) continue;
 			halo.visible = b.live;
@@ -1846,9 +1867,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		// While the human places the jack by hand, the jack itself is the marker.
 		if (statusRef.current === 'placing' && placeRef.current && jackRef.current) {
 			const p = placeRef.current, i = s.bs.indexOf(jackRef.current);
-			const jm = g.meshes[i], jh = g.halos[i], gy = heightAt(s.t, p.x, p.y);
+			const jm = g.meshes[i], jh = g.halos[i], js = g.shades[i], gy = heightAt(s.t, p.x, p.y);
 			if (jm) { jm.visible = true; jm.position.set(wx(p.x), gy + jackRef.current.r, wz(p.y)); }
 			if (jh) { jh.visible = true; jh.position.set(wx(p.x), gy + 0.008, wz(p.y)); }
+			if (js) { js.visible = true; layFlat(js, s.t, p.x, p.y); }
 		}
 
 		g.fx.update(dt);
@@ -2089,6 +2111,47 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		};
 	}, []);
 
+	/* The sun is a function of the deal's seed, and the deal with fixed bodies (Défi, station 1) is
+	   the only one whose pixels repeat run to run — so an A/B across sun angles has no seed to turn.
+	   This is the knob the probe turns instead: degrees in, same code path out, and it re-lays the
+	   pitch so the painted decor shadows move with it. Measurement only; the game never sets it. */
+	useEffect(() => {
+		const w = window as unknown as { __petanqueSun?: (el: number, az: number, seed?: number, expo?: number) => void };
+		w.__petanqueSun = (el, az, seed, expo) => {
+			sunForceRef.current = { el: (el * Math.PI) / 180, az: (az * Math.PI) / 180, seed };
+			const g = g3Ref.current, s = simRef.current;
+			if (!g || !s) return;
+			if (expo !== undefined) g.lights.setSkyExposure(expo);
+			g.scene.remove(g.pitch.group);
+			g.pitch.dispose();
+			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current));
+			g.scene.add(g.pitch.group);
+		};
+		return () => { delete (window as unknown as { __petanqueSun?: unknown }).__petanqueSun; };
+	}, []);
+
+	/* Jump to the end of the match. Measurement only: the end panel is the one piece of chrome that
+	 * lives 13 points away, so a guard that has to play its way there never audits it — which is how
+	 * it shipped as a modal sitting on the pitch. Sets exactly what the real finish sets. */
+	useEffect(() => {
+		const w = window as unknown as { __petanqueOver?: () => void };
+		w.__petanqueOver = () => {
+			const m = matchRef.current, me = mySideRef.current;
+			const scores: [number, number] = [0, 0];
+			scores[me] = m.target;
+			scores[other(me)] = Math.max(0, m.target - 2);
+			const done: Match13 = { ...m, scores, phase: 'match-done', winner: me, lastEvent: null };
+			matchRef.current = done;
+			setMatch(done);
+			const s = simRef.current, j = jackRef.current;
+			setCard({ text: 'Fin', mine: true, rows: s && j ? bouleTable(s.bs, j) : [] });
+			statusRef.current = 'over';
+			setStatus('over');
+			setOver(true);
+		};
+		return () => { delete (window as unknown as { __petanqueOver?: unknown }).__petanqueOver; };
+	}, []);
+
 	// Read-only snapshot for the smoke check.
 	useEffect(() => {
 		const w = window as unknown as { __petanque?: () => unknown };
@@ -2103,6 +2166,21 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			jack: jackRef.current ? { x: jackRef.current.x, y: jackRef.current.y, live: jackRef.current.live } : null,
 			power: powerRef.current,
 			loft: aimLoftRef.current,
+			/* Which sun this deal drew, and where it lands on screen. A shadow measurement that does not
+			   name the sun is not repeatable — and `ndc` answers the question a flare depends on:
+			   is the sun ever actually in frame, or does the azimuth rule keep it off every view? */
+			sun: ((): { el: number; az: number; ndc: [number, number] | null } | null => {
+				const g = g3Ref.current;
+				const s = g?.lights.current();
+				if (!g || !s) return null;
+				const v = s.dir.clone().multiplyScalar(500).add(g.camera.position).project(g.camera);
+				const front = s.dir.clone().applyQuaternion(g.camera.quaternion.clone().invert()).z < 0;
+				return {
+					el: Math.round((s.el * 180) / Math.PI),
+					az: Math.round((s.az * 180) / Math.PI),
+					ndc: front ? [Math.round(v.x * 100) / 100, Math.round(v.y * 100) / 100] : null,
+				};
+			})(),
 			/* The camera and the aim side by side — the only way to ask "is the aim sampled?"
 			   instead of judging it by eye. `frozen` is the board being held. */
 			aim: {
