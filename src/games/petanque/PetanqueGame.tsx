@@ -2203,12 +2203,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		? (myTurn ? '✋ Touche le sol dans l’anneau jaune' : 'L’adversaire place le bouchon…')
 		: status === 'rolling' ? 'La boule roule…'
 		: !myTurn ? (online ? 'L’adversaire joue…' : 'L’adversaire réfléchit…')
-		// Before the view test: aiming the jack HAPPENS from the top view, so "go back to Jeu" there
-		// would send the player away from the one screen the gesture works on.
-		: match.phase === 'throw-jack' ? '🎯 Touche le sol pour viser, puis lance'
-		: view !== 'jeu' ? '👁 Repasse en vue Jeu pour lancer'
-		: holder === mySide ? '🎯 Tu as le point — à toi de jouer'
-		: holder === foeSide ? 'L’adversaire a le point — à toi de jouer'
+		: match.phase === 'throw-jack' ? '🎯 Touche le sol pour viser'
+		/* No line for the wrong view: the board's own caption says to tap it to come back, and this
+		   said the same thing eight words apart. Same for the point — the tail "à toi de jouer" was
+		   already the sentence underneath it. This line answers "what is happening", the caption
+		   answers "what do I do with the board", and neither answers the other's question. */
+		: holder === mySide ? '🎯 Tu as le point'
+		: holder === foeSide ? 'L’adversaire a le point'
 		: 'À toi de jouer';
 
 	return (
@@ -2324,7 +2325,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className={`pe-loft${armed ? ' frozen' : ''}`}>
 						<span className="pe-loft-label">{LOFT_LABEL(loft)}</span>
 						<div className="pe-loft-bar"><div className="pe-loft-fill" style={{ height: `${Math.round(boardForElevation(loft) * 100)}%` }} /></div>
-						<span className="pe-loft-hint">{armed ? 'angle verrouillé' : 'pose le doigt plus haut'}</span>
+						<span className="pe-loft-hint">{armed ? 'angle verrouillé' : 'plus haut = plus lobé'}</span>
 					</div>
 				)}
 
@@ -2375,11 +2376,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 							))}
 						</div>
 					)}
+					{/* The gesture, not the mapping: the graduations right above already say that low is a
+					    roulette and high a plomb, so the caption only has to teach press-then-glide. It
+					    falls back to naming the board whenever the board cannot be thrown from — it used
+					    to invite a throw while the opponent was playing. */}
 					<span className="pe-arm-label">
-						{jackPhase ? '🎯 Vise sur le terrain, puis valide'
-							: view !== 'jeu' ? '👁 Touche ici pour revenir en vue Jeu'
-							: power > 0 ? '◀ ▶ oriente le tir · lâche pour lancer'
-							: '▲ Pose le doigt à la hauteur de l’angle, puis glisse'}
+						{view !== 'jeu' ? '👁 Touche ici pour revenir en vue Jeu'
+							: jackPhase || status !== 'aim' || !myTurn ? '— planche d’envol —'
+							: power > 0 ? '◀ ▶ oriente · lâche pour lancer'
+							: '▲ Pose le doigt, puis glisse pour doser'}
 					</span>
 				</div>
 
