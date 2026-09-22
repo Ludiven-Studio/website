@@ -42,7 +42,7 @@ const PARTS = {
 	stats: '.pe-stats',
 	actions: '.pe-hud-actions',
 	views: '.pe-views',
-	hint: '.pe-hint',
+	hint: '.pe-arm-label', // the one line above the board: gesture while a finger is down, state otherwise
 	strip: '.pe-arm',
 	legend: '.pe-board-marks',
 	power: '.pe-power',
@@ -99,7 +99,7 @@ const audit = async (tag) => {
 		   in 80 px. Measured on the text's own range rect and not on the element box — a graduation
 		   is full-width with a word in the middle, so its box collides with everything and its ink
 		   with almost nothing. That distinction is the whole reason the rectangle pass cried wolf. */
-		const INK = ['.pe-arm-label', '.pe-hint', '.pe-board-mark', '.pe-loft-label', '.pe-loft-hint',
+		const INK = ['.pe-arm-label', '.pe-board-mark', '.pe-loft-label', '.pe-loft-hint',
 			'.pe-tag', '.pe-stats', '.gf-exit', '.pe-act', '.lbc-pill', '.pe-view', '.pe-zoom-label',
 			'.pe-power', '.pe-placeok'];
 		const ink = [];

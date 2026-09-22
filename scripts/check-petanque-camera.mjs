@@ -327,14 +327,15 @@ check(Math.abs(centred) < 0.05, `the eye can be brought back onto the lane (yaw 
 
 /* Press at `t` on the board, then pull for power. `eye` tilts the camera first: the frame is now
    the player's business alone, and a lob wants the eye lifted the same way a real one wants a
-   raised chin. Drawn back from the PRESS point, not from a fixed y, or a press near the top of the
-   board would pull past the glass. */
+   raised chin. Pulled to a y above the SEAM, not 130 px above the press: power is measured from
+   the seam so the board reads zero, and a press-relative pull from low on the board stopped short
+   of the seam and got cancelled by the safe zone — which is exactly what the safe zone is for. */
+const pullY = (px) => Math.max(box.y + 8, box.y + arm0.top - px);
 const armAt = async (t, eye = 0) => {
 	if (eye) { await drag(cx, lookY, 0, eye, 260); }
-	const y0 = boardY(t);
-	await page.mouse.move(cx, y0);
+	await page.mouse.move(cx, boardY(t));
 	await page.mouse.down();
-	await page.mouse.move(cx, y0 - 130, { steps: 14 });
+	await page.mouse.move(cx, pullY(130), { steps: 14 });
 	await sleep(700);
 	return state();
 };
@@ -360,8 +361,8 @@ const gaps = (s) => {
 	return s.arc.at.reduce((n, p, i) => n + (i && p - s.arc.at[i - 1] > step ? 1 : 0), s.arc.at.length ? 1 : 0);
 };
 
-/** Let a held throw go without firing it: back to the press point is power 0, and a tap is not a
- *  throw. Lifting the button 130 px up the pull would launch a real boule. */
+/** Let a held throw go without firing it: anywhere back on the board is power 0, so releasing
+ *  there throws nothing. Lifting the button up the pull would launch a real boule. */
 const relax = async (t) => {
 	await page.mouse.move(cx, boardY(t), { steps: 4 });
 	await sleep(120);
@@ -375,7 +376,19 @@ check(mid.bow >= 12, `the arc bows off a straight line at mid loft (${mid.bow} p
 check(lostOnTheWayDown(mid).length === 0, `the mid-loft flight is whole from the apex to the ground (${JSON.stringify(mid.arc)})`);
 check(gaps(mid) <= 1, `and a flat throw is hidden by one thing only, the hand (${gaps(mid)} stretch)`);
 console.log(`     mid loft: ${lostOnTheWayUp(mid).length}/${mid.arc.n} points under the frame on the way up (the hand)`);
+
+/* The safe zone, asked for as "coming back into the launch zone cancels the throw". Still holding
+   the charged pull from `mid`: slide back down onto the board and let go. Nothing may leave. It
+   needs no branch in the island because power starts at the seam, so this asserts the consequence
+   rather than the code — a press-relative power would fail here and could not be made to pass. */
+check(mid.power > 0.3, `the pull above the board really charges (power ${mid.power.toFixed(2)})`);
+await page.mouse.move(cx, boardY(0.35), { steps: 4 });
+await sleep(150);
+const backIn = await state();
+check(backIn.power === 0, `sliding back onto the board un-charges it (power ${backIn.power})`);
 await relax(0.35);
+const cancelled = await state();
+check(cancelled.status === 'aim', `and releasing there throws nothing (status ${cancelled.status})`);
 
 // Top of the board, eye lifted: a full plomb. The lift is the declared cost of freeing the camera —
 // the loft no longer tilts the view for you, so framing a 70 deg arc is now a thing you do.

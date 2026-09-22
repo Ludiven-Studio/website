@@ -1397,7 +1397,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			const loftNow = elevationForBoard(boardAt(rect, y));
 			aimLoftRef.current = loftNow;
 			setLoft(loftNow);
-			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: aimYawRef.current, b0: 0 };
+			// b0 carries the seam for an arm drag, because power is measured from the seam and not from
+			// the press point: the board is the safe zone, and a pull that has not cleared it is not a
+			// throw yet. Sampled once here — the rect cannot move under a finger that is already down.
+			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: aimYawRef.current, b0: armTop(rect) };
 			setArmed(true);
 			aimDirtyRef.current = true;
 			return;
@@ -1431,7 +1434,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		}
 		if (d.mode === 'arm') {
 			if (!canThrow()) return;
-			const p = Math.max(0, Math.min(1, (d.y0 - y) / POWER_PX));
+			/* Measured from the seam, not from the press point. Asked for as "coming back into the
+			   launch zone cancels the throw", which only holds if being inside the zone means zero
+			   power — press-relative power cannot express it: the board is 200 px tall in fullscreen
+			   and a full pull is 190 px, so a press at the bottom would saturate BEFORE clearing the
+			   board and a soft roulette could never leave. The cost is dead travel from a low press
+			   up to the seam, which is the pull-back of the gesture and is shown as such. */
+			const p = Math.max(0, Math.min(1, (d.b0 - y) / POWER_PX));
 			// Sideways in the strip steers the throw and nothing else — the eye keeps the framing it
 			// had. Same rad-per-px as the camera drag, so the gesture reads the same wherever the
 			// thumb is. The dead band is not polish: a thumb pulling 190 px down wanders 10-30 px
@@ -1470,7 +1479,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		dragRef.current = null;
 		if (d?.mode === 'arm') setArmed(false);
 		if (!d || d.mode !== 'arm' || !canThrow()) return;
-		if (powerRef.current < 0.06) { // a tap, not a throw
+		// The safe zone, and it needs no test of its own: a finger still on the board reads zero power
+		// by construction, so "released without clearing the board" and "released without pulling" are
+		// the same sentence. Sliding back down onto the board un-arms a throw already charged.
+		if (powerRef.current < 0.06) {
 			powerRef.current = 0;
 			setPower(0);
 			aimDirtyRef.current = true;
@@ -2204,13 +2216,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		: status === 'rolling' ? 'La boule roule…'
 		: !myTurn ? (online ? 'L’adversaire joue…' : 'L’adversaire réfléchit…')
 		: match.phase === 'throw-jack' ? '🎯 Touche le sol pour viser'
-		/* No line for the wrong view: the board's own caption says to tap it to come back, and this
-		   said the same thing eight words apart. Same for the point — the tail "à toi de jouer" was
-		   already the sentence underneath it. This line answers "what is happening", the caption
-		   answers "what do I do with the board", and neither answers the other's question. */
-		: holder === mySide ? '🎯 Tu as le point'
-		: holder === foeSide ? 'L’adversaire a le point'
-		: 'À toi de jouer';
+		: '▲ Pose le doigt sur la planche, puis remonte';
+
+	/* The one line above the board — the board itself now carries no text at all, because its centre
+	   is where the thumb lands. A finger down gets the gesture, everything else gets the state. The
+	   old "tu as le point" branches went with it: the scoreboard already prints 🎯 next to the
+	   holder, and a second copy eight words away was the whole bottom-of-screen pile-up. */
+	const armMsg = view !== 'jeu' ? '👁 Touche la planche pour revenir en vue Jeu'
+		: armed ? (power > 0 ? '◀ ▶ oriente · lâche pour lancer' : '✖ Lâche ici et rien ne part — remonte pour armer')
+		: hint;
 
 	return (
 		<div className="pe-root">
@@ -2359,7 +2373,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{/* The launch board. Purely a drawing: the hit test lives in aimStart, so there is
 				    exactly one way into a throw and this cannot swallow a camera drag. It pulses until
 				    the first contact of the session — the whole complaint was that nobody found it. */}
-				<div className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}`} aria-hidden="true">
+				<div className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} aria-hidden="true">
 					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
 					{/* The graduations. Where the finger lands decides the angle, and a board with no
 					    marks on it would make that a secret. */}
@@ -2376,23 +2390,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 							))}
 						</div>
 					)}
-					{/* The gesture, not the mapping: the graduations right above already say that low is a
-					    roulette and high a plomb, so the caption only has to teach press-then-glide. It
-					    falls back to naming the board whenever the board cannot be thrown from — it used
-					    to invite a throw while the opponent was playing. */}
-					<span className="pe-arm-label">
-						{view !== 'jeu' ? '👁 Touche ici pour revenir en vue Jeu'
-							: jackPhase || status !== 'aim' || !myTurn ? '— planche d’envol —'
-							: power > 0 ? '◀ ▶ oriente · lâche pour lancer'
-							: '▲ Pose le doigt, puis glisse pour doser'}
-					</span>
 				</div>
 
 				<div className="pe-power" aria-hidden="true">
 					<div className="pe-power-fill" style={{ width: `${Math.round(power * 100)}%` }} />
 				</div>
 
-				<div className="pe-hint">{hint}</div>
+				<span className={`pe-arm-label${armed && power === 0 ? ' warn' : ''}`}>{armMsg}</span>
 
 				{status === 'placing' && myTurn && placeOk && (
 					<button className="pe-placeok" onClick={confirmPlace}>✓ Poser ici</button>
@@ -2728,29 +2732,32 @@ const CSS = `
 @keyframes pe-arm-call { 0%, 100% { border-top-color: rgba(255,209,102,0.85); } 50% { border-top-color: rgba(255,209,102,0.25); } }
 @media (prefers-reduced-motion: reduce) { .pe-arm.call { animation: none; } }
 .pe-arm-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(140,233,154,0.10), rgba(255,107,107,0.30)); }
-/* Parked in the gap between the two lowest graduations, and measured from the board rather than from
-   the screen: keyed off env(safe-area-inset-bottom) it slid up into "Demi" on any phone with a home
-   indicator. A short board has no such gap, so below that height the caption steps aside entirely. */
-.pe-arm-label { position: absolute; left: 0; right: 0; bottom: 36px; text-align: center; color: #ffe8b0; font-size: 11px; font-weight: 800; opacity: 0.92; text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
-@media (max-height: 560px) { .pe-arm-label { display: none; } }
-.pe-arm.off .pe-arm-label { color: #f0e6da; opacity: 0.75; font-weight: 700; }
+/* The one line above the board. It sits OUTSIDE the board on purpose: the board is a surface the
+   thumb lands on, and its middle is the part the thumb lands on most. This was two elements printed
+   one above the other down there, which is how the bottom of the screen ended up with four rows of
+   text in 80 px. Ellipsised rather than wrapped — a second line would push into the seam. */
+.pe-arm-label { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--pe-arm-h) + 11px); z-index: 3; background: rgba(28,20,12,0.6); color: #f4ece2; font-weight: 600; font-size: 12.5px; padding: 4px 13px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+/* Finger down, nothing pulled yet: letting go here throws nothing. Said in words AND in colour,
+   because the board looks identical whether it is armed or merely touched. */
+.pe-arm-label.warn { background: rgba(120,34,28,0.72); color: #ffd7d2; font-weight: 700; }
 
-/* The graduations of the launch board. Centred, because that is where the thumb starts looking,
-   and thin enough that the pitch stays readable through them. */
-.pe-board-marks { position: absolute; left: 50%; transform: translateX(-50%); top: 0; bottom: 0; width: min(300px, 78%); pointer-events: none; }
-.pe-board-mark { position: absolute; left: 0; right: 0; text-align: center; color: #f0e6da; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.62; text-shadow: 0 1px 3px rgba(0,0,0,0.85); transform: translateY(50%); }
-.pe-board-mark::before, .pe-board-mark::after { content: ''; position: absolute; top: 50%; width: 26%; border-top: 1.5px solid rgba(255,255,255,0.3); }
-.pe-board-mark::before { left: 0; }
-.pe-board-mark::after { right: 0; }
+/* The graduations hug the left edge instead of running across the middle. Same reason as the line
+   above: a word printed in the centre of the board is a word under the thumb that is about to press
+   there. The tick is what points at the height; the word only names it. */
+.pe-board-marks { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 0; bottom: 0; width: 96px; pointer-events: none; }
+.pe-board-mark { position: absolute; left: 0; right: 0; text-align: left; color: #f0e6da; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.62; text-shadow: 0 1px 3px rgba(0,0,0,0.85); transform: translateY(50%); }
+.pe-board-mark::after { content: ''; position: absolute; top: 50%; right: 0; width: 30px; border-top: 1.5px solid rgba(255,255,255,0.3); }
 .pe-board-mark.on { color: #ffd166; opacity: 1; font-size: 11px; }
-.pe-board-mark.on::before, .pe-board-mark.on::after { border-top-color: rgba(255,209,102,0.85); }
+.pe-board-mark.on::after { border-top-color: rgba(255,209,102,0.85); }
+/* Held with nothing pulled: the board is the cancel surface, so it says so with its own skin. */
+.pe-arm.hold { border-top-color: rgba(255,138,128,0.85); background: linear-gradient(180deg, rgba(60,16,12,0) 0%, rgba(80,20,14,0.5) 100%); }
+.pe-arm.hold::before { border-top-color: rgba(255,138,128,0.45); }
 
 /* Rides the seam instead of standing in the middle of the bottom band, where it printed straight
    over the "Roulette" graduation — and where the thumb that sets it covers it anyway. */
 .pe-power { position: absolute; left: 0; right: 0; bottom: calc(var(--pe-arm-h) + 3px); height: 4px; background: rgba(28,20,12,0.45); overflow: hidden; z-index: 3; pointer-events: none; }
 .pe-power-fill { height: 100%; background: linear-gradient(90deg, #8ce99a, #ffd166 55%, #ff6b6b); }
 
-.pe-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--pe-arm-h) + 11px); z-index: 3;background: rgba(28,20,12,0.6); color: #f4ece2; font-weight: 600; font-size: 12.5px; padding: 4px 13px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
 
 .pe-placeok { position: absolute; left: 50%; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); }
 .pe-placeok:hover { filter: brightness(1.08); }
