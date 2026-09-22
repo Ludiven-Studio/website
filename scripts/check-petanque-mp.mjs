@@ -7,15 +7,13 @@
    Unlike billard this is not pure lockstep: the host snaps positions at rest, so (2) is the
    assertion that the snap actually landed. Needs network. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { startServer } from './preview-server.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4371;
 const BOULES = 4;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const errs = [];
@@ -56,7 +54,7 @@ const code = (await A.locator('.pe-mp-code strong').textContent().catch(() => nu
 console.log('code:', code);
 if (!code) {
 	console.log('FAIL: no code (Supabase unreachable?)');
-	await browser.close(); server.kill(); process.exit(1);
+	await browser.close(); server.stop(); process.exit(1);
 }
 
 await B.getByRole('tab', { name: /ligne/i }).click();
@@ -71,7 +69,7 @@ for (let i = 0; i < 60; i++) {
 }
 if (!(a?.online && b?.online)) {
 	console.log('FAIL: both peers did not reach a live match', { a: a?.online, b: b?.online });
-	await browser.close(); server.kill(); process.exit(1);
+	await browser.close(); server.stop(); process.exit(1);
 }
 console.log(`A side ${a.online.side} host=${a.online.host} · B side ${b.online.side} host=${b.online.host}`);
 
@@ -200,7 +198,7 @@ check(!a.oppAim?.live && !b.oppAim?.live, 'le rayon est retiré après le lancer
 
 console.log(errs.length ? `\nPAGE ERRORS:\n${errs.join('\n')}` : '\nno page errors');
 await browser.close();
-server.kill();
+server.stop();
 if (fail.length || errs.length) { console.log(`\n${fail.length} check(s) failed`); process.exit(1); }
 console.log('\nall checks passed');
 process.exit(0);

@@ -10,14 +10,12 @@
    The throw is a real mouse drag, like a player's — the whole point is to exercise the aim
    pipeline, not to call a function the player never touches. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { startServer } from './preview-server.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4367;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 });
@@ -97,7 +95,7 @@ check((await state()).daily === null, 'Libre leaves the course');
 
 console.log(errs.length ? `\nPAGE ERRORS:\n${errs.join('\n')}` : '\nno page errors');
 await browser.close();
-server.kill();
+server.stop();
 if (fail.length || errs.length) { console.log(`\n${fail.length} check(s) failed`); process.exit(1); }
 console.log('\nall checks passed');
 process.exit(0);

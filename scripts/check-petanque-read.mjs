@@ -7,14 +7,12 @@
    The table is read off the DOM and the rings out of the scene graph: "the toggle is on" and
    "there are rings on the ground" are two different claims, and only the second one is the ask. */
 import { chromium } from 'playwright';
-import { spawn } from 'node:child_process';
-import { resolve } from 'node:path';
+import { startServer } from './preview-server.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PORT = 4369;
 const base = `http://localhost:${PORT}`;
-const server = spawn('npx', ['astro', 'preview', '--port', String(PORT)], { cwd: resolve('.'), shell: true, stdio: 'ignore' });
-for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch {} await sleep(300); }
+const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 });
@@ -232,7 +230,7 @@ if (table) {
 
 console.log(errs.length ? `\nPAGE ERRORS:\n${errs.join('\n')}` : '\nno page errors');
 await browser.close();
-server.kill();
+server.stop();
 if (fail.length || errs.length) { console.log(`\n${fail.length} check(s) failed`); process.exit(1); }
 console.log('\nall checks passed');
 process.exit(0);
