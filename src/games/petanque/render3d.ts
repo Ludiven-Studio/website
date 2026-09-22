@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three';
 import {
-	type Terrain, type SurfaceId, PITCH_W, PITCH_L, CELL, heightAt,
+	type Terrain, type SurfaceId, PITCH_W, PITCH_L, CELL, heightAt, hashN,
 } from './terrain';
 import {
 	type Sim, type Boule, BOULE_R, JACK_R, cloneSim, stepSim, speed2, speed3, isSettled,
@@ -110,6 +110,99 @@ function bouleTexture(): THREE.CanvasTexture {
 	return tex;
 }
 
+/* ---------- the decor ---------- */
+
+const DECOR_NEAR = 7.0; // m from the centre — nothing stands closer, the eye walks 9 m up the lane
+const DECOR_FAR = 23.0; // m — inside the apron, so nothing floats off its edge
+const LANE_KEEP = 4.6; // m either side of the lane axis: the far end has to stay readable
+
+/**
+ * Trees, bushes and two benches around the ground. Purely cosmetic and placed off `t.seed`, so a
+ * replay draws the same boulodrome — but also the reason the far end stops reading as a void: with
+ * nothing but a flat apron out there the eye has no scale and the long throws all looked the same.
+ */
+function buildDecor(grp: THREE.Group, seed: number, y: number, keep: <T extends { dispose(): void }>(o: T) => T): void {
+	/* Anywhere on the apron ring except the corridor the lane is read down. Rejected spots are
+	   simply skipped — pushing them sideways instead piles decor along the keep-out line. */
+	const spots: { x: number; z: number; r: number }[] = [];
+	for (let k = 0; k < 64; k++) {
+		const a = hashN(k, seed ^ 0x51a3) * Math.PI * 2;
+		const d = DECOR_NEAR + hashN(k, seed ^ 0x2b7f) * (DECOR_FAR - DECOR_NEAR);
+		const x = Math.cos(a) * d, z = Math.sin(a) * d;
+		if (Math.abs(x) < LANE_KEEP && Math.abs(z) < PITCH_L / 2 + 3) continue;
+		spots.push({ x, z, r: hashN(k, seed ^ 0x77c1) });
+	}
+
+	const trees = spots.filter((_, i) => i % 3 === 0);
+	const bushes = spots.filter((_, i) => i % 3 !== 0);
+
+	const m = new THREE.Matrix4();
+	const q = new THREE.Quaternion();
+	const fill = (inst: THREE.InstancedMesh, at: (i: number) => [THREE.Vector3, THREE.Vector3]): void => {
+		for (let i = 0; i < inst.count; i++) {
+			const [p, s] = at(i);
+			m.compose(p, q, s);
+			inst.setMatrixAt(i, m);
+		}
+		inst.instanceMatrix.needsUpdate = true;
+		grp.add(inst);
+		keep({ dispose: () => inst.dispose() });
+	};
+
+	if (trees.length) {
+		const trunkGeo = keep(new THREE.CylinderGeometry(0.13, 0.19, 1, 6));
+		trunkGeo.translate(0, 0.5, 0); // pivot at the foot, so one scale sets the height
+		const trunkMat = keep(new THREE.MeshStandardMaterial({ color: 0x6d5741, roughness: 0.95 }));
+		const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, trees.length);
+		fill(trunks, (i) => {
+			const t0 = trees[i], h = 2.4 + t0.r * 2.2;
+			return [new THREE.Vector3(t0.x, y, t0.z), new THREE.Vector3(1, h, 1)];
+		});
+
+		// Two blobs a tree: one sphere reads as a lollipop at this distance, three cost a draw call
+		// each for a silhouette nobody can tell apart.
+		const leafGeo = keep(new THREE.IcosahedronGeometry(1, 1));
+		const leafMat = keep(new THREE.MeshStandardMaterial({ color: 0x4d7a3c, roughness: 1, flatShading: true }));
+		const leaves = new THREE.InstancedMesh(leafGeo, leafMat, trees.length * 2);
+		fill(leaves, (i) => {
+			const t0 = trees[i >> 1], h = 2.4 + t0.r * 2.2, up = (i & 1) === 1;
+			const rad = up ? 0.85 + t0.r * 0.5 : 1.15 + t0.r * 0.6;
+			return [
+				new THREE.Vector3(t0.x + (up ? 0.3 : -0.2), y + h + (up ? 0.85 : 0.15), t0.z + (up ? -0.25 : 0.2)),
+				new THREE.Vector3(rad, rad * 0.86, rad),
+			];
+		});
+	}
+
+	if (bushes.length) {
+		const bushGeo = keep(new THREE.IcosahedronGeometry(1, 0));
+		const bushMat = keep(new THREE.MeshStandardMaterial({ color: 0x5d7a3a, roughness: 1, flatShading: true }));
+		const inst = new THREE.InstancedMesh(bushGeo, bushMat, bushes.length);
+		fill(inst, (i) => {
+			const b = bushes[i], rad = 0.35 + b.r * 0.55;
+			return [new THREE.Vector3(b.x, y + rad * 0.45, b.z), new THREE.Vector3(rad, rad * 0.7, rad)];
+		});
+	}
+
+	// Two benches, one each side, square to the pitch — the only straight lines out there, and what
+	// tells you the trees are trees and not shrubs seen from close up.
+	const woodMat = keep(new THREE.MeshStandardMaterial({ color: 0x7d5c39, roughness: 0.9 }));
+	const seatGeo = keep(new THREE.BoxGeometry(1.7, 0.08, 0.42));
+	const legGeo = keep(new THREE.BoxGeometry(0.1, 0.42, 0.38));
+	for (const s of [-1, 1] as const) {
+		const bx = s * (PITCH_W / 2 + 2.6);
+		const seat = new THREE.Mesh(seatGeo, woodMat);
+		seat.position.set(bx, y + 0.45, s * 2.2);
+		seat.rotation.y = Math.PI / 2;
+		grp.add(seat);
+		for (const e of [-1, 1] as const) {
+			const leg = new THREE.Mesh(legGeo, woodMat);
+			leg.position.set(bx, y + 0.21, s * 2.2 + e * 0.7);
+			grp.add(leg);
+		}
+	}
+}
+
 /* ---------- the pitch ---------- */
 
 export interface Pitch3D {
@@ -155,6 +248,8 @@ export function buildPitch3D(t: Terrain): Pitch3D {
 	apron.position.y = low - 0.06;
 	apron.receiveShadow = true;
 	grp.add(apron);
+
+	buildDecor(grp, t.seed, apron.position.y, keep);
 
 	geo.computeVertexNormals();
 	const uv = geo.attributes.uv as THREE.BufferAttribute;
@@ -271,19 +366,28 @@ export function groundRing(t: Terrain, cx: number, cy: number, r: number, color:
 
 /* ---------- camera ---------- */
 
-export const CAM_PITCH_MIN = 0.07; // rad — grazing, eye almost at boule height
-export const CAM_PITCH_MAX = 1.05; // rad — looking down at the lane
-const ELEV_LOW = 0.17; // rad of loft from a plunging camera: a roulette
-const ELEV_HIGH = 0.92; // ...and from a grazing one: a full lob
+export const ELEV_LOW = 0.17; // rad — a roulette, thrown from the bottom of the board
+export const ELEV_HIGH = 1.22; // rad (70 deg) — a full plomb, thrown from the top
 
 /**
- * The hook that makes this game its own: the camera IS the loft control. A grazing view throws
- * high, a plunging view rolls it in. Kept here so the HUD gauge and the physics read one function.
+ * The launch board: where the finger lands in the throwing strip IS the loft, `t` running 0 at the
+ * bottom of the strip to 1 at its top. The camera used to decide this, which tied aiming a plomb to
+ * putting the eye on the ground — exactly where you can no longer see what you are aiming at.
+ *
+ * Declared cost of ELEV_HIGH at 70 deg: with MAX_SPEED unchanged, `v² sin(2e) / g` gives a full
+ * plomb a 7.2 m carry, so the far end of the legal 6-10 m jack window needs a flatter throw. 60 deg
+ * still reaches 9.7 m. That trade is the point — it is learnable, and raising the speed instead
+ * would move a power curve that was measured.
  */
-export const elevationForPitch = (pitch: number): number => {
-	const k = (pitch - CAM_PITCH_MIN) / (CAM_PITCH_MAX - CAM_PITCH_MIN);
-	const c = k < 0 ? 0 : k > 1 ? 1 : k;
-	return ELEV_HIGH + (ELEV_LOW - ELEV_HIGH) * c;
+export const elevationForBoard = (t: number): number => {
+	const c = t < 0 ? 0 : t > 1 ? 1 : t;
+	return ELEV_LOW + (ELEV_HIGH - ELEV_LOW) * c;
+};
+
+/** The board position a loft came from — for the HUD gauge and for replaying a network aim. */
+export const boardForElevation = (elev: number): number => {
+	const t = (elev - ELEV_LOW) / (ELEV_HIGH - ELEV_LOW);
+	return t < 0 ? 0 : t > 1 ? 1 : t;
 };
 
 /* Step the eye off the throw line, over the thrower's shoulder. Dead centre puts the whole
@@ -299,8 +403,8 @@ const FPV_BACK = 0.35; // the first-person eye stands just behind the circle, no
 /**
  * Stand the camera behind the circle, looking down the lane. `yaw` is the lateral swing.
  *
- * `walk` is how far up the lane the player has stepped to read the head, and it deliberately does
- * NOT touch `pitch`: pitch is the loft control, so walking up to look must never change the throw.
+ * `walk` is how far up the lane the player has stepped to read the head. The camera is free: it
+ * carries no part of the throw since the loft moved to the launch board.
  * `walkDir` is the ground axis the feet travel along; it defaults to the yaw heading so every call
  * that omits it is unchanged. The zoom passes the circle-to-head axis instead, because a yaw swung
  * to its limit leaves metres of lateral error at 8 m and the end-of-travel distance would not be

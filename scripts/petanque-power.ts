@@ -8,7 +8,7 @@
    Usage: npx tsx scripts/petanque-power.ts */
 import { makeTerrain, SURFACES, type SurfaceId } from '../src/games/petanque/terrain';
 import { place, settle, makeBoule, throwVelocity, type Sim } from '../src/games/petanque/engine';
-import { elevationForPitch, CAM_PITCH_MIN, CAM_PITCH_MAX } from '../src/games/petanque/render3d';
+import { elevationForBoard } from '../src/games/petanque/render3d';
 
 const FROM = { x: 2, y: 1 };
 const SEEDS = 10;
@@ -26,10 +26,13 @@ const lin = (lo: number, hi: number): Curve =>
 const sq = (lo: number, hi: number): Curve =>
 	({ tag: `sq  ${lo}-${hi}`, speed: (p) => Math.sqrt(lo * lo + (hi * hi - lo * lo) * p) });
 
+/* Read off the launch board now, not off the camera pitch: the top of the board is a plomb, which
+   is steeper than anything the old grazing camera could ask for. */
 const LOFTS: [string, number][] = [
-	['portee', elevationForPitch(CAM_PITCH_MIN)],
-	['demi', elevationForPitch((CAM_PITCH_MIN + CAM_PITCH_MAX) / 2)],
-	['roulette', elevationForPitch(CAM_PITCH_MAX)],
+	['plomb', elevationForBoard(1)],
+	['portee', elevationForBoard(0.62)],
+	['demi', elevationForBoard(0.32)],
+	['roulette', elevationForBoard(0)],
 ];
 
 /** Where a throw at this speed and loft comes to rest. 99 means it left the pitch. */
@@ -86,13 +89,12 @@ for (const c of CURVES) {
    power flat", it is "over the whole loft range, what is the best arrival speed on a target 8 m
    out". E1 measured the carreau transfer from that impact speed. */
 console.log('\nJ3 · arrival on a target 8 m out, full bar — speed, and whether it is still in the air\n');
-console.log('curve            ' + [0, 0.25, 0.5, 0.75, 1].map((k) => `pitch ${k}`.padStart(15)).join(''));
+console.log('curve            ' + [0, 0.25, 0.5, 0.75, 1].map((k) => `board ${k}`.padStart(15)).join(''));
 for (const c of CURVES) {
 	const cells = [0, 0.25, 0.5, 0.75, 1].map((k) => {
-		const pitch = CAM_PITCH_MIN + (CAM_PITCH_MAX - CAM_PITCH_MIN) * k;
 		const s: Sim = { t: makeTerrain(13, SURFACES['terre-battue'], 0.03), bs: [], rng: 0 };
 		const b = place(s.t, makeBoule(FROM.x, FROM.y, 0));
-		const v = throwVelocity(0, 1, c.speed(1), elevationForPitch(pitch));
+		const v = throwVelocity(0, 1, c.speed(1), elevationForBoard(k));
 		b.vx = v.vx; b.vy = v.vy; b.vz = v.vz; b.rolling = false;
 		const sim: Sim = { t: s.t, bs: [b], rng: 0 };
 		let air = false, sp = 0;

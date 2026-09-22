@@ -392,7 +392,7 @@ export const games: GameTile[] = [
 	{
 		id: 'petanque',
 		title: 'Pétanque',
-		pitch: 'Tête-à-tête en 13 points sur un vrai terrain 4×15 : glisse pour doser, incline la caméra pour choisir ta portée, et joue le relief, les graviers et les cailloux.',
+		pitch: 'Tête-à-tête en 13 points sur un vrai terrain 4×15 : pose le doigt sur la planche d’envol pour choisir ton angle, glisse pour doser, et joue le relief, les graviers et les cailloux.',
 		icon: 'petanque',
 		href: '/jeux/petanque',
 		status: 'play',

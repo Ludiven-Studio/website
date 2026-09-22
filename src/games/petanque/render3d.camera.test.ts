@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
-	verticalFov, topCamera, laneFrame, haloRadius, haloFloorFor, elevationForPitch, wx, wz,
-	aimCamera, zoomWalk, VFOV_MIN, VFOV_MAX, CAM_PITCH_MIN, CAM_PITCH_MAX,
+	verticalFov, topCamera, laneFrame, haloRadius, haloFloorFor, wx, wz,
+	aimCamera, zoomWalk, VFOV_MIN, VFOV_MAX,
+	elevationForBoard, boardForElevation, ELEV_LOW, ELEV_HIGH,
 	ZOOM_DIST, ZOOM_EYE, ZOOM_VFOV, EYE_H,
 } from './render3d';
 import { MIN_JACK, MAX_JACK } from './rules13';
@@ -145,21 +146,37 @@ describe('the top view frames the legal jack window', () => {
 	}
 });
 
-/* The camera pitch IS the loft. This pair is the whole mechanic; nobody gets to drift it. */
-describe('pitch drives the loft', () => {
-	it('maps the camera pitch range onto the loft range, inverted', () => {
-		expect(elevationForPitch(CAM_PITCH_MIN)).toBeCloseTo(0.92, 6); // grazing eye, full lob
-		expect(elevationForPitch(CAM_PITCH_MAX)).toBeCloseTo(0.17, 6); // plunging eye, roulette
-		expect(elevationForPitch(-5)).toBeCloseTo(0.92, 6);
-		expect(elevationForPitch(5)).toBeCloseTo(0.17, 6);
+/* The launch board IS the loft. This pair is the whole mechanic; nobody gets to drift it. */
+describe('the board drives the loft', () => {
+	it('maps the strip onto the loft range, bottom grazing and top plomb', () => {
+		expect(elevationForBoard(0)).toBeCloseTo(ELEV_LOW, 6);
+		expect(elevationForBoard(1)).toBeCloseTo(ELEV_HIGH, 6);
+		expect(elevationForBoard(-5)).toBeCloseTo(ELEV_LOW, 6);
+		expect(elevationForBoard(5)).toBeCloseTo(ELEV_HIGH, 6);
 	});
 
-	it('is monotonic, so a nudge of the camera never jumps the throw', () => {
-		let prev = elevationForPitch(CAM_PITCH_MIN);
+	it('is monotonic, so a nudge of the finger never jumps the throw', () => {
+		let prev = elevationForBoard(0);
 		for (let i = 1; i <= 40; i++) {
-			const e = elevationForPitch(CAM_PITCH_MIN + ((CAM_PITCH_MAX - CAM_PITCH_MIN) * i) / 40);
-			expect(e).toBeLessThan(prev);
+			const e = elevationForBoard(i / 40);
+			expect(e).toBeGreaterThan(prev);
 			prev = e;
 		}
+	});
+
+	it('round-trips through the gauge, which reads the board back out of the loft', () => {
+		for (let i = 0; i <= 20; i++) {
+			expect(boardForElevation(elevationForBoard(i / 20))).toBeCloseTo(i / 20, 6);
+		}
+		expect(boardForElevation(0)).toBe(0); // a network aim below the range still lands on the bar
+		expect(boardForElevation(3)).toBe(1);
+	});
+
+	/* A plomb trades carry for bite; it must stay able to reach the nearest legal jack, or the top
+	   of the board would just be a dead zone. `v² sin(2e) / g` at MAX_SPEED = 10.5. */
+	it('a full plomb still carries to the nearest legal jack', () => {
+		const range = (v: number, e: number): number => (v * v * Math.sin(2 * e)) / 9.81;
+		expect(range(10.5, ELEV_HIGH)).toBeGreaterThan(MIN_JACK);
+		expect(range(10.5, 1.05)).toBeGreaterThan(MAX_JACK - 0.5);
 	});
 });

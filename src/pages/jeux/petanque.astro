@@ -5,10 +5,11 @@ import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
 
 <GamePage
 	title="Pétanque | Jeux Ludiven Studio"
-	description="Pétanque 3D en tête-à-tête, 13 points : glisse pour doser ta boule, incline la caméra pour choisir ta portée, et compose avec le relief et les graviers du terrain."
+	description="Pétanque 3D en tête-à-tête, 13 points : pose le doigt sur la planche d'envol pour choisir ton angle, glisse pour doser, et compose avec le relief et les graviers du terrain."
 	heading="Pétanque"
-	tagline="Glisse pour doser, incline la caméra pour la portée — premier à 13"
+	tagline="Pose le doigt à la hauteur de l'angle, glisse pour doser — premier à 13"
 	gameId="petanque"
+	fullscreen="auto"
 >
 	<PetanqueGame client:only="react" gameId="petanque" />
 	<p class="pe-scanner">
@@ -26,5 +27,15 @@ import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
 	/* Fullscreen only hides .game-head and .game-foot, so this one has to opt out itself. */
 	:global(.game-page.gf-full) .pe-scanner {
 		display: none;
+	}
+	/* The leaderboard pill is pinned bottom-right by LeaderboardCorner, which is the corner the
+	   launch board now owns — a hit test over the board found it stealing presses there. Lifted
+	   clear of the board and sent to the other side, because the action row already took the right.
+	   Global because the pill is not in this template, but this stylesheet only ships on this page. */
+	:global(.game-page.gf-full .lbc-root.lbc-side) {
+		right: auto;
+		left: max(12px, env(safe-area-inset-left));
+		align-items: flex-start;
+		bottom: calc(max(12px, env(safe-area-inset-bottom)) + clamp(110px, 30vh, 200px) + 8px);
 	}
 </style>

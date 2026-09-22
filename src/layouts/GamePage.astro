@@ -14,9 +14,12 @@ interface Props {
 	heading: string;
 	tagline: string;
 	gameId: string;
+	/** Open straight into fullscreen. For games whose HUD is drawn over the board and whose
+	 *  windowed 16/10 box is too short to hold it on a phone. */
+	fullscreen?: 'auto';
 }
 
-const { title, description, heading, tagline, gameId } = Astro.props;
+const { title, description, heading, tagline, gameId, fullscreen } = Astro.props;
 // Every listed game has a backdrop (scripts/comfy-thumbs.mjs writes it next to the card);
 // the few unlisted pages don't.
 const hasArt = games.some((g) => g.id === gameId);
@@ -83,7 +86,7 @@ const hasDaily = gameId in DAILY_LB;
 	</script>
 
 	{hasArt && <div class="game-art" style={`--art: url('/assets/jeux/art/${gameId}.jpg')`} aria-hidden="true" />}
-	<div class="wrapper game-page stack gap-4">
+	<div class="wrapper game-page stack gap-4" data-fullscreen={fullscreen}>
 		{/* Kept to one line so the board is reachable without scrolling on a phone —
 		    the pitch, the rules and the wallet wait below it. */}
 		<header class="game-head">

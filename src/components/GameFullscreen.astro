@@ -148,10 +148,22 @@
 			});
 		};
 
+		// The exit button is fixed top-right at the highest z-index there is, so whatever it covers
+		// is unreachable — a game HUD anchored to the same corner has to be told how much room to
+		// leave. Measured, not guessed: the label is translated and the padding is themed.
+		const measureExit = (): void => {
+			requestAnimationFrame(() => {
+				const r = exitBtn.getBoundingClientRect();
+				html.style.setProperty('--gf-exit-w', `${Math.ceil(r.width)}px`);
+				html.style.setProperty('--gf-exit-h', `${Math.ceil(r.height)}px`);
+			});
+		};
+
 		const enter = (): void => {
 			on = true;
 			target.classList.add('gf-full');
 			html.classList.add('gf-full');
+			measureExit(); // after the class: the button is display:none until `.gf-full` lands
 			try {
 				if (target.requestFullscreen) void target.requestFullscreen().catch(() => {});
 				else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
@@ -195,6 +207,11 @@
 		exitBtn.textContent = '⛶ Quitter';
 		exitBtn.addEventListener('click', toggle);
 		target.appendChild(exitBtn);
+
+		// Games that ask for it open straight into fullscreen. Only the class-driven half can run
+		// here — requestFullscreen without a gesture is refused, and the catch inside enter()
+		// swallows it — but that half IS the layout, so the board fills the screen either way.
+		if (target.dataset.fullscreen === 'auto') enter();
 
 		// Keep state in sync if the user exits native fullscreen via Esc / system UI.
 		// Ignore our own synthetic re-measure ping (guarded by `synthetic`).

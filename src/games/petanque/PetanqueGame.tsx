@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import {
-	makeTerrain, SURFACES, heightAt, PITCH_W, PITCH_L, type SurfaceId, type Terrain,
+	makeTerrain, SURFACES, SURFACE_IDS, heightAt, PITCH_W, PITCH_L, type SurfaceId, type Terrain,
 } from './terrain';
 import {
 	makeBoule, makeJack, place, stepSim, isSettled, throwVelocity, G,
@@ -15,8 +15,8 @@ import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai
 import {
 	buildPitch3D, makeBouleMesh, groundRing, makeMarker, makeHalo, arcMesh, aimRay, predictThrow,
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
-	elevationForPitch, addLights, makeFx, wx, wz,
-	CAM_PITCH_MIN, CAM_PITCH_MAX, HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
+	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz,
+	HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
 	BOULE_R, CIRCLE_R, WALK_MAX, EYE_H, ZOOM_EYE, ZOOM_VFOV, type Pitch3D, type Fx,
 } from './render3d';
 import { petanqueLevels } from './levels';
@@ -46,8 +46,9 @@ import LevelOutcome from '../../components/LevelOutcome';
 
 /* =====================================================
    PETANQUE — React island, 3D pitch (three.js).
-   Glisser vers le haut = puissance, latéral = direction. L'inclinaison de la caméra décide de la
-   hauteur du lob : rasante = portée haute, plongeante = roulette. Tête-à-tête en 13, 3 boules,
+   Le point de pose du doigt dans la bande du bas — la planche d'envol — décide de l'angle : en bas
+   c'est rasant, en haut on plombe. Puis glisser vers le haut = puissance, latéral = direction.
+   La caméra est libre et ne touche plus au tir. Tête-à-tête en 13, 3 boules,
    règle officielle (celui qui n'a pas le point rejoue).
    Moteur pur et testé dans ./engine + ./rules13 ; ce fichier ne fait que le piloter.
    ===================================================== */
@@ -67,21 +68,62 @@ const DIFFS: Record<DiffKey, { label: string; skill: number; surface: SurfaceId;
 	expert: { label: 'Expert', skill: 0.95, surface: 'gravier-gros', amp: 0.070 },
 };
 
+/* The ground, chosen by hand. FREE PLAY ONLY: the levels ladder, the daily course and the online
+   seat keep the surface and the relief they were measured on, or their targets would not mean the
+   same thing. 'auto' hands the choice back to the difficulty. */
+const RELIEF_ORDER = ['plat', 'vallonne', 'accidente'] as const;
+type ReliefKey = (typeof RELIEF_ORDER)[number];
+const RELIEFS: Record<ReliefKey, { label: string; hint: string; amp: number; slope: number }> = {
+	plat: { label: 'Plat', hint: 'ratissé, la boule va droit', amp: 0.010, slope: 0.002 },
+	vallonne: { label: 'Vallonné', hint: 'des bosses et des creux', amp: 0.038, slope: 0.009 },
+	accidente: { label: 'Accidenté', hint: 'faux plat marqué', amp: 0.075, slope: 0.022 },
+};
+
+/** What each surface does to a boule, in the words a joueur would use. */
+const SURFACE_HINT: Record<SurfaceId, string> = {
+	'terre-battue': 'roule loin, dévie peu',
+	'gravier-fin': 'accroche un peu',
+	'gravier-gros': 'freine sec, part de travers',
+	sable: 's’arrête net, aucun rebond',
+};
+
+const GROUND_KEY = 'petanque-ground';
+type GroundPick = { surface: SurfaceId | 'auto'; relief: ReliefKey | 'auto' };
+const GROUND_0: GroundPick = { surface: 'auto', relief: 'auto' };
+
+function loadGround(): GroundPick {
+	try {
+		const raw = localStorage.getItem(GROUND_KEY);
+		if (!raw) return GROUND_0;
+		const v = JSON.parse(raw) as GroundPick;
+		return {
+			surface: v.surface === 'auto' || SURFACE_IDS.includes(v.surface) ? v.surface : 'auto',
+			relief: v.relief === 'auto' || RELIEF_ORDER.includes(v.relief) ? v.relief : 'auto',
+		};
+	} catch {
+		return GROUND_0;
+	}
+}
+
 const MIN_SPEED = 3.0;
 const MAX_SPEED = 10.5;
 const POWER_PX = 190; // vertical drag for full power
 const YAW_PER_PX = 0.0021;
-const YAW_MAX = 0.42; // rad off the lane axis — past this you are not on the pitch any more
+/* Derived, not chosen: the circle and the jack may sit against opposite touchlines, so the widest
+   legal throw is the full pitch width across the shortest legal jack distance. The old hand-picked
+   0.42 rad was under that — some legal jacks were simply not aimable, which is what "des fois on
+   n'arrive pas à viser le cochonnet" was. */
+const YAW_MAX = Math.atan2(PITCH_W, MIN_JACK); // 0.588 rad, 34 deg
 const PITCH_PER_PX = 0.0042;
-/* The camera is free; the AIM is what is bounded. Looking around used to be capped at the yaw a
-   boule can legally be thrown at, which is why it did not read as a camera at all. */
-const CAM_YAW_MAX = 1.2;
+/* The camera is free; the AIM is what is bounded. Wide enough to look back over the shoulder — the
+   loft no longer rides on the pitch, so nothing about the throw is lost by turning around. */
+const CAM_YAW_MAX = 2.8;
 const CAM_PITCH_LOW = 0.02;
 const CAM_PITCH_HIGH = 1.35;
-/* The game view stands the eye up and aims it with lookAt, so `pitch` never reached the pose — the
-   tilt moved the loft gauge and nothing else. This is what makes it move the picture too: a
-   fraction of the pitch, as a height on the look target. Full tilt is about +-25 degrees, enough
-   to read as looking up or down without ever putting the target behind the eye. */
+/* The game view stands the eye up and aims it with lookAt, so `pitch` never reached the pose. This
+   is what makes the tilt move the picture: a fraction of the pitch, as a height on the look target.
+   Full tilt is about +-25 degrees, enough to read as looking up or down without ever putting the
+   target behind the eye. */
 const LOOK_TILT_K = 0.45;
 const PITCH_NEUTRAL = 0.55;
 const CAM_DIST = 2.7;
@@ -111,10 +153,22 @@ const DUST: Record<SurfaceId, number> = {
 	sable: 0xe8d2a0,
 };
 
-const LOFT_LABEL = (e: number): string => (e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette');
+const LOFT_0 = 0.55; // rad — where the loft sits before the first throw, mid-board
 
-/* Three views, and only the first one throws: the camera IS the aim, so a view that does not stand
-   behind the circle has no direction to give. */
+const LOFT_LABEL = (e: number): string =>
+	e > 1.0 ? 'Plomb' : e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette';
+
+/* The graduations drawn on the launch board, bottom to top. Four, not a continuous ruler: what the
+   thumb has to find is a band, and a band is what the labels name. */
+const BOARD_MARKS: readonly { t: number; label: string }[] = [
+	{ t: 0.04, label: 'Roulette' },
+	{ t: 0.32, label: 'Demi' },
+	{ t: 0.62, label: 'Portée' },
+	{ t: 0.93, label: 'Plomb' },
+];
+
+/* Three views, and only the first one throws: the launch board is drawn over it, and a view that
+   does not stand behind the circle has no direction to give. */
 const VIEW_ORDER = ['jeu', 'tete', 'dessus'] as const;
 type ViewKey = (typeof VIEW_ORDER)[number];
 const VIEWS: Record<ViewKey, { icon: string; label: string }> = {
@@ -140,9 +194,12 @@ const JACK_AIM_R = 0.45; // m — the target ring for the jack throw, a bullseye
 const AIM_LO = MIN_JACK + 0.5, AIM_HI = MAX_JACK - 1.0;
 
 const AIM_DEAD_PX = 8; // sideways slack before a power pull counts as a direction change
-const ARM_H = 0.25; // share of the canvas height that is the throwing arm, not the camera
-const ARM_MIN_PX = 90;
-const ARM_MAX_PX = 170;
+/* The launch board. Taller than the plain strip it replaced: it now carries the whole loft range,
+   so at 90 px a thumb crossed two bands by landing 25 px off. */
+const ARM_H = 0.30; // share of the canvas height that is the board, not the camera
+const ARM_MIN_PX = 110;
+const ARM_MAX_PX = 200;
+const BOARD_PAD_PX = 10; // the top and bottom bands reach the ends of the board, not a hair short
 
 const HEAD_DIST_0 = 4.2; // m — where the orbit starts when you open the head view
 const HEAD_PITCH_0 = 0.62;
@@ -297,6 +354,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	const statusRef = useRef<Status>('aim');
 	const diffRef = useRef<DiffKey>('moyen');
+	const groundRef = useRef<GroundPick>(GROUND_0); // read by newGame, never by the loop
 	const levelSkillRef = useRef(0.25); // the ladder's skill, read by the rAF loop
 	const targetRef = useRef(13);
 	const aiPendingRef = useRef(false);
@@ -304,27 +362,25 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const endAtRef = useRef(0);
 	const rngRef = useRef(1); // AI plan counter — one per throw, so two plans never coincide
 
-	/* Camera and aim are two different things, and used to be one. The camera is free — look
-	   wherever you like, whenever you like. The aim is SAMPLED off it the instant a drag starts in
-	   the throwing strip; from there the strip owns it and the camera cannot take it back.
-	   Inside that drag, up/down is power and left/right is direction — so a throw can be lined up
-	   without disturbing the framing the player chose.
-	   `aimPitchRef` is the loft, and it IS frozen for the drag: the pitch has nowhere to go in a
-	   gesture whose vertical axis is already power.
-	   Writers: `syncAim`, the sample in `aimStart`, and the yaw steer in `aimMove`. */
+	/* Camera and aim are two different things, and used to be one. The camera is free and reaches
+	   nothing: look wherever you like, whenever you like.
+	   The yaw is sampled off the camera the instant a drag starts on the board; from there the drag
+	   owns it and the camera cannot take it back.
+	   `aimLoftRef` is the elevation in radians, set by WHERE the finger landed on the board and then
+	   frozen for the whole drag — the vertical axis of that gesture is already power.
+	   Writers: `syncAim` (yaw only), the sample in `aimStart`, and the yaw steer in `aimMove`. */
 	const dragRef = useRef<Drag | null>(null);
 	const powerRef = useRef(0);
 	const camYawRef = useRef(0);
 	const camPitchRef = useRef(0.55);
 	const aimYawRef = useRef(0);
-	const aimPitchRef = useRef(0.55);
+	const aimLoftRef = useRef(LOFT_0);
 	const aimDirtyRef = useRef(false);
 	const viewPitchRef = useRef(0.55);
 	const pinchRef = useRef(false); // a second finger voids the gesture, it never aims
 	/* Where the eye stands. `zoom` is a 0-1 dial, not metres: at 1 the eye has walked to ZOOM_DIST
 	   of the head AND the field has narrowed to ZOOM_VFOV. Both halves together, because either
-	   alone falls far short of making a boule readable. Inspection only: it never touches pitch,
-	   which is the loft control, so the throw cannot change. */
+	   alone falls far short of making a boule readable. Inspection only. */
 	const viewRef = useRef<ViewKey>('jeu');
 	const zoomRef = useRef(0);
 	const zoomViewRef = useRef(0);
@@ -367,9 +423,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [match, setMatch] = useState<Match13>(matchRef.current);
 	const [status, setStatus] = useState<Status>('aim');
 	const [power, setPower] = useState(0);
-	const [loft, setLoft] = useState(() => elevationForPitch(0.55));
-	const [armed, setArmed] = useState(false); // the strip is held: the loft shown is now committed
+	const [loft, setLoft] = useState(LOFT_0);
+	const [armed, setArmed] = useState(false); // the board is held: the loft shown is now committed
 	const [diff, setDiff] = useState<DiffKey>('moyen');
+	// Restored here rather than in an effect: the landing effect lays a pitch straight away, and an
+	// effect would get the saved ground back one deal too late.
+	const [ground, setGround] = useState<GroundPick>(() => {
+		groundRef.current = loadGround();
+		return groundRef.current;
+	});
+	const [groundOpen, setGroundOpen] = useState(false);
 	const [over, setOver] = useState(false);
 	const [view, setView] = useState<ViewKey>('jeu');
 	const [zoom, setZoom] = useState(0);
@@ -543,14 +606,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	/* ---------- a new game ---------- */
 
 	/** Lay a fresh pitch and match. Shared by free play and by the levels ladder. */
-	const layMatch = useCallback((cfg: { seed: number; surface: SurfaceId; amp: number; target: number }): boolean => {
+	const layMatch = useCallback((cfg: { seed: number; surface: SurfaceId; amp: number; target: number; slope?: number }): boolean => {
 		if (!initScene()) return false;
 		const g = g3Ref.current;
 		if (!g) return false;
 
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
-		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp);
+		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp, cfg.slope === undefined ? {} : { slope: cfg.slope });
 		g.pitch = buildPitch3D(t);
 		g.scene.add(g.pitch.group);
 
@@ -574,13 +637,31 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	const newGame = useCallback((key: DiffKey) => {
 		const d = DIFFS[key];
+		const pick = groundRef.current;
+		const rel = pick.relief === 'auto' ? null : RELIEFS[pick.relief];
 		diffRef.current = key;
 		dailyRef.current = null;
 		setDaily(false);
-		if (!layMatch({ seed: (Math.random() * 1e9) | 0, surface: d.surface, amp: d.amp, target: 13 })) return;
+		if (!layMatch({
+			seed: (Math.random() * 1e9) | 0,
+			surface: pick.surface === 'auto' ? d.surface : pick.surface,
+			amp: rel ? rel.amp : d.amp,
+			slope: rel ? rel.slope : undefined,
+			target: 13,
+		})) return;
 		setDiff(key);
 		trackGame(gameId, 'game_started', { mode: 'libre', diff: key });
 	}, [gameId, layMatch]);
+
+	/** Choose the ground. It only takes on the next deal — a terrain swap mid-end would move the
+	 *  boules already down, so the pitch is laid again. */
+	const chooseGround = useCallback((pick: Partial<GroundPick>) => {
+		const next = { ...groundRef.current, ...pick };
+		groundRef.current = next;
+		setGround(next);
+		try { localStorage.setItem(GROUND_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+		newGame(diffRef.current);
+	}, [newGame]);
 
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
@@ -693,16 +774,40 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		return { x: Math.sin(y) * m.dir, y: Math.cos(y) * m.dir };
 	}, []);
 
+	/** The head: the live jack, else the centre of what is on the ground, else a point down the
+	 *  lane. Both inspection views point at this, and the walk-up walks towards it. */
+	const headFocus = useCallback((): { x: number; y: number } => {
+		const m = matchRef.current, s = simRef.current;
+		const j = jackRef.current;
+		if (j && j.live) return { x: j.x, y: j.y };
+		const live = (s?.bs ?? []).filter((b) => b.live);
+		if (live.length) {
+			let x = 0, y = 0;
+			for (const b of live) { x += b.x; y += b.y; }
+			return { x: x / live.length, y: y / live.length };
+		}
+		return { x: m.circle.x, y: m.circle.y + m.dir * LOOK_FAR };
+	}, []);
+
+	/** The camera yaw that puts the head in the middle of the frame. Facing straight down the lane
+	 *  meant turning by hand after every jack thrown off-axis. */
+	const yawToHead = useCallback((): number => {
+		const m = matchRef.current, f = headFocus();
+		const dx = (f.x - m.circle.x) * m.dir, dy = (f.y - m.circle.y) * m.dir;
+		if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) return 0;
+		return Math.max(-CAM_YAW_MAX, Math.min(CAM_YAW_MAX, Math.atan2(dx, dy)));
+	}, [headFocus]);
+
 	/**
-	 * Carry the camera over to the aim — clamped, because a throw has limits a look does not.
-	 * Refused while the strip is held: that drag already sampled its aim, and the whole point is
+	 * Carry the camera yaw over to the aim — clamped, because a throw has limits a look does not.
+	 * The loft is NOT here any more: it comes from the launch board, so turning the head to read the
+	 * ground can no longer change what leaves the hand.
+	 * Refused while the board is held: that drag already sampled its aim, and the whole point is
 	 * that the player can then keep moving without the throw sliding out from under them.
 	 */
 	const syncAim = useCallback(() => {
 		if (dragRef.current?.mode === 'arm') return;
 		aimYawRef.current = Math.max(-YAW_MAX, Math.min(YAW_MAX, camYawRef.current));
-		aimPitchRef.current = Math.max(CAM_PITCH_MIN, Math.min(CAM_PITCH_MAX, camPitchRef.current));
-		setLoft(elevationForPitch(aimPitchRef.current));
 		aimDirtyRef.current = true;
 	}, []);
 
@@ -741,13 +846,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		aimSentRef.current = now;
 		// The SAMPLED aim, never the camera: what the other screen must see is the throw being
 		// drawn back. Where this player happens to be looking is nobody else's business.
-		net.sendAim({ yaw: aimYawRef.current, power: powerRef.current, loft: elevationForPitch(aimPitchRef.current), live });
+		net.sendAim({ yaw: aimYawRef.current, power: powerRef.current, loft: aimLoftRef.current, live });
 	}, []);
 
 	const throwFromAim = useCallback(() => {
 		const m = matchRef.current;
 		const h = aimHeading();
-		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), elevationForPitch(aimPitchRef.current));
+		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), aimLoftRef.current);
 		const jack = m.phase === 'throw-jack';
 		// Velocities, never angles: converting an angle calls sin/cos, and two JS engines may not
 		// round those the same way. This is the one message the other board cannot do without.
@@ -804,10 +909,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			streamAim(false); // else their screen keeps a half-drawn ray of ours for ever
 		}
 		if (k === 'tete') headYawRef.current = camYawRef.current; // open where the player was looking
+		// Back to the eye: face the head, not the lane axis. Coming home from a top view with the
+		// camera still pointing where it was left is how the jack ended up off screen.
+		if (k === 'jeu') { camYawRef.current = yawToHead(); syncAim(); }
 		lookRef.current.set(0, 0, 0); // zero means snap, not a travelling shot across the pitch
 		viewRef.current = k;
 		setView(k);
-	}, [cancelIntro, streamAim]);
+	}, [cancelIntro, streamAim, syncAim, yawToHead]);
 
 	const cycleView = useCallback(() => {
 		setViewKey(VIEW_ORDER[(VIEW_ORDER.indexOf(viewRef.current) + 1) % VIEW_ORDER.length]);
@@ -1239,9 +1347,17 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- the aim drag ---------- */
 
-	/** Top of the throwing strip, in client px. Below it is the arm, above it is the camera. */
+	/** Top of the launch board, in client px. Below it is the arm, above it is the camera. */
 	const armTop = useCallback((r: DOMRect): number =>
 		r.bottom - Math.max(ARM_MIN_PX, Math.min(ARM_MAX_PX, r.height * ARM_H)), []);
+
+	/** Where a touch sits on the board, 0 at the bottom edge and 1 at the top. The padding is what
+	 *  lets a thumb reach a full plomb without having to land exactly on the seam. */
+	const boardAt = useCallback((r: DOMRect, y: number): number => {
+		const top = armTop(r) + BOARD_PAD_PX, bot = r.bottom - BOARD_PAD_PX;
+		const t = (bot - y) / Math.max(1, bot - top);
+		return t < 0 ? 0 : t > 1 ? 1 : t;
+	}, [armTop]);
 
 	/* The jack has its own path — aimed with a ring, thrown with a button — so the strip stays inert
 	   during that phase. Two ways to throw the same jack would mean one of them ignores the ring. */
@@ -1260,8 +1376,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			dragRef.current = { mode: 'place', x0: x, y0: y, a0: 0, b0: 0 };
 			return;
 		}
-		if (y >= armTop(cv.getBoundingClientRect())) {
-			// The strip is the arm. Off the game view there is nothing to throw, so a tap here brings
+		const rect = cv.getBoundingClientRect();
+		if (y >= armTop(rect)) {
+			// The board is the arm. Off the game view there is nothing to throw, so a tap here brings
 			// the game view back rather than being a dead zone — unless the jack is being aimed, where
 			// leaving the top view mid-gesture would throw away the spot the player just picked.
 			if (viewRef.current !== 'jeu') { if (!jackAiming()) setViewKey('jeu'); return; }
@@ -1273,10 +1390,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			zoomRef.current = 0;
 			setZoom(0);
 			powerRef.current = 0;
-			// Sample the aim off the camera HERE: this is the moment the player commits to a loft,
-			// and the starting direction the sideways steer works from. `syncAim` refuses once the
-			// drag is armed, so the order matters — arm second.
+			// The press point IS the loft — this is the whole launch board. The yaw is sampled off
+			// the camera in the same beat, as the direction the sideways steer works from.
+			// `syncAim` refuses once the drag is armed, so the order matters — arm second.
 			syncAim();
+			const loftNow = elevationForBoard(boardAt(rect, y));
+			aimLoftRef.current = loftNow;
+			setLoft(loftNow);
 			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: aimYawRef.current, b0: 0 };
 			setArmed(true);
 			aimDirtyRef.current = true;
@@ -1294,7 +1414,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		dragRef.current = viewRef.current === 'tete'
 			? { mode: 'look', x0: x, y0: y, a0: headYawRef.current, b0: headPitchRef.current }
 			: { mode: 'look', x0: x, y0: y, a0: camYawRef.current, b0: camPitchRef.current };
-	}, [armTop, canThrow, cancelIntro, jackAiming, legalise, moveJackAim, pickGround, setViewKey, syncAim]);
+	}, [armTop, boardAt, canThrow, cancelIntro, jackAiming, legalise, moveJackAim, pickGround, setViewKey, syncAim]);
 
 	const aimMove = useCallback((x: number, y: number) => {
 		const d = dragRef.current;
@@ -1316,6 +1436,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			// had. Same rad-per-px as the camera drag, so the gesture reads the same wherever the
 			// thumb is. The dead band is not polish: a thumb pulling 190 px down wanders 10-30 px
 			// sideways on the way, which without it is a degree or two of drift nobody asked for.
+			// The loft is deliberately NOT re-read here: a pull of 190 px would sweep the whole board
+			// on its way up, and the angle the player chose has to survive the pull that fires it.
 			const dx = x - d.x0;
 			const steer = Math.abs(dx) <= AIM_DEAD_PX ? 0 : dx - Math.sign(dx) * AIM_DEAD_PX;
 			const yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, d.a0 - steer * YAW_PER_PX));
@@ -1330,17 +1452,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		}
 		if (viewRef.current === 'tete') {
 			headYawRef.current = d.a0 - (x - d.x0) * YAW_PER_PX * 2;
-			// Opposite sign to the game view on purpose. There the drag grabs the WORLD, because the
-			// tilt is the loft and pulling down has to raise the lob. Here the drag moves the EYE
-			// around the head, which is what every orbit control does — and what the game view does
-			// read as backwards once you are no longer aiming.
+			// Opposite sign to the game view on purpose: there the drag grabs the WORLD, here it
+			// moves the EYE around the head, which is what every orbit control does.
 			headPitchRef.current = Math.max(HEAD_PITCH_MIN, Math.min(HEAD_PITCH_MAX, d.b0 + (y - d.y0) * PITCH_PER_PX));
 			return;
 		}
 		if (viewRef.current !== 'jeu') return;
 		// Drag right looks right on screen: the camera looks down -yaw, so the sign flips here.
 		camYawRef.current = Math.max(-CAM_YAW_MAX, Math.min(CAM_YAW_MAX, d.a0 - (x - d.x0) * YAW_PER_PX));
-		// Grab the world: pull down, the eye rises, the camera grazes — which is the high lob.
+		// Grab the world: pull down and the eye rises.
 		camPitchRef.current = Math.max(CAM_PITCH_LOW, Math.min(CAM_PITCH_HIGH, d.b0 - (y - d.y0) * PITCH_PER_PX));
 		syncAim();
 	}, [canThrow, jackAiming, legalise, moveJackAim, pickGround, streamAim, syncAim]);
@@ -1392,9 +1512,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		const cv = canvasRef.current;
 		if (!cv) return;
-		// The wheel zooms, in every view. It used to tilt in the game view — but the tilt is the loft,
-		// and a mechanic that decides the throw has no business on the one control every player
-		// spins by reflex. The loft stays on the vertical drag and on the arrows.
+		// The wheel zooms, in every view. Nothing about the throw is on it: the loft is on the board.
 		const onWheel = (e: WheelEvent) => {
 			e.preventDefault();
 			const up = e.deltaY < 0;
@@ -1515,7 +1633,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 		const asJack = m.phase === 'throw-jack';
 		const h = aimHeading();
-		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), elevationForPitch(aimPitchRef.current));
+		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), aimLoftRef.current);
 		const from = m.circle;
 		const pred = predictThrow(s, from, v, (c) =>
 			place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn)));
@@ -1535,21 +1653,6 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	}, [aimHeading]);
 
 	/* ---------- where the action is ---------- */
-
-	/** The head: the live jack, else the centre of what is on the ground, else a point down the
-	 *  lane. Both inspection views point at this, and the walk-up walks towards it. */
-	const headFocus = useCallback((): { x: number; y: number } => {
-		const m = matchRef.current, s = simRef.current;
-		const j = jackRef.current;
-		if (j && j.live) return { x: j.x, y: j.y };
-		const live = (s?.bs ?? []).filter((b) => b.live);
-		if (live.length) {
-			let x = 0, y = 0;
-			for (const b of live) { x += b.x; y += b.y; }
-			return { x: x / live.length, y: y / live.length };
-		}
-		return { x: m.circle.x, y: m.circle.y + m.dir * LOOK_FAR };
-	}, []);
 
 	/**
 	 * Zoom out to the head, hold, come back — as a player would look before throwing. Only a timer:
@@ -1606,13 +1709,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		// which is how the AI came to replay while it held the point and to throw a fourth boule.
 		const m = matchRef.current;
 
-		// A new turn re-centres both. This used to live in aimStart, but zeroing the yaw on every
-		// press would swing the view out from under the player mid-gesture.
+		// A new turn re-centres both, on the head rather than on the lane axis. This used to live in
+		// aimStart, but zeroing the yaw on every press would swing the view out from under the
+		// player mid-gesture.
 		const key = `${m.endNo}:${m.turn}:${m.phase}:${m.left[0]}${m.left[1]}`;
 		if (key !== turnKeyRef.current) {
 			turnKeyRef.current = key;
-			camYawRef.current = 0;
-			aimYawRef.current = 0;
+			camYawRef.current = yawToHead();
+			aimYawRef.current = Math.max(-YAW_MAX, Math.min(YAW_MAX, camYawRef.current));
 			aimDirtyRef.current = true;
 			maybeIntro(now);
 		}
@@ -1828,7 +1932,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				setMag(magRef.current);
 			}
 		}
-	}, [aiAct, camHeading, headFocus, layGround, maybeIntro, nextEnd, onImpact, onSettled, rebuildArc]);
+	}, [aiAct, camHeading, headFocus, layGround, maybeIntro, nextEnd, onImpact, onSettled, rebuildArc, yawToHead]);
 
 	const tickRef = useRef(tick);
 	tickRef.current = tick;
@@ -1986,13 +2090,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			bs: (simRef.current?.bs ?? []).map((b) => ({ x: b.x, y: b.y, z: b.z, side: b.side, live: b.live })),
 			jack: jackRef.current ? { x: jackRef.current.x, y: jackRef.current.y, live: jackRef.current.live } : null,
 			power: powerRef.current,
-			loft: elevationForPitch(aimPitchRef.current),
+			loft: aimLoftRef.current,
 			/* The camera and the aim side by side — the only way to ask "is the aim sampled?"
-			   instead of judging it by eye. `frozen` is the strip being held. */
+			   instead of judging it by eye. `frozen` is the board being held. */
 			aim: {
 				yaw: aimYawRef.current,
-				pitch: aimPitchRef.current,
-				loft: elevationForPitch(aimPitchRef.current),
+				loft: aimLoftRef.current,
+				board: boardForElevation(aimLoftRef.current),
 				frozen: dragRef.current?.mode === 'arm',
 			},
 			cam: { yaw: camYawRef.current, pitch: camPitchRef.current },
@@ -2005,12 +2109,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			zoomView: Math.round(zoomViewRef.current * 1000) / 1000,
 			mag: Math.round(magRef.current * 100) / 100,
 			fov: Math.round((g3Ref.current?.camera.fov ?? 0) * 10) / 10,
-			// Where the arm strip starts, in canvas-relative px, and what the current drag is doing.
+			// Where the launch board starts, in canvas-relative px, and what the current drag is doing.
+			// `pad` is the dead margin at each end, so a guard can aim a press at a known loft.
 			arm: (() => {
 				const cv = canvasRef.current;
 				if (!cv) return null;
 				const r = cv.getBoundingClientRect();
-				return { top: Math.round(armTop(r) - r.top), height: Math.round(r.height), mode: dragRef.current?.mode ?? null };
+				return {
+					top: Math.round(armTop(r) - r.top), height: Math.round(r.height),
+					pad: BOARD_PAD_PX, mode: dragRef.current?.mode ?? null,
+				};
 			})(),
 			intro: introRef.current ? introRef.current.stage : null,
 			// The distance rings, from the SCENE and not from the toggle: "the button is on" and
@@ -2073,10 +2181,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const foeSide = other(mySide);
 	const online = mpPhase === 'playing';
 	const myTurn = match.turn === mySide;
-	// The strip only throws in the game view, and never during the jack phase — the jack has its
+	// The board only throws in the game view, and never during the jack phase — the jack has its
 	// own ring-and-button path. Anywhere else it is a drawing with a tap-to-return on it.
 	const jackPhase = match.phase === 'throw-jack';
 	const armLive = view === 'jeu' && !jackPhase;
+	// Which graduation lights up: the one nearest where the finger would have to land.
+	const boardT = boardForElevation(loft);
+	const boardBand = BOARD_MARKS.reduce((a, b) =>
+		(Math.abs(b.t - boardT) < Math.abs(a.t - boardT) ? b : a)).label;
 	const holder = !daily && jackRef.current && status !== 'placing' ? pointHolder(simRef.current?.bs ?? [], jackRef.current) : null;
 	const course = dailyRef.current?.course ?? null;
 	const st = course?.stations[station] ?? null;
@@ -2135,6 +2247,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						))}
 						{/* `pe-act`, not `pe-view`: the camera guards count the view segments and assert
 						    there are exactly three of them. */}
+						{!daily && !lv.active && mpPhase === 'off' && (
+							<button className={`pe-act ${groundOpen ? 'on' : ''}`} aria-pressed={groundOpen}
+								onClick={() => setGroundOpen((v) => !v)}
+								aria-label="Choisir le terrain" title="Choisir le terrain">🏟</button>
+						)}
 						{!daily && (
 							<button className={`pe-act ${dists ? 'on' : ''}`} aria-pressed={dists}
 								onClick={() => { distsRef.current = !dists; setDists(!dists); }}
@@ -2200,13 +2317,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div className="pe-overlay"><div className="pe-card">Ton appareil ne peut pas afficher le terrain 3D (WebGL indisponible).</div></div>
 				)}
 
-				{/* The loft gauge. The camera-drives-loft mechanic is invented here, so nothing on
-				    screen may leave it implicit — this gauge is the tutorial. */}
+				{/* The loft gauge — a readout of the board, which is where the angle is actually set.
+				    The launch-board mechanic is invented here, so nothing on screen may leave it
+				    implicit; this gauge and the graduations below are the tutorial. */}
 				{view === 'jeu' && (
 					<div className={`pe-loft${armed ? ' frozen' : ''}`}>
 						<span className="pe-loft-label">{LOFT_LABEL(loft)}</span>
-						<div className="pe-loft-bar"><div className="pe-loft-fill" style={{ height: `${Math.round(((loft - 0.17) / (0.92 - 0.17)) * 100)}%` }} /></div>
-						<span className="pe-loft-hint">{armed ? 'lob verrouillé' : 'oriente la vue'}</span>
+						<div className="pe-loft-bar"><div className="pe-loft-fill" style={{ height: `${Math.round(boardForElevation(loft) * 100)}%` }} /></div>
+						<span className="pe-loft-hint">{armed ? 'angle verrouillé' : 'pose le doigt plus haut'}</span>
 					</div>
 				)}
 
@@ -2237,16 +2355,31 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{/* The arm. Purely a drawing: the hit test lives in aimStart, so there is exactly one
-				    way into a throw and this cannot swallow a camera drag. It pulses until the first
-				    contact of the session — the whole complaint was that nobody found it. */}
+				{/* The launch board. Purely a drawing: the hit test lives in aimStart, so there is
+				    exactly one way into a throw and this cannot swallow a camera drag. It pulses until
+				    the first contact of the session — the whole complaint was that nobody found it. */}
 				<div className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}`} aria-hidden="true">
 					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
+					{/* The graduations. Where the finger lands decides the angle, and a board with no
+					    marks on it would make that a secret. */}
+					{armLive && view === 'jeu' && !jackPhase && (
+						<div className="pe-board-marks">
+							{BOARD_MARKS.map((mk) => (
+								<span
+									key={mk.label}
+									className={`pe-board-mark${mk.label === boardBand ? ' on' : ''}`}
+									style={{ bottom: `calc(${BOARD_PAD_PX}px + ${mk.t} * (100% - ${BOARD_PAD_PX * 2}px))` }}
+								>
+									{mk.label}
+								</span>
+							))}
+						</div>
+					)}
 					<span className="pe-arm-label">
 						{jackPhase ? '🎯 Vise sur le terrain, puis valide'
 							: view !== 'jeu' ? '👁 Touche ici pour revenir en vue Jeu'
 							: power > 0 ? '◀ ▶ oriente le tir · lâche pour lancer'
-							: '▲ Glisse vers le haut depuis ici pour lancer'}
+							: '▲ Pose le doigt à la hauteur de l’angle, puis glisse'}
 					</span>
 				</div>
 
@@ -2325,6 +2458,42 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
+				{/* The ground picker, free play only. Every row re-deals, so the change is felt at
+				    once instead of waiting for a partie nobody wants to finish first. */}
+				{groundOpen && (
+					<div className="pe-overlay">
+						<div className="pe-card pe-ground">
+							<div className="pe-mp-title">Le terrain</div>
+							<div className="pe-ground-row">
+								<span className="pe-ground-lab">Surface</span>
+								<div className="pe-ground-opts">
+									<button className={`pe-pill ${ground.surface === 'auto' ? 'active' : ''}`} onClick={() => chooseGround({ surface: 'auto' })}>Au hasard</button>
+									{SURFACE_IDS.map((s) => (
+										<button key={s} className={`pe-pill ${ground.surface === s ? 'active' : ''}`}
+											title={SURFACE_HINT[s]} onClick={() => chooseGround({ surface: s })}>{SURFACES[s].label}</button>
+									))}
+								</div>
+							</div>
+							<div className="pe-ground-row">
+								<span className="pe-ground-lab">Relief</span>
+								<div className="pe-ground-opts">
+									<button className={`pe-pill ${ground.relief === 'auto' ? 'active' : ''}`} onClick={() => chooseGround({ relief: 'auto' })}>Au hasard</button>
+									{RELIEF_ORDER.map((r) => (
+										<button key={r} className={`pe-pill ${ground.relief === r ? 'active' : ''}`}
+											title={RELIEFS[r].hint} onClick={() => chooseGround({ relief: r })}>{RELIEFS[r].label}</button>
+									))}
+								</div>
+							</div>
+							<span className="pe-ground-hint">
+								{ground.surface === 'auto' ? 'Surface suivant la difficulté' : SURFACE_HINT[ground.surface]}
+								{' · '}
+								{ground.relief === 'auto' ? 'relief suivant la difficulté' : RELIEFS[ground.relief].hint}
+							</span>
+							<button className="pe-replay" onClick={() => setGroundOpen(false)}>Jouer</button>
+						</div>
+					</div>
+				)}
+
 				{lv.active && lv.menu && (
 					<div className="pe-overlay pe-levels">
 						<LevelSelect progress={lv.progress} onPick={startLevel} />
@@ -2358,10 +2527,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			)}
 
 			<p className="pe-help">
-				Partout sur l’image, tu <strong>tournes la caméra librement</strong>. La <strong>bande du bas</strong>, c’est ton bras :
-				dès que tu y poses le doigt, la vue devient ta <strong>visée</strong> et se fige — latéral = direction,
-				vertical = hauteur du lob (caméra rasante = portée haute, caméra plongeante = roulette).
-				Glisse vers le haut pour la puissance, relâche pour lancer.
+				Partout sur l’image, tu <strong>tournes la caméra librement</strong> — elle ne touche jamais au tir.
+				La <strong>bande du bas</strong>, c’est ta <strong>planche d’envol</strong> : la hauteur à laquelle tu poses le
+				doigt choisit l’angle, du ras du sol (roulette) au plomb bien haut, et la graduation te dit où tu en es.
+				Glisse vers le haut pour la puissance, sur le côté pour corriger la direction, relâche pour lancer.
 				Le curseur 🔍 (ou la molette) t’<strong>avance sur les boules</strong> pour les voir de près, sans jamais toucher au tir.
 				Le <strong>bouchon se vise</strong> : vu de dessus, touche le terrain pour poser le cercle, puis lance-le dessus.
 				{daily
@@ -2404,16 +2573,39 @@ const CSS = `
 }
 .game-page.gf-full .pe-topbar > * { pointer-events: none; }
 .game-page.gf-full .pe-hud-top > * { pointer-events: auto; }
-/* Fullscreen means the pitch is the interface: the mode tabs only leave the game, and they
-   collide with the Quitter button. Same call as billard. */
-.game-page.gf-full .pe-modetoggle { display: none; }
+/* Billard hides the mode tabs in fullscreen, but billard is not opened in fullscreen: here the page
+   starts there, so hiding them would make Niveaux, Défi and En ligne unreachable without quitting
+   first — and nothing on screen would say so. Kept, as a 2x2 block over the sky. */
+.game-page.gf-full .pe-modetoggle { max-width: min(46%, 300px); }
+.game-page.gf-full .pe-modetoggle .dt-toggle { margin: 0; flex-wrap: wrap; border-radius: 16px; padding: 3px; gap: 3px; }
+.game-page.gf-full .pe-modetoggle .dt-seg { flex: 1 1 calc(50% - 3px); font-size: 12px; padding: 6px 4px; }
+/* Here the tabs sit on the sky, not on the page background, so they wear the HUD's own skin — the
+   same dark glass as .pe-stat — instead of a white slab that reads as a hole cut in the scene. */
+.game-page.gf-full .pe-modetoggle .dt-toggle { background: rgba(28,20,12,0.62); border-color: rgba(255,255,255,0.16); box-shadow: none; backdrop-filter: blur(4px); }
+.game-page.gf-full .pe-modetoggle .dt-seg:not(.active) { color: #e6dbcd; }
 .game-page.gf-full .pe-board { order: -1; margin-top: 0; }
+/* The Quitter button is fixed to the top-right corner at the top of the z stack, so anything under
+   it is unreadable AND untappable. Past 680px — the 460px board plus a button's width each side —
+   the centred board never reaches it; below that it spans the screen, so it yields the corner.
+   The width is measured by GameFullscreen; 0 if we are not the ones in fullscreen. */
+@media (max-width: 680px) {
+  .game-page.gf-full .pe-board {
+    max-width: calc(100% - var(--gf-exit-w, 0px) - 8px);
+    margin-right: calc(var(--gf-exit-w, 0px) + 8px);
+  }
+}
 /* Only pe-hud-top children get their pointer events back above, so the views row needs its own
    rule — without it the segments are dead in fullscreen, on the platform that needs them most. */
 .game-page.gf-full .pe-views { pointer-events: auto; }
+/* Clears the launch board instead of sitting in the bottom corner. That corner IS the board now, and
+   the board is the only way to throw, so a button parked there is a dead patch of the one surface the
+   player has to press — measured at 176x96 px on a 390 px phone, the right 45% of it. In fullscreen
+   the stage is the viewport, so this 30vh is the same pixels as the board's own 30%; the two copies
+   are kept honest by the actions-over-board check in scripts/snap-petanque-phone.mjs. */
 .game-page.gf-full .pe-hud-actions {
   position: fixed; z-index: 4; max-width: 45vw;
-  right: max(8px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + clamp(110px, 30vh, 200px) + 8px);
 }
 .game-page.gf-full .pe-stat { font-size: 12px; padding: 4px 10px; }
 .game-page.gf-full .pe-act, .game-page.gf-full .pe-pill { font-size: 12px; padding: 4px 10px; }
@@ -2422,7 +2614,6 @@ const CSS = `
 .pe-hud-top { width: 100%; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; pointer-events: none; }
 .pe-hud-top > * { pointer-events: auto; }
 .pe-hud-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-/* Niveaux / Défi / Libre — kept out of fullscreen, so windowed is the only place modes are reachable. */
 .pe-modetoggle { display: block; }
 .pe-grades { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
 .pe-grade { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: rgba(255,255,255,0.12); color: #f4ece2; }
@@ -2464,13 +2655,13 @@ const CSS = `
 @media (max-width: 420px) { .pe-view-txt { display: none; } }
 .pe-tag { background: rgba(28,20,12,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; text-align: center; max-width: 96%; }
 
-/* Vertical gauge on the left edge: it is the only thing telling the player the camera is a control. */
+/* Vertical gauge on the left edge: the angle the board is currently offering, named. */
 .pe-loft { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 5px; pointer-events: none; }
 .pe-loft-label { background: rgba(28,20,12,0.62); color: #ffe8b0; font-weight: 800; font-size: 11.5px; padding: 3px 9px; border-radius: 999px; backdrop-filter: blur(4px); white-space: nowrap; }
 .pe-loft-bar { width: 9px; height: 96px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
 .pe-loft-fill { width: 100%; background: linear-gradient(180deg, #ffd166, #f4801f); transition: height 0.08s linear; }
 .pe-loft-hint { color: #f0e6da; font-size: 10px; opacity: 0.8; text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
-/* Held strip: the loft stopped following the view. A solid ring says "this is the value that leaves". */
+/* Held board: the angle is committed. A solid ring says "this is the value that leaves". */
 .pe-loft.frozen .pe-loft-bar { border-color: #ffd166; border-width: 2.5px; box-shadow: 0 0 10px rgba(255,209,102,0.55); }
 .pe-loft.frozen .pe-loft-label { background: rgba(255,209,102,0.92); color: #2b1d0c; }
 .pe-loft.frozen .pe-loft-hint { color: #ffd166; opacity: 1; }
@@ -2493,7 +2684,7 @@ const CSS = `
 /* The strip has to READ as a control. A 30 %-opacity dotted rule did not: players never found it.
    Solid accent edge, a dashed echo under it, and a darker floor. ARM_H owns the height — four
    Playwright guards slide from height * 0.8 and land inside it. */
-.pe-arm { position: absolute; left: 0; right: 0; bottom: 0; height: clamp(90px, 25%, 170px); z-index: 2; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border-top: 2px solid rgba(255,209,102,0.85); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.46) 100%); }
+.pe-arm { position: absolute; left: 0; right: 0; bottom: 0; height: clamp(110px, 30%, 200px); z-index: 2; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border-top: 2px solid rgba(255,209,102,0.85); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.46) 100%); }
 .pe-arm::before { content: ''; position: absolute; left: 0; right: 0; top: 4px; border-top: 1.5px dashed rgba(255,209,102,0.45); }
 .pe-arm.off { border-top-color: rgba(255,255,255,0.3); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.24) 100%); }
 .pe-arm.off::before { border-top-color: rgba(255,255,255,0.16); }
@@ -2503,6 +2694,16 @@ const CSS = `
 .pe-arm-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(140,233,154,0.10), rgba(255,107,107,0.30)); }
 .pe-arm-label { position: relative; color: #ffe8b0; font-size: 11px; font-weight: 800; opacity: 0.92; text-shadow: 0 1px 3px rgba(0,0,0,0.85); margin-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 34px); }
 .pe-arm.off .pe-arm-label { color: #f0e6da; opacity: 0.75; font-weight: 700; }
+
+/* The graduations of the launch board. Centred, because that is where the thumb starts looking,
+   and thin enough that the pitch stays readable through them. */
+.pe-board-marks { position: absolute; left: 50%; transform: translateX(-50%); top: 0; bottom: 0; width: min(300px, 78%); pointer-events: none; }
+.pe-board-mark { position: absolute; left: 0; right: 0; text-align: center; color: #f0e6da; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.62; text-shadow: 0 1px 3px rgba(0,0,0,0.85); transform: translateY(50%); }
+.pe-board-mark::before, .pe-board-mark::after { content: ''; position: absolute; top: 50%; width: 26%; border-top: 1.5px solid rgba(255,255,255,0.3); }
+.pe-board-mark::before { left: 0; }
+.pe-board-mark::after { right: 0; }
+.pe-board-mark.on { color: #ffd166; opacity: 1; font-size: 11px; }
+.pe-board-mark.on::before, .pe-board-mark.on::after { border-top-color: rgba(255,209,102,0.85); }
 
 .pe-power { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(12px, env(safe-area-inset-bottom)); width: min(58%, 280px); height: 9px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); overflow: hidden; z-index: 3; pointer-events: none; }
 .pe-power-fill { height: 100%; background: linear-gradient(90deg, #8ce99a, #ffd166 55%, #ff6b6b); }
@@ -2526,13 +2727,33 @@ const CSS = `
 .pe-card .pe-table li { background: color-mix(in srgb, var(--gray-0) 8%, transparent); }
 .pe-card .pe-table li.won { background: color-mix(in srgb, var(--pe-accent) 26%, transparent); }
 
-.pe-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; }
+/* The cards live inside pe-playwrap, which is 16/10 and clips. On a phone that is ~240 px of room
+   for a lobby that is 300 px tall, and the Rejoindre row fell off the bottom with nothing to say
+   so. The overlay scrolls and the card is allowed to fill it. */
+.pe-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; padding: 8px; overflow: auto; }
 .pe-levels { align-items: flex-start; overflow-y: auto; padding: 16px 12px; background: color-mix(in srgb, var(--gray-999) 82%, transparent); }
-.pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; margin: auto; }
 .pe-card strong { color: var(--pe-accent); font-size: 22px; font-variant-numeric: tabular-nums; }
 .pe-replay { border: none; background: var(--pe-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }
 
-.pe-mp { min-width: 240px; }
+.pe-mp { min-width: min(240px, 100%); }
+/* A short landing area (a phone in windowed mode is ~240 px of pitch) has to give the lobby every
+   pixel it can before the overlay starts scrolling. */
+@media (max-height: 460px), (max-width: 26em) {
+  .pe-card { padding: 12px 16px; gap: 7px; font-size: 15px; }
+  .pe-replay { padding: 8px 18px; font-size: 14px; }
+  .pe-mp-title { font-size: 15.5px; }
+}
+.pe-ground { min-width: min(310px, 100%); }
+.pe-ground-row { display: flex; align-items: baseline; gap: 8px; width: 100%; flex-wrap: wrap; }
+.pe-ground-lab { font-size: 11.5px; font-weight: 700; color: var(--gray-300); text-transform: uppercase; letter-spacing: 0.04em; }
+.pe-ground-opts { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; justify-content: center; }
+/* The pills are drawn for the HUD, where the backdrop is always dark earth; on the card they sit
+   on --gray-999, which is white in the light theme. */
+.pe-ground .pe-pill { background: color-mix(in srgb, var(--gray-0) 8%, transparent); color: var(--gray-100); border-color: var(--gray-700); font-size: 12.5px; padding: 5px 10px; }
+.pe-ground .pe-pill.active { background: var(--pe-accent); color: var(--accent-text-over); border-color: var(--pe-accent); }
+.pe-ground-hint { font-size: 12px; color: var(--gray-300); }
+
 .pe-mp-title { font-family: var(--font-brand); font-weight: 700; font-size: 17px; }
 .pe-mp-join { display: flex; gap: 6px; width: 100%; }
 .pe-mp-join input { flex: 1; min-width: 0; text-align: center; letter-spacing: 3px; text-transform: uppercase; font: inherit; font-weight: 700; border-radius: 999px; border: 1.5px solid var(--gray-700); background: var(--gray-999); color: var(--gray-0); padding: 8px 10px; }

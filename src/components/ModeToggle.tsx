@@ -121,5 +121,11 @@ const CSS = `
   color: var(--accent-text-over);
 }
 .dt-seg:not(.active):hover { color: var(--gray-0); }
+/* A flex item defaults to min-width:auto, so four nowrap labels cannot shrink below their own text
+   and the bar simply ran off the side of the phone. Two rows of two instead of a clipped pill. */
+@media (max-width: 26em) {
+  .dt-toggle.four { flex-wrap: wrap; border-radius: 20px; }
+  .dt-toggle.four .dt-seg { flex: 1 1 calc(50% - 4px); }
+}
 @media (prefers-reduced-motion: reduce) { .dt-seg { transition: none; } }
 `;
