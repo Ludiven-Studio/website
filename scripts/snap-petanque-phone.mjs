@@ -46,7 +46,7 @@ const PARTS = {
 };
 
 const audit = async (tag) => {
-	const { boxes, nested, strays } = await page.evaluate((sel) => {
+	const { boxes, nested, strays, inked } = await page.evaluate((sel) => {
 		const els = {}, boxes = {};
 		for (const [k, s] of Object.entries(sel)) {
 			const e = document.querySelector(s);
@@ -88,7 +88,34 @@ const audit = async (tag) => {
 				strays.push(`${id} [${(top.getAttribute('aria-label') || top.textContent || '').trim().slice(0, 24)}] steals ${Math.round(x)},${Math.round(y)}`);
 			}
 		}
-		return { boxes, nested, strays };
+		/* The pairs above are about who steals a PRESS. Nothing there catches a label printed on top
+		   of another label, which is what the bottom band actually looked like: four things stacked
+		   in 80 px. Measured on the text's own range rect and not on the element box — a graduation
+		   is full-width with a word in the middle, so its box collides with everything and its ink
+		   with almost nothing. That distinction is the whole reason the rectangle pass cried wolf. */
+		const INK = ['.pe-arm-label', '.pe-hint', '.pe-board-mark', '.pe-loft-label', '.pe-loft-hint',
+			'.pe-tag', '.pe-stats', '.gf-exit', '.pe-act', '.lbc-pill', '.pe-view', '.pe-zoom-label',
+			'.pe-power', '.pe-placeok'];
+		const ink = [];
+		for (const s of INK) for (const e of document.querySelectorAll(s)) {
+			const cs = getComputedStyle(e);
+			if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) < 0.05) continue;
+			const txt = (e.textContent || '').trim();
+			const rg = document.createRange();
+			rg.selectNodeContents(e);
+			const r = txt ? rg.getBoundingClientRect() : e.getBoundingClientRect();
+			if (r.width < 1 || r.height < 1) continue;
+			ink.push({ k: txt ? `${s}[${txt.slice(0, 14)}]` : s, e, x: r.x, y: r.y, w: r.width, h: r.height });
+		}
+		const inked = [];
+		for (let i = 0; i < ink.length; i++) for (let j = i + 1; j < ink.length; j++) {
+			const a = ink[i], b = ink[j];
+			if (a.e.contains(b.e) || b.e.contains(a.e)) continue;
+			const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+			const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+			if (ox > 2 && oy > 2) inked.push(`${a.k} over ${b.k} — ${Math.round(ox)}x${Math.round(oy)}px`);
+		}
+		return { boxes, nested, strays, inked };
 	}, PARTS);
 	const keys = Object.keys(boxes);
 	const blocking = [], visual = [];
@@ -114,8 +141,16 @@ const audit = async (tag) => {
 		console.log(`    ${k.padEnd(9)} x ${Math.round(b.x)}..${Math.round(b.x + b.w)}  y ${Math.round(b.y)}..${Math.round(b.y + b.h)}`);
 	}
 	for (const s of strays) console.log(`    ON THE BOARD  ${s}`);
+	for (const s of inked) console.log(`    INK ON INK    ${s}`);
 	await page.screenshot({ path: resolve(`${OUT}/phone-${tag}.png`) });
-	return [...blocking.map((h) => `${tag}: ${h}`), ...strays.map((s) => `${tag}: pressable on the board — ${s}`)];
+	/* The whole-page shot is 844 px tall and gets looked at as a thumbnail, which is where a 3 px
+	   collision hides. The band is where the text piles up, so it also comes out at its own size. */
+	await page.screenshot({ path: resolve(`${OUT}/band-${tag}.png`), clip: { x: 0, y: 844 - 250, width: 390, height: 250 } });
+	return [
+		...blocking.map((h) => `${tag}: ${h}`),
+		...strays.map((s) => `${tag}: pressable on the board — ${s}`),
+		...inked.map((s) => `${tag}: unreadable — ${s}`),
+	];
 };
 
 const state = () => page.evaluate(() => window.__petanque());

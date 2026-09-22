@@ -2559,7 +2559,11 @@ const CSS = `
   position: relative;
 }
 
-.pe-playwrap { width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
+/* The height of the launch board, named once. Everything that must sit CLEAR of the board keys off
+   it, because anything keyed off the viewport bottom instead walks into the graduations as soon as
+   a safe-area inset appears — a percentage in a bottom offset resolves against this same box, so
+   the two uses give the same pixels. */
+.pe-playwrap { --pe-arm-h: clamp(110px, 30%, 200px); width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
 .pe-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; background: #7fb4dd; }
 
 /* Fullscreen means the PITCH is fullscreen: the HUD floats over it and costs no pixel of ground. */
@@ -2601,11 +2605,12 @@ const CSS = `
    the board is the only way to throw, so a button parked there is a dead patch of the one surface the
    player has to press — measured at 176x96 px on a 390 px phone, the right 45% of it. In fullscreen
    the stage is the viewport, so this 30vh is the same pixels as the board's own 30%; the two copies
-   are kept honest by the actions-over-board check in scripts/snap-petanque-phone.mjs. */
+   are kept honest by the actions-over-board check in scripts/snap-petanque-phone.mjs. The 40px is the
+   seam stack — power bar then state line — that now lives just above the board. */
 .game-page.gf-full .pe-hud-actions {
   position: fixed; z-index: 4; max-width: 45vw;
   right: max(8px, env(safe-area-inset-right));
-  bottom: calc(max(10px, env(safe-area-inset-bottom)) + clamp(110px, 30vh, 200px) + 8px);
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + clamp(110px, 30vh, 200px) + 40px);
 }
 .game-page.gf-full .pe-stat { font-size: 12px; padding: 4px 10px; }
 .game-page.gf-full .pe-act, .game-page.gf-full .pe-pill { font-size: 12px; padding: 4px 10px; }
@@ -2684,7 +2689,7 @@ const CSS = `
 /* The strip has to READ as a control. A 30 %-opacity dotted rule did not: players never found it.
    Solid accent edge, a dashed echo under it, and a darker floor. ARM_H owns the height — four
    Playwright guards slide from height * 0.8 and land inside it. */
-.pe-arm { position: absolute; left: 0; right: 0; bottom: 0; height: clamp(110px, 30%, 200px); z-index: 2; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border-top: 2px solid rgba(255,209,102,0.85); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.46) 100%); }
+.pe-arm { position: absolute; left: 0; right: 0; bottom: 0; height: var(--pe-arm-h); z-index: 2; pointer-events: none; border-top: 2px solid rgba(255,209,102,0.85); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.46) 100%); }
 .pe-arm::before { content: ''; position: absolute; left: 0; right: 0; top: 4px; border-top: 1.5px dashed rgba(255,209,102,0.45); }
 .pe-arm.off { border-top-color: rgba(255,255,255,0.3); background: linear-gradient(180deg, rgba(20,14,9,0) 0%, rgba(20,14,9,0.24) 100%); }
 .pe-arm.off::before { border-top-color: rgba(255,255,255,0.16); }
@@ -2692,7 +2697,11 @@ const CSS = `
 @keyframes pe-arm-call { 0%, 100% { border-top-color: rgba(255,209,102,0.85); } 50% { border-top-color: rgba(255,209,102,0.25); } }
 @media (prefers-reduced-motion: reduce) { .pe-arm.call { animation: none; } }
 .pe-arm-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(140,233,154,0.10), rgba(255,107,107,0.30)); }
-.pe-arm-label { position: relative; color: #ffe8b0; font-size: 11px; font-weight: 800; opacity: 0.92; text-shadow: 0 1px 3px rgba(0,0,0,0.85); margin-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 34px); }
+/* Parked in the gap between the two lowest graduations, and measured from the board rather than from
+   the screen: keyed off env(safe-area-inset-bottom) it slid up into "Demi" on any phone with a home
+   indicator. A short board has no such gap, so below that height the caption steps aside entirely. */
+.pe-arm-label { position: absolute; left: 0; right: 0; bottom: 36px; text-align: center; color: #ffe8b0; font-size: 11px; font-weight: 800; opacity: 0.92; text-shadow: 0 1px 3px rgba(0,0,0,0.85); }
+@media (max-height: 560px) { .pe-arm-label { display: none; } }
 .pe-arm.off .pe-arm-label { color: #f0e6da; opacity: 0.75; font-weight: 700; }
 
 /* The graduations of the launch board. Centred, because that is where the thumb starts looking,
@@ -2705,12 +2714,14 @@ const CSS = `
 .pe-board-mark.on { color: #ffd166; opacity: 1; font-size: 11px; }
 .pe-board-mark.on::before, .pe-board-mark.on::after { border-top-color: rgba(255,209,102,0.85); }
 
-.pe-power { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(12px, env(safe-area-inset-bottom)); width: min(58%, 280px); height: 9px; border-radius: 999px; background: rgba(28,20,12,0.5); border: 1.5px solid rgba(255,255,255,0.28); overflow: hidden; z-index: 3; pointer-events: none; }
+/* Rides the seam instead of standing in the middle of the bottom band, where it printed straight
+   over the "Roulette" graduation — and where the thumb that sets it covers it anyway. */
+.pe-power { position: absolute; left: 0; right: 0; bottom: calc(var(--pe-arm-h) + 3px); height: 4px; background: rgba(28,20,12,0.45); overflow: hidden; z-index: 3; pointer-events: none; }
 .pe-power-fill { height: 100%; background: linear-gradient(90deg, #8ce99a, #ffd166 55%, #ff6b6b); }
 
-.pe-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(12px, env(safe-area-inset-bottom)) + 18px); z-index: 3; background: rgba(28,20,12,0.6); color: #f4ece2; font-weight: 600; font-size: 12.5px; padding: 4px 13px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+.pe-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--pe-arm-h) + 11px); z-index: 3;background: rgba(28,20,12,0.6); color: #f4ece2; font-weight: 600; font-size: 12.5px; padding: 4px 13px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
 
-.pe-placeok { position: absolute; left: 50%; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 44px); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); }
+.pe-placeok { position: absolute; left: 50%; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); }
 .pe-placeok:hover { filter: brightness(1.08); }
 
 .pe-endcard { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); z-index: 5; padding: 12px 26px; border-radius: 16px; text-align: center; font-weight: 800; font-size: 17px; color: #fff; background: linear-gradient(180deg, rgba(34,24,16,0.94), rgba(22,15,10,0.92)); border: 2px solid rgba(255,255,255,0.18); box-shadow: var(--shadow-lg); cursor: pointer; }
