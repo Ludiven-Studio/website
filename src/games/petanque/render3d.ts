@@ -211,6 +211,68 @@ export function sunFor(seed: number): SunSetup {
 const DECOR_NEAR = 7.0; // m from the centre — nothing stands closer, the eye walks 9 m up the lane
 const DECOR_FAR = 23.0; // m — inside the apron, so nothing floats off its edge
 const LANE_KEEP = 4.6; // m either side of the lane axis: the far end has to stay readable
+const HEDGE_R = SURROUND - 1.7; // m — the hedge that closes the ground
+const RIM_TREES = 56;
+const BACKDROP_R = 70; // m — the painted horizon: hills, a village, a wood line
+const BACKDROP_H = 18; // m, from 2 m under the apron
+
+/**
+ * The horizon, painted on the inside of a cylinder: far hills, a village with a steeple, a wood line
+ * in front. Hazy colours so it reads as distance. Unlit, so it is dimmed and warmed by hand with the
+ * sun: at dusk a full-bright backdrop would glow against a dark pitch.
+ */
+function buildBackdrop(seed: number, y: number, sun: SunSetup, keep: <T extends { dispose(): void }>(o: T) => T): THREE.Mesh {
+	const W = 2048, H = 256;
+	const cv = document.createElement('canvas');
+	cv.width = W; cv.height = H;
+	const g = cv.getContext('2d');
+	if (!g) throw new Error('2d context');
+	const row = (m: number): number => H - ((m + 2) / BACKDROP_H) * H; // metres over the apron -> canvas row
+	const ridge = (base: number, amp: number, freqs: number[], salt: number, color: string): void => {
+		g.fillStyle = color;
+		g.beginPath();
+		g.moveTo(0, H);
+		for (let x = 0; x <= W; x += 8) {
+			let h = base;
+			// Whole cycles across the width, so the seam where the texture repeats does not show.
+			freqs.forEach((f, i) => { h += amp * Math.sin((x / W) * Math.PI * 2 * f + hashN(i, seed ^ salt) * 6.28) / (i + 1); });
+			g.lineTo(x, row(h));
+		}
+		g.lineTo(W, H);
+		g.closePath();
+		g.fill();
+	};
+	ridge(6.5, 2.2, [2, 5, 11], 0x1a2b, '#a9bbbf'); // far hills
+	// The village: a few clusters of houses, one steeple.
+	g.fillStyle = '#8fa1a6';
+	for (let c = 0; c < 3; c++) {
+		const cx = (c + 0.2 + hashN(c, seed ^ 0x3d71) * 0.6) / 3 * W;
+		for (let k = 0; k < 7; k++) {
+			const w = 22 + hashN(c * 7 + k, seed ^ 0x6b1) * 26, x = cx + (k - 3) * 30 + hashN(c * 7 + k, seed ^ 0x1c9) * 12;
+			const wall = row(3 + hashN(c * 7 + k, seed ^ 0x77a) * 2.5), roof = wall - 10 - w * 0.25;
+			g.fillRect(x, wall, w, H - wall);
+			g.beginPath(); g.moveTo(x - 2, wall); g.lineTo(x + w / 2, roof); g.lineTo(x + w + 2, wall); g.fill();
+			if (c === 0 && k === 3) { // the steeple
+				g.fillRect(x + w / 2 - 6, row(9), 12, H - row(9));
+				g.beginPath(); g.moveTo(x + w / 2 - 8, row(9)); g.lineTo(x + w / 2, row(13.5)); g.lineTo(x + w / 2 + 8, row(9)); g.fill();
+			}
+		}
+	}
+	ridge(3.4, 1.3, [7, 17, 31], 0x4e09, '#6f8a63'); // the wood line
+	ridge(1.2, 0.4, [23, 41], 0x2d55, '#5a7550'); // and its dark foot
+
+	const tex = keep(new THREE.CanvasTexture(cv));
+	tex.wrapS = THREE.RepeatWrapping;
+	tex.repeat.x = 3; // ~147 m per repeat, so a metre is as wide as it is tall
+	tex.colorSpace = THREE.SRGBColorSpace;
+	const light = 0.55 + 0.45 * Math.min(1, sun.el / (30 * D2R));
+	const tint = new THREE.Color(1, 1, 1).lerp(sun.color, 0.35).multiplyScalar(light);
+	const mat = keep(new THREE.MeshBasicMaterial({ map: tex, color: tint, side: THREE.BackSide, alphaTest: 0.5, fog: false }));
+	const geo = keep(new THREE.CylinderGeometry(BACKDROP_R, BACKDROP_R, BACKDROP_H, 96, 1, true));
+	const mesh = new THREE.Mesh(geo, mat);
+	mesh.position.y = y - 2 + BACKDROP_H / 2;
+	return mesh;
+}
 
 /**
  * Trees, bushes and two benches around the ground. Purely cosmetic and placed off `t.seed`, so a
@@ -239,6 +301,18 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 
 	const trees = spots.filter((_, i) => i % 3 === 0);
 	const bushes = spots.filter((_, i) => i % 3 !== 0);
+	/* The rim: a ring of tall trees just behind the hedge, so the apron's edge never meets the sky.
+	   `r` over 1 makes them taller than the scattered ones. No painted shadow: they stand on the rim
+	   and a blot would hang past it. */
+	const rim: { x: number; z: number; r: number }[] = [];
+	for (let k = 0; k < RIM_TREES; k++) {
+		// Every third slot left empty on average, so the ring reads as trees and not as a wall.
+		if (hashN(k, seed ^ 0x0d4e) < 0.3) continue;
+		const a = ((k + hashN(k, seed ^ 0x3c11) * 0.8) / RIM_TREES) * Math.PI * 2;
+		const d = SURROUND - 1.2 + hashN(k, seed ^ 0x6e2d) * 1.0;
+		rim.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, r: 0.7 + hashN(k, seed ^ 0x1f5b) * 1.8 });
+	}
+	const forest = trees.concat(rim);
 
 	const m = new THREE.Matrix4();
 	const q = new THREE.Quaternion();
@@ -253,13 +327,13 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 		keep({ dispose: () => inst.dispose() });
 	};
 
-	if (trees.length) {
+	if (forest.length) {
 		const trunkGeo = keep(new THREE.CylinderGeometry(0.13, 0.19, 1, 6));
 		trunkGeo.translate(0, 0.5, 0); // pivot at the foot, so one scale sets the height
 		const trunkMat = keep(new THREE.MeshStandardMaterial({ color: 0x6d5741, roughness: 0.95 }));
-		const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, trees.length);
+		const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, forest.length);
 		fill(trunks, (i) => {
-			const t0 = trees[i], h = 2.4 + t0.r * 2.2;
+			const t0 = forest[i], h = 2.4 + t0.r * 2.2;
 			return [new THREE.Vector3(t0.x, y, t0.z), new THREE.Vector3(1, h, 1)];
 		});
 
@@ -267,9 +341,9 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 		// each for a silhouette nobody can tell apart.
 		const leafGeo = keep(new THREE.IcosahedronGeometry(1, 1));
 		const leafMat = keep(new THREE.MeshStandardMaterial({ color: 0x4d7a3c, roughness: 1, flatShading: true }));
-		const leaves = new THREE.InstancedMesh(leafGeo, leafMat, trees.length * 2);
+		const leaves = new THREE.InstancedMesh(leafGeo, leafMat, forest.length * 2);
 		fill(leaves, (i) => {
-			const t0 = trees[i >> 1], h = 2.4 + t0.r * 2.2, up = (i & 1) === 1;
+			const t0 = forest[i >> 1], h = 2.4 + t0.r * 2.2, up = (i & 1) === 1;
 			const rad = up ? 0.85 + t0.r * 0.5 : 1.15 + t0.r * 0.6;
 			return [
 				new THREE.Vector3(t0.x + (up ? 0.3 : -0.2), y + h + (up ? 0.85 : 0.15), t0.z + (up ? -0.25 : 0.2)),
@@ -313,6 +387,34 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 		blots.push({ x: bx, z: s * 2.2, h: 0.45, r: 0.75 });
 	}
 
+	// A continuous hedge along the rim, in front of the rim trees: it hides their trunks and the
+	// apron's edge, the line that used to meet the sky.
+	{
+		const n = Math.ceil((2 * Math.PI * HEDGE_R) / 0.9);
+		const geo = keep(new THREE.IcosahedronGeometry(1, 1));
+		const mat = keep(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }));
+		const inst = new THREE.InstancedMesh(geo, mat, n);
+		const c = new THREE.Color();
+		for (let i = 0; i < n; i++) inst.setColorAt(i, c.setHex(0x3f6a33).lerp(new THREE.Color(0x587d3b), hashN(i, seed ^ 0x4a17)));
+		fill(inst, (i) => {
+			const a = (i / n) * Math.PI * 2, d = HEDGE_R + (hashN(i, seed ^ 0x2219) - 0.5) * 0.3;
+			// A unit sphere: `h` is a half-height, so the hedge stands 1.1-1.5 m, half of it sunk.
+			const rad = 0.8 + hashN(i, seed ^ 0x5d03) * 0.3, h = 0.75 + hashN(i, seed ^ 0x0b8f) * 0.2;
+			return [new THREE.Vector3(Math.cos(a) * d, y + h * 0.6, Math.sin(a) * d), new THREE.Vector3(rad, h, rad)];
+		});
+	}
+
+	// Ground out to the backdrop, so no view can look between the apron and the painted horizon.
+	const far = new THREE.Mesh(
+		keep(new THREE.RingGeometry(SURROUND - 0.5, BACKDROP_R + 2, 48)),
+		keep(new THREE.MeshStandardMaterial({ color: 0x5f6d3c, roughness: 1 })),
+	);
+	far.rotation.x = -Math.PI / 2;
+	far.position.y = y - 0.03;
+	grp.add(far);
+
+	grp.add(buildBackdrop(seed, y, sun, keep));
+
 	if (blots.length) {
 		const geo = keep(new THREE.PlaneGeometry(2, 2));
 		geo.rotateX(-Math.PI / 2); // local +x runs along world +x, local +y along world +z
@@ -348,6 +450,44 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 		}
 		inst.instanceMatrix.needsUpdate = true;
 	}
+}
+
+/**
+ * One plank as a strip: its inner edge runs from (x0,y0) to (x1,y1) in engine space, it is BORDER_W
+ * thick away from the pitch centre, its top follows `topAt` along the inner edge and its foot is flat.
+ */
+function plankStrip(x0: number, y0: number, x1: number, y1: number, topAt: (x: number, y: number) => number, foot: number): THREE.BufferGeometry {
+	const len = Math.hypot(x1 - x0, y1 - y0);
+	const n = Math.max(2, Math.ceil(len / 0.5)) + 1;
+	const ux = (x1 - x0) / len, uy = (y1 - y0) / len;
+	// Outward normal: of the two perpendiculars, the one pointing away from the pitch centre.
+	let nx = -uy, ny = ux;
+	if (nx * ((x0 + x1) / 2 - PITCH_W / 2) + ny * ((y0 + y1) / 2 - PITCH_L / 2) < 0) { nx = -nx; ny = -ny; }
+	const sec: THREE.Vector3[][] = []; // per sample: inner foot, inner top, outer top, outer foot
+	for (let i = 0; i < n; i++) {
+		const ex = x0 + ux * (len * i / (n - 1)), ey = y0 + uy * (len * i / (n - 1));
+		const top = topAt(ex, ey);
+		const ox = ex + nx * BORDER_W, oy = ey + ny * BORDER_W;
+		sec.push([
+			new THREE.Vector3(wx(ex), foot, wz(ey)), new THREE.Vector3(wx(ex), top, wz(ey)),
+			new THREE.Vector3(wx(ox), top, wz(oy)), new THREE.Vector3(wx(ox), foot, wz(oy)),
+		]);
+	}
+	const p: number[] = [];
+	const quad = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3): void => {
+		for (const v of [a, b, c, a, c, d]) p.push(v.x, v.y, v.z);
+	};
+	for (let i = 0; i + 1 < n; i++) {
+		const [a0, a1, a2, a3] = sec[i], [b0, b1, b2, b3] = sec[i + 1];
+		quad(a0, b0, b1, a1); // inner face
+		quad(a1, b1, b2, a2); // top
+		quad(a2, b2, b3, a3); // outer face
+	}
+	for (const s of [sec[0], sec[n - 1]]) quad(s[0], s[1], s[2], s[3]); // end caps
+	const geo = new THREE.BufferGeometry();
+	geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+	geo.computeVertexNormals();
+	return geo;
 }
 
 /* ---------- the pitch ---------- */
@@ -413,22 +553,21 @@ export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
 
 	// Planks around the pitch — they frame it and, at a grazing camera, they are the reference
 	// line that makes the faux plat readable. Without them the relief reads as a rendering glitch.
-	const plankMat = keep(new THREE.MeshStandardMaterial({ color: 0x6b4b2e, roughness: 0.85 }));
-	// Sunk down to the apron for the same reason: a fixed bottom left the low end of the slope
-	// hovering, with daylight under the plank. The top stays put, only the buried part grows.
-	const deep = BORDER_H - low + 0.06;
-	const midY = deep / 2 - 0.03 - (deep - BORDER_H);
-	const longGeo = keep(new THREE.BoxGeometry(BORDER_W, deep, PITCH_L + BORDER_W * 2));
-	const shortGeo = keep(new THREE.BoxGeometry(PITCH_W + BORDER_W * 2, deep, BORDER_W));
-	for (const s of [-1, 1] as const) {
-		const a = new THREE.Mesh(longGeo, plankMat);
-		a.position.set(s * (PITCH_W / 2 + BORDER_W / 2), midY, 0);
-		a.castShadow = true; a.receiveShadow = true;
-		grp.add(a);
-		const b = new THREE.Mesh(shortGeo, plankMat);
-		b.position.set(0, midY, s * (PITCH_L / 2 + BORDER_W / 2));
-		b.castShadow = true; b.receiveShadow = true;
-		grp.add(b);
+	/* The top rides BORDER_H over the ground at the edge. A flat top at a fixed height sank under the
+	   high end: the faux plat alone lifts one end up to 22 cm. The bottom runs down to the apron, so
+	   the low end never hovers either. */
+	// Double-sided: the strips are built by hand and their winding is not worth auditing face by face.
+	const plankMat = keep(new THREE.MeshStandardMaterial({ color: 0x6b4b2e, roughness: 0.85, side: THREE.DoubleSide }));
+	const foot = apron.position.y - 0.02;
+	const topAt = (ex: number, ey: number): number => heightAt(t, ex, ey) + BORDER_H;
+	const planks: [number, number, number, number][] = [ // engine-space inner edge from -> to
+		[0, -BORDER_W, 0, PITCH_L + BORDER_W], [PITCH_W, -BORDER_W, PITCH_W, PITCH_L + BORDER_W],
+		[-BORDER_W, 0, PITCH_W + BORDER_W, 0], [-BORDER_W, PITCH_L, PITCH_W + BORDER_W, PITCH_L],
+	];
+	for (const [x0, y0, x1, y1] of planks) {
+		const mesh = new THREE.Mesh(keep(plankStrip(x0, y0, x1, y1, topAt, foot)), plankMat);
+		mesh.castShadow = true; mesh.receiveShadow = true;
+		grp.add(mesh);
 	}
 
 	// Pebbles: the ones you see are exactly the ones the engine can deflect a boule on.
