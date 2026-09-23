@@ -12,7 +12,7 @@ import { type Sim, type Boule, makeBoule, makeJack, place, throwVelocity, settle
 import { hashN } from './terrain';
 import { type Match13, type Side, other, MIN_JACK, MAX_JACK } from './rules13';
 
-export type Intent = 'point' | 'shoot';
+export type Intent = 'point' | 'shoot' | 'jack';
 
 export interface Throw {
 	intent: Intent;
@@ -35,6 +35,10 @@ const SPD_BEST = 0.008;
 const UNPOINTABLE = 0.22; // m — an opponent boule this close is easier to shoot than to out-point
 const COMFORT = 0.55; // m — beyond this, pointing is the obvious play
 const LANE_R = 0.13; // m — a boule this close to the path blocks it
+const JACK_SHOT_SKILL = 0.8; // shooting the jack out is a strong player's move: Difficile and up
+const JACK_ELEVS = [0.15, 0.25]; // low shots: a lob comes down on the jack and pins it
+const JACK_SPD_LO = 6, JACK_SPD_HI = 14, JACK_SPD_STEP = 0.5;
+const JACK_RUN = 3; // speeds in a row that must all kill it: ~1 m/s, a margin the AI's error fits in
 
 const norm = (skill: number): number => {
 	const k = (skill - MIN_SKILL) / (MAX_SKILL - MIN_SKILL);
@@ -147,14 +151,64 @@ function bests(bs: Boule[], jack: Boule): [number, number] {
 	return best;
 }
 
-/** Point or shoot. Shooting is for when out-pointing is unlikely, not for when it is merely hard. */
-export function decide(s: Sim, jack: Boule, state: Match13, side: Side, skill: number): Intent {
+type JackShot = { speed: number; elev: number };
+
+/**
+ * Shoot the jack out? A dead jack scores one point per boule still in hand for the only side that
+ * has any, so once the opponent has thrown everything it turns their point into ours. Worth it when
+ * it scores (a boule left after this one) and out-pointing looks hard, or when it voids an end the
+ * opponent was taking two or more from.
+ * The throw is found on the real engine: a sweep of low shots, keeping the middle of the longest run
+ * of speeds that all send the jack out. No such run, no shot — a lucky single speed is not a plan.
+ */
+function jackShot(s: Sim, jack: Boule, state: Match13, side: Side, best: [number, number]): JackShot | null {
+	const foe = other(side);
+	if (state.left[foe] > 0 || state.left[side] < 1) return null;
+	const gain = state.left[side] - 1;
+	const held = s.bs.filter((b) => b.live && b.side === foe && dist(b, jack) < best[side]).length;
+	const hard = best[foe] < UNPOINTABLE || held >= 2 || laneBlocked(s.bs, state.circle, jack);
+	if (gain === 0 ? held < 2 : gain === 1 && !hard) return null;
+
+	const from = state.circle;
+	const len = dist(from, jack) || 1;
+	const dirX = (jack.x - from.x) / len, dirY = (jack.y - from.y) / len;
+	let ji = s.bs.indexOf(jack);
+	if (ji < 0) ji = s.bs.findIndex((b) => b.side === -1);
+	let pick: JackShot | null = null, bestRun = JACK_RUN - 1;
+	for (const elev of JACK_ELEVS) {
+		let run = 0;
+		for (let sp = JACK_SPD_LO; sp <= JACK_SPD_HI + 1e-9; sp += JACK_SPD_STEP) {
+			const c = cloneSim(s);
+			c.bs.push(launch(c, from, side, throwVelocity(dirX, dirY, sp, elev)));
+			settle(c, undefined, 30);
+			const out = ji >= 0 && !c.bs[ji].live;
+			run = out ? run + 1 : 0;
+			if (run > bestRun) { bestRun = run; pick = { speed: sp - ((run - 1) * JACK_SPD_STEP) / 2, elev }; }
+		}
+	}
+	return pick;
+}
+
+/** Point, shoot a boule, or shoot the jack — and for the jack, the throw that does it. */
+function choose(s: Sim, jack: Boule, state: Match13, side: Side, skill: number): { intent: Intent; shot?: JackShot } {
 	const foe = other(side);
 	const best = bests(s.bs, jack);
 	const target = s.bs.find((b) => b.live && b.side === foe && Math.abs(dist(b, jack) - best[foe]) < 1e-9);
-	if (!target) return 'point'; // nothing to shoot at
-	if (best[side] < best[foe]) return 'point'; // we already hold it, just add
+	if (!target) return { intent: 'point' }; // nothing to shoot at
+	if (best[side] < best[foe]) return { intent: 'point' }; // we already hold it, just add
+	if (skill >= JACK_SHOT_SKILL) {
+		const shot = jackShot(s, jack, state, side, best);
+		if (shot) return { intent: 'jack', shot };
+	}
+	return { intent: decideBoule(s, jack, state, side, skill, best) };
+}
 
+export const decide = (s: Sim, jack: Boule, state: Match13, side: Side, skill: number): Intent =>
+	choose(s, jack, state, side, skill).intent;
+
+/** Point or shoot a boule. Shooting is for when out-pointing is unlikely, not for when it is merely hard. */
+function decideBoule(s: Sim, jack: Boule, state: Match13, side: Side, skill: number, best: [number, number]): Intent {
+	const foe = other(side);
 	const k = norm(skill);
 	if (best[foe] > COMFORT) return 'point';
 	if (best[foe] < UNPOINTABLE) return k > 0.25 ? 'shoot' : 'point';
@@ -169,9 +223,9 @@ export function decide(s: Sim, jack: Boule, state: Match13, side: Side, skill: n
 /** The throw the AI actually makes: the ideal one, then blurred by skill. */
 export function planThrow(s: Sim, jack: Boule, state: Match13, side: Side, skill: number, rng: number): Throw {
 	const from = state.circle;
-	const intent = decide(s, jack, state, side, skill);
+	const { intent, shot } = choose(s, jack, state, side, skill);
 	const k = norm(skill);
-	const elev = elevationFor(s, intent);
+	const elev = shot ? shot.elev : elevationFor(s, intent);
 
 	let aim = { x: jack.x, y: jack.y };
 	if (intent === 'shoot') {
@@ -185,10 +239,11 @@ export function planThrow(s: Sim, jack: Boule, state: Match13, side: Side, skill
 	const len = Math.sqrt(dx * dx + dy * dy) || 1;
 	const dirX = dx / len, dirY = dy / len;
 
-	// A tir is thrown flat and fast straight at the boule; a point is solved for its resting spot.
-	const ideal = intent === 'shoot'
-		? shootSpeed(len)
-		: solveSpeed(s, from, side, dirX, dirY, len, elev);
+	// A tir is thrown flat and fast straight at the boule; a point is solved for its resting spot;
+	// a shot at the jack uses the speed its sweep found.
+	const ideal = shot ? shot.speed
+		: intent === 'shoot' ? shootSpeed(len)
+			: solveSpeed(s, from, side, dirX, dirY, len, elev);
 
 	const ang = (ANG_WORST + (ANG_BEST - ANG_WORST) * k) * gauss(rng, s.t.seed);
 	const spd = ideal * (1 + (SPD_WORST + (SPD_BEST - SPD_WORST) * k) * gauss(rng + 991, s.t.seed));

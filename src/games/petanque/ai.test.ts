@@ -137,6 +137,57 @@ describe('point or shoot', () => {
 	});
 });
 
+/* Shooting the jack out: with the opponent's hand empty, a dead jack scores one point per boule
+   still in ours. Only a strong AI sees it, and only when it pays. */
+describe('shoot the jack', () => {
+	const setup = (jy: number, id: SurfaceId = 'terre-battue'): { sim: Sim; jack: Boule } => {
+		const sim = board(id);
+		const jack = place(sim.t, makeJack(2, jy));
+		sim.bs.push(jack, parked(sim, 2.1, jy, 1)); // the opponent glued to it: not out-pointable
+		return { sim, jack };
+	};
+	const late = state({ left: [2, 0] }); // two boules in hand, the opponent's all thrown
+
+	it('a strong AI takes the jack out when the opponent has nothing left', () => {
+		const { sim, jack } = setup(9.5);
+		expect(decide(sim, jack, late, 0, 0.9)).toBe('jack');
+	});
+
+	it('but not a middling one, and not while the opponent still holds boules', () => {
+		const { sim, jack } = setup(9.5);
+		expect(decide(sim, jack, late, 0, 0.62)).not.toBe('jack');
+		expect(decide(sim, jack, state({ left: [2, 1] }), 0, 0.9)).not.toBe('jack');
+	});
+
+	it('not when one boule is left and the point is easy to take back', () => {
+		const sim = board();
+		const jack = place(sim.t, makeJack(2, 9.5));
+		sim.bs.push(jack, parked(sim, 2.45, 9.5, 1)); // 45 cm off, lane clear
+		expect(decide(sim, jack, state({ left: [2, 0] }), 0, 0.9)).toBe('point');
+	});
+
+	// Sand swallows the jack: no speed window sends it out, so the AI does not gamble on one.
+	it('not on sand, where no run of speeds sends the jack out', () => {
+		const { sim, jack } = setup(9.5, 'sable');
+		expect(decide(sim, jack, late, 0, 0.95)).not.toBe('jack');
+	});
+
+	it('and the jack really leaves the pitch when it is thrown with the AI\'s own error', () => {
+		const { sim } = setup(9.5);
+		let out = 0;
+		for (let k = 0; k < 20; k++) {
+			const c = cloneSim(sim);
+			const j = c.bs.find((b) => b.side === -1) as Boule;
+			const th = planThrow(c, j, late, 0, 0.9, k * 17 + 3);
+			expect(th.intent).toBe('jack');
+			c.bs.push(launch(c, late.circle, 0, th));
+			settle(c, undefined, 30);
+			if (!j.live) out++;
+		}
+		expect(out).toBeGreaterThanOrEqual(16);
+	});
+});
+
 describe('the AI never disturbs the real match', () => {
 	it('planning leaves the sim and its grain counter untouched', () => {
 		const s = board('gravier-gros', 0.05);
