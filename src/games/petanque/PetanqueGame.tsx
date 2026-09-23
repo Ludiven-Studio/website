@@ -13,7 +13,7 @@ import {
 } from './rules13';
 import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai';
 import {
-	buildPitch3D, makeBouleMesh, groundRing, makeMarker, makeHalo, arcMesh, aimRay, predictThrow,
+	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, makeMarker, makeHalo, arcMesh, aimRay, predictThrow,
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
 	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz, makeContactShadow, layFlat,
 	HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
@@ -736,6 +736,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp, cfg.slope === undefined ? {} : { slope: cfg.slope });
 		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined));
 		g.scene.add(g.pitch.group);
+		bakeBouleEnv(g.renderer, g.scene);
 
 		simRef.current = { t, bs: [], rng: cfg.seed & 0xffff };
 		prevRef.current = [];
@@ -808,6 +809,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const t = makeTerrain(course.seed, SURFACES[course.surface], course.amp);
 		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined));
 		g.scene.add(g.pitch.group);
+		bakeBouleEnv(g.renderer, g.scene);
 
 		simRef.current = { t, bs: [], rng: course.seed & 0xffff };
 		prevRef.current = [];
@@ -1968,7 +1970,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		} else if (im.kind === 'boule') {
 			g.fx.puff(x, im.z, z, im.speed * 0.6, 0xf2e6d2);
 			if (im.speed > 3.5) g.fx.ring(x, im.z - BOULE_R, z, 0xffd166);
-			sfx.clack(im.speed);
+			sfx.clack(im.speed, im.jack);
 		} else if (im.kind === 'pebble') {
 			if (im.speed < 1) return;
 			g.fx.puff(x, im.z + 0.01, z, im.speed * 0.35, DUST[s.t.surface.id]);
@@ -2467,6 +2469,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			g.pitch.dispose();
 			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current));
 			g.scene.add(g.pitch.group);
+			bakeBouleEnv(g.renderer, g.scene);
 		};
 		return () => { delete (window as unknown as { __petanqueSun?: unknown }).__petanqueSun; };
 	}, []);

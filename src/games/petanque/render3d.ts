@@ -116,24 +116,29 @@ function blobTexture(): THREE.CanvasTexture {
 let blobMap: THREE.CanvasTexture | null = null;
 const blob = (): THREE.CanvasTexture => (blobMap ??= blobTexture());
 
-/** A boule's fine machined grooves, as a bump-ish roughness pattern. */
-function bouleTexture(): THREE.CanvasTexture {
-	const S = 128;
+/**
+ * A boule's engraved stries, one pattern per side — which is how real players tell their boules
+ * apart. Sphere UVs: u runs round the equator, v from pole to pole, so a row of constant v is a ring
+ * round the boule and a column of constant u a meridian. Side 0: three rings round the middle.
+ * Side 1: six meridians. Black is the groove; the same canvas feeds the bump and, inverted by the
+ * shader's scale, the roughness — a groove is rough and dull, the polished steel around it is not.
+ */
+function striesTexture(side: 0 | 1): THREE.CanvasTexture {
+	const W = 512, H = 256;
 	const c = document.createElement('canvas');
-	c.width = c.height = S;
+	c.width = W; c.height = H;
 	const g = c.getContext('2d') as CanvasRenderingContext2D;
-	g.fillStyle = '#b4b4b4';
-	g.fillRect(0, 0, S, S);
-	g.strokeStyle = 'rgba(255,255,255,0.55)';
-	g.lineWidth = 1;
-	for (let i = 0; i < S; i += 4) {
-		g.beginPath();
-		g.moveTo(0, i);
-		g.lineTo(S, i + S * 0.25);
-		g.stroke();
+	g.fillStyle = '#ffffff';
+	g.fillRect(0, 0, W, H);
+	g.fillStyle = '#000000';
+	if (side === 0) {
+		for (const v of [0.44, 0.5, 0.56]) g.fillRect(0, v * H - 2, W, 4);
+	} else {
+		for (let k = 0; k < 6; k++) g.fillRect((k / 6) * W - 2.5, 0, 5, H);
+		g.fillRect(0, 0.5 * H - 2, W, 4);
 	}
 	const tex = new THREE.CanvasTexture(c);
-	tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+	tex.wrapS = THREE.RepeatWrapping;
 	return tex;
 }
 
@@ -209,57 +214,128 @@ export function sunFor(seed: number): SunSetup {
 /* ---------- the decor ---------- */
 
 const DECOR_NEAR = 7.0; // m from the centre — nothing stands closer, the eye walks 9 m up the lane
-const DECOR_FAR = 23.0; // m — inside the apron, so nothing floats off its edge
+const DECOR_FAR = 21.5; // m — inside the stone wall, so nothing stands through it
+const WALL_R = SURROUND - 2.9; // m — the dry-stone wall, just in front of the hedge
+const WALL_H = 0.75;
 const LANE_KEEP = 4.6; // m either side of the lane axis: the far end has to stay readable
 const HEDGE_R = SURROUND - 1.7; // m — the hedge that closes the ground
 const RIM_TREES = 56;
+const RIM_VIEW = 9; // m either side of the lane axis kept free of rim trees, so the village shows
 const BACKDROP_R = 70; // m — the painted horizon: hills, a village, a wood line
 const BACKDROP_H = 18; // m, from 2 m under the apron
 
 /**
- * The horizon, painted on the inside of a cylinder: far hills, a village with a steeple, a wood line
- * in front. Hazy colours so it reads as distance. Unlit, so it is dimmed and warmed by hand with the
- * sun: at dusk a full-bright backdrop would glow against a dark pitch.
+ * The horizon, painted on the inside of a cylinder, in Provence: blue mountains, hazy hills, a
+ * perched village in ochre and terracotta with its bell tower, cypresses and olive trees in front.
+ * Farther layers are pulled toward the haze colour so depth reads. Unlit, so it is dimmed and warmed
+ * by hand with the sun: at dusk a full-bright backdrop would glow against a dark pitch.
  */
 function buildBackdrop(seed: number, y: number, sun: SunSetup, keep: <T extends { dispose(): void }>(o: T) => T): THREE.Mesh {
-	const W = 2048, H = 256;
+	const W = 3072, H = 384;
 	const cv = document.createElement('canvas');
 	cv.width = W; cv.height = H;
 	const g = cv.getContext('2d');
 	if (!g) throw new Error('2d context');
+	const PX = H / BACKDROP_H; // px per metre, both ways (the texture repeats 3x round the cylinder)
 	const row = (m: number): number => H - ((m + 2) / BACKDROP_H) * H; // metres over the apron -> canvas row
+	const rnd = (k: number, salt: number): number => hashN(k, seed ^ salt);
+	const haze = new THREE.Color('#c3d0d6');
+	const hz = (hex: string, k: number): string => `#${new THREE.Color(hex).lerp(haze, k).getHexString()}`;
+	// Whole sine cycles across the width, so the seam where the texture repeats does not show.
+	const ridgeAt = (x: number, base: number, amp: number, freqs: number[], salt: number): number => {
+		let h = base;
+		freqs.forEach((f, i) => { h += amp * Math.sin((x / W) * Math.PI * 2 * f + rnd(i, salt) * 6.28) / (i + 1); });
+		return h;
+	};
 	const ridge = (base: number, amp: number, freqs: number[], salt: number, color: string): void => {
 		g.fillStyle = color;
 		g.beginPath();
 		g.moveTo(0, H);
-		for (let x = 0; x <= W; x += 8) {
-			let h = base;
-			// Whole cycles across the width, so the seam where the texture repeats does not show.
-			freqs.forEach((f, i) => { h += amp * Math.sin((x / W) * Math.PI * 2 * f + hashN(i, seed ^ salt) * 6.28) / (i + 1); });
-			g.lineTo(x, row(h));
-		}
+		for (let x = 0; x <= W; x += 6) g.lineTo(x, row(ridgeAt(x, base, amp, freqs, salt)));
 		g.lineTo(W, H);
 		g.closePath();
 		g.fill();
 	};
-	ridge(6.5, 2.2, [2, 5, 11], 0x1a2b, '#a9bbbf'); // far hills
-	// The village: a few clusters of houses, one steeple.
-	g.fillStyle = '#8fa1a6';
-	for (let c = 0; c < 3; c++) {
-		const cx = (c + 0.2 + hashN(c, seed ^ 0x3d71) * 0.6) / 3 * W;
-		for (let k = 0; k < 7; k++) {
-			const w = 22 + hashN(c * 7 + k, seed ^ 0x6b1) * 26, x = cx + (k - 3) * 30 + hashN(c * 7 + k, seed ^ 0x1c9) * 12;
-			const wall = row(3 + hashN(c * 7 + k, seed ^ 0x77a) * 2.5), roof = wall - 10 - w * 0.25;
-			g.fillRect(x, wall, w, H - wall);
-			g.beginPath(); g.moveTo(x - 2, wall); g.lineTo(x + w / 2, roof); g.lineTo(x + w + 2, wall); g.fill();
-			if (c === 0 && k === 3) { // the steeple
-				g.fillRect(x + w / 2 - 6, row(9), 12, H - row(9));
-				g.beginPath(); g.moveTo(x + w / 2 - 8, row(9)); g.lineTo(x + w / 2, row(13.5)); g.lineTo(x + w / 2 + 8, row(9)); g.fill();
-			}
+	const cypress = (x: number, foot: number, h: number, w: number, color: string): void => {
+		g.fillStyle = color;
+		g.beginPath();
+		g.moveTo(x, row(foot + h));
+		g.quadraticCurveTo(x + w, row(foot + h * 0.55), x + w * 0.45, row(foot));
+		g.lineTo(x - w * 0.45, row(foot));
+		g.quadraticCurveTo(x - w, row(foot + h * 0.55), x, row(foot + h));
+		g.fill();
+	};
+	const olive = (x: number, foot: number, r: number, color: string): void => {
+		g.fillStyle = color;
+		for (let k = 0; k < 3; k++) {
+			g.beginPath();
+			g.ellipse(x + (k - 1) * r * PX * 0.6, row(foot + r * (0.9 + (k % 2) * 0.35)), r * PX * 0.75, r * PX * 0.55, 0, 0, Math.PI * 2);
+			g.fill();
+		}
+	};
+
+	ridge(9, 3.2, [2, 3, 7], 0x1a2b, hz('#7f95ad', 0.45)); // the far mountains
+	ridge(5.5, 1.8, [3, 5, 11], 0x2c3d, hz('#8a9b6e', 0.4)); // the hills
+
+	// Three perched villages per repeat (nine round the horizon, so one is nearly always in view):
+	// houses stepped up a mound, the tallest in the middle.
+	const WALLS = ['#e2c39b', '#d6ae80', '#ead6b6', '#c99b6c', '#dcb98d'];
+	const ROOFS = ['#b9643d', '#c7774c', '#a8553a', '#bd6a45'];
+	for (let v = 0; v < 3; v++) {
+		const cx = ((v + 0.25 + rnd(v, 0x3d71) * 0.5) / 3) * W;
+		const span = 200 + rnd(v, 0x5a1) * 110;
+		const ground = ridgeAt(cx, 5.5, 1.8, [3, 5, 11], 0x2c3d) - 0.6;
+		const houses: { x: number; w: number; foot: number; h: number; c: string; r: string }[] = [];
+		for (let k = 0; k < 20; k++) {
+			const t = rnd(v * 31 + k, 0x6b1) * 2 - 1; // -1..1 across the mound
+			const w = (2.2 + rnd(v * 31 + k, 0x1c9) * 2.2) * PX;
+			const foot = ground + (1 - t * t) * 2.6 + rnd(v * 31 + k, 0x77a) * 0.4;
+			houses.push({
+				x: cx + t * span, w, foot, h: 1.6 + rnd(v * 31 + k, 0x4f3) * 1.4,
+				c: WALLS[k % WALLS.length], r: ROOFS[(k * 3) % ROOFS.length],
+			});
+		}
+		houses.sort((a, b) => b.foot - a.foot); // back rows first: the upper houses sit behind
+		const tower = { x: cx + (rnd(v, 0x2e1) - 0.5) * span * 0.4, foot: ground + 2.4 };
+		const drawTower = (): void => {
+			const tw = 1.3 * PX, th = 6.4;
+			g.fillStyle = hz('#d7b68c', 0.3);
+			g.fillRect(tower.x - tw / 2, row(tower.foot + th), tw, row(tower.foot) - row(tower.foot + th));
+			g.fillStyle = hz('#5b4636', 0.3); // the bell opening
+			g.fillRect(tower.x - tw * 0.18, row(tower.foot + th - 0.4), tw * 0.36, 0.9 * PX);
+			g.fillStyle = hz('#b0603c', 0.3);
+			g.beginPath();
+			g.moveTo(tower.x - tw * 0.62, row(tower.foot + th));
+			g.lineTo(tower.x, row(tower.foot + th + 1.6));
+			g.lineTo(tower.x + tw * 0.62, row(tower.foot + th));
+			g.fill();
+		};
+		drawTower();
+		for (const hs of houses) {
+			const top = row(hs.foot + hs.h), bot = row(hs.foot - 1);
+			g.fillStyle = hz(hs.c, 0.3);
+			g.fillRect(hs.x, top, hs.w, bot - top);
+			g.fillStyle = hz(hs.r, 0.3); // a low Provençal roof, barely pitched
+			g.beginPath();
+			g.moveTo(hs.x - 3, top);
+			g.lineTo(hs.x + hs.w * 0.5, top - hs.w * 0.16);
+			g.lineTo(hs.x + hs.w + 3, top);
+			g.fill();
+			g.fillStyle = hz('#6d5947', 0.35); // two small dark windows
+			const ww = Math.max(2, hs.w * 0.12);
+			g.fillRect(hs.x + hs.w * 0.22, top + (bot - top) * 0.3, ww, ww * 1.3);
+			g.fillRect(hs.x + hs.w * 0.64, top + (bot - top) * 0.3, ww, ww * 1.3);
 		}
 	}
-	ridge(3.4, 1.3, [7, 17, 31], 0x4e09, '#6f8a63'); // the wood line
-	ridge(1.2, 0.4, [23, 41], 0x2d55, '#5a7550'); // and its dark foot
+
+	// Olive groves and cypresses on the nearer slopes, then the dark foot of the wood line.
+	ridge(2.4, 0.9, [5, 13, 29], 0x4e09, '#7b8a58');
+	for (let k = 0; k < 70; k++) olive(rnd(k, 0x0a1) * W, ridgeAt(rnd(k, 0x0a1) * W, 2.4, 0.9, [5, 13, 29], 0x4e09) - 0.4, 0.9 + rnd(k, 0x0a2) * 0.8, rnd(k, 0x0a3) < 0.5 ? '#8a9866' : '#76865a');
+	for (let k = 0; k < 44; k++) {
+		const x = rnd(k, 0xc1) * W;
+		cypress(x, ridgeAt(x, 2.4, 0.9, [5, 13, 29], 0x4e09) - 0.6, 5 + rnd(k, 0xc2) * 4, (0.9 + rnd(k, 0xc3) * 0.5) * PX, rnd(k, 0xc4) < 0.5 ? '#3d5433' : '#35492d');
+	}
+	ridge(1.0, 0.35, [23, 41], 0x2d55, '#5c6f44');
 
 	const tex = keep(new THREE.CanvasTexture(cv));
 	tex.wrapS = THREE.RepeatWrapping;
@@ -272,6 +348,44 @@ function buildBackdrop(seed: number, y: number, sun: SunSetup, keep: <T extends 
 	const mesh = new THREE.Mesh(geo, mat);
 	mesh.position.y = y - 2 + BACKDROP_H / 2;
 	return mesh;
+}
+
+/**
+ * A dry-stone wall round the ground: courses of rough blocks in limestone tones, each course offset
+ * by half a stone, and flat coping stones on top. One InstancedMesh; blocks are turned to the ring.
+ */
+function buildWall(grp: THREE.Group, seed: number, y: number, keep: <T extends { dispose(): void }>(o: T) => T): void {
+	const COURSES = 3, STONE = 0.42, capH = 0.09;
+	const courseH = (WALL_H - capH) / COURSES;
+	const per = Math.ceil((2 * Math.PI * WALL_R) / STONE);
+	const n = per * (COURSES + 1);
+	const geo = keep(new THREE.BoxGeometry(1, 1, 1));
+	const mat = keep(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }));
+	const inst = new THREE.InstancedMesh(geo, mat, n);
+	const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+	const p = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
+	const TONES = [0xcdb99a, 0xbfa885, 0xd8c7aa, 0xb39b78, 0xc6b08e];
+	let i = 0;
+	for (let course = 0; course <= COURSES; course++) {
+		const cap = course === COURSES;
+		for (let k = 0; k < per; k++) {
+			const j = course * per + k;
+			const a = ((k + (course % 2) * 0.5) / per) * Math.PI * 2;
+			const jit = hashN(j, seed ^ 0x3a7);
+			const h = cap ? capH : courseH * (0.86 + jit * 0.1);
+			const d = WALL_R + (cap ? 0 : (hashN(j, seed ^ 0x19f) - 0.5) * 0.04); // a dry wall is never flush
+			p.set(Math.cos(a) * d, y + (cap ? WALL_H - capH / 2 : courseH * (course + 0.5)), Math.sin(a) * d);
+			q.setFromAxisAngle(up, -a + (hashN(j, seed ^ 0x5d1) - 0.5) * 0.06);
+			s.set(cap ? 0.56 : 0.46, h, STONE * (0.88 + jit * 0.1)); // x runs across the wall, z along it
+			m.compose(p, q, s);
+			inst.setMatrixAt(i, m);
+			inst.setColorAt(i, c.setHex(TONES[Math.floor(hashN(j, seed ^ 0x6c3) * TONES.length)]));
+			i++;
+		}
+	}
+	inst.instanceMatrix.needsUpdate = true;
+	grp.add(inst);
+	keep({ dispose: () => inst.dispose() });
 }
 
 /**
@@ -305,12 +419,18 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 	   `r` over 1 makes them taller than the scattered ones. No painted shadow: they stand on the rim
 	   and a blot would hang past it. */
 	const rim: { x: number; z: number; r: number }[] = [];
+	const cypresses: { x: number; z: number; h: number; w: number }[] = [];
 	for (let k = 0; k < RIM_TREES; k++) {
 		// Every third slot left empty on average, so the ring reads as trees and not as a wall.
 		if (hashN(k, seed ^ 0x0d4e) < 0.3) continue;
 		const a = ((k + hashN(k, seed ^ 0x3c11) * 0.8) / RIM_TREES) * Math.PI * 2;
 		const d = SURROUND - 1.2 + hashN(k, seed ^ 0x6e2d) * 1.0;
-		rim.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, r: 0.7 + hashN(k, seed ^ 0x1f5b) * 1.8 });
+		const x = Math.cos(a) * d, z = Math.sin(a) * d;
+		// Clear behind each end of the lane: that is where the eye looks, and the village is the view.
+		if (Math.abs(x) < RIM_VIEW) continue;
+		// Near half are cypresses: the tall dark flames that say Provence before anything else does.
+		if (hashN(k, seed ^ 0x07a2) < 0.45) cypresses.push({ x, z, h: 6 + hashN(k, seed ^ 0x19c) * 3.5, w: 0.65 + hashN(k, seed ^ 0x2b4) * 0.3 });
+		else rim.push({ x, z, r: 0.7 + hashN(k, seed ^ 0x1f5b) * 1.8 });
 	}
 	const forest = trees.concat(rim);
 
@@ -340,8 +460,14 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 		// Two blobs a tree: one sphere reads as a lollipop at this distance, three cost a draw call
 		// each for a silhouette nobody can tell apart.
 		const leafGeo = keep(new THREE.IcosahedronGeometry(1, 1));
-		const leafMat = keep(new THREE.MeshStandardMaterial({ color: 0x4d7a3c, roughness: 1, flatShading: true }));
+		const leafMat = keep(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }));
 		const leaves = new THREE.InstancedMesh(leafGeo, leafMat, forest.length * 2);
+		// A third of them olive-grey, the rest plane-tree greens.
+		const tint = new THREE.Color();
+		for (let i = 0; i < leaves.count; i++) {
+			const r = hashN(i >> 1, seed ^ 0x0e11);
+			leaves.setColorAt(i, tint.setHex(r < 0.33 ? 0x8a9a66 : r < 0.66 ? 0x4d7a3c : 0x5e8544));
+		}
 		fill(leaves, (i) => {
 			const t0 = forest[i >> 1], h = 2.4 + t0.r * 2.2, up = (i & 1) === 1;
 			const rad = up ? 0.85 + t0.r * 0.5 : 1.15 + t0.r * 0.6;
@@ -356,6 +482,17 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 			blots.push({ x: t0.x, z: t0.z, h: h + 0.5, r: 1.2 + t0.r * 0.6 });
 		}
 	}
+
+	if (cypresses.length) {
+		const geo = keep(new THREE.IcosahedronGeometry(1, 1));
+		const mat = keep(new THREE.MeshStandardMaterial({ color: 0x33492c, roughness: 1, flatShading: true }));
+		fill(new THREE.InstancedMesh(geo, mat, cypresses.length), (i) => {
+			const c = cypresses[i];
+			return [new THREE.Vector3(c.x, y + c.h * 0.5, c.z), new THREE.Vector3(c.w, c.h * 0.5, c.w)];
+		});
+	}
+
+	buildWall(grp, seed, y, keep);
 
 	if (bushes.length) {
 		const bushGeo = keep(new THREE.IcosahedronGeometry(1, 0));
@@ -407,7 +544,7 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 	// Ground out to the backdrop, so no view can look between the apron and the painted horizon.
 	const far = new THREE.Mesh(
 		keep(new THREE.RingGeometry(SURROUND - 0.5, BACKDROP_R + 2, 48)),
-		keep(new THREE.MeshStandardMaterial({ color: 0x5f6d3c, roughness: 1 })),
+		keep(new THREE.MeshStandardMaterial({ color: 0x77774a, roughness: 1 })),
 	);
 	far.rotation.x = -Math.PI / 2;
 	far.position.y = y - 0.03;
@@ -524,7 +661,7 @@ export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
 	/* The apron the pitch is cut into, seated under the LOWEST point of the ground. A fixed -6 cm
 	   looked fine down the lane but the faux plat drops the far end further than that, so the
 	   apron punched up through the pitch in ragged green patches — only visible from overhead. */
-	const apronMat = keep(new THREE.MeshStandardMaterial({ color: 0x6f7a46, roughness: 1 }));
+	const apronMat = keep(new THREE.MeshStandardMaterial({ color: 0x858350, roughness: 1 })); // dry summer grass
 	const apron = new THREE.Mesh(keep(new THREE.CircleGeometry(SURROUND, 40)), apronMat);
 	apron.rotation.x = -Math.PI / 2;
 	apron.position.y = low - 0.06;
@@ -612,22 +749,58 @@ export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
 
 /* ---------- boules, jack, circle ---------- */
 
-let bouleMap: THREE.CanvasTexture | null = null;
+const striesMaps: (THREE.CanvasTexture | null)[] = [null, null];
+let bouleEnv: THREE.WebGLRenderTarget | null = null;
+
+/**
+ * What the boules reflect: the scene itself, captured once per deal from where the boules sit. Only
+ * the boules get it — a scene-wide environment would relight the ground, and every shadow depth and
+ * sky level in this file was measured without one. Call after the pitch is in the scene.
+ */
+export function bakeBouleEnv(renderer: THREE.WebGLRenderer, scene: THREE.Scene): void {
+	const pm = new THREE.PMREMGenerator(renderer);
+	const next = pm.fromScene(scene, 0.02, 0.05, SURROUND * 12, { size: 128, position: new THREE.Vector3(0, 0.3, 0) });
+	pm.dispose();
+	bouleEnv?.dispose();
+	bouleEnv = next;
+	scene.traverse((o) => {
+		const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+		if (o.userData.boule && m) { m.envMap = next.texture; m.needsUpdate = true; }
+	});
+}
 
 export function makeBouleMesh(side: 0 | 1 | -1): THREE.Mesh {
 	const jack = side === -1;
-	const geo = new THREE.SphereGeometry(jack ? JACK_R : BOULE_R, jack ? 16 : 26, jack ? 12 : 20);
-	if (!bouleMap) bouleMap = bouleTexture();
-	const mat = jack
-		? new THREE.MeshStandardMaterial({ color: JACK_COLOR, roughness: 0.75, metalness: 0 })
-		// High metalness with no envMap looks "too dark" but MEASURES best: at 10 m a boule is 5 px,
-		// and dropping metalness to 0 lifts the steel one to luma 133 against a 131 ground — gone.
-		: new THREE.MeshStandardMaterial({ color: SIDE_COLORS[side], roughnessMap: bouleMap, roughness: 0.38, metalness: 0.85 });
+	const geo = new THREE.SphereGeometry(jack ? JACK_R : BOULE_R, jack ? 16 : 32, jack ? 12 : 24);
+	let mat: THREE.MeshStandardMaterial;
+	if (jack) {
+		mat = new THREE.MeshStandardMaterial({ color: JACK_COLOR, roughness: 0.75, metalness: 0 });
+	} else {
+		const stries = (striesMaps[side] ??= striesTexture(side));
+		// Side 0's rings run round the sphere's equator, which from above is the silhouette: tip the
+		// axis over so they cross the top, where the eye actually sees the boule.
+		if (side === 0) geo.rotateX(Math.PI / 2);
+		// Polished steel that mirrors the ground and the sky. The grooves are rougher, so they read
+		// as dark lines on the bright metal; the tint keeps the two sides apart at a distance.
+		mat = new THREE.MeshStandardMaterial({
+			color: SIDE_COLORS[side], metalness: 1, roughness: 0.22,
+			bumpMap: stries, bumpScale: 1.2,
+			envMap: bouleEnv?.texture ?? null, envMapIntensity: BOULE_ENV,
+		});
+		mat.onBeforeCompile = (sh) => {
+			// Grooves (black in the map) twice as rough as the polish: dull lines, no second texture.
+			sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>',
+				'#include <roughnessmap_fragment>\n\troughnessFactor = mix( 0.7, roughnessFactor, texture2D( bumpMap, vBumpMapUv ).r );');
+		};
+	}
 	const m = new THREE.Mesh(geo, mat);
+	m.userData.boule = !jack;
 	m.castShadow = true;
 	m.receiveShadow = false;
 	return m;
 }
+
+const BOULE_ENV = 1.0; // strength of the reflection; the readability probe is what sets it
 
 const CONTACT_LIFT = 0.008; // m of clearance, so the decal never fights the ground it sits on
 

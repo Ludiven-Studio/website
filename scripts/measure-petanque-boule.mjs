@@ -113,7 +113,7 @@ function annulus(b, r0, r1, others) {
 
 console.log(`\n${TAG} · gradient DANS le disque, puis ombre de contact AUTOUR`);
 console.log(`vue ${info.width}x${info.height} · soleil ${s.sun ? `el ${s.sun.el}° az ${s.sun.az}°` : '?'}${SUN ? ' (forcé)' : ''} · corps ${JSON.stringify(s.seen)}\n`);
-console.log('corps          taille    dist   écart   ampl    sol  ombre    %   rej%');
+console.log('corps          taille    dist   écart   ampl    sol  ombre    %   rej%  contr');
 const rows = [];
 for (const b of s.seen) {
 	// 0.72 of the radius: the silhouette pixels are half ground, and they would report a contrast
@@ -155,9 +155,12 @@ for (const b of s.seen) {
 	const dark = nl.length ? nl[Math.floor(nl.length * 0.1)] : NaN;
 	const ombre = sol - dark;
 
+	// `contr`: the body's mean against the ground's. What a 5 px boule far away is read by — a body
+	// can shade beautifully and still vanish if its mean sits on the ground's level.
+	const contr = Math.abs(m - sol);
 	const name = b.side < 0 ? 'cochonnet' : `boule s${b.side}`;
-	rows.push({ name, jack: b.side < 0, sd, amp, ombre, pct: (100 * ombre) / sol });
-	console.log(`${name.padEnd(13)} ${String(b.body).padStart(5)}px ${`${b.m}m`.padStart(7)} ${sd.toFixed(1).padStart(7)} ${amp.toFixed(1).padStart(6)} ${sol.toFixed(0).padStart(6)} ${ombre.toFixed(1).padStart(6)} ${((100 * ombre) / sol).toFixed(0).padStart(4)} ${rej.toFixed(0).padStart(6)}`);
+	rows.push({ name, jack: b.side < 0, sd, amp, ombre, pct: (100 * ombre) / sol, contr });
+	console.log(`${name.padEnd(13)} ${String(b.body).padStart(5)}px ${`${b.m}m`.padStart(7)} ${sd.toFixed(1).padStart(7)} ${amp.toFixed(1).padStart(6)} ${sol.toFixed(0).padStart(6)} ${ombre.toFixed(1).padStart(6)} ${((100 * ombre) / sol).toFixed(0).padStart(4)} ${rej.toFixed(0).padStart(6)} ${contr.toFixed(0).padStart(6)}`);
 }
 
 /* The floor. `ombre` compares a p10 against a median, so it reads positive on any textured surface
@@ -203,6 +206,7 @@ const avg = (f, k) => { const p = rows.filter(f); return p.length ? p.reduce((a,
 const show = (v) => (v === null ? '—' : v.toFixed(1));
 console.log(`\namplitude moyenne · cochonnet (témoin, non métallique) ${show(avg((r) => r.jack, 'amp'))}  ·  boules ${show(avg((r) => !r.jack, 'amp'))}`);
 console.log(`ombre de contact moyenne ${show(avg(() => true, 'ombre'))} niveaux (${(avg(() => true, 'pct') ?? 0).toFixed(0)} % du sol)`);
+console.log(`contraste moyen boule / sol ${show(avg((r) => !r.jack, 'contr'))} niveaux`);
 console.log(`capture : ${shotPath}`);
 
 await browser.close();
