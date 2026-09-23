@@ -131,15 +131,32 @@ export function groundHit(speed: number, surface: string): void {
 	if (coarse) noiseHit(c, 'highpass', 3200, 0.9, (0.03 + v * 0.10) * (surface === 'gravier-gros' ? 1.4 : 1), 0.03);
 }
 
-/** Two boules collide: the bright steel "toc", a noise transient over two inharmonic partials. */
-export function clack(speed: number): void {
-	if (speed < 0.5) return;
-	const c = gate('clack', 25);
+/* A hollow steel boule's ring: inharmonic partials at FIXED pitches. The old clack slid each tone
+   down by ~1 kHz, which is a "pew", not metal. Higher partials die first, as they do in the shell. */
+const STEEL = [{ f: 2380, a: 1, d: 0.16 }, { f: 3890, a: 0.6, d: 0.1 }, { f: 5710, a: 0.35, d: 0.06 }];
+
+/**
+ * Two boules collide: a hard click, then the shell rings. Against the jack it is a dull wooden "toc"
+ * instead. The gate is wide on purpose: a boule nudging another reports a contact nearly every
+ * frame, and the old 25 ms gate turned that into a buzz.
+ */
+export function clack(speed: number, jack = false): void {
+	if (speed < (jack ? 0.4 : 0.8)) return;
+	const c = gate(jack ? 'toc' : 'clack', 90);
 	if (!c) return;
 	const v = clamp01(speed / 9);
-	noiseHit(c, 'bandpass', 2600 + v * 2400, 1.4, 0.10 + v * 0.5, 0.02 + v * 0.02);
-	tone(c, 'triangle', 2100 + v * 900, 1500, 0.06 + v * 0.16, 0.06 + v * 0.05, 0, rate);
-	tone(c, 'sine', 3300 + v * 1200, 2600, 0.04 + v * 0.10, 0.05 + v * 0.04, 0.004, rate);
+	const loud = 0.25 + 0.75 * v * v; // soft touches stay soft; a carreau is loud
+	if (jack) {
+		noiseHit(c, 'bandpass', 1200 + v * 500, 2.5, 0.12 * loud + 0.03, 0.025);
+		tone(c, 'sine', 820 + v * 200, 820 + v * 200, 0.06 * loud + 0.02, 0.05, 0, rate);
+		return;
+	}
+	const detune = 0.97 + Math.random() * 0.06; // no two boules ring at quite the same pitch
+	noiseHit(c, 'highpass', 3500, 0.7, 0.35 * loud, 0.008);
+	for (const p of STEEL) {
+		const f = p.f * detune;
+		tone(c, 'sine', f, f, 0.14 * p.a * loud, p.d * (0.6 + 0.4 * v), 0, rate);
+	}
 }
 
 /** A boule clips a stone: a tiny high tick. */

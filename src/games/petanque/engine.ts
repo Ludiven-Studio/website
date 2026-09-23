@@ -46,6 +46,7 @@ export interface Impact {
 	y: number;
 	z: number;
 	speed: number;
+	jack?: boolean; // a 'boule' contact that involved the jack: wood, not steel
 }
 
 export interface Sim {
@@ -169,7 +170,7 @@ function collide(t: Terrain, a: Boule, b: Boule, imp?: Impact[]): boolean {
 	   bounced the jack at impactFriction per hop, and the boule behind re-struck it: a jack hit at
 	   6 m/s stopped after 1.1 m on coarse gravel, 13 hops. */
 	for (const o of [a, b]) if (o.vz < 0 && o.z <= heightAt(t, o.x, o.y) + o.r + 1e-3) o.vz = 0;
-	imp?.push({ kind: 'boule', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2, speed: -vn });
+	imp?.push({ kind: 'boule', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2, speed: -vn, jack: a.side === -1 || b.side === -1 });
 	return true;
 }
 
