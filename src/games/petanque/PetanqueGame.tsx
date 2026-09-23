@@ -31,7 +31,7 @@ import {
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { isTypingTarget } from '../../lib/keyboard';
-import { trackGame } from '../../lib/analytics';
+import { trackGame, trackEvent } from '../../lib/analytics';
 import { withExpert } from '../../lib/difficulty';
 import { useLevels } from '../../lib/useLevels';
 import { usePlayClock } from '../../lib/usePlayClock';
@@ -121,6 +121,10 @@ const PAD_EDGE = 12; // px, same margin the pad's width clamp leaves
 const PAD_GAP = 8; // px kept clear of a side gauge
 const PAD_HEAD = 40; // px above the pad: power bar then state line
 const PAD_GRIP_W = 22;
+// The Pétanque Scanner card in the free side of the band. Closed for the session with its ×.
+const PROMO_KEY = 'petanque-promo-shut';
+const PROMO_MIN = 104; // px — narrower and the name no longer fits on one line
+const PROMO_MAX = 280;
 
 function loadPadX(): PadX {
 	try {
@@ -533,8 +537,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		return padXRef.current;
 	});
 	// Laid out in px by layoutPad; null until the first measure, where the CSS centre stands in.
-	// `label` is the state line's fraction of the width; `grip` the grip's left edge in px.
-	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number } | null>(null);
+	// `label` is the state line's fraction of the width; `grip` the grip's left edge in px; `promo`
+	// the free side of the band, or null when it is too narrow.
+	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number; promo: { left: number; width: number } | null } | null>(null);
+	const [promoShut, setPromoShut] = useState(() => {
+		try { return sessionStorage.getItem(PROMO_KEY) === '1'; } catch { return false; }
+	});
 	const [padGrip, setPadGrip] = useState<'call' | 'idle' | 'held'>(() => {
 		try { return localStorage.getItem(PAD_GRIP_KEY) ? 'idle' : 'call'; } catch { return 'idle'; }
 	});
@@ -1757,7 +1765,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const bandTop = wr.top + el.offsetTop - PAD_HEAD;
 		/* Two passes: the zoom and the leaderboard pill take presses and are never covered; the loft
 		   gauge is inert, so when a short canvas leaves no room between all three the pad may sit on it. */
-		const travel = (sel: string): { lo: number; hi: number } => {
+		const edges = (sel: string): { l0: number; r0: number } => {
 			let l0 = PAD_EDGE, r0 = PAD_EDGE;
 			for (const o of document.querySelectorAll(sel)) {
 				const r = o.getBoundingClientRect();
@@ -1765,10 +1773,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				if (r.left + r.width / 2 < wr.left + W / 2) l0 = Math.max(l0, r.right - wr.left + PAD_GAP);
 				else r0 = Math.max(r0, wr.right - r.left + PAD_GAP);
 			}
-			return { lo: l0, hi: W - r0 - w };
+			return { l0, r0 };
 		};
-		let { lo, hi } = travel('.pe-loft, .pe-zoom, .lbc-pill');
-		if (hi < lo) ({ lo, hi } = travel('.pe-zoom, .lbc-pill'));
+		const all = edges('.pe-loft, .pe-zoom, .lbc-pill');
+		let lo = all.l0, hi = W - all.r0 - w;
+		if (hi < lo) { const hard = edges('.pe-zoom, .lbc-pill'); lo = hard.l0; hi = W - hard.r0 - w; }
 		if (hi < lo) lo = hi = Math.max(PAD_EDGE, Math.min(W - PAD_EDGE - w, (lo + hi) / 2));
 		// Piecewise, so 0.5 is the canvas centre even when the two gauges are not the same width.
 		const c = Math.max(lo, Math.min(hi, (W - w) / 2));
@@ -1781,7 +1790,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const label = Math.max(0, Math.min(1, (mid - PAD_EDGE) / Math.max(1, W - PAD_EDGE * 2)));
 		const grip = mid > W / 2 + 1 ? 'l' : 'r';
 		const gripLeft = grip === 'r' ? left + w + 6 : left - 6 - PAD_GRIP_W;
-		setPadPos((p) => (p && p.left === left && p.label === label && p.grip === gripLeft ? p : { left, label, grip: gripLeft }));
+		/* The promo takes the free side of the band, never a gauge's or the grip's room. The pad never
+		   yields to it: it is laid out after the pad, and only if the side is wide enough to read. */
+		const inL = Math.min(left, gripLeft) - PAD_GAP - all.l0;
+		const inR = W - all.r0 - (Math.max(left + w, gripLeft + PAD_GRIP_W) + PAD_GAP);
+		const room = Math.max(inL, inR);
+		const pw = Math.min(PROMO_MAX, room);
+		const promo = room < PROMO_MIN ? null
+			: inL >= inR ? { left: Math.round(all.l0), width: Math.round(pw) } : { left: Math.round(W - all.r0 - pw), width: Math.round(pw) };
+		setPadPos((p) => (p && p.left === left && p.label === label && p.grip === gripLeft
+			&& p.promo?.left === promo?.left && p.promo?.width === promo?.width ? p : { left, label, grip: gripLeft, promo }));
 	}, []);
 
 	const savePadX = useCallback((f: number) => {
@@ -2868,6 +2886,34 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					>⋮⋮</div>
 				)}
 
+				{/* The real-world companion app, in the free side of the band. Fullscreen only (CSS): the
+				    windowed page already says it in a line under the game. A new tab keeps the match. */}
+				{padPos?.promo && armLive && !card && !promoShut && (
+					<div className={`pe-promo${padPos.promo.width < 190 ? ' narrow' : ''}`} style={{ left: `${padPos.promo.left}px`, width: `${padPos.promo.width}px` }}>
+						<a
+							href="/petanque-scanner/"
+							target="_blank"
+							rel="noopener"
+							onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}
+						>
+							<span className="pe-promo-pic" aria-hidden="true" />
+							<span className="pe-promo-txt">
+								<strong>Pétanque Scanner</strong>
+								<span>Qui a le point ? Mesurez en vrai, au téléphone.</span>
+								<em>Appli gratuite ›</em>
+							</span>
+						</a>
+						<button
+							className="pe-promo-x"
+							aria-label="Fermer la publicité Pétanque Scanner"
+							onClick={() => {
+								setPromoShut(true);
+								try { sessionStorage.setItem(PROMO_KEY, '1'); } catch { /* private mode */ }
+							}}
+						>×</button>
+					</div>
+				)}
+
 				{status === 'placing' && myTurn && placeOk && (
 					<button className="pe-placeok" onClick={confirmPlace}>✓ Poser ici</button>
 				)}
@@ -3229,6 +3275,28 @@ const CSS = `
 /* Finger down, nothing pulled yet: letting go here throws nothing. Said in words AND in colour,
    because the board looks identical whether it is armed or merely touched. */
 .pe-arm-label.warn { background: rgba(120,34,28,0.72); color: #ffd7d2; font-weight: 700; }
+/* The Pétanque Scanner card: same band as the pad, laid out by layoutPad. The screenshot is cropped
+   on the measured distances, which say what the app does faster than any sentence. */
+.pe-promo { display: none; position: absolute; bottom: var(--pe-arm-b); height: var(--pe-arm-h); z-index: 3; }
+.game-page.gf-full .pe-promo { display: block; }
+.pe-promo a { display: flex; gap: 10px; height: 100%; box-sizing: border-box; padding: 8px; border-radius: 14px; border: 1.5px solid rgba(255,255,255,0.28); background: rgba(28,20,12,0.72); color: #f4ece2; text-decoration: none; backdrop-filter: blur(4px); overflow: hidden; }
+.pe-promo a:hover { border-color: var(--pe-accent); }
+/* A background, not an img: object-fit can only shrink the whole phone into the box, and the
+   distances are what sells it, so they are zoomed in on. */
+.pe-promo-pic { flex: 0 0 42%; min-width: 0; height: 100%; border-radius: 9px; background: #2b3a4a url(/assets/petanque-ar/screen-01.webp) no-repeat; background-size: 330% auto; background-position: 44% 55%; }
+.pe-promo-txt { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; padding-right: 14px; }
+.pe-promo-txt strong { font-size: 14px; font-weight: 800; line-height: 1.15; color: #fff; }
+.pe-promo-txt span { font-size: 11.5px; line-height: 1.3; opacity: 0.88; }
+.pe-promo-txt em { font-style: normal; font-size: 12px; font-weight: 800; color: #ffd166; }
+/* A phone column leaves ~120 px: picture on top, name and call below, the sentence dropped. */
+.pe-promo.narrow a { flex-direction: column; gap: 5px; padding: 6px; }
+.pe-promo.narrow .pe-promo-pic { flex: 1 1 auto; width: 100%; height: auto; min-height: 0; background-size: 260% auto; }
+.pe-promo.narrow .pe-promo-txt { flex: 0 0 auto; padding-right: 0; gap: 1px; text-align: center; }
+.pe-promo.narrow .pe-promo-txt strong { font-size: 12px; }
+.pe-promo.narrow .pe-promo-txt span { display: none; }
+.pe-promo.narrow .pe-promo-txt em { font-size: 11px; }
+.pe-promo-x { position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; border-radius: 999px; border: none; background: rgba(0,0,0,0.55); color: #f4ece2; font: inherit; font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.pe-promo-x:hover { background: rgba(0,0,0,0.8); }
 /* The pad's handle, beside it on the pitch side. Pulses a few times the first time it shows. */
 .pe-arm-grip { position: absolute; bottom: calc(var(--pe-arm-b) + var(--pe-arm-h) / 2 - 24px); width: 22px; height: 48px; z-index: 3; display: grid; place-items: center; border: 1.5px solid rgba(255,255,255,0.3); border-radius: 999px; background: rgba(28,20,12,0.55); color: #f0e6da; font-size: 12px; font-weight: 800; letter-spacing: -2px; cursor: ew-resize; touch-action: none; user-select: none; -webkit-user-select: none; backdrop-filter: blur(4px); }
 .pe-arm-grip:focus-visible { outline: 2px solid var(--pe-accent); outline-offset: 2px; }

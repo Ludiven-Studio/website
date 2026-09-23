@@ -50,6 +50,7 @@ const PARTS = {
 	hint: '.pe-arm-label', // the one line above the board: gesture while a finger is down, state otherwise
 	strip: '.pe-arm',
 	grip: '.pe-arm-grip',
+	promo: '.pe-promo',
 	legend: '.pe-board-marks',
 	power: '.pe-power',
 	tag: '.pe-tag',
@@ -111,7 +112,7 @@ const audit = async (tag) => {
 		   with almost nothing. That distinction is the whole reason the rectangle pass cried wolf. */
 		const INK = ['.pe-arm-label', '.pe-board-mark', '.pe-loft-label', '.pe-loft-hint',
 			'.pe-tag', '.pe-stats', '.gf-exit', '.pe-act', '.lbc-pill', '.pe-view', '.pe-zoom-label',
-			'.pe-power', '.pe-placeok'];
+			'.pe-power', '.pe-placeok', '.pe-promo-txt strong', '.pe-promo-txt em'];
 		const ink = [];
 		for (const s of INK) for (const e of document.querySelectorAll(s)) {
 			const cs = getComputedStyle(e);
