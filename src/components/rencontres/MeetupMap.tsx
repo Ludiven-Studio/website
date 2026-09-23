@@ -59,6 +59,13 @@ const HOME_ICON = L.divIcon({
 	iconAnchor: [11, 11],
 });
 
+// Leaflet sets a string tooltip as innerHTML. Spot labels come from OSM, which anyone can edit.
+const textNode = (text: string): HTMLElement => {
+	const el = document.createElement('span');
+	el.textContent = text;
+	return el;
+};
+
 export default function MeetupMap({
 	events, spots, places, hoveredId, selectedId, picking, pin,
 	onHover, onSelect, onSelectSpot, onPick, handle,
@@ -120,7 +127,7 @@ export default function MeetupMap({
 		layer.clearLayers();
 		for (const p of places) {
 			L.marker([p.lat, p.lng], { icon: HOME_ICON, interactive: false })
-				.bindTooltip(p.name, { direction: 'top' })
+				.bindTooltip(textNode(p.name), { direction: 'top' })
 				.addTo(layer);
 		}
 	}, [places]);
@@ -135,7 +142,7 @@ export default function MeetupMap({
 		for (const s of spots) {
 			if (busy.has(s.id)) continue;
 			L.marker([s.lat, s.lng], { icon: s.confirmed ? ICONS.spot : ICONS.hollow, opacity: 0.85 })
-				.bindTooltip(s.label || 'Terrain', { direction: 'top' })
+				.bindTooltip(textNode(s.label || 'Terrain'), { direction: 'top' })
 				// While picking, a marker would otherwise swallow the click that is
 				// trying to drop the pin. Snapping to the terrain is the better answer.
 				.on('click', () => {

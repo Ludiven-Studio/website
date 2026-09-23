@@ -98,7 +98,7 @@ export default function RencontresApp() {
 	const openEvent = useCallback(async (id: string, fromUrl?: string | null) => {
 		const secret = secretFor(id, fromUrl);
 		try {
-			const d = await getMeetup(id, secret);
+			const d = await getMeetup(id, pid, secret);
 			setDetail(d);
 			setCreating(false);
 			setEditing(false);
@@ -109,7 +109,7 @@ export default function RencontresApp() {
 			setError(message(e));
 			setUrl(null);
 		}
-	}, []);
+	}, [pid]);
 
 	useEffect(() => {
 		trackEvent('meetup_view');
@@ -646,7 +646,6 @@ export default function RencontresApp() {
 					event={detail.event}
 					signups={detail.signups}
 					isOrganizer={detail.isOrganizer}
-					playerId={pid}
 					name={name}
 					busy={busy}
 					error={panelError}

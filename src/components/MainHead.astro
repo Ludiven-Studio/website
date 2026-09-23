@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { UMAMI_WEBSITE_ID } from '../data/site';
+import { UMAMI_WEBSITE_ID, SUPABASE_URL } from '../data/site';
 import { getImage } from 'astro:assets';
 import logo from '../assets/LudivenStudioLogo.png';
 
@@ -24,6 +24,25 @@ const {
 	altLang,
 } = Astro.props;
 
+// GitHub Pages sends no headers, so the policy rides in a <meta> (no frame-ancestors there).
+// 'unsafe-inline' scripts: the theme script and Astro's small hoisted scripts are inline. The
+// gain is elsewhere: no foreign script host, and nowhere to send stolen data.
+// Checked page by page with scripts/check-csp.mjs — run it after adding any outside host.
+const supabaseWs = SUPABASE_URL.replace(/^https:/, 'wss:');
+const csp = [
+	"default-src 'self'",
+	"script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cloud.umami.is",
+	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+	"font-src 'self' data: https://fonts.gstatic.com",
+	"img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+	`connect-src 'self' data: blob: ${SUPABASE_URL} ${supabaseWs} https://cloud.umami.is https://api-gateway.umami.dev https://api.web3forms.com https://*.tile.openstreetmap.org`,
+	"media-src 'self' data: blob:",
+	"worker-src 'self' blob:",
+	"object-src 'none'",
+	"base-uri 'self'",
+	"form-action 'self' https://api.web3forms.com",
+].join('; ');
+
 const siteName = 'Ludiven Studio';
 const canonical = new URL(Astro.url.pathname, Astro.site);
 // Custom images are our 1200×630 game previews; only the logo fallback keeps its own ratio.
@@ -41,6 +60,7 @@ if (image) {
 ---
 
 <meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content={csp} />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="generator" content={Astro.generator} />
 <title>{title}</title>
@@ -99,6 +119,7 @@ if (image) {
 			src="https://cloud.umami.is/script.js"
 			data-website-id={UMAMI_WEBSITE_ID}
 			data-domains="www.ludiven-studio.fr"
+			data-exclude-search="true"
 		/>
 	)
 }

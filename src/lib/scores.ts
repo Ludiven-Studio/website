@@ -87,21 +87,22 @@ export async function fetchDailyTopsSecure(day: string): Promise<Record<string, 
 	if (!leaderboardEnabled()) return {};
 	try {
 		const res = await fetch(
-			`${SUPABASE_URL}/rest/v1/game_scores?challenge_date=eq.${day}&select=game_id,player_name,score,player_id&limit=5000`,
+			`${SUPABASE_URL}/rest/v1/game_scores?challenge_date=eq.${day}&select=game_id,player_name,score&limit=5000`,
 			{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
 		);
 		if (!res.ok) return {};
-		const rows: { game_id: string; player_name: string; score: number; player_id: string }[] = await res.json();
+		const rows: { game_id: string; player_name: string; score: number }[] = await res.json();
 		const best: Record<string, { name: string; value: number; players: number }> = {};
-		const players: Record<string, Set<string>> = {};
+		// A daily keeps one row per (game, player, day), so rows = players. player_id is not readable.
+		const players: Record<string, number> = {};
 		for (const r of rows) {
-			(players[r.game_id] ??= new Set()).add(r.player_id);
+			players[r.game_id] = (players[r.game_id] ?? 0) + 1;
 			const metric = SECURED_GAMES[r.game_id] ?? 'score';
 			const cur = best[r.game_id];
 			const better = !cur || (metric === 'time' ? r.score < cur.value : r.score > cur.value);
 			if (better) best[r.game_id] = { name: r.player_name || 'Anonyme', value: r.score, players: 0 };
 		}
-		for (const g in best) best[g].players = players[g].size;
+		for (const g in best) best[g].players = players[g];
 		return best;
 	} catch {
 		return {};

@@ -2,6 +2,8 @@
 // (games/game_scores + submit-score), instead of the legacy direct-insert RPC.
 // The <Leaderboard> component reads this to route both submission and reads.
 // Metric direction must match the `games` table row (time = lower is better).
+// A new daily game must be listed here: the legacy RPC only accepts alchimie-t, bolides,
+// pong and foot from the browser.
 //
 // Packed (golf/angry/billard/flechettes/reussite) and threshold (demineur/codecolor/
 // mot-secret) games ride the 'time' metric too: their encoded value is already

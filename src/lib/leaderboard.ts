@@ -191,20 +191,14 @@ async function submitScore(game: string, value: number, metric: Metric): Promise
 	if (!name) return false;
 	const day = todayKey();
 	try {
-		// Preferred: RPC that keeps a single best row per (game, day, player) and purges past days.
+		// The RPC is the only write path, and it only accepts the games not yet in SECURED_GAMES
+		// (see the allow-list in supabase/migrations/20260923120000_legacy_scores_harden.sql).
 		const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
 			method: 'POST',
 			headers: headers(),
 			body: JSON.stringify({ p_game: game, p_day: day, p_name: name, p_value: value, p_metric: metric }),
 		});
-		if (res.ok) return true;
-		// Fallback when the RPC isn't deployed yet (e.g. 404): plain insert so scores still save.
-		const ins = await fetch(`${SUPABASE_URL}/rest/v1/scores`, {
-			method: 'POST',
-			headers: { ...headers(), Prefer: 'return=minimal' },
-			body: JSON.stringify({ game, day, name, value, metric }),
-		});
-		return ins.ok;
+		return res.ok;
 	} catch {
 		return false;
 	}

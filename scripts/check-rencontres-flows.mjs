@@ -84,7 +84,8 @@ const makeBackend = () => {
 			case 'get_event': {
 				const e = find();
 				if (!e) return bad('unknown event', 404);
-				return ok({ event: e, signups: state.signups[e.id] ?? [], isOrganizer: Boolean(b.secret) && b.secret === state.secrets[e.id] });
+				const signups = (state.signups[e.id] ?? []).map(({ player_id, ...s }) => ({ ...s, is_me: player_id === b.playerId }));
+				return ok({ event: e, signups, isOrganizer: Boolean(b.secret) && b.secret === state.secrets[e.id] });
 			}
 			case 'my_events': {
 				const events = (b.items ?? [])

@@ -132,11 +132,12 @@ export async function getProgression(gameId: string): Promise<GameProgress> {
 	const local = loadLocal(gameId);
 	if (!leaderboardEnabled()) return local;
 	try {
-		const res = await fetch(
-			`${SUPABASE_URL}/rest/v1/game_progress?game_id=eq.${encodeURIComponent(gameId)}` +
-				`&player_id=eq.${playerId()}&select=level,stars,best_score`,
-			{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
-		);
+		// The table is not readable: an open read would publish every player_id.
+		const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_progress`, {
+			method: 'POST',
+			headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ p_game: gameId, p_player: playerId() }),
+		});
 		if (!res.ok) return local;
 		const rows: { level: number; stars: number; best_score: number }[] = await res.json();
 		const merged = mergeIntoLocal(local, rows);

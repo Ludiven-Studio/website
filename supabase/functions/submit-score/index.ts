@@ -79,6 +79,8 @@ Deno.serve(async (req) => {
 	// Optional: score games may send a measured run length; time games omit it (value carries the time).
 	const duration = typeof payload.duration_seconds === 'number' && Number.isFinite(payload.duration_seconds) && payload.duration_seconds > 0
 		? payload.duration_seconds : null;
+	// Audit data is a few fields; an unbounded jsonb would be free storage for anyone.
+	if (JSON.stringify(payload.raw_data ?? null).length > 8192) return bad('raw_data too large');
 	const playerName = String(payload.player_name ?? '').trim().slice(0, 20);
 	const isDaily = payload.is_daily_challenge === true;
 

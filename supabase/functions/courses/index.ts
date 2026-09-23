@@ -10,6 +10,7 @@
 // Local:   supabase functions serve courses
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { ipKey } from '../_shared/ipKey.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -128,6 +129,21 @@ async function mailLinkedSpaces(db: SupabaseClient, email: string, nowIso: strin
 	return true;
 }
 
+// Flood guards, well above what a household does in a day.
+const CREATE_SPACE_IP_CAP = 20;
+const EMAIL_IP_CAP = 10;
+const EMAILS_PER_SPACE = 5;
+const ITEMS_PER_LIST = 300;
+
+/** Count one action for the caller's IP; true once over the daily cap. No pepper = no quota. */
+async function overIpQuota(db: SupabaseClient, req: Request, action: 'create_space' | 'email', cap: number): Promise<boolean> {
+	const ip = await ipKey(req);
+	if (!ip) return false;
+	const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+	const { data } = await db.rpc('courses_bump_quota', { p_action: action, p_subject: ip, p_day: day });
+	return typeof data === 'number' && data > cap;
+}
+
 /** Ensure a space exists. Returns its id or null. */
 async function requireSpace(db: SupabaseClient, spaceId: unknown): Promise<string | null> {
 	if (!isUuid(spaceId)) return null;
@@ -234,6 +250,7 @@ Deno.serve(async (req) => {
 	try {
 		// Create a brand-new space with one empty active list. No space uuid needed.
 		if (action === 'create_space') {
+			if (await overIpQuota(db, req, 'create_space', CREATE_SPACE_IP_CAP)) return bad('trop de listes créées aujourd’hui', 429);
 			const { data: space, error } = await db.from('courses_spaces').insert({}).select('id').single();
 			if (error) throw error;
 			return json(await snapshot(db, space.id as string));
@@ -307,6 +324,13 @@ Deno.serve(async (req) => {
 			const { data: existing } = await db.from('courses_spaces').select('id').in('id', ids);
 			const valid = ((existing ?? []) as { id: string }[]).map((r) => r.id);
 			if (!valid.length) return bad('unknown space', 404);
+			// A space is shared by a household, not a mailing list: cap the addresses on it.
+			const { data: linked } = await db.from('courses_emails').select('space_id, email').in('space_id', valid);
+			const perSpace = new Map<string, number>();
+			for (const r of (linked ?? []) as { space_id: string; email: string }[])
+				if (r.email !== email) perSpace.set(r.space_id, (perSpace.get(r.space_id) ?? 0) + 1);
+			if ([...perSpace.values()].some((n) => n >= EMAILS_PER_SPACE)) return bad('trop d’adresses sur cette liste', 409);
+			if (await overIpQuota(db, req, 'email', EMAIL_IP_CAP)) return bad('trop d’envois aujourd’hui', 429);
 			await db.from('courses_emails').upsert(
 				valid.map((space_id) => ({ email, space_id })),
 				{ onConflict: 'email,space_id' },
@@ -324,7 +348,8 @@ Deno.serve(async (req) => {
 			if (!emailConfigured()) return bad("l'envoi d'emails n'est pas configuré", 503);
 			const email = normEmail(body.email);
 			if (!email) return bad('email invalide');
-			await mailLinkedSpaces(db, email, now);
+			// Over quota answers like the normal path: a distinct reply would be an oracle.
+			if (!(await overIpQuota(db, req, 'email', EMAIL_IP_CAP))) await mailLinkedSpaces(db, email, now);
 			return json({ ok: true });
 		}
 
@@ -346,6 +371,8 @@ Deno.serve(async (req) => {
 				const list = await activeList(db, spaceId);
 				const label = clean(body.label, 120);
 				if (!label) return bad('empty label');
+				const { count: n } = await db.from('courses_items').select('id', { count: 'exact', head: true }).eq('list_id', list.id);
+				if ((n ?? 0) >= ITEMS_PER_LIST) return bad('liste pleine', 409);
 				await categoriesOf(db, spaceId); // seed aisles before any filing happens
 				// Explicit category wins; otherwise fall back to where this label went last time.
 				let categoryId: string | null;
@@ -505,6 +532,7 @@ Deno.serve(async (req) => {
 				return bad(`unknown action '${action}'`);
 		}
 	} catch (e) {
-		return json({ error: 'server error', detail: String(e) }, 500);
+		console.error(e);
+		return json({ error: 'server error' }, 500);
 	}
 });

@@ -8,7 +8,6 @@ interface Props {
 	event: MeetupEvent;
 	signups: readonly MeetupSignup[];
 	isOrganizer: boolean;
-	playerId: string;
 	name: string;
 	busy: boolean;
 	/** The verdict of the last action taken here, shown here. A page-level banner
@@ -26,10 +25,10 @@ interface Props {
 }
 
 export default function EventPanel({
-	event, signups, isOrganizer, playerId, name, busy, error, flash, placeSaved, shareUrl,
+	event, signups, isOrganizer, name, busy, error, flash, placeSaved, shareUrl,
 	onJoin, onLeave, onEdit, onCancel, onClose, onSavePlace,
 }: Props) {
-	const mine = signups.find((s) => s.player_id === playerId);
+	const mine = signups.find((s) => s.is_me);
 	const [seats, setSeats] = useState(mine?.seats ?? 1);
 	const [role, setRole] = useState<Role>(mine?.role ?? 'any');
 	const [who, setWho] = useState(mine?.player_name ?? name);
@@ -84,8 +83,8 @@ export default function EventPanel({
 
 			<ul className="re-who">
 				<li><strong>{event.organizer_name}</strong> (organisateur){event.organizer_seats > 1 ? ` ×${event.organizer_seats}` : ''}</li>
-				{signups.map((s) => (
-					<li key={s.player_id}>{s.player_name}{s.seats > 1 ? ` ×${s.seats}` : ''}</li>
+				{signups.map((s, i) => (
+					<li key={i}>{s.player_name}{s.seats > 1 ? ` ×${s.seats}` : ''}</li>
 				))}
 			</ul>
 

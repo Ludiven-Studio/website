@@ -61,7 +61,8 @@ export interface MeetupEvent {
 }
 
 export interface MeetupSignup {
-	player_id: string;
+	/** Set by the server from the caller's playerId; other players' ids are never sent. */
+	is_me: boolean;
 	player_name: string;
 	seats: number;
 	role: Role;

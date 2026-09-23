@@ -18,6 +18,7 @@
 // Secrets: MEETUPS_ADMIN_KEY (seed + guard cleanup), MEETUPS_IP_PEPPER (quota hashing)
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { ipKey } from '../_shared/ipKey.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -90,26 +91,12 @@ const CREATE_IP_CAP = 12;
 const JOIN_CAP = 20;
 
 const ADMIN_KEY = Deno.env.get('MEETUPS_ADMIN_KEY') ?? '';
-const IP_PEPPER = Deno.env.get('MEETUPS_IP_PEPPER') ?? '';
 
 function isAdmin(v: unknown): boolean {
 	if (!ADMIN_KEY || typeof v !== 'string' || v.length !== ADMIN_KEY.length) return false;
 	let diff = 0;
 	for (let i = 0; i < v.length; i++) diff |= v.charCodeAt(i) ^ ADMIN_KEY.charCodeAt(i);
 	return diff === 0; // compare every char so a wrong key can't be found byte by byte
-}
-
-/** Peppered SHA-256 of the caller's IP. The pepper is what makes this not
- *  personal data: the whole IPv4 space hashes in minutes, so a bare digest is
- *  reversible and would still be an identifier. No pepper set = no IP quota,
- *  rather than a false sense of one. */
-async function ipKey(req: Request): Promise<string | null> {
-	if (!IP_PEPPER) return null;
-	const fwd = req.headers.get('x-forwarded-for') ?? '';
-	const ip = (fwd.split(',')[0] || req.headers.get('cf-connecting-ip') || '').trim();
-	if (!ip) return null;
-	const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${IP_PEPPER}:${ip}`));
-	return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Count one action for the player AND for the IP. Both must stay under the cap:
@@ -247,7 +234,10 @@ Deno.serve(async (req) => {
 					.select(EMBED).eq('status', 'open').gte('ends_at', nowIso)
 					.order('starts_at').limit(500);
 				if (error) throw error;
-				const { data: spots } = await db.from('meetup_spots').select(SPOT_COLS).limit(1000);
+				// Confirmed spots (the OSM seed, or pinned by two organizers) first, so a flood of
+				// fresh user pins falls off the end instead of hiding real terrains.
+				const { data: spots } = await db.from('meetup_spots').select(SPOT_COLS)
+					.order('confirmed', { ascending: false }).order('created_at').limit(1000);
 				return json({
 					events: (events ?? []).map((r) => shapeEvent(r as Record<string, unknown>)),
 					spots: spots ?? [],
@@ -272,7 +262,12 @@ Deno.serve(async (req) => {
 						.select('id').eq('id', body.eventId).eq('secret', body.secret).maybeSingle();
 					isOrganizer = Boolean(own);
 				}
-				return json({ event: shapeEvent(data as Record<string, unknown>), signups: signups ?? [], isOrganizer });
+				// player_id is the only proof of identity for join/leave: never hand it out.
+				const me = isUuid(body.playerId) ? body.playerId : null;
+				const shaped = (signups ?? []).map((s) => ({
+					player_name: s.player_name, seats: s.seats, role: s.role, is_me: s.player_id === me,
+				}));
+				return json({ event: shapeEvent(data as Record<string, unknown>), signups: shaped, isOrganizer });
 			}
 
 			// « Mes parties ». Ownership is the secret, as everywhere else — organizer_id
@@ -484,6 +479,7 @@ Deno.serve(async (req) => {
 				return bad(`unknown action '${action}'`);
 		}
 	} catch (e) {
-		return json({ error: 'server error', detail: String(e) }, 500);
+		console.error(e);
+		return json({ error: 'server error' }, 500);
 	}
 });

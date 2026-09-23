@@ -42,8 +42,8 @@ export const listMeetups = (): Promise<{ events: MeetupEvent[]; spots: MeetupSpo
 
 /** The ?e= link. Returns cancelled and finished events too — a signed-up player
  *  has no other way of learning the game is off. */
-export const getMeetup = (eventId: string, secret?: string): Promise<{ event: MeetupEvent; signups: MeetupSignup[]; isOrganizer: boolean }> =>
-	call('get_event', { eventId, secret });
+export const getMeetup = (eventId: string, playerId: string, secret?: string): Promise<{ event: MeetupEvent; signups: MeetupSignup[]; isOrganizer: boolean }> =>
+	call('get_event', { eventId, playerId, secret });
 
 /** `secret` comes back exactly once. Keep it or the event is orphaned. */
 export const createMeetup = (input: EventInput): Promise<{ id: string; secret: string }> =>
