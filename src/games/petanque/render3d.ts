@@ -278,12 +278,13 @@ function buildBackdrop(seed: number, y: number, sun: SunSetup, keep: <T extends 
 	ridge(9, 3.2, [2, 3, 7], 0x1a2b, hz('#7f95ad', 0.45)); // the far mountains
 	ridge(5.5, 1.8, [3, 5, 11], 0x2c3d, hz('#8a9b6e', 0.4)); // the hills
 
-	// Three perched villages per repeat (nine round the horizon, so one is nearly always in view):
-	// houses stepped up a mound, the tallest in the middle.
+	// One perched village per repeat (three round the horizon), open country between them: houses
+	// stepped up a mound, the tallest in the middle. Nine read as one long town.
 	const WALLS = ['#e2c39b', '#d6ae80', '#ead6b6', '#c99b6c', '#dcb98d'];
 	const ROOFS = ['#b9643d', '#c7774c', '#a8553a', '#bd6a45'];
-	for (let v = 0; v < 3; v++) {
-		const cx = ((v + 0.25 + rnd(v, 0x3d71) * 0.5) / 3) * W;
+	const villageX = (0.3 + rnd(0, 0x3d71) * 0.4) * W;
+	for (let v = 0; v < 1; v++) {
+		const cx = villageX;
 		const span = 200 + rnd(v, 0x5a1) * 110;
 		const ground = ridgeAt(cx, 5.5, 1.8, [3, 5, 11], 0x2c3d) - 0.6;
 		const houses: { x: number; w: number; foot: number; h: number; c: string; r: string }[] = [];
@@ -331,9 +332,16 @@ function buildBackdrop(seed: number, y: number, sun: SunSetup, keep: <T extends 
 
 	// Olive groves and cypresses on the nearer slopes, then the dark foot of the wood line.
 	ridge(2.4, 0.9, [5, 13, 29], 0x4e09, '#7b8a58');
-	for (let k = 0; k < 70; k++) olive(rnd(k, 0x0a1) * W, ridgeAt(rnd(k, 0x0a1) * W, 2.4, 0.9, [5, 13, 29], 0x4e09) - 0.4, 0.9 + rnd(k, 0x0a2) * 0.8, rnd(k, 0x0a3) < 0.5 ? '#8a9866' : '#76865a');
-	for (let k = 0; k < 44; k++) {
-		const x = rnd(k, 0xc1) * W;
+	// Groves, not a carpet: olives and cypresses gather round the village and two other spots.
+	const groves = [villageX, (villageX + W * (0.3 + rnd(1, 0x9a1) * 0.1)) % W, (villageX + W * (0.62 + rnd(2, 0x9a1) * 0.1)) % W];
+	const near = (k: number, salt: number, spread: number): number =>
+		(groves[k % 3] + (rnd(k, salt) - 0.5) * spread + W) % W;
+	for (let k = 0; k < 36; k++) {
+		const x = near(k, 0x0a1, 420);
+		olive(x, ridgeAt(x, 2.4, 0.9, [5, 13, 29], 0x4e09) - 0.4, 0.9 + rnd(k, 0x0a2) * 0.8, rnd(k, 0x0a3) < 0.5 ? '#8a9866' : '#76865a');
+	}
+	for (let k = 0; k < 18; k++) {
+		const x = near(k, 0xc1, 260);
 		cypress(x, ridgeAt(x, 2.4, 0.9, [5, 13, 29], 0x4e09) - 0.6, 5 + rnd(k, 0xc2) * 4, (0.9 + rnd(k, 0xc3) * 0.5) * PX, rnd(k, 0xc4) < 0.5 ? '#3d5433' : '#35492d');
 	}
 	ridge(1.0, 0.35, [23, 41], 0x2d55, '#5c6f44');
@@ -366,12 +374,23 @@ function buildWall(grp: THREE.Group, seed: number, y: number, keep: <T extends {
 	const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
 	const p = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
 	const TONES = [0xcdb99a, 0xbfa885, 0xd8c7aa, 0xb39b78, 0xc6b08e];
+	/* Only in stretches, the hedge showing between them: a wall all the way round read as a pen.
+	   Three runs of 25-45 deg, each seeded. */
+	const runs = [0, 1, 2].map((r) => {
+		const from = ((r + hashN(r, seed ^ 0x61d) * 0.6) / 3) * Math.PI * 2;
+		return [from, from + (25 + hashN(r, seed ^ 0x62e) * 20) * D2R] as const;
+	});
+	const onWall = (a: number): boolean => runs.some(([f, t]) => {
+		const d = ((a - f) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+		return d <= t - f;
+	});
 	let i = 0;
 	for (let course = 0; course <= COURSES; course++) {
 		const cap = course === COURSES;
 		for (let k = 0; k < per; k++) {
 			const j = course * per + k;
 			const a = ((k + (course % 2) * 0.5) / per) * Math.PI * 2;
+			if (!onWall(a)) continue;
 			const jit = hashN(j, seed ^ 0x3a7);
 			const h = cap ? capH : courseH * (0.86 + jit * 0.1);
 			const d = WALL_R + (cap ? 0 : (hashN(j, seed ^ 0x19f) - 0.5) * 0.04); // a dry wall is never flush
@@ -384,6 +403,7 @@ function buildWall(grp: THREE.Group, seed: number, y: number, keep: <T extends {
 			i++;
 		}
 	}
+	inst.count = i; // stones off the runs were skipped
 	inst.instanceMatrix.needsUpdate = true;
 	grp.add(inst);
 	keep({ dispose: () => inst.dispose() });
@@ -429,8 +449,12 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 		const x = Math.cos(a) * d, z = Math.sin(a) * d;
 		// Clear behind each end of the lane: that is where the eye looks, and the village is the view.
 		if (Math.abs(x) < RIM_VIEW) continue;
-		// Near half are cypresses: the tall dark flames that say Provence before anything else does.
-		if (hashN(k, seed ^ 0x07a2) < 0.45) cypresses.push({ x, z, h: 6 + hashN(k, seed ^ 0x19c) * 3.5, w: 0.65 + hashN(k, seed ^ 0x2b4) * 0.3 });
+		// Cypresses in two stands, not sprinkled everywhere: the tall dark flames that say Provence.
+		const stand = Math.min(...[0, 1].map((s2) => {
+			const c = (s2 * 0.5 + hashN(s2, seed ^ 0x07b3)) * Math.PI * 2;
+			return Math.abs(((a - c + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+		}));
+		if (stand < 0.35) cypresses.push({ x, z, h: 6 + hashN(k, seed ^ 0x19c) * 3.5, w: 0.65 + hashN(k, seed ^ 0x2b4) * 0.3 });
 		else rim.push({ x, z, r: 0.7 + hashN(k, seed ^ 0x1f5b) * 1.8 });
 	}
 	const forest = trees.concat(rim);
