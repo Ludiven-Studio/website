@@ -256,11 +256,11 @@ describe('the jack throw', () => {
 		expect(miss[miss.length - 1]).toBeGreaterThan(0.1); // and never a free placement
 	});
 
-	/* The ring may only offer spots the throw can reach. The UI clamps the aim to MIN+0.5 / MAX-1.0,
-	   asymmetric because a speed error stretches outwards; at the raw edges the far one missed the
-	   window 48 % of the time, which turned "choose your spot" into a coin flip for hand placing.
-	   These are the two numbers that margin was cut from, so they belong in a test. */
-	it('keeps the aimable window inside what the throw can hit', () => {
+	/* The risk profile of aiming the jack. The ring now reaches the raw lines (the player picks the
+	   risk), so these are what the player is choosing between: 6.5 / 9 m are safe, asymmetric because
+	   a speed error stretches outwards, and the far raw edge misses the window often — the rule then
+	   hands the placing to the opponent. */
+	it('makes the window edges a real gamble and the inner window safe', () => {
 		const rate = (want: number): number => {
 			let out = 0, n = 0;
 			for (const id of ['terre-battue', 'gravier-gros', 'sable'] as SurfaceId[]) {

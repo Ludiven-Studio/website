@@ -257,15 +257,15 @@ const FOV_TAU = 0.22;
 
 const JACK_AIM_R = 0.45; // m — the target ring for the jack throw, a bullseye on the lane
 
-/* The ring may only offer spots the throw can actually hit. Hand placing keeps 0.15 m of margin
-   because the spot is exact; a THROWN jack carries JACK_SPREAD_PLAYER, and the two ends are not
-   symmetric — a speed error stretches outwards. Measured over 2160 deals per distance (every
-   surface x 3 reliefs x 40 seeds), share landing outside the 6-10 m window:
+/* The ring runs right up to the window's lines, which are drawn on the ground: a ring that stopped
+   a metre short of a visible line read as a bug. The edges are a real gamble, and that is the rule's
+   own answer — a jack out of the window goes to the opponent to place. A THROWN jack carries
+   JACK_SPREAD_PLAYER, and a speed error stretches outwards. Measured over 2160 deals per distance
+   (every surface x 3 reliefs x 40 seeds), share landing outside the 6-10 m window:
      6.15 m 13.5 %   6.30 m 2.9 %   6.40 m 1.9 %   6.50 m 1.5 %
      8.80 m  1.0 %   9.00 m 1.9 %   9.15 m 3.5 %   9.60 m 18.1 %   9.85 m 47.5 %
-   So the ring stops at ~2 % either side. Missing still happens, and hand placing is still the
-   official answer to it — it is just no longer the coin flip the far edge used to be. */
-const AIM_LO = MIN_JACK + 0.5, AIM_HI = MAX_JACK - 1.0;
+   It used to stop at ~2 % either side (6.5 / 9 m); the player now picks the risk. */
+const AIM_LO = MIN_JACK, AIM_HI = MAX_JACK;
 
 const AIM_DEAD_PX = 8; // sideways slack before a power pull counts as a direction change
 /* The launch board: a FIXED pad, centred on the bottom edge, where a full-width band used to take
@@ -633,6 +633,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			fx: makeFx(scene),
 			meshes: [], halos: [], shades: [], arcAir: null, arcRoll: null,
 		};
+		/* Size it now. The landing waits for the progression before laying a pitch, so the scene is
+		   born after the resize observer's first call, which found nothing to size: the camera kept
+		   aspect 1 and the per-aspect field (58 deg) until the next resize. */
+		const wrap = wrapRef.current;
+		if (wrap) {
+			const w = wrap.clientWidth, h = wrap.clientHeight || Math.round(w * 0.625);
+			renderer.setSize(w, h, false);
+			camera.aspect = w / Math.max(1, h);
+			camera.updateProjectionMatrix();
+		}
 		return true;
 	}, []);
 
@@ -1971,6 +1981,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			g.fx.puff(x, im.z, z, im.speed * 0.6, 0xf2e6d2);
 			if (im.speed > 3.5) g.fx.ring(x, im.z - BOULE_R, z, 0xffd166);
 			sfx.clack(im.speed, im.jack);
+		} else if (im.kind === 'out') {
+			// Crossing the line low means running into the plank; a lob sails over it in silence.
+			if (im.z - heightAt(s.t, im.x, im.y) < 0.12) sfx.plank(im.speed, im.jack);
 		} else if (im.kind === 'pebble') {
 			if (im.speed < 1) return;
 			g.fx.puff(x, im.z + 0.01, z, im.speed * 0.35, DUST[s.t.surface.id]);
@@ -2332,13 +2345,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		return () => cancelAnimationFrame(raf);
 	}, []);
 
-	/* Landing. A free pitch goes up at once so the canvas is never blank, then the ladder takes
-	   over on the level the player is actually on. A ?defi deep link is ModeToggle's job. */
+	/* Landing. Wait for the ladder BEFORE laying anything: a free pitch laid first showed a gravel
+	   ground and "13 points" for ~2 s, then swapped to the level the player is really on. Until the
+	   progression answers, a plain loading card stands in. No level to resume (all cleared, or the
+	   progression unreachable) falls back to a free game. A ?defi deep link is ModeToggle's job. */
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
 		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
-		newGame('moyen');
-		void lv.resume().then((next) => { if (next != null) startLevel(next); });
+		void lv.resume().then((next) => { if (next != null) startLevel(next); else newGame('moyen'); });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
@@ -2755,7 +2769,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					/* The TV board: who plays, how many boules each side has left, and the score.
 					   Boules are coloured by SIDE, never a hardcoded green and red — online the guest
 					   sits in seat 1, so its own rings are the red ones. */
-					<div className="pe-board">
+					<div className="pe-board" style={lv.booting && !daily ? { visibility: 'hidden' } : undefined}>
 						<div className={`pe-side ${myTurn && status !== 'rolling' ? 'on' : ''}`}>
 							<span className="pe-side-name">😎 Toi</span>
 							<span className="pe-dots" style={{ color: hex(HALO[mySide]) }}>
@@ -2801,6 +2815,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{/* Niveaux has its own outcome beat (LevelOutcome), so the confetti must not double up. */}
 				{celebrating && !lv.active && <Celebration />}
 				<canvas ref={canvasRef} className="pe-canvas" onPointerDown={onPointerDown} onContextMenu={(e) => e.preventDefault()} />
+
+				{lv.booting && !daily && !webglError && (
+					<div className="pe-overlay pe-booting"><div className="pe-card">Chargement du terrain…</div></div>
+				)}
 
 				{webglError && (
 					<div className="pe-overlay"><div className="pe-card">Ton appareil ne peut pas afficher le terrain 3D (WebGL indisponible).</div></div>
@@ -2849,6 +2867,19 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				    the first contact of the session — the whole complaint was that nobody found it. */}
 				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
+					{/* The gesture, drawn: an arrow lying on the ground and running away up the lane —
+					    press, then push forward. Gone once the pull has started; the fill says it then. */}
+					{armLive && power === 0 && (
+						<svg className={`pe-arm-arrow${armed ? ' held' : ''}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+							<defs>
+								<linearGradient id="pe-arrow-g" x1="0" y1="1" x2="0" y2="0">
+									<stop offset="0" stopColor="#ffd166" stopOpacity="0.04" />
+									<stop offset="1" stopColor="#ffd166" stopOpacity="0.55" />
+								</linearGradient>
+							</defs>
+							<path d="M18 100 L82 100 L61 42 L73 42 L50 3 L27 42 L39 42 Z" fill="url(#pe-arrow-g)" stroke="#ffd166" strokeOpacity="0.35" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+						</svg>
+					)}
 					{/* The graduations. Where the finger lands decides the angle, and a board with no
 					    marks on it would make that a secret. */}
 					{armLive && view === 'jeu' && !jackPhase && (
@@ -3316,6 +3347,12 @@ const CSS = `
    the word only names it. Placed from the top and not from the bottom, because the board is upside
    down on purpose — Plomb is the bottom row and Roulette the top one. */
 .pe-board-marks { position: absolute; left: 10px; right: 10px; top: 0; bottom: 0; pointer-events: none; }
+/* Between the names (left) and the ticks (right), so it covers neither. Wide at the thumb, narrow at
+   the seam: perspective, the lane running away from the player. It drifts up while waiting. */
+.pe-arm-arrow { position: absolute; left: calc(50% - 26px); width: 60px; top: 8px; bottom: 6px; height: calc(100% - 14px); pointer-events: none; animation: pe-arrow-go 1.8s ease-in-out infinite; }
+.pe-arm-arrow.held { animation: none; opacity: 1; }
+@keyframes pe-arrow-go { 0%, 100% { transform: translateY(3px); opacity: 0.7; } 50% { transform: translateY(-3px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pe-arm-arrow { animation: none; } }
 .pe-board-mark { position: absolute; left: 0; right: 0; text-align: left; color: #f0e6da; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.62; text-shadow: 0 1px 3px rgba(0,0,0,0.85); transform: translateY(-50%); }
 .pe-board-mark::after { content: ''; position: absolute; top: 50%; right: 0; width: 30px; border-top: 1.5px solid rgba(255,255,255,0.3); }
 .pe-board-mark.on { color: #ffd166; opacity: 1; font-size: 11px; }
@@ -3354,6 +3391,9 @@ const CSS = `
 /* The cards live inside pe-playwrap, which is 16/10 and clips. On a phone that is ~240 px of room
    for a lobby that is 300 px tall, and the Rejoindre row fell off the bottom with nothing to say
    so. The overlay scrolls and the card is allowed to fill it. */
+/* Sky-coloured like the empty canvas under it, so the first real frame is not a flash. */
+.pe-booting { background: #7fb4dd; pointer-events: none; }
+.pe-booting .pe-card { font-size: 14px; padding: 10px 18px; opacity: 0.9; }
 .pe-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; padding: 8px; overflow: auto; }
 .pe-levels { align-items: flex-start; overflow-y: auto; padding: 16px 12px; background: color-mix(in srgb, var(--gray-999) 82%, transparent); }
 .pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; margin: auto; }
