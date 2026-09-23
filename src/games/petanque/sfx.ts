@@ -131,10 +131,13 @@ export function groundHit(speed: number, surface: string): void {
 	if (coarse) noiseHit(c, 'highpass', 3200, 0.9, (0.03 + v * 0.10) * (surface === 'gravier-gros' ? 1.4 : 1), 0.03);
 }
 
-/* A hollow steel boule's ring: inharmonic partials at FIXED pitches. The old clack slid each tone
-   down by ~1 kHz, which is a "pew", not metal. Higher partials die first, as they do in the shell. */
-// About an octave under the first version, which read as small and tinny for 700 g of steel.
-const STEEL = [{ f: 1180, a: 1, d: 0.18 }, { f: 1930, a: 0.6, d: 0.12 }, { f: 2840, a: 0.35, d: 0.07 }];
+/* Measured on a real shooting video (boule on boule): a click centred at 2.4-4.3 kHz, energy in
+   1.1-1.8 kHz peaks, and 20 dB gone in 5-10 ms. So a knock, not a bell: the partials below die in
+   ~30 ms (the ramp runs to -60 dB, so -20 dB lands at a third of `d`). The first version rang for
+   up to 180 ms and read as a chime. */
+const STEEL = [{ f: 1150, a: 0.7, d: 0.03 }, { f: 1500, a: 1, d: 0.035 }, { f: 1760, a: 0.9, d: 0.03 }, { f: 2100, a: 0.5, d: 0.025 }];
+// The same video's other family: 320-900 Hz with near-harmonic peaks and 30-75 ms to -20 dB. Wood.
+const PLANK = [{ f: 320, a: 1, d: 0.14 }, { f: 470, a: 0.9, d: 0.12 }, { f: 630, a: 0.5, d: 0.09 }, { f: 900, a: 0.3, d: 0.06 }];
 
 /**
  * Two boules collide: a hard click, then the shell rings. Against the jack it is a dull wooden "toc"
@@ -153,12 +156,23 @@ export function clack(speed: number, jack = false): void {
 		tone(c, 'sine', 1300 + v * 200, 1300 + v * 200, 0.04 * loud + 0.01, 0.018, 0, rate);
 		return;
 	}
-	const detune = 0.97 + Math.random() * 0.06; // no two boules ring at quite the same pitch
-	noiseHit(c, 'bandpass', 1800, 0.8, 0.35 * loud, 0.01);
+	const detune = 0.95 + Math.random() * 0.1; // no two boules ring at quite the same pitch
+	noiseHit(c, 'bandpass', 3200, 0.9, 0.45 * loud, 0.006);
 	for (const p of STEEL) {
 		const f = p.f * detune;
-		tone(c, 'sine', f, f, 0.14 * p.a * loud, p.d * (0.6 + 0.4 * v), 0, rate);
+		tone(c, 'sine', f, f, 0.16 * p.a * loud, p.d * (0.7 + 0.3 * v), 0, rate);
 	}
+}
+
+/** A body runs into the wooden plank round the pitch: a hollow knock. The jack is lighter. */
+export function plank(speed: number, jack = false): void {
+	if (speed < 0.3) return;
+	const c = gate('plank', 90);
+	if (!c) return;
+	const v = clamp01(speed / 6);
+	const loud = (0.3 + 0.7 * v) * (jack ? 0.4 : 1);
+	noiseHit(c, 'lowpass', 1400, 0.7, 0.18 * loud, 0.02);
+	for (const p of PLANK) tone(c, 'sine', p.f, p.f, 0.2 * p.a * loud, p.d, 0, rate);
 }
 
 /** A boule clips a stone: a tiny high tick. */

@@ -232,10 +232,11 @@ export function stepSim(s: Sim, dt: number, imp?: Impact[]): StepResult {
 		for (let i = 0; i < bs.length; i++) {
 			const b = bs[i];
 			if (!b.live || inPitch(b.x, b.y)) continue;
+			const outSpeed = speed3(b); // what it hits the plank with; for the sound only
 			b.live = false;
 			b.vx = 0; b.vy = 0; b.vz = 0;
 			res.out.push(i);
-			imp?.push({ kind: 'out', x: b.x, y: b.y, z: b.z, speed: 0 });
+			imp?.push({ kind: 'out', x: b.x, y: b.y, z: b.z, speed: outSpeed, jack: b.side === -1 });
 		}
 	}
 	return res;
