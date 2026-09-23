@@ -128,15 +128,22 @@ export function unlockedUpTo(p: GameProgress): number {
 }
 
 /** Read the player's progression: localStorage first (instant), then reconcile with the server. */
+const PROGRESS_TIMEOUT_MS = 2500;
+
 export async function getProgression(gameId: string): Promise<GameProgress> {
 	const local = loadLocal(gameId);
 	if (!leaderboardEnabled()) return local;
+	// Games wait on this before laying their first board, so a stalled network must not stall the
+	// page: past the cap, the local copy is the answer.
+	const abort = new AbortController();
+	const timer = setTimeout(() => abort.abort(), PROGRESS_TIMEOUT_MS);
 	try {
 		// The table is not readable: an open read would publish every player_id.
 		const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_progress`, {
 			method: 'POST',
 			headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
 			body: JSON.stringify({ p_game: gameId, p_player: playerId() }),
+			signal: abort.signal,
 		});
 		if (!res.ok) return local;
 		const rows: { level: number; stars: number; best_score: number }[] = await res.json();
@@ -145,6 +152,8 @@ export async function getProgression(gameId: string): Promise<GameProgress> {
 		return merged;
 	} catch {
 		return local;
+	} finally {
+		clearTimeout(timer);
 	}
 }
 
