@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
 	type Terrain, type SurfaceId, PITCH_W, PITCH_L, CELL, heightAt, hashN,
 } from './terrain';
@@ -848,13 +849,50 @@ export const CIRCLE_R = 0.25; // m — the official throwing circle is 35 to 50 
  */
 export function groundRing(t: Terrain, cx: number, cy: number, r: number, color: number, tube = 0.022, opacity = 1): THREE.Mesh {
 	const n = Math.max(48, Math.round(r * 24));
-	const pts: THREE.Vector3[] = [];
-	for (let i = 0; i < n; i++) {
-		const a = (i / n) * Math.PI * 2;
+	const at = (a: number): THREE.Vector3 => {
 		const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-		pts.push(new THREE.Vector3(wx(x), heightAt(t, x, y) + tube, wz(y)));
+		return new THREE.Vector3(wx(x), heightAt(t, x, y) + tube, wz(y));
+	};
+	const inside = (a: number): boolean => {
+		const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+		return x >= 0 && x <= PITCH_W && y >= 0 && y <= PITCH_L;
+	};
+	const step = (Math.PI * 2) / n;
+	let start = -1;
+	for (let i = 0; i < n; i++) if (!inside(i * step)) { start = i; break; }
+	let geo: THREE.BufferGeometry;
+	if (start < 0) {
+		const pts: THREE.Vector3[] = [];
+		for (let i = 0; i < n; i++) pts.push(at(i * step));
+		geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), n, tube, 5, true);
+	} else {
+		/* Only the arcs over the pitch: the 10 m window and the distance rings used to run on across
+		   the grass. Walk the circle from a point outside; each inside run is its own open tube, ended
+		   on the exact line crossing (bisection), not on the last sample before it. */
+		const edge = (aIn: number, aOut: number): number => {
+			for (let k = 0; k < 14; k++) { const mid = (aIn + aOut) / 2; if (inside(mid)) aIn = mid; else aOut = mid; }
+			return aIn;
+		};
+		const parts: THREE.BufferGeometry[] = [];
+		let run: THREE.Vector3[] = [];
+		const close = (): void => {
+			if (run.length >= 2) parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(run, false), run.length * 2, tube, 5, false));
+			run = [];
+		};
+		for (let k = 1; k <= n; k++) {
+			const a = (start + k) * step, prev = a - step;
+			if (inside(a)) {
+				if (!run.length) run.push(at(edge(a, prev)));
+				run.push(at(a));
+			} else if (run.length) {
+				run.push(at(edge(prev, a)));
+				close();
+			}
+		}
+		close();
+		geo = parts.length ? mergeGeometries(parts) : new THREE.BufferGeometry();
+		for (const p of parts) p.dispose();
 	}
-	const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), n, tube, 5, true);
 	// `depthWrite: false` on the see-through ones: six of them cross, and a tube that wrote depth
 	// would punch a hole in every ring drawn after it.
 	const mat = new THREE.MeshBasicMaterial(opacity < 1
