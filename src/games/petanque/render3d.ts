@@ -33,7 +33,28 @@ const SURFACE_TINT: Record<SurfaceId, [number, number]> = {
 	sable: [0xe0c489, 0xc4a468],
 };
 
-/* ---------- procedural textures (ComfyUI art replaces these in M9) ---------- */
+/* ---------- textures ---------- */
+
+// ComfyUI tiles (scripts/comfy-petanque.mjs, gated by measure-petanque-tex.mjs). Loaded once for
+// the session and shared by every deal; the procedural grain below stays as the map until the
+// file lands, and for good when it never does (offline before the image cache has it).
+const tilePool = new Map<string, Promise<THREE.Texture>>();
+
+function loadTile(file: string): Promise<THREE.Texture> {
+	const url = `/assets/jeux/petanque/${file}`;
+	let p = tilePool.get(url);
+	if (!p) {
+		p = new THREE.TextureLoader().loadAsync(url).then((t) => {
+			t.wrapS = t.wrapT = THREE.RepeatWrapping;
+			t.colorSpace = THREE.SRGBColorSpace;
+			t.anisotropy = 8;
+			return t;
+		});
+		p.catch(() => tilePool.delete(url)); // a failed load may succeed on the next deal
+		tilePool.set(url, p);
+	}
+	return p;
+}
 
 const hexOf = (n: number): string => '#' + n.toString(16).padStart(6, '0');
 
@@ -379,6 +400,13 @@ export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
 	const grains = t.surface.id === 'sable' ? 2600 : 1400;
 	const dot = t.surface.id === 'gravier-gros' ? 3.4 : t.surface.id === 'gravier-fin' ? 2.2 : 1.5;
 	const groundMat = new THREE.MeshStandardMaterial({ map: keep(groundTexture(t.surface.id, grains, dot)), roughness: 1, metalness: 0 });
+	let disposed = false;
+	// Same tint as the procedural grain, so the swap changes the grain, never the colour.
+	loadTile(`sol-${t.surface.id}.webp`).then((tex) => {
+		if (disposed) return; // the deal changed while the file was on its way
+		groundMat.map = tex;
+		groundMat.needsUpdate = true;
+	}, () => { /* keep the procedural grain */ });
 	const ground = new THREE.Mesh(geo, groundMat);
 	ground.receiveShadow = true;
 	grp.add(ground);
@@ -406,6 +434,9 @@ export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
 	// Pebbles: the ones you see are exactly the ones the engine can deflect a boule on.
 	if (t.pebbles.length) {
 		const pGeo = keep(new THREE.IcosahedronGeometry(1, 0));
+		// Untextured on purpose. A mottled ComfyUI tile was made, wired and measured from the game view
+		// on coarse gravel: 0.0025 levels of difference, against 0.3-0.8 for the ground tiles. A stone
+		// is 5-12 px on screen, so its texture mipmaps down to its own mean colour.
 		const pMat = keep(new THREE.MeshStandardMaterial({ color: SURFACE_TINT[t.surface.id][1], roughness: 0.95, flatShading: true }));
 		const inst = new THREE.InstancedMesh(pGeo, pMat, t.pebbles.length);
 		inst.castShadow = false; // 1500 shadow casters is the whole frame budget, for 1 cm stones
@@ -433,7 +464,8 @@ export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
 		group: grp,
 		groundMat,
 		dispose() {
-			for (const d of junk) d.dispose();
+			disposed = true;
+			for (const d of junk) d.dispose(); // pooled tiles are shared across deals: never here
 			groundMat.dispose();
 		},
 	};

@@ -25,6 +25,9 @@ const DIR = arg('dir', 'D:/tmp/comfy/petanque');
 const WORK = 512;
 // Set by --selftest, not by taste: 0 false alarms on 8 seamless tiles, 7 of 8 real seams caught.
 const SEAM_MAX = 3.0;
+// Above every procedural control (0.40-0.82); the two tiles that showed a stripe in the render read
+// 2.16 (terre-battue) and 1.22 (sable).
+const BAND_MAX = 1.0;
 
 // Mirrors SURFACE_TINT and the grain knobs in src/games/petanque/render3d.ts.
 const SURFACES = [
@@ -113,6 +116,27 @@ function seam(d, w, h) {
 	return { h: z(colDiff(w - 1, 0), cols), v: z(rowDiff(h - 1, 0), rows2) };
 }
 
+/**
+ * Band score, in standard deviations: how far the mean of the wrap-blend band (the first 1/8 of the
+ * tile, where comfy-petanque.mjs cross-fades) sits from the other column (row) means. `seam` cannot see
+ * this: there is no edge, only a 12 cm strip a few levels darker. Invisible at full size, it came
+ * back as a stripe every metre once the pitch was mipmapped. The control has no band, so it reads
+ * whatever the first eighth of any grain reads by chance.
+ */
+function bandScore(d, w, h) {
+	const col = new Float64Array(w), row = new Float64Array(h);
+	for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const l = lum(d, w, x, y); col[x] += l / h; row[y] += l / w; }
+	const z = (a, n) => {
+		const b = Math.round(n / 8);
+		const mean = (s, e) => { let t = 0; for (let k = s; k < e; k++) t += a[k]; return t / (e - s); };
+		const m = mean(b, n);
+		let v = 0;
+		for (let k = b; k < n; k++) v += (a[k] - m) ** 2;
+		return Math.abs(mean(0, b) - m) / Math.max(Math.sqrt(v / (n - b)), 0.05);
+	};
+	return Math.max(z(col, w), z(row, h));
+}
+
 /** Painted light: luminance spread once the grain is averaged away. A flat-lit tile trends to 0. */
 async function blotch(img) {
 	const { data } = await img.clone().removeAlpha().resize(16, 16, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
@@ -184,7 +208,7 @@ const dE = (a, b) => Math.hypot(...lab(a).map((v, i) => v - lab(b)[i]));
 async function measure(img) {
 	const { data, info } = await img.clone().removeAlpha().raw().toBuffer({ resolveWithObject: true });
 	const s = seam(data, info.width, info.height);
-	return { seamH: s.h, seamV: s.v, blotch: await blotch(img), mid: await midScale(img), grain: await grain(img), rgb: await meanRGB(img), px: info.width };
+	return { seamH: s.h, seamV: s.v, band: bandScore(data, info.width, info.height), blotch: await blotch(img), mid: await midScale(img), grain: await grain(img), rgb: await meanRGB(img), px: info.width };
 }
 
 /* A green metric proves nothing until it goes red on the fault it claims to catch. The positive
@@ -220,9 +244,9 @@ for (const s of SURFACES) {
 }
 
 console.log(`\ncouture mesurée en natif · taches et mi-échelle à ${WORK}²  ·  dossier ${DIR}\n`);
-console.log('sol                source                natif  couture↔  couture↕   taches  mi-échelle%    grain   RVB moyen');
+console.log('sol                source                natif  couture↔  couture↕   bande   taches  mi-échelle%    grain   RVB moyen');
 for (const r of rows) {
-	console.log(`${r.id.padEnd(18)} ${r.src.padEnd(20)}${String(r.px).padStart(6)}  ${n2(r.seamH)}  ${n2(r.seamV)}  ${n2(r.blotch)}  ${n2(r.mid)}   ${n2(r.grain)}   ${r.rgb.map((v) => Math.round(v)).join(',')}`);
+	console.log(`${r.id.padEnd(18)} ${r.src.padEnd(20)}${String(r.px).padStart(6)}  ${n2(r.seamH)}  ${n2(r.seamV)}  ${n2(r.band)}  ${n2(r.blotch)}  ${n2(r.mid)}   ${n2(r.grain)}   ${r.rgb.map((v) => Math.round(v)).join(',')}`);
 }
 
 const gen = rows.filter((r) => r.src === 'ComfyUI');
@@ -259,6 +283,7 @@ for (const g of gen) {
 	const c = by(ctl, g.id);
 	const fails = [];
 	if (Math.max(g.seamH, g.seamV) > SEAM_MAX) fails.push(`couture ${Math.max(g.seamH, g.seamV).toFixed(2)}σ (témoin ${Math.max(c.seamH, c.seamV).toFixed(2)})`);
+	if (g.band > BAND_MAX) fails.push(`bande de raccord ${g.band.toFixed(2)}σ (témoin ${c.band.toFixed(2)})`);
 	if (g.blotch > Math.max(3 * c.blotch, 2)) fails.push(`lumière peinte ${g.blotch.toFixed(2)} (témoin ${c.blotch.toFixed(2)})`);
 	if (g.mid > Math.max(3 * c.mid, 5)) fails.push(`structures mi-échelle ${g.mid.toFixed(1)} % (témoin ${c.mid.toFixed(1)} %)`);
 	// Two-sided on purpose: a texture with less grain than the procedural one is not an upgrade, it

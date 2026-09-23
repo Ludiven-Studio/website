@@ -36,6 +36,7 @@ const STEPS = Number(arg('steps', 8));
 const SEED = Number(arg('seed', 1770));
 const CONTRAST = Number(arg('contrast', 1));
 const PUNCH = Number(arg('punch', 1)); // global multiplier on the per-ground punch, for A/B runs
+const ONLY = arg('only', ''); // regenerate one ground, e.g. --only sol-terre-battue
 const TMP = arg('tmp', 'D:/tmp/comfy/petanque');
 const DEST = arg('out', 'public') === 'public' ? resolve('public/assets/jeux/petanque') : TMP;
 
@@ -57,7 +58,9 @@ const NEG = 'shadow, vignette, uneven lighting, large rocks, boulder, object, pl
 // not exist — at 6.4 cm the gravel finally read as gravel while the clay turned into embossed
 // wallpaper, and that is not a compromise to split, it is two different surfaces.
 const GROUNDS = [
-	{ id: 'sol-terre-battue', prompt: 'packed ocre clay court ground, very fine dry dust, smooth and predictable', tint: [0xb5763f, 0x8a5426], punch: 1.0, cut: 1.4 },
+	// seed 2001: the only one of 2001-2008 under the painted-light bar before the band fix (2.52;
+	// the others 3.0-4.2). Since the drift removal in grainToTint it reads 1.43.
+	{ id: 'sol-terre-battue', prompt: 'packed ocre clay court ground, very fine dry dust, smooth and predictable', tint: [0xb5763f, 0x8a5426], punch: 1.0, cut: 1.4, seed: 2001 },
 	{ id: 'sol-gravier-fin', prompt: 'fine gravel grit, small even granules, stone dust', tint: [0x9a988f, 0x77746c], punch: 1.5, cut: 2.8 },
 	{ id: 'sol-gravier-gros', prompt: 'coarse gravel chippings, high contrast granules, broken stone', tint: [0x6f6a61, 0x4a463f], punch: 2.2, cut: 4.8 },
 	{ id: 'sol-sable', prompt: 'soft sand, fine even sand grain', tint: [0xe0c489, 0xc4a468], punch: 0.8, cut: 1.8 },
@@ -71,20 +74,30 @@ const GROUNDS = [
 function wrapBlend(data, ws, ch, side, band) {
 	const out = Buffer.alloc(side * side * ch);
 	const at = (x, y, c) => data[(y * ws + x) * ch + c];
+	const mean = new Float64Array(ch);
+	for (let i = 0; i < data.length; i++) mean[i % ch] += data[i];
+	for (let c = 0; c < ch; c++) mean[c] /= data.length / ch;
 	for (let y = 0; y < side; y++) {
 		const wy = y < band ? y / band : 1;
 		for (let x = 0; x < side; x++) {
 			const wx = x < band ? x / band : 1;
+			/* Two unrelated grains averaged 50/50 keep only 1/√2 of their contrast. That weaker band
+			   then clipped less in grainToTint, and its mean drifted: a 12 cm stripe every metre,
+			   4.5 levels dark on terre-battue, invisible at full size and plain once mipmapped.
+			   Dividing the deviation by the weights' L2 norm keeps the contrast constant. */
+			const w = [wx * wy, (1 - wx) * wy, wx * (1 - wy), (1 - wx) * (1 - wy)];
+			const norm = Math.sqrt(w[0] ** 2 + w[1] ** 2 + w[2] ** 2 + w[3] ** 2);
 			for (let c = 0; c < ch; c++) {
 				// Only sample the far copy where it carries weight. The source is side+band wide, so
 				// at(x + side) is out of bounds for x >= band; multiplying that undefined by a zero
 				// weight yields NaN, and Math.round(NaN) stored into a Buffer becomes 0 — which
 				// silently blacked out everything outside the band.
-				let v = wx * wy * at(x, y, c);
-				if (wx < 1) v += (1 - wx) * wy * at(x + side, y, c);
-				if (wy < 1) v += wx * (1 - wy) * at(x, y + side, c);
-				if (wx < 1 && wy < 1) v += (1 - wx) * (1 - wy) * at(x + side, y + side, c);
-				out[(y * side + x) * ch + c] = Math.round(v);
+				let v = w[0] * at(x, y, c);
+				if (wx < 1) v += w[1] * at(x + side, y, c);
+				if (wy < 1) v += w[2] * at(x, y + side, c);
+				if (wx < 1 && wy < 1) v += w[3] * at(x + side, y + side, c);
+				v = mean[c] + (v - mean[c]) / norm;
+				out[(y * side + x) * ch + c] = Math.max(0, Math.min(255, Math.round(v)));
 			}
 		}
 	}
@@ -160,14 +173,36 @@ async function grainToTint(data, side, ch, { tint, punch, cut }, contrast) {
 		for (let c = 0; c < 3; c++) out[i * 3 + c] = Math.max(0, Math.min(255, Math.round(base[c] + (t[c] - base[c]) * k)));
 	}
 
-	/* A residue of painted light survives on terre-battue (2.74 against a 2.73 bar): the clamp at
-	   |a| = 1 is still a nonlinearity and clips a skewed grain — bright dust specks on dark clay —
-	   unevenly. Two treatments were written, measured and REMOVED: flattening the grain envelope
-	   before the map (no effect at all, 4.38 -> 4.47) and flattening the output luminance after it
-	   (worse, 2.74 -> 2.86, and it pushed every seam score up by ~1 sigma). Both blurred at 12.8 cm
-	   while `blotch` reads 6.4 cm blocks, so neither ever touched the band being measured. Left as a
-	   declared cost: 2.74 levels on a base of ~130 is 2 % across a metre, well inside the 0.67-4.94
-	   range the procedural control itself spans, and far under what three.js lighting varies. */
+	/* Even contrast-preserved, the cross-faded band clips differently from the rest (a sum of two
+	   skewed grains is less skewed), so its mean still drifts: 1.82σ on terre-battue after the fix
+	   in wrapBlend. Remove the slow drift of the column and row means directly. The profile is
+	   smoothed over a wrapped window, so the tile stays seamless and single-pixel grain is untouched. */
+	const L = (i) => 0.2126 * out[i * 3] + 0.7152 * out[i * 3 + 1] + 0.0722 * out[i * 3 + 2];
+	const colM = new Float64Array(side), rowM = new Float64Array(side);
+	let all = 0;
+	for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) { const l = L(y * side + x); colM[x] += l / side; rowM[y] += l / side; all += l; }
+	all /= side * side;
+	const smooth = (a, win) => a.map((_, k) => {
+		let t = 0;
+		for (let j = -win; j <= win; j++) t += a[(k + j + side) % side];
+		return t / (2 * win + 1) - all;
+	});
+	const win = Math.round(side / 64);
+	const dc = smooth(colM, win), dr = smooth(rowM, win);
+	const baseLum = lumOf(base);
+	for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) {
+		const off = dc[x] + dr[y];
+		const i = (y * side + x) * 3;
+		for (let c = 0; c < 3; c++) out[i + c] = Math.max(0, Math.min(255, Math.round(out[i + c] - off * (base[c] / baseLum))));
+	}
+
+	/* A residue of painted light survives on terre-battue: the clamp at |a| = 1 is still a
+	   nonlinearity and clips a skewed grain — bright dust specks on dark clay — unevenly. Two
+	   treatments were written, measured and REMOVED: flattening the grain envelope before the map
+	   (no effect at all, 4.38 -> 4.47) and flattening the output luminance after it (worse, and it
+	   pushed every seam score up by ~1 sigma). Both blurred at 12.8 cm while `blotch` reads 6.4 cm
+	   blocks, so neither ever touched the band being measured. The residue varies by seed; pick
+	   the seed (see GROUNDS), never loosen the bar. */
 	return out;
 }
 
@@ -178,6 +213,7 @@ const gen = SIDE + BAND;
 console.log(`SDXL-Turbo ${gen}² → wrap-blend (band ${BAND}) → passe-haut + teinte → ${SIDE}² webp → ${DEST}`);
 
 for (const g of GROUNDS) {
+	if (ONLY && g.id !== ONLY) continue;
 	const t0 = Date.now();
 	const id = await submit({
 		id: g.id,
@@ -187,7 +223,8 @@ for (const g of GROUNDS) {
 		// --seed shifts the whole set. Needed as well as wanted: an identical prompt makes ComfyUI
 		// replay a cached execution that carries no image, so a re-run at the same seed yields
 		// nothing. Fixed by default, so a given seed always rebuilds the same four grounds.
-		seed: SEED + GROUNDS.indexOf(g) * 97,
+		// A ground may pin its own seed: the one that passed measure-petanque-tex.mjs.
+		seed: arg('seed', null) != null ? SEED + GROUNDS.indexOf(g) * 97 : (g.seed ?? SEED + GROUNDS.indexOf(g) * 97),
 	});
 	const imgs = await waitForImages(id, 300000);
 	const rawPng = `${TMP}/${g.id}-raw.png`;
