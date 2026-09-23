@@ -257,6 +257,14 @@ const FOV_TAU = 0.22;
 
 const JACK_AIM_R = 0.45; // m — the target ring for the jack throw, a bullseye on the lane
 
+/* The loading preview: the place without a match — sky, decor and a neutral pitch — while the level
+   progression answers. Nothing on it claims a surface, a length or a score: the HUD is hidden. */
+const PREVIEW_SEED = 0x5eed;
+const PREVIEW_R = 13; // m, orbit radius round the pitch centre
+const PREVIEW_Y = 4.2; // m, eye height
+const PREVIEW_TURN = 0.06; // rad/s — slow enough to read as a camera move, not a spin
+const PREVIEW_FOV = 50;
+
 /* The ring runs right up to the window's lines, which are drawn on the ground: a ring that stopped
    a metre short of a visible line read as a bug. The edges are a real gamble, and that is the rule's
    own answer — a jack out of the window goes to the opponent to place. A THROWN jack carries
@@ -424,6 +432,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const armElRef = useRef<HTMLDivElement | null>(null); // the launch pad, read back for the hit test
+	const previewRef = useRef(false); // the loading preview owns the camera; no match is laid
 	const padXRef = useRef<PadX>(PAD_X_0);
 	const padRangeRef = useRef({ lo: 0, hi: 0, c: 0 }); // px the pad's left edge may travel, c = centred
 	const padGripRef = useRef<{ x0: number; left0: number } | null>(null);
@@ -540,6 +549,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	// `label` is the state line's fraction of the width; `grip` the grip's left edge in px; `promo`
 	// the free side of the band, or null when it is too narrow.
 	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number; promo: { left: number; width: number } | null } | null>(null);
+	const [veil, setVeil] = useState(0); // bumped when the preview hands over: replays the fade
 	const [promoShut, setPromoShut] = useState(() => {
 		try { return sessionStorage.getItem(PROMO_KEY) === '1'; } catch { return false; }
 	});
@@ -735,11 +745,31 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- a new game ---------- */
 
+	/** The loading preview: sky, decor and a neutral pitch, so the page is alive while the level
+	 *  progression answers. No match, so nothing here can be mistaken for the game to come. */
+	const layPreview = useCallback(() => {
+		if (!initScene()) return;
+		const g = g3Ref.current;
+		if (!g || g.pitch) return;
+		const t = makeTerrain(PREVIEW_SEED, SURFACES['terre-battue'], 0.02);
+		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED));
+		g.scene.add(g.pitch.group);
+		previewRef.current = true;
+	}, [initScene]);
+
+	/** The first real pitch replaces the preview behind a short fade, never a cut. */
+	const endPreview = useCallback(() => {
+		if (!previewRef.current) return;
+		previewRef.current = false;
+		setVeil((k) => k + 1);
+	}, []);
+
 	/** Lay a fresh pitch and match. Shared by free play and by the levels ladder. */
 	const layMatch = useCallback((cfg: { seed: number; surface: SurfaceId; amp: number; target: number; slope?: number }): boolean => {
 		if (!initScene()) return false;
 		const g = g3Ref.current;
 		if (!g) return false;
+		endPreview();
 
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
@@ -765,7 +795,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		resetCamera();
 		clearArc();
 		return true;
-	}, [clearArc, clearBodies, initScene, resetCamera]);
+	}, [clearArc, clearBodies, endPreview, initScene, resetCamera]);
 
 	const newGame = useCallback((key: DiffKey) => {
 		const d = DIFFS[key];
@@ -813,6 +843,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (!initScene()) return false;
 		const g = g3Ref.current;
 		if (!g) return false;
+		endPreview();
 
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
@@ -835,7 +866,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		resetCamera();
 		clearArc();
 		return true;
-	}, [clearArc, clearBodies, initScene, resetCamera]);
+	}, [clearArc, clearBodies, endPreview, initScene, resetCamera]);
 
 	/** Put station `i` on the ground and hand the aim back to the player. */
 	const setStation = useCallback((i: number) => {
@@ -1621,7 +1652,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			dragRef.current = { mode: 'place', x0: x, y0: y, a0: 0, b0: 0 };
 			return;
 		}
-		const pad = armBox();
+		// While the jack is thrown the pad is hidden, and its area is just more ground to aim at.
+		const pad = matchRef.current.phase === 'throw-jack' ? null : armBox();
 		// A box now, not a half-plane: the pad no longer spans the width, so the pitch on either side
 		// of it has to stay a camera drag. That is the point of shrinking it.
 		if (pad && x >= pad.left && x <= pad.right && y >= pad.top && y <= pad.bottom) {
@@ -1935,7 +1967,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const ro = new ResizeObserver(layoutPad);
 		ro.observe(wrap);
 		return () => ro.disconnect();
-	}, [layoutPad, padX, view]);
+	}, [layoutPad, padX, view, match.phase, status]);
 
 	useEffect(() => {
 		const onFs = () => requestAnimationFrame(resize);
@@ -2338,7 +2370,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			if (!g) return;
 			const dt = last ? Math.min(0.1, (now - last) / 1000) : 1 / 60;
 			last = now;
-			tickRef.current(now, dt);
+			if (previewRef.current) {
+				// The loading preview: no match yet, just the place, a slow turn round it.
+				const a = now / 1000 * PREVIEW_TURN;
+				g.camera.position.set(Math.sin(a) * PREVIEW_R, PREVIEW_Y, Math.cos(a) * PREVIEW_R);
+				g.camera.lookAt(0, 0.4, 0);
+				if (g.camera.fov !== PREVIEW_FOV) { g.camera.fov = PREVIEW_FOV; g.camera.updateProjectionMatrix(); }
+			} else {
+				tickRef.current(now, dt);
+			}
 			g.renderer.render(g.scene, g.camera);
 		};
 		raf = requestAnimationFrame(frame);
@@ -2352,6 +2392,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
 		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		layPreview(); // the place, alive, while the ladder answers (see PREVIEW_SEED)
 		void lv.resume().then((next) => { if (next != null) startLevel(next); else newGame('moyen'); });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
@@ -2675,6 +2716,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	// `over` too: the pad cannot throw once the match is done, and it was still drawing itself live
 	// under the end panel — the audit only ever missed it because the view happened to be `tete`.
 	const armLive = view === 'jeu' && !jackPhase && !over;
+	// Throwing or placing the jack: the pad has no part in it, so it is not drawn, and aimStart treats
+	// its area as ground.
+	const jackTime = jackPhase || match.phase === 'place-jack' || status === 'placing';
 	const padStyle = padPos ? { left: `${padPos.left}px`, transform: 'none' } : undefined;
 	// Which graduation lights up: the one nearest where the finger would have to land.
 	const boardT = boardForElevation(loft);
@@ -2701,12 +2745,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	   is where the thumb lands. A finger down gets the gesture, everything else gets the state. The
 	   old "tu as le point" branches went with it: the scoreboard already prints 🎯 next to the
 	   holder, and a second copy eight words away was the whole bottom-of-screen pile-up. */
-	const armMsg = view !== 'jeu' ? '👁 Touche la planche pour revenir en vue Jeu'
+	const armMsg = jackTime ? hint
+		: view !== 'jeu' ? '👁 Touche la planche pour revenir en vue Jeu'
 		: armed ? (power > 0 ? '◀ ▶ oriente · lâche pour lancer' : '✖ Lâche ici et rien ne part — remonte pour armer')
 		: hint;
 
 	return (
-		<div className="pe-root">
+		<div className={`pe-root${lv.booting && !daily ? ' booting' : ''}`}>
 			<style>{CSS}</style>
 
 			<div className="pe-topbar">
@@ -2769,7 +2814,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					/* The TV board: who plays, how many boules each side has left, and the score.
 					   Boules are coloured by SIDE, never a hardcoded green and red — online the guest
 					   sits in seat 1, so its own rings are the red ones. */
-					<div className="pe-board" style={lv.booting && !daily ? { visibility: 'hidden' } : undefined}>
+					<div className="pe-board">
 						<div className={`pe-side ${myTurn && status !== 'rolling' ? 'on' : ''}`}>
 							<span className="pe-side-name">😎 Toi</span>
 							<span className="pe-dots" style={{ color: hex(HALO[mySide]) }}>
@@ -2817,8 +2862,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				<canvas ref={canvasRef} className="pe-canvas" onPointerDown={onPointerDown} onContextMenu={(e) => e.preventDefault()} />
 
 				{lv.booting && !daily && !webglError && (
-					<div className="pe-overlay pe-booting"><div className="pe-card">Chargement du terrain…</div></div>
+					<div className="pe-booting" role="status">
+						<span>Chargement du terrain…</span>
+						<span className="pe-booting-bar" aria-hidden="true"><span /></span>
+					</div>
 				)}
+				{veil > 0 && <div key={veil} className="pe-veil" aria-hidden="true" />}
 
 				{webglError && (
 					<div className="pe-overlay"><div className="pe-card">Ton appareil ne peut pas afficher le terrain 3D (WebGL indisponible).</div></div>
@@ -2865,7 +2914,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{/* The launch board. Purely a drawing: the hit test lives in aimStart, so there is
 				    exactly one way into a throw and this cannot swallow a camera drag. It pulses until
 				    the first contact of the session — the whole complaint was that nobody found it. */}
-				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} style={padStyle} aria-hidden="true">
+				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${jackTime ? ' gone' : ''}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
 					{/* The gesture, drawn: an arrow lying on the ground and running away up the lane —
 					    press, then push forward. Gone once the pull has started; the fill says it then. */}
@@ -2897,7 +2946,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
-				<div className="pe-power" style={padStyle} aria-hidden="true">
+				<div className={`pe-power${jackTime ? ' gone' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-power-fill" style={{ width: `${Math.round(power * 100)}%` }} />
 				</div>
 
@@ -2965,6 +3014,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						<div className={`pe-card pe-endcard ${card.mine ? 'mine' : ''}`} onClick={nextEnd}>
 							<span>{card.text}</span>
 							{card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} />}
+							{/* The card always advanced on a tap, but nothing said so: players sat out the timer.
+							    The bar drains over the time left before it moves on by itself. */}
+							<button className="pe-continue" onClick={(e) => { e.stopPropagation(); nextEnd(); }}>
+								Continuer ›
+								<span className="pe-continue-bar" aria-hidden="true" style={{ animationDuration: `${card.rows.length ? END_TABLE_MS : END_CARD_MS}ms` }} />
+							</button>
 						</div>
 					</div>
 				)}
@@ -3358,6 +3413,8 @@ const CSS = `
 .pe-board-mark.on { color: #ffd166; opacity: 1; font-size: 11px; }
 .pe-board-mark.on::after { border-top-color: rgba(255,209,102,0.85); }
 /* Held with nothing pulled: the board is the cancel surface, so it says so with its own skin. */
+/* Hidden but still laid out: guards and layoutPad read its box, and aimStart ignores it meanwhile. */
+.pe-arm.gone, .pe-power.gone { visibility: hidden; }
 .pe-arm.hold { border-color: rgba(255,138,128,0.85); background: linear-gradient(180deg, rgba(60,16,12,0.12) 0%, rgba(80,20,14,0.5) 100%); }
 .pe-arm.hold::before { border-top-color: rgba(255,138,128,0.45); }
 
@@ -3368,7 +3425,7 @@ const CSS = `
 .pe-power-fill { height: 100%; background: linear-gradient(90deg, #8ce99a, #ffd166 55%, #ff6b6b); }
 
 
-.pe-placeok { position: absolute; left: 50%; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); }
+.pe-placeok { position: absolute; left: 50%; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 56px); transform: translateX(-50%); z-index: 5; border: 2px solid rgba(255,255,255,0.5); background: linear-gradient(180deg, #30d158, #1e963c); color: #fff; font: inherit; font-weight: 800; font-size: 15px; padding: 9px 22px; border-radius: 999px; cursor: pointer; box-shadow: var(--shadow-md); white-space: nowrap; }
 .pe-placeok:hover { filter: brightness(1.08); }
 
 /* The end-of-end verdict. It used to sit dead centre, which was wrong twice over: it covered the
@@ -3376,6 +3433,10 @@ const CSS = `
    circle in the same beat it scores. It docks aside now, on the same rails as the end-of-match
    panel, and the camera holds the layout it is a verdict about. Only the tint is its own. */
 .pe-endcard { font-weight: 800; font-size: 17px; cursor: pointer; }
+.pe-continue { position: relative; overflow: hidden; border: none; background: var(--pe-accent); color: var(--accent-text-over); font: inherit; font-weight: 800; font-size: 15px; border-radius: 999px; padding: 8px 22px; cursor: pointer; }
+.pe-continue-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: rgba(255,255,255,0.75); transform-origin: left; animation: pe-continue-drain linear forwards; }
+@keyframes pe-continue-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .pe-continue-bar { display: none; } }
 .pe-endcard.mine { background: linear-gradient(180deg, rgba(48,209,88,0.96), rgba(24,140,60,0.96)); border-color: rgba(255,255,255,0.4); }
 
 .pe-table { width: 100%; min-width: 14rem; font-weight: 600; font-size: 13.5px; }
@@ -3391,9 +3452,20 @@ const CSS = `
 /* The cards live inside pe-playwrap, which is 16/10 and clips. On a phone that is ~240 px of room
    for a lobby that is 300 px tall, and the Rejoindre row fell off the bottom with nothing to say
    so. The overlay scrolls and the card is allowed to fill it. */
-/* Sky-coloured like the empty canvas under it, so the first real frame is not a flash. */
-.pe-booting { background: #7fb4dd; pointer-events: none; }
-.pe-booting .pe-card { font-size: 14px; padding: 10px 18px; opacity: 0.9; }
+/* Loading: the preview scene turns behind a small pill with an indeterminate bar. Everything that
+   would state a fact about the coming match is hidden until it is laid. */
+.pe-booting { position: absolute; left: 50%; bottom: calc(var(--pe-arm-b) + 24px); transform: translateX(-50%); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 18px 12px; border-radius: 14px; background: rgba(28,20,12,0.68); color: #f4ece2; font-weight: 700; font-size: 14px; backdrop-filter: blur(4px); pointer-events: none; white-space: nowrap; }
+.pe-booting-bar { position: relative; display: block; width: 160px; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.18); overflow: hidden; }
+.pe-booting-bar span { position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 999px; background: #ffd166; animation: pe-booting-slide 1.1s ease-in-out infinite; }
+@keyframes pe-booting-slide { 0% { left: -40%; } 100% { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .pe-booting-bar span { animation: none; left: 30%; } }
+.pe-root.booting .pe-board, .pe-root.booting .pe-arm, .pe-root.booting .pe-power, .pe-root.booting .pe-arm-label,
+.pe-root.booting .pe-loft, .pe-root.booting .pe-zoom, .pe-root.booting .pe-arm-grip, .pe-root.booting .pe-promo,
+.pe-root.booting .pe-hud-actions, .pe-root.booting .pe-views, .pe-root.booting .pe-tag,
+.pe-root.booting .pe-modetoggle, .pe-root.booting .pe-placeok { visibility: hidden; }
+/* The hand-over from preview to the real pitch: a sky-coloured veil that clears in half a second. */
+.pe-veil { position: absolute; inset: 0; z-index: 5; background: #cfe0ea; pointer-events: none; animation: pe-veil-out 0.55s ease-out forwards; }
+@keyframes pe-veil-out { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
 .pe-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; padding: 8px; overflow: auto; }
 .pe-levels { align-items: flex-start; overflow-y: auto; padding: 16px 12px; background: color-mix(in srgb, var(--gray-999) 82%, transparent); }
 .pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; margin: auto; }
@@ -3437,7 +3509,8 @@ const CSS = `
      display:none and so does the eye. The camera fits the layout into the band this frees above. */
   .game-page.gf-full:has(.pe-aside-review) .pe-arm,
   .game-page.gf-full:has(.pe-aside-review) .pe-power,
-  .game-page.gf-full:has(.pe-aside-review) .pe-arm-label { display: none; }
+  .game-page.gf-full:has(.pe-aside-review) .pe-arm-label,
+  .game-page.gf-full:has(.pe-aside-review) .lbc-root { display: none; } /* the card, with its Continuer, reaches the trophy */
   /* The action row normally clears the launch pad; while the verdict is up the card is what sits
      there instead, and it is taller. It steps over the card's MEASURED height (frameEnd publishes
      it) — a constant would be wrong at every table size but one. Not hidden: the ◎ that draws the
