@@ -5,7 +5,7 @@
 // Deploy:  supabase functions deploy submit-score
 // Local:   supabase functions serve submit-score
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from 'jsr:@supabase/supabase-js@2.117.0';
 
 const CORS = {
 	// Open CORS: the games are also embedded in iframes on third-party portals (CrazyGames).

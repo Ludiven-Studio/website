@@ -17,7 +17,7 @@
 // Deploy:  supabase functions deploy meetups
 // Secrets: MEETUPS_ADMIN_KEY (seed + guard cleanup), MEETUPS_IP_PEPPER (quota hashing)
 
-import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { ipKey } from '../_shared/ipKey.ts';
 
 const CORS = {

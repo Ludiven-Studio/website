@@ -9,7 +9,7 @@
 // Deploy:  supabase functions deploy courses
 // Local:   supabase functions serve courses
 
-import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.117.0';
 import { ipKey } from '../_shared/ipKey.ts';
 
 const CORS = {
