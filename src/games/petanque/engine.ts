@@ -148,7 +148,7 @@ function pebbleContact(s: Sim, b: Boule, near: number[], imp?: Impact[]): void {
 	}
 }
 
-function collide(a: Boule, b: Boule, imp?: Impact[]): boolean {
+function collide(t: Terrain, a: Boule, b: Boule, imp?: Impact[]): boolean {
 	const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
 	const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
 	const min = a.r + b.r;
@@ -164,6 +164,11 @@ function collide(a: Boule, b: Boule, imp?: Impact[]): boolean {
 	a.vx -= j * ia * nx; a.vy -= j * ia * ny; a.vz -= j * ia * nz;
 	b.vx += j * ib * nx; b.vy += j * ib * ny; b.vz += j * ib * nz;
 	a.rolling = false; b.rolling = false;
+	/* A boule meets the jack above its centre (radii 37.5 vs 15 mm), so the normal dips ~25 deg and
+	   part of the kick points into the ground. On the ground, the ground takes it. Left in, it
+	   bounced the jack at impactFriction per hop, and the boule behind re-struck it: a jack hit at
+	   6 m/s stopped after 1.1 m on coarse gravel, 13 hops. */
+	for (const o of [a, b]) if (o.vz < 0 && o.z <= heightAt(t, o.x, o.y) + o.r + 1e-3) o.vz = 0;
 	imp?.push({ kind: 'boule', x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2, speed: -vn });
 	return true;
 }
@@ -211,7 +216,7 @@ export function stepSim(s: Sim, dt: number, imp?: Impact[]): StepResult {
 		for (let i = 0; i < bs.length; i++)
 			for (let k = i + 1; k < bs.length; k++) {
 				if (!bs[i].live || !bs[k].live) continue;
-				if (collide(bs[i], bs[k], imp)) res.hitBoule = true;
+				if (collide(s.t, bs[i], bs[k], imp)) res.hitBoule = true;
 			}
 		for (let i = 0; i < bs.length; i++) {
 			const b = bs[i];
