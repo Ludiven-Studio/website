@@ -118,8 +118,8 @@ describe('scoring an end', () => {
 		expect(endScore([at(2, 8.4, 0), at(2, 7.6, 1)], j).side).toBe(null);
 	});
 
-	it('a jack knocked out kills the end and it is replayed by the same thrower', () => {
-		const m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [1, 2] };
+	it('a jack knocked out while both sides still hold boules is a null end, replayed by the same thrower', () => {
+		const m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [2, 2] };
 		const dead = { ...jackAt(2, 8), live: false };
 		const after = applySettled(m, [at(2, 8.1, 0)], dead);
 		expect(after.phase).toBe('end-done');
@@ -128,6 +128,33 @@ describe('scoring an end', () => {
 		expect(next.jackThrower).toBe(0);
 		expect(next.endNo).toBe(2);
 		expect(next.left).toEqual([BOULES_PER_SIDE, BOULES_PER_SIDE]);
+	});
+
+	it('a jack knocked out when only one side holds boules gives it a point per boule in hand', () => {
+		// Side 0 throws its last boule and knocks the jack out; side 1 still holds two.
+		const m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [1, 2] };
+		const dead = { ...jackAt(2, PITCH_L + 0.2), live: false };
+		const after = applySettled(m, [at(2, 8.1, 0)], dead);
+		expect(after.phase).toBe('end-done');
+		expect(after.lastEvent).toContain('2 points');
+		const next = finishEnd(after, [at(2, 8.1, 0)], dead);
+		expect(next.scores).toEqual([0, 2]);
+		expect(next.jackThrower).toBe(1);
+		expect(next.circle.y).toBeLessThanOrEqual(PITCH_L - EDGE);
+	});
+
+	it('a jack knocked out with no boule left anywhere is a null end', () => {
+		const m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 1, left: [0, 1] };
+		const dead = { ...jackAt(-0.3, 8), live: false };
+		const after = applySettled(m, [], dead);
+		expect(finishEnd(after, [], dead).scores).toEqual([0, 0]);
+	});
+
+	it('the next circle stays on the pitch when the dead jack went out sideways', () => {
+		const m: Match13 = { ...initMatch13(13, 0), phase: 'end-done', turn: 0, left: [0, 2] };
+		const next = finishEnd(m, [], { ...jackAt(-0.3, 8), live: false });
+		expect(next.scores).toEqual([0, 2]);
+		expect(next.circle.x).toBeGreaterThanOrEqual(EDGE);
 	});
 });
 

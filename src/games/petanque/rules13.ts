@@ -8,7 +8,7 @@
  * choose between pointing and shooting rather than just alternating.
  */
 
-import { PITCH_L, inPitch } from './terrain';
+import { PITCH_L, PITCH_W, inPitch } from './terrain';
 
 export type Side = 0 | 1;
 export type Phase = 'throw-jack' | 'place-jack' | 'play' | 'end-done' | 'match-done';
@@ -149,13 +149,30 @@ export function applyJack(state: Match13, jack: { x: number; y: number }): Match
 export const applyPlacedJack = (state: Match13): Match13 =>
 	({ ...state, phase: 'play', turn: state.jackThrower, lastEvent: null });
 
+/**
+ * A dead jack. Null if both sides still hold boules, or neither does; otherwise the only side still
+ * holding boules scores one point per boule left in hand.
+ */
+export function deadJackScore(left: readonly [number, number]): { side: Side | null; points: number } {
+	if (left[0] > 0 && left[1] === 0) return { side: 0, points: left[0] };
+	if (left[1] > 0 && left[0] === 0) return { side: 1, points: left[1] };
+	return { side: null, points: 0 };
+}
+
 /** One boule has come to rest. Decides who plays next, or closes the end. */
 export function applySettled(state: Match13, bs: Played[], jack: Played): Match13 {
 	const left: [number, number] = [state.left[0], state.left[1]];
 	left[state.turn] = Math.max(0, left[state.turn] - 1);
 	const next: Match13 = { ...state, left, lastEvent: null };
 
-	if (!jack.live) return { ...next, phase: 'end-done', lastEvent: 'Bouchon sorti — mène nulle' };
+	if (!jack.live) {
+		const d = deadJackScore(left);
+		return {
+			...next, phase: 'end-done',
+			lastEvent: d.side === null ? 'Bouchon sorti — mène nulle'
+				: `Bouchon sorti — ${d.points} point${d.points > 1 ? 's' : ''} pour ${d.side === 0 ? 'toi' : 'l’adversaire'}`,
+		};
+	}
 
 	const t = whoPlays(next, bs, jack);
 	if (t === null) return { ...next, phase: 'end-done' };
@@ -164,7 +181,7 @@ export function applySettled(state: Match13, bs: Played[], jack: Played): Match1
 
 /** Close the end: award the points, set up the next one, or end the match. */
 export function finishEnd(state: Match13, bs: Played[], jack: Played): Match13 {
-	const res = jack.live ? endScore(bs, jack) : { side: null as Side | null, points: 0 };
+	const res = jack.live ? endScore(bs, jack) : deadJackScore(state.left);
 	const scores: [number, number] = [state.scores[0], state.scores[1]];
 	if (res.side !== null) scores[res.side] += res.points;
 
@@ -179,7 +196,9 @@ export function finishEnd(state: Match13, bs: Played[], jack: Played): Match13 {
 	const won = res.side;
 	const thrower: Side = won === null ? state.jackThrower : won;
 	const dir: 1 | -1 = won === null ? state.dir : state.dir === 1 ? -1 : 1;
-	const circle = won === null ? state.circle : { x: jack.x, y: nextCircle(jack.y, dir) };
+	// A dead jack lies past a line, so the circle is pulled back inside the pitch.
+	const circle = won === null ? state.circle
+		: { x: Math.max(EDGE, Math.min(PITCH_W - EDGE, jack.x)), y: nextCircle(jack.y, dir) };
 
 	return {
 		...state,
