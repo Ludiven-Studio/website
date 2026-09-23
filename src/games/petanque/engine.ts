@@ -19,6 +19,7 @@ export const JACK_M = 0.012;
 
 const BOULE_REST = 0.90; // boule-boule restitution — this is what makes a carreau possible
 const ROLL_VN = 0.35; // normal speed below which a bounce becomes a roll
+const BOUNCE_VN = 1.6; // m/s — the rebound a boule tends to on clay, however hard it lands (13 cm ceiling)
 const SLOPE_K = 5 / 7; // rolling sphere: only 5/7 of the slope acceleration reaches the centre
 const PEBBLE_KICK = 0.55; // rad of deflection per unit bite
 const PEBBLE_HOP = 0.15; // upward share of the speed when a boule climbs one
@@ -119,7 +120,16 @@ function groundContact(s: Sim, b: Boule, imp?: Impact[]): void {
 	}
 	// split into normal and tangential, bounce the normal, damp the tangent
 	const tx = b.vx - vn * nx, ty = b.vy - vn * ny, tz = b.vz - vn * nz;
-	const back = -vn * surf.restitution;
+	let back = -vn * surf.restitution;
+	/* A 700 g boule digs in, and the harder it lands the more it digs: a fixed restitution sent a
+	   plombée on clay 27 cm back up. The rebound saturates at BOUNCE_VN instead (scaled by the
+	   ground's own restitution, so soft ground absorbs more), with no kink: a soft touch keeps its
+	   bounce, a plombée stays under ~9 cm. sqrt only, so replays stay bit-identical. The jack is
+	   light and keeps its plain bounce. */
+	if (b.side !== -1) {
+		const cap = BOUNCE_VN * (surf.restitution / 0.30);
+		back /= Math.sqrt(1 + (back / cap) * (back / cap));
+	}
 	b.vx = tx * surf.impactFriction + nx * back;
 	b.vy = ty * surf.impactFriction + ny * back;
 	b.vz = tz * surf.impactFriction + nz * back;
