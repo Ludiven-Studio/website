@@ -118,12 +118,14 @@ export function endScore(bs: Played[], jack: Played): { side: Side | null; point
 }
 
 /**
- * Who plays next. The side without the point, if it still has boules; otherwise the other side
- * plays out its hand; `null` once both are empty. On a tie the side that just played replays.
+ * Who plays next, `state.turn` being the side that just played. The side without the point, if it
+ * still has boules; otherwise the other side plays out its hand; `null` once both are empty. On a
+ * tie the side that just played replays. With no live boule on the ground (the one just thrown
+ * went out), nobody holds the point, so the turn passes to the other side.
  */
 export function whoPlays(state: Match13, bs: Played[], jack: Played): Side | null {
 	const h = pointHolder(bs, jack);
-	const want: Side = h === null ? state.jackThrower : h === 'tie' ? state.turn : other(h);
+	const want: Side = h === null ? other(state.turn) : h === 'tie' ? state.turn : other(h);
 	if (state.left[want] > 0) return want;
 	const o = other(want);
 	return state.left[o] > 0 ? o : null;

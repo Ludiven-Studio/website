@@ -84,8 +84,20 @@ describe('who plays next — the rule that makes the game', () => {
 		expect(whoPlays(state(1, [3, 3]), [at(2, 8.4, 0), at(2, 7.6, 1)], j)).toBe(1);
 	});
 
-	it('the first boule of the end goes to whoever threw the jack', () => {
-		expect(whoPlays({ ...state(1, [3, 3]), jackThrower: 1 }, [], j)).toBe(1);
+	it('a first boule that goes out hands the turn to the other side', () => {
+		const dead = { ...at(2, 8.2, 0), live: false };
+		expect(whoPlays(state(0, [2, 3]), [dead], j)).toBe(1);
+		expect(whoPlays({ ...state(1, [3, 2]), jackThrower: 1 }, [{ ...dead, side: 1 }], j)).toBe(0);
+	});
+
+	it('when both sides have gone out, the turn keeps alternating', () => {
+		let m: Match13 = { ...initMatch13(13, 0), phase: 'play', turn: 0, left: [3, 3] };
+		const bs: Played[] = [{ ...at(2, 8.2, 0), live: false }];
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(1);
+		bs.push({ ...at(2, 8.3, 1), live: false });
+		m = applySettled(m, bs, j);
+		expect(m.turn).toBe(0);
 	});
 });
 

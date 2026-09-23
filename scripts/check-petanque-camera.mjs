@@ -218,7 +218,7 @@ check(await viewNow() === 'jeu', 'the same tap recovers from the head view');
 
 await toView('jeu');
 const before5 = await state();
-await drag(cx, lookY, 0, 90, 300); // pull down: the eye rises
+await drag(cx, lookY, 0, -90, 300); // pull up: the gaze follows the finger up (the lob below needs it)
 const lifted = await state();
 check(Math.abs(lifted.cam.pitch - before5.cam.pitch) > 0.02,
 	`a vertical camera drag moves the eye (pitch ${before5.cam.pitch.toFixed(3)} -> ${lifted.cam.pitch.toFixed(3)})`);
@@ -414,7 +414,8 @@ check(cancelled.status === 'aim', `and releasing there throws nothing (status ${
 
 // Bottom of the pad, eye lifted: a full plomb. The lift is the declared cost of freeing the camera —
 // the loft no longer tilts the view for you, so framing a 70 deg arc is now a thing you do.
-const high = await armAt(0.98, 80);
+// Negative: the finger leads the gaze, so lifting the eye is a drag UP.
+const high = await armAt(0.98, -80);
 check(lostOnTheWayDown(high).length === 0,
 	`the full lob still shows where it lands at ${(high.loft * 180 / Math.PI).toFixed(1)} deg (${JSON.stringify(high.arc)})`);
 check(gaps(high) <= 2, `and the lob is hidden by the hand and the apex, nothing else (${gaps(high)} stretches)`);

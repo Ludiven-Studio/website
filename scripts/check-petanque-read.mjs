@@ -88,7 +88,11 @@ async function checkInversion() {
 	console.log(`     the same downward drag: game view ${dCam.toFixed(3)} rad · head view ${dHead.toFixed(3)} rad`);
 	check(Math.abs(dCam) > 0.02, `a vertical drag still moves the game view (${dCam.toFixed(3)} rad)`);
 	check(Math.abs(dHead) > 0.02, `and it moves the head view too (${dHead.toFixed(3)} rad)`);
-	check(dCam * dHead < 0, 'the head view answers the vertical drag the opposite way round');
+	/* Absolute directions now, both asked for by the player. Game view: the finger leads the gaze, so a
+	   downward drag looks down (pitch up). Head view: the orbit is unchanged, a downward drag lifts the
+	   eye over the head (pitch up). The old "opposite way round" rule died when the game view flipped. */
+	check(dCam > 0, `the game view looks the way the finger goes (drag down looks down, ${dCam.toFixed(3)} rad)`);
+	check(dHead > 0, `the head view keeps its orbit direction (drag down lifts the eye, ${dHead.toFixed(3)} rad)`);
 
 	/* Why the inversion could be scoped to one line: the head view carries its own angles, so
 	   orbiting it cannot reach the loft. The only way this change could have cost a throw. */

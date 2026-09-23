@@ -157,6 +157,41 @@ const DUST: Record<SurfaceId, number> = {
 
 const LOFT_0 = 0.55; // rad — where the loft sits before the first throw, mid-board
 
+/* Aim sway: the arm is never perfectly still, so the throw drifts while the pad is held and the
+   player times the release. Two sines per axis at unrelated frequencies, so it never repeats
+   exactly, from a random phase per press (a phase of 0 would make an instant release perfect).
+   Applied to the throw before the velocity is computed: only velocities travel online, so the
+   random phase never has to match on the other screen. The AI does not sway; its skill noise is
+   its own. Amplitude follows the AI's skill for the mode: 0.3 deg (Facile) to 1.2 deg (Expert)
+   of heading, 1 deg being ~12 cm at 7 m. The loft gets half, because near 30 deg one degree of
+   loft moves the landing about as much as one of heading, and a roulette three to four times more. */
+const SWAY_MIN_DEG = 0.3;
+const SWAY_MAX_DEG = 1.2;
+const SWAY_LOFT_SHARE = 0.5;
+const SWAY_YAW_HZ = [0.71, 1.13] as const;
+const SWAY_LOFT_HZ = [0.53, 0.89] as const;
+// Fatigue: steady for 2 s, then the arm tires up to 2.2x the sway at 5 s. Waiting pays, not forever.
+const SWAY_REST_S = 2;
+const SWAY_TIRE_PER_S = 0.4;
+const SWAY_TIRE_MAX = 1.2;
+
+/** Sway amplitude in radians of heading for an AI skill (0.34 Facile .. 0.95 Expert). */
+const swayAmp = (skill: number): number => {
+	const k = Math.max(0, Math.min(1, (skill - 0.34) / (0.95 - 0.34)));
+	return ((SWAY_MIN_DEG + (SWAY_MAX_DEG - SWAY_MIN_DEG) * k) * Math.PI) / 180;
+};
+
+/** Heading and loft offsets `sec` seconds into a press, for amplitude `amp` and phases `ph`. */
+function swayAt(sec: number, amp: number, ph: readonly number[]): { yaw: number; loft: number } {
+	const tire = 1 + Math.min(SWAY_TIRE_MAX, Math.max(0, sec - SWAY_REST_S) * SWAY_TIRE_PER_S);
+	const w = (hz: number, p: number): number => Math.sin(2 * Math.PI * hz * sec + p);
+	const a = amp * tire;
+	return {
+		yaw: a * (0.65 * w(SWAY_YAW_HZ[0], ph[0]) + 0.35 * w(SWAY_YAW_HZ[1], ph[1])),
+		loft: a * SWAY_LOFT_SHARE * (0.6 * w(SWAY_LOFT_HZ[0], ph[2]) + 0.4 * w(SWAY_LOFT_HZ[1], ph[3])),
+	};
+}
+
 const LOFT_LABEL = (e: number): string =>
 	e > 1.0 ? 'Plomb' : e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette';
 
@@ -392,6 +427,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const aimYawRef = useRef(0);
 	const aimLoftRef = useRef(LOFT_0);
 	const aimDirtyRef = useRef(false);
+	const swayRef = useRef<{ t0: number; amp: number; ph: number[] } | null>(null); // set while the pad is held
 	const viewPitchRef = useRef(0.55);
 	const pinchRef = useRef(false); // a second finger voids the gesture, it never aims
 	/* Where the eye stands. `zoom` is a 0-1 dial, not metres: at 1 the eye has walked to ZOOM_DIST
@@ -788,11 +824,22 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- throwing ---------- */
 
+	/** The sway right now, zero when the pad is not held. */
+	const swayNow = useCallback((): { yaw: number; loft: number } => {
+		const s = swayRef.current;
+		return s ? swayAt((performance.now() - s.t0) / 1000, s.amp, s.ph) : { yaw: 0, loft: 0 };
+	}, []);
+
+	/** Heading and loft the boule would leave with if released now: the chosen aim plus the sway. */
 	const aimHeading = useCallback((): { x: number; y: number } => {
 		const m = matchRef.current;
-		const y = aimYawRef.current;
+		const y = aimYawRef.current + swayNow().yaw;
 		return { x: Math.sin(y) * m.dir, y: Math.cos(y) * m.dir };
-	}, []);
+	}, [swayNow]);
+	const aimLoft = useCallback((): number => {
+		const e = aimLoftRef.current + swayNow().loft;
+		return Math.max(elevationForBoard(0), Math.min(elevationForBoard(1), e));
+	}, [swayNow]);
 
 	/** Where the EYE points. Free, unlike the aim — this one never reaches the physics. */
 	const camHeading = useCallback((): { x: number; y: number } => {
@@ -879,14 +926,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const throwFromAim = useCallback(() => {
 		const m = matchRef.current;
 		const h = aimHeading();
-		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), aimLoftRef.current);
+		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), aimLoft());
+		swayRef.current = null;
 		const jack = m.phase === 'throw-jack';
 		// Velocities, never angles: converting an angle calls sin/cos, and two JS engines may not
 		// round those the same way. This is the one message the other board cannot do without.
 		if (onlineRef.current) netRef.current?.sendThrow({ ...v, jack });
 		streamAim(false);
 		doThrow(m.turn, v, jack);
-	}, [aimHeading, doThrow, streamAim]);
+	}, [aimHeading, aimLoft, doThrow, streamAim]);
 
 	/* ---------- which view we are in ---------- */
 
@@ -1532,6 +1580,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			// Declared cost of the inversion: the seam is the pad's TOP, so a plomb pressed at the
 			// bottom drags the whole pad before it charges, while a roulette charges at once.
 			dragRef.current = { mode: 'arm', x0: x, y0: y, a0: aimYawRef.current, b0: pad.top };
+			// Daily and online sway like Moyen for everyone: a shared board must not favour a ladder.
+			const skill = dailyRef.current || onlineRef.current ? DIFFS.moyen.skill
+				: lvActiveRef.current ? levelSkillRef.current : DIFFS[diffRef.current].skill;
+			swayRef.current = { t0: performance.now(), amp: swayAmp(skill), ph: [0, 1, 2, 3].map(() => Math.random() * Math.PI * 2) };
 			setArmed(true);
 			aimDirtyRef.current = true;
 			return;
@@ -1600,8 +1652,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (viewRef.current !== 'jeu') return;
 		// Drag right looks right on screen: the camera looks down -yaw, so the sign flips here.
 		camYawRef.current = Math.max(-CAM_YAW_MAX, Math.min(CAM_YAW_MAX, d.a0 - (x - d.x0) * YAW_PER_PX));
-		// Grab the world: pull down and the eye rises.
-		camPitchRef.current = Math.max(CAM_PITCH_LOW, Math.min(CAM_PITCH_HIGH, d.b0 - (y - d.y0) * PITCH_PER_PX));
+		// The finger leads the gaze: slide up and the view looks up (a lower pitch raises the look target).
+		camPitchRef.current = Math.max(CAM_PITCH_LOW, Math.min(CAM_PITCH_HIGH, d.b0 + (y - d.y0) * PITCH_PER_PX));
 		syncAim();
 	}, [canThrow, jackAiming, legalise, moveJackAim, pickGround, streamAim, syncAim]);
 
@@ -1609,11 +1661,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const d = dragRef.current;
 		dragRef.current = null;
 		if (d?.mode === 'arm') setArmed(false);
-		if (!d || d.mode !== 'arm' || !canThrow()) return;
+		if (!d || d.mode !== 'arm' || !canThrow()) { swayRef.current = null; return; }
 		// The safe zone, and it needs no test of its own: a finger still on the board reads zero power
 		// by construction, so "released without clearing the board" and "released without pulling" are
 		// the same sentence. Sliding back down onto the board un-arms a throw already charged.
 		if (powerRef.current < 0.06) {
+			swayRef.current = null;
 			powerRef.current = 0;
 			setPower(0);
 			aimDirtyRef.current = true;
@@ -1779,7 +1832,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 		const asJack = m.phase === 'throw-jack';
 		const h = aimHeading();
-		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), aimLoftRef.current);
+		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), aimLoft());
 		const from = m.circle;
 		const pred = predictThrow(s, from, v, (c) =>
 			place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn)));
@@ -1796,7 +1849,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			(g.marker.material as THREE.MeshBasicMaterial).color.setHex(tint);
 			g.marker.visible = true;
 		}
-	}, [aimHeading]);
+	}, [aimHeading, aimLoft]);
 
 	/* ---------- where the action is ---------- */
 
@@ -1891,7 +1944,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		}
 		if (statusRef.current === 'end' && now >= endAtRef.current) nextEnd();
 
-		if (aimDirtyRef.current) { aimDirtyRef.current = false; rebuildArc(); }
+		// While the pad is held the sway moves the throw every frame, so the preview must follow it:
+		// the moving arc and landing marker are how the player times the release.
+		if (aimDirtyRef.current || (swayRef.current && powerRef.current >= 0.06)) { aimDirtyRef.current = false; rebuildArc(); }
 
 		/* --- meshes --- */
 		const a = alphaRef.current;
@@ -2287,6 +2342,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			status: statusRef.current,
 			match: matchRef.current,
 			bodies: simRef.current?.bs.length ?? 0,
+			sway: swayRef.current ? { ...swayNow(), amp: swayRef.current.amp } : null,
 			// What the GROUND holds, which is not the same question as the rules' `left`. The bug that
 			// let the AI throw a fourth boule billed it to the other side, so `left` stayed plausible
 			// while the ground did not. Also what the multiplayer guard compares between two peers.
@@ -2406,7 +2462,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			terrain: terrainStamp(simRef.current?.t ?? null),
 		});
 		return () => { delete (window as unknown as { __petanque?: unknown }).__petanque; };
-	}, [arcBow, arcOnScreen, arcScreen, screenSizes, topFrames]);
+	}, [arcBow, arcOnScreen, arcScreen, screenSizes, swayNow, topFrames]);
 
 
 	/* ---------- HUD ---------- */
