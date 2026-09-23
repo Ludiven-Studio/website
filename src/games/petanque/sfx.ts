@@ -133,7 +133,8 @@ export function groundHit(speed: number, surface: string): void {
 
 /* A hollow steel boule's ring: inharmonic partials at FIXED pitches. The old clack slid each tone
    down by ~1 kHz, which is a "pew", not metal. Higher partials die first, as they do in the shell. */
-const STEEL = [{ f: 2380, a: 1, d: 0.16 }, { f: 3890, a: 0.6, d: 0.1 }, { f: 5710, a: 0.35, d: 0.06 }];
+// About an octave under the first version, which read as small and tinny for 700 g of steel.
+const STEEL = [{ f: 1180, a: 1, d: 0.18 }, { f: 1930, a: 0.6, d: 0.12 }, { f: 2840, a: 0.35, d: 0.07 }];
 
 /**
  * Two boules collide: a hard click, then the shell rings. Against the jack it is a dull wooden "toc"
@@ -147,12 +148,13 @@ export function clack(speed: number, jack = false): void {
 	const v = clamp01(speed / 9);
 	const loud = 0.25 + 0.75 * v * v; // soft touches stay soft; a carreau is loud
 	if (jack) {
-		noiseHit(c, 'bandpass', 1200 + v * 500, 2.5, 0.12 * loud + 0.03, 0.025);
-		tone(c, 'sine', 820 + v * 200, 820 + v * 200, 0.06 * loud + 0.02, 0.05, 0, rate);
+		// Dry: one short knock and almost no ring.
+		noiseHit(c, 'bandpass', 1900 + v * 600, 3, 0.16 * loud + 0.04, 0.012);
+		tone(c, 'sine', 1300 + v * 200, 1300 + v * 200, 0.04 * loud + 0.01, 0.018, 0, rate);
 		return;
 	}
 	const detune = 0.97 + Math.random() * 0.06; // no two boules ring at quite the same pitch
-	noiseHit(c, 'highpass', 3500, 0.7, 0.35 * loud, 0.008);
+	noiseHit(c, 'bandpass', 1800, 0.8, 0.35 * loud, 0.01);
 	for (const p of STEEL) {
 		const f = p.f * detune;
 		tone(c, 'sine', f, f, 0.14 * p.a * loud, p.d * (0.6 + 0.4 * v), 0, rate);
