@@ -305,7 +305,7 @@ interface Scene3D {
 	marker: THREE.Mesh;
 	circle: THREE.Group; // the throwing circle, re-laid on the terrain whenever it moves
 	rings: THREE.Group; // legal jack window, shown while throwing or placing it
-	laidAt: { x: number; y: number } | null; // circle both groups were built for
+	laidAt: { x: number; y: number; t: Terrain } | null; // circle AND terrain both groups were built for
 	ray: THREE.Group; // the opponent's aim, online only
 	rayAt: number; // `seen` of the aim message the ray was built from
 	jackAim: THREE.Group; // where the jack is being aimed, from the top view
@@ -645,7 +645,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		killGroup(g.rings);
 		g.circle.add(groundRing(s.t, c.x, c.y, CIRCLE_R, 0xf2e9d8));
 		for (const r of [MIN_JACK, MAX_JACK]) g.rings.add(groundRing(s.t, c.x, c.y, r, 0xffd166, 0.016));
-		g.laidAt = { x: c.x, y: c.y };
+		g.laidAt = { x: c.x, y: c.y, t: s.t };
 	}, []);
 
 	const resize = useCallback(() => {
@@ -2152,8 +2152,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		}
 
 		// The circle and the legal window are sampled on the terrain, so they are rebuilt when the
-		// circle moves — once an end — and never touched per frame.
-		if (!g.laidAt || g.laidAt.x !== m.circle.x || g.laidAt.y !== m.circle.y) layGround();
+		// circle moves — once an end — or the TERRAIN changes, and never touched per frame. A new deal
+		// often starts from the same circle: keyed on position alone, the rings kept the last deal's
+		// heights and sank under (or floated over) a ground with a different faux plat.
+		if (!g.laidAt || g.laidAt.t !== s.t || g.laidAt.x !== m.circle.x || g.laidAt.y !== m.circle.y) layGround();
 		g.rings.visible = m.phase === 'throw-jack' || m.phase === 'place-jack';
 
 		// Where the jack is being aimed. Sampled on the terrain like every other ground ring — a flat
@@ -2504,6 +2506,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			match: matchRef.current,
 			bodies: simRef.current?.bs.length ?? 0,
 			sway: swayRef.current ? { ...swayNow(), amp: swayRef.current.amp } : null,
+			// Were the circle and the jack window laid on the terrain now on screen? See layGround.
+			ringsOnTerrain: g3Ref.current?.laidAt?.t === simRef.current?.t,
 			// What the GROUND holds, which is not the same question as the rules' `left`. The bug that
 			// let the AI throw a fourth boule billed it to the other side, so `left` stayed plausible
 			// while the ground did not. Also what the multiplayer guard compares between two peers.
