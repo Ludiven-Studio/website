@@ -538,6 +538,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [padGrip, setPadGrip] = useState<'call' | 'idle' | 'held'>(() => {
 		try { return localStorage.getItem(PAD_GRIP_KEY) ? 'idle' : 'call'; } catch { return 'idle'; }
 	});
+	// The match length, announced on the pitch as each match starts: levels play to 5, 7 or 9, not 13.
+	const [goal, setGoal] = useState<{ target: number; key: number } | null>(null);
 	const [over, setOver] = useState(false);
 	const [view, setView] = useState<ViewKey>('jeu');
 	const [zoom, setZoom] = useState(0);
@@ -732,6 +734,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		targetRef.current = cfg.target;
 		matchRef.current = initMatch13(cfg.target, HUMAN);
 		setMatch(matchRef.current);
+		setGoal((n) => ({ target: cfg.target, key: (n?.key ?? 0) + 1 }));
 		statusRef.current = 'aim';
 		setStatus('aim');
 		setCard(null);
@@ -2737,7 +2740,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						</div>
 						<div className="pe-board-mid">
 							<span className="pe-board-score">{match.scores[mySide]} — {match.scores[foeSide]}</span>
-							<span className="pe-board-end">Mène {match.endNo}</span>
+							<span className="pe-board-end">Mène {match.endNo} · en {match.target}</span>
 						</div>
 						<div className={`pe-side foe ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>
 							<span className="pe-pt">{holder === foeSide ? '🎯' : ''}</span>
@@ -2764,6 +2767,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="pe-playwrap" ref={wrapRef}>
+				{goal && !daily && (
+					<div key={goal.key} className="pe-goal" onAnimationEnd={() => setGoal(null)}>
+						Partie en <strong>{goal.target}</strong> points
+					</div>
+				)}
+
 				{/* Niveaux has its own outcome beat (LevelOutcome), so the confetti must not double up. */}
 				{celebrating && !lv.active && <Celebration />}
 				<canvas ref={canvasRef} className="pe-canvas" onPointerDown={onPointerDown} onContextMenu={(e) => e.preventDefault()} />
@@ -3164,6 +3173,10 @@ const CSS = `
 .pe-view { border: none; background: transparent; color: #e8ddcf; font: inherit; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 4px 11px; cursor: pointer; white-space: nowrap; }
 .pe-view.on { background: var(--pe-accent); color: var(--accent-text-over); }
 @media (max-width: 420px) { .pe-view-txt { display: none; } }
+.pe-goal { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; white-space: nowrap; background: rgba(28,20,12,0.72); color: #f4ece2; font-weight: 700; font-size: 17px; padding: 9px 20px; border-radius: 999px; border: 1.5px solid rgba(255,209,102,0.6); backdrop-filter: blur(4px); animation: pe-goal 3.4s ease-in-out forwards; }
+.pe-goal strong { color: #ffd166; font-size: 21px; }
+@keyframes pe-goal { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pe-goal { animation-name: pe-goal-still; } @keyframes pe-goal-still { 0%, 99% { opacity: 1; } 100% { opacity: 0; } } }
 .pe-tag { background: rgba(28,20,12,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; text-align: center; max-width: 96%; }
 
 /* Vertical gauge on the left edge: the angle the board is currently offering, named. */
