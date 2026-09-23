@@ -51,6 +51,8 @@ const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({ viewport: VP, deviceScaleFactor: 1 });
+// Pad pinned to the centre: every press below aims at the canvas middle. check-petanque-pad covers the slide.
+await ctx.addInitScript(() => localStorage.setItem('petanque-pad-x', JSON.stringify({ portrait: 0.5, landscape: 0.5 })));
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push(`THROW ${e.message}`));

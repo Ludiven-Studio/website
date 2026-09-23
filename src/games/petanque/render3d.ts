@@ -602,13 +602,15 @@ const FPV_BACK = 0.35; // the first-person eye stands just behind the circle, no
  * reduced shoulder offset on purpose, because an eye exactly on the throw line flattens the arc to
  * a straight segment and hides the whole mechanic (measurement J).
  *
+ * `shoulder` picks the side the eye steps to; -1 mirrors it, and the arc then bows the other way.
+ *
  * The caller aims the look direction itself, so no lookAt here.
  */
-export function aimCamera(cam: THREE.PerspectiveCamera, circle: { x: number; y: number }, dir: 1 | -1, pitch: number, yaw: number, dist: number, ground: number, walk = 0, fpv = false, walkDir?: { x: number; y: number }, eyeH = EYE_H): void {
+export function aimCamera(cam: THREE.PerspectiveCamera, circle: { x: number; y: number }, dir: 1 | -1, pitch: number, yaw: number, dist: number, ground: number, walk = 0, fpv = false, walkDir?: { x: number; y: number }, eyeH = EYE_H, shoulder: 1 | -1 = 1): void {
 	const fx = Math.sin(yaw) * dir, fz = Math.cos(yaw) * dir; // forward, in engine axes
 	const wxd = walkDir ? walkDir.x : fx, wzd = walkDir ? walkDir.y : fz;
 	const back = fpv ? FPV_BACK : dist * Math.cos(pitch);
-	const side = fpv ? SHOULDER * 0.55 : SHOULDER;
+	const side = (fpv ? SHOULDER * 0.55 : SHOULDER) * shoulder;
 	const up = fpv ? eyeH : 0.35 + dist * Math.sin(pitch);
 	cam.position.set(
 		wx(circle.x) + wxd * walk - fx * back + fz * side,

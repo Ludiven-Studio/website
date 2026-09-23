@@ -21,7 +21,7 @@ const { base } = server;
 const VW = Number(process.env.PET_W || 390);
 const VH = Number(process.env.PET_H || 844);
 const PHONE = VW < 900; // a desktop context with isMobile on gets the phone viewport meta, not the layout
-const SUF = VW === 390 && VH === 844 ? '' : `-${VW}x${VH}`;
+const SUF = (VW === 390 && VH === 844 ? '' : `-${VW}x${VH}`) + (process.env.PET_PAD ? `-pad${process.env.PET_PAD}` : '');
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
 const ctx = await browser.newContext({
@@ -30,6 +30,10 @@ const ctx = await browser.newContext({
 	isMobile: PHONE,
 	hasTouch: PHONE,
 });
+// PET_PAD=0|0.5|1 pins the launch pad; unset audits the default spot for this orientation.
+if (process.env.PET_PAD) {
+	await ctx.addInitScript((x) => localStorage.setItem('petanque-pad-x', JSON.stringify({ portrait: x, landscape: x })), Number(process.env.PET_PAD));
+}
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push(`THROW ${e.message}`));
@@ -45,6 +49,7 @@ const PARTS = {
 	views: '.pe-views',
 	hint: '.pe-arm-label', // the one line above the board: gesture while a finger is down, state otherwise
 	strip: '.pe-arm',
+	grip: '.pe-arm-grip',
 	legend: '.pe-board-marks',
 	power: '.pe-power',
 	tag: '.pe-tag',
@@ -239,23 +244,23 @@ all.push(...await audit('4-eye')); // the throwing view: strip, legend, hint, ev
    back inside the safe zone and fire nothing. */
 const padBox = await page.evaluate(() => {
 	const r = document.querySelector('.pe-arm').getBoundingClientRect();
-	return { top: r.top, bottom: r.bottom };
+	return { top: r.top, bottom: r.bottom, cx: r.left + r.width / 2 }; // the pad slides, so never the canvas middle
 });
-await page.mouse.move(cx, padBox.top + 14);
+await page.mouse.move(padBox.cx, padBox.top + 14);
 await page.mouse.down();
-await page.mouse.move(cx, padBox.top - 130, { steps: 14 });
+await page.mouse.move(padBox.cx, padBox.top - 130, { steps: 14 });
 await sleep(700);
 all.push(...await audit('5-armed-roulette'));
 console.log(`    loft ${(((await state()).loft) * 180 / Math.PI).toFixed(1)} deg`);
-await page.mouse.move(cx, padBox.top + 14, { steps: 4 }); // back to power 0: do not fire
+await page.mouse.move(padBox.cx, padBox.top + 14, { steps: 4 }); // back to power 0: do not fire
 await sleep(150);
 await page.mouse.up();
 await sleep(400);
 
 // And the other end of the pad: a full plomb, where the legend has to read "Plomb".
-await page.mouse.move(cx, padBox.bottom - 14);
+await page.mouse.move(padBox.cx, padBox.bottom - 14);
 await page.mouse.down();
-await page.mouse.move(cx, padBox.top - 130, { steps: 14 });
+await page.mouse.move(padBox.cx, padBox.top - 130, { steps: 14 });
 await sleep(700);
 all.push(...await audit('6-armed-plomb'));
 console.log(`    loft ${(((await state()).loft) * 180 / Math.PI).toFixed(1)} deg`);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import {
 	makeTerrain, SURFACES, SURFACE_IDS, heightAt, PITCH_W, PITCH_L, type SurfaceId, type Terrain,
@@ -106,6 +106,36 @@ function loadGround(): GroundPick {
 		return GROUND_0;
 	}
 }
+
+/* Where the launch pad sits along the bottom edge, 0 = left, 1 = right, one value per screen
+   orientation: 30 % of a 390 px phone and of a 1000 px desktop are not the same reach. Portrait
+   starts right, under a right thumb, so the finger that pulls climbs the edge and not the lane. */
+const PAD_KEY = 'petanque-pad-x';
+const PAD_GRIP_KEY = 'petanque-pad-grip'; // the grip pulses until it has been shown once
+type PadOrient = 'portrait' | 'landscape';
+type PadX = Record<PadOrient, number>;
+const PAD_X_0: PadX = { portrait: 1, landscape: 0.5 };
+const PAD_SNAPS = [0, 0.5, 1];
+const PAD_SNAP_R = 0.08;
+const PAD_EDGE = 12; // px, same margin the pad's width clamp leaves
+const PAD_GAP = 8; // px kept clear of a side gauge
+const PAD_HEAD = 40; // px above the pad: power bar then state line
+const PAD_GRIP_W = 22;
+
+function loadPadX(): PadX {
+	try {
+		const v = JSON.parse(localStorage.getItem(PAD_KEY) ?? 'null') as Partial<PadX> | null;
+		const ok = (n: unknown): n is number => typeof n === 'number' && n >= 0 && n <= 1;
+		return {
+			portrait: ok(v?.portrait) ? v.portrait : PAD_X_0.portrait,
+			landscape: ok(v?.landscape) ? v.landscape : PAD_X_0.landscape,
+		};
+	} catch {
+		return PAD_X_0;
+	}
+}
+
+const padOrient = (): PadOrient => (window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
 
 const MIN_SPEED = 3.0;
 const MAX_SPEED = 10.5;
@@ -390,6 +420,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const armElRef = useRef<HTMLDivElement | null>(null); // the launch pad, read back for the hit test
+	const padXRef = useRef<PadX>(PAD_X_0);
+	const padRangeRef = useRef({ lo: 0, hi: 0, c: 0 }); // px the pad's left edge may travel, c = centred
+	const padGripRef = useRef<{ x0: number; left0: number } | null>(null);
+	/* The eye steps to the side AWAY from the pad. The arc's near end bows towards the shoulder's
+	   opposite side of the screen, so a pad on the right needs the eye on the right, or the finger
+	   pulling power covers the very arc it is shaping. */
+	const shoulderRef = useRef<1 | -1>(1);
 	const g3Ref = useRef<Scene3D | null>(null);
 	const arcPtsRef = useRef<THREE.Vector3[]>([]);
 	const sunForceRef = useRef<{ el: number; az: number; seed?: number } | null>(null); // measurement hook only
@@ -491,6 +528,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		return groundRef.current;
 	});
 	const [groundOpen, setGroundOpen] = useState(false);
+	const [padX, setPadX] = useState<PadX>(() => {
+		padXRef.current = loadPadX();
+		return padXRef.current;
+	});
+	// Laid out in px by layoutPad; null until the first measure, where the CSS centre stands in.
+	// `label` is the state line's fraction of the width; `grip` the grip's left edge in px.
+	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number } | null>(null);
+	const [padGrip, setPadGrip] = useState<'call' | 'idle' | 'held'>(() => {
+		try { return localStorage.getItem(PAD_GRIP_KEY) ? 'idle' : 'call'; } catch { return 'idle'; }
+	});
 	const [over, setOver] = useState(false);
 	const [view, setView] = useState<ViewKey>('jeu');
 	const [zoom, setZoom] = useState(0);
@@ -1696,6 +1743,86 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		(_x, y) => zoomTo(y),
 		() => { zoomDragRef.current = false; },
 	);
+	/* The pad slides along the bottom edge. Its travel is measured, not declared: the side gauges are
+	   vertically centred, so on a short screen they reach down into the pad's band and the travel
+	   stops at them. A gauge wholly above the band leaves the whole width. */
+	const layoutPad = useCallback(() => {
+		const wrap = wrapRef.current, el = armElRef.current;
+		if (!wrap || !el) return;
+		const wr = wrap.getBoundingClientRect();
+		const W = wr.width, w = el.offsetWidth;
+		const bandTop = wr.top + el.offsetTop - PAD_HEAD;
+		/* Two passes: the zoom and the leaderboard pill take presses and are never covered; the loft
+		   gauge is inert, so when a short canvas leaves no room between all three the pad may sit on it. */
+		const travel = (sel: string): { lo: number; hi: number } => {
+			let l0 = PAD_EDGE, r0 = PAD_EDGE;
+			for (const o of document.querySelectorAll(sel)) {
+				const r = o.getBoundingClientRect();
+				if (r.width < 1 || r.bottom <= bandTop || r.top >= wr.bottom || r.right <= wr.left || r.left >= wr.right) continue;
+				if (r.left + r.width / 2 < wr.left + W / 2) l0 = Math.max(l0, r.right - wr.left + PAD_GAP);
+				else r0 = Math.max(r0, wr.right - r.left + PAD_GAP);
+			}
+			return { lo: l0, hi: W - r0 - w };
+		};
+		let { lo, hi } = travel('.pe-loft, .pe-zoom, .lbc-pill');
+		if (hi < lo) ({ lo, hi } = travel('.pe-zoom, .lbc-pill'));
+		if (hi < lo) lo = hi = Math.max(PAD_EDGE, Math.min(W - PAD_EDGE - w, (lo + hi) / 2));
+		// Piecewise, so 0.5 is the canvas centre even when the two gauges are not the same width.
+		const c = Math.max(lo, Math.min(hi, (W - w) / 2));
+		padRangeRef.current = { lo, hi, c };
+		const f = padXRef.current[padOrient()];
+		const left = Math.round(f <= 0.5 ? lo + (c - lo) * f * 2 : c + (hi - c) * (f - 0.5) * 2);
+		const mid = left + w / 2;
+		shoulderRef.current = mid > W * 0.55 ? -1 : 1;
+		// The state line rides the same fraction of the width, so it hugs the pad without leaving the screen.
+		const label = Math.max(0, Math.min(1, (mid - PAD_EDGE) / Math.max(1, W - PAD_EDGE * 2)));
+		const grip = mid > W / 2 + 1 ? 'l' : 'r';
+		const gripLeft = grip === 'r' ? left + w + 6 : left - 6 - PAD_GRIP_W;
+		setPadPos((p) => (p && p.left === left && p.label === label && p.grip === gripLeft ? p : { left, label, grip: gripLeft }));
+	}, []);
+
+	const savePadX = useCallback((f: number) => {
+		const next = { ...padXRef.current, [padOrient()]: f };
+		padXRef.current = next;
+		try { localStorage.setItem(PAD_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+		setPadX(next);
+		layoutPad();
+	}, [layoutPad]);
+
+	/* The grip beside the pad. The pad itself cannot be the handle: a press there is a loft and a
+	   sideways slide is the aim. Snaps to left, centre and right when released close to them. */
+	const { onPointerDown: onGripDown } = usePointerDrag(
+		(x) => {
+			const el = armElRef.current;
+			if (!el) return;
+			padGripRef.current = { x0: x, left0: el.offsetLeft };
+			setPadGrip('held');
+			try { localStorage.setItem(PAD_GRIP_KEY, '1'); } catch { /* private mode */ }
+		},
+		(x) => {
+			const g = padGripRef.current;
+			if (!g) return;
+			const { lo, hi, c } = padRangeRef.current;
+			const p = Math.max(lo, Math.min(hi, g.left0 + x - g.x0));
+			const f = p <= c ? (c > lo ? (p - lo) / (c - lo) / 2 : 0.5) : (hi > c ? 0.5 + (p - c) / (hi - c) / 2 : 0.5);
+			padXRef.current = { ...padXRef.current, [padOrient()]: f };
+			layoutPad();
+		},
+		() => {
+			if (!padGripRef.current) return;
+			padGripRef.current = null;
+			const f = padXRef.current[padOrient()];
+			savePadX(PAD_SNAPS.find((s) => Math.abs(s - f) < PAD_SNAP_R) ?? f);
+			setPadGrip('idle');
+		},
+	);
+	const onGripKey = useCallback((e: React.KeyboardEvent) => {
+		const d = e.key === 'ArrowRight' ? 0.1 : e.key === 'ArrowLeft' ? -0.1 : 0;
+		if (!d) return;
+		e.preventDefault();
+		savePadX(Math.max(0, Math.min(1, padXRef.current[padOrient()] + d)));
+	}, [savePadX]);
+
 	const onZoomKey = useCallback((e: React.KeyboardEvent) => {
 		const d = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? ZOOM_STEP
 			: e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? -ZOOM_STEP
@@ -1766,6 +1893,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		ro.observe(wrap);
 		return () => ro.disconnect();
 	}, [resize]);
+
+	// The side gauges come and go with the view, so the pad's travel is re-measured with them.
+	useLayoutEffect(() => {
+		layoutPad();
+		const wrap = wrapRef.current;
+		if (!wrap) return;
+		const ro = new ResizeObserver(layoutPad);
+		ro.observe(wrap);
+		return () => ro.disconnect();
+	}, [layoutPad, padX, view]);
 
 	useEffect(() => {
 		const onFs = () => requestAnimationFrame(resize);
@@ -2107,7 +2244,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				? { x: (hf.x - m.circle.x) / reach, y: (hf.y - m.circle.y) / reach }
 				: undefined;
 			aimCamera(g.camera, m.circle, m.dir, viewPitchRef.current, camYawRef.current, CAM_DIST, ground,
-				walkM, true, axis, EYE_H + (ZOOM_EYE - EYE_H) * z);
+				walkM, true, axis, EYE_H + (ZOOM_EYE - EYE_H) * z, shoulderRef.current);
 			const h = camHeading();
 			const live = rolling ? s.bs.find((b) => b.live && Math.sqrt(b.vx * b.vx + b.vy * b.vy) > 0.05) : undefined;
 			const focus = live ?? (statusRef.current === 'placing' ? placeRef.current : null);
@@ -2406,6 +2543,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					width: Math.round(b.width), height: Math.round(b.height),
 					cx: Math.round(b.left - r.left + b.width / 2), cy: Math.round(b.top - r.top + b.height / 2),
 					pad: BOARD_PAD_PX, mode: dragRef.current?.mode ?? null,
+					x: padXRef.current[padOrient()], range: { ...padRangeRef.current }, shoulder: shoulderRef.current,
 				};
 			})(),
 			intro: introRef.current ? introRef.current.stage : null,
@@ -2434,6 +2572,23 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			seen: screenSizes(),
 			bow: arcBow(),
 			arcOnScreen: arcOnScreen(),
+			/* The arc and its ground track (the lane it flies over, at landing height) in canvas px, so a
+			   guard can ask what the pulling hand covers. */
+			...((): { arcPx: number[][]; lanePx: number[][] } => {
+				const g = g3Ref.current, pts = arcPtsRef.current;
+				if (!g || !pts.length) return { arcPx: [], lanePx: [] };
+				const el = g.renderer.domElement, w = el.clientWidth, h = el.clientHeight;
+				const floor = pts[pts.length - 1].y, v = new THREE.Vector3();
+				const px = (p: THREE.Vector3, y: number): number[] | null => {
+					v.set(p.x, y, p.z).project(g.camera);
+					const x = (v.x + 1) * 0.5 * w, sy = (1 - v.y) * 0.5 * h;
+					return v.z < 1 && x >= 0 && x <= w && sy >= 0 && sy <= h ? [Math.round(x), Math.round(sy)] : null;
+				};
+				return {
+					arcPx: pts.map((p) => px(p, p.y)).filter((p): p is number[] => !!p),
+					lanePx: pts.map((p) => px(p, floor)).filter((p): p is number[] => !!p),
+				};
+			})(),
 			// How many points the two numbers above were judged on, and which edge loses the rest:
 			// "the arc is cropped" is five different bugs and they have five different fixes.
 			arc: (() => {
@@ -2478,6 +2633,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	// `over` too: the pad cannot throw once the match is done, and it was still drawing itself live
 	// under the end panel — the audit only ever missed it because the view happened to be `tete`.
 	const armLive = view === 'jeu' && !jackPhase && !over;
+	const padStyle = padPos ? { left: `${padPos.left}px`, transform: 'none' } : undefined;
 	// Which graduation lights up: the one nearest where the finger would have to land.
 	const boardT = boardForElevation(loft);
 	const boardBand = BOARD_MARKS.reduce((a, b) =>
@@ -2657,7 +2813,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{/* The launch board. Purely a drawing: the hit test lives in aimStart, so there is
 				    exactly one way into a throw and this cannot swallow a camera drag. It pulses until
 				    the first contact of the session — the whole complaint was that nobody found it. */}
-				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} aria-hidden="true">
+				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
 					{/* The graduations. Where the finger lands decides the angle, and a board with no
 					    marks on it would make that a secret. */}
@@ -2676,11 +2832,32 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
-				<div className="pe-power" aria-hidden="true">
+				<div className="pe-power" style={padStyle} aria-hidden="true">
 					<div className="pe-power-fill" style={{ width: `${Math.round(power * 100)}%` }} />
 				</div>
 
-				<span className={`pe-arm-label${armed && power === 0 ? ' warn' : ''}`}>{armMsg}</span>
+				<span
+					className={`pe-arm-label${armed && power === 0 ? ' warn' : ''}`}
+					style={padPos ? { left: `calc(${PAD_EDGE}px + (100% - ${PAD_EDGE * 2}px) * ${padPos.label})`, transform: `translateX(${-padPos.label * 100}%)` } : undefined}
+				>{armMsg}</span>
+
+				{/* Slides the pad along the bottom edge. Beside it, on the side facing the pitch, and gone
+				    while the pad is held or a verdict owns the band. */}
+				{padPos && armLive && !armed && !card && (
+					<div
+						className={`pe-arm-grip${padGrip === 'call' ? ' call' : ''}${padGrip === 'held' ? ' held' : ''}`}
+						style={{ left: `${padPos.grip}px` }}
+						onPointerDown={onGripDown}
+						onKeyDown={onGripKey}
+						tabIndex={0}
+						role="slider"
+						aria-label="Déplacer la planche de tir"
+						aria-valuemin={0}
+						aria-valuemax={100}
+						aria-valuenow={Math.round(padX[padOrient()] * 100)}
+						title="Glisse pour déplacer la planche"
+					>⋮⋮</div>
+				)}
 
 				{status === 'placing' && myTurn && placeOk && (
 					<button className="pe-placeok" onClick={confirmPlace}>✓ Poser ici</button>
@@ -2865,6 +3042,7 @@ const CSS = `
    390x213 on a phone — where 45 % is 96 px, under that measured floor. So the floor wins and the pad
    takes 29 % of that canvas: a canvas that short has no room to be both readable and small, and the
    old full-width band took 52 % of it. Fullscreen, which is where the game is played, gets the 150.
+   Centred here only until layoutPad measures it: the player slides it along the edge with its grip.
    No backticks anywhere in this block: it is a template literal, and one closes the string. */
 .pe-playwrap { --pe-arm-h: clamp(110px, 45%, 150px); --pe-arm-w: min(220px, calc(100% - 24px)); --pe-arm-b: 16px; width: 100%; aspect-ratio: 16 / 10; position: relative; overflow: hidden; border-radius: 14px; box-shadow: var(--shadow-lg); }
 .pe-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; background: #7fb4dd; }
@@ -3038,6 +3216,12 @@ const CSS = `
 /* Finger down, nothing pulled yet: letting go here throws nothing. Said in words AND in colour,
    because the board looks identical whether it is armed or merely touched. */
 .pe-arm-label.warn { background: rgba(120,34,28,0.72); color: #ffd7d2; font-weight: 700; }
+/* The pad's handle, beside it on the pitch side. Pulses a few times the first time it shows. */
+.pe-arm-grip { position: absolute; bottom: calc(var(--pe-arm-b) + var(--pe-arm-h) / 2 - 24px); width: 22px; height: 48px; z-index: 3; display: grid; place-items: center; border: 1.5px solid rgba(255,255,255,0.3); border-radius: 999px; background: rgba(28,20,12,0.55); color: #f0e6da; font-size: 12px; font-weight: 800; letter-spacing: -2px; cursor: ew-resize; touch-action: none; user-select: none; -webkit-user-select: none; backdrop-filter: blur(4px); }
+.pe-arm-grip:focus-visible { outline: 2px solid var(--pe-accent); outline-offset: 2px; }
+.pe-arm-grip.held { border-color: #ffd166; color: #ffd166; }
+.pe-arm-grip.call { animation: pe-arm-call 1.4s ease-in-out 3; border-color: rgba(255,209,102,0.85); }
+@media (prefers-reduced-motion: reduce) { .pe-arm-grip.call { animation: none; } }
 
 /* The graduations live INSIDE the pad now — the pad is only 220 px wide, so there is no "beside it"
    left to hug. The word sits left, the tick reaches right: the tick is what points at the height,
