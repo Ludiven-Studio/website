@@ -25,8 +25,8 @@ import {
 	GRADE_LABEL, KIND_LABEL, type DailyCourse, type Grade,
 } from './daily';
 import {
-	joinRandom, joinByCode, makeCode, seedFromRoom, multiplayerAvailable,
-	type PetanqueMatchNet, type AimMsg, type SyncMsg,
+	joinRandom, joinByCode, makeCode, seedFromRoom, multiplayerAvailable, joinLobby,
+	type PetanqueMatchNet, type AimMsg, type SyncMsg, type Lobby, type LobbyCounts,
 } from './net';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
@@ -394,6 +394,22 @@ interface DailyState {
 	targetAt: { x: number; y: number } | null;
 }
 
+/** Who else is around, in the online lobby. `counts` include the local player, so they are removed. */
+function LobbyLine({ counts, waiting = false }: { counts: LobbyCounts | null; waiting?: boolean }) {
+	if (!counts) return <span className="pe-mp-lobby">Recherche des joueurs en ligne…</span>;
+	const others = counts.total - 1;
+	if (others <= 0) {
+		return <span className="pe-mp-lobby">{waiting ? 'Personne d’autre en ligne pour l’instant' : 'Personne d’autre en ligne · invite un ami avec un code'}</span>;
+	}
+	const s = others > 1 ? 's' : '';
+	return (
+		<span className="pe-mp-lobby">
+			<span className="pe-mp-dot" aria-hidden="true" />
+			{others} autre{s} joueur{s} en ligne{counts.play ? ` · ${counts.play} en partie` : ''}
+		</span>
+	);
+}
+
 /** The end-of-end table: everything on the ground, nearest first, scoring boules marked. */
 function BouleTable({ rows, mySide }: { rows: readonly BouleRow[]; mySide: Side }) {
 	return (
@@ -588,6 +604,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [elapsed, setElapsed] = useState(0); // centis
 
 	const [mpPhase, setMpPhase] = useState<'off' | 'menu' | 'connecting' | 'waiting' | 'playing'>('off');
+	// Who else is around, while the online tab is open (see joinLobby). Null until the lobby answers.
+	const [lobbyCounts, setLobbyCounts] = useState<LobbyCounts | null>(null);
+	const lobbyRef = useRef<Lobby | null>(null);
 	const [mpCode, setMpCode] = useState<string | null>(null);
 	const [mpOpp, setMpOpp] = useState<string | null>(null);
 	const [mpMsg, setMpMsg] = useState<string | null>(null);
@@ -1553,6 +1572,20 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	}, [newGame, resetOnline]);
 
 	const me = (): string => (playerName() || 'Joueur').slice(0, 16);
+
+	/* The lobby follows the online tab: joined when it opens, told what we are doing at each step,
+	   left when we go back to solo play (or the page goes). */
+	useEffect(() => {
+		if (mpPhase === 'off') {
+			lobbyRef.current?.leave();
+			lobbyRef.current = null;
+			setLobbyCounts(null);
+			return;
+		}
+		if (!lobbyRef.current) lobbyRef.current = joinLobby(setLobbyCounts);
+		lobbyRef.current?.set(mpPhase === 'playing' ? 'play' : mpPhase === 'menu' ? 'browse' : mpCode ? 'friend' : 'wait');
+	}, [mpPhase, mpCode]);
+	useEffect(() => () => lobbyRef.current?.leave(), []);
 
 	const mpQuickMatch = useCallback(async () => {
 		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
@@ -3136,7 +3169,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 							{mpPhase === 'menu' ? (
 								<>
 									<div className="pe-mp-title">Jouer en ligne</div>
-									<button className="pe-replay" onClick={mpQuickMatch}>⚡ Partie rapide</button>
+									<LobbyLine counts={lobbyCounts} />
+									<button className="pe-replay" onClick={mpQuickMatch}>
+										{lobbyCounts && lobbyCounts.wait > 0 ? `⚡ Partie rapide · ${lobbyCounts.wait} joueur${lobbyCounts.wait > 1 ? 's' : ''} t’attend${lobbyCounts.wait > 1 ? 'ent' : ''}` : '⚡ Partie rapide'}
+									</button>
 									<button className="pe-replay" onClick={mpCreateCode}>🔑 Créer un code ami</button>
 									<div className="pe-mp-join">
 										<input value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 4))} maxLength={4} placeholder="CODE" aria-label="Code ami" />
@@ -3149,6 +3185,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 								<>
 									<div className="pe-mp-title">{mpPhase === 'connecting' ? 'Connexion…' : 'En attente d’un joueur…'}</div>
 									{mpCode && <div className="pe-mp-code">Code : <strong>{mpCode}</strong></div>}
+									{!mpCode && mpPhase === 'waiting' && <LobbyLine counts={lobbyCounts} waiting />}
 									{mpMsg && <span className="pe-mp-msg">{mpMsg}</span>}
 									<button className="pe-act" onClick={leaveOnline}>Annuler</button>
 								</>
@@ -3661,6 +3698,8 @@ const CSS = `
 .pe-mp-code { font-size: 15px; color: var(--gray-100); }
 .pe-mp-code strong { font-size: 22px; letter-spacing: 4px; }
 .pe-mp-msg { font-size: 13px; color: var(--gray-200); }
+.pe-mp-lobby { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--gray-200); }
+.pe-mp-dot { width: 8px; height: 8px; border-radius: 50%; background: #30d158; box-shadow: 0 0 0 3px rgba(48,209,88,0.25); animation: pe-beat 1.6s ease-in-out infinite; }
 
 .pe-help { max-width: 480px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1rem; }
 `;

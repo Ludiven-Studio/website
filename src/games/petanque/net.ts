@@ -146,6 +146,49 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 	};
 }
 
+/* ---------- the lobby: who is around ---------- */
+
+/** What a player is doing: in the online menu, waiting in quick match, waiting for a friend, playing. */
+export type LobbyState = 'browse' | 'wait' | 'friend' | 'play';
+/** Counts include the local player; `wait` is how many sit in quick match, ready to be joined. */
+export interface LobbyCounts { total: number; wait: number; play: number; selfWaiting: boolean; }
+export interface Lobby { set: (s: LobbyState) => void; leave: () => void; }
+
+/**
+ * One shared presence channel for everyone with the online tab open (not the whole page: each
+ * connection counts against the Realtime quota, and players vs the AI need no count). Only presence,
+ * no broadcast: a join or a state change is one small message.
+ */
+export function joinLobby(onCounts: (c: LobbyCounts) => void): Lobby | null {
+	const c = getClient();
+	if (!c) return null;
+	const selfId = randomId();
+	const ch = c.channel('petanque-lobby', { config: { presence: { key: selfId } } });
+	let state: LobbyState = 'browse';
+	let ready = false;
+	const count = (): void => {
+		const all = ch.presenceState<{ state: LobbyState }>();
+		const n: LobbyCounts = { total: 0, wait: 0, play: 0, selfWaiting: state === 'wait' };
+		for (const key of Object.keys(all)) {
+			const s = all[key][all[key].length - 1]?.state;
+			n.total++;
+			if (s === 'wait') n.wait++;
+			if (s === 'play') n.play++;
+		}
+		onCounts(n);
+	};
+	ch.on('presence', { event: 'sync' }, count);
+	ch.subscribe((status) => {
+		if (status !== 'SUBSCRIBED') return;
+		ready = true;
+		void ch.track({ state });
+	});
+	return {
+		set: (s) => { if (s === state) return; state = s; if (ready) void ch.track({ state }); },
+		leave: () => { void ch.untrack().then(() => ch.unsubscribe()); },
+	};
+}
+
 /** First-connected matchmaking: the first room with a free slot. */
 export async function joinRandom(name: string): Promise<PetanqueMatchNet | null> {
 	const c = getClient();
