@@ -80,7 +80,8 @@ export type JackVerdict = 'ok' | 'short' | 'long' | 'out';
 
 export function jackCheck(circle: { x: number; y: number }, jack: { x: number; y: number }): JackVerdict {
 	if (!inPitch(jack.x, jack.y)) return 'out';
-	if (jack.y < EDGE || jack.y > PITCH_L - EDGE) return 'out';
+	// All four limits: the side lines were missed, and a jack against a side plank was accepted.
+	if (jack.x < EDGE || jack.x > PITCH_W - EDGE || jack.y < EDGE || jack.y > PITCH_L - EDGE) return 'out';
 	const d = dist(circle, jack);
 	if (d < MIN_JACK) return 'short';
 	if (d > MAX_JACK) return 'long';

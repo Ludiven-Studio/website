@@ -4,7 +4,7 @@ import {
 	jackCheck, pointHolder, endScore, whoPlays, nextCircle, other,
 	MIN_JACK, MAX_JACK, EDGE, BOULES_PER_SIDE, type Match13, type Played, type Side,
 } from './rules13';
-import { PITCH_L } from './terrain';
+import { PITCH_L, PITCH_W } from './terrain';
 
 const at = (x: number, y: number, side: number): Played => ({ x, y, side, live: true });
 const jackAt = (x: number, y: number): Played => ({ x, y, side: -1, live: true });
@@ -18,6 +18,10 @@ describe('the jack', () => {
 		expect(jackCheck(circle, { x: 2, y: 1 + MAX_JACK + 0.2 })).toBe('long');
 		expect(jackCheck(circle, { x: 2, y: PITCH_L + 1 })).toBe('out');
 		expect(jackCheck(circle, { x: 2, y: PITCH_L - EDGE / 2 })).toBe('out'); // inside, but hugging the line
+		// The side lines too: an AI jack was accepted against the side plank.
+		expect(jackCheck(circle, { x: EDGE / 2, y: 1 + MIN_JACK + 1 })).toBe('out');
+		expect(jackCheck(circle, { x: PITCH_W - EDGE / 2, y: 1 + MIN_JACK + 1 })).toBe('out');
+		expect(jackCheck(circle, { x: EDGE + 0.05, y: 1 + MIN_JACK + 1 })).toBe('ok');
 	});
 
 	it('an invalid jack hands the placing to the opponent, not the throw', () => {
