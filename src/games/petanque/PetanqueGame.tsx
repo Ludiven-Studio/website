@@ -123,6 +123,7 @@ const PAD_HEAD = 40; // px above the pad: power bar then state line
 const PAD_GRIP_W = 22;
 // The Pétanque Scanner card in the free side of the band. Closed for the session with its ×.
 const PROMO_KEY = 'petanque-promo-shut';
+const TUTO_KEY = 'petanque-tuto-throw'; // set once the player has thrown a boule by themselves
 const PROMO_MIN = 104; // px — narrower and the name no longer fits on one line
 const PROMO_MAX = 280;
 
@@ -549,7 +550,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	// Laid out in px by layoutPad; null until the first measure, where the CSS centre stands in.
 	// `label` is the state line's fraction of the width; `grip` the grip's left edge in px; `promo`
 	// the free side of the band, or null when it is too narrow.
-	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number; promo: { left: number; width: number } | null } | null>(null);
+	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number; promo: { left: number; width: number } | null; mid: number } | null>(null);
+	// The first-throw tutorial: a ghost finger doing the gesture on the pad, until the first real throw.
+	const [tutoDone, setTutoDone] = useState(() => {
+		try { return localStorage.getItem(TUTO_KEY) === '1'; } catch { return false; }
+	});
 	// What just changed, said on the pitch: who holds the point, whose turn it is. `key` replays it.
 	const [announce, setAnnounce] = useState<{ lines: string[]; tone: 'me' | 'foe' | 'even'; key: number } | null>(null);
 	const holderRef = useRef<Side | 'tie' | null>(null); // who held the point before the last boule
@@ -1058,6 +1063,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (onlineRef.current) netRef.current?.sendThrow({ ...v, jack });
 		streamAim(false);
 		doThrow(m.turn, v, jack);
+		if (!jack) {
+			setTutoDone(true); // the gesture is learnt: the ghost finger never comes back
+			try { localStorage.setItem(TUTO_KEY, '1'); } catch { /* private mode */ }
+		}
 	}, [aimHeading, aimLoft, doThrow, streamAim]);
 
 	/* ---------- which view we are in ---------- */
@@ -1402,7 +1411,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			const b = s.bs[i], k = i * 4;
 			b.x = msg.bs[k]; b.y = msg.bs[k + 1]; b.z = msg.bs[k + 2];
 			b.live = msg.bs[k + 3] === 1;
-			b.vx = 0; b.vy = 0; b.vz = 0; b.rolling = false;
+			// At rest ON the ground, as the host holds them. `rolling = false` marked every synced boule
+			// airborne: the guest's next throw met a different physics state from the host's, and its
+			// arc preview read the first "fall" as its own boule landing at the thrower's feet.
+			b.vx = 0; b.vy = 0; b.vz = 0; b.rolling = true;
 		}
 		matchRef.current = msg.match;
 		setMatch(msg.match);
@@ -1892,8 +1904,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const pw = Math.min(PROMO_MAX, room);
 		const promo = room < PROMO_MIN ? null
 			: inL >= inR ? { left: Math.round(all.l0), width: Math.round(pw) } : { left: Math.round(W - all.r0 - pw), width: Math.round(pw) };
-		setPadPos((p) => (p && p.left === left && p.label === label && p.grip === gripLeft
-			&& p.promo?.left === promo?.left && p.promo?.width === promo?.width ? p : { left, label, grip: gripLeft, promo }));
+		setPadPos((p) => (p && p.left === left && p.label === label && p.grip === gripLeft && p.mid === Math.round(mid)
+			&& p.promo?.left === promo?.left && p.promo?.width === promo?.width ? p : { left, label, grip: gripLeft, promo, mid: Math.round(mid) }));
 	}, []);
 
 	const savePadX = useCallback((f: number) => {
@@ -3013,6 +3025,15 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					style={padPos ? { left: `calc(${PAD_EDGE}px + (100% - ${PAD_EDGE * 2}px) * ${padPos.label})`, transform: `translateX(${-padPos.label * 100}%)` } : undefined}
 				>{armMsg}</span>
 
+				{/* First throw ever: a ghost finger does the gesture on the pad — press, then slide up past
+				    the top. People did not work out the pad on their own. Gone after the first boule. */}
+				{!tutoDone && padPos && armLive && myTurn && status === 'aim' && !armed && power === 0 && !card && !daily && (
+					<div className="pe-tuto" style={{ left: `${padPos.mid}px` }} aria-hidden="true">
+						<span className="pe-tuto-trail" />
+						<span className="pe-tuto-finger" />
+					</div>
+				)}
+
 				{/* Slides the pad along the bottom edge. Beside it, on the side facing the pitch, and gone
 				    while the pad is held or a verdict owns the band. */}
 				{padPos && armLive && !armed && !card && (
@@ -3464,6 +3485,28 @@ const CSS = `
 .pe-promo.narrow .pe-promo-txt em { font-size: 11px; }
 .pe-promo-x { position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; border-radius: 999px; border: none; background: rgba(0,0,0,0.55); color: #f4ece2; font: inherit; font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .pe-promo-x:hover { background: rgba(0,0,0,0.8); }
+/* The first-throw tutorial. Anchored on the pad's centre, 35 % up it (a demi-portée press); the
+   finger lands, presses, and travels up past the seam while a gold trail grows behind it. */
+.pe-tuto { position: absolute; bottom: calc(var(--pe-arm-b) + var(--pe-arm-h) * 0.35); width: 0; height: 0; z-index: 4; pointer-events: none; --pe-tuto-rise: calc(var(--pe-arm-h) * 0.65 + 90px); }
+.pe-tuto-finger { position: absolute; left: -21px; top: -21px; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.88); box-shadow: 0 0 0 6px rgba(255,209,102,0.45), 0 4px 12px rgba(0,0,0,0.45); animation: pe-tuto-finger 2.4s ease-in-out infinite; }
+.pe-tuto-trail { position: absolute; left: -4px; bottom: 0; width: 8px; height: var(--pe-tuto-rise); border-radius: 999px; background: linear-gradient(to top, rgba(255,209,102,0.05), rgba(255,209,102,0.8)); transform-origin: bottom; animation: pe-tuto-trail 2.4s ease-in-out infinite; }
+@keyframes pe-tuto-finger {
+  0% { opacity: 0; transform: translateY(0) scale(1.35); }
+  12% { opacity: 1; transform: translateY(0) scale(1); }
+  22% { transform: translateY(0) scale(0.82); }
+  68% { opacity: 1; transform: translateY(calc(-1 * var(--pe-tuto-rise))) scale(0.82); }
+  84%, 100% { opacity: 0; transform: translateY(calc(-1 * var(--pe-tuto-rise))) scale(0.82); }
+}
+@keyframes pe-tuto-trail {
+  0%, 22% { opacity: 0; transform: scaleY(0); }
+  30% { opacity: 1; }
+  68% { opacity: 1; transform: scaleY(1); }
+  84%, 100% { opacity: 0; transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pe-tuto-finger { animation: none; opacity: 1; }
+  .pe-tuto-trail { animation: none; opacity: 0.8; }
+}
 /* The pad's handle, beside it on the pitch side. Pulses a few times the first time it shows. */
 .pe-arm-grip { position: absolute; bottom: calc(var(--pe-arm-b) + var(--pe-arm-h) / 2 - 24px); width: 22px; height: 48px; z-index: 3; display: grid; place-items: center; border: 1.5px solid rgba(255,255,255,0.3); border-radius: 999px; background: rgba(28,20,12,0.55); color: #f0e6da; font-size: 12px; font-weight: 800; letter-spacing: -2px; cursor: ew-resize; touch-action: none; user-select: none; -webkit-user-select: none; backdrop-filter: blur(4px); }
 .pe-arm-grip:focus-visible { outline: 2px solid var(--pe-accent); outline-offset: 2px; }

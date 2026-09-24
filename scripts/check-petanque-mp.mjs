@@ -107,7 +107,12 @@ async function throwOn(page, other) {
 	await page.mouse.down();
 	await page.mouse.move(s.x, pull, { steps: 14 });
 	await sleep(300);
-	const armed = (await snap(page)).power;
+	const armedSnap = await snap(page);
+	const armed = armedSnap.power;
+	// The thrower must see their OWN arc — the guest's used to stop after two points (applySync left
+	// every synced boule "airborne", and the preview took its first fall for our landing).
+	const who = armedSnap.online.host ? 'host' : 'guest';
+	ownArc[who] = Math.max(ownArc[who] ?? 0, armedSnap.arcPx.length);
 	if (armed < 0.3) {
 		await page.mouse.up();
 		return `la visée n'a pas pris (puissance ${armed})`;
@@ -156,6 +161,7 @@ const ground = (s) => s.bs.map((x) => `${x.side}:${x.x.toFixed(9)},${x.y.toFixed
 const rules = (s) => `${s.match.turn}/${s.match.phase}/${s.match.left.join('-')}/${s.match.scores.join('-')}/${s.match.endNo}`;
 
 let aimSeen = false, raySeen = false;
+const ownArc = {};
 let drift = null, ruleDrift = null, dead = null;
 let thrown = 0;
 
@@ -201,6 +207,8 @@ check(a.match.scores.join('-') === b.match.scores.join('-'), `les scores concord
 check(aimSeen, 'la visée adverse arrive sur l’autre écran');
 check(raySeen, 'le rayon de visée adverse est affiché');
 check(!a.oppAim?.live && !b.oppAim?.live, 'le rayon est retiré après le lancer');
+check((ownArc.host ?? 0) > 20 && (ownArc.guest ?? 0) > 20,
+	`chaque joueur voit sa propre trajectoire en visant (hôte ${ownArc.host ?? '-'} pts, invité ${ownArc.guest ?? '-'} pts)`);
 
 console.log(errs.length ? `\nPAGE ERRORS:\n${errs.join('\n')}` : '\nno page errors');
 await browser.close();

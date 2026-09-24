@@ -12,7 +12,7 @@ import {
 	type Terrain, type SurfaceId, PITCH_W, PITCH_L, CELL, heightAt, hashN,
 } from './terrain';
 import {
-	type Sim, type Boule, BOULE_R, JACK_R, cloneSim, stepSim, speed2, speed3, isSettled,
+	type Sim, type Boule, type Impact, BOULE_R, JACK_R, cloneSim, stepSim, speed2, speed3, isSettled,
 } from './engine';
 
 export const wx = (ex: number): number => ex - PITCH_W / 2;
@@ -1146,19 +1146,26 @@ export function predictThrow(s: Sim, from: { x: number; y: number }, v: { vx: nu
 	let px = b.x, py = b.y;
 	let blocked = false;
 
+	/* Only THIS body's contacts count. StepResult flags any body: on the guest a synced boule could
+	   sit a hair above the ground, drop on the first step, and read as our boule landing at the
+	   thrower's feet — the guest's arc was two points long. Contacts are matched by position. */
+	const imp: Impact[] = [];
+	const mine = (e: Impact, reach: number): boolean => Math.sqrt((e.x - b.x) ** 2 + (e.y - b.y) ** 2) < reach;
 	for (let k = 0; k < PRED_MAX; k++) {
-		const r = stepSim(c, PRED_DT);
+		imp.length = 0;
+		stepSim(c, PRED_DT, imp);
 		if (!b.live) break;
+		const hit = imp.some((e) => e.kind === 'boule' && mine(e, b.r + BOULE_R + 0.02));
 		if (!land) {
 			air.push(new THREE.Vector3(wx(b.x), b.z, wz(b.y)));
-			if (r.hitBoule) { blocked = true; break; }
-			if (r.landed) { land = new THREE.Vector3(wx(b.x), b.z - b.r, wz(b.y)); px = b.x; py = b.y; }
+			if (hit) { blocked = true; break; }
+			if (imp.some((e) => e.kind === 'ground' && mine(e, 0.25))) { land = new THREE.Vector3(wx(b.x), b.z - b.r, wz(b.y)); px = b.x; py = b.y; }
 			continue;
 		}
 		rolled += Math.sqrt((b.x - px) ** 2 + (b.y - py) ** 2);
 		px = b.x; py = b.y;
 		roll.push(new THREE.Vector3(wx(b.x), b.z - b.r * 0.6, wz(b.y)));
-		if (rolled > PREVIEW_ROLL || speed2(b) === 0 || r.hitBoule) break;
+		if (rolled > PREVIEW_ROLL || speed2(b) === 0 || hit) break;
 	}
 	return { air, land, roll, blocked };
 }
