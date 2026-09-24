@@ -194,8 +194,7 @@ const DUST: Record<SurfaceId, number> = {
 const LOFT_0 = 0.55; // rad — where the loft sits before the first throw, mid-board
 
 /* Aim sway: the landing point runs a slowly turning figure 8 while the pad is held (see sway.ts).
-   Its recent path is drawn on the ground, so the player can see the 8 and time the release. */
-const SWAY_TRAIL_S = 1.3; // how much of the landing's figure 8 is drawn behind the marker
+   Only the landing marker moves; the path is deliberately not drawn on the ground. */
 
 const LOFT_LABEL = (e: number): string =>
 	e > 1.0 ? 'Plomb' : e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette';
@@ -295,7 +294,6 @@ interface Scene3D {
 	shades: THREE.Mesh[]; // index-aligned too — the contact shadow under each body
 	arcAir: THREE.Mesh | null;
 	arcRoll: THREE.Mesh | null;
-	swayTrail: THREE.Mesh | null; // the landing's figure 8 while the pad is held
 }
 
 /* Halo colours are the HUD's, not the boules': a steel boule and a bronze one are the same grey
@@ -467,7 +465,6 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const aimLoftRef = useRef(LOFT_0);
 	const aimDirtyRef = useRef(false);
 	const swayRef = useRef<{ t0: number; amp: number; phase: number; turn0: number } | null>(null); // set while the pad is held
-	const swayTrailRef = useRef<{ p: THREE.Vector3; t: number }[]>([]); // recent landing points: the 8
 	const viewPitchRef = useRef(0.55);
 	const pinchRef = useRef(false); // a second finger voids the gesture, it never aims
 	/* Where the eye stands. `zoom` is a 0-1 dial, not metres: at 1 the eye has walked to ZOOM_DIST
@@ -640,7 +637,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			jackAim, jackAimAt: null, dists, distsKey: '',
 			pitch: null as unknown as Pitch3D, // filled by newGame, which always runs next
 			fx: makeFx(scene),
-			meshes: [], halos: [], shades: [], arcAir: null, arcRoll: null, swayTrail: null,
+			meshes: [], halos: [], shades: [], arcAir: null, arcRoll: null,
 		};
 		/* Size it now. The landing waits for the progression before laying a pitch, so the scene is
 		   born after the resize observer's first call, which found nothing to size: the camera kept
@@ -714,8 +711,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const clearArc = useCallback(() => {
 		const g = g3Ref.current;
 		if (!g) return;
-		killMesh(g.arcAir); killMesh(g.arcRoll); killMesh(g.swayTrail);
-		g.arcAir = g.arcRoll = g.swayTrail = null;
+		killMesh(g.arcAir); killMesh(g.arcRoll);
+		g.arcAir = g.arcRoll = null;
 		g.marker.visible = false;
 	}, []);
 
@@ -1753,7 +1750,6 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			const skill = dailyRef.current || onlineRef.current ? DIFFS.moyen.skill
 				: lvActiveRef.current ? levelSkillRef.current : DIFFS[diffRef.current].skill;
 			swayRef.current = { t0: performance.now(), amp: swayAmp(skill), phase: Math.random() * Math.PI * 2, turn0: Math.random() * Math.PI * 2 };
-			swayTrailRef.current = [];
 			setArmed(true);
 			aimDirtyRef.current = true;
 			return;
@@ -2096,8 +2092,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const rebuildArc = useCallback(() => {
 		const g = g3Ref.current, s = simRef.current;
 		if (!g || !s) return;
-		killMesh(g.arcAir); killMesh(g.arcRoll); killMesh(g.swayTrail);
-		g.arcAir = g.arcRoll = g.swayTrail = null;
+		killMesh(g.arcAir); killMesh(g.arcRoll);
+		g.arcAir = g.arcRoll = null;
 		g.marker.visible = false;
 		const m = matchRef.current;
 		if (statusRef.current !== 'aim' || m.turn !== mySideRef.current || viewRef.current !== 'jeu'
@@ -2109,17 +2105,6 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const from = m.circle;
 		const pred = predictThrow(s, from, v, (c) =>
 			place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn)));
-
-		// The sway's figure 8, drawn where it lands: the last SWAY_TRAIL_S of landing points.
-		if (swayRef.current && pred.land) {
-			const now = performance.now(), trail = swayTrailRef.current;
-			trail.push({ p: pred.land.clone().setY(pred.land.y + 0.014), t: now });
-			while (trail.length && now - trail[0].t > SWAY_TRAIL_S * 1000) trail.shift();
-			if (trail.length > 2) {
-				g.swayTrail = arcMesh(trail.map((q) => q.p), 0xffd166, 0.009); // the 8 is ~10-30 cm: a hairline vanished
-				if (g.swayTrail) g.scene.add(g.swayTrail);
-			}
-		}
 
 		const tint = pred.blocked ? 0xff6b6b : 0x8ce99a;
 		arcPtsRef.current = pred.air;
