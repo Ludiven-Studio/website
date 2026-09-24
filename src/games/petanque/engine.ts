@@ -23,6 +23,7 @@ const BOUNCE_VN = 1.6; // m/s — the rebound a boule tends to on clay, however 
 const SLOPE_K = 5 / 7; // rolling sphere: only 5/7 of the slope acceleration reaches the centre
 const PEBBLE_KICK = 0.55; // rad of deflection per unit bite
 const PEBBLE_HOP = 0.15; // upward share of the speed when a boule climbs one
+const JACK_PEBBLE_HOP = 0.9; // and when the jack does: a visible hop off a gravel stone (up to ~8 cm)
 const SETTLE = 0.06; // m/s, below which a rolling boule is at rest
 const MAX_SUB = 24;
 
@@ -152,7 +153,9 @@ function pebbleContact(s: Sim, b: Boule, near: number[], imp?: Impact[]): void {
 		const side = (-b.vy * dx + b.vx * dy) / (sp * reach);
 		const bite = (p.r / b.r) * (1 - d / reach);
 		deflect(b, side * bite * PEBBLE_KICK);
-		b.vz += bite * sp * PEBBLE_HOP;
+		// A 12 g jack jumps off a stone that a 700 g boule just rolls over: its own, livelier hop,
+		// capped so a coarse-gravel stone twice its radius does not launch it.
+		b.vz += b.side === -1 ? Math.min(1, bite) * sp * JACK_PEBBLE_HOP : bite * sp * PEBBLE_HOP;
 		b.rolling = false;
 		imp?.push({ kind: 'pebble', x: p.x, y: p.y, z: b.z - b.r, speed: sp });
 		return; // one pebble per sub-step is enough, and keeps the order unambiguous
