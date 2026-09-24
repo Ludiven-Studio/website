@@ -433,6 +433,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const armElRef = useRef<HTMLDivElement | null>(null); // the launch pad, read back for the hit test
 	const previewRef = useRef(false); // the loading preview owns the camera; no match is laid
+	const snapRef = useRef<HTMLCanvasElement | null>(null); // the preview's last frame, cross-faded out
 	const padXRef = useRef<PadX>(PAD_X_0);
 	const padRangeRef = useRef({ lo: 0, hi: 0, c: 0 }); // px the pad's left edge may travel, c = centred
 	const padGripRef = useRef<{ x0: number; left0: number } | null>(null);
@@ -549,7 +550,6 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	// `label` is the state line's fraction of the width; `grip` the grip's left edge in px; `promo`
 	// the free side of the band, or null when it is too narrow.
 	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number; promo: { left: number; width: number } | null } | null>(null);
-	const [veil, setVeil] = useState(0); // bumped when the preview hands over: replays the fade
 	// What just changed, said on the pitch: who holds the point, whose turn it is. `key` replays it.
 	const [announce, setAnnounce] = useState<{ lines: string[]; tone: 'me' | 'foe' | 'even'; key: number } | null>(null);
 	const holderRef = useRef<Side | 'tie' | null>(null); // who held the point before the last boule
@@ -758,13 +758,31 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED));
 		g.scene.add(g.pitch.group);
 		previewRef.current = true;
+		// Fade the place in from the empty sky-blue canvas rather than popping it.
+		canvasRef.current?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 450, easing: 'ease-out' });
 	}, [initScene]);
 
-	/** The first real pitch replaces the preview behind a short fade, never a cut. */
+	/** The first real pitch replaces the preview by a cross-fade: the preview's last frame is copied
+	 *  onto a 2D canvas laid over the game, and that copy fades out over the new scene. The old veil
+	 *  started as a solid colour, which read as a flash. The copy must be taken in the same task as a
+	 *  render: without preserveDrawingBuffer the WebGL buffer is gone once the frame is composited. */
 	const endPreview = useCallback(() => {
 		if (!previewRef.current) return;
 		previewRef.current = false;
-		setVeil((k) => k + 1);
+		const g = g3Ref.current, cv = canvasRef.current, snap = snapRef.current;
+		if (!g || !cv || !snap) return;
+		g.renderer.render(g.scene, g.camera);
+		snap.width = cv.width;
+		snap.height = cv.height;
+		snap.getContext('2d')?.drawImage(cv, 0, 0);
+		snap.style.transition = 'none';
+		snap.style.opacity = '1';
+		// Two frames in: the new pitch is built synchronously right after this, and the fade should
+		// start once it is on screen, not while the main thread is still busy building it.
+		requestAnimationFrame(() => requestAnimationFrame(() => {
+			snap.style.transition = 'opacity 0.6s ease-out';
+			snap.style.opacity = '0';
+		}));
 	}, []);
 
 	/** Lay a fresh pitch and match. Shared by free play and by the levels ladder. */
@@ -2907,7 +2925,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						<span className="pe-booting-bar" aria-hidden="true"><span /></span>
 					</div>
 				)}
-				{veil > 0 && <div key={`veil-${veil}`} className="pe-veil" aria-hidden="true" />}
+				<canvas ref={snapRef} className="pe-snap" aria-hidden="true" />
 
 				{webglError && (
 					<div className="pe-overlay"><div className="pe-card">Ton appareil ne peut pas afficher le terrain 3D (WebGL indisponible).</div></div>
@@ -3519,9 +3537,9 @@ const CSS = `
 .pe-root.booting .pe-loft, .pe-root.booting .pe-zoom, .pe-root.booting .pe-arm-grip, .pe-root.booting .pe-promo,
 .pe-root.booting .pe-hud-actions, .pe-root.booting .pe-views, .pe-root.booting .pe-tag,
 .pe-root.booting .pe-modetoggle, .pe-root.booting .pe-placeok { visibility: hidden; }
-/* The hand-over from preview to the real pitch: a sky-coloured veil that clears in half a second. */
-.pe-veil { position: absolute; inset: 0; z-index: 5; background: #cfe0ea; pointer-events: none; animation: pe-veil-out 0.55s ease-out forwards; }
-@keyframes pe-veil-out { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+/* The hand-over from preview to the real pitch: the preview's last frame, fading out over the new
+   scene (endPreview). Invisible and inert the rest of the time. */
+.pe-snap { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; opacity: 0; }
 .pe-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; padding: 8px; overflow: auto; }
 .pe-levels { align-items: flex-start; overflow-y: auto; padding: 16px 12px; background: color-mix(in srgb, var(--gray-999) 82%, transparent); }
 .pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; margin: auto; }
