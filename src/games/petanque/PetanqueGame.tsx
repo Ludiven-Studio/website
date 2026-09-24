@@ -550,6 +550,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	// the free side of the band, or null when it is too narrow.
 	const [padPos, setPadPos] = useState<{ left: number; label: number; grip: number; promo: { left: number; width: number } | null } | null>(null);
 	const [veil, setVeil] = useState(0); // bumped when the preview hands over: replays the fade
+	// What just changed, said on the pitch: who holds the point, whose turn it is. `key` replays it.
+	const [announce, setAnnounce] = useState<{ lines: string[]; tone: 'me' | 'foe' | 'even'; key: number } | null>(null);
+	const holderRef = useRef<Side | 'tie' | null>(null); // who held the point before the last boule
 	const [promoShut, setPromoShut] = useState(() => {
 		try { return sessionStorage.getItem(PROMO_KEY) === '1'; } catch { return false; }
 	});
@@ -784,6 +787,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		matchRef.current = initMatch13(cfg.target, HUMAN);
 		setMatch(matchRef.current);
 		setGoal((n) => ({ target: cfg.target, key: (n?.key ?? 0) + 1 }));
+		setAnnounce(null);
+		holderRef.current = null;
 		statusRef.current = 'aim';
 		setStatus('aim');
 		setCard(null);
@@ -1226,6 +1231,21 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 	/* ---------- one body has come to rest ---------- */
 
+	const mpOppRef = useRef<string | null>(null);
+	mpOppRef.current = mpOpp;
+	/** Put what just happened on the pitch, then whose turn it is. `holder` colours it. */
+	const say = useCallback((lines: string[], turn: Side, holder: Side | null) => {
+		const me = mySideRef.current;
+		const left = matchRef.current.left;
+		const foeName = onlineRef.current && mpOppRef.current ? mpOppRef.current : 'l’adversaire';
+		const mine = turn === me;
+		let who = mine ? 'À toi de jouer' : `À ${foeName} de jouer`;
+		// Once one side's hand is empty the other plays out its boules: say how many remain.
+		if (mine && left[other(me)] === 0 && left[me] > 0) who = `À toi · encore ${left[me]} boule${left[me] > 1 ? 's' : ''}`;
+		setGoal(null); // one banner at a time
+		setAnnounce((a) => ({ lines: [...lines, who], tone: holder === null ? 'even' : holder === me ? 'me' : 'foe', key: (a?.key ?? 0) + 1 }));
+	}, []);
+
 	const settle = useCallback(() => {
 		const s = simRef.current, g = g3Ref.current;
 		if (!s || !g) return;
@@ -1278,6 +1298,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			const next = applyJack(m, j);
 			matchRef.current = next;
 			setMatch(next);
+			holderRef.current = null; // a new end: nobody holds anything yet
+			if (next.phase === 'play') say([], next.turn, null);
 			if (next.phase === 'place-jack') {
 				statusRef.current = 'placing';
 				setStatus('placing');
@@ -1296,6 +1318,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		matchRef.current = next;
 		setMatch(next);
 		if (next.phase !== 'end-done') {
+			const me = mySideRef.current, foe = other(me);
+			const h = pointHolder(s.bs, j), was = holderRef.current;
+			holderRef.current = h;
+			const lines: string[] = [];
+			const thrown = s.bs[s.bs.length - 1];
+			if (thrown && thrown.side >= 0 && !thrown.live) lines.push(thrown.side === me ? 'Ta boule est sortie' : 'Boule adverse sortie');
+			if (h === me) lines.push(was === foe ? 'Tu reprends le point !' : was === me ? 'Tu gardes le point' : 'Tu as le point');
+			else if (h === foe) lines.push(was === me ? 'L’adversaire reprend le point' : was === foe ? 'L’adversaire garde le point' : 'L’adversaire a le point');
+			else if (h === 'tie') lines.push('Égalité !');
+			say(lines, next.turn, h === 'tie' ? null : h);
 			statusRef.current = 'aim';
 			setStatus('aim');
 			reviewHead(performance.now());
@@ -1334,7 +1366,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				: lvActiveRef.current ? { mode: 'niveaux' }
 				: { mode: 'libre', diff: diffRef.current });
 		}
-	}, [enterJackView, frameEnd, gameId, reviewHead]);
+	}, [enterJackView, frameEnd, gameId, reviewHead, say]);
 
 	/**
 	 * The host rules at rest. Positions and the state it derived go out together, so a float that
@@ -2851,8 +2883,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="pe-playwrap" ref={wrapRef}>
+				{announce && !daily && !card && !over && (
+					// Keys are prefixed: the goal banner and the veil are siblings with counters of their own,
+					// and a shared "1" made React mix the three up and pile stale banners in the DOM.
+					<div key={`say-${announce.key}`} className={`pe-say ${announce.tone}`} role="status" onAnimationEnd={() => setAnnounce(null)}>
+						{announce.lines.map((l, i) => <span key={i} className={i === announce.lines.length - 1 ? 'turn' : ''}>{l}</span>)}
+					</div>
+				)}
+
 				{goal && !daily && (
-					<div key={goal.key} className="pe-goal" onAnimationEnd={() => setGoal(null)}>
+					<div key={`goal-${goal.key}`} className="pe-goal" onAnimationEnd={() => setGoal(null)}>
 						Partie en <strong>{goal.target}</strong> points
 					</div>
 				)}
@@ -2867,7 +2907,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						<span className="pe-booting-bar" aria-hidden="true"><span /></span>
 					</div>
 				)}
-				{veil > 0 && <div key={veil} className="pe-veil" aria-hidden="true" />}
+				{veil > 0 && <div key={`veil-${veil}`} className="pe-veil" aria-hidden="true" />}
 
 				{webglError && (
 					<div className="pe-overlay"><div className="pe-card">Ton appareil ne peut pas afficher le terrain 3D (WebGL indisponible).</div></div>
@@ -3314,6 +3354,22 @@ const CSS = `
 @media (max-width: 420px) { .pe-view-txt { display: none; } }
 .pe-goal { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; white-space: nowrap; background: rgba(28,20,12,0.72); color: #f4ece2; font-weight: 700; font-size: 17px; padding: 9px 20px; border-radius: 999px; border: 1.5px solid rgba(255,209,102,0.6); backdrop-filter: blur(4px); animation: pe-goal 3.4s ease-in-out forwards; }
 .pe-goal strong { color: #ffd166; font-size: 21px; }
+/* After each boule: the point, then whose turn — big, dead centre, and brief: it pops in, holds for
+   about half a second, and pops out, so it never sits on the boules the player wants to look at.
+   Green when the point is yours, red when it is theirs. */
+.pe-say { position: absolute; left: 50%; top: 45%; z-index: 5; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 4px; white-space: nowrap; color: #fff; font-weight: 900; font-size: clamp(22px, 6vw, 34px); line-height: 1.1; text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 0 18px rgba(0,0,0,0.55); animation: pe-say-pop 0.85s ease-out forwards; }
+.pe-say.me span:first-child { color: #8ce99a; }
+.pe-say.foe span:first-child { color: #ff8a80; }
+.pe-say .turn { font-size: clamp(15px, 3.6vw, 20px); font-weight: 800; color: #fff; }
+.pe-say span:only-child { font-size: clamp(22px, 6vw, 34px); font-weight: 900; }
+@keyframes pe-say-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  16% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+  24% { transform: translate(-50%, -50%) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); }
+}
+@media (prefers-reduced-motion: reduce) { .pe-say { animation: pe-goal-still 0.85s forwards; transform: translate(-50%, -50%); } }
 @keyframes pe-goal { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .pe-goal { animation-name: pe-goal-still; } @keyframes pe-goal-still { 0%, 99% { opacity: 1; } 100% { opacity: 0; } } }
 .pe-tag { background: rgba(28,20,12,0.6); color: #f0e6da; font-size: 12.5px; font-weight: 500; padding: 5px 14px; border-radius: 999px; backdrop-filter: blur(4px); pointer-events: none; text-align: center; max-width: 96%; }
