@@ -12,6 +12,7 @@ import {
 	MIN_JACK, MAX_JACK, EDGE, BOULES_PER_SIDE, type Match13, type Side, type Played,
 } from './rules13';
 import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai';
+import { swayAt, swayAmp } from './sway';
 import {
 	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, makeMarker, makeHalo, arcMesh, aimRay, predictThrow,
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
@@ -192,40 +193,9 @@ const DUST: Record<SurfaceId, number> = {
 
 const LOFT_0 = 0.55; // rad — where the loft sits before the first throw, mid-board
 
-/* Aim sway: the arm is never perfectly still, so the throw drifts while the pad is held and the
-   player times the release. Two sines per axis at unrelated frequencies, so it never repeats
-   exactly, from a random phase per press (a phase of 0 would make an instant release perfect).
-   Applied to the throw before the velocity is computed: only velocities travel online, so the
-   random phase never has to match on the other screen. The AI does not sway; its skill noise is
-   its own. Amplitude follows the AI's skill for the mode: 0.3 deg (Facile) to 1.2 deg (Expert)
-   of heading, 1 deg being ~12 cm at 7 m. The loft gets half, because near 30 deg one degree of
-   loft moves the landing about as much as one of heading, and a roulette three to four times more. */
-const SWAY_MIN_DEG = 0.3;
-const SWAY_MAX_DEG = 1.2;
-const SWAY_LOFT_SHARE = 0.5;
-const SWAY_YAW_HZ = [0.71, 1.13] as const;
-const SWAY_LOFT_HZ = [0.53, 0.89] as const;
-// Fatigue: steady for 2 s, then the arm tires up to 2.2x the sway at 5 s. Waiting pays, not forever.
-const SWAY_REST_S = 2;
-const SWAY_TIRE_PER_S = 0.4;
-const SWAY_TIRE_MAX = 1.2;
-
-/** Sway amplitude in radians of heading for an AI skill (0.34 Facile .. 0.95 Expert). */
-const swayAmp = (skill: number): number => {
-	const k = Math.max(0, Math.min(1, (skill - 0.34) / (0.95 - 0.34)));
-	return ((SWAY_MIN_DEG + (SWAY_MAX_DEG - SWAY_MIN_DEG) * k) * Math.PI) / 180;
-};
-
-/** Heading and loft offsets `sec` seconds into a press, for amplitude `amp` and phases `ph`. */
-function swayAt(sec: number, amp: number, ph: readonly number[]): { yaw: number; loft: number } {
-	const tire = 1 + Math.min(SWAY_TIRE_MAX, Math.max(0, sec - SWAY_REST_S) * SWAY_TIRE_PER_S);
-	const w = (hz: number, p: number): number => Math.sin(2 * Math.PI * hz * sec + p);
-	const a = amp * tire;
-	return {
-		yaw: a * (0.65 * w(SWAY_YAW_HZ[0], ph[0]) + 0.35 * w(SWAY_YAW_HZ[1], ph[1])),
-		loft: a * SWAY_LOFT_SHARE * (0.6 * w(SWAY_LOFT_HZ[0], ph[2]) + 0.4 * w(SWAY_LOFT_HZ[1], ph[3])),
-	};
-}
+/* Aim sway: the landing point runs a slowly turning figure 8 while the pad is held (see sway.ts).
+   Its recent path is drawn on the ground, so the player can see the 8 and time the release. */
+const SWAY_TRAIL_S = 1.3; // how much of the landing's figure 8 is drawn behind the marker
 
 const LOFT_LABEL = (e: number): string =>
 	e > 1.0 ? 'Plomb' : e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette';
@@ -325,6 +295,7 @@ interface Scene3D {
 	shades: THREE.Mesh[]; // index-aligned too — the contact shadow under each body
 	arcAir: THREE.Mesh | null;
 	arcRoll: THREE.Mesh | null;
+	swayTrail: THREE.Mesh | null; // the landing's figure 8 while the pad is held
 }
 
 /* Halo colours are the HUD's, not the boules': a steel boule and a bronze one are the same grey
@@ -495,7 +466,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const aimYawRef = useRef(0);
 	const aimLoftRef = useRef(LOFT_0);
 	const aimDirtyRef = useRef(false);
-	const swayRef = useRef<{ t0: number; amp: number; ph: number[] } | null>(null); // set while the pad is held
+	const swayRef = useRef<{ t0: number; amp: number; phase: number; turn0: number } | null>(null); // set while the pad is held
+	const swayTrailRef = useRef<{ p: THREE.Vector3; t: number }[]>([]); // recent landing points: the 8
 	const viewPitchRef = useRef(0.55);
 	const pinchRef = useRef(false); // a second finger voids the gesture, it never aims
 	/* Where the eye stands. `zoom` is a 0-1 dial, not metres: at 1 the eye has walked to ZOOM_DIST
@@ -668,7 +640,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			jackAim, jackAimAt: null, dists, distsKey: '',
 			pitch: null as unknown as Pitch3D, // filled by newGame, which always runs next
 			fx: makeFx(scene),
-			meshes: [], halos: [], shades: [], arcAir: null, arcRoll: null,
+			meshes: [], halos: [], shades: [], arcAir: null, arcRoll: null, swayTrail: null,
 		};
 		/* Size it now. The landing waits for the progression before laying a pitch, so the scene is
 		   born after the resize observer's first call, which found nothing to size: the camera kept
@@ -742,8 +714,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const clearArc = useCallback(() => {
 		const g = g3Ref.current;
 		if (!g) return;
-		killMesh(g.arcAir); killMesh(g.arcRoll);
-		g.arcAir = g.arcRoll = null;
+		killMesh(g.arcAir); killMesh(g.arcRoll); killMesh(g.swayTrail);
+		g.arcAir = g.arcRoll = g.swayTrail = null;
 		g.marker.visible = false;
 	}, []);
 
@@ -973,21 +945,21 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	/* ---------- throwing ---------- */
 
 	/** The sway right now, zero when the pad is not held. */
-	const swayNow = useCallback((): { yaw: number; loft: number } => {
+	const swayNow = useCallback((): { yaw: number; speed: number } => {
 		const s = swayRef.current;
-		return s ? swayAt((performance.now() - s.t0) / 1000, s.amp, s.ph) : { yaw: 0, loft: 0 };
+		return s ? swayAt((performance.now() - s.t0) / 1000, s.amp, s.phase, s.turn0) : { yaw: 0, speed: 0 };
 	}, []);
 
-	/** Heading and loft the boule would leave with if released now: the chosen aim plus the sway. */
+	/** Heading, loft and speed the boule would leave with if released now: the aim plus the sway,
+	 *  which moves the heading and the speed (never the loft: see sway.ts). */
 	const aimHeading = useCallback((): { x: number; y: number } => {
 		const m = matchRef.current;
 		const y = aimYawRef.current + swayNow().yaw;
 		return { x: Math.sin(y) * m.dir, y: Math.cos(y) * m.dir };
 	}, [swayNow]);
-	const aimLoft = useCallback((): number => {
-		const e = aimLoftRef.current + swayNow().loft;
-		return Math.max(elevationForBoard(0), Math.min(elevationForBoard(1), e));
-	}, [swayNow]);
+	const aimLoft = useCallback((): number =>
+		Math.max(elevationForBoard(0), Math.min(elevationForBoard(1), aimLoftRef.current)), []);
+	const aimSpeed = useCallback((): number => speedOf(powerRef.current) * (1 + swayNow().speed), [swayNow]);
 
 	/** Where the EYE points. Free, unlike the aim — this one never reaches the physics. */
 	const camHeading = useCallback((): { x: number; y: number } => {
@@ -1074,7 +1046,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const throwFromAim = useCallback(() => {
 		const m = matchRef.current;
 		const h = aimHeading();
-		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), aimLoft());
+		const v = throwVelocity(h.x, h.y, aimSpeed(), aimLoft());
 		swayRef.current = null;
 		const jack = m.phase === 'throw-jack';
 		// Velocities, never angles: converting an angle calls sin/cos, and two JS engines may not
@@ -1086,7 +1058,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			setTutoDone(true); // the gesture is learnt: the ghost finger never comes back
 			try { localStorage.setItem(TUTO_KEY, '1'); } catch { /* private mode */ }
 		}
-	}, [aimHeading, aimLoft, doThrow, streamAim]);
+	}, [aimHeading, aimLoft, aimSpeed, doThrow, streamAim]);
 
 	/* ---------- which view we are in ---------- */
 
@@ -1780,7 +1752,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			// Daily and online sway like Moyen for everyone: a shared board must not favour a ladder.
 			const skill = dailyRef.current || onlineRef.current ? DIFFS.moyen.skill
 				: lvActiveRef.current ? levelSkillRef.current : DIFFS[diffRef.current].skill;
-			swayRef.current = { t0: performance.now(), amp: swayAmp(skill), ph: [0, 1, 2, 3].map(() => Math.random() * Math.PI * 2) };
+			swayRef.current = { t0: performance.now(), amp: swayAmp(skill), phase: Math.random() * Math.PI * 2, turn0: Math.random() * Math.PI * 2 };
+			swayTrailRef.current = [];
 			setArmed(true);
 			aimDirtyRef.current = true;
 			return;
@@ -2123,8 +2096,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const rebuildArc = useCallback(() => {
 		const g = g3Ref.current, s = simRef.current;
 		if (!g || !s) return;
-		killMesh(g.arcAir); killMesh(g.arcRoll);
-		g.arcAir = g.arcRoll = null;
+		killMesh(g.arcAir); killMesh(g.arcRoll); killMesh(g.swayTrail);
+		g.arcAir = g.arcRoll = g.swayTrail = null;
 		g.marker.visible = false;
 		const m = matchRef.current;
 		if (statusRef.current !== 'aim' || m.turn !== mySideRef.current || viewRef.current !== 'jeu'
@@ -2132,10 +2105,21 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 		const asJack = m.phase === 'throw-jack';
 		const h = aimHeading();
-		const v = throwVelocity(h.x, h.y, speedOf(powerRef.current), aimLoft());
+		const v = throwVelocity(h.x, h.y, aimSpeed(), aimLoft());
 		const from = m.circle;
 		const pred = predictThrow(s, from, v, (c) =>
 			place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn)));
+
+		// The sway's figure 8, drawn where it lands: the last SWAY_TRAIL_S of landing points.
+		if (swayRef.current && pred.land) {
+			const now = performance.now(), trail = swayTrailRef.current;
+			trail.push({ p: pred.land.clone().setY(pred.land.y + 0.014), t: now });
+			while (trail.length && now - trail[0].t > SWAY_TRAIL_S * 1000) trail.shift();
+			if (trail.length > 2) {
+				g.swayTrail = arcMesh(trail.map((q) => q.p), 0xffd166, 0.009); // the 8 is ~10-30 cm: a hairline vanished
+				if (g.swayTrail) g.scene.add(g.swayTrail);
+			}
+		}
 
 		const tint = pred.blocked ? 0xff6b6b : 0x8ce99a;
 		arcPtsRef.current = pred.air;
@@ -2149,7 +2133,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			(g.marker.material as THREE.MeshBasicMaterial).color.setHex(tint);
 			g.marker.visible = true;
 		}
-	}, [aimHeading, aimLoft]);
+	}, [aimHeading, aimLoft, aimSpeed]);
 
 	/* ---------- where the action is ---------- */
 
