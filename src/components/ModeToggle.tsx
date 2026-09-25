@@ -4,6 +4,7 @@
    Deep link: ?defi (or ?mode=defi / ?mode=daily) auto-opens the daily challenge. */
 
 import { useEffect, useRef } from 'react';
+import { tr, type GameLang } from '../lib/gameLang';
 
 interface Props {
 	daily: boolean;
@@ -17,9 +18,10 @@ interface Props {
 	showOnline?: boolean;
 	onlineActive?: boolean;
 	onOnline?: () => void;
+	lang?: GameLang;
 }
 
-export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsActive, onLevels, showOnline, onlineActive, onOnline }: Props) {
+export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsActive, onLevels, showOnline, onlineActive, onOnline, lang = 'fr' }: Props) {
 	const onDailyRef = useRef(onDaily);
 	onDailyRef.current = onDaily;
 
@@ -43,7 +45,7 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 	// With the third segment the label 'Mode libre' is too wide on phones — shorten.
 	const freeActive = !daily && !levelsActive && !onlineActive;
 	return (
-		<div className={`dt-toggle ${showLevels ? 'three' : ''} ${showOnline ? 'four' : ''}`} role="tablist" aria-label="Mode">
+		<div className={`dt-toggle ${showLevels ? 'three' : ''} ${showOnline ? 'four' : ''}`} role="tablist" aria-label={tr(lang, { fr: 'Mode', en: 'Mode', es: 'Modo' })}>
 			<style>{CSS}</style>
 			{showLevels && (
 				<button
@@ -52,7 +54,7 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 					className={`dt-seg ${levelsActive && !onlineActive ? 'active' : ''}`}
 					onClick={onLevels}
 				>
-					🎯 Niveaux
+					🎯 {tr(lang, { fr: 'Niveaux', en: 'Levels', es: 'Niveles' })}
 				</button>
 			)}
 			<button
@@ -61,7 +63,7 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 				className={`dt-seg ${daily && !levelsActive && !onlineActive ? 'active' : ''}`}
 				onClick={onDaily}
 			>
-				🏆 {showLevels ? 'Défi' : 'Défi du jour'}
+				🏆 {showLevels ? tr(lang, { fr: 'Défi', en: 'Daily', es: 'Reto' }) : tr(lang, { fr: 'Défi du jour', en: 'Daily challenge', es: 'Reto del día' })}
 			</button>
 			<button
 				role="tab"
@@ -69,7 +71,7 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 				className={`dt-seg ${freeActive ? 'active' : ''}`}
 				onClick={onFree}
 			>
-				🎲 {showLevels ? 'Libre' : 'Mode libre'}
+				🎲 {showLevels ? tr(lang, { fr: 'Libre', en: 'Free', es: 'Libre' }) : tr(lang, { fr: 'Mode libre', en: 'Free play', es: 'Modo libre' })}
 			</button>
 			{showOnline && (
 				<button
@@ -78,7 +80,7 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 					className={`dt-seg ${onlineActive ? 'active' : ''}`}
 					onClick={onOnline}
 				>
-					👥 En ligne
+					👥 {tr(lang, { fr: 'En ligne', en: 'Online', es: 'En línea' })}
 				</button>
 			)}
 		</div>

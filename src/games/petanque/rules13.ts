@@ -38,8 +38,16 @@ export interface Match13 {
 	left: [number, number]; // boules still in hand
 	endNo: number;
 	winner: Side | null;
-	lastEvent: string | null;
+	lastEvent: MatchEvent | null;
 }
+
+/** What the umpire just called. Data, not words: the UI says it in the player's language and from
+ *  the player's own seat, which online is not always side 0. */
+export type MatchEvent =
+	| { k: 'jack-short' | 'jack-long' | 'jack-out' }
+	| { k: 'jack-dead'; side: Side | null; points: number }
+	| { k: 'match-won'; side: Side; points: number }
+	| { k: 'end'; side: Side | null; points: number };
 
 export const other = (s: Side): Side => (s === 0 ? 1 : 0);
 
@@ -140,9 +148,7 @@ export function applyJack(state: Match13, jack: { x: number; y: number }): Match
 		...state,
 		phase: 'place-jack',
 		turn: other(state.jackThrower),
-		lastEvent: v === 'short' ? 'Bouchon trop court — à l’adversaire de le placer'
-			: v === 'long' ? 'Bouchon trop long — à l’adversaire de le placer'
-			: 'Bouchon hors du terrain — à l’adversaire de le placer',
+		lastEvent: { k: v === 'short' ? 'jack-short' : v === 'long' ? 'jack-long' : 'jack-out' },
 	};
 }
 
@@ -170,8 +176,7 @@ export function applySettled(state: Match13, bs: Played[], jack: Played): Match1
 		const d = deadJackScore(left);
 		return {
 			...next, phase: 'end-done',
-			lastEvent: d.side === null ? 'Bouchon sorti — mène nulle'
-				: `Bouchon sorti — ${d.points} point${d.points > 1 ? 's' : ''} pour ${d.side === 0 ? 'toi' : 'l’adversaire'}`,
+			lastEvent: { k: 'jack-dead', side: d.side, points: d.points },
 		};
 	}
 
@@ -189,7 +194,7 @@ export function finishEnd(state: Match13, bs: Played[], jack: Played): Match13 {
 	if (res.side !== null && scores[res.side] >= state.target) {
 		return {
 			...state, scores, phase: 'match-done', winner: res.side,
-			lastEvent: `${res.points} point${res.points > 1 ? 's' : ''} — partie gagnée`,
+			lastEvent: { k: 'match-won', side: res.side, points: res.points },
 		};
 	}
 
@@ -211,6 +216,6 @@ export function finishEnd(state: Match13, bs: Played[], jack: Played): Match13 {
 		dir,
 		left: [BOULES_PER_SIDE, BOULES_PER_SIDE],
 		endNo: state.endNo + 1,
-		lastEvent: won === null ? 'Mène nulle — on rejoue' : `${res.points} point${res.points > 1 ? 's' : ''} pour ${won === 0 ? 'toi' : 'l’adversaire'}`,
+		lastEvent: { k: 'end', side: won, points: res.points },
 	};
 }

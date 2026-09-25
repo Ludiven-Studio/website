@@ -5,15 +5,17 @@
 import type { GameProgress } from '../lib/progression';
 import { LEVEL_COUNT, unlockedUpTo } from '../lib/progression';
 import ErrorBoundary from './ErrorBoundary';
+import { tr, type GameLang } from '../lib/gameLang';
 
 interface Props {
 	progress: GameProgress;
 	onPick: (level: number) => void;
 	/** Optional total-stars caption; defaults to "X / 300 ⭐". */
 	title?: string;
+	lang?: GameLang;
 }
 
-function LevelSelectInner({ progress, onPick, title }: Props) {
+function LevelSelectInner({ progress, onPick, title, lang = 'fr' }: Props) {
 	const count = progress.count ?? LEVEL_COUNT;
 	const unlocked = unlockedUpTo(progress);
 	const totalStars = Object.values(progress.stars).reduce((a, b) => a + b, 0);
@@ -34,7 +36,9 @@ function LevelSelectInner({ progress, onPick, title }: Props) {
 							className={`ls-tile ${locked ? 'locked' : ''} ${stars > 0 ? 'done' : ''} ${level === unlocked ? 'next' : ''}`}
 							disabled={locked}
 							onClick={() => !locked && onPick(level)}
-							aria-label={locked ? `Niveau ${level} verrouillé` : `Niveau ${level}, ${stars} étoile${stars > 1 ? 's' : ''}`}
+							aria-label={locked
+								? tr(lang, { fr: `Niveau ${level} verrouillé`, en: `Level ${level} locked`, es: `Nivel ${level} bloqueado` })
+								: tr(lang, { fr: `Niveau ${level}, ${stars} étoile${stars > 1 ? 's' : ''}`, en: `Level ${level}, ${stars} star${stars === 1 ? '' : 's'}`, es: `Nivel ${level}, ${stars} estrella${stars === 1 ? '' : 's'}` })}
 						>
 							{locked ? (
 								<span className="ls-lock">🔒</span>
@@ -61,7 +65,7 @@ export default function LevelSelect(props: Props) {
 		<ErrorBoundary
 			fallback={
 				<p style={{ textAlign: 'center', color: 'var(--gray-300)', fontSize: 13 }}>
-					Sélecteur de niveaux momentanément indisponible.
+					{tr(props.lang ?? 'fr', { fr: 'Sélecteur de niveaux momentanément indisponible.', en: 'Level picker unavailable for now.', es: 'Selector de niveles no disponible por ahora.' })}
 				</p>
 			}
 		>

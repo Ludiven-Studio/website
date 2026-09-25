@@ -21,7 +21,7 @@ const PORT = 4373;
 const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+const ctx = await browser.newContext({ locale: process.env.PET_LANG || 'fr-FR', viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
 const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log(`THROW ${e.message}`));
 

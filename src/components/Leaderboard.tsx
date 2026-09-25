@@ -17,8 +17,45 @@ import { gameStreak } from '../lib/streak';
 import { equippedBlason } from '../lib/wallet';
 import { trackEvent } from '../lib/analytics';
 import ErrorBoundary from './ErrorBoundary';
+import { tr, type GameLang } from '../lib/gameLang';
 
 // Time leaderboards store CENTISECONDS; a game may still pass its own `format`.
+
+const TXT = {
+	fr: {
+		title: 'Classement du jour', daily: 'Défi du jour', rank: ['🥇 1er', '🥈 2e', '🥉 3e'], nth: (n: number) => `${n}e`,
+		of: (n: number) => ` sur ${n}`, streak: (n: number) => `🔥 ${n} jours d'affilée`, beat: 'Peux-tu me battre ?',
+		shared: 'Partagé !', copied: 'Lien copié !', share: '📣 Partager mon score', all: '🗓 Tous les défis',
+		sendFail: "⚠️ Ton score n'a pas pu être envoyé.", retry: 'Réessayer', refused: "⚠️ Ton score n'a pas été retenu par le classement.",
+		off: "Le classement n'est pas encore configuré.", loading: 'Chargement…',
+		down: 'Classement indisponible pour le moment. Vérifie ta connexion.',
+		empty: "Personne n'a encore joué aujourd'hui. À toi de lancer le classement !",
+		nick: 'Ton pseudo', nickLabel: 'Pseudo', ok: 'Valider', cancel: 'Annuler', nickIs: 'Pseudo :', change: 'Changer',
+		setNick: 'Définir un pseudo', crashed: 'Classement momentanément indisponible.',
+	},
+	en: {
+		title: 'Today’s leaderboard', daily: 'Daily challenge', rank: ['🥇 1st', '🥈 2nd', '🥉 3rd'], nth: (n: number) => `${n}th`,
+		of: (n: number) => ` of ${n}`, streak: (n: number) => `🔥 ${n} days in a row`, beat: 'Can you beat me?',
+		shared: 'Shared!', copied: 'Link copied!', share: '📣 Share my score', all: '🗓 All challenges',
+		sendFail: '⚠️ Your score could not be sent.', retry: 'Retry', refused: '⚠️ Your score was not accepted by the leaderboard.',
+		off: 'The leaderboard is not set up yet.', loading: 'Loading…',
+		down: 'Leaderboard unavailable for now. Check your connection.',
+		empty: 'Nobody has played today yet. Be the first on the board!',
+		nick: 'Your nickname', nickLabel: 'Nickname', ok: 'Save', cancel: 'Cancel', nickIs: 'Nickname:', change: 'Change',
+		setNick: 'Set a nickname', crashed: 'Leaderboard unavailable for now.',
+	},
+	es: {
+		title: 'Clasificación del día', daily: 'Reto del día', rank: ['🥇 1.º', '🥈 2.º', '🥉 3.º'], nth: (n: number) => `${n}.º`,
+		of: (n: number) => ` de ${n}`, streak: (n: number) => `🔥 ${n} días seguidos`, beat: '¿Puedes ganarme?',
+		shared: '¡Compartido!', copied: '¡Enlace copiado!', share: '📣 Compartir mi puntuación', all: '🗓 Todos los retos',
+		sendFail: '⚠️ No se pudo enviar tu puntuación.', retry: 'Reintentar', refused: '⚠️ La clasificación no aceptó tu puntuación.',
+		off: 'La clasificación aún no está configurada.', loading: 'Cargando…',
+		down: 'Clasificación no disponible por ahora. Comprueba tu conexión.',
+		empty: 'Nadie ha jugado todavía hoy. ¡Estrena tú la clasificación!',
+		nick: 'Tu apodo', nickLabel: 'Apodo', ok: 'Guardar', cancel: 'Cancelar', nickIs: 'Apodo:', change: 'Cambiar',
+		setNick: 'Elegir un apodo', crashed: 'Clasificación no disponible por ahora.',
+	},
+};
 
 interface Props {
 	game: string;
@@ -32,9 +69,11 @@ interface Props {
 	source?: () => Promise<ScoreRow[]>;
 	/** Share + "tous les défis" row. Off when the board is only a peek (free mode corner). */
 	actions?: boolean;
+	lang?: GameLang;
 }
 
-function LeaderboardInner({ game, metric, submitValue, format, source, actions = true }: Props) {
+function LeaderboardInner({ game, metric, submitValue, format, source, actions = true, lang = 'fr' }: Props) {
+	const t = tr(lang, TXT);
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
 	const [editing, setEditing] = useState(false);
@@ -162,17 +201,17 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 		const line = metric === 'time' ? `⏱️ ${fmt(dayValue)}` : `🏆 ${fmt(dayValue)} pts`;
 		const rank = rows.findIndex((r) => r.name.toLowerCase() === me);
 		const rankLine =
-			rank < 0 ? '' : ` · ${rank < 3 ? ['🥇 1er', '🥈 2e', '🥉 3e'][rank] : `${rank + 1}e`}${rows.length > 1 ? ` sur ${rows.length}` : ''}`;
+			rank < 0 ? '' : ` · ${rank < 3 ? t.rank[rank] : t.nth(rank + 1)}${rows.length > 1 ? t.of(rows.length) : ''}`;
 		const st = gameStreak(gameId);
-		const streakLine = st.count > 1 ? `\n🔥 ${st.count} jours d'affilée` : '';
-		const text = `${title} — Défi du jour\n${line}${rankLine}${streakLine}\nPeux-tu me battre ?`;
+		const streakLine = st.count > 1 ? `\n${t.streak(st.count)}` : '';
+		const text = `${title} — ${t.daily}\n${line}${rankLine}${streakLine}\n${t.beat}`;
 		try {
 			if (navigator.share) {
-				await navigator.share({ title: `${title} — Défi du jour`, text, url });
-				setShareMsg('Partagé !');
+				await navigator.share({ title: `${title} — ${t.daily}`, text, url });
+				setShareMsg(t.shared);
 			} else {
 				await navigator.clipboard.writeText(`${text}\n${url}`);
-				setShareMsg('Lien copié !');
+				setShareMsg(t.copied);
 			}
 		} catch {
 			return; // user cancelled — no toast
@@ -186,11 +225,11 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 			<style>{CSS}</style>
 			{collapsible ? (
 				<button className="lb-title" onClick={toggle} aria-expanded={open}>
-					<span>Classement du jour</span>
+					<span>{t.title}</span>
 					<span className="lb-chev" aria-hidden="true">▾</span>
 				</button>
 			) : (
-				<h3 className="lb-title lb-title-static">Classement du jour</h3>
+				<h3 className="lb-title lb-title-static">{t.title}</h3>
 			)}
 
 			{open && (
@@ -198,9 +237,9 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 			{actions && (
 				<div className="lb-share-row">
 					{dayValue != null && (
-						<button className="lb-share" onClick={share}>📣 Partager mon score</button>
+						<button className="lb-share" onClick={share}>{t.share}</button>
 					)}
-					<a className="lb-back" href="/jeux/defi/">🗓 Tous les défis</a>
+					<a className="lb-back" href="/jeux/defi/">{t.all}</a>
 					{shareMsg && <span className="lb-share-msg">{shareMsg}</span>}
 				</div>
 			)}
@@ -209,28 +248,28 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 				<p className="lb-warn">
 					{submitFailed === 'network' ? (
 						<>
-							⚠️ Ton score n'a pas pu être envoyé.{' '}
-							<button className="lb-link" onClick={load}>Réessayer</button>
+							{t.sendFail}{' '}
+							<button className="lb-link" onClick={load}>{t.retry}</button>
 						</>
 					) : (
-						<>⚠️ Ton score n'a pas été retenu par le classement.</>
+						<>{t.refused}</>
 					)}
 				</p>
 			)}
 
 			{!leaderboardEnabled() ? (
-				<p className="lb-msg">Le classement n'est pas encore configuré.</p>
+				<p className="lb-msg">{t.off}</p>
 			) : (
 				<>
 					{loading ? (
-						<p className="lb-msg">Chargement…</p>
+						<p className="lb-msg">{t.loading}</p>
 					) : error ? (
 						<div className="lb-err">
-							<p className="lb-msg">Classement indisponible pour le moment. Vérifie ta connexion.</p>
-							<button className="lb-retry" onClick={load}>Réessayer</button>
+							<p className="lb-msg">{t.down}</p>
+							<button className="lb-retry" onClick={load}>{t.retry}</button>
 						</div>
 					) : rows.length === 0 ? (
-						<p className="lb-msg">Personne n'a encore joué aujourd'hui. À toi de lancer le classement&nbsp;!</p>
+						<p className="lb-msg">{t.empty}</p>
 					) : (
 						<ol className="lb-list">
 							{rows.map((r, i) => (
@@ -248,27 +287,27 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 							<input
 								type="text"
 								maxLength={20}
-								placeholder="Ton pseudo"
+								placeholder={t.nick}
 								value={draft}
 								onChange={(e) => setDraft(e.target.value)}
 								onKeyDown={(e) => e.key === 'Enter' && save()}
-								aria-label="Pseudo"
+								aria-label={t.nickLabel}
 								autoFocus
 							/>
-							<button onClick={save}>Valider</button>
+							<button onClick={save}>{t.ok}</button>
 							{editing && (
-								<button className="lb-cancel" onClick={() => setEditing(false)}>Annuler</button>
+								<button className="lb-cancel" onClick={() => setEditing(false)}>{t.cancel}</button>
 							)}
 						</div>
 					) : (
 						<p className="lb-foot">
 							{name ? (
 								<>
-									Pseudo : <strong>{myBlason ? `${myBlason.emoji} ` : ''}{name}</strong> ·{' '}
-									<button className="lb-link" onClick={startEdit}>Changer</button>
+									{t.nickIs} <strong>{myBlason ? `${myBlason.emoji} ` : ''}{name}</strong> ·{' '}
+									<button className="lb-link" onClick={startEdit}>{t.change}</button>
 								</>
 							) : (
-								<button className="lb-link" onClick={startEdit}>Définir un pseudo</button>
+								<button className="lb-link" onClick={startEdit}>{t.setNick}</button>
 							)}
 						</p>
 					)}
@@ -287,7 +326,7 @@ export default function Leaderboard(props: Props) {
 		<ErrorBoundary
 			fallback={
 				<p style={{ textAlign: 'center', color: 'var(--gray-300)', fontSize: 13, margin: '1.25rem 0 0' }}>
-					Classement momentanément indisponible.
+					{tr(props.lang ?? 'fr', TXT).crashed}
 				</p>
 			}
 		>

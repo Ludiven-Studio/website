@@ -135,8 +135,16 @@
 			if (on && document.visibilityState === 'visible') void keepAwake();
 		});
 
+		// French unless a game announces another language (see lib/gameLang).
+		const LABELS: Record<string, { enter: string; leave: string; exit: string }> = {
+			fr: { enter: '⛶ Plein écran', leave: '⛶ Quitter le plein écran', exit: '⛶ Quitter' },
+			en: { enter: '⛶ Fullscreen', leave: '⛶ Exit fullscreen', exit: '⛶ Exit' },
+			es: { enter: '⛶ Pantalla completa', leave: '⛶ Salir de pantalla completa', exit: '⛶ Salir' },
+		};
+		// The game may have announced before this ran; it also sets <html lang>.
+		let labels = LABELS[document.documentElement.lang] ?? LABELS.fr;
 		const setLabel = (): void => {
-			btn.textContent = on ? '⛶ Quitter le plein écran' : '⛶ Plein écran';
+			btn.textContent = on ? labels.leave : labels.enter;
 		};
 		// Let games re-measure their canvas: they already listen to `fullscreenchange`,
 		// which the native API doesn't fire on iOS — so dispatch it ourselves.
@@ -196,7 +204,7 @@
 		const btn = document.createElement('button');
 		btn.type = 'button';
 		btn.className = 'gf-btn';
-		btn.textContent = '⛶ Plein écran';
+		btn.textContent = labels.enter;
 		btn.addEventListener('click', toggle);
 		host.appendChild(btn);
 
@@ -204,9 +212,16 @@
 		const exitBtn = document.createElement('button');
 		exitBtn.type = 'button';
 		exitBtn.className = 'gf-exit';
-		exitBtn.textContent = '⛶ Quitter';
+		exitBtn.textContent = labels.exit;
 		exitBtn.addEventListener('click', toggle);
 		target.appendChild(exitBtn);
+
+		document.addEventListener('ludiven:lang', (e) => {
+			labels = LABELS[(e as CustomEvent<string>).detail] ?? LABELS.fr;
+			setLabel();
+			exitBtn.textContent = labels.exit;
+			if (on) measureExit(); // the label width changes, and the HUD keeps clear of it
+		});
 
 		// Games that ask for it open straight into fullscreen. Only the class-driven half can run
 		// here — requestFullscreen without a gesture is refused, and the catch inside enter()

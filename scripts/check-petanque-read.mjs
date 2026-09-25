@@ -15,7 +15,7 @@ const base = `http://localhost:${PORT}`;
 const server = await startServer(PORT);
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
-const ctx = await browser.newContext({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 });
+const ctx = await browser.newContext({ locale: process.env.PET_LANG || 'fr-FR', viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 });
 const page = await ctx.newPage();
 const errs = [];
 page.on('pageerror', (e) => errs.push(`THROW ${e.message}`));

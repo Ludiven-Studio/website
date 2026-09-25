@@ -25,7 +25,7 @@ const errs = [];
 const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${what}`); if (!ok) fail.push(what); };
 
 async function open(viewport) {
-	const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+	const ctx = await browser.newContext({ locale: process.env.PET_LANG || 'fr-FR', viewport, deviceScaleFactor: 1 });
 	const page = await ctx.newPage();
 	page.on('pageerror', (e) => errs.push(`THROW ${e.message}`));
 	await page.goto(`${server.base}/jeux/petanque/`, { waitUntil: 'networkidle' });

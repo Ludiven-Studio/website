@@ -24,7 +24,7 @@ const PHONE = VW < 900; // a desktop context with isMobile on gets the phone vie
 const SUF = (VW === 390 && VH === 844 ? '' : `-${VW}x${VH}`) + (process.env.PET_PAD ? `-pad${process.env.PET_PAD}` : '');
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--use-gl=angle'] });
-const ctx = await browser.newContext({
+const ctx = await browser.newContext({ locale: process.env.PET_LANG || 'fr-FR',
 	viewport: { width: VW, height: VH },
 	deviceScaleFactor: 2, // a phone renders at 2x, and hairlines only show up there
 	isMobile: PHONE,

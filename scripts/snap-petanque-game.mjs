@@ -33,7 +33,7 @@ const gate = (id) => {
 };
 
 async function open() {
-	const ctx = await browser.newContext({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1, serviceWorkers: 'block' });
+	const ctx = await browser.newContext({ locale: process.env.PET_LANG || 'fr-FR', viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1, serviceWorkers: 'block' });
 	let tileHits = 0;
 	await ctx.route('**/assets/jeux/petanque/sol-*.webp', async (r) => {
 		tileHits++;

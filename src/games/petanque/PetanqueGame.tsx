@@ -23,7 +23,7 @@ import {
 import { petanqueLevels } from './levels';
 import {
 	makeCourse, stationBodies, gradeShot, encodeDaily, COURSE_CIRCLE, STATIONS, MAX_DAILY_SCORE,
-	GRADE_LABEL, KIND_LABEL, type DailyCourse, type Grade,
+	type DailyCourse, type Grade,
 } from './daily';
 import {
 	joinRandom, joinByCode, makeCode, seedFromRoom, multiplayerAvailable, joinLobby,
@@ -38,7 +38,10 @@ import { useLevels } from '../../lib/useLevels';
 import { usePlayClock } from '../../lib/usePlayClock';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
-import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, playerName } from '../../lib/leaderboard';
+import { getDaily, loadDailyRun, saveDailyRun, playerName } from '../../lib/leaderboard';
+import { challengeWeekday } from '../../lib/day';
+import { detectGameLang, saveGameLang, announceGameLang, nextGameLang, type GameLang } from '../../lib/gameLang';
+import { STRINGS, LANG_KEY, TIP_URL, type Strings } from './i18n';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -64,11 +67,11 @@ const STEP = 1000 / 60;
 
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 type DiffKey = (typeof DIFF_ORDER)[number] | 'expert';
-const DIFFS: Record<DiffKey, { label: string; skill: number; surface: SurfaceId; amp: number }> = {
-	facile: { label: 'Facile', skill: 0.34, surface: 'terre-battue', amp: 0.018 },
-	moyen: { label: 'Moyen', skill: 0.62, surface: 'gravier-fin', amp: 0.032 },
-	difficile: { label: 'Difficile', skill: 0.86, surface: 'gravier-gros', amp: 0.050 },
-	expert: { label: 'Expert', skill: 0.95, surface: 'gravier-gros', amp: 0.070 },
+const DIFFS: Record<DiffKey, { skill: number; surface: SurfaceId; amp: number }> = {
+	facile: { skill: 0.34, surface: 'terre-battue', amp: 0.018 },
+	moyen: { skill: 0.62, surface: 'gravier-fin', amp: 0.032 },
+	difficile: { skill: 0.86, surface: 'gravier-gros', amp: 0.050 },
+	expert: { skill: 0.95, surface: 'gravier-gros', amp: 0.070 },
 };
 
 /* The ground, chosen by hand. FREE PLAY ONLY: the levels ladder, the daily course and the online
@@ -76,18 +79,10 @@ const DIFFS: Record<DiffKey, { label: string; skill: number; surface: SurfaceId;
    same thing. 'auto' hands the choice back to the difficulty. */
 const RELIEF_ORDER = ['plat', 'vallonne', 'accidente'] as const;
 type ReliefKey = (typeof RELIEF_ORDER)[number];
-const RELIEFS: Record<ReliefKey, { label: string; hint: string; amp: number; slope: number }> = {
-	plat: { label: 'Plat', hint: 'ratissé, la boule va droit', amp: 0.010, slope: 0.002 },
-	vallonne: { label: 'Vallonné', hint: 'des bosses et des creux', amp: 0.038, slope: 0.009 },
-	accidente: { label: 'Accidenté', hint: 'faux plat marqué', amp: 0.075, slope: 0.022 },
-};
-
-/** What each surface does to a boule, in the words a joueur would use. */
-const SURFACE_HINT: Record<SurfaceId, string> = {
-	'terre-battue': 'roule loin, dévie peu',
-	'gravier-fin': 'accroche un peu',
-	'gravier-gros': 'freine sec, part de travers',
-	sable: 's’arrête net, aucun rebond',
+const RELIEFS: Record<ReliefKey, { amp: number; slope: number }> = {
+	plat: { amp: 0.010, slope: 0.002 },
+	vallonne: { amp: 0.038, slope: 0.009 },
+	accidente: { amp: 0.075, slope: 0.022 },
 };
 
 const GROUND_KEY = 'petanque-ground';
@@ -199,8 +194,9 @@ const LOFT_0 = 0.55; // rad — where the loft sits before the first throw, mid-
 /* Aim sway: the landing point runs a slowly turning figure 8 while the pad is held (see sway.ts).
    Only the landing marker moves; the path is deliberately not drawn on the ground. */
 
-const LOFT_LABEL = (e: number): string =>
-	e > 1.0 ? 'Plomb' : e > 0.7 ? 'Portée' : e > 0.42 ? 'Demi-portée' : 'Roulette';
+type BandId = 'roulette' | 'demi' | 'portee' | 'plomb';
+const LOFT_BAND = (e: number): BandId =>
+	e > 1.0 ? 'plomb' : e > 0.7 ? 'portee' : e > 0.42 ? 'demi' : 'roulette';
 
 /* The graduations drawn on the launch board. Four, not a continuous ruler: what the thumb has to
    find is a band, and a band is what the labels name.
@@ -208,23 +204,19 @@ const LOFT_LABEL = (e: number): string =>
    board is drawn upside down on purpose, so t = 1 is at the BOTTOM. Starting the gesture low and
    swinging all the way up is the lob; starting near the seam is the flat roll. */
 /** The graduation nearest a press height (0 top .. 1 bottom). */
-const bandOf = (t: number): string => BOARD_MARKS.reduce((a, b) => (Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a)).label;
-const BOARD_MARKS: readonly { t: number; label: string }[] = [
-	{ t: 0.04, label: 'Roulette' },
-	{ t: 0.32, label: 'Demi' },
-	{ t: 0.62, label: 'Portée' },
-	{ t: 0.93, label: 'Plomb' },
+const bandOf = (t: number): BandId => BOARD_MARKS.reduce((a, b) => (Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a)).id;
+const BOARD_MARKS: readonly { t: number; id: BandId }[] = [
+	{ t: 0.04, id: 'roulette' },
+	{ t: 0.32, id: 'demi' },
+	{ t: 0.62, id: 'portee' },
+	{ t: 0.93, id: 'plomb' },
 ];
 
 /* Three views, and only the first one throws: the launch board is drawn over it, and a view that
    does not stand behind the circle has no direction to give. */
 const VIEW_ORDER = ['jeu', 'tete', 'dessus'] as const;
 type ViewKey = (typeof VIEW_ORDER)[number];
-const VIEWS: Record<ViewKey, { icon: string; label: string }> = {
-	jeu: { icon: '👁', label: 'Vue de jeu' },
-	tete: { icon: '🔍', label: 'Zoom sur les boules' },
-	dessus: { icon: '🛩', label: 'Vue de dessus' },
-};
+const VIEW_ICON: Record<ViewKey, string> = { jeu: '👁', tete: '🔍', dessus: '🛩' };
 /* Horizontal intent, converted to three's vertical fov per aspect. A boule 13 m out measured 4 px
    across at the stock 58 deg, which is what "on ne voit pas les boules au loin" was. */
 const VIEW_HFOV: Record<ViewKey, number> = { jeu: 62, tete: 44, dessus: 74 };
@@ -370,36 +362,55 @@ interface DailyState {
 }
 
 /** Who else is around, in the online lobby. `counts` include the local player, so they are removed. */
-function LobbyLine({ counts, waiting = false }: { counts: LobbyCounts | null; waiting?: boolean }) {
-	if (!counts) return <span className="pe-mp-lobby">Recherche des joueurs en ligne…</span>;
+function LobbyLine({ counts, waiting = false, t }: { counts: LobbyCounts | null; waiting?: boolean; t: Strings }) {
+	if (!counts) return <span className="pe-mp-lobby">{t.lobbySearching}</span>;
 	const others = counts.total - 1;
 	if (others <= 0) {
-		return <span className="pe-mp-lobby">{waiting ? 'Personne d’autre en ligne pour l’instant' : 'Personne d’autre en ligne · invite un ami avec un code'}</span>;
+		return <span className="pe-mp-lobby">{waiting ? t.lobbyNobody : t.lobbyNobodyInvite}</span>;
 	}
-	const s = others > 1 ? 's' : '';
 	return (
 		<span className="pe-mp-lobby">
 			<span className="pe-mp-dot" aria-hidden="true" />
-			{others} autre{s} joueur{s} en ligne{counts.play ? ` · ${counts.play} en partie` : ''}
+			{t.lobbyOthers(others, counts.play)}
 		</span>
 	);
 }
 
 /** The end-of-end table: everything on the ground, nearest first, scoring boules marked. */
-function BouleTable({ rows, mySide }: { rows: readonly BouleRow[]; mySide: Side }) {
+function BouleTable({ rows, mySide, t }: { rows: readonly BouleRow[]; mySide: Side; t: Strings }) {
 	return (
 		<div className="pe-table">
-			<span className="pe-table-cap">Distances au bouchon</span>
+			<span className="pe-table-cap">{t.tableCap}</span>
 			<ol>
 				{rows.map((r, i) => (
 					<li key={i} className={r.counts ? 'won' : ''}>
 						<span style={{ color: hex(HALO[r.side]) }}>●</span>
-						<span>{r.side === mySide ? 'Toi' : 'Adv'}</span>
+						<span>{r.side === mySide ? t.you : t.adv}</span>
 						<span className="pe-table-d">{r.d < 1 ? `${Math.round(r.d * 100)} cm` : `${r.d.toFixed(2)} m`}</span>
 						<span className="pe-table-pt">{r.counts ? '★' : ''}</span>
 					</li>
 				))}
 			</ol>
+		</div>
+	);
+}
+
+/** Under a finished match: the tip jar and the real-world app, in a new tab so the result stays. */
+function TipCard({ t, gameId }: { t: Strings; gameId: string }) {
+	return (
+		<div className="pe-tip">
+			{TIP_URL && (
+				<>
+					<span className="pe-tip-title">{t.tipTitle}</span>
+					<a className="pe-tip-btn" href={TIP_URL} target="_blank" rel="noopener"
+						onClick={() => trackEvent('tip_click', { from: gameId })}>{t.tipBtn}</a>
+					<span className="pe-tip-wink">{t.tipWink}</span>
+				</>
+			)}
+			<a className="pe-tip-scanner" href="/petanque-scanner/" target="_blank" rel="noopener"
+				onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}>
+				<span>{t.scannerTitle}</span> {t.scannerBtn} ›
+			</a>
 		</div>
 	);
 }
@@ -575,6 +586,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [callArm, setCallArm] = useState(true); // the strip pulses until it has been used once
 	const [dists, setDists] = useState(true);
 	const [sound, setSound] = useState(() => sfx.isEnabled());
+	// The UI language. Callbacks with empty deps read it through the ref.
+	const [lang, setLang] = useState<GameLang>(() => detectGameLang(LANG_KEY));
+	const t = STRINGS[lang];
+	const tRef = useRef<Strings>(t);
+	tRef.current = t;
+	useEffect(() => announceGameLang(lang), [lang]);
 
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
@@ -1325,11 +1342,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const say = useCallback((lines: string[], turn: Side, holder: Side | null) => {
 		const me = mySideRef.current;
 		const left = matchRef.current.left;
-		const foeName = onlineRef.current && mpOppRef.current ? mpOppRef.current : 'l’adversaire';
+		const t = tRef.current;
+		const foeName = onlineRef.current && mpOppRef.current ? mpOppRef.current : t.foe;
 		const mine = turn === me;
-		let who = mine ? 'À toi de jouer' : `À ${foeName} de jouer`;
+		let who = mine ? t.turnMine : t.turnFoe(foeName);
 		// Once one side's hand is empty the other plays out its boules: say how many remain.
-		if (mine && left[other(me)] === 0 && left[me] > 0) who = `À toi · encore ${left[me]} boule${left[me] > 1 ? 's' : ''}`;
+		if (mine && left[other(me)] === 0 && left[me] > 0) who = t.turnMineLeft(left[me]);
 		setGoal(null); // one banner at a time
 		setAnnounce((a) => ({ lines: [...lines, who], tone: holder === null ? 'even' : holder === me ? 'me' : 'foe', key: (a?.key ?? 0) + 1 }));
 	}, []);
@@ -1355,7 +1373,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			d.grades.push(grade);
 			const total = sumGrades(d.grades);
 			setPoints(total);
-			setCard({ text: `${GRADE_LABEL[grade]} · +${grade}`, mine: grade >= 3, rows: [] });
+			setCard({ text: `${tRef.current.grade[grade]} · +${grade}`, mine: grade >= 3, rows: [] });
 
 			const last = d.grades.length >= STATIONS;
 			const centis = Math.round((Date.now() - startRef.current) / 10);
@@ -1409,12 +1427,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			const me = mySideRef.current, foe = other(me);
 			const h = pointHolder(s.bs, j), was = holderRef.current;
 			holderRef.current = h;
+			const t = tRef.current;
 			const lines: string[] = [];
 			const thrown = s.bs[s.bs.length - 1];
-			if (thrown && thrown.side >= 0 && !thrown.live) lines.push(thrown.side === me ? 'Ta boule est sortie' : 'Boule adverse sortie');
-			if (h === me) lines.push(was === foe ? 'Tu reprends le point !' : was === me ? 'Tu gardes le point' : 'Tu as le point');
-			else if (h === foe) lines.push(was === me ? 'L’adversaire reprend le point' : was === foe ? 'L’adversaire garde le point' : 'L’adversaire a le point');
-			else if (h === 'tie') lines.push('Égalité !');
+			if (thrown && thrown.side >= 0 && !thrown.live) lines.push(thrown.side === me ? t.outMine : t.outFoe);
+			if (h === me) lines.push(was === foe ? t.pointRetake : was === me ? t.pointKeep : t.pointHave);
+			else if (h === foe) lines.push(was === me ? t.foeRetake : was === foe ? t.foeKeep : t.foeHave);
+			else if (h === 'tie') lines.push(t.tie);
 			say(lines, next.turn, h === 'tie' ? null : h);
 			statusRef.current = 'aim';
 			setStatus('aim');
@@ -1431,7 +1450,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		// The table is read off the ground BEFORE it is cleared for the next end, and off the same
 		// distances the score came from — see `bouleTable`.
 		const rows = bouleTable(s.bs, j);
-		setCard({ text: done.lastEvent ?? (got ? `${got} point${got > 1 ? 's' : ''}` : 'Mène nulle'), mine, rows });
+		const tt = tRef.current;
+		setCard({ text: done.lastEvent ? tt.event(done.lastEvent, me) : got ? tt.points(got) : tt.nullEnd, mine, rows });
 		statusRef.current = done.phase === 'match-done' ? 'over' : 'end';
 		setStatus(statusRef.current);
 		endAtRef.current = performance.now() + (rows.length ? END_TABLE_MS : END_CARD_MS);
@@ -1596,7 +1616,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const watchPeers = useCallback(() => {
 		netRef.current?.onPeers((peers) => {
 			if (peers.length >= 1) { setMpOpp(peers[0].name); startOnlineMatch(); }
-			else if (onlineRef.current) setMpMsg('Adversaire parti');
+			else if (onlineRef.current) setMpMsg(tRef.current.oppLeft);
 		});
 	}, [startOnlineMatch]);
 
@@ -1633,29 +1653,29 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	useEffect(() => () => lobbyRef.current?.leave(), []);
 
 	const mpQuickMatch = useCallback(async () => {
-		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		if (!multiplayerAvailable()) { setMpMsg(tRef.current.mpUnavailable); return; }
 		setMpPhase('connecting'); setMpMsg(null); setMpCode(null);
 		const net = await joinRandom(me());
-		if (!net) { setMpPhase('menu'); setMpMsg('Aucune partie libre, réessaie'); return; }
+		if (!net) { setMpPhase('menu'); setMpMsg(tRef.current.noFreeGame); return; }
 		netRef.current = net; setMpPhase('waiting'); watchPeers();
 	}, [watchPeers]);
 
 	const mpCreateCode = useCallback(async () => {
-		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		if (!multiplayerAvailable()) { setMpMsg(tRef.current.mpUnavailable); return; }
 		const code = makeCode();
 		setMpPhase('connecting'); setMpMsg(null); setMpCode(code);
 		const net = await joinByCode(me(), code);
-		if (!net) { setMpPhase('menu'); setMpMsg('Erreur de connexion'); return; }
+		if (!net) { setMpPhase('menu'); setMpMsg(tRef.current.connError); return; }
 		netRef.current = net; setMpPhase('waiting'); watchPeers();
 	}, [watchPeers]);
 
 	const mpJoinCode = useCallback(async () => {
 		const code = codeInput.trim().toUpperCase();
 		if (!code) return;
-		if (!multiplayerAvailable()) { setMpMsg('Multijoueur indisponible'); return; }
+		if (!multiplayerAvailable()) { setMpMsg(tRef.current.mpUnavailable); return; }
 		setMpPhase('connecting'); setMpMsg(null); setMpCode(code);
 		const net = await joinByCode(me(), code);
-		if (!net) { setMpPhase('menu'); setMpMsg('Code plein ou invalide'); return; }
+		if (!net) { setMpPhase('menu'); setMpMsg(tRef.current.codeBad); return; }
 		netRef.current = net; setMpPhase('waiting'); watchPeers();
 	}, [codeInput, watchPeers]);
 
@@ -2694,7 +2714,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			matchRef.current = done;
 			setMatch(done);
 			const s = simRef.current, j = jackRef.current;
-			setCard({ text: 'Fin', mine: true, rows: s && j ? bouleTable(s.bs, j) : [] });
+			setCard({ text: tRef.current.finish, mine: true, rows: s && j ? bouleTable(s.bs, j) : [] });
 			statusRef.current = 'over';
 			setStatus('over');
 			setOver(true);
@@ -2878,24 +2898,24 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const fmtPacked = (v: number): string => formatScore(DAILY_LB.petanque.fmt, v);
 
 	const hint = daily
-		? (dailyDone ? `Parcours terminé · ${points} / ${MAX_DAILY_SCORE}`
-			: status === 'rolling' ? 'La boule roule…'
-			: st ? `${KIND_LABEL[st.kind]} à ${st.dist} m — tire !`
-			: 'Préparation du défi…')
+		? (dailyDone ? t.dailyDone(points, MAX_DAILY_SCORE)
+			: status === 'rolling' ? t.rolling
+			: st ? t.station(t.kind[st.kind], st.dist)
+			: t.preparing)
 		: status === 'placing'
-		? (myTurn ? '✋ Touche le sol dans l’anneau jaune' : 'L’adversaire place le bouchon…')
-		: status === 'rolling' ? 'La boule roule…'
-		: !myTurn ? (foeBand ? 'L’adversaire tire…' : online ? 'L’adversaire joue…' : 'L’adversaire réfléchit…')
-		: match.phase === 'throw-jack' ? '🎯 Touche le sol pour viser'
-		: '▲ Pose le doigt sur la planche, puis remonte';
+		? (myTurn ? t.placeMine : t.placeFoe)
+		: status === 'rolling' ? t.rolling
+		: !myTurn ? (foeBand ? t.foeThrowing : online ? t.foePlaying : t.foeThinking)
+		: match.phase === 'throw-jack' ? t.aimJack
+		: t.pressBoard;
 
 	/* The one line above the board — the board itself now carries no text at all, because its centre
 	   is where the thumb lands. A finger down gets the gesture, everything else gets the state. The
 	   old "tu as le point" branches went with it: the scoreboard already prints 🎯 next to the
 	   holder, and a second copy eight words away was the whole bottom-of-screen pile-up. */
 	const armMsg = jackTime ? hint
-		: view !== 'jeu' ? '👁 Touche la planche pour revenir en vue Jeu'
-		: armed ? (power > 0 ? '◀ ▶ oriente · lâche pour lancer' : '✖ Lâche ici et rien ne part — remonte pour armer')
+		: view !== 'jeu' ? t.backToGame
+		: armed ? (power > 0 ? t.orient : t.releaseNothing)
 		: hint;
 
 	return (
@@ -2915,48 +2935,52 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 							showOnline={multiplayerAvailable()}
 							onlineActive={mpPhase !== 'off'}
 							onOnline={enterOnline}
+							lang={lang}
 						/>
 					</div>
 					<div className="pe-stats">
 						{daily ? (
 							<>
-								<span className="pe-stat">🎯 Atelier {Math.min(station + 1, STATIONS)}/{STATIONS}</span>
+								<span className="pe-stat">🎯 {t.stationNo} {Math.min(station + 1, STATIONS)}/{STATIONS}</span>
 								<span className="pe-stat">🏆 {points} / {MAX_DAILY_SCORE}</span>
 								<span className="pe-stat">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
 							</>
 						) : (
-							lv.active && !lv.menu && <span className="pe-stat">🎯 Niveau {lv.level}</span>
+							lv.active && !lv.menu && <span className="pe-stat">🎯 {t.level} {lv.level}</span>
 						)}
 					</div>
 					<div className="pe-hud-actions">
 						{!daily && !lv.active && mpPhase === 'off' && withExpert(DIFF_ORDER, gameId).map((k) => (
-							<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title="Force de l’adversaire et terrain">{DIFFS[k as DiffKey].label}</button>
+							<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title={t.diffTitle}>{t.diff[k as DiffKey]}</button>
 						))}
 						{/* `pe-act`, not `pe-view`: the camera guards count the view segments and assert
 						    there are exactly three of them. */}
 						{!daily && !lv.active && mpPhase === 'off' && (
 							<button className={`pe-act ${groundOpen ? 'on' : ''}`} aria-pressed={groundOpen}
 								onClick={() => setGroundOpen((v) => !v)}
-								aria-label="Choisir le terrain" title="Choisir le terrain">🏟</button>
+								aria-label={t.groundBtn} title={t.groundBtn}>🏟</button>
 						)}
 						{!daily && (
 							<button className={`pe-act ${dists ? 'on' : ''}`} aria-pressed={dists}
 								onClick={() => { distsRef.current = !dists; setDists(!dists); }}
-								aria-label="Cercles de distance au bouchon" title="Cercles de distance au bouchon">◎</button>
+								aria-label={t.distsBtn} title={t.distsBtn}>◎</button>
 						)}
 						{mpPhase !== 'off' ? (
-							<button className="pe-act" onClick={leaveOnline} aria-label="Quitter la partie en ligne" title="Quitter la partie en ligne">🚪</button>
+							<button className="pe-act" onClick={leaveOnline} aria-label={t.leaveOnline} title={t.leaveOnline}>🚪</button>
 						) : !daily && (
-							<button className="pe-act" onClick={() => { if (lv.active) startLevel(lv.level); else newGame(diff); }} aria-label="Recommencer" title="Recommencer">↻</button>
+							<button className="pe-act" onClick={() => { if (lv.active) startLevel(lv.level); else newGame(diff); }} aria-label={t.restart} title={t.restart}>↻</button>
 						)}
 						<button className={`pe-act ${sound ? 'on' : ''}`} aria-pressed={sound}
 							onClick={() => { const on = !sound; sfx.setEnabled(on); setSound(on); }}
-							aria-label={sound ? 'Couper le son' : 'Activer le son'} title={sound ? 'Couper le son' : 'Activer le son'}>{sound ? '🔊' : '🔇'}</button>
+							aria-label={sound ? t.soundOff : t.soundOn} title={sound ? t.soundOff : t.soundOn}>{sound ? '🔊' : '🔇'}</button>
+						{/* One tap cycles FR → EN → ES; the page chrome follows through LANG_EVENT. */}
+						<button className="pe-act pe-lang" onClick={() => { const n = nextGameLang(lang); saveGameLang(LANG_KEY, n); setLang(n); }}
+							aria-label={`${t.langName} — ${t.langTitle}`} title={t.langTitle}>{lang.toUpperCase()}</button>
 					</div>
 				</div>
 				{daily ? (
 					<div className="pe-tag">
-						{dailyLoading ? 'Préparation du défi…' : `Défi du jour · ${dailyWeekdayLabel()} · ${course ? SURFACES[course.surface].label : ''}`}
+						{dailyLoading ? t.preparing : t.dailyTag(t.weekday[challengeWeekday()], course ? t.surface[course.surface] : '')}
 					</div>
 				) : (
 					/* The TV board: who plays, how many boules each side has left, and the score.
@@ -2964,7 +2988,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					   sits in seat 1, so its own rings are the red ones. */
 					<div className="pe-board">
 						<div className={`pe-side ${myTurn && status !== 'rolling' ? 'on' : ''}`}>
-							<span className="pe-side-name">😎 Toi</span>
+							<span className="pe-side-name">😎 {t.you}</span>
 							<span className="pe-dots" style={{ color: hex(HALO[mySide]) }}>
 								{'●'.repeat(match.left[mySide])}{'○'.repeat(BOULES_PER_SIDE - match.left[mySide])}
 							</span>
@@ -2972,7 +2996,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						</div>
 						<div className="pe-board-mid">
 							<span className="pe-board-score">{match.scores[mySide]} — {match.scores[foeSide]}</span>
-							<span className="pe-board-end">Mène {match.endNo} · en {match.target}</span>
+							<span className="pe-board-end">{t.endOf(match.endNo, match.target)}</span>
 						</div>
 						<div className={`pe-side foe ${!myTurn && status !== 'rolling' ? 'on' : ''}`}>
 							<span className="pe-pt">{holder === foeSide ? '🎯' : ''}</span>
@@ -2980,22 +3004,22 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 								{'●'.repeat(match.left[foeSide])}{'○'.repeat(BOULES_PER_SIDE - match.left[foeSide])}
 							</span>
 							<span className="pe-side-name">
-								{online ? `🧑 ${mpOpp ?? 'Adversaire'}` : `🤖 ${lv.active ? `IA ${Math.round(levelSkillRef.current * 100)}%` : DIFFS[diff].label}`}
+								{online ? `🧑 ${mpOpp ?? t.opponent}` : `🤖 ${lv.active ? `${t.ai} ${Math.round(levelSkillRef.current * 100)}%` : t.diff[diff]}`}
 							</span>
 						</div>
 					</div>
 				)}
 				{/* Its own row, never inside pe-hud-actions: that one goes fixed bottom-right in
 				    fullscreen, where it would sit on the throwing strip and on the Quitter button. */}
-				<div className="pe-views" role="tablist" aria-label="Vue de la caméra">
+				<div className="pe-views" role="tablist" aria-label={t.viewsAria}>
 					{VIEW_ORDER.map((k) => (
 						<button key={k} role="tab" aria-selected={view === k} className={`pe-view ${view === k ? 'on' : ''}`}
-							onClick={() => setViewKey(k)} title={`${VIEWS[k].label} (V)`}>
-							{VIEWS[k].icon} <span className="pe-view-txt">{VIEWS[k].label}</span>
+							onClick={() => setViewKey(k)} title={`${t.view[k]} (V)`}>
+							{VIEW_ICON[k]} <span className="pe-view-txt">{t.view[k]}</span>
 						</button>
 					))}
 				</div>
-				{!daily && match.lastEvent && status !== 'end' && <div className="pe-tag">{match.lastEvent}</div>}
+				{!daily && match.lastEvent && status !== 'end' && <div className="pe-tag">{t.event(match.lastEvent, mySide)}</div>}
 			</div>
 
 			<div className="pe-playwrap" ref={wrapRef}>
@@ -3009,7 +3033,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 				{goal && !daily && (
 					<div key={`goal-${goal.key}`} className="pe-goal" onAnimationEnd={() => setGoal(null)}>
-						Partie en <strong>{goal.target}</strong> points
+						{t.goal(goal.target)}
 					</div>
 				)}
 
@@ -3019,14 +3043,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 
 				{lv.booting && !daily && !webglError && (
 					<div className="pe-booting" role="status">
-						<span>Chargement du terrain…</span>
+						<span>{t.loading}</span>
 						<span className="pe-booting-bar" aria-hidden="true"><span /></span>
 					</div>
 				)}
 				<canvas ref={snapRef} className="pe-snap" aria-hidden="true" />
 
 				{webglError && (
-					<div className="pe-overlay"><div className="pe-card">Ton appareil ne peut pas afficher le terrain 3D (WebGL indisponible).</div></div>
+					<div className="pe-overlay"><div className="pe-card">{t.noWebgl}</div></div>
 				)}
 
 				{/* The loft gauge — a readout of the board, which is where the angle is actually set.
@@ -3034,9 +3058,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				    implicit; this gauge and the graduations below are the tutorial. */}
 				{view === 'jeu' && (
 					<div className={`pe-loft${armed ? ' frozen' : ''}`}>
-						<span className="pe-loft-label">{LOFT_LABEL(loft)}</span>
+						<span className="pe-loft-label">{t.loft[LOFT_BAND(loft)]}</span>
 						<div className="pe-loft-bar"><div className="pe-loft-fill" style={{ height: `${Math.round(boardForElevation(loft) * 100)}%` }} /></div>
-						<span className="pe-loft-hint">{armed ? 'angle verrouillé' : 'plus bas = plus lobé'}</span>
+						<span className="pe-loft-hint">{armed ? t.loftLocked : t.loftHint}</span>
 					</div>
 				)}
 
@@ -3045,24 +3069,24 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				    magnification, because that is the thing the player is actually after. */}
 				{view === 'jeu' && (
 					<div className="pe-zoom">
-						<button className="pe-zoom-btn" onClick={() => zoomBy(ZOOM_STEP)} disabled={zoom >= 1} aria-label="Zoomer sur les boules" title="Zoomer (W, molette)">＋</button>
+						<button className="pe-zoom-btn" onClick={() => zoomBy(ZOOM_STEP)} disabled={zoom >= 1} aria-label={t.zoomIn} title={t.zoomInTitle}>＋</button>
 						<div
 							ref={zoomTrackRef}
 							className="pe-zoom-bar"
 							role="slider"
 							tabIndex={0}
-							aria-label="Zoom sur les boules"
+							aria-label={t.zoomAria}
 							aria-valuemin={0}
 							aria-valuemax={100}
 							aria-valuenow={Math.round(zoom * 100)}
-							aria-valuetext={`grossissement ${mag.toFixed(1)} fois`}
+							aria-valuetext={t.zoomValue(mag.toFixed(1))}
 							onPointerDown={onZoomDown}
 							onKeyDown={onZoomKey}
 						>
 							<div className="pe-zoom-fill" style={{ height: `${Math.round(zoom * 100)}%` }} />
 							<div className="pe-zoom-thumb" style={{ bottom: `calc(${Math.round(zoom * 100)}% - 7px)` }} />
 						</div>
-						<button className="pe-zoom-btn" onClick={() => zoomBy(-ZOOM_STEP)} disabled={zoom <= 0} aria-label="Dézoomer" title="Dézoomer (S, molette)">－</button>
+						<button className="pe-zoom-btn" onClick={() => zoomBy(-ZOOM_STEP)} disabled={zoom <= 0} aria-label={t.zoomOut} title={t.zoomOutTitle}>－</button>
 						<span className="pe-zoom-label">🔍 ×{mag.toFixed(1)}</span>
 					</div>
 				)}
@@ -3075,7 +3099,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					<div ref={foeFillRef} className="pe-arm-foefill" />
 					{/* Whose turn it is, on the pad itself: the label above it is easy to miss. */}
 					{armLive && status !== 'rolling' && !over && (
-						<span className={`pe-arm-who${myTurn ? '' : ' foe'}`}>{myTurn ? 'À toi' : (online && mpOpp ? mpOpp : 'Adversaire')}</span>
+						<span className={`pe-arm-who${myTurn ? '' : ' foe'}`}>{myTurn ? t.yourTurn : (online && mpOpp ? mpOpp : t.opponent)}</span>
 					)}
 					{/* The gesture, drawn: an arrow lying on the ground and running away up the lane —
 					    press, then push forward. Gone once the pull has started; the fill says it then. */}
@@ -3096,11 +3120,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						<div className="pe-board-marks">
 							{BOARD_MARKS.map((mk) => (
 								<span
-									key={mk.label}
-									className={`pe-board-mark${mk.label === boardBand ? ' on' : ''}`}
+									key={mk.id}
+									className={`pe-board-mark${mk.id === boardBand ? ' on' : ''}`}
 									style={{ top: `calc(${BOARD_PAD_PX}px + ${mk.t} * (100% - ${BOARD_PAD_PX * 2}px))` }}
 								>
-									{mk.label}
+									{t.band[mk.id]}
 								</span>
 							))}
 						</div>
@@ -3141,11 +3165,11 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						onKeyDown={onGripKey}
 						tabIndex={0}
 						role="slider"
-						aria-label="Déplacer la planche de tir"
+						aria-label={t.gripAria}
 						aria-valuemin={0}
 						aria-valuemax={100}
 						aria-valuenow={Math.round(padX[padOrient()] * 100)}
-						title="Glisse pour déplacer la planche"
+						title={t.gripTitle}
 					>⋮⋮</div>
 				)}
 
@@ -3162,13 +3186,13 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 							<span className="pe-promo-pic" aria-hidden="true" />
 							<span className="pe-promo-txt">
 								<strong>Pétanque Scanner</strong>
-								<span>Qui a le point ? Mesurez en vrai, au téléphone.</span>
-								<em>Appli gratuite ›</em>
+								<span>{t.promoLine}</span>
+								<em>{t.promoFree}</em>
 							</span>
 						</a>
 						<button
 							className="pe-promo-x"
-							aria-label="Fermer la publicité Pétanque Scanner"
+							aria-label={t.promoClose}
 							onClick={() => {
 								setPromoShut(true);
 								try { sessionStorage.setItem(PROMO_KEY, '1'); } catch { /* private mode */ }
@@ -3178,22 +3202,22 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				)}
 
 				{status === 'placing' && myTurn && placeOk && (
-					<button className="pe-placeok" onClick={confirmPlace}>✓ Poser ici</button>
+					<button className="pe-placeok" onClick={confirmPlace}>{t.placeHere}</button>
 				)}
 
 				{status === 'aim' && myTurn && match.phase === 'throw-jack' && jackAim && (
-					<button className="pe-placeok" onClick={throwJackAt}>🎯 Lancer le bouchon ici</button>
+					<button className="pe-placeok" onClick={throwJackAt}>{t.throwJackHere}</button>
 				)}
 
 				{card && !over && (
 					<div className="pe-overlay pe-aside pe-aside-review">
 						<div className={`pe-card pe-endcard ${card.mine ? 'mine' : ''}`} onClick={nextEnd}>
 							<span>{card.text}</span>
-							{card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} />}
+							{card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} t={t} />}
 							{/* The card always advanced on a tap, but nothing said so: players sat out the timer.
 							    The bar drains over the time left before it moves on by itself. */}
 							<button className="pe-continue" onClick={(e) => { e.stopPropagation(); nextEnd(); }}>
-								Continuer ›
+								{t.continue}
 								<span className="pe-continue-bar" aria-hidden="true" style={{ animationDuration: `${card.rows.length ? END_TABLE_MS : END_CARD_MS}ms` }} />
 							</button>
 						</div>
@@ -3203,11 +3227,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{over && daily && (
 					<div className="pe-overlay pe-aside">
 						<div className="pe-card pe-endpanel">
-							🎯 Parcours terminé
+							{t.courseDone}
 							<strong>{points} / {MAX_DAILY_SCORE} · {fmtCentis(elapsed)}</strong>
 							<span className="pe-grades">{dailyRef.current?.grades.map((g, i) => (
 								<span key={i} className={`pe-grade g${g}`}>{g}</span>
 							))}</span>
+							<TipCard t={t} gameId={gameId} />
 						</div>
 					</div>
 				)}
@@ -3215,13 +3240,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{over && !daily && !lv.active && (
 					<div className="pe-overlay pe-aside">
 						<div className="pe-card pe-endpanel">
-							{match.winner === mySide ? '🏆 Tu gagnes la partie !' : '❌ L’adversaire gagne'}
+							{match.winner === mySide ? t.youWin : t.foeWins}
 							<strong>{match.scores[mySide]} — {match.scores[foeSide]}</strong>
 							{/* The last end's table: the boule that ended the match is the one people argue about. */}
-							{card && card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} />}
+							{card && card.rows.length > 0 && <BouleTable rows={card.rows} mySide={mySide} t={t} />}
 							{online
-								? <button className="pe-replay" onClick={leaveOnline}>Quitter</button>
-								: <button className="pe-replay" onClick={() => newGame(diff)}>Nouvelle partie</button>}
+								? <button className="pe-replay" onClick={leaveOnline}>{t.quit}</button>
+								: <button className="pe-replay" onClick={() => newGame(diff)}>{t.newGame}</button>}
+							<TipCard t={t} gameId={gameId} />
 						</div>
 					</div>
 				)}
@@ -3232,26 +3258,26 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						<div className="pe-card pe-mp">
 							{mpPhase === 'menu' ? (
 								<>
-									<div className="pe-mp-title">Jouer en ligne</div>
-									<LobbyLine counts={lobbyCounts} />
+									<div className="pe-mp-title">{t.mpTitle}</div>
+									<LobbyLine counts={lobbyCounts} t={t} />
 									<button className="pe-replay" onClick={mpQuickMatch}>
-										{lobbyCounts && lobbyCounts.wait > 0 ? `⚡ Partie rapide · ${lobbyCounts.wait} joueur${lobbyCounts.wait > 1 ? 's' : ''} t’attend${lobbyCounts.wait > 1 ? 'ent' : ''}` : '⚡ Partie rapide'}
+										{lobbyCounts && lobbyCounts.wait > 0 ? t.quickWaiting(lobbyCounts.wait) : t.quick}
 									</button>
-									<button className="pe-replay" onClick={mpCreateCode}>🔑 Créer un code ami</button>
+									<button className="pe-replay" onClick={mpCreateCode}>{t.createCode}</button>
 									<div className="pe-mp-join">
-										<input value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 4))} maxLength={4} placeholder="CODE" aria-label="Code ami" />
-										<button className="pe-replay" onClick={mpJoinCode}>Rejoindre</button>
+										<input value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 4))} maxLength={4} placeholder="CODE" aria-label={t.codeAria} />
+										<button className="pe-replay" onClick={mpJoinCode}>{t.join}</button>
 									</div>
 									{mpMsg && <span className="pe-mp-msg">{mpMsg}</span>}
-									<button className="pe-act" onClick={leaveOnline}>Retour</button>
+									<button className="pe-act" onClick={leaveOnline}>{t.back}</button>
 								</>
 							) : (
 								<>
-									<div className="pe-mp-title">{mpPhase === 'connecting' ? 'Connexion…' : 'En attente d’un joueur…'}</div>
-									{mpCode && <div className="pe-mp-code">Code : <strong>{mpCode}</strong></div>}
-									{!mpCode && mpPhase === 'waiting' && <LobbyLine counts={lobbyCounts} waiting />}
+									<div className="pe-mp-title">{mpPhase === 'connecting' ? t.connecting : t.waiting}</div>
+									{mpCode && <div className="pe-mp-code">{t.codeIs} <strong>{mpCode}</strong></div>}
+									{!mpCode && mpPhase === 'waiting' && <LobbyLine counts={lobbyCounts} waiting t={t} />}
 									{mpMsg && <span className="pe-mp-msg">{mpMsg}</span>}
-									<button className="pe-act" onClick={leaveOnline}>Annuler</button>
+									<button className="pe-act" onClick={leaveOnline}>{t.cancel}</button>
 								</>
 							)}
 						</div>
@@ -3263,40 +3289,40 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{groundOpen && (
 					<div className="pe-overlay">
 						<div className="pe-card pe-ground">
-							<div className="pe-mp-title">Le terrain</div>
+							<div className="pe-mp-title">{t.groundTitle}</div>
 							<div className="pe-ground-row">
-								<span className="pe-ground-lab">Surface</span>
+								<span className="pe-ground-lab">{t.surfaceLab}</span>
 								<div className="pe-ground-opts">
-									<button className={`pe-pill ${ground.surface === 'auto' ? 'active' : ''}`} onClick={() => chooseGround({ surface: 'auto' })}>Au hasard</button>
+									<button className={`pe-pill ${ground.surface === 'auto' ? 'active' : ''}`} onClick={() => chooseGround({ surface: 'auto' })}>{t.random}</button>
 									{SURFACE_IDS.map((s) => (
 										<button key={s} className={`pe-pill ${ground.surface === s ? 'active' : ''}`}
-											title={SURFACE_HINT[s]} onClick={() => chooseGround({ surface: s })}>{SURFACES[s].label}</button>
+											title={t.surfaceHint[s]} onClick={() => chooseGround({ surface: s })}>{t.surface[s]}</button>
 									))}
 								</div>
 							</div>
 							<div className="pe-ground-row">
-								<span className="pe-ground-lab">Relief</span>
+								<span className="pe-ground-lab">{t.reliefLab}</span>
 								<div className="pe-ground-opts">
-									<button className={`pe-pill ${ground.relief === 'auto' ? 'active' : ''}`} onClick={() => chooseGround({ relief: 'auto' })}>Au hasard</button>
+									<button className={`pe-pill ${ground.relief === 'auto' ? 'active' : ''}`} onClick={() => chooseGround({ relief: 'auto' })}>{t.random}</button>
 									{RELIEF_ORDER.map((r) => (
 										<button key={r} className={`pe-pill ${ground.relief === r ? 'active' : ''}`}
-											title={RELIEFS[r].hint} onClick={() => chooseGround({ relief: r })}>{RELIEFS[r].label}</button>
+											title={t.reliefHint[r]} onClick={() => chooseGround({ relief: r })}>{t.relief[r]}</button>
 									))}
 								</div>
 							</div>
 							<span className="pe-ground-hint">
-								{ground.surface === 'auto' ? 'Surface suivant la difficulté' : SURFACE_HINT[ground.surface]}
+								{ground.surface === 'auto' ? t.surfaceAuto : t.surfaceHint[ground.surface]}
 								{' · '}
-								{ground.relief === 'auto' ? 'relief suivant la difficulté' : RELIEFS[ground.relief].hint}
+								{ground.relief === 'auto' ? t.reliefAuto : t.reliefHint[ground.relief]}
 							</span>
-							<button className="pe-replay" onClick={() => setGroundOpen(false)}>Jouer</button>
+							<button className="pe-replay" onClick={() => setGroundOpen(false)}>{t.play}</button>
 						</div>
 					</div>
 				)}
 
 				{lv.active && lv.menu && (
 					<div className="pe-overlay pe-levels">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
+						<LevelSelect progress={lv.progress} onPick={startLevel} lang={lang} />
 					</div>
 				)}
 
@@ -3306,7 +3332,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 						lastLevel={petanqueLevels.count}
 						won={lv.won}
 						stars={lv.stars}
-						detail={lv.won ? `Gagné ${match.scores[HUMAN]} — ${match.scores[AI]}` : `Battu ${match.scores[HUMAN]} — ${match.scores[AI]}`}
+						detail={lv.won ? t.levelWon(match.scores[HUMAN], match.scores[AI]) : t.levelLost(match.scores[HUMAN], match.scores[AI])}
+						lang={lang}
 						onNext={() => startLevel(lv.level + 1)}
 						onReplay={() => startLevel(lv.level)}
 						onMenu={lv.backToMenu}
@@ -3320,24 +3347,14 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				metric="time"
 				submitValue={dailyDone && dailyScore != null ? dailyScore : undefined}
 				format={fmtPacked}
+				lang={lang}
 			/>}
 
 			{!daily && !lv.active && (
-				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" />
+				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" lang={lang} />
 			)}
 
-			<p className="pe-help">
-				Partout sur l’image, tu <strong>tournes la caméra librement</strong> — elle ne touche jamais au tir.
-				Le <strong>pavé en bas au centre</strong>, c’est ta <strong>planche d’envol</strong> : la hauteur à laquelle tu
-				poses le doigt choisit l’angle — <strong>tout en bas = plomb</strong>, tout en haut = roulette au ras du sol — et
-				la graduation te dit où tu en es.
-				Glisse vers le haut pour la puissance, sur le côté pour corriger la direction, relâche pour lancer.
-				Le curseur 🔍 (ou la molette) t’<strong>avance sur les boules</strong> pour les voir de près, sans jamais toucher au tir.
-				Le <strong>bouchon se vise</strong> : vu de dessus, touche le terrain pour poser le cercle, puis lance-le dessus.
-				{daily
-					? ` Défi du jour : ${STATIONS} ateliers, une boule chacun. Carreau = 5 pts, cible sortie = 3, touchée en place = 1. Le chrono départage les ex æquo.`
-					: <> Bouchon entre 6 et 10 m, sinon c’est à l’adversaire de le poser. Celui qui n’a pas le point rejoue. Premier à {match.target}.</>}
-			</p>
+			<p className="pe-help">{t.help(daily, STATIONS, match.target)}</p>
 		</div>
 	);
 }
@@ -3776,5 +3793,14 @@ const CSS = `
 .pe-mp-lobby { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--gray-200); }
 .pe-mp-dot { width: 8px; height: 8px; border-radius: 50%; background: #30d158; box-shadow: 0 0 0 3px rgba(48,209,88,0.25); animation: pe-beat 1.6s ease-in-out infinite; }
 
+.pe-tip { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.14); font-size: 12.5px; font-weight: 500; }
+.pe-tip-title { opacity: 0.8; }
+.pe-tip-btn { display: inline-block; padding: 7px 14px; border-radius: 999px; background: #ffd166; color: #2a1e00; font-weight: 700; text-decoration: none; }
+.pe-tip-btn:hover { background: #ffdd88; }
+.pe-tip-wink { font-size: 11px; opacity: 0.6; font-style: italic; }
+.pe-tip-scanner { color: inherit; opacity: 0.85; text-decoration: none; margin-top: 2px; }
+.pe-tip-scanner:hover { opacity: 1; text-decoration: underline; }
+.pe-tip-scanner span { opacity: 0.7; }
+.pe-lang { font-weight: 800; font-size: 12px; letter-spacing: 0.04em; }
 .pe-help { max-width: 480px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin-top: 1rem; }
 `;

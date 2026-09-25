@@ -68,7 +68,9 @@ describe('Expert tier wiring', () => {
 			const src = sourceFiles(join(GAMES_DIR, g)).map((f) => readFileSync(f, 'utf8')).join('\n');
 			const entry = src.match(/\n\t*expert:\s*\{[^}]*\}/);
 			expect(entry, `${g}: no expert difficulty entry`).toBeTruthy();
-			expect(entry![0]).toMatch(/label:\s*'[^']+'/);
+			// A translated game keeps its labels in a dictionary (`diff: { …, expert: 'Expert' }`).
+			const labelled = /label:\s*'[^']+'/.test(entry![0]) || /\bexpert:\s*'[^']+'/.test(src);
+			expect(labelled, `${g}: expert entry has no label`).toBe(true);
 		});
 	}
 

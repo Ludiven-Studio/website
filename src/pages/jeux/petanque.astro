@@ -13,9 +13,41 @@ import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
 >
 	<PetanqueGame client:only="react" gameId="petanque" />
 	<p class="pe-scanner">
-		Vous jouez pour de vrai ? <a href="/petanque-scanner/">Pétanque Scanner</a> mesure vos points au téléphone.
+		<span data-pe-lang="scanner-pre">Vous jouez pour de vrai ?</span> <a href="/petanque-scanner/">Pétanque Scanner</a>
+		<span data-pe-lang="scanner-post">mesure vos points au téléphone.</span>
 	</p>
 </GamePage>
+
+<script>
+	// The page around the island follows the language picked in the game (see lib/gameLang).
+	const TEXT: Record<string, Record<string, string>> = {
+		fr: {
+			'scanner-pre': 'Vous jouez pour de vrai ?',
+			'scanner-post': 'mesure vos points au téléphone.',
+			tagline: 'Pose le doigt à la hauteur de l’angle, glisse pour doser — premier à 13',
+		},
+		en: {
+			'scanner-pre': 'Playing for real?',
+			'scanner-post': 'measures your points with your phone.',
+			tagline: 'Put your finger at the height of the angle, slide to set the power — first to 13',
+		},
+		es: {
+			'scanner-pre': '¿Juegas de verdad?',
+			'scanner-post': 'mide tus puntos con el móvil.',
+			tagline: 'Pon el dedo a la altura del ángulo y desliza para dosificar — gana quien llega a 13',
+		},
+	};
+	const apply = (lang: string): void => {
+		const t = TEXT[lang] ?? TEXT.fr;
+		document.querySelectorAll<HTMLElement>('[data-pe-lang]').forEach((el) => {
+			el.textContent = t[el.dataset.peLang ?? ''] ?? el.textContent;
+		});
+		const pitch = document.querySelector<HTMLElement>('.game-pitch');
+		if (pitch) pitch.textContent = t.tagline;
+	};
+	document.addEventListener('ludiven:lang', (e) => apply((e as CustomEvent<string>).detail));
+	if (document.documentElement.lang !== 'fr') apply(document.documentElement.lang);
+</script>
 
 <style>
 	.pe-scanner {

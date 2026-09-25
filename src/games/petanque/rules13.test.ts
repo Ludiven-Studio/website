@@ -140,7 +140,7 @@ describe('scoring an end', () => {
 		const dead = { ...jackAt(2, PITCH_L + 0.2), live: false };
 		const after = applySettled(m, [at(2, 8.1, 0)], dead);
 		expect(after.phase).toBe('end-done');
-		expect(after.lastEvent).toContain('2 points');
+		expect(after.lastEvent).toEqual({ k: 'jack-dead', side: 1, points: 2 });
 		const next = finishEnd(after, [at(2, 8.1, 0)], dead);
 		expect(next.scores).toEqual([0, 2]);
 		expect(next.jackThrower).toBe(1);

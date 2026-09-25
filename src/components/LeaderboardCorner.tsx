@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { leaderboardEnabled, type Metric, type ScoreRow } from '../lib/leaderboard';
 import Leaderboard from './Leaderboard';
+import { tr, type GameLang } from '../lib/gameLang';
 
 /* Collapsible corner pill showing the day's leaderboard — shown in free mode
    to entice players into the daily challenge. */
@@ -15,10 +16,12 @@ interface Props {
 	/** 'right' shrinks the pill to its trophy and pins it to the corner — for games whose
 	    controls live along the bottom of the board (bulles aims there). */
 	side?: 'center' | 'right';
+	lang?: GameLang;
 }
 
-export default function LeaderboardCorner({ game, metric, format, source, side = 'center' }: Props) {
+export default function LeaderboardCorner({ game, metric, format, source, side = 'center', lang = 'fr' }: Props) {
 	const [open, setOpen] = useState(false);
+	const title = tr(lang, { fr: 'Classement du jour', en: 'Today’s leaderboard', es: 'Clasificación del día' });
 	if (!leaderboardEnabled()) return null;
 
 	return (
@@ -26,19 +29,19 @@ export default function LeaderboardCorner({ game, metric, format, source, side =
 			<style>{CSS}</style>
 			{open && (
 				<div className="lbc-panel">
-					<button className="lbc-close" onClick={() => setOpen(false)} aria-label="Fermer">
+					<button className="lbc-close" onClick={() => setOpen(false)} aria-label={tr(lang, { fr: 'Fermer', en: 'Close', es: 'Cerrar' })}>
 						✕
 					</button>
-					<Leaderboard game={game} metric={metric} format={format} source={source} actions={false} />
+					<Leaderboard game={game} metric={metric} format={format} source={source} actions={false} lang={lang} />
 				</div>
 			)}
 			<button
 				className="lbc-pill"
 				onClick={() => setOpen((o) => !o)}
 				aria-expanded={open}
-				aria-label="Classement du jour"
+				aria-label={title}
 			>
-				🏆<span className="lbc-label"> Classement du jour</span>
+				🏆<span className="lbc-label"> {title}</span>
 			</button>
 		</div>
 	);

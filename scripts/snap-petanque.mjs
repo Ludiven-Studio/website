@@ -11,7 +11,7 @@ const server = await startServer(PORT);
 const browser = await chromium.launch();
 
 for (const [name, width] of [['desktop', 1280], ['mobile', 420]]) {
-	const ctx = await browser.newContext({ viewport: { width, height: 1000 }, deviceScaleFactor: 2 });
+	const ctx = await browser.newContext({ locale: process.env.PET_LANG || 'fr-FR', viewport: { width, height: 1000 }, deviceScaleFactor: 2 });
 	const page = await ctx.newPage();
 	await page.goto(`${base}/work/petanque-scanner/`, { waitUntil: 'networkidle' });
 	// Gallery images are lazy — scroll them into view or the full-page shot is blank.

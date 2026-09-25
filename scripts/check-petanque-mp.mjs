@@ -21,7 +21,7 @@ const fail = [];
 const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'}  ${what}`); if (!ok) fail.push(what); };
 
 const mk = async (label) => {
-	const ctx = await browser.newContext({ viewport: { width: 900, height: 700 }, deviceScaleFactor: 1 });
+	const ctx = await browser.newContext({ locale: process.env.PET_LANG || 'fr-FR', viewport: { width: 900, height: 700 }, deviceScaleFactor: 1 });
 	const page = await ctx.newPage();
 	page.on('pageerror', (e) => errs.push(`[${label}] THROW ${e.message}`));
 	await page.goto(`${base}/jeux/petanque/`, { waitUntil: 'networkidle' });

@@ -2,6 +2,7 @@
    Next / Replay / Map), or a retry prompt on a loss. Game-agnostic. */
 
 import Celebration, { useOutcomeHold } from './Celebration';
+import { tr, type GameLang } from '../lib/gameLang';
 
 interface Props {
 	level: number;
@@ -13,9 +14,10 @@ interface Props {
 	onMenu: () => void;
 	/** Optional extra line, e.g. "Résolu en 42 s · 18 coups". */
 	detail?: string;
+	lang?: GameLang;
 }
 
-export default function LevelOutcome({ level, lastLevel, won, stars, onNext, onReplay, onMenu, detail }: Props) {
+export default function LevelOutcome({ level, lastLevel, won, stars, onNext, onReplay, onMenu, detail, lang = 'fr' }: Props) {
 	// Every game mounts this the instant the level ends, so the card used to land straight on
 	// top of the board. Now the board is left alone for half a second, then the cocotte gets
 	// hers — which is why games hide their own celebration while a level is running.
@@ -24,24 +26,24 @@ export default function LevelOutcome({ level, lastLevel, won, stars, onNext, onR
 	if (phase === 'beat') return <Celebration won={won} />;
 
 	return (
-		<div className="lo-wrap" role="dialog" aria-label={won ? 'Niveau réussi' : 'Niveau échoué'}>
+		<div className="lo-wrap" role="dialog" aria-label={won ? tr(lang, { fr: 'Niveau réussi', en: 'Level cleared', es: 'Nivel superado' }) : tr(lang, { fr: 'Niveau échoué', en: 'Level failed', es: 'Nivel fallido' })}>
 			<style>{CSS}</style>
 			<div className="lo-card">
 				{won && (
-					<p className="lo-stars" aria-label={`${stars} étoiles sur 3`}>
+					<p className="lo-stars" aria-label={tr(lang, { fr: `${stars} étoiles sur 3`, en: `${stars} stars out of 3`, es: `${stars} estrellas de 3` })}>
 						{[1, 2, 3].map((s) => (
 							<span key={s} className={s <= stars ? 'on' : ''}>★</span>
 						))}
 					</p>
 				)}
-				<h2>{won ? `Niveau ${level} réussi !` : 'Échoué'}</h2>
+				<h2>{won ? tr(lang, { fr: `Niveau ${level} réussi !`, en: `Level ${level} cleared!`, es: `¡Nivel ${level} superado!` }) : tr(lang, { fr: 'Échoué', en: 'Failed', es: 'Fallido' })}</h2>
 				{detail && <p className="lo-detail">{detail}</p>}
 				<div className="lo-btns">
-					<button className="lo-btn ghost" onClick={onMenu}>🗺 Carte</button>
+					<button className="lo-btn ghost" onClick={onMenu}>🗺 {tr(lang, { fr: 'Carte', en: 'Map', es: 'Mapa' })}</button>
 					{won && level < lastLevel ? (
-						<button className="lo-btn" onClick={onNext}>Niveau {level + 1} →</button>
+						<button className="lo-btn" onClick={onNext}>{tr(lang, { fr: 'Niveau', en: 'Level', es: 'Nivel' })} {level + 1} →</button>
 					) : (
-						<button className="lo-btn" onClick={onReplay}>↻ Rejouer</button>
+						<button className="lo-btn" onClick={onReplay}>↻ {tr(lang, { fr: 'Rejouer', en: 'Replay', es: 'Repetir' })}</button>
 					)}
 				</div>
 			</div>

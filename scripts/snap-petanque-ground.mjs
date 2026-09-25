@@ -16,7 +16,7 @@ const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '-
 const errs = [];
 
 const run = async (tag, viewport) => {
-	const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+	const ctx = await browser.newContext({ locale: process.env.PET_LANG || 'fr-FR', viewport, deviceScaleFactor: 1 });
 	const page = await ctx.newPage();
 	page.on('pageerror', (e) => errs.push(`THROW ${tag} ${e.message}`));
 	await page.goto(`${base}/jeux/petanque/`, { waitUntil: 'networkidle' });
