@@ -158,12 +158,13 @@ export interface Lobby { set: (s: LobbyState) => void; leave: () => void; }
  * One shared presence channel for everyone with the online tab open (not the whole page: each
  * connection counts against the Realtime quota, and players vs the AI need no count). Only presence,
  * no broadcast: a join or a state change is one small message.
+ * `pool` splits the crowd: an event page counts, and quick-matches, only its own players.
  */
-export function joinLobby(onCounts: (c: LobbyCounts) => void): Lobby | null {
+export function joinLobby(onCounts: (c: LobbyCounts) => void, pool = ''): Lobby | null {
 	const c = getClient();
 	if (!c) return null;
 	const selfId = randomId();
-	const ch = c.channel('petanque-lobby', { config: { presence: { key: selfId } } });
+	const ch = c.channel(pool ? `petanque-lobby-${pool}` : 'petanque-lobby', { config: { presence: { key: selfId } } });
 	let state: LobbyState = 'browse';
 	let ready = false;
 	const count = (): void => {
@@ -189,12 +190,12 @@ export function joinLobby(onCounts: (c: LobbyCounts) => void): Lobby | null {
 	};
 }
 
-/** First-connected matchmaking: the first room with a free slot. */
-export async function joinRandom(name: string): Promise<PetanqueMatchNet | null> {
+/** First-connected matchmaking: the first room with a free slot, among the rooms of `pool`. */
+export async function joinRandom(name: string, pool = ''): Promise<PetanqueMatchNet | null> {
 	const c = getClient();
 	if (!c) return null;
 	for (let slot = 0; slot < MAX_ROOMS; slot++) {
-		const m = await openRoom(c, `petanque-q-${slot}`, name, null);
+		const m = await openRoom(c, pool ? `petanque-q-${pool}-${slot}` : `petanque-q-${slot}`, name, null);
 		if (m) return m;
 	}
 	return null;

@@ -468,6 +468,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const sunForceRef = useRef<{ el: number; az: number; seed?: number } | null>(null); // measurement hook only
 	const boardsRef = useRef(event?.boards); // stable for the page's life, read by the pitch builders
 	const bannerRef = useRef(event?.banner);
+	const poolRef = useRef(event?.id); // quick-match and lobby pool: an event page meets only its own players
 	const barLabelRef = useRef<HTMLButtonElement | null>(null); // placed over the bar every frame
 
 	const simRef = useRef<Sim | null>(null);
@@ -1672,7 +1673,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			setLobbyCounts(null);
 			return;
 		}
-		if (!lobbyRef.current) lobbyRef.current = joinLobby(setLobbyCounts);
+		if (!lobbyRef.current) lobbyRef.current = joinLobby(setLobbyCounts, poolRef.current);
 		lobbyRef.current?.set(mpPhase === 'playing' ? 'play' : mpPhase === 'menu' ? 'browse' : mpCode ? 'friend' : 'wait');
 	}, [mpPhase, mpCode]);
 	useEffect(() => () => lobbyRef.current?.leave(), []);
@@ -1680,7 +1681,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const mpQuickMatch = useCallback(async () => {
 		if (!multiplayerAvailable()) { setMpMsg(tRef.current.mpUnavailable); return; }
 		setMpPhase('connecting'); setMpMsg(null); setMpCode(null);
-		const net = await joinRandom(me());
+		const net = await joinRandom(me(), poolRef.current);
 		if (!net) { setMpPhase('menu'); setMpMsg(tRef.current.noFreeGame); return; }
 		netRef.current = net; setMpPhase('waiting'); watchPeers();
 	}, [watchPeers]);
