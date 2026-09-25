@@ -2570,8 +2570,10 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	   progression unreachable) falls back to a free game. A ?defi deep link is ModeToggle's job. */
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
-		if (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily') return;
+		if (!event && (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily')) return;
 		layPreview(); // the place, alive, while the ladder answers (see PREVIEW_SEED)
+		// An event page has no ladder: straight into a free game.
+		if (event) { newGame('moyen'); return; }
 		void lv.resume().then((next) => { if (next != null) startLevel(next); else newGame('moyen'); });
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
@@ -2939,7 +2941,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 							daily={daily}
 							onFree={() => { if (lv.active) lv.exit(); resetOnline(); newGame(diff); }}
 							onDaily={() => { lv.exit(); resetOnline(); void startDaily(); }}
-							showLevels
+							showLevels={!event}
+							showDaily={!event}
 							levelsActive={lv.active}
 							onLevels={() => { setDaily(false); dailyRef.current = null; resetOnline(); lv.enter(); }}
 							showOnline={multiplayerAvailable()}
@@ -3366,7 +3369,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				lang={lang}
 			/>}
 
-			{!daily && !lv.active && (
+			{!daily && !lv.active && !event && (
 				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" lang={lang} />
 			)}
 
