@@ -1,5 +1,6 @@
 {
   "extends": "astro/tsconfigs/strict",
   // "exclude" replaces the base's, so re-list dist alongside the Deno-context functions.
-  "exclude": ["dist", "supabase/functions"]
+  // public/vendor holds minified third-party engines copied at build time (scripts/vendor-rapier.mjs).
+  "exclude": ["dist", "supabase/functions", "public/vendor"]
 }

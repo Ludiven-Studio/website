@@ -399,6 +399,15 @@ export const games: GameTile[] = [
 		category: 'adresse',
 	},
 	{
+		id: 'molkky',
+		title: 'Mölkky (WIP)',
+		pitch: 'Le jeu de quilles finlandais en 3D contre l’ordi : lance le bâton sur les douze quilles numérotées, une seule quille vaut son numéro, plusieurs valent leur nombre, et il faut finir à 50 pile.',
+		icon: 'molkky',
+		href: '/jeux/molkky',
+		status: 'play',
+		category: 'adresse',
+	},
+	{
 		id: 'drift',
 		title: 'Drift',
 		pitch: 'Course 3D multi sur circuit aléatoire : meilleur tour, drift auto, jusqu\'à 4 joueurs.',

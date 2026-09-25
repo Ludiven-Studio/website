@@ -3,9 +3,9 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
-    "dev": "astro dev",
-    "start": "astro dev",
-    "build": "astro check && astro build && node scripts/check-precache.mjs",
+    "dev": "node scripts/vendor-rapier.mjs && astro dev",
+    "start": "node scripts/vendor-rapier.mjs && astro dev",
+    "build": "node scripts/vendor-rapier.mjs && astro check && astro build && node scripts/check-precache.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",
@@ -17,6 +17,7 @@
   "dependencies": {
     "@astrojs/check": "^0.5.10",
     "@astrojs/react": "^5.0.7",
+    "@dimforge/rapier3d-deterministic-compat": "^0.21.0",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.8.0",
     "@react-three/postprocessing": "^3.1.2",

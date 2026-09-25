@@ -1,0 +1,15 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import MolkkyGame from '../../games/molkky/MolkkyGame.tsx';
+---
+
+<GamePage
+	title="Mölkky | Jeux Ludiven Studio"
+	description="Mölkky en 3D contre l'ordinateur : lance le bâton sur les douze quilles numérotées, une seule quille vaut son numéro, plusieurs valent leur nombre, et il faut finir à 50 pile."
+	heading="Mölkky (WIP)"
+	tagline="Une quille vaut son numéro, plusieurs valent leur nombre — 50 pile pour gagner"
+	gameId="molkky"
+	fullscreen="auto"
+>
+	<MolkkyGame client:only="react" />
+</GamePage>

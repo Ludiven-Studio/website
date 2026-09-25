@@ -32,3 +32,6 @@ pnpm-debug.log*
 .claude/settings.json
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Copied at dev/build time by scripts/vendor-rapier.mjs
+public/vendor/
