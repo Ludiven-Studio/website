@@ -18,7 +18,7 @@ import {
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
 	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz, makeContactShadow, layFlat,
 	HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
-	BOULE_R, CIRCLE_R, WALK_MAX, EYE_H, ZOOM_EYE, ZOOM_VFOV, type Pitch3D, type Fx, type Lights,
+	BOULE_R, CIRCLE_R, WALK_MAX, EYE_H, ZOOM_EYE, ZOOM_VFOV, BAR_AT, BAR_LABEL_Y, type Pitch3D, type Fx, type Lights,
 } from './render3d';
 import { petanqueLevels } from './levels';
 import {
@@ -396,7 +396,7 @@ function BouleTable({ rows, mySide, t }: { rows: readonly BouleRow[]; mySide: Si
 }
 
 /** Under a finished match: the tip jar and the real-world app, in a new tab so the result stays. */
-function TipCard({ t, gameId }: { t: Strings; gameId: string }) {
+function TipCard({ t, gameId, from = 'end', scanner = true }: { t: Strings; gameId: string; from?: string; scanner?: boolean }) {
 	return (
 		<div className="pe-tip">
 			{(COFFEE_URL || TIP_URL) && (
@@ -404,17 +404,19 @@ function TipCard({ t, gameId }: { t: Strings; gameId: string }) {
 					<span className="pe-tip-title">{t.tipTitle}</span>
 					<span className="pe-tip-row">
 						{COFFEE_URL && <a className="pe-tip-btn" href={COFFEE_URL} target="_blank" rel="noopener"
-							onClick={() => trackEvent('tip_click', { from: gameId, what: 'coffee' })}>{t.coffeeBtn}</a>}
+							onClick={() => trackEvent('tip_click', { from: gameId, where: from, what: 'coffee' })}>{t.coffeeBtn}</a>}
 						{TIP_URL && <a className="pe-tip-btn" href={TIP_URL} target="_blank" rel="noopener"
-							onClick={() => trackEvent('tip_click', { from: gameId, what: 'drink' })}>{t.tipBtn}</a>}
+							onClick={() => trackEvent('tip_click', { from: gameId, where: from, what: 'drink' })}>{t.tipBtn}</a>}
 					</span>
 					<span className="pe-tip-wink">{t.tipWink}</span>
 				</>
 			)}
-			<a className="pe-tip-scanner" href={t.scannerHref} target="_blank" rel="noopener"
-				onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}>
-				<span>{t.scannerTitle}</span> {t.scannerBtn} ›
-			</a>
+			{scanner && (
+				<a className="pe-tip-scanner" href={t.scannerHref} target="_blank" rel="noopener"
+					onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}>
+					<span>{t.scannerTitle}</span> {t.scannerBtn} ›
+				</a>
+			)}
 		</div>
 	);
 }
@@ -466,6 +468,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const sunForceRef = useRef<{ el: number; az: number; seed?: number } | null>(null); // measurement hook only
 	const boardsRef = useRef(event?.boards); // stable for the page's life, read by the pitch builders
 	const bannerRef = useRef(event?.banner);
+	const barLabelRef = useRef<HTMLButtonElement | null>(null); // placed over the bar every frame
 
 	const simRef = useRef<Sim | null>(null);
 	const matchRef = useRef<Match13>(initMatch13(13, HUMAN));
@@ -605,6 +608,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const [callArm, setCallArm] = useState(true); // the strip pulses until it has been used once
 	const [dists, setDists] = useState(true);
 	const [sound, setSound] = useState(() => sfx.isEnabled());
+	const [barOpen, setBarOpen] = useState(false);
 	// The UI language. Callbacks with empty deps read it through the ref.
 	// An event page remembers its own pick, so a choice made on the main game never leaks into it.
 	const langKey = event ? `${LANG_KEY}-${event.id}` : LANG_KEY;
@@ -798,7 +802,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const g = g3Ref.current;
 		if (!g || g.pitch) return;
 		const t = makeTerrain(PREVIEW_SEED, SURFACES['terre-battue'], 0.02);
-		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED), boardsRef.current, bannerRef.current);
+		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED), boardsRef.current, bannerRef.current, true);
 		g.scene.add(g.pitch.group);
 		previewRef.current = true;
 		// Fade the place in from the empty sky-blue canvas rather than popping it.
@@ -838,7 +842,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp, cfg.slope === undefined ? {} : { slope: cfg.slope });
-		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current, bannerRef.current);
+		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current, bannerRef.current, true);
 		g.scene.add(g.pitch.group);
 		bakeBouleEnv(g.renderer, g.scene);
 
@@ -916,7 +920,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(course.seed, SURFACES[course.surface], course.amp);
-		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current, bannerRef.current);
+		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current, bannerRef.current, true);
 		g.scene.add(g.pitch.group);
 		bakeBouleEnv(g.renderer, g.scene);
 
@@ -2554,6 +2558,24 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	useEffect(() => {
 		let raf = 0;
 		let last = 0;
+		/* The "a drink?" label follows the bar on screen. Written straight to the element, like the
+		   foe's hand: going through state would re-render the whole island every frame. */
+		const barTop = new THREE.Vector3(), barCounter = new THREE.Vector3();
+		const placeBarLabel = (cam: THREE.PerspectiveCamera): void => {
+			const el = barLabelRef.current, cv = canvasRef.current;
+			if (!el || !cv) return;
+			// Shown while the counter is on screen; the label rides over the awning, and when the eye
+			// is close enough that the awning leaves the top of the frame, it stays pinned to that edge.
+			barTop.set(BAR_AT.x, BAR_LABEL_Y, BAR_AT.z).project(cam);
+			barCounter.set(BAR_AT.x, 1.1, BAR_AT.z).project(cam);
+			const on = barCounter.z < 1 && Math.abs(barCounter.x) < 0.95 && barCounter.y > -0.9 && barCounter.y < 1;
+			el.style.visibility = on ? 'visible' : 'hidden';
+			if (!on) return;
+			const x = cv.offsetLeft + ((barCounter.x + 1) / 2) * cv.clientWidth;
+			const top = barTop.z < 1 ? ((1 - barTop.y) / 2) * cv.clientHeight : 0;
+			const y = cv.offsetTop + Math.max(top, el.offsetHeight + 10);
+			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
+		};
 		const frame = (now: number): void => {
 			raf = requestAnimationFrame(frame);
 			const g = g3Ref.current;
@@ -2570,6 +2592,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				tickRef.current(now, dt);
 			}
 			g.renderer.render(g.scene, g.camera);
+			placeBarLabel(g.camera);
 		};
 		raf = requestAnimationFrame(frame);
 		return () => cancelAnimationFrame(raf);
@@ -2716,7 +2739,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			if (expo !== undefined) g.lights.setSkyExposure(expo);
 			g.scene.remove(g.pitch.group);
 			g.pitch.dispose();
-			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current), boardsRef.current, bannerRef.current);
+			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current), boardsRef.current, bannerRef.current, true);
 			g.scene.add(g.pitch.group);
 			bakeBouleEnv(g.renderer, g.scene);
 		};
@@ -3226,6 +3249,21 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 								try { sessionStorage.setItem(PROMO_KEY, '1'); } catch { /* private mode */ }
 							}}
 						>×</button>
+					</div>
+				)}
+
+				{/* The bar: a label that rides on the stand in the scene, and the card it opens. */}
+				{!barOpen && !card && !over && !groundOpen && !webglError && !lv.booting && !(lv.active && lv.menu) && mpPhase !== 'menu' && (
+					<button ref={barLabelRef} className="pe-bar-label" style={{ visibility: 'hidden' }}
+						onClick={() => { setBarOpen(true); trackEvent('bar_open', { from: gameId }); }}>{t.barLabel}</button>
+				)}
+				{barOpen && (
+					<div className="pe-overlay" onClick={() => setBarOpen(false)}>
+						<div className="pe-card pe-bar-card" onClick={(e) => e.stopPropagation()}>
+							<button className="pe-bar-x" onClick={() => setBarOpen(false)} aria-label={t.close}>×</button>
+							<div className="pe-mp-title">{t.barTitle}</div>
+							<TipCard t={t} gameId={gameId} from="bar" scanner={false} />
+						</div>
 					</div>
 				)}
 
@@ -3832,6 +3870,13 @@ const CSS = `
 
 .pe-tip { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.14); font-size: 12.5px; font-weight: 500; }
 .pe-tip-title { opacity: 0.8; }
+.pe-bar-label { position: absolute; left: 0; top: 0; z-index: 4; border: 1.5px solid rgba(255,209,102,0.85); background: rgba(35,48,31,0.88); color: #f6e7c1; font: inherit; font-weight: 700; font-size: 14px; padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.35); animation: pe-bar-bob 2.4s ease-in-out infinite; }
+.pe-bar-label::after { content: ''; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: rgba(255,209,102,0.85); border-bottom: 0; }
+@keyframes pe-bar-bob { 0%, 100% { margin-top: 0; } 50% { margin-top: -4px; } }
+@media (prefers-reduced-motion: reduce) { .pe-bar-label { animation: none; } }
+.pe-bar-card { position: relative; min-width: 240px; }
+.pe-bar-card .pe-tip { border-top: 0; margin-top: 0; padding-top: 4px; }
+.pe-bar-x { position: absolute; top: 6px; right: 8px; border: 0; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; color: inherit; opacity: 0.6; }
 .pe-tip-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .pe-tip-btn { display: inline-block; padding: 7px 14px; border-radius: 999px; background: #ffd166; color: #2a1e00; font-weight: 700; text-decoration: none; }
 .pe-tip-btn:hover { background: #ffdd88; }

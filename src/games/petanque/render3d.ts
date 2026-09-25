@@ -414,7 +414,7 @@ function buildWall(grp: THREE.Group, seed: number, y: number, keep: <T extends {
  * replay draws the same boulodrome — but also the reason the far end stops reading as a void: with
  * nothing but a flat apron out there the eye has no scale and the long throws all looked the same.
  */
-function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, keep: <T extends { dispose(): void }>(o: T) => T): void {
+function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, keep: <T extends { dispose(): void }>(o: T) => T, dressed = false): void {
 	/* The decor's shadows are PAINTED, not cast. The shadow camera is fitted tight to the 4x15 m
 	   pitch so a 7.5 cm boule gets the texels it needs; a 23 m decor ring in the same map is a 10x
 	   wider box, which buys a tree shadow by throwing away the boule shadow this whole file was
@@ -431,6 +431,8 @@ function buildDecor(grp: THREE.Group, seed: number, y: number, sun: SunSetup, ke
 		const d = DECOR_NEAR + hashN(k, seed ^ 0x2b7f) * (DECOR_FAR - DECOR_NEAR);
 		const x = Math.cos(a) * d, z = Math.sin(a) * d;
 		if (Math.abs(x) < LANE_KEEP && Math.abs(z) < PITCH_L / 2 + 3) continue;
+		// Boards and banner stand 10-11 m out: a canopy is up to 2 m wide, so the ends keep a deeper gap.
+		if (dressed && Math.abs(x) < LANE_KEEP + 1.5 && Math.abs(z) < PITCH_L / 2 + 7) continue;
 		spots.push({ x, z, r: hashN(k, seed ^ 0x77c1) });
 	}
 
@@ -654,6 +656,13 @@ function plankStrip(x0: number, y0: number, x1: number, y1: number, topAt: (x: n
 
 /* ---------- sponsor boards (event pages only) ---------- */
 
+/** Top of the planks along the end at engine `ey` (0 or PITCH_L), its highest point across the width. */
+function endTop(t: Terrain, ey: number): number {
+	let top = -Infinity;
+	for (let ex = 0; ex <= PITCH_W; ex += 0.5) top = Math.max(top, heightAt(t, ex, ey));
+	return top + BORDER_H;
+}
+
 const BOARD_W = 1.6, BOARD_H = 0.62, BOARD_LIFT = 0.14;
 
 /** A logo fitted inside a white board face. Filled in when the image arrives. */
@@ -683,26 +692,35 @@ function boardTexture(url: string, keep: <T extends { dispose(): void }>(o: T) =
  * the lane corridor the decor keeps clear, and three a side between the planks and the benches.
  * The ends sit behind the eye of whoever throws from that end, so they never cover the lane.
  */
-function buildBoards(grp: THREE.Group, logos: readonly string[], y: number, keep: <T extends { dispose(): void }>(o: T) => T): void {
+function buildBoards(grp: THREE.Group, logos: readonly string[], y: number, t: Terrain, keep: <T extends { dispose(): void }>(o: T) => T): void {
 	const END_Z = PITCH_L / 2 + 2.5, SIDE_X = PITCH_W / 2 + 1.2;
-	const slots: { x: number; z: number; rot: number }[] = [];
+	const slots: { x: number; z: number; rot: number; edge: number }[] = [];
 	for (const s of [1, -1] as const) {
-		for (let i = 0; i < 4; i++) slots.push({ x: (i - 1.5) * (BOARD_W + 0.1), z: s * END_Z, rot: s > 0 ? Math.PI : 0 });
+		const edge = endTop(t, s > 0 ? PITCH_L : 0);
+		for (let i = 0; i < 4; i++) slots.push({ x: (i - 1.5) * (BOARD_W + 0.1), z: s * END_Z, rot: s > 0 ? Math.PI : 0, edge });
 	}
 	for (const s of [1, -1] as const) {
-		for (const z of [-4.5, 0, 4.5]) slots.push({ x: s * SIDE_X, z, rot: s > 0 ? -Math.PI / 2 : Math.PI / 2 });
+		const ex = s > 0 ? PITCH_W : 0;
+		for (const z of [-4.5, 0, 4.5]) {
+			const ey = z + PITCH_L / 2;
+			const edge = Math.max(...[-0.8, 0, 0.8].map((d) => heightAt(t, ex, Math.min(PITCH_L, Math.max(0, ey + d))))) + BORDER_H;
+			slots.push({ x: s * SIDE_X, z, rot: s > 0 ? -Math.PI / 2 : Math.PI / 2, edge });
+		}
 	}
 	const frameMat = keep(new THREE.MeshStandardMaterial({ color: 0x1d2b5c, roughness: 0.6 }));
 	const frameGeo = keep(new THREE.BoxGeometry(BOARD_W, BOARD_H, 0.05));
 	const faceGeo = keep(new THREE.PlaneGeometry(BOARD_W - 0.06, BOARD_H - 0.06));
-	const legGeo = keep(new THREE.BoxGeometry(0.05, BOARD_LIFT + BOARD_H / 2, 0.05));
+	const legGeo = keep(new THREE.BoxGeometry(0.05, 1, 0.05)); // scaled per board to reach its frame
 	const faces = logos.map((url) => keep(new THREE.MeshStandardMaterial({ map: boardTexture(url, keep), roughness: 0.7 })));
 	slots.forEach((s, i) => {
 		const board = new THREE.Group();
 		board.position.set(s.x, y, s.z);
 		board.rotation.y = s.rot;
+		// Bottom clear of the plank top it stands behind; the eye is higher than any plank, so a line
+		// grazing that plank lands under this edge.
+		const bottom = Math.max(BOARD_LIFT, s.edge - y + 0.12);
 		const frame = new THREE.Mesh(frameGeo, frameMat);
-		frame.position.y = BOARD_LIFT + BOARD_H / 2;
+		frame.position.y = bottom + BOARD_H / 2;
 		frame.castShadow = true;
 		board.add(frame);
 		const face = new THREE.Mesh(faceGeo, faces[i % faces.length]);
@@ -710,7 +728,8 @@ function buildBoards(grp: THREE.Group, logos: readonly string[], y: number, keep
 		board.add(face);
 		for (const e of [-1, 1] as const) {
 			const leg = new THREE.Mesh(legGeo, frameMat);
-			leg.position.set(e * (BOARD_W / 2 - 0.12), (BOARD_LIFT + BOARD_H / 2) / 2, -0.04);
+			leg.scale.y = bottom + BOARD_H / 2;
+			leg.position.set(e * (BOARD_W / 2 - 0.12), leg.scale.y / 2, -0.04);
 			board.add(leg);
 		}
 		grp.add(board);
@@ -721,15 +740,15 @@ function buildBoards(grp: THREE.Group, logos: readonly string[], y: number, keep
  * The event's title on a banner raised on two posts behind each end's boards, high enough to clear
  * them: from the circle, the far one fills the space over the lane's end.
  */
-function buildBanner(grp: THREE.Group, url: string, y: number, keep: <T extends { dispose(): void }>(o: T) => T): void {
-	const W = 5.2, LIFT = 1.05, Z = PITCH_L / 2 + 3.3;
-	const panels: { mesh: THREE.Mesh; pad: number }[] = [];
+function buildBanner(grp: THREE.Group, url: string, y: number, t: Terrain, keep: <T extends { dispose(): void }>(o: T) => T): void {
+	const W = 5.2, Z = PITCH_L / 2 + 3.3;
+	const panels: { mesh: THREE.Mesh; pad: number; lift: number }[] = [];
 	const tex = keep(new THREE.TextureLoader().load(url, (t) => {
 		// Height follows the image, so a title of any shape is never stretched.
 		const h = (W * t.image.height) / t.image.width;
 		for (const p of panels) {
 			p.mesh.scale.y = h + p.pad;
-			p.mesh.position.y = LIFT + h / 2;
+			p.mesh.position.y = p.lift + h / 2;
 		}
 	}));
 	tex.colorSpace = THREE.SRGBColorSpace;
@@ -743,21 +762,122 @@ function buildBanner(grp: THREE.Group, url: string, y: number, keep: <T extends 
 		const banner = new THREE.Group();
 		banner.position.set(0, y, s * Z);
 		banner.rotation.y = s > 0 ? Math.PI : 0;
+		// Over the boards, which sit on the plank top of this same end.
+		const lift = Math.max(1.05, endTop(t, s > 0 ? PITCH_L : 0) - y + 0.95);
 		const face = new THREE.Mesh(faceGeo, faceMat);
 		const back = new THREE.Mesh(backGeo, backMat);
-		face.position.set(0, LIFT + 1, 0.022); // until the image says how tall it is
-		back.position.set(0, LIFT + 1, 0);
-		panels.push({ mesh: face, pad: 0 }, { mesh: back, pad: 0.08 });
+		face.position.set(0, lift + 1, 0.022); // until the image says how tall it is
+		back.position.set(0, lift + 1, 0);
+		panels.push({ mesh: face, pad: 0, lift }, { mesh: back, pad: 0.08, lift });
 		banner.add(face, back);
 		for (const e of [-1, 1] as const) {
 			const post = new THREE.Mesh(postGeo, backMat);
-			post.scale.y = 3.2;
-			post.position.set(e * (W / 2 + 0.06), 1.6, -0.02);
+			post.scale.y = lift + 2.15;
+			post.position.set(e * (W / 2 + 0.06), post.scale.y / 2, -0.02);
 			post.castShadow = true;
 			banner.add(post);
 		}
 		grp.add(banner);
 	}
+}
+
+/* ---------- the bar ---------- */
+
+/** Where the bar stands, world metres: left of the pitch, level with its middle, clear of the
+ *  lane and inside DECOR_NEAR so no tree grows through it. */
+export const BAR_AT = { x: -(PITCH_W / 2 + 3.5), z: 1.4 };
+/** Height above the apron the "a drink?" label hangs at, just over the awning. */
+export const BAR_LABEL_Y = 2.95;
+
+function stripes(keep: <T extends { dispose(): void }>(o: T) => T): THREE.CanvasTexture {
+	const cv = document.createElement('canvas');
+	cv.width = 256; cv.height = 16;
+	const ctx = cv.getContext('2d')!;
+	for (let i = 0; i < 8; i++) {
+		ctx.fillStyle = i % 2 ? '#f4efe6' : '#c8332b';
+		ctx.fillRect(i * 32, 0, 32, 16);
+	}
+	const tex = keep(new THREE.CanvasTexture(cv));
+	tex.colorSpace = THREE.SRGBColorSpace;
+	return tex;
+}
+
+function barSign(keep: <T extends { dispose(): void }>(o: T) => T): THREE.CanvasTexture {
+	const cv = document.createElement('canvas');
+	cv.width = 512; cv.height = 128;
+	const ctx = cv.getContext('2d')!;
+	ctx.fillStyle = '#23301f';
+	ctx.fillRect(0, 0, cv.width, cv.height);
+	ctx.strokeStyle = '#e8c979';
+	ctx.lineWidth = 8;
+	ctx.strokeRect(6, 6, cv.width - 12, cv.height - 12);
+	ctx.fillStyle = '#f6e7c1';
+	ctx.font = 'bold 76px sans-serif';
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+	ctx.fillText('🍺 BAR ☕', cv.width / 2, cv.height / 2 + 4); // "Bar" reads the same in fr, en and es
+	const tex = keep(new THREE.CanvasTexture(cv));
+	tex.colorSpace = THREE.SRGBColorSpace;
+	return tex;
+}
+
+/**
+ * A village-fête drinks stand: counter, striped awning, a beer tap, two pints and a coffee.
+ * Built facing the pitch; the game hangs an HTML label over it that opens the tip card.
+ */
+function buildBar(grp: THREE.Group, y: number, keep: <T extends { dispose(): void }>(o: T) => T): void {
+	const bar = new THREE.Group();
+	bar.position.set(BAR_AT.x, y, BAR_AT.z);
+	bar.rotation.y = Math.PI / 2; // local +z, the counter's front, turned towards the pitch (+x)
+	const mat = (color: number, extra: THREE.MeshStandardMaterialParameters = {}) =>
+		keep(new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra }));
+	const box = (w: number, h: number, d: number) => keep(new THREE.BoxGeometry(w, h, d));
+	const cyl = (r: number, h: number) => keep(new THREE.CylinderGeometry(r, r, h, 14));
+	const add = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, yy: number, z: number): THREE.Mesh => {
+		const mesh = new THREE.Mesh(geo, m);
+		mesh.position.set(x, yy, z);
+		bar.add(mesh);
+		return mesh;
+	};
+
+	const wood = mat(0x8a5a2e), top = mat(0xc79a5e), dark = mat(0x5a3d22);
+	add(box(2.0, 1.0, 0.6), wood, 0, 0.5, 0).castShadow = true;
+	add(box(2.14, 0.06, 0.72), top, 0, 1.03, 0);
+	add(box(2.3, 2.3, 0.08), dark, 0, 1.15, -0.85);
+	const post = cyl(0.04, 2.45);
+	for (const px of [-1.1, 1.1]) for (const pz of [0.34, -0.8]) add(post, dark, px, 1.22, pz);
+
+	// Awning, sloping down towards the customers.
+	const awning = add(box(2.5, 0.05, 1.6), keep(new THREE.MeshStandardMaterial({ map: stripes(keep), roughness: 0.9 })), 0, 2.46, -0.2);
+	awning.rotation.x = 0.16;
+	const sign = add(keep(new THREE.PlaneGeometry(1.5, 0.375)), keep(new THREE.MeshStandardMaterial({ map: barSign(keep), roughness: 0.7 })), 0, 2.12, 0.46);
+	sign.rotation.x = -0.05;
+
+	// The tap: a chrome column, a black handle, a drip tray.
+	const chrome = mat(0xd9dde2, { metalness: 0.8, roughness: 0.25 });
+	add(cyl(0.035, 0.34), chrome, 0.35, 1.23, 0.05);
+	add(box(0.12, 0.03, 0.06), chrome, 0.35, 1.38, 0.1);
+	add(box(0.03, 0.16, 0.03), mat(0x151515), 0.35, 1.48, 0.1);
+	add(box(0.22, 0.02, 0.14), mat(0x333333, { metalness: 0.5 }), 0.35, 1.07, 0.12);
+
+	// Two pints and a coffee on the counter.
+	const beer = mat(0xe3a22e, { transparent: true, opacity: 0.88, roughness: 0.3 });
+	const foam = mat(0xfaf6ea);
+	for (const gx of [-0.15, 0.02]) {
+		add(cyl(0.04, 0.14), beer, gx, 1.13, 0.18);
+		add(cyl(0.041, 0.03), foam, gx, 1.215, 0.18);
+	}
+	const china = mat(0xf2f0ea);
+	add(cyl(0.07, 0.012), china, -0.6, 1.066, 0.15);
+	add(cyl(0.035, 0.07), china, -0.6, 1.105, 0.15);
+	add(cyl(0.03, 0.005), mat(0x3b2415), -0.6, 1.141, 0.15);
+
+	// A barrel at the end of the counter.
+	const barrel = add(keep(new THREE.CylinderGeometry(0.26, 0.26, 0.6, 16)), mat(0x7a4b25), 1.45, 0.3, -0.2);
+	barrel.castShadow = true;
+	add(keep(new THREE.CylinderGeometry(0.265, 0.265, 0.04, 16)), mat(0x3a3a3a, { metalness: 0.6 }), 1.45, 0.45, -0.2);
+
+	grp.add(bar);
 }
 
 /* ---------- the pitch ---------- */
@@ -773,7 +893,7 @@ export interface Pitch3D {
  * Built once per deal and never touched again — nothing here is rebuilt per frame.
  * The sky is not here: it belongs to the sun, which outlives the pitch (see addLights).
  */
-export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string[], banner?: string): Pitch3D {
+export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string[], banner?: string, bar = false): Pitch3D {
 	const grp = new THREE.Group();
 	const junk: { dispose(): void }[] = [];
 	const keep = <T extends { dispose(): void }>(o: T): T => { junk.push(o); return o; };
@@ -801,9 +921,10 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 	apron.receiveShadow = true;
 	grp.add(apron);
 
-	buildDecor(grp, t.seed, apron.position.y, sun, keep);
-	if (boards?.length) buildBoards(grp, boards, apron.position.y, keep);
-	if (banner) buildBanner(grp, banner, apron.position.y, keep);
+	buildDecor(grp, t.seed, apron.position.y, sun, keep, !!boards?.length || !!banner);
+	if (boards?.length) buildBoards(grp, boards, apron.position.y, t, keep);
+	if (banner) buildBanner(grp, banner, apron.position.y, t, keep);
+	if (bar) buildBar(grp, apron.position.y, keep);
 
 	geo.computeVertexNormals();
 	const uv = geo.attributes.uv as THREE.BufferAttribute;
