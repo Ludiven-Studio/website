@@ -10,8 +10,10 @@ interface Props {
 	image?: string | undefined; // root-relative or absolute og image (defaults to the studio logo)
 	type?: string | undefined; // og:type (website | article)
 	noindex?: boolean | undefined; // keep this page out of search engines
-	lang?: 'fr' | 'en' | undefined;
+	lang?: 'fr' | 'en' | 'es' | undefined;
 	altLang?: string | undefined; // path of the same page in the other language
+	/** Every language version of the page, when there are more than two. Wins over altLang. */
+	alternates?: Partial<Record<'fr' | 'en' | 'es', string>> | undefined;
 }
 
 const {
@@ -22,6 +24,7 @@ const {
 	noindex = false,
 	lang = 'fr',
 	altLang,
+	alternates,
 } = Astro.props;
 
 // GitHub Pages sends no headers, so the policy rides in a <meta> (no frame-ancestors there).
@@ -68,7 +71,15 @@ if (image) {
 {noindex && <meta name="robots" content="noindex, follow" />}
 <link rel="canonical" href={canonical} />
 {
-	altLang && (
+	alternates && (
+		<>
+			{Object.entries(alternates).map(([l, p]) => <link rel="alternate" hreflang={l} href={new URL(p, Astro.site)} />)}
+			<link rel="alternate" hreflang="x-default" href={new URL(alternates.fr ?? Astro.url.pathname, Astro.site)} />
+		</>
+	)
+}
+{
+	!alternates && altLang && (
 		<>
 			<link rel="alternate" hreflang={lang} href={canonical} />
 			<link rel="alternate" hreflang={lang === 'fr' ? 'en' : 'fr'} href={new URL(altLang, Astro.site)} />
@@ -82,7 +93,7 @@ if (image) {
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:url" content={canonical} />
-<meta property="og:locale" content={lang === 'en' ? 'en_GB' : 'fr_FR'} />
+<meta property="og:locale" content={lang === 'en' ? 'en_GB' : lang === 'es' ? 'es_ES' : 'fr_FR'} />
 <meta property="og:image" content={ogImage} />
 <meta property="og:image:width" content={String(ogW)} />
 <meta property="og:image:height" content={String(ogH)} />

@@ -3,9 +3,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PetanqueLanding from '../../components/PetanqueLanding.astro';
 import { copy, OG_IMAGE, LANDING_PATHS } from '../../data/petanqueScanner';
 
-const t = copy.en;
+const t = copy.es;
 ---
 
-<BaseLayout title={t.title} description={t.description} image={OG_IMAGE} lang="en" alternates={LANDING_PATHS}>
-	<PetanqueLanding lang="en" />
+<BaseLayout title={t.title} description={t.description} image={OG_IMAGE} lang="es" alternates={LANDING_PATHS}>
+	<PetanqueLanding lang="es" />
 </BaseLayout>

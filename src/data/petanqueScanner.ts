@@ -1,5 +1,5 @@
-// Copy for the Pétanque Scanner landing pages (/petanque-scanner/ and /en/petanque-scanner/).
-// Kept in one file so the two languages can't drift apart when the app changes.
+// Copy for the Pétanque Scanner landing pages (French, English and Spanish).
+// Kept in one file so the languages can't drift apart when the app changes.
 
 // App Store links carry no country code on purpose: Apple then redirects to the
 // visitor's own storefront. A hardcoded /fr/ or /us/ shows a "switch store?" wall
@@ -51,7 +51,16 @@ export const SCREENS = [
 	'/assets/petanque-ar/screen-06.webp',
 ];
 
-export const copy: Record<'fr' | 'en', LandingCopy> = {
+export type LandingLang = 'fr' | 'en' | 'es';
+
+/** Every language version of the landing, for hreflang and the language switch. */
+export const LANDING_PATHS: Record<LandingLang, string> = {
+	fr: '/petanque-scanner/',
+	en: '/en/petanque-scanner/',
+	es: '/es/petanque-scanner/',
+};
+
+export const copy: Record<LandingLang, LandingCopy> = {
 	fr: {
 		title: 'Pétanque Scanner — savoir qui a le point avec votre téléphone',
 		description:
@@ -283,5 +292,125 @@ export const copy: Record<'fr' | 'en', LandingCopy> = {
 		privacy: { label: 'privacy policy', href: '/petanque-ar/confidentialite/' },
 		terms: { label: 'terms of use', href: '/petanque-ar/cgu/' },
 		closing: 'Available on Android and iOS',
+	},
+	es: {
+		title: 'Pétanque Scanner — saber quién tiene el punto con el móvil',
+		description:
+			'Aplicación gratuita de realidad aumentada: apunta a las bolas, rodéalas y lee la distancia de cada bola al boliche. Un modo foto toma el relevo en los móviles sin realidad aumentada. Todo se calcula en el móvil, sin conexión ni cuenta.',
+		tagline:
+			'Dos bolas a cada lado del boliche, a uno o dos metros, y el ojo no sabe decidir: de lejos no se pueden comparar dos distancias. Lanza un escaneo, rodea el juego unos segundos y la aplicación muestra la distancia de cada bola, dibujada en realidad aumentada sobre el terreno.',
+		heroAlt: 'Tres bolas y un boliche en un terreno, con las medidas mostradas en realidad aumentada',
+		badges: {
+			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=es',
+			playAlt: 'Disponible en Google Play',
+			apple: 'https://apps.apple.com/app/id6670211733',
+			appleAlt: 'Consíguelo en el App Store',
+		},
+		stepsTitle: 'Cómo funciona',
+		steps: [
+			{
+				icon: 'mobile',
+				title: 'Lanza el escaneo',
+				body: 'Deja las bolas exactamente donde están, abre la aplicación y apunta al juego. No hay nada que poner en el suelo ni ninguna marca que colocar.',
+			},
+			{
+				icon: 'winding-path',
+				title: 'Rodea el juego',
+				body: 'Da unos pasos alrededor de las bolas sin perder el boliche de vista. Un índice de confianza sube en directo mientras la aplicación reúne puntos de vista.',
+			},
+			{
+				icon: 'grid-dots',
+				title: 'Lee la clasificación',
+				body: 'Las distancias aparecen sobre el suelo, de la más corta a la más larga. Sabes quién tiene el punto sin que nadie se agache.',
+			},
+		],
+		featuresTitle: 'Lo que cambia',
+		features: [
+			{
+				title: 'Sin agacharse',
+				body: 'Cada bola se mide respecto al boliche, y la clasificación se muestra directamente sobre el terreno, no en una tabla. Nadie tiene que agacharse para decidir.',
+			},
+			{
+				title: 'Sin conexión',
+				body: 'El reconocimiento funciona en tu móvil. Ningún terreno está demasiado lejos de una antena para que la aplicación funcione.',
+			},
+			{
+				title: 'Nada sale del móvil',
+				body: 'Sin servidor, sin cuenta, sin registro. Las imágenes de la cámara nunca salen del dispositivo.',
+			},
+			{
+				title: 'Sin suscripción',
+				body: 'Gratis todos los días. Si quieres escaneos ilimitados, es una compra única, sin cargos mensuales.',
+			},
+		],
+		photoTitle: '¿Y si tu móvil no admite la realidad aumentada?',
+		photoBody:
+			'Hay un modo foto. Sostienes el móvil en horizontal por encima del juego, haces una sola foto y la aplicación sitúa en ella el boliche y las bolas: la más cercana aparece rodeada en verde, con la diferencia que la separa de la siguiente. No hace falta realidad aumentada: basta con una cámara.',
+		photoNote:
+			'En un dispositivo no compatible, la aplicación cambia sola a este modo: sin menú, nada que configurar. En los demás, el modo foto sigue disponible en los ajustes, útil cuando no hay sitio para rodear el juego. La contrapartida es conocida: una sola foto da una medida menos fiable que un escaneo desde varios ángulos.',
+		limitsTitle: 'Lo que la aplicación no hace',
+		limitsIntro: 'Mejor decirlo desde el principio, así no habrá sorpresas en el terreno.',
+		limits: [
+			{
+				title: 'No tiene ningún valor oficial',
+				body: 'En competición, la medida del árbitro es la que cuenta. Pétanque Scanner está pensado para partidas entre amigos, de vacaciones o en el club.',
+			},
+			{
+				title: 'Necesita ver las bolas',
+				body: 'Sol rasante, sombra muy marcada o una bola medio hundida en la grava: la detección se vuelve mucho más difícil.',
+			},
+			{
+				title: 'El boliche es lo más difícil',
+				body: 'Es pequeño y a menudo queda tapado por una bola. Es lo que más veces hace fallar a la aplicación; un modo «imán» permite recolocarlo a mano.',
+			},
+			{
+				title: 'A pocos milímetros, saca el metro',
+				body: 'La aplicación decide las diferencias visibles. Cuando dos bolas están casi a la misma distancia del boliche, da igual que sea a diez centímetros o a dos metros, la diferencia queda por debajo de la precisión de la medida y solo un metro de verdad las separará.',
+			},
+		],
+		priceTitle: 'Cuánto cuesta',
+		priceBody:
+			'La aplicación es gratuita, con 3 escaneos al día. Puedes ver un anuncio opcional para recargarlos, o pasar una sola vez a Premium de por vida: medidas ilimitadas y ningún anuncio más. No hay suscripción, y no hace falta ninguna compra para usar la aplicación.',
+		galleryTitle: 'La aplicación en imágenes',
+		faqTitle: 'Preguntas frecuentes',
+		faq: [
+			{
+				q: '¿Puedo usarla en competición?',
+				a: 'No. En una partida oficial solo cuenta la medida del árbitro. La aplicación está pensada para partidas amistosas, cuando nadie tiene un metro a mano.',
+			},
+			{
+				q: '¿Qué precisión tiene de verdad?',
+				a: 'La pantalla muestra hasta el milímetro, pero la exactitud es otra cosa: unos pocos milímetros en el mejor de los casos, cuando las bolas se ven bien y has rodeado el juego. Durante el escaneo se muestra un índice de confianza: si se queda bajo, la medida no debe tomarse en serio.',
+			},
+			{
+				q: '¿Funciona sin conexión?',
+				a: 'Sí, por completo. El reconocimiento de las bolas se ejecuta en el móvil y no hay ningún servidor.',
+			},
+			{
+				q: '¿Se envían mis fotos a algún sitio?',
+				a: 'No. Ninguna imagen sale del dispositivo, y la aplicación no pide crear ninguna cuenta.',
+			},
+			{
+				q: '¿Qué móviles son compatibles?',
+				a: 'El escaneo en realidad aumentada necesita un Android compatible con ARCore o un iPhone compatible con ARKit, es decir, la gran mayoría de los modelos lanzados desde 2018. En los que no lo son, la aplicación cambia automáticamente al modo foto y sigue siendo utilizable.',
+			},
+			{
+				q: '¿Hay que poner una marca en el suelo?',
+				a: 'No. La aplicación se orienta sola en el terreno a partir de la cámara y de los sensores de movimiento del móvil.',
+			},
+			{
+				q: '¿La aplicación está en español?',
+				a: 'Todavía no: por ahora está en francés y en inglés, y un móvil configurado en español la muestra en inglés. Tiene poco texto y se usa sin problema.',
+			},
+		],
+		makingOfTitle: 'Cómo está hecha',
+		makingOfBody:
+			'La detección de las bolas se basa en un modelo de visión entrenado solo con imágenes sintéticas, y la medida en una triangulación por acumulación de rayos. He escrito el detalle del proceso, incluidos los experimentos que no funcionaron (en inglés).',
+		makingOfCta: 'Leer los detalles técnicos',
+		makingOfHref: '/en/work/petanque-scanner/',
+		legalIntro: 'Consulta también (en francés):',
+		privacy: { label: 'política de privacidad', href: '/petanque-ar/confidentialite/' },
+		terms: { label: 'condiciones de uso', href: '/petanque-ar/cgu/' },
+		closing: 'Disponible en Android e iOS',
 	},
 };

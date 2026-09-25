@@ -3,12 +3,14 @@ import CallToAction from './CallToAction.astro';
 import Icon from './Icon.astro';
 
 interface Props {
-	lang?: 'fr' | 'en' | undefined;
+	lang?: 'fr' | 'en' | 'es' | undefined;
 }
 
 const { lang = 'fr' } = Astro.props;
 const t = lang === 'en'
 	? { heading: 'Got a project in mind?', cta: 'Get in touch' }
+	: lang === 'es'
+	? { heading: '¿Tienes un proyecto en mente?', cta: 'Escríbeme' }
 	: { heading: 'Un projet en tête ?', cta: 'Contactez-moi' };
 ---
 

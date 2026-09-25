@@ -1,19 +1,21 @@
 ---
-// The Pétanque Scanner product page, shared by /petanque-scanner/ and its English twin.
+// The Pétanque Scanner product page, shared by its French, English and Spanish versions.
 // The portfolio entry at /work/petanque-scanner/ covers the research instead.
 
 import Hero from './Hero.astro';
 import Icon from './Icon.astro';
 import ContactCTA from './ContactCTA.astro';
 import LangSwitch from './LangSwitch.astro';
-import { copy, APP_NAME, HERO, SCREENS } from '../data/petanqueScanner';
+import { copy, APP_NAME, HERO, SCREENS, LANDING_PATHS, type LandingLang } from '../data/petanqueScanner';
 
 interface Props {
-	lang: 'fr' | 'en';
-	altLang: string;
+	lang: LandingLang;
 }
 
-const { lang, altLang } = Astro.props;
+const { lang } = Astro.props;
+const others = (Object.keys(LANDING_PATHS) as LandingLang[])
+	.filter((l) => l !== lang)
+	.map((l) => ({ lang: l, href: LANDING_PATHS[l] }));
 const t = copy[lang];
 const play = `/assets/badges/google-play-${lang}.png`;
 const apple = `/assets/badges/app-store-${lang}.svg`;
@@ -46,7 +48,7 @@ const jsonLd = [
 <div class="stack gap-20">
 	<main class="wrapper stack gap-15">
 		<div class="stack gap-8">
-			<LangSwitch lang={lang} href={altLang} />
+			<LangSwitch lang={lang} links={others} />
 			<Hero title={APP_NAME} tagline={t.tagline} align="start" />
 			<div class="store-badges">
 				<a href={t.badges.play} target="_blank" rel="noopener">

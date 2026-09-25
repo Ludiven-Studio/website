@@ -1,20 +1,36 @@
 ---
-// Only /work and /prestations exist in English, so this is a per-page link, not a site-wide switch.
+// Only a few pages exist in other languages, so this is a per-page link, not a site-wide switch.
+// Two-language pages pass `lang` + `href`; pages with more pass `links` (the other versions).
+type Lang = 'fr' | 'en' | 'es';
+
 interface Props {
-	lang: 'fr' | 'en';
-	href: string; // the same page in the other language
+	lang: Lang;
+	href?: string; // the same page in the other language
+	links?: { lang: Lang; href: string }[];
 }
 
-const { lang, href } = Astro.props;
+// Each label is written in its own language: it is read by someone who does not speak the page's.
+const LABEL: Record<Lang, string> = { fr: 'Lire en français', en: 'Read in English', es: 'Leer en español' };
+
+const { lang, href, links } = Astro.props;
+const all = links ?? (href ? [{ lang: lang === 'fr' ? 'en' : 'fr', href }] as { lang: Lang; href: string }[] : []);
 ---
 
-<a class="lang-switch" href={href} hreflang={lang === 'fr' ? 'en' : 'fr'}>
-	{lang === 'fr' ? 'Read in English' : 'Lire en français'}
-</a>
+<div class="lang-switches">
+	{all.map((l) => (
+		<a class="lang-switch" href={l.href} hreflang={l.lang} lang={l.lang}>{LABEL[l.lang]}</a>
+	))}
+</div>
 
 <style>
-	.lang-switch {
+	.lang-switches {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 		align-self: flex-start;
+	}
+
+	.lang-switch {
 		padding: 0.3rem 0.8rem;
 		border: 1px solid var(--gray-800);
 		border-radius: 999rem;
