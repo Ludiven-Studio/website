@@ -408,9 +408,9 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			'La detección de las bolas se basa en un modelo de visión entrenado solo con imágenes sintéticas, y la medida en una triangulación por acumulación de rayos. He escrito el detalle del proceso, incluidos los experimentos que no funcionaron (en inglés).',
 		makingOfCta: 'Leer los detalles técnicos',
 		makingOfHref: '/en/work/petanque-scanner/',
-		legalIntro: 'Consulta también (en francés):',
-		privacy: { label: 'política de privacidad', href: '/petanque-ar/confidentialite/' },
-		terms: { label: 'condiciones de uso', href: '/petanque-ar/cgu/' },
-		closing: 'Disponible en Android e iOS',
+		legalIntro: 'Consulta también:',
+		privacy: { label: 'política de privacidad', href: '/es/petanque-ar/confidentialite/' },
+		terms: { label: 'condiciones de uso', href: '/es/petanque-ar/cgu/' },
+		closing: 'Disponible para Android e iOS',
 	},
 };
