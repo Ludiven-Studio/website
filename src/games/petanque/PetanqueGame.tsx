@@ -174,6 +174,9 @@ const ZOOM_STEP = 0.2; // per press, so five taps cross the whole range
 const LOOK_FAR = 7.5; // m ahead when there is no jack yet to look at
 const LOOK_MIN = 2.2; // m the look target keeps in front of the eye, however far you walked
 const AI_THINK_MS = 700;
+/* The AI's hand on the pad, press to release, after its think time: the opponent's turn has to be
+   seen on the pad, not only read in a label. */
+const FOE_GESTURE_MS = 950;
 const END_CARD_MS = 2800;
 const END_TABLE_MS = 6000; // the end-of-end card carries a table of six rows — reading it takes longer
 const STATION_CARD_MS = 1500; // the daily has 12 of these, so it holds the card half as long
@@ -204,6 +207,8 @@ const LOFT_LABEL = (e: number): string =>
    `t` is the LOFT parameter (0 grazing, 1 plomb), which is not the same as its place on screen: the
    board is drawn upside down on purpose, so t = 1 is at the BOTTOM. Starting the gesture low and
    swinging all the way up is the lob; starting near the seam is the flat roll. */
+/** The graduation nearest a press height (0 top .. 1 bottom). */
+const bandOf = (t: number): string => BOARD_MARKS.reduce((a, b) => (Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a)).label;
 const BOARD_MARKS: readonly { t: number; label: string }[] = [
 	{ t: 0.04, label: 'Roulette' },
 	{ t: 0.32, label: 'Demi' },
@@ -446,6 +451,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const levelSkillRef = useRef(0.25); // the ladder's skill, read by the rAF loop
 	const targetRef = useRef(13);
 	const aiPendingRef = useRef(false);
+	/** The AI's next boule, planned when its turn comes so its hand can act it out on the pad first. */
+	const aiPlanRef = useRef<{ v: { vx: number; vy: number; vz: number }; m: Match13; start: number; board: number; power: number; yaw: number; shown?: boolean } | null>(null);
+	const foeHandRef = useRef<HTMLDivElement | null>(null);
+	const foeFillRef = useRef<HTMLDivElement | null>(null);
 	const aiAtRef = useRef(0);
 	const endAtRef = useRef(0);
 	const rngRef = useRef(1); // AI plan counter — one per throw, so two plans never coincide
@@ -518,6 +527,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [match, setMatch] = useState<Match13>(matchRef.current);
 	const [status, setStatus] = useState<Status>('aim');
 	const [power, setPower] = useState(0);
+	/** The graduation the opponent's hand is on while it acts on the pad, else null. */
+	const [foeBand, setFoeBand] = useState<string | null>(null);
 	const [loft, setLoft] = useState(LOFT_0);
 	const [armed, setArmed] = useState(false); // the board is held: the loft shown is now committed
 	const [diff, setDiff] = useState<DiffKey>('moyen');
@@ -805,6 +816,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setCard(null);
 		setOver(false);
 		aiPendingRef.current = false;
+		aiPlanRef.current = null;
+		setFoeBand(null);
 		powerRef.current = 0;
 		setPower(0);
 		placeRef.current = null; setPlaceOk(false);
@@ -876,6 +889,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setCard(null);
 		setOver(false);
 		aiPendingRef.current = false;
+		aiPlanRef.current = null;
+		setFoeBand(null);
 		powerRef.current = 0;
 		setPower(0);
 		placeRef.current = null; setPlaceOk(false);
@@ -911,6 +926,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		statusRef.current = 'over';
 		setStatus('over');
 		aiPendingRef.current = false;
+		aiPlanRef.current = null;
+		setFoeBand(null);
 		const run = loadDailyRun(gameId);
 		const seed = run?.seed ?? (await getDaily(gameId)).seed;
 		const grades = (run?.state as { grades?: Grade[] } | undefined)?.grades ?? [];
@@ -1022,6 +1039,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		setStatus('rolling');
 		powerRef.current = 0;
 		setPower(0);
+		setFoeBand(null);
 		// Back to the throwing eye: at full zoom the eye is 1.5 m from the head, so a boule leaving
 		// from the circle 8 m behind it would fly out of frame from the very first instant.
 		zoomRef.current = 0;
@@ -1211,6 +1229,55 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (v) setViewKey(v);
 	}, [setViewKey]);
 
+	/* ---------- the opponent's hand on the pad ---------- */
+
+	/** A throw read back as the pad gesture that would make it: press height (board), pull
+	   (power) and sideways slide (yaw). Display only: the throw itself is the velocity. */
+	const gestureOf = (v: { vx: number; vy: number; vz: number }, dir: number): { board: number; power: number; yaw: number } => {
+		const flat = Math.hypot(v.vx, v.vy);
+		const sp2 = flat * flat + v.vz * v.vz;
+		return {
+			board: boardForElevation(Math.atan2(v.vz, flat)),
+			power: Math.max(0, Math.min(1, (sp2 - MIN_SPEED * MIN_SPEED) / (MAX_SPEED * MAX_SPEED - MIN_SPEED * MIN_SPEED))),
+			yaw: Math.atan2(v.vx * dir, v.vy * dir),
+		};
+	};
+
+	/** The opponent's finger: the AI acting out its planned boule, or the online opponent's live
+	   aim. Written straight to the DOM every frame — a React state here would re-render the whole
+	   game 60 times a second. */
+	const drawFoeHand = (now: number) => {
+		const hand = foeHandRef.current, fill = foeFillRef.current, arm = armElRef.current;
+		if (!hand || !arm) return;
+		const armH = arm.clientHeight, halfW = arm.clientWidth / 2 - 18;
+		const pressY = (t: number) => armH - (BOARD_PAD_PX + t * (armH - BOARD_PAD_PX * 2)); // from the pad's bottom
+		const slide = (yaw: number) => Math.max(-halfW, Math.min(halfW, -yaw / YAW_PER_PX));
+		let show = false, x = 0, y = 0, pull = 0, press = 1;
+		const plan = aiPlanRef.current;
+		const ra = remoteAimRef.current;
+		if (plan && now >= plan.start && statusRef.current === 'aim') {
+			// Press (a fifth), hold, then pull up past the seam while sliding to the aim.
+			const u = Math.min(1, (now - plan.start) / FOE_GESTURE_MS);
+			const q = u < 0.32 ? 0 : 1 - Math.pow(1 - (u - 0.32) / 0.68, 2);
+			const y0 = pressY(plan.board), y1 = armH + plan.power * POWER_PX;
+			y = y0 + (y1 - y0) * q;
+			x = slide(plan.yaw) * q;
+			pull = Math.max(0, (y - armH) / POWER_PX);
+			press = u < 0.2 ? 0.55 + (u / 0.2) * 0.45 : 1;
+			show = true;
+			// Once per gesture: light the AI's graduation and say it is throwing.
+			if (!plan.shown) { plan.shown = true; setFoeBand(bandOf(plan.board)); }
+		} else if (ra && ra.live && now - ra.seen < AIM_STALE_MS && statusRef.current !== 'rolling') {
+			y = armH + ra.power * POWER_PX;
+			x = slide(ra.yaw);
+			pull = ra.power;
+			show = true;
+		}
+		hand.style.opacity = show ? '1' : '0';
+		if (show) hand.style.transform = `translate(${x.toFixed(1)}px, ${(-y).toFixed(1)}px) scale(${press.toFixed(2)})`;
+		if (fill) fill.style.height = `${Math.round((show ? pull : 0) * 100)}%`;
+	};
+
 	/* ---------- what the AI does when its turn comes ---------- */
 
 	const aiAct = useCallback(() => {
@@ -1220,7 +1287,9 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		// the AI throws on the player's turn, and applySettled bills the boule to the player.
 		if (m.turn !== AI || m.winner !== null || (m.phase === 'play' && m.left[AI] <= 0)) return;
 		const skill = lvActiveRef.current ? levelSkillRef.current : DIFFS[diffRef.current].skill;
-		const rng = rngRef.current++;
+		// A planned boule already spent its draw when it was planned.
+		const planned = aiPlanRef.current !== null && aiPlanRef.current.m === m && m.phase === 'play';
+		const rng = planned ? 0 : rngRef.current++;
 
 		if (m.phase === 'place-jack') {
 			const j = jackRef.current;
@@ -1241,7 +1310,10 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		}
 		const j = jackRef.current;
 		if (!j) return;
-		doThrow(AI, planThrow(s, j, m, AI, skill, rng), false);
+		// The boule the hand just acted out, if the match has not moved since it was planned.
+		const plan = aiPlanRef.current;
+		aiPlanRef.current = null;
+		doThrow(AI, plan && plan.m === m ? plan.v : planThrow(s, j, m, AI, skill, rng), false);
 	}, [doThrow]);
 
 	/* ---------- one body has come to rest ---------- */
@@ -1448,6 +1520,8 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (was && viewRef.current === 'tete') setViewKey(was);
 		setCard(null);
 		aiPendingRef.current = false;
+		aiPlanRef.current = null;
+		setFoeBand(null);
 		statusRef.current = 'aim';
 		setStatus('aim');
 	}, [clearBodies, setStation, setViewKey]);
@@ -1503,6 +1577,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		net.onAim((a) => {
 			if (matchRef.current.turn === mySideRef.current || statusRef.current === 'rolling') return;
 			remoteAimRef.current = { ...a, seen: performance.now() };
+			setFoeBand(a.live ? bandOf(boardForElevation(a.loft)) : null);
 		});
 		net.onSync((msg) => {
 			if (statusRef.current === 'rolling') { pendingSyncRef.current = msg; return; }
@@ -2206,12 +2281,21 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			// Never mid-review: the AI throwing while the eye is still up the lane looking at the last
 			// boule reads as a boule appearing out of nowhere.
 			aiAtRef.current = Math.max(now + AI_THINK_MS, reviewUntilRef.current);
+			// A boule (not the jack, not a placing): plan it now and let the hand act it out first.
+			const jk = jackRef.current;
+			if (statusRef.current === 'aim' && m.phase === 'play' && jk && m.left[AI] > 0) {
+				const skill = lvActiveRef.current ? levelSkillRef.current : DIFFS[diffRef.current].skill;
+				const v = planThrow(s, jk, m, AI, skill, rngRef.current++);
+				aiPlanRef.current = { v, m, start: aiAtRef.current, ...gestureOf(v, m.dir) };
+				aiAtRef.current += FOE_GESTURE_MS;
+			}
 		}
 		if (aiPendingRef.current && now >= aiAtRef.current) {
 			aiPendingRef.current = false;
 			aiAct();
 		}
 		if (statusRef.current === 'end' && now >= endAtRef.current) nextEnd();
+		drawFoeHand(now);
 
 		// While the pad is held the sway moves the throw every frame, so the preview must follow it:
 		// the moving arc and landing marker are how the player times the release.
@@ -2786,8 +2870,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const padStyle = padPos ? { left: `${padPos.left}px`, transform: 'none' } : undefined;
 	// Which graduation lights up: the one nearest where the finger would have to land.
 	const boardT = boardForElevation(loft);
-	const boardBand = BOARD_MARKS.reduce((a, b) =>
-		(Math.abs(b.t - boardT) < Math.abs(a.t - boardT) ? b : a)).label;
+	const boardBand = myTurn ? bandOf(boardT) : foeBand;
 	const holder = !daily && jackRef.current && status !== 'placing' ? pointHolder(simRef.current?.bs ?? [], jackRef.current) : null;
 	const course = dailyRef.current?.course ?? null;
 	const st = course?.stations[station] ?? null;
@@ -2801,7 +2884,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		: status === 'placing'
 		? (myTurn ? '✋ Touche le sol dans l’anneau jaune' : 'L’adversaire place le bouchon…')
 		: status === 'rolling' ? 'La boule roule…'
-		: !myTurn ? (online ? 'L’adversaire joue…' : 'L’adversaire réfléchit…')
+		: !myTurn ? (foeBand ? 'L’adversaire tire…' : online ? 'L’adversaire joue…' : 'L’adversaire réfléchit…')
 		: match.phase === 'throw-jack' ? '🎯 Touche le sol pour viser'
 		: '▲ Pose le doigt sur la planche, puis remonte';
 
@@ -2986,11 +3069,16 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{/* The launch board. Purely a drawing: the hit test lives in aimStart, so there is
 				    exactly one way into a throw and this cannot swallow a camera drag. It pulses until
 				    the first contact of the session — the whole complaint was that nobody found it. */}
-				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${jackTime ? ' gone' : ''}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} style={padStyle} aria-hidden="true">
+				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${jackTime ? ' gone' : ''}${armLive && status !== 'rolling' ? (myTurn ? ' mine' : ' foe') : ''}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
+					<div ref={foeFillRef} className="pe-arm-foefill" />
+					{/* Whose turn it is, on the pad itself: the label above it is easy to miss. */}
+					{armLive && status !== 'rolling' && !over && (
+						<span className={`pe-arm-who${myTurn ? '' : ' foe'}`}>{myTurn ? 'À toi' : (online && mpOpp ? mpOpp : 'Adversaire')}</span>
+					)}
 					{/* The gesture, drawn: an arrow lying on the ground and running away up the lane —
 					    press, then push forward. Gone once the pull has started; the fill says it then. */}
-					{armLive && power === 0 && (
+					{armLive && power === 0 && myTurn && (
 						<svg className={`pe-arm-arrow${armed ? ' held' : ''}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
 							<defs>
 								<linearGradient id="pe-arrow-g" x1="0" y1="1" x2="0" y2="0">
@@ -3018,12 +3106,18 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 
+				{/* The opponent's finger. Its own layer, taller than the pad: the pull goes above the pad,
+				    and the pad clips its content. */}
+				<div className={`pe-foe${armLive && !jackTime && !myTurn ? '' : ' gone'}`} style={padStyle} aria-hidden="true">
+					<div ref={foeHandRef} className="pe-foe-hand" />
+				</div>
+
 				<div className={`pe-power${jackTime ? ' gone' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-power-fill" style={{ width: `${Math.round(power * 100)}%` }} />
 				</div>
 
 				<span
-					className={`pe-arm-label${armed && power === 0 ? ' warn' : ''}`}
+					className={`pe-arm-label${armed && power === 0 ? ' warn' : ''}${armLive && status !== 'rolling' && !myTurn ? ' foe' : ''}`}
 					style={padPos ? { left: `calc(${PAD_EDGE}px + (100% - ${PAD_EDGE * 2}px) * ${padPos.label})`, transform: `translateX(${-padPos.label * 100}%)` } : undefined}
 				>{armMsg}</span>
 
@@ -3538,6 +3632,17 @@ const CSS = `
 /* Held with nothing pulled: the board is the cancel surface, so it says so with its own skin. */
 /* Hidden but still laid out: guards and layoutPad read its box, and aimStart ignores it meanwhile. */
 .pe-arm.gone, .pe-power.gone { visibility: hidden; }
+.pe-arm.mine { box-shadow: 0 0 0 3px rgba(255,209,102,0.22), 0 0 18px rgba(255,209,102,0.25); }
+.pe-arm.foe { border-color: rgba(255,95,86,0.9); background: linear-gradient(180deg, rgba(70,14,12,0.14) 0%, rgba(90,18,14,0.5) 100%); box-shadow: 0 0 0 3px rgba(255,95,86,0.2); }
+.pe-arm.foe::before { border-top-color: rgba(255,95,86,0.5); }
+.pe-arm.foe .pe-board-mark.on { color: #ff8a80; }
+.pe-arm-foefill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(180deg, rgba(255,95,86,0.12), rgba(255,95,86,0.42)); }
+.pe-arm-who { position: absolute; right: 8px; top: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: #ffd166; text-transform: uppercase; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pe-arm-who.foe { color: #ff8a80; }
+.pe-arm-label.foe { background: rgba(90,18,14,0.72); color: #ffd9d4; }
+.pe-foe { position: absolute; left: 50%; transform: translateX(-50%); bottom: var(--pe-arm-b); width: var(--pe-arm-w); height: 0; z-index: 4; pointer-events: none; }
+.pe-foe.gone { visibility: hidden; }
+.pe-foe-hand { position: absolute; left: calc(50% - 20px); bottom: -20px; width: 40px; height: 40px; border-radius: 50%; opacity: 0; background: rgba(255,138,128,0.9); box-shadow: 0 0 0 6px rgba(255,95,86,0.35), 0 4px 12px rgba(0,0,0,0.45); transition: opacity 0.15s; will-change: transform; }
 .pe-arm.hold { border-color: rgba(255,138,128,0.85); background: linear-gradient(180deg, rgba(60,16,12,0.12) 0%, rgba(80,20,14,0.5) 100%); }
 .pe-arm.hold::before { border-top-color: rgba(255,138,128,0.45); }
 
