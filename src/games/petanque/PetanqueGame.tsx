@@ -41,7 +41,7 @@ import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, loadDailyRun, saveDailyRun, playerName } from '../../lib/leaderboard';
 import { challengeWeekday } from '../../lib/day';
 import { detectGameLang, storedGameLang, saveGameLang, announceGameLang, nextGameLang, type GameLang } from '../../lib/gameLang';
-import { STRINGS, LANG_KEY, TIP_URL, type Strings } from './i18n';
+import { STRINGS, LANG_KEY, TIP_URL, COFFEE_URL, type Strings } from './i18n';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
@@ -399,11 +399,15 @@ function BouleTable({ rows, mySide, t }: { rows: readonly BouleRow[]; mySide: Si
 function TipCard({ t, gameId }: { t: Strings; gameId: string }) {
 	return (
 		<div className="pe-tip">
-			{TIP_URL && (
+			{(COFFEE_URL || TIP_URL) && (
 				<>
 					<span className="pe-tip-title">{t.tipTitle}</span>
-					<a className="pe-tip-btn" href={TIP_URL} target="_blank" rel="noopener"
-						onClick={() => trackEvent('tip_click', { from: gameId })}>{t.tipBtn}</a>
+					<span className="pe-tip-row">
+						{COFFEE_URL && <a className="pe-tip-btn" href={COFFEE_URL} target="_blank" rel="noopener"
+							onClick={() => trackEvent('tip_click', { from: gameId, what: 'coffee' })}>{t.coffeeBtn}</a>}
+						{TIP_URL && <a className="pe-tip-btn" href={TIP_URL} target="_blank" rel="noopener"
+							onClick={() => trackEvent('tip_click', { from: gameId, what: 'drink' })}>{t.tipBtn}</a>}
+					</span>
 					<span className="pe-tip-wink">{t.tipWink}</span>
 				</>
 			)}
@@ -3828,6 +3832,7 @@ const CSS = `
 
 .pe-tip { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.14); font-size: 12.5px; font-weight: 500; }
 .pe-tip-title { opacity: 0.8; }
+.pe-tip-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .pe-tip-btn { display: inline-block; padding: 7px 14px; border-radius: 999px; background: #ffd166; color: #2a1e00; font-weight: 700; text-decoration: none; }
 .pe-tip-btn:hover { background: #ffdd88; }
 .pe-tip-wink { font-size: 11px; opacity: 0.6; font-style: italic; }

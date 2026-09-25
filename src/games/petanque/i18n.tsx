@@ -153,8 +153,9 @@ const fr = {
 		}
 	},
 
-	tipTitle: 'Le jeu te plaît ?',
-	tipBtn: '🥂 Offrir un verre au développeur',
+	tipTitle: 'Le jeu te plaît ? Offre au développeur…',
+	coffeeBtn: '☕ un café · 1,50 €',
+	tipBtn: '🥂 un verre · dès 2 €',
 	tipWink: '… ou un pastis ?',
 	scannerTitle: 'Tu joues pour de vrai ?',
 	scannerBtn: '📱 Pétanque Scanner mesure tes points',
@@ -314,8 +315,9 @@ const en: Strings = {
 		}
 	},
 
-	tipTitle: 'Enjoying the game?',
-	tipBtn: '🥂 Buy the developer a drink',
+	tipTitle: 'Enjoying the game? Buy the developer…',
+	coffeeBtn: '☕ a coffee · €1.50',
+	tipBtn: '🥂 a drink · from €2',
 	tipWink: '… or a pastis?',
 	scannerTitle: 'Playing for real?',
 	scannerBtn: '📱 Pétanque Scanner measures your points',
@@ -473,8 +475,9 @@ const es: Strings = {
 		}
 	},
 
-	tipTitle: '¿Te gusta el juego?',
-	tipBtn: '🥂 Invita al desarrollador a una caña',
+	tipTitle: '¿Te gusta el juego? Invita al desarrollador a…',
+	coffeeBtn: '☕ un café · 1,50 €',
+	tipBtn: '🍺 una caña · desde 2 €',
 	tipWink: '… ¿o a un pastís?',
 	scannerTitle: '¿Juegas de verdad?',
 	scannerBtn: '📱 Pétanque Scanner mide tus puntos',
@@ -498,5 +501,7 @@ const es: Strings = {
 
 export const STRINGS: Record<GameLang, Strings> = { fr, en, es };
 
-/** The Stripe Payment Link behind "buy the developer a drink". Empty hides the button. */
+/** Stripe Payment Links behind the tip buttons: a drink (pay what you want, from 2 €) and a
+ *  coffee (1.50 €). An empty one hides its button. */
 export const TIP_URL = 'https://buy.stripe.com/3cI9AS34L7sH3MJbNNaVa00';
+export const COFFEE_URL = 'https://buy.stripe.com/cNi14mgVB28nern5ppaVa01';
