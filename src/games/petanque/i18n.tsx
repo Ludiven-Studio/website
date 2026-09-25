@@ -499,4 +499,4 @@ const es: Strings = {
 export const STRINGS: Record<GameLang, Strings> = { fr, en, es };
 
 /** The Stripe Payment Link behind "buy the developer a drink". Empty hides the button. */
-export const TIP_URL = '';
+export const TIP_URL = 'https://buy.stripe.com/3cI9AS34L7sH3MJbNNaVa00';
