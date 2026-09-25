@@ -76,6 +76,23 @@ export function place(t: Terrain, b: Boule): Boule {
 	return b;
 }
 
+/* Where the hand lets go above the circle: low for a roulette thrown crouched, higher for a lob
+   thrown standing. Read from the velocity alone (vz / speed is the sine of the loft) with no trig,
+   so both online peers compute the same bits from the same message. */
+export const RELEASE_LOW = 0.3; // m above the ground, a flat throw
+export const RELEASE_SPAN = 0.5; // m more for a vertical one (~0.77 m at a full plomb)
+
+/** Put a body in the thrower's hand, above the circle, and let it go with velocity `v`. */
+export function release(t: Terrain, b: Boule, v: { vx: number; vy: number; vz: number }): Boule {
+	place(t, b);
+	const sp = Math.sqrt(v.vx * v.vx + v.vy * v.vy + v.vz * v.vz);
+	const up = sp > 0 ? Math.max(0, Math.min(1, v.vz / sp)) : 0;
+	b.z += RELEASE_LOW + RELEASE_SPAN * up;
+	b.vx = v.vx; b.vy = v.vy; b.vz = v.vz;
+	b.rolling = false;
+	return b;
+}
+
 export const speed2 = (b: Boule): number => Math.sqrt(b.vx * b.vx + b.vy * b.vy);
 export const speed3 = (b: Boule): number => Math.sqrt(b.vx * b.vx + b.vy * b.vy + b.vz * b.vz);
 export const dist2 = (a: Boule, b: Boule): number => {

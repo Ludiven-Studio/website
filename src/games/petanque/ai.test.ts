@@ -261,11 +261,13 @@ describe('the jack throw', () => {
 	   a speed error stretches outwards, and the far raw edge misses the window often — the rule then
 	   hands the placing to the opponent. */
 	it('makes the window edges a real gamble and the inner window safe', () => {
+		// 40 throws per board: with 20, one unlucky throw moved the far rate across the 5 % line
+		// (6 of 120) while 480 throws put 9 m at 1.9 %.
 		const rate = (want: number): number => {
 			let out = 0, n = 0;
 			for (const id of ['terre-battue', 'gravier-gros', 'sable'] as SurfaceId[]) {
 				for (const amp of [0.02, 0.14]) {
-					for (let k = 0; k < 20; k++) {
+					for (let k = 0; k < 40; k++) {
 						const s = board(id, amp);
 						const m = state({ phase: 'throw-jack' });
 						const aim = { x: m.circle.x, y: m.circle.y + m.dir * want };

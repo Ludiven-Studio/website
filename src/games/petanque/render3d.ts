@@ -12,7 +12,7 @@ import {
 	type Terrain, type SurfaceId, PITCH_W, PITCH_L, CELL, heightAt, hashN,
 } from './terrain';
 import {
-	type Sim, type Boule, type Impact, BOULE_R, JACK_R, cloneSim, stepSim, speed2, speed3, isSettled,
+	type Sim, type Boule, type Impact, BOULE_R, JACK_R, cloneSim, stepSim, speed2, speed3, isSettled, release,
 } from './engine';
 
 export const wx = (ex: number): number => ex - PITCH_W / 2;
@@ -1134,9 +1134,8 @@ const PRED_MAX = 900;
  */
 export function predictThrow(s: Sim, from: { x: number; y: number }, v: { vx: number; vy: number; vz: number }, mk: (c: Sim) => Boule): ThrowPrediction {
 	const c = cloneSim(s);
-	const b = mk(c);
-	b.vx = v.vx; b.vy = v.vy; b.vz = v.vz;
-	b.rolling = false;
+	// From the hand, exactly as `launch` does it: a preview from the ground would land short.
+	const b = release(c.t, mk(c), v);
 	c.bs.push(b);
 
 	const air: THREE.Vector3[] = [new THREE.Vector3(wx(b.x), b.z, wz(b.y))];

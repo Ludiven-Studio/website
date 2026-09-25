@@ -243,10 +243,11 @@ const PREVIEW_FOV = 50;
 /* The ring runs right up to the window's lines, which are drawn on the ground: a ring that stopped
    a metre short of a visible line read as a bug. The edges are a real gamble, and that is the rule's
    own answer — a jack out of the window goes to the opponent to place. A THROWN jack carries
-   JACK_SPREAD_PLAYER, and a speed error stretches outwards. Measured over 2160 deals per distance
-   (every surface x 3 reliefs x 40 seeds), share landing outside the 6-10 m window:
-     6.15 m 13.5 %   6.30 m 2.9 %   6.40 m 1.9 %   6.50 m 1.5 %
-     8.80 m  1.0 %   9.00 m 1.9 %   9.15 m 3.5 %   9.60 m 18.1 %   9.85 m 47.5 %
+   JACK_SPREAD_PLAYER, and a speed error stretches outwards. Measured over 480 deals per distance
+   (every surface x 3 reliefs x 40 seeds), share landing outside the 6-10 m window, with the jack
+   released from the hand (engine `release`):
+     6.15 m 22.5 %   6.30 m 5.2 %   6.40 m 3.3 %   6.50 m 1.0 %
+     8.80 m  0.4 %   9.00 m 1.9 %   9.15 m 1.9 %   9.60 m 15.6 %   9.85 m 36.9 %
    It used to stop at ~2 % either side (6.5 / 9 m); the player now picks the risk. */
 const AIM_LO = MIN_JACK, AIM_HI = MAX_JACK;
 

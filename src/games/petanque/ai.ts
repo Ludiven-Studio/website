@@ -8,7 +8,7 @@
  * sim never advances while the AI is thinking.
  */
 
-import { type Sim, type Boule, makeBoule, makeJack, place, throwVelocity, settle, cloneSim } from './engine';
+import { type Sim, type Boule, makeBoule, makeJack, release, throwVelocity, settle, cloneSim } from './engine';
 import { hashN } from './terrain';
 import { type Match13, type Side, other, MIN_JACK, MAX_JACK } from './rules13';
 
@@ -82,13 +82,9 @@ export function laneBlocked(bs: Boule[], from: { x: number; y: number }, to: { x
 	return false;
 }
 
-/** Start a throw: the body sits on the ground at the circle, airborne the moment it leaves. */
+/** Start a throw: the body leaves the thrower's hand above the circle (see `release`). */
 export function launch(s: Sim, from: { x: number; y: number }, side: Side, v: { vx: number; vy: number; vz: number }, asJack = false): Boule {
-	const b = asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, side);
-	place(s.t, b);
-	b.vx = v.vx; b.vy = v.vy; b.vz = v.vz;
-	b.rolling = false;
-	return b;
+	return release(s.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, side), v);
 }
 
 /** Replay one throw on a clone. Returns where the new body came to rest. */
