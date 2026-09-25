@@ -1,0 +1,35 @@
+---
+// Unlisted page for the Copa Coruñesa de Petanca 2026 (Cracks Petanca Coruña). Same game as
+// /jeux/petanque/, with the tournament's name and its sponsors round the pitch.
+import GamePage from '../../../layouts/GamePage.astro';
+import PetanqueGame from '../../../games/petanque/PetanqueGame.tsx';
+
+const A = '/assets/jeux/petanque/coruna';
+const event = {
+	title: 'Copa Coruñesa de Petanca 2026',
+	logo: `${A}/club-cracks.png`,
+	lang: 'es' as const,
+	boards: [
+		`${A}/club-cracks.png`,
+		`${A}/sponsor-goleta.webp`,
+		`${A}/sponsor-boado.webp`,
+		`${A}/sponsor-panaderia.webp`,
+		`${A}/sponsor-mata.webp`,
+		`${A}/sponsor-avv.webp`,
+		`${A}/sponsor-cocen.webp`,
+		`${A}/sponsor-club-o-petanque.webp`,
+	],
+};
+---
+
+<GamePage
+	title="Copa Coruñesa de Petanca 2026 | Juego de petanca 3D"
+	description="Juego de petanca en 3D de la Copa Coruñesa de Petanca 2026 «Virgen del Rosario», organizada por Cracks Petanca Coruña."
+	heading="Copa Coruñesa de Petanca 2026"
+	tagline="Pon el dedo a la altura del ángulo y desliza para dosificar — gana quien llega a 13"
+	gameId="petanque"
+	fullscreen="auto"
+	noindex
+>
+	<PetanqueGame client:only="react" gameId="petanque" event={event} />
+</GamePage>

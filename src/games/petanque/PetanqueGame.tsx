@@ -40,7 +40,7 @@ import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, loadDailyRun, saveDailyRun, playerName } from '../../lib/leaderboard';
 import { challengeWeekday } from '../../lib/day';
-import { detectGameLang, saveGameLang, announceGameLang, nextGameLang, type GameLang } from '../../lib/gameLang';
+import { detectGameLang, storedGameLang, saveGameLang, announceGameLang, nextGameLang, type GameLang } from '../../lib/gameLang';
 import { STRINGS, LANG_KEY, TIP_URL, type Strings } from './i18n';
 import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
@@ -431,7 +431,16 @@ const killGroup = (g: THREE.Group): void => {
 	}
 };
 
-export default function PetanqueGame({ gameId }: { gameId: string }) {
+/** A partner event's own page: its name and logo on the pitch, its sponsors on boards round it. */
+export interface PetanqueEvent {
+	title: string;
+	logo: string;
+	boards: readonly string[];
+	/** Language shown until the player picks one. */
+	lang: GameLang;
+}
+
+export default function PetanqueGame({ gameId, event }: { gameId: string; event?: PetanqueEvent }) {
 	const wrapRef = useRef<HTMLDivElement | null>(null);
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const armElRef = useRef<HTMLDivElement | null>(null); // the launch pad, read back for the hit test
@@ -447,6 +456,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const g3Ref = useRef<Scene3D | null>(null);
 	const arcPtsRef = useRef<THREE.Vector3[]>([]);
 	const sunForceRef = useRef<{ el: number; az: number; seed?: number } | null>(null); // measurement hook only
+	const boardsRef = useRef(event?.boards); // stable for the page's life, read by the pitch builders
 
 	const simRef = useRef<Sim | null>(null);
 	const matchRef = useRef<Match13>(initMatch13(13, HUMAN));
@@ -587,7 +597,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 	const [dists, setDists] = useState(true);
 	const [sound, setSound] = useState(() => sfx.isEnabled());
 	// The UI language. Callbacks with empty deps read it through the ref.
-	const [lang, setLang] = useState<GameLang>(() => detectGameLang(LANG_KEY));
+	const [lang, setLang] = useState<GameLang>(() => storedGameLang(LANG_KEY) ?? event?.lang ?? detectGameLang(LANG_KEY));
 	const t = STRINGS[lang];
 	const tRef = useRef<Strings>(t);
 	tRef.current = t;
@@ -777,7 +787,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		const g = g3Ref.current;
 		if (!g || g.pitch) return;
 		const t = makeTerrain(PREVIEW_SEED, SURFACES['terre-battue'], 0.02);
-		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED));
+		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED), boardsRef.current);
 		g.scene.add(g.pitch.group);
 		previewRef.current = true;
 		// Fade the place in from the empty sky-blue canvas rather than popping it.
@@ -817,7 +827,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp, cfg.slope === undefined ? {} : { slope: cfg.slope });
-		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined));
+		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current);
 		g.scene.add(g.pitch.group);
 		bakeBouleEnv(g.renderer, g.scene);
 
@@ -895,7 +905,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(course.seed, SURFACES[course.surface], course.amp);
-		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined));
+		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current);
 		g.scene.add(g.pitch.group);
 		bakeBouleEnv(g.renderer, g.scene);
 
@@ -2693,7 +2703,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 			if (expo !== undefined) g.lights.setSkyExposure(expo);
 			g.scene.remove(g.pitch.group);
 			g.pitch.dispose();
-			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current));
+			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current), boardsRef.current);
 			g.scene.add(g.pitch.group);
 			bakeBouleEnv(g.renderer, g.scene);
 		};
@@ -3032,8 +3042,12 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				)}
 
 				{goal && !daily && (
-					<div key={`goal-${goal.key}`} className="pe-goal" onAnimationEnd={() => setGoal(null)}>
-						{t.goal(goal.target)}
+					<div key={`goal-${goal.key}`} className={`pe-goal${event ? ' event' : ''}`} onAnimationEnd={() => setGoal(null)}>
+						{event && <img className="pe-event-logo" src={event.logo} alt="" />}
+						<span className="pe-event-text">
+							{event && <span className="pe-event-title">{event.title}</span>}
+							<span>{t.goal(goal.target)}</span>
+						</span>
 					</div>
 				)}
 
@@ -3227,6 +3241,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{over && daily && (
 					<div className="pe-overlay pe-aside">
 						<div className="pe-card pe-endpanel">
+							{event && <img className="pe-event-logo" src={event.logo} alt={event.title} />}
 							{t.courseDone}
 							<strong>{points} / {MAX_DAILY_SCORE} · {fmtCentis(elapsed)}</strong>
 							<span className="pe-grades">{dailyRef.current?.grades.map((g, i) => (
@@ -3240,6 +3255,7 @@ export default function PetanqueGame({ gameId }: { gameId: string }) {
 				{over && !daily && !lv.active && (
 					<div className="pe-overlay pe-aside">
 						<div className="pe-card pe-endpanel">
+							{event && <img className="pe-event-logo" src={event.logo} alt={event.title} />}
 							{match.winner === mySide ? t.youWin : t.foeWins}
 							<strong>{match.scores[mySide]} — {match.scores[foeSide]}</strong>
 							{/* The last end's table: the boule that ended the match is the one people argue about. */}
@@ -3509,6 +3525,13 @@ const CSS = `
 .pe-view { border: none; background: transparent; color: #e8ddcf; font: inherit; font-weight: 700; font-size: 12px; border-radius: 999px; padding: 4px 11px; cursor: pointer; white-space: nowrap; }
 .pe-view.on { background: var(--pe-accent); color: var(--accent-text-over); }
 @media (max-width: 420px) { .pe-view-txt { display: none; } }
+.pe-goal.event { top: 34%; display: flex; align-items: center; gap: 10px; border-radius: 18px; padding: 8px 16px 8px 8px; white-space: normal; text-align: left; font-size: 15px; max-width: min(92%, 420px); }
+.pe-goal.event .pe-event-logo { width: 46px; flex: none; }
+.pe-goal.event .pe-event-title { display: block; }
+.pe-goal.event .pe-event-text { display: flex; flex-direction: column; gap: 2px; }
+.pe-event-logo { width: 72px; height: auto; border-radius: 12px; }
+.pe-endpanel .pe-event-logo { width: 56px; align-self: center; }
+.pe-event-title { font-size: 14px; color: #ffd166; letter-spacing: 0.02em; }
 .pe-goal { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; white-space: nowrap; background: rgba(28,20,12,0.72); color: #f4ece2; font-weight: 700; font-size: 17px; padding: 9px 20px; border-radius: 999px; border: 1.5px solid rgba(255,209,102,0.6); backdrop-filter: blur(4px); animation: pe-goal 3.4s ease-in-out forwards; }
 .pe-goal strong { color: #ffd166; font-size: 21px; }
 /* After each boule: the point, then whose turn — big, dead centre, and brief: it pops in, holds for

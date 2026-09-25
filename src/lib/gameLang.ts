@@ -11,14 +11,20 @@ export const LANG_EVENT = 'ludiven:lang';
 
 const isLang = (v: unknown): v is GameLang => v === 'fr' || v === 'en' || v === 'es';
 
-/** The stored choice, else the browser's first known language, else English. */
-export function detectGameLang(key: string): GameLang {
+/** The language the player picked by hand, if any. */
+export function storedGameLang(key: string): GameLang | null {
 	try {
 		const saved = localStorage.getItem(key);
-		if (isLang(saved)) return saved;
+		return isLang(saved) ? saved : null;
 	} catch {
-		/* private mode */
+		return null; // private mode
 	}
+}
+
+/** The stored choice, else the browser's first known language, else English. */
+export function detectGameLang(key: string): GameLang {
+	const saved = storedGameLang(key);
+	if (saved) return saved;
 	const wanted = typeof navigator === 'undefined' ? [] : navigator.languages ?? [navigator.language];
 	for (const l of wanted) {
 		const base = l?.slice(0, 2).toLowerCase();

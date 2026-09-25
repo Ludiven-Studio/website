@@ -17,16 +17,18 @@ interface Props {
 	/** Open straight into fullscreen. For games whose HUD is drawn over the board and whose
 	 *  windowed 16/10 box is too short to hold it on a phone. */
 	fullscreen?: 'auto';
+	/** Keep the page out of search engines (unlisted partner pages). */
+	noindex?: boolean;
 }
 
-const { title, description, heading, tagline, gameId, fullscreen } = Astro.props;
+const { title, description, heading, tagline, gameId, fullscreen, noindex } = Astro.props;
 // Every listed game has a backdrop (scripts/comfy-thumbs.mjs writes it next to the card);
 // the few unlisted pages don't.
 const hasArt = games.some((g) => g.id === gameId);
 const hasDaily = gameId in DAILY_LB;
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout title={title} description={description} noindex={noindex} gameChrome>
 	<script>
 		// Watch the game island and speak up when it dies, in either of the two ways it can.
 		const page = document.querySelector('.game-page');

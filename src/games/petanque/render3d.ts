@@ -652,6 +652,71 @@ function plankStrip(x0: number, y0: number, x1: number, y1: number, topAt: (x: n
 	return geo;
 }
 
+/* ---------- sponsor boards (event pages only) ---------- */
+
+const BOARD_W = 1.6, BOARD_H = 0.62, BOARD_LIFT = 0.14;
+
+/** A logo fitted inside a white board face. Filled in when the image arrives. */
+function boardTexture(url: string, keep: <T extends { dispose(): void }>(o: T) => T): THREE.CanvasTexture {
+	const cv = document.createElement('canvas');
+	cv.width = 640;
+	cv.height = Math.round((640 * BOARD_H) / BOARD_W);
+	const ctx = cv.getContext('2d')!;
+	ctx.fillStyle = '#ffffff';
+	ctx.fillRect(0, 0, cv.width, cv.height);
+	const tex = keep(new THREE.CanvasTexture(cv));
+	tex.colorSpace = THREE.SRGBColorSpace;
+	tex.anisotropy = 4; // read at a grazing angle from the circle
+	const img = new Image();
+	img.onload = () => {
+		const pad = 0.08, w = cv.width * (1 - 2 * pad), h = cv.height * (1 - 2 * pad);
+		const k = Math.min(w / img.width, h / img.height);
+		ctx.drawImage(img, (cv.width - img.width * k) / 2, (cv.height - img.height * k) / 2, img.width * k, img.height * k);
+		tex.needsUpdate = true;
+	};
+	img.src = url;
+	return tex;
+}
+
+/**
+ * Advertising boards round the pitch, one logo each, cycling through `logos`. At both ends, inside
+ * the lane corridor the decor keeps clear, and three a side between the planks and the benches.
+ * The ends sit behind the eye of whoever throws from that end, so they never cover the lane.
+ */
+function buildBoards(grp: THREE.Group, logos: readonly string[], y: number, keep: <T extends { dispose(): void }>(o: T) => T): void {
+	const END_Z = PITCH_L / 2 + 2.5, SIDE_X = PITCH_W / 2 + 1.2;
+	const slots: { x: number; z: number; rot: number }[] = [];
+	for (const s of [1, -1] as const) {
+		for (let i = 0; i < 4; i++) slots.push({ x: (i - 1.5) * (BOARD_W + 0.1), z: s * END_Z, rot: s > 0 ? Math.PI : 0 });
+	}
+	for (const s of [1, -1] as const) {
+		for (const z of [-4.5, 0, 4.5]) slots.push({ x: s * SIDE_X, z, rot: s > 0 ? -Math.PI / 2 : Math.PI / 2 });
+	}
+	const frameMat = keep(new THREE.MeshStandardMaterial({ color: 0x1d2b5c, roughness: 0.6 }));
+	const frameGeo = keep(new THREE.BoxGeometry(BOARD_W, BOARD_H, 0.05));
+	const faceGeo = keep(new THREE.PlaneGeometry(BOARD_W - 0.06, BOARD_H - 0.06));
+	const legGeo = keep(new THREE.BoxGeometry(0.05, BOARD_LIFT + BOARD_H / 2, 0.05));
+	const faces = logos.map((url) => keep(new THREE.MeshStandardMaterial({ map: boardTexture(url, keep), roughness: 0.7 })));
+	slots.forEach((s, i) => {
+		const board = new THREE.Group();
+		board.position.set(s.x, y, s.z);
+		board.rotation.y = s.rot;
+		const frame = new THREE.Mesh(frameGeo, frameMat);
+		frame.position.y = BOARD_LIFT + BOARD_H / 2;
+		frame.castShadow = true;
+		board.add(frame);
+		const face = new THREE.Mesh(faceGeo, faces[i % faces.length]);
+		face.position.set(0, frame.position.y, 0.026); // just proud of the frame, on the side facing the pitch
+		board.add(face);
+		for (const e of [-1, 1] as const) {
+			const leg = new THREE.Mesh(legGeo, frameMat);
+			leg.position.set(e * (BOARD_W / 2 - 0.12), (BOARD_LIFT + BOARD_H / 2) / 2, -0.04);
+			board.add(leg);
+		}
+		grp.add(board);
+	});
+}
+
 /* ---------- the pitch ---------- */
 
 export interface Pitch3D {
@@ -665,7 +730,7 @@ export interface Pitch3D {
  * Built once per deal and never touched again — nothing here is rebuilt per frame.
  * The sky is not here: it belongs to the sun, which outlives the pitch (see addLights).
  */
-export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
+export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string[]): Pitch3D {
 	const grp = new THREE.Group();
 	const junk: { dispose(): void }[] = [];
 	const keep = <T extends { dispose(): void }>(o: T): T => { junk.push(o); return o; };
@@ -694,6 +759,7 @@ export function buildPitch3D(t: Terrain, sun: SunSetup): Pitch3D {
 	grp.add(apron);
 
 	buildDecor(grp, t.seed, apron.position.y, sun, keep);
+	if (boards?.length) buildBoards(grp, boards, apron.position.y, keep);
 
 	geo.computeVertexNormals();
 	const uv = geo.attributes.uv as THREE.BufferAttribute;

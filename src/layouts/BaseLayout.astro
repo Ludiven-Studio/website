@@ -20,9 +20,11 @@ interface Props {
 	lang?: 'fr' | 'en' | 'es' | undefined;
 	altLang?: string | undefined; // path of the same page in the other language
 	alternates?: Partial<Record<'fr' | 'en' | 'es', string>> | undefined;
+	/** A game page outside /jeux/<id>/ (an event page): still gets the fullscreen chrome. */
+	gameChrome?: boolean | undefined;
 }
 
-const { title, description, image, type, noindex, lang = 'fr', altLang, alternates } = Astro.props;
+const { title, description, image, type, noindex, lang = 'fr', altLang, alternates, gameChrome } = Astro.props;
 
 // Route-based structured data (JSON-LD): Organization + WebSite on the home page,
 // VideoGame + BreadcrumbList on a game page — no per-page wiring needed.
@@ -75,7 +77,7 @@ if (path === '/' || path === '') {
 			<Footer />
 		</div>
 
-		{isGamePage && <GameFullscreen />}
+		{(isGamePage || gameChrome) && <GameFullscreen />}
 
 		<script>
 			// Add “loaded” class once the document has completely loaded.
