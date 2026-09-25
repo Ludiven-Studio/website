@@ -158,6 +158,7 @@ const fr = {
 	tipWink: '… ou un pastis ?',
 	scannerTitle: 'Tu joues pour de vrai ?',
 	scannerBtn: '📱 Pétanque Scanner mesure tes points',
+	scannerHref: '/petanque-scanner/',
 
 	help: (daily: boolean, stations: number, target: number): ReactNode => (
 		<>
@@ -318,6 +319,7 @@ const en: Strings = {
 	tipWink: '… or a pastis?',
 	scannerTitle: 'Playing for real?',
 	scannerBtn: '📱 Pétanque Scanner measures your points',
+	scannerHref: '/en/petanque-scanner/',
 
 	help: (daily, stations, target) => (
 		<>
@@ -476,6 +478,7 @@ const es: Strings = {
 	tipWink: '… ¿o a un pastís?',
 	scannerTitle: '¿Juegas de verdad?',
 	scannerBtn: '📱 Pétanque Scanner mide tus puntos',
+	scannerHref: '/es/petanque-scanner/',
 
 	help: (daily, stations, target) => (
 		<>

@@ -717,6 +717,49 @@ function buildBoards(grp: THREE.Group, logos: readonly string[], y: number, keep
 	});
 }
 
+/**
+ * The event's title on a banner raised on two posts behind each end's boards, high enough to clear
+ * them: from the circle, the far one fills the space over the lane's end.
+ */
+function buildBanner(grp: THREE.Group, url: string, y: number, keep: <T extends { dispose(): void }>(o: T) => T): void {
+	const W = 5.2, LIFT = 1.05, Z = PITCH_L / 2 + 3.3;
+	const panels: { mesh: THREE.Mesh; pad: number }[] = [];
+	const tex = keep(new THREE.TextureLoader().load(url, (t) => {
+		// Height follows the image, so a title of any shape is never stretched.
+		const h = (W * t.image.height) / t.image.width;
+		for (const p of panels) {
+			p.mesh.scale.y = h + p.pad;
+			p.mesh.position.y = LIFT + h / 2;
+		}
+	}));
+	tex.colorSpace = THREE.SRGBColorSpace;
+	tex.anisotropy = 4;
+	const faceMat = keep(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 }));
+	const backMat = keep(new THREE.MeshStandardMaterial({ color: 0x1d2b5c, roughness: 0.6 }));
+	const faceGeo = keep(new THREE.PlaneGeometry(W, 1));
+	const backGeo = keep(new THREE.BoxGeometry(W + 0.08, 1, 0.04));
+	const postGeo = keep(new THREE.CylinderGeometry(0.05, 0.05, 1, 10));
+	for (const s of [1, -1] as const) {
+		const banner = new THREE.Group();
+		banner.position.set(0, y, s * Z);
+		banner.rotation.y = s > 0 ? Math.PI : 0;
+		const face = new THREE.Mesh(faceGeo, faceMat);
+		const back = new THREE.Mesh(backGeo, backMat);
+		face.position.set(0, LIFT + 1, 0.022); // until the image says how tall it is
+		back.position.set(0, LIFT + 1, 0);
+		panels.push({ mesh: face, pad: 0 }, { mesh: back, pad: 0.08 });
+		banner.add(face, back);
+		for (const e of [-1, 1] as const) {
+			const post = new THREE.Mesh(postGeo, backMat);
+			post.scale.y = 3.2;
+			post.position.set(e * (W / 2 + 0.06), 1.6, -0.02);
+			post.castShadow = true;
+			banner.add(post);
+		}
+		grp.add(banner);
+	}
+}
+
 /* ---------- the pitch ---------- */
 
 export interface Pitch3D {
@@ -730,7 +773,7 @@ export interface Pitch3D {
  * Built once per deal and never touched again — nothing here is rebuilt per frame.
  * The sky is not here: it belongs to the sun, which outlives the pitch (see addLights).
  */
-export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string[]): Pitch3D {
+export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string[], banner?: string): Pitch3D {
 	const grp = new THREE.Group();
 	const junk: { dispose(): void }[] = [];
 	const keep = <T extends { dispose(): void }>(o: T): T => { junk.push(o); return o; };
@@ -760,6 +803,7 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 
 	buildDecor(grp, t.seed, apron.position.y, sun, keep);
 	if (boards?.length) buildBoards(grp, boards, apron.position.y, keep);
+	if (banner) buildBanner(grp, banner, apron.position.y, keep);
 
 	geo.computeVertexNormals();
 	const uv = geo.attributes.uv as THREE.BufferAttribute;

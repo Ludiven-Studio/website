@@ -407,7 +407,7 @@ function TipCard({ t, gameId }: { t: Strings; gameId: string }) {
 					<span className="pe-tip-wink">{t.tipWink}</span>
 				</>
 			)}
-			<a className="pe-tip-scanner" href="/petanque-scanner/" target="_blank" rel="noopener"
+			<a className="pe-tip-scanner" href={t.scannerHref} target="_blank" rel="noopener"
 				onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}>
 				<span>{t.scannerTitle}</span> {t.scannerBtn} ›
 			</a>
@@ -433,10 +433,14 @@ const killGroup = (g: THREE.Group): void => {
 
 /** A partner event's own page: its name and logo on the pitch, its sponsors on boards round it. */
 export interface PetanqueEvent {
+	/** Short id: the page keeps its own language choice under it. */
+	id: string;
 	title: string;
 	logo: string;
 	boards: readonly string[];
-	/** Language shown until the player picks one. */
+	/** The event's title, on a raised banner behind each end. */
+	banner?: string;
+	/** Language the page opens in, whatever was picked on the main game. */
 	lang: GameLang;
 }
 
@@ -457,6 +461,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const arcPtsRef = useRef<THREE.Vector3[]>([]);
 	const sunForceRef = useRef<{ el: number; az: number; seed?: number } | null>(null); // measurement hook only
 	const boardsRef = useRef(event?.boards); // stable for the page's life, read by the pitch builders
+	const bannerRef = useRef(event?.banner);
 
 	const simRef = useRef<Sim | null>(null);
 	const matchRef = useRef<Match13>(initMatch13(13, HUMAN));
@@ -597,7 +602,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const [dists, setDists] = useState(true);
 	const [sound, setSound] = useState(() => sfx.isEnabled());
 	// The UI language. Callbacks with empty deps read it through the ref.
-	const [lang, setLang] = useState<GameLang>(() => storedGameLang(LANG_KEY) ?? event?.lang ?? detectGameLang(LANG_KEY));
+	// An event page remembers its own pick, so a choice made on the main game never leaks into it.
+	const langKey = event ? `${LANG_KEY}-${event.id}` : LANG_KEY;
+	const [lang, setLang] = useState<GameLang>(() => (event ? storedGameLang(langKey) ?? event.lang : detectGameLang(langKey)));
 	const t = STRINGS[lang];
 	const tRef = useRef<Strings>(t);
 	tRef.current = t;
@@ -787,7 +794,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const g = g3Ref.current;
 		if (!g || g.pitch) return;
 		const t = makeTerrain(PREVIEW_SEED, SURFACES['terre-battue'], 0.02);
-		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED), boardsRef.current);
+		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED), boardsRef.current, bannerRef.current);
 		g.scene.add(g.pitch.group);
 		previewRef.current = true;
 		// Fade the place in from the empty sky-blue canvas rather than popping it.
@@ -827,7 +834,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp, cfg.slope === undefined ? {} : { slope: cfg.slope });
-		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current);
+		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current, bannerRef.current);
 		g.scene.add(g.pitch.group);
 		bakeBouleEnv(g.renderer, g.scene);
 
@@ -905,7 +912,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(course.seed, SURFACES[course.surface], course.amp);
-		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current);
+		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current, bannerRef.current);
 		g.scene.add(g.pitch.group);
 		bakeBouleEnv(g.renderer, g.scene);
 
@@ -2705,7 +2712,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			if (expo !== undefined) g.lights.setSkyExposure(expo);
 			g.scene.remove(g.pitch.group);
 			g.pitch.dispose();
-			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current), boardsRef.current);
+			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current), boardsRef.current, bannerRef.current);
 			g.scene.add(g.pitch.group);
 			bakeBouleEnv(g.renderer, g.scene);
 		};
@@ -2987,7 +2994,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 							onClick={() => { const on = !sound; sfx.setEnabled(on); setSound(on); }}
 							aria-label={sound ? t.soundOff : t.soundOn} title={sound ? t.soundOff : t.soundOn}>{sound ? '🔊' : '🔇'}</button>
 						{/* One tap cycles FR → EN → ES; the page chrome follows through LANG_EVENT. */}
-						<button className="pe-act pe-lang" onClick={() => { const n = nextGameLang(lang); saveGameLang(LANG_KEY, n); setLang(n); }}
+						<button className="pe-act pe-lang" onClick={() => { const n = nextGameLang(lang); saveGameLang(langKey, n); setLang(n); }}
 							aria-label={`${t.langName} — ${t.langTitle}`} title={t.langTitle}>{lang.toUpperCase()}</button>
 					</div>
 				</div>
@@ -3195,7 +3202,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				{padPos?.promo && armLive && !card && !promoShut && (
 					<div className={`pe-promo${padPos.promo.width < 190 ? ' narrow' : ''}`} style={{ left: `${padPos.promo.left}px`, width: `${padPos.promo.width}px` }}>
 						<a
-							href="/petanque-scanner/"
+							href={t.scannerHref}
 							target="_blank"
 							rel="noopener"
 							onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}
