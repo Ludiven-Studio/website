@@ -60,6 +60,18 @@ export const LANDING_PATHS: Record<LandingLang, string> = {
 	es: '/es/petanque-scanner/',
 };
 
+/** The hero has its strapline baked into the pixels, so each language gets a repainted copy and its own share card. */
+export const HEROES: Record<LandingLang, string> = {
+	fr: HERO,
+	en: '/assets/petanque-ar/hero-en.webp',
+	es: '/assets/petanque-ar/hero-es.webp',
+};
+export const OG_IMAGES: Record<LandingLang, string> = {
+	fr: OG_IMAGE,
+	en: '/assets/work/og/petanque-scanner-en.jpg',
+	es: '/assets/work/og/petanque-scanner-es.jpg',
+};
+
 export const copy: Record<LandingLang, LandingCopy> = {
 	fr: {
 		title: 'Pétanque Scanner — savoir qui a le point avec votre téléphone',

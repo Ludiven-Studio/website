@@ -6,7 +6,7 @@ import Hero from './Hero.astro';
 import Icon from './Icon.astro';
 import ContactCTA from './ContactCTA.astro';
 import LangSwitch from './LangSwitch.astro';
-import { copy, APP_NAME, HERO, SCREENS, LANDING_PATHS, type LandingLang } from '../data/petanqueScanner';
+import { copy, APP_NAME, HEROES, SCREENS, LANDING_PATHS, type LandingLang } from '../data/petanqueScanner';
 
 interface Props {
 	lang: LandingLang;
@@ -58,7 +58,7 @@ const jsonLd = [
 					<img class="badge-appstore" src={apple} alt={t.badges.appleAlt} />
 				</a>
 			</div>
-			<img class="cover" src={HERO} alt={t.heroAlt} />
+			<img class="cover" src={HEROES[lang]} alt={t.heroAlt} />
 		</div>
 
 		<section class="stack gap-4">
