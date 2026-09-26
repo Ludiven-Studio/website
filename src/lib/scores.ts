@@ -124,3 +124,27 @@ export async function getLeaderboard(gameId: string, metric: Metric = 'score', d
 	const rows: { player_name: string; score: number; created_at: string }[] = await res.json();
 	return rows.map((r) => ({ name: r.player_name || 'Anonyme', value: r.score, created_at: r.created_at }));
 }
+
+/** An event's board: every free-play row of `gameId` (no challenge date), each player's best
+    kept once. Rows are append-only there, so the dedupe happens here, on the pseudo. */
+export async function getEventLeaderboard(gameId: string, metric: Metric = 'time', limit = 50): Promise<ScoreRow[]> {
+	if (!leaderboardEnabled()) return [];
+	const order = metric === 'time' ? 'score.asc' : 'score.desc';
+	const res = await fetch(
+		`${SUPABASE_URL}/rest/v1/game_scores?game_id=eq.${encodeURIComponent(gameId)}&challenge_date=is.null` +
+			`&select=player_name,score,created_at&order=${order},created_at.asc&limit=2000`,
+		{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
+	);
+	if (!res.ok) throw new Error(`leaderboard ${res.status}`);
+	const rows: { player_name: string; score: number; created_at: string }[] = await res.json();
+	const seen = new Set<string>();
+	const out: ScoreRow[] = [];
+	for (const r of rows) {
+		const name = r.player_name || 'Anonyme';
+		if (seen.has(name.toLowerCase())) continue;
+		seen.add(name.toLowerCase());
+		out.push({ name, value: r.score, created_at: r.created_at });
+		if (out.length >= limit) break;
+	}
+	return out;
+}

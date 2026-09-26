@@ -70,10 +70,13 @@ interface Props {
 	/** Share + "tous les défis" row. Off when the board is only a peek (free mode corner). */
 	actions?: boolean;
 	lang?: GameLang;
+	/** An event board rather than the day's: its own title and empty line, and `submitValue` goes
+	    in as a free-play row (no challenge date) even though `source` does the reading. */
+	event?: { title: string; empty: string };
 }
 
-function LeaderboardInner({ game, metric, submitValue, format, source, actions = true, lang = 'fr' }: Props) {
-	const t = tr(lang, TXT);
+function LeaderboardInner({ game, metric, submitValue, format, source, actions = true, lang = 'fr', event }: Props) {
+	const t = { ...tr(lang, TXT), ...(event ?? {}) };
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
 	const [editing, setEditing] = useState(false);
@@ -101,12 +104,12 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 		// the Edge Function (server-side best-retained/quota); legacy games use submitDaily
 		// (which only posts if it beats the day's best). `source` overrides reads entirely.
 		// Kept separate from the read so a failed POST never hides the board.
-		if (!source && submitValue != null && name && submitValue !== lastSubmittedRef.current) {
+		if ((!source || event) && submitValue != null && name && submitValue !== lastSubmittedRef.current) {
 			lastSubmittedRef.current = submitValue;
 			let failed: 'network' | 'rejected' | null = null;
 			try {
-				if (secured) {
-					const r = await submitScore({ gameId: game, score: submitValue, isDailyChallenge: true });
+				if (secured || event) {
+					const r = await submitScore({ gameId: game, score: submitValue, isDailyChallenge: !event });
 					// 'leaderboard disabled' is a config state, not a lost score — line 210 says so already.
 					if (!r.ok && r.error !== 'leaderboard disabled')
 						failed = r.error === 'network error' ? 'network' : 'rejected';
@@ -129,7 +132,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 		} finally {
 			setLoading(false);
 		}
-	}, [game, metric, submitValue, name, source, secured]);
+	}, [game, metric, submitValue, name, source, secured, event]);
 
 	useEffect(() => {
 		load();

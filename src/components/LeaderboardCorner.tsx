@@ -17,11 +17,17 @@ interface Props {
 	    controls live along the bottom of the board (bulles aims there). */
 	side?: 'center' | 'right';
 	lang?: GameLang;
+	/** An event board: forwarded to Leaderboard, and its title names the pill. */
+	event?: { title: string; empty: string };
+	/** A finished run to submit: opens the panel on it. */
+	submitValue?: number;
 }
 
-export default function LeaderboardCorner({ game, metric, format, source, side = 'center', lang = 'fr' }: Props) {
+export default function LeaderboardCorner({ game, metric, format, source, side = 'center', lang = 'fr', event, submitValue }: Props) {
 	const [open, setOpen] = useState(false);
-	const title = tr(lang, { fr: 'Classement du jour', en: 'Today’s leaderboard', es: 'Clasificación del día' });
+	const [shownFor, setShownFor] = useState<number | undefined>(undefined);
+	if (submitValue !== shownFor) { setShownFor(submitValue); if (submitValue != null) setOpen(true); }
+	const title = event?.title ?? tr(lang, { fr: 'Classement du jour', en: 'Today’s leaderboard', es: 'Clasificación del día' });
 	if (!leaderboardEnabled()) return null;
 
 	return (
@@ -32,7 +38,7 @@ export default function LeaderboardCorner({ game, metric, format, source, side =
 					<button className="lbc-close" onClick={() => setOpen(false)} aria-label={tr(lang, { fr: 'Fermer', en: 'Close', es: 'Cerrar' })}>
 						✕
 					</button>
-					<Leaderboard game={game} metric={metric} format={format} source={source} actions={false} lang={lang} />
+					<Leaderboard game={game} metric={metric} format={format} source={source} actions={false} lang={lang} event={event} submitValue={submitValue} />
 				</div>
 			)}
 			<button

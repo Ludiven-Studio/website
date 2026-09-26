@@ -22,7 +22,8 @@ import {
 } from './render3d';
 import { petanqueLevels } from './levels';
 import {
-	makeCourse, stationBodies, gradeShot, encodeDaily, COURSE_CIRCLE, STATIONS, MAX_DAILY_SCORE,
+	makeCourse, makeEventCourse, courseMax, stationBodies, gradeShot, encodeDaily, COURSE_CIRCLE, STATIONS, MAX_DAILY_SCORE,
+	CLEARED, TOOK_PLACE,
 	type DailyCourse, type Grade,
 } from './daily';
 import {
@@ -43,6 +44,8 @@ import { challengeWeekday } from '../../lib/day';
 import { detectGameLang, storedGameLang, saveGameLang, announceGameLang, nextGameLang, type GameLang } from '../../lib/gameLang';
 import { STRINGS, LANG_KEY, TIP_URL, COFFEE_URL, type Strings } from './i18n';
 import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
+import { getEventLeaderboard } from '../../lib/scores';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import LevelSelect from '../../components/LevelSelect';
@@ -376,6 +379,7 @@ function bouleTable(bs: readonly Played[], jack: Played): BouleRow[] {
    difference between the two, so it has to be captured when the station is laid. */
 interface DailyState {
 	course: DailyCourse;
+	event: boolean; // the tournament's course: replayable, its own board, no daily run saved
 	grades: Grade[];
 	target: Boule | null;
 	targetAt: { x: number; y: number } | null;
@@ -565,6 +569,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	// the throw missed the window. One ref, because the two never overlap.
 	const viewBeforeJackRef = useRef<ViewKey | null>(null);
 	const jackAimRef = useRef<{ x: number; y: number } | null>(null);
+
+	// Where every boule stood when the last boule left the hand: what a carreau is judged against.
+	const throwFromRef = useRef<{ side: Side; at: { b: Boule; x: number; y: number }[] } | null>(null);
 
 	// Daily. `dailyRef` is null in every other mode, which is what the settle branch tests on.
 	const dailyRef = useRef<DailyState | null>(null);
@@ -1028,7 +1035,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const seed = run?.seed ?? (await getDaily(gameId)).seed;
 		const grades = (run?.state as { grades?: Grade[] } | undefined)?.grades ?? [];
 
-		dailyRef.current = { course: makeCourse(seed), grades, target: null, targetAt: null };
+		dailyRef.current = { course: makeCourse(seed), event: false, grades, target: null, targetAt: null };
 		if (!layCourse(dailyRef.current.course)) { setDailyLoading(false); return; }
 		setDailyLoading(false);
 		setPoints(sumGrades(grades));
@@ -1051,6 +1058,22 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		setStation(grades.length);
 		trackGame(gameId, 'game_started', { mode: 'defi' });
 	}, [gameId, layCourse, setStation]);
+
+	/** The tournament's challenge: one course for everyone, as many tries as wanted, best kept. */
+	const startEventChallenge = useCallback(() => {
+		if (!event) return;
+		setDaily(true);
+		dailyRef.current = { course: makeEventCourse(seedFromRoom(event.id)), event: true, grades: [], target: null, targetAt: null };
+		if (!layCourse(dailyRef.current.course)) return;
+		setDailyLoading(false);
+		setDailyDone(false);
+		setDailyScore(null);
+		setPoints(0);
+		startRef.current = Date.now();
+		setElapsed(0);
+		setStation(0);
+		trackGame(gameId, 'game_started', { mode: 'defi-event' });
+	}, [event, gameId, layCourse, setStation]);
 
 	/* ---------- throwing ---------- */
 
@@ -1124,6 +1147,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const doThrow = useCallback((side: Side, v: { vx: number; vy: number; vz: number }, asJack: boolean) => {
 		const s = simRef.current, g = g3Ref.current;
 		if (!s || !g) return;
+		throwFromRef.current = asJack ? null : { side, at: s.bs.filter((o) => o.live).map((o) => ({ b: o, x: o.x, y: o.y })) };
 		const b = launch(s, matchRef.current.circle, side, v, asJack);
 		movesRef.current++;
 		addBody(b);
@@ -1499,9 +1523,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			setPoints(total);
 			setCard({ text: `${tRef.current.grade[grade]} · +${grade}`, mine: grade >= 3, rows: [] });
 
-			const last = d.grades.length >= STATIONS;
+			const last = d.grades.length >= d.course.stations.length;
 			const centis = Math.round((Date.now() - startRef.current) / 10);
-			saveDailyRun(gameId, {
+			if (!d.event) saveDailyRun(gameId, {
 				startedAt: startRef.current,
 				done: last,
 				finalTime: last ? centis : undefined,
@@ -1515,12 +1539,12 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				return;
 			}
 			setElapsed(centis);
-			setDailyScore(encodeDaily(total, centis * 10));
+			setDailyScore(encodeDaily(total, centis * 10, courseMax(d.course)));
 			setDailyDone(true);
 			setOver(true);
 			statusRef.current = 'over';
 			setStatus('over');
-			trackGame(gameId, 'game_won', { mode: 'defi', points: total });
+			trackGame(gameId, 'game_won', { mode: d.event ? 'defi-event' : 'defi', points: total });
 			return;
 		}
 
@@ -1544,6 +1568,18 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		}
 
 		if (!j) return;
+		// Carreau, by the daily's own bar: an opposing boule knocked out, and the shooter at rest
+		// where it stood. Worth a line of its own, whoever made it.
+		const from = throwFromRef.current;
+		throwFromRef.current = null;
+		const shooter = s.bs[s.bs.length - 1];
+		const carreau = !!from && !!shooter && shooter.live && shooter.side === from.side
+			&& from.at.some(({ b, x, y }) => b.side !== -1 && b.side !== from.side
+				&& (!b.live || Math.hypot(b.x - x, b.y - y) > CLEARED)
+				&& Math.hypot(shooter.x - x, shooter.y - y) < TOOK_PLACE);
+		const carreauLine = !carreau || !from ? null
+			: from.side === mySideRef.current ? tRef.current.carreauMine
+			: tRef.current.carreauFoe(onlineRef.current && mpOppRef.current ? mpOppRef.current : tRef.current.foe);
 		const next = applySettled(m, s.bs, j);
 		matchRef.current = next;
 		setMatch(next);
@@ -1552,7 +1588,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			const h = pointHolder(s.bs, j), was = holderRef.current;
 			holderRef.current = h;
 			const t = tRef.current;
-			const lines: string[] = [];
+			const lines: string[] = carreauLine ? [carreauLine] : [];
 			const thrown = s.bs[s.bs.length - 1];
 			if (thrown && thrown.side >= 0 && !thrown.live) lines.push(thrown.side === me ? t.outMine : t.outFoe);
 			if (h === me) lines.push(was === foe ? t.pointRetake : was === me ? t.pointKeep : t.pointHave);
@@ -1575,7 +1611,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		// distances the score came from — see `bouleTable`.
 		const rows = bouleTable(s.bs, j);
 		const tt = tRef.current;
-		setCard({ text: done.lastEvent ? tt.event(done.lastEvent, me) : got ? tt.points(got) : tt.nullEnd, mine, rows });
+		const verdict = done.lastEvent ? tt.event(done.lastEvent, me) : got ? tt.points(got) : tt.nullEnd;
+		setCard({ text: carreauLine ? `${carreauLine} ${verdict}` : verdict, mine, rows });
 		statusRef.current = done.phase === 'match-done' ? 'over' : 'end';
 		setStatus(statusRef.current);
 		endAtRef.current = performance.now() + (rows.length ? END_TABLE_MS : END_CARD_MS);
@@ -3127,10 +3164,11 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			// runs once, so any state it closed over would be the mount value forever.
 			daily: dailyRef.current ? {
 				surface: dailyRef.current.course.surface,
-				station: Math.min(dailyRef.current.grades.length, STATIONS - 1),
+				station: Math.min(dailyRef.current.grades.length, dailyRef.current.course.stations.length - 1),
 				points: sumGrades(dailyRef.current.grades),
 				grades: [...dailyRef.current.grades],
-				done: dailyRef.current.grades.length >= STATIONS,
+				done: dailyRef.current.grades.length >= dailyRef.current.course.stations.length,
+				event: dailyRef.current.event,
 			} : null,
 			// Screen size of each body and of its halo — a boule 10 m out is a couple of pixels,
 			// so this is the only honest way to ask whether the board is readable.
@@ -3209,9 +3247,15 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const course = dailyRef.current?.course ?? null;
 	const st = course?.stations[station] ?? null;
 	const fmtPacked = (v: number): string => formatScore(DAILY_LB.petanque.fmt, v);
+	const eventMax = event ? courseMax(makeEventCourse(seedFromRoom(event.id))) : 0;
+	// The board stores (max - points): the event's max is not the daily's 60.
+	const fmtEvent = (v: number): string =>
+		formatScore({ kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'pts', base: eventMax }, { as: 'time', div: 100 }] }, v);
+	const nStations = course?.stations.length ?? STATIONS;
+	const maxPoints = course ? courseMax(course) : MAX_DAILY_SCORE;
 
 	const hint = daily
-		? (dailyDone ? t.dailyDone(points, MAX_DAILY_SCORE)
+		? (dailyDone ? t.dailyDone(points, maxPoints)
 			: status === 'rolling' ? t.rolling
 			: st ? t.station(t.kind[st.kind], st.dist)
 			: t.preparing)
@@ -3248,9 +3292,10 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 								newGame(diff);
 								setGroundOpen(true);
 							}}
-							onDaily={() => { lv.exit(); resetOnline(); void startDaily(); }}
+							onDaily={() => { lv.exit(); resetOnline(); if (event) startEventChallenge(); else void startDaily(); }}
 							showLevels={!event}
-							showDaily={!event}
+							showDaily
+							dailyLabel={event ? t.eventTab : undefined}
 							levelsActive={lv.active}
 							onLevels={() => { setDaily(false); dailyRef.current = null; resetOnline(); lv.enter(); }}
 							showOnline={multiplayerAvailable()}
@@ -3262,8 +3307,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 					<div className="pe-stats">
 						{daily ? (
 							<>
-								<span className="pe-stat">🎯 {t.stationNo} {Math.min(station + 1, STATIONS)}/{STATIONS}</span>
-								<span className="pe-stat">🏆 {points} / {MAX_DAILY_SCORE}</span>
+								<span className="pe-stat">🎯 {t.stationNo} {Math.min(station + 1, nStations)}/{nStations}</span>
+								<span className="pe-stat">🏆 {points} / {maxPoints}</span>
 								<span className="pe-stat">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
 							</>
 						) : (
@@ -3294,7 +3339,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				</div>
 				{daily ? (
 					<div className="pe-tag">
-						{dailyLoading ? t.preparing : t.dailyTag(t.weekday[challengeWeekday()], course ? t.surface[course.surface] : '')}
+						{dailyLoading ? t.preparing
+							: dailyRef.current?.event ? t.eventTag(nStations)
+							: t.dailyTag(t.weekday[challengeWeekday()], course ? t.surface[course.surface] : '')}
 					</div>
 				) : (
 					/* The TV board: who plays, how many boules each side has left, and the score.
@@ -3564,11 +3611,14 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 						<div className="pe-card pe-endpanel">
 							{event && <img className="pe-event-logo" src={event.logo} alt={event.title} />}
 							{t.courseDone}
-							<strong>{points} / {MAX_DAILY_SCORE} · {fmtCentis(elapsed)}</strong>
+							<strong>{points} / {maxPoints} · {fmtCentis(elapsed)}</strong>
 							<span className="pe-grades">{dailyRef.current?.grades.map((g, i) => (
 								<span key={i} className={`pe-grade g${g}`}>{g}</span>
 							))}</span>
-							<TipCard t={t} gameId={gameId} />
+							{/* The event's board opens under this card: the bar already offers the drinks. */}
+							{dailyRef.current?.event
+								? <button className="pe-replay" onClick={startEventChallenge}>{t.retry}</button>
+								: <TipCard t={t} gameId={gameId} />}
 						</div>
 					</div>
 				)}
@@ -3693,7 +3743,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				)}
 			</div>
 
-			{daily && <Leaderboard
+			{daily && !event && <Leaderboard
 				key={`lb-${points}-${dailyDone ? 1 : 0}`}
 				game={LB_ID(gameId)}
 				metric="time"
@@ -3701,6 +3751,13 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				format={fmtPacked}
 				lang={lang}
 			/>}
+
+			{event && (
+				<LeaderboardCorner game={`petanque-${event.id}-t`} metric="time" format={fmtEvent} side="right" lang={lang}
+					source={() => getEventLeaderboard(`petanque-${event.id}-t`)}
+					event={{ title: t.eventBoard, empty: t.eventEmpty }}
+					submitValue={daily && dailyDone && dailyScore != null ? dailyScore : undefined} />
+			)}
 
 			<p className="pe-help">{t.help(daily, STATIONS, match.target)}</p>
 		</div>

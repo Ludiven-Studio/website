@@ -14,8 +14,8 @@ import { encodePacked } from '../../lib/scoreFormat';
 export const STATIONS = 12;
 export const MAX_DAILY_SCORE = STATIONS * 5;
 
-const CLEARED = 1.0; // m the target must travel to count as knocked out
-const TOOK_PLACE = 0.5; // m the shooter may end from where the target stood
+export const CLEARED = 1.0; // m the target must travel to count as knocked out
+export const TOOK_PLACE = 0.5; // m the shooter may end from where the target stood
 
 /** Where the thrower stands. Matches the opening circle of a match, so the lane reads the same. */
 export const COURSE_CIRCLE = { x: 2, y: EDGE + 0.5 };
@@ -91,6 +91,31 @@ export function makeCourse(seed: number): DailyCourse {
 	return { seed, surface, amp: 0.015 + hashN(4, seed) * 0.02, stations };
 }
 
+/* An event's course: ONE course for the whole run-up to the tournament, so every attempt on the
+   board is the same test. Ten boules, from a bare target at 6 m to a guarded one at 10 m: the
+   order is the difficulty, not a shuffle. Same three kinds as the daily, which all can score 5. */
+const EVENT_LADDER: { dist: number; kind: StationKind }[] = [
+	{ dist: 6, kind: 'nue' },
+	{ dist: 6.5, kind: 'nue' },
+	{ dist: 7, kind: 'masque' },
+	{ dist: 7.5, kind: 'nue' },
+	{ dist: 7.5, kind: 'serree' },
+	{ dist: 8, kind: 'masque' },
+	{ dist: 8.5, kind: 'serree' },
+	{ dist: 9, kind: 'masque' },
+	{ dist: 9.5, kind: 'serree' },
+	{ dist: 10, kind: 'masque' },
+];
+
+/** The course of an event, from its id. Fixed ground: a leaderboard over weeks needs one test. */
+export function makeEventCourse(seed: number): DailyCourse {
+	const stations = EVENT_LADDER.map((s, i) => ({ ...s, offset: (hashN(i * 13 + 1, seed) - 0.5) * 0.6 }));
+	return { seed, surface: 'gravier-fin', amp: 0.02, stations };
+}
+
+/** Best possible points on a course: a carreau at every station. */
+export const courseMax = (c: DailyCourse): number => c.stations.length * 5;
+
 /** The boules a station puts on the pitch: the target first, then whatever guards it. */
 export function stationBodies(st: Station, t: Terrain): Boule[] {
 	const tx = COURSE_CIRCLE.x + st.offset;
@@ -127,8 +152,8 @@ export function gradeShot(o: ShotOutcome): Grade {
    (MAX - points) so that "more points" still sorts ascending, like reussite — the board reads the
    raw int with no decode. The ceiling is hard and good players reach it, which is the whole reason
    there is a tiebreak at all: measured, 5 to 8 players in 200 finish on a perfect 60. */
-export const encodeDaily = (points: number, ms: number): number =>
-	encodePacked(10_000_000, [MAX_DAILY_SCORE - points, Math.min(9_999_999, Math.round(ms / 10))]);
+export const encodeDaily = (points: number, ms: number, max = MAX_DAILY_SCORE): number =>
+	encodePacked(10_000_000, [max - points, Math.min(9_999_999, Math.round(ms / 10))]);
 
 export const GRADE_LABEL: Record<Grade, string> = {
 	5: 'Carreau !',

@@ -21,9 +21,11 @@ interface Props {
 	/** False drops the daily segment (and its ?defi deep link), e.g. on an event page. */
 	showDaily?: boolean;
 	lang?: GameLang;
+	/** Replaces the daily tab's label, e.g. an event's own challenge. */
+	dailyLabel?: string;
 }
 
-export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsActive, onLevels, showOnline, onlineActive, onOnline, showDaily = true, lang = 'fr' }: Props) {
+export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsActive, onLevels, showOnline, onlineActive, onOnline, showDaily = true, lang = 'fr', dailyLabel }: Props) {
 	const onDailyRef = useRef(onDaily);
 	onDailyRef.current = onDaily;
 
@@ -47,7 +49,7 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 	// With the third segment the label 'Mode libre' is too wide on phones — shorten.
 	const freeActive = !daily && !levelsActive && !onlineActive;
 	const segs = 1 + Number(!!showLevels) + Number(showDaily) + Number(!!showOnline);
-	const width = showDaily ? `${showLevels ? 'three' : ''} ${showOnline ? 'four' : ''}` : segs === 4 ? 'four' : segs === 3 ? 'three' : '';
+	const width = showDaily && showLevels ? `three ${showOnline ? 'four' : ''}` : segs === 4 ? 'four' : segs === 3 ? 'three' : '';
 	return (
 		<div className={`dt-toggle ${width}`} role="tablist" aria-label={tr(lang, { fr: 'Mode', en: 'Mode', es: 'Modo' })}>
 			<style>{CSS}</style>
@@ -68,7 +70,7 @@ export default function ModeToggle({ daily, onFree, onDaily, showLevels, levelsA
 					className={`dt-seg ${daily && !levelsActive && !onlineActive ? 'active' : ''}`}
 					onClick={onDaily}
 				>
-					🏆 {showLevels ? tr(lang, { fr: 'Défi', en: 'Daily', es: 'Reto' }) : tr(lang, { fr: 'Défi du jour', en: 'Daily challenge', es: 'Reto del día' })}
+					🏆 {dailyLabel ?? (showLevels ? tr(lang, { fr: 'Défi', en: 'Daily', es: 'Reto' }) : tr(lang, { fr: 'Défi du jour', en: 'Daily challenge', es: 'Reto del día' }))}
 				</button>
 			)}
 			<button
