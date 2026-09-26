@@ -3711,7 +3711,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				{/* Free play setup, opened by "Mode libre". Picking changes nothing yet: "Jouer" deals
 				    with it, and × goes back to the game underneath as it was. */}
 				{groundOpen && (
-					<div className="pe-overlay" onClick={() => setGroundOpen(false)}>
+					<div className="pe-overlay pe-page-modal" onClick={() => setGroundOpen(false)}>
 						<div className="pe-card pe-ground" onClick={(e) => e.stopPropagation()}>
 							<button className="pe-bar-x" onClick={() => setGroundOpen(false)} aria-label={t.close}>×</button>
 							<div className="pe-mp-title">{t.groundTitle}</div>
@@ -4233,6 +4233,9 @@ const CSS = `
   .pe-replay { padding: 8px 18px; font-size: 14px; }
   .pe-mp-title { font-size: 15.5px; }
 }
+/* Over the whole page: outside fullscreen the pitch is ~250 px tall on a phone and clipped the card. */
+.pe-overlay.pe-page-modal { position: fixed; z-index: 60; background: rgba(8, 10, 16, 0.45); padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+.pe-page-modal .pe-card { max-height: 100%; overflow: auto; margin: auto; }
 .pe-ground { position: relative; min-width: min(310px, 100%); }
 .pe-ground-row { display: flex; align-items: baseline; gap: 8px; width: 100%; flex-wrap: wrap; }
 .pe-ground-lab { font-size: 11.5px; font-weight: 700; color: var(--gray-300); text-transform: uppercase; letter-spacing: 0.04em; }
