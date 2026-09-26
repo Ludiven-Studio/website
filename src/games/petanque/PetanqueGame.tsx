@@ -43,7 +43,6 @@ import { challengeWeekday } from '../../lib/day';
 import { detectGameLang, storedGameLang, saveGameLang, announceGameLang, nextGameLang, type GameLang } from '../../lib/gameLang';
 import { STRINGS, LANG_KEY, TIP_URL, COFFEE_URL, type Strings } from './i18n';
 import Leaderboard from '../../components/Leaderboard';
-import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import LevelSelect from '../../components/LevelSelect';
@@ -949,8 +948,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		groundRef.current = next;
 		setGround(next);
 		try { localStorage.setItem(GROUND_KEY, JSON.stringify(next)); } catch { /* private mode */ }
-		newGame(diffRef.current);
-	}, [newGame]);
+	}, []);
 
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
@@ -3242,7 +3240,14 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 					<div className="pe-modetoggle">
 						<ModeToggle
 							daily={daily}
-							onFree={() => { if (lv.active) lv.exit(); resetOnline(); newGame(diff); }}
+							onFree={() => {
+								// Already in free play: just the setup card, the game underneath stays.
+								if (!daily && !lv.active && mpPhase === 'off') { setGroundOpen(true); return; }
+								if (lv.active) lv.exit();
+								resetOnline();
+								newGame(diff);
+								setGroundOpen(true);
+							}}
 							onDaily={() => { lv.exit(); resetOnline(); void startDaily(); }}
 							showLevels={!event}
 							showDaily={!event}
@@ -3266,16 +3271,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 						)}
 					</div>
 					<div className="pe-hud-actions">
-						{!daily && !lv.active && mpPhase === 'off' && withExpert(DIFF_ORDER, gameId).map((k) => (
-							<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`} onClick={() => newGame(k as DiffKey)} title={t.diffTitle}>{t.diff[k as DiffKey]}</button>
-						))}
-						{/* `pe-act`, not `pe-view`: the camera guards count the view segments and assert
-						    there are exactly three of them. */}
-						{!daily && !lv.active && mpPhase === 'off' && (
-							<button className={`pe-act ${groundOpen ? 'on' : ''}`} aria-pressed={groundOpen}
-								onClick={() => setGroundOpen((v) => !v)}
-								aria-label={t.groundBtn} title={t.groundBtn}>🏟</button>
-						)}
+						{/* Only what a match in progress needs: opponent and ground live on the card that
+						    "Mode libre" opens. `pe-act`, not `pe-view`: the camera guards count the view
+						    segments and assert there are exactly three of them. */}
 						{!daily && (
 							<button className={`pe-act ${dists ? 'on' : ''}`} aria-pressed={dists}
 								onClick={() => { distsRef.current = !dists; setDists(!dists); }}
@@ -3283,8 +3281,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 						)}
 						{mpPhase !== 'off' ? (
 							<button className="pe-act" onClick={leaveOnline} aria-label={t.leaveOnline} title={t.leaveOnline}>🚪</button>
-						) : !daily && (
-							<button className="pe-act" onClick={() => { if (lv.active) startLevel(lv.level); else newGame(diff); }} aria-label={t.restart} title={t.restart}>↻</button>
+						) : lv.active && (
+							<button className="pe-act" onClick={() => startLevel(lv.level)} aria-label={t.restart} title={t.restart}>↻</button>
 						)}
 						<button className={`pe-act ${sound ? 'on' : ''}`} aria-pressed={sound}
 							onClick={() => { const on = !sound; sfx.setEnabled(on); setSound(on); }}
@@ -3414,7 +3412,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				{/* The launch board. Purely a drawing: the hit test lives in aimStart, so there is
 				    exactly one way into a throw and this cannot swallow a camera drag. It pulses until
 				    the first contact of the session — the whole complaint was that nobody found it. */}
-				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${jackTime ? ' gone' : ''}${armLive && status !== 'rolling' ? (myTurn ? ' mine' : ' foe') : ''}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} style={padStyle} aria-hidden="true">
+				<div ref={armElRef} className={`pe-arm ${armLive ? '' : 'off'}${jackTime || over ? ' gone' : ''}${armLive && status !== 'rolling' ? (myTurn ? ' mine' : ' foe') : ''}${armLive && callArm && myTurn && status === 'aim' && power === 0 ? ' call' : ''}${armed && power === 0 ? ' hold' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-arm-fill" style={{ height: `${Math.round(power * 100)}%` }} />
 					<div ref={foeFillRef} className="pe-arm-foefill" />
 					{/* Whose turn it is, on the pad itself: the label above it is easy to miss. */}
@@ -3459,12 +3457,12 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				<div ref={foeHandRef} className="pe-foe-hand" />
 				</div>
 
-				<div className={`pe-power${jackTime ? ' gone' : ''}`} style={padStyle} aria-hidden="true">
+				<div className={`pe-power${jackTime || over ? ' gone' : ''}`} style={padStyle} aria-hidden="true">
 					<div className="pe-power-fill" style={{ width: `${Math.round(power * 100)}%` }} />
 				</div>
 
 				<span
-					className={`pe-arm-label${armed && power === 0 ? ' warn' : ''}${armLive && status !== 'rolling' && !myTurn ? ' foe' : ''}`}
+					className={`pe-arm-label${over ? ' gone' : ''}${armed && power === 0 ? ' warn' : ''}${armLive && status !== 'rolling' && !myTurn ? ' foe' : ''}`}
 					style={padPos ? { left: `calc(${PAD_EDGE}px + (100% - ${PAD_EDGE * 2}px) * ${padPos.label})`, transform: `translateX(${-padPos.label * 100}%)` } : undefined}
 				>{armMsg}</span>
 
@@ -3562,7 +3560,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				)}
 
 				{over && daily && (
-					<div className="pe-overlay pe-aside">
+					<div className="pe-overlay pe-over">
 						<div className="pe-card pe-endpanel">
 							{event && <img className="pe-event-logo" src={event.logo} alt={event.title} />}
 							{t.courseDone}
@@ -3576,7 +3574,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				)}
 
 				{over && !daily && !lv.active && (
-					<div className="pe-overlay pe-aside">
+					<div className="pe-overlay pe-over">
 						<div className="pe-card pe-endpanel">
 							{event && <img className="pe-event-logo" src={event.logo} alt={event.title} />}
 							{match.winner === mySide ? t.youWin : t.foeWins}
@@ -3628,12 +3626,22 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 					</div>
 				)}
 
-				{/* The ground picker, free play only. Every row re-deals, so the change is felt at
-				    once instead of waiting for a partie nobody wants to finish first. */}
+				{/* Free play setup, opened by "Mode libre". Picking changes nothing yet: "Jouer" deals
+				    with it, and × goes back to the game underneath as it was. */}
 				{groundOpen && (
-					<div className="pe-overlay">
-						<div className="pe-card pe-ground">
+					<div className="pe-overlay" onClick={() => setGroundOpen(false)}>
+						<div className="pe-card pe-ground" onClick={(e) => e.stopPropagation()}>
+							<button className="pe-bar-x" onClick={() => setGroundOpen(false)} aria-label={t.close}>×</button>
 							<div className="pe-mp-title">{t.groundTitle}</div>
+							<div className="pe-ground-row">
+								<span className="pe-ground-lab">{t.diffLab}</span>
+								<div className="pe-ground-opts">
+									{withExpert(DIFF_ORDER, gameId).map((k) => (
+										<button key={k} className={`pe-pill ${diff === k ? 'active' : ''}`}
+											onClick={() => { diffRef.current = k as DiffKey; setDiff(k as DiffKey); }}>{t.diff[k as DiffKey]}</button>
+									))}
+								</div>
+							</div>
 							<div className="pe-ground-row">
 								<span className="pe-ground-lab">{t.surfaceLab}</span>
 								<div className="pe-ground-opts">
@@ -3659,7 +3667,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 								{' · '}
 								{ground.relief === 'auto' ? t.reliefAuto : t.reliefHint[ground.relief]}
 							</span>
-							<button className="pe-replay" onClick={() => setGroundOpen(false)}>{t.play}</button>
+							<button className="pe-replay" onClick={() => { setGroundOpen(false); newGame(diffRef.current); }}>{t.play}</button>
 						</div>
 					</div>
 				)}
@@ -3693,10 +3701,6 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				format={fmtPacked}
 				lang={lang}
 			/>}
-
-			{!daily && !lv.active && !event && (
-				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" lang={lang} />
-			)}
 
 			<p className="pe-help">{t.help(daily, STATIONS, match.target)}</p>
 		</div>
@@ -4000,7 +4004,7 @@ const CSS = `
 .pe-board-mark.on::after { border-top-color: rgba(255,209,102,0.85); }
 /* Held with nothing pulled: the board is the cancel surface, so it says so with its own skin. */
 /* Hidden but still laid out: guards and layoutPad read its box, and aimStart ignores it meanwhile. */
-.pe-arm.gone, .pe-power.gone { visibility: hidden; }
+.pe-arm.gone, .pe-power.gone, .pe-arm-label.gone { visibility: hidden; }
 .pe-arm.mine { box-shadow: 0 0 0 3px rgba(255,209,102,0.22), 0 0 18px rgba(255,209,102,0.25); }
 .pe-arm.foe { border-color: rgba(255,95,86,0.9); background: linear-gradient(180deg, rgba(70,14,12,0.14) 0%, rgba(90,18,14,0.5) 100%); box-shadow: 0 0 0 3px rgba(255,95,86,0.2); }
 .pe-arm.foe::before { border-top-color: rgba(255,95,86,0.5); }
@@ -4079,6 +4083,18 @@ const CSS = `
    part, unlike the modal cards, because now it CAN collide with something.
    pe-aside, not pe-side: .pe-side is already the TV board's two halves. The rules here are scoped by
    .pe-overlay so they would not have leaked, but any probe asking the DOM for .pe-side would. */
+/* The end of a match: centred in what the mode tabs leave, since the match is over and the pad with
+   it. The aim-only controls go too, and the action row drops into the pad's empty band. */
+.pe-overlay.pe-over { pointer-events: none; }
+.pe-overlay.pe-over .pe-card { pointer-events: auto; width: min(380px, 92%); margin: auto; max-height: 100%; overflow: auto; }
+@media (orientation: portrait) { .pe-overlay.pe-over { padding-top: clamp(56px, 25vh, 216px); } }
+/* Lying down, the middle holds the score and the view tabs: it docks left under the mode tabs. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .pe-overlay.pe-over { justify-content: flex-start; align-items: flex-start; padding: 132px 8px 8px max(64px, env(safe-area-inset-left)); }
+  .pe-overlay.pe-over .pe-card { width: clamp(214px, 34vw, 340px); margin: 0; }
+}
+.pe-root:has(.pe-over) .pe-loft, .pe-root:has(.pe-over) .pe-zoom { display: none; }
+.game-page.gf-full:has(.pe-over) .pe-hud-actions { bottom: max(10px, env(safe-area-inset-bottom)); }
 .pe-overlay.pe-aside { justify-content: flex-start; align-items: flex-start; pointer-events: none; padding: clamp(56px, 25vh, 216px) 8px 8px max(10px, env(safe-area-inset-left)); }
 .pe-overlay.pe-aside .pe-card { pointer-events: auto; width: clamp(214px, 52vw, 380px); margin: 0; }
 @media (orientation: landscape) and (max-height: 520px) {
@@ -4127,7 +4143,7 @@ const CSS = `
   .pe-replay { padding: 8px 18px; font-size: 14px; }
   .pe-mp-title { font-size: 15.5px; }
 }
-.pe-ground { min-width: min(310px, 100%); }
+.pe-ground { position: relative; min-width: min(310px, 100%); }
 .pe-ground-row { display: flex; align-items: baseline; gap: 8px; width: 100%; flex-wrap: wrap; }
 .pe-ground-lab { font-size: 11.5px; font-weight: 700; color: var(--gray-300); text-transform: uppercase; letter-spacing: 0.04em; }
 .pe-ground-opts { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; justify-content: center; }

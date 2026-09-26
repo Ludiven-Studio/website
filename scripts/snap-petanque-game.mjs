@@ -62,7 +62,7 @@ async function open() {
 const state = (page) => page.evaluate(() => window.__petanque());
 
 async function pickSurface(page, label) {
-	await page.getByRole('button', { name: 'Choisir le terrain' }).click();
+	await page.getByRole('tab', { name: /libre/i }).click(); // opens the free-play card
 	await page.locator('.pe-ground .pe-pill').filter({ hasText: label }).first().click();
 	await sleep(300);
 	await page.locator('.pe-ground .pe-replay').click(); // "Jouer" closes the card

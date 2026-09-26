@@ -184,15 +184,12 @@ await sleep(1500);
 const all = [];
 all.push(...await audit('1-niveaux')); // how the game actually opens: fullscreen, on the ladder
 
-await page.getByRole('tab', { name: /Libre/ }).click();
-await sleep(1200);
-all.push(...await audit('2-libre-jack')); // top view, the jack ring, the difficulty pills
-
-await page.locator('.pe-act[aria-label="Choisir le terrain"]').click();
-await sleep(500);
-all.push(...await audit('3-terrain'));
+await page.getByRole('tab', { name: /Libre/ }).click(); // opens the free-play card
+await sleep(800);
+all.push(...await audit('2-libre-carte')); // opponent, surface, relief
 await page.locator('.pe-card .pe-replay').click();
-await sleep(900);
+await sleep(1200);
+all.push(...await audit('3-libre-jack')); // top view, the jack ring
 
 const box = await page.locator('.pe-canvas').boundingBox();
 const cx = box.x + box.width / 2;
@@ -374,10 +371,9 @@ else {
 	const rightEdge = (fin.panel.right - fin.cv.left) / fin.cv.width;
 	console.log(`    fin: panneau ${Math.round(fin.panel.w)}x${Math.round(fin.panel.h)} @ ${Math.round(fin.panel.x)},${Math.round(fin.panel.y)}`
 		+ ` · ${(share * 100).toFixed(0)} % du terrain · bord droit a ${(rightEdge * 100).toFixed(0)} % · ${fin.under}/${fin.n} boules dessous`);
-	// "Sur un cote" is these two numbers, and neither of them is a screenshot: it stays in the left
-	// half, and it leaves most of the ground uncovered.
-	if (rightEdge > 0.6) all.push(`9-fin: the end panel reaches ${(rightEdge * 100).toFixed(0)} % across — not on a side`);
-	if (share > 0.35) all.push(`9-fin: the end panel covers ${(share * 100).toFixed(0)} % of the pitch`);
+	// Asked for in the middle (the match is over, the pad is gone): centred across, within 5 %.
+	const mid = (fin.panel.x + fin.panel.w / 2 - fin.cv.left) / fin.cv.width;
+	if (VH > VW && Math.abs(mid - 0.5) > 0.05) all.push(`9-fin: the end panel is not centred (middle at ${(mid * 100).toFixed(0)} %)`);
 }
 
 console.log(errs.length ? `PAGE ERRORS:\n${errs.join('\n')}` : 'no page errors');

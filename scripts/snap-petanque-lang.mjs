@@ -40,7 +40,7 @@ try {
 		await page.locator('.dt-seg').nth(2).click(); // free play
 		await sleep(1200);
 		await shot('2-free');
-		await page.locator('.pe-hud-actions .pe-act').first().click(); // the ground picker
+		// Free play opened the setup card: it is what the next shot shows.
 		await sleep(500);
 		await shot('3-ground');
 		await page.locator('.pe-card .pe-replay').click();
