@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import {
 	makeTerrain, SURFACES, SURFACE_IDS, heightAt, PITCH_W, PITCH_L, type SurfaceId, type Terrain,
@@ -302,6 +302,7 @@ interface Scene3D {
 	bodies: THREE.Group; // boules + jack
 	meshes: THREE.Mesh[]; // index-aligned with sim.bs
 	marker: THREE.Mesh;
+	pointer: THREE.Mesh; // the daily's "shoot this one" arrow, over the target boule
 	circle: THREE.Group; // the throwing circle, re-laid on the terrain whenever it moves
 	rings: THREE.Group; // legal jack window, shown while throwing or placing it
 	laidAt: { x: number; y: number; t: Terrain } | null; // circle AND terrain both groups were built for
@@ -716,6 +717,13 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const marker = makeMarker(0x30d158);
 		marker.visible = false;
 		scene.add(marker);
+		// Tip at the origin, base a unit above: scaled per frame, it hangs point-down over the target.
+		const pointerGeo = new THREE.ConeGeometry(0.45, 1, 20);
+		pointerGeo.rotateX(Math.PI);
+		pointerGeo.translate(0, 0.5, 0);
+		const pointer = new THREE.Mesh(pointerGeo, new THREE.MeshBasicMaterial({ color: 0xffd166 }));
+		pointer.visible = false;
+		scene.add(pointer);
 		const circle = new THREE.Group();
 		scene.add(circle);
 		const rings = new THREE.Group();
@@ -732,7 +740,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		scene.add(dists);
 
 		g3Ref.current = {
-			renderer, scene, camera, lights, bodies, marker, circle, rings, laidAt: null, ray, rayAt: 0,
+			renderer, scene, camera, lights, bodies, marker, pointer, circle, rings, laidAt: null, ray, rayAt: 0,
 			jackAim, jackAimAt: null, dists, distsKey: '',
 			pitch: null as unknown as Pitch3D, // filled by newGame, which always runs next
 			fx: makeFx(scene),
@@ -2681,6 +2689,17 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			halo.scale.set(rr, 1, rr);
 		}
 
+		// The daily's target, pointed at while there is a shot to take. Sized by camera distance so it
+		// reads the same at 6 m and at 10 m.
+		const tgt = dailyRef.current?.target;
+		g.pointer.visible = !!tgt && tgt.live && statusRef.current === 'aim';
+		if (tgt && g.pointer.visible) {
+			const k = Math.max(0.05, g.pointer.position.distanceTo(g.camera.position) * 0.022);
+			const bob = (Math.sin(performance.now() / 260) + 1) * 0.25 * k;
+			g.pointer.position.set(wx(tgt.x), tgt.z + tgt.r + 0.04 + bob, wz(tgt.y));
+			g.pointer.scale.setScalar(k);
+		}
+
 		// The circle and the legal window are sampled on the terrain, so they are rebuilt when the
 		// circle moves — once an end — or the TERRAIN changes, and never touched per frame. A new deal
 		// often starts from the same circle: keyed on position alone, the rings kept the last deal's
@@ -3251,6 +3270,11 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	// The board stores (max - points): the event's max is not the daily's 60.
 	const fmtEvent = (v: number): string =>
 		formatScore({ kind: 'packed', radix: 10_000_000, fields: [{ as: 'int', unit: 'pts', base: eventMax }, { as: 'time', div: 100 }] }, v);
+	// Stable across renders: the board reloads whenever these change, and the chrono re-renders
+	// the game five times a second.
+	const eventLbId = event ? `petanque-${event.id}-t` : '';
+	const eventSource = useCallback(() => getEventLeaderboard(eventLbId), [eventLbId]);
+	const eventBoard = useMemo(() => ({ title: t.eventBoard, empty: t.eventEmpty }), [t]);
 	const nStations = course?.stations.length ?? STATIONS;
 	const maxPoints = course ? courseMax(course) : MAX_DAILY_SCORE;
 
@@ -3753,9 +3777,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			/>}
 
 			{event && (
-				<LeaderboardCorner game={`petanque-${event.id}-t`} metric="time" format={fmtEvent} side="right" lang={lang}
-					source={() => getEventLeaderboard(`petanque-${event.id}-t`)}
-					event={{ title: t.eventBoard, empty: t.eventEmpty }}
+				<LeaderboardCorner game={eventLbId} metric="time" format={fmtEvent} side="right" lang={lang}
+					source={eventSource}
+					event={eventBoard}
 					submitValue={daily && dailyDone && dailyScore != null ? dailyScore : undefined} />
 			)}
 
