@@ -14,7 +14,7 @@ import {
 import { planThrow, planJack, jackThrow, JACK_SPREAD_PLAYER, launch } from './ai';
 import { swayAt, swayAmp } from './sway';
 import {
-	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, makeMarker, makeHalo, arcMesh, aimRay, predictThrow,
+	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, groundLabel, makeMarker, makeHalo, arcMesh, predictThrow,
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
 	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz, makeContactShadow, layFlat,
 	HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
@@ -433,6 +433,7 @@ const killGroup = (g: THREE.Group): void => {
 		g.remove(c);
 		const m = c as THREE.Mesh;
 		m.geometry?.dispose();
+		((m.material as THREE.SpriteMaterial | undefined)?.map)?.dispose();
 		(m.material as THREE.Material | undefined)?.dispose();
 	}
 };
@@ -489,6 +490,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	/** The AI's next boule, planned when its turn comes so its hand can act it out on the pad first. */
 	const aiPlanRef = useRef<{ v: { vx: number; vy: number; vz: number }; m: Match13; start: number; board: number; power: number; yaw: number; shown?: boolean } | null>(null);
 	const foeHandRef = useRef<HTMLDivElement | null>(null);
+	const foeStartRef = useRef<HTMLDivElement | null>(null); // where the opponent's finger landed
+	const foeTrailRef = useRef<HTMLDivElement | null>(null); // from there to the finger
 	const foeFillRef = useRef<HTMLDivElement | null>(null);
 	const aiAtRef = useRef(0);
 	const endAtRef = useRef(0);
@@ -715,7 +718,22 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		killGroup(g.circle);
 		killGroup(g.rings);
 		g.circle.add(groundRing(s.t, c.x, c.y, CIRCLE_R, 0xf2e9d8));
-		for (const r of [MIN_JACK, MAX_JACK]) g.rings.add(groundRing(s.t, c.x, c.y, r, 0xffd166, 0.016));
+		const dir = matchRef.current.dir;
+		for (const r of [MIN_JACK, MAX_JACK]) {
+			// Dashed: they are rules drawn on the ground, not an object; solid read as a rope.
+			g.rings.add(groundRing(s.t, c.x, c.y, r, 0xffd166, 0.016, 1, 0.3));
+			// The legend stands on the line near a side line, clear of the lane the eye looks down.
+			for (const lx of [PITCH_W - 0.35, 0.35]) {
+				const dx = lx - c.x;
+				if (Math.abs(dx) >= r) continue;
+				const ly = c.y + dir * Math.sqrt(r * r - dx * dx);
+				if (ly < 0.2 || ly > PITCH_L - 0.2) continue;
+				const label = groundLabel(`${r} m`, '#ffd166');
+				label.position.set(wx(lx), heightAt(s.t, lx, ly) + 0.16, wz(ly));
+				g.rings.add(label as unknown as THREE.Mesh);
+				break;
+			}
+		}
 		g.laidAt = { x: c.x, y: c.y, t: s.t };
 	}, []);
 
@@ -1296,14 +1314,15 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const armH = arm.clientHeight, halfW = arm.clientWidth / 2 - 18;
 		const pressY = (t: number) => armH - (BOARD_PAD_PX + t * (armH - BOARD_PAD_PX * 2)); // from the pad's bottom
 		const slide = (yaw: number) => Math.max(-halfW, Math.min(halfW, -yaw / YAW_PER_PX));
-		let show = false, x = 0, y = 0, pull = 0, press = 1;
+		let show = false, x = 0, y = 0, pull = 0, press = 1, y0 = 0;
 		const plan = aiPlanRef.current;
 		const ra = remoteAimRef.current;
 		if (plan && now >= plan.start && statusRef.current === 'aim') {
 			// Press (a fifth), hold, then pull up past the seam while sliding to the aim.
 			const u = Math.min(1, (now - plan.start) / FOE_GESTURE_MS);
 			const q = u < 0.32 ? 0 : 1 - Math.pow(1 - (u - 0.32) / 0.68, 2);
-			const y0 = pressY(plan.board), y1 = armH + plan.power * POWER_PX;
+			y0 = pressY(plan.board);
+			const y1 = armH + plan.power * POWER_PX;
 			y = y0 + (y1 - y0) * q;
 			x = slide(plan.yaw) * q;
 			pull = Math.max(0, (y - armH) / POWER_PX);
@@ -1315,7 +1334,22 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			y = armH + ra.power * POWER_PX;
 			x = slide(ra.yaw);
 			pull = ra.power;
+			// Their press height is their loft; where across the pad they pressed is not sent, so the
+			// middle stands for it (the slide is what the aim is made of).
+			y0 = pressY(boardForElevation(ra.loft));
 			show = true;
+		}
+		const start = foeStartRef.current, trail = foeTrailRef.current;
+		if (start) {
+			start.style.opacity = show ? '1' : '0';
+			if (show) start.style.transform = `translate(0px, ${(-y0).toFixed(1)}px)`;
+		}
+		if (trail) {
+			const dx = x, dy = y - y0; // up is positive here
+			const len = Math.sqrt(dx * dx + dy * dy);
+			trail.style.opacity = show && len > 4 ? '1' : '0';
+			if (show) trail.style.transform = `translate(0px, ${(-y0).toFixed(1)}px) rotate(${(Math.atan2(-dy, dx) * 180 / Math.PI).toFixed(1)}deg)`;
+			trail.style.width = `${len.toFixed(1)}px`;
 		}
 		hand.style.opacity = show ? '1' : '0';
 		if (show) hand.style.transform = `translate(${x.toFixed(1)}px, ${(-y).toFixed(1)}px) scale(${press.toFixed(2)})`;
@@ -2433,19 +2467,30 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			}
 		}
 
-		// The opponent drawing back. Built once per message, not per frame, and dropped when the
-		// stream dries up — a frozen ray would read as an aim they are still holding.
+		/* The opponent drawing back: their flight as it would go, the same prediction as our own arc
+		   in their colour. Online from their streamed aim (rebuilt once per message, dropped when the
+		   stream dries up — a frozen arc would read as an aim still held); against the AI from the
+		   boule its hand is acting out, once per gesture. A straight ray on the ground said where,
+		   never how. */
 		const ra = remoteAimRef.current;
-		const showRay = ra !== null && ra.live && now - ra.seen < AIM_STALE_MS && statusRef.current !== 'rolling';
-		if (!showRay) {
+		const plan = aiPlanRef.current;
+		const aiArc = plan !== null && now >= plan.start && statusRef.current === 'aim';
+		const netArc = ra !== null && ra.live && now - ra.seen < AIM_STALE_MS && statusRef.current !== 'rolling';
+		const arcKey = aiArc && plan ? -plan.start : netArc && ra ? ra.seen : 0;
+		if (!aiArc && !netArc) {
 			if (g.ray.visible) { killGroup(g.ray); g.ray.visible = false; g.rayAt = 0; }
-		} else if (ra && g.rayAt !== ra.seen) {
-			g.rayAt = ra.seen;
+		} else if (g.rayAt !== arcKey) {
+			g.rayAt = arcKey;
 			killGroup(g.ray);
-			const v = speedOf(ra.power);
-			const reach = Math.min(PITCH_L - 1, (v * v * Math.sin(2 * ra.loft)) / G);
-			g.ray.add(aimRay(s.t, m.circle.x, m.circle.y,
-				Math.sin(ra.yaw) * m.dir, Math.cos(ra.yaw) * m.dir, reach, HALO[1]));
+			const v = aiArc && plan ? plan.v
+				: throwVelocity(Math.sin(ra!.yaw) * m.dir, Math.cos(ra!.yaw) * m.dir, speedOf(ra!.power), ra!.loft);
+			const from = m.circle, asJack = m.phase === 'throw-jack';
+			const pred = predictThrow(s, from, v, (c) =>
+				place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn)));
+			const air = arcMesh(pred.air, HALO[1], 0.02);
+			if (air) g.ray.add(air);
+			const roll = arcMesh(pred.roll, 0xffc9c4, 0.014);
+			if (roll) g.ray.add(roll);
 			g.ray.visible = true;
 		}
 
@@ -3186,7 +3231,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				{/* The opponent's finger. Its own layer, taller than the pad: the pull goes above the pad,
 				    and the pad clips its content. */}
 				<div className={`pe-foe${armLive && !jackTime && !myTurn ? '' : ' gone'}`} style={padStyle} aria-hidden="true">
-					<div ref={foeHandRef} className="pe-foe-hand" />
+					<div ref={foeTrailRef} className="pe-foe-trail" />
+				<div ref={foeStartRef} className="pe-foe-start" />
+				<div ref={foeHandRef} className="pe-foe-hand" />
 				</div>
 
 				<div className={`pe-power${jackTime ? ' gone' : ''}`} style={padStyle} aria-hidden="true">
@@ -3736,6 +3783,8 @@ const CSS = `
 .pe-arm-label.foe { background: rgba(90,18,14,0.72); color: #ffd9d4; }
 .pe-foe { position: absolute; left: 50%; transform: translateX(-50%); bottom: var(--pe-arm-b); width: var(--pe-arm-w); height: 0; z-index: 4; pointer-events: none; }
 .pe-foe.gone { visibility: hidden; }
+.pe-foe-start { position: absolute; left: calc(50% - 9px); bottom: -9px; width: 18px; height: 18px; border-radius: 50%; opacity: 0; border: 3px solid rgba(255,138,128,0.95); background: rgba(90,18,14,0.45); box-sizing: border-box; transition: opacity 0.15s; }
+.pe-foe-trail { position: absolute; left: 50%; bottom: -1.5px; height: 3px; width: 0; opacity: 0; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(255,138,128,0.35), rgba(255,138,128,0.9)); border-radius: 2px; transition: opacity 0.15s; }
 .pe-foe-hand { position: absolute; left: calc(50% - 20px); bottom: -20px; width: 40px; height: 40px; border-radius: 50%; opacity: 0; background: rgba(255,138,128,0.9); box-shadow: 0 0 0 6px rgba(255,95,86,0.35), 0 4px 12px rgba(0,0,0,0.45); transition: opacity 0.15s; will-change: transform; }
 .pe-arm.hold { border-color: rgba(255,138,128,0.85); background: linear-gradient(180deg, rgba(60,16,12,0.12) 0%, rgba(80,20,14,0.5) 100%); }
 .pe-arm.hold::before { border-top-color: rgba(255,138,128,0.45); }

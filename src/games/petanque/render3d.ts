@@ -1102,15 +1102,19 @@ export const CIRCLE_R = 0.25; // m — the official throwing circle is 35 to 50 
  * here — the relief is a few centimetres and the ring spans half a metre (six metres for the jack
  * window), so a flat one sinks under the terrain over most of its arc and reads as missing.
  */
-export function groundRing(t: Terrain, cx: number, cy: number, r: number, color: number, tube = 0.022, opacity = 1): THREE.Mesh {
-	const n = Math.max(48, Math.round(r * 24));
+export function groundRing(t: Terrain, cx: number, cy: number, r: number, color: number, tube = 0.022, opacity = 1, dash = 0): THREE.Mesh {
+	// Dashed: `dash` metres of line, then as much gap. Finer sampling, so a dash is more than a dot.
+	const n = dash > 0 ? Math.max(96, Math.round(r * 80)) : Math.max(48, Math.round(r * 24));
 	const at = (a: number): THREE.Vector3 => {
 		const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
 		return new THREE.Vector3(wx(x), heightAt(t, x, y) + tube, wz(y));
 	};
+	/* "Drawn here": on the pitch and, when dashed, in a dash. Both edges go through the same
+	   bisection below, so a dash stops exactly on a side line as a solid ring does. */
 	const inside = (a: number): boolean => {
 		const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
-		return x >= 0 && x <= PITCH_W && y >= 0 && y <= PITCH_L;
+		if (x < 0 || x > PITCH_W || y < 0 || y > PITCH_L) return false;
+		return dash <= 0 || Math.floor((((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) * r / dash) % 2 === 0;
 	};
 	const step = (Math.PI * 2) / n;
 	let start = -1;
@@ -1156,6 +1160,34 @@ export function groundRing(t: Terrain, cx: number, cy: number, r: number, color:
 	const m = new THREE.Mesh(geo, mat);
 	m.renderOrder = 4;
 	return m;
+}
+
+/** A short text standing on the ground (the "6 m" / "10 m" of the jack window): a sprite, so it
+   always faces the eye, with a dark rim so it reads on light gravel and on dark clay alike. Fixed
+   size on screen (no distance attenuation): 20 cm of world text was a few pixels from the top view.
+   `height` is then a share of the view's height. */
+export function groundLabel(text: string, color: string, height = 0.045): THREE.Sprite {
+	const c = document.createElement('canvas');
+	const g = c.getContext('2d') as CanvasRenderingContext2D;
+	const font = 'bold 64px system-ui, sans-serif';
+	g.font = font;
+	c.width = Math.ceil(g.measureText(text).width) + 28;
+	c.height = 88;
+	g.font = font;
+	g.textAlign = 'center';
+	g.textBaseline = 'middle';
+	g.lineJoin = 'round';
+	g.lineWidth = 12;
+	g.strokeStyle = 'rgba(20,14,8,0.85)';
+	g.strokeText(text, c.width / 2, c.height / 2);
+	g.fillStyle = color;
+	g.fillText(text, c.width / 2, c.height / 2);
+	const tex = new THREE.CanvasTexture(c);
+	tex.colorSpace = THREE.SRGBColorSpace;
+	const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, sizeAttenuation: false }));
+	sprite.scale.set((height * c.width) / c.height, height, 1);
+	sprite.renderOrder = 5;
+	return sprite;
 }
 
 /* ---------- camera ---------- */
