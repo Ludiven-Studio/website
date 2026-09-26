@@ -16,6 +16,9 @@ export const MAX_DAILY_SCORE = STATIONS * 5;
 
 export const CLEARED = 1.0; // m the target must travel to count as knocked out
 export const TOOK_PLACE = 0.5; // m the shooter may end from where the target stood
+/* A carreau proper: the shooter stops ON the spot. Measured with solved carries and a human-sized
+   aim error, 60 % of the old 0.5 m carreaux end inside 15 cm; the rest drifted on, and are a palet. */
+export const CARREAU = 0.15;
 
 /** Where the thrower stands. Matches the opening circle of a match, so the lane reads the same. */
 export const COURSE_CIRCLE = { x: 2, y: EDGE + 0.5 };
@@ -42,7 +45,7 @@ export interface DailyCourse {
 	stations: Station[];
 }
 
-export type Grade = 0 | 1 | 3 | 5;
+export type Grade = 0 | 1 | 3 | 4 | 5;
 
 /* The distance ladder is FIXED across days: it is the difficulty spine, and a leaderboard that
    compares Monday to Tuesday needs it to mean the same thing. Only the arrangement and the lateral
@@ -141,10 +144,13 @@ export interface ShotOutcome {
 	shooterLive: boolean;
 }
 
-/** 0 missed · 1 touched but in place · 3 cleared · 5 carreau. The FFPJP bareme. */
+/** 0 missed · 1 touched but in place · 3 cleared · 4 palet (stayed close) · 5 carreau (on the spot). */
 export function gradeShot(o: ShotOutcome): Grade {
 	if (!o.hit) return 0;
-	if (!o.targetLive || o.moved > CLEARED) return o.shooterLive && o.rollOn < TOOK_PLACE ? 5 : 3;
+	if (!o.targetLive || o.moved > CLEARED) {
+		if (!o.shooterLive) return 3;
+		return o.rollOn < CARREAU ? 5 : o.rollOn < TOOK_PLACE ? 4 : 3;
+	}
 	return 1;
 }
 
@@ -157,6 +163,7 @@ export const encodeDaily = (points: number, ms: number, max = MAX_DAILY_SCORE): 
 
 export const GRADE_LABEL: Record<Grade, string> = {
 	5: 'Carreau !',
+	4: 'Palet',
 	3: 'Cible sortie',
 	1: 'Touchée, en place',
 	0: 'Manqué',

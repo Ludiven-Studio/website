@@ -23,7 +23,7 @@ import {
 import { petanqueLevels } from './levels';
 import {
 	makeCourse, makeEventCourse, courseMax, stationBodies, gradeShot, encodeDaily, COURSE_CIRCLE, STATIONS, MAX_DAILY_SCORE,
-	CLEARED, TOOK_PLACE,
+	CLEARED, CARREAU,
 	type DailyCourse, type Grade,
 } from './daily';
 import {
@@ -1584,7 +1584,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const carreau = !!from && !!shooter && shooter.live && shooter.side === from.side
 			&& from.at.some(({ b, x, y }) => b.side !== -1 && b.side !== from.side
 				&& (!b.live || Math.hypot(b.x - x, b.y - y) > CLEARED)
-				&& Math.hypot(shooter.x - x, shooter.y - y) < TOOK_PLACE);
+				&& Math.hypot(shooter.x - x, shooter.y - y) < CARREAU);
 		const carreauLine = !carreau || !from ? null
 			: from.side === mySideRef.current ? tRef.current.carreauMine
 			: tRef.current.carreauFoe(onlineRef.current && mpOppRef.current ? mpOppRef.current : tRef.current.foe);
@@ -3624,7 +3624,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 							    The bar drains over the time left before it moves on by itself. */}
 							<button className="pe-continue" onClick={(e) => { e.stopPropagation(); nextEnd(); }}>
 								{t.continue}
-								<span className="pe-continue-bar" aria-hidden="true" style={{ animationDuration: `${card.rows.length ? END_TABLE_MS : END_CARD_MS}ms` }} />
+								<span className="pe-continue-bar" aria-hidden="true" style={{ animationDuration: `${daily ? STATION_CARD_MS : card.rows.length ? END_TABLE_MS : END_CARD_MS}ms` }} />
 							</button>
 						</div>
 					</div>
@@ -3903,6 +3903,7 @@ const CSS = `
 .pe-grades { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
 .pe-grade { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 800; background: rgba(255,255,255,0.12); color: #f4ece2; }
 .pe-grade.g5 { background: #30d158; color: #06240f; }
+.pe-grade.g4 { background: #9be15d; color: #13300a; }
 .pe-grade.g3 { background: #ffc107; color: #3a2a00; }
 .pe-grade.g1 { background: #7a6a55; }
 .pe-grade.g0 { background: rgba(255,95,86,0.35); }

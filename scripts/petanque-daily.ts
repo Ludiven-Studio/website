@@ -15,7 +15,7 @@
 import { makeTerrain, SURFACES, SURFACE_IDS, hashN, type SurfaceId } from '../src/games/petanque/terrain';
 import { settle, stepSim, throwVelocity, type Sim, type Boule, type Impact } from '../src/games/petanque/engine';
 import { shootSpeed, SHOOT_ELEV, launch } from '../src/games/petanque/ai';
-import { carrySpeed, makeCourse, stationBodies, gradeShot, COURSE_CIRCLE, STATIONS, MAX_DAILY_SCORE, type DailyCourse } from '../src/games/petanque/daily';
+import { carrySpeed, makeCourse, stationBodies, gradeShot, COURSE_CIRCLE, STATIONS, MAX_DAILY_SCORE, type DailyCourse, type Grade } from '../src/games/petanque/daily';
 
 /* `fer` = aim to LAND on the target (tir au fer) instead of reusing the AI's match tir, which is
    really a rafle: it carries ~6 m whatever the range, so at 8 m it lands short and has to roll in —
@@ -60,7 +60,7 @@ function courseForDay(day: number): DailyCourse {
 }
 
 /** One station, one boule. `sigma` is the lateral aim error at the target, in metres. */
-function shoot(course: DailyCourse, idx: number, sigma: number, rng: number): 0 | 1 | 3 | 5 {
+function shoot(course: DailyCourse, idx: number, sigma: number, rng: number): Grade {
 	const st = course.stations[idx];
 	const t = makeTerrain(course.seed, SURFACES[SURF_OVERRIDE ?? course.surface], course.amp);
 	const bodies = stationBodies(st, t);
@@ -105,7 +105,7 @@ const round = (course: DailyCourse, sigma: number, rng: number): number => {
    a bouchon fail for opposite reasons. */
 if (process.argv.includes('why')) {
 	console.log(`H0 · zero aim error (${FER ? 'tir au fer' : "the AI's match tir"}) — every miss here is the instrument\n`);
-	console.log('kind      dist    carry    grades over 3 days (5/3/1/0)     mean pts');
+	console.log('kind      dist    carry    grades over 3 days (5/4/3/1/0)     mean pts');
 	const tally: Record<string, number[]> = {};
 	const dist: Record<string, number[]> = {};
 	const carry: Record<string, number[]> = {};
@@ -122,11 +122,11 @@ if (process.argv.includes('why')) {
 	const avg = (a: number[]): number => a.reduce((x, y) => x + y, 0) / a.length;
 	for (const k of ['nue', 'masque', 'serree']) {
 		const g = tally[k] ?? [0, 0, 0, 0, 0, 0];
-		const n = g[5] + g[3] + g[1] + g[0];
-		const pts = (g[5] * 5 + g[3] * 3 + g[1]) / Math.max(1, n);
+		const n = g[5] + g[4] + g[3] + g[1] + g[0];
+		const pts = (g[5] * 5 + g[4] * 4 + g[3] * 3 + g[1]) / Math.max(1, n);
 		console.log(
 			`${k.padEnd(9)} ${avg(dist[k] ?? [0]).toFixed(1)} m  ${avg(carry[k] ?? [0]).toFixed(1)} m   ` +
-			`${String(g[5]).padStart(3)} / ${String(g[3]).padStart(3)} / ${String(g[1]).padStart(3)} / ${String(g[0]).padStart(3)}   (n=${n})` +
+			`${String(g[5]).padStart(3)} / ${String(g[4]).padStart(3)} / ${String(g[3]).padStart(3)} / ${String(g[1]).padStart(3)} / ${String(g[0]).padStart(3)}   (n=${n})` +
 			`      ${pts.toFixed(2)}`,
 		);
 	}

@@ -33,7 +33,7 @@ const fr = {
 	loft: { plomb: 'Plomb', portee: 'Portée', demi: 'Demi-portée', roulette: 'Roulette' } as Record<Band, string>,
 	band: { roulette: 'Roulette', demi: 'Demi', portee: 'Portée', plomb: 'Plomb' } as Record<Band, string>,
 	view: { jeu: 'Vue de jeu', tete: 'Zoom sur les boules', dessus: 'Vue de dessus' } as Record<View, string>,
-	grade: { 5: 'Carreau !', 3: 'Cible sortie', 1: 'Touchée, en place', 0: 'Manqué' } as Record<Grade, string>,
+	grade: { 5: 'Carreau !', 4: 'Palet (presque carreau)', 3: 'Cible sortie', 1: 'Touchée, en place', 0: 'Manqué' } as Record<Grade, string>,
 	kind: { nue: 'Boule nue', masque: 'Boule masquée', serree: 'Boule serrée' } as Record<Kind, string>,
 	weekday: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
 
@@ -208,7 +208,7 @@ const en: Strings = {
 	loft: { plomb: 'High lob', portee: 'Lob', demi: 'Half lob', roulette: 'Roll' },
 	band: { roulette: 'Roll', demi: 'Half', portee: 'Lob', plomb: 'High' },
 	view: { jeu: 'Game view', tete: 'Zoom on the boules', dessus: 'Top view' },
-	grade: { 5: 'Carreau!', 3: 'Target knocked out', 1: 'Hit, stayed put', 0: 'Missed' },
+	grade: { 5: 'Carreau!', 4: 'Palet (near carreau)', 3: 'Target knocked out', 1: 'Hit, stayed put', 0: 'Missed' },
 	kind: { nue: 'Open boule', masque: 'Hidden boule', serree: 'Tight boule' },
 	weekday: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
 
@@ -381,7 +381,7 @@ const es: Strings = {
 	loft: { plomb: 'A plomo', portee: 'Bolea', demi: 'Media bolea', roulette: 'Rodada' },
 	band: { roulette: 'Rodada', demi: 'Media', portee: 'Bolea', plomb: 'Plomo' },
 	view: { jeu: 'Vista de juego', tete: 'Zoom en las bolas', dessus: 'Vista aérea' },
-	grade: { 5: '¡Carreau!', 3: 'Bola sacada', 1: 'Tocada, en su sitio', 0: 'Fallo' },
+	grade: { 5: '¡Carreau!', 4: 'Palet (casi carreau)', 3: 'Bola sacada', 1: 'Tocada, en su sitio', 0: 'Fallo' },
 	kind: { nue: 'Bola libre', masque: 'Bola tapada', serree: 'Bola arrimada' },
 	weekday: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
 
