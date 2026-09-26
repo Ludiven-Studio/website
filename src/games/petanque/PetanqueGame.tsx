@@ -26,8 +26,8 @@ import {
 	type DailyCourse, type Grade,
 } from './daily';
 import {
-	joinRandom, joinByCode, makeCode, seedFromRoom, multiplayerAvailable, joinLobby,
-	type PetanqueMatchNet, type AimMsg, type SyncMsg, type Lobby, type LobbyCounts,
+	joinRandom, joinByCode, rejoinRoom, makeCode, seedFromRoom, multiplayerAvailable, joinLobby,
+	type PetanqueMatchNet, type AimMsg, type SyncMsg, type ThrowMsg, type PlaceMsg, type Lobby, type LobbyCounts,
 } from './net';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
@@ -60,6 +60,27 @@ import LevelOutcome from '../../components/LevelOutcome';
    ===================================================== */
 
 type Status = 'aim' | 'rolling' | 'placing' | 'end' | 'over';
+
+/* ---------- online: moves and resume ---------- */
+
+type Move = { kind: 'throw'; msg: ThrowMsg & { n: number } } | { kind: 'place'; msg: PlaceMsg & { n: number } };
+/** The board at rest after `n` moves. `bs` is flat [x, y, z, side, live] per body, in sim order. */
+interface RestSnap { n: number; bs: number[]; rng: number; match: Match13; status: Status; }
+/** What a reload needs to walk back into the same match, same seat. */
+interface OnlineResume { at: number; room: string; code: string | null; selfId: string; side: Side; opp: string | null; rest: RestSnap; mine: Move[]; }
+
+const RESUME_MAX_MS = 15 * 60 * 1000;
+const NEED_EVERY_MS = 4000;
+
+function loadResume(key: string): OnlineResume | null {
+	try {
+		const r = JSON.parse(sessionStorage.getItem(key) ?? 'null') as OnlineResume | null;
+		return r && Date.now() - r.at < RESUME_MAX_MS ? r : null;
+	} catch { return null; }
+}
+function clearResume(key: string): void {
+	try { sessionStorage.removeItem(key); } catch { /* private mode */ }
+}
 
 const HUMAN: Side = 0;
 const AI: Side = 1;
@@ -561,6 +582,16 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	// The host settles before us, so its ruling can land while our own boules are still running.
 	// Queued here and drained in onSettled, so a correction never interrupts a roll.
 	const pendingSyncRef = useRef<SyncMsg | null>(null);
+	// Frozen at match start: presence can briefly show us alone, and `isHost()` would then lie.
+	const hostRef = useRef(false);
+	const movesRef = useRef(0); // throws and placed jacks applied on this board; the same count on both
+	const myMovesRef = useRef<Move[]>([]); // ours, kept to resend what the other board missed
+	const inboxRef = useRef(new Map<number, Move>()); // moves waiting for their turn to be applied
+	const lastSyncRef = useRef<SyncMsg | null>(null); // host: its last ruling, resent on request
+	const restRef = useRef<RestSnap | null>(null);
+	const drainRef = useRef<() => void>(() => {});
+	const joinTokRef = useRef(0); // bumped on leave, so a rejoin that lands late is dropped
+	const resumeKey = `petanque-online-${gameId}${event ? `-${event.id}` : ''}`;
 
 	const [match, setMatch] = useState<Match13>(matchRef.current);
 	const [status, setStatus] = useState<Status>('aim');
@@ -637,6 +668,10 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const [mpCode, setMpCode] = useState<string | null>(null);
 	const [mpOpp, setMpOpp] = useState<string | null>(null);
 	const [mpMsg, setMpMsg] = useState<string | null>(null);
+	const mpOppRef = useRef<string | null>(null);
+	mpOppRef.current = mpOpp;
+	const [linkDown, setLinkDown] = useState(false); // our socket dropped
+	const [oppAway, setOppAway] = useState(false); // theirs did, or they reloaded
 	const [mySide, setMySide] = useState<Side>(HUMAN);
 	const [codeInput, setCodeInput] = useState('');
 
@@ -867,6 +902,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 
 		simRef.current = { t, bs: [], rng: cfg.seed & 0xffff };
 		prevRef.current = [];
+		movesRef.current = 0;
 		targetRef.current = cfg.target;
 		matchRef.current = initMatch13(cfg.target, HUMAN);
 		setMatch(matchRef.current);
@@ -1091,6 +1127,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const s = simRef.current, g = g3Ref.current;
 		if (!s || !g) return;
 		const b = launch(s, matchRef.current.circle, side, v, asJack);
+		movesRef.current++;
 		addBody(b);
 		if (asJack) jackRef.current = b;
 		clearArc();
@@ -1107,6 +1144,37 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		zoomRef.current = 0;
 		setZoom(0);
 	}, [addBody, clearArc]);
+
+	/** Save where the online match stands, so a reload walks back into it. */
+	const persist = useCallback(() => {
+		const net = netRef.current, rest = restRef.current;
+		if (!net || !rest || !onlineRef.current) return;
+		if (rest.match.phase === 'match-done') { clearResume(resumeKey); return; }
+		const r: OnlineResume = {
+			at: Date.now(), room: net.roomId, code: net.code, selfId: net.selfId, side: mySideRef.current,
+			opp: mpOppRef.current, rest, mine: myMovesRef.current,
+		};
+		try { sessionStorage.setItem(resumeKey, JSON.stringify(r)); } catch { /* private mode */ }
+	}, [resumeKey]);
+
+	/** The board is at rest: remember it as the point a reload restarts from. */
+	const snapshot = useCallback(() => {
+		const s = simRef.current;
+		if (!s || !onlineRef.current || statusRef.current === 'rolling') return;
+		const bs: number[] = [];
+		for (const b of s.bs) bs.push(b.x, b.y, b.z, b.side, b.live ? 1 : 0);
+		restRef.current = { n: movesRef.current, bs, rng: s.rng, match: matchRef.current, status: statusRef.current };
+		persist();
+	}, [persist]);
+
+	/** Our move goes out, and into the log the other board can ask to replay. */
+	const sendMove = useCallback((mv: Move) => {
+		const net = netRef.current;
+		if (!net) return;
+		myMovesRef.current.push(mv);
+		if (mv.kind === 'throw') net.sendThrow(mv.msg); else net.sendPlace(mv.msg);
+		persist();
+	}, [persist]);
 
 	/** Cosmetic aim stream, so their screen sees us drawing back. Never feeds the simulation. */
 	const streamAim = useCallback((live: boolean) => {
@@ -1128,14 +1196,14 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const jack = m.phase === 'throw-jack';
 		// Velocities, never angles: converting an angle calls sin/cos, and two JS engines may not
 		// round those the same way. This is the one message the other board cannot do without.
-		if (onlineRef.current) netRef.current?.sendThrow({ ...v, jack });
+		if (onlineRef.current) sendMove({ kind: 'throw', msg: { ...v, jack, n: movesRef.current } });
 		streamAim(false);
 		doThrow(m.turn, v, jack);
 		if (!jack) {
 			setTutoDone(true); // the gesture is learnt: the ghost finger never comes back
 			try { localStorage.setItem(TUTO_KEY, '1'); } catch { /* private mode */ }
 		}
-	}, [aimHeading, aimLoft, aimSpeed, doThrow, streamAim]);
+	}, [aimHeading, aimLoft, aimSpeed, doThrow, sendMove, streamAim]);
 
 	/* ---------- which view we are in ---------- */
 
@@ -1396,8 +1464,6 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 
 	/* ---------- one body has come to rest ---------- */
 
-	const mpOppRef = useRef<string | null>(null);
-	mpOppRef.current = mpOpp;
 	/** Put what just happened on the pitch, then whose turn it is. `holder` colours it. */
 	const say = useCallback((lines: string[], turn: Side, holder: Side | null) => {
 		const me = mySideRef.current;
@@ -1557,6 +1623,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			// arc preview read the first "fall" as its own boule landing at the thrower's feet.
 			b.vx = 0; b.vy = 0; b.vz = 0; b.rolling = true;
 		}
+		if (typeof msg.rng === 'number') s.rng = msg.rng; // pebble hops draw from it: keep the next throw identical
 		matchRef.current = msg.match;
 		setMatch(msg.match);
 		// The status is only realigned when we are idle. Both peers ran the same rules on the same
@@ -1575,15 +1642,16 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		settle();
 		const s = simRef.current, net = netRef.current;
 		if (!s || !onlineRef.current || !net || dailyRef.current) return;
-		if (net.isHost()) {
+		if (hostRef.current) {
 			const bs: number[] = [];
 			for (const b of s.bs) bs.push(b.x, b.y, b.z, b.live ? 1 : 0);
-			net.sendSync({ bs, match: matchRef.current });
-			return;
+			const msg: SyncMsg = { bs, match: matchRef.current, n: movesRef.current, rng: s.rng };
+			lastSyncRef.current = msg;
+			net.sendSync(msg);
 		}
-		const q = pendingSyncRef.current;
-		if (q) { pendingSyncRef.current = null; applySync(q); }
-	}, [applySync, settle]);
+		snapshot();
+		drainRef.current();
+	}, [settle, snapshot]);
 
 	/** Clear the ground and start the next end. Runs on the card's timer, or on a click. */
 	const nextEnd = useCallback(() => {
@@ -1618,36 +1686,131 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		setMySide(HUMAN);
 		remoteAimRef.current = null;
 		pendingSyncRef.current = null;
+		hostRef.current = false;
+		myMovesRef.current = [];
+		inboxRef.current.clear();
+		lastSyncRef.current = null;
+		restRef.current = null;
+		joinTokRef.current++;
+		clearResume(resumeKey);
+		setLinkDown(false); setOppAway(false);
 		setMpPhase('off'); setMpCode(null); setMpOpp(null); setMpMsg(null);
+	}, [resumeKey]);
+
+	/** Ask the other board for every move of theirs from our count on. Cheap, and idempotent. */
+	const askMissing = useCallback(() => {
+		if (onlineRef.current) netRef.current?.sendNeed({ n: movesRef.current });
 	}, []);
 
-	const startOnlineMatch = useCallback(() => {
+	/**
+	 * Apply what can be applied, in order: the host's ruling for the board as it stands, then the
+	 * next move. Never while a boule rolls: onSettled calls back in once it stops.
+	 */
+	const drain = useCallback(() => {
+		if (!onlineRef.current) return;
+		for (;;) {
+			if (statusRef.current === 'rolling') return;
+			const q = pendingSyncRef.current;
+			if (q && q.n !== undefined && q.n <= movesRef.current) {
+				pendingSyncRef.current = null;
+				if (q.n === movesRef.current) { applySync(q); snapshot(); }
+			}
+			if (matchRef.current.winner !== null) return;
+			const n = movesRef.current;
+			for (const k of inboxRef.current.keys()) if (k < n) inboxRef.current.delete(k);
+			const mv = inboxRef.current.get(n);
+			if (!mv) return;
+			inboxRef.current.delete(n);
+			if (mv.kind === 'throw') {
+				// Their throw can land while our end card is still up: they moved on, so we do too.
+				if (statusRef.current === 'end') nextEnd();
+				remoteAimRef.current = null;
+				doThrow(matchRef.current.turn, mv.msg, mv.msg.jack);
+				return; // rolling now
+			}
+			const s = simRef.current, j = jackRef.current;
+			if (!s || !j || statusRef.current !== 'placing') return;
+			j.x = mv.msg.x; j.y = mv.msg.y; j.live = true;
+			place(s.t, j);
+			matchRef.current = applyPlacedJack(matchRef.current);
+			movesRef.current++;
+			setMatch(matchRef.current);
+			placeRef.current = null;
+			setPlaceOk(false);
+			statusRef.current = 'aim';
+			setStatus('aim');
+			leaveJackView();
+			snapshot();
+		}
+	}, [applySync, doThrow, leaveJackView, nextEnd, snapshot]);
+	drainRef.current = drain;
+
+	/** Put a saved board back: bodies, grain counter, match, and the phase it was resting in. */
+	const restoreRest = useCallback((r: RestSnap) => {
+		const s = simRef.current;
+		if (!s) return;
+		for (let k = 0; k + 4 < r.bs.length; k += 5) {
+			const side = r.bs[k + 3] as Side | -1;
+			const b = side === -1 ? makeJack(r.bs[k], r.bs[k + 1]) : makeBoule(r.bs[k], r.bs[k + 1], side);
+			b.z = r.bs[k + 2];
+			b.live = r.bs[k + 4] === 1;
+			addBody(b);
+			if (side === -1) jackRef.current = b;
+		}
+		s.rng = r.rng;
+		movesRef.current = r.n;
+		matchRef.current = r.match;
+		setMatch(r.match);
+		if (r.status === 'end') {
+			statusRef.current = 'end';
+			nextEnd(); // the card went with the reload: straight to the next end
+		} else if (r.status === 'placing') {
+			statusRef.current = 'placing';
+			setStatus('placing');
+			const mine = r.match.turn === mySideRef.current;
+			placeRef.current = { x: r.match.circle.x, y: r.match.circle.y + r.match.dir * 7.4 };
+			setPlaceOk(mine);
+			if (mine) enterJackView();
+		}
+	}, [addBody, enterJackView, nextEnd]);
+
+	const startOnlineMatch = useCallback((resume?: OnlineResume) => {
 		const net = netRef.current;
 		if (!net || startedOnlineRef.current) return;
 		startedOnlineRef.current = true;
 		onlineRef.current = true;
 		// Host is side 0, which is also the side initMatch13 gives the first jack to.
-		const side: Side = net.isHost() ? 0 : 1;
+		const side: Side = resume ? resume.side : net.isHost() ? 0 : 1;
+		hostRef.current = side === 0;
 		mySideRef.current = side;
 		setMySide(side);
+		myMovesRef.current = resume ? resume.mine : [];
+		inboxRef.current.clear();
+		lastSyncRef.current = null;
+		pendingSyncRef.current = null;
 		setDaily(false);
 		dailyRef.current = null;
 		lv.exit();
 
+		const queue = (mv: Move): void => {
+			if (mv.msg.n < movesRef.current) return; // already applied
+			inboxRef.current.set(mv.msg.n, mv);
+			drainRef.current();
+			if (mv.msg.n > movesRef.current && statusRef.current !== 'rolling') askMissing();
+		};
+		// A peer on a pre-resync build sends no index: its move is taken as the next one.
 		net.onThrow((t) => {
-			// Their throw can land while our end card is still up: they moved on, so we do too.
-			if (statusRef.current === 'end') nextEnd();
-			const m = matchRef.current;
-			if (m.turn === mySideRef.current || m.winner !== null) return;
-			remoteAimRef.current = null;
-			doThrow(m.turn, t, t.jack);
+			if (t.n === undefined && matchRef.current.turn === mySideRef.current) return;
+			queue({ kind: 'throw', msg: { ...t, n: t.n ?? movesRef.current } });
 		});
 		net.onPlace((p) => {
+			if (p.n !== undefined) { queue({ kind: 'place', msg: { ...p, n: p.n } }); return; }
 			const s = simRef.current, j = jackRef.current;
 			if (!s || !j || statusRef.current !== 'placing' || matchRef.current.turn === mySideRef.current) return;
 			j.x = p.x; j.y = p.y; j.live = true;
 			place(s.t, j);
 			matchRef.current = applyPlacedJack(matchRef.current);
+			movesRef.current++;
 			setMatch(matchRef.current);
 			placeRef.current = null;
 			setPlaceOk(false);
@@ -1661,24 +1824,80 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			setFoeBand(a.live ? bandOf(boardForElevation(a.loft)) : null);
 		});
 		net.onSync((msg) => {
-			if (statusRef.current === 'rolling') { pendingSyncRef.current = msg; return; }
-			applySync(msg);
+			if (hostRef.current) return; // only the host rules
+			if (msg.n === undefined) {
+				if (statusRef.current === 'rolling') { pendingSyncRef.current = msg; return; }
+				applySync(msg);
+				return;
+			}
+			const q = pendingSyncRef.current;
+			if (!q || q.n === undefined || msg.n >= q.n) pendingSyncRef.current = msg;
+			drainRef.current();
+		});
+		net.onNeed(({ n }) => {
+			for (const mv of myMovesRef.current) {
+				if (mv.msg.n < n) continue;
+				if (mv.kind === 'throw') net.sendThrow(mv.msg); else net.sendPlace(mv.msg);
+			}
+			const ls = lastSyncRef.current;
+			if (hostRef.current && ls && ls.n !== undefined && ls.n >= n) net.sendSync(ls);
+			if (n > movesRef.current) askMissing(); // they are ahead of us: we lack something too
+		});
+		net.onLink((up) => {
+			setLinkDown(!up);
+			if (up) askMissing();
 		});
 
 		// Same terrain on both peers, from the room id alone. Neutral ground: on gravel this coarse
 		// neither seat gets an edge, and the first jack is the only thing the host does differently.
 		layMatch({ seed: seedFromRoom(net.roomId), surface: ONLINE_SURFACE, amp: DIFFS.moyen.amp, target: 13 });
+		if (resume) {
+			restoreRest(resume.rest);
+			// Our own moves sent after that rest point were lost with the page: replay them.
+			for (const mv of resume.mine) if (mv.msg.n >= resume.rest.n) inboxRef.current.set(mv.msg.n, mv);
+			drainRef.current();
+		}
+		snapshot();
 		setMpMsg(null);
 		setMpPhase('playing');
-		trackGame(gameId, 'game_started', { mode: 'en-ligne' });
-	}, [applySync, doThrow, gameId, layMatch, leaveJackView, lv, nextEnd]);
+		if (!resume) trackGame(gameId, 'game_started', { mode: 'en-ligne' });
+		askMissing();
+	}, [applySync, askMissing, gameId, layMatch, leaveJackView, lv, restoreRest, snapshot]);
 
 	const watchPeers = useCallback(() => {
 		netRef.current?.onPeers((peers) => {
-			if (peers.length >= 1) { setMpOpp(peers[0].name); startOnlineMatch(); }
-			else if (onlineRef.current) setMpMsg(tRef.current.oppLeft);
+			if (peers.length >= 1) {
+				setMpOpp(peers[0].name);
+				setOppAway(false);
+				if (onlineRef.current) askMissing(); // back from a drop or a reload: catch up both ways
+				startOnlineMatch();
+			} else if (onlineRef.current) setOppAway(true);
 		});
-	}, [startOnlineMatch]);
+	}, [askMissing, startOnlineMatch]);
+
+	/** After a reload: the same room, the same seat, the board as it last rested. */
+	const resumeOnline = useCallback(async (r: OnlineResume) => {
+		const tok = ++joinTokRef.current;
+		setMpPhase('connecting');
+		const net = await rejoinRoom(me(), r.room, r.code, r.selfId);
+		if (tok !== joinTokRef.current) { net?.leave(); return; } // cancelled meanwhile
+		if (!net) { resetOnline(); newGame('moyen'); return; }
+		netRef.current = net;
+		setMpCode(r.code);
+		setMpOpp(r.opp);
+		startOnlineMatch(r);
+		watchPeers();
+	}, [newGame, resetOnline, startOnlineMatch, watchPeers]);
+
+	/* While we wait on the other board, keep asking: a lost message costs seconds, not the match.
+	   A phone coming back to the tab asks at once, since its socket may have slept. */
+	useEffect(() => {
+		if (mpPhase !== 'playing') return;
+		const id = setInterval(() => { if (statusRef.current !== 'rolling') askMissing(); }, NEED_EVERY_MS);
+		const onVis = (): void => { if (document.visibilityState === 'visible') askMissing(); };
+		document.addEventListener('visibilitychange', onVis);
+		return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
+	}, [askMissing, mpPhase]);
 
 	const enterOnline = useCallback(() => {
 		resetOnline();
@@ -1778,15 +1997,17 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		j.x = p.x; j.y = p.y; j.live = true;
 		place(s.t, j);
 		if (jackCheck(matchRef.current.circle, j) !== 'ok') return; // legalise() should make this dead code
-		if (onlineRef.current) netRef.current?.sendPlace({ x: p.x, y: p.y });
+		if (onlineRef.current) sendMove({ kind: 'place', msg: { x: p.x, y: p.y, n: movesRef.current } });
 		matchRef.current = applyPlacedJack(matchRef.current);
+		movesRef.current++;
 		setMatch(matchRef.current);
 		placeRef.current = null;
 		setPlaceOk(false);
 		statusRef.current = 'aim';
 		setStatus('aim');
 		leaveJackView();
-	}, [leaveJackView]);
+		snapshot();
+	}, [leaveJackView, sendMove, snapshot]);
 
 	/* ---------- aiming the jack ---------- */
 
@@ -1817,9 +2038,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		leaveJackView();
 		// Only the velocity travels. The spread is already baked into it, so the other board replays
 		// the same flight without ever seeing the aim or the seeded draw behind it.
-		if (onlineRef.current) netRef.current?.sendThrow({ vx: v.vx, vy: v.vy, vz: v.vz, jack: true });
+		if (onlineRef.current) sendMove({ kind: 'throw', msg: { vx: v.vx, vy: v.vy, vz: v.vz, jack: true, n: movesRef.current } });
 		doThrow(m.turn, v, true);
-	}, [doThrow, jackAiming, leaveJackView]);
+	}, [doThrow, jackAiming, leaveJackView, sendMove]);
 
 	/* ---------- camera controls ---------- */
 
@@ -2652,6 +2873,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const params = new URLSearchParams(location.search);
 		if (!event && (params.has('defi') || params.get('mode') === 'defi' || params.get('mode') === 'daily')) return;
 		layPreview(); // the place, alive, while the ladder answers (see PREVIEW_SEED)
+		const saved = loadResume(resumeKey);
+		if (saved) { void resumeOnline(saved); return; }
 		// An event page has no ladder: straight into a free game.
 		if (event) { newGame('moyen'); return; }
 		void lv.resume().then((next) => { if (next != null) startLevel(next); else newGame('moyen'); });
@@ -2951,7 +3174,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				return { n: pts.length, ...off, at };
 			})(),
 			topFrames: topFrames(),
-			online: onlineRef.current ? { side: mySideRef.current, host: netRef.current?.isHost() ?? false } : null,
+			online: onlineRef.current ? { side: mySideRef.current, host: hostRef.current, moves: movesRef.current, inbox: [...inboxRef.current.keys()], sync: pendingSyncRef.current?.n ?? null } : null,
 			// The opponent drawing back, and whether their ray is actually on screen. Two questions:
 			// the message can land and the ray still not be built.
 			oppAim: remoteAimRef.current ? { power: remoteAimRef.current.power, live: remoteAimRef.current.live } : null,
@@ -3366,6 +3589,11 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 							<TipCard t={t} gameId={gameId} />
 						</div>
 					</div>
+				)}
+
+				{/* The link, while a match is on: without it a lost connection just looks like a frozen game. */}
+				{mpPhase === 'playing' && (linkDown || oppAway) && (
+					<div className="pe-link" role="status">{linkDown ? t.reconnecting : t.oppAway}</div>
 				)}
 
 				{/* Lobby. Shown over a playable Libre pitch, so backing out leaves a real game. */}
@@ -3915,6 +4143,7 @@ const CSS = `
 .pe-mp-code { font-size: 15px; color: var(--gray-100); }
 .pe-mp-code strong { font-size: 22px; letter-spacing: 4px; }
 .pe-mp-msg { font-size: 13px; color: var(--gray-200); }
+.pe-link { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 5; background: rgba(120,30,30,0.9); color: #fff; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 999px; white-space: nowrap; pointer-events: none; }
 .pe-mp-lobby { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--gray-200); }
 .pe-mp-dot { width: 8px; height: 8px; border-radius: 50%; background: #30d158; box-shadow: 0 0 0 3px rgba(48,209,88,0.25); animation: pe-beat 1.6s ease-in-out infinite; }
 

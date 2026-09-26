@@ -10,6 +10,10 @@
  * at rest: once the boules stop it broadcasts their positions AND the resulting rules state, and the
  * guest adopts both. That is one message per throw, about 7 boules of floats — negligible next to
  * the aim stream, and it makes drift structurally impossible rather than merely unlikely.
+ *
+ * Broadcast is fire-and-forget: a phone that dozes for two seconds misses whatever was sent
+ * meanwhile, and both boards then wait on each other forever. So every move carries its index `n`,
+ * each board applies moves strictly in order, and a board that waits asks (`need`) for what it lacks.
  */
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../data/site';
@@ -22,11 +26,15 @@ const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no ambiguous chars (
 
 export interface PetanquePeer { id: string; name: string; }
 
-/** A thrown boule: velocity only. Angles would need sin/cos, which peers may round differently. */
-export interface ThrowMsg { vx: number; vy: number; vz: number; jack: boolean; }
+/** A thrown boule: velocity only. Angles would need sin/cos, which peers may round differently.
+ *  `n` is the move's index in the match, shared by both boards (absent from pre-resync clients). */
+export interface ThrowMsg { vx: number; vy: number; vz: number; jack: boolean; n?: number; }
 
 /** The jack placed by hand after an illegal throw. */
-export interface PlaceMsg { x: number; y: number; }
+export interface PlaceMsg { x: number; y: number; n?: number; }
+
+/** "I have applied `n` moves": the other board resends its own moves from `n` on. */
+export interface NeedMsg { n: number; }
 
 /**
  * Live aim, streamed while the opponent draws back so the other screen can show their arc forming.
@@ -38,7 +46,7 @@ export interface AimMsg { yaw: number; power: number; loft: number; live: boolea
  * Host ruling at rest. `bs` is flat [x, y, z, live] per boule in simulation order, so the guest can
  * adopt positions without trusting its own float path; `match` is the rules state the host derived.
  */
-export interface SyncMsg { bs: number[]; match: Match13; }
+export interface SyncMsg { bs: number[]; match: Match13; n?: number; rng?: number; }
 
 export interface PetanqueMatchNet {
 	roomId: string;
@@ -53,6 +61,10 @@ export interface PetanqueMatchNet {
 	onAim: (cb: (a: AimMsg) => void) => void;
 	sendSync: (s: SyncMsg) => void;
 	onSync: (cb: (s: SyncMsg) => void) => void;
+	sendNeed: (m: NeedMsg) => void;
+	onNeed: (cb: (m: NeedMsg) => void) => void;
+	/** false while the socket is down; true again once the channel has rejoined. */
+	onLink: (cb: (up: boolean) => void) => void;
 	onPeers: (cb: (peers: PetanquePeer[]) => void) => void;
 	leave: () => void;
 }
@@ -61,7 +73,8 @@ let client: SupabaseClient | null = null;
 function getClient(): SupabaseClient | null {
 	if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
 	// 20/s: the aim stream sends ~12 messages a second on top of the odd throw.
-	if (!client) client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 20 } } });
+	// 15 s heartbeat (default 25): a dead mobile socket is noticed, and rejoined, sooner.
+	if (!client) client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 20 }, heartbeatIntervalMs: 15000 } });
 	return client;
 }
 
@@ -94,12 +107,14 @@ function peersOf(ch: RealtimeChannel, selfId: string): PetanquePeer[] {
 	return peers;
 }
 
-function subscribeAndSync(ch: RealtimeChannel, selfId: string): Promise<PetanquePeer[]> {
+/** `onStatus` keeps firing after the first join: the socket rejoins by itself after a drop. */
+function subscribeAndSync(ch: RealtimeChannel, selfId: string, onStatus: (status: string) => void = () => {}): Promise<PetanquePeer[]> {
 	return new Promise((resolve) => {
 		let done = false;
 		const finish = () => { if (done) return; done = true; resolve(peersOf(ch, selfId)); };
 		ch.on('presence', { event: 'sync' }, finish);
 		ch.subscribe((status) => {
+			onStatus(status);
 			if (status === 'SUBSCRIBED') setTimeout(finish, SYNC_WAIT_MS);
 			else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') resolve([]);
 		});
@@ -111,22 +126,34 @@ interface Callbacks {
 	place?: (p: PlaceMsg) => void;
 	aim?: (a: AimMsg) => void;
 	sync?: (s: SyncMsg) => void;
+	need?: (m: NeedMsg) => void;
+	link?: (up: boolean) => void;
 	peers?: (p: PetanquePeer[]) => void;
 }
 
-async function openRoom(c: SupabaseClient, roomId: string, name: string, code: string | null): Promise<PetanqueMatchNet | null> {
-	const selfId = randomId();
+async function openRoom(c: SupabaseClient, roomId: string, name: string, code: string | null, selfId = randomId()): Promise<PetanqueMatchNet | null> {
 	const ch = c.channel(roomId, { config: { presence: { key: selfId }, broadcast: { self: false } } });
 	const cb: Callbacks = {};
 	ch.on('broadcast', { event: 'throw' }, ({ payload }) => cb.throw?.(payload as ThrowMsg));
 	ch.on('broadcast', { event: 'place' }, ({ payload }) => cb.place?.(payload as PlaceMsg));
 	ch.on('broadcast', { event: 'aim' }, ({ payload }) => cb.aim?.(payload as AimMsg));
 	ch.on('broadcast', { event: 'sync' }, ({ payload }) => cb.sync?.(payload as SyncMsg));
+	ch.on('broadcast', { event: 'need' }, ({ payload }) => cb.need?.(payload as NeedMsg));
 	ch.on('presence', { event: 'sync' }, () => cb.peers?.(peersOf(ch, selfId)));
 
-	const peers = await subscribeAndSync(ch, selfId);
+	const meta: PresMeta = { id: selfId, name };
+	let joined = false;
+	const onStatus = (status: string): void => {
+		if (!joined) return;
+		if (status === 'SUBSCRIBED') {
+			void ch.track(meta); // presence does not survive the drop: show up again
+			cb.link?.(true);
+		} else cb.link?.(false);
+	};
+	const peers = await subscribeAndSync(ch, selfId, onStatus);
 	if (peers.length >= MAX_PLAYERS) { await ch.unsubscribe(); return null; } // room full
-	await ch.track({ id: selfId, name } satisfies PresMeta);
+	await ch.track(meta);
+	joined = true;
 
 	return {
 		roomId,
@@ -141,8 +168,11 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 		onAim: (fn) => { cb.aim = fn; },
 		sendSync: (s) => { void ch.send({ type: 'broadcast', event: 'sync', payload: s }); },
 		onSync: (fn) => { cb.sync = fn; },
+		sendNeed: (m) => { void ch.send({ type: 'broadcast', event: 'need', payload: m }); },
+		onNeed: (fn) => { cb.need = fn; },
+		onLink: (fn) => { cb.link = fn; },
 		onPeers: (fn) => { cb.peers = fn; fn(peersOf(ch, selfId)); },
-		leave: () => { void ch.untrack().then(() => ch.unsubscribe()); },
+		leave: () => { joined = false; void ch.untrack().then(() => ch.unsubscribe()); },
 	};
 }
 
@@ -199,6 +229,14 @@ export async function joinRandom(name: string, pool = ''): Promise<PetanqueMatch
 		if (m) return m;
 	}
 	return null;
+}
+
+/** Back into a room after a page reload, under the same id: the host is the smallest id, so a new
+ *  one could swap the seats mid-match. */
+export async function rejoinRoom(name: string, roomId: string, code: string | null, selfId: string): Promise<PetanqueMatchNet | null> {
+	const c = getClient();
+	if (!c) return null;
+	return openRoom(c, roomId, name, code, selfId);
 }
 
 /** Join (or create) the room for a shared friend code. */
