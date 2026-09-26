@@ -197,7 +197,7 @@ const AI_THINK_MS = 700;
 const FOE_GESTURE_MS = 950;
 const END_CARD_MS = 2800;
 const END_TABLE_MS = 6000; // the end-of-end card carries a table of six rows — reading it takes longer
-const STATION_CARD_MS = 1500; // the daily has 12 of these, so it holds the card half as long
+const STATION_CARD_MS = END_CARD_MS; // time to read the grade; "Continuer" skips it
 const ROLL_CAP = 24; // s of simulated roll before we call it settled anyway
 const AIM_SEND_MS = 80; // ~12 aim frames a second, same rate billard settled on
 const AIM_STALE_MS = 2500; // stop drawing their arc if the stream dries up (tab hidden, drop)
@@ -577,6 +577,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	// Daily. `dailyRef` is null in every other mode, which is what the settle branch tests on.
 	const dailyRef = useRef<DailyState | null>(null);
 	const startRef = useRef(0);
+	const cardPauseRef = useRef<number | null>(null); // when the grade card went up: its time is not billed
 
 	// Online. `mySideRef` is the seat this device plays; offline it is always HUMAN, so every
 	// "is it mine" test can read it unconditionally.
@@ -1019,6 +1020,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		for (const b of bodies) addBody(b);
 		d.target = bodies[0];
 		d.targetAt = { x: bodies[0].x, y: bodies[0].y };
+		// The chrono stood still while the grade was read; it picks up again with the next shot.
+		if (cardPauseRef.current != null) { startRef.current += Date.now() - cardPauseRef.current; cardPauseRef.current = null; }
 		setStationNo(i);
 		setCard(null);
 		powerRef.current = 0; camYawRef.current = 0; aimYawRef.current = 0; dragRef.current = null;
@@ -1043,6 +1046,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const seed = run?.seed ?? (await getDaily(gameId)).seed;
 		const grades = (run?.state as { grades?: Grade[] } | undefined)?.grades ?? [];
 
+		cardPauseRef.current = null;
 		dailyRef.current = { course: makeCourse(seed), event: false, grades, target: null, targetAt: null };
 		if (!layCourse(dailyRef.current.course)) { setDailyLoading(false); return; }
 		setDailyLoading(false);
@@ -1071,6 +1075,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const startEventChallenge = useCallback(() => {
 		if (!event) return;
 		setDaily(true);
+		cardPauseRef.current = null;
 		dailyRef.current = { course: makeEventCourse(seedFromRoom(event.id)), event: true, grades: [], target: null, targetAt: null };
 		if (!layCourse(dailyRef.current.course)) return;
 		setDailyLoading(false);
@@ -1541,6 +1546,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				state: { grades: d.grades },
 			});
 			if (!last) {
+				cardPauseRef.current = Date.now();
 				statusRef.current = 'end';
 				setStatus('end');
 				endAtRef.current = performance.now() + STATION_CARD_MS;
@@ -2936,11 +2942,13 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	}, []);
 
 	/* The daily chrono is the leaderboard tiebreak, so it must not bill time spent away. */
-	const ticking = daily && !dailyDone && !dailyLoading;
+	const ticking = daily && !dailyDone && !dailyLoading && status !== 'end'; // the grade card is paused on its own
 	usePlayClock(startRef, ticking, daily ? gameId : null);
 	useEffect(() => {
 		if (!ticking) return;
-		const id = setInterval(() => setElapsed(Math.round((Date.now() - startRef.current) / 10)), 200);
+		const id = setInterval(() => {
+			if (cardPauseRef.current == null) setElapsed(Math.round((Date.now() - startRef.current) / 10));
+		}, 200);
 		return () => clearInterval(id);
 	}, [ticking]);
 
