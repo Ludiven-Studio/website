@@ -1,0 +1,133 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import CallToAction from '../components/CallToAction.astro';
+import Icon from '../components/Icon.astro';
+
+const EXAMPLE = '/jeux/petanque/coruna/';
+const MAIL = `mailto:contact@ludiven-studio.fr?subject=${encodeURIComponent('Jeu de pétanque pour notre tournoi')}`;
+
+const included = [
+	'Une page de jeu rien qu’à vous, avec un lien à partager sur vos réseaux',
+	'Le nom de votre tournoi en grand, au-dessus du terrain',
+	'Les logos de votre club et de vos sponsors sur les panneaux autour du terrain',
+	'Un mode en ligne réservé à vos joueurs : ils s’affrontent entre eux',
+	'En français, en anglais ou en espagnol',
+];
+const needed = [
+	'Le logo du club et ceux des sponsors (PNG de préférence)',
+	'Le nom exact et la date du tournoi',
+	'Environ une semaine avant l’événement',
+];
+
+const title = 'Votre tournoi de pétanque dans un jeu en ligne | Ludiven Studio';
+const description = 'Un jeu de pétanque 3D aux couleurs de votre tournoi : nom du tournoi, logos du club et des sponsors, mode en ligne réservé à vos joueurs.';
+---
+
+<BaseLayout title={title} description={description} image="/assets/work/og/tournoi-petanque.jpg">
+	<div class="stack gap-20">
+		<main class="wrapper stack gap-12">
+			<Hero
+				title="Votre tournoi dans le jeu de pétanque"
+				tagline="Pour les clubs et les organisateurs : une version du jeu de pétanque en ligne aux couleurs de votre tournoi, à faire tourner avant le jour J."
+				align="start"
+			/>
+
+			<a class="shot" href={EXAMPLE}>
+				<img src="/assets/services/tournoi-petanque.webp" width="1010" height="390"
+					alt="Le jeu de pétanque aux couleurs de la Copa Coruñesa de Petanca 2026 : bannière du tournoi et panneaux des sponsors autour du terrain" />
+				<span>Exemple : Copa Coruñesa de Petanca 2026 · jouer ›</span>
+			</a>
+
+			<div class="cols">
+				<section class="stack gap-4">
+					<h2>Ce que vous obtenez</h2>
+					<ul>{included.map((s) => <li>{s}</li>)}</ul>
+				</section>
+				<section class="stack gap-4">
+					<h2>Ce qu’il me faut</h2>
+					<ul>{needed.map((s) => <li>{s}</li>)}</ul>
+					<p class="terms">
+						Les conditions dépendent de l’événement. Pour un club, faire connaître le jeu et
+						l’appli <a href="/petanque-scanner/">Pétanque Scanner</a> à vos joueurs peut suffire.
+					</p>
+				</section>
+			</div>
+
+			<div class="cta">
+				<CallToAction href={MAIL}>
+					Parlons de votre tournoi
+					<Icon icon="paper-plane-tilt" size="1.2em" />
+				</CallToAction>
+			</div>
+		</main>
+	</div>
+</BaseLayout>
+
+<style>
+	.shot {
+		display: flex;
+		flex-direction: column;
+		border-radius: 0.9rem;
+		overflow: hidden;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-md);
+		text-decoration: none;
+		transition: border-color var(--theme-transition), transform var(--theme-transition);
+	}
+
+	.shot:hover,
+	.shot:focus-visible {
+		border-color: var(--accent-regular);
+		transform: translateY(-2px);
+	}
+
+	.shot img {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+
+	.shot span {
+		padding: 0.75rem 1.25rem;
+		font-size: var(--text-sm);
+		color: var(--accent-regular);
+		background: var(--gray-999_40);
+	}
+
+	.cols {
+		display: grid;
+		gap: 2rem;
+		grid-template-columns: 1fr;
+	}
+
+	h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+
+	ul {
+		margin: 0;
+		padding-left: 1.2rem;
+		color: var(--gray-300);
+		line-height: 1.6;
+	}
+
+	.terms {
+		color: var(--gray-400);
+		font-size: var(--text-sm);
+		line-height: 1.5;
+	}
+
+	.cta {
+		display: flex;
+		justify-content: center;
+	}
+
+	@media (min-width: 50em) {
+		.cols {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 3rem;
+		}
+	}
+</style>
