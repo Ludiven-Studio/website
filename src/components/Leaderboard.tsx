@@ -102,13 +102,16 @@ interface Props {
 	source?: () => Promise<ScoreRow[]>;
 	/** Share + "tous les défis" row. Off when the board is only a peek (free mode corner). */
 	actions?: boolean;
+	/** The title folds the board. Defaults to `actions`: the inline daily board folds, a corner panel
+	    (which has its own close) does not. */
+	fold?: boolean;
 	lang?: GameLang;
 	/** An event board rather than the day's: its own title and empty line, and `submitValue` goes
 	    in as a free-play row (no challenge date) even though `source` does the reading. */
 	event?: { title: string; empty: string };
 }
 
-function LeaderboardInner({ game, metric, submitValue, format, source, actions = true, lang = 'fr', event }: Props) {
+function LeaderboardInner({ game, metric, submitValue, format, source, actions = true, fold = actions, lang = 'fr', event }: Props) {
 	const t = { ...tr(lang, TXT), ...(event ?? {}) };
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
@@ -127,8 +130,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	const [submitFailed, setSubmitFailed] = useState<'network' | 'rejected' | null>(null);
 	const [shareMsg, setShareMsg] = useState('');
 	const [dayValue, setDayValue] = useState<number | null>(null); // today's own result, this run or an earlier one
-	// Only the inline daily board folds; the corner peek (actions=false) stays open, plain title.
-	const collapsible = actions;
+	const collapsible = fold;
 	const [open, setOpen] = useState<boolean>(!collapsible || submitValue != null);
 	const lastSubmittedRef = useRef<number | null>(null); // last value sent (re-submit when it improves)
 	const userToggledRef = useRef(false); // once the player folds/unfolds by hand, stop auto-opening

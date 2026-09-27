@@ -43,7 +43,6 @@ import { getDaily, loadDailyRun, saveDailyRun, playerName } from '../../lib/lead
 import { challengeWeekday } from '../../lib/day';
 import { detectGameLang, storedGameLang, saveGameLang, announceGameLang, nextGameLang, type GameLang } from '../../lib/gameLang';
 import { STRINGS, LANG_KEY, TIP_URL, COFFEE_URL, type Strings } from './i18n';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import { getEventLeaderboard } from '../../lib/scores';
 import ModeToggle from '../../components/ModeToggle';
@@ -3775,14 +3774,12 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				)}
 			</div>
 
-			{daily && !event && <Leaderboard
-				key={`lb-${points}-${dailyDone ? 1 : 0}`}
-				game={LB_ID(gameId)}
-				metric="time"
-				submitValue={dailyDone && dailyScore != null ? dailyScore : undefined}
-				format={fmtPacked}
-				lang={lang}
-			/>}
+			{/* A trophy in the corner, like the event's: laid inline, the board took a band of the screen
+			    under the pitch for the whole course. */}
+			{daily && !event && (
+				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" lang={lang} actions
+					submitValue={dailyDone && dailyScore != null ? dailyScore : undefined} />
+			)}
 
 			{event && (
 				<LeaderboardCorner game={eventLbId} metric="time" format={fmtEvent} side="right" lang={lang}

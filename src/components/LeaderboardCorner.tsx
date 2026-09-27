@@ -21,9 +21,11 @@ interface Props {
 	event?: { title: string; empty: string };
 	/** A finished run to submit: opens the panel on it. */
 	submitValue?: number;
+	/** Share + "tous les défis" in the panel: for a daily board shown here instead of inline. */
+	actions?: boolean;
 }
 
-export default function LeaderboardCorner({ game, metric, format, source, side = 'center', lang = 'fr', event, submitValue }: Props) {
+export default function LeaderboardCorner({ game, metric, format, source, side = 'center', lang = 'fr', event, submitValue, actions = false }: Props) {
 	const [open, setOpen] = useState(false);
 	const [shownFor, setShownFor] = useState<number | undefined>(undefined);
 	if (submitValue !== shownFor) { setShownFor(submitValue); if (submitValue != null) setOpen(true); }
@@ -38,7 +40,7 @@ export default function LeaderboardCorner({ game, metric, format, source, side =
 					<button className="lbc-close" onClick={() => setOpen(false)} aria-label={tr(lang, { fr: 'Fermer', en: 'Close', es: 'Cerrar' })}>
 						✕
 					</button>
-					<Leaderboard game={game} metric={metric} format={format} source={source} actions={false} lang={lang} event={event} submitValue={submitValue} />
+					<Leaderboard game={game} metric={metric} format={format} source={source} actions={actions} fold={false} lang={lang} event={event} submitValue={submitValue} />
 				</div>
 			)}
 			<button
