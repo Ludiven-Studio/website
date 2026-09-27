@@ -3787,11 +3787,11 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				)}
 			</div>
 
-			{/* A trophy in the corner, like the event's: laid inline, the board took a band of the screen
-			    under the pitch for the whole course. */}
-			{daily && !event && (
+			{/* A trophy in the corner, like the event's, in every mode: the day's board stays one press
+			    away from a free match too. Laid inline, it took a band of the screen under the pitch. */}
+			{!event && (
 				<LeaderboardCorner game={LB_ID(gameId)} metric="time" format={fmtPacked} side="right" lang={lang} actions
-					submitValue={dailyDone && dailyScore != null ? dailyScore : undefined} />
+					submitValue={daily && dailyDone && dailyScore != null ? dailyScore : undefined} />
 			)}
 
 			{event && (
@@ -4196,6 +4196,14 @@ const CSS = `
 }
 .pe-root:has(.pe-over) .pe-loft, .pe-root:has(.pe-over) .pe-zoom { display: none; }
 .game-page.gf-full:has(.pe-over) .pe-hud-actions { bottom: max(10px, env(safe-area-inset-bottom)); }
+/* The trophy ends the action row, at its height: in the pad's band it cut the pad's travel short of
+   the right edge, the side that keeps the hand off the play. The row steps left of it. */
+.game-page.gf-full .pe-root .lbc-root.lbc-side {
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + clamp(110px, 45vh, 150px) + 16px + 40px);
+}
+.game-page.gf-full:has(.pe-over) .pe-root .lbc-root.lbc-side { bottom: max(10px, env(safe-area-inset-bottom)); }
+.game-page.gf-full .pe-root:has(.lbc-pill) .pe-hud-actions { right: calc(max(8px, env(safe-area-inset-right)) + 50px); }
 .pe-overlay.pe-aside { justify-content: flex-start; align-items: flex-start; pointer-events: none; padding: clamp(56px, 25vh, 216px) 8px 8px max(10px, env(safe-area-inset-left)); }
 .pe-overlay.pe-aside .pe-card { pointer-events: auto; width: clamp(214px, 52vw, 380px); margin: 0; }
 @media (orientation: landscape) and (max-height: 520px) {
