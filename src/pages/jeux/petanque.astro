@@ -60,14 +60,4 @@ import PetanqueGame from '../../games/petanque/PetanqueGame.tsx';
 	:global(.game-page.gf-full) .pe-scanner {
 		display: none;
 	}
-	/* The leaderboard pill is pinned bottom-right by LeaderboardCorner, which is the corner the
-	   launch board now owns — a hit test over the board found it stealing presses there. Lifted
-	   clear of the board and sent to the other side, because the action row already took the right.
-	   Global because the pill is not in this template, but this stylesheet only ships on this page. */
-	:global(.game-page.gf-full .lbc-root.lbc-side) {
-		right: auto;
-		left: max(12px, env(safe-area-inset-left));
-		align-items: flex-start;
-		bottom: calc(max(12px, env(safe-area-inset-bottom)) + clamp(110px, 30vh, 200px) + 40px);
-	}
 </style>

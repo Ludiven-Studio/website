@@ -34,6 +34,8 @@ async function open(viewport) {
 	await page.waitForFunction(() => window.__petanque && window.__petanque().status === 'aim', null, { timeout: 15000 });
 	await page.getByRole('tab', { name: /Libre/ }).click();
 	await sleep(700);
+	// Libre also opens its ground card, a page modal: it would take the next click.
+	await page.locator('.pe-ground .pe-bar-x').click();
 	// Fullscreen: in `astro preview` the canvas otherwise runs past the fold.
 	await page.evaluate(() => {
 		document.querySelector('.game-page')?.classList.add('gf-full');
