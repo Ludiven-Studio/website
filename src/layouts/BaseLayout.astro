@@ -86,6 +86,31 @@ if (path === '/' || path === '') {
 			// Register the service worker (offline play + faster repeat visits).
 			// @vite-pwa/astro skips auto-injection when it doesn't manage the manifest,
 			// so we register its generated sw.js ourselves.
+			function updateBanner(reload: () => void) {
+				const lang = document.documentElement.lang.slice(0, 2);
+				const [text, action] =
+					lang === 'es' ? ['Nueva versión disponible', 'Recargar']
+					: lang === 'en' ? ['New version available', 'Reload']
+					: ['Nouvelle version disponible', 'Recharger'];
+				const bar = document.createElement('div');
+				bar.className = 'sw-update';
+				bar.setAttribute('role', 'status');
+				bar.append(`${text} · `);
+				const btn = document.createElement('button');
+				btn.type = 'button';
+				btn.textContent = action;
+				btn.addEventListener('click', reload);
+				const close = document.createElement('button');
+				close.type = 'button';
+				close.className = 'sw-update-x';
+				close.textContent = '✕';
+				close.setAttribute('aria-label', 'OK');
+				close.addEventListener('click', () => bar.remove());
+				bar.append(btn, close);
+				// Inside the game page: native fullscreen shows that element only.
+				(document.querySelector('.game-page') ?? document.body).appendChild(bar);
+			}
+
 			if ('serviceWorker' in navigator) {
 				addEventListener('load', () => {
 					const sw = navigator.serviceWorker;
@@ -96,10 +121,21 @@ if (path === '/' || path === '') {
 					sw.register('/sw.js').then((reg) => reg.update()).catch(() => {});
 					// A new sw.js took control (skipWaiting + clientsClaim) → reload ONCE to pick up
 					// the fresh assets, so a deploy applies without a manual cache clear.
-					sw.addEventListener('controllerchange', () => {
-						if (reloaded || !hadController) return;
+					const reload = () => {
+						if (reloaded) return;
 						reloaded = true;
 						location.reload();
+					};
+					sw.addEventListener('controllerchange', () => {
+						if (reloaded || !hadController) return;
+						if (!document.querySelector('.game-page')) return reload();
+						// In a game the new worker lands ~30 s in on a phone (it precaches every game),
+						// i.e. mid-match. Offer it, and take it when the page is put away. The timer
+						// never fires if "hidden" is a navigation, which loads the new version anyway.
+						document.addEventListener('visibilitychange', () => {
+							if (document.visibilityState === 'hidden') setTimeout(reload, 300);
+						});
+						updateBanner(reload);
 					});
 					// Re-check for a new sw.js when a long-lived tab/PWA regains focus.
 					document.addEventListener('visibilitychange', () => {
@@ -112,6 +148,21 @@ if (path === '/' || path === '') {
 		</script>
 
 		<style>
+			/* Built by the script, so it carries no scope attribute. Top centre: the bottom belongs to
+			   the games' pads and the corners to their HUD. */
+			:global(.sw-update) {
+				position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+				z-index: 2147483647; display: flex; align-items: center; gap: 6px; max-width: calc(100vw - 24px);
+				padding: 6px 6px 6px 14px; border-radius: 999px; background: var(--gray-999); color: var(--gray-0);
+				border: 1.5px solid var(--accent-regular); box-shadow: var(--shadow-md);
+				font: 600 13px/1.2 var(--font-body); white-space: nowrap;
+			}
+			:global(.sw-update button) {
+				border: none; border-radius: 999px; padding: 5px 12px; cursor: pointer; font: inherit;
+				background: var(--accent-regular); color: var(--accent-text-over);
+			}
+			:global(.sw-update button.sw-update-x) { background: transparent; color: var(--gray-300); padding: 5px 8px; }
+
 			:root {
 				--_placeholder-bg: linear-gradient(transparent, transparent);
 				--bg-image-main: url('/assets/backgrounds/bg-main-light-800w.jpg');
