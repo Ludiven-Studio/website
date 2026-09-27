@@ -4,7 +4,6 @@ import { mulberry32 } from '../prng';
 import { diffKeys } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -179,6 +178,9 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback((): void => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -312,10 +314,7 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 				</div>
 			) : null}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
-			<>
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="mm-status">
 				<span className="mm-score">{total} pts</span>
 				<span className="mm-count">{found.length} mot{found.length > 1 ? 's' : ''}</span>
@@ -411,15 +410,13 @@ export default function MeliMeloGame({ gameId }: { gameId: string }) {
 			) : (
 				found.length > 0 && <div className="mm-chips live">{found.slice().reverse().map((w) => <span key={w} className="mm-chip done">{w} <i>+{wordPoints(w)}</i></span>)}</div>
 			)}
-			</>
-			)}
 
 			<p className="mm-help">
 				Relie des lettres voisines (8 directions, chaque case une seule fois) pour former des mots de 3 lettres ou plus.
 				3-4 lettres = 1 pt, 5 = 2, 6 = 3, 7 = 5, 8 = 11.
 			</p>
 
-			{daily && <Leaderboard game={gameId} metric="score" submitValue={status === 'ended' && !alreadyPlayed ? total : undefined} />}
+			{daily && <LeaderboardCorner game={gameId} metric="score" actions submitValue={status === 'ended' && !alreadyPlayed ? total : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);

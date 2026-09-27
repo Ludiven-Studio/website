@@ -12,7 +12,6 @@ import {
 import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
@@ -479,6 +478,10 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 		lv.enter(); // load progression + show the grid
 	}, [stop, lv]);
 
+	const closeLevels = () => {
+		if (!lv.close()) armFree(diffKey);
+	};
+
 	// Mirror the levels-grid state into a ref so the loop/input guards stay in sync
 	// (e.g. after "Carte" returns from an outcome card).
 	useEffect(() => {
@@ -633,7 +636,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<div className={`fl-boardwrap ${lv.active && lv.menu ? 'hidden' : ''}`}>
+			<div className="fl-boardwrap">
 				<canvas
 					ref={canvasRef}
 					className="fl-canvas"
@@ -688,7 +691,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} />}
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 
 			<p className="fl-help">
 				Appuie sur <strong>Espace</strong>, clique ou touche l'écran pour battre des ailes.
@@ -697,7 +700,7 @@ export default function FlappyGame({ gameId }: { gameId: string }) {
 				au défi du jour, les tuyaux sont les mêmes pour tout le monde.
 			</p>
 
-			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
+			{daily && !lv.active && <LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" actions submitValue={status === 'over' ? best : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
@@ -726,7 +729,6 @@ const CSS = `
 
 .fl-boardwrap { position: relative; width: 100%; max-width: 420px; margin-inline: auto; }
 /* Levels menu: keep the canvas mounted (rAF/render) but hide it behind the level grid. */
-.fl-boardwrap.hidden { display: none; }
 /* Site global fullscreen → the board fits the REMAINING space (a square, no overflow in landscape). */
 .game-page.gf-full .fl-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .fl-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }

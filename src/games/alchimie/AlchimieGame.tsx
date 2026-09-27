@@ -4,7 +4,7 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { encodePacked, formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
-import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
@@ -302,6 +302,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 
 	/* Levels: each level seeds the workspace with the 5 bases and asks to craft one target. */
 	const armLevels = useCallback(() => { modeRef.current = 'level'; setMode('level'); setTokens([]); setReveal(null); setSearch(''); lv.enter(); }, [lv]);
+	const closeLevels = useCallback(() => { if (!lv.close()) newFree(); }, [lv, newFree]);
 
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
@@ -452,9 +453,11 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 				</>
 			)}
 
-			{levels && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : !daily && !levels && catalog ? (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
+
+			{!daily && !levels && catalog ? (
 				<div className="al-catalog">
 					<div className="al-catbar"><b>{discovered.length}</b> / {TOTAL} découverts · <span className="al-catfrontier">{frontierCount} à portée</span></div>
 					<div className="al-catgrid">
@@ -554,7 +557,7 @@ export default function AlchimieGame({ gameId }: { gameId: string }) {
 			<div ref={floatRef} className="al-float" style={{ display: 'none' }} />
 
 			{daily && !dLoading && (
-				<Leaderboard game={LB_ID} metric="time" submitValue={dDone ? dScore : undefined} format={(v) => formatScore(DAILY_LB.alchimie.fmt, v)} />
+				<LeaderboardCorner game={LB_ID} metric="time" actions submitValue={dDone ? dScore : undefined} format={(v) => formatScore(DAILY_LB.alchimie.fmt, v)} />
 			)}
 
 			<p className="al-help">

@@ -30,7 +30,6 @@ import {
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
@@ -1235,6 +1234,8 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 
 	const armLevels = useCallback(() => {
 		stop();
+		// Over a level: keep its run so closing the grid resumes it.
+		if (lv.active) { selectCard(null); lv.enter(); return; }
 		dailyRef.current = false;
 		setDaily(false);
 		levelTargetWaveRef.current = 0;
@@ -1252,6 +1253,18 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 		setStat('ready');
 		draw();
 	}, [lv, stop, draw]);
+	const closeLevels = useCallback(() => {
+		if (lv.close()) {
+			if (statusRef.current === 'playing' && !runningRef.current) {
+				lastRef.current = performance.now();
+				runningRef.current = true;
+				rafRef.current = requestAnimationFrame(frame);
+			}
+			return;
+		}
+		levelTargetWaveRef.current = 0;
+		armFree(diffKey);
+	}, [lv, frame, armFree, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// The level opens behind a ▶ Niveau N — Commencer gate; the loop only runs on that tap. This is
@@ -1573,14 +1586,14 @@ export default function CocottesRenardsGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{lv.active && lv.menu && (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 			)}
 
 			<p className="cr-help">
 				Sélectionne une cocotte puis clique une case pour la poser. Ramasse vite les jetons de blé&nbsp;: ils perdent de la valeur avec le temps (compteur au-dessus). Si un renard atteint un nid, la ligne est perdue — clique-la pour la reconstruire ({REBUY_COST}&nbsp;blé). Tu perds quand il ne reste plus aucun nid.
 			</p>
 
-			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? best : undefined} />}
+			{daily && !lv.active && <LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" actions submitValue={status === 'over' && !alreadyPlayed ? best : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);

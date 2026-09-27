@@ -4,7 +4,6 @@ import { makeGrid, lineCells, matchIndex, findHint, DIFFS, type Grid, type Cell,
 import { diffKeys } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -121,6 +120,10 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setHint(null); hintedRef.current = [];
 	}, []);
+
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	const startDaily = useCallback(async () => {
 		setDaily(true);
@@ -263,7 +266,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && !lv.menu && (
+			{lv.active && (
 				<div className="mm-status">
 					<span className="mm-theme">🔎 {grid.theme}</span>
 					<span className="mm-count">{found.length}/{total}</span>
@@ -302,10 +305,7 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
-			<>
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="mm-playwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -375,10 +375,8 @@ export default function MotsMelesGame({ gameId }: { gameId: string }) {
 			{daily && status === 'playing' && (
 				<p className="mm-help">Retrouve tous les mots le plus vite possible. Glisse sur les lettres pour surligner.</p>
 			)}
-			</>
-			)}
 
-			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
+			{daily && <LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);

@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import {
 	fetchLeaderboard,
 	submitDaily,
@@ -18,6 +17,7 @@ import { gameStreak } from '../lib/streak';
 import { equippedBlason } from '../lib/wallet';
 import { trackEvent } from '../lib/analytics';
 import ErrorBoundary from './ErrorBoundary';
+import GameModal from './GameModal';
 import { tr, type GameLang } from '../lib/gameLang';
 
 // Time leaderboards store CENTISECONDS; a game may still pass its own `format`.
@@ -121,7 +121,6 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	const [myRank, setMyRank] = useState<number | null>(null);
 	const [all, setAll] = useState(false); // the full board is open
 	const pagerRef = useRef<Pager>(async () => []);
-	const rootRef = useRef<HTMLDivElement | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(false);
 	// 'network' is worth a retry; 'rejected' means the server refused the value itself,
@@ -294,7 +293,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	};
 
 	return (
-		<div className={`lb-root ${open ? '' : 'is-folded'}`} ref={rootRef}>
+		<div className={`lb-root ${open ? '' : 'is-folded'}`}>
 			<style>{CSS}</style>
 			{collapsible ? (
 				<button className="lb-title" onClick={toggle} aria-expanded={open}>
@@ -357,11 +356,9 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 							)}
 						</>
 					)}
-					{all && rootRef.current && createPortal(
+					{all && (
 						<AllRows title={t.title} total={total} pager={pagerRef.current} me={me} blason={myBlason?.emoji}
-							fmt={fmt} closeLabel={t.close} loadingLabel={t.loading} onClose={() => setAll(false)} />,
-						// Inside the game page: native fullscreen shows that element only, so a portal to <body> would vanish.
-						rootRef.current.closest('.game-page') ?? document.body,
+							fmt={fmt} closeLabel={t.close} loadingLabel={t.loading} onClose={() => setAll(false)} />
 					)}
 
 					{showInput ? (
@@ -447,25 +444,13 @@ function AllRows({ title, total, pager, me, blason, fmt, closeLabel, loadingLabe
 		return () => io.disconnect();
 	}, [more, done]);
 
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-		window.addEventListener('keydown', onKey);
-		return () => window.removeEventListener('keydown', onKey);
-	}, [onClose]);
-
 	return (
-		<div className="lb-all" role="dialog" aria-modal="true" aria-label={title}>
-			<div className="lb-all-head">
-				<h3>{title} <span className="lb-all-n">· {total}</span></h3>
-				<button className="lb-all-close" onClick={onClose} aria-label={closeLabel}>✕</button>
-			</div>
-			<div className="lb-all-body" ref={boxRef}>
-				<ol className="lb-list">
-					{rows.map((r) => <Row key={`${r.rank}-${r.name}`} r={r} me={me} blason={blason} fmt={fmt} />)}
-				</ol>
-				{!done && <div ref={endRef} className="lb-msg lb-all-more">{loadingLabel}</div>}
-			</div>
-		</div>
+		<GameModal title={<>{title} <span className="lb-all-n">· {total}</span></>} onClose={onClose} closeLabel={closeLabel} bodyRef={boxRef} width={460}>
+			<ol className="lb-list">
+				{rows.map((r) => <Row key={`${r.rank}-${r.name}`} r={r} me={me} blason={blason} fmt={fmt} />)}
+			</ol>
+			{!done && <div ref={endRef} className="lb-msg lb-all-more">{loadingLabel}</div>}
+		</GameModal>
 	);
 }
 
@@ -561,21 +546,7 @@ const CSS = `
   font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 16px; cursor: pointer;
 }
 .lb-all-btn:hover, .lb-all-btn:focus-visible { border-color: var(--accent-regular); color: var(--accent-regular); }
-/* Above everything, the fullscreen exit included: this is a modal and has its own close. */
-.lb-all {
-  position: fixed; inset: 0; z-index: 2147483647; display: flex; flex-direction: column;
-  background: var(--gray-999); color: var(--gray-0); font-family: var(--font-body);
-}
-.lb-all-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
-  border-bottom: 1px solid var(--gray-800);
-}
-.lb-all-head h3 { margin: 0; font-size: 17px; }
 .lb-all-n { color: var(--gray-300); font-weight: 500; }
-.lb-all-close { border: none; background: transparent; color: var(--gray-0); font-size: 20px; line-height: 1; padding: 6px 8px; cursor: pointer; }
-.lb-all-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); }
-.lb-all-body .lb-list { max-width: 480px; margin: 0 auto; }
 .lb-all-more { padding: 14px 0; }
 .lb-row.me { border-color: var(--accent-regular); background: var(--accent-overlay); }
 .lb-rank { font-weight: 700; color: var(--gray-300); text-align: center; font-variant-numeric: tabular-nums; }

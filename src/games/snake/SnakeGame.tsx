@@ -16,7 +16,6 @@ import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
@@ -538,6 +537,16 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 		lv.enter();
 	}, [lv, stop]);
 
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) { armFree(diffKey); return; }
+		// armLevels paused the run: pick it up where it stopped.
+		if (status === 'playing' && !runningRef.current) {
+			lastRef.current = performance.now();
+			runningRef.current = true;
+			rafRef.current = requestAnimationFrame(frame);
+		}
+	}, [lv, armFree, diffKey, status, frame]);
+
 	// Levels is the default landing: resume at the next unlocked level (grid once all
 	// cleared). A ?defi deep link opens the daily instead — skip auto-resume then.
 	useEffect(() => {
@@ -689,10 +698,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="sn-boardwrap edge-safe">
-				{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-				) : (
-				<>
+				{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 				<canvas
 					ref={canvasRef}
 					className="sn-canvas"
@@ -740,8 +746,6 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 						onMenu={lv.backToMenu}
 					/>
 				)}
-				</>
-				)}
 			</div>
 
 			<p className="sn-help">
@@ -749,7 +753,7 @@ export default function SnakeGame({ gameId }: { gameId: string }) {
 				Tu accélères en grossissant — évite les murs et ta propre queue&nbsp;!
 			</p>
 
-			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
+			{daily && !lv.active && <LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" actions submitValue={status === 'over' ? best : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);

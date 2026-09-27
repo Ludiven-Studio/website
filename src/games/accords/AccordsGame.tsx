@@ -737,7 +737,11 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 		);
 	};
 
-	const levelsMenu = lv.active && lv.menu;
+	// armLevels cleared the level flag and parked the round on 'intro': the ready-gate resumes it.
+	const closeLevels = (): void => {
+		if (lv.close()) levelsModeRef.current = true;
+		else startGame();
+	};
 	const totalRounds = roundsRef.current.length;
 
 	return (
@@ -761,29 +765,27 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 				</div>
 			)}
 
-			{!levelsMenu && (
-				<div className="ac-hud">
-					<span className="ac-pill">
-						{lv.active ? (
-							<>Justes <strong>{lvCorrect}</strong>/{totalRounds}</>
-						) : (
-							<>Niveau <strong>{Math.min(level + 1, totalRounds)}</strong>/{totalRounds}</>
-						)}
-					</span>
-					<span className="ac-pill ac-chord">
-						{pitchName(round.root)} {round.chord.name}
-					</span>
-					<span className="ac-pill">🎹 {INSTRUMENTS[round.instrument].label}</span>
-					{lv.active
-						? lvFalls > 0 && <span className="ac-pill">Chutes {lvFalls}</span>
-						: attempts > 0 && <span className="ac-pill">Chutes {attempts}</span>}
-				</div>
+			<div className="ac-hud">
+				<span className="ac-pill">
+					{lv.active ? (
+						<>Justes <strong>{lvCorrect}</strong>/{totalRounds}</>
+					) : (
+						<>Niveau <strong>{Math.min(level + 1, totalRounds)}</strong>/{totalRounds}</>
+					)}
+				</span>
+				<span className="ac-pill ac-chord">
+					{pitchName(round.root)} {round.chord.name}
+				</span>
+				<span className="ac-pill">🎹 {INSTRUMENTS[round.instrument].label}</span>
+				{lv.active
+					? lvFalls > 0 && <span className="ac-pill">Chutes {lvFalls}</span>
+					: attempts > 0 && <span className="ac-pill">Chutes {attempts}</span>}
+			</div>
+
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 			)}
 
-			{levelsMenu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
-			<>
 			<div className="ac-controls">
 				<button className="ac-btn primary" onClick={hearChord} disabled={status === 'intro' || status === 'won'}>
 					▶ Écouter l'accord
@@ -882,8 +884,6 @@ export default function AccordsGame({ gameId = 'accords' }: { gameId?: string } 
 				<p className="ac-help">
 					Prototype — sur un analyseur de spectre, chaque note est un <b>pic</b> à une fréquence. Glisse les pics <b>horizontalement</b> pour les poser aux bonnes fréquences. Aucun retour de justesse&nbsp;: fie-toi à l'oreille («&nbsp;Ma version&nbsp;» pour comparer). Les pics <b>🔒</b> sont des aides&nbsp;: «&nbsp;Notes posées&nbsp;» ou tape-les pour les entendre.
 				</p>
-			)}
-			</>
 			)}
 		</div>
 	);

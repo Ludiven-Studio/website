@@ -16,7 +16,6 @@ import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import LevelSelect from '../../components/LevelSelect';
@@ -630,15 +629,26 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 
 	const armLevels = useCallback(() => {
 		stop();
+		menuOpenRef.current = true;
+		// Over a level: keep its run so closing the grid resumes it.
+		if (lv.active) { lv.enter(); return; }
 		resetBoom();
 		levelsRef.current = false;
-		menuOpenRef.current = true;
 		dailyRef.current = false;
 		setDaily(false);
 		statusRef.current = 'ready';
 		setStatus('ready');
 		lv.enter();
 	}, [stop, resetBoom, lv]);
+	const closeLevels = useCallback(() => {
+		menuOpenRef.current = false;
+		if (!lv.close()) { armFree(diffKey); return; }
+		if (statusRef.current === 'playing' && !runningRef.current) {
+			lastRef.current = performance.now();
+			runningRef.current = true;
+			rafRef.current = requestAnimationFrame(frame);
+		}
+	}, [lv, armFree, diffKey, frame]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// startLevel lands in the "ready" state (▶ Niveau N gate) — the loop only runs on the first input.
@@ -830,7 +840,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{!webglError && status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && !(lv.active && lv.menu) && (
+				{!webglError && status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
 					<div className="es-overlay">
 						<button className="es-startbtn" onClick={start}>▶ {lv.active ? `Niveau ${lv.level}` : daily ? 'Commencer' : 'Jouer'}</button>
 					</div>
@@ -856,10 +866,8 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{lv.menu && (
-					<div className="es-overlay es-levels">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
-					</div>
+				{lv.active && lv.menu && (
+					<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 				)}
 
 				{lv.done && (
@@ -883,7 +891,7 @@ export default function EsquiveGame({ gameId }: { gameId: string }) {
 				défi du jour, les astéroïdes sont les mêmes pour tout le monde (10 essais, meilleur temps classé).
 			</p>
 
-			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtSec} />}
+			{daily && !lv.active && <LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" actions submitValue={status === 'over' ? best : undefined} format={fmtSec} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
@@ -936,11 +944,6 @@ const CSS = `
   position: absolute; inset: 0; z-index: 2;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem;
   background: rgba(6,6,16,0.45); backdrop-filter: blur(2px); border-radius: 12px;
-}
-/* Level grid overlays the (still-rendering) canvas: opaque, padded, scrollable. */
-.es-overlay.es-levels {
-  background: rgba(6,6,16,0.9); overflow-y: auto; align-items: stretch; justify-content: flex-start;
-  padding: 14px 12px;
 }
 .es-overlay-card {
   background: var(--gray-999); border: 2px solid var(--es-accent); border-radius: 16px;

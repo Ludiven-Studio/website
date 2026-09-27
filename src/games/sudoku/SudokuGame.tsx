@@ -11,7 +11,6 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -113,6 +112,9 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(sizeKey, diffKey);
+	}, [lv, newGame, sizeKey, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (or the grid once all
 	// are cleared). A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -486,7 +488,6 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			) : null}
 
-			{!(lv.active && lv.menu) && (
 			<div className="sk-bar">
 				<div className="sk-timer chrono" aria-live="off">{fmtTime(elapsed)}</div>
 				{!daily && !lv.active && (
@@ -499,7 +500,6 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 					</button>
 				)}
 			</div>
-			)}
 
 			{status !== 'won' && !revealed && !(lv.active && !lv.playing) && (
 				<div className="sk-actions">
@@ -528,9 +528,9 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
 			<div className="sk-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -623,15 +623,17 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{hintNote && (
 				<p className="sk-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
+			{daily && (
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+			)}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
-			{lv.active && lv.menu ? null : revealed ? (
+			{revealed ? (
 				daily ? (
 					<RevealNote />
 				) : (
@@ -660,9 +662,6 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				</>
 			)}
 
-			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
-			)}
 		</div>
 	);
 }

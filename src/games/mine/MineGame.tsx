@@ -8,7 +8,6 @@ import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { useLevels } from '../../lib/useLevels';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import LevelSelect from '../../components/LevelSelect';
@@ -299,6 +298,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 	}, [armBoard, lv]);
 
 	const armLevels = useCallback(() => { setDaily(false); dailyRef.current = false; lv.enter(); }, [lv]);
+	const closeLevels = useCallback(() => { if (!lv.close()) newFree(); }, [lv, newFree]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -533,7 +533,6 @@ export default function MineGame({ gameId }: { gameId: string }) {
 			window.removeEventListener('pointercancel', onUp);
 			if (raf) cancelAnimationFrame(raf);
 		};
-		// re-bind when the board (un)mounts — it's replaced by LevelSelect on the progression map
 	}, [lv.active, lv.menu]);
 
 	/* ---------- idle hint ---------- */
@@ -590,18 +589,14 @@ export default function MineGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
-				<div className="mn-hud">
-					<span ref={cocotteRef} key={counterHit} className="mn-stat mn-cstat">🐔 <strong>{cocottesFreed}</strong>/{cocottesTotal}</span>
-					<span className="mn-stat">👣 <strong>{movesLeft}</strong></span>
-					<span className="mn-stat">💎 <strong>{fmtScore(score)}</strong></span>
-					{!daily && !lv.active && <span className="mn-stat">🏆 {fmtScore(best)}</span>}
-				</div>
-			)}
+			<div className="mn-hud">
+				<span ref={cocotteRef} key={counterHit} className="mn-stat mn-cstat">🐔 <strong>{cocottesFreed}</strong>/{cocottesTotal}</span>
+				<span className="mn-stat">👣 <strong>{movesLeft}</strong></span>
+				<span className="mn-stat">💎 <strong>{fmtScore(score)}</strong></span>
+				{!daily && !lv.active && <span className="mn-stat">🏆 {fmtScore(best)}</span>}
+			</div>
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="mn-boardwrap edge-safe">
 				<div
 					ref={wrapRef}
@@ -701,7 +696,6 @@ export default function MineGame({ gameId }: { gameId: string }) {
 					</div>
 				))}
 			</div>
-			)}
 
 			{inLevelsPlay || (status === 'playing' && !dailyLoading && !(lv.active && lv.menu)) ? (
 				<div className="mn-actions">
@@ -715,7 +709,7 @@ export default function MineGame({ gameId }: { gameId: string }) {
 				</div>
 			) : null}
 
-			{daily && <Leaderboard game={gameId} metric="score" submitValue={status === 'over' ? score : undefined} />}
+			{daily && <LeaderboardCorner game={gameId} metric="score" actions submitValue={status === 'over' ? score : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 
 			<p className="mn-help">

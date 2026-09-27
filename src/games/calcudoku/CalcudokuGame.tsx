@@ -11,7 +11,6 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -147,6 +146,7 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+	const closeLevels = useCallback(() => { if (!lv.close()) newGame(diffKey); }, [lv, newGame, diffKey]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -494,7 +494,6 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="cd-bar">
 				{daily || lv.active ? (
 					<div className="cd-timer chrono">{fmtTime(elapsed)}</div>
@@ -530,7 +529,6 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			</div>
-			)}
 
 			{showRules && (
 				<div className="cd-rules">
@@ -581,9 +579,10 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
+
 			<div className="cd-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -667,15 +666,17 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{hintNote && (
 				<p className="cd-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
+			{daily && (
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+			)}
 
-			{lv.active && lv.menu ? null : revealed ? (
+			{revealed ? (
 				daily ? (
 					<RevealNote />
 				) : (
@@ -701,10 +702,6 @@ export default function CalcudokuGame({ gameId }: { gameId: string }) {
 						Touche une case puis un chiffre de 1 à {size}. Besoin d'aide ? Ouvre «&nbsp;?&nbsp;» en haut.
 					</p>
 				</>
-			)}
-
-			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 		</div>
 	);

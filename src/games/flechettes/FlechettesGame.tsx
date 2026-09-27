@@ -8,7 +8,6 @@ import { isTypingTarget } from '../../lib/keyboard';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -160,6 +159,9 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newFree(diffKey);
+	}, [lv, newFree, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi / ?mode=daily deep link opens the daily instead — skip auto-resume then.
@@ -440,7 +442,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!lv.menu && <div className="da-stats">
+			<div className="da-stats">
 				{lv.active ? (
 					<>
 						<span className="da-rem">{points}</span>
@@ -455,8 +457,8 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 						<span className="da-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
 					</>
 				)}
-			</div>}
-			{!lv.menu && <div className="da-last">{flash ? <span className="da-flash">{flash}</span> : lastTxt}</div>}
+			</div>
+			<div className="da-last">{flash ? <span className="da-flash">{flash}</span> : lastTxt}</div>
 			{status === 'aiming' && !(lv.active && !lv.playing) && (
 				<div className={`da-aimhint ${aimPhase === 'y' ? 'step2' : ''}`}>
 					{aimPhase === 'x'
@@ -485,11 +487,7 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-				{lv.menu && (
-					<div className="da-lvoverlay">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
-					</div>
-				)}
+				{lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 				{lv.done && (
 					<LevelOutcome
 						level={lv.level}
@@ -510,12 +508,13 @@ export default function FlechettesGame({ gameId }: { gameId: string }) {
 					: <><strong>Deux visées :</strong> tape une 1<sup>re</sup> fois pour bloquer le balayage <strong>horizontal&nbsp;↔</strong>, puis une 2<sup>e</sup> pour le balayage <strong>vertical&nbsp;↕</strong> — la fléchette part au croisement (Espace au clavier). Pars de 501 et tombe pile à 0 sur un <strong>double</strong>. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}</>}
 			</p>
 
-			{daily && !lv.active && <Leaderboard
+			{daily && !lv.active && <LeaderboardCorner
 				key={`lb-${best ?? 0}`}
 				game={`${gameId}-t`}
 				metric="time"
 				submitValue={status === 'won' && best != null ? best : undefined}
 				format={(v) => formatScore(DAILY_LB.flechettes.fmt, v)}
+				actions
 			/>}
 			{!daily && !lv.active && <LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(DAILY_LB.flechettes.fmt, v)} />}
 		</div>
@@ -544,7 +543,6 @@ const CSS = `
 .da-playwrap { width: 100%; position: relative; display: flex; justify-content: center; padding: 22px 0; border-radius: 16px; background: #2a1a0e url('/assets/jeux/flechettes/wall.jpg') center/cover; box-shadow: inset 0 0 44px rgba(0,0,0,0.45); }
 .da-canvas { display: block; border-radius: 50%; box-shadow: var(--shadow-md); touch-action: none; cursor: pointer; background: #161616; }
 .da-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.da-lvoverlay { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; padding: 16px; overflow-y: auto; background: var(--gray-999); border-radius: 16px; }
 .da-overlay-card { background: var(--gray-999); border: 2px solid var(--da-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .da-overlay-card strong { color: var(--da-accent); }
 .da-replay { border: none; background: var(--da-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }

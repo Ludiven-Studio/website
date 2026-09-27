@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { trackGame } from '../../lib/analytics';
 import Celebration, { useCelebration } from '../../components/Celebration';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -156,6 +155,9 @@ export default function FeuillesGame() {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diff);
+	}, [lv, newGame, diff]);
 
 	// Levels is the default landing: resume at the next unlocked level.
 	// A ?defi deep link opens the daily instead (ModeToggle fires it) — skip auto-resume then.
@@ -396,8 +398,7 @@ export default function FeuillesGame() {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
-				<div className="fl-bar">
+			<div className="fl-bar">
 					<span className="fl-chip">🍂 {shownCollected}/{params.target}</span>
 					<span className="fl-chip">⏱ {fmt(elapsed)}</span>
 					<span className="fl-chip">💨 {breath}</span>
@@ -413,11 +414,10 @@ export default function FeuillesGame() {
 						<button className="fl-act" onClick={() => newGame(diff)}>Nouveau pré</button>
 					)}
 				</div>
-			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
 				<div className="fl-boardwrap edge-safe">
 					{celebrating && !lv.active && <Celebration />}
 					<div
@@ -496,7 +496,6 @@ export default function FeuillesGame() {
 						/>
 					)}
 				</div>
-			)}
 
 			{daily && won && !alreadyPlayed && (
 				<div className="fl-done">
@@ -505,9 +504,10 @@ export default function FeuillesGame() {
 			)}
 
 			{daily && !dailyLoading && (
-				<Leaderboard
+				<LeaderboardCorner
 					game={GAME_ID}
 					metric="time"
+					actions
 					submitValue={won || alreadyPlayed ? finalRef.current : undefined}
 					format={(v) => formatScore(DAILY_LB.feuilles.fmt, v)}
 				/>

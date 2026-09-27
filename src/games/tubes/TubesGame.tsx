@@ -21,7 +21,6 @@ import {
 	saveDailyRun,
 } from '../../lib/leaderboard';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelOutcome from '../../components/LevelOutcome';
 import LevelSelect from '../../components/LevelSelect';
@@ -107,6 +106,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const levelSubmittedRef = useRef(false);
+	const gridFromLevelRef = useRef(false); // the level grid was opened over a level
 
 	const height = puzzle.height;
 
@@ -202,6 +202,7 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 
 	/* Levels / progression mode. */
 	const armLevels = useCallback(() => {
+		if (!(levelsMode && levelMenu)) gridFromLevelRef.current = levelsMode;
 		setDaily(false);
 		setLevelsMode(true);
 		setLevelMenu(true);
@@ -212,7 +213,14 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 		setFresh(null);
 		setHistory([]);
 		void getProgression(gameId).then((prog) => setProgress({ stars: { ...prog.stars }, best: { ...prog.best }, count: tubesLevels.count }));
-	}, [gameId]);
+	}, [gameId, levelsMode, levelMenu]);
+
+	// Back onto the level the grid was opened over: a solved one re-wins and shows its card again
+	// (levelSubmittedRef blocks a second submit). Opened from free play or the daily → free play.
+	const closeLevels = useCallback(() => {
+		if (gridFromLevelRef.current) setLevelMenu(false);
+		else newGame(diffKey);
+	}, [newGame, diffKey]);
 
 	const playLevel = useCallback((level: number) => {
 		const cfg = tubesLevels.config(level);
@@ -492,7 +500,6 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(levelsMode && levelMenu) && (
 			<div className="ws-bar">
 				{!daily && !levelsMode ? (
 					<div className="ws-pills" role="tablist" aria-label="Difficulté">
@@ -519,9 +526,8 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			</div>
-			)}
 
-			{interactive && !(levelsMode && levelMenu) && (
+			{interactive && (
 				<div className="ws-actions">
 					<button className="ws-act" onClick={undo} disabled={history.length === 0}>↶ Annuler</button>
 					<button className="ws-act" onClick={hint} disabled={!gate.ready}>{gate.label}</button>
@@ -542,9 +548,9 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{levelsMode && levelMenu ? (
-				<LevelSelect progress={progress} onPick={playLevel} />
-			) : (
+			{levelsMode && levelMenu && (
+				<LevelSelect progress={progress} onPick={playLevel} onClose={closeLevels} />
+			)}
 			<div className="ws-boardwrap">
 				{celebrating && !levelsMode && <Celebration />}
 				<div className={`ws-board ${daily && !started ? 'blurred' : ''}`}>
@@ -646,10 +652,9 @@ export default function TubesGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 			{!daily && !levelsMode && <LeaderboardCorner game={gameId} metric="time" />}
 

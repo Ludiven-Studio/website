@@ -8,7 +8,6 @@ import { diffKeys } from '../../lib/difficulty';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
@@ -147,6 +146,7 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => { if (!lv.close()) newFree(diffKey); }, [lv, newFree, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi / ?mode=daily deep link opens the daily instead — skip auto-resume then.
@@ -595,22 +595,20 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
-				<div className="co-stats">
-					{lv.playing ? (
-						<span className="co-stat">🐔 {Math.max(0, budgetRef.current - shots)} restantes</span>
-					) : (
-						<span className="co-stat">🐔 {shots} lancées</span>
-					)}
-					<span className="co-stat">🦊 {foxes} renards</span>
-					<span className="co-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
-					{lv.playing ? (
-						<button className="co-act" onClick={() => startLevel(lv.level)}>↺ Recommencer</button>
-					) : (
-						<button className="co-act" onClick={restart}>↺ Recommencer</button>
-					)}
-				</div>
-			)}
+			<div className="co-stats">
+				{lv.playing ? (
+					<span className="co-stat">🐔 {Math.max(0, budgetRef.current - shots)} restantes</span>
+				) : (
+					<span className="co-stat">🐔 {shots} lancées</span>
+				)}
+				<span className="co-stat">🦊 {foxes} renards</span>
+				<span className="co-stat">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
+				{lv.playing ? (
+					<button className="co-act" onClick={() => startLevel(lv.level)}>↺ Recommencer</button>
+				) : (
+					<button className="co-act" onClick={restart}>↺ Recommencer</button>
+				)}
+			</div>
 
 			<div className="co-playwrap" ref={wrapRef}>
 				{celebrating && !lv.active && <Celebration />}
@@ -625,10 +623,8 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-				{lv.menu && (
-					<div className="co-overlay co-overlay-scroll">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
-					</div>
+				{lv.active && lv.menu && (
+					<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 				)}
 				{lv.done && (
 					<LevelOutcome
@@ -665,10 +661,11 @@ export default function AngryGame({ gameId }: { gameId: string }) {
 					: <>Glisse depuis la cocotte puis relâche : tu tires dans le sens opposé, plus tu tires loin plus c'est puissant. Cocottes illimitées — fais tomber tous les renards en le moins de lancers possible. {daily ? 'Le chrono départage les ex æquo.' : `Record : ${bestLabel}.`}</>}
 			</p>
 
-			{daily && !lv.active && <Leaderboard
+			{daily && !lv.active && <LeaderboardCorner
 				key={`lb-${best ?? 0}`}
 				game={`${gameId}-t`}
 				metric="time"
+				actions
 				submitValue={status === 'won' && best != null ? best : undefined}
 				format={(v) => formatScore(DAILY_LB.angry.fmt, v)}
 			/>}
@@ -706,7 +703,6 @@ const CSS = `
 .co-playwrap { width: 100%; position: relative; display: flex; justify-content: center; }
 .co-canvas { display: block; border-radius: 10px; box-shadow: var(--shadow-md); touch-action: none; cursor: crosshair; background: #bfe3ff; }
 .co-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.co-overlay-scroll { background: var(--gray-999); border-radius: 10px; align-items: flex-start; overflow-y: auto; padding: 12px; }
 .co-overlay-card { background: var(--gray-999); border: 2px solid var(--co-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .co-overlay-card strong { color: var(--co-accent); }
 .co-replay { border: none; background: var(--co-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }

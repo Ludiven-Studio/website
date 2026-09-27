@@ -20,7 +20,6 @@ import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, type DailyRun } from '../../lib/leaderboard';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -137,6 +136,9 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -412,7 +414,6 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="dm-bar">
 				{!daily && !lv.active && (
 					<div className="dm-pills" role="tablist" aria-label="Difficulté">
@@ -439,9 +440,8 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			</div>
-			)}
 
-			{!over && (!daily || started) && !(lv.active && lv.menu) && (
+			{!over && (!daily || started) && (
 				<div className="dm-actions">
 					<button
 						className={`dm-act ${flagMode ? 'on' : ''}`}
@@ -487,9 +487,9 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
 			<div className="dm-boardwrap">
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -570,12 +570,11 @@ export default function DemineurGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{hintNote && <p className="dm-hint-note" aria-live="polite">💡 {hintNote}</p>}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={dailyValue} format={lbFormat} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={dailyValue} format={lbFormat} />
 			)}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" format={lbFormat} />}
 

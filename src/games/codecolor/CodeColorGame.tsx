@@ -9,7 +9,6 @@ import {
 	loadDailyRun,
 	saveDailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
@@ -124,6 +123,9 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -361,10 +363,9 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="cc-boardwrap">
-				{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-				) : (
-				<>
+				{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+				)}
 				{celebrating && !lv.active && <Celebration />}
 
 				<div className={`cc-board ${armed ? 'blurred' : ''}`}>
@@ -472,8 +473,6 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-				</>
-				)}
 			</div>
 
 			{lv.done && (
@@ -520,7 +519,7 @@ export default function CodeColorGame({ gameId }: { gameId: string }) {
 			{daily && revealed && <RevealNote>Reviens demain pour un nouveau défi&nbsp;!</RevealNote>}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={over ? cost : undefined} format={fmt} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={over ? cost : undefined} format={fmt} />
 			)}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 

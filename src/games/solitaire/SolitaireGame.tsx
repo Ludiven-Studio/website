@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
@@ -365,6 +364,10 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 		lv.exit();
 	}, [lv]);
 
+	const closeLevels = useCallback((): void => {
+		if (!lv.close()) startFree(variant);
+	}, [lv, startFree, variant]);
+
 	const restart = (): void => {
 		if (levelsRef.current) {
 			startLevel(lv.level);
@@ -696,7 +699,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 						<div className="sol-card">Préparation du défi…</div>
 					</div>
 				)}
-				{!started && status === 'playing' && !dailyLoading && !(lv.active && lv.menu) && !lv.done && (
+				{!started && status === 'playing' && !dailyLoading && !lv.done && (
 					<div className="sol-overlay">
 						<div className="sol-card">
 							<h3>Prêt&nbsp;?</h3>
@@ -705,11 +708,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 						</div>
 					</div>
 				)}
-				{lv.active && lv.menu && (
-					<div className="sol-overlay sol-overlay-scroll">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
-					</div>
-				)}
+				{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 				{lv.done && (
 					<LevelOutcome
 						level={lv.level}
@@ -774,7 +773,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{!(lv.active && (lv.menu || lv.done)) && (
+			{!lv.done && (
 				<div className="sol-controls">
 					<button className="sol-btn" onClick={undo} disabled={moves === 0 || status === 'won'}>
 						↶ Annuler
@@ -801,7 +800,7 @@ export default function SolitaireGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{daily ? (
-				<Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? submitCentis : undefined} />
+				<LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={gameId} metric="time" actions submitValue={status === 'won' && !alreadyPlayed ? submitCentis : undefined} />
 			) : !lv.active ? (
 				<LeaderboardCorner game={gameId} metric="time" />
 			) : null}
@@ -850,7 +849,6 @@ const CSS = `
 .sol-canvas.sol-blur { filter: blur(7px); cursor: default; }
 .sol-overlay { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.45); backdrop-filter: blur(3px); border-radius: 16px; }
 /* Level grid overlay: scrolls if the 100-tile grid overflows the board. */
-.sol-overlay-scroll { align-items: flex-start; overflow: auto; padding: 12px; z-index: 8; }
 .sol-card { background: var(--gray-999); border: 2px solid var(--sol); border-radius: 16px; padding: 18px 22px; max-width: 18rem; text-align: center; box-shadow: var(--shadow-lg); color: var(--gray-0); }
 .sol-card h3 { margin: 0 0 0.5rem; font-family: var(--font-brand); font-size: var(--text-xl); }
 .sol-card p { color: var(--gray-200); font-size: 13.5px; line-height: 1.5; margin: 0 0 0.9rem; }

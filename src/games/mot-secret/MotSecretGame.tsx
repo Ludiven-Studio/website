@@ -4,7 +4,6 @@ import { diffKeys } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyTierOrdinal, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
@@ -182,6 +181,9 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback((): void => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -369,7 +371,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status === 'playing' && !(lv.active && lv.menu) && (
+			{status === 'playing' && (
 				<div className="ms-hintbar">
 					<button className="ms-hintbtn" onClick={askHint} disabled={!gate.ready || dailyLoading}>{gate.label}</button>
 					{!daily && !lv.active && <span>auto dans <strong>{hintIn}s</strong></span>}
@@ -377,9 +379,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-			<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="ms-playwrap">
 				{celebrating && !lv.active && <Celebration />}
 				<div className={`ms-board${shake ? ' shake' : ''}`} style={{ ['--len' as string]: len }}>
@@ -406,7 +406,6 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			<div className="ms-msg" role="status">{msg?.text ?? ' '}</div>
 
@@ -461,7 +460,7 @@ export default function MotSecretGame({ gameId }: { gameId: string }) {
 				<span className="ms-legend"><i className="lg good" /> bien placée · <i className="lg present" /> présente · <i className="lg absent" /> absente</span>
 			</p>
 
-			{daily && <Leaderboard game={gameId} metric="time" submitValue={over && !alreadyPlayed ? cost : undefined} format={fmt} />}
+			{daily && <LeaderboardCorner game={gameId} metric="time" format={fmt} actions submitValue={over && !alreadyPlayed ? cost : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);

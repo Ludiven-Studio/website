@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import Celebration, { useCelebration } from '../../components/Celebration';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -119,6 +118,9 @@ export default function SouffleGame() {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diff);
+	}, [lv, newGame, diff]);
 
 	// Levels is the default landing: resume at the next unlocked level.
 	// A ?defi deep link opens the daily instead (ModeToggle fires it) — skip auto-resume then.
@@ -367,103 +369,100 @@ export default function SouffleGame() {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
-				<div className="sf-bar">
-					<span className="sf-chip">💨 {cur?.gusts ?? 0}</span>
-					<span className="sf-chip">🎯 par {puzzle?.par ?? 0}</span>
-					<span className="sf-chip">🌼 {total - left}/{total}</span>
-					{daily && <span className="sf-chip">⏱ {fmtCentis(elapsed)}</span>}
-					<button className="sf-btn" onClick={undo} disabled={locked || hist.length < 2 || won} aria-label="Annuler le dernier souffle">↩</button>
-					<button className="sf-btn" onClick={restart} disabled={locked || hist.length < 2 || (daily && won)} aria-label="Recommencer ce pré">↻</button>
-					{!daily && !lv.active && (
-						<button className="sf-act" onClick={() => newGame(diff)}>Nouveau pré</button>
-					)}
-				</div>
+			<div className="sf-bar">
+				<span className="sf-chip">💨 {cur?.gusts ?? 0}</span>
+				<span className="sf-chip">🎯 par {puzzle?.par ?? 0}</span>
+				<span className="sf-chip">🌼 {total - left}/{total}</span>
+				{daily && <span className="sf-chip">⏱ {fmtCentis(elapsed)}</span>}
+				<button className="sf-btn" onClick={undo} disabled={locked || hist.length < 2 || won} aria-label="Annuler le dernier souffle">↩</button>
+				<button className="sf-btn" onClick={restart} disabled={locked || hist.length < 2 || (daily && won)} aria-label="Recommencer ce pré">↻</button>
+				{!daily && !lv.active && (
+					<button className="sf-act" onClick={() => newGame(diff)}>Nouveau pré</button>
+				)}
+			</div>
+
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 			)}
+			<div className="sf-boardwrap edge-safe">
+				{celebrating && !lv.active && <Celebration />}
+				<div
+					className={`sf-board ${gated && !dailyLoading ? 'blurred' : ''}`}
+					onPointerDown={swipe.onPointerDown}
+					role="application"
+					aria-label="Pré de Souffle — glisse pour souffler la plume"
+				>
+					{rocks.map((i) => (
+						<div key={`r${i}`} className="sf-cell sf-rock" style={at(i)}><span>🪨</span></div>
+					))}
+					{blooms.map((i) => (
+						<div key={`f${i}`} className="sf-cell sf-flower" style={at(i)}><span>{bloomAt(i)}</span></div>
+					))}
+					{pops.map((p) => (
+						<div key={p.id} className="sf-cell sf-pop" style={at(p.idx)}><span>{p.glyph}</span></div>
+					))}
+					{gusts.map((g) => (
+						<div key={g.id} className={`sf-gust ${g.axis}`} style={at(g.idx)} />
+					))}
+					{ghosts.map((g) => (
+						<button
+							key={g.dir}
+							className="sf-cell sf-ghost"
+							style={at(g.idx)}
+							onClick={() => blow(g.dir)}
+							aria-label={`Souffler vers ${DIR_NAME[g.dir]}`}
+						>
+							<span>🪶</span>
+						</button>
+					))}
+					{cur && (
+						<div
+							className={`sf-cell sf-feather${shake ? ' bump' : ''}${won ? ' rest' : ''}`}
+							style={{ ...at(cur.pos), transitionDuration: `${glideMs}ms` }}
+						>
+							<span>🪶</span>
+						</div>
+					)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
-				<div className="sf-boardwrap edge-safe">
-					{celebrating && !lv.active && <Celebration />}
-					<div
-						className={`sf-board ${gated && !dailyLoading ? 'blurred' : ''}`}
-						onPointerDown={swipe.onPointerDown}
-						role="application"
-						aria-label="Pré de Souffle — glisse pour souffler la plume"
-					>
-						{rocks.map((i) => (
-							<div key={`r${i}`} className="sf-cell sf-rock" style={at(i)}><span>🪨</span></div>
-						))}
-						{blooms.map((i) => (
-							<div key={`f${i}`} className="sf-cell sf-flower" style={at(i)}><span>{bloomAt(i)}</span></div>
-						))}
-						{pops.map((p) => (
-							<div key={p.id} className="sf-cell sf-pop" style={at(p.idx)}><span>{p.glyph}</span></div>
-						))}
-						{gusts.map((g) => (
-							<div key={g.id} className={`sf-gust ${g.axis}`} style={at(g.idx)} />
-						))}
-						{ghosts.map((g) => (
-							<button
-								key={g.dir}
-								className="sf-cell sf-ghost"
-								style={at(g.idx)}
-								onClick={() => blow(g.dir)}
-								aria-label={`Souffler vers ${DIR_NAME[g.dir]}`}
-							>
-								<span>🪶</span>
-							</button>
-						))}
-						{cur && (
-							<div
-								className={`sf-cell sf-feather${shake ? ' bump' : ''}${won ? ' rest' : ''}`}
-								style={{ ...at(cur.pos), transitionDuration: `${glideMs}ms` }}
-							>
-								<span>🪶</span>
-							</div>
-						)}
+					{daily && dailyLoading && (
+						<div className="sf-overlay"><div className="sf-card"><p className="sf-sub">Préparation…</p></div></div>
+					)}
 
-						{daily && dailyLoading && (
-							<div className="sf-overlay"><div className="sf-card"><p className="sf-sub">Préparation…</p></div></div>
-						)}
+					{gated && !dailyLoading && puzzle && (
+						<div className="sf-overlay">
+							<button className="sf-start big" onClick={startTimer}>▶ Commencer</button>
+						</div>
+					)}
 
-						{gated && !dailyLoading && puzzle && (
-							<div className="sf-overlay">
-								<button className="sf-start big" onClick={startTimer}>▶ Commencer</button>
-							</div>
-						)}
-
-						{showWin && !daily && !lv.active && puzzle && cur && (
-							<div className="sf-overlay" role="dialog" aria-label="Pré butiné">
-								<div className="sf-card">
-									<div className="sf-mark">🌼</div>
-									<h2>Toutes les fleurs !</h2>
-									<p className="sf-big">{cur.gusts} souffles</p>
-									<p className="sf-sub">{cur.gusts <= puzzle.par ? 'Le vent ne pouvait pas faire mieux 🎐' : `par ${puzzle.par}`}</p>
-									<div className="sf-row">
-										<button className="sf-start" onClick={restart}>Rejouer</button>
-										<button className="sf-start ghost" onClick={() => newGame(diff)}>Nouveau pré</button>
-									</div>
+					{showWin && !daily && !lv.active && puzzle && cur && (
+						<div className="sf-overlay" role="dialog" aria-label="Pré butiné">
+							<div className="sf-card">
+								<div className="sf-mark">🌼</div>
+								<h2>Toutes les fleurs !</h2>
+								<p className="sf-big">{cur.gusts} souffles</p>
+								<p className="sf-sub">{cur.gusts <= puzzle.par ? 'Le vent ne pouvait pas faire mieux 🎐' : `par ${puzzle.par}`}</p>
+								<div className="sf-row">
+									<button className="sf-start" onClick={restart}>Rejouer</button>
+									<button className="sf-start ghost" onClick={() => newGame(diff)}>Nouveau pré</button>
 								</div>
 							</div>
-						)}
-					</div>
-
-					{lv.done && cur && (
-						<LevelOutcome
-							level={lv.level}
-							lastLevel={souffleLevels.count}
-							won={lv.won}
-							stars={lv.stars}
-							detail={`${cur.gusts} souffles · par ${puzzle?.par ?? 0}`}
-							onNext={() => startLevel(lv.level + 1)}
-							onReplay={() => startLevel(lv.level)}
-							onMenu={lv.backToMenu}
-						/>
+						</div>
 					)}
 				</div>
-			)}
+
+				{lv.done && cur && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={souffleLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={`${cur.gusts} souffles · par ${puzzle?.par ?? 0}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+			</div>
 
 			{daily && (won || alreadyPlayed) && cur && (
 				<div className="sf-done">
@@ -474,9 +473,10 @@ export default function SouffleGame() {
 			)}
 
 			{daily && !dailyLoading && (
-				<Leaderboard
+				<LeaderboardCorner
 					game={`${GAME_ID}-t`}
 					metric="time"
+					actions
 					submitValue={won || alreadyPlayed ? dailyScore : undefined}
 					format={(v) => formatScore(DAILY_LB.souffle.fmt, v)}
 				/>

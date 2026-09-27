@@ -5,7 +5,6 @@ import { mulberry32 } from '../prng';
 import { diffKeys } from '../../lib/difficulty';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -212,6 +211,9 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -461,12 +463,10 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 							? 'Progression — réussis un niveau pour débloquer le suivant'
 							: `Niveau ${lv.level} · ${matricesLevels.config(lv.level).diff.label} · question ${Math.min(qIndex + 1, lvQuestions.length)}/${lvQuestions.length}`}
 					</div>
-					{!lv.menu && (
-						<div className="mx-daily-status">
-							<span className="mx-score">Bonnes {lvCorrect}/{lvQuestions.length}</span>
-							<span className="mx-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
-						</div>
-					)}
+					<div className="mx-daily-status">
+						<span className="mx-score">Bonnes {lvCorrect}/{lvQuestions.length}</span>
+						<span className="mx-best">⏱ <span className="chrono">{fmtTime(elapsed)}</span></span>
+					</div>
 				</>
 			) : daily ? (
 				<>
@@ -490,9 +490,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="mx-playwrap">
 				{celebrating && !lv.active && <Celebration />}
 
@@ -536,7 +534,6 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{status === 'playing' && chosen === null && !revealed && !lv.menu && !lv.done && (
 				<div className="mx-actions">
@@ -576,7 +573,7 @@ export default function MatricesGame({ gameId }: { gameId: string }) {
 				<p className="mx-help">Résous 3 matrices le plus vite possible. Une erreur ne t'arrête pas, mais le chrono continue.</p>
 			)}
 
-			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />}
+			{daily && <LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);

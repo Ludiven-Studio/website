@@ -11,7 +11,6 @@ import {
 	type DailyRun,
 } from '../../lib/leaderboard';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -108,6 +107,9 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Grade the level once solved (Tente can't be lost → always a win).
 	useEffect(() => {
@@ -398,7 +400,6 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 				</div>
 			) : null}
 
-			{!(lv.active && lv.menu) && (
 			<div className="te-bar">
 				{!daily && !lv.active && (
 					<div className="te-pills" role="tablist" aria-label="Difficulté">
@@ -424,7 +425,6 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			</div>
-			)}
 
 			{!over && !(lv.active && !lv.playing) && (
 				<div className="te-actions">
@@ -453,9 +453,9 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
 			<div className="te-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -535,14 +535,13 @@ export default function TenteGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{hintNote && (
 				<p className="te-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}

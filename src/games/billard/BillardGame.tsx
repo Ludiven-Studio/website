@@ -18,7 +18,7 @@ import { trackGame } from '../../lib/analytics';
 import { formatScore, fmtCentis } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun, playerName } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import LevelSelect from '../../components/LevelSelect';
@@ -554,6 +554,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 		setBest(stored);
 		layTable(key, (Math.random() * 2 ** 31) >>> 0);
 	}, [layTable]);
+	const closeLevels = useCallback(() => { if (!lv.close()) newFreeTable(diffKey); }, [lv, newFreeTable, diffKey]);
 
 	const startDaily = useCallback(async () => {
 		setDaily(true);
@@ -1813,9 +1814,7 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 				)}
 
 				{lv.active && lv.menu && (
-					<div className="bi-overlay bi-levels-overlay">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
-					</div>
+					<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 				)}
 				{lv.done && (
 					<LevelOutcome
@@ -1839,10 +1838,11 @@ export default function BillardGame({ gameId }: { gameId: string }) {
 					: ` Même table pour tous · ${MAX_TRIES} essais · le chrono départage les ex æquo.`}
 			</p>
 
-			{daily && !lv.active && <Leaderboard
+			{daily && !lv.active && <LeaderboardCorner
 				key={`lb-${best ?? 0}`}
 				game={`${gameId}-t`}
 				metric="time"
+				actions
 				submitValue={status === 'won' && best != null ? best : undefined}
 				format={(v) => formatScore(DAILY_LB.billard.fmt, v)}
 			/>}
@@ -1968,10 +1968,6 @@ const CSS = `
 .bi-overlay-card strong { color: var(--bi-accent); }
 .bi-replay { border: none; background: var(--bi-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }
 .bi-spent { color: var(--gray-300); font-size: 13px; }
-
-/* Levels grid overlays the table (canvas stays mounted); scrollable + opaque so it reads. */
-.bi-levels-overlay { background: rgba(12, 8, 5, 0.82); backdrop-filter: blur(4px); overflow-y: auto; padding: 18px 12px; align-items: flex-start; }
-.bi-levels-overlay .ls-wrap { margin: auto; }
 
 .bi-help { max-width: 460px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.5; margin-top: 1rem; }
 `;

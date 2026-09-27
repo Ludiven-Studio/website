@@ -4,7 +4,6 @@ import { generatePuzzle, spell, findHint, DIFFS, type Puzzle, type Cell } from '
 import { trackGame } from '../../lib/analytics';
 import { diffKeys } from '../../lib/difficulty';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -125,6 +124,10 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		trackGame(gameId, 'game_started', { difficulty: key, mode: 'free' });
 	}, [gameId]);
+
+	const closeLevels = useCallback((): void => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	const startDaily = useCallback(async (): Promise<void> => {
 		dailyRef.current = true;
@@ -310,7 +313,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 				</>
 			))}
 
-			{lv.active && !lv.menu && (
+			{lv.active && (
 				<div className="wt-status">
 					<span className="wt-theme">🎯 {puzzle.theme}</span>
 					<span className="wt-count">{found.length}/{total}</span>
@@ -318,9 +321,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="wt-playwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div className={`wt-board ${armed ? 'blurred' : ''}`} style={{ aspectRatio: `${puzzle.cols} / ${puzzle.rows}`, ['--cols' as string]: puzzle.cols }}>
@@ -371,9 +372,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="wt-slots">
 				{found.map((i) => (
 					<span key={`f${i}`} className="wt-slot done" style={{ background: wordColor(i), borderColor: wordColor(i) }}>{puzzle.regions[i].word}</span>
@@ -382,16 +381,13 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 					<span key={`r${j}`} className="wt-slot">{'•'.repeat(len)}</span>
 				))}
 			</div>
-			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="wt-controls">
 				<button className="wt-btn" onClick={undo} disabled={!found.length || status === 'won'}>↶ Annuler</button>
 				<button className="wt-btn hint" onClick={askHint} disabled={armed || status !== 'playing' || !gate.ready}>{gate.label}</button>
 				{!daily && !lv.active && <button className="wt-btn" onClick={() => newGame(diffKey)}>↻ Nouvelle grille</button>}
 			</div>
-			)}
-			{hint && !(lv.active && lv.menu) && <p className="wt-hintnote" aria-live="polite">💡 {hint.reason}</p>}
+			{hint && <p className="wt-hintnote" aria-live="polite">💡 {hint.reason}</p>}
 
 			{daily && status === 'won' && (
 				<div className="wt-won">{alreadyPlayed
@@ -408,7 +404,7 @@ export default function MotsTournesGame({ gameId }: { gameId: string }) {
 					: 'Trace chaque mot du thème en reliant des lettres voisines (haut/bas/gauche/droite). Les points en dessous donnent la longueur de chaque mot restant ; les chemins pavent toute la grille.'}
 			</p>
 
-			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
+			{daily && <LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);

@@ -4,7 +4,6 @@ import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { formatScore, fmtCentis, encodePacked } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -261,6 +260,9 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newFree(freeDiff);
+	}, [lv, newFree, freeDiff]);
 
 	// Levels is the default landing: resume at the next unlocked level.
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -800,24 +802,22 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
-				<div className="tk-bar">
-					<span className="tk-chip">💎 {total - left}/{total}</span>
-					<span className="tk-chip">👣 {moves}</span>
-					<span className="tk-chip">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
-					<button
-						className="tk-btn"
-						onClick={daily || lv.playing ? restart : () => newFree(freeDiff)}
-						disabled={daily ? status !== 'playing' : status === 'won'}
-						aria-label="Recommencer"
-					>↻</button>
-					<button
-						className="tk-act"
-						onClick={askHint}
-						disabled={status !== 'playing' || running || !gate.ready || (timed && !started)}
-					>{gate.label}</button>
-				</div>
-			)}
+			<div className="tk-bar">
+				<span className="tk-chip">💎 {total - left}/{total}</span>
+				<span className="tk-chip">👣 {moves}</span>
+				<span className="tk-chip">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
+				<button
+					className="tk-btn"
+					onClick={daily || lv.playing ? restart : () => newFree(freeDiff)}
+					disabled={daily ? status !== 'playing' : status === 'won'}
+					aria-label="Recommencer"
+				>↻</button>
+				<button
+					className="tk-act"
+					onClick={askHint}
+					disabled={status !== 'playing' || running || !gate.ready || (timed && !started)}
+				>{gate.label}</button>
+			</div>
 
 			{/* A true dead end is rare — losing the thread is not. After a long dry spell, say so
 			    and give the way out: start over, or bank the crystals when the daily is at stake. */}
@@ -830,155 +830,152 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
-				<div className="tk-boardwrap edge-safe">
-					{celebrating && !lv.active && <Celebration />}
-					<div
-						className={`tk-board ${gated ? 'blurred' : ''}`}
-						ref={elRef}
-						onPointerDown={swipe.onPointerDown}
-						role="application"
-						aria-label="Grille de Tapis roulants"
-					>
-						{/* One physical band per lane. Draw order does the crossing: plain rows, grid
-						    ticks, plain columns, then the hen's two belts ride over everything. */}
-						{Array.from({ length: n }, (_, r) => r !== laneR && (
-							<div key={`br${r}`} className="tk-belt h" style={{ top: `calc(${(r * 100) / n}% + 4px)`, backgroundPositionX: beltPos('row', r) }} />
-						))}
-						<div className="tk-grid" />
-						{Array.from({ length: n }, (_, c) => c !== laneC && (
-							<div key={`bc${c}`} className="tk-belt v" style={{ left: `calc(${(c * 100) / n}% + 4px)`, backgroundPositionY: beltPos('col', c) }} />
-						))}
-						{heroBelts}
-
-						{/* The hen's cell is a turntable, not one belt running over another: both serve it. */}
-						{crossAt && <div className="tk-cross" aria-hidden="true" style={crossAt} />}
-
-						{sprites.map((s) => {
-							const o = offsetOf(s.idx);
-							return (
-								<div
-									key={s.id}
-									className={`tk-slab ${KIND_CLASS[s.kind]}${jam?.cells.has(s.idx) ? ` jam ${jam.axis === 'row' ? 'jx' : 'jy'}` : ''}`}
-									style={{ transform: `translate(${((s.idx % n) + o.x) * 100}%, ${(Math.floor(s.idx / n) + o.y) * 100}%)` }}
-								>
-									<div className="tk-face">{GLYPH[s.kind] && <span>{GLYPH[s.kind]}</span>}</div>
-								</div>
-							);
-						})}
-
-						{/* Over the hen, or she hides them: a chevron on every side she can be pushed to. */}
-						{crossAt && (
-							<div className="tk-cross arrows" aria-hidden="true" style={crossAt}>
-								{(['up', 'down', 'left', 'right'] as const).map((d) => (
-									<span key={d} className={`tk-arw ${d}${can[d] ? '' : ' off'}`} />
-								))}
-							</div>
-						)}
-
-						{gems.map((i) => (
-							<div
-								key={`g${i}`}
-								className="tk-gem"
-								style={{ transform: `translate(${(i % n) * 100}%, ${Math.floor(i / n) * 100}%)` }}
-							>
-								<span>💎</span>
-							</div>
-						))}
-
-						{pops.map((p) => (
-							<div
-								key={p.id}
-								className="tk-gem tk-pop"
-								style={{ transform: `translate(${(p.idx % n) * 100}%, ${Math.floor(p.idx / n) * 100}%)` }}
-							>
-								<span>✨</span>
-							</div>
-						))}
-					</div>
-
-					{/* End drums in the gutter: every belt wraps around one, the hen's two light up. */}
-					{n > 0 && (
-						<div className="tk-rollers" aria-hidden="true">
-							{Array.from({ length: n }, (_, i) => {
-								const at = `calc(${(i * 100) / n}% + 5px)`;
-								return [
-									<div key={`ra${i}`} className={`tk-roller v${i === laneR ? ' on' : ''}`} style={{ top: at, left: -13 }} />,
-									<div key={`rb${i}`} className={`tk-roller v${i === laneR ? ' on' : ''}`} style={{ top: at, right: -13 }} />,
-									<div key={`rc${i}`} className={`tk-roller h${i === laneC ? ' on' : ''}`} style={{ left: at, top: -13 }} />,
-									<div key={`rd${i}`} className={`tk-roller h${i === laneC ? ' on' : ''}`} style={{ left: at, bottom: -13 }} />,
-								];
-							})}
-						</div>
-					)}
-
-					{daily && dailyLoading && (
-						<div className="tk-overlay"><div className="tk-card"><p className="tk-sub">Préparation…</p></div></div>
-					)}
-
-					{gated && !dailyLoading && board && (
-						<div className="tk-overlay">
-							<button className="tk-start" onClick={startTimer}>
-								{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
-							</button>
-						</div>
-					)}
-
-					{showWin && !daily && !lv.active && (
-						<div className="tk-overlay tk-win" role="dialog" aria-label="Grille résolue">
-							<div className="tk-card">
-								<div className="tk-mark">💎</div>
-								<h2>Tapis nettoyés !</h2>
-								<p className="tk-big">{fmtCentis(finalRef.current)}</p>
-								<button className="tk-start small" onClick={() => newFree(freeDiff)}>Rejouer</button>
-							</div>
-						</div>
-					)}
-
-					{status === 'stuck' && !daily && !lv.active && (
-						<div className="tk-overlay tk-win" role="dialog" aria-label="Usine bloquée">
-							<div className="tk-card">
-								<div className="tk-mark">⚙️</div>
-								<h2>Bloqué !</h2>
-								<p className="tk-sub">Plus rien ne peut bouger autour de la cocotte.</p>
-								<p className="tk-big">💎 {total - left}/{total}</p>
-								<div className="tk-row">
-									<button className="tk-start small" onClick={restart}>Recommencer</button>
-									<button className="tk-start small ghost" onClick={() => newFree(freeDiff)}>Autre usine</button>
-								</div>
-							</div>
-						</div>
-					)}
-
-					{lv.done && (
-						<LevelOutcome
-							level={lv.level}
-							lastLevel={tectoniqueLevels.count}
-							won={lv.won}
-							stars={lv.stars}
-							detail={lv.won ? `${moves} coups` : 'Usine bloquée'}
-							onNext={() => startLevel(lv.level + 1)}
-							onReplay={() => startLevel(lv.level)}
-							onMenu={lv.backToMenu}
-						/>
-					)}
-				</div>
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 			)}
+			<div className="tk-boardwrap edge-safe">
+				{celebrating && !lv.active && <Celebration />}
+				<div
+					className={`tk-board ${gated ? 'blurred' : ''}`}
+					ref={elRef}
+					onPointerDown={swipe.onPointerDown}
+					role="application"
+					aria-label="Grille de Tapis roulants"
+				>
+					{/* One physical band per lane. Draw order does the crossing: plain rows, grid
+					    ticks, plain columns, then the hen's two belts ride over everything. */}
+					{Array.from({ length: n }, (_, r) => r !== laneR && (
+						<div key={`br${r}`} className="tk-belt h" style={{ top: `calc(${(r * 100) / n}% + 4px)`, backgroundPositionX: beltPos('row', r) }} />
+					))}
+					<div className="tk-grid" />
+					{Array.from({ length: n }, (_, c) => c !== laneC && (
+						<div key={`bc${c}`} className="tk-belt v" style={{ left: `calc(${(c * 100) / n}% + 4px)`, backgroundPositionY: beltPos('col', c) }} />
+					))}
+					{heroBelts}
+
+					{/* The hen's cell is a turntable, not one belt running over another: both serve it. */}
+					{crossAt && <div className="tk-cross" aria-hidden="true" style={crossAt} />}
+
+					{sprites.map((s) => {
+						const o = offsetOf(s.idx);
+						return (
+							<div
+								key={s.id}
+								className={`tk-slab ${KIND_CLASS[s.kind]}${jam?.cells.has(s.idx) ? ` jam ${jam.axis === 'row' ? 'jx' : 'jy'}` : ''}`}
+								style={{ transform: `translate(${((s.idx % n) + o.x) * 100}%, ${(Math.floor(s.idx / n) + o.y) * 100}%)` }}
+							>
+								<div className="tk-face">{GLYPH[s.kind] && <span>{GLYPH[s.kind]}</span>}</div>
+							</div>
+						);
+					})}
+
+					{/* Over the hen, or she hides them: a chevron on every side she can be pushed to. */}
+					{crossAt && (
+						<div className="tk-cross arrows" aria-hidden="true" style={crossAt}>
+							{(['up', 'down', 'left', 'right'] as const).map((d) => (
+								<span key={d} className={`tk-arw ${d}${can[d] ? '' : ' off'}`} />
+							))}
+						</div>
+					)}
+
+					{gems.map((i) => (
+						<div
+							key={`g${i}`}
+							className="tk-gem"
+							style={{ transform: `translate(${(i % n) * 100}%, ${Math.floor(i / n) * 100}%)` }}
+						>
+							<span>💎</span>
+						</div>
+					))}
+
+					{pops.map((p) => (
+						<div
+							key={p.id}
+							className="tk-gem tk-pop"
+							style={{ transform: `translate(${(p.idx % n) * 100}%, ${Math.floor(p.idx / n) * 100}%)` }}
+						>
+							<span>✨</span>
+						</div>
+					))}
+				</div>
+
+				{/* End drums in the gutter: every belt wraps around one, the hen's two light up. */}
+				{n > 0 && (
+					<div className="tk-rollers" aria-hidden="true">
+						{Array.from({ length: n }, (_, i) => {
+							const at = `calc(${(i * 100) / n}% + 5px)`;
+							return [
+								<div key={`ra${i}`} className={`tk-roller v${i === laneR ? ' on' : ''}`} style={{ top: at, left: -13 }} />,
+								<div key={`rb${i}`} className={`tk-roller v${i === laneR ? ' on' : ''}`} style={{ top: at, right: -13 }} />,
+								<div key={`rc${i}`} className={`tk-roller h${i === laneC ? ' on' : ''}`} style={{ left: at, top: -13 }} />,
+								<div key={`rd${i}`} className={`tk-roller h${i === laneC ? ' on' : ''}`} style={{ left: at, bottom: -13 }} />,
+							];
+						})}
+					</div>
+				)}
+
+				{daily && dailyLoading && (
+					<div className="tk-overlay"><div className="tk-card"><p className="tk-sub">Préparation…</p></div></div>
+				)}
+
+				{gated && !dailyLoading && board && (
+					<div className="tk-overlay">
+						<button className="tk-start" onClick={startTimer}>
+							{lv.playing ? `▶ Niveau ${lv.level} — Commencer` : '▶ Commencer'}
+						</button>
+					</div>
+				)}
+
+				{showWin && !daily && !lv.active && (
+					<div className="tk-overlay tk-win" role="dialog" aria-label="Grille résolue">
+						<div className="tk-card">
+							<div className="tk-mark">💎</div>
+							<h2>Tapis nettoyés !</h2>
+							<p className="tk-big">{fmtCentis(finalRef.current)}</p>
+							<button className="tk-start small" onClick={() => newFree(freeDiff)}>Rejouer</button>
+						</div>
+					</div>
+				)}
+
+				{status === 'stuck' && !daily && !lv.active && (
+					<div className="tk-overlay tk-win" role="dialog" aria-label="Usine bloquée">
+						<div className="tk-card">
+							<div className="tk-mark">⚙️</div>
+							<h2>Bloqué !</h2>
+							<p className="tk-sub">Plus rien ne peut bouger autour de la cocotte.</p>
+							<p className="tk-big">💎 {total - left}/{total}</p>
+							<div className="tk-row">
+								<button className="tk-start small" onClick={restart}>Recommencer</button>
+								<button className="tk-start small ghost" onClick={() => newFree(freeDiff)}>Autre usine</button>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={tectoniqueLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `${moves} coups` : 'Usine bloquée'}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
+				)}
+			</div>
 
 			{tip && status === 'playing' && (
 				<p className="tk-note" aria-live="polite">💡 {tip.reason}</p>
 			)}
 
-			{!(lv.active && lv.menu) && (
-				<div className="tk-dpad" aria-label="Pousser la ligne de la cocotte">
-					<button className="tk-dbtn up" ref={pad.up} disabled={!can.up} aria-label="Pousser vers le haut">▲</button>
-					<button className="tk-dbtn left" ref={pad.left} disabled={!can.left} aria-label="Pousser vers la gauche">◀</button>
-					<button className="tk-dbtn right" ref={pad.right} disabled={!can.right} aria-label="Pousser vers la droite">▶</button>
-					<button className="tk-dbtn down" ref={pad.down} disabled={!can.down} aria-label="Pousser vers le bas">▼</button>
-				</div>
-			)}
+			<div className="tk-dpad" aria-label="Pousser la ligne de la cocotte">
+				<button className="tk-dbtn up" ref={pad.up} disabled={!can.up} aria-label="Pousser vers le haut">▲</button>
+				<button className="tk-dbtn left" ref={pad.left} disabled={!can.left} aria-label="Pousser vers la gauche">◀</button>
+				<button className="tk-dbtn right" ref={pad.right} disabled={!can.right} aria-label="Pousser vers la droite">▶</button>
+				<button className="tk-dbtn down" ref={pad.down} disabled={!can.down} aria-label="Pousser vers le bas">▼</button>
+			</div>
 
 			{daily && status !== 'playing' && (
 				<div className="tk-done">
@@ -993,9 +990,10 @@ export default function TectoniqueGame({ gameId }: { gameId: string }) {
 			{daily && revealed && <RevealNote>Le chemin d'origine se rejoue sur la grille. Reviens demain pour un nouveau défi&nbsp;!</RevealNote>}
 
 			{daily && !dailyLoading && (
-				<Leaderboard
+				<LeaderboardCorner
 					game={`${gameId}-t`}
 					metric="time"
+					actions
 					submitValue={status !== 'playing' ? dailyScore : undefined}
 					format={(v) => formatScore(DAILY_LB.tectonique.fmt, v)}
 				/>

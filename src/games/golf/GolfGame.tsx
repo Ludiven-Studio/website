@@ -38,7 +38,7 @@ import {
 	saveDailyRun,
 } from '../../lib/leaderboard';
 import { trackGame } from '../../lib/analytics';
-import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import { usePointerDrag } from '../usePointerDrag';
@@ -175,6 +175,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const accRef = useRef(0);
 	const sendAccRef = useRef(0);
 	const runningRef = useRef(false);
+	const pausedLevelRef = useRef(false); // the level grid froze a hole in play: resume it on close
 	const lobbyRef = useRef<Lobby | null>(null);
 	const selfColorRef = useRef(BALL_COLORS[0]);
 	const ghostsRef = useRef<Map<string, Ghost>>(new Map());
@@ -936,6 +937,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
 		levelCfgRef.current = cfg;
+		pausedLevelRef.current = false;
 		if (!initScene()) return;
 		stop();
 		lobbyRef.current?.leave();
@@ -945,12 +947,16 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 	}, [lv, initScene, stop, removeGhost, beginHole, diffKey]);
 
 	const armLevels = useCallback(() => {
+		if (lv.menu) return;
+		pausedLevelRef.current = lv.active && runningRef.current;
 		stop();
-		lobbyRef.current?.leave();
-		lobbyRef.current = null;
-		for (const id of [...ghostsRef.current.keys()]) removeGhost(id);
-		setMode('libre');
-		setPhase('menu');
+		if (!lv.active) {
+			lobbyRef.current?.leave();
+			lobbyRef.current = null;
+			for (const id of [...ghostsRef.current.keys()]) removeGhost(id);
+			setMode('libre');
+			setPhase('menu');
+		}
 		lv.enter();
 	}, [lv, stop, removeGhost]);
 
@@ -1036,6 +1042,21 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 		setPeerCount(1);
 		setPhase('menu');
 	}, [stop, removeGhost]);
+
+	const closeLevels = useCallback(() => {
+		if (lv.close()) {
+			if (pausedLevelRef.current && !runningRef.current) {
+				runningRef.current = true;
+				lastRef.current = performance.now();
+				accRef.current = 0;
+				rafRef.current = requestAnimationFrame(frame);
+			}
+			pausedLevelRef.current = false;
+			return;
+		}
+		setMode('libre');
+		if (phase === 'playing') quit();
+	}, [lv, frame, phase, quit]);
 
 	useEffect(() => {
 		const ghosts = ghostsRef.current; // same Map for the component's life; read here, used in cleanup
@@ -1152,13 +1173,12 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 				{webglError && <div className="gf-overlay"><div className="gf-card">3D indisponible (WebGL manquant).</div></div>}
 
 				{lv.menu && !webglError && (
-					<div className="gf-overlay gf-overlay-levels">
-						<LevelSelect
-							progress={lv.progress}
-							onPick={startLevel}
-							title={`${Object.values(lv.progress.stars).reduce((a, b) => a + b, 0)} / ${golfLevels.count * 3} ⭐`}
-						/>
-					</div>
+					<LevelSelect
+						progress={lv.progress}
+						onPick={startLevel}
+						title={`${Object.values(lv.progress.stars).reduce((a, b) => a + b, 0)} / ${golfLevels.count * 3} ⭐`}
+						onClose={closeLevels}
+					/>
 				)}
 
 				{lv.done && (
@@ -1199,7 +1219,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			{phase === 'playing' && lv.active && !lv.done && (
 				<div className="gf-actions">
 					<button className="gf-restart" onClick={() => startLevel(lv.level)}>↻ Recommencer</button>
-					<button className="gf-quit" onClick={() => { stop(); lv.backToMenu(); }}>🗺 Carte</button>
+					<button className="gf-quit" onClick={() => { pausedLevelRef.current = runningRef.current; stop(); lv.backToMenu(); }}>🗺 Carte</button>
 				</div>
 			)}
 
@@ -1211,7 +1231,7 @@ export default function GolfGame({ gameId }: { gameId: string }) {
 			)}
 
 			{mode === 'defi' && !lv.active && (
-				<Leaderboard key={`lb-${name}-${best ?? 0}`} game={`${gameId}-t`} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => formatScore(DAILY_LB.golf.fmt, v)} />
+				<LeaderboardCorner key={`lb-${name}-${best ?? 0}`} game={`${gameId}-t`} metric="time" submitValue={done ? best ?? undefined : undefined} format={(v) => formatScore(DAILY_LB.golf.fmt, v)} actions />
 			)}
 
 			<p className="gf-help">
@@ -1264,7 +1284,6 @@ const CSS = `
 
 .gf-leveltag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 600; margin: -0.4rem auto 0.7rem; max-width: 480px; }
 .gf-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(6,8,16,0.5); backdrop-filter: blur(2px); border-radius: 12px; }
-.gf-overlay-levels { overflow-y: auto; padding: 16px 12px; align-items: flex-start; }
 .gf-card { background: var(--gray-999); border: 2px solid var(--gf-accent); border-radius: 18px; padding: 22px 26px; text-align: center; box-shadow: var(--shadow-lg); max-width: 360px; }
 .gf-card h2 { font-family: var(--font-brand); font-weight: 600; font-size: 24px; margin: 0 0 6px; }
 .gf-winmark { font-size: 30px; }

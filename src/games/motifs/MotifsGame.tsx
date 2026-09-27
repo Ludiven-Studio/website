@@ -11,7 +11,6 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -132,6 +131,10 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 		setRevealed(false);
 		setElapsed(0);
 	}, []);
+
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -556,7 +559,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status !== 'won' && !revealed && !(lv.active && lv.menu) && (
+			{status !== 'won' && !revealed && (
 				<div className="mo-actions">
 					<button className="mo-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
 					{!daily && !lv.active && elapsed >= 60 && (
@@ -583,9 +586,7 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="mo-boardwrap edge-safe" style={{ ['--n' as string]: size }}>
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -668,14 +669,13 @@ export default function MotifsGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{hintNote && (
 				<p className="mo-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}

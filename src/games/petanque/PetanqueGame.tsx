@@ -965,6 +965,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		try { localStorage.setItem(GROUND_KEY, JSON.stringify(next)); } catch { /* private mode */ }
 	}, []);
 
+	/** The mode the level grid was opened from, when it was not a level (useLevels keeps that one). */
+	const levelsFromRef = useRef<'free' | 'daily' | 'online'>('free');
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
 		levelSkillRef.current = cfg.skill;
@@ -3281,6 +3283,15 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	// the game five times a second.
 	const eventLbId = event ? `petanque-${event.id}-t` : '';
 	const eventSource = useCallback(() => getEventLeaderboard(eventLbId), [eventLbId]);
+
+	/** The level grid closes onto what it was opened over: the level still in play or its result,
+	    free play (still on the pitch underneath), or the day's course (it resumes from storage). An
+	    online match cannot be rejoined, so that one lands on free play. */
+	const closeLevels = useCallback(() => {
+		if (lv.close()) return;
+		if (levelsFromRef.current === 'daily') void startDaily();
+		else if (levelsFromRef.current === 'online') newGame(diff);
+	}, [lv, startDaily, newGame, diff]);
 	const eventBoard = useMemo(() => ({ title: t.eventBoard, empty: t.eventEmpty }), [t]);
 	const nStations = course?.stations.length ?? STATIONS;
 	const maxPoints = course ? courseMax(course) : MAX_DAILY_SCORE;
@@ -3328,7 +3339,11 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 							showDaily
 							dailyLabel={event ? t.eventTab : undefined}
 							levelsActive={lv.active}
-							onLevels={() => { setDaily(false); dailyRef.current = null; resetOnline(); lv.enter(); }}
+							onLevels={() => {
+								if (lv.menu) return;
+								levelsFromRef.current = daily ? 'daily' : mpPhase !== 'off' ? 'online' : 'free';
+								setDaily(false); dailyRef.current = null; resetOnline(); lv.enter();
+							}}
 							showOnline={multiplayerAvailable()}
 							onlineActive={mpPhase !== 'off'}
 							onOnline={enterOnline}
@@ -3754,9 +3769,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				)}
 
 				{lv.active && lv.menu && (
-					<div className="pe-overlay pe-levels">
-						<LevelSelect progress={lv.progress} onPick={startLevel} lang={lang} />
-					</div>
+					<LevelSelect progress={lv.progress} onPick={startLevel} lang={lang} onClose={closeLevels} />
 				)}
 
 				{lv.done && (
@@ -4159,7 +4172,6 @@ const CSS = `
    scene (endPreview). Invisible and inert the rest of the time. */
 .pe-snap { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; opacity: 0; }
 .pe-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 6; padding: 8px; overflow: auto; }
-.pe-levels { align-items: flex-start; overflow-y: auto; padding: 16px 12px; background: color-mix(in srgb, var(--gray-999) 82%, transparent); }
 .pe-card { background: var(--gray-999); border: 2px solid var(--pe-accent); border-radius: 16px; padding: 18px 26px; box-shadow: var(--shadow-lg); color: var(--gray-0); text-align: center; font-size: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 100%; margin: auto; }
 .pe-card strong { color: var(--pe-accent); font-size: 22px; font-variant-numeric: tabular-nums; }
 .pe-replay { border: none; background: var(--pe-accent); color: var(--accent-text-over); font: inherit; font-weight: 700; font-size: 15px; border-radius: 999px; padding: 10px 24px; cursor: pointer; }

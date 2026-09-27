@@ -10,7 +10,6 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -143,6 +142,9 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -532,7 +534,6 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="co-bar">
 				{!daily && !lv.active && (
 					<div className="co-pills" role="tablist" aria-label="Difficulté">
@@ -558,9 +559,8 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			</div>
-			)}
 
-			{!over && (!daily || started) && !(lv.active && lv.menu) && (
+			{!over && (!daily || started) && (
 				<div className="co-tools" role="toolbar" aria-label="Outils">
 					<div className="co-colors" role="group" aria-label="Couleurs">
 						{Array.from({ length: colors }, (_, i) => i + 1).map((v) => (
@@ -607,7 +607,7 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!over && !(lv.active && lv.menu) && (
+			{!over && (
 				<div className="co-actions">
 					<button className="co-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
 					{!daily && !lv.active && elapsed >= 60 && (
@@ -634,9 +634,9 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
 			<div className="co-boardwrap edge-safe" style={{ ['--n' as string]: size }}>
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -720,14 +720,13 @@ export default function ColorgrammeGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{hintNote && (
 				<p className="co-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}

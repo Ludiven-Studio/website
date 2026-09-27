@@ -4,7 +4,6 @@ import { DIFFS, generateQuestion, type Question } from './engine';
 import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -124,6 +123,9 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -310,9 +312,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="fr-playwrap">
 				{celebrating && !lv.active && <Celebration />}
 				<div className={`fr-eqs ${armed ? 'blurred' : ''}`}>
@@ -345,7 +345,6 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{status === 'playing' && chosen === null && !lv.menu && !lv.done && (
 				<div className="fr-actions">
@@ -379,7 +378,7 @@ export default function FruitsGame({ gameId }: { gameId: string }) {
 				<p className="fr-help">Résous 3 énigmes le plus vite possible. Une erreur ne t'arrête pas, mais le chrono continue.</p>
 			)}
 
-			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />}
+			{daily && <LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' ? elapsed : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);

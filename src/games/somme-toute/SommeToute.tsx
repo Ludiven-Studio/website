@@ -12,7 +12,6 @@ import {
 	type DailyRun,
 } from '../../lib/leaderboard';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -149,6 +148,9 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -494,7 +496,7 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status !== 'won' && !revealed && !(lv.active && lv.menu) && (
+			{status !== 'won' && !revealed && (
 				<div className="st-actions">
 					<button className="st-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
 					{!daily && !lv.active && elapsed >= 60 && (
@@ -518,9 +520,9 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
 			<div className="st-boardwrap" style={{ ['--n' as string]: size }}>
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -601,14 +603,13 @@ export default function SommeToute({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
-			{hintNote && !(lv.active && lv.menu) && (
+			{hintNote && (
 				<p className="st-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}

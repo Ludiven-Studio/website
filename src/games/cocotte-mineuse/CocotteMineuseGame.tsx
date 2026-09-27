@@ -11,7 +11,6 @@ import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
 import { useLevels } from '../../lib/useLevels';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import LevelSelect from '../../components/LevelSelect';
@@ -487,6 +486,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 	// Enter levels mode: show the grid over an idle board (daily off, no run yet).
 	const armLevels = useCallback(() => {
 		stop();
+		// Over a level: keep its run so closing the grid resumes it.
+		if (lv.active) { lv.enter(); return; }
 		dailyRef.current = false;
 		levelsRef.current = true;
 		setDaily(false);
@@ -499,7 +500,15 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 		setStatus('ready');
 		lv.enter();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [stop, lv.enter]);
+	}, [stop, lv.enter, lv.active]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) { armFree(diffKey); return; }
+		if (status === 'playing' && !runningRef.current) {
+			lastRef.current = performance.now();
+			runningRef.current = true;
+			rafRef.current = requestAnimationFrame(frame);
+		}
+	}, [lv, armFree, diffKey, status, frame]);
 
 	// Play a level: build the run from its config, store the target, then arm it in the
 	// "ready" state. The descent loop is real-time, so it must NOT auto-start: the
@@ -733,7 +742,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			<div className={`cm-stage ${lv.menu ? 'hidden' : ''}`}>
+			<div className="cm-stage">
 			<div className="cm-side cm-ores" aria-label="Minerais collectés">
 				{ORE_ORDER.map((id) => (
 					<span key={id} className={`cm-item ${invCount(id) ? '' : 'empty'}`} title={LABEL[id]}>
@@ -742,7 +751,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				))}
 			</div>
 
-			<div className={`cm-boardwrap ${lv.menu ? 'hidden' : ''}`}>
+			<div className="cm-boardwrap">
 				<canvas
 					ref={canvasRef}
 					className={`cm-canvas ${daily && status === 'ready' ? 'blurred' : ''}`}
@@ -765,7 +774,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{status === 'ready' && !dailyLoading && !(lv.active && lv.menu) && !(daily && alreadyPlayed) && (
+				{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
 					<div className="cm-overlay">
 						<div className="cm-overlay-card">
 							<p className="cm-go-title">Prêt&nbsp;?</p>
@@ -871,10 +880,8 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 			)}
 			</div>
 
-			{lv.menu && (
-				<div className="cm-levelselect">
-					<LevelSelect progress={lv.progress} onPick={startLevel} />
-				</div>
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 			)}
 
 			<p className="cm-help">
@@ -884,7 +891,7 @@ export default function CocotteMineuseGame({ gameId }: { gameId: string }) {
 				À l'atelier, fabrique outils et bijoux (touches 1-5) — la couronne 👑 rapporte un gros bonus.
 			</p>
 
-			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} />}
+			{daily && !lv.active && <LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" actions submitValue={status === 'over' ? best : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
@@ -1109,7 +1116,6 @@ const CSS = `
 .cm-lampicon { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); font-size: 12px; }
 
 .cm-boardwrap { position: relative; width: 100%; max-width: 380px; margin-inline: auto; }
-.cm-boardwrap.hidden { display: none; }
 /* Timber pit props at the shaft mouth, like the mine the game card is set in:
    a lintel beam across the top and a stub post under each end. */
 .cm-boardwrap::before {
@@ -1123,7 +1129,6 @@ const CSS = `
 }
 /* Fullscreen centres a smaller canvas inside a tall wrap — the beam would float off it. */
 .game-page.gf-full .cm-boardwrap::before { display: none; }
-.cm-levelselect { width: 100%; margin-top: 0.25rem; }
 /* Site global fullscreen → the board fits the remaining space (portrait ratio preserved). */
 .game-page.gf-full .cm-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .cm-boardwrap { flex: 1; min-height: 0; max-width: none; container-type: size; display: flex; align-items: center; justify-content: center; }
@@ -1192,7 +1197,6 @@ const CSS = `
   display: flex; align-items: center; justify-content: center; gap: 6px;
   width: 100%; max-width: 460px;
 }
-.cm-stage.hidden { display: none; }
 .cm-stage .cm-boardwrap { flex: 1 1 auto; min-width: 0; }
 .cm-side {
   display: flex; flex-direction: column; justify-content: center; gap: 5px;

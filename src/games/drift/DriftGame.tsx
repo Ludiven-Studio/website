@@ -24,7 +24,7 @@ import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { formatScore } from '../../lib/scoreFormat';
 import { DAILY_LB } from '../../data/dailyLb';
-import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -1007,11 +1007,24 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 
 	const armLevels = useCallback(() => {
 		stop();
+		// Over a level: keep its track so closing the grid resumes it.
+		if (lv.active) { lv.enter(); return; }
 		setLevelReady(false);
 		setMode('libre');
 		setPhase('menu');
 		lv.enter();
 	}, [lv, stop]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) { setMode('libre'); setPhase('menu'); return; }
+		// A level still being raced resumes its loop; a finished or ready-gated one stays paused.
+		if (isLevelsRef.current && phase === 'racing' && !levelReady && !runningRef.current) {
+			runningRef.current = true;
+			lastRef.current = performance.now();
+			accRef.current = 0;
+			sendAccRef.current = 0;
+			rafRef.current = requestAnimationFrame(frame);
+		}
+	}, [lv, phase, levelReady, frame]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// The level opens behind a ▶ Niveau N — Commencer gate; the loop only runs on that click.
@@ -1172,14 +1185,13 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{lv.menu && !webglError && (
-					<div className="dr-overlay dr-overlay-levels">
-						<LevelSelect
-							progress={lv.progress}
-							onPick={startLevel}
-							title={`${Object.values(lv.progress.stars).reduce((a, b) => a + b, 0)} / ${driftLevels.count * 3} ⭐`}
-						/>
-					</div>
+				{lv.active && lv.menu && !webglError && (
+					<LevelSelect
+						progress={lv.progress}
+						onPick={startLevel}
+						title={`${Object.values(lv.progress.stars).reduce((a, b) => a + b, 0)} / ${driftLevels.count * 3} ⭐`}
+						onClose={closeLevels}
+					/>
 				)}
 
 				{lv.done && (
@@ -1254,7 +1266,7 @@ export default function DriftGame({ gameId }: { gameId: string }) {
 			)}
 
 			{mode === 'defi' && !lv.active && (
-				<Leaderboard game={gameId} metric="time" submitValue={bestMs ?? undefined} format={fmtMs} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={bestMs ?? undefined} format={fmtMs} />
 			)}
 
 			<p className="dr-help">
@@ -1327,5 +1339,4 @@ const CSS = `
 .dr-help { max-width: 460px; text-align: center; color: var(--gray-300); font-size: 12.5px; line-height: 1.55; margin: 1rem auto 0; }
 .dr-leveltag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin: -0.25rem 0 0.75rem; }
 /* Levels grid overlay: scrollable over the (still mounted) canvas. */
-.dr-overlay-levels { align-items: flex-start; overflow-y: auto; padding: 14px 10px; }
 `;

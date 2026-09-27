@@ -33,6 +33,10 @@ export interface UseLevels<Cfg> {
 	exit: () => void; // leave levels mode (back to free/daily)
 	play: (level: number) => Cfg; // start a level; returns its difficulty config
 	backToMenu: () => void;
+	/** Close the grid. Back onto the level it was opened over, untouched (no restart, no regrade):
+	    true. Opened from outside the levels: leaves levels mode and returns false, and the caller
+	    lands the player where its "Libre" tab would. */
+	close: () => boolean;
 	finish: (r: LevelResult) => void; // grade + record a finished run (once)
 	replay: () => Cfg; // replay the current level
 	next: () => Cfg | null; // play the next level (null if last)
@@ -57,15 +61,31 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 	}, []);
 
 	const enter = useCallback(() => {
+		if (phaseRef.current !== 'menu') openedFromRef.current = phaseRef.current;
 		setBooting(false);
 		setPhase('menu');
-		setStars(0);
-		setWon(false);
+		// Kept over a level: close() goes back to it, result card included.
+		if (phaseRef.current !== 'playing' && phaseRef.current !== 'done') {
+			setStars(0);
+			setWon(false);
+		}
 		void getProgression(gameId).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: plan.count }));
 	}, [gameId, plan]);
 
 	const exit = useCallback(() => setPhase('off'), []);
-	const backToMenu = useCallback(() => setPhase('menu'), []);
+	const backToMenu = useCallback(() => {
+		if (phaseRef.current !== 'menu') openedFromRef.current = phaseRef.current;
+		setPhase('menu');
+	}, []);
+	const phaseRef = useRef<LevelPhase>('off');
+	phaseRef.current = phase;
+	const openedFromRef = useRef<LevelPhase>('off'); // what the grid was opened over
+	const close = useCallback((): boolean => {
+		const from = openedFromRef.current;
+		if (from === 'playing' || from === 'done') { setPhase(from); return true; }
+		setPhase('off');
+		return false;
+	}, []);
 
 	const resume = useCallback(async (): Promise<number | null> => {
 		resumedRef.current = true;
@@ -115,6 +135,6 @@ export function useLevels<Cfg>(gameId: string, plan: LevelPlan<Cfg>): UseLevels<
 
 	return {
 		phase, active: phase !== 'off', booting, menu: phase === 'menu', playing: phase === 'playing', done: phase === 'done',
-		progress, level, stars, won, enter, exit, play, backToMenu, finish, replay, next, resume,
+		progress, level, stars, won, enter, exit, play, backToMenu, close, finish, replay, next, resume,
 	};
 }

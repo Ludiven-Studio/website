@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
@@ -295,6 +294,9 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback((): void => {
+		if (!lv.close()) startFree(diffKey);
+	}, [lv, startFree, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -617,7 +619,6 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="reu-hud">
 				<span className="reu-stat">Fondations <strong>{cards}/52</strong></span>
 				{daily || lv.active ? (
@@ -626,14 +627,11 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 					<span className="reu-stat">Record <strong>{best == null ? '—' : `${best}/52`}</strong></span>
 				)}
 			</div>
-			)}
 
 			{lv.active && lv.menu && (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 			)}
-			{/* Keep the canvas mounted (hidden under the grid) so the ResizeObserver re-sizes
-			    it when a level starts — unmounting left it at the default 300×150 (stretched). */}
-			<div className="reu-playwrap edge-safe" ref={wrapRef} hidden={lv.active && lv.menu}>
+			<div className="reu-playwrap edge-safe" ref={wrapRef}>
 				<canvas ref={canvasRef} className={`reu-canvas${started ? '' : ' reu-blur'}`} onPointerDown={pointer.onPointerDown} />
 				{celebrating && !lv.active && <Celebration />}
 
@@ -652,7 +650,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 
 				{dailyLoading && <div className="reu-overlay"><div className="reu-card">Préparation du défi…</div></div>}
 
-				{!started && !dailyLoading && !(lv.active && lv.menu) && !lv.done && (
+				{!started && !dailyLoading && !lv.done && (
 					<div className="reu-overlay">
 						<div className="reu-card">
 							<h3>Prêt&nbsp;?</h3>
@@ -704,7 +702,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{!(lv.active && (lv.menu || lv.done)) && (
+			{!lv.done && (
 			<div className="reu-controls">
 				<button className="reu-btn" onClick={undo} disabled={won || !started || alreadyPlayed}>↶ Annuler</button>
 				<button className={`reu-btn ${jokerArmed ? 'armed' : ''}`} onClick={toggleJoker} disabled={jokers === 0 || won || !started || alreadyPlayed} title="Déplacement libre : pose une carte où tu veux (règles ignorées)">
@@ -729,7 +727,7 @@ export default function ReussiteGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{daily ? (
-				<Leaderboard key={`lb-${gameId}-${attempt}`} game={`${gameId}-t`} metric="time" submitValue={submitVal} format={(v) => formatScore(LB_FMT, v)} />
+				<LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={`${gameId}-t`} metric="time" format={(v) => formatScore(LB_FMT, v)} actions submitValue={submitVal} />
 			) : !lv.active ? (
 				<LeaderboardCorner game={`${gameId}-t`} metric="time" format={(v) => formatScore(LB_FMT, v)} />
 			) : null}

@@ -9,7 +9,6 @@ import {
 	loadDailyRun,
 	saveDailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -151,6 +150,9 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 		setHintNote('');
 		startedRef.current = false;
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	/* Daily: one attempt per device, resumable; server-issued seed. */
 	const startDaily = useCallback(async () => {
@@ -430,9 +432,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 				</div>
 			))}
 
-			{lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="su-playwrap">
 				{celebrating && !lv.active && <Celebration />}
 				<div className={`su-seq ${armed ? 'blurred' : ''}`} aria-label="Séquence">
@@ -483,7 +483,6 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{status === 'playing' && chosen === null && !lv.menu && !lv.done && (
 				<div className="su-actions">
@@ -538,7 +537,7 @@ export default function SuiteGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}

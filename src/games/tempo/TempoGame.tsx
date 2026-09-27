@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -140,6 +139,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 	const diffRef = useRef(1); // difficulty tier index (SPEEDS)
 	const dailyBestRef = useRef<number | null>(null);
 	const levelRunRef = useRef(false); // this run is a levels-mode attempt
+	const levelRunBeforeGridRef = useRef(false); // armLevels clears levelRunRef; closing the grid restores it
 	const targetRef = useRef(0); // score to clear the current level (1★)
 
 	const setStat = (s: Status): void => {
@@ -896,6 +896,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		dailyRef.current = false;
 		setDaily(false);
 		setDailyLoading(false);
+		levelRunBeforeGridRef.current = levelRunRef.current;
 		levelRunRef.current = false;
 		runningRef.current = false;
 		try {
@@ -906,6 +907,11 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 		setStat('ready');
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback((): void => {
+		// Back on a level: its staged tune waits behind the ready-gate, graded again.
+		if (lv.close()) levelRunRef.current = levelRunBeforeGridRef.current;
+		else armFree(diffRef.current);
+	}, [lv, armFree]);
 
 	// Start a level: its seed/tier/tempo are fixed by the plan; play the song and
 	// grade when it ends (song complete or energy-out) against the target.
@@ -1389,11 +1395,9 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			)}
 
 			{lv.active && lv.menu && (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 			)}
-			{/* Keep the canvas mounted (hidden under the grid) so the ResizeObserver re-sizes
-			    it when a level starts — unmounting left it at the default size (stretched). */}
-			<div className="tp-playwrap" ref={wrapRef} hidden={lv.active && lv.menu}>
+			<div className="tp-playwrap" ref={wrapRef}>
 				<canvas ref={canvasRef} className="tp-canvas" onPointerDown={onDown} onPointerUp={onPointerEnd} onPointerCancel={onPointerEnd} />
 
 				{status === 'running' && auto && (
@@ -1482,7 +1486,7 @@ export default function TempoGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{lv.active ? null : daily ? (
-				<Leaderboard key={`lb-${gameId}`} game={gameId} metric="score" submitValue={status === 'done' ? submitScore : undefined} />
+				<LeaderboardCorner key={`lb-${gameId}`} game={gameId} metric="score" actions submitValue={status === 'done' ? submitScore : undefined} />
 			) : (
 				<LeaderboardCorner game={gameId} metric="score" />
 			)}

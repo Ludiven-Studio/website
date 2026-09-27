@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import LevelSelect from '../../components/LevelSelect';
@@ -325,6 +324,11 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 		setStat('ready');
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback((): void => {
+		// armLevels stopped the run: back on a level, its staged melody is graded again.
+		if (lv.close()) levelsRef.current = true;
+		else armFree(diffRef.current);
+	}, [lv, armFree]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -638,11 +642,7 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 
-				{lv.menu && (
-					<div className="sp-overlay sp-overlay-scroll">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
-					</div>
-				)}
+				{lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 				{lv.done && (
 					<LevelOutcome
 						level={lv.level}
@@ -662,7 +662,7 @@ export default function SpectroGame({ gameId }: { gameId: string }) {
 			</p>
 
 			{lv.active ? null : daily ? (
-				<Leaderboard key={`lb-${gameId}`} game={gameId} metric="score" submitValue={status === 'done' ? submitScore : undefined} />
+				<LeaderboardCorner key={`lb-${gameId}`} game={gameId} metric="score" actions submitValue={status === 'done' ? submitScore : undefined} />
 			) : (
 				<LeaderboardCorner game={gameId} metric="score" />
 			)}
@@ -688,8 +688,6 @@ const CSS = `
 .sp-playwrap { width: 100%; position: relative; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-md); }
 .sp-canvas { display: block; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
 .sp-overlay { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); padding: 1rem; }
-.sp-overlay-scroll { align-items: flex-start; overflow-y: auto; }
-.sp-overlay-scroll .ls-wrap { padding: 0.5rem 0; }
 .sp-card { background: var(--gray-999); border: 2px solid var(--sp); border-radius: 16px; padding: 20px 24px; max-width: 22rem; text-align: center; box-shadow: var(--shadow-lg); }
 .sp-card h3 { margin: 0 0 0.5rem; font-family: var(--font-brand); font-size: var(--text-2xl); }
 .sp-card p { color: var(--gray-200); font-size: 13.5px; line-height: 1.55; margin: 0 0 0.9rem; }

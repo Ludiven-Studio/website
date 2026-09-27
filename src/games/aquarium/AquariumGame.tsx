@@ -11,7 +11,6 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -113,6 +112,7 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 		setHintNote('');
 		setElapsed(0);
 	}, []);
+	const closeLevels = useCallback(() => { if (!lv.close()) newGame(diffKey); }, [lv, newGame, diffKey]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -412,7 +412,6 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="aq-bar">
 				{!daily && !lv.active && (
 					<div className="aq-pills" role="tablist" aria-label="Difficulté">
@@ -438,7 +437,6 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			</div>
-			)}
 
 			{!over && !(lv.active && !lv.playing) && (
 				<div className="aq-actions">
@@ -471,9 +469,10 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
+
 			<div className="aq-boardwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -550,10 +549,9 @@ export default function AquariumGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}

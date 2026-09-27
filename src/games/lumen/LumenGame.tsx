@@ -27,7 +27,6 @@ import {
 	loadDailyRun,
 	saveDailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -525,6 +524,9 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -976,13 +978,13 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{puzzle && status !== 'loading' && !(lv.active && lv.menu) && (
+			{puzzle && status !== 'loading' && (
 				<div className="lum-gauge" aria-live="polite">
 					💡 <strong>{sensorsState.ok}</strong>/{sensorsState.total} capteurs à la bonne couleur
 				</div>
 			)}
 
-			{status === 'playing' && !revealed && !(lv.active && lv.menu) && (
+			{status === 'playing' && !revealed && (
 				<div className="lum-actions">
 					<button className="lum-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
 					{!daily && !lv.active && elapsed >= 60 && (
@@ -1009,9 +1011,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="lum-boardwrap" style={{ ['--n' as string]: n }}>
 				{celebrating && !lv.active && <Celebration />}
 				{status === 'loading' || !puzzle ? (
@@ -1073,14 +1073,13 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
-			{hintNote && !(lv.active && lv.menu) && (
+			{hintNote && (
 				<p className="lum-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{/* Tray — hidden while everything sits on the board; holds pieces pulled off-grid. */}
-			{puzzle && status === 'playing' && !revealed && interactive && !(lv.active && lv.menu)
+			{puzzle && status === 'playing' && !revealed && interactive
 				&& (drag?.from === 'tray' || placements.some((pl, i) => !pl && drag?.trayIndex !== i)) && (
 				<div className="lum-tray" aria-label="Pièces à placer" ref={blockTouchStart}>
 					{puzzle.tray.map((tp, i) => {
@@ -1118,7 +1117,7 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 					<button className="lum-replay" onClick={() => newGame(diffKey)}>Rejouer</button>
 				</div>
 				)
-			) : !(lv.active && lv.menu) ? (
+			) : (
 				<p className="lum-help">
 					Les pièces entourées d'un pointillé sont à toi : elles sont mal placées. Glisse-les
 					pour guider la lumière, touche une pièce pour la faire pivoter — pivoter un prisme
@@ -1127,10 +1126,10 @@ export default function LumenGame({ gameId }: { gameId: string }) {
 					ses deux flèches. Chaque capteur veut EXACTEMENT sa couleur — du blanc sur un
 					capteur rouge, c'est raté.
 				</p>
-			) : null}
+			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}

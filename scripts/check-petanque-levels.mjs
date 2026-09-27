@@ -33,13 +33,15 @@ check((await page.evaluate(() => window.__petanque().match.target)) === 5, 'a fr
 await page.getByRole('tab', { name: /Libre/ }).click();
 await sleep(600);
 check((await page.evaluate(() => window.__petanque().match.target)) === 13, 'Libre opens a match to 13');
+// Libre also opens its ground card, a page modal: it would take the next click.
+await page.locator('.pe-ground .pe-bar-x').click();
 
 await page.getByRole('tab', { name: /Niveaux/ }).click();
-await page.waitForSelector('.pe-levels .ls-wrap', { timeout: 5000 });
+await page.waitForSelector('.gm-card .ls-wrap', { timeout: 5000 });
 check(true, 'the Niveaux tab opens the level picker');
 
-await page.locator('.pe-levels').getByText('1', { exact: true }).first().click();
-await page.waitForFunction(() => !document.querySelector('.pe-levels'), null, { timeout: 5000 });
+await page.locator('.gm-card').getByText('1', { exact: true }).first().click();
+await page.waitForFunction(() => !document.querySelector('.gm-card'), null, { timeout: 5000 });
 await sleep(600);
 
 const s = await page.evaluate(() => window.__petanque());

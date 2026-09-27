@@ -14,7 +14,6 @@ import {
 import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, dailyDifficultyIndex, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
@@ -455,6 +454,15 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 		lv.enter();
 	}, [lv, stop]);
 
+	// armLevels stopped the loop: a run still in play resumes where it froze.
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) { armFree(diffKey); return; }
+		if (status !== 'playing' || runningRef.current) return;
+		lastRef.current = performance.now();
+		runningRef.current = true;
+		rafRef.current = requestAnimationFrame(frame);
+	}, [lv, armFree, diffKey, status, frame]);
+
 	// Levels is the default landing: resume at the next unlocked level (grid once all
 	// cleared). A ?defi deep link opens the daily instead — skip auto-resume then.
 	useEffect(() => {
@@ -582,68 +590,66 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			<div className="cb-boardwrap">
-				{lv.active && lv.menu ? (
-					<LevelSelect progress={lv.progress} onPick={startLevel} />
-				) : (
-					<>
-						<canvas
-							ref={canvasRef}
-							className="cb-canvas"
-							role="img"
-										aria-label={`Casse-Briques — score ${score}`}
-							onPointerDown={drag.onPointerDown}
-						/>
+				<canvas
+					ref={canvasRef}
+					className="cb-canvas"
+					role="img"
+					aria-label={`Casse-Briques — score ${score}`}
+					onPointerDown={drag.onPointerDown}
+				/>
 
-						{active.length > 0 && (
-							<div className="cb-buffs" aria-live="off">
-								{active.map((k) => (
-									<span key={k} className="cb-buff" title={BONUS_LABEL[k]}>{BONUS_EMOJI[k]} {BONUS_LABEL[k]}</span>
-								))}
-							</div>
-						)}
+				{active.length > 0 && (
+					<div className="cb-buffs" aria-live="off">
+						{active.map((k) => (
+							<span key={k} className="cb-buff" title={BONUS_LABEL[k]}>{BONUS_EMOJI[k]} {BONUS_LABEL[k]}</span>
+						))}
+					</div>
+				)}
 
-						{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
-							<div className="cb-overlay">
-								{lv.active && <p className="cb-go-chip">Niveau {lv.level} · {diffRef.current.label}</p>}
-								<button className="cb-startbtn" onClick={start}>▶ {lv.active || daily ? 'Commencer' : 'Jouer'}</button>
-							</div>
-						)}
-						{dailyLoading && (
-							<div className="cb-overlay cb-overlay-end"><div className="cb-overlay-card">Préparation…</div></div>
-						)}
-						{(status === 'over' || status === 'won') && !lv.active && (
-							<div className="cb-overlay cb-overlay-end">
-								<div className="cb-overlay-card">
-									<p className="cb-go-title">
-										{status === 'won' ? '🎉 Mur détruit !' : daily && alreadyPlayed ? 'Défi du jour terminé' : 'Perdu !'}
-									</p>
-									<p className="cb-go-score">{daily ? <>Score {score} · Meilleur {best}</> : <>Score {score} · Record {best}</>}</p>
-									{daily && alreadyPlayed ? (
-										<DailyDone />
-									) : (
-										<button className="cb-startbtn sm" onClick={start}>
-											↻ Rejouer{daily ? ` (${MAX_TRIES - tries} restant${MAX_TRIES - tries > 1 ? 's' : ''})` : ''}
-										</button>
-									)}
-								</div>
-							</div>
-						)}
+				{status === 'ready' && !dailyLoading && !(daily && alreadyPlayed) && (
+					<div className="cb-overlay">
+						{lv.active && <p className="cb-go-chip">Niveau {lv.level} · {diffRef.current.label}</p>}
+						<button className="cb-startbtn" onClick={start}>▶ {lv.active || daily ? 'Commencer' : 'Jouer'}</button>
+					</div>
+				)}
+				{dailyLoading && (
+					<div className="cb-overlay cb-overlay-end"><div className="cb-overlay-card">Préparation…</div></div>
+				)}
+				{(status === 'over' || status === 'won') && !lv.active && (
+					<div className="cb-overlay cb-overlay-end">
+						<div className="cb-overlay-card">
+							<p className="cb-go-title">
+								{status === 'won' ? '🎉 Mur détruit !' : daily && alreadyPlayed ? 'Défi du jour terminé' : 'Perdu !'}
+							</p>
+							<p className="cb-go-score">{daily ? <>Score {score} · Meilleur {best}</> : <>Score {score} · Record {best}</>}</p>
+							{daily && alreadyPlayed ? (
+								<DailyDone />
+							) : (
+								<button className="cb-startbtn sm" onClick={start}>
+									↻ Rejouer{daily ? ` (${MAX_TRIES - tries} restant${MAX_TRIES - tries > 1 ? 's' : ''})` : ''}
+								</button>
+							)}
+						</div>
+					</div>
+				)}
 
-						{lv.done && (
-							<LevelOutcome
-								level={lv.level}
-								lastLevel={casseBriquesLevels.count}
-								won={lv.won}
-								stars={lv.stars}
-								detail={lv.won ? `Mur détruit · ${lives} vie${lives > 1 ? 's' : ''} restante${lives > 1 ? 's' : ''}` : `Score ${score}`}
-								onNext={() => startLevel(lv.level + 1)}
-								onReplay={() => startLevel(lv.level)}
-								onMenu={lv.backToMenu}
-							/>
-						)}
-					</>
+				{lv.done && (
+					<LevelOutcome
+						level={lv.level}
+						lastLevel={casseBriquesLevels.count}
+						won={lv.won}
+						stars={lv.stars}
+						detail={lv.won ? `Mur détruit · ${lives} vie${lives > 1 ? 's' : ''} restante${lives > 1 ? 's' : ''}` : `Score ${score}`}
+						onNext={() => startLevel(lv.level + 1)}
+						onReplay={() => startLevel(lv.level)}
+						onMenu={lv.backToMenu}
+					/>
 				)}
 			</div>
+
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
 
 			<p className="cb-help">
 				Glisse la raquette pour renvoyer la cocotte et casser tout le mur. Attrape les bonus qui tombent :
@@ -654,7 +660,7 @@ export default function CasseBriquesGame({ gameId }: { gameId: string }) {
 				un flipper. Flèches ou souris au clavier.
 			</p>
 
-			{daily && !lv.active && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={(status === 'over' || status === 'won') ? best : undefined} />}
+			{daily && !lv.active && <LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" actions submitValue={(status === 'over' || status === 'won') ? best : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);

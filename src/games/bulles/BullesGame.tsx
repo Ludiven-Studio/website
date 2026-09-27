@@ -36,7 +36,6 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -223,6 +222,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => { if (!lv.close()) newGame(diffKey); }, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -617,7 +617,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{grid && status !== 'loading' && !(lv.active && lv.menu) && (
+			{grid && status !== 'loading' && (
 				<div className="bul-gauge" aria-live="polite">
 					{freeMode ? (
 						<>🫧 <strong>{left}</strong> bulles · </>
@@ -629,7 +629,7 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{status === 'playing' && !(lv.active && lv.menu) && (
+			{status === 'playing' && (
 				<div className="bul-actions">
 					<button className="bul-act" onClick={hint} disabled={!gate.ready || !ready}>{gate.label}</button>
 				</div>
@@ -649,9 +649,10 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
+
 			<div className="bul-boardwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				{status === 'loading' || !grid ? (
@@ -868,16 +869,17 @@ export default function BullesGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
-			{hintNote && !(lv.active && lv.menu) && (
+			{hintNote && (
 				<p className="bul-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
-			{daily && <Leaderboard
+			{daily && <LeaderboardCorner
 				key={`lb-${shots}`}
 				game={LB_ID(gameId)}
 				metric="time"
+				side="right"
+				actions
 				submitValue={status === 'won' && !gaveUp ? dailyScore : undefined}
 				format={fmtPacked}
 			/>}

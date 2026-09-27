@@ -3,7 +3,6 @@ import { fmtCentis } from '../../lib/scoreFormat';
 import { generatePuzzle, DIFFS, type Puzzle } from './engine';
 import { trackGame } from '../../lib/analytics';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -178,6 +177,9 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback((): void => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -361,13 +363,11 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 					<div className="lc-daily-tag">
 						{lv.menu ? 'Progression — remplis la grille pour débloquer le niveau suivant' : `Niveau ${lv.level} · ${total} mots`}
 					</div>
-					{!lv.menu && (
-						<div className="lc-status">
-							<span className="lc-count">{found.length}/{total} mots</span>
-							<span className="lc-bonus">✨ {bonusFound.length}</span>
-							<span className="lc-time">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
-						</div>
-					)}
+					<div className="lc-status">
+						<span className="lc-count">{found.length}/{total} mots</span>
+						<span className="lc-bonus">✨ {bonusFound.length}</span>
+						<span className="lc-time">⏱ <span className="chrono">{fmtCentis(elapsed)}</span></span>
+					</div>
 				</>
 			) : daily ? (
 				<>
@@ -395,9 +395,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 				</>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 				<div className="lc-playwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div className={`lc-play ${armed ? 'blurred' : ''}`}>
@@ -479,7 +477,6 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 				</div>
-			)}
 
 			{daily && status === 'won' && (
 				<div className="lc-won">{alreadyPlayed
@@ -496,7 +493,7 @@ export default function LettresCroiseesGame({ gameId }: { gameId: string }) {
 				L'indice 💡 dévoile une seule lettre du mot restant le plus court.
 			</p>
 
-			{daily && <Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
+			{daily && <LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !alreadyPlayed ? elapsed : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 		</div>
 	);

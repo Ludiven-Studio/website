@@ -30,7 +30,6 @@ import {
 	saveDailyRun,
 	type DailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -148,6 +147,9 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -524,13 +526,13 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{puzzle && status !== 'loading' && !(lv.active && lv.menu) && (
+			{puzzle && status !== 'loading' && (
 				<div className="cor-gauge" aria-live="polite">
 					🪢 <strong>{tied}</strong>/{total} reliées
 				</div>
 			)}
 
-			{status === 'playing' && !revealed && !(lv.active && lv.menu) && (
+			{status === 'playing' && !revealed && (
 				<div className="cor-actions">
 					<button className="cor-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
 					{!daily && !lv.active && elapsed >= 60 && (
@@ -554,9 +556,9 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
 			<div className="cor-boardwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				{status === 'loading' || !puzzle ? (
@@ -663,14 +665,13 @@ export default function CordesGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
-			{hintNote && !(lv.active && lv.menu) && (
+			{hintNote && (
 				<p className="cor-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}

@@ -16,7 +16,7 @@ import { useLevels } from '../../lib/useLevels';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
-import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 import Celebration, { useCelebration } from '../../components/Celebration';
 
 /* =====================================================
@@ -112,6 +112,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	const lv = useLevels(gameId, footLevels);
 	// Levels-mode tuning for the running match (refs so the rAF loop reads them without re-arming).
 	const levelsRef = useRef(false); // this match is a level (variable target + per-bot skill)
+	const resumeLevelRef = useRef(false);
 	const targetRef = useRef(WIN_GOALS); // goals needed to win the current match
 	const oppSkillRef = useRef(1); // opponent bot skill 0..1
 	const mateSkillRef = useRef(1); // teammate bot skill 0..1
@@ -540,6 +541,11 @@ export default function FootGame({ gameId }: { gameId: string }) {
 	/* ---------- levels mode ---------- */
 	// Enter the level grid. Leaving free/daily's net match if any.
 	const armLevels = useCallback(() => {
+		if (lv.menu) return;
+		// The grid is a popup over the pitch: freeze the match, and resume it on close if it was a level.
+		resumeLevelRef.current = levelsRef.current && runningRef.current;
+		runningRef.current = false;
+		cancelAnimationFrame(rafRef.current);
 		matchRef.current?.leave();
 		matchRef.current = null;
 		startedRef.current = false;
@@ -549,6 +555,18 @@ export default function FootGame({ gameId }: { gameId: string }) {
 		setStatus('');
 		lv.enter();
 	}, [lv]);
+
+	const closeLevels = useCallback(() => {
+		if (lv.close()) {
+			levelsRef.current = true;
+			if (resumeLevelRef.current) startLoop();
+			return;
+		}
+		dailyRef.current = false;
+		setDaily(false);
+		setConfirmQuit(false);
+		setPhase('menu');
+	}, [lv, startLoop]);
 
 	// Start a level as a fully-local solo match (player team 0 vs AI team 1).
 	const startLevel = useCallback((level: number) => {
@@ -644,7 +662,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 				onLevels={armLevels}
 			/>
 
-			{lv.active && lv.menu && phase === 'menu' && (
+			{lv.active && lv.menu && (
 				<div className="fo-lvtag">Progression solo — gagne un niveau pour débloquer le suivant. Tu joues en bleu.</div>
 			)}
 			{lv.active && (lv.playing || lv.done) && cfg && (
@@ -657,11 +675,7 @@ export default function FootGame({ gameId }: { gameId: string }) {
 			<div className="fo-stage">
 				<canvas ref={canvasRef} width={VIEW_W} height={VIEW_H} className="fo-canvas" role="img" aria-label="Cocotte Foot" />
 
-				{lv.active && lv.menu && phase === 'menu' && (
-					<div className="fo-lvselect">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
-					</div>
-				)}
+				{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 
 				{lv.done && (
 					<LevelOutcome
@@ -779,12 +793,15 @@ export default function FootGame({ gameId }: { gameId: string }) {
 									<button className="fo-btn fo-primary" onClick={startDailyRace}>↻ Réessayer</button>
 								</>
 							)}
-							<Leaderboard game={gameId} metric="time" submitValue={youWon && dailyTime != null ? dailyTime : undefined} />
 							<button className="fo-btn" onClick={armFree}>Menu libre</button>
 						</div>
 					</div>
 				)}
 			</div>
+
+			{daily && !lv.active && (
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={phase === 'over' && youWon && dailyTime != null ? dailyTime : undefined} />
+			)}
 
 			<p className="fo-help">Déplace-toi ◀ ▶ et appuie sur Saut pour bondir — <strong>re-tape Saut en l'air pour planer</strong>. <strong>Double-tape ◀◀ / ▶▶ pour un dash-éclair</strong> qui bouscule les autres poules. Fonce dans le ballon pour tirer (il décolle au sol). Clavier : ← → et Espace / ↑. Tu es la cocotte cerclée d’or.</p>
 		</div>
@@ -798,7 +815,6 @@ const CSS = `
 .fo-mseg.active { background: var(--fo-accent); color: var(--accent-text-over); }
 .fo-mseg:not(.active):hover { color: var(--gray-0); }
 .fo-lvtag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; }
-.fo-lvselect { position: absolute; inset: 0; z-index: 4; overflow-y: auto; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(10,14,20,0.72); backdrop-filter: blur(2px); }
 .fo-stage { position: relative; width: 100%; aspect-ratio: ${FIELD.W} / ${FIELD.H}; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-md); background: #bfe3ff; }
 .fo-canvas { display: block; width: 100%; height: 100%; object-fit: contain; touch-action: none; }
 /* Site global fullscreen. Landscape: the pitch fills the screen. Portrait: keep the
@@ -815,8 +831,12 @@ const CSS = `
 .fo-goal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(30px, 9vw, 68px); color: #fff; text-shadow: 0 3px 10px rgba(0,0,0,0.5); pointer-events: none; animation: fo-pop 0.3s ease; }
 @keyframes fo-pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .fo-quit { position: absolute; top: 8px; right: 10px; border: none; background: rgba(0,0,0,0.35); color: #fff; font: inherit; font-weight: 700; border-radius: 999px; width: 30px; height: 30px; cursor: pointer; }
-.fo-overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(10,14,20,0.55); backdrop-filter: blur(2px); }
-.fo-card { background: var(--gray-999); border: 2px solid var(--fo-accent); border-radius: 16px; padding: 20px 26px; box-shadow: var(--shadow-lg); text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 360px; width: 88%; max-height: 90vh; overflow-y: auto; }
+/* A phone's pitch is shorter than the menu card: it grows under one (the canvas is contain-fitted, no stretch). */
+.fo-stage:has(.fo-overlay) { min-height: 430px; }
+/* Over the pitch only: fixed to the viewport it covered the mode tabs, so Niveaux and Défi could not
+   be reached from the menu. A card taller than a phone's pitch scrolls in it. */
+.fo-overlay { position: absolute; inset: 0; z-index: 50; display: flex; overflow-y: auto; padding: 0.75rem; background: rgba(10,14,20,0.55); backdrop-filter: blur(2px); }
+.fo-card { background: var(--gray-999); border: 2px solid var(--fo-accent); border-radius: 16px; padding: 20px 26px; box-shadow: var(--shadow-lg); text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 360px; width: 88%; margin: auto; }
 .fo-card h2 { margin: 0; font-family: var(--font-brand); font-size: 22px; }
 .fo-sub { margin: 0; color: var(--gray-300); font-size: 13px; line-height: 1.5; }
 .fo-modes { display: flex; gap: 6px; }

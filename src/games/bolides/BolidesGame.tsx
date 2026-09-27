@@ -15,7 +15,7 @@ import { balance, buyCar, WALLET_EVENT } from '../../lib/wallet';
 import { formatScore } from '../../lib/scoreFormat';
 import { isTypingTarget } from '../../lib/keyboard';
 import { DAILY_LB } from '../../data/dailyLb';
-import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 import ModeToggle from '../../components/ModeToggle';
 import Cocoin from '../../components/Cocoin';
 import LevelSelect from '../../components/LevelSelect';
@@ -157,6 +157,9 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	// stable or it reads a stale render. `lv` is a fresh object every render, hence the ref.
 	const lvRef = useRef(lv);
 	lvRef.current = lv;
+	// What the grid was opened over: opening it stops the race, so closing must rebuild that state.
+	const lvPhaseBeforeMenuRef = useRef(lv.phase);
+	if (!lv.menu) lvPhaseBeforeMenuRef.current = lv.phase;
 	// `on` is what tells endGame to grade a level instead of saving a daily run.
 	const levelRef = useRef({ on: false, target: 0 });
 
@@ -714,6 +717,13 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		lvRef.current.enter();
 	}, [stop, leaveOnline]);
 
+	/** Back onto a level: its result card, or the level re-staged behind its ▶ gate. */
+	const closeLevels = useCallback(() => {
+		if (!lvRef.current.close()) { switchMode('libre'); return; }
+		if (lvPhaseBeforeMenuRef.current === 'done') setPhase('dead');
+		else startLevel(lvRef.current.level);
+	}, [switchMode, startLevel]);
+
 	/* ---------- garage ---------- */
 
 	const pickCar = useCallback((id: string) => {
@@ -1264,16 +1274,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 				)}
 
 				{phase === 'menu' && !webglError && !garage && lv.active && lv.menu && (
-					<div className="bo-overlay">
-						<div className="bo-card bo-levels">
-							<h2>Niveaux</h2>
-							<p className="bo-sub">
-								Repeins la part d'arène demandée avant le buzzer. <strong>★★</strong> demande une part plus
-								grosse, <strong>★★★</strong> se gagne en finissant la course en tête.
-							</p>
-							<LevelSelect progress={lv.progress} onPick={startLevel} />
-						</div>
-					</div>
+					<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 				)}
 
 				{/* `booting` too: resume() leaves `active` false while it loads, and the card would flash. */}
@@ -1379,15 +1380,14 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{mode === 'defi' && !lv.active && (
-				<div className="bo-lb">
-					<Leaderboard
-						key={`lb-${gameId}-${attempt}`}
-						game={gameId}
-						metric="score"
-						submitValue={phase === 'dead' ? submitVal : undefined}
-						format={fmtPct}
-					/>
-				</div>
+				<LeaderboardCorner
+					key={`lb-${gameId}-${attempt}`}
+					game={gameId}
+					metric="score"
+					actions
+					submitValue={phase === 'dead' ? submitVal : undefined}
+					format={fmtPct}
+				/>
 			)}
 
 			<p className="bo-help">
@@ -1456,8 +1456,7 @@ const CSS = `
 .game-page.gf-full .bo-overlay { border-radius: 0; }
 .game-page.gf-full .bo-help,
 .game-page.gf-full .bo-items,
-.game-page.gf-full .bo-modetoggle,
-.game-page.gf-full .bo-lb { display: none; }
+.game-page.gf-full .bo-modetoggle { display: none; }
 /* Keep the standings clear of the "⛶ Quitter" button pinned to the same corner. */
 .game-page.gf-full .bo-leaderboard { top: max(54px, calc(env(safe-area-inset-top) + 46px)); }
 .game-page.gf-full .bo-minimap { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); }
@@ -1584,8 +1583,6 @@ const CSS = `
 .bo-card::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 .bo-card::-webkit-scrollbar-track { background: rgba(90,70,140,0.16); border-radius: 4px; }
 .bo-card::-webkit-scrollbar-thumb { background: var(--bo-neon); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
-/* 100 tiles need more than the 360px a text card wants; the grid itself is responsive. */
-.bo-levels { max-width: 520px; width: 100%; padding: 18px 16px; }
 .bo-card h2 { font-family: var(--font-brand); font-weight: 600; font-size: 26px; margin: 0 0 8px; color: var(--bo-blue); }
 .bo-card strong { color: #fff; }
 .bo-sub { color: var(--bo-ink-dim); font-size: 13px; margin: 0 0 12px; line-height: 1.55; }

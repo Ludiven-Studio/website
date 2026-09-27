@@ -17,7 +17,6 @@ import { mulberry32 } from '../prng';
 import { trackGame } from '../../lib/analytics';
 import { isTypingTarget } from '../../lib/keyboard';
 import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import ModeToggle from '../../components/ModeToggle';
@@ -403,6 +402,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => { if (!lv.close()) armFree(diffKey); }, [lv, armFree, diffKey]);
 
 	// Grade + record a finished level run (once). Ref so the stable applyMove reads it.
 	levelFinishRef.current = (r) => lv.finish({ won: r.won, score: r.score });
@@ -526,23 +526,22 @@ export default function Game2048({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
-				<div className="g2-status">
-					<span className="g2-score">Score <strong>{score}</strong></span>
-					{lv.active ? (
-						<span className={`g2-clock${movesLeft <= 5 ? ' urgent' : ''}`}>🎯 <strong>{movesLeft}</strong> coups</span>
-					) : (
-						<>
-							<span className={`g2-clock${remaining <= 30000 ? ' urgent' : ''}`}>⏱ <strong className="chrono">{fmtClock(remaining)}</strong></span>
-							{!daily && <span className="g2-best">Record <strong>{best}</strong></span>}
-						</>
-					)}
-				</div>
+			<div className="g2-status">
+				<span className="g2-score">Score <strong>{score}</strong></span>
+				{lv.active ? (
+					<span className={`g2-clock${movesLeft <= 5 ? ' urgent' : ''}`}>🎯 <strong>{movesLeft}</strong> coups</span>
+				) : (
+					<>
+						<span className={`g2-clock${remaining <= 30000 ? ' urgent' : ''}`}>⏱ <strong className="chrono">{fmtClock(remaining)}</strong></span>
+						{!daily && <span className="g2-best">Record <strong>{best}</strong></span>}
+					</>
+				)}
+			</div>
+
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
 			<div className="g2-playwrap edge-safe">
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -578,7 +577,6 @@ export default function Game2048({ gameId }: { gameId: string }) {
 					</div>
 				)}
 			</div>
-			)}
 
 			{lv.done && (
 				<LevelOutcome
@@ -599,7 +597,7 @@ export default function Game2048({ gameId }: { gameId: string }) {
 					: <>Flèches ou ZQSD au clavier, ou glisse (souris ou doigt) : les tuiles identiques fusionnent. Fais le meilleur score en <b>10 minutes</b> — le chrono démarre au premier coup&nbsp;!</>}
 			</p>
 
-			{daily && !lv.active && <Leaderboard game={gameId} metric="score" submitValue={status === 'over' && !alreadyPlayed ? score : undefined} />}
+			{daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" actions submitValue={status === 'over' && !alreadyPlayed ? score : undefined} />}
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);

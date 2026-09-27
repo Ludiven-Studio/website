@@ -18,7 +18,6 @@ import {
 	loadDailyRun,
 	saveDailyRun,
 } from '../../lib/leaderboard';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -184,6 +183,7 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 		setDaily(false);
 		lv.enter();
 	}, [lv]);
+	const closeLevels = useCallback(() => { if (!lv.close()) newGame(diffKey); }, [lv, newGame, diffKey]);
 
 	// Levels is the default landing: resume at the next unlocked level (grid once all cleared).
 	// A ?defi deep link opens the daily instead — skip auto-resume then.
@@ -426,16 +426,13 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="ba-bar">
 				<span className="ba-stat">🎯 {shotsUsed}</span>
 				<span className="ba-stat sunk">🚢 {sunkCount}/{fleet.length}</span>
 				<span className="ba-stat">🔊 {Math.max(0, sonarsLeft)}/{sonars}</span>
 				{!daily && !lv.active && best > 0 && <span className="ba-stat best">★ {best}</span>}
 			</div>
-			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="ba-fleet" aria-label="Flotte à couler">
 				{fleetGroups.map(({ len, count }) => {
 					const sunkN = sunkByLen.get(len) ?? 0;
@@ -452,9 +449,8 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					);
 				})}
 			</div>
-			)}
 
-			{!over && (!daily || started) && !(lv.active && lv.menu) && (
+			{!over && (!daily || started) && (
 				<div className="ba-actions">
 					<button
 						className={`ba-act ${sonarMode ? 'on' : ''}`}
@@ -468,9 +464,10 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && (
+				<LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />
+			)}
+
 			<div className="ba-boardwrap">
 				{celebrating && !lv.active && <Celebration />}
 				<div
@@ -571,7 +568,6 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{daily && status === 'won' && (
 				<div className="ba-daily-won">
@@ -584,9 +580,10 @@ export default function BatailleGame({ gameId }: { gameId: string }) {
 			)}
 
 			{daily && (
-				<Leaderboard
+				<LeaderboardCorner
 					game={gameId}
 					metric="time"
+					actions
 					submitValue={status === 'won' ? cost : undefined}
 					format={(v) => `${v} coups`}
 				/>

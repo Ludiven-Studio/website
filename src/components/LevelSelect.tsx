@@ -5,6 +5,7 @@
 import type { GameProgress } from '../lib/progression';
 import { LEVEL_COUNT, unlockedUpTo } from '../lib/progression';
 import ErrorBoundary from './ErrorBoundary';
+import GameModal from './GameModal';
 import { tr, type GameLang } from '../lib/gameLang';
 
 interface Props {
@@ -13,6 +14,9 @@ interface Props {
 	/** Optional total-stars caption; defaults to "X / 300 ⭐". */
 	title?: string;
 	lang?: GameLang;
+	/** Shown as the shared popup (title, close, scroll) rather than laid in the page. The close
+	    goes back to what the grid was opened over: see useLevels().close. */
+	onClose?: () => void;
 }
 
 function LevelSelectInner({ progress, onPick, title, lang = 'fr' }: Props) {
@@ -61,16 +65,24 @@ function LevelSelectInner({ progress, onPick, title, lang = 'fr' }: Props) {
 }
 
 export default function LevelSelect(props: Props) {
-	return (
+	const lang = props.lang ?? 'fr';
+	const grid = (
 		<ErrorBoundary
 			fallback={
 				<p style={{ textAlign: 'center', color: 'var(--gray-300)', fontSize: 13 }}>
-					{tr(props.lang ?? 'fr', { fr: 'Sélecteur de niveaux momentanément indisponible.', en: 'Level picker unavailable for now.', es: 'Selector de niveles no disponible por ahora.' })}
+					{tr(lang, { fr: 'Sélecteur de niveaux momentanément indisponible.', en: 'Level picker unavailable for now.', es: 'Selector de niveles no disponible por ahora.' })}
 				</p>
 			}
 		>
 			<LevelSelectInner {...props} />
 		</ErrorBoundary>
+	);
+	if (!props.onClose) return grid;
+	return (
+		<GameModal title={`🎯 ${tr(lang, { fr: 'Niveaux', en: 'Levels', es: 'Niveles' })}`} onClose={props.onClose}
+			closeLabel={tr(lang, { fr: 'Fermer', en: 'Close', es: 'Cerrar' })} width={560}>
+			{grid}
+		</GameModal>
 	);
 }
 

@@ -27,7 +27,6 @@ import { getDaily, dailyWeekdayLabel, loadDailyRun, saveDailyRun } from '../../l
 import { formatScore } from '../../lib/scoreFormat';
 import { getProgression, submitLevel, type GameProgress } from '../../lib/progression';
 import { DAILY_LB } from '../../data/dailyLb';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import DailyDone from '../../components/DailyDone';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -1439,6 +1438,13 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 	}, [gameId, stop, armWorld]);
 
 	const armLevels = useCallback(() => {
+		if (levelMenuRef.current) return;
+		if (modeRef.current === 'levels' && statusRef.current === 'over') {
+			// Over a level result: keep it behind the grid so closing lands back on it.
+			levelMenuRef.current = true;
+			setLevelMenu(true);
+			return;
+		}
 		stop();
 		dailyRef.current = false;
 		modeRef.current = 'levels';
@@ -1453,6 +1459,15 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 		armWorld(lugeLevels.config(1).seed); // idle board behind the grid
 		void getProgression(gameId).then((p) => setProgress({ stars: { ...p.stars }, best: { ...p.best }, count: lugeLevels.count }));
 	}, [gameId, stop, armWorld]);
+
+	const closeLevels = useCallback(() => {
+		if (modeRef.current === 'levels' && statusRef.current === 'over') {
+			levelMenuRef.current = false;
+			setLevelMenu(false);
+			return;
+		}
+		armFree();
+	}, [armFree]);
 
 	const playLevel = useCallback((level: number) => {
 		const cfg = lugeLevels.config(level);
@@ -1657,7 +1672,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				<span className="lg-best">Record {fmtPts(best)}</span>
 			</div>
 
-			<div ref={boardwrapRef} className={`lg-boardwrap ${levelsMode && levelMenu ? 'hidden' : ''}`}>
+			<div ref={boardwrapRef} className="lg-boardwrap">
 				<canvas ref={canvasRef} className="lg-canvas" role="img" aria-label={`Luge — ${fmtPts(score)}`} />
 				<div ref={vignetteRef} className="lg-vignette" aria-hidden="true" />
 				<div ref={flashRef} className="lg-flash" aria-hidden="true" />
@@ -1695,7 +1710,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 					</div>
 				)}
 				{dailyLoading && <div className="lg-overlay"><div className="lg-overlay-card">Préparation…</div></div>}
-				{!webglError && status === 'over' && levelsMode && (
+				{!webglError && status === 'over' && levelsMode && !levelMenu && (
 					<LevelOutcome
 						level={currentLevel}
 						lastLevel={lugeLevels.count}
@@ -1704,7 +1719,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 						detail={`Distance ${dist} m · Score ${fmtPts(score)}`}
 						onNext={() => playLevel(currentLevel + 1)}
 						onReplay={() => playLevel(currentLevel)}
-						onMenu={() => { levelMenuRef.current = true; targetDistRef.current = 0; setLevelMenu(true); statusRef.current = 'ready'; setStatus('ready'); }}
+						onMenu={() => { levelMenuRef.current = true; setLevelMenu(true); }}
 					/>
 				)}
 				{!webglError && status === 'over' && !levelsMode && (
@@ -1727,7 +1742,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{levelsMode && levelMenu && (
-				<LevelSelect progress={progress} onPick={playLevel} />
+				<LevelSelect progress={progress} onPick={playLevel} onClose={closeLevels} />
 			)}
 
 			<p className="lg-help">
@@ -1738,7 +1753,7 @@ export default function LugeGame({ gameId }: { gameId: string }) {
 				du jour, la descente est la même pour tout le monde ({MAX_TRIES} essais, meilleure distance classée).
 			</p>
 
-			{daily && <Leaderboard key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtPts} />}
+			{daily && <LeaderboardCorner key={`lb-${gameId}-${attempt}`} game={gameId} metric="score" submitValue={status === 'over' ? best : undefined} format={fmtPts} actions />}
 			{!daily && !levelsMode && <LeaderboardCorner game={gameId} metric="score" />}
 		</div>
 	);
@@ -1764,7 +1779,6 @@ const CSS = `
 .lg-best { background: var(--gray-900); color: var(--gray-0); border-radius: 999px; padding: 5px 14px; font-variant-numeric: tabular-nums; }
 
 .lg-boardwrap { position: relative; width: 100%; }
-.lg-boardwrap.hidden { display: none; }
 .lg-canvas {
   width: 100%; aspect-ratio: 16 / 10; display: block;
   background: #cfe0f0; border: 1px solid var(--gray-800); border-radius: 12px;

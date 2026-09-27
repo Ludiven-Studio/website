@@ -12,7 +12,6 @@ import {
 	type DailyRun,
 } from '../../lib/leaderboard';
 import GiveUp, { RevealNote } from '../../components/GiveUp';
-import Leaderboard from '../../components/Leaderboard';
 import LeaderboardCorner from '../../components/LeaderboardCorner';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
@@ -108,6 +107,10 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 		setHinted(new Set());
 		setElapsed(0);
 	}, []);
+
+	const closeLevels = useCallback(() => {
+		if (!lv.close()) newGame(diffKey);
+	}, [lv, newGame, diffKey]);
 
 	/* Daily challenge: one attempt per device, resumable. Server-issued seed + difficulty. */
 	const startDaily = useCallback(async () => {
@@ -440,7 +443,6 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{!(lv.active && lv.menu) && (
 			<div className="rc-bar">
 				<div className="rc-bar-right">
 					<div className="rc-timer chrono">{fmtTime(elapsed)}</div>
@@ -455,9 +457,8 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 					)}
 				</div>
 			</div>
-			)}
 
-			{status !== 'won' && !revealed && !(lv.active && lv.menu) && (
+			{status !== 'won' && !revealed && (
 				<div className="rc-actions">
 					<button className="rc-act" onClick={hint} disabled={!gate.ready || (timed && !started)}>{gate.label}</button>
 					{!daily && !lv.active && elapsed >= 60 && (
@@ -484,9 +485,7 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{lv.active && lv.menu ? (
-				<LevelSelect progress={lv.progress} onPick={startLevel} />
-			) : (
+			{lv.active && lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 			<div className="rc-boardwrap" style={{ ['--n' as string]: n }}>
 				{celebrating && !lv.active && <Celebration />}
 				<div className={`rc-board ${(daily || lv.playing) && !started ? 'blurred' : ''}`}>
@@ -582,19 +581,18 @@ export default function RondCarreGame({ gameId }: { gameId: string }) {
 					/>
 				)}
 			</div>
-			)}
 
 			{hintNote && (
 				<p className="rc-hint-note" aria-live="polite">💡 {hintNote}</p>
 			)}
 
 			{daily && (
-				<Leaderboard game={gameId} metric="time" submitValue={status === 'won' && !revealed ? elapsed : undefined} />
+				<LeaderboardCorner game={gameId} metric="time" actions submitValue={status === 'won' && !revealed ? elapsed : undefined} />
 			)}
 
 			{!daily && !lv.active && <LeaderboardCorner game={gameId} metric="time" />}
 
-			{lv.active && lv.menu ? null : revealed ? (
+			{revealed ? (
 				daily ? (
 					<RevealNote />
 				) : (

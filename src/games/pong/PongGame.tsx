@@ -11,7 +11,7 @@ import { pongLevels, type PongLevelCfg } from './levels';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
 import ModeToggle from '../../components/ModeToggle';
-import Leaderboard from '../../components/Leaderboard';
+import LeaderboardCorner from '../../components/LeaderboardCorner';
 
 type Phase = 'menu' | 'waiting' | 'playing' | 'over';
 type Role = 'host' | 'guest' | 'ai';
@@ -63,6 +63,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	const chargeRef = useRef(0); // last pushed charge value (avoid setState every frame)
 	const levelCfgRef = useRef<PongLevelCfg | null>(null); // non-null → levels match (ramps AI + serve speed)
 	const targetRef = useRef(PONG.maxScore); // points to win the current match
+	const levelInPlayRef = useRef(0); // level torn down by armLevels, replayed if the grid is closed
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const runningRef = useRef(false);
@@ -585,6 +586,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	/* ---------- levels mode ---------- */
 	const startLevel = useCallback((level: number) => {
 		const cfg = lv.play(level);
+		levelInPlayRef.current = 0;
 		levelCfgRef.current = cfg;
 		targetRef.current = cfg.target;
 		matchRef.current = null;
@@ -608,6 +610,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 	}, [lv, startLoop]);
 
 	const armLevels = useCallback(() => {
+		levelInPlayRef.current = lv.playing ? lv.level : 0;
 		runningRef.current = false;
 		cancelAnimationFrame(rafRef.current);
 		levelCfgRef.current = null;
@@ -620,6 +623,20 @@ export default function PongGame({ gameId }: { gameId: string }) {
 		setPhase('menu');
 		lv.enter();
 	}, [lv]);
+
+	const closeLevels = useCallback(() => {
+		if (lv.close()) {
+			// armLevels stopped the rally, so a level in play restarts rather than freezing.
+			if (levelInPlayRef.current) startLevel(levelInPlayRef.current);
+			return;
+		}
+		runningRef.current = false;
+		cancelAnimationFrame(rafRef.current);
+		dailyRef.current = false;
+		setDaily(false);
+		setConfirmQuit(false);
+		setPhase('menu');
+	}, [lv, startLevel]);
 
 	const rematch = useCallback(() => {
 		if (roleRef.current === 'guest') return; // host (or AI) controls the restart
@@ -744,11 +761,7 @@ export default function PongGame({ gameId }: { gameId: string }) {
 					</>
 				)}
 
-				{lv.menu && (
-					<div className="pg-leveloverlay">
-						<LevelSelect progress={lv.progress} onPick={startLevel} />
-					</div>
-				)}
+				{lv.menu && <LevelSelect progress={lv.progress} onPick={startLevel} onClose={closeLevels} />}
 
 				{lv.done && (
 					<LevelOutcome
@@ -859,12 +872,13 @@ export default function PongGame({ gameId }: { gameId: string }) {
 									<button className="pg-btn pg-primary" onClick={() => startDailyRace(dailySeedRef.current)}>↻ Réessayer</button>
 								</>
 							)}
-							<Leaderboard game={gameId} metric="time" submitValue={youWon && dailyTime != null ? dailyTime : undefined} />
 							<button className="pg-btn" onClick={armFree}>Menu libre</button>
 						</div>
 					</div>
 				)}
 			</div>
+
+			{daily && <LeaderboardCorner game={gameId} metric="time" actions submitValue={youWon && dailyTime != null ? dailyTime : undefined} />}
 
 			{phase === 'playing' && powersUi && (
 				<div className="pg-powerbar">
@@ -906,10 +920,6 @@ const CSS = `
 .pg-modeseg.active { background: var(--accent-regular); color: var(--accent-text-over); }
 .pg-modeseg:not(.active):hover { color: var(--gray-0); }
 .pg-leveltag { text-align: center; color: var(--gray-300); font-size: 12.5px; font-weight: 500; margin: -0.25rem 0 0; }
-.pg-leveloverlay {
-  position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
-  padding: 1rem; overflow-y: auto; background: rgba(8,10,18,0.72); border-radius: 14px;
-}
 .pg-stage { position: relative; width: 100%; max-width: 680px; aspect-ratio: 5 / 3; }
 /* CRT bloom around the court, like the dark neon arcade room on the game card. */
 .pg-stage::before {
@@ -931,8 +941,12 @@ const CSS = `
 }
 .pg-hud { position: absolute; top: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 0.5rem; font-family: var(--font-brand); font-weight: 700; font-size: 1.1rem; pointer-events: none; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
 .pg-sep { color: var(--gray-300); }
-.pg-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(8,10,18,0.55); padding: 1rem; }
-.pg-card { background: var(--gray-999, #0c0e14); border: 1px solid var(--gray-800, #2a2f3a); border-radius: 16px; padding: 1.25rem; width: min(340px, 100%); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; text-align: center; }
+/* A phone's court is shorter than the menu card: it grows under one (the canvas is contain-fitted, no stretch). */
+.pg-stage:has(.pg-overlay) { min-height: 430px; }
+/* Over the court only: fixed to the viewport it covered the mode tabs, so Niveaux and Défi could not
+   be reached from the menu. A card taller than a phone's court scrolls in it. */
+.pg-overlay { position: absolute; inset: 0; z-index: 50; display: flex; overflow-y: auto; background: rgba(8,10,18,0.55); padding: 0.75rem; }
+.pg-card { background: var(--gray-999, #0c0e14); border: 1px solid var(--gray-800, #2a2f3a); border-radius: 16px; padding: 1.25rem; width: min(340px, 100%); margin: auto; display: flex; flex-direction: column; gap: 0.6rem; text-align: center; }
 .pg-card h2 { margin: 0; font-size: var(--text-xl); }
 .pg-sub { margin: 0; color: var(--gray-300); font-size: var(--text-sm); }
 .pg-modes { display: flex; gap: 0.4rem; }
