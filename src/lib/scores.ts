@@ -111,13 +111,13 @@ export async function fetchDailyTopsSecure(day: string): Promise<Record<string, 
 
 /** Daily top-N from game_scores, shaped like the legacy ScoreRow so
     <Leaderboard source={...}> renders unchanged. 'time' → fastest first, 'score' → highest first. */
-export async function getLeaderboard(gameId: string, metric: Metric = 'score', day: string = challengeDateKey(), limit = 50): Promise<ScoreRow[]> {
+export async function getLeaderboard(gameId: string, metric: Metric = 'score', day: string = challengeDateKey(), limit = 50, offset = 0): Promise<ScoreRow[]> {
 	if (!leaderboardEnabled()) return [];
 	const order = metric === 'time' ? 'score.asc' : 'score.desc';
 	// Throws on transport/HTTP failure so <Leaderboard> can distinguish empty from unreachable.
 	const res = await fetch(
 		`${SUPABASE_URL}/rest/v1/game_scores?game_id=eq.${encodeURIComponent(gameId)}&challenge_date=eq.${day}` +
-			`&select=player_name,score,created_at&order=${order},created_at.asc&limit=${limit}`,
+			`&select=player_name,score,created_at&order=${order},created_at.asc&limit=${limit}&offset=${offset}`,
 		{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
 	);
 	if (!res.ok) throw new Error(`leaderboard ${res.status}`);
@@ -125,26 +125,51 @@ export async function getLeaderboard(gameId: string, metric: Metric = 'score', d
 	return rows.map((r) => ({ name: r.player_name || 'Anonyme', value: r.score, created_at: r.created_at }));
 }
 
+/** How many played a day's board and, given a value, where it stands. One row per player per day
+    (game_scores_daily_uniq), so a count of better rows is the rank: nothing is downloaded. */
+export async function getDailyRank(gameId: string, metric: Metric, value: number | null, day: string = challengeDateKey()): Promise<{ rank: number | null; total: number } | null> {
+	if (!leaderboardEnabled()) return null;
+	const count = async (filter: string): Promise<number | null> => {
+		const res = await fetch(
+			`${SUPABASE_URL}/rest/v1/game_scores?game_id=eq.${encodeURIComponent(gameId)}&challenge_date=eq.${day}${filter}&select=score&limit=1`,
+			{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, Prefer: 'count=exact' } },
+		);
+		const total = res.ok ? Number(res.headers.get('content-range')?.split('/')[1]) : NaN;
+		return Number.isFinite(total) ? total : null;
+	};
+	const [better, total] = await Promise.all([
+		value == null ? Promise.resolve(null) : count(`&score=${metric === 'time' ? 'lt' : 'gt'}.${value}`),
+		count(''),
+	]);
+	if (total == null) return null;
+	return { rank: better == null ? null : better + 1, total };
+}
+
 /** An event's board: every free-play row of `gameId` (no challenge date), each player's best
-    kept once. Rows are append-only there, so the dedupe happens here, on the pseudo. */
-export async function getEventLeaderboard(gameId: string, metric: Metric = 'time', limit = 50): Promise<ScoreRow[]> {
+    kept once. Rows are append-only there, so the dedupe happens here, on the pseudo.
+    Read in chunks: the API hands out at most 1000 rows a request, whatever the limit asks. */
+export async function getEventLeaderboard(gameId: string, metric: Metric = 'time', limit = 1000): Promise<ScoreRow[]> {
 	if (!leaderboardEnabled()) return [];
 	const order = metric === 'time' ? 'score.asc' : 'score.desc';
-	const res = await fetch(
-		`${SUPABASE_URL}/rest/v1/game_scores?game_id=eq.${encodeURIComponent(gameId)}&challenge_date=is.null` +
-			`&select=player_name,score,created_at&order=${order},created_at.asc&limit=2000`,
-		{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
-	);
-	if (!res.ok) throw new Error(`leaderboard ${res.status}`);
-	const rows: { player_name: string; score: number; created_at: string }[] = await res.json();
+	const CHUNK = 1000, MAX_CHUNKS = 10;
 	const seen = new Set<string>();
 	const out: ScoreRow[] = [];
-	for (const r of rows) {
-		const name = r.player_name || 'Anonyme';
-		if (seen.has(name.toLowerCase())) continue;
-		seen.add(name.toLowerCase());
-		out.push({ name, value: r.score, created_at: r.created_at });
-		if (out.length >= limit) break;
+	for (let c = 0; c < MAX_CHUNKS && out.length < limit; c++) {
+		const res = await fetch(
+			`${SUPABASE_URL}/rest/v1/game_scores?game_id=eq.${encodeURIComponent(gameId)}&challenge_date=is.null` +
+				`&select=player_name,score,created_at&order=${order},created_at.asc&limit=${CHUNK}&offset=${c * CHUNK}`,
+			{ headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } },
+		);
+		if (!res.ok) throw new Error(`leaderboard ${res.status}`);
+		const rows: { player_name: string; score: number; created_at: string }[] = await res.json();
+		for (const r of rows) {
+			const name = r.player_name || 'Anonyme';
+			if (seen.has(name.toLowerCase())) continue;
+			seen.add(name.toLowerCase());
+			out.push({ name, value: r.score, created_at: r.created_at });
+			if (out.length >= limit) break;
+		}
+		if (rows.length < CHUNK) break;
 	}
 	return out;
 }

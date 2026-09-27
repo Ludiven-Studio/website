@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
 	fetchLeaderboard,
 	submitDaily,
@@ -12,7 +13,7 @@ import {
 import { games } from '../data/games';
 import { fmtCentisExact } from '../lib/scoreFormat';
 import { isSecured } from '../data/securedGames';
-import { submitScore, getLeaderboard } from '../lib/scores';
+import { submitScore, getLeaderboard, getDailyRank } from '../lib/scores';
 import { gameStreak } from '../lib/streak';
 import { equippedBlason } from '../lib/wallet';
 import { trackEvent } from '../lib/analytics';
@@ -20,6 +21,35 @@ import ErrorBoundary from './ErrorBoundary';
 import { tr, type GameLang } from '../lib/gameLang';
 
 // Time leaderboards store CENTISECONDS; a game may still pass its own `format`.
+
+const PAGE = 50; // rows per page of the full board
+const LOCAL_MAX = 1000; // boards ranked on the client (legacy table, event, custom source) load this many
+
+interface Ranked extends ScoreRow { rank: number }
+/** Rows from `offset`, at most `n`, already ranked. */
+type Pager = (offset: number, n: number) => Promise<Ranked[]>;
+
+const ranked = (rows: ScoreRow[], offset: number): Ranked[] => rows.map((r, i) => ({ ...r, rank: offset + i + 1 }));
+
+/** The short board: the podium, then the player with a neighbour on each side. `null` is a gap.
+    Later rows of `pool` win a rank over earlier ones (the window around the player over the top). */
+function compact(pool: Ranked[], total: number, myRank: number | null): (Ranked | null)[] {
+	const want: number[] = [];
+	if (total <= 6) for (let r = 1; r <= total; r++) want.push(r);
+	else if (myRank == null) want.push(1, 2, 3, 4, 5);
+	else for (const r of [1, 2, 3, myRank - 1, myRank, myRank + 1]) if (r >= 1 && r <= total && !want.includes(r)) want.push(r);
+	const byRank = new Map(pool.map((r) => [r.rank, r]));
+	const out: (Ranked | null)[] = [];
+	let prev = 0;
+	for (const r of want.sort((a, b) => a - b)) {
+		const row = byRank.get(r);
+		if (!row) continue;
+		if (prev > 0 && r > prev + 1) out.push(null);
+		out.push(row);
+		prev = r;
+	}
+	return out;
+}
 
 const TXT = {
 	fr: {
@@ -32,6 +62,7 @@ const TXT = {
 		empty: "Personne n'a encore joué aujourd'hui. À toi de lancer le classement !",
 		nick: 'Ton pseudo', nickLabel: 'Pseudo', ok: 'Valider', cancel: 'Annuler', nickIs: 'Pseudo :', change: 'Changer',
 		setNick: 'Définir un pseudo', crashed: 'Classement momentanément indisponible.',
+		seeAll: (n: number) => `Voir tout (${n})`, close: 'Fermer',
 	},
 	en: {
 		title: 'Today’s leaderboard', daily: 'Daily challenge', rank: ['🥇 1st', '🥈 2nd', '🥉 3rd'], nth: (n: number) => `${n}th`,
@@ -43,6 +74,7 @@ const TXT = {
 		empty: 'Nobody has played today yet. Be the first on the board!',
 		nick: 'Your nickname', nickLabel: 'Nickname', ok: 'Save', cancel: 'Cancel', nickIs: 'Nickname:', change: 'Change',
 		setNick: 'Set a nickname', crashed: 'Leaderboard unavailable for now.',
+		seeAll: (n: number) => `See all (${n})`, close: 'Close',
 	},
 	es: {
 		title: 'Clasificación del día', daily: 'Reto del día', rank: ['🥇 1.º', '🥈 2.º', '🥉 3.º'], nth: (n: number) => `${n}.º`,
@@ -54,6 +86,7 @@ const TXT = {
 		empty: 'Nadie ha jugado todavía hoy. ¡Estrena tú la clasificación!',
 		nick: 'Tu apodo', nickLabel: 'Apodo', ok: 'Guardar', cancel: 'Cancelar', nickIs: 'Apodo:', change: 'Cambiar',
 		setNick: 'Elegir un apodo', crashed: 'Clasificación no disponible por ahora.',
+		seeAll: (n: number) => `Ver todo (${n})`, close: 'Cerrar',
 	},
 };
 
@@ -80,7 +113,12 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	const [name, setName] = useState<string>(() => playerName());
 	const [draft, setDraft] = useState('');
 	const [editing, setEditing] = useState(false);
-	const [rows, setRows] = useState<ScoreRow[]>([]);
+	const [shown, setShown] = useState<(Ranked | null)[]>([]);
+	const [total, setTotal] = useState(0);
+	const [myRank, setMyRank] = useState<number | null>(null);
+	const [all, setAll] = useState(false); // the full board is open
+	const pagerRef = useRef<Pager>(async () => []);
+	const rootRef = useRef<HTMLDivElement | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(false);
 	// 'network' is worth a retry; 'rejected' means the server refused the value itself,
@@ -124,15 +162,45 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 		}
 		// Read the board — throws on a network/HTTP failure (vs. a legit empty board).
 		try {
-			const data = source ? await source() : secured ? await getLeaderboard(game, metric) : await fetchLeaderboard(game, metric);
-			setRows(data);
+			const me = name.toLowerCase();
+			const mine = submitValue ?? dayValue;
+			if (secured && !source && !event) {
+				// The secured daily holds one row per player, so the server pages it and counts the rank:
+				// a board of thousands costs three small requests, never the whole list.
+				const [top, count] = await Promise.all([getLeaderboard(game, metric, undefined, 6), getDailyRank(game, metric, mine)]);
+				const n = count?.total ?? top.length;
+				const at = name ? count?.rank ?? null : null;
+				const pool = ranked(top, 0);
+				if (at != null && at + 1 > pool.length && n > 6) {
+					// One above, one below. Ties can leave the player out of the window, or put them at
+					// its edge, so they are laid in by hand at the counted rank.
+					const others = (await getLeaderboard(game, metric, undefined, 4, at - 2)).filter((r) => r.name.toLowerCase() !== me);
+					if (others[0]) pool.push({ ...others[0], rank: at - 1 });
+					pool.push({ name, value: mine!, created_at: '', rank: at });
+					if (others[1]) pool.push({ ...others[1], rank: at + 1 });
+				}
+				pagerRef.current = async (o, k) => ranked(await getLeaderboard(game, metric, undefined, k, o), o);
+				setTotal(n);
+				setMyRank(at);
+				setShown(compact(pool, n, at));
+			} else {
+				const rows = ranked(source ? await source()
+					: secured ? await getLeaderboard(game, metric, undefined, LOCAL_MAX)
+					: await fetchLeaderboard(game, metric, undefined, LOCAL_MAX), 0);
+				const found = me ? rows.findIndex((r) => r.name.toLowerCase() === me) : -1;
+				const at = found >= 0 ? found + 1 : null;
+				pagerRef.current = async (o, k) => rows.slice(o, o + k);
+				setTotal(rows.length);
+				setMyRank(at);
+				setShown(compact(rows, rows.length, at));
+			}
 			setError(false);
 		} catch {
 			setError(true);
 		} finally {
 			setLoading(false);
 		}
-	}, [game, metric, submitValue, name, source, secured, event]);
+	}, [game, metric, submitValue, dayValue, name, source, secured, event]);
 
 	useEffect(() => {
 		load();
@@ -202,9 +270,9 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 		if (name) extra.set('de', name);
 		const url = `${location.origin}/jeux/${gameId}?defi&${extra}`;
 		const line = metric === 'time' ? `⏱️ ${fmt(dayValue)}` : `🏆 ${fmt(dayValue)} pts`;
-		const rank = rows.findIndex((r) => r.name.toLowerCase() === me);
+		const rank = myRank == null ? -1 : myRank - 1;
 		const rankLine =
-			rank < 0 ? '' : ` · ${rank < 3 ? t.rank[rank] : t.nth(rank + 1)}${rows.length > 1 ? t.of(rows.length) : ''}`;
+			rank < 0 ? '' : ` · ${rank < 3 ? t.rank[rank] : t.nth(rank + 1)}${total > 1 ? t.of(total) : ''}`;
 		const st = gameStreak(gameId);
 		const streakLine = st.count > 1 ? `\n${t.streak(st.count)}` : '';
 		const text = `${title} — ${t.daily}\n${line}${rankLine}${streakLine}\n${t.beat}`;
@@ -224,7 +292,7 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 	};
 
 	return (
-		<div className={`lb-root ${open ? '' : 'is-folded'}`}>
+		<div className={`lb-root ${open ? '' : 'is-folded'}`} ref={rootRef}>
 			<style>{CSS}</style>
 			{collapsible ? (
 				<button className="lb-title" onClick={toggle} aria-expanded={open}>
@@ -271,18 +339,27 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 							<p className="lb-msg">{t.down}</p>
 							<button className="lb-retry" onClick={load}>{t.retry}</button>
 						</div>
-					) : rows.length === 0 ? (
+					) : shown.length === 0 ? (
 						<p className="lb-msg">{t.empty}</p>
 					) : (
-						<ol className="lb-list">
-							{rows.map((r, i) => (
-								<li key={`${r.name}-${i}`} className={`lb-row ${r.name.toLowerCase() === me ? 'me' : ''}`}>
-									<span className="lb-rank">{i + 1}</span>
-									<span className="lb-pname">{r.name.toLowerCase() === me && myBlason ? `${myBlason.emoji} ` : ''}{r.name}</span>
-									<span className="lb-val">{fmt(r.value)}</span>
-								</li>
-							))}
-						</ol>
+						<>
+							<ol className="lb-list">
+								{shown.map((r, i) => r ? (
+									<Row key={`${r.rank}-${r.name}`} r={r} me={me} blason={myBlason?.emoji} fmt={fmt} />
+								) : (
+									<li key={`gap-${i}`} className="lb-gap" aria-hidden="true">⋯</li>
+								))}
+							</ol>
+							{total > shown.filter(Boolean).length && (
+								<button className="lb-all-btn" onClick={() => setAll(true)}>{t.seeAll(total)}</button>
+							)}
+						</>
+					)}
+					{all && rootRef.current && createPortal(
+						<AllRows title={t.title} total={total} pager={pagerRef.current} me={me} blason={myBlason?.emoji}
+							fmt={fmt} closeLabel={t.close} loadingLabel={t.loading} onClose={() => setAll(false)} />,
+						// Inside the game page: native fullscreen shows that element only, so a portal to <body> would vanish.
+						rootRef.current.closest('.game-page') ?? document.body,
 					)}
 
 					{showInput ? (
@@ -318,6 +395,74 @@ function LeaderboardInner({ game, metric, submitValue, format, source, actions =
 			)}
 			</>
 			)}
+		</div>
+	);
+}
+
+function Row({ r, me, blason, fmt }: { r: Ranked; me: string; blason?: string; fmt: (v: number) => string }) {
+	const mine = r.name.toLowerCase() === me;
+	return (
+		<li className={`lb-row ${mine ? 'me' : ''}`}>
+			<span className="lb-rank">{r.rank}</span>
+			<span className="lb-pname">{mine && blason ? `${blason} ` : ''}{r.name}</span>
+			<span className="lb-val">{fmt(r.value)}</span>
+		</li>
+	);
+}
+
+/** The whole board over the page, a page of rows at a time as the list nears its end. */
+function AllRows({ title, total, pager, me, blason, fmt, closeLabel, loadingLabel, onClose }: {
+	title: string; total: number; pager: Pager; me: string; blason?: string; fmt: (v: number) => string;
+	closeLabel: string; loadingLabel: string; onClose: () => void;
+}) {
+	const [rows, setRows] = useState<Ranked[]>([]);
+	const [done, setDone] = useState(false);
+	const busyRef = useRef(false);
+	const boxRef = useRef<HTMLDivElement | null>(null);
+	const endRef = useRef<HTMLDivElement | null>(null);
+
+	const more = useCallback(async () => {
+		if (busyRef.current) return;
+		busyRef.current = true;
+		try {
+			const offset = rows.length;
+			const next = await pager(offset, PAGE);
+			setRows((r) => (r.length === offset ? [...r, ...next] : r));
+			if (next.length < PAGE || offset + next.length >= total) setDone(true);
+		} catch {
+			setDone(true);
+		} finally {
+			busyRef.current = false;
+		}
+	}, [rows.length, pager, total]);
+
+	// Re-observed after every page: a sentinel still in view after a load fires again on observe.
+	useEffect(() => {
+		const box = boxRef.current, end = endRef.current;
+		if (!box || !end || done) return;
+		const io = new IntersectionObserver((e) => { if (e[0].isIntersecting) void more(); }, { root: box, rootMargin: '300px' });
+		io.observe(end);
+		return () => io.disconnect();
+	}, [more, done]);
+
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, [onClose]);
+
+	return (
+		<div className="lb-all" role="dialog" aria-modal="true" aria-label={title}>
+			<div className="lb-all-head">
+				<h3>{title} <span className="lb-all-n">· {total}</span></h3>
+				<button className="lb-all-close" onClick={onClose} aria-label={closeLabel}>✕</button>
+			</div>
+			<div className="lb-all-body" ref={boxRef}>
+				<ol className="lb-list">
+					{rows.map((r) => <Row key={`${r.rank}-${r.name}`} r={r} me={me} blason={blason} fmt={fmt} />)}
+				</ol>
+				{!done && <div ref={endRef} className="lb-msg lb-all-more">{loadingLabel}</div>}
+			</div>
 		</div>
 	);
 }
@@ -400,12 +545,36 @@ const CSS = `
   font: inherit; font-size: 12.5px; font-weight: 600; color: var(--accent-regular); text-decoration: underline;
 }
 
-.lb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lb-list {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px;
+}
 .lb-row {
-  display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px;
+  flex: none; display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px;
   padding: 7px 12px; border-radius: 10px; background: var(--gray-999_40); border: 1px solid var(--gray-800);
   font-size: 14px;
 }
+.lb-gap { text-align: center; color: var(--gray-300); line-height: 1; font-size: 14px; }
+.lb-all-btn {
+  display: block; margin: 8px auto 0; border: 1.5px solid var(--gray-700); background: transparent; color: var(--gray-0);
+  font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 6px 16px; cursor: pointer;
+}
+.lb-all-btn:hover, .lb-all-btn:focus-visible { border-color: var(--accent-regular); color: var(--accent-regular); }
+/* Above everything, the fullscreen exit included: this is a modal and has its own close. */
+.lb-all {
+  position: fixed; inset: 0; z-index: 2147483647; display: flex; flex-direction: column;
+  background: var(--gray-999); color: var(--gray-0); font-family: var(--font-body);
+}
+.lb-all-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--gray-800);
+}
+.lb-all-head h3 { margin: 0; font-size: 17px; }
+.lb-all-n { color: var(--gray-300); font-weight: 500; }
+.lb-all-close { border: none; background: transparent; color: var(--gray-0); font-size: 20px; line-height: 1; padding: 6px 8px; cursor: pointer; }
+.lb-all-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); }
+.lb-all-body .lb-list { max-width: 480px; margin: 0 auto; }
+.lb-all-more { padding: 14px 0; }
 .lb-row.me { border-color: var(--accent-regular); background: var(--accent-overlay); }
 .lb-rank { font-weight: 700; color: var(--gray-300); text-align: center; font-variant-numeric: tabular-nums; }
 .lb-pname { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

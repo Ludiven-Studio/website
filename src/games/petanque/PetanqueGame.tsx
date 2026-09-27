@@ -3833,7 +3833,9 @@ const CSS = `
 .game-page.gf-full:has(.pe-root) { padding: 0; }
 .game-page.gf-full .pe-root { max-width: none; width: 100%; height: 100%; }
 .game-page.gf-full .pe-help { display: none; }
-.game-page.gf-full .pe-playwrap { flex: 1; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+/* The daily board stacks under the pitch here; the pitch never gives it more than 40 % of the screen,
+   or a long board crushed the pitch, and the end panel on it, to nothing. The rest scrolls. */
+.game-page.gf-full .pe-playwrap { flex: 1 1 0; min-height: 60%; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
 .game-page.gf-full .pe-topbar {
   position: absolute; inset: 0 0 auto 0; margin: 0; z-index: 3; gap: 6px; pointer-events: none;
   padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
