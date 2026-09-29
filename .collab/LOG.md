@@ -10,3 +10,4 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-09-29 · 0007 · revue du moteur multi-chapitres · 3 bugs (double paiement multi-onglets, commandes v1, générateur après fusion) corrigés et testés
 - 2026-09-29 · 0008 · chaîne bois + coffre du menuisier (Codex imagegen) · intégrées
 - 2026-09-29 · 0009 · illustration du bureau de Jeanne (Codex imagegen) · intégrée
+- 2026-09-29 · 0010 · chaîne textile + malle à tissus (Codex imagegen) · intégrées
