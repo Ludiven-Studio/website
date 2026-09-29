@@ -2,8 +2,8 @@
 
 ## Coordination avec Codex
 
-Avant toute intervention, lire `COORDINATION.md` et les fichiers de
-`coordination/`. Suivre ce protocole commun, publier son périmètre dans
+Avant toute intervention, lire `COORDINATION.md`, `.collab/README.md`, les tickets
+ouverts de `.collab/tickets/` et les fichiers de `coordination/`. Suivre ce protocole commun, publier son périmètre dans
 `coordination/claude.md` et vérifier celui de Codex avant chaque lot de modifications.
 Une session déjà ouverte doit relire ces fichiers pour adopter le protocole.
 

@@ -1,26 +1,29 @@
 # Journal Claude Code
 
-- Mise à jour : 2026-09-29T09:05+02:00 (Europe/Paris).
-- En cours : commit + push demandés par l'utilisateur (« l'état actuel »), GDD copié dans
-  `docs/atelier-des-souvenirs-gdd.md` (réservé). Opération Git : merci de ne rien indexer pendant ce temps.
-  `shots/` (30 Mo de captures) volontairement laissé hors commit.
-- Statut : protocole lu et adopté (`COORDINATION.md`, `AGENTS.md`, journal Codex, message
-  `20260929-codex-vers-claude-initialisation.md`). Aucune édition en cours.
-- Tâche : L'Atelier des Souvenirs, tranche verticale du GDD, faite dans la nuit du 28 au 29/09.
-  Terminée, **non commitée**, en attente des retours de l'utilisateur.
-- Réservations actives (auteur : Claude, travail de la nuit) :
-  - `src/games/atelier/`, `src/pages/jeux/atelier.astro`
-  - `public/assets/jeux/atelier/`, `public/assets/jeux/atelier.jpg`, `public/assets/jeux/art/atelier.jpg`,
-    `public/assets/jeux/og/atelier.jpg`, `public/assets/jeux/tile/atelier.jpg`
-  - `scripts/atelier-sim.ts`, `scripts/comfy-atelier.mjs`, `scripts/snap-atelier.mjs`
-  - Hunks « atelier » seulement dans : `src/data/games.ts` (entrée atelier), `src/components/IconPaths.ts`
-    (icône atelier), `src/lib/wallet.ts` (fonction `spend`), `scripts/thumb-themes.mjs` (thème atelier),
-    `scripts/generate-og.mjs` (drive atelier). Le reste de ces fichiers n'est pas à moi.
-- Pas à moi (antérieurs, auteur = l'utilisateur) : `src/components/Nav.astro`, `src/pages/partenariats.astro`,
-  `shots/`. Je n'y touche pas.
-- Vérifications réellement exécutées (28/09, ~23:30) : `npm run build` OK (astro check 0 erreur / 0 warning,
-  précache valide) ; `npx vitest run` 85 fichiers / 1360 tests OK ; `node scripts/snap-atelier.mjs`
-  joue le chapitre complet, 0 erreur console. Pas de test sur un vrai téléphone.
+- Mise à jour : 2026-09-29T09:50+02:00 (Europe/Paris).
+- Depuis : palier de réputation 5 (« L'atelier reprend vie », carte postale de mars 1962, +10 énergie) ;
+  scénario de campagne commun `docs/atelier-scenario.md` (tickets 0004, 0005 clos), soumis à l'utilisateur.
+  Vérifié 09:50 : vitest OK, build OK (0/0), snap-atelier sans erreur.
+- Rôle : **orchestrateur**, à la demande de l'utilisateur (29/09). J'ouvre les tickets pour Codex et je les
+  lui fais traiter moi-même avec `node scripts/codex-agent.mjs <id>` (`codex exec` sans interface) ;
+  l'utilisateur ne fait plus le relais. Détails : `.collab/README.md`, section « Mode orchestré ».
+- Réservations actives (Atelier, travail de la nuit du 28/09, commité en `4d1e7d3`) :
+  - `src/games/atelier/`, `src/pages/jeux/atelier.astro`, `public/assets/jeux/atelier/`
+  - `scripts/atelier-sim.ts`, `scripts/comfy-atelier.mjs`, `scripts/snap-atelier.mjs`, `scripts/codex-agent.mjs`
+- Réservations libérées : `.collab/README.md`, `TEMPLATE.md`, `LOG.md` (harmonisation terminée),
+  `.gitignore`, `CLAUDE.md`, mon message `coordination/messages/20260929T085000+0200-claude-vers-codex-atelier.md`.
+- Pas à moi (auteur = l'utilisateur) : `src/components/Nav.astro`, `src/pages/partenariats.astro`, `shots/`.
+- Historique :
+  - 28/09 nuit : Atelier des Souvenirs. Vérifié : `npm run build` OK (astro check 0/0, précache valide),
+    `npx vitest run` 1360 tests OK, `node scripts/snap-atelier.mjs` chapitre complet sans erreur console.
+  - 29/09 09:10 : push de `4d1e7d3` (Atelier + GDD `docs/atelier-des-souvenirs-gdd.md`), `80564bf`
+    (Partenariats, travail de l'utilisateur), `639279e` (protocole). `shots/` laissé hors commit.
+  - 29/09 09:00 : harmonisation `.collab/`. Mon brouillon supprimé à 08:50 a été recréé ; la mention
+    « `.collab/` n'existe plus » de la version précédente de ce journal est **caduque**.
+- Tickets : 0001 (critique Atelier), 0002 (images), 0003 (harmonisation) traités par Codex via
+  `codex-agent.mjs` et clos. Intégré depuis 0001 : aiguilles à 10:08 une fois réparées, inserts dos/mécanisme/
+  photo (`show` sur les répliques), écarts par étape dans `atelier-sim.ts`. Depuis 0002 : 4 images.
+  Vérifié 09:45 : vitest 1360 OK, build OK (0/0, précache valide), capture en jeu sans erreur.
 - Ressources : port 4361 pour `snap-atelier.mjs`. ComfyUI local (8188) arrêté.
-- Demandes à Codex : voir `messages/20260929T085000+0200-claude-vers-codex-atelier.md`.
-- Prochaine action : intégrer les retours de l'utilisateur et de Codex sur l'Atelier.
+- Non commité : `.collab/`, `scripts/codex-agent.mjs`, `.gitignore`, `CLAUDE.md`, ce journal, le renvoi
+  dans mon message du 29/09, et les retouches Atelier ci-dessus.
