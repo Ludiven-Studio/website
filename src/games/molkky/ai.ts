@@ -46,7 +46,9 @@ export function worth(me: Player, points: number): number {
 
 const LOFTS = [0.28, 0.5];
 
-export function planAi(w: MolkkyWorld, me: Player, skill: number, seed: number): Throw {
+/** The same search as planAi, one trial throw per step, so the game can spread it over frames: a trial
+ *  settles in ~45 ms and a turn tries up to 24, a second of frozen screen if run in one go. */
+export function* planAiSteps(w: MolkkyWorld, me: Player, skill: number, seed: number): Generator<void, Throw> {
 	const standing = w.pinViews().filter((p) => !p.down);
 	const need = TARGET - me.score;
 	// Candidates: every standing pin, head on; the one pin that finishes first in line.
@@ -55,17 +57,25 @@ export function planAi(w: MolkkyWorld, me: Player, skill: number, seed: number):
 		.sort((a, b) => (a.n === need ? -1 : b.n === need ? 1 : b.n - a.n));
 	let best: Throw = aimAt(0, standing[0]?.z ?? 3.5, LOFTS[0]);
 	let bestV = -Infinity;
-	for (const p of targets) {
+	search: for (const p of targets) {
 		for (const loft of LOFTS) {
 			const th = aimAt(p.x, p.z, loft);
 			const v = worth(me, pointsFor(simulateThrow(w, th)));
 			if (v > bestV) { bestV = v; best = th; }
-			if (bestV >= 1000) break;
+			if (bestV >= 1000) break search;
+			yield;
 		}
-		if (bestV >= 1000) break;
 	}
 	const k = Math.max(0, Math.min(1, (skill - 0.3) / 0.65));
 	const ang = 0.05 + (0.006 - 0.05) * k; // rad
 	const spd = 0.10 + (0.015 - 0.10) * k; // relative
 	return { yaw: best.yaw + noise(1, seed) * ang, speed: best.speed * (1 + noise(2, seed) * spd), loft: best.loft };
+}
+
+export function planAi(w: MolkkyWorld, me: Player, skill: number, seed: number): Throw {
+	const it = planAiSteps(w, me, skill, seed);
+	for (;;) {
+		const r = it.next();
+		if (r.done) return r.value;
+	}
 }

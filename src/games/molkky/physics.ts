@@ -27,11 +27,32 @@ export const DT = 1 / 120;
 export const REST_CAP_S = 6; // a throw is over after this, whatever still wobbles
 const WOOD = 620; // kg/m³, birch
 const UP_DOWN = 0.5; // a pin whose axis keeps less than this of vertical (tilt > 60°) is down
+const STRAIGHT = 0.98; // raise() stands up anything leaning more than ~11°
 /* At rest = nothing moving more than this for REST_HOLD_S. A pin lying on its side keeps rocking
    for seconds at a few cm/s; waiting for Rapier to put it to sleep ran every throw to the cap. */
 const REST_SPEED = 0.05; // m/s
 const REST_SPIN = 1.0; // rad/s
 const REST_HOLD_S = 0.25;
+
+/** Material and damping knobs, in one place so scripts/molkky-break.ts can sweep them. Tuned 2026-09-29 on
+ *  that script: a hit used to fell 3.0 pins and move them 0.12 m; now 5.8 pins, 0.35 m, up to 2 m. */
+export const FEEL = {
+	groundFriction: 0.65,
+	groundBounce: 0.05,
+	pinFriction: 0.35,
+	pinBounce: 0.45,
+	// Low enough that a pin tipped by a neighbour keeps falling: 2.5 stopped the chain reaction.
+	pinLinDamp: 0.08,
+	pinAngDamp: 0.3,
+	stickFriction: 0.3,
+	stickBounce: 0.35,
+	stickLinDamp: 0.3,
+	stickAngDamp: 0.6,
+	/** Stick friction takes the lower of the pair: a stick landing short skids into the pins instead of stopping dead. */
+	stickSkids: true,
+	/** Stick restitution takes the higher of the pair: wood cracks off wood. */
+	woodBounce: true,
+};
 
 /** Official start, front row nearest the thrower: 1 2 / 3 10 4 / 5 11 12 6 / 7 9 8. */
 const ROWS = [[1, 2], [3, 10, 4], [5, 11, 12, 6], [7, 9, 8]];
@@ -90,7 +111,7 @@ export class MolkkyWorld {
 		world.integrationParameters.numSolverIterations = 8;
 		const ground = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
 		// Grass: grippy, dead. Nothing bounces off a lawn.
-		world.createCollider(RAPIER.ColliderDesc.cuboid(60, 0.5, 60).setFriction(0.8).setRestitution(0.05), ground);
+		world.createCollider(RAPIER.ColliderDesc.cuboid(60, 0.5, 60).setFriction(FEEL.groundFriction).setRestitution(FEEL.groundBounce), ground);
 		const pins = layout.map((s) => ({ n: s.n, body: MolkkyWorld.makePin(world, s.x, s.z) }));
 		return new MolkkyWorld(world, pins, null);
 	}
@@ -99,9 +120,9 @@ export class MolkkyWorld {
 		const body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic()
 			.setTranslation(x, PIN_H / 2 + 0.001, z)
 			// Grass eats a rolling pin fast; without it a pin on its side rolls for metres.
-			.setLinearDamping(0.35).setAngularDamping(2.5)
+			.setLinearDamping(FEEL.pinLinDamp).setAngularDamping(FEEL.pinAngDamp)
 			.setCcdEnabled(true));
-		world.createCollider(RAPIER.ColliderDesc.cylinder(PIN_H / 2, PIN_R).setDensity(WOOD).setFriction(0.55).setRestitution(0.25), body);
+		world.createCollider(RAPIER.ColliderDesc.cylinder(PIN_H / 2, PIN_R).setDensity(WOOD).setFriction(FEEL.pinFriction).setRestitution(FEEL.pinBounce), body);
 		return body;
 	}
 
@@ -133,9 +154,12 @@ export class MolkkyWorld {
 			.setLinvel(v.vx, v.vy, v.vz)
 			// Backspin about the stick's own axis, as an underarm release gives it.
 			.setAngvel({ x: lx * -6, y: 0, z: lz * -6 })
-			.setLinearDamping(0.3).setAngularDamping(2.0)
+			.setLinearDamping(FEEL.stickLinDamp).setAngularDamping(FEEL.stickAngDamp)
 			.setCcdEnabled(true));
-		this.world.createCollider(RAPIER.ColliderDesc.cylinder(STICK_L / 2, STICK_R).setDensity(WOOD).setFriction(0.6).setRestitution(0.2), body);
+		const desc = RAPIER.ColliderDesc.cylinder(STICK_L / 2, STICK_R).setDensity(WOOD).setFriction(FEEL.stickFriction).setRestitution(FEEL.stickBounce);
+		if (FEEL.stickSkids) desc.setFrictionCombineRule(RAPIER.CoefficientCombineRule.Min);
+		if (FEEL.woodBounce) desc.setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max);
+		this.world.createCollider(desc, body);
 		this.stick = body;
 		this.t = 0;
 		this.calm = 0;
@@ -163,9 +187,9 @@ export class MolkkyWorld {
 		return false;
 	}
 
-	/** Run to rest. Returns the pins that are down. */
-	settle(): number[] {
-		while (!this.atRest()) this.step();
+	/** Run to rest, or to `capS` seconds. Returns the pins that are down. */
+	settle(capS = REST_CAP_S): number[] {
+		while (!this.atRest() && this.t < capS) this.step();
 		return this.fallen();
 	}
 
@@ -173,12 +197,18 @@ export class MolkkyWorld {
 		return this.pins.filter((p) => tilt(p.body.rotation()) < UP_DOWN).map((p) => p.n).sort((a, b) => a - b);
 	}
 
-	/** Stand the fallen pins up where they lie and take the stick away: the next throw's board. */
+	/** Stand the fallen pins up where they lie and take the stick away: the next throw's board. A pin left
+	 *  leaning on another counts as standing but would topple once its prop is raised (the lively pins do),
+	 *  so it is straightened in place too. */
 	raise(): void {
 		this.removeStick();
-		const down = new Set(this.fallen());
+		const down = new Set(this.pins.filter((p) => tilt(p.body.rotation()) < STRAIGHT).map((p) => p.n));
 		for (const p of this.pins) {
-			if (!down.has(p.n)) continue;
+			if (!down.has(p.n)) {
+				p.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+				p.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+				continue;
+			}
 			const t = p.body.translation();
 			p.body.setTranslation({ x: t.x, y: PIN_H / 2 + 0.001, z: t.z }, true);
 			p.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
@@ -221,12 +251,16 @@ export class MolkkyWorld {
 	}
 }
 
+/** Seconds the AI lets a trial throw run. Pins fall in the first second or two; what follows is pins
+ *  already down rolling on the grass. Measured by scripts/molkky-break.ts against a full settle. */
+export const TRIAL_CAP_S = 2.2;
+
 /** Try a throw on a copy and report what falls. The copy is freed. */
-export function simulateThrow(w: MolkkyWorld, th: Throw): number[] {
+export function simulateThrow(w: MolkkyWorld, th: Throw, capS = TRIAL_CAP_S): number[] {
 	const c = w.clone();
 	try {
 		c.throwStick(th);
-		return c.settle();
+		return c.settle(capS);
 	} finally {
 		c.free();
 	}

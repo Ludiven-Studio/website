@@ -20,7 +20,7 @@ export const wz = (ey: number): number => ey - PITCH_L / 2;
 
 const SEG_X = 56; // ground mesh resolution — 7 cm steps, finer than the eye can read at this scale
 const SEG_Z = 210;
-const SURROUND = 26; // radius of the flat apron the pitch sits in
+export const SURROUND = 26; // radius of the flat apron the pitch sits in
 const BORDER_H = 0.08; // the wooden planks around a real boulodrome
 const BORDER_W = 0.09;
 
@@ -1001,6 +1001,19 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 			groundMat.dispose();
 		},
 	};
+}
+
+/**
+ * The garden alone (trees, bushes, benches, hedge, painted horizon), around the origin and without the
+ * pitch, for another lawn game: the mölkky. Its throw runs along z like the lane, inside the corridor
+ * the decor keeps clear. The caller lays its own ground out to SURROUND.
+ */
+export function buildSurrounds(seed: number, sun: SunSetup): { group: THREE.Group; dispose(): void } {
+	const grp = new THREE.Group();
+	const junk: { dispose(): void }[] = [];
+	const keep = <T extends { dispose(): void }>(o: T): T => { junk.push(o); return o; };
+	buildDecor(grp, seed, 0, sun, keep);
+	return { group: grp, dispose: () => { for (const d of junk) d.dispose(); } };
 }
 
 /* ---------- boules, jack, circle ---------- */

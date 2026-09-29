@@ -63,6 +63,25 @@ describe('mölkky physics', () => {
 		w.free();
 	});
 
+	it('a break scatters the pack: several pins down on a straight throw', () => {
+		const w = MolkkyWorld.create();
+		const down = simulateThrow(w, aimAt(0, PINS_Z, 0.35));
+		expect(down.length).toBeGreaterThanOrEqual(3);
+		w.free();
+	});
+
+	it('between turns, raised boards stay put: no pin falls on its own (lively pins)', () => {
+		const w = MolkkyWorld.create();
+		for (let k = 0; k < 5; k++) {
+			w.throwStick(aimAt((k - 2) * 0.08, PINS_Z + 0.1, 0.3 + k * 0.05));
+			w.settle();
+			w.raise();
+			for (let i = 0; i < 240; i++) w.step();
+			expect(w.fallen(), `after throw ${k + 1}`).toEqual([]);
+		}
+		w.free();
+	});
+
 	it('settles a throw fast enough for the AI to try a dozen', () => {
 		const w = MolkkyWorld.create();
 		const t0 = performance.now();

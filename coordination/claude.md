@@ -1,6 +1,6 @@
 # Journal Claude Code
 
-- Mise à jour : 2026-09-29T10:44+02:00 (Europe/Paris).
+- Mise à jour : 2026-09-29T10:55+02:00 (Europe/Paris).
 - Rôle : **orchestrateur**, à la demande de l'utilisateur (29/09). J'ouvre les tickets pour Codex et je les
   lui fais traiter moi-même avec `node scripts/codex-agent.mjs <id>` (`codex exec` sans interface) ;
   l'utilisateur ne fait plus le relais. Détails : `.collab/README.md`, section « Mode orchestré ».
@@ -8,6 +8,7 @@
   d'usage jusqu'à ~12:26 : ticket 0011 (dialogues ch. 7) repris par Claude. Push prévu par l'utilisateur
   vers midi (non fait : l'utilisateur le déclenche).
 - Réservations actives :
+  - **Mölkky** (demande de l'utilisateur, 29/09 10:55) : `src/games/molkky/`, `scripts/molkky-*.ts`, `scripts/check-molkky.mjs`
   - `src/games/atelier/`, `src/pages/jeux/atelier.astro`, `public/assets/jeux/atelier/`
   - `scripts/atelier-sim.ts`, `scripts/comfy-atelier.mjs`, `scripts/snap-atelier.mjs`, `scripts/codex-agent.mjs`
 - Pas à moi (auteur = l'utilisateur) : `src/components/Nav.astro`, `src/pages/partenariats.astro`, `shots/`.

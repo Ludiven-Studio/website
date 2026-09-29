@@ -5,12 +5,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { addLights } from '../petanque/render3d';
+import { addLights, buildSurrounds, SURROUND } from '../petanque/render3d';
 import { swayAmp, swayAt } from '../petanque/sway';
 import { usePointerDrag } from '../usePointerDrag';
 import { loadPhysics, MolkkyWorld, PIN_H, PIN_R, STICK_L, STICK_R, PINS_Z, RELEASE_Y, DT, throwVelocity, type Throw } from './physics';
 import { initMolkky, applyThrow, TARGET, MISSES_OUT, type MolkkyState } from './rules';
-import { planAi, SKILLS, type MkLevel } from './ai';
+import { planAiSteps, SKILLS, type MkLevel } from './ai';
 
 type Status = 'loading' | 'aim' | 'flying' | 'result' | 'over';
 type View = 'lancer' | 'quilles' | 'dessus';
@@ -93,9 +93,12 @@ function buildScene(canvas: HTMLCanvasElement, seed: number): Scene3D {
 	const scene = new THREE.Scene();
 	const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 400);
 	const lights = addLights(scene);
-	lights.setSun(seed);
+	const sun = lights.setSun(seed);
+	// The pétanque's garden around the lawn: without it the pack sat on an endless green with no scale.
+	const garden = buildSurrounds(seed, sun);
+	scene.add(garden.group);
 
-	const grass = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ map: grassTexture(), roughness: 1 }));
+	const grass = new THREE.Mesh(new THREE.CircleGeometry(SURROUND, 64), new THREE.MeshStandardMaterial({ map: grassTexture(), roughness: 1 }));
 	grass.rotation.x = -Math.PI / 2;
 	grass.receiveShadow = true;
 	scene.add(grass);
@@ -137,7 +140,7 @@ function buildScene(canvas: HTMLCanvasElement, seed: number): Scene3D {
 
 	return {
 		renderer, scene, camera, pins, pinSide, stick, arc, ring,
-		dispose: () => { lights.dispose(); renderer.dispose(); },
+		dispose: () => { garden.dispose(); lights.dispose(); renderer.dispose(); },
 	};
 }
 
@@ -145,8 +148,10 @@ function buildScene(canvas: HTMLCanvasElement, seed: number): Scene3D {
    flight projects onto one vertical stroke and the arc tells nothing. Narrow field, so twelve 6 cm
    pins 3.5 m away read as pins and not as a crate. */
 const VIEWS: Record<View, { pos: [number, number, number]; look: [number, number, number]; fov: number }> = {
-	lancer: { pos: [0.32, 1.25, -0.55], look: [0, 0.12, PINS_Z + 0.1], fov: 30 },
-	quilles: { pos: [0.75, 0.9, PINS_Z - 1.05], look: [0, 0.05, PINS_Z + 0.2], fov: 42 },
+	// Looking a little above the pack: the garden and its horizon give the lawn a scale, the pins stay clear of the pad.
+	lancer: { pos: [0.32, 1.25, -0.55], look: [0, 0.42, PINS_Z + 0.1], fov: 32 },
+	// Stepped back since the pins got livelier: a break throws them up to 2 m, the old 1 m close-up lost them.
+	quilles: { pos: [1.3, 1.45, PINS_Z - 1.9], look: [0, 0.05, PINS_Z + 0.35], fov: 46 },
 	dessus: { pos: [0, 4.6, PINS_Z - 0.4], look: [0, 0, PINS_Z + 0.25], fov: 40 },
 };
 
@@ -175,6 +180,7 @@ export default function MolkkyGame() {
 	const aimRef = useRef<{ x0: number; top: number; loft: number; power: number; yaw: number; t0: number; phase: number; turn0: number } | null>(null);
 	const aiAtRef = useRef(0);
 	const seedRef = useRef(1);
+	const planRef = useRef<{ it: Generator<void, Throw>; th: Throw | null } | null>(null);
 	const accRef = useRef(0);
 	const resultAtRef = useRef(0);
 
@@ -313,11 +319,21 @@ export default function MolkkyGame() {
 				}
 				if (statusRef.current === 'result' && now >= resultAtRef.current) afterResult();
 
-				// The computer's turn.
-				if (statusRef.current === 'aim' && matchRef.current.turn === AI && aiAtRef.current > 0 && now >= aiAtRef.current) {
-					aiAtRef.current = 0;
-					doThrow(planAi(w, matchRef.current.players[AI], SKILLS[levelRef.current], seedRef.current++));
-				}
+				// The computer's turn: its trial throws run a few per frame during its think time.
+				if (statusRef.current === 'aim' && matchRef.current.turn === AI && aiAtRef.current > 0) {
+					if (!planRef.current) planRef.current = { it: planAiSteps(w, matchRef.current.players[AI], SKILLS[levelRef.current], seedRef.current++), th: null };
+					const plan = planRef.current;
+					const t0 = performance.now();
+					while (!plan.th && performance.now() - t0 < 10) {
+						const r = plan.it.next();
+						if (r.done) plan.th = r.value;
+					}
+					if (plan.th && now >= aiAtRef.current) {
+						aiAtRef.current = 0;
+						planRef.current = null;
+						doThrow(plan.th);
+					}
+				} else planRef.current = null;
 
 				// Meshes.
 				for (const p of w.pinViews()) {
