@@ -9,7 +9,7 @@
    Usage: npx tsx scripts/atelier-sim.ts [seeds] */
 import {
 	newGame, produce, move, deliver, buyUpgrade, sell, activeOrders, parse, genOf, unitCost,
-	upgradeState, stepOf, type State, type Piece,
+	upgradeState, stepOf, mapReady, solveMap, type State, type Piece,
 } from '../src/games/atelier/engine';
 import { GENERATORS, CHAINS, ENERGY_MAX, UPGRADES, type GenId, type ChainId } from '../src/games/atelier/data';
 
@@ -95,13 +95,14 @@ function play(seed: number): Run {
 	let energy = 0, taps = 0, sec = 0;
 	const run: Run = { marks: {}, fullHits: 0, chargeWaits: 0, sold: 0, boughtEnergy: 0 };
 	const act = (dt: number) => { taps++; sec += dt; now += dt * 1000; if (process.env.TRACE && seed === 1) console.log(`e${energy} ${JSON.stringify(s.progress)} orders=${activeOrders(s).map((o) => o.id + "[" + o.needs + "]").join(" ")} board=${s.board.filter(Boolean).join(",")}`); };
-	for (let guard = 0; guard < 8000 && stepOf(s, 'fauteuil') < 3; guard++) {
+	for (let guard = 0; guard < 8000 && stepOf(s, 'musique') < 3; guard++) {
 		const d = activeOrders(s).find((o) => deliver(s, o.id).ok);
 		if (d) {
 			const r = deliver(s, d.id);
 			if (r.ok) { s = r.s; act(TAP_S); run.marks[d.id] = { energy, taps, sec }; }
 			continue;
 		}
+		if (mapReady(s)) { s = solveMap(s); act(8); run.marks.carte = { energy, taps, sec }; continue; }
 		// A player buys each workshop upgrade as soon as it is affordable; the gates matter, the rest is décor.
 		const up = UPGRADES.find((u) => upgradeState(s, u.id) === 'ok');
 		if (up) { s = buyUpgrade(s, up.id); act(TAP_S * 2); run.marks[up.id] = { energy, taps, sec }; continue; }
@@ -146,8 +147,8 @@ const pct = (xs: number[], q: number): number => {
 };
 
 const runs = Array.from({ length: N }, (_, k) => play(k + 1));
-const keys = ['garnier-1', 'etabli', 'lucas-1', 'morel-1', 'garnier-2', 'chen-1', 'morel-2', 'lucas-2', 'morel-3', 'photo', 'radio-1', 'facteur-1', 'etageres', 'chen-2', 'radio-2', 'lucas-3', 'radio-3', 'voilier-1', 'boulangere-1', 'menuiserie', 'chen-3', 'voilier-2', 'morel-4', 'voilier-3', 'boite-1', 'lucas-4', 'boite-2', 'chen-4', 'bureau', 'boite-3', 'fauteuil-1', 'couture', 'garnier-3', 'fauteuil-2', 'lucas-5', 'fauteuil-3'];
-console.log(`${N} runs · start energy ${ENERGY_MAX} · story steps give +10 each · chapters 1-5`);
+const keys = ['garnier-1', 'etabli', 'lucas-1', 'morel-1', 'garnier-2', 'chen-1', 'morel-2', 'lucas-2', 'morel-3', 'photo', 'radio-1', 'facteur-1', 'etageres', 'chen-2', 'radio-2', 'lucas-3', 'radio-3', 'voilier-1', 'boulangere-1', 'menuiserie', 'chen-3', 'voilier-2', 'morel-4', 'voilier-3', 'boite-1', 'lucas-4', 'boite-2', 'chen-4', 'bureau', 'boite-3', 'fauteuil-1', 'couture', 'garnier-3', 'fauteuil-2', 'lucas-5', 'fauteuil-3', 'carte', 'malle-1', 'boulangere-2', 'malle-2', 'morel-5', 'malle-3', 'musique-1', 'lucas-6', 'musique-2', 'garnier-4', 'musique-3'];
+console.log(`${N} runs · start energy ${ENERGY_MAX} · story steps give +10 each · chapters 1-7`);
 console.log('milestone     energy p10/med/p90     taps med   time med');
 for (const k of keys) {
 	const ms = runs.map((r) => r.marks[k]).filter(Boolean);
@@ -158,7 +159,7 @@ for (const k of keys) {
 }
 // Per-run spans between story steps: subtracting cumulative medians would hide the spread.
 console.log('span                energy p10/med/p90     time med/p90');
-for (const [a, b] of [['etabli', 'morel-1'], ['morel-1', 'morel-2'], ['morel-2', 'morel-3'], ['morel-3', 'radio-1'], ['radio-1', 'radio-2'], ['radio-2', 'radio-3'], ['radio-3', 'voilier-1'], ['voilier-1', 'voilier-2'], ['voilier-2', 'voilier-3'], ['voilier-3', 'boite-1'], ['boite-1', 'boite-2'], ['boite-2', 'boite-3'], ['boite-3', 'fauteuil-1'], ['fauteuil-1', 'fauteuil-2'], ['fauteuil-2', 'fauteuil-3']]) {
+for (const [a, b] of [['etabli', 'morel-1'], ['morel-1', 'morel-2'], ['morel-2', 'morel-3'], ['morel-3', 'radio-1'], ['radio-1', 'radio-2'], ['radio-2', 'radio-3'], ['radio-3', 'voilier-1'], ['voilier-1', 'voilier-2'], ['voilier-2', 'voilier-3'], ['voilier-3', 'boite-1'], ['boite-1', 'boite-2'], ['boite-2', 'boite-3'], ['boite-3', 'fauteuil-1'], ['fauteuil-1', 'fauteuil-2'], ['fauteuil-2', 'fauteuil-3'], ['fauteuil-3', 'malle-1'], ['malle-1', 'malle-2'], ['malle-2', 'malle-3'], ['malle-3', 'musique-1'], ['musique-1', 'musique-2'], ['musique-2', 'musique-3']]) {
 	const ok = runs.filter((r) => r.marks[a] && r.marks[b]);
 	const e = ok.map((r) => r.marks[b].energy - r.marks[a].energy);
 	const t = ok.map((r) => r.marks[b].sec - r.marks[a].sec);

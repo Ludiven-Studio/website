@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
 	load, save, newGame, tick, produce, move, moveKind, deliver, sell, sellValue, buyUpgrade, upgradeState,
 	addEnergy, markSeen, dueTier, nextTier, claimTier, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
-	stepOf, storyOrder, currentProject, projectOf, missingGens, code, CELLS, type State, type Piece,
+	stepOf, storyOrder, currentProject, projectOf, missingGens, mapReady, solveMap, code, CELLS, type State, type Piece,
 } from './engine';
 import {
 	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK,
@@ -14,6 +14,8 @@ import Radio, { RADIO_CSS } from './Radio';
 import Voilier, { VOILIER_CSS } from './Voilier';
 import Boite, { MapPieces, BOITE_CSS } from './Boite';
 import Fauteuil, { FAUTEUIL_CSS } from './Fauteuil';
+import Malle, { MapPuzzle, MALLE_CSS } from './Malle';
+import Musique, { MUSIQUE_CSS } from './Musique';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
@@ -43,6 +45,8 @@ function ObjectArt({ project, state }: Art) {
 	if (project === 'voilier') return <Voilier state={state} size="100%" />;
 	if (project === 'boite') return <Boite state={state} size="100%" />;
 	if (project === 'fauteuil') return <Fauteuil state={state} size="100%" />;
+	if (project === 'malle') return <Malle state={state} size="100%" />;
+	if (project === 'musique') return <Musique state={state} size="100%" />;
 	return <Watch state={state} size="100%" />;
 }
 
@@ -94,6 +98,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 	const [confirmSell, setConfirmSell] = useState<number | null>(null);
 	const [confirmReset, setConfirmReset] = useState(false);
 	const [sound, setSound] = useState(true);
+	const [puzzle, setPuzzle] = useState(false);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const dragRef = useRef<{ from: number; x0: number; y0: number; moved: boolean } | null>(null);
 	const animK = useRef(0);
@@ -361,7 +366,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -479,6 +484,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 					coachUp={coach?.target === 'up'}
 					onUpgrade={doUpgrade}
 					onBench={() => setView('etabli')}
+					onPuzzle={() => setPuzzle(true)}
 					confirmReset={confirmReset}
 					onReset={() => (confirmReset ? reset() : setConfirmReset(true))}
 					onReplay={() => {
@@ -507,6 +513,20 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			)}
 
 			{scene && <SceneView scene={scene} onDone={closeScene} />}
+
+			{puzzle && !scene && (
+				<div className="at-modal" role="dialog" aria-modal="true">
+					<MapPuzzle
+						onClose={() => setPuzzle(false)}
+						onSolve={() => {
+							setPuzzle(false);
+							setS(solveMap(s));
+							sfx.restore();
+							trackEvent('atelier:map_solved', {});
+						}}
+					/>
+				</div>
+			)}
 
 			{energyOpen && (
 				<div className="at-modal" onClick={(e) => { if (e.target === e.currentTarget) setEnergyOpen(false); }}>
@@ -593,9 +613,9 @@ function Info({ s, cell, piece, need, now, confirm, onSell }: {
 	);
 }
 
-function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmReset, onReset, onReplay }: {
+function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle, confirmReset, onReset, onReplay }: {
 	s: State; story: Order | null; chapterDone: boolean; coachUp: boolean;
-	onUpgrade: (id: string) => void; onBench: () => void; confirmReset: boolean; onReset: () => void; onReplay: () => void;
+	onUpgrade: (id: string) => void; onBench: () => void; onPuzzle: () => void; confirmReset: boolean; onReset: () => void; onReplay: () => void;
 }) {
 	const has = (u: string) => s.upgrades.includes(u);
 	const project = currentProject(s);
@@ -645,7 +665,7 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmR
 								<span>
 									{project.id === 'montre'
 										? `Restaurée et rendue. ${chapterDone ? 'La photo de 1961 est au mur.' : 'Accroche la photo de 1961 pour clore le chapitre.'}`
-										: 'Restaurée et rendue. La suite de l’histoire arrive bientôt.'}
+										: project.id === 'musique' ? 'Rendue aux Chen. L’histoire est finie ; l’atelier, lui, reste ouvert.' : 'Restauré et rendu.'}
 								</span>
 							) : stepOf(s, project.id) > 0 ? (
 								<span>En attente : {UPGRADES.find((u) => ORDERS.some((o) => o.project === project.id && o.step === step + 1 && o.after === u.id))?.name ?? 'une amélioration de l’atelier'}.</span>
@@ -678,6 +698,8 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmR
 								: 'Le carnet de Rose « la Pie », 1813. Une carte marine, un îlot entouré de rouge. Une fiche : « Chercher la pie. »'}
 						</span>
 						<div className="at-map small"><MapPieces count={stepOf(s, 'fauteuil') >= 2 ? 4 : 3} /></div>
+						{mapReady(s) && <button className="at-btn small at-pulse" onClick={onPuzzle}>Assembler la carte</button>}
+						{s.seen.includes('map-solved') && <span>Retournée, la carte désignait l’atelier lui-même.</span>}
 					</div>
 				</section>
 			)}
@@ -776,6 +798,13 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 						{line.show === 'office' && <div className="at-office-img" role="img" aria-label="Le bureau de Jeanne, rangé, poussiéreux" />}
 						{line.show === 'map' && <div className="at-map"><MapPieces count={3} /></div>}
 						{line.show === 'piece4' && <div className="at-map"><MapPieces count={4} only={3} /></div>}
+						{line.show === 'tag' && (
+							<div className="at-label" role="img" aria-label="Étiquette de Rose : Famille Chen, 1812">
+								<b>Rendre à</b>
+								<span>Famille Chen</span>
+								<em>1812</em>
+							</div>
+						)}
 						{line.show === 'lucile' && (
 							<div className="at-letter at-lucile" role="img" aria-label="Une enveloppe d’une écriture tremblée, signée Lucile">
 								<b>À l’atelier de Jeanne</b><i />
@@ -944,6 +973,8 @@ const CSS = `
 .at-bigwatch.voilier { width: min(58vw, 210px); }
 .at-bigwatch.boite { width: min(70vw, 260px); }
 .at-bigwatch.fauteuil { width: min(58vw, 210px); }
+.at-bigwatch.malle { width: min(70vw, 260px); }
+.at-bigwatch.musique { width: min(70vw, 260px); }
 .at-lucile { margin: 8px auto; width: 190px; transform: rotate(3deg); }
 .at-lucile b { font-size: 14px; }
 .at-keyletter { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 10px 0; }
@@ -1015,6 +1046,8 @@ const CSS = `
 .at-onbench.voilier { width: 13% !important; top: 72% !important; }
 .at-onbench.boite { width: 15% !important; top: 76% !important; }
 .at-onbench.fauteuil { width: 13% !important; top: 72% !important; }
+.at-onbench.malle { width: 16% !important; top: 78% !important; }
+.at-onbench.musique { width: 15% !important; top: 76% !important; }
 .at-onbench { position: absolute; left: 58%; top: 77%; width: 8%; transform: translate(-50%, -50%) rotate(-12deg); filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
 .at-project { display: flex; gap: 12px; align-items: center; background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; }
 .at-project-watch { width: 54px; flex: none; }
@@ -1022,6 +1055,8 @@ const CSS = `
 .at-project-watch.voilier { width: 64px; }
 .at-project-watch.boite { width: 84px; }
 .at-project-watch.fauteuil { width: 64px; }
+.at-project-watch.malle { width: 84px; }
+.at-project-watch.musique { width: 84px; }
 .at-warn { color: #d9822b !important; font-weight: 600; }
 .at-shelves { position: absolute; left: 52%; top: 6%; width: 48%; height: 62%; background: radial-gradient(ellipse at 60% 40%, rgba(255, 214, 140, 0.35), transparent 65%); mix-blend-mode: screen; pointer-events: none; }
 .at-project-txt { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--gray-300); min-width: 0; flex: 1; }

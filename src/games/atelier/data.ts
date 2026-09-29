@@ -4,7 +4,7 @@
 
 export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois' | 'tissu';
 export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre' | 'malle';
-export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite' | 'fauteuil';
+export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite' | 'fauteuil' | 'malle' | 'musique';
 
 export interface Chain {
 	id: ChainId;
@@ -145,11 +145,11 @@ export interface Reward {
 }
 
 export interface Line {
-	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'boulangere' | 'moi' | 'note';
+	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'boulangere' | 'lucile' | 'moi' | 'note';
 	text: string;
 	/** Shown in place of the object while this line is on screen: the clue the line talks about. */
 	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box' | 'key' | 'office' | 'map'
-		| 'piece4' | 'lucile';
+		| 'piece4' | 'lucile' | 'tag';
 }
 
 /** Reached once a project has delivered `step` restoration steps. */
@@ -237,6 +237,32 @@ export const PROJECTS: Project[] = [
 			{ who: 'moi', text: 'Tissu taché, assise effondrée… On va lui refaire une beauté.' },
 		],
 	},
+	{
+		id: 'malle',
+		chapter: 6,
+		object: 'Malle',
+		title: 'La malle de Rose',
+		client: 'Vous',
+		steps: 3,
+		arrival: [
+			{ who: 'note', text: 'Sous l’établi, une latte sonne creux. Une trappe ! Dessous, cerclée de fer, une malle couverte de salpêtre.' },
+			{ who: 'moi', text: 'L’îlot n’était qu’un leurre. La malle de Rose dormait sous l’atelier depuis 1813.' },
+			{ who: 'note', text: 'Jeanne a travaillé toute sa vie juste au-dessus, sans le savoir.' },
+		],
+	},
+	{
+		id: 'musique',
+		chapter: 7,
+		object: 'Boîte à musique',
+		title: 'La boîte à musique des Chen',
+		client: 'Mlle Chen',
+		steps: 3,
+		arrival: [
+			{ who: 'chen', text: 'Une boîte à musique… pour ma famille ? Ma grand-mère fredonne un air dont personne ne connaît l’origine.' },
+			{ who: 'chen', text: 'Si c’est la sienne, je voudrais qu’elle l’entende jouer. Une fois, au moins.' },
+			{ who: 'moi', text: 'Laque ternie, ressort cassé, figurine détachée… On va la faire chanter.' },
+		],
+	},
 ];
 
 export interface Order {
@@ -253,6 +279,8 @@ export interface Order {
 	step?: number;
 	/** Progress needed before the client comes in. */
 	when?: Gate;
+	/** A `seen` flag the player sets by acting (the chapter 6 map puzzle). */
+	flag?: string;
 	/** Shown in the restoration scene once delivered. */
 	scene?: { title: string; lines: Line[] };
 }
@@ -678,7 +706,159 @@ export const ORDERS: Order[] = [
 				{ who: 'note', text: '« Merci pour la boîte, et pour la lettre de Jeanne. Vous méritez la vérité. En mars 1962, nous sommes partis tous les trois vers l’îlot de la carte. La tempête nous a pris. Henri a sauvé Jeanne de la noyade. »' },
 				{ who: 'note', text: '« Ensuite, j’ai voulu continuer à chercher, à terre, pour les familles. Jeanne a refusé : elle avait eu trop peur de perdre Henri. Nous nous sommes dit des mots terribles, et je suis partie. »' },
 				{ who: 'note', text: '« Si vous avez trouvé le quatrième morceau, souvenez-vous de ce que répétait la Pie : rien n’est jamais là où on le croit. Lucile. »' },
-				{ who: 'note', text: 'Fin du chapitre 5.' },
+				{ who: 'note', text: 'Fin du chapitre 5. Dans le bureau, les quatre morceaux de carte attendent d’être assemblés.' },
+			],
+		},
+	},
+
+	// ---- Chapter 6: the map turned over, the trapdoor, Rose's chest ----
+	{
+		id: 'malle-1',
+		kind: 'story',
+		client: 'Vous',
+		ask: 'Dégager et nettoyer la malle.',
+		needs: ['soin:4', 'outil:4'],
+		reward: { coins: 16, rep: 3, energy: 10 },
+		flag: 'map-solved',
+		project: 'malle',
+		step: 1,
+		scene: {
+			title: 'Le salpêtre',
+			lines: [
+				{ who: 'note', text: 'Le salpêtre part, le cuir réapparaît. Marqués au fer : une pie, et deux lettres, R. K.' },
+				{ who: 'moi', text: 'Rose Kerdoual. La Pie. Deux cents ans sous le plancher.' },
+			],
+		},
+	},
+	{
+		id: 'boulangere-2',
+		kind: 'short',
+		client: 'La boulangère',
+		ask: 'Du rembourrage pour les coussins de la boutique.',
+		needs: ['tissu:3'],
+		reward: { coins: 12, rep: 1 },
+		when: { project: 'malle', step: 1 },
+	},
+	{
+		id: 'malle-2',
+		kind: 'story',
+		client: 'Vous',
+		ask: 'Dérouiller et ouvrir la serrure.',
+		needs: ['meca:5', 'outil:4'],
+		reward: { coins: 18, rep: 3, energy: 10 },
+		project: 'malle',
+		step: 2,
+		scene: {
+			title: 'La serrure',
+			lines: [
+				{ who: 'note', text: 'La serrure cède dans un grincement. Dedans, des objets roulés dans de la toile cirée, chacun avec une étiquette de la main de Rose : un nom, un port, une année.' },
+				{ who: 'note', text: 'Et des compartiments vides, plus nombreux que les pleins. Sur chacun, une étiquette barrée : « Rendu ».' },
+				{ who: 'moi', text: 'Rose a volé, puis elle a rendu presque tout, dès 1813. Il ne reste que ce qu’elle n’a pas pu rendre.' },
+			],
+		},
+	},
+	{
+		id: 'morel-5',
+		kind: 'short',
+		client: 'M. Morel',
+		ask: 'Une lampe radio pour le vieux poste de mon père.',
+		needs: ['elec:4'],
+		reward: { coins: 14, rep: 1 },
+		when: { project: 'malle', step: 2 },
+	},
+	{
+		id: 'malle-3',
+		kind: 'story',
+		client: 'Vous',
+		ask: 'Nourrir le cuir et polir les ferrures.',
+		needs: ['tissu:4', 'bois:4'],
+		reward: { coins: 24, rep: 5, energy: 10, cocoins: 10 },
+		project: 'malle',
+		step: 3,
+		scene: {
+			title: 'Ce qui reste',
+			lines: [
+				{ who: 'note', text: 'La malle de Rose brille comme au premier jour, au milieu de l’atelier.' },
+				{ who: 'note', text: 'Au fond, une petite boîte à musique enveloppée de soie. L’étiquette : « Famille Chen, 1812 ».', show: 'tag' },
+				{ who: 'moi', text: 'Chen… Mlle Chen cherchait justement un rouage pour une boîte à musique.' },
+				{ who: 'note', text: 'Fin du chapitre 6.' },
+			],
+		},
+	},
+
+	// ---- Chapter 7: the last restitution, Lucile at the workshop ----
+	{
+		id: 'musique-1',
+		kind: 'story',
+		client: 'Mlle Chen',
+		ask: 'Dépoussiérer le coffret laqué.',
+		needs: ['soin:4', 'bois:3'],
+		reward: { coins: 16, rep: 3, energy: 10 },
+		when: { project: 'malle', step: 3 },
+		project: 'musique',
+		step: 1,
+		scene: {
+			title: 'La laque',
+			lines: [
+				{ who: 'note', text: 'Sous la poussière, le couvercle laqué montre un port, des jonques et des voiliers mêlés. Et un nom gravé : Mei Chen.' },
+				{ who: 'chen', text: 'Mei… C’était l’arrière-grand-mère de ma grand-mère. On disait qu’elle avait tout perdu en mer, en 1812.' },
+			],
+		},
+	},
+	{
+		id: 'lucas-6',
+		kind: 'short',
+		client: 'Lucas',
+		ask: 'Un cadre pour la photo du voilier.',
+		needs: ['bois:4'],
+		reward: { coins: 14, rep: 1 },
+		when: { project: 'musique', step: 1 },
+	},
+	{
+		id: 'musique-2',
+		kind: 'story',
+		client: 'Mlle Chen',
+		ask: 'Réparer le cylindre et le ressort.',
+		needs: ['meca:5', 'outil:4'],
+		reward: { coins: 18, rep: 3, energy: 10 },
+		project: 'musique',
+		step: 2,
+		scene: {
+			title: 'Le cylindre',
+			lines: [
+				{ who: 'note', text: 'Le cylindre tourne. Les premières notes s’égrènent, fragiles, un peu voilées.' },
+				{ who: 'chen', text: '… C’est l’air. C’est exactement l’air de ma grand-mère.' },
+			],
+		},
+	},
+	{
+		id: 'garnier-4',
+		kind: 'short',
+		client: 'Mme Garnier',
+		ask: 'Du galon pour la nappe de la fête.',
+		needs: ['tissu:4'],
+		reward: { coins: 14, rep: 1 },
+		when: { project: 'musique', step: 2 },
+	},
+	{
+		id: 'musique-3',
+		kind: 'story',
+		client: 'Mlle Chen',
+		ask: 'Remonter la figurine et le couvercle.',
+		needs: ['bois:4', 'tissu:3'],
+		reward: { coins: 30, rep: 6, energy: 10, cocoins: 20 },
+		project: 'musique',
+		step: 3,
+		scene: {
+			title: 'Ce que l’on rend',
+			lines: [
+				{ who: 'note', text: 'Chez les Chen, la grand-mère soulève le couvercle. Elle fredonne avant même la première note.' },
+				{ who: 'chen', text: 'Deux cents ans, et elle revient. Merci. Et merci à cette Rose, malgré tout ce qu’elle a pris.' },
+				{ who: 'note', text: 'Quelques jours plus tard, un taxi s’arrête devant l’atelier. Une vieille dame en descend, une canne dans une main, la boîte à ouvrage sous le bras.' },
+				{ who: 'lucile', text: 'J’ai lu la lettre de Jeanne. Soixante ans pour se dire pardon… Nous étions têtues, toutes les deux.' },
+				{ who: 'lucile', text: 'Rose a rendu ce qu’elle a pu. Jeanne a gardé la porte ouverte pour les autres. Et vous, vous avez fini le travail.' },
+				{ who: 'note', text: 'Devant l’atelier, M. Morel, Mme Garnier, Lucas, Mlle Chen, la boulangère et Lucile posent pour une photo. Comme en 1961.', show: 'photo' },
+				{ who: 'note', text: 'Fin de l’histoire. L’atelier reste ouvert : le quartier continue de passer, avec ses objets et ses souvenirs.' },
 			],
 		},
 	},
@@ -702,6 +882,7 @@ export const SPEAKERS: Record<Line['who'], string> = {
 	lucas: 'Lucas',
 	chen: 'Mlle Chen',
 	boulangere: 'La boulangère',
+	lucile: 'Lucile',
 	moi: 'Vous',
 	note: '',
 };
@@ -725,6 +906,21 @@ export const UPGRADES: Upgrade[] = [
 	{ id: 'etageres', name: 'Ouvrir les étagères', desc: 'Les étagères de Jeanne, et sa caisse d’électricien.', cost: 25, when: { project: 'radio', step: 1 }, rep: 2 },
 	{ id: 'menuiserie', name: 'Aménager le coin menuiserie', desc: 'Le coffre du menuisier et un bout d’établi pour le bois.', cost: 30, when: { project: 'voilier', step: 1 }, rep: 2 },
 	{ id: 'couture', name: 'Installer le coin couture', desc: 'La malle à tissus de Jeanne, et sa vieille machine à coudre.', cost: 30, when: { project: 'fauteuil', step: 1 }, rep: 2 },
+	{
+		id: 'souvenirs',
+		name: 'Ouvrir la salle des souvenirs',
+		desc: 'Le bureau de Jeanne, ouvert à tout le quartier.',
+		cost: 40,
+		when: { project: 'musique', step: 3 },
+		rep: 5,
+		scene: {
+			title: 'La salle des souvenirs',
+			lines: [
+				{ who: 'note', text: 'Le carnet de Rose, la malle, les quatre morceaux de carte, la photo de 1961 et celle d’aujourd’hui : le bureau de Jeanne est devenu une salle ouverte à tous.' },
+				{ who: 'lucile', text: 'Jeanne aurait aimé ça. Une porte ouverte, et du monde qui passe.' },
+			],
+		},
+	},
 	{
 		id: 'bureau',
 		name: 'Ouvrir le bureau de Jeanne',
@@ -789,4 +985,4 @@ export const FACES: Record<string, string> = {
 	'La boulangère': 'boulangere',
 	'Le facteur': 'facteur',
 };
-export const FACE_EMOJI: Record<string, string> = {};
+export const FACE_EMOJI: Record<string, string> = { Vous: '🗝️', Lucile: '🌸' };

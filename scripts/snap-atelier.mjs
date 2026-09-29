@@ -221,6 +221,46 @@ try {
 	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
 	await page.locator('.at-office').scrollIntoViewIfNeeded();
 	await shot('46-office-4-pieces');
+	// Chapter 6: the map puzzle, then Rose's chest.
+	await page.locator('.at-office .at-btn', { hasText: 'Assembler' }).click();
+	await sleep(500);
+	await shot('47-puzzle');
+	await page.locator('.at-puzzle .at-btn', { hasText: 'Retourner' }).click();
+	await sleep(2000);
+	await shot('48-puzzle-flipped');
+	await page.locator('.at-zone', { hasText: 'Porte' }).click();
+	await sleep(300);
+	await shot('49-puzzle-miss');
+	await page.locator('.at-zone', { hasText: 'Établi' }).click();
+	await sleep(800);
+	await shot('50-trapdoor');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['soin:4', 'outil:4'], '51-malle-1');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['meca:5', 'outil:4'], '52-malle-2');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['tissu:4', 'bois:4'], '53-malle-3');
+	await next(); await sleep(500);
+	await shot('54-chen-tag');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	// Chapter 7: the music box, Lucile.
+	await deliverStory(['soin:4', 'bois:3'], '55-musique-1');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['meca:5', 'outil:4'], '56-musique-2');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['bois:4', 'tissu:3'], '57-musique-3');
+	for (let k = 0; k < 3; k++) { await next(); await sleep(400); }
+	await shot('58-lucile');
+	for (let k = 0; k < 2; k++) { await next(); await sleep(400); }
+	await shot('59-final-photo');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await page.locator('.at-up', { hasText: 'souvenirs' }).locator('.at-btn').click();
+	await sleep(500);
+	await shot('60-souvenirs');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	await shot('61-endless');
 	await browser.close();
 } finally {
 	server.stop();

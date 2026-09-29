@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	newGame, produce, move, moveKind, deliver, tick, sell, buyUpgrade, load, save, activeOrders,
-	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, SAVE_V, CELLS, type State,
+	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, mapReady, solveMap, SAVE_V, CELLS, type State,
 } from './engine';
 import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS } from './data';
 
@@ -225,6 +225,14 @@ describe('orders', () => {
 		s = buyUpgrade(s, 'couture');
 		for (const id of ['garnier-3', 'fauteuil-2', 'lucas-5', 'fauteuil-3']) s = give(s, id);
 		expect(stepOf(s, 'fauteuil')).toBe(3);
+		expect(storyOrder(s)).toBeNull(); // the chest waits for the map puzzle
+		expect(mapReady(s)).toBe(true);
+		s = solveMap(s);
+		expect(mapReady(s)).toBe(false);
+		for (const id of ['malle-1', 'boulangere-2', 'malle-2', 'morel-5', 'malle-3']) s = give(s, id);
+		expect(stepOf(s, 'malle')).toBe(3);
+		for (const id of ['musique-1', 'lucas-6', 'musique-2', 'garnier-4', 'musique-3']) s = give(s, id);
+		expect(stepOf(s, 'musique')).toBe(3);
 		expect(storyOrder(s)).toBeNull();
 		const locals = shortOrders(s);
 		expect(locals.length).toBe(2);

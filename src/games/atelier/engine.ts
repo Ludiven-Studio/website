@@ -315,7 +315,18 @@ function placeGens(s: State): void {
 
 const has = (s: State, u: string): boolean => s.upgrades.includes(u);
 
-const open = (s: State, o: Order): boolean => (!o.after || has(s, o.after)) && gateOk(s, o.when);
+const open = (s: State, o: Order): boolean =>
+	(!o.after || has(s, o.after)) && gateOk(s, o.when) && (!o.flag || s.seen.includes(o.flag));
+
+/** Chapter 6 map puzzle: available once the 4th piece and Lucile's letter are in. */
+export const mapReady = (s: State): boolean => stepOf(s, 'fauteuil') >= 3 && !s.seen.includes('map-solved');
+
+export function solveMap(s: State): State {
+	if (!mapReady(s)) return s;
+	const n = clone(s);
+	n.seen.push('map-solved');
+	return n;
+}
 
 /** The story order currently open, or null. Steps of a project are taken in sequence. */
 export function storyOrder(s: State): Order | null {

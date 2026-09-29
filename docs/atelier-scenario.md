@@ -2,8 +2,9 @@
 
 **Statut :** version commune validée par Claude et Codex le 29/09 (tickets `.collab/tickets/0004` et
 `0005` ; les trois changements demandés au ticket 0005 sont intégrés). Validé par l'utilisateur le 29/09
-(« captivant »). **Jouable : chapitres 1 à 5** (`src/games/atelier/`). Restent : chapitre 6 (la malle, la
-carte à retourner) et chapitre 7 (la boîte à musique, Lucile à l'atelier).
+(« captivant »). **Jouable : les 7 chapitres** (`src/games/atelier/`), énigme de la carte comprise. Écarts
+assumés : le 4ᵉ morceau et la boîte à musique ramènent la famille Chen (écho préparé au chapitre 4, commande
+de Mlle Chen) ; Lucile n'a pas encore de portrait.
 Sources : proposition de Claude (« Le trésor de la Pie ») et de Codex (« Les Pirates du retour »,
 ticket 0004). Piste demandée par l'utilisateur : un passé de pirates dans la famille, des cartes au trésor,
 de l'aventure et des rebondissements, dans le ton du GDD (nostalgique, réconfortant, mystère humain).
