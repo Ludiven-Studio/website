@@ -1,5 +1,12 @@
 # CLAUDE.md
 
+## Coordination avec Codex
+
+Avant toute intervention, lire `COORDINATION.md` et les fichiers de
+`coordination/`. Suivre ce protocole commun, publier son périmètre dans
+`coordination/claude.md` et vérifier celui de Codex avant chaque lot de modifications.
+Une session déjà ouverte doit relire ces fichiers pour adopter le protocole.
+
 ## Inspection de fichiers — préférer les outils intégrés
 Pour réduire les demandes de permission, n'utilise PAS de one-liners bash pour lire
 ou chercher dans les fichiers. Utilise systématiquement les outils intégrés :
