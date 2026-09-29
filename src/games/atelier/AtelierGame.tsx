@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
 	load, save, newGame, tick, produce, move, moveKind, deliver, sell, sellValue, buyUpgrade, upgradeState,
-	addEnergy, markSeen, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
+	addEnergy, markSeen, dueTier, nextTier, claimTier, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
 	code, CELLS, type State, type Piece,
 } from './engine';
 import {
 	CHAINS, GENERATORS, UPGRADES, ORDERS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK, WATCH_STEPS,
-	INTRO, ARRIVAL, EPILOGUE, SPEAKERS, FACES, FACE_EMOJI,
+	INTRO, ARRIVAL, EPILOGUE, SPEAKERS, FACES, FACE_EMOJI, REP_TIERS,
 	type Line, type Order, type GenId,
 } from './data';
-import Watch, { WATCH_CSS } from './Watch';
+import Watch, { WatchBack, WATCH_CSS } from './Watch';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
@@ -124,6 +124,16 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			window.removeEventListener('pagehide', onHide);
 		};
 	}, []);
+
+	// A reputation threshold plays as a visit once the current scene queue is empty.
+	useEffect(() => {
+		if (!s || scenes.length) return;
+		const t = dueTier(s);
+		if (!t) return;
+		setS(claimTier(s, t.id));
+		setScenes([{ kind: 'talk', id: t.id, lines: t.lines, title: t.title }]);
+		trackEvent('atelier:rep_tier', { id: t.id });
+	}, [s, scenes.length]);
 
 	const flash = useCallback((text: string, undo?: State) => {
 		setToast({ k: Date.now(), text, undo });
@@ -439,7 +449,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 					onBench={() => setView('etabli')}
 					confirmReset={confirmReset}
 					onReset={() => (confirmReset ? reset() : setConfirmReset(true))}
-					onReplay={() => setScenes((q) => [...q, { kind: 'talk', id: 'replay', lines: [...ARRIVAL, ...ORDERS.filter((o) => o.kind === 'story' && (o.step ?? 9) <= s.step).flatMap((o) => o.scene!.lines)], watch: s.step, title: 'Carnet · la montre' }])}
+					onReplay={() => setScenes((q) => [...q, { kind: 'talk', id: 'replay', lines: [...ARRIVAL, ...ORDERS.filter((o) => o.kind === 'story' && (o.step ?? 9) <= s.step).flatMap((o) => o.scene!.lines), ...REP_TIERS.filter((t) => s.seen.includes(t.id)).flatMap((t) => t.lines)], watch: s.step, title: 'Carnet · la montre' }])}
 				/>
 			)}
 
@@ -624,6 +634,9 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmR
 				})}
 			</ul>
 
+			{nextTier(s) && (
+				<p className="at-tier">⭐ Réputation {s.rep}/{nextTier(s)!.at} · prochain palier : {nextTier(s)!.title}</p>
+			)}
 			<p className="at-foot">
 				Réputation {s.rep} · {s.stats.delivered} commande{s.stats.delivered > 1 ? 's' : ''} livrée{s.stats.delivered > 1 ? 's' : ''}
 				<button className="at-link" onClick={onReset}>{confirmReset ? 'Tout effacer, vraiment ?' : 'Recommencer'}</button>
@@ -653,7 +666,20 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 				{scene.kind === 'restore' && <p className="at-kicker">Restauration · étape {scene.to}/{WATCH_STEPS}</p>}
 				{scene.id === 'intro' && <div className="at-intro-img" role="img" aria-label="L’atelier poussiéreux" />}
 				{(scene.kind === 'restore' || scene.title) && <h3>{scene.kind === 'restore' ? scene.title : scene.title}</h3>}
-				{watch !== undefined && (
+				{line?.show ? (
+					<div className="at-clue" key={`clue-${i}`}>
+						{line.show === 'back' && <WatchBack size="100%" />}
+						{line.show === 'mechanism' && <img src={`${ART}/meca-5.png`} alt="Le mécanisme de la montre, remonté" />}
+						{line.show === 'postcard' && (
+							<div className="at-postcard" role="img" aria-label="Carte postale de Jeanne, mars 1962">
+								<p>L’atelier restera ouvert.<br />Le bureau, je le ferme.<br />Ne me demande pas pourquoi.</p>
+								<span>J.</span>
+								<i>Mars 1962</i>
+							</div>
+						)}
+						{line.show === 'photo' && <div className="at-clue-photo"><img src={`${ART}/photo.jpg`} alt="La photo de 1961 : Henri et Jeanne devant l’atelier" /></div>}
+					</div>
+				) : watch !== undefined && (
 					<div className={`at-bigwatch ${scene.kind === 'restore' && after ? 'shine' : ''}`}>
 						<Watch state={watch} size="100%" />
 					</div>
@@ -806,6 +832,16 @@ const CSS = `
 .at-bigwatch { width: min(46vw, 170px); margin: 0 auto; position: relative; }
 .at-bigwatch.shine::after { content: ''; position: absolute; inset: -10%; background: radial-gradient(circle, rgba(255,240,180,0.9), rgba(255,240,180,0) 60%); animation: at-shine 1.2s ease-out forwards; pointer-events: none; }
 @keyframes at-shine { from { opacity: 1; transform: scale(0.4); } to { opacity: 0; transform: scale(1.4); } }
+.at-clue { width: min(56vw, 210px); margin: 0 auto; animation: at-clue 0.45s ease; }
+.at-clue > img { width: 100%; display: block; animation: at-gear 6s ease-in-out infinite; }
+.at-postcard { position: relative; aspect-ratio: 3 / 2; background: linear-gradient(135deg, #fbf1dc, #efdcb4); border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.3); padding: 19% 10% 8%; transform: rotate(2deg); font-family: 'Segoe Script', 'Bradley Hand', cursive; color: #3b3a6b; }
+.at-postcard p { margin: 0; font-size: 14px; line-height: 1.5; }
+.at-postcard span { position: absolute; right: 12%; bottom: 10%; font-size: 20px; }
+.at-postcard i { position: absolute; right: 6%; top: 5%; font-size: 11px; color: #8a6a3a; border: 1.5px dashed #b58b4a; padding: 4px 6px; transform: rotate(-4deg); font-style: normal; }
+.at-clue-photo { background: #f4ead4; padding: 6px 6px 22px; transform: rotate(-2deg); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+.at-clue-photo img { width: 100%; display: block; }
+@keyframes at-clue { from { opacity: 0; transform: scale(0.85) rotate(-4deg); } to { opacity: 1; transform: none; } }
+@keyframes at-gear { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
 .at-line { display: flex; gap: 10px; align-items: flex-start; animation: at-coachin 0.25s ease; min-height: 64px; }
 .at-line strong { font-size: 13px; color: #9c4a1f; }
 .at-line.note p { font-style: italic; color: #5a4020; }
@@ -842,6 +878,7 @@ const CSS = `
 .at-up.locked { opacity: 0.55; }
 .at-up.owned { opacity: 0.8; }
 .at-done { color: #3f9a5a; font-weight: 800; font-size: 18px; }
+.at-tier { text-align: center; font-size: 13px; color: var(--gray-200); margin: 0; }
 .at-foot { text-align: center; font-size: 12px; color: var(--gray-300); margin: 0; }
 @media (max-width: 400px) {
 	.at-stat { padding: 4px 8px; font-size: 13px; }
@@ -852,6 +889,6 @@ const CSS = `
 	.at-stat em { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop { animation: none; }
+	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img { animation: none; }
 }
 `;

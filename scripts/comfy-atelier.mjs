@@ -131,8 +131,12 @@ async function cutout(img, file, size = 160) {
 	console.log('✓', file);
 }
 
+// Redrawn by Codex (.collab ticket 0002): a rerun here must not overwrite them.
+const CODEX_MADE = new Set(['meca-3', 'outil-3']);
+
 for (const [id, [what, seed]] of Object.entries(ITEMS)) {
 	if (!want(id)) continue;
+	if (CODEX_MADE.has(id)) { console.log('skip', id, '(Codex asset)'); continue; }
 	const img = await gen(id, { prompt: `${what}, ${ICON}`, negative: ICON_NEG, w: 512, h: 512, steps: 6, seed });
 	await cutout(img, `${id}.png`);
 }

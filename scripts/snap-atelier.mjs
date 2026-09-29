@@ -99,6 +99,10 @@ try {
 	await page.locator('.at-order.story .at-give').click();
 	await sleep(1400);
 	await shot('12-restore-1');
+	for (let k = 0; k < 2; k++) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(300); }
+	await shot('12b-rep-tier');
+	await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(500);
+	await shot('12c-postcard');
 	while (await page.locator('.at-talk').count()) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(150); }
 	await patch(() => {
 		const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
@@ -121,7 +125,7 @@ try {
 	await page.locator('.at-order.story .at-give').click();
 	await sleep(1400);
 	await shot('15-restore-3');
-	for (let k = 0; k < 2; k++) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(200); }
+	await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(500);
 	await shot('16-restore-3-reveal');
 	while (await page.locator('.at-talk').count()) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(150); }
 	await shot('17-atelier-done');

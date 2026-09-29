@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	newGame, produce, move, moveKind, deliver, tick, sell, buyUpgrade, load, save, activeOrders,
-	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, CELLS, type State,
+	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, CELLS, type State,
 } from './engine';
 import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD } from './data';
 
@@ -265,5 +265,36 @@ describe('save', () => {
 		const back = load(save(s), T0);
 		expect(back.energyAt).toBeLessThanOrEqual(T0);
 		expect(tick(back, T0 + ENERGY_MS).energy).toBe(6);
+	});
+});
+
+describe('reputation tiers', () => {
+	it('pays a reached threshold exactly once', () => {
+		const s = { ...newGame(T0), rep: 4 };
+		expect(dueTier(s)).toBeNull();
+		expect(nextTier(s)?.at).toBe(5);
+		const r = { ...s, rep: 5 };
+		const t = dueTier(r)!;
+		expect(t.id).toBe('rep-5');
+		const paid = claimTier(r, t.id);
+		expect(paid.energy).toBe(r.energy + t.reward.energy);
+		expect(dueTier(paid)).toBeNull();
+		expect(claimTier(paid, t.id)).toBe(paid);
+		expect(claimTier(s, t.id)).toBe(s); // not reached yet
+	});
+
+	it('the first tier lands with the first restoration step', () => {
+		let s: State = { ...newGame(T0), coins: 100 };
+		s = { ...s, board: s.board.slice() };
+		s.board[0] = 'outil:2';
+		const a = deliver(s, 'garnier-1');
+		if (!a.ok) throw new Error('garnier-1');
+		const b = buyUpgrade(a.s, 'etabli');
+		const c = { ...b, board: b.board.slice() };
+		c.board[0] = 'soin:3';
+		const d = deliver(c, 'morel-1');
+		if (!d.ok) throw new Error('morel-1');
+		expect(dueTier(b)).toBeNull();
+		expect(dueTier(d.s)?.id).toBe('rep-5');
 	});
 });

@@ -3,9 +3,9 @@
 // Pieces are strings: 'g:boite' is a generator, 'outil:3' is a level-3 item of a chain.
 
 import {
-	CHAINS, GENERATORS, ORDERS, UPGRADES, START_BOARD, LOCALS, COLS, ROWS,
+	CHAINS, GENERATORS, ORDERS, UPGRADES, START_BOARD, LOCALS, COLS, ROWS, REP_TIERS,
 	ENERGY_MAX, ENERGY_MS, WATCH_STEPS,
-	type ChainId, type GenId, type Order, type Reward,
+	type ChainId, type GenId, type Order, type Reward, type RepTier,
 } from './data';
 
 export const SAVE_V = 1;
@@ -346,7 +346,7 @@ function drawLocal(s: State): Order {
 		id: `q${s.endlessN}`,
 		kind: 'short',
 		client: pick(LOCALS),
-		ask: two ? 'Deux petites choses, si vous avez.' : 'Vous auriez ça pour moi ?',
+		ask: two ? 'Deux petites choses, si vous avez.' : 'Vous auriez ça pour moi ?',
 		needs,
 		reward: { coins: Math.round(units * 1.5) + 2, rep: 1 },
 	};
@@ -398,6 +398,23 @@ export function buyUpgrade(s: State, id: string): State {
 	// Bought early (coins from selling), the bench still ends the tutorial.
 	if (id === 'etabli') n.tut = 4;
 	refill(n);
+	return n;
+}
+
+/** A reputation threshold reached and not yet celebrated, or null. */
+export const dueTier = (s: State): RepTier | null =>
+	REP_TIERS.find((t) => s.rep >= t.at && !s.seen.includes(t.id)) ?? null;
+
+/** The next threshold still ahead, for the progress line. */
+export const nextTier = (s: State): RepTier | null => REP_TIERS.find((t) => s.rep < t.at) ?? null;
+
+/** Pay a reached threshold once; marks it seen so a reload cannot pay it twice. */
+export function claimTier(s: State, id: string): State {
+	const t = REP_TIERS.find((x) => x.id === id);
+	if (!t || s.rep < t.at || s.seen.includes(id)) return s;
+	const n = clone(s);
+	n.energy += t.reward.energy;
+	n.seen.push(id);
 	return n;
 }
 

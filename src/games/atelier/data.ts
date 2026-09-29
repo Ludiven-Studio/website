@@ -89,6 +89,8 @@ export interface Reward {
 export interface Line {
 	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'moi' | 'note';
 	text: string;
+	/** Shown in place of the watch while this line is on screen: the clue the line talks about. */
+	show?: 'back' | 'mechanism' | 'photo' | 'postcard';
 }
 
 export interface Order {
@@ -140,7 +142,7 @@ export const ORDERS: Order[] = [
 		scene: {
 			title: 'Nettoyage',
 			lines: [
-				{ who: 'note', text: 'Sous la crasse, une inscription apparaît au dos du boîtier : « Pour Henri — J., 14 juin 1961 ».' },
+				{ who: 'note', text: 'Sous la crasse, une inscription apparaît au dos du boîtier : « Pour Henri — J., 14 juin 1961 ».', show: 'back' },
 				{ who: 'morel', text: 'Je ne l’avais jamais remarquée… Henri, c’était mon père. Mais qui est ce « J. » ?' },
 			],
 		},
@@ -174,8 +176,8 @@ export const ORDERS: Order[] = [
 		scene: {
 			title: 'Mécanisme',
 			lines: [
-				{ who: 'note', text: 'Les aiguilles repartent. Le tic-tac emplit l’atelier pour la première fois depuis des années.' },
-				{ who: 'moi', text: 'Le 14 juin 1961… C’est la date écrite sous la vieille photo, près de la porte condamnée.' },
+				{ who: 'note', text: 'Le mécanisme, démonté puis remonté pièce par pièce, repart. Le tic-tac emplit l’atelier pour la première fois depuis des années.', show: 'mechanism' },
+				{ who: 'moi', text: 'Le 14 juin 1961… C’est la date écrite sous la vieille photo, près de la porte condamnée.', show: 'photo' },
 				{ who: 'morel', text: 'Une photo de l’atelier ? Vous pourrez me la montrer quand je reviendrai ?' },
 			],
 		},
@@ -201,7 +203,7 @@ export const ORDERS: Order[] = [
 			title: 'Finition',
 			lines: [
 				{ who: 'note', text: 'Verre neuf, boîtier poli, bracelet resserré : la montre brille comme en 1961.' },
-				{ who: 'morel', text: 'Et sur votre photo… c’est mon père, là. Et la femme à côté de lui, c’est Jeanne. Votre grand-mère.' },
+				{ who: 'morel', text: 'Et sur votre photo… c’est mon père, là. Et la femme à côté de lui, c’est Jeanne. Votre grand-mère.', show: 'photo' },
 				{ who: 'morel', text: 'Ils n’étaient pas seulement voisins, alors. Je reviendrai. J’ai des choses à vous raconter.' },
 			],
 		},
@@ -263,6 +265,29 @@ export const START_BOARD: Record<number, string> = {
 
 export const WATCH_STEPS = 3;
 
+export interface RepTier {
+	id: string;
+	at: number;
+	title: string;
+	reward: { energy: number };
+	lines: Line[];
+}
+
+// Reputation never gets spent: each threshold is the neighbourhood's trust, paid once in a visit.
+export const REP_TIERS: RepTier[] = [
+	{
+		id: 'rep-5',
+		at: 5,
+		title: 'L’atelier reprend vie',
+		reward: { energy: 10 },
+		lines: [
+			{ who: 'garnier', text: 'Tout le quartier parle de la montre d’Henri ! Tenez, j’ai retrouvé ça en rangeant. Jeanne me l’avait envoyée.' },
+			{ who: 'note', text: 'Une carte postale du port, datée de mars 1962 : « L’atelier restera ouvert. Le bureau, je le ferme. Ne me demande pas pourquoi. J. »', show: 'postcard' },
+			{ who: 'moi', text: 'Mars 1962… un an après la montre. Qu’est-ce qui a pu se passer ?' },
+		],
+	},
+];
+
 // Neighbourhood orders once the chapter's list runs out. Drawn from the save's rng.
 export const LOCALS = ['Mme Garnier', 'Lucas', 'M. Morel', 'La boulangère', 'Le facteur', 'Mlle Chen'];
 
@@ -272,5 +297,7 @@ export const FACES: Record<string, string> = {
 	Lucas: 'lucas',
 	'M. Morel': 'morel',
 	'Mlle Chen': 'chen',
+	'La boulangère': 'boulangere',
+	'Le facteur': 'facteur',
 };
-export const FACE_EMOJI: Record<string, string> = { 'La boulangère': '🥖', 'Le facteur': '📮' };
+export const FACE_EMOJI: Record<string, string> = {};

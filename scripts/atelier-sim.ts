@@ -151,8 +151,17 @@ for (const k of keys) {
 	const ms = runs.map((r) => r.marks[k]).filter(Boolean);
 	if (!ms.length) { console.log(`${k.padEnd(12)}  never`); continue; }
 	const e = ms.map((m) => m.energy), t = ms.map((m) => m.taps), s = ms.map((m) => m.sec);
-	const fmt = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
+	const fmt = (x: number) => { const r = Math.round(x); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`; };
 	console.log(`${k.padEnd(12)}  ${String(pct(e, 0.1)).padStart(4)} ${String(pct(e, 0.5)).padStart(4)} ${String(pct(e, 0.9)).padStart(4)}          ${String(pct(t, 0.5)).padStart(4)}      ${fmt(pct(s, 0.5))}${ms.length < N ? `  (${ms.length}/${N})` : ''}`);
+}
+// Per-run spans between story steps: subtracting cumulative medians would hide the spread.
+console.log('span                energy p10/med/p90     time med/p90');
+for (const [a, b] of [['etabli', 'morel-1'], ['morel-1', 'morel-2'], ['morel-2', 'morel-3']]) {
+	const ok = runs.filter((r) => r.marks[a] && r.marks[b]);
+	const e = ok.map((r) => r.marks[b].energy - r.marks[a].energy);
+	const t = ok.map((r) => r.marks[b].sec - r.marks[a].sec);
+	const fmt = (x: number) => { const r = Math.round(x); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`; };
+	console.log(`${`${a} → ${b}`.padEnd(19)} ${String(pct(e, 0.1)).padStart(4)} ${String(pct(e, 0.5)).padStart(4)} ${String(pct(e, 0.9)).padStart(4)}          ${fmt(pct(t, 0.5))} / ${fmt(pct(t, 0.9))}`);
 }
 const bought = runs.map((r) => r.boughtEnergy);
 console.log(`energy bought to finish: med ${pct(bought, 0.5)}, p90 ${pct(bought, 0.9)}, runs needing any: ${bought.filter((b) => b > 0).length}/${N}`);

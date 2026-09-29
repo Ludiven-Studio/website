@@ -105,14 +105,15 @@ export default function Watch({ state, size = 180, className }: Props) {
 			</g>
 			<text x="100" y="134" fontFamily="Georgia, serif" fontSize="6.5" fill="#6b4a12" textAnchor="middle" letterSpacing="1">J. ATELIER</text>
 
-			{/* Hands. Stopped at 4:37; running, the second hand ticks and the minute hand creeps. */}
-			<g className="atw-hour" style={{ transformOrigin: '100px 150px', transform: 'rotate(138deg)' }}>
+			{/* Hands. Stopped at 4:37. Mended, they are set to 10:08 — a still frame must show the repair
+			    too (reduced motion drops the ticking) — then the second hand ticks and the minute creeps. */}
+			<g className="atw-hour" style={{ transformOrigin: '100px 150px', transform: `rotate(${running ? 304 : 138}deg)` }}>
 				<path d="M97 150 L100 118 L103 150z" fill="#241809" />
 			</g>
-			<g className="atw-min" style={{ transformOrigin: '100px 150px', transform: 'rotate(222deg)' }}>
+			<g className="atw-min" style={{ transformOrigin: '100px 150px', transform: `rotate(${running ? 48 : 222}deg)` }}>
 				<path d="M98 150 L100 100 L102 150z" fill="#241809" />
 			</g>
-			<g className="atw-sec" style={{ transformOrigin: '100px 150px' }}>
+			<g className="atw-sec" style={{ transformOrigin: '100px 150px', transform: `rotate(${running ? 0 : 222}deg)` }}>
 				<path d="M99.4 162 L100 98 L100.6 162z" fill="#b8321a" />
 			</g>
 			<circle cx="100" cy="150" r="3.2" fill="#241809" />
@@ -136,12 +137,35 @@ export default function Watch({ state, size = 180, className }: Props) {
 	);
 }
 
+/** The caseback, engraved: the clue found at the cleaning step. */
+export function WatchBack({ size = 180 }: { size?: number | string }) {
+	return (
+		<svg viewBox="0 0 200 200" width={size} role="img" aria-label="Dos du boîtier gravé : Pour Henri, J., 14 juin 1961">
+			<defs>
+				<radialGradient id="atw-back" cx="0.4" cy="0.35" r="0.75">
+					<stop offset="0" stopColor="#fff3cf" />
+					<stop offset="0.55" stopColor="#d9ad55" />
+					<stop offset="1" stopColor="#9c6d1c" />
+				</radialGradient>
+			</defs>
+			<circle cx="100" cy="100" r="92" fill="url(#atw-back)" stroke="#6b4a12" strokeWidth="3" />
+			<circle cx="100" cy="100" r="80" fill="none" stroke="#8a5f16" strokeWidth="1.5" strokeDasharray="2 3" />
+			<g fontFamily="Georgia, serif" fill="#5a3b0c" textAnchor="middle" fontStyle="italic">
+				<text x="100" y="82" fontSize="17">Pour Henri</text>
+				<text x="100" y="108" fontSize="22" fontWeight="700" fontStyle="normal">J.</text>
+				<text x="100" y="132" fontSize="14">14 juin 1961</text>
+			</g>
+			<path d="M40 70 Q60 40 96 34" stroke="#fff" strokeWidth="5" opacity="0.35" fill="none" strokeLinecap="round" />
+		</svg>
+	);
+}
+
 export const WATCH_CSS = `
 .atw .atw-layer { transition: opacity 1.4s ease; }
+.atw .atw-hour, .atw .atw-min { transition: transform 1.2s cubic-bezier(.3,.8,.3,1); }
 .atw-run .atw-sec { animation: atw-sec 60s steps(60) infinite; }
-.atw-run .atw-min { animation: atw-min 3600s linear infinite; }
+.atw-run .atw-min { animation: atw-min 3600s linear 1.2s infinite; }
 @keyframes atw-sec { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes atw-min { from { transform: rotate(222deg); } to { transform: rotate(582deg); } }
-.atw .atw-sec { transform: rotate(222deg); }
+@keyframes atw-min { from { transform: rotate(48deg); } to { transform: rotate(408deg); } }
 @media (prefers-reduced-motion: reduce) { .atw-run .atw-sec, .atw-run .atw-min { animation: none; } }
 `;
