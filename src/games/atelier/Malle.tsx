@@ -93,7 +93,7 @@ export function MapPuzzle({ onSolve, onClose }: { onSolve: () => void; onClose: 
 			<p>Les quatre morceaux sont réunis. Au dos du dernier, d’une écriture ancienne : <em>« Retourne l’île, elle a un toit. »</em></p>
 			<div className="at-puzzle-map">
 				<div className="at-puzzle-turn" style={{ transform: flipped ? 'rotate(180deg)' : 'none' }}>
-					<MapPieces count={4} />
+					<MapPieces count={4} joined={flipped} />
 				</div>
 				{flipped && (
 					<svg className="at-puzzle-plan" viewBox="0 0 210 170" aria-label="Plan de l’atelier : où tombe la croix ?">

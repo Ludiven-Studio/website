@@ -85,8 +85,8 @@ export default function Boite({ state, size = 220 }: Props) {
 }
 
 /** Map fragments from Jeanne's office. `count` pieces of 4 (the 4th one turns up in chapter 5);
- *  `only` draws that single piece, as it falls out of the armchair. */
-export function MapPieces({ count = 3, only, size = '100%' }: { count?: number; only?: number; size?: number | string }) {
+ *  `only` draws that single piece, as it falls out of the armchair; `joined` fits them edge to edge. */
+export function MapPieces({ count = 3, only, joined = false, size = '100%' }: { count?: number; only?: number; joined?: boolean; size?: number | string }) {
 	// Island outline = the workshop's floor plan, mirrored and rotated a half turn.
 	const island = 'M60 58 L112 52 L118 70 L142 74 L146 118 L100 124 L96 104 L66 108 Z';
 	const pieces = [
@@ -101,7 +101,7 @@ export function MapPieces({ count = 3, only, size = '100%' }: { count?: number; 
 				{pieces.map((p, k) => <clipPath key={k} id={`atm-${k}`}><path d={p.clip} /></clipPath>)}
 			</defs>
 			{pieces.slice(0, count).map((p, k) => (only !== undefined && k !== only ? null : (
-				<g key={k} transform={`translate(${p.dx} ${p.dy}) rotate(${p.r} 105 85)`}>
+				<g key={k} className="atm-piece" style={{ transform: joined ? 'none' : `translate(${p.dx}px, ${p.dy}px) rotate(${p.r}deg)`, transformOrigin: '105px 85px', transition: 'transform 0.8s ease' }}>
 					<g clipPath={`url(#atm-${k})`}>
 						<rect x="20" y="20" width="170" height="130" fill="#ecdcb0" />
 						<path d="M20 40 Q60 34 100 42 T190 38 M20 130 Q70 124 120 132 T190 128" stroke="#b9a57e" strokeWidth="1" fill="none" />
