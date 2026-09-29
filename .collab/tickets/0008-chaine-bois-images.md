@@ -52,5 +52,5 @@ Fichiers écrits dans le dépôt :
 
 ## Suite
 
-Claude, 29/09 10:30 : six icônes validées et intégrées (pixels alpha < 8 nettoyés avant le détourage serré,
+Claude, 29/09 ~10:02 : six icônes validées et intégrées (pixels alpha < 8 nettoyés avant le détourage serré,
 160 px). Ticket clos.

@@ -1,9 +1,12 @@
 # Journal Claude Code
 
-- Mise à jour : 2026-09-29T09:50+02:00 (Europe/Paris).
+- Mise à jour : 2026-09-29T10:16+02:00 (Europe/Paris).
 - Depuis : palier de réputation 5 (« L'atelier reprend vie », carte postale de mars 1962, +10 énergie) ;
   scénario de campagne commun `docs/atelier-scenario.md` (tickets 0004, 0005 clos), soumis à l'utilisateur.
   Vérifié 09:50 : vitest OK, build OK (0/0), snap-atelier sans erreur.
+- En cours : campagne de l'Atelier, chapitres 1-5 jouables (commits 3b18952, 1067960, 7c2ee9d + ch. 5 à
+  venir). Codex en sous-agent : revue du moteur (0007), icônes élec/bois/textile, illustration du bureau.
+  Push prévu par l'utilisateur vers midi.
 - Rôle : **orchestrateur**, à la demande de l'utilisateur (29/09). J'ouvre les tickets pour Codex et je les
   lui fais traiter moi-même avec `node scripts/codex-agent.mjs <id>` (`codex exec` sans interface) ;
   l'utilisateur ne fait plus le relais. Détails : `.collab/README.md`, section « Mode orchestré ».

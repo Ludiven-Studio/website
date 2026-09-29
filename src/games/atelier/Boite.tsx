@@ -84,8 +84,9 @@ export default function Boite({ state, size = 220 }: Props) {
 	);
 }
 
-/** Map fragments from Jeanne's office. `count` pieces of 4 (the 4th one turns up in chapter 5). */
-export function MapPieces({ count = 3, size = '100%' }: { count?: number; size?: number | string }) {
+/** Map fragments from Jeanne's office. `count` pieces of 4 (the 4th one turns up in chapter 5);
+ *  `only` draws that single piece, as it falls out of the armchair. */
+export function MapPieces({ count = 3, only, size = '100%' }: { count?: number; only?: number; size?: number | string }) {
 	// Island outline = the workshop's floor plan, mirrored and rotated a half turn.
 	const island = 'M60 58 L112 52 L118 70 L142 74 L146 118 L100 124 L96 104 L66 108 Z';
 	const pieces = [
@@ -95,11 +96,11 @@ export function MapPieces({ count = 3, size = '100%' }: { count?: number; size?:
 		{ clip: 'M128 92 L190 86 L190 150 L122 150 Z', dx: 3, dy: 3, r: -2 },
 	];
 	return (
-		<svg viewBox="0 0 210 170" width={size} role="img" aria-label={`${count} morceaux de carte : un îlot marqué d’une croix`}>
+		<svg viewBox={only === 3 ? '112 76 88 84' : '0 0 210 170'} width={size} role="img" aria-label={only !== undefined ? 'Un morceau de carte, bord déchiré' : `${count} morceaux de carte : un îlot marqué d’une croix`}>
 			<defs>
 				{pieces.map((p, k) => <clipPath key={k} id={`atm-${k}`}><path d={p.clip} /></clipPath>)}
 			</defs>
-			{pieces.slice(0, count).map((p, k) => (
+			{pieces.slice(0, count).map((p, k) => (only !== undefined && k !== only ? null : (
 				<g key={k} transform={`translate(${p.dx} ${p.dy}) rotate(${p.r} 105 85)`}>
 					<g clipPath={`url(#atm-${k})`}>
 						<rect x="20" y="20" width="170" height="130" fill="#ecdcb0" />
@@ -110,7 +111,7 @@ export function MapPieces({ count = 3, size = '100%' }: { count?: number; size?:
 					</g>
 					<path d={p.clip} fill="none" stroke="#8a6a3a" strokeWidth="1.2" />
 				</g>
-			))}
+			)))}
 		</svg>
 	);
 }

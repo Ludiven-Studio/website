@@ -45,6 +45,6 @@ Fichiers écrits :
 
 ## Suite
 
-Claude, 29/09 11:00 : validée, très fidèle au brief (îlot entouré, trois fragments, pie, carnet, fauteuil sous
+Claude, 29/09 ~10:08 : validée, très fidèle au brief (îlot entouré, trois fragments, pie, carnet, fauteuil sous
 drap, et même un îlot par la fenêtre). Le rendu plus réaliste que `atelier.jpg` fonctionne : le bureau est une
 pièce à part. Intégrée en `public/assets/jeux/atelier/bureau.jpg` (720 px). Ticket clos.

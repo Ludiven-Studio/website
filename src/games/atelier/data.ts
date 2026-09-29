@@ -2,9 +2,9 @@
 // orders, the workshop. Pure data, no logic, so a sim script and the tests read the same
 // tables as the game. The story behind it: docs/atelier-scenario.md.
 
-export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois';
-export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre';
-export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite';
+export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois' | 'tissu';
+export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre' | 'malle';
+export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite' | 'fauteuil';
 
 export interface Chain {
 	id: ChainId;
@@ -49,6 +49,13 @@ export const CHAINS: Record<ChainId, Chain> = {
 		family: 'Menuiserie',
 		gen: 'coffre',
 		items: ['Chute de bois', 'Planche', 'Pièce taillée', 'Cadre', 'Structure assemblée'],
+		sell: 1,
+	},
+	tissu: {
+		id: 'tissu',
+		family: 'Textile',
+		gen: 'malle',
+		items: ['Fil', 'Coupon de tissu', 'Rembourrage', 'Galon et clous', 'Kit de tapissier'],
 		sell: 1,
 	},
 };
@@ -108,6 +115,17 @@ export const GENERATORS: Record<GenId, Generator> = {
 		chargeMs: 8_000,
 		unlock: 'menuiserie',
 	},
+	malle: {
+		id: 'malle',
+		name: 'Malle à tissus',
+		out: [
+			{ chain: 'tissu', w: 80 },
+			{ chain: 'tissu', level: 2, w: 20 },
+		],
+		charges: 12,
+		chargeMs: 8_000,
+		unlock: 'couture',
+	},
 };
 
 export const COLS = 7;
@@ -127,10 +145,11 @@ export interface Reward {
 }
 
 export interface Line {
-	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'moi' | 'note';
+	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'boulangere' | 'moi' | 'note';
 	text: string;
 	/** Shown in place of the object while this line is on screen: the clue the line talks about. */
-	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box' | 'key' | 'office' | 'map';
+	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box' | 'key' | 'office' | 'map'
+		| 'piece4' | 'lucile';
 }
 
 /** Reached once a project has delivered `step` restoration steps. */
@@ -203,6 +222,19 @@ export const PROJECTS: Project[] = [
 			{ who: 'garnier', text: 'Jeanne me l’a confiée au printemps 1962, pour Lucile. « Quand elle reviendra », disait-elle. Lucile n’est jamais revenue.' },
 			{ who: 'garnier', text: 'Le tiroir est bloqué depuis toujours. Je n’ai jamais voulu le forcer.' },
 			{ who: 'moi', text: 'Marqueterie encrassée, charnière cassée, tiroir coincé… On va l’ouvrir sans rien abîmer.' },
+		],
+	},
+	{
+		id: 'fauteuil',
+		chapter: 5,
+		object: 'Fauteuil',
+		title: 'Le fauteuil de la boulangère',
+		client: 'La boulangère',
+		steps: 3,
+		arrival: [
+			{ who: 'boulangere', text: 'Ma mère gardait ce fauteuil près de la vitrine, pour les clients fatigués. « Il faut toujours garder une place pour quelqu’un », disait-elle.' },
+			{ who: 'boulangere', text: 'Il est tout affaissé. J’aimerais le remettre dans la boutique.' },
+			{ who: 'moi', text: 'Tissu taché, assise effondrée… On va lui refaire une beauté.' },
 		],
 	},
 ];
@@ -571,6 +603,85 @@ export const ORDERS: Order[] = [
 			],
 		},
 	},
+
+	// ---- Chapter 5: the baker's armchair, the 4th map piece, Lucile's reply ----
+	{
+		id: 'fauteuil-1',
+		kind: 'story',
+		client: 'La boulangère',
+		ask: 'Dégarnir et nettoyer la structure.',
+		needs: ['soin:4', 'outil:3'],
+		reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'boite', step: 3 },
+		project: 'fauteuil',
+		step: 1,
+		scene: {
+			title: 'La structure',
+			lines: [
+				{ who: 'note', text: 'Sous le vieux tissu, gravée dans le bois du cadre : une pie, ailes ouvertes. La même que sur la boîte de Lucile.' },
+				{ who: 'moi', text: '« Chercher la pie »… La fiche du bureau parlait de votre famille.' },
+				{ who: 'boulangere', text: 'Ce vieux signe ? Ma grand-mère disait que c’était la marque de la maison. Je n’ai jamais su d’où ça venait.' },
+			],
+		},
+	},
+	{
+		id: 'garnier-3',
+		kind: 'short',
+		client: 'Mme Garnier',
+		ask: 'Un coupon de tissu pour une nappe.',
+		needs: ['tissu:2'],
+		reward: { coins: 10, rep: 1 },
+		after: 'couture',
+	},
+	{
+		id: 'fauteuil-2',
+		kind: 'story',
+		client: 'La boulangère',
+		ask: 'Refaire l’assise.',
+		needs: ['tissu:3', 'bois:3'],
+		reward: { coins: 16, rep: 3, energy: 10 },
+		after: 'couture',
+		project: 'fauteuil',
+		step: 2,
+		scene: {
+			title: 'L’assise',
+			lines: [
+				{ who: 'note', text: 'En retirant le vieux crin, un papier plié tombe de l’assise : un morceau de carte, bordé de la même encre que ceux du bureau.', show: 'piece4' },
+				{ who: 'moi', text: 'Le quatrième morceau. Votre famille le gardait depuis 1813, sans le savoir.' },
+				{ who: 'boulangere', text: 'Alors la pie, c’était une promesse… Prenez-le. Il sera mieux avec les trois autres.' },
+			],
+		},
+	},
+	{
+		id: 'lucas-5',
+		kind: 'short',
+		client: 'Lucas',
+		ask: 'Une lampe radio pour le poste de ma grand-mère.',
+		needs: ['elec:4'],
+		reward: { coins: 14, rep: 1 },
+		when: { project: 'fauteuil', step: 2 },
+	},
+	{
+		id: 'fauteuil-3',
+		kind: 'story',
+		client: 'La boulangère',
+		ask: 'Poser le tissu neuf et le galon.',
+		needs: ['tissu:4', 'soin:3'],
+		reward: { coins: 22, rep: 5, energy: 10, cocoins: 10 },
+		project: 'fauteuil',
+		step: 3,
+		scene: {
+			title: 'Une place pour quelqu’un',
+			lines: [
+				{ who: 'note', text: 'Le fauteuil retrouve sa place dans la vitrine de la boulangerie. Une cliente s’y assoit déjà.' },
+				{ who: 'note', text: 'Le facteur passe : une enveloppe à votre nom, d’une écriture tremblée. Lucile.', show: 'lucile' },
+				{ who: 'note', text: '« Merci pour la boîte, et pour la lettre de Jeanne. Vous méritez la vérité. En mars 1962, nous sommes partis tous les trois vers l’îlot de la carte. La tempête nous a pris. Henri a sauvé Jeanne de la noyade. »' },
+				{ who: 'note', text: '« Ensuite, j’ai voulu continuer à chercher, à terre, pour les familles. Jeanne a refusé : elle avait eu trop peur de perdre Henri. Nous nous sommes dit des mots terribles, et je suis partie. »' },
+				{ who: 'note', text: '« Si vous avez trouvé le quatrième morceau, souvenez-vous de ce que répétait la Pie : rien n’est jamais là où on le croit. Lucile. »' },
+				{ who: 'note', text: 'Fin du chapitre 5.' },
+			],
+		},
+	},
 ];
 
 export const INTRO: Line[] = [
@@ -590,6 +701,7 @@ export const SPEAKERS: Record<Line['who'], string> = {
 	garnier: 'Mme Garnier',
 	lucas: 'Lucas',
 	chen: 'Mlle Chen',
+	boulangere: 'La boulangère',
 	moi: 'Vous',
 	note: '',
 };
@@ -612,6 +724,7 @@ export const UPGRADES: Upgrade[] = [
 	{ id: 'photo', name: 'Accrocher la photo', desc: 'La photo de 1961, remise au mur, bien en vue.', cost: 15, when: { project: 'montre', step: 3 }, rep: 3 },
 	{ id: 'etageres', name: 'Ouvrir les étagères', desc: 'Les étagères de Jeanne, et sa caisse d’électricien.', cost: 25, when: { project: 'radio', step: 1 }, rep: 2 },
 	{ id: 'menuiserie', name: 'Aménager le coin menuiserie', desc: 'Le coffre du menuisier et un bout d’établi pour le bois.', cost: 30, when: { project: 'voilier', step: 1 }, rep: 2 },
+	{ id: 'couture', name: 'Installer le coin couture', desc: 'La malle à tissus de Jeanne, et sa vieille machine à coudre.', cost: 30, when: { project: 'fauteuil', step: 1 }, rep: 2 },
 	{
 		id: 'bureau',
 		name: 'Ouvrir le bureau de Jeanne',

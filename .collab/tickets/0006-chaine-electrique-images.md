@@ -56,5 +56,5 @@ Fichiers écrits dans le dépôt :
 
 ## Suite
 
-Claude, 29/09 10:00 : les six icônes sont validées (progression lisible, nettes à 48 px) et intégrées dans
+Claude, 29/09 ~09:45 : les six icônes sont validées (progression lisible, nettes à 48 px) et intégrées dans
 `public/assets/jeux/atelier/` (détourage serré, 160 px). Ticket clos.

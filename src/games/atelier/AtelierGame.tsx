@@ -13,6 +13,7 @@ import Watch, { WatchBack, WATCH_CSS } from './Watch';
 import Radio, { RADIO_CSS } from './Radio';
 import Voilier, { VOILIER_CSS } from './Voilier';
 import Boite, { MapPieces, BOITE_CSS } from './Boite';
+import Fauteuil, { FAUTEUIL_CSS } from './Fauteuil';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
@@ -28,7 +29,7 @@ import Cocoin from '../../components/Cocoin';
 
 const SAVE_KEY = 'ludiven-atelier';
 const ART = '/assets/jeux/atelier';
-const FALLBACK: Record<string, string> = { outil: '🪛', soin: '🧽', meca: '⚙️', elec: '💡', bois: '🪵', boite: '🧰', tiroir: '🗄️', caisse: '🔌', coffre: '🪚' };
+const FALLBACK: Record<string, string> = { outil: '🪛', soin: '🧽', meca: '⚙️', elec: '💡', bois: '🪵', tissu: '🧵', boite: '🧰', tiroir: '🗄️', caisse: '🔌', coffre: '🪚', malle: '🧺' };
 
 type View = 'atelier' | 'etabli';
 interface Art { project: ProjectId; state: number }
@@ -41,6 +42,7 @@ function ObjectArt({ project, state }: Art) {
 	if (project === 'radio') return <Radio state={state} size="100%" />;
 	if (project === 'voilier') return <Voilier state={state} size="100%" />;
 	if (project === 'boite') return <Boite state={state} size="100%" />;
+	if (project === 'fauteuil') return <Fauteuil state={state} size="100%" />;
 	return <Watch state={state} size="100%" />;
 }
 
@@ -359,7 +361,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -670,8 +672,12 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmR
 					<div className="at-office-img small" />
 					<div className="at-office-txt">
 						<strong>Le bureau de Jeanne</strong>
-						<span>Le carnet de Rose « la Pie », 1813. Une carte marine, un îlot entouré de rouge. Une fiche : « Chercher la pie. »</span>
-						<div className="at-map small"><MapPieces count={3} /></div>
+						<span>
+							{stepOf(s, 'fauteuil') >= 2
+								? 'Le carnet de Rose « la Pie », 1813. Les quatre morceaux de carte sont réunis ; Lucile écrit : « rien n’est jamais là où on le croit ».'
+								: 'Le carnet de Rose « la Pie », 1813. Une carte marine, un îlot entouré de rouge. Une fiche : « Chercher la pie. »'}
+						</span>
+						<div className="at-map small"><MapPieces count={stepOf(s, 'fauteuil') >= 2 ? 4 : 3} /></div>
 					</div>
 				</section>
 			)}
@@ -769,6 +775,12 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 						)}
 						{line.show === 'office' && <div className="at-office-img" role="img" aria-label="Le bureau de Jeanne, rangé, poussiéreux" />}
 						{line.show === 'map' && <div className="at-map"><MapPieces count={3} /></div>}
+						{line.show === 'piece4' && <div className="at-map"><MapPieces count={4} only={3} /></div>}
+						{line.show === 'lucile' && (
+							<div className="at-letter at-lucile" role="img" aria-label="Une enveloppe d’une écriture tremblée, signée Lucile">
+								<b>À l’atelier de Jeanne</b><i />
+							</div>
+						)}
 						{line.show === 'broadcast' && (
 							<div className="at-broadcast" role="img" aria-label="Émission Mémoires du port, archive de 1961">
 								<b>Mémoires du port</b>
@@ -931,6 +943,9 @@ const CSS = `
 .at-bigwatch.radio { width: min(72vw, 270px); }
 .at-bigwatch.voilier { width: min(58vw, 210px); }
 .at-bigwatch.boite { width: min(70vw, 260px); }
+.at-bigwatch.fauteuil { width: min(58vw, 210px); }
+.at-lucile { margin: 8px auto; width: 190px; transform: rotate(3deg); }
+.at-lucile b { font-size: 14px; }
 .at-keyletter { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 10px 0; }
 .at-letter { position: relative; width: 140px; aspect-ratio: 3 / 2; background: #f4ead4; border: 1.5px solid #b58b4a; border-radius: 4px; transform: rotate(-4deg); box-shadow: 0 5px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
 .at-letter b { font-family: 'Segoe Script', 'Bradley Hand', cursive; font-weight: 400; color: #3b3a6b; font-size: 16px; }
@@ -999,12 +1014,14 @@ const CSS = `
 .at-onbench.radio { width: 16% !important; top: 75% !important; }
 .at-onbench.voilier { width: 13% !important; top: 72% !important; }
 .at-onbench.boite { width: 15% !important; top: 76% !important; }
+.at-onbench.fauteuil { width: 13% !important; top: 72% !important; }
 .at-onbench { position: absolute; left: 58%; top: 77%; width: 8%; transform: translate(-50%, -50%) rotate(-12deg); filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
 .at-project { display: flex; gap: 12px; align-items: center; background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; }
 .at-project-watch { width: 54px; flex: none; }
 .at-project-watch.radio { width: 84px; }
 .at-project-watch.voilier { width: 64px; }
 .at-project-watch.boite { width: 84px; }
+.at-project-watch.fauteuil { width: 64px; }
 .at-warn { color: #d9822b !important; font-weight: 600; }
 .at-shelves { position: absolute; left: 52%; top: 6%; width: 48%; height: 62%; background: radial-gradient(ellipse at 60% 40%, rgba(255, 214, 140, 0.35), transparent 65%); mix-blend-mode: screen; pointer-events: none; }
 .at-project-txt { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--gray-300); min-width: 0; flex: 1; }

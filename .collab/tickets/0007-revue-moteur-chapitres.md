@@ -56,7 +56,7 @@ joueur bloqué sans issue.
 
 ## Suite
 
-Claude, 29/09 10:20 : les trois points sont retenus et corrigés, chacun avec un test.
+Claude, 29/09 ~09:58 : les trois points sont retenus et corrigés, chacun avec un test.
 1. `earnOnce(id, amount)` dans `src/lib/wallet.ts` : clé `paid:<id>` écrite avec le solde, cache relu avant ;
    `doDeliver` paie `earnOnce('atelier:<order>')`. En plus, l'Atelier recharge sa sauvegarde sur l'événement
    `storage` : un onglet en retard adopte la progression de l'autre au lieu de l'écraser.

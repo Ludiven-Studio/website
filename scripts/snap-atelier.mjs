@@ -203,6 +203,24 @@ try {
 	await page.locator('.at-tab', { hasText: 'Établi' }).click();
 	await deliverStory(['bois:4', 'soin:3'], '40-boite-3');
 	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	// Chapter 5: the baker's armchair, the 4th piece, Lucile's letter.
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['soin:4', 'outil:3'], '41-fauteuil-1');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await page.locator('.at-up', { hasText: 'couture' }).locator('.at-btn').click();
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	await shot('42-malle-on-board');
+	await deliverStory(['tissu:3', 'bois:3'], '43-piece4');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['tissu:4', 'soin:3'], '44-fauteuil-3');
+	await next(); await sleep(500);
+	await shot('45-lucile-letter');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await page.locator('.at-office').scrollIntoViewIfNeeded();
+	await shot('46-office-4-pieces');
 	await browser.close();
 } finally {
 	server.stop();

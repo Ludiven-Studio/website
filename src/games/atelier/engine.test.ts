@@ -220,6 +220,11 @@ describe('orders', () => {
 		s = buyUpgrade(s, 'bureau');
 		s = give(s, 'boite-3');
 		expect(stepOf(s, 'boite')).toBe(3);
+		s = give(s, 'fauteuil-1');
+		expect(storyOrder(s)).toBeNull(); // the seat waits for the sewing corner
+		s = buyUpgrade(s, 'couture');
+		for (const id of ['garnier-3', 'fauteuil-2', 'lucas-5', 'fauteuil-3']) s = give(s, id);
+		expect(stepOf(s, 'fauteuil')).toBe(3);
 		expect(storyOrder(s)).toBeNull();
 		const locals = shortOrders(s);
 		expect(locals.length).toBe(2);

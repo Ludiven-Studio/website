@@ -1,7 +1,9 @@
 # L'Atelier des Souvenirs — scénario de campagne
 
 **Statut :** version commune validée par Claude et Codex le 29/09 (tickets `.collab/tickets/0004` et
-`0005` ; les trois changements demandés au ticket 0005 sont intégrés). À valider par l'utilisateur.
+`0005` ; les trois changements demandés au ticket 0005 sont intégrés). Validé par l'utilisateur le 29/09
+(« captivant »). **Jouable : chapitres 1 à 5** (`src/games/atelier/`). Restent : chapitre 6 (la malle, la
+carte à retourner) et chapitre 7 (la boîte à musique, Lucile à l'atelier).
 Sources : proposition de Claude (« Le trésor de la Pie ») et de Codex (« Les Pirates du retour »,
 ticket 0004). Piste demandée par l'utilisateur : un passé de pirates dans la famille, des cartes au trésor,
 de l'aventure et des rebondissements, dans le ton du GDD (nostalgique, réconfortant, mystère humain).
