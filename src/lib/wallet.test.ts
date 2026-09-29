@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
 	balance, earn, buyBlason, owns, equipBlason, equippedBlason, ownedBlasons,
 	dailyRewardAmount, rewardState, claimDailyReward,
-	buyUnlock, hasUnlock, unlockedGames, unlockId, resetWalletCache,
+	buyUnlock, hasUnlock, unlockedGames, unlockId, resetWalletCache, earnOnce, spend,
 	BLASONS, UNLOCK_PRICE,
 } from './wallet';
 import { recordDayActivity } from './streak';
@@ -37,6 +37,21 @@ describe('wallet', () => {
 		expect(buyBlason('etoile')).toBe(true); // 25
 		expect(balance()).toBe(25);
 		expect(owns('etoile')).toBe(true);
+	});
+
+	it('earnOnce pays a keyed gift a single time, even after the cache is dropped (another tab)', () => {
+		expect(earnOnce('atelier:morel-3', 10)).toBe(true);
+		resetWalletCache();
+		expect(earnOnce('atelier:morel-3', 10)).toBe(false);
+		expect(balance()).toBe(10);
+		expect(ownedBlasons().map((b) => b.id)).toEqual(['cocotte']); // the key is not a blason
+	});
+
+	it('spend refuses more than the balance', () => {
+		earn(5);
+		expect(spend(10)).toBe(false);
+		expect(spend(5)).toBe(true);
+		expect(balance()).toBe(0);
 	});
 
 	it('refuses an unaffordable buy', () => {

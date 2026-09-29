@@ -7,3 +7,5 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-09-29 · 0004 · scénario pirates (version Codex) · fusionné avec la version Claude dans docs/atelier-scenario.md
 - 2026-09-29 · 0005 · challenge de la fusion · validée avec 3 changements, intégrés ; scénario soumis à l'utilisateur
 - 2026-09-29 · 0006 · chaîne électrique + caisse d'électricien (Codex imagegen) · intégrées
+- 2026-09-29 · 0007 · revue du moteur multi-chapitres · 3 bugs (double paiement multi-onglets, commandes v1, générateur après fusion) corrigés et testés
+- 2026-09-29 · 0008 · chaîne bois + coffre du menuisier (Codex imagegen) · intégrées

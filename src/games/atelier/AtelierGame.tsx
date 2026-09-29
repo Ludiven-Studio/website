@@ -11,10 +11,11 @@ import {
 } from './data';
 import Watch, { WatchBack, WATCH_CSS } from './Watch';
 import Radio, { RADIO_CSS } from './Radio';
+import Voilier, { VOILIER_CSS } from './Voilier';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
-import { spend, earn } from '../../lib/wallet';
+import { spend, earnOnce } from '../../lib/wallet';
 import { trackGame, trackEvent } from '../../lib/analytics';
 import Cocoin from '../../components/Cocoin';
 
@@ -26,7 +27,7 @@ import Cocoin from '../../components/Cocoin';
 
 const SAVE_KEY = 'ludiven-atelier';
 const ART = '/assets/jeux/atelier';
-const FALLBACK: Record<string, string> = { outil: '🪛', soin: '🧽', meca: '⚙️', elec: '💡', boite: '🧰', tiroir: '🗄️', caisse: '🔌' };
+const FALLBACK: Record<string, string> = { outil: '🪛', soin: '🧽', meca: '⚙️', elec: '💡', bois: '🪵', boite: '🧰', tiroir: '🗄️', caisse: '🔌', coffre: '🪚' };
 
 type View = 'atelier' | 'etabli';
 interface Art { project: ProjectId; state: number }
@@ -36,7 +37,9 @@ type Scene =
 
 /** The restored object of a project, drawn at a restoration state. */
 function ObjectArt({ project, state }: Art) {
-	return project === 'radio' ? <Radio state={state} size="100%" /> : <Watch state={state} size="100%" />;
+	if (project === 'radio') return <Radio state={state} size="100%" />;
+	if (project === 'voilier') return <Voilier state={state} size="100%" />;
+	return <Watch state={state} size="100%" />;
 }
 
 interface Drag { from: number; x: number; y: number; over: number }
@@ -110,6 +113,17 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (!s) return;
 		try { localStorage.setItem(SAVE_KEY, save(s)); } catch { /* storage full or blocked */ }
 	}, [s]);
+
+	// Another tab played: take its save, so this one never overwrites newer progress.
+	useEffect(() => {
+		const onStorage = (e: StorageEvent) => {
+			if (e.key !== SAVE_KEY || !e.newValue) return;
+			setS(load(e.newValue, Date.now()));
+			setSel(null);
+		};
+		window.addEventListener('storage', onStorage);
+		return () => window.removeEventListener('storage', onStorage);
+	}, []);
 
 	useEffect(() => {
 		const beat = () => {
@@ -204,8 +218,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		sfx.deliver();
 		trackEvent('atelier:order_completed', { order: o.id.startsWith('q') ? 'local' : o.id });
 		if (s.tut === 2) trackEvent('atelier:tutorial_step', { step: 3 });
-		// Story orders only, and each is delivered once: the cocoin gift cannot repeat.
-		if (o.reward.cocoins) earn(o.reward.cocoins);
+		// Keyed by order: a second tab holding a stale copy of the same order cannot pay it twice.
+		if (o.reward.cocoins) earnOnce(`atelier:${o.id}`, o.reward.cocoins);
 		if (o.kind === 'story' && o.scene && o.project && o.step) {
 			trackEvent('atelier:restoration_step', { project: o.project, step: o.step });
 			const next: Scene[] = [{ kind: 'restore', id: o.id, project: o.project, title: o.scene.title, from: o.step - 1, to: o.step, lines: o.scene.lines }];
@@ -341,7 +355,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}{RADIO_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -718,6 +732,19 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 								<em>— à finir —</em>
 							</div>
 						)}
+						{line.show === 'dedication' && (
+							<div className="at-label at-dedication" role="img" aria-label="Dédicace au crayon : Au capitaine du retour">
+								<em>Au capitaine</em>
+								<em>du retour</em>
+							</div>
+						)}
+						{line.show === 'box' && (
+							<div className="at-box" role="img" aria-label="La boîte à ouvrage de Lucile, en marqueterie, le tiroir bloqué">
+								<span className="at-box-lid" />
+								<span className="at-box-body"><i /></span>
+								<b>Lucile</b>
+							</div>
+						)}
 						{line.show === 'broadcast' && (
 							<div className="at-broadcast" role="img" aria-label="Émission Mémoires du port, archive de 1961">
 								<b>Mémoires du port</b>
@@ -878,6 +905,14 @@ const CSS = `
 .at-intro-img { aspect-ratio: 16 / 10; border-radius: 12px; background: url('${ART}/atelier.jpg') center 30% / cover; filter: sepia(0.6) brightness(0.6) saturate(0.6); box-shadow: inset 0 0 40px rgba(0,0,0,0.6); }
 .at-bigwatch { width: min(46vw, 170px); margin: 0 auto; position: relative; }
 .at-bigwatch.radio { width: min(72vw, 270px); }
+.at-bigwatch.voilier { width: min(58vw, 210px); }
+.at-dedication { background: linear-gradient(180deg, #d9a66b, #b47a3e); border-color: #7a4a1c; color: #3b2a14; border-radius: 6px; }
+.at-dedication em { color: #3b2a14 !important; font-size: 18px !important; }
+.at-box { position: relative; width: 62%; margin: 8px auto 0; aspect-ratio: 5 / 3; }
+.at-box-lid { position: absolute; left: 0; right: 0; top: 0; height: 32%; border-radius: 10px 10px 4px 4px; background: repeating-linear-gradient(90deg, #a0602c 0 14px, #c98a4a 14px 28px); border: 2px solid #5a2e0e; }
+.at-box-body { position: absolute; left: 3%; right: 3%; top: 30%; bottom: 0; border-radius: 4px 4px 8px 8px; background: linear-gradient(180deg, #b0703a, #7a4418); border: 2px solid #5a2e0e; }
+.at-box-body i { position: absolute; left: 30%; right: 30%; top: 40%; height: 26%; border: 2px solid #3a1c06; border-radius: 3px; background: #8a5226; }
+.at-box b { position: absolute; left: 0; right: 0; top: 8%; text-align: center; font-family: 'Segoe Script', 'Bradley Hand', cursive; color: #fff4d6; font-size: 15px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
 .at-label { width: 70%; margin: 0 auto; background: #f6ecd2; border: 1.5px solid #b58b4a; border-radius: 6px 22px 6px 6px; padding: 12px 16px; transform: rotate(-3deg); box-shadow: 0 5px 12px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; gap: 2px; font-family: 'Segoe Script', 'Bradley Hand', cursive; color: #3b3a6b; }
 .at-label b { font-family: Georgia, serif; color: #6b4a12; letter-spacing: 0.1em; font-size: 13px; }
 .at-label em { font-style: normal; font-size: 16px; color: #9c2a1a; }
@@ -923,10 +958,12 @@ const CSS = `
 .at-photo img { width: 100%; display: block; }
 @keyframes at-hang { from { transform: rotate(-12deg) translateY(-12px); opacity: 0; } to { transform: rotate(-3deg); opacity: 1; } }
 .at-onbench.radio { width: 16% !important; top: 75% !important; }
+.at-onbench.voilier { width: 13% !important; top: 72% !important; }
 .at-onbench { position: absolute; left: 58%; top: 77%; width: 8%; transform: translate(-50%, -50%) rotate(-12deg); filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
 .at-project { display: flex; gap: 12px; align-items: center; background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; }
 .at-project-watch { width: 54px; flex: none; }
 .at-project-watch.radio { width: 84px; }
+.at-project-watch.voilier { width: 64px; }
 .at-warn { color: #d9822b !important; font-weight: 600; }
 .at-shelves { position: absolute; left: 52%; top: 6%; width: 48%; height: 62%; background: radial-gradient(ellipse at 60% 40%, rgba(255, 214, 140, 0.35), transparent 65%); mix-blend-mode: screen; pointer-events: none; }
 .at-project-txt { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--gray-300); min-width: 0; flex: 1; }

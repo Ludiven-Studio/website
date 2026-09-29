@@ -162,10 +162,28 @@ try {
 	await next(); await sleep(500);
 	await shot('26-broadcast');
 	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
 	await page.locator('.at-scene').scrollIntoViewIfNeeded();
 	await shot('27-atelier-ch2-done');
 	await page.locator('.at-tab', { hasText: 'Établi' }).click();
-	await shot('28-locals');
+	await shot('28-voilier-orders');
+	// Chapter 3: Lucas's sailboat, then Lucile's box comes in.
+	await deliverStory(['soin:3', 'outil:3'], '29-voilier-1');
+	await next(); await sleep(400);
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await page.locator('.at-up', { hasText: 'menuiserie' }).locator('.at-btn').click();
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	await shot('30-coffre-on-board');
+	await deliverStory(['bois:4', 'meca:3'], '31-voilier-2');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['bois:4', 'soin:4'], '32-voilier-3');
+	for (let k = 0; k < 2; k++) { await next(); await sleep(400); }
+	await shot('33-lucile-box');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await page.locator('.at-scene').scrollIntoViewIfNeeded();
+	await shot('34-atelier-ch3-done');
 	await browser.close();
 } finally {
 	server.stop();

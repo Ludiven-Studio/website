@@ -2,9 +2,9 @@
 // orders, the workshop. Pure data, no logic, so a sim script and the tests read the same
 // tables as the game. The story behind it: docs/atelier-scenario.md.
 
-export type ChainId = 'outil' | 'soin' | 'meca' | 'elec';
-export type GenId = 'boite' | 'tiroir' | 'caisse';
-export type ProjectId = 'montre' | 'radio';
+export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois';
+export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre';
+export type ProjectId = 'montre' | 'radio' | 'voilier';
 
 export interface Chain {
 	id: ChainId;
@@ -42,6 +42,13 @@ export const CHAINS: Record<ChainId, Chain> = {
 		family: 'Électricité',
 		gen: 'caisse',
 		items: ['Fusible', 'Bobine de fil', 'Ampoule', 'Lampe radio', 'Transformateur'],
+		sell: 1,
+	},
+	bois: {
+		id: 'bois',
+		family: 'Menuiserie',
+		gen: 'coffre',
+		items: ['Chute de bois', 'Planche', 'Pièce taillée', 'Cadre', 'Structure assemblée'],
 		sell: 1,
 	},
 };
@@ -90,6 +97,17 @@ export const GENERATORS: Record<GenId, Generator> = {
 		chargeMs: 8_000,
 		unlock: 'etageres',
 	},
+	coffre: {
+		id: 'coffre',
+		name: 'Coffre du menuisier',
+		out: [
+			{ chain: 'bois', w: 80 },
+			{ chain: 'bois', level: 2, w: 20 },
+		],
+		charges: 12,
+		chargeMs: 8_000,
+		unlock: 'menuiserie',
+	},
 };
 
 export const COLS = 7;
@@ -112,7 +130,7 @@ export interface Line {
 	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'moi' | 'note';
 	text: string;
 	/** Shown in place of the object while this line is on screen: the clue the line talks about. */
-	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast';
+	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box';
 }
 
 /** Reached once a project has delivered `step` restoration steps. */
@@ -159,6 +177,19 @@ export const PROJECTS: Project[] = [
 			{ who: 'garnier', text: 'Vous avez fait des merveilles avec la montre d’Henri. Ma radio, elle, se tait depuis des années.' },
 			{ who: 'garnier', text: 'J’écoutais l’émission du port en cousant. Il paraît que la radio locale rediffuse ses vieilles archives, le dimanche.' },
 			{ who: 'moi', text: 'Coffret poussiéreux, lampe grillée, aiguille bloquée… Elle va rechanter, promis.' },
+		],
+	},
+	{
+		id: 'voilier',
+		chapter: 3,
+		object: 'Voilier',
+		title: 'Le voilier de Lucas',
+		client: 'Lucas',
+		steps: 3,
+		arrival: [
+			{ who: 'lucas', text: 'Mon grand-père me l’avait construit quand j’étais petit. Il n’a jamais navigué : le mât s’est cassé le premier jour.' },
+			{ who: 'lucas', text: 'Il disait toujours : « Un bon capitaine ramène tout son équipage. » J’aimerais le faire naviguer au bassin, pour lui.' },
+			{ who: 'moi', text: 'Coque fendue, mât brisé, voiles en lambeaux… On va le remettre à flot.' },
 		],
 	},
 ];
@@ -363,7 +394,91 @@ export const ORDERS: Order[] = [
 				{ who: 'note', text: '« … et voici nos Pirates du retour : Jeanne, Lucile et Henri ! Mademoiselle Lucile, qu’est-ce que vous rendez, au juste ? »', show: 'broadcast' },
 				{ who: 'moi', text: 'Lucile ? Jeanne avait une sœur ? Et… des pirates ?' },
 				{ who: 'garnier', text: 'Je vous dois une vérité. J’ai chez moi une boîte que Jeanne m’avait confiée pour sa sœur. Je n’ai jamais osé l’envoyer. Je vous l’apporterai.' },
-				{ who: 'note', text: 'Fin du chapitre 2. La suite de l’histoire arrive bientôt ; en attendant, le quartier passe avec ses commandes.' },
+				{ who: 'note', text: 'Fin du chapitre 2.' },
+			],
+		},
+	},
+
+	// ---- Chapter 3: Lucas's sailboat, a breather; Lucile's box comes in at the end ----
+	{
+		id: 'voilier-1',
+		kind: 'story',
+		client: 'Lucas',
+		ask: 'Nettoyer et poncer la coque.',
+		needs: ['soin:3', 'outil:3'],
+		reward: { coins: 14, rep: 3, energy: 10 },
+		when: { project: 'radio', step: 3 },
+		project: 'voilier',
+		step: 1,
+		scene: {
+			title: 'La coque',
+			lines: [
+				{ who: 'note', text: 'Sous le socle, une dédicace au crayon, presque effacée : « Au capitaine du retour ».', show: 'dedication' },
+				{ who: 'lucas', text: 'Le capitaine du retour… Grand-père racontait les « Pirates du retour » comme une vieille histoire du port. Je croyais qu’il l’inventait.' },
+			],
+		},
+	},
+	{
+		id: 'boulangere-1',
+		kind: 'short',
+		client: 'La boulangère',
+		ask: 'Une ampoule pour ma vitrine.',
+		needs: ['elec:3'],
+		reward: { coins: 12, rep: 1 },
+		when: { project: 'voilier', step: 1 },
+	},
+	{
+		id: 'chen-3',
+		kind: 'short',
+		client: 'Mlle Chen',
+		ask: 'Une planche pour une étagère de brocante.',
+		needs: ['bois:2'],
+		reward: { coins: 10, rep: 1 },
+		after: 'menuiserie',
+	},
+	{
+		id: 'voilier-2',
+		kind: 'story',
+		client: 'Lucas',
+		ask: 'Réparer le mât et le gouvernail.',
+		needs: ['bois:4', 'meca:3'],
+		reward: { coins: 16, rep: 3, energy: 10 },
+		after: 'menuiserie',
+		project: 'voilier',
+		step: 2,
+		scene: {
+			title: 'Le mât',
+			lines: [
+				{ who: 'note', text: 'Le mât redressé tient droit, le gouvernail tourne sans forcer. Il ne manque plus que les voiles.' },
+				{ who: 'lucas', text: 'Il a l’air d’un vrai bateau, maintenant. Grand-père serait fier.' },
+			],
+		},
+	},
+	{
+		id: 'morel-4',
+		kind: 'short',
+		client: 'M. Morel',
+		ask: 'Un rouage pour la pendule de mon salon.',
+		needs: ['meca:4'],
+		reward: { coins: 14, rep: 1 },
+		when: { project: 'voilier', step: 2 },
+	},
+	{
+		id: 'voilier-3',
+		kind: 'story',
+		client: 'Lucas',
+		ask: 'Recoudre et hisser les voiles.',
+		needs: ['bois:4', 'soin:4'],
+		reward: { coins: 22, rep: 5, energy: 10, cocoins: 10 },
+		project: 'voilier',
+		step: 3,
+		scene: {
+			title: 'Au bassin',
+			lines: [
+				{ who: 'note', text: 'Au bassin du quartier, le petit voilier file droit sous le vent. Des enfants courent le long du bord.' },
+				{ who: 'lucas', text: 'Il navigue ! Et il revient tout seul vers moi. Un bon capitaine…' },
+				{ who: 'garnier', text: 'Tenez. La boîte de Lucile. Je l’ai gardée soixante ans sans oser l’envoyer. C’est à vous de l’ouvrir, maintenant.', show: 'box' },
+				{ who: 'note', text: 'Fin du chapitre 3. La boîte à ouvrage de Lucile attend sur l’établi. Son tiroir est bloqué.' },
 			],
 		},
 	},
@@ -405,6 +520,7 @@ export const UPGRADES: Upgrade[] = [
 	{ id: 'lampe', name: 'Rallumer la lampe', desc: 'La vieille lampe de Jeanne éclaire à nouveau l’établi.', cost: 20, when: { project: 'montre', step: 1 }, rep: 2 },
 	{ id: 'photo', name: 'Accrocher la photo', desc: 'La photo de 1961, remise au mur, bien en vue.', cost: 15, when: { project: 'montre', step: 3 }, rep: 3 },
 	{ id: 'etageres', name: 'Ouvrir les étagères', desc: 'Les étagères de Jeanne, et sa caisse d’électricien.', cost: 25, when: { project: 'radio', step: 1 }, rep: 2 },
+	{ id: 'menuiserie', name: 'Aménager le coin menuiserie', desc: 'Le coffre du menuisier et un bout d’établi pour le bois.', cost: 30, when: { project: 'voilier', step: 1 }, rep: 2 },
 ];
 
 /** Board at a fresh start: both generators, and a few pieces to show what a merge is. */

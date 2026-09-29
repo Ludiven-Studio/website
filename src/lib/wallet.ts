@@ -156,6 +156,21 @@ export function earn(amount: number): number {
 	return w.balance;
 }
 
+/** Pay a one-time gift keyed by `id` (atelier story rewards). Idempotent across tabs and reloads:
+ *  the key is stored with the balance, in the same write. Returns false if it was already paid. */
+export function earnOnce(id: string, amount: number): boolean {
+	const key = `paid:${id}`;
+	cache = null; // another tab may have paid it a moment ago
+	const w = read();
+	if (w.owned.includes(key) || amount <= 0) return false;
+	const gain = Math.round(amount);
+	w.balance += gain;
+	w.owned.push(key);
+	write(w);
+	announceGain(gain);
+	return true;
+}
+
 export const owns = (id: string): boolean => read().owned.includes(id);
 export const ownedBlasons = (): Blason[] => { const o = read().owned; return BLASONS.filter((b) => o.includes(b.id)); };
 export const equippedBlason = (): Blason | null => { const e = read().equipped; return BLASONS.find((b) => b.id === e) ?? null; };

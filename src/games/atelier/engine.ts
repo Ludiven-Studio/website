@@ -256,6 +256,7 @@ export function move(s: State, from: number, to: number): { s: State; kind: Move
 		n.board[to] = code(i.chain, i.level + 1);
 		n.board[from] = null;
 		n.stats.merges++;
+		placeGens(n);
 		if (n.tut === 1) n.tut = 2;
 		return { s: n, kind, piece: n.board[to]! };
 	}
@@ -340,7 +341,8 @@ const campaignDone = (s: State): boolean =>
 export function shortOrders(s: State): Order[] {
 	const left = campaignShortsLeft(s);
 	if (left.length) return left.filter((o) => open(s, o)).slice(0, 2);
-	return s.endless;
+	// A migrated v1 save may still hold neighbourhood orders: they wait for the campaign's end too.
+	return campaignDone(s) ? s.endless : [];
 }
 
 export const activeOrders = (s: State): Order[] => {
