@@ -214,6 +214,15 @@ export function buyCar(id: string, price: number): boolean {
 	return true;
 }
 
+/** Spend cocoins on a consumable (atelier energy). Returns false if the balance is short. */
+export function spend(amount: number): boolean {
+	const w = read();
+	if (amount <= 0 || w.balance < amount) return false;
+	w.balance -= amount;
+	write(w);
+	return true;
+}
+
 export const hasUnlock = (gameId: string): boolean => read().owned.includes(unlockId(gameId));
 
 /** Buy a game's Expert pack. Returns true on success (or if already owned). */

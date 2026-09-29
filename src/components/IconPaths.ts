@@ -12,6 +12,7 @@
  */
 
 export const iconPaths = {
+	atelier: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M100 66 108 24h40l8 42M100 190l8 42h40l8-42"/><circle cx="128" cy="128" r="66" fill="none" stroke-width="16"/><path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M128 94v34l22 14"/>',
 	alchimie: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M96 40h64M112 40v56L58 186a16 16 0 0 0 14 30h112a16 16 0 0 0 14-30l-54-90V40"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M78 152h100"/><circle stroke="none" cx="112" cy="176" r="9"/><circle stroke="none" cx="150" cy="192" r="7"/>',
 	'2048': '<rect x="36" y="36" width="184" height="184" rx="24" fill="none" stroke-linejoin="round" stroke-width="16"/><rect x="70" y="70" width="52" height="52" rx="10" fill="none" stroke-linejoin="round" stroke-width="12"/><rect x="134" y="70" width="52" height="52" rx="10" fill="none" stroke-linejoin="round" stroke-width="12"/><rect x="70" y="134" width="52" height="52" rx="10" stroke="none"/><rect x="134" y="134" width="52" height="52" rx="10" fill="none" stroke-linejoin="round" stroke-width="12"/>',
 	'cocottes-renards': '<circle stroke="none" cx="102" cy="64" r="20"/><circle stroke="none" cx="140" cy="56" r="22"/><circle cx="124" cy="142" r="72" fill="none" stroke-linejoin="round" stroke-width="16"/><path stroke="none" d="M196 128 246 144 196 168Z"/><circle stroke="none" cx="150" cy="128" r="11"/>',

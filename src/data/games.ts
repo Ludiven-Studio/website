@@ -461,6 +461,14 @@ export const games: GameTile[] = [
 		status: 'play',
 	},
 	{
+		id: 'atelier',
+		title: 'L\'Atelier des Souvenirs',
+		pitch: 'Rouvre l\'atelier de ta grand-mère : fusionne outils et pièces sur l\'établi, honore les commandes du quartier et restaure pas à pas la montre de M. Morel. Chaque réparation révèle un souvenir.',
+		icon: 'atelier',
+		href: '/jeux/atelier',
+		status: 'play',
+	},
+	{
 		id: 'pong',
 		title: 'Pong',
 		pitch: 'Pong en temps réel à 2 : partie rapide, avec un code entre amis, ou solo contre l\'ordi.',

@@ -46,6 +46,7 @@ export const THEMES = {
 
 	// Arcade & skill
 	bulles: 'an underwater reef scene, glossy colourful bubbles rising through turquoise water, soft rays of light',
+	atelier: 'a cosy old watchmaker workshop, wooden workbench with brass gears and small tools, shelves of antique clocks, warm lamp light through a dusty window',
 	'casse-briques': 'a neon arcade wall of glowing bricks, retro grid floor, purple and cyan lights',
 	snake: 'a lush jungle clearing with red apples on the ground, vines and big leaves, dappled sunlight',
 	tempo: 'a neon concert stage with glowing piano keys and speaker stacks, purple and cyan spotlights',

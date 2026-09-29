@@ -1,0 +1,14 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import AtelierGame from '../../games/atelier/AtelierGame.tsx';
+---
+
+<GamePage
+	title="L'Atelier des Souvenirs | Jeux Ludiven Studio"
+	description="L'Atelier des Souvenirs : rouvre l'atelier de ta grand-mère, fusionne outils et pièces sur l'établi, honore les commandes du quartier et restaure la montre de M. Morel. Chaque réparation révèle un souvenir. Un jeu de fusion signé Ludiven Studio."
+	heading="L'Atelier des Souvenirs"
+	tagline="Répare les objets auxquels les gens tiennent"
+	gameId="atelier"
+>
+	<AtelierGame client:only="react" gameId="atelier" />
+</GamePage>

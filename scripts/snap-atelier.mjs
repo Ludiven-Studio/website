@@ -1,0 +1,140 @@
+/* Play the Atelier des Souvenirs opening on a phone viewport and screenshot every beat:
+   intro, first tap, first merge, first delivery, the bench upgrade, the watch's arrival.
+   Also fails loudly on any console error.
+
+   Usage: node scripts/snap-atelier.mjs [out dir]   (default D:/tmp/atelier) */
+import { chromium } from 'playwright';
+import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { startServer } from './preview-server.mjs';
+
+const OUT = resolve(process.argv[2] ?? 'D:/tmp/atelier');
+await mkdir(OUT, { recursive: true });
+const PORT = 4361;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const server = await startServer(PORT, { mode: 'dev' });
+const errors = [];
+try {
+	const browser = await chromium.launch();
+	const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
+	await ctx.addInitScript(() => localStorage.setItem('ludiven-tuto-seen', '["atelier"]'));
+	const page = await ctx.newPage();
+	// The dev server has no sw.js: its registration 404 is not the game's.
+	page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('fetching the script')) errors.push(m.text()); });
+	page.on('pageerror', (e) => errors.push(e.message));
+	page.on('response', (r) => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
+	const shot = async (name) => { await sleep(450); await page.screenshot({ path: `${OUT}/${name}.png` }); console.log('shot', name); };
+
+	await page.goto(`http://localhost:${PORT}/jeux/atelier/`, { waitUntil: 'networkidle' });
+	await page.waitForSelector('.at-root');
+	await page.locator('.at-root').scrollIntoViewIfNeeded();
+	await shot('01-intro');
+	// Read through the intro.
+	while (await page.locator('.at-talk').count()) {
+		await page.locator('.at-talk-nav .at-btn:not(.ghost)').click();
+		await sleep(150);
+	}
+	await page.locator('.at-hud').scrollIntoViewIfNeeded();
+	await shot('02-board');
+
+	const cellBox = async (i) => page.locator('.at-cell').nth(i).boundingBox();
+	const tap = async (i) => { const b = await cellBox(i); await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2); await sleep(250); };
+	const dragCells = async (a, b) => {
+		const A = await cellBox(a), B = await cellBox(b);
+		await page.mouse.move(A.x + A.width / 2, A.y + A.height / 2);
+		await page.mouse.down();
+		for (let k = 1; k <= 10; k++) {
+			await page.mouse.move(A.x + A.width / 2 + ((B.x - A.x) * k) / 10, A.y + A.height / 2 + ((B.y - A.y) * k) / 10);
+			await sleep(16);
+		}
+		await page.mouse.up();
+		await sleep(300);
+	};
+	const board = async () => page.evaluate(() => JSON.parse(localStorage.getItem('ludiven-atelier')).board);
+
+	const boite = (await board()).indexOf('g:boite');
+	await tap(boite);
+	await shot('03-first-tap');
+	let b = await board();
+	const outils = b.map((p, i) => (p === 'outil:1' ? i : -1)).filter((i) => i >= 0);
+	console.log('outil:1 cells', outils);
+	await dragCells(outils[0], outils[1]);
+	await shot('04-merged');
+	await page.locator('.at-give:not([disabled])').first().click();
+	await shot('05-delivered');
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await shot('06-atelier-dusty');
+	await page.locator('.at-up .at-btn').first().click();
+	await shot('07-arrival');
+	while (await page.locator('.at-talk').count()) {
+		await page.locator('.at-talk-nav .at-btn:not(.ghost)').click();
+		await sleep(150);
+	}
+	await shot('08-orders');
+	// Tap an item to show the info panel.
+	b = await board();
+	const any = b.findIndex((p) => p && !p.startsWith('g:'));
+	if (any >= 0) { await tap(any); await shot('09-info'); }
+	// Drag the tray toward the generator to see a drag in flight.
+	const tiroir = b.indexOf('g:tiroir');
+	await tap(tiroir);
+	await tap(tiroir);
+	await shot('10-tiroir');
+	await page.locator('.at-energy').click();
+	await shot('11-energy');
+	await page.locator('.at-card .at-btn.ghost').click();
+
+	// Jump the story forward by editing the save, then look at the workshop at each stage.
+	const patch = async (fn) => {
+		await page.evaluate(fn);
+		await page.reload({ waitUntil: 'networkidle' });
+		await page.waitForSelector('.at-root');
+		await page.locator('.at-hud').scrollIntoViewIfNeeded();
+	};
+	await patch(() => {
+		const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
+		st.board[0] = 'soin:3';
+		localStorage.setItem('ludiven-atelier', JSON.stringify(st));
+	});
+	await page.locator('.at-order.story .at-give').click();
+	await sleep(1400);
+	await shot('12-restore-1');
+	while (await page.locator('.at-talk').count()) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(150); }
+	await patch(() => {
+		const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
+		st.coins = 200; st.board[0] = 'outil:4'; st.board[1] = 'meca:5';
+		localStorage.setItem('ludiven-atelier', JSON.stringify(st));
+	});
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await page.locator('.at-up', { hasText: 'lampe' }).locator('.at-btn').click();
+	await shot('13-atelier-lamp');
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	await page.locator('.at-order.story .at-give').click();
+	await sleep(1400);
+	await shot('14-restore-2');
+	while (await page.locator('.at-talk').count()) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(150); }
+	await patch(() => {
+		const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
+		st.board[0] = 'soin:4'; st.board[1] = 'meca:3';
+		localStorage.setItem('ludiven-atelier', JSON.stringify(st));
+	});
+	await page.locator('.at-order.story .at-give').click();
+	await sleep(1400);
+	await shot('15-restore-3');
+	for (let k = 0; k < 2; k++) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(200); }
+	await shot('16-restore-3-reveal');
+	while (await page.locator('.at-talk').count()) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(150); }
+	await shot('17-atelier-done');
+	await page.locator('.at-up', { hasText: 'photo' }).locator('.at-btn').click();
+	await shot('18-epilogue');
+	while (await page.locator('.at-talk').count()) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(150); }
+	await page.locator('.at-scene').scrollIntoViewIfNeeded();
+	await shot('19-atelier-final');
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	await shot('20-locals');
+	await browser.close();
+} finally {
+	server.stop();
+}
+if (errors.length) { console.log('ERRORS:\n' + errors.join('\n')); process.exitCode = 1; }
+else console.log('no console errors');

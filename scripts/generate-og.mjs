@@ -244,6 +244,26 @@ async function main() {
 		},
 		// A fresh arena is four tiny home squares. Drive a full circle so the shot shows
 		// the trail closing and the captured patch that follows.
+		// A fresh save is an empty bench under the intro dialogue. Load a mid-chapter bench:
+		// the watch order open, a spread of chains and a few pairs ready to merge.
+		atelier: async () => {
+			await page.evaluate(() => {
+				const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
+				const put = {
+					1: 'outil:1', 2: 'outil:1', 4: 'soin:2', 5: 'meca:4', 8: 'soin:1', 10: 'outil:3', 12: 'meca:2',
+					15: 'outil:2', 16: 'meca:1', 17: 'meca:1', 19: 'soin:3', 22: 'soin:1', 24: 'meca:3', 26: 'outil:4',
+					36: 'meca:5', 38: 'soin:2', 40: 'outil:2', 43: 'meca:2', 45: 'soin:4', 50: 'outil:1', 52: 'meca:1',
+				};
+				for (const [i, p] of Object.entries(put)) st.board[Number(i)] = p;
+				Object.assign(st, { seen: ['intro', 'arrival'], tut: 4, upgrades: ['etabli'], step: 1, coins: 34, energy: 48, done: ['garnier-1', 'lucas-1', 'morel-1'] });
+				localStorage.setItem('ludiven-atelier', JSON.stringify(st));
+			});
+			await page.reload({ waitUntil: 'networkidle' });
+			await page.addStyleTag({ content: `nav, footer, .game-head, .lbc-root, .game-foot { display: none !important; }
+				.game-page { max-width: none !important; width: 100vw; min-height: 100vh; margin: 0 !important; padding: 0 !important; display: flex; align-items: center; justify-content: center; }
+				.at-root { zoom: 0.62; }` });
+			await sleep(800);
+		},
 		bolides: async () => {
 			// A fresh arena is four tiny home squares — nothing to look at. Let the bots
 			// paint it instead of steering: any loop we could drive blind closes on our own
