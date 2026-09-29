@@ -14,6 +14,13 @@ traiter lui-même : `node scripts/codex-agent.mjs <id>`, qui lance `codex exec` 
 - Claude lit la réponse, écrit « ## Suite », intègre et clôt. L'utilisateur n'arbitre que les désaccords.
 Une session Codex ouverte par l'utilisateur reste possible : elle suit les mêmes tickets.
 
+**Économiser le quota Codex** (limité par l'abonnement de l'utilisateur, épuisé le 29/09 vers 10 h 20) :
+- un ticket cite les fichiers à lire ; la consigne du lanceur interdit d'explorer le reste du dépôt ;
+- regrouper les images d'un même besoin dans un seul ticket, une génération par image ;
+- réserver Codex aux images et aux regards critiques ; le reste, Claude le fait ;
+- quota épuisé : le lanceur sort en code 3 et note l'heure de reprise dans « ## Suite ». Ne pas utiliser la
+  réinitialisation offerte par OpenAI sans l'accord de l'utilisateur.
+
 ## Rôles par défaut (ajustables par l'utilisateur)
 - **Claude Code** : code, intégration dans le site, tests, équilibrage, scripts Playwright.
 - **Codex** : génération d'images, regard critique (challenger une idée, relire un design, proposer).

@@ -9,6 +9,9 @@
    Status goes open → in-progress → answered (or back to open on failure). Full event log in
    D:/tmp/codex-runs/.
 
+   Exit codes: 0 answered, 1 failed, 2 bad ticket, 3 plan quota spent (reset time noted in the ticket).
+   To save quota the prompt restricts reads to the files the ticket cites: write tickets that name them.
+
    Usage: node scripts/codex-agent.mjs <ticket id> [--timeout <min>] [--model <name>] */
 import { spawn } from 'node:child_process';
 import { readFile, writeFile, readdir, stat, mkdir } from 'node:fs/promises';
@@ -59,8 +62,11 @@ const write = type === 'image';
 
 const prompt = `Tu es Codex, sous-agent de Claude Code (orchestrateur) dans ce dépôt. L'utilisateur n'est pas là : ne pose pas de question, fais au mieux et signale les limites.
 
-Lis .collab/README.md, puis traite le ticket .collab/tickets/${file}.
+Traite le ticket .collab/tickets/${file}.
 Règles de cette exécution :
+- Économise ton quota : lis le ticket, puis UNIQUEMENT les fichiers qu'il cite (et seulement les passages utiles).
+  N'explore pas le dépôt, ne relis ni le protocole, ni les journaux, ni les autres tickets. Pas de vérification
+  superflue : une seule génération par image demandée, sauf défaut évident.
 - ${write
 		? `Tu peux créer ou modifier des fichiers UNIQUEMENT dans : ${files}. Crée le dossier si besoin. Rien d'autre, ni le ticket ni ton journal. La copie que ton outil d'images garde d'office dans ~/.codex/generated_images/ est autorisée : ce n'est pas une écriture dans le dépôt.`
 		: 'Bac à sable en lecture seule : ne tente aucune écriture.'}
@@ -68,6 +74,12 @@ Règles de cette exécution :
 - Ta réponse finale est recopiée telle quelle dans la section « ## Réponse » du ticket : écris-la en français,
   en Markdown, directement utilisable (pas de préambule du type « Voici ma réponse »).
 ${write ? '- Termine par la liste exacte des fichiers écrits, avec leurs dimensions.' : ''}`;
+
+/** Last token counts reported by `codex exec --json`, for the per-run usage line. */
+function usageOf(jsonl) {
+	const m = [...jsonl.matchAll(/"usage":\{"input_tokens":(\d+),"cached_input_tokens":(\d+)[^}]*"output_tokens":(\d+)/g)].pop();
+	return m ? { input: Number(m[1]), cached: Number(m[2]), output: Number(m[3]) } : null;
+}
 
 await mkdir(LOGS, { recursive: true });
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -95,9 +107,22 @@ const code = await new Promise((done) => {
 });
 
 const answer = existsSync(out) ? (await readFile(out, 'utf8')).trim() : '';
+const raw = await readFile(log, 'utf8');
+const u = usageOf(raw);
+if (u) console.log(`usage: ${u.input} input tokens (${Math.round((u.cached / Math.max(1, u.input)) * 100)} % cached), ${u.output} output`);
 text = await readFile(path, 'utf8'); // Codex may not touch it, but never clobber a concurrent edit.
 if (code !== 0 || !answer) {
+	// A spent plan quota is not a bug in the ticket: say so, with the reset time, instead of a bare exit 1.
+	const limit = raw.match(/usage limit[^"]*?try again at ([^".]+)/i);
 	await setStatus('open');
+	if (limit) {
+		const day = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Paris' }).slice(0, 16);
+		text = await readFile(path, 'utf8');
+		text = text.replace(/## Suite\n/, `## Suite\n\nCodex, ${day} : quota épuisé, reprise possible à ${limit[1].trim()}.\n`);
+		await writeFile(path, text);
+		console.error(`codex quota spent: retry at ${limit[1].trim()}. Ticket back to open.`);
+		process.exit(3);
+	}
 	console.error(`codex failed (exit ${code}), ticket back to open. See ${log}`);
 	process.exit(1);
 }
