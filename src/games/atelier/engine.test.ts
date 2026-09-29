@@ -215,6 +215,11 @@ describe('orders', () => {
 		s = buyUpgrade(s, 'menuiserie');
 		for (const id of ['chen-3', 'voilier-2', 'morel-4', 'voilier-3']) s = give(s, id);
 		expect(stepOf(s, 'voilier')).toBe(3);
+		for (const id of ['boite-1', 'lucas-4', 'boite-2', 'chen-4']) s = give(s, id);
+		expect(storyOrder(s)).toBeNull(); // the box's last step waits for the office to be opened
+		s = buyUpgrade(s, 'bureau');
+		s = give(s, 'boite-3');
+		expect(stepOf(s, 'boite')).toBe(3);
 		expect(storyOrder(s)).toBeNull();
 		const locals = shortOrders(s);
 		expect(locals.length).toBe(2);
@@ -228,7 +233,7 @@ describe('orders', () => {
 
 describe('generators behind upgrades', () => {
 	it('the crate lands on the board when the shelves are bought, and waits on a full board', () => {
-		const base = { ...newGame(T0), coins: 100, progress: { montre: 3, radio: 1, voilier: 0 } };
+		const base = { ...newGame(T0), coins: 100, progress: { ...newGame(T0).progress, montre: 3, radio: 1, voilier: 0 } };
 		expect(base.board).not.toContain('g:caisse');
 		const full = { ...base, board: base.board.map((p) => p ?? 'meca:6') };
 		const bought = buyUpgrade(full, 'etageres');
@@ -241,7 +246,7 @@ describe('generators behind upgrades', () => {
 	});
 
 	it('a merge frees a cell for a generator waiting on a full board (ticket 0007)', () => {
-		const base = { ...newGame(T0), coins: 100, progress: { montre: 3, radio: 1, voilier: 0 } };
+		const base = { ...newGame(T0), coins: 100, progress: { ...newGame(T0).progress, montre: 3, radio: 1, voilier: 0 } };
 		const full = { ...base, board: base.board.map((p) => p ?? 'meca:6') };
 		full.board[0] = 'outil:1'; full.board[1] = 'outil:1';
 		const bought = buyUpgrade(full, 'etageres');
@@ -252,13 +257,13 @@ describe('generators behind upgrades', () => {
 
 	it('neighbourhood orders kept by a migrated save wait for the end of the campaign (ticket 0007)', () => {
 		const q = { id: 'q1', kind: 'short' as const, client: 'Lucas', ask: '?', needs: ['meca:2'], reward: { coins: 5, rep: 1 } };
-		const s = { ...newGame(T0), progress: { montre: 3, radio: 2, voilier: 0 }, done: ORDERS.filter((o) => o.kind === 'short').map((o) => o.id), endless: [q], upgrades: ['etabli', 'photo', 'etageres'] };
+		const s = { ...newGame(T0), progress: { ...newGame(T0).progress, montre: 3, radio: 2, voilier: 0 }, done: ORDERS.filter((o) => o.kind === 'short').map((o) => o.id), endless: [q], upgrades: ['etabli', 'photo', 'etageres'] };
 		expect(activeOrders(s).map((o) => o.id)).not.toContain('q1');
 		expect(deliver({ ...s, board: s.board.map((p, i) => (i === 0 ? 'meca:2' : p)) }, 'q1').ok).toBe(false);
 	});
 
 	it('neighbourhood orders only ask for chains whose generator is on the board', () => {
-		let s: State = { ...newGame(T0, 11), progress: { montre: 3, radio: 3, voilier: 3 }, done: ORDERS.map((o) => o.id) };
+		let s: State = { ...newGame(T0, 11), progress: { ...newGame(T0).progress, montre: 3, radio: 3, voilier: 3 }, done: ORDERS.map((o) => o.id) };
 		const n = buyUpgrade({ ...s, coins: 100 }, 'photo'); // refill runs on purchase
 		s = n;
 		for (const o of shortOrders(s)) for (const p of o.needs) expect(parse(p)!.chain).not.toBe('elec');

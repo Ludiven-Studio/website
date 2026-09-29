@@ -4,7 +4,7 @@
 
 export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois';
 export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre';
-export type ProjectId = 'montre' | 'radio' | 'voilier';
+export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite';
 
 export interface Chain {
 	id: ChainId;
@@ -130,7 +130,7 @@ export interface Line {
 	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'moi' | 'note';
 	text: string;
 	/** Shown in place of the object while this line is on screen: the clue the line talks about. */
-	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box';
+	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box' | 'key' | 'office' | 'map';
 }
 
 /** Reached once a project has delivered `step` restoration steps. */
@@ -190,6 +190,19 @@ export const PROJECTS: Project[] = [
 			{ who: 'lucas', text: 'Mon grand-père me l’avait construit quand j’étais petit. Il n’a jamais navigué : le mât s’est cassé le premier jour.' },
 			{ who: 'lucas', text: 'Il disait toujours : « Un bon capitaine ramène tout son équipage. » J’aimerais le faire naviguer au bassin, pour lui.' },
 			{ who: 'moi', text: 'Coque fendue, mât brisé, voiles en lambeaux… On va le remettre à flot.' },
+		],
+	},
+	{
+		id: 'boite',
+		chapter: 4,
+		object: 'Boîte',
+		title: 'La boîte de Lucile',
+		client: 'Mme Garnier',
+		steps: 3,
+		arrival: [
+			{ who: 'garnier', text: 'Jeanne me l’a confiée au printemps 1962, pour Lucile. « Quand elle reviendra », disait-elle. Lucile n’est jamais revenue.' },
+			{ who: 'garnier', text: 'Le tiroir est bloqué depuis toujours. Je n’ai jamais voulu le forcer.' },
+			{ who: 'moi', text: 'Marqueterie encrassée, charnière cassée, tiroir coincé… On va l’ouvrir sans rien abîmer.' },
 		],
 	},
 ];
@@ -482,6 +495,82 @@ export const ORDERS: Order[] = [
 			],
 		},
 	},
+
+	// ---- Chapter 4: Lucile's box, the key, and Jeanne's office ----
+	{
+		id: 'boite-1',
+		kind: 'story',
+		client: 'Mme Garnier',
+		ask: 'Nettoyer la marqueterie.',
+		needs: ['soin:4', 'outil:3'],
+		reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'voilier', step: 3 },
+		project: 'boite',
+		step: 1,
+		scene: {
+			title: 'La marqueterie',
+			lines: [
+				{ who: 'note', text: 'Sous la crasse, la marqueterie du couvercle réapparaît : une pie, ailes ouvertes, en bois clair et en bois sombre.' },
+				{ who: 'garnier', text: 'Une pie… Jeanne en dessinait dans les marges de ses factures. Je n’ai jamais su pourquoi.' },
+			],
+		},
+	},
+	{
+		id: 'lucas-4',
+		kind: 'short',
+		client: 'Lucas',
+		ask: 'Une pièce taillée pour le socle du voilier.',
+		needs: ['bois:3'],
+		reward: { coins: 12, rep: 1 },
+		when: { project: 'boite', step: 1 },
+	},
+	{
+		id: 'boite-2',
+		kind: 'story',
+		client: 'Mme Garnier',
+		ask: 'Réparer les charnières et débloquer le tiroir.',
+		needs: ['bois:3', 'meca:4'],
+		reward: { coins: 16, rep: 3, energy: 10 },
+		project: 'boite',
+		step: 2,
+		scene: {
+			title: 'Le tiroir',
+			lines: [
+				{ who: 'note', text: 'Le tiroir cède enfin. Dedans : une lettre cachetée, « Pour Lucile », et une petite clé étiquetée « bureau ».', show: 'key' },
+				{ who: 'moi', text: 'La clé du bureau. Jeanne l’avait cachée là… pour que sa sœur puisse l’ouvrir.' },
+				{ who: 'garnier', text: 'Allez-y. Moi, je n’en ai jamais eu le courage. La lettre, en revanche, ce n’est pas à nous de la lire.' },
+			],
+		},
+	},
+	{
+		id: 'chen-4',
+		kind: 'short',
+		client: 'Mlle Chen',
+		ask: 'Un rouage pour une boîte à musique de brocante.',
+		needs: ['meca:4'],
+		reward: { coins: 14, rep: 1 },
+		when: { project: 'boite', step: 2 },
+	},
+	{
+		id: 'boite-3',
+		kind: 'story',
+		client: 'Mme Garnier',
+		ask: 'Remonter le couvercle et polir la boîte.',
+		needs: ['bois:4', 'soin:3'],
+		reward: { coins: 22, rep: 5, energy: 10, cocoins: 10 },
+		after: 'bureau',
+		project: 'boite',
+		step: 3,
+		scene: {
+			title: 'Pour Lucile',
+			lines: [
+				{ who: 'note', text: 'La boîte brille, prête à voyager. Vous y glissez la lettre de Jeanne, et un mot de vous.' },
+				{ who: 'garnier', text: 'Voilà l’adresse de Lucile. Je l’ai toujours gardée, sans jamais oser m’en servir.' },
+				{ who: 'note', text: 'Vous postez le colis. La réponse de Lucile mettra du temps à venir.' },
+				{ who: 'note', text: 'Fin du chapitre 4.' },
+			],
+		},
+	},
 ];
 
 export const INTRO: Line[] = [
@@ -513,6 +602,8 @@ export interface Upgrade {
 	/** Progress needed before it can be bought. */
 	when?: Gate;
 	rep: number;
+	/** Played once, when bought. */
+	scene?: { title: string; lines: Line[] };
 }
 
 export const UPGRADES: Upgrade[] = [
@@ -521,6 +612,24 @@ export const UPGRADES: Upgrade[] = [
 	{ id: 'photo', name: 'Accrocher la photo', desc: 'La photo de 1961, remise au mur, bien en vue.', cost: 15, when: { project: 'montre', step: 3 }, rep: 3 },
 	{ id: 'etageres', name: 'Ouvrir les étagères', desc: 'Les étagères de Jeanne, et sa caisse d’électricien.', cost: 25, when: { project: 'radio', step: 1 }, rep: 2 },
 	{ id: 'menuiserie', name: 'Aménager le coin menuiserie', desc: 'Le coffre du menuisier et un bout d’établi pour le bois.', cost: 30, when: { project: 'voilier', step: 1 }, rep: 2 },
+	{
+		id: 'bureau',
+		name: 'Ouvrir le bureau de Jeanne',
+		desc: 'La petite clé de la boîte de Lucile tourne dans la serrure.',
+		cost: 20,
+		when: { project: 'boite', step: 2 },
+		rep: 3,
+		scene: {
+			title: 'Le bureau de Jeanne',
+			lines: [
+				{ who: 'note', text: 'La clé tourne. Le bureau sent le papier et la cire. Tout est rangé, comme en attente.', show: 'office' },
+				{ who: 'note', text: 'Au mur, une carte marine : un îlot entouré de rouge, et trois morceaux de carte épinglés. Sur le bureau, un carnet de bord : celui de Rose Kerdoual, dite « la Pie », 1813.', show: 'map' },
+				{ who: 'moi', text: 'Jeanne ne réparait pas seulement des objets. Elle cherchait quelque chose… avec Lucile et Henri.' },
+				{ who: 'note', text: 'Sur une fiche, une pie dessinée à l’encre : « 4ᵉ morceau. Famille dépositaire. Chercher la pie. »' },
+				{ who: 'moi', text: 'Des pirates dans la famille… et une carte au trésor. Il faut que j’écrive à Lucile.' },
+			],
+		},
+	},
 ];
 
 /** Board at a fresh start: both generators, and a few pieces to show what a merge is. */

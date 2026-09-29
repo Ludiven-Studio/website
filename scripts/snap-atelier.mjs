@@ -184,6 +184,25 @@ try {
 	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
 	await page.locator('.at-scene').scrollIntoViewIfNeeded();
 	await shot('34-atelier-ch3-done');
+	// Chapter 4: Lucile's box, the key, the office.
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['soin:4', 'outil:3'], '35-boite-1');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['bois:3', 'meca:4'], '36-boite-2-key');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await page.locator('.at-up', { hasText: 'bureau' }).locator('.at-btn').click();
+	await sleep(600);
+	await shot('37-office-reveal');
+	await next(); await sleep(500);
+	await shot('38-office-map');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-office').scrollIntoViewIfNeeded();
+	await shot('39-office-panel');
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	await deliverStory(['bois:4', 'soin:3'], '40-boite-3');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
 	await browser.close();
 } finally {
 	server.stop();

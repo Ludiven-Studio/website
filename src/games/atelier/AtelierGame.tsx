@@ -12,6 +12,7 @@ import {
 import Watch, { WatchBack, WATCH_CSS } from './Watch';
 import Radio, { RADIO_CSS } from './Radio';
 import Voilier, { VOILIER_CSS } from './Voilier';
+import Boite, { MapPieces, BOITE_CSS } from './Boite';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
@@ -39,6 +40,7 @@ type Scene =
 function ObjectArt({ project, state }: Art) {
 	if (project === 'radio') return <Radio state={state} size="100%" />;
 	if (project === 'voilier') return <Voilier state={state} size="100%" />;
+	if (project === 'boite') return <Boite state={state} size="100%" />;
 	return <Watch state={state} size="100%" />;
 }
 
@@ -252,6 +254,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (s.tut === 3 && id === 'etabli') trackEvent('atelier:tutorial_step', { step: 4 });
 		let st = n;
 		const q: Scene[] = [];
+		const up = UPGRADES.find((u) => u.id === id);
+		if (up?.scene && !st.seen.includes(`up:${id}`)) q.push({ kind: 'talk', id: `up:${id}`, lines: up.scene.lines, title: up.scene.title });
 		if (id === 'photo' && !st.seen.includes('epilogue')) {
 			q.push({ kind: 'talk', id: 'epilogue', lines: EPILOGUE, title: 'Fin du chapitre 1' });
 			st = markSeen(st, 'chapter');
@@ -355,7 +359,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -620,6 +624,7 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmR
 				)}
 				{has('lampe') && <div className="at-lamp" />}
 				{has('etageres') && <div className="at-shelves" aria-label="Les étagères de Jeanne, rouvertes" />}
+				{has('bureau') && <div className="at-door-open" aria-label="La porte du bureau, ouverte" />}
 				{has('photo') && <div className="at-photo" aria-label="La photo de 1961"><img src={`${ART}/photo.jpg`} alt="" /></div>}
 				{started && step < project.steps && story && (
 					<div className={`at-onbench ${project.id}`}><ObjectArt project={project.id} state={step} /></div>
@@ -659,6 +664,17 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmR
 					</div>
 				)}
 			</div>
+
+			{has('bureau') && (
+				<section className="at-office" aria-label="Le bureau de Jeanne">
+					<div className="at-office-img small" />
+					<div className="at-office-txt">
+						<strong>Le bureau de Jeanne</strong>
+						<span>Le carnet de Rose « la Pie », 1813. Une carte marine, un îlot entouré de rouge. Une fiche : « Chercher la pie. »</span>
+						<div className="at-map small"><MapPieces count={3} /></div>
+					</div>
+				</section>
+			)}
 
 			<ul className="at-ups">
 				{UPGRADES.map((u) => {
@@ -745,6 +761,14 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 								<b>Lucile</b>
 							</div>
 						)}
+						{line.show === 'key' && (
+							<div className="at-keyletter" role="img" aria-label="Une lettre cachetée pour Lucile et une petite clé étiquetée bureau">
+								<span className="at-letter"><b>Pour Lucile</b><i /></span>
+								<span className="at-key" aria-hidden="true">🗝️<em>bureau</em></span>
+							</div>
+						)}
+						{line.show === 'office' && <div className="at-office-img" role="img" aria-label="Le bureau de Jeanne, rangé, poussiéreux" />}
+						{line.show === 'map' && <div className="at-map"><MapPieces count={3} /></div>}
 						{line.show === 'broadcast' && (
 							<div className="at-broadcast" role="img" aria-label="Émission Mémoires du port, archive de 1961">
 								<b>Mémoires du port</b>
@@ -906,6 +930,21 @@ const CSS = `
 .at-bigwatch { width: min(46vw, 170px); margin: 0 auto; position: relative; }
 .at-bigwatch.radio { width: min(72vw, 270px); }
 .at-bigwatch.voilier { width: min(58vw, 210px); }
+.at-bigwatch.boite { width: min(70vw, 260px); }
+.at-keyletter { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 10px 0; }
+.at-letter { position: relative; width: 140px; aspect-ratio: 3 / 2; background: #f4ead4; border: 1.5px solid #b58b4a; border-radius: 4px; transform: rotate(-4deg); box-shadow: 0 5px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+.at-letter b { font-family: 'Segoe Script', 'Bradley Hand', cursive; font-weight: 400; color: #3b3a6b; font-size: 16px; }
+.at-letter i { position: absolute; right: 12px; bottom: 10px; width: 20px; height: 20px; border-radius: 50%; background: #9c2a1a; box-shadow: inset 0 0 0 3px #b8321a; }
+.at-key { display: flex; flex-direction: column; align-items: center; font-size: 42px; transform: rotate(12deg); }
+.at-key em { font-size: 11px; font-style: normal; background: #f4ead4; color: #5a3b0c; border: 1px solid #b58b4a; padding: 1px 6px; border-radius: 3px; margin-top: -4px; }
+.at-office-img { aspect-ratio: 3 / 4; max-height: 38vh; margin: 0 auto; border-radius: 12px; background: url('${ART}/bureau.jpg') center / cover, linear-gradient(160deg, #6b4a2a, #2a1a0e); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+.at-office-img.small { width: 76px; max-height: none; flex: none; border-radius: 10px; }
+.at-map { width: min(70vw, 260px); margin: 0 auto; }
+.at-map.small { width: 150px; margin: 4px 0 0; }
+.at-office { display: flex; gap: 12px; align-items: flex-start; background: linear-gradient(180deg, rgba(156, 42, 26, 0.12), var(--gray-900)); border: 1.5px solid #9c6a3a; border-radius: 14px; padding: 10px 12px; }
+.at-office-txt { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--gray-300); }
+.at-office-txt strong { color: var(--gray-0); font-size: 15px; }
+.at-door-open { position: absolute; left: 60%; top: 30%; width: 16%; height: 40%; background: linear-gradient(90deg, rgba(255, 220, 150, 0.45), transparent); mix-blend-mode: screen; pointer-events: none; }
 .at-dedication { background: linear-gradient(180deg, #d9a66b, #b47a3e); border-color: #7a4a1c; color: #3b2a14; border-radius: 6px; }
 .at-dedication em { color: #3b2a14 !important; font-size: 18px !important; }
 .at-box { position: relative; width: 62%; margin: 8px auto 0; aspect-ratio: 5 / 3; }
@@ -959,11 +998,13 @@ const CSS = `
 @keyframes at-hang { from { transform: rotate(-12deg) translateY(-12px); opacity: 0; } to { transform: rotate(-3deg); opacity: 1; } }
 .at-onbench.radio { width: 16% !important; top: 75% !important; }
 .at-onbench.voilier { width: 13% !important; top: 72% !important; }
+.at-onbench.boite { width: 15% !important; top: 76% !important; }
 .at-onbench { position: absolute; left: 58%; top: 77%; width: 8%; transform: translate(-50%, -50%) rotate(-12deg); filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
 .at-project { display: flex; gap: 12px; align-items: center; background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; }
 .at-project-watch { width: 54px; flex: none; }
 .at-project-watch.radio { width: 84px; }
 .at-project-watch.voilier { width: 64px; }
+.at-project-watch.boite { width: 84px; }
 .at-warn { color: #d9822b !important; font-weight: 600; }
 .at-shelves { position: absolute; left: 52%; top: 6%; width: 48%; height: 62%; background: radial-gradient(ellipse at 60% 40%, rgba(255, 214, 140, 0.35), transparent 65%); mix-blend-mode: screen; pointer-events: none; }
 .at-project-txt { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--gray-300); min-width: 0; flex: 1; }
