@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	newGame, produce, move, moveKind, deliver, tick, sell, buyUpgrade, load, save, activeOrders,
-	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, mapReady, solveMap, SAVE_V, CELLS, type State,
+	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, mapReady, solveMap, storyBlocker, SAVE_V, CELLS, type State,
 } from './engine';
 import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS } from './data';
 
@@ -382,5 +382,20 @@ describe('reputation tiers', () => {
 		if (!d.ok) throw new Error('morel-1');
 		expect(dueTier(b)).toBeNull();
 		expect(dueTier(d.s)?.id).toBe('rep-5');
+	});
+});
+
+describe('what the story waits for', () => {
+	it('names the upgrade, then the map, and nothing while an order is open', () => {
+		const base = newGame(T0);
+		expect(storyBlocker(base)).toEqual({ kind: 'upgrade', id: 'etabli' });
+		const open = { ...base, upgrades: ['etabli'] };
+		expect(storyOrder(open)?.id).toBe('morel-1');
+		expect(storyBlocker(open)).toBeNull();
+		const photo = { ...base, upgrades: ['etabli'], progress: { ...base.progress, montre: 3 }, done: ['morel-1', 'morel-2', 'morel-3'] };
+		expect(storyBlocker(photo)).toEqual({ kind: 'upgrade', id: 'photo' });
+		const map = { ...base, progress: { ...base.progress, montre: 3, radio: 3, voilier: 3, boite: 3, fauteuil: 3 }, done: ORDERS.filter((o) => o.project && o.project !== 'malle' && o.project !== 'musique').map((o) => o.id) };
+		expect(storyBlocker(map)).toEqual({ kind: 'map' });
+		expect(storyBlocker(solveMap(map))).toBeNull();
 	});
 });

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
 	load, save, newGame, tick, produce, move, moveKind, deliver, sell, sellValue, buyUpgrade, upgradeState,
 	addEnergy, markSeen, dueTier, nextTier, claimTier, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
-	stepOf, storyOrder, currentProject, projectOf, missingGens, mapReady, solveMap, code, CELLS, type State, type Piece,
+	stepOf, storyOrder, storyBlocker, currentProject, projectOf, missingGens, mapReady, solveMap, code, unitCost, CELLS, type State, type Piece,
 } from './engine';
 import {
 	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK,
@@ -99,6 +99,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 	const [confirmReset, setConfirmReset] = useState(false);
 	const [sound, setSound] = useState(true);
 	const [puzzle, setPuzzle] = useState(false);
+	const [orderSel, setOrderSel] = useState<string | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const dragRef = useRef<{ from: number; x0: number; y0: number; moved: boolean } | null>(null);
 	const animK = useRef(0);
@@ -354,6 +355,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		return set;
 	}, [s, orders]);
 	const story = orders.find((o) => o.kind === 'story') ?? null;
+	const blocker = s ? storyBlocker(s) : null;
+	const helpOrder = orders.find((o) => o.id === orderSel) ?? null;
 
 	if (!s) return <div className="at-root"><style>{CSS}</style><p className="at-loading">Ouverture de l’atelier…</p></div>;
 
@@ -387,13 +390,34 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 			{view === 'etabli' ? (
 				<>
+					{blocker && (
+						<div className="at-next">
+							<span>
+								{blocker.kind === 'map'
+									? 'Les quatre morceaux de carte sont réunis. La suite se joue dans le bureau de Jeanne.'
+									: `Pour continuer l’histoire : « ${UPGRADES.find((u) => u.id === blocker.id)!.name} », dans l’atelier (${UPGRADES.find((u) => u.id === blocker.id)!.cost} 🪙).`}
+							</span>
+							<button className="at-btn small at-pulse" onClick={() => { setView('atelier'); if (blocker.kind === 'map') setPuzzle(true); }}>
+								{blocker.kind === 'map' ? 'Assembler la carte →' : 'Aller à l’atelier →'}
+							</button>
+						</div>
+					)}
 					<div className="at-orders">
-						{orders.length === 0 && <p className="at-noorder">Personne au comptoir pour l’instant.</p>}
+						{orders.length === 0 && !blocker && <p className="at-noorder">Personne au comptoir pour l’instant.</p>}
 						{orders.map((o) => {
 							const cells = pickCells(s, o);
 							const can = cells !== null;
 							return (
-								<div key={o.id} className={`at-order ${o.kind === 'story' ? 'story' : ''} ${can ? 'can' : ''}`}>
+								<div
+									key={o.id}
+									className={`at-order ${o.kind === 'story' ? 'story' : ''} ${can ? 'can' : ''} ${orderSel === o.id ? 'open' : ''}`}
+									role="button"
+									tabIndex={0}
+									aria-expanded={orderSel === o.id}
+									aria-label={`${o.client} : voir comment obtenir chaque objet`}
+									onClick={() => setOrderSel((v) => (v === o.id ? null : o.id))}
+									onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOrderSel((v) => (v === o.id ? null : o.id)); } }}
+								>
 									<div className="at-order-head">
 										<Face who={o.client} size={30} />
 										<div className="at-order-who">
@@ -413,13 +437,15 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 											);
 										})}
 									</div>
-									<button className={`at-give ${coach?.target === 'give' && can ? 'at-pulse' : ''}`} disabled={!can} onClick={() => doDeliver(o)}>
+									<button className={`at-give ${coach?.target === 'give' && can ? 'at-pulse' : ''}`} disabled={!can} onClick={(e) => { e.stopPropagation(); doDeliver(o); }}>
 										{can ? 'Livrer' : `${o.reward.coins} 🪙`}
 									</button>
 								</div>
 							);
 						})}
 					</div>
+
+					{helpOrder && <OrderHelp s={s} o={helpOrder} onClose={() => setOrderSel(null)} />}
 
 					<div className="at-boardwrap">
 						<div ref={boardRef} className="at-board" onPointerDown={onPointerDown} style={{ ['--cols' as string]: COLS, ['--rows' as string]: ROWS }}>
@@ -485,6 +511,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 					onUpgrade={doUpgrade}
 					onBench={() => setView('etabli')}
 					onPuzzle={() => setPuzzle(true)}
+					awaited={blocker?.kind === 'upgrade' ? blocker.id : null}
 					confirmReset={confirmReset}
 					onReset={() => (confirmReset ? reset() : setConfirmReset(true))}
 					onReplay={() => {
@@ -613,8 +640,55 @@ function Info({ s, cell, piece, need, now, confirm, onSell }: {
 	);
 }
 
-function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle, confirmReset, onReset, onReplay }: {
-	s: State; story: Order | null; chapterDone: boolean; coachUp: boolean;
+/** Tapping an order: for each item, where it comes from and how far the bench is from it. */
+function OrderHelp({ s, o, onClose }: { s: State; o: Order; onClose: () => void }) {
+	return (
+		<div className="at-help" role="region" aria-label={`Comment obtenir la commande de ${o.client}`}>
+			<div className="at-help-head">
+				<strong>{o.client} · {o.kind === 'story' ? o.ask : 'commande'}</strong>
+				<button className="at-link" onClick={onClose}>Fermer</button>
+			</div>
+			{o.needs.map((p, k) => {
+				const i = parse(p)!;
+				const chain = CHAINS[i.chain];
+				const gen = GENERATORS[chain.gen];
+				const locked = gen.unlock && !s.upgrades.includes(gen.unlock) ? UPGRADES.find((u) => u.id === gen.unlock) : null;
+				// Level-1 draws already on the bench toward this item: same chain, not above it.
+				const have = s.board.reduce((a, q) => {
+					const j = parse(q);
+					return j && j.chain === i.chain && j.level <= i.level ? a + unitCost(q!) : a;
+				}, 0);
+				const want = unitCost(p);
+				return (
+					<div className="at-help-row" key={k}>
+						<PieceImg piece={p} className="at-help-img" />
+						<div>
+							<b>{i.name}</b> <small>niv. {i.level}</small>
+							<span>
+								Sort de : <PieceImg piece={`g:${chain.gen}`} className="at-help-gen" /> {gen.name}
+								{locked && <em> (à débloquer : « {locked.name} »)</em>}
+							</span>
+							<span className="at-chainrow">
+								{chain.items.slice(0, i.level).map((_, n) => (
+									<span key={n} className={`at-chainstep ${n + 1 === i.level ? 'cur' : 'past'}`}>
+										<PieceImg piece={code(i.chain, n + 1)} />
+									</span>
+								))}
+							</span>
+							<span>
+								{i.level === 1 ? 'Directement.' : `Fusionne 2 par 2, soit ${want} × « ${chain.items[0]} ».`}
+								{' '}Sur l’établi : {Math.min(have, want)}/{want}.
+							</span>
+						</div>
+					</div>
+				);
+			})}
+		</div>
+	);
+}
+
+function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle, awaited, confirmReset, onReset, onReplay }: {
+	s: State; story: Order | null; chapterDone: boolean; coachUp: boolean; awaited: string | null;
 	onUpgrade: (id: string) => void; onBench: () => void; onPuzzle: () => void; confirmReset: boolean; onReset: () => void; onReplay: () => void;
 }) {
 	const has = (u: string) => s.upgrades.includes(u);
@@ -708,7 +782,7 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle
 				{UPGRADES.map((u) => {
 					const st = upgradeState(s, u.id);
 					return (
-						<li key={u.id} className={`at-up ${st}`}>
+						<li key={u.id} className={`at-up ${st} ${awaited === u.id ? 'awaited' : ''}`}>
 							<div>
 								<strong>{u.name}</strong>
 								<span>{st === 'locked' ? 'Se débloque plus tard dans l’histoire.' : u.desc}</span>
@@ -716,7 +790,7 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle
 							{st === 'owned' ? (
 								<span className="at-done">✓</span>
 							) : (
-								<button className={`at-btn small ${coachUp && u.id === 'etabli' ? 'at-pulse' : ''}`} disabled={st !== 'ok'} onClick={() => onUpgrade(u.id)}>
+								<button className={`at-btn small ${(coachUp && u.id === 'etabli') || (awaited === u.id && st === 'ok') ? 'at-pulse' : ''}`} disabled={st !== 'ok'} onClick={() => onUpgrade(u.id)}>
 									{u.cost} 🪙
 								</button>
 							)}
@@ -887,6 +961,20 @@ const CSS = `
 .at-tab.on { background: var(--at-accent); color: var(--accent-text-over); }
 .at-coach { background: #fff4d6; color: #4a3212; border: 2px solid #e2b85a; border-radius: 12px; padding: 8px 12px; font-size: 13.5px; line-height: 1.35; animation: at-in 0.3s ease; }
 .at-orders { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.at-order { cursor: pointer; }
+.at-order.open { box-shadow: 0 0 0 2.5px #ffd76a; }
+.at-next { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: #fff4d6; color: #4a3212; border: 2px solid #e2b85a; border-radius: 12px; padding: 8px 10px 8px 12px; font-size: 13px; line-height: 1.35; }
+.at-next .at-btn { flex: none; }
+.at-up.awaited { border-color: #e2b85a; box-shadow: 0 0 0 2px rgba(226, 184, 90, 0.5); }
+.at-help { background: var(--gray-900); border: 1.5px solid #e2b85a; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--gray-300); animation: at-coachin 0.2s ease; }
+.at-help-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.at-help-head strong { color: var(--gray-0); font-size: 13.5px; }
+.at-help-row { display: flex; gap: 10px; align-items: flex-start; }
+.at-help-row > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.at-help-row b { color: var(--gray-0); }
+.at-help-row em { color: #d9822b; font-style: normal; font-weight: 600; }
+.at-help-img { width: 40px; height: 40px; object-fit: contain; flex: none; font-size: 26px; }
+.at-help-gen { width: 18px; height: 18px; object-fit: contain; vertical-align: -4px; font-size: 13px; }
 .at-noorder { grid-column: 1 / -1; text-align: center; color: var(--gray-300); font-size: 13px; margin: 6px 0; }
 .at-order { background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .at-order.story { border-color: #d9a441; background: linear-gradient(180deg, rgba(217,164,65,0.18), var(--gray-900)); }
@@ -904,7 +992,9 @@ const CSS = `
 .at-give { border: 0; border-radius: 999px; padding: 5px 8px; font: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; background: #3f9a5a; color: #fff; }
 .at-give:disabled { background: var(--gray-800); color: var(--gray-300); cursor: default; font-weight: 600; }
 .at-boardwrap { width: min(100%, calc((100dvh - 360px) * 7 / 9), 480px); min-width: min(100%, 280px); margin-inline: auto; background: linear-gradient(180deg, #8a5a30, #6b4222); border-radius: 14px; padding: 6px; box-shadow: inset 0 2px 0 rgba(255,255,255,0.15), 0 4px 14px rgba(0,0,0,0.25); }
-.at-board { display: grid; grid-template-columns: repeat(var(--cols), 1fr); grid-template-rows: repeat(var(--rows), 1fr); aspect-ratio: 7 / 9; gap: 3px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.at-board { display: grid; grid-template-columns: repeat(var(--cols), 1fr); grid-template-rows: repeat(var(--rows), 1fr); aspect-ratio: 7 / 9; gap: 3px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+/* Only a finger on a piece is a drag; on an empty cell it scrolls the page (the board fills a phone). */
+.at-board .at-piece { touch-action: none; }
 .at-cell { position: relative; background: rgba(255, 236, 200, 0.16); border-radius: 7px; min-width: 0; min-height: 0; }
 .at-cell.sel { box-shadow: 0 0 0 2.5px #ffd76a inset; background: rgba(255, 236, 200, 0.3); }
 .at-cell.twin { box-shadow: 0 0 0 2px rgba(127, 224, 154, 0.9) inset; background: rgba(127, 224, 154, 0.22); }

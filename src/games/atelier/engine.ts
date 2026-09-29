@@ -334,6 +334,20 @@ export function storyOrder(s: State): Order | null {
 		&& stepOf(s, o.project!) === o.step! - 1 && open(s, o)) ?? null;
 }
 
+export type Blocker = { kind: 'upgrade'; id: string } | { kind: 'map' } | null;
+
+/** When no story order is open, what the next one waits for: an upgrade to buy in the workshop, or
+ *  the chapter 6 map. Null while a story order is open or once the campaign is told. Players missed
+ *  these: nothing on the bench said that the way forward was in the other tab. */
+export function storyBlocker(s: State): Blocker {
+	if (storyOrder(s)) return null;
+	const next = ORDERS.find((o) => o.kind === 'story' && !s.done.includes(o.id) && stepOf(s, o.project!) === o.step! - 1);
+	if (!next || !gateOk(s, next.when)) return null;
+	if (next.after && !has(s, next.after)) return { kind: 'upgrade', id: next.after };
+	if (next.flag === 'map-solved' && !s.seen.includes('map-solved')) return { kind: 'map' };
+	return null;
+}
+
 /** The project on the bench: the open story's, else the last one started. */
 export function currentProject(s: State): Project {
 	const st = storyOrder(s);
