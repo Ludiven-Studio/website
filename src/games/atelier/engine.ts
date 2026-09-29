@@ -3,12 +3,13 @@
 // Pieces are strings: 'g:boite' is a generator, 'outil:3' is a level-3 item of a chain.
 
 import {
-	CHAINS, GENERATORS, ORDERS, UPGRADES, START_BOARD, LOCALS, COLS, ROWS, REP_TIERS,
-	ENERGY_MAX, ENERGY_MS, WATCH_STEPS,
-	type ChainId, type GenId, type Order, type Reward, type RepTier,
+	CHAINS, GENERATORS, ORDERS, UPGRADES, START_BOARD, LOCALS, COLS, ROWS, REP_TIERS, PROJECTS,
+	ENERGY_MAX, ENERGY_MS,
+	type ChainId, type GenId, type Order, type Reward, type RepTier, type Gate, type ProjectId, type Project,
 } from './data';
 
-export const SAVE_V = 1;
+// v1: one watch, `step`. v2: one progress counter per project (chapter); v1 saves migrate in load().
+export const SAVE_V = 2;
 export const CELLS = COLS * ROWS;
 
 export type Piece = string;
@@ -31,10 +32,10 @@ export interface State {
 	/** rng state for generator outputs and neighbourhood orders. */
 	seed: number;
 	done: string[];
-	/** Watch restoration steps delivered, 0..WATCH_STEPS. */
-	step: number;
+	/** Restoration steps delivered, per project. */
+	progress: Record<ProjectId, number>;
 	upgrades: string[];
-	/** Neighbourhood orders drawn once the chapter's short orders are all done. */
+	/** Neighbourhood orders drawn once the campaign's orders are all done. */
 	endless: Order[];
 	endlessN: number;
 	/** Tutorial: 0 tap a generator, 1 merge, 2 deliver, 3 buy the bench, 4 done. */
@@ -79,6 +80,15 @@ export const unitCost = (p: Piece): number => {
 	return i ? 2 ** (i.level - 1) : 0;
 };
 
+const noProgress = (): Record<ProjectId, number> =>
+	Object.fromEntries(PROJECTS.map((p) => [p.id, 0])) as Record<ProjectId, number>;
+
+export const stepOf = (s: State, p: ProjectId): number => s.progress[p] ?? 0;
+
+export const gateOk = (s: State, g: Gate | undefined): boolean => !g || stepOf(s, g.project) >= g.step;
+
+export const projectOf = (id: ProjectId): Project => PROJECTS.find((p) => p.id === id)!;
+
 export function newGame(now: number, seed = (now ^ 0x5bd1e995) >>> 0): State {
 	const board: (Piece | null)[] = Array(CELLS).fill(null);
 	for (const [i, p] of Object.entries(START_BOARD)) board[Number(i)] = p;
@@ -94,7 +104,7 @@ export function newGame(now: number, seed = (now ^ 0x5bd1e995) >>> 0): State {
 		rep: 0,
 		seed: seed >>> 0,
 		done: [],
-		step: 0,
+		progress: noProgress(),
 		upgrades: [],
 		endless: [],
 		endlessN: 0,
@@ -112,6 +122,7 @@ function clone(s: State): State {
 		board: s.board.slice(),
 		gens,
 		done: s.done.slice(),
+		progress: { ...s.progress },
 		upgrades: s.upgrades.slice(),
 		endless: s.endless.slice(),
 		seen: s.seen.slice(),
@@ -277,31 +288,58 @@ export function sell(s: State, cell: number): State {
 	n.coins += sellValue(p!);
 	n.board[cell] = null;
 	n.stats.sold++;
+	placeGens(n);
 	return n;
 }
 
 export const isFull = (s: State): boolean => s.board.every((p) => p !== null);
 
+/** Generators whose upgrade is owned but that sit nowhere on the board (bought on a full board). */
+export const missingGens = (s: State): GenId[] =>
+	(Object.keys(GENERATORS) as GenId[]).filter((g) => {
+		const u = GENERATORS[g].unlock;
+		return (!u || s.upgrades.includes(u)) && !s.board.includes(`g:${g}`);
+	});
+
+// Mutates a fresh clone: puts each missing generator on the free cell nearest the centre.
+function placeGens(s: State): void {
+	for (const g of missingGens(s)) {
+		const at = nearestEmpty(s.board, Math.floor(ROWS / 2) * COLS + Math.floor(COLS / 2));
+		if (at < 0) return;
+		s.board[at] = `g:${g}`;
+	}
+}
+
 // ---------- orders ----------
 
 const has = (s: State, u: string): boolean => s.upgrades.includes(u);
 
-/** The story order currently open, or null. */
+const open = (s: State, o: Order): boolean => (!o.after || has(s, o.after)) && gateOk(s, o.when);
+
+/** The story order currently open, or null. Steps of a project are taken in sequence. */
 export function storyOrder(s: State): Order | null {
-	return ORDERS.find((o) => o.kind === 'story' && o.step === s.step + 1 && !s.done.includes(o.id)
-		&& (!o.after || has(s, o.after))) ?? null;
+	return ORDERS.find((o) => o.kind === 'story' && !s.done.includes(o.id)
+		&& stepOf(s, o.project!) === o.step! - 1 && open(s, o)) ?? null;
 }
 
-const chapterShortsLeft = (s: State): Order[] =>
+/** The project on the bench: the open story's, else the last one started. */
+export function currentProject(s: State): Project {
+	const st = storyOrder(s);
+	if (st) return projectOf(st.project!);
+	return [...PROJECTS].reverse().find((p) => stepOf(s, p.id) > 0) ?? PROJECTS[0];
+}
+
+const campaignShortsLeft = (s: State): Order[] =>
 	ORDERS.filter((o) => o.kind === 'short' && !s.done.includes(o.id));
 
-/** Short orders on the counter: the chapter's first, then the neighbourhood's once the
- *  watch is back. Earlier, endless orders would pull the energy away from the story. */
+const campaignDone = (s: State): boolean =>
+	ORDERS.every((o) => o.kind !== 'story' || s.done.includes(o.id));
+
+/** Short orders on the counter: the campaign's first, then the neighbourhood's once every
+ *  story is told. Earlier, endless orders pull the energy away from the story. */
 export function shortOrders(s: State): Order[] {
-	const left = chapterShortsLeft(s);
-	if (left.length) {
-		return left.filter((o) => (!o.after || has(s, o.after)) && (!o.minStep || s.step >= o.minStep)).slice(0, 2);
-	}
+	const left = campaignShortsLeft(s);
+	if (left.length) return left.filter((o) => open(s, o)).slice(0, 2);
 	return s.endless;
 }
 
@@ -330,7 +368,8 @@ export function wanted(s: State): Set<Piece> {
 
 function drawLocal(s: State): Order {
 	s.endlessN++;
-	const chains: ChainId[] = ['outil', 'soin', 'meca'];
+	// Only chains the player can make: a locked generator's chain would be an impossible order.
+	const chains = (Object.keys(CHAINS) as ChainId[]).filter((c) => s.board.includes(`g:${CHAINS[c].gen}`));
 	const pick = <T,>(xs: T[]): T => xs[Math.floor(rand(s) * xs.length)];
 	const two = rand(s) < 0.35;
 	const needs: Piece[] = [];
@@ -353,7 +392,7 @@ function drawLocal(s: State): Order {
 }
 
 function refill(s: State): void {
-	if (chapterShortsLeft(s).length || s.step < WATCH_STEPS) return;
+	if (campaignShortsLeft(s).length || !campaignDone(s)) return;
 	while (s.endless.length < 2) s.endless.push(drawLocal(s));
 }
 
@@ -369,11 +408,12 @@ export function deliver(s: State, orderId: string): DeliverResult {
 	n.coins += o.reward.coins;
 	n.rep += o.reward.rep;
 	if (o.reward.energy) n.energy += o.reward.energy;
-	if (o.kind === 'story' && o.step) n.step = o.step;
+	if (o.kind === 'story' && o.project && o.step) n.progress[o.project] = o.step;
 	if (o.id.startsWith('q')) n.endless = n.endless.filter((x) => x.id !== o.id);
 	else n.done.push(o.id);
 	n.stats.delivered++;
 	if (n.tut === 2) n.tut = has(n, 'etabli') ? 4 : 3;
+	placeGens(n);
 	refill(n);
 	return { ok: true, s: n, order: o, reward: o.reward };
 }
@@ -384,7 +424,7 @@ export function upgradeState(s: State, id: string): 'owned' | 'locked' | 'poor' 
 	const u = UPGRADES.find((x) => x.id === id);
 	if (!u) return 'locked';
 	if (has(s, id)) return 'owned';
-	if (u.step && s.step < u.step) return 'locked';
+	if (!gateOk(s, u.when)) return 'locked';
 	return s.coins < u.cost ? 'poor' : 'ok';
 }
 
@@ -397,6 +437,7 @@ export function buyUpgrade(s: State, id: string): State {
 	n.upgrades.push(id);
 	// Bought early (coins from selling), the bench still ends the tutorial.
 	if (id === 'etabli') n.tut = 4;
+	placeGens(n);
 	refill(n);
 	return n;
 }
@@ -431,8 +472,8 @@ export function markSeen(s: State, id: string): State {
 export function load(raw: string | null, now: number): State {
 	if (!raw) return newGame(now);
 	try {
-		const d = JSON.parse(raw) as Partial<State>;
-		if (d.v !== SAVE_V || !Array.isArray(d.board) || d.board.length !== CELLS) return newGame(now);
+		const d = JSON.parse(raw) as Partial<State> & { step?: number };
+		if ((d.v !== 1 && d.v !== SAVE_V) || !Array.isArray(d.board) || d.board.length !== CELLS) return newGame(now);
 		const base = newGame(now);
 		const board = d.board.map((p) => (typeof p === 'string' && (parse(p) || genOf(p)) ? p : null));
 		const gens = { ...base.gens };
@@ -453,7 +494,7 @@ export function load(raw: string | null, now: number): State {
 			rep: Math.max(0, Number(d.rep) || 0),
 			seed: Number.isFinite(d.seed) ? Number(d.seed) | 0 : base.seed,
 			done: Array.isArray(d.done) ? d.done.filter((x) => typeof x === 'string') : [],
-			step: Math.max(0, Math.min(3, Number(d.step) || 0)),
+			progress: readProgress(d),
 			upgrades: Array.isArray(d.upgrades) ? d.upgrades.filter((x) => typeof x === 'string') : [],
 			endless: Array.isArray(d.endless) ? d.endless.filter((o) => o && Array.isArray(o.needs) && o.needs.every((p) => parse(p))) : [],
 			endlessN: Number(d.endlessN) || 0,
@@ -461,17 +502,28 @@ export function load(raw: string | null, now: number): State {
 			seen: Array.isArray(d.seen) ? d.seen.filter((x) => typeof x === 'string') : [],
 			stats: { ...base.stats, ...(d.stats ?? {}) },
 		};
+		// v1 named the watch's arrival scene 'arrival'; v2 keys arrivals by project.
+		if (s.seen.includes('arrival') && !s.seen.includes('arrival:montre')) s.seen.push('arrival:montre');
 		// Generators are never lost: a save missing one puts it back on a free cell.
-		for (const g of Object.keys(GENERATORS) as GenId[]) {
-			if (s.board.includes(`g:${g}`)) continue;
-			const at = s.board.indexOf(null);
-			if (at >= 0) s.board[at] = `g:${g}`;
-		}
+		placeGens(s);
 		refill(s);
 		return tick(s, now);
 	} catch {
 		return newGame(now);
 	}
+}
+
+function readProgress(d: Partial<State> & { step?: number }): Record<ProjectId, number> {
+	const out = noProgress();
+	if (d.v === 1) {
+		out.montre = Math.max(0, Math.min(projectOf('montre').steps, Number(d.step) || 0));
+		return out;
+	}
+	for (const p of PROJECTS) {
+		const v = Number(d.progress?.[p.id]);
+		out[p.id] = Number.isFinite(v) ? Math.max(0, Math.min(p.steps, Math.floor(v))) : 0;
+	}
+	return out;
 }
 
 export const save = (s: State): string => JSON.stringify(s);

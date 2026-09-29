@@ -2,18 +2,19 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
 	load, save, newGame, tick, produce, move, moveKind, deliver, sell, sellValue, buyUpgrade, upgradeState,
 	addEnergy, markSeen, dueTier, nextTier, claimTier, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
-	code, CELLS, type State, type Piece,
+	stepOf, storyOrder, currentProject, projectOf, missingGens, code, CELLS, type State, type Piece,
 } from './engine';
 import {
-	CHAINS, GENERATORS, UPGRADES, ORDERS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK, WATCH_STEPS,
-	INTRO, ARRIVAL, EPILOGUE, SPEAKERS, FACES, FACE_EMOJI, REP_TIERS,
-	type Line, type Order, type GenId,
+	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK,
+	INTRO, EPILOGUE, SPEAKERS, FACES, FACE_EMOJI, REP_TIERS,
+	type Line, type Order, type GenId, type ProjectId,
 } from './data';
 import Watch, { WatchBack, WATCH_CSS } from './Watch';
+import Radio, { RADIO_CSS } from './Radio';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
-import { spend } from '../../lib/wallet';
+import { spend, earn } from '../../lib/wallet';
 import { trackGame, trackEvent } from '../../lib/analytics';
 import Cocoin from '../../components/Cocoin';
 
@@ -25,12 +26,18 @@ import Cocoin from '../../components/Cocoin';
 
 const SAVE_KEY = 'ludiven-atelier';
 const ART = '/assets/jeux/atelier';
-const FALLBACK: Record<string, string> = { outil: '🪛', soin: '🧽', meca: '⚙️', boite: '🧰', tiroir: '🗄️' };
+const FALLBACK: Record<string, string> = { outil: '🪛', soin: '🧽', meca: '⚙️', elec: '💡', boite: '🧰', tiroir: '🗄️', caisse: '🔌' };
 
 type View = 'atelier' | 'etabli';
+interface Art { project: ProjectId; state: number }
 type Scene =
-	| { kind: 'talk'; id: string; lines: Line[]; watch?: number; title?: string }
-	| { kind: 'restore'; id: string; title: string; from: number; to: number; lines: Line[] };
+	| { kind: 'talk'; id: string; lines: Line[]; art?: Art; title?: string }
+	| { kind: 'restore'; id: string; project: ProjectId; title: string; from: number; to: number; lines: Line[] };
+
+/** The restored object of a project, drawn at a restoration state. */
+function ObjectArt({ project, state }: Art) {
+	return project === 'radio' ? <Radio state={state} size="100%" /> : <Watch state={state} size="100%" />;
+}
 
 interface Drag { from: number; x: number; y: number; over: number }
 interface Anim { k: number; type: 'spawn' | 'pop'; dx?: number; dy?: number }
@@ -115,7 +122,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		document.addEventListener('visibilitychange', onVis);
 		const onHide = () => {
 			const st = sRef.current;
-			if (st) trackEvent('atelier:session_end', { step: st.step, delivered: st.stats.delivered, produced: st.stats.produced });
+			if (st) trackEvent('atelier:session_end', { ...st.progress, delivered: st.stats.delivered, produced: st.stats.produced });
 		};
 		window.addEventListener('pagehide', onHide);
 		return () => {
@@ -125,9 +132,15 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		};
 	}, []);
 
-	// A reputation threshold plays as a visit once the current scene queue is empty.
+	// Once the scene queue is empty: a client arriving with a new object, else a reputation visit.
 	useEffect(() => {
 		if (!s || scenes.length) return;
+		const st = storyOrder(s);
+		if (st && st.step === 1 && !s.seen.includes(`arrival:${st.project}`)) {
+			const p = projectOf(st.project!);
+			setScenes([{ kind: 'talk', id: `arrival:${p.id}`, lines: p.arrival, art: { project: p.id, state: 0 }, title: `Chapitre ${p.chapter} · ${p.title}` }]);
+			return;
+		}
 		const t = dueTier(s);
 		if (!t) return;
 		setS(claimTier(s, t.id));
@@ -155,8 +168,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		const r = produce(s, cell, Date.now());
 		if (!r.ok) {
 			sfx.refuse();
-			if (r.why === 'energy') { setEnergyOpen(true); trackEvent('atelier:energy_empty', { step: s.step }); }
-			else if (r.why === 'full') { flash('Établi plein : fusionne des objets, ou touche-en un pour le vendre.'); trackEvent('atelier:board_full', { step: s.step }); }
+			if (r.why === 'energy') { setEnergyOpen(true); trackEvent('atelier:energy_empty', { project: currentProject(s).id }); }
+			else if (r.why === 'full') { flash('Établi plein : fusionne des objets, ou touche-en un pour le vendre.'); trackEvent('atelier:board_full', { project: currentProject(s).id }); }
 			else if (r.why === 'charges') flash(`${GENERATORS[genOf(s.board[cell])!].name} : rechargement…`);
 			return;
 		}
@@ -189,11 +202,13 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		setS(r.s);
 		setSel(null);
 		sfx.deliver();
-		trackEvent('atelier:order_completed', { order: o.id.startsWith('q') ? 'local' : o.id, step: r.s.step });
+		trackEvent('atelier:order_completed', { order: o.id.startsWith('q') ? 'local' : o.id });
 		if (s.tut === 2) trackEvent('atelier:tutorial_step', { step: 3 });
-		if (o.kind === 'story' && o.scene) {
-			trackEvent('atelier:restoration_step', { step: r.s.step });
-			const next: Scene[] = [{ kind: 'restore', id: o.id, title: o.scene.title, from: r.s.step - 1, to: r.s.step, lines: o.scene.lines }];
+		// Story orders only, and each is delivered once: the cocoin gift cannot repeat.
+		if (o.reward.cocoins) earn(o.reward.cocoins);
+		if (o.kind === 'story' && o.scene && o.project && o.step) {
+			trackEvent('atelier:restoration_step', { project: o.project, step: o.step });
+			const next: Scene[] = [{ kind: 'restore', id: o.id, project: o.project, title: o.scene.title, from: o.step - 1, to: o.step, lines: o.scene.lines }];
 			setScenes((q) => [...q, ...next]);
 		} else {
 			const bits = [`+${o.reward.coins} pièces`];
@@ -223,9 +238,6 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (s.tut === 3 && id === 'etabli') trackEvent('atelier:tutorial_step', { step: 4 });
 		let st = n;
 		const q: Scene[] = [];
-		if (id === 'etabli' && !st.seen.includes('arrival')) {
-			q.push({ kind: 'talk', id: 'arrival', lines: ARRIVAL, watch: 0, title: 'La montre de M. Morel' });
-		}
 		if (id === 'photo' && !st.seen.includes('epilogue')) {
 			q.push({ kind: 'talk', id: 'epilogue', lines: EPILOGUE, title: 'Fin du chapitre 1' });
 			st = markSeen(st, 'chapter');
@@ -238,7 +250,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (!s) return;
 		if (!spend(ENERGY_PACK.price)) return;
 		setS(addEnergy(s, ENERGY_PACK.energy));
-		trackEvent('atelier:energy_bought', { step: s.step });
+		trackEvent('atelier:energy_bought', { project: currentProject(s).id });
 		setEnergyOpen(false);
 		flash(`+${ENERGY_PACK.energy} énergie`);
 	};
@@ -248,8 +260,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (!sc) return;
 		setScenes((q) => q.slice(1));
 		if (s) setS(markSeen(s, sc.id));
-		if (sc.id === 'intro' || sc.id === 'arrival') setView('etabli');
-		if (sc.kind === 'restore' && sc.to >= WATCH_STEPS) setView('atelier');
+		if (sc.id === 'intro' || sc.id.startsWith('arrival')) setView('etabli');
+		if (sc.kind === 'restore' && sc.to >= projectOf(sc.project).steps) setView('atelier');
 	};
 
 	const reset = () => {
@@ -329,7 +341,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -361,7 +373,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 										<Face who={o.client} size={30} />
 										<div className="at-order-who">
 											<strong>{o.client}</strong>
-											<span>{o.kind === 'story' ? `Montre · étape ${o.step}/${WATCH_STEPS}` : o.ask}</span>
+											<span>{o.kind === 'story' ? `${projectOf(o.project!).object} · étape ${o.step}/${projectOf(o.project!).steps}` : o.ask}</span>
 										</div>
 									</div>
 									<div className="at-needs">
@@ -449,7 +461,15 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 					onBench={() => setView('etabli')}
 					confirmReset={confirmReset}
 					onReset={() => (confirmReset ? reset() : setConfirmReset(true))}
-					onReplay={() => setScenes((q) => [...q, { kind: 'talk', id: 'replay', lines: [...ARRIVAL, ...ORDERS.filter((o) => o.kind === 'story' && (o.step ?? 9) <= s.step).flatMap((o) => o.scene!.lines), ...REP_TIERS.filter((t) => s.seen.includes(t.id)).flatMap((t) => t.lines)], watch: s.step, title: 'Carnet · la montre' }])}
+					onReplay={() => {
+						const p = currentProject(s);
+						const lines = [
+							...p.arrival,
+							...ORDERS.filter((o) => o.project === p.id && o.step! <= stepOf(s, p.id)).flatMap((o) => o.scene!.lines),
+							...(p.id === 'montre' ? REP_TIERS.filter((t) => s.seen.includes(t.id)).flatMap((t) => t.lines) : []),
+						];
+						setScenes((q) => [...q, { kind: 'talk', id: 'replay', lines, art: { project: p.id, state: stepOf(s, p.id) }, title: `Carnet · ${p.title}` }]);
+					}}
 				/>
 			)}
 
@@ -558,9 +578,14 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmR
 	onUpgrade: (id: string) => void; onBench: () => void; confirmReset: boolean; onReset: () => void; onReplay: () => void;
 }) {
 	const has = (u: string) => s.upgrades.includes(u);
+	const project = currentProject(s);
+	const step = stepOf(s, project.id);
 	// Dust thins out as the story and the workshop move forward.
-	const progress = Math.min(1, (s.upgrades.length + s.step) / (UPGRADES.length + WATCH_STEPS));
+	const told = PROJECTS.reduce((a, p) => a + stepOf(s, p.id), 0);
+	const total = PROJECTS.reduce((a, p) => a + p.steps, 0);
+	const progress = Math.min(1, (s.upgrades.length + told) / (UPGRADES.length + total));
 	const started = has('etabli');
+	const lost = missingGens(s);
 	return (
 		<div className="at-shop">
 			<div className={`at-scene ${has('lampe') ? 'lit' : ''}`} style={{ ['--dust' as string]: 1 - progress }}>
@@ -580,25 +605,33 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, confirmR
 					</svg>
 				)}
 				{has('lampe') && <div className="at-lamp" />}
+				{has('etageres') && <div className="at-shelves" aria-label="Les étagères de Jeanne, rouvertes" />}
 				{has('photo') && <div className="at-photo" aria-label="La photo de 1961"><img src={`${ART}/photo.jpg`} alt="" /></div>}
-				{started && s.step < WATCH_STEPS && (
-					<div className="at-onbench"><Watch state={s.step} size="100%" /></div>
+				{started && step < project.steps && story && (
+					<div className={`at-onbench ${project.id}`}><ObjectArt project={project.id} state={step} /></div>
 				)}
 			</div>
 
 			<div className="at-project">
 				{started ? (
 					<>
-						<div className="at-project-watch"><Watch state={s.step} size="100%" /></div>
+						<div className={`at-project-watch ${project.id}`}><ObjectArt project={project.id} state={step} /></div>
 						<div className="at-project-txt">
-							<strong>La montre de M. Morel</strong>
+							<strong>Chapitre {project.chapter} · {project.title}</strong>
 							{story ? (
-								<span>Étape {story.step}/{WATCH_STEPS} : {story.ask}</span>
-							) : s.step >= WATCH_STEPS ? (
-								<span>Restaurée et rendue. {chapterDone ? 'La photo de 1961 est au mur.' : 'Accroche la photo de 1961 pour clore le chapitre.'}</span>
+								<span>Étape {story.step}/{project.steps} : {story.ask}</span>
+							) : step >= project.steps ? (
+								<span>
+									{project.id === 'montre'
+										? `Restaurée et rendue. ${chapterDone ? 'La photo de 1961 est au mur.' : 'Accroche la photo de 1961 pour clore le chapitre.'}`
+										: 'Restaurée et rendue. La suite de l’histoire arrive bientôt.'}
+								</span>
+							) : stepOf(s, project.id) > 0 ? (
+								<span>En attente : {UPGRADES.find((u) => ORDERS.some((o) => o.project === project.id && o.step === step + 1 && o.after === u.id))?.name ?? 'une amélioration de l’atelier'}.</span>
 							) : (
 								<span>En attente.</span>
 							)}
+							{lost.length > 0 && <span className="at-warn">Libère une case de l’établi : {GENERATORS[lost[0]].name} attend sa place.</span>}
 							<div className="at-project-btns">
 								{story && <button className="at-btn small" onClick={onBench}>À l’établi</button>}
 								<button className="at-btn small ghost" onClick={onReplay}>Relire</button>
@@ -658,12 +691,12 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 	const lines = scene.lines;
 	const line = lines[i];
 	const last = i >= lines.length - 1;
-	const watch = scene.kind === 'restore' ? (after ? scene.to : scene.from) : scene.watch;
+	const art: Art | undefined = scene.kind === 'restore' ? { project: scene.project, state: after ? scene.to : scene.from } : scene.art;
 	const next = () => (last ? onDone() : setI(i + 1));
 	return (
 		<div className="at-modal at-scene-modal" role="dialog" aria-modal="true">
 			<div className="at-card at-talk">
-				{scene.kind === 'restore' && <p className="at-kicker">Restauration · étape {scene.to}/{WATCH_STEPS}</p>}
+				{scene.kind === 'restore' && <p className="at-kicker">Restauration · étape {scene.to}/{projectOf(scene.project).steps}</p>}
 				{scene.id === 'intro' && <div className="at-intro-img" role="img" aria-label="L’atelier poussiéreux" />}
 				{(scene.kind === 'restore' || scene.title) && <h3>{scene.kind === 'restore' ? scene.title : scene.title}</h3>}
 				{line?.show ? (
@@ -678,10 +711,24 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 							</div>
 						)}
 						{line.show === 'photo' && <div className="at-clue-photo"><img src={`${ART}/photo.jpg`} alt="La photo de 1961 : Henri et Jeanne devant l’atelier" /></div>}
+						{line.show === 'label' && (
+							<div className="at-label" role="img" aria-label="Étiquette de l’atelier : Réparation J., à finir">
+								<b>Atelier J.</b>
+								<span>Réparation</span>
+								<em>— à finir —</em>
+							</div>
+						)}
+						{line.show === 'broadcast' && (
+							<div className="at-broadcast" role="img" aria-label="Émission Mémoires du port, archive de 1961">
+								<b>Mémoires du port</b>
+								<span>Archive · été 1961</span>
+								<i aria-hidden="true">{Array.from({ length: 24 }, (_, k) => <u key={k} style={{ height: `${20 + ((k * 37) % 70)}%` }} />)}</i>
+							</div>
+						)}
 					</div>
-				) : watch !== undefined && (
-					<div className={`at-bigwatch ${scene.kind === 'restore' && after ? 'shine' : ''}`}>
-						<Watch state={watch} size="100%" />
+				) : art && (
+					<div className={`at-bigwatch ${art.project} ${scene.kind === 'restore' && after ? 'shine' : ''}`}>
+						<ObjectArt {...art} />
 					</div>
 				)}
 				{line && (
@@ -830,6 +877,17 @@ const CSS = `
 .at-talk { gap: 12px; }
 .at-intro-img { aspect-ratio: 16 / 10; border-radius: 12px; background: url('${ART}/atelier.jpg') center 30% / cover; filter: sepia(0.6) brightness(0.6) saturate(0.6); box-shadow: inset 0 0 40px rgba(0,0,0,0.6); }
 .at-bigwatch { width: min(46vw, 170px); margin: 0 auto; position: relative; }
+.at-bigwatch.radio { width: min(72vw, 270px); }
+.at-label { width: 70%; margin: 0 auto; background: #f6ecd2; border: 1.5px solid #b58b4a; border-radius: 6px 22px 6px 6px; padding: 12px 16px; transform: rotate(-3deg); box-shadow: 0 5px 12px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; gap: 2px; font-family: 'Segoe Script', 'Bradley Hand', cursive; color: #3b3a6b; }
+.at-label b { font-family: Georgia, serif; color: #6b4a12; letter-spacing: 0.1em; font-size: 13px; }
+.at-label em { font-style: normal; font-size: 16px; color: #9c2a1a; }
+.at-broadcast { background: #2b1d0e; color: #ffe2a0; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+.at-broadcast b { font-size: 16px; }
+.at-broadcast span { font-size: 12px; opacity: 0.75; }
+.at-broadcast i { display: flex; align-items: center; gap: 3px; height: 38px; margin-top: 6px; }
+.at-broadcast u { flex: 1; background: #ffb13b; border-radius: 2px; animation: at-eq 1.1s ease-in-out infinite alternate; }
+.at-broadcast u:nth-child(odd) { animation-delay: -0.5s; }
+@keyframes at-eq { from { transform: scaleY(0.4); } to { transform: scaleY(1); } }
 .at-bigwatch.shine::after { content: ''; position: absolute; inset: -10%; background: radial-gradient(circle, rgba(255,240,180,0.9), rgba(255,240,180,0) 60%); animation: at-shine 1.2s ease-out forwards; pointer-events: none; }
 @keyframes at-shine { from { opacity: 1; transform: scale(0.4); } to { opacity: 0; transform: scale(1.4); } }
 .at-clue { width: min(56vw, 210px); margin: 0 auto; animation: at-clue 0.45s ease; }
@@ -864,9 +922,13 @@ const CSS = `
 .at-photo { position: absolute; left: 40%; top: 34%; width: 22%; transform: rotate(-3deg); background: #f4ead4; padding: 3px 3px 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); animation: at-hang 0.8s ease; }
 .at-photo img { width: 100%; display: block; }
 @keyframes at-hang { from { transform: rotate(-12deg) translateY(-12px); opacity: 0; } to { transform: rotate(-3deg); opacity: 1; } }
+.at-onbench.radio { width: 16% !important; top: 75% !important; }
 .at-onbench { position: absolute; left: 58%; top: 77%; width: 8%; transform: translate(-50%, -50%) rotate(-12deg); filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
 .at-project { display: flex; gap: 12px; align-items: center; background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; }
 .at-project-watch { width: 54px; flex: none; }
+.at-project-watch.radio { width: 84px; }
+.at-warn { color: #d9822b !important; font-weight: 600; }
+.at-shelves { position: absolute; left: 52%; top: 6%; width: 48%; height: 62%; background: radial-gradient(ellipse at 60% 40%, rgba(255, 214, 140, 0.35), transparent 65%); mix-blend-mode: screen; pointer-events: none; }
 .at-project-txt { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--gray-300); min-width: 0; flex: 1; }
 .at-project-txt strong { color: var(--gray-0); font-size: 15px; }
 .at-project-btns { display: flex; gap: 6px; margin-top: 4px; }
@@ -889,6 +951,6 @@ const CSS = `
 	.at-stat em { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img { animation: none; }
+	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img, .at-broadcast u { animation: none; }
 }
 `;

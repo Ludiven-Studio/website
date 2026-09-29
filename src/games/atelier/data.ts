@@ -1,8 +1,10 @@
-// Content of the vertical slice: chains, generators, orders, the watch, the workshop.
-// Pure data, no logic, so a sim script and the tests read the same tables as the game.
+// Content of the campaign: chains, generators, projects (one restored object per chapter),
+// orders, the workshop. Pure data, no logic, so a sim script and the tests read the same
+// tables as the game. The story behind it: docs/atelier-scenario.md.
 
-export type ChainId = 'outil' | 'soin' | 'meca';
-export type GenId = 'boite' | 'tiroir';
+export type ChainId = 'outil' | 'soin' | 'meca' | 'elec';
+export type GenId = 'boite' | 'tiroir' | 'caisse';
+export type ProjectId = 'montre' | 'radio';
 
 export interface Chain {
 	id: ChainId;
@@ -35,6 +37,13 @@ export const CHAINS: Record<ChainId, Chain> = {
 		items: ['Vis', 'Lot de vis', 'Ressort', 'Rouage', 'Mécanisme', 'Mouvement d’horloge'],
 		sell: 1,
 	},
+	elec: {
+		id: 'elec',
+		family: 'Électricité',
+		gen: 'caisse',
+		items: ['Fusible', 'Bobine de fil', 'Ampoule', 'Lampe radio', 'Transformateur'],
+		sell: 1,
+	},
 };
 
 export interface Generator {
@@ -45,6 +54,8 @@ export interface Generator {
 	charges: number;
 	/** Milliseconds to get one charge back. */
 	chargeMs: number;
+	/** Workshop upgrade that puts it on the board. None: there from the start. */
+	unlock?: string;
 }
 
 export const GENERATORS: Record<GenId, Generator> = {
@@ -68,6 +79,17 @@ export const GENERATORS: Record<GenId, Generator> = {
 		charges: 12,
 		chargeMs: 8_000,
 	},
+	caisse: {
+		id: 'caisse',
+		name: 'Caisse d’électricien',
+		out: [
+			{ chain: 'elec', w: 80 },
+			{ chain: 'elec', level: 2, w: 20 },
+		],
+		charges: 12,
+		chargeMs: 8_000,
+		unlock: 'etageres',
+	},
 };
 
 export const COLS = 7;
@@ -89,9 +111,57 @@ export interface Reward {
 export interface Line {
 	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'moi' | 'note';
 	text: string;
-	/** Shown in place of the watch while this line is on screen: the clue the line talks about. */
-	show?: 'back' | 'mechanism' | 'photo' | 'postcard';
+	/** Shown in place of the object while this line is on screen: the clue the line talks about. */
+	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast';
 }
+
+/** Reached once a project has delivered `step` restoration steps. */
+export interface Gate {
+	project: ProjectId;
+	step: number;
+}
+
+export interface Project {
+	id: ProjectId;
+	/** Chapter number, as shown to the player. */
+	chapter: number;
+	/** Short label for the order cards. */
+	object: string;
+	title: string;
+	client: string;
+	steps: number;
+	/** Played when its first story order opens. */
+	arrival: Line[];
+}
+
+export const PROJECTS: Project[] = [
+	{
+		id: 'montre',
+		chapter: 1,
+		object: 'Montre',
+		title: 'La montre de M. Morel',
+		client: 'M. Morel',
+		steps: 3,
+		arrival: [
+			{ who: 'morel', text: 'Bonjour… Vous êtes de la famille de Jeanne ? Enfin quelqu’un rouvre l’atelier.' },
+			{ who: 'morel', text: 'Cette montre était à mon père. Elle s’est arrêtée le jour où il est parti. Je n’ai jamais osé la faire réparer.' },
+			{ who: 'moi', text: 'Boîtier terni, verre fendu, mécanisme bloqué… On va la remettre en état, étape par étape.' },
+		],
+	},
+	{
+		id: 'radio',
+		chapter: 2,
+		object: 'Radio',
+		title: 'La radio de Mme Garnier',
+		client: 'Mme Garnier',
+		steps: 3,
+		arrival: [
+			{ who: 'garnier', text: 'Vous avez fait des merveilles avec la montre d’Henri. Ma radio, elle, se tait depuis des années.' },
+			{ who: 'garnier', text: 'J’écoutais l’émission du port en cousant. Il paraît que la radio locale rediffuse ses vieilles archives, le dimanche.' },
+			{ who: 'moi', text: 'Coffret poussiéreux, lampe grillée, aiguille bloquée… Elle va rechanter, promis.' },
+		],
+	},
+];
 
 export interface Order {
 	id: string;
@@ -102,17 +172,18 @@ export interface Order {
 	reward: Reward;
 	/** Workshop upgrade that must be bought first. */
 	after?: string;
-	/** Story step reached (orders of kind 'story' advance it by one). */
+	/** Story order: the project it restores and the step it delivers (taken in sequence). */
+	project?: ProjectId;
 	step?: number;
-	/** Short orders: story step needed before the client comes in. */
-	minStep?: number;
+	/** Progress needed before the client comes in. */
+	when?: Gate;
 	/** Shown in the restoration scene once delivered. */
 	scene?: { title: string; lines: Line[] };
 }
 
-// Listed in play order. A short order waits for its `after` upgrade; story orders are
-// taken one at a time in sequence.
+// Listed in play order. Story orders are taken one at a time, in sequence per project.
 export const ORDERS: Order[] = [
+	// ---- Chapter 1: the watch ----
 	{
 		id: 'garnier-1',
 		kind: 'short',
@@ -138,6 +209,7 @@ export const ORDERS: Order[] = [
 		needs: ['soin:3'],
 		reward: { coins: 12, rep: 3, energy: 10 },
 		after: 'etabli',
+		project: 'montre',
 		step: 1,
 		scene: {
 			title: 'Nettoyage',
@@ -163,7 +235,7 @@ export const ORDERS: Order[] = [
 		ask: 'Des brucelles pour mes maquettes.',
 		needs: ['outil:3'],
 		reward: { coins: 12, rep: 1 },
-		minStep: 1,
+		when: { project: 'montre', step: 1 },
 	},
 	{
 		id: 'morel-2',
@@ -172,6 +244,7 @@ export const ORDERS: Order[] = [
 		ask: 'Remettre le mécanisme en marche.',
 		needs: ['outil:4', 'meca:5'],
 		reward: { coins: 15, rep: 3, energy: 10 },
+		project: 'montre',
 		step: 2,
 		scene: {
 			title: 'Mécanisme',
@@ -189,7 +262,7 @@ export const ORDERS: Order[] = [
 		ask: 'Un ressort pour la sonnette de mon vélo.',
 		needs: ['meca:3'],
 		reward: { coins: 12, rep: 1 },
-		minStep: 2,
+		when: { project: 'montre', step: 2 },
 	},
 	{
 		id: 'morel-3',
@@ -198,6 +271,7 @@ export const ORDERS: Order[] = [
 		ask: 'Changer le verre et polir le tout.',
 		needs: ['soin:4', 'meca:3'],
 		reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 },
+		project: 'montre',
 		step: 3,
 		scene: {
 			title: 'Finition',
@@ -208,13 +282,91 @@ export const ORDERS: Order[] = [
 			],
 		},
 	},
-];
 
-/** The watch's arrival, before any delivery. */
-export const ARRIVAL: Line[] = [
-	{ who: 'morel', text: 'Bonjour… Vous êtes de la famille de Jeanne ? Enfin quelqu’un rouvre l’atelier.' },
-	{ who: 'morel', text: 'Cette montre était à mon père. Elle s’est arrêtée le jour où il est parti. Je n’ai jamais osé la faire réparer.' },
-	{ who: 'moi', text: 'Boîtier terni, verre fendu, mécanisme bloqué… On va la remettre en état, étape par étape.' },
+	// ---- Chapter 2: the radio (opens once the 1961 photo is on the wall) ----
+	{
+		id: 'radio-1',
+		kind: 'story',
+		client: 'Mme Garnier',
+		ask: 'Dépoussiérer le coffret et dégager la grille.',
+		needs: ['soin:3', 'outil:2'],
+		reward: { coins: 14, rep: 3, energy: 10 },
+		after: 'photo',
+		project: 'radio',
+		step: 1,
+		scene: {
+			title: 'Le coffret',
+			lines: [
+				{ who: 'note', text: 'Sous la poussière, le bois verni et la toile de la grille réapparaissent. Au fond du coffret, une étiquette de l’atelier.', show: 'label' },
+				{ who: 'garnier', text: '« Réparation J. — à finir ». Jeanne ne l’a jamais terminée. C’était au printemps 1962, je crois.' },
+			],
+		},
+	},
+	{
+		id: 'facteur-1',
+		kind: 'short',
+		client: 'Le facteur',
+		ask: 'De quoi nettoyer ma vieille sacoche.',
+		needs: ['soin:3'],
+		reward: { coins: 12, rep: 1 },
+		when: { project: 'radio', step: 1 },
+	},
+	{
+		id: 'chen-2',
+		kind: 'short',
+		client: 'Mlle Chen',
+		ask: 'Du fil électrique pour une lampe de brocante.',
+		needs: ['elec:2'],
+		reward: { coins: 10, rep: 1 },
+		after: 'etageres',
+	},
+	{
+		id: 'radio-2',
+		kind: 'story',
+		client: 'Mme Garnier',
+		ask: 'Changer la lampe et rétablir le courant.',
+		needs: ['elec:4', 'outil:3'],
+		reward: { coins: 16, rep: 3, energy: 10 },
+		after: 'etageres',
+		project: 'radio',
+		step: 2,
+		scene: {
+			title: 'Le courant',
+			lines: [
+				{ who: 'note', text: 'La lampe neuve rougeoie, le voyant s’allume, le cadran s’éclaire. Un grésillement, puis des voix lointaines.' },
+				{ who: 'garnier', text: 'Oh… Ce ronronnement. J’avais oublié ce bruit-là. Il faut juste trouver la bonne station.' },
+			],
+		},
+	},
+	{
+		id: 'lucas-3',
+		kind: 'short',
+		client: 'Lucas',
+		ask: 'Une ampoule pour le phare de mon vélo.',
+		needs: ['elec:3'],
+		reward: { coins: 12, rep: 1 },
+		when: { project: 'radio', step: 2 },
+	},
+	{
+		id: 'radio-3',
+		kind: 'story',
+		client: 'Mme Garnier',
+		ask: 'Régler la réception.',
+		needs: ['elec:5', 'meca:4'],
+		reward: { coins: 22, rep: 5, energy: 10, cocoins: 10 },
+		project: 'radio',
+		step: 3,
+		scene: {
+			title: 'La voix du quai',
+			lines: [
+				{ who: 'note', text: 'Dimanche, « Mémoires du port ». L’animatrice annonce une archive de l’été 1961.' },
+				{ who: 'note', text: '« … et voici nos Pirates du retour : Jeanne, Lucile et Henri ! Mademoiselle Lucile, qu’est-ce que vous rendez, au juste ? »', show: 'broadcast' },
+				{ who: 'moi', text: 'Lucile ? Jeanne avait une sœur ? Et… des pirates ?' },
+				{ who: 'garnier', text: 'Je vous dois une vérité. J’ai chez moi une boîte que Jeanne m’avait confiée pour sa sœur. Je n’ai jamais osé l’envoyer. Je vous l’apporterai.' },
+				{ who: 'note', text: 'Fin du chapitre 2. La suite de l’histoire arrive bientôt ; en attendant, le quartier passe avec ses commandes.' },
+			],
+		},
+	},
 ];
 
 export const INTRO: Line[] = [
@@ -226,7 +378,7 @@ export const INTRO: Line[] = [
 export const EPILOGUE: Line[] = [
 	{ who: 'note', text: 'La photo de 1961 a retrouvé sa place, bien en vue. Derrière vous, la porte du bureau reste fermée.' },
 	{ who: 'moi', text: 'Qu’est-ce que Jeanne gardait là-dedans ?' },
-	{ who: 'note', text: 'Fin du premier chapitre. Les gens du quartier continuent de passer avec leurs commandes.' },
+	{ who: 'note', text: 'Fin du chapitre 1.' },
 ];
 
 export const SPEAKERS: Record<Line['who'], string> = {
@@ -243,15 +395,16 @@ export interface Upgrade {
 	name: string;
 	desc: string;
 	cost: number;
-	/** Story step needed before it can be bought. */
-	step?: number;
+	/** Progress needed before it can be bought. */
+	when?: Gate;
 	rep: number;
 }
 
 export const UPGRADES: Upgrade[] = [
 	{ id: 'etabli', name: 'Dégager l’établi', desc: 'Faire de la place pour recevoir les clients.', cost: 8, rep: 1 },
-	{ id: 'lampe', name: 'Rallumer la lampe', desc: 'La vieille lampe de Jeanne éclaire à nouveau l’établi.', cost: 20, step: 1, rep: 2 },
-	{ id: 'photo', name: 'Accrocher la photo', desc: 'La photo de 1961, remise au mur, bien en vue.', cost: 15, step: 3, rep: 3 },
+	{ id: 'lampe', name: 'Rallumer la lampe', desc: 'La vieille lampe de Jeanne éclaire à nouveau l’établi.', cost: 20, when: { project: 'montre', step: 1 }, rep: 2 },
+	{ id: 'photo', name: 'Accrocher la photo', desc: 'La photo de 1961, remise au mur, bien en vue.', cost: 15, when: { project: 'montre', step: 3 }, rep: 3 },
+	{ id: 'etageres', name: 'Ouvrir les étagères', desc: 'Les étagères de Jeanne, et sa caisse d’électricien.', cost: 25, when: { project: 'radio', step: 1 }, rep: 2 },
 ];
 
 /** Board at a fresh start: both generators, and a few pieces to show what a merge is. */
@@ -262,8 +415,6 @@ export const START_BOARD: Record<number, string> = {
 	[6 * COLS + 3]: 'meca:1',
 	[6 * COLS + 4]: 'meca:1',
 };
-
-export const WATCH_STEPS = 3;
 
 export interface RepTier {
 	id: string;
@@ -288,7 +439,7 @@ export const REP_TIERS: RepTier[] = [
 	},
 ];
 
-// Neighbourhood orders once the chapter's list runs out. Drawn from the save's rng.
+// Neighbourhood orders once the campaign's list runs out. Drawn from the save's rng.
 export const LOCALS = ['Mme Garnier', 'Lucas', 'M. Morel', 'La boulangère', 'Le facteur', 'Mlle Chen'];
 
 /** Portrait file per client; the others get an emoji. */

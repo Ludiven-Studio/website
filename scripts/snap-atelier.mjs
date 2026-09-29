@@ -85,8 +85,8 @@ try {
 	await page.locator('.at-card .at-btn.ghost').click();
 
 	// Jump the story forward by editing the save, then look at the workshop at each stage.
-	const patch = async (fn) => {
-		await page.evaluate(fn);
+	const patch = async (fn, arg) => {
+		await page.evaluate(fn, arg);
 		await page.reload({ waitUntil: 'networkidle' });
 		await page.waitForSelector('.at-root');
 		await page.locator('.at-hud').scrollIntoViewIfNeeded();
@@ -131,11 +131,41 @@ try {
 	await shot('17-atelier-done');
 	await page.locator('.at-up', { hasText: 'photo' }).locator('.at-btn').click();
 	await shot('18-epilogue');
-	while (await page.locator('.at-talk').count()) { await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); await sleep(150); }
+	// The epilogue hands over to chapter 2: Mme Garnier walks in with her radio.
+	const next = () => page.locator('.at-talk-nav .at-btn:not(.ghost)').click();
+	for (let k = 0; k < 3; k++) { await next(); await sleep(250); }
+	await shot('19-radio-arrival');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await shot('20-radio-orders');
+	const deliverStory = async (pieces, name) => {
+		await patch((ps) => {
+			const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
+			ps.forEach((p, k) => { st.board[k] = p; });
+			st.coins = Math.max(st.coins, 200);
+			localStorage.setItem('ludiven-atelier', JSON.stringify(st));
+		}, pieces);
+		await page.locator('.at-order.story .at-give').click();
+		await sleep(1400);
+		await shot(name);
+	};
+	await deliverStory(['soin:3', 'outil:2'], '21-radio-1');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+	await page.locator('.at-up', { hasText: 'étagères' }).locator('.at-btn').click();
 	await page.locator('.at-scene').scrollIntoViewIfNeeded();
-	await shot('19-atelier-final');
+	await shot('22-etageres');
 	await page.locator('.at-tab', { hasText: 'Établi' }).click();
-	await shot('20-locals');
+	await shot('23-caisse-on-board');
+	await deliverStory(['elec:4', 'outil:3'], '24-radio-2');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await deliverStory(['elec:5', 'meca:4'], '25-radio-3');
+	await next(); await sleep(500);
+	await shot('26-broadcast');
+	while (await page.locator('.at-talk').count()) { await next(); await sleep(150); }
+	await page.locator('.at-scene').scrollIntoViewIfNeeded();
+	await shot('27-atelier-ch2-done');
+	await page.locator('.at-tab', { hasText: 'Établi' }).click();
+	await shot('28-locals');
 	await browser.close();
 } finally {
 	server.stop();

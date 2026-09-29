@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
 	newGame, produce, move, moveKind, deliver, tick, sell, buyUpgrade, load, save, activeOrders,
-	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, CELLS, type State,
+	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, SAVE_V, CELLS, type State,
 } from './engine';
-import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD } from './data';
+import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS } from './data';
 
 const T0 = 1_700_000_000_000;
 const genCell = (s: State, g: string): number => s.board.indexOf(`g:${g}`);
@@ -22,8 +22,10 @@ describe('atelier data', () => {
 		}
 	});
 
-	it('story orders cover steps 1..3 once each', () => {
-		expect(ORDERS.filter((o) => o.kind === 'story').map((o) => o.step)).toEqual([1, 2, 3]);
+	it('each project has its steps 1..n once, in order', () => {
+		for (const p of PROJECTS) {
+			expect(ORDERS.filter((o) => o.project === p.id).map((o) => o.step), p.id).toEqual(Array.from({ length: p.steps }, (_, k) => k + 1));
+		}
 	});
 
 	it('every chain has a generator and upgrades have unique ids', () => {
@@ -184,19 +186,29 @@ describe('orders', () => {
 		expect(deliver(newGame(T0), 'garnier-1').ok).toBe(false);
 	});
 
-	it('story steps advance the watch and neighbourhood orders take over', () => {
-		let s: State = { ...newGame(T0), coins: 100 };
-		s = buyUpgrade(s, 'etabli');
+	it('plays the whole campaign, then neighbourhood orders take over', () => {
+		let s: State = { ...newGame(T0), coins: 500 };
 		const give = (st: State, id: string): State => {
-			const o = activeOrders(st).find((x) => x.id === id)!;
+			const o = activeOrders(st).find((x) => x.id === id);
+			expect(o, `${id} open among ${activeOrders(st).map((x) => x.id)}`).toBeDefined();
 			const n = { ...st, board: st.board.slice() };
-			for (const p of o.needs) n.board[n.board.indexOf(null)] = p;
+			for (const p of o!.needs) n.board[n.board.indexOf(null)] = p;
 			const r = deliver(n, id);
 			expect(r.ok, id).toBe(true);
 			return r.ok ? r.s : st;
 		};
+		s = buyUpgrade(s, 'etabli');
 		for (const id of ['garnier-1', 'lucas-1', 'morel-1', 'garnier-2', 'chen-1', 'morel-2', 'lucas-2', 'morel-3']) s = give(s, id);
-		expect(s.step).toBe(3);
+		expect(stepOf(s, 'montre')).toBe(3);
+		expect(storyOrder(s)).toBeNull(); // the radio waits for the photo
+		s = buyUpgrade(s, 'photo');
+		expect(storyOrder(s)?.id).toBe('radio-1');
+		s = give(s, 'radio-1');
+		expect(storyOrder(s)).toBeNull(); // step 2 needs the electrician's crate
+		s = buyUpgrade(s, 'etageres');
+		expect(s.board).toContain('g:caisse');
+		for (const id of ['facteur-1', 'chen-2', 'radio-2', 'lucas-3', 'radio-3']) s = give(s, id);
+		expect(stepOf(s, 'radio')).toBe(3);
 		expect(storyOrder(s)).toBeNull();
 		const locals = shortOrders(s);
 		expect(locals.length).toBe(2);
@@ -204,6 +216,38 @@ describe('orders', () => {
 		s = give(s, locals[0].id);
 		expect(shortOrders(s).length).toBe(2);
 		expect(shortOrders(s)[0].id).toBe(locals[1].id);
+	});
+
+	it('every campaign order is reachable: its chain has a generator unlocked by then', () => {
+		for (const o of ORDERS) for (const p of o.needs) {
+			const g = GENERATORS[CHAINS[parse(p)!.chain].gen];
+			if (!g.unlock) continue;
+			const gated = o.after === g.unlock || UPGRADES.find((u) => u.id === g.unlock)!.when!.project === o.project
+				|| (o.when && o.when.project === 'radio' && o.when.step >= 2);
+			expect(gated, `${o.id} needs ${p} from ${g.id}`).toBe(true);
+		}
+	});
+});
+
+describe('generators behind upgrades', () => {
+	it('the crate lands on the board when the shelves are bought, and waits on a full board', () => {
+		const base = { ...newGame(T0), coins: 100, progress: { montre: 3, radio: 1 } };
+		expect(base.board).not.toContain('g:caisse');
+		const full = { ...base, board: base.board.map((p) => p ?? 'meca:6') };
+		const bought = buyUpgrade(full, 'etageres');
+		expect(bought.upgrades).toContain('etageres');
+		expect(bought.board).not.toContain('g:caisse');
+		expect(missingGens(bought)).toEqual(['caisse']);
+		const freed = sell(bought, bought.board.indexOf('meca:6'));
+		expect(freed.board).toContain('g:caisse');
+		expect(missingGens(freed)).toEqual([]);
+	});
+
+	it('neighbourhood orders only ask for chains whose generator is on the board', () => {
+		let s: State = { ...newGame(T0, 11), progress: { montre: 3, radio: 3 }, done: ORDERS.map((o) => o.id) };
+		const n = buyUpgrade({ ...s, coins: 100 }, 'photo'); // refill runs on purchase
+		s = n;
+		for (const o of shortOrders(s)) for (const p of o.needs) expect(parse(p)!.chain).not.toBe('elec');
 	});
 });
 
@@ -244,6 +288,16 @@ describe('save', () => {
 		if (r.ok) s = r.s;
 		const back = load(save(s), T0);
 		expect(save(back)).toBe(save(s));
+	});
+
+	it('migrates a v1 save: the watch step becomes the watch progress', () => {
+		const v1 = { ...JSON.parse(save(newGame(T0))), v: 1, step: 2, seen: ['intro', 'arrival'] };
+		delete v1.progress;
+		const back = load(JSON.stringify(v1), T0);
+		expect(back.v).toBe(SAVE_V);
+		expect(stepOf(back, 'montre')).toBe(2);
+		expect(stepOf(back, 'radio')).toBe(0);
+		expect(back.seen).toContain('arrival:montre');
 	});
 
 	it('garbage or an unknown version starts fresh', () => {

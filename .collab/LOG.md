@@ -6,3 +6,4 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-09-29 · 0002 · ressort, brucelles, boulangère, facteur (Codex imagegen) · intégrés dans public/assets/jeux/atelier/
 - 2026-09-29 · 0004 · scénario pirates (version Codex) · fusionné avec la version Claude dans docs/atelier-scenario.md
 - 2026-09-29 · 0005 · challenge de la fusion · validée avec 3 changements, intégrés ; scénario soumis à l'utilisateur
+- 2026-09-29 · 0006 · chaîne électrique + caisse d'électricien (Codex imagegen) · intégrées
