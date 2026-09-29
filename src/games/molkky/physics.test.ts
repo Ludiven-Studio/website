@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { loadPhysics, MolkkyWorld, simulateThrow, standardLayout, PINS_Z, PIN_H, RAPIER_VERSION } from './physics';
+import { loadPhysics, MolkkyWorld, simulateThrow, standardLayout, throwVelocity, PINS_Z, PIN_H, RAPIER_VERSION, RELEASE_Y, STICK_R, DT, type SurfaceId } from './physics';
 import { aimAt } from './ai';
 
 beforeAll(() => loadPhysics());
@@ -80,6 +80,39 @@ describe('mölkky physics', () => {
 			expect(w.fallen(), `after throw ${k + 1}`).toEqual([]);
 		}
 		w.free();
+	});
+
+	/** Where the drawn arc puts the stick (the game's preview step) and where the stick really touches, then rests. */
+	function landing(surface: SurfaceId, speed: number, loft: number) {
+		const th = { yaw: 0, speed, loft };
+		const v = throwVelocity(th);
+		let y = RELEASE_Y, z = 0, vy = v.vy;
+		while (y > STICK_R) { vy -= 9.81 * DT; z += v.vz * DT; y += vy * DT; }
+		const w = MolkkyWorld.create(standardLayout().map((p) => ({ ...p, z: p.z + 40 })), surface); // pins out of the way
+		w.throwStick(th);
+		let touch = NaN;
+		for (let k = 0; k < 720; k++) {
+			w.step();
+			if (Number.isNaN(touch) && w.stick!.translation().y < STICK_R + 0.02) touch = w.stick!.translation().z;
+		}
+		const rest = w.stick!.translation().z;
+		w.free();
+		return { preview: z, touch, rest };
+	}
+
+	it('the stick lands where the arc says (it used to fall 12-18 % short)', () => {
+		for (const [speed, loft] of [[5, 0.5], [7, 0.3], [8, 0.6]]) {
+			const l = landing('herbe', speed, loft);
+			expect(Math.abs(l.touch - l.preview), `${speed} m/s`).toBeLessThan(0.12);
+		}
+	});
+
+	it('grass stops a landed stick within a metre; gravel lets it run further', () => {
+		for (const [speed, loft] of [[5, 0.5], [7, 0.3]]) {
+			const g = landing('herbe', speed, loft), r = landing('gravier', speed, loft);
+			expect(g.rest - g.touch, `grass ${speed}`).toBeLessThan(1.2);
+			expect(r.rest - r.touch, `gravel ${speed}`).toBeGreaterThan(g.rest - g.touch);
+		}
 	});
 
 	it('settles a throw fast enough for the AI to try a dozen', () => {

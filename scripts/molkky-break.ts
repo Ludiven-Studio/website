@@ -3,7 +3,7 @@
    enough force to scatter the other pins". Sweeps FEEL presets so a change is judged on numbers.
 
    Usage: npx tsx scripts/molkky-break.ts [throws per preset] */
-import { loadPhysics, MolkkyWorld, standardLayout, FEEL, PINS_Z, type Throw } from '../src/games/molkky/physics';
+import { loadPhysics, MolkkyWorld, standardLayout, FEEL, PINS_Z, type Throw, type SurfaceId } from '../src/games/molkky/physics';
 import { aimAt } from '../src/games/molkky/ai';
 
 const N = Number(process.argv[2] ?? 60);
@@ -17,6 +17,7 @@ const PRESETS: Record<string, Partial<typeof FEEL>> = {
 	old: OLD,
 	current: {},
 };
+const SURF: SurfaceId[] = ['herbe', 'gravier'];
 
 // A player's opening throws: a spread of lofts, each thrown from 20 % short to 35 % long of the exact
 // aim, slightly off-centre. Deterministic, the same throws for every preset.
@@ -35,12 +36,13 @@ const start = new Map(standardLayout().map((p) => [p.n, p]));
 const throws = throwsFor(N);
 console.log(`${N} opening throws per preset (loft 0.15-0.65, speed 0.8x-1.35x the exact aim)`);
 console.log('preset          touched  down avg  p50  ≥3 down  ≥5 down   down|hit  moved|hit  spread|moved (m)  max (m)  settle ms');
-for (const [name, patch] of Object.entries(PRESETS)) {
+for (const surf of SURF) for (const [name0, patch] of Object.entries(PRESETS)) {
+	const name = `${name0}/${surf}`;
 	Object.assign(FEEL, BASE, patch);
 	let down = 0, three = 0, five = 0, touched = 0, spread = 0, spreadN = 0, maxS = 0, ms = 0, movedPins = 0;
 	const downs: number[] = [];
 	for (const th of throws) {
-		const w = MolkkyWorld.create();
+		const w = MolkkyWorld.create(undefined, surf);
 		const t0 = performance.now();
 		w.throwStick(th);
 		const fell = w.settle();

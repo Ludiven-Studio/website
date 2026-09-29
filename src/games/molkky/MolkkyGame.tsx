@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { addLights, buildSurrounds, SURROUND } from '../petanque/render3d';
 import { swayAmp, swayAt } from '../petanque/sway';
 import { usePointerDrag } from '../usePointerDrag';
-import { loadPhysics, MolkkyWorld, PIN_H, PIN_R, STICK_L, STICK_R, PINS_Z, RELEASE_Y, DT, throwVelocity, type Throw } from './physics';
+import { loadPhysics, MolkkyWorld, PIN_H, PIN_R, STICK_L, STICK_R, PINS_Z, RELEASE_Y, DT, throwVelocity, SURFACES, type Throw, type SurfaceId } from './physics';
 import { initMolkky, applyThrow, TARGET, MISSES_OUT, type MolkkyState } from './rules';
 import { planAiSteps, SKILLS, type MkLevel } from './ai';
 
@@ -53,6 +53,50 @@ function grassTexture(): THREE.CanvasTexture {
 	return t;
 }
 
+/** Packed boulodrome gravel, the other surface. Same deterministic LCG as the grass. */
+function gravelTexture(): THREE.CanvasTexture {
+	const c = document.createElement('canvas');
+	c.width = c.height = 256;
+	const g = c.getContext('2d') as CanvasRenderingContext2D;
+	g.fillStyle = '#b7a17d';
+	g.fillRect(0, 0, 256, 256);
+	let s = 424242;
+	const rnd = (): number => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+	for (let i = 0; i < 3400; i++) {
+		const l = 45 + rnd() * 35;
+		g.fillStyle = `hsl(${30 + rnd() * 15}, ${10 + rnd() * 18}%, ${l}%)`;
+		const r = 0.6 + rnd() * 1.8;
+		g.beginPath(); g.arc(rnd() * 256, rnd() * 256, r, 0, Math.PI * 2); g.fill();
+	}
+	const t = new THREE.CanvasTexture(c);
+	t.wrapS = t.wrapT = THREE.RepeatWrapping;
+	t.repeat.set(40, 40);
+	t.colorSpace = THREE.SRGBColorSpace;
+	t.anisotropy = 8;
+	return t;
+}
+
+/** A pin's number floating over it, always facing the camera, so the count reads from any view. */
+function labelSprite(n: number): THREE.Sprite {
+	const c = document.createElement('canvas');
+	c.width = c.height = 64;
+	const g = c.getContext('2d') as CanvasRenderingContext2D;
+	g.fillStyle = 'rgba(28,20,12,0.82)';
+	g.beginPath(); g.arc(32, 32, 28, 0, Math.PI * 2); g.fill();
+	g.strokeStyle = '#f4d98a'; g.lineWidth = 3; g.stroke();
+	g.fillStyle = '#fff';
+	g.font = `bold ${n >= 10 ? 28 : 34}px system-ui, sans-serif`;
+	g.textAlign = 'center'; g.textBaseline = 'middle';
+	g.fillText(String(n), 32, 34);
+	const t = new THREE.CanvasTexture(c);
+	t.colorSpace = THREE.SRGBColorSpace;
+	// Depth-tested and pin-sized: in the tight start pack the labels then overlap exactly as the pins do,
+	// instead of piling into one unreadable stack drawn over everything.
+	const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true }));
+	sp.scale.setScalar(0.052);
+	return sp;
+}
+
 /** The pin's top: the number burnt into the end grain. */
 function numberTexture(n: number): THREE.CanvasTexture {
 	const c = document.createElement('canvas');
@@ -78,6 +122,8 @@ interface Scene3D {
 	camera: THREE.PerspectiveCamera;
 	pins: Map<number, THREE.Mesh>;
 	pinSide: Map<number, THREE.MeshStandardMaterial>;
+	labels: Map<number, THREE.Sprite>;
+	setSurface: (id: SurfaceId) => void;
 	stick: THREE.Mesh;
 	arc: THREE.Line;
 	ring: THREE.Mesh;
@@ -98,7 +144,9 @@ function buildScene(canvas: HTMLCanvasElement, seed: number): Scene3D {
 	const garden = buildSurrounds(seed, sun);
 	scene.add(garden.group);
 
-	const grass = new THREE.Mesh(new THREE.CircleGeometry(SURROUND, 64), new THREE.MeshStandardMaterial({ map: grassTexture(), roughness: 1 }));
+	const grassMap = grassTexture(), gravelMap = gravelTexture();
+	const groundMat = new THREE.MeshStandardMaterial({ map: grassMap, roughness: 1 });
+	const grass = new THREE.Mesh(new THREE.CircleGeometry(SURROUND, 64), groundMat);
 	grass.rotation.x = -Math.PI / 2;
 	grass.receiveShadow = true;
 	scene.add(grass);
@@ -110,6 +158,7 @@ function buildScene(canvas: HTMLCanvasElement, seed: number): Scene3D {
 	scene.add(line);
 
 	const pins = new Map<number, THREE.Mesh>();
+	const labels = new Map<number, THREE.Sprite>();
 	const pinSide = new Map<number, THREE.MeshStandardMaterial>();
 	const pinGeo = new THREE.CylinderGeometry(PIN_R, PIN_R, PIN_H, 28);
 	const woodEnd = new THREE.MeshStandardMaterial({ color: 0xbba77f, roughness: 0.75 });
@@ -123,6 +172,9 @@ function buildScene(canvas: HTMLCanvasElement, seed: number): Scene3D {
 		scene.add(m);
 		pins.set(n, m);
 		pinSide.set(n, side);
+		const lab = labelSprite(n);
+		scene.add(lab);
+		labels.set(n, lab);
 	}
 
 	const stick = new THREE.Mesh(new THREE.CylinderGeometry(STICK_R, STICK_R, STICK_L, 28), new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: 0.65 }));
@@ -139,7 +191,8 @@ function buildScene(canvas: HTMLCanvasElement, seed: number): Scene3D {
 	scene.add(ring);
 
 	return {
-		renderer, scene, camera, pins, pinSide, stick, arc, ring,
+		renderer, scene, camera, pins, pinSide, labels, stick, arc, ring,
+		setSurface: (id) => { groundMat.map = id === 'gravier' ? gravelMap : grassMap; groundMat.needsUpdate = true; },
 		dispose: () => { garden.dispose(); lights.dispose(); renderer.dispose(); },
 	};
 }
@@ -167,6 +220,9 @@ export default function MolkkyGame() {
 	const [match, setMatch] = useState<MolkkyState>(() => initMolkky(['Toi', 'Ordi']));
 	const matchRef = useRef(match);
 	const [level, setLevel] = useState<MkLevel>('moyen');
+	const [surface, setSurface] = useState<SurfaceId>('herbe');
+	const surfaceRef = useRef<SurfaceId>('herbe');
+	surfaceRef.current = surface;
 	const levelRef = useRef(level);
 	levelRef.current = level;
 	const [view, setView] = useState<View>('lancer');
@@ -202,7 +258,8 @@ export default function MolkkyGame() {
 		const w = worldRef.current;
 		if (!w) return;
 		w.free();
-		worldRef.current = MolkkyWorld.create();
+		worldRef.current = MolkkyWorld.create(undefined, surfaceRef.current);
+		g3Ref.current?.setSurface(surfaceRef.current);
 		setMatchBoth(initMolkky(['Toi', `Ordi · ${LEVEL_LABEL[lv]}`]));
 		setLit([]);
 		setAnnounce(null);
@@ -285,7 +342,7 @@ export default function MolkkyGame() {
 		(async () => {
 			await loadPhysics();
 			if (!alive || !canvasRef.current) return;
-			worldRef.current = MolkkyWorld.create();
+			worldRef.current = MolkkyWorld.create(undefined, surfaceRef.current);
 			// Sun seed 19: 42 deg, neutral white, behind the thrower's left. A forced elevation keeps the
 			// seed's colour, and seed 7's was a sunset that turned the birch red.
 			g3Ref.current = buildScene(canvasRef.current, 19);
@@ -341,6 +398,8 @@ export default function MolkkyGame() {
 					if (!m) continue;
 					m.position.set(p.x, p.y, p.z);
 					m.quaternion.set(p.q.x, p.q.y, p.q.z, p.q.w);
+					// Above the pin's highest point: its top when standing, its side when down.
+					g.labels.get(p.n)?.position.set(p.x, p.y + (p.down ? PIN_R : PIN_H / 2) + 0.03, p.z);
 				}
 				if (w.stick) {
 					const t = w.stick.translation(), q = w.stick.rotation();
@@ -354,12 +413,13 @@ export default function MolkkyGame() {
 				if (a && a.power >= 0.06 && statusRef.current === 'aim') {
 					const v = throwVelocity(aimThrow(a));
 					const pts: THREE.Vector3[] = [];
-					let x = 0, y = RELEASE_Y, z = 0;
+					// The same step as Rapier (velocity first, then position), so the ring is where the stick lands.
+					let x = 0, y = RELEASE_Y, z = 0, vy = v.vy;
 					for (let i = 0; i < 400; i++) {
 						pts.push(new THREE.Vector3(x, y, z));
-						const h = 1 / 120;
-						x += v.vx * h; z += v.vz * h; y += (v.vy - 9.81 * i * h) * h;
-						if (y <= 0) break;
+						vy -= 9.81 * DT;
+						x += v.vx * DT; z += v.vz * DT; y += vy * DT;
+						if (y <= STICK_R) break;
 					}
 					g.arc.geometry.dispose();
 					g.arc.geometry = new THREE.BufferGeometry().setFromPoints(pts);
@@ -451,6 +511,13 @@ export default function MolkkyGame() {
 						<button key={lv} className={lv === level ? 'on' : ''} onClick={() => { setLevel(lv); newGame(lv); }}>{LEVEL_LABEL[lv]}</button>
 					))}
 				</div>
+				<div className="mk-surfaces" role="group" aria-label="Surface">
+					{(Object.keys(SURFACES) as SurfaceId[]).map((sf) => (
+						<button key={sf} className={sf === surface ? 'on' : ''} onClick={() => { if (sf === surface) return; surfaceRef.current = sf; setSurface(sf); newGame(); }}>
+							{sf === 'herbe' ? '🌱' : '🪨'} {SURFACES[sf].label}
+						</button>
+					))}
+				</div>
 				<div className="mk-views">
 					{(['lancer', 'quilles', 'dessus'] as View[]).map((v) => (
 						<button key={v} className={v === view ? 'on' : ''} onClick={() => setView(v)}>{v === 'lancer' ? 'Lancer' : v === 'quilles' ? 'Quilles' : 'Dessus'}</button>
@@ -505,6 +572,9 @@ const CSS = `
 
 .mk-levels, .mk-views { position: absolute; top: calc(max(8px, env(safe-area-inset-top)) + 44px); display: flex; flex-direction: column; gap: 5px; z-index: 3; }
 .mk-levels { left: max(8px, env(safe-area-inset-left)); }
+.mk-surfaces { position: absolute; left: max(8px, env(safe-area-inset-left)); top: calc(max(8px, env(safe-area-inset-top)) + 136px); display: flex; flex-direction: column; gap: 5px; z-index: 3; }
+.mk-surfaces button { border: 0; border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 700; background: rgba(28,20,12,0.55); color: #f4ece2; cursor: pointer; }
+.mk-surfaces button.on { background: #2f7a3c; }
 .mk-views { right: max(8px, env(safe-area-inset-right)); }
 .mk-levels button, .mk-views button { border: 0; border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 700; background: rgba(28,20,12,0.55); color: #f4ece2; cursor: pointer; }
 .mk-levels button.on { background: #7a2cd1; }

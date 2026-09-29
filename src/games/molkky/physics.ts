@@ -45,19 +45,34 @@ export const FEEL = {
 	pinLinDamp: 0.08,
 	pinAngDamp: 0.3,
 	stickFriction: 0.3,
-	stickBounce: 0.35,
-	stickLinDamp: 0.3,
+	stickBounce: 0.15, // with the default average: ~0.3 off a pin, a small hop off the ground
+	// Zero in flight: air drag on a 20 cm stick is nothing, and 0.3 landed it 12-18 % short of the drawn arc.
+	stickLinDamp: 0,
 	stickAngDamp: 0.6,
 	/** Stick friction takes the lower of the pair: a stick landing short skids into the pins instead of stopping dead. */
-	stickSkids: true,
-	/** Stick restitution takes the higher of the pair: wood cracks off wood. */
-	woodBounce: true,
+	stickSkids: false, // on: a landed stick slid 1-2 m past the mark on grass, where it should stop
+	/** Stick restitution takes the higher of the pair. Off: against the ground it made the stick hop
+	 *  1.4-2 m/s back up on landing; the default average still cracks wood off wood. */
+	woodBounce: false,
 };
 
 /** Official start, front row nearest the thrower: 1 2 / 3 10 4 / 5 11 12 6 / 7 9 8. */
 const ROWS = [[1, 2], [3, 10, 4], [5, 11, 12, 6], [7, 9, 8]];
 
 export interface Spot { n: number; x: number; z: number }
+
+/* The ground decides how far wood travels once it lies on it. Rapier has no rolling resistance, so a
+   pin on its side on "grass" rolled for metres and the stick slid 7-10 m past its landing point
+   (measured 2026-09-29). Anything LYING on the ground gets the surface's damping; a standing or
+   falling pin keeps the light damping that lets a pack topple in a chain. */
+export type SurfaceId = 'herbe' | 'gravier';
+export interface Surface { id: SurfaceId; label: string; friction: number; bounce: number; lieLin: number; lieAng: number }
+export const SURFACES: Record<SurfaceId, Surface> = {
+	// Grass grips and swallows: a knocked pin stops within a stick's length or two.
+	herbe: { id: 'herbe', label: 'Herbe', friction: 0.8, bounce: 0.02, lieLin: 4, lieAng: 8 },
+	// Packed gravel lets wood run on, more the harder it was hit.
+	gravier: { id: 'gravier', label: 'Gravier', friction: 0.55, bounce: 0.08, lieLin: 1.2, lieAng: 3 },
+};
 export interface Throw { yaw: number; speed: number; loft: number }
 export interface PinView { n: number; x: number; y: number; z: number; q: { x: number; y: number; z: number; w: number }; down: boolean }
 
@@ -97,6 +112,9 @@ export class MolkkyWorld {
 	t = 0;
 	/** Seconds everything has been calm, for atRest. */
 	private calm = 0;
+	surface: Surface = SURFACES.herbe;
+	/** Bodies currently damped as lying on the ground, by handle: the switch only runs on a change. */
+	private lying = new Set<number>();
 
 	private constructor(world: RapierNS.World, pins: { n: number; body: RapierNS.RigidBody }[], stick: RapierNS.RigidBody | null) {
 		this.world = world;
@@ -105,15 +123,18 @@ export class MolkkyWorld {
 	}
 
 	/** A fresh game: flat ground, the twelve pins standing. Call loadPhysics() first. */
-	static create(layout: Spot[] = standardLayout()): MolkkyWorld {
+	static create(layout: Spot[] = standardLayout(), surface: SurfaceId = 'herbe'): MolkkyWorld {
 		const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 		world.timestep = DT;
 		world.integrationParameters.numSolverIterations = 8;
 		const ground = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0));
 		// Grass: grippy, dead. Nothing bounces off a lawn.
-		world.createCollider(RAPIER.ColliderDesc.cuboid(60, 0.5, 60).setFriction(FEEL.groundFriction).setRestitution(FEEL.groundBounce), ground);
+		const surf = SURFACES[surface];
+		world.createCollider(RAPIER.ColliderDesc.cuboid(60, 0.5, 60).setFriction(surf.friction).setRestitution(surf.bounce), ground);
 		const pins = layout.map((s) => ({ n: s.n, body: MolkkyWorld.makePin(world, s.x, s.z) }));
-		return new MolkkyWorld(world, pins, null);
+		const w = new MolkkyWorld(world, pins, null);
+		w.surface = surf;
+		return w;
 	}
 
 	private static makePin(world: RapierNS.World, x: number, z: number): RapierNS.RigidBody {
@@ -133,6 +154,8 @@ export class MolkkyWorld {
 		const copy = new MolkkyWorld(world, pins, this.stick ? world.getRigidBody(this.stick.handle) : null);
 		copy.t = this.t;
 		copy.calm = this.calm;
+		copy.surface = this.surface;
+		copy.lying = new Set(this.lying);
 		return copy;
 	}
 
@@ -169,7 +192,22 @@ export class MolkkyWorld {
 	step(): void {
 		this.world.step();
 		this.t += DT;
+		this.dampLying();
 		this.calm = this.moving() ? 0 : this.calm + DT;
+	}
+
+	/** Surface damping on whatever lies flat on the ground, the light in-play damping on the rest. */
+	private dampLying(): void {
+		const set = (b: RapierNS.RigidBody, lie: boolean, lin: number, ang: number): void => {
+			if (lie === this.lying.has(b.handle)) return;
+			if (lie) { this.lying.add(b.handle); b.setLinearDamping(this.surface.lieLin); b.setAngularDamping(this.surface.lieAng); }
+			else { this.lying.delete(b.handle); b.setLinearDamping(lin); b.setAngularDamping(ang); }
+		};
+		for (const p of this.pins) {
+			const lie = p.body.translation().y < PIN_R + 0.02 && tilt(p.body.rotation()) < UP_DOWN;
+			set(p.body, lie, FEEL.pinLinDamp, FEEL.pinAngDamp);
+		}
+		if (this.stick) set(this.stick, this.stick.translation().y < STICK_R + 0.02, FEEL.stickLinDamp, FEEL.stickAngDamp);
 	}
 
 	/** Everything has been calm for a moment, or the cap is reached. */
@@ -204,6 +242,7 @@ export class MolkkyWorld {
 		this.removeStick();
 		const down = new Set(this.pins.filter((p) => tilt(p.body.rotation()) < STRAIGHT).map((p) => p.n));
 		for (const p of this.pins) {
+			if (this.lying.delete(p.body.handle)) { p.body.setLinearDamping(FEEL.pinLinDamp); p.body.setAngularDamping(FEEL.pinAngDamp); }
 			if (!down.has(p.n)) {
 				p.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
 				p.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -239,7 +278,7 @@ export class MolkkyWorld {
 	}
 
 	private removeStick(): void {
-		if (this.stick) { this.world.removeRigidBody(this.stick); this.stick = null; }
+		if (this.stick) { this.lying.delete(this.stick.handle); this.world.removeRigidBody(this.stick); this.stick = null; }
 	}
 
 	pinViews(): PinView[] {
