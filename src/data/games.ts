@@ -7,7 +7,7 @@ export interface GameTile {
 	icon: keyof typeof iconPaths;
 	href?: string;
 	status: 'play' | 'soon';
-	category?: 'maths' | 'grilles' | 'logique' | 'mots' | 'adresse' | 'multi'; // defaults to logique
+	category?: 'aventure' | 'maths' | 'grilles' | 'logique' | 'mots' | 'adresse' | 'multi'; // defaults to logique
 	image?: string; // optional presentation thumbnail, e.g. '/assets/jeux/<id>.png' (shown only if set)
 }
 
@@ -467,6 +467,7 @@ export const games: GameTile[] = [
 		icon: 'atelier',
 		href: '/jeux/atelier',
 		status: 'play',
+		category: 'aventure',
 	},
 	{
 		id: 'pong',
