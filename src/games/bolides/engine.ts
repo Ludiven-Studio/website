@@ -301,6 +301,9 @@ export interface GameState {
 	sumR: number[];
 	clock: number; // seconds since start
 	limit: number; // race length in seconds; levels shorten it, everything else keeps CFG.timeLimit
+	/** First-race tutorial: the bots stay home and the clock waits until the hero's first capture.
+	 *  Off everywhere shared (daily, online); the shell turns it on for level 1 only. */
+	hold: boolean;
 	over: boolean; // someone passed CFG.winPct (or the clock ran out) — the run is decided
 	winner: number; // car id that won (0 while the run is live)
 	overByTime: boolean; // won on the clock with the biggest share, not by passing winPct
@@ -562,6 +565,7 @@ export function createGame(seed = randSeed(), diff = 1, cars?: readonly CarPick[
 		sumR: new Array(CAR_COUNT + 1).fill(0),
 		clock: 0,
 		limit: CFG.timeLimit,
+		hold: false,
 		over: false,
 		winner: 0,
 		overByTime: false,
@@ -616,6 +620,7 @@ export function resetGame(s: GameState, seed = randSeed(), diff = s.diff, cars?:
 	s.sumR.fill(0);
 	s.clock = 0;
 	s.limit = CFG.timeLimit; // a shortened level race must not leak into the next run
+	s.hold = false; // same: the level 1 tutorial never leaks into the next run
 	s.over = false;
 	s.winner = 0;
 	s.overByTime = false;
@@ -811,6 +816,7 @@ function capture(s: GameState, car: Car, from = 0): void {
 	mark(s);
 	const g = centroid(s, id);
 	s.events.push({ type: 'capture', id, from, cx: g.x, cz: g.z, gain: s.counts[id] - before });
+	if (id === s.hero) s.hold = false;
 }
 
 function respawn(s: GameState, car: Car): void {
@@ -1031,8 +1037,9 @@ export function stepGame(
 	gas: (s: GameState, car: Car, dt: number) => number = () => 0,
 ): void {
 	if (s.over) return;
-	s.clock += dt;
+	if (!s.hold) s.clock += dt;
 	for (const car of s.cars) {
+		if (s.hold && car.id !== s.hero) continue; // the tutorial: rivals wait at home
 		if (!car.alive) {
 			if (s.clock >= car.respawnAt) respawn(s, car);
 			continue;

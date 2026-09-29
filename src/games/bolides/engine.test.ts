@@ -1002,3 +1002,31 @@ describe('bolides presence roster', () => {
 		expect(r[0].car).toBe('bunker');
 	});
 });
+
+describe('level 1 tutorial hold', () => {
+	it('keeps rivals home and the clock still until the hero closes a first loop', () => {
+		const s = newGame(42, 1);
+		s.hold = true;
+		const start = s.cars.filter((c) => c.id !== s.hero).map((c) => [c.x, c.z]);
+		for (let i = 0; i < 120; i++) stepGame(s, 0, 0, 1 / 60);
+		expect(s.clock).toBe(0);
+		expect(s.cars.filter((c) => c.id !== s.hero).map((c) => [c.x, c.z])).toEqual(start);
+		// Drive a loop out of the start square and back: the first capture releases the race.
+		let released = false;
+		for (let i = 0; i < 60 * 30 && !released; i++) {
+			stepGame(s, i % 90 < 40 ? 0 : 1, 0, 1 / 60);
+			released = !s.hold;
+		}
+		expect(released).toBe(true);
+		const t = s.clock;
+		stepGame(s, 0, 0, 1 / 60);
+		expect(s.clock).toBeGreaterThan(t);
+	});
+
+	it('resetGame drops the hold', () => {
+		const s = newGame(7, 1);
+		s.hold = true;
+		resetGame(s, 7, 1);
+		expect(s.hold).toBe(false);
+	});
+});

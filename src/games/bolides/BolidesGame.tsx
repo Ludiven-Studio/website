@@ -1,8 +1,18 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import {
 	createGame, resetGame, stepGame, stepGuest, applySim, setRemotePose, collectEvents, buildSim, readPose,
-	pct, NAMES, PALETTE, DIFFS, CFG, ITEM, CAR_COUNT, type GameState, type NetEvent,
+	pct, NAMES, PALETTE, DIFFS, CFG, ITEM, CAR_COUNT, TOTAL, cellCenterX, cellCenterZ, type GameState, type NetEvent,
 } from './engine';
+
+/** Centre of a car's start square, for the "ta zone" arrow. Start squares never change hands. */
+function homeCentre(s: GameState, id: number): { x: number; z: number } | null {
+	let x = 0, z = 0, n = 0;
+	for (let c = 0; c < s.home.length; c++) {
+		if (s.home[c] !== id) continue;
+		x += cellCenterX(c); z += cellCenterZ(c); n++;
+	}
+	return n ? { x: x / n, z: z / n } : null;
+}
 import { joinRandom, joinByCode, makeCode, multiplayerAvailable, goCars, MAX_PLAYERS, type Match, type BolidePeer, type GoMsg } from './net';
 import { createRenderer, type Renderer } from './render3d';
 // Importing the roster is what installs it into the engine (setCarLookup), so this import
@@ -135,6 +145,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const [wideIn, setWideIn] = useState(0); // seconds the trail is laid wide
 	const [firstDeath, setFirstDeath] = useState(false); // the "what happened" line, once per run
 	const [startHint, setStartHint] = useState(false); // touch control chip, first seconds of a race
+	/** Level 1 tutorial: 'out' = leave the blue, 'back' = come home to close the loop, 'done' = released. */
+	const [coach, setCoach] = useState<'off' | 'out' | 'back' | 'done'>('off');
+	const coachRef = useRef<'off' | 'out' | 'back' | 'done'>('off');
+	const [gain, setGain] = useState<{ k: number; pct: number } | null>(null);
+	const homeArrowRef = useRef<HTMLDivElement | null>(null);
+	const homeAtRef = useRef<{ x: number; z: number } | null>(null);
 	const [left, setLeft] = useState<number>(CFG.timeLimit); // seconds left in the race
 	const [result, setResult] = useState({ pct: 0, best: 0, rank: 0, diff: 1, won: false, winner: 0, deaths: 0, byTime: false });
 	const [labels, setLabels] = useState<string[]>(NAMES.slice()); // car id -> HUD name (driver names online)
@@ -327,7 +343,14 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		const alpha = Math.min(1, accRef.current / STEP);
 		// Only the hero is audible: a bot dying every few seconds would be constant chatter.
 		for (const e of s.events) {
-			if (e.type === 'capture') { if (e.id === s.hero) sfx.capture(e.gain); }
+			if (e.type === 'capture') {
+				if (e.id === s.hero) {
+					sfx.capture(e.gain);
+					// The capture is THE event of this game: say what it bought, where the eye already is.
+					setGain({ k: now, pct: (e.gain / TOTAL) * 100 });
+					if (coachRef.current === 'out' || coachRef.current === 'back') { coachRef.current = 'done'; setCoach('done'); }
+				}
+			}
 			else if (e.type === 'kill') { if (e.killer === s.hero) sfx.kill(); }
 			else if (e.type === 'death') { if (e.isPlayer) { deathsRef.current++; sfx.death(); setFirstDeath(deathsRef.current === 1); } }
 			else if (e.type === 'snap') { if (e.isPlayer) sfx.snap(); }
@@ -341,6 +364,19 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 			}
 		}
 		if (net.active && net.host) collectEvents(s, pendingRef.current);
+		if (coachRef.current === 'out' && hero.outside) { coachRef.current = 'back'; setCoach('back'); }
+		else if (coachRef.current === 'back' && !hero.outside && hero.alive) { coachRef.current = 'out'; setCoach('out'); }
+		// Out of the zone, an arrow points home: the chase cam shows the road ahead, never the way back.
+		const arrow = homeArrowRef.current, home = homeAtRef.current;
+		if (arrow) {
+			if (home && hero.alive && hero.outside && !s.over) {
+				const dx = home.x - hero.x, dz = home.z - hero.z;
+				const h = hero.vh;
+				const fwd = dx * Math.cos(h) + dz * Math.sin(h), right = -dx * Math.sin(h) + dz * Math.cos(h);
+				arrow.style.display = 'grid';
+				arrow.style.setProperty('--bo-turn', `${Math.atan2(right, fwd)}rad`);
+			} else arrow.style.display = 'none';
+		}
 		if (r) r.frame(s, alpha, dt / 1000);
 		s.events.length = 0; // consumed by the renderer (FX) this frame
 
@@ -423,6 +459,10 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		resetGame(s, seed, diff, ids, items);
 		s.limit = limit;
 		s.hero = 1;
+		homeAtRef.current = homeCentre(s, 1);
+		coachRef.current = 'off';
+		setCoach('off');
+		setGain(null);
 		s.record = false;
 		for (const c of s.cars) { c.remote = false; c.isBot = c.id !== 1; }
 		applyLabels(NAMES.slice());
@@ -491,6 +531,12 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 		dailyBestRef.current = 0;
 		setLevelReady(true);
 		launch(cfg.seed, cfg.diff, true, cfg.limit, true);
+		// Level 1 teaches the one move that scores: the rivals and the clock wait for a first loop.
+		if (level === 1) {
+			stateRef.current.hold = true;
+			coachRef.current = 'out';
+			setCoach('out');
+		}
 	}, [ensureRenderer, launch]);
 
 	/** Release the gate. This is the click the browser wants: sound and fullscreen need one. */
@@ -1100,7 +1146,7 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 	const racing = phase === 'playing' && !levelReady;
 
 	return (
-		<div className={`bo-root${racing ? ' racing' : ''}`}>
+		<div className={`bo-root${racing ? ' racing' : ''}${lv.active ? ' levels' : ''}`}>
 			<style>{CSS}</style>
 
 			<div className="bo-modetoggle">
@@ -1163,6 +1209,35 @@ export default function BolidesGame({ gameId }: { gameId: string }) {
 						</li>
 					</ol>
 				)}
+
+				{phase === 'playing' && lv.active && (() => {
+					const me = board.find((r) => r.me);
+					const pct = me ? me.pct : 0;
+					const goal = levelRef.current.target;
+					return (
+						<div className={`bo-goal${pct >= goal ? ' reached' : ''}`}>
+							<span>Ton terrain <b>{pct.toFixed(1)}</b> / {goal} % · {mmss(left)}</span>
+							<i><u style={{ width: `${Math.min(100, (pct / goal) * 100)}%` }} /></i>
+						</div>
+					);
+				})()}
+
+				{phase === 'playing' && (coach === 'out' || coach === 'back' || coach === 'done') && (
+					<div className={`bo-coach ${coach}`} key={coach}>
+						{coach === 'out' && <><b>1.</b> Sors de ta zone bleue et fais un petit tour.</>}
+						{coach === 'back' && <><b>2.</b> Reviens dans le bleu : tout ce que ta trace entoure devient à toi. Ne recroise pas une autre trace&nbsp;!</>}
+						{coach === 'done' && <>Bravo&nbsp;! Les autres démarrent : repeins {levelRef.current.target}&nbsp;% avant la fin.</>}
+					</div>
+				)}
+
+				{phase === 'playing' && gain && gain.pct >= 0.05 && (
+					<div className="bo-gain" key={gain.k}>+{gain.pct.toFixed(1)}&nbsp;%</div>
+				)}
+
+				<div ref={homeArrowRef} className="bo-home" style={{ display: 'none' }} aria-hidden="true">
+					<span>↑</span>
+					<em>ta zone</em>
+				</div>
 
 				{phase === 'playing' && respawnIn > 0 && (
 					<div className="bo-respawn">
@@ -1512,6 +1587,52 @@ const CSS = `
   animation: bo-chip 2.6s ease-out forwards;
 }
 @keyframes bo-chip { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+/* Level goal, top centre: in a level the target is the whole point, the ranking is the side show. */
+.bo-goal {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px 14px 7px;
+  background: rgba(6,8,16,0.80); border: 1px solid rgba(143,196,255,0.45); border-radius: 14px; color: #fff;
+  font-size: 12.5px; font-weight: 700; white-space: nowrap; box-shadow: 0 3px 14px rgba(0,0,0,0.45);
+}
+.bo-goal b { font-family: var(--font-brand); font-size: 15px; color: #8fc4ff; }
+.bo-goal i { display: block; width: 130px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.16); overflow: hidden; }
+.bo-goal u { display: block; height: 100%; background: #4f9dff; transition: width 0.4s ease; text-decoration: none; }
+.bo-goal.reached { border-color: rgba(255,214,90,0.7); }
+.bo-goal.reached b { color: #ffd65a; }
+.bo-goal.reached u { background: #ffd65a; }
+.bo-root .bo-goal ~ .bo-buffs { top: 58px; }
+/* A phone has no room for both across the top: in a level the goal pill wins, the minimap still shows the race. */
+@media (max-width: 560px) { .bo-root.levels .bo-leaderboard { display: none; } }
+.bo-coach {
+  position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 4; pointer-events: none;
+  width: min(330px, calc(100% - 24px)); text-align: center; color: #1b1405;
+  background: #fff1c2; border: 2px solid #ffd65a; border-radius: 14px; padding: 8px 12px;
+  font-size: 13.5px; font-weight: 700; line-height: 1.35; box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  animation: bo-coach-in 0.35s ease-out;
+}
+.bo-coach b { color: #c2410c; }
+.bo-coach.done { animation: bo-coach-in 0.35s ease-out, bo-chip 3.6s ease-out forwards; }
+@keyframes bo-coach-in { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.bo-gain {
+  position: absolute; left: 50%; top: 42%; z-index: 4; pointer-events: none;
+  font-family: var(--font-brand); font-size: 34px; font-weight: 800; color: #fff;
+  -webkit-text-stroke: 1.5px #1d5fd1; text-shadow: 0 3px 0 #0b1a3a, 0 0 22px rgba(79,157,255,0.95);
+  animation: bo-gain 1.5s ease-out forwards;
+}
+@keyframes bo-gain {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.6); }
+  15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+  70% { opacity: 1; transform: translate(-50%, -22px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(1); }
+}
+.bo-home {
+  position: absolute; left: 50%; top: 38%; z-index: 3; pointer-events: none; place-items: center;
+  width: 58px; height: 58px; margin-left: -29px; border-radius: 50%;
+  background: rgba(6,8,16,0.72); border: 2px solid #4f9dff; box-shadow: 0 0 16px rgba(79,157,255,0.6);
+}
+.bo-home span { display: block; font-size: 26px; font-weight: 900; color: #8fc4ff; line-height: 1; transform: rotate(var(--bo-turn, 0rad)); }
+.bo-home em { position: absolute; bottom: -18px; font-style: normal; font-size: 10.5px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .bo-coach, .bo-gain { animation: none; } }
 /* Top centre: the bottom belongs to the two thumbs, and the corners to the map and the board. */
 .bo-buffs {
   position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 3;
