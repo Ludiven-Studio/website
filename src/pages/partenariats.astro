@@ -1,0 +1,162 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import CallToAction from '../components/CallToAction.astro';
+import Icon from '../components/Icon.astro';
+
+const MAIL = `mailto:contact@ludiven-studio.fr?subject=${encodeURIComponent('Partenariat autour d’un mini-jeu')}`;
+
+/** Partnerships done, newest first. One entry per event or partner. */
+const partnerships = [
+	{
+		name: 'Copa Coruñesa de Petanca 2026',
+		partner: 'Cracks Petanca Coruña',
+		where: 'La Corogne, Espagne',
+		when: 'Septembre 2026',
+		game: 'Jeu de pétanque 3D',
+		image: '/assets/services/tournoi-petanque.webp',
+		imageAlt: 'Le jeu de pétanque aux couleurs de la Copa Coruñesa de Petanca 2026 : bannière du tournoi et panneaux des sponsors autour du terrain',
+		done: [
+			'Le nom du tournoi en bannière au-dessus du terrain',
+			'Les logos du club et de ses 7 sponsors sur les panneaux autour du terrain',
+			'Le jeu entièrement en espagnol',
+			'Un défi propre à la Copa, avec son classement',
+			'Un lien à partager aux joueurs avant le jour J',
+		],
+		href: '/jeux/petanque/coruna/',
+		cta: 'Jouer à la version Copa',
+	},
+];
+
+const title = 'Partenariats | Ludiven Studio';
+const description = 'Des mini-jeux aux couleurs d’un club, d’un tournoi ou d’un événement : les partenariats réalisés, et comment proposer le vôtre.';
+---
+
+<BaseLayout title={title} description={description} image="/assets/work/og/tournoi-petanque.jpg">
+	<div class="stack gap-20">
+		<main class="wrapper stack gap-12">
+			<Hero
+				title="Partenariats"
+				tagline="Des mini-jeux du site aux couleurs d’un club, d’un tournoi ou d’un événement : votre nom, vos logos, vos sponsors, et un lien à partager à vos joueurs."
+				align="start"
+			/>
+
+			<section class="stack gap-8">
+				<h2>Réalisés</h2>
+				{partnerships.map((p) => (
+					<article class="case">
+						<a class="shot" href={p.href}>
+							<img src={p.image} width="1010" height="390" alt={p.imageAlt} loading="lazy" />
+						</a>
+						<div class="body stack gap-4">
+							<div>
+								<h3>{p.name}</h3>
+								<p class="meta">{p.partner} · {p.where} · {p.when} · {p.game}</p>
+							</div>
+							<ul>{p.done.map((d) => <li>{d}</li>)}</ul>
+							<a class="play" href={p.href}>{p.cta} ›</a>
+						</div>
+					</article>
+				))}
+			</section>
+
+			<section class="stack gap-4 next">
+				<h2>Et le vôtre ?</h2>
+				<p>
+					Un tournoi de pétanque : tout est décrit sur <a href="/tournoi-petanque">Votre tournoi dans le jeu de pétanque</a>.
+					Un autre événement, un autre mini-jeu du site : écrivez-moi, on regarde ensemble ce qui est faisable.
+				</p>
+			</section>
+
+			<div class="cta">
+				<CallToAction href={MAIL}>
+					Proposer un partenariat
+					<Icon icon="paper-plane-tilt" size="1.2em" />
+				</CallToAction>
+			</div>
+		</main>
+	</div>
+</BaseLayout>
+
+<style>
+	h2 {
+		font-size: var(--text-2xl);
+		color: var(--gray-0);
+	}
+
+	.case {
+		display: grid;
+		gap: 1.5rem;
+		grid-template-columns: 1fr;
+		align-items: start;
+	}
+
+	.shot {
+		display: block;
+		border-radius: 0.9rem;
+		overflow: hidden;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-md);
+		transition: border-color var(--theme-transition), transform var(--theme-transition);
+	}
+
+	.shot:hover,
+	.shot:focus-visible {
+		border-color: var(--accent-regular);
+		transform: translateY(-2px);
+	}
+
+	.shot img {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+
+	h3 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+		margin: 0;
+	}
+
+	.meta {
+		margin: 0.35rem 0 0;
+		color: var(--gray-400);
+		font-size: var(--text-sm);
+	}
+
+	ul {
+		margin: 0;
+		padding-left: 1.2rem;
+		color: var(--gray-300);
+		line-height: 1.6;
+	}
+
+	.play {
+		color: var(--accent-regular);
+		font-weight: 600;
+		text-decoration: none;
+	}
+
+	.play:hover,
+	.play:focus-visible {
+		text-decoration: underline;
+	}
+
+	.next p {
+		color: var(--gray-300);
+		line-height: 1.6;
+		margin: 0;
+	}
+
+	.cta {
+		display: flex;
+		justify-content: center;
+	}
+
+	@media (min-width: 50em) {
+		.case {
+			grid-template-columns: 3fr 2fr;
+			gap: 2.5rem;
+		}
+	}
+</style>
