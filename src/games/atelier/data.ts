@@ -984,5 +984,6 @@ export const FACES: Record<string, string> = {
 	'Mlle Chen': 'chen',
 	'La boulangère': 'boulangere',
 	'Le facteur': 'facteur',
+	Lucile: 'lucile',
 };
-export const FACE_EMOJI: Record<string, string> = { Vous: '🗝️', Lucile: '🌸' };
+export const FACE_EMOJI: Record<string, string> = { Vous: '🗝️' };

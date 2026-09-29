@@ -12,3 +12,4 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-09-29 · 0009 · illustration du bureau de Jeanne (Codex imagegen) · intégrée
 - 2026-09-29 · 0010 · chaîne textile + malle à tissus (Codex imagegen) · intégrées
 - 2026-09-29 · 0011 · dialogues du chapitre 7 · Codex en limite d'usage, écrits par Claude ; relecture à planifier
+- 2026-09-29 · 0012 · portrait de Lucile + parchemin de la carte (Codex, lancement allégé) · intégrés

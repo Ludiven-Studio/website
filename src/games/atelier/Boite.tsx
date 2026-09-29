@@ -104,7 +104,8 @@ export function MapPieces({ count = 3, only, joined = false, size = '100%' }: { 
 				<g key={k} className="atm-piece" style={{ transform: joined ? 'none' : `translate(${p.dx}px, ${p.dy}px) rotate(${p.r}deg)`, transformOrigin: '105px 85px', transition: 'transform 0.8s ease' }}>
 					<g clipPath={`url(#atm-${k})`}>
 						<rect x="20" y="20" width="170" height="130" fill="#ecdcb0" />
-						<path d="M20 40 Q60 34 100 42 T190 38 M20 130 Q70 124 120 132 T190 128" stroke="#b9a57e" strokeWidth="1" fill="none" />
+						{/* Parchment drawn by Codex (.collab ticket 0012); the island and the cross stay SVG, exact. */}
+						<image href="/assets/jeux/atelier/parchemin.jpg" x="20" y="20" width="170" height="130" preserveAspectRatio="none" />
 						<path d={island} fill="#cdb886" stroke="#6b4a12" strokeWidth="2" />
 						<path d="M92 86 L102 96 M102 86 L92 96" stroke="#b8321a" strokeWidth="3" strokeLinecap="round" />
 						<circle cx="97" cy="91" r="34" fill="none" stroke="#b8321a" strokeWidth="1.8" strokeDasharray="5 3" />
