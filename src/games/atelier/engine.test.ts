@@ -233,6 +233,15 @@ describe('orders', () => {
 		expect(stepOf(s, 'malle')).toBe(3);
 		for (const id of ['musique-1', 'lucas-6', 'musique-2', 'garnier-4', 'musique-3']) s = give(s, id);
 		expect(stepOf(s, 'musique')).toBe(3);
+		// Season 2 follows straight on, before any neighbourhood order.
+		for (const id of ['boussole-1', 'chen-5', 'boussole-2', 'boussole-3', 'fanal-1', 'boulangere-3', 'fanal-2', 'fanal-3',
+			'longuevue-1', 'garnier-5', 'longuevue-2', 'longuevue-3', 'coffre-1', 'lucas-7', 'coffre-2', 'coffre-3']) s = give(s, id);
+		expect(storyOrder(s)).toBeNull(); // the dinghy waits for the boat shed
+		expect(storyBlocker(s)).toEqual({ kind: 'upgrade', id: 'hangar' });
+		s = buyUpgrade(s, 'hangar');
+		expect(s.board).toContain('g:greeur');
+		for (const id of ['mouette-1', 'facteur-2', 'mouette-2', 'morel-6', 'mouette-3', 'cloche-1', 'chen-6', 'cloche-2', 'cloche-3']) s = give(s, id);
+		expect(stepOf(s, 'cloche')).toBe(3);
 		expect(storyOrder(s)).toBeNull();
 		const locals = shortOrders(s);
 		expect(locals.length).toBe(2);

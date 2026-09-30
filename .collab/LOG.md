@@ -13,3 +13,6 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-09-29 · 0010 · chaîne textile + malle à tissus (Codex imagegen) · intégrées
 - 2026-09-29 · 0011 · dialogues du chapitre 7 · Codex en limite d'usage, écrits par Claude ; relecture à planifier
 - 2026-09-29 · 0012 · portrait de Lucile + parchemin de la carte (Codex, lancement allégé) · intégrés
+- 2026-09-30 · 0014 · saison 2 (version Codex) · fusionnée avec la version Claude dans docs/atelier-saison2.md
+- 2026-09-30 · 0015 · challenge de la fusion saison 2 · validée avec 3 changements, intégrés ; soumise à l'utilisateur
+- 2026-09-30 · 0016 · chaîne Marine + sac du gréeur + portrait d'Yves (Codex imagegen, 512 k jetons) · intégrés

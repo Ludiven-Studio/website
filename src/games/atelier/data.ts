@@ -2,9 +2,10 @@
 // orders, the workshop. Pure data, no logic, so a sim script and the tests read the same
 // tables as the game. The story behind it: docs/atelier-scenario.md.
 
-export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois' | 'tissu';
-export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre' | 'malle';
-export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite' | 'fauteuil' | 'malle' | 'musique';
+export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois' | 'tissu' | 'marin';
+export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre' | 'malle' | 'greeur';
+export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite' | 'fauteuil' | 'malle' | 'musique'
+	| 'boussole' | 'fanal' | 'longuevue' | 'coffre' | 'mouette' | 'cloche';
 
 export interface Chain {
 	id: ChainId;
@@ -56,6 +57,13 @@ export const CHAINS: Record<ChainId, Chain> = {
 		family: 'Textile',
 		gen: 'malle',
 		items: ['Fil', 'Coupon de tissu', 'Rembourrage', 'Galon et clous', 'Kit de tapissier'],
+		sell: 1,
+	},
+	marin: {
+		id: 'marin',
+		family: 'Marine',
+		gen: 'greeur',
+		items: ['Bout de corde', 'Nœud marin', 'Poulie', 'Voile', 'Gréement'],
 		sell: 1,
 	},
 };
@@ -126,6 +134,17 @@ export const GENERATORS: Record<GenId, Generator> = {
 		chargeMs: 8_000,
 		unlock: 'couture',
 	},
+	greeur: {
+		id: 'greeur',
+		name: 'Sac du gréeur',
+		out: [
+			{ chain: 'marin', w: 80 },
+			{ chain: 'marin', level: 2, w: 20 },
+		],
+		charges: 12,
+		chargeMs: 8_000,
+		unlock: 'hangar',
+	},
 };
 
 export const COLS = 7;
@@ -145,11 +164,11 @@ export interface Reward {
 }
 
 export interface Line {
-	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'boulangere' | 'lucile' | 'moi' | 'note';
+	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'boulangere' | 'lucile' | 'yves' | 'moi' | 'note';
 	text: string;
 	/** Shown in place of the object while this line is on screen: the clue the line talks about. */
 	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box' | 'key' | 'office' | 'map'
-		| 'piece4' | 'lucile' | 'tag';
+		| 'piece4' | 'lucile' | 'tag' | 'yvesnote' | 'carnet';
 }
 
 /** Reached once a project has delivered `step` restoration steps. */
@@ -263,7 +282,83 @@ export const PROJECTS: Project[] = [
 			{ who: 'moi', text: 'Laque ternie, ressort cassé, figurine détachée… On va la faire chanter.' },
 		],
 	},
+	// ---- Season 2: « Le capitaine du retour » (docs/atelier-saison2.md) ----
+	{
+		id: 'boussole',
+		chapter: 8,
+		object: 'Boussole',
+		title: 'La boussole de marine',
+		client: 'Lucas',
+		steps: 3,
+		arrival: [
+			{ who: 'lucas', text: 'Salut ! J’ai seize ans maintenant, et c’est moi qui range le grenier de mon grand-père Yves.' },
+			{ who: 'lucas', text: 'J’ai trouvé cette boussole dans un étui. Grand-père ne veut pas en parler. Vous pourriez la réparer ?' },
+			{ who: 'moi', text: 'Boîtier terni, aiguille bloquée… Elle retrouvera le nord.' },
+		],
+	},
+	{
+		id: 'fanal',
+		chapter: 9,
+		object: 'Fanal',
+		title: 'Le fanal d’Henri',
+		client: 'M. Morel',
+		steps: 3,
+		arrival: [
+			{ who: 'morel', text: 'En vidant la cave de mon père, j’ai trouvé ce vieux fanal. Il y a une étiquette dessus, à moitié effacée.' },
+			{ who: 'moi', text: 'Verre brisé, rouille… On va le rallumer.' },
+		],
+	},
+	{
+		id: 'longuevue',
+		chapter: 10,
+		object: 'Longue-vue',
+		title: 'La longue-vue de Lucile',
+		client: 'Lucile',
+		steps: 3,
+		arrival: [
+			{ who: 'lucile', text: 'Lucas m’a écrit pour la boussole. Alors je suis revenue, avec ceci : ma longue-vue de 1961.' },
+			{ who: 'lucile', text: 'Réparez-la, et je vous raconterai ce que personne ne vous a dit sur La Mouette.' },
+		],
+	},
+	{
+		id: 'coffre',
+		chapter: 11,
+		object: 'Coffre',
+		title: 'Le coffre du mousse',
+		client: 'Lucas',
+		steps: 3,
+		arrival: [
+			{ who: 'lucas', text: 'Au fond du grenier, il y a un coffre de marin fermé à clé. Personne n’a jamais eu la clé. Pas même grand-père.' },
+			{ who: 'moi', text: 'On l’ouvrira sans le forcer. Doucement.' },
+		],
+	},
+	{
+		id: 'mouette',
+		chapter: 12,
+		object: 'Canot',
+		title: 'La Mouette',
+		client: 'Lucas',
+		steps: 3,
+		arrival: [
+			{ who: 'lucas', text: 'Elle est là, dans le hangar : La Mouette. Fendue, mais entière. Grand-père l’a gardée soixante ans sans la regarder.' },
+			{ who: 'morel', text: 'Mon père a navigué sur ce canot. Je vous aide. Et le club de voile viendra vérifier qu’elle tient la mer.' },
+		],
+	},
+	{
+		id: 'cloche',
+		chapter: 13,
+		object: 'Cloche',
+		title: 'La cloche de L’Espérance',
+		client: 'Lucas',
+		steps: 3,
+		arrival: [
+			{ who: 'note', text: 'Mer d’huile, vent léger. Le club de voile accompagne La Mouette jusqu’à l’îlot ; vous suivez tout à la radio de Mme Garnier.' },
+			{ who: 'lucas', text: '… « là où l’île regarde le port ». Il y a une faille dans le rocher. Je la vois ! Elle est lourde… On la ramène.' },
+			{ who: 'moi', text: 'Verte de sel, battant perdu. Deux siècles sous l’eau et le vent.' },
+		],
+	},
 ];
+
 
 export interface Order {
 	id: string;
@@ -858,7 +953,256 @@ export const ORDERS: Order[] = [
 				{ who: 'lucile', text: 'J’ai lu la lettre de Jeanne. Soixante ans pour se dire pardon… Nous étions têtues, toutes les deux.' },
 				{ who: 'lucile', text: 'Rose a rendu ce qu’elle a pu. Jeanne a gardé la porte ouverte pour les autres. Et vous, vous avez fini le travail.' },
 				{ who: 'note', text: 'Devant l’atelier, M. Morel, Mme Garnier, Lucas, Mlle Chen, la boulangère et Lucile posent pour une photo. Comme en 1961.', show: 'photo' },
-				{ who: 'note', text: 'Fin de l’histoire. L’atelier reste ouvert : le quartier continue de passer, avec ses objets et ses souvenirs.' },
+				{ who: 'note', text: 'Fin de la saison 1. L’atelier reste ouvert : le quartier continue de passer, avec ses objets et ses souvenirs.' },
+			],
+		},
+	},
+
+	// ================= Season 2: « Le capitaine du retour » =================
+	// ---- Chapter 8: the compass ----
+	{
+		id: 'boussole-1', kind: 'story', client: 'Lucas', ask: 'Nettoyer le boîtier.',
+		needs: ['soin:3', 'meca:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'musique', step: 3 }, project: 'boussole', step: 1,
+		scene: {
+			title: 'L’étui',
+			lines: [
+				{ who: 'note', text: 'Sous le vert-de-gris, une gravure : « Y. K. — La Mouette, 1962 ». Dans l’étui, une photo de Lucas enfant au bassin, et un mot.' },
+				{ who: 'note', text: '« Pour le capitaine du retour, le jour du bassin. Y. »', show: 'yvesnote' },
+				{ who: 'lucas', text: 'Y. K., c’est grand-père. Le capitaine, c’était lui, alors ? Mais La Mouette… je n’ai jamais entendu ce nom.' },
+			],
+		},
+	},
+	{
+		id: 'chen-5', kind: 'short', client: 'Mlle Chen', ask: 'Un lot de vis pour une vitrine de brocante.',
+		needs: ['meca:2'], reward: { coins: 10, rep: 1 }, when: { project: 'boussole', step: 1 },
+	},
+	{
+		id: 'boussole-2', kind: 'story', client: 'Lucas', ask: 'Débloquer l’aiguille.',
+		needs: ['meca:4', 'outil:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'boussole', step: 2,
+		scene: {
+			title: 'Le nord',
+			lines: [
+				{ who: 'note', text: 'L’aiguille frémit, puis se cale sur le nord. Elle était bloquée sur le cap de l’îlot.' },
+				{ who: 'lucas', text: 'Le cap de l’îlot… Comme sur la carte du bureau de Jeanne.' },
+			],
+		},
+	},
+	{
+		id: 'boussole-3', kind: 'story', client: 'Lucas', ask: 'Changer le verre et polir.',
+		needs: ['soin:4', 'elec:2'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'boussole', step: 3,
+		scene: {
+			title: 'Y. K.',
+			lines: [
+				{ who: 'lucas', text: 'Je l’ai montrée à grand-père. Il l’a tenue longtemps, et il a dit : « Elle marche encore, elle. » Rien d’autre.' },
+				{ who: 'note', text: 'Fin du chapitre 8.' },
+			],
+		},
+	},
+
+	// ---- Chapter 9: Henri's lantern ----
+	{
+		id: 'fanal-1', kind: 'story', client: 'M. Morel', ask: 'Dérouiller la cage.',
+		needs: ['soin:3', 'bois:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'boussole', step: 3 }, project: 'fanal', step: 1,
+		scene: {
+			title: 'L’étiquette',
+			lines: [
+				{ who: 'note', text: 'Sous la rouille, l’étiquette se lit : « Mouette ». L’écriture est celle d’Henri.' },
+				{ who: 'morel', text: 'Mouette ? Mon père n’avait pas de bateau. Pourquoi aurait-il gardé le fanal d’un canot ?' },
+			],
+		},
+	},
+	{
+		id: 'boulangere-3', kind: 'short', client: 'La boulangère', ask: 'Du fil électrique pour l’enseigne.',
+		needs: ['elec:2'], reward: { coins: 10, rep: 1 }, when: { project: 'fanal', step: 1 },
+	},
+	{
+		id: 'fanal-2', kind: 'story', client: 'M. Morel', ask: 'Rallumer la mèche.',
+		needs: ['elec:4', 'meca:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'fanal', step: 2,
+		scene: {
+			title: 'La flamme',
+			lines: [
+				{ who: 'note', text: 'La flamme reprend. Au fond du réservoir, un papier plié : un bulletin de météo marine, mars 1962. « Avis de coup de vent. »' },
+				{ who: 'moi', text: 'Mars 1962. La tempête. Henri était donc à bord de La Mouette.' },
+			],
+		},
+	},
+	{
+		id: 'fanal-3', kind: 'story', client: 'M. Morel', ask: 'Poser un verre neuf et repeindre.',
+		needs: ['soin:4', 'elec:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'fanal', step: 3,
+		scene: {
+			title: 'Le même canot',
+			lines: [
+				{ who: 'lucas', text: 'La Mouette, 1962… sur la boussole de grand-père. Et sur le fanal de votre père.' },
+				{ who: 'morel', text: 'Alors ils étaient dans le même bateau, cette nuit-là. Mon père, et ton grand-père.' },
+				{ who: 'note', text: 'Fin du chapitre 9.' },
+			],
+		},
+	},
+
+	// ---- Chapter 10: Lucile's spyglass ----
+	{
+		id: 'longuevue-1', kind: 'story', client: 'Lucile', ask: 'Nettoyer les lentilles.',
+		needs: ['soin:4', 'outil:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'fanal', step: 3 }, project: 'longuevue', step: 1,
+		scene: {
+			title: 'Notre capitaine',
+			lines: [
+				{ who: 'lucile', text: 'Yves avait dix-sept ans quand il nous a donné son morceau de carte, au printemps 1961. On l’appelait « notre capitaine ».' },
+				{ who: 'lucile', text: 'Un morceau de carte que sa famille gardait depuis toujours, sans savoir pourquoi.' },
+			],
+		},
+	},
+	{
+		id: 'garnier-5', kind: 'short', client: 'Mme Garnier', ask: 'Un coupon de tissu pour un rideau.',
+		needs: ['tissu:2'], reward: { coins: 10, rep: 1 }, when: { project: 'longuevue', step: 1 },
+	},
+	{
+		id: 'longuevue-2', kind: 'story', client: 'Lucile', ask: 'Débloquer les tubes.',
+		needs: ['meca:4', 'outil:4'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'longuevue', step: 2,
+		scene: {
+			title: 'Mars 1962',
+			lines: [
+				{ who: 'lucile', text: 'Le ciel était mauvais. Yves ne voulait pas partir. C’est moi qui ai insisté. Il a cédé pour ne pas passer pour un froussard.' },
+				{ who: 'lucile', text: 'Il nous a ramenés, tous. Et il ne s’est jamais pardonné d’avoir accepté. Ni de n’avoir pas su nous garder ensemble, après.' },
+			],
+		},
+	},
+	{
+		id: 'longuevue-3', kind: 'story', client: 'Lucile', ask: 'Regainer de cuir.',
+		needs: ['tissu:3', 'soin:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'longuevue', step: 3,
+		scene: {
+			title: 'Les Kerbrat',
+			lines: [
+				{ who: 'lucile', text: 'Lucas, le troisième morceau de la carte… c’était celui de ta famille. Les Kerbrat le gardaient depuis 1813.' },
+				{ who: 'lucas', text: 'Depuis 1813 ? Alors mon ancêtre… il était sur le bateau de Rose ?' },
+				{ who: 'note', text: 'Fin du chapitre 10.' },
+			],
+		},
+	},
+
+	// ---- Chapter 11: the ship's boy's chest ----
+	{
+		id: 'coffre-1', kind: 'story', client: 'Lucas', ask: 'Ouvrir la serrure sans la forcer.',
+		needs: ['outil:4', 'bois:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'longuevue', step: 3 }, project: 'coffre', step: 1,
+		scene: {
+			title: 'S. K., 1813',
+			lines: [
+				{ who: 'note', text: 'La serrure cède. Sur le couvercle, gravé au couteau : « S. K. · 1813 ». Samuel Kerbrat, le mousse de Rose. Quatorze ans.' },
+				{ who: 'lucas', text: 'Un mousse de quatorze ans. Presque mon âge.' },
+			],
+		},
+	},
+	{
+		id: 'lucas-7', kind: 'short', client: 'Lucas', ask: 'Un cadre pour la photo du bassin.',
+		needs: ['bois:4'], reward: { coins: 14, rep: 1 }, when: { project: 'coffre', step: 1 },
+	},
+	{
+		id: 'coffre-2', kind: 'story', client: 'Lucas', ask: 'Consolider le fond et les charnières.',
+		needs: ['bois:4', 'meca:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'coffre', step: 2,
+		scene: {
+			title: 'Le carnet',
+			lines: [
+				{ who: 'note', text: 'Au fond, un carnet de bord. Samuel y raconte 1813 : Élie et lui partent rendre des objets volés, chacun de son côté. Pas une fuite : une promesse.', show: 'carnet' },
+				{ who: 'note', text: '« Reste la cloche de L’Espérance, trop lourde pour la route. Je l’ai mise là où l’île regarde le port. Je la rendrai un jour. »' },
+			],
+		},
+	},
+	{
+		id: 'coffre-3', kind: 'story', client: 'Lucas', ask: 'Changer les poignées de corde.',
+		needs: ['tissu:4', 'soin:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'coffre', step: 3,
+		scene: {
+			title: 'L’îlot',
+			lines: [
+				{ who: 'lucas', text: 'L’îlot n’était pas qu’un leurre. Samuel y a caché la cloche. Et personne n’est jamais allé la chercher.' },
+				{ who: 'lucas', text: 'Il nous faut un bateau. Il nous faut La Mouette.' },
+				{ who: 'note', text: 'Fin du chapitre 11. Dans l’atelier, on peut maintenant ouvrir le hangar à bateaux.' },
+			],
+		},
+	},
+
+	// ---- Chapter 12: La Mouette ----
+	{
+		id: 'mouette-1', kind: 'story', client: 'Lucas', ask: 'Poncer la coque.',
+		needs: ['bois:4', 'soin:3'], reward: { coins: 16, rep: 3, energy: 10 },
+		after: 'hangar', when: { project: 'coffre', step: 3 }, project: 'mouette', step: 1,
+		scene: {
+			title: 'Le bois nu',
+			lines: [
+				{ who: 'morel', text: 'Mon père disait qu’un bateau poncé, c’est un bateau qui respire. Je ne savais pas qu’il parlait de celui-là.' },
+			],
+		},
+	},
+	{
+		id: 'facteur-2', kind: 'short', client: 'Le facteur', ask: 'Un bout de corde pour mon vélo de tournée.',
+		needs: ['marin:2'], reward: { coins: 10, rep: 1 }, after: 'hangar',
+	},
+	{
+		id: 'mouette-2', kind: 'story', client: 'Lucas', ask: 'Réparer la coque et dresser le mât.',
+		needs: ['marin:3', 'bois:4'], reward: { coins: 18, rep: 3, energy: 10 }, project: 'mouette', step: 2,
+		scene: {
+			title: 'Le mât',
+			lines: [
+				{ who: 'note', text: 'Le mât se dresse, les poulies tournent. Le club de voile passe au hangar : la coque tient, La Mouette est apte à naviguer.' },
+			],
+		},
+	},
+	{
+		id: 'morel-6', kind: 'short', client: 'M. Morel', ask: 'Une poulie pour la corde à linge.',
+		needs: ['marin:3'], reward: { coins: 12, rep: 1 }, when: { project: 'mouette', step: 2 },
+	},
+	{
+		id: 'mouette-3', kind: 'story', client: 'Lucas', ask: 'Gréer et hisser la voile.',
+		needs: ['marin:4', 'tissu:3'], reward: { coins: 22, rep: 5, energy: 10, cocoins: 10 }, project: 'mouette', step: 3,
+		scene: {
+			title: 'Prête',
+			lines: [
+				{ who: 'lucas', text: 'La Mouette flotte ! Demain, s’il fait beau, on part à l’îlot. Le club nous accompagne.' },
+				{ who: 'note', text: 'Fin du chapitre 12.' },
+			],
+		},
+	},
+
+	// ---- Chapter 13: the bell of L'Espérance ----
+	{
+		id: 'cloche-1', kind: 'story', client: 'Lucas', ask: 'Retirer le vert-de-gris.',
+		needs: ['soin:4', 'outil:3'], reward: { coins: 16, rep: 3, energy: 10 },
+		when: { project: 'mouette', step: 3 }, project: 'cloche', step: 1,
+		scene: {
+			title: 'Un nom',
+			lines: [
+				{ who: 'note', text: 'Sous le vert-de-gris : « L’ESPÉRANCE · 1809 ». Puis, tout autour, les noms de son équipage. Des marins de ce port, pillés en 1811.' },
+			],
+		},
+	},
+	{
+		id: 'chen-6', kind: 'short', client: 'Mlle Chen', ask: 'Un gréement pour une maquette de brocante.',
+		needs: ['marin:4'], reward: { coins: 14, rep: 1 }, when: { project: 'cloche', step: 1 },
+	},
+	{
+		id: 'cloche-2', kind: 'story', client: 'Lucas', ask: 'Remonter le battant.',
+		needs: ['marin:3', 'meca:3'], reward: { coins: 18, rep: 3, energy: 10 }, project: 'cloche', step: 2,
+		scene: {
+			title: 'Le battant',
+			lines: [
+				{ who: 'note', text: 'Le battant retrouve sa place. Un premier coup, un peu sourd, fait taire tout l’atelier.' },
+			],
+		},
+	},
+	{
+		id: 'cloche-3', kind: 'story', client: 'Lucas', ask: 'Polir et suspendre la cloche.',
+		needs: ['soin:4', 'marin:4'], reward: { coins: 30, rep: 6, energy: 10, cocoins: 20 }, project: 'cloche', step: 3,
+		scene: {
+			title: 'Tout l’équipage',
+			lines: [
+				{ who: 'note', text: 'Sous la fenêtre de la maison de retraite, Lucas sonne la cloche de L’Espérance. Une fenêtre s’ouvre.' },
+				{ who: 'yves', text: 'Ce mot dans la boussole… « le capitaine du retour », ce n’était pas moi, petit. C’était toi.' },
+				{ who: 'yves', text: 'Au bassin, tu avais abandonné la course pour ramener les bateaux des autres. Moi, en 1962, je n’avais pas su garder mon équipage. Toi, tu savais déjà.' },
+				{ who: 'yves', text: 'Tout l’équipage est rentré.' },
+				{ who: 'note', text: 'Le lendemain, la cloche est rendue au port, à la capitainerie, avec les noms de L’Espérance. Pendant la cérémonie, Mme Garnier reste longtemps devant l’un d’eux. Puis elle se tait.' },
+				{ who: 'note', text: 'Fin de la saison 2.' },
 			],
 		},
 	},
@@ -882,6 +1226,7 @@ export const SPEAKERS: Record<Line['who'], string> = {
 	lucas: 'Lucas',
 	chen: 'Mlle Chen',
 	boulangere: 'La boulangère',
+	yves: 'Yves Kerbrat',
 	lucile: 'Lucile',
 	moi: 'Vous',
 	note: '',
@@ -906,6 +1251,20 @@ export const UPGRADES: Upgrade[] = [
 	{ id: 'etageres', name: 'Ouvrir les étagères', desc: 'Les étagères de Jeanne, et sa caisse d’électricien.', cost: 25, when: { project: 'radio', step: 1 }, rep: 2 },
 	{ id: 'menuiserie', name: 'Aménager le coin menuiserie', desc: 'Le coffre du menuisier et un bout d’établi pour le bois.', cost: 30, when: { project: 'voilier', step: 1 }, rep: 2 },
 	{ id: 'couture', name: 'Installer le coin couture', desc: 'La malle à tissus de Jeanne, et sa vieille machine à coudre.', cost: 30, when: { project: 'fauteuil', step: 1 }, rep: 2 },
+	{
+		id: 'hangar',
+		name: 'Ouvrir le hangar à bateaux',
+		desc: 'Le vieux hangar du port, où dort La Mouette. Et le sac du gréeur.',
+		cost: 35,
+		when: { project: 'coffre', step: 3 },
+		rep: 3,
+		scene: {
+			title: 'Le hangar',
+			lines: [
+				{ who: 'note', text: 'La porte du hangar grince. Sous une bâche, une coque fendue : La Mouette. Contre le mur, le sac du gréeur, plein de cordages.' },
+			],
+		},
+	},
 	{
 		id: 'souvenirs',
 		name: 'Ouvrir la salle des souvenirs',
@@ -985,5 +1344,6 @@ export const FACES: Record<string, string> = {
 	'La boulangère': 'boulangere',
 	'Le facteur': 'facteur',
 	Lucile: 'lucile',
+	'Yves Kerbrat': 'yves',
 };
 export const FACE_EMOJI: Record<string, string> = { Vous: '🗝️' };
