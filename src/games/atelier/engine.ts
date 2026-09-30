@@ -348,6 +348,10 @@ export function storyBlocker(s: State): Blocker {
 	return null;
 }
 
+/** A trombinoscope fact is known once its gate, upgrade and flag are all reached. */
+export const factKnown = (s: State, f: { when?: Gate; after?: string; flag?: string }): boolean =>
+	gateOk(s, f.when) && (!f.after || has(s, f.after)) && (!f.flag || s.seen.includes(f.flag));
+
 /** The project on the bench: the open story's, else the last one started. */
 export function currentProject(s: State): Project {
 	const st = storyOrder(s);

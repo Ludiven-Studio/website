@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
 	load, save, newGame, tick, produce, move, moveKind, deliver, sell, sellValue, buyUpgrade, upgradeState,
 	addEnergy, markSeen, dueTier, nextTier, claimTier, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
-	stepOf, storyOrder, storyBlocker, currentProject, projectOf, missingGens, mapReady, solveMap, code, unitCost, CELLS, type State, type Piece,
+	stepOf, storyOrder, storyBlocker, factKnown, currentProject, projectOf, missingGens, mapReady, solveMap, code, unitCost, CELLS, type State, type Piece,
 } from './engine';
 import {
 	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK,
@@ -19,6 +19,7 @@ import Musique, { MUSIQUE_CSS } from './Musique';
 import { Boussole, Fanal, LongueVue, CoffreMousse, Canot, Cloche, SAISON2_CSS } from './Saison2';
 import { CadreOvale, Travailleuse, Tabouret, CoffretBobines, CarnetRose, Valise, SAISON3_CSS } from './Saison3';
 import { ValiseEtal, Presentoir, Balance, Caissette, Casier, Toupie, SAISON4_CSS } from './Saison4';
+import { CHARACTERS, type Character } from './characters';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
@@ -661,6 +662,45 @@ function Info({ s, cell, piece, need, now, confirm, onSell }: {
 	);
 }
 
+/** French spacing: glue « » : ; ! ? to their word so a line never starts with them. */
+const NBSP = String.fromCharCode(0xa0);
+const frTypo = (t: string) => t.replace(/« /g, '«' + NBSP).replace(/ ([»:;!?])/g, NBSP + '$1');
+
+/** Faces met so far; tapping one opens what the story has told about them. */
+function Trombi({ s }: { s: State }) {
+	const [open, setOpen] = useState<Character | null>(null);
+	const met = CHARACTERS.filter((c) => factKnown(s, c.facts[0]));
+	if (!met.length) return null;
+	const known = open ? open.facts.filter((f) => factKnown(s, f)) : [];
+	const left = open ? open.facts.length - known.length : 0;
+	return (
+		<section className="at-trombi" aria-label="Trombinoscope">
+			<strong>Trombinoscope</strong>
+			<div className="at-trombi-grid">
+				{met.map((c) => (
+					<button key={c.id} className="at-trombi-face" onClick={() => setOpen(c)} aria-label={`${c.name} : ce qu’on sait`}>
+						<Face who={c.face} size={52} />
+						<span>{c.name}</span>
+					</button>
+				))}
+			</div>
+			{open && (
+				<div className="at-modal" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
+					<div className="at-card at-trombi-card" role="dialog" aria-modal="true" aria-label={open.name}>
+						<div className="at-trombi-head">
+							<Face who={open.face} size={84} />
+							<h3>{open.name}</h3>
+						</div>
+						<ul>{known.map((f, k) => <li key={k}>{frTypo(f.text)}</li>)}</ul>
+						{left > 0 && <p className="at-small">Encore {left} chose{left > 1 ? 's' : ''} à découvrir au fil de l’histoire.</p>}
+						<button className="at-btn ghost" onClick={() => setOpen(null)}>Fermer</button>
+					</div>
+				</div>
+			)}
+		</section>
+	);
+}
+
 /** Tapping an order: for each item, where it comes from and how far the bench is from it. */
 function OrderHelp({ s, o, onClose }: { s: State; o: Order; onClose: () => void }) {
 	return (
@@ -781,6 +821,8 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle
 					</div>
 				)}
 			</div>
+
+			<Trombi s={s} />
 
 			{has('bureau') && (
 				<section className="at-office" aria-label="Le bureau de Jeanne">
@@ -962,7 +1004,7 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 						{line.who !== 'note' && line.who !== 'moi' && <Face who={whoName(line.who)} size={44} />}
 						<div>
 							{line.who !== 'note' && <strong>{whoName(line.who)}</strong>}
-							<p>{line.text}</p>
+							<p>{frTypo(line.text)}</p>
 						</div>
 					</div>
 				)}
@@ -1153,6 +1195,14 @@ const CSS = `
 .at-office-img.small { width: 76px; max-height: none; flex: none; border-radius: 10px; }
 .at-map { width: min(70vw, 260px); margin: 0 auto; }
 .at-map.small { width: 150px; margin: 4px 0 0; }
+.at-trombi { background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.at-trombi > strong { font-size: 15px; color: var(--gray-0); }
+.at-trombi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; }
+.at-trombi-face { border: 0; background: none; padding: 4px 2px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; border-radius: 10px; font: inherit; color: var(--gray-200); }
+.at-trombi-face:hover, .at-trombi-face:focus-visible { background: var(--gray-800); }
+.at-trombi-face span { font-size: 11px; font-weight: 600; text-align: center; line-height: 1.2; }
+.at-trombi-card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.4; }
+.at-trombi-head { display: flex; align-items: center; gap: 14px; }
 .at-office { display: flex; gap: 12px; align-items: flex-start; background: linear-gradient(180deg, rgba(156, 42, 26, 0.12), var(--gray-900)); border: 1.5px solid #9c6a3a; border-radius: 14px; padding: 10px 12px; }
 .at-office-txt { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--gray-300); }
 .at-office-txt strong { color: var(--gray-0); font-size: 15px; }

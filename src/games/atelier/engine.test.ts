@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
 	newGame, produce, move, moveKind, deliver, tick, sell, buyUpgrade, load, save, activeOrders,
-	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, mapReady, solveMap, storyBlocker, SAVE_V, CELLS, type State,
+	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, mapReady, solveMap, storyBlocker, factKnown, SAVE_V, CELLS, type State,
 } from './engine';
-import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS } from './data';
+import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS, FACES } from './data';
+import { CHARACTERS } from './characters';
 
 const T0 = 1_700_000_000_000;
 const genCell = (s: State, g: string): number => s.board.indexOf(`g:${g}`);
@@ -410,5 +411,30 @@ describe('what the story waits for', () => {
 		const map = { ...base, progress: { ...base.progress, montre: 3, radio: 3, voilier: 3, boite: 3, fauteuil: 3 }, done: ORDERS.filter((o) => o.project && o.project !== 'malle' && o.project !== 'musique').map((o) => o.id) };
 		expect(storyBlocker(map)).toEqual({ kind: 'map' });
 		expect(storyBlocker(solveMap(map))).toBeNull();
+	});
+});
+
+describe('trombinoscope', () => {
+	it('every character has a portrait and gates that exist', () => {
+		const projects = new Set(PROJECTS.map((p) => p.id));
+		const ups = new Set(UPGRADES.map((u) => u.id));
+		for (const c of CHARACTERS) {
+			expect(FACES[c.face], c.id).toBeDefined();
+			for (const f of c.facts) {
+				if (f.when) expect(projects.has(f.when.project), `${c.id}: ${f.when.project}`).toBe(true);
+				if (f.after) expect(ups.has(f.after), `${c.id}: ${f.after}`).toBe(true);
+			}
+		}
+	});
+
+	it('a fresh game knows only the opening facts, and nothing about Rose', () => {
+		const s = newGame(T0);
+		const known = CHARACTERS.map((c) => [c.id, c.facts.filter((f) => factKnown(s, f)).length] as const);
+		expect(Object.fromEntries(known)).toMatchObject({ jeanne: 1, garnier: 1, rose: 0, lucile: 0, yves: 0 });
+	});
+
+	it('the whole campaign unlocks every fact', () => {
+		const s = { ...newGame(T0), upgrades: UPGRADES.map((u) => u.id), seen: ['rep-5', 'map-solved'], progress: Object.fromEntries(PROJECTS.map((p) => [p.id, p.steps])) as State['progress'] };
+		for (const c of CHARACTERS) for (const f of c.facts) expect(factKnown(s, f), `${c.id}: ${f.text}`).toBe(true);
 	});
 });

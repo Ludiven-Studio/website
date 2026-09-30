@@ -1339,7 +1339,7 @@ export const ORDERS: Order[] = [
 		needs: ['bois:4', 'meca:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'travailleuse', step: 2,
 		scene: { title: 'De l’autre côté', lines: [
 			{ who: 'garnier', text: 'À la cérémonie, j’ai compris. Avant, je ne savais pas. Mon ancêtre était de L’Espérance. Celle que l’équipage de Rose a pillée.' },
-			{ who: 'garnier', text: 'Et moi, pendant soixante ans, j’ai été l’amie de la petite-fille de la Pie. Drôle d’histoire.' },
+			{ who: 'garnier', text: 'Et moi, pendant soixante ans, j’ai été l’amie de la descendante de la Pie. Drôle d’histoire.' },
 		] },
 	},
 	{

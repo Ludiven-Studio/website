@@ -21,3 +21,8 @@
   (pétanque, mölkky) ont dépassé leur délai une fois sous charge, OK seuls : sans lien avec l'Atelier.
 - Ressources : port 4361 pour `snap-atelier.mjs`. ComfyUI local (8188) arrêté.
 - Tickets Codex : 0001-0010 traités et clos ; 0011 repris par Claude (limite d'usage).
+
+## 2026-09-30 — Atelier : saisons 3-4 et trombinoscope
+- Saisons 3 (Mme Garnier) et 4 (Mlle Chen, finale) jouables : chapitres 14-25, tickets 0016-0021 clos.
+- Trombinoscope dans l'onglet Atelier : `src/games/atelier/characters.ts` (faits gatés par étape/amélioration/flag,
+  vérifiés contre data.ts), `factKnown` dans engine.ts. Capture : `node scripts/snap-atelier-trombi.mjs` (port 4371).
