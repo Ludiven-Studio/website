@@ -5,7 +5,8 @@
 export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois' | 'tissu' | 'marin';
 export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre' | 'malle' | 'greeur';
 export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite' | 'fauteuil' | 'malle' | 'musique'
-	| 'boussole' | 'fanal' | 'longuevue' | 'coffre' | 'mouette' | 'cloche';
+	| 'boussole' | 'fanal' | 'longuevue' | 'coffre' | 'mouette' | 'cloche'
+	| 'cadre' | 'travailleuse' | 'tabouret' | 'bobines' | 'carnet' | 'valise';
 
 export interface Chain {
 	id: ChainId;
@@ -168,7 +169,7 @@ export interface Line {
 	text: string;
 	/** Shown in place of the object while this line is on screen: the clue the line talks about. */
 	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box' | 'key' | 'office' | 'map'
-		| 'piece4' | 'lucile' | 'tag' | 'yvesnote' | 'carnet';
+		| 'piece4' | 'lucile' | 'tag' | 'yvesnote' | 'carnet' | 'ticket' | 'receipt';
 }
 
 /** Reached once a project has delivered `step` restoration steps. */
@@ -357,7 +358,47 @@ export const PROJECTS: Project[] = [
 			{ who: 'moi', text: 'Verte de sel, battant perdu. Deux siècles sous l’eau et le vent.' },
 		],
 	},
+	// ---- Season 3: « Le prochain départ » (docs/atelier-saison3.md) ----
+	{
+		id: 'cadre', chapter: 14, object: 'Cadre', title: 'Le portrait d’Étienne', client: 'Mme Garnier', steps: 3,
+		arrival: [
+			{ who: 'garnier', text: 'Depuis la cérémonie de la cloche, je n’arrête pas d’y penser. Tenez : le portrait que ma mère gardait au salon.' },
+			{ who: 'garnier', text: 'Le cadre se défait. Et je voudrais revoir la liste des noms de la cloche. Pour vous montrer ce que j’y ai reconnu.' },
+		],
+	},
+	{
+		id: 'travailleuse', chapter: 15, object: 'Travailleuse', title: 'La travailleuse de sa mère', client: 'Mme Garnier', steps: 3,
+		arrival: [
+			{ who: 'garnier', text: 'La travailleuse de ma mère. Et dans le tiroir, la notice de famille. Je l’ai relue dix fois cette semaine.' },
+		],
+	},
+	{
+		id: 'tabouret', chapter: 16, object: 'Tabouret', title: 'Le tabouret des ourlets', client: 'La boulangère', steps: 3,
+		arrival: [
+			{ who: 'boulangere', text: 'Le tabouret où Mme Garnier faisait nos ourlets. Elle ne m’a jamais fait payer ma première tenue de travail.' },
+			{ who: 'garnier', text: 'Oh, ce vieux tabouret… Dites, une vieille valise, ça se répare ?' },
+		],
+	},
+	{
+		id: 'bobines', chapter: 17, object: 'Coffret', title: 'Le coffret à bobines', client: 'Mme Garnier', steps: 3,
+		arrival: [
+			{ who: 'garnier', text: 'Mon coffret à bobines. Je vais le vider moi-même. Il y a dedans quelque chose que je dois vous montrer.' },
+		],
+	},
+	{
+		id: 'carnet', chapter: 18, object: 'Carnet', title: 'Le carnet de Rose', client: 'Vous', steps: 3,
+		arrival: [
+			{ who: 'note', text: 'Au bureau, la reliure du carnet de Rose achève de se défaire. Il est temps de la reprendre.' },
+		],
+	},
+	{
+		id: 'valise', chapter: 19, object: 'Valise', title: 'La valise', client: 'Mme Garnier', steps: 3,
+		arrival: [
+			{ who: 'garnier', text: 'La voilà, ma vieille valise. Poignée cassée, serrures rouillées. Il me la faut pour dans quinze jours.' },
+		],
+	},
 ];
+
 
 
 export interface Order {
@@ -1205,6 +1246,191 @@ export const ORDERS: Order[] = [
 				{ who: 'note', text: 'Fin de la saison 2.' },
 			],
 		},
+	},
+
+	// ================= Season 3: « Le prochain départ » =================
+	// ---- Chapter 14: the oval frame ----
+	{
+		id: 'cadre-1', kind: 'story', client: 'Mme Garnier', ask: 'Nettoyer le portrait.',
+		needs: ['soin:3', 'outil:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'cloche', step: 3 }, project: 'cadre', step: 1,
+		scene: { title: 'Le nom', lines: [
+			{ who: 'note', text: 'Sous la crasse, un homme aux mains larges. Au dos, à l’encre : « Étienne Roussel ».' },
+			{ who: 'garnier', text: 'Le même nom que sur la cloche. Je l’ai lu pendant la cérémonie, et je n’ai rien pu dire.' },
+		] },
+	},
+	{
+		id: 'lucas-8', kind: 'short', client: 'Lucas', ask: 'Un nœud marin pour l’amarre de La Mouette.',
+		needs: ['marin:2'], reward: { coins: 10, rep: 1 }, when: { project: 'cadre', step: 1 },
+	},
+	{
+		id: 'cadre-2', kind: 'story', client: 'Mme Garnier', ask: 'Recoller la bordure.',
+		needs: ['bois:3', 'meca:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'cadre', step: 2,
+		scene: { title: 'La liste', lines: [
+			{ who: 'garnier', text: 'Sur la liste de la cloche : « Étienne Roussel ». Mon arrière-arrière-grand-père portait ce nom. Ce n’est peut-être qu’un homonyme.' },
+		] },
+	},
+	{
+		id: 'cadre-3', kind: 'story', client: 'Mme Garnier', ask: 'Refermer le cadre.',
+		needs: ['soin:4', 'bois:2'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'cadre', step: 3,
+		scene: { title: 'Au salon', lines: [
+			{ who: 'garnier', text: 'Il retourne au salon. Je vous apporterai la travailleuse de ma mère : il y a une notice de famille dans le tiroir.' },
+			{ who: 'note', text: 'Fin du chapitre 14.' },
+		] },
+	},
+
+	// ---- Chapter 15: the sewing table ----
+	{
+		id: 'travailleuse-1', kind: 'story', client: 'Mme Garnier', ask: 'Nettoyer le bois.',
+		needs: ['soin:4', 'bois:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'cadre', step: 3 }, project: 'travailleuse', step: 1,
+		scene: { title: 'La notice', lines: [
+			{ who: 'note', text: 'La notice de famille, d’une écriture ancienne : « Étienne Roussel, charpentier, ruiné par les pirates en 1811. Ce qui est pris ne revient pas. »' },
+			{ who: 'garnier', text: 'Charpentier, 1811, des pirates… La cloche de L’Espérance. Ce n’est pas un homonyme.' },
+		] },
+	},
+	{
+		id: 'morel-7', kind: 'short', client: 'M. Morel', ask: 'Une ampoule pour la lampe de chevet.',
+		needs: ['elec:3'], reward: { coins: 12, rep: 1 }, when: { project: 'travailleuse', step: 1 },
+	},
+	{
+		id: 'travailleuse-2', kind: 'story', client: 'Mme Garnier', ask: 'Réparer le pied et les charnières.',
+		needs: ['bois:4', 'meca:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'travailleuse', step: 2,
+		scene: { title: 'De l’autre côté', lines: [
+			{ who: 'garnier', text: 'À la cérémonie, j’ai compris. Avant, je ne savais pas. Mon ancêtre était de L’Espérance. Celle que l’équipage de Rose a pillée.' },
+			{ who: 'garnier', text: 'Et moi, pendant soixante ans, j’ai été l’amie de la petite-fille de la Pie. Drôle d’histoire.' },
+		] },
+	},
+	{
+		id: 'travailleuse-3', kind: 'story', client: 'Mme Garnier', ask: 'Garnir les casiers.',
+		needs: ['tissu:3', 'soin:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'travailleuse', step: 3,
+		scene: { title: 'La maxime', lines: [
+			{ who: 'garnier', text: '« Ce qui est pris ne revient pas. » Ma mère le répétait. Moi, je l’ai pris pour : n’attends rien de personne.' },
+			{ who: 'note', text: 'Fin du chapitre 15.' },
+		] },
+	},
+
+	// ---- Chapter 16: the stool (a breather) ----
+	{
+		id: 'tabouret-1', kind: 'story', client: 'La boulangère', ask: 'Nettoyer et dégarnir.',
+		needs: ['soin:3', 'tissu:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'travailleuse', step: 3 }, project: 'tabouret', step: 1,
+		scene: { title: 'Les ourlets', lines: [
+			{ who: 'boulangere', text: 'Tout le quartier s’est assis là, le temps d’un ourlet. Elle disait : « Tiens-toi droite, ou je raccourcis de travers. »' },
+		] },
+	},
+	{
+		id: 'chen-7', kind: 'short', client: 'Mlle Chen', ask: 'Un coupon de tissu pour une housse.',
+		needs: ['tissu:2'], reward: { coins: 10, rep: 1 }, when: { project: 'tabouret', step: 1 },
+	},
+	{
+		id: 'tabouret-2', kind: 'story', client: 'La boulangère', ask: 'Consolider le pied et regarnir.',
+		needs: ['bois:4', 'tissu:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'tabouret', step: 2,
+		scene: { title: 'Droite', lines: [
+			{ who: 'garnier', text: 'Tiens-toi droite… Oh, pardon, l’habitude. J’aimerais bien recoudre avec quelqu’un, vous savez. Plus toute seule.' },
+		] },
+	},
+	{
+		id: 'tabouret-3', kind: 'story', client: 'La boulangère', ask: 'Poser le tissu neuf.',
+		needs: ['tissu:4', 'soin:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'tabouret', step: 3,
+		scene: { title: 'Une place', lines: [
+			{ who: 'boulangere', text: 'Il retourne à la boutique, à côté du fauteuil de ma mère. Deux places pour quelqu’un, maintenant.' },
+			{ who: 'note', text: 'Fin du chapitre 16.' },
+		] },
+	},
+
+	// ---- Chapter 17: the spool box and the ticket ----
+	{
+		id: 'bobines-1', kind: 'story', client: 'Mme Garnier', ask: 'Redresser le couvercle.',
+		needs: ['bois:3', 'outil:3'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'tabouret', step: 3 }, project: 'bobines', step: 1,
+		scene: { title: 'Le billet', lines: [
+			{ who: 'note', text: 'Sous les bobines, un billet de train, avril 1962, jamais composté. Destination : la ville où vit Lucile.', show: 'ticket' },
+			{ who: 'garnier', text: 'Je devais lui porter la boîte moi-même. Le billet était acheté.' },
+		] },
+	},
+	{
+		id: 'facteur-3', kind: 'short', client: 'Le facteur', ask: 'Une poulie pour le monte-colis.',
+		needs: ['marin:3'], reward: { coins: 12, rep: 1 }, when: { project: 'bobines', step: 1 },
+	},
+	{
+		id: 'bobines-2', kind: 'story', client: 'Mme Garnier', ask: 'Réparer la charnière et les casiers.',
+		needs: ['meca:4', 'bois:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'bobines', step: 2,
+		scene: { title: 'Le retard', lines: [
+			{ who: 'garnier', text: 'J’ai eu peur que Jeanne croie que je choisissais le camp de Lucile. Alors j’ai attendu « le bon moment ».' },
+			{ who: 'garnier', text: 'À la fin, ce n’était plus le moment qui manquait. Je n’osais plus expliquer le retard.' },
+		] },
+	},
+	{
+		id: 'bobines-3', kind: 'story', client: 'Mme Garnier', ask: 'Ranger les bobines et polir.',
+		needs: ['soin:4', 'tissu:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'bobines', step: 3,
+		scene: { title: 'Appeler', lines: [
+			{ who: 'garnier', text: 'J’aimerais appeler Lucile. Pour de vrai, cette fois. Mais je ne sais pas par où commencer.' },
+			{ who: 'note', text: 'Fin du chapitre 17.' },
+		] },
+	},
+
+	// ---- Chapter 18: Rose's logbook and the 1813 receipt ----
+	{
+		id: 'carnet-1', kind: 'story', client: 'Vous', ask: 'Dépoussiérer la couverture.',
+		needs: ['soin:4', 'outil:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'bobines', step: 3 }, project: 'carnet', step: 1,
+		scene: { title: 'La couverture', lines: [
+			{ who: 'note', text: 'La pie gravée sur le cuir réapparaît, et les initiales : R. K., 1813.' },
+		] },
+	},
+	{
+		id: 'boulangere-4', kind: 'short', client: 'La boulangère', ask: 'Du galon pour les rideaux de la boutique.',
+		needs: ['tissu:4'], reward: { coins: 14, rep: 1 }, when: { project: 'carnet', step: 1 },
+	},
+	{
+		id: 'carnet-2', kind: 'story', client: 'Vous', ask: 'Recoudre la reliure.',
+		needs: ['tissu:4', 'outil:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'carnet', step: 2,
+		scene: { title: 'Le rabat', lines: [
+			{ who: 'note', text: 'En recousant le dos, un papier plié glisse du rabat : « 1813. Reçu de la Pie la somme de trois cents francs. Étienne Roussel, charpentier. »', show: 'receipt' },
+			{ who: 'moi', text: 'Rose avait tenté de réparer. En partie seulement : trois cents francs ne rendent pas un navire. Mais quelque chose était revenu.' },
+		] },
+	},
+	{
+		id: 'carnet-3', kind: 'story', client: 'Vous', ask: 'Cirer le cuir.',
+		needs: ['soin:4', 'bois:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'carnet', step: 3,
+		scene: { title: 'Pas toute l’histoire', lines: [
+			{ who: 'garnier', text: '« Ce qui est pris ne revient pas »… Ma famille ne disait pas toute l’histoire. Ça ne répare rien, mais ça change quelque chose.' },
+			{ who: 'garnier', text: 'Ce soir, j’appelle Lucile. Pas pour la cloche. Pour moi.' },
+			{ who: 'note', text: 'Fin du chapitre 18.' },
+		] },
+	},
+
+	// ---- Chapter 19: the suitcase ----
+	{
+		id: 'valise-1', kind: 'story', client: 'Mme Garnier', ask: 'Nettoyer la coque.',
+		needs: ['soin:4', 'meca:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'carnet', step: 3 }, project: 'valise', step: 1,
+		scene: { title: 'Au téléphone', lines: [
+			{ who: 'garnier', text: 'On a parlé une heure. De couture, surtout. Elle m’attend dans quinze jours. J’ai eu le temps de lui dire pourquoi je n’étais pas venue.' },
+		] },
+	},
+	{
+		id: 'lucas-9', kind: 'short', client: 'Lucas', ask: 'Un gréement pour la saison de voile.',
+		needs: ['marin:4'], reward: { coins: 14, rep: 1 }, when: { project: 'valise', step: 1 },
+	},
+	{
+		id: 'valise-2', kind: 'story', client: 'Mme Garnier', ask: 'Réparer la poignée et la doublure.',
+		needs: ['tissu:4', 'meca:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'valise', step: 2,
+		scene: { title: 'Plus joli', lines: [
+			{ who: 'garnier', text: 'J’aurais pu lui faire quelque chose de plus joli, pour l’arrivée… Non. On le fera ensemble.' },
+		] },
+	},
+	{
+		id: 'valise-3', kind: 'story', client: 'Mme Garnier', ask: 'Remonter les fermoirs.',
+		needs: ['meca:4', 'soin:4'], reward: { coins: 30, rep: 6, energy: 10, cocoins: 20 }, project: 'valise', step: 3,
+		scene: { title: 'Le prochain départ', lines: [
+			{ who: 'note', text: 'Cette fois, elle fait elle-même le voyage qu’elle avait toujours reporté. La valise claque, le taxi attend.' },
+			{ who: 'note', text: 'Deux semaines plus tard, une photo arrive à l’atelier : Mme Garnier et Lucile, penchées sur un ouvrage à moitié fini.' },
+			{ who: 'garnier', text: 'On a surtout parlé. Je dois y retourner pour finir.' },
+			{ who: 'chen', text: 'Pour vos prochaines valises : une poignée de mon tout premier lot de brocante. J’en ai gardé une pièce, moi aussi. Un jour, je vous raconterai.' },
+			{ who: 'note', text: 'Fin de la saison 3.' },
+		] },
 	},
 ];
 
