@@ -6,7 +6,8 @@ export type ChainId = 'outil' | 'soin' | 'meca' | 'elec' | 'bois' | 'tissu' | 'm
 export type GenId = 'boite' | 'tiroir' | 'caisse' | 'coffre' | 'malle' | 'greeur';
 export type ProjectId = 'montre' | 'radio' | 'voilier' | 'boite' | 'fauteuil' | 'malle' | 'musique'
 	| 'boussole' | 'fanal' | 'longuevue' | 'coffre' | 'mouette' | 'cloche'
-	| 'cadre' | 'travailleuse' | 'tabouret' | 'bobines' | 'carnet' | 'valise';
+	| 'cadre' | 'travailleuse' | 'tabouret' | 'bobines' | 'carnet' | 'valise'
+	| 'etal' | 'presentoir' | 'balance' | 'caissette' | 'casier' | 'toupie';
 
 export interface Chain {
 	id: ChainId;
@@ -165,11 +166,11 @@ export interface Reward {
 }
 
 export interface Line {
-	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'boulangere' | 'lucile' | 'yves' | 'moi' | 'note';
+	who: 'morel' | 'garnier' | 'lucas' | 'chen' | 'boulangere' | 'lucile' | 'yves' | 'lemoine' | 'moi' | 'note';
 	text: string;
 	/** Shown in place of the object while this line is on screen: the clue the line talks about. */
 	show?: 'back' | 'mechanism' | 'photo' | 'postcard' | 'label' | 'broadcast' | 'dedication' | 'box' | 'key' | 'office' | 'map'
-		| 'piece4' | 'lucile' | 'tag' | 'yvesnote' | 'carnet' | 'ticket' | 'receipt';
+		| 'piece4' | 'lucile' | 'tag' | 'yvesnote' | 'carnet' | 'ticket' | 'receipt' | 'jtag' | 'open';
 }
 
 /** Reached once a project has delivered `step` restoration steps. */
@@ -397,7 +398,47 @@ export const PROJECTS: Project[] = [
 			{ who: 'garnier', text: 'La voilà, ma vieille valise. Poignée cassée, serrures rouillées. Il me la faut pour dans quinze jours.' },
 		],
 	},
+	// ---- Season 4: « À bientôt » (docs/atelier-saison4.md) ----
+	{
+		id: 'etal', chapter: 20, object: 'Valise-étal', title: 'La valise de Mlle Chen', client: 'Mlle Chen', steps: 3,
+		arrival: [
+			{ who: 'chen', text: 'Voilà la valise de la poignée. Mon tout premier lot. Je l’ai démontée il y a des années, et je n’ai jamais osé la remonter.' },
+			{ who: 'chen', text: 'Celle-là, je n’ai jamais réussi à la mettre en vente. Il y a des trous partout à l’intérieur, et aucune doublure.' },
+		],
+	},
+	{
+		id: 'presentoir', chapter: 21, object: 'Présentoir', title: 'Le présentoir de Mme Lemoine', client: 'Mme Lemoine', steps: 3,
+		arrival: [
+			{ who: 'lemoine', text: 'Alors c’est vous qui réparez tout, maintenant ? La petite Chen m’a appelée. J’ai apporté ce qui va avec sa valise.' },
+		],
+	},
+	{
+		id: 'balance', chapter: 22, object: 'Balance', title: 'La balance de la boulangerie', client: 'La boulangère', steps: 3,
+		arrival: [
+			{ who: 'boulangere', text: 'La balance de ma grand-mère. Elle penche toujours du même côté. Je voudrais la remettre au comptoir.' },
+		],
+	},
+	{
+		id: 'caissette', chapter: 23, object: 'Caissette', title: 'La caissette de monnaie', client: 'Mlle Chen', steps: 3,
+		arrival: [
+			{ who: 'chen', text: 'Ma caissette. Je la vide devant vous : pas de trésor, juste mes économies et un plan. J’ai un projet.' },
+		],
+	},
+	{
+		id: 'casier', chapter: 24, object: 'Casier', title: 'Le casier de l’étal', client: 'Mlle Chen', steps: 3,
+		arrival: [
+			{ who: 'chen', text: 'Un petit casier pour l’étal. Je veux qu’il soit à moi, pas une copie de la photo de Mme Lemoine.' },
+		],
+	},
+	{
+		id: 'toupie', chapter: 25, object: 'Toupie', title: 'La toupie', client: 'Vous', steps: 3,
+		arrival: [
+			{ who: 'chen', text: 'La quatrième étiquette, il n’y a pas de nom de client. Juste « toupie, pointe changée ». Tenez, c’est elle.' },
+			{ who: 'moi', text: 'Cette bande bleue maladroite… C’est moi qui l’ai peinte. J’étais tout petit. C’est ma toupie.' },
+		],
+	},
 ];
+
 
 
 
@@ -1432,6 +1473,190 @@ export const ORDERS: Order[] = [
 			{ who: 'note', text: 'Fin de la saison 3.' },
 		] },
 	},
+
+	// ================= Season 4: « À bientôt » =================
+	// ---- Chapter 20: the suitcase stall ----
+	{
+		id: 'etal-1', kind: 'story', client: 'Mlle Chen', ask: 'Nettoyer la coque et l’intérieur.',
+		needs: ['soin:4', 'bois:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'valise', step: 3 }, project: 'etal', step: 1,
+		scene: { title: 'Les tasseaux', lines: [
+			{ who: 'note', text: 'Propre, l’intérieur montre des tasseaux vissés et des trous alignés. Pas de doublure : elle n’en a jamais eu.' },
+			{ who: 'chen', text: 'Une valise sans doublure, avec des trous partout. Je n’ai jamais compris à quoi elle servait.' },
+		] },
+	},
+	{
+		id: 'garnier-6', kind: 'short', client: 'Mme Garnier', ask: 'Du fil, pour l’ouvrage à finir avec Lucile.',
+		needs: ['tissu:2'], reward: { coins: 10, rep: 1 }, when: { project: 'etal', step: 1 },
+	},
+	{
+		id: 'etal-2', kind: 'story', client: 'Mlle Chen', ask: 'Remonter les charnières.',
+		needs: ['meca:4', 'outil:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'etal', step: 2,
+		scene: { title: 'Elle tient', lines: [
+			{ who: 'chen', text: 'Elle s’ouvre et elle tient debout. J’appelle Mme Lemoine, la brocanteuse qui me l’a vendue. Elle saura.' },
+		] },
+	},
+	{
+		id: 'etal-3', kind: 'story', client: 'Mlle Chen', ask: 'Cirer et remettre les coins.',
+		needs: ['soin:4', 'bois:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'etal', step: 3,
+		scene: { title: 'La première pièce', lines: [
+			{ who: 'chen', text: 'Ma première réparation abandonnée, enfin finie. J’avais peur d’abîmer un objet auquel quelqu’un avait tenu.' },
+			{ who: 'note', text: 'Fin du chapitre 20.' },
+		] },
+	},
+
+	// ---- Chapter 21: the folding display ----
+	{
+		id: 'presentoir-1', kind: 'story', client: 'Mme Lemoine', ask: 'Nettoyer les lattes.',
+		needs: ['soin:3', 'bois:3'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'etal', step: 3 }, project: 'presentoir', step: 1,
+		scene: { title: 'Un étal', lines: [
+			{ who: 'lemoine', text: 'Ce n’est pas une valise, ma petite : c’est mon étal. Le présentoir se range dedans, les tasseaux le tiennent. Quarante ans de marchés.' },
+			{ who: 'note', text: 'Elle montre une photo : un marché de village, et la valise ouverte en éventail, couverte d’objets.' },
+		] },
+	},
+	{
+		id: 'lucas-10', kind: 'short', client: 'Lucas', ask: 'Une voile pour la régate du port.',
+		needs: ['marin:4'], reward: { coins: 14, rep: 1 }, when: { project: 'presentoir', step: 1 },
+	},
+	{
+		id: 'presentoir-2', kind: 'story', client: 'Mme Lemoine', ask: 'Remplacer les lattes cassées.',
+		needs: ['bois:4', 'meca:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'presentoir', step: 2,
+		scene: { title: 'La boîte', lines: [
+			{ who: 'chen', text: 'Avec la valise, j’avais aussi gardé une boîte de petits objets. Je ne les ai jamais vendus : ils étaient à quelqu’un.' },
+			{ who: 'note', text: 'Quatre objets, chacun avec une étiquette jaunie : « Réparation J. ».', show: 'jtag' },
+		] },
+	},
+	{
+		id: 'presentoir-3', kind: 'story', client: 'Mme Lemoine', ask: 'Vernir le présentoir.',
+		needs: ['soin:4', 'bois:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'presentoir', step: 3,
+		scene: { title: 'Réparation J.', lines: [
+			{ who: 'moi', text: '« Réparation J. »… C’est l’écriture de Jeanne. Ce sont des réparations de l’atelier.' },
+			{ who: 'note', text: 'Fin du chapitre 21.' },
+		] },
+	},
+
+	// ---- Chapter 22: the scales (a breather) ----
+	{
+		id: 'balance-1', kind: 'story', client: 'La boulangère', ask: 'Nettoyer les plateaux.',
+		needs: ['soin:4', 'meca:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'presentoir', step: 3 }, project: 'balance', step: 1,
+		scene: { title: 'Le cuivre', lines: [
+			{ who: 'boulangere', text: 'Ma grand-mère y pesait la farine pour tout le quartier. Elle disait qu’une balance juste, c’est un commerce honnête.' },
+		] },
+	},
+	{
+		id: 'morel-8', kind: 'short', client: 'M. Morel', ask: 'Un rouage pour la pendule d’Henri.',
+		needs: ['meca:4'], reward: { coins: 14, rep: 1 }, when: { project: 'balance', step: 1 },
+	},
+	{
+		id: 'balance-2', kind: 'story', client: 'La boulangère', ask: 'Redresser le fléau.',
+		needs: ['meca:4', 'outil:4'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'balance', step: 2,
+		scene: { title: 'Les marchés', lines: [
+			{ who: 'chen', text: 'Vous savez quels villages ont un marché le mardi ? Et combien de temps il vous faut pour une réparation, en général ?' },
+		] },
+	},
+	{
+		id: 'balance-3', kind: 'story', client: 'La boulangère', ask: 'Polir le cuivre.',
+		needs: ['soin:4', 'elec:2'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'balance', step: 3,
+		scene: { title: 'Au comptoir', lines: [
+			{ who: 'boulangere', text: 'Elle est juste, à nouveau. Mlle Chen, vous posez beaucoup de questions sur les marchés, vous…' },
+			{ who: 'note', text: 'Fin du chapitre 22.' },
+		] },
+	},
+
+	// ---- Chapter 23: the cash box and the project ----
+	{
+		id: 'caissette-1', kind: 'story', client: 'Mlle Chen', ask: 'Débosseler la caissette.',
+		needs: ['outil:4', 'meca:3'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'balance', step: 3 }, project: 'caissette', step: 1,
+		scene: { title: 'Le projet', lines: [
+			{ who: 'chen', text: 'Mon projet : une tournée des marchés, avec la valise-étal. Je n’osais pas la transformer : elle était à Mme Lemoine avant moi.' },
+			{ who: 'lemoine', text: 'Les trous, c’est moi qui les ai percés. Tu peux en percer d’autres. Un étal, ça sert, ou ça moisit.' },
+		] },
+	},
+	{
+		id: 'facteur-4', kind: 'short', client: 'Le facteur', ask: 'Une ampoule pour la lampe du bureau de poste.',
+		needs: ['elec:3'], reward: { coins: 12, rep: 1 }, when: { project: 'caissette', step: 1 },
+	},
+	{
+		id: 'caissette-2', kind: 'story', client: 'Mlle Chen', ask: 'Réparer la serrure et la poignée.',
+		needs: ['meca:4', 'bois:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'caissette', step: 2,
+		scene: { title: 'D’où venait le lot', lines: [
+			{ who: 'lemoine', text: 'Ce lot-là ? Je l’avais acheté au notaire, quand l’atelier de Jeanne a fermé. Tout son stock. Une boîte de réparations a dû s’y mêler.' },
+			{ who: 'chen', text: 'Alors ces quatre objets attendaient leurs propriétaires depuis tout ce temps. Et moi, je les gardais sans le savoir.' },
+		] },
+	},
+	{
+		id: 'caissette-3', kind: 'story', client: 'Mlle Chen', ask: 'Repeindre la caissette.',
+		needs: ['soin:4', 'tissu:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'caissette', step: 3,
+		scene: { title: 'Un but', lines: [
+			{ who: 'chen', text: 'Ma tournée aura un but en plus : rendre ces réparations. Trois étiquettes ont un nom. La quatrième, non.' },
+			{ who: 'note', text: 'Fin du chapitre 23.' },
+		] },
+	},
+
+	// ---- Chapter 24: the drawer cabinet ----
+	{
+		id: 'casier-1', kind: 'story', client: 'Mlle Chen', ask: 'Décoincer les tiroirs.',
+		needs: ['bois:4', 'outil:3'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'caissette', step: 3 }, project: 'casier', step: 1,
+		scene: { title: 'À sa façon', lines: [
+			{ who: 'chen', text: 'Pas comme sur la photo. Les petits objets devant, les réparations à rendre à part, dans ce tiroir-là.' },
+		] },
+	},
+	{
+		id: 'chen-8', kind: 'short', client: 'Mlle Chen', ask: 'Un nœud marin pour attacher l’étal au vélo.',
+		needs: ['marin:2'], reward: { coins: 10, rep: 1 }, when: { project: 'casier', step: 1 },
+	},
+	{
+		id: 'casier-2', kind: 'story', client: 'Mlle Chen', ask: 'Réparer les glissières.',
+		needs: ['meca:4', 'bois:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'casier', step: 2,
+		scene: { title: 'L’itinéraire', lines: [
+			{ who: 'chen', text: 'Mardi, le marché du bourg. Jeudi, retour ici. Samedi, la côte. Les trois familles des étiquettes sont sur la route.' },
+		] },
+	},
+	{
+		id: 'casier-3', kind: 'story', client: 'Mlle Chen', ask: 'Étiqueter les tiroirs.',
+		needs: ['tissu:3', 'soin:4'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'casier', step: 3,
+		scene: { title: 'Prête', lines: [
+			{ who: 'chen', text: 'L’étal est prêt. Il ne reste que la quatrième réparation, celle sans nom. Venez voir.' },
+			{ who: 'note', text: 'Fin du chapitre 24.' },
+		] },
+	},
+
+	// ---- Chapter 25: the spinning top ----
+	{
+		id: 'toupie-1', kind: 'story', client: 'Vous', ask: 'Nettoyer la toupie.',
+		needs: ['soin:3', 'bois:2'], reward: { coins: 15, rep: 3, energy: 10 },
+		when: { project: 'casier', step: 3 }, project: 'toupie', step: 1,
+		scene: { title: 'Toupie, pointe changée', lines: [
+			{ who: 'note', text: 'L’étiquette, de la main de Jeanne : « toupie, pointe changée ». Rien d’autre. Jeanne l’avait réparée, et gardée.', show: 'jtag' },
+		] },
+	},
+	{
+		id: 'boulangere-5', kind: 'short', client: 'La boulangère', ask: 'Un casse-croûte pour la route de Mlle Chen… et une ampoule pour la vitrine.',
+		needs: ['elec:3'], reward: { coins: 12, rep: 1 }, when: { project: 'toupie', step: 1 },
+	},
+	{
+		id: 'toupie-2', kind: 'story', client: 'Vous', ask: 'Changer la pointe, encore.',
+		needs: ['meca:3', 'outil:4'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'toupie', step: 2,
+		scene: { title: 'La pointe', lines: [
+			{ who: 'note', text: 'L’ancienne réparation a cédé pendant toutes ces années au fond d’une boîte. Vous changez la pointe, comme elle l’avait fait.' },
+		] },
+	},
+	{
+		id: 'toupie-3', kind: 'story', client: 'Vous', ask: 'Repeindre, sans toucher à la bande bleue.',
+		needs: ['soin:4', 'tissu:2'], reward: { coins: 30, rep: 6, energy: 10, cocoins: 20 }, project: 'toupie', step: 3,
+		scene: { title: 'À bientôt', lines: [
+			{ who: 'note', text: 'La toupie tourne sur l’établi, longtemps. La bande bleue maladroite passe et repasse.' },
+			{ who: 'chen', text: 'Je repasse jeudi. J’aurai sûrement quelque chose pour vous.' },
+			{ who: 'moi', text: 'J’avais rouvert l’atelier pour retrouver quelque chose d’elle. Maintenant, j’ai aussi envie de voir ce qui entre.' },
+			{ who: 'note', text: 'Vous retournez le panneau sur « Ouvert ». Quelqu’un frappe.', show: 'open' },
+			{ who: 'note', text: '« Vous pourriez regarder ça ? »' },
+			{ who: 'note', text: 'Fin de L’Atelier des Souvenirs. Merci d’avoir tout réparé avec nous. L’atelier reste ouvert : le quartier continue de passer.' },
+		] },
+	},
 ];
 
 export const INTRO: Line[] = [
@@ -1453,6 +1678,7 @@ export const SPEAKERS: Record<Line['who'], string> = {
 	chen: 'Mlle Chen',
 	boulangere: 'La boulangère',
 	yves: 'Yves Kerbrat',
+	lemoine: 'Mme Lemoine',
 	lucile: 'Lucile',
 	moi: 'Vous',
 	note: '',
@@ -1571,5 +1797,9 @@ export const FACES: Record<string, string> = {
 	'Le facteur': 'facteur',
 	Lucile: 'lucile',
 	'Yves Kerbrat': 'yves',
+	'Mme Lemoine': 'lemoine',
+	Jeanne: 'jeanne',
+	'Henri Morel': 'henri',
+	'Rose Kerdoual': 'rose',
 };
 export const FACE_EMOJI: Record<string, string> = { Vous: '🗝️' };

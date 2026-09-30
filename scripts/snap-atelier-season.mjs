@@ -1,14 +1,23 @@
-/* Play season 2 of L'Atelier des Souvenirs from a "season 1 finished" save, one screenshot per beat,
-   and fail on any console error. Story orders are delivered by putting the asked pieces on the bench,
-   so this checks the chapter flow, the art and the scenes, not the balance (scripts/atelier-sim.ts does).
+/* Play one season of L'Atelier des Souvenirs from a save where every earlier season is finished, one
+   screenshot per beat, and fail on any console error. Story orders are delivered by putting the asked
+   pieces on the bench, so this checks the chapter flow, the art and the scenes, not the balance
+   (scripts/atelier-sim.ts does).
 
-   Usage: node scripts/snap-atelier-s2.mjs [out dir]   (default D:/tmp/atelier-s2) */
+   Usage: node scripts/snap-atelier-season.mjs <season 2-4> [out dir]   (default D:/tmp/atelier-s<n>) */
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { startServer } from './preview-server.mjs';
 
-const OUT = resolve(process.argv[2] ?? 'D:/tmp/atelier-s2');
+const SEASONS = {
+	1: ['montre', 'radio', 'voilier', 'boite', 'fauteuil', 'malle', 'musique'],
+	2: ['boussole', 'fanal', 'longuevue', 'coffre', 'mouette', 'cloche'],
+	3: ['cadre', 'travailleuse', 'tabouret', 'bobines', 'carnet', 'valise'],
+	4: ['etal', 'presentoir', 'balance', 'caissette', 'casier', 'toupie'],
+};
+const SEASON = Number(process.argv[2] ?? 2);
+const PRIOR = Object.entries(SEASONS).filter(([k]) => Number(k) < SEASON).flatMap(([, v]) => v);
+const OUT = resolve(process.argv[3] ?? `D:/tmp/atelier-s${SEASON}`);
 await mkdir(OUT, { recursive: true });
 const PORT = 4369;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -34,31 +43,26 @@ try {
 
 	await page.goto(`http://localhost:${PORT}/jeux/atelier/`, { waitUntil: 'networkidle' });
 	await page.waitForSelector('.at-root');
-	// Season 1 done: every season 1 order delivered, every upgrade up to the souvenirs room owned.
-	await patch(() => {
-		const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
-		const s1 = ['montre', 'radio', 'voilier', 'boite', 'fauteuil', 'malle', 'musique'];
-		for (const p of s1) st.progress[p] = 3;
-		st.seen = ['intro', 'chapter', 'epilogue', 'map-solved', 'rep-5', ...s1.map((p) => `arrival:${p}`)];
-		st.upgrades = ['etabli', 'lampe', 'photo', 'etageres', 'menuiserie', 'couture', 'bureau', 'souvenirs'];
-		st.tut = 4; st.coins = 400;
-		st.board = st.board.map((p) => (p && p.startsWith('g:') ? p : null));
-		const gens = ['g:caisse', 'g:coffre', 'g:malle'];
-		gens.forEach((g, k) => { st.board[10 + k] = g; });
-		// The season 1 short orders count as done so the counter is season 2's.
-		st.done = window.__s1done ?? [];
-		localStorage.setItem('ludiven-atelier', JSON.stringify(st));
-	});
-	const s1done = await page.evaluate(async () => {
+	// Every earlier season done: its orders delivered (short ones too), its upgrades owned.
+	const prior = await page.evaluate(async (projects) => {
 		const m = await import('/src/games/atelier/data.ts');
-		return m.ORDERS.filter((o) => !o.project || ['montre', 'radio', 'voilier', 'boite', 'fauteuil', 'malle', 'musique'].includes(o.project)).map((o) => o.id);
-	});
-	await patch((done) => {
+		const mine = (o) => (o.project && projects.includes(o.project)) || (o.kind === 'short' && (!o.when || projects.includes(o.when.project)));
+		return {
+			done: m.ORDERS.filter(mine).map((o) => o.id),
+			upgrades: m.UPGRADES.filter((u) => !u.when || projects.includes(u.when.project)).map((u) => u.id),
+		};
+	}, PRIOR);
+	await patch(({ projects, done, upgrades }) => {
 		const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
+		for (const p of projects) st.progress[p] = 3;
+		st.seen = ['intro', 'chapter', 'epilogue', 'map-solved', 'rep-5', ...projects.map((p) => `arrival:${p}`), ...upgrades.map((u) => `up:${u}`)];
+		st.upgrades = upgrades;
+		st.tut = 4; st.coins = 400;
+		st.board = st.board.map(() => null);
 		st.done = done;
 		localStorage.setItem('ludiven-atelier', JSON.stringify(st));
-	}, s1done);
-	await shot('01-arrival-boussole');
+	}, { projects: PRIOR, done: prior.done, upgrades: prior.upgrades });
+	await shot('01-arrival');
 	await drain();
 
 	const deliver = async (pieces, name, extra = 0) => {
@@ -80,20 +84,19 @@ try {
 		const m = await import('/src/games/atelier/data.ts');
 		return Object.fromEntries(m.ORDERS.filter((o) => o.kind === 'story').map((o) => [o.id, o.needs]));
 	});
-	for (const p of ['boussole', 'fanal', 'longuevue', 'coffre']) {
-		for (const k of [1, 2, 3]) await deliver(needs[`${p}-${k}`], `${p}-${k}`, p === 'boussole' && k === 1 ? 1 : p === 'coffre' && k === 2 ? 0 : 0);
-	}
-	await page.locator('.at-tab', { hasText: 'Établi' }).click();
-	await shot('20-hangar-banner');
-	await page.locator('.at-next .at-btn').click();
-	await page.locator('.at-up', { hasText: 'hangar' }).locator('.at-btn').click();
-	await sleep(600);
-	await shot('21-hangar-scene');
-	await drain();
-	await page.locator('.at-tab', { hasText: 'Établi' }).click();
-	await shot('22-greeur-on-board');
-	for (const p of ['mouette', 'cloche']) {
-		for (const k of [1, 2, 3]) await deliver(needs[`${p}-${k}`], `${p}-${k}`, p === 'cloche' && k === 3 ? 1 : 0);
+	for (const p of SEASONS[SEASON]) {
+		// A story waiting on an upgrade: take the banner's button, buy it, look at its scene.
+		await drain();
+		await page.locator('.at-tab', { hasText: 'Établi' }).click();
+		if (await page.locator('.at-next').count()) {
+			await shot(`${p}-0-banner`);
+			await page.locator('.at-next .at-btn').click();
+			await page.locator('.at-up.awaited .at-btn').click();
+			await sleep(600);
+			await shot(`${p}-0-upgrade`);
+			await drain();
+		}
+		for (const k of [1, 2, 3]) await deliver(needs[`${p}-${k}`], `${p}-${k}`, k === 1 ? 1 : 0);
 	}
 	await page.locator('.at-tab', { hasText: 'Atelier' }).click();
 	await shot('30-atelier-end');

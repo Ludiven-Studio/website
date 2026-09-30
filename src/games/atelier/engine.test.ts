@@ -242,7 +242,7 @@ describe('orders', () => {
 		expect(s.board).toContain('g:greeur');
 		for (const id of ['mouette-1', 'facteur-2', 'mouette-2', 'morel-6', 'mouette-3', 'cloche-1', 'chen-6', 'cloche-2', 'cloche-3']) s = give(s, id);
 		expect(stepOf(s, 'cloche')).toBe(3);
-		for (const p of ['cadre', 'travailleuse', 'tabouret', 'bobines', 'carnet', 'valise'] as const) {
+		for (const p of ['cadre', 'travailleuse', 'tabouret', 'bobines', 'carnet', 'valise', 'etal', 'presentoir', 'balance', 'caissette', 'casier', 'toupie'] as const) {
 			for (const id of ORDERS.filter((o) => o.project === p || (o.kind === 'short' && o.when?.project === p)).map((o) => o.id)) s = give(s, id);
 			expect(stepOf(s, p), p).toBe(3);
 		}

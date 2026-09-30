@@ -20,3 +20,4 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-09-30 · 0018 · challenge saison 3 · validée avec 3 corrections, intégrées
 - 2026-09-30 · 0019 · saison 4 (version Codex) · fusionnée dans docs/atelier-saison4.md
 - 2026-09-30 · 0020 · challenge saison 4 · 3 corrections intégrées, version sans message posthume retenue
+- 2026-09-30 · 0021 · portraits Jeanne, Henri, Rose, Mme Lemoine (Codex, 214 k jetons) · intégrés

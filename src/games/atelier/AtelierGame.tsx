@@ -18,6 +18,7 @@ import Malle, { MapPuzzle, MALLE_CSS } from './Malle';
 import Musique, { MUSIQUE_CSS } from './Musique';
 import { Boussole, Fanal, LongueVue, CoffreMousse, Canot, Cloche, SAISON2_CSS } from './Saison2';
 import { CadreOvale, Travailleuse, Tabouret, CoffretBobines, CarnetRose, Valise, SAISON3_CSS } from './Saison3';
+import { ValiseEtal, Presentoir, Balance, Caissette, Casier, Toupie, SAISON4_CSS } from './Saison4';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
@@ -61,6 +62,12 @@ function ObjectArt({ project, state }: Art) {
 	if (project === 'bobines') return <CoffretBobines state={state} size="100%" />;
 	if (project === 'carnet') return <CarnetRose state={state} size="100%" />;
 	if (project === 'valise') return <Valise state={state} size="100%" />;
+	if (project === 'etal') return <ValiseEtal state={state} size="100%" />;
+	if (project === 'presentoir') return <Presentoir state={state} size="100%" />;
+	if (project === 'balance') return <Balance state={state} size="100%" />;
+	if (project === 'caissette') return <Caissette state={state} size="100%" />;
+	if (project === 'casier') return <Casier state={state} size="100%" />;
+	if (project === 'toupie') return <Toupie state={state} size="100%" />;
 	return <Watch state={state} size="100%" />;
 }
 
@@ -383,7 +390,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}{SAISON4_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -753,7 +760,7 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle
 								<span>
 									{project.id === 'montre'
 										? `Restaurée et rendue. ${chapterDone ? 'La photo de 1961 est au mur.' : 'Accroche la photo de 1961 pour clore le chapitre.'}`
-										: project.id === 'musique' ? 'Rendue aux Chen. Fin de la saison 1.' : project.id === 'cloche' ? 'Rendue au port. Fin de la saison 2.' : project.id === 'valise' ? 'Mme Garnier est partie voir Lucile. Fin de la saison 3.' : 'Restauré et rendu.'}
+										: project.id === 'musique' ? 'Rendue aux Chen. Fin de la saison 1.' : project.id === 'cloche' ? 'Rendue au port. Fin de la saison 2.' : project.id === 'valise' ? 'Mme Garnier est partie voir Lucile. Fin de la saison 3.' : project.id === 'toupie' ? 'Fin de L’Atelier des Souvenirs. L’atelier reste ouvert.' : 'Restauré et rendu.'}
 								</span>
 							) : stepOf(s, project.id) > 0 ? (
 								<span>En attente : {UPGRADES.find((u) => ORDERS.some((o) => o.project === project.id && o.step === step + 1 && o.after === u.id))?.name ?? 'une amélioration de l’atelier'}.</span>
@@ -897,6 +904,18 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 								<b>S. K. — 1813</b>
 								<span>Élie au levant, moi au couchant. Chacun rend ce qu’il porte.</span>
 								<span>La cloche reste. Là où l’île regarde le port.</span>
+							</div>
+						)}
+						{line.show === 'jtag' && (
+							<div className="at-label" role="img" aria-label="Étiquette jaunie : Réparation J.">
+								<b>Atelier J.</b>
+								<span>Réparation</span>
+								<em>— J. —</em>
+							</div>
+						)}
+						{line.show === 'open' && (
+							<div className="at-open" role="img" aria-label="Le panneau de l’atelier, retourné sur Ouvert">
+								<span>Ouvert</span>
 							</div>
 						)}
 						{line.show === 'ticket' && (
@@ -1110,6 +1129,12 @@ const CSS = `
 .at-bigwatch.longuevue, .at-bigwatch.coffre, .at-bigwatch.mouette { width: min(74vw, 280px); }
 .at-bigwatch.cadre, .at-bigwatch.tabouret, .at-bigwatch.carnet { width: min(50vw, 180px); }
 .at-bigwatch.travailleuse, .at-bigwatch.bobines, .at-bigwatch.valise { width: min(64vw, 230px); }
+.at-bigwatch.etal, .at-bigwatch.presentoir, .at-bigwatch.balance { width: min(66vw, 240px); }
+.at-bigwatch.caissette, .at-bigwatch.casier, .at-bigwatch.toupie { width: min(52vw, 190px); }
+.at-open { width: min(56vw, 200px); margin: 8px auto; position: relative; background: #3f7a4a; border: 4px solid #6b3a14; border-radius: 10px; padding: 14px 0; text-align: center; box-shadow: 0 8px 18px rgba(0,0,0,0.35); animation: at-flip 0.8s ease both; }
+.at-open::before { content: ''; position: absolute; left: 50%; top: -30px; width: 2px; height: 28px; background: #6b3a14; }
+.at-open span { font-family: Georgia, serif; font-size: 26px; font-weight: 700; color: #fff4d6; letter-spacing: 0.06em; }
+@keyframes at-flip { from { transform: rotateY(180deg); } to { transform: rotateY(0); } }
 .at-receipt { width: 100%; transform: rotate(-2deg); }
 .at-ticket { width: min(70vw, 240px); margin: 0 auto; background: #e9dfc2; border: 1.5px dashed #8a6a3a; border-radius: 6px; padding: 10px 14px; display: flex; flex-direction: column; gap: 3px; color: #3b2a14; font-family: Georgia, serif; transform: rotate(2deg); box-shadow: 0 6px 14px rgba(0,0,0,0.3); }
 .at-ticket b { letter-spacing: 0.08em; text-transform: uppercase; font-size: 12px; color: #6b4a12; }
@@ -1193,6 +1218,8 @@ const CSS = `
 .at-onbench.longuevue, .at-onbench.coffre, .at-onbench.mouette { width: 18% !important; top: 77% !important; }
 .at-onbench.cadre, .at-onbench.tabouret, .at-onbench.carnet { width: 10% !important; top: 74% !important; }
 .at-onbench.travailleuse, .at-onbench.bobines, .at-onbench.valise { width: 14% !important; top: 76% !important; }
+.at-onbench.etal, .at-onbench.presentoir, .at-onbench.balance { width: 15% !important; top: 76% !important; }
+.at-onbench.caissette, .at-onbench.casier, .at-onbench.toupie { width: 10% !important; top: 74% !important; }
 .at-onbench { position: absolute; left: 58%; top: 77%; width: 8%; transform: translate(-50%, -50%) rotate(-12deg); filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
 .at-project { display: flex; gap: 12px; align-items: center; background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; }
 .at-project-watch { width: 54px; flex: none; }
@@ -1206,6 +1233,8 @@ const CSS = `
 .at-project-watch.longuevue, .at-project-watch.coffre, .at-project-watch.mouette { width: 90px; }
 .at-project-watch.cadre, .at-project-watch.tabouret, .at-project-watch.carnet { width: 56px; }
 .at-project-watch.travailleuse, .at-project-watch.bobines, .at-project-watch.valise { width: 76px; }
+.at-project-watch.etal, .at-project-watch.presentoir, .at-project-watch.balance { width: 80px; }
+.at-project-watch.caissette, .at-project-watch.casier, .at-project-watch.toupie { width: 58px; }
 .at-warn { color: #d9822b !important; font-weight: 600; }
 .at-shelves { position: absolute; left: 52%; top: 6%; width: 48%; height: 62%; background: radial-gradient(ellipse at 60% 40%, rgba(255, 214, 140, 0.35), transparent 65%); mix-blend-mode: screen; pointer-events: none; }
 .at-project-txt { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--gray-300); min-width: 0; flex: 1; }
@@ -1230,6 +1259,6 @@ const CSS = `
 	.at-stat em { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img, .at-broadcast u { animation: none; }
+	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img, .at-broadcast u, .at-open { animation: none; }
 }
 `;
