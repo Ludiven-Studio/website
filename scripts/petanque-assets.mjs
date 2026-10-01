@@ -20,7 +20,7 @@ await mkdir(OUT, { recursive: true });
 await sharp(`${SRC}/_fg_new.png`)
 	.resize(1024)
 	.avif({ quality: 62 })
-	.toFile(`${OUT}/hero.avif`);
+	.toFile(`${OUT}/hero-fr.avif`);
 
 for (const [i, n] of SLIDES.entries()) {
 	await sharp(`${SRC}/store_v1.2.10/composed/store_65_${n}.png`)

@@ -98,6 +98,19 @@ const jsonLd = [
 		<section class="screens stack gap-6">
 			<h2 class="section-title">{t.galleryTitle}</h2>
 			<div class="screens-grid">
+				{/* Muted loop, fetched only once scrolled into view: 5 MB nobody above the fold should pay for. */}
+				<video
+					class="screen-video"
+					data-src={`/assets/petanque-ar/video-${lang}.mp4`}
+					poster={`/assets/petanque-ar/video-${lang}.webp`}
+					width="554"
+					height="1200"
+					muted
+					loop
+					playsinline
+					preload="none"
+					aria-label={t.galleryTitle}
+				></video>
 				{SCREENS[lang].map((src) => <img src={src} alt="" loading="lazy" decoding="async" />)}
 			</div>
 		</section>
@@ -168,6 +181,18 @@ const jsonLd = [
 
 <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
 
+<script>
+	const video = document.querySelector<HTMLVideoElement>('.screen-video');
+	if (video?.dataset.src && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+		new IntersectionObserver((entries, observer) => {
+			if (!entries.some((e) => e.isIntersecting)) return;
+			observer.disconnect();
+			video.src = video.dataset.src!;
+			video.play().catch(() => {});
+		}, { rootMargin: '200px' }).observe(video);
+	}
+</script>
+
 <style>
 	.box {
 		border: 1px solid var(--gray-800);
@@ -229,7 +254,8 @@ const jsonLd = [
 		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 	}
 
-	.screens-grid img {
+	.screens-grid img,
+	.screens-grid video {
 		width: 100%;
 		height: auto;
 		border-radius: 1.25rem;

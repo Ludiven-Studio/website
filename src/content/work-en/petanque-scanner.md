@@ -1,7 +1,7 @@
 ---
 title: Pétanque Scanner - 2026
 publishDate: 2026-08-22 00:00:00
-img: /assets/petanque-ar/hero.avif
+img: /assets/petanque-ar/hero-en.webp?v=1211
 img_alt: Pétanque Scanner — measure the point with your phone, in augmented reality
 role: Developer
 org: Ludiven Studio
@@ -19,20 +19,18 @@ tags:
 galleryTitle: The app in use
 galleryLayout: phone
 gallery:
-  - src: /assets/petanque-ar/screen-01.webp
-    alt: Scan in progress — six boules measured in augmented reality, from 20.7 cm to 32.2 cm off the jack
-  - src: /assets/petanque-ar/screen-02.webp
-    alt: Green grid laid over the pitch, to confirm before the measurement starts
-  - src: /assets/petanque-ar/screen-03.webp
-    alt: The same measurement from another angle — walking around the game sharpens the distances
-  - src: /assets/petanque-ar/screen-04.webp
-    alt: Photo mode — a single shot, phone held flat, for devices without AR
-  - src: /assets/petanque-ar/screen-05.webp
-    alt: Photo mode result — the closest boule circled in green, about 20 cm from the jack
-  - src: /assets/petanque-ar/screen-06.webp
-    alt: Premium screen — three free scans a day, or lifetime Premium with no subscription
-  - src: /assets/petanque-ar/premium.webp
-    alt: Lifetime Premium artwork — unlimited measurements, no ads
+  - src: /assets/petanque-ar/screen-01-en.webp
+    alt: "3D scan in progress — four boules locked, each one's distance to the jack shown above it"
+  - src: /assets/petanque-ar/screen-02-en.webp
+    alt: "Aiming at the jack, second shot of three"
+  - src: /assets/petanque-ar/screen-03-en.webp
+    alt: "Phone held above a boule: the measure locks, a padlock shows it"
+  - src: /assets/petanque-ar/screen-04-en.webp
+    alt: "The result seen from above, boules ranked from nearest to farthest"
+  - src: /assets/petanque-ar/screen-05-en.webp
+    alt: "Photo mode — a single shot taken from above, the closest boule circled in green"
+  - src: /assets/petanque-ar/screen-06-en.webp
+    alt: "Premium screen — three free scans a day, or lifetime Premium with no subscription"
 ---
 <p>
   This page covers the <strong>engineering behind</strong> Pétanque Scanner. If you're after the app

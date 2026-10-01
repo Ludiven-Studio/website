@@ -1,6 +1,7 @@
 ---
 // Only a few pages exist in other languages, so this is a per-page link, not a site-wide switch.
 // Two-language pages pass `lang` + `href`; pages with more pass `links` (the other versions).
+// One flag per version, the current one greyed out and not a link.
 type Lang = 'fr' | 'en' | 'es' | 'de' | 'it';
 
 interface Props {
@@ -18,39 +19,70 @@ const LABEL: Record<Lang, string> = {
 	it: 'Leggi in italiano',
 };
 
+const ORDER: Lang[] = ['fr', 'en', 'es', 'de', 'it'];
+
 const { lang, href, links } = Astro.props;
-const all = links ?? (href ? [{ lang: lang === 'fr' ? 'en' : 'fr', href }] as { lang: Lang; href: string }[] : []);
+const others = links ?? (href ? [{ lang: lang === 'fr' ? 'en' : 'fr', href }] as { lang: Lang; href: string }[] : []);
+const all = [{ lang, href: undefined as string | undefined }, ...others]
+	.sort((a, b) => ORDER.indexOf(a.lang) - ORDER.indexOf(b.lang));
 ---
 
-<div class="lang-switches">
-	{all.map((l) => (
-		<a class="lang-switch" href={l.href} hreflang={l.lang} lang={l.lang}>{LABEL[l.lang]}</a>
-	))}
-</div>
+<nav class="lang-switches" aria-label="Language">
+	{all.map((l) => {
+		const flag = (
+			<svg viewBox="0 0 30 20" width="30" height="20" aria-hidden="true">
+				{l.lang === 'fr' && <>
+					<rect width="10" height="20" fill="#002395" /><rect x="10" width="10" height="20" fill="#fff" /><rect x="20" width="10" height="20" fill="#ED2939" />
+				</>}
+				{l.lang === 'it' && <>
+					<rect width="10" height="20" fill="#009246" /><rect x="10" width="10" height="20" fill="#fff" /><rect x="20" width="10" height="20" fill="#CE2B37" />
+				</>}
+				{l.lang === 'de' && <>
+					<rect width="30" height="7" fill="#000" /><rect y="6.67" width="30" height="6.67" fill="#DD0000" /><rect y="13.33" width="30" height="6.67" fill="#FFCE00" />
+				</>}
+				{l.lang === 'es' && <>
+					<rect width="30" height="20" fill="#AA151B" /><rect y="5" width="30" height="10" fill="#F1BF00" />
+				</>}
+				{l.lang === 'en' && <>
+					<rect width="30" height="20" fill="#012169" />
+					<path d="M0 0L30 20M30 0L0 20" stroke="#fff" stroke-width="4" />
+					<path d="M0 0L30 20M30 0L0 20" stroke="#C8102E" stroke-width="1.6" />
+					<path d="M15 0V20M0 10H30" stroke="#fff" stroke-width="6" />
+					<path d="M15 0V20M0 10H30" stroke="#C8102E" stroke-width="3.4" />
+				</>}
+			</svg>
+		);
+		return l.href
+			? <a class="lang-switch" href={l.href} hreflang={l.lang} lang={l.lang} title={LABEL[l.lang]} aria-label={LABEL[l.lang]}>{flag}</a>
+			: <span class="lang-switch current" lang={l.lang} title={LABEL[l.lang]} aria-current="page">{flag}</span>;
+	})}
+</nav>
 
 <style>
 	.lang-switches {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		align-self: flex-start;
+		justify-content: flex-end;
+		align-self: stretch;
+		gap: 0.6rem;
 	}
 
 	.lang-switch {
-		padding: 0.3rem 0.8rem;
-		border: 1px solid var(--gray-800);
-		border-radius: 999rem;
-		background-color: var(--gray-999_40);
-		color: var(--gray-300);
-		font-family: var(--font-brand);
-		font-size: var(--text-sm);
-		text-decoration: none;
-		transition: color var(--theme-transition), background-color var(--theme-transition);
+		display: inline-flex;
+		line-height: 0;
+		border-radius: 4px;
+		overflow: hidden;
+		box-shadow: 0 0 0 1px var(--gray-800);
+		transition: transform var(--theme-transition), box-shadow var(--theme-transition);
 	}
 
-	.lang-switch:hover,
-	.lang-switch:focus {
-		color: var(--accent-text-over);
-		background-color: var(--accent-regular);
+	a.lang-switch:hover,
+	a.lang-switch:focus-visible {
+		transform: translateY(-2px);
+		box-shadow: 0 0 0 2px var(--accent-regular);
+	}
+
+	.lang-switch.current {
+		filter: grayscale(1);
+		opacity: 0.45;
 	}
 </style>

@@ -42,13 +42,13 @@ export interface LandingCopy {
 
 export const APP_NAME = 'Pétanque Scanner';
 export const OG_IMAGE = '/assets/work/og/petanque-scanner.jpg';
-export const HERO = '/assets/petanque-ar/hero.avif';
+export const HERO = '/assets/petanque-ar/hero-fr.avif';
 
 /** The store visuals carry their caption and the app's own UI, so each language gets its set. */
 const screens = (suffix: string) =>
 	[1, 2, 3, 4, 5, 6].map((n) => `/assets/petanque-ar/screen-0${n}${suffix}.webp`);
 export const SCREENS: Record<LandingLang, string[]> = {
-	fr: screens(''),
+	fr: screens('-fr'),
 	en: screens('-en'),
 	es: screens('-es'),
 	de: screens('-de'),
@@ -69,8 +69,8 @@ export const LANDING_PATHS: Record<LandingLang, string> = {
 /** The hero has its strapline baked into the pixels, so each language gets a repainted copy and its own share card. */
 export const HEROES: Record<LandingLang, string> = {
 	fr: HERO,
-	en: '/assets/petanque-ar/hero-en.webp',
-	es: '/assets/petanque-ar/hero-es.webp',
+	en: '/assets/petanque-ar/hero-en.webp?v=1211',
+	es: '/assets/petanque-ar/hero-es.webp?v=1211',
 	de: '/assets/petanque-ar/hero-de.webp',
 	it: '/assets/petanque-ar/hero-it.webp',
 };
@@ -86,9 +86,9 @@ export const copy: Record<LandingLang, LandingCopy> = {
 	fr: {
 		title: 'Pétanque Scanner — savoir qui a le point avec votre téléphone',
 		description:
-			'Application gratuite de réalité augmentée : visez les boules, tournez autour, et lisez la distance de chaque boule au cochonnet. Un mode photo prend le relais sur les téléphones sans AR. Tout est calculé sur le téléphone, sans réseau ni compte.',
+			'Application gratuite de réalité augmentée : visez le cochonnet, passez au-dessus des boules, et lisez la distance de chaque boule au cochonnet. Un mode photo prend le relais sur les téléphones sans AR. Tout est calculé sur le téléphone, sans réseau ni compte.',
 		tagline:
-			'Deux boules de chaque côté du cochonnet, à un mètre ou deux, et l\'œil ne tranche pas : de loin, on ne compare pas deux distances. Lancez un scan, tournez quelques secondes autour du jeu, et l\'application affiche la distance de chaque boule — posée en réalité augmentée sur le terrain.',
+			'Deux boules de chaque côté du cochonnet, à un mètre ou deux, et l\'œil ne tranche pas : de loin, on ne compare pas deux distances. Lancez un scan, visez le cochonnet, passez au-dessus de chaque boule, et l\'application affiche la distance de chaque boule — posée en réalité augmentée sur le terrain.',
 		heroAlt: 'Trois boules et un cochonnet sur un terrain, avec les mesures affichées en réalité augmentée',
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=fr',
@@ -100,18 +100,18 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		steps: [
 			{
 				icon: 'mobile',
-				title: 'Lancez le scan',
-				body: 'Laissez les boules exactement où elles sont, ouvrez l\'application et visez le jeu. Rien à poser au sol, aucun repère à placer.',
+				title: 'Placez le cochonnet',
+				body: 'Laissez les boules où elles sont, ouvrez l\'application et filmez le sol autour du jeu. Visez ensuite le cochonnet sous trois angles, un pas de côté entre chaque visée : il est placé.',
 			},
 			{
 				icon: 'winding-path',
-				title: 'Tournez autour',
-				body: 'Faites quelques pas autour des boules en gardant le cochonnet dans le cadre. Un indice de confiance monte en direct pendant que l\'application accumule les points de vue.',
+				title: 'Passez au-dessus des boules',
+				body: 'Filmez les boules depuis trois endroits — plusieurs à la fois, c\'est permis — puis tenez le téléphone au-dessus de chacune : la mesure se verrouille toute seule, un cadenas l\'indique.',
 			},
 			{
 				icon: 'grid-dots',
 				title: 'Lisez le classement',
-				body: 'Les distances s\'affichent au sol, de la plus courte à la plus longue. Vous savez qui a le point sans que personne ne s\'accroupisse.',
+				body: 'Validez : le classement s\'affiche vu du dessus, de la plus proche à la plus éloignée, avec l\'écart bord à bord de chaque boule. Personne n\'a besoin de s\'accroupir.',
 			},
 		],
 		featuresTitle: 'Ce que ça change',
@@ -137,7 +137,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		photoBody:
 			'Il y a un mode photo. Vous tenez le téléphone à plat au-dessus du jeu, vous prenez une seule photo, et l\'application y place le cochonnet et les boules : la plus proche est cerclée de vert, avec l\'écart qui la sépare de la suivante. Aucune réalité augmentée n\'est nécessaire — il suffit d\'une caméra.',
 		photoNote:
-			'Sur un appareil non compatible, l\'application bascule toute seule dans ce mode : pas de menu, rien à régler. Sur les autres, le mode photo reste accessible dans les réglages, pratique quand la place manque pour tourner autour du jeu. La contrepartie est connue : une seule photo donne une mesure moins sûre qu\'un scan sous plusieurs angles.',
+			'Sur un appareil non compatible, l\'application bascule toute seule dans ce mode : pas de menu, rien à régler. Sur les autres, le mode photo se choisit dès l\'écran d\'accueil, pratique quand la place manque pour tourner autour du jeu. La contrepartie est connue : une seule photo donne une mesure moins sûre qu\'un scan sous plusieurs angles.',
 		limitsTitle: 'Ce que l\'application ne fait pas',
 		limitsIntro: 'Autant le dire tout de suite, ça évitera les mauvaises surprises sur le terrain.',
 		limits: [
@@ -203,9 +203,9 @@ export const copy: Record<LandingLang, LandingCopy> = {
 	en: {
 		title: 'Pétanque Scanner — see who has the point with your phone',
 		description:
-			'A free augmented-reality app: point your phone at the boules, walk around them, and read how far each one is from the jack. A photo mode takes over on phones without AR. Everything runs on the phone, with no signal and no account.',
+			'Free augmented reality app: aim at the jack, hold the phone above the boules, and read each boule\'s distance to the jack. A photo mode takes over on phones without AR. Everything is computed on the phone, with no network or account.',
 		tagline:
-			'Two boules either side of the jack, a metre or two out, and your eye can\'t call it: at that range you cannot compare two distances. Start a scan, walk around the game for a few seconds, and the app shows how far each boule is — drawn in augmented reality right on the ground.',
+			'Two boules either side of the jack, a metre or two out, and your eye can\'t call it: at that range you cannot compare two distances. Start a scan, aim at the jack, hold the phone above each boule, and the app shows how far each boule is — drawn in augmented reality right on the ground.',
 		heroAlt: 'Three boules and a jack on a pitch, with the measurements drawn in augmented reality',
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=en',
@@ -217,18 +217,18 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		steps: [
 			{
 				icon: 'mobile',
-				title: 'Start the scan',
-				body: 'Leave the boules exactly where they are, open the app and point it at the game. Nothing to put on the ground, no marker to place.',
+				title: 'Place the jack',
+				body: 'Leave the boules where they are, open the app and film the ground around the game. Then aim at the jack from three angles, one step aside between shots: it is placed.',
 			},
 			{
 				icon: 'winding-path',
-				title: 'Walk around',
-				body: 'Take a few steps around the boules, keeping the jack in frame. A confidence score climbs live while the app gathers viewpoints.',
+				title: 'Go over the boules',
+				body: 'Film the boules from three spots — several at once is fine — then hold the phone above each one: the measure locks by itself, a padlock shows it.',
 			},
 			{
 				icon: 'grid-dots',
 				title: 'Read the ranking',
-				body: 'Distances appear on the ground, shortest to longest. You know who has the point without anyone crouching down.',
+				body: 'Confirm: the ranking appears seen from above, nearest first, with the edge-to-edge gap of each boule. Nobody has to crouch down.',
 			},
 		],
 		featuresTitle: 'What it gives you',
@@ -254,7 +254,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		photoBody:
 			'There is a photo mode. Hold the phone flat above the game, take a single photo, and the app places the jack and the boules on it: the closest one is circled in green, with the gap to the next one. No augmented reality needed — a camera is enough.',
 		photoNote:
-			'On a device without AR support the app switches to this mode by itself: no menu, nothing to set up. On every other phone the photo mode stays available in the settings, which helps when there is no room to walk around the game. The trade-off is plain: one photo is a less reliable measurement than a scan from several angles.',
+			'On a device without AR support the app switches to this mode by itself: no menu, nothing to set up. On every other phone the photo mode can be picked right from the home screen, which helps when there is no room to walk around the game. The trade-off is plain: one photo is a less reliable measurement than a scan from several angles.',
 		limitsTitle: 'What it does not do',
 		limitsIntro: 'Better said upfront, so the pitch holds no surprises.',
 		limits: [
@@ -320,9 +320,9 @@ export const copy: Record<LandingLang, LandingCopy> = {
 	es: {
 		title: 'Pétanque Scanner — saber quién tiene el punto con el móvil',
 		description:
-			'Aplicación gratuita de realidad aumentada: apunta a las bolas, rodéalas y lee la distancia de cada bola al boliche. Un modo foto toma el relevo en los móviles sin realidad aumentada. Todo se calcula en el móvil, sin conexión ni cuenta.',
+			'Aplicación gratuita de realidad aumentada: apunta al boliche, colócate encima de las bolas y lee la distancia de cada bola al boliche. Un modo foto toma el relevo en los móviles sin RA. Todo se calcula en el teléfono, sin red ni cuenta.',
 		tagline:
-			'Dos bolas a cada lado del boliche, a uno o dos metros, y el ojo no sabe decidir: de lejos no se pueden comparar dos distancias. Lanza un escaneo, rodea el juego unos segundos y la aplicación muestra la distancia de cada bola, dibujada en realidad aumentada sobre el terreno.',
+			'Dos bolas a cada lado del boliche, a uno o dos metros, y el ojo no sabe decidir: de lejos no se pueden comparar dos distancias. Lanza un escaneo, apunta al boliche, colócate encima de cada bola y la aplicación muestra la distancia de cada bola, dibujada en realidad aumentada sobre el terreno.',
 		heroAlt: 'Tres bolas y un boliche en un terreno, con las medidas mostradas en realidad aumentada',
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=es',
@@ -334,18 +334,18 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		steps: [
 			{
 				icon: 'mobile',
-				title: 'Lanza el escaneo',
-				body: 'Deja las bolas exactamente donde están, abre la aplicación y apunta al juego. No hay nada que poner en el suelo ni ninguna marca que colocar.',
+				title: 'Sitúa el boliche',
+				body: 'Deja las bolas donde están, abre la aplicación y graba el suelo alrededor del juego. Luego apunta al boliche desde tres ángulos, con un paso al lado entre cada toma: queda situado.',
 			},
 			{
 				icon: 'winding-path',
-				title: 'Rodea el juego',
-				body: 'Da unos pasos alrededor de las bolas sin perder el boliche de vista. Un índice de confianza sube en directo mientras la aplicación reúne puntos de vista.',
+				title: 'Pasa por encima de las bolas',
+				body: 'Graba las bolas desde tres sitios —varias a la vez, sin problema— y luego sostén el móvil encima de cada una: la medida se bloquea sola, un candado lo indica.',
 			},
 			{
 				icon: 'grid-dots',
 				title: 'Lee la clasificación',
-				body: 'Las distancias aparecen sobre el suelo, de la más corta a la más larga. Sabes quién tiene el punto sin que nadie se agache.',
+				body: 'Valida: la clasificación aparece vista desde arriba, de la más cercana a la más lejana, con la distancia borde a borde de cada bola. Nadie tiene que agacharse.',
 			},
 		],
 		featuresTitle: 'Lo que cambia',
@@ -371,7 +371,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		photoBody:
 			'Hay un modo foto. Sostienes el móvil en horizontal por encima del juego, haces una sola foto y la aplicación sitúa en ella el boliche y las bolas: la más cercana aparece rodeada en verde, con la diferencia que la separa de la siguiente. No hace falta realidad aumentada: basta con una cámara.',
 		photoNote:
-			'En un dispositivo no compatible, la aplicación cambia sola a este modo: sin menú, nada que configurar. En los demás, el modo foto sigue disponible en los ajustes, útil cuando no hay sitio para rodear el juego. La contrapartida es conocida: una sola foto da una medida menos fiable que un escaneo desde varios ángulos.',
+			'En un dispositivo no compatible, la aplicación cambia sola a este modo: sin menú, nada que configurar. En los demás, el modo foto se elige desde la pantalla de inicio, útil cuando no hay sitio para rodear el juego. La contrapartida es conocida: una sola foto da una medida menos fiable que un escaneo desde varios ángulos.',
 		limitsTitle: 'Lo que la aplicación no hace',
 		limitsIntro: 'Mejor decirlo desde el principio, así no habrá sorpresas en el terreno.',
 		limits: [
@@ -441,9 +441,9 @@ export const copy: Record<LandingLang, LandingCopy> = {
 	de: {
 		title: 'Pétanque Scanner — mit dem Handy sehen, wer den Punkt hat',
 		description:
-			'Kostenlose Augmented-Reality-App: Richte das Handy auf die Kugeln, geh um sie herum und lies den Abstand jeder Kugel zur Zielkugel ab. Ein Fotomodus springt auf Handys ohne AR ein. Alles wird auf dem Handy berechnet, ohne Netz und ohne Konto.',
+			'Kostenlose Augmented-Reality-App: Ziel auf die Zielkugel, halte das Handy über die Kugeln und lies den Abstand jeder Kugel zur Zielkugel ab. Ein Fotomodus springt auf Handys ohne AR ein. Alles wird auf dem Handy berechnet, ohne Netz und ohne Konto.',
 		tagline:
-			'Zwei Kugeln links und rechts der Zielkugel, ein, zwei Meter entfernt, und das Auge kann es nicht entscheiden: Aus der Distanz lassen sich zwei Abstände nicht vergleichen. Starte einen Scan, geh ein paar Sekunden um das Spiel herum, und die App zeigt den Abstand jeder Kugel an — in Augmented Reality direkt auf den Boden gelegt.',
+			'Zwei Kugeln links und rechts der Zielkugel, ein, zwei Meter entfernt, und das Auge kann es nicht entscheiden: Aus der Distanz lassen sich zwei Abstände nicht vergleichen. Starte einen Scan, ziel auf die Zielkugel, halte das Handy über jede Kugel, und die App zeigt den Abstand jeder Kugel an — in Augmented Reality direkt auf den Boden gelegt.',
 		heroAlt: 'Drei Kugeln und eine Zielkugel auf einem Platz, mit den Messwerten in Augmented Reality eingeblendet',
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=de',
@@ -455,18 +455,18 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		steps: [
 			{
 				icon: 'mobile',
-				title: 'Scan starten',
-				body: 'Lass die Kugeln genau da liegen, wo sie sind, öffne die App und richte sie auf das Spiel. Nichts auf den Boden legen, keine Markierung setzen.',
+				title: 'Zielkugel platzieren',
+				body: 'Lass die Kugeln, wo sie sind, öffne die App und filme den Boden rund um das Spiel. Dann ziel aus drei Winkeln auf die Zielkugel, mit einem Schritt zur Seite zwischen den Aufnahmen: Sie ist platziert.',
 			},
 			{
 				icon: 'winding-path',
-				title: 'Herumgehen',
-				body: 'Mach ein paar Schritte um die Kugeln herum und behalte dabei die Zielkugel im Bild. Ein Vertrauenswert steigt live, während die App Blickwinkel sammelt.',
+				title: 'Über die Kugeln gehen',
+				body: 'Filme die Kugeln von drei Stellen aus — mehrere auf einmal sind erlaubt — und halte das Handy dann über jede: Die Messung rastet von selbst ein, ein Schloss zeigt es an.',
 			},
 			{
 				icon: 'grid-dots',
 				title: 'Rangfolge ablesen',
-				body: 'Die Abstände erscheinen auf dem Boden, vom kürzesten zum längsten. Du weißt, wer den Punkt hat, ohne dass sich jemand hinknien muss.',
+				body: 'Bestätigen: Die Wertung erscheint von oben gesehen, die nächste zuerst, mit dem Abstand Rand zu Rand jeder Kugel. Niemand muss sich hinhocken.',
 			},
 		],
 		featuresTitle: 'Was es dir bringt',
@@ -492,7 +492,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		photoBody:
 			'Dafür gibt es einen Fotomodus. Du hältst das Handy flach über das Spiel, machst ein einziges Foto, und die App findet darauf die Zielkugel und die Kugeln: Die nächste wird grün umkreist, mit dem Abstand zur folgenden. Augmented Reality ist nicht nötig — eine Kamera reicht.',
 		photoNote:
-			'Auf einem nicht kompatiblen Gerät wechselt die App von selbst in diesen Modus: kein Menü, nichts einzustellen. Auf allen anderen bleibt der Fotomodus in den Einstellungen verfügbar, praktisch, wenn kein Platz ist, um das Spiel zu umrunden. Der Preis dafür ist bekannt: Ein einzelnes Foto liefert eine weniger sichere Messung als ein Scan aus mehreren Blickwinkeln.',
+			'Auf einem nicht kompatiblen Gerät wechselt die App von selbst in diesen Modus: kein Menü, nichts einzustellen. Auf allen anderen lässt sich der Fotomodus direkt auf dem Startbildschirm wählen, praktisch, wenn kein Platz ist, um das Spiel zu umrunden. Der Preis dafür ist bekannt: Ein einzelnes Foto liefert eine weniger sichere Messung als ein Scan aus mehreren Blickwinkeln.',
 		limitsTitle: 'Was die App nicht kann',
 		limitsIntro: 'Besser gleich gesagt, dann gibt es auf dem Platz keine bösen Überraschungen.',
 		limits: [
@@ -558,9 +558,9 @@ export const copy: Record<LandingLang, LandingCopy> = {
 	it: {
 		title: 'Pétanque Scanner — scopri chi ha il punto con il telefono',
 		description:
-			'App gratuita di realtà aumentata: inquadra le bocce, giraci intorno e leggi la distanza di ogni boccia dal pallino. Sui telefoni senza AR subentra una modalità foto. Tutto viene calcolato sul telefono, senza rete né account.',
+			'App gratuita di realtà aumentata: inquadra il pallino, tieni il telefono sopra le bocce e leggi la distanza di ogni boccia dal pallino. Una modalità foto subentra sui telefoni senza AR. Tutto è calcolato sul telefono, senza rete né account.',
 		tagline:
-			'Due bocce ai lati del pallino, a uno o due metri, e l\'occhio non sa decidere: da lontano non si confrontano due distanze. Avvia una scansione, gira qualche secondo intorno al gioco e l\'app mostra la distanza di ogni boccia, disegnata in realtà aumentata direttamente sul campo.',
+			'Due bocce ai lati del pallino, a uno o due metri, e l\'occhio non sa decidere: da lontano non si confrontano due distanze. Avvia una scansione, inquadra il pallino, tieni il telefono sopra ogni boccia e l\'app mostra la distanza di ogni boccia, disegnata in realtà aumentata direttamente sul campo.',
 		heroAlt: 'Tre bocce e un pallino su un campo, con le misure mostrate in realtà aumentata',
 		badges: {
 			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=it',
@@ -572,18 +572,18 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		steps: [
 			{
 				icon: 'mobile',
-				title: 'Avvia la scansione',
-				body: 'Lascia le bocce esattamente dove sono, apri l\'app e inquadra il gioco. Niente da appoggiare a terra, nessun riferimento da posizionare.',
+				title: 'Posiziona il pallino',
+				body: 'Lascia le bocce dove sono, apri l\'app e inquadra il terreno intorno al gioco. Poi inquadra il pallino da tre angolazioni, con un passo di lato tra uno scatto e l\'altro: è posizionato.',
 			},
 			{
 				icon: 'winding-path',
-				title: 'Girale intorno',
-				body: 'Fai qualche passo intorno alle bocce tenendo il pallino nell\'inquadratura. Un indice di affidabilità sale in diretta mentre l\'app raccoglie i punti di vista.',
+				title: 'Passa sopra le bocce',
+				body: 'Riprendi le bocce da tre punti — anche più alla volta — poi tieni il telefono sopra ciascuna: la misura si blocca da sola, lo indica un lucchetto.',
 			},
 			{
 				icon: 'grid-dots',
 				title: 'Leggi la classifica',
-				body: 'Le distanze compaiono a terra, dalla più corta alla più lunga. Sai chi ha il punto senza che nessuno debba accovacciarsi.',
+				body: 'Conferma: la classifica appare vista dall\'alto, dalla più vicina alla più lontana, con la distanza bordo a bordo di ogni boccia. Nessuno deve accovacciarsi.',
 			},
 		],
 		featuresTitle: 'Cosa cambia',
@@ -609,7 +609,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		photoBody:
 			'C\'è una modalità foto. Tieni il telefono in piano sopra il gioco, scatti una sola foto e l\'app ci colloca il pallino e le bocce: la più vicina è cerchiata di verde, con lo scarto che la separa dalla successiva. Non serve la realtà aumentata: basta una fotocamera.',
 		photoNote:
-			'Su un dispositivo non compatibile, l\'app passa da sola a questa modalità: nessun menu, niente da impostare. Sugli altri, la modalità foto resta disponibile nelle impostazioni, comoda quando manca lo spazio per girare intorno al gioco. Il compromesso è noto: una sola foto dà una misura meno sicura di una scansione da più angolazioni.',
+			'Su un dispositivo non compatibile, l\'app passa da sola a questa modalità: nessun menu, niente da impostare. Sugli altri, la modalità foto si sceglie direttamente dalla schermata iniziale, comoda quando manca lo spazio per girare intorno al gioco. Il compromesso è noto: una sola foto dà una misura meno sicura di una scansione da più angolazioni.',
 		limitsTitle: 'Cosa l\'app non fa',
 		limitsIntro: 'Meglio dirlo subito, così sul campo non ci saranno brutte sorprese.',
 		limits: [

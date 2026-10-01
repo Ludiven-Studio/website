@@ -1,7 +1,7 @@
 ---
 title: Pétanque Scanner - 2026
 publishDate: 2026-08-22 00:00:00
-img: /assets/petanque-ar/hero.avif
+img: /assets/petanque-ar/hero-fr.avif
 img_alt: Pétanque Scanner — mesurer le point avec son téléphone, en réalité augmentée
 role: Développeur
 org: Ludiven Studio
@@ -19,20 +19,20 @@ tags:
 galleryTitle: L'application en situation
 galleryLayout: phone
 gallery:
-  - src: /assets/petanque-ar/screen-01.webp
-    alt: Scan en cours — six boules mesurées en réalité augmentée, de 20,7 cm à 32,2 cm du cochonnet
-  - src: /assets/petanque-ar/screen-02.webp
-    alt: Quadrillage vert posé sur le terrain, à valider avant de lancer la mesure
-  - src: /assets/petanque-ar/screen-03.webp
-    alt: La même mesure vue sous un autre angle — tourner autour du jeu affine les distances
-  - src: /assets/petanque-ar/screen-04.webp
-    alt: Mode photo — une seule prise de vue, téléphone à plat, pour les appareils sans AR
-  - src: /assets/petanque-ar/screen-05.webp
-    alt: Résultat du mode photo — la boule la plus proche cerclée de vert, à environ 20 cm du cochonnet
-  - src: /assets/petanque-ar/screen-06.webp
-    alt: Écran Premium — trois scans gratuits par jour, ou Premium à vie sans abonnement
+  - src: /assets/petanque-ar/screen-01-fr.webp
+    alt: "Scan 3D en cours — quatre boules verrouillées, la distance au cochonnet affichée au-dessus de chacune"
+  - src: /assets/petanque-ar/screen-02-fr.webp
+    alt: "Visée du cochonnet, deuxième tir sur trois"
+  - src: /assets/petanque-ar/screen-03-fr.webp
+    alt: "Le téléphone au-dessus d'une boule : la mesure se verrouille, un cadenas l'indique"
+  - src: /assets/petanque-ar/screen-04-fr.webp
+    alt: "Le résultat vu du dessus, boules classées de la plus proche à la plus éloignée"
+  - src: /assets/petanque-ar/screen-05-fr.webp
+    alt: "Mode photo — une seule photo prise d'en haut, la boule la plus proche cerclée de vert"
+  - src: /assets/petanque-ar/screen-06-fr.webp
+    alt: "Écran Premium — trois scans gratuits par jour, ou Premium à vie sans abonnement"
   - src: /assets/petanque-ar/premium.webp
-    alt: Visuel Premium à vie — mesures illimitées et sans publicité
+    alt: "Visuel Premium à vie — mesures illimitées, sans publicité"
 ---
 <p>
   Cette page décrit la <strong>démarche technique</strong> derrière Pétanque Scanner. Si vous cherchez
