@@ -5,6 +5,7 @@ img: /assets/petanque-ar/hero-en.webp?v=1211
 img_alt: Pétanque Scanner — measure the point with your phone, in augmented reality
 role: Developer
 org: Ludiven Studio
+appPage: /en/petanque-scanner/
 description: |
   Measuring how far each boule sits from the jack with nothing but a phone — no depth sensor, no marker on the ground. A detector trained entirely on synthetic images, triangulation by accumulated rays, and three experiments written up, two of which failed.
 tags:

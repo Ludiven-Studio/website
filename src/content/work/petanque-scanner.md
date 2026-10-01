@@ -5,6 +5,7 @@ img: /assets/petanque-ar/hero-fr.avif
 img_alt: Pétanque Scanner — mesurer le point avec son téléphone, en réalité augmentée
 role: Développeur
 org: Ludiven Studio
+appPage: /petanque-scanner/
 description: |
   Mesurer l'écart des boules au cochonnet avec un simple téléphone, sans capteur de profondeur ni repère posé au sol. Détecteur de vision entraîné entièrement sur images de synthèse, triangulation par accumulation de rayons, et trois expériences détaillées dont deux ratées.
 tags:

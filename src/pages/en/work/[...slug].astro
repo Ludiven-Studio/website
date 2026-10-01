@@ -48,6 +48,9 @@ const { Content } = await entry.render();
 							</div>
 							<p class="description">{entry.data.description}</p>
 							<StoreBadges appStore={entry.data.appStore} playStore={entry.data.playStore} lang="en" />
+							{entry.data.appPage && (
+								<a class="app-page" href={entry.data.appPage}>See the app page <Icon icon="arrow-right" /></a>
+							)}
 						</div>
 					</Hero>
 				</div>
@@ -226,5 +229,26 @@ const { Content } = await entry.render();
 		.content :global(blockquote) {
 			font-size: var(--text-2xl);
 		}
+	}
+
+	.app-page {
+		display: inline-flex;
+		flex-shrink: 0;
+		white-space: nowrap;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 1.2rem;
+		border-radius: 999rem;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-family: var(--font-brand);
+		font-weight: 600;
+		text-decoration: none;
+		transition: background-color var(--theme-transition);
+	}
+
+	.app-page:hover,
+	.app-page:focus-visible {
+		background: var(--accent-dark);
 	}
 </style>
