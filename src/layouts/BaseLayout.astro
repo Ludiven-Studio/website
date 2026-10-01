@@ -17,9 +17,9 @@ interface Props {
 	image?: string | undefined;
 	type?: string | undefined;
 	noindex?: boolean | undefined;
-	lang?: 'fr' | 'en' | 'es' | undefined;
+	lang?: 'fr' | 'en' | 'es' | 'de' | 'it' | undefined;
 	altLang?: string | undefined; // path of the same page in the other language
-	alternates?: Partial<Record<'fr' | 'en' | 'es', string>> | undefined;
+	alternates?: Partial<Record<'fr' | 'en' | 'es' | 'de' | 'it', string>> | undefined;
 	/** A game page outside /jeux/<id>/ (an event page): still gets the fullscreen chrome. */
 	gameChrome?: boolean | undefined;
 }
@@ -91,6 +91,8 @@ if (path === '/' || path === '') {
 				const [text, action] =
 					lang === 'es' ? ['Nueva versión disponible', 'Recargar']
 					: lang === 'en' ? ['New version available', 'Reload']
+					: lang === 'de' ? ['Neue Version verfügbar', 'Neu laden']
+					: lang === 'it' ? ['Nuova versione disponibile', 'Ricarica']
 					: ['Nouvelle version disponible', 'Recharger'];
 				const bar = document.createElement('div');
 				bar.className = 'sw-update';

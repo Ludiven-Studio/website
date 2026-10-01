@@ -158,6 +158,6 @@ gallery:
 </div>
 <p>
   See also: the <a href="/en/petanque-scanner/">app page</a>, its
-  <a href="/petanque-ar/confidentialite">privacy policy</a> and
-  <a href="/petanque-ar/cgu">terms of use</a>.
+  <a href="/en/petanque-scanner/confidentialite/">privacy policy</a> and
+  <a href="/en/petanque-scanner/cgu/">terms of use</a>.
 </p>

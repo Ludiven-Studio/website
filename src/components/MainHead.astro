@@ -10,10 +10,10 @@ interface Props {
 	image?: string | undefined; // root-relative or absolute og image (defaults to the studio logo)
 	type?: string | undefined; // og:type (website | article)
 	noindex?: boolean | undefined; // keep this page out of search engines
-	lang?: 'fr' | 'en' | 'es' | undefined;
+	lang?: 'fr' | 'en' | 'es' | 'de' | 'it' | undefined;
 	altLang?: string | undefined; // path of the same page in the other language
 	/** Every language version of the page, when there are more than two. Wins over altLang. */
-	alternates?: Partial<Record<'fr' | 'en' | 'es', string>> | undefined;
+	alternates?: Partial<Record<'fr' | 'en' | 'es' | 'de' | 'it', string>> | undefined;
 }
 
 const {
@@ -93,7 +93,7 @@ if (image) {
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:url" content={canonical} />
-<meta property="og:locale" content={lang === 'en' ? 'en_GB' : lang === 'es' ? 'es_ES' : 'fr_FR'} />
+<meta property="og:locale" content={lang === 'en' ? 'en_GB' : lang === 'es' ? 'es_ES' : lang === 'de' ? 'de_DE' : lang === 'it' ? 'it_IT' : 'fr_FR'} />
 <meta property="og:image" content={ogImage} />
 <meta property="og:image:width" content={String(ogW)} />
 <meta property="og:image:height" content={String(ogH)} />

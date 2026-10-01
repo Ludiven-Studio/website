@@ -185,8 +185,8 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		makingOfCta: 'Lire les coulisses techniques',
 		makingOfHref: '/work/petanque-scanner/',
 		legalIntro: 'À consulter également :',
-		privacy: { label: 'politique de confidentialité', href: '/petanque-ar/confidentialite/' },
-		terms: { label: 'conditions d\'utilisation', href: '/petanque-ar/cgu/' },
+		privacy: { label: 'politique de confidentialité', href: '/petanque-scanner/confidentialite/' },
+		terms: { label: 'conditions d\'utilisation', href: '/petanque-scanner/cgu/' },
 		closing: 'Disponible sur Android et iOS',
 	},
 	en: {
@@ -301,8 +301,8 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		makingOfCta: 'Read the technical write-up',
 		makingOfHref: '/en/work/petanque-scanner/',
 		legalIntro: 'See also:',
-		privacy: { label: 'privacy policy', href: '/petanque-ar/confidentialite/' },
-		terms: { label: 'terms of use', href: '/petanque-ar/cgu/' },
+		privacy: { label: 'privacy policy', href: '/en/petanque-scanner/confidentialite/' },
+		terms: { label: 'terms of use', href: '/en/petanque-scanner/cgu/' },
 		closing: 'Available on Android and iOS',
 	},
 	es: {
@@ -421,8 +421,8 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		makingOfCta: 'Leer los detalles técnicos',
 		makingOfHref: '/en/work/petanque-scanner/',
 		legalIntro: 'Consulta también:',
-		privacy: { label: 'política de privacidad', href: '/es/petanque-ar/confidentialite/' },
-		terms: { label: 'condiciones de uso', href: '/es/petanque-ar/cgu/' },
+		privacy: { label: 'política de privacidad', href: '/es/petanque-scanner/confidentialite/' },
+		terms: { label: 'condiciones de uso', href: '/es/petanque-scanner/cgu/' },
 		closing: 'Disponible para Android e iOS',
 	},
 };

@@ -19,9 +19,13 @@ export default defineConfig({
         // become the free-services hub. Old /services links land on the hub — no
         // redirect is possible, a real page now owns that path.
         '/outils': '/services',
-        // The legal pages live under the app's internal code name and are declared as-is
-        // in both store listings — don't move them, just stop 404ing on the parent.
+        // The legal pages moved from the app's code name to its store name. The old URLs are
+        // declared in both store listings and baked into installed apps: keep them for good.
         '/petanque-ar': '/petanque-scanner/',
+        '/petanque-ar/cgu': '/petanque-scanner/cgu/',
+        '/petanque-ar/confidentialite': '/petanque-scanner/confidentialite/',
+        '/es/petanque-ar/cgu': '/es/petanque-scanner/cgu/',
+        '/es/petanque-ar/confidentialite': '/es/petanque-scanner/confidentialite/',
     },
     integrations: [
         react(),

@@ -1,0 +1,437 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Hero from '../../../components/Hero.astro';
+---
+
+<BaseLayout
+	title="Privacy policy of the Pétanque Scanner app | Ludiven Studio"
+	description="Privacy policy of the Pétanque Scanner mobile app: data processed, advertising, analytics, GDPR rights."
+	lang="en"
+	alternates={{ fr: '/petanque-scanner/confidentialite/', en: '/en/petanque-scanner/confidentialite/', es: '/es/petanque-scanner/confidentialite/', de: '/de/petanque-scanner/confidentialite/', it: '/it/petanque-scanner/confidentialite/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<Hero
+			title="Privacy — Pétanque Scanner"
+			tagline="Your camera images never leave your phone."
+		/>
+
+		<p class="updated">
+			This policy covers <strong>the Pétanque Scanner mobile app</strong>
+			(<code>com.raphbenpro.petanquear</code>), not the ludiven-studio.fr website, which has its
+			<a href="/confidentialite">own policy</a>. Last updated: 10 September 2026.
+		</p>
+		<p class="updated">
+			This is a courtesy translation. In case of discrepancy, the
+			<a href="/petanque-scanner/confidentialite/" hreflang="fr">original French version</a> prevails.
+		</p>
+
+		<div class="summary">
+			<p><strong>The essentials:</strong></p>
+			<ul>
+				<li><strong>Your camera images never leave your device.</strong> Boule detection is computed locally on the phone. No photo, no video and no image is sent to a server or stored permanently — including in photo mode, where the image taken when you press the shutter stays in RAM.</li>
+				<li>We have <strong>no server</strong> and <strong>no user accounts</strong>. We do not know your name, your email address or your location.</li>
+				<li>Advertising and analytics are enabled <strong>only with your consent</strong>, requested at first launch. You can withdraw it at any time.</li>
+				<li>Buying <strong>Premium removes advertising</strong> and, in that case, the advertising SDK is not even started.</li>
+			</ul>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Who is the data controller</h2>
+			<p>Publisher of the app and data controller:</p>
+			<ul>
+				<li>Company name: <strong>Ludiven Studio</strong></li>
+				<li>Legal form: EURL (French single-member limited company) with share capital of €1,000</li>
+				<li>Registration: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Registered office: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Publication director: Ludiven Studio</li>
+				<li>Contact: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>See also the <a href="/mentions-legales">legal notice</a> (in French).</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. The camera and augmented reality</h2>
+			<p>
+				Pétanque Scanner needs camera access to work: it is the core of the app. It is important to understand
+				exactly what is done with these images.
+			</p>
+			<ul>
+				<li>Camera images are analysed <strong>in real time, entirely on your device</strong>, by an object detection model built into the app (no download, no network call for the analysis).</li>
+				<li>Images are kept in RAM for the duration of the computation, then <strong>released immediately</strong>. They are not written to your gallery, to a file or to a persistent cache.</li>
+				<li><strong>No image is transmitted</strong> to the publisher or to any third party, whatever your choice regarding advertising consent.</li>
+				<li>Only the result of the computation (3D positions and distances) is used for display, and it disappears when you leave the scan.</li>
+			</ul>
+			<p>
+				<strong>Photo mode.</strong> On phones that do not support augmented reality, the app automatically
+				switches to a mode where you frame the pitch and then press a shutter button, instead of filming
+				continuously. The principle stays the same: the image captured when you press the shutter is analysed
+				<strong>in RAM only</strong>. It is not saved to a file, not added to your gallery and not transmitted; it
+				is released as soon as you leave photo mode. In fact, the app asks for <strong>no permission to access your
+				photos</strong>: only camera permission is required.
+			</p>
+			<p>
+				As a result, use of the camera involves <strong>no collection of personal data</strong> by the publisher.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Data processed</h2>
+			<p>Here is the complete inventory of the processing carried out by the app.</p>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Data</th>
+							<th>Purpose</th>
+							<th>Legal basis</th>
+							<th>Recipient</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Device advertising identifier (GAID on Android, IDFA on iOS)</td>
+							<td>Displaying ads, personalised only if you consent</td>
+							<td>Consent (Art. 6(1)(a) GDPR)</td>
+							<td>Google (AdMob)</td>
+						</tr>
+						<tr>
+							<td>App usage events (see §5) and related technical data: device model, system version, app version, country</td>
+							<td>Analytics: understanding which features are used and improving the app</td>
+							<td>Consent</td>
+							<td>Google (Firebase Analytics)</td>
+						</tr>
+						<tr>
+							<td>The same usage events (see §5), together with: platform (Android or iOS), app version, phone language, screen resolution, operating system</td>
+							<td>Analytics, in addition to the above: getting a simple, cookie-free dashboard</td>
+							<td>Consent</td>
+							<td>Umami Software, Inc. (Umami Cloud)</td>
+						</tr>
+						<tr>
+							<td>Push notification token</td>
+							<td>Sending you notifications (news, reminders)</td>
+							<td>Consent</td>
+							<td>Google (Firebase Cloud Messaging)</td>
+						</tr>
+						<tr>
+							<td>Your consent choice</td>
+							<td>Remembering your decision so you are not asked again at every launch</td>
+							<td>Legal obligation / legitimate interest</td>
+							<td>Stored on the device; managed by Google (UMP)</td>
+						</tr>
+						<tr>
+							<td>Proof of purchase ("receipt") for Premium</td>
+							<td>Unlocking and restoring your purchase</td>
+							<td>Performance of the contract (Art. 6(1)(b))</td>
+							<td>Apple or Google (app store)</td>
+						</tr>
+						<tr>
+							<td>Number of scans made today and today's date</td>
+							<td>Running the limit of 3 free scans per day</td>
+							<td>Performance of the contract</td>
+							<td>No one: stays on the device</td>
+						</tr>
+						<tr>
+							<td>Camera images</td>
+							<td>Boule detection</td>
+							<td>Performance of the contract</td>
+							<td><strong>No one: local processing, no transmission</strong></td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<p>
+				The app does <strong>not</strong> collect: your name, your email address, your phone number, your
+				contacts, your GPS location, your address book, your photos, or any identifier you may have entered. There
+				is no account creation.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Advertising and consent</h2>
+			<p>
+				The app is free and funded by an advertising banner, as well as by an optional ad that you can choose to
+				watch to recharge your free scans. The ad network used is <strong>Google AdMob</strong>.
+			</p>
+			<p>
+				At first launch, a consent screen managed by the <strong>Google UMP</strong> (User Messaging Platform) is
+				shown to you where regulations require it (in particular in the European Economic Area, the United
+				Kingdom and Switzerland). In practice:
+			</p>
+			<ul>
+				<li><strong>If you accept</strong>: ads may be personalised based on your device's advertising identifier, and analytics is enabled.</li>
+				<li><strong>If you refuse</strong>: analytics is not started at all, nor are notifications, and the ads shown are <strong>non-personalised</strong> (they are still needed to fund the free app, but do not rely on an advertising profile).</li>
+				<li>On iOS, a second request, required by Apple (<em>App Tracking Transparency</em>), asks whether you allow tracking. A refusal is respected regardless of your previous answer.</li>
+				<li>Analytics is configured <strong>not to collect the advertising identifier</strong>: it is used only by the advertising part, and only with your agreement.</li>
+				<li><strong>If you buy Premium</strong>: advertising disappears and the advertising SDK is no longer initialised.</li>
+			</ul>
+			<p>
+				To learn more about how Google uses data in this context:
+				<a href="https://business.safety.google/privacy/" target="_blank" rel="noopener">Google — Privacy and terms</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Analytics: the exact events</h2>
+			<p>
+				In the interest of transparency, here is the exhaustive list of events sent
+				<em>when you have consented</em>. None of them contains data you have entered, an identifier we have
+				created, or the results of your games.
+			</p>
+			<p>
+				Since September 2026, these events are sent to <strong>two</strong> analytics tools, which receive exactly
+				the same list: <strong>Firebase Analytics</strong> (Google) and <strong>Umami Cloud</strong>. The second
+				is a cookie-free statistics tool, used because it gives a simple, readable view of usage; it is described
+				in detail below.
+			</p>
+			<ul>
+				<li><code>scan_started</code> — a scan starts</li>
+				<li><code>scan_completed</code> — a scan completes, with the number of scans made that day</li>
+				<li><code>scan_blocked_quota</code> — a scan is refused because the daily limit has been reached</li>
+				<li><code>floor_confirmed</code> — you have confirmed the ground detection</li>
+				<li><code>cochonet_redo</code> — you ask to search for the jack again</li>
+				<li><code>ar_incompatible_shown</code> — your phone does not support augmented reality; you are shown this information</li>
+				<li><code>photo_offer_shown</code> / <code>photo_offer_declined</code> — photo mode is offered to you, or you decline it</li>
+				<li><code>photo_mode_entered</code> — photo mode starts, with the reason (automatic switch, offer accepted, or choice in the settings)</li>
+				<li><code>photo_mode_exited</code> — photo mode is exited</li>
+				<li><code>photo_shutter</code> — you take a photo, with an indication of whether the computation succeeded or failed</li>
+				<li><code>photo_retake</code> — you retake a photo</li>
+				<li><code>photo_camera_unavailable</code> — the camera could not be opened</li>
+				<li><code>settings_opened</code> — the settings screen is opened</li>
+				<li><code>settings_action</code> — an action is triggered there: consent, privacy policy, terms of use, or purchase restore</li>
+				<li><code>paywall_shown</code> / <code>paywall_dismissed</code> — the Premium offer screen is shown or closed, with the reason it was shown</li>
+				<li><code>paywall_watch_ad</code> — you choose to watch an ad to recharge your scans</li>
+				<li><code>ad_reward_earned</code> — the ad was watched to the end and the scans are recharged</li>
+				<li><code>ad_unavailable</code> — no ad was available to show</li>
+				<li><code>premium_purchase_started</code> / <code>premium_purchase_success</code> / <code>premium_purchase_failed</code> — steps of a purchase, with the reason for failure where applicable</li>
+				<li><code>premium_restore_success</code> — a previous purchase was restored</li>
+				<li><code>iap_receipt_invalid</code> — a proof of purchase could not be validated</li>
+				<li><code>consent_accepted</code> / <code>consent_declined</code> — your consent choice</li>
+				<li><code>notification_token_registered</code> — the device is registered for notifications</li>
+			</ul>
+			<p>
+				To these events, Firebase automatically adds standard technical information (device model, operating
+				system version, app version, country inferred from the IP address, first open, session duration).
+			</p>
+			<p>
+				<strong>What Umami receives, precisely.</strong> Each event is sent to <code>cloud.umami.is</code> with the
+				following, and nothing more: the event name, a site identifier that belongs to us, the platform
+				(<code>android</code> or <code>ios</code>), the app version, your phone's language, your screen
+				resolution, and the name of your operating system. <strong>No advertising identifier, no device number, no
+				cookie and no persistent identifier</strong> is included. As with any request on the Internet, the server
+				necessarily sees your IP address; according to Umami's documentation, it is not stored: it is used only to
+				infer a country and to compute an anonymous fingerprint renewed every day, which can neither track you from
+				one day to the next nor recognise you in another app.
+			</p>
+			<p>
+				<strong>One exception, in full transparency:</strong> if you <em>refuse</em> consent, a single
+				<code>consent_declined</code> event is sent to Umami, so that we know what proportion of users refuse. It
+				contains no identifier and is followed by no other transmission: analytics remains entirely disabled. If
+				you would prefer absolutely nothing to be sent, refuse consent <em>and</em> use the app offline, or buy
+				Premium.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Push notifications</h2>
+			<p>
+				If you have consented and accepted the system's notification request, the device is registered with
+				Firebase Cloud Messaging so that it can receive messages. Notifications are sent manually from the
+				Firebase console; there is no automated sending server. You can disable notifications at any time in your
+				phone's settings, with no effect on how the app works.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. In-app purchases</h2>
+			<p>
+				The "Lifetime Premium" purchase is a one-off purchase handled <strong>entirely by Apple's App Store or by
+				Google Play</strong>. We never see your payment details: no card number, no billing address, no identity.
+				The app only receives a proof of purchase, verified locally, which is used to unlock the feature.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. A reference time lookup</h2>
+			<p>
+				So that the limit of 3 free scans resets at a reliable time (and cannot be bypassed by changing the phone's
+				clock), the app reads the reference time from a Google Firebase service hosted in the European Union
+				(Belgium, region <code>europe-west1</code>). This request is <strong>read-only</strong>: it transmits no
+				data about you. If it fails, the local clock is used.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. What is stored on your device</h2>
+			<p>
+				Four pieces of information are stored locally, in the system's secure storage (Keychain on iOS,
+				<em>EncryptedSharedPreferences</em> on Android):
+			</p>
+			<ul>
+				<li>the number of scans made today;</li>
+				<li>the corresponding date, to know when to reset the counter;</li>
+				<li>whether or not you own Premium;</li>
+				<li>your consent choice.</li>
+			</ul>
+			<p>
+				This data is not synchronised to a server and is not backed up to the cloud by the app. Uninstalling the
+				app erases it — with one exception: on iOS, the Premium flag may be kept by the Keychain, which is exactly
+				what allows you to recover your purchase after reinstalling.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Recipients and transfers outside the European Union</h2>
+			<p>
+				The only recipients of data are the providers listed below. We do not sell any data and share nothing
+				with data brokers.
+			</p>
+			<ul>
+				<li><strong>Google Ireland Limited / Google LLC</strong> — advertising (AdMob), analytics (Firebase Analytics), notifications (Firebase Cloud Messaging), consent management (UMP), reference time (Firebase Realtime Database).</li>
+				<li><strong>Umami Software, Inc.</strong> (a US company) — cookie-free analytics, via the Umami Cloud service.</li>
+				<li><strong>Apple Inc.</strong> and <strong>Google LLC</strong> — distribution of the app and processing of in-app purchases.</li>
+			</ul>
+			<p>
+				Some of this processing involves a transfer to the United States. These transfers are governed by the
+				mechanisms provided for in Chapter V of the GDPR: standard contractual clauses and, for the providers
+				concerned, certification under the <em>EU-U.S. Data Privacy Framework</em>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>11. Retention periods</h2>
+			<ul>
+				<li><strong>Camera images</strong>: for the duration of the computation, in RAM only (a few milliseconds).</li>
+				<li><strong>Analytics data — Firebase</strong>: kept by Firebase Analytics for <strong>14 months at most</strong>, according to the period set in the Firebase console. Aggregated reports (which cannot be linked to a device) may be kept longer.</li>
+				<li><strong>Analytics data — Umami</strong>: kept as event statistics for as long as our analytics account remains active. This data is not linked to any device identifier and does not allow anyone's journey to be reconstructed.</li>
+				<li><strong>Scan counter</strong>: reset every day.</li>
+				<li><strong>Premium flag and consent choice</strong>: kept on the device until uninstallation or until you withdraw your consent.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>12. Your rights</h2>
+			<p>
+				Under the GDPR, you have the right of access, rectification, erasure, restriction, objection and
+				portability, as well as the right to withdraw your consent at any time.
+			</p>
+			<p><strong>In practice:</strong></p>
+			<ul>
+				<li><strong>Withdraw or change your consent</strong>: tap "Manage ad consent" in the app's settings. Analytics and notifications are then disabled, and ads switch back to non-personalised mode.</li>
+				<li><strong>Erase local data</strong>: uninstall the app, or clear its data from the phone's settings.</li>
+				<li><strong>Reset your advertising identifier</strong>: Android → Settings › Google › Ads; iOS → Settings › Privacy &amp; Security › Tracking.</li>
+				<li><strong>Exercise your rights with us</strong>: write to <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. We reply within one month. Please note that, as there is no user account or identifier allowing us to recognise you, it is materially impossible for us to find data concerning "you" in our statistics: they are aggregated and not linked to an identifiable person on our side.</li>
+			</ul>
+			<p>
+				If you believe your rights are not being respected, you can lodge a complaint with the French data
+				protection authority, the CNIL (<a href="https://www.cnil.fr" target="_blank" rel="noopener">www.cnil.fr</a>),
+				3 place de Fontenoy, TSA 80715, 75334 Paris Cedex 07.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>13. Children</h2>
+			<p>
+				The app is not intended for children and is not designed as a service aimed at minors. It is not declared
+				as such to the app stores and does not knowingly target under-16s. If you hold parental authority and
+				notice that a child has used the app, contact us.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>14. Security</h2>
+			<p>
+				Data stored locally is kept using the secure storage mechanisms provided by the operating system. Network
+				exchanges with Google services are encrypted (HTTPS/TLS). As there is no application server of Pétanque
+				Scanner's own, the exposure surface is limited to the providers listed in §10.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>15. Changes to this policy</h2>
+			<p>
+				This policy may change, in particular if the app gains new features. The date of the last update appears
+				at the top of the page. In the event of a substantial change affecting your rights, you will be asked for
+				new consent in the app.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>16. Contact</h2>
+			<p>
+				For any question about this policy:
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
+			</p>
+			<p>See also the <a href="/en/petanque-scanner/cgu/">app's terms of use</a>.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+	.summary {
+		border: 1px solid var(--gray-800);
+		border-left: 3px solid var(--accent-regular);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--gray-999_40);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--gray-999_40);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+	/* The 4-column table can't shrink below ~40em — scroll it instead of overflowing the page. */
+	.table-scroll {
+		overflow-x: auto;
+	}
+	table {
+		border-collapse: collapse;
+		width: 100%;
+		min-width: 36rem;
+		font-size: var(--text-sm);
+	}
+	th,
+	td {
+		border: 1px solid var(--gray-800);
+		padding: 0.5rem 0.65rem;
+		text-align: left;
+		vertical-align: top;
+	}
+	th {
+		color: var(--gray-0);
+	}
+</style>
