@@ -68,8 +68,8 @@ gallery:
   La distinction mérite d'être posée&nbsp;: <strong>l'application affiche le millimètre, mais ne le
   garantit pas</strong>. La résolution du chiffre n'est pas sa justesse&nbsp;: celle-ci plafonne à
   quelques millimètres dans les bonnes conditions, et se dégrade dès que les boules sont mal vues. C'est
-  précisément le rôle de l'indice de confiance&nbsp;: dire quand le millimètre affiché veut dire quelque
-  chose.
+  le rôle de la jauge «&nbsp;Précision cochonnet&nbsp;» et des cadenas&nbsp;: ne figer une mesure que
+  quand les rayons se croisent assez nettement pour que le millimètre affiché veuille dire quelque chose.
 </p>
 
 <h2>Les données&nbsp;: tout en synthèse</h2>

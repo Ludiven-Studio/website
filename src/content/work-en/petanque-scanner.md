@@ -65,8 +65,8 @@ gallery:
 <p>
   Worth stating plainly: <strong>the app displays the millimetre, it does not guarantee it</strong>. The
   resolution of a number is not its accuracy: accuracy tops out at a few millimetres in good conditions,
-  and degrades as soon as the boules are poorly seen. That is exactly what the confidence score is for:
-  saying when the millimetre on screen means anything.
+  and degrades as soon as the boules are poorly seen. That is what the “Jack accuracy” gauge and the padlocks are for:
+  a measure is only frozen once the rays cross tightly enough for the millimetre on screen to mean anything.
 </p>
 
 <h2>The data: fully synthetic</h2>

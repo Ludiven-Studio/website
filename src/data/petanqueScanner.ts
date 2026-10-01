@@ -170,7 +170,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			},
 			{
 				q: 'Quelle est la précision réelle ?',
-				a: 'L\'affichage descend au millimètre, mais la justesse est autre chose : quelques millimètres au mieux, quand les boules sont bien visibles et que vous avez tourné autour du jeu. Un indice de confiance s\'affiche pendant le scan : s\'il reste bas, c\'est que la mesure ne doit pas être prise au sérieux.',
+				a: 'L\'affichage descend au millimètre, mais la justesse est autre chose : quelques millimètres au mieux, quand les boules sont bien visibles et que vous avez tourné autour du jeu. Pendant le scan, la jauge « Précision cochonnet » indique si le cochonnet est bien placé, et une boule n\'est mesurée qu\'une fois son cadenas affiché. Si la jauge reste basse, touchez « Retrouver le cochonnet » et refaites ses visées.',
 			},
 			{
 				q: 'Est-ce que ça fonctionne sans connexion ?',
@@ -287,7 +287,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			},
 			{
 				q: 'How accurate is it really?',
-				a: 'The reading goes down to the millimetre, but accuracy is another matter: a few millimetres at best, when the boules are clearly visible and you have walked around the game. A confidence score is shown during the scan: if it stays low, the measurement should not be trusted.',
+				a: 'The reading goes down to the millimetre, but accuracy is another matter: a few millimetres at best, when the boules are clearly visible and you have walked around the game. During the scan, the “Jack accuracy” gauge shows whether the jack is well placed, and a boule is only measured once its padlock shows. If the gauge stays low, tap “Find the jack again” and aim at it once more.',
 			},
 			{
 				q: 'Does it work offline?',
@@ -404,7 +404,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			},
 			{
 				q: '¿Qué precisión tiene de verdad?',
-				a: 'La pantalla muestra hasta el milímetro, pero la exactitud es otra cosa: unos pocos milímetros en el mejor de los casos, cuando las bolas se ven bien y has rodeado el juego. Durante el escaneo se muestra un índice de confianza: si se queda bajo, la medida no debe tomarse en serio.',
+				a: 'La pantalla muestra hasta el milímetro, pero la exactitud es otra cosa: unos pocos milímetros en el mejor de los casos, cuando las bolas se ven bien y has rodeado el juego. Durante el escaneo, la barra «Precisión boliche» indica si el boliche está bien situado, y una bola solo se mide cuando aparece su candado. Si la barra se queda baja, pulsa «Volver a encontrar el boliche» y apunta de nuevo.',
 			},
 			{
 				q: '¿Funciona sin conexión?',
@@ -525,7 +525,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			},
 			{
 				q: 'Wie genau ist sie wirklich?',
-				a: 'Die Anzeige geht bis auf den Millimeter, aber Genauigkeit ist etwas anderes: bestenfalls ein paar Millimeter, wenn die Kugeln gut sichtbar sind und du um das Spiel herumgegangen bist. Während des Scans wird ein Vertrauenswert angezeigt: Bleibt er niedrig, solltest du der Messung nicht trauen.',
+				a: 'Die Anzeige geht bis auf den Millimeter, aber Genauigkeit ist etwas anderes: bestenfalls ein paar Millimeter, wenn die Kugeln gut sichtbar sind und du um das Spiel herumgegangen bist. Während des Scans zeigt die Leiste „Genauigkeit Schweinchen“, ob die Zielkugel gut platziert ist, und eine Kugel wird erst gemessen, wenn ihr Schloss erscheint. Bleibt die Leiste niedrig, tippe auf „Schweinchen neu finden“ und ziele erneut.',
 			},
 			{
 				q: 'Funktioniert sie ohne Internet?',
@@ -642,7 +642,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			},
 			{
 				q: 'Quanto è precisa davvero?',
-				a: 'La lettura scende al millimetro, ma la precisione è un\'altra cosa: qualche millimetro nel migliore dei casi, quando le bocce sono ben visibili e hai girato intorno al gioco. Durante la scansione compare un indice di affidabilità: se resta basso, la misura non va presa sul serio.',
+				a: 'La lettura scende al millimetro, ma la precisione è un\'altra cosa: qualche millimetro nel migliore dei casi, quando le bocce sono ben visibili e hai girato intorno al gioco. Durante la scansione, la barra «Precisione pallino» indica se il pallino è ben posizionato, e una boccia viene misurata solo quando compare il suo lucchetto. Se la barra resta bassa, tocca «Ritrova il pallino» e inquadralo di nuovo.',
 			},
 			{
 				q: 'Funziona senza connessione?',
