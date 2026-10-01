@@ -41,7 +41,14 @@ type View = 'atelier' | 'etabli';
 interface Art { project: ProjectId; state: number }
 type Scene =
 	| { kind: 'talk'; id: string; lines: Line[]; art?: Art; title?: string }
-	| { kind: 'restore'; id: string; project: ProjectId; title: string; from: number; to: number; lines: Line[] };
+	| { kind: 'restore'; id: string; project: ProjectId; title: string; from: number; to: number; lines: Line[]; reward?: Order['reward'] };
+/** An upgrade just bought: the workshop shows the change before any scene or client steps in. */
+interface Reveal { id: string; k: number; after: Scene[] }
+const REVEAL_MS = 4500;
+// Where each upgrade shows in the workshop picture, in % of the frame.
+const REVEAL_AT: Record<string, [number, number]> = {
+	etabli: [62, 82], lampe: [76, 62], photo: [51, 42], etageres: [76, 34], bureau: [68, 50],
+};
 
 /** The restored object of a project, drawn at a restoration state. */
 function ObjectArt({ project, state }: Art) {
@@ -122,6 +129,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 	const [sound, setSound] = useState(true);
 	const [puzzle, setPuzzle] = useState(false);
 	const [orderSel, setOrderSel] = useState<string | null>(null);
+	const [reveal, setReveal] = useState<Reveal | null>(null);
+	const revealRef = useRef<Reveal | null>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const dragRef = useRef<{ from: number; x0: number; y0: number; moved: boolean } | null>(null);
 	const animK = useRef(0);
@@ -180,7 +189,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	// Once the scene queue is empty: a client arriving with a new object, else a reputation visit.
 	useEffect(() => {
-		if (!s || scenes.length) return;
+		if (!s || scenes.length || reveal) return;
 		const st = storyOrder(s);
 		if (st && st.step === 1 && !s.seen.includes(`arrival:${st.project}`)) {
 			const p = projectOf(st.project!);
@@ -192,7 +201,20 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		setS(claimTier(s, t.id));
 		setScenes([{ kind: 'talk', id: t.id, lines: t.lines, title: t.title }]);
 		trackEvent('atelier:rep_tier', { id: t.id });
-	}, [s, scenes.length]);
+	}, [s, scenes.length, reveal]);
+
+	const finishReveal = useCallback(() => {
+		const r = revealRef.current;
+		if (!r) return;
+		revealRef.current = null;
+		setReveal(null);
+		if (r.after.length) setScenes((x) => [...x, ...r.after]);
+	}, []);
+	useEffect(() => {
+		if (!reveal) return;
+		const id = setTimeout(finishReveal, REVEAL_MS);
+		return () => clearTimeout(id);
+	}, [reveal, finishReveal]);
 
 	const flash = useCallback((text: string, undo?: State) => {
 		setToast({ k: Date.now(), text, undo });
@@ -254,7 +276,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (o.reward.cocoins) earnOnce(`atelier:${o.id}`, o.reward.cocoins);
 		if (o.kind === 'story' && o.scene && o.project && o.step) {
 			trackEvent('atelier:restoration_step', { project: o.project, step: o.step });
-			const next: Scene[] = [{ kind: 'restore', id: o.id, project: o.project, title: o.scene.title, from: o.step - 1, to: o.step, lines: o.scene.lines }];
+			const next: Scene[] = [{ kind: 'restore', id: o.id, project: o.project, title: o.scene.title, from: o.step - 1, to: o.step, lines: o.scene.lines, reward: o.reward }];
 			setScenes((q) => [...q, ...next]);
 		} else {
 			const bits = [`+${o.reward.coins} pièces`];
@@ -291,7 +313,11 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			st = markSeen(st, 'chapter');
 		}
 		setS(st);
-		if (q.length) setScenes((x) => [...x, ...q]);
+		finishReveal();
+		const r = { id, k: Date.now(), after: q };
+		revealRef.current = r;
+		setReveal(r);
+		sfx.restore();
 	};
 
 	const buyEnergy = () => {
@@ -319,6 +345,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		setSel(null);
 		setView('etabli');
 		setConfirmReset(false);
+		revealRef.current = null;
+		setReveal(null);
 	};
 
 	// ---------- pointer ----------
@@ -400,7 +428,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 					{s.energy < ENERGY_MAX ? <em>{fmt(energyIn(s, now))}</em> : <small>/{ENERGY_MAX}</small>}
 					<span className="at-plus" aria-hidden="true">+</span>
 				</button>
-				<span className="at-stat" title="Pièces"><span aria-hidden="true">🪙</span><strong>{s.coins}</strong></span>
+				<span className="at-stat at-coins" title="Pièces"><span aria-hidden="true">🪙</span><strong>{s.coins}</strong><Delta value={s.coins} /></span>
 				<button className="at-stat at-snd" onClick={() => { sfx.setEnabled(!sound); setSound(!sound); }} aria-label={sound ? 'Couper le son' : 'Activer le son'} title={sound ? 'Couper le son' : 'Activer le son'}>{sound ? '🔊' : '🔇'}</button>
 				<div className="at-tabs" role="tablist">
 					<button role="tab" aria-selected={view === 'atelier'} className={`at-tab ${view === 'atelier' ? 'on' : ''} ${coach?.target === 'tab' ? 'at-pulse' : ''}`} onClick={() => setView('atelier')}>Atelier</button>
@@ -531,6 +559,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 					chapterDone={chapterDone}
 					coachUp={coach?.target === 'up'}
 					onUpgrade={doUpgrade}
+					reveal={reveal}
+					onRevealDone={finishReveal}
 					onBench={() => setView('etabli')}
 					onPuzzle={() => setPuzzle(true)}
 					awaited={blocker?.kind === 'upgrade' ? blocker.id : null}
@@ -592,6 +622,31 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 					</div>
 				</div>
 			)}
+		</div>
+	);
+}
+
+/** Floats the last change of a counter above it: "+15", "−8". */
+function Delta({ value }: { value: number }) {
+	const prev = useRef(value);
+	const [d, setD] = useState<{ k: number; n: number } | null>(null);
+	useEffect(() => {
+		const n = value - prev.current;
+		prev.current = value;
+		if (n) setD({ k: Date.now(), n });
+	}, [value]);
+	if (!d) return null;
+	return <span className={`at-delta ${d.n > 0 ? 'up' : 'down'}`} key={d.k} aria-hidden="true">{d.n > 0 ? `+${d.n}` : `−${-d.n}`}</span>;
+}
+
+/** Reward chips: what an order or an upgrade brought. */
+function Gains({ coins, rep, energy, cocoins }: { coins?: number; rep?: number; energy?: number; cocoins?: number }) {
+	return (
+		<div className="at-gains">
+			{!!coins && <span>{coins > 0 ? `+${coins}` : `−${-coins}`} 🪙</span>}
+			{!!rep && <span>+{rep} ⭐ réputation</span>}
+			{!!energy && <span>+{energy} ⚡</span>}
+			{!!cocoins && <span>+{cocoins} <Cocoin size="1em" /></span>}
 		</div>
 	);
 }
@@ -748,11 +803,19 @@ function OrderHelp({ s, o, onClose }: { s: State; o: Order; onClose: () => void 
 	);
 }
 
-function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle, awaited, confirmReset, onReset, onReplay }: {
-	s: State; story: Order | null; chapterDone: boolean; coachUp: boolean; awaited: string | null;
+function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealDone, onBench, onPuzzle, awaited, confirmReset, onReset, onReplay }: {
+	s: State; story: Order | null; chapterDone: boolean; coachUp: boolean; awaited: string | null; reveal: Reveal | null; onRevealDone: () => void;
 	onUpgrade: (id: string) => void; onBench: () => void; onPuzzle: () => void; confirmReset: boolean; onReset: () => void; onReplay: () => void;
 }) {
+	const sceneRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (reveal) sceneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}, [reveal]);
 	const has = (u: string) => s.upgrades.includes(u);
+	const fresh = (u: string) => (reveal?.id === u ? 'fresh' : '');
+	const shown = reveal ? UPGRADES.find((u) => u.id === reveal.id) ?? null : null;
+	const newGen = shown ? Object.values(GENERATORS).find((g) => g.unlock === shown.id) ?? null : null;
+	const at = (shown && REVEAL_AT[shown.id]) ?? [50, 58];
 	const project = currentProject(s);
 	const step = stepOf(s, project.id);
 	// Dust thins out as the story and the workshop move forward.
@@ -763,11 +826,11 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle
 	const lost = missingGens(s);
 	return (
 		<div className="at-shop">
-			<div className={`at-scene ${has('lampe') ? 'lit' : ''}`} style={{ ['--dust' as string]: 1 - progress }}>
+			<div ref={sceneRef} className={`at-scene ${has('lampe') ? 'lit' : ''}`} style={{ ['--dust' as string]: 1 - progress }}>
 				<div className="at-scene-img" />
 				<div className="at-scene-dust" />
-				{!has('etabli') && (
-					<svg className="at-sheet" viewBox="0 0 100 40" preserveAspectRatio="none" aria-label="Établi sous une bâche">
+				{(!has('etabli') || reveal?.id === 'etabli') && (
+					<svg className={`at-sheet ${has('etabli') ? 'off' : ''}`}viewBox="0 0 100 40" preserveAspectRatio="none" aria-label="Établi sous une bâche">
 						<defs>
 							<linearGradient id="at-cloth" x1="0" y1="0" x2="0" y2="1">
 								<stop offset="0" stopColor="#d8d0bd" />
@@ -779,12 +842,30 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, onBench, onPuzzle
 						<path d="M6 11 C18 6 30 9 42 7 C56 5 66 10 78 7 C88 5 94 9 96 10" stroke="#efe9dc" strokeWidth="1.2" opacity="0.5" fill="none" />
 					</svg>
 				)}
-				{has('lampe') && <div className="at-lamp" />}
-				{has('etageres') && <div className="at-shelves" aria-label="Les étagères de Jeanne, rouvertes" />}
-				{has('bureau') && <div className="at-door-open" aria-label="La porte du bureau, ouverte" />}
+				{has('lampe') && <div className={`at-lamp ${fresh('lampe')}`} />}
+				{has('etageres') && <div className={`at-shelves ${fresh('etageres')}`} aria-label="Les étagères de Jeanne, rouvertes" />}
+				{has('bureau') && <div className={`at-door-open ${fresh('bureau')}`} aria-label="La porte du bureau, ouverte" />}
 				{has('photo') && <div className="at-photo" aria-label="La photo de 1961"><img src={`${ART}/photo.jpg`} alt="" /></div>}
-				{started && step < project.steps && story && (
+				{started && step < project.steps && story && !reveal && (
 					<div className={`at-onbench ${project.id}`}><ObjectArt project={project.id} state={step} /></div>
+				)}
+				{reveal && shown && (
+					<button className="at-reveal" key={reveal.k} onClick={onRevealDone} aria-label={`${shown.name} : continuer`} style={{ ['--x' as string]: `${at[0]}%`, ['--y' as string]: `${at[1]}%` }}>
+						<span className="at-puff" style={{ left: `${at[0]}%`, top: `${at[1]}%` }} aria-hidden="true">
+							{Array.from({ length: 8 }, (_, k) => <i key={k} style={{ ['--a' as string]: `${k * 45}deg` }} />)}
+						</span>
+						<span className="at-reveal-card" role="status">
+							<strong>✨ {shown.name}</strong>
+							<span>{shown.desc}</span>
+							{newGen && (
+								<span className="at-reveal-gen">
+									<PieceImg piece={`g:${newGen.id}`} /> Nouveau sur l’établi : {newGen.name}
+								</span>
+							)}
+							<Gains coins={-shown.cost} rep={shown.rep} />
+							<small>Toucher pour continuer</small>
+						</span>
+					</button>
 				)}
 			</div>
 
@@ -999,6 +1080,7 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 						<ObjectArt {...art} />
 					</div>
 				)}
+				{scene.kind === 'restore' && scene.reward && after && last && <Gains {...scene.reward} />}
 				{line && (
 					<div className={`at-line ${line.who}`} key={i}>
 						{line.who !== 'note' && line.who !== 'moi' && <Face who={whoName(line.who)} size={44} />}
@@ -1257,6 +1339,39 @@ const CSS = `
 .at-sheet { position: absolute; left: 34%; width: 62%; top: 75%; height: 19%; opacity: 0.93; filter: drop-shadow(0 5px 6px rgba(0,0,0,0.45)); }
 .at-photo { position: absolute; left: 40%; top: 34%; width: 22%; transform: rotate(-3deg); background: #f4ead4; padding: 3px 3px 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); animation: at-hang 0.8s ease; }
 .at-photo img { width: 100%; display: block; }
+.at-sheet.off { animation: at-sheetoff 1.1s cubic-bezier(.5,0,.8,.4) 0.3s forwards; transform-origin: 80% 100%; }
+@keyframes at-sheetoff { 0% { transform: none; } 25% { transform: translateY(-6%) rotate(-2deg); } 100% { transform: translate(30%, -160%) rotate(14deg); opacity: 0; } }
+.at-lamp.fresh { animation: at-lampon 1.8s ease-out, at-flicker 5s ease-in-out 1.8s infinite; }
+@keyframes at-lampon { 0% { opacity: 0; } 15% { opacity: 0.9; } 25% { opacity: 0.1; } 40% { opacity: 1; } 55% { opacity: 0.5; } 100% { opacity: 1; } }
+.at-shelves.fresh, .at-door-open.fresh { animation: at-glowin 1.6s ease-out; }
+@keyframes at-glowin { 0% { opacity: 0; } 50% { opacity: 1; filter: brightness(1.8); } 100% { opacity: 1; } }
+.at-reveal { position: absolute; inset: 0; border: 0; padding: 0; margin: 0; background: transparent; cursor: pointer; font: inherit; color: inherit; }
+.at-reveal::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at var(--x) var(--y), rgba(255, 226, 160, 0.55), transparent 60%); mix-blend-mode: screen; animation: at-warm 2.4s ease-out 0.3s both; pointer-events: none; }
+@keyframes at-warm { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+.at-puff { position: absolute; width: 0; height: 0; }
+.at-puff::before { content: ''; position: absolute; left: -60px; top: -60px; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 236, 190, 0.9), rgba(255, 220, 150, 0.3) 45%, transparent 70%); animation: at-puff 1.3s ease-out 0.35s both; }
+@keyframes at-puff { from { transform: scale(0.2); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
+.at-puff i { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: #ffe7a8; box-shadow: 0 0 8px #ffd24a; animation: at-spark 1.1s ease-out 0.4s both; }
+@keyframes at-spark { 0% { transform: rotate(var(--a)) translateX(0) scale(1); opacity: 0; } 10% { opacity: 1; } 100% { transform: rotate(var(--a)) translateX(70px) scale(0.2); opacity: 0; } }
+.at-reveal-card small { font-size: 11px; color: #c9b48a; margin-top: 2px; }
+.at-reveal-card { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); width: min(92%, 340px); display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; background: rgba(43, 29, 14, 0.92); color: #fff4d6; border: 1.5px solid #ffd24a; border-radius: 14px; padding: 10px 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); animation: at-cardup 0.5s ease 1.3s both; }
+.at-reveal-card strong { font-size: 16px; }
+.at-reveal-card > span { font-size: 13px; color: #f1dfb6; }
+@keyframes at-cardup { from { opacity: 0; transform: translate(-50%, -14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.at-reveal-gen { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #ffd24a !important; }
+.at-reveal-gen img, .at-reveal-gen .at-emoji { width: 28px; height: 28px; object-fit: contain; }
+.at-gains { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 2px 0; }
+.at-gains > span { display: inline-flex; align-items: center; gap: 3px; background: #ffd24a; color: #2b1d0e; font-weight: 800; font-size: 13px; border-radius: 999px; padding: 3px 10px; animation: at-pop 0.45s ease both; }
+.at-gains > span:nth-child(2) { animation-delay: 0.12s; }
+.at-gains > span:nth-child(3) { animation-delay: 0.24s; }
+.at-gains > span:nth-child(4) { animation-delay: 0.36s; }
+.at-reveal-card .at-gains > span { animation-delay: 1.6s; }
+.at-reveal-card .at-gains > span:nth-child(2) { animation-delay: 1.72s; }
+.at-coins { position: relative; }
+.at-delta { position: absolute; right: 6px; top: -4px; font-size: 13px; font-weight: 800; pointer-events: none; animation: at-delta 1.4s ease-out forwards; }
+.at-delta.up { color: #5ccf7a; }
+.at-delta.down { color: #ff8a5c; }
+@keyframes at-delta { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-18px); } }
 @keyframes at-hang { from { transform: rotate(-12deg) translateY(-12px); opacity: 0; } to { transform: rotate(-3deg); opacity: 1; } }
 .at-onbench.radio { width: 16% !important; top: 75% !important; }
 .at-onbench.voilier { width: 13% !important; top: 72% !important; }
@@ -1309,6 +1424,7 @@ const CSS = `
 	.at-stat em { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img, .at-broadcast u, .at-open { animation: none; }
+	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img, .at-broadcast u, .at-open, .at-puff::before, .at-puff i, .at-gains > span, .at-reveal-card, .at-reveal::before { animation: none; }
+	.at-sheet.off { display: none; }
 }
 `;
