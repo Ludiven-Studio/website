@@ -3,7 +3,7 @@ import CallToAction from './CallToAction.astro';
 import Icon from './Icon.astro';
 
 interface Props {
-	lang?: 'fr' | 'en' | 'es' | undefined;
+	lang?: 'fr' | 'en' | 'es' | 'de' | 'it' | undefined;
 }
 
 const { lang = 'fr' } = Astro.props;
@@ -11,6 +11,10 @@ const t = lang === 'en'
 	? { heading: 'Got a project in mind?', cta: 'Get in touch' }
 	: lang === 'es'
 	? { heading: '¿Tienes un proyecto en mente?', cta: 'Escríbeme' }
+	: lang === 'de'
+	? { heading: 'Ein Projekt im Kopf?', cta: 'Schreib mir' }
+	: lang === 'it'
+	? { heading: 'Hai un progetto in mente?', cta: 'Scrivimi' }
 	: { heading: 'Un projet en tête ?', cta: 'Contactez-moi' };
 ---
 

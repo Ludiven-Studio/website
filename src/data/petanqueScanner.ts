@@ -33,6 +33,8 @@ export interface LandingCopy {
 	makingOfCta: string;
 	makingOfHref: string;
 	legalIntro: string;
+	/** The app's support line: the page doubles as the store listings' support URL. */
+	support: string;
 	privacy: { label: string; href: string };
 	terms: { label: string; href: string };
 	closing: string;
@@ -42,22 +44,26 @@ export const APP_NAME = 'Pétanque Scanner';
 export const OG_IMAGE = '/assets/work/og/petanque-scanner.jpg';
 export const HERO = '/assets/petanque-ar/hero.avif';
 
-export const SCREENS = [
-	'/assets/petanque-ar/screen-01.webp',
-	'/assets/petanque-ar/screen-02.webp',
-	'/assets/petanque-ar/screen-03.webp',
-	'/assets/petanque-ar/screen-04.webp',
-	'/assets/petanque-ar/screen-05.webp',
-	'/assets/petanque-ar/screen-06.webp',
-];
+/** The store visuals carry their caption and the app's own UI, so each language gets its set. */
+const screens = (suffix: string) =>
+	[1, 2, 3, 4, 5, 6].map((n) => `/assets/petanque-ar/screen-0${n}${suffix}.webp`);
+export const SCREENS: Record<LandingLang, string[]> = {
+	fr: screens(''),
+	en: screens('-en'),
+	es: screens('-es'),
+	de: screens('-de'),
+	it: screens('-it'),
+};
 
-export type LandingLang = 'fr' | 'en' | 'es';
+export type LandingLang = 'fr' | 'en' | 'es' | 'de' | 'it';
 
 /** Every language version of the landing, for hreflang and the language switch. */
 export const LANDING_PATHS: Record<LandingLang, string> = {
 	fr: '/petanque-scanner/',
 	en: '/en/petanque-scanner/',
 	es: '/es/petanque-scanner/',
+	de: '/de/petanque-scanner/',
+	it: '/it/petanque-scanner/',
 };
 
 /** The hero has its strapline baked into the pixels, so each language gets a repainted copy and its own share card. */
@@ -65,11 +71,15 @@ export const HEROES: Record<LandingLang, string> = {
 	fr: HERO,
 	en: '/assets/petanque-ar/hero-en.webp',
 	es: '/assets/petanque-ar/hero-es.webp',
+	de: '/assets/petanque-ar/hero-de.webp',
+	it: '/assets/petanque-ar/hero-it.webp',
 };
 export const OG_IMAGES: Record<LandingLang, string> = {
 	fr: OG_IMAGE,
 	en: '/assets/work/og/petanque-scanner-en.jpg',
 	es: '/assets/work/og/petanque-scanner-es.jpg',
+	de: '/assets/work/og/petanque-scanner-de.jpg',
+	it: '/assets/work/og/petanque-scanner-it.jpg',
 };
 
 export const copy: Record<LandingLang, LandingCopy> = {
@@ -185,6 +195,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		makingOfCta: 'Lire les coulisses techniques',
 		makingOfHref: '/work/petanque-scanner/',
 		legalIntro: 'À consulter également :',
+		support: 'Une question, un souci avec l\'application ? Écrivez-moi :',
 		privacy: { label: 'politique de confidentialité', href: '/petanque-scanner/confidentialite/' },
 		terms: { label: 'conditions d\'utilisation', href: '/petanque-scanner/cgu/' },
 		closing: 'Disponible sur Android et iOS',
@@ -301,6 +312,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		makingOfCta: 'Read the technical write-up',
 		makingOfHref: '/en/work/petanque-scanner/',
 		legalIntro: 'See also:',
+		support: 'A question or a problem with the app? Write to me:',
 		privacy: { label: 'privacy policy', href: '/en/petanque-scanner/confidentialite/' },
 		terms: { label: 'terms of use', href: '/en/petanque-scanner/cgu/' },
 		closing: 'Available on Android and iOS',
@@ -421,8 +433,243 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		makingOfCta: 'Leer los detalles técnicos',
 		makingOfHref: '/en/work/petanque-scanner/',
 		legalIntro: 'Consulta también:',
+		support: '¿Una pregunta o un problema con la aplicación? Escríbeme:',
 		privacy: { label: 'política de privacidad', href: '/es/petanque-scanner/confidentialite/' },
 		terms: { label: 'condiciones de uso', href: '/es/petanque-scanner/cgu/' },
 		closing: 'Disponible para Android e iOS',
+	},
+	de: {
+		title: 'Pétanque Scanner — mit dem Handy sehen, wer den Punkt hat',
+		description:
+			'Kostenlose Augmented-Reality-App: Richte das Handy auf die Kugeln, geh um sie herum und lies den Abstand jeder Kugel zur Zielkugel ab. Ein Fotomodus springt auf Handys ohne AR ein. Alles wird auf dem Handy berechnet, ohne Netz und ohne Konto.',
+		tagline:
+			'Zwei Kugeln links und rechts der Zielkugel, ein, zwei Meter entfernt, und das Auge kann es nicht entscheiden: Aus der Distanz lassen sich zwei Abstände nicht vergleichen. Starte einen Scan, geh ein paar Sekunden um das Spiel herum, und die App zeigt den Abstand jeder Kugel an — in Augmented Reality direkt auf den Boden gelegt.',
+		heroAlt: 'Drei Kugeln und eine Zielkugel auf einem Platz, mit den Messwerten in Augmented Reality eingeblendet',
+		badges: {
+			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=de',
+			playAlt: 'Jetzt bei Google Play',
+			apple: 'https://apps.apple.com/app/id6670211733',
+			appleAlt: 'Download on the App Store',
+		},
+		stepsTitle: 'So funktioniert es',
+		steps: [
+			{
+				icon: 'mobile',
+				title: 'Scan starten',
+				body: 'Lass die Kugeln genau da liegen, wo sie sind, öffne die App und richte sie auf das Spiel. Nichts auf den Boden legen, keine Markierung setzen.',
+			},
+			{
+				icon: 'winding-path',
+				title: 'Herumgehen',
+				body: 'Mach ein paar Schritte um die Kugeln herum und behalte dabei die Zielkugel im Bild. Ein Vertrauenswert steigt live, während die App Blickwinkel sammelt.',
+			},
+			{
+				icon: 'grid-dots',
+				title: 'Rangfolge ablesen',
+				body: 'Die Abstände erscheinen auf dem Boden, vom kürzesten zum längsten. Du weißt, wer den Punkt hat, ohne dass sich jemand hinknien muss.',
+			},
+		],
+		featuresTitle: 'Was es dir bringt',
+		features: [
+			{
+				title: 'Ohne sich zu bücken',
+				body: 'Jede Kugel wird an der Zielkugel gemessen, und die Rangfolge erscheint direkt auf dem Platz, nicht in einer Tabelle. Niemand muss sich hinhocken, um zu entscheiden.',
+			},
+			{
+				title: 'Ohne Netz',
+				body: 'Die Erkennung läuft auf deinem Handy. Kein Platz liegt zu weit vom nächsten Funkmast entfernt, als dass die App nicht funktionieren würde.',
+			},
+			{
+				title: 'Nichts verlässt das Handy',
+				body: 'Kein Server, kein Konto, keine Anmeldung. Die Kamerabilder verlassen nie das Gerät.',
+			},
+			{
+				title: 'Ohne Abo',
+				body: 'Jeden Tag kostenlos. Wenn du unbegrenzt scannen willst, ist das ein einmaliger Kauf — keine monatlichen Kosten.',
+			},
+		],
+		photoTitle: 'Und wenn dein Handy kein Augmented Reality kann?',
+		photoBody:
+			'Dafür gibt es einen Fotomodus. Du hältst das Handy flach über das Spiel, machst ein einziges Foto, und die App findet darauf die Zielkugel und die Kugeln: Die nächste wird grün umkreist, mit dem Abstand zur folgenden. Augmented Reality ist nicht nötig — eine Kamera reicht.',
+		photoNote:
+			'Auf einem nicht kompatiblen Gerät wechselt die App von selbst in diesen Modus: kein Menü, nichts einzustellen. Auf allen anderen bleibt der Fotomodus in den Einstellungen verfügbar, praktisch, wenn kein Platz ist, um das Spiel zu umrunden. Der Preis dafür ist bekannt: Ein einzelnes Foto liefert eine weniger sichere Messung als ein Scan aus mehreren Blickwinkeln.',
+		limitsTitle: 'Was die App nicht kann',
+		limitsIntro: 'Besser gleich gesagt, dann gibt es auf dem Platz keine bösen Überraschungen.',
+		limits: [
+			{
+				title: 'Sie ist nicht offiziell',
+				body: 'Im Wettkampf zählt allein die Messung des Schiedsrichters. Pétanque Scanner ist für Partien unter Freunden gedacht, im Urlaub oder im Verein.',
+			},
+			{
+				title: 'Sie muss die Kugeln sehen',
+				body: 'Tief stehende Sonne, harter Schatten oder eine halb im Kies versunkene Kugel: Dann wird die Erkennung deutlich schwieriger.',
+			},
+			{
+				title: 'Die Zielkugel ist der Knackpunkt',
+				body: 'Klein und oft von einer Kugel verdeckt. An ihr scheitert die App am häufigsten — der Modus „Einrasten“ lässt dich sie von Hand zurechtrücken.',
+			},
+			{
+				title: 'Bei wenigen Millimetern: Maßband raus',
+				body: 'Die App entscheidet sichtbare Abstände. Liegen zwei Kugeln fast gleich weit von der Zielkugel entfernt — egal ob zehn Zentimeter oder zwei Meter —, fällt der Unterschied unter die Genauigkeit der Messung, und nur ein echtes Maßband trennt sie.',
+			},
+		],
+		priceTitle: 'Was es kostet',
+		priceBody:
+			'Die App ist kostenlos, mit 3 Scans pro Tag. Du kannst dir freiwillig eine Werbung ansehen, um sie aufzuladen, oder einmalig Premium auf Lebenszeit kaufen: unbegrenzte Messungen und keine Werbung mehr. Es gibt kein Abo, und für die Nutzung der App ist kein Kauf nötig.',
+		galleryTitle: 'Die App in Bildern',
+		faqTitle: 'Häufige Fragen',
+		faq: [
+			{
+				q: 'Kann ich sie im Wettkampf benutzen?',
+				a: 'Nein. In einer offiziellen Partie zählt nur die Messung des Schiedsrichters. Die App ist für Freundschaftsspiele gedacht, wenn gerade niemand ein Maßband dabeihat.',
+			},
+			{
+				q: 'Wie genau ist sie wirklich?',
+				a: 'Die Anzeige geht bis auf den Millimeter, aber Genauigkeit ist etwas anderes: bestenfalls ein paar Millimeter, wenn die Kugeln gut sichtbar sind und du um das Spiel herumgegangen bist. Während des Scans wird ein Vertrauenswert angezeigt: Bleibt er niedrig, solltest du der Messung nicht trauen.',
+			},
+			{
+				q: 'Funktioniert sie ohne Internet?',
+				a: 'Ja, vollständig. Die Erkennung der Kugeln läuft auf dem Handy, und es gibt keinen Server.',
+			},
+			{
+				q: 'Werden meine Fotos irgendwohin geschickt?',
+				a: 'Nein. Kein Bild verlässt das Gerät, und die App verlangt kein Konto.',
+			},
+			{
+				q: 'Welche Handys werden unterstützt?',
+				a: 'Der 3D-Scan braucht ein Android-Gerät mit ARCore oder ein iPhone mit ARKit, also die große Mehrheit der Modelle seit 2018. Auf Handys ohne diese Unterstützung wechselt die App automatisch in den Fotomodus und bleibt nutzbar.',
+			},
+			{
+				q: 'Muss ich eine Markierung auf den Boden legen?',
+				a: 'Nein. Die App orientiert sich selbst auf dem Platz, mithilfe der Kamera und der Bewegungssensoren des Handys.',
+			},
+		],
+		makingOfTitle: 'Wie sie gebaut ist',
+		makingOfBody:
+			'Die Erkennung der Kugeln beruht auf einem Bildmodell, das ausschließlich mit synthetischen Bildern trainiert wurde, die Messung auf einer Triangulation aus gesammelten Sichtstrahlen. Ich habe den ganzen Weg aufgeschrieben — samt der Experimente, die nicht funktioniert haben (auf Englisch).',
+		makingOfCta: 'Den technischen Hintergrund lesen',
+		makingOfHref: '/en/work/petanque-scanner/',
+		legalIntro: 'Siehe auch:',
+		support: 'Eine Frage oder ein Problem mit der App? Schreib mir:',
+		privacy: { label: 'Datenschutzerklärung', href: '/de/petanque-scanner/confidentialite/' },
+		terms: { label: 'Nutzungsbedingungen', href: '/de/petanque-scanner/cgu/' },
+		closing: 'Erhältlich für Android und iOS',
+	},
+	it: {
+		title: 'Pétanque Scanner — scopri chi ha il punto con il telefono',
+		description:
+			'App gratuita di realtà aumentata: inquadra le bocce, giraci intorno e leggi la distanza di ogni boccia dal pallino. Sui telefoni senza AR subentra una modalità foto. Tutto viene calcolato sul telefono, senza rete né account.',
+		tagline:
+			'Due bocce ai lati del pallino, a uno o due metri, e l\'occhio non sa decidere: da lontano non si confrontano due distanze. Avvia una scansione, gira qualche secondo intorno al gioco e l\'app mostra la distanza di ogni boccia, disegnata in realtà aumentata direttamente sul campo.',
+		heroAlt: 'Tre bocce e un pallino su un campo, con le misure mostrate in realtà aumentata',
+		badges: {
+			play: 'https://play.google.com/store/apps/details?id=com.raphbenpro.petanquear&hl=it',
+			playAlt: 'Disponibile su Google Play',
+			apple: 'https://apps.apple.com/app/id6670211733',
+			appleAlt: 'Download on the App Store',
+		},
+		stepsTitle: 'Come funziona',
+		steps: [
+			{
+				icon: 'mobile',
+				title: 'Avvia la scansione',
+				body: 'Lascia le bocce esattamente dove sono, apri l\'app e inquadra il gioco. Niente da appoggiare a terra, nessun riferimento da posizionare.',
+			},
+			{
+				icon: 'winding-path',
+				title: 'Girale intorno',
+				body: 'Fai qualche passo intorno alle bocce tenendo il pallino nell\'inquadratura. Un indice di affidabilità sale in diretta mentre l\'app raccoglie i punti di vista.',
+			},
+			{
+				icon: 'grid-dots',
+				title: 'Leggi la classifica',
+				body: 'Le distanze compaiono a terra, dalla più corta alla più lunga. Sai chi ha il punto senza che nessuno debba accovacciarsi.',
+			},
+		],
+		featuresTitle: 'Cosa cambia',
+		features: [
+			{
+				title: 'Senza chinarsi',
+				body: 'Ogni boccia viene misurata rispetto al pallino, e la classifica compare direttamente sul campo, non in una tabella. Nessuno deve accovacciarsi per decidere.',
+			},
+			{
+				title: 'Senza rete',
+				body: 'Il riconoscimento gira sul tuo telefono. Nessun campo è troppo lontano da un\'antenna perché l\'app funzioni.',
+			},
+			{
+				title: 'Niente esce dal telefono',
+				body: 'Nessun server, nessun account, nessuna registrazione. Le immagini della fotocamera non lasciano mai il dispositivo.',
+			},
+			{
+				title: 'Senza abbonamento',
+				body: 'Gratis ogni giorno. Se vuoi l\'illimitato, è un acquisto unico: nessun addebito mensile.',
+			},
+		],
+		photoTitle: 'E se il tuo telefono non supporta la realtà aumentata?',
+		photoBody:
+			'C\'è una modalità foto. Tieni il telefono in piano sopra il gioco, scatti una sola foto e l\'app ci colloca il pallino e le bocce: la più vicina è cerchiata di verde, con lo scarto che la separa dalla successiva. Non serve la realtà aumentata: basta una fotocamera.',
+		photoNote:
+			'Su un dispositivo non compatibile, l\'app passa da sola a questa modalità: nessun menu, niente da impostare. Sugli altri, la modalità foto resta disponibile nelle impostazioni, comoda quando manca lo spazio per girare intorno al gioco. Il compromesso è noto: una sola foto dà una misura meno sicura di una scansione da più angolazioni.',
+		limitsTitle: 'Cosa l\'app non fa',
+		limitsIntro: 'Meglio dirlo subito, così sul campo non ci saranno brutte sorprese.',
+		limits: [
+			{
+				title: 'Non ha alcun valore ufficiale',
+				body: 'In gara fa fede la misura dell\'arbitro. Pétanque Scanner è pensata per le partite tra amici, in vacanza o al circolo.',
+			},
+			{
+				title: 'Ha bisogno di vedere le bocce',
+				body: 'Sole radente, ombra molto marcata o una boccia mezza affondata nella ghiaia: il riconoscimento diventa molto più difficile.',
+			},
+			{
+				title: 'Il pallino è il punto debole',
+				body: 'È piccolo e spesso nascosto da una boccia. È lui a mettere più spesso in difficoltà l\'app: la modalità «Aggancia» permette di riposizionarlo a mano.',
+			},
+			{
+				title: 'Per pochi millimetri, tira fuori il metro',
+				body: 'L\'app decide gli scarti visibili. Quando due bocce sono quasi alla stessa distanza dal pallino, che sia a dieci centimetri o a due metri, lo scarto scende sotto la precisione della misura e solo un vero metro potrà separarle.',
+			},
+		],
+		priceTitle: 'Quanto costa',
+		priceBody:
+			'L\'app è gratuita, con 3 scansioni al giorno. Puoi guardare una pubblicità facoltativa per ricaricarle, oppure passare una volta per tutte a Premium a vita: misure illimitate e nessuna pubblicità. Non c\'è abbonamento, e non serve alcun acquisto per usare l\'app.',
+		galleryTitle: 'L\'app in immagini',
+		faqTitle: 'Domande frequenti',
+		faq: [
+			{
+				q: 'Posso usarla in gara?',
+				a: 'No. In una partita ufficiale conta solo la misura dell\'arbitro. L\'app è pensata per le partite amichevoli, quando nessuno ha un metro a portata di mano.',
+			},
+			{
+				q: 'Quanto è precisa davvero?',
+				a: 'La lettura scende al millimetro, ma la precisione è un\'altra cosa: qualche millimetro nel migliore dei casi, quando le bocce sono ben visibili e hai girato intorno al gioco. Durante la scansione compare un indice di affidabilità: se resta basso, la misura non va presa sul serio.',
+			},
+			{
+				q: 'Funziona senza connessione?',
+				a: 'Sì, completamente. Il riconoscimento delle bocce avviene sul telefono e non c\'è alcun server.',
+			},
+			{
+				q: 'Le mie foto vengono inviate da qualche parte?',
+				a: 'No. Nessuna immagine lascia il dispositivo, e l\'app non chiede di creare alcun account.',
+			},
+			{
+				q: 'Quali telefoni sono compatibili?',
+				a: 'La scansione in realtà aumentata richiede un Android compatibile con ARCore o un iPhone compatibile con ARKit, cioè la grande maggioranza dei modelli usciti dal 2018. Sui telefoni che non lo sono, l\'app passa automaticamente alla modalità foto: resta utilizzabile.',
+			},
+			{
+				q: 'Bisogna mettere un riferimento a terra?',
+				a: 'No. L\'app si orienta da sola sul campo, grazie alla fotocamera e ai sensori di movimento del telefono.',
+			},
+		],
+		makingOfTitle: 'Come è stata costruita',
+		makingOfBody:
+			'Il riconoscimento delle bocce si basa su un modello di visione addestrato solo su immagini sintetiche, e la misura su una triangolazione per accumulo di raggi. Ho raccontato tutto il procedimento, compresi gli esperimenti che non hanno funzionato (in inglese).',
+		makingOfCta: 'Leggi il dietro le quinte tecnico',
+		makingOfHref: '/en/work/petanque-scanner/',
+		legalIntro: 'Da consultare anche:',
+		support: 'Una domanda o un problema con l\'app? Scrivimi:',
+		privacy: { label: 'informativa sulla privacy', href: '/it/petanque-scanner/confidentialite/' },
+		terms: { label: 'condizioni d\'uso', href: '/it/petanque-scanner/cgu/' },
+		closing: 'Disponibile per Android e iOS',
 	},
 };

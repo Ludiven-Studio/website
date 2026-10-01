@@ -1,7 +1,7 @@
 ---
 // Only a few pages exist in other languages, so this is a per-page link, not a site-wide switch.
 // Two-language pages pass `lang` + `href`; pages with more pass `links` (the other versions).
-type Lang = 'fr' | 'en' | 'es';
+type Lang = 'fr' | 'en' | 'es' | 'de' | 'it';
 
 interface Props {
 	lang: Lang;
@@ -10,7 +10,13 @@ interface Props {
 }
 
 // Each label is written in its own language: it is read by someone who does not speak the page's.
-const LABEL: Record<Lang, string> = { fr: 'Lire en français', en: 'Read in English', es: 'Leer en español' };
+const LABEL: Record<Lang, string> = {
+	fr: 'Lire en français',
+	en: 'Read in English',
+	es: 'Leer en español',
+	de: 'Auf Deutsch lesen',
+	it: 'Leggi in italiano',
+};
 
 const { lang, href, links } = Astro.props;
 const all = links ?? (href ? [{ lang: lang === 'fr' ? 'en' : 'fr', href }] as { lang: Lang; href: string }[] : []);

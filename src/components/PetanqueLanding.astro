@@ -18,7 +18,8 @@ const others = (Object.keys(LANDING_PATHS) as LandingLang[])
 	.map((l) => ({ lang: l, href: LANDING_PATHS[l] }));
 const t = copy[lang];
 const play = `/assets/badges/google-play-${lang}.png`;
-const apple = `/assets/badges/app-store-${lang}.svg`;
+// No localized App Store badge on file for de/it: Apple allows the English one everywhere.
+const apple = `/assets/badges/app-store-${lang === 'de' || lang === 'it' ? 'en' : lang}.svg`;
 
 const jsonLd = [
 	{
@@ -97,7 +98,7 @@ const jsonLd = [
 		<section class="screens stack gap-6">
 			<h2 class="section-title">{t.galleryTitle}</h2>
 			<div class="screens-grid">
-				{SCREENS.map((src) => <img src={src} alt="" loading="lazy" decoding="async" />)}
+				{SCREENS[lang].map((src) => <img src={src} alt="" loading="lazy" decoding="async" />)}
 			</div>
 		</section>
 
@@ -153,6 +154,9 @@ const jsonLd = [
 					<img class="badge-appstore" src={apple} alt={t.badges.appleAlt} />
 				</a>
 			</div>
+			<p class="legal" id="support">
+				{t.support} <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
+			</p>
 			<p class="legal">
 				{t.legalIntro} <a href={t.privacy.href}>{t.privacy.label}</a> · <a href={t.terms.href}>{t.terms.label}</a>
 			</p>
