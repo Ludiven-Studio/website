@@ -9,7 +9,7 @@ import {
 	INTRO, EPILOGUE, SPEAKERS, FACES, FACE_EMOJI, REP_TIERS,
 	type Line, type Order, type GenId, type ProjectId, type PuzzleId,
 } from './data';
-import { GearsPuzzle, PUZZLE_CSS } from './Puzzles';
+import { GearsPuzzle, LongueVuePuzzle, TaquinPuzzle, PeseePuzzle, PUZZLE_CSS } from './Puzzles';
 import Watch, { WatchBack, WATCH_CSS } from './Watch';
 import Radio, { RADIO_CSS } from './Radio';
 import Voilier, { VOILIER_CSS } from './Voilier';
@@ -991,6 +991,9 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 					<p className="at-kicker">Énigme · {projectOf(scene.project).object}</p>
 					<h3>{scene.title}</h3>
 					{scene.puzzle === 'gears' && <GearsPuzzle onSolve={() => solve(false)} />}
+					{scene.puzzle === 'longuevue' && <LongueVuePuzzle onSolve={() => solve(false)} />}
+					{scene.puzzle === 'taquin' && <TaquinPuzzle onSolve={() => solve(false)} />}
+					{scene.puzzle === 'pesee' && <PeseePuzzle onSolve={() => solve(false)} />}
 					<button className="at-link" onClick={() => solve(true)}>Passer l’énigme</button>
 				</div>
 			</div>

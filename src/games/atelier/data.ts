@@ -463,7 +463,7 @@ export interface Order {
 }
 
 /** Small "Professor Layton" puzzles inside restoration scenes (docs/atelier-enigmes.md). */
-export type PuzzleId = 'gears';
+export type PuzzleId = 'gears' | 'longuevue' | 'taquin' | 'pesee';
 
 // Listed in play order. Story orders are taken one at a time, in sequence per project.
 export const ORDERS: Order[] = [
@@ -1244,8 +1244,9 @@ export const ORDERS: Order[] = [
 		needs: ['marin:4', 'tissu:3'], reward: { coins: 22, rep: 5, energy: 10, cocoins: 10 }, project: 'mouette', step: 3,
 		scene: {
 			title: 'Prête',
+			puzzle: 'longuevue',
 			lines: [
-				{ who: 'lucas', text: 'La Mouette flotte ! Demain, s’il fait beau, on part à l’îlot. Le club nous accompagne.' },
+				{ who: 'lucas', text: 'La Mouette flotte ! Demain, s’il fait beau, on part à l’îlot, droit sur la crique que vous avez trouvée. Le club nous accompagne.' },
 				{ who: 'note', text: 'Fin du chapitre 12.' },
 			],
 		},
@@ -1389,7 +1390,7 @@ export const ORDERS: Order[] = [
 		id: 'bobines-1', kind: 'story', client: 'Mme Garnier', ask: 'Redresser le couvercle.',
 		needs: ['bois:3', 'outil:3'], reward: { coins: 15, rep: 3, energy: 10 },
 		when: { project: 'tabouret', step: 3 }, project: 'bobines', step: 1,
-		scene: { title: 'Le billet', lines: [
+		scene: { title: 'Le billet', puzzle: 'taquin', lines: [
 			{ who: 'note', text: 'Sous les bobines, un billet de train, avril 1962, jamais composté. Destination : la ville où vit Lucile.', show: 'ticket' },
 			{ who: 'garnier', text: 'Je devais lui porter la boîte moi-même. Le billet était acheté.' },
 		] },
@@ -1563,7 +1564,7 @@ export const ORDERS: Order[] = [
 	{
 		id: 'balance-3', kind: 'story', client: 'La boulangère', ask: 'Polir le cuivre.',
 		needs: ['soin:4', 'elec:2'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'balance', step: 3,
-		scene: { title: 'Au comptoir', lines: [
+		scene: { title: 'Au comptoir', puzzle: 'pesee', lines: [
 			{ who: 'boulangere', text: 'Elle est juste, à nouveau. Mlle Chen, vous posez beaucoup de questions sur les marchés, vous…' },
 			{ who: 'note', text: 'Fin du chapitre 22.' },
 		] },

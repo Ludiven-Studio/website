@@ -13,8 +13,11 @@ et Codex (réponse complète dans `.collab/tickets/0023-enigmes-layton.md`). Mod
 | 3 | 17, étape 1 | **Le couvercle du coffret** | Claude | taquin 3 × 3 ; l'image reformée (une gare) libère le billet d'avril 1962 |
 | 4 | 22 | **La balance juste** | Claude | trouver le faux poids parmi 6 en deux pesées |
 
-Validée par l'utilisateur le 02/10. **Saison 1 jouable** (`src/games/atelier/Puzzles.tsx`, `scene.puzzle` sur
-l'étape ; capture : `node scripts/snap-atelier-gears.mjs`). Saisons 2 à 4 à faire.
+Validée par l'utilisateur le 02/10. **Les quatre sont jouables** (`src/games/atelier/Puzzles.tsx`, `scene.puzzle`
+sur l'étape ; « Passer l'énigme » toujours possible). Emplacements réels : rouages à `morel-2` (ch. 1), longue-vue
+à `mouette-3` (fin du ch. 12, juste avant la sortie vers l'îlot), taquin à `bobines-1` (ch. 17), pesée à `balance-3`
+(ch. 22 ; le faux poids est choisi au fil des pesées pour qu'un coup de chance ne suffise pas). Captures :
+`node scripts/snap-atelier-{gears,longuevue,taquin,pesee}.mjs`.
 
 **Étape suivante demandée** : une interaction dans **chaque** chapitre (25), pas seulement une énigme par saison.
 Les quatre énigmes en restent les temps forts ; les autres chapitres auront des gestes plus courts (10-30 s),
