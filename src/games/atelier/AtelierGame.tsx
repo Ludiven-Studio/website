@@ -5,11 +5,12 @@ import {
 	stepOf, storyOrder, storyBlocker, factKnown, currentProject, projectOf, missingGens, mapReady, solveMap, code, unitCost, CELLS, type State, type Piece,
 } from './engine';
 import {
-	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK,
+	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, RECAPS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK,
 	INTRO, EPILOGUE, SPEAKERS, FACES, FACE_EMOJI, REP_TIERS,
 	type Line, type Order, type GenId, type ProjectId, type PuzzleId,
 } from './data';
 import { GearsPuzzle, LongueVuePuzzle, TaquinPuzzle, PeseePuzzle, PUZZLE_CSS } from './Puzzles';
+import { Gesture, GESTURES, GESTURE_CSS } from './Gestures';
 import Watch, { WatchBack, WATCH_CSS } from './Watch';
 import Radio, { RADIO_CSS } from './Radio';
 import Voilier, { VOILIER_CSS } from './Voilier';
@@ -20,7 +21,7 @@ import Musique, { MUSIQUE_CSS } from './Musique';
 import { Boussole, Fanal, LongueVue, CoffreMousse, Canot, Cloche, SAISON2_CSS } from './Saison2';
 import { CadreOvale, Travailleuse, Tabouret, CoffretBobines, CarnetRose, Valise, SAISON3_CSS } from './Saison3';
 import { ValiseEtal, Presentoir, Balance, Caissette, Casier, Toupie, SAISON4_CSS } from './Saison4';
-import { CHARACTERS, type Character } from './characters';
+import { CHARACTERS, ERAS, FAMILIES, type Character } from './characters';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
 import { useWallet } from '../../lib/useWallet';
@@ -194,7 +195,9 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		const st = storyOrder(s);
 		if (st && st.step === 1 && !s.seen.includes(`arrival:${st.project}`)) {
 			const p = projectOf(st.project!);
-			setScenes([{ kind: 'talk', id: `arrival:${p.id}`, lines: p.arrival, art: { project: p.id, state: 0 }, title: `Chapitre ${p.chapter} · ${p.title}` }]);
+			const recap = RECAPS[p.id];
+			const lines: Line[] = recap ? [{ who: 'note', text: `Précédemment : ${recap}` }, ...p.arrival] : p.arrival;
+			setScenes([{ kind: 'talk', id: `arrival:${p.id}`, lines, art: { project: p.id, state: 0 }, title: `Chapitre ${p.chapter} · ${p.title}` }]);
 			return;
 		}
 		const t = dueTier(s);
@@ -420,7 +423,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}{SAISON4_CSS}{PUZZLE_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}{SAISON4_CSS}{PUZZLE_CSS}{GESTURE_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -725,21 +728,64 @@ const frTypo = (t: string) => t.replace(/« /g, '«' + NBSP).replace(/ ([»:;!?]
 /** Faces met so far; tapping one opens what the story has told about them. */
 function Trombi({ s }: { s: State }) {
 	const [open, setOpen] = useState<Character | null>(null);
+	const [tab, setTab] = useState<'eras' | 'families'>('eras');
 	const met = CHARACTERS.filter((c) => factKnown(s, c.facts[0]));
 	if (!met.length) return null;
 	const known = open ? open.facts.filter((f) => factKnown(s, f)) : [];
 	const left = open ? open.facts.length - known.length : 0;
+	// A family shows once two of its people are known to be related.
+	const families = FAMILIES.map((f) => ({ ...f, rows: f.rows.map((r) => ({ ...r, kin: r.kin.filter((k) => !k.gate || factKnown(s, k.gate)) })).filter((r) => r.kin.length) }))
+		.filter((f) => f.rows.length >= 2);
+	const card = (c: Character) => (
+		<button key={c.id} className="at-trombi-face" onClick={() => setOpen(c)} aria-label={`${c.name} : ce qu’on sait`}>
+			<Face who={c.face} size={52} />
+			<span>{frTypo(c.name)}</span>
+		</button>
+	);
 	return (
 		<section className="at-trombi" aria-label="Trombinoscope">
-			<strong>Trombinoscope</strong>
-			<div className="at-trombi-grid">
-				{met.map((c) => (
-					<button key={c.id} className="at-trombi-face" onClick={() => setOpen(c)} aria-label={`${c.name} : ce qu’on sait`}>
-						<Face who={c.face} size={52} />
-						<span>{c.name}</span>
-					</button>
-				))}
+			<div className="at-trombi-top">
+				<strong>Trombinoscope</strong>
+				{families.length > 0 && (
+					<div className="at-trombi-tabs" role="tablist">
+						<button role="tab" aria-selected={tab === 'eras'} className={tab === 'eras' ? 'on' : ''} onClick={() => setTab('eras')}>Par époque</button>
+						<button role="tab" aria-selected={tab === 'families'} className={tab === 'families' ? 'on' : ''} onClick={() => setTab('families')}>Familles</button>
+					</div>
+				)}
 			</div>
+			{tab === 'eras' || !families.length ? ERAS.map((e) => {
+				const people = met.filter((c) => c.era === e.id);
+				return people.length ? (
+					<div key={e.id} className="at-trombi-era">
+						<em>{e.title}</em>
+						<div className="at-trombi-grid">{people.map(card)}</div>
+					</div>
+				) : null;
+			}) : (
+				<div className="at-tree">
+					{families.map((f) => (
+						<div key={f.title} className="at-tree-family">
+							<em>{f.title}</em>
+							{f.rows.map((r, i) => (
+								<div key={i} className="at-tree-row">
+									{i > 0 && <span className={`at-tree-link ${r.gap ? 'gap' : ''}`} aria-hidden="true">{r.gap ? '⋮' : '│'}</span>}
+									<div className="at-tree-kin">
+										{r.kin.map((k) => (
+											<span key={k.name} className="at-tree-person">
+												{/^\p{Extended_Pictographic}/u.test(k.face)
+													? <span className="at-face at-face-emoji" style={{ width: 40, height: 40 }} aria-hidden="true">{k.face}</span>
+													: <Face who={k.face} size={40} />}
+												<span>{frTypo(k.name)}</span>
+											</span>
+										))}
+									</div>
+								</div>
+							))}
+						</div>
+					))}
+					<p className="at-small">⋮ : plusieurs générations entre les deux.</p>
+				</div>
+			)}
 			{open && (
 				<div className="at-modal" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
 					<div className="at-card at-trombi-card" role="dialog" aria-modal="true" aria-label={open.name}>
@@ -988,13 +1034,14 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 		return (
 			<div className="at-modal at-scene-modal" role="dialog" aria-modal="true">
 				<div className="at-card at-talk">
-					<p className="at-kicker">Énigme · {projectOf(scene.project).object}</p>
+					<p className="at-kicker">{GESTURES.has(scene.puzzle!) ? 'Geste' : 'Énigme'} · {projectOf(scene.project).object}</p>
 					<h3>{scene.title}</h3>
 					{scene.puzzle === 'gears' && <GearsPuzzle onSolve={() => solve(false)} />}
 					{scene.puzzle === 'longuevue' && <LongueVuePuzzle onSolve={() => solve(false)} />}
 					{scene.puzzle === 'taquin' && <TaquinPuzzle onSolve={() => solve(false)} />}
 					{scene.puzzle === 'pesee' && <PeseePuzzle onSolve={() => solve(false)} />}
-					<button className="at-link" onClick={() => solve(true)}>Passer l’énigme</button>
+					{GESTURES.has(scene.puzzle!) && <Gesture id={scene.puzzle!} onSolve={() => solve(false)} />}
+					<button className="at-link" onClick={() => solve(true)}>{GESTURES.has(scene.puzzle!) ? 'Passer' : 'Passer l’énigme'}</button>
 				</div>
 			</div>
 		);
@@ -1058,9 +1105,9 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 							</div>
 						)}
 						{line.show === 'carnet' && (
-							<div className="at-carnet" role="img" aria-label="Carnet de bord de Samuel Kerbrat, 1813">
+							<div className="at-carnet" role="img" aria-label="Carnet de bord du mousse de Rose, 1813">
 								<b>S. K. — 1813</b>
-								<span>Élie au levant, moi au couchant. Chacun rend ce qu’il porte.</span>
+								<span>Le second au levant, moi au couchant. Chacun rend ce qu’il porte.</span>
 								<span>La cloche reste. Là où l’île regarde le port.</span>
 							</div>
 						)}
@@ -1313,7 +1360,19 @@ const CSS = `
 .at-map { width: min(70vw, 260px); margin: 0 auto; }
 .at-map.small { width: 150px; margin: 4px 0 0; }
 .at-trombi { background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
-.at-trombi > strong { font-size: 15px; color: var(--gray-0); }
+.at-trombi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.at-trombi-top > strong { font-size: 15px; color: var(--gray-0); }
+.at-trombi-tabs { display: flex; gap: 2px; background: var(--gray-800); border-radius: 999px; padding: 2px; }
+.at-trombi-tabs button { border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: var(--gray-300); padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.at-trombi-tabs button.on { background: #9c4a1f; color: #fff4d6; }
+.at-trombi-era > em, .at-tree-family > em { display: block; font-size: 12px; font-weight: 700; font-style: normal; color: #c98a4a; text-transform: uppercase; letter-spacing: 0.04em; margin: 2px 0 4px; }
+.at-tree { display: flex; flex-direction: column; gap: 12px; }
+.at-tree-family { border-left: 3px solid #c98a4a55; padding-left: 10px; }
+.at-tree-row { display: flex; flex-direction: column; align-items: flex-start; }
+.at-tree-link { margin-left: 18px; color: #c98a4a; line-height: 1; font-size: 16px; }
+.at-tree-link.gap { letter-spacing: 0; }
+.at-tree-kin { display: flex; gap: 14px; flex-wrap: wrap; }
+.at-tree-person { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--gray-200); }
 .at-trombi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; }
 .at-trombi-face { border: 0; background: none; padding: 4px 2px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; border-radius: 10px; font: inherit; color: var(--gray-200); }
 .at-trombi-face:hover, .at-trombi-face:focus-visible { background: var(--gray-800); }

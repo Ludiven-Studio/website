@@ -1,5 +1,5 @@
 // The Chen family's music box, the last object of the campaign. SVG like the others, one layer per state.
-//   0 dusty, lacquer dull, lid shut, figurine loose     1 cleaned: the lacquered harbour and "Mei Chen"
+//   0 dusty, lacquer dull, lid shut, figurine loose     1 cleaned: the lacquered harbour and "Chen"
 //   2 mechanism mended: lid open, cylinder showing       3 little ship back on its post, turning; notes rise
 
 interface Props {
@@ -17,7 +17,7 @@ export default function Musique({ state, size = 220 }: Props) {
 			viewBox="0 0 220 190"
 			width={size}
 			role="img"
-			aria-label={['Boîte à musique poussiéreuse', 'Boîte nettoyée, un port laqué et un nom : Mei Chen', 'Boîte ouverte, le cylindre réparé', 'Boîte qui joue, un petit voilier tourne'][Math.min(3, state)]}
+			aria-label={['Boîte à musique poussiéreuse', 'Boîte nettoyée, un port laqué et un nom : Chen', 'Boîte ouverte, le cylindre réparé', 'Boîte qui joue, un petit voilier tourne'][Math.min(3, state)]}
 		>
 			<defs>
 				<linearGradient id="atu-lacquer" x1="0" y1="0" x2="0" y2="1">
@@ -70,7 +70,7 @@ export default function Musique({ state, size = 220 }: Props) {
 				<g className="atu-layer" style={{ opacity: dusty ? 0 : 1 }}>
 					<path d="M44 100 Q70 92 96 100 T150 98 T180 100" stroke="#d9a441" strokeWidth="1.5" fill="none" />
 					<path d="M70 96 L78 88 L80 96z M120 96 L128 86 L132 96z" fill="#f4ead4" />
-					<text x="160" y="96" fontFamily="Georgia, serif" fontSize="7" fill="#f4d98a" textAnchor="middle">Mei Chen</text>
+					<text x="160" y="96" fontFamily="Georgia, serif" fontSize="7" fill="#f4d98a" textAnchor="middle">Chen</text>
 				</g>
 			</g>
 			{/* The loose figurine lying on the lid, until it is mounted again */}

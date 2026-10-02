@@ -1,8 +1,16 @@
 // The workshop's "trombinoscope": who is who, filled in as the story reveals it. Each fact unlocks at a
 // story gate (a project step), an owned upgrade, or a `seen` flag, so the page never spoils a chapter.
 // The player is deliberately absent: no face, no name, no gender.
+// Cast cap: 12 named characters (the 11 faces below + Étienne Roussel). Others go by their role.
 
 import type { Gate } from './data';
+
+export type Era = 'today' | '1961' | '1813';
+export const ERAS: { id: Era; title: string }[] = [
+	{ id: 'today', title: 'Le quartier aujourd’hui' },
+	{ id: '1961', title: 'Les Pirates du retour, 1961-1962' },
+	{ id: '1813', title: '1813, au temps de la Pie' },
+];
 
 export interface Fact {
 	text: string;
@@ -16,12 +24,59 @@ export interface Character {
 	name: string;
 	/** Key into FACES (portrait file). */
 	face: string;
+	/** When they matter to the story (Lucile and Yves are still alive, but belong to 1961). */
+	era: Era;
 	facts: Fact[];
 }
 
+/** One person in a family line: a character, or someone known only by their role. Shown once `gate` is reached. */
+export interface Kin { name: string; face: string; gate?: Fact }
+/** Oldest generation first; `gap` marks skipped generations above a row. */
+export interface Family { title: string; rows: { gap?: boolean; kin: Kin[] }[] }
+
+export const FAMILIES: Family[] = [
+	{
+		title: 'La famille de la Pie',
+		rows: [
+			{ kin: [{ name: 'Rose « la Pie »', face: 'Rose', gate: { text: '', after: 'bureau' } }] },
+			{ gap: true, kin: [{ name: 'Jeanne', face: 'Jeanne' }, { name: 'Lucile, sa sœur', face: 'Lucile', gate: { text: '', when: { project: 'radio', step: 3 } } }] },
+			{ gap: true, kin: [{ name: 'Vous', face: 'Vous' }] },
+		],
+	},
+	{
+		title: 'La famille de Lucas',
+		rows: [
+			{ kin: [{ name: 'Le mousse de Rose', face: '⛵', gate: { text: '', when: { project: 'coffre', step: 1 } } }] },
+			{ gap: true, kin: [{ name: 'Yves', face: 'Yves', gate: { text: '', when: { project: 'boussole', step: 1 } } }] },
+			{ gap: true, kin: [{ name: 'Lucas', face: 'Lucas' }] },
+		],
+	},
+	{
+		title: 'La famille Morel',
+		rows: [
+			{ kin: [{ name: 'Henri', face: 'Henri Morel', gate: { text: '', when: { project: 'montre', step: 1 } } }] },
+			{ kin: [{ name: 'M. Morel, son fils', face: 'M. Morel' }] },
+		],
+	},
+	{
+		title: 'La famille de Mme Garnier',
+		rows: [
+			{ kin: [{ name: 'Étienne Roussel, charpentier', face: '🪚', gate: { text: '', when: { project: 'travailleuse', step: 2 } } }] },
+			{ gap: true, kin: [{ name: 'Mme Garnier', face: 'Mme Garnier' }] },
+		],
+	},
+	{
+		title: 'La famille Chen',
+		rows: [
+			{ kin: [{ name: 'L’aïeule, 1812', face: '🎶', gate: { text: '', when: { project: 'musique', step: 1 } } }] },
+			{ gap: true, kin: [{ name: 'Mlle Chen', face: 'Mlle Chen' }] },
+		],
+	},
+];
+
 export const CHARACTERS: Character[] = [
 	{
-		id: 'jeanne', name: 'Jeanne', face: 'Jeanne',
+		id: 'jeanne', name: 'Jeanne', face: 'Jeanne', era: '1961',
 		facts: [
 			{ text: 'Votre grand-mère. Réparatrice, elle a tenu l’atelier du quartier pendant des décennies.' },
 			{ text: 'En mars 1962, elle a fermé son bureau à clé, sans dire pourquoi.', flag: 'rep-5' },
@@ -36,7 +91,7 @@ export const CHARACTERS: Character[] = [
 		],
 	},
 	{
-		id: 'garnier', name: 'Mme Garnier', face: 'Mme Garnier',
+		id: 'garnier', name: 'Mme Garnier', face: 'Mme Garnier', era: 'today',
 		facts: [
 			{ text: 'Voisine et amie de Jeanne. Elle a toujours une petite commande en attente.' },
 			{ text: 'Jeanne lui avait envoyé une carte postale en mars 1962 : « Le bureau, je le ferme. »', flag: 'rep-5' },
@@ -50,7 +105,7 @@ export const CHARACTERS: Character[] = [
 		],
 	},
 	{
-		id: 'morel', name: 'M. Morel', face: 'M. Morel',
+		id: 'morel', name: 'M. Morel', face: 'M. Morel', era: 'today',
 		facts: [
 			{ text: 'Il a apporté la montre de son père, arrêtée le jour où il est parti. Il n’avait jamais osé la faire réparer.', after: 'etabli' },
 			{ text: 'Son père s’appelait Henri.', when: { project: 'montre', step: 1 } },
@@ -60,7 +115,7 @@ export const CHARACTERS: Character[] = [
 		],
 	},
 	{
-		id: 'henri', name: 'Henri Morel', face: 'Henri Morel',
+		id: 'henri', name: 'Henri Morel', face: 'Henri Morel', era: '1961',
 		facts: [
 			{ text: 'Le père de M. Morel. Sa montre porte une gravure signée « J. ».', when: { project: 'montre', step: 1 } },
 			{ text: 'Sur la photo de 1961, à côté de Jeanne.', when: { project: 'montre', step: 3 } },
@@ -70,23 +125,23 @@ export const CHARACTERS: Character[] = [
 		],
 	},
 	{
-		id: 'lucas', name: 'Lucas', face: 'Lucas',
+		id: 'lucas', name: 'Lucas', face: 'Lucas', era: 'today',
 		facts: [
 			{ text: 'Un garçon du quartier, toujours à vélo.', after: 'etabli' },
 			{ text: 'Son grand-père lui avait construit un voilier, dédicacé « Au capitaine du retour ».', when: { project: 'voilier', step: 1 } },
 			{ text: 'À seize ans, il range le grenier de son grand-père Yves.', when: { project: 'boussole', step: 1 } },
-			{ text: 'Sa famille, les Kerbrat, gardait un morceau de la carte depuis 1813.', when: { project: 'longuevue', step: 3 } },
-			{ text: 'Il descend de Samuel Kerbrat, le mousse de Rose.', when: { project: 'coffre', step: 1 } },
+			{ text: 'Sa famille gardait un morceau de la carte depuis 1813.', when: { project: 'longuevue', step: 3 } },
+			{ text: 'Il descend du mousse de Rose, un garçon de quatorze ans.', when: { project: 'coffre', step: 1 } },
 			{ text: 'Il a barré La Mouette jusqu’à l’îlot et rapporté la cloche de L’Espérance.', when: { project: 'mouette', step: 3 } },
 			{ text: 'Le « capitaine du retour », c’était lui : enfant, il ramenait au bassin les bateaux des autres.', when: { project: 'cloche', step: 3 } },
 		],
 	},
 	{
-		id: 'chen', name: 'Mlle Chen', face: 'Mlle Chen',
+		id: 'chen', name: 'Mlle Chen', face: 'Mlle Chen', era: 'today',
 		facts: [
 			{ text: 'Passionnée de maquettes, elle chine dans les brocantes.', when: { project: 'montre', step: 1 } },
-			{ text: 'Sa grand-mère fredonnait un air dont personne ne connaissait l’origine. Son aïeule Mei Chen avait perdu une boîte à musique en 1812.', when: { project: 'musique', step: 1 } },
-			{ text: 'La boîte à musique de Mei Chen est revenue dans sa famille.', when: { project: 'musique', step: 3 } },
+			{ text: 'Sa grand-mère fredonnait un air dont personne ne connaissait l’origine. Une aïeule de sa famille avait perdu une boîte à musique en 1812.', when: { project: 'musique', step: 1 } },
+			{ text: 'La boîte à musique de son aïeule est revenue dans sa famille.', when: { project: 'musique', step: 3 } },
 			{ text: 'Elle gardait une pièce de son tout premier lot de brocante.', when: { project: 'valise', step: 3 } },
 			{ text: 'Son premier lot, c’était cette valise, achetée à Mme Lemoine.', when: { project: 'etal', step: 2 } },
 			{ text: 'Elle prépare une tournée des marchés, avec une valise-étal.', when: { project: 'caissette', step: 1 } },
@@ -95,7 +150,7 @@ export const CHARACTERS: Character[] = [
 		],
 	},
 	{
-		id: 'boulangere', name: 'La boulangère', face: 'La boulangère',
+		id: 'boulangere', name: 'La boulangère', face: 'La boulangère', era: 'today',
 		facts: [
 			{ text: 'Elle tient la boulangerie du quartier.', when: { project: 'voilier', step: 1 } },
 			{ text: 'La pie du fauteuil de sa mère était, disait sa grand-mère, la marque de la maison.', when: { project: 'fauteuil', step: 1 } },
@@ -105,14 +160,7 @@ export const CHARACTERS: Character[] = [
 		],
 	},
 	{
-		id: 'facteur', name: 'Le facteur', face: 'Le facteur',
-		facts: [
-			{ text: 'Il passe tous les jours, souvent avec une lettre qui compte.', when: { project: 'radio', step: 1 } },
-			{ text: 'C’est lui qui a apporté la lettre de Lucile.', when: { project: 'fauteuil', step: 3 } },
-		],
-	},
-	{
-		id: 'lucile', name: 'Lucile', face: 'Lucile',
+		id: 'lucile', name: 'Lucile', face: 'Lucile', era: '1961',
 		facts: [
 			{ text: 'La sœur de Jeanne, l’une des trois « Pirates du retour ».', when: { project: 'radio', step: 3 } },
 			{ text: 'En 1962, elle voulait continuer les recherches à terre. Brouillée avec Jeanne, elle est partie.', when: { project: 'fauteuil', step: 3 } },
@@ -124,19 +172,19 @@ export const CHARACTERS: Character[] = [
 		],
 	},
 	{
-		id: 'rose', name: 'Rose Kerdoual', face: 'Rose Kerdoual',
+		id: 'rose', name: 'Rose « la Pie »', face: 'Rose', era: '1813',
 		facts: [
 			{ text: '« La Pie », ancêtre de Jeanne, pirate. Son carnet de bord date de 1813.', after: 'bureau' },
 			{ text: 'Elle avait caché sa malle sous l’atelier en 1813, et fait de l’îlot un leurre.', flag: 'map-solved' },
 			{ text: 'Elle a volé, puis rendu presque tout : les compartiments vides de sa malle en gardent la trace.', when: { project: 'malle', step: 2 } },
 			{ text: 'Dans sa malle dormait une boîte à musique marquée « Famille Chen, 1812 ».', when: { project: 'malle', step: 3 } },
-			{ text: 'Deux compagnons l’accompagnaient : Élie, et Samuel Kerbrat, un mousse de quatorze ans.', when: { project: 'coffre', step: 2 } },
+			{ text: 'Deux compagnons l’accompagnaient : son second, et un mousse de quatorze ans, l’ancêtre de Lucas.', when: { project: 'coffre', step: 2 } },
 			{ text: 'Son équipage avait pillé L’Espérance en 1811.', when: { project: 'cloche', step: 1 } },
 			{ text: 'En 1813, elle a remis trois cents francs à Étienne Roussel, charpentier ruiné de L’Espérance.', when: { project: 'carnet', step: 2 } },
 		],
 	},
 	{
-		id: 'yves', name: 'Yves Kerbrat', face: 'Yves Kerbrat',
+		id: 'yves', name: 'Yves', face: 'Yves', era: '1961',
 		facts: [
 			{ text: 'Le grand-père de Lucas, « Y. K. », un homme de la mer.', when: { project: 'boussole', step: 1 } },
 			{ text: 'Il était à bord de La Mouette pendant la tempête de 1962.', when: { project: 'fanal', step: 3 } },
@@ -147,7 +195,7 @@ export const CHARACTERS: Character[] = [
 		],
 	},
 	{
-		id: 'lemoine', name: 'Mme Lemoine', face: 'Mme Lemoine',
+		id: 'lemoine', name: 'Mme Lemoine', face: 'Mme Lemoine', era: 'today',
 		facts: [
 			{ text: 'Brocanteuse, quarante ans de marchés. La valise de Mlle Chen était son étal.', when: { project: 'presentoir', step: 1 } },
 			{ text: 'C’est elle qui avait percé les trous de la valise : « Un étal, ça sert, ou ça moisit. »', when: { project: 'caissette', step: 1 } },

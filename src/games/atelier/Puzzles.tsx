@@ -1,7 +1,7 @@
 // Small "Professor Layton" puzzles played inside restoration scenes (docs/atelier-enigmes.md).
 // Touch input goes through usePointerDrag, the only drag path that holds on a real iPhone.
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePointerDrag } from '../usePointerDrag';
 import * as sfx from './sfx';
 
@@ -195,7 +195,7 @@ export function GearsPuzzle({ onSolve }: { onSolve: () => void }) {
 
 // ---------- Chapter 12: where the island looks at the port ----------
 // Top view of the islet, the rest hidden in mist. The spyglass turns on the islet's centre; the lens shows what lies
-// that way. Once the port is in the lens, the cove facing it is the one Samuel meant. Bearings in degrees, 0 = east,
+// that way. Once the port is in the lens, the cove facing it is the one the ship's boy meant. Bearings in degrees, 0 = east,
 // clockwise (SVG y goes down).
 const ISLE = { x: 130, y: 128 };
 const SIGHTS = [
@@ -285,13 +285,13 @@ export function LongueVuePuzzle({ onSolve }: { onSolve: () => void }) {
 				setHint(null);
 				sfx.restore();
 				setTimeout(onSolve, 1600);
-			} else setHint(angleGap(cove, PORT_AT) > 90 ? 'De cette crique, on ne voit que le large. Samuel parlait du port.' : 'Presque : la crique doit regarder le port bien en face.');
+			} else setHint(angleGap(cove, PORT_AT) > 90 ? 'De cette crique, on ne voit que le large. Le mousse parlait du port.' : 'Presque : la crique doit regarder le port bien en face.');
 		},
 	);
 	const tip = { x: ISLE.x + 64 * Math.cos((angle * Math.PI) / 180), y: ISLE.y + 64 * Math.sin((angle * Math.PI) / 180) };
 	return (
 		<div className="atg">
-			<p>Carnet de Samuel : <em>« La cloche reste. Là où l’île regarde le port. »</em> Tourne la longue-vue depuis l’îlot.</p>
+			<p>Carnet du mousse : <em>« La cloche reste. Là où l’île regarde le port. »</em> Tourne la longue-vue depuis l’îlot.</p>
 			<div className="atl-lens-wrap">
 				<LensView sight={sight?.id ?? null} />
 				<span>{sight ? sight.label : 'La mer.'}</span>
@@ -310,7 +310,7 @@ export function LongueVuePuzzle({ onSolve }: { onSolve: () => void }) {
 					<circle cx={ISLE.x} cy={ISLE.y} r="6" />
 				</g>
 			</svg>
-			<p className="at-small">{done ? 'Lucas entoure la crique sur sa carte : c’est là que Samuel a caché la cloche.' : hint ?? (found ? 'Le port ! Maintenant, touche la crique de l’îlot qui le regarde.' : 'Fais glisser le doigt autour de l’îlot pour tourner la longue-vue.')}</p>
+			<p className="at-small">{done ? 'Lucas entoure la crique sur sa carte : c’est là que le mousse a caché la cloche.' : hint ?? (found ? 'Le port ! Maintenant, touche la crique de l’îlot qui le regarde.' : 'Fais glisser le doigt autour de l’îlot pour tourner la longue-vue.')}</p>
 		</div>
 	);
 }
@@ -548,7 +548,134 @@ export function PeseePuzzle({ onSolve }: { onSolve: () => void }) {
 	);
 }
 
+// ---------- Gestures: short, no-fail versions of the craft the scene tells (docs/atelier-enigmes.md) ----------
+export const RUBS = ['frottage', 'vertdegris', 'dosducadre'];
+
+type Grime = 'paper' | 'verdigris' | 'dust';
+const GRIME: Record<Grime, { base: string; specks: string[] }> = {
+	paper: { base: '#efe6cf', specks: ['#e2d6b8', '#f7f0de'] },
+	verdigris: { base: '#5f9c86', specks: ['#4a8a74', '#7fb8a2', '#3c6e5c'] },
+	dust: { base: '#8a7a62', specks: ['#a08e72', '#6e604c', '#b0a080'] },
+};
+const CLEAN = 0.55;
+
+/** Rub a layer of grime off `children` with a finger; past CLEAN of the surface, the rest falls away. */
+function Rub({ grime, ratio, children, onDone }: { grime: Grime; ratio: number; children: ReactNode; onDone: () => void }) {
+	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const last = useRef<{ x: number; y: number } | null>(null);
+	const strokes = useRef(0);
+	const [done, setDone] = useState(false);
+	useEffect(() => {
+		const c = canvasRef.current;
+		const g = c?.getContext('2d');
+		if (!c || !g) return;
+		const r = c.getBoundingClientRect();
+		const dpr = Math.min(2, window.devicePixelRatio || 1);
+		c.width = Math.round(r.width * dpr);
+		c.height = Math.round(r.height * dpr);
+		const { base, specks } = GRIME[grime];
+		g.fillStyle = base;
+		g.fillRect(0, 0, c.width, c.height);
+		// Fixed speckle, so the grime looks the same for everyone and every time.
+		let seed = 7;
+		const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+		for (let k = 0; k < 900; k++) {
+			g.fillStyle = specks[k % specks.length];
+			g.globalAlpha = 0.35 + rnd() * 0.5;
+			g.beginPath();
+			g.arc(rnd() * c.width, rnd() * c.height, (1 + rnd() * 5) * dpr, 0, Math.PI * 2);
+			g.fill();
+		}
+		g.globalAlpha = 1;
+	}, [grime]);
+	const cleared = (): number => {
+		const c = canvasRef.current!, g = c.getContext('2d')!;
+		const data = g.getImageData(0, 0, c.width, c.height).data;
+		let clear = 0, n = 0;
+		for (let i = 3; i < data.length; i += 4 * 23) { n++; if (data[i] < 40) clear++; }
+		return clear / n;
+	};
+	const scrub = (cx: number, cy: number) => {
+		const c = canvasRef.current, g = c?.getContext('2d');
+		if (!c || !g || done) return;
+		const r = c.getBoundingClientRect();
+		const x = ((cx - r.left) / r.width) * c.width, y = ((cy - r.top) / r.height) * c.height;
+		g.globalCompositeOperation = 'destination-out';
+		g.lineCap = 'round';
+		g.lineWidth = c.width * 0.13;
+		g.beginPath();
+		g.moveTo(last.current?.x ?? x, last.current?.y ?? y);
+		g.lineTo(x, y);
+		g.stroke();
+		g.globalCompositeOperation = 'source-over';
+		last.current = { x, y };
+		if (++strokes.current % 8 === 0 && cleared() > CLEAN) {
+			setDone(true);
+			sfx.restore();
+			setTimeout(onDone, 1300);
+		}
+	};
+	const { onPointerDown } = usePointerDrag(
+		(cx, cy) => { last.current = null; scrub(cx, cy); },
+		(cx, cy) => scrub(cx, cy),
+		() => { last.current = null; },
+	);
+	return (
+		<div className="atr" style={{ aspectRatio: String(ratio) }} onPointerDown={onPointerDown}>
+			<div className="atr-under">{children}</div>
+			<canvas ref={canvasRef} className={`atr-grime ${done ? 'gone' : ''}`} />
+		</div>
+	);
+}
+
+const GESTURE_TEXT: Record<string, { ask: string; done: string; grime: Grime; ratio: number }> = {
+	frottage: { ask: 'Le crayon a presque disparu. Pose une feuille sur le socle et frotte avec la mine, comme pour un frottage.', done: '« Au capitaine du retour ».', grime: 'paper', ratio: 1.6 },
+	vertdegris: { ask: 'Le bronze est vert de vert-de-gris. Frotte la cloche pour retrouver ce qui est gravé.', done: 'Un nom de navire, une date, et tout un équipage.', grime: 'verdigris', ratio: 4 / 3 },
+	dosducadre: { ask: 'Au dos du portrait, une écriture sous la crasse. Frotte doucement.', done: 'Un nom, à l’encre.', grime: 'dust', ratio: 1.5 },
+};
+
+/** The rubbing gestures of chapters 3, 13 and 14. */
+export function RubGesture({ id, onSolve }: { id: string; onSolve: () => void }) {
+	const t = GESTURE_TEXT[id];
+	const [done, setDone] = useState(false);
+	return (
+		<div className="atg">
+			<p>{t.ask}</p>
+			<Rub grime={t.grime} ratio={t.ratio} onDone={() => { setDone(true); setTimeout(onSolve, 1400); }}>
+				{id === 'frottage' && (
+					<svg viewBox="0 0 160 100" className="atr-art"><rect width="160" height="100" fill="#4a4640" />
+						<text x="80" y="46" textAnchor="middle" className="atr-pencil">Au capitaine</text>
+						<text x="80" y="70" textAnchor="middle" className="atr-pencil">du retour</text></svg>
+				)}
+				{id === 'vertdegris' && (
+					<svg viewBox="0 0 160 120" className="atr-art"><rect width="160" height="120" fill="#b5803a" />
+						<path d="M0 20 H160 M0 100 H160" stroke="#8a5a22" strokeWidth="3" />
+						<text x="80" y="40" textAnchor="middle" className="atr-engrave big">L’ESPÉRANCE · 1809</text>
+						{/* One legible name only, the one the story needs; the rest of the crew stays worn away. */}
+						{[60, 88].map((y) => <path key={y} d={`M22 ${y} h116`} stroke="#8a5a22" strokeWidth="2.5" strokeDasharray="9 4 14 4 6 4" opacity="0.6" />)}
+						<text x="80" y="77" textAnchor="middle" className="atr-engrave">É. ROUSSEL</text></svg>
+				)}
+				{id === 'dosducadre' && (
+					<svg viewBox="0 0 150 100" className="atr-art"><rect width="150" height="100" fill="#c9a774" />
+						{[18, 38, 58, 78].map((y) => <path key={y} d={`M0 ${y} q75 6 150 0`} stroke="#b08a54" strokeWidth="1.5" fill="none" />)}
+						<text x="75" y="58" textAnchor="middle" className="atr-ink">Étienne Roussel</text></svg>
+				)}
+			</Rub>
+			<p className="at-small">{done ? t.done : 'Frotte du bout du doigt.'}</p>
+		</div>
+	);
+}
+
 export const PUZZLE_CSS = `
+.atr { position: relative; width: min(80vw, 320px); border-radius: 10px; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; box-shadow: 0 4px 12px rgba(0,0,0,0.25); cursor: grab; }
+.atr * { touch-action: none; }
+.atr-under, .atr-under svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.atr-grime { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 1s ease; }
+.atr-grime.gone { opacity: 0; }
+.atr-pencil { font: italic 22px Georgia, serif; fill: #e8e2d4; }
+.atr-engrave { font: 700 8px Georgia, serif; fill: #5a3410; letter-spacing: 0.3px; }
+.atr-engrave.big { font-size: 11px; letter-spacing: 0.8px; }
+.atr-ink { font: italic 20px Georgia, serif; fill: #2a2a4a; }
 .atg { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
 .atg p { margin: 0; }
 .atg-board { width: min(80vw, 320px); max-height: 46vh; touch-action: none; -webkit-user-select: none; user-select: none; }

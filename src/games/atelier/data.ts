@@ -192,6 +192,35 @@ export interface Project {
 	arrival: Line[];
 }
 
+/** "Précédemment…": one line before each chapter's arrival, for players who lost the thread. Only the 12 named
+ *  characters appear; everyone else goes by their role. Never says what the new chapter reveals. */
+export const RECAPS: Partial<Record<ProjectId, string>> = {
+	radio: 'La montre d’Henri, le père de M. Morel, était signée « J. » : sur la photo de 1961, il pose avec Jeanne, votre grand-mère. En mars 1962, elle a fermé son bureau à clé.',
+	voilier: 'Une archive radio de 1961 a révélé les « Pirates du retour » : Jeanne, sa sœur Lucile et Henri. Mme Garnier garde une boîte destinée à Lucile, qu’elle n’a jamais envoyée.',
+	boite: 'Le voilier de Lucas, dédicacé « Au capitaine du retour », a navigué au bassin. Mme Garnier vous a enfin remis la boîte de Lucile, la sœur de Jeanne : son tiroir est bloqué.',
+	fauteuil: 'La clé cachée dans la boîte de Lucile a ouvert le bureau de Jeanne : le carnet de Rose « la Pie », pirate de 1813, une carte en trois morceaux, et une consigne : « Chercher la pie ».',
+	malle: 'Le fauteuil de la boulangère cachait le quatrième morceau de carte. Dans sa lettre, Lucile, la sœur de Jeanne, rappelait le mot de la Pie : « Rien n’est jamais là où on le croit. »',
+	musique: 'Sous l’atelier dormait la malle de Rose « la Pie » : elle avait volé, puis rendu presque tout. Au fond restait une boîte à musique étiquetée « Famille Chen, 1812 ».',
+	boussole: 'La boîte à musique est rentrée chez les Chen, et Lucile, la sœur de Jeanne, est revenue à l’atelier. Enfant, Lucas avait reçu de son grand-père un voilier dédicacé « Au capitaine du retour ».',
+	fanal: 'La boussole d’Yves, le grand-père de Lucas, portait « La Mouette, 1962 », un nom que personne ne connaissait, et son aiguille restait bloquée sur le cap de l’îlot de la carte.',
+	longuevue: 'Le fanal d’Henri, le père de M. Morel, et la boussole d’Yves, le grand-père de Lucas, portaient le même nom : La Mouette. Les deux hommes étaient à bord pendant la tempête de mars 1962.',
+	coffre: 'Lucile, la sœur de Jeanne, a avoué avoir poussé Yves, le grand-père de Lucas, à prendre la mer en 1962. Et le troisième morceau de carte venait de la famille de Lucas, depuis 1813.',
+	mouette: 'Dans le coffre du mousse de Rose, l’ancêtre de Lucas, un carnet : la cloche de L’Espérance attend sur l’îlot depuis 1813. Pour aller la chercher, il faut La Mouette.',
+	cloche: 'Avec M. Morel et le club de voile, Lucas a remis La Mouette à flot. Cap sur l’îlot, vers la crique où le mousse de Rose a caché la cloche de L’Espérance.',
+	cadre: 'Lucas a rapporté la cloche de L’Espérance, et Yves, son grand-père, lui a dit qu’il était le vrai « capitaine du retour ». À la cérémonie, Mme Garnier s’est figée devant l’un des noms gravés.',
+	travailleuse: 'Au dos du portrait que gardait Mme Garnier : « Étienne Roussel », le même nom que sur la cloche de L’Espérance.',
+	tabouret: 'Mme Garnier descend d’Étienne Roussel, charpentier de L’Espérance, le navire pillé par l’équipage de Rose. Dans sa famille, on répétait : « Ce qui est pris ne revient pas. »',
+	bobines: 'Mme Garnier a gardé soixante ans la boîte destinée à Lucile, la sœur de Jeanne. Au tabouret des ourlets, elle l’a avoué : elle aimerait recoudre avec quelqu’un, plus toute seule.',
+	carnet: 'En 1962, Mme Garnier n’a jamais pris son train pour Lucile, la sœur de Jeanne, de peur que Jeanne la croie dans son camp. Elle voudrait l’appeler, sans savoir par où commencer.',
+	valise: 'Dans la reliure du carnet de Rose, un reçu de 1813 : la Pie avait remis trois cents francs à Étienne Roussel, l’ancêtre de Mme Garnier. Mme Garnier a décidé d’appeler Lucile.',
+	etal: 'Mme Garnier a enfin rejoint Lucile, la sœur de Jeanne, avec sa valise réparée. Mlle Chen, elle, garde une pièce de son tout premier lot de brocante, et promet de vous la raconter.',
+	presentoir: 'La valise de Mlle Chen, son premier lot de brocante, sans doublure et percée de trous, tient enfin debout. Elle a appelé Mme Lemoine, la brocanteuse qui la lui a vendue.',
+	balance: 'Pour Mme Lemoine, la valise de Mlle Chen était son étal de marché. Et Mlle Chen gardait avec elle quatre objets étiquetés « Réparation J. », de la main de Jeanne.',
+	caissette: 'Mlle Chen gardait quatre réparations de Jeanne, étiquetées « Réparation J. ». Et depuis quelque temps, elle pose beaucoup de questions sur les marchés de village…',
+	casier: 'Mlle Chen part en tournée des marchés avec la valise-étal. Elle y rendra les réparations de Jeanne, venues du stock racheté par Mme Lemoine : trois ont un nom, la quatrième non.',
+	toupie: 'L’étal de Mlle Chen est prêt, l’itinéraire passe par les trois familles des étiquettes. Reste la quatrième réparation de Jeanne, sans nom de client : Mlle Chen veut vous la montrer.',
+};
+
 export const PROJECTS: Project[] = [
 	{
 		id: 'montre',
@@ -463,7 +492,10 @@ export interface Order {
 }
 
 /** Small "Professor Layton" puzzles inside restoration scenes (docs/atelier-enigmes.md). */
-export type PuzzleId = 'gears' | 'longuevue' | 'taquin' | 'pesee';
+export type PuzzleId = 'gears' | 'longuevue' | 'taquin' | 'pesee'
+	// Gestures (Gestures.tsx): short and no-fail.
+	| 'frottage' | 'vertdegris' | 'dosducadre' | 'radio' | 'nettete' | 'notice' | 'rabat' | 'etal' | 'musique' | 'boussole'
+	| 'fanal' | 'loquet' | 'marque' | 'cale' | 'caissette' | 'valise' | 'presentoir' | 'casier' | 'coffre' | 'toupie';
 
 // Listed in play order. Story orders are taken one at a time, in sequence per project.
 export const ORDERS: Order[] = [
@@ -642,7 +674,7 @@ export const ORDERS: Order[] = [
 		project: 'radio',
 		step: 3,
 		scene: {
-			title: 'La voix du quai',
+			title: 'La voix du quai', puzzle: 'radio',
 			lines: [
 				{ who: 'note', text: 'Dimanche, « Mémoires du port ». L’animatrice annonce une archive de l’été 1961.' },
 				{ who: 'note', text: '« … et voici nos Pirates du retour : Jeanne, Lucile et Henri ! Mademoiselle Lucile, qu’est-ce que vous rendez, au juste ? »', show: 'broadcast' },
@@ -666,6 +698,7 @@ export const ORDERS: Order[] = [
 		step: 1,
 		scene: {
 			title: 'La coque',
+			puzzle: 'frottage',
 			lines: [
 				{ who: 'note', text: 'Sous le socle, une dédicace au crayon, presque effacée : « Au capitaine du retour ».', show: 'dedication' },
 				{ who: 'lucas', text: 'Le capitaine du retour… Grand-père racontait les « Pirates du retour » comme une vieille histoire du port. Je croyais qu’il l’inventait.' },
@@ -775,7 +808,7 @@ export const ORDERS: Order[] = [
 		project: 'boite',
 		step: 2,
 		scene: {
-			title: 'Le tiroir',
+			title: 'Le tiroir', puzzle: 'loquet',
 			lines: [
 				{ who: 'note', text: 'Le tiroir cède enfin. Dedans : une lettre cachetée, « Pour Lucile », et une petite clé étiquetée « bureau ».', show: 'key' },
 				{ who: 'moi', text: 'La clé du bureau. Jeanne l’avait cachée là… pour que sa sœur puisse l’ouvrir.' },
@@ -825,7 +858,7 @@ export const ORDERS: Order[] = [
 		project: 'fauteuil',
 		step: 1,
 		scene: {
-			title: 'La structure',
+			title: 'La structure', puzzle: 'marque',
 			lines: [
 				{ who: 'note', text: 'Sous le vieux tissu, gravée dans le bois du cadre : une pie, ailes ouvertes. La même que sur la boîte de Lucile.' },
 				{ who: 'moi', text: '« Chercher la pie »… La fiche du bureau parlait de votre famille.' },
@@ -907,7 +940,7 @@ export const ORDERS: Order[] = [
 			title: 'Le salpêtre',
 			lines: [
 				{ who: 'note', text: 'Le salpêtre part, le cuir réapparaît. Marqués au fer : une pie, et deux lettres, R. K.' },
-				{ who: 'moi', text: 'Rose Kerdoual. La Pie. Deux cents ans sous le plancher.' },
+				{ who: 'moi', text: 'Rose, la Pie. Deux cents ans sous le plancher.' },
 			],
 		},
 	},
@@ -981,8 +1014,8 @@ export const ORDERS: Order[] = [
 		scene: {
 			title: 'La laque',
 			lines: [
-				{ who: 'note', text: 'Sous la poussière, le couvercle laqué montre un port, des jonques et des voiliers mêlés. Et un nom gravé : Mei Chen.' },
-				{ who: 'chen', text: 'Mei… C’était l’arrière-grand-mère de ma grand-mère. On disait qu’elle avait tout perdu en mer, en 1812.' },
+				{ who: 'note', text: 'Sous la poussière, le couvercle laqué montre un port, des jonques et des voiliers mêlés. Et un nom gravé : Chen.' },
+				{ who: 'chen', text: 'Chen… c’est notre nom. On disait que l’arrière-grand-mère de ma grand-mère avait tout perdu en mer, en 1812.' },
 			],
 		},
 	},
@@ -1031,7 +1064,7 @@ export const ORDERS: Order[] = [
 		project: 'musique',
 		step: 3,
 		scene: {
-			title: 'Ce que l’on rend',
+			title: 'Ce que l’on rend', puzzle: 'musique',
 			lines: [
 				{ who: 'note', text: 'Chez les Chen, la grand-mère soulève le couvercle. Elle fredonne avant même la première note.' },
 				{ who: 'chen', text: 'Deux cents ans, et elle revient. Merci. Et merci à cette Rose, malgré tout ce qu’elle a pris.' },
@@ -1067,7 +1100,7 @@ export const ORDERS: Order[] = [
 		id: 'boussole-2', kind: 'story', client: 'Lucas', ask: 'Débloquer l’aiguille.',
 		needs: ['meca:4', 'outil:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'boussole', step: 2,
 		scene: {
-			title: 'Le nord',
+			title: 'Le nord', puzzle: 'boussole',
 			lines: [
 				{ who: 'note', text: 'L’aiguille frémit, puis se cale sur le nord. Elle était bloquée sur le cap de l’îlot.' },
 				{ who: 'lucas', text: 'Le cap de l’îlot… Comme sur la carte du bureau de Jeanne.' },
@@ -1107,7 +1140,7 @@ export const ORDERS: Order[] = [
 		id: 'fanal-2', kind: 'story', client: 'M. Morel', ask: 'Rallumer la mèche.',
 		needs: ['elec:4', 'meca:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'fanal', step: 2,
 		scene: {
-			title: 'La flamme',
+			title: 'La flamme', puzzle: 'fanal',
 			lines: [
 				{ who: 'note', text: 'La flamme reprend. Au fond du réservoir, un papier plié : un bulletin de météo marine, mars 1962. « Avis de coup de vent. »' },
 				{ who: 'moi', text: 'Mars 1962. La tempête. Henri était donc à bord de La Mouette.' },
@@ -1133,7 +1166,7 @@ export const ORDERS: Order[] = [
 		needs: ['soin:4', 'outil:2'], reward: { coins: 15, rep: 3, energy: 10 },
 		when: { project: 'fanal', step: 3 }, project: 'longuevue', step: 1,
 		scene: {
-			title: 'Notre capitaine',
+			title: 'Notre capitaine', puzzle: 'nettete',
 			lines: [
 				{ who: 'lucile', text: 'Yves avait dix-sept ans quand il nous a donné son morceau de carte, au printemps 1961. On l’appelait « notre capitaine ».' },
 				{ who: 'lucile', text: 'Un morceau de carte que sa famille gardait depuis toujours, sans savoir pourquoi.' },
@@ -1159,9 +1192,9 @@ export const ORDERS: Order[] = [
 		id: 'longuevue-3', kind: 'story', client: 'Lucile', ask: 'Regainer de cuir.',
 		needs: ['tissu:3', 'soin:3'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'longuevue', step: 3,
 		scene: {
-			title: 'Les Kerbrat',
+			title: 'La famille de Lucas',
 			lines: [
-				{ who: 'lucile', text: 'Lucas, le troisième morceau de la carte… c’était celui de ta famille. Les Kerbrat le gardaient depuis 1813.' },
+				{ who: 'lucile', text: 'Lucas, le troisième morceau de la carte… c’était celui de ta famille. Elle le gardait depuis 1813.' },
 				{ who: 'lucas', text: 'Depuis 1813 ? Alors mon ancêtre… il était sur le bateau de Rose ?' },
 				{ who: 'note', text: 'Fin du chapitre 10.' },
 			],
@@ -1174,9 +1207,9 @@ export const ORDERS: Order[] = [
 		needs: ['outil:4', 'bois:2'], reward: { coins: 15, rep: 3, energy: 10 },
 		when: { project: 'longuevue', step: 3 }, project: 'coffre', step: 1,
 		scene: {
-			title: 'S. K., 1813',
+			title: 'S. K., 1813', puzzle: 'coffre',
 			lines: [
-				{ who: 'note', text: 'La serrure cède. Sur le couvercle, gravé au couteau : « S. K. · 1813 ». Samuel Kerbrat, le mousse de Rose. Quatorze ans.' },
+				{ who: 'note', text: 'La serrure cède. Sur le couvercle, gravé au couteau : « S. K. · 1813 ». Le coffre du mousse de Rose, l’ancêtre de Lucas. Quatorze ans.' },
 				{ who: 'lucas', text: 'Un mousse de quatorze ans. Presque mon âge.' },
 			],
 		},
@@ -1191,7 +1224,7 @@ export const ORDERS: Order[] = [
 		scene: {
 			title: 'Le carnet',
 			lines: [
-				{ who: 'note', text: 'Au fond, un carnet de bord. Samuel y raconte 1813 : Élie et lui partent rendre des objets volés, chacun de son côté. Pas une fuite : une promesse.', show: 'carnet' },
+				{ who: 'note', text: 'Au fond, un carnet de bord. Le mousse y raconte 1813 : le second de Rose et lui partent rendre des objets volés, chacun de son côté. Pas une fuite : une promesse.', show: 'carnet' },
 				{ who: 'note', text: '« Reste la cloche de L’Espérance, trop lourde pour la route. Je l’ai mise là où l’île regarde le port. Je la rendrai un jour. »' },
 			],
 		},
@@ -1202,7 +1235,7 @@ export const ORDERS: Order[] = [
 		scene: {
 			title: 'L’îlot',
 			lines: [
-				{ who: 'lucas', text: 'L’îlot n’était pas qu’un leurre. Samuel y a caché la cloche. Et personne n’est jamais allé la chercher.' },
+				{ who: 'lucas', text: 'L’îlot n’était pas qu’un leurre. Le mousse y a caché la cloche. Et personne n’est jamais allé la chercher.' },
 				{ who: 'lucas', text: 'Il nous faut un bateau. Il nous faut La Mouette.' },
 				{ who: 'note', text: 'Fin du chapitre 11. Dans l’atelier, on peut maintenant ouvrir le hangar à bateaux.' },
 			],
@@ -1259,6 +1292,7 @@ export const ORDERS: Order[] = [
 		when: { project: 'mouette', step: 3 }, project: 'cloche', step: 1,
 		scene: {
 			title: 'Un nom',
+			puzzle: 'vertdegris',
 			lines: [
 				{ who: 'note', text: 'Sous le vert-de-gris : « L’ESPÉRANCE · 1809 ». Puis, tout autour, les noms de son équipage. Des marins de ce port, pillés en 1811.' },
 			],
@@ -1300,7 +1334,7 @@ export const ORDERS: Order[] = [
 		id: 'cadre-1', kind: 'story', client: 'Mme Garnier', ask: 'Nettoyer le portrait.',
 		needs: ['soin:3', 'outil:2'], reward: { coins: 15, rep: 3, energy: 10 },
 		when: { project: 'cloche', step: 3 }, project: 'cadre', step: 1,
-		scene: { title: 'Le nom', lines: [
+		scene: { title: 'Le nom', puzzle: 'dosducadre', lines: [
 			{ who: 'note', text: 'Sous la crasse, un homme aux mains larges. Au dos, à l’encre : « Étienne Roussel ».' },
 			{ who: 'garnier', text: 'Le même nom que sur la cloche. Je l’ai lu pendant la cérémonie, et je n’ai rien pu dire.' },
 		] },
@@ -1330,7 +1364,7 @@ export const ORDERS: Order[] = [
 		id: 'travailleuse-1', kind: 'story', client: 'Mme Garnier', ask: 'Nettoyer le bois.',
 		needs: ['soin:4', 'bois:2'], reward: { coins: 15, rep: 3, energy: 10 },
 		when: { project: 'cadre', step: 3 }, project: 'travailleuse', step: 1,
-		scene: { title: 'La notice', lines: [
+		scene: { title: 'La notice', puzzle: 'notice', lines: [
 			{ who: 'note', text: 'La notice de famille, d’une écriture ancienne : « Étienne Roussel, charpentier, ruiné par les pirates en 1811. Ce qui est pris ne revient pas. »' },
 			{ who: 'garnier', text: 'Charpentier, 1811, des pirates… La cloche de L’Espérance. Ce n’est pas un homonyme.' },
 		] },
@@ -1372,7 +1406,7 @@ export const ORDERS: Order[] = [
 	{
 		id: 'tabouret-2', kind: 'story', client: 'La boulangère', ask: 'Consolider le pied et regarnir.',
 		needs: ['bois:4', 'tissu:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'tabouret', step: 2,
-		scene: { title: 'Droite', lines: [
+		scene: { title: 'Droite', puzzle: 'cale', lines: [
 			{ who: 'garnier', text: 'Tiens-toi droite… Oh, pardon, l’habitude. J’aimerais bien recoudre avec quelqu’un, vous savez. Plus toute seule.' },
 		] },
 	},
@@ -1432,7 +1466,7 @@ export const ORDERS: Order[] = [
 	{
 		id: 'carnet-2', kind: 'story', client: 'Vous', ask: 'Recoudre la reliure.',
 		needs: ['tissu:4', 'outil:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'carnet', step: 2,
-		scene: { title: 'Le rabat', lines: [
+		scene: { title: 'Le rabat', puzzle: 'rabat', lines: [
 			{ who: 'note', text: 'En recousant le dos, un papier plié glisse du rabat : « 1813. Reçu de la Pie la somme de trois cents francs. Étienne Roussel, charpentier. »', show: 'receipt' },
 			{ who: 'moi', text: 'Rose avait tenté de réparer. En partie seulement : trois cents francs ne rendent pas un navire. Mais quelque chose était revenu.' },
 		] },
@@ -1470,7 +1504,7 @@ export const ORDERS: Order[] = [
 	{
 		id: 'valise-3', kind: 'story', client: 'Mme Garnier', ask: 'Remonter les fermoirs.',
 		needs: ['meca:4', 'soin:4'], reward: { coins: 30, rep: 6, energy: 10, cocoins: 20 }, project: 'valise', step: 3,
-		scene: { title: 'Le prochain départ', lines: [
+		scene: { title: 'Le prochain départ', puzzle: 'valise', lines: [
 			{ who: 'note', text: 'Cette fois, elle fait elle-même le voyage qu’elle avait toujours reporté. La valise claque, le taxi attend.' },
 			{ who: 'note', text: 'Deux semaines plus tard, une photo arrive à l’atelier : Mme Garnier et Lucile, penchées sur un ouvrage à moitié fini.' },
 			{ who: 'garnier', text: 'On a surtout parlé. Je dois y retourner pour finir.' },
@@ -1497,7 +1531,7 @@ export const ORDERS: Order[] = [
 	{
 		id: 'etal-2', kind: 'story', client: 'Mlle Chen', ask: 'Remonter les charnières.',
 		needs: ['meca:4', 'outil:3'], reward: { coins: 16, rep: 3, energy: 10 }, project: 'etal', step: 2,
-		scene: { title: 'Elle tient', lines: [
+		scene: { title: 'Elle tient', puzzle: 'etal', lines: [
 			{ who: 'chen', text: 'Elle s’ouvre et elle tient debout. J’appelle Mme Lemoine, la brocanteuse qui me l’a vendue. Elle saura.' },
 		] },
 	},
@@ -1515,7 +1549,7 @@ export const ORDERS: Order[] = [
 		id: 'presentoir-1', kind: 'story', client: 'Mme Lemoine', ask: 'Nettoyer les lattes.',
 		needs: ['soin:3', 'bois:3'], reward: { coins: 15, rep: 3, energy: 10 },
 		when: { project: 'etal', step: 3 }, project: 'presentoir', step: 1,
-		scene: { title: 'Un étal', lines: [
+		scene: { title: 'Un étal', puzzle: 'presentoir', lines: [
 			{ who: 'lemoine', text: 'Ce n’est pas une valise, ma petite : c’est mon étal. Le présentoir se range dedans, les tasseaux le tiennent. Quarante ans de marchés.' },
 			{ who: 'note', text: 'Elle montre une photo : un marché de village, et la valise ouverte en éventail, couverte d’objets.' },
 		] },
@@ -1575,7 +1609,7 @@ export const ORDERS: Order[] = [
 		id: 'caissette-1', kind: 'story', client: 'Mlle Chen', ask: 'Débosseler la caissette.',
 		needs: ['outil:4', 'meca:3'], reward: { coins: 15, rep: 3, energy: 10 },
 		when: { project: 'balance', step: 3 }, project: 'caissette', step: 1,
-		scene: { title: 'Le projet', lines: [
+		scene: { title: 'Le projet', puzzle: 'caissette', lines: [
 			{ who: 'chen', text: 'Mon projet : une tournée des marchés, avec la valise-étal. Je n’osais pas la transformer : elle était à Mme Lemoine avant moi.' },
 			{ who: 'lemoine', text: 'Les trous, c’est moi qui les ai percés. Tu peux en percer d’autres. Un étal, ça sert, ou ça moisit.' },
 		] },
@@ -1624,7 +1658,7 @@ export const ORDERS: Order[] = [
 	{
 		id: 'casier-3', kind: 'story', client: 'Mlle Chen', ask: 'Étiqueter les tiroirs.',
 		needs: ['tissu:3', 'soin:4'], reward: { coins: 20, rep: 5, energy: 10, cocoins: 10 }, project: 'casier', step: 3,
-		scene: { title: 'Prête', lines: [
+		scene: { title: 'Prête', puzzle: 'casier', lines: [
 			{ who: 'chen', text: 'L’étal est prêt. Il ne reste que la quatrième réparation, celle sans nom. Venez voir.' },
 			{ who: 'note', text: 'Fin du chapitre 24.' },
 		] },
@@ -1653,7 +1687,7 @@ export const ORDERS: Order[] = [
 	{
 		id: 'toupie-3', kind: 'story', client: 'Vous', ask: 'Repeindre, sans toucher à la bande bleue.',
 		needs: ['soin:4', 'tissu:2'], reward: { coins: 30, rep: 6, energy: 10, cocoins: 20 }, project: 'toupie', step: 3,
-		scene: { title: 'À bientôt', lines: [
+		scene: { title: 'À bientôt', puzzle: 'toupie', lines: [
 			{ who: 'note', text: 'La toupie tourne sur l’établi, longtemps. La bande bleue maladroite passe et repasse.' },
 			{ who: 'chen', text: 'Je repasse jeudi. J’aurai sûrement quelque chose pour vous.' },
 			{ who: 'moi', text: 'J’avais rouvert l’atelier pour retrouver quelque chose d’elle. Maintenant, j’ai aussi envie de voir ce qui entre.' },
@@ -1682,7 +1716,7 @@ export const SPEAKERS: Record<Line['who'], string> = {
 	lucas: 'Lucas',
 	chen: 'Mlle Chen',
 	boulangere: 'La boulangère',
-	yves: 'Yves Kerbrat',
+	yves: 'Yves',
 	lemoine: 'Mme Lemoine',
 	lucile: 'Lucile',
 	moi: 'Vous',
@@ -1748,7 +1782,7 @@ export const UPGRADES: Upgrade[] = [
 			title: 'Le bureau de Jeanne',
 			lines: [
 				{ who: 'note', text: 'La clé tourne. Le bureau sent le papier et la cire. Tout est rangé, comme en attente.', show: 'office' },
-				{ who: 'note', text: 'Au mur, une carte marine : un îlot entouré de rouge, et trois morceaux de carte épinglés. Sur le bureau, un carnet de bord : celui de Rose Kerdoual, dite « la Pie », 1813.', show: 'map' },
+				{ who: 'note', text: 'Au mur, une carte marine : un îlot entouré de rouge, et trois morceaux de carte épinglés. Sur le bureau, un carnet de bord : celui de Rose, dite « la Pie », 1813.', show: 'map' },
 				{ who: 'moi', text: 'Jeanne ne réparait pas seulement des objets. Elle cherchait quelque chose… avec Lucile et Henri.' },
 				{ who: 'note', text: 'Sur une fiche, une pie dessinée à l’encre : « 4ᵉ morceau. Famille dépositaire. Chercher la pie. »' },
 				{ who: 'moi', text: 'Des pirates dans la famille… et une carte au trésor. Il faut que j’écrive à Lucile.' },
@@ -1801,10 +1835,10 @@ export const FACES: Record<string, string> = {
 	'La boulangère': 'boulangere',
 	'Le facteur': 'facteur',
 	Lucile: 'lucile',
-	'Yves Kerbrat': 'yves',
+	Yves: 'yves',
 	'Mme Lemoine': 'lemoine',
 	Jeanne: 'jeanne',
 	'Henri Morel': 'henri',
-	'Rose Kerdoual': 'rose',
+	Rose: 'rose',
 };
 export const FACE_EMOJI: Record<string, string> = { Vous: '🗝️' };

@@ -1,5 +1,12 @@
 # L'Atelier des Souvenirs — scénario de campagne
 
+> **Distribution (règle de l'utilisateur, 02/10) : 12 personnages nommés au maximum, sans fusion.**
+> Jeanne, Lucile, Henri, M. Morel, Mme Garnier, Lucas, Mlle Chen, la boulangère, Yves, Rose « la Pie »,
+> Mme Lemoine, Étienne Roussel. Tous les autres par leur rôle : le mousse de Rose (ex-Samuel Kerbrat), le second
+> de Rose (ex-Élie Varenne), l'aïeule de Mlle Chen (ex-Mei Chen), le facteur. Pas de nom de famille quand le rôle
+> suffit (Kerbrat, Kerdoual). Les noms des docs de saison ci-dessous sont antérieurs à cette règle : le jeu fait foi.
+> Aides en jeu : trombinoscope par époque et par famille, ligne « Précédemment… » à chaque chapitre (`RECAPS`).
+
 **Statut :** version commune validée par Claude et Codex le 29/09 (tickets `.collab/tickets/0004` et
 `0005` ; les trois changements demandés au ticket 0005 sont intégrés). Validé par l'utilisateur le 29/09
 (« captivant »). **Jouable : les 7 chapitres** (`src/games/atelier/`), énigme de la carte comprise. Écarts

@@ -40,6 +40,13 @@ try {
 	await sleep(500);
 	await page.locator('.at-trombi').screenshot({ path: `${OUT}/grid.png` });
 	console.log('faces', await page.locator('.at-trombi-face').count());
+	await page.locator('.at-trombi-tabs button', { hasText: 'Familles' }).click();
+	await page.locator('.at-trombi').scrollIntoViewIfNeeded();
+	await sleep(300);
+	await page.locator('.at-trombi').screenshot({ path: `${OUT}/families.png` });
+	console.log('families', await page.locator('.at-tree-family').count());
+	await page.locator('.at-trombi-tabs button', { hasText: 'Par époque' }).click();
+	await sleep(200);
 	await page.locator('.at-trombi-face', { hasText: 'Jeanne' }).click();
 	await sleep(400);
 	await page.screenshot({ path: `${OUT}/card.png` });
