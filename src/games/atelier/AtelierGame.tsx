@@ -907,7 +907,16 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 
 			<Trombi s={s} />
 
-			{has('bureau') && (
+			{has('bureau') && s.seen.includes('map-solved') ? (
+				// Solved: a souvenir now, folded to one line, the map shown whole.
+				<details className="at-office done">
+					<summary><div className="at-office-img small" /><span><strong>Le bureau de Jeanne</strong>La carte de Rose, assemblée.</span></summary>
+					<div className="at-office-txt">
+						<div className="at-map small"><MapPieces count={4} joined /></div>
+						<span>Le carnet de Rose « la Pie », 1813. Retournée, la carte désignait l’atelier lui-même.</span>
+					</div>
+				</details>
+			) : has('bureau') && (
 				<section className="at-office" aria-label="Le bureau de Jeanne">
 					<div className="at-office-img small" />
 					<div className="at-office-txt">
@@ -919,7 +928,6 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 						</span>
 						<div className="at-map small"><MapPieces count={stepOf(s, 'fauteuil') >= 2 ? 4 : 3} /></div>
 						{mapReady(s) && <button className="at-btn small at-pulse" onClick={onPuzzle}>Assembler la carte</button>}
-						{s.seen.includes('map-solved') && <span>Retournée, la carte désignait l’atelier lui-même.</span>}
 					</div>
 				</section>
 			)}
@@ -1288,6 +1296,15 @@ const CSS = `
 .at-trombi-card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.4; }
 .at-trombi-head { display: flex; align-items: center; gap: 14px; }
 .at-office { display: flex; gap: 12px; align-items: flex-start; background: linear-gradient(180deg, rgba(156, 42, 26, 0.12), var(--gray-900)); border: 1.5px solid #9c6a3a; border-radius: 14px; padding: 10px 12px; }
+.at-office.done { display: block; padding: 8px 12px; }
+.at-office.done summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; font-size: 12.5px; color: var(--gray-300); }
+.at-office.done summary::-webkit-details-marker { display: none; }
+.at-office.done summary::after { content: '▾'; margin-left: auto; color: var(--gray-300); transition: transform 0.2s; }
+.at-office.done[open] summary::after { transform: rotate(180deg); }
+.at-office.done summary span { display: flex; flex-direction: column; }
+.at-office.done summary strong { color: var(--gray-0); font-size: 15px; }
+.at-office.done .at-office-img.small { width: 40px; }
+.at-office.done .at-office-txt { margin-top: 10px; align-items: center; text-align: center; }
 .at-office-txt { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--gray-300); }
 .at-office-txt strong { color: var(--gray-0); font-size: 15px; }
 .at-door-open { position: absolute; left: 60%; top: 30%; width: 16%; height: 40%; background: linear-gradient(90deg, rgba(255, 220, 150, 0.45), transparent); mix-blend-mode: screen; pointer-events: none; }
