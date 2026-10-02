@@ -95,11 +95,14 @@ try {
 	const toWorkshop = async () => {
 		await closeTalks();
 		if (!(await page.locator('.at-shop').count())) await page.locator('.at-tab', { hasText: 'Atelier' }).click();
+		// The chapter panel under the picture would name late chapters: keep it out of the frame.
+		await page.addStyleTag({ content: '.at-project, .at-trombi { visibility: hidden; }' });
 		// Same spot as the reveal's own scrollIntoView, so buying an upgrade does not jump the frame.
 		await page.evaluate(() => document.querySelector('.at-scene').scrollIntoView({ block: 'center' }));
 		await sleep(400);
 	};
-	const buy = (name) => page.locator('.at-up', { hasText: name }).locator('button').click();
+	// A DOM click: Playwright's own click scrolls the button into view and the picture leaves the frame.
+	const buy = (name) => page.locator('.at-up', { hasText: name }).locator('button').evaluate((b) => b.click());
 	const allUpTo = (lastProject, lastStep) => `
 		for (const p of data.PROJECTS) {
 			if (p.id === '${lastProject}') { st.progress[p.id] = ${lastStep}; break; }
@@ -157,7 +160,8 @@ try {
 	await load(`(st, engine, data) => { ${allUpTo('montre', 1)} st.upgrades = ['etabli']; st.coins = 25; st.rep = 4; }`);
 	await toWorkshop();
 	await shot('lampe', async () => { await buy('Rallumer la lampe'); await sleep(2800); });
-	await load(`(st, engine, data) => { ${allUpTo('montre', 3)} st.upgrades = ['etabli', 'lampe']; st.coins = 20; st.rep = 12; st.seen = st.seen.filter((x) => x !== 'chapter' && x !== 'epilogue'); }`);
+	// The photo goes up in a late save, so the room is shown fully restored (the restored picture fades in with progress).
+	await load(`(st, engine, data) => { ${allUpTo('none', 0)} st.upgrades = data.UPGRADES.map((u) => u.id).filter((id) => id !== 'photo'); st.coins = 20; st.rep = 60; }`);
 	await toWorkshop();
 	await shot('photo-up', async () => { await buy('Accrocher la photo'); await sleep(2800); });
 

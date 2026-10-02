@@ -52,12 +52,12 @@ try {
 		await page.locator('#promo .cap').screenshot({ path: join(DIR, 'cards', `cap${i}.png`), omitBackground: true });
 	}
 
-	const bg = await b64('public/assets/jeux/atelier/atelier.jpg', 'image/jpeg');
+	const bg = await b64('public/assets/jeux/atelier/atelier-restaure.jpg', 'image/jpeg');
 	const photo = await b64('public/assets/jeux/atelier/photo.jpg', 'image/jpeg');
 	const logo = await b64('src/assets/LudivenStudioLogo.png', 'image/png');
 	await show(`${base}<style>
 		.end { position: absolute; inset: 0; width: ${W}px; height: ${H}px; overflow: hidden; background: #1b1009; }
-		.end .bg { position: absolute; inset: -40px; background: url(${bg}) center / cover; filter: saturate(1.15) brightness(0.8); }
+		.end .bg { position: absolute; inset: -40px; background: url(${bg}) center / cover; filter: saturate(1.05) brightness(0.85); }
 		.end .warm { position: absolute; inset: 0; background: radial-gradient(circle at 55% 62%, rgba(255, 196, 110, 0.45), transparent 55%),
 			linear-gradient(180deg, rgba(20, 10, 4, 0.75) 0%, rgba(20, 10, 4, 0.15) 38%, rgba(20, 10, 4, 0.2) 60%, rgba(20, 10, 4, 0.92) 100%); }
 		.end .photo { position: absolute; left: 50%; top: 600px; width: 430px; transform: translateX(-50%) rotate(-4deg); background: #f6ecd4;
