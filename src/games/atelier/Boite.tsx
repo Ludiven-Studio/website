@@ -86,31 +86,45 @@ export default function Boite({ state, size = 220 }: Props) {
 
 /** Map fragments from Jeanne's office. `count` pieces of 4 (the 4th one turns up in chapter 5);
  *  `only` draws that single piece, as it falls out of the armchair; `joined` fits them edge to edge. */
-export function MapPieces({ count = 3, only, joined = false, size = '100%' }: { count?: number; only?: number; joined?: boolean; size?: number | string }) {
+/** The four torn pieces of the map, in map space (the whole map is x 20-190, y 20-150). `c` is each piece's centre. */
+export const MAP_PIECES = [
+	{ clip: 'M20 20 L104 20 L100 62 L96 90 L20 88 Z', c: [62, 55], dx: -3, dy: -3, r: -3 },
+	{ clip: 'M104 20 L190 20 L190 86 L128 92 L100 62 Z', c: [145, 56], dx: 4, dy: -2, r: 2 },
+	{ clip: 'M20 88 L96 90 L100 62 L128 92 L122 150 L20 150 Z', c: [74, 106], dx: -2, dy: 4, r: 1.5 },
+	{ clip: 'M128 92 L190 86 L190 150 L122 150 Z', c: [156, 118], dx: 3, dy: 3, r: -2 },
+];
+
+/** Clip paths for the pieces; `id` keeps two maps on one page apart. */
+export function MapClips({ id }: { id: string }) {
+	return <defs>{MAP_PIECES.map((p, k) => <clipPath key={k} id={`${id}-${k}`}><path d={p.clip} /></clipPath>)}</defs>;
+}
+
+/** One piece, drawn where it belongs on the map. */
+export function MapPieceArt({ k, id }: { k: number; id: string }) {
 	// Island outline = the workshop's floor plan, mirrored and rotated a half turn.
 	const island = 'M60 58 L112 52 L118 70 L142 74 L146 118 L100 124 L96 104 L66 108 Z';
-	const pieces = [
-		{ clip: 'M20 20 L104 20 L100 62 L96 90 L20 88 Z', dx: -3, dy: -3, r: -3 },
-		{ clip: 'M104 20 L190 20 L190 86 L128 92 L100 62 Z', dx: 4, dy: -2, r: 2 },
-		{ clip: 'M20 88 L96 90 L100 62 L128 92 L122 150 L20 150 Z', dx: -2, dy: 4, r: 1.5 },
-		{ clip: 'M128 92 L190 86 L190 150 L122 150 Z', dx: 3, dy: 3, r: -2 },
-	];
+	return (
+		<>
+			<g clipPath={`url(#${id}-${k})`}>
+				<rect x="20" y="20" width="170" height="130" fill="#ecdcb0" />
+				{/* Parchment drawn by Codex (.collab ticket 0012); the island and the cross stay SVG, exact. */}
+				<image href="/assets/jeux/atelier/parchemin.jpg" x="20" y="20" width="170" height="130" preserveAspectRatio="none" />
+				<path d={island} fill="#cdb886" stroke="#6b4a12" strokeWidth="2" />
+				<path d="M92 86 L102 96 M102 86 L92 96" stroke="#b8321a" strokeWidth="3" strokeLinecap="round" />
+				<circle cx="97" cy="91" r="34" fill="none" stroke="#b8321a" strokeWidth="1.8" strokeDasharray="5 3" />
+			</g>
+			<path d={MAP_PIECES[k].clip} fill="none" stroke="#8a6a3a" strokeWidth="1.2" />
+		</>
+	);
+}
+
+export function MapPieces({ count = 3, only, joined = false, size = '100%' }: { count?: number; only?: number; joined?: boolean; size?: number | string }) {
 	return (
 		<svg viewBox={only === 3 ? '112 76 88 84' : '0 0 210 170'} width={size} role="img" aria-label={only !== undefined ? 'Un morceau de carte, bord déchiré' : `${count} morceaux de carte : un îlot marqué d’une croix`}>
-			<defs>
-				{pieces.map((p, k) => <clipPath key={k} id={`atm-${k}`}><path d={p.clip} /></clipPath>)}
-			</defs>
-			{pieces.slice(0, count).map((p, k) => (only !== undefined && k !== only ? null : (
+			<MapClips id="atm" />
+			{MAP_PIECES.slice(0, count).map((p, k) => (only !== undefined && k !== only ? null : (
 				<g key={k} className="atm-piece" style={{ transform: joined ? 'none' : `translate(${p.dx}px, ${p.dy}px) rotate(${p.r}deg)`, transformOrigin: '105px 85px', transition: 'transform 0.8s ease' }}>
-					<g clipPath={`url(#atm-${k})`}>
-						<rect x="20" y="20" width="170" height="130" fill="#ecdcb0" />
-						{/* Parchment drawn by Codex (.collab ticket 0012); the island and the cross stay SVG, exact. */}
-						<image href="/assets/jeux/atelier/parchemin.jpg" x="20" y="20" width="170" height="130" preserveAspectRatio="none" />
-						<path d={island} fill="#cdb886" stroke="#6b4a12" strokeWidth="2" />
-						<path d="M92 86 L102 96 M102 86 L92 96" stroke="#b8321a" strokeWidth="3" strokeLinecap="round" />
-						<circle cx="97" cy="91" r="34" fill="none" stroke="#b8321a" strokeWidth="1.8" strokeDasharray="5 3" />
-					</g>
-					<path d={p.clip} fill="none" stroke="#8a6a3a" strokeWidth="1.2" />
+					<MapPieceArt k={k} id="atm" />
 				</g>
 			)))}
 		</svg>

@@ -3,8 +3,9 @@
 //   2 lock open, lid ajar on labelled bundles     3 leather fed, brass polished, closed and proud
 // Also the chapter 6 map puzzle: turn the island over, it is the workshop's floor plan.
 
-import { useState } from 'react';
-import { MapPieces } from './Boite';
+import { useRef, useState } from 'react';
+import { MapPieces, MapClips, MapPieceArt, MAP_PIECES } from './Boite';
+import { usePointerDrag } from '../usePointerDrag';
 
 interface Props {
 	state: number;
@@ -83,14 +84,121 @@ const ZONES = [
 	{ id: 'porte', label: 'Porte', x: 132, y: 70, w: 14, h: 36 },
 ];
 
-/** Chapter 6: read the rule, turn the map, point at the spot. Calls onSolve on the right zone. */
+interface Bit { x: number; y: number; turns: number; placed: boolean; z: number }
+// Pile below the frame: where each piece starts (its centre) and how many quarter turns it is off.
+const PILE: { x: number; y: number; turns: number }[] = [
+	{ x: 152, y: 276, turns: 2 },
+	{ x: 58, y: 206, turns: 3 },
+	{ x: 66, y: 276, turns: 1 },
+	{ x: 160, y: 204, turns: 1 },
+];
+const SNAP = 16;
+// Board height in map units: the frame, then room for the pile, turned pieces included.
+const H = 336;
+
+/** The four pieces scattered and turned: drag each onto the frame, tap it to turn it a quarter. */
+function MapAssembly({ onDone }: { onDone: () => void }) {
+	const svgRef = useRef<SVGSVGElement>(null);
+	const [bits, setBitsState] = useState<Bit[]>(() => PILE.map((p, k) => ({ ...p, placed: false, z: k })));
+	// Pointer moves render a frame late: the handlers read and write this, always current.
+	const live = useRef(bits);
+	const setBits = (next: Bit[]) => { live.current = next; setBitsState(next); };
+	const [hint, setHint] = useState<string | null>(null);
+	const drag = useRef<{ k: number; ox: number; oy: number; x0: number; y0: number; moved: boolean } | null>(null);
+	const [dragging, setDragging] = useState<number | null>(null);
+	const toMap = (cx: number, cy: number) => {
+		const m = svgRef.current?.getScreenCTM();
+		if (!m) return { x: 0, y: 0 };
+		const p = new DOMPoint(cx, cy).matrixTransform(m.inverse());
+		return { x: p.x, y: p.y };
+	};
+	const drop = (k: number, b: Bit): Bit => {
+		const [hx, hy] = MAP_PIECES[k].c;
+		const near = Math.hypot(b.x - hx, b.y - hy) < SNAP;
+		if (near && b.turns % 4 === 0) { setHint(null); return { ...b, x: hx, y: hy, placed: true }; }
+		if (near) setHint('C’est la bonne place, mais pas le bon sens : touche le morceau pour le tourner.');
+		return { ...b, x: Math.max(10, Math.min(200, b.x)), y: Math.max(10, Math.min(H - 10, b.y)) };
+	};
+	const update = (k: number, f: (b: Bit) => Bit) => setBits(live.current.map((b, i) => (i === k ? f(b) : b)));
+	const { onPointerDown } = usePointerDrag(
+		(cx, cy) => {
+			const el = document.elementFromPoint(cx, cy)?.closest('[data-bit]');
+			const k = el ? Number(el.getAttribute('data-bit')) : -1;
+			const bs = live.current;
+			if (k < 0 || bs[k].placed) { drag.current = null; return; }
+			const p = toMap(cx, cy);
+			drag.current = { k, ox: p.x - bs[k].x, oy: p.y - bs[k].y, x0: cx, y0: cy, moved: false };
+			const top = Math.max(...bs.map((b) => b.z)) + 1;
+			update(k, (b) => ({ ...b, z: top }));
+		},
+		(cx, cy) => {
+			const d = drag.current;
+			if (!d) return;
+			if (!d.moved && Math.hypot(cx - d.x0, cy - d.y0) < 6) return;
+			d.moved = true;
+			setDragging(d.k);
+			const p = toMap(cx, cy);
+			update(d.k, (b) => ({ ...b, x: p.x - d.ox, y: p.y - d.oy }));
+		},
+		() => {
+			const d = drag.current;
+			drag.current = null;
+			setDragging(null);
+			if (!d) return;
+			// A tap turns the piece; a turn can also complete it if it already sits at home.
+			const b = live.current[d.k];
+			const nb = drop(d.k, d.moved ? b : { ...b, turns: b.turns + 1 });
+			const next = live.current.map((x, i) => (i === d.k ? nb : x));
+			setBits(next);
+			if (next.every((x) => x.placed)) setTimeout(onDone, 900);
+		},
+	);
+	const order = bits.map((b, k) => ({ b, k })).sort((a, c) => (a.b.placed === c.b.placed ? a.b.z - c.b.z : a.b.placed ? -1 : 1));
+	const left = bits.filter((b) => !b.placed).length;
+	return (
+		<>
+			<p>{left ? 'Reconstitue la carte : fais glisser chaque morceau sur le cadre, touche-le pour le tourner.' : 'La carte est entière.'}</p>
+			<svg ref={svgRef} className="at-assemble" viewBox={`0 0 210 ${H}`} onPointerDown={onPointerDown} role="img" aria-label={`Carte à reconstituer, ${left} morceau${left > 1 ? 'x' : ''} à placer`}>
+				<MapClips id="atp" />
+				<rect className="at-assemble-frame" x="20" y="20" width="170" height="130" rx="2" />
+				{left > 0 && <text className="at-assemble-tray" x="105" y="172" textAnchor="middle">morceaux</text>}
+				{order.map(({ b, k }) => {
+					const [hx, hy] = MAP_PIECES[k].c;
+					return (
+						<g
+							key={k}
+							data-bit={k}
+							className={`at-bit ${b.placed ? 'placed' : ''} ${dragging === k ? 'dragging' : ''}`}
+							style={{ transform: `translate(${b.x - hx}px, ${b.y - hy}px) rotate(${b.turns * 90}deg)`, transformOrigin: `${hx}px ${hy}px` }}
+						>
+							<MapPieceArt k={k} id="atp" />
+						</g>
+					);
+				})}
+			</svg>
+			{hint && left > 0 && <p className="at-small">{hint}</p>}
+		</>
+	);
+}
+
+/** Chapter 6: put the map back together, read the rule, turn the map, point at the spot. Calls onSolve on the right zone. */
 export function MapPuzzle({ onSolve, onClose }: { onSolve: () => void; onClose: () => void }) {
+	const [assembled, setAssembled] = useState(false);
 	const [flipped, setFlipped] = useState(false);
 	const [miss, setMiss] = useState<string | null>(null);
+	if (!assembled) {
+		return (
+			<div className="at-card at-puzzle">
+				<h3>La carte de Rose</h3>
+				<MapAssembly onDone={() => setAssembled(true)} />
+				<button className="at-btn ghost small" onClick={onClose}>Plus tard</button>
+			</div>
+		);
+	}
 	return (
 		<div className="at-card at-puzzle">
 			<h3>La carte de Rose</h3>
-			<p>Les quatre morceaux sont réunis. Au dos du dernier, d’une écriture ancienne : <em>« Retourne l’île, elle a un toit. »</em></p>
+			<p>La carte est entière. Au dos d’un morceau, d’une écriture ancienne : <em>« Retourne l’île, elle a un toit. »</em></p>
 			<div className="at-puzzle-map">
 				<div className="at-puzzle-turn" style={{ transform: flipped ? 'rotate(180deg)' : 'none' }}>
 					<MapPieces count={4} joined={flipped} />
@@ -136,4 +244,12 @@ export const MALLE_CSS = `
 .at-zone rect { fill: rgba(44, 63, 99, 0.12); stroke: #2c3f63; stroke-width: 1; }
 .at-zone:hover rect, .at-zone:focus rect { fill: rgba(44, 63, 99, 0.3); }
 .at-zone text { font-size: 7px; fill: #2c3f63; font-weight: 700; pointer-events: none; }
+.at-assemble { width: min(78vw, 300px); max-height: 56vh; touch-action: none; -webkit-user-select: none; user-select: none; }
+.at-assemble * { touch-action: none; }
+.at-assemble-frame { fill: rgba(107, 74, 42, 0.12); stroke: #8a6a3a; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.at-assemble-tray { font-size: 8px; fill: #9c6a3a; font-style: italic; }
+.at-bit { cursor: grab; transition: transform 0.25s ease; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35)); }
+.at-bit.dragging { transition: none; cursor: grabbing; filter: drop-shadow(0 6px 6px rgba(0,0,0,0.4)); }
+.at-bit.placed { cursor: default; filter: none; animation: at-bit-snap 0.5s ease; }
+@keyframes at-bit-snap { 0% { filter: brightness(1.5); } 100% { filter: none; } }
 `;
