@@ -22,3 +22,4 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-09-30 · 0020 · challenge saison 4 · 3 corrections intégrées, version sans message posthume retenue
 - 2026-09-30 · 0021 · portraits Jeanne, Henri, Rose, Mme Lemoine (Codex, 214 k jetons) · intégrés
 - 2026-10-02 · 0022 · atelier restauré, plus lumineux (Codex imagegen, 287 k jetons) · intégré en fondu selon la progression
+- 2026-10-02 · 0023 · énigmes à la Layton (version Codex, 115 k jetons) · fusionnées dans docs/atelier-enigmes.md, soumises à l'utilisateur

@@ -458,9 +458,12 @@ export interface Order {
 	when?: Gate;
 	/** A `seen` flag the player sets by acting (the chapter 6 map puzzle). */
 	flag?: string;
-	/** Shown in the restoration scene once delivered. */
-	scene?: { title: string; lines: Line[] };
+	/** Shown in the restoration scene once delivered; `puzzle` is played first and does the restoration. */
+	scene?: { title: string; lines: Line[]; puzzle?: PuzzleId };
 }
+
+/** Small "Professor Layton" puzzles inside restoration scenes (docs/atelier-enigmes.md). */
+export type PuzzleId = 'gears';
 
 // Listed in play order. Story orders are taken one at a time, in sequence per project.
 export const ORDERS: Order[] = [
@@ -529,6 +532,7 @@ export const ORDERS: Order[] = [
 		step: 2,
 		scene: {
 			title: 'Mécanisme',
+			puzzle: 'gears',
 			lines: [
 				{ who: 'note', text: 'Le mécanisme, démonté puis remonté pièce par pièce, repart. Le tic-tac emplit l’atelier pour la première fois depuis des années.', show: 'mechanism' },
 				{ who: 'moi', text: 'Le 14 juin 1961… C’est la date écrite sous la vieille photo, près de la porte condamnée.', show: 'photo' },

@@ -7,8 +7,9 @@ import {
 import {
 	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK,
 	INTRO, EPILOGUE, SPEAKERS, FACES, FACE_EMOJI, REP_TIERS,
-	type Line, type Order, type GenId, type ProjectId,
+	type Line, type Order, type GenId, type ProjectId, type PuzzleId,
 } from './data';
+import { GearsPuzzle, PUZZLE_CSS } from './Puzzles';
 import Watch, { WatchBack, WATCH_CSS } from './Watch';
 import Radio, { RADIO_CSS } from './Radio';
 import Voilier, { VOILIER_CSS } from './Voilier';
@@ -41,7 +42,7 @@ type View = 'atelier' | 'etabli';
 interface Art { project: ProjectId; state: number }
 type Scene =
 	| { kind: 'talk'; id: string; lines: Line[]; art?: Art; title?: string }
-	| { kind: 'restore'; id: string; project: ProjectId; title: string; from: number; to: number; lines: Line[]; reward?: Order['reward'] };
+	| { kind: 'restore'; id: string; project: ProjectId; title: string; from: number; to: number; lines: Line[]; reward?: Order['reward']; puzzle?: PuzzleId };
 /** An upgrade just bought: the workshop shows the change before any scene or client steps in. */
 interface Reveal { id: string; k: number; after: Scene[] }
 const REVEAL_MS = 4500;
@@ -276,7 +277,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (o.reward.cocoins) earnOnce(`atelier:${o.id}`, o.reward.cocoins);
 		if (o.kind === 'story' && o.scene && o.project && o.step) {
 			trackEvent('atelier:restoration_step', { project: o.project, step: o.step });
-			const next: Scene[] = [{ kind: 'restore', id: o.id, project: o.project, title: o.scene.title, from: o.step - 1, to: o.step, lines: o.scene.lines, reward: o.reward }];
+			const next: Scene[] = [{ kind: 'restore', id: o.id, project: o.project, title: o.scene.title, from: o.step - 1, to: o.step, lines: o.scene.lines, reward: o.reward, puzzle: o.scene.puzzle }];
 			setScenes((q) => [...q, ...next]);
 		} else {
 			const bits = [`+${o.reward.coins} pièces`];
@@ -419,7 +420,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}{SAISON4_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}{SAISON4_CSS}{PUZZLE_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -967,13 +968,34 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 	const [i, setI] = useState(0);
 	const [after, setAfter] = useState(scene.kind !== 'restore');
+	// A puzzle step: the restoration is the player's own gesture, so it replaces the timed reveal.
+	const [puzzle, setPuzzle] = useState(scene.kind === 'restore' && !!scene.puzzle);
 	useEffect(() => {
 		setI(0);
 		setAfter(scene.kind !== 'restore');
-		if (scene.kind !== 'restore') return;
+		const hasPuzzle = scene.kind === 'restore' && !!scene.puzzle;
+		setPuzzle(hasPuzzle);
+		if (scene.kind !== 'restore' || hasPuzzle) return;
 		const id = setTimeout(() => { setAfter(true); sfx.restore(); }, 900);
 		return () => clearTimeout(id);
 	}, [scene]);
+	if (puzzle && scene.kind === 'restore') {
+		const solve = (skipped: boolean) => {
+			trackEvent(skipped ? 'atelier:puzzle_skipped' : 'atelier:puzzle_solved', { puzzle: scene.puzzle! });
+			setPuzzle(false);
+			setAfter(true);
+		};
+		return (
+			<div className="at-modal at-scene-modal" role="dialog" aria-modal="true">
+				<div className="at-card at-talk">
+					<p className="at-kicker">Énigme · {projectOf(scene.project).object}</p>
+					<h3>{scene.title}</h3>
+					{scene.puzzle === 'gears' && <GearsPuzzle onSolve={() => solve(false)} />}
+					<button className="at-link" onClick={() => solve(true)}>Passer l’énigme</button>
+				</div>
+			</div>
+		);
+	}
 	const lines = scene.lines;
 	const line = lines[i];
 	const last = i >= lines.length - 1;
