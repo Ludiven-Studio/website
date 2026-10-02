@@ -828,6 +828,8 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 		<div className="at-shop">
 			<div ref={sceneRef} className={`at-scene ${has('lampe') ? 'lit' : ''}`} style={{ ['--dust' as string]: 1 - progress }}>
 				<div className="at-scene-img" />
+				{/* The same room restored: fades in as the story moves on, faster at first so chapter 1 already shows it. */}
+				<div className="at-scene-img restored" style={{ opacity: progress ** 0.6 }} />
 				<div className="at-scene-dust" />
 				{(!has('etabli') || reveal?.id === 'etabli') && (
 					<svg className={`at-sheet ${has('etabli') ? 'off' : ''}`}viewBox="0 0 100 40" preserveAspectRatio="none" aria-label="Établi sous une bâche">
@@ -1333,7 +1335,8 @@ const CSS = `
 	radial-gradient(circle at 0 0, rgba(210,200,180,0.55), transparent 28%),
 	radial-gradient(circle at 100% 0, rgba(210,200,180,0.5), transparent 26%),
 	linear-gradient(180deg, rgba(40,30,20,0.25), rgba(40,30,20,0.45)); pointer-events: none; }
-.at-scene.lit .at-scene-img { filter: sepia(calc(var(--dust) * 0.6)) brightness(calc(1.08 - var(--dust) * 0.4)) saturate(calc(1.05 - var(--dust) * 0.4)); }
+.at-scene .at-scene-img.restored { background-image: url('${ART}/atelier-restaure.jpg'); filter: none; transition: opacity 1.2s; }
+.at-scene.lit .at-scene-img:not(.restored) { filter: sepia(calc(var(--dust) * 0.6)) brightness(calc(1.08 - var(--dust) * 0.4)) saturate(calc(1.05 - var(--dust) * 0.4)); }
 .at-lamp { position: absolute; left: 76%; top: 66%; width: 70%; aspect-ratio: 1; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(255, 214, 120, 0.6), rgba(255, 190, 90, 0.18) 38%, transparent 62%); mix-blend-mode: screen; pointer-events: none; animation: at-flicker 5s ease-in-out infinite; }
 @keyframes at-flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.88; } }
 .at-sheet { position: absolute; left: 34%; width: 62%; top: 75%; height: 19%; opacity: 0.93; filter: drop-shadow(0 5px 6px rgba(0,0,0,0.45)); }
