@@ -43,8 +43,8 @@ try {
 		#promo * { box-sizing: border-box; }
 		.cap { position: absolute; left: 0; top: 0; width: ${W}px; display: flex; justify-content: center; padding: 26px 60px; }
 		.cap span { display: inline-block; text-align: center; font-weight: 800; font-size: 68px; line-height: 1.12; letter-spacing: -0.5px;
-			color: #fff6df; padding: 22px 40px 26px; border-radius: 36px; background: rgba(43, 26, 10, 0.86);
-			border: 3px solid #f2c45a; box-shadow: 0 14px 40px rgba(0,0,0,0.45); }
+			color: #fff; padding: 22px 40px 26px; border-radius: 36px; background: rgba(74, 31, 69, 0.9);
+			border: 4px solid #ff3d9a; box-shadow: 0 8px 0 #d3177a, 0 18px 40px rgba(74, 31, 69, 0.45); }
 	</style>`;
 
 	for (const [i, c] of CAPTIONS.entries()) {
@@ -66,12 +66,12 @@ try {
 		.end .photo i { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: italic 30px Georgia, serif; color: #6b4a22; }
 		.end h1 { position: absolute; top: 210px; left: 0; right: 0; margin: 0; text-align: center; font-weight: 800; font-size: 112px; line-height: 1;
 			color: #fff3d6; text-shadow: 0 6px 30px rgba(0,0,0,0.7); letter-spacing: -2px; }
-		.end h1 small { display: block; font-size: 58px; font-weight: 600; letter-spacing: 0; margin-bottom: 18px; color: #f2c45a; }
+		.end h1 small { display: block; font-size: 58px; font-weight: 600; letter-spacing: 0; margin-bottom: 18px; color: #ffc7e3; }
 		.end .tag { position: absolute; top: 1240px; left: 80px; right: 80px; text-align: center; font-size: 46px; font-weight: 600; line-height: 1.25;
 			color: #fff3d6; text-shadow: 0 3px 16px rgba(0,0,0,0.8); }
 		.end .cta { position: absolute; top: 1440px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 56px; font-weight: 800;
-			color: #2b1a0a; background: linear-gradient(180deg, #ffd978, #f2b63a); padding: 26px 64px; border-radius: 999px;
-			box-shadow: 0 12px 40px rgba(242, 182, 58, 0.45); }
+			color: #fff; background: linear-gradient(180deg, #ff6fb5, #ff3d9a); padding: 26px 64px; border-radius: 999px;
+			box-shadow: 0 10px 0 #d3177a, 0 18px 40px rgba(255, 61, 154, 0.45); text-shadow: 0 2px 0 rgba(0,0,0,0.15); }
 		.end .url { position: absolute; top: 1600px; left: 0; right: 0; text-align: center; font-size: 44px; font-weight: 700; color: #fff3d6; }
 		.end .logo { position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 18px;
 			font-size: 36px; font-weight: 700; color: #f6e7c8; }

@@ -8,9 +8,10 @@ export const BAR = (60 / BPM) * 4;
 export const CUTS = [
 	{ shot: 'intro', from: 0.2, dur: 2.5 },
 	{ shot: 'merge', from: 0.1, dur: 5.7 },
-	{ shot: 'deliver', from: 0.25, dur: 2.8 },
-	{ shot: 'etabli', from: 0.15, dur: 2.4 },
-	{ shot: 'lampe', from: 0.15, dur: 1.9 },
+	// The delivery now opens on a second of confetti before the restoration scene.
+	{ shot: 'deliver', from: 0.15, dur: 3.2 },
+	{ shot: 'etabli', from: 0.15, dur: 2.2 },
+	{ shot: 'lampe', from: 0.15, dur: 1.7 },
 	{ shot: 'photo-up', from: 0.15, dur: 2.2 },
 	{ shot: 'photo', from: 0.2, dur: 2.6 },
 	{ shot: 'postcard', from: 0.2, dur: 2.9 },

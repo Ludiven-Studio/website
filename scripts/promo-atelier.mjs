@@ -124,6 +124,8 @@ try {
 		${allUpTo('montre', 2)}
 		st.upgrades = ['etabli', 'lampe'];
 		st.coins = 42; st.rep = 9;
+		// Without the map flag, no chapter-6 order card shows up on the counter (it would spoil the story).
+		st.seen = st.seen.filter((x) => x !== 'map-solved');
 		st.board = st.board.map((p) => (p && p.startsWith('g:') ? p : null));
 		const put = (r, c, p) => { st.board[r * 7 + c] = p; };
 		put(1, 1, 'soin:1'); put(1, 2, 'soin:1'); put(1, 4, 'soin:2'); put(2, 3, 'soin:3');
