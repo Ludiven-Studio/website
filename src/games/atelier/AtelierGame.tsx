@@ -1561,14 +1561,17 @@ const FUN_CSS = `
 .at-root .at-need b, .at-root .at-tag.ready { background: var(--fun-mint-dark); }
 .at-root .at-give { background: linear-gradient(180deg, #4ff0c2, var(--fun-mint)); box-shadow: 0 3px 0 var(--fun-mint-dark); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,0.2); font-size: 13px; padding: 6px 8px; }
 .at-root .at-give:disabled { background: #fff1c8; color: #a8700a; box-shadow: 0 2px 0 #f2d58a; text-shadow: none; }
-.at-root .at-boardwrap { background: linear-gradient(150deg, #ff6fb5, var(--fun-violet)); border-radius: 20px; padding: 8px; box-shadow: 0 4px 0 var(--fun-violet-dark), 0 10px 22px rgba(162, 77, 255, 0.3); }
-.at-root .at-cell { background: #fff9fc; border-radius: 8px; }
-.at-root .at-cell:nth-child(even) { background: #ffe4f2; }
-.at-root .at-cell.sel { background: #fff2c4; box-shadow: 0 0 0 3px var(--fun-gold) inset; }
-.at-root .at-cell.twin { background: #d2fbef; box-shadow: 0 0 0 2.5px var(--fun-mint) inset; }
-.at-root .at-cell.over.merge { background: #b5f5e2; box-shadow: 0 0 0 3px var(--fun-mint) inset; }
-.at-root .at-cell.over.move { background: #f3e6ff; }
-.at-root .at-piece img { filter: drop-shadow(0 3px 2px rgba(116, 40, 214, 0.22)); }
+.at-root { --bd-a: #c9ebe6; --bd-b: #b6e1db; --bd-f1: #ffd2a6; --bd-f2: #ffb985; --bd-edge: #e6955f; --bd-shade: rgba(20, 80, 75, 0.3); }
+.at-root .at-boardwrap { background: linear-gradient(180deg, var(--bd-f1), var(--bd-f2)); border-radius: 18px; padding: 7px; box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.5), 0 4px 0 var(--bd-edge), 0 10px 22px rgba(0, 0, 0, 0.12); }
+.at-root .at-board { gap: 0; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.06); }
+.at-root .at-cell { background: var(--bd-a); border-radius: 0; }
+.at-root .at-cell:nth-child(even) { background: var(--bd-b); }
+.at-root .at-cell.sel { background: #fff4cf; box-shadow: 0 0 0 3px #fff inset, 0 0 0 5px var(--fun-gold) inset; }
+.at-root .at-cell.twin { background: #c9f5e2; box-shadow: 0 0 0 2.5px var(--fun-mint) inset; }
+.at-root .at-cell.over.merge { background: #a9efd2; box-shadow: 0 0 0 3px var(--fun-mint) inset; }
+.at-root .at-cell.over.move { background: #fff; }
+.at-root .at-board .at-tag { box-shadow: 0 0 0 2px #fff; }
+.at-root .at-piece img { filter: drop-shadow(0 3px 2px var(--bd-shade)); }
 .at-root .at-lvl { background: var(--fun-violet-dark); }
 .at-root .at-tag.want { background: var(--fun-pink); }
 .at-root .at-charge { background: rgba(116, 40, 214, 0.2); }
