@@ -4,7 +4,7 @@
 
 import {
 	CHAINS, GENERATORS, ORDERS, UPGRADES, START_BOARD, LOCALS, COLS, ROWS, REP_TIERS, PROJECTS,
-	ENERGY_MAX, ENERGY_MS,
+	ENERGY_MAX, ENERGY_MS, GEN_LEVELS, WELCOME_MS, WELCOME_CHARGE_MS,
 	type ChainId, type GenId, type Order, type Reward, type RepTier, type Gate, type ProjectId, type Project,
 } from './data';
 
@@ -18,6 +18,8 @@ export interface GenState {
 	charges: number;
 	/** Start of the charge being refilled. */
 	at: number;
+	/** 1-based, see GEN_LEVELS. */
+	level: number;
 }
 
 export interface State {
@@ -43,6 +45,8 @@ export interface State {
 	/** Scenes already shown (intro, arrival, epilogue…). */
 	seen: string[];
 	stats: { produced: number; merges: number; sold: number; delivered: number };
+	/** Until then, generators refill at the welcome pace. */
+	welcomeUntil: number;
 }
 
 export type Fail = 'energy' | 'charges' | 'full' | 'none';
@@ -93,7 +97,7 @@ export function newGame(now: number, seed = (now ^ 0x5bd1e995) >>> 0): State {
 	const board: (Piece | null)[] = Array(CELLS).fill(null);
 	for (const [i, p] of Object.entries(START_BOARD)) board[Number(i)] = p;
 	const gens = {} as Record<GenId, GenState>;
-	for (const g of Object.values(GENERATORS)) gens[g.id] = { charges: g.charges, at: now };
+	for (const g of Object.values(GENERATORS)) gens[g.id] = { charges: GEN_LEVELS[0].charges, at: now, level: 1 };
 	return {
 		v: SAVE_V,
 		board,
@@ -111,7 +115,41 @@ export function newGame(now: number, seed = (now ^ 0x5bd1e995) >>> 0): State {
 		tut: 0,
 		seen: [],
 		stats: { produced: 0, merges: 0, sold: 0, delivered: 0 },
+		welcomeUntil: now + WELCOME_MS,
 	};
+}
+
+// ---------- generators ----------
+
+const levelOf = (s: State, g: GenId) => GEN_LEVELS[Math.min(GEN_LEVELS.length, Math.max(1, s.gens[g]?.level ?? 1)) - 1];
+export const genMax = (s: State, g: GenId): number => levelOf(s, g).charges;
+/** Refill time of one charge at `now`: the welcome pace while it lasts, then the level's. */
+export const genChargeMs = (s: State, g: GenId, now: number): number =>
+	now < s.welcomeUntil ? Math.min(WELCOME_CHARGE_MS, levelOf(s, g).chargeMs) : levelOf(s, g).chargeMs;
+
+export function genUpgradeState(s: State, g: GenId): 'max' | 'poor' | 'ok' {
+	const next = GEN_LEVELS[s.gens[g].level];
+	if (!next) return 'max';
+	return s.coins < next.cost ? 'poor' : 'ok';
+}
+
+/** Next level for coins; the generator comes back full, so the purchase is felt at once. */
+export function upgradeGen(s: State, g: GenId, now: number): State {
+	if (genUpgradeState(s, g) !== 'ok') return s;
+	const n = clone(tick(s, now));
+	n.coins -= GEN_LEVELS[n.gens[g].level].cost;
+	n.gens[g].level += 1;
+	n.gens[g].charges = genMax(n, g);
+	n.gens[g].at = now;
+	return n;
+}
+
+/** Refill an empty or part-empty generator at once (the island charges the cocoins). */
+export function rechargeGen(s: State, g: GenId, now: number): State {
+	const n = clone(tick(s, now));
+	n.gens[g].charges = genMax(n, g);
+	n.gens[g].at = now;
+	return n;
 }
 
 function clone(s: State): State {
@@ -158,12 +196,14 @@ export function tick(s: State, now: number): State {
 	for (const g of Object.values(GENERATORS)) {
 		const cur = (out ?? s).gens[g.id];
 		if (now < cur.at) { edit().gens[g.id].at = now; continue; }
-		if (cur.charges >= g.charges) continue;
-		const gained = Math.floor((now - cur.at) / g.chargeMs);
+		const max = genMax(out ?? s, g.id);
+		if (cur.charges >= max) continue;
+		const ms = genChargeMs(out ?? s, g.id, now);
+		const gained = Math.floor((now - cur.at) / ms);
 		if (gained <= 0) continue;
 		const n = edit().gens[g.id];
-		n.charges = Math.min(g.charges, n.charges + gained);
-		n.at = n.charges >= g.charges ? now : n.at + gained * g.chargeMs;
+		n.charges = Math.min(max, n.charges + gained);
+		n.at = n.charges >= max ? now : n.at + gained * ms;
 	}
 	return out ?? s;
 }
@@ -173,7 +213,7 @@ export const energyIn = (s: State, now: number): number =>
 	s.energy >= ENERGY_MAX ? 0 : Math.max(0, ENERGY_MS - (now - s.energyAt));
 
 export const chargeIn = (s: State, g: GenId, now: number): number =>
-	s.gens[g].charges >= GENERATORS[g].charges ? 0 : Math.max(0, GENERATORS[g].chargeMs - (now - s.gens[g].at));
+	s.gens[g].charges >= genMax(s, g) ? 0 : Math.max(0, genChargeMs(s, g, now) - (now - s.gens[g].at));
 
 export function addEnergy(s: State, n: number): State {
 	const out = clone(s);
@@ -202,12 +242,14 @@ function draw(s: State, g: GenId): Piece {
 	const table = GENERATORS[g].out;
 	const total = table.reduce((a, o) => a + o.w, 0);
 	let r = rand(s) * total;
+	let pick = table[table.length - 1];
 	for (const o of table) {
 		r -= o.w;
-		if (r < 0) return code(o.chain, o.level ?? 1);
+		if (r < 0) { pick = o; break; }
 	}
-	const last = table[table.length - 1];
-	return code(last.chain, last.level ?? 1);
+	// A better generator sometimes hands out the next level: one merge saved.
+	const level = Math.min(CHAINS[pick.chain].items.length, (pick.level ?? 1) + (rand(s) < levelOf(s, g).up ? 1 : 0));
+	return code(pick.chain, level);
 }
 
 export type ProduceResult = { ok: true; s: State; at: number; piece: Piece } | { ok: false; why: Fail };
@@ -226,7 +268,7 @@ export function produce(s: State, cell: number, now: number): ProduceResult {
 	n.board[at] = piece;
 	if (n.energy >= ENERGY_MAX) n.energyAt = now; // the refill starts with the first point spent
 	n.energy -= 1;
-	if (n.gens[g].charges >= GENERATORS[g].charges) n.gens[g].at = now;
+	if (n.gens[g].charges >= genMax(n, g)) n.gens[g].at = now;
 	n.gens[g].charges -= 1;
 	n.stats.produced++;
 	if (n.tut === 0) n.tut = 1;
@@ -510,7 +552,10 @@ export function load(raw: string | null, now: number): State {
 		const gens = { ...base.gens };
 		for (const g of Object.keys(gens) as GenId[]) {
 			const v = d.gens?.[g];
-			if (v && Number.isFinite(v.charges) && Number.isFinite(v.at)) gens[g] = { charges: v.charges, at: v.at };
+			if (v && Number.isFinite(v.charges) && Number.isFinite(v.at)) {
+				const level = Math.min(GEN_LEVELS.length, Math.max(1, Math.floor(Number(v.level) || 1)));
+				gens[g] = { charges: Math.min(v.charges, GEN_LEVELS[level - 1].charges), at: v.at, level };
+			}
 		}
 		// A save written by a device whose clock ran ahead must not stall refills for days.
 		const clamp = (t: unknown): number => (Number.isFinite(t) ? Math.min(Number(t), now) : now);
@@ -532,6 +577,8 @@ export function load(raw: string | null, now: number): State {
 			tut: Math.max(0, Math.min(4, Number(d.tut) || 0)),
 			seen: Array.isArray(d.seen) ? d.seen.filter((x) => typeof x === 'string') : [],
 			stats: { ...base.stats, ...(d.stats ?? {}) },
+			// Saves from before the generator levels get the welcome quarter-hour too, from their first load.
+			welcomeUntil: Number.isFinite(d.welcomeUntil) ? Number(d.welcomeUntil) : now + WELCOME_MS,
 		};
 		// v1 named the watch's arrival scene 'arrival'; v2 keys arrivals by project.
 		if (s.seen.includes('arrival') && !s.seen.includes('arrival:montre')) s.seen.push('arrival:montre');

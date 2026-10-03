@@ -27,7 +27,7 @@ try {
 		st.done = ['garnier-1', 'lucas-1', 'morel-1'];
 		st.upgrades = ['etabli'];
 		st.seen = ['intro', 'arrival:montre', 'rep-5'];
-		st.tut = 4;
+		st.tut = 4; st.coins = 100;
 		st.board = st.board.map((p) => (p && p.startsWith('g:') ? p : null));
 		st.board[0] = 'outil:4'; st.board[1] = 'meca:5'; st.board[14] = 'soin:1'; st.board[15] = 'soin:1';
 		localStorage.setItem('ludiven-atelier', JSON.stringify(st));
@@ -66,6 +66,36 @@ try {
 	await freezeAt(500); await page.screenshot({ path: `${OUT}/3-party.png` }); await play();
 	const scene = await page.waitForSelector('.at-talk', { timeout: 4000 }).catch(() => null);
 	if (!scene) fails.push('restoration scene never opened after the party');
+
+	// 4. Through the scene (its puzzle skipped): the full-screen rewards, then "Récupérer" sends them flying.
+	for (let k = 0; k < 12 && (await page.locator('.at-talk').count()); k++) {
+		if (await page.locator('.at-talk .at-link', { hasText: 'Passer' }).count()) await page.locator('.at-talk .at-link', { hasText: 'Passer' }).click();
+		else { await sleep(950); await page.locator('.at-talk-nav .at-btn:not(.ghost)').click(); }
+		await sleep(250);
+	}
+	const pop = await page.waitForSelector('.at-reward', { timeout: 3000 }).catch(() => null);
+	if (!pop) fails.push('no reward popup after the story scene');
+	else {
+		await sleep(900);
+		await page.screenshot({ path: `${OUT}/4-reward.png` });
+		await page.locator('.at-reward-btn').click();
+		await sleep(60);
+		if (!(await page.locator('.at-fly.coin').count())) fails.push('collecting the rewards sent nothing flying');
+		await sleep(1600);
+	}
+
+	// 5. The toolbox panel: level, perks of the next level, upgrade for coins; the welcome pill above.
+	if (!(await page.locator('.at-welcome').count())) fails.push('no welcome pill during the first quarter-hour');
+	const box = await c(await page.evaluate(() => [...document.querySelectorAll('.at-cell')].findIndex((el) => el.querySelector('img[src*="gen-boite"]'))));
+	await page.mouse.click(box.x, box.y);
+	await sleep(400);
+	await page.locator('.at-info-gen').scrollIntoViewIfNeeded();
+	await page.locator('.at-info-gen').screenshot({ path: `${OUT}/5-gen-panel.png` });
+	await page.locator('.at-info-gen .at-btn', { hasText: 'Améliorer' }).click();
+	await sleep(500);
+	if (!(await page.locator('.at-genlvl').count())) fails.push('upgraded generator shows no level stars');
+	if (!(await page.locator('.at-info-gen', { hasText: 'niv. 2' }).count())) fails.push('panel does not say level 2');
+	await page.screenshot({ path: `${OUT}/6-after-upgrade.png` });
 	await browser.close();
 } finally {
 	server.stop();

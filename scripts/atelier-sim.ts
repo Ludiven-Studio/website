@@ -9,22 +9,28 @@
    Usage: npx tsx scripts/atelier-sim.ts [seeds] */
 import {
 	newGame, produce, move, deliver, buyUpgrade, sell, activeOrders, parse, genOf, unitCost,
-	upgradeState, stepOf, mapReady, solveMap, type State, type Piece,
+	upgradeState, stepOf, mapReady, solveMap, tick, energyIn, chargeIn, genUpgradeState, upgradeGen, type State, type Piece,
 } from '../src/games/atelier/engine';
-import { GENERATORS, CHAINS, ENERGY_MAX, UPGRADES, type GenId, type ChainId } from '../src/games/atelier/data';
+import { GENERATORS, CHAINS, ENERGY_MAX, UPGRADES, GEN_LEVELS, type GenId, type ChainId } from '../src/games/atelier/data';
 
 const N = Number(process.argv[2] ?? 300);
 const TAP_S = 0.9;
 const DRAG_S = 1.6;
 const T0 = 1_700_000_000_000;
 
-interface Mark { energy: number; taps: number; sec: number }
+/** `sec`: wall clock, waits included (the bot never pays to skip one). `play`: active seconds only. */
+interface Mark { energy: number; taps: number; sec: number; play: number }
 interface Run {
 	marks: Record<string, Mark>;
 	fullHits: number;
 	chargeWaits: number;
+	energyWait: number;
 	sold: number;
 	boughtEnergy: number;
+	/** Active play before the first wait longer than 20 s. */
+	firstWait: number | null;
+	genLevels: Record<string, number>;
+	coinsSpentOnGens: number;
 }
 
 function needMap(s: State): Map<Piece, number> {
@@ -92,20 +98,38 @@ function sellOne(s: State): State | null {
 function play(seed: number): Run {
 	let s = newGame(T0, seed);
 	let now = T0;
-	let energy = 0, taps = 0, sec = 0;
-	const run: Run = { marks: {}, fullHits: 0, chargeWaits: 0, sold: 0, boughtEnergy: 0 };
-	const act = (dt: number) => { taps++; sec += dt; now += dt * 1000; if (process.env.TRACE && seed === 1) console.log(`e${energy} ${JSON.stringify(s.progress)} orders=${activeOrders(s).map((o) => o.id + "[" + o.needs + "]").join(" ")} board=${s.board.filter(Boolean).join(",")}`); };
-	for (let guard = 0; guard < 20000 && stepOf(s, 'toupie') < 3; guard++) {
+	let energy = 0, taps = 0, sec = 0, played = 0;
+	const run: Run = { marks: {}, fullHits: 0, chargeWaits: 0, energyWait: 0, sold: 0, boughtEnergy: 0, firstWait: null, genLevels: {}, coinsSpentOnGens: 0 };
+	const act = (dt: number) => { taps++; sec += dt; played += dt; now += dt * 1000; if (process.env.TRACE && seed === 1) console.log(`e${energy} ${JSON.stringify(s.progress)} orders=${activeOrders(s).map((o) => o.id + "[" + o.needs + "]").join(" ")} board=${s.board.filter(Boolean).join(",")}`); };
+	const wait = (ms: number, kind: 'energy' | 'charge') => {
+		const dt = Math.max(1, Math.ceil(ms / 1000));
+		if (dt > 20 && run.firstWait === null) run.firstWait = played;
+		sec += dt; now += dt * 1000;
+		if (kind === 'energy') run.energyWait += dt; else run.chargeWaits += dt;
+		s = tick(s, now);
+	};
+	const mark = (k: string) => { run.marks[k] = { energy, taps, sec, play: played }; };
+	for (let guard = 0; guard < 40000 && stepOf(s, 'toupie') < 3; guard++) {
 		const d = activeOrders(s).find((o) => deliver(s, o.id).ok);
 		if (d) {
 			const r = deliver(s, d.id);
-			if (r.ok) { s = r.s; act(TAP_S); run.marks[d.id] = { energy, taps, sec }; }
+			if (r.ok) { s = r.s; act(TAP_S); mark(d.id); }
 			continue;
 		}
-		if (mapReady(s)) { s = solveMap(s); act(8); run.marks.carte = { energy, taps, sec }; continue; }
+		if (mapReady(s)) { s = solveMap(s); act(8); mark('carte'); continue; }
 		// A player buys each workshop upgrade as soon as it is affordable; the gates matter, the rest is décor.
 		const up = UPGRADES.find((u) => upgradeState(s, u.id) === 'ok');
-		if (up) { s = buyUpgrade(s, up.id); act(TAP_S * 2); run.marks[up.id] = { energy, taps, sec }; continue; }
+		if (up) { s = buyUpgrade(s, up.id); act(TAP_S * 2); mark(up.id); continue; }
+		// Then a generator level, for the busiest generator on the bench, keeping a small cushion of coins.
+		const busy = (Object.keys(GENERATORS) as GenId[])
+			.filter((g) => s.board.some((p) => genOf(p) === g) && genUpgradeState(s, g) === 'ok' && s.coins >= GEN_LEVELS[s.gens[g].level].cost + 20)
+			.sort((a, b) => GENERATORS[b].out.reduce((x, o) => x + Math.max(0, deficit(s, o.chain)), 0) - GENERATORS[a].out.reduce((x, o) => x + Math.max(0, deficit(s, o.chain)), 0))[0];
+		if (busy) {
+			run.coinsSpentOnGens += GEN_LEVELS[s.gens[busy].level].cost;
+			s = upgradeGen(s, busy, now); act(TAP_S * 2);
+			run.genLevels[`${busy}${s.gens[busy].level}`] = played;
+			continue;
+		}
 		const m = bestMerge(s);
 		if (m) { s = move(s, m[0], m[1]).s; act(DRAG_S); continue; }
 		// Produce from the generator whose chains lack the most.
@@ -115,7 +139,8 @@ function play(seed: number): Run {
 		})).sort((a, b) => b.want - a.want);
 		const g = gens[0].want > 0 ? gens[0].g : 'boite';
 		const cell = s.board.findIndex((p) => genOf(p) === g);
-		if (s.energy < 1) { s = { ...s, energy: s.energy + 15 }; run.boughtEnergy += 15; }
+		s = tick(s, now);
+		if (s.energy < 1) { wait(energyIn(s, now), 'energy'); continue; }
 		const r = produce(s, cell, now);
 		if (r.ok) { s = r.s; energy++; act(TAP_S); continue; }
 		if (r.why === 'full') {
@@ -126,14 +151,13 @@ function play(seed: number): Run {
 			continue;
 		}
 		if (r.why === 'charges') {
-			run.chargeWaits++;
-			// Waiting: the other generator may still have charges, else the clock runs.
-			const other = (Object.keys(GENERATORS) as GenId[]).find((x) => x !== g && s.gens[x].charges > 0);
-			if (other && GENERATORS[other].out.some((o) => deficit(s, o.chain) > 0)) {
+			// Waiting: another useful generator may still have charges, else the clock runs to the next charge.
+			const other = (Object.keys(GENERATORS) as GenId[]).find((x) => x !== g && s.board.some((p) => genOf(p) === x) && s.gens[x].charges > 0 && GENERATORS[x].out.some((o) => deficit(s, o.chain) > 0));
+			if (other) {
 				const r2 = produce(s, s.board.findIndex((p) => genOf(p) === other), now);
 				if (r2.ok) { s = r2.s; energy++; act(TAP_S); continue; }
 			}
-			now += 1000; sec += 1;
+			wait(chargeIn(s, g, now), 'charge');
 			continue;
 		}
 		break;
@@ -151,14 +175,22 @@ const keys = ['garnier-1', 'etabli', 'lucas-1', 'morel-1', 'garnier-2', 'chen-1'
 	'boussole-3', 'fanal-3', 'longuevue-3', 'coffre-3', 'hangar', 'mouette-3', 'cloche-3',
 	'cadre-3', 'travailleuse-3', 'tabouret-3', 'bobines-3', 'carnet-3', 'valise-3',
 	'etal-3', 'presentoir-3', 'balance-3', 'caissette-3', 'casier-3', 'toupie-3'];
-console.log(`${N} runs · start energy ${ENERGY_MAX} · story steps give +10 each · seasons 1-4 (25 chapters)`);
-console.log('milestone     energy p10/med/p90     taps med   time med');
+const hm = (x: number) => { const m = Math.round(x / 60); return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`; };
+console.log(`${N} runs · start energy ${ENERGY_MAX} · story steps give +10 each · seasons 1-4 (25 chapters) · waits are waited, never bought`);
+console.log('milestone     energy p10/med/p90     taps med   play med   wall clock med');
 for (const k of keys) {
 	const ms = runs.map((r) => r.marks[k]).filter(Boolean);
 	if (!ms.length) { console.log(`${k.padEnd(12)}  never`); continue; }
-	const e = ms.map((m) => m.energy), t = ms.map((m) => m.taps), s = ms.map((m) => m.sec);
-	const fmt = (x: number) => { const r = Math.round(x); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`; };
-	console.log(`${k.padEnd(12)}  ${String(pct(e, 0.1)).padStart(4)} ${String(pct(e, 0.5)).padStart(4)} ${String(pct(e, 0.9)).padStart(4)}          ${String(pct(t, 0.5)).padStart(4)}      ${fmt(pct(s, 0.5))}${ms.length < N ? `  (${ms.length}/${N})` : ''}`);
+	const e = ms.map((m) => m.energy), t = ms.map((m) => m.taps), s = ms.map((m) => m.sec), p = ms.map((m) => m.play);
+	console.log(`${k.padEnd(12)}  ${String(pct(e, 0.1)).padStart(4)} ${String(pct(e, 0.5)).padStart(4)} ${String(pct(e, 0.9)).padStart(4)}          ${String(pct(t, 0.5)).padStart(4)}      ${hm(pct(p, 0.5)).padStart(5)}      ${hm(pct(s, 0.5))}${ms.length < N ? `  (${ms.length}/${N})` : ''}`);
+}
+const fw = runs.map((r) => r.firstWait ?? Infinity);
+console.log(`first wait > 20 s after active play: p10 ${hm(pct(fw, 0.1))}, med ${hm(pct(fw, 0.5))}, p90 ${hm(pct(fw, 0.9))}`);
+console.log(`waits in total: energy med ${hm(pct(runs.map((r) => r.energyWait), 0.5))}, charges med ${hm(pct(runs.map((r) => r.chargeWaits), 0.5))}`);
+console.log(`coins spent on generator levels: med ${pct(runs.map((r) => r.coinsSpentOnGens), 0.5)}`);
+for (const lv of ['boite2', 'boite3', 'boite4', 'tiroir2', 'tiroir3', 'tiroir4']) {
+	const at = runs.map((r) => r.genLevels[lv]).filter((x) => x !== undefined);
+	console.log(`  ${lv} bought by ${at.length}/${N} runs, at play med ${at.length ? hm(pct(at, 0.5)) : '-'}`);
 }
 // Per-run spans between story steps: subtracting cumulative medians would hide the spread.
 console.log('span                energy p10/med/p90     time med/p90');

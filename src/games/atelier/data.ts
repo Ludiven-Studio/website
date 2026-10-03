@@ -75,9 +75,6 @@ export interface Generator {
 	name: string;
 	/** Weighted outputs; `level` defaults to 1. */
 	out: { chain: ChainId; level?: number; w: number }[];
-	charges: number;
-	/** Milliseconds to get one charge back. */
-	chargeMs: number;
 	/** Workshop upgrade that puts it on the board. None: there from the start. */
 	unlock?: string;
 }
@@ -90,8 +87,6 @@ export const GENERATORS: Record<GenId, Generator> = {
 			{ chain: 'outil', w: 55 },
 			{ chain: 'soin', w: 45 },
 		],
-		charges: 12,
-		chargeMs: 8_000,
 	},
 	tiroir: {
 		id: 'tiroir',
@@ -100,8 +95,6 @@ export const GENERATORS: Record<GenId, Generator> = {
 			{ chain: 'meca', w: 80 },
 			{ chain: 'meca', level: 2, w: 20 },
 		],
-		charges: 12,
-		chargeMs: 8_000,
 	},
 	caisse: {
 		id: 'caisse',
@@ -110,8 +103,6 @@ export const GENERATORS: Record<GenId, Generator> = {
 			{ chain: 'elec', w: 80 },
 			{ chain: 'elec', level: 2, w: 20 },
 		],
-		charges: 12,
-		chargeMs: 8_000,
 		unlock: 'etageres',
 	},
 	coffre: {
@@ -121,8 +112,6 @@ export const GENERATORS: Record<GenId, Generator> = {
 			{ chain: 'bois', w: 80 },
 			{ chain: 'bois', level: 2, w: 20 },
 		],
-		charges: 12,
-		chargeMs: 8_000,
 		unlock: 'menuiserie',
 	},
 	malle: {
@@ -132,8 +121,6 @@ export const GENERATORS: Record<GenId, Generator> = {
 			{ chain: 'tissu', w: 80 },
 			{ chain: 'tissu', level: 2, w: 20 },
 		],
-		charges: 12,
-		chargeMs: 8_000,
 		unlock: 'couture',
 	},
 	greeur: {
@@ -143,8 +130,6 @@ export const GENERATORS: Record<GenId, Generator> = {
 			{ chain: 'marin', w: 80 },
 			{ chain: 'marin', level: 2, w: 20 },
 		],
-		charges: 12,
-		chargeMs: 8_000,
 		unlock: 'hangar',
 	},
 };
@@ -154,6 +139,20 @@ export const ROWS = 9;
 
 export const ENERGY_MAX = 60;
 export const ENERGY_MS = 2 * 60_000;
+
+/** Generator levels, bought with coins: more charges, a faster refill, and more often an item one level up
+ *  (a merge saved). Level 1 is the pace that slows a session down once the welcome rush is over. */
+export const GEN_LEVELS = [
+	{ charges: 8, chargeMs: 50_000, up: 0, cost: 0 },
+	{ charges: 10, chargeMs: 35_000, up: 0.12, cost: 60 },
+	{ charges: 12, chargeMs: 22_000, up: 0.22, cost: 160 },
+	{ charges: 14, chargeMs: 12_000, up: 0.32, cost: 320 },
+];
+/** The first quarter of an hour: generators refill this fast, whatever their level. */
+export const WELCOME_MS = 15 * 60_000;
+export const WELCOME_CHARGE_MS = 5_000;
+/** Cocoins to refill an empty generator at once. */
+export const RECHARGE_PRICE = 4;
 
 /** Cocoins → energy, one pack at a time. */
 export const ENERGY_PACK = { price: 10, energy: 15 };

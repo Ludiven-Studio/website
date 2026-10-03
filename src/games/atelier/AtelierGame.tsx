@@ -3,9 +3,10 @@ import {
 	load, save, newGame, tick, produce, move, moveKind, deliver, sell, sellValue, buyUpgrade, upgradeState,
 	addEnergy, markSeen, dueTier, nextTier, claimTier, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
 	stepOf, storyOrder, storyBlocker, factKnown, currentProject, projectOf, missingGens, mapReady, solveMap, code, unitCost, CELLS, type State, type Piece,
+	genMax, genUpgradeState, upgradeGen, rechargeGen,
 } from './engine';
 import {
-	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, RECAPS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK,
+	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, RECAPS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK, GEN_LEVELS, RECHARGE_PRICE,
 	INTRO, EPILOGUE, SPEAKERS, FACES, FACE_EMOJI, REP_TIERS,
 	type Line, type Order, type GenId, type ProjectId, type PuzzleId,
 } from './data';
@@ -88,6 +89,7 @@ interface Drag { from: number; x: number; y: number; over: number }
 interface Anim { k: number; type: 'spawn' | 'pop'; dx?: number; dy?: number; isNew?: boolean }
 /** One flying reward or confetti bit, in viewport pixels. */
 interface Fx { k: number; kind: 'coin' | 'energy' | 'star' | 'confetti'; x: number; y: number; dx: number; dy: number; delay: number; color?: string; rot?: number }
+interface Gain { coins?: number; rep?: number; energy?: number; cocoins?: number }
 const FOUND_KEY = 'ludiven-atelier-found';
 const CONFETTI = ['#ff3d9a', '#a24dff', '#1fd6a6', '#ffc23a', '#4fb3ff'];
 interface Toast { k: number; text: string; undo?: State }
@@ -144,6 +146,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 	const [bump, setBump] = useState(0);
 	// While a delivered story step celebrates, the restoration scene (and any new client) waits.
 	const [party, setParty] = useState(false);
+	// Rewards worth a pause (story steps, reputation visits): shown one at a time, full screen, collected by a tap.
+	const [rewardQ, setRewardQ] = useState<{ k: number; title: string; gains: Gain }[]>([]);
 	const coinRef = useRef<HTMLSpanElement>(null);
 	const energyRef = useRef<HTMLButtonElement>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
@@ -204,7 +208,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	// Once the scene queue is empty: a client arriving with a new object, else a reputation visit.
 	useEffect(() => {
-		if (!s || scenes.length || reveal || party) return;
+		if (!s || scenes.length || reveal || party || rewardQ.length) return;
 		const st = storyOrder(s);
 		if (st && st.step === 1 && !s.seen.includes(`arrival:${st.project}`)) {
 			const p = projectOf(st.project!);
@@ -218,7 +222,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		setS(claimTier(s, t.id));
 		setScenes([{ kind: 'talk', id: t.id, lines: t.lines, title: t.title }]);
 		trackEvent('atelier:rep_tier', { id: t.id });
-	}, [s, scenes.length, reveal, party]);
+	}, [s, scenes.length, reveal, party, rewardQ.length]);
 
 	const finishReveal = useCallback(() => {
 		const r = revealRef.current;
@@ -307,7 +311,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			sfx.refuse();
 			if (r.why === 'energy') { setEnergyOpen(true); trackEvent('atelier:energy_empty', { project: currentProject(s).id }); }
 			else if (r.why === 'full') { flash('Établi plein : fusionne des objets, ou touche-en un pour le vendre.'); trackEvent('atelier:board_full', { project: currentProject(s).id }); }
-			else if (r.why === 'charges') flash(`${GENERATORS[genOf(s.board[cell])!].name} : rechargement…`);
+			else if (r.why === 'charges') flash(`${GENERATORS[genOf(s.board[cell])!].name} : rechargement… Recharge-le ou améliore-le dans le panneau.`);
 			return;
 		}
 		sfx.produce();
@@ -337,7 +341,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		const r = deliver(s, o.id);
 		if (!r.ok) return;
 		const card = document.querySelector(`[data-order="${o.id}"]`);
-		fly(card, { coins: o.reward.coins, energy: o.reward.energy, rep: o.reward.rep });
+		// Story steps show their rewards in the full-screen popup after the scene; small orders just fly them.
+		if (o.kind !== 'story') fly(card, { coins: o.reward.coins, energy: o.reward.energy, rep: o.reward.rep });
 		setS(r.s);
 		setSel(null);
 		sfx.deliver();
@@ -395,6 +400,25 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		sfx.restore();
 	};
 
+	const doGenUp = (g: GenId) => {
+		if (!s) return;
+		const n = upgradeGen(s, g, Date.now());
+		if (n === s) return;
+		setS(n);
+		sfx.restore();
+		confetti(cellEl(n.board.findIndex((p) => genOf(p) === g)));
+		flash(`${GENERATORS[g].name} : niveau ${n.gens[g].level} !`);
+		trackEvent('atelier:gen_level', { gen: g, level: n.gens[g].level });
+	};
+
+	const doRecharge = (g: GenId) => {
+		if (!s || !spend(RECHARGE_PRICE)) return;
+		setS(rechargeGen(s, g, Date.now()));
+		sfx.produce();
+		flash(`${GENERATORS[g].name} rechargé !`);
+		trackEvent('atelier:gen_recharge', { gen: g });
+	};
+
 	const buyEnergy = () => {
 		if (!s) return;
 		if (!spend(ENERGY_PACK.price)) return;
@@ -415,6 +439,26 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (s) setS(markSeen(s, sc.id));
 		if (sc.id === 'intro' || sc.id.startsWith('arrival')) setView('etabli');
 		if (sc.kind === 'restore' && sc.to >= projectOf(sc.project).steps) setView('atelier');
+		// The rewards, now that the story has been told.
+		const tier = REP_TIERS.find((t) => t.id === sc.id);
+		if (sc.kind === 'restore' && sc.reward) {
+			const p = projectOf(sc.project);
+			const { coins, rep, energy, cocoins } = sc.reward;
+			setRewardQ((q) => [...q, { k: Date.now(), title: sc.to >= p.steps ? `Chapitre ${p.chapter} terminé !` : `${p.object} : étape ${sc.to}/${p.steps}`, gains: { coins, rep, energy, cocoins } }]);
+		} else if (tier) {
+			setRewardQ((q) => [...q, { k: Date.now(), title: tier.title, gains: { energy: tier.reward.energy } }]);
+		}
+	};
+
+	const collect = (tiles: Element[]) => {
+		const r = rewardQ[0];
+		if (!r) return;
+		const order = (['coins', 'energy', 'rep', 'cocoins'] as const).filter((k) => r.gains[k]);
+		order.forEach((k, i) => {
+			if (k !== 'cocoins') fly(tiles[i], { [k]: r.gains[k] });
+		});
+		sfx.deliver();
+		setRewardQ((q) => q.slice(1));
 	};
 
 	const reset = () => {
@@ -516,6 +560,9 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{coach && <div className="at-coach" key={coach.text}>{coach.text}</div>}
+			{!coach && now < s.welcomeUntil && (
+				<div className="at-welcome" role="status">⚡ Recharge express de bienvenue : encore <strong>{fmt(s.welcomeUntil - now)}</strong></div>
+			)}
 
 			{view === 'etabli' ? (
 				<>
@@ -634,6 +681,9 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 						now={now}
 						confirm={confirmSell === sel}
 						onSell={() => sel !== null && doSell(sel)}
+						onGenUp={doGenUp}
+						onRecharge={doRecharge}
+						cocoins={wallet.balance}
 					/>
 				</>
 			) : (
@@ -681,6 +731,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 					<PieceImg piece={s.board[drag.from]!} />
 				</div>
 			)}
+
+			{rewardQ[0] && !scene && !reveal && !puzzle && <RewardPop key={rewardQ[0].k} title={rewardQ[0].title} gains={rewardQ[0].gains} onCollect={collect} />}
 
 			{fx.length > 0 && (
 				<div className="at-fx" aria-hidden="true">
@@ -752,6 +804,33 @@ function Delta({ value }: { value: number }) {
 	return <span className={`at-delta ${d.n > 0 ? 'up' : 'down'}`} key={d.k} aria-hidden="true">{d.n > 0 ? `+${d.n}` : `−${-d.n}`}</span>;
 }
 
+/** Full-screen rewards: big coloured tiles that read on any background, then "Récupérer" sends them home. */
+function RewardPop({ title, gains, onCollect }: { title: string; gains: Gain; onCollect: (tiles: Element[]) => void }) {
+	const tiles = useRef<(HTMLDivElement | null)[]>([]);
+	const items = ([
+		['coins', '🪙', 'pièces'], ['energy', '⚡', 'énergie'], ['rep', '⭐', 'réputation'], ['cocoins', null, 'cocoins'],
+	] as const).filter(([k]) => gains[k]);
+	return (
+		<div className="at-modal at-reward-modal" role="dialog" aria-modal="true" aria-label={`Récompenses : ${title}`}>
+			<div className="at-reward">
+				<div className="at-reward-rays" aria-hidden="true" />
+				<p className="at-reward-kicker">Récompenses</p>
+				<h3>{title}</h3>
+				<div className="at-reward-tiles">
+					{items.map(([k, icon, label], i) => (
+						<div key={k} ref={(el) => { tiles.current[i] = el; }} className={`at-reward-tile ${k}`} style={{ animationDelay: `${0.15 + i * 0.12}s` }}>
+							<span className="at-reward-icon">{icon ?? <Cocoin size="1em" />}</span>
+							<b>+{gains[k]}</b>
+							<small>{label}</small>
+						</div>
+					))}
+				</div>
+				<button className="at-btn at-reward-btn" onClick={() => onCollect(tiles.current.filter((t): t is HTMLDivElement => !!t))}>Récupérer</button>
+			</div>
+		</div>
+	);
+}
+
 /** Reward chips: what an order or an upgrade brought. */
 function Gains({ coins, rep, energy, cocoins }: { coins?: number; rep?: number; energy?: number; cocoins?: number }) {
 	return (
@@ -765,10 +844,11 @@ function Gains({ coins, rep, energy, cocoins }: { coins?: number; rep?: number; 
 }
 
 function GenBadge({ s, g, now }: { s: State; g: GenId; now: number }) {
-	const max = GENERATORS[g].charges;
+	const max = genMax(s, g);
 	const c = s.gens[g].charges;
 	return (
 		<>
+			{s.gens[g].level > 1 && <i className="at-genlvl" aria-label={`niveau ${s.gens[g].level}`}>{'★'.repeat(s.gens[g].level - 1)}</i>}
 			<span className="at-charge" aria-label={`${c} charges sur ${max}`}>
 				<span style={{ width: `${(c / max) * 100}%` }} />
 			</span>
@@ -777,8 +857,15 @@ function GenBadge({ s, g, now }: { s: State; g: GenId; now: number }) {
 	);
 }
 
-function Info({ s, cell, piece, need, now, confirm, onSell }: {
+/** What a generator level gives, in words a player reads at a glance. */
+const levelPerks = (lv: number): string => {
+	const L = GEN_LEVELS[lv - 1];
+	return `${L.charges} charges · ${Math.round(L.chargeMs / 1000)} s par charge${L.up ? ` · ${Math.round(L.up * 100)}${NBSP}% d’objets niv.${NBSP}+1` : ''}`;
+};
+
+function Info({ s, cell, piece, need, now, confirm, onSell, onGenUp, onRecharge, cocoins }: {
 	s: State; cell: number | null; piece: Piece | null; need: Set<Piece>; now: number; confirm: boolean; onSell: () => void;
+	onGenUp: (g: GenId) => void; onRecharge: (g: GenId) => void; cocoins: number;
 }) {
 	if (cell === null || !piece) {
 		return (
@@ -794,13 +881,30 @@ function Info({ s, cell, piece, need, now, confirm, onSell }: {
 		const gen = GENERATORS[g];
 		const fams = [...new Set(gen.out.map((o) => CHAINS[o.chain].family))].join(' ou ');
 		const c = s.gens[g].charges;
+		const max = genMax(s, g);
+		const lv = s.gens[g].level;
+		const up = genUpgradeState(s, g);
+		const next = GEN_LEVELS[lv];
 		return (
-			<div className="at-info">
+			<div className="at-info at-info-gen">
 				<PieceImg piece={piece} className="at-info-img" />
 				<div>
-					<strong>{gen.name}</strong>
+					<strong>{gen.name} <small>niv. {lv}/{GEN_LEVELS.length}</small></strong>
 					<span>Produit : {fams} · 1 ⚡ par objet</span>
-					<span>Charges {c}/{gen.charges}{c < gen.charges && ` · +1 dans ${fmt(chargeIn(s, g, now))}`}</span>
+					<span>Charges {c}/{max}{c < max && ` · +1 dans ${fmt(chargeIn(s, g, now))}`}</span>
+					{next && <span className="at-info-next">Niveau {lv + 1} : {levelPerks(lv + 1)}</span>}
+				</div>
+				<div className="at-info-acts">
+					{next && (
+						<button className="at-btn small" disabled={up !== 'ok'} onClick={() => onGenUp(g)}>
+							Améliorer · {next.cost} 🪙
+						</button>
+					)}
+					{c < max && (
+						<button className="at-btn small ghost" disabled={cocoins < RECHARGE_PRICE} onClick={() => onRecharge(g)}>
+							Recharger · {RECHARGE_PRICE} <Cocoin size="1em" />
+						</button>
+					)}
 				</div>
 			</div>
 		);
@@ -1309,7 +1413,6 @@ function SceneView({ scene, onDone, onSkip }: { scene: Scene; onDone: () => void
 						<ObjectArt {...art} />
 					</div>
 				)}
-				{scene.kind === 'restore' && scene.reward && after && last && <Gains {...scene.reward} />}
 				{line && (
 					<div className={`at-line ${line.who}`} key={i}>
 						{line.who !== 'note' && line.who !== 'moi' && <Face who={whoName(line.who)} size={44} />}
@@ -1445,6 +1548,38 @@ const FUN_CSS = `
 .at-newtag { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); z-index: 3; white-space: nowrap; font-family: var(--font-brand); font-size: 11px; font-weight: 800; color: #fff; background: linear-gradient(180deg, #ff6fb5, var(--fun-pink)); border-radius: 999px; padding: 2px 8px; box-shadow: 0 2px 0 var(--fun-pink-dark); pointer-events: none; animation: at-newtag 1.8s ease both; }
 @keyframes at-newtag { 0% { transform: translate(-50%, 6px) scale(0.5); opacity: 0; } 15% { transform: translate(-50%, -6px) scale(1.15); opacity: 1; } 75% { transform: translate(-50%, -10px) scale(1); opacity: 1; } 100% { transform: translate(-50%, -22px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .at-fly, .at-fly > i, .at-burst i, .at-root .at-bumpnum { animation-duration: 0.01s !important; } }
+/* Full-screen rewards: each gain on its own coloured tile, white numbers, never gold on gold. */
+.at-root .at-reward-modal { z-index: 85; background: rgba(74, 31, 69, 0.72); }
+.at-reward { position: relative; width: min(100%, 360px); text-align: center; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 12px; animation: at-reward-in 0.45s cubic-bezier(.3,1.5,.5,1); }
+@keyframes at-reward-in { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.at-reward-rays { position: absolute; left: 50%; top: 45%; width: 520px; height: 520px; margin: -260px 0 0 -260px; z-index: -1; pointer-events: none;
+	background: repeating-conic-gradient(rgba(255, 199, 227, 0.22) 0 12deg, transparent 12deg 24deg); border-radius: 50%;
+	-webkit-mask: radial-gradient(circle, #000 20%, transparent 68%); mask: radial-gradient(circle, #000 20%, transparent 68%); animation: at-rays 14s linear infinite; }
+@keyframes at-rays { to { transform: rotate(360deg); } }
+.at-reward-kicker { margin: 0; font-family: var(--font-brand); font-weight: 800; font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fun-gold); }
+.at-reward h3 { margin: 0; font-family: var(--font-brand); font-size: 26px; line-height: 1.15; color: #fff; text-shadow: 0 3px 0 rgba(74, 31, 69, 0.6); }
+.at-reward-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 6px 0 4px; }
+.at-reward-tile { width: 92px; padding: 12px 6px 10px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 3px solid #fff;
+	box-shadow: 0 5px 0 rgba(0,0,0,0.18), 0 10px 22px rgba(0,0,0,0.25); animation: at-tile-in 0.45s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes at-tile-in { from { transform: scale(0) rotate(-12deg); } to { transform: none; } }
+.at-reward-tile.coins { background: linear-gradient(180deg, #b46dff, var(--fun-violet-dark)); }
+.at-reward-tile.energy { background: linear-gradient(180deg, #ff70b8, var(--fun-pink-dark)); }
+.at-reward-tile.rep { background: linear-gradient(180deg, #43e8bd, var(--fun-mint-dark)); }
+.at-reward-tile.cocoins { background: linear-gradient(180deg, #ff9a5a, #e0532a); }
+.at-reward-icon { font-size: 38px; line-height: 44px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
+.at-reward-tile b { font-family: var(--font-brand); font-size: 26px; font-weight: 800; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.25); }
+.at-reward-tile small { font-size: 12px; font-weight: 700; color: #fff; opacity: 0.92; }
+.at-root .at-reward-btn { font-size: 18px; padding: 12px 36px; }
+.at-welcome { text-align: center; font-size: 13px; color: var(--fun-violet-dark); background: #f3e6ff; border: 2px solid #dcc2ff; border-radius: 999px; padding: 6px 12px; }
+.at-welcome strong { font-variant-numeric: tabular-nums; }
+.at-genlvl { position: absolute; left: 2px; top: 1px; font-style: normal; font-size: 9px; line-height: 1; color: var(--fun-gold); text-shadow: 0 1px 0 #7428d6, 0 0 2px #7428d6; letter-spacing: -1px; }
+.at-root .at-info-gen { display: grid; grid-template-columns: 52px 1fr; align-items: start; column-gap: 10px; row-gap: 8px; }
+.at-info-next { color: var(--fun-violet-dark) !important; font-weight: 600; }
+.at-root .at-info .at-info-acts { grid-column: 1 / -1; display: flex; flex-direction: row; gap: 8px; }
+.at-info-acts .at-btn { flex: 1; white-space: nowrap; }
+/* Flying rewards stand out on any card: a white halo. */
+.at-fly > i { text-shadow: 0 0 3px #fff, 0 0 6px #fff; }
+@media (prefers-reduced-motion: reduce) { .at-reward-rays { animation: none; } }
 .at-root .atx-track { stroke: var(--fun-pink-soft); }
 .at-root .atx-handle { fill: var(--fun-pink); stroke: var(--fun-pink-dark); }
 .at-root .atx-handle.ok { fill: var(--fun-mint); stroke: var(--fun-mint-dark); }

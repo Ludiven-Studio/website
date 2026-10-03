@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
 	newGame, produce, move, moveKind, deliver, tick, sell, buyUpgrade, load, save, activeOrders,
 	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, mapReady, solveMap, storyBlocker, factKnown, SAVE_V, CELLS, type State,
+	genMax, genChargeMs, genUpgradeState, upgradeGen, rechargeGen,
 } from './engine';
-import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS, FACES } from './data';
+import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS, FACES, GEN_LEVELS, WELCOME_MS, WELCOME_CHARGE_MS } from './data';
 import { CHARACTERS } from './characters';
 
 const T0 = 1_700_000_000_000;
@@ -84,7 +85,7 @@ describe('generators', () => {
 		expect(r.ok).toBe(true);
 		if (!r.ok) return;
 		expect(r.s.energy).toBe(ENERGY_MAX - 1);
-		expect(r.s.gens.tiroir.charges).toBe(GENERATORS.tiroir.charges - 1);
+		expect(r.s.gens.tiroir.charges).toBe(genMax(s, 'tiroir') - 1);
 		expect(parse(r.piece)!.chain).toBe('meca');
 		const d = Math.abs(Math.floor(r.at / COLS) - Math.floor(g / COLS)) + Math.abs((r.at % COLS) - (g % COLS));
 		expect(d).toBe(1);
@@ -109,14 +110,51 @@ describe('generators', () => {
 	it('charges run out, then refill with time', () => {
 		let s = newGame(T0);
 		const g = genCell(s, 'tiroir');
-		for (let k = 0; k < GENERATORS.tiroir.charges; k++) {
+		for (let k = 0; k < genMax(s, 'tiroir'); k++) {
 			const r = produce(s, g, T0);
 			expect(r.ok).toBe(true);
 			if (r.ok) s = r.s;
 		}
 		expect(produce(s, g, T0)).toEqual({ ok: false, why: 'charges' });
-		const later = produce(s, g, T0 + GENERATORS.tiroir.chargeMs);
+		const later = produce(s, g, T0 + genChargeMs(s, 'tiroir', T0));
 		expect(later.ok).toBe(true);
+	});
+
+	it('the welcome quarter-hour refills fast, then the level sets the pace', () => {
+		const s = newGame(T0);
+		expect(genChargeMs(s, 'boite', T0)).toBe(WELCOME_CHARGE_MS);
+		expect(genChargeMs(s, 'boite', T0 + WELCOME_MS)).toBe(GEN_LEVELS[0].chargeMs);
+	});
+
+	it('a generator level costs coins, comes back full and refills faster', () => {
+		let s = { ...newGame(T0), coins: 1000, welcomeUntil: 0 };
+		expect(genUpgradeState({ ...s, coins: 0 }, 'boite')).toBe('poor');
+		s = upgradeGen(s, 'boite', T0);
+		expect(s.gens.boite.level).toBe(2);
+		expect(s.coins).toBe(1000 - GEN_LEVELS[1].cost);
+		expect(s.gens.boite.charges).toBe(GEN_LEVELS[1].charges);
+		expect(genChargeMs(s, 'boite', T0)).toBeLessThan(GEN_LEVELS[0].chargeMs);
+		for (let k = 2; k < GEN_LEVELS.length; k++) s = upgradeGen(s, 'boite', T0);
+		expect(genUpgradeState(s, 'boite')).toBe('max');
+		expect(upgradeGen(s, 'boite', T0)).toBe(s);
+	});
+
+	it('a recharge fills an empty generator at once', () => {
+		let s = { ...newGame(T0), welcomeUntil: 0 };
+		const g = genCell(s, 'tiroir');
+		for (let k = 0; k < genMax(s, 'tiroir'); k++) { const r = produce(s, g, T0); if (r.ok) s = r.s; }
+		expect(produce(s, g, T0)).toEqual({ ok: false, why: 'charges' });
+		s = rechargeGen(s, 'tiroir', T0);
+		expect(produce(s, g, T0).ok).toBe(true);
+	});
+
+	it('old saves keep their generators at level 1 and get the welcome quarter-hour', () => {
+		const old = JSON.parse(save(newGame(T0)));
+		for (const g of Object.keys(old.gens)) delete old.gens[g].level;
+		delete old.welcomeUntil;
+		const s = load(JSON.stringify(old), T0 + 86_400_000);
+		expect(s.gens.boite.level).toBe(1);
+		expect(s.welcomeUntil).toBe(T0 + 86_400_000 + WELCOME_MS);
 	});
 
 	it('generator outputs are deterministic for a seed', () => {
