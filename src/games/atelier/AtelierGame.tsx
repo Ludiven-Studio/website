@@ -333,10 +333,14 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		flash(`+${ENERGY_PACK.energy} énergie`);
 	};
 
-	const closeScene = () => {
+	/** `quit`: "Passer" during a chapter replay leaves the whole replay, not just the current scene. */
+	const closeScene = (quit = false) => {
 		const sc = scenes[0];
 		if (!sc) return;
-		setScenes((q) => q.slice(1));
+		const replay = sc.id.startsWith('replay:');
+		setScenes((q) => (replay && quit ? q.filter((x) => !x.id.startsWith('replay:')) : q.slice(1)));
+		// A replay leaves the save alone.
+		if (replay) return;
 		if (s) setS(markSeen(s, sc.id));
 		if (sc.id === 'intro' || sc.id.startsWith('arrival')) setView('etabli');
 		if (sc.kind === 'restore' && sc.to >= projectOf(sc.project).steps) setView('atelier');
@@ -579,6 +583,20 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 						];
 						setScenes((q) => [...q, { kind: 'talk', id: 'replay', lines, art: { project: p.id, state: stepOf(s, p.id) }, title: `Carnet · ${p.title}` }]);
 					}}
+					onReplayChapter={(id) => {
+						// The chapter as played: arrival, then each restoration with its puzzle or gesture. No reward, no state.
+						const p = projectOf(id);
+						const recap = RECAPS[p.id];
+						const q: Scene[] = [{
+							kind: 'talk', id: `replay:arrival:${p.id}`, art: { project: p.id, state: 0 }, title: `Chapitre ${p.chapter} · ${p.title}`,
+							lines: recap ? [{ who: 'note', text: `Précédemment : ${recap}` }, ...p.arrival] : p.arrival,
+						}];
+						for (const o of ORDERS.filter((x) => x.kind === 'story' && x.project === p.id).sort((a, b) => a.step! - b.step!)) {
+							q.push({ kind: 'restore', id: `replay:${o.id}`, project: p.id, title: o.scene!.title, from: o.step! - 1, to: o.step!, lines: o.scene!.lines, puzzle: o.scene!.puzzle });
+						}
+						trackEvent('atelier:chapter_replay', { project: p.id });
+						setScenes((x) => [...x, ...q]);
+					}}
 				/>
 			)}
 
@@ -595,7 +613,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
-			{scene && <SceneView scene={scene} onDone={closeScene} />}
+			{/* Keyed: a replay chains restoration scenes, and a puzzle must not carry its state into the next one. */}
+			{scene && <SceneView key={scene.id} scene={scene} onDone={() => closeScene()} onSkip={() => closeScene(true)} />}
 
 			{puzzle && !scene && (
 				<div className="at-modal" role="dialog" aria-modal="true">
@@ -850,9 +869,45 @@ function OrderHelp({ s, o, onClose }: { s: State; o: Order; onClose: () => void 
 	);
 }
 
-function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealDone, onBench, onPuzzle, awaited, confirmReset, onReset, onReplay }: {
+const SEASONS = [
+	{ title: 'Saison 1 · Les Pirates du retour', from: 1, to: 7 },
+	{ title: 'Saison 2 · Le capitaine du retour', from: 8, to: 13 },
+	{ title: 'Saison 3 · Le prochain départ', from: 14, to: 19 },
+	{ title: 'Saison 4 · À bientôt', from: 20, to: 25 },
+];
+
+/** Finished chapters, to play again with their puzzles and gestures; the save is left as it is. */
+function Chapters({ s, onReplay, onMap }: { s: State; onReplay: (id: ProjectId) => void; onMap: () => void }) {
+	const [open, setOpen] = useState(false);
+	const done = PROJECTS.filter((p) => stepOf(s, p.id) >= p.steps);
+	if (!done.length) return null;
+	return (
+		<details className="at-chapters" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+			<summary><strong>Carnet des chapitres</strong><span>Rejouer un chapitre terminé, énigmes et gestes compris. Votre partie n’est pas touchée.</span></summary>
+			{SEASONS.map((season) => {
+				const list = done.filter((p) => p.chapter >= season.from && p.chapter <= season.to);
+				return list.length ? (
+					<div key={season.title} className="at-chapters-season">
+						<em>{season.title}</em>
+						{list.map((p) => (
+							<div key={p.id} className="at-chapters-row">
+								<span className={`at-chapters-art ${p.id}`}><ObjectArt project={p.id} state={p.steps} /></span>
+								<span className="at-chapters-name">{p.chapter}. {p.title}</span>
+								{p.chapter === 6 && s.seen.includes('map-solved') && <button className="at-btn small ghost" onClick={onMap}>La carte</button>}
+								<button className="at-btn small" onClick={() => onReplay(p.id)}>Rejouer</button>
+							</div>
+						))}
+					</div>
+				) : null;
+			})}
+		</details>
+	);
+}
+
+function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealDone, onBench, onPuzzle, awaited, confirmReset, onReset, onReplay, onReplayChapter }: {
 	s: State; story: Order | null; chapterDone: boolean; coachUp: boolean; awaited: string | null; reveal: Reveal | null; onRevealDone: () => void;
 	onUpgrade: (id: string) => void; onBench: () => void; onPuzzle: () => void; confirmReset: boolean; onReset: () => void; onReplay: () => void;
+	onReplayChapter: (id: ProjectId) => void;
 }) {
 	const sceneRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -954,6 +1009,8 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 
 			<Trombi s={s} />
 
+			<Chapters s={s} onReplay={onReplayChapter} onMap={onPuzzle} />
+
 			{has('bureau') && s.seen.includes('map-solved') ? (
 				// Solved: a souvenir now, folded to one line, the map shown whole.
 				<details className="at-office done">
@@ -1011,7 +1068,7 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 	);
 }
 
-function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
+function SceneView({ scene, onDone, onSkip }: { scene: Scene; onDone: () => void; onSkip: () => void }) {
 	const [i, setI] = useState(0);
 	const [after, setAfter] = useState(scene.kind !== 'restore');
 	// A puzzle step: the restoration is the player's own gesture, so it replaces the timed reveal.
@@ -1027,7 +1084,7 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 	}, [scene]);
 	if (puzzle && scene.kind === 'restore') {
 		const solve = (skipped: boolean) => {
-			trackEvent(skipped ? 'atelier:puzzle_skipped' : 'atelier:puzzle_solved', { puzzle: scene.puzzle! });
+			trackEvent(skipped ? 'atelier:puzzle_skipped' : 'atelier:puzzle_solved', { puzzle: scene.puzzle!, replay: scene.id.startsWith('replay:') });
 			setPuzzle(false);
 			setAfter(true);
 		};
@@ -1173,7 +1230,7 @@ function SceneView({ scene, onDone }: { scene: Scene; onDone: () => void }) {
 					</div>
 				)}
 				<div className="at-talk-nav">
-					<button className="at-btn ghost small" onClick={onDone}>Passer</button>
+					<button className="at-btn ghost small" onClick={onSkip}>{scene.id.startsWith('replay:') ? 'Quitter' : 'Passer'}</button>
 					<span className="at-dots">{lines.map((_, k) => <i key={k} className={k === i ? 'on' : ''} />)}</span>
 					<button className="at-btn" onClick={next} disabled={scene.kind === 'restore' && !after}>{last ? 'Continuer' : 'Suite'}</button>
 				</div>
@@ -1360,6 +1417,18 @@ const CSS = `
 .at-map { width: min(70vw, 260px); margin: 0 auto; }
 .at-map.small { width: 150px; margin: 4px 0 0; }
 .at-trombi { background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.at-chapters { background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; }
+.at-chapters summary { display: flex; flex-direction: column; gap: 2px; cursor: pointer; list-style: none; }
+.at-chapters summary::-webkit-details-marker { display: none; }
+.at-chapters summary strong { font-size: 15px; color: var(--gray-0); }
+.at-chapters summary strong::after { content: ' ▾'; color: var(--gray-300); font-size: 12px; }
+.at-chapters[open] summary strong::after { content: ' ▴'; }
+.at-chapters summary span { font-size: 12px; color: var(--gray-300); }
+.at-chapters-season { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.at-chapters-season > em { font-size: 12px; font-weight: 700; font-style: normal; color: #c98a4a; text-transform: uppercase; letter-spacing: 0.04em; }
+.at-chapters-row { display: flex; align-items: center; gap: 8px; }
+.at-chapters-art { width: 34px; flex: none; display: flex; justify-content: center; }
+.at-chapters-name { flex: 1; min-width: 0; font-size: 13px; color: var(--gray-200); }
 .at-trombi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .at-trombi-top > strong { font-size: 15px; color: var(--gray-0); }
 .at-trombi-tabs { display: flex; gap: 2px; background: var(--gray-800); border-radius: 999px; padding: 2px; }
