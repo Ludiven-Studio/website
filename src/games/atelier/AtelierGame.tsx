@@ -82,7 +82,11 @@ function ObjectArt({ project, state }: Art) {
 }
 
 interface Drag { from: number; x: number; y: number; over: number }
-interface Anim { k: number; type: 'spawn' | 'pop'; dx?: number; dy?: number }
+interface Anim { k: number; type: 'spawn' | 'pop'; dx?: number; dy?: number; isNew?: boolean }
+/** One flying reward or confetti bit, in viewport pixels. */
+interface Fx { k: number; kind: 'coin' | 'energy' | 'star' | 'confetti'; x: number; y: number; dx: number; dy: number; delay: number; color?: string; rot?: number }
+const FOUND_KEY = 'ludiven-atelier-found';
+const CONFETTI = ['#ff3d9a', '#a24dff', '#1fd6a6', '#ffc23a', '#4fb3ff'];
 interface Toast { k: number; text: string; undo?: State }
 
 const fmt = (ms: number): string => {
@@ -133,6 +137,12 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 	const [orderSel, setOrderSel] = useState<string | null>(null);
 	const [reveal, setReveal] = useState<Reveal | null>(null);
 	const revealRef = useRef<Reveal | null>(null);
+	const [fx, setFx] = useState<Fx[]>([]);
+	const [bump, setBump] = useState(0);
+	// While a delivered story step celebrates, the restoration scene (and any new client) waits.
+	const [party, setParty] = useState(false);
+	const coinRef = useRef<HTMLSpanElement>(null);
+	const energyRef = useRef<HTMLButtonElement>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
 	const dragRef = useRef<{ from: number; x0: number; y0: number; moved: boolean } | null>(null);
 	const animK = useRef(0);
@@ -191,7 +201,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	// Once the scene queue is empty: a client arriving with a new object, else a reputation visit.
 	useEffect(() => {
-		if (!s || scenes.length || reveal) return;
+		if (!s || scenes.length || reveal || party) return;
 		const st = storyOrder(s);
 		if (st && st.step === 1 && !s.seen.includes(`arrival:${st.project}`)) {
 			const p = projectOf(st.project!);
@@ -205,7 +215,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		setS(claimTier(s, t.id));
 		setScenes([{ kind: 'talk', id: t.id, lines: t.lines, title: t.title }]);
 		trackEvent('atelier:rep_tier', { id: t.id });
-	}, [s, scenes.length, reveal]);
+	}, [s, scenes.length, reveal, party]);
 
 	const finishReveal = useCallback(() => {
 		const r = revealRef.current;
@@ -234,6 +244,58 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		setAnims((m) => ({ ...m, [cell]: { ...a, k: animK.current } }));
 	};
 
+	// ---------- reward effects ----------
+	const centre = (el: Element | null | undefined) => {
+		const r = el?.getBoundingClientRect();
+		return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
+	};
+	const cellEl = (cell: number) => boardRef.current?.children[cell] ?? null;
+	/** Rewards fly from `from` to their counter, a few at a time; the counter bumps as they land. */
+	const fly = (from: Element | null | undefined, gains: { coins?: number; energy?: number; rep?: number }) => {
+		const a = centre(from);
+		if (!a) return;
+		const out: Fx[] = [];
+		const add = (kind: Fx['kind'], to: Element | null, n: number) => {
+			const b = centre(to) ?? { x: a.x, y: a.y - 120 };
+			for (let i = 0; i < n; i++) {
+				animK.current++;
+				out.push({ k: animK.current, kind, x: a.x + (i % 3 - 1) * 10, y: a.y, dx: b.x - a.x, dy: b.y - a.y, delay: i * 0.08 });
+			}
+		};
+		if (gains.coins) add('coin', coinRef.current, Math.min(8, Math.max(2, Math.round(gains.coins / 3))));
+		if (gains.energy) add('energy', energyRef.current, Math.min(5, Math.max(2, Math.round(gains.energy / 4))));
+		if (gains.rep) add('star', coinRef.current?.parentElement ?? null, Math.min(4, gains.rep));
+		if (!out.length) return;
+		setFx((f) => [...f, ...out]);
+		const last = 900 + out.length * 80;
+		setTimeout(() => setBump((b) => b + 1), 800);
+		setTimeout(() => setFx((f) => f.filter((x) => !out.includes(x))), last + 200);
+	};
+	const confetti = (from: Element | null | undefined) => {
+		const a = centre(from);
+		if (!a) return;
+		const out: Fx[] = Array.from({ length: 36 }, (_, i) => {
+			animK.current++;
+			const ang = (i / 36) * Math.PI * 2, sp = 90 + ((i * 37) % 70);
+			return { k: animK.current, kind: 'confetti' as const, x: a.x, y: a.y, dx: Math.cos(ang) * sp, dy: Math.sin(ang) * sp + 120, delay: (i % 6) * 0.02, color: CONFETTI[i % CONFETTI.length], rot: (i * 47) % 360 + 180 };
+		});
+		setFx((f) => [...f, ...out]);
+		setTimeout(() => setFx((f) => f.filter((x) => !out.includes(x))), 1500);
+	};
+	// Items already met: a merge into anything else shows "Nouveau !". Seeded from the bench on first run.
+	const found = useRef<Set<string> | null>(null);
+	const firstTime = (p: string): boolean => {
+		if (!found.current) {
+			let saved: string[] | null = null;
+			try { saved = JSON.parse(localStorage.getItem(FOUND_KEY) ?? 'null'); } catch { /* storage blocked */ }
+			found.current = new Set(saved ?? (sRef.current?.board.filter((x): x is string => !!x) ?? []));
+		}
+		if (found.current.has(p)) return false;
+		found.current.add(p);
+		try { localStorage.setItem(FOUND_KEY, JSON.stringify([...found.current])); } catch { /* storage full or blocked */ }
+		return true;
+	};
+
 	// ---------- actions ----------
 	const tapGenerator = (cell: number) => {
 		if (!s) return;
@@ -259,7 +321,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (kind === 'none') return;
 		const r = move(s, from, to);
 		if (kind === 'merge') {
-			animate(to, { type: 'pop' });
+			animate(to, { type: 'pop', isNew: firstTime(r.s.board[to]!) });
 			sfx.merge(parse(r.s.board[to])!.level);
 			if (s.tut === 1) trackEvent('atelier:tutorial_step', { step: 2 });
 			setSel(to);
@@ -271,6 +333,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (!s) return;
 		const r = deliver(s, o.id);
 		if (!r.ok) return;
+		const card = document.querySelector(`[data-order="${o.id}"]`);
+		fly(card, { coins: o.reward.coins, energy: o.reward.energy, rep: o.reward.rep });
 		setS(r.s);
 		setSel(null);
 		sfx.deliver();
@@ -281,7 +345,10 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (o.kind === 'story' && o.scene && o.project && o.step) {
 			trackEvent('atelier:restoration_step', { project: o.project, step: o.step });
 			const next: Scene[] = [{ kind: 'restore', id: o.id, project: o.project, title: o.scene.title, from: o.step - 1, to: o.step, lines: o.scene.lines, reward: o.reward, puzzle: o.scene.puzzle }];
-			setScenes((q) => [...q, ...next]);
+			// A story step is a little party first: confetti and rewards flying, then the restoration scene.
+			confetti(card);
+			setParty(true);
+			setTimeout(() => { setScenes((q) => [...q, ...next]); setParty(false); }, 1100);
 		} else {
 			const bits = [`+${o.reward.coins} pièces`];
 			if (o.reward.rep) bits.push(`+${o.reward.rep} réputation`);
@@ -297,6 +364,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (inOrder && confirmSell !== cell) { setConfirmSell(cell); return; }
 		setConfirmSell(null);
 		const before = s;
+		fly(cellEl(cell), { coins: sellValue(p) });
 		setS(sell(s, cell));
 		setSel(null);
 		flash(`${pieceName(p)} vendu · +${sellValue(p)} pièce${sellValue(p) > 1 ? 's' : ''}`, before);
@@ -430,13 +498,13 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}{SAISON4_CSS}{PUZZLE_CSS}{GESTURE_CSS}{FUN_CSS}</style>
 
 			<div className="at-hud">
-				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
+				<button ref={energyRef} className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
 					<span aria-hidden="true">⚡</span>
-					<strong>{s.energy}</strong>
+					<strong key={`e${bump}`} className={bump ? 'at-bumpnum' : ''}>{s.energy}</strong>
 					{s.energy < ENERGY_MAX ? <em>{fmt(energyIn(s, now))}</em> : <small>/{ENERGY_MAX}</small>}
 					<span className="at-plus" aria-hidden="true">+</span>
 				</button>
-				<span className="at-stat at-coins" title="Pièces"><span aria-hidden="true">🪙</span><strong>{s.coins}</strong><Delta value={s.coins} /></span>
+				<span ref={coinRef} className="at-stat at-coins" title="Pièces"><span aria-hidden="true">🪙</span><strong key={`c${bump}`} className={bump ? 'at-bumpnum' : ''}>{s.coins}</strong><Delta value={s.coins} /></span>
 				<button className="at-stat at-snd" onClick={() => { sfx.setEnabled(!sound); setSound(!sound); }} aria-label={sound ? 'Couper le son' : 'Activer le son'} title={sound ? 'Couper le son' : 'Activer le son'}>{sound ? '🔊' : '🔇'}</button>
 				<div className="at-tabs" role="tablist">
 					<button role="tab" aria-selected={view === 'atelier'} className={`at-tab ${view === 'atelier' ? 'on' : ''} ${coach?.target === 'tab' ? 'at-pulse' : ''}`} onClick={() => setView('atelier')}>Atelier</button>
@@ -468,6 +536,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 							return (
 								<div
 									key={o.id}
+									data-order={o.id}
 									className={`at-order ${o.kind === 'story' ? 'story' : ''} ${can ? 'can' : ''} ${orderSel === o.id ? 'open' : ''}`}
 									role="button"
 									tabIndex={0}
@@ -533,6 +602,10 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 												style={a?.type === 'spawn' ? { ['--dx' as string]: a.dx, ['--dy' as string]: a.dy } : undefined}
 											>
 												<PieceImg piece={p} />
+												{a?.type === 'pop' && (
+													<span className="at-burst" aria-hidden="true">{Array.from({ length: 8 }, (_, k) => <i key={k} style={{ ['--a' as string]: `${k * 45}deg` }} />)}</span>
+												)}
+												{a?.type === 'pop' && a.isNew && <b className="at-newtag">Nouveau !</b>}
 												{g ? (
 													<GenBadge s={s} g={g} now={now} />
 												) : (
@@ -603,6 +676,20 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			{drag && s.board[drag.from] && (
 				<div className="at-ghost" style={{ left: drag.x, top: drag.y }}>
 					<PieceImg piece={s.board[drag.from]!} />
+				</div>
+			)}
+
+			{fx.length > 0 && (
+				<div className="at-fx" aria-hidden="true">
+					{fx.map((f) => (
+						<span
+							key={f.k}
+							className={`at-fly ${f.kind}`}
+							style={{ left: f.x, top: f.y, ['--dx' as string]: `${f.dx}px`, ['--dy' as string]: `${f.dy}px`, ['--d' as string]: `${f.delay}s`, ['--c' as string]: f.color, ['--r' as string]: `${f.rot ?? 0}deg` }}
+						>
+							<i>{f.kind === 'coin' ? '🪙' : f.kind === 'energy' ? '⚡' : f.kind === 'star' ? '⭐' : ''}</i>
+						</span>
+					))}
 				</div>
 			)}
 
@@ -1328,12 +1415,33 @@ const FUN_CSS = `
 .at-root .at-dots i { background: var(--fun-pink-soft); }
 .at-root .at-dots i.on { background: var(--fun-pink); }
 .at-root .at-face { border-color: var(--fun-pink-soft); background: var(--fun-pink-pale); }
-.at-root .at-toast { background: var(--fun-plum); }
+/* At the bottom: on top it hid the very counters the rewards fly to. */
+.at-root .at-toast { background: var(--fun-plum); top: auto; bottom: calc(env(safe-area-inset-bottom) + 20px); animation-name: at-in-up; }
+@keyframes at-in-up { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .at-root .at-toast button { background: var(--fun-gold); }
 .at-root .at-trombi-era > em, .at-root .at-tree-family > em, .at-root .at-chapters-season > em { color: var(--fun-violet); }
 .at-root .at-tree-family { border-left-color: var(--fun-pink-soft); }
 .at-root .at-tree-link { color: var(--fun-pink); }
 .at-root .at-up.owned .at-done, .at-root .at-done { color: var(--fun-mint-dark); }
+/* Rewards: they fly to their counter on an arc (x eases in, y eases out), the counter bumps as they land. */
+.at-fx { position: fixed; inset: 0; pointer-events: none; z-index: 95; overflow: hidden; }
+.at-fly { position: absolute; width: 0; height: 0; animation: at-flyx 0.85s cubic-bezier(.55,0,.9,.5) var(--d) both; }
+.at-fly > i { position: absolute; left: -13px; top: -13px; font-style: normal; font-size: 24px; line-height: 26px; filter: drop-shadow(0 2px 2px rgba(74, 31, 69, 0.35)); animation: at-flyy 0.85s cubic-bezier(.15,.75,.35,1) var(--d) both; }
+@keyframes at-flyx { from { transform: translateX(0); } to { transform: translateX(var(--dx)); } }
+@keyframes at-flyy { 0% { transform: translateY(0) scale(0.4); opacity: 0; } 12% { transform: translateY(-34px) scale(1.25); opacity: 1; } 88% { opacity: 1; } 100% { transform: translateY(var(--dy)) scale(0.7); opacity: 0.3; } }
+.at-fly.confetti { animation: at-conf 1.3s cubic-bezier(.2,.7,.5,1) var(--d) both; }
+.at-fly.confetti > i { left: -4px; top: -6px; width: 8px; height: 12px; border-radius: 2px; background: var(--c); animation: none; filter: none; }
+@keyframes at-conf { 0% { transform: translate(0, 0) rotate(0); opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--r)); opacity: 0; } }
+.at-root .at-bumpnum { display: inline-block; animation: at-bumpnum 0.45s cubic-bezier(.3,1.6,.5,1); }
+@keyframes at-bumpnum { 0% { transform: scale(1); } 40% { transform: scale(1.45); color: var(--fun-pink); } 100% { transform: scale(1); } }
+/* Merge: a ring of sparks, and "Nouveau !" the first time an item is made. */
+.at-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.at-burst i { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--fun-gold); box-shadow: 0 0 6px var(--fun-pink); animation: at-spark2 0.55s ease-out both; }
+.at-burst i:nth-child(even) { background: var(--fun-pink); box-shadow: 0 0 6px var(--fun-gold); }
+@keyframes at-spark2 { from { transform: rotate(var(--a)) translateX(4px) scale(1); opacity: 1; } to { transform: rotate(var(--a)) translateX(30px) scale(0.2); opacity: 0; } }
+.at-newtag { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); z-index: 3; white-space: nowrap; font-family: var(--font-brand); font-size: 11px; font-weight: 800; color: #fff; background: linear-gradient(180deg, #ff6fb5, var(--fun-pink)); border-radius: 999px; padding: 2px 8px; box-shadow: 0 2px 0 var(--fun-pink-dark); pointer-events: none; animation: at-newtag 1.8s ease both; }
+@keyframes at-newtag { 0% { transform: translate(-50%, 6px) scale(0.5); opacity: 0; } 15% { transform: translate(-50%, -6px) scale(1.15); opacity: 1; } 75% { transform: translate(-50%, -10px) scale(1); opacity: 1; } 100% { transform: translate(-50%, -22px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .at-fly, .at-fly > i, .at-burst i, .at-root .at-bumpnum { animation-duration: 0.01s !important; } }
 .at-root .atx-track { stroke: var(--fun-pink-soft); }
 .at-root .atx-handle { fill: var(--fun-pink); stroke: var(--fun-pink-dark); }
 .at-root .atx-handle.ok { fill: var(--fun-mint); stroke: var(--fun-mint-dark); }
