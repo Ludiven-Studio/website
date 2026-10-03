@@ -3,7 +3,7 @@ import {
 	load, save, newGame, tick, produce, move, moveKind, deliver, sell, sellValue, buyUpgrade, upgradeState,
 	addEnergy, markSeen, dueTier, nextTier, claimTier, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
 	stepOf, storyOrder, storyBlocker, factKnown, currentProject, projectOf, missingGens, mapReady, solveMap, code, unitCost, CELLS, type State, type Piece,
-	genMax, genUpgradeState, upgradeGen, rechargeGen,
+	genMax, genUpgradeState, upgradeGen, rechargeGen, fullIn, genChargeMs,
 } from './engine';
 import {
 	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, RECAPS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK, GEN_LEVELS, RECHARGE_PRICE,
@@ -135,6 +135,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 	const [toast, setToast] = useState<Toast | null>(null);
 	const [scenes, setScenes] = useState<Scene[]>([]);
 	const [energyOpen, setEnergyOpen] = useState(false);
+	const [genPop, setGenPop] = useState<GenId | null>(null);
 	const [confirmSell, setConfirmSell] = useState<number | null>(null);
 	const [confirmReset, setConfirmReset] = useState(false);
 	const [sound, setSound] = useState(true);
@@ -147,7 +148,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 	// While a delivered story step celebrates, the restoration scene (and any new client) waits.
 	const [party, setParty] = useState(false);
 	// Rewards worth a pause (story steps, reputation visits): shown one at a time, full screen, collected by a tap.
-	const [rewardQ, setRewardQ] = useState<{ k: number; title: string; gains: Gain }[]>([]);
+	const [rewardQ, setRewardQ] = useState<{ k: number; title: string; gains: Gain; after?: Scene[] }[]>([]);
 	const coinRef = useRef<HTMLSpanElement>(null);
 	const energyRef = useRef<HTMLButtonElement>(null);
 	const boardRef = useRef<HTMLDivElement>(null);
@@ -229,7 +230,10 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		if (!r) return;
 		revealRef.current = null;
 		setReveal(null);
-		if (r.after.length) setScenes((x) => [...x, ...r.after]);
+		const up = UPGRADES.find((u) => u.id === r.id);
+		// The reputation it brings gets the full-screen popup; the scenes that follow wait for "Récupérer".
+		if (up?.rep) setRewardQ((q) => [...q, { k: Date.now(), title: `✨ ${up.name}`, gains: { rep: up.rep }, after: r.after }]);
+		else if (r.after.length) setScenes((x) => [...x, ...r.after]);
 	}, []);
 	useEffect(() => {
 		if (!reveal) return;
@@ -311,7 +315,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			sfx.refuse();
 			if (r.why === 'energy') { setEnergyOpen(true); trackEvent('atelier:energy_empty', { project: currentProject(s).id }); }
 			else if (r.why === 'full') { flash('Établi plein : fusionne des objets, ou touche-en un pour le vendre.'); trackEvent('atelier:board_full', { project: currentProject(s).id }); }
-			else if (r.why === 'charges') flash(`${GENERATORS[genOf(s.board[cell])!].name} : rechargement… Recharge-le ou améliore-le dans le panneau.`);
+			else if (r.why === 'charges') setGenPop(genOf(s.board[cell])!);
 			return;
 		}
 		sfx.produce();
@@ -405,6 +409,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		const n = upgradeGen(s, g, Date.now());
 		if (n === s) return;
 		setS(n);
+		setGenPop(null);
 		sfx.restore();
 		confetti(cellEl(n.board.findIndex((p) => genOf(p) === g)));
 		flash(`${GENERATORS[g].name} : niveau ${n.gens[g].level} !`);
@@ -414,6 +419,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 	const doRecharge = (g: GenId) => {
 		if (!s || !spend(RECHARGE_PRICE)) return;
 		setS(rechargeGen(s, g, Date.now()));
+		setGenPop(null);
 		sfx.produce();
 		flash(`${GENERATORS[g].name} rechargé !`);
 		trackEvent('atelier:gen_recharge', { gen: g });
@@ -459,6 +465,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 		});
 		sfx.deliver();
 		setRewardQ((q) => q.slice(1));
+		if (r.after?.length) setScenes((x) => [...x, ...r.after!]);
 	};
 
 	const reset = () => {
@@ -681,9 +688,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 						now={now}
 						confirm={confirmSell === sel}
 						onSell={() => sel !== null && doSell(sel)}
-						onGenUp={doGenUp}
-						onRecharge={doRecharge}
-						cocoins={wallet.balance}
+						onGenOpen={setGenPop}
 					/>
 				</>
 			) : (
@@ -772,6 +777,10 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 				</div>
 			)}
 
+			{genPop && !scene && (
+				<GenPop s={s} g={genPop} now={now} cocoins={wallet.balance} onUp={() => doGenUp(genPop)} onRecharge={() => doRecharge(genPop)} onEnergy={() => { setGenPop(null); setEnergyOpen(true); }} onClose={() => setGenPop(null)} />
+			)}
+
 			{energyOpen && (
 				<div className="at-modal" onClick={(e) => { if (e.target === e.currentTarget) setEnergyOpen(false); }}>
 					<div className="at-card">
@@ -831,18 +840,6 @@ function RewardPop({ title, gains, onCollect }: { title: string; gains: Gain; on
 	);
 }
 
-/** Reward chips: what an order or an upgrade brought. */
-function Gains({ coins, rep, energy, cocoins }: { coins?: number; rep?: number; energy?: number; cocoins?: number }) {
-	return (
-		<div className="at-gains">
-			{!!coins && <span>{coins > 0 ? `+${coins}` : `−${-coins}`} 🪙</span>}
-			{!!rep && <span>+{rep} ⭐ réputation</span>}
-			{!!energy && <span>+{energy} ⚡</span>}
-			{!!cocoins && <span>+{cocoins} <Cocoin size="1em" /></span>}
-		</div>
-	);
-}
-
 function GenBadge({ s, g, now }: { s: State; g: GenId; now: number }) {
 	const max = genMax(s, g);
 	const c = s.gens[g].charges;
@@ -857,15 +854,101 @@ function GenBadge({ s, g, now }: { s: State; g: GenId; now: number }) {
 	);
 }
 
-/** What a generator level gives, in words a player reads at a glance. */
-const levelPerks = (lv: number): string => {
-	const L = GEN_LEVELS[lv - 1];
-	return `${L.charges} charges · ${Math.round(L.chargeMs / 1000)} s par charge${L.up ? ` · ${Math.round(L.up * 100)}${NBSP}% d’objets niv.${NBSP}+1` : ''}`;
-};
+/** The generator window: what it holds, what blocks, and the two ways to go faster. */
+function GenPop({ s, g, now, cocoins, onUp, onRecharge, onEnergy, onClose }: {
+	s: State; g: GenId; now: number; cocoins: number; onUp: () => void; onRecharge: () => void; onEnergy: () => void; onClose: () => void;
+}) {
+	const gen = GENERATORS[g];
+	const fams = [...new Set(gen.out.map((o) => CHAINS[o.chain].family))].join(' ou ');
+	const c = s.gens[g].charges;
+	const max = genMax(s, g);
+	const lv = s.gens[g].level;
+	const cur = GEN_LEVELS[lv - 1];
+	const next = GEN_LEVELS[lv];
+	const up = genUpgradeState(s, g);
+	const welcome = now < s.welcomeUntil;
+	const pace = Math.round(genChargeMs(s, g, now) / 1000);
+	const status = c === 0
+		? { kind: 'block', text: `Plus de charges : toutes revenues dans ${fmt(fullIn(s, g, now))}.` }
+		: s.energy === 0
+			? { kind: 'block', text: `Plus d’énergie : +1 dans ${fmt(energyIn(s, now))}.` }
+			: { kind: 'ok', text: `Encore ${Math.min(c, s.energy)} objet${Math.min(c, s.energy) > 1 ? 's' : ''} d’affilée avant d’attendre.` };
+	const pct = (v: number) => `${Math.round(v * 100)}${NBSP}%`;
+	return (
+		<div className="at-modal" role="dialog" aria-modal="true" aria-label={gen.name} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+			<div className="at-card at-genpop">
+				<button className="at-genpop-x" onClick={onClose} aria-label="Fermer">✕</button>
+				<div className="at-genpop-head">
+					<PieceImg piece={`g:${g}`} className="at-genpop-img" />
+					<div>
+						<h3>{gen.name}</h3>
+						<span className="at-genpop-stars" aria-label={`niveau ${lv} sur ${GEN_LEVELS.length}`}>
+							{GEN_LEVELS.map((_, k) => <i key={k} className={k < lv ? 'on' : ''}>★</i>)}
+							<small>Niveau {lv}/{GEN_LEVELS.length}</small>
+						</span>
+						<span className="at-genpop-sub">Produit : {fams} · 1 ⚡ par objet</span>
+					</div>
+				</div>
 
-function Info({ s, cell, piece, need, now, confirm, onSell, onGenUp, onRecharge, cocoins }: {
+				<div className="at-genpop-meters">
+					<div className={`at-meter ${c === 0 ? 'empty' : ''}`}>
+						<small>Charges</small>
+						<b>{c}<span>/{max}</span></b>
+						<span className="at-meter-bar"><span style={{ width: `${(c / max) * 100}%` }} /></span>
+						<em>{c < max ? <>+1 dans {fmt(chargeIn(s, g, now))}</> : 'Au maximum'}</em>
+					</div>
+					<button className={`at-meter energy ${s.energy === 0 ? 'empty' : ''}`} onClick={onEnergy}>
+						<small>Énergie ⚡</small>
+						<b>{s.energy}<span>/{ENERGY_MAX}</span></b>
+						<span className="at-meter-bar"><span style={{ width: `${Math.min(1, s.energy / ENERGY_MAX) * 100}%` }} /></span>
+						<em>{s.energy < ENERGY_MAX ? <>+1 dans {fmt(energyIn(s, now))}</> : 'Au maximum'}</em>
+					</button>
+				</div>
+
+				<p className={`at-genpop-status ${status.kind}`}>{status.text}</p>
+				{welcome && <p className="at-genpop-welcome">⚡ Bienvenue : 1 charge toutes les {pace} s pendant encore {fmt(s.welcomeUntil - now)}, puis {Math.round(cur.chargeMs / 1000)} s.</p>}
+
+				<h4>Aller plus vite</h4>
+				{c < max && (
+					<div className="at-genpop-opt">
+						<div>
+							<strong>Recharger maintenant</strong>
+							<span>{max - c} charge{max - c > 1 ? 's' : ''} d’un coup · tu as {cocoins} <Cocoin size="1em" />{cocoins < RECHARGE_PRICE && <> · gagne-en avec les <a href="/jeux/defi">défis du jour</a></>}</span>
+						</div>
+						<button className="at-btn small" disabled={cocoins < RECHARGE_PRICE} onClick={onRecharge}>{RECHARGE_PRICE} <Cocoin size="1em" /></button>
+					</div>
+				)}
+				{next ? (
+					<div className="at-genpop-opt up">
+						<div className="at-genpop-cmp">
+							<strong>Passer au niveau {lv + 1}</strong>
+							<table>
+								<tbody>
+									<tr><td>Charges</td><td>{cur.charges}</td><td>→</td><td><b>{next.charges}</b></td></tr>
+									<tr><td>1 charge toutes les</td><td>{Math.round(cur.chargeMs / 1000)}{NBSP}s</td><td>→</td><td><b>{Math.round(next.chargeMs / 1000)}{NBSP}s</b></td></tr>
+									<tr><td>Objets d’un niveau au-dessus</td><td>{pct(cur.up)}</td><td>→</td><td><b>{pct(next.up)}</b></td></tr>
+								</tbody>
+							</table>
+							{up === 'poor' && (
+								<>
+									<span className="at-meter-bar coins"><span style={{ width: `${(s.coins / next.cost) * 100}%` }} /></span>
+									<span className="at-genpop-miss">{s.coins}/{next.cost} 🪙 · il manque {next.cost - s.coins} pièces, gagne-les en livrant des commandes</span>
+								</>
+							)}
+						</div>
+						<button className="at-btn" disabled={up !== 'ok'} onClick={onUp}>Améliorer · {next.cost} 🪙</button>
+					</div>
+				) : (
+					<p className="at-genpop-status ok">Niveau maximum atteint.</p>
+				)}
+			</div>
+		</div>
+	);
+}
+
+function Info({ s, cell, piece, need, now, confirm, onSell, onGenOpen }: {
 	s: State; cell: number | null; piece: Piece | null; need: Set<Piece>; now: number; confirm: boolean; onSell: () => void;
-	onGenUp: (g: GenId) => void; onRecharge: (g: GenId) => void; cocoins: number;
+	onGenOpen: (g: GenId) => void;
 }) {
 	if (cell === null || !piece) {
 		return (
@@ -878,35 +961,19 @@ function Info({ s, cell, piece, need, now, confirm, onSell, onGenUp, onRecharge,
 	}
 	const g = genOf(piece);
 	if (g) {
-		const gen = GENERATORS[g];
-		const fams = [...new Set(gen.out.map((o) => CHAINS[o.chain].family))].join(' ou ');
 		const c = s.gens[g].charges;
 		const max = genMax(s, g);
 		const lv = s.gens[g].level;
-		const up = genUpgradeState(s, g);
-		const next = GEN_LEVELS[lv];
 		return (
-			<div className="at-info at-info-gen">
+			<button className="at-info at-info-gen" onClick={() => onGenOpen(g)}>
 				<PieceImg piece={piece} className="at-info-img" />
 				<div>
-					<strong>{gen.name} <small>niv. {lv}/{GEN_LEVELS.length}</small></strong>
-					<span>Produit : {fams} · 1 ⚡ par objet</span>
+					<strong>{GENERATORS[g].name} <small>{'★'.repeat(lv)} niv. {lv}</small></strong>
+					<span className="at-meter-bar"><span style={{ width: `${(c / max) * 100}%` }} /></span>
 					<span>Charges {c}/{max}{c < max && ` · +1 dans ${fmt(chargeIn(s, g, now))}`}</span>
-					{next && <span className="at-info-next">Niveau {lv + 1} : {levelPerks(lv + 1)}</span>}
 				</div>
-				<div className="at-info-acts">
-					{next && (
-						<button className="at-btn small" disabled={up !== 'ok'} onClick={() => onGenUp(g)}>
-							Améliorer · {next.cost} 🪙
-						</button>
-					)}
-					{c < max && (
-						<button className="at-btn small ghost" disabled={cocoins < RECHARGE_PRICE} onClick={() => onRecharge(g)}>
-							Recharger · {RECHARGE_PRICE} <Cocoin size="1em" />
-						</button>
-					)}
-				</div>
-			</div>
+				<span className="at-info-go">{GEN_LEVELS[lv] ? 'Améliorer' : 'Détails'} ›</span>
+			</button>
 		);
 	}
 	const i = parse(piece)!;
@@ -1160,7 +1227,6 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 									<PieceImg piece={`g:${newGen.id}`} /> Nouveau sur l’établi : {newGen.name}
 								</span>
 							)}
-							<Gains coins={-shown.cost} rep={shown.rep} />
 							<small>Toucher pour continuer</small>
 						</span>
 					</button>
@@ -1573,10 +1639,49 @@ const FUN_CSS = `
 .at-welcome { text-align: center; font-size: 13px; color: var(--fun-violet-dark); background: #f3e6ff; border: 2px solid #dcc2ff; border-radius: 999px; padding: 6px 12px; }
 .at-welcome strong { font-variant-numeric: tabular-nums; }
 .at-genlvl { position: absolute; left: 2px; top: 1px; font-style: normal; font-size: 9px; line-height: 1; color: var(--fun-gold); text-shadow: 0 1px 0 #7428d6, 0 0 2px #7428d6; letter-spacing: -1px; }
-.at-root .at-info-gen { display: grid; grid-template-columns: 52px 1fr; align-items: start; column-gap: 10px; row-gap: 8px; }
-.at-info-next { color: var(--fun-violet-dark) !important; font-weight: 600; }
-.at-root .at-info .at-info-acts { grid-column: 1 / -1; display: flex; flex-direction: row; gap: 8px; }
-.at-info-acts .at-btn { flex: 1; white-space: nowrap; }
+.at-root .at-info-gen { width: 100%; font-family: inherit; color: inherit; text-align: left; cursor: pointer; }
+.at-info-gen > div { gap: 4px !important; }
+.at-info-gen strong small { color: var(--fun-gold-dark) !important; }
+.at-info-go { flex: none; align-self: center; background: linear-gradient(180deg, #c47bff, var(--fun-violet)); color: #fff !important; font-family: var(--font-brand); font-weight: 700; font-size: 13px; border-radius: 999px; padding: 7px 12px; box-shadow: 0 3px 0 var(--fun-violet-dark); }
+.at-meter-bar { display: block; height: 8px; border-radius: 99px; background: #f3dcea; overflow: hidden; }
+.at-meter-bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--fun-gold), #ff9d2e); transition: width 0.4s; }
+.at-meter-bar.coins > span { background: linear-gradient(90deg, #c47bff, var(--fun-violet)); }
+.at-root .at-genpop { position: relative; gap: 12px; }
+.at-genpop-x { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--fun-pink-soft); color: var(--fun-plum); font-size: 15px; cursor: pointer; }
+.at-genpop-head { display: flex; gap: 12px; align-items: center; padding-right: 30px; }
+.at-genpop-head > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.at-genpop-img { width: 72px; height: 72px; object-fit: contain; flex: none; background: #fff; border-radius: 18px; padding: 6px; box-shadow: var(--fun-shadow); }
+.at-genpop-stars { display: flex; align-items: center; gap: 2px; font-size: 18px; color: #e7cfe0; }
+.at-genpop-stars i { font-style: normal; }
+.at-genpop-stars i.on { color: var(--fun-gold); text-shadow: 0 1px 0 var(--fun-gold-dark); }
+.at-genpop-stars small { margin-left: 6px; font-size: 12.5px; font-weight: 700; color: var(--fun-violet-dark); }
+.at-genpop-sub { font-size: 12.5px; color: var(--fun-plum-soft); }
+.at-genpop-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.at-meter { display: flex; flex-direction: column; gap: 4px; background: #fff; border: 2px solid transparent; border-radius: 14px; padding: 9px 10px; box-shadow: var(--fun-shadow); font: inherit; color: var(--fun-plum); text-align: left; }
+button.at-meter { cursor: pointer; }
+.at-meter small { font-size: 12px; font-weight: 700; color: var(--fun-plum-soft); }
+.at-meter b { font-family: var(--font-brand); font-size: 24px; line-height: 1; }
+.at-meter b span { font-size: 14px; color: var(--fun-plum-soft); }
+.at-meter em { font-style: normal; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--fun-violet-dark); font-weight: 600; }
+.at-meter.energy .at-meter-bar > span { background: linear-gradient(90deg, #ff7cc0, var(--fun-pink)); }
+.at-meter.empty { border-color: var(--fun-pink); background: #fff0f7; }
+.at-meter.empty b { color: var(--fun-pink-dark); }
+.at-root .at-card p.at-genpop-status { font-weight: 700; font-size: 14px; border-radius: 12px; padding: 8px 10px; text-align: center; }
+.at-genpop-status.block { background: #ffe0ef; color: var(--fun-pink-dark) !important; }
+.at-genpop-status.ok { background: #d8fbef; color: var(--fun-mint-dark) !important; }
+.at-root .at-card p.at-genpop-welcome { font-size: 12.5px; color: var(--fun-violet-dark); background: #f3e6ff; border-radius: 12px; padding: 6px 10px; text-align: center; }
+.at-genpop h4 { margin: 2px 0 -4px; font-family: var(--font-brand); font-size: 15px; color: var(--fun-plum); }
+.at-genpop-opt { display: flex; gap: 10px; align-items: center; background: #fff; border-radius: 14px; padding: 10px; box-shadow: var(--fun-shadow); }
+.at-genpop-opt > div { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.at-genpop-opt strong { font-size: 14px; }
+.at-genpop-opt > div > span { font-size: 12.5px; color: var(--fun-plum-soft); }
+.at-genpop-opt > .at-btn { flex: none; white-space: nowrap; }
+.at-genpop-opt.up { flex-direction: column; align-items: stretch; border: 2px solid #dcc2ff; }
+.at-genpop-cmp table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 0; border: 0; }
+.at-genpop-cmp td { padding: 3px 0; border: 0; background: none; color: var(--fun-plum-soft); }
+.at-genpop-cmp td:nth-child(n+2) { text-align: right; white-space: nowrap; width: 1%; padding-left: 8px; font-variant-numeric: tabular-nums; }
+.at-genpop-cmp td b { color: var(--fun-mint-dark); font-size: 14px; }
+.at-genpop-miss { font-size: 12.5px; color: var(--fun-violet-dark) !important; font-weight: 600; }
 /* Flying rewards stand out on any card: a white halo. */
 .at-fly > i { text-shadow: 0 0 3px #fff, 0 0 6px #fff; }
 @media (prefers-reduced-motion: reduce) { .at-reward-rays { animation: none; } }
@@ -1858,13 +1963,6 @@ const CSS = `
 @keyframes at-cardup { from { opacity: 0; transform: translate(-50%, -14px); } to { opacity: 1; transform: translate(-50%, 0); } }
 .at-reveal-gen { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #ffd24a !important; }
 .at-reveal-gen img, .at-reveal-gen .at-emoji { width: 28px; height: 28px; object-fit: contain; }
-.at-gains { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 2px 0; }
-.at-gains > span { display: inline-flex; align-items: center; gap: 3px; background: #ffd24a; color: #2b1d0e; font-weight: 800; font-size: 13px; border-radius: 999px; padding: 3px 10px; animation: at-pop 0.45s ease both; }
-.at-gains > span:nth-child(2) { animation-delay: 0.12s; }
-.at-gains > span:nth-child(3) { animation-delay: 0.24s; }
-.at-gains > span:nth-child(4) { animation-delay: 0.36s; }
-.at-reveal-card .at-gains > span { animation-delay: 1.6s; }
-.at-reveal-card .at-gains > span:nth-child(2) { animation-delay: 1.72s; }
 .at-coins { position: relative; }
 .at-delta { position: absolute; right: 6px; top: -4px; font-size: 13px; font-weight: 800; pointer-events: none; animation: at-delta 1.4s ease-out forwards; }
 .at-delta.up { color: #5ccf7a; }
@@ -1922,7 +2020,6 @@ const CSS = `
 	.at-stat em { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img, .at-broadcast u, .at-open, .at-puff::before, .at-puff i, .at-gains > span, .at-reveal-card, .at-reveal::before { animation: none; }
-	.at-sheet.off { display: none; }
+	.at-pulse, .at-cell.at-pulse, .at-lamp, .at-piece.spawn, .at-piece.pop, .at-clue, .at-clue > img, .at-broadcast u, .at-open, .at-puff::before, .at-puff i, 	.at-sheet.off { display: none; }
 }
 `;

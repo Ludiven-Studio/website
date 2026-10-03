@@ -84,18 +84,37 @@ try {
 		await sleep(1600);
 	}
 
-	// 5. The toolbox panel: level, perks of the next level, upgrade for coins; the welcome pill above.
+	// 5. The toolbox row opens the generator window: meters, what blocks, upgrade for coins; the welcome pill above.
 	if (!(await page.locator('.at-welcome').count())) fails.push('no welcome pill during the first quarter-hour');
 	const box = await c(await page.evaluate(() => [...document.querySelectorAll('.at-cell')].findIndex((el) => el.querySelector('img[src*="gen-boite"]'))));
 	await page.mouse.click(box.x, box.y);
 	await sleep(400);
-	await page.locator('.at-info-gen').scrollIntoViewIfNeeded();
-	await page.locator('.at-info-gen').screenshot({ path: `${OUT}/5-gen-panel.png` });
-	await page.locator('.at-info-gen .at-btn', { hasText: 'Améliorer' }).click();
+	await page.locator('.at-info-gen').click();
+	if (!(await page.waitForSelector('.at-genpop', { timeout: 2000 }).catch(() => null))) fails.push('generator row opens no window');
+	await sleep(300);
+	await page.screenshot({ path: `${OUT}/5-gen-pop.png` });
+	await page.locator('.at-genpop .at-btn', { hasText: 'Améliorer' }).click();
 	await sleep(500);
+	if (await page.locator('.at-genpop').count()) fails.push('window still open after the upgrade');
 	if (!(await page.locator('.at-genlvl').count())) fails.push('upgraded generator shows no level stars');
-	if (!(await page.locator('.at-info-gen', { hasText: 'niv. 2' }).count())) fails.push('panel does not say level 2');
+	if (!(await page.locator('.at-info-gen', { hasText: 'niv. 2' }).count())) fails.push('row does not say level 2');
 	await page.screenshot({ path: `${OUT}/6-after-upgrade.png` });
+
+	// 6. An empty generator: tapping it opens the window on its own, with the blocker and the paid recharge.
+	await page.evaluate(async () => {
+		const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
+		st.gens.boite.charges = 0; st.gens.boite.at = Date.now(); st.gens.boite.level = 1; st.welcomeUntil = 0; st.coins = 23;
+		localStorage.setItem('ludiven-atelier', JSON.stringify(st));
+	});
+	await page.reload({ waitUntil: 'networkidle' });
+	while (await page.locator('.at-talk').count()) { await page.locator('.at-talk-nav .at-btn.ghost').click(); await sleep(150); }
+	if (await page.locator('.at-reward-btn').count()) { await page.locator('.at-reward-btn').click(); await sleep(1500); }
+	const box2 = await c(await page.evaluate(() => [...document.querySelectorAll('.at-cell')].findIndex((el) => el.querySelector('img[src*="gen-boite"]'))));
+	await page.mouse.click(box2.x, box2.y);
+	if (!(await page.waitForSelector('.at-genpop', { timeout: 2000 }).catch(() => null))) fails.push('empty generator opens no window');
+	if (!(await page.locator('.at-genpop-status.block').count())) fails.push('window does not say what blocks');
+	await sleep(300);
+	await page.screenshot({ path: `${OUT}/7-gen-empty.png` });
 	await browser.close();
 } finally {
 	server.stop();

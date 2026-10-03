@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	newGame, produce, move, moveKind, deliver, tick, sell, buyUpgrade, load, save, activeOrders,
 	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, mapReady, solveMap, storyBlocker, factKnown, SAVE_V, CELLS, type State,
-	genMax, genChargeMs, genUpgradeState, upgradeGen, rechargeGen,
+	genMax, genChargeMs, genUpgradeState, upgradeGen, rechargeGen, fullIn,
 } from './engine';
 import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS, FACES, GEN_LEVELS, WELCOME_MS, WELCOME_CHARGE_MS } from './data';
 import { CHARACTERS } from './characters';
@@ -146,6 +146,13 @@ describe('generators', () => {
 		expect(produce(s, g, T0)).toEqual({ ok: false, why: 'charges' });
 		s = rechargeGen(s, 'tiroir', T0);
 		expect(produce(s, g, T0).ok).toBe(true);
+	});
+
+	it('fullIn counts every missing charge at the current pace', () => {
+		const s = { ...newGame(T0), welcomeUntil: 0 };
+		const e = { ...s, gens: { ...s.gens, tiroir: { ...s.gens.tiroir, charges: 0, at: T0 } } };
+		expect(fullIn(e, 'tiroir', T0 + 10_000)).toBe(GEN_LEVELS[0].charges * GEN_LEVELS[0].chargeMs - 10_000);
+		expect(fullIn(s, 'tiroir', T0)).toBe(0);
 	});
 
 	it('old saves keep their generators at level 1 and get the welcome quarter-hour', () => {

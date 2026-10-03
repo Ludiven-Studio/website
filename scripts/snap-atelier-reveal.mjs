@@ -1,5 +1,5 @@
 /* Upgrade reveal capture: buys "Dégager l'établi" then "Rallumer la lampe", shoots the scene over time and checks
-   the next client waits for the reveal to end. Fails on console errors.
+   the reward popup and the next client wait for the reveal to end. Fails on console errors.
    Usage: node scripts/snap-atelier-reveal.mjs [out dir]   (default D:/tmp/atelier-reveal) */
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
@@ -36,6 +36,15 @@ try {
 		if (await page.locator('.at-talk').count()) fails.push(`${tag}: a scene opened during the reveal`);
 		await sleep(Math.max(0, 5000 - (Date.now() - t0)));
 		if (await page.locator('.at-reveal').count()) fails.push(`${tag}: reveal still up after 5 s`);
+		// Then the reputation it brings, full screen, before any scene.
+		if (!(await page.waitForSelector('.at-reward', { timeout: 2000 }).catch(() => null))) fails.push(`${tag}: no reward popup after the reveal`);
+		else {
+			if (await page.locator('.at-talk').count()) fails.push(`${tag}: a scene opened under the reward popup`);
+			await sleep(900);
+			await page.screenshot({ path: `${OUT}/${tag}-reward.png` });
+			await page.locator('.at-reward-btn').click();
+			await sleep(1500);
+		}
 	};
 
 	await page.goto(`http://localhost:${PORT}/jeux/atelier/`, { waitUntil: 'networkidle' });

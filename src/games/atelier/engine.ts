@@ -215,6 +215,12 @@ export const energyIn = (s: State, now: number): number =>
 export const chargeIn = (s: State, g: GenId, now: number): number =>
 	s.gens[g].charges >= genMax(s, g) ? 0 : Math.max(0, genChargeMs(s, g, now) - (now - s.gens[g].at));
 
+/** Time until the generator is full, at the current pace. */
+export const fullIn = (s: State, g: GenId, now: number): number => {
+	const missing = genMax(s, g) - s.gens[g].charges;
+	return missing <= 0 ? 0 : chargeIn(s, g, now) + (missing - 1) * genChargeMs(s, g, now);
+};
+
 export function addEnergy(s: State, n: number): State {
 	const out = clone(s);
 	out.energy += n;
