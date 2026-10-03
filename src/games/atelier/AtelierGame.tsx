@@ -427,7 +427,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 
 	return (
 		<div className="at-root">
-			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}{SAISON4_CSS}{PUZZLE_CSS}{GESTURE_CSS}</style>
+			<style>{CSS}{WATCH_CSS}{RADIO_CSS}{VOILIER_CSS}{BOITE_CSS}{FAUTEUIL_CSS}{MALLE_CSS}{MUSIQUE_CSS}{SAISON2_CSS}{SAISON3_CSS}{SAISON4_CSS}{PUZZLE_CSS}{GESTURE_CSS}{FUN_CSS}</style>
 
 			<div className="at-hud">
 				<button className="at-stat at-energy" onClick={() => setEnergyOpen(true)} aria-label="Énergie">
@@ -930,8 +930,8 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 		<div className="at-shop">
 			<div ref={sceneRef} className={`at-scene ${has('lampe') ? 'lit' : ''}`} style={{ ['--dust' as string]: 1 - progress }}>
 				<div className="at-scene-img" />
-				{/* The same room restored: fades in as the story moves on, faster at first so chapter 1 already shows it. */}
-				<div className="at-scene-img restored" style={{ opacity: progress ** 0.6 }} />
+				{/* The same room restored: a third of it from the start (player found it too gloomy), the rest with the story. */}
+				<div className="at-scene-img restored" style={{ opacity: 0.3 + 0.7 * progress ** 0.6 }} />
 				<div className="at-scene-dust" />
 				{(!has('etabli') || reveal?.id === 'etabli') && (
 					<svg className={`at-sheet ${has('etabli') ? 'off' : ''}`}viewBox="0 0 100 40" preserveAspectRatio="none" aria-label="Établi sous une bâche">
@@ -1267,6 +1267,85 @@ function coachFor(s: State, orders: Order[], view: View): { text: string; target
 		? { text: 'Dépense tes pièces pour dégager l’établi : les clients pourront entrer.', target: 'up' }
 		: { text: 'Passe à l’atelier : il est temps d’y faire un peu de place.', target: 'tab' };
 }
+
+// Bright, flashy skin over the base styles (player feedback: "too dull, too serious", wants "flashy girly").
+// One palette, used everywhere: pink = act, pink→violet = the bench, mint = ready/done, gold = story and rewards,
+// plum = text. The site's gray scale is redefined inside the game only, so every panel turns light whatever the
+// site theme; the story art keeps its own tones.
+const FUN_CSS = `
+.at-root {
+	--fun-pink: #ff3d9a; --fun-pink-dark: #d3177a; --fun-pink-soft: #ffc7e3; --fun-pink-pale: #fff3f9;
+	--fun-violet: #a24dff; --fun-violet-dark: #7428d6;
+	--fun-mint: #1fd6a6; --fun-mint-dark: #0e9f79;
+	--fun-gold: #ffc23a; --fun-gold-dark: #e0960a;
+	--fun-plum: #4a1f45; --fun-plum-soft: #8e5b88;
+	--gray-0: var(--fun-plum); --gray-100: #5a2a54; --gray-200: #6e3d68; --gray-300: var(--fun-plum-soft); --gray-700: #f0c2dc;
+	--gray-800: #ffe3f1; --gray-900: #ffffff; --at-accent: var(--fun-pink); --accent-text-over: #fff;
+	--fun-shadow: 0 3px 0 rgba(211, 23, 122, 0.16);
+	/* Older names, kept so the rules below read the same. */
+	--fun-orange-dark: var(--fun-pink-dark); --fun-green: var(--fun-mint); --fun-green-dark: var(--fun-mint-dark);
+	--fun-teal: var(--fun-violet); --fun-teal-dark: var(--fun-violet-dark);
+}
+.at-root .at-stat, .at-root .at-tabs, .at-root .at-order, .at-root .at-info, .at-root .at-project, .at-root .at-up,
+.at-root .at-trombi, .at-root .at-chapters, .at-root .at-help { border-color: transparent; box-shadow: var(--fun-shadow); }
+.at-root .at-stat, .at-root .at-tab, .at-root .at-btn, .at-root .at-give, .at-root .at-order-who strong { font-family: var(--font-brand); }
+.at-root .at-stat strong { font-size: 15px; }
+.at-root .at-tab.on { box-shadow: 0 2px 0 var(--fun-orange-dark); }
+.at-root .at-btn { box-shadow: 0 3px 0 var(--fun-orange-dark); text-shadow: 0 1px 0 rgba(0,0,0,0.15); }
+.at-root .at-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--fun-orange-dark); }
+.at-root .at-btn.ghost { background: #fff; box-shadow: 0 2px 0 rgba(140, 100, 40, 0.18); text-shadow: none; }
+.at-root .at-order { border-radius: 16px; padding: 7px; }
+.at-root .at-order.story { border: 2px solid var(--fun-gold); background: linear-gradient(180deg, #fff1c8, #fff 70%); }
+.at-root .at-order.can { box-shadow: 0 0 0 2.5px var(--fun-mint), var(--fun-shadow); }
+.at-root .at-need { background: var(--fun-pink-pale); border-radius: 10px; }
+.at-root .at-need i { background: var(--fun-violet-dark); }
+.at-root .at-need b, .at-root .at-tag.ready { background: var(--fun-mint-dark); }
+.at-root .at-give { background: linear-gradient(180deg, #4ff0c2, var(--fun-mint)); box-shadow: 0 3px 0 var(--fun-mint-dark); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,0.2); font-size: 13px; padding: 6px 8px; }
+.at-root .at-give:disabled { background: #fff1c8; color: #a8700a; box-shadow: 0 2px 0 #f2d58a; text-shadow: none; }
+.at-root .at-boardwrap { background: linear-gradient(150deg, #ff6fb5, var(--fun-violet)); border-radius: 20px; padding: 8px; box-shadow: 0 4px 0 var(--fun-violet-dark), 0 10px 22px rgba(162, 77, 255, 0.3); }
+.at-root .at-cell { background: #fff9fc; border-radius: 8px; }
+.at-root .at-cell:nth-child(even) { background: #ffe4f2; }
+.at-root .at-cell.sel { background: #fff2c4; box-shadow: 0 0 0 3px var(--fun-gold) inset; }
+.at-root .at-cell.twin { background: #d2fbef; box-shadow: 0 0 0 2.5px var(--fun-mint) inset; }
+.at-root .at-cell.over.merge { background: #b5f5e2; box-shadow: 0 0 0 3px var(--fun-mint) inset; }
+.at-root .at-cell.over.move { background: #f3e6ff; }
+.at-root .at-piece img { filter: drop-shadow(0 3px 2px rgba(116, 40, 214, 0.22)); }
+.at-root .at-lvl { background: var(--fun-violet-dark); }
+.at-root .at-tag.want { background: var(--fun-pink); }
+.at-root .at-charge { background: rgba(116, 40, 214, 0.2); }
+.at-root .at-charge span { background: var(--fun-gold); }
+.at-root .at-coach, .at-root .at-next { background: var(--fun-pink-pale); color: var(--fun-plum); border: 2px solid var(--fun-pink-soft); border-radius: 14px; box-shadow: var(--fun-shadow); }
+/* Dialogs and story scenes: the same pinks, plum text. */
+.at-root .at-modal { background: rgba(74, 31, 69, 0.55); }
+.at-root .at-card { background: linear-gradient(180deg, #fff, var(--fun-pink-pale)); color: var(--fun-plum); border: 2px solid var(--fun-pink-soft); }
+.at-root .at-card h3 { color: var(--fun-plum); }
+.at-root .at-card a { color: var(--fun-pink-dark); }
+.at-root .at-card .at-btn.ghost { color: var(--fun-plum); border-color: var(--fun-pink-soft); }
+.at-root .at-kicker { color: var(--fun-pink-dark); }
+.at-root .at-line strong { color: var(--fun-pink-dark); }
+.at-root .at-line.note p { color: var(--fun-plum-soft); }
+.at-root .at-line.moi p { color: var(--fun-violet-dark); }
+.at-root .at-dots i { background: var(--fun-pink-soft); }
+.at-root .at-dots i.on { background: var(--fun-pink); }
+.at-root .at-face { border-color: var(--fun-pink-soft); background: var(--fun-pink-pale); }
+.at-root .at-toast { background: var(--fun-plum); }
+.at-root .at-toast button { background: var(--fun-gold); }
+.at-root .at-trombi-era > em, .at-root .at-tree-family > em, .at-root .at-chapters-season > em { color: var(--fun-violet); }
+.at-root .at-tree-family { border-left-color: var(--fun-pink-soft); }
+.at-root .at-tree-link { color: var(--fun-pink); }
+.at-root .at-up.owned .at-done, .at-root .at-done { color: var(--fun-mint-dark); }
+.at-root .atx-track { stroke: var(--fun-pink-soft); }
+.at-root .atx-handle { fill: var(--fun-pink); stroke: var(--fun-pink-dark); }
+.at-root .atx-handle.ok { fill: var(--fun-mint); stroke: var(--fun-mint-dark); }
+.at-root .atx-progress { fill: var(--fun-pink); }
+.at-root .at-link { color: var(--fun-pink-dark); }
+/* The workshop starts a lot less gloomy: dust is a hint now, not a veil. */
+.at-root .at-scene-img:not(.restored) { filter: sepia(calc(var(--dust) * 0.3)) brightness(calc(1 - var(--dust) * 0.15)) saturate(calc(1.1 - var(--dust) * 0.25)); }
+.at-root .at-scene-dust { opacity: calc(var(--dust) * 0.4); }
+.at-root .at-scene { border-radius: 20px; box-shadow: 0 4px 0 var(--fun-violet-dark), 0 10px 22px rgba(162, 77, 255, 0.25); }
+.at-root .at-trombi-tabs { background: var(--fun-pink-pale); }
+.at-root .at-trombi-tabs button.on { background: var(--fun-pink); }
+`;
 
 const CSS = `
 .at-root { --at-wood: #7a4f2a; --at-accent: var(--accent-regular); width: 100%; max-width: 480px; margin-inline: auto; color: var(--gray-0); font-family: var(--font-body); display: flex; flex-direction: column; gap: 10px; position: relative; }
