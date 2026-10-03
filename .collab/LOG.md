@@ -25,3 +25,5 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-10-02 · 0023 · énigmes à la Layton (version Codex, 115 k jetons) · fusionnées dans docs/atelier-enigmes.md, soumises à l'utilisateur
 - 2026-10-03 · 0024 · essai d'icônes cartoon, chaîne des outils (Codex, 765 k jetons) · validé, sert de référence aux lots 0025-0027
 - 2026-10-03 · 0025-0027 · 36 icônes cartoon (entretien, mécanique, électricité, menuiserie, textile, marine, 5 générateurs ; Codex, 2,9 M jetons) · intégrées avec l'essai 0024, 42 icônes au total
+- 2026-10-03 · 0028 · essai cartoon : Morel, Jeanne, atelier, montre (Codex) · validé par l'utilisateur, référence des lots 0029-0033
+- 2026-10-03 · 0029-0033 · 10 portraits, 3 décors (atelier poussiéreux, bureau, photo de 1961), 24 objets d'histoire abîmés/restaurés (Codex) · intégrés ; les objets passent de l'image abîmée à la restaurée en fondu

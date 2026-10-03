@@ -12,16 +12,16 @@ import {
 } from './data';
 import { GearsPuzzle, LongueVuePuzzle, TaquinPuzzle, PeseePuzzle, PUZZLE_CSS } from './Puzzles';
 import { Gesture, GESTURES, GESTURE_CSS } from './Gestures';
-import Watch, { WatchBack, WATCH_CSS } from './Watch';
-import Radio, { RADIO_CSS } from './Radio';
-import Voilier, { VOILIER_CSS } from './Voilier';
-import Boite, { MapPieces, BOITE_CSS } from './Boite';
-import Fauteuil, { FAUTEUIL_CSS } from './Fauteuil';
-import Malle, { MapPuzzle, MALLE_CSS } from './Malle';
-import Musique, { MUSIQUE_CSS } from './Musique';
-import { Boussole, Fanal, LongueVue, CoffreMousse, Canot, Cloche, SAISON2_CSS } from './Saison2';
-import { CadreOvale, Travailleuse, Tabouret, CoffretBobines, CarnetRose, Valise, SAISON3_CSS } from './Saison3';
-import { ValiseEtal, Presentoir, Balance, Caissette, Casier, Toupie, SAISON4_CSS } from './Saison4';
+import { WatchBack, WATCH_CSS } from './Watch';
+import { RADIO_CSS } from './Radio';
+import { VOILIER_CSS } from './Voilier';
+import { MapPieces, BOITE_CSS } from './Boite';
+import { FAUTEUIL_CSS } from './Fauteuil';
+import { MapPuzzle, MALLE_CSS } from './Malle';
+import { MUSIQUE_CSS } from './Musique';
+import { SAISON2_CSS } from './Saison2';
+import { SAISON3_CSS } from './Saison3';
+import { SAISON4_CSS } from './Saison4';
 import { CHARACTERS, ERAS, FAMILIES, type Character } from './characters';
 import * as sfx from './sfx';
 import { usePointerDrag } from '../usePointerDrag';
@@ -40,7 +40,7 @@ const SAVE_KEY = 'ludiven-atelier';
 const ART = '/assets/jeux/atelier';
 // Bump when the item icons are redrawn under the same names: the image cache serves stale-while-revalidate, so a
 // new query string is what makes every player see the new art on the first visit.
-const ICON_V = 2;
+const ICON_V = 3;
 const FALLBACK: Record<string, string> = { outil: '🪛', soin: '🧽', meca: '⚙️', elec: '💡', bois: '🪵', tissu: '🧵', marin: '🪢', boite: '🧰', tiroir: '🗄️', caisse: '🔌', coffre: '🪚', malle: '🧺', greeur: '⚓' };
 
 type View = 'atelier' | 'etabli';
@@ -56,33 +56,16 @@ const REVEAL_AT: Record<string, [number, number]> = {
 	etabli: [62, 82], lampe: [76, 62], photo: [51, 42], etageres: [76, 34], bureau: [68, 50],
 };
 
-/** The restored object of a project, drawn at a restoration state. */
+/** The object of a project at a restoration state: the restored picture fades in over the worn one, step by step. */
 function ObjectArt({ project, state }: Art) {
-	if (project === 'radio') return <Radio state={state} size="100%" />;
-	if (project === 'voilier') return <Voilier state={state} size="100%" />;
-	if (project === 'boite') return <Boite state={state} size="100%" />;
-	if (project === 'fauteuil') return <Fauteuil state={state} size="100%" />;
-	if (project === 'malle') return <Malle state={state} size="100%" />;
-	if (project === 'musique') return <Musique state={state} size="100%" />;
-	if (project === 'boussole') return <Boussole state={state} size="100%" />;
-	if (project === 'fanal') return <Fanal state={state} size="100%" />;
-	if (project === 'longuevue') return <LongueVue state={state} size="100%" />;
-	if (project === 'coffre') return <CoffreMousse state={state} size="100%" />;
-	if (project === 'mouette') return <Canot state={state} size="100%" />;
-	if (project === 'cloche') return <Cloche state={state} size="100%" />;
-	if (project === 'cadre') return <CadreOvale state={state} size="100%" />;
-	if (project === 'travailleuse') return <Travailleuse state={state} size="100%" />;
-	if (project === 'tabouret') return <Tabouret state={state} size="100%" />;
-	if (project === 'bobines') return <CoffretBobines state={state} size="100%" />;
-	if (project === 'carnet') return <CarnetRose state={state} size="100%" />;
-	if (project === 'valise') return <Valise state={state} size="100%" />;
-	if (project === 'etal') return <ValiseEtal state={state} size="100%" />;
-	if (project === 'presentoir') return <Presentoir state={state} size="100%" />;
-	if (project === 'balance') return <Balance state={state} size="100%" />;
-	if (project === 'caissette') return <Caissette state={state} size="100%" />;
-	if (project === 'casier') return <Casier state={state} size="100%" />;
-	if (project === 'toupie') return <Toupie state={state} size="100%" />;
-	return <Watch state={state} size="100%" />;
+	const p = projectOf(project);
+	const t = Math.min(1, state / p.steps);
+	return (
+		<span className="at-objart" role="img" aria-label={`${p.object}${t >= 1 ? ' restauré' : t > 0 ? ` : étape ${state}/${p.steps}` : ' abîmé'}`}>
+			<img src={`${ART}/obj/${project}-0.png?v=${ICON_V}`} alt="" style={{ opacity: t >= 1 ? 0 : 1 }} draggable={false} />
+			<img src={`${ART}/obj/${project}-3.png?v=${ICON_V}`} alt="" style={{ opacity: t }} draggable={false} />
+		</span>
+	);
 }
 
 interface Drag { from: number; x: number; y: number; over: number }
@@ -119,7 +102,7 @@ function PieceImg({ piece, className }: { piece: Piece; className?: string }) {
 function Face({ who, size = 40 }: { who: string; size?: number }) {
 	const [broken, setBroken] = useState(false);
 	const f = FACES[who];
-	if (f && !broken) return <img className="at-face" src={`${ART}/${f}.jpg`} alt="" width={size} height={size} onError={() => setBroken(true)} />;
+	if (f && !broken) return <img className="at-face" src={`${ART}/${f}.jpg?v=${ICON_V}`} alt="" width={size} height={size} onError={() => setBroken(true)} />;
 	return <span className="at-face at-face-emoji" style={{ width: size, height: size }} aria-hidden="true">{FACE_EMOJI[who] ?? '🙂'}</span>;
 }
 
@@ -1210,7 +1193,7 @@ function Workshop({ s, story, chapterDone, coachUp, onUpgrade, reveal, onRevealD
 				{has('lampe') && <div className={`at-lamp ${fresh('lampe')}`} />}
 				{has('etageres') && <div className={`at-shelves ${fresh('etageres')}`} aria-label="Les étagères de Jeanne, rouvertes" />}
 				{has('bureau') && <div className={`at-door-open ${fresh('bureau')}`} aria-label="La porte du bureau, ouverte" />}
-				{has('photo') && <div className="at-photo" aria-label="La photo de 1961"><img src={`${ART}/photo.jpg`} alt="" /></div>}
+				{has('photo') && <div className="at-photo" aria-label="La photo de 1961"><img src={`${ART}/photo.jpg?v=${ICON_V}`} alt="" /></div>}
 				{started && step < project.steps && story && !reveal && (
 					<div className={`at-onbench ${project.id}`}><ObjectArt project={project.id} state={step} /></div>
 				)}
@@ -1385,7 +1368,7 @@ function SceneView({ scene, onDone, onSkip }: { scene: Scene; onDone: () => void
 								<i>Mars 1962</i>
 							</div>
 						)}
-						{line.show === 'photo' && <div className="at-clue-photo"><img src={`${ART}/photo.jpg`} alt="La photo de 1961 : Henri et Jeanne devant l’atelier" /></div>}
+						{line.show === 'photo' && <div className="at-clue-photo"><img src={`${ART}/photo.jpg?v=${ICON_V}`} alt="La photo de 1961 : Henri et Jeanne devant l’atelier" /></div>}
 						{line.show === 'label' && (
 							<div className="at-label" role="img" aria-label="Étiquette de l’atelier : Réparation J., à finir">
 								<b>Atelier J.</b>
@@ -1813,20 +1796,10 @@ const CSS = `
 .at-pack { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: #fff; border: 1.5px solid #e2c98f; border-radius: 12px; padding: 10px 12px; font-size: 14px; }
 .at-kicker { font-size: 12px !important; text-transform: uppercase; letter-spacing: 0.08em; color: #9c6a1f; font-weight: 700; }
 .at-talk { gap: 12px; }
-.at-intro-img { aspect-ratio: 16 / 10; border-radius: 12px; background: url('${ART}/atelier.jpg') center 30% / cover; filter: sepia(0.6) brightness(0.6) saturate(0.6); box-shadow: inset 0 0 40px rgba(0,0,0,0.6); }
-.at-bigwatch { width: min(46vw, 170px); margin: 0 auto; position: relative; }
-.at-bigwatch.radio { width: min(72vw, 270px); }
-.at-bigwatch.voilier { width: min(58vw, 210px); }
-.at-bigwatch.boite { width: min(70vw, 260px); }
-.at-bigwatch.fauteuil { width: min(58vw, 210px); }
-.at-bigwatch.malle { width: min(70vw, 260px); }
-.at-bigwatch.musique { width: min(70vw, 260px); }
-.at-bigwatch.boussole, .at-bigwatch.fanal, .at-bigwatch.cloche { width: min(52vw, 190px); }
-.at-bigwatch.longuevue, .at-bigwatch.coffre, .at-bigwatch.mouette { width: min(74vw, 280px); }
-.at-bigwatch.cadre, .at-bigwatch.tabouret, .at-bigwatch.carnet { width: min(50vw, 180px); }
-.at-bigwatch.travailleuse, .at-bigwatch.bobines, .at-bigwatch.valise { width: min(64vw, 230px); }
-.at-bigwatch.etal, .at-bigwatch.presentoir, .at-bigwatch.balance { width: min(66vw, 240px); }
-.at-bigwatch.caissette, .at-bigwatch.casier, .at-bigwatch.toupie { width: min(52vw, 190px); }
+.at-intro-img { aspect-ratio: 16 / 10; border-radius: 12px; background: url('${ART}/atelier.jpg?v=${ICON_V}') center 30% / cover; filter: sepia(0.3) brightness(0.85) saturate(0.8); box-shadow: inset 0 0 40px rgba(0,0,0,0.4); }
+.at-bigwatch { width: min(62vw, 230px); margin: 0 auto; position: relative; }
+.at-objart { position: relative; display: block; width: 100%; aspect-ratio: 1; }
+.at-objart img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 1.2s ease; -webkit-user-drag: none; }
 .at-open { width: min(56vw, 200px); margin: 8px auto; position: relative; background: #3f7a4a; border: 4px solid #6b3a14; border-radius: 10px; padding: 14px 0; text-align: center; box-shadow: 0 8px 18px rgba(0,0,0,0.35); animation: at-flip 0.8s ease both; }
 .at-open::before { content: ''; position: absolute; left: 50%; top: -30px; width: 2px; height: 28px; background: #6b3a14; }
 .at-open span { font-family: Georgia, serif; font-size: 26px; font-weight: 700; color: #fff4d6; letter-spacing: 0.06em; }
@@ -1845,7 +1818,7 @@ const CSS = `
 .at-letter i { position: absolute; right: 12px; bottom: 10px; width: 20px; height: 20px; border-radius: 50%; background: #9c2a1a; box-shadow: inset 0 0 0 3px #b8321a; }
 .at-key { display: flex; flex-direction: column; align-items: center; font-size: 42px; transform: rotate(12deg); }
 .at-key em { font-size: 11px; font-style: normal; background: #f4ead4; color: #5a3b0c; border: 1px solid #b58b4a; padding: 1px 6px; border-radius: 3px; margin-top: -4px; }
-.at-office-img { aspect-ratio: 3 / 4; max-height: 38vh; margin: 0 auto; border-radius: 12px; background: url('${ART}/bureau.jpg') center / cover, linear-gradient(160deg, #6b4a2a, #2a1a0e); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
+.at-office-img { aspect-ratio: 3 / 4; max-height: 38vh; margin: 0 auto; border-radius: 12px; background: url('${ART}/bureau.jpg?v=${ICON_V}') center / cover, linear-gradient(160deg, #6b4a2a, #2a1a0e); box-shadow: 0 6px 16px rgba(0,0,0,0.35); }
 .at-office-img.small { width: 76px; max-height: none; flex: none; border-radius: 10px; }
 .at-map { width: min(70vw, 260px); margin: 0 auto; }
 .at-map.small { width: 150px; margin: 4px 0 0; }
@@ -1933,12 +1906,12 @@ const CSS = `
 .at-dots i.on { background: #9c4a1f; }
 .at-shop { display: flex; flex-direction: column; gap: 10px; }
 .at-scene { position: relative; aspect-ratio: 3 / 4; max-height: 56vh; margin-inline: auto; width: 100%; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,0.3); background: #2a1c10; }
-.at-scene-img { position: absolute; inset: 0; background: url('${ART}/atelier.jpg') center / cover; filter: sepia(calc(var(--dust) * 0.6)) brightness(calc(1 - var(--dust) * 0.45)) saturate(calc(1 - var(--dust) * 0.4)); transition: filter 1.2s; }
+.at-scene-img { position: absolute; inset: 0; background: url('${ART}/atelier.jpg?v=${ICON_V}') center / cover; filter: sepia(calc(var(--dust) * 0.25)) brightness(calc(1 - var(--dust) * 0.15)) saturate(calc(1 - var(--dust) * 0.2)); transition: filter 1.2s; }
 .at-scene-dust { position: absolute; inset: 0; opacity: var(--dust); transition: opacity 1.2s; background:
 	radial-gradient(circle at 0 0, rgba(210,200,180,0.55), transparent 28%),
 	radial-gradient(circle at 100% 0, rgba(210,200,180,0.5), transparent 26%),
 	linear-gradient(180deg, rgba(40,30,20,0.25), rgba(40,30,20,0.45)); pointer-events: none; }
-.at-scene .at-scene-img.restored { background-image: url('${ART}/atelier-restaure.jpg'); filter: none; transition: opacity 1.2s; }
+.at-scene .at-scene-img.restored { background-image: url('${ART}/atelier-restaure.jpg?v=${ICON_V}'); filter: none; transition: opacity 1.2s; }
 .at-scene.lit .at-scene-img:not(.restored) { filter: sepia(calc(var(--dust) * 0.6)) brightness(calc(1.08 - var(--dust) * 0.4)) saturate(calc(1.05 - var(--dust) * 0.4)); }
 .at-lamp { position: absolute; left: 76%; top: 66%; width: 70%; aspect-ratio: 1; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(255, 214, 120, 0.6), rgba(255, 190, 90, 0.18) 38%, transparent 62%); mix-blend-mode: screen; pointer-events: none; animation: at-flicker 5s ease-in-out infinite; }
 @keyframes at-flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.88; } }
@@ -1972,33 +1945,9 @@ const CSS = `
 .at-delta.down { color: #ff8a5c; }
 @keyframes at-delta { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-18px); } }
 @keyframes at-hang { from { transform: rotate(-12deg) translateY(-12px); opacity: 0; } to { transform: rotate(-3deg); opacity: 1; } }
-.at-onbench.radio { width: 16% !important; top: 75% !important; }
-.at-onbench.voilier { width: 13% !important; top: 72% !important; }
-.at-onbench.boite { width: 15% !important; top: 76% !important; }
-.at-onbench.fauteuil { width: 13% !important; top: 72% !important; }
-.at-onbench.malle { width: 16% !important; top: 78% !important; }
-.at-onbench.musique { width: 15% !important; top: 76% !important; }
-.at-onbench.boussole, .at-onbench.fanal, .at-onbench.cloche { width: 10% !important; top: 74% !important; }
-.at-onbench.longuevue, .at-onbench.coffre, .at-onbench.mouette { width: 18% !important; top: 77% !important; }
-.at-onbench.cadre, .at-onbench.tabouret, .at-onbench.carnet { width: 10% !important; top: 74% !important; }
-.at-onbench.travailleuse, .at-onbench.bobines, .at-onbench.valise { width: 14% !important; top: 76% !important; }
-.at-onbench.etal, .at-onbench.presentoir, .at-onbench.balance { width: 15% !important; top: 76% !important; }
-.at-onbench.caissette, .at-onbench.casier, .at-onbench.toupie { width: 10% !important; top: 74% !important; }
-.at-onbench { position: absolute; left: 58%; top: 77%; width: 8%; transform: translate(-50%, -50%) rotate(-12deg); filter: drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
+.at-onbench { position: absolute; left: 58%; top: 76%; width: 17%; transform: translate(-50%, -50%); filter: drop-shadow(0 3px 3px rgba(74, 31, 69, 0.4)); }
 .at-project { display: flex; gap: 12px; align-items: center; background: var(--gray-900); border: 1.5px solid var(--gray-800); border-radius: 14px; padding: 10px 12px; }
-.at-project-watch { width: 54px; flex: none; }
-.at-project-watch.radio { width: 84px; }
-.at-project-watch.voilier { width: 64px; }
-.at-project-watch.boite { width: 84px; }
-.at-project-watch.fauteuil { width: 64px; }
-.at-project-watch.malle { width: 84px; }
-.at-project-watch.musique { width: 84px; }
-.at-project-watch.boussole, .at-project-watch.fanal, .at-project-watch.cloche { width: 60px; }
-.at-project-watch.longuevue, .at-project-watch.coffre, .at-project-watch.mouette { width: 90px; }
-.at-project-watch.cadre, .at-project-watch.tabouret, .at-project-watch.carnet { width: 56px; }
-.at-project-watch.travailleuse, .at-project-watch.bobines, .at-project-watch.valise { width: 76px; }
-.at-project-watch.etal, .at-project-watch.presentoir, .at-project-watch.balance { width: 80px; }
-.at-project-watch.caissette, .at-project-watch.casier, .at-project-watch.toupie { width: 58px; }
+.at-project-watch { width: 76px; flex: none; }
 .at-warn { color: #d9822b !important; font-weight: 600; }
 .at-shelves { position: absolute; left: 52%; top: 6%; width: 48%; height: 62%; background: radial-gradient(ellipse at 60% 40%, rgba(255, 214, 140, 0.35), transparent 65%); mix-blend-mode: screen; pointer-events: none; }
 .at-project-txt { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--gray-300); min-width: 0; flex: 1; }
