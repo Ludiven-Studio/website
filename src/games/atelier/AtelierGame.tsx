@@ -37,6 +37,9 @@ import Cocoin from '../../components/Cocoin';
 
 const SAVE_KEY = 'ludiven-atelier';
 const ART = '/assets/jeux/atelier';
+// Bump when the item icons are redrawn under the same names: the image cache serves stale-while-revalidate, so a
+// new query string is what makes every player see the new art on the first visit.
+const ICON_V = 2;
 const FALLBACK: Record<string, string> = { outil: '🪛', soin: '🧽', meca: '⚙️', elec: '💡', bois: '🪵', tissu: '🧵', marin: '🪢', boite: '🧰', tiroir: '🗄️', caisse: '🔌', coffre: '🪚', malle: '🧺', greeur: '⚓' };
 
 type View = 'atelier' | 'etabli';
@@ -96,9 +99,9 @@ const fmt = (ms: number): string => {
 
 const imgOf = (p: Piece): string => {
 	const g = genOf(p);
-	if (g) return `${ART}/gen-${g}.png`;
+	if (g) return `${ART}/gen-${g}.png?v=${ICON_V}`;
 	const i = parse(p)!;
-	return `${ART}/${i.chain}-${i.level}.png`;
+	return `${ART}/${i.chain}-${i.level}.png?v=${ICON_V}`;
 };
 
 function PieceImg({ piece, className }: { piece: Piece; className?: string }) {
@@ -1204,7 +1207,7 @@ function SceneView({ scene, onDone, onSkip }: { scene: Scene; onDone: () => void
 				{line?.show ? (
 					<div className="at-clue" key={`clue-${i}`}>
 						{line.show === 'back' && <WatchBack size="100%" />}
-						{line.show === 'mechanism' && <img src={`${ART}/meca-5.png`} alt="Le mécanisme de la montre, remonté" />}
+						{line.show === 'mechanism' && <img src={`${ART}/meca-5.png?v=${ICON_V}`} alt="Le mécanisme de la montre, remonté" />}
 						{line.show === 'postcard' && (
 							<div className="at-postcard" role="img" aria-label="Carte postale de Jeanne, mars 1962">
 								<p>L’atelier restera ouvert.<br />Le bureau, je le ferme.<br />Ne me demande pas pourquoi.</p>

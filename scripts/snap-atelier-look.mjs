@@ -24,7 +24,7 @@ try {
 		}, scheme);
 		const page = await ctx.newPage();
 		if (process.env.ICONS) {
-			await page.route('**/assets/jeux/atelier/*.png', (route) => {
+			await page.route('**/assets/jeux/atelier/*.png*', (route) => {
 				const f = join(resolve(process.env.ICONS), basename(new URL(route.request().url()).pathname));
 				return existsSync(f) ? route.fulfill({ path: f, contentType: 'image/png' }) : route.continue();
 			});
