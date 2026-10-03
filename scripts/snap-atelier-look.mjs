@@ -1,8 +1,11 @@
 /* Atelier look check: the bench and the workshop of a chapter-1 save, in the light and the dark site theme.
+   ICONS=<dir> previews candidate item icons: any /assets/jeux/atelier/<name>.png found in that dir is served instead,
+   so new art can be judged in place before it touches public/.
    Fails on console errors. Usage: node scripts/snap-atelier-look.mjs [out dir]   (default D:/tmp/atelier-look) */
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { resolve, join, basename } from 'node:path';
 import { startServer } from './preview-server.mjs';
 
 const OUT = resolve(process.argv[2] ?? 'D:/tmp/atelier-look');
@@ -20,6 +23,12 @@ try {
 			localStorage.setItem('theme', sch);
 		}, scheme);
 		const page = await ctx.newPage();
+		if (process.env.ICONS) {
+			await page.route('**/assets/jeux/atelier/*.png', (route) => {
+				const f = join(resolve(process.env.ICONS), basename(new URL(route.request().url()).pathname));
+				return existsSync(f) ? route.fulfill({ path: f, contentType: 'image/png' }) : route.continue();
+			});
+		}
 		page.on('pageerror', (e) => errors.push(e.message));
 		await page.goto(`http://localhost:${PORT}/jeux/atelier/`, { waitUntil: 'networkidle' });
 		await page.evaluate(async () => {

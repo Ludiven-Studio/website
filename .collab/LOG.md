@@ -23,3 +23,5 @@ Une ligne par ticket : date · id · résumé · décision.
 - 2026-09-30 · 0021 · portraits Jeanne, Henri, Rose, Mme Lemoine (Codex, 214 k jetons) · intégrés
 - 2026-10-02 · 0022 · atelier restauré, plus lumineux (Codex imagegen, 287 k jetons) · intégré en fondu selon la progression
 - 2026-10-02 · 0023 · énigmes à la Layton (version Codex, 115 k jetons) · fusionnées dans docs/atelier-enigmes.md, soumises à l'utilisateur
+- 2026-10-03 · 0024 · essai d'icônes cartoon, chaîne des outils (Codex, 765 k jetons) · validé, sert de référence aux lots 0025-0027
+- 2026-10-03 · 0025-0027 · 36 icônes cartoon (entretien, mécanique, électricité, menuiserie, textile, marine, 5 générateurs ; Codex, 2,9 M jetons) · intégrées avec l'essai 0024, 42 icônes au total
