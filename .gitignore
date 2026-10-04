@@ -37,3 +37,4 @@ pnpm-debug.log*
 
 # Copied at dev/build time by scripts/vendor-rapier.mjs
 public/vendor/
+shots/
