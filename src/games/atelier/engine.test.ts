@@ -4,7 +4,7 @@ import {
 	storyOrder, shortOrders, parse, genOf, nearestEmpty, energyIn, dueTier, nextTier, claimTier, stepOf, missingGens, mapReady, solveMap, storyBlocker, factKnown, SAVE_V, CELLS, type State,
 	genMax, genChargeMs, genUpgradeState, upgradeGen, rechargeGen, fullIn,
 } from './engine';
-import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS, FACES, GEN_LEVELS, WELCOME_MS, WELCOME_CHARGE_MS } from './data';
+import { CHAINS, GENERATORS, ORDERS, UPGRADES, ENERGY_MAX, ENERGY_MS, COLS, START_BOARD, PROJECTS, FACES, GEN_LEVELS, WIND_MS, WINDS } from './data';
 import { CHARACTERS } from './characters';
 
 const T0 = 1_700_000_000_000;
@@ -116,31 +116,56 @@ describe('generators', () => {
 			if (r.ok) s = r.s;
 		}
 		expect(produce(s, g, T0)).toEqual({ ok: false, why: 'charges' });
-		const later = produce(s, g, T0 + genChargeMs(s, 'tiroir', T0));
+		const later = produce(s, g, T0 + genChargeMs(s, 'tiroir'));
 		expect(later.ok).toBe(true);
 	});
 
-	it('the welcome quarter-hour refills fast, then the level sets the pace', () => {
-		const s = newGame(T0);
-		expect(genChargeMs(s, 'boite', T0)).toBe(WELCOME_CHARGE_MS);
-		expect(genChargeMs(s, 'boite', T0 + WELCOME_MS)).toBe(GEN_LEVELS[0].chargeMs);
+	it('out of energy, a second wind comes within 30 s and shrinks each time', () => {
+		let s: State = { ...newGame(T0), energy: 1 };
+		const g = genCell(s, 'tiroir');
+		let now = T0;
+		const sizes: number[] = [];
+		for (let k = 0; k < WINDS.length + 1; k++) {
+			while (s.energy > 0) {
+				const r = produce(s, g, now);
+				if (!r.ok) { now += 1000; s = tick(s, now); continue; }
+				s = { ...r.s, board: r.s.board.map((p, i) => (i === r.at ? null : p)) };
+			}
+			expect(produce(s, g, now)).toEqual({ ok: false, why: 'energy' });
+			s = { ...s, energyAt: now };
+			expect(energyIn(s, now)).toBe(WIND_MS);
+			now += WIND_MS;
+			s = tick(s, now);
+			sizes.push(s.energy);
+		}
+		expect(sizes).toEqual([...WINDS, WINDS[WINDS.length - 1]]);
+	});
+
+	it('a full bar resets the second winds', () => {
+		const s = { ...newGame(T0), energy: ENERGY_MAX - 1, energyAt: T0, winds: 4 };
+		expect(tick(s, T0 + ENERGY_MS).winds).toBe(0);
+	});
+
+	it('no wait is ever longer than 30 s', () => {
+		expect(WIND_MS).toBeLessThanOrEqual(30_000);
+		for (const l of GEN_LEVELS) expect(l.chargeMs).toBeLessThanOrEqual(30_000);
 	});
 
 	it('a generator level costs coins, comes back full and refills faster', () => {
-		let s = { ...newGame(T0), coins: 1000, welcomeUntil: 0 };
+		let s = { ...newGame(T0), coins: 1000 };
 		expect(genUpgradeState({ ...s, coins: 0 }, 'boite')).toBe('poor');
 		s = upgradeGen(s, 'boite', T0);
 		expect(s.gens.boite.level).toBe(2);
 		expect(s.coins).toBe(1000 - GEN_LEVELS[1].cost);
 		expect(s.gens.boite.charges).toBe(GEN_LEVELS[1].charges);
-		expect(genChargeMs(s, 'boite', T0)).toBeLessThan(GEN_LEVELS[0].chargeMs);
+		expect(genChargeMs(s, 'boite')).toBeLessThan(GEN_LEVELS[0].chargeMs);
 		for (let k = 2; k < GEN_LEVELS.length; k++) s = upgradeGen(s, 'boite', T0);
 		expect(genUpgradeState(s, 'boite')).toBe('max');
 		expect(upgradeGen(s, 'boite', T0)).toBe(s);
 	});
 
 	it('a recharge fills an empty generator at once', () => {
-		let s = { ...newGame(T0), welcomeUntil: 0 };
+		let s = newGame(T0);
 		const g = genCell(s, 'tiroir');
 		for (let k = 0; k < genMax(s, 'tiroir'); k++) { const r = produce(s, g, T0); if (r.ok) s = r.s; }
 		expect(produce(s, g, T0)).toEqual({ ok: false, why: 'charges' });
@@ -149,19 +174,19 @@ describe('generators', () => {
 	});
 
 	it('fullIn counts every missing charge at the current pace', () => {
-		const s = { ...newGame(T0), welcomeUntil: 0 };
+		const s = newGame(T0);
 		const e = { ...s, gens: { ...s.gens, tiroir: { ...s.gens.tiroir, charges: 0, at: T0 } } };
-		expect(fullIn(e, 'tiroir', T0 + 10_000)).toBe(GEN_LEVELS[0].charges * GEN_LEVELS[0].chargeMs - 10_000);
+		expect(fullIn(e, 'tiroir', T0 + 1_000)).toBe(GEN_LEVELS[0].charges * GEN_LEVELS[0].chargeMs - 1_000);
 		expect(fullIn(s, 'tiroir', T0)).toBe(0);
 	});
 
-	it('old saves keep their generators at level 1 and get the welcome quarter-hour', () => {
+	it('old saves keep their generators at level 1 and start with no second wind taken', () => {
 		const old = JSON.parse(save(newGame(T0)));
 		for (const g of Object.keys(old.gens)) delete old.gens[g].level;
-		delete old.welcomeUntil;
+		delete old.winds; delete old.emptyAt;
 		const s = load(JSON.stringify(old), T0 + 86_400_000);
 		expect(s.gens.boite.level).toBe(1);
-		expect(s.welcomeUntil).toBe(T0 + 86_400_000 + WELCOME_MS);
+		expect(s.winds).toBe(0);
 	});
 
 	it('generator outputs are deterministic for a seed', () => {

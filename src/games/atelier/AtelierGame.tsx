@@ -3,7 +3,7 @@ import {
 	load, save, newGame, tick, produce, move, moveKind, deliver, sell, sellValue, buyUpgrade, upgradeState,
 	addEnergy, markSeen, dueTier, nextTier, claimTier, activeOrders, pickCells, parse, genOf, pieceName, energyIn, chargeIn, isFull,
 	stepOf, storyOrder, storyBlocker, factKnown, currentProject, projectOf, missingGens, mapReady, solveMap, code, unitCost, CELLS, type State, type Piece,
-	genMax, genUpgradeState, upgradeGen, rechargeGen, fullIn, genChargeMs,
+	genMax, genUpgradeState, upgradeGen, rechargeGen, fullIn, nextWind,
 } from './engine';
 import {
 	CHAINS, GENERATORS, UPGRADES, ORDERS, PROJECTS, RECAPS, COLS, ROWS, ENERGY_MAX, ENERGY_PACK, GEN_LEVELS, RECHARGE_PRICE,
@@ -550,9 +550,6 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 			</div>
 
 			{coach && <div className="at-coach" key={coach.text}>{coach.text}</div>}
-			{!coach && now < s.welcomeUntil && (
-				<div className="at-welcome" role="status">⚡ Recharge express de bienvenue : encore <strong>{fmt(s.welcomeUntil - now)}</strong></div>
-			)}
 
 			{view === 'etabli' ? (
 				<>
@@ -768,8 +765,8 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 				<div className="at-modal" onClick={(e) => { if (e.target === e.currentTarget) setEnergyOpen(false); }}>
 					<div className="at-card">
 						<h3>⚡ Énergie</h3>
-						<p>Chaque objet sorti d’un générateur coûte 1 énergie. Elle revient toute seule : +1 toutes les 2 minutes, jusqu’à {ENERGY_MAX}, même quand le jeu est fermé.</p>
-						<p className="at-big"><strong>{s.energy}</strong> / {ENERGY_MAX}{s.energy < ENERGY_MAX && <> · prochaine dans {fmt(energyIn(s, now))}</>}</p>
+						<p>Chaque objet sorti d’un générateur coûte 1 énergie. Elle revient toute seule : +1 toutes les 2 minutes, jusqu’à {ENERGY_MAX}, même quand le jeu est fermé. À sec, un regain arrive en 30 secondes, un peu plus petit à chaque fois ; une barre pleine les remet à neuf.</p>
+						<p className="at-big"><strong>{s.energy}</strong> / {ENERGY_MAX}{s.energy < ENERGY_MAX && <> · +{s.energy < 1 ? nextWind(s) : 1} dans {fmt(energyIn(s, now))}</>}</p>
 						<div className="at-pack">
 							<span>Échanger <strong>{ENERGY_PACK.price} <Cocoin size="1em" /></strong> contre <strong>{ENERGY_PACK.energy} ⚡</strong></span>
 							<button className="at-btn" disabled={!wallet.ready || wallet.balance < ENERGY_PACK.price} onClick={buyEnergy}>Échanger</button>
@@ -849,12 +846,10 @@ function GenPop({ s, g, now, cocoins, onUp, onRecharge, onEnergy, onClose }: {
 	const cur = GEN_LEVELS[lv - 1];
 	const next = GEN_LEVELS[lv];
 	const up = genUpgradeState(s, g);
-	const welcome = now < s.welcomeUntil;
-	const pace = Math.round(genChargeMs(s, g, now) / 1000);
 	const status = c === 0
 		? { kind: 'block', text: `Plus de charges : toutes revenues dans ${fmt(fullIn(s, g, now))}.` }
 		: s.energy === 0
-			? { kind: 'block', text: `Plus d’énergie : +1 dans ${fmt(energyIn(s, now))}.` }
+			? { kind: 'block', text: `Plus d’énergie : +${nextWind(s)} dans ${fmt(energyIn(s, now))}.` }
 			: { kind: 'ok', text: `Encore ${Math.min(c, s.energy)} objet${Math.min(c, s.energy) > 1 ? 's' : ''} d’affilée avant d’attendre.` };
 	const pct = (v: number) => `${Math.round(v * 100)}${NBSP}%`;
 	return (
@@ -884,12 +879,11 @@ function GenPop({ s, g, now, cocoins, onUp, onRecharge, onEnergy, onClose }: {
 						<small>Énergie ⚡</small>
 						<b>{s.energy}<span>/{ENERGY_MAX}</span></b>
 						<span className="at-meter-bar"><span style={{ width: `${Math.min(1, s.energy / ENERGY_MAX) * 100}%` }} /></span>
-						<em>{s.energy < ENERGY_MAX ? <>+1 dans {fmt(energyIn(s, now))}</> : 'Au maximum'}</em>
+						<em>{s.energy < ENERGY_MAX ? <>+{s.energy < 1 ? nextWind(s) : 1} dans {fmt(energyIn(s, now))}</> : 'Au maximum'}</em>
 					</button>
 				</div>
 
 				<p className={`at-genpop-status ${status.kind}`}>{status.text}</p>
-				{welcome && <p className="at-genpop-welcome">⚡ Bienvenue : 1 charge toutes les {pace} s pendant encore {fmt(s.welcomeUntil - now)}, puis {Math.round(cur.chargeMs / 1000)} s.</p>}
 
 				<h4>Aller plus vite</h4>
 				{c < max && (
@@ -1622,8 +1616,6 @@ const FUN_CSS = `
 .at-reward-tile b { font-family: var(--font-brand); font-size: 26px; font-weight: 800; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.25); }
 .at-reward-tile small { font-size: 12px; font-weight: 700; color: #fff; opacity: 0.92; }
 .at-root .at-reward-btn { font-size: 18px; padding: 12px 36px; }
-.at-welcome { text-align: center; font-size: 13px; color: var(--fun-violet-dark); background: #f3e6ff; border: 2px solid #dcc2ff; border-radius: 999px; padding: 6px 12px; }
-.at-welcome strong { font-variant-numeric: tabular-nums; }
 .at-genlvl { position: absolute; left: 2px; top: 1px; font-style: normal; font-size: 9px; line-height: 1; color: var(--fun-gold); text-shadow: 0 1px 0 #7428d6, 0 0 2px #7428d6; letter-spacing: -1px; }
 .at-root .at-info-gen { width: 100%; font-family: inherit; color: inherit; text-align: left; cursor: pointer; }
 .at-info-gen > div { gap: 4px !important; }
@@ -1655,7 +1647,6 @@ button.at-meter { cursor: pointer; }
 .at-root .at-card p.at-genpop-status { font-weight: 700; font-size: 14px; border-radius: 12px; padding: 8px 10px; text-align: center; }
 .at-genpop-status.block { background: #ffe0ef; color: var(--fun-pink-dark) !important; }
 .at-genpop-status.ok { background: #d8fbef; color: var(--fun-mint-dark) !important; }
-.at-root .at-card p.at-genpop-welcome { font-size: 12.5px; color: var(--fun-violet-dark); background: #f3e6ff; border-radius: 12px; padding: 6px 10px; text-align: center; }
 .at-genpop h4 { margin: 2px 0 -4px; font-family: var(--font-brand); font-size: 15px; color: var(--fun-plum); }
 .at-genpop-opt { display: flex; gap: 10px; align-items: center; background: #fff; border-radius: 14px; padding: 10px; box-shadow: var(--fun-shadow); }
 .at-genpop-opt > div { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }

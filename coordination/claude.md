@@ -78,3 +78,15 @@
 
 - Statut : terminé, poussé. Réservations libérées.
 - Réservations (libérées) : `src/data/petanqueScanner.ts` (FAQ précision), `src/content/work{,-en}/petanque-scanner.md` (un paragraphe).
+
+## 2026-10-02 — Pétanque Scanner : fichier de versions pour l’appli
+
+- Statut : terminé, build OK, non commité.
+- Réservations actives : `public/petanque-scanner/version.json` (nouveau).
+
+## 2026-10-04 — Atelier : rythme des blocages
+
+- Statut : terminé, tests OK, non commité. Réservation (déjà active) : `src/games/atelier/`, `scripts/atelier-sim.ts`.
+- Énergie 105, +1/2 min ; à sec, regain en 30 s de 45, 22, 16, 12, 9, 7, puis 5 (remis à zéro par une barre pleine).
+  Charges des générateurs : 4/3/2/1 s. Sim : 1er blocage ~10 min, 2e ~15 min, puis de plus en plus serrés.
+- `scripts/snap-atelier.mjs` est en retard sur la révélation des améliorations (bloque à l'étape 09) : sans lien.

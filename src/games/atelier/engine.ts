@@ -4,7 +4,7 @@
 
 import {
 	CHAINS, GENERATORS, ORDERS, UPGRADES, START_BOARD, LOCALS, COLS, ROWS, REP_TIERS, PROJECTS,
-	ENERGY_MAX, ENERGY_MS, GEN_LEVELS, WELCOME_MS, WELCOME_CHARGE_MS,
+	ENERGY_MAX, ENERGY_MS, GEN_LEVELS, WIND_MS, WINDS,
 	type ChainId, type GenId, type Order, type Reward, type RepTier, type Gate, type ProjectId, type Project,
 } from './data';
 
@@ -45,8 +45,10 @@ export interface State {
 	/** Scenes already shown (intro, arrival, epilogue…). */
 	seen: string[];
 	stats: { produced: number; merges: number; sold: number; delivered: number };
-	/** Until then, generators refill at the welcome pace. */
-	welcomeUntil: number;
+	/** Second winds taken since the bar was last full. */
+	winds: number;
+	/** When energy last hit 0. */
+	emptyAt: number;
 }
 
 export type Fail = 'energy' | 'charges' | 'full' | 'none';
@@ -115,7 +117,8 @@ export function newGame(now: number, seed = (now ^ 0x5bd1e995) >>> 0): State {
 		tut: 0,
 		seen: [],
 		stats: { produced: 0, merges: 0, sold: 0, delivered: 0 },
-		welcomeUntil: now + WELCOME_MS,
+		winds: 0,
+		emptyAt: now,
 	};
 }
 
@@ -123,9 +126,7 @@ export function newGame(now: number, seed = (now ^ 0x5bd1e995) >>> 0): State {
 
 const levelOf = (s: State, g: GenId) => GEN_LEVELS[Math.min(GEN_LEVELS.length, Math.max(1, s.gens[g]?.level ?? 1)) - 1];
 export const genMax = (s: State, g: GenId): number => levelOf(s, g).charges;
-/** Refill time of one charge at `now`: the welcome pace while it lasts, then the level's. */
-export const genChargeMs = (s: State, g: GenId, now: number): number =>
-	now < s.welcomeUntil ? Math.min(WELCOME_CHARGE_MS, levelOf(s, g).chargeMs) : levelOf(s, g).chargeMs;
+export const genChargeMs = (s: State, g: GenId): number => levelOf(s, g).chargeMs;
 
 export function genUpgradeState(s: State, g: GenId): 'max' | 'poor' | 'ok' {
 	const next = GEN_LEVELS[s.gens[g].level];
@@ -184,6 +185,12 @@ export function tick(s: State, now: number): State {
 	const edit = (): State => (out ??= clone(s));
 	// A clock set back must not cost anything: restart the refill from now.
 	if (now < s.energyAt) edit().energyAt = now;
+	if (now < s.emptyAt) edit().emptyAt = now;
+	if ((out ?? s).energy < 1 && now - (out ?? s).emptyAt >= WIND_MS) {
+		const n = edit();
+		n.energy += nextWind(n);
+		n.winds++;
+	}
 	const e = out ?? s;
 	if (e.energy >= ENERGY_MAX) {
 		if (e.energyAt !== now && now - e.energyAt >= ENERGY_MS) edit().energyAt = now;
@@ -192,13 +199,14 @@ export function tick(s: State, now: number): State {
 		const gained = Math.floor((now - n.energyAt) / ENERGY_MS);
 		n.energy = Math.min(ENERGY_MAX, n.energy + gained);
 		n.energyAt = n.energy >= ENERGY_MAX ? now : n.energyAt + gained * ENERGY_MS;
+		if (n.energy >= ENERGY_MAX) n.winds = 0;
 	}
 	for (const g of Object.values(GENERATORS)) {
 		const cur = (out ?? s).gens[g.id];
 		if (now < cur.at) { edit().gens[g.id].at = now; continue; }
 		const max = genMax(out ?? s, g.id);
 		if (cur.charges >= max) continue;
-		const ms = genChargeMs(out ?? s, g.id, now);
+		const ms = genChargeMs(out ?? s, g.id);
 		const gained = Math.floor((now - cur.at) / ms);
 		if (gained <= 0) continue;
 		const n = edit().gens[g.id];
@@ -208,17 +216,23 @@ export function tick(s: State, now: number): State {
 	return out ?? s;
 }
 
-/** Milliseconds until the next energy point (0 when full). */
-export const energyIn = (s: State, now: number): number =>
-	s.energy >= ENERGY_MAX ? 0 : Math.max(0, ENERGY_MS - (now - s.energyAt));
+/** Energy the next second wind brings. */
+export const nextWind = (s: State): number => WINDS[Math.min(s.winds, WINDS.length - 1)];
+
+/** Milliseconds until energy comes back: the second wind when empty, else the next point (0 when full). */
+export const energyIn = (s: State, now: number): number => {
+	if (s.energy >= ENERGY_MAX) return 0;
+	const point = Math.max(0, ENERGY_MS - (now - s.energyAt));
+	return s.energy < 1 ? Math.min(point, Math.max(0, WIND_MS - (now - s.emptyAt))) : point;
+};
 
 export const chargeIn = (s: State, g: GenId, now: number): number =>
-	s.gens[g].charges >= genMax(s, g) ? 0 : Math.max(0, genChargeMs(s, g, now) - (now - s.gens[g].at));
+	s.gens[g].charges >= genMax(s, g) ? 0 : Math.max(0, genChargeMs(s, g) - (now - s.gens[g].at));
 
 /** Time until the generator is full, at the current pace. */
 export const fullIn = (s: State, g: GenId, now: number): number => {
 	const missing = genMax(s, g) - s.gens[g].charges;
-	return missing <= 0 ? 0 : chargeIn(s, g, now) + (missing - 1) * genChargeMs(s, g, now);
+	return missing <= 0 ? 0 : chargeIn(s, g, now) + (missing - 1) * genChargeMs(s, g);
 };
 
 export function addEnergy(s: State, n: number): State {
@@ -274,6 +288,7 @@ export function produce(s: State, cell: number, now: number): ProduceResult {
 	n.board[at] = piece;
 	if (n.energy >= ENERGY_MAX) n.energyAt = now; // the refill starts with the first point spent
 	n.energy -= 1;
+	if (n.energy < 1) n.emptyAt = now;
 	if (n.gens[g].charges >= genMax(n, g)) n.gens[g].at = now;
 	n.gens[g].charges -= 1;
 	n.stats.produced++;
@@ -583,8 +598,8 @@ export function load(raw: string | null, now: number): State {
 			tut: Math.max(0, Math.min(4, Number(d.tut) || 0)),
 			seen: Array.isArray(d.seen) ? d.seen.filter((x) => typeof x === 'string') : [],
 			stats: { ...base.stats, ...(d.stats ?? {}) },
-			// Saves from before the generator levels get the welcome quarter-hour too, from their first load.
-			welcomeUntil: Number.isFinite(d.welcomeUntil) ? Number(d.welcomeUntil) : now + WELCOME_MS,
+			winds: Math.max(0, Number(d.winds) || 0),
+			emptyAt: clamp(d.emptyAt),
 		};
 		// v1 named the watch's arrival scene 'arrival'; v2 keys arrivals by project.
 		if (s.seen.includes('arrival') && !s.seen.includes('arrival:montre')) s.seen.push('arrival:montre');

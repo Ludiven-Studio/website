@@ -137,20 +137,22 @@ export const GENERATORS: Record<GenId, Generator> = {
 export const COLS = 7;
 export const ROWS = 9;
 
-export const ENERGY_MAX = 60;
+/** Start and cap of the slow refill. A full bar also resets the second winds below. */
+export const ENERGY_MAX = 105;
 export const ENERGY_MS = 2 * 60_000;
+/** Out of energy, a second wind comes back within 30 s, each one smaller than the last,
+ *  so blocks come more often as a session goes on. A rest long enough to fill the bar starts over. */
+export const WIND_MS = 30_000;
+export const WINDS = [45, 22, 16, 12, 9, 7, 5];
 
 /** Generator levels, bought with coins: more charges, a faster refill, and more often an item one level up
- *  (a merge saved). Level 1 is the pace that slows a session down once the welcome rush is over. */
+ *  (a merge saved). Charges only set a rhythm; energy is what blocks a session. */
 export const GEN_LEVELS = [
-	{ charges: 8, chargeMs: 50_000, up: 0, cost: 0 },
-	{ charges: 10, chargeMs: 35_000, up: 0.12, cost: 60 },
-	{ charges: 12, chargeMs: 22_000, up: 0.22, cost: 160 },
-	{ charges: 14, chargeMs: 12_000, up: 0.32, cost: 320 },
+	{ charges: 10, chargeMs: 4_000, up: 0, cost: 0 },
+	{ charges: 12, chargeMs: 3_000, up: 0.12, cost: 60 },
+	{ charges: 14, chargeMs: 2_000, up: 0.22, cost: 160 },
+	{ charges: 16, chargeMs: 1_000, up: 0.32, cost: 320 },
 ];
-/** The first quarter of an hour: generators refill this fast, whatever their level. */
-export const WELCOME_MS = 15 * 60_000;
-export const WELCOME_CHARGE_MS = 5_000;
 /** Cocoins to refill an empty generator at once. */
 export const RECHARGE_PRICE = 4;
 

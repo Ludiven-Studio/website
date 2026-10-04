@@ -31,7 +31,13 @@ interface Run {
 	firstWait: number | null;
 	genLevels: Record<string, number>;
 	coinsSpentOnGens: number;
+	/** Active play at the start of each wait of BLOCK_S or more (back-to-back waits count as one). */
+	blocks: number[];
+	/** Longest single wait, in seconds. */
+	longest: number;
 }
+
+const BLOCK_S = 10;
 
 function needMap(s: State): Map<Piece, number> {
 	const m = new Map<Piece, number>();
@@ -99,11 +105,15 @@ function play(seed: number): Run {
 	let s = newGame(T0, seed);
 	let now = T0;
 	let energy = 0, taps = 0, sec = 0, played = 0;
-	const run: Run = { marks: {}, fullHits: 0, chargeWaits: 0, energyWait: 0, sold: 0, boughtEnergy: 0, firstWait: null, genLevels: {}, coinsSpentOnGens: 0 };
-	const act = (dt: number) => { taps++; sec += dt; played += dt; now += dt * 1000; if (process.env.TRACE && seed === 1) console.log(`e${energy} ${JSON.stringify(s.progress)} orders=${activeOrders(s).map((o) => o.id + "[" + o.needs + "]").join(" ")} board=${s.board.filter(Boolean).join(",")}`); };
+	const run: Run = { marks: {}, fullHits: 0, chargeWaits: 0, energyWait: 0, sold: 0, boughtEnergy: 0, firstWait: null, genLevels: {}, coinsSpentOnGens: 0, blocks: [], longest: 0 };
+	let idle = 0;
+	const act = (dt: number) => { idle = 0; taps++; sec += dt; played += dt; now += dt * 1000; if (process.env.TRACE && seed === 1) console.log(`e${energy} ${JSON.stringify(s.progress)} orders=${activeOrders(s).map((o) => o.id + "[" + o.needs + "]").join(" ")} board=${s.board.filter(Boolean).join(",")}`); };
 	const wait = (ms: number, kind: 'energy' | 'charge') => {
 		const dt = Math.max(1, Math.ceil(ms / 1000));
 		if (dt > 20 && run.firstWait === null) run.firstWait = played;
+		if (idle < BLOCK_S && idle + dt >= BLOCK_S) run.blocks.push(played);
+		idle += dt;
+		run.longest = Math.max(run.longest, idle);
 		sec += dt; now += dt * 1000;
 		if (kind === 'energy') run.energyWait += dt; else run.chargeWaits += dt;
 		s = tick(s, now);
@@ -204,6 +214,14 @@ for (const [a, b] of [['etabli', 'morel-1'], ['morel-1', 'morel-2'], ['morel-2',
 	const fmt = (x: number) => { const r = Math.round(x); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`; };
 	console.log(`${`${a} → ${b}`.padEnd(19)} ${String(pct(e, 0.1)).padStart(4)} ${String(pct(e, 0.5)).padStart(4)} ${String(pct(e, 0.9)).padStart(4)}          ${fmt(pct(t, 0.5))} / ${fmt(pct(t, 0.9))}`);
 }
+console.log(`blocks (waits of ${BLOCK_S} s or more), active play at the start of each, med / p10-p90:`);
+for (let k = 0; k < 12; k++) {
+	const at = runs.map((r) => r.blocks[k]).filter((x) => x !== undefined);
+	if (!at.length) break;
+	const mmss = (x: number) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
+	console.log(`  #${k + 1}  ${mmss(pct(at, 0.5))}  (${mmss(pct(at, 0.1))}-${mmss(pct(at, 0.9))})${at.length < N ? `  ${at.length}/${N}` : ''}`);
+}
+console.log(`blocks in total: med ${pct(runs.map((r) => r.blocks.length), 0.5)} · longest wait: med ${pct(runs.map((r) => r.longest), 0.5)} s, max ${Math.max(...runs.map((r) => r.longest))} s`);
 const bought = runs.map((r) => r.boughtEnergy);
 console.log(`energy bought to finish: med ${pct(bought, 0.5)}, p90 ${pct(bought, 0.9)}, runs needing any: ${bought.filter((b) => b > 0).length}/${N}`);
 console.log(`board full hits: med ${pct(runs.map((r) => r.fullHits), 0.5)}, p90 ${pct(runs.map((r) => r.fullHits), 0.9)} · sold med ${pct(runs.map((r) => r.sold), 0.5)}`);

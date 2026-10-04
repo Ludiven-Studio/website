@@ -103,7 +103,7 @@ try {
 	// 6. An empty generator: tapping it opens the window on its own, with the blocker and the paid recharge.
 	await page.evaluate(async () => {
 		const st = JSON.parse(localStorage.getItem('ludiven-atelier'));
-		st.gens.boite.charges = 0; st.gens.boite.at = Date.now(); st.gens.boite.level = 1; st.welcomeUntil = 0; st.coins = 23;
+		st.gens.boite.charges = 0; st.gens.boite.at = Date.now(); st.gens.boite.level = 1; st.coins = 23;
 		localStorage.setItem('ludiven-atelier', JSON.stringify(st));
 	});
 	await page.reload({ waitUntil: 'networkidle' });
