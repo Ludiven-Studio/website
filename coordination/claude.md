@@ -84,6 +84,15 @@
 - Statut : terminé, build OK, non commité.
 - Réservations actives : `public/petanque-scanner/version.json` (nouveau).
 
+## 2026-10-05 — Rencontres : page de téléchargement de l'APK de test (session PetanqueMeet)
+
+- Statut : terminé, poussé (15:15+02:00). Réservations libérées. Bucket `builds` créé (migration poussée), premier APK publié,
+  `npm run build` OK (118 pages, page absente du sitemap).
+- Réservations (libérées) : `supabase/migrations/20261005120000_builds_bucket.sql` (nouveau),
+  `src/pages/rencontres/test.astro` (nouveau), `astro.config.mjs` (filtre du sitemap seulement).
+- Ressources : `npx supabase db push` (bucket `builds`, public en lecture, écriture service_role seulement),
+  `npm run build` en fin de lot (dist/, .astro/).
+
 ## 2026-10-04 — Atelier : rythme des blocages
 
 - Statut : terminé, tests OK, non commité. Réservation (déjà active) : `src/games/atelier/`, `scripts/atelier-sim.ts`.
