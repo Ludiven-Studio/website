@@ -37,7 +37,8 @@ export default defineConfig({
                 !page.includes('/courses') &&
                 !page.includes('/confidentialite') &&
                 !page.includes('/mentions-legales') &&
-                !page.includes('/rencontres/test'),
+                !page.includes('/rencontres/test') &&
+                !page.includes('/jeux/petanque/test'),
         }),
         AstroPWA({
             registerType: 'autoUpdate',
