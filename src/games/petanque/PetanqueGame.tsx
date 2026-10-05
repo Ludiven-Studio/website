@@ -3596,7 +3596,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 							rel="noopener"
 							onClick={() => trackEvent('promo_click', { from: gameId, to: 'petanque-scanner' })}
 						>
-							<span className="pe-promo-pic" aria-hidden="true" />
+							<span className="pe-promo-pic" aria-hidden="true" style={{ backgroundImage: `url(/assets/petanque-ar/screen-01-${lang}.webp)` }} />
 							<span className="pe-promo-txt">
 								<strong>Pétanque Scanner</strong>
 								<span>{t.promoLine}</span>
@@ -4046,7 +4046,7 @@ const CSS = `
 .pe-promo a:hover { border-color: var(--pe-accent); }
 /* A background, not an img: object-fit can only shrink the whole phone into the box, and the
    distances are what sells it, so they are zoomed in on. */
-.pe-promo-pic { flex: 0 0 42%; min-width: 0; height: 100%; border-radius: 9px; background: #2b3a4a url(/assets/petanque-ar/screen-01.webp) no-repeat; background-size: 330% auto; background-position: 44% 55%; }
+.pe-promo-pic { flex: 0 0 42%; min-width: 0; height: 100%; border-radius: 9px; background: #2b3a4a no-repeat; background-size: 330% auto; background-position: 44% 55%; }
 .pe-promo-txt { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; padding-right: 14px; }
 .pe-promo-txt strong { font-size: 14px; font-weight: 800; line-height: 1.15; color: #fff; }
 .pe-promo-txt span { font-size: 11.5px; line-height: 1.3; opacity: 0.88; }
