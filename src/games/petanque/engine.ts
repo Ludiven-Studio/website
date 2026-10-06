@@ -26,6 +26,14 @@ const PEBBLE_HOP = 0.15; // upward share of the speed when a boule climbs one
 const JACK_PEBBLE_HOP = 0.9; // and when the jack does: a visible hop off a gravel stone (up to ~8 cm)
 const SETTLE = 0.06; // m/s, below which a rolling boule is at rest
 const MAX_SUB = 24;
+/* The effet: side spin given by the hand. It turns the bounce a little towards its side, then
+   curves the roll while it wears off; a strike mostly kills it. Zero spin touches nothing, so every
+   throw without effet replays bit for bit. No sin/cos either: `deflect` shears. */
+const SPIN_LAND = 0.10; // rad of extra turn at a bounce, full spin
+const SPIN_ROLL = 0.22; // rad/s of curve while rolling, full spin
+const SPIN_DECAY = 0.7; // share lost per second of roll
+const SPIN_BOUNCE_KEEP = 0.6;
+const SPIN_HIT_KEEP = 0.25;
 
 export interface Boule {
 	x: number;
@@ -39,7 +47,11 @@ export interface Boule {
 	side: 0 | 1 | -1; // -1 = the jack
 	live: boolean; // false once it has left the pitch
 	rolling: boolean;
+	spin?: number; // the effet, -1 (left) to 1 (right) seen from behind the throw; absent = none
 }
+
+/** A throw's velocity, and its effet when the hand gave one (see `Boule.spin`). */
+export interface Velocity { vx: number; vy: number; vz: number; spin?: number; }
 
 /** A contact the render layer may dramatise. Observational only — reporting changes nothing. */
 export interface Impact {
@@ -83,12 +95,13 @@ export const RELEASE_LOW = 0.3; // m above the ground, a flat throw
 export const RELEASE_SPAN = 0.5; // m more for a vertical one (~0.77 m at a full plomb)
 
 /** Put a body in the thrower's hand, above the circle, and let it go with velocity `v`. */
-export function release(t: Terrain, b: Boule, v: { vx: number; vy: number; vz: number }): Boule {
+export function release(t: Terrain, b: Boule, v: Velocity): Boule {
 	place(t, b);
 	const sp = Math.sqrt(v.vx * v.vx + v.vy * v.vy + v.vz * v.vz);
 	const up = sp > 0 ? Math.max(0, Math.min(1, v.vz / sp)) : 0;
 	b.z += RELEASE_LOW + RELEASE_SPAN * up;
 	b.vx = v.vx; b.vy = v.vy; b.vz = v.vz;
+	if (v.spin) b.spin = Math.max(-1, Math.min(1, v.spin));
 	b.rolling = false;
 	return b;
 }
@@ -152,6 +165,8 @@ function groundContact(s: Sim, b: Boule, imp?: Impact[]): void {
 	b.vy = ty * surf.impactFriction + ny * back;
 	b.vz = tz * surf.impactFriction + nz * back;
 	deflect(b, grain(s) * surf.scatter * -vn);
+	// The effet bites at the bounce: a positive spin turns right, which is a negative shear.
+	if (b.spin) { deflect(b, -b.spin * SPIN_LAND); b.spin *= SPIN_BOUNCE_KEEP; }
 	imp?.push({ kind: 'ground', x: b.x, y: b.y, z: b.z, speed: -vn });
 }
 
@@ -195,6 +210,8 @@ function collide(t: Terrain, a: Boule, b: Boule, imp?: Impact[]): boolean {
 	a.vx -= j * ia * nx; a.vy -= j * ia * ny; a.vz -= j * ia * nz;
 	b.vx += j * ib * nx; b.vy += j * ib * ny; b.vz += j * ib * nz;
 	a.rolling = false; b.rolling = false;
+	if (a.spin) a.spin *= SPIN_HIT_KEEP;
+	if (b.spin) b.spin *= SPIN_HIT_KEEP;
 	/* A boule meets the jack above its centre (radii 37.5 vs 15 mm), so the normal dips ~25 deg and
 	   part of the kick points into the ground. On the ground, the ground takes it. Left in, it
 	   bounced the jack at impactFriction per hop, and the boule behind re-struck it: a jack hit at
@@ -226,6 +243,7 @@ export function stepSim(s: Sim, dt: number, imp?: Impact[]): StepResult {
 				b.vx += (-G * gv.gx * SLOPE_K - (drag * b.vx) / sp) * h;
 				b.vy += (-G * gv.gy * SLOPE_K - (drag * b.vy) / sp) * h;
 				b.vz = 0;
+				if (b.spin) { deflect(b, -b.spin * SPIN_ROLL * h); b.spin -= b.spin * SPIN_DECAY * h; }
 				b.x += b.vx * h;
 				b.y += b.vy * h;
 				b.z = heightAt(s.t, b.x, b.y) + b.r;
