@@ -29,10 +29,10 @@ const MAX_SUB = 24;
 /* The effet: side spin given by the hand. It turns the bounce a little towards its side, then
    curves the roll while it wears off; a strike mostly kills it. Zero spin touches nothing, so every
    throw without effet replays bit for bit. No sin/cos either: `deflect` shears. */
-const SPIN_LAND = 0.10; // rad of extra turn at a bounce, full spin
-const SPIN_ROLL = 0.22; // rad/s of curve while rolling, full spin
-const SPIN_DECAY = 0.7; // share lost per second of roll
-const SPIN_BOUNCE_KEEP = 0.6;
+const SPIN_LAND = 0.20; // rad of extra turn at a bounce, full spin
+const SPIN_ROLL = 0.65; // rad/s of curve while rolling, full spin
+const SPIN_DECAY = 0.45; // share lost per second of roll
+const SPIN_BOUNCE_KEEP = 0.8;
 const SPIN_HIT_KEEP = 0.25;
 
 export interface Boule {

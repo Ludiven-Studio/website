@@ -234,11 +234,11 @@ describe('effet', () => {
 		expect(rest(0)).toEqual(rest(undefined));
 	});
 
-	it('curves the boule to its side, a few tens of centimetres on a pointed throw', () => {
+	it('curves the boule to its side, most of a metre on a pointed throw', () => {
 		const straight = rest(0), right = rest(1), left = rest(-1);
 		// Behind the throw, along +y, right is +x.
-		expect(right.x - straight.x).toBeGreaterThan(0.15);
-		expect(right.x - straight.x).toBeLessThan(0.8);
+		expect(right.x - straight.x).toBeGreaterThan(0.5);
+		expect(right.x - straight.x).toBeLessThan(1.5);
 		expect(left.x - straight.x).toBeCloseTo(-(right.x - straight.x), 2);
 	});
 });
