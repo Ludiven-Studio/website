@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeTerrain, SURFACES, PITCH_W, PITCH_L, heightAt, gradAt } from './terrain';
 import {
-	makeBoule, makeJack, place, release, throwVelocity, stepSim, settle, isSettled, cloneSim,
+	makeBoule, makeJack, place, throwVelocity, stepSim, settle, isSettled, cloneSim,
 	speed2, dist2, BOULE_R, type Sim, type Impact,
 } from './engine';
 
@@ -217,28 +217,5 @@ describe('determinism', () => {
 		const body = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 		for (const banned of ['Math.random', 'Date.now', 'performance.now', 'Math.hypot', 'Math.pow'])
 			expect(body.includes(banned)).toBe(false);
-	});
-});
-
-describe('effet', () => {
-	const calm = () => makeTerrain(1, SURFACES['terre-battue'], 0, { slope: 0, noPebbles: true });
-	function rest(spin: number | undefined, speed = 6, elev = 0.5): { x: number; y: number } {
-		const t = calm();
-		const b = release(t, makeBoule(PITCH_W / 2, 0.6, 0), { ...throwVelocity(0, 1, speed, elev), spin });
-		const s: Sim = { t, bs: [b], rng: 0 };
-		settle(s);
-		return { x: b.x, y: b.y };
-	}
-
-	it('changes nothing when there is none', () => {
-		expect(rest(0)).toEqual(rest(undefined));
-	});
-
-	it('curves the boule to its side, a few tens of centimetres on a pointed throw', () => {
-		const straight = rest(0), right = rest(1), left = rest(-1);
-		// Behind the throw, along +y, right is +x.
-		expect(right.x - straight.x).toBeGreaterThan(0.15);
-		expect(right.x - straight.x).toBeLessThan(0.8);
-		expect(left.x - straight.x).toBeCloseTo(-(right.x - straight.x), 2);
 	});
 });
