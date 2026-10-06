@@ -1,7 +1,9 @@
 // meetups — the ONLY access path to the meetup_* tables (service_role, bypasses
-// RLS). Backs /rencontres: a public map of pétanque games, no accounts. Identity
-// is the browser's playerId() uuid; an organizer proves ownership with the
-// per-event `secret`, handed back exactly once at creation.
+// RLS). Backs /rencontres and the PetanqueMeet app: a public map of pétanque
+// games. Reading is open; acting (create, join, report) needs a Supabase Auth
+// session (Google or Apple), sent as the Authorization bearer. The account id is
+// the organizer_id / player_id. Games posted before accounts keep their per-event
+// `secret` as proof of ownership until they expire.
 //
 // Reads go through here too (unlike games/game_scores, which anon reads
 // directly). Two reasons: the page needs a join + a seats aggregate + a
@@ -15,10 +17,12 @@
 // scripts/check-rencontres.mjs runs an agreement block over both.
 //
 // Deploy:  supabase functions deploy meetups
-// Secrets: MEETUPS_ADMIN_KEY (seed + guard cleanup), MEETUPS_IP_PEPPER (quota hashing)
+// Secrets: MEETUPS_ADMIN_KEY (seed, guard cleanup, moderation links), MEETUPS_IP_PEPPER
+//          (quota and ban hashing), RESEND_API_KEY + MEETUPS_MOD_EMAIL (report mails;
+//          sender MEETUPS_FROM_EMAIL, else COURSES_FROM_EMAIL)
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2.117.0';
-import { ipKey } from '../_shared/ipKey.ts';
+import { ipKey, ipQuotaEnabled } from '../_shared/ipKey.ts';
 
 const CORS = {
 	'Access-Control-Allow-Origin': '*',
@@ -50,7 +54,25 @@ function cleanName(raw: unknown): string | null {
 	if (s.length < 2) return null;
 	if (/[<>]/.test(s)) return null;
 	if (/https?:\/\/|www\.|\.(com|fr|net|org|io)\b/i.test(s)) return null;
+	if (isOffensive(s)) return null;
 	return s;
+}
+
+// Short words match whole words only ("con" must not refuse "Constance"); stems
+// long enough to be unambiguous match anywhere. Not a wall: reports are.
+const BAD_WORDS = ['con', 'cons', 'conne', 'pd', 'pede', 'tg', 'ntm', 'fdp', 'pute', 'putes', 'bite', 'zob',
+	'nazi', 'nazis', 'negre', 'bougnoule', 'youpin', 'gouine', 'tapette', 'merde', 'cul', 'teub'];
+const BAD_STEMS = ['connard', 'connass', 'encul', 'salope', 'salaud', 'enfoire', 'batard', 'niquer', 'niquetamere',
+	'hitler', 'pedophil', 'couille', 'branleur', 'putain', 'trouduc', 'fuck', 'bitch', 'nigger', 'nigga',
+	'asshole', 'cunt', 'whore'];
+
+function isOffensive(name: string): boolean {
+	const flat = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+		.replace(/0/g, 'o').replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/[4@]/g, 'a').replace(/[5$]/g, 's');
+	const words = flat.split(/[^a-z]+/).filter(Boolean);
+	if (words.some((w) => BAD_WORDS.includes(w))) return true;
+	const joined = words.join('');
+	return BAD_STEMS.some((b) => joined.includes(b));
 }
 
 const isFormat = (v: unknown): boolean => FORMATS.includes(String(v));
@@ -92,6 +114,113 @@ const JOIN_CAP = 20;
 
 const ADMIN_KEY = Deno.env.get('MEETUPS_ADMIN_KEY') ?? '';
 
+// ---- moderation ----
+
+const REASONS = ['name', 'fake', 'no_show', 'other'];
+const REASON_LABEL: Record<string, string> = {
+	name: 'Prénom choquant', fake: 'Fausse partie', no_show: "Personne n'est venu", other: 'Autre',
+};
+/** Distinct reporters that hide a game until a human looks. Two distinct IPs
+ *  among them, so one person with three phones on one box cannot do it alone. */
+const HIDE_REPORTERS = 3;
+/** Games a player was reported absent from before the moderator hears of it.
+ *  Never an automatic ban: a flat tyre is not abuse. */
+const NO_SHOW_ALERT = 3;
+const HIDE_IPS = 2;
+const REPORT_IP_CAP = 10;           // reports per IP per 24 h
+/** An IP ban only stops a never-seen player from creating, and only this long:
+ *  a carrier IP (CGNAT) is shared by thousands of people. */
+const IP_BAN_MS = 48 * 3600_000;
+const MOD_URL = 'https://www.ludiven-studio.fr/rencontres/moderation/';
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
+const MOD_EMAIL = Deno.env.get('MEETUPS_MOD_EMAIL') ?? '';
+const FROM_EMAIL = Deno.env.get('MEETUPS_FROM_EMAIL') ?? Deno.env.get('COURSES_FROM_EMAIL') ?? '';
+const BANNED = 'Ton accès aux parties est suspendu.';
+
+/** The moderation link's key for one game: HMAC of the event id, so a link
+ *  forwarded by mistake opens that game only, and never reveals the admin key. */
+async function modToken(eventId: string): Promise<string> {
+	const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(ADMIN_KEY),
+		{ name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+	const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`mod:${eventId}`));
+	return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function isModToken(eventId: string, token: unknown): Promise<boolean> {
+	if (!ADMIN_KEY || typeof token !== 'string') return false;
+	const want = await modToken(eventId);
+	if (token.length !== want.length) return false;
+	let diff = 0;
+	for (let i = 0; i < want.length; i++) diff |= token.charCodeAt(i) ^ want.charCodeAt(i);
+	return diff === 0;
+}
+
+/** A banned player is refused everywhere. A banned IP only refuses a create from
+ *  a player never seen before — the reinstall-and-come-back case. */
+async function isBanned(db: SupabaseClient, playerId: string, ip: string | null, creating: boolean): Promise<boolean> {
+	const { data: player } = await db.from('meetup_bans').select('subject').eq('subject', playerId).maybeSingle();
+	if (player) return true;
+	if (!creating || !ip) return false;
+	const { data: ipBan } = await db.from('meetup_bans').select('subject')
+		.eq('subject', ip).gt('expires_at', new Date().toISOString()).maybeSingle();
+	if (!ipBan) return false;
+	const { count: organized } = await db.from('meetup_events')
+		.select('id', { count: 'exact', head: true }).eq('organizer_id', playerId);
+	const { count: joined } = await db.from('meetup_signups')
+		.select('id', { count: 'exact', head: true }).eq('player_id', playerId);
+	return (organized ?? 0) + (joined ?? 0) === 0;
+}
+
+const LOGIN = 'Connecte-toi pour continuer.';
+
+/** The signed-in account, or null. The anon key is a JWT too, with no user in it. */
+async function authUid(db: SupabaseClient, req: Request): Promise<string | null> {
+	const h = req.headers.get('Authorization') ?? '';
+	const jwt = h.startsWith('Bearer ') ? h.slice(7) : '';
+	if (!jwt) return null;
+	const { data } = await db.auth.getUser(jwt);
+	return data.user?.id ?? null;
+}
+
+/** Owner = the account that posted it, or the secret for a game posted before
+ *  accounts. Secrets are uuids by construction, which also makes them safe in `or`. */
+async function ownsEvent(db: SupabaseClient, eventId: string, secret: unknown, uid: string | null): Promise<boolean> {
+	const ors: string[] = [];
+	if (uid) ors.push(`organizer_id.eq.${uid}`);
+	if (isUuid(secret)) ors.push(`secret.eq.${secret}`);
+	if (!ors.length) return false;
+	const { data } = await db.from('meetup_events').select('id').eq('id', eventId).or(ors.join(',')).maybeSingle();
+	return Boolean(data);
+}
+
+async function ban(db: SupabaseClient, playerId: string, ip: string | null, eventId: string): Promise<void> {
+	const rows: Record<string, unknown>[] = [{ subject: playerId, kind: 'player', event_id: eventId, expires_at: null }];
+	if (ip) rows.push({ subject: ip, kind: 'ip', event_id: eventId, expires_at: new Date(Date.now() + IP_BAN_MS).toISOString() });
+	await db.from('meetup_bans').upsert(rows, { onConflict: 'subject' });
+}
+
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** Never throws: a mail that fails must not lose the report, which is already saved. */
+async function mailReport(eventId: string, ev: Record<string, unknown>, reason: string, count: number, hidden: boolean): Promise<void> {
+	if (!RESEND_API_KEY || !MOD_EMAIL || !FROM_EMAIL || !ADMIN_KEY) return;
+	try {
+		const link = `${MOD_URL}?e=${eventId}&k=${await modToken(eventId)}`;
+		const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5">
+<p><b>${esc(REASON_LABEL[reason] ?? reason)}</b> — ${count} signalement(s)${hidden ? ', <b>partie masquée</b>' : ''}.</p>
+<p>${esc(String(ev.organizer_name ?? ''))} · ${esc(String(ev.label ?? ''))} · ${esc(String(ev.starts_at ?? ''))}</p>
+<p><a href="${link}">Ouvrir la modération</a></p></div>`;
+		const res = await fetch('https://api.resend.com/emails', {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ from: FROM_EMAIL, to: MOD_EMAIL, subject: `Rencontres : signalement (${REASON_LABEL[reason] ?? reason})`, html }),
+		});
+		if (!res.ok) console.error(`resend ${res.status}: ${await res.text().catch(() => '')}`.slice(0, 300));
+	} catch (e) {
+		console.error(e);
+	}
+}
+
 function isAdmin(v: unknown): boolean {
 	if (!ADMIN_KEY || typeof v !== 'string' || v.length !== ADMIN_KEY.length) return false;
 	let diff = 0;
@@ -123,19 +252,25 @@ async function overQuota(
 
 /** Games this organizer still has running. `status` alone is not enough: a game
  *  that has finished is over whether or not anyone cancelled it. */
-async function activeEvents(db: SupabaseClient, playerId: string, nowIso: string): Promise<number> {
+async function activeEvents(db: SupabaseClient, ids: string[], nowIso: string): Promise<number> {
+	if (!ids.length) return 0;
 	const { count } = await db.from('meetup_events')
 		.select('id', { count: 'exact', head: true })
-		.eq('organizer_id', playerId).eq('status', 'open').gte('ends_at', nowIso);
+		.in('organizer_id', ids).eq('status', 'open').gte('ends_at', nowIso);
 	return count ?? 0;
 }
+
+/** The account, plus the device uuid it used before accounts: games and signups
+ *  made then still belong to the same person. */
+const identities = (uid: string | null, legacy: unknown): string[] =>
+	[...new Set([uid, isUuid(legacy) ? legacy : null].filter((x): x is string => Boolean(x)))];
 
 // ---- reads ----
 
 // The single chokepoint for what a read may expose. `secret` is NOT here and
 // must never be: add a column, and every action that returns an event exposes it.
 const EVENT_COLS = 'id, spot_id, starts_at, ends_at, format, players_needed, role_needed, '
-	+ 'organizer_name, organizer_seats, status, created_at';
+	+ 'organizer_name, organizer_seats, organizer_tag, status, hidden, created_at';
 const SPOT_COLS = 'id, lat, lng, label, commune, source, confirmed';
 
 interface SpotRow { id: string; lat: number; lng: number; label: string; commune: string; source: string; confirmed: boolean; }
@@ -223,6 +358,9 @@ Deno.serve(async (req) => {
 	const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 	const nowIso = new Date().toISOString();
 	const nowMs = Date.now();
+	// Lazy: `list` is the hot path and never needs to know who is asking.
+	let uidOnce: Promise<string | null> | undefined;
+	const whoAmI = (): Promise<string | null> => (uidOnce ??= authUid(db, req));
 
 	try {
 		switch (action) {
@@ -231,7 +369,7 @@ Deno.serve(async (req) => {
 			// Expiry is this filter, not a cron — a static site has no scheduler.
 			case 'list': {
 				const { data: events, error } = await db.from('meetup_events')
-					.select(EMBED).eq('status', 'open').gte('ends_at', nowIso)
+					.select(EMBED).eq('status', 'open').eq('hidden', false).gte('ends_at', nowIso)
 					.order('starts_at').limit(500);
 				if (error) throw error;
 				// Confirmed spots (the OSM seed, or pinned by two organizers) first, so a flood of
@@ -253,19 +391,18 @@ Deno.serve(async (req) => {
 				if (error) throw error;
 				if (!data) return bad('unknown event', 404);
 				const { data: signups } = await db.from('meetup_signups')
-					.select('player_id, player_name, seats, role').eq('event_id', body.eventId).order('created_at');
+					.select('id, player_id, player_name, seats, role').eq('event_id', body.eventId).order('created_at');
 				// Compare the secret in SQL so it never lands in a JS object that
 				// could be serialised by accident.
-				let isOrganizer = false;
-				if (typeof body.secret === 'string' && body.secret) {
-					const { data: own } = await db.from('meetup_events')
-						.select('id').eq('id', body.eventId).eq('secret', body.secret).maybeSingle();
-					isOrganizer = Boolean(own);
-				}
+				const uid = await whoAmI();
+				const isOrganizer = await ownsEvent(db, body.eventId, body.secret, uid);
 				// player_id is the only proof of identity for join/leave: never hand it out.
-				const me = isUuid(body.playerId) ? body.playerId : null;
+				// playerId: a signup made before accounts.
+				const me = identities(uid, body.playerId);
+				// `id` is the signup row, not the player: it only lets the organizer
+				// point at one line in report_signup.
 				const shaped = (signups ?? []).map((s) => ({
-					player_name: s.player_name, seats: s.seats, role: s.role, is_me: s.player_id === me,
+					id: s.id, player_name: s.player_name, seats: s.seats, role: s.role, is_me: me.includes(s.player_id),
 				}));
 				return json({ event: shapeEvent(data as Record<string, unknown>), signups: shaped, isOrganizer });
 			}
@@ -288,14 +425,28 @@ Deno.serve(async (req) => {
 					if (error) throw error;
 					events = (data ?? []).map((r) => shapeEvent(r as Record<string, unknown>));
 				}
+				// Plus every game of the account, on any device. Merged by id.
+				const uid = await whoAmI();
+				if (uid) {
+					const { data, error } = await db.from('meetup_events').select(EMBED)
+						.eq('organizer_id', uid).order('starts_at').limit(100);
+					if (error) throw error;
+					const seen = new Set(events.map((e) => e.id));
+					for (const r of data ?? []) {
+						const e = shapeEvent(r as Record<string, unknown>);
+						if (!seen.has(e.id)) events.push(e);
+					}
+					events.sort((x, y) => String(x.starts_at).localeCompare(String(y.starts_at)));
+				}
 				// Counted by organizer, not off the list above: those two differ once a
 				// secret is lost, and the number that decides the cap is this one.
-				const active = isUuid(body.playerId) ? await activeEvents(db, body.playerId, nowIso) : 0;
+				const active = await activeEvents(db, identities(uid, body.playerId), nowIso);
 				return json({ events, active, max: MAX_ACTIVE_EVENTS });
 			}
 
 			case 'create_event': {
-				if (!isUuid(body.playerId)) return bad('bad playerId');
+				const playerId = await whoAmI();
+				if (!playerId) return bad(LOGIN, 401);
 				const slotError = validateSlot(body.startsAt, body.endsAt, nowMs);
 				if (slotError) return bad(slotError);
 				if (!isFormat(body.format)) return bad('Format inconnu.');
@@ -312,18 +463,21 @@ Deno.serve(async (req) => {
 				const freePin = !isUuid(body.spotId);
 				if (freePin && !isPlausibleFr(lat, lng)) return bad('Position hors zone.');
 
-				if (await activeEvents(db, body.playerId, nowIso) >= MAX_ACTIVE_EVENTS) {
+				const createIp = await ipKey(req);
+				if (await isBanned(db, playerId, createIp, true)) return bad(BANNED, 403);
+
+				if (await activeEvents(db, identities(playerId, body.playerId), nowIso) >= MAX_ACTIVE_EVENTS) {
 					return bad(`Tu as déjà ${MAX_ACTIVE_EVENTS} parties en ligne. Supprimes-en une dans « Mes parties ».`, 429);
 				}
 				// Charged once, after validation and before any write, so a typo
 				// never costs a slot and a rejected flood still does.
-				if (await overQuota(db, req, body.playerId, 'creates')) {
+				if (await overQuota(db, req, playerId, 'creates')) {
 					return bad("Trop de parties créées aujourd'hui. Réessaie demain.", 429);
 				}
 
 				let spotId: string;
 				if (freePin) {
-					spotId = (await resolveSpot(db, lat, lng, body.playerId)).id;
+					spotId = (await resolveSpot(db, lat, lng, playerId)).id;
 				} else {
 					const { data: known } = await db.from('meetup_spots').select('id').eq('id', body.spotId).maybeSingle();
 					if (!known) return bad('unknown spot', 404);
@@ -337,9 +491,10 @@ Deno.serve(async (req) => {
 					format: body.format,
 					players_needed: body.playersNeeded,
 					role_needed: body.roleNeeded,
-					organizer_id: body.playerId,
+					organizer_id: playerId,
 					organizer_name: name,
 					organizer_seats: body.organizerSeats,
+					organizer_ip: createIp,
 				}).select('id, secret').single();
 				if (error) throw error;
 				// The one and only time `secret` leaves the database.
@@ -347,10 +502,11 @@ Deno.serve(async (req) => {
 			}
 
 			case 'update_event': {
-				if (!isUuid(body.eventId) || typeof body.secret !== 'string') return bad('bad request');
+				if (!isUuid(body.eventId)) return bad('bad request');
+				if (!await ownsEvent(db, body.eventId, body.secret, await whoAmI())) return bad('forbidden', 403);
 				const { data: own } = await db.from('meetup_events')
 					.select('id, players_needed, organizer_seats')
-					.eq('id', body.eventId).eq('secret', body.secret).maybeSingle();
+					.eq('id', body.eventId).maybeSingle();
 				if (!own) return bad('forbidden', 403);
 
 				const patch: Record<string, unknown> = { updated_at: nowIso };
@@ -381,9 +537,10 @@ Deno.serve(async (req) => {
 			// the organizer's list forever. The signup check is the whole gate, and it
 			// is made here and not in the client — the client can be lied to.
 			case 'delete_event': {
-				if (!isUuid(body.eventId) || typeof body.secret !== 'string') return bad('bad request');
+				if (!isUuid(body.eventId)) return bad('bad request');
+				if (!await ownsEvent(db, body.eventId, body.secret, await whoAmI())) return bad('forbidden', 403);
 				const { data: own } = await db.from('meetup_events')
-					.select('id').eq('id', body.eventId).eq('secret', body.secret).maybeSingle();
+					.select('id').eq('id', body.eventId).maybeSingle();
 				if (!own) return bad('forbidden', 403);
 				const { count } = await db.from('meetup_signups')
 					.select('id', { count: 'exact', head: true }).eq('event_id', body.eventId);
@@ -396,26 +553,30 @@ Deno.serve(async (req) => {
 			// Cancelled, never deleted: the link has to keep working or a signed-up
 			// player just finds a 404 and turns up anyway.
 			case 'cancel_event': {
-				if (!isUuid(body.eventId) || typeof body.secret !== 'string') return bad('bad request');
+				if (!isUuid(body.eventId)) return bad('bad request');
+				if (!await ownsEvent(db, body.eventId, body.secret, await whoAmI())) return bad('forbidden', 403);
 				const { data: own } = await db.from('meetup_events')
-					.select('id').eq('id', body.eventId).eq('secret', body.secret).maybeSingle();
+					.select('id').eq('id', body.eventId).maybeSingle();
 				if (!own) return bad('forbidden', 403);
 				await db.from('meetup_events').update({ status: 'cancelled', updated_at: nowIso }).eq('id', body.eventId);
 				return json({ ok: true });
 			}
 
 			case 'join': {
-				if (!isUuid(body.eventId) || !isUuid(body.playerId)) return bad('bad request');
+				if (!isUuid(body.eventId)) return bad('bad request');
+				const playerId = await whoAmI();
+				if (!playerId) return bad(LOGIN, 401);
 				const name = cleanName(body.playerName);
 				if (!name) return bad('Prénom invalide (2 à 24 caractères, sans lien).');
 				if (!isSeats(body.seats)) return bad('Nombre de places invalide.');
 				if (!isRole(body.role)) return bad('Rôle inconnu.');
-				if (await overQuota(db, req, body.playerId, 'joins')) {
+				if (await isBanned(db, playerId, null, false)) return bad(BANNED, 403);
+				if (await overQuota(db, req, playerId, 'joins')) {
 					return bad("Trop d'inscriptions aujourd'hui. Réessaie demain.", 429);
 				}
 				// Seat counting is a race; the lock lives in the SQL function.
 				const { data, error } = await db.rpc('meetup_join', {
-					p_event: body.eventId, p_player: body.playerId, p_name: name,
+					p_event: body.eventId, p_player: playerId, p_name: name,
 					p_seats: body.seats, p_role: body.role,
 				});
 				if (error) throw error;
@@ -423,13 +584,166 @@ Deno.serve(async (req) => {
 				if (outcome === 'full') return bad('Plus de place.', 409);
 				if (outcome === 'cancelled') return bad('Cette partie est annulée.', 409);
 				if (outcome === 'past') return bad('Cette partie est passée.', 409);
+				if (outcome === 'hidden') return bad('Cette partie est en cours de vérification.', 409);
 				if (outcome !== 'ok') return bad('unknown event', 404);
+				// Kept for a ban later; meetup_join stays unchanged in its signature.
+				const joinIp = await ipKey(req);
+				if (joinIp) {
+					await db.from('meetup_signups').update({ ip: joinIp })
+						.eq('event_id', body.eventId).eq('player_id', playerId);
+				}
+				return json({ ok: true });
+			}
+
+			// Anyone can report a game once. "Personne n'est venu" is the strong
+			// signal, so it is only taken from a signed-up player, once the game started.
+			case 'report': {
+				if (!isUuid(body.eventId)) return bad('bad request');
+				const playerId = await whoAmI();
+				if (!playerId) return bad(LOGIN, 401);
+				const reason = String(body.reason ?? '');
+				if (!REASONS.includes(reason)) return bad('Motif inconnu.');
+				const { data: ev } = await db.from('meetup_events').select(EMBED).eq('id', body.eventId).maybeSingle();
+				if (!ev) return bad('unknown event', 404);
+				if (reason === 'no_show') {
+					const { data: mine } = await db.from('meetup_signups').select('id')
+						.eq('event_id', body.eventId).eq('player_id', playerId).maybeSingle();
+					if (!mine) return bad('Seuls les inscrits peuvent dire que personne n\u2019est venu.', 403);
+					if (Date.parse(String((ev as Record<string, unknown>).starts_at)) > nowMs) {
+						return bad('La partie n\u2019a pas encore commencé.', 409);
+					}
+				}
+				const ip = await ipKey(req);
+				if (ip) {
+					const { count } = await db.from('meetup_reports').select('id', { count: 'exact', head: true })
+						.eq('reporter_ip', ip).gte('created_at', new Date(nowMs - 86400_000).toISOString());
+					if ((count ?? 0) >= REPORT_IP_CAP) return bad('Trop de signalements aujourd\u2019hui. Réessaie demain.', 429);
+				}
+				const { error } = await db.from('meetup_reports').insert(
+					{ event_id: body.eventId, reporter_id: playerId, reporter_ip: ip, reason });
+				// 23505: already reported by this player. Fine, nothing to add.
+				if (error && error.code !== '23505') throw error;
+				if (error) return json({ ok: true });
+
+				const { data: reports } = await db.from('meetup_reports')
+					.select('reporter_id, reporter_ip').eq('event_id', body.eventId).is('target_player', null);
+				const all = reports ?? [];
+				const ips = new Set(all.map((r) => r.reporter_ip).filter(Boolean));
+				const shaped = shapeEvent(ev as Record<string, unknown>);
+				let hidden = Boolean(shaped.hidden);
+				// No pepper means no IP at all: fall back to reporters alone.
+				const enoughIps = ipQuotaEnabled() ? ips.size >= HIDE_IPS : true;
+				if (!hidden && all.length >= HIDE_REPORTERS && enoughIps) {
+					await db.from('meetup_events').update({ hidden: true, updated_at: nowIso }).eq('id', body.eventId);
+					hidden = true;
+				}
+				await mailReport(body.eventId, shaped, reason, all.length, hidden);
+				return json({ ok: true });
+			}
+
+			// The organizer's side of "personne n'est venu": a signed-up player who
+			// never turned up. Proved by the secret, like every organizer action.
+			case 'report_signup': {
+				if (!isUuid(body.eventId) || !isUuid(body.signupId)) return bad('bad request');
+				if (!await ownsEvent(db, body.eventId, body.secret, await whoAmI())) return bad('forbidden', 403);
+				const { data: own } = await db.from('meetup_events').select(EMBED)
+					.eq('id', body.eventId).maybeSingle();
+				if (!own) return bad('forbidden', 403);
+				const ev = own as Record<string, unknown>;
+				if (Date.parse(String(ev.starts_at)) > nowMs) return bad('La partie n\u2019a pas encore commencé.', 409);
+				const { data: su } = await db.from('meetup_signups').select('player_id')
+					.eq('id', body.signupId).eq('event_id', body.eventId).maybeSingle();
+				if (!su) return bad('unknown signup', 404);
+				const { data: org } = await db.from('meetup_events').select('organizer_id').eq('id', body.eventId).single();
+				const { error } = await db.from('meetup_reports').insert({
+					event_id: body.eventId, reporter_id: org!.organizer_id, reporter_ip: await ipKey(req),
+					reason: 'no_show', target_player: su.player_id,
+				});
+				if (error && error.code !== '23505') throw error;
+				if (error) return json({ ok: true });
+				// Distinct games, so one angry organizer cannot reach the bar alone.
+				const { data: strikes } = await db.from('meetup_reports').select('event_id')
+					.eq('target_player', su.player_id).eq('reason', 'no_show');
+				const games = new Set((strikes ?? []).map((r) => r.event_id)).size;
+				if (games >= NO_SHOW_ALERT) await mailReport(body.eventId, shapeEvent(ev), 'no_show', games, false);
+				return json({ ok: true });
+			}
+
+			// Apple requires it in the app. Open games are cancelled, not deleted, so
+			// signed-up players still learn they are off. A ban outlives the account:
+			// meetup_bans keeps only the id, which is no personal data on its own.
+			case 'delete_account': {
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				await db.from('meetup_events').update({ status: 'cancelled', hidden: true, updated_at: nowIso })
+					.eq('organizer_id', uid).eq('status', 'open');
+				await db.from('meetup_events').update({ organizer_name: 'Compte supprimé' }).eq('organizer_id', uid);
+				await db.from('meetup_signups').delete().eq('player_id', uid);
+				await db.from('meetup_reports').delete().eq('reporter_id', uid);
+				const { error } = await db.auth.admin.deleteUser(uid);
+				if (error) throw error;
+				return json({ ok: true });
+			}
+
+			// The page behind the report mail's link. The token is per game.
+			case 'mod_get': {
+				if (!isUuid(body.eventId) || !await isModToken(body.eventId, body.token)) return bad('forbidden', 403);
+				const { data: ev } = await db.from('meetup_events').select(EMBED).eq('id', body.eventId).maybeSingle();
+				if (!ev) return bad('unknown event', 404);
+				const { data: rows } = await db.from('meetup_signups')
+					.select('id, player_id, player_name, seats').eq('event_id', body.eventId).order('created_at');
+				const ids = (rows ?? []).map((r) => r.player_id as string);
+				const { data: strikes } = ids.length
+					? await db.from('meetup_reports').select('target_player, event_id').in('target_player', ids).eq('reason', 'no_show')
+					: { data: [] };
+				// player_id stays here: the page only needs a count per line.
+				const signups = (rows ?? []).map((r) => ({
+					id: r.id, player_name: r.player_name, seats: r.seats,
+					no_shows: new Set((strikes ?? []).filter((x) => x.target_player === r.player_id).map((x) => x.event_id)).size,
+				}));
+				const { data: reports } = await db.from('meetup_reports')
+					.select('reason, created_at').eq('event_id', body.eventId).is('target_player', null).order('created_at');
+				return json({ event: shapeEvent(ev as Record<string, unknown>), signups, reports: reports ?? [] });
+			}
+
+			// restore: show it again, reports cleared. remove: cancel and hide.
+			// ban_organizer: remove + ban, every open game of theirs hidden.
+			// ban_signup: drop one signup (an offensive name) and ban that player.
+			case 'moderate': {
+				if (!isUuid(body.eventId) || !await isModToken(body.eventId, body.token)) return bad('forbidden', 403);
+				const { data: ev } = await db.from('meetup_events')
+					.select('id, organizer_id, organizer_ip').eq('id', body.eventId).maybeSingle();
+				if (!ev) return bad('unknown event', 404);
+				const what = String(body.do ?? '');
+				if (what === 'restore') {
+					await db.from('meetup_reports').delete().eq('event_id', body.eventId);
+					await db.from('meetup_events').update({ hidden: false, updated_at: nowIso }).eq('id', body.eventId);
+				} else if (what === 'remove' || what === 'ban_organizer') {
+					// Cancelled, not deleted: signed-up players must still learn it is off.
+					await db.from('meetup_events').update({ hidden: true, status: 'cancelled', updated_at: nowIso })
+						.eq('id', body.eventId);
+					if (what === 'ban_organizer') {
+						await ban(db, ev.organizer_id as string, ev.organizer_ip as string | null, body.eventId);
+						await db.from('meetup_events').update({ hidden: true, updated_at: nowIso })
+							.eq('organizer_id', ev.organizer_id).eq('status', 'open');
+					}
+				} else if (what === 'ban_signup') {
+					if (!isUuid(body.signupId)) return bad('bad signupId');
+					const { data: su } = await db.from('meetup_signups').select('player_id, ip')
+						.eq('id', body.signupId).eq('event_id', body.eventId).maybeSingle();
+					if (!su) return bad('unknown signup', 404);
+					await ban(db, su.player_id as string, su.ip as string | null, body.eventId);
+					await db.from('meetup_signups').delete().eq('player_id', su.player_id);
+				} else {
+					return bad('unknown do');
+				}
 				return json({ ok: true });
 			}
 
 			case 'leave': {
-				if (!isUuid(body.eventId) || !isUuid(body.playerId)) return bad('bad request');
-				await db.from('meetup_signups').delete().eq('event_id', body.eventId).eq('player_id', body.playerId);
+				const ids = identities(await whoAmI(), body.playerId);
+				if (!isUuid(body.eventId) || !ids.length) return bad('bad request');
+				await db.from('meetup_signups').delete().eq('event_id', body.eventId).in('player_id', ids);
 				return json({ ok: true });
 			}
 
