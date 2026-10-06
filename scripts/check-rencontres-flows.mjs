@@ -182,6 +182,13 @@ await ctx.route('**/functions/v1/meetups', async (route) => {
 	await route.fulfill({ status: r.status, contentType: 'application/json', body: JSON.stringify(r.body) });
 });
 await ctx.route(/tile\.openstreetmap\.org/, (route) => route.abort());
+// Acting needs a session. A stored, unexpired one is enough for the island: every
+// call it makes is answered above, so the token is never checked.
+await ctx.addInitScript((v) => localStorage.setItem('ludiven-meetup-auth', v), JSON.stringify({
+	access_token: 'flows-fake', refresh_token: 'flows', token_type: 'bearer', expires_in: 3600,
+	expires_at: Math.floor(Date.now() / 1000) + 3600,
+	user: { id: '00000000-0000-4000-8000-0000000f1005', email: 'flows@example.invalid', aud: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '' },
+}));
 
 const page = await ctx.newPage();
 page.on('pageerror', (e) => fail.push(`THROW ${e.message}`));
@@ -248,8 +255,8 @@ try {
 	);
 	check(await onScreen('.re-secret'), 'la confirmation est amenee dans la fenetre');
 	check(
-		(await page.locator('.re-secretlink').inputValue()).includes('k='),
-		'le lien d organisateur est rendu une fois',
+		(await page.locator('.re-secret').innerText()).includes('Mes parties'),
+		'la confirmation dit ou retrouver la partie',
 	);
 	check(await page.locator('.re-panel').count() === 1, 'la fiche de la partie creee est ouverte');
 
@@ -333,7 +340,7 @@ try {
 		await go.scrollIntoViewIfNeeded();
 		await go.click();
 		await page.waitForSelector('.re-secret', { timeout: 10000 });
-		await page.locator('.re-secret .re-btn', { hasText: 'noté' }).click();
+		await page.locator('.re-secret .re-btn', { hasText: 'OK' }).click();
 		await page.locator('.re-panel .re-close').click();
 	};
 	const mineRows = async (n) => page.waitForFunction(

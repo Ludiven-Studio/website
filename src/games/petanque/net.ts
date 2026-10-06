@@ -28,7 +28,7 @@ export interface PetanquePeer { id: string; name: string; }
 
 /** A thrown boule: velocity only. Angles would need sin/cos, which peers may round differently.
  *  `n` is the move's index in the match, shared by both boards (absent from pre-resync clients). */
-export interface ThrowMsg { vx: number; vy: number; vz: number; jack: boolean; n?: number; }
+export interface ThrowMsg { vx: number; vy: number; vz: number; spin?: number; jack: boolean; n?: number; }
 
 /** The jack placed by hand after an illegal throw. */
 export interface PlaceMsg { x: number; y: number; n?: number; }

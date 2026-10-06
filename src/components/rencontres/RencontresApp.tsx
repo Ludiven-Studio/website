@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { playerId } from '../../lib/scores';
 import { trackEvent } from '../../lib/analytics';
 import {
 	listMeetups, getMeetup, createMeetup, updateMeetup, cancelMeetup, deleteMeetup, joinMeetup, leaveMeetup,
-	myMeetups, meetupsEnabled, rememberSecret, secretFor, forgetSecret, savedName, saveName,
+	myMeetups, meetupsEnabled, rememberSecret, secretFor, forgetSecret, hasSecret, savedName, saveName,
+	reportMeetup, reportSignup, readMuted, saveMuted, deleteAccount, LoginRequired,
 } from '../../lib/meetups';
+import {
+	accountLabel, currentSession, onSessionChange, signIn, signOut, takeRedirectError,
+	PROVIDER_LABEL, type Provider,
+} from '../../lib/meetupAuth';
 import {
 	applyFilters, DATE_LABEL, DEFAULT_FILTERS,
 	type DateFilter, type Filters, type RoleFilter,
 } from '../../lib/meetupFilters';
 import {
 	FORMAT_LABEL, MAX_ACTIVE_EVENTS, ROLE_LABEL, seatsLeft, validateSignup,
-	type MeetupEvent, type MeetupSignup, type MeetupSpot, type Role,
+	type MeetupEvent, type MeetupSignup, type MeetupSpot, type ReportReason, type Role,
 } from '../../lib/meetupRules';
 import {
 	addPlace, isNearPlaces, nearestPlace, readPlaces, removePlace, savePlaces,
@@ -38,6 +44,17 @@ interface Detail {
 }
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : 'Une erreur est survenue.');
+const NO_OWNER = "Lien d'organisateur manquant.";
+
+/** What to reopen after the provider sends the player back. ?e= covers the rest. */
+const RESUME_KEY = 'ludiven-meetup-resume';
+const takeResume = (): string | null => {
+	try {
+		const v = sessionStorage.getItem(RESUME_KEY);
+		sessionStorage.removeItem(RESUME_KEY);
+		return v;
+	} catch { return null; }
+};
 
 /** The page is static, so the event id lives in the query string and the island
  *  resolves it (spec §2). replaceState keeps the back button out of it. */
@@ -72,6 +89,12 @@ export default function RencontresApp() {
 	const [pinning, setPinning] = useState(false);
 	const [mine, setMine] = useState<MeetupEvent[]>([]);
 	const [cap, setCap] = useState({ active: 0, max: MAX_ACTIVE_EVENTS });
+	const [muted, setMuted] = useState<string[]>([]);
+	const [session, setSession] = useState<Session | null>(null);
+	const [loginOpen, setLoginOpen] = useState<'create' | 'act' | null>(null);
+	const [resumeCreate, setResumeCreate] = useState(false);
+	const [note, setNote] = useState<string | null>(null);
+	const uidRef = useRef<string | null | undefined>(undefined);
 	const mapRef = useRef<MapHandle>(null);
 	const okRef = useRef<HTMLDivElement>(null);
 	// The map is the page, so the icon must open the map — not whatever game card
@@ -103,7 +126,8 @@ export default function RencontresApp() {
 			setCreating(false);
 			setEditing(false);
 			setSpotId(null);
-			setUrl(id, d.isOrganizer ? secret : null);
+			// The account proves ownership now; only a ?k= already there stays.
+			setUrl(id, d.isOrganizer && fromUrl ? fromUrl : null);
 			mapRef.current?.flyTo(d.event.lat, d.event.lng);
 		} catch (e) {
 			setError(message(e));
@@ -115,9 +139,16 @@ export default function RencontresApp() {
 		trackEvent('meetup_view');
 		setName(savedName());
 		setPlaces(readPlaces());
+		setMuted(readMuted());
+		const back = takeRedirectError();
+		if (back) setError(back);
 		const url = new URLSearchParams(window.location.search);
 		const wanted = url.get('e');
 		void (async () => {
+			// Waits for the ?code= exchange, so every call below already carries the account.
+			const s = await currentSession();
+			uidRef.current = s?.user.id ?? null;
+			setSession(s);
 			try {
 				await load();
 			} catch (e) {
@@ -127,6 +158,7 @@ export default function RencontresApp() {
 			}
 			await loadMine();
 			if (wanted) await openEvent(wanted, url.get('k'));
+			if (s && takeResume() === 'create') setResumeCreate(true);
 		})();
 	}, [load, loadMine, openEvent]);
 
@@ -146,6 +178,20 @@ export default function RencontresApp() {
 		setUrl(null);
 	}, []);
 
+	/* Signing in or out changes what « Mes parties » holds and who owns the open
+	   card. setTimeout: auth calls made inside the auth callback can deadlock. */
+	useEffect(() => onSessionChange((s) => {
+		setSession(s);
+		const uid = s?.user.id ?? null;
+		if (uidRef.current === undefined || uidRef.current === uid) return;
+		uidRef.current = uid;
+		setTimeout(() => {
+			void loadMine();
+			const open = new URLSearchParams(window.location.search).get('e');
+			if (open) void openEvent(open);
+		}, 0);
+	}), [loadMine, openEvent]);
+
 	/** Proof of ownership. The ?k= link wins so a cleared browser can still get back
 	 *  in — but only for the event the link names. « Mes parties » asks about rows the
 	 *  URL says nothing about, and handing them the open card's key is a silent 403. */
@@ -160,11 +206,13 @@ export default function RencontresApp() {
 		// screen during the retry is how a second attempt reads as a second failure.
 		setError(null);
 		setFlash(null);
+		setNote(null);
 		try {
 			await fn();
 			setError(null);
 		} catch (e) {
-			setError(message(e));
+			if (e instanceof LoginRequired) setLoginOpen('act');
+			else setError(message(e));
 		} finally {
 			setBusy(false);
 		}
@@ -172,6 +220,7 @@ export default function RencontresApp() {
 
 	const onJoin = useCallback((seats: number, role: Role, who: string) => {
 		if (!detail) return;
+		if (!session) { setLoginOpen('act'); return; }
 		const problem = validateSignup(who, seats, role);
 		if (problem) { setError(problem); return; }
 		void run(async () => {
@@ -182,7 +231,7 @@ export default function RencontresApp() {
 			await refresh(detail.event.id);
 			setFlash('Inscription enregistrée.');
 		});
-	}, [detail, pid, refresh, run]);
+	}, [detail, pid, refresh, run, session]);
 
 	const onLeave = useCallback(() => {
 		if (!detail) return;
@@ -197,7 +246,7 @@ export default function RencontresApp() {
 	const onEditSubmit = useCallback((v: Draft) => {
 		if (!detail) return;
 		const secret = secretOf(detail.event.id);
-		if (!secret) { setError('Lien d\'organisateur manquant.'); return; }
+		if (!secret && !session) { setError(NO_OWNER); return; }
 		void run(async () => {
 			// Only what update_event accepts. The organizer name and seats are not in the
 			// patch, so sending them would be a silent no-op the form would take for a save.
@@ -210,19 +259,19 @@ export default function RencontresApp() {
 			await refresh(detail.event.id);
 			setFlash('Modifications enregistrées.');
 		});
-	}, [detail, refresh, run]);
+	}, [detail, refresh, run, session]);
 
 	const onCancel = useCallback(() => {
 		if (!detail) return;
 		const secret = secretOf(detail.event.id);
-		if (!secret) { setError('Lien d\'organisateur manquant.'); return; }
+		if (!secret && !session) { setError(NO_OWNER); return; }
 		if (!window.confirm('Annuler cette partie ? Les inscrits ne seront pas prévenus.')) return;
 		void run(async () => {
 			await cancelMeetup(detail.event.id, secret);
 			trackEvent('meetup_cancel');
 			await refresh(detail.event.id);
 		});
-	}, [detail, refresh, run]);
+	}, [detail, refresh, run, session]);
 
 	/* Same button, two outcomes, and the row's label says which: with nobody signed
 	   up the game leaves for good, otherwise it is cancelled so the link can still
@@ -230,7 +279,7 @@ export default function RencontresApp() {
 	   this one only picks the wording, a stale count gets a 409 back. */
 	const onRemoveMine = useCallback((e: MeetupEvent) => {
 		const secret = secretOf(e.id);
-		if (!secret) { setError('Lien d\'organisateur manquant.'); return; }
+		if (!secret && !session) { setError(NO_OWNER); return; }
 		const joined = e.seats_taken - e.organizer_seats;
 		const ask = joined > 0
 			? `Annuler cette partie ? ${joined} joueur(s) inscrit(s) : le lien restera en ligne pour les prévenir.`
@@ -250,13 +299,47 @@ export default function RencontresApp() {
 			await loadMine();
 			setFlash(joined > 0 ? 'Partie annulée.' : 'Partie supprimée.');
 		});
-	}, [closeEvent, detail, load, loadMine, run]);
+	}, [closeEvent, detail, load, loadMine, run, session]);
 
 	/** Only forgets the secret. The game stays up — this is the exit for a finished
 	 *  one whose signups keep it from being deleted. */
 	const onForgetMine = useCallback((id: string) => {
 		forgetSecret(id);
 		setMine((list) => list.filter((e) => e.id !== id));
+	}, []);
+
+	/** Rejects with the server's message: the panel shows it next to the button. */
+	const onReport = useCallback(async (reason: ReportReason) => {
+		if (!detail) return;
+		try {
+			await reportMeetup(detail.event.id, pid, reason);
+		} catch (e) {
+			if (e instanceof LoginRequired) setLoginOpen('act');
+			throw e;
+		}
+		trackEvent('meetup_report', { reason });
+	}, [detail, pid]);
+
+	const onReportSignup = useCallback(async (signupId: string) => {
+		if (!detail) return;
+		const secret = secretOf(detail.event.id);
+		if (!secret && !session) throw new Error(NO_OWNER);
+		await reportSignup(detail.event.id, secret, signupId);
+		trackEvent('meetup_report_signup');
+	}, [detail, session]);
+
+	const onMute = useCallback(() => {
+		if (!detail) return;
+		const next = [...new Set([...muted, detail.event.organizer_tag])];
+		setMuted(next);
+		saveMuted(next);
+		trackEvent('meetup_mute');
+		closeEvent();
+	}, [closeEvent, detail, muted]);
+
+	const unmuteAll = useCallback(() => {
+		setMuted([]);
+		saveMuted([]);
 	}, []);
 
 	const onEditMine = useCallback((id: string) => {
@@ -266,6 +349,7 @@ export default function RencontresApp() {
 	/** `at` = a known terrain the player clicked, so posting there is one tap and the
 	 *  pin lands exactly on the spot instead of near it. */
 	const startCreate = useCallback((at?: { lat: number; lng: number }) => {
+		if (!session) { setLoginOpen('create'); return; }
 		setCreating(true);
 		setEditing(false);
 		setDetail(null);
@@ -275,7 +359,47 @@ export default function RencontresApp() {
 		setSpotId(null);
 		setPin(at ?? null);
 		setUrl(null);
-	}, []);
+	}, [session]);
+
+	useEffect(() => {
+		if (!resumeCreate) return;
+		setResumeCreate(false);
+		startCreate();
+	}, [resumeCreate, startCreate]);
+
+	/** null = left for the provider. */
+	const login = useCallback(async (provider: Provider): Promise<string | null> => {
+		try { if (loginOpen === 'create') sessionStorage.setItem(RESUME_KEY, 'create'); } catch { /* private mode */ }
+		trackEvent('meetup_login', { provider });
+		return signIn(provider, window.location.href);
+	}, [loginOpen]);
+
+	const logout = useCallback(() => {
+		void run(async () => {
+			await signOut();
+			setCreating(false);
+			setNote('Tu es déconnecté.');
+		});
+	}, [run]);
+
+	const removeAccount = useCallback(() => {
+		const ok = window.confirm(
+			'Supprimer ton compte\u00a0? C’est définitif.\n\n'
+			+ 'Tes parties en cours seront annulées, tes inscriptions et tes signalements effacés. '
+			+ 'Tu pourras recréer un compte, mais rien ne sera récupéré.',
+		);
+		if (!ok) return;
+		void run(async () => {
+			await deleteAccount();
+			await signOut();
+			trackEvent('meetup_account_delete');
+			setCreating(false);
+			closeEvent();
+			await load();
+			await loadMine();
+			setNote('Ton compte est supprimé.');
+		});
+	}, [closeEvent, load, loadMine, run]);
 
 	const onCreateSubmit = useCallback((v: Draft) => {
 		if (!pin) { setError('Pose une épingle sur la carte.'); return; }
@@ -290,7 +414,7 @@ export default function RencontresApp() {
 			setCreated(r);
 			await load();
 			await loadMine();
-			await openEvent(r.id, r.secret);
+			await openEvent(r.id);
 		});
 	}, [load, loadMine, openEvent, pid, pin, run]);
 
@@ -357,9 +481,14 @@ export default function RencontresApp() {
 		return me ? formatDistance(mine) : null;
 	};
 
-	const shown = useMemo(() => applyFilters(events, filters, new Date(), places), [events, filters, places]);
+	// My own tag never counts as muted, even if an older mute caught it.
+	const myTags = useMemo(() => new Set(mine.map((e) => e.organizer_tag)), [mine]);
+	const shown = useMemo(() => {
+		const off = new Set(muted.filter((t) => !myTags.has(t)));
+		const kept = off.size ? events.filter((e) => !off.has(e.organizer_tag)) : events;
+		return applyFilters(kept, filters, new Date(), places);
+	}, [events, filters, places, muted, myTags]);
 	const shareUrl = (id: string): string => `${window.location.origin}/rencontres/?e=${id}`;
-	const secretUrl = created ? `${window.location.origin}/rencontres/?e=${created.id}&k=${created.secret}` : '';
 	const spot = spotId ? spots.find((s) => s.id === spotId) ?? null : null;
 
 	/* The page is two screens tall, so a banner pinned to the top is a banner
@@ -390,8 +519,26 @@ export default function RencontresApp() {
 			<header className="re-head">
 				<h1>Rencontres pétanque</h1>
 				<p className="re-sub">
-					Qui joue près de chez toi, quand, et combien il manque de joueurs. Sans inscription.
+					Qui joue près de chez toi, quand, et combien il manque de joueurs.
 				</p>
+				<div className="re-account">
+					{session ? (
+						<>
+							<span>Connecté avec <strong>{accountLabel(session)}</strong></span>
+							<button type="button" className="re-link" disabled={busy} onClick={logout}>Se déconnecter</button>
+							<button type="button" className="re-link re-link--danger" disabled={busy} onClick={removeAccount}>
+								Supprimer mon compte
+							</button>
+						</>
+					) : (
+						<>
+							<span>Regarder la carte est libre.</span>
+							<button type="button" className="re-link" onClick={() => setLoginOpen('act')}>
+								Se connecter pour publier ou rejoindre
+							</button>
+						</>
+					)}
+				</div>
 				{!toHome.installed && (
 					<button
 						type="button"
@@ -405,6 +552,9 @@ export default function RencontresApp() {
 
 			{pageError && (
 				<p className="re-error" role="alert" onClick={() => setError(null)}>{pageError}</p>
+			)}
+			{note && !pageError && (
+				<p className="re-ok" role="status" onClick={() => setNote(null)}>{note}</p>
 			)}
 
 			<div className="re-bar">
@@ -446,6 +596,11 @@ export default function RencontresApp() {
 					{locating ? 'Localisation…' : '📍 Autour de moi'}
 				</button>
 				<button type="button" className="re-btn" onClick={() => startCreate()}>+ Poser une partie</button>
+				{muted.length > 0 && (
+					<button type="button" className="re-link re-unmute" onClick={unmuteAll}>
+						Réafficher les organisateurs masqués ({muted.length})
+					</button>
+				)}
 			</div>
 
 			{/* Home ports. One player summers at a campsite and winters in Lyon, and
@@ -530,6 +685,7 @@ export default function RencontresApp() {
 					onEdit={onEditMine}
 					onRemove={onRemoveMine}
 					onForget={onForgetMine}
+					canForget={hasSecret}
 				/>
 			)}
 
@@ -601,18 +757,13 @@ export default function RencontresApp() {
 			{created && (
 				<div className="re-secret">
 					<p className="re-ok re-ok--loud">✅ Ta partie est en ligne.</p>
-					<p><strong>Garde ce lien</strong> pour modifier ou annuler ta partie. C'est le seul moyen : il n'y a ni compte ni mail.</p>
-					<input className="re-secretlink" readOnly value={secretUrl} onFocus={(e) => e.currentTarget.select()} />
+					<p>
+						Elle est liée à ton compte&nbsp;: tu la retrouves dans «&nbsp;Mes parties&nbsp;» pour la modifier
+						ou l'annuler, depuis n'importe quel appareil.
+					</p>
 					<div className="re-secretrow">
-						<button
-							type="button"
-							className="re-btn re-btn--ghost"
-							onClick={() => { void navigator.clipboard?.writeText(secretUrl); }}
-						>
-							Copier le lien
-						</button>
 						<button type="button" className="re-btn re-btn--ghost" onClick={() => setCreated(null)}>
-							J'ai noté
+							OK
 						</button>
 					</div>
 				</div>
@@ -661,6 +812,12 @@ export default function RencontresApp() {
 						detail.event.commune || detail.event.label || 'Mon lieu',
 						detail.event.lat, detail.event.lng,
 					)}
+					onReport={onReport}
+					onReportSignup={onReportSignup}
+					signedIn={Boolean(session)}
+					onLogin={() => setLoginOpen('act')}
+					canMute={!detail.isOrganizer && !myTags.has(detail.event.organizer_tag)}
+					onMute={onMute}
 				/>
 			)}
 			</div>
@@ -700,10 +857,20 @@ export default function RencontresApp() {
 				</ul>
 			</section>
 
+			<p className="re-legal re-rules">
+				Ici, on joue franc jeu&nbsp;: ton vrai prénom, de vraies parties, et du respect pour tout le monde.
+				Une partie louche&nbsp;? Ouvre-la et touche «&nbsp;Signaler&nbsp;». Un souci&nbsp;:{' '}
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
+			</p>
 			<p className="re-legal">
 				Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
-				Aucune inscription, aucun mail. <a href="/confidentialite/">Ce qui est stocké</a>.
+				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler passe par un compte Google ou Apple.{' '}
+				<a href="/confidentialite/">Ce qui est stocké</a>.
 			</p>
+
+			{loginOpen && (
+				<LoginSheet onLogin={login} onClose={() => setLoginOpen(null)} />
+			)}
 
 			{pinning && (
 				<PinSheet
@@ -755,6 +922,48 @@ function PinSheet({ platform, nativePrompt, onClose }: {
 							Installer
 						</button>
 					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/** Opened by any action that needs an account, and by a 401. */
+function LoginSheet({ onLogin, onClose }: {
+	onLogin(p: Provider): Promise<string | null>; onClose(): void;
+}) {
+	const [pending, setPending] = useState<Provider | null>(null);
+	const [failed, setFailed] = useState<string | null>(null);
+
+	const go = async (p: Provider): Promise<void> => {
+		setPending(p);
+		setFailed(null);
+		const why = await onLogin(p);
+		// null: the page is leaving for the provider, keep the button busy.
+		if (why !== null) { setFailed(why); setPending(null); }
+	};
+
+	return (
+		<div className="re-modal" onClick={onClose}>
+			<div className="re-sheet re-login" onClick={(e) => e.stopPropagation()}>
+				<h2>Connecte-toi pour publier, rejoindre ou signaler</h2>
+				<p className="re-hint">
+					Regarder la carte reste libre. Le prénom affiché aux autres joueurs est toujours celui que tu tapes.
+				</p>
+				{(['google', 'apple'] as const).map((p) => (
+					<button
+						key={p}
+						type="button"
+						className={`re-btn re-login-${p}`}
+						disabled={pending !== null}
+						onClick={() => { void go(p); }}
+					>
+						{pending === p ? 'Redirection…' : `Continuer avec ${PROVIDER_LABEL[p]}`}
+					</button>
+				))}
+				{failed && <p className="re-error" role="alert">{failed}</p>}
+				<div className="re-formactions">
+					<button type="button" className="re-btn re-btn--ghost" onClick={onClose}>Fermer</button>
 				</div>
 			</div>
 		</div>

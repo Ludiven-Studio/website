@@ -8,7 +8,7 @@
  * sim never advances while the AI is thinking.
  */
 
-import { type Sim, type Boule, makeBoule, makeJack, release, throwVelocity, settle, cloneSim } from './engine';
+import { type Sim, type Boule, type Velocity, makeBoule, makeJack, release, throwVelocity, settle, cloneSim } from './engine';
 import { hashN } from './terrain';
 import { type Match13, type Side, other, MIN_JACK, MAX_JACK } from './rules13';
 
@@ -83,7 +83,7 @@ export function laneBlocked(bs: Boule[], from: { x: number; y: number }, to: { x
 }
 
 /** Start a throw: the body leaves the thrower's hand above the circle (see `release`). */
-export function launch(s: Sim, from: { x: number; y: number }, side: Side, v: { vx: number; vy: number; vz: number }, asJack = false): Boule {
+export function launch(s: Sim, from: { x: number; y: number }, side: Side, v: Velocity, asJack = false): Boule {
 	return release(s.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, side), v);
 }
 

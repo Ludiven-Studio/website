@@ -220,6 +220,24 @@
 	line-height: 1.6;
 }
 
+/* ---- Account: browsing is free, acting needs a login ---- */
+.re-account {
+	margin-top: 0.5rem;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.3rem 1rem;
+	font-size: var(--text-sm);
+	color: var(--gray-300);
+}
+.re-account strong { color: var(--gray-100); overflow-wrap: anywhere; }
+.re-link--danger { color: #b12a2a; }
+:root.theme-dark .re-link--danger { color: #ffb4b4; }
+.re-link:disabled { opacity: 0.5; cursor: default; }
+.re-login .re-btn { width: 100%; padding: 0.7rem 0.9rem; }
+.re-login-apple { background: #000; border-color: #000; color: #fff; }
+:root.theme-dark .re-login-apple { background: #fff; border-color: #fff; color: #000; }
+
 /* ---- Map ---- */
 .re-map {
 	/* Leaflet panes carry z-index up to 1000. Positioning the container with a
@@ -430,6 +448,27 @@
 .re-mine-state { font-size: var(--text-sm); color: var(--gray-300); white-space: nowrap; }
 .re-mine-acts { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .re-mine .re-link { align-self: flex-start; font-size: var(--text-sm); }
+
+/* ---- Moderation: discreet on purpose, a report is the exception ---- */
+.re-report { display: flex; flex-direction: column; gap: 0.5rem; }
+.re-reportlinks { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
+.re-reportlinks .re-link,
+.re-unmute,
+.re-absent { font-size: var(--text-sm); color: var(--gray-300); }
+.re-absent:disabled { opacity: 0.6; cursor: default; }
+.re-absent--done { color: var(--gray-300); }
+.re-reportform fieldset {
+	margin: 0;
+	padding: 0;
+	border: none;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	color: var(--gray-100);
+}
+.re-reportform legend { margin-bottom: 0.3rem; font-size: var(--text-sm); color: var(--gray-300); }
+.re-reportform label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+.re-reportform .re-actions { margin-top: 0.5rem; }
 
 @media (max-width: 34em) {
 	.re-card {

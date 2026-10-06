@@ -18,6 +18,8 @@ const ev = (over: Partial<MeetupEvent> = {}): MeetupEvent => ({
 	role_needed: 'any',
 	organizer_name: 'Raph',
 	organizer_seats: 1,
+	organizer_tag: 'abc123def456',
+	hidden: false,
 	status: 'open',
 	lat: 45.4489,
 	lng: 5.1381,

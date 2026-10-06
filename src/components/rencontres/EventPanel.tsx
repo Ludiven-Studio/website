@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { FORMAT_LABEL, ROLE_LABEL, ROLES, seatsLeft, type MeetupEvent, type MeetupSignup, type Role } from '../../lib/meetupRules';
+import {
+	FORMAT_LABEL, REPORT_LABEL, REPORT_REASONS, ROLE_LABEL, ROLES, seatsLeft,
+	type MeetupEvent, type MeetupSignup, type ReportReason, type Role,
+} from '../../lib/meetupRules';
 import { buildIcs, downloadIcs } from '../../lib/meetupIcs';
 import { trackEvent } from '../../lib/analytics';
 import { formatDay, formatSlot } from './format';
@@ -22,22 +25,69 @@ interface Props {
 	onCancel(): void;
 	onClose(): void;
 	onSavePlace(): void;
+	/** Rejects with the server's French message, shown as is. */
+	onReport(reason: ReportReason): Promise<void>;
+	onReportSignup(signupId: string): Promise<void>;
+	/** False for my own games: muting myself would only hide them from me. */
+	canMute: boolean;
+	onMute(): void;
+	/** Reporting needs an account; signed out, « Signaler » opens the login sheet. */
+	signedIn: boolean;
+	onLogin(): void;
 }
 
 export default function EventPanel({
 	event, signups, isOrganizer, name, busy, error, flash, placeSaved, shareUrl,
-	onJoin, onLeave, onEdit, onCancel, onClose, onSavePlace,
+	onJoin, onLeave, onEdit, onCancel, onClose, onSavePlace, onReport, onReportSignup, canMute, onMute, signedIn, onLogin,
 }: Props) {
 	const mine = signups.find((s) => s.is_me);
 	const [seats, setSeats] = useState(mine?.seats ?? 1);
 	const [role, setRole] = useState<Role>(mine?.role ?? 'any');
 	const [who, setWho] = useState(mine?.player_name ?? name);
 	const [copied, setCopied] = useState(false);
+	const [reporting, setReporting] = useState(false);
+	const [reason, setReason] = useState<ReportReason | null>(null);
+	const [reported, setReported] = useState(false);
+	const [reportError, setReportError] = useState<string | null>(null);
+	const [sending, setSending] = useState(false);
+	const [absent, setAbsent] = useState<ReadonlySet<string>>(new Set());
 
 	const left = seatsLeft(event);
 	const past = Date.parse(event.ends_at) < Date.now();
 	const cancelled = event.status === 'cancelled';
 	const place = event.label || 'Terrain sur la carte';
+	const started = Date.parse(event.starts_at) <= Date.now();
+	// The server refuses 'no_show' otherwise: don't offer what it will turn down.
+	const reasons = REPORT_REASONS.filter((r) => r !== 'no_show' || (Boolean(mine) && started));
+	const canFlagAbsent = isOrganizer && started && !cancelled;
+
+	const sendReport = async (): Promise<void> => {
+		if (!reason) return;
+		setSending(true);
+		setReportError(null);
+		try {
+			await onReport(reason);
+			setReported(true);
+			setReporting(false);
+		} catch (e) {
+			setReportError(e instanceof Error ? e.message : 'Une erreur est survenue.');
+		} finally {
+			setSending(false);
+		}
+	};
+
+	const flagAbsent = async (signupId: string): Promise<void> => {
+		setSending(true);
+		setReportError(null);
+		try {
+			await onReportSignup(signupId);
+			setAbsent((s) => new Set(s).add(signupId));
+		} catch (e) {
+			setReportError(e instanceof Error ? e.message : 'Une erreur est survenue.');
+		} finally {
+			setSending(false);
+		}
+	};
 
 	const share = async (): Promise<void> => {
 		trackEvent('meetup_share');
@@ -69,6 +119,7 @@ export default function EventPanel({
 
 			{cancelled && <p className="re-banner re-banner--off">Cette partie a été annulée.</p>}
 			{!cancelled && past && <p className="re-banner">Cette partie est passée.</p>}
+			{!cancelled && event.hidden && <p className="re-banner">Cette partie est en cours de vérification.</p>}
 
 			<h2>{FORMAT_LABEL[event.format]}</h2>
 			<p className="re-when">{formatDay(event.starts_at)} · {formatSlot(event.starts_at, event.ends_at)}</p>
@@ -83,8 +134,25 @@ export default function EventPanel({
 
 			<ul className="re-who">
 				<li><strong>{event.organizer_name}</strong> (organisateur){event.organizer_seats > 1 ? ` ×${event.organizer_seats}` : ''}</li>
-				{signups.map((s, i) => (
-					<li key={i}>{s.player_name}{s.seats > 1 ? ` ×${s.seats}` : ''}</li>
+				{signups.map((s) => (
+					<li key={s.id}>
+						{s.player_name}{s.seats > 1 ? ` ×${s.seats}` : ''}
+						{canFlagAbsent && !s.is_me && (absent.has(s.id) ? (
+							<span className="re-absent re-absent--done"> · absent signalé</span>
+						) : (
+							<>
+								{' · '}
+								<button
+									type="button"
+									className="re-link re-absent"
+									disabled={sending}
+									onClick={() => { void flagAbsent(s.id); }}
+								>
+									N'est pas venu
+								</button>
+							</>
+						))}
+					</li>
 				))}
 			</ul>
 
@@ -156,6 +224,48 @@ export default function EventPanel({
 					</button>
 				)}
 			</div>
+
+			{(!isOrganizer || reportError) && (
+				<div className="re-report">
+					{reportError && <p className="re-error" role="alert">{reportError}</p>}
+					{!isOrganizer && (reported ? (
+						<p className="re-hint" role="status">Merci, on va regarder.</p>
+					) : reporting ? (
+						<form className="re-reportform" onSubmit={(e) => { e.preventDefault(); void sendReport(); }}>
+							<fieldset>
+								<legend>Pourquoi signaler cette partie&nbsp;?</legend>
+								{reasons.map((r) => (
+									<label key={r}>
+										<input type="radio" name="reason" checked={reason === r} onChange={() => setReason(r)} />
+										{REPORT_LABEL[r]}
+									</label>
+								))}
+							</fieldset>
+							<div className="re-actions">
+								<button type="submit" className="re-btn" disabled={!reason || sending}>Envoyer</button>
+								<button type="button" className="re-btn re-btn--ghost" onClick={() => { setReporting(false); setReportError(null); }}>
+									Annuler
+								</button>
+							</div>
+						</form>
+					) : (
+						<div className="re-reportlinks">
+							<button
+								type="button"
+								className="re-link"
+								onClick={() => { if (signedIn) setReporting(true); else onLogin(); }}
+							>
+								Signaler
+							</button>
+							{canMute && (
+								<button type="button" className="re-link" onClick={onMute}>
+									Masquer les parties de cet organisateur
+								</button>
+							)}
+						</div>
+					))}
+				</div>
+			)}
 
 			{/* The only place the app appears (spec §10). The map is a service, not an ad. */}
 			<a

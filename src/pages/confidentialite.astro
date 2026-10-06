@@ -49,19 +49,36 @@ import Hero from '../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>Carte des rencontres (pétanque)</h2>
 			<p>
-				La page <a href="/rencontres">Rencontres pétanque</a> fonctionne <strong>sans compte, sans
-				mail et sans mot de passe</strong>. Quand tu publies une partie ou que tu t'y inscris, sont
-				enregistrés chez Supabase&nbsp;: le <strong>prénom que tu saisis</strong> (c'est le seul
-				texte libre du service), le créneau, le format, le nombre de places, et la
-				<strong>position de l'épingle que tu poses sur la carte</strong> — celle du terrain, jamais
-				celle de ton appareil. Le même identifiant technique anonyme que pour les classements
-				rattache tes annonces à ton navigateur.
+				La page <a href="/rencontres">Rencontres pétanque</a> et l'application Pétanque Meet se
+				consultent <strong>sans compte</strong>. Pour publier, rejoindre ou signaler une partie, tu
+				te connectes avec <strong>Google ou Apple</strong>&nbsp;: nous recevons alors un identifiant
+				de compte et ton adresse mail (ou l'adresse relais d'Apple si tu choisis de la masquer),
+				jamais ton mot de passe. Ce compte sert uniquement à rattacher tes parties et inscriptions
+				à toi, sur tous tes appareils, et à faire respecter les règles.
 			</p>
 			<p>
-				Pour limiter les abus sans compte, le site compte le nombre d'annonces et d'inscriptions par
-				jour et par visiteur. Ton adresse IP n'est <strong>jamais stockée</strong>&nbsp;: elle est
-				transformée en empreinte non réversible, mélangée à un secret connu du seul serveur. Sans ce
-				secret, l'empreinte ne peut pas être ramenée à une adresse.
+				Quand tu publies une partie ou que tu t'y inscris, sont aussi enregistrés chez Supabase&nbsp;:
+				le <strong>prénom que tu saisis</strong> (c'est le seul texte libre du service), le créneau,
+				le format, le nombre de places, et la <strong>position de l'épingle que tu poses sur la
+				carte</strong> — celle du terrain, jamais celle de ton appareil.
+			</p>
+			<p>
+				Pour limiter les abus, le service compte les annonces, inscriptions et signalements par jour.
+				Ton adresse IP n'est <strong>jamais stockée</strong>&nbsp;: elle est transformée en empreinte
+				non réversible, mélangée à un secret connu du seul serveur. Sans ce secret, l'empreinte ne
+				peut pas être ramenée à une adresse.
+			</p>
+			<p>
+				<strong>Signalements et modération.</strong> Tu peux signaler une partie (prénom choquant,
+				fausse partie, personne n'est venu). Le signalement est enregistré avec ton identifiant de
+				compte et lu par l'éditeur du site. Une partie signalée par plusieurs joueurs est masquée le
+				temps d'une vérification. Un compte qui ne respecte pas les règles peut être suspendu&nbsp;:
+				seul son identifiant technique est alors conservé, pour que la suspension tienne.
+			</p>
+			<p>
+				<strong>Supprimer ton compte</strong> se fait à tout moment depuis «&nbsp;Mes parties&nbsp;»,
+				sur le site comme dans l'application. Tes parties à venir sont annulées (les inscrits le
+				voient), tes inscriptions et signalements sont effacés, et ton compte est supprimé.
 			</p>
 			<p>
 				Le bouton «&nbsp;autour de moi&nbsp;» demande ta position uniquement quand tu cliques
@@ -103,7 +120,8 @@ import Hero from '../components/Hero.astro';
 				Tes données ne sont ni vendues ni cédées. Elles sont uniquement traitées par nos
 				prestataires techniques&nbsp;: Supabase (base de données des scores et des rencontres, UE),
 				GitHub Pages (hébergement du site) et la Fondation OpenStreetMap (fonds de carte et noms de
-				lieux de la page Rencontres).
+				lieux de la page Rencontres), ainsi que Google et Apple pour la seule connexion à la page
+				Rencontres et à l'application Pétanque Meet.
 			</p>
 		</section>
 

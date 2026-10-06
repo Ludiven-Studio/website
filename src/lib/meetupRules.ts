@@ -51,7 +51,11 @@ export interface MeetupEvent {
 	role_needed: Role;
 	organizer_name: string;
 	organizer_seats: number;
+	/** Opaque per organizer: lets a player mute one without seeing organizer_id. */
+	organizer_tag: string;
 	status: 'open' | 'cancelled';
+	/** Hidden after reports, until a moderator looks. `list` never returns these. */
+	hidden: boolean;
 	lat: number;
 	lng: number;
 	label: string;
@@ -61,6 +65,8 @@ export interface MeetupEvent {
 }
 
 export interface MeetupSignup {
+	/** The signup row, not the player: only used to point at it in report_signup. */
+	id: string;
 	/** Set by the server from the caller's playerId; other players' ids are never sent. */
 	is_me: boolean;
 	player_name: string;
@@ -77,6 +83,16 @@ export interface MeetupSpot {
 	confirmed: boolean;
 }
 
+export const REPORT_REASONS = ['name', 'fake', 'no_show', 'other'] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export const REPORT_LABEL: Record<ReportReason, string> = {
+	name: 'Prénom choquant',
+	fake: 'Fausse partie',
+	no_show: "Personne n'est venu",
+	other: 'Autre',
+};
+
 export const seatsLeft = (e: MeetupEvent): number => Math.max(0, e.players_needed - e.seats_taken);
 
 /** Collapse whitespace and cap the length. Returns null when the result is
@@ -87,7 +103,25 @@ export function cleanName(raw: unknown): string | null {
 	if (s.length < 2) return null;
 	if (/[<>]/.test(s)) return null;
 	if (/https?:\/\/|www\.|\.(com|fr|net|org|io)\b/i.test(s)) return null;
+	if (isOffensive(s)) return null;
 	return s;
+}
+
+// Short words match whole words only ("con" must not refuse "Constance"); stems
+// long enough to be unambiguous match anywhere. Not a wall: reports are.
+const BAD_WORDS = ['con', 'cons', 'conne', 'pd', 'pede', 'tg', 'ntm', 'fdp', 'pute', 'putes', 'bite', 'zob',
+	'nazi', 'nazis', 'negre', 'bougnoule', 'youpin', 'gouine', 'tapette', 'merde', 'cul', 'teub'];
+const BAD_STEMS = ['connard', 'connass', 'encul', 'salope', 'salaud', 'enfoire', 'batard', 'niquer', 'niquetamere',
+	'hitler', 'pedophil', 'couille', 'branleur', 'putain', 'trouduc', 'fuck', 'bitch', 'nigger', 'nigga',
+	'asshole', 'cunt', 'whore'];
+
+function isOffensive(name: string): boolean {
+	const flat = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+		.replace(/0/g, 'o').replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/[4@]/g, 'a').replace(/[5$]/g, 's');
+	const words = flat.split(/[^a-z]+/).filter(Boolean);
+	if (words.some((w) => BAD_WORDS.includes(w))) return true;
+	const joined = words.join('');
+	return BAD_STEMS.some((b) => joined.includes(b));
 }
 
 export const isFormat = (v: unknown): v is Format => FORMATS.includes(v as Format);

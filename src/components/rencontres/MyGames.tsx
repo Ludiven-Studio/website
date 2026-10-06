@@ -17,12 +17,14 @@ interface Props {
 	/** Drops the secret from this device only. The row's last exit once the game is
 	 *  over and the signups keep it from being deleted. */
 	onForget(id: string): void;
+	/** Only a game this device holds a secret for: the account's games come back anyway. */
+	canForget(id: string): boolean;
 }
 
 const startOf = (e: MeetupEvent): number => Date.parse(e.starts_at);
 const isLive = (e: MeetupEvent, now: number): boolean => e.status === 'open' && Date.parse(e.ends_at) >= now;
 
-export default function MyGames({ events, active, max, busy, onOpen, onEdit, onRemove, onForget }: Props) {
+export default function MyGames({ events, active, max, busy, onOpen, onEdit, onRemove, onForget, canForget }: Props) {
 	const [showPast, setShowPast] = useState(false);
 	const now = Date.now();
 	const live = events.filter((e) => isLive(e, now)).sort((a, b) => startOf(a) - startOf(b));
@@ -74,7 +76,7 @@ export default function MyGames({ events, active, max, busy, onOpen, onEdit, onR
 									>
 										Annuler — {joined} inscrit{joined > 1 ? 's' : ''}
 									</button>
-								) : (
+								) : canForget(e.id) && (
 									<button type="button" className="re-btn re-btn--ghost" onClick={() => onForget(e.id)}>
 										Retirer de ma liste
 									</button>

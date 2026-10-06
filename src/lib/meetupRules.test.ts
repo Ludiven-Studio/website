@@ -28,6 +28,17 @@ describe('cleanName', () => {
 		expect(cleanName('<b>Jo</b>')).toBeNull();
 	});
 
+	it('rejects offensive names, even disguised', () => {
+		expect(cleanName('Connard')).toBeNull();
+		expect(cleanName('c0nnard')).toBeNull();
+		expect(cleanName('gros con')).toBeNull();
+	});
+
+	it('keeps real names that contain a short bad word', () => {
+		expect(cleanName('Constance')).toBe('Constance');
+		expect(cleanName('Pascal')).toBe('Pascal');
+	});
+
 	it('rejects too short and truncates too long', () => {
 		expect(cleanName('J')).toBeNull();
 		expect(cleanName('')).toBeNull();
