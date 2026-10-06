@@ -5,7 +5,7 @@ import {
 } from './terrain';
 import {
 	makeBoule, makeJack, place, stepSim, isSettled, throwVelocity, G,
-	type Sim, type Boule, type Impact, type Velocity,
+	type Sim, type Boule, type Impact,
 } from './engine';
 import {
 	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder, endScore, other,
@@ -142,14 +142,6 @@ const PAD_GRIP_W = 22;
 // The Pétanque Scanner card in the free side of the band. Closed for the session with its ×.
 const PROMO_KEY = 'petanque-promo-shut';
 const TUTO_KEY = 'petanque-tuto-throw'; // set once the player has thrown a boule by themselves
-const EFFET_KEY = 'petanque-effet'; // expert mode: where the finger lands across the board gives spin
-// Across the board, from its centre: a middle band throws straight, the edges give full spin.
-const EFFET_DEAD = 0.3;
-const spinAcross = (box: { left: number; right: number }, x: number): number => {
-	const f = (x - (box.left + box.right) / 2) / ((box.right - box.left) / 2);
-	const a = Math.min(1, Math.max(0, (Math.abs(f) - EFFET_DEAD) / (1 - EFFET_DEAD - 0.1)));
-	return Math.round(Math.sign(f) * a * 100) / 100; // two decimals: the wire and both boards agree
-};
 const PROMO_MIN = 104; // px — narrower and the name no longer fits on one line
 const PROMO_MAX = 280;
 
@@ -658,13 +650,6 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const [callArm, setCallArm] = useState(true); // the strip pulses until it has been used once
 	const [dists, setDists] = useState(true);
 	const [sound, setSound] = useState(() => sfx.isEnabled());
-	const [effet, setEffet] = useState(() => { try { return localStorage.getItem(EFFET_KEY) === '1'; } catch { return false; } });
-	const effetRef = useRef(effet);
-	effetRef.current = effet;
-	const spinRef = useRef(0); // the effet of the throw being drawn
-	const [spin, setSpin] = useState(0);
-	// No effet, no field: a throw without it is the very message the other board always got.
-	const withSpin = useCallback((v: Velocity): Velocity => (spinRef.current ? { ...v, spin: spinRef.current } : v), []);
 	const [barOpen, setBarOpen] = useState(false);
 	// The UI language. Callbacks with empty deps read it through the ref.
 	// An event page remembers its own pick, so a choice made on the main game never leaks into it.
@@ -1173,7 +1158,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const speedOf = (p: number): number =>
 		Math.sqrt(MIN_SPEED * MIN_SPEED + (MAX_SPEED * MAX_SPEED - MIN_SPEED * MIN_SPEED) * p);
 
-	const doThrow = useCallback((side: Side, v: Velocity, asJack: boolean) => {
+	const doThrow = useCallback((side: Side, v: { vx: number; vy: number; vz: number }, asJack: boolean) => {
 		const s = simRef.current, g = g3Ref.current;
 		if (!s || !g) return;
 		throwFromRef.current = asJack ? null : { side, at: s.bs.filter((o) => o.live).map((o) => ({ b: o, x: o.x, y: o.y })) };
@@ -1242,10 +1227,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const throwFromAim = useCallback(() => {
 		const m = matchRef.current;
 		const h = aimHeading();
-		const v = withSpin(throwVelocity(h.x, h.y, aimSpeed(), aimLoft()));
+		const v = throwVelocity(h.x, h.y, aimSpeed(), aimLoft());
 		swayRef.current = null;
-		spinRef.current = 0;
-		setSpin(0);
 		const jack = m.phase === 'throw-jack';
 		// Velocities, never angles: converting an angle calls sin/cos, and two JS engines may not
 		// round those the same way. This is the one message the other board cannot do without.
@@ -1256,7 +1239,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			setTutoDone(true); // the gesture is learnt: the ghost finger never comes back
 			try { localStorage.setItem(TUTO_KEY, '1'); } catch { /* private mode */ }
 		}
-	}, [aimHeading, aimLoft, aimSpeed, doThrow, sendMove, streamAim, withSpin]);
+	}, [aimHeading, aimLoft, aimSpeed, doThrow, sendMove, streamAim]);
 
 	/* ---------- which view we are in ---------- */
 
@@ -2184,9 +2167,6 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			const loftNow = elevationForBoard(boardAt(pad, y));
 			aimLoftRef.current = loftNow;
 			setLoft(loftNow);
-			// Expert mode: the press point across the board is the effet, as its height is the loft.
-			spinRef.current = effetRef.current ? spinAcross(pad, x) : 0;
-			setSpin(spinRef.current);
 			// b0 carries the seam for an arm drag, because power is measured from the seam and not from
 			// the press point: the board is the safe zone, and a pull that has not cleared it is not a
 			// throw yet. Sampled once here — the rect cannot move under a finger that is already down.
@@ -2548,7 +2528,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 
 		const asJack = m.phase === 'throw-jack';
 		const h = aimHeading();
-		const v = withSpin(throwVelocity(h.x, h.y, aimSpeed(), aimLoft()));
+		const v = throwVelocity(h.x, h.y, aimSpeed(), aimLoft());
 		const from = m.circle;
 		const pred = predictThrow(s, from, v, (c) =>
 			place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn)));
@@ -2565,7 +2545,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			(g.marker.material as THREE.MeshBasicMaterial).color.setHex(tint);
 			g.marker.visible = true;
 		}
-	}, [aimHeading, aimLoft, aimSpeed, withSpin]);
+	}, [aimHeading, aimLoft, aimSpeed]);
 
 	/* ---------- where the action is ---------- */
 
@@ -3395,10 +3375,6 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 						) : lv.active && (
 							<button className="pe-act" onClick={() => startLevel(lv.level)} aria-label={t.restart} title={t.restart}>↻</button>
 						)}
-						{/* Simple or expert: in expert mode the press point across the board gives effet. */}
-						<button className={`pe-act ${effet ? 'on' : ''}`} aria-pressed={effet}
-							onClick={() => { const on = !effet; try { localStorage.setItem(EFFET_KEY, on ? '1' : '0'); } catch { /* private mode */ } setEffet(on); }}
-							aria-label={effet ? t.effetOff : t.effetOn} title={effet ? t.effetOff : t.effetOn}>{effet ? '↻' : '⟂'}</button>
 						<button className={`pe-act ${sound ? 'on' : ''}`} aria-pressed={sound}
 							onClick={() => { const on = !sound; sfx.setEnabled(on); setSound(on); }}
 							aria-label={sound ? t.soundOff : t.soundOn} title={sound ? t.soundOff : t.soundOn}>{sound ? '🔊' : '🔇'}</button>
@@ -3535,14 +3511,6 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 					{/* Whose turn it is, on the pad itself: the label above it is easy to miss. */}
 					{armLive && status !== 'rolling' && !over && (
 						<span className={`pe-arm-who${myTurn ? '' : ' foe'}`}>{myTurn ? t.yourTurn : (online && mpOpp ? mpOpp : t.opponent)}</span>
-					)}
-					{/* Expert mode: the side bands give effet, and the one under the finger says so. */}
-					{effet && armLive && myTurn && !jackPhase && (
-						<>
-							<div className="pe-arm-effet l" />
-							<div className="pe-arm-effet r" />
-							{armed && spin !== 0 && <span className="pe-arm-spin">{spin < 0 ? '↺ ' : ''}{t.effet}{spin > 0 ? ' ↻' : ''}</span>}
-						</>
 					)}
 					{/* The gesture, drawn: an arrow lying on the ground and running away up the lane —
 					    press, then push forward. Gone once the pull has started; the fill says it then. */}
@@ -4146,10 +4114,6 @@ const CSS = `
 .pe-arm-foefill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(180deg, rgba(255,95,86,0.12), rgba(255,95,86,0.42)); }
 .pe-arm-who { position: absolute; right: 8px; top: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.02em; color: #ffd166; text-transform: uppercase; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pe-arm-who.foe { color: #ff8a80; }
-.pe-arm-effet { position: absolute; top: 0; bottom: 0; width: 30%; pointer-events: none; background: linear-gradient(to right, rgba(255, 209, 102, 0.10), transparent); }
-.pe-arm-effet.l { left: 0; }
-.pe-arm-effet.r { right: 0; transform: scaleX(-1); }
-.pe-arm-spin { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); font-size: 12px; font-weight: 800; color: #ffd166; text-transform: uppercase; white-space: nowrap; }
 .pe-arm-label.foe { background: rgba(90,18,14,0.72); color: #ffd9d4; }
 .pe-foe { position: absolute; left: 50%; transform: translateX(-50%); bottom: var(--pe-arm-b); width: var(--pe-arm-w); height: 0; z-index: 4; pointer-events: none; }
 .pe-foe.gone { visibility: hidden; }
