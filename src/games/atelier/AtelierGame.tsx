@@ -771,7 +771,7 @@ export default function AtelierGame({ gameId }: { gameId: string }) {
 							<span>Échanger <strong>{ENERGY_PACK.price} <Cocoin size="1em" /></strong> contre <strong>{ENERGY_PACK.energy} ⚡</strong></span>
 							<button className="at-btn" disabled={!wallet.ready || wallet.balance < ENERGY_PACK.price} onClick={buyEnergy}>Échanger</button>
 						</div>
-						<p className="at-small">Tu as {wallet.balance} cocoin{wallet.balance > 1 ? 's' : ''}. {wallet.balance < ENERGY_PACK.price ? 'Gagne-en avec les étoiles des niveaux et les ' : 'Tu en gagnes aussi avec les '}<a href="/jeux/defi">défis du jour</a> de tous les jeux.</p>
+						<p className="at-small">Tu as {wallet.balance} cocoin{wallet.balance > 1 ? 's' : ''}. {wallet.balance < ENERGY_PACK.price ? 'Gagne-en avec les étoiles des niveaux et les ' : 'Tu en gagnes aussi avec les '}<a href="/jeux/defi/">défis du jour</a> de tous les jeux.</p>
 						<button className="at-btn ghost" onClick={() => setEnergyOpen(false)}>Fermer</button>
 					</div>
 				</div>
@@ -890,7 +890,7 @@ function GenPop({ s, g, now, cocoins, onUp, onRecharge, onEnergy, onClose }: {
 					<div className="at-genpop-opt">
 						<div>
 							<strong>Recharger maintenant</strong>
-							<span>{max - c} charge{max - c > 1 ? 's' : ''} d’un coup · tu as {cocoins} <Cocoin size="1em" />{cocoins < RECHARGE_PRICE && <> · gagne-en avec les <a href="/jeux/defi">défis du jour</a></>}</span>
+							<span>{max - c} charge{max - c > 1 ? 's' : ''} d’un coup · tu as {cocoins} <Cocoin size="1em" />{cocoins < RECHARGE_PRICE && <> · gagne-en avec les <a href="/jeux/defi/">défis du jour</a></>}</span>
 						</div>
 						<button className="at-btn small" disabled={cocoins < RECHARGE_PRICE} onClick={onRecharge}>{RECHARGE_PRICE} <Cocoin size="1em" /></button>
 					</div>

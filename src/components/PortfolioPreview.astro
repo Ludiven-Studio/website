@@ -10,7 +10,7 @@ const { base = '/work' } = Astro.props;
 const { data, slug } = Astro.props.project;
 ---
 
-<a class={`card${data.img ? '' : ' no-img'}`} href={`${base}/${slug}`}>
+<a class={`card${data.img ? '' : ' no-img'}`} href={`${base}/${slug}/`}>
 	<span class="title">{data.title}</span>
 	{(data.org || data.role) && (
 		<span class="context">{[data.role, data.org].filter(Boolean).join(' · ')}</span>

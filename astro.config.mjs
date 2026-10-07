@@ -12,13 +12,13 @@ export default defineConfig({
     vite: { build: { target: ['es2020', 'safari15'] } },
     // Renamed games — keep the old URLs alive for shared links.
     redirects: {
-        '/jeux/tectonique': '/jeux/tapis',
-        '/jeux/bolides': '/jeux/course-de-peinture',
-        '/jeux/caisses-a-peinture': '/jeux/course-de-peinture',
+        '/jeux/tectonique': '/jeux/tapis/',
+        '/jeux/bolides': '/jeux/course-de-peinture/',
+        '/jeux/caisses-a-peinture': '/jeux/course-de-peinture/',
         // Renamed pages: the Unity offer moved to /prestations so /services could
         // become the free-services hub. Old /services links land on the hub — no
         // redirect is possible, a real page now owns that path.
-        '/outils': '/services',
+        '/outils': '/services/',
         // The legal pages moved from the app's code name to its store name. The old URLs are
         // declared in both store listings and baked into installed apps: keep them for good.
         '/petanque-ar': '/petanque-scanner/',

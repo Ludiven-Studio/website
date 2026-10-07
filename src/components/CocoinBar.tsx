@@ -43,7 +43,7 @@ export default function CocoinBar() {
 			{reward.canClaim && (
 				<button className="cw-claim" onClick={claim}>🎁 +{reward.amount}</button>
 			)}
-			<a className="cw-shop" href="/jeux/boutique">🎖️ Boutique</a>
+			<a className="cw-shop" href="/jeux/boutique/">🎖️ Boutique</a>
 		</div>
 	);
 }
