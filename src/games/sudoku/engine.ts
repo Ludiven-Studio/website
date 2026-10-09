@@ -9,6 +9,7 @@
  */
 
 import type { Rng } from '../prng';
+import { Board, nextPlacement, solveByLogic } from './logic';
 
 export type Grid = number[][]; // 0 = empty
 
@@ -183,8 +184,9 @@ export function countSolutions(
 }
 
 /**
- * Build a full grid then remove cells one by one, keeping a removal only
- * if the solution stays unique. `rng` enables seeded daily puzzles.
+ * Build a full grid then remove cells one by one, keeping a removal only if the
+ * grid stays solvable by logic alone (which also proves the solution unique), so
+ * every hint can name its technique. `rng` enables seeded daily puzzles.
  */
 export function generateSudoku(
 	variant: Variant,
@@ -204,12 +206,13 @@ export function generateSudoku(
 	);
 
 	const target = Math.round(size * size * diff.removeFrac);
+	const shape = { n: size, boxH, boxW };
 	let removed = 0;
 	for (const [r, c] of cells) {
 		if (removed >= target) break;
 		const keep = given[r][c];
 		given[r][c] = 0;
-		if (countSolutions(given, size, boxH, boxW, 2) === 1) {
+		if (solveByLogic(shape, given.flat())) {
 			removed++;
 		} else {
 			given[r][c] = keep;
@@ -224,12 +227,16 @@ export interface HintResult {
 	c: number;
 	value: number;
 	reason: string;
+	/** The reasoning, one line per technique, the placement last. */
+	steps: string[];
+	/** Cells the reasoning looks at, the hinted one included. */
+	focus: [number, number][];
 }
 
 /**
  * Find the next logically-deducible cell for the player and explain the technique.
- * Corrects a wrong entry first; then "last cell in a unit", naked single, hidden
- * single; finally an honest fallback. The returned value is always the solution.
+ * Corrects a wrong entry first; then the simplest single, reached through only the
+ * eliminations it needs. The returned value is always the solution.
  */
 export function findHint(
 	entries: (number | null)[][],
@@ -252,8 +259,6 @@ export function findHint(
 	};
 	const unitName = (k: 'row' | 'col' | 'box') =>
 		k === 'row' ? 'sa ligne' : k === 'col' ? 'sa colonne' : 'son bloc';
-	const unitNameTop = (k: 'row' | 'col' | 'box') =>
-		k === 'row' ? 'cette ligne' : k === 'col' ? 'cette colonne' : 'ce bloc';
 
 	// 1) Correction — a wrong filled cell.
 	for (let r = 0; r < n; r++)
@@ -268,76 +273,26 @@ export function findHint(
 			const reason = dup
 				? `Le ${x} ici fait doublon dans ${unitName(dup)} — la bonne valeur est ${solution[r][c]}.`
 				: `Le ${x} ne convient pas ici — la valeur correcte est ${solution[r][c]}.`;
-			return { r, c, value: solution[r][c], reason };
+			return { r, c, value: solution[r][c], reason, steps: [reason], focus: [[r, c]] };
 		}
 
-	const candidates = (r: number, c: number): number[] => {
-		const used = new Set<number>();
-		for (const k of ['row', 'col', 'box'] as const)
-			for (const [rr, cc] of unitCells(k, k === 'row' ? r : k === 'col' ? c : bi(r, c))) {
-				const v = val(rr, cc);
-				if (v != null) used.add(v);
-			}
-		const out: number[] = [];
-		for (let v = 1; v <= n; v++) if (!used.has(v)) out.push(v);
-		return out;
-	};
+	// 2) Logic: the single with the shortest chain of eliminations behind it.
+	const board = new Board({ n, boxH, boxW }, Array.from({ length: n * n }, (_, i) => val(Math.floor(i / n), i % n) ?? 0));
+	const p = nextPlacement(board);
+	if (p) {
+		const at = (cell: number): [number, number] => [Math.floor(cell / n), cell % n];
+		const [r, c] = at(p.cell);
+		const steps = [...p.steps.map((s) => s.text), p.final];
+		return { r, c, value: p.value, reason: steps.join(' '), steps, focus: p.focus.map(at) };
+	}
 
-	// 2) Last empty cell of a unit.
-	for (const k of ['row', 'col', 'box'] as const)
-		for (let i = 0; i < n; i++) {
-			const empties = unitCells(k, i).filter(([r, c]) => editable(r, c) && val(r, c) == null);
-			if (empties.length !== 1) continue;
-			const [r, c] = empties[0];
-			const y = solution[r][c];
-			return {
-				r,
-				c,
-				value: y,
-				reason: `${unitNameTop(k)} n'a plus qu'une case libre : il y manque le ${y}.`,
-			};
-		}
-
-	// 3) Naked single.
-	for (let r = 0; r < n; r++)
-		for (let c = 0; c < n; c++) {
-			if (!editable(r, c) || val(r, c) != null) continue;
-			const cand = candidates(r, c);
-			if (cand.length === 1 && cand[0] === solution[r][c])
-				return {
-					r,
-					c,
-					value: cand[0],
-					reason: `Sur sa ligne, sa colonne et son bloc réunis, cette case n'accepte que le ${cand[0]}.`,
-				};
-		}
-
-	// 4) Hidden single.
-	for (const k of ['row', 'col', 'box'] as const)
-		for (let i = 0; i < n; i++) {
-			const cells = unitCells(k, i).filter(([r, c]) => editable(r, c) && val(r, c) == null);
-			for (let v = 1; v <= n; v++) {
-				const fit = cells.filter(([r, c]) => candidates(r, c).includes(v));
-				if (fit.length === 1 && solution[fit[0][0]][fit[0][1]] === v)
-					return {
-						r: fit[0][0],
-						c: fit[0][1],
-						value: v,
-						reason: `Le ${v} ne peut se placer que dans cette case de ${unitName(k)}.`,
-					};
-			}
-		}
-
-	// 5) Fallback.
+	// 3) Fallback, unreachable on a generated grid (they are all solvable by logic).
 	for (let r = 0; r < n; r++)
 		for (let c = 0; c < n; c++)
-			if (editable(r, c) && val(r, c) == null)
-				return {
-					r,
-					c,
-					value: solution[r][c],
-					reason: `Par élimination, cette case vaut ${solution[r][c]}.`,
-				};
+			if (editable(r, c) && val(r, c) == null) {
+				const reason = `Par élimination, cette case vaut ${solution[r][c]}.`;
+				return { r, c, value: solution[r][c], reason, steps: [reason], focus: [[r, c]] };
+			}
 
 	return null;
 }

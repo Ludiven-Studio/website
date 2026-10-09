@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SIZES, DIFFS, generateSudoku, countSolutions, findHint, type Grid } from './engine';
 import { mulberry32, dateSeed } from '../prng';
+import { Board, nextPlacement, solveByLogic } from './logic';
 
 function isValidFullGrid(grid: Grid, n: number, boxH: number, boxW: number): boolean {
 	const expected = new Set(Array.from({ length: n }, (_, i) => i + 1));
@@ -69,6 +70,55 @@ describe('sudoku engine', () => {
 		for (let r = 0; r < 9; r++)
 			for (let c = 0; c < 9; c++)
 				expect(p.given[r][c] !== 0 ? p.given[r][c] : entries[r][c]).toBe(p.solution[r][c]);
+	});
+
+	it('every grid is solvable by logic, and every hint names its technique', () => {
+		for (const key of ['difficile', 'expert'] as const)
+			for (let seed = 1; seed <= 15; seed++) {
+				const p = generateSudoku(SIZES['9'], DIFFS[key], mulberry32(seed));
+				expect(solveByLogic({ n: 9, boxH: 3, boxW: 3 }, p.given.flat())).not.toBeNull();
+				const entries: (number | null)[][] = Array.from({ length: 9 }, () => new Array(9).fill(null));
+				for (;;) {
+					const h = findHint(entries, p);
+					if (!h) break;
+					expect(h.value).toBe(p.solution[h.r][h.c]);
+					expect(h.reason, `${key} seed ${seed}`).not.toContain('Par élimination');
+					expect(h.focus).toContainEqual([h.r, h.c]);
+					entries[h.r][h.c] = h.value;
+				}
+			}
+	});
+
+	it('an elimination step never removes the solution digit', () => {
+		for (let seed = 1; seed <= 15; seed++) {
+			const p = generateSudoku(SIZES['9'], DIFFS.expert, mulberry32(100 + seed));
+			const sol = p.solution.flat();
+			const b = new Board({ n: 9, boxH: 3, boxW: 3 }, p.given.flat());
+			for (let h = nextPlacement(b); h; h = nextPlacement(b)) {
+				for (const s of h.steps) for (const e of s.elims) expect(sol[e >> 4]).not.toBe(e & 15);
+				b.place(h.cell, h.value);
+			}
+			expect(b.values).toEqual(sol);
+		}
+	});
+
+	it('pointing names the box and the line', () => {
+		// Rows 2-3 of the top-left box are full, so its 1 must sit on row 1.
+		const g = [
+			'000000000',
+			'234000000',
+			'567000000',
+			'000000000',
+			'000000000',
+			'000000000',
+			'000000000',
+			'000000000',
+			'000000000',
+		];
+		const b = new Board({ n: 9, boxH: 3, boxW: 3 }, g.join('').split('').map(Number));
+		const step = b.findStep('pointing');
+		expect(step?.text).toContain('Dans le bloc du haut à gauche, le 1 ne peut aller que sur la ligne 1');
+		expect(step?.elims).toContain(8 * 16 + 1); // r1c9 loses its 1
 	});
 
 	it('findHint corrects a wrong entry first', () => {
