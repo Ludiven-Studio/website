@@ -1,0 +1,70 @@
+---
+import Icon from './Icon.astro';
+import { games } from '../data/games';
+
+interface Props {
+	current: string;
+}
+
+const { current } = Astro.props;
+const others = games.filter((g) => g.category === 'illusions' && g.id !== current && g.href);
+---
+
+<nav class="ill-links" aria-label="Autres illusions">
+	<p class="ill-links-title">👁️ Autres illusions</p>
+	<ul>
+		{
+			others.map((g) => (
+				<li>
+					<a href={g.href}>
+						<Icon icon={g.icon} color="var(--accent-regular)" size="1.2em" />
+						{g.title}
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</nav>
+
+<style>
+	.ill-links {
+		width: 100%;
+		max-width: 560px;
+		margin: 1.5rem auto 0;
+		text-align: center;
+	}
+	.ill-links-title {
+		margin: 0 0 0.6rem;
+		font-family: var(--font-brand);
+		font-weight: 600;
+		color: var(--gray-200);
+	}
+	.ill-links ul {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 8px;
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+	.ill-links a {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 6px 13px;
+		border: 1px solid var(--gray-800);
+		border-radius: 999px;
+		background: var(--gray-999);
+		color: var(--gray-100);
+		font-size: var(--text-sm);
+		font-weight: 600;
+		text-decoration: none;
+		transition: border-color var(--theme-transition), color var(--theme-transition);
+	}
+	.ill-links a:hover,
+	.ill-links a:focus-visible {
+		border-color: var(--accent-regular);
+		color: var(--accent-regular);
+	}
+</style>

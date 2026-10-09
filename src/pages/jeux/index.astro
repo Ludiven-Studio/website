@@ -24,8 +24,11 @@ const CATEGORIES = [
 	{ id: 'logique', title: '🧩 Jeux de logique' },
 	{ id: 'mots', title: '🔤 Jeux de mots' },
 	{ id: 'adresse', title: "🎯 Jeux d'adresse" },
+	{ id: 'illusions', title: "👁️ Illusions d'optique" },
 	{ id: 'multi', title: '⚽ Jeux multis' },
 ] as const;
+// Sections whose tiles carry no daily-challenge pips.
+const NO_DAILY: string[] = ['illusions', 'multi'];
 const byCategory = CATEGORIES.map((c) => ({
 	...c,
 	games: games.filter((g) => (g.category ?? 'logique') === c.id),
@@ -75,7 +78,7 @@ const byCategory = CATEGORIES.map((c) => ({
 										href={game.href}
 										status={game.status}
 										image={game.image}
-										daily={c.id !== 'multi'}
+										daily={!NO_DAILY.includes(c.id)}
 										favorite
 										art
 									/>

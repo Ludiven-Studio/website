@@ -8,7 +8,7 @@ import { games } from '../../data/games';
 import { NO_EXPERT } from '../../lib/difficulty';
 
 const packs = games
-	.filter((g) => g.status === 'play' && g.href)
+	.filter((g) => g.status === 'play' && g.href && g.category !== 'illusions')
 	.map((g) => ({ id: g.id, title: g.title, href: g.href!, expert: !NO_EXPERT.has(g.id) }));
 ---
 

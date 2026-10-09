@@ -1,0 +1,16 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import IllusionLinks from '../../components/IllusionLinks.astro';
+import MeasureGame from '../../games/illusions/MeasureGame.tsx';
+---
+
+<GamePage
+	title="L'Œil mesureur | Jeux Ludiven Studio"
+	description="Müller-Lyer, Ebbinghaus, Ponzo, T renversé, Delbœuf : règle les traits et les disques pour qu'ils paraissent égaux, puis découvre de combien les illusions d'optique ont trompé ton œil."
+	heading="L'Œil mesureur"
+	tagline="Cinq illusions de taille : fie-toi à ton œil, puis mesure son erreur"
+	gameId="oeil-mesureur"
+>
+	<MeasureGame client:only="react" gameId="oeil-mesureur" />
+	<IllusionLinks current="oeil-mesureur" />
+</GamePage>

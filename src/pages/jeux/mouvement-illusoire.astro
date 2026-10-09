@@ -1,0 +1,16 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import IllusionLinks from '../../components/IllusionLinks.astro';
+import MotionGame from '../../games/illusions/MotionGame.tsx';
+---
+
+<GamePage
+	title="Ça bouge ! Illusions de mouvement | Jeux Ludiven Studio"
+	description="Des illusions de mouvement à tester : les roues de Kitaoka qui tournent toutes seules, le point vert fantôme de Hinton et la spirale qui fait bouger une image fixe. Gratuit, sans pub."
+	heading="Ça bouge !"
+	tagline="Des images immobiles qui bougent quand même : c'est ton œil qui invente le mouvement."
+	gameId="mouvement-illusoire"
+>
+	<MotionGame client:only="react" gameId="mouvement-illusoire" />
+	<IllusionLinks current="mouvement-illusoire" />
+</GamePage>

@@ -7,7 +7,7 @@ export interface GameTile {
 	icon: keyof typeof iconPaths;
 	href?: string;
 	status: 'play' | 'soon';
-	category?: 'aventure' | 'maths' | 'grilles' | 'logique' | 'mots' | 'adresse' | 'multi'; // defaults to logique
+	category?: 'aventure' | 'maths' | 'grilles' | 'logique' | 'mots' | 'adresse' | 'illusions' | 'multi'; // defaults to logique
 	image?: string; // optional presentation thumbnail, e.g. '/assets/jeux/<id>.png' (shown only if set)
 }
 
@@ -459,6 +459,52 @@ export const games: GameTile[] = [
 		icon: 'alchimie',
 		href: '/jeux/alchimie/',
 		status: 'play',
+	},
+	// Optical illusions: pages to look at and play with — no daily, no levels, no Expert pack.
+	{
+		id: 'stereogrammes',
+		title: 'Images 3D cachées',
+		pitch: 'Des stéréogrammes à percer du regard : louche, ou regarde au loin à travers l\'image, et un animal ou un objet surgit en relief. Devine ce que tu as vu !',
+		icon: 'eye',
+		href: '/jeux/stereogrammes/',
+		status: 'play',
+		category: 'illusions',
+	},
+	{
+		id: 'image-remanente',
+		title: 'Couleurs fantômes',
+		pitch: 'Fixe le point d\'une image aux couleurs étranges pendant 20 secondes : quand elle passe en noir et blanc, ton cerveau la repeint en vraies couleurs.',
+		icon: 'afterimage',
+		href: '/jeux/image-remanente/',
+		status: 'play',
+		category: 'illusions',
+	},
+	{
+		id: 'oeil-mesureur',
+		title: 'L\'Œil mesureur',
+		pitch: 'Flèches, cercles, rails : règle les traits pour qu\'ils te paraissent égaux, puis découvre de combien ton œil s\'est trompé.',
+		icon: 'ruler',
+		href: '/jeux/oeil-mesureur/',
+		status: 'play',
+		category: 'illusions',
+	},
+	{
+		id: 'mouvement-illusoire',
+		title: 'Ça bouge !',
+		pitch: 'Des images parfaitement immobiles qui tournent, un point vert qui n\'existe pas, une spirale qui fait onduler le décor : ton œil invente le mouvement.',
+		icon: 'spiral',
+		href: '/jeux/mouvement-illusoire/',
+		status: 'play',
+		category: 'illusions',
+	},
+	{
+		id: 'meme-couleur',
+		title: 'Même couleur ?',
+		pitch: 'Deux cases, deux teintes… vraiment ? Réponds, puis fais glisser le cache pour voir la vérité : l\'ombre et le contraste trompent ton œil.',
+		icon: 'contrast',
+		href: '/jeux/meme-couleur/',
+		status: 'play',
+		category: 'illusions',
 	},
 	{
 		id: 'atelier',
