@@ -123,4 +123,10 @@
   `src/components/IconPaths.ts` (icônes), `src/components/IllusionLinks.astro` (nouveau), `src/data/tutorials.ts` (5 entrées),
   `scripts/illusion-art.mjs` (nouveau), `public/assets/jeux/{,tile/,art/,og/}` (fichiers des 5 ids seulement).
 - Ressources : serveur de dev partagé sur le port 4390 (arrêté en fin de lot), `npm run build` en fin de lot.
-- 2026-10-09 : serveur 4390 arrêté ; `npm run build` (dist/, .astro/) OK.
+- 2026-10-09 : serveur 4390 arrêté ; `npm run build` (dist/, .astro/) OK. Commité et poussé (`9a6df67`).
+
+## 2026-10-09 — Sudoku : l'indice donne la suite logique la plus simple
+
+- Statut : terminé, non commité (2026-10-09, Europe/Paris). Réservations libérées : `src/games/sudoku/`.
+- Techniques notées (échelle Sudoku Explainer) ; l'indice choisit la plus facile, puis la chaîne la plus courte.
+  Générateur inchangé (480 grilles de référence identiques). vitest sudoku 14/14, eslint + tsc OK, capture sur le serveur de dev (port 4391).

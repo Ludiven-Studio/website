@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SIZES, DIFFS, generateSudoku, countSolutions, findHint, type Grid } from './engine';
 import { mulberry32, dateSeed } from '../prng';
-import { Board, nextPlacement, solveByLogic } from './logic';
+import { Board, MOVES, RATING, nextPlacement, solveByLogic } from './logic';
 
 function isValidFullGrid(grid: Grid, n: number, boxH: number, boxW: number): boolean {
 	const expected = new Set(Array.from({ length: n }, (_, i) => i + 1));
@@ -99,6 +99,49 @@ describe('sudoku engine', () => {
 				b.place(h.cell, h.value);
 			}
 			expect(b.values).toEqual(sol);
+		}
+	});
+
+	it('a hint picks the easiest single: a digit\'s only spot in a box before a cell\'s only digit', () => {
+		for (let seed = 1; seed <= 10; seed++) {
+			const p = generateSudoku(SIZES['9'], DIFFS.moyen, mulberry32(seed));
+			const b = new Board({ n: 9, boxH: 3, boxW: 3 }, p.given.flat());
+			const easy = b.findSingles().some((s) => s.kind === 'full' || (s.kind === 'hidden' && s.unit?.kind === 'box'));
+			const h = nextPlacement(b)!;
+			expect(h.steps).toHaveLength(0);
+			if (easy) expect(h.final).not.toMatch(/^Sur sa ligne/);
+		}
+	});
+
+	it('a straight hidden single points at the digits that block the other spots', () => {
+		const p = generateSudoku(SIZES['9'], DIFFS.moyen, mulberry32(3));
+		const b = new Board({ n: 9, boxH: 3, boxW: 3 }, p.given.flat());
+		const h = nextPlacement(b)!;
+		if (h.final.startsWith('Dans')) {
+			const others = h.focus.filter((c) => c !== h.cell);
+			expect(others.length).toBeGreaterThan(0);
+			for (const c of others) expect(b.values[c]).toBe(h.value);
+		}
+	});
+
+	it('a chain only uses a move when no easier set of moves would reach a digit', () => {
+		for (let seed = 1; seed <= 12; seed++) {
+			const p = generateSudoku(SIZES['9'], DIFFS.expert, mulberry32(200 + seed));
+			const b = new Board({ n: 9, boxH: 3, boxW: 3 }, p.given.flat());
+			for (let h = nextPlacement(b); h; h = nextPlacement(b)) {
+				if (h.steps.length) {
+					const hardest = Math.max(...h.steps.map((s) => RATING[s.move]));
+					const easier = MOVES.filter((m) => RATING[m] < hardest);
+					// Apply every easier move to exhaustion: no single may appear.
+					const t = b.clone();
+					for (let s = easier.map((m) => [...t.steps(m)][0]).find(Boolean); s; s = easier.map((m) => [...t.steps(m)][0]).find(Boolean)) {
+						expect(t.findSingles()).toHaveLength(0);
+						t.apply(s);
+					}
+					expect(t.findSingles()).toHaveLength(0);
+				}
+				b.place(h.cell, h.value);
+			}
 		}
 	});
 
