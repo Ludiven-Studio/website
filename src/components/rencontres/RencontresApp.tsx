@@ -623,7 +623,7 @@ export default function RencontresApp() {
 						📲 Mettre la carte sur mon téléphone
 					</button>
 				)}
-				<button type="button" className="re-install" onClick={toggleDemo}>
+				<button type="button" className="re-demo-btn" onClick={toggleDemo}>
 					{demo ? '✖ Quitter la démo' : '👀 Démo : voir des exemples'}
 				</button>
 			</header>
