@@ -288,6 +288,24 @@ try {
 	const modBlind = await fn({ action: 'moderate', eventId: NO_GAME, token: 'nope', do: 'remove' });
 	check(modBlind.status === 403, `moderate sans le bon jeton est refuse (${modBlind.status})`);
 
+	// ---- 4quater. Tournaments: same gates ----
+	const listed = await fn({ action: 'list' });
+	check(Array.isArray(listed.body.tournaments), 'list rend un tableau tournaments');
+	check((listed.body.tournaments ?? []).every((t) => !('poster_path' in t) && !('organizer_id' in t)),
+		'un tournoi liste ne montre ni chemin d affiche ni organizer_id');
+	check((listed.body.tournaments ?? []).every((t) => t.poster_url === null || t.poster_status === 'approved'),
+		'seule une affiche validee a une URL publique');
+	for (const [label, body] of [
+		['create_tournament', { action: 'create_tournament', ...OFF_MAP, startsAt: iso(-86400e3), clubName: 'Guard', title: 'Guard', format: 'doublette', category: 'open' }],
+		['report_tournament', { action: 'report_tournament', tournamentId: NO_GAME, reason: 'fake' }],
+		['upload_poster', { action: 'upload_poster', tournamentId: NO_GAME, image: 'AAAA' }],
+	]) {
+		const r = await fn(body);
+		check(r.status === 401 && /Connecte-toi/.test(r.body.error ?? ''), `${label} sans session: 401 (${r.status} ${r.body.error})`);
+	}
+	const tModBlind = await fn({ action: 'moderate_tournament', tournamentId: NO_GAME, token: 'nope', do: 'approve_poster' });
+	check(tModBlind.status === 403, `moderate_tournament sans le bon jeton est refuse (${tModBlind.status})`);
+
 	if (!KEY || !JWT_A) {
 		skip('ecritures (sections 5 a 9)', !KEY ? 'MEETUPS_ADMIN_KEY absente' : 'MEETUPS_TEST_JWT absent, agir demande une session');
 	} else {
@@ -351,6 +369,55 @@ try {
 		await B.waitForSelector('.re-list', { timeout: 15000 });
 		await B.locator('.re-segbtn', { hasText: 'Tout' }).click();
 		check(!(await B.locator('.re-list').innerText()).includes('Guard'), 'une partie annulee sort de la carte');
+
+		// ---- 8bis. Tournament and poster, end to end ----
+		// The poster must stay private until approved: that is the whole promise.
+		const tMade = await fn({
+			action: 'create_tournament', ...OFF_MAP, startsAt: iso(10 * 86400e3),
+			clubName: 'Guard Club', title: 'Guard Open', format: 'triplette', category: 'open',
+			entryFeeCents: 500, contactPhone: '06 12 34 56 78',
+		}, JWT_A);
+		check(tMade.ok && tMade.body.id, `create_tournament rend un id (${tMade.status} ${tMade.body.error ?? ''})`);
+		const tBad = await fn({
+			action: 'create_tournament', ...OFF_MAP, startsAt: iso(10 * 86400e3),
+			clubName: 'Guard', title: 'www.pub.fr', format: 'triplette', category: 'open',
+		}, JWT_A);
+		check(tBad.status === 400, `un titre avec un lien est refuse (${tBad.status} ${tBad.body.error})`);
+		if (tMade.body.id) {
+			const tid = tMade.body.id;
+			const inList = () => fn({ action: 'list' }).then((r) => (r.body.tournaments ?? []).find((t) => t.id === tid));
+			check(Boolean(await inList()), 'le tournoi est sur la carte tout de suite');
+			// 1x1 white JPEG.
+			const JPEG = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+			const notImage = await fn({ action: 'upload_poster', tournamentId: tid, image: btoa('hello') }, JWT_A);
+			check(notImage.status === 400, `upload_poster refuse ce qui n est pas une image (${notImage.status})`);
+			const up = await fn({ action: 'upload_poster', tournamentId: tid, image: JPEG }, JWT_A);
+			check(up.ok && up.body.posterStatus === 'pending', `upload_poster: affiche en attente (${up.status} ${up.body.error ?? ''})`);
+			const pending = await inList();
+			check(pending?.poster_status === 'pending' && pending?.poster_url === null, 'en attente: aucune URL publique');
+			if (JWT_B) {
+				const other = await fn({ action: 'upload_poster', tournamentId: tid, image: JPEG }, JWT_B);
+				check(other.status === 403, `un autre compte ne change pas l affiche (${other.status})`);
+				const rep = await fn({ action: 'report_tournament', tournamentId: tid, reason: 'poster' }, JWT_B);
+				check(rep.ok, `report_tournament passe (${rep.status} ${rep.body.error ?? ''})`);
+			}
+			const { createHmac } = await import('node:crypto');
+			const token = createHmac('sha256', KEY).update(`mod:t:${tid}`).digest('hex');
+			const mod = await fn({ action: 'mod_get_tournament', tournamentId: tid, token });
+			check(mod.ok && typeof mod.body.posterPreview === 'string', 'la moderation voit l affiche en attente');
+			const ok = await fn({ action: 'moderate_tournament', tournamentId: tid, token, do: 'approve_poster' });
+			check(ok.ok, `approve_poster passe (${ok.status} ${ok.body.error ?? ''})`);
+			const approved = await inList();
+			check(approved?.poster_status === 'approved' && /\/public\/posters\//.test(approved?.poster_url ?? ''),
+				'validee: l affiche a une URL publique');
+			if (approved?.poster_url) {
+				const img = await fetch(approved.poster_url);
+				check(img.ok && /image\/jpeg/.test(img.headers.get('content-type') ?? ''), `l URL publique sert l image (${img.status})`);
+			}
+			const del = await fn({ action: 'delete_tournament', tournamentId: tid }, JWT_A);
+			check(del.ok, 'delete_tournament passe');
+			check(!(await inList()), 'le tournoi supprime sort de la carte');
+		}
 
 		// ---- 9. The purge must give creating back ----
 		// A create charges the account's active cap AND the IP counter. This guard

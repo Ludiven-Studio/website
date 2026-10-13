@@ -49,8 +49,8 @@ const MAX_AHEAD_MS = 60 * 86400_000;
 
 /** null = unusable. A URL or a tag is not a first name, and this is the only
  *  free-text field in the product — so the only ad surface. */
-function cleanName(raw: unknown): string | null {
-	const s = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_NAME);
+function cleanName(raw: unknown, max = MAX_NAME): string | null {
+	const s = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 	if (s.length < 2) return null;
 	if (/[<>]/.test(s)) return null;
 	if (/https?:\/\/|www\.|\.(com|fr|net|org|io)\b/i.test(s)) return null;
@@ -201,24 +201,171 @@ async function ban(db: SupabaseClient, playerId: string, ip: string | null, even
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** Never throws: a mail that fails must not lose the report, which is already saved. */
-async function mailReport(eventId: string, ev: Record<string, unknown>, reason: string, count: number, hidden: boolean): Promise<void> {
+/** Never throws: a mail that fails must not lose what is already saved. */
+async function mailMod(subject: string, lines: string[], link: string): Promise<void> {
 	if (!RESEND_API_KEY || !MOD_EMAIL || !FROM_EMAIL || !ADMIN_KEY) return;
 	try {
-		const link = `${MOD_URL}?e=${eventId}&k=${await modToken(eventId)}`;
 		const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5">
-<p><b>${esc(REASON_LABEL[reason] ?? reason)}</b> — ${count} signalement(s)${hidden ? ', <b>partie masquée</b>' : ''}.</p>
-<p>${esc(String(ev.organizer_name ?? ''))} · ${esc(String(ev.label ?? ''))} · ${esc(String(ev.starts_at ?? ''))}</p>
+${lines.map((l) => `<p>${l}</p>`).join('\n')}
 <p><a href="${link}">Ouvrir la modération</a></p></div>`;
 		const res = await fetch('https://api.resend.com/emails', {
 			method: 'POST',
 			headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-			body: JSON.stringify({ from: FROM_EMAIL, to: MOD_EMAIL, subject: `Rencontres : signalement (${REASON_LABEL[reason] ?? reason})`, html }),
+			body: JSON.stringify({ from: FROM_EMAIL, to: MOD_EMAIL, subject, html }),
 		});
 		if (!res.ok) console.error(`resend ${res.status}: ${await res.text().catch(() => '')}`.slice(0, 300));
 	} catch (e) {
 		console.error(e);
 	}
+}
+
+async function mailReport(eventId: string, ev: Record<string, unknown>, reason: string, count: number, hidden: boolean): Promise<void> {
+	if (!ADMIN_KEY) return;
+	await mailMod(`Rencontres : signalement (${REASON_LABEL[reason] ?? reason})`, [
+		`<b>${esc(REASON_LABEL[reason] ?? reason)}</b> — ${count} signalement(s)${hidden ? ', <b>partie masquée</b>' : ''}.`,
+		`${esc(String(ev.organizer_name ?? ''))} · ${esc(String(ev.label ?? ''))} · ${esc(String(ev.starts_at ?? ''))}`,
+	], `${MOD_URL}?e=${eventId}&k=${await modToken(eventId)}`);
+}
+
+// ---- tournaments ----
+
+const T_FORMATS = ['tete-a-tete', 'doublette', 'triplette'];
+const T_CATEGORIES = ['open', 'veterans', 'feminin', 'jeunes', 'mixte'];
+const T_REASONS = ['poster', 'fake', 'wrong_info', 'other'];
+const T_REASON_LABEL: Record<string, string> = {
+	poster: 'Affiche choquante', fake: 'Faux tournoi', wrong_info: 'Infos erronées', other: 'Autre',
+};
+const T_MAX_TEXT = 60;
+const T_MAX_DETAILS = 300;
+const T_MAX_AHEAD_MS = 120 * 86400_000;
+/** A tournament has no end time: it leaves the map half a day after it starts. */
+const T_SHOWN_AFTER_START_MS = 12 * 3600_000;
+const MAX_ACTIVE_TOURNAMENTS = 5;
+/** Fewer than for a game: a tournament is seen by far more people. */
+const T_HIDE_REPORTERS = 2;
+const T_HIDE_IPS = 2;
+const POSTER_MAX_BYTES = 1024 * 1024;
+const POSTERS_PUBLIC = `${Deno.env.get('SUPABASE_URL') ?? ''}/storage/v1/object/public/posters/`;
+
+const tToken = (id: string): Promise<string> => modToken(`t:${id}`);
+const isTToken = (id: string, token: unknown): Promise<boolean> => isModToken(`t:${id}`, token);
+
+/** null = invalid. Same filters as a name, newlines kept. */
+function cleanDetails(raw: unknown): string | null {
+	const s = String(raw ?? '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, T_MAX_DETAILS);
+	if (/[<>]/.test(s)) return null;
+	if (/https?:\/\/|www\.|\.(com|fr|net|org|io)\b/i.test(s)) return null;
+	if (isOffensive(s)) return null;
+	return s;
+}
+
+/** French numbers only, stored as ten digits. null = invalid. */
+function cleanPhone(raw: unknown): string | null {
+	const s = String(raw ?? '').replace(/[\s.\-()]/g, '').replace(/^\+33/, '0').replace(/^0033/, '0');
+	return /^0[1-9]\d{8}$/.test(s) ? s : null;
+}
+
+function validateTournamentStart(startsAt: unknown, now: number): string | null {
+	const start = Date.parse(String(startsAt));
+	if (!Number.isFinite(start)) return 'Date invalide.';
+	if (start <= now) return 'Le tournoi doit être dans le futur.';
+	if (start > now + T_MAX_AHEAD_MS) return "Pas plus de 120 jours à l'avance.";
+	return null;
+}
+
+/** Validates the fields present in `body` into a row patch. A string = refusal. */
+function tournamentFields(body: Record<string, unknown>, now: number): Record<string, unknown> | string {
+	const row: Record<string, unknown> = {};
+	if ('startsAt' in body) {
+		const e = validateTournamentStart(body.startsAt, now);
+		if (e) return e;
+		row.starts_at = new Date(String(body.startsAt)).toISOString();
+	}
+	if ('clubName' in body) {
+		const v = cleanName(body.clubName, T_MAX_TEXT);
+		if (!v) return 'Nom du club invalide (2 à 60 caractères, sans lien).';
+		row.club_name = v;
+	}
+	if ('title' in body) {
+		const v = cleanName(body.title, T_MAX_TEXT);
+		if (!v) return 'Titre invalide (2 à 60 caractères, sans lien).';
+		row.title = v;
+	}
+	if ('format' in body) {
+		if (!T_FORMATS.includes(String(body.format))) return 'Format inconnu.';
+		row.format = body.format;
+	}
+	if ('category' in body) {
+		if (!T_CATEGORIES.includes(String(body.category))) return 'Catégorie inconnue.';
+		row.category = body.category;
+	}
+	if ('entryFeeCents' in body) {
+		const v = body.entryFeeCents;
+		if (v !== null && !(typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 100000)) return 'Prix invalide.';
+		row.entry_fee_cents = v;
+	}
+	if ('details' in body) {
+		const v = body.details === null ? '' : cleanDetails(body.details);
+		if (v === null) return 'Détails invalides (300 caractères, sans lien).';
+		row.details = v || null;
+	}
+	if ('contactPhone' in body) {
+		const empty = body.contactPhone === null || String(body.contactPhone).trim() === '';
+		const v = empty ? null : cleanPhone(body.contactPhone);
+		if (!empty && !v) return 'Numéro de téléphone invalide.';
+		row.contact_phone = v;
+	}
+	return row;
+}
+
+const TOURN_COLS = 'id, spot_id, club_name, title, starts_at, format, category, entry_fee_cents, details, '
+	+ 'contact_phone, poster_status, poster_path, organizer_tag, status, hidden, created_at';
+const T_EMBED = `${TOURN_COLS}, meetup_spots!inner(id, lat, lng, label, commune)`;
+
+/** Flatten the spot. The poster URL only exists once approved. */
+function shapeTournament(row: Record<string, unknown>): Record<string, unknown> {
+	const spot = (row.meetup_spots ?? {}) as { lat?: number; lng?: number; label?: string; commune?: string };
+	const { meetup_spots: _s, poster_path: path, ...rest } = row;
+	return {
+		...rest,
+		lat: spot.lat ?? 0,
+		lng: spot.lng ?? 0,
+		label: spot.label ?? '',
+		commune: spot.commune ?? '',
+		poster_url: rest.poster_status === 'approved' && path ? POSTERS_PUBLIC + path : null,
+	};
+}
+
+async function activeTournaments(db: SupabaseClient, uid: string, nowMs: number): Promise<number> {
+	const { count } = await db.from('meetup_tournaments')
+		.select('id', { count: 'exact', head: true })
+		.eq('organizer_id', uid).eq('status', 'open')
+		.gte('starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString());
+	return count ?? 0;
+}
+
+/** Removes a poster from both buckets; a missing object is not an error. */
+async function dropPosters(db: SupabaseClient, paths: (string | null | undefined)[]): Promise<void> {
+	const list = paths.filter((p): p is string => Boolean(p));
+	if (!list.length) return;
+	await db.storage.from('posters-pending').remove(list);
+	await db.storage.from('posters').remove(list);
+}
+
+/** JPEG or PNG by its first bytes; the declared type is never trusted. */
+function imageType(bytes: Uint8Array): 'image/jpeg' | 'image/png' | null {
+	if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+	if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png';
+	return null;
+}
+
+async function mailTournament(t: Record<string, unknown>, headline: string, subject: string): Promise<void> {
+	if (!ADMIN_KEY) return;
+	const id = String(t.id);
+	await mailMod(subject, [
+		headline,
+		`${esc(String(t.title ?? ''))} · ${esc(String(t.club_name ?? ''))} · ${esc(String(t.commune ?? ''))} · ${esc(String(t.starts_at ?? ''))}`,
+	], `${MOD_URL}?t=${id}&k=${await tToken(id)}`);
 }
 
 function isAdmin(v: unknown): boolean {
@@ -376,9 +523,15 @@ Deno.serve(async (req) => {
 				// fresh user pins falls off the end instead of hiding real terrains.
 				const { data: spots } = await db.from('meetup_spots').select(SPOT_COLS)
 					.order('confirmed', { ascending: false }).order('created_at').limit(1000);
+				const { data: tournaments, error: tErr } = await db.from('meetup_tournaments')
+					.select(T_EMBED).eq('status', 'open').eq('hidden', false)
+					.gte('starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString())
+					.order('starts_at').limit(300);
+				if (tErr) throw tErr;
 				return json({
 					events: (events ?? []).map((r) => shapeEvent(r as Record<string, unknown>)),
 					spots: spots ?? [],
+					tournaments: (tournaments ?? []).map((r) => shapeTournament(r as Record<string, unknown>)),
 				});
 			}
 
@@ -441,7 +594,19 @@ Deno.serve(async (req) => {
 				// Counted by organizer, not off the list above: those two differ once a
 				// secret is lost, and the number that decides the cap is this one.
 				const active = await activeEvents(db, identities(uid, body.playerId), nowIso);
-				return json({ events, active, max: MAX_ACTIVE_EVENTS });
+				let tournaments: Record<string, unknown>[] = [];
+				if (uid) {
+					const { data, error } = await db.from('meetup_tournaments').select(T_EMBED)
+						.eq('organizer_id', uid).order('starts_at').limit(50);
+					if (error) throw error;
+					tournaments = (data ?? []).map((r) => shapeTournament(r as Record<string, unknown>));
+				}
+				return json({
+					events, active, max: MAX_ACTIVE_EVENTS,
+					tournaments,
+					activeTournaments: uid ? await activeTournaments(db, uid, nowMs) : 0,
+					maxTournaments: MAX_ACTIVE_TOURNAMENTS,
+				});
 			}
 
 			case 'create_event': {
@@ -680,6 +845,11 @@ Deno.serve(async (req) => {
 				await db.from('meetup_events').update({ organizer_name: 'Compte supprimé' }).eq('organizer_id', uid);
 				await db.from('meetup_signups').delete().eq('player_id', uid);
 				await db.from('meetup_reports').delete().eq('reporter_id', uid);
+				// Tournaments have no signups to warn: they go, posters with them.
+				const { data: tours } = await db.from('meetup_tournaments').select('poster_path').eq('organizer_id', uid);
+				await dropPosters(db, (tours ?? []).map((t) => t.poster_path as string | null));
+				await db.from('meetup_tournaments').delete().eq('organizer_id', uid);
+				await db.from('meetup_tournament_reports').delete().eq('reporter_id', uid);
 				const { error } = await db.auth.admin.deleteUser(uid);
 				if (error) throw error;
 				return json({ ok: true });
@@ -740,6 +910,249 @@ Deno.serve(async (req) => {
 				return json({ ok: true });
 			}
 
+			// ---- tournaments ----
+
+			// Unlike `list`, returns cancelled and past ones: a shared link must still answer.
+			case 'get_tournament': {
+				if (!isUuid(body.tournamentId)) return bad('bad tournamentId');
+				const { data, error } = await db.from('meetup_tournaments')
+					.select(`${T_EMBED}, organizer_id`).eq('id', body.tournamentId).maybeSingle();
+				if (error) throw error;
+				if (!data) return bad('unknown tournament', 404);
+				const uid = await whoAmI();
+				const { organizer_id: owner, ...row } = data as Record<string, unknown>;
+				return json({ tournament: shapeTournament(row), isOrganizer: Boolean(uid) && uid === owner });
+			}
+
+			case 'create_tournament': {
+				const playerId = await whoAmI();
+				if (!playerId) return bad(LOGIN, 401);
+				for (const k of ['startsAt', 'clubName', 'title', 'format', 'category']) {
+					if (!(k in body)) return bad('Champ manquant.');
+				}
+				const fields = tournamentFields(body, nowMs);
+				if (typeof fields === 'string') return bad(fields);
+
+				const lat = Number(body.lat), lng = Number(body.lng);
+				const freePin = !isUuid(body.spotId);
+				if (freePin && !isPlausibleFr(lat, lng)) return bad('Position hors zone.');
+
+				const createIp = await ipKey(req);
+				if (await isBanned(db, playerId, createIp, true)) return bad(BANNED, 403);
+				if (await activeTournaments(db, playerId, nowMs) >= MAX_ACTIVE_TOURNAMENTS) {
+					return bad(`Tu as déjà ${MAX_ACTIVE_TOURNAMENTS} tournois en ligne. Supprimes-en un dans « Mes parties ».`, 429);
+				}
+				if (await overQuota(db, req, playerId, 'creates')) {
+					return bad("Trop d'annonces créées aujourd'hui. Réessaie demain.", 429);
+				}
+
+				let spotId: string;
+				if (freePin) {
+					spotId = (await resolveSpot(db, lat, lng, playerId)).id;
+				} else {
+					const { data: known } = await db.from('meetup_spots').select('id').eq('id', body.spotId).maybeSingle();
+					if (!known) return bad('unknown spot', 404);
+					spotId = known.id as string;
+				}
+				const { data: created, error } = await db.from('meetup_tournaments').insert({
+					...fields, spot_id: spotId, organizer_id: playerId, organizer_ip: createIp,
+				}).select('id').single();
+				if (error) throw error;
+				return json({ id: created.id });
+			}
+
+			// Key presence decides what changes, as in update_event.
+			case 'update_tournament': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				const fields = tournamentFields(body, nowMs);
+				if (typeof fields === 'string') return bad(fields);
+				const { data, error } = await db.from('meetup_tournaments').update({ ...fields, updated_at: nowIso })
+					.eq('id', body.tournamentId).eq('organizer_id', uid).select('id');
+				if (error) throw error;
+				if (!data?.length) return bad('forbidden', 403);
+				return json({ ok: true });
+			}
+
+			case 'cancel_tournament':
+			case 'delete_tournament': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				const { data: own } = await db.from('meetup_tournaments').select('id, poster_path')
+					.eq('id', body.tournamentId).eq('organizer_id', uid).maybeSingle();
+				if (!own) return bad('forbidden', 403);
+				if (action === 'cancel_tournament') {
+					await db.from('meetup_tournaments').update({ status: 'cancelled', updated_at: nowIso }).eq('id', own.id);
+				} else {
+					await dropPosters(db, [own.poster_path as string | null]);
+					const { error } = await db.from('meetup_tournaments').delete().eq('id', own.id);
+					if (error) throw error;
+				}
+				return json({ ok: true });
+			}
+
+			// The image never goes public from here: it waits in a private bucket
+			// until the moderator approves it. A new upload replaces the old one
+			// and goes back to pending.
+			case 'upload_poster': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				const raw = String(body.image ?? '').replace(/^data:[^,]*,/, '');
+				if (!raw || raw.length > Math.ceil(POSTER_MAX_BYTES * 4 / 3) + 8) return bad('Image trop lourde (1 Mo au plus).', 413);
+				let bytes: Uint8Array;
+				try { bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0)); } catch { return bad('Image illisible.'); }
+				if (bytes.length > POSTER_MAX_BYTES) return bad('Image trop lourde (1 Mo au plus).', 413);
+				const type = imageType(bytes);
+				if (!type) return bad('Seules les images JPEG et PNG sont acceptées.');
+
+				const { data: own } = await db.from('meetup_tournaments').select(`${T_EMBED}, organizer_id`)
+					.eq('id', body.tournamentId).eq('organizer_id', uid).maybeSingle();
+				if (!own) return bad('forbidden', 403);
+				if (await isBanned(db, uid, null, false)) return bad(BANNED, 403);
+
+				// A fresh name per upload: the public URL can then be cached forever.
+				const path = `${own.id}/${crypto.randomUUID()}.${type === 'image/png' ? 'png' : 'jpg'}`;
+				const { error: upErr } = await db.storage.from('posters-pending')
+					.upload(path, bytes, { contentType: type, cacheControl: '31536000', upsert: false });
+				if (upErr) throw upErr;
+				await dropPosters(db, [own.poster_path as string | null]);
+				await db.from('meetup_tournaments')
+					.update({ poster_status: 'pending', poster_path: path, updated_at: nowIso }).eq('id', own.id);
+				await mailTournament(shapeTournament(own as Record<string, unknown>),
+					'<b>Nouvelle affiche à valider.</b>', 'Rencontres : affiche à valider');
+				return json({ ok: true, posterStatus: 'pending' });
+			}
+
+			case 'remove_poster': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				const { data: own } = await db.from('meetup_tournaments').select('id, poster_path')
+					.eq('id', body.tournamentId).eq('organizer_id', uid).maybeSingle();
+				if (!own) return bad('forbidden', 403);
+				await dropPosters(db, [own.poster_path as string | null]);
+				await db.from('meetup_tournaments')
+					.update({ poster_status: 'none', poster_path: null, updated_at: nowIso }).eq('id', own.id);
+				return json({ ok: true });
+			}
+
+			case 'report_tournament': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				const playerId = await whoAmI();
+				if (!playerId) return bad(LOGIN, 401);
+				const reason = String(body.reason ?? '');
+				if (!T_REASONS.includes(reason)) return bad('Motif inconnu.');
+				const { data: t } = await db.from('meetup_tournaments').select(T_EMBED).eq('id', body.tournamentId).maybeSingle();
+				if (!t) return bad('unknown tournament', 404);
+				const ip = await ipKey(req);
+				if (ip) {
+					// One daily cap across games and tournaments.
+					const since = new Date(nowMs - 86400_000).toISOString();
+					const { count: a } = await db.from('meetup_reports').select('id', { count: 'exact', head: true })
+						.eq('reporter_ip', ip).gte('created_at', since);
+					const { count: b } = await db.from('meetup_tournament_reports').select('id', { count: 'exact', head: true })
+						.eq('reporter_ip', ip).gte('created_at', since);
+					if ((a ?? 0) + (b ?? 0) >= REPORT_IP_CAP) return bad('Trop de signalements aujourd’hui. Réessaie demain.', 429);
+				}
+				const { error } = await db.from('meetup_tournament_reports').insert(
+					{ tournament_id: body.tournamentId, reporter_id: playerId, reporter_ip: ip, reason });
+				if (error && error.code !== '23505') throw error;
+				if (error) return json({ ok: true });
+
+				const { data: reports } = await db.from('meetup_tournament_reports')
+					.select('reporter_ip').eq('tournament_id', body.tournamentId);
+				const all = reports ?? [];
+				const ips = new Set(all.map((r) => r.reporter_ip).filter(Boolean));
+				const shaped = shapeTournament(t as Record<string, unknown>);
+				let hidden = Boolean(shaped.hidden);
+				const enoughIps = ipQuotaEnabled() ? ips.size >= T_HIDE_IPS : true;
+				if (!hidden && all.length >= T_HIDE_REPORTERS && enoughIps) {
+					await db.from('meetup_tournaments').update({ hidden: true, updated_at: nowIso }).eq('id', body.tournamentId);
+					hidden = true;
+				}
+				const label = T_REASON_LABEL[reason] ?? reason;
+				await mailTournament(shaped,
+					`<b>${esc(label)}</b> — ${all.length} signalement(s)${hidden ? ', <b>tournoi masqué</b>' : ''}.`,
+					`Rencontres : signalement tournoi (${label})`);
+				return json({ ok: true });
+			}
+
+			// The page behind the poster and report mails. The token is per tournament.
+			case 'mod_get_tournament': {
+				if (!isUuid(body.tournamentId) || !await isTToken(body.tournamentId, body.token)) return bad('forbidden', 403);
+				const { data: t } = await db.from('meetup_tournaments').select(T_EMBED).eq('id', body.tournamentId).maybeSingle();
+				if (!t) return bad('unknown tournament', 404);
+				const row = t as Record<string, unknown>;
+				let posterPreview: string | null = null;
+				if (row.poster_path && (row.poster_status === 'pending' || row.poster_status === 'approved')) {
+					const bucket = row.poster_status === 'pending' ? 'posters-pending' : 'posters';
+					const { data: signed } = await db.storage.from(bucket).createSignedUrl(String(row.poster_path), 3600);
+					posterPreview = signed?.signedUrl ?? null;
+				}
+				const { data: reports } = await db.from('meetup_tournament_reports')
+					.select('reason, created_at').eq('tournament_id', body.tournamentId).order('created_at');
+				return json({ tournament: shapeTournament(row), posterPreview, reports: reports ?? [] });
+			}
+
+			// approve_poster / reject_poster: the image. restore: show it again,
+			// reports cleared. remove: cancel and hide. ban_organizer: remove + ban,
+			// every open game and tournament of theirs hidden.
+			case 'moderate_tournament': {
+				if (!isUuid(body.tournamentId) || !await isTToken(body.tournamentId, body.token)) return bad('forbidden', 403);
+				const { data: t } = await db.from('meetup_tournaments')
+					.select('id, organizer_id, organizer_ip, poster_path, poster_status').eq('id', body.tournamentId).maybeSingle();
+				if (!t) return bad('unknown tournament', 404);
+				const what = String(body.do ?? '');
+				const path = t.poster_path as string | null;
+				if (what === 'approve_poster') {
+					if (!path || t.poster_status !== 'pending') return bad('Aucune affiche en attente.', 409);
+					const { data: file, error: dlErr } = await db.storage.from('posters-pending').download(path);
+					if (dlErr || !file) throw dlErr ?? new Error('poster download');
+					const { error: upErr } = await db.storage.from('posters')
+						.upload(path, file, { contentType: path.endsWith('.png') ? 'image/png' : 'image/jpeg', cacheControl: '31536000', upsert: true });
+					if (upErr) throw upErr;
+					await db.storage.from('posters-pending').remove([path]);
+					await db.from('meetup_tournaments').update({ poster_status: 'approved', updated_at: nowIso }).eq('id', t.id);
+				} else if (what === 'reject_poster') {
+					await dropPosters(db, [path]);
+					await db.from('meetup_tournaments')
+						.update({ poster_status: path ? 'rejected' : t.poster_status, poster_path: null, updated_at: nowIso }).eq('id', t.id);
+				} else if (what === 'restore') {
+					await db.from('meetup_tournament_reports').delete().eq('tournament_id', t.id);
+					await db.from('meetup_tournaments').update({ hidden: false, updated_at: nowIso }).eq('id', t.id);
+				} else if (what === 'remove' || what === 'ban_organizer') {
+					await db.from('meetup_tournaments').update({ hidden: true, status: 'cancelled', updated_at: nowIso }).eq('id', t.id);
+					if (what === 'ban_organizer') {
+						await ban(db, t.organizer_id as string, t.organizer_ip as string | null, t.id as string);
+						await db.from('meetup_tournaments').update({ hidden: true, updated_at: nowIso })
+							.eq('organizer_id', t.organizer_id).eq('status', 'open');
+						await db.from('meetup_events').update({ hidden: true, updated_at: nowIso })
+							.eq('organizer_id', t.organizer_id).eq('status', 'open');
+					}
+				} else {
+					return bad('unknown do');
+				}
+				return json({ ok: true });
+			}
+
+			// Posters of tournaments long past, so storage does not grow forever.
+			// Admin-keyed; run by a scheduled job or by hand.
+			case 'admin_prune_posters': {
+				if (!isAdmin(body.adminKey)) return bad('forbidden', 403);
+				const { data: old } = await db.from('meetup_tournaments').select('id, poster_path')
+					.not('poster_path', 'is', null).lt('starts_at', new Date(nowMs - 7 * 86400_000).toISOString()).limit(500);
+				const rows = old ?? [];
+				await dropPosters(db, rows.map((r) => r.poster_path as string));
+				if (rows.length) {
+					await db.from('meetup_tournaments').update({ poster_status: 'none', poster_path: null })
+						.in('id', rows.map((r) => r.id));
+				}
+				return json({ ok: true, pruned: rows.length });
+			}
+
 			case 'leave': {
 				const ids = identities(await whoAmI(), body.playerId);
 				if (!isUuid(body.eventId) || !ids.length) return bad('bad request');
@@ -779,6 +1192,10 @@ Deno.serve(async (req) => {
 				await db.from('meetup_signups').delete().eq('player_id', body.targetPlayerId);
 				// Signups cascade from the event; spots go last, once nothing points at them.
 				await db.from('meetup_events').delete().eq('organizer_id', body.targetPlayerId);
+				const { data: tours } = await db.from('meetup_tournaments').select('poster_path').eq('organizer_id', body.targetPlayerId);
+				await dropPosters(db, (tours ?? []).map((t) => t.poster_path as string | null));
+				await db.from('meetup_tournaments').delete().eq('organizer_id', body.targetPlayerId);
+				await db.from('meetup_tournament_reports').delete().eq('reporter_id', body.targetPlayerId);
 				await db.from('meetup_spots').delete().eq('first_organizer', body.targetPlayerId).eq('source', 'user');
 				await db.from('meetup_quota').delete().eq('subject', body.targetPlayerId);
 				// Every create charged two counters, the player AND the IP. Clearing only the

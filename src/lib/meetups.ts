@@ -99,6 +99,24 @@ export const modGet = (eventId: string, token: string): Promise<{ event: MeetupE
 export const moderate = (eventId: string, token: string, what: ModAction, signupId?: string): Promise<{ ok: true }> =>
 	call('moderate', { eventId, token, do: what, signupId });
 
+// ---- tournament moderation (the page behind the poster mail) ----
+
+export interface ModTournament {
+	id: string; title: string; club_name: string; starts_at: string; format: string; category: string;
+	entry_fee_cents: number | null; details: string | null; contact_phone: string | null;
+	poster_status: 'none' | 'pending' | 'approved' | 'rejected'; poster_url: string | null;
+	status: 'open' | 'cancelled'; hidden: boolean; label: string; commune: string;
+}
+export type TournamentReportReason = 'poster' | 'fake' | 'wrong_info' | 'other';
+export interface ModTournamentReport { reason: TournamentReportReason; created_at: string; }
+export type ModTournamentAction = 'approve_poster' | 'reject_poster' | 'restore' | 'remove' | 'ban_organizer';
+
+export const modGetTournament = (tournamentId: string, token: string): Promise<{ tournament: ModTournament; posterPreview: string | null; reports: ModTournamentReport[] }> =>
+	call('mod_get_tournament', { tournamentId, token });
+
+export const moderateTournament = (tournamentId: string, token: string, what: ModTournamentAction): Promise<{ ok: true }> =>
+	call('moderate_tournament', { tournamentId, token, do: what });
+
 // ---- muted organizers, kept on the device ----
 
 const MUTED_KEY = 'ludiven-meetup-muted';

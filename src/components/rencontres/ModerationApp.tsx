@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { modGet, moderate, type ModAction, type ModReport, type ModSignup } from '../../lib/meetups';
 import { FORMAT_LABEL, REPORT_LABEL, type MeetupEvent } from '../../lib/meetupRules';
 import { formatDay, formatShortDay, formatSlot, formatTime } from './format';
+import TournamentModeration from './TournamentModeration';
 
 interface Data { event: MeetupEvent; signups: ModSignup[]; reports: ModReport[]; }
 
@@ -20,11 +21,15 @@ const DONE: Record<ModAction, string> = {
 	ban_signup: 'Joueur banni et retiré.',
 };
 
-/** The page behind the report mail. ?e= is the game, ?k= its per-game token. */
+/** The page behind the report mails. ?e= is a game, ?t= a tournament, ?k= the token. */
 export default function ModerationApp() {
 	const [q] = useState(() => new URLSearchParams(window.location.search));
-	const eventId = q.get('e') ?? '';
-	const token = q.get('k') ?? '';
+	const tournamentId = q.get('t');
+	if (tournamentId) return <TournamentModeration tournamentId={tournamentId} token={q.get('k') ?? ''} />;
+	return <EventModeration eventId={q.get('e') ?? ''} token={q.get('k') ?? ''} />;
+}
+
+function EventModeration({ eventId, token }: { eventId: string; token: string }) {
 	const [data, setData] = useState<Data | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [flash, setFlash] = useState<string | null>(null);
