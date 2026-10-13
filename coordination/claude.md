@@ -130,3 +130,15 @@
 - Statut : terminé, non commité (2026-10-09, Europe/Paris). Réservations libérées : `src/games/sudoku/`.
 - Techniques notées (échelle Sudoku Explainer) ; l'indice choisit la plus facile, puis la chaîne la plus courte.
   Générateur inchangé (480 grilles de référence identiques). vitest sudoku 14/14, eslint + tsc OK, capture sur le serveur de dev (port 4391).
+
+## 2026-10-13 — Page Services : scènes animées par service
+
+- Statut : terminé, non commité (2026-10-13, Europe/Paris). Réservations libérées. astro check 0 erreur, captures bureau/mobile/sombre OK.
+- Réservations (libérées) : `src/pages/services.astro`, `src/components/ServiceScene.astro` (nouveau).
+- Ressources : serveur de dev sur le port 4395 (arrêté).
+
+## 2026-10-13 — Page Prestations : scènes animées par offre
+
+- Statut : terminé, non commité (2026-10-13, Europe/Paris). Réservations libérées. astro check 0 erreur, captures FR/EN/mobile OK.
+- Réservations (libérées) : `src/pages/prestations.astro`, `src/pages/en/services.astro`, `src/components/OfferScene.astro` (nouveau).
+- Ressources : serveur de dev sur le port 4395 (arrêté).

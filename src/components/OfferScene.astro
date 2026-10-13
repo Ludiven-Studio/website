@@ -1,0 +1,528 @@
+---
+// Small looping illustration of a prestation. Pure SVG + CSS, 8 s cycle.
+// Reduced motion freezes each scene on a telling frame (--freeze).
+export type OfferSceneId = 'unity' | 'mobile' | 'vr' | 'multi' | 'audit' | 'mentor';
+
+interface Props {
+	scene: OfferSceneId;
+	lang?: 'fr' | 'en';
+}
+
+const { scene, lang = 'fr' } = Astro.props;
+
+const t = {
+	fr: {
+		notif: '🔔 Record battu !',
+		publishing: 'Publication…',
+		live: 'Publiée ✓',
+		server: 'serveur',
+		p1: 'Joueur 1',
+		p2: 'Joueur 2',
+		memory: 'Mémoire',
+		tip: '💡 Et si on en faisait une méthode ?',
+		ok: 'Approuvé ✓',
+	},
+	en: {
+		notif: '🔔 New record!',
+		publishing: 'Uploading…',
+		live: 'Live ✓',
+		server: 'server',
+		p1: 'Player 1',
+		p2: 'Player 2',
+		memory: 'Memory',
+		tip: '💡 Could this be its own method?',
+		ok: 'Approved ✓',
+	},
+}[lang];
+
+// [indent, width, colour]
+const unityCode: [number, number, string][] = [
+	[0, 64, '#c084fc'],
+	[1, 46, '#38bdf8'],
+	[2, 80, '#e2e8f0'],
+	[2, 58, '#fbbf24'],
+	[1, 12, '#38bdf8'],
+	[1, 52, '#38bdf8'],
+	[2, 92, '#e2e8f0'],
+	[0, 10, '#c084fc'],
+];
+const mentorCode: [number, number, string][] = [
+	[0, 70, '#c084fc'],
+	[1, 54, '#38bdf8'],
+	[2, 96, '#e2e8f0'],
+	[2, 120, '#e2e8f0'],
+	[2, 64, '#fbbf24'],
+	[1, 12, '#38bdf8'],
+	[1, 82, '#38bdf8'],
+	[0, 10, '#c084fc'],
+];
+const stores = [
+	{ x: 14, label: 'iOS' },
+	{ x: 214, label: 'Android' },
+];
+const screens = [
+	{ x: 10, label: t.p1 },
+	{ x: 214, label: t.p2 },
+];
+---
+
+<div class:list={['offer', `offer-${scene}`]} aria-hidden="true">
+	<svg viewBox="0 0 320 180">
+		<rect width="320" height="180" fill="#161a26" />
+
+		{scene === 'unity' && (
+			<g>
+				<defs>
+					<linearGradient id="os-sky" x1="0" y1="0" x2="0" y2="1">
+						<stop offset="0" stop-color="#312e81" />
+						<stop offset="1" stop-color="#7c3aed" />
+					</linearGradient>
+					<clipPath id="os-game"><rect x="172" y="14" width="136" height="152" rx="8" /></clipPath>
+				</defs>
+				<rect x="12" y="14" width="150" height="152" rx="8" fill="#1f2433" />
+				<circle cx="24" cy="26" r="3" fill="#ef4444" /><circle cx="33" cy="26" r="3" fill="#f59e0b" /><circle cx="42" cy="26" r="3" fill="#22c55e" />
+				<text x="54" y="29" class="tab">Player.cs</text>
+				{unityCode.map(([ind, w, c], i) => (
+					<rect x={24 + ind * 10} y={44 + i * 14} width={w} height="5" rx="2.5" fill={c} class="type" style={`--d:${i * 0.28}s`} />
+				))}
+				<g clip-path="url(#os-game)">
+					<rect x="172" y="14" width="136" height="152" fill="url(#os-sky)" />
+					<circle cx="196" cy="52" r="1.2" fill="#fff" opacity="0.7" /><circle cx="286" cy="60" r="1" fill="#fff" opacity="0.6" /><circle cx="240" cy="44" r="1" fill="#fff" opacity="0.5" />
+					<rect x="172" y="140" width="136" height="26" fill="#16a34a" />
+					<rect x="172" y="140" width="136" height="3" fill="#4ade80" />
+					<rect x="250" y="112" width="40" height="8" rx="2" fill="#a16207" />
+					<circle cx="270" cy="100" r="5" fill="#facc15" class="coin" />
+					<text x="270" y="92" text-anchor="middle" class="plus">+1</text>
+					<g class="hero">
+						<rect x="190" y="126" width="14" height="14" rx="3" fill="#c084fc" />
+						<circle cx="198" cy="131" r="1.5" fill="#fff" /><circle cx="202" cy="131" r="1.5" fill="#fff" />
+					</g>
+					<rect x="172" y="14" width="136" height="152" fill="#0b0e16" class="cover" />
+					<rect x="172" y="14" width="136" height="20" fill="#1f2433" />
+				</g>
+				<g class="play"><path d="M235 18 L247 24 L235 30Z" fill="#22c55e" /></g>
+			</g>
+		)}
+
+		{scene === 'mobile' && (
+			<g>
+				{stores.map((s) => (
+					<g>
+						<rect x={s.x} y="52" width="92" height="78" rx="8" fill="#1f2433" />
+						<text x={s.x + 46} y="72" text-anchor="middle" class="store">{s.label}</text>
+						<rect x={s.x + 12} y="84" width="68" height="6" rx="3" fill="#334155" />
+						<rect x={s.x + 12} y="84" width="68" height="6" rx="3" fill="#a855f7" class="upload" />
+						<text x={s.x + 46} y="106" text-anchor="middle" class="status status-before">{t.publishing}</text>
+						<text x={s.x + 46} y="106" text-anchor="middle" class="status status-after">{t.live}</text>
+						<text x={s.x + 46} y="121" text-anchor="middle" class="stars">★★★★★</text>
+					</g>
+				))}
+				<g class="tilt">
+					<rect x="120" y="10" width="80" height="160" rx="14" fill="#0b0e16" stroke="#334155" stroke-width="2" />
+					<rect x="126" y="18" width="68" height="144" rx="8" fill="#4c1d95" />
+					<text x="160" y="68" text-anchor="middle" class="score-label">SCORE</text>
+					<text x="160" y="84" text-anchor="middle" class="score-value">1 250</text>
+					<rect x="134" y="114" width="52" height="4" rx="2" fill="#7c3aed" />
+					<circle cx="160" cy="108" r="6" fill="#facc15" class="roll" />
+					<g class="notif">
+						<rect x="129" y="22" width="62" height="18" rx="5" fill="#fff" />
+						<text x="160" y="34" text-anchor="middle" class="notif-text">{t.notif}</text>
+					</g>
+				</g>
+			</g>
+		)}
+
+		{scene === 'vr' && (
+			<g>
+				<defs>
+					<linearGradient id="os-vr-sky" x1="0" y1="0" x2="0" y2="1">
+						<stop offset="0" stop-color="#0f172a" />
+						<stop offset="1" stop-color="#4c1d95" />
+					</linearGradient>
+					<mask id="os-lens">
+						<rect width="320" height="180" fill="#fff" />
+						<ellipse cx="88" cy="90" rx="82" ry="80" fill="#000" />
+						<ellipse cx="232" cy="90" rx="82" ry="80" fill="#000" />
+						<ellipse cx="160" cy="188" rx="24" ry="26" fill="#fff" />
+					</mask>
+				</defs>
+				<rect width="320" height="100" fill="url(#os-vr-sky)" />
+				<rect y="100" width="320" height="80" fill="#1e1b4b" />
+				<g stroke="#a855f7" stroke-width="1" opacity="0.5">
+					<line x1="0" y1="106" x2="320" y2="106" />
+					<line x1="0" y1="116" x2="320" y2="116" />
+					<line x1="0" y1="132" x2="320" y2="132" />
+					<line x1="0" y1="156" x2="320" y2="156" />
+					{[-240, -120, 0, 80, 160, 240, 320, 440, 560].map((x) => <line x1="160" y1="100" x2={x} y2="180" />)}
+				</g>
+				<path d="M262 150 L162 72" pathLength="100" class="ray" />
+				<g class="cube">
+					<path d="M160 52 L178 61 L160 70 L142 61Z" fill="#c084fc" />
+					<path d="M142 61 L160 70 L160 90 L142 81Z" fill="#7c3aed" />
+					<path d="M178 61 L160 70 L160 90 L178 81Z" fill="#5b21b6" />
+					<path d="M160 52 L178 61 L178 81 L160 90 L142 81 L142 61Z" fill="none" stroke="#f0abfc" stroke-width="2" stroke-linejoin="round" class="glow" />
+				</g>
+				<line x1="266" y1="153" x2="292" y2="174" stroke="#cbd5e1" stroke-width="9" stroke-linecap="round" />
+				<circle cx="262" cy="150" r="5" fill="#0f172a" stroke="#22d3ee" stroke-width="2" />
+				<rect width="320" height="180" fill="#05060a" mask="url(#os-lens)" />
+				<g fill="none" stroke="#fff" stroke-opacity="0.08" stroke-width="2">
+					<ellipse cx="88" cy="90" rx="82" ry="80" />
+					<ellipse cx="232" cy="90" rx="82" ry="80" />
+				</g>
+			</g>
+		)}
+
+		{scene === 'multi' && (
+			<g>
+				{['M106 70 L140 74', 'M180 74 L214 70', 'M214 96 L180 92', 'M140 92 L106 96'].map((d, i) => (
+					<g>
+						<path d={d} class="wire" />
+						<path d={d} pathLength="100" class="packet" style={`--d:${(i % 2) * -0.5}s`} />
+					</g>
+				))}
+				{screens.map((s) => (
+					<g>
+						<rect x={s.x} y="40" width="96" height="74" rx="6" fill="#0f172a" stroke="#475569" />
+						<rect x={s.x + 6} y="46" width="84" height="62" rx="4" fill="#0b1020" />
+						<g transform={`translate(${s.x + 6} 46)`}>
+							<circle r="4" fill="#ef4444" class="p1" />
+							<circle r="4" fill="#38bdf8" class="p2" />
+						</g>
+						<text x={s.x + 48} y="128" text-anchor="middle" class="caption">{s.label}</text>
+					</g>
+				))}
+				<rect x="140" y="56" width="40" height="64" rx="4" fill="#334155" />
+				{[0, 1, 2].map((i) => (
+					<g>
+						<rect x="146" y={62 + i * 18} width="28" height="12" rx="2" fill="#1e293b" />
+						<circle cx="168" cy={68 + i * 18} r="2" fill="#22c55e" class="led" style={`--d:${i * -0.3}s`} />
+					</g>
+				))}
+				<text x="160" y="136" text-anchor="middle" class="caption">{t.server}</text>
+				<text x="160" y="40" text-anchor="middle" class="ping">24 ms</text>
+			</g>
+		)}
+
+		{scene === 'audit' && (
+			<g>
+				<rect x="14" y="14" width="196" height="110" rx="8" fill="#1f2433" />
+				<g stroke="#334155" stroke-width="1">
+					<line x1="24" y1="48" x2="200" y2="48" /><line x1="24" y1="80" x2="200" y2="80" /><line x1="24" y1="112" x2="200" y2="112" />
+				</g>
+				<text x="24" y="32" class="tab">FPS</text>
+				<text x="200" y="33" text-anchor="end" class="fps fps-before">23 fps</text>
+				<text x="200" y="33" text-anchor="end" class="fps fps-after">60 fps</text>
+				<polyline points="24,90 40,104 52,78 66,110 80,86 94,108 108,74 122,100 136,112 150,82 164,106 178,92 200,108" class="jagged" />
+				<path d="M24 50 C60 46 90 52 120 48 S180 46 200 49" pathLength="100" class="smooth" />
+				<rect x="220" y="14" width="86" height="110" rx="8" fill="#1f2433" />
+				<text x="263" y="32" text-anchor="middle" class="tab">{t.memory}</text>
+				<rect x="248" y="42" width="30" height="72" rx="4" fill="none" stroke="#475569" />
+				<rect x="250" y="44" width="26" height="68" rx="3" class="mem" />
+				<rect x="14" y="134" width="292" height="32" rx="6" fill="#1f2433" />
+				<rect x="24" y="143" width="90" height="4" rx="2" fill="#38bdf8" opacity="0.7" />
+				<rect x="34" y="153" width="70" height="4" rx="2" fill="#e2e8f0" opacity="0.5" />
+				<rect x="200" y="143" width="80" height="4" rx="2" fill="#c084fc" opacity="0.7" />
+				<rect x="210" y="153" width="60" height="4" rx="2" fill="#e2e8f0" opacity="0.5" />
+				<g class="bug">
+					<g stroke="#ef4444" stroke-width="1.2">
+						<line x1="164" y1="146" x2="176" y2="154" /><line x1="176" y1="146" x2="164" y2="154" /><line x1="163" y1="150" x2="177" y2="150" />
+					</g>
+					<ellipse cx="170" cy="150" rx="4.5" ry="5.5" fill="#ef4444" />
+				</g>
+				<text x="170" y="154" text-anchor="middle" class="fixed">✓</text>
+				<g class="mag">
+					<circle r="9" fill="#ffffff" fill-opacity="0.08" stroke="#e2e8f0" stroke-width="2.5" />
+					<line x1="7" y1="7" x2="13" y2="13" stroke="#e2e8f0" stroke-width="3" stroke-linecap="round" />
+				</g>
+			</g>
+		)}
+
+		{scene === 'mentor' && (
+			<g>
+				<rect x="12" y="14" width="192" height="152" rx="8" fill="#1f2433" />
+				<rect x="16" y="73" width="184" height="14" fill="#ef4444" fill-opacity="0.18" class="old" />
+				<rect x="16" y="73" width="184" height="14" fill="#22c55e" fill-opacity="0.2" class="new" />
+				{mentorCode.map(([ind, w, c], i) => (
+					<g>
+						<text x="26" y={34 + i * 16} text-anchor="end" class="lineno">{i + 1}</text>
+						{i === 3 ? (
+							<g>
+								<rect x={36 + ind * 10} y={30 + i * 16} width={w} height="5" rx="2.5" fill="#f87171" class="old" />
+								<rect x={36 + ind * 10} y={30 + i * 16} width="74" height="5" rx="2.5" fill="#4ade80" class="new" />
+							</g>
+						) : (
+							<rect x={36 + ind * 10} y={30 + i * 16} width={w} height="5" rx="2.5" fill={c} opacity="0.85" />
+						)}
+					</g>
+				))}
+				<circle cx="282" cy="34" r="16" fill="#f59e0b" />
+				<circle cx="282" cy="29" r="5" fill="#fff" opacity="0.92" />
+				<path d="M273 45 Q282 34 291 45Z" fill="#fff" opacity="0.92" />
+				<circle cx="282" cy="148" r="16" fill="#38bdf8" />
+				<circle cx="282" cy="143" r="5" fill="#fff" opacity="0.92" />
+				<path d="M273 159 Q282 148 291 159Z" fill="#fff" opacity="0.92" />
+				<g class="tip">
+					<rect x="122" y="58" width="184" height="24" rx="8" fill="#fff" />
+					<path d="M272 59 L282 51 L290 59Z" fill="#fff" />
+					<text x="130" y="73.5" class="tip-text">{t.tip}</text>
+				</g>
+				<g class="typing">
+					<rect x="222" y="140" width="40" height="16" rx="8" fill="#334155" />
+					<circle cx="233" cy="148" r="2" fill="#e2e8f0" /><circle cx="242" cy="148" r="2" fill="#e2e8f0" /><circle cx="251" cy="148" r="2" fill="#e2e8f0" />
+				</g>
+				<g class="ok">
+					<rect x="210" y="94" width="96" height="20" rx="10" fill="#16a34a" />
+					<text x="258" y="107.5" text-anchor="middle" class="ok-text">{t.ok}</text>
+				</g>
+			</g>
+		)}
+	</svg>
+</div>
+
+<style>
+	.offer {
+		--freeze: -5.6s;
+		aspect-ratio: 16 / 9;
+		border-radius: 0.6rem;
+		overflow: hidden;
+		border: 1px solid var(--gray-800);
+	}
+
+	.offer svg {
+		display: block;
+		width: 100%;
+		height: 100%;
+		font-family: inherit;
+	}
+
+	.offer * {
+		animation-duration: 8s;
+		animation-iteration-count: infinite;
+		animation-timing-function: ease-in-out;
+		animation-fill-mode: backwards;
+		transform-box: fill-box;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.offer * {
+			animation-play-state: paused !important;
+			animation-delay: var(--freeze) !important;
+		}
+	}
+
+	.tab { font-size: 8px; fill: #94a3b8; }
+	.caption { font-size: 8px; fill: #94a3b8; }
+
+	/* — Unity: code typed, play pressed, the game runs — */
+	.type { transform-origin: left; animation-name: os-type; animation-delay: var(--d); }
+	.play { transform-origin: center; animation-name: os-press; }
+	.cover { animation-name: os-cover; }
+	.hero { animation-name: os-hero; }
+	.coin { transform-origin: center; animation-name: os-coin; }
+	.plus { font-size: 9px; font-weight: 800; fill: #facc15; opacity: 0; animation-name: os-plus; }
+
+	@keyframes os-type {
+		0% { transform: scaleX(0); }
+		4%, 92% { transform: scaleX(1); opacity: 1; }
+		97%, 100% { transform: scaleX(1); opacity: 0; }
+	}
+	@keyframes os-press {
+		0%, 31% { transform: scale(1); }
+		33% { transform: scale(0.7); }
+		36%, 100% { transform: scale(1); }
+	}
+	@keyframes os-cover { 0%, 34% { opacity: 1; } 39%, 93% { opacity: 0; } 97%, 100% { opacity: 1; } }
+	@keyframes os-hero {
+		0%, 40% { transform: translate(0, 0); }
+		52% { transform: translate(34px, 0); }
+		58% { transform: translate(55px, -42px); }
+		64% { transform: translate(73px, -28px); }
+		66% { transform: translate(73px, -31px); }
+		68%, 100% { transform: translate(73px, -28px); }
+	}
+	@keyframes os-coin {
+		0%, 63% { opacity: 1; transform: scale(1); }
+		67%, 96% { opacity: 0; transform: scale(1.8); }
+		100% { opacity: 1; transform: scale(1); }
+	}
+	@keyframes os-plus {
+		0%, 64% { opacity: 0; transform: translateY(0); }
+		67% { opacity: 1; }
+		78%, 100% { opacity: 0; transform: translateY(-12px); }
+	}
+
+	/* — Mobile: sensors, notification, published on both stores — */
+	.offer-mobile { --freeze: -6.4s; }
+	.store { font-size: 10px; font-weight: 800; fill: #fff; }
+	.status { font-size: 7.5px; font-weight: 700; }
+	.status-before { fill: #94a3b8; animation-name: os-before; }
+	.status-after { fill: #4ade80; opacity: 0; animation-name: os-after; }
+	.stars { font-size: 9px; fill: #facc15; letter-spacing: 1px; opacity: 0; animation-name: os-stars; }
+	.upload { transform-origin: left; animation-name: os-upload; }
+	.tilt { transform-origin: center; animation-name: os-tilt; }
+	.roll { animation-name: os-roll; }
+	.score-label { font-size: 7px; font-weight: 700; fill: #c4b5fd; letter-spacing: 0.1em; }
+	.score-value { font-size: 15px; font-weight: 800; fill: #fff; }
+	.notif { animation-name: os-notif; }
+	.notif-text { font-size: 6.5px; font-weight: 700; fill: #1f2937; }
+
+	@keyframes os-tilt {
+		0%, 2% { transform: rotate(0); }
+		9% { transform: rotate(-10deg); }
+		18% { transform: rotate(10deg); }
+		25%, 100% { transform: rotate(0); }
+	}
+	@keyframes os-roll {
+		0%, 2% { transform: translateX(0); }
+		9% { transform: translateX(-18px); }
+		18% { transform: translateX(18px); }
+		25%, 100% { transform: translateX(0); }
+	}
+	@keyframes os-notif {
+		0%, 27% { opacity: 0; transform: translateY(-24px); }
+		31%, 92% { opacity: 1; transform: translateY(0); }
+		97%, 100% { opacity: 0; transform: translateY(-24px); }
+	}
+	@keyframes os-upload { 0%, 38% { transform: scaleX(0); } 70%, 100% { transform: scaleX(1); } }
+	@keyframes os-before { 0%, 71% { opacity: 1; } 74%, 100% { opacity: 0; } }
+	@keyframes os-after { 0%, 72% { opacity: 0; } 75%, 95% { opacity: 1; } 99%, 100% { opacity: 0; } }
+	@keyframes os-stars { 0%, 77% { opacity: 0; } 81%, 95% { opacity: 1; } 99%, 100% { opacity: 0; } }
+
+	/* — VR: point, grab, pull the cube in — */
+	.offer-vr { --freeze: -4.8s; }
+	.ray {
+		fill: none;
+		stroke: #22d3ee;
+		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-dasharray: 100 200;
+		animation-name: os-ray;
+	}
+	.cube { transform-origin: center; animation-name: os-cube; }
+	.glow { opacity: 0; animation-name: os-glow; }
+
+	@keyframes os-ray {
+		0%, 26% { stroke-dashoffset: 100; opacity: 0; }
+		27% { stroke-dashoffset: 100; opacity: 1; }
+		33% { stroke-dashoffset: 0; opacity: 1; }
+		38% { stroke-dashoffset: 0; }
+		52%, 74% { stroke-dashoffset: 54; opacity: 1; }
+		80%, 100% { stroke-dashoffset: 54; opacity: 0; }
+	}
+	@keyframes os-cube {
+		0% { transform: translate(0, 0) scale(1); }
+		15% { transform: translate(0, -6px) scale(1); }
+		30% { transform: translate(0, 0) scale(1); }
+		38% { transform: translate(0, -2px) scale(1); }
+		52%, 74% { transform: translate(48px, 34px) scale(1.3); }
+		92%, 100% { transform: translate(0, 0) scale(1); }
+	}
+	@keyframes os-glow { 0%, 32% { opacity: 0; } 35%, 76% { opacity: 1; } 82%, 100% { opacity: 0; } }
+
+	/* — Multiplayer: both screens show the same state, packets flow — */
+	.offer-multi { --freeze: -2s; }
+	.wire { fill: none; stroke: #475569; stroke-width: 1.5; stroke-dasharray: 2 3; }
+	.packet {
+		fill: none;
+		stroke: #22c55e;
+		stroke-width: 4;
+		stroke-linecap: round;
+		stroke-dasharray: 6 200;
+		animation-name: os-packet;
+		animation-duration: 1s;
+		animation-timing-function: linear;
+		animation-delay: var(--d);
+	}
+	.led { animation-name: os-led; animation-duration: 0.9s; animation-delay: var(--d); }
+	.p1 { animation-name: os-p1; animation-timing-function: linear; }
+	.p2 { animation-name: os-p2; animation-timing-function: linear; }
+	.ping { font-size: 8px; font-weight: 700; fill: #4ade80; }
+
+	@keyframes os-packet { 0% { stroke-dashoffset: 6; } 100% { stroke-dashoffset: -100; } }
+	@keyframes os-led { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+	@keyframes os-p1 {
+		0%, 100% { transform: translate(14px, 14px); }
+		25% { transform: translate(70px, 12px); }
+		50% { transform: translate(74px, 48px); }
+		75% { transform: translate(22px, 46px); }
+	}
+	@keyframes os-p2 {
+		0%, 100% { transform: translate(44px, 30px); }
+		20% { transform: translate(20px, 20px); }
+		45% { transform: translate(60px, 16px); }
+		70% { transform: translate(68px, 44px); }
+	}
+
+	/* — Audit: the bug is found, the frame rate gets smooth — */
+	.offer-audit { --freeze: -6.4s; }
+	.fps { font-size: 10px; font-weight: 800; }
+	.fps-before { fill: #f87171; animation-name: os-swap-a; }
+	.fps-after { fill: #4ade80; opacity: 0; animation-name: os-swap-b; }
+	.jagged { fill: none; stroke: #ef4444; stroke-width: 2; stroke-linejoin: round; animation-name: os-jagged; }
+	.smooth {
+		fill: none;
+		stroke: #22c55e;
+		stroke-width: 2.5;
+		stroke-linecap: round;
+		stroke-dasharray: 100 200;
+		stroke-dashoffset: 100;
+		animation-name: os-smooth;
+	}
+	.mem { transform-origin: bottom; animation-name: os-mem; }
+	.bug { transform-origin: center; animation-name: os-bug; }
+	.fixed { font-size: 11px; font-weight: 800; fill: #4ade80; opacity: 0; animation-name: os-fixed; }
+	.mag { animation-name: os-mag; }
+
+	@keyframes os-swap-a { 0%, 53% { opacity: 1; } 56%, 95% { opacity: 0; } 99%, 100% { opacity: 1; } }
+	@keyframes os-swap-b { 0%, 54% { opacity: 0; } 57%, 95% { opacity: 1; } 99%, 100% { opacity: 0; } }
+	@keyframes os-jagged { 0%, 48% { opacity: 1; } 56%, 94% { opacity: 0.15; } 99%, 100% { opacity: 1; } }
+	@keyframes os-smooth {
+		0%, 50% { stroke-dashoffset: 100; opacity: 1; }
+		70%, 94% { stroke-dashoffset: 0; opacity: 1; }
+		99%, 100% { stroke-dashoffset: 0; opacity: 0; }
+	}
+	@keyframes os-mem {
+		0%, 52% { transform: scaleY(0.9); fill: #ef4444; }
+		70%, 94% { transform: scaleY(0.4); fill: #22c55e; }
+		99%, 100% { transform: scaleY(0.9); fill: #ef4444; }
+	}
+	@keyframes os-bug {
+		0%, 36% { opacity: 1; transform: scale(1); }
+		40% { opacity: 1; transform: scale(1.5); }
+		45%, 96% { opacity: 0; transform: scale(0); }
+		100% { opacity: 1; transform: scale(1); }
+	}
+	@keyframes os-fixed { 0%, 44% { opacity: 0; } 48%, 93% { opacity: 1; } 97%, 100% { opacity: 0; } }
+	@keyframes os-mag {
+		0%, 8% { opacity: 0; transform: translate(40px, 150px); }
+		12% { opacity: 1; transform: translate(40px, 150px); }
+		32%, 42% { opacity: 1; transform: translate(170px, 150px); }
+		48%, 100% { opacity: 0; transform: translate(170px, 150px); }
+	}
+
+	/* — Mentoring: a review comment, a fix, an approval — */
+	.lineno { font-size: 7px; fill: #64748b; font-variant-numeric: tabular-nums; }
+	.old { animation-name: os-old; }
+	.new { opacity: 0; animation-name: os-new; }
+	.tip { transform-origin: 85% 0; animation-name: os-tip; }
+	.tip-text { font-size: 8.5px; font-weight: 600; fill: #1f2937; }
+	.typing { opacity: 0; animation-name: os-typing; }
+	.ok { transform-origin: center; animation-name: os-ok; }
+	.ok-text { font-size: 9px; font-weight: 800; fill: #fff; }
+
+	@keyframes os-old { 0%, 48% { opacity: 1; } 52%, 94% { opacity: 0; } 98%, 100% { opacity: 1; } }
+	@keyframes os-new { 0%, 49% { opacity: 0; } 53%, 94% { opacity: 1; } 98%, 100% { opacity: 0; } }
+	@keyframes os-tip {
+		0%, 10% { opacity: 0; transform: scale(0.3); }
+		15% { opacity: 1; transform: scale(1.04); }
+		18%, 92% { opacity: 1; transform: scale(1); }
+		96%, 100% { opacity: 0; transform: scale(1); }
+	}
+	@keyframes os-typing { 0%, 29% { opacity: 0; } 32%, 47% { opacity: 1; } 50%, 100% { opacity: 0; } }
+	@keyframes os-ok {
+		0%, 59% { opacity: 0; transform: scale(0.5); }
+		63% { opacity: 1; transform: scale(1.1); }
+		66%, 92% { opacity: 1; transform: scale(1); }
+		96%, 100% { opacity: 0; transform: scale(1); }
+	}
+</style>

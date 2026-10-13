@@ -1,25 +1,26 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Hero from '../components/Hero.astro';
+import ServiceScene from '../components/ServiceScene.astro';
 
 // The whole hub. Adding a service = adding one entry here.
-const services: { emoji: string; title: string; pitch: string; href: string; note: string }[] = [
+const services: { scene: 'courses' | 'rencontres' | 'tournoi'; title: string; pitch: string; href: string; note: string }[] = [
 	{
-		emoji: '🛒',
+		scene: 'courses',
 		title: 'Mes courses',
 		pitch: "Une liste de courses partagée entre plusieurs téléphones, rangée par rayon. Elle se met à jour en direct pendant que l'autre fait les courses.",
 		href: '/courses/',
 		note: 'Sans inscription · lien à partager',
 	},
 	{
-		emoji: '🎯',
+		scene: 'rencontres',
 		title: 'Rencontres pétanque',
 		pitch: "La carte des parties de pétanque autour de toi. Vois qui joue, quand, et combien il manque de joueurs — ou pose la tienne en deux minutes.",
 		href: '/rencontres/',
 		note: 'Sans inscription · Isère et alentours',
 	},
 	{
-		emoji: '🏆',
+		scene: 'tournoi',
 		title: 'Votre tournoi dans le jeu de pétanque',
 		pitch: "Le jeu de pétanque en ligne aux couleurs de votre tournoi : son nom au-dessus du terrain, les logos du club et des sponsors, un mode en ligne réservé à vos joueurs.",
 		href: '/tournoi-petanque/',
@@ -43,7 +44,7 @@ const description = "Des petits services web gratuits et utilisables sans compte
 			<div class="services">
 				{services.map((t) => (
 					<a class="service" href={t.href}>
-						<span class="service-emoji" aria-hidden="true">{t.emoji}</span>
+						<ServiceScene scene={t.scene} />
 						<h2>{t.title}</h2>
 						<p>{t.pitch}</p>
 						<span class="service-note">{t.note}</span>
@@ -90,9 +91,8 @@ const description = "Des petits services web gratuits et utilisables sans compte
 		transform: translateY(-2px);
 	}
 
-	.service-emoji {
-		font-size: 2.25rem;
-		line-height: 1;
+	.service :global(.scene) {
+		margin-bottom: 0.4rem;
 	}
 
 	.service h2 {

@@ -1,19 +1,18 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Hero from '../../components/Hero.astro';
-import Icon from '../../components/Icon.astro';
+import OfferScene, { type OfferSceneId } from '../../components/OfferScene.astro';
 import ContactCTA from '../../components/ContactCTA.astro';
 import LangSwitch from '../../components/LangSwitch.astro';
-import type { iconPaths } from '../../components/IconPaths';
 
 // Mirrors /prestations — keep both lists in step when the offer changes.
-const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
-	{ icon: 'code', title: 'Unity development', body: 'From the idea to a shipped product: Unity apps and games — mobile, desktop and WebGL — with code built to last.' },
-	{ icon: 'mobile', title: 'iOS & Android apps', body: 'Your apps built with Unity, with real access to native features (sensors, notifications, offline mode), then shipped to the App Store and Google Play: signed builds, certificates, store listings and review rules.' },
-	{ icon: 'virtual-reality', title: 'Virtual reality / XR', body: 'Immersive VR and XR experiences for training, simulation or games — on headset as well as on mobile.' },
-	{ icon: 'strategy', title: 'Real-time multiplayer', body: 'Real time that holds up: state sync, netcode, headless servers, with Photon or Netcode for GameObjects — from prototype to production.' },
-	{ icon: 'scales', title: 'Audit, rescue & optimisation', body: 'Audit, bug fixing, version upgrades and a way through the stubborn problems. Then performance: smoother frames, less memory, a lighter build.' },
-	{ icon: 'pencil-line', title: 'Training & mentoring', body: 'Tailored sessions on Unity and C#, technical guidance, code reviews and mentoring for apprentices and junior developers.' },
+const services: { scene: OfferSceneId; title: string; body: string }[] = [
+	{ scene: 'unity', title: 'Unity development', body: 'From the idea to a shipped product: Unity apps and games — mobile, desktop and WebGL — with code built to last.' },
+	{ scene: 'mobile', title: 'iOS & Android apps', body: 'Your apps built with Unity, with real access to native features (sensors, notifications, offline mode), then shipped to the App Store and Google Play: signed builds, certificates, store listings and review rules.' },
+	{ scene: 'vr', title: 'Virtual reality / XR', body: 'Immersive VR and XR experiences for training, simulation or games — on headset as well as on mobile.' },
+	{ scene: 'multi', title: 'Real-time multiplayer', body: 'Real time that holds up: state sync, netcode, headless servers, with Photon or Netcode for GameObjects — from prototype to production.' },
+	{ scene: 'audit', title: 'Audit, rescue & optimisation', body: 'Audit, bug fixing, version upgrades and a way through the stubborn problems. Then performance: smoother frames, less memory, a lighter build.' },
+	{ scene: 'mentor', title: 'Training & mentoring', body: 'Tailored sessions on Unity and C#, technical guidance, code reviews and mentoring for apprentices and junior developers.' },
 ];
 
 const focused: { title: string; body: string }[] = [
@@ -57,7 +56,7 @@ const jsonLd = {
 				<div class="box services">
 					{services.map((s) => (
 						<div class="stack gap-2 lg:gap-4">
-							<Icon icon={s.icon} color="var(--accent-regular)" size="2.5rem" gradient />
+							<OfferScene scene={s.scene} lang="en" />
 							<h3>{s.title}</h3>
 							<p>{s.body}</p>
 						</div>

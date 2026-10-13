@@ -1,19 +1,18 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Hero from '../components/Hero.astro';
-import Icon from '../components/Icon.astro';
+import OfferScene, { type OfferSceneId } from '../components/OfferScene.astro';
 import ContactCTA from '../components/ContactCTA.astro';
 import LangSwitch from '../components/LangSwitch.astro';
-import type { iconPaths } from '../components/IconPaths';
 
 // Two tiers: the offers a client actually buys, then the finer work that comes with them.
-const services: { icon: keyof typeof iconPaths; title: string; body: string }[] = [
-	{ icon: 'code', title: 'Développement Unity', body: 'De l\'idée au produit livré : applications et jeux sous Unity — mobile, desktop et WebGL — avec un code pensé pour durer.' },
-	{ icon: 'mobile', title: 'Applications mobiles iOS & Android', body: 'Vos applications développées sous Unity avec un vrai accès aux fonctions natives (capteurs, notifications, hors-ligne), puis publiées sur l\'App Store et Google Play : builds signés, certificats, fiches store et règles de validation.' },
-	{ icon: 'virtual-reality', title: 'Réalité virtuelle / XR', body: 'Des expériences immersives VR/XR pour la formation, la simulation ou le jeu, sur casque comme sur mobile.' },
-	{ icon: 'strategy', title: 'Multijoueur temps réel', body: 'Du temps réel qui tient la route : synchronisation, netcode, serveurs headless, avec Photon ou Netcode for GameObjects — du prototype à la production.' },
-	{ icon: 'scales', title: 'Audit, reprise & optimisation', body: 'Audit, correction de bugs, montée de version et déblocage des problèmes tenaces. Puis les perfs : plus de fluidité, moins de mémoire, un build plus léger.' },
-	{ icon: 'pencil-line', title: 'Formation & accompagnement', body: 'Sessions sur-mesure sur Unity et C#, encadrement technique, revues de code et suivi d\'alternants ou de développeurs juniors.' },
+const services: { scene: OfferSceneId; title: string; body: string }[] = [
+	{ scene: 'unity', title: 'Développement Unity', body: 'De l\'idée au produit livré : applications et jeux sous Unity — mobile, desktop et WebGL — avec un code pensé pour durer.' },
+	{ scene: 'mobile', title: 'Applications mobiles iOS & Android', body: 'Vos applications développées sous Unity avec un vrai accès aux fonctions natives (capteurs, notifications, hors-ligne), puis publiées sur l\'App Store et Google Play : builds signés, certificats, fiches store et règles de validation.' },
+	{ scene: 'vr', title: 'Réalité virtuelle / XR', body: 'Des expériences immersives VR/XR pour la formation, la simulation ou le jeu, sur casque comme sur mobile.' },
+	{ scene: 'multi', title: 'Multijoueur temps réel', body: 'Du temps réel qui tient la route : synchronisation, netcode, serveurs headless, avec Photon ou Netcode for GameObjects — du prototype à la production.' },
+	{ scene: 'audit', title: 'Audit, reprise & optimisation', body: 'Audit, correction de bugs, montée de version et déblocage des problèmes tenaces. Puis les perfs : plus de fluidité, moins de mémoire, un build plus léger.' },
+	{ scene: 'mentor', title: 'Formation & accompagnement', body: 'Sessions sur-mesure sur Unity et C#, encadrement technique, revues de code et suivi d\'alternants ou de développeurs juniors.' },
 ];
 
 // Finer work, usually bundled with a prestation above rather than sold on its own.
@@ -59,7 +58,7 @@ const jsonLd = {
 				<div class="box services">
 					{services.map((s) => (
 						<div class="stack gap-2 lg:gap-4">
-							<Icon icon={s.icon} color="var(--accent-regular)" size="2.5rem" gradient />
+							<OfferScene scene={s.scene} />
 							<h3>{s.title}</h3>
 							<p>{s.body}</p>
 						</div>
