@@ -794,6 +794,8 @@ export default function RencontresApp() {
 				tournaments={demoData ? demoData.tournaments : tournaments}
 				hoveredId={hoveredId}
 				selectedId={detail?.event.id ?? null}
+				selectedTournamentId={tournament?.id ?? null}
+				selectedSpotId={spot && !creating ? spot.id : null}
 				picking={creating}
 				pin={pin}
 				onHover={setHoveredId}

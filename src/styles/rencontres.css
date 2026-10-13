@@ -297,7 +297,13 @@
 /* ---- Event panel ---- */
 .re-panel { position: relative; }
 .re-pin--cluster { position: relative; }
-.re-pin--active svg { transform: scale(1.3); transform-origin: 50% 100%; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4)); }
+/* Every pin grows under the mouse and while its sheet is open; a teardrop grows
+   around its tip, a disc around its centre. */
+.re-pin svg { transition: transform 0.12s ease-out; transform-origin: 50% 100%; }
+.re-pin--home svg { transform-origin: 50% 50%; }
+.re-pin:hover svg,
+.re-pin--active svg { transform: scale(1.3); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4)); }
+.re-pin:hover { z-index: 2000 !important; }
 .re-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0.4rem 0 0; font-size: var(--text-sm); color: var(--gray-300); }
 .re-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
 .re-dot { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 50%; }

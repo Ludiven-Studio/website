@@ -22,6 +22,9 @@ interface Props {
 	tournaments: readonly MeetupTournament[];
 	hoveredId: string | null;
 	selectedId: string | null;
+	/** The open tournament or pitch: its pin stays grown, like the open game's. */
+	selectedTournamentId?: string | null;
+	selectedSpotId?: string | null;
 	/** When set, a click on the map drops the pin instead of selecting an event. */
 	picking: boolean;
 	pin: { lat: number; lng: number } | null;
@@ -87,7 +90,8 @@ const textNode = (text: string): HTMLElement => {
 };
 
 export default function MeetupMap({
-	events, spots, places, tournaments, hoveredId, selectedId, picking, pin,
+	events, spots, places, tournaments, hoveredId, selectedId, selectedTournamentId = null, selectedSpotId = null,
+	picking, pin,
 	onHover, onSelect, onSelectSpot, onSelectTournament, onPick, handle,
 }: Props) {
 	const boxRef = useRef<HTMLDivElement>(null);
@@ -98,6 +102,9 @@ export default function MeetupMap({
 	const tournamentLayer = useRef<L.LayerGroup | null>(null);
 	const pinMarker = useRef<L.Marker | null>(null);
 	const markers = useRef(new Map<string, L.Marker>());
+	// Tournament and pitch pins by id, for the grown "open" state.
+	const tournamentMarkers = useRef(new Map<string, L.Marker>());
+	const spotMarkers = useRef(new Map<string, L.Marker>());
 	const [zoom, setZoom] = useState(11);
 	// Read inside Leaflet handlers, which are bound once — a captured prop would
 	// be the value from the frame the map was created on.
@@ -179,6 +186,7 @@ export default function MeetupMap({
 		const layer = spotLayer.current;
 		if (!layer) return;
 		layer.clearLayers();
+		spotMarkers.current.clear();
 		const busy = new Set(events.map((e) => e.spot_id));
 		const free = spots.filter((s) => !busy.has(s.id));
 		for (const g of groupsOf(free)) {
@@ -187,7 +195,7 @@ export default function MeetupMap({
 				continue;
 			}
 			const s = free[g[0]];
-			L.marker([s.lat, s.lng], { icon: s.confirmed ? ICONS.spot : ICONS.hollow, opacity: 0.85 })
+			const m = L.marker([s.lat, s.lng], { icon: s.confirmed ? ICONS.spot : ICONS.hollow, opacity: 0.85 })
 				.bindTooltip(textNode(s.label || 'Terrain'), { direction: 'top' })
 				// While picking, a marker would otherwise swallow the click that is
 				// trying to drop the pin. Snapping to the terrain is the better answer.
@@ -196,6 +204,7 @@ export default function MeetupMap({
 					else cb.current.onSelectSpot(s.id);
 				})
 				.addTo(layer);
+			spotMarkers.current.set(s.id, m);
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
 	}, [spots, events, zoom]);
@@ -231,19 +240,21 @@ export default function MeetupMap({
 		const layer = tournamentLayer.current;
 		if (!layer) return;
 		layer.clearLayers();
+		tournamentMarkers.current.clear();
 		for (const g of groupsOf(tournaments)) {
 			if (g.length > 1) {
 				addCluster(layer, tournaments, g, clusterIcon('re-pin--tournament', '#c98a22', '#5a3c0b', g.length));
 				continue;
 			}
 			const t = tournaments[g[0]];
-			L.marker([t.lat, t.lng], { icon: ICONS.tournament, title: t.title, zIndexOffset: 500 })
+			const m = L.marker([t.lat, t.lng], { icon: ICONS.tournament, title: t.title, zIndexOffset: 500 })
 				.bindTooltip(textNode(t.title), { direction: 'top' })
 				.on('click', () => {
 					if (cb.current.picking) cb.current.onPick(t.lat, t.lng);
 					else cb.current.onSelectTournament(t.id);
 				})
 				.addTo(layer);
+			tournamentMarkers.current.set(t.id, m);
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
 	}, [tournaments, zoom]);
@@ -257,6 +268,12 @@ export default function MeetupMap({
 			m.setZIndexOffset(id === active ? 1000 : 0);
 		}
 	}, [hoveredId, selectedId, events]);
+
+	// A class on the element, not a new icon: the pin keeps its own colour and grows.
+	useEffect(() => {
+		for (const [id, m] of tournamentMarkers.current) m.getElement()?.classList.toggle('re-pin--active', id === selectedTournamentId);
+		for (const [id, m] of spotMarkers.current) m.getElement()?.classList.toggle('re-pin--active', id === selectedSpotId);
+	}, [selectedTournamentId, selectedSpotId, tournaments, spots, events, zoom]);
 
 	useEffect(() => {
 		const map = mapRef.current;
