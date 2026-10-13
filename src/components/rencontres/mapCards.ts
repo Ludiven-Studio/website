@@ -19,14 +19,14 @@ const BOULE = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true
 	+ '<ellipse cx="9" cy="8" rx="2.2" ry="1.4" fill="#fff" opacity="0.75"/></svg>';
 
 const TROPHY = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">'
-	+ '<path d="M7 3h10v3h3v2a4 4 0 0 1-4 4h-.4A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.4 12H8a4 4 0 0 1-4-4V6h3z" fill="#fff"/></svg>';
+	+ '<path d="M7 3h10v3h3v2a4 4 0 0 1-4 4h-.4A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.4 12H8a4 4 0 0 1-4-4V6h3z" fill="#f3d98a"/></svg>';
 
 const HOUSE = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">'
-	+ '<path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z" fill="#c4512a"/></svg>';
+	+ '<path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z" fill="#5d86b8"/></svg>';
 
 const HEART = '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">'
-	+ '<path d="M12 21s-8.5-5.4-8.5-11.2A4.8 4.8 0 0 1 12 6.6a4.8 4.8 0 0 1 8.5 3.2C20.5 15.6 12 21 12 21z" fill="#4a722c" stroke="#1e2233" stroke-width="1.4"/>'
-	+ '<path d="M12 15.5s-3.6-2.3-3.6-4.8A2 2 0 0 1 12 9.4a2 2 0 0 1 3.6 1.3c0 2.5-3.6 4.8-3.6 4.8z" fill="#fbf7f0"/></svg>';
+	+ '<path d="M12 21s-8.5-5.4-8.5-11.2A4.8 4.8 0 0 1 12 6.6a4.8 4.8 0 0 1 8.5 3.2C20.5 15.6 12 21 12 21z" fill="#bfe3c6" stroke="#5fa571" stroke-width="1.6"/>'
+	+ '<path d="M12 15.5s-3.6-2.3-3.6-4.8A2 2 0 0 1 12 9.4a2 2 0 0 1 3.6 1.3c0 2.5-3.6 4.8-3.6 4.8z" fill="#ffffff"/></svg>';
 
 const dayFmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' });
 const timeFmt = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });

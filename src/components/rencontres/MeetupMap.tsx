@@ -52,8 +52,8 @@ const icon = (cls: string, fill: string, ring: string): L.DivIcon =>
 	L.divIcon({ html: pinHtml(fill, ring), className: `re-pin ${cls}`, iconSize: [26, 34], iconAnchor: [13, 34] });
 
 const ICONS = {
-	spot: icon('re-pin--spot', '#8a8f9a', '#4a4f58'),
-	hollow: icon('re-pin--hollow', 'rgba(138,143,154,0.35)', '#4a4f58'),
+	spot: icon('re-pin--spot', '#b8b4c8', '#7d7a8c'),
+	hollow: icon('re-pin--hollow', 'rgba(184,180,200,0.4)', '#7d7a8c'),
 	pick: icon('re-pin--pick', '#2fbf71', '#146b3c'),
 };
 
@@ -184,7 +184,7 @@ export default function MeetupMap({
 		const free = zoom >= SPOTS_MIN_ZOOM ? spots.filter((s) => !busy.has(s.id)) : [];
 		for (const g of groupsOf(free)) {
 			if (g.length > 1) {
-				addCluster(layer, free, g, clusterIcon('re-pin--spot', '#8a8f9a', '#4a4f58', g.length));
+				addCluster(layer, free, g, clusterIcon('re-pin--spot', '#b8b4c8', '#7d7a8c', g.length));
 				continue;
 			}
 			const s = free[g[0]];
