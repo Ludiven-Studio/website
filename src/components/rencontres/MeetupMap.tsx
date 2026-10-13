@@ -1,8 +1,9 @@
-import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import L from 'leaflet';
 import type { MeetupEvent, MeetupSpot } from '../../lib/meetupRules';
 import type { Place } from '../../lib/meetupPlaces';
 import type { MeetupTournament } from '../../lib/meetups';
+import { centreOf, clusterPoints } from '../../lib/mapClusters';
 
 // Saint-Jean-de-Bournay — the launch area (spec §6).
 export const HOME: [number, number] = [45.4489, 5.1381];
@@ -54,6 +55,18 @@ const ICONS = {
 	tournament: icon('re-pin--tournament', '#c98a22', '#5a3c0b'),
 };
 
+/** Pins closer than this many screen pixels merge into a count pin (about a pin's width). */
+const CLUSTER_PX = 24;
+/** From this zoom every pin stands alone: two on one pitch would otherwise stay a
+ *  count pin that no zoom can open. */
+const NO_CLUSTER_ZOOM = 16;
+
+const clusterIcon = (cls: string, fill: string, ring: string, count: number): L.DivIcon =>
+	L.divIcon({
+		html: pinHtml(fill, ring) + `<span class="re-pin-count">${count > 9 ? '9+' : count}</span>`,
+		className: `re-pin re-pin--cluster ${cls}`, iconSize: [26, 34], iconAnchor: [13, 34],
+	});
+
 // A disc, not a teardrop: a home port is not a game, and one glance has to say so.
 const HOME_ICON = L.divIcon({
 	html: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">'
@@ -83,6 +96,7 @@ export default function MeetupMap({
 	const tournamentLayer = useRef<L.LayerGroup | null>(null);
 	const pinMarker = useRef<L.Marker | null>(null);
 	const markers = useRef(new Map<string, L.Marker>());
+	const [zoom, setZoom] = useState(11);
 	// Read inside Leaflet handlers, which are bound once — a captured prop would
 	// be the value from the frame the map was created on.
 	const cb = useRef({ onPick, onSelect, onSelectSpot, onSelectTournament, onHover, picking });
@@ -105,6 +119,7 @@ export default function MeetupMap({
 		spotLayer.current = L.layerGroup().addTo(map);
 		eventLayer.current = L.layerGroup().addTo(map);
 		tournamentLayer.current = L.layerGroup().addTo(map);
+		map.on('zoomend', () => setZoom(map.getZoom()));
 		map.on('click', (e: L.LeafletMouseEvent) => {
 			if (cb.current.picking) cb.current.onPick(e.latlng.lat, e.latlng.lng);
 		});
@@ -114,6 +129,23 @@ export default function MeetupMap({
 		setTimeout(() => map.invalidateSize(), 0);
 		return () => { map.remove(); mapRef.current = null; };
 	}, []);
+
+	/** Member indices per pin at the current zoom; singletons from NO_CLUSTER_ZOOM on. */
+	const groupsOf = <T extends { lat: number; lng: number }>(items: readonly T[]): number[][] => {
+		const map = mapRef.current;
+		if (!map || zoom >= NO_CLUSTER_ZOOM) return items.map((_, i) => [i]);
+		return clusterPoints(items.map((it) => map.project([it.lat, it.lng], zoom)), CLUSTER_PX);
+	};
+
+	/** A count pin: a tap zooms in two levels on the members' average. */
+	const addCluster = <T extends { lat: number; lng: number }>(
+		layer: L.LayerGroup, items: readonly T[], members: number[], icon: L.DivIcon,
+	): void => {
+		const c = centreOf(members, (i) => items[i]);
+		L.marker([c.lat, c.lng], { icon, title: `${members.length}` })
+			.on('click', () => mapRef.current?.flyTo([c.lat, c.lng], Math.min(19, zoom + 2), { duration: 0.6 }))
+			.addTo(layer);
+	};
 
 	useImperativeHandle(handle, () => ({
 		flyTo: (lat, lng, zoom = 14) => mapRef.current?.flyTo([lat, lng], zoom, { duration: 0.8 }),
@@ -146,8 +178,13 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		const busy = new Set(events.map((e) => e.spot_id));
-		for (const s of spots) {
-			if (busy.has(s.id)) continue;
+		const free = spots.filter((s) => !busy.has(s.id));
+		for (const g of groupsOf(free)) {
+			if (g.length > 1) {
+				addCluster(layer, free, g, clusterIcon('re-pin--spot', '#8a8f9a', '#4a4f58', g.length));
+				continue;
+			}
+			const s = free[g[0]];
 			L.marker([s.lat, s.lng], { icon: s.confirmed ? ICONS.spot : ICONS.hollow, opacity: 0.85 })
 				.bindTooltip(textNode(s.label || 'Terrain'), { direction: 'top' })
 				// While picking, a marker would otherwise swallow the click that is
@@ -158,14 +195,20 @@ export default function MeetupMap({
 				})
 				.addTo(layer);
 		}
-	}, [spots, events]);
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
+	}, [spots, events, zoom]);
 
 	useEffect(() => {
 		const layer = eventLayer.current;
 		if (!layer) return;
 		layer.clearLayers();
 		markers.current.clear();
-		for (const e of events) {
+		for (const g of groupsOf(events)) {
+			if (g.length > 1) {
+				addCluster(layer, events, g, clusterIcon('re-pin--event', '#b14ae0', '#5a1f77', g.length));
+				continue;
+			}
+			const e = events[g[0]];
 			const m = L.marker([e.lat, e.lng], { icon: ICONS.event, title: e.label || 'Terrain' })
 				// Same rule as the terrains above, and the case that made it necessary:
 				// a marker over the pin you were aiming for opened its event, which
@@ -179,13 +222,19 @@ export default function MeetupMap({
 				.addTo(layer);
 			markers.current.set(e.id, m);
 		}
-	}, [events]);
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
+	}, [events, zoom]);
 
 	useEffect(() => {
 		const layer = tournamentLayer.current;
 		if (!layer) return;
 		layer.clearLayers();
-		for (const t of tournaments) {
+		for (const g of groupsOf(tournaments)) {
+			if (g.length > 1) {
+				addCluster(layer, tournaments, g, clusterIcon('re-pin--tournament', '#c98a22', '#5a3c0b', g.length));
+				continue;
+			}
+			const t = tournaments[g[0]];
 			L.marker([t.lat, t.lng], { icon: ICONS.tournament, title: t.title, zIndexOffset: 500 })
 				.bindTooltip(textNode(t.title), { direction: 'top' })
 				.on('click', () => {
@@ -194,7 +243,8 @@ export default function MeetupMap({
 				})
 				.addTo(layer);
 		}
-	}, [tournaments]);
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
+	}, [tournaments, zoom]);
 
 	// Highlight without rebuilding the layer: swapping icons keeps the popup
 	// state and avoids a flash on every mouse move across the list.

@@ -228,6 +228,14 @@ export default function RencontresApp() {
 		await openEvent(eventId);
 	}, [load, loadMine, openEvent]);
 
+	useEffect(() => {
+		if (!detail) return undefined;
+		const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') closeEvent(); };
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- closeEvent is stable
+	}, [detail]);
+
 	const closeEvent = useCallback(() => {
 		setDetail(null);
 		setCreated(null);
@@ -888,33 +896,38 @@ export default function RencontresApp() {
 			)}
 
 			{detail && (
-				<EventPanel
-					key={detail.event.id}
-					event={detail.event}
-					signups={detail.signups}
-					isOrganizer={detail.isOrganizer}
-					name={name}
-					busy={busy}
-					error={panelError}
-					flash={flash}
-					placeSaved={isSavedPlace(detail.event.lat, detail.event.lng)}
-					shareUrl={shareUrl(detail.event.id)}
-					onJoin={onJoin}
-					onLeave={onLeave}
-					onEdit={() => setEditing(true)}
-					onCancel={onCancel}
-					onClose={closeEvent}
-					onSavePlace={() => savePlaceAt(
-						detail.event.commune || detail.event.label || 'Mon lieu',
-						detail.event.lat, detail.event.lng,
-					)}
-					onReport={onReport}
-					onReportSignup={onReportSignup}
-					signedIn={Boolean(session)}
-					onLogin={() => setLoginOpen('act')}
-					canMute={!detail.isOrganizer && !myTags.has(detail.event.organizer_tag)}
-					onMute={onMute}
-				/>
+				// Over the map, like a tournament: on a phone a panel under the map is a screen away.
+				<div className="re-modal re-modal--tournament" onClick={closeEvent}>
+					<div className="re-sheet re-sheet--event" onClick={(e) => e.stopPropagation()}>
+						<EventPanel
+							key={detail.event.id}
+							event={detail.event}
+							signups={detail.signups}
+							isOrganizer={detail.isOrganizer}
+							name={name}
+							busy={busy}
+							error={panelError}
+							flash={flash}
+							placeSaved={isSavedPlace(detail.event.lat, detail.event.lng)}
+							shareUrl={shareUrl(detail.event.id)}
+							onJoin={onJoin}
+							onLeave={onLeave}
+							onEdit={() => setEditing(true)}
+							onCancel={onCancel}
+							onClose={closeEvent}
+							onSavePlace={() => savePlaceAt(
+								detail.event.commune || detail.event.label || 'Mon lieu',
+								detail.event.lat, detail.event.lng,
+							)}
+							onReport={onReport}
+							onReportSignup={onReportSignup}
+							signedIn={Boolean(session)}
+							onLogin={() => setLoginOpen('act')}
+							canMute={!detail.isOrganizer && !myTags.has(detail.event.organizer_tag)}
+							onMute={onMute}
+						/>
+					</div>
+				</div>
 			)}
 			</div>
 
