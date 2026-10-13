@@ -43,6 +43,17 @@ const boxIndex = (r: number, c: number, boxH: number, boxW: number, n: number) =
 
 // Daily challenge: fixed size; seed + difficulty come from the server (same for everyone).
 const DAILY_SIZE: SizeKey = '9';
+
+/* Daily-run state is versioned: GEN_V bumps with the generator, so entries saved
+   against an older grid are dropped instead of landing on a different one. */
+const GEN_V = 2;
+const packEntries = (entries: (number | null)[][]) => ({ v: GEN_V, entries });
+const unpackEntries = (state: unknown, n: number): (number | null)[][] | null => {
+	const s = state as { v?: number; entries?: unknown } | null;
+	return s && s.v === GEN_V && Array.isArray(s.entries) && s.entries.length === n
+		? (s.entries as (number | null)[][])
+		: null;
+};
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 
 export default function SudokuGame({ gameId }: { gameId: string }) {
@@ -61,7 +72,8 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 	const [daily, setDaily] = useState(false);
 	const [dailyLoading, setDailyLoading] = useState(false);
 	const [alreadyPlayed, setAlreadyPlayed] = useState(false); // daily already completed today
-	const [hintNote, setHintNote] = useState(''); // explanation of the last hint
+	const [hintNote, setHintNote] = useState<string[]>([]); // reasoning of the last hint, one line per step
+	const [hintFocus, setHintFocus] = useState<Set<string>>(() => new Set()); // cells that reasoning looks at
 	const startRef = useRef<number>(0);
 	const dailySeedRef = useRef<{ seed: number; diffIndex: number } | null>(null);
 	const lv = useLevels(gameId, sudokuLevels);
@@ -79,7 +91,8 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		const variant = SIZES[sk];
 		setDaily(false);
 		setAlreadyPlayed(false);
-		setHintNote('');
+		setHintNote([]);
+		setHintFocus(new Set());
 		setSizeKey(sk);
 		setDiffKey(dk);
 		setPuzzle(generateSudoku(variant, DIFFS[dk]));
@@ -103,7 +116,8 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setStatus('playing');
 		setRevealed(false);
 		setHinted(new Set());
-		setHintNote('');
+		setHintNote([]);
+		setHintFocus(new Set());
 		setStarted(false); // ready-gate: blurred board + ▶ Commencer starts the chrono
 		setElapsed(0);
 	}, [lv]);
@@ -148,8 +162,11 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			dailySeedRef.current = { seed: run.seed, diffIndex: run.diffIndex ?? 0 };
 			setDailyLoading(false);
 			setDiffKey(dk);
-			setPuzzle(generateSudoku(variant, DIFFS[dk], mulberry32(run.seed)));
-			setEntries((run.state as (number | null)[][]) ?? emptyEntries(variant.size));
+			const p = generateSudoku(variant, DIFFS[dk], mulberry32(run.seed));
+			setPuzzle(p);
+			// A finished run saved against an older grid shows this grid's solution instead.
+			const saved = unpackEntries(run.state, variant.size);
+			setEntries(saved ?? (run.done ? p.solution.map((row) => [...row]) : emptyEntries(variant.size)));
 			setStarted(true);
 			if (run.done && run.abandoned) {
 				// Gave up earlier today: the stored grid IS the solution, and it never won.
@@ -202,7 +219,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				done: false,
 				seed: sd?.seed,
 				diffIndex: sd?.diffIndex,
-				state: emptyEntries(SIZES[DAILY_SIZE].size),
+				state: packEntries(emptyEntries(SIZES[DAILY_SIZE].size)),
 			});
 		}
 	}, [gameId, daily]);
@@ -213,14 +230,15 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 		setEntries(emptyEntries(variant.size));
 		setHinted(new Set());
 		setSelected(null);
-		setHintNote('');
+		setHintNote([]);
+		setHintFocus(new Set());
 		const sd = dailySeedRef.current;
 		saveDailyRun(gameId, {
 			startedAt: startRef.current,
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: emptyEntries(variant.size),
+			state: packEntries(emptyEntries(variant.size)),
 		});
 	}, [gameId]);
 
@@ -299,7 +317,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			done: false,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: entries,
+			state: packEntries(entries),
 		});
 	}, [daily, started, status, revealed, entries, gameId]);
 
@@ -314,7 +332,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			finalTime,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: entries,
+			state: packEntries(entries),
 		};
 		saveDailyRun(gameId, snapshot);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -340,7 +358,8 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			else if (h) next.add(`${h.r},${h.c}`);
 			return next;
 		});
-		setHintNote(repairing ? repairNote(wrongCells.length) : (h?.reason ?? ''));
+		setHintNote(repairing ? [repairNote(wrongCells.length)] : (h?.steps ?? []));
+		setHintFocus(new Set(repairing || !h ? [] : h.focus.map(([r, c]) => `${r},${c}`)));
 		if (!started) {
 			startRef.current = Date.now();
 			setStarted(true);
@@ -373,7 +392,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 			abandoned: true,
 			seed: sd?.seed,
 			diffIndex: sd?.diffIndex,
-			state: solved,
+			state: packEntries(solved),
 		});
 		trackGame(gameId, 'solution_shown');
 	}, [puzzle, gameId]);
@@ -394,6 +413,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				n.delete(`${r},${c}`);
 				return n;
 			});
+			setHintFocus((prev) => (prev.size ? new Set() : prev));
 			if (!started) {
 				startRef.current = Date.now();
 				setStarted(true);
@@ -566,6 +586,7 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 										bad ? 'bad' : '',
 										status === 'won' || revealed ? 'wondone' : '',
 										!isGiven && hinted.has(`${r},${c}`) ? 'hinted' : '',
+										hintFocus.has(`${r},${c}`) ? 'focus' : '',
 									].join(' ')}
 									style={{
 										borderRight: c === size - 1 ? 'none' : (c + 1) % boxW === 0 ? thick : thin,
@@ -624,8 +645,14 @@ export default function SudokuGame({ gameId }: { gameId: string }) {
 				)}
 			</div>
 
-			{hintNote && (
-				<p className="sk-hint-note" aria-live="polite">💡 {hintNote}</p>
+			{hintNote.length === 1 && (
+				<p className="sk-hint-note" aria-live="polite">💡 {hintNote[0]}</p>
+			)}
+			{hintNote.length > 1 && (
+				<div className="sk-hint-note" aria-live="polite">
+					💡 Raisonnement :
+					<ol>{hintNote.map((s, i) => <li key={i}>{s}</li>)}</ol>
+				</div>
 			)}
 
 			{daily && (
@@ -823,6 +850,9 @@ const CSS = `
 .sk-cell.bad { color: var(--sk-bad); background: rgba(217, 83, 79, 0.14); }
 .sk-cell.wondone { color: var(--sk-ok); }
 .sk-cell.hinted { color: var(--sk-ok); }
+.sk-cell.focus { box-shadow: inset 0 0 0 2px var(--sk-ok); }
+.sk-hint-note ol { text-align: left; margin: 6px 0 0; padding-left: 1.3em; }
+.sk-hint-note li + li { margin-top: 4px; }
 
 .sk-pad {
   display: flex;

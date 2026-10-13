@@ -190,8 +190,9 @@ try {
 	await S.locator('.re-bar .re-btn', { hasText: 'Poser une partie' }).click();
 	await S.waitForSelector('.re-login', { timeout: 5000 }).catch(() => {});
 	check(await S.locator('.re-form').count() === 0, 'deconnecte: pas de formulaire de creation');
-	check((await S.locator('.re-login').innerText().catch(() => '')).includes('Connecte-toi'), 'deconnecte: la fiche de connexion s ouvre');
-	check(await S.locator('.re-login .re-btn', { hasText: 'Continuer avec' }).count() === 2, 'Google et Apple proposes');
+	// Browse-only site (WEB_LOGIN false): the sheet sends people to the app.
+	check((await S.locator('.re-login').innerText().catch(() => '')).includes("dans l'appli"), 'deconnecte: la fiche renvoie vers l appli');
+	check(await S.locator('.re-login .re-btn', { hasText: 'Continuer avec' }).count() === 0, 'aucune connexion proposee sur le site');
 	await S.locator('.re-login .re-btn--ghost', { hasText: 'Fermer' }).click();
 	check(await S.locator('.re-login').count() === 0, 'la fiche de connexion se referme');
 	await S.context().close();

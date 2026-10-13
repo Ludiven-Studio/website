@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/vendor-rapier.mjs && astro dev",
     "start": "node scripts/vendor-rapier.mjs && astro dev",
-    "build": "node scripts/vendor-rapier.mjs && astro check && astro build && node scripts/check-precache.mjs",
+    "build": "node scripts/vendor-rapier.mjs && astro check && astro build && node scripts/check-precache.mjs && node scripts/check-links.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "test": "vitest run",

@@ -1,0 +1,16 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import IllusionLinks from '../../components/IllusionLinks.astro';
+import StereogramGame from '../../games/illusions/StereogramGame.tsx';
+---
+
+<GamePage
+	title="Images 3D cachées : stéréogrammes | Jeux Ludiven Studio"
+	description="Des stéréogrammes à regarder en louchant ou en regardant au loin : un animal ou un objet surgit en relief. Devine ce que tu vois ! Gratuit, sans pub."
+	heading="Images 3D cachées"
+	tagline="Louche ou regarde au loin : une forme cachée sort de l'image"
+	gameId="stereogrammes"
+>
+	<StereogramGame client:only="react" gameId="stereogrammes" />
+	<IllusionLinks current="stereogrammes" />
+</GamePage>

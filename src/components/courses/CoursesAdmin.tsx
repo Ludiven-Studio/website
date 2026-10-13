@@ -110,7 +110,7 @@ export default function CoursesAdmin() {
 				<div className="co-title-row"><h1>Listes de courses</h1></div>
 				<div className="co-tools">
 					<button className="co-btn" onClick={() => load(key)} disabled={busy}>Rafraîchir</button>
-					<a className="co-btn" href="/courses">Nouvelle</a>
+					<a className="co-btn" href="/courses/">Nouvelle</a>
 				</div>
 			</div>
 
@@ -137,7 +137,7 @@ export default function CoursesAdmin() {
 								Créée le {fmt(s.created_at)} · activité {ago(s.lastActivity)}
 							</span>
 							<div className="co-card-actions">
-								<a className="co-btn" href={`/courses?l=${s.id}`}>Ouvrir</a>
+								<a className="co-btn" href={`/courses/?l=${s.id}`}>Ouvrir</a>
 								<button className="co-btn" onClick={() => copy(s.id)}>
 									{copied === s.id ? 'Lien copié ✓' : 'Copier le lien'}
 								</button>

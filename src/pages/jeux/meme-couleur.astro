@@ -1,0 +1,16 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import IllusionLinks from '../../components/IllusionLinks.astro';
+import SameColorGame from '../../games/illusions/SameColorGame.tsx';
+---
+
+<GamePage
+	title="Même couleur ? | Jeux Ludiven Studio"
+	description="Échiquier d'Adelson, illusion de White, disques rayés : cinq illusions d'optique où deux couleurs identiques semblent différentes, avec la preuve à faire glisser. Gratuit, sans pub."
+	heading="Même couleur ?"
+	tagline="Fais confiance à tes yeux… puis retire le décor pour voir la vérité"
+	gameId="meme-couleur"
+>
+	<SameColorGame client:only="react" gameId="meme-couleur" />
+	<IllusionLinks current="meme-couleur" />
+</GamePage>

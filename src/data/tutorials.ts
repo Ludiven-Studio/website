@@ -310,4 +310,34 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '⬇️', title: 'La règle', body: 'Dans un bassin, l\'eau est de niveau et monte par le bas : si une case est remplie, toutes celles du même bassin en dessous le sont aussi.' },
 		{ emoji: '💡', title: 'Comment jouer', body: 'Touche/glisse pour cycler : eau, puis « pas d\'eau » (✕), puis vide. Indice corrige une case ; solution dispo après 1 min.' },
 	],
+	stereogrammes: [
+		{ emoji: '🎯', title: 'Le but', body: 'Chaque image cache une forme en relief : un animal ou un objet. Trouve-la avec tes yeux, puis dis ce que tu as vu parmi quatre réponses.' },
+		{ emoji: '😵‍💫', title: 'Loucher', body: 'Place un doigt entre tes yeux et l\'écran et fixe-le : l\'image derrière se dédouble. Avance ou recule le doigt jusqu\'à voir trois points en haut au lieu de deux, puis retire-le et patiente.' },
+		{ emoji: '🔭', title: 'Ou regarder au loin', body: 'Approche ton visage tout près de l\'écran, regarde « à travers » comme vers un point lointain, puis recule doucement sans changer de regard. Choisis la méthode avec les boutons du haut.' },
+		{ emoji: '💡', title: 'Astuces', body: 'Les premières fois demandent un peu de patience, c\'est normal. Si la forme paraît creusée, change de méthode. Bloqué ? « Je ne vois rien » montre la forme, puis réessaie de la voir en relief.' },
+	],
+	'image-remanente': [
+		{ emoji: '🎯', title: 'Le but', body: 'Une image aux couleurs bizarres, un point noir au centre : fixe-le sans bouger les yeux, et ton cerveau va colorier tout seul une image en noir et blanc.' },
+		{ emoji: '👁️', title: 'Fixer le point', body: 'Choisis une scène et une durée, puis appuie sur Commencer. Garde les yeux sur le point jusqu\'à la fin du cercle, en clignant le moins possible.' },
+		{ emoji: '🎨', title: 'La surprise', body: 'D\'un coup, l\'image passe en gris. Regarde toujours le point : les vraies couleurs apparaissent quelques secondes. Puis vérifie avec « Voir les vraies couleurs ».' },
+		{ emoji: '💡', title: 'Pourquoi ?', body: 'À force de voir une couleur, les cellules de ton œil qui la captent se fatiguent. Sur le gris, c\'est donc la couleur opposée qui domine. Monte la luminosité pour un effet plus fort.' },
+	],
+	'oeil-mesureur': [
+		{ emoji: '🎯', title: 'Le but', body: 'Cinq illusions de taille célèbres. À chaque manche, règle le trait ou le disque pour qu\'il te paraisse exactement égal à son modèle.' },
+		{ emoji: '🎚️', title: 'Régler', body: 'Fais glisser le curseur, puis peaufine avec − et +. Fie-toi à ton œil, pas à une règle : c\'est lui qu\'on mesure !' },
+		{ emoji: '🔍', title: 'La vérité', body: 'Valide : les éléments trompeurs s\'effacent, des pointillés montrent la vraie taille et tu vois de combien tu t\'es trompé, en plus ou en moins.' },
+		{ emoji: '🦉', title: 'Ton score', body: 'À la fin, ton écart moyen te vaut un œil, de lynx à taupe. Rejoue pour battre ton record : l\'ordre et les départs changent à chaque fois.' },
+	],
+	'mouvement-illusoire': [
+		{ emoji: '🌀', title: 'Roues tournantes', body: 'L\'image est parfaitement fixe. Promène ton regard dessus : les roues se mettent à tourner dans le coin de ton œil. Fixe un seul point et elles s\'arrêtent.' },
+		{ emoji: '🟢', title: 'Le point vert', body: 'Fixe la croix noire au centre pendant 20 secondes sans bouger les yeux : les points roses s\'effacent et un point vert, qui n\'existe pas, se met à courir en rond.' },
+		{ emoji: '🍥', title: 'La spirale', body: 'Lance la spirale et fixe le point rouge pendant 30 secondes. Quand elle s\'arrête, le mur de briques immobile semble rétrécir ou gonfler. Essaie aussi sur le dos de ta main !' },
+		{ emoji: '💡', title: 'Astuce', body: 'Ces illusions marchent mieux en grand : passe en plein écran. Et ouvre « Pourquoi ça bouge ? » pour découvrir ce que ton cerveau invente.' },
+	],
+	'meme-couleur': [
+		{ emoji: '👀', title: 'Le but', body: 'Cinq images, une question à chaque fois : ces deux zones sont-elles de la même couleur ? Réponds à l\'instinct, ton œil va être mis à l\'épreuve.' },
+		{ emoji: '🎚️', title: 'La preuve', body: 'Après ta réponse, fais glisser le curseur pour retirer le décor : il ne reste que les deux zones, côte à côte. À toi de juger !' },
+		{ emoji: '🪤', title: 'Attention au piège', body: 'Le plus souvent, les couleurs sont identiques… mais pas toujours. Une manche cache une vraie différence que le décor rend invisible.' },
+		{ emoji: '🧠', title: 'Pourquoi ça marche', body: 'Ton cerveau ne mesure pas la lumière comme un appareil photo : il corrige les ombres et compare chaque teinte à ses voisines. C\'est utile au quotidien… et c\'est ce qui te piège ici.' },
+	],
 };

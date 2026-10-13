@@ -352,6 +352,18 @@ async function dropPosters(db: SupabaseClient, paths: (string | null | undefined
 	await db.storage.from('posters').remove(list);
 }
 
+/** Posters of tournaments a week past, so storage does not grow forever. */
+async function prunePosters(db: SupabaseClient, nowMs: number): Promise<number> {
+	const { data: old } = await db.from('meetup_tournaments').select('id, poster_path')
+		.not('poster_path', 'is', null).lt('starts_at', new Date(nowMs - 7 * 86400_000).toISOString()).limit(200);
+	const rows = old ?? [];
+	if (!rows.length) return 0;
+	await dropPosters(db, rows.map((r) => r.poster_path as string));
+	await db.from('meetup_tournaments').update({ poster_status: 'none', poster_path: null })
+		.in('id', rows.map((r) => r.id));
+	return rows.length;
+}
+
 /** JPEG or PNG by its first bytes; the declared type is never trusted. */
 function imageType(bytes: Uint8Array): 'image/jpeg' | 'image/png' | null {
 	if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
@@ -1023,6 +1035,8 @@ Deno.serve(async (req) => {
 					.update({ poster_status: 'pending', poster_path: path, updated_at: nowIso }).eq('id', own.id);
 				await mailTournament(shapeTournament(own as Record<string, unknown>),
 					'<b>Nouvelle affiche à valider.</b>', 'Rencontres : affiche à valider');
+				// Each new poster pays for the old ones: no scheduler needed.
+				await prunePosters(db, nowMs).catch((e) => console.error(e));
 				return json({ ok: true, posterStatus: 'pending' });
 			}
 
@@ -1138,19 +1152,10 @@ Deno.serve(async (req) => {
 				return json({ ok: true });
 			}
 
-			// Posters of tournaments long past, so storage does not grow forever.
-			// Admin-keyed; run by a scheduled job or by hand.
+			// By hand; upload_poster also prunes on every call.
 			case 'admin_prune_posters': {
 				if (!isAdmin(body.adminKey)) return bad('forbidden', 403);
-				const { data: old } = await db.from('meetup_tournaments').select('id, poster_path')
-					.not('poster_path', 'is', null).lt('starts_at', new Date(nowMs - 7 * 86400_000).toISOString()).limit(500);
-				const rows = old ?? [];
-				await dropPosters(db, rows.map((r) => r.poster_path as string));
-				if (rows.length) {
-					await db.from('meetup_tournaments').update({ poster_status: 'none', poster_path: null })
-						.in('id', rows.map((r) => r.id));
-				}
-				return json({ ok: true, pruned: rows.length });
+				return json({ ok: true, pruned: await prunePosters(db, nowMs) });
 			}
 
 			case 'leave': {

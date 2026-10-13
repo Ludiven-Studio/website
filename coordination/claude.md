@@ -99,3 +99,34 @@
 - Énergie 105, +1/2 min ; à sec, regain en 30 s de 45, 22, 16, 12, 9, 7, puis 5 (remis à zéro par une barre pleine).
   Charges des générateurs : 4/3/2/1 s. Sim : 1er blocage ~10 min, 2e ~15 min, puis de plus en plus serrés.
 - `scripts/snap-atelier.mjs` est en retard sur la révélation des améliorations (bloque à l'étape 09) : sans lien.
+
+## 2026-10-07 — SEO : liens internes avec slash final (Search Console « Page avec redirection » 59)
+
+- Statut : terminé, non commité (2026-10-07 10:50+02:00). Build + check-links + 1388 tests OK. Réservations libérées : liens `href` dans `src/` (games.ts, Nav, Footer, pages légales, index, services…),
+  `src/layouts/BaseLayout.astro` (ligne lookup jeu), `src/components/PortfolioPreview.astro`, `scripts/check-links.mjs` (nouveau), `package.json` (script build).
+- Ressources : `npm run build` (dist/, .astro/).
+
+## 2026-10-09 — Sudoku : indices qui expliquent la vraie technique
+
+- Statut : terminé, non commité (2026-10-09, Europe/Paris). Réservations libérées : `src/games/sudoku/`.
+- Solveur humain `logic.ts` (paires pointantes, paires/triplets nus et cachés, X-Wing/Swordfish, XY-Wing) ; le générateur
+  ne garde une case retirée que si la grille reste résoluble par logique ; état du défi versionné (GEN_V 2).
+- Vérifié : vitest sudoku 11/11, eslint + tsc OK, capture du mode Expert sur le serveur de dev (port 4391), 0 erreur.
+- Commité et poussé (`a32a619`).
+
+## 2026-10-09 — Nouvelle rubrique « Illusions d'optique » (stéréogrammes + 4 autres pages)
+
+- Statut : terminé, non commité (2026-10-09, Europe/Paris). Build OK (125 pages, précache + liens), vitest 1430/1430,
+  fumée sur le build : 5 pages sans erreur, tutos, 5 vignettes, absentes du défi et de la boutique. Réservations libérées :
+  `src/games/illusions/`, `src/pages/jeux/{stereogrammes,image-remanente,oeil-mesureur,mouvement-illusoire,meme-couleur}.astro`,
+  `src/data/games.ts` (type `category` + 5 entrées), `src/pages/jeux/index.astro` (rubrique), `src/pages/jeux/boutique.astro` (filtre),
+  `src/components/IconPaths.ts` (icônes), `src/components/IllusionLinks.astro` (nouveau), `src/data/tutorials.ts` (5 entrées),
+  `scripts/illusion-art.mjs` (nouveau), `public/assets/jeux/{,tile/,art/,og/}` (fichiers des 5 ids seulement).
+- Ressources : serveur de dev partagé sur le port 4390 (arrêté en fin de lot), `npm run build` en fin de lot.
+- 2026-10-09 : serveur 4390 arrêté ; `npm run build` (dist/, .astro/) OK. Commité et poussé (`9a6df67`).
+
+## 2026-10-09 — Sudoku : l'indice donne la suite logique la plus simple
+
+- Statut : terminé, non commité (2026-10-09, Europe/Paris). Réservations libérées : `src/games/sudoku/`.
+- Techniques notées (échelle Sudoku Explainer) ; l'indice choisit la plus facile, puis la chaîne la plus courte.
+  Générateur inchangé (480 grilles de référence identiques). vitest sudoku 14/14, eslint + tsc OK, capture sur le serveur de dev (port 4391).

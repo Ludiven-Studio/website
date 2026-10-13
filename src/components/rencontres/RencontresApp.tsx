@@ -45,6 +45,9 @@ interface Detail {
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : 'Une erreur est survenue.');
 const NO_OWNER = "Lien d'organisateur manquant.";
+/** Browse-only for now: every action goes through the app. The web login
+ *  stays wired for the day the site opens actions again. */
+const WEB_LOGIN: boolean = false;
 
 /** What to reopen after the provider sends the player back. ?e= covers the rest. */
 const RESUME_KEY = 'ludiven-meetup-resume';
@@ -859,18 +862,18 @@ export default function RencontresApp() {
 
 			<p className="re-legal re-rules">
 				Ici, on joue franc jeu&nbsp;: ton vrai prénom, de vraies parties, et du respect pour tout le monde.
-				Une partie louche&nbsp;? Ouvre-la et touche «&nbsp;Signaler&nbsp;». Un souci&nbsp;:{' '}
+				Une partie louche&nbsp;? Signale-la depuis l'appli Pétanque Meet. Un souci&nbsp;:{' '}
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
 			</p>
 			<p className="re-legal">
 				Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
-				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler passe par un compte Google ou Apple.{' '}
+				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans l'appli Pétanque Meet.{' '}
 				<a href="/confidentialite/">Ce qui est stocké</a>.
 			</p>
 
-			{loginOpen && (
-				<LoginSheet onLogin={login} onClose={() => setLoginOpen(null)} />
-			)}
+			{loginOpen && (WEB_LOGIN
+				? <LoginSheet onLogin={login} onClose={() => setLoginOpen(null)} />
+				: <AppSheet onClose={() => setLoginOpen(null)} />)}
 
 			{pinning && (
 				<PinSheet
@@ -922,6 +925,24 @@ function PinSheet({ platform, nativePrompt, onClose }: {
 							Installer
 						</button>
 					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/** Any action that needs an account, while the site is browse-only. */
+function AppSheet({ onClose }: { onClose(): void }) {
+	return (
+		<div className="re-modal" onClick={onClose}>
+			<div className="re-sheet re-login" onClick={(e) => e.stopPropagation()}>
+				<h2>Ça se passe dans l'appli</h2>
+				<p className="re-hint">
+					Ici, la carte se consulte librement. Pour publier une partie, la rejoindre, annoncer un tournoi
+					ou signaler un abus, utilise l'appli Pétanque Meet, bientôt sur Android et iPhone.
+				</p>
+				<div className="re-formactions">
+					<button type="button" className="re-btn re-btn--ghost" onClick={onClose}>Fermer</button>
 				</div>
 			</div>
 		</div>

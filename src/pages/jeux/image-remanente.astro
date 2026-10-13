@@ -1,0 +1,16 @@
+---
+import GamePage from '../../layouts/GamePage.astro';
+import IllusionLinks from '../../components/IllusionLinks.astro';
+import AfterimageGame from '../../games/illusions/AfterimageGame.tsx';
+---
+
+<GamePage
+	title="Couleurs fantômes | Jeux Ludiven Studio"
+	description="Illusion d'optique de l'image rémanente : fixe une image aux couleurs inversées pendant 20 secondes et vois une photo en noir et blanc se colorer toute seule."
+	heading="Couleurs fantômes"
+	tagline="Fixe le point 20 secondes : ton cerveau va colorier une image en noir et blanc"
+	gameId="image-remanente"
+>
+	<AfterimageGame client:only="react" gameId="image-remanente" />
+	<IllusionLinks current="image-remanente" />
+</GamePage>

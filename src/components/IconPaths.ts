@@ -12,6 +12,11 @@
  */
 
 export const iconPaths = {
+	eye: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M128 56C48 56 16 128 16 128s32 72 112 72 112-72 112-72-32-72-112-72Z"/><circle cx="128" cy="128" r="40" fill="none" stroke-width="16"/>',
+	afterimage: '<circle cx="100" cy="128" r="60" fill="none" stroke-width="16"/><circle stroke="none" cx="156" cy="128" r="60" opacity=".45"/>',
+	ruler: '<rect x="26" y="90" width="204" height="76" rx="8" fill="none" stroke-width="16"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M66 90v32M106 90v20M146 90v32M186 90v20"/>',
+	spiral: '<path fill="none" stroke-linecap="round" stroke-width="16" d="M128 128a12 12 0 0 1 24 0a28 28 0 0 1-56 0a44 44 0 0 1 88 0a60 60 0 0 1-120 0a76 76 0 0 1 152 0"/>',
+	contrast: '<circle cx="128" cy="128" r="96" fill="none" stroke-width="16"/><path stroke="none" d="M128 32a96 96 0 0 1 0 192Z"/>',
 	atelier: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M100 66 108 24h40l8 42M100 190l8 42h40l8-42"/><circle cx="128" cy="128" r="66" fill="none" stroke-width="16"/><path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M128 94v34l22 14"/>',
 	alchimie: '<path fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="16" d="M96 40h64M112 40v56L58 186a16 16 0 0 0 14 30h112a16 16 0 0 0 14-30l-54-90V40"/><path fill="none" stroke-linecap="round" stroke-width="16" d="M78 152h100"/><circle stroke="none" cx="112" cy="176" r="9"/><circle stroke="none" cx="150" cy="192" r="7"/>',
 	'2048': '<rect x="36" y="36" width="184" height="184" rx="24" fill="none" stroke-linejoin="round" stroke-width="16"/><rect x="70" y="70" width="52" height="52" rx="10" fill="none" stroke-linejoin="round" stroke-width="12"/><rect x="134" y="70" width="52" height="52" rx="10" fill="none" stroke-linejoin="round" stroke-width="12"/><rect x="70" y="134" width="52" height="52" rx="10" stroke="none"/><rect x="134" y="134" width="52" height="52" rx="10" fill="none" stroke-linejoin="round" stroke-width="12"/>',
