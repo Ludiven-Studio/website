@@ -810,13 +810,30 @@ export default function RencontresApp() {
 			{/* A terrain used to be a dot with a tooltip and nothing else — 115 of them,
 			    all inert. Clicking one now leads somewhere. */}
 			{spot && !creating && (
-				<section className="re-panel">
+				// Over the map, like a game: a panel under the map is a screen away on a phone.
+				<div className="re-modal re-modal--tournament" onClick={() => setSpotId(null)}>
+				<section className="re-sheet re-tournament" onClick={(e) => e.stopPropagation()} aria-label={spot.label || 'Terrain'}>
 					<button type="button" className="re-close" onClick={() => setSpotId(null)} aria-label="Fermer">×</button>
-					<h2>📍 {spot.label || 'Terrain'}</h2>
+					<h2>📍 {spot.label || 'Terrain de pétanque'}</h2>
 					{spot.commune && spot.commune !== spot.label && <p className="re-where">{spot.commune}</p>}
-					{!spot.confirmed && <p className="re-hint">Terrain signalé par un joueur, pas encore confirmé.</p>}
-					<p className="re-hint">Aucune partie posée ici pour l'instant.</p>
+					<p className="re-hint">
+						{spot.confirmed
+							? 'Terrain de pétanque connu (OpenStreetMap ou confirmé par plusieurs organisateurs).'
+							: 'Terrain signalé par un joueur, pas encore confirmé.'}
+					</p>
+					<p className="re-hint">
+						Aucune partie posée ici pour l'instant. Pour en organiser une, ou être prévenu des parties
+						autour, utilise l'appli Pétanque Meet.
+					</p>
 					<div className="re-actions">
+						<a
+							className="re-btn re-btn--ghost"
+							href={`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`}
+							target="_blank"
+							rel="noopener"
+						>
+							Y aller
+						</a>
 						<button
 							type="button"
 							className="re-btn"
@@ -834,6 +851,7 @@ export default function RencontresApp() {
 						</button>
 					</div>
 				</section>
+				</div>
 			)}
 
 			{creating && (
