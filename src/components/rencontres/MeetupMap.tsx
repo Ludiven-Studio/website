@@ -46,8 +46,10 @@ const icon = (cls: string, fill: string, ring: string): L.DivIcon =>
 	L.divIcon({ html: pinHtml(fill, ring), className: `re-pin ${cls}`, iconSize: [26, 34], iconAnchor: [13, 34] });
 
 const ICONS = {
-	event: icon('re-pin--event', '#b14ae0', '#5a1f77'),
-	active: icon('re-pin--active', '#ff8a3d', '#8a3d12'),
+	// Same colours as the app: terracotta games, gold tournaments, grey pitches,
+	// green saved places. The open or hovered game grows instead of changing hue.
+	event: icon('re-pin--event', '#c4512a', '#7e3116'),
+	active: icon('re-pin--event re-pin--active', '#c4512a', '#7e3116'),
 	spot: icon('re-pin--spot', '#8a8f9a', '#4a4f58'),
 	hollow: icon('re-pin--hollow', 'rgba(138,143,154,0.35)', '#4a4f58'),
 	pick: icon('re-pin--pick', '#2fbf71', '#146b3c'),
@@ -70,7 +72,7 @@ const clusterIcon = (cls: string, fill: string, ring: string, count: number): L.
 // A disc, not a teardrop: a home port is not a game, and one glance has to say so.
 const HOME_ICON = L.divIcon({
 	html: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">'
-		+ '<circle cx="12" cy="12" r="10" fill="#2c7fb8" stroke="#14405e" stroke-width="2"/>'
+		+ '<circle cx="12" cy="12" r="10" fill="#4a722c" stroke="#ffffff" stroke-width="2"/>'
 		+ '<path d="M12 6l5 5h-2v5h-6v-5H7z" fill="#fff"/></svg>',
 	className: 're-pin re-pin--home',
 	iconSize: [22, 22],
@@ -205,7 +207,7 @@ export default function MeetupMap({
 		markers.current.clear();
 		for (const g of groupsOf(events)) {
 			if (g.length > 1) {
-				addCluster(layer, events, g, clusterIcon('re-pin--event', '#b14ae0', '#5a1f77', g.length));
+				addCluster(layer, events, g, clusterIcon('re-pin--event', '#c4512a', '#7e3116', g.length));
 				continue;
 			}
 			const e = events[g[0]];

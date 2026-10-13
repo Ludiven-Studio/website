@@ -297,6 +297,14 @@
 /* ---- Event panel ---- */
 .re-panel { position: relative; }
 .re-pin--cluster { position: relative; }
+.re-pin--active svg { transform: scale(1.3); transform-origin: 50% 100%; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4)); }
+.re-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0.4rem 0 0; font-size: var(--text-sm); color: var(--gray-300); }
+.re-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.re-dot { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 50%; }
+.re-dot--game { background: #c4512a; }
+.re-dot--tournament { background: #c98a22; }
+.re-dot--spot { background: #8a8f9a; }
+.re-dot--place { background: #4a722c; }
 .re-pin-count {
 	position: absolute;
 	top: -6px;

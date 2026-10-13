@@ -806,6 +806,13 @@ export default function RencontresApp() {
 					setPin({ lat, lng });
 				}}
 			/>
+			<p className="re-legend" aria-label="Légende de la carte">
+				<span><i className="re-dot re-dot--game" />Partie</span>
+				<span><i className="re-dot re-dot--tournament" />Tournoi</span>
+				<span><i className="re-dot re-dot--spot" />Terrain</span>
+				<span><i className="re-dot re-dot--place" />Mes lieux</span>
+				<span>Un chiffre = plusieurs, touche pour zoomer</span>
+			</p>
 
 			{/* A terrain used to be a dot with a tooltip and nothing else — 115 of them,
 			    all inert. Clicking one now leads somewhere. */}
