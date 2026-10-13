@@ -26,10 +26,11 @@ import {
 } from '../../lib/meetupPlaces';
 import { usePinToHome, type PinPlatform } from '../../lib/usePinToHome';
 import { distanceM, formatDistance, isPlausibleFr, nearest } from '../../lib/meetupGeo';
-import MeetupMap, { type MapHandle } from './MeetupMap';
+import MeetupMap, { HOME, type MapHandle } from './MeetupMap';
 import CreateForm, { type Draft } from './CreateForm';
 import EventPanel from './EventPanel';
 import TournamentPanel from './TournamentPanel';
+import { demoEvents, demoSignups, demoTournaments, isDemo } from '../../lib/meetupDemo';
 import MyGames from './MyGames';
 import { formatShortDay, formatTime } from './format';
 
@@ -77,6 +78,9 @@ export default function RencontresApp() {
 	const [spots, setSpots] = useState<MeetupSpot[]>([]);
 	const [tournaments, setTournaments] = useState<MeetupTournament[]>([]);
 	const [tournament, setTournament] = useState<MeetupTournament | null>(null);
+	// ?demo opens straight on the samples: a link to show someone what it looks like.
+	const [demo, setDemo] = useState(() => new URLSearchParams(window.location.search).has('demo'));
+	const demoData = useMemo(() => (demo ? { events: demoEvents(), tournaments: demoTournaments() } : null), [demo]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -129,6 +133,15 @@ export default function RencontresApp() {
 
 	/** The ?t= link a club shares. Cancelled and past ones still open. */
 	const openTournament = useCallback(async (id: string) => {
+		if (isDemo(id)) {
+			const t = demoTournaments().find((x) => x.id === id);
+			if (!t) return;
+			setTournament(t);
+			setDetail(null);
+			setSpotId(null);
+			mapRef.current?.flyTo(t.lat, t.lng);
+			return;
+		}
 		try {
 			const r = await getTournament(id);
 			setTournament(r.tournament);
@@ -150,6 +163,17 @@ export default function RencontresApp() {
 	}, []);
 
 	const openEvent = useCallback(async (id: string, fromUrl?: string | null) => {
+		if (isDemo(id)) {
+			const ev = demoEvents().find((x) => x.id === id);
+			if (!ev) return;
+			setTournament(null);
+			setDetail({ event: ev, signups: demoSignups(ev), isOrganizer: false });
+			setCreating(false);
+			setEditing(false);
+			setSpotId(null);
+			mapRef.current?.flyTo(ev.lat, ev.lng);
+			return;
+		}
 		const secret = secretFor(id, fromUrl);
 		try {
 			const d = await getMeetup(id, pid, secret);
@@ -519,9 +543,26 @@ export default function RencontresApp() {
 	const myTags = useMemo(() => new Set(mine.map((e) => e.organizer_tag)), [mine]);
 	const shown = useMemo(() => {
 		const off = new Set(muted.filter((t) => !myTags.has(t)));
-		const kept = off.size ? events.filter((e) => !off.has(e.organizer_tag)) : events;
+		const source = demoData ? demoData.events : events;
+		const kept = off.size ? source.filter((e) => !off.has(e.organizer_tag)) : source;
 		return applyFilters(kept, filters, new Date(), places);
-	}, [events, filters, places, muted, myTags]);
+	}, [events, demoData, filters, places, muted, myTags]);
+
+	const toggleDemo = (): void => {
+		const on = !demo;
+		if (on) trackEvent('meetup_demo');
+		setDemo(on);
+		setDetail(null);
+		setTournament(null);
+		setSpotId(null);
+		const url = new URL(window.location.href);
+		url.searchParams.delete('e');
+		url.searchParams.delete('t');
+		url.searchParams.delete('k');
+		if (on) url.searchParams.set('demo', ''); else url.searchParams.delete('demo');
+		window.history.replaceState(null, '', url);
+		if (on) mapRef.current?.flyTo(HOME[0], HOME[1], 10);
+	};
 	const shareUrl = (id: string): string => `${window.location.origin}/rencontres/?e=${id}`;
 	const spot = spotId ? spots.find((s) => s.id === spotId) ?? null : null;
 
@@ -568,7 +609,7 @@ export default function RencontresApp() {
 						<>
 							<span>Regarder la carte est libre.</span>
 							<button type="button" className="re-link" onClick={() => setLoginOpen('act')}>
-								Se connecter pour publier ou rejoindre
+								{WEB_LOGIN ? 'Se connecter pour publier ou rejoindre' : "Publier ou rejoindre : dans l'appli"}
 							</button>
 						</>
 					)}
@@ -582,7 +623,17 @@ export default function RencontresApp() {
 						📲 Mettre la carte sur mon téléphone
 					</button>
 				)}
+				<button type="button" className="re-install" onClick={toggleDemo}>
+					{demo ? '✖ Quitter la démo' : '👀 Démo : voir des exemples'}
+				</button>
 			</header>
+
+			{demo && (
+				<p className="re-ok re-demo" role="status">
+					Mode démo&nbsp;: ces parties et ces tournois sont des exemples fictifs, pour voir à quoi
+					ressemble la carte quand les joueurs et les clubs l'utilisent.
+				</p>
+			)}
 
 			{pageError && (
 				<p className="re-error" role="alert" onClick={() => setError(null)}>{pageError}</p>
@@ -732,7 +783,7 @@ export default function RencontresApp() {
 				events={shown}
 				spots={spots}
 				places={places}
-				tournaments={tournaments}
+				tournaments={demoData ? demoData.tournaments : tournaments}
 				hoveredId={hoveredId}
 				selectedId={detail?.event.id ?? null}
 				picking={creating}
