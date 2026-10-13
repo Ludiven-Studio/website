@@ -337,7 +337,9 @@
 	border: 2px solid #f2ae6b;
 	color: #6b3e12;
 }
-.re-cp-txt { display: flex; flex-direction: column; min-width: 0; }
+.re-cp-txt { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.re-cp-txt b,
+.re-cp-txt small { overflow: hidden; text-overflow: ellipsis; }
 .re-cp-txt b { font-size: 14px; white-space: nowrap; }
 .re-cp-txt small { font-size: 12px; font-weight: 600; opacity: 0.95; white-space: nowrap; }
 .re-cp--tournament {

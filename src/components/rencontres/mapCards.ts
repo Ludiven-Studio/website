@@ -55,7 +55,7 @@ export function gameCard(e: MeetupEvent): L.DivIcon {
 
 export function gameClusterCard(count: number): L.DivIcon {
 	return board(
-		`<div class="re-cp re-cp--game">${BOULE}<span class="re-cp-txt"><b>${count} parties</b><small>touche pour zoomer</small></span></div>`,
+		`<div class="re-cp re-cp--game">${BOULE}<span class="re-cp-txt"><b>${count} parties</b><small>zoomer</small></span></div>`,
 		're-pin--event re-pin--cluster', GAME_W, GAME_H);
 }
 
