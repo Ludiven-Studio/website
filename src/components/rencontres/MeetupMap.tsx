@@ -4,6 +4,7 @@ import type { MeetupEvent, MeetupSpot } from '../../lib/meetupRules';
 import type { Place } from '../../lib/meetupPlaces';
 import type { MeetupTournament } from '../../lib/meetups';
 import { centreOf, clusterPoints } from '../../lib/mapClusters';
+import { gameCard, gameClusterCard, ME_ICON, placeIcon, tournamentCard, tournamentClusterCard } from './mapCards';
 
 // Saint-Jean-de-Bournay — the launch area (spec §6).
 export const HOME: [number, number] = [45.4489, 5.1381];
@@ -25,6 +26,8 @@ interface Props {
 	/** The open tournament or pitch: its pin stays grown, like the open game's. */
 	selectedTournamentId?: string | null;
 	selectedSpotId?: string | null;
+	/** The player's position, once "Autour de moi" got it. */
+	me?: { lat: number; lng: number } | null;
 	/** When set, a click on the map drops the pin instead of selecting an event. */
 	picking: boolean;
 	pin: { lat: number; lng: number } | null;
@@ -49,38 +52,26 @@ const icon = (cls: string, fill: string, ring: string): L.DivIcon =>
 	L.divIcon({ html: pinHtml(fill, ring), className: `re-pin ${cls}`, iconSize: [26, 34], iconAnchor: [13, 34] });
 
 const ICONS = {
-	// Same colours as the app: terracotta games, gold tournaments, grey pitches,
-	// green saved places. The open or hovered game grows instead of changing hue.
-	event: icon('re-pin--event', '#c4512a', '#7e3116'),
-	active: icon('re-pin--event re-pin--active', '#c4512a', '#7e3116'),
 	spot: icon('re-pin--spot', '#8a8f9a', '#4a4f58'),
 	hollow: icon('re-pin--hollow', 'rgba(138,143,154,0.35)', '#4a4f58'),
 	pick: icon('re-pin--pick', '#2fbf71', '#146b3c'),
-	// Gold, as in the app: a tournament is an event the whole town is invited to.
-	tournament: icon('re-pin--tournament', '#c98a22', '#5a3c0b'),
 };
 
-/** Pins closer than this many screen pixels merge into a count pin (about a pin's width). */
+/** Pins closer than this many screen pixels merge into a count pin: about the
+ *  marker's half width, so boards do not pile up. */
 const CLUSTER_PX = 24;
+const GAME_CLUSTER_PX = 110;
+const TOURNAMENT_CLUSTER_PX = 85;
 /** From this zoom every pin stands alone: two on one pitch would otherwise stay a
  *  count pin that no zoom can open. */
 const NO_CLUSTER_ZOOM = 16;
+const SPOTS_MIN_ZOOM = 12;
 
 const clusterIcon = (cls: string, fill: string, ring: string, count: number): L.DivIcon =>
 	L.divIcon({
 		html: pinHtml(fill, ring) + `<span class="re-pin-count">${count > 9 ? '9+' : count}</span>`,
 		className: `re-pin re-pin--cluster ${cls}`, iconSize: [26, 34], iconAnchor: [13, 34],
 	});
-
-// A disc, not a teardrop: a home port is not a game, and one glance has to say so.
-const HOME_ICON = L.divIcon({
-	html: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">'
-		+ '<circle cx="12" cy="12" r="10" fill="#4a722c" stroke="#ffffff" stroke-width="2"/>'
-		+ '<path d="M12 6l5 5h-2v5h-6v-5H7z" fill="#fff"/></svg>',
-	className: 're-pin re-pin--home',
-	iconSize: [22, 22],
-	iconAnchor: [11, 11],
-});
 
 // Leaflet sets a string tooltip as innerHTML. Spot labels come from OSM, which anyone can edit.
 const textNode = (text: string): HTMLElement => {
@@ -91,7 +82,7 @@ const textNode = (text: string): HTMLElement => {
 
 export default function MeetupMap({
 	events, spots, places, tournaments, hoveredId, selectedId, selectedTournamentId = null, selectedSpotId = null,
-	picking, pin,
+	picking, pin, me = null,
 	onHover, onSelect, onSelectSpot, onSelectTournament, onPick, handle,
 }: Props) {
 	const boxRef = useRef<HTMLDivElement>(null);
@@ -140,10 +131,10 @@ export default function MeetupMap({
 	}, []);
 
 	/** Member indices per pin at the current zoom; singletons from NO_CLUSTER_ZOOM on. */
-	const groupsOf = <T extends { lat: number; lng: number }>(items: readonly T[]): number[][] => {
+	const groupsOf = <T extends { lat: number; lng: number }>(items: readonly T[], radius = CLUSTER_PX): number[][] => {
 		const map = mapRef.current;
 		if (!map || zoom >= NO_CLUSTER_ZOOM) return items.map((_, i) => [i]);
-		return clusterPoints(items.map((it) => map.project([it.lat, it.lng], zoom)), CLUSTER_PX);
+		return clusterPoints(items.map((it) => map.project([it.lat, it.lng], zoom)), radius);
 	};
 
 	/** A count pin: a tap zooms in two levels on the members' average. */
@@ -174,11 +165,12 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		for (const p of places) {
-			L.marker([p.lat, p.lng], { icon: HOME_ICON, interactive: false })
-				.bindTooltip(textNode(p.name), { direction: 'top' })
-				.addTo(layer);
+			const m = L.marker([p.lat, p.lng], { icon: placeIcon(p), interactive: false });
+			if (p.kind !== 'home') m.bindTooltip(textNode(p.name), { direction: 'top', permanent: false });
+			m.addTo(layer);
 		}
-	}, [places]);
+		if (me) L.marker([me.lat, me.lng], { icon: ME_ICON, interactive: false, zIndexOffset: 3000 }).addTo(layer);
+	}, [places, me]);
 
 	// Known places, drawn under the events. Unconfirmed user pins show hollow —
 	// a pin in someone's garden stays faint and dies on its own (spec §6).
@@ -188,7 +180,8 @@ export default function MeetupMap({
 		layer.clearLayers();
 		spotMarkers.current.clear();
 		const busy = new Set(events.map((e) => e.spot_id));
-		const free = spots.filter((s) => !busy.has(s.id));
+		// As in the app: zoomed out, 100+ grey pins buried the games; pitches show from town scale.
+		const free = zoom >= SPOTS_MIN_ZOOM ? spots.filter((s) => !busy.has(s.id)) : [];
 		for (const g of groupsOf(free)) {
 			if (g.length > 1) {
 				addCluster(layer, free, g, clusterIcon('re-pin--spot', '#8a8f9a', '#4a4f58', g.length));
@@ -214,13 +207,13 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		markers.current.clear();
-		for (const g of groupsOf(events)) {
+		for (const g of groupsOf(events, GAME_CLUSTER_PX)) {
 			if (g.length > 1) {
-				addCluster(layer, events, g, clusterIcon('re-pin--event', '#c4512a', '#7e3116', g.length));
+				addCluster(layer, events, g, gameClusterCard(g.length));
 				continue;
 			}
 			const e = events[g[0]];
-			const m = L.marker([e.lat, e.lng], { icon: ICONS.event, title: e.label || 'Terrain' })
+			const m = L.marker([e.lat, e.lng], { icon: gameCard(e), title: e.label || 'Terrain' })
 				// Same rule as the terrains above, and the case that made it necessary:
 				// a marker over the pin you were aiming for opened its event, which
 				// closed the half-filled form without a word.
@@ -241,14 +234,13 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		tournamentMarkers.current.clear();
-		for (const g of groupsOf(tournaments)) {
+		for (const g of groupsOf(tournaments, TOURNAMENT_CLUSTER_PX)) {
 			if (g.length > 1) {
-				addCluster(layer, tournaments, g, clusterIcon('re-pin--tournament', '#c98a22', '#5a3c0b', g.length));
+				addCluster(layer, tournaments, g, tournamentClusterCard(g.length));
 				continue;
 			}
 			const t = tournaments[g[0]];
-			const m = L.marker([t.lat, t.lng], { icon: ICONS.tournament, title: t.title, zIndexOffset: 500 })
-				.bindTooltip(textNode(t.title), { direction: 'top' })
+			const m = L.marker([t.lat, t.lng], { icon: tournamentCard(t), title: t.title, zIndexOffset: 500 })
 				.on('click', () => {
 					if (cb.current.picking) cb.current.onPick(t.lat, t.lng);
 					else cb.current.onSelectTournament(t.id);
@@ -264,7 +256,7 @@ export default function MeetupMap({
 	useEffect(() => {
 		const active = selectedId ?? hoveredId;
 		for (const [id, m] of markers.current) {
-			m.setIcon(id === active ? ICONS.active : ICONS.event);
+			m.getElement()?.classList.toggle('re-pin--active', id === active);
 			m.setZIndexOffset(id === active ? 1000 : 0);
 		}
 	}, [hoveredId, selectedId, events]);

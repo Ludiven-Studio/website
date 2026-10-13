@@ -22,7 +22,7 @@ import {
 } from '../../lib/meetupRules';
 import {
 	addPlace, isNearPlaces, nearestPlace, readPlaces, removePlace, savePlaces,
-	MAX_PLACES, NEAR_M, SAME_PLACE_M, type Place,
+	MAX_PLACES, NEAR_M, SAME_PLACE_M, type Place, type PlaceKind,
 } from '../../lib/meetupPlaces';
 import { usePinToHome, type PinPlatform } from '../../lib/usePinToHome';
 import { distanceM, formatDistance, isPlausibleFr, nearest } from '../../lib/meetupGeo';
@@ -98,6 +98,7 @@ export default function RencontresApp() {
 	const [name, setName] = useState('');
 	const [places, setPlaces] = useState<Place[]>([]);
 	const [naming, setNaming] = useState<string | null>(null); // the draft name, while adding a place
+	const [namingKind, setNamingKind] = useState<PlaceKind>('favorite');
 	const [pinning, setPinning] = useState(false);
 	const [mine, setMine] = useState<MeetupEvent[]>([]);
 	const [cap, setCap] = useState({ active: 0, max: MAX_ACTIVE_EVENTS });
@@ -505,17 +506,17 @@ export default function RencontresApp() {
 		savePlaces(next);
 	}, []);
 
-	const savePlaceAt = useCallback((label: string, lat: number, lng: number) => {
-		commitPlaces(addPlace(places, label, lat, lng));
+	const savePlaceAt = useCallback((label: string, lat: number, lng: number, kind: PlaceKind = 'favorite') => {
+		commitPlaces(addPlace(places, label, lat, lng, kind));
 		trackEvent('meetup_place_add');
 	}, [commitPlaces, places]);
 
 	/* The map centre, not the geolocation: the winter address is exactly the one
 	   you are NOT standing in when you save it. Pan there, name it, done. */
-	const saveCurrentPlace = useCallback((label: string) => {
+	const saveCurrentPlace = useCallback((label: string, kind: PlaceKind) => {
 		const c = mapRef.current?.center();
 		if (!c) return;
-		savePlaceAt(label, c.lat, c.lng);
+		savePlaceAt(label, c.lat, c.lng, kind);
 		setNaming(null);
 	}, [savePlaceAt]);
 
@@ -722,8 +723,14 @@ export default function RencontresApp() {
 				{naming !== null ? (
 					<form
 						className="re-naming"
-						onSubmit={(e) => { e.preventDefault(); saveCurrentPlace(naming); }}
+						onSubmit={(e) => { e.preventDefault(); saveCurrentPlace(naming, namingKind); }}
 					>
+						<span className="re-seg" role="group" aria-label="Type de lieu">
+							<button type="button" className={`re-segbtn ${namingKind === 'home' ? 're-segbtn--on' : ''}`}
+								aria-pressed={namingKind === 'home'} onClick={() => setNamingKind('home')}>🏠 Ma maison</button>
+							<button type="button" className={`re-segbtn ${namingKind === 'favorite' ? 're-segbtn--on' : ''}`}
+								aria-pressed={namingKind === 'favorite'} onClick={() => setNamingKind('favorite')}>💚 Lieu favori</button>
+						</span>
 						<input
 							autoFocus
 							value={naming}
@@ -796,6 +803,7 @@ export default function RencontresApp() {
 				selectedId={detail?.event.id ?? null}
 				selectedTournamentId={tournament?.id ?? null}
 				selectedSpotId={spot && !creating ? spot.id : null}
+				me={me}
 				picking={creating}
 				pin={pin}
 				onHover={setHoveredId}

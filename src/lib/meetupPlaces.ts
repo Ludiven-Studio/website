@@ -8,7 +8,9 @@
 
 import { distanceM } from './meetupGeo';
 
-export interface Place { name: string; lat: number; lng: number; }
+/** home: shown as a board with its name; favorite: a heart. Older saves have none and read as favorites. */
+export type PlaceKind = 'home' | 'favorite';
+export interface Place { name: string; lat: number; lng: number; kind?: PlaceKind; }
 
 export const MAX_PLACES = 4;
 /** Two pins this close are the same home port: adding one renames the other
@@ -23,9 +25,11 @@ export const cleanPlaceName = (raw: string): string =>
 	raw.replace(/\s+/g, ' ').trim().slice(0, 24) || 'Mon lieu';
 
 /** The list is the caller's, so every rule here is testable without storage. */
-export function addPlace(list: readonly Place[], name: string, lat: number, lng: number): Place[] {
+export function addPlace(
+	list: readonly Place[], name: string, lat: number, lng: number, kind: PlaceKind = 'favorite',
+): Place[] {
 	const rest = list.filter((p) => distanceM(p.lat, p.lng, lat, lng) > SAME_PLACE_M);
-	return [{ name: cleanPlaceName(name), lat, lng }, ...rest].slice(0, MAX_PLACES);
+	return [{ name: cleanPlaceName(name), lat, lng, kind }, ...rest].slice(0, MAX_PLACES);
 }
 
 /** By index, not by name: nothing stops two places being called "Mon lieu". */
