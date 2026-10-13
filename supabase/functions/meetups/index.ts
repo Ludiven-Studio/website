@@ -319,13 +319,13 @@ function tournamentFields(body: Record<string, unknown>, now: number): Record<st
 }
 
 const TOURN_COLS = 'id, spot_id, club_name, title, starts_at, format, category, entry_fee_cents, details, '
-	+ 'contact_phone, poster_status, poster_path, organizer_tag, status, hidden, created_at';
+	+ 'contact_phone, poster_status, poster_path, poster_has_thumb, organizer_tag, status, hidden, created_at';
 const T_EMBED = `${TOURN_COLS}, meetup_spots!inner(id, lat, lng, label, commune)`;
 
 /** Flatten the spot. The poster URL only exists once approved. */
 function shapeTournament(row: Record<string, unknown>): Record<string, unknown> {
 	const spot = (row.meetup_spots ?? {}) as { lat?: number; lng?: number; label?: string; commune?: string };
-	const { meetup_spots: _s, poster_path: path, ...rest } = row;
+	const { meetup_spots: _s, poster_path: path, poster_has_thumb: thumb, ...rest } = row;
 	return {
 		...rest,
 		lat: spot.lat ?? 0,
@@ -333,6 +333,7 @@ function shapeTournament(row: Record<string, unknown>): Record<string, unknown> 
 		label: spot.label ?? '',
 		commune: spot.commune ?? '',
 		poster_url: rest.poster_status === 'approved' && path ? POSTERS_PUBLIC + path : null,
+		poster_thumb_url: rest.poster_status === 'approved' && path && thumb ? POSTERS_PUBLIC + thumbOf(String(path)) : null,
 	};
 }
 
@@ -344,9 +345,13 @@ async function activeTournaments(db: SupabaseClient, uid: string, nowMs: number)
 	return count ?? 0;
 }
 
-/** Removes a poster from both buckets; a missing object is not an error. */
+/** The map cards' small copy, stored next to the poster. */
+const thumbOf = (path: string): string => path.replace(/\.(jpg|png)$/, '_t.jpg');
+const POSTER_THUMB_MAX_BYTES = 200 * 1024;
+
+/** Removes posters and their thumbnails from both buckets; a missing object is not an error. */
 async function dropPosters(db: SupabaseClient, paths: (string | null | undefined)[]): Promise<void> {
-	const list = paths.filter((p): p is string => Boolean(p));
+	const list = paths.filter((p): p is string => Boolean(p)).flatMap((p) => [p, thumbOf(p)]);
 	if (!list.length) return;
 	await db.storage.from('posters-pending').remove(list);
 	await db.storage.from('posters').remove(list);
@@ -359,7 +364,7 @@ async function prunePosters(db: SupabaseClient, nowMs: number): Promise<number> 
 	const rows = old ?? [];
 	if (!rows.length) return 0;
 	await dropPosters(db, rows.map((r) => r.poster_path as string));
-	await db.from('meetup_tournaments').update({ poster_status: 'none', poster_path: null })
+	await db.from('meetup_tournaments').update({ poster_status: 'none', poster_path: null, poster_has_thumb: false })
 		.in('id', rows.map((r) => r.id));
 	return rows.length;
 }
@@ -1030,9 +1035,22 @@ Deno.serve(async (req) => {
 				const { error: upErr } = await db.storage.from('posters-pending')
 					.upload(path, bytes, { contentType: type, cacheControl: '31536000', upsert: false });
 				if (upErr) throw upErr;
+				// Optional: an app that sends none still gets its poster, the cards load the full one.
+				let hasThumb = false;
+				const rawThumb = String(body.thumb ?? '').replace(/^data:[^,]*,/, '');
+				if (rawThumb && rawThumb.length <= Math.ceil(POSTER_THUMB_MAX_BYTES * 4 / 3) + 8) {
+					try {
+						const thumb = Uint8Array.from(atob(rawThumb), (c) => c.charCodeAt(0));
+						if (imageType(thumb) === 'image/jpeg') {
+							const { error: tErr } = await db.storage.from('posters-pending')
+								.upload(thumbOf(path), thumb, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: true });
+							hasThumb = !tErr;
+						}
+					} catch { /* a bad thumbnail never costs the poster */ }
+				}
 				await dropPosters(db, [own.poster_path as string | null]);
 				await db.from('meetup_tournaments')
-					.update({ poster_status: 'pending', poster_path: path, updated_at: nowIso }).eq('id', own.id);
+					.update({ poster_status: 'pending', poster_path: path, poster_has_thumb: hasThumb, updated_at: nowIso }).eq('id', own.id);
 				await mailTournament(shapeTournament(own as Record<string, unknown>),
 					'<b>Nouvelle affiche à valider.</b>', 'Rencontres : affiche à valider');
 				// Each new poster pays for the old ones: no scheduler needed.
@@ -1049,7 +1067,7 @@ Deno.serve(async (req) => {
 				if (!own) return bad('forbidden', 403);
 				await dropPosters(db, [own.poster_path as string | null]);
 				await db.from('meetup_tournaments')
-					.update({ poster_status: 'none', poster_path: null, updated_at: nowIso }).eq('id', own.id);
+					.update({ poster_status: 'none', poster_path: null, poster_has_thumb: false, updated_at: nowIso }).eq('id', own.id);
 				return json({ ok: true });
 			}
 
@@ -1117,7 +1135,7 @@ Deno.serve(async (req) => {
 			case 'moderate_tournament': {
 				if (!isUuid(body.tournamentId) || !await isTToken(body.tournamentId, body.token)) return bad('forbidden', 403);
 				const { data: t } = await db.from('meetup_tournaments')
-					.select('id, organizer_id, organizer_ip, poster_path, poster_status').eq('id', body.tournamentId).maybeSingle();
+					.select('id, organizer_id, organizer_ip, poster_path, poster_status, poster_has_thumb').eq('id', body.tournamentId).maybeSingle();
 				if (!t) return bad('unknown tournament', 404);
 				const what = String(body.do ?? '');
 				const path = t.poster_path as string | null;
@@ -1128,12 +1146,19 @@ Deno.serve(async (req) => {
 					const { error: upErr } = await db.storage.from('posters')
 						.upload(path, file, { contentType: path.endsWith('.png') ? 'image/png' : 'image/jpeg', cacheControl: '31536000', upsert: true });
 					if (upErr) throw upErr;
-					await db.storage.from('posters-pending').remove([path]);
+					if (t.poster_has_thumb) {
+						const { data: small } = await db.storage.from('posters-pending').download(thumbOf(path));
+						if (small) {
+							await db.storage.from('posters')
+								.upload(thumbOf(path), small, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: true });
+						}
+					}
+					await db.storage.from('posters-pending').remove([path, thumbOf(path)]);
 					await db.from('meetup_tournaments').update({ poster_status: 'approved', updated_at: nowIso }).eq('id', t.id);
 				} else if (what === 'reject_poster') {
 					await dropPosters(db, [path]);
 					await db.from('meetup_tournaments')
-						.update({ poster_status: path ? 'rejected' : t.poster_status, poster_path: null, updated_at: nowIso }).eq('id', t.id);
+						.update({ poster_status: path ? 'rejected' : t.poster_status, poster_path: null, poster_has_thumb: false, updated_at: nowIso }).eq('id', t.id);
 				} else if (what === 'restore') {
 					await db.from('meetup_tournament_reports').delete().eq('tournament_id', t.id);
 					await db.from('meetup_tournaments').update({ hidden: false, updated_at: nowIso }).eq('id', t.id);

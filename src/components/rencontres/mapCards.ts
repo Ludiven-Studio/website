@@ -64,8 +64,10 @@ const T_H = 136;
 
 /** The approved poster in an A4 window; without one, the title in the gold card. */
 export function tournamentCard(t: MeetupTournament): L.DivIcon {
-	const face = t.poster_url
-		? `<img src="${esc(t.poster_url)}" alt="" loading="lazy" />`
+	// The thumbnail when there is one: a map full of A4 posters at full size is a lot of bandwidth.
+	const src = t.poster_thumb_url ?? t.poster_url;
+	const face = src
+		? `<img src="${esc(src)}" alt="" loading="lazy" />`
 		: `<span class="re-cp-title">${esc(t.title)}</span>`;
 	return board(
 		`<div class="re-cp re-cp--tournament"><span class="re-cp-badge">${TROPHY}</span>`

@@ -56,6 +56,8 @@ export interface MeetupTournament {
 	format: 'tete-a-tete' | 'doublette' | 'triplette'; category: 'open' | 'veterans' | 'feminin' | 'jeunes' | 'mixte';
 	entry_fee_cents: number | null; details: string | null; contact_phone: string | null;
 	poster_status: 'none' | 'pending' | 'approved' | 'rejected'; poster_url: string | null;
+	/** The small copy for the map cards; null for posters sent before thumbnails. */
+	poster_thumb_url?: string | null;
 	organizer_tag: string; status: 'open' | 'cancelled'; hidden: boolean;
 	lat: number; lng: number; label: string; commune: string;
 }
