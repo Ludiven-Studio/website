@@ -603,7 +603,7 @@ export default function RencontresApp() {
 			<header className="re-head">
 				<h1>Rencontres pétanque</h1>
 				<p className="re-sub">
-					Qui joue près de chez toi, quand, et combien il manque de joueurs.
+					Trouve des joueurs et des tournois autour de chez toi.
 				</p>
 				<div className="re-account">
 					{session ? (
