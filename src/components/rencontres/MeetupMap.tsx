@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
 import L from 'leaflet';
 import type { MeetupEvent, MeetupSpot } from '../../lib/meetupRules';
 import type { Place } from '../../lib/meetupPlaces';
+import type { MeetupTournament } from '../../lib/meetups';
 
 // Saint-Jean-de-Bournay — the launch area (spec §6).
 export const HOME: [number, number] = [45.4489, 5.1381];
@@ -17,6 +18,7 @@ interface Props {
 	events: readonly MeetupEvent[];
 	spots: readonly MeetupSpot[];
 	places: readonly Place[];
+	tournaments: readonly MeetupTournament[];
 	hoveredId: string | null;
 	selectedId: string | null;
 	/** When set, a click on the map drops the pin instead of selecting an event. */
@@ -25,6 +27,7 @@ interface Props {
 	onHover(id: string | null): void;
 	onSelect(id: string): void;
 	onSelectSpot(id: string): void;
+	onSelectTournament(id: string): void;
 	onPick(lat: number, lng: number): void;
 	handle?: Ref<MapHandle>;
 }
@@ -47,6 +50,8 @@ const ICONS = {
 	spot: icon('re-pin--spot', '#8a8f9a', '#4a4f58'),
 	hollow: icon('re-pin--hollow', 'rgba(138,143,154,0.35)', '#4a4f58'),
 	pick: icon('re-pin--pick', '#2fbf71', '#146b3c'),
+	// Gold, as in the app: a tournament is an event the whole town is invited to.
+	tournament: icon('re-pin--tournament', '#c98a22', '#5a3c0b'),
 };
 
 // A disc, not a teardrop: a home port is not a game, and one glance has to say so.
@@ -67,20 +72,21 @@ const textNode = (text: string): HTMLElement => {
 };
 
 export default function MeetupMap({
-	events, spots, places, hoveredId, selectedId, picking, pin,
-	onHover, onSelect, onSelectSpot, onPick, handle,
+	events, spots, places, tournaments, hoveredId, selectedId, picking, pin,
+	onHover, onSelect, onSelectSpot, onSelectTournament, onPick, handle,
 }: Props) {
 	const boxRef = useRef<HTMLDivElement>(null);
 	const mapRef = useRef<L.Map | null>(null);
 	const eventLayer = useRef<L.LayerGroup | null>(null);
 	const spotLayer = useRef<L.LayerGroup | null>(null);
 	const placeLayer = useRef<L.LayerGroup | null>(null);
+	const tournamentLayer = useRef<L.LayerGroup | null>(null);
 	const pinMarker = useRef<L.Marker | null>(null);
 	const markers = useRef(new Map<string, L.Marker>());
 	// Read inside Leaflet handlers, which are bound once — a captured prop would
 	// be the value from the frame the map was created on.
-	const cb = useRef({ onPick, onSelect, onSelectSpot, onHover, picking });
-	cb.current = { onPick, onSelect, onSelectSpot, onHover, picking };
+	const cb = useRef({ onPick, onSelect, onSelectSpot, onSelectTournament, onHover, picking });
+	cb.current = { onPick, onSelect, onSelectSpot, onSelectTournament, onHover, picking };
 
 	useEffect(() => {
 		// Strict mode mounts twice; a second init on the same node throws
@@ -98,6 +104,7 @@ export default function MeetupMap({
 		placeLayer.current = L.layerGroup().addTo(map);
 		spotLayer.current = L.layerGroup().addTo(map);
 		eventLayer.current = L.layerGroup().addTo(map);
+		tournamentLayer.current = L.layerGroup().addTo(map);
 		map.on('click', (e: L.LeafletMouseEvent) => {
 			if (cb.current.picking) cb.current.onPick(e.latlng.lat, e.latlng.lng);
 		});
@@ -173,6 +180,21 @@ export default function MeetupMap({
 			markers.current.set(e.id, m);
 		}
 	}, [events]);
+
+	useEffect(() => {
+		const layer = tournamentLayer.current;
+		if (!layer) return;
+		layer.clearLayers();
+		for (const t of tournaments) {
+			L.marker([t.lat, t.lng], { icon: ICONS.tournament, title: t.title, zIndexOffset: 500 })
+				.bindTooltip(textNode(t.title), { direction: 'top' })
+				.on('click', () => {
+					if (cb.current.picking) cb.current.onPick(t.lat, t.lng);
+					else cb.current.onSelectTournament(t.id);
+				})
+				.addTo(layer);
+		}
+	}, [tournaments]);
 
 	// Highlight without rebuilding the layer: swapping icons keeps the popup
 	// state and avoids a flash on every mouse move across the list.

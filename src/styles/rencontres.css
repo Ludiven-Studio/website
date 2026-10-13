@@ -294,6 +294,8 @@
 
 /* ---- Event panel ---- */
 .re-panel { position: relative; }
+.re-poster { display: block; width: 100%; height: auto; border-radius: 12px; margin: 0.5rem 0; }
+.re-app-cta { margin-top: 1rem; }
 .re-close {
 	position: absolute;
 	top: 0.4rem;

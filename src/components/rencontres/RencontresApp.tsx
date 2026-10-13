@@ -5,7 +5,8 @@ import { trackEvent } from '../../lib/analytics';
 import {
 	listMeetups, getMeetup, createMeetup, updateMeetup, cancelMeetup, deleteMeetup, joinMeetup, leaveMeetup,
 	myMeetups, meetupsEnabled, rememberSecret, secretFor, forgetSecret, hasSecret, savedName, saveName,
-	reportMeetup, reportSignup, readMuted, saveMuted, deleteAccount, LoginRequired,
+	reportMeetup, reportSignup, readMuted, saveMuted, deleteAccount, LoginRequired, getTournament,
+	type MeetupTournament,
 } from '../../lib/meetups';
 import {
 	accountLabel, currentSession, onSessionChange, signIn, signOut, takeRedirectError,
@@ -28,6 +29,7 @@ import { distanceM, formatDistance, isPlausibleFr, nearest } from '../../lib/mee
 import MeetupMap, { type MapHandle } from './MeetupMap';
 import CreateForm, { type Draft } from './CreateForm';
 import EventPanel from './EventPanel';
+import TournamentPanel from './TournamentPanel';
 import MyGames from './MyGames';
 import { formatShortDay, formatTime } from './format';
 
@@ -63,6 +65,7 @@ const takeResume = (): string | null => {
  *  resolves it (spec §2). replaceState keeps the back button out of it. */
 function setUrl(eventId: string | null, secret?: string | null): void {
 	const url = new URL(window.location.href);
+	url.searchParams.delete('t');
 	if (eventId) url.searchParams.set('e', eventId); else url.searchParams.delete('e');
 	if (secret) url.searchParams.set('k', secret); else url.searchParams.delete('k');
 	window.history.replaceState(null, '', url);
@@ -72,6 +75,8 @@ export default function RencontresApp() {
 	const [pid] = useState(() => playerId());
 	const [events, setEvents] = useState<MeetupEvent[]>([]);
 	const [spots, setSpots] = useState<MeetupSpot[]>([]);
+	const [tournaments, setTournaments] = useState<MeetupTournament[]>([]);
+	const [tournament, setTournament] = useState<MeetupTournament | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -108,6 +113,7 @@ export default function RencontresApp() {
 		const r = await listMeetups();
 		setEvents(r.events);
 		setSpots(r.spots);
+		setTournaments(r.tournaments ?? []);
 		return r.events;
 	}, []);
 
@@ -121,10 +127,33 @@ export default function RencontresApp() {
 		} catch { /* keep the last list */ }
 	}, [pid]);
 
+	/** The ?t= link a club shares. Cancelled and past ones still open. */
+	const openTournament = useCallback(async (id: string) => {
+		try {
+			const r = await getTournament(id);
+			setTournament(r.tournament);
+			setDetail(null);
+			setSpotId(null);
+			setUrl(null);
+			const url = new URL(window.location.href);
+			url.searchParams.set('t', id);
+			window.history.replaceState(null, '', url);
+			mapRef.current?.flyTo(r.tournament.lat, r.tournament.lng);
+		} catch (e) {
+			setError(message(e));
+		}
+	}, []);
+
+	const closeTournament = useCallback(() => {
+		setTournament(null);
+		setUrl(null);
+	}, []);
+
 	const openEvent = useCallback(async (id: string, fromUrl?: string | null) => {
 		const secret = secretFor(id, fromUrl);
 		try {
 			const d = await getMeetup(id, pid, secret);
+			setTournament(null);
 			setDetail(d);
 			setCreating(false);
 			setEditing(false);
@@ -147,6 +176,7 @@ export default function RencontresApp() {
 		if (back) setError(back);
 		const url = new URLSearchParams(window.location.search);
 		const wanted = url.get('e');
+		const wantedTournament = url.get('t');
 		void (async () => {
 			// Waits for the ?code= exchange, so every call below already carries the account.
 			const s = await currentSession();
@@ -161,9 +191,10 @@ export default function RencontresApp() {
 			}
 			await loadMine();
 			if (wanted) await openEvent(wanted, url.get('k'));
+			else if (wantedTournament) await openTournament(wantedTournament);
 			if (s && takeResume() === 'create') setResumeCreate(true);
 		})();
-	}, [load, loadMine, openEvent]);
+	}, [load, loadMine, openEvent, openTournament]);
 
 	/** After any write: the list and the open card must agree, or the seat counter
 	 *  on the map contradicts the one in the panel. */
@@ -701,13 +732,15 @@ export default function RencontresApp() {
 				events={shown}
 				spots={spots}
 				places={places}
+				tournaments={tournaments}
 				hoveredId={hoveredId}
 				selectedId={detail?.event.id ?? null}
 				picking={creating}
 				pin={pin}
 				onHover={setHoveredId}
 				onSelect={(id) => { void openEvent(id); }}
-				onSelectSpot={setSpotId}
+				onSelectSpot={(id) => { closeTournament(); setSpotId(id); }}
+				onSelectTournament={(id) => { void openTournament(id); }}
 				onPick={(lat, lng) => {
 					if (!isPlausibleFr(lat, lng)) { setError('Choisis un endroit en France.'); return; }
 					setError(null);
@@ -791,6 +824,15 @@ export default function RencontresApp() {
 					onPickAgain={() => { /* the spot is fixed once the game is posted */ }}
 					onCancel={() => setEditing(false)}
 					onSubmit={onEditSubmit}
+				/>
+			)}
+
+			{tournament && (
+				<TournamentPanel
+					key={tournament.id}
+					tournament={tournament}
+					shareUrl={`${PAGE_URL}?t=${tournament.id}`}
+					onClose={closeTournament}
 				/>
 			)}
 

@@ -47,7 +47,21 @@ export interface EventInput {
 }
 
 /** Everything the page needs, in one invocation. */
-export const listMeetups = (): Promise<{ events: MeetupEvent[]; spots: MeetupSpot[] }> => call('list');
+export const listMeetups = (): Promise<{ events: MeetupEvent[]; spots: MeetupSpot[]; tournaments?: MeetupTournament[] }> =>
+	call('list');
+
+/** A club's tournament. poster_url only once the moderator approved the poster. */
+export interface MeetupTournament {
+	id: string; spot_id: string; title: string; club_name: string; starts_at: string;
+	format: 'tete-a-tete' | 'doublette' | 'triplette'; category: 'open' | 'veterans' | 'feminin' | 'jeunes' | 'mixte';
+	entry_fee_cents: number | null; details: string | null; contact_phone: string | null;
+	poster_status: 'none' | 'pending' | 'approved' | 'rejected'; poster_url: string | null;
+	organizer_tag: string; status: 'open' | 'cancelled'; hidden: boolean;
+	lat: number; lng: number; label: string; commune: string;
+}
+
+export const getTournament = (tournamentId: string): Promise<{ tournament: MeetupTournament; isOrganizer: boolean }> =>
+	call('get_tournament', { tournamentId });
 
 /** The ?e= link. Returns cancelled and finished events too — a signed-up player
  *  has no other way of learning the game is off. */
@@ -101,12 +115,7 @@ export const moderate = (eventId: string, token: string, what: ModAction, signup
 
 // ---- tournament moderation (the page behind the poster mail) ----
 
-export interface ModTournament {
-	id: string; title: string; club_name: string; starts_at: string; format: string; category: string;
-	entry_fee_cents: number | null; details: string | null; contact_phone: string | null;
-	poster_status: 'none' | 'pending' | 'approved' | 'rejected'; poster_url: string | null;
-	status: 'open' | 'cancelled'; hidden: boolean; label: string; commune: string;
-}
+export type ModTournament = MeetupTournament;
 export type TournamentReportReason = 'poster' | 'fake' | 'wrong_info' | 'other';
 export interface ModTournamentReport { reason: TournamentReportReason; created_at: string; }
 export type ModTournamentAction = 'approve_poster' | 'reject_poster' | 'restore' | 'remove' | 'ban_organizer';

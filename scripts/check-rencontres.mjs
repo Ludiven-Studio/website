@@ -304,6 +304,22 @@ try {
 		const r = await fn(body);
 		check(r.status === 401 && /Connecte-toi/.test(r.body.error ?? ''), `${label} sans session: 401 (${r.status} ${r.body.error})`);
 	}
+	// A shared ?t= link opens the tournament's panel, poster included when approved.
+	const someT = (listed.body.tournaments ?? []).find((t) => t.poster_url) ?? (listed.body.tournaments ?? [])[0];
+	if (someT) {
+		const T = await newPage(PLAYER_A);
+		await T.goto(`${BASE}/rencontres/?t=${someT.id}`);
+		await T.waitForSelector('.re-tournament', { timeout: 10000 }).catch(() => {});
+		check((await T.locator('.re-tournament h2').innerText().catch(() => '')).includes(someT.title), 'le lien ?t= ouvre la fiche du tournoi');
+		if (someT.poster_url) {
+			await T.waitForTimeout(1500);
+			const w = await T.locator('.re-poster').evaluate((i) => i.naturalWidth).catch(() => 0);
+			check(w > 0, `l'affiche validee s'affiche (CSP img-src) (${w} px)`);
+		}
+		await T.close();
+	} else {
+		skip('lien ?t=', 'aucun tournoi en ligne');
+	}
 	const tModBlind = await fn({ action: 'moderate_tournament', tournamentId: NO_GAME, token: 'nope', do: 'approve_poster' });
 	check(tModBlind.status === 403, `moderate_tournament sans le bon jeton est refuse (${tModBlind.status})`);
 
