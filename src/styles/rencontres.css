@@ -318,7 +318,26 @@
 .re-tournament { position: relative; max-width: 30rem; margin: auto 0; }
 .re-sheet--event { max-width: 30rem; margin: auto 0; padding: 0; border: none; background: transparent; }
 .re-sheet--event > .re-panel { margin: 0; }
-.re-tournament .re-close { position: absolute; top: 0.4rem; right: 0.6rem; z-index: 1; }
+/* In a sheet the close button is a 44 px white disc that stays in view while the
+   sheet scrolls: a grey glyph on a red poster was hard to see and to hit. */
+.re-modal .re-close {
+	position: sticky;
+	top: 0.5rem;
+	z-index: 3;
+	float: right;
+	align-self: flex-end;
+	width: 44px;
+	height: 44px;
+	margin: -0.4rem -0.4rem -44px auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: #fff;
+	color: #1e2233;
+	font-size: 1.9rem;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
 /* A poster composed from the details, for a club that sent none. */
 .re-affiche {
 	display: flex;
