@@ -509,6 +509,7 @@
 .re-where,
 .re-seats { margin: 0; color: var(--gray-100); }
 .re-seats strong { color: var(--accent-regular); }
+.re-contests { margin: 0; padding-left: 1.1rem; color: var(--gray-100); }
 .re-who {
 	margin: 0;
 	padding-left: 1.1rem;

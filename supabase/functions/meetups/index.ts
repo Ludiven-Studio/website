@@ -238,6 +238,9 @@ const T_REASON_LABEL: Record<string, string> = {
 const T_MAX_TEXT = 60;
 const T_MAX_DETAILS = 300;
 const T_MAX_AHEAD_MS = 120 * 86400_000;
+/** Contests of one tournament: side by side, morning and afternoon, a weekend at most. */
+const T_MAX_CONTESTS = 6;
+const T_CONTESTS_SPAN_MS = 3 * 86400_000;
 /** A tournament has no end time: it leaves the map half a day after it starts. */
 const T_SHOWN_AFTER_START_MS = 12 * 3600_000;
 const MAX_ACTIVE_TOURNAMENTS = 5;
@@ -273,10 +276,53 @@ function validateTournamentStart(startsAt: unknown, now: number): string | null 
 	return null;
 }
 
-/** Validates the fields present in `body` into a row patch. A string = refusal. */
+/** `contests` sorted by start, as stored. A string = refusal. */
+function cleanContests(raw: unknown, now: number): Record<string, unknown>[] | string {
+	if (!Array.isArray(raw) || raw.length < 1) return 'Au moins un concours.';
+	if (raw.length > T_MAX_CONTESTS) return `${T_MAX_CONTESTS} concours au plus.`;
+	const out: Record<string, unknown>[] = [];
+	for (const item of raw) {
+		if (!item || typeof item !== 'object') return 'Concours invalide.';
+		const c = item as Record<string, unknown>;
+		const e = validateTournamentStart(c.startsAt, now);
+		if (e) return e;
+		if (!T_FORMATS.includes(String(c.format))) return 'Format inconnu.';
+		if (!T_CATEGORIES.includes(String(c.category))) return 'Catégorie inconnue.';
+		const fee = c.entryFeeCents ?? null;
+		if (fee !== null && !(typeof fee === 'number' && Number.isInteger(fee) && fee >= 0 && fee <= 100000)) return 'Prix invalide.';
+		out.push({
+			starts_at: new Date(String(c.startsAt)).toISOString(),
+			format: c.format, category: c.category, entry_fee_cents: fee,
+		});
+	}
+	out.sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)));
+	const first = Date.parse(String(out[0].starts_at));
+	if (Date.parse(String(out[out.length - 1].starts_at)) - first > T_CONTESTS_SPAN_MS) {
+		return 'Les concours tiennent sur 3 jours au plus.';
+	}
+	const keys = new Set(out.map((c) => `${c.starts_at}|${c.format}|${c.category}`));
+	if (keys.size !== out.length) return 'Deux concours identiques.';
+	return out;
+}
+
+/** Validates the fields present in `body` into a row patch. A string = refusal.
+ *  `contests` wins over the single startsAt/format/category/entryFeeCents of
+ *  older apps; those alone reset the list to one contest (the trigger rebuilds it). */
 function tournamentFields(body: Record<string, unknown>, now: number): Record<string, unknown> | string {
 	const row: Record<string, unknown> = {};
-	if ('startsAt' in body) {
+	const many = 'contests' in body;
+	if (many) {
+		const contests = cleanContests(body.contests, now);
+		if (typeof contests === 'string') return contests;
+		row.contests = contests;
+		row.starts_at = contests[0].starts_at;
+		row.format = contests[0].format;
+		row.category = contests[0].category;
+		row.entry_fee_cents = contests[0].entry_fee_cents;
+	} else if (['startsAt', 'format', 'category', 'entryFeeCents'].some((k) => k in body)) {
+		row.contests = null;
+	}
+	if ('startsAt' in body && !many) {
 		const e = validateTournamentStart(body.startsAt, now);
 		if (e) return e;
 		row.starts_at = new Date(String(body.startsAt)).toISOString();
@@ -291,15 +337,15 @@ function tournamentFields(body: Record<string, unknown>, now: number): Record<st
 		if (!v) return 'Titre invalide (2 à 60 caractères, sans lien).';
 		row.title = v;
 	}
-	if ('format' in body) {
+	if ('format' in body && !many) {
 		if (!T_FORMATS.includes(String(body.format))) return 'Format inconnu.';
 		row.format = body.format;
 	}
-	if ('category' in body) {
+	if ('category' in body && !many) {
 		if (!T_CATEGORIES.includes(String(body.category))) return 'Catégorie inconnue.';
 		row.category = body.category;
 	}
-	if ('entryFeeCents' in body) {
+	if ('entryFeeCents' in body && !many) {
 		const v = body.entryFeeCents;
 		if (v !== null && !(typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 100000)) return 'Prix invalide.';
 		row.entry_fee_cents = v;
@@ -318,7 +364,7 @@ function tournamentFields(body: Record<string, unknown>, now: number): Record<st
 	return row;
 }
 
-const TOURN_COLS = 'id, spot_id, club_name, title, starts_at, format, category, entry_fee_cents, details, '
+const TOURN_COLS = 'id, spot_id, club_name, title, starts_at, last_starts_at, format, category, entry_fee_cents, contests, details, '
 	+ 'contact_phone, poster_status, poster_path, poster_has_thumb, organizer_tag, status, hidden, created_at';
 const T_EMBED = `${TOURN_COLS}, meetup_spots!inner(id, lat, lng, label, commune)`;
 
@@ -341,7 +387,7 @@ async function activeTournaments(db: SupabaseClient, uid: string, nowMs: number)
 	const { count } = await db.from('meetup_tournaments')
 		.select('id', { count: 'exact', head: true })
 		.eq('organizer_id', uid).eq('status', 'open')
-		.gte('starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString());
+		.gte('last_starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString());
 	return count ?? 0;
 }
 
@@ -360,7 +406,7 @@ async function dropPosters(db: SupabaseClient, paths: (string | null | undefined
 /** Posters of tournaments a week past, so storage does not grow forever. */
 async function prunePosters(db: SupabaseClient, nowMs: number): Promise<number> {
 	const { data: old } = await db.from('meetup_tournaments').select('id, poster_path')
-		.not('poster_path', 'is', null).lt('starts_at', new Date(nowMs - 7 * 86400_000).toISOString()).limit(200);
+		.not('poster_path', 'is', null).lt('last_starts_at', new Date(nowMs - 7 * 86400_000).toISOString()).limit(200);
 	const rows = old ?? [];
 	if (!rows.length) return 0;
 	await dropPosters(db, rows.map((r) => r.poster_path as string));
@@ -542,7 +588,7 @@ Deno.serve(async (req) => {
 					.order('confirmed', { ascending: false }).order('created_at').limit(1000);
 				const { data: tournaments, error: tErr } = await db.from('meetup_tournaments')
 					.select(T_EMBED).eq('status', 'open').eq('hidden', false)
-					.gte('starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString())
+					.gte('last_starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString())
 					.order('starts_at').limit(300);
 				if (tErr) throw tErr;
 				return json({
@@ -944,7 +990,8 @@ Deno.serve(async (req) => {
 			case 'create_tournament': {
 				const playerId = await whoAmI();
 				if (!playerId) return bad(LOGIN, 401);
-				for (const k of ['startsAt', 'clubName', 'title', 'format', 'category']) {
+				const needed = 'contests' in body ? ['clubName', 'title'] : ['startsAt', 'clubName', 'title', 'format', 'category'];
+				for (const k of needed) {
 					if (!(k in body)) return bad('Champ manquant.');
 				}
 				const fields = tournamentFields(body, nowMs);

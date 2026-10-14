@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-	modGetTournament, moderateTournament,
+	contestsOf, modGetTournament, moderateTournament,
 	type ModTournament, type ModTournamentAction, type ModTournamentReport, type TournamentReportReason,
 } from '../../lib/meetups';
 import { formatDay, formatShortDay, formatTime } from './format';
@@ -76,7 +76,6 @@ export default function TournamentModeration({ tournamentId, token }: { tourname
 
 	const { tournament: t, posterPreview, reports } = data;
 	const state = t.status === 'cancelled' ? 'Annulé' : t.hidden ? 'Masqué' : 'En ligne';
-	const fee = t.entry_fee_cents === null ? null : `${(t.entry_fee_cents / 100).toLocaleString('fr-FR')} €`;
 
 	return (
 		<div className="re-root">
@@ -87,7 +86,13 @@ export default function TournamentModeration({ tournamentId, token }: { tourname
 				<p>Organisateur&nbsp;: <strong>{t.club_name}</strong></p>
 				<p className="re-when">{formatDay(t.starts_at)} · {formatTime(t.starts_at)}</p>
 				<p className="re-where">📍 {t.label || 'Lieu'}{t.commune && t.commune !== t.label ? ` · ${t.commune}` : ''}</p>
-				<p>{t.format} · {t.category}{fee ? ` · ${fee}` : ''}{t.contact_phone ? ` · ${t.contact_phone}` : ''}</p>
+				{contestsOf(t).map((c, i) => (
+					<p key={i}>
+						{formatShortDay(c.starts_at)} {formatTime(c.starts_at)} · {c.format} · {c.category}
+						{c.entry_fee_cents === null ? '' : ` · ${(c.entry_fee_cents / 100).toLocaleString('fr-FR')} €`}
+					</p>
+				))}
+				{t.contact_phone && <p>{t.contact_phone}</p>}
 				{t.details && <p style={{ whiteSpace: 'pre-line' }}>{t.details}</p>}
 			</section>
 

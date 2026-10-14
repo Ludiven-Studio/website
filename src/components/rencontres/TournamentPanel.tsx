@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { MeetupTournament } from '../../lib/meetups';
+import { contestsOf, type MeetupTournament, type TournamentContest } from '../../lib/meetups';
 import { formatDay, formatTime } from './format';
 
 const FORMAT: Record<MeetupTournament['format'], string> = {
@@ -21,17 +21,43 @@ const fee = (cents: number | null): string | null => {
 
 const phone = (digits: string): string => digits.replace(/(\d{2})(?=\d)/g, '$1 ');
 
+const sameDay = (cs: TournamentContest[]): boolean =>
+	cs.every((c) => formatDay(c.starts_at) === formatDay(cs[0].starts_at));
+
+/** "14:30 · Triplette · Vétérans · Inscription 5 €", the day first when they span several. */
+const contestLine = (c: TournamentContest, withDay: boolean): string => {
+	const price = fee(c.entry_fee_cents);
+	return `${withDay ? `${formatDay(c.starts_at)} ` : ''}${formatTime(c.starts_at)} · ${FORMAT[c.format]} · ${CATEGORY[c.category]}`
+		+ (price ? ` · ${price}` : '');
+};
+
 /** What a club without a poster still gets: one composed from its own details,
  *  so every tournament reads like a poster on a café wall. */
 function ComposedPoster({ t }: { t: MeetupTournament }) {
 	const price = fee(t.entry_fee_cents);
+	const cs = contestsOf(t);
+	const oneDay = sameDay(cs);
 	return (
 		<div className={`re-affiche re-affiche--${t.format}`} role="img" aria-label={`Affiche : ${t.title}`}>
 			<p className="re-affiche-kicker">Concours de pétanque</p>
 			<p className="re-affiche-title">{t.title}</p>
-			<p className="re-affiche-when">{formatDay(t.starts_at)}<br />{formatTime(t.starts_at)}</p>
-			<p className="re-affiche-what">{FORMAT_PLURAL[t.format]} · {CATEGORY[t.category]}</p>
-			{price && <p className="re-affiche-what">{price}</p>}
+			{cs.length === 1 ? (
+				<>
+					<p className="re-affiche-when">{formatDay(t.starts_at)}<br />{formatTime(t.starts_at)}</p>
+					<p className="re-affiche-what">{FORMAT_PLURAL[t.format]} · {CATEGORY[t.category]}</p>
+					{price && <p className="re-affiche-what">{price}</p>}
+				</>
+			) : (
+				<>
+					{oneDay && <p className="re-affiche-when">{formatDay(t.starts_at)}</p>}
+					{cs.map((c, i) => (
+						<p key={i} className="re-affiche-what">
+							{oneDay ? formatTime(c.starts_at) : `${formatDay(c.starts_at)} ${formatTime(c.starts_at)}`}
+							{' · '}{FORMAT_PLURAL[c.format]} · {CATEGORY[c.category]}
+						</p>
+					))}
+				</>
+			)}
 			<p className="re-affiche-where">{t.label || 'Lieu du tournoi'}{t.commune && t.commune !== t.label ? `, ${t.commune}` : ''}</p>
 			<p className="re-affiche-club">{t.club_name}</p>
 		</div>
@@ -45,6 +71,7 @@ export default function TournamentPanel({ tournament: t, shareUrl, onClose }: {
 }) {
 	const place = t.label || 'Lieu du tournoi';
 	const price = fee(t.entry_fee_cents);
+	const cs = contestsOf(t);
 	const directions = `https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}`;
 
 	useEffect(() => {
@@ -72,9 +99,17 @@ export default function TournamentPanel({ tournament: t, shareUrl, onClose }: {
 					: <ComposedPoster t={t} />}
 				<h2>🏆 {t.title}</h2>
 				<p><strong>Organisé par {t.club_name}</strong></p>
-				<p className="re-when">{formatDay(t.starts_at)} · {formatTime(t.starts_at)}</p>
+				{(cs.length === 1 || sameDay(cs)) && (
+					<p className="re-when">{formatDay(t.starts_at)}{cs.length === 1 ? ` · ${formatTime(t.starts_at)}` : ''}</p>
+				)}
 				<p className="re-where">📍 {place}{t.commune && t.commune !== place ? ` · ${t.commune}` : ''}</p>
-				<p className="re-hint">{FORMAT[t.format]} · {CATEGORY[t.category]}{price ? ` · ${price}` : ''}</p>
+				{cs.length === 1
+					? <p className="re-hint">{FORMAT[t.format]} · {CATEGORY[t.category]}{price ? ` · ${price}` : ''}</p>
+					: (
+						<ul className="re-contests">
+							{cs.map((c, i) => <li key={i}>{contestLine(c, !sameDay(cs))}</li>)}
+						</ul>
+					)}
 				{t.details && <p style={{ whiteSpace: 'pre-line' }}>{t.details}</p>}
 				<div className="re-actions">
 					{t.contact_phone && t.status === 'open' && (

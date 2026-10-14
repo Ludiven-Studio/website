@@ -47,14 +47,27 @@ export interface EventInput {
 }
 
 /** Everything the page needs, in one invocation. */
+/** Every contest, the single one of an older row included. */
+export const contestsOf = (t: MeetupTournament): TournamentContest[] => (t.contests?.length ? t.contests : [t]);
+
 export const listMeetups = (): Promise<{ events: MeetupEvent[]; spots: MeetupSpot[]; tournaments?: MeetupTournament[] }> =>
 	call('list');
 
-/** A club's tournament. poster_url only once the moderator approved the poster. */
+/** One contest of a tournament day: doublette in the morning, triplette after lunch. */
+export interface TournamentContest {
+	starts_at: string;
+	format: 'tete-a-tete' | 'doublette' | 'triplette'; category: 'open' | 'veterans' | 'feminin' | 'jeunes' | 'mixte';
+	entry_fee_cents: number | null;
+}
+
+/** A club's tournament. poster_url only once the moderator approved the poster.
+ *  starts_at, format, category and entry_fee_cents repeat the first contest. */
 export interface MeetupTournament {
 	id: string; spot_id: string; title: string; club_name: string; starts_at: string;
-	format: 'tete-a-tete' | 'doublette' | 'triplette'; category: 'open' | 'veterans' | 'feminin' | 'jeunes' | 'mixte';
+	format: TournamentContest['format']; category: TournamentContest['category'];
 	entry_fee_cents: number | null; details: string | null; contact_phone: string | null;
+	/** Sorted by start; missing from a function deployed before contests. */
+	contests?: TournamentContest[];
 	poster_status: 'none' | 'pending' | 'approved' | 'rejected'; poster_url: string | null;
 	/** The small copy for the map cards; null for posters sent before thumbnails. */
 	poster_thumb_url?: string | null;
