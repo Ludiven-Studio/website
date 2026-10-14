@@ -42,7 +42,7 @@ const jsonLd = {
 
 <BaseLayout title={title} description={description} lang="en" altLang="/prestations/">
 	<div class="stack gap-20">
-		<main class="wrapper stack gap-12">
+		<main class="wrapper stack gap-15">
 			<div class="stack gap-8">
 				<LangSwitch lang="en" href="/prestations/" />
 				<Hero
@@ -52,7 +52,7 @@ const jsonLd = {
 				/>
 			</div>
 
-			<section class="stack gap-4">
+			<section class="stack gap-8">
 				<h2 class="section-title">Main services</h2>
 				<div class="box services">
 					{services.map((s) => (
@@ -65,7 +65,7 @@ const jsonLd = {
 				</div>
 			</section>
 
-			<section class="stack gap-8 focused-section">
+			<section class="stack gap-8">
 				<h2 class="section-title">Focused work</h2>
 				<div class="box focused">
 					{focused.map((s) => (
@@ -105,9 +105,6 @@ const jsonLd = {
 		background: linear-gradient(90deg, #8b5cf6, #0ea5e9, #10b981);
 	}
 
-	.focused-section {
-		margin-top: 1.5rem;
-	}
 
 	.services {
 		display: grid;

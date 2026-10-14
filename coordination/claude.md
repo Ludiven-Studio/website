@@ -148,3 +148,20 @@
 - Statut : terminé, non commité (2026-10-14, Europe/Paris). Réservations libérées. astro check 0 erreur, captures FR/EN sombre/mobile OK.
 - Réservations (libérées) : `src/pages/prestations.astro`, `src/pages/en/services.astro`, `src/components/FocusItem.astro` (nouveau).
 - Ressources : serveur de dev sur le port 4395 (arrêté).
+
+## 2026-10-14 — Prestations : scènes animées plus petites
+
+- Statut : terminé, non commité (2026-10-14, Europe/Paris). Réservations libérées. Captures FR/EN/mobile OK, 0 erreur.
+- Réservations (libérées) : `src/components/OfferScene.astro`, `src/pages/prestations.astro`, `src/pages/en/services.astro`.
+- Ressources : serveur de dev sur le port 4395 (arrêté).
+
+## 2026-10-14 — Prestations : espace au-dessus des titres de section
+
+- Statut : terminé, non commité (2026-10-14, Europe/Paris). Réservations libérées. `gap-12`/`gap-6` absents de global.css (utilisés ailleurs, non corrigés). Captures EN/mobile OK.
+- Réservations (libérées) : `src/pages/prestations.astro`, `src/pages/en/services.astro`.
+
+## 2026-10-14 — Classes d'espacement `gap-6` et `gap-12` manquantes
+
+- Statut : terminé, non commité (2026-10-14, Europe/Paris). Réservations libérées. 9 pages concernées capturées, 0 erreur.
+- Réservations (libérées) : `src/styles/global.css` (bloc `.gap-*` seulement).
+- Ressources : serveur de dev sur le port 4395 (arrêté).
