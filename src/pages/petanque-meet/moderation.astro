@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ModerationApp from '../../components/rencontres/ModerationApp';
+import '../../styles/rencontres.css';
+---
+
+<BaseLayout title="Rencontres — modération | Ludiven Studio" description="Modération des parties de pétanque." noindex>
+	<div class="wrapper">
+		<ModerationApp client:only="react" />
+	</div>
+</BaseLayout>

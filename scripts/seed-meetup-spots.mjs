@@ -1,5 +1,5 @@
 // One-off import of the OSM `sport=boules` places around Saint-Jean-de-Bournay
-// into meetup_spots, so /rencontres does not open on an empty map.
+// into meetup_spots, so /petanque-meet does not open on an empty map.
 //
 // Writes through the meetups function's seed_spots action, not with the
 // service_role key: the master credential never leaves Supabase, and routing the

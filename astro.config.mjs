@@ -37,7 +37,9 @@ export default defineConfig({
                 !page.includes('/courses') &&
                 !page.includes('/confidentialite') &&
                 !page.includes('/mentions-legales') &&
-                !page.includes('/rencontres/test') &&
+                !page.includes('/rencontres') &&
+                !page.includes('/petanque-meet/moderation') &&
+                !page.includes('/petanque-meet/test') &&
                 !page.includes('/jeux/petanque/test'),
         }),
         AstroPWA({
@@ -68,7 +70,7 @@ export default defineConfig({
                 maximumFileSizeToCacheInBytes: 3_500_000,
                 runtimeCaching: [
                     {
-                        // OSM map tiles (/rencontres). MUST come before the image rule: tiles are
+                        // OSM map tiles (/petanque-meet). MUST come before the image rule: tiles are
                         // <img>, so they would otherwise land in ludiven-images and one pan (~30
                         // tiles at z15) would evict the game art from a 150-entry cache.
                         // The tile layer sets crossOrigin — without it these are opaque responses,

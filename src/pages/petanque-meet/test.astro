@@ -1,0 +1,124 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { SUPABASE_URL } from '../../data/site';
+
+// Written by PetanqueMeet's tools/publish_test_apk.py; no-cache, so a new build
+// shows up on the next visit.
+const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet/latest.json`;
+---
+
+<BaseLayout
+	title="Pétanque Meet — version de test | Ludiven Studio"
+	description="Version de test Android de l'appli Pétanque Meet."
+	noindex
+>
+	<div class="wrapper test-page stack gap-6">
+		<header class="stack gap-2">
+			<h1>Pétanque Meet — version de test</h1>
+			<p class="lead">Appli Android en cours de développement. Elle s'installe à côté de la version du Play Store et utilise les vraies parties de la carte.</p>
+		</header>
+
+		<section class="card stack gap-4" id="build" data-latest={LATEST}>
+			<p class="muted" data-state="loading">Chargement de la dernière version…</p>
+			<div class="stack gap-3" data-state="ready" hidden>
+				<a class="download" data-field="url" href="#">Télécharger la version <span data-field="version"></span></a>
+				<p class="muted"><span data-field="date"></span> · <span data-field="size"></span> · commit <code data-field="commit"></code></p>
+				<div>
+					<h2>Nouveautés</h2>
+					<ul data-field="notes"></ul>
+				</div>
+			</div>
+			<p class="muted" data-state="error" hidden>Aucune version de test n'est publiée pour l'instant.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Installer sur Android</h2>
+			<ol>
+				<li>Ouvre cette page sur le téléphone et touche « Télécharger ».</li>
+				<li>Ouvre le fichier téléchargé. Si Android bloque, autorise ton navigateur à installer des applis inconnues, puis réessaie.</li>
+				<li>Pour une nouvelle version, refais la même chose : elle s'installe par-dessus et garde tes parties.</li>
+			</ol>
+			<p class="muted">Une partie créée en test apparaît sur la carte publique : pense à la supprimer.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<script>
+	const box = document.getElementById('build');
+	const show = (state: string) => {
+		box?.querySelectorAll<HTMLElement>('[data-state]').forEach((el) => {
+			el.hidden = el.dataset.state !== state;
+		});
+	};
+	const field = (name: string) => box?.querySelector<HTMLElement>(`[data-field="${name}"]`);
+
+	async function load() {
+		try {
+			const res = await fetch(`${box?.dataset.latest}?t=${Date.now()}`, { cache: 'no-store' });
+			if (!res.ok) throw new Error(String(res.status));
+			const b = await res.json();
+			const link = field('url') as HTMLAnchorElement | null;
+			if (link) link.href = b.url;
+			field('version')!.textContent = b.version;
+			field('date')!.textContent = new Date(b.date).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+			field('size')!.textContent = `${(b.size / 1e6).toFixed(1)} Mo`;
+			field('commit')!.textContent = b.commit;
+			const notes = field('notes');
+			if (notes) {
+				notes.replaceChildren(...(b.notes as string[]).map((n) => {
+					const li = document.createElement('li');
+					li.textContent = n;
+					return li;
+				}));
+			}
+			show('ready');
+		} catch {
+			show('error');
+		}
+	}
+	load();
+</script>
+
+<style>
+	.test-page {
+		max-width: 40rem;
+		margin-inline: auto;
+	}
+	.test-page h1 {
+		font-size: var(--text-3xl);
+	}
+	.test-page h2 {
+		font-size: var(--text-xl);
+	}
+	.lead,
+	.muted {
+		color: var(--gray-300);
+	}
+	.card {
+		padding: 1.5rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background: var(--gray-999_40);
+	}
+	.download {
+		display: inline-block;
+		padding: 0.9rem 1.4rem;
+		border-radius: 999px;
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
+		font-weight: 600;
+		text-decoration: none;
+		text-align: center;
+	}
+	.download:hover,
+	.download:focus-visible {
+		background: var(--accent-dark);
+	}
+	ol,
+	ul {
+		padding-inline-start: 1.25rem;
+	}
+	li + li {
+		margin-top: 0.4rem;
+	}
+</style>

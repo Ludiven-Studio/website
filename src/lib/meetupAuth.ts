@@ -1,4 +1,4 @@
-// Supabase Auth for /rencontres: browsing is open, acting (create, join, report)
+// Supabase Auth for /petanque-meet: browsing is open, acting (create, join, report)
 // needs an account. Google or Apple only, PKCE, session kept in localStorage.
 
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';

@@ -83,7 +83,7 @@ function EventModeration({ eventId, token }: { eventId: string; token: string })
 				<p className="re-where">📍 {event.label || 'Terrain'}{event.commune && event.commune !== event.label ? ` · ${event.commune}` : ''}</p>
 				<p className="re-seats"><strong>{event.seats_taken} / {event.players_needed}</strong> joueurs</p>
 				<p>Organisateur&nbsp;: <strong>{event.organizer_name}</strong>{event.organizer_seats > 1 ? ` ×${event.organizer_seats}` : ''}</p>
-				<a className="re-link" href={`/rencontres/?e=${event.id}`}>Voir la fiche publique</a>
+				<a className="re-link" href={`/petanque-meet/?e=${event.id}`}>Voir la fiche publique</a>
 			</section>
 
 			<section className="re-panel">

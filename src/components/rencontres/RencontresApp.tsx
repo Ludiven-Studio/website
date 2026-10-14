@@ -38,7 +38,7 @@ const DATES: DateFilter[] = ['today', 'weekend', 'week', 'all'];
 const ROLE_FILTERS: RoleFilter[] = ['all', 'tireur', 'pointeur'];
 /* The island is client:only, so `window` is always there. The installed icon must
    land on the map, never on the ?e= card that happened to be open. */
-const PAGE_URL = `${window.location.origin}/rencontres/`;
+const PAGE_URL = `${window.location.origin}/petanque-meet/`;
 
 interface Detail {
 	event: MeetupEvent;
@@ -112,7 +112,7 @@ export default function RencontresApp() {
 	const okRef = useRef<HTMLDivElement>(null);
 	// The map is the page, so the icon must open the map — not whatever game card
 	// happened to be open, which is what the live URL would carry.
-	const toHome = usePinToHome({ name: 'Rencontres pétanque', scope: '/rencontres', startUrl: PAGE_URL });
+	const toHome = usePinToHome({ name: 'Rencontres pétanque', scope: '/petanque-meet', startUrl: PAGE_URL });
 
 	const load = useCallback(async (): Promise<MeetupEvent[]> => {
 		const r = await listMeetups();
@@ -572,7 +572,7 @@ export default function RencontresApp() {
 		window.history.replaceState(null, '', url);
 		if (on) mapRef.current?.flyTo(HOME[0], HOME[1], 10);
 	};
-	const shareUrl = (id: string): string => `${window.location.origin}/rencontres/?e=${id}`;
+	const shareUrl = (id: string): string => `${window.location.origin}/petanque-meet/?e=${id}`;
 	const spot = spotId ? spots.find((s) => s.id === spotId) ?? null : null;
 
 	/* The page is two screens tall, so a banner pinned to the top is a banner

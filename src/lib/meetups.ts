@@ -1,4 +1,4 @@
-// Client for the `meetups` Edge Function (/rencontres). Reads go through it too:
+// Client for the `meetups` Edge Function (/petanque-meet). Reads go through it too:
 // the meetup_* tables have RLS on and no policies, so there is no PostgREST path
 // to them — deliberately, because meetup_events carries the organizer `secret`.
 

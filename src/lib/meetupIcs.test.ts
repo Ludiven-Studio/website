@@ -8,7 +8,7 @@ const base = {
 	summary: 'Pétanque — doublette',
 	location: 'Saint-Jean-de-Bournay — Place de la Mairie',
 	description: 'Doublette, 4 joueurs',
-	url: 'https://www.ludiven-studio.fr/rencontres/?e=abc-123',
+	url: 'https://www.ludiven-studio.fr/petanque-meet/?e=abc-123',
 	stamp: new Date('2026-09-21T12:00:00.000Z'),
 };
 

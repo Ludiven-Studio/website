@@ -1,0 +1,25 @@
+---
+// Astro's `redirects` drop the query string, and shared links carry it (?e=<id>, ?t=<id>&k=<token>).
+interface Props {
+	to: string;
+}
+const { to } = Astro.props;
+const canonical = new URL(to, Astro.site).href;
+---
+
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="robots" content="noindex" />
+		<link rel="canonical" href={canonical} />
+		<title>Redirection…</title>
+		<script is:inline define:vars={{ to }}>
+			location.replace(to + location.search + location.hash);
+		</script>
+		<noscript><meta http-equiv="refresh" content={`0;url=${to}`} /></noscript>
+	</head>
+	<body>
+		<p>Cette page a déménagé&nbsp;: <a href={to}>{canonical}</a></p>
+	</body>
+</html>

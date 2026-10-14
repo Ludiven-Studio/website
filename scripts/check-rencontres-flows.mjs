@@ -1,4 +1,4 @@
-/* Flow tests for /rencontres, over a FAKE backend.
+/* Flow tests for /petanque-meet, over a FAKE backend.
    scripts/check-rencontres.mjs hits production, so it can only afford the happy
    path and needs an admin key to clean up. This one answers the meetups function
    itself from a table in this file, which buys the cases that matter and cost
@@ -218,7 +218,7 @@ const clickMap = async (fx, fy) => {
 };
 
 try {
-	await page.goto(`${BASE}/rencontres/`, { waitUntil: 'networkidle' });
+	await page.goto(`${BASE}/petanque-meet/`, { waitUntil: 'networkidle' });
 	await page.waitForSelector('.re-map', { timeout: 15000 });
 	await page.locator('.re-segbtn', { hasText: 'Tout' }).click();
 	check(await page.locator('.re-item').count() === 2, 'les deux parties du faux serveur sont listees');

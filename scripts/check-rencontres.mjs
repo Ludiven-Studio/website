@@ -1,4 +1,4 @@
-/* Guard for /rencontres. It hits the REAL backend — there is no local Supabase
+/* Guard for /petanque-meet. It hits the REAL backend — there is no local Supabase
    here — so three things keep it from silting up the live map:
      · fixed test player uuids, injected before the island boots;
      · a fixed off-map coordinate (Bay of Biscay) that also exercises, for free,
@@ -99,7 +99,7 @@ let eventId = null;
 
 try {
 	// ---- 1. The page stands up ----
-	await A.goto(`${BASE}/rencontres/`, { waitUntil: 'networkidle' });
+	await A.goto(`${BASE}/petanque-meet/`, { waitUntil: 'networkidle' });
 	await A.waitForSelector('.re-map', { timeout: 15000 });
 	const box = await A.locator('.re-map').boundingBox();
 	check(box && box.height > 200, `la carte a une hauteur reelle (${Math.round(box?.height ?? 0)} px)`);
@@ -184,7 +184,7 @@ try {
 
 	// ---- 2quinquies. Signed out: browsing is open, acting asks for a login ----
 	const S = await newPage(PLAYER_B);
-	await S.goto(`${BASE}/rencontres/`, { waitUntil: 'networkidle' });
+	await S.goto(`${BASE}/petanque-meet/`, { waitUntil: 'networkidle' });
 	await S.waitForSelector('.re-map', { timeout: 15000 });
 	check(await S.locator('.re-empty, .re-item').count() > 0, 'deconnecte: la liste se charge');
 	await S.locator('.re-bar .re-btn', { hasText: 'Poser une partie' }).click();
@@ -308,7 +308,7 @@ try {
 	const someT = (listed.body.tournaments ?? []).find((t) => t.poster_url) ?? (listed.body.tournaments ?? [])[0];
 	if (someT) {
 		const T = await newPage(PLAYER_A);
-		await T.goto(`${BASE}/rencontres/?t=${someT.id}`);
+		await T.goto(`${BASE}/petanque-meet/?t=${someT.id}`);
 		await T.waitForSelector('.re-tournament', { timeout: 10000 }).catch(() => {});
 		check((await T.locator('.re-tournament h2').innerText().catch(() => '')).includes(someT.title), 'le lien ?t= ouvre la fiche du tournoi');
 		if (someT.poster_url) {
@@ -340,7 +340,7 @@ try {
 		// The pin is 600 km offshore: Nominatim finds nothing, and the fallback
 		// must still produce a usable card instead of an empty one. No ?k=: the
 		// account alone must make A the organizer.
-		await A.goto(`${BASE}/rencontres/?e=${eventId}`, { waitUntil: 'networkidle' });
+		await A.goto(`${BASE}/petanque-meet/?e=${eventId}`, { waitUntil: 'networkidle' });
 		await A.waitForSelector('.re-panel', { timeout: 15000 });
 		check((await A.locator('.re-where').innerText()).trim().length > 2, 'geocodage muet: la fiche a quand meme un lieu');
 		check(await A.locator('.re-panel .re-btn--danger').count() > 0, 'le compte ouvre le mode organisateur, sans secret');
@@ -355,7 +355,7 @@ try {
 
 		// ---- 7. A second player joins, the counter follows ----
 		const B = await newPage(PLAYER_B, JWT_B || null);
-		await B.goto(`${BASE}/rencontres/?e=${eventId}`, { waitUntil: 'networkidle' });
+		await B.goto(`${BASE}/petanque-meet/?e=${eventId}`, { waitUntil: 'networkidle' });
 		await B.waitForSelector('.re-panel', { timeout: 15000 });
 		check(await B.locator('.re-panel .re-btn--danger').count() === 0, 'un autre joueur n a pas de bouton annuler');
 		if (!JWT_B) {
@@ -382,7 +382,7 @@ try {
 		check(await B.locator('.re-banner--off').count() > 0, "l inscrit voit l'annulation en rouvrant le lien");
 
 		// A cancelled game is off the map but still reachable by its link (§7).
-		await B.goto(`${BASE}/rencontres/`, { waitUntil: 'networkidle' });
+		await B.goto(`${BASE}/petanque-meet/`, { waitUntil: 'networkidle' });
 		await B.waitForSelector('.re-list', { timeout: 15000 });
 		await B.locator('.re-segbtn', { hasText: 'Tout' }).click();
 		check(!(await B.locator('.re-list').innerText()).includes('Guard'), 'une partie annulee sort de la carte');

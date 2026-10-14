@@ -1,5 +1,5 @@
 // meetups — the ONLY access path to the meetup_* tables (service_role, bypasses
-// RLS). Backs /rencontres and the PetanqueMeet app: a public map of pétanque
+// RLS). Backs /petanque-meet and the PetanqueMeet app: a public map of pétanque
 // games. Reading is open; acting (create, join, report) needs a Supabase Auth
 // session (Google or Apple), sent as the Authorization bearer. The account id is
 // the organizer_id / player_id. Games posted before accounts keep their per-event
@@ -131,7 +131,7 @@ const REPORT_IP_CAP = 10;           // reports per IP per 24 h
 /** An IP ban only stops a never-seen player from creating, and only this long:
  *  a carrier IP (CGNAT) is shared by thousands of people. */
 const IP_BAN_MS = 48 * 3600_000;
-const MOD_URL = 'https://www.ludiven-studio.fr/rencontres/moderation/';
+const MOD_URL = 'https://www.ludiven-studio.fr/petanque-meet/moderation/';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 const MOD_EMAIL = Deno.env.get('MEETUPS_MOD_EMAIL') ?? '';
 const FROM_EMAIL = Deno.env.get('MEETUPS_FROM_EMAIL') ?? Deno.env.get('COURSES_FROM_EMAIL') ?? '';
