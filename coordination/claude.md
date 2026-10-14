@@ -142,3 +142,9 @@
 - Statut : terminé, non commité (2026-10-13, Europe/Paris). Réservations libérées. astro check 0 erreur, captures FR/EN/mobile OK.
 - Réservations (libérées) : `src/pages/prestations.astro`, `src/pages/en/services.astro`, `src/components/OfferScene.astro` (nouveau).
 - Ressources : serveur de dev sur le port 4395 (arrêté).
+
+## 2026-10-14 — Prestations : « Interventions ciblées » animées et colorées
+
+- Statut : terminé, non commité (2026-10-14, Europe/Paris). Réservations libérées. astro check 0 erreur, captures FR/EN sombre/mobile OK.
+- Réservations (libérées) : `src/pages/prestations.astro`, `src/pages/en/services.astro`, `src/components/FocusItem.astro` (nouveau).
+- Ressources : serveur de dev sur le port 4395 (arrêté).

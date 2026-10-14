@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Hero from '../../components/Hero.astro';
 import OfferScene, { type OfferSceneId } from '../../components/OfferScene.astro';
+import FocusItem, { type FocusIconId } from '../../components/FocusItem.astro';
 import ContactCTA from '../../components/ContactCTA.astro';
 import LangSwitch from '../../components/LangSwitch.astro';
 
@@ -15,14 +16,14 @@ const services: { scene: OfferSceneId; title: string; body: string }[] = [
 	{ scene: 'mentor', title: 'Training & mentoring', body: 'Tailored sessions on Unity and C#, technical guidance, code reviews and mentoring for apprentices and junior developers.' },
 ];
 
-const focused: { title: string; body: string }[] = [
-	{ title: 'Project structure', body: 'Architecture, code organisation and good practice to keep a Unity project healthy.' },
-	{ title: 'Gameplay & physics', body: 'Original mechanics designed around your idea, with collisions and simulations tuned finely.' },
-	{ title: 'In-game UI & menus', body: 'Screens that are clear, responsive and pleasant to use.' },
-	{ title: 'AssetBundles & Addressables', body: 'On-demand asset loading and management, done properly.' },
-	{ title: 'Internal tools & debug', body: 'A homegrown toolbox and test shortcuts to speed up development and QA.' },
-	{ title: 'Localisation', body: 'Text ready to be translated and displayed in several languages.' },
-	{ title: 'Sound & music', body: 'Audio integration: SFX, music and volume settings.' },
+const focused: { icon: FocusIconId; title: string; body: string }[] = [
+	{ icon: 'structure', title: 'Project structure', body: 'Architecture, code organisation and good practice to keep a Unity project healthy.' },
+	{ icon: 'physics', title: 'Gameplay & physics', body: 'Original mechanics designed around your idea, with collisions and simulations tuned finely.' },
+	{ icon: 'ui', title: 'In-game UI & menus', body: 'Screens that are clear, responsive and pleasant to use.' },
+	{ icon: 'assets', title: 'AssetBundles & Addressables', body: 'On-demand asset loading and management, done properly.' },
+	{ icon: 'tools', title: 'Internal tools & debug', body: 'A homegrown toolbox and test shortcuts to speed up development and QA.' },
+	{ icon: 'loc', title: 'Localisation', body: 'Text ready to be translated and displayed in several languages.' },
+	{ icon: 'sound', title: 'Sound & music', body: 'Audio integration: SFX, music and volume settings.' },
 ];
 
 const title = 'Services — Unity, mobile, VR & multiplayer development | Ludiven Studio';
@@ -64,14 +65,11 @@ const jsonLd = {
 				</div>
 			</section>
 
-			<section class="stack gap-4">
+			<section class="stack gap-8 focused-section">
 				<h2 class="section-title">Focused work</h2>
 				<div class="box focused">
 					{focused.map((s) => (
-						<div>
-							<h3>{s.title}</h3>
-							<p>{s.body}</p>
-						</div>
+						<FocusItem icon={s.icon} title={s.title} body={s.body} />
 					))}
 				</div>
 			</section>
@@ -97,6 +95,20 @@ const jsonLd = {
 		color: var(--gray-0);
 	}
 
+	.section-title::after {
+		content: '';
+		display: block;
+		width: 3rem;
+		height: 0.25rem;
+		margin-top: 0.5rem;
+		border-radius: 1rem;
+		background: linear-gradient(90deg, #8b5cf6, #0ea5e9, #10b981);
+	}
+
+	.focused-section {
+		margin-top: 1.5rem;
+	}
+
 	.services {
 		display: grid;
 		grid-template-columns: 1fr;
@@ -110,16 +122,11 @@ const jsonLd = {
 	.focused {
 		display: grid;
 		grid-template-columns: 1fr;
-		gap: 1.5rem;
+		gap: 1rem;
+		padding: 0.75rem;
 	}
 
-	.focused h3 {
-		font-size: var(--text-md);
-		color: var(--gray-0);
-	}
-
-	.services p,
-	.focused p {
+	.services p {
 		color: var(--gray-400);
 	}
 
@@ -136,7 +143,7 @@ const jsonLd = {
 
 		.focused {
 			grid-template-columns: repeat(2, 1fr);
-			gap: 1.75rem 5rem;
+			gap: 1.25rem;
 		}
 	}
 </style>
