@@ -74,7 +74,13 @@ const TOURNAMENTS: TournamentSeed[] = [
 	[4, 20, 9, 'Challenge vétérans', 'Amicale Bouliste Berjallienne', 'doublette', 'veterans', 800, 'veterans'],
 	[5, 33, 14, 'Grand prix de la ville', 'Pétanque Viennoise', 'triplette', 'open', 1000, 'grand-prix'],
 	[2, 8, 19, 'Nocturne en doublettes', 'Comité des fêtes', 'doublette', 'mixte', 0, null],
+	[1, 15, 9, 'Journée des boulistes', 'La Boule du Lac', 'doublette', 'open', 500, null],
 ];
+
+/** A day with three contests: doublette and triplette in the morning, tête-à-tête after lunch. */
+const DEMO_CONTESTS: Record<number, [hour: number, minute: number, format: MeetupTournament['format'], fee: number | null][]> = {
+	4: [[9, 0, 'doublette', 500], [9, 0, 'triplette', 800], [14, 30, 'tete-a-tete', 300]],
+};
 
 export function demoTournaments(): MeetupTournament[] {
 	return TOURNAMENTS.map(([p, days, hour, title, club, format, category, fee, poster], i) => {
@@ -89,6 +95,9 @@ export function demoTournaments(): MeetupTournament[] {
 			organizer_tag: `${DEMO_PREFIX}club-${i}`, status: 'open', hidden: false,
 			// A little off the pitch, so the gold pin does not hide the game's.
 			lat: place.lat + 0.003, lng: place.lng - 0.004, label: place.label, commune: place.commune,
+			contests: (DEMO_CONTESTS[i] ?? [[hour, 0, format, fee]]).map(([h, m, f, cents]) => ({
+				starts_at: at(days, h, m).toISOString(), format: f, category, entry_fee_cents: cents,
+			})),
 		};
 	});
 }

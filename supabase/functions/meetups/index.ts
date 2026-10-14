@@ -276,15 +276,17 @@ function validateTournamentStart(startsAt: unknown, now: number): string | null 
 	return null;
 }
 
-/** `contests` sorted by start, as stored. A string = refusal. */
-function cleanContests(raw: unknown, now: number): Record<string, unknown>[] | string {
+/** `contests` sorted by start, as stored. A string = refusal. `kept` holds the
+ *  starts (ms) already stored: those may be past, so a tournament under way
+ *  can still have its later contests or its phone fixed. */
+function cleanContests(raw: unknown, now: number, kept: Set<number>): Record<string, unknown>[] | string {
 	if (!Array.isArray(raw) || raw.length < 1) return 'Au moins un concours.';
 	if (raw.length > T_MAX_CONTESTS) return `${T_MAX_CONTESTS} concours au plus.`;
 	const out: Record<string, unknown>[] = [];
 	for (const item of raw) {
 		if (!item || typeof item !== 'object') return 'Concours invalide.';
 		const c = item as Record<string, unknown>;
-		const e = validateTournamentStart(c.startsAt, now);
+		const e = kept.has(Date.parse(String(c.startsAt))) ? null : validateTournamentStart(c.startsAt, now);
 		if (e) return e;
 		if (!T_FORMATS.includes(String(c.format))) return 'Format inconnu.';
 		if (!T_CATEGORIES.includes(String(c.category))) return 'Catégorie inconnue.';
@@ -308,11 +310,11 @@ function cleanContests(raw: unknown, now: number): Record<string, unknown>[] | s
 /** Validates the fields present in `body` into a row patch. A string = refusal.
  *  `contests` wins over the single startsAt/format/category/entryFeeCents of
  *  older apps; those alone reset the list to one contest (the trigger rebuilds it). */
-function tournamentFields(body: Record<string, unknown>, now: number): Record<string, unknown> | string {
+function tournamentFields(body: Record<string, unknown>, now: number, kept = new Set<number>()): Record<string, unknown> | string {
 	const row: Record<string, unknown> = {};
 	const many = 'contests' in body;
 	if (many) {
-		const contests = cleanContests(body.contests, now);
+		const contests = cleanContests(body.contests, now, kept);
 		if (typeof contests === 'string') return contests;
 		row.contests = contests;
 		row.starts_at = contests[0].starts_at;
@@ -1030,7 +1032,12 @@ Deno.serve(async (req) => {
 				if (!isUuid(body.tournamentId)) return bad('bad request');
 				const uid = await whoAmI();
 				if (!uid) return bad(LOGIN, 401);
-				const fields = tournamentFields(body, nowMs);
+				const { data: own } = await db.from('meetup_tournaments').select('contests')
+					.eq('id', body.tournamentId).eq('organizer_id', uid).maybeSingle();
+				if (!own) return bad('forbidden', 403);
+				const kept = new Set<number>(((own.contests ?? []) as { starts_at?: string }[])
+					.map((c) => Date.parse(String(c.starts_at))));
+				const fields = tournamentFields(body, nowMs, kept);
 				if (typeof fields === 'string') return bad(fields);
 				const { data, error } = await db.from('meetup_tournaments').update({ ...fields, updated_at: nowIso })
 					.eq('id', body.tournamentId).eq('organizer_id', uid).select('id');
