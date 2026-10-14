@@ -1009,7 +1009,7 @@ export default function RencontresApp() {
 			<p className="re-legal">
 				Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
 				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans l'appli Pétanque Meet.{' '}
-				<a href="/confidentialite/">Ce qui est stocké</a>.
+				<a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a>.
 			</p>
 
 			{loginOpen && (WEB_LOGIN

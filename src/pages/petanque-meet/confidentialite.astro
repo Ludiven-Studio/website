@@ -1,0 +1,409 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+---
+
+<BaseLayout
+	title="Confidentialité de l'application Pétanque Meet | Ludiven Studio"
+	description="Politique de confidentialité de l'application mobile Pétanque Meet : compte Google ou Apple, parties publiées sur la carte, tournois, modération, droits RGPD."
+	alternates={{ fr: '/petanque-meet/confidentialite/' }}
+>
+	<div class="wrapper stack gap-12 legal">
+		<Hero
+			title="Confidentialité — Pétanque Meet"
+			tagline="Ce que tu publies sur la carte est public. Le reste ne sort pas de chez nous."
+		/>
+
+		<p class="updated">
+			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>
+			(<code>com.ludivenstudio.petanquemeet</code>) et la carte des rencontres qu'elle partage avec le site
+			(<a href="/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). Le reste du site a sa
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 14 octobre 2026.
+		</p>
+
+		<div class="summary">
+			<p><strong>L'essentiel&nbsp;:</strong></p>
+			<ul>
+				<li>Regarder la carte ne demande <strong>aucun compte</strong>. Pour publier, rejoindre ou signaler une partie, tu te connectes avec <strong>Google ou Apple</strong>.</li>
+				<li>Ce que tu publies est <strong>visible de tous</strong>&nbsp;: le prénom que tu saisis, le terrain, l'horaire, et pour un tournoi les informations du club. Ton adresse mail, elle, n'est jamais montrée.</li>
+				<li>Ta position GPS sert seulement à centrer la carte sur ton téléphone. <strong>Elle n'est jamais envoyée.</strong></li>
+				<li>Pas de publicité, pas de revente de données, pas de profilage.</li>
+				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis l'application.</li>
+			</ul>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>1. Qui est responsable du traitement</h2>
+			<p>Éditeur de l'application et responsable du traitement&nbsp;:</p>
+			<ul>
+				<li>Dénomination sociale&nbsp;: <strong>Ludiven Studio</strong></li>
+				<li>Forme juridique&nbsp;: EURL au capital de 1&nbsp;000&nbsp;€</li>
+				<li>Immatriculation&nbsp;: 999&nbsp;253&nbsp;586 R.C.S. Vienne — SIRET 999&nbsp;253&nbsp;586&nbsp;00013</li>
+				<li>Siège social&nbsp;: 1166 route de la Ranche, 38440 Châtonnay, France</li>
+				<li>Contact&nbsp;: <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a></li>
+			</ul>
+			<p>Voir aussi les <a href="/mentions-legales/">mentions légales</a>.</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>2. Ton compte</h2>
+			<p>
+				Pour agir (publier une partie ou un tournoi, s'inscrire, signaler), tu te connectes avec
+				<strong>Google</strong> (Android) ou <strong>Apple</strong> (iPhone). Nous recevons alors un
+				identifiant de compte et ton adresse mail&nbsp;; avec Apple, ce peut être l'adresse relais qui masque
+				la tienne. Nous ne recevons jamais ton mot de passe.
+			</p>
+			<p>
+				Ce compte sert à rattacher tes parties et inscriptions à toi, sur tous tes appareils, et à faire
+				respecter les règles. Ton adresse mail n'est affichée qu'à toi, dans l'écran «&nbsp;Compte et aide&nbsp;», et
+				n'est jamais montrée aux autres joueurs.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>3. Ce qui est public</h2>
+			<p>
+				La carte est consultable par tout le monde, dans l'application comme sur le site, sans compte.
+				Sont visibles de tous&nbsp;:
+			</p>
+			<ul>
+				<li><strong>Pour une partie</strong>&nbsp;: le terrain (position exacte de l'épingle et nom du lieu), la date et l'heure, le format, le nombre de places, le <strong>prénom de l'organisateur</strong> et les <strong>prénoms des inscrits</strong>.</li>
+				<li><strong>Pour un tournoi</strong>&nbsp;: le nom du club, le titre, le lieu, la date, la catégorie, le prix d'inscription, les détails, et s'ils ont été fournis le <strong>numéro de téléphone</strong> et l'<strong>affiche</strong> (une fois validée par l'éditeur).</li>
+				<li>Un <strong>repère anonyme</strong> par compte, qui permet de reconnaître que plusieurs annonces viennent du même organisateur, sans révéler qui il est.</li>
+			</ul>
+			<p>
+				Le prénom est le seul texte libre d'une partie. Il n'a pas besoin d'être complet&nbsp;: un prénom ou
+				un surnom suffit. N'y mets ni nom de famille, ni numéro, ni adresse.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>4. Données traitées</h2>
+			<div class="table-scroll">
+				<table>
+					<thead>
+						<tr>
+							<th>Donnée</th>
+							<th>Finalité</th>
+							<th>Base légale</th>
+							<th>Destinataire</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>Identifiant de compte et adresse mail</td>
+							<td>Te connecter, rattacher tes parties à toi</td>
+							<td>Exécution du contrat (art. 6.1.b RGPD)</td>
+							<td>Supabase&nbsp;; Google ou Apple pour la connexion</td>
+						</tr>
+						<tr>
+							<td>Parties&nbsp;: terrain, horaire, format, places, prénom de l'organisateur</td>
+							<td>Publier la partie sur la carte</td>
+							<td>Exécution du contrat</td>
+							<td>Supabase&nbsp;; public</td>
+						</tr>
+						<tr>
+							<td>Inscriptions&nbsp;: prénom, nombre de places, rôle</td>
+							<td>Rejoindre une partie</td>
+							<td>Exécution du contrat</td>
+							<td>Supabase&nbsp;; public</td>
+						</tr>
+						<tr>
+							<td>Tournois&nbsp;: club, titre, détails, prix, téléphone facultatif, affiche facultative</td>
+							<td>Annoncer un tournoi</td>
+							<td>Exécution du contrat</td>
+							<td>Supabase&nbsp;; public après validation de l'affiche</td>
+						</tr>
+						<tr>
+							<td>Coordonnées d'un nouveau terrain</td>
+							<td>Retrouver le nom du lieu et de la commune</td>
+							<td>Exécution du contrat</td>
+							<td>OpenStreetMap (Nominatim), appelé par notre serveur</td>
+						</tr>
+						<tr>
+							<td>Empreinte de l'adresse IP (voir §6)</td>
+							<td>Limiter les abus et le spam</td>
+							<td>Intérêt légitime (art. 6.1.f)</td>
+							<td>Supabase</td>
+						</tr>
+						<tr>
+							<td>Signalements&nbsp;: motif, identifiant du compte qui signale</td>
+							<td>Modération</td>
+							<td>Intérêt légitime</td>
+							<td>Supabase&nbsp;; l'éditeur, par e-mail via Resend</td>
+						</tr>
+						<tr>
+							<td>Texte d'une recherche de lieu</td>
+							<td>Trouver une ville ou une adresse sur la carte</td>
+							<td>Exécution du contrat</td>
+							<td>IGN (Géoplateforme)</td>
+						</tr>
+						<tr>
+							<td>Statistiques d'usage anonymes (voir §8)</td>
+							<td>Savoir quelles fonctions servent et améliorer l'application</td>
+							<td>Intérêt légitime</td>
+							<td>Umami Cloud</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<p>
+				L'application ne collecte <strong>pas</strong>&nbsp;: ta position GPS, tes contacts, tes photos (hors
+				l'affiche que tu choisis d'envoyer), ton nom de famille, ni aucun identifiant publicitaire. Elle
+				n'affiche aucune publicité.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>5. Ta position</h2>
+			<p>
+				Le bouton «&nbsp;Autour de moi&nbsp;» demande l'accès à ta position, <strong>seulement quand tu
+				appuies dessus</strong>. L'application lit une position, centre la carte et calcule les distances
+				aux parties, puis arrête la localisation. Cette position <strong>reste sur ton téléphone</strong>&nbsp;:
+				aucun envoi n'est prévu, vers nous ni vers personne.
+			</p>
+			<p>
+				Ce que nous recevons, c'est l'emplacement du <strong>terrain</strong> que tu choisis sur la carte
+				pour une partie ou un tournoi, jamais celui de ton appareil.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>6. Lutte contre les abus</h2>
+			<p>
+				Le service compte, par jour, les annonces, inscriptions et signalements de chaque compte et de chaque
+				connexion. Ton adresse IP n'est <strong>jamais stockée</strong>&nbsp;: elle est transformée en
+				empreinte non réversible, mélangée à un secret connu du seul serveur. Sans ce secret, l'empreinte ne
+				peut pas être ramenée à une adresse.
+			</p>
+			<p>
+				Les textes saisis passent un filtre automatique (liens, mots injurieux). Une annonce signalée par
+				plusieurs joueurs est masquée le temps d'une vérification par l'éditeur.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>7. Signalements et modération</h2>
+			<p>
+				Tu peux signaler une partie ou un tournoi (prénom choquant, fausse annonce, affiche inadaptée,
+				personne n'est venu). Ton signalement est <strong>anonyme vis-à-vis des autres joueurs</strong>&nbsp;:
+				personne ne sait qui l'a fait. Il est toutefois enregistré avec ton identifiant de compte, pour éviter
+				les signalements en série.
+			</p>
+			<p>
+				L'éditeur est prévenu par e-mail et voit l'annonce, les prénoms, le motif et le nombre de signalements,
+				jamais l'identité de qui a signalé. Il peut rétablir l'annonce, la retirer ou suspendre le compte
+				fautif. D'un compte suspendu, seul l'identifiant technique est conservé, pour que la suspension tienne.
+			</p>
+			<p>
+				Les affiches de tournoi restent privées jusqu'à leur validation par l'éditeur. Une affiche refusée
+				est effacée aussitôt.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>8. Statistiques d'usage</h2>
+			<p>
+				L'application envoie à <strong>Umami Cloud</strong>, un outil de statistiques sans cookie, le nom des
+				actions faites (ouvrir l'application, ouvrir une partie, s'inscrire, publier, se connecter, partager,
+				signaler…), avec la plateforme, la version de l'application et du système, la langue, la taille de
+				l'écran et le modèle de téléphone.
+			</p>
+			<p>
+				<strong>Aucun</strong> prénom, identifiant de compte, adresse mail, position, texte de recherche ni
+				identifiant d'annonce n'y figure. Ces statistiques ne permettent pas de te reconnaître ni de te suivre
+				d'un jour à l'autre.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>9. Ce qui est stocké sur ton téléphone</h2>
+			<ul>
+				<li>ta session de connexion et ton adresse mail&nbsp;;</li>
+				<li>le prénom que tu as saisi, les parties rejointes, les lieux que tu as enregistrés, le dernier endroit affiché sur la carte&nbsp;;</li>
+				<li>tes préférences&nbsp;: langue, thème, organisateurs masqués, messages déjà vus&nbsp;;</li>
+				<li>un cache des fonds de carte et des affiches, pour un affichage plus rapide.</li>
+			</ul>
+			<p>
+				Tout cela reste sur l'appareil et disparaît quand tu désinstalles l'application.
+			</p>
+			<p>
+				<strong>Rappels.</strong> Si tu l'acceptes, l'application programme sur ton téléphone un rappel une
+				heure avant tes parties. Ce sont des notifications locales&nbsp;: aucun serveur ne t'envoie de message.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Destinataires et transferts hors Union européenne</h2>
+			<p>
+				Tes données ne sont ni vendues ni cédées. Elles ne sont traitées que par ces prestataires&nbsp;:
+			</p>
+			<ul>
+				<li><strong>Supabase</strong> — base de données, comptes et stockage des affiches. Données hébergées dans l'Union européenne (Irlande).</li>
+				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte et distribution de l'application.</li>
+				<li><strong>IGN</strong> (Institut national de l'information géographique et forestière, France) — fonds de carte et recherche de lieux. Comme pour tout site web, ses serveurs voient l'adresse IP de ton téléphone.</li>
+				<li><strong>Fondation OpenStreetMap</strong> — nom d'un nouveau terrain (service Nominatim). Seules les coordonnées du terrain lui sont envoyées, par notre serveur.</li>
+				<li><strong>Resend</strong> — envoi à l'éditeur des e-mails de modération.</li>
+				<li><strong>Umami Software, Inc.</strong> — statistiques d'usage anonymes.</li>
+			</ul>
+			<p>
+				Le bouton «&nbsp;Itinéraire&nbsp;» ouvre Google Maps ou Plans (Apple) avec l'adresse du terrain. Le
+				bouton «&nbsp;Partager&nbsp;» passe un lien vers l'annonce à l'application que tu choisis. Leur usage
+				relève alors de ces services.
+			</p>
+			<p>
+				Certains prestataires sont des sociétés américaines. Ces transferts sont encadrés par les mécanismes
+				du chapitre V du RGPD&nbsp;: clauses contractuelles types et, pour les prestataires concernés,
+				certification au titre du <em>EU-U.S. Data Privacy Framework</em>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>11. Durées de conservation</h2>
+			{/* TODO legal: the server has no purge job yet. These durations need one before release. */}
+			<ul>
+				<li><strong>Parties et inscriptions</strong>&nbsp;: retirées de la carte dès qu'elles sont terminées ou annulées, puis effacées <strong>12 mois</strong> après leur date.</li>
+				<li><strong>Tournois</strong>&nbsp;: retirés de la carte le lendemain, effacés 12 mois après leur date. L'affiche est effacée une semaine après le tournoi.</li>
+				<li><strong>Signalements</strong>&nbsp;: effacés une fois traités, et au plus tard 12 mois après.</li>
+				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
+				<li><strong>Suspension d'un compte</strong>&nbsp;: l'identifiant technique est conservé tant que la suspension dure.</li>
+				<li><strong>Compte</strong>&nbsp;: jusqu'à ce que tu le supprimes.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>12. Supprimer ton compte</h2>
+			<p>
+				Dans l'application&nbsp;: <strong>«&nbsp;Compte et aide&nbsp;» → «&nbsp;Supprimer mon compte&nbsp;»</strong>.
+				C'est immédiat et définitif&nbsp;:
+			</p>
+			<ul>
+				<li>ton compte et ton adresse mail sont effacés&nbsp;;</li>
+				<li>tes parties à venir sont annulées (les inscrits le voient) et ton prénom est remplacé par «&nbsp;Compte supprimé&nbsp;» sur toutes tes parties&nbsp;;</li>
+				<li>tes inscriptions, tes tournois, leurs affiches et tes signalements sont effacés.</li>
+			</ul>
+			<p>
+				Tes anciennes parties restent un temps dans la base, sans prénom, rattachées à un identifiant technique
+				qui ne renvoie plus à aucun compte. Elles suivent ensuite les durées du §11.
+			</p>
+			<p>
+				Tu peux aussi demander la suppression par e-mail à
+				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>, depuis l'adresse de ton
+				compte.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>13. Tes droits</h2>
+			<p>
+				Conformément au RGPD, tu disposes d'un droit d'accès, de rectification, d'effacement, de limitation,
+				d'opposition et de portabilité. Pour les exercer, ou pour faire retirer une annonce, un prénom ou une
+				inscription, écris à <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>. Nous
+				répondons sous un mois.
+			</p>
+			<p>
+				Si tu estimes que tes droits ne sont pas respectés, tu peux adresser une réclamation à la CNIL
+				(<a href="https://www.cnil.fr" target="_blank" rel="noopener">www.cnil.fr</a>), 3 place de Fontenoy,
+				TSA 80715, 75334 Paris Cedex 07.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>14. Mineurs</h2>
+			<p>
+				L'application sert à rencontrer d'autres joueurs en vrai. Elle s'adresse aux personnes de
+				<strong>15 ans et plus</strong>. Un mineur doit avoir l'accord de ses parents, et ne devrait pas se
+				rendre seul à une partie avec des inconnus. Si tu es parent et constates qu'un enfant a créé un compte,
+				écris-nous&nbsp;: nous le supprimerons.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>15. Sécurité</h2>
+			<p>
+				Tous les échanges sont chiffrés (HTTPS). Les données de la carte ne sont accessibles que par notre
+				serveur&nbsp;: aucun accès direct à la base n'est ouvert, même en lecture. Ta session est conservée
+				dans le stockage de l'application sur ton téléphone.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>16. Modifications</h2>
+			<p>
+				Cette politique peut évoluer avec l'application. La date de dernière mise à jour figure en haut de
+				page. En cas de changement important, l'application te le signalera.
+			</p>
+			<p>Voir aussi les <a href="/petanque-meet/cgu/">conditions d'utilisation de l'application</a>.</p>
+		</section>
+	</div>
+</BaseLayout>
+
+<style>
+	.legal {
+		max-width: 68ch;
+		margin-inline: auto;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.legal h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.legal ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.legal a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.legal a:hover,
+	.legal a:focus {
+		text-decoration-color: currentColor;
+	}
+	.updated {
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+	.summary {
+		border: 1px solid var(--gray-800);
+		border-left: 3px solid var(--accent-regular);
+		border-radius: 0.5rem;
+		padding: 1rem 1.25rem;
+		background: var(--gray-999_40);
+	}
+	.summary p {
+		margin-bottom: 0.5rem;
+	}
+	code {
+		font-size: 0.9em;
+		background: var(--gray-999_40);
+		padding: 0.1em 0.35em;
+		border-radius: 0.25em;
+	}
+	/* The 4-column table can't shrink below ~40em — scroll it instead of overflowing the page. */
+	.table-scroll {
+		overflow-x: auto;
+	}
+	table {
+		border-collapse: collapse;
+		width: 100%;
+		min-width: 36rem;
+		font-size: var(--text-sm);
+	}
+	th,
+	td {
+		border: 1px solid var(--gray-800);
+		padding: 0.5rem 0.65rem;
+		text-align: left;
+		vertical-align: top;
+	}
+	th {
+		color: var(--gray-0);
+	}
+</style>
