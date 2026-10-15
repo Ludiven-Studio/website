@@ -252,6 +252,9 @@ export function start(): void {
 	let rippleT = 0;
 	// Test hook only: slows the game clock so a capture can catch a short move.
 	let timeScale = 1;
+	let fixedDt: number | null = null;
+	let stepBudget = Infinity;
+	let holdJump = false;
 	let wadeT = 0;
 	let kiteFly = false;
 	let drive: { yaw: number; speed: number } | null = null;
@@ -1036,6 +1039,14 @@ export function start(): void {
 	const camLook = new THREE.Vector3();
 	let camInit = false;
 	let camLift = 0;
+	let steerYaw: number | null = null;
+	// Test hook only: the camera as it was before the platforming fixes, for an A/B measure.
+	let oldCam = false;
+	// Height the camera frames: the last ground, not every hop.
+	let camFloor = 0;
+	let sinceJump = 99;
+	let onPlatformT = 0;
+	let platformingNow = false;
 
 	// Small props (rocks, trunks, crates) let the camera through: seen from inside, their
 	// faces are culled, so the view stays clear instead of the camera hugging Rayou.
@@ -1071,19 +1082,26 @@ export function start(): void {
 	function updateCamera(dt: number, now: number) {
 		const drag = input.camDrag;
 		camYaw -= drag.x * 0.006;
+		if (steerYaw !== null) steerYaw -= drag.x * 0.006;
 		camPitch = THREE.MathUtils.clamp(camPitch + drag.y * 0.004, -0.05, 1.1);
 		if (playing) tuto.bump('cam', Math.abs(drag.x) + Math.abs(drag.y));
 		drag.x = drag.y = 0;
 		const moving = player.speed > 0.6 && !climb;
+		sinceJump = player.grounded ? sinceJump + dt : 0;
+		// Standing on something built (rocks, stumps, crates, pads) means platforming.
+		onPlatformT = player.grounded && player.support ? 1.5 : Math.max(0, onPlatformT - dt);
+		const platforming = !player.grounded || sinceJump < 1.5 || onPlatformT > 0;
+		platformingNow = platforming;
 		if (!playing) camYaw += dt * 0.1;
-		else if (now - input.camTouchedAt > 1600 && moving) {
+		else if (now - input.camTouchedAt > 1600 && moving && (oldCam || !platforming)) {
 			const d = Math.atan2(Math.sin(player.yaw + Math.PI - camYaw), Math.cos(player.yaw + Math.PI - camYaw));
-			camYaw += d * Math.min(1, dt * 1.3 * Math.min(1, player.speed / RUN));
+			camYaw += d * Math.min(1, dt * (oldCam ? 1.3 : 0.9) * Math.min(1, player.speed / RUN));
 		}
 		const onPeak = mountPolar(player.pos.x, player.pos.z).d < R_OUT + 2;
 		const dist = !playing ? 9 : onPeak ? 6.6 : 5.6;
 		const pitch = !playing ? 0.42 : camPitch + (onPeak ? 0.08 : 0);
-		const target = new THREE.Vector3(player.pos.x, player.pos.y + 0.9, player.pos.z);
+		if (oldCam || player.grounded || player.pos.y < camFloor || player.pos.y > camFloor + 2.4 || climb) camFloor += (player.pos.y - camFloor) * (1 - Math.exp(-6 * dt));
+		const target = new THREE.Vector3(player.pos.x, camFloor + 0.9, player.pos.z);
 		const orbit = (p: number) => new THREE.Vector3(target.x + Math.sin(camYaw) * Math.cos(p) * dist, target.y + Math.sin(p) * dist, target.z + Math.cos(camYaw) * Math.cos(p) * dist);
 		// Blocked from behind (rocks, a ledge): look over the obstacle before giving up distance.
 		let lift = 0;
@@ -1091,7 +1109,7 @@ export function start(): void {
 			lift = extra;
 			if (clearRun(target, orbit(pitch + extra)) >= dist - 0.3) break;
 		}
-		camLift += (lift - camLift) * (1 - Math.exp(-4 * dt));
+		camLift += (lift - camLift) * (1 - Math.exp(-(lift > camLift ? 4 : 1.2) * dt));
 		let want = orbit(Math.min(1.35, pitch + camLift));
 		let look = target.clone();
 		const talkNpc = dialog?.npc ? npcs[dialog.npc].root.position : null;
@@ -1349,8 +1367,14 @@ export function start(): void {
 	let last = performance.now();
 	const frame = (now: number) => {
 		requestAnimationFrame(frame);
-		const dt = Math.min(0.05, (now - last) / 1000) * timeScale;
+		const dt = fixedDt ?? Math.min(0.05, (now - last) / 1000) * timeScale;
 		last = now;
+		// Captures step the game one frame at a time; between steps it only redraws.
+		if (stepBudget <= 0) {
+			renderer.render(scene, camera);
+			return;
+		}
+		stepBudget--;
 		if (input.consumeMenu() && playing && !finale && hud.el.end.hidden) openMenu(hud.el.menu.hidden);
 		if (input.consumeBag() && playing && !finale && hud.el.end.hidden) openMenu(hud.el.menu.hidden, 'bag');
 		if (halo.visible) {
@@ -1384,11 +1408,18 @@ export function start(): void {
 		let cmd: Command = { dirX: 0, dirZ: 0, jump: false, jumpHeld: false, roll: false };
 		if (!locked) {
 			const mx = input.move.x, my = input.move.y;
+			// The stick steers in the frame the camera had when it was pushed. If the camera then
+			// swings round on its own, the same thumb keeps going the same way: no curving off a ledge.
+			const held = Math.hypot(mx, my) > 0.15;
+			if (!held || steerYaw === null || oldCam) steerYaw = camYaw;
+			// Away from platforms the frame drifts back to the screen, so a long hold stays intuitive.
+			else if (!platformingNow) steerYaw += Math.atan2(Math.sin(camYaw - steerYaw), Math.cos(camYaw - steerYaw)) * Math.min(1, dt * 1.5);
+			const sy = steerYaw;
 			cmd = {
-				dirX: -Math.sin(camYaw) * my + Math.cos(camYaw) * mx,
-				dirZ: -Math.cos(camYaw) * my - Math.sin(camYaw) * mx,
+				dirX: -Math.sin(sy) * my + Math.cos(sy) * mx,
+				dirZ: -Math.cos(sy) * my - Math.sin(sy) * mx,
 				jump: input.consumeJump() || pressed.jump,
-				jumpHeld: input.jumpHeld || pressed.jump,
+				jumpHeld: input.jumpHeld || pressed.jump || holdJump,
 				roll: input.consumeRoll() || pressed.roll,
 			};
 			if (drive) {
@@ -1557,18 +1588,27 @@ export function start(): void {
 				region: regionName(player.pos.x, player.pos.z),
 				finale: !!finale,
 				busy: !!climb || player.respawnT > 0 || !!finale,
+				camYaw,
 			};
 		},
 		teleport(x: number, z: number, yaw?: number, y?: number) {
 			player.teleport(x, z, yaw ?? player.yaw, y);
 			if (yaw !== undefined) camYaw = yaw + Math.PI;
 			camInit = false;
+			camFloor = player.pos.y;
 		},
 		drive(yaw: number | null, speed = RUN) {
 			drive = yaw === null ? null : { yaw, speed };
 		},
 		press(k: 'jump' | 'roll' | 'action') {
 			pressed[k] = true;
+		},
+		// Hand the camera back to the auto-follow (setCam holds it).
+		oldCam(on: boolean) {
+			oldCam = on;
+		},
+		camFollow() {
+			input.camTouchedAt = -1e9;
 		},
 		setCam(y: number, p: number) {
 			camYaw = y;
@@ -1581,6 +1621,27 @@ export function start(): void {
 		advance,
 		slow(k: number) {
 			timeScale = k;
+		},
+		// Fixed game step per frame (captures), or null for real time.
+		fixed(dt: number | null) {
+			fixedDt = dt;
+		},
+		holdJump(on: boolean) {
+			holdJump = on;
+		},
+		setDay(t: number) {
+			dayT = t;
+		},
+		// Run exactly n frames then hold (Infinity resumes).
+		steps(n: number) {
+			stepBudget = n;
+		},
+		get held() {
+			return stepBudget <= 0;
+		},
+		// Free camera for captures, or null to give it back to the game.
+		camAt(p: [number, number, number] | null, look?: [number, number, number]) {
+			cine = p && look ? { pos: new THREE.Vector3(...p), look: new THREE.Vector3(...look) } : null;
 		},
 		perf: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }),
 		talk: (k: NpcKey) => talk(k),

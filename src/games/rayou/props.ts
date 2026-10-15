@@ -99,6 +99,25 @@ export function mushroomMesh(capR: number, stemH: number): THREE.Group {
 	cap.scale.y = 0.55;
 	cap.position.y = stemH - 0.05;
 	g.add(stem, cap);
+	// The cap is an open dome: close it underneath with a shallow cream cone and its gills,
+	// or it looks hollow from below (a jump onto it, a low camera).
+	const under = new THREE.Mesh(new THREE.ConeGeometry(capR * 0.99, capR * 0.18, 18, 1, true), mat('#f1dcc3', { emissive: '#e8cfb2', emissiveIntensity: 0.45 }));
+	under.position.y = stemH - 0.05 - capR * 0.09;
+	under.rotation.x = Math.PI;
+	g.add(under);
+	// Facing down, only the grass bounce lights them: a little glow keeps them cream, not olive.
+	const gill = mat('#c99f7e', { emissive: '#b88c6a', emissiveIntensity: 0.4 });
+	for (let i = 0; i < 16; i++) {
+		const a = (i / 16) * Math.PI * 2;
+		const len = capR * 0.62;
+		const l = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.02, len), gill);
+		const mid = capR * 0.36 + len / 2;
+		l.position.set(Math.sin(a) * mid, stemH - 0.05 - capR * 0.18 * (1 - mid / capR) - 0.012, Math.cos(a) * mid);
+		// Tilted to follow the underside, which rises towards the rim.
+		l.rotation.order = 'YXZ';
+		l.rotation.set(-Math.atan(0.18), a, 0);
+		g.add(l);
+	}
 	const dot = mat('#fff6e8');
 	for (let i = 0; i < 7; i++) {
 		const a = i * 2.4;

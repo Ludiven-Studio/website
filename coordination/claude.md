@@ -207,3 +207,9 @@
 - Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Le museau ne rentre plus dans les falaises ni les murs (sonde devant le corps + cercle de tête), tête gardée ronde en boule, roulade qui part debout. Test « snout » ajouté à `check-rayou`, vert.
 - Réservations (libérées) : `src/games/rayou/`, `scripts/check-rayou.ts`.
 - Ressources : serveur de dev sur le port 4396 (arrêté).
+
+## 2026-10-15 — Rayou : teaser, dessous des champignons, caméra de plateforme
+
+- Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Teaser 4:5 et 16:9 (`scripts/promo-rayou*.mjs`, sorties dans `D:/tmp/promo-rayou`, copiées dans Téléchargements). Champignons fermés dessous, plein écran pleine largeur, caméra qui ne tourne plus pendant les sauts (mesuré : 154° → 0° sur l'escalier de rochers), joystick figé tant qu'il est tenu. `check-rayou` vert.
+- Réservations (libérées) : `src/games/rayou/`, `src/pages/jeux/rayou.astro`, `scripts/promo-rayou*.mjs` (nouveaux).
+- Ressources : serveur de dev sur les ports 4384-4385 et 4396 (arrêtés).
