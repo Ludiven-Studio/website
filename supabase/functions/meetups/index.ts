@@ -244,6 +244,7 @@ const T_CONTESTS_SPAN_MS = 3 * 86400_000;
 /** A tournament has no end time: it leaves the map half a day after it starts. */
 const T_SHOWN_AFTER_START_MS = 12 * 3600_000;
 const MAX_ACTIVE_TOURNAMENTS = 5;
+const MAX_FOLLOWS = 50;
 /** Fewer than for a game: a tournament is seen by far more people. */
 const T_HIDE_REPORTERS = 2;
 const T_HIDE_IPS = 2;
@@ -391,6 +392,34 @@ async function activeTournaments(db: SupabaseClient, uid: string, nowMs: number)
 		.eq('organizer_id', uid).eq('status', 'open')
 		.gte('last_starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString());
 	return count ?? 0;
+}
+
+/** Follower count per tournament. Only the organizer is told. */
+async function followerCounts(db: SupabaseClient, ids: string[]): Promise<Map<string, number>> {
+	const counts = new Map<string, number>();
+	if (!ids.length) return counts;
+	const { data, error } = await db.from('meetup_tournament_follows').select('tournament_id').in('tournament_id', ids).limit(20000);
+	if (error) throw error;
+	for (const r of data ?? []) counts.set(r.tournament_id as string, (counts.get(r.tournament_id as string) ?? 0) + 1);
+	return counts;
+}
+
+/** The player's followed tournaments still on the map, cancelled ones included so
+ *  they learn of it. Follows of tournaments long over are dropped on the way. */
+async function followedTournaments(db: SupabaseClient, uid: string, nowMs: number): Promise<Record<string, unknown>[]> {
+	const { data: follows, error } = await db.from('meetup_tournament_follows').select('tournament_id').eq('player_id', uid).limit(MAX_FOLLOWS * 2);
+	if (error) throw error;
+	const ids = (follows ?? []).map((f) => f.tournament_id as string);
+	if (!ids.length) return [];
+	const { data, error: tErr } = await db.from('meetup_tournaments').select(T_EMBED).in('id', ids);
+	if (tErr) throw tErr;
+	const cutoff = nowMs - T_SHOWN_AFTER_START_MS;
+	const rows = (data ?? []) as Record<string, unknown>[];
+	const stale = rows.filter((r) => Date.parse(String(r.last_starts_at)) < cutoff).map((r) => r.id as string);
+	if (stale.length) await db.from('meetup_tournament_follows').delete().eq('player_id', uid).in('tournament_id', stale);
+	return rows.filter((r) => !r.hidden && Date.parse(String(r.last_starts_at)) >= cutoff)
+		.map(shapeTournament)
+		.sort((x, y) => String(x.starts_at).localeCompare(String(y.starts_at)));
 }
 
 /** The map cards' small copy, stored next to the poster. */
@@ -665,10 +694,13 @@ Deno.serve(async (req) => {
 						.eq('organizer_id', uid).order('starts_at').limit(50);
 					if (error) throw error;
 					tournaments = (data ?? []).map((r) => shapeTournament(r as Record<string, unknown>));
+					const counts = await followerCounts(db, tournaments.map((t) => t.id as string));
+					for (const t of tournaments) t.followers = counts.get(t.id as string) ?? 0;
 				}
 				return json({
 					events, active, max: MAX_ACTIVE_EVENTS,
 					tournaments,
+					followed: uid ? await followedTournaments(db, uid, nowMs) : [],
 					activeTournaments: uid ? await activeTournaments(db, uid, nowMs) : 0,
 					maxTournaments: MAX_ACTIVE_TOURNAMENTS,
 				});
@@ -697,7 +729,7 @@ Deno.serve(async (req) => {
 				if (await isBanned(db, playerId, createIp, true)) return bad(BANNED, 403);
 
 				if (await activeEvents(db, identities(playerId, body.playerId), nowIso) >= MAX_ACTIVE_EVENTS) {
-					return bad(`Tu as déjà ${MAX_ACTIVE_EVENTS} parties en ligne. Supprimes-en une dans « Mes parties ».`, 429);
+					return bad(`Tu as déjà ${MAX_ACTIVE_EVENTS} parties en ligne. Supprimes-en une dans « Agenda ».`, 429);
 				}
 				// Charged once, after validation and before any write, so a typo
 				// never costs a slot and a rejected flood still does.
@@ -915,6 +947,7 @@ Deno.serve(async (req) => {
 				await dropPosters(db, (tours ?? []).map((t) => t.poster_path as string | null));
 				await db.from('meetup_tournaments').delete().eq('organizer_id', uid);
 				await db.from('meetup_tournament_reports').delete().eq('reporter_id', uid);
+				await db.from('meetup_tournament_follows').delete().eq('player_id', uid);
 				const { error } = await db.auth.admin.deleteUser(uid);
 				if (error) throw error;
 				return json({ ok: true });
@@ -986,7 +1019,40 @@ Deno.serve(async (req) => {
 				if (!data) return bad('unknown tournament', 404);
 				const uid = await whoAmI();
 				const { organizer_id: owner, ...row } = data as Record<string, unknown>;
-				return json({ tournament: shapeTournament(row), isOrganizer: Boolean(uid) && uid === owner });
+				const isOrganizer = Boolean(uid) && uid === owner;
+				let following = false;
+				if (uid && !isOrganizer) {
+					const { count } = await db.from('meetup_tournament_follows').select('player_id', { count: 'exact', head: true })
+						.eq('tournament_id', body.tournamentId).eq('player_id', uid);
+					following = (count ?? 0) > 0;
+				}
+				const shaped = shapeTournament(row);
+				if (isOrganizer) shaped.followers = (await followerCounts(db, [String(row.id)])).get(String(row.id)) ?? 0;
+				return json({ tournament: shaped, isOrganizer, following });
+			}
+
+			// Follow or unfollow: { tournamentId, follow }. Only a tournament still on the
+			// map can be followed; unfollowing always works.
+			case 'follow_tournament': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				if (body.follow === false) {
+					await db.from('meetup_tournament_follows').delete().eq('tournament_id', body.tournamentId).eq('player_id', uid);
+					return json({ ok: true, following: false });
+				}
+				const { data: t } = await db.from('meetup_tournaments').select('id, status, hidden, last_starts_at')
+					.eq('id', body.tournamentId).maybeSingle();
+				if (!t || t.hidden || t.status !== 'open' || Date.parse(String(t.last_starts_at)) < nowMs - T_SHOWN_AFTER_START_MS) {
+					return bad('Ce tournoi n’est plus en ligne.', 409);
+				}
+				const { count } = await db.from('meetup_tournament_follows').select('tournament_id', { count: 'exact', head: true })
+					.eq('player_id', uid);
+				if ((count ?? 0) >= MAX_FOLLOWS) return bad(`Tu suis déjà ${MAX_FOLLOWS} tournois.`, 409);
+				const { error } = await db.from('meetup_tournament_follows')
+					.upsert({ tournament_id: t.id, player_id: uid }, { onConflict: 'tournament_id,player_id', ignoreDuplicates: true });
+				if (error) throw error;
+				return json({ ok: true, following: true });
 			}
 
 			case 'create_tournament': {
@@ -1006,7 +1072,7 @@ Deno.serve(async (req) => {
 				const createIp = await ipKey(req);
 				if (await isBanned(db, playerId, createIp, true)) return bad(BANNED, 403);
 				if (await activeTournaments(db, playerId, nowMs) >= MAX_ACTIVE_TOURNAMENTS) {
-					return bad(`Tu as déjà ${MAX_ACTIVE_TOURNAMENTS} tournois en ligne. Supprimes-en un dans « Mes parties ».`, 429);
+					return bad(`Tu as déjà ${MAX_ACTIVE_TOURNAMENTS} tournois en ligne. Supprimes-en un dans « Agenda ».`, 429);
 				}
 				if (await overQuota(db, req, playerId, 'creates')) {
 					return bad("Trop d'annonces créées aujourd'hui. Réessaie demain.", 429);
@@ -1280,6 +1346,7 @@ Deno.serve(async (req) => {
 				await dropPosters(db, (tours ?? []).map((t) => t.poster_path as string | null));
 				await db.from('meetup_tournaments').delete().eq('organizer_id', body.targetPlayerId);
 				await db.from('meetup_tournament_reports').delete().eq('reporter_id', body.targetPlayerId);
+				await db.from('meetup_tournament_follows').delete().eq('player_id', body.targetPlayerId);
 				await db.from('meetup_spots').delete().eq('first_organizer', body.targetPlayerId).eq('source', 'user');
 				await db.from('meetup_quota').delete().eq('subject', body.targetPlayerId);
 				// Every create charged two counters, the player AND the IP. Clearing only the

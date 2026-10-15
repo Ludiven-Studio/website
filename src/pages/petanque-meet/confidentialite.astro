@@ -69,6 +69,7 @@ import Hero from '../../components/Hero.astro';
 			<ul>
 				<li><strong>Pour une partie</strong>&nbsp;: le terrain (position exacte de l'épingle et nom du lieu), la date et l'heure, le format, le nombre de places, le <strong>prénom de l'organisateur</strong> et les <strong>prénoms des inscrits</strong>.</li>
 				<li><strong>Pour un tournoi</strong>&nbsp;: le nom du club, le titre, le lieu, la date, la catégorie, le prix d'inscription, les détails, et s'ils ont été fournis le <strong>numéro de téléphone</strong> et l'<strong>affiche</strong> (une fois validée par l'éditeur).</li>
+				<li>Les <strong>tournois que tu suis</strong> ne sont visibles de personne&nbsp;: l'organisateur voit seulement combien de joueurs suivent le sien.</li>
 				<li>Un <strong>repère anonyme</strong> par compte, qui permet de reconnaître que plusieurs annonces viennent du même organisateur, sans révéler qui il est.</li>
 			</ul>
 			<p>
@@ -113,6 +114,12 @@ import Hero from '../../components/Hero.astro';
 							<td>Annoncer un tournoi</td>
 							<td>Exécution du contrat</td>
 							<td>Supabase&nbsp;; public après validation de l'affiche</td>
+						</tr>
+						<tr>
+							<td>Tournois suivis</td>
+							<td>Retrouver un tournoi dans ton agenda&nbsp;; donner à l'organisateur un nombre de joueurs intéressés</td>
+							<td>Exécution du contrat</td>
+							<td>Supabase&nbsp;; l'organisateur ne voit qu'un total</td>
 						</tr>
 						<tr>
 							<td>Coordonnées d'un nouveau terrain</td>
@@ -263,7 +270,7 @@ import Hero from '../../components/Hero.astro';
 			{/* TODO legal: the server has no purge job yet. These durations need one before release. */}
 			<ul>
 				<li><strong>Parties et inscriptions</strong>&nbsp;: retirées de la carte dès qu'elles sont terminées ou annulées, puis effacées <strong>12 mois</strong> après leur date.</li>
-				<li><strong>Tournois</strong>&nbsp;: retirés de la carte le lendemain, effacés 12 mois après leur date. L'affiche est effacée une semaine après le tournoi.</li>
+				<li><strong>Tournois</strong>&nbsp;: retirés de la carte le lendemain, effacés 12 mois après leur date. L'affiche est effacée une semaine après le tournoi. Le suivi d'un tournoi est effacé une fois le tournoi passé, au plus tard avec lui.</li>
 				<li><strong>Signalements</strong>&nbsp;: effacés une fois traités, et au plus tard 12 mois après.</li>
 				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
 				<li><strong>Suspension d'un compte</strong>&nbsp;: l'identifiant technique est conservé tant que la suspension dure.</li>
@@ -280,7 +287,7 @@ import Hero from '../../components/Hero.astro';
 			<ul>
 				<li>ton compte et ton adresse mail sont effacés&nbsp;;</li>
 				<li>tes parties à venir sont annulées (les inscrits le voient) et ton prénom est remplacé par «&nbsp;Compte supprimé&nbsp;» sur toutes tes parties&nbsp;;</li>
-				<li>tes inscriptions, tes tournois, leurs affiches et tes signalements sont effacés.</li>
+				<li>tes inscriptions, tes tournois, leurs affiches, les tournois que tu suis et tes signalements sont effacés.</li>
 			</ul>
 			<p>
 				Tes anciennes parties restent un temps dans la base, sans prénom, rattachées à un identifiant technique
