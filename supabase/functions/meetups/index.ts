@@ -254,6 +254,19 @@ const POSTERS_PUBLIC = `${Deno.env.get('SUPABASE_URL') ?? ''}/storage/v1/object/
 const tToken = (id: string): Promise<string> => modToken(`t:${id}`);
 const isTToken = (id: string, token: unknown): Promise<boolean> => isModToken(`t:${id}`, token);
 
+/** The queue's mailed pass: "<expiry ms>.<HMAC>". Only ever sent to MOD_EMAIL. */
+const QUEUE_LINK_MS = 7 * 86400_000;
+const QUEUE_LINKS_PER_DAY = 5;
+const queueToken = async (expMs: number): Promise<string> => `${expMs}.${await modToken(`queue:${expMs}`)}`;
+
+async function isQueueToken(token: unknown, nowMs: number): Promise<boolean> {
+	if (typeof token !== 'string') return false;
+	const [exp, sig] = token.split('.');
+	const expMs = Number(exp);
+	if (!Number.isFinite(expMs) || expMs < nowMs || expMs > nowMs + QUEUE_LINK_MS) return false;
+	return isModToken(`queue:${expMs}`, sig);
+}
+
 /** null = invalid. Same filters as a name, newlines kept. */
 function cleanDetails(raw: unknown): string | null {
 	const s = String(raw ?? '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, T_MAX_DETAILS);
@@ -1306,8 +1319,21 @@ Deno.serve(async (req) => {
 
 			// The moderator's queue, behind the admin key: posters waiting, then games
 			// and tournaments with reports, each with its usual mail link.
+			// Mails the moderator a 7-day pass to the queue: no key to remember.
+			case 'mod_send_link': {
+				if (!ADMIN_KEY || !MOD_EMAIL) return bad('forbidden', 403);
+				const { data: sent } = await db.rpc('meetup_bump_quota',
+					{ p_kind: 'ip', p_subject: 'mod-link', p_day: parisDay(), p_creates: 1, p_joins: 0 });
+				if (typeof sent === 'number' && sent > QUEUE_LINKS_PER_DAY) return bad('Trop de liens demandés aujourd’hui. Réessaie demain.', 429);
+				await mailMod('Rencontres : accès à la modération', [
+					'Voici ton lien vers la file de modération. Il reste valable 7 jours.',
+					'Si tu n’as rien demandé, ignore ce message.',
+				], `${MOD_URL}?q=${await queueToken(nowMs + QUEUE_LINK_MS)}`);
+				return json({ ok: true });
+			}
+
 			case 'mod_list': {
-				if (!isAdmin(body.adminKey)) return bad('forbidden', 403);
+				if (!isAdmin(body.adminKey) && !await isQueueToken(body.pass, nowMs)) return bad('forbidden', 403);
 				const tCutoff = new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString();
 				const countBy = (rows: Record<string, unknown>[] | null, key: string): Map<string, number> => {
 					const m = new Map<string, number>();

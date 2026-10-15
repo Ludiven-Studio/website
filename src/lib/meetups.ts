@@ -146,8 +146,14 @@ export const moderateTournament = (tournamentId: string, token: string, what: Mo
 export type ModQueueTournament = MeetupTournament & { reports: number; preview: string | null; link: string };
 export type ModQueueEvent = MeetupEvent & { reports: number; link: string };
 
-export const modList = (adminKey: string): Promise<{ tournaments: ModQueueTournament[]; events: ModQueueEvent[] }> =>
-	call('mod_list', { adminKey });
+/** Either the admin key or the 7-day pass from the mailed link. */
+export type ModCredential = { adminKey: string } | { pass: string };
+
+export const modList = (cred: ModCredential): Promise<{ tournaments: ModQueueTournament[]; events: ModQueueEvent[] }> =>
+	call('mod_list', cred);
+
+/** Mails the moderator a link to the queue. */
+export const modSendLink = (): Promise<{ ok: true }> => call('mod_send_link');
 
 // ---- muted organizers, kept on the device ----
 
