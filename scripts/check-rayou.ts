@@ -1,11 +1,11 @@
-/* Headless checks for the Tygo prototype: every platforming step can be done (and the
+/* Headless checks for the Rayou prototype: every platforming step can be done (and the
    gated ones can only be done the intended way), and a random-walk fuzz finds no spot where
-   Tygo stays stuck. Usage: npx tsx scripts/check-tygo.ts [--fuzz-minutes N] */
+   Rayou stays stuck. Usage: npx tsx scripts/check-rayou.ts [--fuzz-minutes N] */
 import * as THREE from 'three';
-import { buildZones } from '../src/prototypes/tygo/zones';
-import { Player, RUN, type Command } from '../src/prototypes/tygo/player';
-import { groundHeight, mountPoint, ringLevel, riverX, ISLETS, BANK, OAK, OAK_GATE, MILL, MOUNT, BOUNDS, waterAt, WATER_Y, START } from '../src/prototypes/tygo/terrain';
-import { query, inside } from '../src/prototypes/tygo/colliders';
+import { buildZones } from '../src/prototypes/rayou/zones';
+import { Player, RUN, type Command } from '../src/prototypes/rayou/player';
+import { groundHeight, mountPoint, ringLevel, riverX, ISLETS, BANK, OAK, OAK_GATE, MILL, MOUNT, BOUNDS, waterAt, WATER_Y, START } from '../src/prototypes/rayou/terrain';
+import { query, inside } from '../src/prototypes/rayou/colliders';
 
 const scene = new THREE.Scene();
 const zones = buildZones(scene);
@@ -160,6 +160,18 @@ function chain(name: string, pts: P[], roll: boolean[] = []) {
 	}
 }
 
+// — Hazel rock: hop up the stair of rocks; the third rock is out of reach from the grass. —
+{
+	const steps = zones.hazelSteps;
+	const p0 = steps[0];
+	const away = { x: p0.x - 12, z: p0.z + 10 };
+	const len = Math.hypot(away.x, away.z);
+	const start = at(p0.x + (away.x / len) * 2.4, p0.z + (away.z / len) * 2.4);
+	chain('hazel rocks', [start, ...steps.map((s) => ({ x: s.x, z: s.z, y: s.y }))]);
+	const s2 = steps[2];
+	expect('hazel rock 3 is not reachable from the grass', jumpWindow(at(s2.x + 2.2, s2.z + 0.5), { x: s2.x, z: s2.z, y: s2.y }) === 0);
+}
+
 // — Forest. —
 {
 	const cx = -40, cz = 14;
@@ -301,7 +313,7 @@ chain('lake west', [at(4.6, 49.6), at(3.0, 50.9), at(0.6, 52.6), at(-2.3, 52.0),
 		step(rider, c);
 		if (Math.abs(rider.pos.y - ringLevel(5)) < 0.05 && Math.hypot(rider.pos.x - MOUNT.x, rider.pos.z - MOUNT.z) < 11) rode = true;
 	}
-	expect('piston carries Tygo to ring 5', rode);
+	expect('piston carries Rayou to ring 5', rode);
 	// Boulder.
 	const boulder = zones.breakables.find((b) => b.id === 'boulder')!;
 	const bp = mk(onRing(9.5, 1.2, 5), 0);
@@ -396,7 +408,7 @@ function mountPolarA(p: Player) {
 			}
 			if (i % 60 === 0) hist.push({ x: p.pos.x, z: p.pos.z });
 		}
-		// Over the last 8 seconds of trying every direction Tygo must have moved somewhere.
+		// Over the last 8 seconds of trying every direction Rayou must have moved somewhere.
 		hist = hist.slice(-8);
 		const spread = Math.max(...hist.map((h) => Math.hypot(h.x - hist[0].x, h.z - hist[0].z)));
 		if (spread < 0.6) stuckSpots.push(`${p.pos.x.toFixed(1)},${p.pos.y.toFixed(1)},${p.pos.z.toFixed(1)} (from ${placed.x.toFixed(1)},${placed.z.toFixed(1)})`);

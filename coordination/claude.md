@@ -177,3 +177,15 @@
 - Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Physique vérifiée hors navigateur par `npx tsx scripts/check-tygo.ts` (sauts, passages réservés à la roulade, rive est inaccessible avant le barrage, aucun blocage en déplacement aléatoire). Partie complète jouée par `node scripts/snap-tygo.mjs`, 0 erreur console.
 - Réservations (libérées) : `src/prototypes/tygo/`, `src/pages/prototypes/tygo.astro`, `scripts/snap-tygo.mjs`, `scripts/check-tygo.ts` (nouveau).
 - Ressources : serveur de dev sur le port 4396 (arrêté).
+
+## 2026-10-15 — Tygo : tutoriel, rochers jusqu'au noisetier, sac, noms complets des animaux
+
+- Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. `check-tygo` vert (escalier de rochers inclus), captures bureau et mobile, 0 erreur.
+- Réservations (libérées) : `src/prototypes/tygo/`, `src/pages/prototypes/tygo.astro`, `scripts/snap-tygo.mjs`, `scripts/check-tygo.ts`.
+- Ressources : serveur de dev sur le port 4396 (arrêté).
+
+## 2026-10-15 — Prototype renommé « Rayou » et prénoms qui riment
+
+- Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Le héros ne reprend plus le nom du porteur de projet : `src/prototypes/tygo/` → `src/prototypes/rayou/`, page `/prototypes/rayou/`, scripts `check-rayou.ts` et `snap-rayou.mjs`. Boutons Sauter/Rouler identiques. `check-rayou` vert.
+- Réservations (libérées) : `src/prototypes/rayou/`, `src/pages/prototypes/rayou.astro`, `scripts/check-rayou.ts`, `scripts/snap-rayou.mjs`.
+- Ressources : serveur de dev sur le port 4396 (arrêté).

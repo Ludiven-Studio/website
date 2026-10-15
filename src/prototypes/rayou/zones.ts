@@ -10,7 +10,7 @@ import {
 	START,
 	DEN,
 	HOUSE,
-	SALLY_SPOT,
+	FEUILLE_SPOT,
 	PLATEAU,
 	POND,
 	OAK,
@@ -48,7 +48,7 @@ export interface Zones {
 	climbs: ClimbSpot[];
 	crowns: Crown[];
 	canopies: THREE.Object3D[];
-	npcSpots: Record<'sally' | 'owl' | 'beaver' | 'pipa' | 'lila' | 'lou' | 'frog', P3 & { yaw: number }>;
+	npcSpots: Record<'feuille' | 'owl' | 'beaver' | 'simone' | 'caline' | 'pepin' | 'frog', P3 & { yaw: number }>;
 	questNut: P3;
 	branches: Spot[];
 	babies: Spot[];
@@ -57,6 +57,7 @@ export interface Zones {
 	goldNuts: Spot[];
 	lantern: P3;
 	chimney: P3;
+	hazelSteps: P3[];
 	breakables: Solid[];
 	bouncers: { solid: Solid; mesh: THREE.Object3D; squash: number }[];
 	dam: { built: boolean; build(): void; update(dt: number): void; center: P3 };
@@ -106,7 +107,7 @@ function pawPrints(base: P3, dir: { x: number; z: number }): THREE.Group {
 	return grp;
 }
 
-// — Hub: Sally's house, the hazel rock, the pond, Tygo's den. —
+// — Hub: Feuille's house, the hazel rock, the pond, Rayou's den. —
 function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 	const hg = new THREE.Group();
 	const { w, d } = HOUSE;
@@ -153,11 +154,11 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 	root.add(wp);
 	addBox(wp.position.x, wp.position.z, 0.55, 0.5, -1, 0.92);
 
-	root.add(shadowed(stumpDeco(SALLY_SPOT.x, SALLY_SPOT.z, 0.45, 0.45)));
-	addCyl(SALLY_SPOT.x, SALLY_SPOT.z, 0.55, -1, g(SALLY_SPOT.x, SALLY_SPOT.z) + 0.43);
-	keepClear(SALLY_SPOT.x, SALLY_SPOT.z, 3);
+	root.add(shadowed(stumpDeco(FEUILLE_SPOT.x, FEUILLE_SPOT.z, 0.45, 0.45)));
+	addCyl(FEUILLE_SPOT.x, FEUILLE_SPOT.z, 0.55, -1, g(FEUILLE_SPOT.x, FEUILLE_SPOT.z) + 0.43);
+	keepClear(FEUILLE_SPOT.x, FEUILLE_SPOT.z, 3);
 
-	// Hazel rock: a ring of boulders with one climbable notch.
+	// Hazel rock: a ring of boulders with a gap, reached by hopping up a stair of rocks.
 	const climbDir = new THREE.Vector2(HOUSE.x - PLATEAU.x, HOUSE.z + 9 - PLATEAU.z).normalize();
 	const climbA = Math.atan2(climbDir.y, climbDir.x);
 	const n = 34;
@@ -165,7 +166,7 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		const a = (i / n) * Math.PI * 2 + r() * 0.08;
 		let da = Math.abs(a - climbA);
 		da = Math.min(da, Math.PI * 2 - da);
-		if (da < 0.2) continue;
+		if (da < 0.38) continue;
 		const m = rockMesh(0.75 + r() * 0.45, r() > 0.5 ? '#a99886' : '#9a8a79', r);
 		m.scale.set(1, 1.5 + r() * 0.6, 1);
 		const rad = PLATEAU.r + 0.05;
@@ -173,21 +174,30 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		root.add(shadowed(m));
 		addCyl(m.position.x, m.position.z, 0.85, -1, 2.5);
 	}
-	for (let i = 0; i < 4; i++) {
-		const t = i / 3;
-		const rad = PLATEAU.r + 0.55 - t * 0.9;
-		const ledge = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.85, 0.35, 7), mat('#c2b19a'));
-		ledge.position.set(PLATEAU.x + climbDir.x * rad, 0.2 + t * 2.1, PLATEAU.z + climbDir.y * rad);
-		ledge.rotation.y = i * 0.7;
-		root.add(shadowed(ledge));
-	}
-	const cb = { x: PLATEAU.x + climbDir.x * (PLATEAU.r + 0.9), z: PLATEAU.z + climbDir.y * (PLATEAU.r + 0.9) };
-	const ct = { x: PLATEAU.x + climbDir.x * (PLATEAU.r - 1.4), z: PLATEAU.z + climbDir.y * (PLATEAU.r - 1.4) };
-	const ce = { x: PLATEAU.x + climbDir.x * (PLATEAU.r - 0.1), z: PLATEAU.z + climbDir.y * (PLATEAU.r - 0.1) };
-	const hazelClimb: ClimbSpot = { id: 'hazel', base: at(cb.x, cb.z), edge: { ...ce, y: g(ct.x, ct.z) + 0.1 }, top: at(ct.x, ct.z), prints: new THREE.Group() };
-	hazelClimb.prints = pawPrints(hazelClimb.base, { x: -climbDir.x, z: -climbDir.y });
-	root.add(hazelClimb.prints);
-	out.climbs!.push(hazelClimb);
+	// Each step rises half a metre; the third is too high to reach straight from the grass.
+	const hazelRocks: [number, number, number][] = [
+		[1.05, 8.6, 0.6],
+		[0.78, 8.5, 1.1],
+		[0.5, 8.3, 1.6],
+		[0.18, 7.6, 2.05],
+	];
+	out.hazelSteps = hazelRocks.map(([da, rad, top], i) => {
+		const x = PLATEAU.x + Math.cos(climbA + da) * rad, z = PLATEAU.z + Math.sin(climbA + da) * rad;
+		const gy = g(x, z);
+		const rock = new THREE.Group();
+		const body = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.82, top - gy + 0.4, 7), mat(i % 2 ? '#a99886' : '#b3a28c'));
+		body.position.y = (top - gy + 0.4) / 2 - 0.4;
+		const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.64, 0.08, 7), mat('#c9b79c'));
+		cap.position.y = top - gy - 0.02;
+		rock.add(body, cap);
+		rock.position.set(x, gy, z);
+		rock.rotation.y = i * 1.3;
+		root.add(shadowed(rock));
+		addCyl(x, z, 0.66, -1, top);
+		return { x, y: top, z };
+	});
+	const landing = { x: PLATEAU.x + climbDir.x * (PLATEAU.r - 1.3), z: PLATEAU.z + climbDir.y * (PLATEAU.r - 1.3) };
+	out.hazelSteps.push(at(landing.x, landing.z));
 	keepClear(PLATEAU.x, PLATEAU.z, PLATEAU.r + 2.5);
 
 	const hazel = new THREE.Vector3(PLATEAU.x + 2, 0, PLATEAU.z - 1.6);
@@ -230,7 +240,7 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 	addCyl(POND.x, POND.z, POND.r + 0.3, -2, 30);
 	keepClear(POND.x, POND.z, POND.r + 2);
 
-	// Tygo's den: a rock shelter facing the start, with a ledge on top.
+	// Rayou's den: a rock shelter facing the start, with a ledge on top.
 	const den = new THREE.Group();
 	const rocks: [number, number, number, number][] = [
 		[-1.9, 0.4, 1.3, 1.6],
@@ -555,7 +565,7 @@ function buildRiver(root: THREE.Group, r: () => number, out: Partial<Zones>, mov
 	keepClear(bankC - 2, c.z, 4);
 }
 
-// — The forest: Pipa's babies hide in five tricky spots. —
+// — The forest: Simone's babies hide in five tricky spots. —
 function buildForest(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 	const babies: Spot[] = [];
 	const burrow = new THREE.Mesh(new THREE.SphereGeometry(1.1, 9, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat('#8b6a45'));
@@ -1088,7 +1098,7 @@ function scatterTrees(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		if (Math.hypot(x - OAK.x, z - OAK.z) < OAK.valley + 3) return true;
 		return false;
 	};
-	// Spacing keeps a gap wider than Tygo between any two trunks.
+	// Spacing keeps a gap wider than Rayou between any two trunks.
 	const spaced = (x: number, z: number, min: number) => trees.every((t) => Math.hypot(t.x - x, t.z - z) > min);
 	const inBounds = (x: number, z: number) => x > BOUNDS.x0 + 1 && x < BOUNDS.x1 - 1 && z > BOUNDS.z0 + 1 && z < BOUNDS.z1 - 1;
 	// Forest.
@@ -1272,15 +1282,15 @@ export function buildZones(scene: THREE.Scene, lite = false): Zones {
 
 	const sp = (x: number, z: number, yaw: number, lift = 0) => ({ ...at(x, z, lift), yaw });
 	out.npcSpots = {
-		sally: { x: SALLY_SPOT.x, y: g(SALLY_SPOT.x, SALLY_SPOT.z) + 0.43, z: SALLY_SPOT.z, yaw: 0.6 },
+		feuille: { x: FEUILLE_SPOT.x, y: g(FEUILLE_SPOT.x, FEUILLE_SPOT.z) + 0.43, z: FEUILLE_SPOT.z, yaw: 0.6 },
 		owl: { x: OWL_SPOT.x, y: g(OWL_SPOT.x, OWL_SPOT.z) + 1.1, z: OWL_SPOT.z, yaw: 0 },
 		beaver: sp(riverX(-3) - BANK - 1.3, -3, -1.2),
-		pipa: sp(-29.2, -2.6, 1.6),
-		lila: sp(-31, 28.6, 0.8),
-		lou: sp(-29.6, 29.9, 0.8),
+		simone: sp(-29.2, -2.6, 1.6),
+		caline: sp(-31, 28.6, 0.8),
+		pepin: sp(-29.6, 29.9, 0.8),
 		frog: { x: 6.25, y: 0.45, z: 37.2, yaw: -2.4 },
 	};
-	for (const k of ['beaver', 'pipa', 'lila', 'lou'] as const) {
+	for (const k of ['beaver', 'simone', 'caline', 'pepin'] as const) {
 		const s = out.npcSpots[k];
 		addCyl(s.x, s.z, 0.4, s.y - 1, s.y + 1);
 	}

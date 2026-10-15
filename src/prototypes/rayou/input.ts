@@ -10,6 +10,7 @@ export interface Input {
 	consumeRoll(): boolean;
 	consumeMenu(): boolean;
 	consumeTrack(): boolean;
+	consumeBag(): boolean;
 	clear(): void;
 }
 
@@ -30,7 +31,7 @@ export interface Buttons {
 
 export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: HTMLElement, btn: Buttons): Input {
 	const held = new Set<string>();
-	const latch = { action: false, jump: false, roll: false, menu: false, track: false };
+	const latch = { action: false, jump: false, roll: false, menu: false, track: false, bag: false };
 	let touchJump = false;
 	let joyId: number | null = null;
 	let camId: number | null = null;
@@ -54,6 +55,7 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		consumeRoll: take('roll'),
 		consumeMenu: take('menu'),
 		consumeTrack: take('track'),
+		consumeBag: take('bag'),
 		clear() {
 			held.clear();
 			joy.x = joy.y = 0;
@@ -98,6 +100,8 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 			if (!e.repeat) latch.menu = true;
 		} else if (c === 'Tab') {
 			if (!e.repeat) latch.track = true;
+		} else if (c === 'KeyI') {
+			if (!e.repeat) latch.bag = true;
 		} else if (KEYS[c]) held.add(c);
 		else return;
 		e.preventDefault();
@@ -222,6 +226,8 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		el.addEventListener('touchend', release);
 		el.addEventListener('touchcancel', release);
 		el.addEventListener('mousedown', (e) => {
+			// No focus, or Space (jump) would click the button again.
+			e.preventDefault();
 			e.stopPropagation();
 			down();
 			refresh();

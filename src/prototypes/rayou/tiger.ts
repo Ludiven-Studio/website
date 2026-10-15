@@ -144,7 +144,7 @@ export function createTiger(): Tiger {
 	mouth.position.set(0, -0.17, 0.3);
 	head.add(mouth);
 
-	// Sally's knitted scarf, hidden until earned.
+	// Feuille's knitted scarf, hidden until earned.
 	const scarf = new THREE.Group();
 	const red = mat('#d6453d');
 	const ring = part(new THREE.TorusGeometry(0.2, 0.06, 6, 14), red);

@@ -1,7 +1,7 @@
 // Every sound is synthesised: no audio files to load.
 export type Sfx = 'jump' | 'land' | 'roll' | 'splash' | 'pickup' | 'gold' | 'jar' | 'break' | 'bounce' | 'climb' | 'click' | 'follow' | 'magic';
 
-const VOICES: Record<string, number> = { Sally: 880, Tygo: 520, Hector: 330, Barnabé: 300, Pipa: 990, Lila: 1050, Lou: 940, Gaston: 260 };
+const VOICES: Record<string, number> = { Feuille: 880, Rayou: 520, Caillou: 330, Nestor: 300, Simone: 990, Câline: 1050, Pépin: 940, Gribouille: 260 };
 const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
 
 export class Audio {

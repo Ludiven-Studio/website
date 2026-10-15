@@ -98,7 +98,7 @@ function arm(body: THREE.Group, side: number, x: number, y: number, z: number, c
 	return a;
 }
 
-export function createSally(): Npc {
+export function createFeuille(): Npc {
 	const root = new THREE.Group();
 	const body = new THREE.Group();
 	root.add(body);

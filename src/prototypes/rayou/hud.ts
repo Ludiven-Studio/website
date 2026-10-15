@@ -1,5 +1,5 @@
 import { groundHeight, waterAt, distToPath, mountPolar, R_OUT, BOUNDS, WATER_Y } from './terrain';
-import { COLORS, SOUVENIRS, type Line } from './story';
+import { COLORS, LABELS, SOUVENIRS, type Line } from './story';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -10,6 +10,14 @@ export interface Objective {
 	done?: boolean;
 }
 
+export interface BagItem {
+	icon: string;
+	name: string;
+	count: string;
+	note: string;
+	empty?: boolean;
+}
+
 export interface MapMarker {
 	x: number;
 	z: number;
@@ -17,6 +25,7 @@ export interface MapMarker {
 	label?: string;
 	kind: 'player' | 'npc' | 'goal';
 	yaw?: number;
+	align?: 'above' | 'below' | 'left' | 'right';
 }
 
 export class Hud {
@@ -100,7 +109,7 @@ export class Hud {
 
 	showLine(l: Line): void {
 		this.el.dialog.hidden = false;
-		this.el.dlgName.textContent = l.who === 'Petit' ? 'Petit hérisson' : l.who;
+		this.el.dlgName.textContent = LABELS[l.who];
 		this.el.dlgName.style.background = COLORS[l.who];
 		this.el.dlgText.textContent = '';
 	}
@@ -115,6 +124,32 @@ export class Hud {
 
 	fade(on: boolean): void {
 		this.el.fade.style.opacity = on ? '1' : '0';
+	}
+
+	fillBag(items: BagItem[]): void {
+		$('bag').replaceChildren(
+			...items.map((it) => {
+				const li = document.createElement('li');
+				if (it.empty) li.className = 'empty';
+				const ico = document.createElement('span');
+				ico.className = 'it-ico';
+				if (it.icon === 'jar' || it.icon === 'gold') {
+					const c = document.createElement('span');
+					c.className = `ico ${it.icon}`;
+					ico.append(c);
+				} else ico.textContent = it.icon;
+				const name = document.createElement('b');
+				name.textContent = `${it.name} `;
+				const count = document.createElement('span');
+				count.className = 'count';
+				count.textContent = it.count;
+				name.append(count);
+				const note = document.createElement('small');
+				note.textContent = it.note;
+				li.append(ico, name, note);
+				return li;
+			}),
+		);
 	}
 
 	fillMenu(objs: Objective[], souvenirs: string[]): void {
@@ -196,8 +231,17 @@ export class Hud {
 				g.fill();
 				g.stroke();
 				if (m.label) {
+					const a = m.align ?? 'above';
+					g.textAlign = a === 'left' ? 'right' : a === 'right' ? 'left' : 'center';
+					const lx = a === 'left' ? x - 8 : a === 'right' ? x + 8 : x;
+					const ly = a === 'above' ? y - 8 : a === 'below' ? y + 16 : y + 3.5;
+					// A light halo keeps the name readable over the terrain.
+					g.lineWidth = 3;
+					g.strokeStyle = 'rgba(255, 250, 240, 0.85)';
+					g.strokeText(m.label, lx, ly);
 					g.fillStyle = '#3a2a1c';
-					g.fillText(m.label, x, y - 8);
+					g.fillText(m.label, lx, ly);
+					g.textAlign = 'center';
 				}
 			} else {
 				g.save();

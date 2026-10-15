@@ -91,7 +91,7 @@ export class Player {
 		this.lastSafe = { ...this.pos, yaw };
 	}
 
-	// Fades out and puts Tygo back on the last safe ground.
+	// Fades out and puts Rayou back on the last safe ground.
 	respawn(splash = false): void {
 		if (this.respawnT > 0) return;
 		this.respawnT = 0.7;
@@ -312,7 +312,7 @@ export class Player {
 				}
 			}
 		}
-		// Falling lets Tygo catch a ledge up to a step above his feet.
+		// Falling lets Rayou catch a ledge up to a step above his feet.
 		const f = this.floorAt(p.x, p.z, this.vy <= 0 ? p.y + 0.3 : p.y);
 		if (p.y <= f.h) {
 			const impact = -this.vy;

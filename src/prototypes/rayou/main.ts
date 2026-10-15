@@ -2,21 +2,22 @@ import * as THREE from 'three';
 import { buildEnv } from './world';
 import { buildZones, type P3, type ClimbSpot } from './zones';
 import { createTiger } from './tiger';
-import { createSally, createOwl, createBeaver, createHedgehog, createRabbit, createFrog, type Npc, type Mood } from './critters';
+import { createFeuille, createOwl, createBeaver, createHedgehog, createRabbit, createFrog, type Npc, type Mood } from './critters';
 import { createInput } from './input';
 import { Player, RUN, type Command } from './player';
 import { createFx } from './fx';
 import { Audio } from './audio';
-import { Hud, type Objective, type MapMarker } from './hud';
-import { L, newState, loadState, saveState, clearState, jars, goldCount, GOLD_TOTAL, SOUVENIRS, COLORS, type Line, type State, type Who } from './story';
+import { Hud, type Objective, type MapMarker, type BagItem } from './hud';
+import { L, newState, loadState, saveState, clearState, jars, goldCount, GOLD_TOTAL, SOUVENIRS, COLORS, LABELS, type Line, type State, type Who } from './story';
 import { groundHeight, mountPolar, mountPoint, ringOf, riverX, regionName, ringLevel, R_OUT, START, OAK_GATE, MOUNT, ISLETS, BANK } from './terrain';
 import { query, inside, type Solid } from './colliders';
+import { Tutorial, TUTO_STEPS } from './tutorial';
 
-type NpcKey = 'sally' | 'owl' | 'beaver' | 'pipa' | 'lila' | 'lou' | 'frog';
+type NpcKey = 'feuille' | 'owl' | 'beaver' | 'simone' | 'caline' | 'pepin' | 'frog';
 
 const CLIMB_TIME = 2.2;
 const TALK_DIST = 2.4;
-const NPC_NAMES: Record<NpcKey, Who> = { sally: 'Sally', owl: 'Hector', beaver: 'Barnabé', pipa: 'Pipa', lila: 'Lila', lou: 'Lou', frog: 'Gaston' };
+const NPC_NAMES: Record<NpcKey, Who> = { feuille: 'Feuille', owl: 'Caillou', beaver: 'Nestor', simone: 'Simone', caline: 'Câline', pepin: 'Pépin', frog: 'Gribouille' };
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const V = (p: { x: number; y: number; z: number }) => new THREE.Vector3(p.x, p.y, p.z);
 
@@ -104,6 +105,7 @@ function orbMesh(): THREE.Group {
 
 export function start(): void {
 	const coarse = matchMedia('(pointer: coarse)').matches;
+	document.body.classList.add(coarse ? 'is-touch' : 'is-mouse');
 	const stageEl = $('stage');
 	const canvas = $<HTMLCanvasElement>('view');
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: !coarse });
@@ -127,12 +129,12 @@ export function start(): void {
 	const tiger = createTiger();
 	scene.add(tiger.root);
 	const npcs: Record<NpcKey, Npc> = {
-		sally: createSally(),
+		feuille: createFeuille(),
 		owl: createOwl(),
 		beaver: createBeaver(),
-		pipa: createHedgehog(1),
-		lila: createRabbit('#f4efe8', '#ff8fb5', false),
-		lou: createRabbit('#b9b2a8', '#4f7fc0', true),
+		simone: createHedgehog(1),
+		caline: createRabbit('#f4efe8', '#ff8fb5', false),
+		pepin: createRabbit('#b9b2a8', '#4f7fc0', true),
 		frog: createFrog(),
 	};
 	const home: Record<NpcKey, THREE.Vector3> = {} as Record<NpcKey, THREE.Vector3>;
@@ -249,6 +251,19 @@ export function start(): void {
 	let drive: { yaw: number; speed: number } | null = null;
 	const pressed = { jump: false, roll: false, action: false };
 	const trail: THREE.Vector3[] = [];
+	const lastPos = { x: 0, z: 0 };
+	const tuto = new Tutorial(
+		coarse,
+		() => S.tuto,
+		(v) => {
+			S.tuto = v;
+			persist();
+		},
+		(last) => {
+			audio.play('pickup');
+			if (last) setTimeout(() => hud.toast('Tutoriel terminé ! Les commandes sont dans le menu ☰', true), 1200);
+		},
+	);
 
 	// — Helpers —
 	const tip = (id: string, text: string) => {
@@ -260,7 +275,7 @@ export function start(): void {
 		S.pos = { ...player.lastSafe };
 		saveState(S);
 	};
-	const tygoPos = () => new THREE.Vector3(player.pos.x, player.pos.y, player.pos.z);
+	const rayouPos = () => new THREE.Vector3(player.pos.x, player.pos.y, player.pos.z);
 	const flat = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
 
 	const say = (lines: Line[], done: () => void = () => {}, npc: NpcKey | null = null) => {
@@ -297,13 +312,13 @@ export function start(): void {
 
 	const giveJar = (souvenir: string) => {
 		audio.play('jar');
-		fx.sparkle(tygoPos().add(new THREE.Vector3(0, 1, 0)), '#ffe066', 40);
+		fx.sparkle(rayouPos().add(new THREE.Vector3(0, 1, 0)), '#ffe066', 40);
 		hud.toast(`Bocal de lucioles ! (${jars(S)}/4)`, true);
 		if (!S.souvenirs.includes(souvenir)) {
 			S.souvenirs.push(souvenir);
 			setTimeout(() => hud.toast(`Nouveau souvenir : ${SOUVENIRS[souvenir].title}`), 900);
 		}
-		if (jars(S) === 4) setTimeout(() => hud.toast('Les quatre bocaux ! Retourne voir Hector.', true), 2200);
+		if (jars(S) === 4) setTimeout(() => hud.toast('Les quatre bocaux ! Retourne voir Caillou le hibou.', true), 2200);
 		persist();
 	};
 
@@ -409,63 +424,69 @@ export function start(): void {
 		return { text: k >= 7 ? 'Allume la lanterne !' : `Allume la lanterne du Pic (terrasse ${Math.max(0, k + 1)}/7)`, target: guides[Math.min(8, k + 1)] };
 	}
 
+	// The lowest rock still above Rayou, so the marker walks him up the stair.
+	const nextHazelStep = () => {
+		const s = zones.hazelSteps.find((p) => p.y > player.pos.y + 0.2) ?? zones.hazelSteps[zones.hazelSteps.length - 1];
+		return { ...s, y: s.y + 1.1 };
+	};
+
 	function objectives(): Objective[] {
 		const o: Objective[] = [];
 		const followers = babies.filter((b) => b.state === 'follow').length;
-		if (S.nut === 0) o.push({ id: 'nut', text: 'Va voir Sally, près de la maison', target: npcTarget('sally') });
+		if (S.nut === 0) o.push({ id: 'nut', text: 'Va voir Feuille l’écureuil, près de la maison', target: npcTarget('feuille') });
 		else if (S.nut === 1)
 			o.push(
 				onPlateau()
 					? { id: 'nut', text: 'Trouve la noisette près du noisetier', target: { ...zones.questNut, y: zones.questNut.y + 0.6 } }
-					: { id: 'nut', text: 'Grimpe sur le rocher (traces de pattes)', target: { ...zones.climbs[0].base, y: zones.climbs[0].base.y + 1.2 } },
+					: { id: 'nut', text: 'Saute de pierre en pierre jusqu’au noisetier', target: nextHazelStep() },
 			);
-		else if (S.nut === 2) o.push({ id: 'nut', text: 'Rapporte la noisette à Sally', target: npcTarget('sally') });
-		else o.push({ id: 'nut', text: 'La noisette de Sally', target: null, done: true });
+		else if (S.nut === 2) o.push({ id: 'nut', text: 'Rapporte la noisette à Feuille l’écureuil', target: npcTarget('feuille') });
+		else o.push({ id: 'nut', text: 'La noisette de Feuille l’écureuil', target: null, done: true });
 		if (S.nut < 3) return o;
 
 		if (S.owl === 0) {
-			o.push({ id: 'owl', text: 'Va voir Hector au Grand Chêne (nord)', target: npcTarget('owl') });
+			o.push({ id: 'owl', text: 'Va voir Caillou le hibou au Grand Chêne (nord)', target: npcTarget('owl') });
 			return o;
 		}
 		if (S.owl === 1) {
 			const quests: Objective[] = [];
-			if (S.beaver === 0) quests.push({ id: 'beaver', text: 'Rivière : Barnabé le castor a besoin d’aide', target: npcTarget('beaver') });
+			if (S.beaver === 0) quests.push({ id: 'beaver', text: 'Rivière : Nestor le castor a besoin d’aide', target: npcTarget('beaver') });
 			else if (S.beaver === 1) {
 				const left = branches.filter((b) => !has(b.spot.id)).map((b) => ({ ...b.spot, y: b.spot.y + 0.7 }));
 				quests.push(
 					S.carry.startsWith('branch')
-						? { id: 'beaver', text: `Apporte la branche à Barnabé (${S.branches}/3)`, target: npcTarget('beaver') }
+						? { id: 'beaver', text: `Apporte la branche à Nestor le castor (${S.branches}/3)`, target: npcTarget('beaver') }
 						: { id: 'beaver', text: `Rapporte les branches des îlots (${S.branches}/3)`, target: nearestOf(left) },
 				);
-			} else quests.push({ id: 'beaver', text: 'Le barrage de Barnabé', target: null, done: true });
-			if (S.hedge === 0) quests.push({ id: 'hedge', text: 'Bois : Pipa la hérissonne te cherche', target: npcTarget('pipa') });
+			} else quests.push({ id: 'beaver', text: 'Le barrage de Nestor le castor', target: null, done: true });
+			if (S.hedge === 0) quests.push({ id: 'hedge', text: 'Bois : Simone la hérissonne te cherche', target: npcTarget('simone') });
 			else if (S.hedge === 1) {
 				const hidden = babies.filter((b) => b.state === 'hidden').map((b) => ({ ...b.spot, y: b.spot.y + 0.8 }));
 				const found = S.babiesHome + followers;
 				quests.push(
 					followers && !hidden.length
-						? { id: 'hedge', text: `Ramène les petits à Pipa (${found}/5)`, target: npcTarget('pipa') }
+						? { id: 'hedge', text: `Ramène les petits à Simone la hérissonne (${found}/5)`, target: npcTarget('simone') }
 						: { id: 'hedge', text: `Retrouve les petits hérissons (${found}/5)`, target: nearestOf(hidden) },
 				);
-			} else quests.push({ id: 'hedge', text: 'Les petits de Pipa', target: null, done: true });
-			if (S.rabbit === 0) quests.push({ id: 'rabbit', text: 'Moulin : Lila et Lou ont un souci', target: npcTarget('lila') });
+			} else quests.push({ id: 'hedge', text: 'Les petits de Simone la hérissonne', target: null, done: true });
+			if (S.rabbit === 0) quests.push({ id: 'rabbit', text: 'Moulin : Câline et Pépin les lapins ont un souci', target: npcTarget('caline') });
 			else if (S.rabbit === 1)
 				quests.push(
 					S.carry === 'kite'
-						? { id: 'rabbit', text: 'Rapporte le cerf-volant à Lila et Lou', target: npcTarget('lila') }
+						? { id: 'rabbit', text: 'Rapporte le cerf-volant à Câline et Pépin les lapins', target: npcTarget('caline') }
 						: { id: 'rabbit', text: 'Récupère le cerf-volant en haut du moulin', target: { ...zones.kite, y: zones.kite.y + 1.2 } },
 				);
-			else quests.push({ id: 'rabbit', text: 'Le cerf-volant des lapins', target: null, done: true });
+			else quests.push({ id: 'rabbit', text: 'Le cerf-volant de Câline et Pépin les lapins', target: null, done: true });
 			const orbN = orbs.filter((x) => has(x.spot.id)).length;
-			if (S.frog === 0) quests.push({ id: 'frog', text: 'Lac : Gaston la grenouille t’appelle', target: npcTarget('frog') });
+			if (S.frog === 0) quests.push({ id: 'frog', text: 'Lac : Gribouille la grenouille t’appelle', target: npcTarget('frog') });
 			else if (S.frog === 1)
 				quests.push(
 					orbN >= 6
-						? { id: 'frog', text: 'Retourne voir Gaston sur le ponton', target: npcTarget('frog') }
+						? { id: 'frog', text: 'Retourne voir Gribouille la grenouille sur le ponton', target: npcTarget('frog') }
 						: { id: 'frog', text: `Attrape les lucioles sur les nénuphars (${orbN}/6)`, target: nearestOf(orbs.filter((x) => !has(x.spot.id)).map((x) => ({ ...x.spot, y: x.spot.y + 0.6 }))) },
 				);
-			else quests.push({ id: 'frog', text: 'Les lucioles du lac', target: null, done: true });
-			if (jars(S) === 4) o.push({ id: 'owl', text: 'Retourne voir Hector au Grand Chêne', target: npcTarget('owl') });
+			else quests.push({ id: 'frog', text: 'Les lucioles de Gribouille la grenouille', target: null, done: true });
+			if (jars(S) === 4) o.push({ id: 'owl', text: 'Retourne voir Caillou le hibou au Grand Chêne', target: npcTarget('owl') });
 			o.push(...quests);
 			return o;
 		}
@@ -504,41 +525,44 @@ export function start(): void {
 		audio.play('click');
 	};
 	hud.el.objective.addEventListener('click', cycleTracked);
+	// HUD chips must not keep focus: Space is the jump key.
+	for (const id of ['objective', 'counters']) $(id).addEventListener('mousedown', (e) => e.preventDefault());
+	$('counters').addEventListener('click', () => playing && !finale && hud.el.end.hidden && openMenu(true, 'bag'));
 
 	// — Quests: talking —
 	function talk(k: NpcKey) {
 		const who = NPC_NAMES[k];
-		const teaser = (): Line[] => [{ who, text: 'Bonjour Tygo ! Hector te cherche, tu sais. Il t’attend au Grand Chêne.' }];
+		const teaser = (): Line[] => [{ who, text: 'Bonjour Rayou ! Caillou le hibou te cherche, tu sais. Il t’attend au Grand Chêne.' }];
 		switch (k) {
-			case 'sally':
-				if (S.nut === 0) return say(L.sallyAsk, () => ((S.nut = 1), persist()), k);
-				if (S.nut === 1) return say(L.sallyRemind, () => {}, k);
+			case 'feuille':
+				tuto.bump('act');
+				if (S.nut === 0) return say(L.feuilleAsk, () => ((S.nut = 1), persist()), k);
+				if (S.nut === 1) return say(L.feuilleRemind, () => {}, k);
 				if (S.nut === 2) {
 					S.carry = '';
-					npcs.sally.hand.add(questNut);
+					npcs.feuille.hand.add(questNut);
 					questNut.position.set(0, 0, 0);
 					questNut.rotation.set(0, 0, 0);
 					audio.play('pickup');
-					return say(L.sallyThanks, () => {
+					return say(L.feuilleThanks, () => {
 						S.nut = 3;
 						party = 3.5;
-						fx.confetti(home.sally.clone().add(new THREE.Vector3(0, 1, 0)));
+						fx.confetti(home.feuille.clone().add(new THREE.Vector3(0, 1, 0)));
 						audio.play('jar');
 						setTimeout(() => (questNut.visible = false), 3500);
-						tip('roll', coarse ? 'Bouton ⟳ : rouler en boule' : 'Maj : rouler en boule');
 						persist();
 					}, k);
 				}
 				if (goldCount(S) >= 10 && !S.scarf)
-					return say(L.sallyScarf, () => {
+					return say(L.feuilleScarf, () => {
 						S.scarf = true;
 						tiger.scarf.visible = true;
-						fx.sparkle(tygoPos().add(new THREE.Vector3(0, 0.9, 0.3)), '#ff6b6b', 30);
+						fx.sparkle(rayouPos().add(new THREE.Vector3(0, 0.9, 0.3)), '#ff6b6b', 30);
 						audio.play('magic');
 						persist();
 					}, k);
-				if (goldCount(S) >= GOLD_TOTAL && !S.allGold) return say(L.sallyAllGold, () => ((S.allGold = true), persist()), k);
-				return say(S.owl >= 3 ? L.sallyLate : L.sallyIdle, () => {}, k);
+				if (goldCount(S) >= GOLD_TOTAL && !S.allGold) return say(L.feuilleAllGold, () => ((S.allGold = true), persist()), k);
+				return say(S.owl >= 3 ? L.feuilleLate : L.feuilleIdle, () => {}, k);
 			case 'owl':
 				if (S.nut < 3) return say(L.owlEarly, () => {}, k);
 				if (S.owl === 0)
@@ -553,7 +577,7 @@ export function start(): void {
 							S.owl = 2;
 							persist();
 						}, k);
-					return say([{ who: 'Hector', text: `${jars(S)} ${jars(S) > 1 ? 'bocaux' : 'bocal'} sur 4. ${L.owlRemind[0].text}` }], () => {}, k);
+					return say([{ who: 'Caillou', text: `${jars(S)} ${jars(S) > 1 ? 'bocaux' : 'bocal'} sur 4. ${L.owlRemind[0].text}` }], () => {}, k);
 				}
 				return say(L.owlGo, () => {}, k);
 			case 'beaver':
@@ -568,7 +592,7 @@ export function start(): void {
 						drop(b.mesh);
 						b.mesh.visible = false;
 						audio.play('pickup');
-						if (S.branches < 3) return say([{ who: 'Barnabé', text: `${L.beaverOne[0].text} (${S.branches}/3)` }], persist, k);
+						if (S.branches < 3) return say([{ who: 'Nestor', text: `${L.beaverOne[0].text} (${S.branches}/3)` }], persist, k);
 						zones.dam.build();
 						cine = { pos: V(zones.dam.center).add(new THREE.Vector3(-7, 5, 8)), look: V(zones.dam.center) };
 						return say(L.beaverDone.slice(0, 1), () => {
@@ -581,13 +605,13 @@ export function start(): void {
 					return say(L.beaverRemind, () => {}, k);
 				}
 				return say(L.beaverIdle, () => {}, k);
-			case 'pipa':
+			case 'simone':
 				if (S.owl === 0) return say(teaser(), () => {}, k);
-				if (S.hedge === 0) return say(L.pipaAsk, () => ((S.hedge = 1), persist()), k);
-				if (S.hedge === 1) return say(L.pipaRemind, () => {}, k);
-				return say(L.pipaIdle, () => {}, k);
-			case 'lila':
-			case 'lou':
+				if (S.hedge === 0) return say(L.simoneAsk, () => ((S.hedge = 1), persist()), k);
+				if (S.hedge === 1) return say(L.simoneRemind, () => {}, k);
+				return say(L.simoneIdle, () => {}, k);
+			case 'caline':
+			case 'pepin':
 				if (S.owl === 0) return say(teaser(), () => {}, k);
 				if (S.rabbit === 0) return say(L.rabbitAsk, () => ((S.rabbit = 1), persist()), k);
 				if (S.rabbit === 1) {
@@ -616,7 +640,7 @@ export function start(): void {
 							giveJar('signal');
 							say(L.frogDone.slice(2), () => {}, k);
 						}, k);
-					return say([{ who: 'Gaston', text: `${n}/6. ${L.frogRemind[0].text}` }], () => {}, k);
+					return say([{ who: 'Gribouille', text: `${n}/6. ${L.frogRemind[0].text}` }], () => {}, k);
 				}
 				return say(L.frogIdle, () => {}, k);
 		}
@@ -638,20 +662,20 @@ export function start(): void {
 		}
 		if (bestNpc) {
 			const k = bestNpc;
-			const give = (k === 'sally' && S.nut === 2) || (k === 'beaver' && S.carry.startsWith('branch')) || ((k === 'lila' || k === 'lou') && S.carry === 'kite');
+			const give = (k === 'feuille' && S.nut === 2) || (k === 'beaver' && S.carry.startsWith('branch')) || ((k === 'caline' || k === 'pepin') && S.carry === 'kite');
 			return { label: give ? 'Donner' : 'Parler', run: () => talk(k) };
 		}
 		if (player.grounded && !player.low)
 			for (const c of zones.climbs)
 				if (flat(c.base, p) < 1.6 && Math.abs(p.y - c.base.y) < 0.6) return { label: 'Grimper', run: () => startClimb(c) };
-		const near = (o: THREE.Object3D, r = 1.5) => o.visible && o.parent === scene && o.position.distanceTo(tygoPos().add(new THREE.Vector3(0, 0.3, 0))) < r;
+		const near = (o: THREE.Object3D, r = 1.5) => o.visible && o.parent === scene && o.position.distanceTo(rayouPos().add(new THREE.Vector3(0, 0.3, 0))) < r;
 		const pick = (fn: () => void): Action => ({
 			label: 'Ramasser',
 			run: () => {
 				if (S.carry) return say(L.carrying);
 				fn();
 				audio.play('pickup');
-				fx.sparkle(tygoPos().add(new THREE.Vector3(0, 0.6, 0)), '#ffffff', 10);
+				fx.sparkle(rayouPos().add(new THREE.Vector3(0, 0.6, 0)), '#ffffff', 10);
 			},
 		});
 		if (S.nut === 1 && near(questNut))
@@ -713,7 +737,7 @@ export function start(): void {
 			player.frozen = false;
 			player.teleport(spot.top.x, spot.top.z, player.yaw);
 			tiger.land(0.5);
-			fx.dust(tygoPos(), 5, 0.5);
+			fx.dust(rayouPos(), 5, 0.5);
 		}
 	}
 
@@ -725,9 +749,9 @@ export function start(): void {
 		audio.play('magic');
 		hud.setArrow(null);
 	}
-	// Friends sit in an arc on both sides of Tygo, all facing the far light.
+	// Friends sit in an arc on both sides of Rayou, all facing the far light.
 	const farA = Math.atan2(-150, 150);
-	const summitSeats: [NpcKey, number][] = [['sally', farA - 0.55], ['owl', farA - 0.95], ['pipa', farA + 0.75], ['beaver', farA - 1.35], ['lila', farA + 1.1], ['lou', farA + 1.4], ['frog', farA + 1.75]];
+	const summitSeats: [NpcKey, number][] = [['feuille', farA - 0.55], ['owl', farA - 0.95], ['simone', farA + 0.75], ['beaver', farA - 1.35], ['caline', farA + 1.1], ['pepin', farA + 1.4], ['frog', farA + 1.75]];
 	function updateFinale(dt: number) {
 		if (!finale) return;
 		finale.t += dt;
@@ -735,13 +759,13 @@ export function start(): void {
 		const ang = 0.6 + finale.t * 0.08;
 		const farLines = dialog && dialog.lines === L.lantern && dialog.i >= 2 && dialog.i <= 4;
 		if (farLines) {
-			// Over Tygo's shoulder, towards the answering light.
+			// Over Rayou's shoulder, towards the answering light.
 			const away = farLight.position.clone().sub(L0).setY(0).normalize();
 			const side = new THREE.Vector3(-away.z, 0, away.x);
-			cine = { pos: tygoPos().addScaledVector(away, -4).addScaledVector(side, 1.3).add(new THREE.Vector3(0, 0.9, 0)), look: tygoPos().addScaledVector(away, 30).add(new THREE.Vector3(0, 1.5, 0)) };
+			cine = { pos: rayouPos().addScaledVector(away, -4).addScaledVector(side, 1.3).add(new THREE.Vector3(0, 0.9, 0)), look: rayouPos().addScaledVector(away, 30).add(new THREE.Vector3(0, 1.5, 0)) };
 		} else cine = { pos: L0.clone().add(new THREE.Vector3(Math.cos(ang) * 9, 2.5, Math.sin(ang) * 9)), look: L0.clone().add(new THREE.Vector3(0, -1.2, 0)) };
 		if (finale.step === 0) {
-			if (Math.random() < dt * 30) fx.sparkle(tygoPos().add(new THREE.Vector3((Math.random() - 0.5) * 2, 1 + Math.random(), (Math.random() - 0.5) * 2)), '#ffe066', 3);
+			if (Math.random() < dt * 30) fx.sparkle(rayouPos().add(new THREE.Vector3((Math.random() - 0.5) * 2, 1 + Math.random(), (Math.random() - 0.5) * 2)), '#ffe066', 3);
 			lightLantern(Math.min(1, finale.t / 3));
 			dayT = Math.min(1, dayT + dt * 0.08);
 			if (finale.t > 3.2) {
@@ -768,7 +792,7 @@ export function start(): void {
 				});
 			}
 		}
-		// The far light blinks three times while Gaston speaks.
+		// The far light blinks three times while Gribouille speaks.
 		if (dialog && dialog.lines === L.lantern && dialog.i >= 2 && dialog.i <= 4) {
 			const b = Math.floor((finale.t * 2.2) % 4);
 			const on = b < 3 && (finale.t * 2.2) % 1 < 0.55;
@@ -796,12 +820,13 @@ export function start(): void {
 
 	// — Player events —
 	player.onEvent = (e, data) => {
-		const p = tygoPos();
+		const p = rayouPos();
 		switch (e) {
 			case 'jump':
 				audio.play('jump');
 				fx.dust(p, 3, 0.3);
-				if (data) tip('longjump', 'Saut roulé ! Bien plus loin qu’un saut normal.');
+				tuto.bump('jump');
+				if (data) tuto.bump('longjump');
 				break;
 			case 'land':
 				if ((data as number) > 6) {
@@ -814,9 +839,10 @@ export function start(): void {
 				fx.dust(p, 10, 0.8);
 				audio.play('land');
 				audio.play('roll');
-				tip('tumble', 'Pas de bobo : Tygo roule pour amortir ses chutes !');
+				tip('tumble', 'Pas de bobo : Rayou roule pour amortir ses chutes !');
 				break;
 			case 'roll':
+				tuto.bump('roll');
 				audio.play('roll');
 				fx.dust(p, 4, 0.4);
 				break;
@@ -845,7 +871,7 @@ export function start(): void {
 				const now = performance.now();
 				splash = now - splash.at < 25000 ? { n: splash.n + 1, at: now } : { n: 1, at: now };
 				if (splash.n >= 3) {
-					// After a few misses, put Tygo back on the shore instead of the last islet.
+					// After a few misses, put Rayou back on the shore instead of the last islet.
 					let best = zones.rescue[0], bd = Infinity;
 					for (const r of zones.rescue) {
 						const d = flat(r, at);
@@ -859,7 +885,7 @@ export function start(): void {
 						splash.n = 0;
 					}
 				}
-				tip('splash', 'Plouf ! Tygo s’ébroue et revient au bord.');
+				tip('splash', 'Plouf ! Rayou s’ébroue et revient au bord.');
 				break;
 			}
 			case 'respawn':
@@ -871,7 +897,7 @@ export function start(): void {
 
 	// — Per-frame quest logic —
 	function updateQuests(dt: number) {
-		const p = tygoPos();
+		const p = rayouPos();
 		const c = p.clone().add(new THREE.Vector3(0, 0.4, 0));
 		for (const g of golds) {
 			if (!g.mesh.visible) continue;
@@ -883,7 +909,7 @@ export function start(): void {
 				fx.sparkle(g.mesh.position, '#ffd84d', 24);
 				const n = goldCount(S);
 				hud.toast(`Noisette dorée ! ${n}/${GOLD_TOTAL}`);
-				if (n === 10 && S.nut >= 3) setTimeout(() => hud.toast('Sally a une surprise pour toi…', true), 1200);
+				if (n === 10 && S.nut >= 3) setTimeout(() => hud.toast('Feuille l’écureuil a une surprise pour toi…', true), 1200);
 				persist();
 			}
 		}
@@ -900,7 +926,7 @@ export function start(): void {
 				audio.play('gold');
 				fx.sparkle(o.mesh.position, '#fff3a0', 26);
 				const n = orbs.filter((x) => has(x.spot.id)).length;
-				hud.toast(n < 6 ? `Luciole ${n}/6` : 'Toutes les lucioles ! Retourne voir Gaston.', n === 6);
+				hud.toast(n < 6 ? `Luciole ${n}/6` : 'Toutes les lucioles ! Retourne voir Gribouille la grenouille.', n === 6);
 				persist();
 			}
 		}
@@ -944,7 +970,7 @@ export function start(): void {
 			} else if (b.state === 'hidden') b.npc.update(dt, flat(r.position, p) < 4 ? 'idle' : 'curl', p);
 		}
 		const followers = babies.filter((b) => b.state === 'follow');
-		if (followers.length && !dialog && flat(home.pipa, p) < 3.2) {
+		if (followers.length && !dialog && flat(home.simone, p) < 3.2) {
 			for (const b of followers) {
 				b.state = 'home';
 				b.homeT = 0;
@@ -953,12 +979,12 @@ export function start(): void {
 			S.babiesHome += followers.length;
 			audio.play('pickup');
 			if (S.babiesHome >= 5)
-				say(L.pipaDone.slice(0, 2), () => {
+				say(L.simoneDone.slice(0, 2), () => {
 					S.hedge = 2;
 					giveJar('bell');
-					say(L.pipaDone.slice(2), () => {}, 'pipa');
-				}, 'pipa');
-			else say([{ who: 'Pipa', text: `${L.pipaSome[0].text} (${S.babiesHome}/5)` }], persist, 'pipa');
+					say(L.simoneDone.slice(2), () => {}, 'simone');
+				}, 'simone');
+			else say([{ who: 'Simone', text: `${L.simoneSome[0].text} (${S.babiesHome}/5)` }], persist, 'simone');
 		}
 
 		// Contextual tips.
@@ -967,7 +993,7 @@ export function start(): void {
 			S.seen.push('trunk');
 			say(L.trunk, () => hud.toast(coarse ? 'Bouton ⟳ pour rouler sous le tronc' : 'Maj pour rouler sous le tronc'));
 		}
-		if (player.crawl) tip('crawl', 'Tygo rampe sous l’obstacle…');
+		if (player.crawl) tip('crawl', 'Rayou rampe sous l’obstacle…');
 		const near = (x: number, z: number, r: number) => flat({ x, z }, p) < r;
 		for (const b of zones.bouncers) if (near(b.solid.x, b.solid.z, 4)) tip('bounce', 'Saute sur le champignon pour rebondir très haut !');
 		const bramble = zones.breakables.find((b) => b.id === 'bramble');
@@ -992,7 +1018,7 @@ export function start(): void {
 
 		if (party > 0) {
 			party -= dt;
-			if (party > 2.9 && party - dt <= 2.9) fx.confetti(home.sally.clone().add(new THREE.Vector3(0, 1.2, 0)));
+			if (party > 2.9 && party - dt <= 2.9) fx.confetti(home.feuille.clone().add(new THREE.Vector3(0, 1.2, 0)));
 		}
 	}
 
@@ -1027,6 +1053,7 @@ export function start(): void {
 		const drag = input.camDrag;
 		camYaw -= drag.x * 0.006;
 		camPitch = THREE.MathUtils.clamp(camPitch + drag.y * 0.004, -0.05, 1.1);
+		if (playing) tuto.bump('cam', Math.abs(drag.x) + Math.abs(drag.y));
 		drag.x = drag.y = 0;
 		const moving = player.speed > 0.6 && !climb;
 		if (!playing) camYaw += dt * 0.1;
@@ -1116,24 +1143,54 @@ export function start(): void {
 	}
 
 	// — Menu —
-	const openMenu = (on: boolean) => {
+	const openMenu = (on: boolean, tab = 'quests') => {
 		hud.el.menu.hidden = !on;
 		paused = on;
 		input.clear();
 		if (on) {
 			hud.fillMenu(objectives(), S.souvenirs);
+			hud.fillBag(bagItems());
+			hud.showTab(tab);
 			drawMap();
 		}
 		audio.play('click');
 	};
+	function bagItems(): BagItem[] {
+		const carried: Record<string, string> = { nut: 'La noisette de Feuille l’écureuil', kite: 'Le cerf-volant de Câline et Pépin', '': 'Rien pour l’instant' };
+		const items: BagItem[] = [
+			{ icon: 'jar', name: 'Bocaux de lucioles', count: `${jars(S)}/4`, note: 'Pour la grande lanterne du Pic.', empty: !jars(S) },
+			{ icon: 'gold', name: 'Noisettes dorées', count: `${goldCount(S)}/${GOLD_TOTAL}`, note: S.scarf ? 'Feuille l’écureuil t’a tricoté une écharpe !' : 'À 10, Feuille l’écureuil a une surprise.', empty: !goldCount(S) },
+			{ icon: '📜', name: 'Souvenirs', count: `${S.souvenirs.length}/4`, note: 'L’histoire de la nuit où Rayou est arrivé.', empty: !S.souvenirs.length },
+			{ icon: '🐯', name: 'Dans la gueule', count: '', note: S.carry.startsWith('branch') ? 'Une branche pour Nestor le castor' : carried[S.carry] ?? '', empty: !S.carry },
+		];
+		if (S.beaver >= 1) items.push({ icon: '🌿', name: 'Branches', count: `${S.branches}/3`, note: S.beaver === 2 ? 'Le barrage de Nestor le castor tient bon.' : 'Pour le barrage de Nestor le castor.' });
+		if (S.hedge >= 1) {
+			const follow = babies.filter((b) => b.state === 'follow').length;
+			items.push({ icon: '🦔', name: 'Petits hérissons', count: `${S.babiesHome + follow}/5`, note: S.hedge === 2 ? 'Tous rentrés chez Simone la hérissonne.' : follow ? `${follow} te suivent : ramène-les à Simone la hérissonne.` : 'Cachés dans le bois.' });
+		}
+		if (S.rabbit >= 1) items.push({ icon: '🪁', name: 'Cerf-volant', count: S.rabbit === 2 ? '✓' : S.carry === 'kite' ? '1/1' : '0/1', note: S.rabbit === 2 ? 'Il vole à nouveau au-dessus du moulin.' : 'Coincé en haut du moulin.' });
+		if (S.frog >= 1) {
+			const n = orbs.filter((x) => has(x.spot.id)).length;
+			items.push({ icon: '✨', name: 'Lucioles du lac', count: `${n}/6`, note: S.frog === 2 ? 'Rendues à Gribouille la grenouille.' : 'Sur les nénuphars de Gribouille la grenouille.' });
+		}
+		if (S.scarf) items.push({ icon: '🧣', name: 'Écharpe rouge', count: '', note: 'Tricotée par Feuille l’écureuil. Rayou la porte !' });
+		return items;
+	}
+
 	const drawMap = () => {
 		const markers: MapMarker[] = [];
 		for (const o of activeObjectives()) markers.push({ x: o.target!.x, z: o.target!.z, color: '#ffd23f', kind: 'goal' });
-		for (const k of Object.keys(npcs) as NpcKey[]) if (k !== 'lou') markers.push({ x: home[k].x, z: home[k].z, color: COLORS[NPC_NAMES[k]], label: k === 'lila' ? 'Lila & Lou' : NPC_NAMES[k], kind: 'npc' });
+		// Labels sit on the side with room: the meadow in the middle is crowded.
+		const side: Record<NpcKey, MapMarker['align']> = { feuille: 'below', owl: 'above', beaver: 'right', simone: 'above', caline: 'below', pepin: 'below', frog: 'right' };
+		for (const k of Object.keys(npcs) as NpcKey[]) if (k !== 'pepin') markers.push({ x: home[k].x, z: home[k].z, color: COLORS[NPC_NAMES[k]], label: k === 'caline' ? 'Câline et Pépin les lapins' : LABELS[NPC_NAMES[k]], kind: 'npc', align: side[k] });
 		markers.push({ x: player.pos.x, z: player.pos.z, color: '#ee8a2c', kind: 'player', yaw: player.yaw });
 		hud.drawMap(markers);
 	};
 	$('resume').addEventListener('click', () => openMenu(false));
+	$('opt-tuto').addEventListener('click', () => {
+		tuto.restart();
+		openMenu(false);
+	});
 	$('opt-unstuck').addEventListener('click', () => {
 		openMenu(false);
 		if (climb) return;
@@ -1172,13 +1229,16 @@ export function start(): void {
 			S = newState();
 		} else S = saved ?? newState();
 		applyState();
+		lastPos.x = player.pos.x;
+		lastPos.z = player.pos.z;
+		// Someone who already talked to Feuille knows the last card.
+		if (S.tuto === TUTO_STEPS.length - 1 && S.nut > 0) S.tuto = TUTO_STEPS.length;
 		hud.el.intro.hidden = true;
 		document.body.classList.add('playing');
 		playing = true;
 		audio.start();
 		if (coarse) goFullscreen();
 		lastRegion = regionName(player.pos.x, player.pos.z);
-		if (fresh || !saved) setTimeout(() => tip('move', coarse ? 'Pouce gauche pour bouger, glisse à droite pour la caméra' : 'ZQSD pour bouger, Espace pour sauter'), 600);
 		persist();
 	};
 	if (saved && saved.nut + saved.owl > 0) $('continue').hidden = false;
@@ -1208,6 +1268,7 @@ export function start(): void {
 		const dt = Math.min(0.05, (now - last) / 1000);
 		last = now;
 		if (input.consumeMenu() && playing && !finale && hud.el.end.hidden) openMenu(hud.el.menu.hidden);
+		if (input.consumeBag() && playing && !finale && hud.el.end.hidden) openMenu(hud.el.menu.hidden, 'bag');
 		if (halo.visible) {
 			halo.scale.setScalar(7 + Math.sin(now * 0.004) * 0.6);
 			// Fade out when the camera comes inside the glow, or it washes the whole frame.
@@ -1256,7 +1317,13 @@ export function start(): void {
 		else player.update(dt, cmd);
 		updateFinale(dt);
 
-		if (playing) updateQuests(dt);
+		if (playing) {
+			updateQuests(dt);
+			if (player.grounded && player.respawnT <= 0) tuto.bump('move', Math.hypot(player.pos.x - lastPos.x, player.pos.z - lastPos.z));
+			lastPos.x = player.pos.x;
+			lastPos.z = player.pos.z;
+			tuto.update(dt, !dialog && !finale);
+		}
 		const act = updateHud();
 		if (act && !dialog && (input.consumeAction() || pressed.action)) act.run();
 		else if (!dialog) input.consumeAction();
@@ -1288,8 +1355,8 @@ export function start(): void {
 		for (const k of Object.keys(npcs) as NpcKey[]) {
 			const n = npcs[k];
 			const talking = dialog && dialog.lines[dialog.i].who === NPC_NAMES[k];
-			const happy = (k === 'sally' && party > 0) || (!!finale && finale.step >= 1);
-			const sad = (k === 'beaver' && S.beaver < 2) || (k === 'pipa' && S.hedge < 2) || ((k === 'lila' || k === 'lou') && S.rabbit < 2);
+			const happy = (k === 'feuille' && party > 0) || (!!finale && finale.step >= 1);
+			const sad = (k === 'beaver' && S.beaver < 2) || (k === 'simone' && S.hedge < 2) || ((k === 'caline' || k === 'pepin') && S.rabbit < 2);
 			const mood: Mood = happy ? 'happy' : talking ? 'talk' : sad && S.owl >= 1 ? 'sad' : 'idle';
 			const gazeFar = !!finale && !!dialog && dialog.lines === L.lantern && dialog.i >= 2 && dialog.i <= 4;
 			n.update(dt, mood, gazeFar ? farLight.position : flat(n.root.position, player.pos) < 7 ? player.pos : null);
@@ -1302,7 +1369,7 @@ export function start(): void {
 		}
 		for (const b of branches) if (b.mesh.parent === scene && b.mesh.visible) b.mesh.position.y = b.spot.y + Math.sin(time * 2 + b.spot.x) * 0.03;
 		if (kiteFly) {
-			const anchor = home.lila.clone().add(new THREE.Vector3(0.6, 0.5, 0.6));
+			const anchor = home.caline.clone().add(new THREE.Vector3(0.6, 0.5, 0.6));
 			kite.position.set(anchor.x + 4 + Math.sin(time * 0.7) * 1.2, anchor.y + 7 + Math.sin(time * 1.1) * 0.6, anchor.z - 3 + Math.cos(time * 0.5));
 			kite.rotation.set(0, 0.6, Math.sin(time * 1.3) * 0.25);
 			kite.scale.setScalar(1.3);
@@ -1318,7 +1385,7 @@ export function start(): void {
 			s.m.scale.setScalar(0.4 + s.t * 1.4);
 			(s.m.material as THREE.MeshStandardMaterial).opacity = 0.65 * (1 - s.t) * Math.min(1, s.t * 6);
 		}
-		const pv = tygoPos();
+		const pv = rayouPos();
 		for (const b of butterflies) {
 			b.g.visible = dayT < 0.85 && flat({ x: b.cx, z: b.cz }, pv) < 45;
 			if (!b.g.visible) continue;
@@ -1369,7 +1436,7 @@ export function start(): void {
 	requestAnimationFrame(frame);
 
 	// Test hook for the capture and check scripts.
-	(window as unknown as { __tygo: unknown }).__tygo = {
+	(window as unknown as { __rayou: unknown }).__rayou = {
 		get state() {
 			return {
 				pos: [player.pos.x, player.pos.y, player.pos.z],
@@ -1414,6 +1481,7 @@ export function start(): void {
 		spots: {
 			npcs: zones.npcSpots,
 			climbs: zones.climbs.map((c) => ({ id: c.id, base: c.base, top: c.top })),
+			hazelSteps: zones.hazelSteps,
 			branches: zones.branches,
 			babies: zones.babies,
 			orbs: zones.orbs,
