@@ -674,3 +674,9 @@
 	.re-mine-open { grid-template-columns: 1fr auto; }
 	.re-mine-what { grid-column: 1 / -1; }
 }
+
+/* Moderation queue: one link per poster or reported listing. */
+.re-queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
+.re-queue a { display: flex; gap: 0.75rem; align-items: center; color: inherit; text-decoration: none; padding: 0.5rem; border-radius: 0.5rem; background: var(--re-surface-soft, rgba(0, 0, 0, 0.04)); }
+.re-queue a:hover { background: rgba(0, 0, 0, 0.08); }
+.re-queue img { width: 64px; height: 90px; object-fit: cover; border-radius: 0.25rem; flex: none; }

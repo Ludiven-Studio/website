@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { modGet, moderate, type ModAction, type ModReport, type ModSignup } from '../../lib/meetups';
 import { FORMAT_LABEL, REPORT_LABEL, type MeetupEvent } from '../../lib/meetupRules';
 import { formatDay, formatShortDay, formatSlot, formatTime } from './format';
+import ModerationQueue from './ModerationQueue';
 import TournamentModeration from './TournamentModeration';
 
 interface Data { event: MeetupEvent; signups: ModSignup[]; reports: ModReport[]; }
@@ -21,11 +22,13 @@ const DONE: Record<ModAction, string> = {
 	ban_signup: 'Joueur banni et retiré.',
 };
 
-/** The page behind the report mails. ?e= is a game, ?t= a tournament, ?k= the token. */
+/** The page behind the report mails. ?e= is a game, ?t= a tournament, ?k= the token.
+ *  Neither: the moderator's queue, behind the admin key. */
 export default function ModerationApp() {
 	const [q] = useState(() => new URLSearchParams(window.location.search));
 	const tournamentId = q.get('t');
 	if (tournamentId) return <TournamentModeration tournamentId={tournamentId} token={q.get('k') ?? ''} />;
+	if (!q.get('e')) return <ModerationQueue />;
 	return <EventModeration eventId={q.get('e') ?? ''} token={q.get('k') ?? ''} />;
 }
 

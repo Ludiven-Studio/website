@@ -141,6 +141,14 @@ export const modGetTournament = (tournamentId: string, token: string): Promise<{
 export const moderateTournament = (tournamentId: string, token: string, what: ModTournamentAction): Promise<{ ok: true }> =>
 	call('moderate_tournament', { tournamentId, token, do: what });
 
+// ---- the moderator's queue, behind the admin key ----
+
+export type ModQueueTournament = MeetupTournament & { reports: number; preview: string | null; link: string };
+export type ModQueueEvent = MeetupEvent & { reports: number; link: string };
+
+export const modList = (adminKey: string): Promise<{ tournaments: ModQueueTournament[]; events: ModQueueEvent[] }> =>
+	call('mod_list', { adminKey });
+
 // ---- muted organizers, kept on the device ----
 
 const MUTED_KEY = 'ludiven-meetup-muted';

@@ -394,14 +394,16 @@ async function activeTournaments(db: SupabaseClient, uid: string, nowMs: number)
 	return count ?? 0;
 }
 
-/** Follower count per tournament. Only the organizer is told. */
+/** Follower count per tournament. Only the organizer is told. One head count each:
+ *  fetching the rows would stop at the API's row cap. */
 async function followerCounts(db: SupabaseClient, ids: string[]): Promise<Map<string, number>> {
-	const counts = new Map<string, number>();
-	if (!ids.length) return counts;
-	const { data, error } = await db.from('meetup_tournament_follows').select('tournament_id').in('tournament_id', ids).limit(20000);
-	if (error) throw error;
-	for (const r of data ?? []) counts.set(r.tournament_id as string, (counts.get(r.tournament_id as string) ?? 0) + 1);
-	return counts;
+	const counts = await Promise.all(ids.map(async (id) => {
+		const { count, error } = await db.from('meetup_tournament_follows')
+			.select('player_id', { count: 'exact', head: true }).eq('tournament_id', id);
+		if (error) throw error;
+		return [id, count ?? 0] as const;
+	}));
+	return new Map(counts);
 }
 
 /** The player's followed tournaments still on the map, cancelled ones included so
@@ -947,7 +949,8 @@ Deno.serve(async (req) => {
 				await dropPosters(db, (tours ?? []).map((t) => t.poster_path as string | null));
 				await db.from('meetup_tournaments').delete().eq('organizer_id', uid);
 				await db.from('meetup_tournament_reports').delete().eq('reporter_id', uid);
-				await db.from('meetup_tournament_follows').delete().eq('player_id', uid);
+				const { error: fErr } = await db.from('meetup_tournament_follows').delete().eq('player_id', uid);
+				if (fErr) throw fErr;
 				const { error } = await db.auth.admin.deleteUser(uid);
 				if (error) throw error;
 				return json({ ok: true });
@@ -1038,7 +1041,9 @@ Deno.serve(async (req) => {
 				const uid = await whoAmI();
 				if (!uid) return bad(LOGIN, 401);
 				if (body.follow === false) {
-					await db.from('meetup_tournament_follows').delete().eq('tournament_id', body.tournamentId).eq('player_id', uid);
+					const { error } = await db.from('meetup_tournament_follows').delete()
+						.eq('tournament_id', body.tournamentId).eq('player_id', uid);
+					if (error) throw error;
 					return json({ ok: true, following: false });
 				}
 				const { data: t } = await db.from('meetup_tournaments').select('id, status, hidden, last_starts_at')
@@ -1046,8 +1051,10 @@ Deno.serve(async (req) => {
 				if (!t || t.hidden || t.status !== 'open' || Date.parse(String(t.last_starts_at)) < nowMs - T_SHOWN_AFTER_START_MS) {
 					return bad('Ce tournoi n’est plus en ligne.', 409);
 				}
-				const { count } = await db.from('meetup_tournament_follows').select('tournament_id', { count: 'exact', head: true })
-					.eq('player_id', uid);
+				// Follows of tournaments over do not count: the agenda no longer shows them.
+				const { count } = await db.from('meetup_tournament_follows')
+					.select('tournament_id, meetup_tournaments!inner(last_starts_at)', { count: 'exact', head: true })
+					.eq('player_id', uid).gte('meetup_tournaments.last_starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString());
 				if ((count ?? 0) >= MAX_FOLLOWS) return bad(`Tu suis déjà ${MAX_FOLLOWS} tournois.`, 409);
 				const { error } = await db.from('meetup_tournament_follows')
 					.upsert({ tournament_id: t.id, player_id: uid }, { onConflict: 'tournament_id,player_id', ignoreDuplicates: true });
@@ -1295,6 +1302,53 @@ Deno.serve(async (req) => {
 					return bad('unknown do');
 				}
 				return json({ ok: true });
+			}
+
+			// The moderator's queue, behind the admin key: posters waiting, then games
+			// and tournaments with reports, each with its usual mail link.
+			case 'mod_list': {
+				if (!isAdmin(body.adminKey)) return bad('forbidden', 403);
+				const tCutoff = new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString();
+				const countBy = (rows: Record<string, unknown>[] | null, key: string): Map<string, number> => {
+					const m = new Map<string, number>();
+					for (const r of rows ?? []) m.set(r[key] as string, (m.get(r[key] as string) ?? 0) + 1);
+					return m;
+				};
+
+				const { data: tReps } = await db.from('meetup_tournament_reports').select('tournament_id').limit(5000);
+				const tCounts = countBy(tReps, 'tournament_id');
+				const { data: pending, error: pErr } = await db.from('meetup_tournaments').select(T_EMBED)
+					.eq('poster_status', 'pending').gte('last_starts_at', tCutoff).order('created_at').limit(100);
+				if (pErr) throw pErr;
+				const seen = new Set((pending ?? []).map((r) => r.id as string));
+				const missing = [...tCounts.keys()].filter((id) => !seen.has(id)).slice(0, 100);
+				const { data: reported } = missing.length
+					? await db.from('meetup_tournaments').select(T_EMBED).in('id', missing).gte('last_starts_at', tCutoff)
+					: { data: [] };
+				const tournaments = [];
+				for (const r of [...(pending ?? []), ...(reported ?? [])] as Record<string, unknown>[]) {
+					const id = String(r.id);
+					let preview: string | null = null;
+					if (r.poster_status === 'pending' && r.poster_path) {
+						const { data: signed } = await db.storage.from('posters-pending').createSignedUrl(String(r.poster_path), 3600);
+						preview = signed?.signedUrl ?? null;
+					}
+					tournaments.push({ ...shapeTournament(r), reports: tCounts.get(id) ?? 0, preview,
+						link: `${MOD_URL}?t=${id}&k=${await tToken(id)}` });
+				}
+
+				const { data: eReps } = await db.from('meetup_reports').select('event_id').limit(5000);
+				const eCounts = countBy(eReps, 'event_id');
+				const eIds = [...eCounts.keys()].slice(0, 100);
+				const { data: evs } = eIds.length
+					? await db.from('meetup_events').select(EMBED).in('id', eIds).gte('ends_at', nowIso).order('starts_at')
+					: { data: [] };
+				const events = [];
+				for (const r of (evs ?? []) as Record<string, unknown>[]) {
+					const id = String(r.id);
+					events.push({ ...shapeEvent(r), reports: eCounts.get(id) ?? 0, link: `${MOD_URL}?e=${id}&k=${await modToken(id)}` });
+				}
+				return json({ tournaments, events });
 			}
 
 			// By hand; upload_poster also prunes on every call.
