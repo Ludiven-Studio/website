@@ -120,7 +120,8 @@ export default function TournamentPanel({ tournament: t, shareUrl, onClose }: {
 				</div>
 				<p className="re-hint re-app-cta">
 					Ce tournoi et toutes les parties autour de toi sont dans l'appli <strong>Pétanque Meet</strong>,
-					bientôt sur Android et iPhone.
+					sur Android dès maintenant, bientôt sur iPhone.{' '}
+					<a href="/petanque-meet/telecharger/">Télécharger l'appli</a>
 				</p>
 			</section>
 		</div>

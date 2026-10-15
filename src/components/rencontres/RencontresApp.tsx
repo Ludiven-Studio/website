@@ -39,6 +39,7 @@ const ROLE_FILTERS: RoleFilter[] = ['all', 'tireur', 'pointeur'];
 /* The island is client:only, so `window` is always there. The installed icon must
    land on the map, never on the ?e= card that happened to be open. */
 const PAGE_URL = `${window.location.origin}/petanque-meet/`;
+const APP_PAGE = '/petanque-meet/telecharger/';
 
 interface Detail {
 	event: MeetupEvent;
@@ -840,7 +841,7 @@ export default function RencontresApp() {
 					</p>
 					<p className="re-hint">
 						Aucune partie posée ici pour l'instant. Pour en organiser une, ou être prévenu des parties
-						autour, utilise l'appli Pétanque Meet.
+						autour, utilise <a href={APP_PAGE}>l'appli Pétanque Meet</a>.
 					</p>
 					<div className="re-actions">
 						<a
@@ -1008,7 +1009,8 @@ export default function RencontresApp() {
 			</p>
 			<p className="re-legal">
 				Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
-				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans l'appli Pétanque Meet.{' '}
+				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans{' '}
+				<a href={APP_PAGE}>l'appli Pétanque Meet</a>.{' '}
 				<a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a>.
 			</p>
 
@@ -1080,10 +1082,12 @@ function AppSheet({ onClose }: { onClose(): void }) {
 				<h2>Ça se passe dans l'appli</h2>
 				<p className="re-hint">
 					Ici, la carte se consulte librement. Pour publier une partie, la rejoindre, annoncer un tournoi
-					ou signaler un abus, utilise l'appli Pétanque Meet, bientôt sur Android et iPhone.
+					ou signaler un abus, utilise l'appli Pétanque Meet&nbsp;: sur Android dès maintenant,
+					bientôt sur iPhone.
 				</p>
 				<div className="re-formactions">
 					<button type="button" className="re-btn re-btn--ghost" onClick={onClose}>Fermer</button>
+					<a className="re-btn" href={APP_PAGE}>Télécharger pour Android</a>
 				</div>
 			</div>
 		</div>

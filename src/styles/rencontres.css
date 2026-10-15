@@ -50,6 +50,7 @@
 	padding: 0.5rem 0.9rem;
 	cursor: pointer;
 	white-space: nowrap;
+	text-decoration: none;
 }
 .re-btn:hover:not(:disabled) { filter: brightness(1.1); }
 .re-btn:disabled { opacity: 0.45; cursor: default; }
