@@ -213,3 +213,8 @@
 - Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Teaser 4:5 et 16:9 (`scripts/promo-rayou*.mjs`, sorties dans `D:/tmp/promo-rayou`, copiées dans Téléchargements). Champignons fermés dessous, plein écran pleine largeur, caméra qui ne tourne plus pendant les sauts (mesuré : 154° → 0° sur l'escalier de rochers), joystick figé tant qu'il est tenu. `check-rayou` vert.
 - Réservations (libérées) : `src/games/rayou/`, `src/pages/jeux/rayou.astro`, `scripts/promo-rayou*.mjs` (nouveaux).
 - Ressources : serveur de dev sur les ports 4384-4385 et 4396 (arrêtés).
+
+## 2026-10-15 — Rayou : lucioles ramassables avant la quête
+
+- Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Les lucioles du lac se ramassent même avant d'avoir parlé à Gribouille (elles brillaient mais on passait au travers) ; Gribouille tient compte de celles déjà trouvées et donne le bocal tout de suite s'il y en a six. Testé en jeu (port 4396, arrêté), `check-rayou` vert, tsc + eslint OK.
+- Réservations (libérées) : `src/games/rayou/main.ts`, `src/games/rayou/story.ts`.

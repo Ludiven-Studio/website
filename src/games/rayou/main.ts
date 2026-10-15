@@ -638,20 +638,30 @@ export function start(): void {
 					return say(L.rabbitRemind, () => {}, k);
 				}
 				return say(L.rabbitIdle, () => {}, k);
-			case 'frog':
+			case 'frog': {
 				if (S.owl === 0) return say(teaser(), () => {}, k);
-				if (S.frog === 0) return say(L.frogAsk, () => ((S.frog = 1), persist()), k);
+				const n = orbs.filter((x) => has(x.spot.id)).length;
+				const thank = () =>
+					say(L.frogDone.slice(0, 2), () => {
+						S.frog = 2;
+						giveJar('signal');
+						say(L.frogDone.slice(2), () => {}, k);
+					}, k);
+				if (S.frog === 0) {
+					// The fireflies glow from the start, so Rayou may already hold some.
+					const ask: Line[] = n >= 6 ? [L.frogAsk[0], ...L.frogAskAll] : n ? [L.frogAsk[0], { who: 'Gribouille', text: `Il y en a six, tu en as déjà ${n}. Saute de feuille en feuille pour trouver les autres.` }, L.frogAsk[2]] : L.frogAsk;
+					return say(ask, () => {
+						S.frog = 1;
+						persist();
+						if (n >= 6) thank();
+					}, k);
+				}
 				if (S.frog === 1) {
-					const n = orbs.filter((x) => has(x.spot.id)).length;
-					if (n >= 6)
-						return say(L.frogDone.slice(0, 2), () => {
-							S.frog = 2;
-							giveJar('signal');
-							say(L.frogDone.slice(2), () => {}, k);
-						}, k);
+					if (n >= 6) return thank();
 					return say([{ who: 'Gribouille', text: `${n}/6. ${L.frogRemind[0].text}` }], () => {}, k);
 				}
 				return say(L.frogIdle, () => {}, k);
+			}
 		}
 	}
 
@@ -929,13 +939,15 @@ export function start(): void {
 				const k = ch.userData.k;
 				if (k !== undefined) ch.position.set(Math.cos(time * 3 + k * 2.1) * 0.35, Math.sin(time * 4 + k) * 0.15, Math.sin(time * 3 + k * 2.1) * 0.35);
 			});
-			if (S.frog === 1 && o.mesh.position.distanceTo(c) < 1.0) {
+			if (o.mesh.position.distanceTo(c) < 1.0) {
 				o.mesh.visible = false;
 				S.taken.push(o.spot.id);
 				audio.play('gold');
 				fx.sparkle(o.mesh.position, '#fff3a0', 26);
 				const n = orbs.filter((x) => has(x.spot.id)).length;
-				hud.toast(n < 6 ? `Luciole ${n}/6` : 'Toutes les lucioles ! Retourne voir Gribouille la grenouille.', n === 6);
+				const to = S.frog === 1 ? 'Retourne voir Gribouille la grenouille.' : 'Apporte-les à Gribouille la grenouille, sur le ponton.';
+				hud.toast(n < 6 ? `Luciole ${n}/6` : `Toutes les lucioles ! ${to}`, n === 6);
+				if (n === 1 && S.frog === 0) setTimeout(() => hud.toast('Gribouille la grenouille les cherche, sur le ponton du lac.', true), 1200);
 				persist();
 			}
 		}
@@ -1255,9 +1267,10 @@ export function start(): void {
 			items.push({ icon: '🦔', name: 'Petits hérissons', count: `${S.babiesHome + follow}/5`, note: S.hedge === 2 ? 'Tous rentrés chez Simone la hérissonne.' : follow ? `${follow} te suivent : ramène-les à Simone la hérissonne.` : 'Cachés dans le bois.' });
 		}
 		if (S.rabbit >= 1) items.push({ icon: '🪁', name: 'Cerf-volant', count: S.rabbit === 2 ? '✓' : S.carry === 'kite' ? '1/1' : '0/1', note: S.rabbit === 2 ? 'Il vole à nouveau au-dessus du moulin.' : 'Coincé en haut du moulin.' });
-		if (S.frog >= 1) {
-			const n = orbs.filter((x) => has(x.spot.id)).length;
-			items.push({ icon: '✨', name: 'Lucioles du lac', count: `${n}/6`, note: S.frog === 2 ? 'Rendues à Gribouille la grenouille.' : 'Sur les nénuphars de Gribouille la grenouille.' });
+		const orbN = orbs.filter((x) => has(x.spot.id)).length;
+		if (S.frog >= 1 || orbN) {
+			const note = S.frog === 2 ? 'Rendues à Gribouille la grenouille.' : S.frog === 1 ? 'Sur les nénuphars de Gribouille la grenouille.' : 'Gribouille la grenouille les cherche, sur le ponton du lac.';
+			items.push({ icon: '✨', name: 'Lucioles du lac', count: `${orbN}/6`, note });
 		}
 		if (S.scarf) items.push({ icon: '🧣', name: 'Écharpe rouge', count: '', note: 'Tricotée par Feuille l’écureuil. Rayou la porte !' });
 		return items;

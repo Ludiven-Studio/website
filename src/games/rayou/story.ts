@@ -222,6 +222,7 @@ export const L = {
 		{ who: 'Gribouille', text: 'Méfie-toi : une feuille dérive, une autre s’enfonce si on traîne dessus. Et si tu tombes à l’eau… tu seras mouillé, voilà tout !' },
 	],
 	frogRemind: [{ who: 'Gribouille', text: 'Six lucioles sur les nénuphars. Saute, croâ !' }],
+	frogAskAll: [{ who: 'Gribouille', text: 'Croâ ? Mais… tu les as déjà toutes les six !' }],
 	frogDone: [
 		{ who: 'Gribouille', text: 'Six sur six ! Tu sautes presque aussi bien que moi.' },
 		{ who: 'Gribouille', text: 'Voilà ton bocal. Elles brillent fort, ce soir.' },
