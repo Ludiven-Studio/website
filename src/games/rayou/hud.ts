@@ -1,7 +1,8 @@
 import { groundHeight, waterAt, distToPath, mountPolar, R_OUT, BOUNDS, WATER_Y } from './terrain';
 import { COLORS, LABELS, SOUVENIRS, type Line } from './story';
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+// Every element of the game carries the ry- prefix, so it cannot clash with the site's own ids.
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(`ry-${id}`) as T;
 
 export interface Objective {
 	id: string;
@@ -55,14 +56,14 @@ export class Hud {
 	private lastToast = '';
 
 	constructor() {
-		for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.tab'))) {
+		for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.ry-tab'))) {
 			tab.addEventListener('click', () => this.showTab(tab.dataset.tab!));
 		}
 	}
 
 	showTab(name: string): void {
-		for (const t of Array.from(document.querySelectorAll<HTMLElement>('.tab'))) t.classList.toggle('on', t.dataset.tab === name);
-		for (const p of Array.from(document.querySelectorAll<HTMLElement>('.pane'))) p.hidden = p.dataset.pane !== name;
+		for (const t of Array.from(document.querySelectorAll<HTMLElement>('.ry-tab'))) t.classList.toggle('ry-on', t.dataset.tab === name);
+		for (const p of Array.from(document.querySelectorAll<HTMLElement>('.ry-pane'))) p.hidden = p.dataset.pane !== name;
 	}
 
 	setObjective(o: Objective | null, count: number): void {
@@ -83,7 +84,7 @@ export class Hud {
 		if (text === this.lastToast && this.el.toasts.childElementCount) return;
 		this.lastToast = text;
 		const t = document.createElement('div');
-		t.className = big ? 'toast big' : 'toast';
+		t.className = big ? 'ry-toast ry-big' : 'ry-toast';
 		t.textContent = text;
 		this.el.toasts.appendChild(t);
 		while (this.el.toasts.childElementCount > 3) this.el.toasts.firstElementChild?.remove();
@@ -91,7 +92,7 @@ export class Hud {
 	}
 
 	setAction(label: string | null, keyHint: string): void {
-		this.el.action.classList.toggle('on', !!label);
+		this.el.action.classList.toggle('ry-on', !!label);
 		const l = label ?? '';
 		if (this.el.actionLabel.textContent !== l) this.el.actionLabel.textContent = l;
 		this.el.hint.hidden = !label;
@@ -130,18 +131,18 @@ export class Hud {
 		$('bag').replaceChildren(
 			...items.map((it) => {
 				const li = document.createElement('li');
-				if (it.empty) li.className = 'empty';
+				if (it.empty) li.className = 'ry-empty';
 				const ico = document.createElement('span');
-				ico.className = 'it-ico';
+				ico.className = 'ry-it-ico';
 				if (it.icon === 'jar' || it.icon === 'gold') {
 					const c = document.createElement('span');
-					c.className = `ico ${it.icon}`;
+					c.className = `ry-ico ry-${it.icon}`;
 					ico.append(c);
 				} else ico.textContent = it.icon;
 				const name = document.createElement('b');
 				name.textContent = `${it.name} `;
 				const count = document.createElement('span');
-				count.className = 'count';
+				count.className = 'ry-count';
 				count.textContent = it.count;
 				name.append(count);
 				const note = document.createElement('small');
@@ -157,7 +158,7 @@ export class Hud {
 			...objs.map((o) => {
 				const li = document.createElement('li');
 				li.textContent = o.text;
-				if (o.done) li.className = 'done';
+				if (o.done) li.className = 'ry-done';
 				return li;
 			}),
 		);
@@ -169,7 +170,7 @@ export class Hud {
 					b.textContent = s.title;
 					li.append(b, s.text);
 				} else {
-					li.className = 'locked';
+					li.className = 'ry-locked';
 					li.textContent = '??? — un ami de la vallée s’en souvient peut-être.';
 				}
 				return li;

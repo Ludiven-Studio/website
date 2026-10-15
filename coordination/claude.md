@@ -189,3 +189,9 @@
 - Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Le héros ne reprend plus le nom du porteur de projet : `src/prototypes/tygo/` → `src/prototypes/rayou/`, page `/prototypes/rayou/`, scripts `check-rayou.ts` et `snap-rayou.mjs`. Boutons Sauter/Rouler identiques. `check-rayou` vert.
 - Réservations (libérées) : `src/prototypes/rayou/`, `src/pages/prototypes/rayou.astro`, `scripts/check-rayou.ts`, `scripts/snap-rayou.mjs`.
 - Ressources : serveur de dev sur le port 4396 (arrêté).
+
+## 2026-10-15 — Rayou dans le catalogue des jeux (catégorie Aventures)
+
+- Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Page `/jeux/rayou/` (GamePage, plein écran du site), carte et images générées (ComfyUI arrêté), `/prototypes/rayou` redirigé. `check-rayou` vert.
+- Réservations : `src/games/rayou/` (déplacé depuis `src/prototypes/rayou/`), `src/pages/jeux/rayou.astro` (nouveau), `src/pages/prototypes/`, `src/data/games.ts` (une entrée), `src/data/tutorials.ts` (une entrée), `src/components/IconPaths.ts` (une icône), `astro.config.mjs` (une redirection), `scripts/check-rayou.ts`, `scripts/snap-rayou.mjs`, `scripts/thumb-themes.mjs` (un thème), `public/assets/jeux/{rayou.jpg,og/,art/,tile/}`.
+- Ressources : serveur de dev sur le port 4396 (arrêté), ComfyUI local port 8188 (arrêté).

@@ -10,7 +10,7 @@ import { Audio } from './audio';
 import { Hud, type Objective, type MapMarker, type BagItem } from './hud';
 import { L, newState, loadState, saveState, clearState, jars, goldCount, GOLD_TOTAL, SOUVENIRS, COLORS, LABELS, type Line, type State, type Who } from './story';
 import { groundHeight, mountPolar, mountPoint, ringOf, riverX, regionName, ringLevel, R_OUT, START, OAK_GATE, MOUNT, ISLETS, BANK } from './terrain';
-import { query, inside, type Solid } from './colliders';
+import { query, inside, solids, type Solid } from './colliders';
 import { Tutorial, TUTO_STEPS } from './tutorial';
 
 type NpcKey = 'feuille' | 'owl' | 'beaver' | 'simone' | 'caline' | 'pepin' | 'frog';
@@ -18,7 +18,8 @@ type NpcKey = 'feuille' | 'owl' | 'beaver' | 'simone' | 'caline' | 'pepin' | 'fr
 const CLIMB_TIME = 2.2;
 const TALK_DIST = 2.4;
 const NPC_NAMES: Record<NpcKey, Who> = { feuille: 'Feuille', owl: 'Caillou', beaver: 'Nestor', simone: 'Simone', caline: 'Câline', pepin: 'Pépin', frog: 'Gribouille' };
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+// Every element of the game carries the ry- prefix, so it cannot clash with the site's own ids.
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(`ry-${id}`) as T;
 const V = (p: { x: number; y: number; z: number }) => new THREE.Vector3(p.x, p.y, p.z);
 
 function nutMesh(gold: boolean): THREE.Group {
@@ -105,7 +106,8 @@ function orbMesh(): THREE.Group {
 
 export function start(): void {
 	const coarse = matchMedia('(pointer: coarse)').matches;
-	document.body.classList.add(coarse ? 'is-touch' : 'is-mouse');
+	const rootEl = $('root');
+	rootEl.classList.add(coarse ? 'ry-touch' : 'ry-mouse');
 	const stageEl = $('stage');
 	const canvas = $<HTMLCanvasElement>('view');
 	const renderer = new THREE.WebGLRenderer({ canvas, antialias: !coarse });
@@ -1029,13 +1031,26 @@ export function start(): void {
 	const camTarget = new THREE.Vector3();
 	const camLook = new THREE.Vector3();
 	let camInit = false;
+	let camLift = 0;
 
+	// Small props (rocks, trunks, crates) let the camera through: seen from inside, their
+	// faces are culled, so the view stays clear instead of the camera hugging Rayou.
+	const small = (s: Solid) => (s.kind === 'cyl' ? s.r < 1.3 : s.hw < 1.3 && s.hd < 1.3);
 	function blocked(p: THREE.Vector3): boolean {
 		if (groundHeight(p.x, p.z) > p.y - 0.25) return true;
-		for (const s of query(p.x, p.z)) if (p.y > s.y0 - 0.15 && p.y < s.y1 + 0.15 && inside(s, p.x, p.z, 0.15)) return true;
+		for (const s of query(p.x, p.z)) if (!small(s) && p.y > s.y0 - 0.15 && p.y < s.y1 + 0.15 && inside(s, p.x, p.z, 0.15)) return true;
 		for (const c of zones.crowns) if (p.y > c.y0 && p.y < c.y1 && Math.hypot(p.x - c.x, p.z - c.z) < c.r) return true;
 		return false;
 	}
+	// Length of clear sight from `from` towards `to` (full length when nothing is in the way).
+	function clearRun(from: THREE.Vector3, to: THREE.Vector3): number {
+		const dir = to.clone().sub(from);
+		const len = dir.length();
+		const q = new THREE.Vector3();
+		for (let d = 0.9; d < len; d += 0.25) if (blocked(q.copy(from).addScaledVector(dir, d / len))) return d;
+		return len;
+	}
+
 	function pullIn(from: THREE.Vector3, want: THREE.Vector3) {
 		const dir = want.clone().sub(from);
 		const len = dir.length();
@@ -1065,11 +1080,15 @@ export function start(): void {
 		const dist = !playing ? 9 : onPeak ? 6.6 : 5.6;
 		const pitch = !playing ? 0.42 : camPitch + (onPeak ? 0.08 : 0);
 		const target = new THREE.Vector3(player.pos.x, player.pos.y + 0.9, player.pos.z);
-		let want = new THREE.Vector3(
-			target.x + Math.sin(camYaw) * Math.cos(pitch) * dist,
-			target.y + Math.sin(pitch) * dist,
-			target.z + Math.cos(camYaw) * Math.cos(pitch) * dist,
-		);
+		const orbit = (p: number) => new THREE.Vector3(target.x + Math.sin(camYaw) * Math.cos(p) * dist, target.y + Math.sin(p) * dist, target.z + Math.cos(camYaw) * Math.cos(p) * dist);
+		// Blocked from behind (rocks, a ledge): look over the obstacle before giving up distance.
+		let lift = 0;
+		for (const extra of [0, 0.25, 0.5, 0.8]) {
+			lift = extra;
+			if (clearRun(target, orbit(pitch + extra)) >= dist - 0.3) break;
+		}
+		camLift += (lift - camLift) * (1 - Math.exp(-4 * dt));
+		let want = orbit(Math.min(1.35, pitch + camLift));
 		let look = target.clone();
 		const talkNpc = dialog?.npc ? npcs[dialog.npc].root.position : null;
 		if (cine) {
@@ -1106,6 +1125,51 @@ export function start(): void {
 		camera.lookAt(camLook);
 	}
 
+	// Small props between the camera and Rayou turn see-through, so he never disappears behind a rock.
+	const faded = new Map<THREE.Object3D, number>();
+	const fadeable = solids.filter((s) => s.mesh && small(s) && !s.moving && !s.bouncy);
+	function setOpacity(o: THREE.Object3D, k: number) {
+		o.traverse((c) => {
+			const m = c as THREE.Mesh;
+			if (!m.isMesh) return;
+			// Materials are shared between props: give a faded one its own copy first.
+			if (!m.userData.ownMat) {
+				m.material = (m.material as THREE.Material).clone();
+				m.userData.ownMat = true;
+			}
+			const mt = m.material as THREE.MeshStandardMaterial;
+			mt.transparent = k < 0.99;
+			mt.opacity = k;
+			mt.depthWrite = k > 0.6;
+		});
+	}
+	function updateOccluders(dt: number) {
+		const a = camera.position, b = new THREE.Vector3(player.pos.x, player.pos.y + 0.5, player.pos.z);
+		const abx = b.x - a.x, abz = b.z - a.z, len2 = abx * abx + abz * abz || 1;
+		const hide = new Set<THREE.Object3D>();
+		for (const s of fadeable) {
+			if (!s.alive) continue;
+			// Closest point of the camera→Rayou segment to the prop, in plan view.
+			const t = Math.max(0, Math.min(1, ((s.x - a.x) * abx + (s.z - a.z) * abz) / len2));
+			if (t > 0.94) continue;
+			const px = a.x + abx * t, pz = a.z + abz * t, py = a.y + (b.y - a.y) * t;
+			const reach = (s.kind === 'cyl' ? s.r : Math.max(s.hw, s.hd)) + 0.25;
+			if (Math.hypot(px - s.x, pz - s.z) < reach && py > s.y0 && py < s.y1 + 0.3) hide.add(s.mesh!);
+		}
+		for (const o of hide) if (!faded.has(o)) faded.set(o, 1);
+		for (const [o, k] of faded) {
+			const want = hide.has(o) ? 0.28 : 1;
+			const nk = k + (want - k) * Math.min(1, dt * 8);
+			if (want === 1 && nk > 0.98) {
+				setOpacity(o, 1);
+				faded.delete(o);
+			} else {
+				setOpacity(o, nk);
+				faded.set(o, nk);
+			}
+		}
+	}
+
 	// — HUD —
 	const proj = new THREE.Vector3();
 	function updateHud() {
@@ -1122,7 +1186,7 @@ export function start(): void {
 			marker.position.copy(target).setY(target.y + Math.sin(time * 3) * 0.12);
 			marker.rotation.y = time * 2;
 			proj.copy(target).project(camera);
-			const w = window.innerWidth, h = window.innerHeight;
+			const w = rootEl.clientWidth, h = rootEl.clientHeight;
 			const behind = proj.z > 1;
 			const onScreen = !behind && Math.abs(proj.x) < 0.92 && Math.abs(proj.y) < 0.88;
 			if (onScreen) hud.setArrow(null);
@@ -1197,7 +1261,10 @@ export function start(): void {
 		player.frozen = false;
 		player.respawn();
 	});
-	$('opt-full').addEventListener('click', () => goFullscreen());
+	$('opt-full').addEventListener('click', () => {
+		openMenu(false);
+		goFullscreen(!isFull());
+	});
 	const sfxBtn = $('opt-sfx'), musicBtn = $('opt-music');
 	sfxBtn.addEventListener('click', () => {
 		audio.sfxOn = !audio.sfxOn;
@@ -1213,13 +1280,18 @@ export function start(): void {
 		location.reload();
 	});
 
-	function goFullscreen() {
-		const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
-		const req = el.requestFullscreen?.bind(el) ?? el.webkitRequestFullscreen?.bind(el);
-		if (!req || document.fullscreenElement) return;
-		Promise.resolve(req({ navigationUI: 'hide' } as FullscreenOptions))
-			.then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> })?.lock?.('landscape'))
-			.catch(() => {});
+	// The site's own fullscreen (GameFullscreen.astro) owns the switch: it hides the page chrome
+	// and draws the exit button. Its button is in the page header.
+	const isFull = () => document.documentElement.classList.contains('gf-full');
+	function goFullscreen(on = true, tries = 40) {
+		const btn = document.querySelector<HTMLButtonElement>('.gf-btn');
+		// The site script may run after this one: wait for its button.
+		if (!btn) {
+			if (tries > 0) setTimeout(() => goFullscreen(on, tries - 1), 50);
+			return;
+		}
+		if (isFull() !== on) btn.click();
+		if (on) setTimeout(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> })?.lock?.('landscape').catch(() => {}), 300);
 	}
 
 	// — Intro —
@@ -1234,9 +1306,12 @@ export function start(): void {
 		// Someone who already talked to Feuille knows the last card.
 		if (S.tuto === TUTO_STEPS.length - 1 && S.nut > 0) S.tuto = TUTO_STEPS.length;
 		hud.el.intro.hidden = true;
-		document.body.classList.add('playing');
+		rootEl.classList.add('ry-playing');
+		if (!isFull()) rootEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
 		playing = true;
+		input.enabled = true;
 		audio.start();
+		// On a phone the game is only playable full screen; the tap on Play is the gesture it needs.
 		if (coarse) goFullscreen();
 		lastRegion = regionName(player.pos.x, player.pos.z);
 		persist();
@@ -1251,17 +1326,22 @@ export function start(): void {
 	});
 
 	const resize = () => {
-		const w = window.innerWidth, h = window.innerHeight;
+		const w = Math.max(1, rootEl.clientWidth), h = Math.max(1, rootEl.clientHeight);
 		renderer.setSize(w, h, false);
 		camera.aspect = w / h;
 		camera.fov = w < h ? 70 : 55;
 		camera.updateProjectionMatrix();
 	};
-	window.addEventListener('resize', resize);
+	new ResizeObserver(resize).observe(rootEl);
+	// The fullscreen switch can land between two observer callbacks.
+	document.addEventListener('fullscreenchange', () => requestAnimationFrame(resize));
 	resize();
+	// A phone opens straight into the full-screen layout so the intro card has room;
+	// without a gesture only the class half applies, the native half waits for Play.
+	if (coarse) goFullscreen();
 
 	// — Loop —
-	const portrait = () => coarse && window.innerHeight > window.innerWidth;
+	const portrait = () => coarse && isFull() && window.innerHeight > window.innerWidth;
 	let last = performance.now();
 	const frame = (now: number) => {
 		requestAnimationFrame(frame);
@@ -1423,6 +1503,7 @@ export function start(): void {
 		audio.night = dayT > 0.85 ? 1 : 0;
 		audio.tick();
 		updateCamera(dt, now);
+		updateOccluders(dt);
 		env.sun.position.set(player.pos.x - 10 + dayT * 14, player.pos.y + 18 - dayT * 6, player.pos.z + 8);
 		env.sun.target.position.set(player.pos.x, player.pos.y, player.pos.z);
 

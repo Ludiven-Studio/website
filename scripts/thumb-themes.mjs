@@ -46,6 +46,7 @@ export const THEMES = {
 
 	// Arcade & skill
 	bulles: 'an underwater reef scene, glossy colourful bubbles rising through turquoise water, soft rays of light',
+	rayou: 'a sunny storybook valley at golden hour, a stone peak with a small lantern on top in the distance, a winding river, a red-roofed cottage, round green trees and a meadow of flowers, warm glowing fireflies',
 	atelier: 'a cosy old watchmaker workshop, wooden workbench with brass gears and small tools, shelves of antique clocks, warm lamp light through a dusty window',
 	'casse-briques': 'a neon arcade wall of glowing bricks, retro grid floor, purple and cyan lights',
 	snake: 'a lush jungle clearing with red apples on the ground, vines and big leaves, dappled sunlight',

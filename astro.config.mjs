@@ -15,6 +15,8 @@ export default defineConfig({
         '/jeux/tectonique': '/jeux/tapis/',
         '/jeux/bolides': '/jeux/course-de-peinture/',
         '/jeux/caisses-a-peinture': '/jeux/course-de-peinture/',
+        // The adventure started life as a hidden prototype.
+        '/prototypes/rayou': '/jeux/rayou/',
         // Renamed pages: the Unity offer moved to /prestations so /services could
         // become the free-services hub. Old /services links land on the hub — no
         // redirect is possible, a real page now owns that path.

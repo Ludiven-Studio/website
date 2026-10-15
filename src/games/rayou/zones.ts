@@ -172,7 +172,7 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		const rad = PLATEAU.r + 0.05;
 		m.position.set(PLATEAU.x + Math.cos(a) * rad, 0.9 + r() * 0.4, PLATEAU.z + Math.sin(a) * rad);
 		root.add(shadowed(m));
-		addCyl(m.position.x, m.position.z, 0.85, -1, 2.5);
+		addCyl(m.position.x, m.position.z, 0.85, -1, 2.5, { mesh: m });
 	}
 	// Each step rises half a metre; the third is too high to reach straight from the grass.
 	const hazelRocks: [number, number, number][] = [
@@ -193,7 +193,7 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		rock.position.set(x, gy, z);
 		rock.rotation.y = i * 1.3;
 		root.add(shadowed(rock));
-		addCyl(x, z, 0.66, -1, top);
+		addCyl(x, z, 0.66, -1, top, { mesh: rock });
 		return { x, y: top, z };
 	});
 	const landing = { x: PLATEAU.x + climbDir.x * (PLATEAU.r - 1.3), z: PLATEAU.z + climbDir.y * (PLATEAU.r - 1.3) };
@@ -254,7 +254,7 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		m.scale.y = sy;
 		m.position.set(DEN.x + dx, g(DEN.x + dx, DEN.z + dz) + s * 0.6, DEN.z + dz);
 		den.add(m);
-		addCyl(DEN.x + dx, DEN.z + dz, s * 0.85, -1, g(DEN.x, DEN.z + 1.2) + 1.65);
+		addCyl(DEN.x + dx, DEN.z + dz, s * 0.85, -1, g(DEN.x, DEN.z + 1.2) + 1.65, { mesh: m });
 	}
 	const slab = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.5, 3.0), mat('#968671'));
 	slab.position.set(DEN.x, g(DEN.x, DEN.z + 1.2) + 2.35, DEN.z + 1.2);
@@ -274,7 +274,7 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		const gy = g(x, z);
 		m.position.set(x, gy + top / 2 - 0.05, z);
 		den.add(m);
-		addCyl(x, z, 0.65, -1, gy + top);
+		addCyl(x, z, 0.65, -1, gy + top, { mesh: m });
 	}
 	root.add(shadowed(den));
 	keepClear(DEN.x, DEN.z + 1, 6);
@@ -411,7 +411,7 @@ function buildOak(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 	const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, 4, 7), mat('#a99886'));
 	pillar.position.set(px, g(px, pz) + 1.9, pz);
 	root.add(shadowed(pillar));
-	addCyl(px, pz, 1.05, -1, g(px, pz) + 3.9);
+	addCyl(px, pz, 1.05, -1, g(px, pz) + 3.9, { mesh: pillar });
 }
 
 // — The river: beaver, islets, ferry log, dam. —
@@ -613,7 +613,7 @@ function buildForest(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 				}
 				bush.position.set(x, gy, z);
 				root.add(shadowed(bush));
-				addCyl(x, z, 0.95, gy - 1, gy + 2.3);
+				addCyl(x, z, 0.95, gy - 1, gy + 2.3, { mesh: bush });
 			}
 		}
 		babies.push({ id: 'baby1', x: cx, y: g(cx, cz), z: cz });
@@ -639,7 +639,7 @@ function buildForest(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.35, 4.1, 8), mat('#a99886'));
 		pillar.position.set(px, gy + 1.95, pz);
 		root.add(shadowed(pillar));
-		addCyl(px, pz, 1.2, -1, gy + 4.0);
+		addCyl(px, pz, 1.2, -1, gy + 4.0, { mesh: pillar });
 		const mx = px + 2.6, mz = pz + 1.0, my = g(mx, mz);
 		const mm = mushroomMesh(0.9, 0.9);
 		mm.position.set(mx, my, mz);
@@ -1013,7 +1013,7 @@ function buildMountain(root: THREE.Group, r: () => number, out: Partial<Zones>, 
 		const m = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, top - ringLevel(6) + 0.5, 8), mat('#b3a28c'));
 		m.position.set(p.x, (top + ringLevel(6) - 0.5) / 2, p.z);
 		root.add(shadowed(m));
-		addCyl(p.x, p.z, 0.62, ringLevel(6) - 1, top);
+		addCyl(p.x, p.z, 0.62, ringLevel(6) - 1, top, { mesh: m });
 	});
 
 	// Summit lantern.
@@ -1064,12 +1064,12 @@ function buildMountain(root: THREE.Group, r: () => number, out: Partial<Zones>, 
 			const m = rockMesh(0.35 + r() * 0.3, '#a99886', r);
 			m.position.set(p.x, ringLevel(k) + 0.15, p.z);
 			root.add(shadowed(m));
-			addCyl(p.x, p.z, 0.4, -1, ringLevel(k) + 0.4);
+			addCyl(p.x, p.z, 0.4, -1, ringLevel(k) + 0.4, { mesh: m });
 		} else {
 			const t = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.5, 6), mat('#3f8a4a'));
 			t.position.set(p.x, ringLevel(k) + 0.75, p.z);
 			root.add(shadowed(t));
-			addCyl(p.x, p.z, 0.3, -1, ringLevel(k) + 30);
+			addCyl(p.x, p.z, 0.3, -1, ringLevel(k) + 30, { mesh: t });
 		}
 	}
 	// Little lanterns marking each step of the way.

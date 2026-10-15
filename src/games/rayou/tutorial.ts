@@ -30,7 +30,7 @@ export const TUTO_STEPS: Step[] = [
 		id: 'jump',
 		title: 'Sauter',
 		desk: '<kbd>Espace</kbd> pour sauter. Garde-la enfoncée pour sauter plus haut.',
-		mob: 'Bouton <b class="ico-btn">⤒</b> pour sauter. Garde-le appuyé pour sauter plus haut.',
+		mob: 'Bouton <b class="ry-ico-btn">⤒</b> pour sauter. Garde-le appuyé pour sauter plus haut.',
 		btn: ['btn-jump'],
 		need: 2,
 	},
@@ -38,7 +38,7 @@ export const TUTO_STEPS: Step[] = [
 		id: 'roll',
 		title: 'Rouler en boule',
 		desk: '<kbd>Maj</kbd> (ou <kbd>C</kbd>) : Rayou se roule en boule et fonce. En boule, il passe sous les obstacles bas et casse ce qui est fendu.',
-		mob: 'Bouton <b class="ico-btn">⟳</b> : Rayou se roule en boule et fonce. En boule, il passe sous les obstacles bas et casse ce qui est fendu.',
+		mob: 'Bouton <b class="ry-ico-btn">⟳</b> : Rayou se roule en boule et fonce. En boule, il passe sous les obstacles bas et casse ce qui est fendu.',
 		btn: ['btn-roll'],
 		need: 2,
 	},
@@ -46,7 +46,7 @@ export const TUTO_STEPS: Step[] = [
 		id: 'longjump',
 		title: 'Saut roulé',
 		desk: 'Roule avec <kbd>Maj</kbd>, puis saute avec <kbd>Espace</kbd> pendant la roulade : tu iras bien plus loin !',
-		mob: 'Appuie sur <b class="ico-btn">⟳</b> puis tout de suite sur <b class="ico-btn">⤒</b> : le saut roulé va bien plus loin !',
+		mob: 'Appuie sur <b class="ry-ico-btn">⟳</b> puis tout de suite sur <b class="ry-ico-btn">⤒</b> : le saut roulé va bien plus loin !',
 		btn: ['btn-roll', 'btn-jump'],
 		need: 1,
 	},
@@ -60,7 +60,7 @@ export const TUTO_STEPS: Step[] = [
 	},
 ];
 
-const $ = (id: string) => document.getElementById(id) as HTMLElement;
+const $ = (id: string) => document.getElementById(`ry-${id}`) as HTMLElement;
 
 export class Tutorial {
 	private count = 0;
@@ -125,7 +125,7 @@ export class Tutorial {
 		const s = TUTO_STEPS[i];
 		const show = !!s && visible;
 		this.el.box.hidden = !show;
-		for (const id of ['btn-jump', 'btn-roll', 'btn-action']) $(id).classList.toggle('pulse', show && s.btn.includes(id) && this.doneT < 0);
+		for (const id of ['btn-jump', 'btn-roll', 'btn-action']) $(id).classList.toggle('ry-pulse', show && s.btn.includes(id) && this.doneT < 0);
 		if (!show) return;
 		if (this.shown !== i) {
 			this.shown = i;
@@ -134,7 +134,7 @@ export class Tutorial {
 			this.el.text.innerHTML = this.coarse ? s.mob : s.desk;
 		}
 		const done = this.doneT >= 0;
-		this.el.box.classList.toggle('done', done);
+		this.el.box.classList.toggle('ry-done', done);
 		(this.el.bar.firstElementChild as HTMLElement).style.width = `${Math.min(100, (done ? 1 : this.count / s.need) * 100)}%`;
 	}
 }

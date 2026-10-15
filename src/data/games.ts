@@ -516,6 +516,15 @@ export const games: GameTile[] = [
 		category: 'aventure',
 	},
 	{
+		id: 'rayou',
+		title: 'Rayou et la Fête des Lumières',
+		pitch: 'Une aventure en 3D : Rayou le petit tigre aide Feuille l’écureuil, Caillou le hibou et leurs amis, saute de rocher en rocher, roule en boule sous les obstacles et grimpe jusqu’à la lanterne du Pic. Environ une heure de jeu, sauvegarde automatique.',
+		icon: 'rayou',
+		href: '/jeux/rayou/',
+		status: 'play',
+		category: 'aventure',
+	},
+	{
 		id: 'pong',
 		title: 'Pong',
 		pitch: 'Pong en temps réel à 2 : partie rapide, avec un code entre amis, ou solo contre l\'ordi.',

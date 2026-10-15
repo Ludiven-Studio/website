@@ -2,10 +2,10 @@
    gated ones can only be done the intended way), and a random-walk fuzz finds no spot where
    Rayou stays stuck. Usage: npx tsx scripts/check-rayou.ts [--fuzz-minutes N] */
 import * as THREE from 'three';
-import { buildZones } from '../src/prototypes/rayou/zones';
-import { Player, RUN, type Command } from '../src/prototypes/rayou/player';
-import { groundHeight, mountPoint, ringLevel, riverX, ISLETS, BANK, OAK, OAK_GATE, MILL, MOUNT, BOUNDS, waterAt, WATER_Y, START } from '../src/prototypes/rayou/terrain';
-import { query, inside } from '../src/prototypes/rayou/colliders';
+import { buildZones } from '../src/games/rayou/zones';
+import { Player, RUN, type Command } from '../src/games/rayou/player';
+import { groundHeight, mountPoint, ringLevel, riverX, ISLETS, BANK, OAK, OAK_GATE, MILL, MOUNT, BOUNDS, waterAt, WATER_Y, START } from '../src/games/rayou/terrain';
+import { query, inside } from '../src/games/rayou/colliders';
 
 const scene = new THREE.Scene();
 const zones = buildZones(scene);

@@ -5,6 +5,8 @@ export interface Input {
 	camDrag: { x: number; y: number };
 	camTouchedAt: number;
 	jumpHeld: boolean;
+	// Keys are only taken while a game runs, so the page still scrolls before Play.
+	enabled: boolean;
 	consumeAction(): boolean;
 	consumeJump(): boolean;
 	consumeRoll(): boolean;
@@ -50,6 +52,7 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		camDrag: { x: 0, y: 0 },
 		camTouchedAt: -1e9,
 		jumpHeld: false,
+		enabled: false,
 		consumeAction: take('action'),
 		consumeJump: take('jump'),
 		consumeRoll: take('roll'),
@@ -87,7 +90,7 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 	};
 
 	window.addEventListener('keydown', (e) => {
-		if (isTypingTarget(e.target)) return;
+		if (!input.enabled || isTypingTarget(e.target)) return;
 		const c = e.code;
 		if (c === 'Space') {
 			if (!e.repeat) latch.jump = true;
@@ -96,7 +99,8 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 			if (!e.repeat) latch.action = true;
 		} else if (c === 'ShiftLeft' || c === 'ShiftRight' || c === 'KeyC') {
 			if (!e.repeat) latch.roll = true;
-		} else if (c === 'Escape' || c === 'KeyP') {
+		} else if (c === 'KeyP' || (c === 'Escape' && !document.documentElement.classList.contains('gf-full'))) {
+			// In fullscreen, Escape belongs to the browser and the site: it leaves fullscreen.
 			if (!e.repeat) latch.menu = true;
 		} else if (c === 'Tab') {
 			if (!e.repeat) latch.track = true;
@@ -128,7 +132,8 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		(e) => {
 			e.preventDefault();
 			for (const t of Array.from(e.changedTouches)) {
-				if (t.clientX < window.innerWidth * 0.45 && joyId === null) {
+				const box = stage.getBoundingClientRect();
+				if (t.clientX - box.left < box.width * 0.45 && joyId === null) {
 					joyId = t.identifier;
 					joyOrigin.x = t.clientX;
 					joyOrigin.y = t.clientY;
@@ -211,7 +216,7 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 			(e) => {
 				e.preventDefault();
 				e.stopPropagation();
-				el.classList.add('down');
+				el.classList.add('ry-down');
 				down();
 				refresh();
 			},
@@ -219,7 +224,7 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		);
 		const release = (e: Event) => {
 			e.preventDefault();
-			el.classList.remove('down');
+			el.classList.remove('ry-down');
 			up?.();
 			refresh();
 		};

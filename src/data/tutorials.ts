@@ -340,4 +340,11 @@ export const TUTORIALS: Record<string, TutorialStep[]> = {
 		{ emoji: '🪤', title: 'Attention au piège', body: 'Le plus souvent, les couleurs sont identiques… mais pas toujours. Une manche cache une vraie différence que le décor rend invisible.' },
 		{ emoji: '🧠', title: 'Pourquoi ça marche', body: 'Ton cerveau ne mesure pas la lumière comme un appareil photo : il corrige les ombres et compare chaque teinte à ses voisines. C\'est utile au quotidien… et c\'est ce qui te piège ici.' },
 	],
+	rayou: [
+		{ emoji: '🐯', title: 'Le but', body: 'Ce soir, c’est la Fête des Lumières. Aide les amis de la vallée à retrouver leurs lucioles, rapporte quatre bocaux à Caillou le hibou, puis grimpe tout en haut du Pic pour allumer la grande lanterne.' },
+		{ emoji: '🕹️', title: 'Bouger et sauter', body: 'Au clavier : ZQSD ou les flèches pour courir, Espace pour sauter (garde-la enfoncée pour sauter plus haut). Sur téléphone : le pouce gauche pour courir, le bouton ⤒ pour sauter. La caméra se tourne en glissant la souris ou un doigt à droite.' },
+		{ emoji: '⟳', title: 'Rouler en boule', body: 'Maj (ou le bouton ⟳) : Rayou se roule en boule. En boule, il passe sous les obstacles bas et casse ce qui est fendu. Roule puis saute tout de suite : le saut roulé va bien plus loin.' },
+		{ emoji: '💬', title: 'Parler et agir', body: 'Approche-toi d’un ami et appuie sur E (ou le bouton jaune) pour parler, ramasser ou grimper. L’étoile en haut de l’écran indique où aller, et le sac 🎒 garde le compte de tout ce que tu as trouvé.' },
+		{ emoji: '💾', title: 'Pas de bobo', body: 'Rayou ne se fait jamais mal : une grosse chute se termine en roulade, et un plongeon le ramène au bord. La partie se sauvegarde toute seule ; reviens quand tu veux avec « Continuer ».' },
+	],
 };

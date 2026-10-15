@@ -20,8 +20,12 @@ try {
 	const errors = [];
 	page.on('pageerror', (e) => errors.push(e.message));
 	page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-	await page.goto(`http://localhost:${PORT}/prototypes/rayou/`, { waitUntil: 'networkidle' });
-	await page.evaluate(() => localStorage.clear());
+	await page.goto(`http://localhost:${PORT}/jeux/rayou/`, { waitUntil: 'networkidle' });
+	await page.evaluate(() => {
+		localStorage.clear();
+		// The site's how-to-play sheet opens on a first visit; this run is not one.
+		localStorage.setItem('ludiven-tuto-seen', JSON.stringify(['rayou']));
+	});
 	await page.reload({ waitUntil: 'networkidle' });
 	await page.waitForFunction(() => window.__rayou, null, { timeout: 60000 });
 	// The dev toolbar sits over the bottom of a short landscape screen.
@@ -80,7 +84,7 @@ try {
 
 	await wait(1500);
 	await shot('00-intro');
-	await page.click('#play');
+	await page.click('#ry-play');
 	await wait(900);
 	await shot('01-start');
 	// Tutorial cards: run a bit to clear the first one, then show the roll card.
@@ -100,16 +104,16 @@ try {
 	await T((t) => t.set({ tuto: 6 }));
 	await tp(4, 6.5, Math.PI);
 	if (want('01b')) {
-		await page.click('#btn-menu');
+		await page.click('#ry-btn-menu');
 		await wait(500);
 		await shot('01b-menu');
-		await page.click('.tab[data-tab=map]');
+		await page.click('.ry-tab[data-tab=map]');
 		await wait(500);
 		await shot('01c-map');
-		await page.click('.tab[data-tab=controls]');
+		await page.click('.ry-tab[data-tab=controls]');
 		await wait(400);
 		await shot('01d-controls');
-		await page.click('#resume');
+		await page.click('#ry-resume');
 		await wait(300);
 	}
 
@@ -212,10 +216,10 @@ try {
 	await talkThrough();
 	await shot('15-simone-done');
 	if (want('15b')) {
-		await page.click('#counters');
+		await page.click('#ry-counters');
 		await wait(600);
 		await shot('15b-bag');
-		await page.click('#resume');
+		await page.click('#ry-resume');
 		await wait(300);
 	}
 
@@ -283,13 +287,13 @@ try {
 	await shot('25-lantern-lit');
 	await wait(2000);
 	await until((s) => s.dialog, 20000);
-	for (let i = 0; i < 30 && (await page.evaluate(() => !/Là-bas/.test(document.getElementById('dlg-text').textContent ?? ''))); i++) {
+	for (let i = 0; i < 30 && (await page.evaluate(() => !/Là-bas/.test(document.getElementById('ry-dlg-text').textContent ?? ''))); i++) {
 		await T((t) => t.advance());
 		await wait(300);
 	}
 	await wait(1200);
 	await shot('26-far-light');
-	for (let i = 0; i < 300 && (await page.evaluate(() => document.getElementById('end').hidden)); i++) {
+	for (let i = 0; i < 300 && (await page.evaluate(() => document.getElementById('ry-end').hidden)); i++) {
 		await T((t) => t.advance());
 		await wait(250);
 	}
