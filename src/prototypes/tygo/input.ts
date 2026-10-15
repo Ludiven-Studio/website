@@ -2,11 +2,15 @@ import { isTypingTarget } from '../../lib/keyboard';
 
 export interface Input {
 	move: { x: number; y: number };
-	walk: boolean;
 	camDrag: { x: number; y: number };
 	camTouchedAt: number;
+	jumpHeld: boolean;
 	consumeAction(): boolean;
 	consumeJump(): boolean;
+	consumeRoll(): boolean;
+	consumeMenu(): boolean;
+	consumeTrack(): boolean;
+	clear(): void;
 }
 
 const KEYS: Record<string, [number, number]> = {
@@ -17,10 +21,17 @@ const KEYS: Record<string, [number, number]> = {
 };
 const JOY_R = 56;
 
-export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: HTMLElement, actionBtn: HTMLElement, jumpBtn: HTMLElement): Input {
+export interface Buttons {
+	action: HTMLElement;
+	jump: HTMLElement;
+	roll: HTMLElement;
+	menu: HTMLElement;
+}
+
+export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: HTMLElement, btn: Buttons): Input {
 	const held = new Set<string>();
-	let action = false;
-	let jump = false;
+	const latch = { action: false, jump: false, roll: false, menu: false, track: false };
+	let touchJump = false;
 	let joyId: number | null = null;
 	let camId: number | null = null;
 	const joyOrigin = { x: 0, y: 0 };
@@ -28,20 +39,29 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 	const camLast = { x: 0, y: 0 };
 	let mouseDown = false;
 
+	const take = (k: keyof typeof latch) => () => {
+		const v = latch[k];
+		latch[k] = false;
+		return v;
+	};
 	const input: Input = {
 		move: { x: 0, y: 0 },
-		walk: false,
 		camDrag: { x: 0, y: 0 },
 		camTouchedAt: -1e9,
-		consumeAction() {
-			const a = action;
-			action = false;
-			return a;
-		},
-		consumeJump() {
-			const j = jump;
-			jump = false;
-			return j;
+		jumpHeld: false,
+		consumeAction: take('action'),
+		consumeJump: take('jump'),
+		consumeRoll: take('roll'),
+		consumeMenu: take('menu'),
+		consumeTrack: take('track'),
+		clear() {
+			held.clear();
+			joy.x = joy.y = 0;
+			joyId = camId = null;
+			touchJump = false;
+			for (const k of Object.keys(latch) as (keyof typeof latch)[]) latch[k] = false;
+			showJoy(false);
+			refresh();
 		},
 	};
 
@@ -61,21 +81,26 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		}
 		input.move.x = x;
 		input.move.y = y;
-		input.walk = held.has('ShiftLeft') || held.has('ShiftRight');
+		input.jumpHeld = held.has('Space') || touchJump;
 	};
 
 	window.addEventListener('keydown', (e) => {
 		if (isTypingTarget(e.target)) return;
-		if (e.code === 'Space') {
-			if (!e.repeat) jump = true;
-			e.preventDefault();
-		} else if (e.code === 'KeyE' || e.code === 'Enter') {
-			if (!e.repeat) action = true;
-			e.preventDefault();
-		} else if (KEYS[e.code] || e.code.startsWith('Shift')) {
-			held.add(e.code);
-			e.preventDefault();
-		}
+		const c = e.code;
+		if (c === 'Space') {
+			if (!e.repeat) latch.jump = true;
+			held.add(c);
+		} else if (c === 'KeyE' || c === 'Enter') {
+			if (!e.repeat) latch.action = true;
+		} else if (c === 'ShiftLeft' || c === 'ShiftRight' || c === 'KeyC') {
+			if (!e.repeat) latch.roll = true;
+		} else if (c === 'Escape' || c === 'KeyP') {
+			if (!e.repeat) latch.menu = true;
+		} else if (c === 'Tab') {
+			if (!e.repeat) latch.track = true;
+		} else if (KEYS[c]) held.add(c);
+		else return;
+		e.preventDefault();
 		refresh();
 	});
 	window.addEventListener('keyup', (e) => {
@@ -83,10 +108,7 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		held.delete(e.code);
 		refresh();
 	});
-	window.addEventListener('blur', () => {
-		held.clear();
-		refresh();
-	});
+	window.addEventListener('blur', () => input.clear());
 
 	const showJoy = (on: boolean) => {
 		joyBase.style.opacity = on ? '1' : '0';
@@ -102,7 +124,7 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		(e) => {
 			e.preventDefault();
 			for (const t of Array.from(e.changedTouches)) {
-				if (t.clientX < window.innerWidth * 0.5 && joyId === null) {
+				if (t.clientX < window.innerWidth * 0.45 && joyId === null) {
 					joyId = t.identifier;
 					joyOrigin.x = t.clientX;
 					joyOrigin.y = t.clientY;
@@ -127,6 +149,11 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 					let dx = (t.clientX - joyOrigin.x) / JOY_R;
 					let dy = -(t.clientY - joyOrigin.y) / JOY_R;
 					const m = Math.hypot(dx, dy);
+					// Drag the base along when the thumb overshoots, so it never sticks at the rim.
+					if (m > 1.3) {
+						joyOrigin.x = t.clientX - (dx / m) * 1.3 * JOY_R;
+						joyOrigin.y = t.clientY + (dy / m) * 1.3 * JOY_R;
+					}
 					if (m > 1) {
 						dx /= m;
 						dy /= m;
@@ -135,8 +162,8 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 					joy.y = dy;
 					showJoy(true);
 				} else if (t.identifier === camId) {
-					input.camDrag.x += t.clientX - camLast.x;
-					input.camDrag.y += t.clientY - camLast.y;
+					input.camDrag.x += (t.clientX - camLast.x) * 1.3;
+					input.camDrag.y += (t.clientY - camLast.y) * 1.3;
 					input.camTouchedAt = performance.now();
 					camLast.x = t.clientX;
 					camLast.y = t.clientY;
@@ -174,23 +201,47 @@ export function createInput(stage: HTMLElement, joyBase: HTMLElement, joyKnob: H
 		camLast.y = e.clientY;
 	});
 
-	const bindButton = (el: HTMLElement, fire: () => void) => {
+	const bind = (el: HTMLElement, down: () => void, up?: () => void) => {
 		el.addEventListener(
 			'touchstart',
 			(e) => {
 				e.preventDefault();
 				e.stopPropagation();
-				fire();
+				el.classList.add('down');
+				down();
+				refresh();
 			},
 			{ passive: false },
 		);
+		const release = (e: Event) => {
+			e.preventDefault();
+			el.classList.remove('down');
+			up?.();
+			refresh();
+		};
+		el.addEventListener('touchend', release);
+		el.addEventListener('touchcancel', release);
 		el.addEventListener('mousedown', (e) => {
 			e.stopPropagation();
-			fire();
+			down();
+			refresh();
+		});
+		el.addEventListener('mouseup', () => {
+			up?.();
+			refresh();
 		});
 	};
-	bindButton(actionBtn, () => (action = true));
-	bindButton(jumpBtn, () => (jump = true));
+	bind(btn.action, () => (latch.action = true));
+	bind(
+		btn.jump,
+		() => {
+			latch.jump = true;
+			touchJump = true;
+		},
+		() => (touchJump = false),
+	);
+	bind(btn.roll, () => (latch.roll = true));
+	bind(btn.menu, () => (latch.menu = true));
 
 	return input;
 }

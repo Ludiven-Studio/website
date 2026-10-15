@@ -171,3 +171,9 @@
 - Statut : terminé, non commité (2026-10-14, Europe/Paris). Réservations libérées. Quête jouée de bout en bout par `node scripts/snap-tygo.mjs [dossier] [--mobile]`, 0 erreur. Demande de l'utilisateur : voir si l'idée d'un porteur de projet se représente facilement. Page non partagée.
 - Réservations (libérées) : `src/pages/prototypes/` (nouveau), `src/prototypes/tygo/` (nouveau), `astro.config.mjs` (filtre du sitemap seulement), `scripts/snap-tygo.mjs` (nouveau).
 - Ressources : serveur de dev sur le port 4396 (arrêté).
+
+## 2026-10-15 — Tygo : jeu complet (~1 h, histoire, plateformes, roulade)
+
+- Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Physique vérifiée hors navigateur par `npx tsx scripts/check-tygo.ts` (sauts, passages réservés à la roulade, rive est inaccessible avant le barrage, aucun blocage en déplacement aléatoire). Partie complète jouée par `node scripts/snap-tygo.mjs`, 0 erreur console.
+- Réservations (libérées) : `src/prototypes/tygo/`, `src/pages/prototypes/tygo.astro`, `scripts/snap-tygo.mjs`, `scripts/check-tygo.ts` (nouveau).
+- Ressources : serveur de dev sur le port 4396 (arrêté).

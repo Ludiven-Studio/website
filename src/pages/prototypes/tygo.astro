@@ -5,16 +5,27 @@ import MainHead from '../../components/MainHead.astro';
 <html lang="fr">
 	<head>
 		<MainHead title="Tygo — prototype | Ludiven Studio" description="Prototype jouable." noindex />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
 	</head>
 	<body>
 		<div id="stage"><canvas id="view"></canvas></div>
+		<div id="fade"></div>
 
 		<div class="hud">
-			<p id="objective" hidden></p>
+			<button id="btn-menu" class="chip-btn" aria-label="Menu">☰</button>
+			<button id="objective" class="chip" hidden><span id="obj-text"></span><span id="obj-more"></span></button>
+			<div id="counters" class="chip">
+				<span class="ico jar" aria-hidden="true"></span><b id="jar-count">0/4</b>
+				<span class="ico gold" aria-hidden="true"></span><b id="gold-count">0/24</b>
+			</div>
+			<div id="arrow" hidden><span></span></div>
 			<p id="hint" hidden></p>
+			<div id="toasts"></div>
 
 			<div id="joy"><div id="joy-knob"></div></div>
 			<button id="btn-jump" class="touch-btn" aria-label="Sauter">⤒</button>
+			<button id="btn-roll" class="touch-btn" aria-label="Rouler">⟳</button>
 			<button id="btn-action" class="touch-btn"><span id="action-label"></span></button>
 
 			<div id="dialog" hidden>
@@ -25,26 +36,66 @@ import MainHead from '../../components/MainHead.astro';
 
 			<section id="intro" class="card-screen">
 				<div class="card">
-					<p class="kicker">Prototype</p>
+					<p class="kicker">Prototype · chapitre 1</p>
 					<h1>Tygo</h1>
-					<p>Une petite quête autour de la maison : Sally a besoin d'aide.</p>
+					<p class="sub">et la Fête des Lumières</p>
+					<p class="prologue">
+						Par une nuit pleine d’étoiles, un bébé tigre est arrivé seul dans la vallée. Les animaux l’ont recueilli et l’ont appelé Tygo.
+						Ce matin, c’est le jour de la Fête des Lumières…
+					</p>
 					<ul class="keys">
-						<li class="desk"><b>ZQSD</b> ou flèches : se déplacer · <b>Maj</b> : marcher</li>
-						<li class="desk"><b>Espace</b> : sauter · <b>E</b> : agir · glisser la souris : caméra</li>
-						<li class="mob">Pouce gauche : se déplacer · glisser à droite : caméra</li>
+						<li class="desk"><b>ZQSD</b> ou flèches : bouger · <b>Espace</b> : sauter · <b>Maj</b> : rouler</li>
+						<li class="desk"><b>E</b> : agir · <b>Échap</b> : menu · glisser la souris : caméra</li>
+						<li class="mob">Pouce gauche : bouger · glisser à droite : caméra</li>
 					</ul>
-					<button id="play">Jouer</button>
+					<div class="row">
+						<button id="continue" hidden>Continuer</button>
+						<button id="play">Nouvelle partie</button>
+					</div>
+				</div>
+			</section>
+
+			<section id="menu" class="card-screen" hidden>
+				<div class="card wide">
+					<div class="tabs" role="tablist">
+						<button class="tab on" data-tab="quests">Objectifs</button>
+						<button class="tab" data-tab="map">Carte</button>
+						<button class="tab" data-tab="memories">Souvenirs</button>
+						<button class="tab" data-tab="options">Options</button>
+					</div>
+					<div class="pane" data-pane="quests"><ul id="quest-list"></ul></div>
+					<div class="pane" data-pane="map" hidden><canvas id="map" width="336" height="268"></canvas></div>
+					<div class="pane" data-pane="memories" hidden><ul id="memories"></ul></div>
+					<div class="pane" data-pane="options" hidden>
+						<div class="opts">
+							<button id="opt-unstuck">Débloquer Tygo</button>
+							<button id="opt-full">Plein écran</button>
+							<button id="opt-sfx">Sons : oui</button>
+							<button id="opt-music">Musique : oui</button>
+							<button id="opt-reset" class="danger">Recommencer du début</button>
+						</div>
+					</div>
+					<button id="resume" class="primary">Reprendre</button>
 				</div>
 			</section>
 
 			<section id="end" class="card-screen" hidden>
 				<div class="card">
-					<p class="kicker">Quête terminée</p>
-					<h1>Merci Tygo !</h1>
-					<p>Sally a retrouvé sa noisette, en <span id="end-time"></span>.</p>
-					<button id="replay">Rejouer</button>
+					<p class="kicker">Fin du chapitre 1</p>
+					<h1>À suivre…</h1>
+					<p>La lanterne brille sur le Pic, et quelqu’un, de l’autre côté des montagnes, y a répondu.</p>
+					<ul class="stats">
+						<li>Temps de jeu : <b id="end-time"></b></li>
+						<li>Noisettes dorées : <b id="end-gold"></b></li>
+						<li>Souvenirs : <b id="end-mem"></b></li>
+					</ul>
+					<div class="row">
+						<button id="end-explore">Continuer à explorer</button>
+					</div>
 				</div>
 			</section>
+
+			<div id="rotate"><div><span class="phone">📱</span><p>Tourne ton téléphone<br />pour jouer en paysage</p></div></div>
 		</div>
 
 		<script>
@@ -65,6 +116,7 @@ import MainHead from '../../components/MainHead.astro';
 		-webkit-user-select: none;
 		user-select: none;
 		-webkit-touch-callout: none;
+		-webkit-tap-highlight-color: transparent;
 	}
 
 	#stage {
@@ -79,6 +131,15 @@ import MainHead from '../../components/MainHead.astro';
 		height: 100%;
 	}
 
+	#fade {
+		position: fixed;
+		inset: 0;
+		background: #fff8ec;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.3s;
+	}
+
 	.hud {
 		position: fixed;
 		inset: 0;
@@ -91,21 +152,37 @@ import MainHead from '../../components/MainHead.astro';
 		pointer-events: auto;
 	}
 
-	#objective {
+	.chip,
+	.chip-btn {
 		position: absolute;
-		top: max(14px, env(safe-area-inset-top));
-		left: 50%;
-		transform: translateX(-50%);
-		margin: 0;
-		max-width: calc(100% - 32px);
-		padding: 0.55rem 1rem;
-		border-radius: 999px;
+		border: none;
 		background: rgba(255, 250, 240, 0.92);
 		box-shadow: 0 4px 14px rgba(80, 50, 20, 0.18);
+		color: inherit;
+		font: inherit;
 		font-weight: 700;
-		font-size: 0.95rem;
+	}
+
+	#btn-menu {
+		top: max(12px, env(safe-area-inset-top));
+		left: max(12px, env(safe-area-inset-left));
+		width: 42px;
+		height: 42px;
+		border-radius: 50%;
+		font-size: 1.2rem;
+		cursor: pointer;
+	}
+
+	#objective {
+		top: max(12px, env(safe-area-inset-top));
+		left: 50%;
+		transform: translateX(-50%);
+		max-width: min(60%, 520px);
+		padding: 0.55rem 1rem;
+		border-radius: 999px;
+		font-size: 0.92rem;
 		text-align: center;
-		pointer-events: none;
+		cursor: pointer;
 	}
 
 	#objective::before {
@@ -113,9 +190,65 @@ import MainHead from '../../components/MainHead.astro';
 		color: #f0a020;
 	}
 
+	#obj-more {
+		margin-left: 0.4rem;
+		color: #a0835f;
+		font-size: 0.8em;
+	}
+
+	#counters {
+		top: max(12px, env(safe-area-inset-top));
+		right: max(12px, env(safe-area-inset-right));
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		padding: 0.45rem 0.8rem;
+		border-radius: 999px;
+		font-size: 0.9rem;
+		pointer-events: none;
+	}
+
+	#counters b + .ico {
+		margin-left: 0.5rem;
+	}
+
+	.ico {
+		display: inline-block;
+		width: 16px;
+		height: 18px;
+	}
+
+	.ico.jar {
+		border-radius: 4px 4px 6px 6px;
+		background: radial-gradient(circle at 50% 60%, #fff3a0 0 25%, #ffcf3a 45%, rgba(255, 207, 58, 0.25) 75%);
+		box-shadow: inset 0 0 0 2px rgba(120, 90, 40, 0.45);
+	}
+
+	.ico.gold {
+		border-radius: 50% 50% 45% 45%;
+		background: radial-gradient(circle at 35% 35%, #fff3b0, #e6a91c 60%, #a8700e);
+	}
+
+	#arrow {
+		position: absolute;
+		width: 34px;
+		height: 34px;
+		margin: -17px 0 0 -17px;
+		pointer-events: none;
+	}
+
+	#arrow span {
+		display: block;
+		width: 100%;
+		height: 100%;
+		background: #ffd23f;
+		clip-path: polygon(50% 0, 100% 75%, 50% 55%, 0 75%);
+		filter: drop-shadow(0 2px 3px rgba(80, 50, 20, 0.5));
+	}
+
 	#hint {
 		position: absolute;
-		bottom: 28%;
+		bottom: 22%;
 		left: 50%;
 		transform: translateX(-50%);
 		margin: 0;
@@ -125,6 +258,51 @@ import MainHead from '../../components/MainHead.astro';
 		color: #fff;
 		font-weight: 700;
 		pointer-events: none;
+		white-space: nowrap;
+	}
+
+	#toasts {
+		position: absolute;
+		top: 64px;
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		pointer-events: none;
+	}
+
+	.toast {
+		padding: 0.45rem 1rem;
+		border-radius: 999px;
+		background: rgba(58, 42, 28, 0.88);
+		color: #fff;
+		font-weight: 700;
+		font-size: 0.9rem;
+		animation: toast 3s ease forwards;
+		white-space: nowrap;
+	}
+
+	.toast.big {
+		background: #ffd23f;
+		color: #3a2a1c;
+		font-size: 1.05rem;
+	}
+
+	@keyframes toast {
+		0% {
+			opacity: 0;
+			transform: translateY(-8px) scale(0.9);
+		}
+		10%,
+		80% {
+			opacity: 1;
+			transform: none;
+		}
+		100% {
+			opacity: 0;
+		}
 	}
 
 	#joy {
@@ -158,26 +336,39 @@ import MainHead from '../../components/MainHead.astro';
 		font: inherit;
 		font-weight: 800;
 		color: #3a2a1c;
-		background: rgba(255, 250, 240, 0.9);
+		background: rgba(255, 250, 240, 0.88);
 		box-shadow: 0 4px 14px rgba(80, 50, 20, 0.25);
 		touch-action: none;
 	}
 
+	.touch-btn.down {
+		transform: scale(0.92);
+		background: #fff;
+	}
+
 	#btn-jump {
-		right: calc(24px + env(safe-area-inset-right));
-		bottom: calc(28px + env(safe-area-inset-bottom));
-		width: 68px;
-		height: 68px;
-		font-size: 1.6rem;
+		right: calc(22px + env(safe-area-inset-right));
+		bottom: calc(22px + env(safe-area-inset-bottom));
+		width: 78px;
+		height: 78px;
+		font-size: 1.8rem;
+	}
+
+	#btn-roll {
+		right: calc(112px + env(safe-area-inset-right));
+		bottom: calc(16px + env(safe-area-inset-bottom));
+		width: 62px;
+		height: 62px;
+		font-size: 1.5rem;
 	}
 
 	#btn-action {
-		right: calc(104px + env(safe-area-inset-right));
-		bottom: calc(52px + env(safe-area-inset-bottom));
-		width: 84px;
-		height: 84px;
-		font-size: 0.85rem;
-		opacity: 0.35;
+		right: calc(40px + env(safe-area-inset-right));
+		bottom: calc(112px + env(safe-area-inset-bottom));
+		width: 76px;
+		height: 76px;
+		font-size: 0.8rem;
+		opacity: 0.3;
 		transform: scale(0.85);
 		transition: transform 0.15s, opacity 0.15s, background 0.15s;
 	}
@@ -193,8 +384,8 @@ import MainHead from '../../components/MainHead.astro';
 			display: block;
 		}
 		#objective {
-			font-size: 0.82rem;
-			border-radius: 1rem;
+			font-size: 0.8rem;
+			padding: 0.45rem 0.8rem;
 		}
 		#hint,
 		.desk {
@@ -211,20 +402,23 @@ import MainHead from '../../components/MainHead.astro';
 	#dialog {
 		position: absolute;
 		left: 50%;
-		bottom: calc(150px + env(safe-area-inset-bottom));
+		bottom: calc(24px + env(safe-area-inset-bottom));
 		transform: translateX(-50%);
-		width: min(560px, calc(100% - 32px));
+		width: min(600px, calc(100% - 32px));
 		box-sizing: border-box;
-		padding: 1.4rem 1.2rem 1rem;
+		padding: 1.3rem 1.2rem 0.9rem;
 		border-radius: 1.1rem;
 		background: #fffaf0;
 		box-shadow: 0 8px 30px rgba(80, 50, 20, 0.3);
 		cursor: pointer;
 	}
 
-	@media (pointer: fine) {
+	@media (pointer: coarse) {
 		#dialog {
-			bottom: 40px;
+			width: min(560px, calc(100% - 260px));
+			left: calc(50% - 40px);
+			bottom: calc(12px + env(safe-area-inset-bottom));
+			padding: 1.1rem 1rem 0.7rem;
 		}
 	}
 
@@ -240,10 +434,6 @@ import MainHead from '../../components/MainHead.astro';
 		font-size: 0.9rem;
 	}
 
-	#dlg-name[data-who='Tygo'] {
-		background: #ee8a2c;
-	}
-
 	#dlg-text {
 		margin: 0;
 		min-height: 2.8em;
@@ -251,10 +441,17 @@ import MainHead from '../../components/MainHead.astro';
 		line-height: 1.4;
 	}
 
+	@media (pointer: coarse) and (max-height: 500px) {
+		#dlg-text {
+			font-size: 0.92rem;
+			min-height: 2.6em;
+		}
+	}
+
 	.dlg-next {
 		position: absolute;
 		right: 1rem;
-		bottom: 0.6rem;
+		bottom: 0.5rem;
 		font-size: 0.8rem;
 		color: #c0682f;
 		animation: nudge 1s ease-in-out infinite;
@@ -272,35 +469,55 @@ import MainHead from '../../components/MainHead.astro';
 		display: grid;
 		place-items: center;
 		padding: 16px;
-		background: linear-gradient(180deg, rgba(255, 236, 205, 0.15), rgba(80, 45, 15, 0.35));
+		box-sizing: border-box;
+		background: linear-gradient(180deg, rgba(255, 236, 205, 0.15), rgba(80, 45, 15, 0.45));
+		overflow-y: auto;
 	}
 
 	.card-screen[hidden],
 	#dialog[hidden],
 	#objective[hidden],
-	#hint[hidden] {
+	#hint[hidden],
+	#arrow[hidden],
+	.pane[hidden],
+	button[hidden] {
 		display: none;
 	}
 
 	.card {
-		width: min(420px, 100%);
+		width: min(440px, 100%);
 		box-sizing: border-box;
-		padding: 1.8rem 1.6rem;
+		padding: 1.6rem 1.5rem;
 		border-radius: 1.4rem;
 		background: #fffaf0;
 		box-shadow: 0 12px 40px rgba(80, 50, 20, 0.35);
 		text-align: center;
 	}
 
+	.card.wide {
+		width: min(560px, 100%);
+	}
+
 	.card h1 {
-		margin: 0.1rem 0 0.6rem;
+		margin: 0;
 		font-size: 2.6rem;
 		color: #e2761c;
+	}
+
+	.card .sub {
+		margin: 0 0 0.8rem;
+		font-weight: 800;
+		color: #a0835f;
 	}
 
 	.card p {
 		margin: 0 0 1rem;
 		line-height: 1.45;
+	}
+
+	.prologue {
+		font-size: 0.95rem;
+		font-style: italic;
 	}
 
 	.kicker {
@@ -311,30 +528,184 @@ import MainHead from '../../components/MainHead.astro';
 		color: #a0835f;
 	}
 
-	.keys {
+	.keys,
+	.stats {
 		list-style: none;
-		margin: 0 0 1.3rem;
+		margin: 0 0 1.2rem;
 		padding: 0;
 		font-size: 0.85rem;
 		color: #6b5640;
 		line-height: 1.6;
 	}
 
+	.row {
+		display: flex;
+		gap: 0.6rem;
+		justify-content: center;
+		flex-wrap: wrap;
+	}
+
 	.card button {
-		padding: 0.8rem 2.4rem;
+		padding: 0.75rem 1.8rem;
 		border: none;
 		border-radius: 999px;
 		background: #ee8a2c;
 		color: #fff;
 		font: inherit;
 		font-weight: 800;
-		font-size: 1.1rem;
+		font-size: 1.05rem;
 		cursor: pointer;
-		box-shadow: 0 6px 0 #b85f14;
+		box-shadow: 0 5px 0 #b85f14;
 	}
 
 	.card button:active {
 		transform: translateY(3px);
-		box-shadow: 0 3px 0 #b85f14;
+		box-shadow: 0 2px 0 #b85f14;
+	}
+
+	#continue {
+		background: #4f9e45;
+		box-shadow: 0 5px 0 #33702c;
+	}
+
+	.tabs {
+		display: flex;
+		gap: 0.3rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-bottom: 0.9rem;
+	}
+
+	.card .tab {
+		padding: 0.4rem 0.9rem;
+		font-size: 0.9rem;
+		background: #efe0c8;
+		color: #6b5640;
+		box-shadow: none;
+	}
+
+	.card .tab.on {
+		background: #ee8a2c;
+		color: #fff;
+	}
+
+	.pane {
+		min-height: 150px;
+		margin-bottom: 1rem;
+		text-align: left;
+	}
+
+	#quest-list,
+	#memories {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		font-size: 0.92rem;
+	}
+
+	#quest-list li,
+	#memories li {
+		padding: 0.55rem 0.8rem;
+		border-radius: 0.7rem;
+		background: #f6ead6;
+	}
+
+	#quest-list li.done {
+		opacity: 0.55;
+		text-decoration: line-through;
+	}
+
+	#memories li b {
+		display: block;
+		color: #c0682f;
+	}
+
+	#memories li.locked {
+		color: #a0835f;
+		font-style: italic;
+	}
+
+	#map {
+		display: block;
+		width: 100%;
+		max-width: 420px;
+		height: auto;
+		margin: 0 auto;
+		border-radius: 0.8rem;
+		image-rendering: auto;
+	}
+
+	.opts {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.5rem;
+	}
+
+	.card .opts button {
+		font-size: 0.9rem;
+		padding: 0.6rem 0.8rem;
+		background: #efe0c8;
+		color: #3a2a1c;
+		box-shadow: none;
+	}
+
+	.card .opts .danger {
+		grid-column: 1 / -1;
+		background: #f3d1c8;
+		color: #9a2f1c;
+	}
+
+	.card .primary {
+		width: 100%;
+	}
+
+	@media (max-height: 480px) {
+		.card {
+			padding: 1rem 1.2rem;
+		}
+		.card h1 {
+			font-size: 2rem;
+		}
+		.pane {
+			min-height: 0;
+		}
+		#map {
+			max-width: 300px;
+		}
+	}
+
+	#rotate {
+		position: fixed;
+		inset: 0;
+		display: none;
+		place-items: center;
+		background: #2e2016;
+		color: #fff8ec;
+		text-align: center;
+		font-weight: 800;
+		font-size: 1.1rem;
+		z-index: 10;
+	}
+
+	#rotate .phone {
+		display: inline-block;
+		font-size: 3rem;
+		animation: turn 2s ease-in-out infinite;
+	}
+
+	@keyframes turn {
+		40%,
+		70% {
+			transform: rotate(-90deg);
+		}
+	}
+
+	@media (pointer: coarse) and (orientation: portrait) {
+		body.playing #rotate {
+			display: grid;
+		}
 	}
 </style>

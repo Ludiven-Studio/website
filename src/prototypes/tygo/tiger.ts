@@ -5,7 +5,9 @@ export interface TigerPose {
 	turn: number;
 	grounded: boolean;
 	vy: number;
-	climb: number; // 0 = not climbing, otherwise the climb progress
+	climb: number;
+	roll: number; // spin angle while rolling, NaN when not rolling
+	crawl: boolean;
 	happy: boolean;
 	lookAt: THREE.Vector3 | null;
 }
@@ -13,6 +15,7 @@ export interface TigerPose {
 export interface Tiger {
 	root: THREE.Group;
 	mouth: THREE.Object3D;
+	scarf: THREE.Object3D;
 	land(impact: number): void;
 	update(dt: number, pose: TigerPose): void;
 }
@@ -25,8 +28,10 @@ const BLACK = '#2a2119';
 const WALK_OFF = [0.25, 0.75, 0, 0.5];
 const GALLOP_OFF = [0, 0.1, 0.5, 0.6];
 const LEG_LEN = 0.5;
+const PIVOT = 0.42;
 
-function stripeTexture(): THREE.CanvasTexture {
+function stripeTexture(): THREE.Texture | null {
+	if (typeof document === 'undefined') return null;
 	const c = document.createElement('canvas');
 	c.width = 256;
 	c.height = 256;
@@ -52,8 +57,8 @@ function stripeTexture(): THREE.CanvasTexture {
 	return t;
 }
 
-const mat = (color: THREE.ColorRepresentation, map?: THREE.Texture) =>
-	new THREE.MeshStandardMaterial({ color: map ? '#ffffff' : color, map, flatShading: true, roughness: 0.85 });
+const mat = (color: THREE.ColorRepresentation, map?: THREE.Texture | null) =>
+	new THREE.MeshStandardMaterial({ color: map ? '#ffffff' : color, map: map ?? undefined, flatShading: true, roughness: 0.85 });
 
 function part(geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {
 	const mesh = new THREE.Mesh(geo, m);
@@ -69,21 +74,22 @@ interface Leg {
 }
 
 export function createTiger(): Tiger {
-	const stripes = stripeTexture();
 	const orange = mat(ORANGE);
-	const striped = mat(ORANGE, stripes);
+	const striped = mat(ORANGE, stripeTexture());
 	const white = mat(WHITE);
 	const black = mat(BLACK);
 	const pink = mat('#f29aa0');
 
 	const root = new THREE.Group();
+	// Rolls spin around the middle of the body, not around the feet.
+	const spin = new THREE.Group();
+	spin.position.y = PIVOT;
+	root.add(spin);
 	const body = new THREE.Group();
-	body.position.y = 0.52;
-	root.add(body);
+	body.position.y = 0.52 - PIVOT;
+	spin.add(body);
 
-	const torsoGeo = new THREE.CapsuleGeometry(0.29, 0.5, 4, 10).rotateX(Math.PI / 2);
-	const torso = part(torsoGeo, striped);
-	body.add(torso);
+	body.add(part(new THREE.CapsuleGeometry(0.29, 0.5, 4, 10).rotateX(Math.PI / 2), striped));
 	const belly = part(new THREE.SphereGeometry(0.25, 10, 6), white, 0, -0.1, 0.02);
 	belly.scale.set(0.95, 0.65, 1.55);
 	body.add(belly);
@@ -138,6 +144,23 @@ export function createTiger(): Tiger {
 	mouth.position.set(0, -0.17, 0.3);
 	head.add(mouth);
 
+	// Sally's knitted scarf, hidden until earned.
+	const scarf = new THREE.Group();
+	const red = mat('#d6453d');
+	const ring = part(new THREE.TorusGeometry(0.2, 0.06, 6, 14), red);
+	ring.rotation.x = Math.PI / 2 - 0.5;
+	scarf.add(ring);
+	for (const s of [-1, 1]) {
+		const tail = part(new THREE.BoxGeometry(0.09, 0.26, 0.04), red, s * 0.06, -0.14, 0.17);
+		tail.rotation.z = s * 0.15;
+		scarf.add(tail);
+		const stripe = part(new THREE.BoxGeometry(0.095, 0.03, 0.045), mat('#f4e3c4'), s * 0.06, -0.2, 0.17);
+		scarf.add(stripe);
+	}
+	scarf.position.set(0, 0.08, 0.05);
+	scarf.visible = false;
+	neck.add(scarf);
+
 	const legs: Leg[] = [];
 	for (const [x, z, front] of [[-0.17, 0.3, true], [0.17, 0.3, true], [-0.17, -0.3, false], [0.17, -0.3, false]] as const) {
 		const hip = new THREE.Group();
@@ -175,6 +198,8 @@ export function createTiger(): Tiger {
 	let blink = 2;
 	let lookYaw = 0;
 	let lookPitch = 0;
+	let ball = 0;
+	let low = 0;
 	const tmp = new THREE.Vector3();
 
 	function legAngles(p: number, stanceFrac: number, amp: number, lift: number): [number, number] {
@@ -187,19 +212,31 @@ export function createTiger(): Tiger {
 	return {
 		root,
 		mouth,
+		scarf,
 		land(impact: number) {
 			squash = Math.min(1, impact);
 		},
 		update(dt: number, pose: TigerPose) {
 			time += dt;
+			const rolling = !Number.isNaN(pose.roll);
+			ball += ((rolling ? 1 : 0) - ball) * Math.min(1, dt * 18);
+			low += ((pose.crawl ? 1 : 0) - low) * Math.min(1, dt * 10);
+			if (rolling) spin.rotation.x = pose.roll;
+			else {
+				// Finish the turn forward instead of unwinding it.
+				const rest = Math.ceil(spin.rotation.x / (Math.PI * 2) - 0.25) * Math.PI * 2;
+				spin.rotation.x += (rest - spin.rotation.x) * Math.min(1, dt * 14);
+				if (Math.abs(rest - spin.rotation.x) < 0.01) spin.rotation.x = 0;
+			}
+
 			const speed = pose.speed;
-			const g = THREE.MathUtils.smoothstep(speed, 2.6, 4.2);
-			const stride = THREE.MathUtils.lerp(0.95, 1.9, g);
+			const g = THREE.MathUtils.smoothstep(speed, 2.6, 4.2) * (1 - low);
+			const stride = THREE.MathUtils.lerp(0.95, 1.9, g) * (1 - low * 0.45);
 			const stanceFrac = THREE.MathUtils.lerp(0.62, 0.42, g);
 			const moving = THREE.MathUtils.smoothstep(speed, 0.05, 0.7);
 			phase = (phase + (speed * dt) / stride + (pose.climb ? dt * 2.6 : 0)) % 1;
 
-			idle = speed < 0.1 && pose.grounded && !pose.climb ? idle + dt : 0;
+			idle = speed < 0.1 && pose.grounded && !pose.climb && !pose.crawl ? idle + dt : 0;
 			sit = THREE.MathUtils.damp(sit, idle > 4 || pose.happy ? 1 : 0, idle > 4 || pose.happy ? 3 : 10, dt);
 
 			// Feet do not skate: the stance sweep covers exactly stanceFrac of the stride.
@@ -209,38 +246,43 @@ export function createTiger(): Tiger {
 			let bodyPitch = Math.sin(phase * Math.PI * 2) * 0.13 * g;
 			let bodyY = 0.52 + Math.abs(Math.sin(phase * Math.PI * 4)) * 0.025 * moving * (1 - g) + Math.sin(phase * Math.PI * 2 + 1) * 0.06 * g;
 			bodyPitch -= sit * 0.5;
-			bodyY -= sit * 0.12;
+			bodyY -= sit * 0.12 + low * 0.2;
 			if (pose.climb) bodyPitch = -0.95 + Math.sin(phase * Math.PI * 4) * 0.06;
-			if (!pose.grounded && !pose.climb) bodyPitch = THREE.MathUtils.clamp(-pose.vy * 0.05, -0.35, 0.4);
+			if (!pose.grounded && !pose.climb && !rolling) bodyPitch = THREE.MathUtils.clamp(-pose.vy * 0.05, -0.35, 0.4);
 			squash = Math.max(0, squash - dt * 4);
 			const breathe = 1 + Math.sin(time * 2.2) * 0.012;
-			body.position.y = bodyY - squash * 0.08;
-			body.rotation.x = THREE.MathUtils.damp(body.rotation.x, bodyPitch, 14, dt);
-			body.rotation.z = THREE.MathUtils.damp(body.rotation.z, -pose.turn * Math.min(speed, 4) * 0.04, 8, dt);
-			body.scale.set(1 + squash * 0.1, breathe - squash * 0.12, 1 + squash * 0.05);
+			body.position.y = bodyY - PIVOT - squash * 0.08 + ball * (PIVOT - 0.52 + 0.04);
+			body.rotation.x = THREE.MathUtils.damp(body.rotation.x, bodyPitch * (1 - ball), 14, dt);
+			body.rotation.z = THREE.MathUtils.damp(body.rotation.z, -pose.turn * Math.min(speed, 4) * 0.04 * (1 - ball), 8, dt);
+			// Rolling: the long body squeezes into a ball.
+			body.scale.set(1 + squash * 0.1 + ball * 0.15, (breathe - squash * 0.12) * (1 + ball * 0.22), (1 + squash * 0.05) * (1 - ball * 0.42));
 
 			const offs = WALK_OFF.map((w, i) => THREE.MathUtils.lerp(w, GALLOP_OFF[i], g));
 			legs.forEach((leg, i) => {
-				let [hip, knee] = legAngles((phase + offs[i]) % 1, stanceFrac, amp, lift);
+				let [hip, knee] = legAngles((phase + offs[i]) % 1, stanceFrac, amp * (1 - low * 0.3), lift * (1 - low * 0.5));
 				if (!pose.grounded && !pose.climb) {
 					const tuck = pose.vy > 0 ? 1 : -0.6;
 					hip = leg.front ? -0.7 * tuck : 0.7 * tuck;
 					knee = 0.5;
 				}
 				// Sitting: hind legs fold forward under the body, front legs stay upright.
-				const sitHip = leg.front ? 0.5 : -1.25;
-				const sitKnee = leg.front ? 0 : 1.9;
-				hip = THREE.MathUtils.lerp(hip, sitHip, sit);
-				knee = THREE.MathUtils.lerp(knee, sitKnee, sit);
-				// Keep the legs reaching for the ground when the body pitches.
-				hip -= body.rotation.x * (1 - sit);
+				hip = THREE.MathUtils.lerp(hip, leg.front ? 0.5 : -1.25, sit);
+				knee = THREE.MathUtils.lerp(knee, leg.front ? 0 : 1.9, sit);
+				// Crawling: legs splay out under a flat body.
+				hip = THREE.MathUtils.lerp(hip, hip * 0.6 + (leg.front ? -0.5 : 0.5), low);
+				knee = THREE.MathUtils.lerp(knee, knee + (leg.front ? 1.1 : -1.1) * -1, low);
+				// Ball: everything tucked in.
+				hip = THREE.MathUtils.lerp(hip, leg.front ? 1.3 : -1.3, ball);
+				knee = THREE.MathUtils.lerp(knee, leg.front ? -2.0 : 2.0, ball);
+				hip -= body.rotation.x * (1 - sit) * (1 - ball);
 				leg.hip.rotation.x = THREE.MathUtils.damp(leg.hip.rotation.x, hip, 30, dt);
 				leg.knee.rotation.x = THREE.MathUtils.damp(leg.knee.rotation.x, knee, 30, dt);
+				leg.hip.scale.setScalar(1 - ball * 0.7);
 			});
 
 			let wantYaw = 0;
 			let wantPitch = -body.rotation.x * 0.7;
-			if (pose.lookAt && !pose.climb) {
+			if (pose.lookAt && !pose.climb && !rolling) {
 				neck.getWorldPosition(tmp);
 				const local = root.worldToLocal(pose.lookAt.clone());
 				const neckLocal = root.worldToLocal(tmp.clone());
@@ -249,21 +291,25 @@ export function createTiger(): Tiger {
 				wantPitch += THREE.MathUtils.clamp(-Math.atan2(d.y, Math.hypot(d.x, d.z)), -0.5, 0.4);
 			}
 			wantYaw += pose.turn * 0.12;
-			lookYaw = THREE.MathUtils.damp(lookYaw, wantYaw, 6, dt);
+			wantPitch = THREE.MathUtils.lerp(wantPitch, 0.9, ball);
+			wantPitch = THREE.MathUtils.lerp(wantPitch, -0.25, low);
+			lookYaw = THREE.MathUtils.damp(lookYaw, wantYaw * (1 - ball), 6, dt);
 			lookPitch = THREE.MathUtils.damp(lookPitch, wantPitch + (pose.happy ? Math.sin(time * 9) * 0.1 : 0), 8, dt);
 			neck.rotation.set(lookPitch, lookYaw, pose.happy ? Math.sin(time * 4.5) * 0.15 : 0);
+			neck.position.set(0, 0.2 - ball * 0.06, 0.42 - ball * 0.2);
 
 			blink -= dt;
-			const closed = blink < 0.12 || pose.happy;
+			const closed = blink < 0.12 || pose.happy || ball > 0.5;
 			if (blink < 0) blink = 2.5 + Math.random() * 3;
 			for (const e of eyes) e.scale.y = THREE.MathUtils.damp(e.scale.y, closed ? 0.15 : 1, 30, dt);
 
 			tail.forEach((seg, i) => {
 				// Per segment: the chain sums seven of these.
 				const swish = Math.sin(time * (pose.happy ? 8 : 2.1) - i * 0.6) * (0.04 + 0.06 * (1 - moving)) * (pose.happy ? 2 : 1);
-				const up = i === 0 ? THREE.MathUtils.lerp(0.75, 0.15, g) + sit * -0.6 : THREE.MathUtils.lerp(-0.22, -0.03, g) + (i > 4 ? 0.35 : 0) * (1 - g);
+				let up = i === 0 ? THREE.MathUtils.lerp(0.75, 0.15, g) + sit * -0.6 : THREE.MathUtils.lerp(-0.22, -0.03, g) + (i > 4 ? 0.35 : 0) * (1 - g);
+				up = THREE.MathUtils.lerp(up, i === 0 ? -0.9 : -0.55, ball);
 				seg.rotation.x = THREE.MathUtils.damp(seg.rotation.x, up + Math.sin(time * 3 - i) * 0.05 * g, 8, dt);
-				seg.rotation.y = THREE.MathUtils.damp(seg.rotation.y, swish - pose.turn * 0.12, 8, dt);
+				seg.rotation.y = THREE.MathUtils.damp(seg.rotation.y, (swish - pose.turn * 0.12) * (1 - ball), 8, dt);
 			});
 		},
 	};
