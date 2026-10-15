@@ -1126,6 +1126,8 @@ function scatterTrees(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		const px = side === 0 ? BOUNDS.x0 - d : side === 1 ? BOUNDS.x1 + d : BOUNDS.x0 + u * (BOUNDS.x1 - BOUNDS.x0);
 		const pz = side === 2 ? BOUNDS.z0 - d : side === 3 ? BOUNDS.z1 + d : BOUNDS.z0 + u * (BOUNDS.z1 - BOUNDS.z0);
 		if (mountPolar(px, pz).d < R_OUT + 2) continue;
+		// The river runs on through the rim: keep its bed and banks clear.
+		if (Math.abs(px - riverX(pz)) < RIVER.half + 2.5) continue;
 		trees.push({ x: px, z: pz, s: 1 + r() * 0.8, pine: r() > 0.4 });
 	}
 

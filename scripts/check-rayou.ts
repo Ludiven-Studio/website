@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { buildZones } from '../src/games/rayou/zones';
 import { Player, RUN, type Command } from '../src/games/rayou/player';
 import { groundHeight, mountPoint, ringLevel, riverX, ISLETS, BANK, OAK, OAK_GATE, MILL, MOUNT, BOUNDS, waterAt, WATER_Y, START } from '../src/games/rayou/terrain';
-import { query, inside } from '../src/games/rayou/colliders';
+import { query, inside, solids } from '../src/games/rayou/colliders';
 
 const scene = new THREE.Scene();
 const zones = buildZones(scene);
@@ -115,6 +115,12 @@ function chain(name: string, pts: P[], roll: boolean[] = []) {
 		step(jump, c);
 	}
 	expect('trunk cannot be jumped', jump.pos.z > OAK_GATE.z + 0.3, `z ${jump.pos.z.toFixed(2)}`);
+}
+
+// — No tree grows in the water (trees are the only tall thin colliders). —
+{
+	const wet = solids.filter((s) => s.kind === 'cyl' && s.r < 1 && s.y1 - s.y0 > 25 && waterAt(s.x, s.z) && groundHeight(s.x, s.z) < WATER_Y + 0.3);
+	expect('no tree stands in the water', wet.length === 0, wet.slice(0, 5).map((s) => `${s.x.toFixed(1)},${s.z.toFixed(1)}`).join(' | '));
 }
 
 // — Steep slopes cannot be climbed by spamming jumps (oak ridge, world rim). —
