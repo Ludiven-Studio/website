@@ -165,3 +165,9 @@
 - Statut : terminé, non commité (2026-10-14, Europe/Paris). Réservations libérées. 9 pages concernées capturées, 0 erreur.
 - Réservations (libérées) : `src/styles/global.css` (bloc `.gap-*` seulement).
 - Ressources : serveur de dev sur le port 4395 (arrêté).
+
+## 2026-10-14 — Prototype caché « Tygo » (three.js)
+
+- Statut : terminé, non commité (2026-10-14, Europe/Paris). Réservations libérées. Quête jouée de bout en bout par `node scripts/snap-tygo.mjs [dossier] [--mobile]`, 0 erreur. Demande de l'utilisateur : voir si l'idée d'un porteur de projet se représente facilement. Page non partagée.
+- Réservations (libérées) : `src/pages/prototypes/` (nouveau), `src/prototypes/tygo/` (nouveau), `astro.config.mjs` (filtre du sitemap seulement), `scripts/snap-tygo.mjs` (nouveau).
+- Ressources : serveur de dev sur le port 4396 (arrêté).

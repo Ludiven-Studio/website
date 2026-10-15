@@ -40,6 +40,7 @@ export default defineConfig({
                 !page.includes('/rencontres') &&
                 !page.includes('/petanque-meet/moderation') &&
                 !page.includes('/petanque-meet/test') &&
+                !page.includes('/prototypes') &&
                 !page.includes('/jeux/petanque/test'),
         }),
         AstroPWA({

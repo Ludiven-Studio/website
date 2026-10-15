@@ -1,0 +1,340 @@
+---
+import MainHead from '../../components/MainHead.astro';
+---
+
+<html lang="fr">
+	<head>
+		<MainHead title="Tygo — prototype | Ludiven Studio" description="Prototype jouable." noindex />
+	</head>
+	<body>
+		<div id="stage"><canvas id="view"></canvas></div>
+
+		<div class="hud">
+			<p id="objective" hidden></p>
+			<p id="hint" hidden></p>
+
+			<div id="joy"><div id="joy-knob"></div></div>
+			<button id="btn-jump" class="touch-btn" aria-label="Sauter">⤒</button>
+			<button id="btn-action" class="touch-btn"><span id="action-label"></span></button>
+
+			<div id="dialog" hidden>
+				<span id="dlg-name"></span>
+				<p id="dlg-text"></p>
+				<span class="dlg-next">▶</span>
+			</div>
+
+			<section id="intro" class="card-screen">
+				<div class="card">
+					<p class="kicker">Prototype</p>
+					<h1>Tygo</h1>
+					<p>Une petite quête autour de la maison : Sally a besoin d'aide.</p>
+					<ul class="keys">
+						<li class="desk"><b>ZQSD</b> ou flèches : se déplacer · <b>Maj</b> : marcher</li>
+						<li class="desk"><b>Espace</b> : sauter · <b>E</b> : agir · glisser la souris : caméra</li>
+						<li class="mob">Pouce gauche : se déplacer · glisser à droite : caméra</li>
+					</ul>
+					<button id="play">Jouer</button>
+				</div>
+			</section>
+
+			<section id="end" class="card-screen" hidden>
+				<div class="card">
+					<p class="kicker">Quête terminée</p>
+					<h1>Merci Tygo !</h1>
+					<p>Sally a retrouvé sa noisette, en <span id="end-time"></span>.</p>
+					<button id="replay">Rejouer</button>
+				</div>
+			</section>
+		</div>
+
+		<script>
+			import { start } from '../../prototypes/tygo/main';
+			start();
+		</script>
+	</body>
+</html>
+
+<style is:global>
+	html,
+	body {
+		margin: 0;
+		height: 100%;
+		overflow: hidden;
+		overscroll-behavior: none;
+		background: #f2dcc0;
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
+	}
+
+	#stage {
+		position: fixed;
+		inset: 0;
+		touch-action: none;
+	}
+
+	#view {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	.hud {
+		position: fixed;
+		inset: 0;
+		pointer-events: none;
+		font-family: var(--font-body, system-ui, sans-serif);
+		color: #3a2a1c;
+	}
+
+	.hud > * {
+		pointer-events: auto;
+	}
+
+	#objective {
+		position: absolute;
+		top: max(14px, env(safe-area-inset-top));
+		left: 50%;
+		transform: translateX(-50%);
+		margin: 0;
+		max-width: calc(100% - 32px);
+		padding: 0.55rem 1rem;
+		border-radius: 999px;
+		background: rgba(255, 250, 240, 0.92);
+		box-shadow: 0 4px 14px rgba(80, 50, 20, 0.18);
+		font-weight: 700;
+		font-size: 0.95rem;
+		text-align: center;
+		pointer-events: none;
+	}
+
+	#objective::before {
+		content: '★ ';
+		color: #f0a020;
+	}
+
+	#hint {
+		position: absolute;
+		bottom: 28%;
+		left: 50%;
+		transform: translateX(-50%);
+		margin: 0;
+		padding: 0.4rem 0.9rem;
+		border-radius: 0.6rem;
+		background: rgba(58, 42, 28, 0.85);
+		color: #fff;
+		font-weight: 700;
+		pointer-events: none;
+	}
+
+	#joy {
+		position: absolute;
+		width: 112px;
+		height: 112px;
+		margin: -56px 0 0 -56px;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.22);
+		border: 2px solid rgba(255, 255, 255, 0.6);
+		opacity: 0;
+		transition: opacity 0.15s;
+		pointer-events: none;
+	}
+
+	#joy-knob {
+		position: absolute;
+		left: 28px;
+		top: 28px;
+		width: 56px;
+		height: 56px;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.85);
+	}
+
+	.touch-btn {
+		position: absolute;
+		display: none;
+		border: none;
+		border-radius: 50%;
+		font: inherit;
+		font-weight: 800;
+		color: #3a2a1c;
+		background: rgba(255, 250, 240, 0.9);
+		box-shadow: 0 4px 14px rgba(80, 50, 20, 0.25);
+		touch-action: none;
+	}
+
+	#btn-jump {
+		right: calc(24px + env(safe-area-inset-right));
+		bottom: calc(28px + env(safe-area-inset-bottom));
+		width: 68px;
+		height: 68px;
+		font-size: 1.6rem;
+	}
+
+	#btn-action {
+		right: calc(104px + env(safe-area-inset-right));
+		bottom: calc(52px + env(safe-area-inset-bottom));
+		width: 84px;
+		height: 84px;
+		font-size: 0.85rem;
+		opacity: 0.35;
+		transform: scale(0.85);
+		transition: transform 0.15s, opacity 0.15s, background 0.15s;
+	}
+
+	#btn-action.on {
+		opacity: 1;
+		transform: scale(1);
+		background: #ffd23f;
+	}
+
+	@media (pointer: coarse) {
+		.touch-btn {
+			display: block;
+		}
+		#objective {
+			font-size: 0.82rem;
+			border-radius: 1rem;
+		}
+		#hint,
+		.desk {
+			display: none !important;
+		}
+	}
+
+	@media (pointer: fine) {
+		.mob {
+			display: none;
+		}
+	}
+
+	#dialog {
+		position: absolute;
+		left: 50%;
+		bottom: calc(150px + env(safe-area-inset-bottom));
+		transform: translateX(-50%);
+		width: min(560px, calc(100% - 32px));
+		box-sizing: border-box;
+		padding: 1.4rem 1.2rem 1rem;
+		border-radius: 1.1rem;
+		background: #fffaf0;
+		box-shadow: 0 8px 30px rgba(80, 50, 20, 0.3);
+		cursor: pointer;
+	}
+
+	@media (pointer: fine) {
+		#dialog {
+			bottom: 40px;
+		}
+	}
+
+	#dlg-name {
+		position: absolute;
+		top: -0.8rem;
+		left: 1rem;
+		padding: 0.2rem 0.8rem;
+		border-radius: 999px;
+		background: #c0682f;
+		color: #fff;
+		font-weight: 800;
+		font-size: 0.9rem;
+	}
+
+	#dlg-name[data-who='Tygo'] {
+		background: #ee8a2c;
+	}
+
+	#dlg-text {
+		margin: 0;
+		min-height: 2.8em;
+		font-size: 1.05rem;
+		line-height: 1.4;
+	}
+
+	.dlg-next {
+		position: absolute;
+		right: 1rem;
+		bottom: 0.6rem;
+		font-size: 0.8rem;
+		color: #c0682f;
+		animation: nudge 1s ease-in-out infinite;
+	}
+
+	@keyframes nudge {
+		50% {
+			transform: translateX(3px);
+		}
+	}
+
+	.card-screen {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		padding: 16px;
+		background: linear-gradient(180deg, rgba(255, 236, 205, 0.15), rgba(80, 45, 15, 0.35));
+	}
+
+	.card-screen[hidden],
+	#dialog[hidden],
+	#objective[hidden],
+	#hint[hidden] {
+		display: none;
+	}
+
+	.card {
+		width: min(420px, 100%);
+		box-sizing: border-box;
+		padding: 1.8rem 1.6rem;
+		border-radius: 1.4rem;
+		background: #fffaf0;
+		box-shadow: 0 12px 40px rgba(80, 50, 20, 0.35);
+		text-align: center;
+	}
+
+	.card h1 {
+		margin: 0.1rem 0 0.6rem;
+		font-size: 2.6rem;
+		color: #e2761c;
+	}
+
+	.card p {
+		margin: 0 0 1rem;
+		line-height: 1.45;
+	}
+
+	.kicker {
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		font-size: 0.75rem;
+		font-weight: 800;
+		color: #a0835f;
+	}
+
+	.keys {
+		list-style: none;
+		margin: 0 0 1.3rem;
+		padding: 0;
+		font-size: 0.85rem;
+		color: #6b5640;
+		line-height: 1.6;
+	}
+
+	.card button {
+		padding: 0.8rem 2.4rem;
+		border: none;
+		border-radius: 999px;
+		background: #ee8a2c;
+		color: #fff;
+		font: inherit;
+		font-weight: 800;
+		font-size: 1.1rem;
+		cursor: pointer;
+		box-shadow: 0 6px 0 #b85f14;
+	}
+
+	.card button:active {
+		transform: translateY(3px);
+		box-shadow: 0 3px 0 #b85f14;
+	}
+</style>
