@@ -9,7 +9,7 @@ import { createFx } from './fx';
 import { Audio } from './audio';
 import { Hud, type Objective, type MapMarker, type BagItem } from './hud';
 import { L, newState, loadState, saveState, clearState, jars, goldCount, GOLD_TOTAL, SOUVENIRS, COLORS, LABELS, type Line, type State, type Who } from './story';
-import { groundHeight, mountPolar, mountPoint, ringOf, riverX, regionName, ringLevel, R_OUT, START, OAK_GATE, MOUNT, ISLETS, BANK } from './terrain';
+import { groundHeight, baseHeight, waterAt, mountPolar, mountPoint, ringOf, riverX, regionName, ringLevel, R_OUT, START, OAK_GATE, MOUNT, ISLETS, BANK, POND, WATER_Y } from './terrain';
 import { query, inside, solids, type Solid } from './colliders';
 import { Tutorial, TUTO_STEPS } from './tutorial';
 
@@ -249,6 +249,10 @@ export function start(): void {
 	let regionT = 0;
 	let splash = { n: 0, at: -1e9 };
 	let saveT = 0;
+	let rippleT = 0;
+	// Test hook only: slows the game clock so a capture can catch a short move.
+	let timeScale = 1;
+	let wadeT = 0;
 	let kiteFly = false;
 	let drive: { yaw: number; speed: number } | null = null;
 	const pressed = { jump: false, roll: false, action: false };
@@ -1345,7 +1349,7 @@ export function start(): void {
 	let last = performance.now();
 	const frame = (now: number) => {
 		requestAnimationFrame(frame);
-		const dt = Math.min(0.05, (now - last) / 1000);
+		const dt = Math.min(0.05, (now - last) / 1000) * timeScale;
 		last = now;
 		if (input.consumeMenu() && playing && !finale && hud.el.end.hidden) openMenu(hud.el.menu.hidden);
 		if (input.consumeBag() && playing && !finale && hud.el.end.hidden) openMenu(hud.el.menu.hidden, 'bag');
@@ -1496,10 +1500,28 @@ export function start(): void {
 			});
 			nightFlies.instanceMatrix.needsUpdate = true;
 		}
+		// Paddling in the pond: rings and droplets at each stride.
+		wadeT -= dt;
+		if (player.grounded && player.pos.y < -0.14 && Math.hypot(player.pos.x - POND.x, player.pos.z - POND.z) < POND.r + 0.4 && player.speed > 0.8 && wadeT < 0) {
+			wadeT = 0.28;
+			const p = new THREE.Vector3(player.pos.x, -0.12, player.pos.z);
+			fx.ring(p, '#e8f8ff');
+			fx.sparkle(p.clone().add(new THREE.Vector3(0, 0.1, 0)), '#cfeefa', 5);
+		}
+		// Now and then a fish or a water strider rings the water near Rayou.
+		rippleT -= dt;
+		if (rippleT < 0) {
+			rippleT = 0.35 + Math.random() * 0.6;
+			const a = Math.random() * Math.PI * 2, r = 2 + Math.random() * 14;
+			const x = player.pos.x + Math.cos(a) * r, z = player.pos.z + Math.sin(a) * r;
+			if (waterAt(x, z) && baseHeight(x, z) < WATER_Y - 0.4) fx.ring(new THREE.Vector3(x, WATER_Y, z), '#e8f8ff');
+			else if (Math.hypot(x - POND.x, z - POND.z) < POND.r - 0.5) fx.ring(new THREE.Vector3(x, -0.12, z), '#e8f8ff');
+		}
 		fx.update(dt);
 
 		if (!finale) dayT += (targetDay() - dayT) * Math.min(1, dt * 0.25);
 		env.sky.set(dayT);
+		env.water.update(time, env.sun, env.hemi, env.sky.mid);
 		audio.night = dayT > 0.85 ? 1 : 0;
 		audio.tick();
 		updateCamera(dt, now);
@@ -1557,6 +1579,9 @@ export function start(): void {
 			Object.assign(S, patch);
 		},
 		advance,
+		slow(k: number) {
+			timeScale = k;
+		},
 		perf: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }),
 		talk: (k: NpcKey) => talk(k),
 		spots: {

@@ -195,3 +195,15 @@
 - Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Page `/jeux/rayou/` (GamePage, plein écran du site), carte et images générées (ComfyUI arrêté), `/prototypes/rayou` redirigé. `check-rayou` vert.
 - Réservations : `src/games/rayou/` (déplacé depuis `src/prototypes/rayou/`), `src/pages/jeux/rayou.astro` (nouveau), `src/pages/prototypes/`, `src/data/games.ts` (une entrée), `src/data/tutorials.ts` (une entrée), `src/components/IconPaths.ts` (une icône), `astro.config.mjs` (une redirection), `scripts/check-rayou.ts`, `scripts/snap-rayou.mjs`, `scripts/thumb-themes.mjs` (un thème), `public/assets/jeux/{rayou.jpg,og/,art/,tile/}`.
 - Ressources : serveur de dev sur le port 4396 (arrêté), ComfyUI local port 8188 (arrêté).
+
+## 2026-10-15 — Rayou : champignons et eau
+
+- Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Tous les champignons rebondissent (un chapeau sans collision laissait Rayou entrer dedans), nouvelle eau en shader (`src/games/rayou/water.ts` : transparence selon la profondeur, reflets, écume, rides), étang praticable. `check-rayou` vert, test des champignons ajouté.
+- Réservations (libérées) : `src/games/rayou/`, `scripts/check-rayou.ts`.
+- Ressources : serveur de dev sur le port 4396 (arrêté).
+
+## 2026-10-15 — Rayou : collisions du museau, pose de roulade
+
+- Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Le museau ne rentre plus dans les falaises ni les murs (sonde devant le corps + cercle de tête), tête gardée ronde en boule, roulade qui part debout. Test « snout » ajouté à `check-rayou`, vert.
+- Réservations (libérées) : `src/games/rayou/`, `scripts/check-rayou.ts`.
+- Ressources : serveur de dev sur le port 4396 (arrêté).

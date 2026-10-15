@@ -237,7 +237,7 @@ function buildHub(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 		pg.add(m);
 	}
 	root.add(shadowed(pg, false));
-	addCyl(POND.x, POND.z, POND.r + 0.3, -2, 30);
+	// No collider: the pond is ankle-deep and Rayou may paddle in it.
 	keepClear(POND.x, POND.z, POND.r + 2);
 
 	// Rayou's den: a rock shelter facing the start, with a ledge on top.
@@ -677,13 +677,14 @@ function buildForest(root: THREE.Group, r: () => number, out: Partial<Zones>) {
 	}
 	out.babies = babies;
 
-	// Decorative mushrooms, some bouncy.
-	for (const [x, z, s, bounce] of [[-36, -18, 0.6, false], [-50, 4, 0.5, false], [-46, 22, 0.8, true], [-56, -12, 0.7, true], [-34, 8, 0.45, false]] as const) {
+	// Every red mushroom bounces, small ones a little less: one rule a child can trust.
+	// A cap without a collider let Rayou step onto the stem and stand inside the cap.
+	for (const [x, z, s] of [[-36, -18, 0.6], [-50, 4, 0.65], [-46, 22, 0.8], [-56, -12, 0.7], [-34, 8, 0.62]] as const) {
 		const mm = mushroomMesh(s, s * 1.1);
 		const gy = g(x, z);
 		mm.position.set(x, gy, z);
 		root.add(mm);
-		if (bounce) out.bouncers!.push({ solid: addCyl(x, z, s, gy + s * 1.1 - 0.3, gy + s * 1.1, { bouncy: 11, mesh: mm }), mesh: mm, squash: 0 });
+		out.bouncers!.push({ solid: addCyl(x, z, s, gy + s * 1.1 - 0.3, gy + s * 1.1, { bouncy: 8.5 + s * 4.5, mesh: mm }), mesh: mm, squash: 0 });
 		addCyl(x, z, s * 0.35, -1, gy + s * 1.1 - 0.3);
 		keepClear(x, z, 2.2);
 	}

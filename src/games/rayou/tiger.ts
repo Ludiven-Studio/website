@@ -98,9 +98,12 @@ export function createTiger(): Tiger {
 	body.add(chest);
 
 	// Head on a neck pivot, so it can look around and stabilise against the gait.
+	// The mount undoes the body's squash, so the head stays round when the body curls into a ball.
+	const neckMount = new THREE.Group();
+	neckMount.position.set(0, 0.2, 0.42);
+	body.add(neckMount);
 	const neck = new THREE.Group();
-	neck.position.set(0, 0.2, 0.42);
-	body.add(neck);
+	neckMount.add(neck);
 	const head = new THREE.Group();
 	head.position.set(0, 0.16, 0.12);
 	neck.add(head);
@@ -296,7 +299,9 @@ export function createTiger(): Tiger {
 			lookYaw = THREE.MathUtils.damp(lookYaw, wantYaw * (1 - ball), 6, dt);
 			lookPitch = THREE.MathUtils.damp(lookPitch, wantPitch + (pose.happy ? Math.sin(time * 9) * 0.1 : 0), 8, dt);
 			neck.rotation.set(lookPitch, lookYaw, pose.happy ? Math.sin(time * 4.5) * 0.15 : 0);
-			neck.position.set(0, 0.2 - ball * 0.06, 0.42 - ball * 0.2);
+			// Curled up, the head tucks into the front of the ball, a little smaller.
+			neckMount.position.set(0, 0.2 - ball * 0.1, 0.42 - ball * 0.3);
+			neckMount.scale.set(1 / body.scale.x, 1 / body.scale.y, 1 / body.scale.z).multiplyScalar(1 - ball * 0.15);
 
 			blink -= dt;
 			const closed = blink < 0.12 || pose.happy || ball > 0.5;

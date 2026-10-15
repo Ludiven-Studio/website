@@ -139,6 +139,37 @@ function chain(name: string, pts: P[], roll: boolean[] = []) {
 	}
 }
 
+// — Running or rolling into walls: the snout never sinks into a bank, a cliff or a building. —
+{
+	const P = (r: number, a: number) => mountPoint(r, a);
+	const walls: [string, P, P][] = [
+		['oak ridge', { x: OAK_GATE.x + 10, z: OAK_GATE.z + 3 }, { x: OAK_GATE.x + 10, z: OAK_GATE.z - 10 }],
+		['world rim', { x: BOUNDS.x0 + 6, z: 0 }, { x: BOUNDS.x0 - 10, z: 0 }],
+		['peak cliff', { ...P(24.5, 0.1), y: ringLevel(0) }, P(18, 0.1)],
+		['house', { x: -6, z: 2 }, { x: -6, z: -5 }],
+		['mill tower', { x: MILL.x + 5, z: MILL.z - 6 }, MILL],
+	];
+	for (const [name, from, to] of walls) {
+		let worst = 0;
+		for (const roll of [false, true]) {
+			const p = mk(from, 0);
+			for (let i = 0; i < 240; i++) {
+				const c = toward(p, to);
+				if (roll && i % 45 === 5) c.roll = true;
+				step(p, c);
+				if (!p.grounded || p.respawnT > 0) continue;
+				// Snout ahead when standing; curled up, the ball is round and smaller.
+				const reach = p.low ? 0.3 : 0.55;
+				const sx = p.pos.x + Math.sin(p.yaw) * reach, sz = p.pos.z + Math.cos(p.yaw) * reach;
+				worst = Math.max(worst, groundHeight(sx, sz) - p.pos.y);
+				for (const s of query(sx, sz))
+					if (s.y1 > p.pos.y + 0.5 && s.y0 < p.pos.y + 0.6 && inside(s, sx, sz, -0.08) && s.r !== 0.15) worst = Math.max(worst, 9);
+			}
+		}
+		expect(`${name}: snout stays out of the wall`, worst < 0.8, `worst ${worst.toFixed(2)}`);
+	}
+}
+
 // — River islets. —
 {
 	const a = ISLETS[0];
@@ -170,6 +201,29 @@ function chain(name: string, pts: P[], roll: boolean[] = []) {
 	chain('hazel rocks', [start, ...steps.map((s) => ({ x: s.x, z: s.z, y: s.y }))]);
 	const s2 = steps[2];
 	expect('hazel rock 3 is not reachable from the grass', jumpWindow(at(s2.x + 2.2, s2.z + 0.5), { x: s2.x, z: s2.z, y: s2.y }) === 0);
+}
+
+// — Mushrooms: walking or jumping onto one never puts Rayou inside the cap, and a jump bounces. —
+for (const b of zones.bouncers) {
+	const s = b.solid;
+	let insideCap = false, bounced = false;
+	for (const a of [0, 1.6, 3.2, 4.8]) {
+		const from = { x: s.x + Math.cos(a) * 3, z: s.z + Math.sin(a) * 3 };
+		for (const jump of [false, true]) {
+			const p = mk(from, 0);
+			events.length = 0;
+			for (let i = 0; i < 150; i++) {
+				const c = toward(p, s);
+				if (jump && Math.hypot(p.pos.x - s.x, p.pos.z - s.z) < s.r + 0.9 && p.grounded && i < 100) c.jump = true;
+				c.jumpHeld = true;
+				step(p, c);
+				const d = Math.hypot(p.pos.x - s.x, p.pos.z - s.z);
+				if (d < s.r - 0.15 && p.pos.y < s.y1 - 0.05 && p.pos.y + 0.5 > s.y0) insideCap = true;
+			}
+			if (jump && events.includes('bounce')) bounced = true;
+		}
+	}
+	expect(`mushroom at ${s.x.toFixed(0)},${s.z.toFixed(0)}: never inside, bounces`, !insideCap && bounced, `inside ${insideCap}, bounced ${bounced}`);
 }
 
 // — Forest. —

@@ -15,13 +15,15 @@ import {
 	LAKE,
 	POND,
 	WATER_Y,
-	BANK,
 } from './terrain';
 import { mat } from './props';
+import { buildWater, type Water } from './water';
 
 export interface Sky {
 	mesh: THREE.Mesh;
 	stars: THREE.Points;
+	// Colour of the sky near the horizon, mirrored by the water.
+	mid: THREE.Color;
 	set(t: number): void;
 }
 
@@ -30,7 +32,7 @@ export interface Env {
 	sun: THREE.DirectionalLight;
 	hemi: THREE.HemisphereLight;
 	sky: Sky;
-	water: THREE.Material[];
+	water: Water;
 }
 
 // Time of day: 0 morning, 0.5 afternoon, 0.8 sunset, 1 night.
@@ -74,6 +76,7 @@ function buildSky(scene: THREE.Scene, sun: THREE.DirectionalLight, hemi: THREE.H
 	return {
 		mesh,
 		stars,
+		mid: uniforms.mid.value,
 		set(t: number) {
 			let i = 0;
 			while (i < PALETTE.length - 2 && t > PALETTE[i + 1].t) i++;
@@ -186,34 +189,6 @@ function buildMountain(): THREE.Mesh {
 	return mesh;
 }
 
-function buildWater(): { group: THREE.Group; mats: THREE.Material[] } {
-	const g = new THREE.Group();
-	const m = new THREE.MeshStandardMaterial({ color: '#4fb0d4', roughness: 0.12, metalness: 0.15, transparent: true, opacity: 0.86 });
-	const pos: number[] = [];
-	for (let z = -80; z < 74; z += 1) {
-		const xa0 = riverX(z) - RIVER.half - 1, xa1 = riverX(z) + RIVER.half + 1;
-		const xb0 = riverX(z + 1) - RIVER.half - 1, xb1 = riverX(z + 1) + RIVER.half + 1;
-		pos.push(xa0, WATER_Y, z, xb0, WATER_Y, z + 1, xa1, WATER_Y, z, xa1, WATER_Y, z, xb0, WATER_Y, z + 1, xb1, WATER_Y, z + 1);
-	}
-	const rg = new THREE.BufferGeometry();
-	rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-	rg.computeVertexNormals();
-	const river = new THREE.Mesh(rg, m);
-	river.receiveShadow = true;
-	g.add(river);
-	const lake = new THREE.Mesh(new THREE.CircleGeometry(LAKE.r + 1.8, 40), m);
-	lake.rotation.x = -Math.PI / 2;
-	lake.position.set(LAKE.x, WATER_Y, LAKE.z);
-	lake.receiveShadow = true;
-	g.add(lake);
-	const pond = new THREE.Mesh(new THREE.CircleGeometry(POND.r + 0.5, 28), m);
-	pond.rotation.x = -Math.PI / 2;
-	pond.position.set(POND.x, -0.12, POND.z);
-	g.add(pond);
-	void BANK;
-	return { group: g, mats: [m] };
-}
-
 export function buildEnv(lite = false): Env {
 	const scene = new THREE.Scene();
 	scene.fog = new THREE.Fog('#f2dcc0', 40, 120);
@@ -233,7 +208,7 @@ export function buildEnv(lite = false): Env {
 	const water = buildWater();
 	scene.add(water.group);
 	sky.set(0);
-	return { scene, sun, hemi, sky, water: water.mats };
+	return { scene, sun, hemi, sky, water };
 }
 
 export { mat };

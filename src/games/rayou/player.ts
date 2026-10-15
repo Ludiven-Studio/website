@@ -15,6 +15,11 @@ const BUFFER = 0.14;
 const ROLL_TIME = 0.55;
 const CRAWL_SPEED = 1.8;
 const TUMBLE_FALL = 3.2;
+// How far the snout sticks out ahead of the collision centre.
+const REACH = 0.6;
+// The head is a second, smaller circle ahead of the body circle.
+const HEAD_AHEAD = 0.45;
+const HEAD_R = 0.3;
 
 export interface Command {
 	dirX: number;
@@ -140,6 +145,8 @@ export class Player {
 		if (cmd.roll && this.rollCool <= 0 && this.rollT <= 0 && !this.crawl && (this.grounded || !this.airRolled)) {
 			if (mag > 0.2) this.yaw = Math.atan2(cmd.dirX, cmd.dirZ);
 			this.rollT = ROLL_TIME;
+			// Each roll turns from upright, not from where the last one stopped.
+			this.rollSpin = 0;
 			this.rollCool = ROLL_TIME + 0.15;
 			this.speed = Math.max(this.speed, this.grounded ? ROLL_SPEED : Math.min(ROLL_SPEED, this.speed + 2));
 			if (!this.grounded) this.airRolled = true;
@@ -195,12 +202,23 @@ export class Player {
 	}
 
 	private terrainBlocked(fromX: number, fromZ: number, x: number, z: number): boolean {
-		const g = groundHeight(x, z);
-		if (g > this.pos.y + STEP_UP) return true;
-		const g0 = groundHeight(fromX, fromZ);
 		const len = Math.hypot(x - fromX, z - fromZ);
-		const onTerrain = this.pos.y - g0 < 0.3;
-		return onTerrain && g > this.pos.y + 0.05 && (g - g0) / Math.max(len, 1e-4) > MAX_SLOPE;
+		if (len < 1e-6) return false;
+		if (groundHeight(x, z) > this.pos.y + STEP_UP) return true;
+		// The body reaches ahead of its centre: test the ground under the snout, or the head
+		// and chest sink into a steep bank or a terrace cliff.
+		const reach = this.low ? 0.35 : REACH;
+		const wall = this.pos.y + STEP_UP + 0.25;
+		const dx = (x - fromX) / len, dz = (z - fromZ) / len;
+		const g = groundHeight(x + dx * reach, z + dz * reach);
+		if (g > wall) return true;
+		// Sliding along a wall moves sideways while Rayou still faces it: test where he looks too,
+		// but only refuse the step that would push the snout in, never the one that backs out.
+		const yx = Math.sin(this.yaw) * reach, yz = Math.cos(this.yaw) * reach;
+		if (groundHeight(x + yx, z + yz) > wall && groundHeight(fromX + yx, fromZ + yz) <= wall) return true;
+		const gq = groundHeight(fromX + dx * reach, fromZ + dz * reach);
+		const onTerrain = this.pos.y - groundHeight(fromX, fromZ) < 0.3;
+		return onTerrain && g > this.pos.y + 0.05 && (g - gq) / len > MAX_SLOPE;
 	}
 
 	private moveHorizontal(dt: number): void {
@@ -232,9 +250,28 @@ export class Player {
 				this.pos.z = oz;
 			}
 		}
+		this.backOffWall();
 		const m = 0.5;
 		this.pos.x = Math.min(BOUNDS.x1 + m, Math.max(BOUNDS.x0 - m, this.pos.x));
 		this.pos.z = Math.min(BOUNDS.z1 + m, Math.max(BOUNDS.z0 - m, this.pos.z));
+	}
+
+	// Standing up from a ball, or turning on the spot, can swing the snout into a cliff: step
+	// back along the facing line until it clears, as long as the spot behind is free.
+	private backOffWall(): void {
+		if (this.low || !this.grounded) return;
+		const wall = this.pos.y + STEP_UP + 0.25;
+		const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+		const snoutIn = (x: number, z: number) => groundHeight(x + fx * REACH, z + fz * REACH) > wall;
+		if (!snoutIn(this.pos.x, this.pos.z)) return;
+		for (let back = 0.05; back <= 0.4; back += 0.05) {
+			const x = this.pos.x - fx * back, z = this.pos.z - fz * back;
+			if (snoutIn(x, z)) continue;
+			if (groundHeight(x, z) > this.pos.y + STEP_UP || query(x, z).some((s) => this.isWall(s) && inside(s, x, z, RADIUS - 0.05))) return;
+			this.pos.x = x;
+			this.pos.z = z;
+			return;
+		}
 	}
 
 	private isWall(s: Solid): boolean {
@@ -253,6 +290,19 @@ export class Player {
 					continue;
 				}
 				if (pushOut(s, this.pos, RADIUS)) moved = true;
+			}
+			// Curled in a ball the body is round; standing, the head sticks out in front.
+			if (!this.low) {
+				const h = { x: this.pos.x + Math.sin(this.yaw) * HEAD_AHEAD, z: this.pos.z + Math.cos(this.yaw) * HEAD_AHEAD };
+				for (const s of query(h.x, h.z)) {
+					if (!this.isWall(s)) continue;
+					const bx = h.x, bz = h.z;
+					if (pushOut(s, h, HEAD_R)) {
+						this.pos.x += h.x - bx;
+						this.pos.z += h.z - bz;
+						moved = true;
+					}
+				}
 			}
 			if (!moved) break;
 		}
