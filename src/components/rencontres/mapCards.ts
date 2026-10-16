@@ -61,6 +61,42 @@ export function gameClusterCard(count: number): L.DivIcon {
 
 const T_W = 78;
 const T_H = 136;
+// The poster window less the title's padding, and the font of .re-cp-title.
+const TITLE_W = 60;
+const TITLE_H = 87;
+const TITLE_MAX = 11;
+const TITLE_MIN = 7;
+const TITLE_LINE = 1.15;
+let measure: CanvasRenderingContext2D | null | undefined;
+
+/** Lines of `size` px the title wraps to, or Infinity when a word is wider than the card. */
+function titleLines(words: string[][], size: number): number {
+	if (!measure) return 1;
+	measure.font = `800 ${size}px system-ui, sans-serif`;
+	const space = measure.measureText(' ').width;
+	let lines = 1;
+	let line = 0;
+	for (const word of words) {
+		for (const [i, piece] of word.entries()) {
+			const w = measure.measureText(piece).width;
+			if (w > TITLE_W) return Infinity;
+			const gap = i === 0 && line > 0 ? space : 0;
+			if (line > 0 && line + gap + w > TITLE_W) { lines++; line = w; } else line += gap + w;
+		}
+	}
+	return lines;
+}
+
+/** Shrinks a long title instead of breaking a word, like the app's card. */
+function titleSize(title: string): number {
+	measure ??= document.createElement('canvas').getContext('2d');
+	// A line may also break after a hyphen: Saint-Romain-de-Surieu.
+	const words = title.split(/\s+/).filter(Boolean).map((w) => w.split(/(?<=-)/));
+	for (let size = TITLE_MAX; size > TITLE_MIN; size -= 0.5) {
+		if (titleLines(words, size) * size * TITLE_LINE <= TITLE_H) return size;
+	}
+	return TITLE_MIN;
+}
 
 /** The approved poster in an A4 window; without one, the title in the gold card. */
 export function tournamentCard(t: MeetupTournament): L.DivIcon {
@@ -68,7 +104,7 @@ export function tournamentCard(t: MeetupTournament): L.DivIcon {
 	const src = t.poster_thumb_url ?? t.poster_url;
 	const face = src
 		? `<img src="${esc(src)}" alt="" loading="lazy" />`
-		: `<span class="re-cp-title">${esc(t.title)}</span>`;
+		: `<span class="re-cp-title" style="font-size:${titleSize(t.title)}px">${esc(t.title)}</span>`;
 	return board(
 		`<div class="re-cp re-cp--tournament"><span class="re-cp-badge">${TROPHY}</span>`
 		+ `<span class="re-cp-poster">${face}</span><span class="re-cp-date">${esc(shortDate.format(new Date(t.starts_at)))}</span></div>`,
