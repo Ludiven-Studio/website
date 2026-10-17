@@ -13,7 +13,7 @@ import {
 	PROVIDER_LABEL, type Provider,
 } from '../../lib/meetupAuth';
 import {
-	applyFilters, DATE_LABEL, DEFAULT_FILTERS,
+	applyFilters, applyTournamentFilters, DATE_LABEL, DEFAULT_FILTERS,
 	type DateFilter, type Filters, type RoleFilter,
 } from '../../lib/meetupFilters';
 import {
@@ -556,6 +556,17 @@ export default function RencontresApp() {
 		const kept = off.size ? source.filter((e) => !off.has(e.organizer_tag)) : source;
 		return applyFilters(kept, filters, new Date(), places);
 	}, [events, demoData, filters, places, muted, myTags]);
+	const allTournaments = demoData ? demoData.tournaments : tournaments;
+	const shownTournaments = useMemo(
+		() => applyTournamentFilters(allTournaments, filters, new Date(), places),
+		[allTournaments, filters, places]);
+	// Every coming date on the open tournament's pitch, whatever the filter.
+	const samePitch = useMemo(
+		() => (tournament
+			? allTournaments.filter((t) => t.spot_id === tournament.spot_id && t.id !== tournament.id)
+				.sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+			: []),
+		[allTournaments, tournament]);
 
 	const toggleDemo = (): void => {
 		const on = !demo;
@@ -798,7 +809,7 @@ export default function RencontresApp() {
 				events={shown}
 				spots={spots}
 				places={places}
-				tournaments={demoData ? demoData.tournaments : tournaments}
+				tournaments={shownTournaments}
 				hoveredId={hoveredId}
 				selectedId={detail?.event.id ?? null}
 				selectedTournamentId={tournament?.id ?? null}
@@ -926,6 +937,8 @@ export default function RencontresApp() {
 					key={tournament.id}
 					tournament={tournament}
 					shareUrl={`${PAGE_URL}?t=${tournament.id}`}
+					samePitch={samePitch}
+					onOpen={(id) => { void openTournament(id); }}
 					onClose={closeTournament}
 				/>
 			)}

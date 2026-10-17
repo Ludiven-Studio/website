@@ -5,6 +5,7 @@
 import { challengeDayOrdinal, challengeWeekday } from './day';
 import { isNearPlaces, type Place } from './meetupPlaces';
 import { seatsLeft, type MeetupEvent, type Role } from './meetupRules';
+import { contestsOf, type MeetupTournament } from './meetups';
 
 export type DateFilter = 'today' | 'weekend' | 'week' | 'all';
 export type RoleFilter = 'all' | Role;
@@ -41,7 +42,7 @@ export function weekendDays(now: Date = new Date()): [number, number] {
 	return [sat, sat + 1];
 }
 
-export function matchesDate(e: MeetupEvent, f: DateFilter, now: Date = new Date()): boolean {
+export function matchesDate(e: { starts_at: string }, f: DateFilter, now: Date = new Date()): boolean {
 	if (f === 'all') return true;
 	const d = dayOf(e.starts_at);
 	const today = challengeDayOrdinal(now);
@@ -69,4 +70,15 @@ export function applyFilters(
 		.filter((e) => !f.freeSeatsOnly || seatsLeft(e) > 0)
 		.filter((e) => !near || isNearPlaces(places, e.lat, e.lng))
 		.sort((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0));
+}
+
+/** The date and place filters only: a tournament has no seats and no role. It
+ *  stays while any of its contests falls in the range. */
+export function applyTournamentFilters(
+	tournaments: readonly MeetupTournament[], f: Filters, now: Date = new Date(), places: readonly Place[] = [],
+): MeetupTournament[] {
+	const near = f.nearPlaces && places.length > 0;
+	return tournaments
+		.filter((t) => contestsOf(t).some((c) => matchesDate(c, f.date, now)))
+		.filter((t) => !near || isNearPlaces(places, t.lat, t.lng));
 }

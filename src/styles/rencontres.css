@@ -438,6 +438,9 @@
 }
 .re-poster { display: block; width: 100%; height: auto; border-radius: 12px; margin: 0.5rem 0; }
 .re-app-cta { margin-top: 1rem; }
+.re-same-pitch { margin: 0.75rem 0; }
+.re-same-pitch .re-hint { margin-bottom: 0.25rem; }
+.re-same-pitch .re-link { text-align: left; }
 /* The tournament sheet scrolls inside the viewport: a tall poster must not push its close button off-screen. */
 .re-modal--tournament { align-items: flex-start; overflow-y: auto; }
 .re-tournament { position: relative; max-width: 30rem; margin: auto 0; }

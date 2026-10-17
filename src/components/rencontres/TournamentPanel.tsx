@@ -66,8 +66,10 @@ function ComposedPoster({ t }: { t: MeetupTournament }) {
 
 /** The page a shared tournament link opens, over the map: on a phone a panel
  *  under the map is a screen away, and the tap seemed to show the name only. */
-export default function TournamentPanel({ tournament: t, shareUrl, onClose }: {
-	tournament: MeetupTournament; shareUrl: string; onClose(): void;
+export default function TournamentPanel({ tournament: t, shareUrl, samePitch = [], onOpen, onClose }: {
+	tournament: MeetupTournament; shareUrl: string;
+	/** The other tournaments on this pitch: the map shows one card for all of them. */
+	samePitch?: readonly MeetupTournament[]; onOpen?(id: string): void; onClose(): void;
 }) {
 	const place = t.label || 'Lieu du tournoi';
 	const price = fee(t.entry_fee_cents);
@@ -111,6 +113,20 @@ export default function TournamentPanel({ tournament: t, shareUrl, onClose }: {
 						</ul>
 					)}
 				{t.details && <p style={{ whiteSpace: 'pre-line' }}>{t.details}</p>}
+				{samePitch.length > 0 && onOpen && (
+					<div className="re-same-pitch">
+						<p className="re-hint">Aussi à ce terrain&nbsp;:</p>
+						<ul className="re-contests">
+							{samePitch.map((o) => (
+								<li key={o.id}>
+									<button type="button" className="re-link" onClick={() => onOpen(o.id)}>
+										{formatDay(o.starts_at)} · {o.title}
+									</button>
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
 				<div className="re-actions">
 					{t.contact_phone && t.status === 'open' && (
 						<a className="re-btn" href={`tel:${t.contact_phone}`}>Appeler le {phone(t.contact_phone)}</a>

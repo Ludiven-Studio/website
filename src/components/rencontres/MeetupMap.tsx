@@ -67,6 +67,16 @@ const TOURNAMENT_CLUSTER_PX = 85;
 const NO_CLUSTER_ZOOM = 16;
 const SPOTS_MIN_ZOOM = 12;
 
+/** Tournaments grouped by pitch, each group sorted by start. */
+export function stacksBySpot(tournaments: readonly MeetupTournament[]): MeetupTournament[][] {
+	const by = new Map<string, MeetupTournament[]>();
+	for (const t of tournaments) {
+		const list = by.get(t.spot_id);
+		if (list) list.push(t); else by.set(t.spot_id, [t]);
+	}
+	return [...by.values()].map((s) => s.sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
+}
+
 const clusterIcon = (cls: string, fill: string, ring: string, count: number): L.DivIcon =>
 	L.divIcon({
 		html: pinHtml(fill, ring) + `<span class="re-pin-count">${count > 9 ? '9+' : count}</span>`,
@@ -234,19 +244,24 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		tournamentMarkers.current.clear();
-		for (const g of groupsOf(tournaments, TOURNAMENT_CLUSTER_PX)) {
+		// One card per pitch: at full zoom, a club's dates on the same pitch stacked
+		// into one card and hid all but the top one. The card shows the next.
+		const stacks = stacksBySpot(tournaments);
+		const heads = stacks.map((s) => s[0]);
+		for (const g of groupsOf(heads, TOURNAMENT_CLUSTER_PX)) {
 			if (g.length > 1) {
-				addCluster(layer, tournaments, g, tournamentClusterCard(g.length));
+				addCluster(layer, heads, g, tournamentClusterCard(g.reduce((n, i) => n + stacks[i].length, 0)));
 				continue;
 			}
-			const t = tournaments[g[0]];
-			const m = L.marker([t.lat, t.lng], { icon: tournamentCard(t), title: t.title, zIndexOffset: 500 })
+			const stack = stacks[g[0]];
+			const t = stack[0];
+			const m = L.marker([t.lat, t.lng], { icon: tournamentCard(t, stack.length), title: t.title, zIndexOffset: 500 })
 				.on('click', () => {
 					if (cb.current.picking) cb.current.onPick(t.lat, t.lng);
 					else cb.current.onSelectTournament(t.id);
 				})
 				.addTo(layer);
-			tournamentMarkers.current.set(t.id, m);
+			for (const s of stack) tournamentMarkers.current.set(s.id, m);
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
 	}, [tournaments, zoom]);

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { applyFilters, matchesDate, matchesRole, weekendDays, DEFAULT_FILTERS } from './meetupFilters';
+import { applyFilters, applyTournamentFilters, matchesDate, matchesRole, weekendDays, DEFAULT_FILTERS } from './meetupFilters';
+import type { MeetupTournament } from './meetups';
 import { challengeDayOrdinal } from './day';
 import type { MeetupEvent } from './meetupRules';
 
@@ -113,5 +114,23 @@ describe('applyFilters', () => {
 		const before = list.map((e) => e.id);
 		applyFilters(list, DEFAULT_FILTERS, NOW);
 		expect(list.map((e) => e.id)).toEqual(before);
+	});
+});
+
+describe('applyTournamentFilters', () => {
+	const tour = (starts: string[]): MeetupTournament => ({
+		id: `t${++n}`, spot_id: 's1', title: 'Concours', club_name: 'Club', starts_at: starts[0],
+		format: 'doublette', category: 'open', entry_fee_cents: null, details: null, contact_phone: null,
+		poster_status: 'none', poster_url: null, organizer_tag: 'abc', status: 'open', hidden: false,
+		created_at: NOW.toISOString(), lat: 45.4489, lng: 5.1381, label: 'Place', commune: '',
+		contests: starts.map((s) => ({ starts_at: s, format: 'doublette', category: 'open', entry_fee_cents: null })),
+	} as MeetupTournament);
+
+	it('keeps a tournament while any contest is in the range', () => {
+		const later = tour([inDays(20)]);
+		const twoDays = tour([inDays(-1), inDays(0)]);
+		const today = { ...DEFAULT_FILTERS, date: 'today' as const };
+		expect(applyTournamentFilters([later, twoDays], today, NOW)).toEqual([twoDays]);
+		expect(applyTournamentFilters([later, twoDays], { ...DEFAULT_FILTERS, date: 'all' }, NOW)).toHaveLength(2);
 	});
 });

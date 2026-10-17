@@ -98,8 +98,10 @@ function titleSize(title: string): number {
 	return TITLE_MIN;
 }
 
-/** The approved poster in an A4 window; without one, the title in the gold card. */
-export function tournamentCard(t: MeetupTournament): L.DivIcon {
+/** The approved poster in an A4 window; without one, the title in the gold card.
+ *  `count` > 1: the next of several tournaments on the same pitch. */
+export function tournamentCard(t: MeetupTournament, count = 1): L.DivIcon {
+	const more = count > 1 ? ` <b>+${count - 1}</b>` : '';
 	// The thumbnail when there is one: a map full of A4 posters at full size is a lot of bandwidth.
 	const src = t.poster_thumb_url ?? t.poster_url;
 	const face = src
@@ -107,8 +109,8 @@ export function tournamentCard(t: MeetupTournament): L.DivIcon {
 		: `<span class="re-cp-title" style="font-size:${titleSize(t.title)}px">${esc(t.title)}</span>`;
 	return board(
 		`<div class="re-cp re-cp--tournament"><span class="re-cp-badge">${TROPHY}</span>`
-		+ `<span class="re-cp-poster">${face}</span><span class="re-cp-date">${esc(shortDate.format(new Date(t.starts_at)))}</span></div>`,
-		're-pin--tournament', T_W, T_H);
+		+ `<span class="re-cp-poster">${face}</span><span class="re-cp-date">${esc(shortDate.format(new Date(t.starts_at)))}${more}</span></div>`,
+		`re-pin--tournament${count > 1 ? ' re-pin--stack' : ''}`, T_W, T_H);
 }
 
 export function tournamentClusterCard(count: number): L.DivIcon {
