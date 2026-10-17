@@ -10,7 +10,7 @@ interface Data { tournament: ModTournament; posterPreview: string | null; report
 const message = (e: unknown): string => (e instanceof Error ? e.message : 'Une erreur est survenue.');
 
 const REASON: Record<TournamentReportReason, string> = {
-	poster: 'Affiche choquante', fake: 'Faux tournoi', wrong_info: 'Infos erronées', other: 'Autre',
+	poster: 'Affiche choquante', fake: 'Faux concours', wrong_info: 'Infos erronées', other: 'Autre',
 };
 
 const POSTER_STATE: Record<ModTournament['poster_status'], string> = {
@@ -19,18 +19,18 @@ const POSTER_STATE: Record<ModTournament['poster_status'], string> = {
 
 const ASK: Record<ModTournamentAction, string> = {
 	approve_poster: 'Valider cette affiche ? Elle devient visible de tous.',
-	reject_poster: 'Refuser cette affiche ? Elle est supprimée, le tournoi reste en ligne.',
-	restore: 'Rétablir ce tournoi ? Il revient sur la carte et ses signalements sont effacés.',
-	remove: 'Retirer ce tournoi ? Il est annulé et masqué.',
-	ban_organizer: "Retirer ce tournoi et bannir l'organisateur ? Toutes ses annonces ouvertes seront masquées.",
+	reject_poster: 'Refuser cette affiche ? Elle est supprimée, le concours reste en ligne.',
+	restore: 'Rétablir ce concours ? Il revient sur la carte et ses signalements sont effacés.',
+	remove: 'Retirer ce concours ? Il est annulé et masqué.',
+	ban_organizer: "Retirer ce concours et bannir l'organisateur ? Toutes ses annonces ouvertes seront masquées.",
 };
 
 const DONE: Record<ModTournamentAction, string> = {
 	approve_poster: 'Affiche validée.',
 	reject_poster: 'Affiche refusée.',
-	restore: 'Tournoi rétabli.',
-	remove: 'Tournoi retiré.',
-	ban_organizer: 'Tournoi retiré, organisateur banni.',
+	restore: 'Concours rétabli.',
+	remove: 'Concours retiré.',
+	ban_organizer: 'Concours retiré, organisateur banni.',
 };
 
 /** ?t= is the tournament, ?k= its own token. */
@@ -79,7 +79,7 @@ export default function TournamentModeration({ tournamentId, token }: { tourname
 
 	return (
 		<div className="re-root">
-			<h1>Modération — tournoi</h1>
+			<h1>Modération — concours</h1>
 
 			<section className="re-panel">
 				<h2>{t.title} · {state}</h2>
@@ -99,7 +99,7 @@ export default function TournamentModeration({ tournamentId, token }: { tourname
 			<section className="re-panel">
 				<h2>{POSTER_STATE[t.poster_status]}</h2>
 				{posterPreview
-					? <img src={posterPreview} alt="Affiche du tournoi" style={{ maxWidth: '100%', borderRadius: 8 }} />
+					? <img src={posterPreview} alt="Affiche du concours" style={{ maxWidth: '100%', borderRadius: 8 }} />
 					: <p className="re-hint">Rien à afficher.</p>}
 				{t.poster_status === 'pending' && (
 					<div className="re-actions">

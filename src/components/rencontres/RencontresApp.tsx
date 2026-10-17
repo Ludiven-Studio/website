@@ -614,7 +614,7 @@ export default function RencontresApp() {
 			<header className="re-head">
 				<h1>Rencontres pétanque</h1>
 				<p className="re-sub">
-					Trouve des joueurs et des tournois autour de chez toi.
+					Trouve des joueurs et des concours autour de chez toi.
 				</p>
 				<div className="re-account">
 					{session ? (
@@ -650,7 +650,7 @@ export default function RencontresApp() {
 
 			{demo && (
 				<p className="re-ok re-demo" role="status">
-					Mode démo&nbsp;: ces parties et ces tournois sont des exemples fictifs, pour voir à quoi
+					Mode démo&nbsp;: ces parties et ces concours sont des exemples fictifs, pour voir à quoi
 					ressemble la carte quand les joueurs et les clubs l'utilisent.
 				</p>
 			)}
@@ -829,7 +829,7 @@ export default function RencontresApp() {
 			/>
 			<p className="re-legend" aria-label="Légende de la carte">
 				<span><i className="re-dot re-dot--game" />Partie</span>
-				<span><i className="re-dot re-dot--tournament" />Tournoi</span>
+				<span><i className="re-dot re-dot--tournament" />Concours</span>
 				<span><i className="re-dot re-dot--spot" />Terrain</span>
 				<span><i className="re-dot re-dot--place" />Mes lieux</span>
 				<span>Un chiffre = plusieurs, touche pour zoomer</span>
@@ -1093,7 +1093,7 @@ function AppSheet({ onClose }: { onClose(): void }) {
 			<div className="re-sheet re-login" onClick={(e) => e.stopPropagation()}>
 				<h2>Bientôt dans l'appli</h2>
 				<p className="re-hint">
-					Ici, la carte se consulte librement. Publier une partie, la rejoindre, annoncer un tournoi
+					Ici, la carte se consulte librement. Publier une partie, la rejoindre, annoncer un concours
 					ou signaler un abus se fera dans l'appli Pétanque Meet, bientôt disponible sur Android
 					et iPhone.
 				</p>

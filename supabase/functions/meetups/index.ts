@@ -233,7 +233,7 @@ const T_FORMATS = ['tete-a-tete', 'doublette', 'triplette'];
 const T_CATEGORIES = ['open', 'veterans', 'feminin', 'jeunes', 'mixte'];
 const T_REASONS = ['poster', 'fake', 'wrong_info', 'other'];
 const T_REASON_LABEL: Record<string, string> = {
-	poster: 'Affiche choquante', fake: 'Faux tournoi', wrong_info: 'Infos erronées', other: 'Autre',
+	poster: 'Affiche choquante', fake: 'Faux concours', wrong_info: 'Infos erronées', other: 'Autre',
 };
 const T_MAX_TEXT = 60;
 const T_MAX_DETAILS = 300;
@@ -285,7 +285,7 @@ function cleanPhone(raw: unknown): string | null {
 function validateTournamentStart(startsAt: unknown, now: number): string | null {
 	const start = Date.parse(String(startsAt));
 	if (!Number.isFinite(start)) return 'Date invalide.';
-	if (start <= now) return 'Le tournoi doit être dans le futur.';
+	if (start <= now) return 'Le concours doit être dans le futur.';
 	if (start > now + T_MAX_AHEAD_MS) return "Pas plus de 120 jours à l'avance.";
 	return null;
 }
@@ -294,11 +294,11 @@ function validateTournamentStart(startsAt: unknown, now: number): string | null 
  *  starts (ms) already stored: those may be past, so a tournament under way
  *  can still have its later contests or its phone fixed. */
 function cleanContests(raw: unknown, now: number, kept: Set<number>): Record<string, unknown>[] | string {
-	if (!Array.isArray(raw) || raw.length < 1) return 'Au moins un concours.';
-	if (raw.length > T_MAX_CONTESTS) return `${T_MAX_CONTESTS} concours au plus.`;
+	if (!Array.isArray(raw) || raw.length < 1) return 'Au moins une épreuve.';
+	if (raw.length > T_MAX_CONTESTS) return `${T_MAX_CONTESTS} épreuves au plus.`;
 	const out: Record<string, unknown>[] = [];
 	for (const item of raw) {
-		if (!item || typeof item !== 'object') return 'Concours invalide.';
+		if (!item || typeof item !== 'object') return 'Épreuve invalide.';
 		const c = item as Record<string, unknown>;
 		const e = kept.has(Date.parse(String(c.startsAt))) ? null : validateTournamentStart(c.startsAt, now);
 		if (e) return e;
@@ -314,10 +314,10 @@ function cleanContests(raw: unknown, now: number, kept: Set<number>): Record<str
 	out.sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)));
 	const first = Date.parse(String(out[0].starts_at));
 	if (Date.parse(String(out[out.length - 1].starts_at)) - first > T_CONTESTS_SPAN_MS) {
-		return 'Les concours tiennent sur 3 jours au plus.';
+		return 'Les épreuves tiennent sur 3 jours au plus.';
 	}
 	const keys = new Set(out.map((c) => `${c.starts_at}|${c.format}|${c.category}`));
-	if (keys.size !== out.length) return 'Deux concours identiques.';
+	if (keys.size !== out.length) return 'Deux épreuves identiques.';
 	return out;
 }
 
@@ -1062,13 +1062,13 @@ Deno.serve(async (req) => {
 				const { data: t } = await db.from('meetup_tournaments').select('id, status, hidden, last_starts_at')
 					.eq('id', body.tournamentId).maybeSingle();
 				if (!t || t.hidden || t.status !== 'open' || Date.parse(String(t.last_starts_at)) < nowMs - T_SHOWN_AFTER_START_MS) {
-					return bad('Ce tournoi n’est plus en ligne.', 409);
+					return bad('Ce concours n’est plus en ligne.', 409);
 				}
 				// Follows of tournaments over do not count: the agenda no longer shows them.
 				const { count } = await db.from('meetup_tournament_follows')
 					.select('tournament_id, meetup_tournaments!inner(last_starts_at)', { count: 'exact', head: true })
 					.eq('player_id', uid).gte('meetup_tournaments.last_starts_at', new Date(nowMs - T_SHOWN_AFTER_START_MS).toISOString());
-				if ((count ?? 0) >= MAX_FOLLOWS) return bad(`Tu suis déjà ${MAX_FOLLOWS} tournois.`, 409);
+				if ((count ?? 0) >= MAX_FOLLOWS) return bad(`Tu suis déjà ${MAX_FOLLOWS} concours.`, 409);
 				const { error } = await db.from('meetup_tournament_follows')
 					.upsert({ tournament_id: t.id, player_id: uid }, { onConflict: 'tournament_id,player_id', ignoreDuplicates: true });
 				if (error) throw error;
@@ -1092,7 +1092,7 @@ Deno.serve(async (req) => {
 				const createIp = await ipKey(req);
 				if (await isBanned(db, playerId, createIp, true)) return bad(BANNED, 403);
 				if (await activeTournaments(db, playerId, nowMs) >= MAX_ACTIVE_TOURNAMENTS) {
-					return bad(`Tu as déjà ${MAX_ACTIVE_TOURNAMENTS} tournois en ligne. Supprimes-en un dans « Agenda ».`, 429);
+					return bad(`Tu as déjà ${MAX_ACTIVE_TOURNAMENTS} concours en ligne. Supprimes-en un dans « Agenda ».`, 429);
 				}
 				if (await overQuota(db, req, playerId, 'creates')) {
 					return bad("Trop d'annonces créées aujourd'hui. Réessaie demain.", 429);
@@ -1247,8 +1247,8 @@ Deno.serve(async (req) => {
 				}
 				const label = T_REASON_LABEL[reason] ?? reason;
 				await mailTournament(shaped,
-					`<b>${esc(label)}</b> — ${all.length} signalement(s)${hidden ? ', <b>tournoi masqué</b>' : ''}.`,
-					`Rencontres : signalement tournoi (${label})`);
+					`<b>${esc(label)}</b> — ${all.length} signalement(s)${hidden ? ', <b>concours masqué</b>' : ''}.`,
+					`Rencontres : signalement concours (${label})`);
 				return json({ ok: true });
 			}
 

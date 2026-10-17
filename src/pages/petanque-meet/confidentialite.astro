@@ -5,7 +5,7 @@ import Hero from '../../components/Hero.astro';
 
 <BaseLayout
 	title="Confidentialité de l'application Pétanque Meet | Ludiven Studio"
-	description="Politique de confidentialité de l'application mobile Pétanque Meet : compte Google ou Apple, parties publiées sur la carte, tournois, modération, droits RGPD."
+	description="Politique de confidentialité de l'application mobile Pétanque Meet : compte Google ou Apple, parties publiées sur la carte, concours, modération, droits RGPD."
 	alternates={{ fr: '/petanque-meet/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
@@ -25,7 +25,7 @@ import Hero from '../../components/Hero.astro';
 			<p><strong>L'essentiel&nbsp;:</strong></p>
 			<ul>
 				<li>Regarder la carte ne demande <strong>aucun compte</strong>. Pour publier, rejoindre ou signaler une partie, tu te connectes avec <strong>Google ou Apple</strong>.</li>
-				<li>Ce que tu publies est <strong>visible de tous</strong>&nbsp;: le prénom que tu saisis, le terrain, l'horaire, et pour un tournoi les informations du club. Ton adresse mail, elle, n'est jamais montrée.</li>
+				<li>Ce que tu publies est <strong>visible de tous</strong>&nbsp;: le prénom que tu saisis, le terrain, l'horaire, et pour un concours les informations du club. Ton adresse mail, elle, n'est jamais montrée.</li>
 				<li>Ta position GPS sert seulement à centrer la carte sur ton téléphone. <strong>Elle n'est jamais envoyée.</strong></li>
 				<li>Pas de publicité, pas de revente de données, pas de profilage.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis l'application.</li>
@@ -48,7 +48,7 @@ import Hero from '../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>2. Ton compte</h2>
 			<p>
-				Pour agir (publier une partie ou un tournoi, s'inscrire, signaler), tu te connectes avec
+				Pour agir (publier une partie ou un concours, s'inscrire, signaler), tu te connectes avec
 				<strong>Google</strong> (Android) ou <strong>Apple</strong> (iPhone). Nous recevons alors un
 				identifiant de compte et ton adresse mail&nbsp;; avec Apple, ce peut être l'adresse relais qui masque
 				la tienne. Nous ne recevons jamais ton mot de passe.
@@ -68,8 +68,8 @@ import Hero from '../../components/Hero.astro';
 			</p>
 			<ul>
 				<li><strong>Pour une partie</strong>&nbsp;: le terrain (position exacte de l'épingle et nom du lieu), la date et l'heure, le format, le nombre de places, le <strong>prénom de l'organisateur</strong> et les <strong>prénoms des inscrits</strong>.</li>
-				<li><strong>Pour un tournoi</strong>&nbsp;: le nom du club, le titre, le lieu, la date, la catégorie, le prix d'inscription, les détails, et s'ils ont été fournis le <strong>numéro de téléphone</strong> et l'<strong>affiche</strong> (une fois validée par l'éditeur).</li>
-				<li>Les <strong>tournois que tu suis</strong> ne sont visibles de personne&nbsp;: l'organisateur voit seulement combien de joueurs suivent le sien.</li>
+				<li><strong>Pour un concours</strong>&nbsp;: le nom du club, le titre, le lieu, la date, la catégorie, le prix d'inscription, les détails, et s'ils ont été fournis le <strong>numéro de téléphone</strong> et l'<strong>affiche</strong> (une fois validée par l'éditeur).</li>
+				<li>Les <strong>concours que tu suis</strong> ne sont visibles de personne&nbsp;: l'organisateur voit seulement combien de joueurs suivent le sien.</li>
 				<li>Un <strong>repère anonyme</strong> par compte, qui permet de reconnaître que plusieurs annonces viennent du même organisateur, sans révéler qui il est.</li>
 			</ul>
 			<p>
@@ -110,14 +110,14 @@ import Hero from '../../components/Hero.astro';
 							<td>Supabase&nbsp;; public</td>
 						</tr>
 						<tr>
-							<td>Tournois&nbsp;: club, titre, détails, prix, téléphone facultatif, affiche facultative</td>
-							<td>Annoncer un tournoi</td>
+							<td>Concours&nbsp;: club, titre, détails, prix, téléphone facultatif, affiche facultative</td>
+							<td>Annoncer un concours</td>
 							<td>Exécution du contrat</td>
 							<td>Supabase&nbsp;; public après validation de l'affiche</td>
 						</tr>
 						<tr>
-							<td>Tournois suivis</td>
-							<td>Retrouver un tournoi dans ton agenda&nbsp;; donner à l'organisateur un nombre de joueurs intéressés</td>
+							<td>Concours suivis</td>
+							<td>Retrouver un concours dans ton agenda&nbsp;; donner à l'organisateur un nombre de joueurs intéressés</td>
 							<td>Exécution du contrat</td>
 							<td>Supabase&nbsp;; l'organisateur ne voit qu'un total</td>
 						</tr>
@@ -171,7 +171,7 @@ import Hero from '../../components/Hero.astro';
 			</p>
 			<p>
 				Ce que nous recevons, c'est l'emplacement du <strong>terrain</strong> que tu choisis sur la carte
-				pour une partie ou un tournoi, jamais celui de ton appareil.
+				pour une partie ou un concours, jamais celui de ton appareil.
 			</p>
 		</section>
 
@@ -192,7 +192,7 @@ import Hero from '../../components/Hero.astro';
 		<section class="stack gap-2">
 			<h2>7. Signalements et modération</h2>
 			<p>
-				Tu peux signaler une partie ou un tournoi (prénom choquant, fausse annonce, affiche inadaptée,
+				Tu peux signaler une partie ou un concours (prénom choquant, fausse annonce, affiche inadaptée,
 				personne n'est venu). Ton signalement est <strong>anonyme vis-à-vis des autres joueurs</strong>&nbsp;:
 				personne ne sait qui l'a fait. Il est toutefois enregistré avec ton identifiant de compte, pour éviter
 				les signalements en série.
@@ -203,7 +203,7 @@ import Hero from '../../components/Hero.astro';
 				fautif. D'un compte suspendu, seul l'identifiant technique est conservé, pour que la suspension tienne.
 			</p>
 			<p>
-				Les affiches de tournoi restent privées jusqu'à leur validation par l'éditeur. Une affiche refusée
+				Les affiches de concours restent privées jusqu'à leur validation par l'éditeur. Une affiche refusée
 				est effacée aussitôt.
 			</p>
 		</section>
@@ -270,7 +270,7 @@ import Hero from '../../components/Hero.astro';
 			{/* TODO legal: the server has no purge job yet. These durations need one before release. */}
 			<ul>
 				<li><strong>Parties et inscriptions</strong>&nbsp;: retirées de la carte dès qu'elles sont terminées ou annulées, puis effacées <strong>12 mois</strong> après leur date.</li>
-				<li><strong>Tournois</strong>&nbsp;: retirés de la carte le lendemain, effacés 12 mois après leur date. L'affiche est effacée une semaine après le tournoi. Le suivi d'un tournoi est effacé une fois le tournoi passé, au plus tard avec lui.</li>
+				<li><strong>Concours</strong>&nbsp;: retirés de la carte le lendemain, effacés 12 mois après leur date. L'affiche est effacée une semaine après le concours. Le suivi d'un concours est effacé une fois le concours passé, au plus tard avec lui.</li>
 				<li><strong>Signalements</strong>&nbsp;: effacés une fois traités, et au plus tard 12 mois après.</li>
 				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
 				<li><strong>Suspension d'un compte</strong>&nbsp;: l'identifiant technique est conservé tant que la suspension dure.</li>
@@ -287,7 +287,7 @@ import Hero from '../../components/Hero.astro';
 			<ul>
 				<li>ton compte et ton adresse mail sont effacés&nbsp;;</li>
 				<li>tes parties à venir sont annulées (les inscrits le voient) et ton prénom est remplacé par «&nbsp;Compte supprimé&nbsp;» sur toutes tes parties&nbsp;;</li>
-				<li>tes inscriptions, tes tournois, leurs affiches, les tournois que tu suis et tes signalements sont effacés.</li>
+				<li>tes inscriptions, tes concours, leurs affiches, les concours que tu suis et tes signalements sont effacés.</li>
 			</ul>
 			<p>
 				Tes anciennes parties restent un temps dans la base, sans prénom, rattachées à un identifiant technique

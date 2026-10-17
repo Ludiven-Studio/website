@@ -147,7 +147,7 @@ export default function ModerationQueue() {
 								{reportedT.map((t) => (
 									<li key={t.id}>
 										<a href={t.link}>
-											<span><strong>Tournoi · {t.title}</strong> · {t.reports} signalement(s){t.hidden ? ' · masqué' : ''}<br />
+											<span><strong>Concours · {t.title}</strong> · {t.reports} signalement(s){t.hidden ? ' · masqué' : ''}<br />
 												{formatDay(t.starts_at)} · {t.commune || t.label}</span>
 										</a>
 									</li>

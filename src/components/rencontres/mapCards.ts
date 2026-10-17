@@ -117,7 +117,7 @@ export function tournamentCard(t: MeetupTournament, slot?: Slot): L.DivIcon {
 export function tournamentClusterCard(count: number): L.DivIcon {
 	return board(
 		`<div class="re-cp re-cp--tournament re-cp--stack"><span class="re-cp-badge">${TROPHY}</span>`
-		+ `<span class="re-cp-poster"><span class="re-cp-title">${count} tournois</span></span><span class="re-cp-date">zoomer</span></div>`,
+		+ `<span class="re-cp-poster"><span class="re-cp-title">${count} concours</span></span><span class="re-cp-date">zoomer</span></div>`,
 		're-pin--tournament re-pin--cluster', T_W, T_H);
 }
 

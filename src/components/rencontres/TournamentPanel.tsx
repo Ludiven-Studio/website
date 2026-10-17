@@ -58,7 +58,7 @@ function ComposedPoster({ t }: { t: MeetupTournament }) {
 					))}
 				</>
 			)}
-			<p className="re-affiche-where">{t.label || 'Lieu du tournoi'}{t.commune && t.commune !== t.label ? `, ${t.commune}` : ''}</p>
+			<p className="re-affiche-where">{t.label || 'Lieu du concours'}{t.commune && t.commune !== t.label ? `, ${t.commune}` : ''}</p>
 			<p className="re-affiche-club">{t.club_name}</p>
 		</div>
 	);
@@ -71,7 +71,7 @@ export default function TournamentPanel({ tournament: t, shareUrl, samePitch = [
 	/** The other tournaments on this pitch: the map shows one card for all of them. */
 	samePitch?: readonly MeetupTournament[]; onOpen?(id: string): void; onClose(): void;
 }) {
-	const place = t.label || 'Lieu du tournoi';
+	const place = t.label || 'Lieu du concours';
 	const price = fee(t.entry_fee_cents);
 	const cs = contestsOf(t);
 	const directions = `https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}`;
@@ -95,7 +95,7 @@ export default function TournamentPanel({ tournament: t, shareUrl, samePitch = [
 		<div className="re-modal re-modal--tournament" onClick={onClose}>
 			<section className="re-sheet re-tournament" onClick={(e) => e.stopPropagation()} aria-label={t.title}>
 				<button type="button" className="re-close" onClick={onClose} aria-label="Fermer">×</button>
-				{t.status === 'cancelled' && <p className="re-banner re-banner--off">Tournoi annulé</p>}
+				{t.status === 'cancelled' && <p className="re-banner re-banner--off">Concours annulé</p>}
 				{t.poster_url
 					? <img className="re-poster" src={t.poster_url} alt={`Affiche : ${t.title}`} />
 					: <ComposedPoster t={t} />}
@@ -136,7 +136,7 @@ export default function TournamentPanel({ tournament: t, shareUrl, samePitch = [
 				</div>
 				<p className="re-hint re-app-cta">
 					L'appli <strong>Pétanque Meet</strong> arrive bientôt sur Android et iPhone&nbsp;: tu y
-					retrouveras ce tournoi et toutes les parties autour de toi.
+					retrouveras ce concours et toutes les parties autour de toi.
 				</p>
 			</section>
 		</div>
