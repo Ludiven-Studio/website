@@ -134,3 +134,11 @@ describe('applyTournamentFilters', () => {
 		expect(applyTournamentFilters([later, twoDays], { ...DEFAULT_FILTERS, date: 'all' }, NOW)).toHaveLength(2);
 	});
 });
+
+describe('fortnight', () => {
+	it('reaches the weekend after next', () => {
+		expect(matchesDate(ev({ starts_at: inDays(12) }), 'week', NOW)).toBe(false);
+		expect(matchesDate(ev({ starts_at: inDays(12) }), 'fortnight', NOW)).toBe(true);
+		expect(matchesDate(ev({ starts_at: inDays(15) }), 'fortnight', NOW)).toBe(false);
+	});
+});

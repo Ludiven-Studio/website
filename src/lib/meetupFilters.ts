@@ -7,7 +7,7 @@ import { isNearPlaces, type Place } from './meetupPlaces';
 import { seatsLeft, type MeetupEvent, type Role } from './meetupRules';
 import { contestsOf, type MeetupTournament } from './meetups';
 
-export type DateFilter = 'today' | 'weekend' | 'week' | 'all';
+export type DateFilter = 'today' | 'weekend' | 'week' | 'fortnight' | 'all';
 export type RoleFilter = 'all' | Role;
 
 export interface Filters {
@@ -23,6 +23,7 @@ export const DATE_LABEL: Record<DateFilter, string> = {
 	today: "Aujourd'hui",
 	weekend: 'Ce week-end',
 	week: '7 jours',
+	fortnight: '14 jours',
 	all: 'Tout',
 };
 
@@ -48,6 +49,7 @@ export function matchesDate(e: { starts_at: string }, f: DateFilter, now: Date =
 	const today = challengeDayOrdinal(now);
 	if (f === 'today') return d === today;
 	if (f === 'week') return d >= today && d <= today + 7;
+	if (f === 'fortnight') return d >= today && d <= today + 14;
 	const [sat, sun] = weekendDays(now);
 	return d === sat || d === sun;
 }

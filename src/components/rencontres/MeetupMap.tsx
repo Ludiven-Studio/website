@@ -4,7 +4,10 @@ import type { MeetupEvent, MeetupSpot } from '../../lib/meetupRules';
 import type { Place } from '../../lib/meetupPlaces';
 import type { MeetupTournament } from '../../lib/meetups';
 import { centreOf, clusterPoints } from '../../lib/mapClusters';
-import { gameCard, gameClusterCard, ME_ICON, placeIcon, tournamentCard, tournamentClusterCard } from './mapCards';
+import {
+	GAME_H, GAME_W, gameCard, gameClusterCard, ME_ICON, placeIcon, T_H, T_W, tournamentCard, tournamentClusterCard,
+	type Slot,
+} from './mapCards';
 
 // Saint-Jean-de-Bournay — the launch area (spec §6).
 export const HOME: [number, number] = [45.4489, 5.1381];
@@ -67,14 +70,31 @@ const TOURNAMENT_CLUSTER_PX = 85;
 const NO_CLUSTER_ZOOM = 16;
 const SPOTS_MIN_ZOOM = 12;
 
-/** Tournaments grouped by pitch, each group sorted by start. */
-export function stacksBySpot(tournaments: readonly MeetupTournament[]): MeetupTournament[][] {
-	const by = new Map<string, MeetupTournament[]>();
-	for (const t of tournaments) {
-		const list = by.get(t.spot_id);
-		if (list) list.push(t); else by.set(t.spot_id, [t]);
+const FAN_ROW = 4;
+const FAN_GAP = 6;
+
+/** At full zoom, cards on the same pitch side by side instead of piled on one
+ *  point, where only the top one showed: rows of FAN_ROW centred on the pin,
+ *  by start, each new row above the last. */
+export function fanSlots<T extends { spot_id: string; starts_at: string }>(
+	items: readonly T[], w: number, h: number,
+): Map<T, Slot> {
+	const by = new Map<string, T[]>();
+	for (const it of items) {
+		const list = by.get(it.spot_id);
+		if (list) list.push(it); else by.set(it.spot_id, [it]);
 	}
-	return [...by.values()].map((s) => s.sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
+	const out = new Map<T, Slot>();
+	for (const list of by.values()) {
+		if (list.length < 2) continue;
+		list.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+		list.forEach((it, i) => {
+			const row = Math.floor(i / FAN_ROW);
+			const inRow = Math.min(FAN_ROW, list.length - row * FAN_ROW);
+			out.set(it, [(i % FAN_ROW - (inRow - 1) / 2) * (w + FAN_GAP), row * (h + FAN_GAP)]);
+		});
+	}
+	return out;
 }
 
 const clusterIcon = (cls: string, fill: string, ring: string, count: number): L.DivIcon =>
@@ -217,13 +237,14 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		markers.current.clear();
+		const slots = zoom >= NO_CLUSTER_ZOOM ? fanSlots(events, GAME_W, GAME_H) : null;
 		for (const g of groupsOf(events, GAME_CLUSTER_PX)) {
 			if (g.length > 1) {
 				addCluster(layer, events, g, gameClusterCard(g.length));
 				continue;
 			}
 			const e = events[g[0]];
-			const m = L.marker([e.lat, e.lng], { icon: gameCard(e), title: e.label || 'Terrain' })
+			const m = L.marker([e.lat, e.lng], { icon: gameCard(e, slots?.get(e)), title: e.label || 'Terrain' })
 				// Same rule as the terrains above, and the case that made it necessary:
 				// a marker over the pin you were aiming for opened its event, which
 				// closed the half-filled form without a word.
@@ -244,24 +265,20 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		tournamentMarkers.current.clear();
-		// One card per pitch: at full zoom, a club's dates on the same pitch stacked
-		// into one card and hid all but the top one. The card shows the next.
-		const stacks = stacksBySpot(tournaments);
-		const heads = stacks.map((s) => s[0]);
-		for (const g of groupsOf(heads, TOURNAMENT_CLUSTER_PX)) {
+		const slots = zoom >= NO_CLUSTER_ZOOM ? fanSlots(tournaments, T_W, T_H) : null;
+		for (const g of groupsOf(tournaments, TOURNAMENT_CLUSTER_PX)) {
 			if (g.length > 1) {
-				addCluster(layer, heads, g, tournamentClusterCard(g.reduce((n, i) => n + stacks[i].length, 0)));
+				addCluster(layer, tournaments, g, tournamentClusterCard(g.length));
 				continue;
 			}
-			const stack = stacks[g[0]];
-			const t = stack[0];
-			const m = L.marker([t.lat, t.lng], { icon: tournamentCard(t, stack.length), title: t.title, zIndexOffset: 500 })
+			const t = tournaments[g[0]];
+			const m = L.marker([t.lat, t.lng], { icon: tournamentCard(t, slots?.get(t)), title: t.title, zIndexOffset: 500 })
 				.on('click', () => {
 					if (cb.current.picking) cb.current.onPick(t.lat, t.lng);
 					else cb.current.onSelectTournament(t.id);
 				})
 				.addTo(layer);
-			for (const s of stack) tournamentMarkers.current.set(s.id, m);
+			tournamentMarkers.current.set(t.id, m);
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
 	}, [tournaments, zoom]);

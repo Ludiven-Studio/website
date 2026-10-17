@@ -34,7 +34,7 @@ import { demoEvents, demoSignups, demoTournaments, isDemo } from '../../lib/meet
 import MyGames from './MyGames';
 import { formatShortDay, formatTime } from './format';
 
-const DATES: DateFilter[] = ['today', 'weekend', 'week', 'all'];
+const DATES: DateFilter[] = ['today', 'weekend', 'week', 'fortnight', 'all'];
 const ROLE_FILTERS: RoleFilter[] = ['all', 'tireur', 'pointeur'];
 /* The island is client:only, so `window` is always there. The installed icon must
    land on the map, never on the ?e= card that happened to be open. */
