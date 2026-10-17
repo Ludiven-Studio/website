@@ -1,75 +1,28 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { SUPABASE_URL } from '../../data/site';
 
-// Written by PetanqueMeet's tools/publish_test_apk.py --prod; no-cache, so a new
-// version shows up on the next visit.
-const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet/release/latest.json`;
+// The app is not out yet. The page stays so links already shared do not break.
 ---
 
 <BaseLayout
-	title="Télécharger Pétanque Meet pour Android | Ludiven Studio"
-	description="L'appli Pétanque Meet pour Android : les parties et les tournois de pétanque autour de chez toi, sur ton téléphone."
+	title="Pétanque Meet, bientôt sur Android et iPhone | Ludiven Studio"
+	description="L'appli Pétanque Meet arrive bientôt sur Android et iPhone : les parties et les tournois de pétanque autour de chez toi, sur ton téléphone."
 >
 	<div class="wrapper download-page stack gap-6">
 		<header class="stack gap-2">
-			<h1>Pétanque Meet sur Android</h1>
+			<h1>Pétanque Meet arrive bientôt</h1>
 			<p class="lead">Les parties et les tournois de pétanque autour de chez toi. Publie ta partie, rejoins celle des autres, suis les tournois.</p>
 		</header>
 
-		<section class="card stack gap-4" id="build" data-latest={LATEST}>
-			<p class="muted" data-state="loading">Chargement…</p>
-			<div class="stack gap-3" data-state="ready" hidden>
-				<a class="download" data-field="url" href="#">Télécharger l'appli</a>
-				<p class="muted">Version <span data-field="version"></span> · <span data-field="date"></span> · <span data-field="size"></span></p>
-			</div>
-			<p class="muted" data-state="error" hidden>Le téléchargement n'est pas disponible pour l'instant. Reviens un peu plus tard.</p>
-		</section>
-
-		<section class="stack gap-2">
-			<h2>Installer sur ton téléphone</h2>
-			<ol>
-				<li>Ouvre cette page sur ton téléphone Android et touche « Télécharger l'appli ».</li>
-				<li>Ouvre le fichier téléchargé. Si Android bloque, autorise ton navigateur à installer des applis inconnues, puis réessaie.</li>
-				<li>Pour une nouvelle version, refais la même chose : elle s'installe par-dessus et garde tes lieux.</li>
-			</ol>
-		</section>
-
-		<section class="stack gap-2">
-			<h2>Et sur iPhone ?</h2>
-			<p>L'appli arrive bientôt sur iPhone et sur le Play Store. En attendant, <a href="/petanque-meet/">la carte des parties</a> se consulte librement dans le navigateur.</p>
+		<section class="card stack gap-3">
+			<p>L'appli sera bientôt disponible sur le Play Store et l'App Store.</p>
+			<p>En attendant, la carte des parties et des tournois se consulte librement dans le navigateur.</p>
+			<a class="download" href="/petanque-meet/">Voir la carte</a>
 		</section>
 
 		<p class="muted"><a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a></p>
 	</div>
 </BaseLayout>
-
-<script>
-	const box = document.getElementById('build');
-	const show = (state: string) => {
-		box?.querySelectorAll<HTMLElement>('[data-state]').forEach((el) => {
-			el.hidden = el.dataset.state !== state;
-		});
-	};
-	const field = (name: string) => box?.querySelector<HTMLElement>(`[data-field="${name}"]`);
-
-	async function load() {
-		try {
-			const res = await fetch(`${box?.dataset.latest}?t=${Date.now()}`, { cache: 'no-store' });
-			if (!res.ok) throw new Error(String(res.status));
-			const b = await res.json();
-			const link = field('url') as HTMLAnchorElement | null;
-			if (link) link.href = b.url;
-			field('version')!.textContent = b.version;
-			field('date')!.textContent = new Date(b.date).toLocaleDateString('fr-FR', { dateStyle: 'long' });
-			field('size')!.textContent = `${Math.round(b.size / 1e6)}\u00a0Mo`;
-			show('ready');
-		} catch {
-			show('error');
-		}
-	}
-	load();
-</script>
 
 <style>
 	.download-page {
@@ -78,9 +31,6 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet/rel
 	}
 	.download-page h1 {
 		font-size: var(--text-3xl);
-	}
-	.download-page h2 {
-		font-size: var(--text-xl);
 	}
 	.lead,
 	.muted {
@@ -94,6 +44,7 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet/rel
 	}
 	.download {
 		display: inline-block;
+		align-self: flex-start;
 		padding: 1rem 1.6rem;
 		border-radius: 999px;
 		background: var(--accent-regular);
@@ -106,11 +57,5 @@ const LATEST = `${SUPABASE_URL}/storage/v1/object/public/builds/petanquemeet/rel
 	.download:hover,
 	.download:focus-visible {
 		background: var(--accent-dark);
-	}
-	ol {
-		padding-inline-start: 1.25rem;
-	}
-	li + li {
-		margin-top: 0.4rem;
 	}
 </style>

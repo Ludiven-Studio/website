@@ -108,9 +108,7 @@ gallery:
 
 <h2>Où en est le projet</h2>
 <p>
-  La carte web est en ligne. L'appli Android se télécharge déjà depuis la
-  <a href="/petanque-meet/telecharger/">page de téléchargement</a>, et la publication sur le Play Store
-  et l'App Store est en cours.
+  La carte web est en ligne. La publication de l'appli sur le Play Store et l'App Store est en cours.
 </p>
 <p>
   Voir aussi&nbsp;: la <a href="/petanque-meet/">carte des parties</a>, la

@@ -104,7 +104,5 @@ gallery:
 
 <h2>Where the project stands</h2>
 <p>
-  The web map is live. The Android app can already be downloaded from the
-  <a href="/petanque-meet/telecharger/">download page</a> (in French), and the Play Store and App Store
-  releases are under way.
+  The web map is live. The Play Store and App Store releases are under way.
 </p>

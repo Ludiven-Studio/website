@@ -119,9 +119,8 @@ export default function TournamentPanel({ tournament: t, shareUrl, onClose }: {
 					<button type="button" className="re-btn re-btn--ghost" onClick={() => { void share(); }}>Partager</button>
 				</div>
 				<p className="re-hint re-app-cta">
-					Ce tournoi et toutes les parties autour de toi sont dans l'appli <strong>Pétanque Meet</strong>,
-					sur Android dès maintenant, bientôt sur iPhone.{' '}
-					<a href="/petanque-meet/telecharger/">Télécharger l'appli</a>
+					L'appli <strong>Pétanque Meet</strong> arrive bientôt sur Android et iPhone&nbsp;: tu y
+					retrouveras ce tournoi et toutes les parties autour de toi.
 				</p>
 			</section>
 		</div>

@@ -39,7 +39,6 @@ const ROLE_FILTERS: RoleFilter[] = ['all', 'tireur', 'pointeur'];
 /* The island is client:only, so `window` is always there. The installed icon must
    land on the map, never on the ?e= card that happened to be open. */
 const PAGE_URL = `${window.location.origin}/petanque-meet/`;
-const APP_PAGE = '/petanque-meet/telecharger/';
 
 interface Detail {
 	event: MeetupEvent;
@@ -619,7 +618,7 @@ export default function RencontresApp() {
 						<>
 							<span>Regarder la carte est libre.</span>
 							<button type="button" className="re-link" onClick={() => setLoginOpen('act')}>
-								{WEB_LOGIN ? 'Se connecter pour publier ou rejoindre' : "Publier ou rejoindre : dans l'appli"}
+								{WEB_LOGIN ? 'Se connecter pour publier ou rejoindre' : "Publier ou rejoindre : bientôt dans l'appli"}
 							</button>
 						</>
 					)}
@@ -840,8 +839,8 @@ export default function RencontresApp() {
 							: 'Terrain signalé par un joueur, pas encore confirmé.'}
 					</p>
 					<p className="re-hint">
-						Aucune partie posée ici pour l'instant. Pour en organiser une, ou être prévenu des parties
-						autour, utilise <a href={APP_PAGE}>l'appli Pétanque Meet</a>.
+						Aucune partie posée ici pour l'instant. L'appli Pétanque Meet, bientôt disponible, permettra
+						d'en organiser une ou d'être prévenu des parties autour.
 					</p>
 					<div className="re-actions">
 						<a
@@ -1004,13 +1003,13 @@ export default function RencontresApp() {
 
 			<p className="re-legal re-rules">
 				Ici, on joue franc jeu&nbsp;: ton vrai prénom, de vraies parties, et du respect pour tout le monde.
-				Une partie louche&nbsp;? Signale-la depuis l'appli Pétanque Meet. Un souci&nbsp;:{' '}
+				Une partie louche ou un souci&nbsp;:{' '}
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
 			</p>
 			<p className="re-legal">
 				Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
-				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans{' '}
-				<a href={APP_PAGE}>l'appli Pétanque Meet</a>.{' '}
+				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fera dans l'appli
+				Pétanque Meet, bientôt disponible.{' '}
 				<a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a>.
 			</p>
 
@@ -1079,15 +1078,14 @@ function AppSheet({ onClose }: { onClose(): void }) {
 	return (
 		<div className="re-modal" onClick={onClose}>
 			<div className="re-sheet re-login" onClick={(e) => e.stopPropagation()}>
-				<h2>Ça se passe dans l'appli</h2>
+				<h2>Bientôt dans l'appli</h2>
 				<p className="re-hint">
-					Ici, la carte se consulte librement. Pour publier une partie, la rejoindre, annoncer un tournoi
-					ou signaler un abus, utilise l'appli Pétanque Meet&nbsp;: sur Android dès maintenant,
-					bientôt sur iPhone.
+					Ici, la carte se consulte librement. Publier une partie, la rejoindre, annoncer un tournoi
+					ou signaler un abus se fera dans l'appli Pétanque Meet, bientôt disponible sur Android
+					et iPhone.
 				</p>
 				<div className="re-formactions">
-					<button type="button" className="re-btn re-btn--ghost" onClick={onClose}>Fermer</button>
-					<a className="re-btn" href={APP_PAGE}>Télécharger pour Android</a>
+					<button type="button" className="re-btn" onClick={onClose}>Compris</button>
 				</div>
 			</div>
 		</div>
