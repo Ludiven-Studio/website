@@ -504,6 +504,18 @@ async function emailOf(db: SupabaseClient, uid: string): Promise<string | null> 
 	return data?.user?.email ?? null;
 }
 
+/** Per isolate: get_tournament asks on every panel the app opens. */
+const importAccountOf = new Map<string, boolean>();
+
+async function isImportAccount(db: SupabaseClient, uid: string): Promise<boolean> {
+	let known = importAccountOf.get(uid);
+	if (known === undefined) {
+		known = (await emailOf(db, uid))?.toLowerCase() === IMPORT_ACCOUNT_EMAIL;
+		importAccountOf.set(uid, known);
+	}
+	return known;
+}
+
 type ClaimRow = { id: string; player_id: string; club_name: string; from_organizer: string };
 
 /** Every tournament of that club still on the import account moves to the
@@ -1096,7 +1108,9 @@ Deno.serve(async (req) => {
 				}
 				const shaped = shapeTournament(row);
 				if (isOrganizer) shaped.followers = (await followerCounts(db, [String(row.id)])).get(String(row.id)) ?? 0;
-				return json({ tournament: shaped, isOrganizer, following });
+				// Imported from a committee calendar: the app offers "C'est mon club".
+				const claimable = !isOrganizer && await isImportAccount(db, String(owner));
+				return json({ tournament: shaped, isOrganizer, following, claimable });
 			}
 
 			// Follow or unfollow: { tournamentId, follow }. Only a tournament still on the
@@ -1322,9 +1336,7 @@ Deno.serve(async (req) => {
 				if (!t) return bad('unknown tournament', 404);
 				const owner = String(t.organizer_id);
 				if (owner === uid) return bad('Ce concours est déjà sur ton compte.', 409);
-				if ((await emailOf(db, owner))?.toLowerCase() !== IMPORT_ACCOUNT_EMAIL) {
-					return bad('Ce concours a déjà un organisateur.', 409);
-				}
+				if (!await isImportAccount(db, owner)) return bad('Ce concours a déjà un organisateur.', 409);
 				if (await isBanned(db, uid, null, false)) return bad(BANNED, 403);
 				const { count: pending } = await db.from('meetup_tournament_claims').select('id', { count: 'exact', head: true })
 					.eq('player_id', uid).eq('status', 'pending');
