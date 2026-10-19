@@ -132,7 +132,7 @@ export const moderate = (eventId: string, token: string, what: ModAction, signup
 
 export type ModTournament = MeetupTournament;
 export type TournamentReportReason = 'poster' | 'fake' | 'wrong_info' | 'other';
-export interface ModTournamentReport { reason: TournamentReportReason; created_at: string; }
+export interface ModTournamentReport { reason: TournamentReportReason; note?: string | null; created_at: string; }
 export type ModTournamentAction = 'approve_poster' | 'reject_poster' | 'restore' | 'remove' | 'ban_organizer';
 
 export const modGetTournament = (tournamentId: string, token: string): Promise<{ tournament: ModTournament; posterPreview: string | null; reports: ModTournamentReport[] }> =>
@@ -149,8 +149,18 @@ export type ModQueueEvent = MeetupEvent & { reports: number; link: string };
 /** Either the admin key or the 7-day pass from the mailed link. */
 export type ModCredential = { adminKey: string } | { pass: string };
 
-export const modList = (cred: ModCredential): Promise<{ tournaments: ModQueueTournament[]; events: ModQueueEvent[] }> =>
+/** A club asking for the tournaments imported for it (the app's "C'est mon club"). */
+export interface ModClaim {
+	id: string; club_name: string; message: string; created_at: string;
+	email: string | null; clubTournaments: number; tournament: MeetupTournament | null;
+}
+
+export const modList = (cred: ModCredential): Promise<{ tournaments: ModQueueTournament[]; events: ModQueueEvent[]; claims?: ModClaim[] }> =>
 	call('mod_list', cred);
+
+/** approve moves every imported tournament of the club to the claimer. */
+export const moderateClaim = (cred: ModCredential, claimId: string, what: 'approve' | 'reject'): Promise<{ ok: true; moved?: number }> =>
+	call('moderate_claim', { ...cred, claimId, do: what });
 
 /** Mails the moderator a link to the queue. */
 export const modSendLink = (): Promise<{ ok: true }> => call('mod_send_link');

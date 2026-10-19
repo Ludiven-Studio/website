@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { modList, modSendLink, type ModCredential, type ModQueueEvent, type ModQueueTournament } from '../../lib/meetups';
+import { moderateClaim, modList, modSendLink, type ModClaim, type ModCredential, type ModQueueEvent, type ModQueueTournament } from '../../lib/meetups';
 import { formatDay, formatTime } from './format';
 
 const KEY = 'ludiven-meetup-admin';
@@ -35,7 +35,8 @@ export default function ModerationQueue() {
 	const [withKey, setWithKey] = useState(false);
 	const [sent, setSent] = useState(false);
 	const [busy, setBusy] = useState(false);
-	const [data, setData] = useState<{ tournaments: ModQueueTournament[]; events: ModQueueEvent[] } | null>(null);
+	const [data, setData] = useState<{ tournaments: ModQueueTournament[]; events: ModQueueEvent[]; claims?: ModClaim[] } | null>(null);
+	const [done, setDone] = useState<Record<string, string>>({});
 	const [error, setError] = useState<string | null>(null);
 
 	const load = useCallback(async (c: ModCredential) => {
@@ -59,6 +60,20 @@ export default function ModerationQueue() {
 		try {
 			await modSendLink();
 			setSent(true);
+		} catch (e) {
+			setError(message(e));
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const decide = async (c: ModClaim, what: 'approve' | 'reject'): Promise<void> => {
+		if (!cred) return;
+		setBusy(true);
+		setError(null);
+		try {
+			const r = await moderateClaim(cred, c.id, what);
+			setDone((d) => ({ ...d, [c.id]: what === 'approve' ? `✅ ${r.moved ?? 0} concours transférés.` : 'Refusée.' }));
 		} catch (e) {
 			setError(message(e));
 		} finally {
@@ -135,6 +150,31 @@ export default function ModerationQueue() {
 											<span><strong>{t.title}</strong> · {t.club_name}<br />
 												{formatDay(t.starts_at)} · {formatTime(t.starts_at)} · {t.commune || t.label}</span>
 										</a>
+									</li>
+								))}
+							</ul>
+						)}
+					</section>
+					<section className="re-panel">
+						<h2>Clubs à vérifier ({data.claims?.length ?? 0})</h2>
+						<p className="re-hint">Appelle le numéro du calendrier, pas celui du message. Valider transfère
+							tous les concours importés du club sur le compte du demandeur.</p>
+						{!data.claims?.length ? <p className="re-hint">Aucune demande.</p> : (
+							<ul className="re-queue">
+								{data.claims.map((c) => (
+									<li key={c.id}>
+										<span><strong>{c.club_name}</strong> · {c.clubTournaments} concours
+											{c.tournament && <> · {c.tournament.commune || c.tournament.label}</>}<br />
+											« {c.message} »<br />
+											Compte : {c.email ?? '?'}
+											{c.tournament?.contact_phone && <> · Calendrier : <a href={`tel:${c.tournament.contact_phone}`}>{c.tournament.contact_phone}</a></>}
+										</span>
+										{done[c.id] ? <p className="re-ok" role="status">{done[c.id]}</p> : (
+											<div className="re-actions">
+												<button type="button" className="re-btn" disabled={busy} onClick={() => { void decide(c, 'approve'); }}>Valider</button>
+												<button type="button" className="re-btn re-btn--ghost" disabled={busy} onClick={() => { void decide(c, 'reject'); }}>Refuser</button>
+											</div>
+										)}
 									</li>
 								))}
 							</ul>

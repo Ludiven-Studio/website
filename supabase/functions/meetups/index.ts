@@ -202,21 +202,26 @@ async function ban(db: SupabaseClient, playerId: string, ip: string | null, even
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** Never throws: a mail that fails must not lose what is already saved. */
-async function mailMod(subject: string, lines: string[], link: string): Promise<void> {
-	if (!RESEND_API_KEY || !MOD_EMAIL || !FROM_EMAIL || !ADMIN_KEY) return;
+async function sendMail(to: string, subject: string, lines: string[], link?: { href: string; text: string }): Promise<void> {
+	if (!RESEND_API_KEY || !FROM_EMAIL || !to) return;
 	try {
 		const html = `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.5">
 ${lines.map((l) => `<p>${l}</p>`).join('\n')}
-<p><a href="${link}">Ouvrir la modération</a></p></div>`;
+${link ? `<p><a href="${link.href}">${link.text}</a></p>` : ''}</div>`;
 		const res = await fetch('https://api.resend.com/emails', {
 			method: 'POST',
 			headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-			body: JSON.stringify({ from: FROM_EMAIL, to: MOD_EMAIL, subject, html }),
+			body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
 		});
 		if (!res.ok) console.error(`resend ${res.status}: ${await res.text().catch(() => '')}`.slice(0, 300));
 	} catch (e) {
 		console.error(e);
 	}
+}
+
+async function mailMod(subject: string, lines: string[], link: string): Promise<void> {
+	if (!MOD_EMAIL || !ADMIN_KEY) return;
+	await sendMail(MOD_EMAIL, subject, lines, { href: link, text: 'Ouvrir la modération' });
 }
 
 async function mailReport(eventId: string, ev: Record<string, unknown>, reason: string, count: number, hidden: boolean): Promise<void> {
@@ -245,6 +250,12 @@ const T_CONTESTS_SPAN_MS = 3 * 86400_000;
 const T_SHOWN_AFTER_START_MS = 12 * 3600_000;
 const MAX_ACTIVE_TOURNAMENTS = 5;
 const MAX_FOLLOWS = 50;
+/** The account the committee calendars are imported under (tools/import_committee.py
+ *  in PetanqueMeet). Only its tournaments can be claimed by a club. */
+const IMPORT_ACCOUNT_EMAIL = 'petanquemeet.admin@ludiven-studio.fr';
+const MAX_PENDING_CLAIMS = 5;
+/** Claim messages and "wrong info" notes: read by the moderator only. */
+const T_MAX_NOTE = 300;
 /** Fewer than for a game: a tournament is seen by far more people. */
 const T_HIDE_REPORTERS = 2;
 const T_HIDE_IPS = 2;
@@ -275,6 +286,17 @@ function cleanDetails(raw: unknown): string | null {
 	if (isOffensive(s)) return null;
 	return s;
 }
+
+/** Text for the moderator only, never shown on the map: no markup, capped.
+ *  null = too short to say anything. */
+function cleanNote(raw: unknown): string | null {
+	const s = String(raw ?? '').replace(/[<>]/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n')
+		.trim().slice(0, T_MAX_NOTE);
+	return s.length >= 5 ? s : null;
+}
+
+/** A club name as an exact, case-blind ilike pattern. */
+const likeExact = (s: string): string => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 /** French numbers only, stored as ten digits. null = invalid. */
 function cleanPhone(raw: unknown): string | null {
@@ -475,6 +497,36 @@ async function mailTournament(t: Record<string, unknown>, headline: string, subj
 		headline,
 		`${esc(String(t.title ?? ''))} · ${esc(String(t.club_name ?? ''))} · ${esc(String(t.commune ?? ''))} · ${esc(String(t.starts_at ?? ''))}`,
 	], `${MOD_URL}?t=${id}&k=${await tToken(id)}`);
+}
+
+async function emailOf(db: SupabaseClient, uid: string): Promise<string | null> {
+	const { data } = await db.auth.admin.getUserById(uid);
+	return data?.user?.email ?? null;
+}
+
+type ClaimRow = { id: string; player_id: string; club_name: string; from_organizer: string };
+
+/** Every tournament of that club still on the import account moves to the
+ *  claimer, the one claimed included. Returns how many moved. */
+async function approveClaim(db: SupabaseClient, c: ClaimRow, nowIso: string): Promise<number> {
+	const { data: moved, error } = await db.from('meetup_tournaments')
+		.update({ organizer_id: c.player_id, updated_at: nowIso })
+		.eq('organizer_id', c.from_organizer).ilike('club_name', likeExact(c.club_name)).select('id');
+	if (error) throw error;
+	await db.from('meetup_tournament_claims').update({ status: 'approved', decided_at: nowIso }).eq('id', c.id);
+	return moved?.length ?? 0;
+}
+
+async function mailClaimer(db: SupabaseClient, c: ClaimRow, approved: boolean, moved: number): Promise<void> {
+	const to = await emailOf(db, c.player_id);
+	if (!to) return;
+	const club = esc(c.club_name);
+	await sendMail(to, approved ? `Pétanque Meet : ${c.club_name} est sur ton compte` : 'Pétanque Meet : ta demande de club',
+		approved
+			? ['Bonjour,', `C’est vérifié : ${moved} concours de <b>${club}</b> sont maintenant sur ton compte.`,
+				'Dans l’app, onglet « Mes parties », tu peux les modifier et ajouter l’affiche.']
+			: ['Bonjour,', `Nous n’avons pas pu confirmer que tu représentes <b>${club}</b>.`,
+				'Si c’est une erreur, réponds à ce message avec le nom du président et un numéro du club.']);
 }
 
 function isAdmin(v: unknown): boolean {
@@ -1229,14 +1281,17 @@ Deno.serve(async (req) => {
 						.eq('reporter_ip', ip).gte('created_at', since);
 					if ((a ?? 0) + (b ?? 0) >= REPORT_IP_CAP) return bad('Trop de signalements aujourd’hui. Réessaie demain.', 429);
 				}
+				// "Info erronée" says what is wrong; the moderator fixes it.
+				const note = reason === 'wrong_info' ? cleanNote(body.note) : null;
 				const { error } = await db.from('meetup_tournament_reports').insert(
-					{ tournament_id: body.tournamentId, reporter_id: playerId, reporter_ip: ip, reason });
+					{ tournament_id: body.tournamentId, reporter_id: playerId, reporter_ip: ip, reason, note });
 				if (error && error.code !== '23505') throw error;
 				if (error) return json({ ok: true });
 
 				const { data: reports } = await db.from('meetup_tournament_reports')
-					.select('reporter_ip').eq('tournament_id', body.tournamentId);
-				const all = reports ?? [];
+					.select('reporter_ip, reason').eq('tournament_id', body.tournamentId);
+				// A wrong time or phone is a fix to make, not a reason to hide the tournament.
+				const all = (reports ?? []).filter((r) => r.reason !== 'wrong_info');
 				const ips = new Set(all.map((r) => r.reporter_ip).filter(Boolean));
 				const shaped = shapeTournament(t as Record<string, unknown>);
 				let hidden = Boolean(shaped.hidden);
@@ -1247,9 +1302,76 @@ Deno.serve(async (req) => {
 				}
 				const label = T_REASON_LABEL[reason] ?? reason;
 				await mailTournament(shaped,
-					`<b>${esc(label)}</b> — ${all.length} signalement(s)${hidden ? ', <b>concours masqué</b>' : ''}.`,
+					`<b>${esc(label)}</b> — ${all.length} signalement(s)${hidden ? ', <b>concours masqué</b>' : ''}.`
+						+ (note ? `<br>« ${esc(note)} »` : ''),
 					`Rencontres : signalement concours (${label})`);
 				return json({ ok: true });
+			}
+
+			// "C'est mon club": { tournamentId, message }. Only a tournament imported from
+			// a committee calendar can be claimed. The moderator checks with the club,
+			// unless this account was already validated for the same club.
+			case 'claim_tournament': {
+				if (!isUuid(body.tournamentId)) return bad('bad request');
+				const uid = await whoAmI();
+				if (!uid) return bad(LOGIN, 401);
+				const message = cleanNote(body.message);
+				if (!message) return bad('Dis-nous qui tu es au club : ton nom, ton rôle, un numéro.');
+				const { data: t } = await db.from('meetup_tournaments').select(`${T_EMBED}, organizer_id`)
+					.eq('id', body.tournamentId).maybeSingle();
+				if (!t) return bad('unknown tournament', 404);
+				const owner = String(t.organizer_id);
+				if (owner === uid) return bad('Ce concours est déjà sur ton compte.', 409);
+				if ((await emailOf(db, owner))?.toLowerCase() !== IMPORT_ACCOUNT_EMAIL) {
+					return bad('Ce concours a déjà un organisateur.', 409);
+				}
+				if (await isBanned(db, uid, null, false)) return bad(BANNED, 403);
+				const { count: pending } = await db.from('meetup_tournament_claims').select('id', { count: 'exact', head: true })
+					.eq('player_id', uid).eq('status', 'pending');
+				if ((pending ?? 0) >= MAX_PENDING_CLAIMS) return bad(`Tu as déjà ${MAX_PENDING_CLAIMS} demandes en attente.`, 429);
+
+				const clubName = String(t.club_name ?? '');
+				const { data: claim, error } = await db.from('meetup_tournament_claims').upsert({
+					tournament_id: t.id, player_id: uid, club_name: clubName, from_organizer: owner, message,
+					status: 'pending', created_at: nowIso, decided_at: null,
+				}, { onConflict: 'tournament_id,player_id' }).select('id, player_id, club_name, from_organizer').single();
+				if (error) throw error;
+
+				const { count: known } = await db.from('meetup_tournament_claims').select('id', { count: 'exact', head: true })
+					.eq('player_id', uid).eq('status', 'approved').ilike('club_name', likeExact(clubName));
+				if ((known ?? 0) > 0) {
+					const moved = await approveClaim(db, claim as ClaimRow, nowIso);
+					return json({ ok: true, status: 'approved', moved });
+				}
+				const shaped = shapeTournament(t as Record<string, unknown>);
+				await mailMod(`Rencontres : ${clubName} réclame ses concours`, [
+					`<b>${esc(clubName)}</b> · ${esc(String(shaped.commune ?? ''))} · ${esc(String(shaped.title ?? ''))}`,
+					`« ${esc(message)} »`,
+					`Compte : ${esc(await emailOf(db, uid) ?? '?')}`,
+					`Numéro du club au calendrier : ${esc(String(shaped.contact_phone ?? 'aucun'))}`,
+				], `${MOD_URL}?q=${await queueToken(nowMs + QUEUE_LINK_MS)}`);
+				return json({ ok: true, status: 'pending' });
+			}
+
+			case 'moderate_claim': {
+				if (!isAdmin(body.adminKey) && !await isQueueToken(body.pass, nowMs)) return bad('forbidden', 403);
+				if (!isUuid(body.claimId)) return bad('bad request');
+				const { data: c } = await db.from('meetup_tournament_claims')
+					.select('id, player_id, club_name, from_organizer, status').eq('id', body.claimId).maybeSingle();
+				if (!c) return bad('unknown claim', 404);
+				if (c.status !== 'pending') return bad('Demande déjà traitée.', 409);
+				const what = String(body.do ?? '');
+				if (what === 'approve') {
+					const moved = await approveClaim(db, c as ClaimRow, nowIso);
+					await mailClaimer(db, c as ClaimRow, true, moved);
+					return json({ ok: true, moved });
+				}
+				if (what === 'reject') {
+					await db.from('meetup_tournament_claims').update({ status: 'rejected', decided_at: nowIso }).eq('id', c.id);
+					await mailClaimer(db, c as ClaimRow, false, 0);
+					return json({ ok: true });
+				}
+				return bad('unknown do');
 			}
 
 			// The page behind the poster and report mails. The token is per tournament.
@@ -1265,7 +1387,7 @@ Deno.serve(async (req) => {
 					posterPreview = signed?.signedUrl ?? null;
 				}
 				const { data: reports } = await db.from('meetup_tournament_reports')
-					.select('reason, created_at').eq('tournament_id', body.tournamentId).order('created_at');
+					.select('reason, note, created_at').eq('tournament_id', body.tournamentId).order('created_at');
 				return json({ tournament: shapeTournament(row), posterPreview, reports: reports ?? [] });
 			}
 
@@ -1374,7 +1496,22 @@ Deno.serve(async (req) => {
 					const id = String(r.id);
 					events.push({ ...shapeEvent(r), reports: eCounts.get(id) ?? 0, link: `${MOD_URL}?e=${id}&k=${await modToken(id)}` });
 				}
-				return json({ tournaments, events });
+				// Pending club claims, with what the moderator needs to call the club.
+				const { data: pend } = await db.from('meetup_tournament_claims')
+					.select('id, tournament_id, player_id, club_name, from_organizer, message, created_at')
+					.eq('status', 'pending').order('created_at').limit(50);
+				const claims = [];
+				for (const c of (pend ?? []) as Record<string, unknown>[]) {
+					const { data: t } = await db.from('meetup_tournaments').select(T_EMBED).eq('id', c.tournament_id).maybeSingle();
+					const { count } = await db.from('meetup_tournaments').select('id', { count: 'exact', head: true })
+						.eq('organizer_id', c.from_organizer).ilike('club_name', likeExact(String(c.club_name)));
+					claims.push({
+						id: c.id, club_name: c.club_name, message: c.message, created_at: c.created_at,
+						email: await emailOf(db, String(c.player_id)), clubTournaments: count ?? 0,
+						tournament: t ? shapeTournament(t as Record<string, unknown>) : null,
+					});
+				}
+				return json({ tournaments, events, claims });
 			}
 
 			// By hand; upload_poster also prunes on every call.

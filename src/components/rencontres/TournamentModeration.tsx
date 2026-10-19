@@ -125,7 +125,8 @@ export default function TournamentModeration({ tournamentId, token }: { tourname
 				{reports.length === 0 ? <p className="re-hint">Aucun signalement.</p> : (
 					<ul className="re-who">
 						{reports.map((r, i) => (
-							<li key={i}>{REASON[r.reason] ?? r.reason} — {formatShortDay(r.created_at)} {formatTime(r.created_at)}</li>
+							<li key={i}>{REASON[r.reason] ?? r.reason} — {formatShortDay(r.created_at)} {formatTime(r.created_at)}
+								{r.note && <><br />« {r.note} »</>}</li>
 						))}
 					</ul>
 				)}
