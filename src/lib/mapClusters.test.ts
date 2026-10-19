@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { centreOf, clusterBoxes, clusterPoints } from './mapClusters';
+import { centreOf, clusterBoxes, clusterPoints, liftOver } from './mapClusters';
 
 describe('clusterPoints', () => {
 	it('keeps far points apart', () => {
@@ -25,6 +25,24 @@ describe('clusterBoxes', () => {
 		// 78 x 136 posters: 90 px above still overlaps, 80 px aside does not.
 		expect(clusterBoxes([{ x: 0, y: 0 }, { x: 0, y: 90 }], 78, 136)).toEqual([[0, 1]]);
 		expect(clusterBoxes([{ x: 0, y: 0 }, { x: 80, y: 0 }], 78, 136)).toEqual([[0], [1]]);
+	});
+});
+
+describe('liftOver', () => {
+	// A 78×136 poster and 136×58 game cards, both standing on their point.
+	it('lifts a poster above the game card on its pitch', () => {
+		const [, up] = liftOver({ x: 0, y: 0 }, [0, 0], 78, 136, [{ x: 0, y: 0 }], 136, 58, 6);
+		expect(up).toBe(64);
+	});
+
+	it('leaves a poster clear of every game alone', () => {
+		expect(liftOver({ x: 0, y: 0 }, [0, 0], 78, 136, [{ x: 200, y: 0 }], 136, 58, 6)).toEqual([0, 0]);
+	});
+
+	it('clears a second game the first lift ran into', () => {
+		const games = [{ x: 0, y: 0 }, { x: 10, y: -70 }];
+		const [, up] = liftOver({ x: 0, y: 0 }, [0, 0], 78, 136, games, 136, 58, 6);
+		expect(up).toBe(70 + 58 + 6);
 	});
 });
 

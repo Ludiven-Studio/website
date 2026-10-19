@@ -114,11 +114,11 @@ export function tournamentCard(t: MeetupTournament, slot?: Slot): L.DivIcon {
 		're-pin--tournament', T_W, T_H, slot);
 }
 
-export function tournamentClusterCard(count: number): L.DivIcon {
+export function tournamentClusterCard(count: number, slot?: Slot): L.DivIcon {
 	return board(
 		`<div class="re-cp re-cp--tournament re-cp--stack"><span class="re-cp-badge">${TROPHY}</span>`
 		+ `<span class="re-cp-poster"><span class="re-cp-title">${count} concours</span></span><span class="re-cp-date">zoomer</span></div>`,
-		're-pin--tournament re-pin--cluster', T_W, T_H);
+		're-pin--tournament re-pin--cluster', T_W, T_H, slot);
 }
 
 export function placeIcon(p: Place): L.DivIcon {

@@ -18,6 +18,31 @@ export function clusterBoxes(points: readonly ScreenPoint[], w: number, h: numbe
 	return greedy(points, (dx, dy) => Math.abs(dx) < w && Math.abs(dy) < h);
 }
 
+/** The [right, up] slot, px, that lifts a w×h card standing on `at` above every
+ *  game card it would cover: a poster on a game's pitch hid the game. Points in
+ *  map pixels, y down; cards stand on their point, centred. Same rule as the app's
+ *  MapMarkers.LiftOverGames. */
+export function liftOver(
+	at: ScreenPoint, slot: readonly [number, number], w: number, h: number,
+	games: readonly ScreenPoint[], gw: number, gh: number, gap: number,
+): [number, number] {
+	const x = at.x + slot[0];
+	let bottom = at.y - slot[1];
+	// Each pass clears one more card at most: as many passes as cards.
+	for (let pass = 0; pass < games.length; pass++) {
+		let moved = false;
+		for (const g of games) {
+			const across = Math.abs(x - g.x) < (w + gw) / 2;
+			const along = bottom > g.y - gh && bottom - h < g.y;
+			if (!across || !along) continue;
+			bottom = g.y - gh - gap;
+			moved = true;
+		}
+		if (!moved) break;
+	}
+	return [slot[0], at.y - bottom];
+}
+
 /** Average of the members' coordinates: where the count pin goes. */
 export function centreOf(members: readonly number[], at: (i: number) => { lat: number; lng: number }): { lat: number; lng: number } {
 	let lat = 0;

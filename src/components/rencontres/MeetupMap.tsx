@@ -3,7 +3,7 @@ import L from 'leaflet';
 import type { MeetupEvent, MeetupSpot } from '../../lib/meetupRules';
 import type { Place } from '../../lib/meetupPlaces';
 import type { MeetupTournament } from '../../lib/meetups';
-import { centreOf, clusterBoxes, clusterPoints } from '../../lib/mapClusters';
+import { centreOf, clusterBoxes, clusterPoints, liftOver } from '../../lib/mapClusters';
 import {
 	GAME_H, GAME_W, gameCard, gameClusterCard, ME_ICON, placeIcon, T_H, T_W, tournamentCard, tournamentClusterCard,
 	type Slot,
@@ -213,7 +213,7 @@ export default function MeetupMap({
 		if (nearM > 0) {
 			for (const p of places) {
 				L.circle([p.lat, p.lng], {
-					radius: nearM, color: NEAR_COLOUR, weight: 1.5, opacity: 0.7,
+					radius: nearM, color: NEAR_COLOUR, weight: 2.5, opacity: 0.85,
 					fillColor: NEAR_COLOUR, fillOpacity: 0.06, interactive: false,
 				}).addTo(layer);
 			}
@@ -289,8 +289,18 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		tournamentMarkers.current.clear();
+		// Where the game cards stand, as the layer above drew them: a poster lifts over them.
+		const map = mapRef.current;
+		const games = map
+			? cardGroupsOf(events, GAME_W, GAME_H).map((g) => {
+				const c = g.length > 1 ? centreOf(g, (i) => events[i]) : events[g[0]];
+				return map.project([c.lat, c.lng], zoom);
+			})
+			: [];
+		const lift = (at: { lat: number; lng: number }, slot: Slot = [0, 0]): Slot =>
+			map ? liftOver(map.project([at.lat, at.lng], zoom), slot, T_W, T_H, games, GAME_W, GAME_H, FAN_GAP) : slot;
 		const add = (t: MeetupTournament, at: { lat: number; lng: number }, slot?: Slot): void => {
-			const m = L.marker([at.lat, at.lng], { icon: tournamentCard(t, slot), title: t.title, zIndexOffset: 500 })
+			const m = L.marker([at.lat, at.lng], { icon: tournamentCard(t, lift(at, slot)), title: t.title, zIndexOffset: 500 })
 				.on('click', () => {
 					if (cb.current.picking) cb.current.onPick(t.lat, t.lng);
 					else cb.current.onSelectTournament(t.id);
@@ -303,7 +313,10 @@ export default function MeetupMap({
 			if (g.length === 1) {
 				add(tournaments[g[0]], tournaments[g[0]]);
 			} else if (!fan) {
-				addCluster(layer, tournaments, g, tournamentClusterCard(g.length));
+				const c = centreOf(g, (i) => tournaments[i]);
+				L.marker([c.lat, c.lng], { icon: tournamentClusterCard(g.length, lift(c)), title: `${g.length}`, zIndexOffset: 500 })
+					.on('click', () => mapRef.current?.flyTo([c.lat, c.lng], Math.min(19, zoom + 2), { duration: 0.6 }))
+					.addTo(layer);
 			} else {
 				// No zoom can split them any more: side by side around their centre, soonest first.
 				const c = centreOf(g, (i) => tournaments[i]);
@@ -312,7 +325,7 @@ export default function MeetupMap({
 			}
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
-	}, [tournaments, zoom]);
+	}, [tournaments, events, zoom]);
 
 	// Highlight without rebuilding the layer: swapping icons keeps the popup
 	// state and avoids a flash on every mouse move across the list.
