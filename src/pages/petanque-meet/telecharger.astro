@@ -1,26 +1,28 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-
-// The app is not out yet. The page stays so links already shared do not break.
+import StoreBadges from '../../components/StoreBadges.astro';
+import { MEET_STORES } from '../../data/petanqueMeet';
 ---
 
 <BaseLayout
-	title="Pétanque Meet, bientôt sur Android et iPhone | Ludiven Studio"
-	description="L'appli Pétanque Meet arrive bientôt sur Android et iPhone : les parties et les concours de pétanque autour de chez toi, sur ton téléphone."
+	title="Télécharger Pétanque Meet sur Android et iPhone | Ludiven Studio"
+	description="L'appli Pétanque Meet sur le Play Store et l'App Store : les parties et les concours de pétanque autour de chez toi, sur ton téléphone."
 >
 	<div class="wrapper download-page stack gap-6">
 		<header class="stack gap-2">
-			<h1>Pétanque Meet arrive bientôt</h1>
+			<h1>Pétanque Meet sur ton téléphone</h1>
 			<p class="lead">Les parties et les concours de pétanque autour de chez toi. Publie ta partie, rejoins celle des autres, suis les concours.</p>
 		</header>
 
 		<section class="card stack gap-3">
-			<p>L'appli sera bientôt disponible sur le Play Store et l'App Store.</p>
-			<p>En attendant, la carte des parties et des concours se consulte librement dans le navigateur.</p>
-			<a class="download" href="/petanque-meet/">Voir la carte</a>
+			<p>L'appli est gratuite, sur Android et iPhone.</p>
+			<StoreBadges playStore={MEET_STORES.play} appStore={MEET_STORES.apple} lang="fr" />
 		</section>
 
-		<p class="muted"><a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a></p>
+		<p class="muted">
+			La carte des parties et des concours se consulte aussi <a href="/petanque-meet/">dans le navigateur</a>.
+			<br /><a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a>
+		</p>
 	</div>
 </BaseLayout>
 
@@ -41,21 +43,5 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 		border: 1px solid var(--gray-800);
 		border-radius: 1rem;
 		background: var(--gray-999_40);
-	}
-	.download {
-		display: inline-block;
-		align-self: flex-start;
-		padding: 1rem 1.6rem;
-		border-radius: 999px;
-		background: var(--accent-regular);
-		color: var(--accent-text-over);
-		font-size: var(--text-lg);
-		font-weight: 600;
-		text-decoration: none;
-		text-align: center;
-	}
-	.download:hover,
-	.download:focus-visible {
-		background: var(--accent-dark);
 	}
 </style>

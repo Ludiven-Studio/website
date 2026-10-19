@@ -13,16 +13,17 @@ import {
 	PROVIDER_LABEL, type Provider,
 } from '../../lib/meetupAuth';
 import {
-	applyFilters, applyTournamentFilters, DATE_LABEL, DEFAULT_FILTERS,
+	applyFilters, applyTournamentFilters, DATE_LABEL, DEFAULT_FILTERS, NEAR_KM, rangeLabel,
 	type DateFilter, type Filters, type RoleFilter,
 } from '../../lib/meetupFilters';
+import { challengeDay } from '../../lib/day';
 import {
 	FORMAT_LABEL, MAX_ACTIVE_EVENTS, ROLE_LABEL, seatsLeft, validateSignup,
 	type MeetupEvent, type MeetupSignup, type MeetupSpot, type ReportReason, type Role,
 } from '../../lib/meetupRules';
 import {
-	addPlace, isNearPlaces, nearestPlace, readPlaces, removePlace, savePlaces,
-	MAX_PLACES, NEAR_M, SAME_PLACE_M, type Place, type PlaceKind,
+	addPlace, isNearPlaces, nearestPlace, readNearKm, readPlaces, removePlace, saveNearKm, savePlaces,
+	MAX_PLACES, SAME_PLACE_M, type Place, type PlaceKind,
 } from '../../lib/meetupPlaces';
 import { usePinToHome, type PinPlatform } from '../../lib/usePinToHome';
 import { distanceM, formatDistance, isPlausibleFr, nearest } from '../../lib/meetupGeo';
@@ -32,13 +33,15 @@ import EventPanel from './EventPanel';
 import TournamentPanel from './TournamentPanel';
 import { demoEvents, demoSignups, demoTournaments, isDemo } from '../../lib/meetupDemo';
 import MyGames from './MyGames';
+import StoreLinks from './StoreLinks';
 import { formatShortDay, formatTime } from './format';
 
-const DATES: DateFilter[] = ['today', 'weekend', 'week', 'fortnight', 'all'];
+const DATES: DateFilter[] = ['today', 'weekend', 'week', 'fortnight', 'all', 'custom'];
 const ROLE_FILTERS: RoleFilter[] = ['all', 'tireur', 'pointeur'];
 /* The island is client:only, so `window` is always there. The installed icon must
    land on the map, never on the ?e= card that happened to be open. */
 const PAGE_URL = `${window.location.origin}/petanque-meet/`;
+const APP_PAGE = '/petanque-meet/telecharger/';
 
 interface Detail {
 	event: MeetupEvent;
@@ -85,6 +88,8 @@ export default function RencontresApp() {
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+	// Paris day, as the date filters count them: the earliest a picked day can be.
+	const today = challengeDay();
 	const [hoveredId, setHoveredId] = useState<string | null>(null);
 	const [detail, setDetail] = useState<Detail | null>(null);
 	const [creating, setCreating] = useState(false);
@@ -192,10 +197,23 @@ export default function RencontresApp() {
 		}
 	}, [pid]);
 
+	// The period strip scrolls on a phone: keep the picked one in view, dates and all.
+	// The strip alone: scrollIntoView would also move the page on load.
+	useEffect(() => {
+		const on = document.querySelector<HTMLElement>('.re-bar .re-seg .re-segbtn--on');
+		const strip = on?.parentElement;
+		if (!on || !strip) return;
+		const a = on.getBoundingClientRect();
+		const b = strip.getBoundingClientRect();
+		if (a.left < b.left) strip.scrollLeft -= b.left - a.left;
+		else if (a.right > b.right) strip.scrollLeft += a.right - b.right;
+	}, [filters.date, filters.from, filters.to]);
+
 	useEffect(() => {
 		trackEvent('meetup_view');
 		setName(savedName());
 		setPlaces(readPlaces());
+		setFilters((f) => ({ ...f, nearKm: readNearKm(NEAR_KM, f.nearKm) }));
 		setMuted(readMuted());
 		const back = takeRedirectError();
 		if (back) setError(back);
@@ -629,7 +647,7 @@ export default function RencontresApp() {
 						<>
 							<span>Regarder la carte est libre.</span>
 							<button type="button" className="re-link" onClick={() => setLoginOpen('act')}>
-								{WEB_LOGIN ? 'Se connecter pour publier ou rejoindre' : "Publier ou rejoindre : bientôt dans l'appli"}
+								{WEB_LOGIN ? 'Se connecter pour publier ou rejoindre' : "Publier ou rejoindre : dans l'appli"}
 							</button>
 						</>
 					)}
@@ -670,12 +688,45 @@ export default function RencontresApp() {
 							type="button"
 							className={`re-segbtn ${filters.date === d ? 're-segbtn--on' : ''}`}
 							aria-pressed={filters.date === d}
-							onClick={() => setFilters((f) => ({ ...f, date: d }))}
+							onClick={() => setFilters((f) => d !== 'custom' ? { ...f, date: d }
+								// Today by default: the two fields below then only need moving.
+								: { ...f, date: d, from: f.from || today, to: f.to || f.from || today })}
 						>
-							{DATE_LABEL[d]}
+							{d === 'custom' && filters.date === 'custom' ? `📅 ${rangeLabel(filters)}` : DATE_LABEL[d]}
 						</button>
 					))}
 				</div>
+
+				{filters.date === 'custom' && (
+					<span className="re-dates" role="group" aria-label="Dates choisies">
+						<label>
+							Du
+							<input
+								type="date"
+								className="re-select"
+								min={today}
+								value={filters.from}
+								onChange={(e) => {
+									const from = e.target.value;
+									setFilters((f) => ({ ...f, from, to: f.to && f.to >= from ? f.to : from }));
+								}}
+							/>
+						</label>
+						<label>
+							au
+							<input
+								type="date"
+								className="re-select"
+								min={filters.from || today}
+								value={filters.to}
+								onChange={(e) => {
+									const to = e.target.value;
+									setFilters((f) => ({ ...f, to: to && to >= f.from ? to : f.from }));
+								}}
+							/>
+						</label>
+					</span>
+				)}
 
 				<select
 					className="re-select"
@@ -766,14 +817,20 @@ export default function RencontresApp() {
 				)}
 
 				{places.length > 0 && naming === null && (
-					<label className="re-check">
-						<input
-							type="checkbox"
-							checked={filters.nearPlaces}
-							onChange={(e) => setFilters((f) => ({ ...f, nearPlaces: e.target.checked }))}
-						/>
-						À moins de {Math.round(NEAR_M / 1000)} km de mes lieux
-					</label>
+					<select
+						className="re-select"
+						aria-label="Autour de mes lieux"
+						value={filters.nearPlaces ? String(filters.nearKm) : ''}
+						onChange={(e) => {
+							const km = Number(e.target.value);
+							if (!km) { setFilters((f) => ({ ...f, nearPlaces: false })); return; }
+							saveNearKm(km);
+							setFilters((f) => ({ ...f, nearPlaces: true, nearKm: km }));
+						}}
+					>
+						<option value="">Autour de mes lieux : partout</option>
+						{NEAR_KM.map((km) => <option key={km} value={km}>À {km} km de mes lieux</option>)}
+					</select>
 				)}
 			</div>
 
@@ -809,6 +866,7 @@ export default function RencontresApp() {
 				events={shown}
 				spots={spots}
 				places={places}
+				nearM={filters.nearPlaces && places.length > 0 ? filters.nearKm * 1000 : 0}
 				tournaments={shownTournaments}
 				hoveredId={hoveredId}
 				selectedId={detail?.event.id ?? null}
@@ -850,8 +908,8 @@ export default function RencontresApp() {
 							: 'Terrain signalé par un joueur, pas encore confirmé.'}
 					</p>
 					<p className="re-hint">
-						Aucune partie posée ici pour l'instant. L'appli Pétanque Meet, bientôt disponible, permettra
-						d'en organiser une ou d'être prévenu des parties autour.
+						Aucune partie posée ici pour l'instant. Pour en organiser une, ou être prévenu des parties
+						autour, utilise <a href={APP_PAGE}>l'appli Pétanque Meet</a>.
 					</p>
 					<div className="re-actions">
 						<a
@@ -1021,8 +1079,8 @@ export default function RencontresApp() {
 			</p>
 			<p className="re-legal">
 				Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
-				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fera dans l'appli
-				Pétanque Meet, bientôt disponible.{' '}
+				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans{' '}
+				<a href={APP_PAGE}>l'appli Pétanque Meet</a>.{' '}
 				<a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a>.
 			</p>
 
@@ -1091,14 +1149,14 @@ function AppSheet({ onClose }: { onClose(): void }) {
 	return (
 		<div className="re-modal" onClick={onClose}>
 			<div className="re-sheet re-login" onClick={(e) => e.stopPropagation()}>
-				<h2>Bientôt dans l'appli</h2>
+				<h2>Ça se passe dans l'appli</h2>
 				<p className="re-hint">
-					Ici, la carte se consulte librement. Publier une partie, la rejoindre, annoncer un concours
-					ou signaler un abus se fera dans l'appli Pétanque Meet, bientôt disponible sur Android
-					et iPhone.
+					Ici, la carte se consulte librement. Pour publier une partie, la rejoindre, annoncer un concours
+					ou signaler un abus, utilise l'appli Pétanque Meet, sur Android et iPhone.
 				</p>
+				<StoreLinks />
 				<div className="re-formactions">
-					<button type="button" className="re-btn" onClick={onClose}>Compris</button>
+					<button type="button" className="re-btn re-btn--ghost" onClick={onClose}>Fermer</button>
 				</div>
 			</div>
 		</div>

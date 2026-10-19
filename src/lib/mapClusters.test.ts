@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { centreOf, clusterPoints } from './mapClusters';
+import { centreOf, clusterBoxes, clusterPoints } from './mapClusters';
 
 describe('clusterPoints', () => {
 	it('keeps far points apart', () => {
@@ -17,6 +17,14 @@ describe('clusterPoints', () => {
 
 	it('gives nothing for nothing', () => {
 		expect(clusterPoints([], 50)).toEqual([]);
+	});
+});
+
+describe('clusterBoxes', () => {
+	it('merges cards whose boxes overlap, round or not', () => {
+		// 78 x 136 posters: 90 px above still overlaps, 80 px aside does not.
+		expect(clusterBoxes([{ x: 0, y: 0 }, { x: 0, y: 90 }], 78, 136)).toEqual([[0, 1]]);
+		expect(clusterBoxes([{ x: 0, y: 0 }, { x: 80, y: 0 }], 78, 136)).toEqual([[0], [1]]);
 	});
 });
 

@@ -97,13 +97,20 @@
 	align-items: center;
 	gap: 0.5rem;
 }
+/* Six periods outgrow a phone: the strip scrolls sideways rather than squeezing
+   "Aujourd'hui" out of its own button. */
 .re-seg {
 	display: flex;
+	max-width: 100%;
 	border: 1px solid var(--gray-700);
 	border-radius: 0.6rem;
-	overflow: hidden;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
 }
 .re-segbtn {
+	flex: none;
+	white-space: nowrap;
 	font-family: var(--font-brand);
 	font-size: var(--text-sm);
 	color: var(--gray-100);
@@ -116,6 +123,20 @@
 .re-segbtn:last-child { border-right: none; }
 .re-segbtn--on { background: var(--accent-regular); color: var(--accent-text-over, #fff); }
 .re-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	color: var(--gray-100);
+	font-size: var(--text-sm);
+}
+
+.re-dates {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+.re-dates label {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.4rem;

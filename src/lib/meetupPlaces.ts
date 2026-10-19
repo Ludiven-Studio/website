@@ -20,6 +20,8 @@ export const SAME_PLACE_M = 500;
 export const NEAR_M = 30_000;
 
 const KEY = 'ludiven-meetup-places';
+/** The distance a player drives does not change between visits. */
+const NEAR_KEY = 'ludiven-meetup-near-km';
 
 export const cleanPlaceName = (raw: string): string =>
 	raw.replace(/\s+/g, ' ').trim().slice(0, 24) || 'Mon lieu';
@@ -67,4 +69,16 @@ export function readPlaces(): Place[] {
 
 export function savePlaces(list: readonly Place[]): void {
 	try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* private mode */ }
+}
+
+/** `allowed` keeps a stale or hand-edited value out of the filter. */
+export function readNearKm(allowed: readonly number[], fallback: number): number {
+	try {
+		const km = Number(localStorage.getItem(NEAR_KEY));
+		return allowed.includes(km) ? km : fallback;
+	} catch { return fallback; }
+}
+
+export function saveNearKm(km: number): void {
+	try { localStorage.setItem(NEAR_KEY, String(km)); } catch { /* private mode */ }
 }

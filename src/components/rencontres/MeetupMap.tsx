@@ -3,7 +3,7 @@ import L from 'leaflet';
 import type { MeetupEvent, MeetupSpot } from '../../lib/meetupRules';
 import type { Place } from '../../lib/meetupPlaces';
 import type { MeetupTournament } from '../../lib/meetups';
-import { centreOf, clusterPoints } from '../../lib/mapClusters';
+import { centreOf, clusterBoxes, clusterPoints } from '../../lib/mapClusters';
 import {
 	GAME_H, GAME_W, gameCard, gameClusterCard, ME_ICON, placeIcon, T_H, T_W, tournamentCard, tournamentClusterCard,
 	type Slot,
@@ -31,6 +31,8 @@ interface Props {
 	selectedSpotId?: string | null;
 	/** The player's position, once "Autour de moi" got it. */
 	me?: { lat: number; lng: number } | null;
+	/** Metres of the "autour de mes lieux" circles, 0 for none. */
+	nearM?: number;
 	/** When set, a click on the map drops the pin instead of selecting an event. */
 	picking: boolean;
 	pin: { lat: number; lng: number } | null;
@@ -61,10 +63,11 @@ const ICONS = {
 };
 
 /** Pins closer than this many screen pixels merge into a count pin: about the
- *  marker's half width, so boards do not pile up. */
+ *  marker's half width, so boards do not pile up. Cards merge when their boxes
+ *  would overlap (clusterBoxes). */
 const CLUSTER_PX = 24;
-const GAME_CLUSTER_PX = 110;
-const TOURNAMENT_CLUSTER_PX = 85;
+/** The place green of the app, faint inside so the games in the zone still read. */
+const NEAR_COLOUR = '#4a722c';
 /** From this zoom every pin stands alone: two on one pitch would otherwise stay a
  *  count pin that no zoom can open. */
 const NO_CLUSTER_ZOOM = 16;
@@ -73,9 +76,15 @@ const SPOTS_MIN_ZOOM = 12;
 const FAN_ROW = 4;
 const FAN_GAP = 6;
 
-/** At full zoom, cards on the same pitch side by side instead of piled on one
- *  point, where only the top one showed: rows of FAN_ROW centred on the pin,
- *  by start, each new row above the last. */
+/** Card `i` of `count` side by side: rows of FAN_ROW centred on the pin, each
+ *  new row above the last. Piled on one point, only the top card showed. */
+export function fanSlot(i: number, count: number, w: number, h: number): Slot {
+	const row = Math.floor(i / FAN_ROW);
+	const inRow = Math.min(FAN_ROW, count - row * FAN_ROW);
+	return [(i % FAN_ROW - (inRow - 1) / 2) * (w + FAN_GAP), row * (h + FAN_GAP)];
+}
+
+/** At full zoom, the games of one pitch side by side, by start. */
 export function fanSlots<T extends { spot_id: string; starts_at: string }>(
 	items: readonly T[], w: number, h: number,
 ): Map<T, Slot> {
@@ -88,11 +97,7 @@ export function fanSlots<T extends { spot_id: string; starts_at: string }>(
 	for (const list of by.values()) {
 		if (list.length < 2) continue;
 		list.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
-		list.forEach((it, i) => {
-			const row = Math.floor(i / FAN_ROW);
-			const inRow = Math.min(FAN_ROW, list.length - row * FAN_ROW);
-			out.set(it, [(i % FAN_ROW - (inRow - 1) / 2) * (w + FAN_GAP), row * (h + FAN_GAP)]);
-		});
+		list.forEach((it, i) => out.set(it, fanSlot(i, list.length, w, h)));
 	}
 	return out;
 }
@@ -112,7 +117,7 @@ const textNode = (text: string): HTMLElement => {
 
 export default function MeetupMap({
 	events, spots, places, tournaments, hoveredId, selectedId, selectedTournamentId = null, selectedSpotId = null,
-	picking, pin, me = null,
+	picking, pin, me = null, nearM = 0,
 	onHover, onSelect, onSelectSpot, onSelectTournament, onPick, handle,
 }: Props) {
 	const boxRef = useRef<HTMLDivElement>(null);
@@ -167,6 +172,16 @@ export default function MeetupMap({
 		return clusterPoints(items.map((it) => map.project([it.lat, it.lng], zoom)), radius);
 	};
 
+	/** Cards whose boxes would overlap. From NO_CLUSTER_ZOOM on they stand alone,
+	 *  unless `atFullZoom`: the caller then fans them out. */
+	const cardGroupsOf = <T extends { lat: number; lng: number }>(
+		items: readonly T[], w: number, h: number, atFullZoom = false,
+	): number[][] => {
+		const map = mapRef.current;
+		if (!map || (zoom >= NO_CLUSTER_ZOOM && !atFullZoom)) return items.map((_, i) => [i]);
+		return clusterBoxes(items.map((it) => map.project([it.lat, it.lng], zoom)), w, h);
+	};
+
 	/** A count pin: a tap zooms in two levels on the members' average. */
 	const addCluster = <T extends { lat: number; lng: number }>(
 		layer: L.LayerGroup, items: readonly T[], members: number[], icon: L.DivIcon,
@@ -194,13 +209,22 @@ export default function MeetupMap({
 		const layer = placeLayer.current;
 		if (!layer) return;
 		layer.clearLayers();
+		// Under the boards: the zone "autour de mes lieux" keeps to, one circle per place.
+		if (nearM > 0) {
+			for (const p of places) {
+				L.circle([p.lat, p.lng], {
+					radius: nearM, color: NEAR_COLOUR, weight: 1.5, opacity: 0.7,
+					fillColor: NEAR_COLOUR, fillOpacity: 0.06, interactive: false,
+				}).addTo(layer);
+			}
+		}
 		for (const p of places) {
 			const m = L.marker([p.lat, p.lng], { icon: placeIcon(p), interactive: false });
 			if (p.kind !== 'home') m.bindTooltip(textNode(p.name), { direction: 'top', permanent: false });
 			m.addTo(layer);
 		}
 		if (me) L.marker([me.lat, me.lng], { icon: ME_ICON, interactive: false, zIndexOffset: 3000 }).addTo(layer);
-	}, [places, me]);
+	}, [places, me, nearM]);
 
 	// Known places, drawn under the events. Unconfirmed user pins show hollow —
 	// a pin in someone's garden stays faint and dies on its own (spec §6).
@@ -238,7 +262,7 @@ export default function MeetupMap({
 		layer.clearLayers();
 		markers.current.clear();
 		const slots = zoom >= NO_CLUSTER_ZOOM ? fanSlots(events, GAME_W, GAME_H) : null;
-		for (const g of groupsOf(events, GAME_CLUSTER_PX)) {
+		for (const g of cardGroupsOf(events, GAME_W, GAME_H)) {
 			if (g.length > 1) {
 				addCluster(layer, events, g, gameClusterCard(g.length));
 				continue;
@@ -265,20 +289,27 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		tournamentMarkers.current.clear();
-		const slots = zoom >= NO_CLUSTER_ZOOM ? fanSlots(tournaments, T_W, T_H) : null;
-		for (const g of groupsOf(tournaments, TOURNAMENT_CLUSTER_PX)) {
-			if (g.length > 1) {
-				addCluster(layer, tournaments, g, tournamentClusterCard(g.length));
-				continue;
-			}
-			const t = tournaments[g[0]];
-			const m = L.marker([t.lat, t.lng], { icon: tournamentCard(t, slots?.get(t)), title: t.title, zIndexOffset: 500 })
+		const add = (t: MeetupTournament, at: { lat: number; lng: number }, slot?: Slot): void => {
+			const m = L.marker([at.lat, at.lng], { icon: tournamentCard(t, slot), title: t.title, zIndexOffset: 500 })
 				.on('click', () => {
 					if (cb.current.picking) cb.current.onPick(t.lat, t.lng);
 					else cb.current.onSelectTournament(t.id);
 				})
 				.addTo(layer);
 			tournamentMarkers.current.set(t.id, m);
+		};
+		const fan = zoom >= NO_CLUSTER_ZOOM;
+		for (const g of cardGroupsOf(tournaments, T_W, T_H, true)) {
+			if (g.length === 1) {
+				add(tournaments[g[0]], tournaments[g[0]]);
+			} else if (!fan) {
+				addCluster(layer, tournaments, g, tournamentClusterCard(g.length));
+			} else {
+				// No zoom can split them any more: side by side around their centre, soonest first.
+				const c = centreOf(g, (i) => tournaments[i]);
+				const group = g.map((i) => tournaments[i]).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+				group.forEach((t, i) => add(t, c, fanSlot(i, group.length, T_W, T_H)));
+			}
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps -- groupsOf/addCluster read the same zoom
 	}, [tournaments, zoom]);

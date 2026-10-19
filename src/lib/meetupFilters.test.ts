@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyFilters, applyTournamentFilters, matchesDate, matchesRole, weekendDays, DEFAULT_FILTERS } from './meetupFilters';
+import { applyFilters, applyTournamentFilters, matchesDate, matchesRole, rangeLabel, weekendDays, DEFAULT_FILTERS } from './meetupFilters';
 import type { MeetupTournament } from './meetups';
 import { challengeDayOrdinal } from './day';
 import type { MeetupEvent } from './meetupRules';
@@ -109,6 +109,14 @@ describe('applyFilters', () => {
 		expect(applyFilters([here, lyon, paris], f, NOW)).toHaveLength(3);
 	});
 
+	it('keeps to the distance picked around the places', () => {
+		// Saint-Jean-de-Bournay to Lyon is about 42 km.
+		const lyon = ev({ lat: 45.7578, lng: 4.8320 });
+		const places = [{ name: 'Maison', lat: 45.4489, lng: 5.1381 }];
+		expect(applyFilters([lyon], { ...DEFAULT_FILTERS, nearPlaces: true, nearKm: 30 }, NOW, places)).toHaveLength(0);
+		expect(applyFilters([lyon], { ...DEFAULT_FILTERS, nearPlaces: true, nearKm: 50 }, NOW, places)).toHaveLength(1);
+	});
+
 	it('does not mutate its input', () => {
 		const list = [ev({ starts_at: inDays(3) }), ev({ starts_at: inDays(1) })];
 		const before = list.map((e) => e.id);
@@ -140,5 +148,45 @@ describe('fortnight', () => {
 		expect(matchesDate(ev({ starts_at: inDays(12) }), 'week', NOW)).toBe(false);
 		expect(matchesDate(ev({ starts_at: inDays(12) }), 'fortnight', NOW)).toBe(true);
 		expect(matchesDate(ev({ starts_at: inDays(15) }), 'fortnight', NOW)).toBe(false);
+	});
+});
+
+describe('custom dates', () => {
+	// NOW is Monday 21 September; inDays(3) is Thursday the 24th, 17:00 Paris.
+	const range = { from: '2026-09-24', to: '2026-09-26' };
+
+	it('keeps both ends of the picked days', () => {
+		expect(matchesDate(ev({ starts_at: inDays(2) }), 'custom', NOW, range)).toBe(false);
+		expect(matchesDate(ev({ starts_at: inDays(3) }), 'custom', NOW, range)).toBe(true);
+		expect(matchesDate(ev({ starts_at: inDays(5) }), 'custom', NOW, range)).toBe(true);
+		expect(matchesDate(ev({ starts_at: inDays(6) }), 'custom', NOW, range)).toBe(false);
+	});
+
+	it('reads one day when the end is missing or before the start', () => {
+		expect(matchesDate(ev({ starts_at: inDays(3) }), 'custom', NOW, { from: '2026-09-24', to: '' })).toBe(true);
+		expect(matchesDate(ev({ starts_at: inDays(4) }), 'custom', NOW, { from: '2026-09-24', to: '2026-09-20' })).toBe(false);
+	});
+
+	it('counts the Paris day: 23:30 in Paris is still the 24th', () => {
+		const day = { from: '2026-09-24', to: '' };
+		expect(matchesDate({ starts_at: '2026-09-24T21:30:00Z' }, 'custom', NOW, day)).toBe(true);
+		expect(matchesDate({ starts_at: '2026-09-24T22:30:00Z' }, 'custom', NOW, day)).toBe(false);
+	});
+
+	it('keeps everything until a day is picked', () => {
+		expect(matchesDate(ev({ starts_at: inDays(40) }), 'custom', NOW, { from: '', to: '' })).toBe(true);
+	});
+
+	it('filters games through the same fields', () => {
+		const inside = ev({ starts_at: inDays(4) });
+		const outside = ev({ starts_at: inDays(9) });
+		const f = { ...DEFAULT_FILTERS, date: 'custom' as const, ...range };
+		expect(applyFilters([inside, outside], f, NOW).map((e) => e.id)).toEqual([inside.id]);
+	});
+
+	it('names the range the short way', () => {
+		expect(rangeLabel({ from: '2026-10-24', to: '' })).toBe('24 oct.');
+		expect(rangeLabel({ from: '2026-10-24', to: '2026-10-27' })).toBe('24 – 27 oct.');
+		expect(rangeLabel({ from: '2026-10-30', to: '2026-11-02' })).toBe('30 oct. – 2 nov.');
 	});
 });

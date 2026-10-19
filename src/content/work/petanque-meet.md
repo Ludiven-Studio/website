@@ -6,6 +6,8 @@ img_alt: Pétanque Meet — trouve des joueurs de pétanque près de chez toi
 role: Développeur
 org: Ludiven Studio
 appPage: /petanque-meet/
+appStore: https://apps.apple.com/fr/app/id6823583416
+playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=fr
 description: |
   Projet en cours. La carte des parties et des concours de pétanque, sur le web et en appli mobile : un seul serveur pour les deux, des comptes Apple et Google, du contenu public à modérer, et une interface Unity générée par script.
 tags:
@@ -35,7 +37,7 @@ gallery:
 ---
 <p>
   Cette page décrit la <strong>démarche technique</strong> derrière Pétanque Meet, un projet
-  <strong>en cours</strong>&nbsp;: l'appli est en cours de publication sur le Play Store et l'App Store.
+  <strong>en cours</strong>&nbsp;: l'appli est sur le Play Store et l'App Store, et continue d'évoluer.
   Pour trouver une partie, la <a href="/petanque-meet/">carte des parties</a> est faite pour ça.
 </p>
 
@@ -108,7 +110,9 @@ gallery:
 
 <h2>Où en est le projet</h2>
 <p>
-  La carte web est en ligne. La publication de l'appli sur le Play Store et l'App Store est en cours.
+  La carte web est en ligne, et l'appli est disponible sur le
+  <a href="https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=fr" target="_blank">Play Store</a>
+  et l'<a href="https://apps.apple.com/fr/app/id6823583416" target="_blank">App Store</a>.
 </p>
 <p>
   Voir aussi&nbsp;: la <a href="/petanque-meet/">carte des parties</a>, la
