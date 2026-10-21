@@ -5,20 +5,20 @@ import Hero from '../../components/Hero.astro';
 
 <BaseLayout
 	title="Confidentialité de l'application Pétanque Meet | Ludiven Studio"
-	description="Politique de confidentialité de l'application mobile Pétanque Meet : compte Google ou Apple, parties publiées sur la carte, concours, modération, droits RGPD."
+	description="Politique de confidentialité de l'application mobile Pétanque Meet : compte Google ou Apple, parties publiées sur la carte, concours, publicité, modération, droits RGPD."
 	alternates={{ fr: '/petanque-meet/confidentialite/' }}
 >
 	<div class="wrapper stack gap-12 legal">
 		<Hero
 			title="Confidentialité — Pétanque Meet"
-			tagline="Ce que tu publies sur la carte est public. Le reste ne sort pas de chez nous."
+			tagline="Ce que tu publies sur la carte est public. Le reste n'est ni vendu ni cédé."
 		/>
 
 		<p class="updated">
 			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>
 			(<code>com.ludivenstudio.petanquemeet</code>) et la carte des rencontres qu'elle partage avec le site
 			(<a href="/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 14 octobre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 21 octobre 2026.
 		</p>
 
 		<div class="summary">
@@ -27,7 +27,7 @@ import Hero from '../../components/Hero.astro';
 				<li>Regarder la carte ne demande <strong>aucun compte</strong>. Pour publier, rejoindre ou signaler une partie, tu te connectes avec <strong>Google ou Apple</strong>.</li>
 				<li>Ce que tu publies est <strong>visible de tous</strong>&nbsp;: le prénom que tu saisis, le terrain, l'horaire, et pour un concours les informations du club. Ton adresse mail, elle, n'est jamais montrée.</li>
 				<li>Ta position GPS sert seulement à centrer la carte sur ton téléphone. <strong>Elle n'est jamais envoyée.</strong></li>
-				<li>Pas de publicité, pas de revente de données, pas de profilage.</li>
+				<li>Une <strong>bannière publicitaire</strong> de Google finance l'application. Elle n'est personnalisée qu'<strong>avec ton accord</strong>. Aucune revente de données.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis l'application.</li>
 			</ul>
 		</div>
@@ -151,13 +151,19 @@ import Hero from '../../components/Hero.astro';
 							<td>Intérêt légitime</td>
 							<td>Umami Cloud</td>
 						</tr>
+						<tr>
+							<td>Identifiant publicitaire, adresse IP, interactions avec les annonces, informations techniques (voir §9)</td>
+							<td>Afficher et mesurer la bannière publicitaire, lutter contre la fraude</td>
+							<td>Ton consentement (art. 6.1.a) pour les annonces personnalisées&nbsp;; intérêt légitime sinon</td>
+							<td>Google (AdMob) et, avec ton accord, ses partenaires publicitaires</td>
+						</tr>
 					</tbody>
 				</table>
 			</div>
 			<p>
 				L'application ne collecte <strong>pas</strong>&nbsp;: ta position GPS, tes contacts, tes photos (hors
-				l'affiche que tu choisis d'envoyer), ton nom de famille, ni aucun identifiant publicitaire. Elle
-				n'affiche aucune publicité.
+				l'affiche que tu choisis d'envoyer), ni ton nom de famille. L'identifiant publicitaire de ton téléphone
+				n'est lu que par le module publicitaire de Google (voir §9)&nbsp;: nous ne le recevons pas.
 			</p>
 		</section>
 
@@ -224,11 +230,42 @@ import Hero from '../../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>9. Ce qui est stocké sur ton téléphone</h2>
+			<h2>9. Publicité</h2>
+			<p>
+				L'application affiche une <strong>bannière publicitaire</strong> en haut de l'écran. Elle est fournie
+				par <strong>Google AdMob</strong> et finance le service, qui reste gratuit.
+			</p>
+			<p>
+				Pour afficher les annonces, les mesurer et lutter contre la fraude, le module de Google reçoit
+				l'<strong>identifiant publicitaire</strong> de ton téléphone, ton <strong>adresse IP</strong> (qui
+				donne une position approximative, à l'échelle de la ville), tes interactions avec les annonces
+				(affichage, toucher) et des informations techniques sur l'application et l'appareil. Nous ne lui
+				transmettons ni ton compte, ni ton adresse mail, ni ton prénom, ni tes parties.
+			</p>
+			<p>
+				<strong>Ton accord.</strong> Au premier lancement, un formulaire de Google te demande si tu acceptes
+				les annonces personnalisées. Sans ton accord, les annonces ne sont pas personnalisées. Tu peux changer
+				d'avis à tout moment&nbsp;: «&nbsp;Compte et aide&nbsp;» → «&nbsp;Choix publicitaires&nbsp;». Sur
+				iPhone, l'application te demande aussi l'autorisation de suivi d'Apple&nbsp;; sans elle, l'identifiant
+				publicitaire n'est pas utilisé.
+			</p>
+			<p>
+				Tu peux aussi réinitialiser ou supprimer l'identifiant publicitaire dans les réglages de ton téléphone.
+				Pour en savoir plus&nbsp;:
+				<a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">comment
+				Google utilise les données des applications partenaires</a> et les
+				<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">règles de confidentialité
+				de Google</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>10. Ce qui est stocké sur ton téléphone</h2>
 			<ul>
 				<li>ta session de connexion et ton adresse mail&nbsp;;</li>
 				<li>le prénom que tu as saisi, les parties rejointes, les lieux que tu as enregistrés, le dernier endroit affiché sur la carte&nbsp;;</li>
 				<li>tes préférences&nbsp;: langue, thème, organisateurs masqués, messages déjà vus&nbsp;;</li>
+				<li>ton choix sur la publicité et les données du module publicitaire de Google (voir §9)&nbsp;;</li>
 				<li>un cache des fonds de carte et des affiches, pour un affichage plus rapide.</li>
 			</ul>
 			<p>
@@ -241,13 +278,14 @@ import Hero from '../../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>10. Destinataires et transferts hors Union européenne</h2>
+			<h2>11. Destinataires et transferts hors Union européenne</h2>
 			<p>
 				Tes données ne sont ni vendues ni cédées. Elles ne sont traitées que par ces prestataires&nbsp;:
 			</p>
 			<ul>
 				<li><strong>Supabase</strong> — base de données, comptes et stockage des affiches. Données hébergées dans l'Union européenne (Irlande).</li>
 				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte et distribution de l'application.</li>
+				<li><strong>Google (AdMob)</strong> — affichage et mesure de la bannière publicitaire (voir §9).</li>
 				<li><strong>IGN</strong> (Institut national de l'information géographique et forestière, France) — fonds de carte et recherche de lieux. Comme pour tout site web, ses serveurs voient l'adresse IP de ton téléphone.</li>
 				<li><strong>Fondation OpenStreetMap</strong> — nom d'un nouveau terrain (service Nominatim). Seules les coordonnées du terrain lui sont envoyées, par notre serveur.</li>
 				<li><strong>Resend</strong> — envoi à l'éditeur des e-mails de modération.</li>
@@ -266,7 +304,7 @@ import Hero from '../../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>11. Durées de conservation</h2>
+			<h2>12. Durées de conservation</h2>
 			{/* TODO legal: the server has no purge job yet. These durations need one before release. */}
 			<ul>
 				<li><strong>Parties et inscriptions</strong>&nbsp;: retirées de la carte dès qu'elles sont terminées ou annulées, puis effacées <strong>12 mois</strong> après leur date.</li>
@@ -279,7 +317,7 @@ import Hero from '../../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>12. Supprimer ton compte</h2>
+			<h2>13. Supprimer ton compte</h2>
 			<p>
 				Dans l'application&nbsp;: <strong>«&nbsp;Compte et aide&nbsp;» → «&nbsp;Supprimer mon compte&nbsp;»</strong>.
 				C'est immédiat et définitif&nbsp;:
@@ -291,7 +329,7 @@ import Hero from '../../components/Hero.astro';
 			</ul>
 			<p>
 				Tes anciennes parties restent un temps dans la base, sans prénom, rattachées à un identifiant technique
-				qui ne renvoie plus à aucun compte. Elles suivent ensuite les durées du §11.
+				qui ne renvoie plus à aucun compte. Elles suivent ensuite les durées du §12.
 			</p>
 			<p>
 				Tu peux aussi demander la suppression par e-mail à
@@ -301,7 +339,7 @@ import Hero from '../../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>13. Tes droits</h2>
+			<h2>14. Tes droits</h2>
 			<p>
 				Conformément au RGPD, tu disposes d'un droit d'accès, de rectification, d'effacement, de limitation,
 				d'opposition et de portabilité. Pour les exercer, ou pour faire retirer une annonce, un prénom ou une
@@ -316,7 +354,7 @@ import Hero from '../../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>14. Mineurs</h2>
+			<h2>15. Mineurs</h2>
 			<p>
 				L'application sert à rencontrer d'autres joueurs en vrai. Elle s'adresse aux personnes de
 				<strong>15 ans et plus</strong>. Un mineur doit avoir l'accord de ses parents, et ne devrait pas se
@@ -326,7 +364,7 @@ import Hero from '../../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>15. Sécurité</h2>
+			<h2>16. Sécurité</h2>
 			<p>
 				Tous les échanges sont chiffrés (HTTPS). Les données de la carte ne sont accessibles que par notre
 				serveur&nbsp;: aucun accès direct à la base n'est ouvert, même en lecture. Ta session est conservée
@@ -335,7 +373,7 @@ import Hero from '../../components/Hero.astro';
 		</section>
 
 		<section class="stack gap-2">
-			<h2>16. Modifications</h2>
+			<h2>17. Modifications</h2>
 			<p>
 				Cette politique peut évoluer avec l'application. La date de dernière mise à jour figure en haut de
 				page. En cas de changement important, l'application te le signalera.
