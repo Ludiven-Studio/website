@@ -18,7 +18,7 @@ import Hero from '../../components/Hero.astro';
 			Cette politique concerne <strong>l'application mobile Pétanque Meet</strong>
 			(<code>com.ludivenstudio.petanquemeet</code>) et la carte des rencontres qu'elle partage avec le site
 			(<a href="/petanque-meet/">ludiven-studio.fr/petanque-meet</a>). Le reste du site a sa
-			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 21 octobre 2026.
+			<a href="/confidentialite/">propre politique</a>. Dernière mise à jour&nbsp;: 22 octobre 2026.
 		</p>
 
 		<div class="summary">
@@ -140,10 +140,10 @@ import Hero from '../../components/Hero.astro';
 							<td>Supabase&nbsp;; l'éditeur, par e-mail via Resend</td>
 						</tr>
 						<tr>
-							<td>Texte d'une recherche de lieu</td>
+							<td>Texte d'une recherche de lieu, et pour komoot le centre de la carte affichée</td>
 							<td>Trouver une ville ou une adresse sur la carte</td>
 							<td>Exécution du contrat</td>
-							<td>IGN (Géoplateforme)</td>
+							<td>IGN (Géoplateforme) pour la France&nbsp;; komoot (Photon) pour le reste du monde</td>
 						</tr>
 						<tr>
 							<td>Statistiques d'usage anonymes (voir §8)</td>
@@ -286,7 +286,9 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>Supabase</strong> — base de données, comptes et stockage des affiches. Données hébergées dans l'Union européenne (Irlande).</li>
 				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte et distribution de l'application.</li>
 				<li><strong>Google (AdMob)</strong> — affichage et mesure de la bannière publicitaire (voir §9).</li>
-				<li><strong>IGN</strong> (Institut national de l'information géographique et forestière, France) — fonds de carte et recherche de lieux. Comme pour tout site web, ses serveurs voient l'adresse IP de ton téléphone.</li>
+				<li><strong>BKG</strong> (Office fédéral allemand de cartographie et de géodésie) — fonds de carte (TopPlusOpen). Comme pour tout site web, ses serveurs voient l'adresse IP de ton téléphone.</li>
+				<li><strong>IGN</strong> (Institut national de l'information géographique et forestière, France) — recherche d'adresses en France, et fonds de carte des premières versions de l'application. Ses serveurs voient aussi l'adresse IP de ton téléphone.</li>
+				<li><strong>komoot</strong> (service Photon, Allemagne) — recherche de lieux hors de France. Le texte cherché et le centre de la carte affichée lui sont envoyés.</li>
 				<li><strong>Fondation OpenStreetMap</strong> — nom d'un nouveau terrain (service Nominatim). Seules les coordonnées du terrain lui sont envoyées, par notre serveur.</li>
 				<li><strong>Resend</strong> — envoi à l'éditeur des e-mails de modération.</li>
 				<li><strong>Umami Software, Inc.</strong> — statistiques d'usage anonymes.</li>
