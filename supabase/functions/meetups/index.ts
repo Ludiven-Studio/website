@@ -248,7 +248,9 @@ const T_MAX_CONTESTS = 6;
 const T_CONTESTS_SPAN_MS = 3 * 86400_000;
 /** A tournament has no end time: it leaves the map half a day after it starts. */
 const T_SHOWN_AFTER_START_MS = 12 * 3600_000;
-const MAX_ACTIVE_TOURNAMENTS = 5;
+/** Per account, which for a club is the club: some run 50 a year, two a week
+ *  posted four months ahead. The daily create cap stays the flood guard. */
+const MAX_ACTIVE_TOURNAMENTS = 50;
 const MAX_FOLLOWS = 50;
 /** The account the committee calendars are imported under (tools/import_committee.py
  *  in PetanqueMeet). Only its tournaments can be claimed by a club. */
