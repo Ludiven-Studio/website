@@ -9,7 +9,7 @@
  * order; previews and the AI run on a clone so they never advance the real one.
  */
 
-import { type Terrain, heightAt, gradAt, pebblesNear, inPitch, hashN } from './terrain';
+import { type Terrain, type GroundSample, heightAt, gradAt, pebblesNear, inPitch, hashN, surfaceAt, gritAt } from './terrain';
 
 export const G = 9.81;
 export const BOULE_R = 0.0375; // 75 mm competition boule
@@ -17,7 +17,7 @@ export const BOULE_M = 0.7;
 export const JACK_R = 0.015;
 export const JACK_M = 0.012;
 
-const BOULE_REST = 0.90; // boule-boule restitution — this is what makes a carreau possible
+export const BOULE_REST = 0.90; // boule-boule restitution — this is what makes a carreau possible
 const ROLL_VN = 0.35; // normal speed below which a bounce becomes a roll
 const BOUNCE_VN = 1.6; // m/s — the rebound a boule tends to on clay, however hard it lands (13 cm ceiling)
 const SLOPE_K = 5 / 7; // rolling sphere: only 5/7 of the slope acceleration reaches the centre
@@ -34,6 +34,28 @@ const SPIN_ROLL = 0.65; // rad/s of curve while rolling, full spin
 const SPIN_DECAY = 0.45; // share lost per second of roll
 const SPIN_BOUNCE_KEEP = 0.8;
 const SPIN_HIT_KEEP = 0.25;
+/* Uneven pitches (terrain.rough set) only. Landing on a stone sends the boule off at an angle, away
+   from the stone; the micro-gravel turns a rolling boule all along its run, more as it slows. A
+   heavy boule pushes through both, a big one rides the grit. Previews and the AI plan on a blind
+   sim that feels neither: they are what nobody can read on the ground. The stones a rolling boule
+   meets are drawn where they lie, so the blind sim still meets them. */
+const LAND_KICK = 0.9; // rad per unit bite
+const LAND_MAX = 0.35; // rad, about 20 deg
+const LAND_HOP = 0.12; // upward share of the speed
+const GRIT = 4.4; // rad per second of run at full difficulty on grit 1, over a speed in m/s
+const GRIT_V0 = 0.35; // m/s: below this a stone turns it no more than at this speed
+const JACK_GRIT = 1.5;
+
+/** A boule's make. The standard one is the website's boule, value for value. */
+export interface Kit {
+	m: number; // kg
+	r: number; // m
+	e: number; // restitution against another body: a soft (tendre) boule keeps less
+	bite: number; // speed kept on landing: under 1 a soft boule sticks, over 1 a hard one runs on
+	aim: number; // spread of the hand: a heavy or big boule is harder to hold steady
+}
+
+export const STANDARD_KIT: Kit = { m: BOULE_M, r: BOULE_R, e: BOULE_REST, bite: 1, aim: 1 };
 
 export interface Boule {
 	x: number;
@@ -48,6 +70,8 @@ export interface Boule {
 	live: boolean; // false once it has left the pitch
 	rolling: boolean;
 	spin?: number; // the effet, -1 (left) to 1 (right) seen from behind the throw; absent = none
+	e?: number; // the kit's restitution; absent = BOULE_REST
+	bite?: number; // the kit's landing grip; absent = 1
 }
 
 /** A throw's velocity, and its effet when the hand gave one (see `Boule.spin`). */
@@ -67,6 +91,8 @@ export interface Sim {
 	t: Terrain;
 	bs: Boule[];
 	rng: number; // grain counter
+	kits?: [Kit, Kit]; // each side's boules; absent = standard
+	blind?: boolean; // a plan or a preview: no stone kick on landing, no micro-gravel
 }
 
 export interface StepResult {
@@ -75,8 +101,9 @@ export interface StepResult {
 	out: number[]; // indices that left the pitch this call
 }
 
-export const makeBoule = (x: number, y: number, side: 0 | 1): Boule =>
-	({ x, y, z: BOULE_R, vx: 0, vy: 0, vz: 0, r: BOULE_R, m: BOULE_M, side, live: true, rolling: true });
+export const makeBoule = (x: number, y: number, side: 0 | 1, kit?: Kit): Boule => kit
+	? { x, y, z: kit.r, vx: 0, vy: 0, vz: 0, r: kit.r, m: kit.m, side, live: true, rolling: true, e: kit.e, bite: kit.bite }
+	: { x, y, z: BOULE_R, vx: 0, vy: 0, vz: 0, r: BOULE_R, m: BOULE_M, side, live: true, rolling: true };
 
 export const makeJack = (x: number, y: number): Boule =>
 	({ x, y, z: JACK_R, vx: 0, vy: 0, vz: 0, r: JACK_R, m: JACK_M, side: -1, live: true, rolling: true });
@@ -114,8 +141,29 @@ export const dist2 = (a: Boule, b: Boule): number => {
 };
 
 export function cloneSim(s: Sim): Sim {
-	return { t: s.t, rng: s.rng, bs: s.bs.map((b) => ({ ...b })) };
+	const c: Sim = { t: s.t, rng: s.rng, bs: s.bs.map((b) => ({ ...b })) };
+	if (s.kits) c.kits = s.kits;
+	if (s.blind) c.blind = true;
+	return c;
 }
+
+/** A clone for planning or previewing: it reads the ground but feels no stone kick on landing nor grit. */
+export function blindSim(s: Sim): Sim {
+	const c = cloneSim(s);
+	c.blind = true;
+	return c;
+}
+
+/** How much less a body is thrown about than the standard boule: its mass against 700 g, squared
+ *  (measured: linear, a heavy boule never paid off on rough ground). The jack keeps its own,
+ *  untouched behaviour. */
+const steady = (b: Boule): number => (b.side === -1 ? 1 : (BOULE_M / b.m) * (BOULE_M / b.m));
+
+/** The share of its run a body keeps for its weight when it lands: a heavy boule sinks into sand or
+ *  loose gravel, not into packed clay (restitution 0.30 and up). Measured: digging in everywhere
+ *  made heavy boules win on every ground. 1 for the standard boule and the jack. */
+const dig = (b: Boule, restitution: number): number =>
+	1 - (1 - Math.sqrt(steady(b))) * (restitution < 0.30 ? 1 - restitution / 0.30 : 0);
 
 /** Rotate the horizontal velocity by a small angle without sin/cos: shear, then restore speed. */
 function deflect(b: Boule, a: number): void {
@@ -133,9 +181,10 @@ function grain(s: Sim): number {
 }
 
 const gv = { gx: 0, gy: 0 };
+const gs: GroundSample = { rollFriction: 0, restitution: 0, impactFriction: 0, scatter: 0, grit: 0 };
 
-function groundContact(s: Sim, b: Boule, imp?: Impact[]): void {
-	const surf = s.t.surface;
+function groundContact(s: Sim, b: Boule, near: number[], imp?: Impact[]): void {
+	const surf = surfaceAt(s.t, b.x, b.y, gs);
 	gradAt(s.t, b.x, b.y, gv);
 	// unit normal of the local patch
 	const nl = 1 / Math.sqrt(gv.gx * gv.gx + gv.gy * gv.gy + 1);
@@ -156,18 +205,45 @@ function groundContact(s: Sim, b: Boule, imp?: Impact[]): void {
 	   plombée on clay 27 cm back up. The rebound saturates at BOUNCE_VN instead (scaled by the
 	   ground's own restitution, so soft ground absorbs more), with no kink: a soft touch keeps its
 	   bounce, a plombée stays under ~9 cm. sqrt only, so replays stay bit-identical. The jack is
-	   light and keeps its plain bounce. */
+	   light and keeps its plain bounce. A heavier boule digs into a soft ground and keeps less of its
+	   run; a light one skips on. Its rebound does not depend on its weight: measured, a heavy boule
+	   bouncing lower won every ground. */
 	if (b.side !== -1) {
 		const cap = BOUNCE_VN * (surf.restitution / 0.30);
 		back /= Math.sqrt(1 + (back / cap) * (back / cap));
 	}
-	b.vx = tx * surf.impactFriction + nx * back;
-	b.vy = ty * surf.impactFriction + ny * back;
-	b.vz = tz * surf.impactFriction + nz * back;
-	deflect(b, grain(s) * surf.scatter * -vn);
+	const bite = b.bite ?? 1;
+	const run = surf.impactFriction * bite * dig(b, surf.restitution);
+	b.vx = tx * run + nx * back * bite;
+	b.vy = ty * run + ny * back * bite;
+	b.vz = tz * run + nz * back * bite;
+	deflect(b, grain(s) * surf.scatter * -vn * steady(b));
 	// The effet bites at the bounce: a positive spin turns right, which is a negative shear.
 	if (b.spin) { deflect(b, -b.spin * SPIN_LAND); b.spin *= SPIN_BOUNCE_KEEP; }
 	imp?.push({ kind: 'ground', x: b.x, y: b.y, z: b.z, speed: -vn });
+	if (s.t.rough !== undefined && !s.blind) landOnStone(s, b, near, imp);
+}
+
+/** Uneven pitches: a boule coming down on a stone leaves at an angle, away from it, and hops. */
+function landOnStone(s: Sim, b: Boule, near: number[], imp?: Impact[]): void {
+	const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+	if (sp < 0.15) return;
+	pebblesNear(s.t, b.x, b.y, near);
+	for (let k = 0; k < near.length; k++) {
+		const p = s.t.pebbles[near[k]];
+		const dx = p.x - b.x, dy = p.y - b.y;
+		const d = Math.sqrt(dx * dx + dy * dy);
+		const reach = b.r * 0.8 + p.r;
+		if (d >= reach || d <= 1e-6) continue;
+		// The stone's side of the line of flight, -1..1: a stone on the left sends it right.
+		const side = (-b.vy * dx + b.vx * dy) / (sp * reach);
+		const bite = (p.r / b.r) * (1 - d / reach);
+		const a = -side * bite * LAND_KICK * steady(b);
+		deflect(b, a < -LAND_MAX ? -LAND_MAX : a > LAND_MAX ? LAND_MAX : a);
+		b.vz += bite * sp * LAND_HOP * steady(b);
+		imp?.push({ kind: 'pebble', x: p.x, y: p.y, z: b.z - b.r, speed: sp });
+		return;
+	}
 }
 
 /** A pebble under a rolling boule kicks it sideways and a little upward. */
@@ -181,13 +257,13 @@ function pebbleContact(s: Sim, b: Boule, near: number[], imp?: Impact[]): void {
 		const d = Math.sqrt(dx * dx + dy * dy);
 		const reach = b.r * 0.55 + p.r;
 		if (d >= reach || d <= 1e-6) continue;
-		// signed offset across the direction of travel decides which way it is thrown
+		// The stone's side of the direction of travel, -1..1: one on the left pushes it right.
 		const side = (-b.vy * dx + b.vx * dy) / (sp * reach);
 		const bite = (p.r / b.r) * (1 - d / reach);
-		deflect(b, side * bite * PEBBLE_KICK);
+		deflect(b, -side * bite * PEBBLE_KICK * steady(b));
 		// A 12 g jack jumps off a stone that a 700 g boule just rolls over: its own, livelier hop,
 		// capped so a coarse-gravel stone twice its radius does not launch it.
-		b.vz += b.side === -1 ? Math.min(1, bite) * sp * JACK_PEBBLE_HOP : bite * sp * PEBBLE_HOP;
+		b.vz += b.side === -1 ? Math.min(1, bite) * sp * JACK_PEBBLE_HOP : bite * sp * PEBBLE_HOP * steady(b);
 		b.rolling = false;
 		imp?.push({ kind: 'pebble', x: p.x, y: p.y, z: b.z - b.r, speed: sp });
 		return; // one pebble per sub-step is enough, and keeps the order unambiguous
@@ -206,7 +282,9 @@ function collide(t: Terrain, a: Boule, b: Boule, imp?: Impact[]): boolean {
 	b.x += nx * push * ib; b.y += ny * push * ib; b.z += nz * push * ib;
 	const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny + (b.vz - a.vz) * nz;
 	if (vn >= 0) return false;
-	const j = (-(1 + BOULE_REST) * vn) / (ia + ib);
+	// Two makes meet halfway: a soft boule against a hard one bounces like two medium ones.
+	const rest = ((a.e ?? BOULE_REST) + (b.e ?? BOULE_REST)) / 2;
+	const j = (-(1 + rest) * vn) / (ia + ib);
 	a.vx -= j * ia * nx; a.vy -= j * ia * ny; a.vz -= j * ia * nz;
 	b.vx += j * ib * nx; b.vy += j * ib * ny; b.vz += j * ib * nz;
 	a.rolling = false; b.rolling = false;
@@ -239,11 +317,16 @@ export function stepSim(s: Sim, dt: number, imp?: Impact[]): StepResult {
 				const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
 				if (sp < SETTLE) { b.vx = 0; b.vy = 0; b.vz = 0; b.z = ground; continue; }
 				gradAt(s.t, b.x, b.y, gv);
-				const drag = s.t.surface.rollFriction * G;
+				const drag = surfaceAt(s.t, b.x, b.y, gs).rollFriction * G;
 				b.vx += (-G * gv.gx * SLOPE_K - (drag * b.vx) / sp) * h;
 				b.vy += (-G * gv.gy * SLOPE_K - (drag * b.vy) / sp) * h;
 				b.vz = 0;
 				if (b.spin) { deflect(b, -b.spin * SPIN_ROLL * h); b.spin -= b.spin * SPIN_DECAY * h; }
+				// Micro-gravel: each stone turns it by more as it slows (the run's last metre wanders).
+				if (s.t.rough !== undefined && !s.blind) {
+					const w = (GRIT * s.t.rough * gs.grit * gritAt(s.t, b.x, b.y) * h * sp) / Math.max(sp * sp, GRIT_V0 * GRIT_V0);
+					deflect(b, b.side === -1 ? w * JACK_GRIT : w * steady(b) * (BOULE_R / b.r));
+				}
 				b.x += b.vx * h;
 				b.y += b.vy * h;
 				b.z = heightAt(s.t, b.x, b.y) + b.r;
@@ -258,7 +341,7 @@ export function stepSim(s: Sim, dt: number, imp?: Impact[]): StepResult {
 				b.z += b.vz * h;
 				if (b.z <= heightAt(s.t, b.x, b.y) + b.r) {
 					if (!res.landed) res.landed = true;
-					groundContact(s, b, imp);
+					groundContact(s, b, near, imp);
 				}
 			}
 		}

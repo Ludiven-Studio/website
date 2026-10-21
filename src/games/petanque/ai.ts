@@ -8,8 +8,8 @@
  * sim never advances while the AI is thinking.
  */
 
-import { type Sim, type Boule, type Velocity, makeBoule, makeJack, release, throwVelocity, settle, cloneSim } from './engine';
-import { hashN } from './terrain';
+import { type Sim, type Boule, type Velocity, makeBoule, makeJack, release, throwVelocity, settle, blindSim, BOULE_R } from './engine';
+import { type GroundSample, hashN, surfaceAt } from './terrain';
 import { type Match13, type Side, other, MIN_JACK, MAX_JACK } from './rules13';
 
 export type Intent = 'point' | 'shoot' | 'jack';
@@ -56,9 +56,16 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number 
 	return Math.sqrt(dx * dx + dy * dy);
 };
 
-/** A hard ground lets the boule run, so the donnée sits short; on sand you have to carry it. */
-const elevationFor = (s: Sim, intent: Intent): number =>
-	intent === 'shoot' ? 0.36 : 0.45 + s.t.surface.rollFriction * 0.35;
+/** A boule's distance to the jack as the umpire measures it: a bigger boule reaches closer. Equal to
+ *  the plain distance for the standard size. */
+const gap = (b: Boule, jack: Boule): number => dist(b, jack) - (b.r - BOULE_R);
+
+const ground: GroundSample = { rollFriction: 0, restitution: 0, impactFriction: 0, scatter: 0, grit: 0 };
+
+/** A hard ground lets the boule run, so the donnée sits short; on sand you have to carry it. Read
+ *  where the jack lies: on a patchy pitch, that is the ground the boule must stop on. */
+const elevationFor = (s: Sim, intent: Intent, at: { x: number; y: number }): number =>
+	intent === 'shoot' ? 0.36 : 0.45 + surfaceAt(s.t, at.x, at.y, ground).rollFriction * 0.35;
 
 export const SHOOT_ELEV = 0.36;
 
@@ -82,15 +89,15 @@ export function laneBlocked(bs: Boule[], from: { x: number; y: number }, to: { x
 	return false;
 }
 
-/** Start a throw: the body leaves the thrower's hand above the circle (see `release`). */
+/** Start a throw: the body leaves the thrower's hand above the circle (see `release`), in its side's make. */
 export function launch(s: Sim, from: { x: number; y: number }, side: Side, v: Velocity, asJack = false): Boule {
-	return release(s.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, side), v);
+	return release(s.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, side, s.kits?.[side]), v);
 }
 
-/** Replay one throw on a clone. Returns where the new body came to rest. */
+/** Replay one throw on a blind clone. Returns where the new body came to rest. */
 function tryThrow(s: Sim, from: { x: number; y: number }, side: Side, dirX: number, dirY: number, speed: number, elev: number, asJack: boolean):
 	{ x: number; y: number; live: boolean } {
-	const c = cloneSim(s);
+	const c = blindSim(s);
 	const b = launch(c, from, side, throwVelocity(dirX, dirY, speed, elev), asJack);
 	c.bs.push(b);
 	settle(c, undefined, 30);
@@ -141,7 +148,7 @@ function bests(bs: Boule[], jack: Boule): [number, number] {
 	const best: [number, number] = [Infinity, Infinity];
 	for (const b of bs) {
 		if (!b.live || (b.side !== 0 && b.side !== 1)) continue;
-		const d = dist(b, jack);
+		const d = gap(b, jack);
 		if (d < best[b.side]) best[b.side] = d;
 	}
 	return best;
@@ -161,7 +168,7 @@ function jackShot(s: Sim, jack: Boule, state: Match13, side: Side, best: [number
 	const foe = other(side);
 	if (state.left[foe] > 0 || state.left[side] < 1) return null;
 	const gain = state.left[side] - 1;
-	const held = s.bs.filter((b) => b.live && b.side === foe && dist(b, jack) < best[side]).length;
+	const held = s.bs.filter((b) => b.live && b.side === foe && gap(b, jack) < best[side]).length;
 	const hard = best[foe] < UNPOINTABLE || held >= 2 || laneBlocked(s.bs, state.circle, jack);
 	if (gain === 0 ? held < 2 : gain === 1 && !hard) return null;
 
@@ -174,7 +181,7 @@ function jackShot(s: Sim, jack: Boule, state: Match13, side: Side, best: [number
 	for (const elev of JACK_ELEVS) {
 		let run = 0;
 		for (let sp = JACK_SPD_LO; sp <= JACK_SPD_HI + 1e-9; sp += JACK_SPD_STEP) {
-			const c = cloneSim(s);
+			const c = blindSim(s);
 			c.bs.push(launch(c, from, side, throwVelocity(dirX, dirY, sp, elev)));
 			settle(c, undefined, 30);
 			const out = ji >= 0 && !c.bs[ji].live;
@@ -189,7 +196,7 @@ function jackShot(s: Sim, jack: Boule, state: Match13, side: Side, best: [number
 function choose(s: Sim, jack: Boule, state: Match13, side: Side, skill: number): { intent: Intent; shot?: JackShot } {
 	const foe = other(side);
 	const best = bests(s.bs, jack);
-	const target = s.bs.find((b) => b.live && b.side === foe && Math.abs(dist(b, jack) - best[foe]) < 1e-9);
+	const target = s.bs.find((b) => b.live && b.side === foe && Math.abs(gap(b, jack) - best[foe]) < 1e-9);
 	if (!target) return { intent: 'point' }; // nothing to shoot at
 	if (best[side] < best[foe]) return { intent: 'point' }; // we already hold it, just add
 	if (skill >= JACK_SHOT_SKILL) {
@@ -221,13 +228,13 @@ export function planThrow(s: Sim, jack: Boule, state: Match13, side: Side, skill
 	const from = state.circle;
 	const { intent, shot } = choose(s, jack, state, side, skill);
 	const k = norm(skill);
-	const elev = shot ? shot.elev : elevationFor(s, intent);
+	const elev = shot ? shot.elev : elevationFor(s, intent, jack);
 
 	let aim = { x: jack.x, y: jack.y };
 	if (intent === 'shoot') {
 		const foe = other(side);
 		const best = bests(s.bs, jack);
-		const t = s.bs.find((b) => b.live && b.side === foe && Math.abs(dist(b, jack) - best[foe]) < 1e-9);
+		const t = s.bs.find((b) => b.live && b.side === foe && Math.abs(gap(b, jack) - best[foe]) < 1e-9);
 		if (t) aim = { x: t.x, y: t.y };
 	}
 
@@ -241,8 +248,10 @@ export function planThrow(s: Sim, jack: Boule, state: Match13, side: Side, skill
 		: intent === 'shoot' ? shootSpeed(len)
 			: solveSpeed(s, from, side, dirX, dirY, len, elev);
 
-	const ang = (ANG_WORST + (ANG_BEST - ANG_WORST) * k) * gauss(rng, s.t.seed);
-	const spd = ideal * (1 + (SPD_WORST + (SPD_BEST - SPD_WORST) * k) * gauss(rng + 991, s.t.seed));
+	// A heavy or big boule is harder to hold steady: the make widens the hand's spread.
+	const hand = s.kits ? s.kits[side].aim : 1;
+	const ang = (ANG_WORST + (ANG_BEST - ANG_WORST) * k) * gauss(rng, s.t.seed) * hand;
+	const spd = ideal * (1 + (SPD_WORST + (SPD_BEST - SPD_WORST) * k) * gauss(rng + 991, s.t.seed) * hand);
 	const ex = dirX - ang * dirY, ey = dirY + ang * dirX; // small rotation, no sin/cos
 
 	const v = throwVelocity(ex, ey, spd, elev);

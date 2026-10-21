@@ -218,3 +218,17 @@
 
 - Statut : terminé, non commité (2026-10-15, Europe/Paris). Réservations libérées. Les lucioles du lac se ramassent même avant d'avoir parlé à Gribouille (elles brillaient mais on passait au travers) ; Gribouille tient compte de celles déjà trouvées et donne le bocal tout de suite s'il y en a six. Testé en jeu (port 4396, arrêté), `check-rayou` vert, tsc + eslint OK.
 - Réservations (libérées) : `src/games/rayou/main.ts`, `src/games/rayou/story.ts`.
+
+## 2026-10-21 — Pétanque Meet : filtre « affiches seulement » + panneau de filtres repliable
+- Réservations actives : `src/components/rencontres/RencontresApp.tsx`, `src/lib/meetupFilters.ts`,
+  `src/lib/meetupFilters.test.ts`, `src/styles/rencontres.css`.
+- Fait : filtre `postersOnly` (+ `activeCount`, tests), panneau de filtres repliable (état mémorisé en
+  localStorage), guards `check-rencontres*.mjs` ouvrent le panneau. Vérifié : vitest meetup OK, tsc/eslint OK,
+  capture dev `?demo` bureau + téléphone (4 → 3 cartes concours, pas de défilement horizontal). Non commité.
+- Réservations : libérées.
+
+## 2026-10-21 — Pétanque (moteur) : terrains de difficulté 1-100 et boules à caractéristiques (session PetanqueGame)
+- Statut : terminé, non commité (2026-10-21 19:40, Europe/Paris). Demande de l'utilisateur depuis le dépôt PetanqueGame (port Unity, dont ce moteur est la référence). Ajouts désactivés par défaut (terrains de difficulté, kits de boules, mesure au bord : le jeu du site ne les utilise pas). Équilibrage mesuré (boules et ligues) par simulation IA contre IA.
+- Une correction touche le jeu du site : un caillou au roulement déviait la boule vers lui, il la pousse maintenant à l'opposé (`engine.ts`, `pebbleContact`, relevé par la revue Codex). Même amplitude, sens physique. `npx vitest run src/games/petanque` : 101/101.
+- Réservations (libérées) : `src/games/petanque/terrain.ts`, `src/games/petanque/engine.ts`, `src/games/petanque/ai.ts`, `src/games/petanque/rules13.ts`, `src/games/petanque/uneven.test.ts` (nouveau).
+- Ressources : `npx vitest run src/games/petanque` et `npx tsx ../PetanqueGame/tools/gen_fixtures.mts` (écrit dans PetanqueGame). Pas de build, pas de `dist/`.

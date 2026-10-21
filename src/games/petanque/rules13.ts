@@ -9,6 +9,7 @@
  */
 
 import { PITCH_L, PITCH_W, inPitch } from './terrain';
+import { BOULE_R } from './engine';
 
 export type Side = 0 | 1;
 export type Phase = 'throw-jack' | 'place-jack' | 'play' | 'end-done' | 'match-done';
@@ -25,6 +26,7 @@ export interface Played {
 	y: number;
 	side: number; // 0 | 1, -1 for the jack
 	live: boolean;
+	r?: number; // its radius when it is not the standard boule's
 }
 
 export interface Match13 {
@@ -55,6 +57,10 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number 
 	const dx = a.x - b.x, dy = a.y - b.y;
 	return Math.sqrt(dx * dx + dy * dy);
 };
+
+/** The umpire measures to the boule's edge: a bigger boule reaches closer. The plain distance for
+ *  the standard size, so only the gap between two makes shows. */
+const gap = (b: Played, jack: Played): number => dist(b, jack) - ((b.r ?? BOULE_R) - BOULE_R);
 
 /**
  * Keep the circle where a legal throw still fits on the pitch. Real play moves it back too.
@@ -101,7 +107,7 @@ export function pointHolder(bs: Played[], jack: Played): Side | null | 'tie' {
 	const best: [number, number] = [Infinity, Infinity];
 	for (const b of bs) {
 		if (!b.live || (b.side !== 0 && b.side !== 1)) continue;
-		const d = dist(b, jack);
+		const d = gap(b, jack);
 		if (d < best[b.side]) best[b.side] = d;
 	}
 	if (best[0] === Infinity && best[1] === Infinity) return null;
@@ -114,7 +120,7 @@ export function endScore(bs: Played[], jack: Played): { side: Side | null; point
 	const ds: [number[], number[]] = [[], []];
 	for (const b of bs) {
 		if (!b.live || (b.side !== 0 && b.side !== 1)) continue;
-		ds[b.side].push(dist(b, jack));
+		ds[b.side].push(gap(b, jack));
 	}
 	ds[0].sort((a, b) => a - b);
 	ds[1].sort((a, b) => a - b);
