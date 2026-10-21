@@ -80,8 +80,13 @@ const isRole = (v: unknown): boolean => ROLES.includes(String(v));
 const isPlayersNeeded = (v: unknown): boolean => typeof v === 'number' && PLAYERS_NEEDED.includes(v);
 const isSeats = (v: unknown): boolean =>
 	typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_SEATS;
-const isPlausibleFr = (lat: number, lng: number): boolean =>
-	Number.isFinite(lat) && Number.isFinite(lng) && lat >= 41 && lat <= 52 && lng >= -6 && lng <= 10;
+/** Anywhere on the map, which covers the world since the app moved to TopPlusOpen:
+ *  players asked for Switzerland and Spain. Only a broken position is refused, and
+ *  0,0 is what an unset one reads as. Mirrors MeetupGeo.IsPlausible in the app. */
+const MAX_LAT = 85.05112878;
+const isPlausible = (lat: number, lng: number): boolean =>
+	Number.isFinite(lat) && Number.isFinite(lng) && !(Math.abs(lat) < 0.01 && Math.abs(lng) < 0.01)
+	&& lat >= -MAX_LAT && lat <= MAX_LAT && lng >= -180 && lng <= 180;
 
 /** null = valid slot. */
 function validateSlot(startsAt: unknown, endsAt: unknown, now: number): string | null {
@@ -825,7 +830,7 @@ Deno.serve(async (req) => {
 
 				const lat = Number(body.lat), lng = Number(body.lng);
 				const freePin = !isUuid(body.spotId);
-				if (freePin && !isPlausibleFr(lat, lng)) return bad('Position hors zone.');
+				if (freePin && !isPlausible(lat, lng)) return bad('Position hors zone.');
 
 				const createIp = await ipKey(req);
 				if (await isBanned(db, playerId, createIp, true)) return bad(BANNED, 403);
@@ -1176,7 +1181,7 @@ Deno.serve(async (req) => {
 
 				const lat = Number(body.lat), lng = Number(body.lng);
 				const freePin = !isUuid(body.spotId);
-				if (freePin && !isPlausibleFr(lat, lng)) return bad('Position hors zone.');
+				if (freePin && !isPlausible(lat, lng)) return bad('Position hors zone.');
 
 				const createIp = await ipKey(req);
 				if (await isBanned(db, playerId, createIp, true)) return bad(BANNED, 403);
