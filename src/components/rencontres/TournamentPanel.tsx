@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { contestsOf, type MeetupTournament, type TournamentContest } from '../../lib/meetups';
+import { approvalLine, contestsOf, type MeetupTournament, type TournamentContest } from '../../lib/meetups';
 import { formatDay, formatTime } from './format';
 
 const FORMAT: Record<MeetupTournament['format'], string> = {
@@ -72,6 +72,7 @@ export default function TournamentPanel({ tournament: t, shareUrl, samePitch = [
 	samePitch?: readonly MeetupTournament[]; onOpen?(id: string): void; onClose(): void;
 }) {
 	const place = t.label || 'Lieu du concours';
+	const approval = approvalLine(t);
 	const price = fee(t.entry_fee_cents);
 	const cs = contestsOf(t);
 	const directions = `https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}`;
@@ -112,6 +113,10 @@ export default function TournamentPanel({ tournament: t, shareUrl, samePitch = [
 							{cs.map((c, i) => <li key={i}>{contestLine(c, !sameDay(cs))}</li>)}
 						</ul>
 					)}
+				<p className={approval.verified ? 're-approval re-approval--ok' : 're-approval'}>{approval.text}</p>
+				{!approval.verified && (
+					<p className="re-hint">Un licencié qui joue une compétition non agréée peut être sanctionné&nbsp;: vérifie auprès du club ou du comité.</p>
+				)}
 				{t.details && <p style={{ whiteSpace: 'pre-line' }}>{t.details}</p>}
 				{samePitch.length > 0 && onOpen && (
 					<div className="re-same-pitch">

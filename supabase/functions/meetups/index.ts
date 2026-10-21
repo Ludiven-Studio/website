@@ -393,6 +393,12 @@ function tournamentFields(body: Record<string, unknown>, now: number, kept = new
 		if (v === null) return 'Détails invalides (300 caractères, sans lien).';
 		row.details = v || null;
 	}
+	// The organizer's word only: approval_source (verified) is never set from here.
+	if ('approvalDeclared' in body) {
+		const v = body.approvalDeclared;
+		if (v !== null && typeof v !== 'boolean') return 'Agrément invalide.';
+		row.approval_declared = v;
+	}
 	if ('contactPhone' in body) {
 		const empty = body.contactPhone === null || String(body.contactPhone).trim() === '';
 		const v = empty ? null : cleanPhone(body.contactPhone);
@@ -402,8 +408,23 @@ function tournamentFields(body: Record<string, unknown>, now: number, kept = new
 	return row;
 }
 
+type ContestKey = { starts_at?: unknown; format?: unknown; category?: unknown };
+const contestKey = (c: ContestKey) => `${Date.parse(String(c.starts_at))}|${c.format}|${c.category}`;
+
+/** A checked approval covers the contests the calendar listed (start, format,
+ *  category). A patch that brings a contest the tournament did not have, or an
+ *  organizer saying "not approved", contradicts it. Fewer contests do not. */
+function approvalContradicted(fields: Record<string, unknown>, own: ContestKey & { contests?: unknown }): boolean {
+	if (fields.approval_declared === false) return true;
+	const before = new Set(((own.contests as ContestKey[] | null) ?? [own]).map(contestKey));
+	if (Array.isArray(fields.contests)) return (fields.contests as ContestKey[]).some((c) => !before.has(contestKey(c)));
+	if (!['starts_at', 'format', 'category'].some((k) => k in fields)) return false;
+	return !before.has(contestKey({ ...own, ...fields } as ContestKey));
+}
+
 const TOURN_COLS = 'id, spot_id, club_name, title, starts_at, last_starts_at, format, category, entry_fee_cents, contests, details, '
-	+ 'contact_phone, poster_status, poster_path, poster_has_thumb, organizer_tag, status, hidden, created_at';
+	+ 'contact_phone, poster_status, poster_path, poster_has_thumb, organizer_tag, status, hidden, created_at, '
+	+ 'approval_declared, approval_source';
 const T_EMBED = `${TOURN_COLS}, meetup_spots!inner(id, lat, lng, label, commune)`;
 
 /** Flatten the spot. The poster URL only exists once approved. */
@@ -1184,13 +1205,15 @@ Deno.serve(async (req) => {
 				if (!isUuid(body.tournamentId)) return bad('bad request');
 				const uid = await whoAmI();
 				if (!uid) return bad(LOGIN, 401);
-				const { data: own } = await db.from('meetup_tournaments').select('contests')
+				const { data: own } = await db.from('meetup_tournaments').select('contests, starts_at, format, category')
 					.eq('id', body.tournamentId).eq('organizer_id', uid).maybeSingle();
 				if (!own) return bad('forbidden', 403);
 				const kept = new Set<number>(((own.contests ?? []) as { starts_at?: string }[])
 					.map((c) => Date.parse(String(c.starts_at))));
+				kept.add(Date.parse(String(own.starts_at)));
 				const fields = tournamentFields(body, nowMs, kept);
 				if (typeof fields === 'string') return bad(fields);
+				if (approvalContradicted(fields, own)) fields.approval_source = null;
 				const { data, error } = await db.from('meetup_tournaments').update({ ...fields, updated_at: nowIso })
 					.eq('id', body.tournamentId).eq('organizer_id', uid).select('id');
 				if (error) throw error;

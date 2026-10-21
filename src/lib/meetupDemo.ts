@@ -93,6 +93,9 @@ export function demoTournaments(): MeetupTournament[] {
 			poster_status: poster ? 'approved' : 'none',
 			poster_url: poster ? `/assets/rencontres/demo/${poster}.jpg` : null,
 			organizer_tag: `${DEMO_PREFIX}club-${i}`, status: 'open', hidden: false,
+			// The three approval states, in turn.
+			approval_source: i % 3 === 0 ? 'Calendrier du comité de l’Isère' : null,
+			approval_declared: i % 3 === 1 ? true : null,
 			// A little off the pitch, so the gold pin does not hide the game's.
 			lat: place.lat + 0.003, lng: place.lng - 0.004, label: place.label, commune: place.commune,
 			contests: (DEMO_CONTESTS[i] ?? [[hour, 0, format, fee]]).map(([h, m, f, cents]) => ({

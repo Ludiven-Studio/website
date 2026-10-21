@@ -50,6 +50,12 @@ export interface EventInput {
 /** Every contest, the single one of an older row included. */
 export const contestsOf = (t: MeetupTournament): TournamentContest[] => (t.contests?.length ? t.contests : [t]);
 
+/** The approval line, worded like the app. A "no" from the organizer stays "not checked". */
+export const approvalLine = (t: MeetupTournament): { text: string; verified: boolean } =>
+	t.approval_source ? { text: `Agréé FFPJP · ${t.approval_source}`, verified: true }
+	: t.approval_declared ? { text: 'Agréé FFPJP selon l’organisateur', verified: false }
+	: { text: 'Agrément FFPJP non vérifié', verified: false };
+
 export const listMeetups = (): Promise<{ events: MeetupEvent[]; spots: MeetupSpot[]; tournaments?: MeetupTournament[] }> =>
 	call('list');
 
@@ -66,6 +72,9 @@ export interface MeetupTournament {
 	id: string; spot_id: string; title: string; club_name: string; starts_at: string;
 	format: TournamentContest['format']; category: TournamentContest['category'];
 	entry_fee_cents: number | null; details: string | null; contact_phone: string | null;
+	/** FFPJP approval: the organizer's answer (null = does not know), and the checked
+	 *  source, set only by an import or a moderator. Missing from older functions. */
+	approval_declared?: boolean | null; approval_source?: string | null;
 	/** Sorted by start; missing from a function deployed before contests. */
 	contests?: TournamentContest[];
 	poster_status: 'none' | 'pending' | 'approved' | 'rejected'; poster_url: string | null;

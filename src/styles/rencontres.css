@@ -542,6 +542,8 @@
 	line-height: 1.6;
 }
 .re-ok { margin: 0; color: #1f8f56; }
+.re-approval { margin: 0; font-weight: 600; color: var(--gray-200); }
+.re-approval--ok { color: #1f8f56; }
 /* A publish that succeeded has to be as loud as one that failed. */
 .re-ok--loud {
 	font-family: var(--font-brand);
