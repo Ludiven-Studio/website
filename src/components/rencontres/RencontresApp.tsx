@@ -13,7 +13,7 @@ import {
 	PROVIDER_LABEL, type Provider,
 } from '../../lib/meetupAuth';
 import {
-	applyFilters, applyTournamentFilters, DATE_LABEL, DEFAULT_FILTERS, NEAR_KM, rangeLabel,
+	activeCount, applyFilters, applyTournamentFilters, DATE_LABEL, DEFAULT_FILTERS, NEAR_KM, rangeLabel,
 	type DateFilter, type Filters, type RoleFilter,
 } from '../../lib/meetupFilters';
 import { challengeDay } from '../../lib/day';
@@ -55,6 +55,12 @@ const NO_OWNER = "Lien d'organisateur manquant.";
  *  stays wired for the day the site opens actions again. */
 const WEB_LOGIN: boolean = false;
 
+/** The filter panel folds away: the map is the page, not the controls above it. */
+const FILTERS_OPEN_KEY = 'ludiven-meetup-filters-open';
+const readFiltersOpen = (): boolean => {
+	try { return localStorage.getItem(FILTERS_OPEN_KEY) === '1'; } catch { return false; }
+};
+
 /** What to reopen after the provider sends the player back. ?e= covers the rest. */
 const RESUME_KEY = 'ludiven-meetup-resume';
 const takeResume = (): string | null => {
@@ -88,6 +94,7 @@ export default function RencontresApp() {
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+	const [filtersOpen, setFiltersOpen] = useState(readFiltersOpen);
 	// Paris day, as the date filters count them: the earliest a picked day can be.
 	const today = challengeDay();
 	const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -200,14 +207,14 @@ export default function RencontresApp() {
 	// The period strip scrolls on a phone: keep the picked one in view, dates and all.
 	// The strip alone: scrollIntoView would also move the page on load.
 	useEffect(() => {
-		const on = document.querySelector<HTMLElement>('.re-bar .re-seg .re-segbtn--on');
+		const on = document.querySelector<HTMLElement>('.re-filters .re-seg .re-segbtn--on');
 		const strip = on?.parentElement;
 		if (!on || !strip) return;
 		const a = on.getBoundingClientRect();
 		const b = strip.getBoundingClientRect();
 		if (a.left < b.left) strip.scrollLeft -= b.left - a.left;
 		else if (a.right > b.right) strip.scrollLeft += a.right - b.right;
-	}, [filters.date, filters.from, filters.to]);
+	}, [filters.date, filters.from, filters.to, filtersOpen]);
 
 	useEffect(() => {
 		trackEvent('meetup_view');
@@ -586,6 +593,15 @@ export default function RencontresApp() {
 			: []),
 		[allTournaments, tournament]);
 
+	const periodLabel = filters.date === 'custom' ? rangeLabel(filters) : DATE_LABEL[filters.date];
+	const active = activeCount(filters, places.length > 0);
+	const toggleFilters = (open: boolean): void => {
+		setFiltersOpen(open);
+		try { localStorage.setItem(FILTERS_OPEN_KEY, open ? '1' : '0'); } catch { /* private mode */ }
+	};
+	// The distance keeps its last value: only the toggle goes back to "partout".
+	const resetFilters = (): void => setFilters((f) => ({ ...DEFAULT_FILTERS, nearKm: f.nearKm }));
+
 	const toggleDemo = (): void => {
 		const on = !demo;
 		if (on) trackEvent('meetup_demo');
@@ -681,73 +697,17 @@ export default function RencontresApp() {
 			)}
 
 			<div className="re-bar">
-				<div className="re-seg" role="group" aria-label="Quand">
-					{DATES.map((d) => (
-						<button
-							key={d}
-							type="button"
-							className={`re-segbtn ${filters.date === d ? 're-segbtn--on' : ''}`}
-							aria-pressed={filters.date === d}
-							onClick={() => setFilters((f) => d !== 'custom' ? { ...f, date: d }
-								// Today by default: the two fields below then only need moving.
-								: { ...f, date: d, from: f.from || today, to: f.to || f.from || today })}
-						>
-							{d === 'custom' && filters.date === 'custom' ? `📅 ${rangeLabel(filters)}` : DATE_LABEL[d]}
-						</button>
-					))}
-				</div>
-
-				{filters.date === 'custom' && (
-					<span className="re-dates" role="group" aria-label="Dates choisies">
-						<label>
-							Du
-							<input
-								type="date"
-								className="re-select"
-								min={today}
-								value={filters.from}
-								onChange={(e) => {
-									const from = e.target.value;
-									setFilters((f) => ({ ...f, from, to: f.to && f.to >= from ? f.to : from }));
-								}}
-							/>
-						</label>
-						<label>
-							au
-							<input
-								type="date"
-								className="re-select"
-								min={filters.from || today}
-								value={filters.to}
-								onChange={(e) => {
-									const to = e.target.value;
-									setFilters((f) => ({ ...f, to: to && to >= f.from ? to : f.from }));
-								}}
-							/>
-						</label>
-					</span>
-				)}
-
-				<select
-					className="re-select"
-					aria-label="Rôle"
-					value={filters.role}
-					onChange={(e) => setFilters((f) => ({ ...f, role: e.target.value as RoleFilter }))}
+				<button
+					type="button"
+					className={`re-btn re-btn--ghost re-filtertoggle ${filtersOpen ? 're-filtertoggle--on' : ''}`}
+					aria-expanded={filtersOpen}
+					aria-controls="re-filters"
+					onClick={() => toggleFilters(!filtersOpen)}
 				>
-					{ROLE_FILTERS.map((r) => (
-						<option key={r} value={r}>{r === 'all' ? 'Tous les rôles' : ROLE_LABEL[r as Role]}</option>
-					))}
-				</select>
-
-				<label className="re-check">
-					<input
-						type="checkbox"
-						checked={filters.freeSeatsOnly}
-						onChange={(e) => setFilters((f) => ({ ...f, freeSeatsOnly: e.target.checked }))}
-					/>
-					Places libres
-				</label>
-
+					<span aria-hidden="true">⚙️</span> Filtres · {periodLabel}
+					{active > 0 && <span className="re-badge" aria-label={`${active} filtre(s) actif(s)`}>+{active}</span>}
+					<span className="re-chev" aria-hidden="true">▾</span>
+				</button>
 				<button type="button" className="re-btn re-btn--ghost" disabled={locating} onClick={locate}>
 					{locating ? 'Localisation…' : '📍 Autour de moi'}
 				</button>
@@ -759,86 +719,184 @@ export default function RencontresApp() {
 				)}
 			</div>
 
-			{/* Home ports. One player summers at a campsite and winters in Lyon, and
-			    "autour de moi" serves whichever one he is standing in — never both. */}
-			<div className="re-places">
-				{places.map((p, i) => (
-					<span key={`${p.lat},${p.lng}`} className="re-place">
-						<button
-							type="button"
-							className="re-place-go"
-							onClick={() => mapRef.current?.flyTo(p.lat, p.lng, 12)}
+			{filtersOpen && (
+				<div id="re-filters" className="re-filters">
+					<fieldset className="re-fgroup">
+						<legend>Quand</legend>
+						<div className="re-seg" role="group" aria-label="Quand">
+							{DATES.map((d) => (
+								<button
+									key={d}
+									type="button"
+									className={`re-segbtn ${filters.date === d ? 're-segbtn--on' : ''}`}
+									aria-pressed={filters.date === d}
+									onClick={() => setFilters((f) => d !== 'custom' ? { ...f, date: d }
+										// Today by default: the two fields below then only need moving.
+										: { ...f, date: d, from: f.from || today, to: f.to || f.from || today })}
+								>
+									{d === 'custom' && filters.date === 'custom' ? `📅 ${rangeLabel(filters)}` : DATE_LABEL[d]}
+								</button>
+							))}
+						</div>
+
+						{filters.date === 'custom' && (
+							<span className="re-dates" role="group" aria-label="Dates choisies">
+								<label>
+									Du
+									<input
+										type="date"
+										className="re-select"
+										min={today}
+										value={filters.from}
+										onChange={(e) => {
+											const from = e.target.value;
+											setFilters((f) => ({ ...f, from, to: f.to && f.to >= from ? f.to : from }));
+										}}
+									/>
+								</label>
+								<label>
+									au
+									<input
+										type="date"
+										className="re-select"
+										min={filters.from || today}
+										value={filters.to}
+										onChange={(e) => {
+											const to = e.target.value;
+											setFilters((f) => ({ ...f, to: to && to >= f.from ? to : f.from }));
+										}}
+									/>
+								</label>
+							</span>
+						)}
+					</fieldset>
+
+					<fieldset className="re-fgroup">
+						<legend>Parties</legend>
+						<select
+							className="re-select"
+							aria-label="Rôle"
+							value={filters.role}
+							onChange={(e) => setFilters((f) => ({ ...f, role: e.target.value as RoleFilter }))}
 						>
-							🏠 {p.name}
-						</button>
-						<button
-							type="button"
-							className="re-place-off"
-							aria-label={`Retirer ${p.name}`}
-							onClick={() => dropPlace(i)}
-						>
-							×
-						</button>
-					</span>
-				))}
+							{ROLE_FILTERS.map((r) => (
+								<option key={r} value={r}>{r === 'all' ? 'Tous les rôles' : ROLE_LABEL[r as Role]}</option>
+							))}
+						</select>
 
-				{naming !== null ? (
-					<form
-						className="re-naming"
-						onSubmit={(e) => { e.preventDefault(); saveCurrentPlace(naming, namingKind); }}
-					>
-						<span className="re-seg" role="group" aria-label="Type de lieu">
-							<button type="button" className={`re-segbtn ${namingKind === 'home' ? 're-segbtn--on' : ''}`}
-								aria-pressed={namingKind === 'home'} onClick={() => setNamingKind('home')}>🏠 Ma maison</button>
-							<button type="button" className={`re-segbtn ${namingKind === 'favorite' ? 're-segbtn--on' : ''}`}
-								aria-pressed={namingKind === 'favorite'} onClick={() => setNamingKind('favorite')}>💚 Lieu favori</button>
-						</span>
-						<input
-							autoFocus
-							value={naming}
-							maxLength={24}
-							placeholder="Lyon, le camping…"
-							aria-label="Nom du lieu"
-							onChange={(e) => setNaming(e.target.value)}
-						/>
-						<button type="submit" className="re-btn">Enregistrer</button>
-						<button type="button" className="re-btn re-btn--ghost" onClick={() => setNaming(null)}>
-							Annuler
+						<label className="re-check">
+							<input
+								type="checkbox"
+								checked={filters.freeSeatsOnly}
+								onChange={(e) => setFilters((f) => ({ ...f, freeSeatsOnly: e.target.checked }))}
+							/>
+							Places libres
+						</label>
+					</fieldset>
+
+					<fieldset className="re-fgroup">
+						<legend>Concours</legend>
+						<label className="re-check">
+							<input
+								type="checkbox"
+								checked={filters.postersOnly}
+								onChange={(e) => setFilters((f) => ({ ...f, postersOnly: e.target.checked }))}
+							/>
+							Avec affiche seulement
+						</label>
+					</fieldset>
+
+					<fieldset className="re-fgroup">
+						<legend>Mes lieux</legend>
+						{/* Home ports. One player summers at a campsite and winters in Lyon, and
+						    "autour de moi" serves whichever one he is standing in — never both. */}
+						<div className="re-places">
+							{places.map((p, i) => (
+								<span key={`${p.lat},${p.lng}`} className="re-place">
+									<button
+										type="button"
+										className="re-place-go"
+										onClick={() => mapRef.current?.flyTo(p.lat, p.lng, 12)}
+									>
+										🏠 {p.name}
+									</button>
+									<button
+										type="button"
+										className="re-place-off"
+										aria-label={`Retirer ${p.name}`}
+										onClick={() => dropPlace(i)}
+									>
+										×
+									</button>
+								</span>
+							))}
+
+							{naming !== null ? (
+								<form
+									className="re-naming"
+									onSubmit={(e) => { e.preventDefault(); saveCurrentPlace(naming, namingKind); }}
+								>
+									<span className="re-seg" role="group" aria-label="Type de lieu">
+										<button type="button" className={`re-segbtn ${namingKind === 'home' ? 're-segbtn--on' : ''}`}
+											aria-pressed={namingKind === 'home'} onClick={() => setNamingKind('home')}>🏠 Ma maison</button>
+										<button type="button" className={`re-segbtn ${namingKind === 'favorite' ? 're-segbtn--on' : ''}`}
+											aria-pressed={namingKind === 'favorite'} onClick={() => setNamingKind('favorite')}>💚 Lieu favori</button>
+									</span>
+									<input
+										autoFocus
+										value={naming}
+										maxLength={24}
+										placeholder="Lyon, le camping…"
+										aria-label="Nom du lieu"
+										onChange={(e) => setNaming(e.target.value)}
+									/>
+									<button type="submit" className="re-btn">Enregistrer</button>
+									<button type="button" className="re-btn re-btn--ghost" onClick={() => setNaming(null)}>
+										Annuler
+									</button>
+								</form>
+							) : places.length < MAX_PLACES && (
+								<button
+									type="button"
+									className="re-btn re-btn--ghost"
+									onClick={() => setNaming(guessPlaceName())}
+								>
+									🏠 Enregistrer ce lieu
+								</button>
+							)}
+
+							{places.length > 0 && naming === null && (
+								<select
+									className="re-select"
+									aria-label="Autour de mes lieux"
+									value={filters.nearPlaces ? String(filters.nearKm) : ''}
+									onChange={(e) => {
+										const km = Number(e.target.value);
+										if (!km) { setFilters((f) => ({ ...f, nearPlaces: false })); return; }
+										saveNearKm(km);
+										setFilters((f) => ({ ...f, nearPlaces: true, nearKm: km }));
+									}}
+								>
+									<option value="">Autour de mes lieux : partout</option>
+									{NEAR_KM.map((km) => <option key={km} value={km}>À {km} km de mes lieux</option>)}
+								</select>
+							)}
+						</div>
+
+						{places.length === 0 && naming === null && (
+							<p className="re-hint re-hint--places">
+								Tu joues à plusieurs endroits&nbsp;? Centre la carte sur l'un d'eux et enregistre-le.
+								Les distances partiront de tes lieux, pas d'un seul.
+							</p>
+						)}
+					</fieldset>
+
+					{(active > 0 || filters.date !== DEFAULT_FILTERS.date) && (
+						<button type="button" className="re-link re-reset" onClick={resetFilters}>
+							Réinitialiser les filtres
 						</button>
-					</form>
-				) : places.length < MAX_PLACES && (
-					<button
-						type="button"
-						className="re-btn re-btn--ghost"
-						onClick={() => setNaming(guessPlaceName())}
-					>
-						🏠 Enregistrer ce lieu
-					</button>
-				)}
-
-				{places.length > 0 && naming === null && (
-					<select
-						className="re-select"
-						aria-label="Autour de mes lieux"
-						value={filters.nearPlaces ? String(filters.nearKm) : ''}
-						onChange={(e) => {
-							const km = Number(e.target.value);
-							if (!km) { setFilters((f) => ({ ...f, nearPlaces: false })); return; }
-							saveNearKm(km);
-							setFilters((f) => ({ ...f, nearPlaces: true, nearKm: km }));
-						}}
-					>
-						<option value="">Autour de mes lieux : partout</option>
-						{NEAR_KM.map((km) => <option key={km} value={km}>À {km} km de mes lieux</option>)}
-					</select>
-				)}
-			</div>
-
-			{places.length === 0 && naming === null && (
-				<p className="re-hint re-hint--places">
-					Tu joues à plusieurs endroits&nbsp;? Centre la carte sur l'un d'eux et enregistre-le.
-					Les distances partiront de tes lieux, pas d'un seul.
-				</p>
+					)}
+				</div>
 			)}
 
 			{/* Above the map on purpose: the cap is spent from the button right above,

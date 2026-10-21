@@ -130,6 +130,55 @@
 	font-size: var(--text-sm);
 }
 
+/* ---- Folding filter panel ---- */
+.re-filtertoggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+.re-filtertoggle--on { border-color: var(--accent-regular); }
+.re-badge {
+	font-size: var(--text-xs, 0.75rem);
+	line-height: 1;
+	color: var(--accent-text-over, #fff);
+	background: var(--accent-regular);
+	border-radius: 999px;
+	padding: 0.2rem 0.45rem;
+}
+.re-chev { transition: transform 0.15s; }
+.re-filtertoggle--on .re-chev { transform: rotate(180deg); }
+.re-filters {
+	display: grid;
+	gap: 0.75rem;
+	padding: 0.75rem;
+	border: 1px solid var(--gray-700);
+	border-radius: 0.6rem;
+	background: var(--gray-900, var(--gray-800));
+}
+.re-fgroup {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: none;
+}
+.re-fgroup legend {
+	float: left;
+	width: 100%;
+	margin-bottom: 0.35rem;
+	font-family: var(--font-brand);
+	font-size: var(--text-xs, 0.75rem);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--gray-300);
+}
+.re-fgroup > .re-places,
+.re-fgroup > .re-hint { width: 100%; }
+.re-reset { justify-self: start; font-size: var(--text-sm); }
+
 .re-dates {
 	display: inline-flex;
 	flex-wrap: wrap;

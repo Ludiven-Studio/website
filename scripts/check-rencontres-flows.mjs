@@ -184,6 +184,8 @@ await ctx.route('**/functions/v1/meetups', async (route) => {
 await ctx.route(/tile\.openstreetmap\.org/, (route) => route.abort());
 // Acting needs a session. A stored, unexpired one is enough for the island: every
 // call it makes is answered above, so the token is never checked.
+// The filters fold away by default; the flows below click the period strip.
+await ctx.addInitScript(() => localStorage.setItem('ludiven-meetup-filters-open', '1'));
 await ctx.addInitScript((v) => localStorage.setItem('ludiven-meetup-auth', v), JSON.stringify({
 	access_token: 'flows-fake', refresh_token: 'flows', token_type: 'bearer', expires_in: 3600,
 	expires_at: Math.floor(Date.now() / 1000) + 3600,

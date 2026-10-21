@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyFilters, applyTournamentFilters, matchesDate, matchesRole, rangeLabel, weekendDays, DEFAULT_FILTERS } from './meetupFilters';
+import { activeCount, applyFilters, applyTournamentFilters, matchesDate, matchesRole, rangeLabel, weekendDays, DEFAULT_FILTERS } from './meetupFilters';
 import type { MeetupTournament } from './meetups';
 import { challengeDayOrdinal } from './day';
 import type { MeetupEvent } from './meetupRules';
@@ -140,6 +140,25 @@ describe('applyTournamentFilters', () => {
 		const today = { ...DEFAULT_FILTERS, date: 'today' as const };
 		expect(applyTournamentFilters([later, twoDays], today, NOW)).toEqual([twoDays]);
 		expect(applyTournamentFilters([later, twoDays], { ...DEFAULT_FILTERS, date: 'all' }, NOW)).toHaveLength(2);
+	});
+
+	it('keeps only approved posters when asked', () => {
+		const bare = tour([inDays(1)]);
+		const pending = { ...tour([inDays(1)]), poster_status: 'pending' as const };
+		const shown = { ...tour([inDays(1)]), poster_status: 'approved' as const, poster_url: '/a.jpg' };
+		const f = { ...DEFAULT_FILTERS, postersOnly: true };
+		expect(applyTournamentFilters([bare, pending, shown], f, NOW)).toEqual([shown]);
+		expect(applyTournamentFilters([bare, pending, shown], DEFAULT_FILTERS, NOW)).toHaveLength(3);
+	});
+});
+
+describe('activeCount', () => {
+	it('counts what the folded panel hides, never the date', () => {
+		expect(activeCount({ ...DEFAULT_FILTERS, date: 'all' }, true)).toBe(0);
+		expect(activeCount({ ...DEFAULT_FILTERS, role: 'tireur', postersOnly: true }, false)).toBe(2);
+		// No place saved: the distance filter does nothing, so it does not count.
+		expect(activeCount({ ...DEFAULT_FILTERS, nearPlaces: true }, false)).toBe(0);
+		expect(activeCount({ ...DEFAULT_FILTERS, nearPlaces: true }, true)).toBe(1);
 	});
 });
 

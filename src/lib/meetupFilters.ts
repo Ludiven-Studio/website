@@ -20,13 +20,15 @@ export interface Filters extends DayRange {
 	nearPlaces: boolean;
 	/** Kilometres around each saved place, one of NEAR_KM. */
 	nearKm: number;
+	/** Tournaments only: games carry no poster. */
+	postersOnly: boolean;
 }
 
 /** What "autour de mes lieux" offers, as in the app. */
 export const NEAR_KM = [5, 10, 20, 30, 50] as const;
 
 export const DEFAULT_FILTERS: Filters = {
-	date: 'week', from: '', to: '', role: 'all', freeSeatsOnly: false, nearPlaces: false, nearKm: NEAR_M / 1000,
+	date: 'week', from: '', to: '', role: 'all', freeSeatsOnly: false, nearPlaces: false, nearKm: NEAR_M / 1000, postersOnly: false,
 };
 
 export const DATE_LABEL: Record<DateFilter, string> = {
@@ -110,13 +112,22 @@ export function applyFilters(
 		.sort((a, b) => (a.starts_at < b.starts_at ? -1 : a.starts_at > b.starts_at ? 1 : 0));
 }
 
-/** The date and place filters only: a tournament has no seats and no role. It
- *  stays while any of its contests falls in the range. */
+/** Filters set away from their default, the date aside: the folded panel shows
+ *  the date itself and counts these. */
+export function activeCount(f: Filters, hasPlaces: boolean): number {
+	return Number(f.role !== 'all') + Number(f.freeSeatsOnly) + Number(f.postersOnly)
+		+ Number(f.nearPlaces && hasPlaces);
+}
+
+/** The date, place and poster filters: a tournament has no seats and no role. It
+ *  stays while any of its contests falls in the range. poster_url is only set once
+ *  the moderator approved the poster. */
 export function applyTournamentFilters(
 	tournaments: readonly MeetupTournament[], f: Filters, now: Date = new Date(), places: readonly Place[] = [],
 ): MeetupTournament[] {
 	const near = f.nearPlaces && places.length > 0;
 	return tournaments
+		.filter((t) => !f.postersOnly || Boolean(t.poster_url))
 		.filter((t) => contestsOf(t).some((c) => matchesDate(c, f.date, now, f)))
 		.filter((t) => !near || isNearPlaces(places, t.lat, t.lng, f.nearKm * 1000));
 }

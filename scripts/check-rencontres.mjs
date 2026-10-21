@@ -74,6 +74,8 @@ const browser = await chromium.launch();
 const newPage = async (playerId, jwt = null) => {
 	const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 }, acceptDownloads: true });
 	await ctx.addInitScript((id) => localStorage.setItem('ludiven-player-id', id), playerId);
+	// The filters fold away by default; the checks below drive them.
+	await ctx.addInitScript(() => localStorage.setItem('ludiven-meetup-filters-open', '1'));
 	if (jwt) {
 		const real = jwt !== 'fake';
 		const c = real ? claims(jwt) : { sub: playerId, email: 'guard@example.invalid', exp: Math.floor(Date.now() / 1000) + 3600 };
