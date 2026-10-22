@@ -1,0 +1,198 @@
+---
+// Every pétanque app of the studio in one place: the link of the shared Facebook Page.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from '../components/Icon.astro';
+import StoreBadges from '../components/StoreBadges.astro';
+import { MEET_STORES } from '../data/petanqueMeet';
+import { copy as scanner } from '../data/petanqueScanner';
+
+const apps = [
+	{
+		id: 'meet',
+		name: 'Pétanque Meet',
+		icon: '/assets/petanque-meet/icon.webp',
+		title: 'Trouver une partie près de chez soi',
+		body: 'Les parties qui cherchent des joueurs et les concours des clubs, sur une carte. On rejoint une partie, ou on propose la sienne quand il manque du monde.',
+		play: MEET_STORES.fr.play,
+		apple: MEET_STORES.fr.apple,
+		href: '/petanque-meet/telecharger/',
+	},
+	{
+		id: 'scanner',
+		name: 'Pétanque Scanner',
+		icon: '/assets/petanque/icon-scanner.webp',
+		title: 'Savoir qui a le point',
+		body: 'On vise le cochonnet, on passe au-dessus des boules, et l’appli donne la distance de chaque boule au cochonnet, en réalité augmentée.',
+		play: scanner.fr.badges.play,
+		apple: scanner.fr.badges.apple,
+		href: '/petanque-scanner/telecharger/',
+	},
+];
+---
+
+<BaseLayout
+	title="Les applis de pétanque | Ludiven Studio"
+	description="Pétanque Meet pour trouver une partie près de chez soi, Pétanque Scanner pour savoir qui a le point : les applis de pétanque de Ludiven Studio, gratuites sur Android et iPhone."
+	image="/assets/petanque/og.jpg"
+>
+	<main class="wrapper">
+		<div class="petanque-apps stack gap-10">
+			<header class="stack gap-2">
+				<h1>Les applis de pétanque</h1>
+				<p class="lead">Par Ludiven Studio, gratuites sur Android et iPhone.</p>
+			</header>
+
+			<img
+				class="banner"
+				src="/assets/petanque/banner.webp"
+				alt="Pétanque Meet et Pétanque Scanner sur deux téléphones"
+				width="1640"
+				height="624"
+				fetchpriority="high"
+			/>
+
+			<div class="apps">
+				{apps.map((a) => (
+					<section class:list={['app', `app--${a.id}`]}>
+						<div class="app-head">
+							<img src={a.icon} alt="" width="72" height="72" />
+							<h2>{a.name}</h2>
+						</div>
+						<p class="app-title">{a.title}</p>
+						<p class="app-body">{a.body}</p>
+						<StoreBadges playStore={a.play} appStore={a.apple} lang="fr" />
+						<a class="app-more" href={a.href}>
+							Découvrir l’appli <Icon icon="arrow-right" />
+						</a>
+					</section>
+				))}
+			</div>
+
+			<p class="soon">D’autres applis de pétanque arrivent bientôt.</p>
+		</div>
+	</main>
+</BaseLayout>
+
+<style>
+	.petanque-apps {
+		max-width: 62rem;
+		margin-inline: auto;
+		padding-bottom: 1rem;
+	}
+
+	h1 {
+		font-size: clamp(2.25rem, 6vw, 3.5rem);
+	}
+
+	.lead {
+		font-size: var(--text-lg);
+		color: var(--gray-300);
+	}
+
+	.banner {
+		width: 100%;
+		height: auto;
+		border-radius: 1.5rem;
+		box-shadow: 0 30px 60px -32px rgb(9 11 17 / 0.45);
+	}
+
+	.apps {
+		display: grid;
+		gap: 1.25rem;
+	}
+
+	.app {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.75rem;
+		padding: 1.75rem;
+		border-radius: 1.5rem;
+		box-shadow: 0 24px 48px -30px rgb(9 11 17 / 0.5);
+	}
+
+	/* Each app keeps its own colours, in both site themes. */
+	.app--meet {
+		--app-ink: #1e2233;
+		--app-soft: #4a4f63;
+		--app-accent: #a8431f;
+		background: linear-gradient(160deg, #fbf7f0 30%, #f6d6aa);
+	}
+
+	.app--scanner {
+		--app-ink: #ffffff;
+		--app-soft: #d6e0f0;
+		--app-accent: #4ecdd6;
+		background: linear-gradient(160deg, #0d1526 30%, #1c2a44);
+	}
+
+	.app-head {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.app-head img {
+		width: 4rem;
+		height: 4rem;
+		border-radius: 22%;
+		box-shadow: 0 4px 12px rgb(9 11 17 / 0.25);
+	}
+
+	.app h2 {
+		font-size: var(--text-2xl);
+		color: var(--app-ink);
+	}
+
+	.app-title {
+		font-family: var(--font-brand);
+		font-size: var(--text-lg);
+		font-weight: 600;
+		color: var(--app-accent);
+	}
+
+	.app-body {
+		color: var(--app-soft);
+	}
+
+	.app :global(.store-badges) {
+		--badge-h: 2.75rem;
+		justify-content: flex-start;
+		gap: 0.625rem;
+		margin-top: 0.5rem;
+	}
+
+	.app-more {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-top: auto;
+		padding-top: 0.5rem;
+		font-family: var(--font-brand);
+		font-weight: 600;
+		color: var(--app-accent);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+
+	.app-more:hover,
+	.app-more:focus-visible {
+		text-decoration-color: currentColor;
+	}
+
+	.soon {
+		text-align: center;
+		color: var(--gray-300);
+	}
+
+	@media (min-width: 50em) {
+		.apps {
+			grid-template-columns: 1fr 1fr;
+		}
+
+		.app {
+			padding: 2.25rem;
+		}
+	}
+</style>

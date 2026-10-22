@@ -379,3 +379,37 @@
 - 21:55 : `astro check` 0 erreur, build OK, précache 304 entrées, liens 160 pages ; les deux fiches renvoient vers la page.
   Commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement (journal mixte).
   Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Pétanque Meet : page de téléchargement en 5 langues (session PetanqueMeet)
+- Statut : en cours (2026-10-22T22:02+02:00). Demande de l'utilisateur : la page de téléchargement de Pétanque Meet n'a
+  que 2 langues ; ajouter l'espagnol, l'allemand et l'italien, comme l'appli et la page de Pétanque Scanner.
+- Réservations actives : `src/components/MeetDownload.astro`, `src/data/petanqueMeet.ts`, `src/components/StoreBadges.astro`
+  (langues es/de/it, sans changer fr/en), `src/pages/petanque-meet/telecharger.astro`,
+  `src/pages/en/petanque-meet/download.astro`, `src/pages/es/petanque-meet/descargar.astro`,
+  `src/pages/de/petanque-meet/herunterladen.astro`, `src/pages/it/petanque-meet/scarica.astro` (nouveaux),
+  `public/assets/petanque-meet/download/*-{es,de,it}.*` (nouveaux). Pas touché : `src/pages/petanque-scanner/test.astro`.
+- Ressources : serveur de dev sur le port 4476 ; eslint, `astro check`. Build annoncé ici avant.
+- 22:05 : pages es/de/it écrites (mêmes mots que l'appli et les fiches des stores), badges es/de/it dans
+  `StoreBadges.astro` (fr/en inchangés), hreflang des 5 versions ; eslint OK, `astro check` 0 erreur ; captures dev des
+  5 langues sans erreur (serveur 4476 arrêté). Lancement du build complet (écrit `dist/`, `.astro/`, `public/vendor/`),
+  puis `check-precache` et `check-links`.
+- 22:07 : build OK, précache 307 entrées, liens 163 pages, les 3 nouvelles pages dans le sitemap ; sur le build (preview
+  4476, arrêté) : 5 langues, hreflang fr/en/es/de/it + x-default, aucune erreur console ; badges des fiches projet
+  inchangés. Statut : terminé, non commité (en attente de l'utilisateur). Réservations gardées jusqu'au commit ; au
+  commit, mes fichiers seulement (pas `public/assets/petanque/`, apparu pendant ce lot, ni `test.astro`).
+- 22:19 : commité et poussé à la demande de l'utilisateur, mes fichiers et cette section seulement (journal mixte).
+  Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Les applis de pétanque : une page qui les regroupe (session PetanqueMeet)
+- Statut : en cours (2026-10-22T22:06+02:00). Demande de l'utilisateur : une page qui montre toutes ses applis de
+  pétanque, pour le bouton de la nouvelle Page Facebook commune (`/petanque/`).
+- Réservations actives : `src/pages/petanque.astro` (nouveau), `public/assets/petanque/` (nouveau : bannière, icône de
+  Scanner, image de partage). Lecture seule de `src/data/petanqueMeet.ts`, `src/data/petanqueScanner.ts` et
+  `src/components/StoreBadges.astro` (réservés par la section précédente : je ne les modifie pas).
+- Ressources : serveur de dev sur le port 4477 ; eslint, `astro check`. Build annoncé ici avant, pas pendant un autre.
+- 22:16 : page écrite, eslint OK ; captures bureau/téléphone/sombre sans erreur (serveur 4477 arrêté). La section
+  précédente a fini son build. Lancement de `astro check`, du build complet (écrit `dist/`, `.astro/`, `public/vendor/`),
+  puis `check-precache` et `check-links`.
+- 22:19 : `astro check` 0 erreur, build OK (avec la section précédente), précache 308 entrées, liens 164 pages.
+  Commité et poussé à la demande de l'utilisateur : mes 4 fichiers et cette section seulement (journal mixte).
+  Statut : terminé. Réservations libérées.
