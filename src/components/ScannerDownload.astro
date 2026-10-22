@@ -1,0 +1,651 @@
+---
+// The Pétanque Scanner download page, in the landing's five languages: the store badges first, then the app at work.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from './Icon.astro';
+import LangSwitch from './LangSwitch.astro';
+import type { iconPaths } from './IconPaths';
+import {
+	APP_NAME,
+	copy,
+	download,
+	DOWNLOAD_PATHS,
+	LANDING_PATHS,
+	OG_IMAGES,
+	SCREENS,
+	type LandingLang,
+} from '../data/petanqueScanner';
+
+interface Props {
+	lang: LandingLang;
+}
+
+const { lang } = Astro.props;
+const c = copy[lang];
+const t = download[lang];
+// French wants a no-break space before : ? ! ; the shared copy has plain ones.
+const typo = (s: string) => (lang === 'fr' ? s.replace(/ ([:?!;])/g, ' $1') : s);
+const others = (Object.keys(DOWNLOAD_PATHS) as LandingLang[])
+	.filter((l) => l !== lang)
+	.map((l) => ({ lang: l, href: DOWNLOAD_PATHS[l] }));
+const strap = c.title.split(' — ')[1] ?? c.title;
+const tagline = strap.charAt(0).toUpperCase() + strap.slice(1);
+const free = `${c.priceBody.split('. ')[0]}.`;
+const play = `/assets/badges/google-play-${lang}.png`;
+// No localized App Store badge on file for de/it: Apple allows the English one everywhere.
+const apple = `/assets/badges/app-store-${lang === 'de' || lang === 'it' ? 'en' : lang}.svg`;
+const icons: (keyof typeof iconPaths)[] = ['paper-plane-tilt', 'mobile', 'crown'];
+const points = c.features.slice(1, 4).map((f, i) => ({ ...f, icon: icons[i] }));
+const shots = SCREENS[lang];
+---
+
+<BaseLayout
+	title={t.title}
+	description={c.description}
+	image={OG_IMAGES[lang]}
+	lang={lang}
+	alternates={DOWNLOAD_PATHS}
+>
+	<main class="wrapper">
+		<div class="scan-dl stack gap-12">
+			<LangSwitch lang={lang} links={others} />
+
+			<section class="hero">
+				<div class="hero-copy">
+					<p class="kicker">{t.kicker}</p>
+					<h1>{APP_NAME}</h1>
+					<p class="tagline">{typo(tagline)}</p>
+					<p class="lead">{typo(c.description)}</p>
+					<div class="store-badges">
+						<a href={c.badges.play} target="_blank" rel="noopener">
+							<img class="badge-play" src={play} alt={c.badges.playAlt} />
+						</a>
+						<a href={c.badges.apple} target="_blank" rel="noopener">
+							<img class="badge-appstore" src={apple} alt={c.badges.appleAlt} />
+						</a>
+					</div>
+					<p class="free">{typo(free)}</p>
+				</div>
+
+				<figure class="showcase" data-showcase aria-label={c.galleryTitle}>
+					<div class="slides">
+						{shots.map((src, i) => (
+							<img
+								class:list={['shot', { 'is-active': i === 0 }]}
+								src={src}
+								alt={t.shots[i]}
+								width="560"
+								height="1212"
+								aria-hidden={i === 0 ? undefined : 'true'}
+								loading={i === 0 ? 'eager' : 'lazy'}
+								fetchpriority={i === 0 ? 'high' : undefined}
+								decoding="async"
+							/>
+						))}
+					</div>
+					{/* Shown by the script: without it the first visual simply stays. */}
+					<div class="controls" hidden>
+						{shots.map((_, i) => (
+							<button type="button" class="dot" aria-label={t.shots[i]} aria-pressed={i === 0 ? 'true' : 'false'}></button>
+						))}
+						<button type="button" class="pause" aria-label={t.pause} aria-pressed="false">
+							<svg class="i-pause" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+								<rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" />
+							</svg>
+							<svg class="i-play" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+								<path d="M4 2.5v11a1 1 0 0 0 1.5.86l9-5.5a1 1 0 0 0 0-1.72l-9-5.5A1 1 0 0 0 4 2.5Z" />
+							</svg>
+						</button>
+					</div>
+				</figure>
+			</section>
+
+			<section class="points" data-reveal>
+				{points.map((p) => (
+					<div class="point">
+						<Icon icon={p.icon} size="2.25rem" color="var(--teal)" />
+						<h2>{typo(p.title)}</h2>
+						<p>{typo(p.body)}</p>
+					</div>
+				))}
+			</section>
+
+			<section class="film" data-reveal>
+				<div class="film-copy">
+					<h2>{t.videoTitle}</h2>
+					<p>
+						{c.steps.map((s, i) => (
+							<>
+								{i > 0 && ' · '}
+								<span class="step">{s.title}</span>
+							</>
+						))}
+					</p>
+				</div>
+				<video
+					class="teaser"
+					data-src={`/assets/petanque-ar/video-${lang}.mp4`}
+					poster={`/assets/petanque-ar/video-${lang}.webp`}
+					width="554"
+					height="1200"
+					muted
+					playsinline
+					controls
+					preload="none"
+					aria-label={c.galleryTitle}
+				></video>
+			</section>
+
+			<section class="closing" data-reveal>
+				<p class="kicker">{APP_NAME}</p>
+				<h2>{c.closing}</h2>
+				<p>{typo(free)}</p>
+				<div class="store-badges">
+					<a href={c.badges.play} target="_blank" rel="noopener">
+						<img class="badge-play" src={play} alt={c.badges.playAlt} />
+					</a>
+					<a href={c.badges.apple} target="_blank" rel="noopener">
+						<img class="badge-appstore" src={apple} alt={c.badges.appleAlt} />
+					</a>
+				</div>
+			</section>
+
+			<div class="after">
+				<p>
+					<a class="more" href={LANDING_PATHS[lang]}>{t.more} <Icon icon="arrow-right" size="1em" /></a>
+				</p>
+				<p>
+					{typo(c.support)} <a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>
+				</p>
+				<p>
+					{typo(c.legalIntro)} <a href={c.privacy.href}>{c.privacy.label}</a> · <a href={c.terms.href}>{c.terms.label}</a>
+				</p>
+			</div>
+		</div>
+	</main>
+</BaseLayout>
+
+<script>
+	const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	// The store visuals: one every 3.8 s while in view, held under the mouse, stopped by a choice.
+	const box = document.querySelector<HTMLElement>('[data-showcase]');
+	if (box) {
+		const shots = [...box.querySelectorAll<HTMLImageElement>('.shot')];
+		const dots = [...box.querySelectorAll<HTMLButtonElement>('.dot')];
+		const toggle = box.querySelector<HTMLButtonElement>('.pause')!;
+		let current = 0;
+		let paused = reduced;
+		let hovered = false;
+		let inView = false;
+		let timer = 0;
+
+		const show = (n: number) => {
+			shots[current].classList.remove('is-active');
+			shots[current].setAttribute('aria-hidden', 'true');
+			dots[current].setAttribute('aria-pressed', 'false');
+			current = (n + shots.length) % shots.length;
+			shots[current].classList.add('is-active');
+			shots[current].removeAttribute('aria-hidden');
+			dots[current].setAttribute('aria-pressed', 'true');
+		};
+		const schedule = () => {
+			clearTimeout(timer);
+			if (paused || hovered || !inView || document.hidden) return;
+			timer = window.setTimeout(() => {
+				show(current + 1);
+				schedule();
+			}, 3800);
+		};
+		const setPaused = (value: boolean) => {
+			paused = value;
+			toggle.setAttribute('aria-pressed', String(value));
+			schedule();
+		};
+
+		dots.forEach((dot, n) =>
+			dot.addEventListener('click', () => {
+				show(n);
+				setPaused(true);
+			}),
+		);
+		toggle.addEventListener('click', () => setPaused(!paused));
+		box.addEventListener('pointerenter', (e) => {
+			if (e.pointerType !== 'mouse') return;
+			hovered = true;
+			schedule();
+		});
+		box.addEventListener('pointerleave', () => {
+			hovered = false;
+			schedule();
+		});
+		document.addEventListener('visibilitychange', schedule);
+		new IntersectionObserver(([e]) => {
+			inView = e.isIntersecting;
+			schedule();
+		}, { threshold: 0.3 }).observe(box);
+		box.querySelector<HTMLElement>('.controls')!.hidden = false;
+		setPaused(paused);
+	}
+
+	// Sections rise into view once. Without the observer, or with reduced motion, they are just there.
+	const page = document.querySelector<HTMLElement>('.scan-dl');
+	if (page && !reduced) {
+		const io = new IntersectionObserver((entries) => {
+			for (const e of entries) {
+				if (!e.isIntersecting) continue;
+				e.target.classList.add('is-in');
+				io.unobserve(e.target);
+			}
+		}, { threshold: 0.15 });
+		page.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+		page.classList.add('can-reveal');
+	}
+
+	// The demo video is fetched only near the screen: 5 MB nobody above the fold should pay for.
+	const video = document.querySelector<HTMLVideoElement>('.teaser');
+	if (video?.dataset.src) {
+		new IntersectionObserver((entries, observer) => {
+			if (!entries.some((e) => e.isIntersecting)) return;
+			observer.disconnect();
+			video.src = video.dataset.src!;
+			if (!reduced) video.play().catch(() => {});
+		}, { rootMargin: '200px' }).observe(video);
+	}
+</script>
+
+<style>
+	/* The app's own colours, from its store visuals: night blue and the AR cyan. The hero stays dark in both themes. */
+	.scan-dl {
+		--navy: #0f1527;
+		--navy-2: #1c2a45;
+		--cyan: #5adae1;
+		--teal: #13808a;
+		--mist: #c9d3e6;
+		max-width: 68rem;
+		margin-inline: auto;
+		padding-bottom: 1rem;
+	}
+
+	:global(.theme-dark) .scan-dl {
+		--teal: var(--cyan);
+	}
+
+	/* The hero photo carries its title painted on its left half. Stacked, the photo is twice the panel's
+	   width and pinned right, so only its right half shows; side by side, the night blue covers the left. */
+	.hero {
+		display: grid;
+		gap: 2.5rem;
+		padding: 2rem 1.25rem 1.75rem;
+		border-radius: 1.75rem;
+		color: #fff;
+		background:
+			linear-gradient(180deg, var(--navy) 0 44%, rgb(15 21 39 / 0.35) 72%, rgb(15 21 39 / 0.75)),
+			url('/assets/petanque-ar/hero-en.webp') 100% 100% / 205% auto no-repeat,
+			var(--navy);
+		box-shadow: 0 30px 60px -32px rgb(9 14 30 / 0.65);
+		overflow: hidden;
+	}
+
+	.hero-copy {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.kicker {
+		font-size: var(--text-sm);
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--cyan);
+	}
+
+	.hero h1 {
+		margin-top: 0.5rem;
+		font-size: clamp(2.25rem, 8vw, 3.75rem);
+		font-weight: 700;
+		line-height: 1;
+		letter-spacing: 0.01em;
+		text-transform: uppercase;
+		color: #fff;
+	}
+
+	/* The cyan bar under the name, as on the hero image. */
+	.hero h1::after {
+		content: '';
+		display: block;
+		width: 3.5rem;
+		height: 0.25rem;
+		margin-top: 1rem;
+		border-radius: 1rem;
+		background: var(--cyan);
+	}
+
+	.tagline {
+		margin-top: 1rem;
+		font-family: var(--font-brand);
+		font-size: var(--text-xl);
+		font-weight: 600;
+		line-height: 1.2;
+		text-wrap: balance;
+	}
+
+	.lead {
+		margin-top: 0.75rem;
+		max-width: 34rem;
+		color: var(--mist);
+	}
+
+	/* Side by side down to a 390 px phone. */
+	.hero-copy .store-badges,
+	.closing .store-badges {
+		justify-content: flex-start;
+		gap: 0.5rem;
+		--badge-h: 2.6rem;
+	}
+
+	.free {
+		margin-top: 0.85rem;
+		font-size: var(--text-sm);
+		font-weight: 700;
+		color: var(--cyan);
+	}
+
+	.showcase {
+		display: grid;
+		justify-items: center;
+		gap: 1rem;
+		margin: 0;
+	}
+
+	.slides {
+		position: relative;
+		width: min(15rem, 66vw);
+		aspect-ratio: 560 / 1212;
+		border-radius: 1.5rem;
+		overflow: hidden;
+		isolation: isolate;
+		background: var(--navy);
+		box-shadow:
+			0 0 0 1px rgb(90 218 225 / 0.25),
+			0 30px 50px -24px rgb(0 0 0 / 0.7),
+			0 0 40px -10px rgb(90 218 225 / 0.35);
+	}
+
+	.shot {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		transform: scale(1.04);
+		transition:
+			opacity 0.7s ease,
+			transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+	}
+
+	.shot.is-active {
+		opacity: 1;
+		transform: none;
+	}
+
+	.controls {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.controls[hidden] {
+		display: none;
+	}
+
+	.dot {
+		width: 0.65rem;
+		height: 0.65rem;
+		padding: 0;
+		border: 0;
+		border-radius: 999px;
+		background: rgb(255 255 255 / 0.3);
+		cursor: pointer;
+		transition:
+			width 0.3s ease,
+			background-color 0.3s ease;
+	}
+
+	.dot[aria-pressed='true'] {
+		width: 1.75rem;
+		background: var(--cyan);
+	}
+
+	.pause {
+		display: grid;
+		place-items: center;
+		width: 2rem;
+		height: 2rem;
+		margin-left: 0.35rem;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: rgb(255 255 255 / 0.14);
+		color: #fff;
+		cursor: pointer;
+	}
+
+	.pause svg {
+		fill: currentColor;
+	}
+
+	.pause .i-play,
+	.pause[aria-pressed='true'] .i-pause {
+		display: none;
+	}
+
+	.pause[aria-pressed='true'] .i-play {
+		display: block;
+	}
+
+	.dot:focus-visible,
+	.pause:focus-visible {
+		outline: 2px solid var(--cyan);
+		outline-offset: 3px;
+	}
+
+	.points {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.point {
+		display: grid;
+		gap: 0.6rem;
+		align-content: start;
+		padding: 1.5rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1.25rem;
+		background: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.point h2 {
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+		text-wrap: balance;
+	}
+
+	.point p {
+		color: var(--gray-400);
+	}
+
+	.film {
+		display: grid;
+		gap: 1.5rem;
+		justify-items: center;
+		width: 100%;
+		max-width: 52rem;
+		margin-inline: auto;
+		text-align: center;
+		text-wrap: balance;
+	}
+
+	.film h2,
+	.closing h2 {
+		font-size: var(--text-2xl);
+		color: var(--gray-0);
+	}
+
+	.film-copy p {
+		margin-top: 0.5rem;
+		max-width: 26rem;
+		color: var(--gray-400);
+	}
+
+	/* "au-dessus" broke on its hyphen. */
+	.step {
+		white-space: nowrap;
+	}
+
+	.teaser {
+		width: min(100%, 18rem);
+		height: auto;
+		border-radius: 1.5rem;
+		background: var(--navy);
+		box-shadow: 0 30px 50px -28px rgb(9 14 30 / 0.6);
+	}
+
+	.closing {
+		display: grid;
+		justify-items: center;
+		gap: 0.5rem;
+		padding: 2.5rem 1.5rem;
+		border-radius: 1.75rem;
+		text-align: center;
+		color: #fff;
+		background:
+			radial-gradient(60% 90% at 50% 0%, rgb(90 218 225 / 0.22), transparent 70%),
+			linear-gradient(180deg, var(--navy), var(--navy-2));
+		box-shadow: 0 30px 60px -32px rgb(9 14 30 / 0.65);
+	}
+
+	.closing h2 {
+		color: #fff;
+	}
+
+	.closing p:not(.kicker) {
+		color: var(--mist);
+		font-weight: 600;
+	}
+
+	.closing .store-badges {
+		justify-content: center;
+		margin-top: 1rem;
+	}
+
+	.after {
+		display: grid;
+		gap: 0.35rem;
+		text-align: center;
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+
+	.more {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-family: var(--font-brand);
+		font-size: var(--text-md);
+		font-weight: 600;
+	}
+
+	@media (min-width: 30em) {
+		.hero-copy .store-badges,
+		.closing .store-badges {
+			gap: 0.75rem;
+			--badge-h: 3.25rem;
+		}
+	}
+
+	@media (min-width: 40em) {
+		.points {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+
+	@media (min-width: 56em) {
+		.hero {
+			grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+			align-items: center;
+			min-height: 38rem;
+			padding: 2.5rem 2.5rem 2rem 3.5rem;
+			background:
+				linear-gradient(90deg, var(--navy) 0 46%, rgb(15 21 39 / 0.6) 60%, rgb(15 21 39 / 0.15) 82%),
+				url('/assets/petanque-ar/hero-en.webp') right center / cover no-repeat,
+				var(--navy);
+		}
+
+		.slides {
+			width: 15.5rem;
+		}
+
+		.film {
+			grid-template-columns: 1fr auto;
+			justify-items: start;
+			align-items: center;
+			gap: 3rem;
+			text-align: left;
+		}
+
+		.teaser {
+			width: 17rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.hero-copy > * {
+			animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+		}
+
+		.hero-copy > :nth-child(2) {
+			animation-delay: 0.06s;
+		}
+
+		.hero-copy > :nth-child(3) {
+			animation-delay: 0.12s;
+		}
+
+		.hero-copy > :nth-child(n + 4) {
+			animation-delay: 0.18s;
+		}
+
+		.slides {
+			animation: phone-in 1s 0.15s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+		}
+
+		.can-reveal [data-reveal] {
+			opacity: 0;
+			transform: translateY(1.5rem);
+			transition:
+				opacity 0.7s ease,
+				transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+		}
+
+		.can-reveal [data-reveal].is-in {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(0.75rem);
+		}
+	}
+
+	@keyframes phone-in {
+		from {
+			opacity: 0;
+			transform: translateY(3rem) rotate(2deg);
+		}
+	}
+</style>

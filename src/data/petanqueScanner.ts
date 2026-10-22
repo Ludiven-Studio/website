@@ -673,3 +673,102 @@ export const copy: Record<LandingLang, LandingCopy> = {
 		closing: 'Disponibile per Android e iOS',
 	},
 };
+
+/** Every language version of the download page. */
+export const DOWNLOAD_PATHS: Record<LandingLang, string> = {
+	fr: '/petanque-scanner/telecharger/',
+	en: '/en/petanque-scanner/download/',
+	es: '/es/petanque-scanner/descargar/',
+	de: '/de/petanque-scanner/herunterladen/',
+	it: '/it/petanque-scanner/scarica/',
+};
+
+export interface DownloadCopy {
+	title: string;
+	/** The hero's own kicker, as painted on the hero images. */
+	kicker: string;
+	/** What each store visual says (its painted caption), in SCREENS order. */
+	shots: string[];
+	pause: string;
+	videoTitle: string;
+	more: string;
+}
+
+// The download page takes the rest from `copy`: title, description, features, steps, price, closing, legal.
+export const download: Record<LandingLang, DownloadCopy> = {
+	fr: {
+		title: 'Télécharger Pétanque Scanner sur Android et iPhone | Ludiven Studio',
+		kicker: 'Réalité augmentée',
+		shots: [
+			'Qui a le point ? L’écart de chaque boule, jusqu’au millimètre.',
+			'Vise le cochonnet. 3 visées, il est placé.',
+			'Passe au-dessus. Chaque boule se verrouille toute seule.',
+			'Le verdict d’en haut. Boules classées, écarts affichés.',
+			'Pas d’AR ? Une photo suffit. Le mode photo marche sur tous les téléphones.',
+			'3 scans gratuits par jour. Premium à vie : illimité, sans pub, sans abonnement.',
+		],
+		pause: 'Mettre l’animation en pause',
+		videoTitle: 'En vidéo',
+		more: 'Tout savoir sur l’application',
+	},
+	en: {
+		title: 'Download Pétanque Scanner for Android and iPhone | Ludiven Studio',
+		kicker: 'Augmented reality',
+		shots: [
+			'Who has the point? Each boule’s gap, down to the millimetre.',
+			'Aim at the jack. 3 shots and it is placed.',
+			'Hold it above. Each boule locks by itself.',
+			'The verdict from above. Boules ranked, gaps shown.',
+			'No AR? One photo will do. Photo mode works on every phone.',
+			'3 free scans a day. Lifetime Premium: unlimited, no ads, no subscription.',
+		],
+		pause: 'Pause the animation',
+		videoTitle: 'On video',
+		more: 'All about the app',
+	},
+	es: {
+		title: 'Descargar Pétanque Scanner para Android y iPhone | Ludiven Studio',
+		kicker: 'Realidad aumentada',
+		shots: [
+			'¿Quién tiene el punto? La distancia de cada bola, hasta el milímetro.',
+			'Apunta al boliche. 3 tomas y queda situado.',
+			'Colócate encima. Cada bola se bloquea sola.',
+			'El veredicto desde arriba. Bolas clasificadas, distancias a la vista.',
+			'¿Sin AR? Basta una foto. El modo foto funciona en todos los móviles.',
+			'3 escaneos gratis al día. Premium de por vida: ilimitado, sin anuncios ni suscripción.',
+		],
+		pause: 'Pausar la animación',
+		videoTitle: 'En vídeo',
+		more: 'Todo sobre la aplicación',
+	},
+	de: {
+		title: 'Pétanque Scanner für Android und iPhone herunterladen | Ludiven Studio',
+		kicker: 'Erweiterte Realität',
+		shots: [
+			'Wer hat den Punkt? Der Abstand jeder Kugel, bis auf den Millimeter.',
+			'Ziel auf die Zielkugel. 3 Aufnahmen, schon ist sie platziert.',
+			'Halte es darüber. Jede Kugel rastet von selbst ein.',
+			'Das Urteil von oben. Kugeln gewertet, Abstände sichtbar.',
+			'Kein AR? Ein Foto reicht. Der Fotomodus läuft auf jedem Handy.',
+			'3 Gratis-Scans pro Tag. Premium auf Lebenszeit: unbegrenzt, ohne Werbung, ohne Abo.',
+		],
+		pause: 'Animation anhalten',
+		videoTitle: 'Im Video',
+		more: 'Alles über die App',
+	},
+	it: {
+		title: 'Scarica Pétanque Scanner per Android e iPhone | Ludiven Studio',
+		kicker: 'Realtà aumentata',
+		shots: [
+			'Chi ha il punto? La distanza di ogni boccia, fino al millimetro.',
+			'Inquadra il pallino. 3 scatti ed è posizionato.',
+			'Tienilo sopra. Ogni boccia si blocca da sola.',
+			'Il verdetto dall’alto. Bocce in classifica, distanze in vista.',
+			'Niente AR? Basta una foto. La modalità foto funziona su ogni telefono.',
+			'3 scansioni gratis al giorno. Premium a vita: illimitato, senza pubblicità né abbonamento.',
+		],
+		pause: 'Metti in pausa l’animazione',
+		videoTitle: 'In video',
+		more: 'Tutto sull’app',
+	},
+};

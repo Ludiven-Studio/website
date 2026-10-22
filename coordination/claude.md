@@ -356,3 +356,26 @@
 - 21:03 : `astro check` 0 erreur, build OK, précache 298 entrées, liens 155 pages. Commité et poussé à la demande de
   l'utilisateur (« ok oui tu peux mettre à jour ») : mes 20 fichiers et cette section seulement (journal mixte).
   Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Pétanque Scanner : page de téléchargement (session PetanqueMeet)
+- Statut : en cours (2026-10-22T21:36+02:00). Demande de l'utilisateur : une page de téléchargement pour Pétanque
+  Scanner comme celle de Pétanque Meet, dans les 5 langues de la page produit.
+- Réservations actives : `src/components/ScannerDownload.astro` (nouveau), `src/data/petanqueScanner.ts` (ajout des
+  textes de la page, rien d'existant modifié), `src/pages/petanque-scanner/telecharger.astro`,
+  `src/pages/en/petanque-scanner/download.astro`, `src/pages/es/petanque-scanner/descargar.astro`,
+  `src/pages/de/petanque-scanner/herunterladen.astro`, `src/pages/it/petanque-scanner/scarica.astro` (nouveaux).
+  Pas touché : `src/pages/petanque-scanner/test.astro` (fichier d'une autre session), `public/petanque-scanner/version.json`.
+- Ressources : serveur de dev sur le port 4475 ; eslint, `astro check`. Build annoncé ici avant.
+- 21:44 : page écrite dans les 5 langues, eslint OK, `astro check` 0 erreur ; captures dev sans erreur (serveur 4475
+  arrêté). Lancement du build complet (écrit `dist/`, `.astro/`, `public/vendor/`), puis `check-precache` et `check-links`.
+- 21:46 : build OK, précache 304 entrées, liens 160 pages, les 5 pages dans le sitemap ; sur le build (preview 4475,
+  arrêté) : aucune erreur console, défilement, pause, apparition des sections et vidéo vérifiés. Aucune page n'y renvoie
+  encore. Statut : terminé, non commité (en attente de l'utilisateur). Réservations gardées jusqu'au commit ; au commit,
+  mes fichiers seulement.
+- 21:52 : l'utilisateur valide (« ok »). Réservations ajoutées : `src/content/work/petanque-scanner.md`,
+  `src/content/work-en/petanque-scanner.md` (front-matter : « Découvrir l'appli » vers la page de téléchargement). Pas de
+  lien sur la page produit : elle a déjà les badges et les mêmes images. Lancement de `astro check`, du build complet
+  (écrit `dist/`, `.astro/`, `public/vendor/`), puis `check-precache` et `check-links`.
+- 21:55 : `astro check` 0 erreur, build OK, précache 304 entrées, liens 160 pages ; les deux fiches renvoient vers la page.
+  Commité et poussé à la demande de l'utilisateur : mes 9 fichiers et cette section seulement (journal mixte).
+  Statut : terminé. Réservations libérées.
