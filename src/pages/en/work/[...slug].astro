@@ -48,12 +48,17 @@ const { Content } = await entry.render();
 							</div>
 							<div class="summary">
 								<p class="description">{entry.data.description}</p>
-								{(entry.data.appStore || entry.data.playStore || entry.data.appPage) && (
+								{(entry.data.appStore || entry.data.playStore || entry.data.appPage || entry.data.webApp) && (
 									<div class="cta">
 										<StoreBadges appStore={entry.data.appStore} playStore={entry.data.playStore} lang="en" />
 										{entry.data.appPage && (
 											<a class="app-page" href={entry.data.appPage}>
 												{entry.data.appPageLabel || 'See the app page'} <Icon icon="arrow-right" />
+											</a>
+										)}
+										{entry.data.webApp && (
+											<a class="app-page app-page--web" href={entry.data.webApp}>
+												{entry.data.webAppLabel || 'Open the web version'} <Icon icon="arrow-right" />
 											</a>
 										)}
 									</div>
@@ -306,5 +311,17 @@ const { Content } = await entry.render();
 	.app-page:hover,
 	.app-page:focus-visible {
 		background: var(--accent-dark);
+	}
+
+	.app-page--web {
+		background: transparent;
+		color: var(--gray-0);
+		box-shadow: inset 0 0 0 2px var(--accent-regular);
+	}
+
+	.app-page--web:hover,
+	.app-page--web:focus-visible {
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
 	}
 </style>

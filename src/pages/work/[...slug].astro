@@ -49,12 +49,17 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 							</div>
 							<div class="summary">
 								<p class="description">{entry.data.description}</p>
-								{(entry.data.appStore || entry.data.playStore || entry.data.appPage) && (
+								{(entry.data.appStore || entry.data.playStore || entry.data.appPage || entry.data.webApp) && (
 									<div class="cta">
 										<StoreBadges appStore={entry.data.appStore} playStore={entry.data.playStore} lang="fr" />
 										{entry.data.appPage && (
 											<a class="app-page" href={entry.data.appPage}>
 												{entry.data.appPageLabel || "Voir la page de l'application"} <Icon icon="arrow-right" />
+											</a>
+										)}
+										{entry.data.webApp && (
+											<a class="app-page app-page--web" href={entry.data.webApp}>
+												{entry.data.webAppLabel || 'Ouvrir la version web'} <Icon icon="arrow-right" />
 											</a>
 										)}
 									</div>
@@ -307,5 +312,17 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 	.app-page:hover,
 	.app-page:focus-visible {
 		background: var(--accent-dark);
+	}
+
+	.app-page--web {
+		background: transparent;
+		color: var(--gray-0);
+		box-shadow: inset 0 0 0 2px var(--accent-regular);
+	}
+
+	.app-page--web:hover,
+	.app-page--web:focus-visible {
+		background: var(--accent-regular);
+		color: var(--accent-text-over);
 	}
 </style>

@@ -1,12 +1,14 @@
 ---
 title: Pétanque Meet - 2026
 publishDate: 2026-10-16 00:00:00
-img: /assets/petanque-meet/hero.webp
+img: /assets/petanque-meet/hero-en.webp
 img_alt: Pétanque Meet — find pétanque players near you
 role: Developer
 org: Ludiven Studio
-appPage: /en/petanque-meet/
-appPageLabel: Browse the map
+appPage: /en/petanque-meet/download/
+appPageLabel: Discover the app
+webApp: /en/petanque-meet/
+webAppLabel: Browse the map
 appStore: https://apps.apple.com/app/id6823583416
 playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=en
 description: |
@@ -20,20 +22,20 @@ tags:
   - Python
   - Android
   - iOS
-galleryTitle: The app (in French)
+galleryTitle: The app
 galleryLayout: phone
 gallery:
-  - src: /assets/petanque-meet/screen-01.webp
+  - src: /assets/petanque-meet/screen-01-en.webp
     alt: "The map: games looking for players, and club tournaments"
-  - src: /assets/petanque-meet/screen-02.webp
+  - src: /assets/petanque-meet/screen-02-en.webp
     alt: "A game: the pitch, the time, the format and who already plays"
-  - src: /assets/petanque-meet/screen-03.webp
+  - src: /assets/petanque-meet/screen-03-en.webp
     alt: "A club tournament, with its poster and the organizer's number"
-  - src: /assets/petanque-meet/screen-04.webp
+  - src: /assets/petanque-meet/screen-04-en.webp
     alt: "Posting a game: the pitch, the time, the format and the number of players"
-  - src: /assets/petanque-meet/screen-05.webp
+  - src: /assets/petanque-meet/screen-05-en.webp
     alt: "The agenda: games organized, games joined and tournaments followed"
-  - src: /assets/petanque-meet/screen-06.webp
+  - src: /assets/petanque-meet/screen-06-en.webp
     alt: "The same map in the dark theme"
 ---
 <p>

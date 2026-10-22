@@ -333,3 +333,26 @@
   l'utilisateur). Réservations gardées jusqu'au commit ; au commit, mes fichiers seulement.
 - Commité et poussé à la demande de l'utilisateur (« ok push ») : mes 19 fichiers et cette section seulement (journal
   mixte). Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Pétanque Meet : la fiche projet mène à la page de téléchargement (session PetanqueMeet)
+- Statut : en cours (2026-10-22T20:46+02:00). Demande de l'utilisateur : pouvoir aller de `/work/petanque-meet/` à la
+  page de téléchargement. Bouton « Découvrir l'appli » (page produit) + « Consulter la carte » gardé en second bouton.
+- Réservations actives : `src/content/config.ts` (champs `webApp`/`webAppLabel`), `src/pages/work/[...slug].astro`,
+  `src/pages/en/work/[...slug].astro` (bloc `.cta` seulement), `src/content/work/petanque-meet.md`,
+  `src/content/work-en/petanque-meet.md` (front-matter).
+- Ressources : serveur de dev sur le port 4474 ; eslint, `astro check`. Build annoncé ici avant.
+- 20:48 : eslint OK ; captures FR/EN, bureau/téléphone/sombre : « Découvrir l'appli » puis « Consulter la carte », la
+  fiche Pétanque Scanner inchangée, aucune erreur console (serveur 4474 arrêté). Lancement du build complet (écrit
+  `dist/`, `.astro/`, `public/vendor/`), puis `check-precache` et `check-links`.
+- 20:50 : `astro check` 0 erreur, build OK (143 pages), précache 298 entrées, liens 155 pages. Statut : terminé, non
+  commité (en attente de l'utilisateur). Réservations gardées jusqu'au commit ; au commit, mes fichiers seulement.
+- Suite : l'utilisateur valide le push et veut les images de la fiche en 0.1.5. Réservations ajoutées :
+  `public/assets/petanque-meet/hero*.webp`, `public/assets/petanque-meet/screen-*.webp`, `public/assets/work/og/petanque-meet.jpg`
+  (refait seul, avec les réglages de `generate-work-og.mjs`, pour ne pas réécrire les autres).
+- 21:02 : images 0.1.5 faites depuis les captures des stores (`hero.webp` et `screen-01..06.webp` remplacés, versions
+  `-en` ajoutées pour la fiche anglaise, dont la galerie n'est plus « in French »), aperçu de partage refait ; contrôle
+  navigateur FR + EN sans erreur ni image manquante (serveur 4474 arrêté). Lancement du build complet (écrit `dist/`,
+  `.astro/`, `public/vendor/`), puis `check-precache` et `check-links`.
+- 21:03 : `astro check` 0 erreur, build OK, précache 298 entrées, liens 155 pages. Commité et poussé à la demande de
+  l'utilisateur (« ok oui tu peux mettre à jour ») : mes 20 fichiers et cette section seulement (journal mixte).
+  Statut : terminé. Réservations libérées.

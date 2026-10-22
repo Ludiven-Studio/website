@@ -19,6 +19,9 @@ const workSchema = z.object({
 	/** The product page, for research write-ups whose app has its own landing. */
 	appPage: z.string().optional(),
 	appPageLabel: z.string().optional(),
+	/** The same service in the browser, shown as a second button. */
+	webApp: z.string().optional(),
+	webAppLabel: z.string().optional(),
 });
 
 export const collections = {
