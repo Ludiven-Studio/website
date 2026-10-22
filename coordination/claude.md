@@ -317,3 +317,19 @@
   Statut : terminé, non commité. Réservations libérées.
 - Commité à la demande de l'utilisateur (« ok » pour commit et push) : mes 2 fichiers et cette section seulement (journal
   mixte). Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Pétanque Meet : une page de téléchargement plus vivante (session PetanqueMeet)
+- Statut : en cours (2026-10-22T19:48+02:00). Demande de l'utilisateur : la page `/petanque-meet/telecharger/` fait
+  austère, l'améliorer avec des images ou des animations.
+- Réservations actives : `src/pages/petanque-meet/telecharger.astro`, `src/pages/en/petanque-meet/download.astro`,
+  `src/components/MeetDownload.astro` (nouveau), `src/data/petanqueMeet.ts` (textes de la page),
+  `public/assets/petanque-meet/download/` (nouveau : décor, captures 0.1.5, vidéo, image de partage).
+- Ressources : serveur de dev sur le port 4474 ; eslint sur mes fichiers, `astro check`. Build annoncé ici avant.
+- 19:56 : page écrite (héros avec le décor et un téléphone qui fait défiler 5 écrans, 3 points forts, la vidéo en FR,
+  bandeau final), eslint OK, `astro check` 0 erreur ; captures bureau/téléphone/sombre FR et EN sans erreur (serveur 4474
+  arrêté). Lancement du build complet (écrit `dist/`, `.astro/`, `public/vendor/`), puis `check-precache` et `check-links`.
+- 19:58 : build OK (143 pages), précache 296 entrées, liens 155 pages ; sur le build (preview 4474, arrêté) : aucune erreur
+  console, défilement, pause, apparition des sections et vidéo vérifiés. Statut : terminé, non commité (en attente de
+  l'utilisateur). Réservations gardées jusqu'au commit ; au commit, mes fichiers seulement.
+- Commité et poussé à la demande de l'utilisateur (« ok push ») : mes 19 fichiers et cette section seulement (journal
+  mixte). Statut : terminé. Réservations libérées.

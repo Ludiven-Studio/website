@@ -1,0 +1,628 @@
+---
+// The Pétanque Meet download page, French and English: the store badges first, then the app at work.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Icon from './Icon.astro';
+import LangSwitch from './LangSwitch.astro';
+import StoreBadges from './StoreBadges.astro';
+import { MEET_DOWNLOAD, MEET_STORES } from '../data/petanqueMeet';
+
+interface Props {
+	lang: 'fr' | 'en';
+}
+
+const { lang } = Astro.props;
+const t = MEET_DOWNLOAD[lang];
+const other = MEET_DOWNLOAD[lang === 'fr' ? 'en' : 'fr'].path;
+const stores = MEET_STORES[lang];
+const dir = '/assets/petanque-meet/download';
+const first = t.screens[0];
+---
+
+<BaseLayout title={t.title} description={t.description} image={`${dir}/og-${lang}.jpg`} lang={lang} altLang={other}>
+	<main class="wrapper">
+		<div class="meet-dl stack gap-12">
+			<LangSwitch lang={lang} href={other} />
+
+			<section class="hero">
+				<div class="hero-copy">
+					<p class="app-name">
+						<img src="/assets/petanque-meet/icon.webp" alt="" width="56" height="56" />
+						Pétanque Meet
+					</p>
+					<h1>{t.h1}</h1>
+					<p class="lead">{t.lead}</p>
+					<StoreBadges playStore={stores.play} appStore={stores.apple} lang={lang} />
+					<p class="free">{t.free}</p>
+				</div>
+
+				<figure class="showcase" data-showcase>
+					<div class="phone">
+						<div class="screen">
+							{t.screens.map((s, i) => (
+								<img
+									class:list={['shot', { 'is-active': i === 0 }]}
+									src={`${dir}/${s.id}-${lang}.webp`}
+									alt={s.alt}
+									width="600"
+									height="1304"
+									data-title={s.title}
+									data-sub={s.sub}
+									aria-hidden={i === 0 ? undefined : 'true'}
+									loading={i === 0 ? 'eager' : 'lazy'}
+									fetchpriority={i === 0 ? 'high' : undefined}
+									decoding="async"
+								/>
+							))}
+						</div>
+					</div>
+					<figcaption class="caption">
+						<strong>{first.title}</strong>
+						<span>{first.sub}</span>
+					</figcaption>
+					{/* Shown by the script: without it the first screen simply stays. */}
+					<div class="controls" hidden>
+						{t.screens.map((s, i) => (
+							<button type="button" class="dot" aria-label={s.title} aria-pressed={i === 0 ? 'true' : 'false'}></button>
+						))}
+						<button type="button" class="pause" aria-label={t.pause} aria-pressed="false">
+							<svg class="i-pause" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+								<rect x="3" y="2" width="3.5" height="12" rx="1" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" />
+							</svg>
+							<svg class="i-play" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+								<path d="M4 2.5v11a1 1 0 0 0 1.5.86l9-5.5a1 1 0 0 0 0-1.72l-9-5.5A1 1 0 0 0 4 2.5Z" />
+							</svg>
+						</button>
+					</div>
+				</figure>
+			</section>
+
+			<section class="points" data-reveal>
+				{t.points.map((p) => (
+					<div class="point">
+						<Icon icon={p.icon} size="2.25rem" color="var(--clay)" />
+						<h2>{p.title}</h2>
+						<p>{p.body}</p>
+					</div>
+				))}
+			</section>
+
+			{t.video && (
+				<section class="film" data-reveal>
+					<div class="film-copy">
+						<h2>{t.video.title}</h2>
+						<p>{t.video.body}</p>
+					</div>
+					<video
+						class="teaser"
+						data-src={`${dir}/teaser-${lang}.mp4`}
+						poster={`${dir}/teaser-${lang}.webp`}
+						width="720"
+						height="900"
+						muted
+						playsinline
+						controls
+						preload="none"
+						aria-label={t.video.label}
+					></video>
+				</section>
+			)}
+
+			<section class="closing" data-reveal>
+				<img class="closing-icon" src="/assets/petanque-meet/icon.webp" alt="" width="72" height="72" loading="lazy" />
+				<h2>{t.closing}</h2>
+				<p>{t.free}</p>
+				<StoreBadges playStore={stores.play} appStore={stores.apple} lang={lang} />
+			</section>
+
+			<p class="after">
+				{t.browser.before}<a href={t.browser.href}>{t.browser.link}</a>{t.browser.after}
+				<br />
+				{t.legal.map((l, i) => (
+					<>
+						{i > 0 && ' · '}
+						<a href={l.href} hreflang={lang === 'fr' ? undefined : 'fr'}>{l.label}</a>
+					</>
+				))}
+				{t.legalNote && ` ${t.legalNote}`}
+			</p>
+		</div>
+	</main>
+</BaseLayout>
+
+<script>
+	const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	// The phone's slides: one every 3.8 s while in view, held under the mouse, stopped by a choice.
+	const box = document.querySelector<HTMLElement>('[data-showcase]');
+	if (box) {
+		const shots = [...box.querySelectorAll<HTMLImageElement>('.shot')];
+		const dots = [...box.querySelectorAll<HTMLButtonElement>('.dot')];
+		const toggle = box.querySelector<HTMLButtonElement>('.pause')!;
+		const caption = box.querySelector<HTMLElement>('.caption')!;
+		const title = caption.querySelector('strong')!;
+		const sub = caption.querySelector('span')!;
+		let current = 0;
+		let paused = reduced;
+		let hovered = false;
+		let inView = false;
+		let timer = 0;
+
+		const show = (n: number) => {
+			shots[current].classList.remove('is-active');
+			shots[current].setAttribute('aria-hidden', 'true');
+			dots[current].setAttribute('aria-pressed', 'false');
+			current = (n + shots.length) % shots.length;
+			const shot = shots[current];
+			shot.classList.add('is-active');
+			shot.removeAttribute('aria-hidden');
+			dots[current].setAttribute('aria-pressed', 'true');
+			title.textContent = shot.dataset.title ?? '';
+			sub.textContent = shot.dataset.sub ?? '';
+			caption.classList.remove('is-new');
+			void caption.offsetWidth; // restarts the caption's fade
+			caption.classList.add('is-new');
+		};
+		const schedule = () => {
+			clearTimeout(timer);
+			if (paused || hovered || !inView || document.hidden) return;
+			timer = window.setTimeout(() => {
+				show(current + 1);
+				schedule();
+			}, 3800);
+		};
+		const setPaused = (value: boolean) => {
+			paused = value;
+			toggle.setAttribute('aria-pressed', String(value));
+			schedule();
+		};
+
+		dots.forEach((dot, n) =>
+			dot.addEventListener('click', () => {
+				show(n);
+				setPaused(true);
+			}),
+		);
+		toggle.addEventListener('click', () => setPaused(!paused));
+		box.addEventListener('pointerenter', (e) => {
+			if (e.pointerType !== 'mouse') return;
+			hovered = true;
+			schedule();
+		});
+		box.addEventListener('pointerleave', () => {
+			hovered = false;
+			schedule();
+		});
+		document.addEventListener('visibilitychange', schedule);
+		new IntersectionObserver(([e]) => {
+			inView = e.isIntersecting;
+			schedule();
+		}, { threshold: 0.3 }).observe(box);
+		box.querySelector<HTMLElement>('.controls')!.hidden = false;
+		setPaused(paused);
+	}
+
+	// Sections rise into view once. Without the observer, or with reduced motion, they are just there.
+	const page = document.querySelector<HTMLElement>('.meet-dl');
+	if (page && !reduced) {
+		const io = new IntersectionObserver((entries) => {
+			for (const e of entries) {
+				if (!e.isIntersecting) continue;
+				e.target.classList.add('is-in');
+				io.unobserve(e.target);
+			}
+		}, { threshold: 0.15 });
+		page.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+		page.classList.add('can-reveal');
+	}
+
+	// The teaser is fetched only near the screen: 1.3 MB nobody above the fold should pay for.
+	const video = document.querySelector<HTMLVideoElement>('.teaser');
+	if (video?.dataset.src) {
+		new IntersectionObserver((entries, observer) => {
+			if (!entries.some((e) => e.isIntersecting)) return;
+			observer.disconnect();
+			video.src = video.dataset.src!;
+			if (!reduced) video.play().catch(() => {});
+		}, { rootMargin: '200px' }).observe(video);
+	}
+</script>
+
+<style>
+	/* The app's own colours: the hero is an illustration and stays light in both themes. */
+	.meet-dl {
+		--sand: #fbf7f0;
+		--ink: #1e2233;
+		--clay: #c4512a;
+		--clay-end: #de6f36;
+		--clay-dark: #a8431f;
+		max-width: 68rem;
+		margin-inline: auto;
+		padding-bottom: 1rem;
+	}
+
+	:global(.theme-dark) .meet-dl {
+		--clay: #e0794f;
+	}
+
+	.hero {
+		display: grid;
+		gap: 2.5rem;
+		padding: 2rem 1.25rem 1.75rem;
+		border-radius: 1.75rem;
+		color: var(--ink);
+		background:
+			linear-gradient(180deg, var(--sand) 0 36%, rgb(251 247 240 / 0) 60%),
+			url('/assets/petanque-meet/download/scene.webp') 60% 100% / auto 66% no-repeat,
+			var(--sand);
+		box-shadow: 0 30px 60px -32px rgb(60 20 5 / 0.45);
+		overflow: hidden;
+	}
+
+	.hero-copy {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.app-name {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		font-family: var(--font-brand);
+		font-size: var(--text-lg);
+		font-weight: 600;
+		color: var(--ink);
+	}
+
+	.app-name img {
+		width: 3rem;
+		height: 3rem;
+		border-radius: 22%;
+		box-shadow: 0 2px 8px rgb(60 20 5 / 0.25);
+	}
+
+	.hero h1 {
+		margin-top: 1.25rem;
+		font-size: clamp(2.125rem, 7vw, 3.25rem);
+		line-height: 1.08;
+		color: var(--ink);
+		text-wrap: balance;
+	}
+
+	.lead {
+		margin-top: 1rem;
+		max-width: 34rem;
+		font-size: var(--text-md);
+		color: #4a4f63;
+	}
+
+	/* Side by side down to a 390 px phone. */
+	.hero-copy :global(.store-badges) {
+		justify-content: flex-start;
+		gap: 0.5rem;
+		--badge-h: 2.6rem;
+	}
+
+	.free {
+		margin-top: 0.85rem;
+		font-size: var(--text-sm);
+		font-weight: 700;
+		color: var(--clay-dark);
+	}
+
+	.showcase {
+		display: grid;
+		justify-items: center;
+		gap: 1rem;
+		margin: 0;
+	}
+
+	.phone {
+		width: min(15.5rem, 68vw);
+		padding: 0.55rem;
+		border-radius: 2.5rem;
+		background: var(--ink);
+		box-shadow:
+			inset 0 0 0 1px rgb(255 255 255 / 0.08),
+			0 40px 50px -26px rgb(60 20 5 / 0.6),
+			0 14px 24px -12px rgb(60 20 5 / 0.35);
+	}
+
+	.screen {
+		position: relative;
+		aspect-ratio: 600 / 1304;
+		border-radius: 2rem;
+		overflow: hidden;
+		isolation: isolate;
+		background: var(--sand);
+	}
+
+	.shot {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		opacity: 0;
+		transform: scale(1.04);
+		transition:
+			opacity 0.7s ease,
+			transform 1.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+	}
+
+	.shot.is-active {
+		opacity: 1;
+		transform: none;
+	}
+
+	.caption {
+		display: grid;
+		gap: 0.15rem;
+		min-height: 3.4rem;
+		text-align: center;
+		text-wrap: balance;
+	}
+
+	.caption strong {
+		font-family: var(--font-brand);
+		font-size: var(--text-md);
+		font-weight: 600;
+		color: var(--ink);
+	}
+
+	.caption span {
+		font-size: var(--text-sm);
+		color: var(--clay-dark);
+	}
+
+	.controls {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.controls[hidden] {
+		display: none;
+	}
+
+	.dot {
+		width: 0.65rem;
+		height: 0.65rem;
+		padding: 0;
+		border: 0;
+		border-radius: 999px;
+		background: rgb(30 34 51 / 0.25);
+		cursor: pointer;
+		transition:
+			width 0.3s ease,
+			background-color 0.3s ease;
+	}
+
+	.dot[aria-pressed='true'] {
+		width: 1.75rem;
+		background: var(--clay);
+	}
+
+	.pause {
+		display: grid;
+		place-items: center;
+		width: 2rem;
+		height: 2rem;
+		margin-left: 0.35rem;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: rgb(30 34 51 / 0.1);
+		color: var(--ink);
+		cursor: pointer;
+	}
+
+	.pause svg {
+		fill: currentColor;
+	}
+
+	.pause .i-play,
+	.pause[aria-pressed='true'] .i-pause {
+		display: none;
+	}
+
+	.pause[aria-pressed='true'] .i-play {
+		display: block;
+	}
+
+	.dot:focus-visible,
+	.pause:focus-visible {
+		outline: 2px solid var(--clay-dark);
+		outline-offset: 3px;
+	}
+
+	.points {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.point {
+		display: grid;
+		gap: 0.6rem;
+		align-content: start;
+		padding: 1.5rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1.25rem;
+		background: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.point h2 {
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+		text-wrap: balance;
+	}
+
+	.point p {
+		color: var(--gray-400);
+	}
+
+	.film {
+		display: grid;
+		gap: 1.5rem;
+		justify-items: center;
+		width: 100%;
+		max-width: 52rem;
+		margin-inline: auto;
+		text-align: center;
+		text-wrap: balance;
+	}
+
+	.film h2,
+	.closing h2 {
+		font-size: var(--text-2xl);
+		color: var(--gray-0);
+	}
+
+	.film-copy p {
+		margin-top: 0.5rem;
+		max-width: 26rem;
+		color: var(--gray-400);
+	}
+
+	.teaser {
+		width: min(100%, 24rem);
+		height: auto;
+		border-radius: 1.5rem;
+		background: var(--sand);
+		box-shadow: 0 30px 50px -28px rgb(60 20 5 / 0.5);
+	}
+
+	.closing {
+		display: grid;
+		justify-items: center;
+		gap: 0.5rem;
+		padding: 2.5rem 1.5rem;
+		border-radius: 1.75rem;
+		text-align: center;
+		color: #fff;
+		background: linear-gradient(135deg, #c4512a, #de6f36);
+		box-shadow: 0 30px 60px -32px rgb(60 20 5 / 0.55);
+	}
+
+	.closing h2 {
+		color: #fff;
+	}
+
+	.closing p {
+		color: #fdf1ea;
+		font-weight: 600;
+	}
+
+	.closing-icon {
+		width: 4.5rem;
+		height: 4.5rem;
+		border-radius: 22%;
+		box-shadow: 0 6px 18px rgb(60 20 5 / 0.35);
+	}
+
+	.closing :global(.store-badges) {
+		margin-top: 1rem;
+		gap: 0.75rem;
+	}
+
+	.after {
+		text-align: center;
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+	}
+
+	@media (min-width: 40em) {
+		.points {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+
+	@media (min-width: 30em) {
+		.hero-copy :global(.store-badges) {
+			gap: 0.75rem;
+			--badge-h: 3.25rem;
+		}
+	}
+
+	@media (min-width: 56em) {
+		.hero {
+			grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+			align-items: center;
+			min-height: 38rem;
+			padding: 2.5rem 2.5rem 2rem 3.5rem;
+			background:
+				linear-gradient(90deg, var(--sand) 0 34%, rgb(251 247 240 / 0) 56%),
+				url('/assets/petanque-meet/download/scene.webp') right center / cover no-repeat,
+				var(--sand);
+		}
+
+		.phone {
+			width: 16rem;
+		}
+
+		.film {
+			grid-template-columns: 1fr auto;
+			justify-items: start;
+			align-items: center;
+			gap: 3rem;
+			text-align: left;
+		}
+
+		.teaser {
+			width: 22rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.hero-copy > * {
+			animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+		}
+
+		.hero-copy > :nth-child(2) {
+			animation-delay: 0.06s;
+		}
+
+		.hero-copy > :nth-child(3) {
+			animation-delay: 0.12s;
+		}
+
+		.hero-copy > :nth-child(n + 4) {
+			animation-delay: 0.18s;
+		}
+
+		.phone {
+			animation: phone-in 1s 0.15s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+		}
+
+		.caption.is-new {
+			animation: rise 0.5s ease both;
+		}
+
+		.can-reveal [data-reveal] {
+			opacity: 0;
+			transform: translateY(1.5rem);
+			transition:
+				opacity 0.7s ease,
+				transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+		}
+
+		.can-reveal [data-reveal].is-in {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(0.75rem);
+		}
+	}
+
+	@keyframes phone-in {
+		from {
+			opacity: 0;
+			transform: translateY(3rem) rotate(2deg);
+		}
+	}
+</style>
