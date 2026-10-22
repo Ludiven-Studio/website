@@ -26,11 +26,10 @@ import {
 	MAX_PLACES, SAME_PLACE_M, type Place, type PlaceKind,
 } from '../../lib/meetupPlaces';
 import { distanceM, formatDistance, isPlausibleFr, nearest } from '../../lib/meetupGeo';
-import MeetupMap, { HOME, type MapHandle } from './MeetupMap';
+import MeetupMap, { type MapHandle } from './MeetupMap';
 import CreateForm, { type Draft } from './CreateForm';
 import EventPanel from './EventPanel';
 import TournamentPanel from './TournamentPanel';
-import { demoEvents, demoSignups, demoTournaments, isDemo } from '../../lib/meetupDemo';
 import MyGames from './MyGames';
 import StoreLinks, { AppCard, AppIcon } from './StoreLinks';
 import { formatShortDay, formatTime } from './format';
@@ -92,9 +91,6 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 	const [spots, setSpots] = useState<MeetupSpot[]>([]);
 	const [tournaments, setTournaments] = useState<MeetupTournament[]>([]);
 	const [tournament, setTournament] = useState<MeetupTournament | null>(null);
-	// ?demo opens straight on the samples: a link to show someone what it looks like.
-	const [demo, setDemo] = useState(() => new URLSearchParams(window.location.search).has('demo'));
-	const demoData = useMemo(() => (demo ? { events: demoEvents(), tournaments: demoTournaments() } : null), [demo]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -147,15 +143,6 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 
 	/** The ?t= link a club shares. Cancelled and past ones still open. */
 	const openTournament = useCallback(async (id: string) => {
-		if (isDemo(id)) {
-			const t = demoTournaments().find((x) => x.id === id);
-			if (!t) return;
-			setTournament(t);
-			setDetail(null);
-			setSpotId(null);
-			mapRef.current?.flyTo(t.lat, t.lng);
-			return;
-		}
 		try {
 			const r = await getTournament(id);
 			setTournament(r.tournament);
@@ -177,17 +164,6 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 	}, []);
 
 	const openEvent = useCallback(async (id: string, fromUrl?: string | null) => {
-		if (isDemo(id)) {
-			const ev = demoEvents().find((x) => x.id === id);
-			if (!ev) return;
-			setTournament(null);
-			setDetail({ event: ev, signups: demoSignups(ev), isOrganizer: false });
-			setCreating(false);
-			setEditing(false);
-			setSpotId(null);
-			mapRef.current?.flyTo(ev.lat, ev.lng);
-			return;
-		}
 		const secret = secretFor(id, fromUrl);
 		try {
 			const d = await getMeetup(id, pid, secret);
@@ -593,21 +569,19 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 	const myTags = useMemo(() => new Set(mine.map((e) => e.organizer_tag)), [mine]);
 	const shown = useMemo(() => {
 		const off = new Set(muted.filter((t) => !myTags.has(t)));
-		const source = demoData ? demoData.events : events;
-		const kept = off.size ? source.filter((e) => !off.has(e.organizer_tag)) : source;
+		const kept = off.size ? events.filter((e) => !off.has(e.organizer_tag)) : events;
 		return applyFilters(kept, filters, new Date(), places);
-	}, [events, demoData, filters, places, muted, myTags]);
-	const allTournaments = demoData ? demoData.tournaments : tournaments;
+	}, [events, filters, places, muted, myTags]);
 	const shownTournaments = useMemo(
-		() => applyTournamentFilters(allTournaments, filters, new Date(), places),
-		[allTournaments, filters, places]);
+		() => applyTournamentFilters(tournaments, filters, new Date(), places),
+		[tournaments, filters, places]);
 	// Every coming date on the open tournament's pitch, whatever the filter.
 	const samePitch = useMemo(
 		() => (tournament
-			? allTournaments.filter((t) => t.spot_id === tournament.spot_id && t.id !== tournament.id)
+			? tournaments.filter((t) => t.spot_id === tournament.spot_id && t.id !== tournament.id)
 				.sort((a, b) => a.starts_at.localeCompare(b.starts_at))
 			: []),
-		[allTournaments, tournament]);
+		[tournaments, tournament]);
 
 	const periodLabel = filters.date === 'custom' ? rangeLabel(filters, lang) : L.date[filters.date];
 	const active = activeCount(filters, places.length > 0);
@@ -618,21 +592,6 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 	// The distance keeps its last value: only the toggle goes back to "partout".
 	const resetFilters = (): void => setFilters((f) => ({ ...DEFAULT_FILTERS, nearKm: f.nearKm }));
 
-	const toggleDemo = (): void => {
-		const on = !demo;
-		if (on) trackEvent('meetup_demo');
-		setDemo(on);
-		setDetail(null);
-		setTournament(null);
-		setSpotId(null);
-		const url = new URL(window.location.href);
-		url.searchParams.delete('e');
-		url.searchParams.delete('t');
-		url.searchParams.delete('k');
-		if (on) url.searchParams.set('demo', ''); else url.searchParams.delete('demo');
-		window.history.replaceState(null, '', url);
-		if (on) mapRef.current?.flyTo(HOME[0], HOME[1], 10);
-	};
 	const shareUrl = (id: string): string => `${pageUrl}?e=${id}`;
 	const spot = spotId ? spots.find((s) => s.id === spotId) ?? null : null;
 
@@ -690,19 +649,7 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 					</div>
 				)}
 				<AppCard />
-				<button type="button" className="re-demo-btn" onClick={toggleDemo}>
-					{demo ? tr('✖ Quitter la démo', '✖ Leave the demo') : tr('👀 Démo : voir des exemples', '👀 Demo: see examples')}
-				</button>
 			</header>
-
-			{demo && (
-				<p className="re-ok re-demo" role="status">
-					{tr(
-						'Mode démo\u00a0: ces parties et ces concours sont des exemples fictifs, pour voir à quoi ressemble la carte quand les joueurs et les clubs l\'utilisent.',
-						'Demo mode: these games and tournaments are made-up examples, to show what the map looks like when players and clubs use it.',
-					)}
-				</p>
-			)}
 
 			{pageError && (
 				<p className="re-error" role="alert" onClick={() => setError(null)}>{pageError}</p>

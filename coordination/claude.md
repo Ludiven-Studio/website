@@ -284,3 +284,23 @@
   sans texte français hors contenu des joueurs et clubs.
 - Commité à la demande de l'utilisateur (« commit et push ») : mes 25 fichiers et cette section seulement (journal mixte).
   Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Pétanque Meet : plus de bouton « Démo » sur la carte
+- Statut : en cours (2026-10-22, Europe/Paris). Demande de l'utilisateur : retirer le bouton de démo maintenant qu'il y a
+  de vraies données. Les liens `?demo` restent valables (avec « Quitter la démo »).
+- Réservations actives : `src/components/rencontres/RencontresApp.tsx`.
+- Ressources : serveur de dev sur le port 4463 ; eslint sur le fichier.
+- Fait : plus de bouton d'entrée dans la démo (FR et EN) ; un lien `?demo` ouvre toujours les exemples, avec « Quitter la
+  démo ». Vérifié : eslint et tsc OK, contrôle navigateur FR + EN (pas de bouton ni de bandeau, `?demo` s'ouvre et se quitte,
+  l'URL perd `?demo`), serveur 4463 arrêté. Statut : terminé, non commité. Réservations libérées.
+- Suite (même jour) : l'utilisateur veut supprimer tout le mode démo. Statut : en cours. Réservations actives :
+  `src/components/rencontres/RencontresApp.tsx`, `src/lib/meetupDemo.ts` (supprimé), `public/assets/rencontres/demo/`
+  (supprimé, aucune référence ailleurs, ni dans PetanqueMeet, PetanqueGame ou LudivenTools), `src/styles/rencontres.css`
+  (`.re-demo-btn`). Build annoncé ici avant.
+- Lancement du build complet (écrit `dist/`, `.astro/`, `public/vendor/`), puis `check-precache` et `check-links`.
+- Fait : mode démo supprimé (état, bandeau, bouton, `meetupDemo.ts`, les 3 affiches d'exemple, style `.re-demo-btn`) ; un
+  ancien lien `?demo` ouvre la vraie carte. Vérifié : eslint OK, `astro check` 0 erreur, build OK, précache 295 entrées (sans
+  affiche de démo), liens 155 pages, contrôle sur le build FR + EN avec et sans `?demo` (ni bandeau, ni requête d'affiche,
+  aucune erreur).
+- Commité à la demande de l'utilisateur (« commit et push ») : mes 6 fichiers et cette section seulement (journal mixte).
+  Statut : terminé. Réservations libérées.
