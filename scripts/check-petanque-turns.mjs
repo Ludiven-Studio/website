@@ -33,6 +33,8 @@ await page.waitForFunction(() => window.__petanque && window.__petanque().status
 // ModeToggle segments declare role="tab", so they are not buttons to the a11y tree.
 await page.getByRole('tab', { name: /Libre/ }).click();
 await sleep(700);
+// Libre also opens its ground card, a page modal: it would take the jack button's click.
+await page.locator('.pe-ground .pe-bar-x').click();
 
 // Fullscreen the pitch: in `astro preview` the canvas runs past the fold, and a drag aimed at its
 // lower half then lands on nothing.

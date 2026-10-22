@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
 	balance, earn, buyBlason, owns, equipBlason, equippedBlason, ownedBlasons,
 	dailyRewardAmount, rewardState, claimDailyReward,
-	buyUnlock, hasUnlock, unlockedGames, unlockId, resetWalletCache, earnOnce, spend,
+	buyUnlock, hasUnlock, unlockedGames, unlockId, resetWalletCache, earnOnce, spend, buyOwned,
 	BLASONS, UNLOCK_PRICE,
 } from './wallet';
 import { recordDayActivity } from './streak';
@@ -117,6 +117,19 @@ describe('expert packs', () => {
 		expect(ownedBlasons().map((b) => b.id)).toEqual(['cocotte']);
 		equipBlason(unlockId('sudoku'));
 		expect(equippedBlason()).toBeNull();
+	});
+});
+
+describe('items a game names', () => {
+	it('charges the price once and keeps the key out of the blasons', () => {
+		earn(40);
+		expect(buyOwned('petanque:boule_cuivre', 50)).toBe(false);
+		expect(owns('petanque:boule_cuivre')).toBe(false);
+		expect(buyOwned('petanque:boule_cuivre', 40)).toBe(true);
+		expect(balance()).toBe(0);
+		expect(buyOwned('petanque:boule_cuivre', 40)).toBe(true); // already owned: free
+		expect(balance()).toBe(0);
+		expect(ownedBlasons().map((b) => b.id)).toEqual(['cocotte']);
 	});
 });
 

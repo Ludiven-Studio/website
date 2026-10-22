@@ -14,6 +14,7 @@ export interface PetanqueLevelCfg {
 	surface: SurfaceId;
 	amp: number; // relief amplitude, m
 	target: number; // points that win the match
+	difficulty: number; // how uneven the pitch is, 0-100 (terrain.ts): rougher up the ladder
 }
 
 const levelSeed = (level: number): number => (Math.imul(level, 2246822519) ^ 0x85ebca6b) >>> 0;
@@ -29,6 +30,10 @@ const basePlan: LevelPlan<PetanqueLevelCfg> = {
 	config(level: number): PetanqueLevelCfg {
 		const l = Math.max(1, Math.min(LEVEL_COUNT, level));
 		const t = (l - 1) / (LEVEL_COUNT - 1); // 0 → 1 ramp
+		// 10 → 73, what terrain.ts's ampFor maps the relief ramp below to: the uneven pitch's patches,
+		// stones and loose bed grow with it, as the app's leagues do (Bronze 10-22 … Or 52-68). The
+		// relief keeps its own formula: the app ports this file and checks it value for value.
+		const difficulty = Math.round(10 + 63 * t);
 		return {
 			seed: levelSeed(l),
 			// Bent, not linear: a straight ramp only reached a middling player's own strength at
@@ -36,6 +41,7 @@ const basePlan: LevelPlan<PetanqueLevelCfg> = {
 			skill: Math.round((MIN_SKILL + (BASE_TOP_SKILL - MIN_SKILL) * Math.pow(t, 0.8)) * 100) / 100,
 			surface: l <= 25 ? 'terre-battue' : l <= 60 ? 'gravier-fin' : 'gravier-gros',
 			amp: Math.round((0.015 + 0.035 * t) * 1000) / 1000, // 1.5 → 5.0 cm
+			difficulty,
 			// Length is not a second knob next to skill, it MULTIPLIES it: a match is N independent
 			// menes, so a per-mene edge compounds. Measured against a 0.95 AI, an average player
 			// wins 25 % to 5, 10 % to 11 and near nothing to 13. The ladder therefore stops at 9.
@@ -60,13 +66,18 @@ const basePlan: LevelPlan<PetanqueLevelCfg> = {
 	},
 };
 
-// 101-200: the same ladder on coarse gravel throughout, with more relief, and spending the skill
-// the base ladder left on the table — level 200 is the only one that meets the AI at full strength.
+// 101-200: the same ladder on coarse gravel throughout, with more relief on rougher pitches, and
+// spending the skill the base ladder left on the table — level 200 is the only one that meets the
+// AI at full strength.
 export const petanqueLevels = extendPlan('petanque', basePlan, {
-	configExt: (base) => ({
-		...base,
-		skill: Math.min(MAX_SKILL, Math.round((base.skill + (MAX_SKILL - BASE_TOP_SKILL)) * 100) / 100),
-		surface: 'gravier-gros' as SurfaceId,
-		amp: Math.min(0.075, base.amp + 0.02),
-	}),
+	configExt: (base) => {
+		const difficulty = Math.min(100, base.difficulty + 36);
+		return {
+			...base,
+			skill: Math.min(MAX_SKILL, Math.round((base.skill + (MAX_SKILL - BASE_TOP_SKILL)) * 100) / 100),
+			surface: 'gravier-gros' as SurfaceId,
+			amp: Math.min(0.075, base.amp + 0.02),
+			difficulty,
+		};
+	},
 });

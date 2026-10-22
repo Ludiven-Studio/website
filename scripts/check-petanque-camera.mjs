@@ -68,6 +68,8 @@ await page.waitForFunction(() => window.__petanque && window.__petanque().status
 // ModeToggle segments declare role="tab", so they are not buttons to the a11y tree.
 await page.getByRole('tab', { name: /Libre/ }).click();
 await sleep(700);
+// Libre also opens its ground card, a page modal: it would take the next click.
+await page.locator('.pe-ground .pe-bar-x').click();
 
 const goFull = async (on) => {
 	await page.evaluate((v) => {

@@ -7,7 +7,11 @@
    The 0.62 reference fixes the SHAPE of the ladder, not where a real player lands on it — only a
    human can say that. So read the bands as a dynamic-range gate, not as a promise.
 
-   Usage: npx tsx scripts/petanque-levels.ts [tries] */
+   Each level is played on its uneven pitch (cfg.difficulty); `even` lays the even one instead, the
+   control row for the difficulty's effect (2026-10-22, 100 tries: even 83/72/26/6 %, uneven
+   84/72/29/10 % over the four bands — same shape, a touch kinder at the top).
+
+   Usage: npx tsx scripts/petanque-levels.ts [even] [tries] */
 import { petanqueLevels } from '../src/games/petanque/levels';
 import { playMatch, mean } from './petanque-match';
 
@@ -33,6 +37,7 @@ function probe(level: number): LevelStat {
 		const r = playMatch({
 			seed: cfg.seed, grain: (cfg.seed ^ (0x9e3779b9 * (k + 1))) >>> 0,
 			skills: [PLAYER, cfg.skill], target: cfg.target, surface: cfg.surface, amp: cfg.amp,
+			...(process.argv.includes('even') ? {} : { difficulty: cfg.difficulty }),
 		});
 		const won = r.winner === 0;
 		if (won) { wins++; conceded.push(r.scores[1]); }

@@ -9,11 +9,14 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-	type Terrain, type SurfaceId, PITCH_W, PITCH_L, CELL, heightAt, hashN,
+	type Terrain, type SurfaceId, type GroundSample, PITCH_W, PITCH_L, CELL, LOOSE_FULL, heightAt, hashN, looseAt, patchAt, surfaceAt,
 } from './terrain';
 import {
-	type Sim, type Boule, type Impact, type Velocity, BOULE_R, JACK_R, cloneSim, stepSim, speed2, speed3, isSettled, release,
+	type Sim, type Boule, type Impact, type Velocity, BOULE_R, BOULE_M, JACK_R, blindSim, stepSim, speed2, speed3, isSettled, release,
 } from './engine';
+import { buildTown, type DecorId, type TownDecor } from './decors';
+import { FINISHES, type BouleLook } from './shop';
+import { albedoTexture, heightTexture, tipsOver } from './bouleLook';
 
 export const wx = (ex: number): number => ex - PITCH_W / 2;
 export const wz = (ey: number): number => ey - PITCH_L / 2;
@@ -210,6 +213,22 @@ export function sunFor(seed: number): SunSetup {
 		   every pixel probe in scripts/ unreproducible. One deal, one sky. */
 		cloudSeed: hashN(17, seed) * 4000,
 	};
+}
+
+/** The square at dusk (the 'soir' decor): the sun low over the roofs on its seeded side, orange, and
+ *  the shade bluer. Dimmer than an afternoon on purpose: the lamps and the windows are the point. */
+function duskSun(s: SunSetup): void {
+	s.el = 8 * D2R;
+	s.az = (s.az > Math.PI / 2 && s.az < (3 * Math.PI) / 2 ? Math.PI : 0) + 0.25;
+	s.dir.set(Math.cos(s.az) * Math.cos(s.el), Math.sin(s.el), Math.sin(s.az) * Math.cos(s.el));
+	s.color.set(0xff9452);
+	s.intensity = 2.1;
+	s.skyColor.set(0x5a6292);
+	s.groundColor.set(0x4a3a30);
+	s.hemi = 1.25;
+	s.turbidity = 6;
+	s.rayleigh = 2.6;
+	s.clouds = 0.2;
 }
 
 /* ---------- the decor ---------- */
@@ -882,9 +901,72 @@ function buildBar(grp: THREE.Group, y: number, keep: <T extends { dispose(): voi
 
 /* ---------- the pitch ---------- */
 
+const share = { a: 0, b: 0 };
+const STONE = new THREE.Color();
+
+/** A stone takes the colour of the ground it lies on; a big one on a fine ground is one of the loose
+ *  coarse stones an uneven pitch strews everywhere. */
+function stoneTint(t: Terrain, x: number, y: number, r: number): THREE.Color {
+	patchAt(t, x, y, share);
+	const own = 1 - share.a - share.b;
+	let id = own >= share.a && own >= share.b ? t.surface.id : share.a >= share.b ? t.patches![0].id : t.patches![1].id;
+	if (r >= 0.01 && id !== 'gravier-gros') id = 'gravier-gros';
+	return STONE.setHex(SURFACE_TINT[id][1]);
+}
+
+/**
+ * An uneven pitch shows what the engine plays: its patches of other grounds, where they lie, and its
+ * loose gravel bed, lighter and drier on top. Weights ride on the ground mesh's vertices (7 cm, finer
+ * than the 5 cm physics cells read at that scale), the two patch grounds are sampled beside the
+ * pitch's own. Where a patch meets the ground, the brighter grain wins, so the edge is ragged like
+ * gravel spilling over, never a cross-fade.
+ */
+function dressUneven(t: Terrain, geo: THREE.BufferGeometry, mat: THREE.MeshStandardMaterial,
+	grainOf: (id: SurfaceId) => THREE.CanvasTexture, gone: () => boolean): void {
+	const pos = geo.attributes.position as THREE.BufferAttribute;
+	const n = pos.count;
+	const pw = new Float32Array(n * 2), ld = new Float32Array(n);
+	for (let i = 0; i < n; i++) {
+		const ex = pos.getX(i) + PITCH_W / 2, ey = pos.getZ(i) + PITCH_L / 2;
+		patchAt(t, ex, ey, share);
+		pw[i * 2] = share.a;
+		pw[i * 2 + 1] = share.b;
+		ld[i] = Math.min(1, looseAt(t, ex, ey) / LOOSE_FULL);
+	}
+	geo.setAttribute('patchW', new THREE.BufferAttribute(pw, 2));
+	geo.setAttribute('looseD', new THREE.BufferAttribute(ld, 1));
+
+	const [a, b] = t.patches!;
+	const uni = { mapA: { value: grainOf(a.id) as THREE.Texture }, mapB: { value: grainOf(b.id) as THREE.Texture } };
+	loadTile(`sol-${a.id}.webp`).then((tex) => { if (!gone()) uni.mapA.value = tex; }, () => { /* keep the grain */ });
+	loadTile(`sol-${b.id}.webp`).then((tex) => { if (!gone()) uni.mapB.value = tex; }, () => { /* keep the grain */ });
+	mat.onBeforeCompile = (sh) => {
+		sh.uniforms.mapA = uni.mapA;
+		sh.uniforms.mapB = uni.mapB;
+		sh.vertexShader = sh.vertexShader
+			.replace('#include <common>', '#include <common>\nattribute vec2 patchW;\nattribute float looseD;\nvarying vec2 vPatch;\nvarying float vLoose;')
+			.replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvPatch = patchW;\n\tvLoose = looseD;');
+		sh.fragmentShader = sh.fragmentShader
+			.replace('#include <common>', '#include <common>\nuniform sampler2D mapA;\nuniform sampler2D mapB;\nvarying vec2 vPatch;\nvarying float vLoose;')
+			.replace('#include <map_fragment>', `
+	vec4 g0 = texture2D( map, vMapUv );
+	vec4 gA = texture2D( mapA, vMapUv );
+	vec4 gB = texture2D( mapB, vMapUv );
+	float h0 = dot( g0.rgb, vec3( 0.299, 0.587, 0.114 ) );
+	float ka = smoothstep( 0.3, 0.7, vPatch.x + ( dot( gA.rgb, vec3( 0.299, 0.587, 0.114 ) ) - h0 ) * 0.8 );
+	float kb = smoothstep( 0.3, 0.7, vPatch.y + ( dot( gB.rgb, vec3( 0.299, 0.587, 0.114 ) ) - h0 ) * 0.8 );
+	vec4 g = mix( mix( g0, gA, ka ), gB, kb );
+	g.rgb = mix( g.rgb, g.rgb * 1.12 + 0.03, vLoose * 0.55 );
+	diffuseColor *= g;`);
+	};
+	mat.customProgramCacheKey = () => 'pitch-uneven';
+}
+
 export interface Pitch3D {
 	group: THREE.Group;
 	groundMat: THREE.MeshStandardMaterial;
+	/** The haze the decor asks of the scene, or null. */
+	fog: TownDecor['fog'];
 	dispose(): void;
 }
 
@@ -893,7 +975,7 @@ export interface Pitch3D {
  * Built once per deal and never touched again — nothing here is rebuilt per frame.
  * The sky is not here: it belongs to the sun, which outlives the pitch (see addLights).
  */
-export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string[], banner?: string, bar = false): Pitch3D {
+export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string[], banner?: string, bar = false, decor: DecorId = 'jardin'): Pitch3D {
 	const grp = new THREE.Group();
 	const junk: { dispose(): void }[] = [];
 	const keep = <T extends { dispose(): void }>(o: T): T => { junk.push(o); return o; };
@@ -914,25 +996,33 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 	/* The apron the pitch is cut into, seated under the LOWEST point of the ground. A fixed -6 cm
 	   looked fine down the lane but the faux plat drops the far end further than that, so the
 	   apron punched up through the pitch in ragged green patches — only visible from overhead. */
-	const apronMat = keep(new THREE.MeshStandardMaterial({ color: 0x858350, roughness: 1 })); // dry summer grass
-	const apron = new THREE.Mesh(keep(new THREE.CircleGeometry(SURROUND, 40)), apronMat);
-	apron.rotation.x = -Math.PI / 2;
-	apron.position.y = low - 0.06;
-	apron.receiveShadow = true;
-	grp.add(apron);
-
-	buildDecor(grp, t.seed, apron.position.y, sun, keep, !!boards?.length || !!banner);
-	if (boards?.length) buildBoards(grp, boards, apron.position.y, t, keep);
-	if (banner) buildBanner(grp, banner, apron.position.y, t, keep);
-	if (bar) buildBar(grp, apron.position.y, keep);
+	const apronY = low - 0.06;
+	let fog: TownDecor['fog'] = null;
+	if (decor === 'jardin') {
+		const apronMat = keep(new THREE.MeshStandardMaterial({ color: 0x858350, roughness: 1 })); // dry summer grass
+		const apron = new THREE.Mesh(keep(new THREE.CircleGeometry(SURROUND, 40)), apronMat);
+		apron.rotation.x = -Math.PI / 2;
+		apron.position.y = apronY;
+		apron.receiveShadow = true;
+		grp.add(apron);
+		buildDecor(grp, t.seed, apronY, sun, keep, !!boards?.length || !!banner);
+	} else {
+		// A bought decor brings its own ground (paving, quay) along with everything standing on it.
+		const town = keep(buildTown(decor, t.seed, apronY, sun));
+		grp.add(town.group);
+		fog = town.fog;
+	}
+	if (boards?.length) buildBoards(grp, boards, apronY, t, keep);
+	if (banner) buildBanner(grp, banner, apronY, t, keep);
+	if (bar) buildBar(grp, apronY, keep);
 
 	geo.computeVertexNormals();
 	const uv = geo.attributes.uv as THREE.BufferAttribute;
 	for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * PITCH_W, uv.getY(i) * PITCH_L); // 1 tile = 1 m
 
-	const grains = t.surface.id === 'sable' ? 2600 : 1400;
-	const dot = t.surface.id === 'gravier-gros' ? 3.4 : t.surface.id === 'gravier-fin' ? 2.2 : 1.5;
-	const groundMat = new THREE.MeshStandardMaterial({ map: keep(groundTexture(t.surface.id, grains, dot)), roughness: 1, metalness: 0 });
+	const grainOf = (id: SurfaceId): THREE.CanvasTexture => keep(groundTexture(id,
+		id === 'sable' ? 2600 : 1400, id === 'gravier-gros' ? 3.4 : id === 'gravier-fin' ? 2.2 : 1.5));
+	const groundMat = new THREE.MeshStandardMaterial({ map: grainOf(t.surface.id), roughness: 1, metalness: 0 });
 	let disposed = false;
 	// Same tint as the procedural grain, so the swap changes the grain, never the colour.
 	loadTile(`sol-${t.surface.id}.webp`).then((tex) => {
@@ -940,6 +1030,7 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 		groundMat.map = tex;
 		groundMat.needsUpdate = true;
 	}, () => { /* keep the procedural grain */ });
+	if (t.pw && t.patches) dressUneven(t, geo, groundMat, grainOf, () => disposed);
 	const ground = new THREE.Mesh(geo, groundMat);
 	ground.receiveShadow = true;
 	grp.add(ground);
@@ -951,7 +1042,7 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 	   the low end never hovers either. */
 	// Double-sided: the strips are built by hand and their winding is not worth auditing face by face.
 	const plankMat = keep(new THREE.MeshStandardMaterial({ color: 0x6b4b2e, roughness: 0.85, side: THREE.DoubleSide }));
-	const foot = apron.position.y - 0.02;
+	const foot = apronY - 0.02;
 	const topAt = (ex: number, ey: number): number => heightAt(t, ex, ey) + BORDER_H;
 	const planks: [number, number, number, number][] = [ // engine-space inner edge from -> to
 		[0, -BORDER_W, 0, PITCH_L + BORDER_W], [PITCH_W, -BORDER_W, PITCH_W, PITCH_L + BORDER_W],
@@ -969,7 +1060,8 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 		// Untextured on purpose. A mottled ComfyUI tile was made, wired and measured from the game view
 		// on coarse gravel: 0.0025 levels of difference, against 0.3-0.8 for the ground tiles. A stone
 		// is 5-12 px on screen, so its texture mipmaps down to its own mean colour.
-		const pMat = keep(new THREE.MeshStandardMaterial({ color: SURFACE_TINT[t.surface.id][1], roughness: 0.95, flatShading: true }));
+		const uneven = !!t.patches;
+		const pMat = keep(new THREE.MeshStandardMaterial({ color: uneven ? 0xffffff : SURFACE_TINT[t.surface.id][1], roughness: 0.95, flatShading: true }));
 		const inst = new THREE.InstancedMesh(pGeo, pMat, t.pebbles.length);
 		inst.castShadow = false; // 1500 shadow casters is the whole frame budget, for 1 cm stones
 		inst.receiveShadow = false;
@@ -986,6 +1078,7 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 				new THREE.Vector3(p.r, p.r * 0.7, p.r),
 			);
 			inst.setMatrixAt(k, m);
+			if (uneven) inst.setColorAt(k, stoneTint(t, p.x, p.y, p.r));
 		}
 		inst.instanceMatrix.needsUpdate = true;
 		grp.add(inst);
@@ -995,6 +1088,7 @@ export function buildPitch3D(t: Terrain, sun: SunSetup, boards?: readonly string
 	return {
 		group: grp,
 		groundMat,
+		fog,
 		dispose() {
 			disposed = true;
 			for (const d of junk) d.dispose(); // pooled tiles are shared across deals: never here
@@ -1038,12 +1132,29 @@ export function bakeBouleEnv(renderer: THREE.WebGLRenderer, scene: THREE.Scene):
 	});
 }
 
-export function makeBouleMesh(side: 0 | 1 | -1): THREE.Mesh {
+/** Grooves (black in the bump map) duller than the polish: dull lines, no second texture. */
+const grooveRough = (sh: THREE.WebGLProgramParametersWithUniforms): void => {
+	sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>',
+		'#include <roughnessmap_fragment>\n\troughnessFactor = mix( 0.7, roughnessFactor, texture2D( bumpMap, vBumpMapUv ).r );');
+};
+
+/** A body's mesh. A boule in a shop look (`look`, at its make's radius `r`), else the side's plain
+ *  steel or bronze; the jack in `jackColor`. */
+export function makeBouleMesh(side: 0 | 1 | -1, look?: BouleLook, r = BOULE_R, jackColor = JACK_COLOR): THREE.Mesh {
 	const jack = side === -1;
-	const geo = new THREE.SphereGeometry(jack ? JACK_R : BOULE_R, jack ? 16 : 32, jack ? 12 : 24);
+	const geo = new THREE.SphereGeometry(jack ? JACK_R : r, jack ? 16 : 32, jack ? 12 : 24);
 	let mat: THREE.MeshStandardMaterial;
 	if (jack) {
-		mat = new THREE.MeshStandardMaterial({ color: JACK_COLOR, roughness: 0.75, metalness: 0 });
+		mat = new THREE.MeshStandardMaterial({ color: jackColor, roughness: 0.75, metalness: 0 });
+	} else if (look) {
+		const fin = FINISHES[look.finish];
+		if (tipsOver(look.pattern)) geo.rotateX(Math.PI / 2);
+		mat = new THREE.MeshStandardMaterial({
+			color: 0xffffff, map: albedoTexture(look), metalness: fin.metalness, roughness: fin.roughness,
+			bumpMap: heightTexture(look.pattern), bumpScale: 1.2,
+			envMap: bouleEnv?.texture ?? null, envMapIntensity: BOULE_ENV,
+		});
+		mat.onBeforeCompile = grooveRough;
 	} else {
 		const stries = (striesMaps[side] ??= striesTexture(side));
 		// Side 0's rings run round the sphere's equator, which from above is the silhouette: tip the
@@ -1056,11 +1167,7 @@ export function makeBouleMesh(side: 0 | 1 | -1): THREE.Mesh {
 			bumpMap: stries, bumpScale: 1.2,
 			envMap: bouleEnv?.texture ?? null, envMapIntensity: BOULE_ENV,
 		});
-		mat.onBeforeCompile = (sh) => {
-			// Grooves (black in the map) twice as rough as the polish: dull lines, no second texture.
-			sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>',
-				'#include <roughnessmap_fragment>\n\troughnessFactor = mix( 0.7, roughnessFactor, texture2D( bumpMap, vBumpMapUv ).r );');
-		};
+		mat.onBeforeCompile = grooveRough;
 	}
 	const m = new THREE.Mesh(geo, mat);
 	m.userData.boule = !jack;
@@ -1097,6 +1204,93 @@ export function makeContactShadow(r: number): THREE.Mesh {
 
 const N_UP = new THREE.Vector3(0, 1, 0);
 const N_TMP = new THREE.Vector3();
+const GS: GroundSample = { rollFriction: 0, restitution: 0, impactFriction: 0, scatter: 0, grit: 0 };
+
+/** How much a ground gives under a landing, 0 (packed clay) to 1: what makes a crater and a sink. */
+export const giveAt = (t: Terrain, x: number, y: number): number => Math.max(0, 1 - surfaceAt(t, x, y, GS).restitution / 0.30);
+
+/** How deep a body on the ground sits into a loose one, for the eye only (the physics keeps it on the
+ *  surface): sand and loose gravel take a boule in by a few millimetres, a heavier one more, a deep
+ *  loose bed up to half its radius. Packed clay takes nothing. The app's GameController.Sink. */
+export function sinkOf(t: Terrain, b: Boule): number {
+	if (!b.live || !b.rolling) return 0;
+	const heavy = b.side === -1 ? 0.5 : b.m / BOULE_M;
+	return Math.min(giveAt(t, b.x, b.y) * 0.010 * heavy + looseAt(t, b.x, b.y) * 0.4 * heavy, b.r * 0.5);
+}
+
+/* ---------- marks ---------- */
+
+const MARK_MAX = 24;
+export const MARK_SPEED = 1.8; // m/s of landing below which the ground keeps no mark
+
+/** Where a body came down on a ground that gives, a small crater stays until the end is over. */
+export interface Marks { add(t: Terrain, im: Impact): void; clear(): void; count(): number }
+
+function markTexture(): THREE.CanvasTexture {
+	const S = 128;
+	const c = document.createElement('canvas');
+	c.width = c.height = S;
+	const g = c.getContext('2d') as CanvasRenderingContext2D;
+	// A dark hollow and the lighter rim of displaced gravel round it, ragged.
+	const grad = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+	grad.addColorStop(0, 'rgba(38,28,18,0.42)');
+	grad.addColorStop(0.5, 'rgba(38,28,18,0.3)');
+	grad.addColorStop(0.68, 'rgba(255,244,222,0.22)');
+	grad.addColorStop(0.85, 'rgba(255,244,222,0.1)');
+	grad.addColorStop(1, 'rgba(255,244,222,0)');
+	g.fillStyle = grad;
+	g.fillRect(0, 0, S, S);
+	let h = 0x51ab;
+	const rnd = (): number => { h = (Math.imul(h ^ (h >>> 15), 2246822519) + 0x9e3779b9) | 0; return ((h >>> 8) & 0xffffff) / 0xffffff; };
+	for (let k = 0; k < 140; k++) {
+		const a = rnd() * Math.PI * 2, r = (0.45 + rnd() * 0.45) * (S / 2);
+		g.fillStyle = rnd() < 0.5 ? 'rgba(40,30,20,0.35)' : 'rgba(255,246,228,0.35)';
+		g.beginPath();
+		g.arc(S / 2 + Math.cos(a) * r, S / 2 + Math.sin(a) * r, 1 + rnd() * 2.2, 0, Math.PI * 2);
+		g.fill();
+	}
+	const tex = new THREE.CanvasTexture(c);
+	tex.colorSpace = THREE.SRGBColorSpace;
+	return tex;
+}
+
+/** A pool of flat decals laid on the relief, the oldest reused first. The app's GameController.Mark. */
+export function makeMarks(scene: THREE.Scene): Marks {
+	const grp = new THREE.Group();
+	scene.add(grp);
+	const geo = new THREE.PlaneGeometry(1, 1);
+	geo.rotateX(-Math.PI / 2);
+	const mat = new THREE.MeshBasicMaterial({
+		map: markTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+	});
+	const pool: THREE.Mesh[] = [];
+	let next = 0, shown = 0;
+	return {
+		add(t, im) {
+			const give = giveAt(t, im.x, im.y);
+			if (give <= 0.05) return;
+			const ground = heightAt(t, im.x, im.y);
+			const r = Math.max(JACK_R, Math.min(BOULE_R * 1.1, im.z - ground));
+			const size = r * 2 * (1.2 + 0.1 * im.speed) * (0.7 + 0.5 * give) + looseAt(t, im.x, im.y);
+			let m = pool[next];
+			if (!m) {
+				m = new THREE.Mesh(geo, mat);
+				m.renderOrder = 1; // under the contact shadow and the halo
+				grp.add(m);
+				pool[next] = m;
+			}
+			next = (next + 1) % MARK_MAX;
+			layFlat(m, t, im.x, im.y);
+			m.position.y -= CONTACT_LIFT - 0.003;
+			m.rotateY(hashN(Math.round(im.x * 1000), Math.round(im.y * 1000)) * Math.PI * 2);
+			m.scale.setScalar(size);
+			m.visible = true;
+			shown = Math.min(MARK_MAX, shown + 1);
+		},
+		clear() { for (const m of pool) m.visible = false; next = 0; shown = 0; },
+		count: () => shown,
+	};
+}
 
 /** Lay a flat decal on the heightfield at (x, y), tilted onto the local slope. */
 export function layFlat(m: THREE.Mesh, t: Terrain, x: number, y: number): void {
@@ -1406,10 +1600,11 @@ const PRED_MAX = 900;
 /**
  * The arc, simulated with the real engine on a clone. Two consequences that matter: the preview
  * cannot promise anything the physics will not deliver, and the grain counter of the live sim is
- * never advanced by looking at a shot.
+ * never advanced by looking at a shot. A blind clone: on an uneven pitch it does not feel the stone
+ * under the landing nor the grit, which nobody can read on the ground (the AI plans the same way).
  */
 export function predictThrow(s: Sim, from: { x: number; y: number }, v: Velocity, mk: (c: Sim) => Boule): ThrowPrediction {
-	const c = cloneSim(s);
+	const c = blindSim(s);
 	// From the hand, exactly as `launch` does it: a preview from the ground would land short.
 	const b = release(c.t, mk(c), v);
 	c.bs.push(b);
@@ -1642,7 +1837,7 @@ export interface Lights {
 	/** Re-aim everything for one deal. `force` is the measurement hook, in radians.
 	 *  Its `seed` overrides the deal's for the haze and the clouds, which are seeded too — without it
 	 *  two runs of the same probe compare two skies and call the difference a change. */
-	setSun(seed: number, force?: { el: number; az: number; seed?: number }): SunSetup;
+	setSun(seed: number, force?: { el: number; az: number; seed?: number }, decor?: DecorId): SunSetup;
 	current(): SunSetup;
 	/** Measurement hook. 0 gives the raw, untone-mapped dome — the control row for SKY_EXPOSURE, so
 	 *  before and after come out of ONE build at one framing instead of two runs. Negative restores
@@ -1697,8 +1892,9 @@ export function addLights(scene: THREE.Scene): Lights {
 
 	let now = sunFor(0);
 
-	const setSun = (seed: number, force?: { el: number; az: number; seed?: number }): SunSetup => {
+	const setSun = (seed: number, force?: { el: number; az: number; seed?: number }, decor?: DecorId): SunSetup => {
 		const s = sunFor(force?.seed ?? seed);
+		if (decor === 'soir' && !force) duskSun(s);
 		if (force) {
 			s.el = force.el;
 			s.az = force.az;

@@ -27,6 +27,8 @@ await page.waitForFunction(() => window.__petanque && window.__petanque().status
 
 await page.getByRole('tab', { name: /Libre/ }).click();
 await sleep(700);
+// Libre also opens its ground card, a page modal: it would take the next click.
+await page.locator('.pe-ground .pe-bar-x').click();
 await page.evaluate(() => {
 	document.querySelector('.game-page')?.classList.add('gf-full');
 	document.documentElement.classList.add('gf-full');

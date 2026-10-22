@@ -229,6 +229,18 @@ export function buyCar(id: string, price: number): boolean {
 	return true;
 }
 
+/** Buy an item a game names itself ('petanque:boule_bronze'), for the price it gives — same reason
+ *  as buyCar: no game catalog in here. Returns true on success (or if already owned). */
+export function buyOwned(key: string, price: number): boolean {
+	const w = read();
+	if (w.owned.includes(key)) return true;
+	if (price < 0 || w.balance < price) return false;
+	w.balance -= price;
+	w.owned.push(key);
+	write(w);
+	return true;
+}
+
 /** Spend cocoins on a consumable (atelier energy). Returns false if the balance is short. */
 export function spend(amount: number): boolean {
 	const w = read();

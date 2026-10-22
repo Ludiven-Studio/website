@@ -1,11 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import {
-	makeTerrain, SURFACES, SURFACE_IDS, heightAt, PITCH_W, PITCH_L, type SurfaceId, type Terrain,
+	makeTerrain, ampFor, SURFACES, SURFACE_IDS, heightAt, PITCH_W, PITCH_L, type SurfaceId, type Terrain, type TerrainOpts,
 } from './terrain';
 import {
-	makeBoule, makeJack, place, stepSim, isSettled, throwVelocity, G,
-	type Sim, type Boule, type Impact, type Velocity,
+	makeBoule, makeJack, place, stepSim, isSettled, throwVelocity, G, STANDARD_KIT,
+	type Sim, type Boule, type Impact, type Velocity, type Kit,
 } from './engine';
 import {
 	initMatch13, applyJack, applyPlacedJack, applySettled, finishEnd, jackCheck, pointHolder, endScore, other,
@@ -16,9 +16,9 @@ import { swayAt, swayAmp } from './sway';
 import {
 	buildPitch3D, bakeBouleEnv, makeBouleMesh, groundRing, groundLabel, makeMarker, makeHalo, arcMesh, predictThrow,
 	aimCamera, headCamera, topCamera, laneFrame, verticalFov, haloRadius, haloFloorFor, zoomWalk,
-	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz, makeContactShadow, layFlat,
+	elevationForBoard, boardForElevation, addLights, makeFx, wx, wz, makeContactShadow, layFlat, makeMarks, sinkOf, MARK_SPEED,
 	HEAD_DIST_MIN, HEAD_DIST_MAX, HEAD_PITCH_MIN, HEAD_PITCH_MAX,
-	BOULE_R, CIRCLE_R, WALK_MAX, EYE_H, ZOOM_EYE, ZOOM_VFOV, BAR_AT, BAR_LABEL_Y, type Pitch3D, type Fx, type Lights,
+	BOULE_R, CIRCLE_R, WALK_MAX, EYE_H, ZOOM_EYE, ZOOM_VFOV, BAR_AT, BAR_LABEL_Y, type Pitch3D, type Fx, type Lights, type Marks,
 } from './render3d';
 import { petanqueLevels } from './levels';
 import {
@@ -31,6 +31,8 @@ import {
 	type PetanqueMatchNet, type AimMsg, type SyncMsg, type ThrowMsg, type PlaceMsg, type Lobby, type LobbyCounts,
 } from './net';
 import * as sfx from './sfx';
+import { preloadTown, type DecorId } from './decors';
+import { loadEquipped, modelOf, kitOf, otherLook, decorOf, jackColorOf, type Equipped, type BouleLook, type ShopItem } from './shop';
 import { usePointerDrag } from '../usePointerDrag';
 import { isTypingTarget } from '../../lib/keyboard';
 import { trackGame, trackEvent } from '../../lib/analytics';
@@ -49,6 +51,7 @@ import ModeToggle from '../../components/ModeToggle';
 import Celebration, { useCelebration } from '../../components/Celebration';
 import LevelSelect from '../../components/LevelSelect';
 import LevelOutcome from '../../components/LevelOutcome';
+import ShopPanel from './ShopPanel';
 
 /* =====================================================
    PETANQUE — React island, 3D pitch (three.js).
@@ -87,38 +90,41 @@ const HUMAN: Side = 0;
 const AI: Side = 1;
 const STEP = 1000 / 60;
 
+/** What a match is laid from. `difficulty` (0-100) makes the pitch uneven; absent, it is even. */
+interface MatchCfg { seed: number; surface: SurfaceId; amp: number; target: number; slope?: number; difficulty?: number }
+
 const DIFF_ORDER = ['facile', 'moyen', 'difficile'] as const;
 type DiffKey = (typeof DIFF_ORDER)[number] | 'expert';
-const DIFFS: Record<DiffKey, { skill: number; surface: SurfaceId; amp: number }> = {
-	facile: { skill: 0.34, surface: 'terre-battue', amp: 0.018 },
-	moyen: { skill: 0.62, surface: 'gravier-fin', amp: 0.032 },
-	difficile: { skill: 0.86, surface: 'gravier-gros', amp: 0.050 },
-	expert: { skill: 0.95, surface: 'gravier-gros', amp: 0.070 },
+/* Difficulty = AI skill + surface + how uneven the pitch is (0-100, terrain.ts), as the app's levels:
+   bosses and craters, patches of other grounds, stones, a loose gravel bed, rougher as it rises. */
+const DIFFS: Record<DiffKey, { skill: number; surface: SurfaceId; pitch: number }> = {
+	facile: { skill: 0.34, surface: 'terre-battue', pitch: 12 },
+	moyen: { skill: 0.62, surface: 'gravier-fin', pitch: 35 },
+	difficile: { skill: 0.86, surface: 'gravier-gros', pitch: 58 },
+	expert: { skill: 0.95, surface: 'gravier-gros', pitch: 80 },
 };
+
+/* Online: neutral ground, so neither seat is favoured, and the app's pitch for it. */
+const ONLINE_PITCH = 35;
 
 /* The ground, chosen by hand. FREE PLAY ONLY: the levels ladder, the daily course and the online
-   seat keep the surface and the relief they were measured on, or their targets would not mean the
+   seat keep the surface and the pitch they were measured on, or their targets would not mean the
    same thing. 'auto' hands the choice back to the difficulty. */
-const RELIEF_ORDER = ['plat', 'vallonne', 'accidente'] as const;
-type ReliefKey = (typeof RELIEF_ORDER)[number];
-const RELIEFS: Record<ReliefKey, { amp: number; slope: number }> = {
-	plat: { amp: 0.010, slope: 0.002 },
-	vallonne: { amp: 0.038, slope: 0.009 },
-	accidente: { amp: 0.075, slope: 0.022 },
-};
+const PITCHES = [10, 30, 50, 70, 90] as const;
 
 const GROUND_KEY = 'petanque-ground';
-type GroundPick = { surface: SurfaceId | 'auto'; relief: ReliefKey | 'auto' };
-const GROUND_0: GroundPick = { surface: 'auto', relief: 'auto' };
+type GroundPick = { surface: SurfaceId | 'auto'; pitch: number | 'auto' };
+const GROUND_0: GroundPick = { surface: 'auto', pitch: 'auto' };
 
 function loadGround(): GroundPick {
 	try {
 		const raw = localStorage.getItem(GROUND_KEY);
 		if (!raw) return GROUND_0;
-		const v = JSON.parse(raw) as GroundPick;
+		const v = JSON.parse(raw) as Partial<GroundPick>;
 		return {
-			surface: v.surface === 'auto' || SURFACE_IDS.includes(v.surface) ? v.surface : 'auto',
-			relief: v.relief === 'auto' || RELIEF_ORDER.includes(v.relief) ? v.relief : 'auto',
+			surface: v.surface === 'auto' || SURFACE_IDS.includes(v.surface as SurfaceId) ? v.surface as SurfaceId | 'auto' : 'auto',
+			// An old pick saved a relief name instead: it reads as auto.
+			pitch: (PITCHES as readonly unknown[]).includes(v.pitch) ? v.pitch as number : 'auto',
 		};
 	} catch {
 		return GROUND_0;
@@ -306,6 +312,7 @@ interface Scene3D {
 	pitch: Pitch3D;
 	lights: Lights;
 	fx: Fx;
+	marks: Marks; // craters where bodies came down on a ground that gives, cleared with the end
 	bodies: THREE.Group; // boules + jack
 	meshes: THREE.Mesh[]; // index-aligned with sim.bs
 	marker: THREE.Mesh;
@@ -503,6 +510,14 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const bannerRef = useRef(event?.banner);
 	const poolRef = useRef(event?.id); // quick-match and lobby pool: an event page meets only its own players
 	const barLabelRef = useRef<HTMLButtonElement | null>(null); // placed over the bar every frame
+	/* What the player wears from the shop. The boule's make is read when a match is laid, so a boule
+	   bought mid-match plays from the next one; the jack and the decor change at once. */
+	const [equipped, setEquipped] = useState<Equipped>(loadEquipped);
+	const equippedRef = useRef(equipped);
+	const decorRef = useRef<DecorId>(decorOf(equipped));
+	const looksRef = useRef<[BouleLook, BouleLook]>([modelOf(equipped.boule), otherLook(modelOf(equipped.boule))]);
+	const oppBouleRef = useRef<string | null>(null); // the online opponent's boule, from its presence
+	const myOnlineBouleRef = useRef<string | null>(null); // the boule our presence announced: we throw that one
 
 	const simRef = useRef<Sim | null>(null);
 	const matchRef = useRef<Match13>(initMatch13(13, HUMAN));
@@ -623,6 +638,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		return groundRef.current;
 	});
 	const [groundOpen, setGroundOpen] = useState(false);
+	const [shopOpen, setShopOpen] = useState(false);
 	const [padX, setPadX] = useState<PadX>(() => {
 		padXRef.current = loadPadX();
 		return padXRef.current;
@@ -645,7 +661,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		try { return localStorage.getItem(PAD_GRIP_KEY) ? 'idle' : 'call'; } catch { return 'idle'; }
 	});
 	// The match length, announced on the pitch as each match starts: levels play to 5, 7 or 9, not 13.
-	const [goal, setGoal] = useState<{ target: number; key: number } | null>(null);
+	const [goal, setGoal] = useState<{ target: number; key: number; surface: SurfaceId; pitch: number | null } | null>(null);
 	const [over, setOver] = useState(false);
 	const [view, setView] = useState<ViewKey>('jeu');
 	const [zoom, setZoom] = useState(0);
@@ -759,6 +775,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			jackAim, jackAimAt: null, dists, distsKey: '',
 			pitch: null as unknown as Pitch3D, // filled by newGame, which always runs next
 			fx: makeFx(scene),
+			marks: makeMarks(scene),
 			meshes: [], halos: [], shades: [], arcAir: null, arcRoll: null,
 		};
 		/* Size it now. The landing waits for the progression before laying a pitch, so the scene is
@@ -816,7 +833,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const g = g3Ref.current, s = simRef.current;
 		if (!g || !s) return b;
 		s.bs.push(b);
-		const m = makeBouleMesh(b.side);
+		const m = b.side === -1 ? makeBouleMesh(-1, undefined, b.r, jackColorOf(equippedRef.current))
+			: makeBouleMesh(b.side, looksRef.current[b.side], b.r);
 		g.bodies.add(m);
 		g.meshes.push(m);
 		const h = makeHalo(b.side === -1 ? HALO[2] : HALO[b.side]);
@@ -840,6 +858,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		g.meshes = [];
 		g.halos = [];
 		g.shades = [];
+		g.marks.clear();
 		s.bs = [];
 		prevRef.current = [];
 		jackRef.current = null;
@@ -878,6 +897,34 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 
 	/* ---------- a new game ---------- */
 
+	/** The pitch for terrain `t`, dressed in the player's decor. An event page keeps the garden its
+	 *  sponsors' boards were placed in. */
+	const pitchFor = useCallback((g: Scene3D, t: Terrain): Pitch3D => {
+		const decor: DecorId = poolRef.current ? 'jardin' : decorRef.current;
+		const p = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined, decor),
+			boardsRef.current, bannerRef.current, true, decor);
+		g.scene.fog = p.fog ? new THREE.Fog(p.fog.color, p.fog.near, p.fog.far) : null;
+		return p;
+	}, []);
+
+	/** Each side's make and look for the match about to be laid. The player throws their own boule,
+	 *  except where the board must be fair (the daily plays the standard make, in the player's look);
+	 *  online the opponent throws theirs; the AI throws the standard boule, in a look that never
+	 *  passes for the player's. */
+	const sidesFor = useCallback((fair: boolean): { kits?: [Kit, Kit]; looks: [BouleLook, BouleLook] } => {
+		const me = mySideRef.current, foe = other(me);
+		const mine = modelOf(onlineRef.current && myOnlineBouleRef.current ? myOnlineBouleRef.current : equippedRef.current.boule);
+		const theirs = onlineRef.current && oppBouleRef.current ? modelOf(oppBouleRef.current) : null;
+		const kits: [Kit, Kit] = [STANDARD_KIT, STANDARD_KIT];
+		kits[me] = fair ? STANDARD_KIT : kitOf(mine);
+		kits[foe] = theirs ? kitOf(theirs) : STANDARD_KIT;
+		const looks: [BouleLook, BouleLook] = [mine, mine];
+		const same = theirs && theirs.finish === mine.finish && theirs.pattern === mine.pattern && theirs.inlay === mine.inlay;
+		looks[foe] = theirs && !same ? theirs : otherLook(mine);
+		// Absent kits are the standard ones: an all-standard match stays bit for bit what it always was.
+		return { looks, ...(kits[0] === STANDARD_KIT && kits[1] === STANDARD_KIT ? {} : { kits }) };
+	}, []);
+
 	/** The loading preview: sky, decor and a neutral pitch, so the page is alive while the level
 	 *  progression answers. No match, so nothing here can be mistaken for the game to come. */
 	const layPreview = useCallback(() => {
@@ -885,12 +932,12 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const g = g3Ref.current;
 		if (!g || g.pitch) return;
 		const t = makeTerrain(PREVIEW_SEED, SURFACES['terre-battue'], 0.02);
-		g.pitch = buildPitch3D(t, g.lights.setSun(PREVIEW_SEED), boardsRef.current, bannerRef.current, true);
+		g.pitch = pitchFor(g, t);
 		g.scene.add(g.pitch.group);
 		previewRef.current = true;
 		// Fade the place in from the empty sky-blue canvas rather than popping it.
 		canvasRef.current?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 450, easing: 'ease-out' });
-	}, [initScene]);
+	}, [initScene, pitchFor]);
 
 	/** The first real pitch replaces the preview by a cross-fade: the preview's last frame is copied
 	 *  onto a 2D canvas laid over the game, and that copy fades out over the new scene. The old veil
@@ -916,7 +963,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	}, []);
 
 	/** Lay a fresh pitch and match. Shared by free play and by the levels ladder. */
-	const layMatch = useCallback((cfg: { seed: number; surface: SurfaceId; amp: number; target: number; slope?: number }): boolean => {
+	const layMatch = useCallback((cfg: MatchCfg): boolean => {
 		if (!initScene()) return false;
 		const g = g3Ref.current;
 		if (!g) return false;
@@ -924,18 +971,23 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
-		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp, cfg.slope === undefined ? {} : { slope: cfg.slope });
-		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current, bannerRef.current, true);
+		const opts: TerrainOpts = {};
+		if (cfg.slope !== undefined) opts.slope = cfg.slope;
+		if (cfg.difficulty !== undefined) opts.difficulty = cfg.difficulty;
+		const t = makeTerrain(cfg.seed, SURFACES[cfg.surface], cfg.amp, opts);
+		g.pitch = pitchFor(g, t);
 		g.scene.add(g.pitch.group);
 		bakeBouleEnv(g.renderer, g.scene);
 
-		simRef.current = { t, bs: [], rng: cfg.seed & 0xffff };
+		const sides = sidesFor(false);
+		looksRef.current = sides.looks;
+		simRef.current = { t, bs: [], rng: cfg.seed & 0xffff, ...(sides.kits ? { kits: sides.kits } : {}) };
 		prevRef.current = [];
 		movesRef.current = 0;
 		targetRef.current = cfg.target;
 		matchRef.current = initMatch13(cfg.target, HUMAN);
 		setMatch(matchRef.current);
-		setGoal((n) => ({ target: cfg.target, key: (n?.key ?? 0) + 1 }));
+		setGoal((n) => ({ target: cfg.target, key: (n?.key ?? 0) + 1, surface: cfg.surface, pitch: cfg.difficulty ?? null }));
 		setAnnounce(null);
 		holderRef.current = null;
 		statusRef.current = 'aim';
@@ -951,20 +1003,20 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		resetCamera();
 		clearArc();
 		return true;
-	}, [clearArc, clearBodies, endPreview, initScene, resetCamera]);
+	}, [clearArc, clearBodies, endPreview, initScene, pitchFor, resetCamera, sidesFor]);
 
 	const newGame = useCallback((key: DiffKey) => {
 		const d = DIFFS[key];
 		const pick = groundRef.current;
-		const rel = pick.relief === 'auto' ? null : RELIEFS[pick.relief];
+		const pitch = pick.pitch === 'auto' ? d.pitch : pick.pitch;
 		diffRef.current = key;
 		dailyRef.current = null;
 		setDaily(false);
 		if (!layMatch({
 			seed: (Math.random() * 1e9) | 0,
 			surface: pick.surface === 'auto' ? d.surface : pick.surface,
-			amp: rel ? rel.amp : d.amp,
-			slope: rel ? rel.slope : undefined,
+			amp: ampFor(pitch),
+			difficulty: pitch,
 			target: 13,
 		})) return;
 		setDiff(key);
@@ -1005,10 +1057,11 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (simRef.current) clearBodies();
 		if (g.pitch) { g.scene.remove(g.pitch.group); g.pitch.dispose(); }
 		const t = makeTerrain(course.seed, SURFACES[course.surface], course.amp);
-		g.pitch = buildPitch3D(t, g.lights.setSun(t.seed, sunForceRef.current ?? undefined), boardsRef.current, bannerRef.current, true);
+		g.pitch = pitchFor(g, t);
 		g.scene.add(g.pitch.group);
 		bakeBouleEnv(g.renderer, g.scene);
 
+		looksRef.current = sidesFor(true).looks;
 		simRef.current = { t, bs: [], rng: course.seed & 0xffff };
 		prevRef.current = [];
 		targetRef.current = 13;
@@ -1025,7 +1078,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		resetCamera();
 		clearArc();
 		return true;
-	}, [clearArc, clearBodies, endPreview, initScene, resetCamera]);
+	}, [clearArc, clearBodies, endPreview, initScene, pitchFor, resetCamera, sidesFor]);
 
 	/** Put station `i` on the ground and hand the aim back to the player. */
 	const setStation = useCallback((i: number) => {
@@ -1749,6 +1802,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (netRef.current) { netRef.current.leave(); netRef.current = null; }
 		onlineRef.current = false;
 		startedOnlineRef.current = false;
+		oppBouleRef.current = null;
 		mySideRef.current = HUMAN;
 		setMySide(HUMAN);
 		remoteAimRef.current = null;
@@ -1818,7 +1872,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (!s) return;
 		for (let k = 0; k + 4 < r.bs.length; k += 5) {
 			const side = r.bs[k + 3] as Side | -1;
-			const b = side === -1 ? makeJack(r.bs[k], r.bs[k + 1]) : makeBoule(r.bs[k], r.bs[k + 1], side);
+			const b = side === -1 ? makeJack(r.bs[k], r.bs[k + 1]) : makeBoule(r.bs[k], r.bs[k + 1], side, s.kits?.[side]);
 			b.z = r.bs[k + 2];
 			b.live = r.bs[k + 4] === 1;
 			addBody(b);
@@ -1917,7 +1971,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 
 		// Same terrain on both peers, from the room id alone. Neutral ground: on gravel this coarse
 		// neither seat gets an edge, and the first jack is the only thing the host does differently.
-		layMatch({ seed: seedFromRoom(net.roomId), surface: ONLINE_SURFACE, amp: DIFFS.moyen.amp, target: 13 });
+		layMatch({ seed: seedFromRoom(net.roomId), surface: ONLINE_SURFACE, amp: ampFor(ONLINE_PITCH), difficulty: ONLINE_PITCH, target: 13 });
 		if (resume) {
 			restoreRest(resume.rest);
 			// Our own moves sent after that rest point were lost with the page: replay them.
@@ -1931,22 +1985,53 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		askMissing();
 	}, [applySync, askMissing, gameId, layMatch, leaveJackView, lv, restoreRest, snapshot]);
 
+	/** The online opponent's boule, from its presence: their make in the sim and their look on their
+	 *  boules. A reload rejoins and lays the board before presence answers, so a match already laid
+	 *  takes it too, bodies on the ground included. */
+	const applyOppBoule = useCallback((id: string | null) => {
+		if (oppBouleRef.current === id) return;
+		oppBouleRef.current = id;
+		const s = simRef.current, g = g3Ref.current;
+		if (!onlineRef.current || !s) return;
+		const sides = sidesFor(false);
+		looksRef.current = sides.looks;
+		if (sides.kits) s.kits = sides.kits; else delete s.kits;
+		const foe = other(mySideRef.current);
+		const kit = sides.kits?.[foe];
+		s.bs.forEach((b, i) => {
+			if (b.side !== foe) return;
+			if (kit) { b.r = kit.r; b.m = kit.m; b.e = kit.e; b.bite = kit.bite; }
+			const old = g?.meshes[i];
+			if (!g || !old) return;
+			const m = makeBouleMesh(foe, sides.looks[foe], b.r);
+			m.position.copy(old.position);
+			m.quaternion.copy(old.quaternion);
+			g.bodies.remove(old);
+			old.geometry.dispose();
+			(old.material as THREE.Material).dispose();
+			g.bodies.add(m);
+			g.meshes[i] = m;
+		});
+	}, [sidesFor]);
+
 	const watchPeers = useCallback(() => {
 		netRef.current?.onPeers((peers) => {
 			if (peers.length >= 1) {
+				applyOppBoule(peers[0].boule ?? null);
 				setMpOpp(peers[0].name);
 				setOppAway(false);
 				if (onlineRef.current) askMissing(); // back from a drop or a reload: catch up both ways
 				startOnlineMatch();
 			} else if (onlineRef.current) setOppAway(true);
 		});
-	}, [askMissing, startOnlineMatch]);
+	}, [applyOppBoule, askMissing, startOnlineMatch]);
 
 	/** After a reload: the same room, the same seat, the board as it last rested. */
 	const resumeOnline = useCallback(async (r: OnlineResume) => {
 		const tok = ++joinTokRef.current;
 		setMpPhase('connecting');
-		const net = await rejoinRoom(me(), r.room, r.code, r.selfId);
+		myOnlineBouleRef.current = equippedRef.current.boule;
+		const net = await rejoinRoom(me(), myOnlineBouleRef.current, r.room, r.code, r.selfId);
 		if (tok !== joinTokRef.current) { net?.leave(); return; } // cancelled meanwhile
 		if (!net) { resetOnline(); newGame('moyen'); return; }
 		netRef.current = net;
@@ -2001,7 +2086,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 	const mpQuickMatch = useCallback(async () => {
 		if (!multiplayerAvailable()) { setMpMsg(tRef.current.mpUnavailable); return; }
 		setMpPhase('connecting'); setMpMsg(null); setMpCode(null);
-		const net = await joinRandom(me(), poolRef.current);
+		myOnlineBouleRef.current = equippedRef.current.boule;
+		const net = await joinRandom(me(), myOnlineBouleRef.current, poolRef.current);
 		if (!net) { setMpPhase('menu'); setMpMsg(tRef.current.noFreeGame); return; }
 		netRef.current = net; setMpPhase('waiting'); watchPeers();
 	}, [watchPeers]);
@@ -2010,7 +2096,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (!multiplayerAvailable()) { setMpMsg(tRef.current.mpUnavailable); return; }
 		const code = makeCode();
 		setMpPhase('connecting'); setMpMsg(null); setMpCode(code);
-		const net = await joinByCode(me(), code);
+		myOnlineBouleRef.current = equippedRef.current.boule;
+		const net = await joinByCode(me(), myOnlineBouleRef.current, code);
 		if (!net) { setMpPhase('menu'); setMpMsg(tRef.current.connError); return; }
 		netRef.current = net; setMpPhase('waiting'); watchPeers();
 	}, [watchPeers]);
@@ -2020,7 +2107,8 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (!code) return;
 		if (!multiplayerAvailable()) { setMpMsg(tRef.current.mpUnavailable); return; }
 		setMpPhase('connecting'); setMpMsg(null); setMpCode(code);
-		const net = await joinByCode(me(), code);
+		myOnlineBouleRef.current = equippedRef.current.boule;
+		const net = await joinByCode(me(), myOnlineBouleRef.current, code);
 		if (!net) { setMpPhase('menu'); setMpMsg(tRef.current.codeBad); return; }
 		netRef.current = net; setMpPhase('waiting'); watchPeers();
 	}, [codeInput, watchPeers]);
@@ -2196,7 +2284,9 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			// Daily and online sway like Moyen for everyone: a shared board must not favour a ladder.
 			const skill = dailyRef.current || onlineRef.current ? DIFFS.moyen.skill
 				: lvActiveRef.current ? levelSkillRef.current : DIFFS[diffRef.current].skill;
-			swayRef.current = { t0: performance.now(), amp: swayAmp(skill), phase: Math.random() * Math.PI * 2, turn0: Math.random() * Math.PI * 2 };
+			// A heavy or big boule is harder to hold steady: the make widens the hand's sway.
+			const hand = simRef.current?.kits?.[mySideRef.current].aim ?? 1;
+			swayRef.current = { t0: performance.now(), amp: swayAmp(skill) * hand, phase: Math.random() * Math.PI * 2, turn0: Math.random() * Math.PI * 2 };
 			setArmed(true);
 			aimDirtyRef.current = true;
 			return;
@@ -2517,6 +2607,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		if (!g || !s) return;
 		const x = wx(im.x), z = wz(im.y);
 		if (im.kind === 'ground') {
+			if (im.speed >= MARK_SPEED) g.marks.add(s.t, im);
 			if (im.speed < 1.2) return;
 			g.fx.puff(x, im.z - BOULE_R, z, im.speed, DUST[s.t.surface.id]);
 			sfx.groundHit(im.speed, s.t.surface.id);
@@ -2551,7 +2642,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 		const v = withSpin(throwVelocity(h.x, h.y, aimSpeed(), aimLoft()));
 		const from = m.circle;
 		const pred = predictThrow(s, from, v, (c) =>
-			place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn)));
+			place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn, c.kits?.[m.turn])));
 
 		const tint = pred.blocked ? 0xff6b6b : 0x8ce99a;
 		arcPtsRef.current = pred.air;
@@ -2682,7 +2773,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			const bx = p && a < 1 ? p.x + (b.x - p.x) * a : b.x;
 			const by = p && a < 1 ? p.y + (b.y - p.y) * a : b.y;
 			const bz = p && a < 1 ? p.z + (b.z - p.z) * a : b.z;
-			mesh.position.set(wx(bx), bz, wz(by));
+			mesh.position.set(wx(bx), bz - sinkOf(s.t, b), wz(by));
 			const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
 			if (sp > 0.25) {
 				SPIN.set(b.vy, 0, -b.vx).normalize();
@@ -2788,7 +2879,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 				: throwVelocity(Math.sin(ra!.yaw) * m.dir, Math.cos(ra!.yaw) * m.dir, speedOf(ra!.power), ra!.loft);
 			const from = m.circle, asJack = m.phase === 'throw-jack';
 			const pred = predictThrow(s, from, v, (c) =>
-				place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn)));
+				place(c.t, asJack ? makeJack(from.x, from.y) : makeBoule(from.x, from.y, m.turn, c.kits?.[m.turn])));
 			const air = arcMesh(pred.air, HALO[1], 0.02);
 			if (air) g.ray.add(air);
 			const roll = arcMesh(pred.roll, 0xffc9c4, 0.014);
@@ -3091,12 +3182,51 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			if (expo !== undefined) g.lights.setSkyExposure(expo);
 			g.scene.remove(g.pitch.group);
 			g.pitch.dispose();
-			g.pitch = buildPitch3D(s.t, g.lights.setSun(s.t.seed, sunForceRef.current), boardsRef.current, bannerRef.current, true);
+			g.pitch = pitchFor(g, s.t);
 			g.scene.add(g.pitch.group);
 			bakeBouleEnv(g.renderer, g.scene);
 		};
 		return () => { delete (window as unknown as { __petanqueSun?: unknown }).__petanqueSun; };
-	}, []);
+	}, [pitchFor]);
+
+	/** Re-dress the pitch in `decorRef`'s decor. The terrain and the bodies stay; only what stands
+	 *  round them is rebuilt, so a decor can change in the middle of an end. */
+	const redress = useCallback(() => {
+		const g = g3Ref.current, s = simRef.current;
+		if (!g || !s || !g.pitch) return;
+		g.scene.remove(g.pitch.group);
+		g.pitch.dispose();
+		g.pitch = pitchFor(g, s.t);
+		g.scene.add(g.pitch.group);
+		bakeBouleEnv(g.renderer, g.scene);
+	}, [pitchFor]);
+
+	/* Any decor, owned or not: the decor guard and the shop's preview pictures. */
+	useEffect(() => {
+		const w = window as unknown as { __petanqueDecor?: (id: DecorId) => void };
+		w.__petanqueDecor = (id) => { decorRef.current = id; redress(); };
+		return () => { delete (window as unknown as { __petanqueDecor?: unknown }).__petanqueDecor; };
+	}, [redress]);
+
+	/** Something was bought or chosen in the shop. The jack and the decor change at once; a boule's
+	 *  make is read when the next match is laid. */
+	const onEquip = useCallback((next: Equipped, it: ShopItem) => {
+		equippedRef.current = next;
+		setEquipped(next);
+		const g = g3Ref.current, s = simRef.current;
+		if (it.kind === 'jack' && g && s) {
+			const i = s.bs.findIndex((b) => b.side === -1);
+			const m = i >= 0 ? g.meshes[i] : null;
+			if (m) (m.material as THREE.MeshStandardMaterial).color.setHex(jackColorOf(next));
+		}
+		if (it.kind === 'decor') {
+			const d = decorOf(next);
+			decorRef.current = d;
+			// Textures first, so the square never shows a frame in bare grey.
+			if (d === 'jardin') redress();
+			else void preloadTown(d).finally(() => { if (decorRef.current === d) redress(); });
+		}
+	}, [redress]);
 
 	/* Jump to the end of the match. Measurement only: the end panel is the one piece of chrome that
 	 * lives 13 points away, so a guard that has to play its way there never audits it — which is how
@@ -3133,7 +3263,16 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 			// What the GROUND holds, which is not the same question as the rules' `left`. The bug that
 			// let the AI throw a fourth boule billed it to the other side, so `left` stayed plausible
 			// while the ground did not. Also what the multiplayer guard compares between two peers.
-			bs: (simRef.current?.bs ?? []).map((b) => ({ x: b.x, y: b.y, z: b.z, side: b.side, live: b.live })),
+			bs: (simRef.current?.bs ?? []).map((b) => ({ x: b.x, y: b.y, z: b.z, side: b.side, live: b.live, r: b.r })),
+			// What the shop dressed this match in: the makes the sim plays (null = both standard), the
+			// decor round the pitch, how uneven the pitch is, and the craters on the ground.
+			shop: {
+				equipped: { ...equippedRef.current },
+				decor: poolRef.current ? 'jardin' : decorRef.current,
+				kits: simRef.current?.kits ?? null,
+				rough: simRef.current?.t.rough ?? null,
+				marks: g3Ref.current?.marks.count() ?? 0,
+			},
 			jack: jackRef.current ? { x: jackRef.current.x, y: jackRef.current.y, live: jackRef.current.live } : null,
 			power: powerRef.current,
 			loft: aimLoftRef.current,
@@ -3399,6 +3538,11 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 						<button className={`pe-act ${effet ? 'on' : ''}`} aria-pressed={effet}
 							onClick={() => { const on = !effet; try { localStorage.setItem(EFFET_KEY, on ? '1' : '0'); } catch { /* private mode */ } setEffet(on); }}
 							aria-label={effet ? t.effetOff : t.effetOn} title={effet ? t.effetOff : t.effetOn}>{effet ? '↻' : '⟂'}</button>
+						{/* Not on a partner's event page: its pitch keeps the garden its boards stand in. */}
+						{!event && (
+							<button className="pe-act pe-shop" onClick={() => setShopOpen(true)}
+								aria-label={t.shop.btn} title={t.shop.btn}>🛍️</button>
+						)}
 						<button className={`pe-act ${sound ? 'on' : ''}`} aria-pressed={sound}
 							onClick={() => { const on = !sound; sfx.setEnabled(on); setSound(on); }}
 							aria-label={sound ? t.soundOff : t.soundOn} title={sound ? t.soundOff : t.soundOn}>{sound ? '🔊' : '🔇'}</button>
@@ -3468,6 +3612,7 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 						<span className="pe-event-text">
 							{event && <span className="pe-event-title">{event.title}</span>}
 							<span>{t.goal(goal.target)}</span>
+							{!event && goal.pitch !== null && <span className="pe-goal-pitch">{t.pitchLine(t.surface[goal.surface], goal.pitch)}</span>}
 						</span>
 					</div>
 				)}
@@ -3781,19 +3926,21 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 								</div>
 							</div>
 							<div className="pe-ground-row">
-								<span className="pe-ground-lab">{t.reliefLab}</span>
+								<span className="pe-ground-lab">{t.pitchLab}</span>
 								<div className="pe-ground-opts">
-									<button className={`pe-pill ${ground.relief === 'auto' ? 'active' : ''}`} onClick={() => chooseGround({ relief: 'auto' })}>{t.random}</button>
-									{RELIEF_ORDER.map((r) => (
-										<button key={r} className={`pe-pill ${ground.relief === r ? 'active' : ''}`}
-											title={t.reliefHint[r]} onClick={() => chooseGround({ relief: r })}>{t.relief[r]}</button>
+									<button className={`pe-pill ${ground.pitch === 'auto' ? 'active' : ''}`} onClick={() => chooseGround({ pitch: 'auto' })}>
+										{t.pitchAutoPill(DIFFS[diff].pitch)}
+									</button>
+									{PITCHES.map((p) => (
+										<button key={p} className={`pe-pill ${ground.pitch === p ? 'active' : ''}`}
+											title={t.pitchHint(p)} onClick={() => chooseGround({ pitch: p })}>{p}</button>
 									))}
 								</div>
 							</div>
 							<span className="pe-ground-hint">
 								{ground.surface === 'auto' ? t.surfaceAuto : t.surfaceHint[ground.surface]}
 								{' · '}
-								{ground.relief === 'auto' ? t.reliefAuto : t.reliefHint[ground.relief]}
+								{t.pitchHint(ground.pitch === 'auto' ? DIFFS[diff].pitch : ground.pitch)}
 							</span>
 							<button className="pe-replay" onClick={() => { setGroundOpen(false); newGame(diffRef.current); }}>{t.play}</button>
 						</div>
@@ -3802,6 +3949,10 @@ export default function PetanqueGame({ gameId, event }: { gameId: string; event?
 
 				{lv.active && lv.menu && (
 					<LevelSelect progress={lv.progress} onPick={startLevel} lang={lang} onClose={closeLevels} />
+				)}
+
+				{shopOpen && (
+					<ShopPanel t={t} equipped={equipped} onEquip={onEquip} onClose={() => setShopOpen(false)} daily={daily} />
 				)}
 
 				{lv.done && (
@@ -4000,6 +4151,7 @@ const CSS = `
 .pe-event-title { font-size: 14px; color: #ffd166; letter-spacing: 0.02em; }
 .pe-goal { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; white-space: nowrap; background: rgba(28,20,12,0.72); color: #f4ece2; font-weight: 700; font-size: 17px; padding: 9px 20px; border-radius: 999px; border: 1.5px solid rgba(255,209,102,0.6); backdrop-filter: blur(4px); animation: pe-goal 3.4s ease-in-out forwards; }
 .pe-goal strong { color: #ffd166; font-size: 21px; }
+.pe-goal-pitch { display: block; margin-top: 2px; font-size: 13px; font-weight: 600; color: #e8dccb; text-align: center; }
 /* After each boule: the point, then whose turn — big, dead centre, and brief: it pops in, holds for
    about half a second, and pops out, so it never sits on the boules the player wants to look at.
    Green when the point is yours, red when it is theirs. */

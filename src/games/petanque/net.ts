@@ -23,8 +23,13 @@ export const MAX_PLAYERS = 2;
 const MAX_ROOMS = 24;
 const SYNC_WAIT_MS = 600;
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no ambiguous chars (0/O, 1/I/L)
+/* Every room and the lobby carry the protocol in their name. Raise it with any change to how the
+   pitch is laid or how a boule plays: a tab left open on the old page then never meets a new one,
+   which would roll the same throw on another ground. 2: uneven pitches and boule makes. */
+const ROOMS = 'petanque2';
 
-export interface PetanquePeer { id: string; name: string; }
+/** `boule` is the shop model the peer throws (shop.ts); absent from older clients. */
+export interface PetanquePeer { id: string; name: string; boule?: string; }
 
 /** A thrown boule: velocity only. Angles would need sin/cos, which peers may round differently.
  *  `n` is the move's index in the match, shared by both boards (absent from pre-resync clients). */
@@ -90,7 +95,7 @@ export function seedFromRoom(roomId: string): number {
 
 const randomId = (): string => `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
 
-interface PresMeta { id: string; name: string; }
+interface PresMeta { id: string; name: string; boule?: string; }
 
 /** All player ids in the room (including self), sorted — smallest is the host / side 0. */
 function allIds(ch: RealtimeChannel, selfId: string): string[] {
@@ -103,7 +108,7 @@ function allIds(ch: RealtimeChannel, selfId: string): string[] {
 function peersOf(ch: RealtimeChannel, selfId: string): PetanquePeer[] {
 	const state = ch.presenceState<PresMeta>();
 	const peers: PetanquePeer[] = [];
-	for (const key of Object.keys(state)) for (const m of state[key]) if (m.id !== selfId) peers.push({ id: m.id, name: m.name });
+	for (const key of Object.keys(state)) for (const m of state[key]) if (m.id !== selfId) peers.push({ id: m.id, name: m.name, ...(m.boule ? { boule: m.boule } : {}) });
 	return peers;
 }
 
@@ -131,7 +136,7 @@ interface Callbacks {
 	peers?: (p: PetanquePeer[]) => void;
 }
 
-async function openRoom(c: SupabaseClient, roomId: string, name: string, code: string | null, selfId = randomId()): Promise<PetanqueMatchNet | null> {
+async function openRoom(c: SupabaseClient, roomId: string, name: string, code: string | null, boule: string, selfId = randomId()): Promise<PetanqueMatchNet | null> {
 	const ch = c.channel(roomId, { config: { presence: { key: selfId }, broadcast: { self: false } } });
 	const cb: Callbacks = {};
 	ch.on('broadcast', { event: 'throw' }, ({ payload }) => cb.throw?.(payload as ThrowMsg));
@@ -141,7 +146,8 @@ async function openRoom(c: SupabaseClient, roomId: string, name: string, code: s
 	ch.on('broadcast', { event: 'need' }, ({ payload }) => cb.need?.(payload as NeedMsg));
 	ch.on('presence', { event: 'sync' }, () => cb.peers?.(peersOf(ch, selfId)));
 
-	const meta: PresMeta = { id: selfId, name };
+	// The boule rides on presence: known before any move, and shown again after every rejoin.
+	const meta: PresMeta = { id: selfId, name, boule };
 	let joined = false;
 	const onStatus = (status: string): void => {
 		if (!joined) return;
@@ -194,7 +200,7 @@ export function joinLobby(onCounts: (c: LobbyCounts) => void, pool = ''): Lobby 
 	const c = getClient();
 	if (!c) return null;
 	const selfId = randomId();
-	const ch = c.channel(pool ? `petanque-lobby-${pool}` : 'petanque-lobby', { config: { presence: { key: selfId } } });
+	const ch = c.channel(pool ? `${ROOMS}-lobby-${pool}` : `${ROOMS}-lobby`, { config: { presence: { key: selfId } } });
 	let state: LobbyState = 'browse';
 	let ready = false;
 	const count = (): void => {
@@ -221,11 +227,11 @@ export function joinLobby(onCounts: (c: LobbyCounts) => void, pool = ''): Lobby 
 }
 
 /** First-connected matchmaking: the first room with a free slot, among the rooms of `pool`. */
-export async function joinRandom(name: string, pool = ''): Promise<PetanqueMatchNet | null> {
+export async function joinRandom(name: string, boule: string, pool = ''): Promise<PetanqueMatchNet | null> {
 	const c = getClient();
 	if (!c) return null;
 	for (let slot = 0; slot < MAX_ROOMS; slot++) {
-		const m = await openRoom(c, pool ? `petanque-q-${pool}-${slot}` : `petanque-q-${slot}`, name, null);
+		const m = await openRoom(c, pool ? `${ROOMS}-q-${pool}-${slot}` : `${ROOMS}-q-${slot}`, name, null, boule);
 		if (m) return m;
 	}
 	return null;
@@ -233,17 +239,17 @@ export async function joinRandom(name: string, pool = ''): Promise<PetanqueMatch
 
 /** Back into a room after a page reload, under the same id: the host is the smallest id, so a new
  *  one could swap the seats mid-match. */
-export async function rejoinRoom(name: string, roomId: string, code: string | null, selfId: string): Promise<PetanqueMatchNet | null> {
+export async function rejoinRoom(name: string, boule: string, roomId: string, code: string | null, selfId: string): Promise<PetanqueMatchNet | null> {
 	const c = getClient();
 	if (!c) return null;
-	return openRoom(c, roomId, name, code, selfId);
+	return openRoom(c, roomId, name, code, boule, selfId);
 }
 
 /** Join (or create) the room for a shared friend code. */
-export async function joinByCode(name: string, code: string): Promise<PetanqueMatchNet | null> {
+export async function joinByCode(name: string, boule: string, code: string): Promise<PetanqueMatchNet | null> {
 	const c = getClient();
 	if (!c) return null;
 	const norm = code.trim().toUpperCase();
 	if (!norm) return null;
-	return openRoom(c, `petanque-c-${norm}`, name, norm);
+	return openRoom(c, `${ROOMS}-c-${norm}`, name, norm, boule);
 }

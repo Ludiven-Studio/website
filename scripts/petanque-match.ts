@@ -28,11 +28,13 @@ export interface MatchOpts {
 	amp: number;
 	/** Grain counter start. Split from `seed` so repeated tries can share one pitch. */
 	grain?: number;
+	/** An uneven pitch (terrain.ts), 0-100; absent, the even one. */
+	difficulty?: number;
 }
 
 /** One match, start to `target`. */
 export function playMatch(o: MatchOpts): MatchResult {
-	const t = makeTerrain(o.seed, SURFACES[o.surface], o.amp);
+	const t = makeTerrain(o.seed, SURFACES[o.surface], o.amp, o.difficulty === undefined ? {} : { difficulty: o.difficulty });
 	let state: Match13 = initMatch13(o.target, 0);
 	const res: MatchResult = { winner: 0, scores: [0, 0], ends: 0, points: 0, handPlaced: 0, nullEnds: 0, shots: 0, throws: 0 };
 	let rng = 1;
