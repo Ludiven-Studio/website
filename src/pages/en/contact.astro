@@ -1,0 +1,94 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+import CallToAction from '../../components/CallToAction.astro';
+import Icon from '../../components/Icon.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Contact | Ludiven Studio"
+	description="Get in touch with Ludiven Studio: a Unity project, services, or help with the Prefab Fusion editor tool or one of the apps."
+	lang="en"
+	altLang="/contact/"
+>
+	<main class="wrapper stack gap-12 contact">
+		<div class="stack gap-8">
+			<LangSwitch lang="en" href="/contact/" />
+			<Hero title="Contact" tagline="A project, a question, or help with one of my tools or apps: write to me." />
+		</div>
+
+		<div class="mail">
+			<CallToAction href="mailto:contact@ludiven-studio.fr">
+				contact@ludiven-studio.fr
+				<Icon icon="paper-plane-tilt" size="1.2em" />
+			</CallToAction>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>A project or a service</h2>
+			<p>
+				Tell me about the idea, the target platforms and the deadline, and I will get back to you.
+				The offer is detailed on the <a href="/en/services/">Services</a> page.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Support for a tool or an app</h2>
+			<ul>
+				<li>
+					<strong>Prefab Fusion</strong>, the Unity editor tool: the <a href="/en/prefab-fusion/">tool page</a>
+					says what to include in your message.
+				</li>
+				<li><a href="/en/petanque-scanner/">Pétanque Scanner</a></li>
+				<li><a href="/petanque-meet/">Pétanque Meet</a> (in French)</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Ludiven Studio</h2>
+			<p>
+				A French company (EURL) based in Châtonnay, France. Full details in the
+				<a href="/mentions-legales/">legal notice</a> (in French). Also on
+				<a href="https://www.linkedin.com/in/raphael-benedetto/" target="_blank" rel="noopener">LinkedIn</a>.
+			</p>
+		</section>
+	</main>
+</BaseLayout>
+
+<style>
+	.contact {
+		max-width: 68ch;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.contact h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.contact ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.contact section a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.contact section a:hover,
+	.contact section a:focus {
+		text-decoration-color: currentColor;
+	}
+	/* The regular accent is too dark to read on the dark background. */
+	:global(.theme-dark) .contact section a {
+		color: var(--accent-dark);
+	}
+	.mail {
+		display: flex;
+		justify-content: center;
+	}
+</style>

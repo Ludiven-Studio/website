@@ -1,0 +1,93 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import CallToAction from '../components/CallToAction.astro';
+import Icon from '../components/Icon.astro';
+import LangSwitch from '../components/LangSwitch.astro';
+---
+
+<BaseLayout
+	title="Contact | Ludiven Studio"
+	description="Contacter Ludiven Studio : un projet Unity, une prestation, ou de l'aide sur l'outil Prefab Fusion ou une appli."
+	altLang="/en/contact/"
+>
+	<main class="wrapper stack gap-12 contact">
+		<div class="stack gap-8">
+			<LangSwitch lang="fr" href="/en/contact/" />
+			<Hero title="Contact" tagline="Un projet, une question, ou besoin d'aide sur un outil ou une appli : écrivez-moi." />
+		</div>
+
+		<div class="mail">
+			<CallToAction href="mailto:contact@ludiven-studio.fr">
+				contact@ludiven-studio.fr
+				<Icon icon="paper-plane-tilt" size="1.2em" />
+			</CallToAction>
+		</div>
+
+		<section class="stack gap-2">
+			<h2>Un projet ou une prestation</h2>
+			<p>
+				Décrivez l'idée, les plateformes visées et le délai : je reviens vers vous pour en parler.
+				Le détail des offres est sur la page <a href="/prestations/">Prestations</a>.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Support d'un outil ou d'une appli</h2>
+			<ul>
+				<li>
+					<strong>Prefab Fusion</strong>, l'outil pour l'éditeur Unity : la
+					<a href="/en/prefab-fusion/">page de l'outil</a> (en anglais) dit quoi joindre à votre message.
+				</li>
+				<li><a href="/petanque-scanner/">Pétanque Scanner</a></li>
+				<li><a href="/petanque-meet/">Pétanque Meet</a></li>
+			</ul>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Ludiven Studio</h2>
+			<p>
+				EURL, 38440 Châtonnay, France. Toutes les informations dans les
+				<a href="/mentions-legales/">mentions légales</a>. Aussi sur
+				<a href="https://www.linkedin.com/in/raphael-benedetto/" target="_blank" rel="noopener">LinkedIn</a>.
+			</p>
+		</section>
+	</main>
+</BaseLayout>
+
+<style>
+	.contact {
+		max-width: 68ch;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.contact h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.contact ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.contact section a {
+		color: var(--accent-regular);
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+	.contact section a:hover,
+	.contact section a:focus {
+		text-decoration-color: currentColor;
+	}
+	/* The regular accent is too dark to read on the dark background. */
+	:global(.theme-dark) .contact section a {
+		color: var(--accent-dark);
+	}
+	.mail {
+		display: flex;
+		justify-content: center;
+	}
+</style>

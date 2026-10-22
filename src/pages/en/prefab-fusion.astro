@@ -1,0 +1,146 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Hero from '../../components/Hero.astro';
+import CallToAction from '../../components/CallToAction.astro';
+import Icon from '../../components/Icon.astro';
+
+// Keep in step with the package: Documentation/Prefab Fusion Manual.md in the LudivenTools repo.
+const features: { title: string; body: string }[] = [
+	{
+		title: 'Extract to Nested Prefab',
+		body: 'Pick a part of a prefab. Prefab Fusion finds the same part in your other prefabs and turns every copy into an instance of one new prefab. Each copy keeps its own values as overrides, and references from scenes, prefabs and assets follow.',
+	},
+	{
+		title: 'Make Variant, in place',
+		body: 'Turn an existing prefab into a variant of another one. It keeps its path and GUID, only its differences become overrides, and everything that uses it keeps working.',
+	},
+	{
+		title: 'Find what to refactor',
+		body: 'A scan lists the blocks repeated across your prefabs, and the prefab pairs that should be variants.',
+	},
+	{
+		title: 'Preview, check, undo',
+		body: 'A preview before any change, a warning on files with uncommitted git changes, a check of every value after each restructure, and an undo of the last ten.',
+	},
+];
+
+const title = 'Prefab Fusion: refactor Unity prefabs into nested prefabs and variants | Ludiven Studio';
+const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab parts become one nested prefab, near-copies become variants, in place, with every value and reference kept.';
+---
+
+<BaseLayout title={title} description={description} lang="en">
+	<main class="wrapper stack gap-12 product">
+		<div class="stack gap-4">
+			<Hero
+				title="Prefab Fusion"
+				tagline="A Unity editor tool to refactor prefabs: copy-pasted parts become one nested prefab, near-copies become variants, with every value and reference kept."
+			/>
+			<p class="status">Coming soon to the Unity Asset Store.</p>
+		</div>
+
+		<section class="stack gap-4">
+			<h2>What it does</h2>
+			<div class="features">
+				{features.map((f) => (
+					<div class="feature stack gap-2">
+						<h3>{f.title}</h3>
+						<p>{f.body}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Also in the package</h2>
+			<p>
+				Export a prefab to readable JSON, edit it, and rebuild the prefab in place. Generate C# scripts that
+				rebuild a prefab from code. Render a prefab to PNG. Run every command in batch mode or from the open
+				editor, for scripts, CI and AI coding agents.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Requirements</h2>
+			<ul>
+				<li>Unity 2022.3 LTS or newer. Tested on Windows with 2022.3, 6.0, 6.3, 6.4, 6.5 and 6.6.</li>
+				<li>The Unity UI package (uGUI), and TextMeshPro on 2022.3.</li>
+				<li>Assets serialized as text (Force Text, Unity's default), so that references can follow.</li>
+				<li>Editor only: nothing ends up in your builds. Prefab Fusion sends nothing anywhere: it only reads and writes files in your project.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-4 support" id="support">
+			<h2>Support</h2>
+			<p>The manual ships with the package, in <code>Documentation/</code>. For anything else, write to me:</p>
+			<div class="mail">
+				<CallToAction href="mailto:contact@ludiven-studio.fr?subject=Prefab%20Fusion%20support">
+					contact@ludiven-studio.fr
+					<Icon icon="paper-plane-tilt" size="1.2em" />
+				</CallToAction>
+			</div>
+			<p>To help me reproduce a problem, please include:</p>
+			<ul>
+				<li>your Unity version and render pipeline;</li>
+				<li>the Prefab Fusion version (top of <code>CHANGELOG.md</code>);</li>
+				<li>what you did, what you expected, and what happened;</li>
+				<li>the report or the Console messages (commands also write them to <code>PrefabFusion/_pending_log.txt</code>);</li>
+				<li>if you can, a small prefab that shows the problem.</li>
+			</ul>
+		</section>
+	</main>
+</BaseLayout>
+
+<style>
+	.product {
+		max-width: 68ch;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.product h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.product h3 {
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+	}
+	.status {
+		align-self: center;
+		padding: 0.4rem 1rem;
+		border: 1px solid var(--accent-regular);
+		border-radius: 999rem;
+		color: var(--gray-0);
+		font-size: var(--text-sm);
+	}
+	.features {
+		display: grid;
+		gap: 1rem;
+	}
+	.feature {
+		padding: 1.25rem 1.5rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+	.product ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.product code {
+		font-size: 0.9em;
+		color: var(--gray-0);
+	}
+	.mail {
+		display: flex;
+		justify-content: center;
+	}
+	@media (min-width: 50em) {
+		.features {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+</style>
