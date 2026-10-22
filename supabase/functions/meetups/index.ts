@@ -1056,6 +1056,9 @@ Deno.serve(async (req) => {
 				await db.from('meetup_tournament_reports').delete().eq('reporter_id', uid);
 				const { error: fErr } = await db.from('meetup_tournament_follows').delete().eq('player_id', uid);
 				if (fErr) throw fErr;
+				// A claim holds the name and phone the claimer typed, and no foreign key removes it.
+				const { error: cErr } = await db.from('meetup_tournament_claims').delete().eq('player_id', uid);
+				if (cErr) throw cErr;
 				const { error } = await db.auth.admin.deleteUser(uid);
 				if (error) throw error;
 				return json({ ok: true });
