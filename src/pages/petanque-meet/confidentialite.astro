@@ -26,7 +26,7 @@ import Hero from '../../components/Hero.astro';
 			<ul>
 				<li>Regarder la carte ne demande <strong>aucun compte</strong>. Pour publier, rejoindre ou signaler une partie, tu te connectes avec <strong>Google ou Apple</strong>.</li>
 				<li>Ce que tu publies est <strong>visible de tous</strong>&nbsp;: le prénom que tu saisis, le terrain, l'horaire, et pour un concours les informations du club. Ton adresse mail, elle, n'est jamais montrée.</li>
-				<li>Ta position GPS sert seulement à centrer la carte sur ton téléphone. <strong>Elle n'est jamais envoyée.</strong></li>
+				<li>Ta position GPS sert à centrer la carte et à calculer les distances, sur ton téléphone. <strong>Elle ne nous est jamais envoyée.</strong></li>
 				<li>Une <strong>bannière publicitaire</strong> de Google finance l'application. Elle n'est personnalisée qu'<strong>avec ton accord</strong>. Aucune revente de données.</li>
 				<li>Tu peux <strong>supprimer ton compte</strong> à tout moment depuis l'application.</li>
 			</ul>
@@ -51,7 +51,8 @@ import Hero from '../../components/Hero.astro';
 				Pour agir (publier une partie ou un concours, s'inscrire, signaler), tu te connectes avec
 				<strong>Google</strong> (Android) ou <strong>Apple</strong> (iPhone). Nous recevons alors un
 				identifiant de compte et ton adresse mail&nbsp;; avec Apple, ce peut être l'adresse relais qui masque
-				la tienne. Nous ne recevons jamais ton mot de passe.
+				la tienne. Nous ne recevons jamais ton mot de passe. Avec Google, le service de connexion garde aussi
+				le nom et la photo de ton profil Google&nbsp;: nous ne les affichons pas et ne nous en servons pas.
 			</p>
 			<p>
 				Ce compte sert à rattacher tes parties et inscriptions à toi, sur tous tes appareils, et à faire
@@ -134,16 +135,22 @@ import Hero from '../../components/Hero.astro';
 							<td>Supabase</td>
 						</tr>
 						<tr>
-							<td>Signalements&nbsp;: motif, identifiant du compte qui signale</td>
+							<td>Signalements&nbsp;: motif, ta précision pour une info erronée, identifiant du compte qui signale</td>
 							<td>Modération</td>
 							<td>Intérêt légitime</td>
 							<td>Supabase&nbsp;; l'éditeur, par e-mail via Resend</td>
 						</tr>
 						<tr>
-							<td>Texte d'une recherche de lieu, et pour komoot le centre de la carte affichée</td>
+							<td>Demande «&nbsp;C'est mon club&nbsp;»&nbsp;: ton message (nom, rôle au club, téléphone), l'adresse mail de ton compte</td>
+							<td>Vérifier auprès du club que tu le représentes, puis passer ses concours sur ton compte</td>
+							<td>Exécution du contrat</td>
+							<td>Supabase&nbsp;; l'éditeur, par e-mail via Resend</td>
+						</tr>
+						<tr>
+							<td>Texte d'une recherche de lieu&nbsp;; pour komoot, aussi le centre de la carte affichée, arrondi à une dizaine de kilomètres, et la langue de l'application</td>
 							<td>Trouver une ville ou une adresse sur la carte</td>
 							<td>Exécution du contrat</td>
-							<td>IGN (Géoplateforme) pour la France&nbsp;; komoot (Photon) pour le reste du monde</td>
+							<td>IGN (Géoplateforme) et komoot (Photon)&nbsp;: chaque recherche part aux deux</td>
 						</tr>
 						<tr>
 							<td>Statistiques d'usage anonymes (voir §8)</td>
@@ -161,8 +168,9 @@ import Hero from '../../components/Hero.astro';
 				</table>
 			</div>
 			<p>
-				L'application ne collecte <strong>pas</strong>&nbsp;: ta position GPS, tes contacts, tes photos (hors
-				l'affiche que tu choisis d'envoyer), ni ton nom de famille. L'identifiant publicitaire de ton téléphone
+				L'application ne collecte <strong>pas</strong> tes contacts, ni tes photos (hors l'affiche que tu
+				choisis d'envoyer). Ta position GPS ne nous est jamais envoyée (voir §5). Ton nom de famille n'est
+				demandé que pour une demande «&nbsp;C'est mon club&nbsp;», et seul l'éditeur le voit. L'identifiant publicitaire de ton téléphone
 				n'est lu que par le module publicitaire de Google (voir §9)&nbsp;: nous ne le recevons pas.
 			</p>
 		</section>
@@ -172,8 +180,12 @@ import Hero from '../../components/Hero.astro';
 			<p>
 				Le bouton «&nbsp;Autour de moi&nbsp;» demande l'accès à ta position, <strong>seulement quand tu
 				appuies dessus</strong>. L'application lit une position, centre la carte et calcule les distances
-				aux parties, puis arrête la localisation. Cette position <strong>reste sur ton téléphone</strong>&nbsp;:
-				aucun envoi n'est prévu, vers nous ni vers personne.
+				aux parties, puis arrête la localisation. Cette position <strong>ne nous est jamais envoyée</strong>.
+			</p>
+			<p>
+				Quand tu cherches un lieu, komoot reçoit le centre de la carte affichée, <strong>arrondi à une
+				dizaine de kilomètres</strong>, pour te proposer d'abord les lieux proches. Juste après «&nbsp;Autour de
+				moi&nbsp;», ce centre est proche de ta position&nbsp;: komoot n'en connaît donc que la région.
 			</p>
 			<p>
 				Ce que nous recevons, c'est l'emplacement du <strong>terrain</strong> que tu choisis sur la carte
@@ -204,13 +216,19 @@ import Hero from '../../components/Hero.astro';
 				les signalements en série.
 			</p>
 			<p>
-				L'éditeur est prévenu par e-mail et voit l'annonce, les prénoms, le motif et le nombre de signalements,
-				jamais l'identité de qui a signalé. Il peut rétablir l'annonce, la retirer ou suspendre le compte
+				L'éditeur est prévenu par e-mail et voit l'annonce, les prénoms, le motif, ta précision pour une info
+				erronée et le nombre de signalements, jamais l'identité de qui a signalé. Il peut rétablir l'annonce, la retirer ou suspendre le compte
 				fautif. D'un compte suspendu, seul l'identifiant technique est conservé, pour que la suspension tienne.
 			</p>
 			<p>
 				Les affiches de concours restent privées jusqu'à leur validation par l'éditeur. Une affiche refusée
 				est effacée aussitôt.
+			</p>
+			<p>
+				<strong>«&nbsp;C'est mon club&nbsp;».</strong> Pour reprendre les concours de ton club importés d'un
+				calendrier de comité, tu indiques ton nom, ton rôle au club et un téléphone. L'éditeur reçoit ce
+				message par e-mail avec l'adresse de ton compte, vérifie auprès du club, puis te répond par e-mail.
+				Personne d'autre ne le voit.
 			</p>
 		</section>
 
@@ -237,15 +255,17 @@ import Hero from '../../components/Hero.astro';
 			</p>
 			<p>
 				Pour afficher les annonces, les mesurer et lutter contre la fraude, le module de Google reçoit
-				l'<strong>identifiant publicitaire</strong> de ton téléphone, ton <strong>adresse IP</strong> (qui
-				donne une position approximative, à l'échelle de la ville), tes interactions avec les annonces
-				(affichage, toucher) et des informations techniques sur l'application et l'appareil. Nous ne lui
+				l'<strong>identifiant publicitaire</strong> de ton téléphone et d'autres identifiants propres à
+				l'application (sur Android, l'«&nbsp;app set ID&nbsp;»), ton <strong>adresse IP</strong> (qui donne une
+				position approximative, à l'échelle de la ville), tes interactions avec l'application et les annonces
+				(ouverture, annonces vues, touchers) et des informations techniques (performances, plantages). Nous ne lui
 				transmettons ni ton compte, ni ton adresse mail, ni ton prénom, ni tes parties.
 			</p>
 			<p>
 				<strong>Ton accord.</strong> Au premier lancement, un formulaire de Google te demande si tu acceptes
 				les annonces personnalisées. Sans ton accord, les annonces ne sont pas personnalisées. Tu peux changer
-				d'avis à tout moment&nbsp;: «&nbsp;Compte et aide&nbsp;» → «&nbsp;Choix publicitaires&nbsp;». Sur
+				d'avis à tout moment&nbsp;: «&nbsp;Compte et aide&nbsp;» → «&nbsp;Choix publicitaires&nbsp;» (ce bouton
+				apparaît là où ce choix est demandé, dont l'Union européenne). Sur
 				iPhone, l'application te demande aussi l'autorisation de suivi d'Apple&nbsp;; sans elle, l'identifiant
 				publicitaire n'est pas utilisé.
 			</p>
@@ -287,10 +307,10 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>Google</strong> et <strong>Apple</strong> — connexion à ton compte et distribution de l'application.</li>
 				<li><strong>Google (AdMob)</strong> — affichage et mesure de la bannière publicitaire (voir §9).</li>
 				<li><strong>BKG</strong> (Office fédéral allemand de cartographie et de géodésie) — fonds de carte (TopPlusOpen). Comme pour tout site web, ses serveurs voient l'adresse IP de ton téléphone.</li>
-				<li><strong>IGN</strong> (Institut national de l'information géographique et forestière, France) — recherche d'adresses en France, et fonds de carte des premières versions de l'application. Ses serveurs voient aussi l'adresse IP de ton téléphone.</li>
-				<li><strong>komoot</strong> (service Photon, Allemagne) — recherche de lieux hors de France. Le texte cherché et le centre de la carte affichée lui sont envoyés.</li>
+				<li><strong>IGN</strong> (Institut national de l'information géographique et forestière, France) — recherche d'adresses&nbsp;: chaque recherche lui est envoyée. Fonds de carte des premières versions de l'application. Ses serveurs voient aussi l'adresse IP de ton téléphone.</li>
+				<li><strong>komoot</strong> (service Photon, Allemagne) — recherche de lieux dans le monde&nbsp;: chaque recherche lui est envoyée, avec le centre de la carte affichée arrondi à une dizaine de kilomètres et la langue de l'application.</li>
 				<li><strong>Fondation OpenStreetMap</strong> — nom d'un nouveau terrain (service Nominatim). Seules les coordonnées du terrain lui sont envoyées, par notre serveur.</li>
-				<li><strong>Resend</strong> — envoi à l'éditeur des e-mails de modération.</li>
+				<li><strong>Resend</strong> — envoi des e-mails de modération et des réponses aux demandes «&nbsp;C'est mon club&nbsp;».</li>
 				<li><strong>Umami Software, Inc.</strong> — statistiques d'usage anonymes.</li>
 			</ul>
 			<p>
@@ -312,6 +332,7 @@ import Hero from '../../components/Hero.astro';
 				<li><strong>Parties et inscriptions</strong>&nbsp;: retirées de la carte dès qu'elles sont terminées ou annulées, puis effacées <strong>12 mois</strong> après leur date.</li>
 				<li><strong>Concours</strong>&nbsp;: retirés de la carte le lendemain, effacés 12 mois après leur date. L'affiche est effacée une semaine après le concours. Le suivi d'un concours est effacé une fois le concours passé, au plus tard avec lui.</li>
 				<li><strong>Signalements</strong>&nbsp;: effacés une fois traités, et au plus tard 12 mois après.</li>
+				<li><strong>Demandes «&nbsp;C'est mon club&nbsp;»</strong>&nbsp;: gardées avec ton compte, effacées quand tu le supprimes.</li>
 				<li><strong>Compteurs anti-abus</strong>&nbsp;: effacés au bout de 30 jours.</li>
 				<li><strong>Suspension d'un compte</strong>&nbsp;: l'identifiant technique est conservé tant que la suspension dure.</li>
 				<li><strong>Compte</strong>&nbsp;: jusqu'à ce que tu le supprimes.</li>
@@ -327,7 +348,7 @@ import Hero from '../../components/Hero.astro';
 			<ul>
 				<li>ton compte et ton adresse mail sont effacés&nbsp;;</li>
 				<li>tes parties à venir sont annulées (les inscrits le voient) et ton prénom est remplacé par «&nbsp;Compte supprimé&nbsp;» sur toutes tes parties&nbsp;;</li>
-				<li>tes inscriptions, tes concours, leurs affiches, les concours que tu suis et tes signalements sont effacés.</li>
+				<li>tes inscriptions, tes concours, leurs affiches, les concours que tu suis, tes signalements et tes demandes «&nbsp;C'est mon club&nbsp;» sont effacés.</li>
 			</ul>
 			<p>
 				Tes anciennes parties restent un temps dans la base, sans prénom, rattachées à un identifiant technique
