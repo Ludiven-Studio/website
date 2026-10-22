@@ -8,6 +8,18 @@ export const MEET_STORES = {
 		play: 'https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=en',
 		apple: 'https://apps.apple.com/app/id6823583416',
 	},
+	es: {
+		play: 'https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=es',
+		apple: 'https://apps.apple.com/es/app/id6823583416',
+	},
+	de: {
+		play: 'https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=de',
+		apple: 'https://apps.apple.com/de/app/id6823583416',
+	},
+	it: {
+		play: 'https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=it',
+		apple: 'https://apps.apple.com/it/app/id6823583416',
+	},
 } as const;
 
 // The download page. `screens` are the phone's slides, in order: their images are
@@ -76,5 +88,97 @@ export const MEET_DOWNLOAD = {
 			{ label: 'Terms', href: '/petanque-meet/cgu/' },
 		],
 		legalNote: '(in French)',
+	},
+	// es/de/it: the app's own words (AppLocalization) and the store listings'. Club tournaments are
+	// only on the map in France so far, which these say; the map on the web is in English.
+	es: {
+		path: '/es/petanque-meet/descargar/',
+		title: 'Descargar Pétanque Meet para Android y iPhone | Ludiven Studio',
+		description:
+			'La app Pétanque Meet en Google Play y en el App Store: las partidas de petanca cerca de ti y, en Francia, los torneos de los clubes.',
+		h1: 'Encuentra una partida de petanca cerca de ti',
+		lead: 'Las partidas que buscan jugadores, en un mapa, y en Francia también los torneos de los clubes. Apúntate a una, o publica la tuya cuando te falte gente.',
+		free: 'Gratis en Android y iPhone',
+		screens: [
+			{ id: 'carte', title: 'El mapa de las partidas', sub: 'Las que buscan jugadores, cerca de ti', alt: 'El mapa: las partidas que buscan jugadores y los torneos de los clubes' },
+			{ id: 'partie', title: 'Apúntate en un toque', sub: 'El terreno, la hora, quién juega ya', alt: 'Una partida: el terreno, la hora, el formato y quién juega ya' },
+			{ id: 'poser', title: 'Publica la tuya en segundos', sub: 'Los jugadores de la zona la ven en el mapa', alt: 'Publicar una partida: el terreno, la hora, el formato y el número de jugadores' },
+			{ id: 'concours', title: 'Los torneos de los clubes', sub: 'Con su cartel y el teléfono del organizador', alt: 'Un torneo de club, con su cartel y el teléfono del organizador' },
+			{ id: 'agenda', title: 'Tu agenda', sub: 'Tus partidas y tus torneos, juntos', alt: 'La agenda: las partidas que organizas, a las que te apuntas y los torneos que sigues' },
+		],
+		pause: 'Pausar la animación',
+		points: [
+			{ icon: 'eye', title: 'Gratis, sin cuenta para mirar', body: 'El mapa es libre. Para publicar una partida o apuntarte, inicia sesión con Google en Android o con Apple en iPhone.' },
+			{ icon: 'trophy', title: 'Sigue los torneos', body: 'En Francia, los torneos de los clubes ya están en el mapa, con su cartel. Sigue uno y lo tendrás en tu agenda.' },
+			{ icon: 'check', title: 'Un recordatorio antes de cada partida', body: 'Tu agenda reúne tus partidas y tus torneos, y el móvil te avisa una hora antes de jugar.' },
+		],
+		video: null,
+		closing: '¿Jugamos?',
+		browser: { before: '¿No estás en el móvil? El mapa también se abre ', link: 'en tu navegador', after: ' (en inglés).', href: '/en/petanque-meet/' },
+		legal: [
+			{ label: 'Lo que se guarda', href: '/petanque-meet/confidentialite/' },
+			{ label: 'Condiciones', href: '/petanque-meet/cgu/' },
+		],
+		legalNote: '(en francés)',
+	},
+	de: {
+		path: '/de/petanque-meet/herunterladen/',
+		title: 'Pétanque Meet für Android und iPhone herunterladen | Ludiven Studio',
+		description:
+			'Die App Pétanque Meet bei Google Play und im App Store: Boule-Spiele in deiner Nähe und, in Frankreich, die Turniere der Vereine.',
+		h1: 'Finde ein Boule-Spiel in deiner Nähe',
+		lead: 'Spiele, die noch Spieler suchen, auf einer Karte, und in Frankreich auch die Turniere der Vereine. Spiel bei einem mit oder stell dein eigenes ein, wenn dir Mitspieler fehlen.',
+		free: 'Kostenlos für Android und iPhone',
+		screens: [
+			{ id: 'carte', title: 'Die Karte der Spiele', sub: 'Die noch Spieler suchen, in deiner Nähe', alt: 'Die Karte: Spiele, die noch Spieler suchen, und die Turniere der Vereine' },
+			{ id: 'partie', title: 'Mitspielen mit einem Tipp', sub: 'Platz, Uhrzeit und wer schon dabei ist', alt: 'Ein Spiel: Platz, Uhrzeit, Format und wer schon dabei ist' },
+			{ id: 'poser', title: 'Stell deins in Sekunden ein', sub: 'Spieler in der Nähe sehen es auf der Karte', alt: 'Ein Spiel einstellen: Platz, Uhrzeit, Format und Anzahl der Spieler' },
+			{ id: 'concours', title: 'Die Turniere der Vereine', sub: 'Mit Plakat und der Nummer des Veranstalters', alt: 'Ein Vereinsturnier mit Plakat und der Nummer des Veranstalters' },
+			{ id: 'agenda', title: 'Deine Termine', sub: 'Deine Spiele und Turniere an einem Ort', alt: 'Die Termine: Spiele, die du organisierst oder bei denen du mitspielst, und Turniere, denen du folgst' },
+		],
+		pause: 'Animation anhalten',
+		points: [
+			{ icon: 'eye', title: 'Kostenlos, ohne Konto zum Schauen', body: 'Die Karte ist frei. Um ein Spiel einzustellen oder mitzuspielen, meldest du dich mit Google auf Android oder mit Apple auf dem iPhone an.' },
+			{ icon: 'trophy', title: 'Turnieren folgen', body: 'In Frankreich stehen die Vereinsturniere schon auf der Karte, mit ihrem Plakat. Folge einem, und es steht in deinen Terminen.' },
+			{ icon: 'check', title: 'Eine Erinnerung vor jedem Spiel', body: 'Deine Termine zeigen deine Spiele und Turniere, und dein Handy erinnert dich eine Stunde vor dem Spiel.' },
+		],
+		video: null,
+		closing: 'Bereit zum Spielen?',
+		browser: { before: 'Nicht am Handy? Die Karte gibt es auch ', link: 'im Browser', after: ' (auf Englisch).', href: '/en/petanque-meet/' },
+		legal: [
+			{ label: 'Was gespeichert wird', href: '/petanque-meet/confidentialite/' },
+			{ label: 'Nutzungsbedingungen', href: '/petanque-meet/cgu/' },
+		],
+		legalNote: '(auf Französisch)',
+	},
+	it: {
+		path: '/it/petanque-meet/scarica/',
+		title: 'Scarica Pétanque Meet per Android e iPhone | Ludiven Studio',
+		description:
+			"L'app Pétanque Meet su Google Play e sull'App Store: le partite di pétanque vicino a te e, in Francia, i tornei dei club.",
+		h1: 'Trova una partita di pétanque vicino a te',
+		lead: 'Le partite che cercano giocatori, su una mappa, e in Francia anche i tornei dei club. Partecipa a una, o pubblica la tua quando ti mancano giocatori.',
+		free: 'Gratis su Android e iPhone',
+		screens: [
+			{ id: 'carte', title: 'La mappa delle partite', sub: 'Quelle che cercano giocatori, vicino a te', alt: 'La mappa: le partite che cercano giocatori e i tornei dei club' },
+			{ id: 'partie', title: 'Partecipa con un tocco', sub: "Il campo, l'ora, chi gioca già", alt: "Una partita: il campo, l'ora, il formato e chi gioca già" },
+			{ id: 'poser', title: 'Pubblica la tua in pochi secondi', sub: 'I giocatori della zona la vedono sulla mappa', alt: "Pubblicare una partita: il campo, l'ora, il formato e il numero di giocatori" },
+			{ id: 'concours', title: 'I tornei dei club', sub: "Con la locandina e il numero dell'organizzatore", alt: "Un torneo di club, con la locandina e il numero dell'organizzatore" },
+			{ id: 'agenda', title: 'La tua agenda', sub: 'Le tue partite e i tuoi tornei, insieme', alt: "L'agenda: le partite che organizzi, quelle a cui partecipi e i tornei che segui" },
+		],
+		pause: "Metti in pausa l'animazione",
+		points: [
+			{ icon: 'eye', title: 'Gratis, senza account per guardare', body: 'La mappa è libera. Per pubblicare una partita o partecipare, accedi con Google su Android o con Apple su iPhone.' },
+			{ icon: 'trophy', title: 'Segui i tornei', body: 'In Francia i tornei dei club sono già sulla mappa, con la loro locandina. Seguine uno e lo ritrovi nella tua agenda.' },
+			{ icon: 'check', title: 'Un promemoria prima di ogni partita', body: "La tua agenda riunisce le tue partite e i tuoi tornei, e il telefono ti avvisa un'ora prima di giocare." },
+		],
+		video: null,
+		closing: 'Giochiamo?',
+		browser: { before: 'Non sei sul telefono? La mappa si apre anche ', link: 'nel browser', after: ' (in inglese).', href: '/en/petanque-meet/' },
+		legal: [
+			{ label: 'Cosa viene salvato', href: '/petanque-meet/confidentialite/' },
+			{ label: 'Condizioni', href: '/petanque-meet/cgu/' },
+		],
+		legalNote: '(in francese)',
 	},
 } as const;

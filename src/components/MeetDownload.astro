@@ -1,27 +1,31 @@
 ---
-// The Pétanque Meet download page, French and English: the store badges first, then the app at work.
+// The Pétanque Meet download page, in the app's five languages: the store badges first, then the app at work.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from './Icon.astro';
 import LangSwitch from './LangSwitch.astro';
 import StoreBadges from './StoreBadges.astro';
 import { MEET_DOWNLOAD, MEET_STORES } from '../data/petanqueMeet';
 
+type Lang = keyof typeof MEET_DOWNLOAD;
+
 interface Props {
-	lang: 'fr' | 'en';
+	lang: Lang;
 }
 
 const { lang } = Astro.props;
 const t = MEET_DOWNLOAD[lang];
-const other = MEET_DOWNLOAD[lang === 'fr' ? 'en' : 'fr'].path;
+const langs = Object.keys(MEET_DOWNLOAD) as Lang[];
+const paths = Object.fromEntries(langs.map((l) => [l, MEET_DOWNLOAD[l].path])) as Record<Lang, string>;
+const others = langs.filter((l) => l !== lang).map((l) => ({ lang: l, href: paths[l] }));
 const stores = MEET_STORES[lang];
 const dir = '/assets/petanque-meet/download';
 const first = t.screens[0];
 ---
 
-<BaseLayout title={t.title} description={t.description} image={`${dir}/og-${lang}.jpg`} lang={lang} altLang={other}>
+<BaseLayout title={t.title} description={t.description} image={`${dir}/og-${lang}.jpg`} lang={lang} alternates={paths}>
 	<main class="wrapper">
 		<div class="meet-dl stack gap-12">
-			<LangSwitch lang={lang} href={other} />
+			<LangSwitch lang={lang} links={others} />
 
 			<section class="hero">
 				<div class="hero-copy">
