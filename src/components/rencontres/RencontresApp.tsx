@@ -223,6 +223,16 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 		})();
 	}, [load, loadMine, openEvent, openTournament, failed]);
 
+	/* Nothing around Saint-Jean-de-Bournay in the period reads as an empty map: open on what
+	   there is instead. Once, on arrival, and never over a shared ?e= or ?t= link. */
+	const framed = useRef(false);
+	useEffect(() => {
+		if (loading || framed.current) return;
+		framed.current = true;
+		const q = new URLSearchParams(window.location.search);
+		if (!q.has('e') && !q.has('t')) mapRef.current?.frameIfEmpty();
+	}, [loading]);
+
 	/** After any write: the list and the open card must agree, or the seat counter
 	 *  on the map contradicts the one in the panel. */
 	const refresh = useCallback(async (eventId: string) => {

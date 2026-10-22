@@ -15,7 +15,8 @@ export const HOME: [number, number] = [45.4489, 5.1381];
 
 export interface MapHandle {
 	flyTo(lat: number, lng: number, zoom?: number): void;
-	fitAll(): void;
+	/** Nothing to see in the view: widen it to the nearest games or tournaments. */
+	frameIfEmpty(): void;
 	/** What "ajouter ce lieu" means: wherever the player has just panned to. */
 	center(): { lat: number; lng: number } | null;
 }
@@ -198,16 +199,24 @@ export default function MeetupMap({
 
 	useImperativeHandle(handle, () => ({
 		flyTo: (lat, lng, zoom = 14) => mapRef.current?.flyTo([lat, lng], zoom, { duration: 0.8 }),
-		fitAll: () => {
-			const pts = events.map((e) => [e.lat, e.lng] as [number, number]);
-			if (pts.length) mapRef.current?.fitBounds(L.latLngBounds(pts).pad(0.2), { maxZoom: 14 });
-			else mapRef.current?.setView(HOME, 11);
+		frameIfEmpty: () => {
+			const map = mapRef.current;
+			const pts = [...events, ...tournaments].map((p) => L.latLng(p.lat, p.lng));
+			if (!map || !pts.length) return;
+			if (pts.some((p) => map.getBounds().contains(p))) return;
+			// Where the map stood and the three nearest: fitting them all let one pin by Geneva
+			// zoom out to half of France. The cards stand on their pin, so room above for the tallest.
+			const centre = map.getCenter();
+			const nearest = pts.sort((a, b) => centre.distanceTo(a) - centre.distanceTo(b)).slice(0, 3);
+			map.fitBounds(L.latLngBounds([centre, ...nearest]), {
+				maxZoom: map.getZoom(), paddingTopLeft: [32, T_H + 16], paddingBottomRight: [32, 32], animate: false,
+			});
 		},
 		center: () => {
 			const c = mapRef.current?.getCenter();
 			return c ? { lat: c.lat, lng: c.lng } : null;
 		},
-	}), [events]);
+	}), [events, tournaments]);
 
 	useEffect(() => {
 		const layer = placeLayer.current;

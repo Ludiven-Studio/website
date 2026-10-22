@@ -304,3 +304,16 @@
   aucune erreur).
 - Commité à la demande de l'utilisateur (« commit et push ») : mes 6 fichiers et cette section seulement (journal mixte).
   Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Pétanque Meet : la carte se cadre sur ce qui existe à l'ouverture
+- Statut : en cours (2026-10-22, Europe/Paris). Demande de l'utilisateur : à l'ouverture, si aucune partie ni aucun concours
+  n'est visible autour de Saint-Jean-de-Bournay, cadrer la carte sur ce que montrent les filtres.
+- Réservations actives : `src/components/rencontres/MeetupMap.tsx`, `src/components/rencontres/RencontresApp.tsx`.
+- Ressources : serveur de dev sur le port 4463 ; eslint sur les deux fichiers.
+- Fait : `frameIfEmpty` (remplace `fitAll`, jamais appelé) : une fois les données chargées, si rien n'est visible, la vue
+  s'élargit au point de départ + les 3 plus proches (tout cadrer faisait dézoomer jusqu'à Genève). Rien sur un lien `?e=`/`?t=`.
+  Mesuré sur les vraies données : 0 → 4 cartes visibles à l'ouverture (bureau et téléphone, FR et EN) ; données simulées :
+  partie visible = zoom 11 inchangé, Lyon seul = 9, Marseille seul = 7, rien = inchangé. eslint OK, `astro check` 0 erreur.
+  Statut : terminé, non commité. Réservations libérées.
+- Commité à la demande de l'utilisateur (« ok » pour commit et push) : mes 2 fichiers et cette section seulement (journal
+  mixte). Statut : terminé. Réservations libérées.
