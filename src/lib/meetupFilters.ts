@@ -40,15 +40,28 @@ export const DATE_LABEL: Record<DateFilter, string> = {
 	custom: 'Dates…',
 };
 
+export const DATE_LABEL_EN: Record<DateFilter, string> = {
+	today: 'Today',
+	weekend: 'This weekend',
+	week: '7 days',
+	fortnight: '14 days',
+	all: 'All',
+	custom: 'Dates…',
+};
+
 /** The day counter of a YYYY-MM-DD, the same one challengeDayOrdinal gives an instant. */
 const ordinalOf = (isoDay: string): number => Math.floor(Date.parse(`${isoDay}T12:00:00Z`) / 86400000);
 
-const shortDay = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const dayNum = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', timeZone: 'UTC' });
+const dayFormats = (locale: string) => ({
+	shortDay: new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }),
+	dayNum: new Intl.DateTimeFormat(locale, { day: 'numeric', timeZone: 'UTC' }),
+});
+const DAY_FORMATS = { fr: dayFormats('fr-FR'), en: dayFormats('en-GB') };
 
 /** "24 oct.", "24 – 27 oct." or "30 oct. – 2 nov.": the month once when both share it. */
-export function rangeLabel({ from, to }: DayRange): string {
-	if (!from) return DATE_LABEL.custom;
+export function rangeLabel({ from, to }: DayRange, lang: 'fr' | 'en' = 'fr'): string {
+	if (!from) return (lang === 'en' ? DATE_LABEL_EN : DATE_LABEL).custom;
+	const { shortDay, dayNum } = DAY_FORMATS[lang];
 	const a = new Date(`${from}T12:00:00Z`);
 	if (!to || to <= from) return shortDay.format(a);
 	const b = new Date(`${to}T12:00:00Z`);

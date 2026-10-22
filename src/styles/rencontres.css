@@ -246,8 +246,7 @@
 }
 .re-hint--places { font-size: var(--text-sm); }
 
-/* ---- Install ---- */
-.re-install,
+/* ---- Demo ---- */
 .re-demo-btn {
 	margin-top: 0.5rem;
 	font-family: var(--font-brand);
@@ -259,7 +258,6 @@
 	padding: 0.4rem 0.9rem;
 	cursor: pointer;
 }
-.re-install:hover,
 .re-demo-btn:hover { color: var(--accent-regular); border-color: var(--accent-regular); }
 
 /* ---- The app: publishing and joining happen there ---- */
@@ -327,12 +325,6 @@
 	padding: 1.2rem;
 }
 .re-sheet h2 { margin: 0; font-size: var(--text-lg); }
-.re-steps {
-	margin: 0;
-	padding-left: 1.2rem;
-	color: var(--gray-100);
-	line-height: 1.6;
-}
 
 /* ---- Account: browsing is free, acting needs a login ---- */
 .re-account {

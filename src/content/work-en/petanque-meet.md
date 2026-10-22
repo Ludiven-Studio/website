@@ -5,7 +5,7 @@ img: /assets/petanque-meet/hero.webp
 img_alt: Pétanque Meet — find pétanque players near you
 role: Developer
 org: Ludiven Studio
-appPage: /petanque-meet/
+appPage: /en/petanque-meet/
 appPageLabel: Browse the map
 appStore: https://apps.apple.com/app/id6823583416
 playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=en
@@ -39,7 +39,7 @@ gallery:
 <p>
   This page covers the <strong>technical approach</strong> behind Pétanque Meet, a project
   <strong>still in progress</strong>: the app is out on the Play Store and the App Store, and keeps growing. To find
-  a game, the <a href="/petanque-meet/">map of games</a> (in French) is the place.
+  a game, the <a href="/en/petanque-meet/">map of games</a> is the place.
 </p>
 
 <h2>The need</h2>

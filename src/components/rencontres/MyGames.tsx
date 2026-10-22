@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { FORMAT_LABEL, type MeetupEvent } from '../../lib/meetupRules';
+import type { MeetupEvent } from '../../lib/meetupRules';
 import { formatShortDay, formatTime } from './format';
+import { labels, pick, useLang } from './i18n';
 
 interface Props {
 	events: MeetupEvent[];
@@ -25,60 +26,65 @@ const startOf = (e: MeetupEvent): number => Date.parse(e.starts_at);
 const isLive = (e: MeetupEvent, now: number): boolean => e.status === 'open' && Date.parse(e.ends_at) >= now;
 
 export default function MyGames({ events, active, max, busy, onOpen, onEdit, onRemove, onForget, canForget }: Props) {
+	const lang = useLang();
+	const tr = pick(lang);
+	const L = labels(lang);
 	const [showPast, setShowPast] = useState(false);
 	const now = Date.now();
 	const live = events.filter((e) => isLive(e, now)).sort((a, b) => startOf(a) - startOf(b));
 	const past = events.filter((e) => !isLive(e, now)).sort((a, b) => startOf(b) - startOf(a));
 	const rows = showPast ? [...live, ...past] : live;
+	const signedUp = (n: number): string => tr(`${n} inscrit${n > 1 ? 's' : ''}`, `${n} signed up`);
 
 	return (
-		<section className="re-mine" aria-label="Mes parties">
+		<section className="re-mine" aria-label={tr('Mes parties', 'My games')}>
 			<h2>
-				Mes parties
-				<span className="re-mine-cap">{active} / {max} en ligne</span>
+				{tr('Mes parties', 'My games')}
+				<span className="re-mine-cap">{active} / {max} {tr('en ligne', 'online')}</span>
 			</h2>
 
 			{live.length === 0 && (
-				<p className="re-hint">Aucune partie en ligne. Tu peux en poser {max}.</p>
+				<p className="re-hint">{tr(`Aucune partie en ligne. Tu peux en poser ${max}.`, `No game online. You can post ${max}.`)}</p>
 			)}
 
 			<ul>
 				{rows.map((e) => {
 					const joined = e.seats_taken - e.organizer_seats;
 					const running = isLive(e, now);
-					const state = e.status === 'cancelled' ? 'Annulée' : running ? 'En ligne' : 'Terminée';
+					const state = e.status === 'cancelled' ? tr('Annulée', 'Cancelled')
+						: running ? tr('En ligne', 'Online') : tr('Terminée', 'Over');
 					return (
 						<li key={e.id} className={`re-mine-row ${running ? '' : 're-mine-row--off'}`}>
 							<button type="button" className="re-mine-open" onClick={() => onOpen(e.id)}>
-								<span className="re-mine-when">{formatShortDay(e.starts_at)} · {formatTime(e.starts_at)}</span>
-								<span className="re-mine-what">{FORMAT_LABEL[e.format]} · {e.label || 'Terrain'}</span>
+								<span className="re-mine-when">{formatShortDay(e.starts_at, lang)} · {formatTime(e.starts_at, lang)}</span>
+								<span className="re-mine-what">{L.format[e.format]} · {e.label || tr('Terrain', 'Pitch')}</span>
 								<span className="re-mine-state">
-									{state}{joined > 0 ? ` · ${joined} inscrit${joined > 1 ? 's' : ''}` : ''}
+									{state}{joined > 0 ? ` · ${signedUp(joined)}` : ''}
 								</span>
 							</button>
 							<div className="re-mine-acts">
 								{running && (
 									<button type="button" className="re-btn re-btn--ghost" disabled={busy} onClick={() => onEdit(e.id)}>
-										Modifier
+										{tr('Modifier', 'Edit')}
 									</button>
 								)}
 								{joined === 0 ? (
 									<button type="button" className="re-btn re-btn--danger" disabled={busy} onClick={() => onRemove(e)}>
-										Supprimer
+										{tr('Supprimer', 'Delete')}
 									</button>
 								) : running ? (
 									<button
 										type="button"
 										className="re-btn re-btn--danger"
 										disabled={busy}
-										title="Le lien reste en ligne pour prévenir les inscrits"
+										title={tr('Le lien reste en ligne pour prévenir les inscrits', 'The link stays online to tell the players')}
 										onClick={() => onRemove(e)}
 									>
-										Annuler — {joined} inscrit{joined > 1 ? 's' : ''}
+										{tr('Annuler', 'Cancel')} — {signedUp(joined)}
 									</button>
 								) : canForget(e.id) && (
 									<button type="button" className="re-btn re-btn--ghost" onClick={() => onForget(e.id)}>
-										Retirer de ma liste
+										{tr('Retirer de ma liste', 'Remove from my list')}
 									</button>
 								)}
 							</div>
@@ -89,7 +95,7 @@ export default function MyGames({ events, active, max, busy, onOpen, onEdit, onR
 
 			{past.length > 0 && (
 				<button type="button" className="re-link" onClick={() => setShowPast((v) => !v)}>
-					{showPast ? 'Masquer' : `Voir les parties passées (${past.length})`}
+					{showPast ? tr('Masquer', 'Hide') : tr(`Voir les parties passées (${past.length})`, `Show past games (${past.length})`)}
 				</button>
 			)}
 		</section>

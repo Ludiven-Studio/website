@@ -177,12 +177,9 @@ try {
 	check(await A.locator('.re-places .re-check').count() === 0, 'sans lieu, le filtre disparait au lieu de vider la carte');
 	check(await A.locator('.re-hint--places').count() === 1, "l'invitation a enregistrer un lieu revient");
 
-	// ---- 2quater. "Plutôt une appli à télécharger" — it already is one ----
-	await A.locator('.re-install').click();
-	await A.waitForSelector('.re-sheet', { timeout: 5000 });
-	check((await A.locator('.re-sheet').innerText()).length > 40, "la fiche d'installation dit quoi faire");
-	await A.locator('.re-sheet .re-btn--ghost', { hasText: 'Fermer' }).click();
-	check(await A.locator('.re-sheet').count() === 0, 'elle se referme');
+	// ---- 2quater. The store apps, not an installable map ----
+	check(await A.locator('.re-install').count() === 0, 'plus de bouton pour installer la carte');
+	check(await A.locator('.re-appcard .store-badges a').count() === 2, "le bandeau de l'appli porte les deux badges");
 
 	// ---- 2quinquies. Signed out: browsing is open, acting asks for a login ----
 	const S = await newPage(PLAYER_B);
@@ -198,6 +195,17 @@ try {
 	await S.locator('.re-login .re-btn--ghost', { hasText: 'Fermer' }).click();
 	check(await S.locator('.re-login').count() === 0, 'la fiche de connexion se referme');
 	await S.context().close();
+
+	// ---- 2sexies. /en/petanque-meet: the same island, in English ----
+	const E = await newPage(PLAYER_B);
+	await E.goto(`${BASE}/en/petanque-meet/`, { waitUntil: 'networkidle' });
+	await E.waitForSelector('.re-map', { timeout: 15000 });
+	check((await E.locator('.re-head h1').innerText()) === 'Pétanque meetups', 'en: le titre est en anglais');
+	await E.locator('.re-bar .re-btn', { hasText: 'Post a game' }).click();
+	await E.waitForSelector('.re-login', { timeout: 5000 }).catch(() => {});
+	check((await E.locator('.re-login').innerText().catch(() => '')).includes('It happens in the app'), "en: la fiche renvoie vers l'appli, en anglais");
+	check(await E.locator('.re-login img[src*="-en."]').count() === 2, 'en: les badges des stores sont les anglais');
+	await E.context().close();
 
 	// ---- 3. Zero anon grant: the tables have no reader but the function ----
 	const direct = await fetch(`${SUPABASE_URL}/rest/v1/meetup_events?select=id&limit=1`, {

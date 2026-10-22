@@ -38,6 +38,21 @@ export const ROLE_LABEL: Record<Role, string> = {
 	pointeur: 'Pointeur',
 };
 
+/** /en/petanque-meet. The English names of the formats, as English clubs say them. */
+export const FORMAT_LABEL_EN: Record<Format, string> = {
+	'tete-a-tete': 'Singles',
+	doublette: 'Doubles',
+	triplette: 'Triples',
+	melee: 'Mêlée (random teams)',
+	'mini-tournoi': 'Mini tournament',
+};
+
+export const ROLE_LABEL_EN: Record<Role, string> = {
+	any: 'Any',
+	tireur: 'Shooter',
+	pointeur: 'Pointer',
+};
+
 /** One row of the map, spot already joined and seats already counted — the shape
  *  the `meetups` function returns, never the raw table. `secret` is not here and
  *  must never be. */
@@ -91,6 +106,13 @@ export const REPORT_LABEL: Record<ReportReason, string> = {
 	fake: 'Fausse partie',
 	no_show: "Personne n'est venu",
 	other: 'Autre',
+};
+
+export const REPORT_LABEL_EN: Record<ReportReason, string> = {
+	name: 'Offensive first name',
+	fake: 'Fake game',
+	no_show: 'Nobody came',
+	other: 'Other',
 };
 
 export const seatsLeft = (e: MeetupEvent): number => Math.max(0, e.players_needed - e.seats_taken);

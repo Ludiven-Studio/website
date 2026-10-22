@@ -73,6 +73,12 @@ describe('formatDistance', () => {
 		expect(formatDistance(2400)).toBe('2,4 km');
 		expect(formatDistance(17_300)).toBe('17 km');
 	});
+
+	it('takes a decimal point in English', () => {
+		expect(formatDistance(452, 'en')).toBe('450 m');
+		expect(formatDistance(2400, 'en')).toBe('2.4 km');
+		expect(formatDistance(17_300, 'en')).toBe('17 km');
+	});
 });
 
 describe('isPlausibleFr', () => {

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import {
-	FORMAT_LABEL, REPORT_LABEL, REPORT_REASONS, ROLE_LABEL, ROLES, seatsLeft,
+	REPORT_REASONS, ROLES, seatsLeft,
 	type MeetupEvent, type MeetupSignup, type ReportReason, type Role,
 } from '../../lib/meetupRules';
 import { buildIcs, downloadIcs } from '../../lib/meetupIcs';
 import { trackEvent } from '../../lib/analytics';
 import { formatDay, formatSlot } from './format';
+import { labels, PATHS, pick, useLang } from './i18n';
 
 interface Props {
 	event: MeetupEvent;
@@ -40,6 +41,9 @@ export default function EventPanel({
 	event, signups, isOrganizer, name, busy, error, flash, placeSaved, shareUrl,
 	onJoin, onLeave, onEdit, onCancel, onClose, onSavePlace, onReport, onReportSignup, canMute, onMute, signedIn, onLogin,
 }: Props) {
+	const lang = useLang();
+	const tr = pick(lang);
+	const L = labels(lang);
 	const mine = signups.find((s) => s.is_me);
 	const [seats, setSeats] = useState(mine?.seats ?? 1);
 	const [role, setRole] = useState<Role>(mine?.role ?? 'any');
@@ -55,11 +59,13 @@ export default function EventPanel({
 	const left = seatsLeft(event);
 	const past = Date.parse(event.ends_at) < Date.now();
 	const cancelled = event.status === 'cancelled';
-	const place = event.label || 'Terrain sur la carte';
+	const place = event.label || tr('Terrain sur la carte', 'Pitch on the map');
 	const started = Date.parse(event.starts_at) <= Date.now();
 	// The server refuses 'no_show' otherwise: don't offer what it will turn down.
 	const reasons = REPORT_REASONS.filter((r) => r !== 'no_show' || (Boolean(mine) && started));
 	const canFlagAbsent = isOrganizer && started && !cancelled;
+	const failed = tr('Une erreur est survenue.', 'Something went wrong.');
+	const day = formatDay(event.starts_at, lang);
 
 	const sendReport = async (): Promise<void> => {
 		if (!reason) return;
@@ -70,7 +76,7 @@ export default function EventPanel({
 			setReported(true);
 			setReporting(false);
 		} catch (e) {
-			setReportError(e instanceof Error ? e.message : 'Une erreur est survenue.');
+			setReportError(e instanceof Error ? e.message : failed);
 		} finally {
 			setSending(false);
 		}
@@ -83,7 +89,7 @@ export default function EventPanel({
 			await onReportSignup(signupId);
 			setAbsent((s) => new Set(s).add(signupId));
 		} catch (e) {
-			setReportError(e instanceof Error ? e.message : 'Une erreur est survenue.');
+			setReportError(e instanceof Error ? e.message : failed);
 		} finally {
 			setSending(false);
 		}
@@ -91,9 +97,12 @@ export default function EventPanel({
 
 	const share = async (): Promise<void> => {
 		trackEvent('meetup_share');
-		const text = `Pétanque ${FORMAT_LABEL[event.format]} — ${formatDay(event.starts_at)} à ${place}`;
+		const text = `Pétanque ${L.format[event.format]} — ${day} ${tr('à', 'at')} ${place}`;
 		try {
-			if (navigator.share) { await navigator.share({ title: 'Partie de pétanque', text, url: shareUrl }); return; }
+			if (navigator.share) {
+				await navigator.share({ title: tr('Partie de pétanque', 'Pétanque game'), text, url: shareUrl });
+				return;
+			}
 			await navigator.clipboard.writeText(shareUrl);
 			setCopied(true);
 			setTimeout(() => setCopied(false), 2000);
@@ -102,43 +111,60 @@ export default function EventPanel({
 
 	const ics = (): void => {
 		trackEvent('meetup_ics');
+		const format = L.format[event.format];
 		downloadIcs('petanque.ics', buildIcs({
 			uid: `${event.id}@ludiven-studio.fr`,
 			startsAt: event.starts_at,
 			endsAt: event.ends_at,
-			summary: `Pétanque — ${FORMAT_LABEL[event.format]}`,
+			summary: `Pétanque — ${format}`,
 			location: [place, event.commune].filter(Boolean).join(', '),
-			description: `${FORMAT_LABEL[event.format]}, ${event.players_needed} joueurs. Organisé par ${event.organizer_name}.\n${shareUrl}`,
+			description: tr(
+				`${format}, ${event.players_needed} joueurs. Organisé par ${event.organizer_name}.\n${shareUrl}`,
+				`${format}, ${event.players_needed} players. Organized by ${event.organizer_name}.\n${shareUrl}`,
+			),
 			url: shareUrl,
 		}));
 	};
 
 	return (
 		<section className="re-panel">
-			<button type="button" className="re-close" onClick={onClose} aria-label="Fermer">×</button>
+			<button type="button" className="re-close" onClick={onClose} aria-label={tr('Fermer', 'Close')}>×</button>
 
-			{cancelled && <p className="re-banner re-banner--off">Cette partie a été annulée.</p>}
-			{!cancelled && past && <p className="re-banner">Cette partie est passée.</p>}
-			{!cancelled && event.hidden && <p className="re-banner">Cette partie est en cours de vérification.</p>}
+			{cancelled && <p className="re-banner re-banner--off">{tr('Cette partie a été annulée.', 'This game has been cancelled.')}</p>}
+			{!cancelled && past && <p className="re-banner">{tr('Cette partie est passée.', 'This game is over.')}</p>}
+			{!cancelled && event.hidden && (
+				<p className="re-banner">{tr('Cette partie est en cours de vérification.', 'This game is being checked.')}</p>
+			)}
 
-			<h2>{FORMAT_LABEL[event.format]}</h2>
-			<p className="re-when">{formatDay(event.starts_at)} · {formatSlot(event.starts_at, event.ends_at)}</p>
+			<h2>{L.format[event.format]}</h2>
+			<p className="re-when">{day} · {formatSlot(event.starts_at, event.ends_at, lang)}</p>
 			<p className="re-where">📍 {place}{event.commune && place !== event.commune ? ` · ${event.commune}` : ''}</p>
-			{!event.confirmed && <p className="re-hint">Terrain signalé par un joueur, pas encore confirmé.</p>}
+			{!event.confirmed && (
+				<p className="re-hint">{tr('Terrain signalé par un joueur, pas encore confirmé.', 'Pitch added by a player, not confirmed yet.')}</p>
+			)}
 
 			<p className="re-seats">
-				<strong>{event.seats_taken} / {event.players_needed}</strong> joueurs
-				{left > 0 ? <> · il manque <strong>{left}</strong></> : <> · complet</>}
+				<strong>{event.seats_taken} / {event.players_needed}</strong> {tr('joueurs', 'players')}
+				{left > 0
+					? tr(<> · il manque <strong>{left}</strong></>, <> · <strong>{left}</strong> spot{left > 1 ? 's' : ''} left</>)
+					: tr(' · complet', ' · full')}
 			</p>
-			{event.role_needed !== 'any' && <p className="re-hint">Recherche surtout un {ROLE_LABEL[event.role_needed].toLowerCase()}.</p>}
+			{event.role_needed !== 'any' && (
+				<p className="re-hint">
+					{tr('Recherche surtout un', 'Mostly looking for a')} {L.role[event.role_needed].toLowerCase()}.
+				</p>
+			)}
 
 			<ul className="re-who">
-				<li><strong>{event.organizer_name}</strong> (organisateur){event.organizer_seats > 1 ? ` ×${event.organizer_seats}` : ''}</li>
+				<li>
+					<strong>{event.organizer_name}</strong> ({tr('organisateur', 'organizer')})
+					{event.organizer_seats > 1 ? ` ×${event.organizer_seats}` : ''}
+				</li>
 				{signups.map((s) => (
 					<li key={s.id}>
 						{s.player_name}{s.seats > 1 ? ` ×${s.seats}` : ''}
 						{canFlagAbsent && !s.is_me && (absent.has(s.id) ? (
-							<span className="re-absent re-absent--done"> · absent signalé</span>
+							<span className="re-absent re-absent--done"> · {tr('absent signalé', 'reported absent')}</span>
 						) : (
 							<>
 								{' · '}
@@ -148,7 +174,7 @@ export default function EventPanel({
 									disabled={sending}
 									onClick={() => { void flagAbsent(s.id); }}
 								>
-									N'est pas venu
+									{tr("N'est pas venu", 'Did not come')}
 								</button>
 							</>
 						))}
@@ -165,21 +191,26 @@ export default function EventPanel({
 				   action here is to change the game, not to enter it. */
 				isOrganizer ? (
 					<div className="re-actions">
-						<p className="re-ok">Tu organises cette partie.</p>
+						<p className="re-ok">{tr('Tu organises cette partie.', 'You are organizing this game.')}</p>
 						<button type="button" className="re-btn" disabled={busy} onClick={onEdit}>
-							Modifier la partie
+							{tr('Modifier la partie', 'Edit the game')}
 						</button>
 						{mine && (
 							<button type="button" className="re-btn re-btn--ghost" disabled={busy} onClick={onLeave}>
-								Me désinscrire
+								{tr('Me désinscrire', 'Leave the game')}
 							</button>
 						)}
 					</div>
 				) : mine ? (
 					<div className="re-actions">
-						<p className="re-ok">Tu es inscrit{mine.seats > 1 ? ` à ${mine.seats}` : ''}.</p>
+						<p className="re-ok">
+							{tr(
+								`Tu es inscrit${mine.seats > 1 ? ` à ${mine.seats}` : ''}.`,
+								`You are signed up${mine.seats > 1 ? ` for ${mine.seats} seats` : ''}.`,
+							)}
+						</p>
 						<button type="button" className="re-btn re-btn--ghost" disabled={busy} onClick={onLeave}>
-							Me désinscrire
+							{tr('Me désinscrire', 'Leave the game')}
 						</button>
 					</div>
 				) : (
@@ -188,23 +219,23 @@ export default function EventPanel({
 						onSubmit={(e) => { e.preventDefault(); onJoin(seats, role, who); }}
 					>
 						<label>
-							<span>Prénom</span>
+							<span>{tr('Prénom', 'First name')}</span>
 							<input value={who} onChange={(e) => setWho(e.target.value)} maxLength={24} placeholder="Léa" required />
 						</label>
 						<label>
-							<span>Places</span>
+							<span>{tr('Places', 'Seats')}</span>
 							<select value={seats} onChange={(e) => setSeats(Number(e.target.value))}>
 								{[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
 							</select>
 						</label>
 						<label>
-							<span>Je joue</span>
+							<span>{tr('Je joue', 'I play')}</span>
 							<select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-								{ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+								{ROLES.map((r) => <option key={r} value={r}>{L.role[r]}</option>)}
 							</select>
 						</label>
 						<button type="submit" className="re-btn" disabled={busy || left <= 0}>
-							{left > 0 ? 'Je viens' : 'Complet'}
+							{left > 0 ? tr('Je viens', "I'm in") : tr('Complet', 'Full')}
 						</button>
 					</form>
 				)
@@ -212,15 +243,17 @@ export default function EventPanel({
 
 			<div className="re-tools">
 				<button type="button" className="re-btn re-btn--ghost" disabled={placeSaved} onClick={onSavePlace}>
-					{placeSaved ? '🏠 Lieu enregistré' : '🏠 Enregistrer ce lieu'}
+					{placeSaved ? tr('🏠 Lieu enregistré', '🏠 Place saved') : tr('🏠 Enregistrer ce lieu', '🏠 Save this place')}
 				</button>
-				<button type="button" className="re-btn re-btn--ghost" onClick={ics}>📅 Ajouter à mon agenda</button>
+				<button type="button" className="re-btn re-btn--ghost" onClick={ics}>
+					{tr('📅 Ajouter à mon agenda', '📅 Add to my calendar')}
+				</button>
 				<button type="button" className="re-btn re-btn--ghost" onClick={share}>
-					{copied ? '✔ Lien copié' : '🔗 Partager'}
+					{copied ? tr('✔ Lien copié', '✔ Link copied') : tr('🔗 Partager', '🔗 Share')}
 				</button>
 				{isOrganizer && !cancelled && (
 					<button type="button" className="re-btn re-btn--danger" disabled={busy} onClick={onCancel}>
-						Annuler la partie
+						{tr('Annuler la partie', 'Cancel the game')}
 					</button>
 				)}
 			</div>
@@ -229,22 +262,22 @@ export default function EventPanel({
 				<div className="re-report">
 					{reportError && <p className="re-error" role="alert">{reportError}</p>}
 					{!isOrganizer && (reported ? (
-						<p className="re-hint" role="status">Merci, on va regarder.</p>
+						<p className="re-hint" role="status">{tr('Merci, on va regarder.', 'Thanks, we will look into it.')}</p>
 					) : reporting ? (
 						<form className="re-reportform" onSubmit={(e) => { e.preventDefault(); void sendReport(); }}>
 							<fieldset>
-								<legend>Pourquoi signaler cette partie&nbsp;?</legend>
+								<legend>{tr('Pourquoi signaler cette partie\u00a0?', 'Why report this game?')}</legend>
 								{reasons.map((r) => (
 									<label key={r}>
 										<input type="radio" name="reason" checked={reason === r} onChange={() => setReason(r)} />
-										{REPORT_LABEL[r]}
+										{L.report[r]}
 									</label>
 								))}
 							</fieldset>
 							<div className="re-actions">
-								<button type="submit" className="re-btn" disabled={!reason || sending}>Envoyer</button>
+								<button type="submit" className="re-btn" disabled={!reason || sending}>{tr('Envoyer', 'Send')}</button>
 								<button type="button" className="re-btn re-btn--ghost" onClick={() => { setReporting(false); setReportError(null); }}>
-									Annuler
+									{tr('Annuler', 'Cancel')}
 								</button>
 							</div>
 						</form>
@@ -255,11 +288,11 @@ export default function EventPanel({
 								className="re-link"
 								onClick={() => { if (signedIn) setReporting(true); else onLogin(); }}
 							>
-								Signaler
+								{tr('Signaler', 'Report')}
 							</button>
 							{canMute && (
 								<button type="button" className="re-link" onClick={onMute}>
-									Masquer les parties de cet organisateur
+									{tr('Masquer les parties de cet organisateur', "Hide this organizer's games")}
 								</button>
 							)}
 						</div>
@@ -270,10 +303,13 @@ export default function EventPanel({
 			{/* The only place the app appears (spec §10). The map is a service, not an ad. */}
 			<a
 				className="re-scanner"
-				href="/petanque-scanner/"
+				href={PATHS[lang].scanner}
 				onClick={() => trackEvent('meetup_scanner_click')}
 			>
-				Vous jouez le {formatDay(event.starts_at).toLowerCase()}&nbsp;? <strong>Pétanque Scanner</strong> compte les points au téléphone.
+				{tr(
+					<>Vous jouez le {day.toLowerCase()}&nbsp;? <strong>Pétanque Scanner</strong> compte les points au téléphone.</>,
+					<>Playing on {day}? <strong>Pétanque Scanner</strong> counts the points with your phone.</>,
+				)}
 			</a>
 		</section>
 	);

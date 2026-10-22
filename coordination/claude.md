@@ -263,3 +263,24 @@
   écrasement forcé est bien détecté).
 - Commité à la demande de l'utilisateur (« commit et push ») : mes 12 fichiers et cette section seulement (journal
   mixte). Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Pétanque Meet : la carte en anglais, et plus d'installation de la carte sur le téléphone
+- Statut : en cours (2026-10-22, Europe/Paris). Demande de l'utilisateur : une version EN de `/petanque-meet/` comme
+  pour la fiche projet ; ne plus proposer « Mettre la carte sur mon téléphone », promouvoir les applis.
+- Réservations actives : `src/components/rencontres/` (hors modération), `src/lib/meetupRules.ts`, `src/lib/meetupFilters.ts`,
+  `src/lib/meetupGeo.ts`, `src/lib/meetups.ts` (`approvalLine`), `src/data/petanqueMeet.ts`, `src/styles/rencontres.css`,
+  `src/pages/petanque-meet.astro`, `src/pages/en/petanque-meet.astro` (nouveau), `src/pages/petanque-meet/telecharger.astro`,
+  `src/pages/en/petanque-meet/download.astro` (nouveau), `src/content/work-en/petanque-meet.md`, `src/pages/en/contact.astro`
+  (un lien), `scripts/check-rencontres.mjs` (bloc installation), `src/lib/meetupGeo.test.ts`, `src/lib/meetupFilters.test.ts`.
+- Ressources : serveur de dev sur le port 4463 ; eslint, `astro check`, vitest `src/lib/meetup*`. Build annoncé ici avant.
+- 14:17 : serveur 4463 arrêté. Lancement du build complet (écrit `dist/`, `.astro/`, `public/vendor/`), puis `check-precache`
+  et `check-links`.
+- Fait : `/en/petanque-meet/` (même île, `lang="en"` : textes, dates en-GB, badges et liens stores anglais) et
+  `/en/petanque-meet/download/`, drapeaux FR/EN + hreflang sur les deux paires, fiche projet et Contact EN pointent vers la
+  carte EN. Bouton « Mettre la carte sur mon téléphone » et sa fiche retirés (le bandeau de l'appli reste). Les messages du
+  serveur et la validation du formulaire de création (inaccessible, site en consultation) restent en français. Vérifié :
+  eslint OK, `astro check` 0 erreur, vitest meetup 61/61 (cas EN ajoutés), build OK, précache 295 entrées, liens 155 pages,
+  sitemap avec les 2 pages EN ; texte de la carte FR identique avant/après (dev et build) sauf le bouton retiré ; carte EN
+  sans texte français hors contenu des joueurs et clubs.
+- Commité à la demande de l'utilisateur (« commit et push ») : mes 25 fichiers et cette section seulement (journal mixte).
+  Statut : terminé. Réservations libérées.

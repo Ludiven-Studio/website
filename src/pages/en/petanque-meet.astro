@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
+import RencontresApp from '../../components/rencontres/RencontresApp';
+// From the page, as on /petanque-meet/: Leaflet's global stylesheet stays out of the island's chunk.
+import 'leaflet/dist/leaflet.css';
+import '../../styles/rencontres.css';
+
+const title = 'Pétanque meetups — players and tournaments near you | Ludiven Studio';
+const description = 'The map of pétanque games around Saint-Jean-de-Bournay and the Isère, in France: who plays, when, how many players are missing, and the upcoming tournaments. Free to browse.';
+---
+
+<BaseLayout title={title} description={description} lang="en" altLang="/petanque-meet/">
+	<div class="wrapper">
+		<div class="lang"><LangSwitch lang="en" href="/petanque-meet/" /></div>
+		<RencontresApp client:only="react" lang="en" />
+	</div>
+</BaseLayout>
+
+<style>
+	.lang {
+		max-width: 780px;
+		margin: 0 auto 0.5rem;
+	}
+</style>

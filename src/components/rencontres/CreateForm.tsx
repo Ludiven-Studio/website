@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
-	FORMATS, FORMAT_LABEL, PLAYERS_NEEDED, ROLES, ROLE_LABEL, validateEvent,
+	FORMATS, PLAYERS_NEEDED, ROLES, validateEvent,
 	type Format, type Role,
 } from '../../lib/meetupRules';
 import { defaultStart, toLocalInput } from './format';
+import { labels, pick, useLang } from './i18n';
 
 export interface Draft {
 	startsAt: string; endsAt: string; format: Format; playersNeeded: number;
@@ -30,8 +31,12 @@ interface Props {
 const DURATIONS = [1, 2, 3, 4, 6];
 
 /** Entirely closed except the first name: every other field is a list or a date
- *  (spec §8). Nothing here needs moderating. */
+ *  (spec §8). Nothing here needs moderating. Its refusals (validateEvent) are French
+ *  only: posting happens in the app while the site is browse-only. */
 export default function CreateForm({ pin, name, busy, initial, error: refused, onPickAgain, onCancel, onSubmit }: Props) {
+	const lang = useLang();
+	const tr = pick(lang);
+	const L = labels(lang);
 	const editing = Boolean(initial);
 	const [start, setStart] = useState(() => toLocalInput(initial ? new Date(initial.startsAt) : defaultStart()));
 	const [hours, setHours] = useState(() => (initial
@@ -51,7 +56,7 @@ export default function CreateForm({ pin, name, busy, initial, error: refused, o
 	const submit = (e: React.FormEvent): void => {
 		e.preventDefault();
 		const startsAt = new Date(start);
-		if (Number.isNaN(startsAt.getTime())) { setError('Date invalide.'); return; }
+		if (Number.isNaN(startsAt.getTime())) { setError(tr('Date invalide.', 'Invalid date.')); return; }
 		const endsAt = new Date(startsAt.getTime() + hours * 3600_000);
 		const draft = {
 			startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(),
@@ -59,34 +64,37 @@ export default function CreateForm({ pin, name, busy, initial, error: refused, o
 		};
 		const problem = validateEvent(draft);
 		if (problem) { setError(problem); return; }
-		if (!editing && !pin) { setError('Pose une épingle sur la carte.'); return; }
+		if (!editing && !pin) { setError(tr('Pose une épingle sur la carte.', 'Drop a pin on the map.')); return; }
 		setError(null);
 		onSubmit(draft);
 	};
 
 	return (
 		<form className="re-form" onSubmit={submit}>
-			<h2>{editing ? 'Modifier la partie' : 'Poser une partie'}</h2>
+			<h2>{editing ? tr('Modifier la partie', 'Edit the game') : tr('Poser une partie', 'Post a game')}</h2>
 
 			{editing ? (
 				<p className="re-hint">
-					Le terrain et les inscrits ne bougent pas. Pour jouer ailleurs, annule cette partie et repose-en une.
+					{tr(
+						'Le terrain et les inscrits ne bougent pas. Pour jouer ailleurs, annule cette partie et repose-en une.',
+						'The pitch and the players stay. To play somewhere else, cancel this game and post a new one.',
+					)}
 				</p>
 			) : (
 				<p className={`re-pinstate ${pin ? 're-pinstate--set' : ''}`}>
 					{pin
-						? <>Épingle posée. <button type="button" className="re-link" onClick={onPickAgain}>Déplacer</button></>
-						: <>Touche la carte pour poser l'épingle à l'endroit où vous jouez.</>}
+						? <>{tr('Épingle posée.', 'Pin dropped.')} <button type="button" className="re-link" onClick={onPickAgain}>{tr('Déplacer', 'Move')}</button></>
+						: tr("Touche la carte pour poser l'épingle à l'endroit où vous jouez.", 'Tap the map to drop the pin where you play.')}
 				</p>
 			)}
 
 			<label>
-				<span>Quand</span>
+				<span>{tr('Quand', 'When')}</span>
 				<input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} required />
 			</label>
 
 			<label>
-				<span>Durée</span>
+				<span>{tr('Durée', 'Duration')}</span>
 				<select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
 					{durations.map((h) => <option key={h} value={h}>{h} h</option>)}
 				</select>
@@ -95,33 +103,33 @@ export default function CreateForm({ pin, name, busy, initial, error: refused, o
 			<label>
 				<span>Format</span>
 				<select value={format} onChange={(e) => setFormat(e.target.value as Format)}>
-					{FORMATS.map((f) => <option key={f} value={f}>{FORMAT_LABEL[f]}</option>)}
+					{FORMATS.map((f) => <option key={f} value={f}>{L.format[f]}</option>)}
 				</select>
 			</label>
 
 			<label>
-				<span>Joueurs au total</span>
+				<span>{tr('Joueurs au total', 'Players in total')}</span>
 				<select value={playersNeeded} onChange={(e) => setPlayersNeeded(Number(e.target.value))}>
-					{PLAYERS_NEEDED.map((n) => <option key={n} value={n}>{n} joueurs</option>)}
+					{PLAYERS_NEEDED.map((n) => <option key={n} value={n}>{n} {tr('joueurs', 'players')}</option>)}
 				</select>
 			</label>
 
 			<label>
-				<span>On cherche</span>
+				<span>{tr('On cherche', 'Looking for')}</span>
 				<select value={roleNeeded} onChange={(e) => setRoleNeeded(e.target.value as Role)}>
-					{ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+					{ROLES.map((r) => <option key={r} value={r}>{L.role[r]}</option>)}
 				</select>
 			</label>
 
 			{!editing && (
 				<>
 					<label>
-						<span>Ton prénom</span>
+						<span>{tr('Ton prénom', 'Your first name')}</span>
 						<input value={organizerName} onChange={(e) => setOrganizerName(e.target.value)} maxLength={24} placeholder="Raph" required />
 					</label>
 
 					<label>
-						<span>Tu viens à</span>
+						<span>{tr('Tu viens à', 'Your seats')}</span>
 						<select value={organizerSeats} onChange={(e) => setOrganizerSeats(Number(e.target.value))}>
 							{[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
 						</select>
@@ -135,10 +143,10 @@ export default function CreateForm({ pin, name, busy, initial, error: refused, o
 
 			<div className="re-formactions">
 				<button type="button" className="re-btn re-btn--ghost" onClick={onCancel}>
-					{editing ? 'Revenir' : 'Annuler'}
+					{editing ? tr('Revenir', 'Back') : tr('Annuler', 'Cancel')}
 				</button>
 				<button type="submit" className="re-btn" disabled={busy || (!editing && !pin)}>
-					{busy ? 'Envoi…' : editing ? 'Enregistrer' : 'Publier la partie'}
+					{busy ? tr('Envoi…', 'Sending…') : editing ? tr('Enregistrer', 'Save') : tr('Publier la partie', 'Post the game')}
 				</button>
 			</div>
 		</form>

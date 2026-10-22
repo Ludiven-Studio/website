@@ -13,19 +13,18 @@ import {
 	PROVIDER_LABEL, type Provider,
 } from '../../lib/meetupAuth';
 import {
-	activeCount, applyFilters, applyTournamentFilters, DATE_LABEL, DEFAULT_FILTERS, NEAR_KM, rangeLabel,
+	activeCount, applyFilters, applyTournamentFilters, DEFAULT_FILTERS, NEAR_KM, rangeLabel,
 	type DateFilter, type Filters, type RoleFilter,
 } from '../../lib/meetupFilters';
 import { challengeDay } from '../../lib/day';
 import {
-	FORMAT_LABEL, MAX_ACTIVE_EVENTS, ROLE_LABEL, seatsLeft, validateSignup,
+	MAX_ACTIVE_EVENTS, seatsLeft, validateSignup,
 	type MeetupEvent, type MeetupSignup, type MeetupSpot, type ReportReason, type Role,
 } from '../../lib/meetupRules';
 import {
 	addPlace, isNearPlaces, nearestPlace, readNearKm, readPlaces, removePlace, saveNearKm, savePlaces,
 	MAX_PLACES, SAME_PLACE_M, type Place, type PlaceKind,
 } from '../../lib/meetupPlaces';
-import { usePinToHome, type PinPlatform } from '../../lib/usePinToHome';
 import { distanceM, formatDistance, isPlausibleFr, nearest } from '../../lib/meetupGeo';
 import MeetupMap, { HOME, type MapHandle } from './MeetupMap';
 import CreateForm, { type Draft } from './CreateForm';
@@ -35,13 +34,11 @@ import { demoEvents, demoSignups, demoTournaments, isDemo } from '../../lib/meet
 import MyGames from './MyGames';
 import StoreLinks, { AppCard, AppIcon } from './StoreLinks';
 import { formatShortDay, formatTime } from './format';
+import { seatsText } from './mapCards';
+import { LangContext, labels, PATHS, pick, useT, type Lang } from './i18n';
 
 const DATES: DateFilter[] = ['today', 'weekend', 'week', 'fortnight', 'all', 'custom'];
 const ROLE_FILTERS: RoleFilter[] = ['all', 'tireur', 'pointeur'];
-/* The island is client:only, so `window` is always there. The installed icon must
-   land on the map, never on the ?e= card that happened to be open. */
-const PAGE_URL = `${window.location.origin}/petanque-meet/`;
-const APP_PAGE = '/petanque-meet/telecharger/';
 
 interface Detail {
 	event: MeetupEvent;
@@ -49,8 +46,8 @@ interface Detail {
 	isOrganizer: boolean;
 }
 
-const message = (e: unknown): string => (e instanceof Error ? e.message : 'Une erreur est survenue.');
-const NO_OWNER = "Lien d'organisateur manquant.";
+/** Server refusals are French on both pages: the function writes them, the app shows them as is. */
+const message = (e: unknown, fallback: string): string => (e instanceof Error ? e.message : fallback);
 /** Browse-only for now: every action goes through the app. The web login
  *  stays wired for the day the site opens actions again. */
 const WEB_LOGIN: boolean = false;
@@ -81,7 +78,15 @@ function setUrl(eventId: string | null, secret?: string | null): void {
 	window.history.replaceState(null, '', url);
 }
 
-export default function RencontresApp() {
+export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
+	const tr = useMemo(() => pick(lang), [lang]);
+	const L = labels(lang);
+	const paths = PATHS[lang];
+	// client:only, so `window` is always there.
+	const pageUrl = `${window.location.origin}${paths.map}`;
+	const failed = tr('Une erreur est survenue.', 'Something went wrong.');
+	const noOwner = tr("Lien d'organisateur manquant.", 'The organizer link is missing.');
+	const myPlace = tr('Mon lieu', 'My place');
 	const [pid] = useState(() => playerId());
 	const [events, setEvents] = useState<MeetupEvent[]>([]);
 	const [spots, setSpots] = useState<MeetupSpot[]>([]);
@@ -111,7 +116,6 @@ export default function RencontresApp() {
 	const [places, setPlaces] = useState<Place[]>([]);
 	const [naming, setNaming] = useState<string | null>(null); // the draft name, while adding a place
 	const [namingKind, setNamingKind] = useState<PlaceKind>('favorite');
-	const [pinning, setPinning] = useState(false);
 	const [mine, setMine] = useState<MeetupEvent[]>([]);
 	const [cap, setCap] = useState({ active: 0, max: MAX_ACTIVE_EVENTS });
 	const [muted, setMuted] = useState<string[]>([]);
@@ -122,9 +126,6 @@ export default function RencontresApp() {
 	const uidRef = useRef<string | null | undefined>(undefined);
 	const mapRef = useRef<MapHandle>(null);
 	const okRef = useRef<HTMLDivElement>(null);
-	// The map is the page, so the icon must open the map — not whatever game card
-	// happened to be open, which is what the live URL would carry.
-	const toHome = usePinToHome({ name: 'Rencontres pétanque', scope: '/petanque-meet', startUrl: PAGE_URL });
 
 	const load = useCallback(async (): Promise<MeetupEvent[]> => {
 		const r = await listMeetups();
@@ -166,9 +167,9 @@ export default function RencontresApp() {
 			window.history.replaceState(null, '', url);
 			mapRef.current?.flyTo(r.tournament.lat, r.tournament.lng);
 		} catch (e) {
-			setError(message(e));
+			setError(message(e, failed));
 		}
-	}, []);
+	}, [failed]);
 
 	const closeTournament = useCallback(() => {
 		setTournament(null);
@@ -199,10 +200,10 @@ export default function RencontresApp() {
 			setUrl(id, d.isOrganizer && fromUrl ? fromUrl : null);
 			mapRef.current?.flyTo(d.event.lat, d.event.lng);
 		} catch (e) {
-			setError(message(e));
+			setError(message(e, failed));
 			setUrl(null);
 		}
-	}, [pid]);
+	}, [pid, failed]);
 
 	// The period strip scrolls on a phone: keep the picked one in view, dates and all.
 	// The strip alone: scrollIntoView would also move the page on load.
@@ -235,7 +236,7 @@ export default function RencontresApp() {
 			try {
 				await load();
 			} catch (e) {
-				setError(message(e));
+				setError(message(e, failed));
 			} finally {
 				setLoading(false);
 			}
@@ -244,7 +245,7 @@ export default function RencontresApp() {
 			else if (wantedTournament) await openTournament(wantedTournament);
 			if (s && takeResume() === 'create') setResumeCreate(true);
 		})();
-	}, [load, loadMine, openEvent, openTournament]);
+	}, [load, loadMine, openEvent, openTournament, failed]);
 
 	/** After any write: the list and the open card must agree, or the seat counter
 	 *  on the map contradicts the one in the panel. */
@@ -304,11 +305,11 @@ export default function RencontresApp() {
 			setError(null);
 		} catch (e) {
 			if (e instanceof LoginRequired) setLoginOpen('act');
-			else setError(message(e));
+			else setError(message(e, failed));
 		} finally {
 			setBusy(false);
 		}
-	}, []);
+	}, [failed]);
 
 	const onJoin = useCallback((seats: number, role: Role, who: string) => {
 		if (!detail) return;
@@ -321,9 +322,9 @@ export default function RencontresApp() {
 			setName(who);
 			trackEvent('meetup_join', { format: detail.event.format });
 			await refresh(detail.event.id);
-			setFlash('Inscription enregistrée.');
+			setFlash(tr('Inscription enregistrée.', 'You are signed up.'));
 		});
-	}, [detail, pid, refresh, run, session]);
+	}, [detail, pid, refresh, run, session, tr]);
 
 	const onLeave = useCallback(() => {
 		if (!detail) return;
@@ -331,14 +332,14 @@ export default function RencontresApp() {
 			await leaveMeetup(detail.event.id, pid);
 			trackEvent('meetup_leave');
 			await refresh(detail.event.id);
-			setFlash('Tu es désinscrit.');
+			setFlash(tr('Tu es désinscrit.', 'You have left the game.'));
 		});
-	}, [detail, pid, refresh, run]);
+	}, [detail, pid, refresh, run, tr]);
 
 	const onEditSubmit = useCallback((v: Draft) => {
 		if (!detail) return;
 		const secret = secretOf(detail.event.id);
-		if (!secret && !session) { setError(NO_OWNER); return; }
+		if (!secret && !session) { setError(noOwner); return; }
 		void run(async () => {
 			// Only what update_event accepts. The organizer name and seats are not in the
 			// patch, so sending them would be a silent no-op the form would take for a save.
@@ -349,21 +350,24 @@ export default function RencontresApp() {
 			trackEvent('meetup_edit', { format: v.format });
 			setEditing(false);
 			await refresh(detail.event.id);
-			setFlash('Modifications enregistrées.');
+			setFlash(tr('Modifications enregistrées.', 'Changes saved.'));
 		});
-	}, [detail, refresh, run, session]);
+	}, [detail, refresh, run, session, noOwner, tr]);
 
 	const onCancel = useCallback(() => {
 		if (!detail) return;
 		const secret = secretOf(detail.event.id);
-		if (!secret && !session) { setError(NO_OWNER); return; }
-		if (!window.confirm('Annuler cette partie ? Les inscrits ne seront pas prévenus.')) return;
+		if (!secret && !session) { setError(noOwner); return; }
+		if (!window.confirm(tr(
+			'Annuler cette partie ? Les inscrits ne seront pas prévenus.',
+			'Cancel this game? The players who signed up will not be told.',
+		))) return;
 		void run(async () => {
 			await cancelMeetup(detail.event.id, secret);
 			trackEvent('meetup_cancel');
 			await refresh(detail.event.id);
 		});
-	}, [detail, refresh, run, session]);
+	}, [detail, refresh, run, session, noOwner, tr]);
 
 	/* Same button, two outcomes, and the row's label says which: with nobody signed
 	   up the game leaves for good, otherwise it is cancelled so the link can still
@@ -371,11 +375,17 @@ export default function RencontresApp() {
 	   this one only picks the wording, a stale count gets a 409 back. */
 	const onRemoveMine = useCallback((e: MeetupEvent) => {
 		const secret = secretOf(e.id);
-		if (!secret && !session) { setError(NO_OWNER); return; }
+		if (!secret && !session) { setError(noOwner); return; }
 		const joined = e.seats_taken - e.organizer_seats;
 		const ask = joined > 0
-			? `Annuler cette partie ? ${joined} joueur(s) inscrit(s) : le lien restera en ligne pour les prévenir.`
-			: 'Supprimer cette partie ? Personne n\'est inscrit, elle disparaîtra pour de bon.';
+			? tr(
+				`Annuler cette partie ? ${joined} joueur(s) inscrit(s) : le lien restera en ligne pour les prévenir.`,
+				`Cancel this game? ${joined} player(s) signed up: the link stays online to let them know.`,
+			)
+			: tr(
+				'Supprimer cette partie ? Personne n\'est inscrit, elle disparaîtra pour de bon.',
+				'Delete this game? Nobody has signed up, so it will be gone for good.',
+			);
 		if (!window.confirm(ask)) return;
 		void run(async () => {
 			if (joined > 0) {
@@ -389,9 +399,9 @@ export default function RencontresApp() {
 			if (detail?.event.id === e.id && joined === 0) closeEvent();
 			await load();
 			await loadMine();
-			setFlash(joined > 0 ? 'Partie annulée.' : 'Partie supprimée.');
+			setFlash(joined > 0 ? tr('Partie annulée.', 'Game cancelled.') : tr('Partie supprimée.', 'Game deleted.'));
 		});
-	}, [closeEvent, detail, load, loadMine, run, session]);
+	}, [closeEvent, detail, load, loadMine, run, session, noOwner, tr]);
 
 	/** Only forgets the secret. The game stays up — this is the exit for a finished
 	 *  one whose signups keep it from being deleted. */
@@ -415,10 +425,10 @@ export default function RencontresApp() {
 	const onReportSignup = useCallback(async (signupId: string) => {
 		if (!detail) return;
 		const secret = secretOf(detail.event.id);
-		if (!secret && !session) throw new Error(NO_OWNER);
+		if (!secret && !session) throw new Error(noOwner);
 		await reportSignup(detail.event.id, secret, signupId);
 		trackEvent('meetup_report_signup');
-	}, [detail, session]);
+	}, [detail, session, noOwner]);
 
 	const onMute = useCallback(() => {
 		if (!detail) return;
@@ -470,16 +480,19 @@ export default function RencontresApp() {
 		void run(async () => {
 			await signOut();
 			setCreating(false);
-			setNote('Tu es déconnecté.');
+			setNote(tr('Tu es déconnecté.', 'You are signed out.'));
 		});
-	}, [run]);
+	}, [run, tr]);
 
 	const removeAccount = useCallback(() => {
-		const ok = window.confirm(
+		const ok = window.confirm(tr(
 			'Supprimer ton compte\u00a0? C’est définitif.\n\n'
 			+ 'Tes parties en cours seront annulées, tes inscriptions et tes signalements effacés. '
 			+ 'Tu pourras recréer un compte, mais rien ne sera récupéré.',
-		);
+			'Delete your account? This cannot be undone.\n\n'
+			+ 'Your upcoming games will be cancelled, and your signups and reports erased. '
+			+ 'You can create a new account, but nothing will be recovered.',
+		));
 		if (!ok) return;
 		void run(async () => {
 			await deleteAccount();
@@ -489,12 +502,12 @@ export default function RencontresApp() {
 			closeEvent();
 			await load();
 			await loadMine();
-			setNote('Ton compte est supprimé.');
+			setNote(tr('Ton compte est supprimé.', 'Your account is deleted.'));
 		});
-	}, [closeEvent, load, loadMine, run]);
+	}, [closeEvent, load, loadMine, run, tr]);
 
 	const onCreateSubmit = useCallback((v: Draft) => {
-		if (!pin) { setError('Pose une épingle sur la carte.'); return; }
+		if (!pin) { setError(tr('Pose une épingle sur la carte.', 'Drop a pin on the map.')); return; }
 		void run(async () => {
 			const r = await createMeetup({ playerId: pid, lat: pin.lat, lng: pin.lng, ...v });
 			rememberSecret(r.id, r.secret);
@@ -508,12 +521,15 @@ export default function RencontresApp() {
 			await loadMine();
 			await openEvent(r.id);
 		});
-	}, [load, loadMine, openEvent, pid, pin, run]);
+	}, [load, loadMine, openEvent, pid, pin, run, tr]);
 
 	// Button only, never on load (spec §8): a map that asks for your position the
 	// second it opens reads as a tracker, and the answer is usually "block".
 	const locate = useCallback(() => {
-		if (!navigator.geolocation) { setError('Ton navigateur ne partage pas la position.'); return; }
+		if (!navigator.geolocation) {
+			setError(tr('Ton navigateur ne partage pas la position.', 'Your browser does not share its location.'));
+			return;
+		}
 		setLocating(true);
 		navigator.geolocation.getCurrentPosition(
 			(p) => {
@@ -521,10 +537,10 @@ export default function RencontresApp() {
 				setMe({ lat: p.coords.latitude, lng: p.coords.longitude });
 				mapRef.current?.flyTo(p.coords.latitude, p.coords.longitude, 13);
 			},
-			() => { setLocating(false); setError('Position indisponible.'); },
+			() => { setLocating(false); setError(tr('Position indisponible.', 'Location unavailable.')); },
 			{ enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 },
 		);
-	}, []);
+	}, [tr]);
 
 	const commitPlaces = useCallback((next: Place[]) => {
 		setPlaces(next);
@@ -541,9 +557,9 @@ export default function RencontresApp() {
 	const saveCurrentPlace = useCallback((label: string, kind: PlaceKind) => {
 		const c = mapRef.current?.center();
 		if (!c) return;
-		savePlaceAt(label, c.lat, c.lng, kind);
+		savePlaceAt(label.trim() || myPlace, c.lat, c.lng, kind);
 		setNaming(null);
-	}, [savePlaceAt]);
+	}, [savePlaceAt, myPlace]);
 
 	/** Already a home port? Then the button must say so instead of quietly renaming
 	 *  the one that is there. Same threshold addPlace merges on. */
@@ -569,8 +585,8 @@ export default function RencontresApp() {
 	const distanceLabel = (e: MeetupEvent): string | null => {
 		const n = nearestPlace(places, e.lat, e.lng);
 		const mine = me ? distanceM(me.lat, me.lng, e.lat, e.lng) : Infinity;
-		if (n && n.m <= mine) return `${formatDistance(n.m)} de ${n.place.name}`;
-		return me ? formatDistance(mine) : null;
+		if (n && n.m <= mine) return `${formatDistance(n.m, lang)} ${tr('de', 'from')} ${n.place.name}`;
+		return me ? formatDistance(mine, lang) : null;
 	};
 
 	// My own tag never counts as muted, even if an older mute caught it.
@@ -593,7 +609,7 @@ export default function RencontresApp() {
 			: []),
 		[allTournaments, tournament]);
 
-	const periodLabel = filters.date === 'custom' ? rangeLabel(filters) : DATE_LABEL[filters.date];
+	const periodLabel = filters.date === 'custom' ? rangeLabel(filters, lang) : L.date[filters.date];
 	const active = activeCount(filters, places.length > 0);
 	const toggleFilters = (open: boolean): void => {
 		setFiltersOpen(open);
@@ -617,7 +633,7 @@ export default function RencontresApp() {
 		window.history.replaceState(null, '', url);
 		if (on) mapRef.current?.flyTo(HOME[0], HOME[1], 10);
 	};
-	const shareUrl = (id: string): string => `${window.location.origin}/petanque-meet/?e=${id}`;
+	const shareUrl = (id: string): string => `${pageUrl}?e=${id}`;
 	const spot = spotId ? spots.find((s) => s.id === spotId) ?? null : null;
 
 	/* The page is two screens tall, so a banner pinned to the top is a banner
@@ -641,54 +657,50 @@ export default function RencontresApp() {
 		if (editing) okRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}, [editing]);
 
-	if (!meetupsEnabled()) return <p className="re-empty">Le service n'est pas disponible.</p>;
+	if (!meetupsEnabled()) return <p className="re-empty">{tr("Le service n'est pas disponible.", 'The service is not available.')}</p>;
 
 	return (
+		<LangContext.Provider value={lang}>
 		<div className="re-root">
 			<header className="re-head">
-				<h1>Rencontres pétanque</h1>
+				<h1>{tr('Rencontres pétanque', 'Pétanque meetups')}</h1>
 				<p className="re-sub">
-					Trouve des joueurs et des concours autour de chez toi.
+					{tr('Trouve des joueurs et des concours autour de chez toi.', 'Find players and tournaments near you.')}
 				</p>
 				{(session || WEB_LOGIN) && (
 					<div className="re-account">
 						{session ? (
 							<>
-								<span>Connecté avec <strong>{accountLabel(session)}</strong></span>
-								<button type="button" className="re-link" disabled={busy} onClick={logout}>Se déconnecter</button>
+								<span>{tr('Connecté avec', 'Signed in as')} <strong>{accountLabel(session)}</strong></span>
+								<button type="button" className="re-link" disabled={busy} onClick={logout}>
+									{tr('Se déconnecter', 'Sign out')}
+								</button>
 								<button type="button" className="re-link re-link--danger" disabled={busy} onClick={removeAccount}>
-									Supprimer mon compte
+									{tr('Supprimer mon compte', 'Delete my account')}
 								</button>
 							</>
 						) : (
 							<>
-								<span>Regarder la carte est libre.</span>
+								<span>{tr('Regarder la carte est libre.', 'Browsing the map is free.')}</span>
 								<button type="button" className="re-link" onClick={() => setLoginOpen('act')}>
-									Se connecter pour publier ou rejoindre
+									{tr('Se connecter pour publier ou rejoindre', 'Sign in to post or join')}
 								</button>
 							</>
 						)}
 					</div>
 				)}
 				<AppCard />
-				{!toHome.installed && (
-					<button
-						type="button"
-						className="re-install"
-						onClick={() => { trackEvent('meetup_pin_open'); setPinning(true); }}
-					>
-						📲 Mettre la carte sur mon téléphone
-					</button>
-				)}
 				<button type="button" className="re-demo-btn" onClick={toggleDemo}>
-					{demo ? '✖ Quitter la démo' : '👀 Démo : voir des exemples'}
+					{demo ? tr('✖ Quitter la démo', '✖ Leave the demo') : tr('👀 Démo : voir des exemples', '👀 Demo: see examples')}
 				</button>
 			</header>
 
 			{demo && (
 				<p className="re-ok re-demo" role="status">
-					Mode démo&nbsp;: ces parties et ces concours sont des exemples fictifs, pour voir à quoi
-					ressemble la carte quand les joueurs et les clubs l'utilisent.
+					{tr(
+						'Mode démo\u00a0: ces parties et ces concours sont des exemples fictifs, pour voir à quoi ressemble la carte quand les joueurs et les clubs l\'utilisent.',
+						'Demo mode: these games and tournaments are made-up examples, to show what the map looks like when players and clubs use it.',
+					)}
 				</p>
 			)}
 
@@ -707,17 +719,21 @@ export default function RencontresApp() {
 					aria-controls="re-filters"
 					onClick={() => toggleFilters(!filtersOpen)}
 				>
-					<span aria-hidden="true">⚙️</span> Filtres · {periodLabel}
-					{active > 0 && <span className="re-badge" aria-label={`${active} filtre(s) actif(s)`}>+{active}</span>}
+					<span aria-hidden="true">⚙️</span> {tr('Filtres', 'Filters')} · {periodLabel}
+					{active > 0 && (
+						<span className="re-badge" aria-label={tr(`${active} filtre(s) actif(s)`, `${active} active filter(s)`)}>
+							+{active}
+						</span>
+					)}
 					<span className="re-chev" aria-hidden="true">▾</span>
 				</button>
 				<button type="button" className="re-btn re-btn--ghost" disabled={locating} onClick={locate}>
-					{locating ? 'Localisation…' : '📍 Autour de moi'}
+					{locating ? tr('Localisation…', 'Locating…') : tr('📍 Autour de moi', '📍 Near me')}
 				</button>
-				<button type="button" className="re-btn" onClick={() => startCreate()}>+ Poser une partie</button>
+				<button type="button" className="re-btn" onClick={() => startCreate()}>{tr('+ Poser une partie', '+ Post a game')}</button>
 				{muted.length > 0 && (
 					<button type="button" className="re-link re-unmute" onClick={unmuteAll}>
-						Réafficher les organisateurs masqués ({muted.length})
+						{tr(`Réafficher les organisateurs masqués (${muted.length})`, `Show hidden organizers again (${muted.length})`)}
 					</button>
 				)}
 			</div>
@@ -725,8 +741,8 @@ export default function RencontresApp() {
 			{filtersOpen && (
 				<div id="re-filters" className="re-filters">
 					<fieldset className="re-fgroup">
-						<legend>Quand</legend>
-						<div className="re-seg" role="group" aria-label="Quand">
+						<legend>{tr('Quand', 'When')}</legend>
+						<div className="re-seg" role="group" aria-label={tr('Quand', 'When')}>
 							{DATES.map((d) => (
 								<button
 									key={d}
@@ -737,15 +753,15 @@ export default function RencontresApp() {
 										// Today by default: the two fields below then only need moving.
 										: { ...f, date: d, from: f.from || today, to: f.to || f.from || today })}
 								>
-									{d === 'custom' && filters.date === 'custom' ? `📅 ${rangeLabel(filters)}` : DATE_LABEL[d]}
+									{d === 'custom' && filters.date === 'custom' ? `📅 ${rangeLabel(filters, lang)}` : L.date[d]}
 								</button>
 							))}
 						</div>
 
 						{filters.date === 'custom' && (
-							<span className="re-dates" role="group" aria-label="Dates choisies">
+							<span className="re-dates" role="group" aria-label={tr('Dates choisies', 'Chosen dates')}>
 								<label>
-									Du
+									{tr('Du', 'From')}
 									<input
 										type="date"
 										className="re-select"
@@ -758,7 +774,7 @@ export default function RencontresApp() {
 									/>
 								</label>
 								<label>
-									au
+									{tr('au', 'to')}
 									<input
 										type="date"
 										className="re-select"
@@ -775,15 +791,15 @@ export default function RencontresApp() {
 					</fieldset>
 
 					<fieldset className="re-fgroup">
-						<legend>Parties</legend>
+						<legend>{tr('Parties', 'Games')}</legend>
 						<select
 							className="re-select"
-							aria-label="Rôle"
+							aria-label={tr('Rôle', 'Role')}
 							value={filters.role}
 							onChange={(e) => setFilters((f) => ({ ...f, role: e.target.value as RoleFilter }))}
 						>
 							{ROLE_FILTERS.map((r) => (
-								<option key={r} value={r}>{r === 'all' ? 'Tous les rôles' : ROLE_LABEL[r as Role]}</option>
+								<option key={r} value={r}>{r === 'all' ? tr('Tous les rôles', 'All roles') : L.role[r as Role]}</option>
 							))}
 						</select>
 
@@ -793,24 +809,24 @@ export default function RencontresApp() {
 								checked={filters.freeSeatsOnly}
 								onChange={(e) => setFilters((f) => ({ ...f, freeSeatsOnly: e.target.checked }))}
 							/>
-							Places libres
+							{tr('Places libres', 'Free seats only')}
 						</label>
 					</fieldset>
 
 					<fieldset className="re-fgroup">
-						<legend>Concours</legend>
+						<legend>{tr('Concours', 'Tournaments')}</legend>
 						<label className="re-check">
 							<input
 								type="checkbox"
 								checked={filters.postersOnly}
 								onChange={(e) => setFilters((f) => ({ ...f, postersOnly: e.target.checked }))}
 							/>
-							Avec affiche seulement
+							{tr('Avec affiche seulement', 'With a poster only')}
 						</label>
 					</fieldset>
 
 					<fieldset className="re-fgroup">
-						<legend>Mes lieux</legend>
+						<legend>{tr('Mes lieux', 'My places')}</legend>
 						{/* Home ports. One player summers at a campsite and winters in Lyon, and
 						    "autour de moi" serves whichever one he is standing in — never both. */}
 						<div className="re-places">
@@ -826,7 +842,7 @@ export default function RencontresApp() {
 									<button
 										type="button"
 										className="re-place-off"
-										aria-label={`Retirer ${p.name}`}
+										aria-label={tr(`Retirer ${p.name}`, `Remove ${p.name}`)}
 										onClick={() => dropPlace(i)}
 									>
 										×
@@ -839,23 +855,27 @@ export default function RencontresApp() {
 									className="re-naming"
 									onSubmit={(e) => { e.preventDefault(); saveCurrentPlace(naming, namingKind); }}
 								>
-									<span className="re-seg" role="group" aria-label="Type de lieu">
+									<span className="re-seg" role="group" aria-label={tr('Type de lieu', 'Kind of place')}>
 										<button type="button" className={`re-segbtn ${namingKind === 'home' ? 're-segbtn--on' : ''}`}
-											aria-pressed={namingKind === 'home'} onClick={() => setNamingKind('home')}>🏠 Ma maison</button>
+											aria-pressed={namingKind === 'home'} onClick={() => setNamingKind('home')}>
+											{tr('🏠 Ma maison', '🏠 My home')}
+										</button>
 										<button type="button" className={`re-segbtn ${namingKind === 'favorite' ? 're-segbtn--on' : ''}`}
-											aria-pressed={namingKind === 'favorite'} onClick={() => setNamingKind('favorite')}>💚 Lieu favori</button>
+											aria-pressed={namingKind === 'favorite'} onClick={() => setNamingKind('favorite')}>
+											{tr('💚 Lieu favori', '💚 Favourite place')}
+										</button>
 									</span>
 									<input
 										autoFocus
 										value={naming}
 										maxLength={24}
-										placeholder="Lyon, le camping…"
-										aria-label="Nom du lieu"
+										placeholder={tr('Lyon, le camping…', 'Lyon, the campsite…')}
+										aria-label={tr('Nom du lieu', 'Place name')}
 										onChange={(e) => setNaming(e.target.value)}
 									/>
-									<button type="submit" className="re-btn">Enregistrer</button>
+									<button type="submit" className="re-btn">{tr('Enregistrer', 'Save')}</button>
 									<button type="button" className="re-btn re-btn--ghost" onClick={() => setNaming(null)}>
-										Annuler
+										{tr('Annuler', 'Cancel')}
 									</button>
 								</form>
 							) : places.length < MAX_PLACES && (
@@ -864,14 +884,14 @@ export default function RencontresApp() {
 									className="re-btn re-btn--ghost"
 									onClick={() => setNaming(guessPlaceName())}
 								>
-									🏠 Enregistrer ce lieu
+									{tr('🏠 Enregistrer ce lieu', '🏠 Save this place')}
 								</button>
 							)}
 
 							{places.length > 0 && naming === null && (
 								<select
 									className="re-select"
-									aria-label="Autour de mes lieux"
+									aria-label={tr('Autour de mes lieux', 'Around my places')}
 									value={filters.nearPlaces ? String(filters.nearKm) : ''}
 									onChange={(e) => {
 										const km = Number(e.target.value);
@@ -880,23 +900,27 @@ export default function RencontresApp() {
 										setFilters((f) => ({ ...f, nearPlaces: true, nearKm: km }));
 									}}
 								>
-									<option value="">Autour de mes lieux : partout</option>
-									{NEAR_KM.map((km) => <option key={km} value={km}>À {km} km de mes lieux</option>)}
+									<option value="">{tr('Autour de mes lieux : partout', 'Around my places: anywhere')}</option>
+									{NEAR_KM.map((km) => (
+										<option key={km} value={km}>{tr(`À ${km} km de mes lieux`, `Within ${km} km of my places`)}</option>
+									))}
 								</select>
 							)}
 						</div>
 
 						{places.length === 0 && naming === null && (
 							<p className="re-hint re-hint--places">
-								Tu joues à plusieurs endroits&nbsp;? Centre la carte sur l'un d'eux et enregistre-le.
-								Les distances partiront de tes lieux, pas d'un seul.
+								{tr(
+									'Tu joues à plusieurs endroits\u00a0? Centre la carte sur l\'un d\'eux et enregistre-le. Les distances partiront de tes lieux, pas d\'un seul.',
+									'Do you play in several places? Centre the map on one of them and save it. Distances will then start from your places, not from just one.',
+								)}
 							</p>
 						)}
 					</fieldset>
 
 					{(active > 0 || filters.date !== DEFAULT_FILTERS.date) && (
 						<button type="button" className="re-link re-reset" onClick={resetFilters}>
-							Réinitialiser les filtres
+							{tr('Réinitialiser les filtres', 'Reset filters')}
 						</button>
 					)}
 				</div>
@@ -919,7 +943,9 @@ export default function RencontresApp() {
 			)}
 
 			{creating && !pin && (
-				<p className="re-tip">Touche la carte à l'endroit où vous jouez pour poser l'épingle.</p>
+				<p className="re-tip">
+					{tr("Touche la carte à l'endroit où vous jouez pour poser l'épingle.", 'Tap the map where you play to drop the pin.')}
+				</p>
 			)}
 
 			<MeetupMap
@@ -941,17 +967,17 @@ export default function RencontresApp() {
 				onSelectSpot={(id) => { closeTournament(); setSpotId(id); }}
 				onSelectTournament={(id) => { void openTournament(id); }}
 				onPick={(lat, lng) => {
-					if (!isPlausibleFr(lat, lng)) { setError('Choisis un endroit en France.'); return; }
+					if (!isPlausibleFr(lat, lng)) { setError(tr('Choisis un endroit en France.', 'Pick a place in France.')); return; }
 					setError(null);
 					setPin({ lat, lng });
 				}}
 			/>
-			<p className="re-legend" aria-label="Légende de la carte">
-				<span><i className="re-dot re-dot--game" />Partie</span>
-				<span><i className="re-dot re-dot--tournament" />Concours</span>
-				<span><i className="re-dot re-dot--spot" />Terrain</span>
-				<span><i className="re-dot re-dot--place" />Mes lieux</span>
-				<span>Un chiffre = plusieurs, touche pour zoomer</span>
+			<p className="re-legend" aria-label={tr('Légende de la carte', 'Map legend')}>
+				<span><i className="re-dot re-dot--game" />{tr('Partie', 'Game')}</span>
+				<span><i className="re-dot re-dot--tournament" />{tr('Concours', 'Tournament')}</span>
+				<span><i className="re-dot re-dot--spot" />{tr('Terrain', 'Pitch')}</span>
+				<span><i className="re-dot re-dot--place" />{tr('Mes lieux', 'My places')}</span>
+				<span>{tr('Un chiffre = plusieurs, touche pour zoomer', 'A number = several, tap to zoom in')}</span>
 			</p>
 
 			{/* A terrain used to be a dot with a tooltip and nothing else — 115 of them,
@@ -959,18 +985,29 @@ export default function RencontresApp() {
 			{spot && !creating && (
 				// Over the map, like a game: a panel under the map is a screen away on a phone.
 				<div className="re-modal re-modal--tournament" onClick={() => setSpotId(null)}>
-				<section className="re-sheet re-tournament" onClick={(e) => e.stopPropagation()} aria-label={spot.label || 'Terrain'}>
-					<button type="button" className="re-close" onClick={() => setSpotId(null)} aria-label="Fermer">×</button>
-					<h2>📍 {spot.label || 'Terrain de pétanque'}</h2>
+				<section className="re-sheet re-tournament" onClick={(e) => e.stopPropagation()} aria-label={spot.label || tr('Terrain', 'Pitch')}>
+					<button type="button" className="re-close" onClick={() => setSpotId(null)} aria-label={tr('Fermer', 'Close')}>×</button>
+					<h2>📍 {spot.label || tr('Terrain de pétanque', 'Pétanque pitch')}</h2>
 					{spot.commune && spot.commune !== spot.label && <p className="re-where">{spot.commune}</p>}
 					<p className="re-hint">
 						{spot.confirmed
-							? 'Terrain de pétanque connu (OpenStreetMap ou confirmé par plusieurs organisateurs).'
-							: 'Terrain signalé par un joueur, pas encore confirmé.'}
+							? tr(
+								'Terrain de pétanque connu (OpenStreetMap ou confirmé par plusieurs organisateurs).',
+								'Known pétanque pitch (OpenStreetMap, or confirmed by several organizers).',
+							)
+							: tr('Terrain signalé par un joueur, pas encore confirmé.', 'Pitch added by a player, not confirmed yet.')}
 					</p>
 					<p className="re-hint">
-						Aucune partie posée ici pour l'instant. Pour en organiser une, ou être prévenu des parties
-						autour, utilise <a href={APP_PAGE}>l'appli Pétanque Meet</a>.
+						{tr(
+							<>
+								Aucune partie posée ici pour l'instant. Pour en organiser une, ou être prévenu des parties
+								autour, utilise <a href={paths.app}>l'appli Pétanque Meet</a>.
+							</>,
+							<>
+								No game posted here yet. To set one up, or to hear about games nearby, use{' '}
+								<a href={paths.app}>the Pétanque Meet app</a>.
+							</>,
+						)}
 					</p>
 					<div className="re-actions">
 						<a
@@ -979,22 +1016,24 @@ export default function RencontresApp() {
 							target="_blank"
 							rel="noopener"
 						>
-							Y aller
+							{tr('Y aller', 'Directions')}
 						</a>
 						<button
 							type="button"
 							className="re-btn"
 							onClick={() => startCreate({ lat: spot.lat, lng: spot.lng })}
 						>
-							+ Poser une partie ici
+							{tr('+ Poser une partie ici', '+ Post a game here')}
 						</button>
 						<button
 							type="button"
 							className="re-btn re-btn--ghost"
 							disabled={isSavedPlace(spot.lat, spot.lng)}
-							onClick={() => savePlaceAt(spot.commune || spot.label || 'Mon lieu', spot.lat, spot.lng)}
+							onClick={() => savePlaceAt(spot.commune || spot.label || myPlace, spot.lat, spot.lng)}
 						>
-							{isSavedPlace(spot.lat, spot.lng) ? '🏠 Lieu enregistré' : '🏠 Enregistrer ce lieu'}
+							{isSavedPlace(spot.lat, spot.lng)
+								? tr('🏠 Lieu enregistré', '🏠 Place saved')
+								: tr('🏠 Enregistrer ce lieu', '🏠 Save this place')}
 						</button>
 					</div>
 				</section>
@@ -1016,10 +1055,15 @@ export default function RencontresApp() {
 			<div className="re-focus" ref={okRef}>
 			{created && (
 				<div className="re-secret">
-					<p className="re-ok re-ok--loud">✅ Ta partie est en ligne.</p>
+					<p className="re-ok re-ok--loud">{tr('✅ Ta partie est en ligne.', '✅ Your game is online.')}</p>
 					<p>
-						Elle est liée à ton compte&nbsp;: tu la retrouves dans «&nbsp;Mes parties&nbsp;» pour la modifier
-						ou l'annuler, depuis n'importe quel appareil.
+						{tr(
+							<>
+								Elle est liée à ton compte&nbsp;: tu la retrouves dans «&nbsp;Mes parties&nbsp;» pour la modifier
+								ou l'annuler, depuis n'importe quel appareil.
+							</>,
+							<>It is linked to your account: find it under “My games” to edit or cancel it, from any device.</>,
+						)}
 					</p>
 					<div className="re-secretrow">
 						<button type="button" className="re-btn re-btn--ghost" onClick={() => setCreated(null)}>
@@ -1055,7 +1099,7 @@ export default function RencontresApp() {
 				<TournamentPanel
 					key={tournament.id}
 					tournament={tournament}
-					shareUrl={`${PAGE_URL}?t=${tournament.id}`}
+					shareUrl={`${pageUrl}?t=${tournament.id}`}
 					samePitch={samePitch}
 					onOpen={(id) => { void openTournament(id); }}
 					onClose={closeTournament}
@@ -1083,7 +1127,7 @@ export default function RencontresApp() {
 							onCancel={onCancel}
 							onClose={closeEvent}
 							onSavePlace={() => savePlaceAt(
-								detail.event.commune || detail.event.label || 'Mon lieu',
+								detail.event.commune || detail.event.label || myPlace,
 								detail.event.lat, detail.event.lng,
 							)}
 							onReport={onReport}
@@ -1098,11 +1142,14 @@ export default function RencontresApp() {
 			)}
 			</div>
 
-			<section className="re-list" aria-label="Parties">
-				{loading && <p className="re-empty">Chargement…</p>}
+			<section className="re-list" aria-label={tr('Parties', 'Games')}>
+				{loading && <p className="re-empty">{tr('Chargement…', 'Loading…')}</p>}
 				{!loading && shown.length === 0 && (
 					<p className="re-empty">
-						Aucune partie ici pour l'instant. Pose la tienne&nbsp;: c'est comme ça que la carte se remplit.
+						{tr(
+							<>Aucune partie ici pour l'instant. Pose la tienne&nbsp;: c'est comme ça que la carte se remplit.</>,
+							<>No games here yet. Post yours: that is how the map fills up.</>,
+						)}
 					</p>
 				)}
 				<ul>
@@ -1117,14 +1164,14 @@ export default function RencontresApp() {
 								onMouseLeave={() => setHoveredId(null)}
 							>
 								<button type="button" className="re-card" onClick={() => { void openEvent(e.id); }}>
-									<span className="re-card-when">{formatShortDay(e.starts_at)} · {formatTime(e.starts_at)}</span>
-									<span className="re-card-title">{FORMAT_LABEL[e.format]}</span>
+									<span className="re-card-when">{formatShortDay(e.starts_at, lang)} · {formatTime(e.starts_at, lang)}</span>
+									<span className="re-card-title">{L.format[e.format]}</span>
 									<span className="re-card-place">
-										{e.label || 'Terrain'}{e.commune && e.commune !== e.label ? ` · ${e.commune}` : ''}
+										{e.label || tr('Terrain', 'Pitch')}{e.commune && e.commune !== e.label ? ` · ${e.commune}` : ''}
 										{far ? ` · ${far}` : ''}
 									</span>
 									<span className={`re-card-seats ${left > 0 ? '' : 're-card-seats--full'}`}>
-										{left > 0 ? `il manque ${left}` : 'complet'}
+										{seatsText(left, lang)}
 									</span>
 								</button>
 							</li>
@@ -1134,90 +1181,57 @@ export default function RencontresApp() {
 			</section>
 
 			<p className="re-legal re-rules">
-				Ici, on joue franc jeu&nbsp;: ton vrai prénom, de vraies parties, et du respect pour tout le monde.
-				Une partie louche ou un souci&nbsp;:{' '}
+				{tr(
+					<>
+						Ici, on joue franc jeu&nbsp;: ton vrai prénom, de vraies parties, et du respect pour tout le monde.
+						Une partie louche ou un souci&nbsp;:
+					</>,
+					<>Play fair here: your real first name, real games, and respect for everyone. A dodgy game or a problem:</>,
+				)}{' '}
 				<a href="mailto:contact@ludiven-studio.fr">contact@ludiven-studio.fr</a>.
 			</p>
 			<p className="re-legal">
-				Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
-				Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans{' '}
-				<a href={APP_PAGE}>l'appli Pétanque Meet</a>.{' '}
-				<a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a>.
+				{tr(
+					<>
+						Fonds de carte&nbsp;: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
+						Regarder ne demande rien&nbsp;; publier, rejoindre ou signaler se fait dans{' '}
+						<a href={paths.app}>l'appli Pétanque Meet</a>.{' '}
+						<a href="/petanque-meet/confidentialite/">Ce qui est stocké</a> · <a href="/petanque-meet/cgu/">Conditions</a>.
+					</>,
+					<>
+						Base map: <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
+						Browsing asks for nothing; posting, joining or reporting happens in{' '}
+						<a href={paths.app}>the Pétanque Meet app</a>.{' '}
+						<a href="/petanque-meet/confidentialite/" hrefLang="fr">What is stored</a> ·{' '}
+						<a href="/petanque-meet/cgu/" hrefLang="fr">Terms</a> (in French).
+					</>,
+				)}
 			</p>
 
 			{loginOpen && (WEB_LOGIN
 				? <LoginSheet onLogin={login} onClose={() => setLoginOpen(null)} />
 				: <AppSheet onClose={() => setLoginOpen(null)} />)}
-
-			{pinning && (
-				<PinSheet
-					platform={toHome.platform}
-					nativePrompt={toHome.nativePrompt}
-					onClose={() => setPinning(false)}
-				/>
-			)}
 		</div>
-	);
-}
-
-/** The answer to "plutôt une appli à télécharger": there already is one, it just
- *  never said so. iOS has no install API, so those steps are written out. */
-function PinSheet({ platform, nativePrompt, onClose }: {
-	platform: PinPlatform; nativePrompt: (() => void) | null; onClose: () => void;
-}) {
-	return (
-		<div className="re-modal" onClick={onClose}>
-			<div className="re-sheet" onClick={(e) => e.stopPropagation()}>
-				<h2>Mettre la carte sur ton téléphone</h2>
-				<p className="re-hint">
-					Rien à télécharger&nbsp;: la page s'installe comme une application, avec son icône,
-					et s'ouvre directement sur la carte.
-				</p>
-				{platform === 'ios' && (
-					<ol className="re-steps">
-						<li>Touche le bouton <strong>Partager</strong> en bas de Safari.</li>
-						<li>Fais défiler et choisis <strong>« Sur l'écran d'accueil »</strong>.</li>
-						<li>Valide avec <strong>Ajouter</strong>.</li>
-					</ol>
-				)}
-				{platform === 'android' && !nativePrompt && (
-					<ol className="re-steps">
-						<li>Ouvre le menu <strong>⋮</strong> de Chrome, en haut à droite.</li>
-						<li>Choisis <strong>« Ajouter à l'écran d'accueil »</strong> ou « Installer l'application ».</li>
-					</ol>
-				)}
-				{platform === 'desktop' && !nativePrompt && (
-					<p className="re-hint">
-						Sur ordinateur, ajoute simplement cette page à tes favoris&nbsp;: l'installation
-						a surtout du sens sur téléphone, là où on lit la carte au bord du terrain.
-					</p>
-				)}
-				<div className="re-formactions">
-					<button type="button" className="re-btn re-btn--ghost" onClick={onClose}>Fermer</button>
-					{nativePrompt && (
-						<button type="button" className="re-btn" onClick={() => { nativePrompt(); onClose(); }}>
-							Installer
-						</button>
-					)}
-				</div>
-			</div>
-		</div>
+		</LangContext.Provider>
 	);
 }
 
 /** Any action that needs an account, while the site is browse-only. */
 function AppSheet({ onClose }: { onClose(): void }) {
+	const tr = useT();
 	return (
 		<div className="re-modal" onClick={onClose}>
 			<div className="re-sheet re-login" onClick={(e) => e.stopPropagation()}>
-				<h2 className="re-apptitle"><AppIcon size={40} /> Ça se passe dans l'appli</h2>
+				<h2 className="re-apptitle"><AppIcon size={40} /> {tr("Ça se passe dans l'appli", 'It happens in the app')}</h2>
 				<p className="re-hint">
-					Ici, la carte se consulte librement. Pour publier une partie, la rejoindre, annoncer un concours
-					ou signaler un abus, utilise l'appli Pétanque Meet, sur Android et iPhone.
+					{tr(
+						"Ici, la carte se consulte librement. Pour publier une partie, la rejoindre, annoncer un concours ou signaler un abus, utilise l'appli Pétanque Meet, sur Android et iPhone.",
+						'Here, the map is free to browse. To post a game, join one, announce a tournament or report abuse, use the Pétanque Meet app, on Android and iPhone.',
+					)}
 				</p>
 				<StoreLinks />
 				<div className="re-formactions">
-					<button type="button" className="re-btn re-btn--ghost" onClick={onClose}>Fermer</button>
+					<button type="button" className="re-btn re-btn--ghost" onClick={onClose}>{tr('Fermer', 'Close')}</button>
 				</div>
 			</div>
 		</div>
@@ -1228,6 +1242,7 @@ function AppSheet({ onClose }: { onClose(): void }) {
 function LoginSheet({ onLogin, onClose }: {
 	onLogin(p: Provider): Promise<string | null>; onClose(): void;
 }) {
+	const tr = useT();
 	const [pending, setPending] = useState<Provider | null>(null);
 	const [failed, setFailed] = useState<string | null>(null);
 
@@ -1242,9 +1257,12 @@ function LoginSheet({ onLogin, onClose }: {
 	return (
 		<div className="re-modal" onClick={onClose}>
 			<div className="re-sheet re-login" onClick={(e) => e.stopPropagation()}>
-				<h2>Connecte-toi pour publier, rejoindre ou signaler</h2>
+				<h2>{tr('Connecte-toi pour publier, rejoindre ou signaler', 'Sign in to post, join or report')}</h2>
 				<p className="re-hint">
-					Regarder la carte reste libre. Le prénom affiché aux autres joueurs est toujours celui que tu tapes.
+					{tr(
+						'Regarder la carte reste libre. Le prénom affiché aux autres joueurs est toujours celui que tu tapes.',
+						'Browsing the map stays free. The first name other players see is always the one you type.',
+					)}
 				</p>
 				{(['google', 'apple'] as const).map((p) => (
 					<button
@@ -1254,7 +1272,7 @@ function LoginSheet({ onLogin, onClose }: {
 						disabled={pending !== null}
 						onClick={() => { void go(p); }}
 					>
-						{pending === p ? 'Redirection…' : `Continuer avec ${PROVIDER_LABEL[p]}`}
+						{pending === p ? tr('Redirection…', 'Redirecting…') : tr(`Continuer avec ${PROVIDER_LABEL[p]}`, `Continue with ${PROVIDER_LABEL[p]}`)}
 					</button>
 				))}
 				{failed && <p className="re-error" role="alert">{failed}</p>}

@@ -40,11 +40,13 @@ export function nearest<T extends { lat: number; lng: number }>(
 	return best;
 }
 
-/** "450 m" / "2,4 km" / "17 km" — French decimal comma. */
-export function formatDistance(m: number): string {
+/** "450 m" / "2,4 km" / "17 km" — a decimal comma in French, a point in English. */
+export function formatDistance(m: number, lang: 'fr' | 'en' = 'fr'): string {
 	if (m < 1000) return `${Math.round(m / 10) * 10} m`;
 	const km = m / 1000;
-	return km < 10 ? `${km.toFixed(1).replace('.', ',')} km` : `${Math.round(km)} km`;
+	if (km >= 10) return `${Math.round(km)} km`;
+	const one = km.toFixed(1);
+	return `${lang === 'en' ? one : one.replace('.', ',')} km`;
 }
 
 /** Keep a free pin plausible: anywhere in metropolitan France plus a margin.

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
 import StoreBadges from '../../components/StoreBadges.astro';
 import { MEET_STORES } from '../../data/petanqueMeet';
 ---
@@ -7,8 +8,10 @@ import { MEET_STORES } from '../../data/petanqueMeet';
 <BaseLayout
 	title="Télécharger Pétanque Meet sur Android et iPhone | Ludiven Studio"
 	description="L'appli Pétanque Meet sur le Play Store et l'App Store : les parties et les concours de pétanque autour de chez toi, sur ton téléphone."
+	altLang="/en/petanque-meet/download/"
 >
 	<div class="wrapper download-page stack gap-6">
+		<LangSwitch lang="fr" href="/en/petanque-meet/download/" />
 		<header class="stack gap-2">
 			<h1>Pétanque Meet sur ton téléphone</h1>
 			<p class="lead">Les parties et les concours de pétanque autour de chez toi. Publie ta partie, rejoins celle des autres, suis les concours.</p>
@@ -19,7 +22,7 @@ import { MEET_STORES } from '../../data/petanqueMeet';
 				<img class="icon" src="/assets/petanque-meet/icon.webp" alt="" width="72" height="72" />
 				<p><strong>Pétanque Meet</strong><br />L'appli est gratuite, sur Android et iPhone.</p>
 			</div>
-			<StoreBadges playStore={MEET_STORES.play} appStore={MEET_STORES.apple} lang="fr" />
+			<StoreBadges playStore={MEET_STORES.fr.play} appStore={MEET_STORES.fr.apple} lang="fr" />
 		</section>
 
 		<p class="muted">

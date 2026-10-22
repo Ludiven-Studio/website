@@ -8,6 +8,7 @@ import {
 	GAME_H, GAME_W, gameCard, gameClusterCard, ME_ICON, placeIcon, T_H, T_W, tournamentCard, tournamentClusterCard,
 	type Slot,
 } from './mapCards';
+import { pick, useLang } from './i18n';
 
 // Saint-Jean-de-Bournay — the launch area (spec §6).
 export const HOME: [number, number] = [45.4489, 5.1381];
@@ -120,6 +121,9 @@ export default function MeetupMap({
 	picking, pin, me = null, nearM = 0,
 	onHover, onSelect, onSelectSpot, onSelectTournament, onPick, handle,
 }: Props) {
+	const lang = useLang();
+	const tr = pick(lang);
+	const pitch = tr('Terrain', 'Pitch');
 	const boxRef = useRef<HTMLDivElement>(null);
 	const mapRef = useRef<L.Map | null>(null);
 	const eventLayer = useRef<L.LayerGroup | null>(null);
@@ -243,7 +247,7 @@ export default function MeetupMap({
 			}
 			const s = free[g[0]];
 			const m = L.marker([s.lat, s.lng], { icon: s.confirmed ? ICONS.spot : ICONS.hollow, opacity: 0.85 })
-				.bindTooltip(textNode(s.label || 'Terrain'), { direction: 'top' })
+				.bindTooltip(textNode(s.label || pitch), { direction: 'top' })
 				// While picking, a marker would otherwise swallow the click that is
 				// trying to drop the pin. Snapping to the terrain is the better answer.
 				.on('click', () => {
@@ -264,11 +268,11 @@ export default function MeetupMap({
 		const slots = zoom >= NO_CLUSTER_ZOOM ? fanSlots(events, GAME_W, GAME_H) : null;
 		for (const g of cardGroupsOf(events, GAME_W, GAME_H)) {
 			if (g.length > 1) {
-				addCluster(layer, events, g, gameClusterCard(g.length));
+				addCluster(layer, events, g, gameClusterCard(g.length, lang));
 				continue;
 			}
 			const e = events[g[0]];
-			const m = L.marker([e.lat, e.lng], { icon: gameCard(e, slots?.get(e)), title: e.label || 'Terrain' })
+			const m = L.marker([e.lat, e.lng], { icon: gameCard(e, slots?.get(e), lang), title: e.label || pitch })
 				// Same rule as the terrains above, and the case that made it necessary:
 				// a marker over the pin you were aiming for opened its event, which
 				// closed the half-filled form without a word.
@@ -300,7 +304,7 @@ export default function MeetupMap({
 		const lift = (at: { lat: number; lng: number }, slot: Slot = [0, 0]): Slot =>
 			map ? liftOver(map.project([at.lat, at.lng], zoom), slot, T_W, T_H, games, GAME_W, GAME_H, FAN_GAP) : slot;
 		const add = (t: MeetupTournament, at: { lat: number; lng: number }, slot?: Slot): void => {
-			const m = L.marker([at.lat, at.lng], { icon: tournamentCard(t, lift(at, slot)), title: t.title, zIndexOffset: 500 })
+			const m = L.marker([at.lat, at.lng], { icon: tournamentCard(t, lift(at, slot), lang), title: t.title, zIndexOffset: 500 })
 				.on('click', () => {
 					if (cb.current.picking) cb.current.onPick(t.lat, t.lng);
 					else cb.current.onSelectTournament(t.id);
@@ -314,7 +318,7 @@ export default function MeetupMap({
 				add(tournaments[g[0]], tournaments[g[0]]);
 			} else if (!fan) {
 				const c = centreOf(g, (i) => tournaments[i]);
-				L.marker([c.lat, c.lng], { icon: tournamentClusterCard(g.length, lift(c)), title: `${g.length}`, zIndexOffset: 500 })
+				L.marker([c.lat, c.lng], { icon: tournamentClusterCard(g.length, lift(c), lang), title: `${g.length}`, zIndexOffset: 500 })
 					.on('click', () => mapRef.current?.flyTo([c.lat, c.lng], Math.min(19, zoom + 2), { duration: 0.6 }))
 					.addTo(layer);
 			} else {
@@ -359,5 +363,5 @@ export default function MeetupMap({
 		boxRef.current?.classList.toggle('re-map--picking', picking);
 	}, [picking]);
 
-	return <div ref={boxRef} className="re-map" role="application" aria-label="Carte des parties" />;
+	return <div ref={boxRef} className="re-map" role="application" aria-label={tr('Carte des parties', 'Map of games')} />;
 }

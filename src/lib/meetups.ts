@@ -51,10 +51,12 @@ export interface EventInput {
 export const contestsOf = (t: MeetupTournament): TournamentContest[] => (t.contests?.length ? t.contests : [t]);
 
 /** The approval line, worded like the app. A "no" from the organizer stays "not checked". */
-export const approvalLine = (t: MeetupTournament): { text: string; verified: boolean } =>
-	t.approval_source ? { text: `Agréé FFPJP · ${t.approval_source}`, verified: true }
-	: t.approval_declared ? { text: 'Agréé FFPJP selon l’organisateur', verified: false }
-	: { text: 'Agrément FFPJP non vérifié', verified: false };
+export const approvalLine = (t: MeetupTournament, lang: 'fr' | 'en' = 'fr'): { text: string; verified: boolean } => {
+	const en = lang === 'en';
+	return t.approval_source ? { text: `${en ? 'FFPJP-approved' : 'Agréé FFPJP'} · ${t.approval_source}`, verified: true }
+		: t.approval_declared ? { text: en ? 'FFPJP-approved, according to the organizer' : 'Agréé FFPJP selon l’organisateur', verified: false }
+		: { text: en ? 'FFPJP approval not checked' : 'Agrément FFPJP non vérifié', verified: false };
+};
 
 export const listMeetups = (): Promise<{ events: MeetupEvent[]; spots: MeetupSpot[]; tournaments?: MeetupTournament[] }> =>
 	call('list');

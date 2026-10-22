@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import LangSwitch from '../components/LangSwitch.astro';
 import RencontresApp from '../components/rencontres/RencontresApp';
 // Leaflet's stylesheet is aggressively global (it styles bare .leaflet-* classes
 // and sets sizing on its container's children). Importing it from the page keeps
@@ -11,8 +12,17 @@ const title = 'Rencontres pétanque — joueurs et concours autour de chez toi |
 const description = "La carte des parties de pétanque autour de Saint-Jean-de-Bournay et de l'Isère : qui joue, quand, combien il manque de joueurs, et les concours à venir. Consultation libre.";
 ---
 
-<BaseLayout title={title} description={description}>
+<BaseLayout title={title} description={description} altLang="/en/petanque-meet/">
 	<div class="wrapper">
+		<div class="lang"><LangSwitch lang="fr" href="/en/petanque-meet/" /></div>
 		<RencontresApp client:only="react" />
 	</div>
 </BaseLayout>
+
+<style>
+	/* The island's column (.re-root), so the flags sit over the map, not at the window's edge. */
+	.lang {
+		max-width: 780px;
+		margin: 0 auto 0.5rem;
+	}
+</style>

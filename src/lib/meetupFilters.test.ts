@@ -208,4 +208,11 @@ describe('custom dates', () => {
 		expect(rangeLabel({ from: '2026-10-24', to: '2026-10-27' })).toBe('24 – 27 oct.');
 		expect(rangeLabel({ from: '2026-10-30', to: '2026-11-02' })).toBe('30 oct. – 2 nov.');
 	});
+
+	it('names it in English on the English page', () => {
+		expect(rangeLabel({ from: '', to: '' }, 'en')).toBe('Dates…');
+		expect(rangeLabel({ from: '2026-10-24', to: '' }, 'en')).toBe('24 Oct');
+		expect(rangeLabel({ from: '2026-10-24', to: '2026-10-27' }, 'en')).toBe('24 – 27 Oct');
+		expect(rangeLabel({ from: '2026-10-30', to: '2026-11-02' }, 'en')).toBe('30 Oct – 2 Nov');
+	});
 });
