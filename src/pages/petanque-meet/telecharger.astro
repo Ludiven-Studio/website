@@ -14,8 +14,11 @@ import { MEET_STORES } from '../../data/petanqueMeet';
 			<p class="lead">Les parties et les concours de pétanque autour de chez toi. Publie ta partie, rejoins celle des autres, suis les concours.</p>
 		</header>
 
-		<section class="card stack gap-3">
-			<p>L'appli est gratuite, sur Android et iPhone.</p>
+		<section class="card">
+			<div class="app">
+				<img class="icon" src="/assets/petanque-meet/icon.webp" alt="" width="72" height="72" />
+				<p><strong>Pétanque Meet</strong><br />L'appli est gratuite, sur Android et iPhone.</p>
+			</div>
 			<StoreBadges playStore={MEET_STORES.play} appStore={MEET_STORES.apple} lang="fr" />
 		</section>
 
@@ -43,5 +46,32 @@ import { MEET_STORES } from '../../data/petanqueMeet';
 		border: 1px solid var(--gray-800);
 		border-radius: 1rem;
 		background: var(--gray-999_40);
+	}
+	.app {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
+	/* Under the icon, aligned with it. */
+	.card :global(.store-badges) {
+		justify-content: flex-start;
+		gap: 1rem;
+		margin-top: 1.25rem;
+	}
+	.app p {
+		margin: 0;
+		line-height: 1.5;
+	}
+	.app strong {
+		font-family: var(--font-brand);
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+	}
+	.icon {
+		flex: none;
+		width: 4.5rem;
+		height: 4.5rem;
+		border-radius: 22%;
+		box-shadow: 0 1px 4px rgba(9, 11, 17, 0.18);
 	}
 </style>

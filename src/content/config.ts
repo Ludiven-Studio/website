@@ -18,6 +18,7 @@ const workSchema = z.object({
 	playStore: z.string().url().optional(),
 	/** The product page, for research write-ups whose app has its own landing. */
 	appPage: z.string().optional(),
+	appPageLabel: z.string().optional(),
 });
 
 export const collections = {

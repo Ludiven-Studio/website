@@ -47,11 +47,19 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 								)}
 								{entry.data.tags.map((t) => <Pill>{t}</Pill>)}
 							</div>
-							<p class="description">{entry.data.description}</p>
-							<StoreBadges appStore={entry.data.appStore} playStore={entry.data.playStore} lang="fr" />
-							{entry.data.appPage && (
-								<a class="app-page" href={entry.data.appPage}>Voir la page de l'application <Icon icon="arrow-right" /></a>
-							)}
+							<div class="summary">
+								<p class="description">{entry.data.description}</p>
+								{(entry.data.appStore || entry.data.playStore || entry.data.appPage) && (
+									<div class="cta">
+										<StoreBadges appStore={entry.data.appStore} playStore={entry.data.playStore} lang="fr" />
+										{entry.data.appPage && (
+											<a class="app-page" href={entry.data.appPage}>
+												{entry.data.appPageLabel || "Voir la page de l'application"} <Icon icon="arrow-right" />
+											</a>
+										)}
+									</div>
+								)}
+							</div>
 						</div>
 					</Hero>
 				</div>
@@ -99,7 +107,6 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 		flex-direction: column;
 		padding: 0.5rem;
 		gap: 1.5rem;
-		justify-content: space-between;
 		align-items: center;
 	}
 
@@ -107,11 +114,35 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 		display: flex;
 		gap: 0.5rem;
 		flex-wrap: wrap;
+		justify-content: center;
+	}
+
+	.summary {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1.5rem;
 	}
 
 	.description {
 		font-size: var(--text-lg);
 		max-width: 54ch;
+	}
+
+	/* Store badges and the product page on one row, at one height. */
+	.cta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem 1rem;
+	}
+
+	/* 42px keeps both badges on one line down to a 360px phone. */
+	.cta :global(.store-badges) {
+		--badge-h: 2.625rem;
+		gap: 0.625rem;
+		margin-top: 0;
 	}
 
 	.content {
@@ -223,8 +254,21 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 		}
 
 		.details {
-			flex-direction: row;
-			gap: 2.5rem;
+			align-items: flex-start;
+		}
+
+		.tags,
+		.cta {
+			justify-content: flex-start;
+		}
+
+		.summary {
+			align-items: flex-start;
+		}
+
+		.cta :global(.store-badges) {
+			--badge-h: 3rem;
+			gap: 0.75rem;
 		}
 
 		.content :global(blockquote) {
@@ -232,18 +276,30 @@ const altLang = en ? `/en/work/${entry.slug}/` : undefined;
 		}
 	}
 
+	/* Two columns, not four in a row: that squashed the badges and broke at tablet width. */
+	@media (min-width: 60em) {
+		.details {
+			display: grid;
+			grid-template-columns: minmax(min-content, 1fr) minmax(0, 2fr);
+			align-items: center;
+			gap: 2.5rem 3rem;
+		}
+	}
+
 	.app-page {
 		display: inline-flex;
-		flex-shrink: 0;
-		white-space: nowrap;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.6rem 1.2rem;
+		min-height: 3rem;
+		max-width: 100%;
+		padding: 0.5rem 1.25rem;
 		border-radius: 999rem;
 		background: var(--accent-regular);
 		color: var(--accent-text-over);
 		font-family: var(--font-brand);
+		font-size: var(--text-md);
 		font-weight: 600;
+		line-height: 1.2;
 		text-decoration: none;
 		transition: background-color var(--theme-transition);
 	}

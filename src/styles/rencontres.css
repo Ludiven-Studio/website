@@ -262,6 +262,47 @@
 .re-install:hover,
 .re-demo-btn:hover { color: var(--accent-regular); border-color: var(--accent-regular); }
 
+/* ---- The app: publishing and joining happen there ---- */
+.re-appcard {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	gap: 0.75rem 0.9rem;
+	margin-top: 0.75rem;
+	padding: 0.75rem 0.9rem;
+	background: var(--gray-999_40);
+	border: 1px solid var(--gray-700);
+	border-radius: 0.8rem;
+}
+.re-appicon {
+	flex: none;
+	border-radius: 22%;
+	box-shadow: 0 1px 4px rgba(9, 11, 17, 0.18);
+}
+.re-appcard .re-appicon { width: 3.5rem; height: 3.5rem; }
+.re-appcard-text {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	font-size: var(--text-sm);
+	line-height: 1.4;
+	color: var(--gray-300);
+}
+.re-appcard-text strong {
+	font-family: var(--font-brand);
+	font-size: var(--text-base);
+	color: var(--gray-0);
+}
+.re-appcard .store-badges { grid-column: 1 / -1; justify-content: flex-start; }
+@media (min-width: 44em) {
+	.re-appcard { grid-template-columns: auto minmax(0, 1fr) auto; }
+	.re-appcard .store-badges { grid-column: auto; }
+}
+.re-apptitle { display: flex; align-items: center; gap: 0.65rem; }
+.re-apptitle .re-appicon { width: 2.5rem; height: 2.5rem; }
+.re-login .store-badges { margin-block: 0.3rem; }
+
 .re-modal {
 	position: fixed;
 	inset: 0;

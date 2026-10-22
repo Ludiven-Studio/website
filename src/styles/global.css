@@ -237,6 +237,7 @@ table, th, td {
 /* Store badges (Google Play / App Store). The Play PNG is pre-cropped to its
    visible badge, so both images share the same height. */
 .store-badges {
+	--badge-h: 3.5rem;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -244,9 +245,40 @@ table, th, td {
 	gap: 1.5rem;
 	margin-top: 1.5rem;
 }
+/* Small enough for both badges to share one line on a phone. */
+.store-badges--compact {
+	--badge-h: 2.75rem;
+	gap: 0.625rem;
+	margin-top: 0;
+}
+.store-badges a {
+	display: block;
+	flex: none;
+	border-radius: calc(var(--badge-h) * 0.16);
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.store-badges a:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 0.4rem 1rem rgba(9, 11, 17, 0.25);
+}
+.store-badges a:focus-visible {
+	outline: 2px solid var(--accent-regular);
+	outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.store-badges a {
+		transition: none;
+	}
+	.store-badges a:hover {
+		transform: none;
+	}
+}
 .store-badges img {
-	height: 3.5rem;
+	display: block;
+	height: var(--badge-h);
 	width: auto;
+	/* The global img cap squashed a badge in a narrow column: wrap instead. */
+	max-width: none;
 	border: 0 !important;
 	border-radius: 0 !important;
 	box-shadow: none !important;

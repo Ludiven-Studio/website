@@ -5,9 +5,10 @@ interface Props {
 	appStore?: string | undefined;
 	playStore?: string | undefined;
 	lang?: 'fr' | 'en';
+	class?: string;
 }
 
-const { appStore, playStore, lang = 'fr' } = Astro.props;
+const { appStore, playStore, lang = 'fr', class: className } = Astro.props;
 const play = `/assets/badges/google-play-${lang}.png`;
 const apple = `/assets/badges/app-store-${lang}.svg`;
 
@@ -18,7 +19,7 @@ const alt =
 ---
 
 {(appStore || playStore) && (
-	<div class="store-badges">
+	<div class:list={['store-badges', className]}>
 		{playStore && (
 			<a href={playStore} target="_blank" rel="noopener">
 				<img class="badge-play" src={play} alt={alt.play} />

@@ -6,6 +6,7 @@ img_alt: Pétanque Meet — trouve des joueurs de pétanque près de chez toi
 role: Développeur
 org: Ludiven Studio
 appPage: /petanque-meet/
+appPageLabel: Consulter la carte
 appStore: https://apps.apple.com/fr/app/id6823583416
 playStore: https://play.google.com/store/apps/details?id=com.ludivenstudio.petanquemeet&hl=fr
 description: |

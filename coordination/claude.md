@@ -244,3 +244,22 @@
 - Ressources : serveur de dev sur les ports 4431-4439.
 - 2026-10-22 ~08:50 : build complet lancé (écrit `dist/`, `.astro/`, `public/vendor/`), puis guards Playwright sur les ports 4366-4440.
 - Fait : `shop.ts` (catalogue Unity, prix en cocoins), `ShopPanel.tsx`, `bouleLook.ts`, `decors.ts` (place, crépuscule, port), terrains irréguliers en partie libre, niveaux et en ligne (salons `petanque2-*`), défi du jour inchangé (piste égale, boule standard). Vérifié : vitest 127/127, astro check 0 erreur, build + précache + liens OK, guards shop/levels/daily/turns/pad/read/sfx/mp/resync OK, audit téléphone sans chevauchement. `check-petanque-camera` : un point (« full lob ») échoue aussi sur HEAD (témoin rejoué dans un worktree supprimé ensuite) : antérieur à ce travail. Quatre guards périmés depuis le 26/09 (carte « Libre ») corrigés.
+
+## 2026-10-22 — Pétanque Meet : présentation de la fiche projet et boutons vers les stores
+- Statut : en cours (2026-10-22, Europe/Paris). Demande de l'utilisateur : la présentation de la fiche Pétanque Meet
+  n'est pas terrible, améliorer les boutons vers les stores, de même sur la page de consultation (la carte).
+- Réservations actives : `src/components/StoreBadges.astro`, `src/styles/global.css` (bloc `.store-badges` seulement),
+  `src/pages/work/[...slug].astro`, `src/pages/en/work/[...slug].astro`, `src/components/rencontres/StoreLinks.tsx`,
+  `src/components/rencontres/RencontresApp.tsx`, `src/styles/rencontres.css`, `src/pages/petanque-meet/telecharger.astro`,
+  `src/content/work/petanque-meet.md`, `src/content/work-en/petanque-meet.md`, `public/assets/badges/`,
+  `src/content/config.ts` (un champ `appPageLabel`), `public/assets/petanque-meet/icon.webp` (nouveau, icône de l'appli).
+- Ressources : serveur de dev sur le port 4462 (arrêté). Lancement de eslint, `astro check` puis `astro build` (écrit `dist/`
+  et `.astro/`), `check-precache` et `check-links`.
+- Fait : fiche projet en deux colonnes (tags | description + rangée badges/bouton de même hauteur), badges jamais écrasés
+  (`max-width: none`, variante `store-badges--compact`), bandeau de l'appli (icône + badges) en tête de la carte, badges
+  côte à côte dans la fenêtre « Ça se passe dans l'appli », icône sur la page de téléchargement, libellé « Consulter la
+  carte » (champ `appPageLabel`). Vérifié : eslint OK, `astro check` 0 erreur, build OK (141 pages), précache et liens OK,
+  captures dev + build (19 vues, clair/sombre, 360 à 1400 px) sans badge déformé ni défilement horizontal (témoin : un
+  écrasement forcé est bien détecté).
+- Commité à la demande de l'utilisateur (« commit et push ») : mes 12 fichiers et cette section seulement (journal
+  mixte). Statut : terminé. Réservations libérées.

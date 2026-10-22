@@ -33,7 +33,7 @@ import EventPanel from './EventPanel';
 import TournamentPanel from './TournamentPanel';
 import { demoEvents, demoSignups, demoTournaments, isDemo } from '../../lib/meetupDemo';
 import MyGames from './MyGames';
-import StoreLinks from './StoreLinks';
+import StoreLinks, { AppCard, AppIcon } from './StoreLinks';
 import { formatShortDay, formatTime } from './format';
 
 const DATES: DateFilter[] = ['today', 'weekend', 'week', 'fortnight', 'all', 'custom'];
@@ -650,24 +650,27 @@ export default function RencontresApp() {
 				<p className="re-sub">
 					Trouve des joueurs et des concours autour de chez toi.
 				</p>
-				<div className="re-account">
-					{session ? (
-						<>
-							<span>Connecté avec <strong>{accountLabel(session)}</strong></span>
-							<button type="button" className="re-link" disabled={busy} onClick={logout}>Se déconnecter</button>
-							<button type="button" className="re-link re-link--danger" disabled={busy} onClick={removeAccount}>
-								Supprimer mon compte
-							</button>
-						</>
-					) : (
-						<>
-							<span>Regarder la carte est libre.</span>
-							<button type="button" className="re-link" onClick={() => setLoginOpen('act')}>
-								{WEB_LOGIN ? 'Se connecter pour publier ou rejoindre' : "Publier ou rejoindre : dans l'appli"}
-							</button>
-						</>
-					)}
-				</div>
+				{(session || WEB_LOGIN) && (
+					<div className="re-account">
+						{session ? (
+							<>
+								<span>Connecté avec <strong>{accountLabel(session)}</strong></span>
+								<button type="button" className="re-link" disabled={busy} onClick={logout}>Se déconnecter</button>
+								<button type="button" className="re-link re-link--danger" disabled={busy} onClick={removeAccount}>
+									Supprimer mon compte
+								</button>
+							</>
+						) : (
+							<>
+								<span>Regarder la carte est libre.</span>
+								<button type="button" className="re-link" onClick={() => setLoginOpen('act')}>
+									Se connecter pour publier ou rejoindre
+								</button>
+							</>
+						)}
+					</div>
+				)}
+				<AppCard />
 				{!toHome.installed && (
 					<button
 						type="button"
@@ -1207,7 +1210,7 @@ function AppSheet({ onClose }: { onClose(): void }) {
 	return (
 		<div className="re-modal" onClick={onClose}>
 			<div className="re-sheet re-login" onClick={(e) => e.stopPropagation()}>
-				<h2>Ça se passe dans l'appli</h2>
+				<h2 className="re-apptitle"><AppIcon size={40} /> Ça se passe dans l'appli</h2>
 				<p className="re-hint">
 					Ici, la carte se consulte librement. Pour publier une partie, la rejoindre, annoncer un concours
 					ou signaler un abus, utilise l'appli Pétanque Meet, sur Android et iPhone.
