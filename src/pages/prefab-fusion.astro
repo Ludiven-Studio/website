@@ -1,0 +1,202 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Hero from '../components/Hero.astro';
+import CallToAction from '../components/CallToAction.astro';
+import Icon from '../components/Icon.astro';
+import LangSwitch from '../components/LangSwitch.astro';
+
+// Keep in step with the package: Documentation/Prefab Fusion Manual.md in the LudivenTools repo.
+const features: { title: string; body: string }[] = [
+	{
+		title: 'Extraire en prefab imbriqué',
+		body: "Choisissez une partie d'un prefab. Prefab Fusion retrouve la même partie dans vos autres prefabs et fait de chaque copie une instance d'un seul nouveau prefab. Chaque copie garde ses propres valeurs en overrides, et les références des scènes, des prefabs et des assets suivent.",
+	},
+	{
+		title: 'Faire une variante, sur place',
+		body: "Transformez un prefab existant en variante d'un autre. Il garde son chemin et son GUID, seules ses différences deviennent des overrides, et tout ce qui l'utilise continue de fonctionner.",
+	},
+	{
+		title: 'Trouver quoi restructurer',
+		body: 'Un scan liste les blocs répétés entre vos prefabs, et les paires de prefabs qui devraient être des variantes.',
+	},
+	{
+		title: 'Aperçu, vérification, annulation',
+		body: "Un aperçu avant tout changement, une alerte sur les fichiers aux modifications git non commitées, la vérification de chaque valeur après chaque restructuration, et l'annulation des dix dernières.",
+	},
+];
+
+// Captures of the real editor windows, dark skin.
+const shots = [
+	{ src: '/assets/prefab-fusion/main.webp', w: 1230, h: 1184, wide: true, caption: 'Les parties marquées ×N se répètent dans vos prefabs : double-cliquez sur l\'une d\'elles pour l\'extraire.' },
+	{ src: '/assets/prefab-fusion/extract.webp', w: 900, h: 1004, wide: false, caption: 'Avant d\'extraire : chaque copie trouvée, et le nombre de valeurs qu\'elle garde en overrides.' },
+	{ src: '/assets/prefab-fusion/variant.webp', w: 810, h: 884, wide: false, caption: 'Une variante sur place : la part de structure commune, les overrides, les enfants ajoutés.' },
+	{ src: '/assets/prefab-fusion/prefab-pairs.webp', w: 1350, h: 348, wide: true, caption: 'Le scan d\'un dossier propose les prefabs qui pourraient être des variantes.' },
+];
+
+const title = 'Prefab Fusion : restructurer les prefabs Unity en prefabs imbriqués et en variantes | Ludiven Studio';
+const description = "Prefab Fusion est un outil pour l'éditeur Unity : les parties de prefabs copiées-collées deviennent un seul prefab imbriqué, les quasi-copies deviennent des variantes, sur place, en gardant chaque valeur et chaque référence.";
+---
+
+<BaseLayout title={title} description={description} image="/assets/work/og/prefab-fusion.jpg" altLang="/en/prefab-fusion/">
+	<main class="wrapper stack gap-12 product">
+		<div class="stack gap-4">
+			<LangSwitch lang="fr" href="/en/prefab-fusion/" />
+			<Hero
+				title="Prefab Fusion"
+				tagline="Un outil pour l'éditeur Unity qui restructure les prefabs : les parties copiées-collées deviennent un seul prefab imbriqué, les quasi-copies deviennent des variantes, en gardant chaque valeur et chaque référence."
+			/>
+			<p class="status">Bientôt sur l'Unity Asset Store.</p>
+		</div>
+
+		<section class="stack gap-4">
+			<h2>Ce que fait l'outil</h2>
+			<div class="features">
+				{features.map((f) => (
+					<div class="feature stack gap-2">
+						<h3>{f.title}</h3>
+						<p>{f.body}</p>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2>En images</h2>
+			<div class="shots">
+				{shots.map((s) => (
+					<figure class:list={[{ wide: s.wide }]}>
+						<img src={s.src} width={s.w} height={s.h} alt={s.caption} loading="lazy" decoding="async" />
+						<figcaption>{s.caption}</figcaption>
+					</figure>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Aussi dans le paquet</h2>
+			<p>
+				Exportez un prefab en JSON lisible, modifiez-le, et reconstruisez le prefab sur place. Générez des scripts C#
+				qui reconstruisent un prefab par le code. Faites un rendu PNG d'un prefab. Lancez chaque commande en mode batch
+				ou depuis l'éditeur ouvert, pour les scripts, la CI et les agents de code IA.
+			</p>
+		</section>
+
+		<section class="stack gap-2">
+			<h2>Configuration requise</h2>
+			<ul>
+				<li>Unity 2022.3 LTS ou plus récent. Testé sous Windows avec 2022.3, 6.0, 6.3, 6.4, 6.5 et 6.6.</li>
+				<li>Le paquet Unity UI (uGUI), et TextMeshPro sur 2022.3.</li>
+				<li>Des assets sérialisés en texte (Force Text, le réglage par défaut d'Unity), pour que les références puissent suivre.</li>
+				<li>Uniquement dans l'éditeur&nbsp;: rien ne part dans vos builds. Prefab Fusion n'envoie rien nulle part&nbsp;: il lit et écrit seulement les fichiers de votre projet.</li>
+				<li>L'interface et le manuel sont en anglais.</li>
+			</ul>
+		</section>
+
+		<section class="stack gap-4 support" id="support">
+			<h2>Support</h2>
+			<p>Le manuel est livré avec le paquet, dans <code>Documentation/</code>. Pour tout le reste, écrivez-moi&nbsp;:</p>
+			<div class="mail">
+				<CallToAction href="mailto:contact@ludiven-studio.fr?subject=Support%20Prefab%20Fusion">
+					contact@ludiven-studio.fr
+					<Icon icon="paper-plane-tilt" size="1.2em" />
+				</CallToAction>
+			</div>
+			<p>Pour m'aider à reproduire un problème, indiquez si possible&nbsp;:</p>
+			<ul>
+				<li>votre version d'Unity et votre pipeline de rendu&nbsp;;</li>
+				<li>la version de Prefab Fusion (en haut de <code>CHANGELOG.md</code>)&nbsp;;</li>
+				<li>ce que vous avez fait, ce que vous attendiez, et ce qui s'est passé&nbsp;;</li>
+				<li>le rapport ou les messages de la console (les commandes les écrivent aussi dans <code>PrefabFusion/_pending_log.txt</code>)&nbsp;;</li>
+				<li>si vous le pouvez, un petit prefab qui montre le problème.</li>
+			</ul>
+		</section>
+	</main>
+</BaseLayout>
+
+<style>
+	.product {
+		max-width: 68ch;
+		color: var(--gray-200);
+		font-size: var(--text-md);
+		line-height: 1.6;
+	}
+	.product h2 {
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+	.product h3 {
+		font-size: var(--text-lg);
+		color: var(--gray-0);
+	}
+	.status {
+		align-self: center;
+		padding: 0.4rem 1rem;
+		border: 1px solid var(--accent-regular);
+		border-radius: 999rem;
+		color: var(--gray-0);
+		font-size: var(--text-sm);
+	}
+	.features {
+		display: grid;
+		gap: 1rem;
+	}
+	.feature {
+		padding: 1.25rem 1.5rem;
+		border: 1px solid var(--gray-800);
+		border-radius: 1rem;
+		background-color: var(--gray-999_40);
+		box-shadow: var(--shadow-sm);
+	}
+	/* Wider than the text column, centered on it, so the windows stay readable. */
+	.shots {
+		--shots-width: min(64rem, 100vw - 2rem);
+		width: var(--shots-width);
+		margin-inline: calc((100% - var(--shots-width)) / 2);
+		display: grid;
+		gap: 1.5rem;
+	}
+	.shots figure {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+	.shots img {
+		width: 100%;
+		height: auto;
+		border-radius: 0.75rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-md);
+	}
+	.shots figcaption {
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+		text-align: center;
+	}
+	.product ul {
+		padding-left: 1.2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+	.product code {
+		font-size: 0.9em;
+		color: var(--gray-0);
+	}
+	.mail {
+		display: flex;
+		justify-content: center;
+	}
+	@media (min-width: 50em) {
+		.features {
+			grid-template-columns: 1fr 1fr;
+		}
+		.shots {
+			grid-template-columns: 1fr 1fr;
+			align-items: start;
+		}
+		.shots .wide {
+			grid-column: 1 / -1;
+		}
+	}
+</style>

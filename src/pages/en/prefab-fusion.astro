@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Hero from '../../components/Hero.astro';
 import CallToAction from '../../components/CallToAction.astro';
 import Icon from '../../components/Icon.astro';
+import LangSwitch from '../../components/LangSwitch.astro';
 
 // Keep in step with the package: Documentation/Prefab Fusion Manual.md in the LudivenTools repo.
 const features: { title: string; body: string }[] = [
@@ -24,13 +25,22 @@ const features: { title: string; body: string }[] = [
 	},
 ];
 
+// Captures of the real editor windows, dark skin.
+const shots = [
+	{ src: '/assets/prefab-fusion/main.webp', w: 1230, h: 1184, wide: true, caption: 'Parts marked ×N repeat across your prefabs: double-click one to extract it.' },
+	{ src: '/assets/prefab-fusion/extract.webp', w: 900, h: 1004, wide: false, caption: 'Before extracting: every copy found, and how many of its values it keeps as overrides.' },
+	{ src: '/assets/prefab-fusion/variant.webp', w: 810, h: 884, wide: false, caption: 'A variant, in place: how much structure is shared, the overrides, the added children.' },
+	{ src: '/assets/prefab-fusion/prefab-pairs.webp', w: 1350, h: 348, wide: true, caption: 'Scanning a folder suggests the prefabs that could be variants.' },
+];
+
 const title = 'Prefab Fusion: refactor Unity prefabs into nested prefabs and variants | Ludiven Studio';
 const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab parts become one nested prefab, near-copies become variants, in place, with every value and reference kept.';
 ---
 
-<BaseLayout title={title} description={description} lang="en">
+<BaseLayout title={title} description={description} image="/assets/work/og/prefab-fusion.jpg" lang="en" altLang="/prefab-fusion/">
 	<main class="wrapper stack gap-12 product">
 		<div class="stack gap-4">
+			<LangSwitch lang="en" href="/prefab-fusion/" />
 			<Hero
 				title="Prefab Fusion"
 				tagline="A Unity editor tool to refactor prefabs: copy-pasted parts become one nested prefab, near-copies become variants, with every value and reference kept."
@@ -46,6 +56,18 @@ const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab pa
 						<h3>{f.title}</h3>
 						<p>{f.body}</p>
 					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="stack gap-4">
+			<h2>Screenshots</h2>
+			<div class="shots">
+				{shots.map((s) => (
+					<figure class:list={[{ wide: s.wide }]}>
+						<img src={s.src} width={s.w} height={s.h} alt={s.caption} loading="lazy" decoding="async" />
+						<figcaption>{s.caption}</figcaption>
+					</figure>
 				))}
 			</div>
 		</section>
@@ -124,6 +146,32 @@ const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab pa
 		background-color: var(--gray-999_40);
 		box-shadow: var(--shadow-sm);
 	}
+	/* Wider than the text column, centered on it, so the windows stay readable. */
+	.shots {
+		--shots-width: min(64rem, 100vw - 2rem);
+		width: var(--shots-width);
+		margin-inline: calc((100% - var(--shots-width)) / 2);
+		display: grid;
+		gap: 1.5rem;
+	}
+	.shots figure {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+	.shots img {
+		width: 100%;
+		height: auto;
+		border-radius: 0.75rem;
+		border: 1px solid var(--gray-800);
+		box-shadow: var(--shadow-md);
+	}
+	.shots figcaption {
+		font-size: var(--text-sm);
+		color: var(--gray-300);
+		text-align: center;
+	}
 	.product ul {
 		padding-left: 1.2rem;
 		display: flex;
@@ -141,6 +189,13 @@ const description = 'Prefab Fusion is a Unity editor tool: copy-pasted prefab pa
 	@media (min-width: 50em) {
 		.features {
 			grid-template-columns: 1fr 1fr;
+		}
+		.shots {
+			grid-template-columns: 1fr 1fr;
+			align-items: start;
+		}
+		.shots .wide {
+			grid-column: 1 / -1;
 		}
 	}
 </style>
