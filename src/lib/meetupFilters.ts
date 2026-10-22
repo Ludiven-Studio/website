@@ -9,6 +9,9 @@ import { contestsOf, type MeetupTournament } from './meetups';
 
 export type DateFilter = 'today' | 'weekend' | 'week' | 'fortnight' | 'all' | 'custom';
 export type RoleFilter = 'all' | Role;
+export type ShowFilter = 'all' | 'games' | 'tournaments';
+/** As in the app: 'approved' keeps the checked and the declared ones, 'unknown' the rest. */
+export type ApprovalFilter = 'all' | 'approved' | 'unknown';
 
 /** Paris days, YYYY-MM-DD, both included. An empty `to` means the `from` day alone. */
 export interface DayRange { from: string; to: string; }
@@ -22,6 +25,8 @@ export interface Filters extends DayRange {
 	nearKm: number;
 	/** Tournaments only: games carry no poster. */
 	postersOnly: boolean;
+	show: ShowFilter;
+	approval: ApprovalFilter;
 }
 
 /** What "autour de mes lieux" offers, as in the app. */
@@ -29,6 +34,7 @@ export const NEAR_KM = [5, 10, 20, 30, 50] as const;
 
 export const DEFAULT_FILTERS: Filters = {
 	date: 'week', from: '', to: '', role: 'all', freeSeatsOnly: false, nearPlaces: false, nearKm: NEAR_M / 1000, postersOnly: false,
+	show: 'all', approval: 'all',
 };
 
 export const DATE_LABEL: Record<DateFilter, string> = {
@@ -115,6 +121,7 @@ export function applyFilters(
 ): MeetupEvent[] {
 	// An empty list of places cannot constrain anything. Enforcing it would empty
 	// the map with no way to tell why — the bar hides the toggle instead.
+	if (f.show === 'tournaments') return [];
 	const near = f.nearPlaces && places.length > 0;
 	return events
 		.filter((e) => e.status === 'open')
@@ -129,17 +136,23 @@ export function applyFilters(
  *  the date itself and counts these. */
 export function activeCount(f: Filters, hasPlaces: boolean): number {
 	return Number(f.role !== 'all') + Number(f.freeSeatsOnly) + Number(f.postersOnly)
-		+ Number(f.nearPlaces && hasPlaces);
+		+ Number(f.nearPlaces && hasPlaces) + Number(f.show !== 'all') + Number(f.approval !== 'all');
 }
 
-/** The date, place and poster filters: a tournament has no seats and no role. It
- *  stays while any of its contests falls in the range. poster_url is only set once
+/** A checked source or the organizer's yes both count as approved, as approvalLine words them. */
+export const isApproved = (t: Pick<MeetupTournament, 'approval_source' | 'approval_declared'>): boolean =>
+	Boolean(t.approval_source) || t.approval_declared === true;
+
+/** The date, place, poster and approval filters: a tournament has no seats and no role.
+ *  It stays while any of its contests falls in the range. poster_url is only set once
  *  the moderator approved the poster. */
 export function applyTournamentFilters(
 	tournaments: readonly MeetupTournament[], f: Filters, now: Date = new Date(), places: readonly Place[] = [],
 ): MeetupTournament[] {
+	if (f.show === 'games') return [];
 	const near = f.nearPlaces && places.length > 0;
 	return tournaments
+		.filter((t) => f.approval === 'all' || isApproved(t) === (f.approval === 'approved'))
 		.filter((t) => !f.postersOnly || Boolean(t.poster_url))
 		.filter((t) => contestsOf(t).some((c) => matchesDate(c, f.date, now, f)))
 		.filter((t) => !near || isNearPlaces(places, t.lat, t.lng, f.nearKm * 1000));

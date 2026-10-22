@@ -150,6 +150,26 @@ describe('applyTournamentFilters', () => {
 		expect(applyTournamentFilters([bare, pending, shown], f, NOW)).toEqual([shown]);
 		expect(applyTournamentFilters([bare, pending, shown], DEFAULT_FILTERS, NOW)).toHaveLength(3);
 	});
+
+	it('splits approved from unknown as the app does: the organizer\'s yes counts', () => {
+		const checked = { ...tour([inDays(1)]), approval_source: 'Calendrier du comité de l’Isère' };
+		const declared = { ...tour([inDays(1)]), approval_declared: true };
+		const said = { ...tour([inDays(1)]), approval_declared: false };
+		const unknown = tour([inDays(1)]);
+		const all = [checked, declared, said, unknown];
+		expect(applyTournamentFilters(all, { ...DEFAULT_FILTERS, approval: 'approved' }, NOW)).toEqual([checked, declared]);
+		expect(applyTournamentFilters(all, { ...DEFAULT_FILTERS, approval: 'unknown' }, NOW)).toEqual([said, unknown]);
+		expect(applyTournamentFilters(all, DEFAULT_FILTERS, NOW)).toHaveLength(4);
+	});
+
+	it('shows only games or only tournaments when asked', () => {
+		const t = tour([inDays(1)]);
+		const e = ev();
+		expect(applyTournamentFilters([t], { ...DEFAULT_FILTERS, show: 'games' }, NOW)).toHaveLength(0);
+		expect(applyFilters([e], { ...DEFAULT_FILTERS, show: 'tournaments' }, NOW)).toHaveLength(0);
+		expect(applyTournamentFilters([t], { ...DEFAULT_FILTERS, show: 'tournaments' }, NOW)).toHaveLength(1);
+		expect(applyFilters([e], { ...DEFAULT_FILTERS, show: 'games' }, NOW)).toHaveLength(1);
+	});
 });
 
 describe('activeCount', () => {
@@ -159,6 +179,7 @@ describe('activeCount', () => {
 		// No place saved: the distance filter does nothing, so it does not count.
 		expect(activeCount({ ...DEFAULT_FILTERS, nearPlaces: true }, false)).toBe(0);
 		expect(activeCount({ ...DEFAULT_FILTERS, nearPlaces: true }, true)).toBe(1);
+		expect(activeCount({ ...DEFAULT_FILTERS, show: 'tournaments', approval: 'approved' }, false)).toBe(2);
 	});
 });
 

@@ -413,3 +413,18 @@
 - 22:19 : `astro check` 0 erreur, build OK (avec la section précédente), précache 308 entrées, liens 164 pages.
   Commité et poussé à la demande de l'utilisateur : mes 4 fichiers et cette section seulement (journal mixte).
   Statut : terminé. Réservations libérées.
+
+## 2026-10-22 — Pétanque Meet : filtres « parties / concours » et agrément sur la carte (session PetanqueMeet)
+- Statut : en cours (2026-10-22T22:51+02:00). Demande de l'utilisateur : sur le site aussi, filtrer les concours agréés
+  ou non, et n'afficher que les parties ou que les concours.
+- Réservations actives : `src/lib/meetupFilters.ts`, `src/lib/meetupFilters.test.ts`, `src/components/rencontres/RencontresApp.tsx`
+  (panneau des filtres seulement), `src/styles/rencontres.css` (si besoin, classes `.re-` du panneau).
+- Ressources : serveur de dev sur le port 4478 ; eslint, `astro check`, vitest `src/lib/meetup*`. Build annoncé ici avant.
+- 22:58 : « Afficher : tout / les parties / les concours » et « Concours : tous / agréés seulement / sans agrément connu »
+  (mots de l'appli) ; vitest meetupFilters 23/23 (cas ajoutés), eslint OK, `astro check` 0 erreur ; contrôle navigateur
+  FR + EN sans erreur (serveur 4478 arrêté). Lancement du build complet (écrit `dist/`, `.astro/`, `public/vendor/`),
+  puis `check-precache` et `check-links`.
+- 23:00 : build OK, précache 308 entrées, liens 164 pages, vitest meetup 63/63. Statut : terminé, non commité
+  (en attente de l'utilisateur). Réservations gardées jusqu'au commit ; au commit, mes fichiers seulement.
+- 23:05 : commité et poussé à la demande de l'utilisateur : mes 3 fichiers et cette section seulement (journal mixte).
+  Statut : terminé. Réservations libérées.

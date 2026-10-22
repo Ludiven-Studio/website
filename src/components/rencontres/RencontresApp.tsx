@@ -14,7 +14,7 @@ import {
 } from '../../lib/meetupAuth';
 import {
 	activeCount, applyFilters, applyTournamentFilters, DEFAULT_FILTERS, NEAR_KM, rangeLabel,
-	type DateFilter, type Filters, type RoleFilter,
+	type ApprovalFilter, type DateFilter, type Filters, type RoleFilter, type ShowFilter,
 } from '../../lib/meetupFilters';
 import { challengeDay } from '../../lib/day';
 import {
@@ -38,6 +38,8 @@ import { LangContext, labels, PATHS, pick, useT, type Lang } from './i18n';
 
 const DATES: DateFilter[] = ['today', 'weekend', 'week', 'fortnight', 'all', 'custom'];
 const ROLE_FILTERS: RoleFilter[] = ['all', 'tireur', 'pointeur'];
+const SHOWS: ShowFilter[] = ['all', 'games', 'tournaments'];
+const APPROVALS: ApprovalFilter[] = ['all', 'approved', 'unknown'];
 
 interface Detail {
 	event: MeetupEvent;
@@ -698,6 +700,24 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 			{filtersOpen && (
 				<div id="re-filters" className="re-filters">
 					<fieldset className="re-fgroup">
+						<legend>{tr('Afficher', 'Show')}</legend>
+						<div className="re-seg" role="group" aria-label={tr('Afficher', 'Show')}>
+							{SHOWS.map((s) => (
+								<button
+									key={s}
+									type="button"
+									className={`re-segbtn ${filters.show === s ? 're-segbtn--on' : ''}`}
+									aria-pressed={filters.show === s}
+									onClick={() => setFilters((f) => ({ ...f, show: s }))}
+								>
+									{s === 'all' ? tr('Tout', 'All') : s === 'games' ? tr('Les parties', 'Games')
+										: tr('Les concours', 'Tournaments')}
+								</button>
+							))}
+						</div>
+					</fieldset>
+
+					<fieldset className="re-fgroup">
 						<legend>{tr('Quand', 'When')}</legend>
 						<div className="re-seg" role="group" aria-label={tr('Quand', 'When')}>
 							{DATES.map((d) => (
@@ -747,7 +767,7 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 						)}
 					</fieldset>
 
-					<fieldset className="re-fgroup">
+					{filters.show !== 'tournaments' && <fieldset className="re-fgroup">
 						<legend>{tr('Parties', 'Games')}</legend>
 						<select
 							className="re-select"
@@ -768,10 +788,25 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 							/>
 							{tr('Places libres', 'Free seats only')}
 						</label>
-					</fieldset>
+					</fieldset>}
 
-					<fieldset className="re-fgroup">
+					{filters.show !== 'games' && <fieldset className="re-fgroup">
 						<legend>{tr('Concours', 'Tournaments')}</legend>
+						<select
+							className="re-select"
+							aria-label={tr('Agrément', 'Approval')}
+							value={filters.approval}
+							onChange={(e) => setFilters((f) => ({ ...f, approval: e.target.value as ApprovalFilter }))}
+						>
+							{APPROVALS.map((a) => (
+								<option key={a} value={a}>
+									{a === 'all' ? tr('Tous les concours', 'All tournaments')
+										: a === 'approved' ? tr('Agréés seulement', 'Approved only')
+											: tr('Sans agrément connu', 'No known approval')}
+								</option>
+							))}
+						</select>
+
 						<label className="re-check">
 							<input
 								type="checkbox"
@@ -780,7 +815,7 @@ export default function RencontresApp({ lang = 'fr' }: { lang?: Lang }) {
 							/>
 							{tr('Avec affiche seulement', 'With a poster only')}
 						</label>
-					</fieldset>
+					</fieldset>}
 
 					<fieldset className="re-fgroup">
 						<legend>{tr('Mes lieux', 'My places')}</legend>
