@@ -65,6 +65,7 @@ export interface Terrain {
 	rough?: number; // the difficulty as 0..1
 	patches?: [Surface, Surface];
 	pw?: Float32Array; // patch weights, two per height node
+	ld?: Float32Array; // loose gravel over the packed bed, metres, one per height node
 }
 
 /** What the ground is like at one spot: its own surface blended with the patches lying there. */
@@ -167,6 +168,7 @@ export function makeTerrain(seed: number, surface: Surface, amp: number, opts: T
 	t.patches = [SURFACES[PATCHES[surface.id][0]], SURFACES[PATCHES[surface.id][1]]];
 	shapeRelief(t, rough);
 	t.pw = layPatches(t, rough);
+	t.ld = layLoose(t, rough);
 	scatterUneven(t, opts.noPebbles ? 0 : 1);
 	return t;
 }
@@ -238,6 +240,33 @@ function toPlanks(x: number, y: number): number {
 	const side = 1 - Math.min(x, PITCH_W - x) / 0.9;
 	const end = 1 - Math.min(y, PITCH_L - y) / 1.8;
 	return clamp(side > end ? side : end, 0, 1);
+}
+
+/* The loose layer over the packed bed: a few millimetres raked everywhere, thinner down the lane
+   where boules land and roll, thicker where they and the players' feet push it (against the planks,
+   at the far ends) and in heaps here and there, more of them on a rougher pitch. A deep bed swallows
+   a bounce and drags a roll (surfaceAt). */
+const LOOSE_NF = 0.7; // ~1.4 m heaps
+const LOOSE_NF2 = 2.2; // their ragged edge
+export const LOOSE_FULL = 0.03; // m of loose gravel past which a bed is as soft as it gets
+
+function layLoose(t: Terrain, k: number): Float32Array {
+	const ld = new Float32Array(t.nx * t.ny);
+	const cut = 0.78 - 0.3 * k;
+	const raked = 0.002 + 0.004 * k, heaped = 0.006 + 0.024 * k;
+	for (let j = 0; j < t.ny; j++) {
+		const y = j * CELL;
+		for (let i = 0; i < t.nx; i++) {
+			const x = i * CELL;
+			const f = 0.65 * vnoise(x * LOOSE_NF, y * LOOSE_NF, t.seed + 0x10ad) + 0.35 * vnoise(x * LOOSE_NF2, y * LOOSE_NF2, t.seed + 0x10ae);
+			const u = clamp((f - cut) / 0.12, 0, 1);
+			const heap = u * u * (3 - 2 * u);
+			const edge = 0.8 * toPlanks(x, y);
+			const lane = 0.5 + 0.5 * clamp(Math.abs(x - PITCH_W / 2) / 1.0, 0, 1);
+			ld[j * t.nx + i] = raked * lane + heaped * (heap > edge ? heap : edge);
+		}
+	}
+	return ld;
 }
 
 /* Stones: each ground's own, fewer on a raked pitch, then loose coarse stones strewn everywhere as
@@ -354,9 +383,23 @@ export function patchAt(t: Terrain, x: number, y: number, out: { a: number; b: n
 	out.b = (pw[o + 1] * (1 - fx) + pw[o + 3] * fx) * (1 - fy) + (pw[o2 + 1] * (1 - fx) + pw[o2 + 3] * fx) * fy;
 }
 
+/** Metres of loose gravel at (x, y), bilinear; 0 on an even pitch. */
+export function looseAt(t: Terrain, x: number, y: number): number {
+	const ld = t.ld;
+	if (!ld) return 0;
+	const gx = clamp(x / CELL, 0, t.nx - 1.0001);
+	const gy = clamp(y / CELL, 0, t.ny - 1.0001);
+	const i = Math.floor(gx), j = Math.floor(gy);
+	const fx = gx - i, fy = gy - j;
+	const o = j * t.nx + i;
+	return (ld[o] * (1 - fx) + ld[o + 1] * fx) * (1 - fy) + (ld[o + t.nx] * (1 - fx) + ld[o + t.nx + 1] * fx) * fy;
+}
+
 const share = { a: 0, b: 0 };
 
-/** The ground under (x, y). An even pitch is its surface everywhere, value for value. */
+/** The ground under (x, y). An even pitch is its surface everywhere, value for value. On an uneven
+ *  one the patches blend in, then the loose bed softens it: a deep one keeps less of a bounce and of
+ *  the run on landing, drags a roll harder and scatters it more. */
 export function surfaceAt(t: Terrain, x: number, y: number, out: GroundSample): GroundSample {
 	const s = t.surface;
 	if (!t.pw) {
@@ -375,6 +418,12 @@ export function surfaceAt(t: Terrain, x: number, y: number, out: GroundSample): 
 	out.impactFriction = s.impactFriction * w + a.impactFriction * wa + b.impactFriction * wb;
 	out.scatter = s.scatter * w + a.scatter * wa + b.scatter * wb;
 	out.grit = s.grit * w + a.grit * wa + b.grit * wb;
+	const soft = clamp(looseAt(t, x, y) / LOOSE_FULL, 0, 1);
+	out.restitution *= 1 - 0.55 * soft;
+	out.impactFriction *= 1 - 0.3 * soft;
+	out.rollFriction *= 1 + 0.8 * soft;
+	out.scatter *= 1 + 0.8 * soft;
+	out.grit *= 1 + 0.6 * soft;
 	return out;
 }
 

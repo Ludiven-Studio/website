@@ -228,7 +228,12 @@
 - Réservations : libérées.
 
 ## 2026-10-21 — Pétanque (moteur) : terrains de difficulté 1-100 et boules à caractéristiques (session PetanqueGame)
-- Statut : terminé, non commité (2026-10-21 19:40, Europe/Paris). Demande de l'utilisateur depuis le dépôt PetanqueGame (port Unity, dont ce moteur est la référence). Ajouts désactivés par défaut (terrains de difficulté, kits de boules, mesure au bord : le jeu du site ne les utilise pas). Équilibrage mesuré (boules et ligues) par simulation IA contre IA.
+- Statut : terminé, commité (`caa53ee`, 2026-10-21 19:40, Europe/Paris). Demande de l'utilisateur depuis le dépôt PetanqueGame (port Unity, dont ce moteur est la référence). Ajouts désactivés par défaut (terrains de difficulté, kits de boules, mesure au bord : le jeu du site ne les utilise pas). Équilibrage mesuré (boules et ligues) par simulation IA contre IA.
 - Une correction touche le jeu du site : un caillou au roulement déviait la boule vers lui, il la pousse maintenant à l'opposé (`engine.ts`, `pebbleContact`, relevé par la revue Codex). Même amplitude, sens physique. `npx vitest run src/games/petanque` : 101/101.
 - Réservations (libérées) : `src/games/petanque/terrain.ts`, `src/games/petanque/engine.ts`, `src/games/petanque/ai.ts`, `src/games/petanque/rules13.ts`, `src/games/petanque/uneven.test.ts` (nouveau).
 - Ressources : `npx vitest run src/games/petanque` et `npx tsx ../PetanqueGame/tools/gen_fixtures.mts` (écrit dans PetanqueGame). Pas de build, pas de `dist/`.
+
+## 2026-10-22 — Pétanque (moteur) : couche meuble (épaisseur), session PetanqueGame
+- Statut : terminé, commité et poussé à la demande de l'utilisateur (2026-10-22, Europe/Paris). Demande de l'utilisateur depuis le dépôt PetanqueGame : sur un terrain irrégulier, l'épaisseur de gravier libre varie (rebord, extrémités, tas), une zone épaisse amortit la boule et l'enfonce, le rebond suit la dureté du sol. Désactivé par défaut comme le reste des terrains irréguliers : le jeu du site ne change pas. `terrain.ts` : `layLoose`, `looseAt`, `LOOSE_FULL`, adoucissement dans `surfaceAt` ; `engine.ts` : `bedBite` (sur un lit épais la dureté d'une boule compte moins, mesuré : sans cela une boule tendre gagnait 61 % contre la standard sur les terrains rugueux). `npx vitest run src/games/petanque` : 104/104 (3 tests ajoutés), tsc et eslint OK. Lancé par `node node_modules/vitest/vitest.mjs` : `node_modules/.bin` est absent dans ce dépôt (pas de `npm install` lancé, pour ne rien changer).
+- Réservations (libérées) : `src/games/petanque/terrain.ts`, `src/games/petanque/engine.ts`, `src/games/petanque/uneven.test.ts`.
+- Ressources : `npx vitest run src/games/petanque`, `npx tsx ../PetanqueGame/tools/gen_fixtures.mts` (écrit dans PetanqueGame). Pas de build.

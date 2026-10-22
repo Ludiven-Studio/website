@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeTerrain, SURFACES, ampFor, patchAt, surfaceAt, heightAt, type Terrain, type GroundSample } from './terrain';
+import { makeTerrain, SURFACES, ampFor, patchAt, surfaceAt, heightAt, looseAt, LOOSE_FULL, type Terrain, type GroundSample } from './terrain';
 import {
 	makeBoule, place, release, settle, stepSim, throwVelocity, blindSim, speed2, STANDARD_KIT, BOULE_R,
 	type Sim, type Kit, type Impact,
@@ -35,6 +35,8 @@ describe('an even pitch', () => {
 		const t = makeTerrain(4242, SURFACES['gravier-fin'], 0.03);
 		expect(t.rough).toBeUndefined();
 		expect(t.pw).toBeUndefined();
+		expect(t.ld).toBeUndefined();
+		expect(looseAt(t, 1.3, 7.7)).toBe(0);
 		const g: GroundSample = { rollFriction: 0, restitution: 0, impactFriction: 0, scatter: 0, grit: 0 };
 		surfaceAt(t, 1.3, 7.7, g);
 		expect(g.rollFriction).toBe(SURFACES['gravier-fin'].rollFriction);
@@ -80,11 +82,56 @@ describe('difficulty', () => {
 				patchAt(t, x, y, w);
 				if (w.b > 0.95) {
 					surfaceAt(t, x, y, g);
-					expect(g.rollFriction).toBeCloseTo(SURFACES.sable.rollFriction, 2);
+					// Sand, dragged harder by the loose bed lying there.
+					const soft = Math.min(1, looseAt(t, x, y) / LOOSE_FULL);
+					expect(g.rollFriction).toBeCloseTo(SURFACES.sable.rollFriction * (1 + 0.8 * soft), 2);
 					sandy = true;
 				}
 			}
 		expect(sandy).toBe(true);
+	});
+
+	it('lays the loose bed deeper against the planks than down the lane, deeper as it rises', () => {
+		const depth = (d: number, inLane: boolean) => {
+			let sum = 0, n = 0;
+			for (let seed = 1; seed <= 6; seed++) {
+				const t = uneven(d, seed * 131);
+				for (let y = 2; y < 13; y += 0.25) {
+					for (const x of inLane ? [1.8, 2, 2.2] : [0.05, 3.95]) { sum += looseAt(t, x, y); n++; }
+				}
+			}
+			return sum / n;
+		};
+		expect(depth(80, false)).toBeGreaterThan(depth(80, true) * 2);
+		expect(depth(80, true)).toBeGreaterThan(depth(20, true));
+		expect(depth(100, false)).toBeLessThan(LOOSE_FULL * 1.1);
+	});
+
+	it('a deep bed keeps less of a bounce and of the run: the boule stops shorter', () => {
+		const t = uneven(60, 4242, 'gravier-fin');
+		const raked = { ...t, ld: new Float32Array(t.ld!.length).fill(0.002) };
+		const deep = { ...t, ld: new Float32Array(t.ld!.length).fill(LOOSE_FULL) };
+		const g: GroundSample = { rollFriction: 0, restitution: 0, impactFriction: 0, scatter: 0, grit: 0 };
+		const h: GroundSample = { ...g };
+		surfaceAt(raked, 2, 7, g);
+		surfaceAt(deep, 2, 7, h);
+		expect(h.restitution).toBeLessThan(g.restitution * 0.6);
+		expect(h.rollFriction).toBeGreaterThan(g.rollFriction * 1.5);
+		const v = throwVelocity(0, 1, 7, 0.55);
+		expect(rest(deep, undefined, v).y).toBeLessThan(rest(raked, undefined, v).y - 0.5);
+	});
+
+	it('a deep bed evens out the boules\' hardness: a soft and a hard boule end nearer each other', () => {
+		const t = uneven(60, 4242, 'gravier-fin');
+		const raked = { ...t, ld: new Float32Array(t.ld!.length).fill(0.002) };
+		const deep = { ...t, ld: new Float32Array(t.ld!.length).fill(LOOSE_FULL) };
+		const soft: Kit = { ...STANDARD_KIT, e: 0.8, bite: 0.8 };
+		const hard: Kit = { ...STANDARD_KIT, e: 0.95, bite: 1.2 };
+		const v = throwVelocity(0, 1, 7, 0.55);
+		const gap = (tt: Terrain) => Math.abs(rest(tt, hard, v, true).y - rest(tt, soft, v, true).y);
+		expect(gap(deep)).toBeLessThan(gap(raked) * 0.8);
+		// The standard boule is the standard boule on any bed.
+		expect(rest(deep, STANDARD_KIT, v, true)).toEqual(rest(deep, undefined, v, true));
 	});
 
 	it('replays the same on the same seed', () => {

@@ -9,7 +9,7 @@
  * order; previews and the AI run on a clone so they never advance the real one.
  */
 
-import { type Terrain, type GroundSample, heightAt, gradAt, pebblesNear, inPitch, hashN, surfaceAt, gritAt } from './terrain';
+import { type Terrain, type GroundSample, heightAt, gradAt, pebblesNear, inPitch, hashN, surfaceAt, gritAt, looseAt, LOOSE_FULL } from './terrain';
 
 export const G = 9.81;
 export const BOULE_R = 0.0375; // 75 mm competition boule
@@ -165,6 +165,20 @@ const steady = (b: Boule): number => (b.side === -1 ? 1 : (BOULE_M / b.m) * (BOU
 const dig = (b: Boule, restitution: number): number =>
 	1 - (1 - Math.sqrt(steady(b))) * (restitution < 0.30 ? 1 - restitution / 0.30 : 0);
 
+/* A deep loose bed takes a landing whatever the boule is made of: its hardness (bite) counts for
+   less there, toward the standard boule's, as players say a soft boule dies in loose gravel where a
+   hard one keeps some life. Measured (KitBalance): without it a soft boule stuck where it landed on
+   the rough leagues' heaps and beat the standard boule 61 % of the time, the hard ones fell to 45 %. */
+const BED_EVENS = 0.6;
+
+/** The kit's landing grip, evened out by the loose bed under the landing. */
+function bedBite(t: Terrain, b: Boule): number {
+	const bite = b.bite ?? 1;
+	if (bite === 1 || !t.ld) return bite;
+	const soft = Math.min(1, looseAt(t, b.x, b.y) / LOOSE_FULL);
+	return bite + (1 - bite) * BED_EVENS * soft;
+}
+
 /** Rotate the horizontal velocity by a small angle without sin/cos: shear, then restore speed. */
 function deflect(b: Boule, a: number): void {
 	const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
@@ -212,7 +226,7 @@ function groundContact(s: Sim, b: Boule, near: number[], imp?: Impact[]): void {
 		const cap = BOUNCE_VN * (surf.restitution / 0.30);
 		back /= Math.sqrt(1 + (back / cap) * (back / cap));
 	}
-	const bite = b.bite ?? 1;
+	const bite = bedBite(s.t, b);
 	const run = surf.impactFriction * bite * dig(b, surf.restitution);
 	b.vx = tx * run + nx * back * bite;
 	b.vy = ty * run + ny * back * bite;
