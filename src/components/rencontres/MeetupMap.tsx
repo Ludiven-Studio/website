@@ -77,6 +77,8 @@ const SPOTS_MIN_ZOOM = 12;
 
 const FAN_ROW = 4;
 const FAN_GAP = 6;
+/** Room around the cards an empty map opens on: the trophy badge stands 8 px out of its card. */
+const FRAME_EDGE = 16;
 
 /** Card `i` of `count` side by side: rows of FAN_ROW centred on the pin, each
  *  new row above the last. Piled on one point, only the top card showed. */
@@ -180,11 +182,23 @@ export default function MeetupMap({
 	/** Cards whose boxes would overlap. From NO_CLUSTER_ZOOM on they stand alone,
 	 *  unless `atFullZoom`: the caller then fans them out. */
 	const cardGroupsOf = <T extends { lat: number; lng: number }>(
-		items: readonly T[], w: number, h: number, atFullZoom = false,
+		items: readonly T[], w: number, h: number, atFullZoom = false, z = zoom,
 	): number[][] => {
 		const map = mapRef.current;
-		if (!map || (zoom >= NO_CLUSTER_ZOOM && !atFullZoom)) return items.map((_, i) => [i]);
-		return clusterBoxes(items.map((it) => map.project([it.lat, it.lng], zoom)), w, h);
+		if (!map || (z >= NO_CLUSTER_ZOOM && !atFullZoom)) return items.map((_, i) => [i]);
+		return clusterBoxes(items.map((it) => map.project([it.lat, it.lng], z)), w, h);
+	};
+
+	/** At zoom `z`, the slot that lifts a poster standing on a point over the game cards
+	 *  it would cover, the game cards placed as the event layer draws them. */
+	const liftAt = (z: number): ((at: { lat: number; lng: number }, slot?: Slot) => Slot) => {
+		const map = mapRef.current;
+		if (!map) return (_, slot = [0, 0]) => slot;
+		const games = cardGroupsOf(events, GAME_W, GAME_H, false, z).map((g) => {
+			const c = g.length > 1 ? centreOf(g, (i) => events[i]) : events[g[0]];
+			return map.project([c.lat, c.lng], z);
+		});
+		return (at, slot = [0, 0]) => liftOver(map.project([at.lat, at.lng], z), slot, T_W, T_H, games, GAME_W, GAME_H, FAN_GAP);
 	};
 
 	/** A count pin: a tap zooms in two levels on the members' average. */
@@ -201,21 +215,45 @@ export default function MeetupMap({
 		flyTo: (lat, lng, zoom = 14) => mapRef.current?.flyTo([lat, lng], zoom, { duration: 0.8 }),
 		frameIfEmpty: () => {
 			const map = mapRef.current;
-			const pts = [...events, ...tournaments].map((p) => L.latLng(p.lat, p.lng));
-			if (!map || !pts.length) return;
-			if (pts.some((p) => map.getBounds().contains(p))) return;
+			const all = [...events, ...tournaments];
+			if (!map || !all.length) return;
+			const view = map.getBounds();
+			if (all.some((p) => view.contains([p.lat, p.lng]))) return;
 			// Where the map stood and the three nearest: fitting them all let one pin by Geneva
-			// zoom out to half of France. The cards stand on their pin, so room above for the tallest.
-			const centre = map.getCenter();
-			const nearest = pts.sort((a, b) => centre.distanceTo(a) - centre.distanceTo(b)).slice(0, 3);
-			map.fitBounds(L.latLngBounds([centre, ...nearest]), {
-				maxZoom: map.getZoom(), paddingTopLeft: [32, T_H + 16], paddingBottomRight: [32, 32], animate: false,
-			});
+			// zoom out to half of France.
+			const start = map.getCenter();
+			const far = (p: { lat: number; lng: number }): number => start.distanceTo([p.lat, p.lng]);
+			const nearest = new Set<object>(all.sort((a, b) => far(a) - far(b)).slice(0, 3));
+			const room = map.getSize().subtract([2 * FRAME_EDGE, 2 * FRAME_EDGE]);
+			// Fit their cards, not their points: a card is wider than any margin around its point, and
+			// a count card stands on its members' average, which can lie off the map.
+			for (let z = Math.min(map.getZoom(), NO_CLUSTER_ZOOM - 1); z > 0; z--) {
+				const box = L.bounds([map.project(start, z)]);
+				const card = (at: { lat: number; lng: number }, w: number, h: number, [dx, up]: Slot = [0, 0]): void => {
+					const p = map.project([at.lat, at.lng], z);
+					box.extend(L.point(p.x + dx - w / 2, p.y - up - h)).extend(L.point(p.x + dx + w / 2, p.y - up));
+				};
+				for (const g of cardGroupsOf(events, GAME_W, GAME_H, false, z)) {
+					if (g.some((i) => nearest.has(events[i]))) card(g.length > 1 ? centreOf(g, (i) => events[i]) : events[g[0]], GAME_W, GAME_H);
+				}
+				const lift = liftAt(z);
+				for (const g of cardGroupsOf(tournaments, T_W, T_H, true, z)) {
+					if (!g.some((i) => nearest.has(tournaments[i]))) continue;
+					const at = g.length > 1 ? centreOf(g, (i) => tournaments[i]) : tournaments[g[0]];
+					card(at, T_W, T_H, lift(at));
+				}
+				const size = box.getSize();
+				if (size.x <= room.x && size.y <= room.y) {
+					map.setView(map.unproject(box.getCenter(), z), z, { animate: false });
+					return;
+				}
+			}
 		},
 		center: () => {
 			const c = mapRef.current?.getCenter();
 			return c ? { lat: c.lat, lng: c.lng } : null;
 		},
+	// eslint-disable-next-line react-hooks/exhaustive-deps -- cardGroupsOf/liftAt read events and the zoom passed in
 	}), [events, tournaments]);
 
 	useEffect(() => {
@@ -302,16 +340,7 @@ export default function MeetupMap({
 		if (!layer) return;
 		layer.clearLayers();
 		tournamentMarkers.current.clear();
-		// Where the game cards stand, as the layer above drew them: a poster lifts over them.
-		const map = mapRef.current;
-		const games = map
-			? cardGroupsOf(events, GAME_W, GAME_H).map((g) => {
-				const c = g.length > 1 ? centreOf(g, (i) => events[i]) : events[g[0]];
-				return map.project([c.lat, c.lng], zoom);
-			})
-			: [];
-		const lift = (at: { lat: number; lng: number }, slot: Slot = [0, 0]): Slot =>
-			map ? liftOver(map.project([at.lat, at.lng], zoom), slot, T_W, T_H, games, GAME_W, GAME_H, FAN_GAP) : slot;
+		const lift = liftAt(zoom);
 		const add = (t: MeetupTournament, at: { lat: number; lng: number }, slot?: Slot): void => {
 			const m = L.marker([at.lat, at.lng], { icon: tournamentCard(t, lift(at, slot), lang), title: t.title, zIndexOffset: 500 })
 				.on('click', () => {

@@ -428,3 +428,18 @@
   (en attente de l'utilisateur). Réservations gardées jusqu'au commit ; au commit, mes fichiers seulement.
 - 23:05 : commité et poussé à la demande de l'utilisateur : mes 3 fichiers et cette section seulement (journal mixte).
   Statut : terminé. Réservations libérées.
+
+## 2026-10-23 — Pétanque Meet : à l'ouverture, les cartes des concours les plus proches en entier
+- Statut : en cours (2026-10-23T07:41+02:00). Demande de l'utilisateur : sur téléphone, le cadrage d'ouverture (`b77d864`)
+  coupe au bord de la carte deux des quatre cartes de concours ; cadrer pour qu'elles tiennent en entier.
+- Réservations actives : `src/components/rencontres/MeetupMap.tsx`.
+- Ressources : serveur de dev sur le port 4463 ; eslint, `astro check`. Pas de build.
+- Fait : le cadrage loge les cartes (taille, badge, carte « N concours » posée sur la moyenne de ses membres, affiche
+  soulevée au-dessus d'une partie) au lieu des points, et dézoome d'un cran tant qu'elles ne tiennent pas. Témoin sur le
+  site en ligne (ancien cadrage), données simulées, téléphone : une carte « N concours », une carte de partie et un concours
+  coupés au bord ; nouveau cadrage : aucune des cartes des 3 plus proches coupée (7 cas × bureau/téléphone), zoom 8 au lieu
+  de 9 sur téléphone dans ces deux cas, autres zooms inchangés. Affiches au-dessus des parties : positions identiques en
+  ligne et en dev (zoom 11 et 17). eslint OK, `astro check` 0 erreur. Serveur 4463 arrêté.
+  Statut : terminé, non commité. Réservations libérées.
+- Commité à la demande de l'utilisateur (« ok » pour commit et push) : mon fichier et cette section seulement (journal
+  mixte). Statut : terminé. Réservations libérées.
