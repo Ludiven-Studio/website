@@ -118,7 +118,7 @@ const first = t.screens[0];
 						<p>{t.guides.body}</p>
 					</div>
 					{/* preload="none": the poster only, the film once the player asks for it. */}
-					<ul class="guide-list" role="list">
+					<ul class:list={['guide-list', { single: t.guides.items.length === 1 }]} role="list">
 						{t.guides.items.map((g) => (
 							<li class="guide">
 								<video
@@ -567,6 +567,13 @@ const first = t.screens[0];
 		overscroll-behavior-x: contain;
 	}
 
+	/* One film: centred, no row to swipe. */
+	.guide-list.single {
+		grid-auto-columns: min(100%, 20rem);
+		justify-content: center;
+		overflow: visible;
+	}
+
 	.guide {
 		display: grid;
 		align-content: start;
@@ -644,6 +651,10 @@ const first = t.screens[0];
 			grid-auto-flow: row;
 			grid-template-columns: repeat(4, minmax(0, 1fr));
 			overflow: visible;
+		}
+
+		.guide-list.single {
+			grid-template-columns: min(100%, 20rem);
 		}
 	}
 

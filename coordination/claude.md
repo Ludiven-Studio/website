@@ -490,3 +490,18 @@
   l'utilisateur). Réservations gardées jusqu'au commit.
 - 19:08 : commité et poussé à la demande de l'utilisateur (« go ») : mes 10 fichiers et cette section seulement. Statut
   : terminé. Réservations libérées.
+
+## 2026-10-23 — Pétanque Meet : vidéo « rejoindre » dans chaque langue (session PetanqueMeet)
+- Statut : en cours (2026-10-23T23:05+02:00). Demande de l'utilisateur : mettre à jour le site web pour afficher les
+  bonnes vidéos suivant la langue
+- Réservations actives : `src/components/MeetDownload.astro`, `src/data/petanqueMeet.ts`,
+  `public/assets/petanque-meet/download/guide-rejoindre-*`.
+- Ressources : serveur de dev sur le port 4492 ; eslint, `astro check`. Build annoncé ici avant.
+- 23:08 : vidéo « rejoindre » traduite sur les pages EN/ES/DE/IT (une vidéo, centrée) ; 4 mp4 720×900 (4,5 Mo en tout)
+  et leurs affiches webp. eslint OK, astro check 0 erreur, captures bureau/téléphone sombre sans erreur console
+  (serveur 4492 arrêté). Lancement du build complet (écrit dist/, .astro/, public/vendor/), puis check-precache et
+  check-links
+- 23:09 : build OK (152 pages), précache 308 entrées, liens 164 pages. Statut : terminé, non commité (en attente de
+  l'utilisateur). Réservations gardées jusqu'au commit.
+- 23:12 : commité et poussé à la demande de l'utilisateur : mes 10 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

@@ -92,7 +92,11 @@ export const MEET_DOWNLOAD = {
 		],
 		// The teaser speaks French.
 		video: null,
-		guides: null,
+		guides: {
+			title: 'How it works',
+			body: 'Filmed in the app.',
+			items: [{ id: 'rejoindre-en', title: 'Join a game', sub: 'One tap on “I’m in”, and the game is in your agenda.' }],
+		},
 		closing: 'Ready to play?',
 		browser: { before: 'Not on your phone? The map is also open ', link: 'in your browser', after: '.', href: '/en/petanque-meet/' },
 		legal: [
@@ -125,7 +129,11 @@ export const MEET_DOWNLOAD = {
 			{ icon: 'check', title: 'Un recordatorio antes de cada partida', body: 'Tu agenda reúne tus partidas y tus torneos, y el móvil te avisa una hora antes de jugar.' },
 		],
 		video: null,
-		guides: null,
+		guides: {
+			title: 'Cómo funciona',
+			body: 'Filmado en la app.',
+			items: [{ id: 'rejoindre-es', title: 'Apuntarse a una partida', sub: 'Un toque en «Me apunto» y la partida ya está en tu agenda.' }],
+		},
 		closing: '¿Jugamos?',
 		browser: { before: '¿No estás en el móvil? El mapa también se abre ', link: 'en tu navegador', after: ' (en inglés).', href: '/en/petanque-meet/' },
 		legal: [
@@ -156,7 +164,11 @@ export const MEET_DOWNLOAD = {
 			{ icon: 'check', title: 'Eine Erinnerung vor jedem Spiel', body: 'Deine Termine zeigen deine Spiele und Turniere, und dein Handy erinnert dich eine Stunde vor dem Spiel.' },
 		],
 		video: null,
-		guides: null,
+		guides: {
+			title: 'So funktioniert es',
+			body: 'In der App gefilmt.',
+			items: [{ id: 'rejoindre-de', title: 'Bei einem Spiel mitmachen', sub: 'Ein Tipp auf „Bin dabei“, und das Spiel steht in deinen Terminen.' }],
+		},
 		closing: 'Bereit zum Spielen?',
 		browser: { before: 'Nicht am Handy? Die Karte gibt es auch ', link: 'im Browser', after: ' (auf Englisch).', href: '/en/petanque-meet/' },
 		legal: [
@@ -187,7 +199,11 @@ export const MEET_DOWNLOAD = {
 			{ icon: 'check', title: 'Un promemoria prima di ogni partita', body: "La tua agenda riunisce le tue partite e i tuoi tornei, e il telefono ti avvisa un'ora prima di giocare." },
 		],
 		video: null,
-		guides: null,
+		guides: {
+			title: 'Come funziona',
+			body: 'Filmato nell’app.',
+			items: [{ id: 'rejoindre-it', title: 'Partecipare a una partita', sub: 'Un tocco su «Ci sono» e la partita è nella tua agenda.' }],
+		},
 		closing: 'Giochiamo?',
 		browser: { before: 'Non sei sul telefono? La mappa si apre anche ', link: 'nel browser', after: ' (in inglese).', href: '/en/petanque-meet/' },
 		legal: [
