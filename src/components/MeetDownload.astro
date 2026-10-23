@@ -111,6 +111,35 @@ const first = t.screens[0];
 				</section>
 			)}
 
+			{t.guides && (
+				<section class="guides" data-reveal>
+					<div class="guides-copy">
+						<h2>{t.guides.title}</h2>
+						<p>{t.guides.body}</p>
+					</div>
+					{/* preload="none": the poster only, the film once the player asks for it. */}
+					<ul class="guide-list" role="list">
+						{t.guides.items.map((g) => (
+							<li class="guide">
+								<video
+									class="guide-video"
+									src={`${dir}/guide-${g.id}.mp4`}
+									poster={`${dir}/guide-${g.id}.webp`}
+									width="720"
+									height="900"
+									playsinline
+									controls
+									preload="none"
+									aria-label={g.title}
+								></video>
+								<h3>{g.title}</h3>
+								<p>{g.sub}</p>
+							</li>
+						))}
+					</ul>
+				</section>
+			)}
+
 			<section class="closing" data-reveal>
 				<img class="closing-icon" src="/assets/petanque-meet/icon.webp" alt="" width="72" height="72" loading="lazy" />
 				<h2>{t.closing}</h2>
@@ -229,6 +258,12 @@ const first = t.screens[0];
 			if (!reduced) video.play().catch(() => {});
 		}, { rootMargin: '200px' }).observe(video);
 	}
+
+	// One film at a time: starting one pauses the others, the teaser too.
+	const films = [...document.querySelectorAll<HTMLVideoElement>('.guide-video, .teaser')];
+	films.forEach((film) =>
+		film.addEventListener('play', () => films.forEach((other) => other !== film && other.pause())),
+	);
 </script>
 
 <style>
@@ -496,6 +531,69 @@ const first = t.screens[0];
 		box-shadow: 0 30px 50px -28px rgb(60 20 5 / 0.5);
 	}
 
+	.guides {
+		display: grid;
+		gap: 1.5rem;
+		width: 100%;
+		min-width: 0;
+	}
+
+	.guides-copy {
+		text-align: center;
+		text-wrap: balance;
+	}
+
+	.guides-copy h2 {
+		font-size: var(--text-2xl);
+		color: var(--gray-0);
+	}
+
+	.guides-copy p {
+		margin-top: 0.5rem;
+		color: var(--gray-400);
+	}
+
+	/* A row to swipe on a phone, four side by side from a tablet. */
+	.guide-list {
+		display: grid;
+		grid-auto-flow: column;
+		grid-auto-columns: min(72%, 17rem);
+		gap: 1rem;
+		margin: 0;
+		padding: 0 0 1rem;
+		list-style: none;
+		overflow-x: auto;
+		scroll-snap-type: x mandatory;
+		overscroll-behavior-x: contain;
+	}
+
+	.guide {
+		display: grid;
+		align-content: start;
+		gap: 0.4rem;
+		scroll-snap-align: start;
+	}
+
+	.guide-video {
+		width: 100%;
+		height: auto;
+		aspect-ratio: 4 / 5;
+		margin-bottom: 0.4rem;
+		border-radius: 1.25rem;
+		background: var(--sand);
+		box-shadow: 0 24px 40px -26px rgb(60 20 5 / 0.5);
+	}
+
+	.guide h3 {
+		font-size: var(--text-md);
+		color: var(--gray-0);
+	}
+
+	.guide p {
+		font-size: var(--text-sm);
+		color: var(--gray-400);
+	}
+
 	.closing {
 		display: grid;
 		justify-items: center;
@@ -538,6 +636,14 @@ const first = t.screens[0];
 	@media (min-width: 40em) {
 		.points {
 			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+
+	@media (min-width: 52em) {
+		.guide-list {
+			grid-auto-flow: row;
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			overflow: visible;
 		}
 	}
 

@@ -51,6 +51,17 @@ export const MEET_DOWNLOAD = {
 			body: "Trouver une partie, la rejoindre, poser la sienne, suivre les concours : l'appli en 20 secondes.",
 			label: 'Vidéo de présentation de Pétanque Meet',
 		},
+		// Flows filmed in the app: /assets/petanque-meet/download/guide-<id>.mp4 and its .webp poster.
+		guides: {
+			title: 'Comment ça marche',
+			body: "Quatre gestes, filmés dans l'appli.",
+			items: [
+				{ id: 'rejoindre', title: 'Rejoindre une partie', sub: 'Un appui sur « Je viens », et la partie est dans ton agenda.' },
+				{ id: 'poser', title: 'Poser ta partie', sub: "Il te manque un joueur : le terrain, le jour, le format, et c'est en ligne." },
+				{ id: 'concours', title: 'Suivre un concours', sub: "Son affiche, son format, son agrément, et il t'attend dans ton agenda." },
+				{ id: 'club', title: 'Annoncer le concours de ton club', sub: "Le nom, les épreuves, l'affiche : les joueurs du coin le voient." },
+			],
+		},
 		closing: 'Prêt à jouer ?',
 		browser: { before: 'Pas sur ton téléphone ? La carte se consulte aussi ', link: 'dans le navigateur', after: '.', href: '/petanque-meet/' },
 		legal: [
@@ -81,6 +92,7 @@ export const MEET_DOWNLOAD = {
 		],
 		// The teaser speaks French.
 		video: null,
+		guides: null,
 		closing: 'Ready to play?',
 		browser: { before: 'Not on your phone? The map is also open ', link: 'in your browser', after: '.', href: '/en/petanque-meet/' },
 		legal: [
@@ -113,6 +125,7 @@ export const MEET_DOWNLOAD = {
 			{ icon: 'check', title: 'Un recordatorio antes de cada partida', body: 'Tu agenda reúne tus partidas y tus torneos, y el móvil te avisa una hora antes de jugar.' },
 		],
 		video: null,
+		guides: null,
 		closing: '¿Jugamos?',
 		browser: { before: '¿No estás en el móvil? El mapa también se abre ', link: 'en tu navegador', after: ' (en inglés).', href: '/en/petanque-meet/' },
 		legal: [
@@ -143,6 +156,7 @@ export const MEET_DOWNLOAD = {
 			{ icon: 'check', title: 'Eine Erinnerung vor jedem Spiel', body: 'Deine Termine zeigen deine Spiele und Turniere, und dein Handy erinnert dich eine Stunde vor dem Spiel.' },
 		],
 		video: null,
+		guides: null,
 		closing: 'Bereit zum Spielen?',
 		browser: { before: 'Nicht am Handy? Die Karte gibt es auch ', link: 'im Browser', after: ' (auf Englisch).', href: '/en/petanque-meet/' },
 		legal: [
@@ -173,6 +187,7 @@ export const MEET_DOWNLOAD = {
 			{ icon: 'check', title: 'Un promemoria prima di ogni partita', body: "La tua agenda riunisce le tue partite e i tuoi tornei, e il telefono ti avvisa un'ora prima di giocare." },
 		],
 		video: null,
+		guides: null,
 		closing: 'Giochiamo?',
 		browser: { before: 'Non sei sul telefono? La mappa si apre anche ', link: 'nel browser', after: ' (in inglese).', href: '/en/petanque-meet/' },
 		legal: [

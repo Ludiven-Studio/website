@@ -475,3 +475,18 @@
   l'utilisateur). Réservations gardées jusqu'au commit.
 - 15:45 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-23 — Pétanque Meet : vidéos d'usage sur la page de téléchargement (session PetanqueMeet)
+- Statut : en cours (2026-10-23T18:56+02:00). Demande de l'utilisateur : mettre les vidéos de présentation des
+  fonctions (rejoindre, poser, concours, club) sur le site
+- Réservations actives : `src/components/MeetDownload.astro`, `src/data/petanqueMeet.ts`,
+  `public/assets/petanque-meet/download/guide-*`.
+- Ressources : serveur de dev sur le port 4491 ; eslint, `astro check`. Build annoncé ici avant.
+- 19:00 : section « Comment ça marche » (4 vidéos, page FR seulement, preload none, une seule lecture à la fois) ; 4
+  mp4 720×900 (5,7 Mo en tout) et leurs affiches webp. eslint OK, astro check 0 erreur, captures
+  bureau/téléphone/sombre sans erreur console (serveur 4491 arrêté). Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/), puis check-precache et check-links
+- 19:01 : build OK (152 pages), précache 308 entrées, liens 164 pages. Statut : terminé, non commité (en attente de
+  l'utilisateur). Réservations gardées jusqu'au commit.
+- 19:08 : commité et poussé à la demande de l'utilisateur (« go ») : mes 10 fichiers et cette section seulement. Statut
+  : terminé. Réservations libérées.
