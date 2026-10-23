@@ -462,3 +462,16 @@
   Build OK (152 pages), précache 308 entrées, liens 164 pages, la page n'est plus dans le sitemap
 - 08:37 : commité et poussé à la demande de l'utilisateur (« go ») : mes 2 fichiers et cette section seulement (journal
   mixte). Statut : terminé. Réservations libérées.
+
+## 2026-10-23 — Prefab Fusion : nombre de tests sur la fiche Projets (session LudivenTools)
+- Statut : en cours (2026-10-23T10:18+02:00). Demande de l'utilisateur : mettre à jour le site : 53 tests au lieu de
+  38, après les avoir relancés sur les 6 versions
+- Réservations actives : `src/content/work/prefab-fusion.md`, `src/content/work-en/prefab-fusion.md`.
+- Ressources : serveur de dev sur le port 4483 ; eslint, `astro check`. Build annoncé ici avant.
+- 10:22 : « 38 » devient « 53 » (FR et EN) : relancés le 2026-10-23 sur 2022.3, 6.0, 6.3, 6.4, 6.5 et 6.6, aucun échec.
+  astro check 0 erreur ; captures bureau et téléphone sombre sans erreur console (serveur 4483 arrêté). Lancement du
+  build complet (écrit dist/, .astro/, public/vendor/), puis check-precache et check-links
+- 10:24 : build OK (152 pages), précache 308 entrées, liens 164 pages. Statut : terminé, non commité (en attente de
+  l'utilisateur). Réservations gardées jusqu'au commit.
+- 15:45 : commité et poussé à la demande de l'utilisateur : mes 2 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.

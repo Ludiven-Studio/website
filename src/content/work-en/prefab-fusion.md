@@ -76,7 +76,7 @@ gallery:
 
 <h2>Tests</h2>
 <p>
-  A suite of 38 automated tests runs with no failure on Windows, on Unity 2022.3, 6.0, 6.3, 6.4, 6.5 and 6.6. On
+  A suite of 53 automated tests runs with no failure on Windows, on Unity 2022.3, 6.0, 6.3, 6.4, 6.5 and 6.6. On
   four real projects, 687 prefabs out of 722 come back identical, value by value, after a round trip through JSON;
   nearly all the others use a script missing from the project.
 </p>
