@@ -505,3 +505,16 @@
   l'utilisateur). Réservations gardées jusqu'au commit.
 - 23:12 : commité et poussé à la demande de l'utilisateur : mes 10 fichiers et cette section seulement. Statut :
   terminé. Réservations libérées.
+
+## 2026-10-24 — Pétanque Scanner : nouveau déroulé du scan (une visée, tour du jeu) (session Petanque AR)
+- Statut : en cours (2026-10-24T01:17+02:00). Demande de l'utilisateur : les pages Pétanque Scanner décrivent un ancien
+  déroulé (sol filmé, trois visées du cochonnet) : décrire une seule visée puis le tour du jeu
+- Réservations actives : `src/data/petanqueScanner.ts`.
+- Ressources : serveur de dev sur le port 4497 ; eslint, `astro check`. Build annoncé ici avant.
+- 01:20 : étapes 1 et 2 réécrites dans les 5 langues (plus d'étape « sol », une seule visée puis le tour du jeu ; les
+  boules apparaissent en marchant) et la FAQ FR « visez-le à nouveau ». eslint OK, astro check 0 erreur, captures
+  téléphone FR sans erreur console (serveur 4497 arrêté). Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/), puis check-precache et check-links
+- 01:22 : build OK (152 pages), précache 308 entrées, liens 164 pages
+- 01:22 : commité à la demande de l'utilisateur, non poussé : mon fichier et cette section seulement. Statut : terminé.
+  Réservations libérées.

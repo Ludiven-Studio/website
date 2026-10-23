@@ -101,12 +101,12 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			{
 				icon: 'mobile',
 				title: 'Placez le cochonnet',
-				body: 'Laissez les boules où elles sont, ouvrez l\'application et filmez le sol autour du jeu. Visez ensuite le cochonnet sous trois angles, un pas de côté entre chaque visée : il est placé.',
+				body: 'Laissez les boules où elles sont et ouvrez l\'application : le scan démarre aussitôt. Visez le cochonnet une seule fois, puis tournez autour du jeu : il se place tout seul.',
 			},
 			{
 				icon: 'winding-path',
 				title: 'Passez au-dessus des boules',
-				body: 'Filmez les boules depuis trois endroits — plusieurs à la fois, c\'est permis — puis tenez le téléphone au-dessus de chacune : la mesure se verrouille toute seule, un cadenas l\'indique.',
+				body: 'Les boules apparaissent au fil de vos pas — plusieurs à la fois, c\'est permis. Tenez ensuite le téléphone au-dessus de chacune : la mesure se verrouille toute seule, un cadenas l\'indique.',
 			},
 			{
 				icon: 'grid-dots',
@@ -170,7 +170,7 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			},
 			{
 				q: 'Quelle est la précision réelle ?',
-				a: 'L\'affichage descend au millimètre, mais la justesse est autre chose : quelques millimètres au mieux, quand les boules sont bien visibles et que vous avez tourné autour du jeu. Pendant le scan, la jauge « Précision cochonnet » indique si le cochonnet est bien placé, et une boule n\'est mesurée qu\'une fois son cadenas affiché. Si la jauge reste basse, touchez « Retrouver le cochonnet » et refaites ses visées.',
+				a: 'L\'affichage descend au millimètre, mais la justesse est autre chose : quelques millimètres au mieux, quand les boules sont bien visibles et que vous avez tourné autour du jeu. Pendant le scan, la jauge « Précision cochonnet » indique si le cochonnet est bien placé, et une boule n\'est mesurée qu\'une fois son cadenas affiché. Si la jauge reste basse, touchez « Retrouver le cochonnet » et visez-le à nouveau.',
 			},
 			{
 				q: 'Est-ce que ça fonctionne sans connexion ?',
@@ -218,12 +218,12 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			{
 				icon: 'mobile',
 				title: 'Place the jack',
-				body: 'Leave the boules where they are, open the app and film the ground around the game. Then aim at the jack from three angles, one step aside between shots: it is placed.',
+				body: 'Leave the boules where they are and open the app: the scan starts straight away. Aim at the jack just once, then walk round the game: it places itself.',
 			},
 			{
 				icon: 'winding-path',
 				title: 'Go over the boules',
-				body: 'Film the boules from three spots — several at once is fine — then hold the phone above each one: the measure locks by itself, a padlock shows it.',
+				body: 'The boules appear as you walk — several at once is fine. Then hold the phone above each one: the measure locks by itself, a padlock shows it.',
 			},
 			{
 				icon: 'grid-dots',
@@ -335,12 +335,12 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			{
 				icon: 'mobile',
 				title: 'Sitúa el boliche',
-				body: 'Deja las bolas donde están, abre la aplicación y graba el suelo alrededor del juego. Luego apunta al boliche desde tres ángulos, con un paso al lado entre cada toma: queda situado.',
+				body: 'Deja las bolas donde están y abre la aplicación: el escaneo empieza enseguida. Apunta al boliche una sola vez y luego rodea el juego: se sitúa solo.',
 			},
 			{
 				icon: 'winding-path',
 				title: 'Pasa por encima de las bolas',
-				body: 'Graba las bolas desde tres sitios —varias a la vez, sin problema— y luego sostén el móvil encima de cada una: la medida se bloquea sola, un candado lo indica.',
+				body: 'Las bolas aparecen a medida que caminas —varias a la vez, sin problema—. Luego sostén el móvil encima de cada una: la medida se bloquea sola, un candado lo indica.',
 			},
 			{
 				icon: 'grid-dots',
@@ -456,12 +456,12 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			{
 				icon: 'mobile',
 				title: 'Zielkugel platzieren',
-				body: 'Lass die Kugeln, wo sie sind, öffne die App und filme den Boden rund um das Spiel. Dann ziel aus drei Winkeln auf die Zielkugel, mit einem Schritt zur Seite zwischen den Aufnahmen: Sie ist platziert.',
+				body: 'Lass die Kugeln, wo sie sind, und öffne die App: Der Scan startet sofort. Ziel ein einziges Mal auf die Zielkugel, dann geh um das Spiel herum: Sie platziert sich von selbst.',
 			},
 			{
 				icon: 'winding-path',
 				title: 'Über die Kugeln gehen',
-				body: 'Filme die Kugeln von drei Stellen aus — mehrere auf einmal sind erlaubt — und halte das Handy dann über jede: Die Messung rastet von selbst ein, ein Schloss zeigt es an.',
+				body: 'Die Kugeln erscheinen, während du gehst — mehrere auf einmal sind erlaubt. Halte das Handy dann über jede: Die Messung rastet von selbst ein, ein Schloss zeigt es an.',
 			},
 			{
 				icon: 'grid-dots',
@@ -573,12 +573,12 @@ export const copy: Record<LandingLang, LandingCopy> = {
 			{
 				icon: 'mobile',
 				title: 'Posiziona il pallino',
-				body: 'Lascia le bocce dove sono, apri l\'app e inquadra il terreno intorno al gioco. Poi inquadra il pallino da tre angolazioni, con un passo di lato tra uno scatto e l\'altro: è posizionato.',
+				body: 'Lascia le bocce dove sono e apri l\'app: la scansione parte subito. Inquadra il pallino una sola volta, poi gira intorno al gioco: si posiziona da solo.',
 			},
 			{
 				icon: 'winding-path',
 				title: 'Passa sopra le bocce',
-				body: 'Riprendi le bocce da tre punti — anche più alla volta — poi tieni il telefono sopra ciascuna: la misura si blocca da sola, lo indica un lucchetto.',
+				body: 'Le bocce compaiono mentre cammini — anche più alla volta. Poi tieni il telefono sopra ciascuna: la misura si blocca da sola, lo indica un lucchetto.',
 			},
 			{
 				icon: 'grid-dots',
