@@ -443,3 +443,22 @@
   Statut : terminé, non commité. Réservations libérées.
 - Commité à la demande de l'utilisateur (« ok » pour commit et push) : mon fichier et cette section seulement (journal
   mixte). Statut : terminé. Réservations libérées.
+
+## 2026-10-23 — Pétanque Scanner : mise en ligne de la page de l'APK de test (session Petanque AR)
+- Statut : en cours (2026-10-23T08:32+02:00). Demande de l'utilisateur : pousser `/petanque-scanner/test/` (404 : la
+  page écrite le 05/10 n'a jamais été commitée), pour un lien fixe vers le dernier APK Dev
+- Réservations actives : `src/pages/petanque-scanner/test.astro` (créé le 05/10 par une session Petanque AR, non
+  suivi).
+- Ressources : serveur de dev sur le port 4479 ; eslint, `astro check`. Build annoncé ici avant.
+- 08:34 : eslint OK, `astro check` 0 erreur ; captures bureau/téléphone/sombre sans erreur console (serveur 4479
+  arrêté), la page charge le dernier build (1.2.11 (456)). Lancement du build complet (écrit `dist/`, `.astro/`,
+  `public/vendor/`), puis `check-precache` et `check-links`
+- 08:36 : build OK (152 pages), précache 308 entrées, liens 164 pages ; mais la page figure dans le sitemap alors
+  qu'elle est en noindex (celle de Meet en est exclue). Réservation ajoutée : `astro.config.mjs` (une ligne du filtre
+  du sitemap, comme `/petanque-meet/test`)
+- 08:36 : ligne ajoutée au filtre du sitemap, eslint OK. Relance du build complet (écrit `dist/`, `.astro/`,
+  `public/vendor/`), puis `check-precache` et `check-links`
+- 08:37 : correction : eslint ignore `astro.config.mjs` (motif d'exclusion du dépôt), c'est le build qui le valide.
+  Build OK (152 pages), précache 308 entrées, liens 164 pages, la page n'est plus dans le sitemap
+- 08:37 : commité et poussé à la demande de l'utilisateur (« go ») : mes 2 fichiers et cette section seulement (journal
+  mixte). Statut : terminé. Réservations libérées.
