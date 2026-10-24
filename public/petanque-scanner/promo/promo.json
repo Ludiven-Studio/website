@@ -1,0 +1,10 @@
+{
+  "clips": {
+    "fr": "meet_fr.mp4",
+    "en": "meet_en.mp4",
+    "es": "meet_es.mp4",
+    "de": "meet_de.mp4",
+    "it": "meet_it.mp4"
+  },
+  "fallback": "fr"
+}

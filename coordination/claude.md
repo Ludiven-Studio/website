@@ -518,3 +518,16 @@
 - 01:22 : build OK (152 pages), précache 308 entrées, liens 164 pages
 - 01:22 : commité à la demande de l'utilisateur, non poussé : mon fichier et cette section seulement. Statut : terminé.
   Réservations libérées.
+
+## 2026-10-24 — Pétanque Scanner : clips promo Meet pour l'appli (session Petanque AR)
+- Statut : en cours (2026-10-24T03:36+02:00). Demande de l'utilisateur : héberger les clips promo Pétanque Meet (5
+  langues) et promo.json que la prochaine version de l'appli lira en streaming
+- Réservations actives : `public/petanque-scanner/promo/` (nouveau).
+- Ressources : eslint, `astro check`. Build annoncé ici avant.
+- 03:38 : 5 mp4 copiés à l'identique depuis StreamingAssets/MeetPromo (meet_<lang>.mp4, 5,1 Mo en tout) et promo.json ;
+  aucune page ne les cite. Pas d'eslint (ni JS ni Astro touché). Lancement du build complet (écrit dist/, .astro/,
+  public/vendor/), puis check-precache et check-links
+- 03:39 : build OK (152 pages), précache 308 entrées sans aucun mp4 ni json, liens 164 pages ;
+  dist/petanque-scanner/promo/ contient les 6 fichiers, identiques aux sources
+- 03:39 : commité à la demande de l'utilisateur, non poussé : mes 6 fichiers et cette section seulement. Statut :
+  terminé. Réservations libérées.
